@@ -29,6 +29,7 @@ type ConversationForStorage struct {
 	ID        string          `json:"id"`
 	UserID    string          `json:"user_id"`
 	Title     string          `json:"title,omitempty"`
+	Namespace string          `json:"namespace,omitempty"`
 	CreatedAt time.Time       `json:"created_at"`
 	UpdatedAt time.Time       `json:"updated_at"`
 	Messages  []agent.Message `json:"messages"`
@@ -40,6 +41,7 @@ func (c *ConversationForStorage) ToConversation() *agent.Conversation {
 		ID:        c.ID,
 		UserID:    c.UserID,
 		Title:     c.Title,
+		Namespace: c.Namespace,
 		CreatedAt: c.CreatedAt,
 		UpdatedAt: c.UpdatedAt,
 	}
@@ -51,6 +53,7 @@ func FromConversation(conv *agent.Conversation, messages []agent.Message) *Conve
 		ID:        conv.ID,
 		UserID:    conv.UserID,
 		Title:     conv.Title,
+		Namespace: conv.Namespace,
 		CreatedAt: conv.CreatedAt,
 		UpdatedAt: conv.UpdatedAt,
 		Messages:  messages,

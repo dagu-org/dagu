@@ -188,6 +188,11 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 		return nil, status.Error(codes.InvalidArgument, "task.Definition is required for distributed execution")
 	}
 
+	// Validate namespace is set - required for namespace-scoped execution
+	if req.Task.Namespace == "" {
+		return nil, status.Error(codes.InvalidArgument, "task.Namespace is required")
+	}
+
 	logger.Info(ctx, "Handler Dispatch called",
 		tag.RunID(req.Task.DagRunId),
 		tag.Target(req.Task.Target),
@@ -217,10 +222,15 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 		}
 	}
 
-	// Try to find a waiting poller that matches the worker selector
+	// Try to find a waiting poller that matches the worker selector and namespace affinity
 	for pollerID, worker := range h.waitingPollers {
-		// Check if worker matches the selector
+		// Check if worker matches the task's worker selector labels
 		if !matchesSelector(worker.labels, req.Task.WorkerSelector) {
+			continue
+		}
+
+		// Check if worker's namespace affinity allows this task's namespace
+		if !matchesNamespaceAffinity(worker.labels, req.Task.Namespace) {
 			continue
 		}
 
@@ -256,6 +266,22 @@ func matchesSelector(workerLabels, selector map[string]string) bool {
 		}
 	}
 	return true
+}
+
+// namespaceLabel is the well-known label key for namespace affinity.
+const namespaceLabel = "namespace"
+
+// matchesNamespaceAffinity checks if a worker's namespace label is compatible
+// with the task's namespace. A worker with a "namespace" label only accepts
+// tasks from that specific namespace. A worker without a "namespace" label
+// accepts tasks from any namespace.
+func matchesNamespaceAffinity(workerLabels map[string]string, taskNamespace string) bool {
+	workerNS, hasLabel := workerLabels[namespaceLabel]
+	if !hasLabel {
+		// Worker has no namespace label — accepts tasks from any namespace
+		return true
+	}
+	return workerNS == taskNamespace
 }
 
 // createAttemptForTask creates a DAGRun attempt for a root-level task.

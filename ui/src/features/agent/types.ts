@@ -73,6 +73,7 @@ export interface Message {
 // Conversation types
 export interface Conversation {
   id: string;
+  namespace?: string;
   created_at: string;
   updated_at: string;
 }
@@ -101,6 +102,7 @@ export interface ChatRequest {
   model?: string;
   dag_contexts?: DAGContext[];
   safe_mode?: boolean;
+  namespace?: string;
 }
 
 export interface NewConversationResponse {

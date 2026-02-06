@@ -184,6 +184,151 @@ func TestUser_JSONSerialization(t *testing.T) {
 	})
 }
 
+func TestUser_EffectiveRoleInNamespace(t *testing.T) {
+	tests := []struct {
+		name      string
+		user      *User
+		namespace string
+		want      Role
+	}{
+		{
+			name:      "global admin always admin",
+			user:      &User{Role: RoleAdmin},
+			namespace: "team-alpha",
+			want:      RoleAdmin,
+		},
+		{
+			name: "global admin with lower ns role stays admin",
+			user: &User{
+				Role:           RoleAdmin,
+				NamespaceRoles: map[string]Role{"team-alpha": RoleViewer},
+			},
+			namespace: "team-alpha",
+			want:      RoleAdmin,
+		},
+		{
+			name:      "global viewer without ns role",
+			user:      &User{Role: RoleViewer},
+			namespace: "team-alpha",
+			want:      RoleViewer,
+		},
+		{
+			name: "ns role higher than global",
+			user: &User{
+				Role:           RoleViewer,
+				NamespaceRoles: map[string]Role{"team-alpha": RoleManager},
+			},
+			namespace: "team-alpha",
+			want:      RoleManager,
+		},
+		{
+			name: "global role higher than ns role",
+			user: &User{
+				Role:           RoleManager,
+				NamespaceRoles: map[string]Role{"team-alpha": RoleViewer},
+			},
+			namespace: "team-alpha",
+			want:      RoleManager,
+		},
+		{
+			name: "ns role same as global",
+			user: &User{
+				Role:           RoleOperator,
+				NamespaceRoles: map[string]Role{"team-alpha": RoleOperator},
+			},
+			namespace: "team-alpha",
+			want:      RoleOperator,
+		},
+		{
+			name: "different namespace returns global role",
+			user: &User{
+				Role:           RoleViewer,
+				NamespaceRoles: map[string]Role{"team-alpha": RoleAdmin},
+			},
+			namespace: "team-beta",
+			want:      RoleViewer,
+		},
+		{
+			name:      "no global role no ns role",
+			user:      &User{},
+			namespace: "team-alpha",
+			want:      Role(""),
+		},
+		{
+			name: "no global role but has ns role",
+			user: &User{
+				NamespaceRoles: map[string]Role{"team-alpha": RoleOperator},
+			},
+			namespace: "team-alpha",
+			want:      RoleOperator,
+		},
+		{
+			name:      "nil namespace roles map",
+			user:      &User{Role: RoleOperator},
+			namespace: "team-alpha",
+			want:      RoleOperator,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.user.EffectiveRoleInNamespace(tt.namespace)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestUser_HasNamespaceAccess(t *testing.T) {
+	tests := []struct {
+		name      string
+		user      *User
+		namespace string
+		want      bool
+	}{
+		{
+			name:      "global admin has access",
+			user:      &User{Role: RoleAdmin},
+			namespace: "team-alpha",
+			want:      true,
+		},
+		{
+			name:      "global viewer has access",
+			user:      &User{Role: RoleViewer},
+			namespace: "team-alpha",
+			want:      true,
+		},
+		{
+			name: "ns role grants access",
+			user: &User{
+				NamespaceRoles: map[string]Role{"team-alpha": RoleViewer},
+			},
+			namespace: "team-alpha",
+			want:      true,
+		},
+		{
+			name:      "no role no access",
+			user:      &User{},
+			namespace: "team-alpha",
+			want:      false,
+		},
+		{
+			name: "ns role in different namespace no access",
+			user: &User{
+				NamespaceRoles: map[string]Role{"team-alpha": RoleAdmin},
+			},
+			namespace: "team-beta",
+			want:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.user.HasNamespaceAccess(tt.namespace)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestUserForStorage_JSONSerialization(t *testing.T) {
 	t.Run("includes password hash", func(t *testing.T) {
 		storage := &UserForStorage{

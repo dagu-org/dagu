@@ -30,6 +30,7 @@ var (
 type LoadOptions struct {
 	name              string   // Name of the DAG.
 	baseConfig        string   // Path to the base core.DAG configuration file.
+	baseDAG           *core.DAG // Pre-built base DAG configuration (takes precedence over baseConfig path).
 	params            string   // Parameters to override default parameters in the DAG.
 	paramsList        []string // List of parameters to override default parameters in the DAG.
 	flags             BuildFlag
@@ -45,6 +46,16 @@ type LoadOption func(*LoadOptions)
 func WithBaseConfig(baseDAG string) LoadOption {
 	return func(o *LoadOptions) {
 		o.baseConfig = baseDAG
+	}
+}
+
+// WithBaseDAG sets a pre-built base DAG configuration directly.
+// This takes precedence over WithBaseConfig (file path).
+// It is used for namespace-specific base configurations that are already
+// parsed and stored in the namespace metadata.
+func WithBaseDAG(dag *core.DAG) LoadOption {
+	return func(o *LoadOptions) {
+		o.baseDAG = dag
 	}
 }
 
@@ -170,6 +181,7 @@ func Load(ctx context.Context, nameOrPath string, opts ...LoadOption) (*core.DAG
 		ctx: ctx,
 		opts: BuildOpts{
 			Base:              options.baseConfig,
+			BaseDAG:           options.baseDAG,
 			Parameters:        options.params,
 			ParametersList:    options.paramsList,
 			Name:              options.name,
@@ -190,6 +202,7 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*core.DAG, 
 	}
 	return LoadYAMLWithOpts(ctx, data, BuildOpts{
 		Base:              options.baseConfig,
+		BaseDAG:           options.baseDAG,
 		Parameters:        options.params,
 		ParametersList:    options.paramsList,
 		Name:              options.name,
@@ -279,7 +292,7 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 	}
 
 	// Load all DAGs from the file
-	dags, err := loadDAGsFromFile(ctx, filePath, baseDef)
+	dags, err := loadDAGsFromFile(ctx, filePath, baseDef, ctx.opts.BaseDAG)
 	if err != nil {
 		if ctx.opts.Has(BuildFlagAllowBuildErrors) {
 			// Return a minimal core.DAG with the error recorded
@@ -318,7 +331,7 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 }
 
 // loadDAGsFromFile loads all DAGs from a multi-document YAML file
-func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *dag) ([]*core.DAG, error) {
+func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *dag, preBuiltBase *core.DAG) ([]*core.DAG, error) {
 	// Open the file
 	f, err := os.Open(filePath) //nolint:gosec
 	if err != nil {
@@ -359,7 +372,7 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *dag) ([]*core.
 		ctx.index = docIndex
 
 		// Process the document
-		dag, err := processDAGDocument(ctx, doc, baseDef, filePath, dat, docIndex)
+		dag, err := processDAGDocument(ctx, doc, baseDef, preBuiltBase, filePath, dat, docIndex)
 		if err != nil {
 			return nil, fmt.Errorf("failed to process document %d: %w", docIndex, err)
 		}
@@ -381,6 +394,7 @@ func processDAGDocument(
 	ctx BuildContext,
 	doc map[string]any,
 	baseDef *dag,
+	preBuiltBase *core.DAG,
 	filePath string,
 	fullData []byte,
 	docIndex int,
@@ -391,7 +405,9 @@ func processDAGDocument(
 		return nil, err
 	}
 
-	// Build a fresh base core.DAG from base manifest if provided
+	// Build a fresh base core.DAG from base manifest if provided.
+	// A pre-built base DAG (e.g., from namespace config) takes precedence
+	// and is merged on top of the file-based base config.
 	var dest *core.DAG
 	if baseDef != nil {
 		dest, err = buildBaseDAG(ctx, baseDef)
@@ -400,6 +416,13 @@ func processDAGDocument(
 		}
 	} else {
 		dest = new(core.DAG)
+	}
+
+	// Merge pre-built base DAG (namespace config) on top of file-based base config.
+	if preBuiltBase != nil {
+		if err := merge(dest, preBuiltBase); err != nil {
+			return nil, fmt.Errorf("failed to merge namespace base config: %w", err)
+		}
 	}
 
 	// Build the core.DAG from the current document

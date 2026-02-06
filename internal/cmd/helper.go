@@ -94,6 +94,23 @@ func rebuildDAGFromYAML(ctx context.Context, dag *core.DAG) (*core.DAG, error) {
 	return dag, nil
 }
 
+// parseNamespaceFromArg splits a "namespace/dag-name" format argument.
+// If the argument contains a "/" and doesn't end with .yaml/.yml (i.e., not a file path),
+// the prefix is treated as a namespace name. Otherwise, returns empty namespace
+// and the original argument unchanged.
+func parseNamespaceFromArg(arg string) (namespace, dagName string) {
+	// File paths are never parsed as namespace/dag-name
+	if strings.HasSuffix(arg, ".yaml") || strings.HasSuffix(arg, ".yml") {
+		return "", arg
+	}
+
+	if idx := strings.IndexByte(arg, '/'); idx > 0 {
+		return arg[:idx], arg[idx+1:]
+	}
+
+	return "", arg
+}
+
 // extractDAGName extracts the DAG name from a file path or name.
 // If the input is a file path (.yaml or .yml), it loads the DAG metadata
 // to extract the name. Otherwise, it returns the input as-is.

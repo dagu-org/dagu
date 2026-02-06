@@ -58,7 +58,14 @@ type SubDAGExecutor struct {
 // NewSubDAGExecutor creates a new SubDAGExecutor.
 // It handles the logic for finding the DAG - either from the database
 // or from local DAGs defined in the parent.
+// Sub-DAG names resolve within the parent's namespace; cross-namespace
+// references (e.g. "other-ns/dag-name") are not supported.
 func NewSubDAGExecutor(ctx context.Context, childName string) (*SubDAGExecutor, error) {
+	// Reject cross-namespace sub-DAG references
+	if strings.Contains(childName, "/") {
+		return nil, fmt.Errorf("cross-namespace sub-DAG references are not supported: %q", childName)
+	}
+
 	rCtx := exec1.GetContext(ctx)
 
 	// First, check if it's a local DAG in the parent
@@ -81,6 +88,8 @@ func NewSubDAGExecutor(ctx context.Context, childName string) (*SubDAGExecutor, 
 			// Clone the DAG and set the location to the temporary file
 			dag := localDAG.Clone()
 			dag.Location = tempFile
+			// Inherit parent's namespace
+			dag.Namespace = rCtx.Namespace
 
 			return &SubDAGExecutor{
 				DAG:             dag,
@@ -99,6 +108,8 @@ func NewSubDAGExecutor(ctx context.Context, childName string) (*SubDAGExecutor, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to find DAG %q: %w", childName, err)
 	}
+	// Inherit parent's namespace
+	dag.Namespace = rCtx.Namespace
 
 	return &SubDAGExecutor{
 		DAG:             dag,
@@ -132,6 +143,9 @@ func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, 
 		fmt.Sprintf("--parent=%s", rCtx.DAGRunRef().String()),
 		fmt.Sprintf("--run-id=%s", runParams.RunID),
 		"--trigger-type=subdag",
+	}
+	if rCtx.Namespace != "" {
+		args = append(args, fmt.Sprintf("--namespace=%s", rCtx.Namespace))
 	}
 	if workDir != "" {
 		args = append(args, fmt.Sprintf("--default-working-dir=%s", workDir))
@@ -184,6 +198,7 @@ func (e *SubDAGExecutor) BuildCoordinatorTask(ctx context.Context, runParams Run
 		string(e.DAG.YamlData),
 		coordinatorv1.Operation_OPERATION_START,
 		runParams.RunID,
+		WithNamespace(rCtx.Namespace),
 		WithRootDagRun(rCtx.RootDAGRun),
 		WithParentDagRun(exec1.DAGRunRef{
 			Name: rCtx.DAG.Name,

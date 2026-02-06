@@ -2,7 +2,15 @@ import dayjs from 'dayjs';
 import { Layers, List, Search } from 'lucide-react';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
+import useSWR from 'swr';
 import { Status } from '../../api/v1/schema';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '../../components/ui/breadcrumb';
 import { Button } from '../../components/ui/button';
 import { DateRangePicker } from '../../components/ui/date-range-picker';
 import { Input } from '../../components/ui/input';
@@ -17,12 +25,13 @@ import { TagCombobox } from '../../components/ui/tag-combobox';
 import { ToggleButton, ToggleGroup } from '../../components/ui/toggle-group';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';
+import { useNamespace } from '../../contexts/NamespaceContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
 import { useUserPreferences } from '../../contexts/UserPreference';
 import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-details';
 import DAGRunGroupedView from '../../features/dag-runs/components/dag-run-list/DAGRunGroupedView';
 import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
-import { useQuery } from '../../hooks/api';
+import { useClient, useQuery } from '../../hooks/api';
 import { useDAGRunsListSSE } from '../../hooks/useDAGRunsListSSE';
 import StatusChip from '../../ui/StatusChip';
 import Title from '../../ui/Title';
@@ -99,6 +108,8 @@ function DAGRuns() {
   const config = useConfig();
   const { preferences, updatePreference } = useUserPreferences();
   const searchState = useSearchState();
+  const { selectedNamespace, isAllNamespaces } = useNamespace();
+  const client = useClient();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
 
   // Extract short datetime format from URL if present
@@ -391,8 +402,12 @@ function DAGRuns() {
   }, [currentFilters, remoteKey, searchState]);
 
   React.useEffect(() => {
-    appBarContext.setTitle('DAG Runs');
-  }, [appBarContext]);
+    if (isAllNamespaces) {
+      appBarContext.setTitle('DAG Runs');
+    } else {
+      appBarContext.setTitle(`DAG Runs — ${selectedNamespace}`);
+    }
+  }, [appBarContext, selectedNamespace, isAllNamespaces]);
 
   // Fetch available tags for the filter dropdown
   const { data: tagsData } = useQuery(
@@ -411,39 +426,54 @@ function DAGRuns() {
   );
   const availableTags = tagsData?.tags ?? [];
 
-  // SSE for real-time updates with polling fallback
-  const sseParams = {
-    name: apiSearchText || undefined,
-    dagRunId: apiDagRunId || undefined,
-    status: apiStatus !== 'all' ? parseInt(apiStatus) : undefined,
-    tags: apiTags.length > 0 ? apiTags.join(',') : undefined,
-    fromDate: formatDateForApi(apiFromDate),
-    toDate: formatDateForApi(apiToDate),
-  };
+  // SSE for real-time updates with namespace scoping
+  const sseParams = React.useMemo(
+    () => ({
+      name: apiSearchText || undefined,
+      dagRunId: apiDagRunId || undefined,
+      status: apiStatus !== 'all' ? parseInt(apiStatus) : undefined,
+      tags: apiTags.length > 0 ? apiTags.join(',') : undefined,
+      fromDate: formatDateForApi(apiFromDate),
+      toDate: formatDateForApi(apiToDate),
+      namespace: !isAllNamespaces ? selectedNamespace : undefined,
+    }),
+    [apiSearchText, apiDagRunId, apiStatus, apiTags, apiFromDate, apiToDate, selectedNamespace, isAllNamespaces]
+  );
   const sseResult = useDAGRunsListSSE(sseParams, true);
   const shouldUsePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
 
-  const { data: pollingData, mutate } = useQuery(
-    '/dag-runs',
-    {
-      params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-          name: apiSearchText || undefined,
-          dagRunId: apiDagRunId || undefined,
-          status: apiStatus !== 'all' ? parseInt(apiStatus) : undefined,
-          tags: apiTags.length > 0 ? apiTags.join(',') : undefined,
-          fromDate: formatDateForApi(apiFromDate),
-          toDate: formatDateForApi(apiToDate),
+  // Polling fallback with namespace support
+  const pollingKey = React.useMemo(
+    () =>
+      shouldUsePolling
+        ? ['dag-runs-list', selectedNamespace, apiSearchText, apiDagRunId, apiStatus, apiTags.join(','), apiFromDate, apiToDate, remoteKey]
+        : null,
+    [shouldUsePolling, selectedNamespace, apiSearchText, apiDagRunId, apiStatus, apiTags, apiFromDate, apiToDate, remoteKey]
+  );
+
+  const { data: pollingData, mutate } = useSWR(
+    pollingKey,
+    async () => {
+      const { data } = await client.GET('/dag-runs', {
+        params: {
+          query: {
+            remoteNode: appBarContext.selectedRemoteNode || 'local',
+            name: apiSearchText || undefined,
+            dagRunId: apiDagRunId || undefined,
+            status: apiStatus !== 'all' ? parseInt(apiStatus) : undefined,
+            tags: apiTags.length > 0 ? apiTags.join(',') : undefined,
+            fromDate: formatDateForApi(apiFromDate),
+            toDate: formatDateForApi(apiToDate),
+            namespace: !isAllNamespaces ? selectedNamespace : undefined,
+          },
         },
-      },
+      });
+      return data;
     },
     {
-      revalidateIfStale: shouldUsePolling,
-      revalidateOnFocus: shouldUsePolling,
-      revalidateOnReconnect: shouldUsePolling,
-      refreshInterval: shouldUsePolling ? 2000 : 0,
-      isPaused: () => !shouldUsePolling,
+      refreshInterval: 2000,
+      revalidateIfStale: false,
+      keepPreviousData: true,
     }
   );
 
@@ -696,6 +726,19 @@ function DAGRuns() {
 
   return (
     <div className="max-w-7xl">
+      {!isAllNamespaces && (
+        <Breadcrumb className="mb-1">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbPage>{selectedNamespace}</BreadcrumbPage>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>DAG Runs</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      )}
       <div className="flex items-center justify-between mb-2">
         <Title>DAG Runs</Title>
         <ToggleGroup aria-label="View mode">

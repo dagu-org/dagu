@@ -72,3 +72,29 @@ func ParseRole(s string) (Role, error) {
 	}
 	return role, nil
 }
+
+// roleRank returns a numeric rank for role comparison.
+// Higher rank means more privileges. Invalid/empty roles return -1.
+func roleRank(r Role) int {
+	switch r {
+	case RoleAdmin:
+		return 3
+	case RoleManager:
+		return 2
+	case RoleOperator:
+		return 1
+	case RoleViewer:
+		return 0
+	default:
+		return -1
+	}
+}
+
+// HigherRole returns the role with higher privileges.
+// If both roles have the same rank, a is returned.
+func HigherRole(a, b Role) Role {
+	if roleRank(b) > roleRank(a) {
+		return b
+	}
+	return a
+}

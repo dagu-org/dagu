@@ -62,7 +62,7 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, defaultWorkingDirFlag, startWorkerIDFlag, triggerTypeFlag}
+var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, defaultWorkingDirFlag, startWorkerIDFlag, triggerTypeFlag, namespaceFlag}
 
 var fromRunIDFlag = commandLineFlag{
 	name:  "from-run-id",
@@ -83,6 +83,17 @@ var triggerTypeFlag = commandLineFlag{
 }
 
 func runStart(ctx *Context, args []string) error {
+	namespaceName, dagName, err := ctx.ResolveNamespaceFromArg(args[0])
+	if err != nil {
+		return err
+	}
+	args[0] = dagName
+
+	ns, err := ctx.NamespaceStore.Get(ctx, namespaceName)
+	if err != nil {
+		return fmt.Errorf("failed to get namespace %q: %w", namespaceName, err)
+	}
+
 	fromRunID, err := ctx.StringParam("from-run-id")
 	if err != nil {
 		return fmt.Errorf("failed to get from-run-id: %w", err)
@@ -155,11 +166,14 @@ func runStart(ctx *Context, args []string) error {
 		}
 	} else {
 		// Load parameters and DAG
-		dag, params, err = loadDAGWithParams(ctx, args, isSubDAGRun)
+		dag, params, err = loadDAGWithParams(ctx, args, isSubDAGRun, ns)
 		if err != nil {
 			return err
 		}
 	}
+
+	// Set namespace on the DAG so it propagates through execution
+	dag.Namespace = namespaceName
 
 	root, err := determineRootDAGRun(isSubDAGRun, rootRef, dag, dagRunID)
 	if err != nil {
@@ -264,12 +278,18 @@ func getDAGRunInfo(ctx *Context) (dagRunID, rootDAGRun, parentDAGRun string, isS
 }
 
 // loadDAGWithParams loads the DAG and its parameters from command arguments.
-func loadDAGWithParams(ctx *Context, args []string, isSubDAGRun bool) (*core.DAG, string, error) {
+func loadDAGWithParams(ctx *Context, args []string, isSubDAGRun bool, ns *exec.Namespace) (*core.DAG, string, error) {
 	dagPath := args[0]
 
 	loadOpts := []spec.LoadOption{
 		spec.WithBaseConfig(ctx.Config.Paths.BaseConfig),
-		spec.WithDAGsDir(ctx.Config.Paths.DAGsDir),
+		spec.WithDAGsDir(ctx.NamespacedDAGsDir()),
+	}
+
+	// If the namespace has a base config, pass it as a pre-built base DAG.
+	// This is merged on top of the global base config file.
+	if ns != nil && ns.BaseConfig != nil {
+		loadOpts = append(loadOpts, spec.WithBaseDAG(ns.BaseConfig))
 	}
 
 	if isSubDAGRun {
@@ -400,6 +420,7 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 			RootDAGRun:      root,
 			PeerConfig:      ctx.Config.Core.Peer,
 			TriggerType:     triggerType,
+			Namespace:       d.Namespace,
 		},
 	)
 

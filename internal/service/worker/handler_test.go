@@ -57,6 +57,7 @@ func TestTaskHandler(t *testing.T) {
 			Definition:     dagContent,
 			RootDagRunName: dag.Name,
 			RootDagRunId:   dagRunID,
+			Namespace:      "default",
 		}
 
 		// Create a context with timeout for the task execution
@@ -105,6 +106,7 @@ func TestTaskHandler(t *testing.T) {
 			RootDagRunName: dag.Name,
 			RootDagRunId:   dagRunID,
 			Step:           "1",
+			Namespace:      "default",
 		}
 
 		// Create a context with timeout for the task execution
@@ -141,6 +143,7 @@ func TestTaskHandler(t *testing.T) {
 			RootDagRunName: dag.Name,
 			RootDagRunId:   dagRunID,
 			Params:         "param1=value1",
+			Namespace:      "default",
 		}
 
 		// Create a context with timeout for the task execution
@@ -171,6 +174,7 @@ func TestTaskHandler(t *testing.T) {
 			DagRunId:   "test-id",
 			Target:     "test-dag",
 			Definition: "steps:\n  - name: step1\n    command: echo test\n",
+			Namespace:  "default",
 		}
 
 		// Execute the task
@@ -178,6 +182,21 @@ func TestTaskHandler(t *testing.T) {
 		err := handler.Handle(ctx, task)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "operation not specified")
+	})
+
+	t.Run("RejectsEmptyNamespace", func(t *testing.T) {
+		task := &coordinatorv1.Task{
+			Operation:  coordinatorv1.Operation_OPERATION_START,
+			DagRunId:   "test-id",
+			Target:     "test-dag",
+			Definition: "steps:\n  - name: step1\n    command: echo test\n",
+			Namespace:  "",
+		}
+
+		handler := NewTaskHandler(th.Config)
+		err := handler.Handle(th.Context, task)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "task.Namespace is required")
 	})
 }
 
@@ -228,6 +247,7 @@ func TestTaskHandlerStartWithDefinition(t *testing.T) {
 		Target:     originalTarget,
 		Definition: "steps:\n  - name: example\n",
 		Params:     "foo=bar",
+		Namespace:  "default",
 	}
 
 	err = handler.Handle(context.Background(), task)
@@ -241,6 +261,7 @@ func TestTaskHandlerStartWithDefinition(t *testing.T) {
 	argsLines := strings.Split(strings.TrimSpace(string(argsData)), "\n")
 	require.Contains(t, argsLines, "start")
 	require.Contains(t, argsLines, "--run-id=run-123")
+	require.Contains(t, argsLines, "--namespace=default")
 	require.Contains(t, argsLines, task.Target)
 	require.Contains(t, argsLines, "--")
 	require.Contains(t, argsLines, "foo=bar")

@@ -29,9 +29,15 @@ Examples:
 	)
 }
 
-var enqueueFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, queueFlag, defaultWorkingDirFlag, triggerTypeFlag}
+var enqueueFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, queueFlag, defaultWorkingDirFlag, triggerTypeFlag, namespaceFlag}
 
 func runEnqueue(ctx *Context, args []string) error {
+	_, dagName, err := ctx.ResolveNamespaceFromArg(args[0])
+	if err != nil {
+		return fmt.Errorf("failed to resolve namespace: %w", err)
+	}
+	args[0] = dagName
+
 	runID, err := ctx.StringParam("run-id")
 	if err != nil {
 		return fmt.Errorf("failed to get Run ID: %w", err)
@@ -51,7 +57,7 @@ func runEnqueue(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to get queue override: %w", err)
 	}
 
-	dag, _, err := loadDAGWithParams(ctx, args, false)
+	dag, _, err := loadDAGWithParams(ctx, args, false, nil)
 	if err != nil {
 		return err
 	}

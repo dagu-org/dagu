@@ -40,6 +40,8 @@ var (
 	WithLogEncoding = exec.WithLogEncoding
 	// WithLogWriterFactory sets the log writer factory for remote log streaming.
 	WithLogWriterFactory = exec.WithLogWriterFactory
+	// WithNamespace sets the active namespace for this DAG run.
+	WithNamespace = exec.WithNamespace
 )
 
 // LogWriterFactory is re-exported from execution package

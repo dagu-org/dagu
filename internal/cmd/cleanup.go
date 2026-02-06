@@ -41,10 +41,14 @@ var cleanupFlags = []commandLineFlag{
 	retentionDaysFlag,
 	dryRunFlag,
 	yesFlag,
+	namespaceFlag,
 }
 
 func runCleanup(ctx *Context, args []string) error {
-	dagName := args[0]
+	_, dagName, err := ctx.ResolveNamespaceFromArg(args[0])
+	if err != nil {
+		return err
+	}
 
 	// Parse retention days (flags are string-based in this codebase)
 	retentionStr, err := ctx.StringParam("retention-days")

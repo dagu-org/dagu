@@ -47,35 +47,123 @@ Every Dagu instance has a built-in `default` namespace for backward compatibilit
 
 ### Directory-Based Storage
 
-Namespaces map directly to the filesystem. Each namespace is a subdirectory under the DAGs root and data root:
+Namespaces map directly to the filesystem. Each namespace is a subdirectory under the DAGs root and data root, using a **short internal ID** (4-char hex, first 4 characters of the SHA256 hex digest of the namespace name) as the directory name. This avoids filesystem path length issues — namespace names can be up to 63 characters, and combined with DAG names and the hierarchical run storage (`YYYY/MM/DD/dag-run_*/attempt_*/`), raw names could exceed OS path limits.
+
+This approach is consistent with the existing pattern in the codebase where `SafeName()` + 4-char SHA256 suffix is used for DAG run directory names.
 
 ```
 # DAG definitions
 ~/.config/dagu/dags/
-├── default/          # built-in namespace
+├── 6a5f/             # "default" → sha256("default")[:4] = 6a5f
 │   ├── etl-daily.yaml
 │   └── reports.yaml
-├── team-alpha/
+├── a1c3/             # "team-alpha" → sha256("team-alpha")[:4] = a1c3
 │   ├── ingest.yaml
 │   └── transform.yaml
-└── team-beta/
+└── e7b2/             # "team-beta" → sha256("team-beta")[:4] = e7b2
     └── analytics.yaml
 
 # DAG runs and operational data
 ~/.local/share/dagu/data/
-├── default/
+├── 6a5f/             # "default"
 │   ├── dag-runs/
 │   ├── proc/
 │   └── queue/
-├── team-alpha/
+├── a1c3/             # "team-alpha"
 │   ├── dag-runs/
 │   ├── proc/
 │   └── queue/
-└── team-beta/
+└── e7b2/             # "team-beta"
     └── ...
 ```
 
-A namespace is created by creating its directory. No separate registration step is required.
+#### Namespace Store
+
+Namespace data follows the existing persistence pattern used by all other stores in the codebase:
+
+**Port interface** (`internal/core/exec/namespace.go`):
+
+```go
+type NamespaceStore interface {
+    Create(ctx context.Context, name string) (Namespace, error)
+    Delete(ctx context.Context, name string) error
+    Get(ctx context.Context, name string) (Namespace, error)
+    List(ctx context.Context) ([]Namespace, error)
+    Resolve(ctx context.Context, name string) (string, error) // name → short ID
+}
+
+type Namespace struct {
+    Name        string           // Human-readable name (e.g., "team-alpha")
+    ShortID     string           // 4-char hex directory name (e.g., "a1c3")
+    CreatedAt   time.Time
+    Description string           // Human-readable description
+    BaseConfig  *core.DAG        // Namespace-level base config (same structure as global base.yaml)
+    Defaults    NamespaceDefaults
+    GitSync     NamespaceGitSync // Git sync settings (see Git Sync section)
+}
+
+type NamespaceDefaults struct {
+    Queue      string
+    WorkingDir string
+}
+```
+
+**File-based implementation** (`internal/persis/filenamespace/store.go`):
+
+```go
+func New(baseDir string) exec.NamespaceStore {
+    return &Store{baseDir: baseDir}
+}
+```
+
+The store persists namespace data as JSON files inside its base directory — one file per namespace (`{shortID}.json`):
+
+```
+~/.local/share/dagu/data/namespaces/
+├── 6a5f.json          # "default"
+├── a1c3.json          # "team-alpha"
+└── e7b2.json          # "team-beta"
+```
+
+Example (`a1c3.json`):
+
+```json
+{
+  "name": "team-alpha",
+  "shortID": "a1c3",
+  "createdAt": "2025-03-01T10:30:00Z",
+  "description": "Team Alpha workflows",
+  "baseConfig": {
+    "env": [
+      {"name": "TEAM", "value": "alpha"}
+    ],
+    "logDir": "/logs/team-alpha",
+    "histRetentionDays": 30
+  },
+  "defaults": {
+    "queue": "team-alpha-queue",
+    "workingDir": "/data/team-alpha"
+  }
+}
+```
+
+**Wired into `Context`** (`internal/cmd/context.go`) following the same pattern as `ProcStore`, `QueueStore`, etc.:
+
+```go
+type Context struct {
+    // ... existing fields ...
+    NamespaceStore exec.NamespaceStore
+}
+
+// In NewContext:
+ns := filenamespace.New(cfg.Paths.NamespacesDir)
+```
+
+**Config path** (`internal/cmn/config/loader.go`) — a new `NamespacesDir` is added to the `Paths` struct and derived from `DataDir` in `finalizePaths()`, following the same derivation pattern as `ProcDir`, `QueueDir`, etc.
+
+The `default` namespace uses a well-known fixed short ID assigned during initial setup or migration. Users never see the short ID — the API, CLI, and UI always use the human-readable namespace name. The short ID is an internal implementation detail for filesystem storage only.
+
+In the unlikely event of a hash collision (two namespace names producing the same 4-char prefix), `Create` returns an error and the user must choose a different name.
 
 ### DAG Identity
 
@@ -129,13 +217,216 @@ dagu namespace create staging          # create namespace
 
 ### UI Changes
 
-- Namespace selector in the navigation bar
-- Namespace-scoped views for DAGs, runs, and logs
-- Admin panel for namespace management and role assignment
+#### Namespace Selector
+
+A dropdown in the navigation bar lets the user switch the active namespace. The selector lists all namespaces the user has access to (retrieved from `GET /api/v1/namespaces`). Changing the selection reloads the current view (DAGs, runs, logs) scoped to the chosen namespace. A special "All Namespaces" option shows an aggregated view across every namespace the user can read.
+
+#### Namespace Management Page
+
+A dedicated settings page (`/namespaces`) where administrators can:
+
+- **List** all namespaces with their description and status.
+- **Create** a new namespace — prompts for name, description, and optional defaults.
+- **Edit** an existing namespace — update description, default queue, default working directory, and git-sync settings (remote URL, branch, SSH key reference, sync interval).
+- **Delete** a namespace — requires confirmation; only allowed when the namespace contains no DAGs.
+
+All mutations go through the `NamespaceStore` API; there is no `_namespace.yaml` file to edit by hand.
+
+#### Base Config Editor
+
+Each namespace can carry a base configuration (shared `env`, `logDir`, `handlerOn`, etc.) that every DAG in the namespace inherits. The namespace settings page embeds a YAML editor — identical in style to the existing DAG spec editor — for viewing and editing this base config. Changes are validated server-side before being persisted to the `NamespaceStore`.
+
+#### Namespace-Scoped Views
+
+When a namespace is selected, every major view is filtered to that namespace:
+
+- **DAGs list** — shows only DAGs belonging to the active namespace.
+- **Run history** — displays runs for DAGs in the active namespace.
+- **Log viewer** — scoped to log entries from the active namespace.
+
+Breadcrumbs and page titles include the namespace name for clarity.
+
+#### Admin Panel
+
+The admin panel adds a **Role Assignment** tab per namespace where administrators can:
+
+- Assign users or groups to roles (`viewer`, `editor`, `admin`) within a namespace.
+- View the effective permission matrix for the selected namespace.
 
 ### Scheduler
 
-The scheduler discovers and schedules DAGs across all namespaces. It scans namespace subdirectories under the DAGs root and watches each for file changes. Each scheduled DAG carries its namespace context through execution.
+The scheduler discovers and schedules DAGs across all namespaces. It scans namespace subdirectories under the DAGs root and watches each for file changes. When a DAG's schedule fires, the scheduler submits a task to the coordinator with the `namespace` field set to the namespace the DAG belongs to. This ensures the namespace context is available before the task reaches any worker.
+
+### Worker
+
+Workers poll the coordinator for tasks. Every task **must** carry a `namespace` field so the worker knows which namespace the DAG belongs to. Without this, the worker cannot resolve the correct DAG directory, data directory, base config, queue, or log path.
+
+#### Proto Change
+
+Add `namespace` to the `Task` message:
+
+```proto
+message Task {
+  // ... existing fields ...
+  string namespace = 16; // Namespace the DAG belongs to (required)
+}
+```
+
+The coordinator **must** populate `namespace` before dispatching a task. A worker receiving a task with an empty `namespace` treats it as an error and rejects the task.
+
+#### Subprocess Execution (Standard Mode)
+
+`SubCmdBuilder.TaskStart()` adds a `--namespace` flag when building the subprocess command so the child `dagu start` process runs in the correct namespace context:
+
+```go
+// In TaskStart():
+if task.Namespace != "" {
+    args = append(args, fmt.Sprintf("--namespace=%s", task.Namespace))
+}
+```
+
+The `start` command uses the namespace to:
+
+1. **Resolve the DAG directory** — `{dagsRoot}/{shortID}/` instead of the flat root.
+2. **Resolve the data directory** — `{dataRoot}/{shortID}/dag-runs/`, `proc/`, `queue/`.
+3. **Load the namespace base config** — fetched from `NamespaceStore.Get()` and merged before DAG-level config, so namespace-level `env`, `logDir`, `handlerOn`, etc. are inherited.
+4. **Select the correct queue** — defaults to the namespace's `Defaults.Queue` if the DAG does not specify one.
+
+#### In-Process Execution (Shared-Nothing Mode)
+
+The remote task handler receives the `namespace` from the `Task` proto and threads it through in the same way. It resolves paths and base config locally, then streams status and logs back to the coordinator tagged with the namespace.
+
+#### Sub-DAG Propagation
+
+When a running DAG spawns a sub-DAG via a `run` step, the agent propagates the parent's namespace to the child. The child task inherits the same `namespace` value — cross-namespace sub-DAG calls remain unsupported.
+
+#### Local Socket Name
+
+Each running DAG agent opens a Unix domain socket in `/tmp` for IPC (status queries and stop signals). The current `SockAddr()` function builds the socket name from the DAG's `Location` (file path) or `Name` + `dagRunID`:
+
+```
+/tmp/@dagu_<safeName>_<md5-hash>.sock
+```
+
+With namespaces, two DAGs with the same name in different namespaces (e.g., `team-alpha/ingest` and `team-beta/ingest`) could collide because the `safeName` portion is truncated to 32 characters and the 6-char MD5 hash only covers the name and run ID — not the namespace.
+
+**Fix:** Include the namespace in the hash input so socket names are unique per namespace:
+
+```go
+func SockAddr(namespace, name, dagRunID string) string {
+    hash := fmt.Sprintf("%x", md5.Sum([]byte(namespace+name+dagRunID)))[:hashLength]
+    // ... rest unchanged ...
+}
+```
+
+The namespace does **not** need to appear in the readable portion of the socket name (the `safeName` segment). Adding it to the MD5 input is sufficient to prevent collisions while keeping the socket path short. All call sites (`DAG.SockAddr()`, `DAG.SockAddrForSubDAGRun()`, and the manager) must pass the namespace through.
+
+#### Worker Labels and Namespace Affinity
+
+Workers can optionally restrict themselves to specific namespaces using labels:
+
+```bash
+dagu worker start --labels namespace=team-alpha
+```
+
+The coordinator matches `worker_selector` labels when dispatching, so teams can dedicate workers to their namespace. This is optional — workers without a namespace label accept tasks from any namespace.
+
+### Namespace Context Propagation
+
+Namespace must be available at every layer of the execution stack. The following changes thread it from the coordinator all the way down to stores and sockets.
+
+#### 1. `core.DAG` — carry namespace on the DAG struct
+
+```go
+type DAG struct {
+    Namespace string   // Namespace this DAG belongs to
+    // ... existing fields ...
+}
+```
+
+The `spec.Load()` pipeline does not set `Namespace` — the caller does, because namespace is determined by context (CLI flag, API path, coordinator task), not by the YAML file itself. This keeps DAG definitions portable across namespaces.
+
+#### 2. `exec.Context` — runtime execution context
+
+Add `Namespace` so every running step can access it:
+
+```go
+type Context struct {
+    Namespace string          // Active namespace
+    DAGRunID  string
+    DAG       *core.DAG
+    // ... existing fields ...
+}
+```
+
+`exec.NewContext()` receives the namespace from the agent. Steps use it when spawning sub-DAGs (to propagate the parent's namespace) and when resolving log paths.
+
+#### 3. `agent.Options` — pass namespace into the agent
+
+```go
+type Options struct {
+    Namespace string          // Namespace for this execution
+    // ... existing fields (WorkerID, RootDAGRun, etc.) ...
+}
+```
+
+The agent stores `opts.Namespace` and:
+
+- Passes it to `exec.NewContext()` during `Run()`.
+- Passes it to `dag.SockAddr()` when setting up the socket server.
+- Includes it in the sub-command when dispatching sub-DAGs to the coordinator.
+
+#### 4. `start` command — accept `--namespace` flag
+
+```go
+// In CmdStart():
+cmd.Flags().StringVar(&namespaceFlag, "namespace", "default", "namespace for this DAG run")
+```
+
+`runStart()` uses the flag to:
+
+1. **Resolve store paths** — constructs namespace-scoped base directories (`{dataRoot}/{shortID}/dag-runs/`, `{dataRoot}/{shortID}/proc/`, etc.) before initializing `DAGRunStore`, `ProcStore`, and `QueueStore`.
+2. **Load namespace base config** — calls `NamespaceStore.Get()` and passes `ns.BaseConfig` to `spec.Load()` via `WithBaseConfig()`, replacing the global `base.yaml`.
+3. **Set `DAG.Namespace`** — assigns the namespace on the loaded DAG struct.
+4. **Pass to agent** — sets `agent.Options.Namespace`.
+
+#### 5. Store scoping
+
+Stores are already parameterized by a `baseDir`. Namespace scoping works by constructing namespace-specific base directories before creating stores — no changes to the store implementations themselves:
+
+```go
+// In runStart(), after resolving namespace short ID:
+shortID, _ := namespaceStore.Resolve(ctx, namespaceFlag)
+
+dagRunsDir := filepath.Join(cfg.Paths.DataDir, shortID, "dag-runs")
+procDir    := filepath.Join(cfg.Paths.DataDir, shortID, "proc")
+queueDir   := filepath.Join(cfg.Paths.DataDir, shortID, "queue")
+
+drs := filedagrun.New(dagRunsDir)
+ps  := fileproc.New(procDir)
+qs  := filequeue.New(queueDir)
+```
+
+This keeps the store code unchanged — namespace isolation is achieved purely through directory layout.
+
+#### 6. Full propagation chain
+
+```
+Coordinator (sets Task.Namespace)
+  → Worker (reads Task.Namespace, passes --namespace flag)
+    → start command (reads --namespace, resolves short ID)
+      → NamespaceStore.Resolve() → short ID for directory paths
+      → NamespaceStore.Get()     → base config for spec.Load()
+      → Stores created with namespace-scoped base dirs
+      → DAG.Namespace set on loaded DAG struct
+      → agent.New(..., Options{Namespace: ns})
+        → exec.Context{Namespace: ns}
+          → Steps inherit namespace
+          → Sub-DAG dispatch carries namespace
+        → dag.SockAddr(namespace, ...) → unique socket
+```
+
+For CLI-initiated runs (`dagu start team-alpha/ingest`), the namespace is extracted from the `namespace/dag-name` format or the `--namespace` flag — no coordinator involved, but the same chain applies from the `start` command onward.
 
 ### Sub-DAG References
 
@@ -151,48 +442,50 @@ If teams need to share workflows, they should duplicate the DAG into each namesp
 
 ### Namespace Configuration
 
-Each namespace can optionally include a `_namespace.yaml` configuration file:
+Namespace configuration is stored in the `NamespaceStore` as part of the `Namespace` struct. It is managed via the API and CLI — there is no separate configuration file to edit by hand.
 
-```yaml
-# team-alpha/_namespace.yaml
-description: "Team Alpha workflows"
-baseConfig: base.yaml              # namespace-level base config
-defaults:
-  queue: team-alpha-queue
-  workingDir: /data/team-alpha
+```bash
+dagu namespace create team-alpha \
+  --description "Team Alpha workflows" \
+  --default-queue team-alpha-queue \
+  --default-working-dir /data/team-alpha
+
+# Set base config from a YAML file (parsed and stored in the namespace JSON)
+dagu namespace set-base-config team-alpha --from-file base.yaml
 ```
 
 ### Git Sync
 
-Git sync becomes namespace-scoped. Each namespace can configure its own git repository, branch, and sync settings independently via `_namespace.yaml`:
+Git sync becomes namespace-scoped. Each namespace can configure its own git repository, branch, and sync settings via the `GitSync` field in the `NamespaceStore`:
 
-```yaml
-# team-alpha/_namespace.yaml
-gitSync:
-  enabled: true
-  repository: "github.com/org/team-alpha-dags"
-  branch: main
-  auth:
-    type: token
-    token: "${TEAM_ALPHA_GIT_TOKEN}"
-  autoSync:
-    enabled: true
-    interval: 300
+```json
+{
+  "name": "team-alpha",
+  "shortID": "a1c3",
+  "gitSync": {
+    "enabled": true,
+    "repository": "github.com/org/team-alpha-dags",
+    "branch": "main",
+    "auth": {
+      "type": "token",
+      "tokenEnv": "TEAM_ALPHA_GIT_TOKEN"
+    },
+    "autoSync": {
+      "enabled": true,
+      "interval": 300
+    }
+  }
+}
 ```
 
 Alternatively, a single repository can serve multiple namespaces by mapping subdirectories to namespaces using the `path` field:
 
-```yaml
-# Shared repo, different subdirectories per namespace
-# team-alpha/_namespace.yaml
-gitSync:
-  repository: "github.com/org/all-dags"
-  path: "team-alpha"           # sync only this subdirectory
+```json
+// team-alpha namespace
+{ "gitSync": { "repository": "github.com/org/all-dags", "path": "team-alpha" } }
 
-# team-beta/_namespace.yaml
-gitSync:
-  repository: "github.com/org/all-dags"
-  path: "team-beta"
+// team-beta namespace
+{ "gitSync": { "repository": "github.com/org/all-dags", "path": "team-beta" } }
 ```
 
 Key behaviors:
@@ -242,12 +535,13 @@ Audit logging (RFC 002) includes the namespace in every agent action record for 
 
 Existing installations upgrade seamlessly:
 
-1. All current DAGs are moved into `default/` subdirectory
-2. All current run data is moved into `default/` subdirectory (dag-runs, proc, queue, suspend flags)
-3. Git sync state is moved into `default/` subdirectory
-4. Agent conversation history is tagged with the `default` namespace
-5. Existing users receive their current global role unchanged
-6. No configuration changes are required
+1. Create the namespace registry file (`namespaces.json`) in the config root with the `default` namespace mapped to its well-known fixed short ID
+2. All current DAGs are moved into the `default` namespace's short-ID subdirectory (e.g., `dags/6a5f/`)
+3. All current run data is moved into the `default` namespace's short-ID subdirectory (dag-runs, proc, queue, suspend flags)
+4. Git sync state is moved into the `default` namespace's short-ID subdirectory
+5. Agent conversation history is tagged with the `default` namespace
+6. Existing users receive their current global role unchanged
+7. No configuration changes are required
 
 An automatic migration runs on first startup after upgrade.
 
@@ -255,7 +549,7 @@ An automatic migration runs on first startup after upgrade.
 
 1. **Namespace deletion requires empty namespace** — a namespace must have all DAGs and run history removed before it can be deleted. No cascading deletion.
 2. **No cross-namespace triggers** — DAGs cannot trigger or reference DAGs in other namespaces. All `run` references resolve within the same namespace. This avoids complex cross-namespace dependency graphs.
-3. **Secrets are per-namespace by default** — secrets are configured in `baseConfig` which is already namespace-scoped. No additional mechanism needed.
+3. **Secrets are per-namespace by default** — secrets are configured in the namespace's `BaseConfig` stored in the `NamespaceStore`. No additional mechanism needed.
 4. **Git sync pushes independently per namespace** — when multiple namespaces share the same git repository, each namespace pushes independently. No coordination between namespaces.
 5. **Agent conversations are locked to a single namespace** — the agent cannot switch namespaces mid-conversation. Users start a new conversation to work in a different namespace.
 

@@ -185,6 +185,21 @@ func (a *API) UpdateUser(ctx context.Context, request api.UpdateUserRequestObjec
 		}
 		input.IsDisabled = request.Body.IsDisabled
 	}
+	if request.Body.NamespaceRoles != nil {
+		nsRoles := make(map[string]auth.Role, len(*request.Body.NamespaceRoles))
+		for ns, roleStr := range *request.Body.NamespaceRoles {
+			role, parseErr := auth.ParseRole(roleStr)
+			if parseErr != nil {
+				return nil, &Error{
+					Code:       api.ErrorCodeBadRequest,
+					Message:    "Invalid namespace role for " + ns,
+					HTTPStatus: http.StatusBadRequest,
+				}
+			}
+			nsRoles[ns] = role
+		}
+		input.NamespaceRoles = &nsRoles
+	}
 
 	user, err := a.authService.UpdateUser(ctx, request.UserId, input)
 	if err != nil {
@@ -223,6 +238,9 @@ func (a *API) UpdateUser(ctx context.Context, request api.UpdateUserRequestObjec
 		}
 		if input.Role != nil {
 			changes["role"] = string(*input.Role)
+		}
+		if input.NamespaceRoles != nil {
+			changes["namespace_roles"] = *input.NamespaceRoles
 		}
 		details, err := json.Marshal(changes)
 		if err != nil {

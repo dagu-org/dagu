@@ -39,7 +39,7 @@ func TestSockAddr(t *testing.T) {
 	t.Run("BasicFunctionality", func(t *testing.T) {
 		t.Parallel()
 
-		addr := core.SockAddr("mydag", "run123")
+		addr := core.SockAddr("", "mydag", "run123")
 
 		require.True(t, strings.HasPrefix(addr, "/tmp/@dagu_"))
 		require.True(t, strings.HasSuffix(addr, ".sock"))
@@ -52,24 +52,33 @@ func TestSockAddr(t *testing.T) {
 		require.Len(t, hashPart, 6)
 
 		// Deterministic: same inputs produce same output
-		require.Equal(t, addr, core.SockAddr("mydag", "run123"))
+		require.Equal(t, addr, core.SockAddr("", "mydag", "run123"))
 	})
 
 	t.Run("DifferentInputsProduceDifferentHashes", func(t *testing.T) {
 		t.Parallel()
 
-		addr1 := core.SockAddr("dag1", "run1")
-		addr2 := core.SockAddr("dag1", "run2")
-		addr3 := core.SockAddr("dag2", "run1")
+		addr1 := core.SockAddr("", "dag1", "run1")
+		addr2 := core.SockAddr("", "dag1", "run2")
+		addr3 := core.SockAddr("", "dag2", "run1")
 
 		require.NotEqual(t, addr1, addr2, "different dagRunIDs should produce different addresses")
 		require.NotEqual(t, addr1, addr3, "different names should produce different addresses")
 	})
 
+	t.Run("DifferentNamespacesProduceDifferentPaths", func(t *testing.T) {
+		t.Parallel()
+
+		addr1 := core.SockAddr("ns-alpha", "mydag", "run1")
+		addr2 := core.SockAddr("ns-beta", "mydag", "run1")
+
+		require.NotEqual(t, addr1, addr2, "different namespaces should produce different addresses for same DAG name")
+	})
+
 	t.Run("SafeNameHandling", func(t *testing.T) {
 		t.Parallel()
 
-		addr := core.SockAddr("my/dag\\with:special*chars", "run|with<>chars")
+		addr := core.SockAddr("", "my/dag\\with:special*chars", "run|with<>chars")
 		socketName := strings.TrimPrefix(addr, "/tmp/")
 
 		// Verify unsafe characters are sanitized
@@ -81,7 +90,7 @@ func TestSockAddr(t *testing.T) {
 	t.Run("MaxSocketLengthEnforcement", func(t *testing.T) {
 		t.Parallel()
 
-		addr := core.SockAddr(strings.Repeat("a", 100), "run123")
+		addr := core.SockAddr("", strings.Repeat("a", 100), "run123")
 		socketName := strings.TrimPrefix(addr, "/tmp/")
 
 		require.LessOrEqual(t, len(socketName), 50)
@@ -97,8 +106,8 @@ func TestSockAddr(t *testing.T) {
 		name32 := strings.Repeat("x", 32)
 		name33 := strings.Repeat("x", 33)
 
-		socketName32 := strings.TrimPrefix(core.SockAddr(name32, "run123"), "/tmp/")
-		socketName33 := strings.TrimPrefix(core.SockAddr(name33, "run123"), "/tmp/")
+		socketName32 := strings.TrimPrefix(core.SockAddr("", name32, "run123"), "/tmp/")
+		socketName33 := strings.TrimPrefix(core.SockAddr("", name33, "run123"), "/tmp/")
 
 		require.LessOrEqual(t, len(socketName32), 50)
 		require.LessOrEqual(t, len(socketName33), 50)
@@ -110,9 +119,9 @@ func TestSockAddr(t *testing.T) {
 		t.Parallel()
 
 		addrs := []string{
-			core.SockAddr("", ""),
-			core.SockAddr("dag", ""),
-			core.SockAddr("", "run"),
+			core.SockAddr("", "", ""),
+			core.SockAddr("", "dag", ""),
+			core.SockAddr("", "", "run"),
 		}
 
 		for _, addr := range addrs {
@@ -124,12 +133,12 @@ func TestSockAddr(t *testing.T) {
 	t.Run("HashConsistency", func(t *testing.T) {
 		t.Parallel()
 
-		name, runID := "testdag", "testrun"
-		addr := core.SockAddr(name, runID)
+		ns, name, runID := "testns", "testdag", "testrun"
+		addr := core.SockAddr(ns, name, runID)
 
 		parts := strings.Split(addr, "_")
 		hash := strings.TrimSuffix(parts[len(parts)-1], ".sock")
-		expectedHash := fmt.Sprintf("%x", md5.Sum([]byte(name+runID)))[:6]
+		expectedHash := fmt.Sprintf("%x", md5.Sum([]byte(ns+name+runID)))[:6]
 
 		require.Equal(t, expectedHash, hash)
 	})
@@ -137,23 +146,23 @@ func TestSockAddr(t *testing.T) {
 	t.Run("DAGMethodsUseSockAddr", func(t *testing.T) {
 		t.Parallel()
 
-		// With Location set: uses Location
-		dag1 := &core.DAG{Name: "mydag", Location: "path/to/dag.yml"}
-		require.Equal(t, core.SockAddr("path/to/dag.yml", ""), dag1.SockAddr("run123"))
+		// With Location set: uses Location and Namespace
+		dag1 := &core.DAG{Name: "mydag", Location: "path/to/dag.yml", Namespace: "ns1"}
+		require.Equal(t, core.SockAddr("ns1", "path/to/dag.yml", ""), dag1.SockAddr("run123"))
 
-		// Without Location: uses Name and dagRunID
-		dag2 := &core.DAG{Name: "mydag"}
-		require.Equal(t, core.SockAddr("mydag", "run123"), dag2.SockAddr("run123"))
+		// Without Location: uses Name, Namespace, and dagRunID
+		dag2 := &core.DAG{Name: "mydag", Namespace: "ns1"}
+		require.Equal(t, core.SockAddr("ns1", "mydag", "run123"), dag2.SockAddr("run123"))
 	})
 
 	t.Run("SockAddrForSubDAGRun", func(t *testing.T) {
 		t.Parallel()
 
-		dag := &core.DAG{Name: "parentdag", Location: "path/to/parent.yml"}
+		dag := &core.DAG{Name: "parentdag", Location: "path/to/parent.yml", Namespace: "ns1"}
 		subRunID := "child-run-456"
 
-		// Uses DAG name (not location) with the sub run ID
-		require.Equal(t, core.SockAddr("parentdag", subRunID), dag.SockAddrForSubDAGRun(subRunID))
+		// Uses DAG name (not location) with the sub run ID and Namespace
+		require.Equal(t, core.SockAddr("ns1", "parentdag", subRunID), dag.SockAddrForSubDAGRun(subRunID))
 	})
 }
 

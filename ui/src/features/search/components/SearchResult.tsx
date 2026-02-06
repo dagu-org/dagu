@@ -2,6 +2,7 @@ import React, { ReactElement, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { components } from '../../../api/v1/schema';
 import Prism from '../../../assets/js/prism';
+import { Badge } from '../../../components/ui/badge';
 import { DAGDefinition } from '../../dags/components/dag-editor';
 
 type Props = {
@@ -18,11 +19,21 @@ function SearchResult({ results }: Props) {
             <li key={`${result.name}-${m.lineNumber}`} className="px-4">
               <div className="flex flex-col space-y-2 w-full">
                 {j == 0 ? (
-                  <Link to={`/dags/${encodeURI(result.name)}/spec`}>
-                    <h3 className="text-lg font-semibold text-foreground">
-                      {result.name}
-                    </h3>
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <Link to={`/dags/${encodeURI(result.name)}/spec`}>
+                      <h3 className="text-lg font-semibold text-foreground">
+                        {result.name}
+                      </h3>
+                    </Link>
+                    {result.namespace && (
+                      <Badge
+                        variant="secondary"
+                        className="text-xs px-1.5 py-0 h-4 rounded-sm font-normal"
+                      >
+                        {result.namespace}
+                      </Badge>
+                    )}
+                  </div>
                 ) : null}
                 <DAGDefinition
                   value={m.line}

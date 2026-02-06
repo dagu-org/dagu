@@ -1,18 +1,41 @@
 import React from 'react';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '../../../../components/ui/breadcrumb';
 import { RefreshButton } from '../../../../components/ui/refresh-button';
 import Title from '../../../../ui/Title';
 import { CreateDAGButton } from '../common';
 
 interface DAGListHeaderProps {
   onRefresh?: () => void | Promise<void>;
+  namespace?: string;
 }
 
-const DAGListHeader: React.FC<DAGListHeaderProps> = ({ onRefresh }) => (
-  <div className="flex flex-row items-center justify-between mb-2">
-    <Title>DAG Definitions</Title>
-    <div className="flex gap-2">
-      <CreateDAGButton />
-      {onRefresh && <RefreshButton onRefresh={onRefresh} />}
+const DAGListHeader: React.FC<DAGListHeaderProps> = ({ onRefresh, namespace }) => (
+  <div className="flex flex-col gap-1 mb-2">
+    {namespace && (
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbPage>{namespace}</BreadcrumbPage>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>DAGs</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+    )}
+    <div className="flex flex-row items-center justify-between">
+      <Title>DAG Definitions</Title>
+      <div className="flex gap-2">
+        <CreateDAGButton />
+        {onRefresh && <RefreshButton onRefresh={onRefresh} />}
+      </div>
     </div>
   </div>
 );

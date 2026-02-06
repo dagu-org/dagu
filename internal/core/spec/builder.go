@@ -70,6 +70,9 @@ const (
 type BuildOpts struct {
 	// Base specifies the Base configuration file for the DAG.
 	Base string
+	// BaseDAG is a pre-built base DAG configuration that takes precedence over Base (file path).
+	// Used for namespace-specific base configurations stored as DAG objects.
+	BaseDAG *core.DAG
 	// Parameters specifies the Parameters to the DAG.
 	// Parameters are used to override the default Parameters in the DAG.
 	Parameters string

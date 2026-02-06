@@ -673,6 +673,7 @@ steps:
 		task := &coordinatorv1.Task{
 			Target:     "inline-dag", // Target is the DAG name, not filename
 			Definition: dagDefinition,
+			Namespace:  "team-alpha",
 		}
 
 		dag, cleanup, err := handler.loadDAG(context.Background(), task)
@@ -680,6 +681,7 @@ steps:
 		require.NoError(t, err)
 		require.NotNil(t, dag)
 		assert.Equal(t, "inline-dag", dag.Name) // Name comes from task.Target when Definition is provided
+		assert.Equal(t, "team-alpha", dag.Namespace) // Namespace propagated from task
 		require.NotNil(t, cleanup, "cleanup should be set for inline definitions")
 
 		// Call cleanup to remove temp file
@@ -728,6 +730,7 @@ func TestHandle(t *testing.T) {
 
 		task := &coordinatorv1.Task{
 			Operation: coordinatorv1.Operation_OPERATION_UNSPECIFIED,
+			Namespace: "default",
 		}
 
 		err := handler.Handle(context.Background(), task)
@@ -747,12 +750,34 @@ func TestHandle(t *testing.T) {
 
 		task := &coordinatorv1.Task{
 			Operation: coordinatorv1.Operation(999), // Unknown value
+			Namespace: "default",
 		}
 
 		err := handler.Handle(context.Background(), task)
 
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "unsupported operation")
+	})
+
+	t.Run("RejectsEmptyNamespace", func(t *testing.T) {
+		t.Parallel()
+
+		handler := &remoteTaskHandler{
+			workerID:          "test-worker",
+			coordinatorClient: newMockRemoteCoordinatorClient(),
+			config:            &config.Config{},
+		}
+
+		task := &coordinatorv1.Task{
+			Operation: coordinatorv1.Operation_OPERATION_START,
+			Target:    "test-dag",
+			Namespace: "",
+		}
+
+		err := handler.Handle(context.Background(), task)
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "task.Namespace is required")
 	})
 }
 
@@ -915,6 +940,7 @@ steps:
 		DagRunId:       "run-start-1",
 		RootDagRunName: "root",
 		RootDagRunId:   "root-1",
+		Namespace:      "default",
 	}
 
 	// This will fail at agent creation (no parent DAG run), but proves the path is taken
@@ -943,6 +969,7 @@ func TestHandle_OperationRetryWithoutStatusSource(t *testing.T) {
 		RootDagRunName: "root",
 		RootDagRunId:   "root-1",
 		PreviousStatus: nil, // Missing - should error
+		Namespace:      "default",
 	}
 
 	// Without PreviousStatus, retry should fail with a clear error
@@ -969,6 +996,7 @@ func TestHandle_OperationRetryWithStep(t *testing.T) {
 		RootDagRunName: "root",
 		RootDagRunId:   "root-1",
 		PreviousStatus: nil, // No embedded status
+		Namespace:      "default",
 	}
 
 	err := handler.Handle(context.Background(), task)

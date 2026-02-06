@@ -40,19 +40,24 @@ similar to the server-side spec validation.`,
 		},
 	}
 
-	// Initialize flags required by NewContext
-	initFlags(cmd)
+	// Initialize flags required by NewContext, plus namespace flag
+	initFlags(cmd, namespaceFlag)
 
 	return cmd
 }
 
 func runValidate(ctx *Context, args []string) error {
+	_, dagName, err := ctx.ResolveNamespaceFromArg(args[0])
+	if err != nil {
+		return err
+	}
+
 	// Try loading the DAG without evaluation, resolving relative names against DAGsDir
 	dag, err := spec.Load(
 		ctx,
-		args[0],
+		dagName,
 		spec.WithoutEval(),
-		spec.WithDAGsDir(ctx.Config.Paths.DAGsDir),
+		spec.WithDAGsDir(ctx.NamespacedDAGsDir()),
 	)
 
 	if err != nil {

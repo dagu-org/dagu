@@ -133,6 +133,8 @@ type Conversation struct {
 	UserID string `json:"user_id,omitempty"`
 	// Title is a human-readable name for the conversation.
 	Title string `json:"title,omitempty"`
+	// Namespace is the namespace this conversation is scoped to.
+	Namespace string `json:"namespace,omitempty"`
 	// CreatedAt is when this conversation was created.
 	CreatedAt time.Time `json:"created_at"`
 	// UpdatedAt is when this conversation was last modified.
@@ -177,6 +179,8 @@ type ChatRequest struct {
 	DAGContexts []DAGContext `json:"dag_contexts,omitempty"`
 	// SafeMode enables approval prompts for dangerous commands when true.
 	SafeMode bool `json:"safe_mode,omitempty"`
+	// Namespace is the namespace context for this request.
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // ResolvedDAGContext contains server-resolved information for a DAG.
@@ -225,6 +229,10 @@ type ToolContext struct {
 	Context context.Context
 	// WorkingDir is the current working directory for the tool.
 	WorkingDir string
+	// Namespace is the active namespace for this tool execution.
+	Namespace string
+	// NamespaceRole is the user's effective role in the namespace (e.g., "admin", "operator", "viewer").
+	NamespaceRole string
 	// EmitUIAction is a callback to emit UI actions during execution.
 	EmitUIAction UIActionFunc
 	// EmitUserPrompt is a callback to emit user prompts during execution.
@@ -284,4 +292,6 @@ type EnvironmentInfo struct {
 	WorkingDir string
 	// BaseConfigFile is the path to the base configuration file.
 	BaseConfigFile string
+	// Namespace is the active namespace for this environment.
+	Namespace string
 }

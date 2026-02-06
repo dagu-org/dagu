@@ -1,9 +1,17 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '../../components/ui/breadcrumb';
 import { Search as SearchIcon } from 'lucide-react';
 import React, { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import { useNamespace } from '../../contexts/NamespaceContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
 import SearchResult from '../../features/search/components/SearchResult';
 import { useQuery } from '../../hooks/api';
@@ -13,6 +21,7 @@ function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const appBarContext = React.useContext(AppBarContext);
   const searchState = useSearchState();
+  const { selectedNamespace, isAllNamespaces } = useNamespace();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
 
   type SearchFilters = {
@@ -93,6 +102,14 @@ function Search() {
     searchState.writeState('searchPage', remoteKey, currentFilters);
   }, [currentFilters, remoteKey, searchState]);
 
+  React.useEffect(() => {
+    if (isAllNamespaces) {
+      appBarContext.setTitle('Search DAG Definitions');
+    } else {
+      appBarContext.setTitle(`Search DAG Definitions — ${selectedNamespace}`);
+    }
+  }, [appBarContext, selectedNamespace, isAllNamespaces]);
+
   const q = searchParams.get('q') || '';
   // Use a conditional key pattern - this is a standard SWR pattern for conditional fetching
   // When q is empty, we pass undefined for the first parameter, which tells SWR not to fetch
@@ -104,6 +121,7 @@ function Search() {
             query: {
               remoteNode: appBarContext.selectedRemoteNode || 'local',
               q,
+              namespace: !isAllNamespaces ? selectedNamespace : undefined,
             },
           },
         }
@@ -128,6 +146,19 @@ function Search() {
   return (
     <div className="max-w-7xl">
       <div className="w-full">
+        {!isAllNamespaces && (
+          <Breadcrumb className="mb-1">
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbPage>{selectedNamespace}</BreadcrumbPage>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Search</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        )}
         <Title>Search DAG Definitions</Title>
         <div className="flex items-center gap-2 pt-2">
           <Input

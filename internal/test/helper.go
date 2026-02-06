@@ -27,6 +27,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
 	"github.com/dagu-org/dagu/internal/persis/filequeue"
+	"github.com/dagu-org/dagu/internal/persis/filenamespace"
 	"github.com/dagu-org/dagu/internal/persis/fileserviceregistry"
 	runtimepkg "github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
@@ -158,9 +159,14 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	cfg.Paths.LogDir = filepath.Join(tmpDir, "logs")
 	dataDir := filepath.Join(tmpDir, "data")
 	cfg.Paths.DataDir = dataDir
-	cfg.Paths.DAGRunsDir = filepath.Join(dataDir, "dag-runs")
-	cfg.Paths.QueueDir = filepath.Join(dataDir, "queue")
-	cfg.Paths.ProcDir = filepath.Join(dataDir, "proc")
+	// Use default namespace-scoped directories (short ID "0000") so test
+	// verification stores match the directories that namespace-aware commands
+	// (start, restart) will write to after resolving the default namespace.
+	defaultNSDir := filepath.Join(dataDir, "0000")
+	cfg.Paths.DAGRunsDir = filepath.Join(defaultNSDir, "dag-runs")
+	cfg.Paths.QueueDir = filepath.Join(defaultNSDir, "queue")
+	cfg.Paths.ProcDir = filepath.Join(defaultNSDir, "proc")
+	cfg.Paths.NamespacesDir = filepath.Join(dataDir, "namespaces")
 	cfg.Paths.ServiceRegistryDir = filepath.Join(dataDir, "service-registry")
 	cfg.Paths.UsersDir = filepath.Join(dataDir, "users")
 	cfg.Paths.SuspendFlagsDir = filepath.Join(tmpDir, "suspend-flags")
@@ -195,6 +201,8 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	procStore := fileproc.New(cfg.Paths.ProcDir)
 	queueStore := filequeue.New(cfg.Paths.QueueDir)
 	serviceMonitor := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
+	nsStore, err := filenamespace.New(cfg.Paths.NamespacesDir)
+	require.NoError(t, err, "failed to initialize namespace store")
 
 	drm := runtimepkg.NewManager(runStore, procStore, cfg)
 
@@ -207,6 +215,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		ProcStore:       procStore,
 		QueueStore:      queueStore,
 		ServiceRegistry: serviceMonitor,
+		NamespaceStore:  nsStore,
 		SubCmdBuilder:   runtimepkg.NewSubCmdBuilder(cfg),
 
 		tmpDir: tmpDir,
@@ -273,6 +282,7 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 		"serviceRegistryDir": cfg.Paths.ServiceRegistryDir,
 		"usersDir":           cfg.Paths.UsersDir,
 		"executable":         cfg.Paths.Executable,
+		"namespacesDir":      cfg.Paths.NamespacesDir,
 	}
 
 	if cfg.Queues.Enabled || len(cfg.Queues.Config) > 0 {
@@ -368,6 +378,7 @@ type Helper struct {
 	ProcStore       exec1.ProcStore
 	QueueStore      exec1.QueueStore
 	ServiceRegistry exec1.ServiceRegistry
+	NamespaceStore  exec1.NamespaceStore
 	SubCmdBuilder   *runtimepkg.SubCmdBuilder
 
 	tmpDir string
@@ -406,6 +417,9 @@ func (h Helper) DAG(t *testing.T, yamlContent string) DAG {
 
 	dag, err := spec.Load(h.Context, testFile)
 	require.NoError(t, err, "failed to load test DAG")
+
+	// Set default namespace to match what namespace-aware commands (start, restart) will set.
+	dag.Namespace = "default"
 
 	return DAG{
 		Helper: &h,

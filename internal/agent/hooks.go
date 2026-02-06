@@ -13,6 +13,7 @@ type ToolExecInfo struct {
 	UserID         string
 	Username       string
 	IPAddress      string
+	Namespace      string
 	Audit          *AuditInfo // from AgentTool.Audit; nil = not audited
 }
 

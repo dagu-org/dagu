@@ -71,6 +71,10 @@ type DAG struct {
 	Group string `json:"group,omitempty"`
 	// Name is the name of the DAG. The default is the filename without the extension.
 	Name string `json:"name,omitempty"`
+	// Namespace is the namespace the DAG belongs to.
+	// This field is set by the caller (CLI flag, API path, coordinator task),
+	// not by spec.Load(). DAG YAML files remain namespace-agnostic.
+	Namespace string `json:"namespace,omitempty"`
 	// Type is the execution type (graph, chain, or agent). Default is graph.
 	Type string `json:"type,omitempty"`
 	// Shell is the default shell to use for all steps in this DAG.
@@ -247,15 +251,15 @@ func (d *DAG) HasHITLSteps() bool {
 // The address is used to communicate with the agent process.
 func (d *DAG) SockAddr(dagRunID string) string {
 	if d.Location != "" {
-		return SockAddr(d.Location, "")
+		return SockAddr(d.Namespace, d.Location, "")
 	}
-	return SockAddr(d.Name, dagRunID)
+	return SockAddr(d.Namespace, d.Name, dagRunID)
 }
 
 // SockAddrForSubDAGRun returns the unix socket address for a specific dag-run ID.
 // This is used to control sub dag-runs.
 func (d *DAG) SockAddrForSubDAGRun(dagRunID string) string {
-	return SockAddr(d.GetName(), dagRunID)
+	return SockAddr(d.Namespace, d.GetName(), dagRunID)
 }
 
 // GetName returns the name of the DAG.
@@ -694,7 +698,9 @@ func (h HandlerType) String() string {
 
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
-func SockAddr(name, dagRunID string) string {
+// The namespace parameter is included in the hash input so that two DAGs with
+// the same name in different namespaces produce different socket paths.
+func SockAddr(namespace, name, dagRunID string) string {
 	const (
 		hashLength          = 6
 		maxSocketNameLength = 50
@@ -702,7 +708,7 @@ func SockAddr(name, dagRunID string) string {
 		suffix              = ".sock"
 	)
 
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(name+dagRunID)))[:hashLength] //nolint:gosec
+	hash := fmt.Sprintf("%x", md5.Sum([]byte(namespace+name+dagRunID)))[:hashLength] //nolint:gosec
 	safeName := fileutil.SafeName(name)
 
 	// Calculate available space for the name

@@ -1,13 +1,17 @@
 import { debounce } from 'lodash';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
+import useSWR from 'swr';
 import {
   PathsDagsGetParametersQueryOrder,
   PathsDagsGetParametersQuerySort,
+  PathsNamespacesNamespaceNameDagsGetParametersQueryOrder,
+  PathsNamespacesNamespaceNameDagsGetParametersQuerySort,
 } from '../../api/v1/schema';
 import SplitLayout from '../../components/SplitLayout';
 import { TabBar } from '../../components/TabBar';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import { useNamespace } from '../../contexts/NamespaceContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
 import { TabProvider, useTabContext } from '../../contexts/TabContext';
 import { useUserPreferences } from '../../contexts/UserPreference';
@@ -15,7 +19,7 @@ import { DAGDetailsPanel } from '../../features/dags/components/dag-details';
 import { DAGErrors } from '../../features/dags/components/dag-editor';
 import { DAGTable } from '../../features/dags/components/dag-list';
 import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
-import { useQuery } from '../../hooks/api';
+import { useClient } from '../../hooks/api';
 import { useDAGsListSSE } from '../../hooks/useDAGsListSSE';
 import LoadingIndicator from '../../ui/LoadingIndicator';
 
@@ -57,6 +61,8 @@ function DAGsContent() {
   const { preferences, updatePreference } = useUserPreferences();
   const { tabs, activeTabId, selectDAG, addTab, closeTab, getActiveFileName } =
     useTabContext();
+  const { selectedNamespace, isAllNamespaces } = useNamespace();
+  const client = useClient();
 
   const defaultFilters = React.useMemo<DAGDefinitionsFilters>(
     () => ({
@@ -203,26 +209,59 @@ function DAGsContent() {
     [page, preferences.pageLimit, apiSearchText, apiSearchTags, sortField, sortOrder]
   );
 
-  const sseResult = useDAGsListSSE(queryParams, true);
+  // SSE with namespace scoping
+  const sseParams = React.useMemo(
+    () => ({
+      ...queryParams,
+      namespace: !isAllNamespaces ? selectedNamespace : undefined,
+    }),
+    [queryParams, selectedNamespace, isAllNamespaces]
+  );
+
+  const sseResult = useDAGsListSSE(sseParams, true);
   const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
 
-  const { data: pollingData, mutate, isLoading } = useQuery(
-    '/dags',
-    {
-      params: {
-        query: {
-          ...queryParams,
-          remoteNode,
-          sort: sortField as PathsDagsGetParametersQuerySort,
-          order: sortOrder as PathsDagsGetParametersQueryOrder,
+  // Polling fallback - supports both global and namespace-scoped endpoints
+  const pollingKey = React.useMemo(
+    () =>
+      usePolling
+        ? ['dags-list', selectedNamespace, page, preferences.pageLimit, apiSearchText, apiSearchTags.join(','), sortField, sortOrder, remoteNode]
+        : null,
+    [usePolling, selectedNamespace, page, preferences.pageLimit, apiSearchText, apiSearchTags, sortField, sortOrder, remoteNode]
+  );
+
+  const { data: pollingData, mutate, isLoading } = useSWR(
+    pollingKey,
+    async () => {
+      if (isAllNamespaces) {
+        const { data } = await client.GET('/dags', {
+          params: {
+            query: {
+              ...queryParams,
+              remoteNode,
+              sort: sortField as PathsDagsGetParametersQuerySort,
+              order: sortOrder as PathsDagsGetParametersQueryOrder,
+            },
+          },
+        });
+        return data;
+      }
+      const { data } = await client.GET('/namespaces/{namespaceName}/dags', {
+        params: {
+          path: { namespaceName: selectedNamespace },
+          query: {
+            ...queryParams,
+            sort: sortField as PathsNamespacesNamespaceNameDagsGetParametersQuerySort,
+            order: sortOrder as PathsNamespacesNamespaceNameDagsGetParametersQueryOrder,
+          },
         },
-      },
+      });
+      return data;
     },
     {
-      refreshInterval: usePolling ? 2000 : 0,
+      refreshInterval: 2000,
       revalidateIfStale: false,
       keepPreviousData: true,
-      isPaused: () => !usePolling,
     }
   );
 
@@ -254,9 +293,14 @@ function DAGsContent() {
     setTimeout(() => mutate(), 500);
   }, [mutate]);
 
+  // Update page title with namespace context
   React.useEffect(() => {
-    appBarContext.setTitle('DAG Definitions');
-  }, [appBarContext]);
+    if (isAllNamespaces) {
+      appBarContext.setTitle('DAG Definitions');
+    } else {
+      appBarContext.setTitle(`DAG Definitions — ${selectedNamespace}`);
+    }
+  }, [appBarContext, selectedNamespace, isAllNamespaces]);
 
   const { dagFiles, errorCount } = React.useMemo(() => {
     const dags = data?.dags ?? [];
@@ -321,9 +365,11 @@ function DAGsContent() {
 
   const displayData = data ?? lastValidData;
 
+  const namespaceBreadcrumb = !isAllNamespaces ? selectedNamespace : undefined;
+
   const leftPanel = (
     <div className="pl-4 md:pl-6 pr-2 pt-4 md:pt-6 pb-6">
-      <DAGListHeader onRefresh={refreshFn} />
+      <DAGListHeader onRefresh={refreshFn} namespace={namespaceBreadcrumb} />
       {displayData ? (
         <>
           <DAGErrors

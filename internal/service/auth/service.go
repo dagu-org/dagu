@@ -284,10 +284,11 @@ func (s *Service) ListUsers(ctx context.Context) ([]*auth.User, error) {
 // but the API handler intentionally omits it - password changes should
 // go through ChangePassword (user self-service) or ResetPassword (admin).
 type UpdateUserInput struct {
-	Username   *string
-	Role       *auth.Role
-	Password   *string
-	IsDisabled *bool
+	Username       *string
+	Role           *auth.Role
+	Password       *string
+	IsDisabled     *bool
+	NamespaceRoles *map[string]auth.Role
 }
 
 // UpdateUser updates an existing user.
@@ -321,6 +322,10 @@ func (s *Service) UpdateUser(ctx context.Context, id string, input UpdateUserInp
 
 	if input.IsDisabled != nil {
 		user.IsDisabled = *input.IsDisabled
+	}
+
+	if input.NamespaceRoles != nil {
+		user.NamespaceRoles = *input.NamespaceRoles
 	}
 
 	user.UpdatedAt = time.Now().UTC()

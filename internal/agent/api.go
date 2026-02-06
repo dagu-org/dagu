@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -56,14 +57,15 @@ func getUserContextFromRequest(r *http.Request) (userID, username, ipAddress str
 
 // API handles HTTP requests for the agent.
 type API struct {
-	conversations sync.Map // id -> *ConversationManager (active conversations)
-	store         ConversationStore
-	configStore   ConfigStore
-	workingDir    string
-	logger        *slog.Logger
-	dagStore      exec.DAGStore // For resolving DAG file paths
-	environment   EnvironmentInfo
-	hooks         *Hooks
+	conversations  sync.Map // id -> *ConversationManager (active conversations)
+	store          ConversationStore
+	configStore    ConfigStore
+	workingDir     string
+	logger         *slog.Logger
+	dagStore       exec.DAGStore // For resolving DAG file paths
+	namespaceStore exec.NamespaceStore
+	environment    EnvironmentInfo
+	hooks          *Hooks
 }
 
 // APIConfig contains configuration for the API.
@@ -73,6 +75,7 @@ type APIConfig struct {
 	Logger            *slog.Logger
 	ConversationStore ConversationStore
 	DAGStore          exec.DAGStore // For resolving DAG file paths
+	NamespaceStore    exec.NamespaceStore
 	Environment       EnvironmentInfo
 	Hooks             *Hooks
 }
@@ -92,13 +95,14 @@ func NewAPI(cfg APIConfig) *API {
 	}
 
 	return &API{
-		configStore: cfg.ConfigStore,
-		workingDir:  cfg.WorkingDir,
-		logger:      logger,
-		store:       cfg.ConversationStore,
-		dagStore:    cfg.DAGStore,
-		environment: cfg.Environment,
-		hooks:       cfg.Hooks,
+		configStore:    cfg.ConfigStore,
+		workingDir:     cfg.WorkingDir,
+		logger:         logger,
+		store:          cfg.ConversationStore,
+		dagStore:       cfg.DAGStore,
+		namespaceStore: cfg.NamespaceStore,
+		environment:    cfg.Environment,
+		hooks:          cfg.Hooks,
 	}
 }
 
@@ -226,13 +230,14 @@ func (a *API) createMessageCallback(id string) func(ctx context.Context, msg Mes
 }
 
 // persistNewConversation saves a new conversation to the store if configured.
-func (a *API) persistNewConversation(ctx context.Context, id, userID string, now time.Time) {
+func (a *API) persistNewConversation(ctx context.Context, id, userID, namespace string, now time.Time) {
 	if a.store == nil {
 		return
 	}
 	conv := &Conversation{
 		ID:        id,
 		UserID:    userID,
+		Namespace: namespace,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -275,6 +280,13 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Enforce namespace-scoped access
+	nsRole := a.resolveNamespaceRole(r.Context(), req.Namespace)
+	if req.Namespace != "" && nsRole == "" {
+		a.respondError(w, http.StatusForbidden, api.ErrorCodeForbidden, "No access to namespace: "+req.Namespace)
+		return
+	}
+
 	provider, configModel, err := a.configStore.GetProvider(r.Context())
 	if err != nil {
 		a.logger.Error("Failed to get LLM provider", "error", err)
@@ -287,20 +299,23 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 	id := uuid.New().String()
 	now := time.Now()
 
+	env := a.environmentForNamespace(req.Namespace)
+
 	mgr := NewConversationManager(ConversationManagerConfig{
-		ID:          id,
-		UserID:      userID,
-		Logger:      a.logger,
-		WorkingDir:  a.workingDir,
-		OnMessage:   a.createMessageCallback(id),
-		Environment: a.environment,
-		SafeMode:    req.SafeMode,
-		Hooks:       a.hooks,
-		Username:    username,
-		IPAddress:   ipAddress,
+		ID:            id,
+		UserID:        userID,
+		Logger:        a.logger,
+		WorkingDir:    env.DAGsDir,
+		OnMessage:     a.createMessageCallback(id),
+		Environment:   env,
+		SafeMode:      req.SafeMode,
+		Hooks:         a.hooks,
+		Username:      username,
+		IPAddress:     ipAddress,
+		NamespaceRole: nsRole,
 	})
 
-	a.persistNewConversation(r.Context(), id, userID, now)
+	a.persistNewConversation(r.Context(), id, userID, req.Namespace, now)
 	a.conversations.Store(id, mgr)
 
 	messageWithContext := a.formatMessage(r.Context(), req.Message, req.DAGContexts)
@@ -509,6 +524,7 @@ func (a *API) getOrReactivateConversation(ctx context.Context, id, userID, usern
 }
 
 // reactivateConversation restores a conversation from storage and makes it active.
+// Uses the stored conversation's namespace to scope the environment (namespace locking).
 func (a *API) reactivateConversation(ctx context.Context, id, userID, username, ipAddress string) (*ConversationManager, bool) {
 	if a.store == nil {
 		return nil, false
@@ -516,6 +532,13 @@ func (a *API) reactivateConversation(ctx context.Context, id, userID, username, 
 
 	conv, err := a.store.GetConversation(ctx, id)
 	if err != nil || conv == nil || conv.UserID != userID {
+		return nil, false
+	}
+
+	// Check namespace access for the stored conversation's namespace
+	nsRole := a.resolveNamespaceRole(ctx, conv.Namespace)
+	if conv.Namespace != "" && nsRole == "" {
+		a.logger.Warn("User lacks access to conversation namespace", "namespace", conv.Namespace, "user", userID)
 		return nil, false
 	}
 
@@ -530,18 +553,22 @@ func (a *API) reactivateConversation(ctx context.Context, id, userID, username, 
 		seqID = int64(len(messages))
 	}
 
+	// Use the stored conversation's namespace for environment (namespace locking)
+	env := a.environmentForNamespace(conv.Namespace)
+
 	mgr := NewConversationManager(ConversationManagerConfig{
-		ID:          id,
-		UserID:      userID,
-		Logger:      a.logger,
-		WorkingDir:  a.workingDir,
-		OnMessage:   a.createMessageCallback(id),
-		History:     messages,
-		SequenceID:  seqID,
-		Environment: a.environment,
-		Hooks:       a.hooks,
-		Username:    username,
-		IPAddress:   ipAddress,
+		ID:            id,
+		UserID:        userID,
+		Logger:        a.logger,
+		WorkingDir:    env.DAGsDir,
+		OnMessage:     a.createMessageCallback(id),
+		History:       messages,
+		SequenceID:    seqID,
+		Environment:   env,
+		Hooks:         a.hooks,
+		Username:      username,
+		IPAddress:     ipAddress,
+		NamespaceRole: nsRole,
 	})
 	a.conversations.Store(id, mgr)
 
@@ -650,6 +677,54 @@ func (a *API) handleUserResponse(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.respondJSON(w, http.StatusOK, map[string]string{"status": "accepted"})
+}
+
+// environmentForNamespace returns an EnvironmentInfo scoped to the given namespace.
+// If namespace is empty or "default", returns the base environment with Namespace set.
+// For non-default namespaces, looks up the namespace short ID and adjusts paths.
+func (a *API) environmentForNamespace(namespace string) EnvironmentInfo {
+	if namespace == "" || namespace == "default" {
+		env := a.environment
+		env.Namespace = namespace
+		return env
+	}
+
+	env := a.environment
+	env.Namespace = namespace
+
+	if a.namespaceStore == nil {
+		return env
+	}
+
+	ns, err := a.namespaceStore.Get(context.Background(), namespace)
+	if err != nil {
+		a.logger.Warn("Failed to resolve namespace for agent", "namespace", namespace, "error", err)
+		return env
+	}
+
+	env.DAGsDir = filepath.Join(a.environment.DAGsDir, ns.ShortID)
+	env.DataDir = filepath.Join(a.environment.DataDir, ns.ShortID)
+	env.WorkingDir = env.DAGsDir
+	return env
+}
+
+// resolveNamespaceRole returns the user's effective role in the given namespace.
+// Returns an empty string if: auth is disabled (no user in context), namespace is empty,
+// or the user has no access to the namespace. When auth is disabled, returns "admin"
+// for backward compatibility.
+func (a *API) resolveNamespaceRole(ctx context.Context, namespace string) string {
+	user, ok := auth.UserFromContext(ctx)
+	if !ok || user == nil {
+		return string(auth.RoleAdmin) // Auth disabled: full access
+	}
+	if namespace == "" {
+		return string(user.Role) // No namespace: use global role
+	}
+	role := user.EffectiveRoleInNamespace(namespace)
+	if !role.Valid() {
+		return ""
+	}
+	return string(role)
 }
 
 // ptrTo returns a pointer to the given value.

@@ -132,6 +132,34 @@ func TestAllRoles(t *testing.T) {
 	}
 }
 
+func TestHigherRole(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b Role
+		want Role
+	}{
+		{"admin vs viewer", RoleAdmin, RoleViewer, RoleAdmin},
+		{"viewer vs admin", RoleViewer, RoleAdmin, RoleAdmin},
+		{"manager vs operator", RoleManager, RoleOperator, RoleManager},
+		{"operator vs manager", RoleOperator, RoleManager, RoleManager},
+		{"same role", RoleOperator, RoleOperator, RoleOperator},
+		{"admin vs admin", RoleAdmin, RoleAdmin, RoleAdmin},
+		{"viewer vs viewer", RoleViewer, RoleViewer, RoleViewer},
+		{"invalid vs viewer", Role("invalid"), RoleViewer, RoleViewer},
+		{"viewer vs invalid", RoleViewer, Role("invalid"), RoleViewer},
+		{"empty vs operator", Role(""), RoleOperator, RoleOperator},
+		{"operator vs empty", RoleOperator, Role(""), RoleOperator},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := HigherRole(tt.a, tt.b); got != tt.want {
+				t.Errorf("HigherRole(%q, %q) = %q, want %q", tt.a, tt.b, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRole_String(t *testing.T) {
 	tests := []struct {
 		role Role

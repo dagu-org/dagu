@@ -33,6 +33,7 @@ type ConversationManager struct {
 	hooks           *Hooks
 	username        string
 	ipAddress       string
+	namespaceRole   string
 	onWorkingChange func(id string, working bool)
 	onMessage       func(ctx context.Context, msg Message) error
 	pendingPrompts  map[string]chan UserPromptResponse
@@ -54,6 +55,7 @@ type ConversationManagerConfig struct {
 	Hooks           *Hooks
 	Username        string
 	IPAddress       string
+	NamespaceRole   string // User's effective role in the namespace
 }
 
 // NewConversationManager creates a new ConversationManager.
@@ -86,6 +88,7 @@ func NewConversationManager(cfg ConversationManagerConfig) *ConversationManager 
 		hooks:           cfg.Hooks,
 		username:        cfg.Username,
 		ipAddress:       cfg.IPAddress,
+		namespaceRole:   cfg.NamespaceRole,
 	}
 }
 
@@ -181,6 +184,7 @@ func (cm *ConversationManager) GetConversation() Conversation {
 	return Conversation{
 		ID:        cm.id,
 		UserID:    cm.userID,
+		Namespace: cm.environment.Namespace,
 		CreatedAt: cm.lastActivity,
 		UpdatedAt: cm.lastActivity,
 	}
@@ -339,6 +343,8 @@ func (cm *ConversationManager) createLoop(provider llm.Provider, model string, h
 		UserID:           cm.userID,
 		Username:         cm.username,
 		IPAddress:        cm.ipAddress,
+		Namespace:        cm.environment.Namespace,
+		NamespaceRole:    cm.namespaceRole,
 	})
 }
 

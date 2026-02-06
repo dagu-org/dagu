@@ -496,13 +496,29 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	pg := exec.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
 	tags := parseCommaSeparatedTags(request.Params.Tags)
 
-	result, errList, err := a.dagStore.List(ctx, exec.ListDAGsOptions{
+	listOpts := exec.ListDAGsOptions{
 		Paginator: &pg,
 		Name:      valueOf(request.Params.Name),
 		Tags:      tags,
 		Sort:      sortField,
 		Order:     sortOrder,
-	})
+	}
+
+	// Aggregate across all namespaces when namespace store is available.
+	if a.namespaceStore != nil {
+		agg, err := a.listDAGsAcrossNamespaces(ctx, listOpts)
+		if err != nil {
+			return nil, fmt.Errorf("error listing DAGs: %w", err)
+		}
+		paginatedResult := exec.NewPaginatedResult(agg.dagFiles, agg.total, pg)
+		return &api.ListDAGs200JSONResponse{
+			Dags:       agg.dagFiles,
+			Errors:     agg.errors,
+			Pagination: toPagination(paginatedResult),
+		}, nil
+	}
+
+	result, errList, err := a.dagStore.List(ctx, listOpts)
 	if err != nil {
 		return nil, fmt.Errorf("error listing DAGs: %w", err)
 	}
@@ -1062,6 +1078,55 @@ func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDA
 }
 
 func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObject) (api.SearchDAGsResponseObject, error) {
+	// Use namespace-scoped stores if namespace param is provided.
+	if request.Params.Namespace != nil && *request.Params.Namespace != "" {
+		stores, nsErr := a.resolveNamespaceStores(ctx, *request.Params.Namespace)
+		if nsErr != nil {
+			return nil, nsErr
+		}
+
+		ret, errs, err := stores.dagStore.Grep(ctx, request.Params.Q)
+		if err != nil {
+			return nil, fmt.Errorf("error searching DAGs: %w", err)
+		}
+
+		var results []api.SearchResultItem
+		for _, item := range ret {
+			var matches []api.SearchDAGsMatchItem
+			for _, match := range item.Matches {
+				matches = append(matches, api.SearchDAGsMatchItem{
+					Line:       match.Line,
+					LineNumber: match.LineNumber,
+					StartLine:  match.StartLine,
+				})
+			}
+
+			results = append(results, api.SearchResultItem{
+				Name:    item.Name,
+				Dag:     toDAG(item.DAG),
+				Matches: matches,
+			})
+		}
+
+		return &api.SearchDAGs200JSONResponse{
+			Results: results,
+			Errors:  errs,
+		}, nil
+	}
+
+	// Aggregate across all namespaces.
+	if a.namespaceStore != nil {
+		results, errs, err := a.searchDAGsAcrossNamespaces(ctx, request.Params.Q)
+		if err != nil {
+			return nil, fmt.Errorf("error searching DAGs: %w", err)
+		}
+		return &api.SearchDAGs200JSONResponse{
+			Results: results,
+			Errors:  errs,
+		}, nil
+	}
+
+	// Fallback: use global store.
 	ret, errs, err := a.dagStore.Grep(ctx, request.Params.Q)
 	if err != nil {
 		return nil, fmt.Errorf("error searching DAGs: %w", err)
@@ -1176,6 +1241,7 @@ func (a *API) GetDAGHistoryData(ctx context.Context, fileName string) (any, erro
 
 // GetDAGsListData returns DAGs list for SSE.
 // Identifier format: URL query string (e.g., "page=1&perPage=100&name=mydag")
+// Supports optional "namespace" param to scope results to a specific namespace.
 func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, error) {
 	params, err := url.ParseQuery(queryString)
 	if err != nil {
@@ -1211,6 +1277,58 @@ func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, err
 		Order:     sortOrder,
 	}
 
+	// Use namespace-scoped stores if namespace param is provided.
+	namespaceName := params.Get("namespace")
+	if namespaceName != "" {
+		// Single namespace scoping.
+		stores, nsErr := a.resolveNamespaceStores(ctx, namespaceName)
+		if nsErr != nil {
+			return nil, nsErr
+		}
+
+		result, errList, err := stores.dagStore.List(ctx, listOpts)
+		if err != nil {
+			return nil, fmt.Errorf("error listing DAGs: %w", err)
+		}
+
+		dagFiles := make([]api.DAGFile, 0, len(result.Items))
+		for _, item := range result.Items {
+			dagStatus, statusErr := stores.dagRunMgr.GetLatestStatus(ctx, item)
+			dagFile := api.DAGFile{
+				FileName:     item.FileName(),
+				LatestDAGRun: toDAGRunSummary(dagStatus),
+				Suspended:    stores.dagStore.IsSuspended(ctx, item.FileName()),
+				Dag:          toDAG(item),
+				Errors:       extractBuildErrors(item.BuildErrors),
+			}
+			if statusErr != nil {
+				errList = append(errList, statusErr.Error())
+			}
+			dagFiles = append(dagFiles, dagFile)
+		}
+
+		return api.ListDAGs200JSONResponse{
+			Dags:       dagFiles,
+			Errors:     errList,
+			Pagination: toPagination(result),
+		}, nil
+	}
+
+	// Aggregate across all namespaces.
+	if a.namespaceStore != nil {
+		agg, err := a.listDAGsAcrossNamespaces(ctx, listOpts)
+		if err != nil {
+			return nil, fmt.Errorf("error listing DAGs: %w", err)
+		}
+		paginatedResult := exec.NewPaginatedResult(agg.dagFiles, agg.total, pg)
+		return api.ListDAGs200JSONResponse{
+			Dags:       agg.dagFiles,
+			Errors:     agg.errors,
+			Pagination: toPagination(paginatedResult),
+		}, nil
+	}
+
+	// Fallback: use global stores (no namespace store configured).
 	result, errList, err := a.dagStore.List(ctx, listOpts)
 	if err != nil {
 		return nil, fmt.Errorf("error listing DAGs: %w", err)

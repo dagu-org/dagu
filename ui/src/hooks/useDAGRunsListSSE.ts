@@ -14,6 +14,7 @@ interface DAGRunsListParams {
   name?: string;
   dagRunId?: string;
   tags?: string;
+  namespace?: string;
 }
 
 export function useDAGRunsListSSE(

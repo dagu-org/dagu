@@ -33,7 +33,7 @@ Examples:
 	)
 }
 
-var retryFlags = []commandLineFlag{dagRunIDFlagRetry, stepNameForRetry, retryWorkerIDFlag}
+var retryFlags = []commandLineFlag{dagRunIDFlagRetry, stepNameForRetry, retryWorkerIDFlag, namespaceFlag}
 
 var retryWorkerIDFlag = commandLineFlag{
 	name:  "worker-id",
@@ -41,11 +41,16 @@ var retryWorkerIDFlag = commandLineFlag{
 }
 
 func runRetry(ctx *Context, args []string) error {
+	_, dagName, err := ctx.ResolveNamespaceFromArg(args[0])
+	if err != nil {
+		return fmt.Errorf("failed to resolve namespace: %w", err)
+	}
+
 	dagRunID, _ := ctx.StringParam("run-id")
 	stepName, _ := ctx.StringParam("step")
 	workerID := getWorkerID(ctx)
 
-	name, err := extractDAGName(ctx, args[0])
+	name, err := extractDAGName(ctx, dagName)
 	if err != nil {
 		return fmt.Errorf("failed to extract DAG name: %w", err)
 	}

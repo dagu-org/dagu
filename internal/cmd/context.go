@@ -26,6 +26,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
+	"github.com/dagu-org/dagu/internal/persis/filenamespace"
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
 	"github.com/dagu-org/dagu/internal/persis/filequeue"
 	"github.com/dagu-org/dagu/internal/persis/fileserviceregistry"
@@ -54,25 +55,29 @@ type Context struct {
 	ProcStore       exec.ProcStore
 	QueueStore      exec.QueueStore
 	ServiceRegistry exec.ServiceRegistry
+	NamespaceStore  exec.NamespaceStore
 
-	Proc exec.ProcHandle
+	Proc             exec.ProcHandle
+	NamespaceShortID string // Set by ResolveNamespace/ResolveNamespaceFromArg
 }
 
 // WithContext returns a new Context with a different underlying context.Context.
 // This is useful for creating a signal-aware context for service operations.
 func (c *Context) WithContext(ctx context.Context) *Context {
 	return &Context{
-		Context:         ctx,
-		Command:         c.Command,
-		Flags:           c.Flags,
-		Config:          c.Config,
-		Quiet:           c.Quiet,
-		DAGRunStore:     c.DAGRunStore,
-		DAGRunMgr:       c.DAGRunMgr,
-		ProcStore:       c.ProcStore,
-		QueueStore:      c.QueueStore,
-		ServiceRegistry: c.ServiceRegistry,
-		Proc:            c.Proc,
+		Context:          ctx,
+		Command:          c.Command,
+		Flags:            c.Flags,
+		Config:           c.Config,
+		Quiet:            c.Quiet,
+		DAGRunStore:      c.DAGRunStore,
+		DAGRunMgr:        c.DAGRunMgr,
+		ProcStore:        c.ProcStore,
+		QueueStore:       c.QueueStore,
+		ServiceRegistry:  c.ServiceRegistry,
+		NamespaceStore:   c.NamespaceStore,
+		Proc:             c.Proc,
+		NamespaceShortID: c.NamespaceShortID,
 	}
 }
 
@@ -201,6 +206,15 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	drm := runtime.NewManager(drs, ps, cfg)
 	qs := filequeue.New(cfg.Paths.QueueDir)
 	sm := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
+	ns, err := filenamespace.New(cfg.Paths.NamespacesDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize namespace store: %w", err)
+	}
+
+	// Auto-migrate existing data into the default namespace on first startup.
+	if err := migrateToDefaultNamespace(cfg.Paths); err != nil {
+		return nil, fmt.Errorf("failed to run namespace migration: %w", err)
+	}
 
 	// Log key configuration settings for debugging
 	logger.Debug(ctx, "Configuration loaded",
@@ -224,6 +238,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		ProcStore:       ps,
 		QueueStore:      qs,
 		ServiceRegistry: sm,
+		NamespaceStore:  ns,
 	}, nil
 }
 
@@ -295,6 +310,9 @@ func (c *Context) NewServer(rs *resource.Service, opts ...frontend.ServerOption)
 
 	mr := telemetry.NewRegistry(collector)
 
+	if c.NamespaceStore != nil {
+		opts = append(opts, frontend.WithNamespaceStore(c.NamespaceStore))
+	}
 	return frontend.NewServer(c.Context, c.Config, dr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.DAGRunMgr, cc, c.ServiceRegistry, mr, collector, rs, opts...)
 }
 
@@ -336,7 +354,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 
 	coordinatorCli := c.NewCoordinatorClient()
 	de := scheduler.NewDAGExecutor(coordinatorCli, runtime.NewSubCmdBuilder(c.Config))
-	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable)
+	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable, c.NamespaceStore)
 	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli)
 }
 
@@ -392,6 +410,92 @@ func (c *Context) dagStore(cfg dagStoreConfig) (exec.DAGStore, error) {
 	}
 
 	return store, nil
+}
+
+// InitNamespaceScopedStores re-initializes stores to use namespace-scoped directories
+// under {DataDir}/{namespaceShortID}/. Directories are created if they don't exist.
+func (c *Context) InitNamespaceScopedStores(namespaceShortID string) error {
+	nsDAGRunsDir := filepath.Join(c.Config.Paths.DataDir, namespaceShortID, "dag-runs")
+	nsProcDir := filepath.Join(c.Config.Paths.DataDir, namespaceShortID, "proc")
+	nsQueueDir := filepath.Join(c.Config.Paths.DataDir, namespaceShortID, "queue")
+
+	for _, dir := range []string{nsDAGRunsDir, nsProcDir, nsQueueDir} {
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			return fmt.Errorf("failed to create namespace directory %s: %w", dir, err)
+		}
+	}
+
+	c.DAGRunStore = filedagrun.New(nsDAGRunsDir,
+		filedagrun.WithLatestStatusToday(c.Config.Server.LatestStatusToday),
+		filedagrun.WithLocation(c.Config.Core.Location),
+	)
+	c.ProcStore = fileproc.New(nsProcDir)
+	c.QueueStore = filequeue.New(nsQueueDir)
+	c.DAGRunMgr = runtime.NewManager(c.DAGRunStore, c.ProcStore, c.Config)
+
+	return nil
+}
+
+// ResolveNamespace reads the --namespace flag (defaulting to "default"),
+// resolves it to a short ID, and re-initializes stores with namespace-scoped directories.
+func (c *Context) ResolveNamespace() (string, error) {
+	namespaceName, err := c.StringParam("namespace")
+	if err != nil {
+		return "", fmt.Errorf("failed to get namespace: %w", err)
+	}
+	if namespaceName == "" {
+		namespaceName = "default"
+	}
+
+	namespaceShortID, err := c.NamespaceStore.Resolve(c, namespaceName)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve namespace %q: %w", namespaceName, err)
+	}
+
+	c.NamespaceShortID = namespaceShortID
+
+	if err := c.InitNamespaceScopedStores(namespaceShortID); err != nil {
+		return "", err
+	}
+
+	return namespaceName, nil
+}
+
+// ResolveNamespaceFromArg parses a "namespace/dag-name" format from the argument,
+// resolves the namespace, initializes namespace-scoped stores, and returns the
+// namespace name and the DAG name portion of the argument.
+// If the argument contains no namespace prefix, falls back to the --namespace flag
+// (default: "default").
+func (c *Context) ResolveNamespaceFromArg(arg string) (namespaceName, dagName string, err error) {
+	namespaceName, dagName = parseNamespaceFromArg(arg)
+	if namespaceName == "" {
+		namespaceName, err = c.StringParam("namespace")
+		if err != nil || namespaceName == "" {
+			namespaceName = "default"
+		}
+	}
+
+	namespaceShortID, err := c.NamespaceStore.Resolve(c, namespaceName)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to resolve namespace %q: %w", namespaceName, err)
+	}
+
+	c.NamespaceShortID = namespaceShortID
+
+	if err := c.InitNamespaceScopedStores(namespaceShortID); err != nil {
+		return "", "", err
+	}
+
+	return namespaceName, dagName, nil
+}
+
+// NamespacedDAGsDir returns the DAGs directory scoped to the resolved namespace.
+// Falls back to the base DAGsDir if no namespace has been resolved.
+func (c *Context) NamespacedDAGsDir() string {
+	if c.NamespaceShortID != "" {
+		return filepath.Join(c.Config.Paths.DAGsDir, c.NamespaceShortID)
+	}
+	return c.Config.Paths.DAGsDir
 }
 
 // OpenLogFile creates and opens a log file for a given dag-run.

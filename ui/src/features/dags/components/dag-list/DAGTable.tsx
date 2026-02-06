@@ -126,8 +126,18 @@ function DAGCard({
     >
       {/* Header: Name + Status */}
       <div className="flex justify-between items-start gap-2 mb-1.5">
-        <div className="font-medium text-xs truncate flex-1 min-w-0">
-          {dag.dag.name}
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <span className="font-medium text-xs truncate">
+            {dag.dag.name}
+          </span>
+          {dag.namespace && (
+            <Badge
+              variant="secondary"
+              className="text-[10px] px-1 py-0 h-3.5 rounded-sm shrink-0 font-normal"
+            >
+              {dag.namespace}
+            </Badge>
+          )}
         </div>
         <StatusChip status={status} size="xs">
           {statusLabel}
@@ -418,14 +428,25 @@ const defaultColumns = [
         // DAG Row: Render link with description and tags below
         const tags = data.dag.dag.tags || [];
         const description = data.dag.dag.description;
+        const namespace = data.dag.namespace;
 
         return (
           <div
             style={{ paddingLeft: `${row.depth * 1.5}rem` }}
             className="space-y-0.5 min-w-0"
           >
-            <div className="font-medium text-foreground tracking-tight text-xs truncate">
-              {getValue()}
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-medium text-foreground tracking-tight text-xs truncate">
+                {getValue()}
+              </span>
+              {namespace && (
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] px-1 py-0 h-3.5 rounded-sm shrink-0 font-normal"
+                >
+                  {namespace}
+                </Badge>
+              )}
             </div>
 
             {description && (

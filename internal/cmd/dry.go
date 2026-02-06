@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var dryFlags = []commandLineFlag{paramsFlag, nameFlag}
+var dryFlags = []commandLineFlag{paramsFlag, nameFlag, namespaceFlag}
 
 // Dry returns the cobra command for dry-run simulation.
 func Dry() *cobra.Command {
@@ -39,10 +39,18 @@ Example:
 
 // runDry executes a dry-run simulation of the specified DAG.
 func runDry(ctx *Context, args []string) error {
+	namespaceName, dagName, err := ctx.ResolveNamespaceFromArg(args[0])
+	if err != nil {
+		return err
+	}
+	args[0] = dagName
+
 	dag, err := loadDAGForDryRun(ctx, args)
 	if err != nil {
 		return err
 	}
+
+	dag.Namespace = namespaceName
 
 	if err := dag.Validate(); err != nil {
 		return fmt.Errorf("validation failed for %s: %w", args[0], err)
@@ -99,7 +107,7 @@ func runDry(ctx *Context, args []string) error {
 func loadDAGForDryRun(ctx *Context, args []string) (*core.DAG, error) {
 	loadOpts := []spec.LoadOption{
 		spec.WithBaseConfig(ctx.Config.Paths.BaseConfig),
-		spec.WithDAGsDir(ctx.Config.Paths.DAGsDir),
+		spec.WithDAGsDir(ctx.NamespacedDAGsDir()),
 	}
 
 	nameOverride, err := ctx.StringParam("name")

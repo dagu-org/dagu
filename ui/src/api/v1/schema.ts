@@ -1588,6 +1588,182 @@ export interface paths {
         patch: operations["updateAgentConfig"];
         trace?: never;
     };
+    "/namespaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all namespaces
+         * @description Returns all namespaces accessible to the current user. Requires admin role when auth is enabled.
+         */
+        get: operations["listNamespaces"];
+        put?: never;
+        /**
+         * Create a namespace
+         * @description Creates a new namespace. Requires admin role.
+         */
+        post: operations["createNamespace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/namespaces/{namespaceName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get namespace details
+         * @description Returns details of a specific namespace. Requires admin role when auth is enabled.
+         */
+        get: operations["getNamespace"];
+        /**
+         * Update a namespace
+         * @description Updates namespace settings including description, defaults, base config, and git sync. Requires admin role.
+         */
+        put: operations["updateNamespace"];
+        post?: never;
+        /**
+         * Delete a namespace
+         * @description Deletes a namespace. Requires admin role. Namespace must be empty (no DAGs).
+         */
+        delete: operations["deleteNamespace"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/namespaces/{namespaceName}/dags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List DAGs in a namespace
+         * @description Retrieves DAG definitions within a specific namespace with optional filtering by name and tags
+         */
+        get: operations["listNamespaceDAGs"];
+        put?: never;
+        /**
+         * Create a DAG in a namespace
+         * @description Creates a new DAG definition within a specific namespace
+         */
+        post: operations["createNamespaceDAG"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/namespaces/{namespaceName}/dags/{fileName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get DAG details in a namespace
+         * @description Retrieves comprehensive information about a specific DAG within a namespace
+         */
+        get: operations["getNamespaceDAGDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/namespaces/{namespaceName}/dags/{fileName}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trigger a DAG run in a namespace
+         * @description Creates and executes a DAG-run for a DAG within a specific namespace
+         */
+        post: operations["triggerNamespaceDAGRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/namespaces/{namespaceName}/sync/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get namespace Git sync status
+         * @description Returns the Git sync status for a specific namespace
+         */
+        get: operations["getNamespaceSyncStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/namespaces/{namespaceName}/sync/pull": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pull changes for namespace
+         * @description Fetches and syncs changes from the remote Git repository for a specific namespace
+         */
+        post: operations["namespaceSyncPull"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/namespaces/{namespaceName}/sync/publish-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish all modified DAGs for namespace
+         * @description Commits and pushes all modified DAGs to the remote repository for a specific namespace
+         */
+        post: operations["namespaceSyncPublishAll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1845,6 +2021,8 @@ export interface components {
             suspended: boolean;
             /** @description List of errors encountered during the request */
             errors: string[];
+            /** @description Namespace this DAG belongs to (present in aggregated views) */
+            namespace?: string;
         };
         /** @description Core DAG configuration containing definition and metadata */
         DAG: {
@@ -2091,6 +2269,8 @@ export interface components {
             triggerType?: components["schemas"]["TriggerType"];
             /** @description List of tags for categorizing and filtering DAG runs */
             tags?: string[];
+            /** @description Namespace this DAG run belongs to (present in aggregated views) */
+            namespace?: string;
         };
         /** @description Detailed status of a DAG-run including sub DAG-run nodes */
         DAGRunDetails: components["schemas"]["DAGRunSummary"] & {
@@ -2261,6 +2441,8 @@ export interface components {
             dag: components["schemas"]["DAG"];
             /** @description Details of where matches were found */
             matches: components["schemas"]["SearchDAGsMatchItem"][];
+            /** @description Namespace this search result belongs to (present in aggregated views) */
+            namespace?: string;
         };
         /** @description Details of a search match within a DAG definition */
         SearchDAGsMatchItem: {
@@ -2484,6 +2666,10 @@ export interface components {
             role?: components["schemas"]["UserRole"];
             /** @description Whether to disable the user account */
             isDisabled?: boolean;
+            /** @description Namespace-specific role assignments (replaces all namespace roles) */
+            namespaceRoles?: {
+                [key: string]: string;
+            };
         };
         /** @description User information */
         User: {
@@ -2499,6 +2685,10 @@ export interface components {
             authProvider?: UserAuthProvider;
             /** @description Whether the user account is disabled */
             isDisabled?: boolean;
+            /** @description Per-namespace role assignments */
+            namespaceRoles?: {
+                [key: string]: string;
+            };
             /**
              * Format: date-time
              * @description Account creation timestamp
@@ -2797,6 +2987,70 @@ export interface components {
             /** @description Custom API endpoint URL */
             baseUrl?: string;
         };
+        /** @description Default values for DAGs in a namespace */
+        NamespaceDefaults: {
+            /** @description Default queue name */
+            queue?: string;
+            /** @description Default working directory */
+            workingDir?: string;
+        };
+        /** @description Git sync configuration for a namespace */
+        NamespaceGitSync: {
+            /** @description Git remote URL */
+            remoteURL?: string;
+            /** @description Git branch to sync */
+            branch?: string;
+            /** @description SSH key reference for authentication */
+            sshKeyRef?: string;
+            /** @description Subdirectory within the repo for this namespace */
+            path?: string;
+            /** @description Interval for automatic syncing */
+            autoSyncInterval?: string;
+        };
+        /** @description Namespace information */
+        Namespace: {
+            /** @description Namespace name */
+            name: string;
+            /** @description 4-character hex short ID */
+            shortID: string;
+            /** @description Namespace description */
+            description?: string;
+            /**
+             * Format: date-time
+             * @description Namespace creation timestamp
+             */
+            createdAt: string;
+            /** @description Base configuration in YAML format */
+            baseConfig?: string;
+            defaults?: components["schemas"]["NamespaceDefaults"];
+            gitSync?: components["schemas"]["NamespaceGitSync"];
+        };
+        /** @description Response containing namespace information */
+        NamespaceResponse: {
+            namespace: components["schemas"]["Namespace"];
+        };
+        /** @description Request to create a new namespace */
+        CreateNamespaceRequest: {
+            /** @description Namespace name (must match [a-z0-9][a-z0-9-]*[a-z0-9], max 63 characters) */
+            name: string;
+            /** @description Optional namespace description */
+            description?: string;
+            defaults?: components["schemas"]["NamespaceDefaults"];
+            gitSync?: components["schemas"]["NamespaceGitSync"];
+        };
+        /** @description Request to update a namespace */
+        UpdateNamespaceRequest: {
+            /** @description Namespace description */
+            description?: string;
+            defaults?: components["schemas"]["NamespaceDefaults"];
+            /** @description Base configuration in YAML format */
+            baseConfig?: string;
+            gitSync?: components["schemas"]["NamespaceGitSync"];
+        };
+        /** @description Response containing list of namespaces */
+        NamespaceListResponse: {
+            namespaces: components["schemas"]["Namespace"][];
+        };
     };
     responses: never;
     parameters: {
@@ -2806,6 +3060,8 @@ export interface components {
         UserId: string;
         /** @description unique identifier of the API key */
         APIKeyId: string;
+        /** @description name of the namespace */
+        NamespaceName: string;
         /** @description number of items per page (default is 30, max is 100) */
         PerPage: number;
         /** @description the name of the DAG file */
@@ -4504,6 +4760,8 @@ export interface operations {
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description A search query string */
                 q: string;
+                /** @description Scope results to a specific namespace. If omitted, uses global (default namespace) stores. */
+                namespace?: string;
             };
             header?: never;
             path?: never;
@@ -4585,6 +4843,8 @@ export interface operations {
                 name?: string;
                 /** @description Filter DAG-runs by DAG tags (comma-separated). Returns runs from DAGs that have ALL specified tags. */
                 tags?: string;
+                /** @description Scope results to a specific namespace. If omitted, uses global (default namespace) stores. */
+                namespace?: string;
             };
             header?: never;
             path?: never;
@@ -7292,6 +7552,672 @@ export interface operations {
             };
         };
     };
+    listNamespaces: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of namespaces */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NamespaceListResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden - requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createNamespace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateNamespaceRequest"];
+            };
+        };
+        responses: {
+            /** @description Namespace created successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NamespaceResponse"];
+                };
+            };
+            /** @description Invalid request (e.g., invalid name format) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden - requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict - namespace already exists or hash collision */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getNamespace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description name of the namespace */
+                namespaceName: components["parameters"]["NamespaceName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Namespace details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NamespaceResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden - requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Namespace not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateNamespace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description name of the namespace */
+                namespaceName: components["parameters"]["NamespaceName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateNamespaceRequest"];
+            };
+        };
+        responses: {
+            /** @description Namespace updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NamespaceResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden - requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Namespace not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteNamespace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description name of the namespace */
+                namespaceName: components["parameters"]["NamespaceName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Namespace deleted successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden - requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Namespace not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict - namespace contains DAGs */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listNamespaceDAGs: {
+        parameters: {
+            query?: {
+                /** @description page number of items to fetch (default is 1) */
+                page?: components["parameters"]["Page"];
+                /** @description number of items per page (default is 30, max is 100) */
+                perPage?: components["parameters"]["PerPage"];
+                /** @description Filter DAGs by name */
+                name?: string;
+                /** @description Filter DAGs by tags (comma-separated). Returns DAGs that have ALL specified tags. */
+                tags?: string;
+                /** @description Field to sort by */
+                sort?: PathsNamespacesNamespaceNameDagsGetParametersQuerySort;
+                /** @description Sort order (ascending or descending) */
+                order?: PathsNamespacesNamespaceNameDagsGetParametersQueryOrder;
+            };
+            header?: never;
+            path: {
+                /** @description name of the namespace */
+                namespaceName: components["parameters"]["NamespaceName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description List of DAG definitions with their status and metadata */
+                        dags: components["schemas"]["DAGFile"][];
+                        /** @description List of errors encountered during the request */
+                        errors: string[];
+                        pagination: components["schemas"]["Pagination"];
+                    };
+                };
+            };
+            /** @description Namespace not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createNamespaceDAG: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description name of the namespace */
+                namespaceName: components["parameters"]["NamespaceName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: components["schemas"]["DAGName"];
+                    /** @description Optional DAG spec in YAML format to initialize the DAG. If provided, the spec will be validated before creation. */
+                    spec?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description DAG created successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Name of the newly created DAG */
+                        name: string;
+                    };
+                };
+            };
+            /** @description Invalid DAG spec */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Namespace not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description DAG already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getNamespaceDAGDetails: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description name of the namespace */
+                namespaceName: components["parameters"]["NamespaceName"];
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        dag?: components["schemas"]["DAGDetails"];
+                        /** @description List of local DAGs that are part of this DAG */
+                        localDags: components["schemas"]["LocalDag"][];
+                        latestDAGRun: components["schemas"]["DAGRunDetails"];
+                        /** @description Whether the DAG is suspended */
+                        suspended: boolean;
+                        /** @description List of errors encountered during the request */
+                        errors: string[];
+                        /** @description The DAG specification in YAML format */
+                        spec?: string;
+                    };
+                };
+            };
+            /** @description Namespace or DAG not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    triggerNamespaceDAGRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description name of the namespace */
+                namespaceName: components["parameters"]["NamespaceName"];
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Parameters to pass to the DAG-run in JSON format */
+                    params?: string;
+                    dagRunId?: components["schemas"]["DAGRunId"] & unknown;
+                    /** @description Optional DAG name override to use for the created dag-run */
+                    dagName?: string;
+                    /**
+                     * @description If true, prevent starting if DAG is already running (returns 409 conflict)
+                     * @default false
+                     */
+                    singleton?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description DAG-run triggered successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        dagRunId: components["schemas"]["DAGRunId"];
+                    };
+                };
+            };
+            /** @description Namespace or DAG not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description DAG is already running (singleton mode) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getNamespaceSyncStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description name of the namespace */
+                namespaceName: components["parameters"]["NamespaceName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sync status retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncStatusResponse"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    namespaceSyncPull: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description name of the namespace */
+                namespaceName: components["parameters"]["NamespaceName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pull completed successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncResultResponse"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    namespaceSyncPublishAll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description name of the namespace */
+                namespaceName: components["parameters"]["NamespaceName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncPublishAllRequest"];
+            };
+        };
+        responses: {
+            /** @description Publish completed successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncResultResponse"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
 }
 export enum PathsDagsGetParametersQuerySort {
     name = "name",
@@ -7304,6 +8230,14 @@ export enum PathsDagsGetParametersQueryOrder {
 export enum PathsQueuesNameItemsGetParametersQueryType {
     running = "running",
     queued = "queued"
+}
+export enum PathsNamespacesNamespaceNameDagsGetParametersQuerySort {
+    name = "name",
+    nextRun = "nextRun"
+}
+export enum PathsNamespacesNamespaceNameDagsGetParametersQueryOrder {
+    asc = "asc",
+    desc = "desc"
 }
 export enum ChatMessageRole {
     system = "system",

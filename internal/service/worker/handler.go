@@ -32,10 +32,15 @@ type taskHandler struct{ subCmdBuilder *runtime.SubCmdBuilder }
 
 // Handle runs the task using the dagrun.Manager.
 func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) error {
+	if task.Namespace == "" {
+		return fmt.Errorf("task.Namespace is required: rejecting task for %s", task.Target)
+	}
+
 	logger.Info(ctx, "Executing task",
 		slog.String("operation", task.Operation.String()),
 		tag.Target(task.Target),
 		tag.RunID(task.DagRunId),
+		slog.String("namespace", task.Namespace),
 		slog.String("root-dag-run-id", task.RootDagRunId),
 		slog.String("parent-dag-run-id", task.ParentDagRunId),
 		slog.String("worker-id", task.WorkerId))

@@ -302,7 +302,34 @@ func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObj
 		opts = append(opts, exec.WithTags(tags))
 	}
 
-	dagRuns, err := a.listDAGRuns(ctx, opts)
+	// Use namespace-scoped stores if namespace param is provided.
+	if request.Params.Namespace != nil && *request.Params.Namespace != "" {
+		stores, nsErr := a.resolveNamespaceStores(ctx, *request.Params.Namespace)
+		if nsErr != nil {
+			return nil, nsErr
+		}
+		dagRuns, err := a.listDAGRunsFromStore(ctx, stores.dagRunStore, opts)
+		if err != nil {
+			return nil, fmt.Errorf("error listing dag-runs: %w", err)
+		}
+		return api.ListDAGRuns200JSONResponse{
+			DagRuns: dagRuns,
+		}, nil
+	}
+
+	// Aggregate across all namespaces.
+	if a.namespaceStore != nil {
+		dagRuns, err := a.listDAGRunsAcrossNamespaces(ctx, opts)
+		if err != nil {
+			return nil, fmt.Errorf("error listing dag-runs: %w", err)
+		}
+		return api.ListDAGRuns200JSONResponse{
+			DagRuns: dagRuns,
+		}, nil
+	}
+
+	// Fallback: use global stores.
+	dagRuns, err := a.listDAGRunsFromStore(ctx, a.dagRunStore, opts)
 	if err != nil {
 		return nil, fmt.Errorf("error listing dag-runs: %w", err)
 	}
@@ -345,7 +372,11 @@ func (a *API) ListDAGRunsByName(ctx context.Context, request api.ListDAGRunsByNa
 }
 
 func (a *API) listDAGRuns(ctx context.Context, opts []exec.ListDAGRunStatusesOption) ([]api.DAGRunSummary, error) {
-	statuses, err := a.dagRunStore.ListStatuses(ctx, opts...)
+	return a.listDAGRunsFromStore(ctx, a.dagRunStore, opts)
+}
+
+func (a *API) listDAGRunsFromStore(ctx context.Context, store exec.DAGRunStore, opts []exec.ListDAGRunStatusesOption) ([]api.DAGRunSummary, error) {
+	statuses, err := store.ListStatuses(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("error listing dag-runs: %w", err)
 	}
@@ -2086,6 +2117,37 @@ func (a *API) GetDAGRunsListData(ctx context.Context, queryString string) (any, 
 		}
 	}
 
+	// Use namespace-scoped stores if namespace param is provided.
+	if namespaceName := params.Get("namespace"); namespaceName != "" {
+		stores, nsErr := a.resolveNamespaceStores(ctx, namespaceName)
+		if nsErr != nil {
+			return nil, nsErr
+		}
+		statuses, listErr := stores.dagRunStore.ListStatuses(ctx, opts...)
+		if listErr != nil {
+			return nil, fmt.Errorf("error listing dag-runs: %w", listErr)
+		}
+		dagRuns := make([]api.DAGRunSummary, 0, len(statuses))
+		for _, status := range statuses {
+			dagRuns = append(dagRuns, toDAGRunSummary(*status))
+		}
+		return api.ListDAGRuns200JSONResponse{
+			DagRuns: dagRuns,
+		}, nil
+	}
+
+	// Aggregate across all namespaces.
+	if a.namespaceStore != nil {
+		dagRuns, aggErr := a.listDAGRunsAcrossNamespaces(ctx, opts)
+		if aggErr != nil {
+			return nil, fmt.Errorf("error listing dag-runs: %w", aggErr)
+		}
+		return api.ListDAGRuns200JSONResponse{
+			DagRuns: dagRuns,
+		}, nil
+	}
+
+	// Fallback: use global stores.
 	statuses, err := a.dagRunStore.ListStatuses(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("error listing dag-runs: %w", err)

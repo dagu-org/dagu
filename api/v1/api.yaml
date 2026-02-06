@@ -47,6 +47,8 @@ tags:
     description: "Git synchronization operations for DAGs"
   - name: "agent"
     description: "AI Agent configuration operations (admin only)"
+  - name: "namespaces"
+    description: "Namespace management operations"
 
 paths:
   /health:
@@ -1409,6 +1411,12 @@ paths:
           schema:
             type: "string"
           description: "A search query string"
+        - name: "namespace"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Scope results to a specific namespace. If omitted, uses global (default namespace) stores."
       responses:
         "200":
           description: "A successful response"
@@ -1486,6 +1494,12 @@ paths:
           schema:
             type: "string"
           description: "Filter DAG-runs by DAG tags (comma-separated). Returns runs from DAGs that have ALL specified tags."
+        - name: "namespace"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Scope results to a specific namespace. If omitted, uses global (default namespace) stores."
       responses:
         "200":
           description: "A successful response"
@@ -3632,6 +3646,555 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /namespaces:
+    get:
+      summary: "List all namespaces"
+      description: "Returns all namespaces accessible to the current user. Requires admin role when auth is enabled."
+      operationId: "listNamespaces"
+      tags:
+        - "namespaces"
+      responses:
+        "200":
+          description: "List of namespaces"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NamespaceListResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create a namespace"
+      description: "Creates a new namespace. Requires admin role."
+      operationId: "createNamespace"
+      tags:
+        - "namespaces"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNamespaceRequest"
+      responses:
+        "201":
+          description: "Namespace created successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NamespaceResponse"
+        "400":
+          description: "Invalid request (e.g., invalid name format)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Conflict - namespace already exists or hash collision"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /namespaces/{namespaceName}:
+    get:
+      summary: "Get namespace details"
+      description: "Returns details of a specific namespace. Requires admin role when auth is enabled."
+      operationId: "getNamespace"
+      tags:
+        - "namespaces"
+      parameters:
+        - $ref: "#/components/parameters/NamespaceName"
+      responses:
+        "200":
+          description: "Namespace details"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NamespaceResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Namespace not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      summary: "Update a namespace"
+      description: "Updates namespace settings including description, defaults, base config, and git sync. Requires admin role."
+      operationId: "updateNamespace"
+      tags:
+        - "namespaces"
+      parameters:
+        - $ref: "#/components/parameters/NamespaceName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNamespaceRequest"
+      responses:
+        "200":
+          description: "Namespace updated successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NamespaceResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Namespace not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Delete a namespace"
+      description: "Deletes a namespace. Requires admin role. Namespace must be empty (no DAGs)."
+      operationId: "deleteNamespace"
+      tags:
+        - "namespaces"
+      parameters:
+        - $ref: "#/components/parameters/NamespaceName"
+      responses:
+        "204":
+          description: "Namespace deleted successfully"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Namespace not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Conflict - namespace contains DAGs"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /namespaces/{namespaceName}/dags:
+    get:
+      summary: "List DAGs in a namespace"
+      description: "Retrieves DAG definitions within a specific namespace with optional filtering by name and tags"
+      operationId: "listNamespaceDAGs"
+      tags:
+        - "namespaces"
+      parameters:
+        - $ref: "#/components/parameters/NamespaceName"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - name: "name"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAGs by name"
+        - name: "tags"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAGs by tags (comma-separated). Returns DAGs that have ALL specified tags."
+        - name: "sort"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            enum: ["name", "nextRun"]
+            default: "name"
+          description: "Field to sort by"
+        - name: "order"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            enum: ["asc", "desc"]
+            default: "asc"
+          description: "Sort order (ascending or descending)"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dags:
+                    type: array
+                    description: "List of DAG definitions with their status and metadata"
+                    items:
+                      $ref: "#/components/schemas/DAGFile"
+                  errors:
+                    type: array
+                    description: "List of errors encountered during the request"
+                    items:
+                      type: string
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+                required:
+                  - dags
+                  - errors
+                  - pagination
+        "404":
+          description: "Namespace not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create a DAG in a namespace"
+      description: "Creates a new DAG definition within a specific namespace"
+      operationId: "createNamespaceDAG"
+      tags:
+        - "namespaces"
+      parameters:
+        - $ref: "#/components/parameters/NamespaceName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  $ref: "#/components/schemas/DAGName"
+                spec:
+                  type: string
+                  description: "Optional DAG spec in YAML format to initialize the DAG. If provided, the spec will be validated before creation."
+              required:
+                - name
+      responses:
+        "201":
+          description: "DAG created successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: "Name of the newly created DAG"
+                required:
+                  - name
+        "400":
+          description: "Invalid DAG spec"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Namespace not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "DAG already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /namespaces/{namespaceName}/dags/{fileName}:
+    get:
+      summary: "Get DAG details in a namespace"
+      description: "Retrieves comprehensive information about a specific DAG within a namespace"
+      operationId: "getNamespaceDAGDetails"
+      tags:
+        - "namespaces"
+      parameters:
+        - $ref: "#/components/parameters/NamespaceName"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                description: "Response object for getting details of a DAG"
+                properties:
+                  dag:
+                    $ref: "#/components/schemas/DAGDetails"
+                  localDags:
+                    type: array
+                    description: "List of local DAGs that are part of this DAG"
+                    items:
+                      $ref: "#/components/schemas/LocalDag"
+                  latestDAGRun:
+                    $ref: "#/components/schemas/DAGRunDetails"
+                  suspended:
+                    type: boolean
+                    description: "Whether the DAG is suspended"
+                  errors:
+                    type: array
+                    description: "List of errors encountered during the request"
+                    items:
+                      type: string
+                  spec:
+                    type: string
+                    description: "The DAG specification in YAML format"
+                required:
+                  - latestDAGRun
+                  - suspended
+                  - localDags
+                  - errors
+        "404":
+          description: "Namespace or DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /namespaces/{namespaceName}/dags/{fileName}/runs:
+    post:
+      summary: "Trigger a DAG run in a namespace"
+      description: "Creates and executes a DAG-run for a DAG within a specific namespace"
+      operationId: "triggerNamespaceDAGRun"
+      tags:
+        - "namespaces"
+      parameters:
+        - $ref: "#/components/parameters/NamespaceName"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                params:
+                  type: string
+                  description: "Parameters to pass to the DAG-run in JSON format"
+                dagRunId:
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Optional ID for the DAG-run, if not provided a new one will be generated"
+                dagName:
+                  type: string
+                  description: "Optional DAG name override to use for the created dag-run"
+                singleton:
+                  type: boolean
+                  description: "If true, prevent starting if DAG is already running (returns 409 conflict)"
+                  default: false
+      responses:
+        "200":
+          description: "DAG-run triggered successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagRunId:
+                    $ref: "#/components/schemas/DAGRunId"
+                required:
+                  - dagRunId
+        "404":
+          description: "Namespace or DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "DAG is already running (singleton mode)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # Namespace-scoped Git Sync endpoints
+  /namespaces/{namespaceName}/sync/status:
+    get:
+      summary: "Get namespace Git sync status"
+      description: "Returns the Git sync status for a specific namespace"
+      operationId: "getNamespaceSyncStatus"
+      tags:
+        - "namespaces"
+      parameters:
+        - $ref: "#/components/parameters/NamespaceName"
+      responses:
+        "200":
+          description: "Sync status retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncStatusResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /namespaces/{namespaceName}/sync/pull:
+    post:
+      summary: "Pull changes for namespace"
+      description: "Fetches and syncs changes from the remote Git repository for a specific namespace"
+      operationId: "namespaceSyncPull"
+      tags:
+        - "namespaces"
+      parameters:
+        - $ref: "#/components/parameters/NamespaceName"
+      responses:
+        "200":
+          description: "Pull completed successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResultResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /namespaces/{namespaceName}/sync/publish-all:
+    post:
+      summary: "Publish all modified DAGs for namespace"
+      description: "Commits and pushes all modified DAGs to the remote repository for a specific namespace"
+      operationId: "namespaceSyncPublishAll"
+      tags:
+        - "namespaces"
+      parameters:
+        - $ref: "#/components/parameters/NamespaceName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncPublishAllRequest"
+      responses:
+        "200":
+          description: "Publish completed successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResultResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   securitySchemes:
     basicAuth:
@@ -3670,6 +4233,17 @@ components:
       schema:
         type: string
         minLength: 1
+
+    NamespaceName:
+      name: namespaceName
+      in: path
+      description: name of the namespace
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 63
+        pattern: "^[a-z0-9][a-z0-9-]*[a-z0-9]$"
 
     PerPage:
       name: perPage
@@ -4269,6 +4843,9 @@ components:
           description: "List of errors encountered during the request"
           items:
             type: string
+        namespace:
+          type: string
+          description: "Namespace this DAG belongs to (present in aggregated views)"
       required:
         - fileName
         - dag
@@ -4707,6 +5284,9 @@ components:
           items:
             type: string
           description: "List of tags for categorizing and filtering DAG runs"
+        namespace:
+          type: string
+          description: "Namespace this DAG run belongs to (present in aggregated views)"
       required:
         - rootDAGRunName
         - rootDAGRunId
@@ -5040,6 +5620,9 @@ components:
           description: "Details of where matches were found"
           items:
             $ref: "#/components/schemas/SearchDAGsMatchItem"
+        namespace:
+          type: string
+          description: "Namespace this search result belongs to (present in aggregated views)"
       required:
         - name
         - dag
@@ -5511,6 +6094,11 @@ components:
         isDisabled:
           type: boolean
           description: "Whether to disable the user account"
+        namespaceRoles:
+          type: object
+          description: "Namespace-specific role assignments (replaces all namespace roles)"
+          additionalProperties:
+            type: string
 
     User:
       type: object
@@ -5531,6 +6119,11 @@ components:
         isDisabled:
           type: boolean
           description: "Whether the user account is disabled"
+        namespaceRoles:
+          type: object
+          description: "Per-namespace role assignments"
+          additionalProperties:
+            type: string
         createdAt:
           type: string
           format: date-time
@@ -6069,6 +6662,118 @@ components:
         baseUrl:
           type: string
           description: "Custom API endpoint URL"
+
+    NamespaceDefaults:
+      type: object
+      description: "Default values for DAGs in a namespace"
+      properties:
+        queue:
+          type: string
+          description: "Default queue name"
+        workingDir:
+          type: string
+          description: "Default working directory"
+
+    NamespaceGitSync:
+      type: object
+      description: "Git sync configuration for a namespace"
+      properties:
+        remoteURL:
+          type: string
+          description: "Git remote URL"
+        branch:
+          type: string
+          description: "Git branch to sync"
+        sshKeyRef:
+          type: string
+          description: "SSH key reference for authentication"
+        path:
+          type: string
+          description: "Subdirectory within the repo for this namespace"
+        autoSyncInterval:
+          type: string
+          description: "Interval for automatic syncing"
+
+    Namespace:
+      type: object
+      description: "Namespace information"
+      properties:
+        name:
+          type: string
+          description: "Namespace name"
+        shortID:
+          type: string
+          description: "4-character hex short ID"
+        description:
+          type: string
+          description: "Namespace description"
+        createdAt:
+          type: string
+          format: date-time
+          description: "Namespace creation timestamp"
+        baseConfig:
+          type: string
+          description: "Base configuration in YAML format"
+        defaults:
+          $ref: "#/components/schemas/NamespaceDefaults"
+        gitSync:
+          $ref: "#/components/schemas/NamespaceGitSync"
+      required:
+        - name
+        - shortID
+        - createdAt
+
+    NamespaceResponse:
+      type: object
+      description: "Response containing namespace information"
+      properties:
+        namespace:
+          $ref: "#/components/schemas/Namespace"
+      required:
+        - namespace
+
+    CreateNamespaceRequest:
+      type: object
+      description: "Request to create a new namespace"
+      properties:
+        name:
+          type: string
+          description: "Namespace name (must match [a-z0-9][a-z0-9-]*[a-z0-9], max 63 characters)"
+        description:
+          type: string
+          description: "Optional namespace description"
+        defaults:
+          $ref: "#/components/schemas/NamespaceDefaults"
+        gitSync:
+          $ref: "#/components/schemas/NamespaceGitSync"
+      required:
+        - name
+
+    UpdateNamespaceRequest:
+      type: object
+      description: "Request to update a namespace"
+      properties:
+        description:
+          type: string
+          description: "Namespace description"
+        defaults:
+          $ref: "#/components/schemas/NamespaceDefaults"
+        baseConfig:
+          type: string
+          description: "Base configuration in YAML format"
+        gitSync:
+          $ref: "#/components/schemas/NamespaceGitSync"
+
+    NamespaceListResponse:
+      type: object
+      description: "Response containing list of namespaces"
+      properties:
+        namespaces:
+          type: array
+          items:
+            $ref: "#/components/schemas/Namespace"
+      required:
+        - namespaces
 
 # Apply security requirements globally
 security:

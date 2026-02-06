@@ -96,9 +96,18 @@ type StateManager struct {
 }
 
 // NewStateManager creates a new state manager.
+// The state file is stored at {dataDir}/gitsync/state.json.
 func NewStateManager(dataDir string) *StateManager {
 	return &StateManager{
 		statePath: filepath.Join(dataDir, "gitsync", "state.json"),
+	}
+}
+
+// NewNamespaceStateManager creates a state manager scoped to a namespace.
+// The state file is stored at {dataDir}/{shortID}/gitsync/state.json.
+func NewNamespaceStateManager(dataDir, shortID string) *StateManager {
+	return &StateManager{
+		statePath: filepath.Join(dataDir, shortID, "gitsync", "state.json"),
 	}
 }
 

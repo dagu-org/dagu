@@ -37,15 +37,21 @@ Example:
 
 var stopFlags = []commandLineFlag{
 	dagRunIDFlagStop,
+	namespaceFlag,
 }
 
 func runStop(ctx *Context, args []string) error {
+	namespaceName, dagName, err := ctx.ResolveNamespaceFromArg(args[0])
+	if err != nil {
+		return err
+	}
+
 	dagRunID, err := ctx.StringParam("run-id")
 	if err != nil {
 		return fmt.Errorf("failed to get dag-run ID: %w", err)
 	}
 
-	name, err := extractDAGName(ctx, args[0])
+	name, err := extractDAGName(ctx, dagName)
 	if err != nil {
 		return fmt.Errorf("failed to extract DAG name: %w", err)
 	}
@@ -65,12 +71,14 @@ func runStop(ctx *Context, args []string) error {
 		}
 		dag = d
 	} else {
-		d, err := spec.Load(ctx, args[0], spec.WithBaseConfig(ctx.Config.Paths.BaseConfig))
+		d, err := spec.Load(ctx, dagName, spec.WithBaseConfig(ctx.Config.Paths.BaseConfig), spec.WithDAGsDir(ctx.NamespacedDAGsDir()))
 		if err != nil {
-			return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
+			return fmt.Errorf("failed to load DAG from %s: %w", dagName, err)
 		}
 		dag = d
 	}
+
+	dag.Namespace = namespaceName
 
 	logger.Info(ctx, "Dag-run is stopping", tag.DAG(dag.Name))
 

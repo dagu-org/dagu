@@ -56,6 +56,7 @@ type API struct {
 	tunnelService      *tunnel.Service
 	dagWritesDisabled  bool // True when git sync read-only mode is active
 	agentConfigStore   agent.ConfigStore
+	namespaceStore     exec.NamespaceStore
 }
 
 // AuthService defines the interface for authentication operations.
@@ -126,6 +127,13 @@ func WithTunnelService(ts *tunnel.Service) APIOption {
 func WithAgentConfigStore(store agent.ConfigStore) APIOption {
 	return func(a *API) {
 		a.agentConfigStore = store
+	}
+}
+
+// WithNamespaceStore returns an APIOption that sets the API's namespace store.
+func WithNamespaceStore(ns exec.NamespaceStore) APIOption {
+	return func(a *API) {
+		a.namespaceStore = ns
 	}
 }
 
@@ -356,6 +364,12 @@ func (a *API) resolveError(err error) (api.ErrorCode, string, int) {
 	if errors.Is(err, exec.ErrDAGAlreadyExists) {
 		return api.ErrorCodeAlreadyExists, "DAG already exists", http.StatusConflict
 	}
+	if errors.Is(err, exec.ErrNamespaceNotFound) {
+		return api.ErrorCodeNotFound, "Namespace not found", http.StatusNotFound
+	}
+	if errors.Is(err, exec.ErrNamespaceAlreadyExists) {
+		return api.ErrorCodeAlreadyExists, "Namespace already exists", http.StatusConflict
+	}
 
 	return api.ErrorCodeInternalError, "An unexpected error occurred", http.StatusInternalServerError
 }
@@ -446,6 +460,74 @@ func (a *API) requireExecute(ctx context.Context) error {
 		return errAuthRequired
 	}
 	if !user.Role.CanExecute() {
+		return errInsufficientPermissions
+	}
+	return nil
+}
+
+// requireNamespaceAccess checks if the current user has any valid role in the namespace.
+// Returns nil if auth is not enabled (authService is nil).
+func (a *API) requireNamespaceAccess(ctx context.Context, namespace string) error {
+	if a.authService == nil {
+		return nil
+	}
+	user, ok := auth.UserFromContext(ctx)
+	if !ok {
+		return errAuthRequired
+	}
+	if !user.HasNamespaceAccess(namespace) {
+		return errInsufficientPermissions
+	}
+	return nil
+}
+
+// requireNamespaceAdmin checks if the current user has admin role in the namespace.
+// Returns nil if auth is not enabled (authService is nil).
+func (a *API) requireNamespaceAdmin(ctx context.Context, namespace string) error {
+	if a.authService == nil {
+		return nil
+	}
+	user, ok := auth.UserFromContext(ctx)
+	if !ok {
+		return errAuthRequired
+	}
+	if !user.EffectiveRoleInNamespace(namespace).IsAdmin() {
+		return errInsufficientPermissions
+	}
+	return nil
+}
+
+// requireNamespaceDAGWrite checks all permissions for namespace-scoped DAG write operations.
+func (a *API) requireNamespaceDAGWrite(ctx context.Context, namespace string) error {
+	if !a.config.Server.Permissions[config.PermissionWriteDAGs] {
+		return errPermissionDenied
+	}
+	if a.authService != nil {
+		user, ok := auth.UserFromContext(ctx)
+		if !ok {
+			return errAuthRequired
+		}
+		if !user.EffectiveRoleInNamespace(namespace).CanWrite() {
+			return errInsufficientPermissions
+		}
+	}
+	if a.dagWritesDisabled {
+		return errDAGWritesDisabled
+	}
+	return nil
+}
+
+// requireNamespaceExecute checks if the current user can execute DAGs in the namespace.
+// Returns nil if auth is not enabled (authService is nil).
+func (a *API) requireNamespaceExecute(ctx context.Context, namespace string) error {
+	if a.authService == nil {
+		return nil
+	}
+	user, ok := auth.UserFromContext(ctx)
+	if !ok {
+		return errAuthRequired
+	}
+	if !user.EffectiveRoleInNamespace(namespace).CanExecute() {
 		return errInsufficientPermissions
 	}
 	return nil

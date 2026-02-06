@@ -2,6 +2,7 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useUserPreferences } from '@/contexts/UserPreference';
+import { useNamespace, ALL_NAMESPACES } from '@/contexts/NamespaceContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useAgentChatContext } from '../context/AgentChatContext';
 import { getAuthToken, getAuthHeaders } from '@/lib/authHeaders';
@@ -18,9 +19,10 @@ function buildChatRequest(
   message: string,
   model?: string,
   dagContexts?: DAGContext[],
-  safeMode?: boolean
+  safeMode?: boolean,
+  namespace?: string
 ): ChatRequest {
-  return { message, model, dag_contexts: dagContexts, safe_mode: safeMode };
+  return { message, model, dag_contexts: dagContexts, safe_mode: safeMode, namespace };
 }
 
 async function fetchWithAuth<T>(url: string, options?: RequestInit): Promise<T> {
@@ -61,6 +63,7 @@ export function useAgentChat() {
   const config = useConfig();
   const navigate = useNavigate();
   const { preferences } = useUserPreferences();
+  const { selectedNamespace, isAllNamespaces } = useNamespace();
   const appBarContext = useContext(AppBarContext);
   const {
     conversationId,
@@ -84,6 +87,9 @@ export function useAgentChat() {
   const [answeredPrompts, setAnsweredPrompts] = useState<Record<string, string>>({});
   const baseUrl = `${config.apiURL}/agent`;
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  // Agent conversations are scoped to a namespace. When "All Namespaces" is
+  // selected, default to "default" since agents cannot operate across namespaces.
+  const agentNamespace = isAllNamespaces ? 'default' : selectedNamespace;
 
   const closeEventSource = useCallback((): void => {
     if (eventSourceRef.current) {
@@ -147,7 +153,7 @@ export function useAgentChat() {
     async (message: string, model?: string, dagContexts?: DAGContext[]): Promise<string> => {
       const data = await fetchWithAuth<NewConversationResponse>(
         buildApiUrl(baseUrl, '/conversations/new', remoteNode),
-        { method: 'POST', body: JSON.stringify(buildChatRequest(message, model, dagContexts, preferences.safeMode)) }
+        { method: 'POST', body: JSON.stringify(buildChatRequest(message, model, dagContexts, preferences.safeMode, agentNamespace)) }
       );
       setConversationId(data.conversation_id);
       // Refresh conversations list to include the new one
@@ -155,7 +161,7 @@ export function useAgentChat() {
       setConversations(convs || []);
       return data.conversation_id;
     },
-    [baseUrl, remoteNode, setConversationId, setConversations, preferences.safeMode]
+    [baseUrl, remoteNode, setConversationId, setConversations, preferences.safeMode, agentNamespace]
   );
 
   const sendMessage = useCallback(
@@ -171,7 +177,7 @@ export function useAgentChat() {
         }
         await fetchWithAuth(buildApiUrl(baseUrl, `/conversations/${conversationId}/chat`, remoteNode), {
           method: 'POST',
-          body: JSON.stringify(buildChatRequest(message, model, dagContexts, preferences.safeMode)),
+          body: JSON.stringify(buildChatRequest(message, model, dagContexts, preferences.safeMode, agentNamespace)),
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to send message');
@@ -181,7 +187,7 @@ export function useAgentChat() {
         setIsSending(false);
       }
     },
-    [baseUrl, remoteNode, conversationId, startConversation, setPendingUserMessage, preferences.safeMode]
+    [baseUrl, remoteNode, conversationId, startConversation, setPendingUserMessage, preferences.safeMode, agentNamespace]
   );
 
   const cancelConversation = useCallback(async (): Promise<void> => {

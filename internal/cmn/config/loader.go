@@ -325,6 +325,7 @@ func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) error {
 		{"APIKeysDir", &cfg.Paths.APIKeysDir, def.Paths.APIKeysDir},
 		{"WebhooksDir", &cfg.Paths.WebhooksDir, def.Paths.WebhooksDir},
 		{"ConversationsDir", &cfg.Paths.ConversationsDir, def.Paths.ConversationsDir},
+		{"NamespacesDir", &cfg.Paths.NamespacesDir, def.Paths.NamespacesDir},
 	}
 
 	for _, m := range pathMappings {
@@ -934,6 +935,7 @@ func (l *ConfigLoader) finalizePaths(cfg *Config) {
 		{&cfg.Paths.UsersDir, "users"},
 		{&cfg.Paths.APIKeysDir, "apikeys"},
 		{&cfg.Paths.WebhooksDir, "webhooks"},
+		{&cfg.Paths.NamespacesDir, "namespaces"},
 	}
 
 	for _, dp := range derivedPaths {

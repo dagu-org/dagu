@@ -248,6 +248,7 @@ type PathsConfig struct {
 	APIKeysDir         string
 	WebhooksDir        string
 	ConversationsDir   string
+	NamespacesDir      string
 	ConfigFileUsed     string
 }
 

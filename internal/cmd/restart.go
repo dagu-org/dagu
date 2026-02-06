@@ -38,15 +38,20 @@ Example:
 	)
 }
 
-var restartFlags = []commandLineFlag{dagRunIDFlagRestart}
+var restartFlags = []commandLineFlag{dagRunIDFlagRestart, namespaceFlag}
 
 func runRestart(ctx *Context, args []string) error {
+	_, dagName, err := ctx.ResolveNamespaceFromArg(args[0])
+	if err != nil {
+		return err
+	}
+
 	dagRunID, err := ctx.StringParam("run-id")
 	if err != nil {
 		return fmt.Errorf("failed to get dag-run ID: %w", err)
 	}
 
-	name := args[0]
+	name := dagName
 
 	var attempt exec.DAGRunAttempt
 	if dagRunID != "" {

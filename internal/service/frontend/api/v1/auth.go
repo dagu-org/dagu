@@ -162,6 +162,14 @@ func toAPIUser(user *auth.User) api.User {
 		apiUser.IsDisabled = &user.IsDisabled
 	}
 
+	if len(user.NamespaceRoles) > 0 {
+		nsRoles := make(map[string]string, len(user.NamespaceRoles))
+		for ns, role := range user.NamespaceRoles {
+			nsRoles[ns] = string(role)
+		}
+		apiUser.NamespaceRoles = &nsRoles
+	}
+
 	return apiUser
 }
 

@@ -72,7 +72,9 @@ type Server struct {
 	sseHub           *sse.Hub
 	metricsRegistry  *prometheus.Registry
 	tunnelAPIOpts    []apiv1.APIOption
+	namespaceAPIOpts []apiv1.APIOption
 	dagStore         exec.DAGStore
+	namespaceStore   exec.NamespaceStore
 }
 
 // ServerOption is a functional option for configuring the Server.
@@ -90,6 +92,16 @@ func WithTunnelService(ts *tunnel.Service) ServerOption {
 	return func(s *Server) {
 		if ts != nil {
 			s.tunnelAPIOpts = append(s.tunnelAPIOpts, apiv1.WithTunnelService(ts))
+		}
+	}
+}
+
+// WithNamespaceStore sets the namespace store for the API.
+func WithNamespaceStore(ns exec.NamespaceStore) ServerOption {
+	return func(s *Server) {
+		if ns != nil {
+			s.namespaceStore = ns
+			s.namespaceAPIOpts = append(s.namespaceAPIOpts, apiv1.WithNamespaceStore(ns))
 		}
 	}
 }
@@ -131,13 +143,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		logger.Warn(ctx, "Failed to create agent config store", tag.Error(err))
 	}
 
-	var agentAPI *agent.API
-	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, &cfg.Paths, dr, auditSvc)
-		if err != nil {
-			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
-		}
-	}
+	// Agent API is initialized later (after options are applied) so namespace store is available.
 
 	var authSvc *authservice.Service
 	if cfg.Server.Auth.Mode == config.AuthModeBuiltin {
@@ -198,7 +204,6 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	srv := &Server{
 		config:           cfg,
-		agentAPI:         agentAPI,
 		agentConfigStore: agentConfigStore,
 		builtinOIDCCfg:   builtinOIDCCfg,
 		authService:      authSvc,
@@ -232,7 +237,18 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		opt(srv)
 	}
 
+	// Initialize agent API after options are applied (namespace store is set via WithNamespaceStore).
+	if agentConfigStore != nil {
+		agentAPI, err := initAgentAPI(ctx, agentConfigStore, &cfg.Paths, dr, srv.namespaceStore, auditSvc)
+		if err != nil {
+			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
+		} else {
+			srv.agentAPI = agentAPI
+		}
+	}
+
 	allAPIOptions := append(apiOpts, srv.tunnelAPIOpts...)
+	allAPIOptions = append(allAPIOptions, srv.namespaceAPIOpts...)
 	if srv.agentConfigStore != nil {
 		allAPIOptions = append(allAPIOptions, apiv1.WithAgentConfigStore(srv.agentConfigStore))
 	}
@@ -374,7 +390,7 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 
 // initAgentAPI creates and returns an agent API.
 // The API uses the config store to check enabled status and get provider dynamically.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *config.PathsConfig, dagStore exec.DAGStore, auditSvc *audit.Service) (*agent.API, error) {
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *config.PathsConfig, dagStore exec.DAGStore, nsStore exec.NamespaceStore, auditSvc *audit.Service) (*agent.API, error) {
 	convStore, err := fileconversation.New(paths.ConversationsDir)
 	if err != nil {
 		logger.Warn(ctx, "Failed to create conversation store, persistence disabled", tag.Error(err))
@@ -391,6 +407,7 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *conf
 		Logger:            slog.Default(),
 		ConversationStore: convStore,
 		DAGStore:          dagStore,
+		NamespaceStore:    nsStore,
 		Hooks:             hooks,
 		Environment: agent.EnvironmentInfo{
 			DAGsDir:        paths.DAGsDir,
@@ -422,6 +439,9 @@ func newAgentAuditHook(auditSvc *audit.Service) agent.AfterToolExecHookFunc {
 			details["failed"] = true
 		}
 		details["conversation_id"] = info.ConversationID
+		if info.Namespace != "" {
+			details["namespace"] = info.Namespace
+		}
 
 		detailsJSON, _ := json.Marshal(details)
 		entry := audit.NewEntry(audit.CategoryAgent, info.Audit.Action, info.UserID, info.Username).

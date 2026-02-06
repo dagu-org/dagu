@@ -78,6 +78,8 @@ message Task {
   string attempt_id = 14;
   // Globally unique attempt identifier for cancellation tracking.
   string attempt_key = 15;
+  // Namespace this task belongs to. Required for namespace-scoped execution.
+  string namespace = 16;
 }
 
 enum Operation {

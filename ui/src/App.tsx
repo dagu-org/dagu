@@ -19,6 +19,7 @@ import {
 } from './contexts/UserPreference';
 import { AgentChatModal, AgentChatProvider } from './features/agent';
 import Layout from './layouts/Layout';
+import { NamespaceProvider } from './contexts/NamespaceContext';
 import fetchJson from './lib/fetchJson';
 import Dashboard from './pages';
 import AgentSettingsPage from './pages/agent-settings';
@@ -34,6 +35,9 @@ import Queues from './pages/queues';
 import Search from './pages/search';
 import SystemStatus from './pages/system-status';
 import TerminalPage from './pages/terminal';
+import NamespacesPage from './pages/namespaces';
+import NamespaceCreatePage from './pages/namespaces/create';
+import NamespaceEditPage from './pages/namespaces/edit';
 import UsersPage from './pages/users';
 import WebhooksPage from './pages/webhooks';
 
@@ -135,6 +139,7 @@ function AppInner({ config }: Props): React.ReactElement {
                             path="/*"
                             element={
                               <ProtectedRoute>
+                                <NamespaceProvider>
                                 <AgentChatProvider>
                                   <PageContextProvider>
                                     <Layout navbarColor={config.navbarColor}>
@@ -155,12 +160,16 @@ function AppInner({ config }: Props): React.ReactElement {
                                         <Route path="/terminal" element={<AdminElement><TerminalPage /></AdminElement>} />
                                         <Route path="/audit-logs" element={<AdminElement><AuditLogsPage /></AdminElement>} />
                                         <Route path="/git-sync" element={<AdminElement><GitSyncPage /></AdminElement>} />
+                                        <Route path="/namespaces" element={<AdminElement><NamespacesPage /></AdminElement>} />
+                                        <Route path="/namespaces/create" element={<AdminElement><NamespaceCreatePage /></AdminElement>} />
+                                        <Route path="/namespaces/:name/edit" element={<AdminElement><NamespaceEditPage /></AdminElement>} />
                                         <Route path="/agent-settings" element={<AdminElement><AgentSettingsPage /></AdminElement>} />
                                       </Routes>
                                     </Layout>
                                     {config.agentEnabled && <AgentChatModal />}
                                   </PageContextProvider>
                                 </AgentChatProvider>
+                                </NamespaceProvider>
                               </ProtectedRoute>
                             }
                           />

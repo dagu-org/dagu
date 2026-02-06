@@ -25,6 +25,7 @@ type Context struct {
 	Shell              string           // Default shell for this DAG (from DAG.Shell)
 	LogEncodingCharset string           // Character encoding for log files (e.g., "utf-8", "shift_jis", "euc-jp")
 	LogWriterFactory   LogWriterFactory // For remote log streaming (nil = use local files)
+	Namespace          string           // Active namespace for this DAG run
 }
 
 // LogWriterFactory creates log writers for step stdout/stderr.
@@ -141,6 +142,7 @@ type contextOptions struct {
 	secretEnvs         []string
 	logEncodingCharset string
 	logWriterFactory   LogWriterFactory
+	namespace          string
 }
 
 // ContextOption configures optional parameters for NewContext.
@@ -196,6 +198,13 @@ func WithLogWriterFactory(factory LogWriterFactory) ContextOption {
 	}
 }
 
+// WithNamespace sets the active namespace for this DAG run.
+func WithNamespace(namespace string) ContextOption {
+	return func(o *contextOptions) {
+		o.namespace = namespace
+	}
+}
+
 // NewContext creates a new context with DAG execution metadata.
 // Required: ctx, dag, dagRunID, logFile
 // Optional: use ContextOption functions (WithDatabase, WithParams, etc.)
@@ -246,6 +255,7 @@ func NewContext(
 		Shell:              dag.Shell,
 		LogEncodingCharset: options.logEncodingCharset,
 		LogWriterFactory:   options.logWriterFactory,
+		Namespace:          options.namespace,
 	})
 }
 

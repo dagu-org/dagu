@@ -96,6 +96,7 @@ func TestWorkerStart(t *testing.T) {
 				Target:     "test.yaml",
 				Operation:  coordinatorv1.Operation_OPERATION_START,
 				Definition: "name: test\nsteps:\n  - name: step1\n    command: echo hello",
+				Namespace:  "default",
 			}
 			err := coord.DispatchTask(t, task)
 			require.NoError(t, err)
@@ -135,6 +136,7 @@ func TestWorkerTaskExecution(t *testing.T) {
 			Target:     "test.yaml",
 			Operation:  coordinatorv1.Operation_OPERATION_START,
 			Definition: "name: test\nsteps:\n  - name: step1\n    command: echo hello",
+			Namespace:  "default",
 		}
 
 		// Create worker
@@ -206,6 +208,7 @@ func TestWorkerTaskExecution(t *testing.T) {
 			Target:     "test.yaml",
 			Operation:  coordinatorv1.Operation_OPERATION_START,
 			Definition: "name: test\nsteps:\n  - name: step1\n    command: echo hello",
+			Namespace:  "default",
 		}
 
 		// Create worker with failing executor
@@ -262,6 +265,7 @@ func TestWorkerWithLabels(t *testing.T) {
 			Operation:      coordinatorv1.Operation_OPERATION_START,
 			WorkerSelector: map[string]string{"type": "special", "region": "us-east"},
 			Definition:     "name: test\nsteps:\n  - name: step1\n    command: echo hello",
+			Namespace:      "default",
 		}
 
 		// Create worker WITHOUT matching labels
@@ -453,6 +457,7 @@ func TestRunningTaskTracking(t *testing.T) {
 				RootDagRunName: "root-dag",
 				RootDagRunId:   "root-123",
 				Definition:     "name: test\nsteps:\n  - name: step1\n    command: echo hello",
+				Namespace:      "default",
 			}
 			err := coord.DispatchTask(t, task)
 			require.NoError(t, err)
@@ -484,6 +489,7 @@ func TestRunningTaskTracking(t *testing.T) {
 				RootDagRunName: "root-dag",
 				RootDagRunId:   "root-123",
 				Definition:     "name: test\nsteps:\n  - name: step1\n    command: echo hello",
+				Namespace:      "default",
 			}
 			err := coord.DispatchTask(t, task)
 			require.NoError(t, err)

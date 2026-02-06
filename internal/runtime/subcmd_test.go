@@ -487,6 +487,31 @@ func TestTaskStart(t *testing.T) {
 		}
 	})
 
+	t.Run("TaskStartWithNamespace", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			DagRunId:  "task-run-id",
+			Target:    "/path/to/task.yaml",
+			Namespace: "team-alpha",
+		}
+		spec := builder.TaskStart(task)
+
+		assert.Contains(t, spec.Args, "--namespace=team-alpha")
+	})
+
+	t.Run("TaskStartWithoutNamespace", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			DagRunId: "task-run-id",
+			Target:   "/path/to/task.yaml",
+		}
+		spec := builder.TaskStart(task)
+
+		for _, arg := range spec.Args {
+			assert.NotContains(t, arg, "--namespace=")
+		}
+	})
+
 	t.Run("TaskStartWithoutConfig", func(t *testing.T) {
 		t.Parallel()
 		cfgNoFile := &config.Config{
@@ -543,6 +568,19 @@ func TestTaskRetry(t *testing.T) {
 		spec := builder.TaskRetry(task)
 
 		assert.Contains(t, spec.Args, "--step=failed-step")
+	})
+
+	t.Run("TaskRetryWithNamespace", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			DagRunId:       "retry-run-id",
+			Target:         "/path/to/task.yaml",
+			RootDagRunName: "root-dag",
+			Namespace:      "team-beta",
+		}
+		spec := builder.TaskRetry(task)
+
+		assert.Contains(t, spec.Args, "--namespace=team-beta")
 	})
 
 	t.Run("TaskRetryWithoutConfig", func(t *testing.T) {

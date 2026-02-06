@@ -14,11 +14,13 @@ import {
   Activity,
   BarChart2,
   Bot,
+  Boxes,
   GitBranch,
   Globe,
   History,
   Inbox,
   KeyRound,
+  Layers,
   Moon,
   Network,
   PanelLeft,
@@ -32,6 +34,7 @@ import {
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AppBarContext } from './contexts/AppBarContext';
+import { ALL_NAMESPACES, useNamespace } from './contexts/NamespaceContext';
 import { useUserPreferences } from './contexts/UserPreference';
 import { useAgentChatContext } from './features/agent';
 
@@ -228,6 +231,7 @@ export const mainListItems = React.forwardRef<
   const canWrite = useCanWrite();
   const { preferences, updatePreference } = useUserPreferences();
   const { toggleChat } = useAgentChatContext();
+  const { namespaces, selectedNamespace, selectNamespace } = useNamespace();
 
   const theme = preferences.theme || 'dark';
   const title = config.title || DEFAULT_TITLE;
@@ -340,6 +344,55 @@ export const mainListItems = React.forwardRef<
           }}
         </AppBarContext.Consumer>
 
+        {/* Namespace Selector */}
+        {namespaces.length > 0 && (
+          <div className="px-1">
+            <Select value={selectedNamespace} onValueChange={selectNamespace}>
+              <SelectTrigger
+                className={cn(
+                  'h-9 text-xs text-sidebar-foreground rounded-md',
+                  isOpen
+                    ? 'bg-sidebar-hover border-sidebar-border hover:bg-sidebar-active'
+                    : 'bg-transparent border-transparent hover:bg-sidebar-hover [&>svg:last-child]:hidden'
+                )}
+                style={{
+                  transition: 'width 280ms cubic-bezier(0.4, 0, 0.2, 1), background-color 150ms ease, border-color 150ms ease, padding 280ms cubic-bezier(0.4, 0, 0.2, 1)',
+                  width: isOpen ? '100%' : '36px',
+                  paddingLeft: isOpen ? '12px' : '9px',
+                  paddingRight: isOpen ? '12px' : '9px',
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <Layers size={18} className="text-sidebar-foreground flex-shrink-0" />
+                  <span
+                    className="overflow-hidden whitespace-nowrap"
+                    style={{
+                      transition: 'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), max-width 280ms cubic-bezier(0.4, 0, 0.2, 1)',
+                      opacity: isOpen ? 1 : 0,
+                      maxWidth: isOpen ? '150px' : '0px',
+                    }}
+                  >
+                    <SelectValue />
+                  </span>
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_NAMESPACES}>
+                  <div className="flex items-center gap-2">
+                    <Boxes size={14} className="flex-shrink-0" />
+                    <span>All Namespaces</span>
+                  </div>
+                </SelectItem>
+                {namespaces.map((ns) => (
+                  <SelectItem key={ns.name} value={ns.name}>
+                    {ns.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         <div className="space-y-4">
           <div className="space-y-0.5">
             <SectionLabel label="System" isOpen={isOpen} customColor={customColor} />
@@ -356,6 +409,16 @@ export const mainListItems = React.forwardRef<
                 to="/system-status"
                 text="System Status"
                 icon={<Activity size={18} />}
+                isOpen={isOpen}
+                onClick={onNavItemClick}
+                customColor={customColor}
+              />
+            )}
+            {isAdmin && (
+              <NavItem
+                to="/namespaces"
+                text="Namespaces"
+                icon={<Layers size={18} />}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
                 customColor={customColor}

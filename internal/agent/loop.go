@@ -68,6 +68,10 @@ type LoopConfig struct {
 	Username string
 	// IPAddress is the client's IP address.
 	IPAddress string
+	// Namespace is the namespace this conversation is scoped to.
+	Namespace string
+	// NamespaceRole is the user's effective role in the namespace.
+	NamespaceRole string
 }
 
 // Loop manages a conversation turn with an LLM including tool execution.
@@ -94,6 +98,8 @@ type Loop struct {
 	userID           string
 	username         string
 	ipAddress        string
+	namespace        string
+	namespaceRole    string
 }
 
 // NewLoop creates a new Loop instance.
@@ -123,6 +129,8 @@ func NewLoop(config LoopConfig) *Loop {
 		userID:           config.UserID,
 		username:         config.Username,
 		ipAddress:        config.IPAddress,
+		namespace:        config.Namespace,
+		namespaceRole:    config.NamespaceRole,
 	}
 }
 
@@ -290,11 +298,17 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		UserID:         l.userID,
 		Username:       l.username,
 		IPAddress:      l.ipAddress,
+		Namespace:      l.namespace,
 		Audit:          tool.Audit,
 	}
 
 	if err := l.hooks.RunBeforeToolExec(ctx, info); err != nil {
 		return toolError("Blocked by policy: %v", err)
+	}
+
+	// Enforce namespace-scoped write permissions
+	if isWriteTool(tc.Function.Name) && !namespaceRoleAllowsWrite(l.namespaceRole) {
+		return toolError("Permission denied: role %q in namespace %q does not allow write operations", l.namespaceRole, l.namespace)
 	}
 
 	l.mu.Lock()
@@ -304,6 +318,8 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 	result := tool.Run(ToolContext{
 		Context:          ctx,
 		WorkingDir:       l.workingDir,
+		Namespace:        l.namespace,
+		NamespaceRole:    l.namespaceRole,
 		EmitUIAction:     l.emitUIAction,
 		EmitUserPrompt:   l.emitUserPrompt,
 		WaitUserResponse: l.waitUserResponse,

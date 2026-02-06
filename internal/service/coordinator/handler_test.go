@@ -278,6 +278,7 @@ func TestHandler_Poll(t *testing.T) {
 			ParentDagRunId:   "",
 			DagRunId:         "run-123",
 			Definition:       "name: test-dag\nsteps:\n  - name: step1\n    command: echo hello",
+			Namespace:        "default",
 		}
 
 		_, err := h.Dispatch(ctx, &coordinatorv1.DispatchRequest{
@@ -310,6 +311,7 @@ func TestHandler_Poll(t *testing.T) {
 			RootDagRunId:   "run-123",
 			DagRunId:       "run-123",
 			Definition:     "name: test-dag\nsteps:\n  - name: step1\n    command: echo hello",
+			Namespace:      "default",
 		}
 
 		_, err := h.Dispatch(ctx, &coordinatorv1.DispatchRequest{
@@ -1279,6 +1281,274 @@ func TestMatchesSelector(t *testing.T) {
 		selector := map[string]string{"type": "compute"}
 
 		require.False(t, matchesSelector(nil, selector))
+	})
+}
+
+func TestMatchesNamespaceAffinity(t *testing.T) {
+	t.Parallel()
+
+	t.Run("WorkerWithoutNamespaceLabelAcceptsAnyNamespace", func(t *testing.T) {
+		t.Parallel()
+
+		workerLabels := map[string]string{"type": "compute", "region": "us-east"}
+		require.True(t, matchesNamespaceAffinity(workerLabels, "team-alpha"))
+		require.True(t, matchesNamespaceAffinity(workerLabels, "team-beta"))
+		require.True(t, matchesNamespaceAffinity(workerLabels, "default"))
+	})
+
+	t.Run("WorkerWithNilLabelsAcceptsAnyNamespace", func(t *testing.T) {
+		t.Parallel()
+
+		require.True(t, matchesNamespaceAffinity(nil, "team-alpha"))
+		require.True(t, matchesNamespaceAffinity(nil, "default"))
+	})
+
+	t.Run("WorkerWithEmptyLabelsAcceptsAnyNamespace", func(t *testing.T) {
+		t.Parallel()
+
+		require.True(t, matchesNamespaceAffinity(map[string]string{}, "team-alpha"))
+	})
+
+	t.Run("WorkerWithMatchingNamespaceLabelAccepts", func(t *testing.T) {
+		t.Parallel()
+
+		workerLabels := map[string]string{"namespace": "team-alpha", "type": "compute"}
+		require.True(t, matchesNamespaceAffinity(workerLabels, "team-alpha"))
+	})
+
+	t.Run("WorkerWithDifferentNamespaceLabelRejects", func(t *testing.T) {
+		t.Parallel()
+
+		workerLabels := map[string]string{"namespace": "team-alpha", "type": "compute"}
+		require.False(t, matchesNamespaceAffinity(workerLabels, "team-beta"))
+	})
+
+	t.Run("WorkerWithDefaultNamespaceLabelAcceptsDefault", func(t *testing.T) {
+		t.Parallel()
+
+		workerLabels := map[string]string{"namespace": "default"}
+		require.True(t, matchesNamespaceAffinity(workerLabels, "default"))
+		require.False(t, matchesNamespaceAffinity(workerLabels, "team-alpha"))
+	})
+
+	t.Run("WorkerWithEmptyNamespaceLabelRejectsNonEmpty", func(t *testing.T) {
+		t.Parallel()
+
+		workerLabels := map[string]string{"namespace": ""}
+		// Empty namespace label matches only empty task namespace
+		require.True(t, matchesNamespaceAffinity(workerLabels, ""))
+		require.False(t, matchesNamespaceAffinity(workerLabels, "team-alpha"))
+	})
+}
+
+func TestHandler_DispatchNamespaceAffinity(t *testing.T) {
+	t.Parallel()
+
+	t.Run("DispatchToWorkerWithMatchingNamespaceLabel", func(t *testing.T) {
+		t.Parallel()
+
+		h := NewHandler(HandlerConfig{})
+		ctx := context.Background()
+
+		// Start polling with namespace label
+		pollDone := make(chan *coordinatorv1.PollResponse)
+		pollErr := make(chan error)
+		go func() {
+			resp, err := h.Poll(ctx, &coordinatorv1.PollRequest{
+				WorkerId: "worker-alpha",
+				PollerId: "poller-alpha",
+				Labels:   map[string]string{"namespace": "team-alpha"},
+			})
+			if err != nil {
+				pollErr <- err
+			} else {
+				pollDone <- resp
+			}
+		}()
+
+		// Wait for poller to register
+		require.Eventually(t, func() bool {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			return len(h.waitingPollers) == 1
+		}, time.Second, 10*time.Millisecond)
+
+		// Dispatch a task in namespace team-alpha
+		task := &coordinatorv1.Task{
+			RootDagRunName: "test-dag",
+			RootDagRunId:   "run-123",
+			DagRunId:       "run-123",
+			Definition:     "name: test-dag\nsteps:\n  - name: step1\n    command: echo hello",
+			Namespace:      "team-alpha",
+		}
+
+		_, err := h.Dispatch(ctx, &coordinatorv1.DispatchRequest{Task: task})
+		require.NoError(t, err)
+
+		select {
+		case resp := <-pollDone:
+			require.NotNil(t, resp)
+			require.NotNil(t, resp.Task)
+			require.Equal(t, "team-alpha", resp.Task.Namespace)
+		case err := <-pollErr:
+			t.Fatalf("Poll failed: %v", err)
+		case <-time.After(time.Second):
+			t.Fatal("Poll timed out")
+		}
+	})
+
+	t.Run("DispatchSkipsWorkerWithDifferentNamespaceLabel", func(t *testing.T) {
+		t.Parallel()
+
+		h := NewHandler(HandlerConfig{})
+		ctx := context.Background()
+
+		// Start polling with namespace label for team-alpha
+		go func() {
+			_, _ = h.Poll(ctx, &coordinatorv1.PollRequest{
+				WorkerId: "worker-alpha",
+				PollerId: "poller-alpha",
+				Labels:   map[string]string{"namespace": "team-alpha"},
+			})
+		}()
+
+		// Wait for poller to register
+		require.Eventually(t, func() bool {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			return len(h.waitingPollers) == 1
+		}, time.Second, 10*time.Millisecond)
+
+		// Dispatch a task in namespace team-beta - should fail since no matching workers
+		task := &coordinatorv1.Task{
+			RootDagRunName: "test-dag",
+			RootDagRunId:   "run-456",
+			DagRunId:       "run-456",
+			Definition:     "name: test-dag\nsteps:\n  - name: step1\n    command: echo hello",
+			Namespace:      "team-beta",
+		}
+
+		_, err := h.Dispatch(ctx, &coordinatorv1.DispatchRequest{Task: task})
+		require.Error(t, err)
+		st, ok := status.FromError(err)
+		require.True(t, ok)
+		require.Equal(t, codes.FailedPrecondition, st.Code())
+	})
+
+	t.Run("DispatchToWorkerWithoutNamespaceLabelFromAnyNamespace", func(t *testing.T) {
+		t.Parallel()
+
+		h := NewHandler(HandlerConfig{})
+		ctx := context.Background()
+
+		// Start polling without namespace label (generic worker)
+		pollDone := make(chan *coordinatorv1.PollResponse)
+		pollErr := make(chan error)
+		go func() {
+			resp, err := h.Poll(ctx, &coordinatorv1.PollRequest{
+				WorkerId: "worker-generic",
+				PollerId: "poller-generic",
+				Labels:   map[string]string{"type": "compute"},
+			})
+			if err != nil {
+				pollErr <- err
+			} else {
+				pollDone <- resp
+			}
+		}()
+
+		// Wait for poller to register
+		require.Eventually(t, func() bool {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			return len(h.waitingPollers) == 1
+		}, time.Second, 10*time.Millisecond)
+
+		// Dispatch a task from any namespace - generic worker should accept it
+		task := &coordinatorv1.Task{
+			RootDagRunName: "test-dag",
+			RootDagRunId:   "run-789",
+			DagRunId:       "run-789",
+			Definition:     "name: test-dag\nsteps:\n  - name: step1\n    command: echo hello",
+			Namespace:      "team-alpha",
+		}
+
+		_, err := h.Dispatch(ctx, &coordinatorv1.DispatchRequest{Task: task})
+		require.NoError(t, err)
+
+		select {
+		case resp := <-pollDone:
+			require.NotNil(t, resp)
+			require.NotNil(t, resp.Task)
+			require.Equal(t, "team-alpha", resp.Task.Namespace)
+		case err := <-pollErr:
+			t.Fatalf("Poll failed: %v", err)
+		case <-time.After(time.Second):
+			t.Fatal("Poll timed out")
+		}
+	})
+
+	t.Run("DispatchPrefersNamespaceAffinityWorkerOverGeneric", func(t *testing.T) {
+		t.Parallel()
+
+		h := NewHandler(HandlerConfig{})
+		ctx := t.Context()
+
+		// Start two workers:
+		// 1. Worker with namespace=team-alpha label
+		// 2. Generic worker without namespace label
+		affinityDone := make(chan *coordinatorv1.PollResponse, 1)
+		go func() {
+			resp, err := h.Poll(ctx, &coordinatorv1.PollRequest{
+				WorkerId: "worker-alpha",
+				PollerId: "poller-alpha",
+				Labels:   map[string]string{"namespace": "team-alpha"},
+			})
+			if err == nil {
+				affinityDone <- resp
+			}
+		}()
+
+		genericDone := make(chan *coordinatorv1.PollResponse, 1)
+		go func() {
+			resp, err := h.Poll(ctx, &coordinatorv1.PollRequest{
+				WorkerId: "worker-generic",
+				PollerId: "poller-generic",
+				Labels:   map[string]string{"type": "compute"},
+			})
+			if err == nil {
+				genericDone <- resp
+			}
+		}()
+
+		// Wait for both pollers to register
+		require.Eventually(t, func() bool {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			return len(h.waitingPollers) == 2
+		}, time.Second, 10*time.Millisecond)
+
+		// Dispatch a task for team-alpha - both workers can accept it
+		task := &coordinatorv1.Task{
+			RootDagRunName: "test-dag",
+			RootDagRunId:   "run-101",
+			DagRunId:       "run-101",
+			Definition:     "name: test-dag\nsteps:\n  - name: step1\n    command: echo hello",
+			Namespace:      "team-alpha",
+		}
+
+		_, err := h.Dispatch(ctx, &coordinatorv1.DispatchRequest{Task: task})
+		require.NoError(t, err)
+
+		// One of the workers should receive the task (map iteration is random)
+		select {
+		case resp := <-affinityDone:
+			require.Equal(t, "team-alpha", resp.Task.Namespace)
+		case resp := <-genericDone:
+			require.Equal(t, "team-alpha", resp.Task.Namespace)
+		case <-time.After(time.Second):
+			t.Fatal("No worker received the task")
+		}
 	})
 }
 

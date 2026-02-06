@@ -73,10 +73,15 @@ type remoteTaskHandler struct {
 
 // Handle executes a task in-process with remote status/log streaming
 func (h *remoteTaskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) error {
+	if task.Namespace == "" {
+		return fmt.Errorf("task.Namespace is required: rejecting task for %s", task.Target)
+	}
+
 	logger.Info(ctx, "Executing remote task",
 		slog.String("operation", task.Operation.String()),
 		tag.Target(task.Target),
 		tag.RunID(task.DagRunId),
+		slog.String("namespace", task.Namespace),
 		slog.String("root-dag-run-id", task.RootDagRunId),
 		slog.String("parent-dag-run-id", task.ParentDagRunId))
 
@@ -200,6 +205,9 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 		return nil, nil, fmt.Errorf("failed to load DAG from %s: %w", tempFile, err)
 	}
 
+	// Set namespace from task so it propagates through execution
+	dag.Namespace = task.Namespace
+
 	return dag, cleanupFunc, nil
 }
 
@@ -280,6 +288,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 
 	// Build agent options
 	opts := agent.Options{
+		Namespace:        dag.Namespace,
 		ParentDAGRun:     parent,
 		WorkerID:         h.workerID,
 		StatusPusher:     statusPusher,

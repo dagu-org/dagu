@@ -4,13 +4,17 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"text/tabwriter"
 
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/gitsync"
 	"github.com/spf13/cobra"
 )
+
+var syncFlags = []commandLineFlag{namespaceFlag}
 
 // Sync returns the sync command with subcommands for Git sync operations.
 func Sync() *cobra.Command {
@@ -52,16 +56,17 @@ Shows overall sync status including:
 - Per-DAG status (synced, modified, untracked, conflict)
 
 Example:
-  dagu sync status`,
+  dagu sync status
+  dagu sync status --namespace my-team`,
 			Args: cobra.NoArgs,
 		},
-		nil,
+		syncFlags,
 		runSyncStatus,
 	)
 }
 
 func runSyncStatus(ctx *Context, _ []string) error {
-	syncSvc, err := newSyncService(ctx)
+	syncSvc, err := resolveSyncService(ctx)
 	if err != nil {
 		return err
 	}
@@ -139,24 +144,105 @@ func syncPull() *cobra.Command {
 This command fetches and applies changes from the remote repository
 to your local DAG definitions.
 
+When --namespace is specified, pulls only for that namespace.
+When no namespace is specified, syncs all namespaces that have git sync enabled.
+
 Example:
-  dagu sync pull`,
+  dagu sync pull
+  dagu sync pull --namespace my-team`,
 			Args: cobra.NoArgs,
 		},
-		nil,
+		syncFlags,
 		runSyncPull,
 	)
 }
 
 func runSyncPull(ctx *Context, _ []string) error {
-	syncSvc, err := newSyncService(ctx)
+	nsName, _ := ctx.StringParam("namespace")
+
+	// If a specific namespace is requested, pull only for that namespace.
+	if nsName != "" && nsName != "default" {
+		return runSyncPullForNamespace(ctx, nsName)
+	}
+
+	// If "default" or no namespace specified, try all namespaces with git sync enabled.
+	if ctx.NamespaceStore != nil {
+		return runSyncPullAllNamespaces(ctx)
+	}
+
+	// Fallback: use instance-level config (backwards compatible).
+	return runSyncPullSingle(ctx, nil)
+}
+
+func runSyncPullForNamespace(ctx *Context, nsName string) error {
+	svc, err := newNamespaceSyncService(ctx, nsName)
 	if err != nil {
 		return err
 	}
+	fmt.Printf("Pulling changes for namespace %q...\n", nsName)
+	return printPullResult(ctx, svc)
+}
 
+func runSyncPullAllNamespaces(ctx *Context) error {
+	namespaces, err := ctx.NamespaceStore.List(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list namespaces: %w", err)
+	}
+
+	var synced int
+	for _, ns := range namespaces {
+		// Check if namespace has git sync configured.
+		if ns.GitSync.RemoteURL == "" {
+			// For default namespace, fall back to instance-level config.
+			if ns.Name == "default" {
+				globalCfg := gitsync.NewConfigFromGlobal(ctx.Config.GitSync)
+				if globalCfg.IsValid() {
+					fmt.Printf("\n--- Namespace: %s (instance config) ---\n", ns.Name)
+					svc := gitsync.NewNamespaceService(globalCfg, filepath.Join(ctx.Config.Paths.DAGsDir, ns.ShortID), ctx.Config.Paths.DataDir, ns.ShortID)
+					if err := printPullResult(ctx, svc); err != nil {
+						fmt.Printf("  Error: %v\n", err)
+					} else {
+						synced++
+					}
+				}
+			}
+			continue
+		}
+
+		nsCfg := gitsync.NewConfigFromNamespace(ns.GitSync)
+		if !nsCfg.IsValid() {
+			continue
+		}
+
+		fmt.Printf("\n--- Namespace: %s ---\n", ns.Name)
+		svc := gitsync.NewNamespaceService(nsCfg, filepath.Join(ctx.Config.Paths.DAGsDir, ns.ShortID), ctx.Config.Paths.DataDir, ns.ShortID)
+		if err := printPullResult(ctx, svc); err != nil {
+			fmt.Printf("  Error: %v\n", err)
+		} else {
+			synced++
+		}
+	}
+
+	if synced == 0 {
+		fmt.Println("No namespaces have git sync enabled")
+	}
+	return nil
+}
+
+func runSyncPullSingle(ctx *Context, svc gitsync.Service) error {
+	if svc == nil {
+		var err error
+		svc, err = newSyncService(ctx)
+		if err != nil {
+			return err
+		}
+	}
 	fmt.Println("Pulling changes from remote...")
+	return printPullResult(ctx, svc)
+}
 
-	result, err := syncSvc.Pull(ctx)
+func printPullResult(ctx *Context, svc gitsync.Service) error {
+	result, err := svc.Pull(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to pull: %w", err)
 	}
@@ -206,11 +292,11 @@ Examples:
 	cmd.Flags().Bool("all", false, "Publish all modified DAGs")
 	cmd.Flags().BoolP("force", "f", false, "Force publish even with conflicts")
 
-	return NewCommand(cmd, nil, runSyncPublish)
+	return NewCommand(cmd, syncFlags, runSyncPublish)
 }
 
 func runSyncPublish(ctx *Context, args []string) error {
-	syncSvc, err := newSyncService(ctx)
+	syncSvc, err := resolveSyncService(ctx)
 	if err != nil {
 		return err
 	}
@@ -286,11 +372,11 @@ Example:
 
 	cmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
 
-	return NewCommand(cmd, nil, runSyncDiscard)
+	return NewCommand(cmd, syncFlags, runSyncDiscard)
 }
 
 func runSyncDiscard(ctx *Context, args []string) error {
-	syncSvc, err := newSyncService(ctx)
+	syncSvc, err := resolveSyncService(ctx)
 	if err != nil {
 		return err
 	}
@@ -326,17 +412,58 @@ func runSyncDiscard(ctx *Context, args []string) error {
 	return nil
 }
 
-// newSyncService creates a new GitSync service from the context configuration.
+// resolveSyncService creates a sync service based on the --namespace flag.
+// If a non-default namespace is specified, creates a namespace-scoped service.
+// Otherwise falls back to instance-level config.
+func resolveSyncService(ctx *Context) (gitsync.Service, error) {
+	nsName, _ := ctx.StringParam("namespace")
+
+	if nsName != "" && nsName != "default" {
+		return newNamespaceSyncService(ctx, nsName)
+	}
+
+	// For default namespace, check if namespace has its own config first.
+	if ctx.NamespaceStore != nil {
+		ns, err := ctx.NamespaceStore.Get(ctx, "default")
+		if err == nil && ns.GitSync.RemoteURL != "" {
+			return newNamespaceSyncServiceFromNS(ctx, ns)
+		}
+	}
+
+	// Fallback: instance-level config.
+	return newSyncService(ctx)
+}
+
+// newSyncService creates a sync service from the instance-level config.
 func newSyncService(ctx *Context) (gitsync.Service, error) {
-	cfg := ctx.Config.GitSync
-
-	syncCfg := gitsync.NewConfigFromGlobal(cfg)
-
+	syncCfg := gitsync.NewConfigFromGlobal(ctx.Config.GitSync)
 	if !syncCfg.Enabled {
 		return nil, fmt.Errorf("git sync is not enabled, set gitSync.enabled=true in your config")
 	}
+	return gitsync.NewService(syncCfg, ctx.Config.Paths.DAGsDir, ctx.Config.Paths.DataDir), nil
+}
 
-	// Create the service
-	svc := gitsync.NewService(syncCfg, ctx.Config.Paths.DAGsDir, ctx.Config.Paths.DataDir)
-	return svc, nil
+// newNamespaceSyncService creates a sync service for the named namespace.
+func newNamespaceSyncService(ctx *Context, nsName string) (gitsync.Service, error) {
+	if ctx.NamespaceStore == nil {
+		return nil, fmt.Errorf("namespaces are not configured")
+	}
+
+	ns, err := ctx.NamespaceStore.Get(ctx, nsName)
+	if err != nil {
+		return nil, fmt.Errorf("namespace %q not found: %w", nsName, err)
+	}
+
+	return newNamespaceSyncServiceFromNS(ctx, ns)
+}
+
+// newNamespaceSyncServiceFromNS creates a sync service from a resolved namespace.
+func newNamespaceSyncServiceFromNS(ctx *Context, ns *exec.Namespace) (gitsync.Service, error) {
+	if ns.GitSync.RemoteURL == "" {
+		return nil, fmt.Errorf("git sync is not configured for namespace %q", ns.Name)
+	}
+
+	nsCfg := gitsync.NewConfigFromNamespace(ns.GitSync)
+	dagsDir := filepath.Join(ctx.Config.Paths.DAGsDir, ns.ShortID)
+	return gitsync.NewNamespaceService(nsCfg, dagsDir, ctx.Config.Paths.DataDir, ns.ShortID), nil
 }

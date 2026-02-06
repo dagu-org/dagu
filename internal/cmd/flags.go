@@ -156,6 +156,13 @@ var (
 		usage: "[only for sub dag-runs] reference for the root dag-run",
 	}
 
+	namespaceFlag = commandLineFlag{
+		name:         "namespace",
+		shorthand:    "n",
+		defaultValue: "default",
+		usage:        "Namespace to run the DAG in (default: \"default\")",
+	}
+
 	parentDAGRunFlag = commandLineFlag{
 		name:  "parent",
 		usage: "[only for sub dag-runs] reference for the parent dag-run",

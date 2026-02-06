@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components, Status } from '../../../../api/v1/schema';
+import { Badge } from '../../../../components/ui/badge';
 import {
   Table,
   TableBody,
@@ -259,7 +260,17 @@ function DAGRunTable({
           >
             {/* Header with name and status */}
             <div className="flex justify-between items-start mb-2">
-              <div className="font-normal text-sm">{dagRun.name}</div>
+              <div className="flex items-center gap-1.5 font-normal text-sm">
+                <span>{dagRun.name}</span>
+                {dagRun.namespace && (
+                  <Badge
+                    variant="secondary"
+                    className="text-[10px] px-1 py-0 h-3.5 rounded-sm shrink-0 font-normal"
+                  >
+                    {dagRun.namespace}
+                  </Badge>
+                )}
+              </div>
               <StepDetailsTooltip dagRun={dagRun}>
                 <div className="flex items-center">
                   <StatusChip status={dagRun.status} size="xs">
@@ -381,7 +392,17 @@ function DAGRunTable({
               }}
             >
               <TableCell className="py-1 px-2 font-normal">
-                {dagRun.name}
+                <div className="flex items-center gap-1.5">
+                  <span>{dagRun.name}</span>
+                  {dagRun.namespace && (
+                    <Badge
+                      variant="secondary"
+                      className="text-[10px] px-1 py-0 h-3.5 rounded-sm shrink-0 font-normal"
+                    >
+                      {dagRun.namespace}
+                    </Badge>
+                  )}
+                </div>
               </TableCell>
               <TableCell className="py-1 px-2 font-mono text-muted-foreground">
                 {dagRun.dagRunId}

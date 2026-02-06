@@ -1,6 +1,13 @@
 package gitsync
 
-import "github.com/dagu-org/dagu/internal/cmn/config"
+import (
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/core/exec"
+)
 
 // Config holds the configuration for Git sync functionality.
 type Config struct {
@@ -95,6 +102,52 @@ func (c *Config) GetAuthorEmail() string {
 		return c.Commit.AuthorEmail
 	}
 	return "dagu@localhost"
+}
+
+// NewConfigFromNamespace creates a gitsync.Config from a namespace's git sync settings.
+// The SSHKeyRef field from NamespaceGitSync is mapped to Auth.SSHKeyPath.
+func NewConfigFromNamespace(ns exec.NamespaceGitSync) *Config {
+	enabled := ns.RemoteURL != ""
+	cfg := &Config{
+		Enabled:    enabled,
+		Repository: ns.RemoteURL,
+		Branch:     ns.Branch,
+		Path:       ns.Path,
+	}
+	if ns.SSHKeyRef != "" {
+		cfg.Auth = AuthConfig{
+			Type:       AuthTypeSSH,
+			SSHKeyPath: ns.SSHKeyRef,
+		}
+	}
+	if ns.AutoSyncInterval != "" {
+		if seconds := parseIntervalSeconds(ns.AutoSyncInterval); seconds > 0 {
+			cfg.AutoSync = AutoSyncConfig{
+				Enabled:  true,
+				Interval: seconds,
+			}
+		}
+	}
+	return cfg
+}
+
+// parseIntervalSeconds parses a duration string (e.g. "5m", "1h", "30s") into seconds.
+func parseIntervalSeconds(s string) int {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0
+	}
+	// Try Go duration format first (e.g. "5m", "1h30m", "30s")
+	d, err := time.ParseDuration(s)
+	if err == nil {
+		return int(d.Seconds())
+	}
+	// Fall back to plain integer (seconds)
+	n, err := strconv.Atoi(s)
+	if err == nil {
+		return n
+	}
+	return 0
 }
 
 // NewConfigFromGlobal creates a gitsync.Config from the global configuration.

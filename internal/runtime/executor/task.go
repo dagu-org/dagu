@@ -80,6 +80,13 @@ func WithStep(step string) TaskOption {
 	}
 }
 
+// WithNamespace sets the namespace for the task.
+func WithNamespace(namespace string) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		task.Namespace = namespace
+	}
+}
+
 // WithPreviousStatus sets the previous status for retry operations in shared-nothing mode.
 // When set, workers can retry without needing local DAGRunStore access.
 func WithPreviousStatus(status *exec.DAGRunStatus) TaskOption {

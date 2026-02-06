@@ -42,9 +42,15 @@ Example:
 var statusFlags = []commandLineFlag{
 	dagRunIDFlagStatus,
 	subDAGRunIDFlagStatus,
+	namespaceFlag,
 }
 
 func runStatus(ctx *Context, args []string) error {
+	_, dagName, err := ctx.ResolveNamespaceFromArg(args[0])
+	if err != nil {
+		return err
+	}
+
 	dagRunID, err := ctx.StringParam("run-id")
 	if err != nil {
 		return fmt.Errorf("failed to get dag-run ID: %w", err)
@@ -59,7 +65,7 @@ func runStatus(ctx *Context, args []string) error {
 		return fmt.Errorf("--sub-run-id requires --run-id to be provided (root DAG run context is needed)")
 	}
 
-	name, err := extractDAGName(ctx, args[0])
+	name, err := extractDAGName(ctx, dagName)
 	if err != nil {
 		return fmt.Errorf("failed to extract DAG name: %w", err)
 	}

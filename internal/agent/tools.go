@@ -39,6 +39,20 @@ func toolError(format string, args ...any) ToolOut {
 	}
 }
 
+// isWriteTool returns true if the tool can modify files or execute commands.
+func isWriteTool(name string) bool {
+	return name == "bash" || name == "patch"
+}
+
+// namespaceRoleAllowsWrite returns true if the role has write permission.
+// Empty role (no namespace context) is allowed for backward compatibility.
+func namespaceRoleAllowsWrite(role string) bool {
+	if role == "" {
+		return true // No namespace role restriction (backward compatible)
+	}
+	return role == "admin" || role == "manager" || role == "operator"
+}
+
 // resolvePath joins path with workingDir if path is relative and workingDir is set.
 func resolvePath(path, workingDir string) string {
 	if !filepath.IsAbs(path) && workingDir != "" {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"path/filepath"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/gitsync"
@@ -299,6 +300,134 @@ func (a *API) DiscardDagChanges(ctx context.Context, req api.DiscardDagChangesRe
 	return api.DiscardDagChanges200JSONResponse{
 		Message: "Changes discarded successfully",
 	}, nil
+}
+
+// GetNamespaceSyncStatus returns the Git sync status for a namespace.
+func (a *API) GetNamespaceSyncStatus(ctx context.Context, request api.GetNamespaceSyncStatusRequestObject) (api.GetNamespaceSyncStatusResponseObject, error) {
+	if err := a.requireNamespaceAccess(ctx, request.NamespaceName); err != nil {
+		return nil, err
+	}
+
+	svc, err := a.resolveNamespaceSyncService(ctx, request.NamespaceName)
+	if err != nil {
+		// If git sync is not configured for this namespace, return disabled status.
+		return api.GetNamespaceSyncStatus200JSONResponse{
+			Enabled: false,
+			Summary: api.SyncSummarySynced,
+			Counts: api.SyncStatusCounts{
+				Synced:    0,
+				Modified:  0,
+				Untracked: 0,
+				Conflict:  0,
+			},
+		}, nil
+	}
+
+	status, err := svc.GetStatus(ctx)
+	if err != nil {
+		return nil, internalError(err)
+	}
+
+	return api.GetNamespaceSyncStatus200JSONResponse{
+		Enabled:        status.Enabled,
+		Repository:     ptrOf(status.Repository),
+		Branch:         ptrOf(status.Branch),
+		Summary:        toAPISyncSummary(status.Summary),
+		LastSyncAt:     status.LastSyncAt,
+		LastSyncCommit: ptrOf(status.LastSyncCommit),
+		LastSyncStatus: ptrOf(status.LastSyncStatus),
+		LastError:      status.LastError,
+		Dags:           toAPISyncDAGStates(status.DAGs),
+		Counts:         toAPISyncCounts(status.Counts),
+	}, nil
+}
+
+// NamespaceSyncPull pulls changes from the remote repository for a namespace.
+func (a *API) NamespaceSyncPull(ctx context.Context, request api.NamespaceSyncPullRequestObject) (api.NamespaceSyncPullResponseObject, error) {
+	if err := a.requireNamespaceDAGWrite(ctx, request.NamespaceName); err != nil {
+		return nil, err
+	}
+
+	svc, err := a.resolveNamespaceSyncService(ctx, request.NamespaceName)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := svc.Pull(ctx)
+	if err != nil {
+		return nil, internalError(err)
+	}
+
+	a.logAuditEntry(ctx, audit.CategoryGitSync, "namespace_sync_pull", map[string]any{
+		"namespace": request.NamespaceName,
+		"synced":    result.Synced,
+		"modified":  result.Modified,
+		"conflicts": result.Conflicts,
+	})
+
+	return api.NamespaceSyncPull200JSONResponse(toAPISyncResult(result)), nil
+}
+
+// NamespaceSyncPublishAll publishes all modified DAGs for a namespace.
+func (a *API) NamespaceSyncPublishAll(ctx context.Context, request api.NamespaceSyncPublishAllRequestObject) (api.NamespaceSyncPublishAllResponseObject, error) {
+	if err := a.requireNamespaceDAGWrite(ctx, request.NamespaceName); err != nil {
+		return nil, err
+	}
+
+	svc, err := a.resolveNamespaceSyncService(ctx, request.NamespaceName)
+	if err != nil {
+		return nil, err
+	}
+
+	var message string
+	if request.Body != nil {
+		message = valueOf(request.Body.Message)
+	}
+
+	result, err := svc.PublishAll(ctx, message)
+	if err != nil {
+		if gitsync.IsNotEnabled(err) {
+			return nil, errSyncNotConfigured
+		}
+		return nil, internalError(err)
+	}
+
+	a.logAuditEntry(ctx, audit.CategoryGitSync, "namespace_sync_publish_all", map[string]any{
+		"namespace": request.NamespaceName,
+		"message":   message,
+		"synced":    result.Synced,
+		"modified":  result.Modified,
+	})
+
+	return api.NamespaceSyncPublishAll200JSONResponse(toAPISyncResult(result)), nil
+}
+
+// resolveNamespaceSyncService creates a git sync service for the given namespace.
+func (a *API) resolveNamespaceSyncService(ctx context.Context, namespaceName string) (gitsync.Service, error) {
+	if a.namespaceStore == nil {
+		return nil, errSyncNotConfigured
+	}
+
+	ns, err := a.namespaceStore.Get(ctx, namespaceName)
+	if err != nil {
+		return nil, &Error{
+			Code:       api.ErrorCodeNotFound,
+			Message:    "namespace not found: " + namespaceName,
+			HTTPStatus: http.StatusNotFound,
+		}
+	}
+
+	if ns.GitSync.RemoteURL == "" {
+		return nil, &Error{
+			Code:       api.ErrorCodeInternalError,
+			Message:    "git sync is not configured for namespace " + namespaceName,
+			HTTPStatus: http.StatusServiceUnavailable,
+		}
+	}
+
+	nsCfg := gitsync.NewConfigFromNamespace(ns.GitSync)
+	dagsDir := filepath.Join(a.config.Paths.DAGsDir, ns.ShortID)
+	return gitsync.NewNamespaceService(nsCfg, dagsDir, a.config.Paths.DataDir, ns.ShortID), nil
 }
 
 // Helper functions for type conversion

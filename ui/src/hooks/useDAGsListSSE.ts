@@ -17,6 +17,7 @@ interface DAGsListParams {
   tags?: string;
   sort?: string;
   order?: string;
+  namespace?: string;
 }
 
 export function useDAGsListSSE(

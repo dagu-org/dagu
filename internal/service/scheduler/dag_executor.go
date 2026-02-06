@@ -130,6 +130,7 @@ func (e *DAGExecutor) ExecuteDAG(
 			string(dag.YamlData),
 			operation,
 			runID,
+			executor.WithNamespace(dag.Namespace),
 			executor.WithWorkerSelector(dag.WorkerSelector),
 			executor.WithPreviousStatus(previousStatus),
 		)

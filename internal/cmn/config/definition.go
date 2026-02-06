@@ -186,6 +186,7 @@ type PathsDef struct {
 	APIKeysDir         string `mapstructure:"apiKeysDir"`
 	WebhooksDir        string `mapstructure:"webhooksDir"`
 	ConversationsDir   string `mapstructure:"conversationsDir"`
+	NamespacesDir      string `mapstructure:"namespacesDir"`
 }
 
 // -----------------------------------------------------------------------------

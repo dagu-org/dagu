@@ -218,6 +218,9 @@ type Options struct {
 	PeerConfig config.Peer
 	// TriggerType indicates how this DAG run was initiated.
 	TriggerType core.TriggerType
+	// Namespace is the active namespace for this DAG run.
+	// It is threaded through execution context, socket addressing, and sub-DAG dispatch.
+	Namespace string
 }
 
 // New creates a new Agent.
@@ -251,6 +254,12 @@ func New(
 		queuedRun:        opts.QueuedRun,
 		attemptID:        opts.AttemptID,
 		triggerType:      opts.TriggerType,
+	}
+
+	// Set the namespace on the DAG if provided via options.
+	// This ensures socket addressing and context propagation use the correct namespace.
+	if opts.Namespace != "" && a.dag.Namespace == "" {
+		a.dag.Namespace = opts.Namespace
 	}
 
 	// Initialize progress display if enabled
@@ -386,6 +395,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		runtime.WithParams(a.dag.Params),
 		runtime.WithCoordinator(coordinatorCli),
 		runtime.WithSecrets(secretEnvs),
+		runtime.WithNamespace(a.dag.Namespace),
 	}
 
 	if a.logWriterFactory != nil {

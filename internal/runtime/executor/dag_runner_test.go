@@ -150,6 +150,102 @@ func TestNewSubDAGExecutor_NotFound(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
+func TestNewSubDAGExecutor_RejectsCrossNamespaceRef(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	parentDAG := &core.DAG{Name: "parent"}
+	mockDB := new(mockDatabase)
+	dagCtx := exec1.Context{
+		DAG:        parentDAG,
+		DB:         mockDB,
+		RootDAGRun: exec1.NewDAGRunRef("parent", "root-123"),
+		DAGRunID:   "parent-456",
+		Namespace:  "team-alpha",
+	}
+	ctx = exec1.WithContext(ctx, dagCtx)
+
+	// Cross-namespace references (namespace/dag-name) should be rejected
+	executor, err := NewSubDAGExecutor(ctx, "other-ns/child-dag")
+	assert.Error(t, err)
+	assert.Nil(t, executor)
+	assert.Contains(t, err.Error(), "cross-namespace sub-DAG references are not supported")
+}
+
+func TestNewSubDAGExecutor_InheritsNamespace_LocalDAG(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	parentDAG := &core.DAG{
+		Name:      "parent",
+		Namespace: "team-alpha",
+		LocalDAGs: map[string]*core.DAG{
+			"local-child": {
+				Name:     "local-child",
+				YamlData: []byte("name: local-child\nsteps:\n  - name: step1\n    command: echo hello"),
+			},
+		},
+	}
+
+	mockDB := new(mockDatabase)
+	dagCtx := exec1.Context{
+		DAG:        parentDAG,
+		DB:         mockDB,
+		RootDAGRun: exec1.NewDAGRunRef("parent", "root-123"),
+		DAGRunID:   "parent-456",
+		Namespace:  "team-alpha",
+	}
+	ctx = exec1.WithContext(ctx, dagCtx)
+
+	executor, err := NewSubDAGExecutor(ctx, "local-child")
+	require.NoError(t, err)
+	require.NotNil(t, executor)
+
+	// Verify namespace is inherited from parent context
+	assert.Equal(t, "team-alpha", executor.DAG.Namespace)
+
+	// Cleanup temp file
+	_ = executor.Cleanup(ctx)
+}
+
+func TestNewSubDAGExecutor_InheritsNamespace_RegularDAG(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	parentDAG := &core.DAG{
+		Name:      "parent",
+		Namespace: "team-alpha",
+	}
+
+	mockDB := new(mockDatabase)
+	expectedDAG := &core.DAG{
+		Name:     "regular-child",
+		Location: "/path/to/regular-child.yaml",
+	}
+	dagCtx := exec1.Context{
+		DAG:        parentDAG,
+		DB:         mockDB,
+		RootDAGRun: exec1.NewDAGRunRef("parent", "root-123"),
+		DAGRunID:   "parent-456",
+		Namespace:  "team-alpha",
+	}
+	ctx = exec1.WithContext(ctx, dagCtx)
+
+	mockDB.On("GetDAG", ctx, "regular-child").Return(expectedDAG, nil)
+
+	executor, err := NewSubDAGExecutor(ctx, "regular-child")
+	require.NoError(t, err)
+	require.NotNil(t, executor)
+
+	// Verify namespace is inherited from parent context
+	assert.Equal(t, "team-alpha", executor.DAG.Namespace)
+
+	mockDB.AssertExpectations(t)
+}
+
 func TestBuildCommand(t *testing.T) {
 	t.Parallel()
 
@@ -199,6 +295,44 @@ func TestBuildCommand(t *testing.T) {
 	assert.Contains(t, args, "/path/to/test.yaml")
 	assert.Contains(t, args, "--")
 	assert.Contains(t, args, "param1=value1 param2=value2")
+}
+
+func TestBuildCommand_WithNamespace(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	mockDB := new(mockDatabase)
+	baseEnv := config.NewBaseEnv(nil)
+	dagCtx := exec1.Context{
+		DAG:        &core.DAG{Name: "parent"},
+		DB:         mockDB,
+		RootDAGRun: exec1.NewDAGRunRef("parent", "root-123"),
+		DAGRunID:   "parent-456",
+		BaseEnv:    &baseEnv,
+		Namespace:  "team-alpha",
+	}
+	ctx = exec1.WithContext(ctx, dagCtx)
+
+	executor := &SubDAGExecutor{
+		DAG: &core.DAG{
+			Name:      "test-child",
+			Location:  "/path/to/test.yaml",
+			Namespace: "team-alpha",
+		},
+		killed: make(chan struct{}),
+	}
+
+	runParams := RunParams{
+		RunID: "child-789",
+	}
+
+	cmd, err := executor.buildCommand(ctx, runParams, "/work/dir")
+	require.NoError(t, err)
+	require.NotNil(t, cmd)
+
+	// Verify --namespace flag is included
+	assert.Contains(t, cmd.Args, "--namespace=team-alpha")
 }
 
 func TestBuildCommand_NoRunID(t *testing.T) {

@@ -82,7 +82,12 @@ export function AgentChatModalHeader({
                 value={conv.conversation.id}
                 className="text-xs"
               >
-                {formatDate(conv.conversation.created_at)}
+                <span className="flex items-center gap-1.5">
+                  {conv.conversation.namespace && conv.conversation.namespace !== 'default' && (
+                    <span className="text-[10px] px-1 rounded bg-muted text-muted-foreground">{conv.conversation.namespace}</span>
+                  )}
+                  {formatDate(conv.conversation.created_at)}
+                </span>
               </SelectItem>
             ))}
           </SelectContent>
