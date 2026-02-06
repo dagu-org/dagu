@@ -1282,6 +1282,12 @@ func TestBuildWorkingDir(t *testing.T) {
 			},
 			expected: "/default/dir",
 		},
+		{
+			name:     "EmptyWithNoFileOrDefault",
+			dag:      &dag{},
+			ctx:      BuildContext{},
+			expected: "",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1348,17 +1354,6 @@ func TestBuildWorkingDir_TildePreserved(t *testing.T) {
 	assert.Equal(t, "~/mydir", result)
 }
 
-func TestBuildWorkingDir_FallbackToCurrentDir(t *testing.T) {
-	t.Parallel()
-
-	ctx := BuildContext{} // No file, no default
-	d := &dag{}
-
-	result, err := buildWorkingDir(ctx, d)
-	require.NoError(t, err)
-	assert.Empty(t, result) // Returns empty; fallback applied post-merge in loadDAG
-}
-
 func TestBuildWorkingDir_DefaultWorkingDir(t *testing.T) {
 	t.Parallel()
 
@@ -1384,20 +1379,6 @@ func TestBuildWorkingDir_RelativeNoFileContext(t *testing.T) {
 	require.NoError(t, err)
 	// Without file context, relative path is stored as-is
 	assert.Equal(t, "subdir", result)
-}
-
-func TestBuildWorkingDir_FallbackToFileDir(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	dagFile := filepath.Join(tmpDir, "dag.yaml")
-
-	ctx := BuildContext{file: dagFile}
-	d := &dag{} // No WorkingDir
-
-	result, err := buildWorkingDir(ctx, d)
-	require.NoError(t, err)
-	assert.Empty(t, result) // Returns empty; fallback applied post-merge in loadDAG
 }
 
 func TestBuildShell(t *testing.T) {
