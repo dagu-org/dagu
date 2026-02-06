@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/dagu-org/dagu/internal/cmn/backoff"
 )
 
 const (
@@ -30,21 +32,32 @@ func WithMetrics(m *Metrics) HubOption {
 	}
 }
 
+// WithWatcherInterval overrides the default base and max polling intervals
+// for all watchers created by this hub.
+func WithWatcherInterval(base, maxInterval time.Duration) HubOption {
+	return func(h *Hub) {
+		h.watcherBaseInterval = base
+		h.watcherMaxInterval = maxInterval
+	}
+}
+
 // Hub manages all SSE client connections and their associated watchers.
 // It uses a pluggable fetcher pattern where each TopicType has a registered
 // FetchFunc that knows how to retrieve data for that topic type.
 type Hub struct {
-	mu              sync.RWMutex
-	clients         map[*Client]string      // client -> topic
-	watchers        map[string]*Watcher     // topic -> watcher
-	fetchers        map[TopicType]FetchFunc // topicType -> fetcher
-	maxClients      int
-	heartbeatTicker *time.Ticker
-	heartbeatWg     sync.WaitGroup // Tracks heartbeat goroutine for clean shutdown
-	ctx             context.Context
-	cancel          context.CancelFunc
-	metrics         *Metrics
-	started         bool
+	mu                  sync.RWMutex
+	clients             map[*Client]string      // client -> topic
+	watchers            map[string]*Watcher     // topic -> watcher
+	fetchers            map[TopicType]FetchFunc // topicType -> fetcher
+	maxClients          int
+	heartbeatTicker     *time.Ticker
+	heartbeatWg         sync.WaitGroup // Tracks heartbeat goroutine for clean shutdown
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	metrics             *Metrics
+	started             bool
+	watcherBaseInterval time.Duration
+	watcherMaxInterval  time.Duration
 }
 
 // NewHub creates a new SSE hub.
@@ -147,6 +160,16 @@ func (h *Hub) Subscribe(client *Client, topic string) error {
 	watcher, ok := h.watchers[topic]
 	if !ok {
 		watcher = NewWatcher(identifier, fetcher, TopicType(topicType), h.metrics)
+		if h.watcherBaseInterval > 0 {
+			watcher.baseInterval = h.watcherBaseInterval
+			watcher.currentInterval = h.watcherBaseInterval
+			policy := backoff.NewExponentialBackoffPolicy(h.watcherBaseInterval)
+			policy.MaxInterval = h.watcherMaxInterval
+			watcher.errorBackoff = backoff.NewRetrier(policy)
+		}
+		if h.watcherMaxInterval > 0 {
+			watcher.maxInterval = h.watcherMaxInterval
+		}
 		h.watchers[topic] = watcher
 		if h.metrics != nil {
 			h.metrics.WatcherStarted()
