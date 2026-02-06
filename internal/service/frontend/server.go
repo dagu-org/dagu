@@ -610,7 +610,7 @@ func (srv *Server) setupAssetRoutes(r *chi.Mux, basePath string) {
 	r.Get(assetsPath, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "max-age=86400")
 
-		// Serve schema from shared package instead of embedded assets
+		// Serve schemas from shared package instead of embedded assets
 		if strings.HasSuffix(r.URL.Path, "dag.schema.json") {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write(cmnschema.DAGSchemaJSON)

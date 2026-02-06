@@ -413,8 +413,6 @@ func (n *navigator) formatProperties(props map[string]any, parent map[string]any
 	}
 }
 
-// Helper functions
-
 // getUnionOptions returns the oneOf or anyOf array if present, nil otherwise.
 func getUnionOptions(node map[string]any) []any {
 	for _, key := range []string{"oneOf", "anyOf"} {
