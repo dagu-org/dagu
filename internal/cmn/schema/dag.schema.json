@@ -117,7 +117,11 @@
         {
           "type": "object",
           "additionalProperties": {
-            "type": "string"
+            "oneOf": [
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "boolean" }
+            ]
           },
           "description": "Tags as key-value pairs in map notation"
         },
@@ -132,7 +136,11 @@
               {
                 "type": "object",
                 "additionalProperties": {
-                  "type": "string"
+                  "oneOf": [
+                    { "type": "string" },
+                    { "type": "number" },
+                    { "type": "boolean" }
+                  ]
                 },
                 "maxProperties": 1,
                 "description": "Single key-value pair"
