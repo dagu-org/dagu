@@ -43,7 +43,6 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_DEBUG":        "true",
 		"DAGU_HEADLESS":     "true",
 
-		"DAGU_WORK_DIR":      filepath.Join(testPaths, "work"),
 		"DAGU_DEFAULT_SHELL": "/bin/zsh",
 
 		"DAGU_UI_MAX_DASHBOARD_PAGE_LIMIT": "250",

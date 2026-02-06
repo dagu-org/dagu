@@ -958,10 +958,9 @@ func buildWorkingDir(ctx BuildContext, d *dag) (string, error) {
 	if ctx.opts.DefaultWorkingDir != "" {
 		return ctx.opts.DefaultWorkingDir, nil
 	}
-	if ctx.file != "" {
-		return filepath.Dir(ctx.file), nil
-	}
-	return getDefaultWorkingDir()
+	// Return empty to allow inheritance from base config.
+	// Default is applied post-merge in loadDAG.
+	return "", nil
 }
 
 // resolveWorkingDirPath resolves the working directory path at build time.

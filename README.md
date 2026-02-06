@@ -279,7 +279,6 @@ Full documentation is available at [docs.dagu.cloud](https://docs.dagu.cloud/).
 | `DAGU_LOG_FORMAT` | `text` | Log format (`text` or `json`) |
 | `DAGU_HEADLESS` | `false` | Run without Web UI |
 | `DAGU_LATEST_STATUS_TODAY` | `false` | Show only today's latest status |
-| `DAGU_WORK_DIR` | - | Default working directory for DAGs |
 | `DAGU_DEFAULT_SHELL` | - | Default shell for command execution |
 | `DAGU_CERT_FILE` | - | TLS certificate file path |
 | `DAGU_KEY_FILE` | - | TLS key file path |

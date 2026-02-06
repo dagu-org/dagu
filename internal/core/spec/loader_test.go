@@ -445,6 +445,47 @@ steps:
 		// Env still inherited from base (since not specified in override DAG)
 		assert.Contains(t, dag.Env, "BASE_ENV=base_value")
 	})
+
+	t.Run("InheritBaseWorkingDir", func(t *testing.T) {
+		t.Parallel()
+
+		baseDAG := createTempYAMLFile(t, `
+workingDir: /shared/workspace
+`)
+
+		childDAG := createTempYAMLFile(t, `
+steps:
+  - name: "step1"
+    command: echo "test"
+`)
+
+		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseDAG))
+		require.NoError(t, err)
+
+		// Child should inherit base's workingDir
+		assert.Equal(t, "/shared/workspace", dag.WorkingDir)
+	})
+
+	t.Run("OverrideBaseWorkingDir", func(t *testing.T) {
+		t.Parallel()
+
+		baseDAG := createTempYAMLFile(t, `
+workingDir: /shared/workspace
+`)
+
+		childDAG := createTempYAMLFile(t, `
+workingDir: /my/custom/dir
+steps:
+  - name: "step1"
+    command: echo "test"
+`)
+
+		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseDAG))
+		require.NoError(t, err)
+
+		// Child's explicit workingDir should override base
+		assert.Equal(t, "/my/custom/dir", dag.WorkingDir)
+	})
 }
 
 func TestLoadYAML(t *testing.T) {
