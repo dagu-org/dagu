@@ -337,7 +337,7 @@ func initAuditService(cfg *config.Config) (*audit.Service, error) {
 		return nil, nil
 	}
 
-	store, err := fileaudit.New(filepath.Join(cfg.Paths.AdminLogsDir, "audit"))
+	store, err := fileaudit.New(filepath.Join(cfg.Paths.AdminLogsDir, "audit"), 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create audit store: %w", err)
 	}

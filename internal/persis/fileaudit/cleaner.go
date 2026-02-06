@@ -1,0 +1,112 @@
+package fileaudit
+
+import (
+	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+)
+
+// cleaner handles periodic cleanup of expired audit log files.
+type cleaner struct {
+	baseDir       string
+	retentionDays int
+	stopCh        chan struct{}
+	stopOnce      sync.Once
+}
+
+// newCleaner creates and starts a cleaner that purges expired audit log files.
+// It runs purgeExpiredFiles immediately, then every 24 hours.
+func newCleaner(baseDir string, retentionDays int) *cleaner {
+	c := &cleaner{
+		baseDir:       baseDir,
+		retentionDays: retentionDays,
+		stopCh:        make(chan struct{}),
+	}
+	go c.run()
+	return c
+}
+
+// run executes the cleanup loop.
+func (c *cleaner) run() {
+	c.purgeExpiredFiles()
+
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			c.purgeExpiredFiles()
+		case <-c.stopCh:
+			return
+		}
+	}
+}
+
+// stop stops the cleaner goroutine. Safe to call multiple times.
+func (c *cleaner) stop() {
+	c.stopOnce.Do(func() {
+		close(c.stopCh)
+	})
+}
+
+// purgeExpiredFiles removes audit log files whose date is strictly before
+// the current time minus retentionDays (UTC).
+func (c *cleaner) purgeExpiredFiles() {
+	if c.retentionDays <= 0 {
+		return
+	}
+
+	entries, err := os.ReadDir(c.baseDir)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			slog.Warn("fileaudit: failed to read audit directory for cleanup",
+				slog.String("dir", c.baseDir),
+				slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	cutoff := time.Now().UTC().AddDate(0, 0, -c.retentionDays)
+	cutoffDate := time.Date(cutoff.Year(), cutoff.Month(), cutoff.Day(), 0, 0, 0, 0, time.UTC)
+
+	removed := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		name := entry.Name()
+		if !strings.HasSuffix(name, auditFileExtension) {
+			continue
+		}
+
+		// Parse date from filename (YYYY-MM-DD.jsonl)
+		datePart := strings.TrimSuffix(name, auditFileExtension)
+		fileDate, err := time.Parse(dateFormat, datePart)
+		if err != nil {
+			// Skip files with unparseable names
+			continue
+		}
+
+		if fileDate.Before(cutoffDate) {
+			filePath := filepath.Join(c.baseDir, name)
+			if err := os.Remove(filePath); err != nil {
+				slog.Warn("fileaudit: failed to remove expired audit file",
+					slog.String("file", filePath),
+					slog.String("error", err.Error()))
+				continue
+			}
+			removed++
+		}
+	}
+
+	if removed > 0 {
+		slog.Info("fileaudit: purged expired audit log files",
+			slog.Int("removed", removed),
+			slog.Int("retentionDays", c.retentionDays))
+	}
+}
