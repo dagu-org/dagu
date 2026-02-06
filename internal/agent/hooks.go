@@ -13,6 +13,7 @@ type ToolExecInfo struct {
 	UserID         string
 	Username       string
 	IPAddress      string
+	Audit          *AuditInfo // from AgentTool.Audit; nil = not audited
 }
 
 // BeforeToolExecHookFunc is called before tool execution.

@@ -290,6 +290,7 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		UserID:         l.userID,
 		Username:       l.username,
 		IPAddress:      l.ipAddress,
+		Audit:          tool.Audit,
 	}
 
 	if err := l.hooks.RunBeforeToolExec(ctx, info); err != nil {

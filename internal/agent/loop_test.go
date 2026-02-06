@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 	"sync/atomic"
@@ -392,6 +393,61 @@ func TestLoop_ExecuteTool(t *testing.T) {
 		assert.Equal(t, "alice", capturedInfo.Username)
 		assert.Equal(t, "10.0.0.1", capturedInfo.IPAddress)
 		assert.Equal(t, result.Content, capturedResult.Content)
+		// think tool has nil Audit (not audited)
+		assert.Nil(t, capturedInfo.Audit)
+	})
+
+	t.Run("populates Audit from tool", func(t *testing.T) {
+		t.Parallel()
+
+		hooks := NewHooks()
+		var capturedInfo ToolExecInfo
+
+		hooks.OnAfterToolExec(func(_ context.Context, info ToolExecInfo, _ ToolOut) {
+			capturedInfo = info
+		})
+
+		auditInfo := &AuditInfo{
+			Action: "test_action",
+			DetailExtractor: func(input json.RawMessage) map[string]any {
+				return map[string]any{"raw": string(input)}
+			},
+		}
+
+		customTool := &AgentTool{
+			Tool: llm.Tool{
+				Type: "function",
+				Function: llm.ToolFunction{
+					Name:        "audited_tool",
+					Description: "A tool with audit info",
+					Parameters:  map[string]any{"type": "object", "properties": map[string]any{}},
+				},
+			},
+			Run: func(_ ToolContext, _ json.RawMessage) ToolOut {
+				return ToolOut{Content: "ok"}
+			},
+			Audit: auditInfo,
+		}
+
+		loop := NewLoop(LoopConfig{
+			Provider: &mockLLMProvider{},
+			Tools:    []*AgentTool{customTool},
+			Hooks:    hooks,
+		})
+
+		loop.executeTool(context.Background(), llm.ToolCall{
+			ID:   "test-id",
+			Type: "function",
+			Function: llm.ToolCallFunction{
+				Name:      "audited_tool",
+				Arguments: `{"key":"val"}`,
+			},
+		})
+
+		require.NotNil(t, capturedInfo.Audit)
+		assert.Equal(t, "test_action", capturedInfo.Audit.Action)
+		details := capturedInfo.Audit.DetailExtractor(capturedInfo.Input)
+		assert.Equal(t, `{"key":"val"}`, details["raw"])
 	})
 
 	t.Run("before hook blocks execution", func(t *testing.T) {

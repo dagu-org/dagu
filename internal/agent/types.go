@@ -235,11 +235,23 @@ type ToolContext struct {
 	SafeMode bool
 }
 
+// AuditInfo configures how a tool's executions appear in audit logs.
+// Nil means the tool is not audited.
+type AuditInfo struct {
+	// Action is the audit action name (e.g. "bash_exec", "file_read").
+	Action string
+	// DetailExtractor extracts audit details from the tool's input JSON.
+	// If nil, only the tool name is logged.
+	DetailExtractor func(input json.RawMessage) map[string]any
+}
+
 // AgentTool extends llm.Tool with an execution function.
 type AgentTool struct {
 	llm.Tool
 	// Run is the function that executes this tool.
 	Run ToolFunc
+	// Audit configures audit logging for this tool. Nil means not audited.
+	Audit *AuditInfo
 }
 
 // EnvironmentInfo contains Dagu environment paths for the system prompt.

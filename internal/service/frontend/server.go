@@ -410,9 +410,13 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *conf
 // newAgentAuditHook returns a hook that logs agent tool executions to the audit service.
 func newAgentAuditHook(auditSvc *audit.Service) agent.AfterToolExecHookFunc {
 	return func(ctx context.Context, info agent.ToolExecInfo, result agent.ToolOut) {
-		action, details := extractAuditDetails(info)
-		if action == "" {
-			return // skip non-audited tools
+		if info.Audit == nil {
+			return // tool opted out of audit
+		}
+
+		details := make(map[string]any)
+		if info.Audit.DetailExtractor != nil {
+			details = info.Audit.DetailExtractor(info.Input)
 		}
 		if result.IsError {
 			details["failed"] = true
@@ -420,38 +424,10 @@ func newAgentAuditHook(auditSvc *audit.Service) agent.AfterToolExecHookFunc {
 		details["conversation_id"] = info.ConversationID
 
 		detailsJSON, _ := json.Marshal(details)
-		entry := audit.NewEntry(audit.CategoryAgent, action, info.UserID, info.Username).
+		entry := audit.NewEntry(audit.CategoryAgent, info.Audit.Action, info.UserID, info.Username).
 			WithDetails(string(detailsJSON)).
 			WithIPAddress(info.IPAddress)
 		_ = auditSvc.Log(context.Background(), entry)
-	}
-}
-
-// extractAuditDetails extracts audit action and details from a tool execution.
-// Returns empty action for tools that should not be audited.
-func extractAuditDetails(info agent.ToolExecInfo) (string, map[string]any) {
-	switch info.ToolName {
-	case "bash":
-		var input struct {
-			Command string `json:"command"`
-		}
-		_ = json.Unmarshal(info.Input, &input)
-		return "bash_exec", map[string]any{"command": input.Command}
-	case "read":
-		var input struct {
-			Path string `json:"path"`
-		}
-		_ = json.Unmarshal(info.Input, &input)
-		return "file_read", map[string]any{"path": input.Path}
-	case "patch":
-		var input struct {
-			Path      string `json:"path"`
-			Operation string `json:"operation"`
-		}
-		_ = json.Unmarshal(info.Input, &input)
-		return "file_patch", map[string]any{"path": input.Path, "operation": input.Operation}
-	default:
-		return "", nil
 	}
 }
 

@@ -11,63 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestExtractAuditDetails_Bash(t *testing.T) {
-	t.Parallel()
-
-	info := agent.ToolExecInfo{
-		ToolName: "bash",
-		Input:    json.RawMessage(`{"command":"ls -la"}`),
-	}
-
-	action, details := extractAuditDetails(info)
-
-	assert.Equal(t, "bash_exec", action)
-	assert.Equal(t, "ls -la", details["command"])
-}
-
-func TestExtractAuditDetails_Read(t *testing.T) {
-	t.Parallel()
-
-	info := agent.ToolExecInfo{
-		ToolName: "read",
-		Input:    json.RawMessage(`{"path":"/etc/hosts"}`),
-	}
-
-	action, details := extractAuditDetails(info)
-
-	assert.Equal(t, "file_read", action)
-	assert.Equal(t, "/etc/hosts", details["path"])
-}
-
-func TestExtractAuditDetails_Patch(t *testing.T) {
-	t.Parallel()
-
-	info := agent.ToolExecInfo{
-		ToolName: "patch",
-		Input:    json.RawMessage(`{"path":"/tmp/file.txt","operation":"replace"}`),
-	}
-
-	action, details := extractAuditDetails(info)
-
-	assert.Equal(t, "file_patch", action)
-	assert.Equal(t, "/tmp/file.txt", details["path"])
-	assert.Equal(t, "replace", details["operation"])
-}
-
-func TestExtractAuditDetails_SkipsNonAudited(t *testing.T) {
-	t.Parallel()
-
-	for _, toolName := range []string{"think", "navigate", "read_schema", "ask_user", "web_search"} {
-		action, details := extractAuditDetails(agent.ToolExecInfo{
-			ToolName: toolName,
-			Input:    json.RawMessage(`{}`),
-		})
-
-		assert.Empty(t, action, "tool %s should be skipped", toolName)
-		assert.Nil(t, details, "tool %s should return nil details", toolName)
-	}
-}
-
 func TestNewAgentAuditHook(t *testing.T) {
 	t.Parallel()
 
@@ -82,6 +25,16 @@ func TestNewAgentAuditHook(t *testing.T) {
 		UserID:         "user-1",
 		Username:       "alice",
 		IPAddress:      "192.168.1.1",
+		Audit: &agent.AuditInfo{
+			Action: "bash_exec",
+			DetailExtractor: func(input json.RawMessage) map[string]any {
+				var p struct {
+					Command string `json:"command"`
+				}
+				_ = json.Unmarshal(input, &p)
+				return map[string]any{"command": p.Command}
+			},
+		},
 	}
 	result := agent.ToolOut{Content: "hello\n", IsError: false}
 
@@ -116,6 +69,16 @@ func TestNewAgentAuditHook_FailedAction(t *testing.T) {
 		ConversationID: "conv-456",
 		UserID:         "user-2",
 		Username:       "bob",
+		Audit: &agent.AuditInfo{
+			Action: "bash_exec",
+			DetailExtractor: func(input json.RawMessage) map[string]any {
+				var p struct {
+					Command string `json:"command"`
+				}
+				_ = json.Unmarshal(input, &p)
+				return map[string]any{"command": p.Command}
+			},
+		},
 	}
 	result := agent.ToolOut{Content: "command failed", IsError: true}
 
@@ -137,11 +100,44 @@ func TestNewAgentAuditHook_SkipsNonAudited(t *testing.T) {
 	info := agent.ToolExecInfo{
 		ToolName: "think",
 		Input:    json.RawMessage(`{"thought":"hmm"}`),
+		Audit:    nil, // not audited
 	}
 
 	hook(context.Background(), info, agent.ToolOut{})
 
 	assert.Empty(t, store.entries)
+}
+
+func TestNewAgentAuditHook_NilDetailExtractor(t *testing.T) {
+	t.Parallel()
+
+	store := &mockAuditStore{}
+	svc := audit.New(store)
+	hook := newAgentAuditHook(svc)
+
+	info := agent.ToolExecInfo{
+		ToolName:       "custom_tool",
+		Input:          json.RawMessage(`{"key":"value"}`),
+		ConversationID: "conv-789",
+		UserID:         "user-3",
+		Username:       "charlie",
+		Audit: &agent.AuditInfo{
+			Action:          "custom_action",
+			DetailExtractor: nil,
+		},
+	}
+
+	hook(context.Background(), info, agent.ToolOut{Content: "ok"})
+
+	require.Len(t, store.entries, 1)
+	entry := store.entries[0]
+	assert.Equal(t, "custom_action", entry.Action)
+
+	var details map[string]any
+	require.NoError(t, json.Unmarshal([]byte(entry.Details), &details))
+	assert.Equal(t, "conv-789", details["conversation_id"])
+	// Only conversation_id should be present (no extracted details)
+	assert.Len(t, details, 1)
 }
 
 // mockAuditStore is a simple in-memory audit store for testing.

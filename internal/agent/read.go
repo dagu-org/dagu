@@ -50,6 +50,16 @@ func NewReadTool() *AgentTool {
 			},
 		},
 		Run: readRun,
+		Audit: &AuditInfo{
+			Action: "file_read",
+			DetailExtractor: func(input json.RawMessage) map[string]any {
+				var p struct {
+					Path string `json:"path"`
+				}
+				_ = json.Unmarshal(input, &p)
+				return map[string]any{"path": p.Path}
+			},
+		},
 	}
 }
 
