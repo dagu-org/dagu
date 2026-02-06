@@ -2,10 +2,12 @@ package eval
 
 import (
 	"context"
+	"fmt"
 	"runtime"
+	"strings"
+	"sync/atomic"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -82,7 +84,7 @@ func TestString_DollarEscape(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := String(ctx, tt.input, opts...)
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected, got)
+			require.Equal(t, tt.expected, got)
 		})
 	}
 }
@@ -95,7 +97,7 @@ func TestString_DollarEscape_Backtick(t *testing.T) {
 
 	got, err := String(ctx, "`echo \\$`")
 	require.NoError(t, err)
-	assert.Equal(t, "$", got)
+	require.Equal(t, "$", got)
 }
 
 func TestString_DollarEscape_Disabled(t *testing.T) {
@@ -103,33 +105,72 @@ func TestString_DollarEscape_Disabled(t *testing.T) {
 
 	got, err := String(ctx, `Price: \$9.99`, WithoutDollarEscape())
 	require.NoError(t, err)
-	assert.Equal(t, `Price: \$9.99`, got)
+	require.Equal(t, `Price: \$9.99`, got)
+}
+
+func TestWithDollarEscapes_NoEscapes(t *testing.T) {
+	ctx := context.Background()
+	input := "no dollar escapes here"
+
+	nextCtx, result := withDollarEscapes(ctx, input)
+	require.Equal(t, ctx, nextCtx)
+	require.Equal(t, input, result)
+}
+
+func TestWithDollarEscapes_BackslashesWithoutEscape(t *testing.T) {
+	ctx := context.Background()
+	input := `\\foo \\$BAR`
+
+	nextCtx, result := withDollarEscapes(ctx, input)
+	require.Equal(t, input, result)
+	require.Equal(t, input, unescapeDollars(nextCtx, result))
 }
 
 func TestWithDollarEscapes_NilContext(t *testing.T) {
 	ctx, result := withDollarEscapes(nil, `\$test`) //nolint:staticcheck // intentionally testing nil context handling
 	require.NotNil(t, ctx)
-	assert.NotEqual(t, `\$test`, result)
-	assert.Equal(t, "$test", unescapeDollars(ctx, result))
+	require.NotEqual(t, `\$test`, result)
+	require.Equal(t, "$test", unescapeDollars(ctx, result))
 }
 
 func TestUnescapeDollars_NilContext(t *testing.T) {
 	result := unescapeDollars(nil, `test\$value`) //nolint:staticcheck // intentionally testing nil context handling
-	assert.Equal(t, `test\$value`, result)
+	require.Equal(t, `test\$value`, result)
 }
 
 func TestUnescapeDollars_NoTokensInContext(t *testing.T) {
 	ctx := context.Background()
-	assert.Equal(t, `test\$value`, unescapeDollars(ctx, `test\$value`))
+	require.Equal(t, `test\$value`, unescapeDollars(ctx, `test\$value`))
 
 	type otherKey struct{}
 	ctx = context.WithValue(ctx, otherKey{}, "something")
-	assert.Equal(t, `test\$value`, unescapeDollars(ctx, `test\$value`))
+	require.Equal(t, `test\$value`, unescapeDollars(ctx, `test\$value`))
 }
 
 func TestUnescapeDollars_EmptyTokens(t *testing.T) {
 	ctx := context.WithValue(context.Background(), dollarEscapeKey{}, dollarEscapeTokens{
 		token: "",
 	})
-	assert.Equal(t, `test\$value`, unescapeDollars(ctx, `test\$value`))
+	require.Equal(t, `test\$value`, unescapeDollars(ctx, `test\$value`))
+}
+
+func TestUniqueToken_Fallback(t *testing.T) {
+	const base = "__DAGU_DOLLAR_ESC__"
+	const maxTokenAttempts = 1024
+
+	prev := atomic.LoadUint64(&dollarEscapeSeq)
+	atomic.StoreUint64(&dollarEscapeSeq, 0)
+	t.Cleanup(func() {
+		atomic.StoreUint64(&dollarEscapeSeq, prev)
+	})
+
+	var b strings.Builder
+	for i := 1; i <= maxTokenAttempts; i++ {
+		fmt.Fprintf(&b, "%s%d__", base, i)
+	}
+	input := b.String()
+
+	token := uniqueToken(input, base)
+	require.True(t, strings.HasSuffix(token, "__fallback__"))
+	require.False(t, strings.Contains(input, token))
 }

@@ -13,6 +13,7 @@ Add a single escape mechanism to the v1 variable expansion system so that users 
 1. **`\$` → literal `$`**: A backslash immediately before `$` produces a single literal `$` in the output.
 
 This escape is applied only when Dagu is the final evaluator (non-shell executors/config fields). Shell-executed commands are left untouched so shell semantics remain intact.
+Single-quoted `$VAR`/`${VAR}` patterns remain verbatim and keep their quotes; no stripping is performed.
 
 This is a targeted fix for issue [#1628](https://github.com/dagu-org/dagu/issues/1628).
 

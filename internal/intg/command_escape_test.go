@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/test"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCommandExecution_DollarEscape(t *testing.T) {
@@ -72,9 +73,7 @@ steps:
 		t.Parallel()
 
 		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			t.Fatalf("failed to resolve home directory: %v", err)
-		}
+		require.NoError(t, err)
 
 		dag := th.DAG(t, `
 shell: direct

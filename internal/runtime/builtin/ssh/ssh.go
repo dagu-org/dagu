@@ -253,24 +253,10 @@ func init() {
 
 func hasShellConfigured(ctx context.Context, step core.Step) bool {
 	if len(step.ExecutorConfig.Config) > 0 {
-		return isShellValueSet(step.ExecutorConfig.Config["shell"])
+		return cmdutil.IsShellValueSet(step.ExecutorConfig.Config["shell"])
 	}
 	if cli := getSSHClientFromContext(ctx); cli != nil && cli.Shell != "" {
 		return true
 	}
 	return step.Shell != ""
-}
-
-// isShellValueSet checks if a shell value from config is non-empty.
-func isShellValueSet(shellValue any) bool {
-	switch v := shellValue.(type) {
-	case string:
-		return strings.TrimSpace(v) != ""
-	case []any:
-		return len(v) > 0
-	case []string:
-		return len(v) > 0
-	default:
-		return false
-	}
 }

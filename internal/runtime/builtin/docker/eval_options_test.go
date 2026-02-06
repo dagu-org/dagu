@@ -19,9 +19,13 @@ func getEscapeDollar(ctx context.Context, step core.Step) bool {
 }
 
 func TestDockerExecutor_GetEvalOptions(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	t.Run("ShellDisablesEscape", func(t *testing.T) {
+		t.Parallel()
+
 		tests := []struct {
 			name string
 			step core.Step
@@ -75,13 +79,18 @@ func TestDockerExecutor_GetEvalOptions(t *testing.T) {
 		}
 
 		for _, tt := range tests {
+			tt := tt
 			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
 				require.False(t, getEscapeDollar(ctx, tt.step))
 			})
 		}
 	})
 
 	t.Run("NoShellKeepsEscapeEnabled", func(t *testing.T) {
+		t.Parallel()
+
 		tests := []struct {
 			name string
 			step core.Step
@@ -138,13 +147,18 @@ func TestDockerExecutor_GetEvalOptions(t *testing.T) {
 		}
 
 		for _, tt := range tests {
+			tt := tt
 			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
 				require.True(t, getEscapeDollar(ctx, tt.step))
 			})
 		}
 	})
 
 	t.Run("DAGContainerShell", func(t *testing.T) {
+		t.Parallel()
+
 		dag := &core.DAG{
 			Name: "test-dag",
 			Container: &core.Container{
@@ -159,6 +173,8 @@ func TestDockerExecutor_GetEvalOptions(t *testing.T) {
 	})
 
 	t.Run("DAGContainerNilShell", func(t *testing.T) {
+		t.Parallel()
+
 		dag := &core.DAG{
 			Name:      "test-dag",
 			Container: &core.Container{Image: "alpine"},
@@ -170,6 +186,8 @@ func TestDockerExecutor_GetEvalOptions(t *testing.T) {
 	})
 
 	t.Run("DAGNilContainer", func(t *testing.T) {
+		t.Parallel()
+
 		dag := &core.DAG{Name: "test-dag"}
 		dagCtx := runtime.NewContextForTest(ctx, dag, "run-1", "log.txt")
 		step := core.Step{ExecutorConfig: core.ExecutorConfig{Type: "docker"}}

@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/signal"
@@ -519,45 +520,16 @@ func init() {
 
 func hasShellConfigured(ctx context.Context, step core.Step) bool {
 	if step.Container != nil {
-		return hasShellArgs(step.Container.Shell)
+		return cmdutil.HasShellArgs(step.Container.Shell)
 	}
 	if len(step.ExecutorConfig.Config) > 0 {
-		return isShellValueSet(step.ExecutorConfig.Config["shell"])
+		return cmdutil.IsShellValueSet(step.ExecutorConfig.Config["shell"])
 	}
 
 	env := runtime.GetEnv(ctx)
 	if env.DAG != nil && env.DAG.Container != nil {
-		return hasShellArgs(env.DAG.Container.Shell)
+		return cmdutil.HasShellArgs(env.DAG.Container.Shell)
 	}
 
-	return false
-}
-
-func hasShellArgs(shell []string) bool {
-	for _, arg := range shell {
-		if strings.TrimSpace(arg) != "" {
-			return true
-		}
-	}
-	return false
-}
-
-func isShellValueSet(shellValue any) bool {
-	switch v := shellValue.(type) {
-	case string:
-		return strings.TrimSpace(v) != ""
-	case []string:
-		return hasShellArgs(v)
-	case []any:
-		for _, item := range v {
-			if s, ok := item.(string); ok {
-				if strings.TrimSpace(s) != "" {
-					return true
-				}
-			} else if item != nil {
-				return true
-			}
-		}
-	}
 	return false
 }

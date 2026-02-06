@@ -10,6 +10,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/test"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDollarEscape(t *testing.T) {
@@ -68,13 +69,20 @@ steps:
 	t.Run("BackslashDollarLiteralInHTTPBody", func(t *testing.T) {
 		t.Parallel()
 
-		bodyCh := make(chan string, 1)
+		type httpBodyResult struct {
+			body string
+			auth string
+			err  error
+		}
+		bodyCh := make(chan httpBodyResult, 1)
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			defer func() { _ = r.Body.Close() }()
+			defer func() {
+				if err := r.Body.Close(); err != nil {
+					t.Errorf("failed to close request body: %v", err)
+				}
+			}()
 			body, err := io.ReadAll(r.Body)
-			if err == nil {
-				bodyCh <- string(body)
-			}
+			bodyCh <- httpBodyResult{body: string(body), auth: r.Header.Get("Authorization"), err: err}
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("ok"))
 		}))
@@ -82,13 +90,17 @@ steps:
 
 		th := test.Setup(t)
 		dag := th.DAG(t, fmt.Sprintf(`
+env:
+  - TOKEN: secret
 steps:
   - name: http-price
     type: http
     config:
       headers:
+        Authorization: "Bearer \\$TOKEN"
         Content-Type: application/json
-      body: '{"price":"\$9.99"}'
+      body: |-
+        {"price":"\$TOKEN"}
       silent: true
     command: POST %s/price
 `, server.URL))
@@ -96,12 +108,12 @@ steps:
 		agent.RunSuccess(t)
 
 		select {
-		case got := <-bodyCh:
-			if got != `{"price":"$9.99"}` {
-				t.Fatalf("expected body to contain $9.99, got %q", got)
-			}
+		case result := <-bodyCh:
+			require.NoError(t, result.err)
+			require.Equal(t, `Bearer $TOKEN`, result.auth)
+			require.Equal(t, `{"price":"$TOKEN"}`, result.body)
 		case <-time.After(5 * time.Second):
-			t.Fatal("timed out waiting for HTTP body")
+			require.FailNow(t, "timed out waiting for HTTP body")
 		}
 	})
 }
