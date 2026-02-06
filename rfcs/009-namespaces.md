@@ -36,8 +36,12 @@ A namespace is a named isolation boundary that scopes:
 - **DAGs** — each DAG belongs to exactly one namespace
 - **DAG runs and history** — run data is stored and queried per namespace
 - **Logs** — execution logs are partitioned by namespace
-- **Queues** — queue definitions and state are namespace-local
+- **Queues** — queue definitions and state are namespace-local; the same queue name in different namespaces are independent
+- **Suspend flags** — DAG suspend state is per-namespace
+- **Webhooks** — webhook URLs include the namespace for routing
 - **Configuration** — base config, secrets, and environment defaults can be set per namespace
+
+Namespace names must match `[a-z0-9][a-z0-9-]*[a-z0-9]`, with a maximum length of 63 characters. The name `default` is reserved for the built-in namespace.
 
 Every Dagu instance has a built-in `default` namespace for backward compatibility. Existing single-tenant deployments continue to work without changes.
 
@@ -91,18 +95,11 @@ Extend the existing role system to support per-namespace role bindings:
 
 A user can hold different roles in different namespaces. Global admin remains the superuser across all namespaces. A user with no explicit namespace binding has no access to that namespace (deny-by-default).
 
-Example binding:
+Each user gains a `namespaceRoles` mapping in addition to their existing global `role`. The existing role system (admin, manager, operator, viewer) is reused — no new role types are introduced.
 
-```yaml
-users:
-  alice:
-    globalRole: viewer              # can see namespace list
-    namespaces:
-      team-alpha: admin             # full control in team-alpha
-      team-beta: operator           # can run DAGs in team-beta
-  bob:
-    globalRole: admin               # full control everywhere
-```
+Example: Alice has `viewer` as her global role, `admin` in `team-alpha`, and `operator` in `team-beta`. Bob has `admin` globally (superuser across all namespaces).
+
+API keys are global-only in the initial implementation. Namespace-scoped API keys may be added later.
 
 ### API Changes
 
@@ -120,9 +117,12 @@ Requests without a namespace prefix operate on `default` for backward compatibil
 
 ### CLI Changes
 
+Existing commands accept namespace via the `namespace/dag-name` format or a `--namespace` flag:
+
 ```bash
 dagu start team-alpha/ingest           # run DAG in namespace
-dagu list --namespace team-alpha       # list DAGs in namespace
+dagu status team-alpha/ingest          # DAG status in namespace
+dagu sync pull --namespace team-alpha  # sync specific namespace
 dagu namespace list                    # list all namespaces
 dagu namespace create staging          # create namespace
 ```
@@ -132,6 +132,10 @@ dagu namespace create staging          # create namespace
 - Namespace selector in the navigation bar
 - Namespace-scoped views for DAGs, runs, and logs
 - Admin panel for namespace management and role assignment
+
+### Scheduler
+
+The scheduler discovers and schedules DAGs across all namespaces. It scans namespace subdirectories under the DAGs root and watches each for file changes. Each scheduled DAG carries its namespace context through execution.
 
 ### Sub-DAG References
 
@@ -221,13 +225,13 @@ The AI agent becomes namespace-aware. When a user interacts with the agent, the 
 Example agent interaction:
 
 ```
-User (namespace: team-alpha, role: developer):
+User (namespace: team-alpha, role: manager):
   "Create a new DAG that runs the ETL pipeline daily"
 
 Agent:
   → Creates DAG in team-alpha/ namespace
-  → Tools enforced: can create/edit DAGs (developer role)
-  → Cannot access team-beta/ DAGs unless user has a role there
+  → Tools enforced: can create/edit DAGs (manager role)
+  → Cannot access DAGs outside team-alpha
 ```
 
 Each conversation is locked to the namespace in which it was started. The agent cannot switch namespaces mid-conversation. Users must start a new conversation to work in a different namespace. Conversation history is visible across namespaces the user has access to, but each conversation is tagged with its originating namespace.
@@ -239,9 +243,11 @@ Audit logging (RFC 002) includes the namespace in every agent action record for 
 Existing installations upgrade seamlessly:
 
 1. All current DAGs are moved into `default/` subdirectory
-2. All current run data is moved into `default/` subdirectory
-3. Existing users receive their current global role unchanged
-4. No configuration changes are required
+2. All current run data is moved into `default/` subdirectory (dag-runs, proc, queue, suspend flags)
+3. Git sync state is moved into `default/` subdirectory
+4. Agent conversation history is tagged with the `default` namespace
+5. Existing users receive their current global role unchanged
+6. No configuration changes are required
 
 An automatic migration runs on first startup after upgrade.
 

@@ -1,7 +1,7 @@
 ---
 id: "008"
 title: "Dollar Sign Escaping in v1 Variable Expansion"
-status: draft
+status: implemented
 ---
 
 # RFC 008: Dollar Sign Escaping in v1 Variable Expansion
