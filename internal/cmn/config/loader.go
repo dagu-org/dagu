@@ -563,6 +563,11 @@ func (l *ConfigLoader) loadServerDefaults(cfg *Config, def Definition) {
 	if def.Audit != nil && def.Audit.Enabled != nil {
 		cfg.Server.Audit.Enabled = *def.Audit.Enabled
 	}
+
+	cfg.Server.Audit.RetentionDays = l.v.GetInt("audit.retentionDays")
+	if def.Audit != nil && def.Audit.RetentionDays != nil {
+		cfg.Server.Audit.RetentionDays = *def.Audit.RetentionDays
+	}
 }
 
 func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
@@ -1143,6 +1148,9 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	// Peer
 	l.v.SetDefault("peer.insecure", true)
 
+	// Audit
+	l.v.SetDefault("audit.retentionDays", 7)
+
 	// Monitoring
 	l.v.SetDefault("monitoring.retention", "24h")
 	l.v.SetDefault("monitoring.interval", "5s")
@@ -1170,6 +1178,7 @@ var envBindings = []envBinding{
 
 	{key: "terminal.enabled", env: "TERMINAL_ENABLED"},
 	{key: "audit.enabled", env: "AUDIT_ENABLED"},
+	{key: "audit.retentionDays", env: "AUDIT_RETENTION_DAYS"},
 
 	// Core
 	{key: "workDir", env: "WORK_DIR", isPath: true},

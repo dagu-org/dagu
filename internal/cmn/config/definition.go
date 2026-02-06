@@ -305,7 +305,8 @@ type TerminalDef struct {
 
 // AuditDef configures the audit logging feature.
 type AuditDef struct {
-	Enabled *bool `mapstructure:"enabled"` // Default: true
+	Enabled       *bool `mapstructure:"enabled"`       // Default: true
+	RetentionDays *int  `mapstructure:"retentionDays"` // Default: 7
 }
 
 // -----------------------------------------------------------------------------
