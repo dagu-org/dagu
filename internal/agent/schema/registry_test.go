@@ -111,7 +111,7 @@ func TestRegistry_Navigate(t *testing.T) {
 
 		result, err := r.Navigate("test", "")
 		require.NoError(t, err)
-		assert.Contains(t, result, "DAG Schema Root")
+		assert.Contains(t, result, "Test Schema Root")
 		assert.Contains(t, result, "Root schema description")
 	})
 
