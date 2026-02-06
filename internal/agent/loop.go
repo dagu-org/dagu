@@ -60,6 +60,14 @@ type LoopConfig struct {
 	WaitUserResponse WaitUserResponseFunc
 	// SafeMode enables approval prompts for dangerous commands when true.
 	SafeMode bool
+	// Hooks provides lifecycle callbacks for tool execution.
+	Hooks *Hooks
+	// UserID is the authenticated user's ID.
+	UserID string
+	// Username is the authenticated user's display name.
+	Username string
+	// IPAddress is the client's IP address.
+	IPAddress string
 }
 
 // Loop manages a conversation turn with an LLM including tool execution.
@@ -82,6 +90,10 @@ type Loop struct {
 	emitUserPrompt   EmitUserPromptFunc
 	waitUserResponse WaitUserResponseFunc
 	safeMode         bool
+	hooks            *Hooks
+	userID           string
+	username         string
+	ipAddress        string
 }
 
 // NewLoop creates a new Loop instance.
@@ -107,6 +119,10 @@ func NewLoop(config LoopConfig) *Loop {
 		emitUserPrompt:   config.EmitUserPrompt,
 		waitUserResponse: config.WaitUserResponse,
 		safeMode:         config.SafeMode,
+		hooks:            config.Hooks,
+		userID:           config.UserID,
+		username:         config.Username,
+		ipAddress:        config.IPAddress,
 	}
 }
 
@@ -267,11 +283,28 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		input = json.RawMessage("{}")
 	}
 
+	// Build hook context
+	info := ToolExecInfo{
+		ToolName:       tc.Function.Name,
+		Input:          input,
+		ConversationID: l.conversationID,
+		UserID:         l.userID,
+		Username:       l.username,
+		IPAddress:      l.ipAddress,
+	}
+
+	// Pre-execution hooks (guardrails)
+	if l.hooks != nil {
+		if err := l.hooks.RunBeforeToolExec(ctx, info); err != nil {
+			return toolError("Blocked by policy: %v", err)
+		}
+	}
+
 	l.mu.Lock()
 	safeMode := l.safeMode
 	l.mu.Unlock()
 
-	return tool.Run(ToolContext{
+	result := tool.Run(ToolContext{
 		Context:          ctx,
 		WorkingDir:       l.workingDir,
 		EmitUIAction:     l.emitUIAction,
@@ -279,6 +312,13 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		WaitUserResponse: l.waitUserResponse,
 		SafeMode:         safeMode,
 	}, input)
+
+	// Post-execution hooks (audit)
+	if l.hooks != nil {
+		l.hooks.RunAfterToolExec(ctx, info, result)
+	}
+
+	return result
 }
 
 // handleToolCalls processes tool calls from the LLM response using iteration

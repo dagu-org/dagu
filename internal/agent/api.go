@@ -43,6 +43,17 @@ func getUserIDFromContext(ctx context.Context) string {
 	return defaultUserID
 }
 
+// getUserContextFromRequest extracts user identity and IP from the request context.
+func getUserContextFromRequest(r *http.Request) (userID, username, ipAddress string) {
+	userID, username = defaultUserID, defaultUserID
+	if user, ok := auth.UserFromContext(r.Context()); ok && user != nil {
+		userID = user.ID
+		username = user.Username
+	}
+	ipAddress, _ = auth.ClientIPFromContext(r.Context())
+	return
+}
+
 // API handles HTTP requests for the agent.
 type API struct {
 	conversations sync.Map // id -> *ConversationManager (active conversations)
@@ -52,6 +63,7 @@ type API struct {
 	logger        *slog.Logger
 	dagStore      exec.DAGStore // For resolving DAG file paths
 	environment   EnvironmentInfo
+	hooks         *Hooks
 }
 
 // APIConfig contains configuration for the API.
@@ -62,6 +74,7 @@ type APIConfig struct {
 	ConversationStore ConversationStore
 	DAGStore          exec.DAGStore // For resolving DAG file paths
 	Environment       EnvironmentInfo
+	Hooks             *Hooks
 }
 
 // ConversationWithState is a conversation with its current state.
@@ -85,6 +98,7 @@ func NewAPI(cfg APIConfig) *API {
 		store:       cfg.ConversationStore,
 		dagStore:    cfg.DAGStore,
 		environment: cfg.Environment,
+		hooks:       cfg.Hooks,
 	}
 }
 
@@ -268,7 +282,7 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := getUserIDFromContext(r.Context())
+	userID, username, ipAddress := getUserContextFromRequest(r)
 	model := selectModel(req.Model, "", configModel)
 	id := uuid.New().String()
 	now := time.Now()
@@ -281,6 +295,9 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 		OnMessage:   a.createMessageCallback(id),
 		Environment: a.environment,
 		SafeMode:    req.SafeMode,
+		Hooks:       a.hooks,
+		Username:    username,
+		IPAddress:   ipAddress,
 	})
 
 	a.persistNewConversation(r.Context(), id, userID, now)
@@ -439,9 +456,9 @@ func (a *API) getStoredConversation(ctx context.Context, id, userID string) (*Co
 // POST /api/v1/agent/conversations/{id}/chat
 func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	userID := getUserIDFromContext(r.Context())
+	userID, username, ipAddress := getUserContextFromRequest(r)
 
-	mgr, ok := a.getOrReactivateConversation(r.Context(), id, userID)
+	mgr, ok := a.getOrReactivateConversation(r.Context(), id, userID, username, ipAddress)
 	if !ok {
 		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Conversation not found")
 		return
@@ -481,18 +498,18 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 }
 
 // getOrReactivateConversation retrieves an active conversation or reactivates it from storage.
-func (a *API) getOrReactivateConversation(ctx context.Context, id, userID string) (*ConversationManager, bool) {
+func (a *API) getOrReactivateConversation(ctx context.Context, id, userID, username, ipAddress string) (*ConversationManager, bool) {
 	// Check active conversations first
 	if mgr, ok := a.getActiveConversation(id, userID); ok {
 		return mgr, true
 	}
 
 	// Try to reactivate from store
-	return a.reactivateConversation(ctx, id, userID)
+	return a.reactivateConversation(ctx, id, userID, username, ipAddress)
 }
 
 // reactivateConversation restores a conversation from storage and makes it active.
-func (a *API) reactivateConversation(ctx context.Context, id, userID string) (*ConversationManager, bool) {
+func (a *API) reactivateConversation(ctx context.Context, id, userID, username, ipAddress string) (*ConversationManager, bool) {
 	if a.store == nil {
 		return nil, false
 	}
@@ -522,6 +539,9 @@ func (a *API) reactivateConversation(ctx context.Context, id, userID string) (*C
 		History:     messages,
 		SequenceID:  seqID,
 		Environment: a.environment,
+		Hooks:       a.hooks,
+		Username:    username,
+		IPAddress:   ipAddress,
 	})
 	a.conversations.Store(id, mgr)
 

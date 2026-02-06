@@ -27,6 +27,7 @@ const CATEGORIES = [
   { value: 'api_key', label: 'API Key' },
   { value: 'webhook', label: 'Webhook' },
   { value: 'git_sync', label: 'Git Sync' },
+  { value: 'agent', label: 'Agent' },
 ];
 
 const PAGE_SIZE = 50;
@@ -359,6 +360,11 @@ export default function AuditLogsPage() {
       if (entry.action === 'command') {
         return `Command: ${details.command || 'N/A'}`;
       }
+    }
+    if (entry.category === 'agent') {
+      if (entry.action === 'bash_exec') return `Command: ${details.command || 'N/A'}`;
+      if (entry.action === 'file_read') return `Path: ${details.path || 'N/A'}`;
+      if (entry.action === 'file_patch') return `${details.operation || 'patch'}: ${details.path || 'N/A'}`;
     }
     return entry.details || '-';
   };
