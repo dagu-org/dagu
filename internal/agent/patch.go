@@ -79,15 +79,8 @@ func NewPatchTool(dagsDir string) *AgentTool {
 			return patchRun(ctx, input, dagsDir)
 		},
 		Audit: &AuditInfo{
-			Action: "file_patch",
-			DetailExtractor: func(input json.RawMessage) map[string]any {
-				var p struct {
-					Path      string `json:"path"`
-					Operation string `json:"operation"`
-				}
-				_ = json.Unmarshal(input, &p)
-				return map[string]any{"path": p.Path, "operation": p.Operation}
-			},
+			Action:          "file_patch",
+			DetailExtractor: ExtractFields("path", "operation"),
 		},
 	}
 }

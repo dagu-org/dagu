@@ -57,14 +57,8 @@ func NewBashTool() *AgentTool {
 		},
 		Run: bashRun,
 		Audit: &AuditInfo{
-			Action: "bash_exec",
-			DetailExtractor: func(input json.RawMessage) map[string]any {
-				var p struct {
-					Command string `json:"command"`
-				}
-				_ = json.Unmarshal(input, &p)
-				return map[string]any{"command": p.Command}
-			},
+			Action:          "bash_exec",
+			DetailExtractor: ExtractFields("command"),
 		},
 	}
 }

@@ -26,14 +26,8 @@ func TestNewAgentAuditHook(t *testing.T) {
 		Username:       "alice",
 		IPAddress:      "192.168.1.1",
 		Audit: &agent.AuditInfo{
-			Action: "bash_exec",
-			DetailExtractor: func(input json.RawMessage) map[string]any {
-				var p struct {
-					Command string `json:"command"`
-				}
-				_ = json.Unmarshal(input, &p)
-				return map[string]any{"command": p.Command}
-			},
+			Action:          "bash_exec",
+			DetailExtractor: agent.ExtractFields("command"),
 		},
 	}
 	result := agent.ToolOut{Content: "hello\n", IsError: false}
@@ -70,14 +64,8 @@ func TestNewAgentAuditHook_FailedAction(t *testing.T) {
 		UserID:         "user-2",
 		Username:       "bob",
 		Audit: &agent.AuditInfo{
-			Action: "bash_exec",
-			DetailExtractor: func(input json.RawMessage) map[string]any {
-				var p struct {
-					Command string `json:"command"`
-				}
-				_ = json.Unmarshal(input, &p)
-				return map[string]any{"command": p.Command}
-			},
+			Action:          "bash_exec",
+			DetailExtractor: agent.ExtractFields("command"),
 		},
 	}
 	result := agent.ToolOut{Content: "command failed", IsError: true}

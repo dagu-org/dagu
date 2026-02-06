@@ -245,6 +245,22 @@ type AuditInfo struct {
 	DetailExtractor func(input json.RawMessage) map[string]any
 }
 
+// ExtractFields returns a DetailExtractor that pulls the named fields from
+// the tool's JSON input. Only non-nil values are included in the result.
+func ExtractFields(fields ...string) func(json.RawMessage) map[string]any {
+	return func(input json.RawMessage) map[string]any {
+		var raw map[string]any
+		_ = json.Unmarshal(input, &raw)
+		result := make(map[string]any, len(fields))
+		for _, f := range fields {
+			if v, ok := raw[f]; ok {
+				result[f] = v
+			}
+		}
+		return result
+	}
+}
+
 // AgentTool extends llm.Tool with an execution function.
 type AgentTool struct {
 	llm.Tool

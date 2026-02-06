@@ -409,7 +409,7 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *conf
 
 // newAgentAuditHook returns a hook that logs agent tool executions to the audit service.
 func newAgentAuditHook(auditSvc *audit.Service) agent.AfterToolExecHookFunc {
-	return func(ctx context.Context, info agent.ToolExecInfo, result agent.ToolOut) {
+	return func(_ context.Context, info agent.ToolExecInfo, result agent.ToolOut) {
 		if info.Audit == nil {
 			return // tool opted out of audit
 		}
