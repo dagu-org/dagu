@@ -1094,7 +1094,6 @@ func (l *ConfigLoader) setupViper(xdgConfig XDGConfig, homeDir, configFile, appH
 
 func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	// Paths
-	l.v.SetDefault("workDir", "")
 	l.v.SetDefault("skipExamples", false)
 	l.v.SetDefault("paths.dagsDir", paths.DAGsDir)
 	l.v.SetDefault("paths.suspendFlagsDir", paths.SuspendFlagsDir)
@@ -1172,7 +1171,6 @@ var envBindings = []envBinding{
 	{key: "audit.enabled", env: "AUDIT_ENABLED"},
 
 	// Core
-	{key: "workDir", env: "WORK_DIR", isPath: true},
 	{key: "defaultShell", env: "DEFAULT_SHELL"},
 	{key: "skipExamples", env: "SKIP_EXAMPLES"},
 

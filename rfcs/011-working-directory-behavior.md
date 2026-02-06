@@ -183,7 +183,7 @@ JSON schema files referenced in DAG parameters (`internal/core/spec/schema.go`) 
 
 ### Environment Variables
 
-- `DAGU_WORK_DIR` — bound in config loader (`internal/cmn/config/loader.go:1175`) with an empty default, but the config struct has no corresponding field and the value is never read. This is effectively dead/orphaned configuration that has no observable effect on DAG working directory behavior.
+- `DAGU_WORK_DIR` — removed (was dead/orphaned: bound in config loader but never stored or read)
 - `PWD` — set per-step to the resolved working directory (`env.go:80`)
 - `DAGU_HOME` — determines the base directory for Dagu's data/config paths, but does not directly affect DAG working directory
 
