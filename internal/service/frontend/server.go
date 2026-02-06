@@ -616,6 +616,11 @@ func (srv *Server) setupAssetRoutes(r *chi.Mux, basePath string) {
 			_, _ = w.Write(cmnschema.DAGSchemaJSON)
 			return
 		}
+		if strings.HasSuffix(r.URL.Path, "config.schema.json") {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(cmnschema.ConfigSchemaJSON)
+			return
+		}
 
 		if ctype := mime.TypeByExtension(path.Ext(r.URL.Path)); ctype != "" {
 			w.Header().Set("Content-Type", ctype)

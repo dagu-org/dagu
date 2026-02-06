@@ -5,3 +5,6 @@ import _ "embed"
 
 //go:embed dag.schema.json
 var DAGSchemaJSON []byte
+
+//go:embed config.schema.json
+var ConfigSchemaJSON []byte

@@ -10,4 +10,7 @@ func init() {
 		// the binary is misconfigured and should fail fast.
 		panic("failed to register dag schema: " + err.Error())
 	}
+	if err := DefaultRegistry.Register("config", cmnschema.ConfigSchemaJSON); err != nil {
+		panic("failed to register config schema: " + err.Error())
+	}
 }
