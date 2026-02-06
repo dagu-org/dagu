@@ -65,6 +65,7 @@ var defaultPipeline = &pipeline{
 			execute: func(ctx context.Context, input string, _ *Options) (string, error) {
 				return unescapeDollars(ctx, input), nil
 			},
+			enabled: func(opts *Options) bool { return opts.EscapeDollar },
 		},
 	},
 }

@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 )
 
-type dollarEscapeTokens struct {
+type dollarEscapeToken struct {
 	token string
 }
 
@@ -44,7 +44,7 @@ func withDollarEscapes(ctx context.Context, input string) (context.Context, stri
 		count := i - start
 
 		if i < len(input) && input[i] == '$' && count%2 == 1 {
-			for j := 0; j < count-1; j++ {
+			for range count - 1 {
 				b.WriteByte('\\')
 			}
 			b.WriteString(token)
@@ -52,12 +52,12 @@ func withDollarEscapes(ctx context.Context, input string) (context.Context, stri
 			continue
 		}
 
-		for j := 0; j < count; j++ {
+		for range count {
 			b.WriteByte('\\')
 		}
 	}
 
-	tokens := dollarEscapeTokens{token: token}
+	tokens := dollarEscapeToken{token: token}
 	ctx = context.WithValue(ctx, dollarEscapeKey{}, tokens)
 	return ctx, b.String()
 }
@@ -67,7 +67,7 @@ func unescapeDollars(ctx context.Context, input string) string {
 	if ctx == nil {
 		return input
 	}
-	tokens, ok := ctx.Value(dollarEscapeKey{}).(dollarEscapeTokens)
+	tokens, ok := ctx.Value(dollarEscapeKey{}).(dollarEscapeToken)
 	if !ok {
 		return input
 	}

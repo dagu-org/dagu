@@ -23,7 +23,8 @@ func HasShellArgs(shell []string) bool {
 func IsShellValueSet(shellValue any) bool {
 	switch v := shellValue.(type) {
 	case string:
-		return !isDirectShell(strings.TrimSpace(v)) && strings.TrimSpace(v) != ""
+		trimmed := strings.TrimSpace(v)
+		return trimmed != "" && !isDirectShell(trimmed)
 	case []string:
 		return HasShellArgs(v)
 	case []any:

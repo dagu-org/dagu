@@ -148,7 +148,7 @@ func TestUnescapeDollars_NoTokensInContext(t *testing.T) {
 }
 
 func TestUnescapeDollars_EmptyTokens(t *testing.T) {
-	ctx := context.WithValue(context.Background(), dollarEscapeKey{}, dollarEscapeTokens{
+	ctx := context.WithValue(context.Background(), dollarEscapeKey{}, dollarEscapeToken{
 		token: "",
 	})
 	require.Equal(t, `test\$value`, unescapeDollars(ctx, `test\$value`))
