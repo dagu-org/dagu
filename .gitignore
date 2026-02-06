@@ -41,3 +41,7 @@ __debug_bin*
 # Go cache
 .gocache
 .gomodcache
+
+# Ralph PRD file
+prd.json
+
