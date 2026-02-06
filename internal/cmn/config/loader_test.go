@@ -236,8 +236,9 @@ func TestLoad_Env(t *testing.T) {
 				BlockDurationSeconds: 1800,
 			},
 		},
-		Warnings: []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://auth.example.com)"},
-		Cache:    CacheModeNormal,
+		DefaultExecutionMode: ExecutionModeLocal,
+		Warnings:             []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://auth.example.com)"},
+		Cache:                CacheModeNormal,
 	}
 
 	assert.Equal(t, expected, cfg)
@@ -486,8 +487,9 @@ scheduler:
 			Retention: 24 * time.Hour,
 			Interval:  5 * time.Second,
 		},
-		Warnings: []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://accounts.example.com)"},
-		Cache:    CacheModeNormal,
+		DefaultExecutionMode: ExecutionModeLocal,
+		Warnings:             []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://accounts.example.com)"},
+		Cache:                CacheModeNormal,
 	}
 
 	assert.Equal(t, expected, cfg)
@@ -1346,5 +1348,41 @@ tunnel:
 `)
 		assert.False(t, cfg.Tunnel.Enabled)
 		assert.Empty(t, cfg.Tunnel.Tailscale.Hostname)
+	})
+}
+
+func TestLoad_DefaultExecutionMode(t *testing.T) {
+	t.Run("DefaultIsLocal", func(t *testing.T) {
+		cfg := loadFromYAML(t, "# empty")
+		assert.Equal(t, ExecutionModeLocal, cfg.DefaultExecutionMode)
+	})
+
+	t.Run("SetToDistributed", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+defaultExecutionMode: distributed
+`)
+		assert.Equal(t, ExecutionModeDistributed, cfg.DefaultExecutionMode)
+	})
+
+	t.Run("SetToLocal", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+defaultExecutionMode: local
+`)
+		assert.Equal(t, ExecutionModeLocal, cfg.DefaultExecutionMode)
+	})
+
+	t.Run("FromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_DEFAULT_EXECUTION_MODE": "distributed",
+		})
+		assert.Equal(t, ExecutionModeDistributed, cfg.DefaultExecutionMode)
+	})
+
+	t.Run("InvalidValue", func(t *testing.T) {
+		err := loadWithErrorFromYAML(t, `
+defaultExecutionMode: invalid
+`)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid defaultExecutionMode")
 	})
 }

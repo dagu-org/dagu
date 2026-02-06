@@ -23,7 +23,9 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	runtime1 "github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/service/audit"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
 const defaultHistoryLimit = 30
@@ -883,7 +885,47 @@ func (a *API) waitForDAGStatusChange(ctx context.Context, dag *core.DAG, dagRunI
 	return false
 }
 
+// dispatchStartToCoordinator dispatches a DAG start operation to the coordinator
+// and waits for the DAG status to change from NotStarted within the given timeout.
+func (a *API) dispatchStartToCoordinator(ctx context.Context, dag *core.DAG, dagRunID string, timeout time.Duration) error {
+	var taskOpts []executor.TaskOption
+	if len(dag.WorkerSelector) > 0 {
+		taskOpts = append(taskOpts, executor.WithWorkerSelector(dag.WorkerSelector))
+	}
+
+	task := executor.CreateTask(
+		dag.Name,
+		string(dag.YamlData),
+		coordinatorv1.Operation_OPERATION_START,
+		dagRunID,
+		taskOpts...,
+	)
+
+	if err := a.coordinatorCli.Dispatch(ctx, task); err != nil {
+		return fmt.Errorf("error dispatching to coordinator: %w", err)
+	}
+
+	if !a.waitForDAGStatusChange(ctx, dag, dagRunID, timeout) {
+		return &Error{
+			HTTPStatus: http.StatusInternalServerError,
+			Code:       api.ErrorCodeInternalError,
+			Message:    "DAG did not start after coordinator dispatch",
+		}
+	}
+
+	return nil
+}
+
 func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts startDAGRunOptions) error {
+	// Check if this DAG should be dispatched to the coordinator for distributed execution
+	if core.ShouldDispatchToCoordinator(dag, a.coordinatorCli != nil, a.defaultExecutionMode) {
+		timeout := 5 * time.Second
+		if runtime.GOOS == "windows" {
+			timeout = 10 * time.Second
+		}
+		return a.dispatchStartToCoordinator(ctx, dag, opts.dagRunID, timeout)
+	}
+
 	// Only pass trigger type if it's a known value (not TriggerTypeUnknown)
 	triggerTypeStr := ""
 	if opts.triggerType != core.TriggerTypeUnknown {
@@ -997,6 +1039,11 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 }
 
 func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string, triggerType core.TriggerType) error {
+	// Check if this DAG should be dispatched to the coordinator for distributed execution
+	if core.ShouldDispatchToCoordinator(dag, a.coordinatorCli != nil, a.defaultExecutionMode) {
+		return a.dispatchStartToCoordinator(ctx, dag, dagRunID, 3*time.Second)
+	}
+
 	// Only pass trigger type if it's a known value (not TriggerTypeUnknown)
 	triggerTypeStr := ""
 	if triggerType != core.TriggerTypeUnknown {

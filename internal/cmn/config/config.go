@@ -8,19 +8,20 @@ import (
 
 // Config holds the overall configuration for the application.
 type Config struct {
-	Core        Core
-	Server      Server
-	Paths       PathsConfig
-	UI          UI
-	Queues      Queues
-	Coordinator Coordinator
-	Worker      Worker
-	Scheduler   Scheduler
-	Monitoring  MonitoringConfig
-	Cache       CacheMode
-	GitSync     GitSyncConfig
-	Tunnel      TunnelConfig
-	Warnings    []string
+	Core                 Core
+	Server               Server
+	Paths                PathsConfig
+	UI                   UI
+	Queues               Queues
+	Coordinator          Coordinator
+	Worker               Worker
+	Scheduler            Scheduler
+	Monitoring           MonitoringConfig
+	DefaultExecutionMode ExecutionMode
+	Cache                CacheMode
+	GitSync              GitSyncConfig
+	Tunnel               TunnelConfig
+	Warnings             []string
 }
 
 // GitSyncConfig holds the configuration for Git sync functionality.
@@ -83,6 +84,14 @@ type TunnelRateLimitConfig struct {
 }
 
 const TunnelProviderTailscale = "tailscale"
+
+// ExecutionMode represents the default execution mode for DAGs.
+type ExecutionMode string
+
+const (
+	ExecutionModeLocal       ExecutionMode = "local"
+	ExecutionModeDistributed ExecutionMode = "distributed"
+)
 
 // MonitoringConfig holds the configuration for system monitoring.
 // Memory usage: ~4 metrics * (retention / interval) * 16 bytes per point.
@@ -353,6 +362,9 @@ func (c *Config) Validate() error {
 	if err := c.validateBuiltinAuth(); err != nil {
 		return err
 	}
+	if err := c.validateExecutionMode(); err != nil {
+		return err
+	}
 	if err := c.validateGitSync(); err != nil {
 		return err
 	}
@@ -435,6 +447,16 @@ func (c *Config) validateOIDCForBuiltin() error {
 	}
 
 	return nil
+}
+
+// validateExecutionMode validates the default execution mode.
+func (c *Config) validateExecutionMode() error {
+	switch c.DefaultExecutionMode {
+	case ExecutionModeLocal, ExecutionModeDistributed:
+		return nil
+	default:
+		return fmt.Errorf("invalid defaultExecutionMode: %q (must be one of: local, distributed)", c.DefaultExecutionMode)
+	}
 }
 
 // validateGitSync validates the Git sync configuration.

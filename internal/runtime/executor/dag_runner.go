@@ -227,7 +227,8 @@ func (e *SubDAGExecutor) Cleanup(ctx context.Context) error {
 func (e *SubDAGExecutor) Execute(ctx context.Context, runParams RunParams, workDir string) (*exec1.RunStatus, error) {
 	ctx = logger.WithValues(ctx, tag.SubDAG(e.DAG.Name), tag.SubRunID(runParams.RunID))
 
-	if len(e.DAG.WorkerSelector) > 0 {
+	rCtx := exec1.GetContext(ctx)
+	if core.ShouldDispatchToCoordinator(e.DAG, e.coordinatorCli != nil, rCtx.DefaultExecutionMode) {
 		// Handle distributed execution
 		logger.Info(ctx, "Executing sub DAG via distributed execution")
 
@@ -282,7 +283,7 @@ func (e *SubDAGExecutor) Execute(ctx context.Context, runParams RunParams, workD
 	default:
 	}
 
-	rCtx := exec1.GetContext(ctx)
+	rCtx = exec1.GetContext(ctx)
 	result, resultErr := rCtx.DB.GetSubDAGRunStatus(ctx, runParams.RunID, rCtx.RootDAGRun)
 	if resultErr != nil {
 		errMsg := fmt.Sprintf("sub dag-run %q failed and wrote no status", runParams.RunID)

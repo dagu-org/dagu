@@ -280,16 +280,17 @@ func (h *remoteTaskHandler) executeDAGRun(
 
 	// Build agent options
 	opts := agent.Options{
-		ParentDAGRun:     parent,
-		WorkerID:         h.workerID,
-		StatusPusher:     statusPusher,
-		LogWriterFactory: logStreamer,
-		QueuedRun:        queuedRun,
-		AttemptID:        attemptID,
-		DAGRunStore:      h.dagRunStore,
-		ServiceRegistry:  h.serviceRegistry,
-		RootDAGRun:       root,
-		PeerConfig:       h.peerConfig,
+		ParentDAGRun:         parent,
+		WorkerID:             h.workerID,
+		StatusPusher:         statusPusher,
+		LogWriterFactory:     logStreamer,
+		QueuedRun:            queuedRun,
+		AttemptID:            attemptID,
+		DAGRunStore:          h.dagRunStore,
+		ServiceRegistry:      h.serviceRegistry,
+		RootDAGRun:           root,
+		PeerConfig:           h.peerConfig,
+		DefaultExecutionMode: h.config.DefaultExecutionMode,
 	}
 
 	// Add retry configuration if present

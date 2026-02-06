@@ -478,11 +478,21 @@
       "description": "Configuration for controlling user interactions when starting DAG runs. Allows restricting parameter editing and custom run ID input."
     },
     "workerSelector": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "string"
-      },
-      "description": "Key-value pairs specifying worker label requirements for executing this DAG. The DAG will only run on workers that have all specified labels with matching values. For example: {\"gpu\": \"true\", \"memory\": \"64G\"} requires a worker with both gpu=true and memory=64G labels. This setting applies to the entire DAG; individual steps can override this with their own workerSelector."
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Key-value pairs specifying worker label requirements. For example: {\"gpu\": \"true\", \"memory\": \"64G\"} requires a worker with both gpu=true and memory=64G labels."
+        },
+        {
+          "type": "string",
+          "enum": ["local"],
+          "description": "Set to \"local\" to force this DAG to run locally even when the server default execution mode is distributed."
+        }
+      ],
+      "description": "Worker selection for this DAG. Use a map of label key-value pairs to target specific workers, or the string \"local\" to force local execution. This setting applies to the entire DAG; individual steps can override this with their own workerSelector."
     },
     "shell": {
       "oneOf": [
@@ -998,11 +1008,21 @@
           "description": "Configuration for parallel execution of sub DAGs. Only applicable when 'run' is specified. Allows processing multiple items concurrently using the same workflow definition."
         },
         "workerSelector": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Key-value pairs specifying worker label requirements for executing this step. The step will only run on workers that have all specified labels with matching values. For example: {\"gpu\": \"true\", \"memory\": \"64G\"} requires a worker with both gpu=true and memory=64G labels."
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Key-value pairs specifying worker label requirements. For example: {\"gpu\": \"true\", \"memory\": \"64G\"} requires a worker with both gpu=true and memory=64G labels."
+            },
+            {
+              "type": "string",
+              "enum": ["local"],
+              "description": "Set to \"local\" to force this step to run locally even when the server default execution mode is distributed."
+            }
+          ],
+          "description": "Worker selection for this step. Use a map of label key-value pairs to target specific workers, or the string \"local\" to force local execution."
         },
         "env": {
           "oneOf": [

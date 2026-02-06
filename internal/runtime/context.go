@@ -40,6 +40,8 @@ var (
 	WithLogEncoding = exec.WithLogEncoding
 	// WithLogWriterFactory sets the log writer factory for remote log streaming.
 	WithLogWriterFactory = exec.WithLogWriterFactory
+	// WithDefaultExecutionMode sets the server-level default execution mode.
+	WithDefaultExecutionMode = exec.WithDefaultExecutionMode
 )
 
 // LogWriterFactory is re-exported from execution package

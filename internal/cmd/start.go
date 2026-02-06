@@ -200,14 +200,13 @@ var errProcAcquisitionFailed = errors.New("failed to acquire process handle")
 
 // tryExecuteDAG acquires a process handle and executes the DAG.
 func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root exec.DAGRunRef, workerID string, triggerType core.TriggerType) error {
-	// Check for workerSelector - dispatch to coordinator for distributed execution
-	// Skip if already running on a worker (workerID is set via --worker-id flag to a value other than "local")
-	if len(dag.WorkerSelector) > 0 && workerID == "local" {
+	// Check for dispatch to coordinator for distributed execution.
+	// Skip if already running on a worker (workerID != "local").
+	if workerID == "local" {
 		coordinatorCli := ctx.NewCoordinatorClient()
-		if coordinatorCli == nil {
-			return fmt.Errorf("coordinator required for DAG with workerSelector; configure peer settings")
+		if core.ShouldDispatchToCoordinator(dag, coordinatorCli != nil, ctx.Config.DefaultExecutionMode) {
+			return dispatchToCoordinatorAndWait(ctx, dag, dagRunID, coordinatorCli)
 		}
-		return dispatchToCoordinatorAndWait(ctx, dag, dagRunID, coordinatorCli)
 	}
 
 	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
@@ -391,15 +390,16 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 		ctx.DAGRunMgr,
 		dr,
 		agent.Options{
-			ParentDAGRun:    parent,
-			ProgressDisplay: shouldEnableProgress(ctx),
-			WorkerID:        workerID,
-			QueuedRun:       queuedRun,
-			DAGRunStore:     ctx.DAGRunStore,
-			ServiceRegistry: ctx.ServiceRegistry,
-			RootDAGRun:      root,
-			PeerConfig:      ctx.Config.Core.Peer,
-			TriggerType:     triggerType,
+			ParentDAGRun:         parent,
+			ProgressDisplay:      shouldEnableProgress(ctx),
+			WorkerID:             workerID,
+			QueuedRun:            queuedRun,
+			DAGRunStore:          ctx.DAGRunStore,
+			ServiceRegistry:      ctx.ServiceRegistry,
+			RootDAGRun:           root,
+			PeerConfig:           ctx.Config.Core.Peer,
+			TriggerType:          triggerType,
+			DefaultExecutionMode: ctx.Config.DefaultExecutionMode,
 		},
 	)
 

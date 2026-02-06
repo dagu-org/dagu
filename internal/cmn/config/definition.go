@@ -66,6 +66,9 @@ type Definition struct {
 	Scheduler   *SchedulerDef   `mapstructure:"scheduler"`
 	Queues      *QueueConfigDef `mapstructure:"queues"`
 
+	// Execution
+	DefaultExecutionMode string `mapstructure:"defaultExecutionMode"`
+
 	// Features
 	Monitoring *MonitoringDef `mapstructure:"monitoring"`
 	Metrics    *string        `mapstructure:"metrics"` // "public" or "private"

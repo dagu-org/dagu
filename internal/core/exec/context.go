@@ -15,16 +15,17 @@ import (
 
 // Context contains the execution metadata for a dag-run.
 type Context struct {
-	DAGRunID           string
-	RootDAGRun         DAGRunRef
-	DAG                *core.DAG
-	DB                 Database
-	BaseEnv            *config.BaseEnv
-	EnvScope           *eval.EnvScope // Unified environment scope - THE single source for all env vars
-	CoordinatorCli     Dispatcher
-	Shell              string           // Default shell for this DAG (from DAG.Shell)
-	LogEncodingCharset string           // Character encoding for log files (e.g., "utf-8", "shift_jis", "euc-jp")
-	LogWriterFactory   LogWriterFactory // For remote log streaming (nil = use local files)
+	DAGRunID             string
+	RootDAGRun           DAGRunRef
+	DAG                  *core.DAG
+	DB                   Database
+	BaseEnv              *config.BaseEnv
+	EnvScope             *eval.EnvScope // Unified environment scope - THE single source for all env vars
+	CoordinatorCli       Dispatcher
+	Shell                string               // Default shell for this DAG (from DAG.Shell)
+	LogEncodingCharset   string               // Character encoding for log files (e.g., "utf-8", "shift_jis", "euc-jp")
+	LogWriterFactory     LogWriterFactory     // For remote log streaming (nil = use local files)
+	DefaultExecutionMode config.ExecutionMode // Server-level default execution mode (local or distributed)
 }
 
 // LogWriterFactory creates log writers for step stdout/stderr.
@@ -134,13 +135,14 @@ type Dispatcher interface {
 
 // contextOptions holds optional configuration for NewContext.
 type contextOptions struct {
-	db                 Database
-	rootDAGRun         DAGRunRef
-	params             []string
-	coordinator        Dispatcher
-	secretEnvs         []string
-	logEncodingCharset string
-	logWriterFactory   LogWriterFactory
+	db                   Database
+	rootDAGRun           DAGRunRef
+	params               []string
+	coordinator          Dispatcher
+	secretEnvs           []string
+	logEncodingCharset   string
+	logWriterFactory     LogWriterFactory
+	defaultExecutionMode config.ExecutionMode
 }
 
 // ContextOption configures optional parameters for NewContext.
@@ -196,6 +198,13 @@ func WithLogWriterFactory(factory LogWriterFactory) ContextOption {
 	}
 }
 
+// WithDefaultExecutionMode sets the server-level default execution mode.
+func WithDefaultExecutionMode(mode config.ExecutionMode) ContextOption {
+	return func(o *contextOptions) {
+		o.defaultExecutionMode = mode
+	}
+}
+
 // NewContext creates a new context with DAG execution metadata.
 // Required: ctx, dag, dagRunID, logFile
 // Optional: use ContextOption functions (WithDatabase, WithParams, etc.)
@@ -236,16 +245,17 @@ func NewContext(
 	}
 
 	return context.WithValue(ctx, dagCtxKey{}, Context{
-		RootDAGRun:         options.rootDAGRun,
-		DAG:                dag,
-		DB:                 options.db,
-		EnvScope:           scope,
-		DAGRunID:           dagRunID,
-		BaseEnv:            config.GetBaseEnv(ctx),
-		CoordinatorCli:     options.coordinator,
-		Shell:              dag.Shell,
-		LogEncodingCharset: options.logEncodingCharset,
-		LogWriterFactory:   options.logWriterFactory,
+		RootDAGRun:           options.rootDAGRun,
+		DAG:                  dag,
+		DB:                   options.db,
+		EnvScope:             scope,
+		DAGRunID:             dagRunID,
+		BaseEnv:              config.GetBaseEnv(ctx),
+		CoordinatorCli:       options.coordinator,
+		Shell:                dag.Shell,
+		LogEncodingCharset:   options.logEncodingCharset,
+		LogWriterFactory:     options.logWriterFactory,
+		DefaultExecutionMode: options.defaultExecutionMode,
 	})
 }
 
