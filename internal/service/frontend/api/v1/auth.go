@@ -173,6 +173,7 @@ func toAPIUser(user *auth.User) api.User {
 	return apiUser
 }
 
+// toAPIUsers converts a slice of auth.User to their API representations,
 // preserving the input order.
 func toAPIUsers(users []*auth.User) []api.User {
 	result := make([]api.User, len(users))

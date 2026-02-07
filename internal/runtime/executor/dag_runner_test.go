@@ -18,7 +18,6 @@ import (
 func TestNewSubDAGExecutor_LocalDAG(t *testing.T) {
 	t.Parallel()
 
-	// Create a context with environment
 	ctx := context.Background()
 
 	// Create a parent DAG with local DAGs
@@ -73,7 +72,6 @@ func TestNewSubDAGExecutor_LocalDAG(t *testing.T) {
 func TestNewSubDAGExecutor_RegularDAG(t *testing.T) {
 	t.Parallel()
 
-	// Create a context with environment
 	ctx := context.Background()
 
 	// Create a parent DAG without local DAGs
@@ -117,7 +115,6 @@ func TestNewSubDAGExecutor_RegularDAG(t *testing.T) {
 func TestNewSubDAGExecutor_NotFound(t *testing.T) {
 	t.Parallel()
 
-	// Create a context with environment
 	ctx := context.Background()
 
 	// Create a parent DAG without the requested local DAG
@@ -248,7 +245,6 @@ func TestNewSubDAGExecutor_InheritsNamespace_RegularDAG(t *testing.T) {
 func TestBuildCommand(t *testing.T) {
 	t.Parallel()
 
-	// Create a context with environment
 	ctx := context.Background()
 
 	// Set up the DAG context

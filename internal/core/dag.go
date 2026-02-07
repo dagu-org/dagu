@@ -273,7 +273,6 @@ func (d *DAG) GetName() string {
 }
 
 // String implements the Stringer interface.
-// String returns a formatted string representation of the DAG
 func (d *DAG) String() string {
 	var sb strings.Builder
 
@@ -451,19 +450,9 @@ func (d *DAG) ParamsMap() map[string]string {
 	return params
 }
 
-// ProcGroup returns the name of the process group for this DAG.
-// The process group name is used to identify and manage related DAG executions.
-//
-// Returns:
-//   - If Queue is set: returns the Queue value
-//   - If Queue is empty: returns the DAG name as the default
-//
-// The process group name is used by the process store to:
-//  1. Manage heartbeat files for active DAG runs
-//  2. Enforce concurrency limits (max concurrent runs) across DAGs in the same group
-//
-// This allows the scheduler to control how many DAGs can run simultaneously
-// within the same process group.
+// ProcGroup returns the process group name for this DAG.
+// Returns the Queue value if set, otherwise the DAG name.
+// The process store uses this to manage heartbeat files and enforce concurrency limits.
 func (d *DAG) ProcGroup() string {
 	if d.Queue != "" {
 		return d.Queue

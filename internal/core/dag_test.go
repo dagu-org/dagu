@@ -239,6 +239,8 @@ func TestEffectiveLogOutput(t *testing.T) {
 		name          string
 		dagLogOutput  core.LogOutputMode
 		stepLogOutput core.LogOutputMode
+		nilDAG        bool
+		nilStep       bool
 		expected      core.LogOutputMode
 	}{
 		{
@@ -285,15 +287,15 @@ func TestEffectiveLogOutput(t *testing.T) {
 		},
 		{
 			name:          "NilDAG_StepMerged_ReturnsMerged",
-			dagLogOutput:  "", // Will use nil DAG
+			nilDAG:        true,
 			stepLogOutput: core.LogOutputMerged,
 			expected:      core.LogOutputMerged,
 		},
 		{
-			name:          "NilStep_DAGMerged_ReturnsMerged",
-			dagLogOutput:  core.LogOutputMerged,
-			stepLogOutput: "", // Will use nil Step
-			expected:      core.LogOutputMerged,
+			name:         "NilStep_DAGMerged_ReturnsMerged",
+			dagLogOutput: core.LogOutputMerged,
+			nilStep:      true,
+			expected:     core.LogOutputMerged,
 		},
 	}
 
@@ -304,13 +306,10 @@ func TestEffectiveLogOutput(t *testing.T) {
 			var dag *core.DAG
 			var step *core.Step
 
-			// Setup DAG
-			if tt.name != "NilDAG_StepMerged_ReturnsMerged" {
+			if !tt.nilDAG {
 				dag = &core.DAG{LogOutput: tt.dagLogOutput}
 			}
-
-			// Setup Step
-			if tt.name != "NilStep_DAGMerged_ReturnsMerged" {
+			if !tt.nilStep {
 				step = &core.Step{LogOutput: tt.stepLogOutput}
 			}
 

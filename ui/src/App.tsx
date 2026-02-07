@@ -10,6 +10,7 @@ import { ToastProvider } from './components/ui/simple-toast';
 import { AppBarContext } from './contexts/AppBarContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { Config, ConfigContext } from './contexts/ConfigContext';
+import { NamespaceProvider } from './contexts/NamespaceContext';
 import { PageContextProvider } from './contexts/PageContext';
 import { SchemaProvider } from './contexts/SchemaContext';
 import { SearchStateProvider } from './contexts/SearchStateContext';
@@ -19,7 +20,6 @@ import {
 } from './contexts/UserPreference';
 import { AgentChatModal, AgentChatProvider } from './features/agent';
 import Layout from './layouts/Layout';
-import { NamespaceProvider } from './contexts/NamespaceContext';
 import fetchJson from './lib/fetchJson';
 import Dashboard from './pages';
 import AgentSettingsPage from './pages/agent-settings';

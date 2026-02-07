@@ -2,14 +2,11 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/cmn/logger"
-	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 )
@@ -89,24 +86,11 @@ func (a *API) CreateUser(ctx context.Context, request api.CreateUserRequestObjec
 		return nil, err
 	}
 
-	// Log user creation
-	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		details, err := json.Marshal(map[string]string{
-			"target_user_id":  user.ID,
-			"target_username": user.Username,
-			"role":            string(user.Role),
-		})
-		if err != nil {
-			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
-			details = []byte("{}")
-		}
-		entry := audit.NewEntry(audit.CategoryUser, "user_create", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
-	}
+	a.logAuditEntry(ctx, audit.CategoryUser, "user_create", map[string]string{
+		"target_user_id":  user.ID,
+		"target_username": user.Username,
+		"role":            string(user.Role),
+	})
 
 	return api.CreateUser201JSONResponse{
 		User: toAPIUser(user),
@@ -227,31 +211,17 @@ func (a *API) UpdateUser(ctx context.Context, request api.UpdateUserRequestObjec
 		return nil, err
 	}
 
-	// Log user update
-	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		changes := make(map[string]any)
-		changes["target_user_id"] = request.UserId
-		if input.Username != nil {
-			changes["username"] = *input.Username
-		}
-		if input.Role != nil {
-			changes["role"] = string(*input.Role)
-		}
-		if input.NamespaceRoles != nil {
-			changes["namespace_roles"] = *input.NamespaceRoles
-		}
-		details, err := json.Marshal(changes)
-		if err != nil {
-			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
-			details = []byte("{}")
-		}
-		entry := audit.NewEntry(audit.CategoryUser, "user_update", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
+	changes := map[string]any{"target_user_id": request.UserId}
+	if input.Username != nil {
+		changes["username"] = *input.Username
 	}
+	if input.Role != nil {
+		changes["role"] = string(*input.Role)
+	}
+	if input.NamespaceRoles != nil {
+		changes["namespace_roles"] = *input.NamespaceRoles
+	}
+	a.logAuditEntry(ctx, audit.CategoryUser, "user_update", changes)
 
 	return api.UpdateUser200JSONResponse{
 		User: toAPIUser(user),
@@ -299,23 +269,11 @@ func (a *API) DeleteUser(ctx context.Context, request api.DeleteUserRequestObjec
 		return nil, err
 	}
 
-	// Log user deletion
-	if a.auditService != nil {
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		detailsMap := map[string]string{"target_user_id": request.UserId}
-		if targetUser != nil {
-			detailsMap["target_username"] = targetUser.Username
-		}
-		details, err := json.Marshal(detailsMap)
-		if err != nil {
-			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
-			details = []byte("{}")
-		}
-		entry := audit.NewEntry(audit.CategoryUser, "user_delete", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
+	detailsMap := map[string]string{"target_user_id": request.UserId}
+	if targetUser != nil {
+		detailsMap["target_username"] = targetUser.Username
 	}
+	a.logAuditEntry(ctx, audit.CategoryUser, "user_delete", detailsMap)
 
 	return api.DeleteUser204Response{}, nil
 }
@@ -359,24 +317,11 @@ func (a *API) ResetUserPassword(ctx context.Context, request api.ResetUserPasswo
 		return nil, err
 	}
 
-	// Log password reset
-	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		detailsMap := map[string]string{"target_user_id": request.UserId}
-		if targetUser != nil {
-			detailsMap["target_username"] = targetUser.Username
-		}
-		details, err := json.Marshal(detailsMap)
-		if err != nil {
-			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
-			details = []byte("{}")
-		}
-		entry := audit.NewEntry(audit.CategoryUser, "password_reset", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
+	detailsMap := map[string]string{"target_user_id": request.UserId}
+	if targetUser != nil {
+		detailsMap["target_username"] = targetUser.Username
 	}
+	a.logAuditEntry(ctx, audit.CategoryUser, "password_reset", detailsMap)
 
 	return api.ResetUserPassword200JSONResponse{
 		Message: "Password reset successfully",

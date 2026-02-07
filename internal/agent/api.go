@@ -32,7 +32,6 @@ func respondErrorDirect(w http.ResponseWriter, status int, code api.ErrorCode, m
 }
 
 // defaultUserID is used when no user is authenticated (e.g., auth disabled).
-// This value should match the system's expected default user identifier.
 const defaultUserID = "admin"
 
 // getUserIDFromContext extracts the user ID from the request context.
@@ -683,16 +682,10 @@ func (a *API) handleUserResponse(w http.ResponseWriter, r *http.Request) {
 // If namespace is empty or "default", returns the base environment with Namespace set.
 // For non-default namespaces, looks up the namespace short ID and adjusts paths.
 func (a *API) environmentForNamespace(namespace string) EnvironmentInfo {
-	if namespace == "" || namespace == "default" {
-		env := a.environment
-		env.Namespace = namespace
-		return env
-	}
-
 	env := a.environment
 	env.Namespace = namespace
 
-	if a.namespaceStore == nil {
+	if namespace == "" || namespace == "default" || a.namespaceStore == nil {
 		return env
 	}
 

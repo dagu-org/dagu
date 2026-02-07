@@ -15,29 +15,31 @@ interface DAGListHeaderProps {
   namespace?: string;
 }
 
-const DAGListHeader: React.FC<DAGListHeaderProps> = ({ onRefresh, namespace }) => (
-  <div className="flex flex-col gap-1 mb-2">
-    {namespace && (
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbPage>{namespace}</BreadcrumbPage>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>DAGs</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-    )}
-    <div className="flex flex-row items-center justify-between">
-      <Title>DAG Definitions</Title>
-      <div className="flex gap-2">
-        <CreateDAGButton />
-        {onRefresh && <RefreshButton onRefresh={onRefresh} />}
+function DAGListHeader({ onRefresh, namespace }: DAGListHeaderProps): React.ReactElement {
+  return (
+    <div className="flex flex-col gap-1 mb-2">
+      {namespace && (
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbPage>{namespace}</BreadcrumbPage>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>DAGs</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      )}
+      <div className="flex flex-row items-center justify-between">
+        <Title>DAG Definitions</Title>
+        <div className="flex gap-2">
+          <CreateDAGButton />
+          {onRefresh && <RefreshButton onRefresh={onRefresh} />}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+}
 
 export default DAGListHeader;

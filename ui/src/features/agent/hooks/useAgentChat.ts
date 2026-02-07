@@ -2,7 +2,7 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useUserPreferences } from '@/contexts/UserPreference';
-import { useNamespace, ALL_NAMESPACES } from '@/contexts/NamespaceContext';
+import { useNamespace } from '@/contexts/NamespaceContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useAgentChatContext } from '../context/AgentChatContext';
 import { getAuthToken, getAuthHeaders } from '@/lib/authHeaders';
@@ -234,7 +234,7 @@ export function useAgentChat() {
     [baseUrl, remoteNode, setConversationId, setMessages, setConversationState]
   );
 
-  const isWorking = isSending || conversationState?.working || false;
+  const isWorking = isSending || !!conversationState?.working;
 
   const clearError = useCallback(() => setError(null), []);
 

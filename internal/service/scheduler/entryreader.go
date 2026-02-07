@@ -82,7 +82,6 @@ func NewEntryReader(
 ) EntryReader {
 	return &entryReaderImpl{
 		dagsDir:        dir,
-		lock:           sync.Mutex{},
 		registry:       map[string]*core.DAG{},
 		knownNS:        map[string]string{},
 		nsDirs:         map[string]string{},
@@ -384,8 +383,7 @@ func (er *entryReaderImpl) handleFileEvent(ctx context.Context, event fsnotify.E
 				slog.String("namespace", nsName),
 			)
 		}
-	}
-	if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
+	} else if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
 		delete(er.registry, registryKey)
 		logger.Info(ctx, "DAG removed",
 			tag.Name(fileName),

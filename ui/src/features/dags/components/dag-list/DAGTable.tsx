@@ -30,8 +30,29 @@ import React, {
 } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components, Status } from '../../../../api/v1/schema';
+import { PanelWidthContext } from '../../../../components/SplitLayout';
+import { Badge } from '../../../../components/ui/badge';
+import { Button } from '../../../../components/ui/button';
+import { Input } from '../../../../components/ui/input';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../../../../components/ui/table';
+import { TagCombobox } from '../../../../components/ui/tag-combobox';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '../../../../components/ui/tooltip';
+import { AppBarContext } from '../../../../contexts/AppBarContext';
 import type { Config } from '../../../../contexts/ConfigContext';
+import { useQuery } from '../../../../hooks/api';
 import dayjs from '../../../../lib/dayjs';
+import { parseTagParts } from '../../../../lib/utils';
 import StatusChip from '../../../../ui/StatusChip';
 import Ticker from '../../../../ui/Ticker';
 import VisuallyHidden from '../../../../ui/VisuallyHidden';
@@ -56,29 +77,6 @@ function formatMs(ms: number): string {
   if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
   return parts.join(' ');
 }
-
-// Import shadcn/ui components
-import { PanelWidthContext } from '../../../../components/SplitLayout';
-import { Badge } from '../../../../components/ui/badge';
-import { Button } from '../../../../components/ui/button';
-import { Input } from '../../../../components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../../../../components/ui/table';
-import { TagCombobox } from '../../../../components/ui/tag-combobox';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '../../../../components/ui/tooltip';
-import { AppBarContext } from '../../../../contexts/AppBarContext';
-import { useQuery } from '../../../../hooks/api';
-import { parseTagParts } from '../../../../lib/utils';
 
 // Threshold in pixels below which we switch to card view
 // Set higher than table's comfortable minimum width (~700px for all columns)
@@ -335,8 +333,6 @@ function getNextSchedule(
     return;
   }
 }
-// --- End Helper Functions ---
-
 const defaultColumns = [
   columnHelper.accessor('name', {
     id: 'Expand',
@@ -501,10 +497,9 @@ const defaultColumns = [
       }
     },
     filterFn: (row, _, filterValue) => {
-      // Use row instead of props
       const data = row.original!;
       if (data.kind === ItemKind.Group) {
-        return true; // Always show group rows during filtering
+        return true;
       }
       if (data.kind === ItemKind.DAG) {
         const name = data.dag.dag.name.toLowerCase();
@@ -546,8 +541,6 @@ const defaultColumns = [
       return false;
     },
   }),
-  // Tags column removed as tags are now displayed under the name
-  // The filter functionality is preserved in the Name column
   columnHelper.accessor('kind', {
     id: 'Status',
     size: 80,
@@ -561,10 +554,8 @@ const defaultColumns = [
       </div>
     ),
     cell: ({ row }) => {
-      // Use row
       const data = row.original!;
       if (data.kind === ItemKind.DAG) {
-        // Use the updated StatusChip component with xs size
         return (
           <StatusChip status={data.dag.latestDAGRun.status} size="xs">
             {data.dag.latestDAGRun?.statusLabel}
@@ -744,16 +735,13 @@ const defaultColumns = [
       </div>
     ),
     cell: ({ row, table }) => {
-      // Use row and table
       const data = row.original!;
       if (data.kind === ItemKind.Group) {
         return null;
       }
-      // Assuming DAGActions is refactored or compatible
       return (
-        // Wrap DAGActions in a div and stop propagation on its click
         <div
-          className="flex justify-center scale-90" // Scale down for density
+          className="flex justify-center scale-90"
           onClick={(e) => e.stopPropagation()}
         >
           <DAGActions

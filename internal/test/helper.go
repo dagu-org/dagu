@@ -507,7 +507,7 @@ func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 	require.NoError(t, err)
 
 	// collect the actual outputs from the status
-	var actualOutputs = make(map[string]string)
+	actualOutputs := make(map[string]string)
 	for _, node := range status.Nodes {
 		if node.OutputVariables == nil {
 			continue
@@ -745,7 +745,7 @@ func createDefaultContext() context.Context {
 	))
 }
 
-// getShell returns the path to the default shell.
+// setShell sets the SHELL environment variable to the given shell binary.
 func setShell(t *testing.T, shell string) {
 	t.Helper()
 

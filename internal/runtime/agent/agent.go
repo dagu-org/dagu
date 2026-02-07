@@ -323,8 +323,10 @@ func (a *Agent) Run(ctx context.Context) error {
 			attribute.String("dag.run_id", a.dagRunID),
 		}
 		if a.parentDAGRun.Name != "" {
-			spanAttrs = append(spanAttrs, attribute.String("dag.parent_run_id", a.parentDAGRun.ID))
-			spanAttrs = append(spanAttrs, attribute.String("dag.parent_name", a.parentDAGRun.Name))
+			spanAttrs = append(spanAttrs,
+				attribute.String("dag.parent_run_id", a.parentDAGRun.ID),
+				attribute.String("dag.parent_name", a.parentDAGRun.Name),
+			)
 		}
 
 		// For sub DAGs, ensure we're creating the span as a child of the parent context

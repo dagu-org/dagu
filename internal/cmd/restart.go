@@ -51,20 +51,17 @@ func runRestart(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to get dag-run ID: %w", err)
 	}
 
-	name := dagName
-
 	var attempt exec.DAGRunAttempt
 	if dagRunID != "" {
-		// Retrieve the previous run for the specified dag-run ID.
-		dagRunRef := exec.NewDAGRunRef(name, dagRunID)
+		dagRunRef := exec.NewDAGRunRef(dagName, dagRunID)
 		attempt, err = ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
 		if err != nil {
 			return fmt.Errorf("failed to find the run for dag-run ID %s: %w", dagRunID, err)
 		}
 	} else {
-		attempt, err = ctx.DAGRunStore.LatestAttempt(ctx, name)
+		attempt, err = ctx.DAGRunStore.LatestAttempt(ctx, dagName)
 		if err != nil {
-			return fmt.Errorf("failed to find the latest execution history for DAG %s: %w", name, err)
+			return fmt.Errorf("failed to find the latest execution history for DAG %s: %w", dagName, err)
 		}
 	}
 
@@ -73,7 +70,7 @@ func runRestart(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 	if dagStatus.Status != core.Running {
-		return fmt.Errorf("DAG %s is not running, current status: %s", name, dagStatus.Status)
+		return fmt.Errorf("DAG %s is not running, current status: %s", dagName, dagStatus.Status)
 	}
 
 	dag, err := attempt.ReadDAG(ctx)

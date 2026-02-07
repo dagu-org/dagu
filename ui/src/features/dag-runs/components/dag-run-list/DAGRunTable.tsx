@@ -15,6 +15,21 @@ import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import { StepDetailsTooltip } from './StepDetailsTooltip';
 
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-card">
+      <div className="text-6xl mb-4">🔍</div>
+      <h3 className="text-lg font-normal text-foreground mb-2">
+        No DAG runs found
+      </h3>
+      <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
+        There are no DAG runs matching your current filters. Try adjusting your
+        search criteria or date range.
+      </p>
+    </div>
+  );
+}
+
 interface DAGRunTableProps {
   dagRuns: components['schemas']['DAGRunSummary'][];
   selectedDAGRun?: { name: string; dagRunId: string } | null;
@@ -32,23 +47,15 @@ function DAGRunTable({
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const tableRef = useRef<HTMLDivElement>(null);
 
-  // Check screen size on mount and when window resizes
   useEffect(() => {
     const checkScreenSize = () => {
-      setIsSmallScreen(window.innerWidth < 768); // 768px is typically md breakpoint
+      setIsSmallScreen(window.innerWidth < 768);
     };
-
-    // Initial check
     checkScreenSize();
-
-    // Add event listener
     window.addEventListener('resize', checkScreenSize);
-
-    // Cleanup
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
-  // Helper function to scroll to the selected row
   const scrollToSelectedRow = (index: number) => {
     if (index >= 0 && tableRef.current) {
       const rows = tableRef.current.querySelectorAll('tbody tr');
@@ -145,7 +152,6 @@ function DAGRunTable({
     }
   }, [dagRuns, selectedIndex]);
 
-  // Format timezone information for display
   const getTimezoneInfo = (): string => {
     if (config.tzOffsetInSec === undefined) return 'Local Timezone';
 
@@ -162,7 +168,6 @@ function DAGRunTable({
     return `${sign}${formattedHours}:${formattedMinutes}`;
   };
 
-  // Calculate duration between start and finish times
   const calculateDuration = (
     startedAt: string,
     finishedAt: string | null,
@@ -194,7 +199,6 @@ function DAGRunTable({
     return '-';
   };
 
-  // Format duration in a human-readable format
   const formatDuration = (durationMs: number): string => {
     const seconds = Math.floor(durationMs / 1000);
 
@@ -217,21 +221,6 @@ function DAGRunTable({
 
   const timezoneInfo = getTimezoneInfo();
 
-  // Empty state component
-  const EmptyState = () => (
-    <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-card">
-      <div className="text-6xl mb-4">🔍</div>
-      <h3 className="text-lg font-normal text-foreground mb-2">
-        No DAG runs found
-      </h3>
-      <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
-        There are no DAG runs matching your current filters. Try adjusting your
-        search criteria or date range.
-      </p>
-    </div>
-  );
-
-  // If there are no DAG runs, show empty state
   if (dagRuns.length === 0) {
     return <EmptyState />;
   }
@@ -373,16 +362,11 @@ function DAGRunTable({
               style={{ fontSize: '0.8125rem' }}
               onClick={(e) => {
                 if (e.ctrlKey || e.metaKey) {
-                  // Open in new tab
                   window.open(
                     `/dag-runs/${dagRun.name}/${dagRun.dagRunId}`,
                     '_blank'
                   );
-                } else if (isSmallScreen) {
-                  // On small screens, navigate to full page
-                  navigate(`/dag-runs/${dagRun.name}/${dagRun.dagRunId}`);
                 } else if (onSelectDAGRun) {
-                  // Select the DAG run
                   setSelectedIndex(index);
                   onSelectDAGRun({
                     name: dagRun.name,

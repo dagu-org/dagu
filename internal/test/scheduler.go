@@ -2,7 +2,6 @@ package test
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -29,24 +28,11 @@ type Scheduler struct {
 func SetupScheduler(t *testing.T, opts ...HelperOption) *Scheduler {
 	t.Helper()
 
-	// Create scheduler-specific options
+	// If no options are provided, default to the testdata scheduler directory.
 	schedulerOpts := make([]HelperOption, 0, len(opts)+1)
-
-	// Set up a test DAGs directory if not already specified
-	var hasDAGsDir bool
-	for _, opt := range opts {
-		schedulerOpts = append(schedulerOpts, opt)
-		// Check if DAGsDir option is already provided
-		// This is a simple check, in production code you might want a more robust solution
-		if opt != nil {
-			hasDAGsDir = true
-		}
-	}
-
-	// If no DAGsDir specified, use the testdata scheduler directory
-	if !hasDAGsDir {
-		testdataDir := TestdataPath(t, filepath.Join("scheduler"))
-		schedulerOpts = append(schedulerOpts, WithDAGsDir(testdataDir))
+	schedulerOpts = append(schedulerOpts, opts...)
+	if len(opts) == 0 {
+		schedulerOpts = append(schedulerOpts, WithDAGsDir(TestdataPath(t, "scheduler")))
 	}
 
 	// Create the base helper

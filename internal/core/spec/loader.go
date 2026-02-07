@@ -42,6 +42,30 @@ type LoadOptions struct {
 // LoadOption is a function type for setting LoadOptions.
 type LoadOption func(*LoadOptions)
 
+// applyLoadOptions applies all LoadOption functions and returns the resulting LoadOptions.
+func applyLoadOptions(opts []LoadOption) LoadOptions {
+	var options LoadOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+	return options
+}
+
+// toBuildOpts converts LoadOptions into BuildOpts for the builder.
+func (o *LoadOptions) toBuildOpts() BuildOpts {
+	return BuildOpts{
+		Base:              o.baseConfig,
+		BaseDAG:           o.baseDAG,
+		Parameters:        o.params,
+		ParametersList:    o.paramsList,
+		Name:              o.name,
+		DAGsDir:           o.dagsDir,
+		DefaultWorkingDir: o.defaultWorkingDir,
+		Flags:             o.flags,
+		BuildEnv:          o.buildEnv,
+	}
+}
+
 // WithBaseConfig sets the base core.DAG configuration file.
 func WithBaseConfig(baseDAG string) LoadOption {
 	return func(o *LoadOptions) {
@@ -173,44 +197,18 @@ func Load(ctx context.Context, nameOrPath string, opts ...LoadOption) (*core.DAG
 	if nameOrPath == "" {
 		return nil, ErrNameOrPathRequired
 	}
-	var options LoadOptions
-	for _, opt := range opts {
-		opt(&options)
-	}
+	options := applyLoadOptions(opts)
 	buildContext := BuildContext{
-		ctx: ctx,
-		opts: BuildOpts{
-			Base:              options.baseConfig,
-			BaseDAG:           options.baseDAG,
-			Parameters:        options.params,
-			ParametersList:    options.paramsList,
-			Name:              options.name,
-			DAGsDir:           options.dagsDir,
-			DefaultWorkingDir: options.defaultWorkingDir,
-			Flags:             options.flags,
-			BuildEnv:          options.buildEnv,
-		},
+		ctx:  ctx,
+		opts: options.toBuildOpts(),
 	}
 	return loadDAG(buildContext, nameOrPath)
 }
 
 // LoadYAML loads the core.DAG from the given YAML data with the specified options.
 func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*core.DAG, error) {
-	var options LoadOptions
-	for _, opt := range opts {
-		opt(&options)
-	}
-	return LoadYAMLWithOpts(ctx, data, BuildOpts{
-		Base:              options.baseConfig,
-		BaseDAG:           options.baseDAG,
-		Parameters:        options.params,
-		ParametersList:    options.paramsList,
-		Name:              options.name,
-		DAGsDir:           options.dagsDir,
-		DefaultWorkingDir: options.defaultWorkingDir,
-		Flags:             options.flags,
-		BuildEnv:          options.buildEnv,
-	})
+	options := applyLoadOptions(opts)
+	return LoadYAMLWithOpts(ctx, data, options.toBuildOpts())
 }
 
 // LoadYAMLWithOpts loads the core.DAG configuration from YAML data.
@@ -530,7 +528,7 @@ func resolveYamlFilePath(ctx BuildContext, file string) (string, error) {
 	// Check if the file exists in the current Directory.
 	absFile, err := filepath.Abs(file)
 	if err == nil && fileutil.FileExists(absFile) {
-		// If	the file exists, return the absolute path.
+		// If the file exists, return the absolute path.
 		return absFile, nil
 	}
 

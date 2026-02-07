@@ -166,7 +166,7 @@ func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, 
 
 	// Inject OpenTelemetry trace context into environment variables
 	logCtx := logger.WithValues(ctx, tag.DAG(e.DAG.Name))
-	traceEnvVars := extractTraceContext(ctx)
+	traceEnvVars := telemetry.InjectTraceContext(ctx)
 	if len(traceEnvVars) > 0 {
 		cmd.Env = append(cmd.Env, traceEnvVars...)
 		logger.Debug(logCtx, "Injecting trace context into sub DAG",
@@ -230,7 +230,7 @@ func (e *SubDAGExecutor) Cleanup(ctx context.Context) error {
 	logger.Info(ctx, "Cleaning up temporary DAG file")
 
 	if err := os.Remove(e.tempFile); err != nil && !os.IsNotExist(err) {
-		logger.Error(ctx, "Failed to remove temporary DAG file", tag.File(e.tempFile), tag.Error(err))
+		logger.Error(ctx, "Failed to remove temporary DAG file", tag.Error(err))
 		return fmt.Errorf("failed to remove temp file: %w", err)
 	}
 
@@ -648,10 +648,4 @@ func executablePath() (string, error) {
 		return "", fmt.Errorf("failed to get executable path: %w", err)
 	}
 	return executable, nil
-}
-
-// extractTraceContext extracts OpenTelemetry trace context from the current context
-// and returns it as environment variables for child processes.
-func extractTraceContext(ctx context.Context) []string {
-	return telemetry.InjectTraceContext(ctx)
 }

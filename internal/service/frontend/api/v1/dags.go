@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -455,18 +456,12 @@ func (a *API) readHistoryData(_ context.Context, statusList []exec.DAGRunStatus)
 }
 
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
-	sortField := a.config.UI.DAGs.SortField
-	if sortField == "" {
-		sortField = "name"
-	}
+	sortField := cmp.Or(a.config.UI.DAGs.SortField, "name")
 	if request.Params.Sort != nil {
 		sortField = string(*request.Params.Sort)
 	}
 
-	sortOrder := a.config.UI.DAGs.SortOrder
-	if sortOrder == "" {
-		sortOrder = "asc"
-	}
+	sortOrder := cmp.Or(a.config.UI.DAGs.SortOrder, "asc")
 	if request.Params.Order != nil {
 		sortOrder = string(*request.Params.Order)
 	}

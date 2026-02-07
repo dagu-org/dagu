@@ -61,10 +61,8 @@ var namespaceListFlags = []commandLineFlag{
 }
 
 var namespaceListFormatFlag = commandLineFlag{
-	name:         "format",
-	shorthand:    "",
-	defaultValue: "",
-	usage:        "Output format: table (default) or json",
+	name:  "format",
+	usage: "Output format: table (default) or json",
 }
 
 func runNamespaceList(ctx *Context, _ []string) error {

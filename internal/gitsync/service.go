@@ -875,8 +875,6 @@ func (s *serviceImpl) runAutoSync(ctx context.Context) {
 	}
 }
 
-// Helper methods
-
 func (s *serviceImpl) updateLastSyncError(err error) {
 	state, _ := s.stateManager.GetState()
 	errMsg := err.Error()
@@ -886,32 +884,26 @@ func (s *serviceImpl) updateLastSyncError(err error) {
 }
 
 func (s *serviceImpl) filePathToDAGID(filePath string) string {
-	// Remove path prefix if configured
 	if s.cfg.Path != "" {
 		filePath = strings.TrimPrefix(filePath, s.cfg.Path+"/")
 	}
-	// Remove extension
-	ext := filepath.Ext(filePath)
-	dagID := strings.TrimSuffix(filePath, ext)
-	// URL encode for safety
+	return strings.TrimSuffix(filePath, filepath.Ext(filePath))
+}
+
+// unescapeDAGID decodes a URL-encoded DAG ID if applicable.
+func unescapeDAGID(dagID string) string {
+	if decoded, err := url.PathUnescape(dagID); err == nil {
+		return decoded
+	}
 	return dagID
 }
 
 func (s *serviceImpl) dagIDToFilePath(dagID string) string {
-	// Decode if URL encoded
-	decoded, err := url.PathUnescape(dagID)
-	if err == nil {
-		dagID = decoded
-	}
-	return filepath.Join(s.dagsDir, dagID+".yaml")
+	return filepath.Join(s.dagsDir, unescapeDAGID(dagID)+".yaml")
 }
 
 func (s *serviceImpl) dagIDToRepoPath(dagID string) string {
-	// Decode if URL encoded
-	decoded, err := url.PathUnescape(dagID)
-	if err == nil {
-		dagID = decoded
-	}
+	dagID = unescapeDAGID(dagID)
 	if s.cfg.Path != "" {
 		return filepath.Join(s.cfg.Path, dagID+".yaml")
 	}

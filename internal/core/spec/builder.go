@@ -171,8 +171,6 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]*core.Condition, e
 
 // parseSecretRefs parses secret references from the YAML definition.
 func parseSecretRefs(secretRefs []secretRef) ([]core.SecretRef, error) {
-
-	// Convert secretRef to core.SecretRef and validate
 	secrets := make([]core.SecretRef, 0, len(secretRefs))
 	names := make(map[string]bool)
 
@@ -317,12 +315,15 @@ func injectChainDependencies(dag *core.DAG, prevSteps []*core.Step, step *core.S
 	}
 }
 
-// getStepAlternateKey returns the alternate identifier for a step, or empty string if none
+// getStepAlternateKey returns the alternate identifier for a step, or empty string if none.
 func getStepAlternateKey(step *core.Step, primaryKey string) string {
-	if step.ID != "" && primaryKey == step.ID {
+	if step.ID == "" {
+		return ""
+	}
+	if primaryKey == step.ID {
 		return step.Name
 	}
-	if step.ID != "" && primaryKey == step.Name {
+	if primaryKey == step.Name {
 		return step.ID
 	}
 	return ""

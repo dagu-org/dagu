@@ -1,11 +1,8 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 	"strconv"
-	"strings"
 
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/spf13/cobra"
@@ -50,7 +47,6 @@ func runCleanup(ctx *Context, args []string) error {
 		return err
 	}
 
-	// Parse retention days (flags are string-based in this codebase)
 	retentionStr, err := ctx.StringParam("retention-days")
 	if err != nil {
 		return fmt.Errorf("failed to get retention-days: %w", err)
@@ -60,16 +56,13 @@ func runCleanup(ctx *Context, args []string) error {
 		return fmt.Errorf("invalid retention-days value %q: must be a non-negative integer", retentionStr)
 	}
 
-	// Reject negative retention (clearer error than silent no-op)
 	if retentionDays < 0 {
 		return fmt.Errorf("retention-days cannot be negative (got %d)", retentionDays)
 	}
 
-	// Get boolean flags
 	dryRun, _ := ctx.Command.Flags().GetBool("dry-run")
 	skipConfirm, _ := ctx.Command.Flags().GetBool("yes")
 
-	// Build description message
 	var actionDesc string
 	if retentionDays == 0 {
 		actionDesc = fmt.Sprintf("all history for DAG %q", dagName)
@@ -77,15 +70,8 @@ func runCleanup(ctx *Context, args []string) error {
 		actionDesc = fmt.Sprintf("history older than %d days for DAG %q", retentionDays, dagName)
 	}
 
-	// Build options for RemoveOldDAGRuns
-	var opts []exec.RemoveOldDAGRunsOption
 	if dryRun {
-		opts = append(opts, exec.WithDryRun())
-	}
-
-	// Dry run mode - show what would be deleted
-	if dryRun {
-		runIDs, err := ctx.DAGRunStore.RemoveOldDAGRuns(ctx, dagName, retentionDays, opts...)
+		runIDs, err := ctx.DAGRunStore.RemoveOldDAGRuns(ctx, dagName, retentionDays, exec.WithDryRun())
 		if err != nil {
 			return fmt.Errorf("failed to check history for %q: %w", dagName, err)
 		}
@@ -101,27 +87,16 @@ func runCleanup(ctx *Context, args []string) error {
 		return nil
 	}
 
-	// Confirmation prompt (unless --yes or --quiet)
 	if !skipConfirm && !ctx.Quiet {
 		fmt.Printf("This will delete %s.\n", actionDesc)
 		fmt.Println("Active runs will be preserved.")
-		fmt.Print("Continue? [y/N]: ")
-
-		reader := bufio.NewReader(os.Stdin)
-		response, err := reader.ReadString('\n')
-		if err != nil {
-			return fmt.Errorf("failed to read user input: %w", err)
-		}
-		response = strings.TrimSpace(strings.ToLower(response))
-
-		if response != "y" && response != "yes" {
+		if !confirmAction("Continue?") {
 			fmt.Println("Cancelled.")
 			return nil
 		}
 	}
 
-	// Execute cleanup using the existing DAGRunStore method
-	runIDs, err := ctx.DAGRunStore.RemoveOldDAGRuns(ctx, dagName, retentionDays, opts...)
+	runIDs, err := ctx.DAGRunStore.RemoveOldDAGRuns(ctx, dagName, retentionDays)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup history for %q: %w", dagName, err)
 	}

@@ -58,24 +58,21 @@ func runStop(ctx *Context, args []string) error {
 
 	var dag *core.DAG
 	if dagRunID != "" {
-		// Retrieve the previous run's history record for the specified dag-run ID.
 		ref := exec.NewDAGRunRef(name, dagRunID)
 		rec, err := ctx.DAGRunStore.FindAttempt(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRunID, err)
 		}
-
-		d, err := rec.ReadDAG(ctx)
+		dag, err = rec.ReadDAG(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to read DAG from history record: %w", err)
 		}
-		dag = d
 	} else {
-		d, err := spec.Load(ctx, dagName, spec.WithBaseConfig(ctx.Config.Paths.BaseConfig), spec.WithDAGsDir(ctx.NamespacedDAGsDir()))
+		var err error
+		dag, err = spec.Load(ctx, dagName, spec.WithBaseConfig(ctx.Config.Paths.BaseConfig), spec.WithDAGsDir(ctx.NamespacedDAGsDir()))
 		if err != nil {
 			return fmt.Errorf("failed to load DAG from %s: %w", dagName, err)
 		}
-		dag = d
 	}
 
 	dag.Namespace = namespaceName

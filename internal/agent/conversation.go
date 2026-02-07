@@ -97,7 +97,6 @@ func (cm *ConversationManager) SetSafeMode(enabled bool) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	cm.safeMode = enabled
-	// Update active loop if one exists
 	if cm.loop != nil {
 		cm.loop.SetSafeMode(enabled)
 	}

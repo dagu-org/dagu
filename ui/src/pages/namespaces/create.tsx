@@ -48,11 +48,7 @@ export default function NamespaceCreatePage() {
 
   const handleNameChange = (value: string) => {
     setName(value);
-    if (value) {
-      setNameError(validateName(value));
-    } else {
-      setNameError(null);
-    }
+    setNameError(value ? validateName(value) : null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

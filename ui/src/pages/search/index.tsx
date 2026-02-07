@@ -17,19 +17,20 @@ import SearchResult from '../../features/search/components/SearchResult';
 import { useQuery } from '../../hooks/api';
 import Title from '../../ui/Title';
 
+type SearchFilters = {
+  searchVal: string;
+};
+
+function areFiltersEqual(a: SearchFilters, b: SearchFilters): boolean {
+  return a.searchVal === b.searchVal;
+}
+
 function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const appBarContext = React.useContext(AppBarContext);
   const searchState = useSearchState();
   const { selectedNamespace, isAllNamespaces } = useNamespace();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
-
-  type SearchFilters = {
-    searchVal: string;
-  };
-
-  const areFiltersEqual = (a: SearchFilters, b: SearchFilters) =>
-    a.searchVal === b.searchVal;
 
   const defaultFilters = React.useMemo<SearchFilters>(
     () => ({
@@ -135,13 +136,11 @@ function Search() {
 
   useEffect(() => {
     ref.current?.focus();
-  }, [ref.current]);
+  }, []);
 
   const onSubmit = React.useCallback((value: string) => {
-    setSearchParams({
-      q: value,
-    });
-  }, []);
+    setSearchParams({ q: value });
+  }, [setSearchParams]);
 
   return (
     <div className="max-w-7xl">
@@ -180,9 +179,7 @@ function Search() {
           />
           <Button
             disabled={!searchVal}
-            onClick={async () => {
-              onSubmit(searchVal);
-            }}
+            onClick={() => onSubmit(searchVal)}
           >
             <SearchIcon className="h-4 w-4" />
             Search
@@ -190,39 +187,24 @@ function Search() {
         </div>
 
         <div className="mt-2">
-          {(() => {
-            if (!q) {
-              return (
-                <div className="text-sm text-muted-foreground italic">
-                  Enter a search term and press Enter or click Search
-                </div>
-              );
-            }
-
-            if (data && data.results && data.results.length > 0) {
-              return (
-                <div>
-                  <h2 className="text-lg font-semibold mb-2">
-                    {data.results.length} results found
-                  </h2>
-                  <SearchResult results={data.results} />
-                </div>
-              );
-            }
-
-            if (
-              (data && !data.results) ||
-              (data && data.results && data.results.length === 0)
-            ) {
-              return (
-                <div className="text-sm text-muted-foreground italic">
-                  No results found
-                </div>
-              );
-            }
-
-            return null;
-          })()}
+          {!q && (
+            <div className="text-sm text-muted-foreground italic">
+              Enter a search term and press Enter or click Search
+            </div>
+          )}
+          {q && data?.results?.length > 0 && (
+            <div>
+              <h2 className="text-lg font-semibold mb-2">
+                {data.results.length} results found
+              </h2>
+              <SearchResult results={data.results} />
+            </div>
+          )}
+          {q && data && !data.results?.length && (
+            <div className="text-sm text-muted-foreground italic">
+              No results found
+            </div>
+          )}
         </div>
       </div>
     </div>

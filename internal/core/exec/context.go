@@ -267,17 +267,12 @@ func WithContext(ctx context.Context, rCtx Context) context.Context {
 
 // GetContext retrieves the DAGContext from the context.
 func GetContext(ctx context.Context) Context {
-	value := ctx.Value(dagCtxKey{})
-	if value == nil {
+	execCtx, ok := ctx.Value(dagCtxKey{}).(Context)
+	if !ok {
 		logger.Error(ctx, "DAGContext not found in context")
 		return Context{}
 	}
-	execEnv, ok := value.(Context)
-	if !ok {
-		logger.Error(ctx, "Invalid DAGContext type in context")
-		return Context{}
-	}
-	return execEnv
+	return execCtx
 }
 
 type dagCtxKey struct{}

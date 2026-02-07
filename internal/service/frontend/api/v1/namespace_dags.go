@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -97,18 +98,12 @@ func (a *API) ListNamespaceDAGs(ctx context.Context, request api.ListNamespaceDA
 		return nil, err
 	}
 
-	sortField := a.config.UI.DAGs.SortField
-	if sortField == "" {
-		sortField = "name"
-	}
+	sortField := cmp.Or(a.config.UI.DAGs.SortField, "name")
 	if request.Params.Sort != nil {
 		sortField = string(*request.Params.Sort)
 	}
 
-	sortOrder := a.config.UI.DAGs.SortOrder
-	if sortOrder == "" {
-		sortOrder = "asc"
-	}
+	sortOrder := cmp.Or(a.config.UI.DAGs.SortOrder, "asc")
 	if request.Params.Order != nil {
 		sortOrder = string(*request.Params.Order)
 	}
@@ -469,23 +464,10 @@ func (a *API) listDAGsAcrossNamespaces(ctx context.Context, listOpts exec.ListDA
 		}
 	}
 
-	// Apply sorting.
-	sortField := "name"
-	sortOrder := "asc"
-	if listOpts.Sort != "" {
-		sortField = listOpts.Sort
-	}
-	if listOpts.Order != "" {
-		sortOrder = listOpts.Order
-	}
+	// Apply sorting (currently only "name" is supported).
+	sortOrder := cmp.Or(listOpts.Order, "asc")
 	sort.Slice(allDAGFiles, func(i, j int) bool {
-		var less bool
-		switch sortField {
-		case "name":
-			less = allDAGFiles[i].Dag.Name < allDAGFiles[j].Dag.Name
-		default:
-			less = allDAGFiles[i].Dag.Name < allDAGFiles[j].Dag.Name
-		}
+		less := allDAGFiles[i].Dag.Name < allDAGFiles[j].Dag.Name
 		if sortOrder == "desc" {
 			return !less
 		}

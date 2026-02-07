@@ -167,7 +167,6 @@ func (l *Loop) Go(ctx context.Context) error {
 		default:
 		}
 
-		// Process any queued messages
 		l.mu.Lock()
 		hasQueuedMessages := len(l.messageQueue) > 0
 		if hasQueuedMessages {
@@ -209,8 +208,26 @@ func (l *Loop) sleepWithContext(ctx context.Context, d time.Duration) {
 	}
 }
 
-// processLLMRequest sends a request to the LLM and handles the response.
+// processLLMRequest sends a request to the LLM and handles the response,
+// including tool call chains if the LLM requests tool execution.
 func (l *Loop) processLLMRequest(ctx context.Context) error {
+	resp, err := l.sendLLMRequest(ctx)
+	if err != nil {
+		return err
+	}
+
+	if len(resp.ToolCalls) > 0 {
+		l.logger.Info("handling tool calls", "count", len(resp.ToolCalls))
+		return l.handleToolCalls(ctx, resp.ToolCalls)
+	}
+
+	l.setWorking(false)
+	return nil
+}
+
+// sendLLMRequest builds and sends a single request to the LLM provider.
+// It accumulates usage, records the assistant message, and returns the response.
+func (l *Loop) sendLLMRequest(ctx context.Context) (*llm.ChatResponse, error) {
 	history := l.copyHistory()
 	messages := l.buildMessages(history)
 	tools := l.buildToolDefinitions()
@@ -221,11 +238,6 @@ func (l *Loop) processLLMRequest(ctx context.Context) error {
 		Tools:    tools,
 	}
 
-	l.logger.Debug("sending LLM request",
-		"message_count", len(messages),
-		"tool_count", len(tools),
-		"model", l.model)
-
 	l.setWorking(true)
 
 	llmCtx, cancel := context.WithTimeout(ctx, llmRequestTimeout)
@@ -235,24 +247,12 @@ func (l *Loop) processLLMRequest(ctx context.Context) error {
 	if err != nil {
 		l.recordErrorMessage(ctx, fmt.Sprintf("LLM request failed: %v", err))
 		l.setWorking(false)
-		return fmt.Errorf("LLM request failed: %w", err)
+		return nil, fmt.Errorf("LLM request failed: %w", err)
 	}
-
-	l.logger.Debug("received LLM response",
-		"content_length", len(resp.Content),
-		"finish_reason", resp.FinishReason,
-		"tool_calls", len(resp.ToolCalls))
 
 	l.accumulateUsage(resp.Usage)
 	l.recordAssistantMessage(ctx, resp)
-
-	if len(resp.ToolCalls) > 0 {
-		l.logger.Info("handling tool calls", "count", len(resp.ToolCalls))
-		return l.handleToolCalls(ctx, resp.ToolCalls)
-	}
-
-	l.setWorking(false)
-	return nil
+	return resp, nil
 }
 
 // setWorking safely calls the onWorking callback if configured.
@@ -337,7 +337,7 @@ func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) er
 	for depth := range maxToolCallDepth {
 		l.executeToolCalls(ctx, toolCalls, depth)
 
-		resp, err := l.sendToolChainRequest(ctx, depth)
+		resp, err := l.sendLLMRequest(ctx)
 		if err != nil {
 			return err
 		}
@@ -362,47 +362,6 @@ func (l *Loop) executeToolCalls(ctx context.Context, toolCalls []llm.ToolCall, d
 		l.logger.Debug("executing tool", "name", tc.Function.Name, "id", tc.ID, "depth", depth)
 		l.recordToolResult(ctx, tc, l.executeTool(ctx, tc))
 	}
-}
-
-// sendToolChainRequest sends an LLM request after tool execution.
-func (l *Loop) sendToolChainRequest(ctx context.Context, depth int) (*llm.ChatResponse, error) {
-	history := l.copyHistory()
-	messages := l.buildMessages(history)
-	tools := l.buildToolDefinitions()
-
-	req := &llm.ChatRequest{
-		Model:    l.model,
-		Messages: messages,
-		Tools:    tools,
-	}
-
-	l.logger.Debug("sending LLM request (tool chain)",
-		"message_count", len(messages),
-		"tool_count", len(tools),
-		"model", l.model,
-		"depth", depth)
-
-	l.setWorking(true)
-
-	llmCtx, cancel := context.WithTimeout(ctx, llmRequestTimeout)
-	defer cancel()
-
-	resp, err := l.provider.Chat(llmCtx, req)
-	if err != nil {
-		l.recordErrorMessage(ctx, fmt.Sprintf("LLM request failed: %v", err))
-		l.setWorking(false)
-		return nil, fmt.Errorf("LLM request failed: %w", err)
-	}
-
-	l.logger.Debug("received LLM response (tool chain)",
-		"content_length", len(resp.Content),
-		"finish_reason", resp.FinishReason,
-		"tool_calls", len(resp.ToolCalls),
-		"depth", depth)
-
-	l.accumulateUsage(resp.Usage)
-	l.recordAssistantMessage(ctx, resp)
-	return resp, nil
 }
 
 // recordToolResult adds a tool result to history and records it.
