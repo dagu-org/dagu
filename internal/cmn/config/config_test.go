@@ -11,7 +11,7 @@ import (
 // Callers can mutate the returned config to set up specific test scenarios.
 func validBaseConfig() *Config {
 	return &Config{
-		DefaultExecutionMode: ExecutionModeLocal,
+		DefaultExecMode: ExecutionModeLocal,
 		Server: Server{
 			Port: 8080,
 			Auth: Auth{Mode: AuthModeNone},

@@ -8,20 +8,20 @@ import (
 
 // Config holds the overall configuration for the application.
 type Config struct {
-	Core                 Core
-	Server               Server
-	Paths                PathsConfig
-	UI                   UI
-	Queues               Queues
-	Coordinator          Coordinator
-	Worker               Worker
-	Scheduler            Scheduler
-	Monitoring           MonitoringConfig
-	DefaultExecutionMode ExecutionMode
-	Cache                CacheMode
-	GitSync              GitSyncConfig
-	Tunnel               TunnelConfig
-	Warnings             []string
+	Core            Core
+	Server          Server
+	Paths           PathsConfig
+	UI              UI
+	Queues          Queues
+	Coordinator     Coordinator
+	Worker          Worker
+	Scheduler       Scheduler
+	Monitoring      MonitoringConfig
+	DefaultExecMode ExecutionMode
+	Cache           CacheMode
+	GitSync         GitSyncConfig
+	Tunnel          TunnelConfig
+	Warnings        []string
 }
 
 // GitSyncConfig holds the configuration for Git sync functionality.
@@ -451,11 +451,11 @@ func (c *Config) validateOIDCForBuiltin() error {
 
 // validateExecutionMode validates the default execution mode.
 func (c *Config) validateExecutionMode() error {
-	switch c.DefaultExecutionMode {
+	switch c.DefaultExecMode {
 	case ExecutionModeLocal, ExecutionModeDistributed:
 		return nil
 	default:
-		return fmt.Errorf("invalid defaultExecutionMode: %q (must be one of: local, distributed)", c.DefaultExecutionMode)
+		return fmt.Errorf("invalid defaultExecutionMode: %q (must be one of: local, distributed)", c.DefaultExecMode)
 	}
 }
 

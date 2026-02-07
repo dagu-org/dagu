@@ -329,7 +329,7 @@ Update `SubDAGExecutor.Execute`:
 
 ```go
 func (e *SubDAGExecutor) Execute(ctx context.Context, runParams RunParams, workDir string) (*exec1.RunStatus, error) {
-    rCtx := exec1.GetContext(ctx)
+    rCtx := exec.GetContext(ctx)
     if core.ShouldDispatchToCoordinator(e.DAG, e.coordinatorCli != nil, rCtx.DefaultExecMode) {
         // ... existing distributed dispatch ...
     }

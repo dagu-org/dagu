@@ -76,12 +76,12 @@ func runDry(ctx *Context, args []string) error {
 		ctx.DAGRunMgr,
 		dagStore,
 		agent.Options{
-			Dry:                  true,
-			DAGRunStore:          ctx.DAGRunStore,
-			ServiceRegistry:      ctx.ServiceRegistry,
-			RootDAGRun:           exec.NewDAGRunRef(dag.Name, dagRunID),
-			PeerConfig:           ctx.Config.Core.Peer,
-			DefaultExecutionMode: ctx.Config.DefaultExecutionMode,
+			Dry:             true,
+			DAGRunStore:     ctx.DAGRunStore,
+			ServiceRegistry: ctx.ServiceRegistry,
+			RootDAGRun:      exec.NewDAGRunRef(dag.Name, dagRunID),
+			PeerConfig:      ctx.Config.Core.Peer,
+			DefaultExecMode: ctx.Config.DefaultExecMode,
 		},
 	)
 

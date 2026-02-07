@@ -236,9 +236,9 @@ func TestLoad_Env(t *testing.T) {
 				BlockDurationSeconds: 1800,
 			},
 		},
-		DefaultExecutionMode: ExecutionModeLocal,
-		Warnings:             []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://auth.example.com)"},
-		Cache:                CacheModeNormal,
+		DefaultExecMode: ExecutionModeLocal,
+		Warnings:        []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://auth.example.com)"},
+		Cache:           CacheModeNormal,
 	}
 
 	assert.Equal(t, expected, cfg)
@@ -487,9 +487,9 @@ scheduler:
 			Retention: 24 * time.Hour,
 			Interval:  5 * time.Second,
 		},
-		DefaultExecutionMode: ExecutionModeLocal,
-		Warnings:             []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://accounts.example.com)"},
-		Cache:                CacheModeNormal,
+		DefaultExecMode: ExecutionModeLocal,
+		Warnings:        []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://accounts.example.com)"},
+		Cache:           CacheModeNormal,
 	}
 
 	assert.Equal(t, expected, cfg)
@@ -1354,28 +1354,28 @@ tunnel:
 func TestLoad_DefaultExecutionMode(t *testing.T) {
 	t.Run("DefaultIsLocal", func(t *testing.T) {
 		cfg := loadFromYAML(t, "# empty")
-		assert.Equal(t, ExecutionModeLocal, cfg.DefaultExecutionMode)
+		assert.Equal(t, ExecutionModeLocal, cfg.DefaultExecMode)
 	})
 
 	t.Run("SetToDistributed", func(t *testing.T) {
 		cfg := loadFromYAML(t, `
 defaultExecutionMode: distributed
 `)
-		assert.Equal(t, ExecutionModeDistributed, cfg.DefaultExecutionMode)
+		assert.Equal(t, ExecutionModeDistributed, cfg.DefaultExecMode)
 	})
 
 	t.Run("SetToLocal", func(t *testing.T) {
 		cfg := loadFromYAML(t, `
 defaultExecutionMode: local
 `)
-		assert.Equal(t, ExecutionModeLocal, cfg.DefaultExecutionMode)
+		assert.Equal(t, ExecutionModeLocal, cfg.DefaultExecMode)
 	})
 
 	t.Run("FromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
 			"DAGU_DEFAULT_EXECUTION_MODE": "distributed",
 		})
-		assert.Equal(t, ExecutionModeDistributed, cfg.DefaultExecutionMode)
+		assert.Equal(t, ExecutionModeDistributed, cfg.DefaultExecMode)
 	})
 
 	t.Run("InvalidValue", func(t *testing.T) {

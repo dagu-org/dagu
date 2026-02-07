@@ -914,7 +914,7 @@ func (l *ConfigLoader) loadExecutionModeConfig(cfg *Config, _ Definition) {
 	if mode == "" {
 		mode = ExecutionModeLocal
 	}
-	cfg.DefaultExecutionMode = mode
+	cfg.DefaultExecMode = mode
 }
 
 func (l *ConfigLoader) loadCacheConfig(cfg *Config, def Definition) {

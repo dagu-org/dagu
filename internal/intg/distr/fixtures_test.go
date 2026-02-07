@@ -187,7 +187,7 @@ func (f *testFixture) waitForWorkerRegistration(workerID string, timeout time.Du
 func (f *testFixture) startScheduler(timeout time.Duration) {
 	f.t.Helper()
 
-	de := scheduler.NewDAGExecutor(f.coordinatorClient, runtime.NewSubCmdBuilder(f.coord.Config), f.coord.Config.DefaultExecutionMode)
+	de := scheduler.NewDAGExecutor(f.coordinatorClient, runtime.NewSubCmdBuilder(f.coord.Config), f.coord.Config.DefaultExecMode)
 	em := scheduler.NewEntryReader(f.coord.Config.Paths.DAGsDir, f.coord.DAGStore, f.coord.DAGRunMgr, de, "")
 
 	schedulerInst, err := scheduler.New(

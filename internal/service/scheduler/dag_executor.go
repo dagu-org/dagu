@@ -48,21 +48,21 @@ import (
 // - HandleJob(): Entry point for new scheduled jobs (handles persistence)
 // - ExecuteDAG(): Executes/dispatches already-persisted jobs (no persistence)
 type DAGExecutor struct {
-	coordinatorCli       exec.Dispatcher
-	subCmdBuilder        *runtime.SubCmdBuilder
-	defaultExecutionMode config.ExecutionMode
+	coordinatorCli  exec.Dispatcher
+	subCmdBuilder   *runtime.SubCmdBuilder
+	defaultExecMode config.ExecutionMode
 }
 
 // NewDAGExecutor creates a new DAGExecutor instance.
 func NewDAGExecutor(
 	coordinatorCli exec.Dispatcher,
 	subCmdBuilder *runtime.SubCmdBuilder,
-	defaultExecutionMode config.ExecutionMode,
+	defaultExecMode config.ExecutionMode,
 ) *DAGExecutor {
 	return &DAGExecutor{
-		coordinatorCli:       coordinatorCli,
-		subCmdBuilder:        subCmdBuilder,
-		defaultExecutionMode: defaultExecutionMode,
+		coordinatorCli:  coordinatorCli,
+		subCmdBuilder:   subCmdBuilder,
+		defaultExecMode: defaultExecMode,
 	}
 }
 
@@ -166,7 +166,7 @@ func (e *DAGExecutor) ExecuteDAG(
 // Delegates to core.ShouldDispatchToCoordinator for consistent dispatch logic
 // across all execution paths (API, CLI, scheduler, sub-DAG).
 func (e *DAGExecutor) shouldUseDistributedExecution(dag *core.DAG) bool {
-	return core.ShouldDispatchToCoordinator(dag, e.coordinatorCli != nil, e.defaultExecutionMode)
+	return core.ShouldDispatchToCoordinator(dag, e.coordinatorCli != nil, e.defaultExecMode)
 }
 
 // dispatchToCoordinator dispatches a task to the coordinator for distributed execution.

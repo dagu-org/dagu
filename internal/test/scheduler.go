@@ -67,7 +67,7 @@ func SetupScheduler(t *testing.T, opts ...HelperOption) *Scheduler {
 
 	// Create entry reader
 	coordinatorCli := coordinator.New(helper.ServiceRegistry, coordinator.DefaultConfig())
-	de := scheduler.NewDAGExecutor(coordinatorCli, runtime.NewSubCmdBuilder(helper.Config), helper.Config.DefaultExecutionMode)
+	de := scheduler.NewDAGExecutor(coordinatorCli, runtime.NewSubCmdBuilder(helper.Config), helper.Config.DefaultExecMode)
 	em := scheduler.NewEntryReader(helper.Config.Paths.DAGsDir, ds, drm, de, "")
 
 	// Update helper with scheduler-specific stores

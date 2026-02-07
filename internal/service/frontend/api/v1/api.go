@@ -36,27 +36,27 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
-	dagStore             exec.DAGStore
-	dagRunStore          exec.DAGRunStore
-	dagRunMgr            runtime.Manager
-	queueStore           exec.QueueStore
-	procStore            exec.ProcStore
-	remoteNodes          map[string]config.RemoteNode
-	apiBasePath          string
-	logEncodingCharset   string
-	config               *config.Config
-	metricsRegistry      *prometheus.Registry
-	coordinatorCli       coordinator.Client
-	serviceRegistry      exec.ServiceRegistry
-	subCmdBuilder        *runtime.SubCmdBuilder
-	resourceService      *resource.Service
-	authService          AuthService
-	auditService         *audit.Service
-	syncService          SyncService
-	tunnelService        *tunnel.Service
-	defaultExecutionMode config.ExecutionMode
-	dagWritesDisabled    bool // True when git sync read-only mode is active
-	agentConfigStore     agent.ConfigStore
+	dagStore           exec.DAGStore
+	dagRunStore        exec.DAGRunStore
+	dagRunMgr          runtime.Manager
+	queueStore         exec.QueueStore
+	procStore          exec.ProcStore
+	remoteNodes        map[string]config.RemoteNode
+	apiBasePath        string
+	logEncodingCharset string
+	config             *config.Config
+	metricsRegistry    *prometheus.Registry
+	coordinatorCli     coordinator.Client
+	serviceRegistry    exec.ServiceRegistry
+	subCmdBuilder      *runtime.SubCmdBuilder
+	resourceService    *resource.Service
+	authService        AuthService
+	auditService       *audit.Service
+	syncService        SyncService
+	tunnelService      *tunnel.Service
+	defaultExecMode    config.ExecutionMode
+	dagWritesDisabled  bool // True when git sync read-only mode is active
+	agentConfigStore   agent.ConfigStore
 }
 
 // AuthService defines the interface for authentication operations.
@@ -153,21 +153,21 @@ func New(
 	}
 
 	a := &API{
-		dagStore:             dr,
-		dagRunStore:          drs,
-		queueStore:           qs,
-		procStore:            ps,
-		dagRunMgr:            drm,
-		logEncodingCharset:   cfg.UI.LogEncodingCharset,
-		remoteNodes:          remoteNodes,
-		subCmdBuilder:        runtime.NewSubCmdBuilder(cfg),
-		apiBasePath:          cfg.Server.APIBasePath,
-		config:               cfg,
-		coordinatorCli:       cc,
-		serviceRegistry:      sr,
-		metricsRegistry:      mr,
-		resourceService:      rs,
-		defaultExecutionMode: cfg.DefaultExecutionMode,
+		dagStore:           dr,
+		dagRunStore:        drs,
+		queueStore:         qs,
+		procStore:          ps,
+		dagRunMgr:          drm,
+		logEncodingCharset: cfg.UI.LogEncodingCharset,
+		remoteNodes:        remoteNodes,
+		subCmdBuilder:      runtime.NewSubCmdBuilder(cfg),
+		apiBasePath:        cfg.Server.APIBasePath,
+		config:             cfg,
+		coordinatorCli:     cc,
+		serviceRegistry:    sr,
+		metricsRegistry:    mr,
+		resourceService:    rs,
+		defaultExecMode:    cfg.DefaultExecMode,
 	}
 
 	for _, opt := range opts {

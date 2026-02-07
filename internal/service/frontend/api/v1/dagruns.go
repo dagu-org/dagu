@@ -1296,7 +1296,7 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 	stepName := valueOf(request.Body.StepName)
 
 	// Check if this DAG should be dispatched to the coordinator for distributed execution
-	if core.ShouldDispatchToCoordinator(dag, a.coordinatorCli != nil, a.defaultExecutionMode) {
+	if core.ShouldDispatchToCoordinator(dag, a.coordinatorCli != nil, a.defaultExecMode) {
 		// Get previous status for retry context
 		prevStatus, err := attempt.ReadStatus(ctx)
 		if err != nil {

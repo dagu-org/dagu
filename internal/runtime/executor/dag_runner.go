@@ -7,7 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"os/exec"
+	osexec "os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -19,7 +19,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/cmn/telemetry"
 	"github.com/dagu-org/dagu/internal/core"
-	exec1 "github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/proto/convert"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
@@ -42,13 +42,13 @@ type SubDAGExecutor struct {
 	tempFile string
 
 	// coordinatorCli is used for distributed execution
-	coordinatorCli exec1.Dispatcher
+	coordinatorCli exec.Dispatcher
 
 	// Process tracking for ALL executions
 	mu              sync.Mutex
-	cmds            map[string]*exec.Cmd // runID -> cmd for local processes
-	distributedRuns map[string]bool      // runID -> true for distributed runs
-	dagCtx          exec1.Context        // for DB access when cancelling distributed runs
+	cmds            map[string]*osexec.Cmd // runID -> cmd for local processes
+	distributedRuns map[string]bool        // runID -> true for distributed runs
+	dagCtx          exec.Context           // for DB access when cancelling distributed runs
 
 	// killed should be closed when Kill is called
 	killed     chan struct{}
@@ -59,7 +59,7 @@ type SubDAGExecutor struct {
 // It handles the logic for finding the DAG - either from the database
 // or from local DAGs defined in the parent.
 func NewSubDAGExecutor(ctx context.Context, childName string) (*SubDAGExecutor, error) {
-	rCtx := exec1.GetContext(ctx)
+	rCtx := exec.GetContext(ctx)
 
 	// First, check if it's a local DAG in the parent
 	if rCtx.DAG != nil && rCtx.DAG.LocalDAGs != nil {
@@ -86,7 +86,7 @@ func NewSubDAGExecutor(ctx context.Context, childName string) (*SubDAGExecutor, 
 				DAG:             dag,
 				tempFile:        tempFile,
 				coordinatorCli:  rCtx.CoordinatorCli,
-				cmds:            make(map[string]*exec.Cmd),
+				cmds:            make(map[string]*osexec.Cmd),
 				distributedRuns: make(map[string]bool),
 				dagCtx:          rCtx,
 				killed:          make(chan struct{}),
@@ -103,7 +103,7 @@ func NewSubDAGExecutor(ctx context.Context, childName string) (*SubDAGExecutor, 
 	return &SubDAGExecutor{
 		DAG:             dag,
 		coordinatorCli:  rCtx.CoordinatorCli,
-		cmds:            make(map[string]*exec.Cmd),
+		cmds:            make(map[string]*osexec.Cmd),
 		distributedRuns: make(map[string]bool),
 		dagCtx:          rCtx,
 		killed:          make(chan struct{}),
@@ -111,7 +111,7 @@ func NewSubDAGExecutor(ctx context.Context, childName string) (*SubDAGExecutor, 
 }
 
 // buildCommand builds the command to execute the sub DAG.
-func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, workDir string) (*exec.Cmd, error) {
+func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, workDir string) (*osexec.Cmd, error) {
 	executable, err := executablePath()
 	if err != nil {
 		return nil, fmt.Errorf("failed to find executable path: %w", err)
@@ -121,7 +121,7 @@ func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, 
 		return nil, errDAGRunIDNotSet
 	}
 
-	rCtx := exec1.GetContext(ctx)
+	rCtx := exec.GetContext(ctx)
 	if rCtx.RootDAGRun.Zero() {
 		return nil, errRootDAGRunNotSet
 	}
@@ -145,7 +145,7 @@ func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, 
 		args = append(args, "--", runParams.Params)
 	}
 
-	cmd := exec.CommandContext(ctx, executable, args...) // nolint:gosec
+	cmd := osexec.CommandContext(ctx, executable, args...) // nolint:gosec
 	cmd.Dir = workDir
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, rCtx.AllEnvs()...)
@@ -168,7 +168,7 @@ func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, 
 
 // BuildCoordinatorTask creates a coordinator task for distributed execution
 func (e *SubDAGExecutor) BuildCoordinatorTask(ctx context.Context, runParams RunParams) (*coordinatorv1.Task, error) {
-	rCtx := exec1.GetContext(ctx)
+	rCtx := exec.GetContext(ctx)
 
 	if runParams.RunID == "" {
 		return nil, errDAGRunIDNotSet
@@ -185,7 +185,7 @@ func (e *SubDAGExecutor) BuildCoordinatorTask(ctx context.Context, runParams Run
 		coordinatorv1.Operation_OPERATION_START,
 		runParams.RunID,
 		WithRootDagRun(rCtx.RootDAGRun),
-		WithParentDagRun(exec1.DAGRunRef{
+		WithParentDagRun(exec.DAGRunRef{
 			Name: rCtx.DAG.Name,
 			ID:   rCtx.DAGRunID,
 		}),
@@ -224,11 +224,11 @@ func (e *SubDAGExecutor) Cleanup(ctx context.Context) error {
 
 // Execute executes the sub DAG and returns the result.
 // This is useful for parallel execution where results need to be collected.
-func (e *SubDAGExecutor) Execute(ctx context.Context, runParams RunParams, workDir string) (*exec1.RunStatus, error) {
+func (e *SubDAGExecutor) Execute(ctx context.Context, runParams RunParams, workDir string) (*exec.RunStatus, error) {
 	ctx = logger.WithValues(ctx, tag.SubDAG(e.DAG.Name), tag.SubRunID(runParams.RunID))
 
-	rCtx := exec1.GetContext(ctx)
-	if core.ShouldDispatchToCoordinator(e.DAG, e.coordinatorCli != nil, rCtx.DefaultExecutionMode) {
+	rCtx := exec.GetContext(ctx)
+	if core.ShouldDispatchToCoordinator(e.DAG, e.coordinatorCli != nil, rCtx.DefaultExecMode) {
 		// Handle distributed execution
 		logger.Info(ctx, "Executing sub DAG via distributed execution")
 
@@ -283,7 +283,7 @@ func (e *SubDAGExecutor) Execute(ctx context.Context, runParams RunParams, workD
 	default:
 	}
 
-	rCtx = exec1.GetContext(ctx)
+	rCtx = exec.GetContext(ctx)
 	result, resultErr := rCtx.DB.GetSubDAGRunStatus(ctx, runParams.RunID, rCtx.RootDAGRun)
 	if resultErr != nil {
 		errMsg := fmt.Sprintf("sub dag-run %q failed and wrote no status", runParams.RunID)
@@ -305,7 +305,7 @@ func (e *SubDAGExecutor) Execute(ctx context.Context, runParams RunParams, workD
 }
 
 // dispatch runs the sub DAG via coordinator and returns the result.
-func (e *SubDAGExecutor) dispatch(ctx context.Context, runParams RunParams) (*exec1.RunStatus, error) {
+func (e *SubDAGExecutor) dispatch(ctx context.Context, runParams RunParams) (*exec.RunStatus, error) {
 	dispatchCtx := logger.WithValues(ctx,
 		tag.RunID(runParams.RunID),
 		tag.DAG(e.DAG.Name),
@@ -346,7 +346,7 @@ func (e *SubDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams Ru
 	return nil
 }
 
-func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*exec1.RunStatus, error) {
+func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*exec.RunStatus, error) {
 	waitCtx := logger.WithValues(ctx,
 		tag.RunID(dagRunID),
 		tag.DAG(e.DAG.Name),
@@ -405,7 +405,7 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 }
 
 // waitForCancellation waits for a distributed sub DAG run to terminate after cancellation is requested.
-func (e *SubDAGExecutor) waitForCancellation(ctx context.Context, dagRunID string, startTime time.Time) (*exec1.RunStatus, error) {
+func (e *SubDAGExecutor) waitForCancellation(ctx context.Context, dagRunID string, startTime time.Time) (*exec.RunStatus, error) {
 	waitCtx := logger.WithValues(ctx,
 		tag.RunID(dagRunID),
 		tag.DAG(e.DAG.Name),
@@ -429,7 +429,7 @@ func (e *SubDAGExecutor) waitForCancellation(ctx context.Context, dagRunID strin
 	// Use a fresh context for status queries since the original context may be canceled
 	cancelWaitCtx := context.WithoutCancel(ctx)
 
-	var lastStatus *exec1.RunStatus
+	var lastStatus *exec.RunStatus
 
 	for {
 		status, err := e.getSubDAGRunStatus(cancelWaitCtx, dagRunID)
@@ -466,8 +466,8 @@ func (e *SubDAGExecutor) waitForCancellation(ctx context.Context, dagRunID strin
 
 // getSubDAGRunStatus retrieves the status of a sub-DAG run.
 // For distributed runs, it queries the coordinator; otherwise, it uses the local DB.
-func (e *SubDAGExecutor) getSubDAGRunStatus(ctx context.Context, dagRunID string) (*exec1.RunStatus, error) {
-	rCtx := exec1.GetContext(ctx)
+func (e *SubDAGExecutor) getSubDAGRunStatus(ctx context.Context, dagRunID string) (*exec.RunStatus, error) {
+	rCtx := exec.GetContext(ctx)
 
 	if e.coordinatorCli != nil {
 		return e.getStatusFromCoordinator(ctx, dagRunID, rCtx.RootDAGRun)
@@ -481,7 +481,7 @@ func (e *SubDAGExecutor) getSubDAGRunStatus(ctx context.Context, dagRunID string
 }
 
 // getStatusFromCoordinator queries the coordinator for sub-DAG run status.
-func (e *SubDAGExecutor) getStatusFromCoordinator(ctx context.Context, dagRunID string, rootDAGRun exec1.DAGRunRef) (*exec1.RunStatus, error) {
+func (e *SubDAGExecutor) getStatusFromCoordinator(ctx context.Context, dagRunID string, rootDAGRun exec.DAGRunRef) (*exec.RunStatus, error) {
 	rootRef := &rootDAGRun
 	resp, err := e.coordinatorCli.GetDAGRunStatus(ctx, e.DAG.Name, dagRunID, rootRef)
 	if err != nil {
@@ -500,7 +500,7 @@ func (e *SubDAGExecutor) getStatusFromCoordinator(ctx context.Context, dagRunID 
 	}
 	outputs := extractOutputsFromNodes(dagRunStatus.Nodes)
 
-	return &exec1.RunStatus{
+	return &exec.RunStatus{
 		Name:     dagRunStatus.Name,
 		DAGRunID: dagRunID,
 		Params:   dagRunStatus.Params,
@@ -514,7 +514,7 @@ func (e *SubDAGExecutor) getStatusFromCoordinator(ctx context.Context, dagRunID 
 // 1. Local format: key="VAR", value="VAR=actual_value" (KeyValue string)
 // 2. Proto format: key="VAR", value="actual_value" (direct value)
 // This function normalizes both formats to extract the actual value.
-func extractOutputsFromNodes(nodes []*exec1.Node) map[string]string {
+func extractOutputsFromNodes(nodes []*exec.Node) map[string]string {
 	outputs := make(map[string]string)
 	for _, node := range nodes {
 		if node.OutputVariables == nil {
@@ -580,7 +580,7 @@ func (e *SubDAGExecutor) Kill(sig os.Signal) error {
 		// Fallback: try local DB (for non-shared-nothing mode with local dagRunStore)
 		if e.dagCtx.DB != nil {
 			if err := e.dagCtx.DB.RequestChildCancel(ctx, runID, e.dagCtx.RootDAGRun); err != nil {
-				if errors.Is(err, exec1.ErrDAGRunIDNotFound) {
+				if errors.Is(err, exec.ErrDAGRunIDNotFound) {
 					continue
 				}
 				errs = append(errs, err)

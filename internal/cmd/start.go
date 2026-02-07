@@ -204,7 +204,7 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root exec.DAGRu
 	// Skip if already running on a worker (workerID != "local").
 	if workerID == "local" {
 		coordinatorCli := ctx.NewCoordinatorClient()
-		if core.ShouldDispatchToCoordinator(dag, coordinatorCli != nil, ctx.Config.DefaultExecutionMode) {
+		if core.ShouldDispatchToCoordinator(dag, coordinatorCli != nil, ctx.Config.DefaultExecMode) {
 			return dispatchToCoordinatorAndWait(ctx, dag, dagRunID, coordinatorCli)
 		}
 	}
@@ -390,16 +390,16 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 		ctx.DAGRunMgr,
 		dr,
 		agent.Options{
-			ParentDAGRun:         parent,
-			ProgressDisplay:      shouldEnableProgress(ctx),
-			WorkerID:             workerID,
-			QueuedRun:            queuedRun,
-			DAGRunStore:          ctx.DAGRunStore,
-			ServiceRegistry:      ctx.ServiceRegistry,
-			RootDAGRun:           root,
-			PeerConfig:           ctx.Config.Core.Peer,
-			TriggerType:          triggerType,
-			DefaultExecutionMode: ctx.Config.DefaultExecutionMode,
+			ParentDAGRun:    parent,
+			ProgressDisplay: shouldEnableProgress(ctx),
+			WorkerID:        workerID,
+			QueuedRun:       queuedRun,
+			DAGRunStore:     ctx.DAGRunStore,
+			ServiceRegistry: ctx.ServiceRegistry,
+			RootDAGRun:      root,
+			PeerConfig:      ctx.Config.Core.Peer,
+			TriggerType:     triggerType,
+			DefaultExecMode: ctx.Config.DefaultExecMode,
 		},
 	)
 

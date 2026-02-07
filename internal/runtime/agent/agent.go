@@ -138,8 +138,8 @@ type Agent struct {
 	// triggerType indicates how this DAG run was initiated.
 	triggerType core.TriggerType
 
-	// defaultExecutionMode is the server-level default execution mode.
-	defaultExecutionMode config.ExecutionMode
+	// defaultExecMode is the server-level default execution mode.
+	defaultExecMode config.ExecutionMode
 
 	// tracer is the OpenTelemetry tracer for the agent.
 	tracer *telemetry.Tracer
@@ -221,8 +221,8 @@ type Options struct {
 	PeerConfig config.Peer
 	// TriggerType indicates how this DAG run was initiated.
 	TriggerType core.TriggerType
-	// DefaultExecutionMode is the server-level default execution mode.
-	DefaultExecutionMode config.ExecutionMode
+	// DefaultExecMode is the server-level default execution mode.
+	DefaultExecMode config.ExecutionMode
 }
 
 // New creates a new Agent.
@@ -236,27 +236,27 @@ func New(
 	opts Options,
 ) *Agent {
 	a := &Agent{
-		rootDAGRun:           opts.RootDAGRun,
-		parentDAGRun:         opts.ParentDAGRun,
-		dagRunID:             dagRunID,
-		dag:                  dag,
-		dry:                  opts.Dry,
-		retryTarget:          opts.RetryTarget,
-		logDir:               logDir,
-		logFile:              logFile,
-		dagRunMgr:            drm,
-		dagStore:             ds,
-		dagRunStore:          opts.DAGRunStore,
-		registry:             opts.ServiceRegistry,
-		stepRetry:            opts.StepRetry,
-		peerConfig:           opts.PeerConfig,
-		workerID:             opts.WorkerID,
-		statusPusher:         opts.StatusPusher,
-		logWriterFactory:     opts.LogWriterFactory,
-		queuedRun:            opts.QueuedRun,
-		attemptID:            opts.AttemptID,
-		triggerType:          opts.TriggerType,
-		defaultExecutionMode: opts.DefaultExecutionMode,
+		rootDAGRun:       opts.RootDAGRun,
+		parentDAGRun:     opts.ParentDAGRun,
+		dagRunID:         dagRunID,
+		dag:              dag,
+		dry:              opts.Dry,
+		retryTarget:      opts.RetryTarget,
+		logDir:           logDir,
+		logFile:          logFile,
+		dagRunMgr:        drm,
+		dagStore:         ds,
+		dagRunStore:      opts.DAGRunStore,
+		registry:         opts.ServiceRegistry,
+		stepRetry:        opts.StepRetry,
+		peerConfig:       opts.PeerConfig,
+		workerID:         opts.WorkerID,
+		statusPusher:     opts.StatusPusher,
+		logWriterFactory: opts.LogWriterFactory,
+		queuedRun:        opts.QueuedRun,
+		attemptID:        opts.AttemptID,
+		triggerType:      opts.TriggerType,
+		defaultExecMode:  opts.DefaultExecMode,
 	}
 
 	// Initialize progress display if enabled
@@ -392,7 +392,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		runtime.WithParams(a.dag.Params),
 		runtime.WithCoordinator(coordinatorCli),
 		runtime.WithSecrets(secretEnvs),
-		runtime.WithDefaultExecutionMode(a.defaultExecutionMode),
+		runtime.WithDefaultExecMode(a.defaultExecMode),
 	}
 
 	if a.logWriterFactory != nil {
