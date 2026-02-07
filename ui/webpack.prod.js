@@ -1,7 +1,7 @@
 const { merge } = require('webpack-merge');
 const common = require('./webpack.common.js');
 const path = require('path');
-const TerserPlugin = require('terser-webpack-plugin');
+const { EsbuildPlugin } = require('esbuild-loader');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 
@@ -11,14 +11,23 @@ module.exports = merge(common, {
     rules: [
       {
         test: /\.tsx?$/,
-        use: [
-          {
-            loader: 'ts-loader',
-          },
-        ],
+        loader: 'esbuild-loader',
+        options: {
+          loader: 'tsx',
+          target: 'es2015',
+        },
         include: path.resolve(__dirname, 'src'),
         exclude: [path.resolve(__dirname, 'node_modules')],
       },
+    ],
+  },
+  optimization: {
+    minimize: true,
+    minimizer: [
+      new EsbuildPlugin({
+        target: 'es2015',
+        css: true,
+      }),
     ],
   },
   plugins: [
