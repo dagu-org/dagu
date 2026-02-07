@@ -188,6 +188,12 @@
     "gitSync": {
       "$ref": "#/definitions/GitSyncDef"
     },
+    "defaultExecutionMode": {
+      "type": "string",
+      "description": "Default execution mode for DAGs. 'local' runs DAGs on the server process, 'distributed' dispatches to workers.",
+      "enum": ["local", "distributed"],
+      "default": "local"
+    },
     "tunnel": {
       "$ref": "#/definitions/TunnelDef"
     }
