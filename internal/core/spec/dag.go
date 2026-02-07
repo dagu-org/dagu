@@ -942,11 +942,7 @@ func buildWorkerSelector(_ BuildContext, d *dag) (map[string]string, bool, error
 		}
 		ret := make(map[string]string)
 		for key, val := range v {
-			strVal, ok := val.(string)
-			if !ok {
-				return nil, false, fmt.Errorf("workerSelector values must be strings, got %T for key %q", val, key)
-			}
-			ret[strings.TrimSpace(key)] = strings.TrimSpace(strVal)
+			ret[strings.TrimSpace(key)] = strings.TrimSpace(fmt.Sprint(val))
 		}
 		return ret, false, nil
 
@@ -960,11 +956,7 @@ func buildWorkerSelector(_ BuildContext, d *dag) (map[string]string, bool, error
 			if !ok {
 				return nil, false, fmt.Errorf("workerSelector keys must be strings, got %T", key)
 			}
-			strVal, ok := val.(string)
-			if !ok {
-				return nil, false, fmt.Errorf("workerSelector values must be strings, got %T for key %q", val, strKey)
-			}
-			ret[strings.TrimSpace(strKey)] = strings.TrimSpace(strVal)
+			ret[strings.TrimSpace(strKey)] = strings.TrimSpace(fmt.Sprint(val))
 		}
 		return ret, false, nil
 

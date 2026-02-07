@@ -52,7 +52,7 @@ const (
 
 Environment variable:
 
-```
+```sh
 DAGU_DEFAULT_EXECUTION_MODE=distributed
 ```
 

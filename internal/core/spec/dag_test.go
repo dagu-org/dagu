@@ -651,6 +651,16 @@ func TestBuildWorkerSelector(t *testing.T) {
 			input:    map[string]any{"env": "prod"},
 			expected: map[string]string{"env": "prod"},
 		},
+		{
+			name:     "MapStringAnyBoolValue",
+			input:    map[string]any{"gpu": true},
+			expected: map[string]string{"gpu": "true"},
+		},
+		{
+			name:     "MapStringAnyIntValue",
+			input:    map[string]any{"memory": 64},
+			expected: map[string]string{"memory": "64"},
+		},
 	}
 
 	for _, tt := range tests {
