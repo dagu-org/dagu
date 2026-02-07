@@ -34,7 +34,7 @@ The chart deploys four components:
 
 - **Coordinator**: gRPC server for distributed task execution (port 50055)
 - **Scheduler**: Manages DAG execution schedules (port 8090 for health)
-- **Worker**: Executes DAG steps (2 replicas by default)
+- **Worker**: Executes DAG steps (configurable pools with independent replicas)
 - **UI**: Web interface for managing DAGs (port 8080)
 
 All components share a single PersistentVolumeClaim with `ReadWriteMany` access mode.
@@ -56,7 +56,57 @@ For local single-node clusters that don't support RWX:
 helm install dagu charts/dagu \
   --set persistence.accessMode=ReadWriteOnce \
   --set persistence.skipValidation=true \
-  --set worker.replicas=1
+  --set workerPools.general.replicas=1
+```
+
+### Worker Pools
+
+Workers are organized into pools. Each pool creates a separate Kubernetes Deployment with its own replicas, labels, resources, and scheduling constraints. DAGs select workers via `workerSelector` labels that match a pool's labels.
+
+```yaml
+workerPools:
+  general:
+    replicas: 2
+    labels: {}
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+
+  gpu:
+    replicas: 1
+    labels:
+      gpu: "true"
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+        nvidia.com/gpu: "1"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+        nvidia.com/gpu: "1"
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+    affinity: {}
+```
+
+A pool with `labels: {}` (like `general` above) matches any DAG that has no `workerSelector`. To route a DAG to a specific pool, set `workerSelector` in the DAG definition to match the pool's labels:
+
+```yaml
+# In your DAG file
+workerSelector:
+  gpu: "true"
 ```
 
 ### Authentication
@@ -101,12 +151,14 @@ scheduler:
       memory: "256Mi"
       cpu: "250m"
 
-worker:
-  replicas: 2
-  resources:
-    requests:
-      memory: "128Mi"
-      cpu: "100m"
+workerPools:
+  general:
+    replicas: 2
+    labels: {}
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
 
 ui:
   replicas: 1
