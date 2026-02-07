@@ -235,7 +235,7 @@ func runNamespaceDelete(ctx *Context, args []string) error {
 
 	// Check if the namespace contains DAGs.
 	dagDir := filepath.Join(ctx.Config.Paths.DAGsDir, ns.ShortID)
-	if hasDAGs, checkErr := namespaceHasDAGs(dagDir); checkErr != nil {
+	if hasDAGs, checkErr := exec.NamespaceHasDAGs(dagDir); checkErr != nil {
 		return fmt.Errorf("failed to check DAGs in namespace %q: %w", name, checkErr)
 	} else if hasDAGs {
 		return fmt.Errorf("namespace %q contains DAGs; remove all DAGs before deleting the namespace", name)
@@ -256,29 +256,6 @@ func runNamespaceDelete(ctx *Context, args []string) error {
 
 	fmt.Printf("Namespace %q deleted.\n", name)
 	return nil
-}
-
-// namespaceHasDAGs checks if a namespace DAG directory exists and contains any YAML files.
-func namespaceHasDAGs(dagDir string) (bool, error) {
-	entries, err := os.ReadDir(dagDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		ext := filepath.Ext(entry.Name())
-		if ext == ".yaml" || ext == ".yml" {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
 
 // NamespaceSetBaseConfig creates the namespace set-base-config subcommand.

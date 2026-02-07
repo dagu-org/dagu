@@ -1189,27 +1189,6 @@ func TestHandler_GetDAGRunStatus(t *testing.T) {
 	})
 }
 
-func TestHandler_StreamLogs(t *testing.T) {
-	t.Parallel()
-
-	t.Run("EmptyLogDirReturnsError", func(t *testing.T) {
-		t.Parallel()
-
-		h := NewHandler(HandlerConfig{}) // No logDir
-		// StreamLogs requires a mock stream, but we can test the precondition check
-		// by checking that logDir is empty
-		require.Empty(t, h.logDir)
-	})
-
-	t.Run("WithLogDirConfigured", func(t *testing.T) {
-		t.Parallel()
-
-		logDir := t.TempDir()
-		h := NewHandler(HandlerConfig{LogDir: logDir})
-		require.Equal(t, logDir, h.logDir)
-	})
-}
-
 func TestMatchesSelector(t *testing.T) {
 	t.Parallel()
 

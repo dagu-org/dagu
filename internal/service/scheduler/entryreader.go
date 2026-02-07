@@ -55,11 +55,11 @@ var _ EntryReader = (*entryReaderImpl)(nil)
 // It iterates NamespaceStore.List() and watches {DAGsDir}/{shortID}/ for each
 // namespace, setting dag.Namespace on every loaded DAG.
 type entryReaderImpl struct {
-	dagsDir        string                // base DAGs directory
-	namespaceStore exec.NamespaceStore   // namespace store for listing namespaces
-	registry       map[string]*core.DAG  // key: shortID/filename → DAG
-	knownNS        map[string]string     // shortID → namespace name
-	nsDirs         map[string]string     // dir path → shortID
+	dagsDir        string               // base DAGs directory
+	namespaceStore exec.NamespaceStore  // namespace store for listing namespaces
+	registry       map[string]*core.DAG // key: shortID/filename → DAG
+	knownNS        map[string]string    // shortID → namespace name
+	nsDirs         map[string]string    // dir path → shortID
 	lock           sync.Mutex
 	dagStore       exec.DAGStore
 	dagRunMgr      runtime.Manager

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"os"
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/api/v1"
@@ -25,24 +24,16 @@ func (a *API) ListNamespaces(ctx context.Context, _ api.ListNamespacesRequestObj
 		}
 	}
 
-	namespaces, err := a.namespaceStore.List(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Filter namespaces by user access when auth is enabled.
+	// When auth is enabled, require an authenticated user.
 	if a.authService != nil {
-		user, ok := auth.UserFromContext(ctx)
-		if !ok {
+		if _, ok := auth.UserFromContext(ctx); !ok {
 			return nil, errAuthRequired
 		}
-		filtered := make([]*exec.Namespace, 0, len(namespaces))
-		for _, ns := range namespaces {
-			if user.HasNamespaceAccess(ns.Name) {
-				filtered = append(filtered, ns)
-			}
-		}
-		namespaces = filtered
+	}
+
+	namespaces, err := a.listAccessibleNamespaces(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	result := make([]api.Namespace, len(namespaces))
@@ -250,7 +241,7 @@ func (a *API) DeleteNamespace(ctx context.Context, request api.DeleteNamespaceRe
 
 	// Check if the namespace contains DAGs.
 	dagDir := filepath.Join(a.config.Paths.DAGsDir, ns.ShortID)
-	if hasDAGs, checkErr := namespaceHasDAGs(dagDir); checkErr != nil {
+	if hasDAGs, checkErr := exec.NamespaceHasDAGs(dagDir); checkErr != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusInternalServerError,
 			Code:       api.ErrorCodeInternalError,
@@ -273,28 +264,6 @@ func (a *API) DeleteNamespace(ctx context.Context, request api.DeleteNamespaceRe
 	})
 
 	return api.DeleteNamespace204Response{}, nil
-}
-
-// namespaceHasDAGs checks if a namespace DAG directory contains any YAML files.
-func namespaceHasDAGs(dagDir string) (bool, error) {
-	entries, err := os.ReadDir(dagDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		ext := filepath.Ext(entry.Name())
-		if ext == ".yaml" || ext == ".yml" {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 // toAPINamespace converts an exec.Namespace to the API representation.

@@ -3,6 +3,8 @@ package exec
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -67,6 +69,28 @@ type Namespace struct {
 	Defaults NamespaceDefaults `json:"defaults,omitzero"`
 	// GitSync contains git sync configuration for this namespace.
 	GitSync NamespaceGitSync `json:"gitSync,omitzero"`
+}
+
+// NamespaceHasDAGs checks if a namespace DAG directory contains any YAML files.
+func NamespaceHasDAGs(dagDir string) (bool, error) {
+	entries, err := os.ReadDir(dagDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		ext := filepath.Ext(entry.Name())
+		if ext == ".yaml" || ext == ".yml" {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // NamespaceDefaults contains default values for DAGs in a namespace.

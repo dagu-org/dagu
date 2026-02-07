@@ -600,23 +600,3 @@ func TestTaskRetry(t *testing.T) {
 		assert.NotContains(t, spec.Args, "--config")
 	})
 }
-
-func TestCmdSpec(t *testing.T) {
-	t.Parallel()
-	t.Run("CmdSpecStructure", func(t *testing.T) {
-		t.Parallel()
-		spec := runtime.CmdSpec{
-			Executable: "/usr/bin/test",
-			Args:       []string{"arg1", "arg2"},
-			Env:        []string{"VAR=value"},
-			Stdout:     os.Stdout,
-			Stderr:     os.Stderr,
-		}
-
-		assert.Equal(t, "/usr/bin/test", spec.Executable)
-		assert.Equal(t, []string{"arg1", "arg2"}, spec.Args)
-		assert.Equal(t, []string{"VAR=value"}, spec.Env)
-		assert.Equal(t, os.Stdout, spec.Stdout)
-		assert.Equal(t, os.Stderr, spec.Stderr)
-	})
-}

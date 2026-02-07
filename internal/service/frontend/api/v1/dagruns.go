@@ -113,7 +113,7 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 	}
 	defer cleanup()
 
-	if err := a.ensureDAGRunIDUnique(ctx, dag, dagRunId); err != nil {
+	if err := a.ensureDAGRunIDUnique(ctx, a.dagRunStore, dag, dagRunId); err != nil {
 		return nil, err
 	}
 
@@ -1600,7 +1600,7 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 		newDagRunID = id
 	}
 
-	if err := a.ensureDAGRunIDUnique(ctx, dag, newDagRunID); err != nil {
+	if err := a.ensureDAGRunIDUnique(ctx, a.dagRunStore, dag, newDagRunID); err != nil {
 		return nil, err
 	}
 

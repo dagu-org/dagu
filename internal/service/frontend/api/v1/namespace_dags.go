@@ -21,6 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
 	"github.com/dagu-org/dagu/internal/persis/filequeue"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/service/audit"
 )
 
 // namespaceScopedStores holds namespace-scoped store instances for a single request.
@@ -200,7 +201,7 @@ func (a *API) CreateNamespaceDAG(ctx context.Context, request api.CreateNamespac
 		return nil, fmt.Errorf("error creating DAG: %w", err)
 	}
 
-	a.logDAGAudit(ctx, "dag_create", map[string]any{
+	a.logAuditEntry(ctx, audit.CategoryDAG, "dag_create", map[string]any{
 		"dag_name":  request.Body.Name,
 		"namespace": request.NamespaceName,
 	})
@@ -323,16 +324,16 @@ func (a *API) TriggerNamespaceDAGRun(ctx context.Context, request api.TriggerNam
 	}
 
 	if singleton {
-		if err := a.checkSingletonRunningWith(ctx, stores, dag); err != nil {
+		if err := a.checkSingletonRunning(ctx, stores.procStore, dag); err != nil {
 			return nil, err
 		}
 	}
 
-	if err := a.ensureDAGRunIDUniqueWith(ctx, stores, dag, dagRunId); err != nil {
+	if err := a.ensureDAGRunIDUnique(ctx, stores.dagRunStore, dag, dagRunId); err != nil {
 		return nil, err
 	}
 
-	if err := a.startNamespaceScopedDAGRun(ctx, stores, dag, params, dagRunId, nameOverride, singleton); err != nil {
+	if err := a.startNamespaceScopedDAGRun(ctx, stores, dag, params, dagRunId, nameOverride); err != nil {
 		return nil, fmt.Errorf("error starting dag-run: %w", err)
 	}
 
@@ -344,45 +345,11 @@ func (a *API) TriggerNamespaceDAGRun(ctx context.Context, request api.TriggerNam
 	if params != "" {
 		detailsMap["params"] = params
 	}
-	a.logDAGAudit(ctx, "dag_execute", detailsMap)
+	a.logAuditEntry(ctx, audit.CategoryDAG, "dag_execute", detailsMap)
 
 	return &api.TriggerNamespaceDAGRun200JSONResponse{
 		DagRunId: dagRunId,
 	}, nil
-}
-
-// checkSingletonRunningWith checks singleton status using namespace-scoped stores.
-func (a *API) checkSingletonRunningWith(_ context.Context, stores *namespaceScopedStores, dag *core.DAG) error {
-	ctx := context.Background()
-	alive, err := stores.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if err != nil {
-		return fmt.Errorf("failed to check singleton execution status: %w", err)
-	}
-	if alive > 0 {
-		return &Error{
-			HTTPStatus: http.StatusConflict,
-			Code:       api.ErrorCodeAlreadyExists,
-			Message:    fmt.Sprintf("DAG %s is already running (singleton mode)", dag.Name),
-		}
-	}
-	return nil
-}
-
-// ensureDAGRunIDUniqueWith validates dagRunID uniqueness using namespace-scoped stores.
-func (a *API) ensureDAGRunIDUniqueWith(ctx context.Context, stores *namespaceScopedStores, dag *core.DAG, dagRunID string) error {
-	if dagRunID == "" {
-		return fmt.Errorf("dagRunID must be non-empty")
-	}
-	if _, err := stores.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(dag.Name, dagRunID)); err == nil {
-		return &Error{
-			HTTPStatus: http.StatusConflict,
-			Code:       api.ErrorCodeAlreadyExists,
-			Message:    fmt.Sprintf("dag-run ID %s already exists for DAG %s", dagRunID, dag.Name),
-		}
-	} else if !errors.Is(err, exec.ErrDAGRunIDNotFound) {
-		return fmt.Errorf("failed to verify dag-run ID uniqueness: %w", err)
-	}
-	return nil
 }
 
 // startNamespaceScopedDAGRun starts a DAG run using namespace-scoped stores.
@@ -391,7 +358,6 @@ func (a *API) startNamespaceScopedDAGRun(
 	stores *namespaceScopedStores,
 	dag *core.DAG,
 	params, dagRunID, nameOverride string,
-	_ bool,
 ) error {
 	triggerTypeStr := core.TriggerTypeManual.String()
 	startSpec := stores.subCmdBuilder.Start(dag, runtime.StartOptions{
@@ -406,7 +372,7 @@ func (a *API) startNamespaceScopedDAGRun(
 		return fmt.Errorf("error starting DAG: %w", err)
 	}
 
-	if !waitForStatusChange(ctx, stores.dagRunMgr, dag, dagRunID, 5*time.Second) {
+	if !a.waitForDAGStatusChange(ctx, stores.dagRunMgr, dag, dagRunID, 5*time.Second) {
 		return &Error{
 			HTTPStatus: http.StatusInternalServerError,
 			Code:       api.ErrorCodeInternalError,
@@ -415,27 +381,6 @@ func (a *API) startNamespaceScopedDAGRun(
 	}
 
 	return nil
-}
-
-// waitForStatusChange waits until the DAG status transitions from NotStarted
-// using the provided manager.
-func waitForStatusChange(ctx context.Context, mgr runtime.Manager, dag *core.DAG, dagRunID string, timeout time.Duration) bool {
-	deadline := time.Now().Add(timeout)
-	pollInterval := 100 * time.Millisecond
-
-	for time.Now().Before(deadline) {
-		select {
-		case <-ctx.Done():
-			return false
-		default:
-			status, _ := mgr.GetCurrentStatus(ctx, dag, dagRunID)
-			if status != nil && status.Status != core.NotStarted {
-				return true
-			}
-			time.Sleep(pollInterval)
-		}
-	}
-	return false
 }
 
 // listAccessibleNamespaces returns all namespaces the current user can access.
@@ -638,24 +583,9 @@ func (a *API) searchDAGsAcrossNamespaces(ctx context.Context, query string) ([]a
 
 		nsName := ns.Name
 		for _, item := range ret {
-			var matches []api.SearchDAGsMatchItem
-			for _, match := range item.Matches {
-				matches = append(matches, api.SearchDAGsMatchItem{
-					Line:       match.Line,
-					LineNumber: match.LineNumber,
-					StartLine:  match.StartLine,
-				})
-			}
-
-			allResults = append(allResults, api.SearchResultItem{
-				Name:      item.Name,
-				Dag:       toDAG(item.DAG),
-				Matches:   matches,
-				Namespace: &nsName,
-			})
+			allResults = append(allResults, toSearchResultItem(item, &nsName))
 		}
 	}
 
 	return allResults, allErrors, nil
 }
-

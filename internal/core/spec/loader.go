@@ -28,11 +28,11 @@ var (
 
 // LoadOptions contains options for loading a DAG.
 type LoadOptions struct {
-	name              string   // Name of the DAG.
-	baseConfig        string   // Path to the base core.DAG configuration file.
+	name              string    // Name of the DAG.
+	baseConfig        string    // Path to the base core.DAG configuration file.
 	baseDAG           *core.DAG // Pre-built base DAG configuration (takes precedence over baseConfig path).
-	params            string   // Parameters to override default parameters in the DAG.
-	paramsList        []string // List of parameters to override default parameters in the DAG.
+	params            string    // Parameters to override default parameters in the DAG.
+	paramsList        []string  // List of parameters to override default parameters in the DAG.
 	flags             BuildFlag
 	dagsDir           string            // Directory containing the core.DAG files.
 	defaultWorkingDir string            // Default working directory for DAGs without explicit workingDir.

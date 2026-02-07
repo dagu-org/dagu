@@ -67,18 +67,16 @@ function getActiveIndicatorStyle(customColor: boolean): string {
     : 'bg-sidebar-primary';
 }
 
-function getActiveLinkStyle(customColor: boolean): string {
-  return customColor
-    ? 'bg-sidebar-active'
-    : 'bg-sidebar-active';
+function getActiveLinkStyle(_customColor: boolean): string {
+  return 'bg-sidebar-active';
 }
 
 function getActiveIconStyle(customColor: boolean): string {
   return customColor ? 'text-foreground' : 'text-sidebar-primary';
 }
 
-function getIconWrapperStyle(customColor: boolean): string {
-  return customColor ? 'text-sidebar-foreground' : 'text-sidebar-foreground';
+function getIconWrapperStyle(_customColor: boolean): string {
+  return 'text-sidebar-foreground';
 }
 
 type RemoteNodeSelectContentProps = {

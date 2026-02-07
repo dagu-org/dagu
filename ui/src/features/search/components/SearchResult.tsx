@@ -18,7 +18,7 @@ function SearchResult({ results }: Props) {
           ret.push(
             <li key={`${result.name}-${m.lineNumber}`} className="px-4">
               <div className="flex flex-col space-y-2 w-full">
-                {j == 0 ? (
+                {j === 0 ? (
                   <div className="flex items-center gap-2">
                     <Link to={`/dags/${encodeURI(result.name)}/spec`}>
                       <h3 className="text-lg font-semibold text-foreground">

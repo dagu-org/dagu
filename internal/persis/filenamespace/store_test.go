@@ -228,14 +228,14 @@ func TestStore_NameValidation(t *testing.T) {
 	}
 
 	invalidNames := []string{
-		"",                                        // empty
-		"-team",                                   // starts with hyphen
-		"team-",                                   // ends with hyphen
-		"Team-Alpha",                              // uppercase
-		"team_alpha",                              // underscore
-		"team.alpha",                              // dot
-		"team alpha",                              // space
-		strings.Repeat("a", 64),                   // too long
+		"",                      // empty
+		"-team",                 // starts with hyphen
+		"team-",                 // ends with hyphen
+		"Team-Alpha",            // uppercase
+		"team_alpha",            // underscore
+		"team.alpha",            // dot
+		"team alpha",            // space
+		strings.Repeat("a", 64), // too long
 	}
 
 	for _, name := range invalidNames {

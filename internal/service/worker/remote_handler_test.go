@@ -680,7 +680,7 @@ steps:
 
 		require.NoError(t, err)
 		require.NotNil(t, dag)
-		assert.Equal(t, "inline-dag", dag.Name) // Name comes from task.Target when Definition is provided
+		assert.Equal(t, "inline-dag", dag.Name)      // Name comes from task.Target when Definition is provided
 		assert.Equal(t, "team-alpha", dag.Namespace) // Namespace propagated from task
 		require.NotNil(t, cleanup, "cleanup should be set for inline definitions")
 

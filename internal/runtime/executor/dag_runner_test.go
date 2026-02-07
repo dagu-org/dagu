@@ -206,7 +206,6 @@ func TestNewSubDAGExecutor_InheritsNamespace_LocalDAG(t *testing.T) {
 	// Verify namespace is inherited from parent context
 	assert.Equal(t, "team-alpha", executor.DAG.Namespace)
 
-	// Cleanup temp file
 	_ = executor.Cleanup(ctx)
 }
 
