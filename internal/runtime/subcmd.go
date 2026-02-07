@@ -115,9 +115,7 @@ func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	if opts.TriggerType != "" {
 		args = append(args, fmt.Sprintf("--trigger-type=%s", opts.TriggerType))
 	}
-	if dag.Namespace != "" {
-		args = append(args, fmt.Sprintf("--namespace=%s", dag.Namespace))
-	}
+	args = append(args, fmt.Sprintf("--namespace=%s", dag.Namespace))
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
 	}
@@ -159,9 +157,7 @@ func (b *SubCmdBuilder) Enqueue(dag *core.DAG, opts EnqueueOptions) CmdSpec {
 	if opts.TriggerType != "" {
 		args = append(args, fmt.Sprintf("--trigger-type=%s", opts.TriggerType))
 	}
-	if dag.Namespace != "" {
-		args = append(args, fmt.Sprintf("--namespace=%s", dag.Namespace))
-	}
+	args = append(args, fmt.Sprintf("--namespace=%s", dag.Namespace))
 	args = append(args, dag.Location)
 
 	return CmdSpec{
@@ -198,9 +194,7 @@ func (b *SubCmdBuilder) Restart(dag *core.DAG, opts RestartOptions) CmdSpec {
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
-	if dag.Namespace != "" {
-		args = append(args, fmt.Sprintf("--namespace=%s", dag.Namespace))
-	}
+	args = append(args, fmt.Sprintf("--namespace=%s", dag.Namespace))
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
 	}
@@ -220,9 +214,7 @@ func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string) C
 	if stepName != "" {
 		args = append(args, fmt.Sprintf("--step=%s", stepName))
 	}
-	if dag.Namespace != "" {
-		args = append(args, fmt.Sprintf("--namespace=%s", dag.Namespace))
-	}
+	args = append(args, fmt.Sprintf("--namespace=%s", dag.Namespace))
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
 	}
@@ -259,9 +251,7 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 		args = append(args, fmt.Sprintf("--worker-id=%s", task.WorkerId))
 	}
 
-	if task.Namespace != "" {
-		args = append(args, fmt.Sprintf("--namespace=%s", task.Namespace))
-	}
+	args = append(args, fmt.Sprintf("--namespace=%s", task.Namespace))
 
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
@@ -292,9 +282,7 @@ func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
 		args = append(args, fmt.Sprintf("--worker-id=%s", task.WorkerId))
 	}
 
-	if task.Namespace != "" {
-		args = append(args, fmt.Sprintf("--namespace=%s", task.Namespace))
-	}
+	args = append(args, fmt.Sprintf("--namespace=%s", task.Namespace))
 
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)

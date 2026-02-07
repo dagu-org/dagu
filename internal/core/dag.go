@@ -5,6 +5,7 @@ import (
 	"crypto/md5" //nolint:gosec
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,6 +20,17 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/robfig/cron/v3"
 )
+
+// DefaultNamespace is the canonical name of the default namespace.
+const DefaultNamespace = "default"
+
+// ValidateNamespace returns an error if namespace is empty.
+func ValidateNamespace(ns string) error {
+	if ns == "" {
+		return fmt.Errorf("namespace must not be empty")
+	}
+	return nil
+}
 
 // Execution type constants
 const (
@@ -690,6 +702,10 @@ func (h HandlerType) String() string {
 // The namespace parameter is included in the hash input so that two DAGs with
 // the same name in different namespaces produce different socket paths.
 func SockAddr(namespace, name, dagRunID string) string {
+	if namespace == "" {
+		slog.Warn("SockAddr called with empty namespace", "name", name, "dagRunID", dagRunID)
+	}
+
 	const (
 		hashLength          = 6
 		maxSocketNameLength = 50

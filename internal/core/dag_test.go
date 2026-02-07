@@ -16,6 +16,45 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestValidateNamespace(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		namespace string
+		wantErr   bool
+	}{
+		{
+			name:      "empty namespace returns error",
+			namespace: "",
+			wantErr:   true,
+		},
+		{
+			name:      "default namespace is valid",
+			namespace: "default",
+			wantErr:   false,
+		},
+		{
+			name:      "custom namespace is valid",
+			namespace: "myns",
+			wantErr:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := core.ValidateNamespace(tt.namespace)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "namespace must not be empty")
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestSockAddr(t *testing.T) {
 	t.Parallel()
 

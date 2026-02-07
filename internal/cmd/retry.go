@@ -129,6 +129,10 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
+	if err := core.ValidateNamespace(dag.Namespace); err != nil {
+		return fmt.Errorf("cannot retry DAG: %w", err)
+	}
+
 	agentInstance := agent.New(
 		status.DAGRunID,
 		dag,

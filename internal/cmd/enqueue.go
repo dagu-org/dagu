@@ -32,7 +32,7 @@ Examples:
 var enqueueFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, queueFlag, defaultWorkingDirFlag, triggerTypeFlag, namespaceFlag}
 
 func runEnqueue(ctx *Context, args []string) error {
-	_, dagName, err := ctx.ResolveNamespaceFromArg(args[0])
+	namespaceName, dagName, err := ctx.ResolveNamespaceFromArg(args[0])
 	if err != nil {
 		return fmt.Errorf("failed to resolve namespace: %w", err)
 	}
@@ -61,6 +61,8 @@ func runEnqueue(ctx *Context, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	dag.Namespace = namespaceName
 
 	if queueOverride != "" {
 		dag.Queue = queueOverride

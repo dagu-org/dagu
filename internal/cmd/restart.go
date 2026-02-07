@@ -150,6 +150,10 @@ func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRu
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
+	if err := core.ValidateNamespace(dag.Namespace); err != nil {
+		return fmt.Errorf("cannot restart DAG: %w", err)
+	}
+
 	agentInstance := agent.New(
 		dagRunID,
 		dag,

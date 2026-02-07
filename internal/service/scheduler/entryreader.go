@@ -360,7 +360,8 @@ func (er *entryReaderImpl) handleFileEvent(ctx context.Context, event fsnotify.E
 	fileName := filepath.Base(event.Name)
 	registryKey := shortID + "/" + fileName
 
-	if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
+	switch event.Op {
+	case fsnotify.Create, fsnotify.Write:
 		filePath := filepath.Join(eventDir, fileName)
 		dag, err := spec.Load(
 			ctx,
@@ -383,7 +384,7 @@ func (er *entryReaderImpl) handleFileEvent(ctx context.Context, event fsnotify.E
 				slog.String("namespace", nsName),
 			)
 		}
-	} else if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
+	case fsnotify.Rename, fsnotify.Remove:
 		delete(er.registry, registryKey)
 		logger.Info(ctx, "DAG removed",
 			tag.Name(fileName),

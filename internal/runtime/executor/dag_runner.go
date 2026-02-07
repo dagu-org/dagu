@@ -144,9 +144,7 @@ func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, 
 		fmt.Sprintf("--run-id=%s", runParams.RunID),
 		"--trigger-type=subdag",
 	}
-	if rCtx.Namespace != "" {
-		args = append(args, fmt.Sprintf("--namespace=%s", rCtx.Namespace))
-	}
+	args = append(args, fmt.Sprintf("--namespace=%s", rCtx.Namespace))
 	if workDir != "" {
 		args = append(args, fmt.Sprintf("--default-working-dir=%s", workDir))
 	}

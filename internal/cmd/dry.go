@@ -76,6 +76,10 @@ func runDry(ctx *Context, args []string) error {
 		return err
 	}
 
+	if err := core.ValidateNamespace(dag.Namespace); err != nil {
+		return fmt.Errorf("cannot dry-run DAG: %w", err)
+	}
+
 	ag := agent.New(
 		dagRunID,
 		dag,

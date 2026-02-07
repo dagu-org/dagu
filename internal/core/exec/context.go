@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
@@ -201,6 +202,9 @@ func WithLogWriterFactory(factory LogWriterFactory) ContextOption {
 // WithNamespace sets the active namespace for this DAG run.
 func WithNamespace(namespace string) ContextOption {
 	return func(o *contextOptions) {
+		if namespace == "" {
+			slog.Warn("exec.WithNamespace called with empty namespace")
+		}
 		o.namespace = namespace
 	}
 }

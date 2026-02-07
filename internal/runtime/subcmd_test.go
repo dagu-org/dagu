@@ -507,9 +507,8 @@ func TestTaskStart(t *testing.T) {
 		}
 		spec := builder.TaskStart(task)
 
-		for _, arg := range spec.Args {
-			assert.NotContains(t, arg, "--namespace=")
-		}
+		// --namespace= is always passed, even when empty
+		assert.Contains(t, spec.Args, "--namespace=")
 	})
 
 	t.Run("TaskStartWithoutConfig", func(t *testing.T) {
@@ -599,4 +598,95 @@ func TestTaskRetry(t *testing.T) {
 
 		assert.NotContains(t, spec.Args, "--config")
 	})
+}
+
+func TestNamespaceAlwaysPassedInArgs(t *testing.T) {
+	t.Parallel()
+
+	cfg := &config.Config{
+		Paths: config.PathsConfig{
+			Executable:     "/usr/bin/dagu",
+			ConfigFileUsed: "/etc/dagu/config.yaml",
+		},
+	}
+	builder := runtime.NewSubCmdBuilder(cfg)
+
+	tests := []struct {
+		name          string
+		namespace     string
+		expectedArg   string
+		buildSpec     func(ns string) runtime.CmdSpec
+	}{
+		{
+			name:        "Start empty namespace",
+			namespace:   "",
+			expectedArg: "--namespace=",
+			buildSpec: func(ns string) runtime.CmdSpec {
+				dag := &core.DAG{Name: "test-dag", Location: "/path/to/dag.yaml", Namespace: ns}
+				return builder.Start(dag, runtime.StartOptions{})
+			},
+		},
+		{
+			name:        "Start with namespace",
+			namespace:   "production",
+			expectedArg: "--namespace=production",
+			buildSpec: func(ns string) runtime.CmdSpec {
+				dag := &core.DAG{Name: "test-dag", Location: "/path/to/dag.yaml", Namespace: ns}
+				return builder.Start(dag, runtime.StartOptions{})
+			},
+		},
+		{
+			name:        "Enqueue empty namespace",
+			namespace:   "",
+			expectedArg: "--namespace=",
+			buildSpec: func(ns string) runtime.CmdSpec {
+				dag := &core.DAG{Name: "test-dag", Location: "/path/to/dag.yaml", Namespace: ns}
+				return builder.Enqueue(dag, runtime.EnqueueOptions{})
+			},
+		},
+		{
+			name:        "Restart empty namespace",
+			namespace:   "",
+			expectedArg: "--namespace=",
+			buildSpec: func(ns string) runtime.CmdSpec {
+				dag := &core.DAG{Name: "test-dag", Location: "/path/to/dag.yaml", Namespace: ns}
+				return builder.Restart(dag, runtime.RestartOptions{})
+			},
+		},
+		{
+			name:        "Retry empty namespace",
+			namespace:   "",
+			expectedArg: "--namespace=",
+			buildSpec: func(ns string) runtime.CmdSpec {
+				dag := &core.DAG{Name: "test-dag", Location: "/path/to/dag.yaml", Namespace: ns}
+				return builder.Retry(dag, "run-id", "")
+			},
+		},
+		{
+			name:        "TaskStart empty namespace",
+			namespace:   "",
+			expectedArg: "--namespace=",
+			buildSpec: func(ns string) runtime.CmdSpec {
+				task := &coordinatorv1.Task{DagRunId: "task-run-id", Target: "/path/to/task.yaml", Namespace: ns}
+				return builder.TaskStart(task)
+			},
+		},
+		{
+			name:        "TaskRetry empty namespace",
+			namespace:   "",
+			expectedArg: "--namespace=",
+			buildSpec: func(ns string) runtime.CmdSpec {
+				task := &coordinatorv1.Task{DagRunId: "retry-run-id", Target: "/path/to/task.yaml", RootDagRunName: "root-dag", Namespace: ns}
+				return builder.TaskRetry(task)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			spec := tt.buildSpec(tt.namespace)
+			assert.Contains(t, spec.Args, tt.expectedArg)
+		})
+	}
 }

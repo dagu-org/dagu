@@ -83,6 +83,9 @@ func WithStep(step string) TaskOption {
 // WithNamespace sets the namespace for the task.
 func WithNamespace(namespace string) TaskOption {
 	return func(task *coordinatorv1.Task) {
+		if namespace == "" {
+			slog.Warn("executor.WithNamespace called with empty namespace")
+		}
 		task.Namespace = namespace
 	}
 }

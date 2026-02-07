@@ -403,6 +403,10 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 	// When running on a worker, the dag-run was already created by the coordinator.
 	queuedRun := workerID != "local"
 
+	if err := core.ValidateNamespace(d.Namespace); err != nil {
+		return fmt.Errorf("cannot start DAG: %w", err)
+	}
+
 	agentInstance := agent.New(
 		dagRunID,
 		d,

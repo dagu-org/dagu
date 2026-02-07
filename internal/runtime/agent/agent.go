@@ -258,8 +258,11 @@ func New(
 
 	// Set the namespace on the DAG if provided via options.
 	// This ensures socket addressing and context propagation use the correct namespace.
-	if opts.Namespace != "" && a.dag.Namespace == "" {
+	if a.dag.Namespace == "" {
 		a.dag.Namespace = opts.Namespace
+	}
+	if a.dag.Namespace == "" {
+		slog.Warn("Agent created with empty namespace", "dag", a.dag.Name)
 	}
 
 	// Initialize progress display if enabled
