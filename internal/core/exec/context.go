@@ -22,9 +22,10 @@ type Context struct {
 	BaseEnv            *config.BaseEnv
 	EnvScope           *eval.EnvScope // Unified environment scope - THE single source for all env vars
 	CoordinatorCli     Dispatcher
-	Shell              string           // Default shell for this DAG (from DAG.Shell)
-	LogEncodingCharset string           // Character encoding for log files (e.g., "utf-8", "shift_jis", "euc-jp")
-	LogWriterFactory   LogWriterFactory // For remote log streaming (nil = use local files)
+	Shell              string               // Default shell for this DAG (from DAG.Shell)
+	LogEncodingCharset string               // Character encoding for log files (e.g., "utf-8", "shift_jis", "euc-jp")
+	LogWriterFactory   LogWriterFactory     // For remote log streaming (nil = use local files)
+	DefaultExecMode    config.ExecutionMode // Server-level default execution mode (local or distributed)
 }
 
 // LogWriterFactory creates log writers for step stdout/stderr.
@@ -141,6 +142,7 @@ type contextOptions struct {
 	secretEnvs         []string
 	logEncodingCharset string
 	logWriterFactory   LogWriterFactory
+	defaultExecMode    config.ExecutionMode
 }
 
 // ContextOption configures optional parameters for NewContext.
@@ -196,6 +198,13 @@ func WithLogWriterFactory(factory LogWriterFactory) ContextOption {
 	}
 }
 
+// WithDefaultExecMode sets the server-level default execution mode.
+func WithDefaultExecMode(mode config.ExecutionMode) ContextOption {
+	return func(o *contextOptions) {
+		o.defaultExecMode = mode
+	}
+}
+
 // NewContext creates a new context with DAG execution metadata.
 // Required: ctx, dag, dagRunID, logFile
 // Optional: use ContextOption functions (WithDatabase, WithParams, etc.)
@@ -246,6 +255,7 @@ func NewContext(
 		Shell:              dag.Shell,
 		LogEncodingCharset: options.logEncodingCharset,
 		LogWriterFactory:   options.logWriterFactory,
+		DefaultExecMode:    options.defaultExecMode,
 	})
 }
 

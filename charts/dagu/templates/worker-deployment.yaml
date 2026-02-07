@@ -1,34 +1,46 @@
+{{- range $poolName, $pool := .Values.workerPools }}
+{{- if not (regexMatch "^[a-z][a-z0-9-]*$" $poolName) }}
+{{- fail (printf "invalid workerPool name %q: must match ^[a-z][a-z0-9-]*$" $poolName) }}
+{{- end }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "dagu.fullname" . }}-worker
+  name: {{ include "dagu.fullname" $ }}-worker-{{ $poolName }}
   labels:
-    {{- include "dagu.labels" . | nindent 4 }}
+    {{- include "dagu.labels" $ | nindent 4 }}
     app.kubernetes.io/component: worker
+    dagu.io/worker-pool: {{ $poolName }}
 spec:
-  replicas: {{ .Values.worker.replicas }}
+  replicas: {{ $pool.replicas }}
   selector:
     matchLabels:
-      {{- include "dagu.labels" . | nindent 6 }}
+      {{- include "dagu.selectorLabels" $ | nindent 6 }}
       app.kubernetes.io/component: worker
+      dagu.io/worker-pool: {{ $poolName }}
   template:
     metadata:
       labels:
-        {{- include "dagu.labels" . | nindent 8 }}
+        {{- include "dagu.labels" $ | nindent 8 }}
         app.kubernetes.io/component: worker
+        dagu.io/worker-pool: {{ $poolName }}
     spec:
       # Disable Kubernetes Service env var injection to avoid overriding
       # dagu config values (e.g., scheduler.port) with Service URLs
       enableServiceLinks: false
       containers:
         - name: worker
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
           command:
             - dagu
             - worker
             - --config
             - /etc/dagu/dagu.yaml
+            {{- if $pool.labels }}
+            - --worker.labels
+            - {{ include "dagu.workerLabels" $pool.labels | quote }}
+            {{- end }}
           env:
             - name: WORKER_ID
               valueFrom:
@@ -40,11 +52,24 @@ spec:
             - name: config
               mountPath: /etc/dagu
           resources:
-            {{- toYaml .Values.worker.resources | nindent 12 }}
+            {{- toYaml $pool.resources | nindent 12 }}
+      {{- with $pool.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $pool.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $pool.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: {{ include "dagu.fullname" . }}-data
+            claimName: {{ include "dagu.fullname" $ }}-data
         - name: config
           configMap:
-            name: {{ include "dagu.fullname" . }}-config
+            name: {{ include "dagu.fullname" $ }}-config
+{{- end }}

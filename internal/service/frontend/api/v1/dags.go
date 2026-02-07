@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"runtime"
+	osrt "runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,8 +22,10 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
-	runtime1 "github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/service/audit"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
 const defaultHistoryLimit = 30
@@ -883,13 +885,53 @@ func (a *API) waitForDAGStatusChange(ctx context.Context, dag *core.DAG, dagRunI
 	return false
 }
 
+// dispatchStartToCoordinator dispatches a DAG start operation to the coordinator
+// and waits for the DAG status to change from NotStarted within the given timeout.
+func (a *API) dispatchStartToCoordinator(ctx context.Context, dag *core.DAG, dagRunID string, timeout time.Duration) error {
+	var taskOpts []executor.TaskOption
+	if len(dag.WorkerSelector) > 0 {
+		taskOpts = append(taskOpts, executor.WithWorkerSelector(dag.WorkerSelector))
+	}
+
+	task := executor.CreateTask(
+		dag.Name,
+		string(dag.YamlData),
+		coordinatorv1.Operation_OPERATION_START,
+		dagRunID,
+		taskOpts...,
+	)
+
+	if err := a.coordinatorCli.Dispatch(ctx, task); err != nil {
+		return fmt.Errorf("error dispatching to coordinator: %w", err)
+	}
+
+	if !a.waitForDAGStatusChange(ctx, dag, dagRunID, timeout) {
+		return &Error{
+			HTTPStatus: http.StatusInternalServerError,
+			Code:       api.ErrorCodeInternalError,
+			Message:    "DAG did not start after coordinator dispatch",
+		}
+	}
+
+	return nil
+}
+
 func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts startDAGRunOptions) error {
+	// Check if this DAG should be dispatched to the coordinator for distributed execution
+	if core.ShouldDispatchToCoordinator(dag, a.coordinatorCli != nil, a.defaultExecMode) {
+		timeout := 5 * time.Second
+		if osrt.GOOS == "windows" {
+			timeout = 10 * time.Second
+		}
+		return a.dispatchStartToCoordinator(ctx, dag, opts.dagRunID, timeout)
+	}
+
 	// Only pass trigger type if it's a known value (not TriggerTypeUnknown)
 	triggerTypeStr := ""
 	if opts.triggerType != core.TriggerTypeUnknown {
 		triggerTypeStr = opts.triggerType.String()
 	}
-	spec := a.subCmdBuilder.Start(dag, runtime1.StartOptions{
+	spec := a.subCmdBuilder.Start(dag, runtime.StartOptions{
 		Params:       opts.params,
 		DAGRunID:     opts.dagRunID,
 		Quiet:        true,
@@ -899,12 +941,12 @@ func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts st
 		TriggerType:  triggerTypeStr,
 	})
 
-	if err := runtime1.Start(ctx, spec); err != nil {
+	if err := runtime.Start(ctx, spec); err != nil {
 		return fmt.Errorf("error starting DAG: %w", err)
 	}
 
 	timeout := 5 * time.Second
-	if runtime.GOOS == "windows" {
+	if osrt.GOOS == "windows" {
 		timeout = 10 * time.Second
 	}
 
@@ -1002,7 +1044,7 @@ func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID
 	if triggerType != core.TriggerTypeUnknown {
 		triggerTypeStr = triggerType.String()
 	}
-	opts := runtime1.EnqueueOptions{
+	opts := runtime.EnqueueOptions{
 		Params:       params,
 		DAGRunID:     dagRunID,
 		NameOverride: nameOverride,
@@ -1013,7 +1055,7 @@ func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID
 	}
 
 	spec := a.subCmdBuilder.Enqueue(dag, opts)
-	if err := runtime1.Run(ctx, spec); err != nil {
+	if err := runtime.Run(ctx, spec); err != nil {
 		return fmt.Errorf("error enqueuing DAG: %w", err)
 	}
 

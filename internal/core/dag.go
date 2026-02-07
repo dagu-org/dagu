@@ -158,6 +158,9 @@ type DAG struct {
 	// WorkerSelector defines labels required for worker selection in distributed execution.
 	// If specified, the DAG will only run on workers with matching tag.
 	WorkerSelector map[string]string `json:"workerSelector,omitempty"`
+	// ForceLocal forces the DAG to run locally even when the server default is distributed.
+	// Set by workerSelector: local in the DAG spec.
+	ForceLocal bool `json:"forceLocal,omitempty"`
 	// MaxOutputSize is the maximum size of step output to capture in bytes.
 	// Default is 1MB. Output exceeding this will return an error.
 	MaxOutputSize int `json:"maxOutputSize,omitempty"`

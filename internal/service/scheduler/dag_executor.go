@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
@@ -47,18 +48,21 @@ import (
 // - HandleJob(): Entry point for new scheduled jobs (handles persistence)
 // - ExecuteDAG(): Executes/dispatches already-persisted jobs (no persistence)
 type DAGExecutor struct {
-	coordinatorCli exec.Dispatcher
-	subCmdBuilder  *runtime.SubCmdBuilder
+	coordinatorCli  exec.Dispatcher
+	subCmdBuilder   *runtime.SubCmdBuilder
+	defaultExecMode config.ExecutionMode
 }
 
 // NewDAGExecutor creates a new DAGExecutor instance.
 func NewDAGExecutor(
 	coordinatorCli exec.Dispatcher,
 	subCmdBuilder *runtime.SubCmdBuilder,
+	defaultExecMode config.ExecutionMode,
 ) *DAGExecutor {
 	return &DAGExecutor{
-		coordinatorCli: coordinatorCli,
-		subCmdBuilder:  subCmdBuilder,
+		coordinatorCli:  coordinatorCli,
+		subCmdBuilder:   subCmdBuilder,
+		defaultExecMode: defaultExecMode,
 	}
 }
 
@@ -159,14 +163,10 @@ func (e *DAGExecutor) ExecuteDAG(
 }
 
 // shouldUseDistributedExecution checks if distributed execution should be used.
-// Returns true only if:
-// 1. A coordinator client is configured (coordinator is available)
-// 2. The DAG has workerSelector labels (DAG explicitly requests distributed execution)
-//
-// This ensures backward compatibility - DAGs without workerSelector continue
-// to run locally even when a coordinator is configured.
+// Delegates to core.ShouldDispatchToCoordinator for consistent dispatch logic
+// across all execution paths (API, CLI, scheduler, sub-DAG).
 func (e *DAGExecutor) shouldUseDistributedExecution(dag *core.DAG) bool {
-	return e.coordinatorCli != nil && len(dag.WorkerSelector) > 0
+	return core.ShouldDispatchToCoordinator(dag, e.coordinatorCli != nil, e.defaultExecMode)
 }
 
 // dispatchToCoordinator dispatches a task to the coordinator for distributed execution.

@@ -1295,16 +1295,8 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 
 	stepName := valueOf(request.Body.StepName)
 
-	// Check for workerSelector - dispatch to coordinator for distributed execution
-	if len(dag.WorkerSelector) > 0 {
-		if a.coordinatorCli == nil {
-			return nil, &Error{
-				HTTPStatus: http.StatusServiceUnavailable,
-				Code:       api.ErrorCodeInternalError,
-				Message:    "coordinator not configured for distributed DAG retry",
-			}
-		}
-
+	// Check if this DAG should be dispatched to the coordinator for distributed execution
+	if core.ShouldDispatchToCoordinator(dag, a.coordinatorCli != nil, a.defaultExecMode) {
 		// Get previous status for retry context
 		prevStatus, err := attempt.ReadStatus(ctx)
 		if err != nil {

@@ -29,16 +29,23 @@ coordinator:
       memory: "256Mi"
       cpu: "200m"
 
-# Worker configuration
-worker:
-  replicas: 2
-  resources:
-    requests:
-      memory: "128Mi"
-      cpu: "100m"
-    limits:
-      memory: "256Mi"
-      cpu: "200m"
+# Worker pool configuration
+# Each pool creates a separate Kubernetes Deployment.
+# Pool names become part of the Deployment name: <release>-dagu-worker-<poolName>
+workerPools:
+  general:
+    replicas: 2
+    labels: {}
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
 
 # UI configuration
 ui:

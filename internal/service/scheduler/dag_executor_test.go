@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
@@ -23,7 +24,7 @@ steps:
 `)
 	coordinatorCli := coordinator.New(th.ServiceRegistry, coordinator.DefaultConfig())
 
-	dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, th.SubCmdBuilder)
+	dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, th.SubCmdBuilder, config.ExecutionModeLocal)
 	t.Cleanup(func() {
 		dagExecutor.Close(th.Context)
 	})
@@ -67,7 +68,7 @@ steps:
 	})
 
 	t.Run("HandleJob_Local_ExecutesDirectly", func(t *testing.T) {
-		localExecutor := scheduler.NewDAGExecutor(nil, th.SubCmdBuilder)
+		localExecutor := scheduler.NewDAGExecutor(nil, th.SubCmdBuilder, config.ExecutionModeLocal)
 
 		dag, err := spec.Load(context.Background(), testDAG.Location)
 		require.NoError(t, err)

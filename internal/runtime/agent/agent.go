@@ -138,6 +138,9 @@ type Agent struct {
 	// triggerType indicates how this DAG run was initiated.
 	triggerType core.TriggerType
 
+	// defaultExecMode is the server-level default execution mode.
+	defaultExecMode config.ExecutionMode
+
 	// tracer is the OpenTelemetry tracer for the agent.
 	tracer *telemetry.Tracer
 
@@ -218,6 +221,8 @@ type Options struct {
 	PeerConfig config.Peer
 	// TriggerType indicates how this DAG run was initiated.
 	TriggerType core.TriggerType
+	// DefaultExecMode is the server-level default execution mode.
+	DefaultExecMode config.ExecutionMode
 }
 
 // New creates a new Agent.
@@ -251,6 +256,7 @@ func New(
 		queuedRun:        opts.QueuedRun,
 		attemptID:        opts.AttemptID,
 		triggerType:      opts.TriggerType,
+		defaultExecMode:  opts.DefaultExecMode,
 	}
 
 	// Initialize progress display if enabled
@@ -386,6 +392,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		runtime.WithParams(a.dag.Params),
 		runtime.WithCoordinator(coordinatorCli),
 		runtime.WithSecrets(secretEnvs),
+		runtime.WithDefaultExecMode(a.defaultExecMode),
 	}
 
 	if a.logWriterFactory != nil {

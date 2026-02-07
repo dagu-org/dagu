@@ -54,6 +54,7 @@ type API struct {
 	auditService       *audit.Service
 	syncService        SyncService
 	tunnelService      *tunnel.Service
+	defaultExecMode    config.ExecutionMode
 	dagWritesDisabled  bool // True when git sync read-only mode is active
 	agentConfigStore   agent.ConfigStore
 }
@@ -166,6 +167,7 @@ func New(
 		serviceRegistry:    sr,
 		metricsRegistry:    mr,
 		resourceService:    rs,
+		defaultExecMode:    cfg.DefaultExecMode,
 	}
 
 	for _, opt := range opts {

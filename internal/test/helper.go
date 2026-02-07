@@ -614,6 +614,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 	helper.opts.ServiceRegistry = d.ServiceRegistry
 	helper.opts.RootDAGRun = root
 	helper.opts.PeerConfig = d.Config.Core.Peer
+	helper.opts.DefaultExecMode = d.Config.DefaultExecMode
 
 	helper.Agent = agent.New(
 		dagRunID,

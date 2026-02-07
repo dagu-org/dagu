@@ -593,9 +593,12 @@ func TestBuildWorkerSelector(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		input    map[string]string
-		expected map[string]string
+		name        string
+		input       any
+		expected    map[string]string
+		forceLocal  bool
+		expectErr   bool
+		errContains string
 	}{
 		{
 			name:     "Nil",
@@ -603,7 +606,7 @@ func TestBuildWorkerSelector(t *testing.T) {
 			expected: nil,
 		},
 		{
-			name:     "Empty",
+			name:     "EmptyMap",
 			input:    map[string]string{},
 			expected: nil,
 		},
@@ -617,14 +620,61 @@ func TestBuildWorkerSelector(t *testing.T) {
 			input:    map[string]string{" key ": " value "},
 			expected: map[string]string{"key": "value"},
 		},
+		{
+			name:       "StringLocal",
+			input:      "local",
+			forceLocal: true,
+		},
+		{
+			name:       "StringLocalUpperCase",
+			input:      "LOCAL",
+			forceLocal: true,
+		},
+		{
+			name:       "StringLocalMixedCase",
+			input:      "Local",
+			forceLocal: true,
+		},
+		{
+			name:       "StringLocalWithSpaces",
+			input:      "  local  ",
+			forceLocal: true,
+		},
+		{
+			name:        "UnsupportedString",
+			input:       "remote",
+			expectErr:   true,
+			errContains: "the only allowed string value is \"local\"",
+		},
+		{
+			name:     "MapStringAny",
+			input:    map[string]any{"env": "prod"},
+			expected: map[string]string{"env": "prod"},
+		},
+		{
+			name:     "MapStringAnyBoolValue",
+			input:    map[string]any{"gpu": true},
+			expected: map[string]string{"gpu": "true"},
+		},
+		{
+			name:     "MapStringAnyIntValue",
+			input:    map[string]any{"memory": 64},
+			expected: map[string]string{"memory": "64"},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			d := &dag{WorkerSelector: tt.input}
-			result, err := buildWorkerSelector(testBuildContext(), d)
+			result, forceLocal, err := buildWorkerSelector(testBuildContext(), d)
+			if tt.expectErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				return
+			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
+			assert.Equal(t, tt.forceLocal, forceLocal)
 		})
 	}
 }

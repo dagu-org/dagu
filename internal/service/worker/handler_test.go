@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"runtime"
+	osrt "runtime"
 	"strings"
 	"testing"
 	"time"
@@ -12,7 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
-	runtime1 "github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/test"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
@@ -36,8 +36,8 @@ func TestTaskHandler(t *testing.T) {
 
 		// First, create an initial dag-run (simulating what coordinator does during enqueue)
 		// This creates the status record that retry will use
-		spec := th.SubCmdBuilder.Start(dag.DAG, runtime1.StartOptions{})
-		err := runtime1.Start(th.Context, spec)
+		spec := th.SubCmdBuilder.Start(dag.DAG, runtime.StartOptions{})
+		err := runtime.Start(th.Context, spec)
 		require.NoError(t, err)
 
 		// Wait for the initial run to complete
@@ -84,8 +84,8 @@ func TestTaskHandler(t *testing.T) {
 		cli := th.DAGRunMgr
 
 		// First, start a DAG run
-		spec := th.SubCmdBuilder.Start(dag.DAG, runtime1.StartOptions{})
-		err := runtime1.Start(th.Context, spec)
+		spec := th.SubCmdBuilder.Start(dag.DAG, runtime.StartOptions{})
+		err := runtime.Start(th.Context, spec)
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
@@ -198,7 +198,7 @@ func TestCreateTempDAGFile(t *testing.T) {
 }
 
 func TestTaskHandlerStartWithDefinition(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if osrt.GOOS == "windows" {
 		t.Skip("POSIX shell required for fake executable script")
 	}
 

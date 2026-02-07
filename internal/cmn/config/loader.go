@@ -252,6 +252,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 
 	l.loadCacheConfig(&cfg, def)
+	l.loadExecutionModeConfig(&cfg, def)
 
 	if err := l.LoadLegacyFields(&cfg, def); err != nil {
 		return nil, err
@@ -910,6 +911,14 @@ func setDefaultIfNotPositive(target *int, defaultValue int) {
 	}
 }
 
+func (l *ConfigLoader) loadExecutionModeConfig(cfg *Config, _ Definition) {
+	mode := ExecutionMode(l.v.GetString("defaultExecutionMode"))
+	if mode == "" {
+		mode = ExecutionModeLocal
+	}
+	cfg.DefaultExecMode = mode
+}
+
 func (l *ConfigLoader) loadCacheConfig(cfg *Config, def Definition) {
 	cfg.Cache = CacheModeNormal
 	if def.Cache == nil {
@@ -1134,6 +1143,9 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("ui.dags.sortField", "name")
 	l.v.SetDefault("ui.dags.sortOrder", "asc")
 
+	// Execution
+	l.v.SetDefault("defaultExecutionMode", string(ExecutionModeLocal))
+
 	// Queues
 	l.v.SetDefault("queues.enabled", true)
 
@@ -1249,6 +1261,9 @@ var envBindings = []envBinding{
 	{key: "paths.queueDir", env: "QUEUE_DIR", isPath: true},
 	{key: "paths.serviceRegistryDir", env: "SERVICE_REGISTRY_DIR", isPath: true},
 	{key: "paths.usersDir", env: "USERS_DIR", isPath: true},
+
+	// Execution
+	{key: "defaultExecutionMode", env: "DEFAULT_EXECUTION_MODE"},
 
 	// Queues
 	{key: "queues.enabled", env: "QUEUE_ENABLED"},

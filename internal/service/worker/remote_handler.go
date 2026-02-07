@@ -290,6 +290,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 		ServiceRegistry:  h.serviceRegistry,
 		RootDAGRun:       root,
 		PeerConfig:       h.peerConfig,
+		DefaultExecMode:  h.config.DefaultExecMode,
 	}
 
 	// Add retry configuration if present

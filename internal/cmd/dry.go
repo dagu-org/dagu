@@ -81,6 +81,7 @@ func runDry(ctx *Context, args []string) error {
 			ServiceRegistry: ctx.ServiceRegistry,
 			RootDAGRun:      exec.NewDAGRunRef(dag.Name, dagRunID),
 			PeerConfig:      ctx.Config.Core.Peer,
+			DefaultExecMode: ctx.Config.DefaultExecMode,
 		},
 	)
 

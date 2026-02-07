@@ -97,7 +97,8 @@ type dag struct {
 	// OTel is the OpenTelemetry configuration.
 	OTel any
 	// WorkerSelector specifies required worker labels for execution.
-	WorkerSelector map[string]string
+	// Can be a map of label key-value pairs or the string "local" to force local execution.
+	WorkerSelector any
 	// Container is the container definition for the DAG.
 	// Can be a string (existing container name to exec into) or an object (container configuration).
 	Container any
@@ -390,7 +391,7 @@ var metadataTransformers = []transform{
 	{"params", newTransformer("Params", buildParams)},
 	{"defaultParams", newTransformer("DefaultParams", buildDefaultParams)},
 	{"paramsJSON", newTransformer("ParamsJSON", buildParamsJSON)},
-	{"workerSelector", newTransformer("WorkerSelector", buildWorkerSelector)},
+	{"workerSelector", &workerSelectorTransformer{}},
 	{"timeout", newTransformer("Timeout", buildTimeout)},
 	{"delay", newTransformer("Delay", buildDelay)},
 	{"restartWait", newTransformer("RestartWait", buildRestartWait)},
@@ -886,16 +887,82 @@ func parseParamsInternal(ctx BuildContext, d *dag) (*paramsResult, error) {
 	}, nil
 }
 
-func buildWorkerSelector(_ BuildContext, d *dag) (map[string]string, error) {
-	if len(d.WorkerSelector) == 0 {
-		return nil, nil
+// workerSelectorTransformer is a custom transformer that sets both WorkerSelector and ForceLocal fields.
+type workerSelectorTransformer struct{}
+
+func (t *workerSelectorTransformer) Transform(ctx BuildContext, in *dag, out reflect.Value) error {
+	ws, forceLocal, err := buildWorkerSelector(ctx, in)
+	if err != nil {
+		return err
 	}
 
-	ret := make(map[string]string)
-	for key, val := range d.WorkerSelector {
-		ret[strings.TrimSpace(key)] = strings.TrimSpace(val)
+	if ws != nil {
+		wsField := out.FieldByName("WorkerSelector")
+		if wsField.IsValid() && wsField.CanSet() {
+			wsField.Set(reflect.ValueOf(ws))
+		}
 	}
-	return ret, nil
+
+	if forceLocal {
+		flField := out.FieldByName("ForceLocal")
+		if flField.IsValid() && flField.CanSet() {
+			flField.SetBool(true)
+		}
+	}
+
+	return nil
+}
+
+func buildWorkerSelector(_ BuildContext, d *dag) (map[string]string, bool, error) {
+	if d.WorkerSelector == nil {
+		return nil, false, nil
+	}
+
+	switch v := d.WorkerSelector.(type) {
+	case string:
+		trimmed := strings.TrimSpace(v)
+		if strings.EqualFold(trimmed, "local") {
+			return nil, true, nil
+		}
+		return nil, false, fmt.Errorf("unsupported workerSelector string value %q; the only allowed string value is \"local\"", trimmed)
+
+	case map[string]string:
+		if len(v) == 0 {
+			return nil, false, nil
+		}
+		ret := make(map[string]string)
+		for key, val := range v {
+			ret[strings.TrimSpace(key)] = strings.TrimSpace(val)
+		}
+		return ret, false, nil
+
+	case map[string]any:
+		if len(v) == 0 {
+			return nil, false, nil
+		}
+		ret := make(map[string]string)
+		for key, val := range v {
+			ret[strings.TrimSpace(key)] = strings.TrimSpace(fmt.Sprint(val))
+		}
+		return ret, false, nil
+
+	case map[any]any:
+		if len(v) == 0 {
+			return nil, false, nil
+		}
+		ret := make(map[string]string)
+		for key, val := range v {
+			strKey, ok := key.(string)
+			if !ok {
+				return nil, false, fmt.Errorf("workerSelector keys must be strings, got %T", key)
+			}
+			ret[strings.TrimSpace(strKey)] = strings.TrimSpace(fmt.Sprint(val))
+		}
+		return ret, false, nil
+
+	default:
+		return nil, false, fmt.Errorf("workerSelector must be a map or \"local\", got %T", d.WorkerSelector)
+	}
 }
 
 // shellResult holds both shell and args for internal use
