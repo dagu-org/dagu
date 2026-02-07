@@ -67,6 +67,7 @@ type Server struct {
 	builtinOIDCCfg   *auth.BuiltinOIDCConfig
 	authService      *authservice.Service
 	auditService     *audit.Service
+	auditStore       *fileaudit.Store
 	syncService      gitsync.Service
 	listener         net.Listener
 	sseHub           *sse.Hub
@@ -113,7 +114,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		oidcButtonLabel string
 	)
 
-	auditSvc, err := initAuditService(cfg)
+	auditSvc, auditStore, err := initAuditService(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize audit service: %w", err)
 	}
@@ -203,6 +204,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		builtinOIDCCfg:   builtinOIDCCfg,
 		authService:      authSvc,
 		auditService:     auditSvc,
+		auditStore:       auditStore,
 		syncService:      syncSvc,
 		metricsRegistry:  mr,
 		dagStore:         dr,
@@ -332,17 +334,17 @@ func initBuiltinAuthService(cfg *config.Config, collector *telemetry.Collector) 
 }
 
 // initAuditService creates a file-based audit store and service.
-func initAuditService(cfg *config.Config) (*audit.Service, error) {
+func initAuditService(cfg *config.Config) (*audit.Service, *fileaudit.Store, error) {
 	if !cfg.Server.Audit.Enabled {
-		return nil, nil
+		return nil, nil, nil
 	}
 
-	store, err := fileaudit.New(filepath.Join(cfg.Paths.AdminLogsDir, "audit"))
+	store, err := fileaudit.New(filepath.Join(cfg.Paths.AdminLogsDir, "audit"), cfg.Server.Audit.RetentionDays)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create audit store: %w", err)
+		return nil, nil, fmt.Errorf("failed to create audit store: %w", err)
 	}
 
-	return audit.New(store), nil
+	return audit.New(store), store, nil
 }
 
 // initSyncService creates and returns a Git sync service if enabled.
@@ -610,10 +612,15 @@ func (srv *Server) setupAssetRoutes(r *chi.Mux, basePath string) {
 	r.Get(assetsPath, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "max-age=86400")
 
-		// Serve schema from shared package instead of embedded assets
+		// Serve schemas from shared package instead of embedded assets
 		if strings.HasSuffix(r.URL.Path, "dag.schema.json") {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write(cmnschema.DAGSchemaJSON)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "config.schema.json") {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(cmnschema.ConfigSchemaJSON)
 			return
 		}
 
@@ -800,6 +807,12 @@ func (srv *Server) serveHTTP(tlsCfg *config.TLSConfig, hasListener bool) error {
 
 // Shutdown gracefully shuts down the server.
 func (srv *Server) Shutdown(ctx context.Context) error {
+	if srv.auditStore != nil {
+		if err := srv.auditStore.Close(); err != nil {
+			logger.Warn(ctx, "Failed to close audit store", tag.Error(err))
+		}
+	}
+
 	if srv.syncService != nil {
 		if err := srv.syncService.Stop(); err != nil {
 			logger.Warn(ctx, "Failed to stop git sync service", tag.Error(err))
@@ -835,11 +848,7 @@ func (srv *Server) setupGracefulShutdown(ctx context.Context) {
 		logger.Info(ctx, "Received shutdown signal", slog.String("signal", sig.String()))
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	srv.httpServer.SetKeepAlivesEnabled(false)
-	if err := srv.httpServer.Shutdown(shutdownCtx); err != nil {
+	if err := srv.Shutdown(ctx); err != nil {
 		logger.Error(ctx, "Failed to shutdown server gracefully", tag.Error(err))
 	}
 }

@@ -44,10 +44,11 @@ func (r *Registry) Navigate(schemaName, path string) (string, error) {
 	}
 
 	nav := &navigator{
-		root:   schema,
-		defs:   getDefinitions(schema),
-		path:   path,
-		output: &strings.Builder{},
+		root:       schema,
+		defs:       getDefinitions(schema),
+		path:       path,
+		schemaName: schemaName,
+		output:     &strings.Builder{},
 	}
 
 	return nav.navigate()
@@ -67,10 +68,11 @@ func (r *Registry) AvailableSchemas() []string {
 
 // navigator handles schema path navigation and formatting.
 type navigator struct {
-	root   map[string]any
-	defs   map[string]any
-	path   string
-	output *strings.Builder
+	root       map[string]any
+	defs       map[string]any
+	path       string
+	schemaName string
+	output     *strings.Builder
 }
 
 func (n *navigator) navigate() (string, error) {
@@ -300,7 +302,7 @@ func (n *navigator) mergeAllOf(allOf []any) map[string]any {
 func (n *navigator) formatNode(node map[string]any, path string) {
 	// Header
 	if path == "" {
-		n.output.WriteString("# DAG Schema Root\n\n")
+		n.output.WriteString(fmt.Sprintf("# %s Schema Root\n\n", capitalizeFirst(n.schemaName)))
 	} else {
 		n.output.WriteString(fmt.Sprintf("# %s\n\n", path))
 	}
@@ -411,8 +413,6 @@ func (n *navigator) formatProperties(props map[string]any, parent map[string]any
 	}
 }
 
-// Helper functions
-
 // getUnionOptions returns the oneOf or anyOf array if present, nil otherwise.
 func getUnionOptions(node map[string]any) []any {
 	for _, key := range []string{"oneOf", "anyOf"} {
@@ -464,6 +464,13 @@ func getRequiredSet(node map[string]any) map[string]bool {
 		}
 	}
 	return result
+}
+
+func capitalizeFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
 
 func truncateDescription(v any) string {

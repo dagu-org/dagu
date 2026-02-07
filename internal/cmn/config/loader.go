@@ -564,6 +564,8 @@ func (l *ConfigLoader) loadServerDefaults(cfg *Config, def Definition) {
 	if def.Audit != nil && def.Audit.Enabled != nil {
 		cfg.Server.Audit.Enabled = *def.Audit.Enabled
 	}
+
+	cfg.Server.Audit.RetentionDays = l.v.GetInt("audit.retentionDays")
 }
 
 func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
@@ -1103,7 +1105,6 @@ func (l *ConfigLoader) setupViper(xdgConfig XDGConfig, homeDir, configFile, appH
 
 func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	// Paths
-	l.v.SetDefault("workDir", "")
 	l.v.SetDefault("skipExamples", false)
 	l.v.SetDefault("paths.dagsDir", paths.DAGsDir)
 	l.v.SetDefault("paths.suspendFlagsDir", paths.SuspendFlagsDir)
@@ -1155,6 +1156,9 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	// Peer
 	l.v.SetDefault("peer.insecure", true)
 
+	// Audit
+	l.v.SetDefault("audit.retentionDays", 7)
+
 	// Monitoring
 	l.v.SetDefault("monitoring.retention", "24h")
 	l.v.SetDefault("monitoring.interval", "5s")
@@ -1182,9 +1186,9 @@ var envBindings = []envBinding{
 
 	{key: "terminal.enabled", env: "TERMINAL_ENABLED"},
 	{key: "audit.enabled", env: "AUDIT_ENABLED"},
+	{key: "audit.retentionDays", env: "AUDIT_RETENTION_DAYS"},
 
 	// Core
-	{key: "workDir", env: "WORK_DIR", isPath: true},
 	{key: "defaultShell", env: "DEFAULT_SHELL"},
 	{key: "skipExamples", env: "SKIP_EXAMPLES"},
 

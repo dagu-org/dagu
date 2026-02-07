@@ -43,7 +43,6 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_DEBUG":        "true",
 		"DAGU_HEADLESS":     "true",
 
-		"DAGU_WORK_DIR":      filepath.Join(testPaths, "work"),
 		"DAGU_DEFAULT_SHELL": "/bin/zsh",
 
 		"DAGU_UI_MAX_DASHBOARD_PAGE_LIMIT": "250",
@@ -165,7 +164,7 @@ func TestLoad_Env(t *testing.T) {
 			StrictValidation:  false,
 			Metrics:           MetricsAccessPrivate,
 			Terminal:          TerminalConfig{Enabled: true},
-			Audit:             AuditConfig{Enabled: false},
+			Audit:             AuditConfig{Enabled: false, RetentionDays: 7},
 		},
 		Paths: PathsConfig{
 			DAGsDir:            filepath.Join(testPaths, "dags"),
@@ -423,7 +422,7 @@ scheduler:
 			},
 			Metrics:  MetricsAccessPrivate,
 			Terminal: TerminalConfig{Enabled: false},
-			Audit:    AuditConfig{Enabled: true},
+			Audit:    AuditConfig{Enabled: true, RetentionDays: 7},
 		},
 		Paths: PathsConfig{
 			DAGsDir:            "/var/dagu/dags",
