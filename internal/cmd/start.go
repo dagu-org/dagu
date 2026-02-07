@@ -458,6 +458,7 @@ func dispatchToCoordinatorAndWait(ctx *Context, d *core.DAG, dagRunID string, co
 		string(d.YamlData),
 		coordinatorv1.Operation_OPERATION_START,
 		dagRunID,
+		executor.WithNamespace(d.Namespace),
 		executor.WithWorkerSelector(d.WorkerSelector),
 	)
 

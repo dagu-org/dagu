@@ -166,6 +166,7 @@ func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRu
 			ServiceRegistry: ctx.ServiceRegistry,
 			RootDAGRun:      exec.NewDAGRunRef(dag.Name, dagRunID),
 			PeerConfig:      ctx.Config.Core.Peer,
+			Namespace:       dag.Namespace,
 		})
 
 	listenSignals(ctx, agentInstance)
