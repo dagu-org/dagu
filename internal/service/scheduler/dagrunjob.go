@@ -63,8 +63,7 @@ func (j *DAGRunJob) Start(ctx context.Context) error {
 		return err
 	}
 
-	// Handle the job execution (implements persistence-first for distributed execution)
-	// Pass j.Next as the scheduled time so live runs also have scheduledTime set
+	// Pass j.Next as the scheduled time so live runs also record scheduledTime
 	return j.DAGExecutor.HandleJob(ctx, j.DAG, coordinatorv1.Operation_OPERATION_START, runID, core.TriggerTypeScheduler, j.Next)
 }
 

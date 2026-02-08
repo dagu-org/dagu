@@ -262,7 +262,7 @@ func New(
 		queuedRun:        opts.QueuedRun,
 		attemptID:        opts.AttemptID,
 		triggerType:      opts.TriggerType,
-		scheduledTime:   opts.ScheduledTime,
+		scheduledTime:    opts.ScheduledTime,
 		defaultExecMode:  opts.DefaultExecMode,
 	}
 

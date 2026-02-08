@@ -85,13 +85,8 @@ func (e *DAGExecutor) HandleJob(
 	operation coordinatorv1.Operation,
 	runID string,
 	triggerType core.TriggerType,
-	scheduledTime ...time.Time,
+	scheduledTime time.Time,
 ) error {
-	var schedTimeStr string
-	if len(scheduledTime) > 0 && !scheduledTime[0].IsZero() {
-		schedTimeStr = scheduledTime[0].Format(time.RFC3339)
-	}
-
 	// For distributed execution with START operation, enqueue for persistence
 	if e.shouldUseDistributedExecution(dag) && operation == coordinatorv1.Operation_OPERATION_START {
 		ctx = logger.WithValues(ctx,
@@ -106,7 +101,7 @@ func (e *DAGExecutor) HandleJob(
 		spec := e.subCmdBuilder.Enqueue(dag, runtime.EnqueueOptions{
 			DAGRunID:      runID,
 			TriggerType:   triggerType.String(),
-			ScheduledTime: schedTimeStr,
+			ScheduledTime: formatScheduledTime(scheduledTime),
 		})
 		if err := runtime.Run(ctx, spec); err != nil {
 			return fmt.Errorf("failed to enqueue DAG run: %w", err)
@@ -115,7 +110,7 @@ func (e *DAGExecutor) HandleJob(
 	}
 
 	// For all other cases (local execution or non-START operations), use ExecuteDAG
-	return e.ExecuteDAG(ctx, dag, operation, runID, nil, triggerType, scheduledTime...)
+	return e.ExecuteDAG(ctx, dag, operation, runID, nil, triggerType, scheduledTime)
 }
 
 // ExecuteDAG executes or dispatches an already-persisted DAG.
@@ -134,13 +129,8 @@ func (e *DAGExecutor) ExecuteDAG(
 	runID string,
 	previousStatus *exec.DAGRunStatus,
 	triggerType core.TriggerType,
-	scheduledTime ...time.Time,
+	scheduledTime time.Time,
 ) error {
-	var schedTimeStr string
-	if len(scheduledTime) > 0 && !scheduledTime[0].IsZero() {
-		schedTimeStr = scheduledTime[0].Format(time.RFC3339)
-	}
-
 	if e.shouldUseDistributedExecution(dag) {
 		// Distributed execution: dispatch to coordinator
 		task := executor.CreateTask(
@@ -164,7 +154,7 @@ func (e *DAGExecutor) ExecuteDAG(
 			DAGRunID:      runID,
 			Quiet:         true,
 			TriggerType:   triggerType.String(),
-			ScheduledTime: schedTimeStr,
+			ScheduledTime: formatScheduledTime(scheduledTime),
 		})
 		return runtime.Start(ctx, spec)
 
@@ -175,6 +165,15 @@ func (e *DAGExecutor) ExecuteDAG(
 	default:
 		return fmt.Errorf("unsupported operation: %v", operation)
 	}
+}
+
+// formatScheduledTime returns the RFC3339 representation of a scheduled time,
+// or an empty string if the time is zero.
+func formatScheduledTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format(time.RFC3339)
 }
 
 // shouldUseDistributedExecution checks if distributed execution should be used.

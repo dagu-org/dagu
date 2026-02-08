@@ -23,7 +23,6 @@ type CatchupEngine struct {
 	dagExecutor    *DAGExecutor
 	runtimeMgr     *runtime.Manager
 	config         *config.Config
-	location       *time.Location
 	clock          Clock
 }
 
@@ -48,7 +47,6 @@ func NewCatchupEngine(
 	dagExecutor *DAGExecutor,
 	runtimeMgr *runtime.Manager,
 	cfg *config.Config,
-	location *time.Location,
 	clock Clock,
 ) *CatchupEngine {
 	return &CatchupEngine{
@@ -57,7 +55,6 @@ func NewCatchupEngine(
 		dagExecutor:    dagExecutor,
 		runtimeMgr:     runtimeMgr,
 		config:         cfg,
-		location:       location,
 		clock:          clock,
 	}
 }
@@ -132,7 +129,6 @@ func (c *CatchupEngine) Run(ctx context.Context, dags map[string]*core.DAG) (*Ca
 			result.Skipped++
 		}
 
-		// Rate limit
 		time.Sleep(c.config.Scheduler.CatchupRateLimit)
 	}
 
@@ -159,12 +155,7 @@ func (c *CatchupEngine) generateCandidates(
 	dags map[string]*core.DAG,
 	lastTick, catchupTo time.Time,
 ) []catchupCandidate {
-	type dagCandidates struct {
-		dagName    string
-		candidates []catchupCandidate
-	}
-
-	var allDAGCandidates []dagCandidates
+	var merged []catchupCandidate
 
 	for _, dag := range dags {
 		var dagCands []catchupCandidate
@@ -188,34 +179,30 @@ func (c *CatchupEngine) generateCandidates(
 			dagCands = append(dagCands, entryCands...)
 		}
 
-		if len(dagCands) > 0 {
-			// Sort by scheduled time within this DAG
-			sort.Slice(dagCands, func(i, j int) bool {
-				return dagCands[i].scheduledTime.Before(dagCands[j].scheduledTime)
-			})
-
-			// Apply per-DAG cap
-			if c.config.Scheduler.MaxCatchupRunsPerDAG > 0 && len(dagCands) > c.config.Scheduler.MaxCatchupRunsPerDAG {
-				logger.Info(ctx, "Capping catch-up runs for DAG",
-					tag.DAG(dag.Name),
-					slog.Int("candidates", len(dagCands)),
-					slog.Int("cap", c.config.Scheduler.MaxCatchupRunsPerDAG),
-				)
-				dagCands = dagCands[:c.config.Scheduler.MaxCatchupRunsPerDAG]
-			}
-
-			allDAGCandidates = append(allDAGCandidates, dagCandidates{
-				dagName:    dag.Name,
-				candidates: dagCands,
-			})
+		if len(dagCands) == 0 {
+			continue
 		}
+
+		// Sort by scheduled time within this DAG
+		sort.Slice(dagCands, func(i, j int) bool {
+			return dagCands[i].scheduledTime.Before(dagCands[j].scheduledTime)
+		})
+
+		// Apply per-DAG cap
+		perDAGCap := c.config.Scheduler.MaxCatchupRunsPerDAG
+		if perDAGCap > 0 && len(dagCands) > perDAGCap {
+			logger.Info(ctx, "Capping catch-up runs for DAG",
+				tag.DAG(dag.Name),
+				slog.Int("candidates", len(dagCands)),
+				slog.Int("cap", perDAGCap),
+			)
+			dagCands = dagCands[:perDAGCap]
+		}
+
+		merged = append(merged, dagCands...)
 	}
 
-	// Merge all candidates and sort globally by scheduled time
-	var merged []catchupCandidate
-	for _, dc := range allDAGCandidates {
-		merged = append(merged, dc.candidates...)
-	}
+	// Sort globally by scheduled time
 	sort.Slice(merged, func(i, j int) bool {
 		return merged[i].scheduledTime.Before(merged[j].scheduledTime)
 	})
@@ -276,21 +263,20 @@ func (c *CatchupEngine) applyPolicy(policy core.MisfirePolicy, candidates []catc
 	switch policy {
 	case core.MisfirePolicyIgnore:
 		return nil
-	case MisfirePolicyRunOnce:
+	case core.MisfirePolicyRunOnce:
 		return candidates[:1] // earliest
-	case MisfirePolicyRunLatest:
+	case core.MisfirePolicyRunLatest:
 		return candidates[len(candidates)-1:] // latest
-	case MisfirePolicyRunAll:
-		return candidates // all
+	case core.MisfirePolicyRunAll:
+		return candidates
 	default:
-		return nil // unknown policy, treat as ignore
+		return nil
 	}
 }
 
 // dispatchCandidate dispatches a single catch-up run.
 // Returns true if dispatched, false if skipped (duplicate).
 func (c *CatchupEngine) dispatchCandidate(ctx context.Context, cand catchupCandidate) (bool, error) {
-	// Check for duplicate: is there already a run for this DAG at this scheduled time?
 	if c.isDuplicate(ctx, cand) {
 		logger.Info(ctx, "Skipping duplicate catch-up run",
 			tag.DAG(cand.dag.Name),
@@ -325,25 +311,20 @@ func (c *CatchupEngine) dispatchCandidate(ctx context.Context, cand catchupCandi
 	return true, nil
 }
 
-// isDuplicate checks if a run already exists for the same DAG at the same scheduled time.
-// It looks at recent runs within the scheduled time's minute window.
+// isDuplicate checks if a run already exists for the same DAG at the same scheduled time
+// by comparing RFC3339 timestamps in recent attempts.
 func (c *CatchupEngine) isDuplicate(ctx context.Context, cand catchupCandidate) bool {
+	target := cand.scheduledTime.Format(time.RFC3339)
 	attempts := c.dagRunStore.RecentAttempts(ctx, cand.dag.Name, 50)
 	for _, attempt := range attempts {
 		status, err := attempt.ReadStatus(ctx)
 		if err != nil {
 			continue
 		}
-		if status.ScheduledTime != "" && status.ScheduledTime == cand.scheduledTime.Format(time.RFC3339) {
+		if status.ScheduledTime == target {
 			return true
 		}
 	}
 	return false
 }
 
-// Policy constants aliased for use in applyPolicy.
-const (
-	MisfirePolicyRunOnce  = core.MisfirePolicyRunOnce
-	MisfirePolicyRunLatest = core.MisfirePolicyRunLatest
-	MisfirePolicyRunAll   = core.MisfirePolicyRunAll
-)

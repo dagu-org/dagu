@@ -79,7 +79,7 @@ func TestCatchupEngine_NoCatchupConfigured(t *testing.T) {
 	cfg.Scheduler.MaxCatchupRunsPerDAG = 20
 	cfg.Scheduler.CatchupRateLimit = time.Millisecond
 
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, time.UTC, clock)
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
 
 	// DAG with misfire=ignore (default)
 	dags := map[string]*core.DAG{
@@ -112,7 +112,7 @@ func TestCatchupEngine_MissingWatermark(t *testing.T) {
 	cfg.Scheduler.MaxCatchupRunsPerDAG = 20
 	cfg.Scheduler.CatchupRateLimit = time.Millisecond
 
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, time.UTC, clock)
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
 
 	dags := map[string]*core.DAG{
 		"test.yaml": {
@@ -149,7 +149,7 @@ func TestCatchupEngine_GenerateCandidates_RunAll(t *testing.T) {
 	cfg.Scheduler.MaxCatchupRunsPerDAG = 20
 	cfg.Scheduler.CatchupRateLimit = time.Millisecond
 
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, time.UTC, clock)
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
 
 	sched := parseCron(t, "0 * * * *") // every hour on the hour
 	dags := map[string]*core.DAG{
@@ -186,7 +186,7 @@ func TestCatchupEngine_GenerateCandidates_RunOnce(t *testing.T) {
 	cfg.Scheduler.MaxCatchupRunsPerDAG = 20
 	cfg.Scheduler.CatchupRateLimit = time.Millisecond
 
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, time.UTC, clock)
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
 
 	sched := parseCron(t, "0 * * * *")
 	dags := map[string]*core.DAG{
@@ -220,7 +220,7 @@ func TestCatchupEngine_GenerateCandidates_RunLatest(t *testing.T) {
 	cfg.Scheduler.MaxCatchupRunsPerDAG = 20
 	cfg.Scheduler.CatchupRateLimit = time.Millisecond
 
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, time.UTC, clock)
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
 
 	sched := parseCron(t, "0 * * * *")
 	dags := map[string]*core.DAG{
@@ -255,7 +255,7 @@ func TestCatchupEngine_MaxCatchupRunsCap(t *testing.T) {
 	cfg.Scheduler.MaxCatchupRunsPerDAG = 5 // Cap at 5
 	cfg.Scheduler.CatchupRateLimit = time.Millisecond
 
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, time.UTC, clock)
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
 
 	sched := parseCron(t, "0 * * * *")
 	dags := map[string]*core.DAG{
@@ -287,7 +287,7 @@ func TestCatchupEngine_MaxGlobalCatchupRunsCap(t *testing.T) {
 	cfg.Scheduler.MaxCatchupRunsPerDAG = 20
 	cfg.Scheduler.CatchupRateLimit = time.Millisecond
 
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, time.UTC, clock)
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
 
 	sched := parseCron(t, "0 * * * *")
 	dags := map[string]*core.DAG{
@@ -325,7 +325,7 @@ func TestCatchupEngine_PerEntryCap(t *testing.T) {
 	cfg.Scheduler.MaxCatchupRunsPerDAG = 100
 	cfg.Scheduler.CatchupRateLimit = time.Millisecond
 
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, time.UTC, clock)
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
 
 	sched := parseCron(t, "0 * * * *")
 	dags := map[string]*core.DAG{
@@ -362,7 +362,7 @@ func TestCatchupEngine_CatchupWindow(t *testing.T) {
 	cfg.Scheduler.MaxCatchupRunsPerDAG = 100
 	cfg.Scheduler.CatchupRateLimit = time.Millisecond
 
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, time.UTC, clock)
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
 
 	sched := parseCron(t, "0 * * * *")
 	dags := map[string]*core.DAG{

@@ -109,7 +109,6 @@ func New(
 		dagExecutor,
 		&drm,
 		cfg,
-		timeLoc,
 		time.Now,
 	)
 	return &Scheduler{
@@ -239,14 +238,8 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	// Run catch-up before entering live loop
 	if s.catchupEngine != nil {
 		registry := s.entryReader.Registry()
-		if catchupResult, err := s.catchupEngine.Run(ctx, registry); err != nil {
+		if _, err := s.catchupEngine.Run(ctx, registry); err != nil {
 			logger.Error(ctx, "Catch-up failed", tag.Error(err))
-		} else if catchupResult.Dispatched > 0 || catchupResult.Skipped > 0 {
-			logger.Info(ctx, "Catch-up completed",
-				slog.Int("dispatched", catchupResult.Dispatched),
-				slog.Int("skipped", catchupResult.Skipped),
-				slog.String("duration", catchupResult.Duration.String()),
-			)
 		}
 	}
 
