@@ -37,12 +37,12 @@ type ScheduleEntry struct {
 //	  - cron: "30 * * * *"
 //	    catchup: latest
 type ScheduleValue struct {
-	raw          any              // Original value for error reporting
-	isSet        bool             // Whether the field was set in YAML
-	starts       []string         // Start schedules (or simple schedule expressions)
-	stops        []string         // Stop schedules
-	restarts     []string         // Restart schedules
-	startEntries []ScheduleEntry  // Structured start entries with catch-up metadata
+	raw          any             // Original value for error reporting
+	isSet        bool            // Whether the field was set in YAML
+	starts       []string        // Start schedules (or simple schedule expressions)
+	stops        []string        // Stop schedules
+	restarts     []string        // Restart schedules
+	startEntries []ScheduleEntry // Structured start entries with catch-up metadata
 }
 
 // scheduleEntryKeys are the valid keys for a single schedule-entry map.

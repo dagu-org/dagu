@@ -56,8 +56,8 @@ type Scheduler struct {
 	instanceID          string          // Unique instance identifier for service registry
 	// queueProcessor is the processor for queued DAG runs
 	queueProcessor *QueueProcessor
-	catchupEngine  *CatchupEngine  // Catch-up engine for replaying missed runs
-	watermarkStore *WatermarkStore // Watermark persistence for catch-up
+	catchupEngine  *CatchupEngine // Catch-up engine for replaying missed runs
+	dagStateStore  *DAGStateStore // Per-DAG state persistence for catch-up
 	stopOnce       sync.Once
 	lock           sync.Mutex
 	clock          Clock // Clock function for getting current time
@@ -102,9 +102,9 @@ func New(
 		dagExecutor,
 		cfg.Queues,
 	)
-	watermarkStore := NewWatermarkStore(cfg.Paths.DataDir)
+	dagStateStore := NewDAGStateStore(cfg.Paths.DataDir, cfg.Paths.DAGsDir)
 	catchupEngine := NewCatchupEngine(
-		watermarkStore,
+		dagStateStore,
 		dagRunStore,
 		dagExecutor,
 		&drm,
@@ -127,7 +127,7 @@ func New(
 		serviceRegistry: reg,
 		queueProcessor:  processor,
 		catchupEngine:   catchupEngine,
-		watermarkStore:  watermarkStore,
+		dagStateStore:   dagStateStore,
 		clock:           time.Now, // Default to real time
 	}, nil
 }
@@ -235,6 +235,15 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		return err
 	}
 
+	// One-time migration from old global watermark to per-DAG state files
+	if s.dagStateStore != nil {
+		oldWatermarkPath := filepath.Join(s.config.Paths.DataDir, "scheduler", "state.json")
+		registry := s.entryReader.Registry()
+		if err := s.dagStateStore.Migrate(oldWatermarkPath, registry); err != nil {
+			logger.Error(ctx, "Watermark migration failed", tag.Error(err))
+		}
+	}
+
 	// Run catch-up before entering live loop
 	if s.catchupEngine != nil {
 		registry := s.entryReader.Registry()
@@ -323,10 +332,10 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 		case <-timer.C:
 			_ = timer.Stop()
 			s.invokeJobs(ctx, tickTime)
-			// Save watermark after processing jobs
-			if s.watermarkStore != nil {
-				if err := s.watermarkStore.Save(tickTime); err != nil {
-					logger.Error(ctx, "Failed to save watermark", tag.Error(err))
+			// Save per-DAG watermarks after processing jobs
+			if s.dagStateStore != nil {
+				if err := s.dagStateStore.SaveAll(s.entryReader.Registry(), tickTime); err != nil {
+					logger.Error(ctx, "Failed to save DAG state", tag.Error(err))
 				}
 			}
 			tickTime = s.NextTick(tickTime)

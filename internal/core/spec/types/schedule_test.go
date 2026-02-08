@@ -308,13 +308,13 @@ func TestScheduleValue_CatchupEntries(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name          string
-		input         string
-		wantErr       bool
-		errContains   string
-		wantEntries   int
-		wantCatchup   string
-		wantWindow    string
+		name        string
+		input       string
+		wantErr     bool
+		errContains string
+		wantEntries int
+		wantCatchup string
+		wantWindow  string
 	}{
 		{
 			name:        "CatchupAll",
