@@ -161,7 +161,7 @@ func (c *CatchupEngine) generateCandidates(
 		var dagCands []catchupCandidate
 
 		for _, sched := range dag.Schedule {
-			if sched.Misfire == core.MisfirePolicyIgnore {
+			if sched.Catchup == core.CatchupPolicyOff {
 				continue
 			}
 			if sched.Parsed == nil {
@@ -169,12 +169,7 @@ func (c *CatchupEngine) generateCandidates(
 			}
 
 			entryCands := c.generateEntryCandidates(dag, sched, lastTick, catchupTo)
-			entryCands = c.applyPolicy(sched.Misfire, entryCands)
-
-			// Apply per-entry maxCatchupRuns cap
-			if sched.MaxCatchupRuns > 0 && len(entryCands) > sched.MaxCatchupRuns {
-				entryCands = entryCands[:sched.MaxCatchupRuns]
-			}
+			entryCands = c.applyPolicy(sched.Catchup, entryCands)
 
 			dagCands = append(dagCands, entryCands...)
 		}
@@ -254,20 +249,18 @@ func (c *CatchupEngine) generateEntryCandidates(
 	return candidates
 }
 
-// applyPolicy filters candidates based on the misfire policy.
-func (c *CatchupEngine) applyPolicy(policy core.MisfirePolicy, candidates []catchupCandidate) []catchupCandidate {
+// applyPolicy filters candidates based on the catchup policy.
+func (c *CatchupEngine) applyPolicy(policy core.CatchupPolicy, candidates []catchupCandidate) []catchupCandidate {
 	if len(candidates) == 0 {
 		return candidates
 	}
 
 	switch policy {
-	case core.MisfirePolicyIgnore:
+	case core.CatchupPolicyOff:
 		return nil
-	case core.MisfirePolicyRunOnce:
-		return candidates[:1] // earliest
-	case core.MisfirePolicyRunLatest:
+	case core.CatchupPolicyLatest:
 		return candidates[len(candidates)-1:] // latest
-	case core.MisfirePolicyRunAll:
+	case core.CatchupPolicyAll:
 		return candidates
 	default:
 		return nil
@@ -294,7 +287,7 @@ func (c *CatchupEngine) dispatchCandidate(ctx context.Context, cand catchupCandi
 		tag.DAG(cand.dag.Name),
 		tag.RunID(runID),
 		slog.String("scheduledTime", cand.scheduledTime.Format(time.RFC3339)),
-		slog.String("misfire", cand.schedule.Misfire.String()),
+		slog.String("catchup", cand.schedule.Catchup.String()),
 	)
 
 	if err := c.dagExecutor.HandleJob(

@@ -2,26 +2,22 @@ package types
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/goccy/go-yaml"
 )
 
-const maxInt = math.MaxInt
-
 // ScheduleEntry holds a structured schedule entry with catch-up metadata.
 type ScheduleEntry struct {
-	Cron           string
-	Misfire        string // "ignore", "runOnce", "runLatest", "runAll"
-	CatchupWindow  string // duration string like "24h", "2d12h"
-	MaxCatchupRuns int
+	Cron          string
+	Catchup       string // "false", "latest", "all", "true"
+	CatchupWindow string // duration string like "24h", "2d12h"
 }
 
 // ScheduleValue represents a schedule configuration that can be specified as:
 // - A single cron expression string
 // - An array of cron expressions or schedule-entry objects
 // - A map with start/stop/restart keys
-// - A map with cron/misfire/catchupWindow/maxCatchupRuns keys (single schedule-entry)
+// - A map with cron/catchup/catchupWindow keys (single schedule-entry)
 //
 // YAML examples:
 //
@@ -33,13 +29,13 @@ type ScheduleEntry struct {
 //	  restart: "0 12 * * *"
 //	schedule:
 //	  cron: "0 * * * *"
-//	  misfire: runAll
+//	  catchup: all
 //	  catchupWindow: "6h"
 //	schedule:
 //	  - cron: "0 * * * *"
-//	    misfire: runAll
+//	    catchup: all
 //	  - cron: "30 * * * *"
-//	    misfire: runOnce
+//	    catchup: latest
 type ScheduleValue struct {
 	raw          any              // Original value for error reporting
 	isSet        bool             // Whether the field was set in YAML
@@ -51,7 +47,7 @@ type ScheduleValue struct {
 
 // scheduleEntryKeys are the valid keys for a single schedule-entry map.
 var scheduleEntryKeys = map[string]bool{
-	"cron": true, "misfire": true, "catchupWindow": true, "maxCatchupRuns": true,
+	"cron": true, "catchup": true, "catchupWindow": true,
 }
 
 // typedScheduleKeys are the valid keys for a typed schedule map (start/stop/restart).
@@ -150,7 +146,7 @@ func (s *ScheduleValue) parseScheduleMap(m map[string]any) error {
 	}
 
 	if hasEntryKeys && hasTypedKeys {
-		return fmt.Errorf("schedule: cannot mix schedule-entry keys (cron, misfire, ...) with typed keys (start, stop, restart)")
+		return fmt.Errorf("schedule: cannot mix schedule-entry keys (cron, catchup, ...) with typed keys (start, stop, restart)")
 	}
 
 	if hasEntryKeys {
@@ -183,7 +179,7 @@ func (s *ScheduleValue) parseScheduleMap(m map[string]any) error {
 			}
 			s.restarts = values
 		default:
-			return fmt.Errorf("schedule: unknown key %q (expected start, stop, restart, or cron/misfire/catchupWindow/maxCatchupRuns)", key)
+			return fmt.Errorf("schedule: unknown key %q (expected start, stop, restart, or cron/catchup/catchupWindow)", key)
 		}
 	}
 	return nil
@@ -246,7 +242,7 @@ func parseScheduleEntryMap(m map[string]any) (ScheduleEntry, error) {
 
 	for key := range m {
 		if !scheduleEntryKeys[key] {
-			return entry, fmt.Errorf("unknown schedule-entry key %q (expected cron, misfire, catchupWindow, or maxCatchupRuns)", key)
+			return entry, fmt.Errorf("unknown schedule-entry key %q (expected cron, catchup, or catchupWindow)", key)
 		}
 	}
 
@@ -260,12 +256,12 @@ func parseScheduleEntryMap(m map[string]any) (ScheduleEntry, error) {
 	}
 	entry.Cron = cronStr
 
-	if v, ok := m["misfire"]; ok {
+	if v, ok := m["catchup"]; ok {
 		str, ok := v.(string)
 		if !ok {
-			return entry, fmt.Errorf("schedule-entry 'misfire' must be a string, got %T", v)
+			return entry, fmt.Errorf("schedule-entry 'catchup' must be a string, got %T", v)
 		}
-		entry.Misfire = str
+		entry.Catchup = str
 	}
 
 	if v, ok := m["catchupWindow"]; ok {
@@ -274,22 +270,6 @@ func parseScheduleEntryMap(m map[string]any) (ScheduleEntry, error) {
 			return entry, fmt.Errorf("schedule-entry 'catchupWindow' must be a string, got %T", v)
 		}
 		entry.CatchupWindow = str
-	}
-
-	if v, ok := m["maxCatchupRuns"]; ok {
-		switch num := v.(type) {
-		case int:
-			entry.MaxCatchupRuns = num
-		case uint64:
-			if num > uint64(maxInt) {
-				return entry, fmt.Errorf("schedule-entry 'maxCatchupRuns' value %d overflows int", num)
-			}
-			entry.MaxCatchupRuns = int(num) //nolint:gosec // overflow checked above
-		case float64:
-			entry.MaxCatchupRuns = int(num)
-		default:
-			return entry, fmt.Errorf("schedule-entry 'maxCatchupRuns' must be an integer, got %T", v)
-		}
 	}
 
 	return entry, nil

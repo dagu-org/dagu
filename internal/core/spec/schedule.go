@@ -40,13 +40,12 @@ func buildSchedulerFromEntries(entries []types.ScheduleEntry) ([]core.Schedule, 
 		}
 
 		sched := core.Schedule{
-			Expression:     e.Cron,
-			Parsed:         parsed,
-			MaxCatchupRuns: e.MaxCatchupRuns,
+			Expression: e.Cron,
+			Parsed:     parsed,
 		}
 
-		if e.Misfire != "" {
-			sched.Misfire, err = core.ParseMisfirePolicy(e.Misfire)
+		if e.Catchup != "" {
+			sched.Catchup, err = core.ParseCatchupPolicy(e.Catchup)
 			if err != nil {
 				return nil, fmt.Errorf("schedule entry %q: %w", e.Cron, err)
 			}

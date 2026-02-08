@@ -54,12 +54,11 @@ Extend the `schedule` field to support configurable catch-up:
 name: daily-etl
 schedule:
   cron: "0 9 * * *"
-  misfire: runAll               # Policy for missed schedules (enables catch-up)
-  catchupWindow: "24h"          # Only backfill the last 24h of missed intervals
-  maxCatchupRuns: 12            # Bound the number of executions per restart
+  catchup: all                 # Policy for missed schedules (enables catch-up)
+  catchupWindow: "24h"         # Only backfill the last 24h of missed intervals
 ```
 
-Setting `misfire` to any value other than `ignore` enables catch-up processing. There is no separate boolean toggle — the misfire policy is the single opt-in mechanism.
+Setting `catchup` to any value other than `false` enables catch-up processing. There is no separate boolean toggle — the catchup policy is the single opt-in mechanism.
 
 #### Backward Compatibility
 
@@ -71,7 +70,7 @@ schedule: "0 9 * * *"
 
 schedule:
   cron: "0 9 * * *"
-  misfire: ignore    # Default: current behavior, no catch-up
+  # catchup defaults to false: current behavior, no catch-up
 ```
 
 > **Why no `start`/`end` fields?** Dagu already uses `schedule.start/stop/restart` to separate cron expressions by action. Reusing the same keys for ISO timestamps would break every existing DAG. Relative windows (Temporal-style) also avoid the timezone ambiguity and "first deploy in the past" issues that absolute timestamps create.
@@ -84,15 +83,15 @@ The `schedule` field accepts several shapes. The parser determines the form by i
 |-------|---------|---------|
 | `schedule: "expr"` | `schedule: "0 9 * * *"` | Start schedule, no catch-up |
 | `schedule: ["expr", ...]` | `schedule: ["0 9 * * *", "0 18 * * *"]` | Multiple start schedules, no catch-up |
-| `schedule: {cron, misfire?, ...}` | `schedule: { cron: "0 9 * * *", misfire: runAll }` | Single start entry with catch-up |
-| `schedule: [{cron, misfire?, ...}, ...]` | `schedule: [{ cron: "0 * * * *", misfire: runAll }, ...]` | Multiple start entries with catch-up |
+| `schedule: {cron, catchup?, ...}` | `schedule: { cron: "0 9 * * *", catchup: all }` | Single start entry with catch-up |
+| `schedule: [{cron, catchup?, ...}, ...]` | `schedule: [{ cron: "0 * * * *", catchup: all }, ...]` | Multiple start entries with catch-up |
 | `schedule: {start, stop?, restart?}` | `schedule: { start: "0 9 * * *", stop: "0 18 * * *" }` | Typed schedules (`start` accepts catch-up) |
 
 ### Parser Disambiguation
 
 When the `schedule` value is a **map**, the parser inspects its keys:
 
-- If all keys are in `{cron, misfire, catchupWindow, maxCatchupRuns}` → **schedule-entry form** (a single start entry with optional catch-up fields).
+- If all keys are in `{cron, catchup, catchupWindow}` → **schedule-entry form** (a single start entry with optional catch-up fields).
 - If all keys are in `{start, stop, restart}` → **typed-schedule form** (the existing map form).
 - If keys from both sets are present → **validation error**.
 
@@ -106,19 +105,18 @@ In the **typed-schedule form**, the `start` value is polymorphic and accepts any
 
 - `string` — a single cron expression (current behavior)
 - `string[]` — multiple cron expressions (current behavior)
-- `ScheduleEntry` — a single `{cron, misfire?, catchupWindow?, maxCatchupRuns?}` object
+- `ScheduleEntry` — a single `{cron, catchup?, catchupWindow?}` object
 - `ScheduleEntry[]` — multiple schedule entry objects
 
-The `stop` and `restart` values remain `string | string[]` only. The parser rejects catch-up fields (`misfire`, `catchupWindow`, `maxCatchupRuns`) on `stop` or `restart` entries.
+The `stop` and `restart` values remain `string | string[]` only. The parser rejects catch-up fields (`catchup`, `catchupWindow`) on `stop` or `restart` entries.
 
 ### Schedule Fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `cron` | string | required | Cron expression |
-| `misfire` | string | `ignore` | Policy for missed schedules. Any value other than `ignore` enables catch-up |
-| `catchupWindow` | duration | `24h` | Lookback duration to search for missed intervals relative to `now`. Applied only when `misfire != ignore` |
-| `maxCatchupRuns` | int | `10` | Maximum catch-up runs per schedule entry per scheduler restart. Applied only when `misfire = runAll` (`runOnce` and `runLatest` always dispatch at most 1) |
+| `catchup` | string | `false` | Policy for missed schedules: `false`/omitted (no catch-up), `latest` (latest missed only), `all` or `true` (all missed intervals) |
+| `catchupWindow` | duration | `24h` | Lookback duration to search for missed intervals relative to `now`. Applied only when `catchup != false` |
 
 #### Duration Format
 
@@ -140,20 +138,17 @@ Validation rules:
 
 - Tokens must be positive integers followed by a unit.
 - Empty strings, missing units (e.g. `2d12`), and negative values are invalid.
-- `0` or `0h` is invalid when `misfire != ignore`.
+- `0` or `0h` is invalid when `catchup != false`.
 
-### Misfire Policies
+### Catchup Policies
 
 | Policy | Behavior | Use Case |
 |--------|----------|----------|
-| `ignore` | Skip missed runs (current behavior) | Real-time only jobs, transient data |
-| `runOnce` | Execute the **earliest** missed interval only | Gap-filling — ensure the oldest missing data point is processed |
-| `runLatest` | Execute the **latest** missed interval only | Most common — ensure most recent data is processed |
-| `runAll` | Execute all missed runs up to `maxCatchupRuns` | Data pipelines needing complete backfill |
+| `false` (default) | Skip missed runs (current behavior) | Real-time only jobs, transient data |
+| `latest` | Execute the **latest** missed interval only | Most common — ensure most recent data is processed |
+| `all` / `true` | Execute all missed runs (bounded by global caps) | Data pipelines needing complete backfill |
 
-For `runOnce`, the selected run is the **earliest** missed interval within the replay window. Example: if the scheduler was down from 09:00–12:00 and the cron is hourly, `runOnce` fires the 09:00 interval only. This choice prioritizes completeness over recency and is best for gap-filling scenarios.
-
-For `runLatest`, the selected run is the **latest** missed interval within the replay window. Using the same example, `runLatest` fires the 11:00 interval only. This is the most common choice when only the most recent data matters (e.g., dashboard refreshes, status reports).
+For `latest`, the selected run is the **latest** missed interval within the replay window. Example: if the scheduler was down from 09:00–12:00 and the cron is hourly, `latest` fires the 11:00 interval only. This is the most common choice when only the most recent data matters (e.g., dashboard refreshes, status reports).
 
 ### Scope
 
@@ -169,7 +164,7 @@ If a DAG uses the map-form schedule (`schedule: { start: ..., stop: ..., restart
 schedule:
   start:
     cron: "0 9 * * *"
-    misfire: runAll
+    catchup: all
     catchupWindow: "6h"
   stop: "0 18 * * *"
 
@@ -177,9 +172,9 @@ schedule:
 schedule:
   start:
     - cron: "0 * * * *"
-      misfire: runAll
+      catchup: all
     - cron: "30 9 * * *"
-      misfire: runOnce
+      catchup: latest
   stop: "0 18 * * *"
 
 # Backward compatible: string values still work
@@ -195,10 +190,10 @@ A DAG may have multiple cron expressions (array form):
 ```yaml
 schedule:
   - cron: "0 * * * *"
-    misfire: runAll
+    catchup: all
     catchupWindow: "6h"
   - cron: "30 9 * * *"
-    misfire: runOnce
+    catchup: latest
     catchupWindow: "24h"
 ```
 
@@ -206,12 +201,12 @@ Each schedule entry is evaluated independently during catch-up detection. Overla
 
 Cap ordering:
 
-1. Apply `maxCatchupRuns` per schedule entry.
+1. Apply catchup policy per schedule entry (e.g. `latest` keeps only the most recent candidate).
 2. Merge runs **across schedule entries for the same DAG** ordered by scheduled time.
 3. Apply `scheduler.maxCatchupRunsPerDAG` (default 20) across all entries for the same DAG.
 4. Apply `scheduler.maxGlobalCatchupRuns` across all DAGs.
 
-`maxCatchupRuns` is a **per-restart budget** applied to the candidate list computed from the current watermarks. After a partial failure, the next restart recomputes from the last persisted watermark and applies a fresh budget to the remaining candidates.
+These caps are **per-restart budgets** applied to the candidate list computed from the current watermarks. After a partial failure, the next restart recomputes from the last persisted watermark and applies a fresh budget to the remaining candidates.
 
 ## Design
 
@@ -277,8 +272,8 @@ During catch-up, the watermark advances **per successful dispatch** to the sched
 
 > A dispatch is considered **successful** when the DAG run is persisted to the queue store. Subsequent failure to reach the coordinator is handled by the queue retry mechanism and does not affect the watermark.
 
-Catch-up dispatch is fire-and-forget; it does **not** wait for completion. Existing guards (for example, `skipIfSuccessful` or “already running” checks) are applied when dispatching. If a run is skipped because a guard indicates it has already been handled, it is treated as handled for watermark advancement.
-As a result, `runAll` can yield concurrent executions **only when the DAG allows it**; if a concurrency guard blocks new starts, missed intervals will be skipped and the watermark will advance past them.
+Catch-up dispatch is fire-and-forget; it does **not** wait for completion. Existing guards (for example, `skipIfSuccessful` or "already running" checks) are applied when dispatching. If a run is skipped because a guard indicates it has already been handled, it is treated as handled for watermark advancement.
+As a result, `all` can yield concurrent executions **only when the DAG allows it**; if a concurrency guard blocks new starts, missed intervals will be skipped and the watermark will advance past them.
 
 ### Environment Variables
 
@@ -344,23 +339,22 @@ The scheduler watermark is tied to the directory lock (`dirLock`). Only the lock
 
 ## Behavior Matrix
 
-| Scenario | `misfire=ignore` (default) | `misfire=runOnce` | `misfire=runLatest` | `misfire=runAll` |
-|----------|----------------------------|-------------------|---------------------|------------------|
-| First deploy (no prior runs) | Run from now only | Run from now only (`firstSeenAt = now`, nothing to backfill) | Run from now only (`firstSeenAt = now`, nothing to backfill) | Run from now only (`firstSeenAt = now`, nothing to backfill) |
-| Scheduler restart after 3h downtime | Jobs resume from now | Run the **earliest** missed interval within `catchupWindow` | Run the **latest** missed interval within `catchupWindow` | Run **all** missed intervals within `catchupWindow` (bounded by caps) |
-| DAG disabled then re-enabled | Run from now only | Backfill from the last dag-run start time (earliest missed within window) | Run the **latest** missed interval since last dag-run within window | Backfill all missed runs since last dag-run (bounded by caps) |
+| Scenario | `catchup: false` (default) | `catchup: latest` | `catchup: all` |
+|----------|----------------------------|-------------------|----------------|
+| First deploy (no prior runs) | Run from now only | Run from now only (`firstSeenAt = now`, nothing to backfill) | Run from now only (`firstSeenAt = now`, nothing to backfill) |
+| Scheduler restart after 3h downtime | Jobs resume from now | Run the **latest** missed interval within `catchupWindow` | Run **all** missed intervals within `catchupWindow` (bounded by caps) |
+| DAG disabled then re-enabled | Run from now only | Run the **latest** missed interval since last dag-run within window | Backfill all missed runs since last dag-run (bounded by caps) |
 
 ## Safety Mechanisms
 
 1. **Rate Limiting** — configurable delay between catch-up dispatches (default 100ms)
 2. **Global Limit** — `scheduler.maxGlobalCatchupRuns` (default 100) caps total catch-up runs per restart
 3. **Per-DAG Limit** — `scheduler.maxCatchupRunsPerDAG` (default 20) prevents one DAG from consuming the global budget
-4. **Per-Schedule Limit** — `maxCatchupRuns` (default 10) bounds `runAll` per schedule entry
-5. **Duplicate Prevention** — check if a dag-run already exists before dispatching
-6. **Time Boundaries** — `catchupWindow` truncates the replay horizon
-7. **Graceful Degradation** — missing watermark file = no catch-up (safe default)
-8. **Dispatch Atomicity** — watermark advances per successful dispatch; failures leave it at the last successful time
-9. **Scope Restriction** — only start schedules participate in catch-up
+4. **Duplicate Prevention** — check if a dag-run already exists before dispatching
+5. **Time Boundaries** — `catchupWindow` truncates the replay horizon
+6. **Graceful Degradation** — missing watermark file = no catch-up (safe default)
+7. **Dispatch Atomicity** — watermark advances per successful dispatch; failures leave it at the last successful time
+8. **Scope Restriction** — only start schedules participate in catch-up
 
 ## Observability
 
@@ -377,7 +371,7 @@ level=INFO msg="Catch-up started" dags_with_catchup=3 total_candidates=15 window
 
 **Per-DAG summary** (once per DAG that has catch-up work):
 ```
-level=INFO msg="Catch-up planned" dag="hourly-etl" policy="runAll" candidates=3 window="6h"
+level=INFO msg="Catch-up planned" dag="hourly-etl" policy="all" candidates=3 window="6h"
 ```
 
 **Per-dispatch** (once per catch-up run dispatched):
@@ -390,7 +384,7 @@ level=INFO msg="Catch-up run dispatched" dag="hourly-etl" scheduled_time="2026-0
 level=INFO msg="Catch-up run skipped" dag="hourly-etl" scheduled_time="2026-02-07T10:00:00Z" reason="cap_exceeded"
 ```
 
-Skip reasons: `cap_exceeded` (maxCatchupRuns/per-DAG/global cap hit), `already_exists` (duplicate prevention), `guard_blocked` (concurrency guard).
+Skip reasons: `cap_exceeded` (per-DAG/global cap hit), `already_exists` (duplicate prevention), `guard_blocked` (concurrency guard).
 
 **Catch-up completion summary** (once per restart):
 ```
@@ -424,7 +418,7 @@ The API surfaces catch-up metadata:
 
 ```
 $ dagu catchup --dry-run hourly-etl
-Catch-up preview for "hourly-etl" (policy: runAll, window: 6h)
+Catch-up preview for "hourly-etl" (policy: all, window: 6h)
 
   Scheduled Time           Action
   2026-02-07T09:00:00Z     dispatch
@@ -434,7 +428,7 @@ Catch-up preview for "hourly-etl" (policy: runAll, window: 6h)
 3 runs would be dispatched.
 ```
 
-This lets users verify catch-up behavior before enabling `misfire` on a DAG or after changing its configuration.
+This lets users verify catch-up behavior before enabling `catchup` on a DAG or after changing its configuration.
 
 **Status display.** `dagu status` shows catch-up state when the scheduler is actively processing catch-up:
 
@@ -445,8 +439,8 @@ Scheduler: running (catch-up in progress: 5/15 dispatched, 2 skipped)
 ## Migration
 
 1. **No breaking changes** — existing DAGs keep running unchanged.
-2. **Default behavior preserved** — `misfire: ignore` is the default, so nothing replays unless explicitly configured.
-3. **Opt-in** — users enable catch-up per DAG by setting `misfire`.
+2. **Default behavior preserved** — `catchup: false` is the default, so nothing replays unless explicitly configured.
+3. **Opt-in** — users enable catch-up per DAG by setting `catchup`.
 4. **Pre-existing DAGs** — on first startup after migration, DAGs with prior runs are bounded by the latest run time; DAGs with no runs get `firstSeenAt = now`, preventing replay of ancient schedules.
 5. **Legacy flag files** — lazily imported into the new metadata store, then removed.
 
@@ -462,13 +456,13 @@ steps:
     command: rm -rf /tmp/old-files
 ```
 
-### Daily Report with Run-Once
+### Daily Report with Latest
 
 ```yaml
 name: daily-report
 schedule:
   cron: "0 9 * * *"
-  misfire: runOnce
+  catchup: latest
   catchupWindow: "12h"
 steps:
   - name: generate
@@ -481,9 +475,8 @@ steps:
 name: hourly-etl
 schedule:
   cron: "0 * * * *"
-  misfire: runAll
+  catchup: all
   catchupWindow: "3d"
-  maxCatchupRuns: 48
 steps:
   - name: etl
     command: python etl.py --hour=${DAGU_SCHEDULED_TIME}
@@ -495,11 +488,10 @@ steps:
 name: mixed-schedule
 schedule:
   - cron: "0 * * * *"
-    misfire: runAll
+    catchup: all
     catchupWindow: "6h"
-    maxCatchupRuns: 6
   - cron: "30 9 * * *"
-    misfire: runOnce
+    catchup: latest
     catchupWindow: "1d"
 steps:
   - name: process
@@ -516,7 +508,7 @@ This walkthrough shows what a user sees end-to-end when catch-up fires.
 name: hourly-etl
 schedule:
   cron: "0 * * * *"
-  misfire: runAll
+  catchup: all
   catchupWindow: "6h"
 steps:
   - name: etl
@@ -529,7 +521,7 @@ steps:
 
 ```
 level=INFO msg="Catch-up started" dags_with_catchup=1 total_candidates=3 window_start="2026-02-07T09:05:00Z" window_end="2026-02-07T12:02:00Z"
-level=INFO msg="Catch-up planned" dag="hourly-etl" policy="runAll" candidates=3 window="6h"
+level=INFO msg="Catch-up planned" dag="hourly-etl" policy="all" candidates=3 window="6h"
 level=INFO msg="Catch-up run dispatched" dag="hourly-etl" scheduled_time="2026-02-07T10:00:00Z" run_id="run-a1b2"
 level=INFO msg="Catch-up run dispatched" dag="hourly-etl" scheduled_time="2026-02-07T11:00:00Z" run_id="run-c3d4"
 level=INFO msg="Catch-up run dispatched" dag="hourly-etl" scheduled_time="2026-02-07T12:00:00Z" run_id="run-e5f6"
@@ -557,7 +549,7 @@ So `python etl.py --hour=2026-02-07T10:00:00Z` processes the correct historical 
 
 ```
 $ dagu catchup --dry-run hourly-etl
-Catch-up preview for "hourly-etl" (policy: runAll, window: 6h)
+Catch-up preview for "hourly-etl" (policy: all, window: 6h)
 
   Scheduled Time           Action
   2026-02-07T10:00:00Z     dispatch

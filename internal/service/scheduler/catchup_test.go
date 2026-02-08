@@ -81,12 +81,12 @@ func TestCatchupEngine_NoCatchupConfigured(t *testing.T) {
 
 	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
 
-	// DAG with misfire=ignore (default)
+	// DAG with catchup=off (default)
 	dags := map[string]*core.DAG{
 		"test.yaml": {
 			Name: "test",
 			Schedule: []core.Schedule{
-				{Expression: "0 * * * *", Parsed: parseCron(t, "0 * * * *"), Misfire: core.MisfirePolicyIgnore},
+				{Expression: "0 * * * *", Parsed: parseCron(t, "0 * * * *"), Catchup: core.CatchupPolicyOff},
 			},
 		},
 	}
@@ -118,7 +118,7 @@ func TestCatchupEngine_MissingWatermark(t *testing.T) {
 		"test.yaml": {
 			Name: "test",
 			Schedule: []core.Schedule{
-				{Expression: "0 * * * *", Parsed: parseCron(t, "0 * * * *"), Misfire: core.MisfirePolicyRunAll},
+				{Expression: "0 * * * *", Parsed: parseCron(t, "0 * * * *"), Catchup: core.CatchupPolicyAll},
 			},
 		},
 	}
@@ -156,7 +156,7 @@ func TestCatchupEngine_GenerateCandidates_RunAll(t *testing.T) {
 		"test.yaml": {
 			Name: "test",
 			Schedule: []core.Schedule{
-				{Expression: "0 * * * *", Parsed: sched, Misfire: core.MisfirePolicyRunAll},
+				{Expression: "0 * * * *", Parsed: sched, Catchup: core.CatchupPolicyAll},
 			},
 		},
 	}
@@ -168,40 +168,6 @@ func TestCatchupEngine_GenerateCandidates_RunAll(t *testing.T) {
 	// 12:00 is NOT after 12:00 so it should be included... but we check > not >=
 	// Let's just check we get at least 2 candidates
 	assert.GreaterOrEqual(t, len(candidates), 2)
-}
-
-func TestCatchupEngine_GenerateCandidates_RunOnce(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	now := time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC)
-	lastTick := now.Add(-3 * time.Hour)
-	clock := testClock(now)
-
-	store := NewWatermarkStore(tmpDir)
-	require.NoError(t, store.Save(lastTick))
-
-	cfg := &config.Config{}
-	cfg.Scheduler.MaxGlobalCatchupRuns = 100
-	cfg.Scheduler.MaxCatchupRunsPerDAG = 20
-	cfg.Scheduler.CatchupRateLimit = time.Millisecond
-
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
-
-	sched := parseCron(t, "0 * * * *")
-	dags := map[string]*core.DAG{
-		"test.yaml": {
-			Name: "test",
-			Schedule: []core.Schedule{
-				{Expression: "0 * * * *", Parsed: sched, Misfire: core.MisfirePolicyRunOnce},
-			},
-		},
-	}
-
-	candidates := engine.generateCandidates(context.Background(), dags, lastTick, now)
-	// RunOnce should only keep the earliest candidate
-	assert.Equal(t, 1, len(candidates))
-	assert.Equal(t, time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC), candidates[0].scheduledTime)
 }
 
 func TestCatchupEngine_GenerateCandidates_RunLatest(t *testing.T) {
@@ -227,7 +193,7 @@ func TestCatchupEngine_GenerateCandidates_RunLatest(t *testing.T) {
 		"test.yaml": {
 			Name: "test",
 			Schedule: []core.Schedule{
-				{Expression: "0 * * * *", Parsed: sched, Misfire: core.MisfirePolicyRunLatest},
+				{Expression: "0 * * * *", Parsed: sched, Catchup: core.CatchupPolicyLatest},
 			},
 		},
 	}
@@ -262,7 +228,7 @@ func TestCatchupEngine_MaxCatchupRunsCap(t *testing.T) {
 		"test.yaml": {
 			Name: "test",
 			Schedule: []core.Schedule{
-				{Expression: "0 * * * *", Parsed: sched, Misfire: core.MisfirePolicyRunAll},
+				{Expression: "0 * * * *", Parsed: sched, Catchup: core.CatchupPolicyAll},
 			},
 		},
 	}
@@ -294,56 +260,19 @@ func TestCatchupEngine_MaxGlobalCatchupRunsCap(t *testing.T) {
 		"dag1.yaml": {
 			Name: "dag1",
 			Schedule: []core.Schedule{
-				{Expression: "0 * * * *", Parsed: sched, Misfire: core.MisfirePolicyRunAll},
+				{Expression: "0 * * * *", Parsed: sched, Catchup: core.CatchupPolicyAll},
 			},
 		},
 		"dag2.yaml": {
 			Name: "dag2",
 			Schedule: []core.Schedule{
-				{Expression: "0 * * * *", Parsed: sched, Misfire: core.MisfirePolicyRunAll},
+				{Expression: "0 * * * *", Parsed: sched, Catchup: core.CatchupPolicyAll},
 			},
 		},
 	}
 
 	candidates := engine.generateCandidates(context.Background(), dags, lastTick, now)
 	assert.Equal(t, 3, len(candidates))
-}
-
-func TestCatchupEngine_PerEntryCap(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	now := time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC)
-	lastTick := now.Add(-24 * time.Hour)
-	clock := testClock(now)
-
-	store := NewWatermarkStore(tmpDir)
-	require.NoError(t, store.Save(lastTick))
-
-	cfg := &config.Config{}
-	cfg.Scheduler.MaxGlobalCatchupRuns = 100
-	cfg.Scheduler.MaxCatchupRunsPerDAG = 100
-	cfg.Scheduler.CatchupRateLimit = time.Millisecond
-
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
-
-	sched := parseCron(t, "0 * * * *")
-	dags := map[string]*core.DAG{
-		"test.yaml": {
-			Name: "test",
-			Schedule: []core.Schedule{
-				{
-					Expression:     "0 * * * *",
-					Parsed:         sched,
-					Misfire:        core.MisfirePolicyRunAll,
-					MaxCatchupRuns: 2, // Per-entry cap of 2
-				},
-			},
-		},
-	}
-
-	candidates := engine.generateCandidates(context.Background(), dags, lastTick, now)
-	assert.Equal(t, 2, len(candidates))
 }
 
 func TestCatchupEngine_CatchupWindow(t *testing.T) {
@@ -372,7 +301,7 @@ func TestCatchupEngine_CatchupWindow(t *testing.T) {
 				{
 					Expression:    "0 * * * *",
 					Parsed:        sched,
-					Misfire:       core.MisfirePolicyRunAll,
+					Catchup:       core.CatchupPolicyAll,
 					CatchupWindow: 3 * time.Hour, // Only look back 3 hours
 				},
 			},

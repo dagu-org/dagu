@@ -602,31 +602,25 @@ type Schedule struct {
 	Expression string `json:"expression"`
 	// Parsed is the parsed cron schedule.
 	Parsed cron.Schedule `json:"-"`
-	// Misfire is the policy for handling missed runs during scheduler downtime.
-	Misfire MisfirePolicy `json:"misfire,omitempty"`
+	// Catchup is the policy for handling missed runs during scheduler downtime.
+	Catchup CatchupPolicy `json:"catchup,omitempty"`
 	// CatchupWindow limits how far back the scheduler looks for missed runs.
 	CatchupWindow time.Duration `json:"catchupWindow,omitempty"`
-	// MaxCatchupRuns caps the number of catch-up runs per schedule entry.
-	MaxCatchupRuns int `json:"maxCatchupRuns,omitempty"`
 }
 
 // MarshalJSON implements the json.Marshaler interface.
 func (s Schedule) MarshalJSON() ([]byte, error) {
 	type alias struct {
-		Expression     string `json:"expression"`
-		Misfire        string `json:"misfire,omitempty"`
-		CatchupWindow  string `json:"catchupWindow,omitempty"`
-		MaxCatchupRuns int    `json:"maxCatchupRuns,omitempty"`
+		Expression    string `json:"expression"`
+		Catchup       string `json:"catchup,omitempty"`
+		CatchupWindow string `json:"catchupWindow,omitempty"`
 	}
 	a := alias{Expression: s.Expression}
-	if s.Misfire != MisfirePolicyIgnore {
-		a.Misfire = s.Misfire.String()
+	if s.Catchup != CatchupPolicyOff {
+		a.Catchup = s.Catchup.String()
 	}
 	if s.CatchupWindow > 0 {
 		a.CatchupWindow = s.CatchupWindow.String()
-	}
-	if s.MaxCatchupRuns > 0 {
-		a.MaxCatchupRuns = s.MaxCatchupRuns
 	}
 	return json.Marshal(a)
 }
@@ -635,10 +629,9 @@ func (s Schedule) MarshalJSON() ([]byte, error) {
 // It also parses the cron expression to populate the Parsed field.
 func (s *Schedule) UnmarshalJSON(data []byte) error {
 	var alias struct {
-		Expression     string `json:"expression"`
-		Misfire        string `json:"misfire,omitempty"`
-		CatchupWindow  string `json:"catchupWindow,omitempty"`
-		MaxCatchupRuns int    `json:"maxCatchupRuns,omitempty"`
+		Expression    string `json:"expression"`
+		Catchup       string `json:"catchup,omitempty"`
+		CatchupWindow string `json:"catchupWindow,omitempty"`
 	}
 	if err := json.Unmarshal(data, &alias); err != nil {
 		return err
@@ -655,8 +648,8 @@ func (s *Schedule) UnmarshalJSON(data []byte) error {
 	}
 	s.Parsed = parsed
 
-	if alias.Misfire != "" {
-		s.Misfire, err = ParseMisfirePolicy(alias.Misfire)
+	if alias.Catchup != "" {
+		s.Catchup, err = ParseCatchupPolicy(alias.Catchup)
 		if err != nil {
 			return err
 		}
@@ -667,7 +660,6 @@ func (s *Schedule) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("invalid catchupWindow %q: %w", alias.CatchupWindow, err)
 		}
 	}
-	s.MaxCatchupRuns = alias.MaxCatchupRuns
 	return nil
 }
 

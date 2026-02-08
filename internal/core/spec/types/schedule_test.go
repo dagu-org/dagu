@@ -303,3 +303,81 @@ func TestScheduleValue_AdditionalCoverage(t *testing.T) {
 		assert.Nil(t, s.Starts())
 	})
 }
+
+func TestScheduleValue_CatchupEntries(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		input         string
+		wantErr       bool
+		errContains   string
+		wantEntries   int
+		wantCatchup   string
+		wantWindow    string
+	}{
+		{
+			name:        "CatchupAll",
+			input:       `{cron: "0 * * * *", catchup: all, catchupWindow: "6h"}`,
+			wantEntries: 1,
+			wantCatchup: "all",
+			wantWindow:  "6h",
+		},
+		{
+			name:        "CatchupTrue",
+			input:       `{cron: "0 * * * *", catchup: "true"}`,
+			wantEntries: 1,
+			wantCatchup: "true",
+		},
+		{
+			name:        "CatchupLatest",
+			input:       `{cron: "0 * * * *", catchup: latest}`,
+			wantEntries: 1,
+			wantCatchup: "latest",
+		},
+		{
+			name:        "CatchupFalse",
+			input:       `{cron: "0 * * * *", catchup: "false"}`,
+			wantEntries: 1,
+			wantCatchup: "false",
+		},
+		{
+			name:        "OldMisfireKeyRejected",
+			input:       `{cron: "0 * * * *", misfire: runAll}`,
+			wantErr:     true,
+			errContains: "unknown schedule-entry key",
+		},
+		{
+			name:        "OldMaxCatchupRunsKeyRejected",
+			input:       `{cron: "0 * * * *", catchup: all, maxCatchupRuns: 10}`,
+			wantErr:     true,
+			errContains: "unknown schedule-entry key",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var s types.ScheduleValue
+			err := yaml.Unmarshal([]byte(tt.input), &s)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
+			require.NoError(t, err)
+			entries := s.StartEntries()
+			assert.Len(t, entries, tt.wantEntries)
+			if tt.wantEntries > 0 {
+				if tt.wantCatchup != "" {
+					assert.Equal(t, tt.wantCatchup, entries[0].Catchup)
+				}
+				if tt.wantWindow != "" {
+					assert.Equal(t, tt.wantWindow, entries[0].CatchupWindow)
+				}
+			}
+		})
+	}
+}
