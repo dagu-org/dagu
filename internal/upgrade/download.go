@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/go-resty/resty/v2"
 )
 
@@ -38,93 +39,88 @@ func (pw *progressWriter) Write(p []byte) (int, error) {
 }
 
 // Download downloads a file with checksum verification.
+// The entire GET + stream-to-file + checksum-verify is wrapped in a retry loop
+// so that mid-stream failures (io.Copy errors) are also retried.
 func Download(ctx context.Context, opts DownloadOptions) error {
 	dir := filepath.Dir(opts.Destination)
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
-	tempFile, err := os.CreateTemp(dir, "dagu-download-*.tmp")
-	if err != nil {
-		return fmt.Errorf("failed to create temp file: %w", err)
-	}
-	tempPath := tempFile.Name()
-	defer func() {
-		_ = tempFile.Close()
-		if _, err := os.Stat(tempPath); err == nil {
-			_ = os.Remove(tempPath)
-		}
-	}()
+	client := resty.New().SetTimeout(0) // No timeout for downloads, no retry config
 
-	client := resty.New().
-		SetTimeout(0). // No timeout for downloads
-		SetRetryCount(3).
-		AddRetryCondition(func(r *resty.Response, err error) bool {
-			if err != nil {
-				return true
-			}
-			code := r.StatusCode()
-			return code == 429 || (code >= 500 && code <= 504)
-		})
-
+	// HEAD for content-length (best-effort, outside retry)
 	var contentLength int64
 	if opts.OnProgress != nil {
-		sizeResp, sizeErr := client.R().
-			SetContext(ctx).
-			Head(opts.URL)
+		sizeResp, sizeErr := client.R().SetContext(ctx).Head(opts.URL)
 		if sizeErr == nil && sizeResp.StatusCode() == 200 {
 			contentLength = sizeResp.RawResponse.ContentLength
 		}
 	}
 
-	var writer io.Writer = tempFile
-	if opts.OnProgress != nil {
-		writer = &progressWriter{
-			writer:     tempFile,
-			total:      contentLength,
-			onProgress: opts.OnProgress,
+	policy := newUpgradeRetryPolicy()
+
+	return backoff.Retry(ctx, func(ctx context.Context) error {
+		// Fresh temp file per attempt
+		tempFile, err := os.CreateTemp(dir, "dagu-download-*.tmp")
+		if err != nil {
+			return &nonRetriableError{err: fmt.Errorf("failed to create temp file: %w", err)}
 		}
-	}
+		tempPath := tempFile.Name()
+		defer func() {
+			_ = tempFile.Close()
+			if _, statErr := os.Stat(tempPath); statErr == nil {
+				_ = os.Remove(tempPath)
+			}
+		}()
 
-	resp, err := client.R().
-		SetContext(ctx).
-		SetDoNotParseResponse(true).
-		Get(opts.URL)
+		// Progress writer (reset per attempt)
+		var writer io.Writer = tempFile
+		if opts.OnProgress != nil {
+			writer = &progressWriter{writer: tempFile, total: contentLength, onProgress: opts.OnProgress}
+		}
 
-	if err != nil {
-		return fmt.Errorf("download failed: %w", err)
-	}
+		// GET
+		resp, err := client.R().SetContext(ctx).SetDoNotParseResponse(true).Get(opts.URL)
+		if err != nil {
+			return fmt.Errorf("download failed: %w", err)
+		}
 
-	if resp.StatusCode() != 200 {
+		code := resp.StatusCode()
+		if code != 200 {
+			if resp.RawBody() != nil {
+				_ = resp.RawBody().Close()
+			}
+			return &httpError{statusCode: code, message: fmt.Sprintf("download failed with status %d", code)}
+		}
+
+		// Stream to file
 		if resp.RawBody() != nil {
+			_, copyErr := io.Copy(writer, resp.RawBody())
 			_ = resp.RawBody().Close()
+			if copyErr != nil {
+				return fmt.Errorf("failed to write downloaded data: %w", copyErr)
+			}
 		}
-		return fmt.Errorf("download failed with status %d", resp.StatusCode())
-	}
 
-	if resp.RawBody() != nil {
-		_, copyErr := io.Copy(writer, resp.RawBody())
-		_ = resp.RawBody().Close()
-		if copyErr != nil {
-			return fmt.Errorf("failed to write downloaded data: %w", copyErr)
+		if err := tempFile.Close(); err != nil {
+			return &nonRetriableError{err: fmt.Errorf("failed to close temp file: %w", err)}
 		}
-	}
 
-	if err := tempFile.Close(); err != nil {
-		return fmt.Errorf("failed to close temp file: %w", err)
-	}
-
-	if opts.ExpectedHash != "" {
-		if err := VerifyChecksum(tempPath, opts.ExpectedHash); err != nil {
-			return err
+		// Verify checksum
+		if opts.ExpectedHash != "" {
+			if err := VerifyChecksum(tempPath, opts.ExpectedHash); err != nil {
+				return &nonRetriableError{err: err}
+			}
 		}
-	}
 
-	if err := os.Rename(tempPath, opts.Destination); err != nil {
-		return fmt.Errorf("failed to move downloaded file: %w", err)
-	}
+		// Atomic move
+		if err := os.Rename(tempPath, opts.Destination); err != nil {
+			return &nonRetriableError{err: fmt.Errorf("failed to move downloaded file: %w", err)}
+		}
 
-	return nil
+		return nil
+	}, policy, isRetriableError)
 }
 
 // VerifyChecksum computes SHA256 and compares with expected hash.

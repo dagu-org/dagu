@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/mholt/archives"
 )
@@ -54,6 +55,10 @@ func Install(ctx context.Context, opts InstallOptions) (*InstallResult, error) {
 
 	if opts.CreateBackup {
 		backupPath := opts.TargetPath + ".bak"
+		if _, err := os.Stat(backupPath); err == nil {
+			// Backup already exists; use a timestamped name to avoid overwriting
+			backupPath = fmt.Sprintf("%s.bak.%s", opts.TargetPath, time.Now().Format("20060102150405"))
+		}
 		if err := copyFile(opts.TargetPath, backupPath); err != nil {
 			return nil, fmt.Errorf("failed to create backup: %w", err)
 		}
@@ -204,24 +209,46 @@ func replaceUnixBinary(src, target string, perm os.FileMode) error {
 }
 
 // replaceWindowsBinary replaces the binary on Windows systems.
+// Mirrors the Unix approach: copy new binary to a temp file in the same
+// directory, rename old binary to .old, then rename temp to target.
+// This reduces the vulnerable window from a full copy to just two renames.
 func replaceWindowsBinary(src, target string, perm os.FileMode) error {
+	dir := filepath.Dir(target)
+	tempFile, err := os.CreateTemp(dir, "dagu-new-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tempPath := tempFile.Name()
+	_ = tempFile.Close()
+
+	if err := copyFile(src, tempPath); err != nil {
+		_ = os.Remove(tempPath)
+		return err
+	}
+
+	if err := os.Chmod(tempPath, perm); err != nil {
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("failed to set permissions: %w", err)
+	}
+
 	oldPath := target + ".old"
 	_ = os.Remove(oldPath)
 
 	if err := os.Rename(target, oldPath); err != nil {
 		if !os.IsNotExist(err) {
+			_ = os.Remove(tempPath)
 			return fmt.Errorf("failed to rename old binary: %w", err)
 		}
 	}
 
-	if err := copyFile(src, target); err != nil {
+	if err := os.Rename(tempPath, target); err != nil {
+		// Try to restore old binary
 		_ = os.Rename(oldPath, target)
-		return err
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("failed to replace binary: %w", err)
 	}
 
-	_ = os.Chmod(target, perm)
 	_ = os.Remove(oldPath)
-
 	return nil
 }
 
