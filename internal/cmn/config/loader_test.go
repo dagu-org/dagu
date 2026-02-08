@@ -214,6 +214,9 @@ func TestLoad_Env(t *testing.T) {
 			LockStaleThreshold:      30 * time.Second,
 			LockRetryInterval:       5 * time.Second,
 			ZombieDetectionInterval: 90 * time.Second,
+			MaxGlobalCatchupRuns:    100,
+			MaxCatchupRunsPerDAG:    20,
+			CatchupRateLimit:        100 * time.Millisecond,
 		},
 		Monitoring: MonitoringConfig{
 			Retention: 24 * time.Hour,
@@ -481,6 +484,9 @@ scheduler:
 			LockStaleThreshold:      50 * time.Second,
 			LockRetryInterval:       10 * time.Second,
 			ZombieDetectionInterval: 60 * time.Second,
+			MaxGlobalCatchupRuns:    100,
+			MaxCatchupRunsPerDAG:    20,
+			CatchupRateLimit:        100 * time.Millisecond,
 		},
 		Monitoring: MonitoringConfig{
 			Retention: 24 * time.Hour,
