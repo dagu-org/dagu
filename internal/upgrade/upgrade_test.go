@@ -21,6 +21,23 @@ import (
 	"github.com/go-resty/resty/v2"
 )
 
+var _ CacheStore = (*mockCacheStore)(nil)
+
+// mockCacheStore implements CacheStore for testing.
+type mockCacheStore struct {
+	cache *UpgradeCheckCache
+	err   error
+}
+
+func (m *mockCacheStore) Load() (*UpgradeCheckCache, error) {
+	return m.cache, m.err
+}
+
+func (m *mockCacheStore) Save(cache *UpgradeCheckCache) error {
+	m.cache = cache
+	return m.err
+}
+
 func TestParseVersion(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -537,76 +554,10 @@ func TestIsCacheValid(t *testing.T) {
 	}
 }
 
-func TestCacheSaveAndLoad(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("DAGU_HOME", tmpDir)
-
-	cache := &UpgradeCheckCache{
-		LastCheck:       time.Now().Truncate(time.Second),
-		LatestVersion:   "v1.30.3",
-		CurrentVersion:  "v1.30.0",
-		UpdateAvailable: true,
-	}
-
-	if err := SaveCache(cache); err != nil {
-		t.Fatalf("SaveCache() error: %v", err)
-	}
-
-	loaded, err := LoadCache()
-	if err != nil {
-		t.Fatalf("LoadCache() error: %v", err)
-	}
-	if loaded == nil {
-		t.Fatal("LoadCache() returned nil")
-	}
-	if loaded.LatestVersion != cache.LatestVersion {
-		t.Errorf("LoadCache().LatestVersion = %q, want %q", loaded.LatestVersion, cache.LatestVersion)
-	}
-	if loaded.CurrentVersion != cache.CurrentVersion {
-		t.Errorf("LoadCache().CurrentVersion = %q, want %q", loaded.CurrentVersion, cache.CurrentVersion)
-	}
-	if loaded.UpdateAvailable != cache.UpdateAvailable {
-		t.Errorf("LoadCache().UpdateAvailable = %v, want %v", loaded.UpdateAvailable, cache.UpdateAvailable)
-	}
-}
-
-func TestLoadCacheNonExistent(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("DAGU_HOME", tmpDir)
-
-	cache, err := LoadCache()
-	if err != nil {
-		t.Errorf("LoadCache() error for non-existent file: %v", err)
-	}
-	if cache != nil {
-		t.Error("LoadCache() should return nil for non-existent cache")
-	}
-}
-
-func TestLoadCacheInvalidJSON(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("DAGU_HOME", tmpDir)
-
-	cachePath := filepath.Join(tmpDir, CacheFileName)
-	if err := os.WriteFile(cachePath, []byte("invalid json{"), 0600); err != nil {
-		t.Fatalf("Failed to write test file: %v", err)
-	}
-
-	cache, err := LoadCache()
-	if err != nil {
-		t.Errorf("LoadCache() should not error on invalid JSON: %v", err)
-	}
-	if cache != nil {
-		t.Error("LoadCache() should return nil for invalid JSON")
-	}
-}
-
 func TestGetCachedUpdateInfo(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("DAGU_HOME", tmpDir)
-
 	t.Run("no cache exists", func(t *testing.T) {
-		if result := GetCachedUpdateInfo(); result != nil {
+		store := &mockCacheStore{}
+		if result := GetCachedUpdateInfo(store); result != nil {
 			t.Error("GetCachedUpdateInfo() should return nil when no cache exists")
 		}
 	})
@@ -618,11 +569,9 @@ func TestGetCachedUpdateInfo(t *testing.T) {
 			CurrentVersion:  "v1.30.0",
 			UpdateAvailable: true,
 		}
-		if err := SaveCache(cache); err != nil {
-			t.Fatalf("SaveCache() error: %v", err)
-		}
+		store := &mockCacheStore{cache: cache}
 
-		result := GetCachedUpdateInfo()
+		result := GetCachedUpdateInfo(store)
 		if result == nil {
 			t.Fatal("GetCachedUpdateInfo() should return cache")
 		}
@@ -638,54 +587,19 @@ func TestGetCachedUpdateInfo(t *testing.T) {
 			CurrentVersion:  "v1.30.0",
 			UpdateAvailable: true,
 		}
-		if err := SaveCache(cache); err != nil {
-			t.Fatalf("SaveCache() error: %v", err)
-		}
+		store := &mockCacheStore{cache: cache}
 
-		if result := GetCachedUpdateInfo(); result != nil {
+		if result := GetCachedUpdateInfo(store); result != nil {
 			t.Error("GetCachedUpdateInfo() should return nil for very stale cache")
 		}
 	})
 }
 
-func TestGetCacheDir(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("DAGU_HOME", tmpDir)
-
-	dir, err := GetCacheDir()
-	if err != nil {
-		t.Fatalf("GetCacheDir() error: %v", err)
-	}
-	if dir == "" {
-		t.Error("GetCacheDir() returned empty string")
-	}
-
-	info, err := os.Stat(dir)
-	if err != nil {
-		t.Errorf("GetCacheDir() returned non-existent directory: %v", err)
-	}
-	if !info.IsDir() {
-		t.Error("GetCacheDir() should return a directory")
-	}
-}
-
-func TestGetCachePath(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("DAGU_HOME", tmpDir)
-
-	path, err := GetCachePath()
-	if err != nil {
-		t.Fatalf("GetCachePath() error: %v", err)
-	}
-	if !strings.HasSuffix(path, CacheFileName) {
-		t.Errorf("GetCachePath() = %q, should end with %q", path, CacheFileName)
-	}
-}
-
 func TestCheckAndUpdateCacheDevVersion(t *testing.T) {
+	store := &mockCacheStore{}
 	devVersions := []string{"dev", "0.0.0"}
 	for _, v := range devVersions {
-		cache, err := CheckAndUpdateCache(v)
+		cache, err := CheckAndUpdateCache(store, v)
 		if err != nil {
 			t.Errorf("CheckAndUpdateCache(%s) error: %v", v, err)
 		}
@@ -696,20 +610,15 @@ func TestCheckAndUpdateCacheDevVersion(t *testing.T) {
 }
 
 func TestCheckAndUpdateCacheWithValidCache(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("DAGU_HOME", tmpDir)
-
 	cache := &UpgradeCheckCache{
 		LastCheck:       time.Now(),
 		LatestVersion:   "v1.30.3",
 		CurrentVersion:  "v1.30.0",
 		UpdateAvailable: true,
 	}
-	if err := SaveCache(cache); err != nil {
-		t.Fatalf("SaveCache() error: %v", err)
-	}
+	store := &mockCacheStore{cache: cache}
 
-	result, err := CheckAndUpdateCache("v1.30.0")
+	result, err := CheckAndUpdateCache(store, "v1.30.0")
 	if err != nil {
 		t.Fatalf("CheckAndUpdateCache() error: %v", err)
 	}

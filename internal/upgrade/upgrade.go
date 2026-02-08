@@ -245,7 +245,7 @@ func FetchReleaseInfo(ctx context.Context, opts Options) (*ReleaseInfo, error) {
 }
 
 // UpgradeWithReleaseInfo performs the upgrade using pre-fetched release information.
-func UpgradeWithReleaseInfo(ctx context.Context, opts Options, info *ReleaseInfo) (*Result, error) {
+func UpgradeWithReleaseInfo(ctx context.Context, opts Options, info *ReleaseInfo, store CacheStore) (*Result, error) {
 	result := &Result{
 		CurrentVersion: config.Version,
 		DryRun:         opts.DryRun,
@@ -342,7 +342,7 @@ func UpgradeWithReleaseInfo(ctx context.Context, opts Options, info *ReleaseInfo
 	}
 
 	// Update cache with new version info
-	_ = SaveCache(&UpgradeCheckCache{
+	_ = store.Save(&UpgradeCheckCache{
 		LastCheck:       time.Now(),
 		CurrentVersion:  info.Release.TagName,
 		LatestVersion:   info.Release.TagName,

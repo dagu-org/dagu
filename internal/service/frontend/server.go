@@ -36,6 +36,7 @@ import (
 	"github.com/dagu-org/dagu/internal/gitsync"
 	_ "github.com/dagu-org/dagu/internal/llm/allproviders" // Register LLM providers
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
+	"github.com/dagu-org/dagu/internal/persis/fileupgradecheck"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
 	"github.com/dagu-org/dagu/internal/persis/fileconversation"
@@ -192,10 +193,17 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		}
 	}
 
-	// Check for updates asynchronously (populates cache for next startup)
-	go func() { _, _ = upgrade.CheckAndUpdateCache(config.Version) }()
+	upgradeStore, err := fileupgradecheck.New(cfg.Paths.DataDir)
+	if err != nil {
+		logger.Warn(ctx, "Failed to create upgrade check store", tag.Error(err))
+	}
 
-	updateAvailable, latestVersion := getUpdateInfo()
+	// Check for updates asynchronously (populates cache for next startup)
+	if upgradeStore != nil {
+		go func() { _, _ = upgrade.CheckAndUpdateCache(upgradeStore, config.Version) }()
+	}
+
+	updateAvailable, latestVersion := getUpdateInfo(upgradeStore)
 
 	srv := &Server{
 		config:           cfg,
@@ -245,8 +253,11 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 }
 
 // getUpdateInfo returns update availability and latest version from cache.
-func getUpdateInfo() (updateAvailable bool, latestVersion string) {
-	cache := upgrade.GetCachedUpdateInfo()
+func getUpdateInfo(store upgrade.CacheStore) (updateAvailable bool, latestVersion string) {
+	if store == nil {
+		return false, ""
+	}
+	cache := upgrade.GetCachedUpdateInfo(store)
 	if cache == nil {
 		return false, ""
 	}
