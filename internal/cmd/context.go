@@ -216,9 +216,9 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		return nil, fmt.Errorf("failed to initialize namespace store: %w", err)
 	}
 
-	// Auto-migrate existing data into the default namespace on first startup.
-	if err := migrateToDefaultNamespace(cfg.Paths); err != nil {
-		return nil, fmt.Errorf("failed to run namespace migration: %w", err)
+	// Warn if namespace migration has not been run yet.
+	if needed, reason := needsNamespaceMigration(cfg.Paths); needed {
+		logger.Warn(ctx, reason)
 	}
 
 	// Log key configuration settings for debugging

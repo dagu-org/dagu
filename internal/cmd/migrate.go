@@ -18,10 +18,12 @@ func Migrate() *cobra.Command {
 		Long: `Migrate various types of legacy data to new formats.
 
 Available subcommands:
-  history - Migrate DAG run history from v1.16 format to v1.17+ format`,
+  history   - Migrate DAG run history from v1.16 format to v1.17+ format
+  namespace - Migrate existing data into the default namespace`,
 	}
 
 	cmd.AddCommand(MigrateHistoryCommand())
+	cmd.AddCommand(MigrateNamespaceCommand())
 	return cmd
 }
 
@@ -130,4 +132,30 @@ func runMigration(ctx *Context) error {
 	}
 
 	return nil
+}
+
+// MigrateNamespaceCommand creates a command to migrate data into the default namespace.
+func MigrateNamespaceCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "namespace",
+		Short: "Migrate existing data into the default namespace",
+		Long: `Migrate existing DAG definitions, run data, and agent conversations into the
+default namespace directory structure.
+
+This command will:
+- Move DAG YAML files from the root DAGs directory into the default namespace subdirectory
+- Move dag-runs, proc, queue, suspend, and gitsync data into namespace-scoped directories
+- Tag agent conversations with the default namespace
+- Write a marker file to prevent re-migration on subsequent runs
+
+Use --dry-run to preview what would be migrated without making changes.
+
+Examples:
+  dagu migrate namespace
+  dagu migrate namespace --dry-run`,
+	}
+
+	return NewCommand(cmd, []commandLineFlag{dryRunFlag}, func(ctx *Context, _ []string) error {
+		return runNamespaceMigrationCommand(ctx)
+	})
 }

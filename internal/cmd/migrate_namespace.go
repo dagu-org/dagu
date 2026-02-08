@@ -9,40 +9,64 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/persis/filenamespace"
 )
 
 const namespaceMigratedMarker = ".namespace-migrated"
 
-// migrateToDefaultNamespace moves existing DAG definitions and run data
-// into the default namespace subdirectory ({shortID}). The migration is
-// idempotent: a marker file prevents re-execution on subsequent startups.
-// Environments with already namespace-scoped paths (e.g., test setups) are
-// detected and skipped automatically.
-func migrateToDefaultNamespace(paths config.PathsConfig) error {
+// MigrationResult reports what the namespace migration did (or would do in dry-run mode).
+type MigrationResult struct {
+	DAGFilesMoved       int
+	DirEntriesMoved     map[string]int // "dag-runs", "proc", "queue", "suspend", "gitsync"
+	ConversationsTagged int
+	AlreadyMigrated     bool // marker file existed
+	AlreadyScoped       bool // paths already namespace-scoped
+}
+
+func (r *MigrationResult) totalMigrated() int {
+	total := r.DAGFilesMoved + r.ConversationsTagged
+	for _, n := range r.DirEntriesMoved {
+		total += n
+	}
+	return total
+}
+
+// runNamespaceMigration moves existing DAG definitions and run data into the
+// default namespace subdirectory ({shortID}). When dryRun is true it counts
+// what would be moved without touching the filesystem.
+func runNamespaceMigration(paths config.PathsConfig, dryRun bool) (*MigrationResult, error) {
+	result := &MigrationResult{
+		DirEntriesMoved: make(map[string]int),
+	}
+
 	markerPath := filepath.Join(paths.DataDir, namespaceMigratedMarker)
 
 	if fileExists(markerPath) {
 		slog.Debug("namespace migration: already completed, skipping")
-		return nil
+		result.AlreadyMigrated = true
+		return result, nil
 	}
 
-	// If paths are already namespace-scoped (e.g., DAGRunsDir is {DataDir}/0000/dag-runs),
-	// write the marker and skip — no migration needed.
 	if isAlreadyNamespaceScoped(paths) {
 		slog.Debug("namespace migration: paths already namespace-scoped, skipping")
-		return writeMarker(markerPath)
+		result.AlreadyScoped = true
+		if !dryRun {
+			if err := writeMarker(markerPath); err != nil {
+				return nil, err
+			}
+		}
+		return result, nil
 	}
 
 	defaultShortID := filenamespace.DefaultShortID
-	migrated := false
 
 	// Move DAG YAML files from root DAGsDir to {DAGsDir}/{defaultShortID}/
-	moved, err := migrateDAGFiles(paths.DAGsDir, defaultShortID)
+	count, err := migrateDAGFiles(paths.DAGsDir, defaultShortID, dryRun)
 	if err != nil {
-		return fmt.Errorf("failed to migrate DAG files: %w", err)
+		return nil, fmt.Errorf("failed to migrate DAG files: %w", err)
 	}
-	migrated = migrated || moved
+	result.DAGFilesMoved = count
 
 	// Move run data directories into {DataDir}/{defaultShortID}/
 	dataDirs := []struct {
@@ -56,51 +80,157 @@ func migrateToDefaultNamespace(paths config.PathsConfig) error {
 
 	for _, d := range dataDirs {
 		dstDir := filepath.Join(paths.DataDir, defaultShortID, d.name)
-		m, err := moveDirContents(d.srcDir, dstDir, defaultShortID)
+		n, err := moveDirContents(d.srcDir, dstDir, defaultShortID, dryRun)
 		if err != nil {
-			return fmt.Errorf("failed to migrate %s: %w", d.name, err)
+			return nil, fmt.Errorf("failed to migrate %s: %w", d.name, err)
 		}
-		migrated = migrated || m
+		if n > 0 {
+			result.DirEntriesMoved[d.name] = n
+		}
 	}
 
 	// Move suspend flags into {DataDir}/{defaultShortID}/suspend/
 	if paths.SuspendFlagsDir != "" {
 		dstDir := filepath.Join(paths.DataDir, defaultShortID, "suspend")
-		m, err := moveDirContents(paths.SuspendFlagsDir, dstDir, "")
+		n, err := moveDirContents(paths.SuspendFlagsDir, dstDir, "", dryRun)
 		if err != nil {
-			return fmt.Errorf("failed to migrate suspend flags: %w", err)
+			return nil, fmt.Errorf("failed to migrate suspend flags: %w", err)
 		}
-		migrated = migrated || m
+		if n > 0 {
+			result.DirEntriesMoved["suspend"] = n
+		}
 	}
 
 	// Move git sync state into {DataDir}/{defaultShortID}/gitsync/
 	gitSyncDir := filepath.Join(paths.DataDir, "gitsync")
 	if fileExists(gitSyncDir) {
 		dstDir := filepath.Join(paths.DataDir, defaultShortID, "gitsync")
-		m, err := moveDirContents(gitSyncDir, dstDir, "")
+		n, err := moveDirContents(gitSyncDir, dstDir, "", dryRun)
 		if err != nil {
-			return fmt.Errorf("failed to migrate git sync state: %w", err)
+			return nil, fmt.Errorf("failed to migrate git sync state: %w", err)
 		}
-		migrated = migrated || m
+		if n > 0 {
+			result.DirEntriesMoved["gitsync"] = n
+		}
 	}
 
 	// Tag existing agent conversations with the default namespace
 	if paths.ConversationsDir != "" {
-		tagged, err := tagConversationsWithNamespace(paths.ConversationsDir, "default")
+		n, err := tagConversationsWithNamespace(paths.ConversationsDir, "default", dryRun)
 		if err != nil {
-			return fmt.Errorf("failed to tag conversations: %w", err)
+			return nil, fmt.Errorf("failed to tag conversations: %w", err)
 		}
-		migrated = migrated || tagged
+		result.ConversationsTagged = n
 	}
 
-	if migrated {
-		slog.Info("auto-migration: data migration to default namespace complete",
-			"namespace", "default",
-			"short_id", defaultShortID,
-		)
+	if !dryRun {
+		if result.totalMigrated() > 0 {
+			slog.Info("namespace migration: data migration to default namespace complete",
+				"namespace", "default",
+				"short_id", defaultShortID,
+			)
+		}
+		if err := writeMarker(markerPath); err != nil {
+			return nil, err
+		}
 	}
 
-	return writeMarker(markerPath)
+	return result, nil
+}
+
+// needsNamespaceMigration reports whether the environment has unmigrated data
+// that should be migrated via `dagu migrate namespace`. Fresh installs return
+// false so no spurious warning is emitted.
+func needsNamespaceMigration(paths config.PathsConfig) (bool, string) {
+	markerPath := filepath.Join(paths.DataDir, namespaceMigratedMarker)
+	if fileExists(markerPath) {
+		return false, ""
+	}
+	if isAlreadyNamespaceScoped(paths) {
+		return false, ""
+	}
+	if !hasUnmigratedData(paths) {
+		return false, "" // fresh install — no warning
+	}
+	return true, "namespace migration has not been run; execute 'dagu migrate namespace' to migrate existing data"
+}
+
+// hasUnmigratedData checks for signs that the environment contains data from
+// before namespace scoping: YAML files at the root of DAGsDir or a non-empty
+// DAGRunsDir.
+func hasUnmigratedData(paths config.PathsConfig) bool {
+	// Check for YAML files at root of DAGsDir
+	if entries, err := os.ReadDir(paths.DAGsDir); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() && (strings.HasSuffix(e.Name(), ".yaml") || strings.HasSuffix(e.Name(), ".yml")) {
+				return true
+			}
+		}
+	}
+
+	// Check for entries in DAGRunsDir (excluding the default short ID dir)
+	if entries, err := os.ReadDir(paths.DAGRunsDir); err == nil {
+		for _, e := range entries {
+			if e.Name() != filenamespace.DefaultShortID {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// runNamespaceMigrationCommand is the CLI handler for `dagu migrate namespace`.
+func runNamespaceMigrationCommand(ctx *Context) error {
+	dryRun, err := ctx.Command.Flags().GetBool("dry-run")
+	if err != nil {
+		return fmt.Errorf("failed to get dry-run flag: %w", err)
+	}
+
+	if dryRun {
+		logger.Info(ctx, "Dry-run mode: no files will be moved")
+	}
+
+	result, err := runNamespaceMigration(ctx.Config.Paths, dryRun)
+	if err != nil {
+		return fmt.Errorf("namespace migration failed: %w", err)
+	}
+
+	if result.AlreadyMigrated {
+		logger.Info(ctx, "Namespace migration has already been completed (marker file exists)")
+		return nil
+	}
+	if result.AlreadyScoped {
+		logger.Info(ctx, "Paths are already namespace-scoped, no migration needed")
+		return nil
+	}
+
+	total := result.totalMigrated()
+	if total == 0 {
+		logger.Info(ctx, "No data found to migrate")
+		return nil
+	}
+
+	prefix := "Migrated"
+	if dryRun {
+		prefix = "Would migrate"
+	}
+
+	if result.DAGFilesMoved > 0 {
+		logger.Info(ctx, fmt.Sprintf("%s %d DAG file(s)", prefix, result.DAGFilesMoved))
+	}
+	for name, count := range result.DirEntriesMoved {
+		logger.Info(ctx, fmt.Sprintf("%s %d %s entries", prefix, count, name))
+	}
+	if result.ConversationsTagged > 0 {
+		logger.Info(ctx, fmt.Sprintf("%s %d conversation(s)", prefix, result.ConversationsTagged))
+	}
+
+	if dryRun {
+		logger.Info(ctx, "Re-run without --dry-run to apply changes")
+	}
+
+	return nil
 }
 
 // isAlreadyNamespaceScoped checks whether the configured paths already point to
@@ -128,14 +258,14 @@ func writeMarker(markerPath string) error {
 }
 
 // migrateDAGFiles moves YAML files from the root DAGsDir to a namespace subdirectory.
-// Returns true if any files were moved.
-func migrateDAGFiles(dagsDir, shortID string) (bool, error) {
+// When dryRun is true it counts files without moving them.
+func migrateDAGFiles(dagsDir, shortID string, dryRun bool) (int, error) {
 	entries, err := os.ReadDir(dagsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return false, nil
+			return 0, nil
 		}
-		return false, fmt.Errorf("failed to read DAGs directory: %w", err)
+		return 0, fmt.Errorf("failed to read DAGs directory: %w", err)
 	}
 
 	// Collect YAML files at root level
@@ -151,15 +281,19 @@ func migrateDAGFiles(dagsDir, shortID string) (bool, error) {
 	}
 
 	if len(yamlFiles) == 0 {
-		return false, nil
+		return 0, nil
+	}
+
+	if dryRun {
+		return len(yamlFiles), nil
 	}
 
 	dstDir := filepath.Join(dagsDir, shortID)
 	if err := os.MkdirAll(dstDir, 0750); err != nil {
-		return false, fmt.Errorf("failed to create namespace DAGs directory: %w", err)
+		return 0, fmt.Errorf("failed to create namespace DAGs directory: %w", err)
 	}
 
-	slog.Info("auto-migration: moving DAG definitions into default namespace",
+	slog.Info("namespace migration: moving DAG definitions into default namespace",
 		"count", len(yamlFiles),
 		"destination", dstDir,
 	)
@@ -169,25 +303,25 @@ func migrateDAGFiles(dagsDir, shortID string) (bool, error) {
 		dst := filepath.Join(dstDir, entry.Name())
 
 		if err := os.Rename(src, dst); err != nil {
-			return false, fmt.Errorf("failed to move DAG file %s: %w", entry.Name(), err)
+			return 0, fmt.Errorf("failed to move DAG file %s: %w", entry.Name(), err)
 		}
-		slog.Debug("auto-migration: moved DAG file", "file", entry.Name())
+		slog.Debug("namespace migration: moved DAG file", "file", entry.Name())
 	}
 
-	return true, nil
+	return len(yamlFiles), nil
 }
 
 // moveDirContents moves the contents of srcDir into dstDir.
 // skipEntry is the name of a subdirectory to skip (e.g., the namespace shortID
 // to avoid moving the destination into itself). Pass "" to skip nothing.
-// Returns true if any entries were moved.
-func moveDirContents(srcDir, dstDir, skipEntry string) (bool, error) {
+// When dryRun is true it counts entries without moving them.
+func moveDirContents(srcDir, dstDir, skipEntry string, dryRun bool) (int, error) {
 	entries, err := os.ReadDir(srcDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return false, nil
+			return 0, nil
 		}
-		return false, fmt.Errorf("failed to read directory %s: %w", srcDir, err)
+		return 0, fmt.Errorf("failed to read directory %s: %w", srcDir, err)
 	}
 
 	// Filter out entries to skip
@@ -200,14 +334,18 @@ func moveDirContents(srcDir, dstDir, skipEntry string) (bool, error) {
 	}
 
 	if len(toMove) == 0 {
-		return false, nil
+		return 0, nil
+	}
+
+	if dryRun {
+		return len(toMove), nil
 	}
 
 	if err := os.MkdirAll(dstDir, 0750); err != nil {
-		return false, fmt.Errorf("failed to create destination directory %s: %w", dstDir, err)
+		return 0, fmt.Errorf("failed to create destination directory %s: %w", dstDir, err)
 	}
 
-	slog.Info("auto-migration: moving data into default namespace",
+	slog.Info("namespace migration: moving data into default namespace",
 		"source", srcDir,
 		"destination", dstDir,
 		"count", len(toMove),
@@ -218,25 +356,25 @@ func moveDirContents(srcDir, dstDir, skipEntry string) (bool, error) {
 		dst := filepath.Join(dstDir, entry.Name())
 
 		if err := os.Rename(src, dst); err != nil {
-			return false, fmt.Errorf("failed to move %s: %w", entry.Name(), err)
+			return 0, fmt.Errorf("failed to move %s: %w", entry.Name(), err)
 		}
-		slog.Debug("auto-migration: moved entry", "name", entry.Name())
+		slog.Debug("namespace migration: moved entry", "name", entry.Name())
 	}
 
-	return true, nil
+	return len(toMove), nil
 }
 
 // tagConversationsWithNamespace scans all conversation JSON files and sets
-// the namespace field to the given value if it is empty. Returns true if
-// any conversations were tagged.
-func tagConversationsWithNamespace(conversationsDir, namespace string) (bool, error) {
+// the namespace field to the given value if it is empty. When dryRun is true
+// it counts files that would be tagged without modifying them.
+func tagConversationsWithNamespace(conversationsDir, namespace string, dryRun bool) (int, error) {
 	// Conversations are stored as {conversationsDir}/{userID}/{conversationID}.json
 	userDirs, err := os.ReadDir(conversationsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return false, nil
+			return 0, nil
 		}
-		return false, fmt.Errorf("failed to read conversations directory: %w", err)
+		return 0, fmt.Errorf("failed to read conversations directory: %w", err)
 	}
 
 	tagged := 0
@@ -248,7 +386,7 @@ func tagConversationsWithNamespace(conversationsDir, namespace string) (bool, er
 		userPath := filepath.Join(conversationsDir, userDir.Name())
 		convFiles, err := os.ReadDir(userPath)
 		if err != nil {
-			slog.Warn("auto-migration: failed to read user conversation directory",
+			slog.Warn("namespace migration: failed to read user conversation directory",
 				"user_dir", userDir.Name(), "error", err)
 			continue
 		}
@@ -259,23 +397,56 @@ func tagConversationsWithNamespace(conversationsDir, namespace string) (bool, er
 			}
 
 			filePath := filepath.Join(userPath, convFile.Name())
-			if t, err := tagConversationFile(filePath, namespace); err != nil {
-				slog.Warn("auto-migration: failed to tag conversation",
-					"file", filePath, "error", err)
-			} else if t {
-				tagged++
+			if dryRun {
+				needs, err := conversationNeedsTag(filePath, namespace)
+				if err != nil {
+					slog.Warn("namespace migration: failed to check conversation",
+						"file", filePath, "error", err)
+				} else if needs {
+					tagged++
+				}
+			} else {
+				if t, err := tagConversationFile(filePath, namespace); err != nil {
+					slog.Warn("namespace migration: failed to tag conversation",
+						"file", filePath, "error", err)
+				} else if t {
+					tagged++
+				}
 			}
 		}
 	}
 
-	if tagged > 0 {
-		slog.Info("auto-migration: tagged agent conversations with default namespace",
+	if !dryRun && tagged > 0 {
+		slog.Info("namespace migration: tagged agent conversations with default namespace",
 			"count", tagged,
 			"namespace", namespace,
 		)
 	}
 
-	return tagged > 0, nil
+	return tagged, nil
+}
+
+// conversationNeedsTag checks whether a conversation JSON file needs a namespace tag
+// without modifying it.
+func conversationNeedsTag(filePath, _ string) (bool, error) {
+	data, err := os.ReadFile(filePath) // #nosec G304 - path constructed from internal baseDir
+	if err != nil {
+		return false, err
+	}
+
+	var conv map[string]json.RawMessage
+	if err := json.Unmarshal(data, &conv); err != nil {
+		return false, err
+	}
+
+	if ns, ok := conv["namespace"]; ok {
+		var existing string
+		if err := json.Unmarshal(ns, &existing); err == nil && existing != "" {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 // tagConversationFile reads a conversation JSON file, sets the namespace if
