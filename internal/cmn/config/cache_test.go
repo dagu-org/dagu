@@ -45,6 +45,9 @@ func TestCacheMode_Limits_Low(t *testing.T) {
 
 	assert.Equal(t, 100, limits.Webhook.Limit)
 	assert.Equal(t, 15*time.Minute, limits.Webhook.TTL)
+
+	assert.Equal(t, 50, limits.Namespace.Limit)
+	assert.Equal(t, 15*time.Minute, limits.Namespace.TTL)
 }
 
 func TestCacheMode_Limits_Normal(t *testing.T) {
@@ -63,6 +66,9 @@ func TestCacheMode_Limits_Normal(t *testing.T) {
 
 	assert.Equal(t, 500, limits.Webhook.Limit)
 	assert.Equal(t, 15*time.Minute, limits.Webhook.TTL)
+
+	assert.Equal(t, 100, limits.Namespace.Limit)
+	assert.Equal(t, 15*time.Minute, limits.Namespace.TTL)
 }
 
 func TestCacheMode_Limits_High(t *testing.T) {
@@ -81,6 +87,9 @@ func TestCacheMode_Limits_High(t *testing.T) {
 
 	assert.Equal(t, 1000, limits.Webhook.Limit)
 	assert.Equal(t, 15*time.Minute, limits.Webhook.TTL)
+
+	assert.Equal(t, 500, limits.Namespace.Limit)
+	assert.Equal(t, 15*time.Minute, limits.Namespace.TTL)
 }
 
 func TestCacheMode_Limits_Invalid_DefaultsToNormal(t *testing.T) {
@@ -94,6 +103,7 @@ func TestCacheMode_Limits_Invalid_DefaultsToNormal(t *testing.T) {
 	assert.Equal(t, normalLimits.DAGRun.Limit, limits.DAGRun.Limit)
 	assert.Equal(t, normalLimits.APIKey.Limit, limits.APIKey.Limit)
 	assert.Equal(t, normalLimits.Webhook.Limit, limits.Webhook.Limit)
+	assert.Equal(t, normalLimits.Namespace.Limit, limits.Namespace.Limit)
 }
 
 func TestCacheMode_Constants(t *testing.T) {

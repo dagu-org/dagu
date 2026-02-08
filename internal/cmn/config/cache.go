@@ -13,10 +13,11 @@ const (
 
 // CacheLimits contains the cache limits for each cache type
 type CacheLimits struct {
-	DAG     CacheEntryLimits
-	DAGRun  CacheEntryLimits
-	APIKey  CacheEntryLimits
-	Webhook CacheEntryLimits
+	DAG       CacheEntryLimits
+	DAGRun    CacheEntryLimits
+	APIKey    CacheEntryLimits
+	Webhook   CacheEntryLimits
+	Namespace CacheEntryLimits
 }
 
 // CacheEntryLimits contains limit and TTL for a cache
@@ -30,24 +31,27 @@ func (m CacheMode) Limits() CacheLimits {
 	switch m {
 	case CacheModeLow:
 		return CacheLimits{
-			DAG:     CacheEntryLimits{Limit: 500, TTL: 12 * time.Hour},
-			DAGRun:  CacheEntryLimits{Limit: 5000, TTL: 12 * time.Hour},
-			APIKey:  CacheEntryLimits{Limit: 100, TTL: 15 * time.Minute},
-			Webhook: CacheEntryLimits{Limit: 100, TTL: 15 * time.Minute},
+			DAG:       CacheEntryLimits{Limit: 500, TTL: 12 * time.Hour},
+			DAGRun:    CacheEntryLimits{Limit: 5000, TTL: 12 * time.Hour},
+			APIKey:    CacheEntryLimits{Limit: 100, TTL: 15 * time.Minute},
+			Webhook:   CacheEntryLimits{Limit: 100, TTL: 15 * time.Minute},
+			Namespace: CacheEntryLimits{Limit: 50, TTL: 15 * time.Minute},
 		}
 	case CacheModeHigh:
 		return CacheLimits{
-			DAG:     CacheEntryLimits{Limit: 5000, TTL: 12 * time.Hour},
-			DAGRun:  CacheEntryLimits{Limit: 50000, TTL: 12 * time.Hour},
-			APIKey:  CacheEntryLimits{Limit: 1000, TTL: 15 * time.Minute},
-			Webhook: CacheEntryLimits{Limit: 1000, TTL: 15 * time.Minute},
+			DAG:       CacheEntryLimits{Limit: 5000, TTL: 12 * time.Hour},
+			DAGRun:    CacheEntryLimits{Limit: 50000, TTL: 12 * time.Hour},
+			APIKey:    CacheEntryLimits{Limit: 1000, TTL: 15 * time.Minute},
+			Webhook:   CacheEntryLimits{Limit: 1000, TTL: 15 * time.Minute},
+			Namespace: CacheEntryLimits{Limit: 500, TTL: 15 * time.Minute},
 		}
 	default: // CacheModeNormal or any invalid value defaults to normal
 		return CacheLimits{
-			DAG:     CacheEntryLimits{Limit: 1000, TTL: 12 * time.Hour},
-			DAGRun:  CacheEntryLimits{Limit: 10000, TTL: 12 * time.Hour},
-			APIKey:  CacheEntryLimits{Limit: 500, TTL: 15 * time.Minute},
-			Webhook: CacheEntryLimits{Limit: 500, TTL: 15 * time.Minute},
+			DAG:       CacheEntryLimits{Limit: 1000, TTL: 12 * time.Hour},
+			DAGRun:    CacheEntryLimits{Limit: 10000, TTL: 12 * time.Hour},
+			APIKey:    CacheEntryLimits{Limit: 500, TTL: 15 * time.Minute},
+			Webhook:   CacheEntryLimits{Limit: 500, TTL: 15 * time.Minute},
+			Namespace: CacheEntryLimits{Limit: 100, TTL: 15 * time.Minute},
 		}
 	}
 }

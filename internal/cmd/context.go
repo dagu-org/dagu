@@ -191,6 +191,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		filedagrun.WithLatestStatusToday(cfg.Server.LatestStatusToday),
 		filedagrun.WithLocation(cfg.Core.Location),
 	}
+	var nsOpts []filenamespace.Option
 
 	switch cmd.Name() {
 	case "server", "scheduler", "start-all", "coordinator":
@@ -199,6 +200,10 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		hc := fileutil.NewCache[*exec.DAGRunStatus]("dag_run_status", limits.DAGRun.Limit, limits.DAGRun.TTL)
 		hc.StartEviction(ctx)
 		hrOpts = append(hrOpts, filedagrun.WithHistoryFileCache(hc))
+
+		nsc := fileutil.NewCache[*exec.Namespace]("namespace", limits.Namespace.Limit, limits.Namespace.TTL)
+		nsc.StartEviction(ctx)
+		nsOpts = append(nsOpts, filenamespace.WithFileCache(nsc))
 	}
 
 	ps := fileproc.New(cfg.Paths.ProcDir)
@@ -206,7 +211,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	drm := runtime.NewManager(drs, ps, cfg)
 	qs := filequeue.New(cfg.Paths.QueueDir)
 	sm := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
-	ns, err := filenamespace.New(cfg.Paths.NamespacesDir)
+	ns, err := filenamespace.New(cfg.Paths.NamespacesDir, nsOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize namespace store: %w", err)
 	}

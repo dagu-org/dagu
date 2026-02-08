@@ -4,10 +4,12 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/persis/filenamespace"
 )
@@ -320,4 +322,52 @@ func TestStore_DefaultNamespace(t *testing.T) {
 	// Creating "default" again should fail with ErrNamespaceAlreadyExists.
 	_, err = s.Create(ctx, exec.CreateNamespaceOptions{Name: "default"})
 	require.ErrorIs(t, err, exec.ErrNamespaceAlreadyExists)
+}
+
+func TestStore_WithFileCache(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	cache := fileutil.NewCache[*exec.Namespace]("namespace_test", 100, 15*time.Minute)
+	dir := t.TempDir()
+	s, err := filenamespace.New(dir, filenamespace.WithFileCache(cache))
+	require.NoError(t, err)
+
+	// Create a namespace
+	created, err := s.Create(ctx, exec.CreateNamespaceOptions{
+		Name:        "cached-ns",
+		Description: "original",
+	})
+	require.NoError(t, err)
+
+	// First Get populates the cache
+	got1, err := s.Get(ctx, "cached-ns")
+	require.NoError(t, err)
+	assert.Equal(t, "original", got1.Description)
+	assert.Equal(t, created.ShortID, got1.ShortID)
+
+	// Second Get should hit the cache (returns same data)
+	got2, err := s.Get(ctx, "cached-ns")
+	require.NoError(t, err)
+	assert.Equal(t, "original", got2.Description)
+
+	// Update invalidates the cache
+	newDesc := "updated"
+	updated, err := s.Update(ctx, "cached-ns", exec.UpdateNamespaceOptions{
+		Description: &newDesc,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "updated", updated.Description)
+
+	// Get after update should see the new value (cache was invalidated)
+	got3, err := s.Get(ctx, "cached-ns")
+	require.NoError(t, err)
+	assert.Equal(t, "updated", got3.Description)
+
+	// Delete invalidates the cache
+	err = s.Delete(ctx, "cached-ns")
+	require.NoError(t, err)
+
+	_, err = s.Get(ctx, "cached-ns")
+	require.ErrorIs(t, err, exec.ErrNamespaceNotFound)
 }

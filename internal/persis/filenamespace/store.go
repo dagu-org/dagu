@@ -35,11 +35,22 @@ const (
 // Single character names like "a" are also valid.
 var nameRegex = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 
+// Option configures a Store.
+type Option func(*Store)
+
+// WithFileCache sets the file cache for namespace objects.
+func WithFileCache(cache *fileutil.Cache[*exec.Namespace]) Option {
+	return func(s *Store) {
+		s.fileCache = cache
+	}
+}
+
 // Store is a file-based implementation of exec.NamespaceStore.
 // Each namespace is persisted as a JSON file ({shortID}.json) under the base directory.
 type Store struct {
-	baseDir string
-	mu      sync.RWMutex
+	baseDir   string
+	fileCache *fileutil.Cache[*exec.Namespace]
+	mu        sync.RWMutex
 	// index maps namespace name -> Namespace for fast lookups.
 	index map[string]*exec.Namespace
 	// shortIDs maps shortID -> namespace name for collision detection.
@@ -48,7 +59,7 @@ type Store struct {
 
 // New creates a new file-based NamespaceStore.
 // The "default" namespace is automatically created if it does not already exist.
-func New(baseDir string) (*Store, error) {
+func New(baseDir string, opts ...Option) (*Store, error) {
 	if err := os.MkdirAll(baseDir, dirPerm); err != nil {
 		return nil, fmt.Errorf("failed to create namespace directory %s: %w", baseDir, err)
 	}
@@ -56,6 +67,9 @@ func New(baseDir string) (*Store, error) {
 		baseDir:  baseDir,
 		index:    make(map[string]*exec.Namespace),
 		shortIDs: make(map[string]string),
+	}
+	for _, opt := range opts {
+		opt(s)
 	}
 	if err := s.rebuildIndex(); err != nil {
 		return nil, fmt.Errorf("failed to rebuild namespace index: %w", err)
@@ -134,6 +148,9 @@ func (s *Store) Create(_ context.Context, opts exec.CreateNamespaceOptions) (*ex
 	if err := s.writeFile(ns); err != nil {
 		return nil, err
 	}
+	if s.fileCache != nil {
+		s.fileCache.Invalidate(s.filePath(ns.ShortID))
+	}
 
 	s.index[ns.Name] = ns
 	s.shortIDs[ns.ShortID] = ns.Name
@@ -170,6 +187,9 @@ func (s *Store) Update(_ context.Context, name string, opts exec.UpdateNamespace
 	if err := s.writeFile(ns); err != nil {
 		return nil, err
 	}
+	if s.fileCache != nil {
+		s.fileCache.Invalidate(s.filePath(ns.ShortID))
+	}
 
 	return ns, nil
 }
@@ -188,6 +208,9 @@ func (s *Store) Delete(_ context.Context, name string) error {
 	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to delete namespace file %s: %w", filePath, err)
 	}
+	if s.fileCache != nil {
+		s.fileCache.Invalidate(filePath)
+	}
 
 	delete(s.index, name)
 	delete(s.shortIDs, ns.ShortID)
@@ -198,14 +221,21 @@ func (s *Store) Delete(_ context.Context, name string) error {
 // Get retrieves a namespace by name.
 func (s *Store) Get(_ context.Context, name string) (*exec.Namespace, error) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	ns, exists := s.index[name]
+	s.mu.RUnlock()
+
 	if !exists {
 		return nil, exec.ErrNamespaceNotFound
 	}
 
-	return ns, nil
+	if s.fileCache == nil {
+		return ns, nil
+	}
+
+	filePath := s.filePath(ns.ShortID)
+	return s.fileCache.LoadLatest(filePath, func() (*exec.Namespace, error) {
+		return s.readFromFile(filePath)
+	})
 }
 
 // List returns all namespaces.
@@ -256,6 +286,19 @@ func validateName(name string) error {
 		return fmt.Errorf("namespace name %q must match [a-z0-9][a-z0-9-]*[a-z0-9]", name)
 	}
 	return nil
+}
+
+// readFromFile reads and parses a namespace JSON file from disk.
+func (s *Store) readFromFile(filePath string) (*exec.Namespace, error) {
+	data, err := os.ReadFile(filePath) // #nosec G304 - path constructed from internal baseDir
+	if err != nil {
+		return nil, fmt.Errorf("failed to read namespace file %s: %w", filePath, err)
+	}
+	var ns exec.Namespace
+	if err := json.Unmarshal(data, &ns); err != nil {
+		return nil, fmt.Errorf("failed to parse namespace file %s: %w", filePath, err)
+	}
+	return &ns, nil
 }
 
 // writeFile persists a namespace to disk as JSON.
