@@ -71,6 +71,16 @@ type Namespace struct {
 	GitSync NamespaceGitSync `json:"gitSync,omitzero"`
 }
 
+// NsDir is the directory name grouping namespace-scoped subdirectories.
+const NsDir = "ns"
+
+// NamespaceDir returns the root directory for a namespace under the given base:
+//
+//	{baseDir}/ns/{nsID}
+func NamespaceDir(baseDir, nsID string) string {
+	return filepath.Join(baseDir, NsDir, nsID)
+}
+
 // NamespaceHasDAGs checks if a namespace DAG directory contains any YAML files.
 func NamespaceHasDAGs(dagDir string) (bool, error) {
 	entries, err := os.ReadDir(dagDir)

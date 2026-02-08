@@ -611,8 +611,7 @@ func (h *Handler) transformLogPaths(status *exec.DAGRunStatus, namespaceID strin
 		ext := StreamTypeToExtension(streamType)
 		filename := fmt.Sprintf("%s.%s", fileutil.SafeName(stepName), ext)
 		return filepath.Join(
-			h.logDir,
-			namespaceID,
+			exec.NamespaceDir(h.logDir, namespaceID),
 			fileutil.SafeName(dagName),
 			fileutil.SafeName(dagRunID),
 			fileutil.SafeName(attemptID),
@@ -649,8 +648,7 @@ func (h *Handler) transformLogPaths(status *exec.DAGRunStatus, namespaceID strin
 
 	// Transform scheduler log path
 	status.Log = filepath.Join(
-		h.logDir,
-		namespaceID,
+		exec.NamespaceDir(h.logDir, namespaceID),
 		fileutil.SafeName(dagName),
 		fileutil.SafeName(dagRunID),
 		fileutil.SafeName(attemptID),

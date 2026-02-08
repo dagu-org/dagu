@@ -420,9 +420,10 @@ func (c *Context) dagStore(cfg dagStoreConfig) (exec.DAGStore, error) {
 // InitNamespaceScopedStores re-initializes stores to use namespace-scoped directories
 // under {DataDir}/{namespaceID}/. Directories are created if they don't exist.
 func (c *Context) InitNamespaceScopedStores(namespaceID string) error {
-	nsDAGRunsDir := filepath.Join(c.Config.Paths.DataDir, namespaceID, "dag-runs")
-	nsProcDir := filepath.Join(c.Config.Paths.DataDir, namespaceID, "proc")
-	nsQueueDir := filepath.Join(c.Config.Paths.DataDir, namespaceID, "queue")
+	nsBase := exec.NamespaceDir(c.Config.Paths.DataDir, namespaceID)
+	nsDAGRunsDir := filepath.Join(nsBase, "dag-runs")
+	nsProcDir := filepath.Join(nsBase, "proc")
+	nsQueueDir := filepath.Join(nsBase, "queue")
 
 	for _, dir := range []string{nsDAGRunsDir, nsProcDir, nsQueueDir} {
 		if err := os.MkdirAll(dir, 0750); err != nil {
@@ -501,7 +502,7 @@ func (c *Context) ResolveNamespaceFromArg(arg string) (namespaceName, dagName st
 // Falls back to the base DAGsDir if no namespace has been resolved.
 func (c *Context) NamespacedDAGsDir() string {
 	if c.NamespaceID != "" {
-		return filepath.Join(c.Config.Paths.DAGsDir, c.NamespaceID)
+		return exec.NamespaceDir(c.Config.Paths.DAGsDir, c.NamespaceID)
 	}
 	return c.Config.Paths.DAGsDir
 }
@@ -682,7 +683,7 @@ func (cfg LogConfig) LogDir() (string, error) {
 	utcTimestamp := time.Now().UTC().Format("20060102_150405Z")
 
 	safeName := fileutil.SafeName(cfg.Name)
-	logDir := filepath.Join(baseDir, cfg.NamespaceID, safeName, "dag-run_"+utcTimestamp+"_"+cfg.DAGRunID)
+	logDir := filepath.Join(exec.NamespaceDir(baseDir, cfg.NamespaceID), safeName, "dag-run_"+utcTimestamp+"_"+cfg.DAGRunID)
 	if err := os.MkdirAll(logDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to initialize directory %s: %w", logDir, err)
 	}

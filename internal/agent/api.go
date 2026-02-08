@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -698,8 +697,8 @@ func (a *API) environmentForNamespace(namespace string) EnvironmentInfo {
 		return env
 	}
 
-	env.DAGsDir = filepath.Join(a.environment.DAGsDir, ns.ID)
-	env.DataDir = filepath.Join(a.environment.DataDir, ns.ID)
+	env.DAGsDir = exec.NamespaceDir(a.environment.DAGsDir, ns.ID)
+	env.DataDir = exec.NamespaceDir(a.environment.DataDir, ns.ID)
 	env.WorkingDir = env.DAGsDir
 	return env
 }

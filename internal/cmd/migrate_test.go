@@ -165,14 +165,16 @@ func TestNeedsNamespaceMigration(t *testing.T) {
 	t.Run("ReturnsFalseWhenAlreadyScoped", func(t *testing.T) {
 		t.Parallel()
 		tempDir := t.TempDir()
+		dataDir := filepath.Join(tempDir, "data")
 		paths := config.PathsConfig{
-			DataDir:    filepath.Join(tempDir, "data"),
-			DAGsDir:    filepath.Join(tempDir, "dags"),
-			DAGRunsDir: filepath.Join(tempDir, "data", "0000", "dag-runs"),
-			ProcDir:    filepath.Join(tempDir, "data", "0000", "proc"),
-			QueueDir:   filepath.Join(tempDir, "data", "0000", "queue"),
+			DataDir:       dataDir,
+			DAGsDir:       filepath.Join(tempDir, "dags"),
+			DAGRunsDir:    filepath.Join(exec.NamespaceDir(dataDir, "0000"), "dag-runs"),
+			ProcDir:       filepath.Join(exec.NamespaceDir(dataDir, "0000"), "proc"),
+			QueueDir:      filepath.Join(exec.NamespaceDir(dataDir, "0000"), "queue"),
+			NamespacesDir: filepath.Join(dataDir, "namespaces"),
 		}
-		for _, dir := range []string{paths.DataDir, paths.DAGsDir, paths.DAGRunsDir} {
+		for _, dir := range []string{paths.DataDir, paths.DAGsDir, paths.DAGRunsDir, paths.NamespacesDir} {
 			require.NoError(t, os.MkdirAll(dir, 0750))
 		}
 
@@ -216,8 +218,8 @@ func TestRunNamespaceMigration(t *testing.T) {
 		assert.False(t, result.AlreadyMigrated)
 		assert.False(t, result.AlreadyScoped)
 
-		assert.FileExists(t, filepath.Join(paths.DAGsDir, "0000", "a.yaml"))
-		assert.FileExists(t, filepath.Join(paths.DAGsDir, "0000", "b.yml"))
+		assert.FileExists(t, filepath.Join(exec.NamespaceDir(paths.DAGsDir, "0000"), "a.yaml"))
+		assert.FileExists(t, filepath.Join(exec.NamespaceDir(paths.DAGsDir, "0000"), "b.yml"))
 		assert.NoFileExists(t, filepath.Join(paths.DAGsDir, "a.yaml"))
 		assert.NoFileExists(t, filepath.Join(paths.DAGsDir, "b.yml"))
 		assert.FileExists(t, filepath.Join(paths.DataDir, namespaceMigratedMarker))
@@ -259,7 +261,7 @@ func TestRunNamespaceMigration(t *testing.T) {
 		result, err := runNamespaceMigration(paths, false)
 		require.NoError(t, err)
 		assert.Equal(t, 1, result.DirEntriesMoved["dag-runs"])
-		assert.DirExists(t, filepath.Join(paths.DataDir, "0000", "dag-runs", "my-dag"))
+		assert.DirExists(t, filepath.Join(exec.NamespaceDir(paths.DataDir, "0000"), "dag-runs", "my-dag"))
 	})
 
 	t.Run("TagsConversations", func(t *testing.T) {
@@ -298,8 +300,8 @@ func TestMigrateLogDir(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 2, n)
 
-		assert.DirExists(t, filepath.Join(paths.LogDir, "0000", "mydag"))
-		assert.DirExists(t, filepath.Join(paths.LogDir, "0000", "otherdag"))
+		assert.DirExists(t, filepath.Join(exec.NamespaceDir(paths.LogDir, "0000"), "mydag"))
+		assert.DirExists(t, filepath.Join(exec.NamespaceDir(paths.LogDir, "0000"), "otherdag"))
 		assert.NoDirExists(t, filepath.Join(paths.LogDir, "mydag"))
 		assert.NoDirExists(t, filepath.Join(paths.LogDir, "otherdag"))
 		assert.DirExists(t, paths.AdminLogsDir)
@@ -326,11 +328,11 @@ func TestFixLogPathsInStatusFiles(t *testing.T) {
 		t.Parallel()
 		paths := newTestPaths(t)
 
-		dagRunDir := filepath.Join(paths.DataDir, "0000", "dag-runs", "mydag", "run1")
+		dagRunDir := filepath.Join(exec.NamespaceDir(paths.DataDir, "0000"), "dag-runs", "mydag", "run1")
 		require.NoError(t, os.MkdirAll(dagRunDir, 0750))
 
 		oldPath := paths.LogDir + "/mydag/run1.log"
-		expectedPath := filepath.Join(paths.LogDir, "0000") + "/mydag/run1.log"
+		expectedPath := exec.NamespaceDir(paths.LogDir, "0000") + "/mydag/run1.log"
 		content := fmt.Sprintf(`{"Log":"%s","Name":"mydag"}`, oldPath)
 		require.NoError(t, os.WriteFile(filepath.Join(dagRunDir, "status.jsonl"), []byte(content), 0600))
 
@@ -348,11 +350,11 @@ func TestFixLogPathsInStatusFiles(t *testing.T) {
 		t.Parallel()
 		paths := newTestPaths(t)
 
-		dagRunDir := filepath.Join(paths.DataDir, "0000", "dag-runs", "mydag", "run1")
+		dagRunDir := filepath.Join(exec.NamespaceDir(paths.DataDir, "0000"), "dag-runs", "mydag", "run1")
 		require.NoError(t, os.MkdirAll(dagRunDir, 0750))
 
 		oldPath := paths.LogDir + "/mydag/run1.log"
-		scopedPath := filepath.Join(paths.LogDir, "0000") + "/mydag/run2.log"
+		scopedPath := exec.NamespaceDir(paths.LogDir, "0000") + "/mydag/run2.log"
 		content := fmt.Sprintf("{\"Log\":\"%s\"}\n{\"Log\":\"%s\"}", oldPath, scopedPath)
 		require.NoError(t, os.WriteFile(filepath.Join(dagRunDir, "status.jsonl"), []byte(content), 0600))
 
@@ -363,10 +365,11 @@ func TestFixLogPathsInStatusFiles(t *testing.T) {
 		updated, err := os.ReadFile(filepath.Join(dagRunDir, "status.jsonl"))
 		require.NoError(t, err)
 		s := string(updated)
-		expectedFixed := filepath.Join(paths.LogDir, "0000") + "/mydag/run1.log"
+		expectedFixed := exec.NamespaceDir(paths.LogDir, "0000") + "/mydag/run1.log"
 		assert.Contains(t, s, expectedFixed)
 		assert.Contains(t, s, scopedPath)
-		assert.NotContains(t, s, filepath.Join(paths.LogDir, "0000", "0000"))
+		// Ensure no double-scoping (ns/0000/ns/0000)
+		assert.NotContains(t, s, filepath.Join(exec.NamespaceDir(paths.LogDir, "0000"), "ns"))
 	})
 }
 
@@ -390,12 +393,12 @@ func TestRunNamespaceMigration_MigratesLogs(t *testing.T) {
 	assert.Greater(t, result.LogEntriesMoved, 0)
 	assert.Greater(t, result.StatusFilesFixed, 0)
 
-	assert.DirExists(t, filepath.Join(paths.LogDir, "0000", "mydag"))
+	assert.DirExists(t, filepath.Join(exec.NamespaceDir(paths.LogDir, "0000"), "mydag"))
 	assert.NoDirExists(t, filepath.Join(paths.LogDir, "mydag"))
 
-	updated, err := os.ReadFile(filepath.Join(paths.DataDir, "0000", "dag-runs", "mydag", "run1", "status.jsonl"))
+	updated, err := os.ReadFile(filepath.Join(exec.NamespaceDir(paths.DataDir, "0000"), "dag-runs", "mydag", "run1", "status.jsonl"))
 	require.NoError(t, err)
-	expectedPath := filepath.Join(paths.LogDir, "0000") + "/mydag/run1.log"
+	expectedPath := exec.NamespaceDir(paths.LogDir, "0000") + "/mydag/run1.log"
 	assert.Contains(t, string(updated), expectedPath)
 }
 
@@ -416,6 +419,130 @@ func TestHasUnmigratedData_ChecksLogDir(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Join(paths.LogDir, "0000"), 0750))
 
 		assert.False(t, hasUnmigratedData(paths))
+	})
+}
+
+func TestRunNamespaceNsRelayout(t *testing.T) {
+	t.Parallel()
+
+	t.Run("RelocatesNamespaceDirs", func(t *testing.T) {
+		t.Parallel()
+		paths := newTestPaths(t)
+
+		// Register a namespace
+		require.NoError(t, os.WriteFile(filepath.Join(paths.NamespacesDir, "0000.json"), []byte("{}"), 0600))
+
+		// Create old-layout namespace dirs directly under base dirs
+		require.NoError(t, os.MkdirAll(filepath.Join(paths.DataDir, "0000", "dag-runs"), 0750))
+		require.NoError(t, os.MkdirAll(filepath.Join(paths.DAGsDir, "0000"), 0750))
+		require.NoError(t, os.WriteFile(filepath.Join(paths.DAGsDir, "0000", "a.yaml"), []byte("name: a"), 0600))
+		require.NoError(t, os.MkdirAll(filepath.Join(paths.LogDir, "0000", "mydag"), 0750))
+
+		result, err := runNamespaceNsRelayout(paths, false)
+		require.NoError(t, err)
+		assert.Equal(t, 3, result.DirsRelocated)
+		assert.False(t, result.AlreadyMigrated)
+
+		// Verify moved to ns/ layout
+		assert.DirExists(t, filepath.Join(exec.NamespaceDir(paths.DataDir, "0000"), "dag-runs"))
+		assert.FileExists(t, filepath.Join(exec.NamespaceDir(paths.DAGsDir, "0000"), "a.yaml"))
+		assert.DirExists(t, filepath.Join(exec.NamespaceDir(paths.LogDir, "0000"), "mydag"))
+
+		// Verify old locations are gone
+		assert.NoDirExists(t, filepath.Join(paths.DataDir, "0000"))
+		assert.NoDirExists(t, filepath.Join(paths.DAGsDir, "0000"))
+		assert.NoDirExists(t, filepath.Join(paths.LogDir, "0000"))
+
+		// Marker written
+		assert.FileExists(t, filepath.Join(paths.DataDir, namespaceNsMigratedMarker))
+	})
+
+	t.Run("DryRunDoesNotMove", func(t *testing.T) {
+		t.Parallel()
+		paths := newTestPaths(t)
+
+		require.NoError(t, os.WriteFile(filepath.Join(paths.NamespacesDir, "0000.json"), []byte("{}"), 0600))
+		require.NoError(t, os.MkdirAll(filepath.Join(paths.DataDir, "0000"), 0750))
+
+		result, err := runNamespaceNsRelayout(paths, true)
+		require.NoError(t, err)
+		assert.Equal(t, 1, result.DirsRelocated)
+
+		// Original still exists
+		assert.DirExists(t, filepath.Join(paths.DataDir, "0000"))
+		assert.NoFileExists(t, filepath.Join(paths.DataDir, namespaceNsMigratedMarker))
+	})
+
+	t.Run("IdempotentAfterMarker", func(t *testing.T) {
+		t.Parallel()
+		paths := newTestPaths(t)
+
+		markerPath := filepath.Join(paths.DataDir, namespaceNsMigratedMarker)
+		require.NoError(t, os.WriteFile(markerPath, []byte("migrated\n"), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(paths.NamespacesDir, "0000.json"), []byte("{}"), 0600))
+		require.NoError(t, os.MkdirAll(filepath.Join(paths.DataDir, "0000"), 0750))
+
+		result, err := runNamespaceNsRelayout(paths, false)
+		require.NoError(t, err)
+		assert.True(t, result.AlreadyMigrated)
+		assert.Equal(t, 0, result.totalMigrated())
+	})
+
+	t.Run("FixesLogPathsInStatusFiles", func(t *testing.T) {
+		t.Parallel()
+		paths := newTestPaths(t)
+
+		require.NoError(t, os.WriteFile(filepath.Join(paths.NamespacesDir, "0000.json"), []byte("{}"), 0600))
+
+		// Create status file with old-style log path (no ns/ prefix)
+		dagRunDir := filepath.Join(paths.DataDir, "0000", "dag-runs", "mydag", "run1")
+		require.NoError(t, os.MkdirAll(dagRunDir, 0750))
+
+		oldLogPath := filepath.Join(paths.LogDir, "0000") + "/mydag/run1.log"
+		content := fmt.Sprintf(`{"Log":"%s","Name":"mydag"}`, oldLogPath)
+		require.NoError(t, os.WriteFile(filepath.Join(dagRunDir, "status.jsonl"), []byte(content), 0600))
+
+		result, err := runNamespaceNsRelayout(paths, false)
+		require.NoError(t, err)
+		assert.Greater(t, result.StatusFilesFixed, 0)
+
+		// The status file got moved along with its parent dir,
+		// so read from the new location
+		newStatusPath := filepath.Join(exec.NamespaceDir(paths.DataDir, "0000"), "dag-runs", "mydag", "run1", "status.jsonl")
+		updated, err := os.ReadFile(newStatusPath)
+		require.NoError(t, err)
+
+		expectedPath := exec.NamespaceDir(paths.LogDir, "0000") + "/mydag/run1.log"
+		assert.Contains(t, string(updated), expectedPath)
+	})
+}
+
+func TestHasUnrelocatedNamespaceDirs(t *testing.T) {
+	t.Parallel()
+
+	t.Run("DetectsOldLayout", func(t *testing.T) {
+		t.Parallel()
+		paths := newTestPaths(t)
+		require.NoError(t, os.WriteFile(filepath.Join(paths.NamespacesDir, "0000.json"), []byte("{}"), 0600))
+		require.NoError(t, os.MkdirAll(filepath.Join(paths.DataDir, "0000"), 0750))
+
+		assert.True(t, hasUnrelocatedNamespaceDirs(paths))
+	})
+
+	t.Run("ReturnsFalseWhenNoNamespaces", func(t *testing.T) {
+		t.Parallel()
+		paths := newTestPaths(t)
+
+		assert.False(t, hasUnrelocatedNamespaceDirs(paths))
+	})
+
+	t.Run("ReturnsFalseWhenAlreadyUnderNs", func(t *testing.T) {
+		t.Parallel()
+		paths := newTestPaths(t)
+		require.NoError(t, os.WriteFile(filepath.Join(paths.NamespacesDir, "0000.json"), []byte("{}"), 0600))
+		require.NoError(t, os.MkdirAll(exec.NamespaceDir(paths.DataDir, "0000"), 0750))
+
+		assert.False(t, hasUnrelocatedNamespaceDirs(paths))
 	})
 }
 

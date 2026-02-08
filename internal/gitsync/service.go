@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"sync"
 	"time"
 )
@@ -145,7 +147,7 @@ func NewService(cfg *Config, dagsDir, dataDir string) Service {
 // NewNamespaceService creates a Git sync service scoped to a namespace.
 // State and repo are stored at {dataDir}/{id}/gitsync/.
 func NewNamespaceService(cfg *Config, dagsDir, dataDir, id string) Service {
-	nsDataDir := filepath.Join(dataDir, id)
+	nsDataDir := exec.NamespaceDir(dataDir, id)
 	repoPath := filepath.Join(nsDataDir, "gitsync", "repo")
 	return &serviceImpl{
 		cfg:          cfg,

@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"time"
 )
 
@@ -107,7 +109,7 @@ func NewStateManager(dataDir string) *StateManager {
 // The state file is stored at {dataDir}/{id}/gitsync/state.json.
 func NewNamespaceStateManager(dataDir, id string) *StateManager {
 	return &StateManager{
-		statePath: filepath.Join(dataDir, id, "gitsync", "state.json"),
+		statePath: filepath.Join(exec.NamespaceDir(dataDir, id), "gitsync", "state.json"),
 	}
 }
 

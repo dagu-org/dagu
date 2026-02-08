@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"path/filepath"
 
 	"github.com/dagu-org/dagu/api/v1"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/gitsync"
 	"github.com/dagu-org/dagu/internal/service/audit"
 )
@@ -426,7 +426,7 @@ func (a *API) resolveNamespaceSyncService(ctx context.Context, namespaceName str
 	}
 
 	nsCfg := gitsync.NewConfigFromNamespace(ns.GitSync)
-	dagsDir := filepath.Join(a.config.Paths.DAGsDir, ns.ID)
+	dagsDir := exec.NamespaceDir(a.config.Paths.DAGsDir, ns.ID)
 	return gitsync.NewNamespaceService(nsCfg, dagsDir, a.config.Paths.DataDir, ns.ID), nil
 }
 

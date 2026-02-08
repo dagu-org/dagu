@@ -162,7 +162,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	// Use default namespace-scoped directories (short ID "0000") so test
 	// verification stores match the directories that namespace-aware commands
 	// (start, restart) will write to after resolving the default namespace.
-	defaultNSDir := filepath.Join(dataDir, "0000")
+	defaultNSDir := exec1.NamespaceDir(dataDir, "0000")
 	cfg.Paths.DAGRunsDir = filepath.Join(defaultNSDir, "dag-runs")
 	cfg.Paths.QueueDir = filepath.Join(defaultNSDir, "queue")
 	cfg.Paths.ProcDir = filepath.Join(defaultNSDir, "proc")

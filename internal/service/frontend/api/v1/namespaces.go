@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"path/filepath"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/auth"
@@ -240,7 +239,7 @@ func (a *API) DeleteNamespace(ctx context.Context, request api.DeleteNamespaceRe
 	}
 
 	// Check if the namespace contains DAGs.
-	dagDir := filepath.Join(a.config.Paths.DAGsDir, ns.ID)
+	dagDir := exec.NamespaceDir(a.config.Paths.DAGsDir, ns.ID)
 	if hasDAGs, checkErr := exec.NamespaceHasDAGs(dagDir); checkErr != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusInternalServerError,
