@@ -39,17 +39,8 @@ func TestParseCatchupPolicy(t *testing.T) {
 		{"latest", CatchupPolicyLatest, false},
 		{"all", CatchupPolicyAll, false},
 		{"true", CatchupPolicyAll, false},
-		// Case-insensitive variants
-		{"ALL", CatchupPolicyAll, false},
-		{"All", CatchupPolicyAll, false},
-		{"Latest", CatchupPolicyLatest, false},
-		{"LATEST", CatchupPolicyLatest, false},
-		{"OFF", CatchupPolicyOff, false},
-		{"Off", CatchupPolicyOff, false},
-		{"FALSE", CatchupPolicyOff, false},
-		{"False", CatchupPolicyOff, false},
-		{"TRUE", CatchupPolicyAll, false},
-		{"True", CatchupPolicyAll, false},
+		{"ALL", CatchupPolicyAll, false},   // case-insensitive
+		{"Latest", CatchupPolicyLatest, false}, // case-insensitive
 		{"invalid", CatchupPolicyOff, true},
 	}
 

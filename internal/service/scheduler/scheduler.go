@@ -112,6 +112,7 @@ func New(
 		cfg,
 		time.Now,
 	)
+
 	return &Scheduler{
 		logDir:          cfg.Paths.LogDir,
 		quit:            make(chan struct{}),

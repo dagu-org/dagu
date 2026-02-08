@@ -12,16 +12,26 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/runtime"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
+
+// catchupDispatcher is the interface used by CatchupEngine to dispatch DAG runs.
+type catchupDispatcher interface {
+	HandleJob(ctx context.Context, dag *core.DAG, operation coordinatorv1.Operation,
+		runID string, triggerType core.TriggerType, scheduledTime time.Time) error
+}
+
+// catchupIDGenerator generates unique run IDs for catch-up dispatches.
+type catchupIDGenerator interface {
+	GenDAGRunID(ctx context.Context) (string, error)
+}
 
 // CatchupEngine replays missed DAG runs that were scheduled during scheduler downtime.
 type CatchupEngine struct {
 	dagStateStore *DAGStateStore
 	dagRunStore   exec.DAGRunStore
-	dagExecutor   *DAGExecutor
-	runtimeMgr    *runtime.Manager
+	dagExecutor   catchupDispatcher
+	idGen         catchupIDGenerator
 	config        *config.Config
 	clock         Clock
 }
@@ -44,8 +54,8 @@ type catchupCandidate struct {
 func NewCatchupEngine(
 	dagStateStore *DAGStateStore,
 	dagRunStore exec.DAGRunStore,
-	dagExecutor *DAGExecutor,
-	runtimeMgr *runtime.Manager,
+	dagExecutor catchupDispatcher,
+	idGen catchupIDGenerator,
 	cfg *config.Config,
 	clock Clock,
 ) *CatchupEngine {
@@ -53,7 +63,7 @@ func NewCatchupEngine(
 		dagStateStore: dagStateStore,
 		dagRunStore:   dagRunStore,
 		dagExecutor:   dagExecutor,
-		runtimeMgr:    runtimeMgr,
+		idGen:         idGen,
 		config:        cfg,
 		clock:         clock,
 	}
@@ -323,7 +333,7 @@ func (c *CatchupEngine) dispatchCandidate(ctx context.Context, cand catchupCandi
 		return false, nil
 	}
 
-	runID, err := c.runtimeMgr.GenDAGRunID(ctx)
+	runID, err := c.idGen.GenDAGRunID(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to generate run ID: %w", err)
 	}
@@ -350,10 +360,12 @@ func (c *CatchupEngine) dispatchCandidate(ctx context.Context, cand catchupCandi
 }
 
 // isDuplicate checks if a run already exists for the same DAG at the same scheduled time
-// by comparing RFC3339 timestamps in recent attempts.
+// by comparing RFC3339 timestamps in recent attempts. The number of attempts checked is
+// controlled by config.Scheduler.DuplicateCheckLimit (default: 100).
 func (c *CatchupEngine) isDuplicate(ctx context.Context, cand catchupCandidate) bool {
 	target := cand.scheduledTime.Format(time.RFC3339)
-	attempts := c.dagRunStore.RecentAttempts(ctx, cand.dag.Name, 50)
+	limit := c.config.Scheduler.DuplicateCheckLimit
+	attempts := c.dagRunStore.RecentAttempts(ctx, cand.dag.Name, limit)
 	for _, attempt := range attempts {
 		status, err := attempt.ReadStatus(ctx)
 		if err != nil {

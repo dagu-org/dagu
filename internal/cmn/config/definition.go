@@ -279,6 +279,7 @@ type SchedulerDef struct {
 	MaxGlobalCatchupRuns    int    `mapstructure:"maxGlobalCatchupRuns"`    // Default: 100
 	MaxCatchupRunsPerDAG    int    `mapstructure:"maxCatchupRunsPerDAG"`    // Default: 20
 	CatchupRateLimit        string `mapstructure:"catchupRateLimit"`        // Default: 100ms
+	DuplicateCheckLimit     int    `mapstructure:"duplicateCheckLimit"`     // Default: 100
 }
 
 // QueueConfigDef configures global queue settings.

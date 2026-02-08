@@ -217,6 +217,7 @@ func TestLoad_Env(t *testing.T) {
 			MaxGlobalCatchupRuns:    100,
 			MaxCatchupRunsPerDAG:    20,
 			CatchupRateLimit:        100 * time.Millisecond,
+			DuplicateCheckLimit:     100,
 		},
 		Monitoring: MonitoringConfig{
 			Retention: 24 * time.Hour,
@@ -487,6 +488,7 @@ scheduler:
 			MaxGlobalCatchupRuns:    100,
 			MaxCatchupRunsPerDAG:    20,
 			CatchupRateLimit:        100 * time.Millisecond,
+			DuplicateCheckLimit:     100,
 		},
 		Monitoring: MonitoringConfig{
 			Retention: 24 * time.Hour,

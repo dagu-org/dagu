@@ -333,6 +333,7 @@ type Scheduler struct {
 	MaxGlobalCatchupRuns    int           // Max catch-up runs across all DAGs (default: 100)
 	MaxCatchupRunsPerDAG    int           // Max catch-up runs per DAG (default: 20)
 	CatchupRateLimit        time.Duration // Delay between catch-up dispatches (default: 100ms)
+	DuplicateCheckLimit     int           // Max recent attempts to check for duplicates (default: 100)
 }
 
 // PostgresPoolConfig holds PostgreSQL connection pool settings for workers.

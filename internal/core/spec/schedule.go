@@ -2,12 +2,17 @@ package spec
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/duration"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec/types"
 	"github.com/robfig/cron/v3"
 )
+
+// defaultCatchupWindow is the default lookback window applied when catch-up is
+// enabled but no explicit catchupWindow is specified.
+const defaultCatchupWindow = 24 * time.Hour
 
 var cronParser = cron.NewParser(
 	cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow,
@@ -55,6 +60,9 @@ func buildSchedulerFromEntries(entries []types.ScheduleEntry) ([]core.Schedule, 
 			if err != nil {
 				return nil, fmt.Errorf("schedule entry %q: %w", e.Cron, err)
 			}
+		} else if sched.Catchup != core.CatchupPolicyOff {
+			// Apply default window when catch-up is enabled but no window specified
+			sched.CatchupWindow = defaultCatchupWindow
 		}
 
 		ret = append(ret, sched)

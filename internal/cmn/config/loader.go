@@ -732,6 +732,7 @@ func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 		cfg.Scheduler.MaxGlobalCatchupRuns = def.Scheduler.MaxGlobalCatchupRuns
 		cfg.Scheduler.MaxCatchupRunsPerDAG = def.Scheduler.MaxCatchupRunsPerDAG
 		cfg.Scheduler.CatchupRateLimit = l.parseDuration("scheduler.catchupRateLimit", def.Scheduler.CatchupRateLimit)
+		cfg.Scheduler.DuplicateCheckLimit = def.Scheduler.DuplicateCheckLimit
 	}
 
 	l.setSchedulerDefaults(cfg)
@@ -759,6 +760,9 @@ func (l *ConfigLoader) setSchedulerDefaults(cfg *Config) {
 	}
 	if cfg.Scheduler.CatchupRateLimit <= 0 {
 		cfg.Scheduler.CatchupRateLimit = 100 * time.Millisecond
+	}
+	if cfg.Scheduler.DuplicateCheckLimit <= 0 {
+		cfg.Scheduler.DuplicateCheckLimit = 100
 	}
 }
 

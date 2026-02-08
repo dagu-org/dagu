@@ -16,6 +16,8 @@ import (
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
+var _ catchupDispatcher = (*DAGExecutor)(nil)
+
 // DAGExecutor handles both local and distributed DAG execution.
 //
 // It uses a persistence-first approach for distributed execution:
