@@ -1591,7 +1591,7 @@ func TestGetLatestReleaseRetryOnServerError(t *testing.T) {
 	}
 
 	var attempts int
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		attempts++
 		if attempts <= 2 {
 			w.WriteHeader(http.StatusServiceUnavailable)
@@ -1619,7 +1619,7 @@ func TestGetLatestReleaseRetryOnServerError(t *testing.T) {
 
 func TestGetRelease404NotRetried(t *testing.T) {
 	var attempts int
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		attempts++
 		w.WriteHeader(http.StatusNotFound)
 	}))

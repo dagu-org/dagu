@@ -344,10 +344,11 @@ func UpgradeWithReleaseInfo(ctx context.Context, opts Options, info *ReleaseInfo
 		if result.BackupPath != "" {
 			restoreSrc = result.BackupPath
 		}
-		if restoreErr := copyFile(restoreSrc, execPath); restoreErr == nil {
+		restoreErr := copyFile(restoreSrc, execPath)
+		if restoreErr == nil {
 			return nil, fmt.Errorf("upgrade verification failed (restored backup): %w", err)
 		}
-		return nil, fmt.Errorf("upgrade verification failed (restore also failed): %w", err)
+		return nil, fmt.Errorf("upgrade verification failed (restore also failed: %v): %w", restoreErr, err)
 	}
 
 	// Update cache with new version info
