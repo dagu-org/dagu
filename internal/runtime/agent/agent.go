@@ -1060,8 +1060,8 @@ func (a *Agent) Signal(ctx context.Context, sig os.Signal) {
 	a.signal(ctx, sig, false)
 }
 
-// wait before read the running status
-const waitForRunning = time.Millisecond * 100
+// waitForRunning is the delay before reading the initial running status.
+const waitForRunning = 100 * time.Millisecond
 
 // Simple regular expressions for request routing
 var (

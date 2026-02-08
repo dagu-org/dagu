@@ -40,7 +40,7 @@ type Scheduler struct {
 	runtimeManager      runtime.Manager
 	entryReader         EntryReader
 	logDir              string
-	quit                chan any
+	quit                chan struct{}
 	running             atomic.Bool
 	location            *time.Location
 	dagRunStore         exec.DAGRunStore
@@ -113,7 +113,7 @@ func New(
 	)
 	return &Scheduler{
 		logDir:          cfg.Paths.LogDir,
-		quit:            make(chan any),
+		quit:            make(chan struct{}),
 		location:        timeLoc,
 		entryReader:     er,
 		runtimeManager:  drm,
@@ -337,7 +337,7 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 
 // NextTick returns the next tick time for the scheduler.
 func (*Scheduler) NextTick(now time.Time) time.Time {
-	return now.Add(time.Minute).Truncate(time.Second * 60)
+	return now.Add(time.Minute).Truncate(time.Minute)
 }
 
 // IsRunning returns whether the scheduler is currently running.

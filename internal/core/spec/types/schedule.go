@@ -150,7 +150,7 @@ func (s *ScheduleValue) parseScheduleMap(m map[string]any) error {
 	}
 
 	if hasEntryKeys {
-		// Single schedule-entry form: {cron: "...", misfire: "..."}
+		// Single schedule-entry form: {cron: "...", catchup: "..."}
 		entry, err := parseScheduleEntryMap(m)
 		if err != nil {
 			return err

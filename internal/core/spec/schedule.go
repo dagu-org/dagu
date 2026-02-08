@@ -13,8 +13,7 @@ var cronParser = cron.NewParser(
 	cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow,
 )
 
-// buildScheduler parses the schedule values and returns a list of schedules.
-// each schedule is parsed as a cron expression.
+// buildScheduler parses cron expressions and returns a list of schedules.
 func buildScheduler(values []string) ([]core.Schedule, error) {
 	var ret []core.Schedule
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,8 +72,7 @@ type entryReaderImpl struct {
 func NewEntryReader(dir string, dagCli exec.DAGStore, drm runtime.Manager, de *DAGExecutor, executable string) EntryReader {
 	return &entryReaderImpl{
 		targetDir:   dir,
-		lock:        sync.Mutex{},
-		registry:    map[string]*core.DAG{},
+		registry:    make(map[string]*core.DAG),
 		dagStore:    dagCli,
 		dagRunMgr:   drm,
 		executable:  executable,
@@ -213,9 +213,7 @@ func (er *entryReaderImpl) Registry() map[string]*core.DAG {
 	defer er.lock.Unlock()
 
 	snapshot := make(map[string]*core.DAG, len(er.registry))
-	for k, v := range er.registry {
-		snapshot[k] = v
-	}
+	maps.Copy(snapshot, er.registry)
 	return snapshot
 }
 
