@@ -249,7 +249,7 @@ func TestScheduleValue_AdditionalCoverage(t *testing.T) {
 			name:        "InvalidScheduleEntryTypeInMap",
 			input:       "start: 123",
 			wantErr:     true,
-			errContains: "expected string or array",
+			errContains: "expected string, array, or object",
 		},
 		{
 			name:        "InvalidTypeInStartArray",

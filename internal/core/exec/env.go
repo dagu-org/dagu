@@ -26,4 +26,10 @@ const (
 	// EnvKeyDAGParamsJSON exposes the resolved parameters encoded as JSON.
 	// When params were provided as JSON, the original payload is preserved.
 	EnvKeyDAGParamsJSON = "DAGU_PARAMS_JSON"
+
+	// EnvKeyScheduledTime holds the originally scheduled time for catch-up runs (RFC3339).
+	EnvKeyScheduledTime = "DAGU_SCHEDULED_TIME"
+
+	// EnvKeyIsCatchup is set to "1" when the run is a catch-up replay of a missed schedule.
+	EnvKeyIsCatchup = "DAGU_IS_CATCHUP"
 )

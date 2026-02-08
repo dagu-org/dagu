@@ -29,6 +29,10 @@ func (er *mockJobManager) Start(_ context.Context) {
 func (er *mockJobManager) Stop() {
 }
 
+func (er *mockJobManager) Registry() map[string]*core.DAG {
+	return nil
+}
+
 var _ scheduler.Job = (*mockJob)(nil)
 
 type mockJob struct {

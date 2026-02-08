@@ -163,6 +163,13 @@ func WithTriggerType(triggerType core.TriggerType) StatusOption {
 	}
 }
 
+// WithScheduledTime returns a StatusOption that sets the originally scheduled time.
+func WithScheduledTime(t string) StatusOption {
+	return func(s *exec.DAGRunStatus) {
+		s.ScheduledTime = t
+	}
+}
+
 // Create builds a Status object for a dag-run with the specified parameters
 func (f *StatusBuilder) Create(
 	dagRunID string,

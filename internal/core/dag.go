@@ -602,22 +602,43 @@ type Schedule struct {
 	Expression string `json:"expression"`
 	// Parsed is the parsed cron schedule.
 	Parsed cron.Schedule `json:"-"`
+	// Misfire is the policy for handling missed runs during scheduler downtime.
+	Misfire MisfirePolicy `json:"misfire,omitempty"`
+	// CatchupWindow limits how far back the scheduler looks for missed runs.
+	CatchupWindow time.Duration `json:"catchupWindow,omitempty"`
+	// MaxCatchupRuns caps the number of catch-up runs per schedule entry.
+	MaxCatchupRuns int `json:"maxCatchupRuns,omitempty"`
 }
 
 // MarshalJSON implements the json.Marshaler interface.
 func (s Schedule) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Expression string `json:"expression"`
-	}{
-		Expression: s.Expression,
-	})
+	type alias struct {
+		Expression     string `json:"expression"`
+		Misfire        string `json:"misfire,omitempty"`
+		CatchupWindow  string `json:"catchupWindow,omitempty"`
+		MaxCatchupRuns int    `json:"maxCatchupRuns,omitempty"`
+	}
+	a := alias{Expression: s.Expression}
+	if s.Misfire != MisfirePolicyIgnore {
+		a.Misfire = s.Misfire.String()
+	}
+	if s.CatchupWindow > 0 {
+		a.CatchupWindow = s.CatchupWindow.String()
+	}
+	if s.MaxCatchupRuns > 0 {
+		a.MaxCatchupRuns = s.MaxCatchupRuns
+	}
+	return json.Marshal(a)
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
 // It also parses the cron expression to populate the Parsed field.
 func (s *Schedule) UnmarshalJSON(data []byte) error {
 	var alias struct {
-		Expression string `json:"expression"`
+		Expression     string `json:"expression"`
+		Misfire        string `json:"misfire,omitempty"`
+		CatchupWindow  string `json:"catchupWindow,omitempty"`
+		MaxCatchupRuns int    `json:"maxCatchupRuns,omitempty"`
 	}
 	if err := json.Unmarshal(data, &alias); err != nil {
 		return err
@@ -633,6 +654,20 @@ func (s *Schedule) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("invalid cron expression %q: %w", s.Expression, err)
 	}
 	s.Parsed = parsed
+
+	if alias.Misfire != "" {
+		s.Misfire, err = ParseMisfirePolicy(alias.Misfire)
+		if err != nil {
+			return err
+		}
+	}
+	if alias.CatchupWindow != "" {
+		s.CatchupWindow, err = time.ParseDuration(alias.CatchupWindow)
+		if err != nil {
+			return fmt.Errorf("invalid catchupWindow %q: %w", alias.CatchupWindow, err)
+		}
+	}
+	s.MaxCatchupRuns = alias.MaxCatchupRuns
 	return nil
 }
 

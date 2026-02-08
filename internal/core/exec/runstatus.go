@@ -57,6 +57,7 @@ type DAGRunStatus struct {
 	QueuedAt      string            `json:"queuedAt,omitempty"`
 	StartedAt     string            `json:"startedAt,omitempty"`
 	FinishedAt    string            `json:"finishedAt,omitempty"`
+	ScheduledTime string            `json:"scheduledTime,omitempty"`
 	Log           string            `json:"log,omitempty"`
 	Error         string            `json:"error,omitempty"`
 	Params        string            `json:"params,omitempty"`

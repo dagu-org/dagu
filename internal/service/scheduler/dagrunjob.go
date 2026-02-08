@@ -64,7 +64,8 @@ func (j *DAGRunJob) Start(ctx context.Context) error {
 	}
 
 	// Handle the job execution (implements persistence-first for distributed execution)
-	return j.DAGExecutor.HandleJob(ctx, j.DAG, coordinatorv1.Operation_OPERATION_START, runID, core.TriggerTypeScheduler)
+	// Pass j.Next as the scheduled time so live runs also have scheduledTime set
+	return j.DAGExecutor.HandleJob(ctx, j.DAG, coordinatorv1.Operation_OPERATION_START, runID, core.TriggerTypeScheduler, j.Next)
 }
 
 // Ready checks whether the job can be safely started based on the latest status.

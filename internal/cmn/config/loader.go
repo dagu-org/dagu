@@ -729,6 +729,9 @@ func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 		cfg.Scheduler.LockStaleThreshold = l.parseDuration("scheduler.lockStaleThreshold", def.Scheduler.LockStaleThreshold)
 		cfg.Scheduler.LockRetryInterval = l.parseDuration("scheduler.lockRetryInterval", def.Scheduler.LockRetryInterval)
 		cfg.Scheduler.ZombieDetectionInterval = l.parseDuration("scheduler.zombieDetectionInterval", def.Scheduler.ZombieDetectionInterval)
+		cfg.Scheduler.MaxGlobalCatchupRuns = def.Scheduler.MaxGlobalCatchupRuns
+		cfg.Scheduler.MaxCatchupRunsPerDAG = def.Scheduler.MaxCatchupRunsPerDAG
+		cfg.Scheduler.CatchupRateLimit = l.parseDuration("scheduler.catchupRateLimit", def.Scheduler.CatchupRateLimit)
 	}
 
 	l.setSchedulerDefaults(cfg)
@@ -747,6 +750,15 @@ func (l *ConfigLoader) setSchedulerDefaults(cfg *Config) {
 	// Default ZombieDetectionInterval only if not explicitly set (0 disables detection)
 	if cfg.Scheduler.ZombieDetectionInterval <= 0 && !l.v.IsSet("scheduler.zombieDetectionInterval") {
 		cfg.Scheduler.ZombieDetectionInterval = 45 * time.Second
+	}
+	if cfg.Scheduler.MaxGlobalCatchupRuns <= 0 {
+		cfg.Scheduler.MaxGlobalCatchupRuns = 100
+	}
+	if cfg.Scheduler.MaxCatchupRunsPerDAG <= 0 {
+		cfg.Scheduler.MaxCatchupRunsPerDAG = 20
+	}
+	if cfg.Scheduler.CatchupRateLimit <= 0 {
+		cfg.Scheduler.CatchupRateLimit = 100 * time.Millisecond
 	}
 }
 

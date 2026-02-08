@@ -276,6 +276,9 @@ type SchedulerDef struct {
 	LockStaleThreshold      string `mapstructure:"lockStaleThreshold"`      // Default: 30s
 	LockRetryInterval       string `mapstructure:"lockRetryInterval"`       // Default: 5s
 	ZombieDetectionInterval string `mapstructure:"zombieDetectionInterval"` // Default: 45s, 0 to disable
+	MaxGlobalCatchupRuns    int    `mapstructure:"maxGlobalCatchupRuns"`    // Default: 100
+	MaxCatchupRunsPerDAG    int    `mapstructure:"maxCatchupRunsPerDAG"`    // Default: 20
+	CatchupRateLimit        string `mapstructure:"catchupRateLimit"`        // Default: 100ms
 }
 
 // QueueConfigDef configures global queue settings.

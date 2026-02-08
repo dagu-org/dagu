@@ -56,6 +56,8 @@ type Scheduler struct {
 	instanceID          string          // Unique instance identifier for service registry
 	// queueProcessor is the processor for queued DAG runs
 	queueProcessor *QueueProcessor
+	catchupEngine  *CatchupEngine  // Catch-up engine for replaying missed runs
+	watermarkStore *WatermarkStore // Watermark persistence for catch-up
 	stopOnce       sync.Once
 	lock           sync.Mutex
 	clock          Clock // Clock function for getting current time
@@ -100,6 +102,16 @@ func New(
 		dagExecutor,
 		cfg.Queues,
 	)
+	watermarkStore := NewWatermarkStore(cfg.Paths.DataDir)
+	catchupEngine := NewCatchupEngine(
+		watermarkStore,
+		dagRunStore,
+		dagExecutor,
+		&drm,
+		cfg,
+		timeLoc,
+		time.Now,
+	)
 	return &Scheduler{
 		logDir:          cfg.Paths.LogDir,
 		quit:            make(chan any),
@@ -115,6 +127,8 @@ func New(
 		healthServer:    healthServer,
 		serviceRegistry: reg,
 		queueProcessor:  processor,
+		catchupEngine:   catchupEngine,
+		watermarkStore:  watermarkStore,
 		clock:           time.Now, // Default to real time
 	}, nil
 }
@@ -123,6 +137,9 @@ func New(
 // This must be called before Start().
 func (s *Scheduler) SetClock(clock Clock) {
 	s.clock = clock
+	if s.catchupEngine != nil {
+		s.catchupEngine.clock = clock
+	}
 }
 
 // DisableHealthServer disables the health check server (used when running from start-all)
@@ -219,6 +236,20 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		return err
 	}
 
+	// Run catch-up before entering live loop
+	if s.catchupEngine != nil {
+		registry := s.entryReader.Registry()
+		if catchupResult, err := s.catchupEngine.Run(ctx, registry); err != nil {
+			logger.Error(ctx, "Catch-up failed", tag.Error(err))
+		} else if catchupResult.Dispatched > 0 || catchupResult.Skipped > 0 {
+			logger.Info(ctx, "Catch-up completed",
+				slog.Int("dispatched", catchupResult.Dispatched),
+				slog.Int("skipped", catchupResult.Skipped),
+				slog.String("duration", catchupResult.Duration.String()),
+			)
+		}
+	}
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -299,6 +330,12 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 		case <-timer.C:
 			_ = timer.Stop()
 			s.invokeJobs(ctx, tickTime)
+			// Save watermark after processing jobs
+			if s.watermarkStore != nil {
+				if err := s.watermarkStore.Save(tickTime); err != nil {
+					logger.Error(ctx, "Failed to save watermark", tag.Error(err))
+				}
+			}
 			tickTime = s.NextTick(tickTime)
 			timer.Reset(tickTime.Sub(s.clock()))
 		}

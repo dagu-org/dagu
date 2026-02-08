@@ -330,6 +330,9 @@ type Scheduler struct {
 	LockStaleThreshold      time.Duration // Default: 30s
 	LockRetryInterval       time.Duration // Default: 5s
 	ZombieDetectionInterval time.Duration // Default: 45s; 0 disables
+	MaxGlobalCatchupRuns    int           // Max catch-up runs across all DAGs (default: 100)
+	MaxCatchupRunsPerDAG    int           // Max catch-up runs per DAG (default: 20)
+	CatchupRateLimit        time.Duration // Delay between catch-up dispatches (default: 100ms)
 }
 
 // PostgresPoolConfig holds PostgreSQL connection pool settings for workers.

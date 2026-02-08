@@ -717,6 +717,9 @@ func buildSchedule(_ BuildContext, d *dag) ([]core.Schedule, error) {
 	if d.Schedule.IsZero() {
 		return nil, nil
 	}
+	if entries := d.Schedule.StartEntries(); len(entries) > 0 {
+		return buildSchedulerFromEntries(entries)
+	}
 	return buildScheduler(d.Schedule.Starts())
 }
 
