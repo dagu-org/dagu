@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -174,19 +175,23 @@ func newTestPaths(t *testing.T) config.PathsConfig {
 	tempDir := t.TempDir()
 
 	paths := config.PathsConfig{
-		DataDir:         filepath.Join(tempDir, "data"),
-		DAGsDir:         filepath.Join(tempDir, "dags"),
-		DAGRunsDir:      filepath.Join(tempDir, "data", "dag-runs"),
-		ProcDir:         filepath.Join(tempDir, "data", "proc"),
-		QueueDir:        filepath.Join(tempDir, "data", "queue"),
-		SuspendFlagsDir: filepath.Join(tempDir, "data", "suspend"),
+		DataDir:          filepath.Join(tempDir, "data"),
+		DAGsDir:          filepath.Join(tempDir, "dags"),
+		DAGRunsDir:       filepath.Join(tempDir, "data", "dag-runs"),
+		ProcDir:          filepath.Join(tempDir, "data", "proc"),
+		QueueDir:         filepath.Join(tempDir, "data", "queue"),
+		SuspendFlagsDir:  filepath.Join(tempDir, "data", "suspend"),
 		ConversationsDir: filepath.Join(tempDir, "data", "conversations"),
+		LogDir:           filepath.Join(tempDir, "logs"),
+		AdminLogsDir:     filepath.Join(tempDir, "logs", "admin"),
+		NamespacesDir:    filepath.Join(tempDir, "data", "namespaces"),
 	}
 
 	for _, dir := range []string{
 		paths.DataDir, paths.DAGsDir, paths.DAGRunsDir,
 		paths.ProcDir, paths.QueueDir, paths.SuspendFlagsDir,
-		paths.ConversationsDir,
+		paths.ConversationsDir, paths.LogDir, paths.AdminLogsDir,
+		paths.NamespacesDir,
 	} {
 		require.NoError(t, os.MkdirAll(dir, 0750))
 	}
@@ -332,4 +337,185 @@ func TestRunNamespaceMigration(t *testing.T) {
 		require.NoError(t, json.Unmarshal(updated, &parsed))
 		assert.Equal(t, "default", parsed["namespace"])
 	})
+}
+
+func TestMigrateLogDir(t *testing.T) {
+	paths := newTestPaths(t)
+
+	// Create DAG log directories
+	require.NoError(t, os.MkdirAll(filepath.Join(paths.LogDir, "mydag"), 0750))
+	require.NoError(t, os.MkdirAll(filepath.Join(paths.LogDir, "otherdag"), 0750))
+
+	// Register namespace 0000 so it's in the skip set
+	require.NoError(t, os.WriteFile(filepath.Join(paths.NamespacesDir, "0000.json"), []byte("{}"), 0600))
+
+	n, err := migrateLogDir(paths.LogDir, paths.AdminLogsDir, paths.NamespacesDir, "0000", false)
+	require.NoError(t, err)
+	assert.Equal(t, 2, n)
+
+	// Verify directories moved
+	assert.DirExists(t, filepath.Join(paths.LogDir, "0000", "mydag"))
+	assert.DirExists(t, filepath.Join(paths.LogDir, "0000", "otherdag"))
+	assert.NoDirExists(t, filepath.Join(paths.LogDir, "mydag"))
+	assert.NoDirExists(t, filepath.Join(paths.LogDir, "otherdag"))
+
+	// Admin dir should remain
+	assert.DirExists(t, paths.AdminLogsDir)
+}
+
+func TestMigrateLogDir_DryRun(t *testing.T) {
+	paths := newTestPaths(t)
+
+	require.NoError(t, os.MkdirAll(filepath.Join(paths.LogDir, "mydag"), 0750))
+	require.NoError(t, os.MkdirAll(filepath.Join(paths.LogDir, "otherdag"), 0750))
+	require.NoError(t, os.WriteFile(filepath.Join(paths.NamespacesDir, "0000.json"), []byte("{}"), 0600))
+
+	n, err := migrateLogDir(paths.LogDir, paths.AdminLogsDir, paths.NamespacesDir, "0000", true)
+	require.NoError(t, err)
+	assert.Equal(t, 2, n)
+
+	// Files should still be in place
+	assert.DirExists(t, filepath.Join(paths.LogDir, "mydag"))
+	assert.DirExists(t, filepath.Join(paths.LogDir, "otherdag"))
+	assert.NoDirExists(t, filepath.Join(paths.LogDir, "0000", "mydag"))
+}
+
+func TestMigrateLogDir_SkipsNamespaceDirs(t *testing.T) {
+	paths := newTestPaths(t)
+
+	// Create a directory that matches a registered namespace
+	require.NoError(t, os.MkdirAll(filepath.Join(paths.LogDir, "a1b2"), 0750))
+	require.NoError(t, os.WriteFile(filepath.Join(paths.NamespacesDir, "a1b2.json"), []byte("{}"), 0600))
+
+	n, err := migrateLogDir(paths.LogDir, paths.AdminLogsDir, paths.NamespacesDir, "0000", false)
+	require.NoError(t, err)
+	assert.Equal(t, 0, n)
+
+	// Directory should still be at original location
+	assert.DirExists(t, filepath.Join(paths.LogDir, "a1b2"))
+}
+
+func TestFixLogPathsInStatusFiles(t *testing.T) {
+	paths := newTestPaths(t)
+
+	// Create a status.jsonl with old-format log path
+	dagRunDir := filepath.Join(paths.DataDir, "0000", "dag-runs", "mydag", "run1")
+	require.NoError(t, os.MkdirAll(dagRunDir, 0750))
+
+	oldPath := paths.LogDir + "/mydag/run1.log"
+	expectedPath := filepath.Join(paths.LogDir, "0000") + "/mydag/run1.log"
+	content := fmt.Sprintf(`{"Log":"%s","Name":"mydag"}`, oldPath)
+	require.NoError(t, os.WriteFile(filepath.Join(dagRunDir, "status.jsonl"), []byte(content), 0600))
+
+	n, err := fixLogPathsInStatusFiles(paths.DataDir, paths.LogDir, "0000", false)
+	require.NoError(t, err)
+	assert.Equal(t, 1, n)
+
+	// Verify path was updated
+	updated, err := os.ReadFile(filepath.Join(dagRunDir, "status.jsonl"))
+	require.NoError(t, err)
+	assert.Contains(t, string(updated), expectedPath)
+	assert.NotContains(t, string(updated), oldPath)
+}
+
+func TestFixLogPathsInStatusFiles_AlreadyScoped(t *testing.T) {
+	paths := newTestPaths(t)
+
+	dagRunDir := filepath.Join(paths.DataDir, "0000", "dag-runs", "mydag", "run1")
+	require.NoError(t, os.MkdirAll(dagRunDir, 0750))
+
+	// Path already has the namespace prefix
+	scopedPath := filepath.Join(paths.LogDir, "0000") + "/mydag/run1.log"
+	content := fmt.Sprintf(`{"Log":"%s","Name":"mydag"}`, scopedPath)
+	require.NoError(t, os.WriteFile(filepath.Join(dagRunDir, "status.jsonl"), []byte(content), 0600))
+
+	n, err := fixLogPathsInStatusFiles(paths.DataDir, paths.LogDir, "0000", false)
+	require.NoError(t, err)
+	assert.Equal(t, 0, n)
+}
+
+func TestFixLogPathsInStatusFiles_ThreeStepSafety(t *testing.T) {
+	paths := newTestPaths(t)
+
+	dagRunDir := filepath.Join(paths.DataDir, "0000", "dag-runs", "mydag", "run1")
+	require.NoError(t, os.MkdirAll(dagRunDir, 0750))
+
+	oldPath := paths.LogDir + "/mydag/run1.log"
+	scopedPath := filepath.Join(paths.LogDir, "0000") + "/mydag/run2.log"
+	// Mix of old and already-scoped paths
+	content := fmt.Sprintf("{\"Log\":\"%s\"}\n{\"Log\":\"%s\"}", oldPath, scopedPath)
+	require.NoError(t, os.WriteFile(filepath.Join(dagRunDir, "status.jsonl"), []byte(content), 0600))
+
+	n, err := fixLogPathsInStatusFiles(paths.DataDir, paths.LogDir, "0000", false)
+	require.NoError(t, err)
+	assert.Equal(t, 1, n)
+
+	// Verify: old path fixed, already-scoped path untouched (no double 0000/0000)
+	updated, err := os.ReadFile(filepath.Join(dagRunDir, "status.jsonl"))
+	require.NoError(t, err)
+	s := string(updated)
+	expectedFixed := filepath.Join(paths.LogDir, "0000") + "/mydag/run1.log"
+	assert.Contains(t, s, expectedFixed)
+	assert.Contains(t, s, scopedPath)
+	assert.NotContains(t, s, filepath.Join(paths.LogDir, "0000", "0000"))
+}
+
+func TestRunNamespaceMigration_MigratesLogs(t *testing.T) {
+	paths := newTestPaths(t)
+
+	// Create log directories
+	require.NoError(t, os.MkdirAll(filepath.Join(paths.LogDir, "mydag"), 0750))
+	require.NoError(t, os.WriteFile(filepath.Join(paths.NamespacesDir, "0000.json"), []byte("{}"), 0600))
+
+	// Create a status.jsonl with old-format log path
+	dagRunDir := filepath.Join(paths.DAGRunsDir, "mydag", "run1")
+	require.NoError(t, os.MkdirAll(dagRunDir, 0750))
+	oldPath := paths.LogDir + "/mydag/run1.log"
+	content := fmt.Sprintf(`{"Log":"%s","Name":"mydag"}`, oldPath)
+	require.NoError(t, os.WriteFile(filepath.Join(dagRunDir, "status.jsonl"), []byte(content), 0600))
+
+	result, err := runNamespaceMigration(paths, false)
+	require.NoError(t, err)
+
+	assert.Greater(t, result.LogEntriesMoved, 0)
+	assert.Greater(t, result.StatusFilesFixed, 0)
+
+	// Verify log directory moved
+	assert.DirExists(t, filepath.Join(paths.LogDir, "0000", "mydag"))
+	assert.NoDirExists(t, filepath.Join(paths.LogDir, "mydag"))
+
+	// Verify status path updated
+	updated, err := os.ReadFile(filepath.Join(paths.DataDir, "0000", "dag-runs", "mydag", "run1", "status.jsonl"))
+	require.NoError(t, err)
+	expectedPath := filepath.Join(paths.LogDir, "0000") + "/mydag/run1.log"
+	assert.Contains(t, string(updated), expectedPath)
+}
+
+func TestHasUnmigratedData_ChecksLogDir(t *testing.T) {
+	t.Run("DetectsNonNamespaceLogDir", func(t *testing.T) {
+		paths := newTestPaths(t)
+		// Create a non-namespace directory under LogDir
+		require.NoError(t, os.MkdirAll(filepath.Join(paths.LogDir, "mydag"), 0750))
+
+		assert.True(t, hasUnmigratedData(paths))
+	})
+
+	t.Run("IgnoresAdminAndNamespaceDirs", func(t *testing.T) {
+		paths := newTestPaths(t)
+		// admin dir already exists from newTestPaths
+		// Create a 4-char hex dir (namespace dir)
+		require.NoError(t, os.MkdirAll(filepath.Join(paths.LogDir, "0000"), 0750))
+
+		assert.False(t, hasUnmigratedData(paths))
+	})
+}
+
+func TestIsHexString(t *testing.T) {
+	assert.True(t, isHexString("0000"))
+	assert.True(t, isHexString("a1b2"))
+	assert.True(t, isHexString("deadbeef"))
+	assert.False(t, isHexString("my-dag"))
+	assert.False(t, isHexString(""))
+	assert.False(t, isHexString("ABCD"))
+	assert.False(t, isHexString("0000/"))
 }

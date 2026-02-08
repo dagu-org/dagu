@@ -20,12 +20,14 @@ type MigrationResult struct {
 	DAGFilesMoved       int
 	DirEntriesMoved     map[string]int // "dag-runs", "proc", "queue", "suspend", "gitsync"
 	ConversationsTagged int
+	LogEntriesMoved     int // log directory entries moved
+	StatusFilesFixed    int // status.jsonl files with rewritten paths
 	AlreadyMigrated     bool // marker file existed
 	AlreadyScoped       bool // paths already namespace-scoped
 }
 
 func (r *MigrationResult) totalMigrated() int {
-	total := r.DAGFilesMoved + r.ConversationsTagged
+	total := r.DAGFilesMoved + r.ConversationsTagged + r.LogEntriesMoved + r.StatusFilesFixed
 	for _, n := range r.DirEntriesMoved {
 		total += n
 	}
@@ -123,6 +125,24 @@ func runNamespaceMigration(paths config.PathsConfig, dryRun bool) (*MigrationRes
 		result.ConversationsTagged = n
 	}
 
+	// Move log directories into {LogDir}/{defaultShortID}/
+	if paths.LogDir != "" {
+		n, err := migrateLogDir(paths.LogDir, paths.AdminLogsDir, paths.NamespacesDir, defaultShortID, dryRun)
+		if err != nil {
+			return nil, fmt.Errorf("failed to migrate log directories: %w", err)
+		}
+		result.LogEntriesMoved = n
+	}
+
+	// Fix log paths in status.jsonl files across all namespaces
+	if paths.LogDir != "" && paths.DataDir != "" {
+		n, err := fixLogPathsInStatusFiles(paths.DataDir, paths.LogDir, defaultShortID, dryRun)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fix log paths in status files: %w", err)
+		}
+		result.StatusFilesFixed = n
+	}
+
 	if !dryRun {
 		if result.totalMigrated() > 0 {
 			slog.Info("namespace migration: data migration to default namespace complete",
@@ -177,6 +197,26 @@ func hasUnmigratedData(paths config.PathsConfig) bool {
 		}
 	}
 
+	// Check for non-namespace log directories in LogDir
+	if paths.LogDir != "" {
+		adminRel, _ := filepath.Rel(paths.LogDir, paths.AdminLogsDir)
+		if entries, err := os.ReadDir(paths.LogDir); err == nil {
+			for _, e := range entries {
+				if !e.IsDir() {
+					continue
+				}
+				name := e.Name()
+				if name == adminRel {
+					continue
+				}
+				if len(name) == 4 && isHexString(name) {
+					continue
+				}
+				return true
+			}
+		}
+	}
+
 	return false
 }
 
@@ -223,6 +263,12 @@ func runNamespaceMigrationCommand(ctx *Context) error {
 	if preview.ConversationsTagged > 0 {
 		logger.Info(ctx, fmt.Sprintf("Would migrate %d conversation(s)", preview.ConversationsTagged))
 	}
+	if preview.LogEntriesMoved > 0 {
+		logger.Info(ctx, fmt.Sprintf("Would migrate %d log directory entries", preview.LogEntriesMoved))
+	}
+	if preview.StatusFilesFixed > 0 {
+		logger.Info(ctx, fmt.Sprintf("Would fix paths in %d status file(s)", preview.StatusFilesFixed))
+	}
 
 	if dryRun {
 		logger.Info(ctx, "Re-run without --dry-run to apply changes")
@@ -251,6 +297,12 @@ func runNamespaceMigrationCommand(ctx *Context) error {
 	}
 	if result.ConversationsTagged > 0 {
 		logger.Info(ctx, fmt.Sprintf("Migrated %d conversation(s)", result.ConversationsTagged))
+	}
+	if result.LogEntriesMoved > 0 {
+		logger.Info(ctx, fmt.Sprintf("Migrated %d log directory entries", result.LogEntriesMoved))
+	}
+	if result.StatusFilesFixed > 0 {
+		logger.Info(ctx, fmt.Sprintf("Fixed paths in %d status file(s)", result.StatusFilesFixed))
 	}
 
 	return nil
@@ -508,6 +560,167 @@ func tagConversationFile(filePath, namespace string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// migrateLogDir moves DAG log directories from the root of logDir into
+// {logDir}/{defaultShortID}/. It skips the admin logs directory and any
+// directory whose name matches a registered namespace short ID.
+// When dryRun is true it counts entries without moving them.
+func migrateLogDir(logDir, adminLogsDir, namespacesDir, defaultShortID string, dryRun bool) (int, error) {
+	entries, err := os.ReadDir(logDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("failed to read log directory: %w", err)
+	}
+
+	// Build skip set: admin dir + registered namespace dirs
+	skip := make(map[string]bool)
+
+	adminRel, relErr := filepath.Rel(logDir, adminLogsDir)
+	if relErr == nil && !strings.Contains(adminRel, string(filepath.Separator)) {
+		skip[adminRel] = true
+	}
+
+	if nsEntries, nsErr := os.ReadDir(namespacesDir); nsErr == nil {
+		for _, e := range nsEntries {
+			name := e.Name()
+			if strings.HasSuffix(name, ".json") {
+				skip[strings.TrimSuffix(name, ".json")] = true
+			}
+		}
+	}
+
+	var toMove []os.DirEntry
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		if skip[e.Name()] {
+			continue
+		}
+		toMove = append(toMove, e)
+	}
+
+	if len(toMove) == 0 {
+		return 0, nil
+	}
+
+	if dryRun {
+		return len(toMove), nil
+	}
+
+	dstDir := filepath.Join(logDir, defaultShortID)
+	if err := os.MkdirAll(dstDir, 0750); err != nil {
+		return 0, fmt.Errorf("failed to create namespace log directory: %w", err)
+	}
+
+	slog.Info("namespace migration: moving log directories into default namespace",
+		"count", len(toMove),
+		"destination", dstDir,
+	)
+
+	for _, e := range toMove {
+		src := filepath.Join(logDir, e.Name())
+		dst := filepath.Join(dstDir, e.Name())
+		if err := os.Rename(src, dst); err != nil {
+			return 0, fmt.Errorf("failed to move log directory %s: %w", e.Name(), err)
+		}
+		slog.Debug("namespace migration: moved log directory", "name", e.Name())
+	}
+
+	return len(toMove), nil
+}
+
+// fixLogPathsInStatusFiles rewrites log file paths in status.jsonl files so
+// they point to the namespace-scoped log directory. It uses a 3-step safe
+// replacement to avoid double-scoping paths that are already correct.
+// When dryRun is true it counts files that would be fixed without modifying them.
+func fixLogPathsInStatusFiles(dataDir, logDir, defaultShortID string, dryRun bool) (int, error) {
+	oldPrefix := logDir + "/"
+	newPrefix := filepath.Join(logDir, defaultShortID) + "/"
+	placeholder := "\x00NS\x00"
+
+	fixed := 0
+
+	err := filepath.WalkDir(dataDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil // skip unreadable dirs
+		}
+		if d.IsDir() || d.Name() != "status.jsonl" {
+			return nil
+		}
+
+		content, readErr := os.ReadFile(path) // #nosec G304 - path from internal walk
+		if readErr != nil {
+			slog.Warn("namespace migration: failed to read status file", "path", path, "error", readErr)
+			return nil
+		}
+
+		s := string(content)
+		if !strings.Contains(s, oldPrefix) {
+			return nil
+		}
+
+		// 3-step safe replacement:
+		// 1. Protect already-correct paths
+		s = strings.ReplaceAll(s, newPrefix, placeholder)
+		// 2. Fix old paths
+		s = strings.ReplaceAll(s, oldPrefix, newPrefix)
+		// 3. Restore protected paths
+		s = strings.ReplaceAll(s, placeholder, newPrefix)
+
+		if s == string(content) {
+			return nil // no actual changes
+		}
+
+		fixed++
+
+		if dryRun {
+			return nil
+		}
+
+		// Atomic write: temp file + rename
+		dir := filepath.Dir(path)
+		tmp, tmpErr := os.CreateTemp(dir, "status-*.jsonl.tmp")
+		if tmpErr != nil {
+			return fmt.Errorf("failed to create temp file for %s: %w", path, tmpErr)
+		}
+		tmpName := tmp.Name()
+
+		if _, wErr := tmp.WriteString(s); wErr != nil {
+			tmp.Close()
+			os.Remove(tmpName)
+			return fmt.Errorf("failed to write temp file for %s: %w", path, wErr)
+		}
+		if cErr := tmp.Close(); cErr != nil {
+			os.Remove(tmpName)
+			return fmt.Errorf("failed to close temp file for %s: %w", path, cErr)
+		}
+		if rErr := os.Rename(tmpName, path); rErr != nil {
+			os.Remove(tmpName)
+			return fmt.Errorf("failed to rename temp file for %s: %w", path, rErr)
+		}
+
+		slog.Debug("namespace migration: fixed log paths in status file", "path", path)
+		return nil
+	})
+
+	return fixed, err
+}
+
+// isHexString returns true if s is a non-empty string of lowercase hex characters.
+func isHexString(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	for _, c := range s {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			return false
+		}
+	}
+	return true
 }
 
 // fileExists returns true if the file at path exists.

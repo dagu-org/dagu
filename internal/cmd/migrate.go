@@ -146,6 +146,8 @@ This command will:
 - Move DAG YAML files from the root DAGs directory into the default namespace subdirectory
 - Move dag-runs, proc, queue, suspend, and gitsync data into namespace-scoped directories
 - Tag agent conversations with the default namespace
+- Move log directories into the default namespace log subdirectory
+- Fix log file paths in all status records to reflect the new location
 - Write a marker file to prevent re-migration on subsequent runs
 
 Use --dry-run to preview what would be migrated without making changes.
