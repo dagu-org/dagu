@@ -36,7 +36,7 @@ func TestStore_Create(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, "team-alpha", ns.Name)
-		require.Len(t, ns.ShortID, 4)
+		require.Len(t, ns.ID, 4)
 		require.False(t, ns.CreatedAt.IsZero())
 		require.Equal(t, "Team Alpha's namespace", ns.Description)
 	})
@@ -48,7 +48,7 @@ func TestStore_Create(t *testing.T) {
 		// The "default" namespace is auto-created with the well-known short ID.
 		ns, err := s.Get(ctx, "default")
 		require.NoError(t, err)
-		require.Equal(t, filenamespace.DefaultShortID, ns.ShortID)
+		require.Equal(t, filenamespace.DefaultID, ns.ID)
 	})
 
 	t.Run("with defaults and git sync", func(t *testing.T) {
@@ -101,7 +101,7 @@ func TestStore_Get(t *testing.T) {
 		got, err := s.Get(ctx, "team-alpha")
 		require.NoError(t, err)
 		require.Equal(t, created.Name, got.Name)
-		require.Equal(t, created.ShortID, got.ShortID)
+		require.Equal(t, created.ID, got.ID)
 		require.Equal(t, created.Description, got.Description)
 	})
 
@@ -191,9 +191,9 @@ func TestStore_Resolve(t *testing.T) {
 		ns, err := s.Create(ctx, exec.CreateNamespaceOptions{Name: "team-alpha"})
 		require.NoError(t, err)
 
-		shortID, err := s.Resolve(ctx, "team-alpha")
+		nsID, err := s.Resolve(ctx, "team-alpha")
 		require.NoError(t, err)
-		require.Equal(t, ns.ShortID, shortID)
+		require.Equal(t, ns.ID, nsID)
 	})
 
 	t.Run("resolve non-existent namespace", func(t *testing.T) {
@@ -313,11 +313,11 @@ func TestStore_DefaultNamespace(t *testing.T) {
 	// The "default" namespace is auto-created on store initialization.
 	ns, err := s.Get(ctx, "default")
 	require.NoError(t, err)
-	require.Equal(t, "0000", ns.ShortID)
+	require.Equal(t, "0000", ns.ID)
 
-	shortID, err := s.Resolve(ctx, "default")
+	nsID, err := s.Resolve(ctx, "default")
 	require.NoError(t, err)
-	require.Equal(t, "0000", shortID)
+	require.Equal(t, "0000", nsID)
 
 	// Creating "default" again should fail with ErrNamespaceAlreadyExists.
 	_, err = s.Create(ctx, exec.CreateNamespaceOptions{Name: "default"})
@@ -344,7 +344,7 @@ func TestStore_WithFileCache(t *testing.T) {
 	got1, err := s.Get(ctx, "cached-ns")
 	require.NoError(t, err)
 	assert.Equal(t, "original", got1.Description)
-	assert.Equal(t, created.ShortID, got1.ShortID)
+	assert.Equal(t, created.ID, got1.ID)
 
 	// Second Get should hit the cache (returns same data)
 	got2, err := s.Get(ctx, "cached-ns")

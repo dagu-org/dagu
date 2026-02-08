@@ -6701,9 +6701,9 @@ components:
         name:
           type: string
           description: "Namespace name"
-        shortID:
+        id:
           type: string
-          description: "4-character hex short ID"
+          description: "4-character hex namespace ID"
         description:
           type: string
           description: "Namespace description"
@@ -6720,7 +6720,7 @@ components:
           $ref: "#/components/schemas/NamespaceGitSync"
       required:
         - name
-        - shortID
+        - id
         - createdAt
 
     NamespaceResponse:

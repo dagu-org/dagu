@@ -112,7 +112,7 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 
 	root := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
 	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
-	nsID := filenamespace.GenerateShortID(task.Namespace)
+	nsID := filenamespace.GenerateID(task.Namespace)
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root, nsID)
 
 	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, root, parent, statusPusher, logStreamer, queuedRun, nil)
@@ -142,7 +142,7 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 	}
 
 	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
-	nsID := filenamespace.GenerateShortID(task.Namespace)
+	nsID := filenamespace.GenerateID(task.Namespace)
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root, nsID)
 
 	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, root, parent, statusPusher, logStreamer, false, &retryConfig{

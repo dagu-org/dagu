@@ -612,10 +612,10 @@ func TestNamespaceAlwaysPassedInArgs(t *testing.T) {
 	builder := runtime.NewSubCmdBuilder(cfg)
 
 	tests := []struct {
-		name          string
-		namespace     string
-		expectedArg   string
-		buildSpec     func(ns string) runtime.CmdSpec
+		name        string
+		namespace   string
+		expectedArg string
+		buildSpec   func(ns string) runtime.CmdSpec
 	}{
 		{
 			name:        "Start empty namespace",

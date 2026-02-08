@@ -196,7 +196,7 @@ func runSyncPullAllNamespaces(ctx *Context) error {
 				globalCfg := gitsync.NewConfigFromGlobal(ctx.Config.GitSync)
 				if globalCfg.IsValid() {
 					fmt.Printf("\n--- Namespace: %s (instance config) ---\n", ns.Name)
-					svc := gitsync.NewNamespaceService(globalCfg, filepath.Join(ctx.Config.Paths.DAGsDir, ns.ShortID), ctx.Config.Paths.DataDir, ns.ShortID)
+					svc := gitsync.NewNamespaceService(globalCfg, filepath.Join(ctx.Config.Paths.DAGsDir, ns.ID), ctx.Config.Paths.DataDir, ns.ID)
 					if err := printPullResult(ctx, svc); err != nil {
 						fmt.Printf("  Error: %v\n", err)
 					} else {
@@ -213,7 +213,7 @@ func runSyncPullAllNamespaces(ctx *Context) error {
 		}
 
 		fmt.Printf("\n--- Namespace: %s ---\n", ns.Name)
-		svc := gitsync.NewNamespaceService(nsCfg, filepath.Join(ctx.Config.Paths.DAGsDir, ns.ShortID), ctx.Config.Paths.DataDir, ns.ShortID)
+		svc := gitsync.NewNamespaceService(nsCfg, filepath.Join(ctx.Config.Paths.DAGsDir, ns.ID), ctx.Config.Paths.DataDir, ns.ID)
 		if err := printPullResult(ctx, svc); err != nil {
 			fmt.Printf("  Error: %v\n", err)
 		} else {
@@ -455,6 +455,6 @@ func newNamespaceSyncServiceFromNS(ctx *Context, ns *exec.Namespace) (gitsync.Se
 	}
 
 	nsCfg := gitsync.NewConfigFromNamespace(ns.GitSync)
-	dagsDir := filepath.Join(ctx.Config.Paths.DAGsDir, ns.ShortID)
-	return gitsync.NewNamespaceService(nsCfg, dagsDir, ctx.Config.Paths.DataDir, ns.ShortID), nil
+	dagsDir := filepath.Join(ctx.Config.Paths.DAGsDir, ns.ID)
+	return gitsync.NewNamespaceService(nsCfg, dagsDir, ctx.Config.Paths.DataDir, ns.ID), nil
 }

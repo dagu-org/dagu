@@ -19,10 +19,10 @@ import (
 var _ exec.NamespaceStore = (*Store)(nil)
 
 const (
-	// DefaultShortID is the well-known short ID for the "default" namespace.
-	DefaultShortID = "0000"
-	// shortIDLength is the number of hex characters in a short ID.
-	shortIDLength = 4
+	// DefaultID is the well-known ID for the "default" namespace.
+	DefaultID = "0000"
+	// idLength is the number of hex characters in a namespace ID.
+	idLength = 4
 	// maxNameLength is the maximum length of a namespace name.
 	maxNameLength = 63
 	// filePerm is the file permission for namespace JSON files.
@@ -46,15 +46,15 @@ func WithFileCache(cache *fileutil.Cache[*exec.Namespace]) Option {
 }
 
 // Store is a file-based implementation of exec.NamespaceStore.
-// Each namespace is persisted as a JSON file ({shortID}.json) under the base directory.
+// Each namespace is persisted as a JSON file ({id}.json) under the base directory.
 type Store struct {
 	baseDir   string
 	fileCache *fileutil.Cache[*exec.Namespace]
 	mu        sync.RWMutex
 	// index maps namespace name -> Namespace for fast lookups.
 	index map[string]*exec.Namespace
-	// shortIDs maps shortID -> namespace name for collision detection.
-	shortIDs map[string]string
+	// ids maps id -> namespace name for collision detection.
+	ids map[string]string
 }
 
 // New creates a new file-based NamespaceStore.
@@ -64,9 +64,9 @@ func New(baseDir string, opts ...Option) (*Store, error) {
 		return nil, fmt.Errorf("failed to create namespace directory %s: %w", baseDir, err)
 	}
 	s := &Store{
-		baseDir:  baseDir,
-		index:    make(map[string]*exec.Namespace),
-		shortIDs: make(map[string]string),
+		baseDir: baseDir,
+		index:   make(map[string]*exec.Namespace),
+		ids:     make(map[string]string),
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -90,13 +90,13 @@ func (s *Store) ensureDefaultNamespace() error {
 
 	slog.Info("auto-migration: creating default namespace registry",
 		"name", "default",
-		"short_id", DefaultShortID,
+		"id", DefaultID,
 		"base_dir", s.baseDir,
 	)
 
 	ns := &exec.Namespace{
 		Name:        "default",
-		ShortID:     DefaultShortID,
+		ID:          DefaultID,
 		CreatedAt:   time.Now(),
 		Description: "Default namespace",
 	}
@@ -106,10 +106,10 @@ func (s *Store) ensureDefaultNamespace() error {
 	}
 
 	s.index[ns.Name] = ns
-	s.shortIDs[ns.ShortID] = ns.Name
+	s.ids[ns.ID] = ns.Name
 
 	slog.Info("auto-migration: default namespace created successfully",
-		"file", s.filePath(DefaultShortID),
+		"file", s.filePath(DefaultID),
 	)
 
 	return nil
@@ -128,17 +128,17 @@ func (s *Store) Create(_ context.Context, opts exec.CreateNamespaceOptions) (*ex
 		return nil, exec.ErrNamespaceAlreadyExists
 	}
 
-	shortID := GenerateShortID(opts.Name)
+	id := GenerateID(opts.Name)
 
-	// Check for hash collision: different name but same short ID.
-	if existingName, collision := s.shortIDs[shortID]; collision && existingName != opts.Name {
-		return nil, fmt.Errorf("%w: %q and %q both produce short ID %q",
-			exec.ErrNamespaceHashCollision, opts.Name, existingName, shortID)
+	// Check for hash collision: different name but same ID.
+	if existingName, collision := s.ids[id]; collision && existingName != opts.Name {
+		return nil, fmt.Errorf("%w: %q and %q both produce ID %q",
+			exec.ErrNamespaceHashCollision, opts.Name, existingName, id)
 	}
 
 	ns := &exec.Namespace{
 		Name:        opts.Name,
-		ShortID:     shortID,
+		ID:          id,
 		CreatedAt:   time.Now(),
 		Description: opts.Description,
 		Defaults:    opts.Defaults,
@@ -149,11 +149,11 @@ func (s *Store) Create(_ context.Context, opts exec.CreateNamespaceOptions) (*ex
 		return nil, err
 	}
 	if s.fileCache != nil {
-		s.fileCache.Invalidate(s.filePath(ns.ShortID))
+		s.fileCache.Invalidate(s.filePath(ns.ID))
 	}
 
 	s.index[ns.Name] = ns
-	s.shortIDs[ns.ShortID] = ns.Name
+	s.ids[ns.ID] = ns.Name
 
 	return ns, nil
 }
@@ -188,7 +188,7 @@ func (s *Store) Update(_ context.Context, name string, opts exec.UpdateNamespace
 		return nil, err
 	}
 	if s.fileCache != nil {
-		s.fileCache.Invalidate(s.filePath(ns.ShortID))
+		s.fileCache.Invalidate(s.filePath(ns.ID))
 	}
 
 	return ns, nil
@@ -204,7 +204,7 @@ func (s *Store) Delete(_ context.Context, name string) error {
 		return exec.ErrNamespaceNotFound
 	}
 
-	filePath := s.filePath(ns.ShortID)
+	filePath := s.filePath(ns.ID)
 	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to delete namespace file %s: %w", filePath, err)
 	}
@@ -213,7 +213,7 @@ func (s *Store) Delete(_ context.Context, name string) error {
 	}
 
 	delete(s.index, name)
-	delete(s.shortIDs, ns.ShortID)
+	delete(s.ids, ns.ID)
 
 	return nil
 }
@@ -232,7 +232,7 @@ func (s *Store) Get(_ context.Context, name string) (*exec.Namespace, error) {
 		return ns, nil
 	}
 
-	filePath := s.filePath(ns.ShortID)
+	filePath := s.filePath(ns.ID)
 	return s.fileCache.LoadLatest(filePath, func() (*exec.Namespace, error) {
 		return s.readFromFile(filePath)
 	})
@@ -251,7 +251,7 @@ func (s *Store) List(_ context.Context) ([]*exec.Namespace, error) {
 	return result, nil
 }
 
-// Resolve returns the short ID for a given namespace name.
+// Resolve returns the ID for a given namespace name.
 func (s *Store) Resolve(_ context.Context, name string) (string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -261,17 +261,17 @@ func (s *Store) Resolve(_ context.Context, name string) (string, error) {
 		return "", exec.ErrNamespaceNotFound
 	}
 
-	return ns.ShortID, nil
+	return ns.ID, nil
 }
 
-// GenerateShortID produces a 4-character hex string from the SHA256 hash of the name.
-// The "default" namespace always returns the well-known fixed short ID "0000".
-func GenerateShortID(name string) string {
+// GenerateID produces a 4-character hex string from the SHA256 hash of the name.
+// The "default" namespace always returns the well-known fixed ID "0000".
+func GenerateID(name string) string {
 	if name == "default" {
-		return DefaultShortID
+		return DefaultID
 	}
 	hash := sha256.Sum256([]byte(name))
-	return fmt.Sprintf("%x", hash[:2])[:shortIDLength]
+	return fmt.Sprintf("%x", hash[:2])[:idLength]
 }
 
 // validateName checks that a namespace name conforms to the required format.
@@ -303,13 +303,13 @@ func (s *Store) readFromFile(filePath string) (*exec.Namespace, error) {
 
 // writeFile persists a namespace to disk as JSON.
 func (s *Store) writeFile(ns *exec.Namespace) error {
-	filePath := s.filePath(ns.ShortID)
+	filePath := s.filePath(ns.ID)
 	return fileutil.WriteJSONAtomic(filePath, ns, filePerm)
 }
 
-// filePath returns the JSON file path for a namespace short ID.
-func (s *Store) filePath(shortID string) string {
-	return filepath.Join(s.baseDir, shortID+".json")
+// filePath returns the JSON file path for a namespace ID.
+func (s *Store) filePath(id string) string {
+	return filepath.Join(s.baseDir, id+".json")
 }
 
 // rebuildIndex scans the base directory and loads all namespace JSON files.
@@ -336,7 +336,7 @@ func (s *Store) rebuildIndex() error {
 		}
 
 		s.index[ns.Name] = &ns
-		s.shortIDs[ns.ShortID] = ns.Name
+		s.ids[ns.ID] = ns.Name
 	}
 
 	return nil

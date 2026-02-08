@@ -143,15 +143,15 @@ func NewService(cfg *Config, dagsDir, dataDir string) Service {
 }
 
 // NewNamespaceService creates a Git sync service scoped to a namespace.
-// State and repo are stored at {dataDir}/{shortID}/gitsync/.
-func NewNamespaceService(cfg *Config, dagsDir, dataDir, shortID string) Service {
-	nsDataDir := filepath.Join(dataDir, shortID)
+// State and repo are stored at {dataDir}/{id}/gitsync/.
+func NewNamespaceService(cfg *Config, dagsDir, dataDir, id string) Service {
+	nsDataDir := filepath.Join(dataDir, id)
 	repoPath := filepath.Join(nsDataDir, "gitsync", "repo")
 	return &serviceImpl{
 		cfg:          cfg,
 		dagsDir:      dagsDir,
 		dataDir:      nsDataDir,
-		stateManager: NewNamespaceStateManager(dataDir, shortID),
+		stateManager: NewNamespaceStateManager(dataDir, id),
 		gitClient:    NewGitClient(cfg, repoPath),
 	}
 }

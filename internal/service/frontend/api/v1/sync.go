@@ -426,8 +426,8 @@ func (a *API) resolveNamespaceSyncService(ctx context.Context, namespaceName str
 	}
 
 	nsCfg := gitsync.NewConfigFromNamespace(ns.GitSync)
-	dagsDir := filepath.Join(a.config.Paths.DAGsDir, ns.ShortID)
-	return gitsync.NewNamespaceService(nsCfg, dagsDir, a.config.Paths.DataDir, ns.ShortID), nil
+	dagsDir := filepath.Join(a.config.Paths.DAGsDir, ns.ID)
+	return gitsync.NewNamespaceService(nsCfg, dagsDir, a.config.Paths.DataDir, ns.ID), nil
 }
 
 // Helper functions for type conversion

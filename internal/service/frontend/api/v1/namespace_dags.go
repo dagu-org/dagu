@@ -58,11 +58,11 @@ func (a *API) resolveNamespaceStores(ctx context.Context, namespaceName string) 
 		return nil, err
 	}
 
-	namespacedDAGsDir := filepath.Join(a.config.Paths.DAGsDir, ns.ShortID)
-	namespacedDAGRunsDir := filepath.Join(a.config.Paths.DataDir, ns.ShortID, "dag-runs")
-	namespacedProcDir := filepath.Join(a.config.Paths.DataDir, ns.ShortID, "proc")
-	namespacedQueueDir := filepath.Join(a.config.Paths.DataDir, ns.ShortID, "queue")
-	namespacedSuspendDir := filepath.Join(a.config.Paths.DataDir, ns.ShortID, "suspend")
+	namespacedDAGsDir := filepath.Join(a.config.Paths.DAGsDir, ns.ID)
+	namespacedDAGRunsDir := filepath.Join(a.config.Paths.DataDir, ns.ID, "dag-runs")
+	namespacedProcDir := filepath.Join(a.config.Paths.DataDir, ns.ID, "proc")
+	namespacedQueueDir := filepath.Join(a.config.Paths.DataDir, ns.ID, "queue")
+	namespacedSuspendDir := filepath.Join(a.config.Paths.DataDir, ns.ID, "suspend")
 
 	dagStore := filedag.New(
 		namespacedDAGsDir,

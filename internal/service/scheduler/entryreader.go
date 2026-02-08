@@ -52,14 +52,14 @@ func NewScheduledJob(next time.Time, job Job, typ ScheduleType) *ScheduledJob {
 var _ EntryReader = (*entryReaderImpl)(nil)
 
 // entryReaderImpl manages DAGs on local filesystem across all namespaces.
-// It iterates NamespaceStore.List() and watches {DAGsDir}/{shortID}/ for each
+// It iterates NamespaceStore.List() and watches {DAGsDir}/{id}/ for each
 // namespace, setting dag.Namespace on every loaded DAG.
 type entryReaderImpl struct {
 	dagsDir        string               // base DAGs directory
 	namespaceStore exec.NamespaceStore  // namespace store for listing namespaces
-	registry       map[string]*core.DAG // key: shortID/filename → DAG
-	knownNS        map[string]string    // shortID → namespace name
-	nsDirs         map[string]string    // dir path → shortID
+	registry       map[string]*core.DAG // key: id/filename → DAG
+	knownNS        map[string]string    // id → namespace name
+	nsDirs         map[string]string    // dir path → id
 	lock           sync.Mutex
 	dagStore       exec.DAGStore
 	dagRunMgr      runtime.Manager
@@ -71,7 +71,7 @@ type entryReaderImpl struct {
 }
 
 // NewEntryReader creates a new namespace-aware DAG manager.
-// It scans {dagsDir}/{shortID}/ subdirectories for each namespace.
+// It scans {dagsDir}/{id}/ subdirectories for each namespace.
 func NewEntryReader(
 	dir string,
 	dagCli exec.DAGStore,
@@ -219,18 +219,18 @@ func (er *entryReaderImpl) syncNamespaces(ctx context.Context) error {
 		return fmt.Errorf("failed to list namespaces: %w", err)
 	}
 
-	// Build set of current namespace shortIDs
+	// Build set of current namespace IDs
 	currentIDs := make(map[string]struct{}, len(namespaces))
 	for _, ns := range namespaces {
-		currentIDs[ns.ShortID] = struct{}{}
+		currentIDs[ns.ID] = struct{}{}
 
 		// Skip already known namespaces
-		if _, known := er.knownNS[ns.ShortID]; known {
+		if _, known := er.knownNS[ns.ID]; known {
 			continue
 		}
 
 		// New namespace found — register it
-		nsDir := filepath.Join(er.dagsDir, ns.ShortID)
+		nsDir := filepath.Join(er.dagsDir, ns.ID)
 
 		// Create directory if it doesn't exist
 		if err := os.MkdirAll(nsDir, 0750); err != nil {
@@ -253,23 +253,23 @@ func (er *entryReaderImpl) syncNamespaces(ctx context.Context) error {
 		}
 
 		// Register namespace
-		er.knownNS[ns.ShortID] = ns.Name
-		er.nsDirs[nsDir] = ns.ShortID
+		er.knownNS[ns.ID] = ns.Name
+		er.nsDirs[nsDir] = ns.ID
 
 		// Load DAGs from this namespace directory
-		er.loadNamespaceDAGs(ctx, ns.Name, ns.ShortID, nsDir)
+		er.loadNamespaceDAGs(ctx, ns.Name, ns.ID, nsDir)
 
 		logger.Info(ctx, "Namespace directory registered",
 			slog.String("namespace", ns.Name),
-			slog.String("shortID", ns.ShortID),
+			slog.String("id", ns.ID),
 			tag.Dir(nsDir),
 		)
 	}
 
 	// Remove DAGs from deleted namespaces
-	for shortID := range er.knownNS {
-		if _, exists := currentIDs[shortID]; !exists {
-			er.removeNamespace(ctx, shortID)
+	for nsID := range er.knownNS {
+		if _, exists := currentIDs[nsID]; !exists {
+			er.removeNamespace(ctx, nsID)
 		}
 	}
 
@@ -278,7 +278,7 @@ func (er *entryReaderImpl) syncNamespaces(ctx context.Context) error {
 
 // loadNamespaceDAGs loads all YAML DAG files from a namespace directory.
 // The caller must hold er.lock.
-func (er *entryReaderImpl) loadNamespaceDAGs(ctx context.Context, nsName, shortID, nsDir string) {
+func (er *entryReaderImpl) loadNamespaceDAGs(ctx context.Context, nsName, nsID, nsDir string) {
 	fis, err := os.ReadDir(nsDir)
 	if err != nil {
 		logger.Error(ctx, "Failed to read namespace DAG directory",
@@ -310,7 +310,7 @@ func (er *entryReaderImpl) loadNamespaceDAGs(ctx context.Context, nsName, shortI
 			continue
 		}
 		dag.Namespace = nsName
-		registryKey := shortID + "/" + fi.Name()
+		registryKey := nsID + "/" + fi.Name()
 		er.registry[registryKey] = dag
 		dags = append(dags, fi.Name())
 	}
@@ -323,9 +323,9 @@ func (er *entryReaderImpl) loadNamespaceDAGs(ctx context.Context, nsName, shortI
 
 // removeNamespace removes all DAGs for a deleted namespace from the registry.
 // The caller must hold er.lock.
-func (er *entryReaderImpl) removeNamespace(ctx context.Context, shortID string) {
-	nsName := er.knownNS[shortID]
-	prefix := shortID + "/"
+func (er *entryReaderImpl) removeNamespace(ctx context.Context, nsID string) {
+	nsName := er.knownNS[nsID]
+	prefix := nsID + "/"
 	for key := range er.registry {
 		if strings.HasPrefix(key, prefix) {
 			delete(er.registry, key)
@@ -333,13 +333,13 @@ func (er *entryReaderImpl) removeNamespace(ctx context.Context, shortID string) 
 	}
 
 	// Remove from tracking maps
-	nsDir := filepath.Join(er.dagsDir, shortID)
+	nsDir := filepath.Join(er.dagsDir, nsID)
 	delete(er.nsDirs, nsDir)
-	delete(er.knownNS, shortID)
+	delete(er.knownNS, nsID)
 
 	logger.Info(ctx, "Namespace removed from scheduler",
 		slog.String("namespace", nsName),
-		slog.String("shortID", shortID),
+		slog.String("id", nsID),
 	)
 }
 
@@ -348,7 +348,7 @@ func (er *entryReaderImpl) removeNamespace(ctx context.Context, shortID string) 
 func (er *entryReaderImpl) handleFileEvent(ctx context.Context, event fsnotify.Event) {
 	// Determine which namespace this file belongs to
 	eventDir := filepath.Dir(event.Name)
-	shortID, ok := er.nsDirs[eventDir]
+	nsID, ok := er.nsDirs[eventDir]
 	if !ok {
 		logger.Debug(ctx, "File event from unknown directory",
 			tag.File(event.Name),
@@ -356,9 +356,9 @@ func (er *entryReaderImpl) handleFileEvent(ctx context.Context, event fsnotify.E
 		return
 	}
 
-	nsName := er.knownNS[shortID]
+	nsName := er.knownNS[nsID]
 	fileName := filepath.Base(event.Name)
-	registryKey := shortID + "/" + fileName
+	registryKey := nsID + "/" + fileName
 
 	switch event.Op {
 	case fsnotify.Create, fsnotify.Write:
@@ -390,5 +390,7 @@ func (er *entryReaderImpl) handleFileEvent(ctx context.Context, event fsnotify.E
 			tag.Name(fileName),
 			slog.String("namespace", nsName),
 		)
+	default:
+		// Ignore other events (e.g., Chmod)
 	}
 }

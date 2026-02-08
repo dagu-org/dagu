@@ -104,10 +104,10 @@ func NewStateManager(dataDir string) *StateManager {
 }
 
 // NewNamespaceStateManager creates a state manager scoped to a namespace.
-// The state file is stored at {dataDir}/{shortID}/gitsync/state.json.
-func NewNamespaceStateManager(dataDir, shortID string) *StateManager {
+// The state file is stored at {dataDir}/{id}/gitsync/state.json.
+func NewNamespaceStateManager(dataDir, id string) *StateManager {
 	return &StateManager{
-		statePath: filepath.Join(dataDir, shortID, "gitsync", "state.json"),
+		statePath: filepath.Join(dataDir, id, "gitsync", "state.json"),
 	}
 }
 

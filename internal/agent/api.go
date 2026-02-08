@@ -680,7 +680,7 @@ func (a *API) handleUserResponse(w http.ResponseWriter, r *http.Request) {
 
 // environmentForNamespace returns an EnvironmentInfo scoped to the given namespace.
 // If namespace is empty or "default", returns the base environment with Namespace set.
-// For non-default namespaces, looks up the namespace short ID and adjusts paths.
+// For non-default namespaces, looks up the namespace ID and adjusts paths.
 func (a *API) environmentForNamespace(namespace string) EnvironmentInfo {
 	env := a.environment
 	env.Namespace = namespace
@@ -698,8 +698,8 @@ func (a *API) environmentForNamespace(namespace string) EnvironmentInfo {
 		return env
 	}
 
-	env.DAGsDir = filepath.Join(a.environment.DAGsDir, ns.ShortID)
-	env.DataDir = filepath.Join(a.environment.DataDir, ns.ShortID)
+	env.DAGsDir = filepath.Join(a.environment.DAGsDir, ns.ID)
+	env.DataDir = filepath.Join(a.environment.DataDir, ns.ID)
 	env.WorkingDir = env.DAGsDir
 	return env
 }

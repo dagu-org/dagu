@@ -57,7 +57,7 @@ type Context struct {
 	ServiceRegistry exec.ServiceRegistry
 	NamespaceStore  exec.NamespaceStore
 
-	Proc             exec.ProcHandle
+	Proc        exec.ProcHandle
 	NamespaceID string // Set by ResolveNamespace/ResolveNamespaceFromArg
 }
 
@@ -65,19 +65,19 @@ type Context struct {
 // This is useful for creating a signal-aware context for service operations.
 func (c *Context) WithContext(ctx context.Context) *Context {
 	return &Context{
-		Context:          ctx,
-		Command:          c.Command,
-		Flags:            c.Flags,
-		Config:           c.Config,
-		Quiet:            c.Quiet,
-		DAGRunStore:      c.DAGRunStore,
-		DAGRunMgr:        c.DAGRunMgr,
-		ProcStore:        c.ProcStore,
-		QueueStore:       c.QueueStore,
-		ServiceRegistry:  c.ServiceRegistry,
-		NamespaceStore:   c.NamespaceStore,
-		Proc:             c.Proc,
-		NamespaceID: c.NamespaceID,
+		Context:         ctx,
+		Command:         c.Command,
+		Flags:           c.Flags,
+		Config:          c.Config,
+		Quiet:           c.Quiet,
+		DAGRunStore:     c.DAGRunStore,
+		DAGRunMgr:       c.DAGRunMgr,
+		ProcStore:       c.ProcStore,
+		QueueStore:      c.QueueStore,
+		ServiceRegistry: c.ServiceRegistry,
+		NamespaceStore:  c.NamespaceStore,
+		Proc:            c.Proc,
+		NamespaceID:     c.NamespaceID,
 	}
 }
 
@@ -652,7 +652,7 @@ type LogConfig struct {
 	DAGLogDir   string // Optional alternative log directory specified by the DAG definition.
 	Name        string // Name of the DAG; used for generating a safe directory name.
 	DAGRunID    string // Unique dag-run ID used in the filename.
-	NamespaceID string // Namespace short ID for filesystem scoping.
+	NamespaceID string // Namespace ID for filesystem scoping.
 }
 
 // Validate checks that essential fields are provided.

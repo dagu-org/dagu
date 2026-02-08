@@ -3011,8 +3011,8 @@ export interface components {
         Namespace: {
             /** @description Namespace name */
             name: string;
-            /** @description 4-character hex short ID */
-            shortID: string;
+            /** @description 4-character hex namespace ID */
+            id: string;
             /** @description Namespace description */
             description?: string;
             /**

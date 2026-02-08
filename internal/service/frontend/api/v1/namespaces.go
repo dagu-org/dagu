@@ -133,7 +133,7 @@ func (a *API) CreateNamespace(ctx context.Context, request api.CreateNamespaceRe
 
 	a.logAuditEntry(ctx, audit.CategoryNamespace, "namespace_create", map[string]any{
 		"namespace": ns.Name,
-		"short_id":  ns.ShortID,
+		"id":        ns.ID,
 	})
 
 	return api.CreateNamespace201JSONResponse{
@@ -233,14 +233,14 @@ func (a *API) DeleteNamespace(ctx context.Context, request api.DeleteNamespaceRe
 		}
 	}
 
-	// Get namespace to resolve the short ID for DAG directory check.
+	// Get namespace to resolve the ID for DAG directory check.
 	ns, err := a.namespaceStore.Get(ctx, name)
 	if err != nil {
 		return nil, err
 	}
 
 	// Check if the namespace contains DAGs.
-	dagDir := filepath.Join(a.config.Paths.DAGsDir, ns.ShortID)
+	dagDir := filepath.Join(a.config.Paths.DAGsDir, ns.ID)
 	if hasDAGs, checkErr := exec.NamespaceHasDAGs(dagDir); checkErr != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusInternalServerError,
@@ -270,7 +270,7 @@ func (a *API) DeleteNamespace(ctx context.Context, request api.DeleteNamespaceRe
 func toAPINamespace(ns *exec.Namespace) api.Namespace {
 	result := api.Namespace{
 		Name:        ns.Name,
-		ShortID:     ns.ShortID,
+		Id:          ns.ID,
 		CreatedAt:   ns.CreatedAt,
 		Description: ptrOf(ns.Description),
 	}

@@ -20,8 +20,8 @@ type MigrationResult struct {
 	DAGFilesMoved       int
 	DirEntriesMoved     map[string]int // "dag-runs", "proc", "queue", "suspend", "gitsync"
 	ConversationsTagged int
-	LogEntriesMoved     int // log directory entries moved
-	StatusFilesFixed    int // status.jsonl files with rewritten paths
+	LogEntriesMoved     int  // log directory entries moved
+	StatusFilesFixed    int  // status.jsonl files with rewritten paths
 	AlreadyMigrated     bool // marker file existed
 	AlreadyScoped       bool // paths already namespace-scoped
 }
@@ -35,7 +35,7 @@ func (r *MigrationResult) totalMigrated() int {
 }
 
 // runNamespaceMigration moves existing DAG definitions and run data into the
-// default namespace subdirectory ({shortID}). When dryRun is true it counts
+// default namespace subdirectory ({id}). When dryRun is true it counts
 // what would be moved without touching the filesystem.
 func runNamespaceMigration(paths config.PathsConfig, dryRun bool) (*MigrationResult, error) {
 	result := &MigrationResult{
@@ -61,16 +61,16 @@ func runNamespaceMigration(paths config.PathsConfig, dryRun bool) (*MigrationRes
 		return result, nil
 	}
 
-	defaultShortID := filenamespace.DefaultShortID
+	defaultID := filenamespace.DefaultID
 
-	// Move DAG YAML files from root DAGsDir to {DAGsDir}/{defaultShortID}/
-	count, err := migrateDAGFiles(paths.DAGsDir, defaultShortID, dryRun)
+	// Move DAG YAML files from root DAGsDir to {DAGsDir}/{defaultID}/
+	count, err := migrateDAGFiles(paths.DAGsDir, defaultID, dryRun)
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate DAG files: %w", err)
 	}
 	result.DAGFilesMoved = count
 
-	// Move run data directories into {DataDir}/{defaultShortID}/
+	// Move run data directories into {DataDir}/{defaultID}/
 	dataDirs := []struct {
 		name   string
 		srcDir string
@@ -81,8 +81,8 @@ func runNamespaceMigration(paths config.PathsConfig, dryRun bool) (*MigrationRes
 	}
 
 	for _, d := range dataDirs {
-		dstDir := filepath.Join(paths.DataDir, defaultShortID, d.name)
-		n, err := moveDirContents(d.srcDir, dstDir, defaultShortID, dryRun)
+		dstDir := filepath.Join(paths.DataDir, defaultID, d.name)
+		n, err := moveDirContents(d.srcDir, dstDir, defaultID, dryRun)
 		if err != nil {
 			return nil, fmt.Errorf("failed to migrate %s: %w", d.name, err)
 		}
@@ -91,9 +91,9 @@ func runNamespaceMigration(paths config.PathsConfig, dryRun bool) (*MigrationRes
 		}
 	}
 
-	// Move suspend flags into {DataDir}/{defaultShortID}/suspend/
+	// Move suspend flags into {DataDir}/{defaultID}/suspend/
 	if paths.SuspendFlagsDir != "" {
-		dstDir := filepath.Join(paths.DataDir, defaultShortID, "suspend")
+		dstDir := filepath.Join(paths.DataDir, defaultID, "suspend")
 		n, err := moveDirContents(paths.SuspendFlagsDir, dstDir, "", dryRun)
 		if err != nil {
 			return nil, fmt.Errorf("failed to migrate suspend flags: %w", err)
@@ -103,10 +103,10 @@ func runNamespaceMigration(paths config.PathsConfig, dryRun bool) (*MigrationRes
 		}
 	}
 
-	// Move git sync state into {DataDir}/{defaultShortID}/gitsync/
+	// Move git sync state into {DataDir}/{defaultID}/gitsync/
 	gitSyncDir := filepath.Join(paths.DataDir, "gitsync")
 	if fileExists(gitSyncDir) {
-		dstDir := filepath.Join(paths.DataDir, defaultShortID, "gitsync")
+		dstDir := filepath.Join(paths.DataDir, defaultID, "gitsync")
 		n, err := moveDirContents(gitSyncDir, dstDir, "", dryRun)
 		if err != nil {
 			return nil, fmt.Errorf("failed to migrate git sync state: %w", err)
@@ -125,9 +125,9 @@ func runNamespaceMigration(paths config.PathsConfig, dryRun bool) (*MigrationRes
 		result.ConversationsTagged = n
 	}
 
-	// Move log directories into {LogDir}/{defaultShortID}/
+	// Move log directories into {LogDir}/{defaultID}/
 	if paths.LogDir != "" {
-		n, err := migrateLogDir(paths.LogDir, paths.AdminLogsDir, paths.NamespacesDir, defaultShortID, dryRun)
+		n, err := migrateLogDir(paths.LogDir, paths.AdminLogsDir, paths.NamespacesDir, defaultID, dryRun)
 		if err != nil {
 			return nil, fmt.Errorf("failed to migrate log directories: %w", err)
 		}
@@ -136,7 +136,7 @@ func runNamespaceMigration(paths config.PathsConfig, dryRun bool) (*MigrationRes
 
 	// Fix log paths in status.jsonl files across all namespaces
 	if paths.LogDir != "" && paths.DataDir != "" {
-		n, err := fixLogPathsInStatusFiles(paths.DataDir, paths.LogDir, defaultShortID, dryRun)
+		n, err := fixLogPathsInStatusFiles(paths.DataDir, paths.LogDir, defaultID, dryRun)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fix log paths in status files: %w", err)
 		}
@@ -147,7 +147,7 @@ func runNamespaceMigration(paths config.PathsConfig, dryRun bool) (*MigrationRes
 		if result.totalMigrated() > 0 {
 			slog.Info("namespace migration: data migration to default namespace complete",
 				"namespace", "default",
-				"short_id", defaultShortID,
+				"id", defaultID,
 			)
 		}
 		if err := writeMarker(markerPath); err != nil {
@@ -191,7 +191,7 @@ func hasUnmigratedData(paths config.PathsConfig) bool {
 	// Check for entries in DAGRunsDir (excluding the default short ID dir)
 	if entries, err := os.ReadDir(paths.DAGRunsDir); err == nil {
 		for _, e := range entries {
-			if e.Name() != filenamespace.DefaultShortID {
+			if e.Name() != filenamespace.DefaultID {
 				return true
 			}
 		}
@@ -334,7 +334,7 @@ func writeMarker(markerPath string) error {
 
 // migrateDAGFiles moves YAML files from the root DAGsDir to a namespace subdirectory.
 // When dryRun is true it counts files without moving them.
-func migrateDAGFiles(dagsDir, shortID string, dryRun bool) (int, error) {
+func migrateDAGFiles(dagsDir, id string, dryRun bool) (int, error) {
 	entries, err := os.ReadDir(dagsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -363,7 +363,7 @@ func migrateDAGFiles(dagsDir, shortID string, dryRun bool) (int, error) {
 		return len(yamlFiles), nil
 	}
 
-	dstDir := filepath.Join(dagsDir, shortID)
+	dstDir := filepath.Join(dagsDir, id)
 	if err := os.MkdirAll(dstDir, 0750); err != nil {
 		return 0, fmt.Errorf("failed to create namespace DAGs directory: %w", err)
 	}
@@ -387,7 +387,7 @@ func migrateDAGFiles(dagsDir, shortID string, dryRun bool) (int, error) {
 }
 
 // moveDirContents moves the contents of srcDir into dstDir.
-// skipEntry is the name of a subdirectory to skip (e.g., the namespace shortID
+// skipEntry is the name of a subdirectory to skip (e.g., the namespace ID
 // to avoid moving the destination into itself). Pass "" to skip nothing.
 // When dryRun is true it counts entries without moving them.
 func moveDirContents(srcDir, dstDir, skipEntry string, dryRun bool) (int, error) {
@@ -563,10 +563,10 @@ func tagConversationFile(filePath, namespace string) (bool, error) {
 }
 
 // migrateLogDir moves DAG log directories from the root of logDir into
-// {logDir}/{defaultShortID}/. It skips the admin logs directory and any
-// directory whose name matches a registered namespace short ID.
+// {logDir}/{defaultID}/. It skips the admin logs directory and any
+// directory whose name matches a registered namespace ID.
 // When dryRun is true it counts entries without moving them.
-func migrateLogDir(logDir, adminLogsDir, namespacesDir, defaultShortID string, dryRun bool) (int, error) {
+func migrateLogDir(logDir, adminLogsDir, namespacesDir, defaultID string, dryRun bool) (int, error) {
 	entries, err := os.ReadDir(logDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -611,7 +611,7 @@ func migrateLogDir(logDir, adminLogsDir, namespacesDir, defaultShortID string, d
 		return len(toMove), nil
 	}
 
-	dstDir := filepath.Join(logDir, defaultShortID)
+	dstDir := filepath.Join(logDir, defaultID)
 	if err := os.MkdirAll(dstDir, 0750); err != nil {
 		return 0, fmt.Errorf("failed to create namespace log directory: %w", err)
 	}
@@ -637,9 +637,9 @@ func migrateLogDir(logDir, adminLogsDir, namespacesDir, defaultShortID string, d
 // they point to the namespace-scoped log directory. It uses a 3-step safe
 // replacement to avoid double-scoping paths that are already correct.
 // When dryRun is true it counts files that would be fixed without modifying them.
-func fixLogPathsInStatusFiles(dataDir, logDir, defaultShortID string, dryRun bool) (int, error) {
+func fixLogPathsInStatusFiles(dataDir, logDir, defaultID string, dryRun bool) (int, error) {
 	oldPrefix := logDir + "/"
-	newPrefix := filepath.Join(logDir, defaultShortID) + "/"
+	newPrefix := filepath.Join(logDir, defaultID) + "/"
 	placeholder := "\x00NS\x00"
 
 	fixed := 0
@@ -690,16 +690,16 @@ func fixLogPathsInStatusFiles(dataDir, logDir, defaultShortID string, dryRun boo
 		tmpName := tmp.Name()
 
 		if _, wErr := tmp.WriteString(s); wErr != nil {
-			tmp.Close()
-			os.Remove(tmpName)
+			_ = tmp.Close()
+			_ = os.Remove(tmpName)
 			return fmt.Errorf("failed to write temp file for %s: %w", path, wErr)
 		}
 		if cErr := tmp.Close(); cErr != nil {
-			os.Remove(tmpName)
+			_ = os.Remove(tmpName)
 			return fmt.Errorf("failed to close temp file for %s: %w", path, cErr)
 		}
 		if rErr := os.Rename(tmpName, path); rErr != nil {
-			os.Remove(tmpName)
+			_ = os.Remove(tmpName)
 			return fmt.Errorf("failed to rename temp file for %s: %w", path, rErr)
 		}
 
@@ -716,7 +716,7 @@ func isHexString(s string) bool {
 		return false
 	}
 	for _, c := range s {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 			return false
 		}
 	}

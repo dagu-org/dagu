@@ -1046,7 +1046,7 @@ type ReportStatusRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
 	Status        *DAGRunStatusProto     `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	NamespaceId   string                 `protobuf:"bytes,3,opt,name=namespace_id,json=namespaceId,proto3" json:"namespace_id,omitempty"` // Namespace short ID for filesystem scoping
+	NamespaceId   string                 `protobuf:"bytes,3,opt,name=namespace_id,json=namespaceId,proto3" json:"namespace_id,omitempty"` // Namespace ID for filesystem scoping
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1216,7 +1216,7 @@ type LogChunk struct {
 	RootDagRunId   string `protobuf:"bytes,10,opt,name=root_dag_run_id,json=rootDagRunId,proto3" json:"root_dag_run_id,omitempty"`
 	// Attempt ID for the DAG run
 	AttemptId string `protobuf:"bytes,11,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
-	// Namespace short ID for filesystem scoping
+	// Namespace ID for filesystem scoping
 	NamespaceId   string `protobuf:"bytes,12,opt,name=namespace_id,json=namespaceId,proto3" json:"namespace_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

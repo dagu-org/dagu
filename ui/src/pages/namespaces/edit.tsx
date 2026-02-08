@@ -376,7 +376,7 @@ export default function NamespaceEditPage() {
         </Button>
         <h1 className="text-lg font-semibold">Edit Namespace: {namespace.name}</h1>
         <p className="text-sm text-muted-foreground">
-          Short ID: {namespace.shortID}
+          ID: {namespace.id}
         </p>
       </div>
 

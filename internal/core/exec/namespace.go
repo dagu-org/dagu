@@ -14,7 +14,7 @@ import (
 var (
 	ErrNamespaceNotFound      = errors.New("namespace not found")
 	ErrNamespaceAlreadyExists = errors.New("namespace already exists")
-	ErrNamespaceHashCollision = errors.New("namespace hash collision: two different names produced the same short ID")
+	ErrNamespaceHashCollision = errors.New("namespace hash collision: two different names produced the same ID")
 )
 
 // NamespaceStore is an interface for managing namespace storage.
@@ -27,7 +27,7 @@ type NamespaceStore interface {
 	Get(ctx context.Context, name string) (*Namespace, error)
 	// List returns all namespaces.
 	List(ctx context.Context) ([]*Namespace, error)
-	// Resolve returns the short ID for a given namespace name.
+	// Resolve returns the ID for a given namespace name.
 	Resolve(ctx context.Context, name string) (string, error)
 	// Update applies partial updates to an existing namespace.
 	Update(ctx context.Context, name string, opts UpdateNamespaceOptions) (*Namespace, error)
@@ -55,8 +55,8 @@ type UpdateNamespaceOptions struct {
 type Namespace struct {
 	// Name is the human-readable namespace name.
 	Name string `json:"name"`
-	// ShortID is a 4-character hex prefix derived from SHA256 of the name.
-	ShortID string `json:"shortID"`
+	// ID is a 4-character hex prefix derived from SHA256 of the name.
+	ID string `json:"id"`
 	// CreatedAt is the timestamp when the namespace was created.
 	CreatedAt time.Time `json:"createdAt"`
 	// Description is an optional description of the namespace.

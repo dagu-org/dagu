@@ -190,7 +190,7 @@ func runNamespaceCreate(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to create namespace: %w", err)
 	}
 
-	fmt.Printf("Namespace %q created (short ID: %s)\n", ns.Name, ns.ShortID)
+	fmt.Printf("Namespace %q created (ID: %s)\n", ns.Name, ns.ID)
 	return nil
 }
 
@@ -225,14 +225,14 @@ func runNamespaceDelete(ctx *Context, args []string) error {
 		return fmt.Errorf("cannot delete the \"default\" namespace")
 	}
 
-	// Look up the namespace to get its short ID.
+	// Look up the namespace to get its ID.
 	ns, err := ctx.NamespaceStore.Get(ctx, name)
 	if err != nil {
 		return fmt.Errorf("failed to get namespace %q: %w", name, err)
 	}
 
 	// Check if the namespace contains DAGs.
-	dagDir := filepath.Join(ctx.Config.Paths.DAGsDir, ns.ShortID)
+	dagDir := filepath.Join(ctx.Config.Paths.DAGsDir, ns.ID)
 	if hasDAGs, checkErr := exec.NamespaceHasDAGs(dagDir); checkErr != nil {
 		return fmt.Errorf("failed to check DAGs in namespace %q: %w", name, checkErr)
 	} else if hasDAGs {
