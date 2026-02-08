@@ -187,47 +187,70 @@ func runNamespaceMigrationCommand(ctx *Context) error {
 		return fmt.Errorf("failed to get dry-run flag: %w", err)
 	}
 
-	if dryRun {
-		logger.Info(ctx, "Dry-run mode: no files will be moved")
+	skipConfirm, err := ctx.Command.Flags().GetBool("yes")
+	if err != nil {
+		return fmt.Errorf("failed to get yes flag: %w", err)
 	}
 
-	result, err := runNamespaceMigration(ctx.Config.Paths, dryRun)
+	// Always scan first to show a preview.
+	preview, err := runNamespaceMigration(ctx.Config.Paths, true)
 	if err != nil {
 		return fmt.Errorf("namespace migration failed: %w", err)
 	}
 
-	if result.AlreadyMigrated {
+	if preview.AlreadyMigrated {
 		logger.Info(ctx, "Namespace migration has already been completed (marker file exists)")
 		return nil
 	}
-	if result.AlreadyScoped {
+	if preview.AlreadyScoped {
 		logger.Info(ctx, "Paths are already namespace-scoped, no migration needed")
 		return nil
 	}
 
-	total := result.totalMigrated()
+	total := preview.totalMigrated()
 	if total == 0 {
 		logger.Info(ctx, "No data found to migrate")
 		return nil
 	}
 
-	prefix := "Migrated"
-	if dryRun {
-		prefix = "Would migrate"
+	// Print preview summary.
+	if preview.DAGFilesMoved > 0 {
+		logger.Info(ctx, fmt.Sprintf("Would migrate %d DAG file(s)", preview.DAGFilesMoved))
 	}
-
-	if result.DAGFilesMoved > 0 {
-		logger.Info(ctx, fmt.Sprintf("%s %d DAG file(s)", prefix, result.DAGFilesMoved))
+	for name, count := range preview.DirEntriesMoved {
+		logger.Info(ctx, fmt.Sprintf("Would migrate %d %s entries", count, name))
 	}
-	for name, count := range result.DirEntriesMoved {
-		logger.Info(ctx, fmt.Sprintf("%s %d %s entries", prefix, count, name))
-	}
-	if result.ConversationsTagged > 0 {
-		logger.Info(ctx, fmt.Sprintf("%s %d conversation(s)", prefix, result.ConversationsTagged))
+	if preview.ConversationsTagged > 0 {
+		logger.Info(ctx, fmt.Sprintf("Would migrate %d conversation(s)", preview.ConversationsTagged))
 	}
 
 	if dryRun {
 		logger.Info(ctx, "Re-run without --dry-run to apply changes")
+		return nil
+	}
+
+	// Confirmation gate.
+	if !skipConfirm {
+		if !confirmAction("Continue?") {
+			fmt.Println("Cancelled.")
+			return nil
+		}
+	}
+
+	// Execute for real.
+	result, err := runNamespaceMigration(ctx.Config.Paths, false)
+	if err != nil {
+		return fmt.Errorf("namespace migration failed: %w", err)
+	}
+
+	if result.DAGFilesMoved > 0 {
+		logger.Info(ctx, fmt.Sprintf("Migrated %d DAG file(s)", result.DAGFilesMoved))
+	}
+	for name, count := range result.DirEntriesMoved {
+		logger.Info(ctx, fmt.Sprintf("Migrated %d %s entries", count, name))
+	}
+	if result.ConversationsTagged > 0 {
+		logger.Info(ctx, fmt.Sprintf("Migrated %d conversation(s)", result.ConversationsTagged))
 	}
 
 	return nil

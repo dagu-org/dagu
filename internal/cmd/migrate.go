@@ -155,7 +155,7 @@ Examples:
   dagu migrate namespace --dry-run`,
 	}
 
-	return NewCommand(cmd, []commandLineFlag{dryRunFlag}, func(ctx *Context, _ []string) error {
+	return NewCommand(cmd, []commandLineFlag{dryRunFlag, yesFlag}, func(ctx *Context, _ []string) error {
 		return runNamespaceMigrationCommand(ctx)
 	})
 }
