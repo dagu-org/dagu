@@ -1046,6 +1046,7 @@ type ReportStatusRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
 	Status        *DAGRunStatusProto     `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	NamespaceId   string                 `protobuf:"bytes,3,opt,name=namespace_id,json=namespaceId,proto3" json:"namespace_id,omitempty"` // Namespace short ID for filesystem scoping
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1092,6 +1093,13 @@ func (x *ReportStatusRequest) GetStatus() *DAGRunStatusProto {
 		return x.Status
 	}
 	return nil
+}
+
+func (x *ReportStatusRequest) GetNamespaceId() string {
+	if x != nil {
+		return x.NamespaceId
+	}
+	return ""
 }
 
 // Response message for reporting DAG run status.
@@ -1207,7 +1215,9 @@ type LogChunk struct {
 	RootDagRunName string `protobuf:"bytes,9,opt,name=root_dag_run_name,json=rootDagRunName,proto3" json:"root_dag_run_name,omitempty"`
 	RootDagRunId   string `protobuf:"bytes,10,opt,name=root_dag_run_id,json=rootDagRunId,proto3" json:"root_dag_run_id,omitempty"`
 	// Attempt ID for the DAG run
-	AttemptId     string `protobuf:"bytes,11,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
+	AttemptId string `protobuf:"bytes,11,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
+	// Namespace short ID for filesystem scoping
+	NamespaceId   string `protobuf:"bytes,12,opt,name=namespace_id,json=namespaceId,proto3" json:"namespace_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1315,6 +1325,13 @@ func (x *LogChunk) GetRootDagRunId() string {
 func (x *LogChunk) GetAttemptId() string {
 	if x != nil {
 		return x.AttemptId
+	}
+	return ""
+}
+
+func (x *LogChunk) GetNamespaceId() string {
+	if x != nil {
+		return x.NamespaceId
 	}
 	return ""
 }
@@ -1722,15 +1739,16 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x13parent_dag_run_name\x18\x06 \x01(\tR\x10parentDagRunName\x12)\n" +
 	"\x11parent_dag_run_id\x18\a \x01(\tR\x0eparentDagRunId\x12\x1f\n" +
 	"\vattempt_key\x18\b \x01(\tR\n" +
-	"attemptKey\"m\n" +
+	"attemptKey\"\x90\x01\n" +
 	"\x13ReportStatusRequest\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x129\n" +
-	"\x06status\x18\x02 \x01(\v2!.coordinator.v1.DAGRunStatusProtoR\x06status\"H\n" +
+	"\x06status\x18\x02 \x01(\v2!.coordinator.v1.DAGRunStatusProtoR\x06status\x12!\n" +
+	"\fnamespace_id\x18\x03 \x01(\tR\vnamespaceId\"H\n" +
 	"\x14ReportStatusResponse\x12\x1a\n" +
 	"\baccepted\x18\x01 \x01(\bR\baccepted\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\"0\n" +
 	"\x11DAGRunStatusProto\x12\x1b\n" +
-	"\tjson_data\x18\x01 \x01(\tR\bjsonData\"\xf9\x02\n" +
+	"\tjson_data\x18\x01 \x01(\tR\bjsonData\"\x9c\x03\n" +
 	"\bLogChunk\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x1c\n" +
 	"\n" +
@@ -1746,7 +1764,8 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x0froot_dag_run_id\x18\n" +
 	" \x01(\tR\frootDagRunId\x12\x1d\n" +
 	"\n" +
-	"attempt_id\x18\v \x01(\tR\tattemptId\"x\n" +
+	"attempt_id\x18\v \x01(\tR\tattemptId\x12!\n" +
+	"\fnamespace_id\x18\f \x01(\tR\vnamespaceId\"x\n" +
 	"\x12StreamLogsResponse\x12'\n" +
 	"\x0fchunks_received\x18\x01 \x01(\x04R\x0echunksReceived\x12#\n" +
 	"\rbytes_written\x18\x02 \x01(\x04R\fbytesWritten\x12\x14\n" +

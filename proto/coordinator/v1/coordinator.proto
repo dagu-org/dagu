@@ -162,6 +162,7 @@ message RunningTask {
 message ReportStatusRequest {
   string worker_id = 1;
   DAGRunStatusProto status = 2;
+  string namespace_id = 3;  // Namespace short ID for filesystem scoping
 }
 
 // Response message for reporting DAG run status.
@@ -192,6 +193,9 @@ message LogChunk {
 
   // Attempt ID for the DAG run
   string attempt_id = 11;
+
+  // Namespace short ID for filesystem scoping
+  string namespace_id = 12;
 }
 
 // Type of log stream.

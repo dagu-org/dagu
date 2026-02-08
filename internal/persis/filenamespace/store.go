@@ -128,7 +128,7 @@ func (s *Store) Create(_ context.Context, opts exec.CreateNamespaceOptions) (*ex
 		return nil, exec.ErrNamespaceAlreadyExists
 	}
 
-	shortID := generateShortID(opts.Name)
+	shortID := GenerateShortID(opts.Name)
 
 	// Check for hash collision: different name but same short ID.
 	if existingName, collision := s.shortIDs[shortID]; collision && existingName != opts.Name {
@@ -264,9 +264,9 @@ func (s *Store) Resolve(_ context.Context, name string) (string, error) {
 	return ns.ShortID, nil
 }
 
-// generateShortID produces a 4-character hex string from the SHA256 hash of the name.
+// GenerateShortID produces a 4-character hex string from the SHA256 hash of the name.
 // The "default" namespace always returns the well-known fixed short ID "0000".
-func generateShortID(name string) string {
+func GenerateShortID(name string) string {
 	if name == "default" {
 		return DefaultShortID
 	}

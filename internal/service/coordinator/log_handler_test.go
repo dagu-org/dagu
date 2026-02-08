@@ -67,7 +67,7 @@ func TestLogHandler_StreamKey(t *testing.T) {
 		}
 
 		key := h.streamKey(chunk)
-		require.Equal(t, "test-dag/run-123/attempt-1/step1/LOG_STREAM_TYPE_STDOUT", key)
+		require.Equal(t, "/test-dag/run-123/attempt-1/step1/LOG_STREAM_TYPE_STDOUT", key)
 	})
 
 	t.Run("DifferentStreamTypesProduceDifferentKeys", func(t *testing.T) {

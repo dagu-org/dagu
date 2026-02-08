@@ -12,15 +12,17 @@ import (
 
 // StatusPusher sends status updates to coordinator via gRPC
 type StatusPusher struct {
-	client   coordinator.Client
-	workerID string
+	client      coordinator.Client
+	workerID    string
+	namespaceID string
 }
 
 // NewStatusPusher creates a new StatusPusher
-func NewStatusPusher(client coordinator.Client, workerID string) *StatusPusher {
+func NewStatusPusher(client coordinator.Client, workerID string, namespaceID string) *StatusPusher {
 	return &StatusPusher{
-		client:   client,
-		workerID: workerID,
+		client:      client,
+		workerID:    workerID,
+		namespaceID: namespaceID,
 	}
 }
 
@@ -31,8 +33,9 @@ func (p *StatusPusher) Push(ctx context.Context, status exec.DAGRunStatus) error
 		return fmt.Errorf("failed to convert status to proto: %w", err)
 	}
 	req := &coordinatorv1.ReportStatusRequest{
-		WorkerId: p.workerID,
-		Status:   protoStatus,
+		WorkerId:    p.workerID,
+		Status:      protoStatus,
+		NamespaceId: p.namespaceID,
 	}
 
 	resp, err := p.client.ReportStatus(ctx, req)

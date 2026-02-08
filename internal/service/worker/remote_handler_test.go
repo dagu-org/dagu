@@ -472,7 +472,7 @@ func TestCreateRemoteHandlers(t *testing.T) {
 		}
 
 		root := exec.DAGRunRef{Name: "root-dag", ID: "root-123"}
-		statusPusher, _ := handler.createRemoteHandlers("run-1", "test-dag", root)
+		statusPusher, _ := handler.createRemoteHandlers("run-1", "test-dag", root, "")
 
 		require.NotNil(t, statusPusher)
 	})
@@ -487,7 +487,7 @@ func TestCreateRemoteHandlers(t *testing.T) {
 		}
 
 		root := exec.DAGRunRef{Name: "root-dag", ID: "root-123"}
-		_, logStreamer := handler.createRemoteHandlers("run-1", "test-dag", root)
+		_, logStreamer := handler.createRemoteHandlers("run-1", "test-dag", root, "")
 
 		require.NotNil(t, logStreamer)
 	})
@@ -502,7 +502,7 @@ func TestCreateRemoteHandlers(t *testing.T) {
 		}
 
 		root := exec.DAGRunRef{Name: "my-root", ID: "root-xyz"}
-		statusPusher, logStreamer := handler.createRemoteHandlers("my-run-id", "my-dag", root)
+		statusPusher, logStreamer := handler.createRemoteHandlers("my-run-id", "my-dag", root, "")
 
 		// Both should be created
 		require.NotNil(t, statusPusher)
@@ -1331,7 +1331,7 @@ steps:
 	// Create remote handlers
 	root := exec.DAGRunRef{Name: "root", ID: "root-1"}
 	parent := exec.DAGRunRef{Name: "parent", ID: "parent-1"}
-	statusPusher, logStreamer := handler.createRemoteHandlers("run-error", dag.Name, root)
+	statusPusher, logStreamer := handler.createRemoteHandlers("run-error", dag.Name, root, "")
 
 	// Call executeDAGRun directly - should fail at createAgentEnv
 	err := handler.executeDAGRun(context.Background(), dag, "run-error", "", root, parent, statusPusher, logStreamer, false, nil)
@@ -1373,8 +1373,8 @@ steps:
 	// For a top-level run, root ID should match the dagRunID
 	dagRunID := "run-success-1"
 	root := exec.DAGRunRef{Name: dag.Name, ID: dagRunID}
-	statusPusher := remote.NewStatusPusher(client, "integration-test-worker")
-	logStreamer := remote.NewLogStreamer(client, "integration-test-worker", dagRunID, dag.Name, "", root)
+	statusPusher := remote.NewStatusPusher(client, "integration-test-worker", "")
+	logStreamer := remote.NewLogStreamer(client, "integration-test-worker", dagRunID, dag.Name, "", root, "")
 
 	// Call executeDAGRun - this should succeed and log completion
 	// For top-level runs, pass empty parent and ensure root matches dagRunID

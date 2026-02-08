@@ -15,6 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
+	"github.com/dagu-org/dagu/internal/persis/filenamespace"
 	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
@@ -111,7 +112,8 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 
 	root := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
 	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
-	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
+	nsID := filenamespace.GenerateShortID(task.Namespace)
+	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root, nsID)
 
 	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, root, parent, statusPusher, logStreamer, queuedRun, nil)
 }
@@ -140,7 +142,8 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 	}
 
 	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
-	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
+	nsID := filenamespace.GenerateShortID(task.Namespace)
+	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root, nsID)
 
 	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, root, parent, statusPusher, logStreamer, false, &retryConfig{
 		target:   status,
@@ -155,8 +158,8 @@ type retryConfig struct {
 }
 
 // createRemoteHandlers creates the status pusher and log streamer for remote execution.
-func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root exec.DAGRunRef) (*remote.StatusPusher, *remote.LogStreamer) {
-	statusPusher := remote.NewStatusPusher(h.coordinatorClient, h.workerID)
+func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root exec.DAGRunRef, namespaceID string) (*remote.StatusPusher, *remote.LogStreamer) {
+	statusPusher := remote.NewStatusPusher(h.coordinatorClient, h.workerID, namespaceID)
 	logStreamer := remote.NewLogStreamer(
 		h.coordinatorClient,
 		h.workerID,
@@ -164,6 +167,7 @@ func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root 
 		dagName,
 		"", // attemptID will be set by agent after attempt creation
 		root,
+		namespaceID,
 	)
 	return statusPusher, logStreamer
 }

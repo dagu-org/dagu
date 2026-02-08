@@ -25,13 +25,14 @@ const (
 
 // LogStreamer streams logs to coordinator via gRPC
 type LogStreamer struct {
-	client    coordinator.Client
-	workerID  string
-	dagRunID  string
-	dagName   string
-	attemptID string
-	rootRef   exec.DAGRunRef
-	mu        sync.RWMutex
+	client      coordinator.Client
+	workerID    string
+	dagRunID    string
+	dagName     string
+	attemptID   string
+	namespaceID string
+	rootRef     exec.DAGRunRef
+	mu          sync.RWMutex
 }
 
 // NewLogStreamer creates a new LogStreamer
@@ -42,14 +43,16 @@ func NewLogStreamer(
 	dagName string,
 	attemptID string,
 	rootRef exec.DAGRunRef,
+	namespaceID string,
 ) *LogStreamer {
 	return &LogStreamer{
-		client:    client,
-		workerID:  workerID,
-		dagRunID:  dagRunID,
-		dagName:   dagName,
-		attemptID: attemptID,
-		rootRef:   rootRef,
+		client:      client,
+		workerID:    workerID,
+		dagRunID:    dagRunID,
+		dagName:     dagName,
+		attemptID:   attemptID,
+		rootRef:     rootRef,
+		namespaceID: namespaceID,
 	}
 }
 
@@ -142,6 +145,7 @@ func (s *LogStreamer) StreamSchedulerLog(ctx context.Context, logFilePath string
 			RootDagRunName: s.rootRef.Name,
 			RootDagRunId:   s.rootRef.ID,
 			AttemptId:      s.getAttemptID(),
+			NamespaceId:    s.namespaceID,
 		}
 
 		if err := stream.Send(chunk); err != nil {
@@ -161,6 +165,7 @@ func (s *LogStreamer) StreamSchedulerLog(ctx context.Context, logFilePath string
 		RootDagRunName: s.rootRef.Name,
 		RootDagRunId:   s.rootRef.ID,
 		AttemptId:      s.getAttemptID(),
+		NamespaceId:    s.namespaceID,
 	}
 
 	if err := stream.Send(finalChunk); err != nil {
@@ -269,6 +274,7 @@ func (w *stepLogWriter) flush() error {
 			RootDagRunName: w.streamer.rootRef.Name,
 			RootDagRunId:   w.streamer.rootRef.ID,
 			AttemptId:      w.streamer.getAttemptID(),
+			NamespaceId:    w.streamer.namespaceID,
 		}
 
 		if err := w.stream.Send(chunk); err != nil {
@@ -313,6 +319,7 @@ func (w *stepLogWriter) Close() error {
 			RootDagRunName: w.streamer.rootRef.Name,
 			RootDagRunId:   w.streamer.rootRef.ID,
 			AttemptId:      w.streamer.getAttemptID(),
+			NamespaceId:    w.streamer.namespaceID,
 		}
 		if err := w.stream.Send(finalChunk); err != nil {
 			logger.Error(w.ctx, "Failed to send final log chunk", tag.Error(err))
@@ -440,6 +447,7 @@ func (w *schedulerLogWriter) flush() error {
 			RootDagRunName: w.streamer.rootRef.Name,
 			RootDagRunId:   w.streamer.rootRef.ID,
 			AttemptId:      w.streamer.getAttemptID(),
+			NamespaceId:    w.streamer.namespaceID,
 		}
 
 		if err := w.stream.Send(chunk); err != nil {
@@ -478,6 +486,7 @@ func (w *schedulerLogWriter) Close() error {
 			RootDagRunName: w.streamer.rootRef.Name,
 			RootDagRunId:   w.streamer.rootRef.ID,
 			AttemptId:      w.streamer.getAttemptID(),
+			NamespaceId:    w.streamer.namespaceID,
 		}
 		_ = w.stream.Send(finalChunk)  // Ignore error - best effort
 		_, _ = w.stream.CloseAndRecv() // Ignore error - best effort

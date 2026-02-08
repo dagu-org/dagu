@@ -72,7 +72,7 @@ func TestNewStatusPusher(t *testing.T) {
 	t.Parallel()
 
 	client := &mockCoordinatorClient{}
-	pusher := NewStatusPusher(client, "worker-123")
+	pusher := NewStatusPusher(client, "worker-123", "")
 
 	require.NotNil(t, pusher)
 	assert.Equal(t, "worker-123", pusher.workerID)
@@ -93,7 +93,7 @@ func TestPush(t *testing.T) {
 			},
 		}
 
-		pusher := NewStatusPusher(client, "worker-1")
+		pusher := NewStatusPusher(client, "worker-1", "")
 		status := exec.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
@@ -126,7 +126,7 @@ func TestPush(t *testing.T) {
 			},
 		}
 
-		pusher := NewStatusPusher(client, "worker-1")
+		pusher := NewStatusPusher(client, "worker-1", "")
 		status := exec.DAGRunStatus{Name: "test-dag", DAGRunID: "run-123"}
 
 		err := pusher.Push(context.Background(), status)
@@ -145,7 +145,7 @@ func TestPush(t *testing.T) {
 			},
 		}
 
-		pusher := NewStatusPusher(client, "worker-1")
+		pusher := NewStatusPusher(client, "worker-1", "")
 		err := pusher.Push(context.Background(), exec.DAGRunStatus{})
 
 		require.Error(t, err)
@@ -161,7 +161,7 @@ func TestPush(t *testing.T) {
 			},
 		}
 
-		pusher := NewStatusPusher(client, "worker-1")
+		pusher := NewStatusPusher(client, "worker-1", "")
 		err := pusher.Push(context.Background(), exec.DAGRunStatus{})
 
 		require.Error(t, err)
@@ -177,7 +177,7 @@ func TestPush(t *testing.T) {
 			},
 		}
 
-		pusher := NewStatusPusher(client, "worker-1")
+		pusher := NewStatusPusher(client, "worker-1", "")
 		err := pusher.Push(context.Background(), exec.DAGRunStatus{})
 
 		require.Error(t, err)
@@ -197,7 +197,7 @@ func TestPush(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // Cancel immediately
 
-		pusher := NewStatusPusher(client, "worker-1")
+		pusher := NewStatusPusher(client, "worker-1", "")
 		err := pusher.Push(ctx, exec.DAGRunStatus{})
 
 		require.Error(t, err)
@@ -235,7 +235,7 @@ func TestPush(t *testing.T) {
 			},
 		}
 
-		pusher := NewStatusPusher(client, "worker-1")
+		pusher := NewStatusPusher(client, "worker-1", "")
 		err := pusher.Push(context.Background(), status)
 
 		require.NoError(t, err)

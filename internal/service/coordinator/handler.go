@@ -550,7 +550,7 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 	}
 
 	// Transform worker-local log paths to coordinator paths (shared-nothing mode)
-	h.transformLogPaths(dagRunStatus)
+	h.transformLogPaths(dagRunStatus, req.NamespaceId)
 
 	// Get or create an open attempt for this dag run
 	// Check if this is a sub-DAG (has root that differs from self)
@@ -586,7 +586,7 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 
 // transformLogPaths rewrites worker-local log paths to coordinator paths.
 // This is called when logDir is configured (shared-nothing mode).
-func (h *Handler) transformLogPaths(status *exec.DAGRunStatus) {
+func (h *Handler) transformLogPaths(status *exec.DAGRunStatus, namespaceID string) {
 	if h.logDir == "" {
 		return // Not in shared-nothing mode, keep original paths
 	}
@@ -612,6 +612,7 @@ func (h *Handler) transformLogPaths(status *exec.DAGRunStatus) {
 		filename := fmt.Sprintf("%s.%s", fileutil.SafeName(stepName), ext)
 		return filepath.Join(
 			h.logDir,
+			namespaceID,
 			fileutil.SafeName(dagName),
 			fileutil.SafeName(dagRunID),
 			fileutil.SafeName(attemptID),
@@ -649,6 +650,7 @@ func (h *Handler) transformLogPaths(status *exec.DAGRunStatus) {
 	// Transform scheduler log path
 	status.Log = filepath.Join(
 		h.logDir,
+		namespaceID,
 		fileutil.SafeName(dagName),
 		fileutil.SafeName(dagRunID),
 		fileutil.SafeName(attemptID),

@@ -58,7 +58,7 @@ type Context struct {
 	NamespaceStore  exec.NamespaceStore
 
 	Proc             exec.ProcHandle
-	NamespaceShortID string // Set by ResolveNamespace/ResolveNamespaceFromArg
+	NamespaceID string // Set by ResolveNamespace/ResolveNamespaceFromArg
 }
 
 // WithContext returns a new Context with a different underlying context.Context.
@@ -77,7 +77,7 @@ func (c *Context) WithContext(ctx context.Context) *Context {
 		ServiceRegistry:  c.ServiceRegistry,
 		NamespaceStore:   c.NamespaceStore,
 		Proc:             c.Proc,
-		NamespaceShortID: c.NamespaceShortID,
+		NamespaceID: c.NamespaceID,
 	}
 }
 
@@ -418,11 +418,11 @@ func (c *Context) dagStore(cfg dagStoreConfig) (exec.DAGStore, error) {
 }
 
 // InitNamespaceScopedStores re-initializes stores to use namespace-scoped directories
-// under {DataDir}/{namespaceShortID}/. Directories are created if they don't exist.
-func (c *Context) InitNamespaceScopedStores(namespaceShortID string) error {
-	nsDAGRunsDir := filepath.Join(c.Config.Paths.DataDir, namespaceShortID, "dag-runs")
-	nsProcDir := filepath.Join(c.Config.Paths.DataDir, namespaceShortID, "proc")
-	nsQueueDir := filepath.Join(c.Config.Paths.DataDir, namespaceShortID, "queue")
+// under {DataDir}/{namespaceID}/. Directories are created if they don't exist.
+func (c *Context) InitNamespaceScopedStores(namespaceID string) error {
+	nsDAGRunsDir := filepath.Join(c.Config.Paths.DataDir, namespaceID, "dag-runs")
+	nsProcDir := filepath.Join(c.Config.Paths.DataDir, namespaceID, "proc")
+	nsQueueDir := filepath.Join(c.Config.Paths.DataDir, namespaceID, "queue")
 
 	for _, dir := range []string{nsDAGRunsDir, nsProcDir, nsQueueDir} {
 		if err := os.MkdirAll(dir, 0750); err != nil {
@@ -452,14 +452,14 @@ func (c *Context) ResolveNamespace() (string, error) {
 		return "", fmt.Errorf("namespace must not be empty; use --namespace flag or set a default")
 	}
 
-	namespaceShortID, err := c.NamespaceStore.Resolve(c, namespaceName)
+	namespaceID, err := c.NamespaceStore.Resolve(c, namespaceName)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve namespace %q: %w", namespaceName, err)
 	}
 
-	c.NamespaceShortID = namespaceShortID
+	c.NamespaceID = namespaceID
 
-	if err := c.InitNamespaceScopedStores(namespaceShortID); err != nil {
+	if err := c.InitNamespaceScopedStores(namespaceID); err != nil {
 		return "", err
 	}
 
@@ -483,14 +483,14 @@ func (c *Context) ResolveNamespaceFromArg(arg string) (namespaceName, dagName st
 		}
 	}
 
-	namespaceShortID, err := c.NamespaceStore.Resolve(c, namespaceName)
+	namespaceID, err := c.NamespaceStore.Resolve(c, namespaceName)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to resolve namespace %q: %w", namespaceName, err)
 	}
 
-	c.NamespaceShortID = namespaceShortID
+	c.NamespaceID = namespaceID
 
-	if err := c.InitNamespaceScopedStores(namespaceShortID); err != nil {
+	if err := c.InitNamespaceScopedStores(namespaceID); err != nil {
 		return "", "", err
 	}
 
@@ -500,8 +500,8 @@ func (c *Context) ResolveNamespaceFromArg(arg string) (namespaceName, dagName st
 // NamespacedDAGsDir returns the DAGs directory scoped to the resolved namespace.
 // Falls back to the base DAGsDir if no namespace has been resolved.
 func (c *Context) NamespacedDAGsDir() string {
-	if c.NamespaceShortID != "" {
-		return filepath.Join(c.Config.Paths.DAGsDir, c.NamespaceShortID)
+	if c.NamespaceID != "" {
+		return filepath.Join(c.Config.Paths.DAGsDir, c.NamespaceID)
 	}
 	return c.Config.Paths.DAGsDir
 }
@@ -535,10 +535,11 @@ func (c *Context) GenLogFileName(dag *core.DAG, dagRunID string) (string, error)
 	}
 
 	cfg := LogConfig{
-		BaseDir:   baseLogDir,
-		DAGLogDir: dagLogDir,
-		Name:      dag.Name,
-		DAGRunID:  dagRunID,
+		BaseDir:     baseLogDir,
+		DAGLogDir:   dagLogDir,
+		Name:        dag.Name,
+		DAGRunID:    dagRunID,
+		NamespaceID: c.NamespaceID,
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -647,10 +648,11 @@ func listenSignals(ctx context.Context, listener signalListener) {
 
 // LogConfig defines configuration for log file creation.
 type LogConfig struct {
-	BaseDir   string // Base directory for logs.
-	DAGLogDir string // Optional alternative log directory specified by the DAG definition.
-	Name      string // Name of the DAG; used for generating a safe directory name.
-	DAGRunID  string // Unique dag-run ID used in the filename.
+	BaseDir     string // Base directory for logs.
+	DAGLogDir   string // Optional alternative log directory specified by the DAG definition.
+	Name        string // Name of the DAG; used for generating a safe directory name.
+	DAGRunID    string // Unique dag-run ID used in the filename.
+	NamespaceID string // Namespace short ID for filesystem scoping.
 }
 
 // Validate checks that essential fields are provided.
@@ -680,7 +682,7 @@ func (cfg LogConfig) LogDir() (string, error) {
 	utcTimestamp := time.Now().UTC().Format("20060102_150405Z")
 
 	safeName := fileutil.SafeName(cfg.Name)
-	logDir := filepath.Join(baseDir, safeName, "dag-run_"+utcTimestamp+"_"+cfg.DAGRunID)
+	logDir := filepath.Join(baseDir, cfg.NamespaceID, safeName, "dag-run_"+utcTimestamp+"_"+cfg.DAGRunID)
 	if err := os.MkdirAll(logDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to initialize directory %s: %w", logDir, err)
 	}

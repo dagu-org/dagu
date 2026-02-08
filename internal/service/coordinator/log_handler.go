@@ -144,7 +144,8 @@ func (h *logHandler) handleStream(stream coordinatorv1.CoordinatorService_Stream
 // streamKey creates a unique key for identifying a log stream.
 // Includes AttemptId to prevent collisions during retry scenarios.
 func (h *logHandler) streamKey(chunk *coordinatorv1.LogChunk) string {
-	return fmt.Sprintf("%s/%s/%s/%s/%s",
+	return fmt.Sprintf("%s/%s/%s/%s/%s/%s",
+		chunk.NamespaceId,
 		chunk.DagName,
 		chunk.DagRunId,
 		chunk.AttemptId,
@@ -233,6 +234,7 @@ func (h *logHandler) logFilePath(chunk *coordinatorv1.LogChunk) string {
 
 	return filepath.Join(
 		h.logDir,
+		chunk.NamespaceId,
 		fileutil.SafeName(dagName),
 		fileutil.SafeName(dagRunID),
 		fileutil.SafeName(attemptDir),
