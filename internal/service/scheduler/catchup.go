@@ -110,12 +110,15 @@ func (c *CatchupEngine) Run(ctx context.Context, dags map[string]*core.DAG) (*Ca
 		slog.Int("count", len(candidates)),
 	)
 
-	// Track DAGs that failed dispatch so we don't advance their watermarks
+	// Track per-DAG state during dispatch
 	failedDAGs := make(map[string]struct{})
+	lastProcessed := make(map[string]time.Time) // last candidate time processed per DAG
+	completedAll := true
 
 	// Dispatch candidates
 	for _, cand := range candidates {
 		if ctx.Err() != nil {
+			completedAll = false
 			break
 		}
 
@@ -126,8 +129,12 @@ func (c *CatchupEngine) Run(ctx context.Context, dags map[string]*core.DAG) (*Ca
 				tag.Error(err),
 			)
 			failedDAGs[cand.dag.Name] = struct{}{}
+			completedAll = false
 			break
 		}
+
+		// Track the last processed candidate time for this DAG
+		lastProcessed[cand.dag.Name] = cand.scheduledTime
 
 		if dispatched {
 			result.Dispatched++
@@ -142,14 +149,21 @@ func (c *CatchupEngine) Run(ctx context.Context, dags map[string]*core.DAG) (*Ca
 		time.Sleep(c.config.Scheduler.CatchupRateLimit)
 	}
 
-	// Advance watermarks to catchupTo only for DAGs that didn't fail.
-	// Failed DAGs keep their last successfully dispatched watermark.
+	// Advance watermarks for non-failed DAGs.
+	// If all candidates were processed, advance to catchupTo.
+	// If the loop broke early, advance only to the last processed candidate.
 	for _, dag := range dags {
 		if _, failed := failedDAGs[dag.Name]; failed {
 			continue
 		}
-		if err := c.dagStateStore.Save(dag, dagState{LastTick: catchupTo}); err != nil {
-			logger.Error(ctx, "Failed to save final watermark", tag.Error(err))
+		if completedAll {
+			if err := c.dagStateStore.Save(dag, dagState{LastTick: catchupTo}); err != nil {
+				logger.Error(ctx, "Failed to save final watermark", tag.Error(err))
+			}
+		} else if t, ok := lastProcessed[dag.Name]; ok {
+			if err := c.dagStateStore.Save(dag, dagState{LastTick: t}); err != nil {
+				logger.Error(ctx, "Failed to save final watermark", tag.Error(err))
+			}
 		}
 	}
 
@@ -174,7 +188,15 @@ func (c *CatchupEngine) generateCandidates(
 ) []catchupCandidate {
 	var merged []catchupCandidate
 
-	for _, dag := range dags {
+	// Sort keys for deterministic iteration order
+	keys := make([]string, 0, len(dags))
+	for k := range dags {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		dag := dags[k]
 		lastTick := perDAGStates[dag].LastTick
 		if lastTick.IsZero() {
 			// First run for this DAG — no catch-up needed
@@ -258,7 +280,7 @@ func (c *CatchupEngine) generateEntryCandidates(
 
 	for {
 		next := sched.Parsed.Next(cursor)
-		if next.After(catchupTo) || next.IsZero() {
+		if !next.Before(catchupTo) || next.IsZero() {
 			break
 		}
 		candidates = append(candidates, catchupCandidate{

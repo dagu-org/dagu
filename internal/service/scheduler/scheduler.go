@@ -136,6 +136,9 @@ func New(
 // SetClock sets a custom clock function for testing purposes.
 // This must be called before Start().
 func (s *Scheduler) SetClock(clock Clock) {
+	if s.running.Load() {
+		panic("SetClock must be called before Start()")
+	}
 	s.clock = clock
 	if s.catchupEngine != nil {
 		s.catchupEngine.clock = clock

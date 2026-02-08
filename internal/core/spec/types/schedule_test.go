@@ -341,6 +341,18 @@ func TestScheduleValue_CatchupEntries(t *testing.T) {
 			wantErr:     true,
 			errContains: "unknown schedule-entry key",
 		},
+		{
+			name:        "CatchupBoolTrue",
+			input:       `{cron: "0 * * * *", catchup: true}`,
+			wantEntries: 1,
+			wantCatchup: "true",
+		},
+		{
+			name:        "CatchupBoolFalse",
+			input:       `{cron: "0 * * * *", catchup: false}`,
+			wantEntries: 1,
+			wantCatchup: "false",
+		},
 	}
 
 	for _, tt := range tests {

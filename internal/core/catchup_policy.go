@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // CatchupPolicy determines what happens when scheduled DAG runs are missed
 // during scheduler downtime.
@@ -30,8 +33,9 @@ func (c CatchupPolicy) String() string {
 }
 
 // ParseCatchupPolicy parses a string into a CatchupPolicy.
+// The comparison is case-insensitive.
 func ParseCatchupPolicy(s string) (CatchupPolicy, error) {
-	switch s {
+	switch strings.ToLower(s) {
 	case "", "false", "off":
 		return CatchupPolicyOff, nil
 	case "latest":

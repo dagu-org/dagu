@@ -141,8 +141,8 @@ func TestCatchupEngine_GenerateCandidates_RunAll(t *testing.T) {
 	candidates := engine.generateCandidates(context.Background(), dags, perDAGStates, now)
 	// lastTick = 09:00, catchupTo = 12:00
 	// Next(09:00)=10:00, Next(10:00)=11:00, Next(11:00)=12:00
-	// 12:00.After(12:00) is false, so 12:00 IS included = 3 candidates
-	assert.Equal(t, 3, len(candidates))
+	// 12:00 is excluded (equals catchupTo, left to live loop) = 2 candidates
+	assert.Equal(t, 2, len(candidates))
 }
 
 func TestCatchupEngine_GenerateCandidates_RunLatest(t *testing.T) {
@@ -180,9 +180,9 @@ func TestCatchupEngine_GenerateCandidates_RunLatest(t *testing.T) {
 	}
 
 	candidates := engine.generateCandidates(context.Background(), dags, perDAGStates, now)
-	// RunLatest should only keep the latest candidate
+	// RunLatest should only keep the latest candidate (12:00 excluded as it equals catchupTo)
 	assert.Equal(t, 1, len(candidates))
-	assert.Equal(t, time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC), candidates[0].scheduledTime)
+	assert.Equal(t, time.Date(2025, 6, 15, 11, 0, 0, 0, time.UTC), candidates[0].scheduledTime)
 }
 
 func TestCatchupEngine_MaxCatchupRunsCap(t *testing.T) {
@@ -310,9 +310,9 @@ func TestCatchupEngine_CatchupWindow(t *testing.T) {
 	}
 
 	candidates := engine.generateCandidates(context.Background(), dags, perDAGStates, now)
-	// catchupWindow = 3h means replayFrom = 09:00, candidates: 10:00, 11:00, 12:00
-	assert.Equal(t, 3, len(candidates))
+	// catchupWindow = 3h means replayFrom = 09:00, candidates: 10:00, 11:00
+	// 12:00 excluded (equals catchupTo, left to live loop)
+	assert.Equal(t, 2, len(candidates))
 	assert.Equal(t, time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC), candidates[0].scheduledTime)
 	assert.Equal(t, time.Date(2025, 6, 15, 11, 0, 0, 0, time.UTC), candidates[1].scheduledTime)
-	assert.Equal(t, time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC), candidates[2].scheduledTime)
 }

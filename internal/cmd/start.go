@@ -101,7 +101,10 @@ func runStart(ctx *Context, args []string) error {
 		return err
 	}
 
-	scheduledTime, _ := ctx.StringParam("scheduled-time")
+	scheduledTime, err := ctx.StringParam("scheduled-time")
+	if err != nil {
+		scheduledTime = ""
+	}
 
 	dagRunID, rootRef, parentRef, isSubDAGRun, err := getDAGRunInfo(ctx)
 	if err != nil {

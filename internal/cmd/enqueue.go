@@ -65,7 +65,10 @@ func runEnqueue(ctx *Context, args []string) error {
 		return err
 	}
 
-	scheduledTime, _ := ctx.StringParam("scheduled-time")
+	scheduledTime, err := ctx.StringParam("scheduled-time")
+	if err != nil {
+		scheduledTime = ""
+	}
 
 	return enqueueDAGRun(ctx, dag, runID, triggerType, scheduledTime)
 }

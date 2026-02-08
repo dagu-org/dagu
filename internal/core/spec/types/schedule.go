@@ -257,11 +257,18 @@ func parseScheduleEntryMap(m map[string]any) (ScheduleEntry, error) {
 	entry.Cron = cronStr
 
 	if v, ok := m["catchup"]; ok {
-		str, ok := v.(string)
-		if !ok {
-			return entry, fmt.Errorf("schedule-entry 'catchup' must be a string, got %T", v)
+		switch val := v.(type) {
+		case string:
+			entry.Catchup = val
+		case bool:
+			if val {
+				entry.Catchup = "true"
+			} else {
+				entry.Catchup = "false"
+			}
+		default:
+			return entry, fmt.Errorf("schedule-entry 'catchup' must be a string or boolean, got %T", v)
 		}
-		entry.Catchup = str
 	}
 
 	if v, ok := m["catchupWindow"]; ok {
