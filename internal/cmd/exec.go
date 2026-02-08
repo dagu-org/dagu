@@ -29,6 +29,7 @@ var (
 	execFlags = []commandLineFlag{
 		dagRunIDFlag,
 		nameFlag,
+		namespaceFlag,
 		workdirFlag,
 		shellFlag,
 		baseFlag,
@@ -131,6 +132,12 @@ func runExec(ctx *Context, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	namespaceName, err := ctx.ResolveNamespace()
+	if err != nil {
+		return err
+	}
+	dag.Namespace = namespaceName
 
 	dagRunRef := exec.NewDAGRunRef(dag.Name, runID)
 

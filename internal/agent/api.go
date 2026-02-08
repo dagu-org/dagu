@@ -685,6 +685,9 @@ func (a *API) environmentForNamespace(namespace string) EnvironmentInfo {
 	env := a.environment
 	env.Namespace = namespace
 
+	if namespace == "" {
+		a.logger.Warn("environmentForNamespace called with empty namespace")
+	}
 	if namespace == "" || namespace == "default" || a.namespaceStore == nil {
 		return env
 	}

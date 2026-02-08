@@ -444,7 +444,7 @@ func (c *Context) ResolveNamespace() (string, error) {
 		return "", fmt.Errorf("failed to get namespace: %w", err)
 	}
 	if namespaceName == "" {
-		namespaceName = "default"
+		return "", fmt.Errorf("namespace must not be empty; use --namespace flag or set a default")
 	}
 
 	namespaceShortID, err := c.NamespaceStore.Resolve(c, namespaceName)
@@ -470,8 +470,11 @@ func (c *Context) ResolveNamespaceFromArg(arg string) (namespaceName, dagName st
 	namespaceName, dagName = parseNamespaceFromArg(arg)
 	if namespaceName == "" {
 		namespaceName, err = c.StringParam("namespace")
-		if err != nil || namespaceName == "" {
-			namespaceName = "default"
+		if err != nil {
+			return "", "", fmt.Errorf("failed to get namespace: %w", err)
+		}
+		if namespaceName == "" {
+			return "", "", fmt.Errorf("namespace must not be empty; use --namespace flag or 'namespace/dag' format")
 		}
 	}
 
