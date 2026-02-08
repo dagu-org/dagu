@@ -1,8 +1,3 @@
-// Copyright 2025 The Dagu Authors
-//
-// Licensed under the GNU Affero General Public License v3.0.
-// You may obtain a copy of the License at https://www.gnu.org/licenses/agpl-3.0.html
-
 package core
 
 import "fmt"
