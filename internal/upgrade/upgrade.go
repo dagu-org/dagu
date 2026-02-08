@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/dagu-org/dagu/internal/cmn/config"
@@ -342,6 +343,7 @@ func UpgradeWithReleaseInfo(ctx context.Context, opts Options, info *ReleaseInfo
 
 	// Update cache with new version info
 	_ = SaveCache(&UpgradeCheckCache{
+		LastCheck:       time.Now(),
 		CurrentVersion:  info.Release.TagName,
 		LatestVersion:   info.Release.TagName,
 		UpdateAvailable: false,
