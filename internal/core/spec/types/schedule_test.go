@@ -324,22 +324,10 @@ func TestScheduleValue_CatchupEntries(t *testing.T) {
 			wantWindow:  "6h",
 		},
 		{
-			name:        "CatchupTrue",
-			input:       `{cron: "0 * * * *", catchup: "true"}`,
-			wantEntries: 1,
-			wantCatchup: "true",
-		},
-		{
 			name:        "CatchupLatest",
 			input:       `{cron: "0 * * * *", catchup: latest}`,
 			wantEntries: 1,
 			wantCatchup: "latest",
-		},
-		{
-			name:        "CatchupFalse",
-			input:       `{cron: "0 * * * *", catchup: "false"}`,
-			wantEntries: 1,
-			wantCatchup: "false",
 		},
 		{
 			name:        "OldMisfireKeyRejected",

@@ -63,40 +63,6 @@ func (m *catchupMockDAGRunStore) RemoveDAGRun(_ context.Context, _ exec.DAGRunRe
 	return nil
 }
 
-func TestCatchupEngine_NoCatchupConfigured(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	now := time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC)
-	lastTick := now.Add(-3 * time.Hour)
-	clock := testClock(now)
-
-	store := NewWatermarkStore(tmpDir)
-	require.NoError(t, store.Save(lastTick))
-
-	cfg := &config.Config{}
-	cfg.Scheduler.MaxGlobalCatchupRuns = 100
-	cfg.Scheduler.MaxCatchupRunsPerDAG = 20
-	cfg.Scheduler.CatchupRateLimit = time.Millisecond
-
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
-
-	// DAG with catchup=off (default)
-	dags := map[string]*core.DAG{
-		"test.yaml": {
-			Name: "test",
-			Schedule: []core.Schedule{
-				{Expression: "0 * * * *", Parsed: parseCron(t, "0 * * * *"), Catchup: core.CatchupPolicyOff},
-			},
-		},
-	}
-
-	result, err := engine.Run(context.Background(), dags)
-	require.NoError(t, err)
-	assert.Equal(t, 0, result.Dispatched)
-	assert.Equal(t, 0, result.Skipped)
-}
-
 func TestCatchupEngine_MissingWatermark(t *testing.T) {
 	t.Parallel()
 

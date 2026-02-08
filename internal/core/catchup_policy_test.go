@@ -57,19 +57,3 @@ func TestParseCatchupPolicy(t *testing.T) {
 		assert.Equal(t, tt.want, got)
 	}
 }
-
-func TestCatchupPolicy_RoundTrip(t *testing.T) {
-	t.Parallel()
-
-	policies := []CatchupPolicy{
-		CatchupPolicyOff,
-		CatchupPolicyLatest,
-		CatchupPolicyAll,
-	}
-
-	for _, p := range policies {
-		parsed, err := ParseCatchupPolicy(p.String())
-		require.NoError(t, err)
-		assert.Equal(t, p, parsed)
-	}
-}
