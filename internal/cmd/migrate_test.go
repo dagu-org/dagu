@@ -218,8 +218,8 @@ func TestRunNamespaceMigration(t *testing.T) {
 		assert.False(t, result.AlreadyMigrated)
 		assert.False(t, result.AlreadyScoped)
 
-		assert.FileExists(t, filepath.Join(exec.NamespaceDir(paths.DAGsDir, "0000"), "a.yaml"))
-		assert.FileExists(t, filepath.Join(exec.NamespaceDir(paths.DAGsDir, "0000"), "b.yml"))
+		assert.FileExists(t, filepath.Join(paths.DAGsDir, "0000", "a.yaml"))
+		assert.FileExists(t, filepath.Join(paths.DAGsDir, "0000", "b.yml"))
 		assert.NoFileExists(t, filepath.Join(paths.DAGsDir, "a.yaml"))
 		assert.NoFileExists(t, filepath.Join(paths.DAGsDir, "b.yml"))
 		assert.FileExists(t, filepath.Join(paths.DataDir, namespaceMigratedMarker))
@@ -445,7 +445,7 @@ func TestRunNamespaceNsRelayout(t *testing.T) {
 
 		// Verify moved to ns/ layout
 		assert.DirExists(t, filepath.Join(exec.NamespaceDir(paths.DataDir, "0000"), "dag-runs"))
-		assert.FileExists(t, filepath.Join(exec.NamespaceDir(paths.DAGsDir, "0000"), "a.yaml"))
+		assert.FileExists(t, filepath.Join(paths.DAGsDir, "0000", "a.yaml"))
 		assert.DirExists(t, filepath.Join(exec.NamespaceDir(paths.LogDir, "0000"), "mydag"))
 
 		// Verify old locations are gone

@@ -230,7 +230,7 @@ func (er *entryReaderImpl) syncNamespaces(ctx context.Context) error {
 		}
 
 		// New namespace found — register it
-		nsDir := exec.NamespaceDir(er.dagsDir, ns.ID)
+		nsDir := filepath.Join(er.dagsDir, ns.ID)
 
 		// Create directory if it doesn't exist
 		if err := os.MkdirAll(nsDir, 0750); err != nil {
@@ -333,7 +333,7 @@ func (er *entryReaderImpl) removeNamespace(ctx context.Context, nsID string) {
 	}
 
 	// Remove from tracking maps
-	nsDir := exec.NamespaceDir(er.dagsDir, nsID)
+	nsDir := filepath.Join(er.dagsDir, nsID)
 	delete(er.nsDirs, nsDir)
 	delete(er.knownNS, nsID)
 
@@ -390,7 +390,7 @@ func (er *entryReaderImpl) handleFileEvent(ctx context.Context, event fsnotify.E
 			tag.Name(fileName),
 			slog.String("namespace", nsName),
 		)
-	default:
-		// Ignore other events (e.g., Chmod)
+	case fsnotify.Chmod:
+		// Ignore permission changes
 	}
 }

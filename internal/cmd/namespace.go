@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"text/tabwriter"
 
 	"github.com/dagu-org/dagu/internal/core/exec"
@@ -231,7 +232,7 @@ func runNamespaceDelete(ctx *Context, args []string) error {
 	}
 
 	// Check if the namespace contains DAGs.
-	dagDir := exec.NamespaceDir(ctx.Config.Paths.DAGsDir, ns.ID)
+	dagDir := filepath.Join(ctx.Config.Paths.DAGsDir, ns.ID)
 	if hasDAGs, checkErr := exec.NamespaceHasDAGs(dagDir); checkErr != nil {
 		return fmt.Errorf("failed to check DAGs in namespace %q: %w", name, checkErr)
 	} else if hasDAGs {

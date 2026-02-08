@@ -502,7 +502,7 @@ func (c *Context) ResolveNamespaceFromArg(arg string) (namespaceName, dagName st
 // Falls back to the base DAGsDir if no namespace has been resolved.
 func (c *Context) NamespacedDAGsDir() string {
 	if c.NamespaceID != "" {
-		return exec.NamespaceDir(c.Config.Paths.DAGsDir, c.NamespaceID)
+		return filepath.Join(c.Config.Paths.DAGsDir, c.NamespaceID)
 	}
 	return c.Config.Paths.DAGsDir
 }

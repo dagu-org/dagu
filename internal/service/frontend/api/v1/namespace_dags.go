@@ -58,7 +58,7 @@ func (a *API) resolveNamespaceStores(ctx context.Context, namespaceName string) 
 		return nil, err
 	}
 
-	namespacedDAGsDir := exec.NamespaceDir(a.config.Paths.DAGsDir, ns.ID)
+	namespacedDAGsDir := filepath.Join(a.config.Paths.DAGsDir, ns.ID)
 	nsBase := exec.NamespaceDir(a.config.Paths.DataDir, ns.ID)
 	namespacedDAGRunsDir := filepath.Join(nsBase, "dag-runs")
 	namespacedProcDir := filepath.Join(nsBase, "proc")

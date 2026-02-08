@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"text/tabwriter"
 
@@ -195,7 +196,7 @@ func runSyncPullAllNamespaces(ctx *Context) error {
 				globalCfg := gitsync.NewConfigFromGlobal(ctx.Config.GitSync)
 				if globalCfg.IsValid() {
 					fmt.Printf("\n--- Namespace: %s (instance config) ---\n", ns.Name)
-					svc := gitsync.NewNamespaceService(globalCfg, exec.NamespaceDir(ctx.Config.Paths.DAGsDir, ns.ID), ctx.Config.Paths.DataDir, ns.ID)
+					svc := gitsync.NewNamespaceService(globalCfg, filepath.Join(ctx.Config.Paths.DAGsDir, ns.ID), ctx.Config.Paths.DataDir, ns.ID)
 					if err := printPullResult(ctx, svc); err != nil {
 						fmt.Printf("  Error: %v\n", err)
 					} else {
@@ -212,7 +213,7 @@ func runSyncPullAllNamespaces(ctx *Context) error {
 		}
 
 		fmt.Printf("\n--- Namespace: %s ---\n", ns.Name)
-		svc := gitsync.NewNamespaceService(nsCfg, exec.NamespaceDir(ctx.Config.Paths.DAGsDir, ns.ID), ctx.Config.Paths.DataDir, ns.ID)
+		svc := gitsync.NewNamespaceService(nsCfg, filepath.Join(ctx.Config.Paths.DAGsDir, ns.ID), ctx.Config.Paths.DataDir, ns.ID)
 		if err := printPullResult(ctx, svc); err != nil {
 			fmt.Printf("  Error: %v\n", err)
 		} else {
@@ -454,6 +455,6 @@ func newNamespaceSyncServiceFromNS(ctx *Context, ns *exec.Namespace) (gitsync.Se
 	}
 
 	nsCfg := gitsync.NewConfigFromNamespace(ns.GitSync)
-	dagsDir := exec.NamespaceDir(ctx.Config.Paths.DAGsDir, ns.ID)
+	dagsDir := filepath.Join(ctx.Config.Paths.DAGsDir, ns.ID)
 	return gitsync.NewNamespaceService(nsCfg, dagsDir, ctx.Config.Paths.DataDir, ns.ID), nil
 }

@@ -188,7 +188,7 @@ func hasUnrelocatedNamespaceDirs(paths config.PathsConfig) bool {
 		return false
 	}
 
-	for _, baseDir := range []string{paths.DataDir, paths.DAGsDir, paths.LogDir} {
+	for _, baseDir := range []string{paths.DataDir, paths.LogDir} {
 		if baseDir == "" {
 			continue
 		}
@@ -438,7 +438,7 @@ func migrateDAGFiles(dagsDir, id string, dryRun bool) (int, error) {
 		return len(yamlFiles), nil
 	}
 
-	dstDir := exec.NamespaceDir(dagsDir, id)
+	dstDir := filepath.Join(dagsDir, id)
 	if err := os.MkdirAll(dstDir, 0750); err != nil {
 		return 0, fmt.Errorf("failed to create namespace DAGs directory: %w", err)
 	}
@@ -823,8 +823,8 @@ func runNamespaceNsRelayout(paths config.PathsConfig, dryRun bool) (*NsRelayoutR
 		return result, nil
 	}
 
-	// Relocate namespace dirs under each base directory
-	baseDirs := []string{paths.DataDir, paths.DAGsDir}
+	// Relocate namespace dirs under each base directory (not DAGsDir — DAGs stay flat)
+	baseDirs := []string{paths.DataDir}
 	if paths.LogDir != "" {
 		baseDirs = append(baseDirs, paths.LogDir)
 	}
