@@ -10,6 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis/filedagstate"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/assert"
@@ -29,6 +30,9 @@ func parseCron(t *testing.T, expr string) cron.Schedule {
 	require.NoError(t, err)
 	return sched
 }
+
+// Compile-time check: *filedagstate.Store implements DAGStateStore.
+var _ DAGStateStore = (*filedagstate.Store)(nil)
 
 // catchupMockDAGRunStore is a minimal mock for testing.
 var _ exec.DAGRunStore = (*catchupMockDAGRunStore)(nil)
@@ -76,7 +80,7 @@ func TestCatchupEngine_MissingWatermark(t *testing.T) {
 	now := time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC)
 	clock := testClock(now)
 
-	store := NewDAGStateStore(tmpDir, dagsDir)
+	store := filedagstate.New(tmpDir, dagsDir)
 	// Don't save any watermark
 
 	cfg := &config.Config{}
@@ -103,9 +107,9 @@ func TestCatchupEngine_MissingWatermark(t *testing.T) {
 	assert.Equal(t, 0, result.Dispatched)
 
 	// Per-DAG watermark should now be set
-	state, err := store.Load(testDAG)
+	lastTick, err := store.Load(context.Background(), testDAG)
 	require.NoError(t, err)
-	assert.True(t, now.Equal(state.LastTick))
+	assert.True(t, now.Equal(lastTick))
 }
 
 func TestCatchupEngine_GenerateCandidates_RunAll(t *testing.T) {
@@ -117,7 +121,7 @@ func TestCatchupEngine_GenerateCandidates_RunAll(t *testing.T) {
 	lastTick := now.Add(-3 * time.Hour) // 3 hours ago
 	clock := testClock(now)
 
-	store := NewDAGStateStore(tmpDir, dagsDir)
+	store := filedagstate.New(tmpDir, dagsDir)
 
 	cfg := &config.Config{}
 	cfg.Scheduler.MaxGlobalCatchupRuns = 100
@@ -138,8 +142,8 @@ func TestCatchupEngine_GenerateCandidates_RunAll(t *testing.T) {
 		"test.yaml": testDAG,
 	}
 
-	perDAGStates := map[*core.DAG]dagState{
-		testDAG: {LastTick: lastTick},
+	perDAGStates := map[*core.DAG]time.Time{
+		testDAG: lastTick,
 	}
 
 	candidates := engine.generateCandidates(context.Background(), dags, perDAGStates, now)
@@ -158,7 +162,7 @@ func TestCatchupEngine_GenerateCandidates_RunLatest(t *testing.T) {
 	lastTick := now.Add(-3 * time.Hour)
 	clock := testClock(now)
 
-	store := NewDAGStateStore(tmpDir, dagsDir)
+	store := filedagstate.New(tmpDir, dagsDir)
 
 	cfg := &config.Config{}
 	cfg.Scheduler.MaxGlobalCatchupRuns = 100
@@ -179,8 +183,8 @@ func TestCatchupEngine_GenerateCandidates_RunLatest(t *testing.T) {
 		"test.yaml": testDAG,
 	}
 
-	perDAGStates := map[*core.DAG]dagState{
-		testDAG: {LastTick: lastTick},
+	perDAGStates := map[*core.DAG]time.Time{
+		testDAG: lastTick,
 	}
 
 	candidates := engine.generateCandidates(context.Background(), dags, perDAGStates, now)
@@ -198,7 +202,7 @@ func TestCatchupEngine_MaxCatchupRunsCap(t *testing.T) {
 	lastTick := now.Add(-24 * time.Hour) // 24 hours ago = 24 hourly candidates
 	clock := testClock(now)
 
-	store := NewDAGStateStore(tmpDir, dagsDir)
+	store := filedagstate.New(tmpDir, dagsDir)
 
 	cfg := &config.Config{}
 	cfg.Scheduler.MaxGlobalCatchupRuns = 100
@@ -219,8 +223,8 @@ func TestCatchupEngine_MaxCatchupRunsCap(t *testing.T) {
 		"test.yaml": testDAG,
 	}
 
-	perDAGStates := map[*core.DAG]dagState{
-		testDAG: {LastTick: lastTick},
+	perDAGStates := map[*core.DAG]time.Time{
+		testDAG: lastTick,
 	}
 
 	candidates := engine.generateCandidates(context.Background(), dags, perDAGStates, now)
@@ -236,7 +240,7 @@ func TestCatchupEngine_MaxGlobalCatchupRunsCap(t *testing.T) {
 	lastTick := now.Add(-24 * time.Hour)
 	clock := testClock(now)
 
-	store := NewDAGStateStore(tmpDir, dagsDir)
+	store := filedagstate.New(tmpDir, dagsDir)
 
 	cfg := &config.Config{}
 	cfg.Scheduler.MaxGlobalCatchupRuns = 3 // Cap globally at 3
@@ -265,9 +269,9 @@ func TestCatchupEngine_MaxGlobalCatchupRunsCap(t *testing.T) {
 		"dag2.yaml": dag2,
 	}
 
-	perDAGStates := map[*core.DAG]dagState{
-		dag1: {LastTick: lastTick},
-		dag2: {LastTick: lastTick},
+	perDAGStates := map[*core.DAG]time.Time{
+		dag1: lastTick,
+		dag2: lastTick,
 	}
 
 	candidates := engine.generateCandidates(context.Background(), dags, perDAGStates, now)
@@ -283,7 +287,7 @@ func TestCatchupEngine_CatchupWindow(t *testing.T) {
 	lastTick := now.Add(-24 * time.Hour) // 24 hours ago
 	clock := testClock(now)
 
-	store := NewDAGStateStore(tmpDir, dagsDir)
+	store := filedagstate.New(tmpDir, dagsDir)
 
 	cfg := &config.Config{}
 	cfg.Scheduler.MaxGlobalCatchupRuns = 100
@@ -309,8 +313,8 @@ func TestCatchupEngine_CatchupWindow(t *testing.T) {
 		"test.yaml": testDAG,
 	}
 
-	perDAGStates := map[*core.DAG]dagState{
-		testDAG: {LastTick: lastTick},
+	perDAGStates := map[*core.DAG]time.Time{
+		testDAG: lastTick,
 	}
 
 	candidates := engine.generateCandidates(context.Background(), dags, perDAGStates, now)
@@ -380,7 +384,7 @@ func TestCatchupEngine_Run_DispatchesAll(t *testing.T) {
 	now := time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC)
 	lastTick := now.Add(-3 * time.Hour)
 
-	store := NewDAGStateStore(tmpDir, dagsDir)
+	store := filedagstate.New(tmpDir, dagsDir)
 	dispatcher := &mockDispatcher{}
 	sched := parseCron(t, "0 * * * *")
 	testDAG := &core.DAG{
@@ -393,7 +397,7 @@ func TestCatchupEngine_Run_DispatchesAll(t *testing.T) {
 	dags := map[string]*core.DAG{"test.yaml": testDAG}
 
 	// Seed watermark so catch-up runs
-	require.NoError(t, store.Save(testDAG, dagState{LastTick: lastTick}))
+	require.NoError(t, store.Save(context.Background(), testDAG, lastTick))
 
 	cfg := newTestConfig()
 	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, dispatcher, cfg, testClock(now))
@@ -414,9 +418,9 @@ func TestCatchupEngine_Run_DispatchesAll(t *testing.T) {
 	assert.Equal(t, time.Date(2025, 6, 15, 11, 0, 0, 0, time.UTC), dispatcher.calls[1].ScheduledTime)
 
 	// Watermark should be advanced to catchupTo (all completed)
-	state, err := store.Load(testDAG)
+	lastTickLoaded, err := store.Load(context.Background(), testDAG)
 	require.NoError(t, err)
-	assert.True(t, now.Equal(state.LastTick))
+	assert.True(t, now.Equal(lastTickLoaded))
 }
 
 func TestCatchupEngine_Run_DispatchFailure_WatermarkPartialAdvance(t *testing.T) {
@@ -427,7 +431,7 @@ func TestCatchupEngine_Run_DispatchFailure_WatermarkPartialAdvance(t *testing.T)
 	now := time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC)
 	lastTick := now.Add(-5 * time.Hour)
 
-	store := NewDAGStateStore(tmpDir, dagsDir)
+	store := filedagstate.New(tmpDir, dagsDir)
 	dispatcher := &mockDispatcher{
 		failOn: map[string]error{"dag-fail": errors.New("dispatch error")},
 	}
@@ -453,29 +457,30 @@ func TestCatchupEngine_Run_DispatchFailure_WatermarkPartialAdvance(t *testing.T)
 	}
 
 	// Seed watermarks
-	require.NoError(t, store.Save(dagOK, dagState{LastTick: lastTick}))
-	require.NoError(t, store.Save(dagFail, dagState{LastTick: lastTick}))
+	ctx := context.Background()
+	require.NoError(t, store.Save(ctx, dagOK, lastTick))
+	require.NoError(t, store.Save(ctx, dagFail, lastTick))
 
 	cfg := newTestConfig()
 	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, dispatcher, cfg, testClock(now))
 
-	result, err := engine.Run(context.Background(), dags)
+	result, err := engine.Run(ctx, dags)
 	require.NoError(t, err)
 
 	// Some candidates dispatched before failure broke the loop
 	assert.True(t, result.Dispatched >= 0)
 
 	// dag-fail's watermark should NOT be advanced to catchupTo
-	failState, err := store.Load(dagFail)
+	failTick, err := store.Load(ctx, dagFail)
 	require.NoError(t, err)
-	assert.True(t, failState.LastTick.Before(now), "failed DAG watermark should not advance to catchupTo")
+	assert.True(t, failTick.Before(now), "failed DAG watermark should not advance to catchupTo")
 
 	// dag-ok's watermark should be at most the last processed candidate (not catchupTo since loop broke early)
-	okState, err := store.Load(dagOK)
+	okTick, err := store.Load(ctx, dagOK)
 	require.NoError(t, err)
 	// It may or may not have been advanced depending on ordering, but must NOT equal catchupTo
 	// since completedAll=false
-	assert.True(t, okState.LastTick.Before(now) || okState.LastTick.Equal(now))
+	assert.True(t, okTick.Before(now) || okTick.Equal(now))
 }
 
 func TestCatchupEngine_IsDuplicate(t *testing.T) {
@@ -500,7 +505,7 @@ func TestCatchupEngine_IsDuplicate(t *testing.T) {
 
 		cfg := newTestConfig()
 		engine := NewCatchupEngine(
-			NewDAGStateStore(tmpDir, dagsDir), mockStore, nil, cfg, testClock(time.Now()),
+			filedagstate.New(tmpDir, dagsDir), mockStore, nil, cfg, testClock(time.Now()),
 		)
 
 		cand := catchupCandidate{
@@ -528,7 +533,7 @@ func TestCatchupEngine_IsDuplicate(t *testing.T) {
 
 		cfg := newTestConfig()
 		engine := NewCatchupEngine(
-			NewDAGStateStore(tmpDir, dagsDir), mockStore, nil, cfg, testClock(time.Now()),
+			filedagstate.New(tmpDir, dagsDir), mockStore, nil, cfg, testClock(time.Now()),
 		)
 
 		cand := catchupCandidate{
@@ -549,7 +554,7 @@ func TestCatchupEngine_IsDuplicate(t *testing.T) {
 
 		cfg := newTestConfig()
 		engine := NewCatchupEngine(
-			NewDAGStateStore(tmpDir, dagsDir), mockStore, nil, cfg, testClock(time.Now()),
+			filedagstate.New(tmpDir, dagsDir), mockStore, nil, cfg, testClock(time.Now()),
 		)
 
 		cand := catchupCandidate{
@@ -579,8 +584,8 @@ func TestCatchupEngine_Run_SkipsDuplicates(t *testing.T) {
 	}
 	dags := map[string]*core.DAG{"test.yaml": testDAG}
 
-	store := NewDAGStateStore(tmpDir, dagsDir)
-	require.NoError(t, store.Save(testDAG, dagState{LastTick: lastTick}))
+	store := filedagstate.New(tmpDir, dagsDir)
+	require.NoError(t, store.Save(context.Background(), testDAG, lastTick))
 
 	// Mock store that reports 10:00 as already existing
 	existingAttempt := &exec.MockDAGRunAttempt{
@@ -624,8 +629,8 @@ func TestCatchupEngine_Run_ContextCancelled(t *testing.T) {
 	}
 	dags := map[string]*core.DAG{"test.yaml": testDAG}
 
-	store := NewDAGStateStore(tmpDir, dagsDir)
-	require.NoError(t, store.Save(testDAG, dagState{LastTick: lastTick}))
+	store := filedagstate.New(tmpDir, dagsDir)
+	require.NoError(t, store.Save(context.Background(), testDAG, lastTick))
 
 	dispatcher := &mockDispatcher{}
 	cfg := newTestConfig()
@@ -642,8 +647,8 @@ func TestCatchupEngine_Run_ContextCancelled(t *testing.T) {
 	assert.Equal(t, 0, result.Dispatched)
 
 	// Watermark should NOT advance to catchupTo since completedAll=false
-	state, err := store.Load(testDAG)
+	loadedTick, err := store.Load(context.Background(), testDAG)
 	require.NoError(t, err)
-	assert.True(t, state.LastTick.Before(now) || state.LastTick.Equal(lastTick),
+	assert.True(t, loadedTick.Before(now) || loadedTick.Equal(lastTick),
 		"watermark should not advance to catchupTo when context is cancelled")
 }

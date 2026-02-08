@@ -57,8 +57,8 @@ type Scheduler struct {
 	instanceID          string          // Unique instance identifier for service registry
 	// queueProcessor is the processor for queued DAG runs
 	queueProcessor *QueueProcessor
-	catchupEngine  *CatchupEngine // Catch-up engine for replaying missed runs
-	dagStateStore  *DAGStateStore // Per-DAG state persistence for catch-up
+	catchupEngine  *CatchupEngine  // Catch-up engine for replaying missed runs
+	dagStateStore  DAGStateStore   // Per-DAG state persistence for catch-up
 	stopOnce       sync.Once
 	lock           sync.Mutex
 	clock          Clock // Clock function for getting current time
@@ -82,6 +82,7 @@ func New(
 	procStore exec.ProcStore,
 	reg exec.ServiceRegistry,
 	coordinatorCli exec.Dispatcher,
+	dagStateStore DAGStateStore,
 ) (*Scheduler, error) {
 	timeLoc := cfg.Core.Location
 	if timeLoc == nil {
@@ -103,7 +104,6 @@ func New(
 		dagExecutor,
 		cfg.Queues,
 	)
-	dagStateStore := NewDAGStateStore(cfg.Paths.DataDir, cfg.Paths.DAGsDir)
 	catchupEngine := NewCatchupEngine(
 		dagStateStore,
 		dagRunStore,
@@ -244,9 +244,13 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	registry := s.entryReader.Registry()
 
 	if s.dagStateStore != nil {
-		oldWatermarkPath := filepath.Join(s.config.Paths.DataDir, "scheduler", "state.json")
-		if err := s.dagStateStore.Migrate(oldWatermarkPath, registry); err != nil {
-			logger.Error(ctx, "Watermark migration failed", tag.Error(err))
+		if migrator, ok := s.dagStateStore.(interface {
+			Migrate(string, map[string]*core.DAG) error
+		}); ok {
+			oldWatermarkPath := filepath.Join(s.config.Paths.DataDir, "scheduler", "state.json")
+			if err := migrator.Migrate(oldWatermarkPath, registry); err != nil {
+				logger.Error(ctx, "Watermark migration failed", tag.Error(err))
+			}
 		}
 	}
 
@@ -343,7 +347,7 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 			if s.dagStateStore != nil {
 				catchupDAGs := filterCatchupDAGs(s.entryReader.Registry())
 				if len(catchupDAGs) > 0 {
-					if err := s.dagStateStore.SaveAll(catchupDAGs, tickTime); err != nil {
+					if err := s.dagStateStore.SaveAll(ctx, catchupDAGs, tickTime); err != nil {
 						logger.Error(ctx, "Failed to save DAG state", tag.Error(err))
 					}
 				}

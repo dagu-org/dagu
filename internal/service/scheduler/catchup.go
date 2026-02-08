@@ -16,6 +16,14 @@ import (
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
+// DAGStateStore is the interface for per-DAG state persistence used by the scheduler.
+type DAGStateStore interface {
+	Load(ctx context.Context, dag *core.DAG) (time.Time, error)
+	Save(ctx context.Context, dag *core.DAG, lastTick time.Time) error
+	LoadAll(ctx context.Context, dags map[string]*core.DAG) (map[*core.DAG]time.Time, error)
+	SaveAll(ctx context.Context, dags map[string]*core.DAG, tick time.Time) error
+}
+
 // catchupDispatcher is the interface used by CatchupEngine to dispatch DAG runs.
 type catchupDispatcher interface {
 	HandleJob(ctx context.Context, dag *core.DAG, operation coordinatorv1.Operation,
@@ -24,7 +32,7 @@ type catchupDispatcher interface {
 
 // CatchupEngine replays missed DAG runs that were scheduled during scheduler downtime.
 type CatchupEngine struct {
-	dagStateStore *DAGStateStore
+	dagStateStore DAGStateStore
 	dagRunStore   exec.DAGRunStore
 	dagExecutor   catchupDispatcher
 	config        *config.Config
@@ -47,7 +55,7 @@ type catchupCandidate struct {
 
 // NewCatchupEngine creates a new CatchupEngine.
 func NewCatchupEngine(
-	dagStateStore *DAGStateStore,
+	dagStateStore DAGStateStore,
 	dagRunStore exec.DAGRunStore,
 	dagExecutor catchupDispatcher,
 	cfg *config.Config,
@@ -67,7 +75,7 @@ func (c *CatchupEngine) Run(ctx context.Context, dags map[string]*core.DAG) (*Ca
 	start := c.clock()
 	result := &CatchupResult{}
 
-	perDAGStates, err := c.dagStateStore.LoadAll(dags)
+	perDAGStates, err := c.dagStateStore.LoadAll(ctx, dags)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load per-DAG states: %w", err)
 	}
@@ -76,8 +84,8 @@ func (c *CatchupEngine) Run(ctx context.Context, dags map[string]*core.DAG) (*Ca
 
 	// Check if any DAG has a non-zero watermark (i.e., has been seen before)
 	hasAnyWatermark := false
-	for _, state := range perDAGStates {
-		if !state.LastTick.IsZero() {
+	for _, lastTick := range perDAGStates {
+		if !lastTick.IsZero() {
 			hasAnyWatermark = true
 			break
 		}
@@ -86,7 +94,7 @@ func (c *CatchupEngine) Run(ctx context.Context, dags map[string]*core.DAG) (*Ca
 	if !hasAnyWatermark {
 		// First run — no catch-up needed, seed all DAGs with current time
 		logger.Info(ctx, "No per-DAG watermarks found, skipping catch-up")
-		if err := c.dagStateStore.SaveAll(dags, catchupTo); err != nil {
+		if err := c.dagStateStore.SaveAll(ctx, dags, catchupTo); err != nil {
 			return nil, fmt.Errorf("failed to save initial watermarks: %w", err)
 		}
 		result.Duration = c.clock().Sub(start)
@@ -102,7 +110,7 @@ func (c *CatchupEngine) Run(ctx context.Context, dags map[string]*core.DAG) (*Ca
 
 	if len(candidates) == 0 {
 		logger.Info(ctx, "No catch-up candidates found")
-		if err := c.dagStateStore.SaveAll(dags, catchupTo); err != nil {
+		if err := c.dagStateStore.SaveAll(ctx, dags, catchupTo); err != nil {
 			logger.Error(ctx, "Failed to save watermarks after catch-up", tag.Error(err))
 		}
 		result.Duration = c.clock().Sub(start)
@@ -142,7 +150,7 @@ func (c *CatchupEngine) Run(ctx context.Context, dags map[string]*core.DAG) (*Ca
 		if dispatched {
 			result.Dispatched++
 			// Advance this DAG's watermark after each successful dispatch
-			if err := c.dagStateStore.Save(cand.dag, dagState{LastTick: cand.scheduledTime}); err != nil {
+			if err := c.dagStateStore.Save(ctx, cand.dag, cand.scheduledTime); err != nil {
 				logger.Error(ctx, "Failed to save DAG state", tag.Error(err))
 			}
 		} else {
@@ -160,11 +168,11 @@ func (c *CatchupEngine) Run(ctx context.Context, dags map[string]*core.DAG) (*Ca
 			continue
 		}
 		if completedAll {
-			if err := c.dagStateStore.Save(dag, dagState{LastTick: catchupTo}); err != nil {
+			if err := c.dagStateStore.Save(ctx, dag, catchupTo); err != nil {
 				logger.Error(ctx, "Failed to save final watermark", tag.Error(err))
 			}
 		} else if t, ok := lastProcessed[dag.Name]; ok {
-			if err := c.dagStateStore.Save(dag, dagState{LastTick: t}); err != nil {
+			if err := c.dagStateStore.Save(ctx, dag, t); err != nil {
 				logger.Error(ctx, "Failed to save final watermark", tag.Error(err))
 			}
 		}
@@ -186,7 +194,7 @@ func (c *CatchupEngine) Run(ctx context.Context, dags map[string]*core.DAG) (*Ca
 func (c *CatchupEngine) generateCandidates(
 	ctx context.Context,
 	dags map[string]*core.DAG,
-	perDAGStates map[*core.DAG]dagState,
+	perDAGStates map[*core.DAG]time.Time,
 	catchupTo time.Time,
 ) []catchupCandidate {
 	var merged []catchupCandidate
@@ -200,7 +208,7 @@ func (c *CatchupEngine) generateCandidates(
 
 	for _, k := range keys {
 		dag := dags[k]
-		lastTick := perDAGStates[dag].LastTick
+		lastTick := perDAGStates[dag]
 		if lastTick.IsZero() {
 			// First run for this DAG — no catch-up needed
 			continue

@@ -8,6 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis/filedagstate"
 	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/robfig/cron/v3"
@@ -29,7 +30,8 @@ func TestScheduler(t *testing.T) {
 		}
 
 		th := test.SetupScheduler(t)
-		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
+		dss := filedagstate.New(th.Config.Paths.DataDir, th.Config.Paths.DAGsDir)
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, dss)
 		require.NoError(t, err)
 		sc.SetClock(func() time.Time { return now })
 
@@ -55,7 +57,8 @@ func TestScheduler(t *testing.T) {
 		}
 
 		th := test.SetupScheduler(t)
-		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
+		dss := filedagstate.New(th.Config.Paths.DataDir, th.Config.Paths.DAGsDir)
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, dss)
 		require.NoError(t, err)
 		sc.SetClock(func() time.Time { return now })
 
@@ -72,7 +75,8 @@ func TestScheduler(t *testing.T) {
 		now := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
 
 		th := test.SetupScheduler(t)
-		schedulerInstance, err := scheduler.New(th.Config, &mockJobManager{}, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
+		dss := filedagstate.New(th.Config.Paths.DataDir, th.Config.Paths.DAGsDir)
+		schedulerInstance, err := scheduler.New(th.Config, &mockJobManager{}, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, dss)
 		require.NoError(t, err)
 
 		next := schedulerInstance.NextTick(now)
@@ -212,9 +216,10 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	}
 
 	th := test.SetupScheduler(t)
+	dss := filedagstate.New(th.Config.Paths.DataDir, th.Config.Paths.DAGsDir)
 
 	// Create first scheduler instance
-	sc1, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
+	sc1, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, dss)
 	require.NoError(t, err)
 	sc1.SetClock(clock)
 
@@ -229,7 +234,7 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	// Create second scheduler instance with same config
-	sc2, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
+	sc2, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, dss)
 	require.NoError(t, err)
 	sc2.SetClock(clock)
 
