@@ -19,10 +19,12 @@ const (
 	filePermissions = 0600
 )
 
-// Store implements a file-based store for upgrade check cache data.
+var _ upgrade.CacheStore = (*store)(nil)
+
+// store implements a file-based store for upgrade check cache data.
 // The cache is stored as a JSON file at {dataDir}/upgrade/upgrade-check.json.
 // Thread-safe through internal locking.
-type Store struct {
+type store struct {
 	baseDir string
 	mu      sync.RWMutex
 }
@@ -30,7 +32,7 @@ type Store struct {
 // New creates a new file-based upgrade check store.
 // The dataDir is the base data directory (e.g., DAGU_HOME/data).
 // The cache will be stored at {dataDir}/upgrade/upgrade-check.json.
-func New(dataDir string) (*Store, error) {
+func New(dataDir string) (upgrade.CacheStore, error) {
 	if dataDir == "" {
 		return nil, errors.New("fileupgradecheck: dataDir cannot be empty")
 	}
@@ -40,12 +42,12 @@ func New(dataDir string) (*Store, error) {
 		return nil, fmt.Errorf("fileupgradecheck: failed to create directory %s: %w", baseDir, err)
 	}
 
-	return &Store{baseDir: baseDir}, nil
+	return &store{baseDir: baseDir}, nil
 }
 
 // Load reads the upgrade check cache from the JSON file.
 // Returns nil, nil if the file doesn't exist or contains invalid JSON.
-func (s *Store) Load() (*upgrade.UpgradeCheckCache, error) {
+func (s *store) Load() (*upgrade.UpgradeCheckCache, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -66,7 +68,7 @@ func (s *Store) Load() (*upgrade.UpgradeCheckCache, error) {
 }
 
 // Save writes the upgrade check cache to the JSON file atomically.
-func (s *Store) Save(cache *upgrade.UpgradeCheckCache) error {
+func (s *store) Save(cache *upgrade.UpgradeCheckCache) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -77,6 +79,6 @@ func (s *Store) Save(cache *upgrade.UpgradeCheckCache) error {
 }
 
 // cachePath returns the full path to the cache file.
-func (s *Store) cachePath() string {
+func (s *store) cachePath() string {
 	return filepath.Join(s.baseDir, cacheFileName)
 }
