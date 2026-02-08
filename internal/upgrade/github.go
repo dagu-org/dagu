@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -95,12 +96,15 @@ func (c *GitHubClient) GetLatestRelease(ctx context.Context, includePreRelease b
 // GetRelease fetches a specific release by tag.
 func (c *GitHubClient) GetRelease(ctx context.Context, tag string) (*Release, error) {
 	tag = NormalizeVersionTag(tag)
+	if err := ValidateVersionTag(tag); err != nil {
+		return nil, err
+	}
 	policy := newUpgradeRetryPolicy()
 
 	var release Release
 	err := backoff.Retry(ctx, func(ctx context.Context) error {
 		resp, err := c.client.R().SetContext(ctx).SetResult(&release).
-			Get(fmt.Sprintf("%s/tags/%s", githubAPIURL, tag))
+			Get(fmt.Sprintf("%s/tags/%s", githubAPIURL, url.PathEscape(tag)))
 		if err != nil {
 			return err
 		}

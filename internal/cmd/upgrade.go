@@ -171,6 +171,10 @@ func createProgressCallback() func(downloaded, total int64) {
 			return
 		}
 		percent := int(downloaded * 100 / total)
+		// Reset on retry: percent only decreases when a fresh download starts
+		if percent < lastPercent {
+			lastPercent = 0
+		}
 		// Update display every 5%
 		if percent/5 > lastPercent/5 {
 			lastPercent = percent

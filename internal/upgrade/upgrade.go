@@ -33,16 +33,17 @@ type ReleaseInfo struct {
 
 // Result contains the result of an upgrade operation.
 type Result struct {
-	CurrentVersion string
-	TargetVersion  string
-	UpgradeNeeded  bool
-	WasUpgraded    bool
-	BackupPath     string
-	DryRun         bool
-	AssetName      string
-	AssetSize      int64
-	DownloadURL    string
-	ExecutablePath string
+	CurrentVersion         string
+	TargetVersion          string
+	UpgradeNeeded          bool
+	WasUpgraded            bool
+	BackupPath             string
+	DryRun                 bool
+	AssetName              string
+	AssetSize              int64
+	DownloadURL            string
+	ExecutablePath         string
+	SpecificVersionRequest bool
 }
 
 // InstallMethod represents how dagu was installed.
@@ -174,7 +175,11 @@ func FormatCheckResult(r *Result) string {
 	var sb strings.Builder
 
 	fmt.Fprintf(&sb, "Current version: %s\n", formatVersion(r.CurrentVersion))
-	fmt.Fprintf(&sb, "Latest version:  %s\n", r.TargetVersion)
+	label := "Latest version"
+	if r.SpecificVersionRequest {
+		label = "Target version"
+	}
+	fmt.Fprintf(&sb, "%s:  %s\n", label, r.TargetVersion)
 
 	if r.UpgradeNeeded {
 		sb.WriteString("\nAn update is available. Run 'dagu upgrade' to update.\n")
@@ -187,13 +192,8 @@ func FormatCheckResult(r *Result) string {
 
 // FetchReleaseInfo fetches all release information in a single set of API calls.
 // This allows checking and upgrading without making duplicate requests.
+// Note: Callers are expected to check CanSelfUpgrade() before calling this.
 func FetchReleaseInfo(ctx context.Context, opts Options) (*ReleaseInfo, error) {
-	// Check if we can self-upgrade
-	canUpgrade, reason := CanSelfUpgrade()
-	if !canUpgrade {
-		return nil, fmt.Errorf("%s", reason)
-	}
-
 	// Check platform support
 	platform := Detect()
 	if !platform.IsSupported() {
@@ -247,12 +247,13 @@ func FetchReleaseInfo(ctx context.Context, opts Options) (*ReleaseInfo, error) {
 // UpgradeWithReleaseInfo performs the upgrade using pre-fetched release information.
 func UpgradeWithReleaseInfo(ctx context.Context, opts Options, info *ReleaseInfo, store CacheStore) (*Result, error) {
 	result := &Result{
-		CurrentVersion: config.Version,
-		DryRun:         opts.DryRun,
-		TargetVersion:  info.Release.TagName,
-		AssetName:      info.Asset.Name,
-		AssetSize:      info.Asset.Size,
-		DownloadURL:    info.Asset.BrowserDownloadURL,
+		CurrentVersion:         config.Version,
+		DryRun:                 opts.DryRun,
+		TargetVersion:          info.Release.TagName,
+		AssetName:              info.Asset.Name,
+		AssetSize:              info.Asset.Size,
+		DownloadURL:            info.Asset.BrowserDownloadURL,
+		SpecificVersionRequest: opts.TargetVersion != "",
 	}
 
 	// Get executable path
@@ -304,6 +305,12 @@ func UpgradeWithReleaseInfo(ctx context.Context, opts Options, info *ReleaseInfo
 	}
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
+	// Create internal backup of current binary (for restore on verify failure)
+	internalBackupPath := filepath.Join(tempDir, "dagu.prev")
+	if err := copyFile(execPath, internalBackupPath); err != nil {
+		return nil, fmt.Errorf("failed to create internal backup: %w", err)
+	}
+
 	archivePath := filepath.Join(tempDir, info.Asset.Name)
 
 	// Download archive
@@ -332,13 +339,15 @@ func UpgradeWithReleaseInfo(ctx context.Context, opts Options, info *ReleaseInfo
 
 	// Verify the installed binary
 	if err := VerifyBinary(execPath, info.Release.TagName); err != nil {
-		// If verification fails and we have a backup, restore it
+		// Always restore from the internal backup; fall back to user backup path
+		restoreSrc := internalBackupPath
 		if result.BackupPath != "" {
-			if restoreErr := copyFile(result.BackupPath, execPath); restoreErr == nil {
-				return nil, fmt.Errorf("upgrade verification failed (restored backup): %w", err)
-			}
+			restoreSrc = result.BackupPath
 		}
-		return nil, fmt.Errorf("upgrade verification failed: %w", err)
+		if restoreErr := copyFile(restoreSrc, execPath); restoreErr == nil {
+			return nil, fmt.Errorf("upgrade verification failed (restored backup): %w", err)
+		}
+		return nil, fmt.Errorf("upgrade verification failed (restore also failed): %w", err)
 	}
 
 	// Update cache with new version info
