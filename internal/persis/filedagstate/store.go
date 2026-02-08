@@ -35,67 +35,47 @@ func New(dataDir, dagsDir string) *Store {
 	}
 }
 
-// Load reads the last tick time for a single DAG from disk.
-// Returns zero time if the file is missing or corrupt.
-func (s *Store) Load(_ context.Context, dag *core.DAG) (time.Time, error) {
+// Load reads the state for a single DAG from disk.
+// Returns a zero DAGState if the file is missing or corrupt.
+func (s *Store) Load(_ context.Context, dag *core.DAG) (core.DAGState, error) {
 	filePath := filepath.Join(s.dir, s.stateFileName(dag))
 
 	data, err := os.ReadFile(filePath) //nolint:gosec // path derived from internal config
 	if err != nil {
 		if os.IsNotExist(err) {
-			return time.Time{}, nil
+			return core.DAGState{}, nil
 		}
-		return time.Time{}, fmt.Errorf("failed to read DAG state: %w", err)
+		return core.DAGState{}, fmt.Errorf("failed to read DAG state: %w", err)
 	}
 
-	var state dagState
-	if err := json.Unmarshal(data, &state); err != nil {
+	var st dagState
+	if err := json.Unmarshal(data, &st); err != nil {
 		// Corrupt file — treat as missing
-		return time.Time{}, nil
+		return core.DAGState{}, nil
 	}
 
-	return state.LastTick, nil
+	return core.DAGState{LastTick: st.LastTick}, nil
 }
 
-// Save atomically writes the last tick time for a single DAG to disk.
-func (s *Store) Save(_ context.Context, dag *core.DAG, lastTick time.Time) error {
+// Save atomically writes the state for a single DAG to disk.
+func (s *Store) Save(_ context.Context, dag *core.DAG, state core.DAGState) error {
 	if err := os.MkdirAll(s.dir, 0o750); err != nil {
 		return fmt.Errorf("failed to create DAG state directory: %w", err)
 	}
 
 	filePath := filepath.Join(s.dir, s.stateFileName(dag))
-	return fileutil.WriteJSONAtomic(filePath, dagState{LastTick: lastTick}, 0o600)
+	return fileutil.WriteJSONAtomic(filePath, dagState{LastTick: state.LastTick}, 0o600)
 }
 
-// SaveAll saves the lastTick for all DAGs in bulk.
-// Returns the first error encountered; remaining DAGs are still processed.
-func (s *Store) SaveAll(_ context.Context, dags map[string]*core.DAG, tick time.Time) error {
-	if err := os.MkdirAll(s.dir, 0o750); err != nil {
-		return fmt.Errorf("failed to create DAG state directory: %w", err)
-	}
-
-	st := dagState{LastTick: tick}
-	var firstErr error
+// LoadAll loads the state for all provided DAGs.
+func (s *Store) LoadAll(ctx context.Context, dags map[string]*core.DAG) (map[*core.DAG]core.DAGState, error) {
+	result := make(map[*core.DAG]core.DAGState, len(dags))
 	for _, dag := range dags {
-		filePath := filepath.Join(s.dir, s.stateFileName(dag))
-		if err := fileutil.WriteJSONAtomic(filePath, st, 0o600); err != nil {
-			if firstErr == nil {
-				firstErr = err
-			}
-		}
-	}
-	return firstErr
-}
-
-// LoadAll loads the last tick time for all provided DAGs.
-func (s *Store) LoadAll(ctx context.Context, dags map[string]*core.DAG) (map[*core.DAG]time.Time, error) {
-	result := make(map[*core.DAG]time.Time, len(dags))
-	for _, dag := range dags {
-		lastTick, err := s.Load(ctx, dag)
+		state, err := s.Load(ctx, dag)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load state for DAG %s: %w", dag.Name, err)
 		}
-		result[dag] = lastTick
+		result[dag] = state
 	}
 	return result, nil
 }
@@ -126,8 +106,15 @@ func (s *Store) Migrate(oldWatermarkPath string, dags map[string]*core.DAG) erro
 	}
 
 	// Seed each DAG with the global lastTick
-	if err := s.SaveAll(context.Background(), dags, old.LastTick); err != nil {
-		return fmt.Errorf("failed to migrate watermark to per-DAG state: %w", err)
+	if err := os.MkdirAll(s.dir, 0o750); err != nil {
+		return fmt.Errorf("failed to create DAG state directory: %w", err)
+	}
+	st := dagState{LastTick: old.LastTick}
+	for _, dag := range dags {
+		filePath := filepath.Join(s.dir, s.stateFileName(dag))
+		if err := fileutil.WriteJSONAtomic(filePath, st, 0o600); err != nil {
+			return fmt.Errorf("failed to migrate watermark for DAG %s: %w", dag.Name, err)
+		}
 	}
 
 	// Remove the old global file

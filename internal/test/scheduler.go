@@ -9,7 +9,6 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
-	"github.com/dagu-org/dagu/internal/persis/filedagstate"
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
 	"github.com/dagu-org/dagu/internal/persis/filequeue"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -91,7 +90,6 @@ func SetupScheduler(t *testing.T, opts ...HelperOption) *Scheduler {
 func (s *Scheduler) NewSchedulerInstance(t *testing.T) (*scheduler.Scheduler, error) {
 	t.Helper()
 
-	dss := filedagstate.New(s.Config.Paths.DataDir, s.Config.Paths.DAGsDir)
 	return scheduler.New(
 		s.Config,
 		s.EntryReader,
@@ -101,7 +99,6 @@ func (s *Scheduler) NewSchedulerInstance(t *testing.T) (*scheduler.Scheduler, er
 		s.ProcStore,
 		s.ServiceRegistry,
 		s.CoordinatorCli,
-		dss,
 	)
 }
 

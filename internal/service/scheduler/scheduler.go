@@ -18,7 +18,6 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/dirlock"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
-	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 )
@@ -57,8 +56,6 @@ type Scheduler struct {
 	instanceID          string          // Unique instance identifier for service registry
 	// queueProcessor is the processor for queued DAG runs
 	queueProcessor *QueueProcessor
-	catchupEngine  *CatchupEngine  // Catch-up engine for replaying missed runs
-	dagStateStore  DAGStateStore   // Per-DAG state persistence for catch-up
 	stopOnce       sync.Once
 	lock           sync.Mutex
 	clock          Clock // Clock function for getting current time
@@ -82,7 +79,6 @@ func New(
 	procStore exec.ProcStore,
 	reg exec.ServiceRegistry,
 	coordinatorCli exec.Dispatcher,
-	dagStateStore DAGStateStore,
 ) (*Scheduler, error) {
 	timeLoc := cfg.Core.Location
 	if timeLoc == nil {
@@ -104,14 +100,6 @@ func New(
 		dagExecutor,
 		cfg.Queues,
 	)
-	catchupEngine := NewCatchupEngine(
-		dagStateStore,
-		dagRunStore,
-		dagExecutor,
-		cfg,
-		time.Now,
-	)
-
 	return &Scheduler{
 		logDir:          cfg.Paths.LogDir,
 		quit:            make(chan struct{}),
@@ -127,8 +115,6 @@ func New(
 		healthServer:    healthServer,
 		serviceRegistry: reg,
 		queueProcessor:  processor,
-		catchupEngine:   catchupEngine,
-		dagStateStore:   dagStateStore,
 		clock:           time.Now, // Default to real time
 	}, nil
 }
@@ -140,9 +126,6 @@ func (s *Scheduler) SetClock(clock Clock) {
 		panic("SetClock must be called before Start()")
 	}
 	s.clock = clock
-	if s.catchupEngine != nil {
-		s.catchupEngine.clock = clock
-	}
 }
 
 // DisableHealthServer disables the health check server (used when running from start-all)
@@ -239,30 +222,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		return err
 	}
 
-	// One-time migration from old global watermark to per-DAG state files,
-	// then run catch-up for DAGs that have catch-up enabled.
-	registry := s.entryReader.Registry()
-
-	if s.dagStateStore != nil {
-		if migrator, ok := s.dagStateStore.(interface {
-			Migrate(string, map[string]*core.DAG) error
-		}); ok {
-			oldWatermarkPath := filepath.Join(s.config.Paths.DataDir, "scheduler", "state.json")
-			if err := migrator.Migrate(oldWatermarkPath, registry); err != nil {
-				logger.Error(ctx, "Watermark migration failed", tag.Error(err))
-			}
-		}
-	}
-
-	if s.catchupEngine != nil {
-		catchupDAGs := filterCatchupDAGs(registry)
-		if len(catchupDAGs) > 0 {
-			if _, err := s.catchupEngine.Run(ctx, catchupDAGs); err != nil {
-				logger.Error(ctx, "Catch-up failed", tag.Error(err))
-			}
-		}
-	}
-
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -343,15 +302,6 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 		case <-timer.C:
 			_ = timer.Stop()
 			s.invokeJobs(ctx, tickTime)
-			// Save per-DAG watermarks after processing jobs (only for catch-up-enabled DAGs)
-			if s.dagStateStore != nil {
-				catchupDAGs := filterCatchupDAGs(s.entryReader.Registry())
-				if len(catchupDAGs) > 0 {
-					if err := s.dagStateStore.SaveAll(ctx, catchupDAGs, tickTime); err != nil {
-						logger.Error(ctx, "Failed to save DAG state", tag.Error(err))
-					}
-				}
-			}
 			tickTime = s.NextTick(tickTime)
 			timer.Reset(tickTime.Sub(s.clock()))
 		}
@@ -361,20 +311,6 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 // NextTick returns the next tick time for the scheduler.
 func (*Scheduler) NextTick(now time.Time) time.Time {
 	return now.Add(time.Minute).Truncate(time.Minute)
-}
-
-// filterCatchupDAGs returns only DAGs that have at least one schedule with catch-up enabled.
-func filterCatchupDAGs(dags map[string]*core.DAG) map[string]*core.DAG {
-	result := make(map[string]*core.DAG)
-	for k, dag := range dags {
-		for _, sched := range dag.Schedule {
-			if sched.Catchup != core.CatchupPolicyOff {
-				result[k] = dag
-				break
-			}
-		}
-	}
-	return result
 }
 
 // IsRunning returns whether the scheduler is currently running.

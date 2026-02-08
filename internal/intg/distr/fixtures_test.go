@@ -11,7 +11,6 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/persis/filedagstate"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/scheduler"
@@ -191,7 +190,6 @@ func (f *testFixture) startScheduler(timeout time.Duration) {
 	de := scheduler.NewDAGExecutor(f.coordinatorClient, runtime.NewSubCmdBuilder(f.coord.Config), f.coord.Config.DefaultExecMode)
 	em := scheduler.NewEntryReader(f.coord.Config.Paths.DAGsDir, f.coord.DAGStore, f.coord.DAGRunMgr, de, "")
 
-	dss := filedagstate.New(f.coord.Config.Paths.DataDir, f.coord.Config.Paths.DAGsDir)
 	schedulerInst, err := scheduler.New(
 		f.coord.Config,
 		em,
@@ -201,7 +199,6 @@ func (f *testFixture) startScheduler(timeout time.Duration) {
 		f.coord.ProcStore,
 		f.coord.ServiceRegistry,
 		f.coordinatorClient,
-		dss,
 	)
 	require.NoError(f.t, err)
 

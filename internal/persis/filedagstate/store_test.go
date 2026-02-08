@@ -30,19 +30,19 @@ func TestStore_LoadSave(t *testing.T) {
 
 	// Save and reload
 	now := time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)
-	require.NoError(t, store.Save(ctx, dag, now))
+	require.NoError(t, store.Save(ctx, dag, core.DAGState{LastTick: now}))
 
-	lastTick, err := store.Load(ctx, dag)
+	state, err := store.Load(ctx, dag)
 	require.NoError(t, err)
-	assert.True(t, now.Equal(lastTick))
+	assert.True(t, now.Equal(state.LastTick))
 
 	// Overwrite with new value
 	later := now.Add(time.Hour)
-	require.NoError(t, store.Save(ctx, dag, later))
+	require.NoError(t, store.Save(ctx, dag, core.DAGState{LastTick: later}))
 
-	lastTick, err = store.Load(ctx, dag)
+	state, err = store.Load(ctx, dag)
 	require.NoError(t, err)
-	assert.True(t, later.Equal(lastTick))
+	assert.True(t, later.Equal(state.LastTick))
 }
 
 func TestStore_LoadMissing(t *testing.T) {
@@ -57,9 +57,9 @@ func TestStore_LoadMissing(t *testing.T) {
 		Location: filepath.Join(tmpDir, "nonexistent.yaml"),
 	}
 
-	lastTick, err := store.Load(ctx, dag)
+	state, err := store.Load(ctx, dag)
 	require.NoError(t, err)
-	assert.True(t, lastTick.IsZero())
+	assert.True(t, state.LastTick.IsZero())
 }
 
 func TestStore_CorruptFile(t *testing.T) {
@@ -79,40 +79,9 @@ func TestStore_CorruptFile(t *testing.T) {
 	require.NoError(t, os.MkdirAll(dir, 0o750))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "corrupt.json"), []byte("{invalid"), 0o644))
 
-	lastTick, err := store.Load(ctx, dag)
+	state, err := store.Load(ctx, dag)
 	require.NoError(t, err)
-	assert.True(t, lastTick.IsZero())
-}
-
-func TestStore_SaveAll(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	dagsDir := filepath.Join(tmpDir, "dags")
-	require.NoError(t, os.MkdirAll(dagsDir, 0o750))
-
-	store := New(tmpDir, dagsDir)
-	ctx := context.Background()
-
-	dag1 := &core.DAG{Name: "dag1", Location: filepath.Join(dagsDir, "dag1.yaml")}
-	dag2 := &core.DAG{Name: "dag2", Location: filepath.Join(dagsDir, "dag2.yaml")}
-
-	dags := map[string]*core.DAG{
-		"dag1.yaml": dag1,
-		"dag2.yaml": dag2,
-	}
-
-	tick := time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC)
-	require.NoError(t, store.SaveAll(ctx, dags, tick))
-
-	// Verify both DAGs have the same tick
-	lastTick1, err := store.Load(ctx, dag1)
-	require.NoError(t, err)
-	assert.True(t, tick.Equal(lastTick1))
-
-	lastTick2, err := store.Load(ctx, dag2)
-	require.NoError(t, err)
-	assert.True(t, tick.Equal(lastTick2))
+	assert.True(t, state.LastTick.IsZero())
 }
 
 func TestStore_LoadAll(t *testing.T) {
@@ -136,14 +105,14 @@ func TestStore_LoadAll(t *testing.T) {
 	tick1 := time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC)
 	tick2 := time.Date(2025, 6, 15, 11, 0, 0, 0, time.UTC)
 
-	require.NoError(t, store.Save(ctx, dag1, tick1))
-	require.NoError(t, store.Save(ctx, dag2, tick2))
+	require.NoError(t, store.Save(ctx, dag1, core.DAGState{LastTick: tick1}))
+	require.NoError(t, store.Save(ctx, dag2, core.DAGState{LastTick: tick2}))
 
 	states, err := store.LoadAll(ctx, dags)
 	require.NoError(t, err)
 	assert.Len(t, states, 2)
-	assert.True(t, tick1.Equal(states[dag1]))
-	assert.True(t, tick2.Equal(states[dag2]))
+	assert.True(t, tick1.Equal(states[dag1].LastTick))
+	assert.True(t, tick2.Equal(states[dag2].LastTick))
 }
 
 func TestStore_Migrate(t *testing.T) {
@@ -178,13 +147,13 @@ func TestStore_Migrate(t *testing.T) {
 	require.NoError(t, store.Migrate(oldPath, dags))
 
 	// All DAGs should have the global tick
-	lastTick1, err := store.Load(ctx, dag1)
+	state1, err := store.Load(ctx, dag1)
 	require.NoError(t, err)
-	assert.True(t, globalTick.Equal(lastTick1))
+	assert.True(t, globalTick.Equal(state1.LastTick))
 
-	lastTick2, err := store.Load(ctx, dag2)
+	state2, err := store.Load(ctx, dag2)
 	require.NoError(t, err)
-	assert.True(t, globalTick.Equal(lastTick2))
+	assert.True(t, globalTick.Equal(state2.LastTick))
 
 	// Old file should be removed
 	_, err = os.Stat(oldPath)
@@ -225,14 +194,14 @@ func TestStore_NamespacedDAG(t *testing.T) {
 	tick := time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC)
 
 	// Both should be saveable without collision
-	require.NoError(t, store.Save(ctx, flatDAG, tick))
-	require.NoError(t, store.Save(ctx, nsDAG, tick.Add(time.Hour)))
+	require.NoError(t, store.Save(ctx, flatDAG, core.DAGState{LastTick: tick}))
+	require.NoError(t, store.Save(ctx, nsDAG, core.DAGState{LastTick: tick.Add(time.Hour)}))
 
-	lastTick1, err := store.Load(ctx, flatDAG)
+	state1, err := store.Load(ctx, flatDAG)
 	require.NoError(t, err)
-	assert.True(t, tick.Equal(lastTick1))
+	assert.True(t, tick.Equal(state1.LastTick))
 
-	lastTick2, err := store.Load(ctx, nsDAG)
+	state2, err := store.Load(ctx, nsDAG)
 	require.NoError(t, err)
-	assert.True(t, tick.Add(time.Hour).Equal(lastTick2))
+	assert.True(t, tick.Add(time.Hour).Equal(state2.LastTick))
 }
