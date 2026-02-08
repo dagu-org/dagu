@@ -183,7 +183,7 @@ func (c *CatchupEngine) generateCandidates(
 			}
 
 			entryCands := c.generateEntryCandidates(dag, sched, lastTick, catchupTo)
-			entryCands = c.applyPolicy(sched.Catchup, entryCands)
+			entryCands = applyPolicy(sched.Catchup, entryCands)
 
 			dagCands = append(dagCands, entryCands...)
 		}
@@ -264,7 +264,7 @@ func (c *CatchupEngine) generateEntryCandidates(
 }
 
 // applyPolicy filters candidates based on the catchup policy.
-func (c *CatchupEngine) applyPolicy(policy core.CatchupPolicy, candidates []catchupCandidate) []catchupCandidate {
+func applyPolicy(policy core.CatchupPolicy, candidates []catchupCandidate) []catchupCandidate {
 	if len(candidates) == 0 {
 		return candidates
 	}

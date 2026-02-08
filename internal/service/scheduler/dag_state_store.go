@@ -1,7 +1,6 @@
 package scheduler
 
 import (
-	// nolint: gosec
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -68,7 +67,7 @@ func (s *DAGStateStore) Save(dag *core.DAG, state dagState) error {
 }
 
 // SaveAll saves the lastTick for all DAGs in bulk.
-// Errors are logged but do not stop processing.
+// Returns the first error encountered; remaining DAGs are still processed.
 func (s *DAGStateStore) SaveAll(dags map[string]*core.DAG, tick time.Time) error {
 	if err := os.MkdirAll(s.dir, 0o750); err != nil {
 		return fmt.Errorf("failed to create DAG state directory: %w", err)

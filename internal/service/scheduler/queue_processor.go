@@ -11,6 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -379,7 +380,8 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 	defer decInflight()
 
 	go func() {
-		if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID, status, status.TriggerType, time.Time{}); err != nil {
+		scheduledTime, _ := stringutil.ParseTime(status.ScheduledTime)
+		if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID, status, status.TriggerType, scheduledTime); err != nil {
 			logger.Error(ctx, "Failed to execute DAG", tag.Error(err))
 		}
 	}()

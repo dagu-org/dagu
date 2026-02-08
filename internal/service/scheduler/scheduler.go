@@ -18,6 +18,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/dirlock"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 )
@@ -235,20 +236,23 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		return err
 	}
 
-	// One-time migration from old global watermark to per-DAG state files
+	// One-time migration from old global watermark to per-DAG state files,
+	// then run catch-up for DAGs that have catch-up enabled.
+	registry := s.entryReader.Registry()
+
 	if s.dagStateStore != nil {
 		oldWatermarkPath := filepath.Join(s.config.Paths.DataDir, "scheduler", "state.json")
-		registry := s.entryReader.Registry()
 		if err := s.dagStateStore.Migrate(oldWatermarkPath, registry); err != nil {
 			logger.Error(ctx, "Watermark migration failed", tag.Error(err))
 		}
 	}
 
-	// Run catch-up before entering live loop
 	if s.catchupEngine != nil {
-		registry := s.entryReader.Registry()
-		if _, err := s.catchupEngine.Run(ctx, registry); err != nil {
-			logger.Error(ctx, "Catch-up failed", tag.Error(err))
+		catchupDAGs := filterCatchupDAGs(registry)
+		if len(catchupDAGs) > 0 {
+			if _, err := s.catchupEngine.Run(ctx, catchupDAGs); err != nil {
+				logger.Error(ctx, "Catch-up failed", tag.Error(err))
+			}
 		}
 	}
 
@@ -332,10 +336,13 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 		case <-timer.C:
 			_ = timer.Stop()
 			s.invokeJobs(ctx, tickTime)
-			// Save per-DAG watermarks after processing jobs
+			// Save per-DAG watermarks after processing jobs (only for catch-up-enabled DAGs)
 			if s.dagStateStore != nil {
-				if err := s.dagStateStore.SaveAll(s.entryReader.Registry(), tickTime); err != nil {
-					logger.Error(ctx, "Failed to save DAG state", tag.Error(err))
+				catchupDAGs := filterCatchupDAGs(s.entryReader.Registry())
+				if len(catchupDAGs) > 0 {
+					if err := s.dagStateStore.SaveAll(catchupDAGs, tickTime); err != nil {
+						logger.Error(ctx, "Failed to save DAG state", tag.Error(err))
+					}
 				}
 			}
 			tickTime = s.NextTick(tickTime)
@@ -347,6 +354,20 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 // NextTick returns the next tick time for the scheduler.
 func (*Scheduler) NextTick(now time.Time) time.Time {
 	return now.Add(time.Minute).Truncate(time.Minute)
+}
+
+// filterCatchupDAGs returns only DAGs that have at least one schedule with catch-up enabled.
+func filterCatchupDAGs(dags map[string]*core.DAG) map[string]*core.DAG {
+	result := make(map[string]*core.DAG)
+	for k, dag := range dags {
+		for _, sched := range dag.Schedule {
+			if sched.Catchup != core.CatchupPolicyOff {
+				result[k] = dag
+				break
+			}
+		}
+	}
+	return result
 }
 
 // IsRunning returns whether the scheduler is currently running.

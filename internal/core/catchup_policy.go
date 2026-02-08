@@ -24,13 +24,13 @@ const (
 func (c CatchupPolicy) String() string {
 	switch c {
 	case CatchupPolicyOff:
-		return "false"
+		return "off"
 	case CatchupPolicyLatest:
 		return "latest"
 	case CatchupPolicyAll:
 		return "all"
 	default:
-		return "false"
+		return "off"
 	}
 }
 

@@ -19,10 +19,10 @@ func TestCatchupPolicy_String(t *testing.T) {
 		policy CatchupPolicy
 		want   string
 	}{
-		{CatchupPolicyOff, "false"},
+		{CatchupPolicyOff, "off"},
 		{CatchupPolicyLatest, "latest"},
 		{CatchupPolicyAll, "all"},
-		{CatchupPolicy(99), "false"},
+		{CatchupPolicy(99), "off"},
 	}
 
 	for _, tt := range tests {

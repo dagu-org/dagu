@@ -140,11 +140,9 @@ func TestCatchupEngine_GenerateCandidates_RunAll(t *testing.T) {
 
 	candidates := engine.generateCandidates(context.Background(), dags, perDAGStates, now)
 	// lastTick = 09:00, catchupTo = 12:00
-	// Expected: 10:00, 11:00 (12:00 is after catchupTo when equal)
-	// Actually: Next(09:00) = 10:00, Next(10:00) = 11:00, Next(11:00) = 12:00 which equals catchupTo
-	// 12:00 is NOT after 12:00 so it should be included... but we check > not >=
-	// Let's just check we get at least 2 candidates
-	assert.GreaterOrEqual(t, len(candidates), 2)
+	// Next(09:00)=10:00, Next(10:00)=11:00, Next(11:00)=12:00
+	// 12:00.After(12:00) is false, so 12:00 IS included = 3 candidates
+	assert.Equal(t, 3, len(candidates))
 }
 
 func TestCatchupEngine_GenerateCandidates_RunLatest(t *testing.T) {
@@ -184,8 +182,7 @@ func TestCatchupEngine_GenerateCandidates_RunLatest(t *testing.T) {
 	candidates := engine.generateCandidates(context.Background(), dags, perDAGStates, now)
 	// RunLatest should only keep the latest candidate
 	assert.Equal(t, 1, len(candidates))
-	// The latest candidate should be 12:00 or 11:00
-	assert.True(t, candidates[0].scheduledTime.After(time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC)))
+	assert.Equal(t, time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC), candidates[0].scheduledTime)
 }
 
 func TestCatchupEngine_MaxCatchupRunsCap(t *testing.T) {
@@ -314,10 +311,8 @@ func TestCatchupEngine_CatchupWindow(t *testing.T) {
 
 	candidates := engine.generateCandidates(context.Background(), dags, perDAGStates, now)
 	// catchupWindow = 3h means replayFrom = 09:00, candidates: 10:00, 11:00, 12:00
-	assert.LessOrEqual(t, len(candidates), 3)
-	// All should be after 09:00
-	for _, c := range candidates {
-		assert.True(t, c.scheduledTime.After(time.Date(2025, 6, 15, 9, 0, 0, 0, time.UTC)) ||
-			c.scheduledTime.Equal(time.Date(2025, 6, 15, 9, 0, 0, 0, time.UTC)))
-	}
+	assert.Equal(t, 3, len(candidates))
+	assert.Equal(t, time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC), candidates[0].scheduledTime)
+	assert.Equal(t, time.Date(2025, 6, 15, 11, 0, 0, 0, time.UTC), candidates[1].scheduledTime)
+	assert.Equal(t, time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC), candidates[2].scheduledTime)
 }
