@@ -214,7 +214,7 @@ func FetchReleaseInfo(ctx context.Context, opts Options) (*ReleaseInfo, error) {
 	} else {
 		release, err = client.GetLatestRelease(ctx, opts.IncludePreRelease)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch latest release: %w", err)
+			return nil, err
 		}
 	}
 
@@ -339,7 +339,7 @@ func UpgradeWithReleaseInfo(ctx context.Context, opts Options, info *ReleaseInfo
 
 	// Verify the installed binary
 	if err := VerifyBinary(execPath, info.Release.TagName); err != nil {
-		// Always restore from the internal backup; fall back to user backup path
+		// Prefer user backup when available; fall back to internal backup
 		restoreSrc := internalBackupPath
 		if result.BackupPath != "" {
 			restoreSrc = result.BackupPath

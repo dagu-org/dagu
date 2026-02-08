@@ -7,9 +7,6 @@ import (
 )
 
 const (
-	// CacheFileName is the name of the upgrade check cache file.
-	CacheFileName = "upgrade-check.json"
-
 	// CacheTTL is how long the cache is valid.
 	CacheTTL = 24 * time.Hour
 )
