@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/persis/fileupgradecheck"
 	"github.com/dagu-org/dagu/internal/upgrade"
 	"github.com/spf13/cobra"
 )
@@ -91,6 +92,11 @@ func runUpgrade(ctx *Context, _ []string) error {
 		return fmt.Errorf("%s", reason)
 	}
 
+	upgradeStore, err := fileupgradecheck.New(ctx.Config.Paths.DataDir)
+	if err != nil {
+		return fmt.Errorf("failed to create upgrade check store: %w", err)
+	}
+
 	opts := upgrade.Options{
 		TargetVersion:     targetVersion,
 		CheckOnly:         checkOnly,
@@ -107,7 +113,7 @@ func runUpgrade(ctx *Context, _ []string) error {
 
 	checkOpts := opts
 	checkOpts.DryRun = true
-	result, err := upgrade.UpgradeWithReleaseInfo(ctx, checkOpts, releaseInfo)
+	result, err := upgrade.UpgradeWithReleaseInfo(ctx, checkOpts, releaseInfo, upgradeStore)
 	if err != nil {
 		return err
 	}
@@ -142,7 +148,7 @@ func runUpgrade(ctx *Context, _ []string) error {
 	}
 
 	opts.OnProgress = createProgressCallback()
-	result, err = upgrade.UpgradeWithReleaseInfo(ctx, opts, releaseInfo)
+	result, err = upgrade.UpgradeWithReleaseInfo(ctx, opts, releaseInfo, upgradeStore)
 	if err != nil {
 		return err
 	}
@@ -165,6 +171,10 @@ func createProgressCallback() func(downloaded, total int64) {
 			return
 		}
 		percent := int(downloaded * 100 / total)
+		// Reset on retry: percent only decreases when a fresh download starts
+		if percent < lastPercent {
+			lastPercent = 0
+		}
 		// Update display every 5%
 		if percent/5 > lastPercent/5 {
 			lastPercent = percent
