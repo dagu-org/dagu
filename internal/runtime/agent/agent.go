@@ -414,7 +414,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			exec.EnvKeyScheduledTime: a.scheduledTime,
 		}
 		if a.triggerType == core.TriggerTypeCatchUp {
-			extraEnvs[exec.EnvKeyIsCatchup] = "1"
+			extraEnvs[exec.EnvKeyIsCatchup] = "true"
 		}
 		rCtx.EnvScope = rCtx.EnvScope.WithEntries(extraEnvs, eval.EnvSourceDAGEnv)
 		ctx = runtime.WithDAGContext(ctx, rCtx)

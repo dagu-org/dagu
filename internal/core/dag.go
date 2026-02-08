@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/duration"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -655,7 +656,7 @@ func (s *Schedule) UnmarshalJSON(data []byte) error {
 		}
 	}
 	if alias.CatchupWindow != "" {
-		s.CatchupWindow, err = time.ParseDuration(alias.CatchupWindow)
+		s.CatchupWindow, err = duration.Parse(alias.CatchupWindow)
 		if err != nil {
 			return fmt.Errorf("invalid catchupWindow %q: %w", alias.CatchupWindow, err)
 		}
