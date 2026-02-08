@@ -26,8 +26,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { TOKEN_KEY, useIsAdmin } from '@/contexts/AuthContext';
-import { useConfig } from '@/contexts/ConfigContext';
+import { useIsAdmin } from '@/contexts/AuthContext';
 import DAGEditor from '@/features/dags/components/dag-editor/DAGEditor';
 import { useClient } from '@/hooks/api';
 import { AlertCircle, ArrowLeft, Save, Trash2 } from 'lucide-react';
@@ -79,7 +78,6 @@ export default function NamespaceEditPage() {
 
   // Role assignment state
   const isAdmin = useIsAdmin();
-  const config = useConfig();
   const [users, setUsers] = useState<User[]>([]);
   const [roleChanges, setRoleChanges] = useState<Record<string, UserRole | 'none'>>({});
   const [isSavingRoles, setIsSavingRoles] = useState(false);
@@ -155,17 +153,12 @@ export default function NamespaceEditPage() {
   const fetchUsers = useCallback(async () => {
     if (!isAdmin) return;
     try {
-      const token = localStorage.getItem(TOKEN_KEY);
-      const response = await fetch(`${config.apiURL}/users`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) return;
-      const data = await response.json();
-      setUsers(data.users || []);
+      const { data } = await client.GET('/users');
+      setUsers(data?.users || []);
     } catch {
       // Silently fail - role section just won't show
     }
-  }, [isAdmin, config.apiURL]);
+  }, [isAdmin, client]);
 
   useEffect(() => {
     fetchUsers();
@@ -191,8 +184,6 @@ export default function NamespaceEditPage() {
     setRoleSuccess(null);
 
     try {
-      const token = localStorage.getItem(TOKEN_KEY);
-
       for (const [userId, newRole] of Object.entries(roleChanges)) {
         const user = users.find((u) => u.id === userId);
         if (!user) continue;
@@ -205,19 +196,14 @@ export default function NamespaceEditPage() {
           nsRoles[name] = newRole;
         }
 
-        const response = await fetch(`${config.apiURL}/users/${userId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ namespaceRoles: nsRoles }),
+        const { error: patchError } = await client.PATCH('/users/{userId}', {
+          params: { path: { userId } },
+          body: { namespaceRoles: nsRoles },
         });
 
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
+        if (patchError) {
           throw new Error(
-            (data as { message?: string }).message ||
+            (patchError as { message?: string }).message ||
               `Failed to update roles for ${user.username}`
           );
         }

@@ -663,6 +663,24 @@ func TestNamespaceAlwaysPassedInArgs(t *testing.T) {
 			},
 		},
 		{
+			name:        "Dequeue empty namespace",
+			namespace:   "",
+			expectedArg: "--namespace=",
+			buildSpec: func(ns string) runtime.CmdSpec {
+				dag := &core.DAG{Name: "test-dag", Location: "/path/to/dag.yaml", Namespace: ns}
+				return builder.Dequeue(dag, exec.NewDAGRunRef("test-dag", "run-123"))
+			},
+		},
+		{
+			name:        "Dequeue with namespace",
+			namespace:   "production",
+			expectedArg: "--namespace=production",
+			buildSpec: func(ns string) runtime.CmdSpec {
+				dag := &core.DAG{Name: "test-dag", Location: "/path/to/dag.yaml", Namespace: ns}
+				return builder.Dequeue(dag, exec.NewDAGRunRef("test-dag", "run-123"))
+			},
+		},
+		{
 			name:        "TaskStart empty namespace",
 			namespace:   "",
 			expectedArg: "--namespace=",

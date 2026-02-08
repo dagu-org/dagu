@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/persis/filenamespace"
@@ -1018,6 +1019,5 @@ func isHexString(s string) bool {
 
 // fileExists returns true if the file at path exists.
 func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
+	return fileutil.FileExists(path)
 }

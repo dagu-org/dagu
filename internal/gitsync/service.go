@@ -506,7 +506,6 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string) (*SyncResu
 
 	// Copy files and track which succeeded
 	successfulDAGs := make([]string, 0, len(modifiedDAGs))
-	stagedFiles := make([]string, 0, len(modifiedDAGs))
 
 	for _, dagID := range modifiedDAGs {
 		dagFilePath := s.dagIDToFilePath(dagID)
@@ -529,7 +528,6 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string) (*SyncResu
 		}
 
 		successfulDAGs = append(successfulDAGs, dagID)
-		stagedFiles = append(stagedFiles, repoFilePath)
 	}
 
 	// Check if any files were successfully staged
@@ -537,18 +535,7 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string) (*SyncResu
 		return nil, fmt.Errorf("all files failed to copy: %d error(s)", len(result.Errors))
 	}
 
-	// Stage only the successful files
-	wt, err := s.gitClient.repo.Worktree()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get worktree: %w", err)
-	}
-	for _, file := range stagedFiles {
-		if _, err := wt.Add(file); err != nil {
-			return nil, fmt.Errorf("failed to stage file %s: %w", file, err)
-		}
-	}
-
-	// Commit
+	// Commit all staged files
 	if message == "" {
 		message = fmt.Sprintf("Update %d DAG(s)", len(successfulDAGs))
 	}

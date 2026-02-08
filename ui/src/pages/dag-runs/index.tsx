@@ -4,6 +4,7 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import useSWR from 'swr';
 import { Status } from '../../api/v1/schema';
+import { areTagsEqual, formatTimezoneOffset } from '../../lib/format-utils';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -47,13 +48,6 @@ type DAGRunsFilters = {
   datePreset: string;
   specificPeriod: 'date' | 'month' | 'year';
   specificValue: string;
-};
-
-const areTagsEqual = (a: string[], b: string[]): boolean => {
-  if (a.length !== b.length) return false;
-  const sortedA = [...a].sort();
-  const sortedB = [...b].sort();
-  return sortedA.every((tag, i) => tag === sortedB[i]);
 };
 
 const STATUS_CONFIG: Record<Status, string> = {
@@ -705,24 +699,7 @@ function DAGRuns() {
     }
   };
 
-  // Format timezone offset for display
-  const formatTimezoneOffset = (): string => {
-    if (config.tzOffsetInSec === undefined) return '';
-
-    // Convert seconds to hours and minutes
-    const offsetInMinutes = config.tzOffsetInSec / 60;
-    const hours = Math.floor(Math.abs(offsetInMinutes) / 60);
-    const minutes = Math.abs(offsetInMinutes) % 60;
-
-    // Format with sign and padding
-    const sign = offsetInMinutes >= 0 ? '+' : '-';
-    const formattedHours = hours.toString().padStart(2, '0');
-    const formattedMinutes = minutes.toString().padStart(2, '0');
-
-    return `(${sign}${formattedHours}:${formattedMinutes})`;
-  };
-
-  const tzLabel = formatTimezoneOffset();
+  const tzLabel = formatTimezoneOffset(config.tzOffsetInSec);
 
   return (
     <div className="max-w-7xl">

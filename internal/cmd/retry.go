@@ -43,7 +43,7 @@ var retryWorkerIDFlag = commandLineFlag{
 func runRetry(ctx *Context, args []string) error {
 	_, dagName, err := ctx.ResolveNamespaceFromArg(args[0])
 	if err != nil {
-		return fmt.Errorf("failed to resolve namespace: %w", err)
+		return err
 	}
 
 	dagRunID, _ := ctx.StringParam("run-id")
@@ -84,22 +84,13 @@ func runRetry(ctx *Context, args []string) error {
 
 	ctx.Context = logger.WithValues(ctx.Context, tag.DAG(dag.Name), tag.RunID(dagRunID))
 
-	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
-		return fmt.Errorf("failed to lock process group: %w", err)
-	}
-
-	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), exec.NewDAGRunRef(dag.Name, dagRunID))
+	proc, err := ctx.AcquireProc(dag, dagRunID)
 	if err != nil {
-		ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
-		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
-		_ = ctx.RecordEarlyFailure(dag, dagRunID, err)
-		return fmt.Errorf("failed to acquire process handle: %w", errProcAcquisitionFailed)
+		return err
 	}
 	defer func() {
 		_ = proc.Stop(ctx)
 	}()
-
-	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
 	return executeRetry(ctx, dag, status, status.DAGRun(), stepName, workerID)
 }

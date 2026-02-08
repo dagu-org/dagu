@@ -1,5 +1,6 @@
 import { components } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
+import { formatTimezoneOffset } from '@/lib/format-utils';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { Input } from '@/components/ui/input';
 import {
@@ -174,17 +175,7 @@ export default function AuditLogsPage() {
     }
   };
 
-  // Format timezone offset for display
-  const formatTimezoneOffset = (): string => {
-    if (config.tzOffsetInSec === undefined) return '';
-    const offsetInMinutes = config.tzOffsetInSec / 60;
-    const hours = Math.floor(Math.abs(offsetInMinutes) / 60);
-    const minutes = Math.abs(offsetInMinutes) % 60;
-    const sign = offsetInMinutes >= 0 ? '+' : '-';
-    return `(${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')})`;
-  };
-
-  const tzLabel = formatTimezoneOffset();
+  const tzLabel = formatTimezoneOffset(config.tzOffsetInSec);
 
   // Initialize date values on mount
   useEffect(() => {

@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/spf13/cobra"
 )
@@ -45,7 +43,12 @@ func runDry(ctx *Context, args []string) error {
 	}
 	args[0] = dagName
 
-	dag, err := loadDAGForDryRun(ctx, args)
+	ns, err := ctx.NamespaceStore.Get(ctx, namespaceName)
+	if err != nil {
+		return fmt.Errorf("failed to get namespace %q: %w", namespaceName, err)
+	}
+
+	dag, _, err := loadDAGWithParams(ctx, args, false, ns)
 	if err != nil {
 		return err
 	}
@@ -107,35 +110,3 @@ func runDry(ctx *Context, args []string) error {
 	return nil
 }
 
-// loadDAGForDryRun loads the DAG with parameters from flags or command-line arguments.
-func loadDAGForDryRun(ctx *Context, args []string) (*core.DAG, error) {
-	loadOpts := []spec.LoadOption{
-		spec.WithBaseConfig(ctx.Config.Paths.BaseConfig),
-		spec.WithDAGsDir(ctx.NamespacedDAGsDir()),
-	}
-
-	nameOverride, err := ctx.StringParam("name")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get name override: %w", err)
-	}
-	if nameOverride != "" {
-		loadOpts = append(loadOpts, spec.WithName(nameOverride))
-	}
-
-	if argsLenAtDash := ctx.Command.ArgsLenAtDash(); argsLenAtDash != -1 {
-		loadOpts = append(loadOpts, spec.WithParams(args[argsLenAtDash:]))
-	} else {
-		params, err := ctx.StringParam("params")
-		if err != nil {
-			return nil, fmt.Errorf("failed to get parameters: %w", err)
-		}
-		loadOpts = append(loadOpts, spec.WithParams(stringutil.RemoveQuotes(params)))
-	}
-
-	dag, err := spec.Load(ctx, args[0], loadOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
-	}
-
-	return dag, nil
-}

@@ -2,6 +2,7 @@ import { debounce } from 'lodash';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import useSWR from 'swr';
+import { areTagsEqual } from '../../lib/format-utils';
 import {
   PathsDagsGetParametersQueryOrder,
   PathsDagsGetParametersQuerySort,
@@ -29,13 +30,6 @@ type DAGDefinitionsFilters = {
   page: number;
   sortField: string;
   sortOrder: string;
-};
-
-const areTagsEqual = (a: string[], b: string[]): boolean => {
-  if (a.length !== b.length) return false;
-  const sortedA = [...a].sort();
-  const sortedB = [...b].sort();
-  return sortedA.every((tag, i) => tag === sortedB[i]);
 };
 
 const areDAGDefinitionsFiltersEqual = (

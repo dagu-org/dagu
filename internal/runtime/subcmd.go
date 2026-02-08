@@ -174,6 +174,7 @@ func (b *SubCmdBuilder) Dequeue(dag *core.DAG, dagRun exec1.DAGRunRef) CmdSpec {
 	queueName := dag.ProcGroup()
 	args := []string{"dequeue", queueName, fmt.Sprintf("--dag-run=%s", dagRun.String())}
 
+	args = append(args, fmt.Sprintf("--namespace=%s", dag.Namespace))
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
 	}

@@ -54,8 +54,8 @@ func (a *API) checkSingletonRunning(ctx context.Context, procStore exec.ProcStor
 }
 
 // checkSingletonQueued returns an error if the DAG is already queued in singleton mode.
-func (a *API) checkSingletonQueued(ctx context.Context, dag *core.DAG) error {
-	queued, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
+func (a *API) checkSingletonQueued(ctx context.Context, queueStore exec.QueueStore, dag *core.DAG) error {
+	queued, err := queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
 	if err != nil {
 		return fmt.Errorf("failed to check singleton queue status: %w", err)
 	}
@@ -121,44 +121,8 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 		return nil, err
 	}
 
-	var yamlSpec []byte
-	if request.Body.Spec != nil && strings.TrimSpace(*request.Body.Spec) != "" {
-		_, err := spec.LoadYAML(ctx,
-			[]byte(*request.Body.Spec),
-			spec.WithName(request.Body.Name),
-			spec.WithoutEval(),
-		)
-
-		if err != nil {
-			var verrs core.ErrorList
-			if errors.As(err, &verrs) {
-				return nil, &Error{
-					HTTPStatus: http.StatusBadRequest,
-					Code:       api.ErrorCodeBadRequest,
-					Message:    strings.Join(verrs.ToStringList(), "; "),
-				}
-			}
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    err.Error(),
-			}
-		}
-		yamlSpec = []byte(*request.Body.Spec)
-	} else {
-		yamlSpec = []byte(`steps:
-  - command: echo hello
-`)
-	}
-
-	if err := a.dagStore.Create(ctx, request.Body.Name, yamlSpec); err != nil {
-		if errors.Is(err, exec.ErrDAGAlreadyExists) {
-			return nil, &Error{
-				HTTPStatus: http.StatusConflict,
-				Code:       api.ErrorCodeAlreadyExists,
-			}
-		}
-		return nil, fmt.Errorf("error creating DAG: %w", err)
+	if err := createDAGInStore(ctx, a.dagStore, request.Body.Name, request.Body.Spec); err != nil {
+		return nil, err
 	}
 
 	a.logAuditEntry(ctx, audit.CategoryDAG, "dag_create", map[string]any{"dag_name": request.Body.Name})
@@ -345,21 +309,66 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 // getDAGDetailsData returns DAG details data. Used by both HTTP handler and SSE fetcher.
 func (a *API) getDAGDetailsData(ctx context.Context, fileName string) (api.GetDAGDetails200JSONResponse, error) {
-	dag, err := a.dagStore.GetDetails(ctx, fileName, spec.WithAllowBuildErrors())
+	return getDAGDetailsFromStore(ctx, a.dagStore, a.dagRunMgr, fileName)
+}
+
+// createDAGInStore validates the spec and creates a DAG in the given store.
+func createDAGInStore(ctx context.Context, dagStore exec.DAGStore, name string, specStr *string) error {
+	var yamlSpec []byte
+	if specStr != nil && strings.TrimSpace(*specStr) != "" {
+		_, err := spec.LoadYAML(ctx,
+			[]byte(*specStr),
+			spec.WithName(name),
+			spec.WithoutEval(),
+		)
+		if err != nil {
+			var verrs core.ErrorList
+			if errors.As(err, &verrs) {
+				return &Error{
+					HTTPStatus: http.StatusBadRequest,
+					Code:       api.ErrorCodeBadRequest,
+					Message:    strings.Join(verrs.ToStringList(), "; "),
+				}
+			}
+			return &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    err.Error(),
+			}
+		}
+		yamlSpec = []byte(*specStr)
+	} else {
+		yamlSpec = []byte(`steps:
+  - command: echo hello
+`)
+	}
+
+	if err := dagStore.Create(ctx, name, yamlSpec); err != nil {
+		if errors.Is(err, exec.ErrDAGAlreadyExists) {
+			return &Error{
+				HTTPStatus: http.StatusConflict,
+				Code:       api.ErrorCodeAlreadyExists,
+			}
+		}
+		return fmt.Errorf("error creating DAG: %w", err)
+	}
+	return nil
+}
+
+// getDAGDetailsFromStore returns DAG details using the given stores.
+func getDAGDetailsFromStore(ctx context.Context, dagStore exec.DAGStore, dagRunMgr runtime1.Manager, fileName string) (api.GetDAGDetails200JSONResponse, error) {
+	dag, err := dagStore.GetDetails(ctx, fileName, spec.WithAllowBuildErrors())
 	if err != nil {
 		return api.GetDAGDetails200JSONResponse{}, fmt.Errorf("DAG %s not found", fileName)
 	}
 
-	dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
+	dagStatus, err := dagRunMgr.GetLatestStatus(ctx, dag)
 	if err != nil && !errors.Is(err, exec.ErrNoStatusData) {
 		return api.GetDAGDetails200JSONResponse{}, fmt.Errorf("failed to get latest status for DAG %s", fileName)
 	}
-	// If ErrNoStatusData, dagStatus will be zero-value (empty), which is fine for DAGs with no runs
 
-	// Get the raw spec YAML for SSE updates
-	yamlSpec, err := a.dagStore.GetSpec(ctx, fileName)
+	yamlSpec, err := dagStore.GetSpec(ctx, fileName)
 	if err != nil {
-		// Continue even if spec fetch fails - it's optional for SSE
 		yamlSpec = ""
 	}
 
@@ -377,7 +386,7 @@ func (a *API) getDAGDetailsData(ctx context.Context, fileName string) (api.GetDA
 	return api.GetDAGDetails200JSONResponse{
 		Dag:          details,
 		LatestDAGRun: ToDAGRunDetails(dagStatus),
-		Suspended:    a.dagStore.IsSuspended(ctx, fileName),
+		Suspended:    dagStore.IsSuspended(ctx, fileName),
 		LocalDags:    localDAGs,
 		Errors:       extractBuildErrors(dag.BuildErrors),
 		Spec:         &yamlSpec,
@@ -391,6 +400,27 @@ func extractBuildErrors(errs []error) []string {
 		result = append(result, e.Error())
 	}
 	return result
+}
+
+// buildDAGFileList converts a list of DAGs into DAGFile API responses, enriched with latest status.
+func buildDAGFileList(ctx context.Context, dagStore exec.DAGStore, dagRunMgr runtime1.Manager, items []*core.DAG, namespace *string) ([]api.DAGFile, []string) {
+	var errList []string
+	dagFiles := make([]api.DAGFile, 0, len(items))
+	for _, item := range items {
+		dagStatus, statusErr := dagRunMgr.GetLatestStatus(ctx, item)
+		if statusErr != nil {
+			errList = append(errList, statusErr.Error())
+		}
+		dagFiles = append(dagFiles, api.DAGFile{
+			FileName:     item.FileName(),
+			LatestDAGRun: toDAGRunSummary(dagStatus),
+			Suspended:    dagStore.IsSuspended(ctx, item.FileName()),
+			Dag:          toDAG(item),
+			Errors:       extractBuildErrors(item.BuildErrors),
+			Namespace:    namespace,
+		})
+	}
+	return dagFiles, errList
 }
 
 func (a *API) readHistoryData(_ context.Context, statusList []exec.DAGRunStatus) []api.DAGGridItem {
@@ -496,21 +526,8 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 		return nil, fmt.Errorf("error listing DAGs: %w", err)
 	}
 
-	dagFiles := make([]api.DAGFile, 0, len(result.Items))
-	for _, item := range result.Items {
-		dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, item)
-		if err != nil {
-			errList = append(errList, err.Error())
-		}
-
-		dagFiles = append(dagFiles, api.DAGFile{
-			FileName:     item.FileName(),
-			LatestDAGRun: toDAGRunSummary(dagStatus),
-			Suspended:    a.dagStore.IsSuspended(ctx, item.FileName()),
-			Dag:          toDAG(item),
-			Errors:       extractBuildErrors(item.BuildErrors),
-		})
-	}
+	dagFiles, statusErrs := buildDAGFileList(ctx, a.dagStore, a.dagRunMgr, result.Items, nil)
+	errList = append(errList, statusErrs...)
 
 	resp := &api.ListDAGs200JSONResponse{
 		Dags:       dagFiles,
@@ -849,6 +866,10 @@ type startDAGRunOptions struct {
 	fromRunID    string
 	target       string
 	triggerType  core.TriggerType
+	// Optional overrides for namespace-scoped execution.
+	// When subCmdBuilder is non-nil, both overrides are used.
+	subCmdBuilder *runtime1.SubCmdBuilder
+	dagRunMgr     runtime1.Manager
 }
 
 // waitForDAGStatusChange waits until the DAG status transitions from NotStarted.
@@ -873,12 +894,19 @@ func (a *API) waitForDAGStatusChange(ctx context.Context, mgr runtime1.Manager, 
 }
 
 func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts startDAGRunOptions) error {
+	builder := a.subCmdBuilder
+	mgr := a.dagRunMgr
+	if opts.subCmdBuilder != nil {
+		builder = opts.subCmdBuilder
+		mgr = opts.dagRunMgr
+	}
+
 	// Only pass trigger type if it's a known value (not TriggerTypeUnknown)
 	triggerTypeStr := ""
 	if opts.triggerType != core.TriggerTypeUnknown {
 		triggerTypeStr = opts.triggerType.String()
 	}
-	spec := a.subCmdBuilder.Start(dag, runtime1.StartOptions{
+	spec := builder.Start(dag, runtime1.StartOptions{
 		Params:       opts.params,
 		DAGRunID:     opts.dagRunID,
 		Quiet:        true,
@@ -897,7 +925,7 @@ func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts st
 		timeout = 10 * time.Second
 	}
 
-	if !a.waitForDAGStatusChange(ctx, a.dagRunMgr, dag, opts.dagRunID, timeout) {
+	if !a.waitForDAGStatusChange(ctx, mgr, dag, opts.dagRunID, timeout) {
 		return &Error{
 			HTTPStatus: http.StatusInternalServerError,
 			Code:       api.ErrorCodeInternalError,
@@ -962,7 +990,7 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		if err := a.checkSingletonRunning(ctx, a.procStore, dag); err != nil {
 			return nil, err
 		}
-		if err := a.checkSingletonQueued(ctx, dag); err != nil {
+		if err := a.checkSingletonQueued(ctx, a.queueStore, dag); err != nil {
 			return nil, err
 		}
 	}
@@ -1238,21 +1266,8 @@ func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, err
 			return nil, fmt.Errorf("error listing DAGs: %w", err)
 		}
 
-		dagFiles := make([]api.DAGFile, 0, len(result.Items))
-		for _, item := range result.Items {
-			dagStatus, statusErr := stores.dagRunMgr.GetLatestStatus(ctx, item)
-			dagFile := api.DAGFile{
-				FileName:     item.FileName(),
-				LatestDAGRun: toDAGRunSummary(dagStatus),
-				Suspended:    stores.dagStore.IsSuspended(ctx, item.FileName()),
-				Dag:          toDAG(item),
-				Errors:       extractBuildErrors(item.BuildErrors),
-			}
-			if statusErr != nil {
-				errList = append(errList, statusErr.Error())
-			}
-			dagFiles = append(dagFiles, dagFile)
-		}
+		dagFiles, statusErrs := buildDAGFileList(ctx, stores.dagStore, stores.dagRunMgr, result.Items, nil)
+		errList = append(errList, statusErrs...)
 
 		return api.ListDAGs200JSONResponse{
 			Dags:       dagFiles,
@@ -1281,21 +1296,8 @@ func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, err
 		return nil, fmt.Errorf("error listing DAGs: %w", err)
 	}
 
-	dagFiles := make([]api.DAGFile, 0, len(result.Items))
-	for _, item := range result.Items {
-		dagStatus, statusErr := a.dagRunMgr.GetLatestStatus(ctx, item)
-		dagFile := api.DAGFile{
-			FileName:     item.FileName(),
-			LatestDAGRun: toDAGRunSummary(dagStatus),
-			Suspended:    a.dagStore.IsSuspended(ctx, item.FileName()),
-			Dag:          toDAG(item),
-			Errors:       extractBuildErrors(item.BuildErrors),
-		}
-		if statusErr != nil {
-			errList = append(errList, statusErr.Error())
-		}
-		dagFiles = append(dagFiles, dagFile)
-	}
+	dagFiles, statusErrs := buildDAGFileList(ctx, a.dagStore, a.dagRunMgr, result.Items, nil)
+	errList = append(errList, statusErrs...)
 
 	return api.ListDAGs200JSONResponse{
 		Dags:       dagFiles,

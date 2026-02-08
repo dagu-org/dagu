@@ -41,7 +41,7 @@ Example:
 var restartFlags = []commandLineFlag{dagRunIDFlagRestart, namespaceFlag}
 
 func runRestart(ctx *Context, args []string) error {
-	_, dagName, err := ctx.ResolveNamespaceFromArg(args[0])
+	namespaceName, dagName, err := ctx.ResolveNamespaceFromArg(args[0])
 	if err != nil {
 		return err
 	}
@@ -83,6 +83,8 @@ func runRestart(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to restore DAG from status: %w", err)
 	}
 
+	dag.Namespace = namespaceName
+
 	if err := handleRestartProcess(ctx, dag, dagRunID); err != nil {
 		return fmt.Errorf("restart process failed for DAG %s: %w", dag.Name, err)
 	}
@@ -105,24 +107,13 @@ func handleRestartProcess(ctx *Context, d *core.DAG, oldDagRunID string) error {
 		return fmt.Errorf("failed to generate dag-run ID: %w", err)
 	}
 
-	if err := ctx.ProcStore.Lock(ctx, d.ProcGroup()); err != nil {
-		logger.Debug(ctx, "Failed to lock process group", tag.Error(err))
-		_ = ctx.RecordEarlyFailure(d, newDagRunID, err)
-		return errProcAcquisitionFailed
-	}
-
-	proc, err := ctx.ProcStore.Acquire(ctx, d.ProcGroup(), exec.NewDAGRunRef(d.Name, newDagRunID))
+	proc, err := ctx.AcquireProc(d, newDagRunID)
 	if err != nil {
-		ctx.ProcStore.Unlock(ctx, d.ProcGroup())
-		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
-		_ = ctx.RecordEarlyFailure(d, newDagRunID, err)
-		return fmt.Errorf("failed to acquire process handle: %w", errProcAcquisitionFailed)
+		return err
 	}
 	defer func() {
 		_ = proc.Stop(ctx)
 	}()
-
-	ctx.ProcStore.Unlock(ctx, d.ProcGroup())
 
 	return executeDAGWithRunID(ctx, ctx.DAGRunMgr, d, newDagRunID)
 }

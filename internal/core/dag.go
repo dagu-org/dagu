@@ -703,7 +703,7 @@ func (h HandlerType) String() string {
 // the same name in different namespaces produce different socket paths.
 func SockAddr(namespace, name, dagRunID string) string {
 	if namespace == "" {
-		slog.Warn("SockAddr called with empty namespace", "name", name, "dagRunID", dagRunID)
+		slog.Debug("SockAddr called with empty namespace", "name", name, "dagRunID", dagRunID)
 	}
 
 	const (

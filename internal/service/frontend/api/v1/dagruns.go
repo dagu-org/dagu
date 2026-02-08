@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -40,23 +39,7 @@ func sanitizeFilename(s string) string {
 
 // logDAGRunAudit logs a DAG-run related audit event.
 func (a *API) logDAGRunAudit(ctx context.Context, action string, details map[string]any) {
-	if a.auditService == nil {
-		return
-	}
-	currentUser, ok := auth.UserFromContext(ctx)
-	clientIP, _ := auth.ClientIPFromContext(ctx)
-
-	var userID, username string
-	if ok && currentUser != nil {
-		userID = currentUser.ID
-		username = currentUser.Username
-	}
-
-	detailsJSON, _ := json.Marshal(details)
-	entry := audit.NewEntry(audit.CategoryDAG, action, userID, username).
-		WithDetails(string(detailsJSON)).
-		WithIPAddress(clientIP)
-	_ = a.auditService.Log(ctx, entry)
+	a.logAuditEntry(ctx, audit.CategoryDAG, action, details)
 }
 
 // buildLogReadOptions constructs LogReadOptions from request parameters.

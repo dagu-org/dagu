@@ -1638,7 +1638,7 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 		return nil, nil
 
 	case []any:
-		normalized := normalizeStepData(ctx, v)
+		normalized := normalizeStepData(v)
 
 		var builtSteps []*core.Step
 		var prevSteps []*core.Step
@@ -1664,7 +1664,7 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 
 			case []any:
 				var tempSteps []*core.Step
-				var normalizedNested = normalizeStepData(ctx, v)
+				var normalizedNested = normalizeStepData(v)
 				for _, nested := range normalizedNested {
 					switch vv := nested.(type) {
 					case map[string]any:

@@ -263,6 +263,7 @@ func (cm *ConversationManager) SubscribeWithSnapshot(ctx context.Context) (Strea
 	conv := Conversation{
 		ID:        id,
 		UserID:    cm.userID,
+		Namespace: cm.environment.Namespace,
 		CreatedAt: cm.lastActivity,
 		UpdatedAt: cm.lastActivity,
 	}
@@ -521,7 +522,7 @@ func (cm *ConversationManager) SubmitUserResponse(response UserPromptResponse) b
 	cm.promptsMu.Unlock()
 
 	if !exists {
-		slog.Warn("no pending prompt for response", "promptID", response.PromptID)
+		cm.logger.Warn("no pending prompt for response", "promptID", response.PromptID)
 		return false
 	}
 
@@ -529,7 +530,7 @@ func (cm *ConversationManager) SubmitUserResponse(response UserPromptResponse) b
 	case ch <- response:
 		return true
 	default:
-		slog.Warn("response dropped, channel full", "promptID", response.PromptID)
+		cm.logger.Warn("response dropped, channel full", "promptID", response.PromptID)
 		return false
 	}
 }

@@ -75,10 +75,6 @@ function getActiveIconStyle(customColor: boolean): string {
   return customColor ? 'text-foreground' : 'text-sidebar-primary';
 }
 
-function getIconWrapperStyle(_customColor: boolean): string {
-  return 'text-sidebar-foreground';
-}
-
 type RemoteNodeSelectContentProps = {
   nodes: string[];
 };

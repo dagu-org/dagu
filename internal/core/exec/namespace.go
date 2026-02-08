@@ -3,8 +3,10 @@ package exec
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -16,6 +18,26 @@ var (
 	ErrNamespaceAlreadyExists = errors.New("namespace already exists")
 	ErrNamespaceHashCollision = errors.New("namespace hash collision: two different names produced the same ID")
 )
+
+// NamespaceNameRegex validates namespace names: lowercase alphanumeric with hyphens.
+var NamespaceNameRegex = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
+
+// MaxNamespaceNameLength is the maximum allowed length for a namespace name.
+const MaxNamespaceNameLength = 63
+
+// ValidateNamespaceName checks that a namespace name conforms to the required format.
+func ValidateNamespaceName(name string) error {
+	if len(name) == 0 {
+		return fmt.Errorf("namespace name must not be empty")
+	}
+	if len(name) > MaxNamespaceNameLength {
+		return fmt.Errorf("namespace name must be at most %d characters, got %d", MaxNamespaceNameLength, len(name))
+	}
+	if !NamespaceNameRegex.MatchString(name) {
+		return fmt.Errorf("namespace name %q must match [a-z0-9][a-z0-9-]*[a-z0-9]", name)
+	}
+	return nil
+}
 
 // NamespaceStore is an interface for managing namespace storage.
 type NamespaceStore interface {

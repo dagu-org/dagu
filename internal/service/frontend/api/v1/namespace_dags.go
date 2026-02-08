@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/auth"
@@ -123,21 +122,8 @@ func (a *API) ListNamespaceDAGs(ctx context.Context, request api.ListNamespaceDA
 		return nil, fmt.Errorf("error listing DAGs: %w", err)
 	}
 
-	dagFiles := make([]api.DAGFile, 0, len(result.Items))
-	for _, item := range result.Items {
-		dagStatus, statusErr := stores.dagRunMgr.GetLatestStatus(ctx, item)
-		if statusErr != nil {
-			errList = append(errList, statusErr.Error())
-		}
-
-		dagFiles = append(dagFiles, api.DAGFile{
-			FileName:     item.FileName(),
-			LatestDAGRun: toDAGRunSummary(dagStatus),
-			Suspended:    stores.dagStore.IsSuspended(ctx, item.FileName()),
-			Dag:          toDAG(item),
-			Errors:       extractBuildErrors(item.BuildErrors),
-		})
-	}
+	dagFiles, statusErrs := buildDAGFileList(ctx, stores.dagStore, stores.dagRunMgr, result.Items, nil)
+	errList = append(errList, statusErrs...)
 
 	return &api.ListNamespaceDAGs200JSONResponse{
 		Dags:       dagFiles,
@@ -158,43 +144,8 @@ func (a *API) CreateNamespaceDAG(ctx context.Context, request api.CreateNamespac
 		return nil, err
 	}
 
-	var yamlSpec []byte
-	if request.Body.Spec != nil && strings.TrimSpace(*request.Body.Spec) != "" {
-		_, err := spec.LoadYAML(ctx,
-			[]byte(*request.Body.Spec),
-			spec.WithName(request.Body.Name),
-			spec.WithoutEval(),
-		)
-		if err != nil {
-			var verrs core.ErrorList
-			if errors.As(err, &verrs) {
-				return nil, &Error{
-					HTTPStatus: http.StatusBadRequest,
-					Code:       api.ErrorCodeBadRequest,
-					Message:    strings.Join(verrs.ToStringList(), "; "),
-				}
-			}
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    err.Error(),
-			}
-		}
-		yamlSpec = []byte(*request.Body.Spec)
-	} else {
-		yamlSpec = []byte(`steps:
-  - command: echo hello
-`)
-	}
-
-	if err := stores.dagStore.Create(ctx, request.Body.Name, yamlSpec); err != nil {
-		if errors.Is(err, exec.ErrDAGAlreadyExists) {
-			return nil, &Error{
-				HTTPStatus: http.StatusConflict,
-				Code:       api.ErrorCodeAlreadyExists,
-			}
-		}
-		return nil, fmt.Errorf("error creating DAG: %w", err)
+	if err := createDAGInStore(ctx, stores.dagStore, request.Body.Name, request.Body.Spec); err != nil {
+		return nil, err
 	}
 
 	a.logAuditEntry(ctx, audit.CategoryDAG, "dag_create", map[string]any{
@@ -219,7 +170,7 @@ func (a *API) GetNamespaceDAGDetails(ctx context.Context, request api.GetNamespa
 		return nil, err
 	}
 
-	dag, err := stores.dagStore.GetDetails(ctx, request.FileName, spec.WithAllowBuildErrors())
+	resp, err := getDAGDetailsFromStore(ctx, stores.dagStore, stores.dagRunMgr, request.FileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -228,35 +179,7 @@ func (a *API) GetNamespaceDAGDetails(ctx context.Context, request api.GetNamespa
 		}
 	}
 
-	dagStatus, err := stores.dagRunMgr.GetLatestStatus(ctx, dag)
-	if err != nil && !errors.Is(err, exec.ErrNoStatusData) {
-		return nil, fmt.Errorf("failed to get latest status for DAG %s", request.FileName)
-	}
-
-	yamlSpec, err := stores.dagStore.GetSpec(ctx, request.FileName)
-	if err != nil {
-		yamlSpec = ""
-	}
-
-	details := toDAGDetails(dag)
-
-	localDAGs := make([]api.LocalDag, 0, len(dag.LocalDAGs))
-	for _, localDAG := range dag.LocalDAGs {
-		localDAGs = append(localDAGs, toLocalDAG(localDAG))
-	}
-
-	sort.Slice(localDAGs, func(i, j int) bool {
-		return localDAGs[i].Name < localDAGs[j].Name
-	})
-
-	return &api.GetNamespaceDAGDetails200JSONResponse{
-		Dag:          details,
-		LatestDAGRun: ToDAGRunDetails(dagStatus),
-		Suspended:    stores.dagStore.IsSuspended(ctx, request.FileName),
-		LocalDags:    localDAGs,
-		Errors:       extractBuildErrors(dag.BuildErrors),
-		Spec:         &yamlSpec,
-	}, nil
+	return (*api.GetNamespaceDAGDetails200JSONResponse)(&resp), nil
 }
 
 // TriggerNamespaceDAGRun triggers a DAG run within a specific namespace.
@@ -323,13 +246,23 @@ func (a *API) TriggerNamespaceDAGRun(ctx context.Context, request api.TriggerNam
 		if err := a.checkSingletonRunning(ctx, stores.procStore, dag); err != nil {
 			return nil, err
 		}
+		if err := a.checkSingletonQueued(ctx, stores.queueStore, dag); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := a.ensureDAGRunIDUnique(ctx, stores.dagRunStore, dag, dagRunId); err != nil {
 		return nil, err
 	}
 
-	if err := a.startNamespaceScopedDAGRun(ctx, stores, dag, params, dagRunId, nameOverride); err != nil {
+	if err := a.startDAGRunWithOptions(ctx, dag, startDAGRunOptions{
+		params:        params,
+		dagRunID:      dagRunId,
+		nameOverride:  nameOverride,
+		triggerType:   core.TriggerTypeManual,
+		subCmdBuilder: stores.subCmdBuilder,
+		dagRunMgr:     stores.dagRunMgr,
+	}); err != nil {
 		return nil, fmt.Errorf("error starting dag-run: %w", err)
 	}
 
@@ -346,37 +279,6 @@ func (a *API) TriggerNamespaceDAGRun(ctx context.Context, request api.TriggerNam
 	return &api.TriggerNamespaceDAGRun200JSONResponse{
 		DagRunId: dagRunId,
 	}, nil
-}
-
-// startNamespaceScopedDAGRun starts a DAG run using namespace-scoped stores.
-func (a *API) startNamespaceScopedDAGRun(
-	ctx context.Context,
-	stores *namespaceScopedStores,
-	dag *core.DAG,
-	params, dagRunID, nameOverride string,
-) error {
-	triggerTypeStr := core.TriggerTypeManual.String()
-	startSpec := stores.subCmdBuilder.Start(dag, runtime.StartOptions{
-		Params:       params,
-		DAGRunID:     dagRunID,
-		Quiet:        true,
-		NameOverride: nameOverride,
-		TriggerType:  triggerTypeStr,
-	})
-
-	if err := runtime.Start(ctx, startSpec); err != nil {
-		return fmt.Errorf("error starting DAG: %w", err)
-	}
-
-	if !a.waitForDAGStatusChange(ctx, stores.dagRunMgr, dag, dagRunID, 5*time.Second) {
-		return &Error{
-			HTTPStatus: http.StatusInternalServerError,
-			Code:       api.ErrorCodeInternalError,
-			Message:    "DAG did not start",
-		}
-	}
-
-	return nil
 }
 
 // listAccessibleNamespaces returns all namespaces the current user can access.
@@ -448,21 +350,9 @@ func (a *API) listDAGsAcrossNamespaces(ctx context.Context, listOpts exec.ListDA
 		allErrors = append(allErrors, errList...)
 
 		nsName := ns.Name
-		for _, item := range result.Items {
-			dagStatus, statusErr := stores.dagRunMgr.GetLatestStatus(ctx, item)
-			if statusErr != nil {
-				allErrors = append(allErrors, statusErr.Error())
-			}
-
-			allDAGFiles = append(allDAGFiles, api.DAGFile{
-				FileName:     item.FileName(),
-				LatestDAGRun: toDAGRunSummary(dagStatus),
-				Suspended:    stores.dagStore.IsSuspended(ctx, item.FileName()),
-				Dag:          toDAG(item),
-				Errors:       extractBuildErrors(item.BuildErrors),
-				Namespace:    &nsName,
-			})
-		}
+		dagFiles, statusErrs := buildDAGFileList(ctx, stores.dagStore, stores.dagRunMgr, result.Items, &nsName)
+		allDAGFiles = append(allDAGFiles, dagFiles...)
+		allErrors = append(allErrors, statusErrs...)
 	}
 
 	// Apply sorting (currently only "name" is supported).

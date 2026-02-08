@@ -83,7 +83,7 @@ type Database interface {
 	RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) error
 }
 
-// SubDAGRunStatus is an interface that represents the status of a sub dag-run.
+// RunStatus represents the status of a sub dag-run.
 type RunStatus struct {
 	// Name represents the name of the executed DAG.
 	Name string

@@ -565,7 +565,6 @@ const defaultColumns = [
       return null;
     },
   }),
-  // Removed Started At and Finished At columns
   columnHelper.accessor('kind', {
     id: 'LastRun',
     size: 110,

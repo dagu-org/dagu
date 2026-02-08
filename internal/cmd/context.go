@@ -738,6 +738,27 @@ func (c *Context) RecordEarlyFailure(dag *core.DAG, dagRunID string, err error) 
 	return nil
 }
 
+// AcquireProc locks the process group, acquires a process handle, and unlocks.
+// The caller must call proc.Stop() when done.
+func (c *Context) AcquireProc(dag *core.DAG, dagRunID string) (exec.ProcHandle, error) {
+	if err := c.ProcStore.Lock(c, dag.ProcGroup()); err != nil {
+		logger.Debug(c, "Failed to lock process group", tag.Error(err))
+		_ = c.RecordEarlyFailure(dag, dagRunID, err)
+		return nil, errProcAcquisitionFailed
+	}
+
+	proc, err := c.ProcStore.Acquire(c, dag.ProcGroup(), exec.NewDAGRunRef(dag.Name, dagRunID))
+	if err != nil {
+		c.ProcStore.Unlock(c, dag.ProcGroup())
+		logger.Debug(c, "Failed to acquire process handle", tag.Error(err))
+		_ = c.RecordEarlyFailure(dag, dagRunID, err)
+		return nil, fmt.Errorf("failed to acquire process handle: %w", errProcAcquisitionFailed)
+	}
+
+	c.ProcStore.Unlock(c, dag.ProcGroup())
+	return proc, nil
+}
+
 // LogFile constructs the log filename using the prefix, safe DAG name, current timestamp,
 // and a truncated version of the dag-run ID.
 func (cfg LogConfig) LogFile() string {

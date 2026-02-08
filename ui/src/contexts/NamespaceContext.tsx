@@ -52,8 +52,9 @@ export function NamespaceProvider({ children }: { children: React.ReactNode }) {
           if (stored && stored !== ALL_NAMESPACES) {
             const valid = nsList.some((ns) => ns.name === stored);
             if (!valid) {
-              setSelectedNamespace('default');
-              localStorage.setItem(NAMESPACE_STORAGE_KEY, 'default');
+              const fallback = nsList[0]?.name ?? 'default';
+              setSelectedNamespace(fallback);
+              localStorage.setItem(NAMESPACE_STORAGE_KEY, fallback);
             }
           }
         }

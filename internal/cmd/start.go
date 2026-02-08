@@ -121,9 +121,6 @@ func runStart(ctx *Context, args []string) error {
 	)
 
 	if fromRunID != "" {
-		if len(args) == 0 {
-			return fmt.Errorf("DAG name or file must be provided when using --from-run-id")
-		}
 		if len(args) > 1 || ctx.Command.Flags().Changed("params") || ctx.Command.ArgsLenAtDash() != -1 {
 			return fmt.Errorf("parameters cannot be provided when using --from-run-id")
 		}
@@ -224,31 +221,20 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root exec.DAGRu
 		return dispatchToCoordinatorAndWait(ctx, dag, dagRunID, coordinatorCli)
 	}
 
-	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
-		logger.Debug(ctx, "Failed to lock process group", tag.Error(err))
-		_ = ctx.RecordEarlyFailure(dag, dagRunID, err)
-		return errProcAcquisitionFailed
-	}
-
-	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), exec.NewDAGRunRef(dag.Name, dagRunID))
+	proc, err := ctx.AcquireProc(dag, dagRunID)
 	if err != nil {
-		ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
-		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
-		_ = ctx.RecordEarlyFailure(dag, dagRunID, err)
-		return fmt.Errorf("failed to acquire process handle: %w", errProcAcquisitionFailed)
+		return err
 	}
 	defer func() {
 		_ = proc.Stop(ctx)
 	}()
 	ctx.Proc = proc
 
-	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
-
 	return executeDAGRun(ctx, dag, exec.DAGRunRef{}, dagRunID, root, workerID, triggerType)
 }
 
 // getDAGRunInfo extracts and validates dag-run ID and references from command flags.
-// nolint:revive
+//nolint:revive
 func getDAGRunInfo(ctx *Context) (dagRunID, rootDAGRun, parentDAGRun string, isSubDAGRun bool, err error) {
 	dagRunID, err = ctx.StringParam("run-id")
 	if err != nil {

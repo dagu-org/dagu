@@ -8,11 +8,11 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
@@ -23,17 +23,11 @@ const (
 	DefaultID = "0000"
 	// idLength is the number of hex characters in a namespace ID.
 	idLength = 4
-	// maxNameLength is the maximum length of a namespace name.
-	maxNameLength = 63
 	// filePerm is the file permission for namespace JSON files.
 	filePerm = 0600
 	// dirPerm is the directory permission for the namespace base directory.
 	dirPerm = 0750
 )
-
-// nameRegex validates namespace names: [a-z0-9][a-z0-9-]*[a-z0-9], max 63 chars.
-// Single character names like "a" are also valid.
-var nameRegex = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 
 // Option configures a Store.
 type Option func(*Store)
@@ -83,19 +77,19 @@ func New(baseDir string, opts ...Option) (*Store, error) {
 // ensureDefaultNamespace creates the "default" namespace if it does not already exist.
 // This runs automatically on startup and is idempotent.
 func (s *Store) ensureDefaultNamespace() error {
-	if _, exists := s.index["default"]; exists {
+	if _, exists := s.index[core.DefaultNamespace]; exists {
 		slog.Debug("default namespace already exists, skipping migration")
 		return nil
 	}
 
 	slog.Info("auto-migration: creating default namespace registry",
-		"name", "default",
+		"name", core.DefaultNamespace,
 		"id", DefaultID,
 		"base_dir", s.baseDir,
 	)
 
 	ns := &exec.Namespace{
-		Name:        "default",
+		Name:        core.DefaultNamespace,
 		ID:          DefaultID,
 		CreatedAt:   time.Now(),
 		Description: "Default namespace",
@@ -229,7 +223,8 @@ func (s *Store) Get(_ context.Context, name string) (*exec.Namespace, error) {
 	}
 
 	if s.fileCache == nil {
-		return ns, nil
+		nsCopy := *ns
+		return &nsCopy, nil
 	}
 
 	filePath := s.filePath(ns.ID)
@@ -245,7 +240,8 @@ func (s *Store) List(_ context.Context) ([]*exec.Namespace, error) {
 
 	result := make([]*exec.Namespace, 0, len(s.index))
 	for _, ns := range s.index {
-		result = append(result, ns)
+		nsCopy := *ns
+		result = append(result, &nsCopy)
 	}
 
 	return result, nil
@@ -267,7 +263,7 @@ func (s *Store) Resolve(_ context.Context, name string) (string, error) {
 // GenerateID produces a 4-character hex string from the SHA256 hash of the name.
 // The "default" namespace always returns the well-known fixed ID "0000".
 func GenerateID(name string) string {
-	if name == "default" {
+	if name == core.DefaultNamespace {
 		return DefaultID
 	}
 	hash := sha256.Sum256([]byte(name))
@@ -276,16 +272,7 @@ func GenerateID(name string) string {
 
 // validateName checks that a namespace name conforms to the required format.
 func validateName(name string) error {
-	if len(name) == 0 {
-		return fmt.Errorf("namespace name must not be empty")
-	}
-	if len(name) > maxNameLength {
-		return fmt.Errorf("namespace name must be at most %d characters, got %d", maxNameLength, len(name))
-	}
-	if !nameRegex.MatchString(name) {
-		return fmt.Errorf("namespace name %q must match [a-z0-9][a-z0-9-]*[a-z0-9]", name)
-	}
-	return nil
+	return exec.ValidateNamespaceName(name)
 }
 
 // readFromFile reads and parses a namespace JSON file from disk.
@@ -325,17 +312,12 @@ func (s *Store) rebuildIndex() error {
 		}
 
 		filePath := filepath.Join(s.baseDir, entry.Name())
-		data, err := os.ReadFile(filePath) // #nosec G304 - path constructed from internal baseDir
+		ns, err := s.readFromFile(filePath)
 		if err != nil {
-			return fmt.Errorf("failed to read namespace file %s: %w", filePath, err)
+			return err
 		}
 
-		var ns exec.Namespace
-		if err := json.Unmarshal(data, &ns); err != nil {
-			return fmt.Errorf("failed to parse namespace file %s: %w", filePath, err)
-		}
-
-		s.index[ns.Name] = &ns
+		s.index[ns.Name] = ns
 		s.ids[ns.ID] = ns.Name
 	}
 

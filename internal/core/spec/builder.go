@@ -238,8 +238,8 @@ func generateTypedStepName(existingNames map[string]struct{}, step *core.Step, i
 	}
 }
 
-// normalizedStepData converts string to map[string]any for subsequent process
-func normalizeStepData(ctx BuildContext, data []any) []any {
+// normalizeStepData converts string to map[string]any for subsequent processing.
+func normalizeStepData(data []any) []any {
 	// Convert string steps to map format for shorthand syntax support
 	normalized := make([]any, len(data))
 	for i, item := range data {

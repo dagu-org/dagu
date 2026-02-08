@@ -38,18 +38,9 @@ func runEnqueue(ctx *Context, args []string) error {
 	}
 	args[0] = dagName
 
-	runID, err := ctx.StringParam("run-id")
+	runID, err := resolveRunID(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get Run ID: %w", err)
-	}
-
-	if runID == "" {
-		runID, err = genRunID()
-		if err != nil {
-			return fmt.Errorf("failed to generate Run ID: %w", err)
-		}
-	} else if err := validateRunID(runID); err != nil {
-		return fmt.Errorf("invalid Run ID: %w", err)
+		return err
 	}
 
 	queueOverride, err := ctx.StringParam("queue")
@@ -57,7 +48,12 @@ func runEnqueue(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to get queue override: %w", err)
 	}
 
-	dag, _, err := loadDAGWithParams(ctx, args, false, nil)
+	ns, err := ctx.NamespaceStore.Get(ctx, namespaceName)
+	if err != nil {
+		return fmt.Errorf("failed to get namespace %q: %w", namespaceName, err)
+	}
+
+	dag, _, err := loadDAGWithParams(ctx, args, false, ns)
 	if err != nil {
 		return err
 	}
