@@ -108,7 +108,6 @@ func New(
 		dagStateStore,
 		dagRunStore,
 		dagExecutor,
-		&drm,
 		cfg,
 		time.Now,
 	)

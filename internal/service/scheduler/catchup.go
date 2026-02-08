@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/runtime"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -21,17 +22,11 @@ type catchupDispatcher interface {
 		runID string, triggerType core.TriggerType, scheduledTime time.Time) error
 }
 
-// catchupIDGenerator generates unique run IDs for catch-up dispatches.
-type catchupIDGenerator interface {
-	GenDAGRunID(ctx context.Context) (string, error)
-}
-
 // CatchupEngine replays missed DAG runs that were scheduled during scheduler downtime.
 type CatchupEngine struct {
 	dagStateStore *DAGStateStore
 	dagRunStore   exec.DAGRunStore
 	dagExecutor   catchupDispatcher
-	idGen         catchupIDGenerator
 	config        *config.Config
 	clock         Clock
 }
@@ -55,7 +50,6 @@ func NewCatchupEngine(
 	dagStateStore *DAGStateStore,
 	dagRunStore exec.DAGRunStore,
 	dagExecutor catchupDispatcher,
-	idGen catchupIDGenerator,
 	cfg *config.Config,
 	clock Clock,
 ) *CatchupEngine {
@@ -63,7 +57,6 @@ func NewCatchupEngine(
 		dagStateStore: dagStateStore,
 		dagRunStore:   dagRunStore,
 		dagExecutor:   dagExecutor,
-		idGen:         idGen,
 		config:        cfg,
 		clock:         clock,
 	}
@@ -333,7 +326,7 @@ func (c *CatchupEngine) dispatchCandidate(ctx context.Context, cand catchupCandi
 		return false, nil
 	}
 
-	runID, err := c.idGen.GenDAGRunID(ctx)
+	runID, err := runtime.GenRunID()
 	if err != nil {
 		return false, fmt.Errorf("failed to generate run ID: %w", err)
 	}

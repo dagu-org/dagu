@@ -635,7 +635,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 
 	if dagRunId == "" {
 		var err error
-		dagRunId, err = a.dagRunMgr.GenDAGRunID(ctx)
+		dagRunId, err = runtime.GenRunID()
 		if err != nil {
 			return nil, fmt.Errorf("error generating dag-run ID: %w", err)
 		}
@@ -719,7 +719,7 @@ func (a *API) ExecuteDAGSync(ctx context.Context, request api.ExecuteDAGSyncRequ
 
 	if dagRunId == "" {
 		var err error
-		dagRunId, err = a.dagRunMgr.GenDAGRunID(ctx)
+		dagRunId, err = runtime.GenRunID()
 		if err != nil {
 			return nil, fmt.Errorf("error generating dag-run ID: %w", err)
 		}
@@ -1004,7 +1004,7 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 	dagRunId := valueOf(request.Body.DagRunId)
 	if dagRunId == "" {
 		var err error
-		dagRunId, err = a.dagRunMgr.GenDAGRunID(ctx)
+		dagRunId, err = runtime.GenRunID()
 		if err != nil {
 			return nil, fmt.Errorf("error generating dag-run ID: %w", err)
 		}

@@ -58,7 +58,7 @@ func (j *DAGRunJob) Start(ctx context.Context) error {
 	}
 
 	// Create a unique run ID for this scheduled execution
-	runID, err := j.Client.GenDAGRunID(ctx)
+	runID, err := runtime.GenRunID()
 	if err != nil {
 		return err
 	}

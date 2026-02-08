@@ -162,8 +162,8 @@ func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *core.DAG, dagRunID 
 	return fmt.Errorf("failed to find dag-run attempt: %w", err)
 }
 
-// GenDAGRunID generates a unique ID for a dag-run using UUID version 7.
-func (m *Manager) GenDAGRunID(_ context.Context) (string, error) {
+// GenRunID generates a unique run ID using UUID version 7.
+func GenRunID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate dag-run ID: %w", err)

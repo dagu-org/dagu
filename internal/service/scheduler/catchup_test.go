@@ -3,7 +3,6 @@ package scheduler
 import (
 	"context"
 	"errors"
-	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -85,7 +84,7 @@ func TestCatchupEngine_MissingWatermark(t *testing.T) {
 	cfg.Scheduler.MaxCatchupRunsPerDAG = 20
 	cfg.Scheduler.CatchupRateLimit = time.Millisecond
 
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, cfg, clock)
 
 	testDAG := &core.DAG{
 		Name:     "test",
@@ -125,7 +124,7 @@ func TestCatchupEngine_GenerateCandidates_RunAll(t *testing.T) {
 	cfg.Scheduler.MaxCatchupRunsPerDAG = 20
 	cfg.Scheduler.CatchupRateLimit = time.Millisecond
 
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, cfg, clock)
 
 	sched := parseCron(t, "0 * * * *") // every hour on the hour
 	testDAG := &core.DAG{
@@ -166,7 +165,7 @@ func TestCatchupEngine_GenerateCandidates_RunLatest(t *testing.T) {
 	cfg.Scheduler.MaxCatchupRunsPerDAG = 20
 	cfg.Scheduler.CatchupRateLimit = time.Millisecond
 
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, cfg, clock)
 
 	sched := parseCron(t, "0 * * * *")
 	testDAG := &core.DAG{
@@ -206,7 +205,7 @@ func TestCatchupEngine_MaxCatchupRunsCap(t *testing.T) {
 	cfg.Scheduler.MaxCatchupRunsPerDAG = 5 // Cap at 5
 	cfg.Scheduler.CatchupRateLimit = time.Millisecond
 
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, cfg, clock)
 
 	sched := parseCron(t, "0 * * * *")
 	testDAG := &core.DAG{
@@ -244,7 +243,7 @@ func TestCatchupEngine_MaxGlobalCatchupRunsCap(t *testing.T) {
 	cfg.Scheduler.MaxCatchupRunsPerDAG = 20
 	cfg.Scheduler.CatchupRateLimit = time.Millisecond
 
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, cfg, clock)
 
 	sched := parseCron(t, "0 * * * *")
 	dag1 := &core.DAG{
@@ -291,7 +290,7 @@ func TestCatchupEngine_CatchupWindow(t *testing.T) {
 	cfg.Scheduler.MaxCatchupRunsPerDAG = 100
 	cfg.Scheduler.CatchupRateLimit = time.Millisecond
 
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, nil, cfg, clock)
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, nil, cfg, clock)
 
 	sched := parseCron(t, "0 * * * *")
 	testDAG := &core.DAG{
@@ -328,8 +327,8 @@ func TestCatchupEngine_CatchupWindow(t *testing.T) {
 var _ catchupDispatcher = (*mockDispatcher)(nil)
 
 type mockDispatcher struct {
-	calls    []mockDispatchCall
-	failOn   map[string]error // DAG name -> error to return
+	calls  []mockDispatchCall
+	failOn map[string]error // DAG name -> error to return
 }
 
 type mockDispatchCall struct {
@@ -359,18 +358,6 @@ func (m *mockDispatcher) HandleJob(
 	return nil
 }
 
-// mockIDGenerator returns sequential run IDs.
-var _ catchupIDGenerator = (*mockIDGenerator)(nil)
-
-type mockIDGenerator struct {
-	counter int
-}
-
-func (m *mockIDGenerator) GenDAGRunID(_ context.Context) (string, error) {
-	m.counter++
-	return fmt.Sprintf("run-%d", m.counter), nil
-}
-
 // For DAGRunAttempt mocking, use exec.MockDAGRunAttempt from the core/exec package.
 // It has a Status field shortcut: set Status to return from ReadStatus without mock setup.
 
@@ -395,8 +382,6 @@ func TestCatchupEngine_Run_DispatchesAll(t *testing.T) {
 
 	store := NewDAGStateStore(tmpDir, dagsDir)
 	dispatcher := &mockDispatcher{}
-	idGen := &mockIDGenerator{}
-
 	sched := parseCron(t, "0 * * * *")
 	testDAG := &core.DAG{
 		Name:     "test",
@@ -411,7 +396,7 @@ func TestCatchupEngine_Run_DispatchesAll(t *testing.T) {
 	require.NoError(t, store.Save(testDAG, dagState{LastTick: lastTick}))
 
 	cfg := newTestConfig()
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, dispatcher, idGen, cfg, testClock(now))
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, dispatcher, cfg, testClock(now))
 
 	result, err := engine.Run(context.Background(), dags)
 	require.NoError(t, err)
@@ -446,8 +431,6 @@ func TestCatchupEngine_Run_DispatchFailure_WatermarkPartialAdvance(t *testing.T)
 	dispatcher := &mockDispatcher{
 		failOn: map[string]error{"dag-fail": errors.New("dispatch error")},
 	}
-	idGen := &mockIDGenerator{}
-
 	sched := parseCron(t, "0 * * * *")
 
 	dagOK := &core.DAG{
@@ -474,7 +457,7 @@ func TestCatchupEngine_Run_DispatchFailure_WatermarkPartialAdvance(t *testing.T)
 	require.NoError(t, store.Save(dagFail, dagState{LastTick: lastTick}))
 
 	cfg := newTestConfig()
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, dispatcher, idGen, cfg, testClock(now))
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, dispatcher, cfg, testClock(now))
 
 	result, err := engine.Run(context.Background(), dags)
 	require.NoError(t, err)
@@ -517,7 +500,7 @@ func TestCatchupEngine_IsDuplicate(t *testing.T) {
 
 		cfg := newTestConfig()
 		engine := NewCatchupEngine(
-			NewDAGStateStore(tmpDir, dagsDir), mockStore, nil, nil, cfg, testClock(time.Now()),
+			NewDAGStateStore(tmpDir, dagsDir), mockStore, nil, cfg, testClock(time.Now()),
 		)
 
 		cand := catchupCandidate{
@@ -545,7 +528,7 @@ func TestCatchupEngine_IsDuplicate(t *testing.T) {
 
 		cfg := newTestConfig()
 		engine := NewCatchupEngine(
-			NewDAGStateStore(tmpDir, dagsDir), mockStore, nil, nil, cfg, testClock(time.Now()),
+			NewDAGStateStore(tmpDir, dagsDir), mockStore, nil, cfg, testClock(time.Now()),
 		)
 
 		cand := catchupCandidate{
@@ -566,7 +549,7 @@ func TestCatchupEngine_IsDuplicate(t *testing.T) {
 
 		cfg := newTestConfig()
 		engine := NewCatchupEngine(
-			NewDAGStateStore(tmpDir, dagsDir), mockStore, nil, nil, cfg, testClock(time.Now()),
+			NewDAGStateStore(tmpDir, dagsDir), mockStore, nil, cfg, testClock(time.Now()),
 		)
 
 		cand := catchupCandidate{
@@ -610,9 +593,8 @@ func TestCatchupEngine_Run_SkipsDuplicates(t *testing.T) {
 	}
 
 	dispatcher := &mockDispatcher{}
-	idGen := &mockIDGenerator{}
 	cfg := newTestConfig()
-	engine := NewCatchupEngine(store, mockRunStore, dispatcher, idGen, cfg, testClock(now))
+	engine := NewCatchupEngine(store, mockRunStore, dispatcher, cfg, testClock(now))
 
 	result, err := engine.Run(context.Background(), dags)
 	require.NoError(t, err)
@@ -646,9 +628,8 @@ func TestCatchupEngine_Run_ContextCancelled(t *testing.T) {
 	require.NoError(t, store.Save(testDAG, dagState{LastTick: lastTick}))
 
 	dispatcher := &mockDispatcher{}
-	idGen := &mockIDGenerator{}
 	cfg := newTestConfig()
-	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, dispatcher, idGen, cfg, testClock(now))
+	engine := NewCatchupEngine(store, &catchupMockDAGRunStore{}, dispatcher, cfg, testClock(now))
 
 	// Cancel the context immediately
 	ctx, cancel := context.WithCancel(context.Background())
