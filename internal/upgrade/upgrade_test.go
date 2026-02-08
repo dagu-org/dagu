@@ -17,6 +17,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-resty/resty/v2"
 )
 
 func TestParseVersion(t *testing.T) {
@@ -1639,6 +1641,146 @@ func TestIsNumeric(t *testing.T) {
 				t.Errorf("isNumeric(%q) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestGetLatestReleaseRetryOnServerError(t *testing.T) {
+	release := Release{
+		TagName: "v1.30.3",
+		Name:    "Release v1.30.3",
+	}
+
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts <= 2 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(release)
+	}))
+	defer server.Close()
+
+	client := newTestGitHubClient(server.URL)
+
+	ctx := context.Background()
+	result, err := client.GetLatestRelease(ctx, false)
+	if err != nil {
+		t.Fatalf("GetLatestRelease() error: %v", err)
+	}
+	if result.TagName != "v1.30.3" {
+		t.Errorf("GetLatestRelease().TagName = %q, want %q", result.TagName, "v1.30.3")
+	}
+	if attempts != 3 {
+		t.Errorf("expected 3 attempts, got %d", attempts)
+	}
+}
+
+func TestGetRelease404NotRetried(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	client := newTestGitHubClient(server.URL)
+
+	ctx := context.Background()
+	_, err := client.GetRelease(ctx, "v99.99.99")
+	if err == nil {
+		t.Fatal("GetRelease() expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("GetRelease() error should contain 'not found': %v", err)
+	}
+	if attempts != 1 {
+		t.Errorf("expected 1 attempt (no retry for 404), got %d", attempts)
+	}
+}
+
+// newTestGitHubClient creates a GitHubClient that redirects all requests
+// from the real GitHub API URL to the given test server URL.
+func newTestGitHubClient(serverURL string) *GitHubClient {
+	client := NewGitHubClient()
+	client.client.OnBeforeRequest(func(_ *resty.Client, req *resty.Request) error {
+		req.URL = strings.Replace(req.URL, githubAPIURL, serverURL+"/releases", 1)
+		return nil
+	})
+	return client
+}
+
+func TestDownloadRetryOnServerError(t *testing.T) {
+	content := []byte("test binary content")
+	hash := sha256.Sum256(content)
+	expectedHash := hex.EncodeToString(hash[:])
+
+	var getAttempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "HEAD" {
+			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(content)))
+			return
+		}
+		getAttempts++
+		if getAttempts <= 2 {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		_, _ = w.Write(content)
+	}))
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	destPath := filepath.Join(tmpDir, "downloaded-file")
+
+	ctx := context.Background()
+	err := Download(ctx, DownloadOptions{
+		URL:          server.URL + "/test-file",
+		Destination:  destPath,
+		ExpectedHash: expectedHash,
+	})
+	if err != nil {
+		t.Fatalf("Download() error: %v", err)
+	}
+
+	downloaded, err := os.ReadFile(destPath)
+	if err != nil {
+		t.Fatalf("Failed to read downloaded file: %v", err)
+	}
+	if string(downloaded) != string(content) {
+		t.Error("Download() content mismatch")
+	}
+	if getAttempts != 3 {
+		t.Errorf("expected 3 GET attempts, got %d", getAttempts)
+	}
+}
+
+func TestDownloadPermanent404(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "HEAD" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		attempts++
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	destPath := filepath.Join(tmpDir, "downloaded-file")
+
+	ctx := context.Background()
+	err := Download(ctx, DownloadOptions{
+		URL:         server.URL + "/not-found",
+		Destination: destPath,
+	})
+	if err == nil {
+		t.Fatal("Download() expected error, got nil")
+	}
+	if attempts != 1 {
+		t.Errorf("expected 1 attempt (no retry for 404), got %d", attempts)
 	}
 }
 

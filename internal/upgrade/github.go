@@ -7,16 +7,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/go-resty/resty/v2"
 )
 
 const (
 	githubAPIURL = "https://api.github.com/repos/dagu-org/dagu/releases"
 
-	defaultTimeout       = 30 * time.Second
-	defaultRetryCount    = 3
-	defaultRetryWaitTime = 1 * time.Second
-	defaultRetryMaxWait  = 5 * time.Second
+	defaultTimeout = 30 * time.Second
 )
 
 // Release represents a GitHub release.
@@ -42,61 +40,47 @@ type GitHubClient struct {
 	client *resty.Client
 }
 
-// NewGitHubClient creates a new GitHub API client with retry logic.
+// NewGitHubClient creates a new GitHub API client.
 func NewGitHubClient() *GitHubClient {
 	client := resty.New().
 		SetTimeout(defaultTimeout).
-		SetRetryCount(defaultRetryCount).
-		SetRetryWaitTime(defaultRetryWaitTime).
-		SetRetryMaxWaitTime(defaultRetryMaxWait).
 		SetHeader("Accept", "application/vnd.github+json").
-		SetHeader("User-Agent", "dagu-upgrade-client").
-		AddRetryCondition(func(r *resty.Response, err error) bool {
-			if err != nil {
-				return true // Retry on network errors
-			}
-			// Retry on rate limit and server errors
-			code := r.StatusCode()
-			return code == 429 || (code >= 500 && code <= 504)
-		})
-
+		SetHeader("User-Agent", "dagu-upgrade-client")
 	return &GitHubClient{client: client}
 }
 
 // GetLatestRelease fetches the latest release from GitHub.
 // If includePreRelease is true, it may return a pre-release version.
 func (c *GitHubClient) GetLatestRelease(ctx context.Context, includePreRelease bool) (*Release, error) {
+	policy := newUpgradeRetryPolicy()
+
 	if !includePreRelease {
 		var release Release
-		resp, err := c.client.R().
-			SetContext(ctx).
-			SetResult(&release).
-			Get(githubAPIURL + "/latest")
-
+		err := backoff.Retry(ctx, func(ctx context.Context) error {
+			resp, err := c.client.R().SetContext(ctx).SetResult(&release).
+				Get(githubAPIURL + "/latest")
+			if err != nil {
+				return err
+			}
+			return classifyResponse(resp)
+		}, policy, isRetriableError)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch latest release: %w", err)
 		}
-
-		if resp.StatusCode() != 200 {
-			return nil, fmt.Errorf("GitHub API returned status %d: %s", resp.StatusCode(), resp.String())
-		}
-
 		return &release, nil
 	}
 
 	var releases []Release
-	resp, err := c.client.R().
-		SetContext(ctx).
-		SetResult(&releases).
-		SetQueryParam("per_page", "10").
-		Get(githubAPIURL)
-
+	err := backoff.Retry(ctx, func(ctx context.Context) error {
+		resp, err := c.client.R().SetContext(ctx).SetResult(&releases).
+			SetQueryParam("per_page", "10").Get(githubAPIURL)
+		if err != nil {
+			return err
+		}
+		return classifyResponse(resp)
+	}, policy, isRetriableError)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch releases: %w", err)
-	}
-
-	if resp.StatusCode() != 200 {
-		return nil, fmt.Errorf("GitHub API returned status %d: %s", resp.StatusCode(), resp.String())
 	}
 
 	for i := range releases {
@@ -111,25 +95,23 @@ func (c *GitHubClient) GetLatestRelease(ctx context.Context, includePreRelease b
 // GetRelease fetches a specific release by tag.
 func (c *GitHubClient) GetRelease(ctx context.Context, tag string) (*Release, error) {
 	tag = NormalizeVersionTag(tag)
+	policy := newUpgradeRetryPolicy()
 
 	var release Release
-	resp, err := c.client.R().
-		SetContext(ctx).
-		SetResult(&release).
-		Get(fmt.Sprintf("%s/tags/%s", githubAPIURL, tag))
-
+	err := backoff.Retry(ctx, func(ctx context.Context) error {
+		resp, err := c.client.R().SetContext(ctx).SetResult(&release).
+			Get(fmt.Sprintf("%s/tags/%s", githubAPIURL, tag))
+		if err != nil {
+			return err
+		}
+		if resp.StatusCode() == 404 {
+			return &httpError{statusCode: 404, message: fmt.Sprintf("release %s not found", tag)}
+		}
+		return classifyResponse(resp)
+	}, policy, isRetriableError)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch release %s: %w", tag, err)
+		return nil, err
 	}
-
-	if resp.StatusCode() == 404 {
-		return nil, fmt.Errorf("release %s not found", tag)
-	}
-
-	if resp.StatusCode() != 200 {
-		return nil, fmt.Errorf("GitHub API returned status %d: %s", resp.StatusCode(), resp.String())
-	}
-
 	return &release, nil
 }
 
@@ -148,19 +130,23 @@ func (c *GitHubClient) GetChecksums(ctx context.Context, release *Release) (map[
 		return nil, fmt.Errorf("checksums.txt not found in release %s", release.TagName)
 	}
 
-	resp, err := c.client.R().
-		SetContext(ctx).
-		Get(checksumsURL)
-
+	policy := newUpgradeRetryPolicy()
+	var body string
+	err := backoff.Retry(ctx, func(ctx context.Context) error {
+		resp, err := c.client.R().SetContext(ctx).Get(checksumsURL)
+		if err != nil {
+			return err
+		}
+		if statusErr := classifyResponse(resp); statusErr != nil {
+			return statusErr
+		}
+		body = resp.String()
+		return nil
+	}, policy, isRetriableError)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download checksums.txt: %w", err)
 	}
-
-	if resp.StatusCode() != 200 {
-		return nil, fmt.Errorf("failed to download checksums.txt: status %d", resp.StatusCode())
-	}
-
-	return parseChecksums(resp.String())
+	return parseChecksums(body)
 }
 
 // parseChecksums parses the checksums.txt format (sha256sum output format).
