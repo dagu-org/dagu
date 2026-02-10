@@ -76,6 +76,24 @@ func (cm *CatchupManager) Init(ctx context.Context, dags []*core.DAG) error {
 		return nil
 	}
 
+	// Prune stale DAG entries that no longer exist on disk.
+	activeDags := make(map[string]struct{}, len(dags))
+	for _, dag := range dags {
+		activeDags[dag.Name] = struct{}{}
+	}
+	pruned := 0
+	for name := range state.DAGs {
+		if _, ok := activeDags[name]; !ok {
+			delete(state.DAGs, name)
+			pruned++
+		}
+	}
+	if pruned > 0 {
+		logger.Info(ctx, "Pruned stale watermark entries",
+			slog.Int("pruned", pruned),
+		)
+	}
+
 	cm.mu.Lock()
 	cm.watermarkState = state
 	cm.mu.Unlock()
@@ -139,12 +157,19 @@ func (cm *CatchupManager) initBuffers(ctx context.Context, dags []*core.DAG) {
 		buffers[dagName] = q
 
 		for _, t := range missed {
-			q.Send(QueueItem{
+			if !q.Send(QueueItem{
 				DAG:           dag,
 				ScheduledTime: t,
 				TriggerType:   core.TriggerTypeCatchUp,
 				ScheduleType:  ScheduleTypeStart,
-			})
+			}) {
+				logger.Error(ctx, "Catch-up buffer full, dropping remaining items",
+					tag.DAG(dagName),
+					slog.Int("buffered", q.Len()),
+					slog.Int("dropped", len(missed)-q.Len()),
+				)
+				break
+			}
 		}
 	}
 
@@ -214,7 +239,8 @@ func (cm *CatchupManager) ProcessBuffers(ctx context.Context) {
 }
 
 // RouteToBuffer attempts to route a scheduled start job to its catch-up buffer.
-// Returns true if the item was buffered, false if no buffer exists for this DAG.
+// Returns true if the item was buffered, false if no buffer exists for this DAG
+// or the buffer is full (caller should dispatch directly as fallback).
 // Called from invokeJobs in the cronLoop.
 func (cm *CatchupManager) RouteToBuffer(dagName string, item QueueItem) bool {
 	cm.mu.RLock()
@@ -227,8 +253,7 @@ func (cm *CatchupManager) RouteToBuffer(dagName string, item QueueItem) bool {
 	if !ok {
 		return false
 	}
-	q.Send(item)
-	return true
+	return q.Send(item)
 }
 
 // StartFlusher runs the periodic watermark flusher. Blocks until ctx is done.

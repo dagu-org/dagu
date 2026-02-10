@@ -345,3 +345,70 @@ func TestCatchupManager_ConcurrentFlushAndAdvance(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestCatchupManager_PrunesStaleDAGEntries(t *testing.T) {
+	t.Parallel()
+
+	store := &mockWatermarkStore{
+		state: &core.SchedulerState{
+			Version:  1,
+			LastTick: time.Date(2026, 2, 7, 9, 0, 0, 0, time.UTC),
+			DAGs: map[string]core.DAGWatermark{
+				"active-dag":  {LastScheduledTime: time.Date(2026, 2, 7, 8, 0, 0, 0, time.UTC)},
+				"deleted-dag": {LastScheduledTime: time.Date(2026, 2, 7, 7, 0, 0, 0, time.UTC)},
+				"gone-dag":    {LastScheduledTime: time.Date(2026, 2, 7, 6, 0, 0, 0, time.UTC)},
+			},
+		},
+	}
+	cm := newTestCatchupManager(store)
+
+	// Only "active-dag" still exists
+	dags := []*core.DAG{{Name: "active-dag"}}
+	require.NoError(t, cm.Init(context.Background(), dags))
+
+	cm.mu.RLock()
+	_, hasActive := cm.watermarkState.DAGs["active-dag"]
+	_, hasDeleted := cm.watermarkState.DAGs["deleted-dag"]
+	_, hasGone := cm.watermarkState.DAGs["gone-dag"]
+	cm.mu.RUnlock()
+
+	assert.True(t, hasActive, "active-dag should remain")
+	assert.False(t, hasDeleted, "deleted-dag should be pruned")
+	assert.False(t, hasGone, "gone-dag should be pruned")
+}
+
+func TestCatchupManager_RouteToBufferFullFallback(t *testing.T) {
+	t.Parallel()
+
+	parsed, err := cron.ParseStandard("0 * * * *")
+	require.NoError(t, err)
+
+	store := &mockWatermarkStore{
+		state: &core.SchedulerState{
+			Version:  1,
+			LastTick: time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC),
+			DAGs:     make(map[string]core.DAGWatermark),
+		},
+	}
+	cm := newTestCatchupManager(store)
+
+	dag := &core.DAG{
+		Name:          "test-dag",
+		CatchupWindow: 6 * time.Hour,
+		Schedule:      []core.Schedule{{Expression: "0 * * * *", Parsed: parsed}},
+	}
+	require.NoError(t, cm.Init(context.Background(), []*core.DAG{dag}))
+
+	// Set the buffer max to a tiny size
+	cm.mu.Lock()
+	cm.scheduleBuffers["test-dag"].maxItems = 2
+	// Clear existing items
+	cm.scheduleBuffers["test-dag"].items = nil
+	cm.mu.Unlock()
+
+	// First two should succeed
+	assert.True(t, cm.RouteToBuffer("test-dag", QueueItem{DAG: dag, ScheduledTime: time.Now()}))
+	assert.True(t, cm.RouteToBuffer("test-dag", QueueItem{DAG: dag, ScheduledTime: time.Now()}))
+	// Third should fail (buffer full), returning false so caller dispatches directly
+	assert.False(t, cm.RouteToBuffer("test-dag", QueueItem{DAG: dag, ScheduledTime: time.Now()}))
+}

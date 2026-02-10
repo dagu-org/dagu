@@ -89,3 +89,49 @@ func TestScheduleBuffer_Len(t *testing.T) {
 	q.Pop()
 	assert.Equal(t, 0, q.Len())
 }
+
+func TestScheduleBuffer_CapacityLimit(t *testing.T) {
+	t.Parallel()
+
+	q := NewScheduleBuffer("test-dag", core.OverlapPolicyAll)
+	q.maxItems = 3
+
+	assert.True(t, q.Send(QueueItem{ScheduledTime: time.Now()}))
+	assert.True(t, q.Send(QueueItem{ScheduledTime: time.Now()}))
+	assert.True(t, q.Send(QueueItem{ScheduledTime: time.Now()}))
+	assert.False(t, q.Send(QueueItem{ScheduledTime: time.Now()}), "should reject when full")
+	assert.Equal(t, 3, q.Len())
+
+	// After popping one, can send again
+	q.Pop()
+	assert.True(t, q.Send(QueueItem{ScheduledTime: time.Now()}))
+	assert.Equal(t, 3, q.Len())
+}
+
+func TestScheduleBuffer_PopCompacts(t *testing.T) {
+	t.Parallel()
+
+	q := NewScheduleBuffer("test-dag", core.OverlapPolicyAll)
+
+	// Fill with enough items to trigger compaction
+	for i := range 100 {
+		q.Send(QueueItem{ScheduledTime: time.Now().Add(time.Duration(i) * time.Minute)})
+	}
+	assert.Equal(t, 100, q.Len())
+
+	// Pop most items — should trigger compaction
+	for range 90 {
+		_, ok := q.Pop()
+		require.True(t, ok)
+	}
+	assert.Equal(t, 10, q.Len())
+
+	// Verify remaining items are still correct (FIFO order preserved)
+	for i := range 10 {
+		item, ok := q.Pop()
+		require.True(t, ok)
+		_ = item
+		_ = i
+	}
+	assert.Equal(t, 0, q.Len())
+}

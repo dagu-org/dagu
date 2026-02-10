@@ -25,9 +25,15 @@ func ComputeReplayFrom(catchupWindow time.Duration, lastTick, lastScheduledTime,
 	return earliest
 }
 
+// MaxMissedRuns is the maximum number of missed intervals that will be
+// replayed per DAG. Prevents memory explosion for large catchup windows
+// with high-frequency schedules (e.g., 30-day window + per-minute cron).
+const MaxMissedRuns = 1000
+
 // ComputeMissedIntervals iterates each schedule's cron expression from
 // replayFrom to replayTo, collects all missed ticks, merges and sorts
 // chronologically. Duplicates across schedules are removed.
+// If the total exceeds MaxMissedRuns, only the most recent runs are kept.
 func ComputeMissedIntervals(schedules []core.Schedule, replayFrom, replayTo time.Time) []time.Time {
 	seen := make(map[time.Time]bool)
 	var result []time.Time
@@ -50,6 +56,11 @@ func ComputeMissedIntervals(schedules []core.Schedule, replayFrom, replayTo time
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].Before(result[j])
 	})
+
+	// Cap to most recent runs to prevent memory explosion.
+	if len(result) > MaxMissedRuns {
+		result = result[len(result)-MaxMissedRuns:]
+	}
 
 	return result
 }

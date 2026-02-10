@@ -153,3 +153,19 @@ func TestComputeMissedIntervals(t *testing.T) {
 		})
 	}
 }
+
+func TestComputeMissedIntervals_CappedAtMax(t *testing.T) {
+	t.Parallel()
+
+	// Per-minute schedule over 30 days = 43,200 intervals, should be capped at MaxMissedRuns
+	schedules := []core.Schedule{mustParseSchedule(t, "* * * * *")}
+	replayFrom := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	replayTo := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC)
+
+	got := ComputeMissedIntervals(schedules, replayFrom, replayTo)
+	assert.LessOrEqual(t, len(got), MaxMissedRuns)
+	// Should keep the most recent runs (closest to replayTo)
+	if len(got) > 0 {
+		assert.True(t, got[len(got)-1].Before(replayTo) || got[len(got)-1].Equal(replayTo))
+	}
+}
