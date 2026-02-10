@@ -614,7 +614,7 @@ func (s *Scheduler) initCatchupQueues(ctx context.Context, wg *sync.WaitGroup) {
 		)
 
 		// Create queue with enough buffer for catch-up items plus some headroom for live ticks
-		q := NewDAGQueue(dagName, dag.OverlapPolicy, len(missed)+10)
+		q := NewDAGQueue(dagName, dag.OverlapPolicy)
 		s.dagQueues[dagName] = q
 
 		// Enqueue catch-up items

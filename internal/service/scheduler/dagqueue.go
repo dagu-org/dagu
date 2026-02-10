@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -28,54 +29,81 @@ type QueueItem struct {
 // catch-up runs into one dispatch mechanism. OverlapPolicy is enforced at the
 // queue level.
 type DAGQueue struct {
-	ch            chan QueueItem
+	mu            sync.Mutex
+	cond          *sync.Cond
+	items         []QueueItem
+	closed        bool
 	overlapPolicy core.OverlapPolicy
 	dagName       string
 }
 
-// NewDAGQueue creates a queue with a buffered channel.
-func NewDAGQueue(dagName string, policy core.OverlapPolicy, bufSize int) *DAGQueue {
-	if bufSize < 1 {
-		bufSize = 1
-	}
-	return &DAGQueue{
-		ch:            make(chan QueueItem, bufSize),
+// NewDAGQueue creates a per-DAG queue with the given overlap policy.
+func NewDAGQueue(dagName string, policy core.OverlapPolicy) *DAGQueue {
+	q := &DAGQueue{
 		overlapPolicy: policy,
 		dagName:       dagName,
 	}
+	q.cond = sync.NewCond(&q.mu)
+	return q
 }
 
 // Send enqueues an item (catch-up or live scheduled run).
-// Non-blocking: drops the item if the channel is full.
 func (q *DAGQueue) Send(item QueueItem) {
-	select {
-	case q.ch <- item:
-	default:
-		// Channel full — item is dropped. This should not happen
-		// because the buffer is sized to fit all catch-up items + live ticks.
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	if q.closed {
+		return
 	}
+	q.items = append(q.items, item)
+	q.cond.Signal()
 }
 
-// Start runs the consumer goroutine. Reads from channel, respects overlapPolicy,
-// dispatches via the provided function. Exits when ctx is cancelled or channel
-// is closed.
+// Start runs the consumer loop. Pops items in FIFO order, respects
+// overlapPolicy, dispatches via the provided function. Exits when ctx is
+// cancelled or the queue is closed and drained.
 func (q *DAGQueue) Start(ctx context.Context, dispatch DispatchFunc, isRunning IsRunningFunc) {
+	// Wake the consumer when the context is cancelled.
+	go func() {
+		<-ctx.Done()
+		q.cond.Broadcast()
+	}()
+
 	for {
-		select {
-		case <-ctx.Done():
+		item, ok := q.dequeue(ctx)
+		if !ok {
 			return
-		case item, ok := <-q.ch:
-			if !ok {
-				return
-			}
-			q.processItem(ctx, item, dispatch, isRunning)
 		}
+		q.processItem(ctx, item, dispatch, isRunning)
 	}
 }
 
-// Close closes the channel (signals no more items).
+// Close signals that no more items will be sent.
 func (q *DAGQueue) Close() {
-	close(q.ch)
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	q.closed = true
+	q.cond.Broadcast()
+}
+
+// dequeue blocks until an item is available, the queue is closed and empty,
+// or the context is cancelled.
+func (q *DAGQueue) dequeue(ctx context.Context) (QueueItem, bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	for len(q.items) == 0 && !q.closed && ctx.Err() == nil {
+		q.cond.Wait()
+	}
+
+	if ctx.Err() != nil || (len(q.items) == 0 && q.closed) {
+		return QueueItem{}, false
+	}
+
+	item := q.items[0]
+	q.items = q.items[1:]
+	return item, true
 }
 
 func (q *DAGQueue) processItem(ctx context.Context, item QueueItem, dispatch DispatchFunc, isRunning IsRunningFunc) {
@@ -115,7 +143,7 @@ func (q *DAGQueue) processItem(ctx context.Context, item QueueItem, dispatch Dis
 		}
 
 	default:
-		// Fallback: treat as skip
+		// Fallback: dispatch immediately
 		if err := dispatch(ctx, item); err != nil {
 			logger.Error(ctx, "Failed to dispatch queued item",
 				tag.DAG(q.dagName),

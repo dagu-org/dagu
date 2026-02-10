@@ -13,7 +13,7 @@ import (
 func TestDAGQueue_BasicDispatch(t *testing.T) {
 	t.Parallel()
 
-	q := NewDAGQueue("test-dag", core.OverlapPolicyAll, 10)
+	q := NewDAGQueue("test-dag", core.OverlapPolicyAll)
 
 	var dispatched []time.Time
 	var mu sync.Mutex
@@ -49,7 +49,7 @@ func TestDAGQueue_BasicDispatch(t *testing.T) {
 func TestDAGQueue_SkipPolicy(t *testing.T) {
 	t.Parallel()
 
-	q := NewDAGQueue("test-dag", core.OverlapPolicySkip, 10)
+	q := NewDAGQueue("test-dag", core.OverlapPolicySkip)
 
 	var dispatched []time.Time
 	var mu sync.Mutex
@@ -92,7 +92,7 @@ func TestDAGQueue_SkipPolicy(t *testing.T) {
 func TestDAGQueue_OrderPreservation(t *testing.T) {
 	t.Parallel()
 
-	q := NewDAGQueue("test-dag", core.OverlapPolicyAll, 20)
+	q := NewDAGQueue("test-dag", core.OverlapPolicyAll)
 
 	var dispatched []time.Time
 	var mu sync.Mutex
@@ -134,7 +134,7 @@ func TestDAGQueue_OrderPreservation(t *testing.T) {
 func TestDAGQueue_ContextCancellation(t *testing.T) {
 	t.Parallel()
 
-	q := NewDAGQueue("test-dag", core.OverlapPolicyAll, 10)
+	q := NewDAGQueue("test-dag", core.OverlapPolicyAll)
 
 	dispatch := func(_ context.Context, _ QueueItem) error {
 		return nil
