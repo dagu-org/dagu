@@ -336,8 +336,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	}
 
 	coordinatorCli := c.NewCoordinatorClient()
-	de := scheduler.NewDAGExecutor(coordinatorCli, runtime.NewSubCmdBuilder(c.Config), c.Config.DefaultExecMode)
-	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable)
+	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr)
 	watermarkDir := filepath.Join(c.Config.Paths.DataDir, "scheduler")
 	wmStore := filewatermark.New(watermarkDir)
 	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli, wmStore)

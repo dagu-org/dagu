@@ -16,9 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
-	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/scheduler/filenotify"
-	"github.com/robfig/cron/v3"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -35,49 +33,29 @@ type EntryReader interface {
 	Stop()
 	// DAGs returns a snapshot of all currently loaded DAG definitions.
 	DAGs() []*core.DAG
-	// StopRestartJobs returns stop and restart scheduled jobs due at the given time.
-	StopRestartJobs(ctx context.Context, now time.Time) []*ScheduledJob
-}
-
-// ScheduledJob stores the next time a job should be run and the job itself.
-type ScheduledJob struct {
-	Next time.Time // Next is the time when the job should be run.
-	Job  Job
-	Type ScheduleType // start, stop, restart
-}
-
-// NewScheduledJob creates a new ScheduledJob.
-func NewScheduledJob(next time.Time, job Job, typ ScheduleType) *ScheduledJob {
-	return &ScheduledJob{next, job, typ}
 }
 
 var _ EntryReader = (*entryReaderImpl)(nil)
 
 // entryReaderImpl manages DAGs on local filesystem.
 type entryReaderImpl struct {
-	targetDir   string
-	registry    map[string]*core.DAG
-	lock        sync.Mutex
-	dagStore    exec.DAGStore
-	dagRunMgr   runtime.Manager
-	executable  string
-	dagExecutor *DAGExecutor
-	watcher     filenotify.FileWatcher
-	quit        chan struct{}
-	closeOnce   sync.Once
-	events      chan DAGChangeEvent
+	targetDir string
+	registry  map[string]*core.DAG
+	lock      sync.Mutex
+	dagStore  exec.DAGStore // used by scheduler via type assertion for IsSuspended
+	watcher   filenotify.FileWatcher
+	quit      chan struct{}
+	closeOnce sync.Once
+	events    chan DAGChangeEvent
 }
 
 // NewEntryReader creates a new DAG manager with the given configuration.
-func NewEntryReader(dir string, dagCli exec.DAGStore, drm runtime.Manager, de *DAGExecutor, executable string) EntryReader {
+func NewEntryReader(dir string, dagCli exec.DAGStore) EntryReader {
 	return &entryReaderImpl{
-		targetDir:   dir,
-		registry:    make(map[string]*core.DAG),
-		dagStore:    dagCli,
-		dagRunMgr:   drm,
-		executable:  executable,
-		dagExecutor: de,
-		quit:        make(chan struct{}),
+		targetDir: dir,
+		registry:  make(map[string]*core.DAG),
+		dagStore:  dagCli,
+		quit:      make(chan struct{}),
 	}
 }
 
@@ -241,49 +219,6 @@ func (er *entryReaderImpl) Stop() {
 	})
 }
 
-
-// StopRestartJobs returns stop and restart scheduled jobs due at the given time.
-func (er *entryReaderImpl) StopRestartJobs(ctx context.Context, now time.Time) []*ScheduledJob {
-	er.lock.Lock()
-	defer er.lock.Unlock()
-
-	var jobs []*ScheduledJob
-
-	for _, dag := range er.registry {
-		dagName := strings.TrimSuffix(filepath.Base(dag.Location), filepath.Ext(dag.Location))
-		if er.dagStore.IsSuspended(ctx, dagName) {
-			continue
-		}
-
-		schedules := []struct {
-			items []core.Schedule
-			typ   ScheduleType
-		}{
-			{dag.StopSchedule, ScheduleTypeStop},
-			{dag.RestartSchedule, ScheduleTypeRestart},
-		}
-
-		for _, s := range schedules {
-			for _, schedule := range s.items {
-				next := schedule.Parsed.Next(now)
-				job := NewScheduledJob(next, er.createJob(dag, next, schedule.Parsed), s.typ)
-				jobs = append(jobs, job)
-			}
-		}
-	}
-
-	return jobs
-}
-
-func (er *entryReaderImpl) createJob(dag *core.DAG, next time.Time, schedule cron.Schedule) Job {
-	return &DAGRunJob{
-		DAG:         dag,
-		Next:        next,
-		Schedule:    schedule,
-		Client:      er.dagRunMgr,
-		DAGExecutor: er.dagExecutor,
-	}
-}
 
 func (er *entryReaderImpl) DAGs() []*core.DAG {
 	er.lock.Lock()

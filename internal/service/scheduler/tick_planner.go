@@ -15,7 +15,6 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
-	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
 // DAGChangeType identifies the kind of DAG lifecycle event.
@@ -40,6 +39,7 @@ type PlannedRun struct {
 	RunID         string
 	ScheduledTime time.Time
 	TriggerType   core.TriggerType
+	ScheduleType  ScheduleType
 }
 
 // DispatchFunc dispatches a catch-up or scheduled run for the given DAG.
@@ -57,6 +57,12 @@ type GetLatestStatusFunc func(ctx context.Context, dag *core.DAG) (exec.DAGRunSt
 // IsSuspendedFunc checks whether a DAG is currently suspended.
 type IsSuspendedFunc func(ctx context.Context, dagName string) bool
 
+// StopFunc stops a running DAG.
+type StopFunc func(ctx context.Context, dag *core.DAG) error
+
+// RestartFunc restarts a DAG unconditionally.
+type RestartFunc func(ctx context.Context, dag *core.DAG) error
+
 // TickPlannerConfig holds the dependencies for creating a TickPlanner.
 type TickPlannerConfig struct {
 	WatermarkStore  WatermarkStore
@@ -65,7 +71,10 @@ type TickPlannerConfig struct {
 	IsRunning       IsRunningFunc
 	GenRunID        RunIDFunc
 	Dispatch        DispatchFunc
+	Stop            StopFunc
+	Restart         RestartFunc
 	Clock           Clock
+	Location        *time.Location // timezone for cron schedule evaluation
 	Events          <-chan DAGChangeEvent
 }
 
@@ -121,8 +130,17 @@ func NewTickPlanner(cfg TickPlannerConfig) *TickPlanner {
 			return exec.DAGRunStatus{}, nil
 		}
 	}
+	if cfg.Stop == nil {
+		cfg.Stop = func(context.Context, *core.DAG) error { return nil }
+	}
+	if cfg.Restart == nil {
+		cfg.Restart = func(context.Context, *core.DAG) error { return nil }
+	}
 	if cfg.Clock == nil {
 		cfg.Clock = time.Now
+	}
+	if cfg.Location == nil {
+		cfg.Location = time.Local
 	}
 	return &TickPlanner{
 		cfg:     cfg,
@@ -310,7 +328,7 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 			continue
 		}
 
-		// Evaluate cron schedules for live runs
+		// Evaluate cron schedules for live start runs
 		for _, schedule := range entry.schedules {
 			if schedule.Parsed == nil {
 				continue
@@ -332,6 +350,53 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 			if ok {
 				candidates = append(candidates, run)
 			}
+		}
+
+		// Evaluate stop schedules.
+		// Use Location-adjusted time for timezone parity with the previous implementation.
+		evalTime := now.In(tp.cfg.Location)
+		for _, schedule := range entry.dag.StopSchedule {
+			if schedule.Parsed == nil {
+				continue
+			}
+			next := schedule.Parsed.Next(evalTime.Add(-time.Second))
+			if next.After(evalTime) {
+				continue
+			}
+
+			// Guard: DAG must be running (matches DAGRunJob.Stop behavior)
+			latestStatus, err := tp.cfg.GetLatestStatus(ctx, entry.dag)
+			if err != nil {
+				logger.Error(ctx, "Failed to fetch DAG status for stop schedule",
+					tag.DAG(dagName), tag.Error(err))
+				continue
+			}
+			if latestStatus.Status != core.Running {
+				continue
+			}
+
+			candidates = append(candidates, PlannedRun{
+				DAG:           entry.dag,
+				ScheduledTime: next,
+				ScheduleType:  ScheduleTypeStop,
+			})
+		}
+
+		// Evaluate restart schedules (no guard — fires unconditionally).
+		for _, schedule := range entry.dag.RestartSchedule {
+			if schedule.Parsed == nil {
+				continue
+			}
+			next := schedule.Parsed.Next(evalTime.Add(-time.Second))
+			if next.After(evalTime) {
+				continue
+			}
+
+			candidates = append(candidates, PlannedRun{
+				DAG:           entry.dag,
+				ScheduledTime: next,
+				ScheduleType:  ScheduleTypeRestart,
+			})
 		}
 	}
 
@@ -606,33 +671,29 @@ func (tp *TickPlanner) recomputeBuffer(ctx context.Context, dag *core.DAG) {
 	)
 }
 
-// DispatchRun dispatches a PlannedRun using the configured dispatch function.
+// DispatchRun dispatches a PlannedRun using the configured dispatch functions.
 func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 	logger.Info(ctx, "Dispatching planned run",
 		tag.DAG(run.DAG.Name),
-		tag.RunID(run.RunID),
-		slog.String("triggerType", run.TriggerType.String()),
+		slog.String("scheduleType", run.ScheduleType.String()),
 		slog.String("scheduledTime", run.ScheduledTime.Format(time.RFC3339)),
 	)
 
-	if err := tp.cfg.Dispatch(ctx, run.DAG, run.RunID, run.TriggerType); err != nil {
+	var err error
+	switch run.ScheduleType {
+	case ScheduleTypeStart:
+		err = tp.cfg.Dispatch(ctx, run.DAG, run.RunID, run.TriggerType)
+	case ScheduleTypeStop:
+		err = tp.cfg.Stop(ctx, run.DAG)
+	case ScheduleTypeRestart:
+		err = tp.cfg.Restart(ctx, run.DAG)
+	}
+
+	if err != nil {
 		logger.Error(ctx, "Failed to dispatch run",
 			tag.DAG(run.DAG.Name),
-			tag.RunID(run.RunID),
+			slog.String("scheduleType", run.ScheduleType.String()),
 			tag.Error(err),
 		)
 	}
-}
-
-// HandleJobDirect dispatches a DAG execution directly (for stop/restart).
-// This is a passthrough to the underlying dispatch function via the DAGExecutor.
-func HandleJobDirect(
-	ctx context.Context,
-	dagExecutor *DAGExecutor,
-	dag *core.DAG,
-	operation coordinatorv1.Operation,
-	runID string,
-	triggerType core.TriggerType,
-) error {
-	return dagExecutor.HandleJob(ctx, dag, operation, runID, triggerType)
 }

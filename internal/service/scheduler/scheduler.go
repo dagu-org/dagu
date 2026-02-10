@@ -2,13 +2,10 @@ package scheduler
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -23,16 +20,6 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
-
-// Job is the interface for the actual DAG.
-type Job interface {
-	// GetDAG returns the DAG associated with this job.
-	GetDAG(ctx context.Context) *core.DAG
-	// Stop stops the DAG.
-	Stop(ctx context.Context) error
-	// Restart restarts the DAG.
-	Restart(ctx context.Context) error
-}
 
 // Clock is a function that returns the current time.
 // It can be replaced for testing purposes.
@@ -125,8 +112,15 @@ func New(
 				runID, triggerType,
 			)
 		},
-		Clock:  defaultClock,
-		Events: eventCh,
+		Stop: func(ctx context.Context, dag *core.DAG) error {
+			return drm.Stop(ctx, dag, "")
+		},
+		Restart: func(ctx context.Context, dag *core.DAG) error {
+			return dagExecutor.Restart(ctx, dag)
+		},
+		Clock:    defaultClock,
+		Location: timeLoc,
+		Events:   eventCh,
 	})
 
 	return &Scheduler{
@@ -154,6 +148,12 @@ func New(
 func (s *Scheduler) SetClock(clock Clock) {
 	s.clock = clock
 	s.planner.cfg.Clock = clock
+}
+
+// SetRestartFunc overrides the planner's restart function for testing purposes.
+// This must be called before Start().
+func (s *Scheduler) SetRestartFunc(fn RestartFunc) {
+	s.planner.cfg.Restart = fn
 }
 
 // DisableHealthServer disables the health check server (used when running from start-all)
@@ -329,14 +329,11 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 		case <-timer.C:
 			_ = timer.Stop()
 
-			// Start schedules: unified plan + dispatch
+			// Plan and dispatch all schedules (start, stop, restart)
 			for _, run := range s.planner.Plan(ctx, tickTime) {
 				s.dispatchRun(ctx, run)
 			}
 			s.planner.Advance(tickTime)
-
-			// Stop/restart schedules: direct dispatch (unchanged)
-			s.invokeStopRestartJobs(ctx, tickTime)
 
 			tickTime = s.NextTick(tickTime)
 			timer.Reset(tickTime.Sub(s.clock()))
@@ -433,69 +430,3 @@ func (s *Scheduler) dispatchRun(ctx context.Context, run PlannedRun) {
 	}()
 }
 
-// invokeStopRestartJobs handles stop and restart schedule types.
-func (s *Scheduler) invokeStopRestartJobs(ctx context.Context, now time.Time) {
-	jobs := s.entryReader.StopRestartJobs(ctx, now.Add(-time.Second).In(s.location))
-
-	sort.SliceStable(jobs, func(i, j int) bool {
-		return jobs[i].Next.Before(jobs[j].Next)
-	})
-
-	for _, job := range jobs {
-		if job.Next.After(now) {
-			break
-		}
-
-		jobCtx := logger.WithValues(ctx,
-			tag.Job(fmt.Sprintf("%v", job.Job)),
-			slog.String("jobType", job.Type.String()),
-			slog.String("scheduledTime", job.Next.Format(time.RFC3339)),
-		)
-
-		go func(ctx context.Context, job *ScheduledJob) {
-			defer func() {
-				if r := recover(); r != nil {
-					logger.Error(ctx, "Job invocation panicked", tag.Error(panicToError(r)))
-				}
-			}()
-			if err := job.invoke(ctx); err != nil {
-				switch {
-				case errors.Is(err, ErrJobRunning):
-					logger.Info(ctx, "Job already in progress")
-				case errors.Is(err, ErrJobIsNotRunning):
-					logger.Info(ctx, "Job is not running")
-				default:
-					logger.Error(ctx, "Job execution failed",
-						tag.Error(err),
-						tag.Type(fmt.Sprintf("%T", err)),
-					)
-				}
-			} else {
-				logger.Info(ctx, "Job completed successfully")
-			}
-		}(jobCtx, job)
-	}
-}
-
-// invoke invokes the job based on the schedule type.
-func (s *ScheduledJob) invoke(ctx context.Context) error {
-	if s.Job == nil {
-		return fmt.Errorf("job is nil")
-	}
-
-	logger.Info(ctx, "Starting operation",
-		tag.Type(s.Type.String()),
-		tag.Job(fmt.Sprintf("%v", s.Job)),
-	)
-
-	switch s.Type {
-	case ScheduleTypeStop:
-		return s.Job.Stop(ctx)
-	case ScheduleTypeRestart:
-		return s.Job.Restart(ctx)
-	case ScheduleTypeStart:
-		return fmt.Errorf("start schedule type should not reach stop/restart path")
-	}
-
-	return nil
-}

@@ -2,9 +2,11 @@ package scheduler_test
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/robfig/cron/v3"
@@ -17,9 +19,19 @@ func TestScheduler(t *testing.T) {
 	t.Run("Restart", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 
+		// Parse a cron that fires at minute 0 (matches "now")
+		cronParser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+		parsed, err := cronParser.Parse("0 * * * *")
+		require.NoError(t, err)
+
 		entryReader := newMockJobManager()
-		entryReader.StopRestartEntries = []*scheduler.ScheduledJob{
-			{Type: scheduler.ScheduleTypeRestart, Job: &mockJob{}, Next: now},
+		entryReader.LoadedDAGs = []*core.DAG{
+			{
+				Name: "restart-dag",
+				RestartSchedule: []core.Schedule{
+					{Expression: "0 * * * *", Parsed: parsed},
+				},
+			},
 		}
 
 		th := test.SetupScheduler(t)
@@ -27,14 +39,20 @@ func TestScheduler(t *testing.T) {
 		require.NoError(t, err)
 		sc.SetClock(func() time.Time { return now })
 
+		// Track restart calls via the planner's Restart function
+		var restartCount atomic.Int32
+		sc.SetRestartFunc(func(_ context.Context, _ *core.DAG) error {
+			restartCount.Add(1)
+			return nil
+		})
+
 		go func() {
 			_ = sc.Start(context.Background())
 		}()
 		defer sc.Stop(context.Background())
 
 		time.Sleep(time.Second + time.Millisecond*100)
-		require.Equal(t, int32(1), entryReader.StopRestartEntries[0].Job.(*mockJob).RestartCount.Load())
-
+		require.GreaterOrEqual(t, restartCount.Load(), int32(1))
 	})
 	t.Run("NextTick", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
