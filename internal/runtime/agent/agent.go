@@ -939,7 +939,7 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 				transform.WithAttemptID(a.dagRunAttemptID),
 				transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
 				transform.WithTriggerType(a.triggerType),
-				)
+			)
 	}
 
 	runnerStatus := a.runner.Status(ctx, a.plan)

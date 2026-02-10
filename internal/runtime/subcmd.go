@@ -306,10 +306,10 @@ type StartOptions struct {
 	Quiet    bool   // Whether to run in quiet mode
 	DAGRunID string // ID for the dag-run
 
-	NameOverride  string // Optional DAG name override
-	FromRunID     string // Historic dag-run ID to use as a template
-	Target        string // Optional CLI argument override (DAG name or file path)
-	TriggerType string // How this DAG run was initiated (scheduler, manual, webhook, subdag)
+	NameOverride string // Optional DAG name override
+	FromRunID    string // Historic dag-run ID to use as a template
+	Target       string // Optional CLI argument override (DAG name or file path)
+	TriggerType  string // How this DAG run was initiated (scheduler, manual, webhook, subdag)
 }
 
 // EnqueueOptions contains options for enqueuing a dag-run.

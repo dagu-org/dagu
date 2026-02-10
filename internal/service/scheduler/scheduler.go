@@ -51,18 +51,18 @@ type Scheduler struct {
 	queueStore          exec.QueueStore
 	procStore           exec.ProcStore
 	config              *config.Config
-	dirLock             dirlock.DirLock  // File-based lock to prevent multiple scheduler instances
+	dirLock             dirlock.DirLock // File-based lock to prevent multiple scheduler instances
 	dagExecutor         *DAGExecutor
-	healthServer        *HealthServer    // Health check server for monitoring
+	healthServer        *HealthServer // Health check server for monitoring
 	serviceRegistry     exec.ServiceRegistry
-	disableHealthServer bool             // Disable health server when running from start-all
-	zombieDetector      *ZombieDetector  // Zombie DAG run detector
-	instanceID          string           // Unique instance identifier for service registry
-	queueProcessor      *QueueProcessor  // Processor for queued DAG runs
-	catchupManager      *CatchupManager  // Watermark persistence and catch-up buffer processing
+	disableHealthServer bool            // Disable health server when running from start-all
+	zombieDetector      *ZombieDetector // Zombie DAG run detector
+	instanceID          string          // Unique instance identifier for service registry
+	queueProcessor      *QueueProcessor // Processor for queued DAG runs
+	catchupManager      *CatchupManager // Watermark persistence and catch-up buffer processing
 	stopOnce            sync.Once
 	lock                sync.Mutex
-	clock               Clock            // Clock function for getting current time
+	clock               Clock // Clock function for getting current time
 }
 
 // New constructs a Scheduler from the provided stores, runtime manager,

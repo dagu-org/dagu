@@ -35,7 +35,7 @@ func TestStore_SaveAndLoad(t *testing.T) {
 		Version:  1,
 		LastTick: now,
 		DAGs: map[string]core.DAGWatermark{
-			"hourly-etl": {LastScheduledTime: now.Add(-time.Hour)},
+			"hourly-etl":   {LastScheduledTime: now.Add(-time.Hour)},
 			"daily-report": {LastScheduledTime: now.Add(-24 * time.Hour)},
 		},
 	}
