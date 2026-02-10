@@ -28,8 +28,6 @@ import (
 type Job interface {
 	// GetDAG returns the DAG associated with this job.
 	GetDAG(ctx context.Context) *core.DAG
-	// Start starts the DAG.
-	Start(ctx context.Context) error
 	// Stop stops the DAG.
 	Stop(ctx context.Context) error
 	// Restart restarts the DAG.
@@ -59,7 +57,7 @@ type Scheduler struct {
 	zombieDetector      *ZombieDetector // Zombie DAG run detector
 	instanceID          string          // Unique instance identifier for service registry
 	queueProcessor      *QueueProcessor // Processor for queued DAG runs
-	catchupManager      *CatchupManager // Watermark persistence and catch-up buffer processing
+	planner             *TickPlanner    // Unified scheduling decision module
 	stopOnce            sync.Once
 	lock                sync.Mutex
 	clock               Clock // Clock function for getting current time
@@ -99,18 +97,18 @@ func New(
 		cfg.Queues,
 	)
 	defaultClock := Clock(time.Now)
-	catchupMgr := NewCatchupManager(CatchupManagerConfig{
-		WatermarkStore: watermarkStore,
-		Dispatch: func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error {
-			return dagExecutor.HandleJob(
-				ctx, dag,
-				coordinatorv1.Operation_OPERATION_START,
-				runID, triggerType,
-			)
-		},
-		GenRunID: func(ctx context.Context) (string, error) {
-			return drm.GenDAGRunID(ctx)
-		},
+
+	// Resolve IsSuspended once at construction time.
+	var isSuspended IsSuspendedFunc
+	if ds, ok := er.(*entryReaderImpl); ok {
+		isSuspended = ds.dagStore.IsSuspended
+	}
+
+	// Create the TickPlanner with the event channel from the EntryReader
+	planner := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore:  watermarkStore,
+		IsSuspended:     isSuspended,
+		GetLatestStatus: drm.GetLatestStatus,
 		IsRunning: func(ctx context.Context, dag *core.DAG) (bool, error) {
 			count, err := procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
 			if err != nil {
@@ -118,8 +116,18 @@ func New(
 			}
 			return count > 0, nil
 		},
-		Clock: defaultClock,
+		GenRunID: drm.GenDAGRunID,
+		Dispatch: func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error {
+			return dagExecutor.HandleJob(
+				ctx, dag,
+				coordinatorv1.Operation_OPERATION_START,
+				runID, triggerType,
+			)
+		},
+		Clock:  defaultClock,
+		Events: er.Events(),
 	})
+
 	return &Scheduler{
 		logDir:          cfg.Paths.LogDir,
 		quit:            make(chan any),
@@ -135,7 +143,7 @@ func New(
 		healthServer:    healthServer,
 		serviceRegistry: reg,
 		queueProcessor:  processor,
-		catchupManager:  catchupMgr,
+		planner:         planner,
 		clock:           defaultClock,
 	}, nil
 }
@@ -144,7 +152,7 @@ func New(
 // This must be called before Start().
 func (s *Scheduler) SetClock(clock Clock) {
 	s.clock = clock
-	s.catchupManager.clock = clock
+	s.planner.cfg.Clock = clock
 }
 
 // DisableHealthServer disables the health check server (used when running from start-all)
@@ -232,7 +240,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		s.catchupManager.StartFlusher(ctx)
+		s.planner.StartFlusher(ctx)
 	}()
 
 	if err := s.entryReader.Init(ctx); err != nil {
@@ -240,8 +248,8 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		return err
 	}
 
-	if err := s.catchupManager.Init(ctx, s.entryReader.DAGs()); err != nil {
-		logger.Error(ctx, "Failed to initialize catch-up manager", tag.Error(err))
+	if err := s.planner.Init(ctx, s.entryReader.DAGs()); err != nil {
+		logger.Error(ctx, "Failed to initialize tick planner", tag.Error(err))
 	}
 
 	wg.Add(1)
@@ -323,9 +331,16 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 			return
 		case <-timer.C:
 			_ = timer.Stop()
-			s.invokeJobs(ctx, tickTime)
-			s.catchupManager.ProcessBuffers(ctx)
-			s.catchupManager.AdvanceWatermark(tickTime)
+
+			// Start schedules: unified plan + dispatch
+			for _, run := range s.planner.Plan(ctx, tickTime) {
+				s.dispatchRun(ctx, run)
+			}
+			s.planner.Advance(tickTime)
+
+			// Stop/restart schedules: direct dispatch (unchanged)
+			s.invokeStopRestartJobs(ctx, tickTime)
+
 			tickTime = s.NextTick(tickTime)
 			timer.Reset(tickTime.Sub(s.clock()))
 		}
@@ -372,7 +387,7 @@ func (s *Scheduler) Stop(ctx context.Context) {
 			s.zombieDetector.Stop(ctx)
 		}
 
-		s.catchupManager.Flush(ctx)
+		s.planner.Flush(ctx)
 
 		if err := s.dirLock.Unlock(); err != nil {
 			logger.Error(ctx, "Failed to release scheduler lock in Stop", tag.Error(err))
@@ -406,19 +421,24 @@ func (s *Scheduler) stopCron(ctx context.Context) {
 	logger.Info(ctx, "Scheduler stopped")
 }
 
-// invokeJobs executes the scheduled jobs at the current time.
-func (s *Scheduler) invokeJobs(ctx context.Context, now time.Time) {
-	if !s.dirLock.IsHeldByMe() {
-		logger.Error(ctx, "Scheduler lock is not held, cannot run jobs")
-		return
-	}
+// dispatchRun dispatches a planned run in a goroutine.
+func (s *Scheduler) dispatchRun(ctx context.Context, run PlannedRun) {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error(ctx, "Run dispatch panicked",
+					tag.DAG(run.DAG.Name),
+					tag.Error(panicToError(r)),
+				)
+			}
+		}()
+		s.planner.DispatchRun(ctx, run)
+	}()
+}
 
-	// Subtract one second to avoid edge cases with exact timing.
-	jobs, err := s.entryReader.Next(ctx, now.Add(-time.Second).In(s.location))
-	if err != nil {
-		logger.Error(ctx, "Failed to get next jobs", tag.Error(err))
-		return
-	}
+// invokeStopRestartJobs handles stop and restart schedule types.
+func (s *Scheduler) invokeStopRestartJobs(ctx context.Context, now time.Time) {
+	jobs := s.entryReader.StopRestartJobs(ctx, now.Add(-time.Second).In(s.location))
 
 	sort.SliceStable(jobs, func(i, j int) bool {
 		return jobs[i].Next.Before(jobs[j].Next)
@@ -435,21 +455,6 @@ func (s *Scheduler) invokeJobs(ctx context.Context, now time.Time) {
 			slog.String("scheduledTime", job.Next.Format(time.RFC3339)),
 		)
 
-		// For start jobs, route through catch-up buffer if one exists
-		if job.Type == ScheduleTypeStart {
-			if dag := job.Job.GetDAG(jobCtx); dag != nil {
-				if s.catchupManager.RouteToBuffer(dag.Name, QueueItem{
-					DAG:           dag,
-					ScheduledTime: job.Next,
-					TriggerType:   core.TriggerTypeScheduler,
-					ScheduleType:  job.Type,
-				}) {
-					continue
-				}
-			}
-		}
-
-		// No buffer — dispatch directly
 		go func(ctx context.Context, job *ScheduledJob) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -458,14 +463,10 @@ func (s *Scheduler) invokeJobs(ctx context.Context, now time.Time) {
 			}()
 			if err := job.invoke(ctx); err != nil {
 				switch {
-				case errors.Is(err, ErrJobFinished):
-					logger.Info(ctx, "Job already completed")
 				case errors.Is(err, ErrJobRunning):
 					logger.Info(ctx, "Job already in progress")
-				case errors.Is(err, ErrJobSkipped):
-					logger.Info(ctx, "Job execution skipped",
-						tag.Reason(err.Error()),
-					)
+				case errors.Is(err, ErrJobIsNotRunning):
+					logger.Info(ctx, "Job is not running")
 				default:
 					logger.Error(ctx, "Job execution failed",
 						tag.Error(err),
@@ -491,13 +492,13 @@ func (s *ScheduledJob) invoke(ctx context.Context) error {
 	)
 
 	switch s.Type {
-	case ScheduleTypeStart:
-		return s.Job.Start(ctx)
 	case ScheduleTypeStop:
 		return s.Job.Stop(ctx)
 	case ScheduleTypeRestart:
 		return s.Job.Restart(ctx)
-	default:
-		return fmt.Errorf("unknown schedule type: %v", s.Type)
+	case ScheduleTypeStart:
+		return fmt.Errorf("start schedule type should not reach stop/restart path")
 	}
+
+	return nil
 }

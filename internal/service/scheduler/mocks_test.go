@@ -12,11 +12,15 @@ import (
 var _ scheduler.EntryReader = (*mockJobManager)(nil)
 
 type mockJobManager struct {
-	Entries []*scheduler.ScheduledJob
+	StopRestartEntries []*scheduler.ScheduledJob
+	LoadedDAGs         []*core.DAG
+	EventCh            chan scheduler.DAGChangeEvent
 }
 
-func (er *mockJobManager) Next(_ context.Context, _ time.Time) ([]*scheduler.ScheduledJob, error) {
-	return er.Entries, nil
+func newMockJobManager() *mockJobManager {
+	return &mockJobManager{
+		EventCh: make(chan scheduler.DAGChangeEvent, 256),
+	}
 }
 
 func (er *mockJobManager) Init(_ context.Context) error {
@@ -30,7 +34,15 @@ func (er *mockJobManager) Stop() {
 }
 
 func (er *mockJobManager) DAGs() []*core.DAG {
-	return nil
+	return er.LoadedDAGs
+}
+
+func (er *mockJobManager) Events() <-chan scheduler.DAGChangeEvent {
+	return er.EventCh
+}
+
+func (er *mockJobManager) StopRestartJobs(_ context.Context, _ time.Time) []*scheduler.ScheduledJob {
+	return er.StopRestartEntries
 }
 
 var _ scheduler.Job = (*mockJob)(nil)
@@ -38,7 +50,6 @@ var _ scheduler.Job = (*mockJob)(nil)
 type mockJob struct {
 	DAG          *core.DAG
 	Name         string
-	RunCount     atomic.Int32
 	StopCount    atomic.Int32
 	RestartCount atomic.Int32
 	Panic        error
@@ -48,14 +59,6 @@ func (j *mockJob) GetDAG(_ context.Context) *core.DAG {
 	return j.DAG
 }
 
-func (j *mockJob) Start(_ context.Context) error {
-	j.RunCount.Add(1)
-	if j.Panic != nil {
-		panic(j.Panic)
-	}
-	return nil
-}
-
 func (j *mockJob) Stop(_ context.Context) error {
 	j.StopCount.Add(1)
 	return nil
@@ -63,6 +66,9 @@ func (j *mockJob) Stop(_ context.Context) error {
 
 func (j *mockJob) Restart(_ context.Context) error {
 	j.RestartCount.Add(1)
+	if j.Panic != nil {
+		panic(j.Panic)
+	}
 	return nil
 }
 

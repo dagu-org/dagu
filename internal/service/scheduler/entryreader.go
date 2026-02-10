@@ -23,20 +23,26 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-// EntryReader is responsible for managing scheduled Jobs.
+// eventChannelSize is the buffer size for DAG change events.
+// Handles bursts (e.g., bulk DAG file copy) without blocking the file watcher.
+const eventChannelSize = 256
+
+// EntryReader is responsible for managing DAG definitions and watching for changes.
 type EntryReader interface {
 	// Init initializes the DAG registry by loading all DAGs from the target directory.
-	// This must be called before Start or Next.
+	// This must be called before Start.
 	Init(ctx context.Context) error
 	// Start starts watching the DAG directory for changes.
 	// This method blocks until Stop is called or context is canceled.
 	Start(ctx context.Context)
 	// Stop stops watching the DAG directory.
 	Stop()
-	// Next returns the next scheduled jobs.
-	Next(ctx context.Context, now time.Time) ([]*ScheduledJob, error)
 	// DAGs returns a snapshot of all currently loaded DAG definitions.
 	DAGs() []*core.DAG
+	// Events returns a receive-only channel of DAG lifecycle events.
+	Events() <-chan DAGChangeEvent
+	// StopRestartJobs returns stop and restart scheduled jobs due at the given time.
+	StopRestartJobs(ctx context.Context, now time.Time) []*ScheduledJob
 }
 
 // ScheduledJob stores the next time a job should be run and the job itself.
@@ -65,6 +71,7 @@ type entryReaderImpl struct {
 	watcher     filenotify.FileWatcher
 	quit        chan struct{}
 	closeOnce   sync.Once
+	events      chan DAGChangeEvent
 }
 
 // NewEntryReader creates a new DAG manager with the given configuration.
@@ -77,6 +84,7 @@ func NewEntryReader(dir string, dagCli exec.DAGStore, drm runtime.Manager, de *D
 		executable:  executable,
 		dagExecutor: de,
 		quit:        make(chan struct{}),
+		events:      make(chan DAGChangeEvent, eventChannelSize),
 	}
 }
 
@@ -122,30 +130,7 @@ func (er *entryReaderImpl) Start(ctx context.Context) {
 				continue
 			}
 
-			er.lock.Lock()
-			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				filePath := filepath.Join(er.targetDir, filepath.Base(event.Name))
-				dag, err := spec.Load(
-					ctx,
-					filePath,
-					spec.OnlyMetadata(),
-					spec.WithoutEval(),
-					spec.SkipSchemaValidation(),
-				)
-				if err != nil {
-					logger.Error(ctx, "DAG load failed",
-						tag.Error(err),
-						tag.File(event.Name))
-				} else {
-					er.registry[filepath.Base(event.Name)] = dag
-					logger.Info(ctx, "DAG added/updated", tag.Name(filepath.Base(event.Name)))
-				}
-			}
-			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
-				delete(er.registry, filepath.Base(event.Name))
-				logger.Info(ctx, "DAG removed", tag.Name(filepath.Base(event.Name)))
-			}
-			er.lock.Unlock()
+			er.handleFSEvent(ctx, event)
 
 		case err, ok := <-er.watcher.Errors():
 			if !ok {
@@ -153,6 +138,96 @@ func (er *entryReaderImpl) Start(ctx context.Context) {
 			}
 			logger.Error(ctx, "Watcher error", tag.Error(err))
 		}
+	}
+}
+
+// handleFSEvent processes a filesystem event and emits a DAGChangeEvent.
+func (er *entryReaderImpl) handleFSEvent(ctx context.Context, event fsnotify.Event) {
+	fileName := filepath.Base(event.Name)
+
+	if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
+		filePath := filepath.Join(er.targetDir, fileName)
+		dag, err := spec.Load(
+			ctx,
+			filePath,
+			spec.OnlyMetadata(),
+			spec.WithoutEval(),
+			spec.SkipSchemaValidation(),
+		)
+		if err != nil {
+			logger.Error(ctx, "DAG load failed",
+				tag.Error(err),
+				tag.File(event.Name))
+			return
+		}
+
+		// Determine add vs update by checking registry existence before updating
+		er.lock.Lock()
+		_, existed := er.registry[fileName]
+
+		// Check if name changed (file is same but DAG name differs)
+		var oldDAGName string
+		if existed {
+			oldDAG := er.registry[fileName]
+			if oldDAG.Name != dag.Name {
+				oldDAGName = oldDAG.Name
+			}
+		}
+
+		er.registry[fileName] = dag
+		er.lock.Unlock()
+
+		// If name changed, emit delete for old name first
+		if oldDAGName != "" {
+			er.sendEvent(ctx, DAGChangeEvent{
+				Type:    DAGChangeDeleted,
+				DAGName: oldDAGName,
+			})
+		}
+
+		if existed && oldDAGName == "" {
+			er.sendEvent(ctx, DAGChangeEvent{
+				Type:    DAGChangeUpdated,
+				DAG:     dag,
+				DAGName: dag.Name,
+			})
+		} else {
+			er.sendEvent(ctx, DAGChangeEvent{
+				Type:    DAGChangeAdded,
+				DAG:     dag,
+				DAGName: dag.Name,
+			})
+		}
+		logger.Info(ctx, "DAG added/updated", tag.Name(fileName))
+		return
+	}
+
+	if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
+		// Capture DAG name from registry before deleting
+		er.lock.Lock()
+		dag, existed := er.registry[fileName]
+		delete(er.registry, fileName)
+		er.lock.Unlock()
+
+		if existed && dag != nil {
+			er.sendEvent(ctx, DAGChangeEvent{
+				Type:    DAGChangeDeleted,
+				DAGName: dag.Name,
+			})
+		}
+		logger.Info(ctx, "DAG removed", tag.Name(fileName))
+	}
+}
+
+// sendEvent sends a DAGChangeEvent on the channel. Non-blocking: drops and warns if full.
+func (er *entryReaderImpl) sendEvent(ctx context.Context, event DAGChangeEvent) {
+	select {
+	case er.events <- event:
+	default:
+		logger.Warn(ctx, "DAG event channel full, dropping event",
+			tag.DAG(event.DAGName),
+			slog.Int("type", int(event.Type)),
+		)
 	}
 }
 
@@ -168,7 +243,13 @@ func (er *entryReaderImpl) Stop() {
 	})
 }
 
-func (er *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*ScheduledJob, error) {
+// Events returns a receive-only channel of DAG lifecycle events.
+func (er *entryReaderImpl) Events() <-chan DAGChangeEvent {
+	return er.events
+}
+
+// StopRestartJobs returns stop and restart scheduled jobs due at the given time.
+func (er *entryReaderImpl) StopRestartJobs(ctx context.Context, now time.Time) []*ScheduledJob {
 	er.lock.Lock()
 	defer er.lock.Unlock()
 
@@ -177,7 +258,6 @@ func (er *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*Schedule
 	for _, dag := range er.registry {
 		dagName := strings.TrimSuffix(filepath.Base(dag.Location), filepath.Ext(dag.Location))
 		if er.dagStore.IsSuspended(ctx, dagName) {
-			logger.Debug(ctx, "Skipping suspended DAG", tag.DAG(dagName))
 			continue
 		}
 
@@ -185,7 +265,6 @@ func (er *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*Schedule
 			items []core.Schedule
 			typ   ScheduleType
 		}{
-			{dag.Schedule, ScheduleTypeStart},
 			{dag.StopSchedule, ScheduleTypeStop},
 			{dag.RestartSchedule, ScheduleTypeRestart},
 		}
@@ -199,7 +278,7 @@ func (er *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*Schedule
 		}
 	}
 
-	return jobs, nil
+	return jobs
 }
 
 func (er *entryReaderImpl) createJob(dag *core.DAG, next time.Time, schedule cron.Schedule) Job {
