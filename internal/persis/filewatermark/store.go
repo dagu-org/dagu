@@ -9,14 +9,14 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
-	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/service/scheduler"
 )
 
 const stateFileName = "state.json"
 
-var _ core.WatermarkStore = (*Store)(nil)
+var _ scheduler.WatermarkStore = (*Store)(nil)
 
-// Store implements core.WatermarkStore using a JSON file in the scheduler data directory.
+// Store implements scheduler.WatermarkStore using a JSON file in the scheduler data directory.
 type Store struct {
 	baseDir string
 }
@@ -29,7 +29,7 @@ func New(baseDir string) *Store {
 
 // Load reads the scheduler state from the state file.
 // If the file is missing or corrupt, it returns a fresh empty state.
-func (s *Store) Load(ctx context.Context) (*core.SchedulerState, error) {
+func (s *Store) Load(ctx context.Context) (*scheduler.SchedulerState, error) {
 	path := s.statePath()
 
 	data, err := os.ReadFile(filepath.Clean(path))
@@ -41,7 +41,7 @@ func (s *Store) Load(ctx context.Context) (*core.SchedulerState, error) {
 		return newEmptyState(), nil
 	}
 
-	var state core.SchedulerState
+	var state scheduler.SchedulerState
 	if err := json.Unmarshal(data, &state); err != nil {
 		logger.Warn(ctx, "Corrupt watermark state file, starting fresh",
 			tag.Error(err), tag.File(path))
@@ -49,14 +49,14 @@ func (s *Store) Load(ctx context.Context) (*core.SchedulerState, error) {
 	}
 
 	if state.DAGs == nil {
-		state.DAGs = make(map[string]core.DAGWatermark)
+		state.DAGs = make(map[string]scheduler.DAGWatermark)
 	}
 
 	return &state, nil
 }
 
 // Save writes the scheduler state atomically (temp file + rename).
-func (s *Store) Save(ctx context.Context, state *core.SchedulerState) error {
+func (s *Store) Save(ctx context.Context, state *scheduler.SchedulerState) error {
 	if err := os.MkdirAll(s.baseDir, 0o750); err != nil {
 		return fmt.Errorf("failed to create watermark directory: %w", err)
 	}
@@ -91,9 +91,9 @@ func (s *Store) statePath() string {
 	return filepath.Join(s.baseDir, stateFileName)
 }
 
-func newEmptyState() *core.SchedulerState {
-	return &core.SchedulerState{
+func newEmptyState() *scheduler.SchedulerState {
+	return &scheduler.SchedulerState{
 		Version: 1,
-		DAGs:    make(map[string]core.DAGWatermark),
+		DAGs:    make(map[string]scheduler.DAGWatermark),
 	}
 }

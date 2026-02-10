@@ -13,24 +13,24 @@ import (
 )
 
 type mockWatermarkStore struct {
-	state   *core.SchedulerState
+	state   *SchedulerState
 	loadErr error
 	saveErr error
 	mu      sync.Mutex
-	saved   []*core.SchedulerState
+	saved   []*SchedulerState
 }
 
-func (m *mockWatermarkStore) Load(_ context.Context) (*core.SchedulerState, error) {
+func (m *mockWatermarkStore) Load(_ context.Context) (*SchedulerState, error) {
 	if m.loadErr != nil {
 		return nil, m.loadErr
 	}
 	if m.state == nil {
-		return &core.SchedulerState{Version: 1, DAGs: make(map[string]core.DAGWatermark)}, nil
+		return &SchedulerState{Version: 1, DAGs: make(map[string]DAGWatermark)}, nil
 	}
 	return m.state, nil
 }
 
-func (m *mockWatermarkStore) Save(_ context.Context, state *core.SchedulerState) error {
+func (m *mockWatermarkStore) Save(_ context.Context, state *SchedulerState) error {
 	if m.saveErr != nil {
 		return m.saveErr
 	}
@@ -40,7 +40,7 @@ func (m *mockWatermarkStore) Save(_ context.Context, state *core.SchedulerState)
 	return nil
 }
 
-func (m *mockWatermarkStore) lastSaved() *core.SchedulerState {
+func (m *mockWatermarkStore) lastSaved() *SchedulerState {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if len(m.saved) == 0 {
@@ -49,7 +49,7 @@ func (m *mockWatermarkStore) lastSaved() *core.SchedulerState {
 	return m.saved[len(m.saved)-1]
 }
 
-func newTestCatchupManager(store core.WatermarkStore) *CatchupManager {
+func newTestCatchupManager(store WatermarkStore) *CatchupManager {
 	return NewCatchupManager(CatchupManagerConfig{
 		WatermarkStore: store,
 		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
@@ -69,11 +69,11 @@ func newTestCatchupManager(store core.WatermarkStore) *CatchupManager {
 
 // newMockWatermarkState creates a SchedulerState with the given lastTick and an
 // empty DAGs map. Most catchup manager tests share this setup.
-func newMockWatermarkState(lastTick time.Time) *core.SchedulerState {
-	return &core.SchedulerState{
+func newMockWatermarkState(lastTick time.Time) *SchedulerState {
+	return &SchedulerState{
 		Version:  1,
 		LastTick: lastTick,
-		DAGs:     make(map[string]core.DAGWatermark),
+		DAGs:     make(map[string]DAGWatermark),
 	}
 }
 
@@ -323,7 +323,7 @@ func TestCatchupManager_PrunesStaleDAGEntries(t *testing.T) {
 	t.Parallel()
 
 	state := newMockWatermarkState(time.Date(2026, 2, 7, 9, 0, 0, 0, time.UTC))
-	state.DAGs = map[string]core.DAGWatermark{
+	state.DAGs = map[string]DAGWatermark{
 		"active-dag":  {LastScheduledTime: time.Date(2026, 2, 7, 8, 0, 0, 0, time.UTC)},
 		"deleted-dag": {LastScheduledTime: time.Date(2026, 2, 7, 7, 0, 0, 0, time.UTC)},
 		"gone-dag":    {LastScheduledTime: time.Date(2026, 2, 7, 6, 0, 0, 0, time.UTC)},

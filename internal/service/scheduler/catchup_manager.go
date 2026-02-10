@@ -24,7 +24,7 @@ type IsRunningFunc func(ctx context.Context, dag *core.DAG) (bool, error)
 
 // CatchupManagerConfig holds the configuration for creating a CatchupManager.
 type CatchupManagerConfig struct {
-	WatermarkStore core.WatermarkStore
+	WatermarkStore WatermarkStore
 	Dispatch       DispatchFunc
 	GenRunID       RunIDFunc
 	IsRunning      IsRunningFunc
@@ -37,7 +37,7 @@ type CatchupManagerConfig struct {
 // from the cronLoop goroutine. StartFlusher and Flush may be called from other
 // goroutines. The internal RWMutex protects watermarkState for concurrent access.
 type CatchupManager struct {
-	watermarkStore core.WatermarkStore
+	watermarkStore WatermarkStore
 	dispatch       DispatchFunc
 	genRunID       RunIDFunc
 	isRunning      IsRunningFunc
@@ -46,7 +46,7 @@ type CatchupManager struct {
 	// mu protects watermarkState for concurrent access between
 	// the cronLoop (writer) and the flusher goroutine (reader).
 	mu              sync.RWMutex
-	watermarkState  *core.SchedulerState
+	watermarkState  *SchedulerState
 	watermarkDirty  atomic.Bool
 	scheduleBuffers map[string]*ScheduleBuffer
 }
@@ -288,10 +288,10 @@ func (cm *CatchupManager) Flush(ctx context.Context) {
 		cm.mu.RUnlock()
 		return
 	}
-	snapshot := &core.SchedulerState{
+	snapshot := &SchedulerState{
 		Version:  cm.watermarkState.Version,
 		LastTick: cm.watermarkState.LastTick,
-		DAGs:     make(map[string]core.DAGWatermark, len(cm.watermarkState.DAGs)),
+		DAGs:     make(map[string]DAGWatermark, len(cm.watermarkState.DAGs)),
 	}
 	maps.Copy(snapshot.DAGs, cm.watermarkState.DAGs)
 	cm.mu.RUnlock()
@@ -341,9 +341,9 @@ func (cm *CatchupManager) updateWatermarkDAG(dagName string, scheduledTime time.
 		return
 	}
 	if cm.watermarkState.DAGs == nil {
-		cm.watermarkState.DAGs = make(map[string]core.DAGWatermark)
+		cm.watermarkState.DAGs = make(map[string]DAGWatermark)
 	}
-	cm.watermarkState.DAGs[dagName] = core.DAGWatermark{
+	cm.watermarkState.DAGs[dagName] = DAGWatermark{
 		LastScheduledTime: scheduledTime,
 	}
 	cm.watermarkDirty.Store(true)

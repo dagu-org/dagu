@@ -1,4 +1,4 @@
-package core
+package scheduler
 
 import (
 	"context"
@@ -20,10 +20,6 @@ type DAGWatermark struct {
 
 // WatermarkStore persists scheduler watermark state to durable storage.
 type WatermarkStore interface {
-	// Load reads the scheduler state from storage.
-	// Returns a fresh state (Version=1) if the store is empty or corrupt.
 	Load(ctx context.Context) (*SchedulerState, error)
-
-	// Save writes the scheduler state to storage atomically.
 	Save(ctx context.Context, state *SchedulerState) error
 }
