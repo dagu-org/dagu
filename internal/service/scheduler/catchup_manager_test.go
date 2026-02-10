@@ -412,3 +412,243 @@ func TestCatchupManager_RouteToBufferFullFallback(t *testing.T) {
 	// Third should fail (buffer full), returning false so caller dispatches directly
 	assert.False(t, cm.RouteToBuffer("test-dag", QueueItem{DAG: dag, ScheduledTime: time.Now()}))
 }
+
+func TestCatchupManager_ProcessBuffersCleansEmpty(t *testing.T) {
+	t.Parallel()
+
+	parsed, err := cron.ParseStandard("0 * * * *")
+	require.NoError(t, err)
+
+	store := &mockWatermarkStore{
+		state: &core.SchedulerState{
+			Version:  1,
+			LastTick: time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC),
+			DAGs:     make(map[string]core.DAGWatermark),
+		},
+	}
+
+	cm := NewCatchupManager(CatchupManagerConfig{
+		WatermarkStore: store,
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			return nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "run-1", nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+	})
+
+	dag := &core.DAG{
+		Name:          "drain-dag",
+		CatchupWindow: 6 * time.Hour,
+		Schedule:      []core.Schedule{{Expression: "0 * * * *", Parsed: parsed}},
+	}
+	require.NoError(t, cm.Init(context.Background(), []*core.DAG{dag}))
+
+	cm.mu.RLock()
+	_, exists := cm.scheduleBuffers["drain-dag"]
+	cm.mu.RUnlock()
+	require.True(t, exists, "buffer should exist after init")
+
+	// Drain all items (1 per ProcessBuffers call)
+	for range 10 {
+		cm.ProcessBuffers(context.Background())
+	}
+
+	// Empty buffer should have been deleted from the map
+	cm.mu.RLock()
+	_, exists = cm.scheduleBuffers["drain-dag"]
+	cm.mu.RUnlock()
+	assert.False(t, exists, "empty buffer should be removed from map")
+}
+
+func TestCatchupManager_ProcessBuffersDispatchError(t *testing.T) {
+	t.Parallel()
+
+	parsed, err := cron.ParseStandard("0 * * * *")
+	require.NoError(t, err)
+
+	var dispatched int
+	store := &mockWatermarkStore{
+		state: &core.SchedulerState{
+			Version:  1,
+			LastTick: time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC),
+			DAGs:     make(map[string]core.DAGWatermark),
+		},
+	}
+
+	cm := NewCatchupManager(CatchupManagerConfig{
+		WatermarkStore: store,
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			dispatched++
+			return errors.New("DAG no longer exists")
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "run-1", nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+	})
+
+	dag := &core.DAG{
+		Name:          "fail-dag",
+		CatchupWindow: 6 * time.Hour,
+		Schedule:      []core.Schedule{{Expression: "0 * * * *", Parsed: parsed}},
+	}
+	require.NoError(t, cm.Init(context.Background(), []*core.DAG{dag}))
+
+	cm.mu.RLock()
+	initialLen := cm.scheduleBuffers["fail-dag"].Len()
+	cm.mu.RUnlock()
+	require.Greater(t, initialLen, 0)
+
+	// Drain all items despite dispatch errors
+	for range initialLen + 1 {
+		cm.ProcessBuffers(context.Background())
+	}
+
+	// All items should have been popped and dispatched (even with errors)
+	assert.Equal(t, initialLen, dispatched)
+
+	// Buffer should be cleaned up
+	cm.mu.RLock()
+	_, exists := cm.scheduleBuffers["fail-dag"]
+	cm.mu.RUnlock()
+	assert.False(t, exists, "buffer should be removed after draining")
+}
+
+func TestCatchupManager_ProcessBuffersIsRunningError(t *testing.T) {
+	t.Parallel()
+
+	parsed, err := cron.ParseStandard("0 * * * *")
+	require.NoError(t, err)
+
+	var dispatched int
+	store := &mockWatermarkStore{
+		state: &core.SchedulerState{
+			Version:  1,
+			LastTick: time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC),
+			DAGs:     make(map[string]core.DAGWatermark),
+		},
+	}
+
+	cm := NewCatchupManager(CatchupManagerConfig{
+		WatermarkStore: store,
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			dispatched++
+			return nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "run-1", nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, errors.New("proc store unavailable")
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+	})
+
+	dag := &core.DAG{
+		Name:          "err-dag",
+		CatchupWindow: 6 * time.Hour,
+		Schedule:      []core.Schedule{{Expression: "0 * * * *", Parsed: parsed}},
+	}
+	require.NoError(t, cm.Init(context.Background(), []*core.DAG{dag}))
+
+	cm.mu.RLock()
+	initialLen := cm.scheduleBuffers["err-dag"].Len()
+	cm.mu.RUnlock()
+	require.Greater(t, initialLen, 0)
+
+	// isRunning errors should default to "not running" and dispatch proceeds
+	cm.ProcessBuffers(context.Background())
+	assert.Equal(t, 1, dispatched, "should dispatch despite isRunning error")
+
+	// Buffer should have drained by one
+	cm.mu.RLock()
+	assert.Equal(t, initialLen-1, cm.scheduleBuffers["err-dag"].Len())
+	cm.mu.RUnlock()
+}
+
+func TestCatchupManager_NilWatermarkStoreFullPath(t *testing.T) {
+	t.Parallel()
+
+	cm := NewCatchupManager(CatchupManagerConfig{})
+
+	// Init with nil watermarkStore
+	require.NoError(t, cm.Init(context.Background(), []*core.DAG{{Name: "any-dag"}}))
+
+	// All operations should be safe no-ops
+	cm.AdvanceWatermark(time.Now())
+	cm.ProcessBuffers(context.Background())
+	cm.Flush(context.Background())
+
+	// RouteToBuffer should return false (no buffers)
+	assert.False(t, cm.RouteToBuffer("any-dag", QueueItem{}))
+
+	// No state should exist
+	cm.mu.RLock()
+	assert.Nil(t, cm.watermarkState)
+	assert.Nil(t, cm.scheduleBuffers)
+	cm.mu.RUnlock()
+}
+
+func TestCatchupManager_RouteToBufferAfterDrain(t *testing.T) {
+	t.Parallel()
+
+	parsed, err := cron.ParseStandard("0 * * * *")
+	require.NoError(t, err)
+
+	store := &mockWatermarkStore{
+		state: &core.SchedulerState{
+			Version:  1,
+			LastTick: time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC),
+			DAGs:     make(map[string]core.DAGWatermark),
+		},
+	}
+
+	cm := NewCatchupManager(CatchupManagerConfig{
+		WatermarkStore: store,
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			return nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "run-1", nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+	})
+
+	dag := &core.DAG{
+		Name:          "route-dag",
+		CatchupWindow: 6 * time.Hour,
+		Schedule:      []core.Schedule{{Expression: "0 * * * *", Parsed: parsed}},
+	}
+	require.NoError(t, cm.Init(context.Background(), []*core.DAG{dag}))
+
+	// RouteToBuffer should work initially
+	assert.True(t, cm.RouteToBuffer("route-dag", QueueItem{DAG: dag, ScheduledTime: time.Now()}))
+
+	// Drain all items
+	for range 10 {
+		cm.ProcessBuffers(context.Background())
+	}
+
+	// After drain + cleanup, RouteToBuffer should return false (buffer gone)
+	assert.False(t, cm.RouteToBuffer("route-dag", QueueItem{DAG: dag, ScheduledTime: time.Now()}),
+		"after buffer is drained and cleaned up, RouteToBuffer should fall through to direct dispatch")
+}

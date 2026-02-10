@@ -207,16 +207,21 @@ func (cm *CatchupManager) ProcessBuffers(ctx context.Context) {
 	for dagName, buf := range cm.scheduleBuffers {
 		item, ok := buf.Peek()
 		if !ok {
+			// Buffer fully drained — remove it from the map.
+			delete(cm.scheduleBuffers, dagName)
 			continue
 		}
 
 		running, err := cm.isRunning(ctx, item.DAG)
 		if err != nil {
-			logger.Error(ctx, "Failed to check if DAG is running",
+			// Treat as "not running" so the buffer keeps draining.
+			// If the DAG was deleted, dispatch will fail and the item is gone.
+			// If transient, the execution layer handles overlap.
+			logger.Error(ctx, "Failed to check if DAG is running, assuming not running",
 				tag.DAG(dagName),
 				tag.Error(err),
 			)
-			continue
+			running = false
 		}
 
 		if !running {
