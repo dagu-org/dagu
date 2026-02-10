@@ -108,6 +108,16 @@
       "type": "boolean",
       "description": "When true, Dagu checks if this DAG has already succeeded since the last scheduled time. If it has, Dagu will skip the current scheduled run. This is useful for resource-intensive tasks or data processing jobs that shouldn't run twice. Note: Manual triggers always run regardless of this setting."
     },
+    "catchupWindow": {
+      "type": "string",
+      "description": "Lookback horizon for replaying missed cron runs when the scheduler restarts. Accepts Go duration syntax with day support (e.g. \"6h\", \"2d12h\", \"30m\"). Must be positive. If omitted, missed runs are not replayed."
+    },
+    "overlapPolicy": {
+      "type": "string",
+      "enum": ["skip", "all"],
+      "default": "skip",
+      "description": "Controls what happens when a catchup run is ready but the DAG is still running from a previous run. \"skip\" (default) drops the catchup run and moves to the next. \"all\" keeps it in the buffer and retries on the next scheduler tick."
+    },
     "tags": {
       "oneOf": [
         {
