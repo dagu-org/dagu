@@ -74,8 +74,8 @@ type TickPlannerConfig struct {
 // tracks progress via watermarks, and reacts to DAG lifecycle changes.
 //
 // Thread safety:
-//   - entries and buffers are only accessed from Plan() and drainEvents(),
-//     both called from the cronLoop goroutine. No lock needed.
+//   - entries and buffers are protected by entryMu (accessed from drainEvents
+//     goroutine and cronLoop's Plan).
 //   - watermarkState is shared with the flusher goroutine and protected by mu.
 type TickPlanner struct {
 	cfg TickPlannerConfig
@@ -85,12 +85,17 @@ type TickPlanner struct {
 	watermarkState *SchedulerState
 	watermarkDirty atomic.Bool
 
-	// per-DAG tracking (accessed only from cronLoop goroutine, no lock needed)
+	// per-DAG tracking (protected by entryMu)
+	entryMu sync.Mutex
 	entries map[string]*plannerEntry
 	buffers map[string]*ScheduleBuffer
 
 	// last plan result (for Advance to update watermarks)
 	lastPlanResult []PlannedRun
+
+	// lifecycle
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
 // plannerEntry tracks a single DAG's scheduling metadata.
@@ -128,6 +133,9 @@ func NewTickPlanner(cfg TickPlannerConfig) *TickPlanner {
 
 // Init loads watermark state and computes catchup buffers for existing DAGs.
 func (tp *TickPlanner) Init(ctx context.Context, dags []*core.DAG) error {
+	tp.entryMu.Lock()
+	defer tp.entryMu.Unlock()
+
 	// Populate entries from existing DAGs
 	for _, dag := range dags {
 		tp.entries[dag.Name] = &plannerEntry{
@@ -243,7 +251,8 @@ func (tp *TickPlanner) initBuffers(ctx context.Context, dags []*core.DAG) {
 // all guards (not running, not suspended, not finished, not skipped).
 // The caller just dispatches.
 func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
-	tp.drainEvents(ctx)
+	tp.entryMu.Lock()
+	defer tp.entryMu.Unlock()
 
 	var candidates []PlannedRun
 
@@ -457,8 +466,31 @@ func (tp *TickPlanner) Flush(ctx context.Context) {
 	}
 }
 
-// StartFlusher runs the periodic watermark flusher. Blocks until ctx is done.
-func (tp *TickPlanner) StartFlusher(ctx context.Context) {
+// Start launches the internal goroutines (event drainer + watermark flusher).
+func (tp *TickPlanner) Start(ctx context.Context) {
+	ctx, tp.cancel = context.WithCancel(ctx)
+	tp.wg.Add(2)
+	go func() {
+		defer tp.wg.Done()
+		tp.drainEvents(ctx)
+	}()
+	go func() {
+		defer tp.wg.Done()
+		tp.startFlusher(ctx)
+	}()
+}
+
+// Stop cancels internal goroutines, waits for them, and performs a final flush.
+func (tp *TickPlanner) Stop(ctx context.Context) {
+	if tp.cancel != nil {
+		tp.cancel()
+	}
+	tp.wg.Wait()
+	tp.Flush(ctx)
+}
+
+// startFlusher runs the periodic watermark flusher. Blocks until ctx is done.
+func (tp *TickPlanner) startFlusher(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
@@ -472,18 +504,19 @@ func (tp *TickPlanner) StartFlusher(ctx context.Context) {
 	}
 }
 
-// drainEvents processes all queued DAG change events from the channel.
-// Non-blocking: processes all available events, then returns.
+// drainEvents continuously processes DAG change events. Blocks until ctx is done.
 func (tp *TickPlanner) drainEvents(ctx context.Context) {
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case event, ok := <-tp.cfg.Events:
 			if !ok {
 				return
 			}
+			tp.entryMu.Lock()
 			tp.handleEvent(ctx, event)
-		default:
-			return
+			tp.entryMu.Unlock()
 		}
 	}
 }

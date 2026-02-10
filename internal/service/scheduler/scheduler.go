@@ -60,8 +60,7 @@ type Scheduler struct {
 	planner             *TickPlanner    // Unified scheduling decision module
 	stopOnce            sync.Once
 	lock                sync.Mutex
-	clock               Clock                  // Clock function for getting current time
-	cancelCtx           context.CancelFunc     // Cancel function for the Start context
+	clock               Clock // Clock function for getting current time
 }
 
 // New constructs a Scheduler from the provided stores, runtime manager,
@@ -76,7 +75,6 @@ func New(
 	reg exec.ServiceRegistry,
 	coordinatorCli exec.Dispatcher,
 	watermarkStore WatermarkStore,
-	events <-chan DAGChangeEvent,
 ) (*Scheduler, error) {
 	timeLoc := cfg.Core.Location
 	if timeLoc == nil {
@@ -100,13 +98,14 @@ func New(
 	)
 	defaultClock := Clock(time.Now)
 
-	// Resolve IsSuspended once at construction time.
+	// Resolve IsSuspended once at construction time and wire the event channel.
+	eventCh := make(chan DAGChangeEvent)
 	var isSuspended IsSuspendedFunc
-	if ds, ok := er.(*entryReaderImpl); ok {
-		isSuspended = ds.dagStore.IsSuspended
+	if impl, ok := er.(*entryReaderImpl); ok {
+		isSuspended = impl.dagStore.IsSuspended
+		impl.setEvents(eventCh)
 	}
 
-	// Create the TickPlanner with the event channel from the EntryReader
 	planner := NewTickPlanner(TickPlannerConfig{
 		WatermarkStore:  watermarkStore,
 		IsSuspended:     isSuspended,
@@ -127,7 +126,7 @@ func New(
 			)
 		},
 		Clock:  defaultClock,
-		Events: events,
+		Events: eventCh,
 	})
 
 	return &Scheduler{
@@ -164,7 +163,6 @@ func (s *Scheduler) DisableHealthServer() {
 
 func (s *Scheduler) Start(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
-	s.cancelCtx = cancel
 	defer cancel()
 
 	if s.instanceID == "" {
@@ -240,12 +238,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		s.startZombieDetector(ctx)
 	}()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		s.planner.StartFlusher(ctx)
-	}()
-
 	if err := s.entryReader.Init(ctx); err != nil {
 		logger.Error(ctx, "Failed to initialize entry reader", tag.Error(err))
 		return err
@@ -254,6 +246,8 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	if err := s.planner.Init(ctx, s.entryReader.DAGs()); err != nil {
 		logger.Error(ctx, "Failed to initialize tick planner", tag.Error(err))
 	}
+
+	s.planner.Start(ctx)
 
 	wg.Add(1)
 	go func() {
@@ -370,9 +364,6 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		wg.Add(3)
 
 		close(s.quit)
-		if s.cancelCtx != nil {
-			s.cancelCtx()
-		}
 
 		go func() {
 			defer wg.Done()
@@ -393,7 +384,7 @@ func (s *Scheduler) Stop(ctx context.Context) {
 			s.zombieDetector.Stop(ctx)
 		}
 
-		s.planner.Flush(ctx)
+		s.planner.Stop(ctx)
 
 		if err := s.dirLock.Unlock(); err != nil {
 			logger.Error(ctx, "Failed to release scheduler lock in Stop", tag.Error(err))

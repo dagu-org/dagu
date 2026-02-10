@@ -69,7 +69,7 @@ type entryReaderImpl struct {
 }
 
 // NewEntryReader creates a new DAG manager with the given configuration.
-func NewEntryReader(dir string, dagCli exec.DAGStore, drm runtime.Manager, de *DAGExecutor, executable string, events chan DAGChangeEvent) EntryReader {
+func NewEntryReader(dir string, dagCli exec.DAGStore, drm runtime.Manager, de *DAGExecutor, executable string) EntryReader {
 	return &entryReaderImpl{
 		targetDir:   dir,
 		registry:    make(map[string]*core.DAG),
@@ -78,8 +78,11 @@ func NewEntryReader(dir string, dagCli exec.DAGStore, drm runtime.Manager, de *D
 		executable:  executable,
 		dagExecutor: de,
 		quit:        make(chan struct{}),
-		events:      events,
 	}
+}
+
+func (er *entryReaderImpl) setEvents(ch chan DAGChangeEvent) {
+	er.events = ch
 }
 
 func (er *entryReaderImpl) Init(ctx context.Context) error {
@@ -213,16 +216,12 @@ func (er *entryReaderImpl) handleFSEvent(ctx context.Context, event fsnotify.Eve
 	}
 }
 
-// sendEvent sends a DAGChangeEvent on the channel. Non-blocking: drops and warns if full.
-func (er *entryReaderImpl) sendEvent(ctx context.Context, event DAGChangeEvent) {
-	select {
-	case er.events <- event:
-	default:
-		logger.Warn(ctx, "DAG event channel full, dropping event",
-			tag.DAG(event.DAGName),
-			slog.Int("type", int(event.Type)),
-		)
+// sendEvent sends a DAGChangeEvent on the channel. Blocks until the event is consumed.
+func (er *entryReaderImpl) sendEvent(_ context.Context, event DAGChangeEvent) {
+	if er.events == nil {
+		return
 	}
+	er.events <- event
 }
 
 func (er *entryReaderImpl) Stop() {

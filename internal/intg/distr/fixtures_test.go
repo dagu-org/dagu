@@ -188,8 +188,7 @@ func (f *testFixture) startScheduler(timeout time.Duration) {
 	f.t.Helper()
 
 	de := scheduler.NewDAGExecutor(f.coordinatorClient, runtime.NewSubCmdBuilder(f.coord.Config), f.coord.Config.DefaultExecMode)
-	eventCh := make(chan scheduler.DAGChangeEvent, 256)
-	em := scheduler.NewEntryReader(f.coord.Config.Paths.DAGsDir, f.coord.DAGStore, f.coord.DAGRunMgr, de, "", eventCh)
+	em := scheduler.NewEntryReader(f.coord.Config.Paths.DAGsDir, f.coord.DAGStore, f.coord.DAGRunMgr, de, "")
 
 	schedulerInst, err := scheduler.New(
 		f.coord.Config,
@@ -201,7 +200,6 @@ func (f *testFixture) startScheduler(timeout time.Duration) {
 		f.coord.ServiceRegistry,
 		f.coordinatorClient,
 		nil,
-		eventCh,
 	)
 	require.NoError(f.t, err)
 

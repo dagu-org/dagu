@@ -346,11 +346,11 @@ func TestTickPlanner_PlanSuspendedDAGSkipped(t *testing.T) {
 	assert.Len(t, runs, 0)
 }
 
-func TestTickPlanner_DrainEvents_Added(t *testing.T) {
+func TestTickPlanner_HandleEvent_Added(t *testing.T) {
 	t.Parallel()
 
 	store := &mockWatermarkStore{}
-	tp, eventCh := newTestTickPlanner(store)
+	tp, _ := newTestTickPlanner(store)
 	require.NoError(t, tp.Init(context.Background(), nil))
 
 	newDAG := &core.DAG{
@@ -358,15 +358,13 @@ func TestTickPlanner_DrainEvents_Added(t *testing.T) {
 		Schedule: []core.Schedule{mustParseSchedule(t, "0 * * * *")},
 	}
 
-	// Send an Added event
-	eventCh <- DAGChangeEvent{
+	tp.entryMu.Lock()
+	tp.handleEvent(context.Background(), DAGChangeEvent{
 		Type:    DAGChangeAdded,
 		DAG:     newDAG,
 		DAGName: "new-dag",
-	}
-
-	// Drain events
-	tp.drainEvents(context.Background())
+	})
+	tp.entryMu.Unlock()
 
 	// Verify entry was added
 	_, ok := tp.entries["new-dag"]
@@ -379,11 +377,11 @@ func TestTickPlanner_DrainEvents_Added(t *testing.T) {
 	assert.True(t, hasWM, "watermark should be set for new DAG")
 }
 
-func TestTickPlanner_DrainEvents_Deleted(t *testing.T) {
+func TestTickPlanner_HandleEvent_Deleted(t *testing.T) {
 	t.Parallel()
 
 	store := &mockWatermarkStore{}
-	tp, eventCh := newTestTickPlanner(store)
+	tp, _ := newTestTickPlanner(store)
 
 	dag := &core.DAG{
 		Name:     "del-dag",
@@ -395,26 +393,25 @@ func TestTickPlanner_DrainEvents_Deleted(t *testing.T) {
 	_, ok := tp.entries["del-dag"]
 	require.True(t, ok)
 
-	// Send a Deleted event
-	eventCh <- DAGChangeEvent{
+	tp.entryMu.Lock()
+	tp.handleEvent(context.Background(), DAGChangeEvent{
 		Type:    DAGChangeDeleted,
 		DAGName: "del-dag",
-	}
-
-	tp.drainEvents(context.Background())
+	})
+	tp.entryMu.Unlock()
 
 	// Verify entry was removed
 	_, ok = tp.entries["del-dag"]
 	assert.False(t, ok, "del-dag should be removed from entries")
 }
 
-func TestTickPlanner_DrainEvents_Updated(t *testing.T) {
+func TestTickPlanner_HandleEvent_Updated(t *testing.T) {
 	t.Parallel()
 
 	store := &mockWatermarkStore{
 		state: newMockWatermarkState(time.Date(2026, 2, 7, 9, 0, 0, 0, time.UTC)),
 	}
-	tp, eventCh := newTestTickPlanner(store)
+	tp, _ := newTestTickPlanner(store)
 
 	dag := newHourlyCatchupDAG(t, "upd-dag")
 	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
@@ -430,13 +427,13 @@ func TestTickPlanner_DrainEvents_Updated(t *testing.T) {
 		Schedule:      []core.Schedule{mustParseSchedule(t, "*/30 * * * *")}, // changed schedule
 	}
 
-	eventCh <- DAGChangeEvent{
+	tp.entryMu.Lock()
+	tp.handleEvent(context.Background(), DAGChangeEvent{
 		Type:    DAGChangeUpdated,
 		DAG:     updatedDAG,
 		DAGName: "upd-dag",
-	}
-
-	tp.drainEvents(context.Background())
+	})
+	tp.entryMu.Unlock()
 
 	// Entry should be updated
 	entry, ok := tp.entries["upd-dag"]

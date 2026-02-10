@@ -337,11 +337,10 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 
 	coordinatorCli := c.NewCoordinatorClient()
 	de := scheduler.NewDAGExecutor(coordinatorCli, runtime.NewSubCmdBuilder(c.Config), c.Config.DefaultExecMode)
-	eventCh := make(chan scheduler.DAGChangeEvent, 256)
-	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable, eventCh)
+	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable)
 	watermarkDir := filepath.Join(c.Config.Paths.DataDir, "scheduler")
 	wmStore := filewatermark.New(watermarkDir)
-	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli, wmStore, eventCh)
+	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli, wmStore)
 }
 
 // StringParam retrieves a string parameter from the command line flags.
