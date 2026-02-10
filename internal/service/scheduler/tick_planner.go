@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"maps"
 	"path/filepath"
@@ -142,6 +143,16 @@ func NewTickPlanner(cfg TickPlannerConfig) *TickPlanner {
 	if cfg.Location == nil {
 		cfg.Location = time.Local
 	}
+	if cfg.GenRunID == nil {
+		cfg.GenRunID = func(context.Context) (string, error) {
+			return "", fmt.Errorf("GenRunID not configured")
+		}
+	}
+	if cfg.Dispatch == nil {
+		cfg.Dispatch = func(context.Context, *core.DAG, string, core.TriggerType) error {
+			return fmt.Errorf("Dispatch not configured")
+		}
+	}
 	return &TickPlanner{
 		cfg:     cfg,
 		entries: make(map[string]*plannerEntry),
@@ -202,8 +213,13 @@ func (tp *TickPlanner) Init(ctx context.Context, dags []*core.DAG) error {
 // initBuffers creates per-DAG queues for DAGs with CatchupWindow > 0
 // and enqueues catch-up items.
 func (tp *TickPlanner) initBuffers(ctx context.Context, dags []*core.DAG) {
+	// Snapshot watermark state under the lock. Although initBuffers is only
+	// called from Init (before Start), we snapshot defensively to avoid
+	// reading the shared DAGs map outside the lock.
 	tp.mu.RLock()
-	state := tp.watermarkState
+	lastTick := tp.watermarkState.LastTick
+	dagWatermarks := make(map[string]DAGWatermark, len(tp.watermarkState.DAGs))
+	maps.Copy(dagWatermarks, tp.watermarkState.DAGs)
 	tp.mu.RUnlock()
 
 	now := tp.cfg.Clock()
@@ -214,9 +230,8 @@ func (tp *TickPlanner) initBuffers(ctx context.Context, dags []*core.DAG) {
 			continue
 		}
 
-		lastTick := state.LastTick
 		var lastScheduledTime time.Time
-		if wm, ok := state.DAGs[dag.Name]; ok {
+		if wm, ok := dagWatermarks[dag.Name]; ok {
 			lastScheduledTime = wm.LastScheduledTime
 		}
 
@@ -464,12 +479,28 @@ func (tp *TickPlanner) shouldRun(ctx context.Context, dag *core.DAG, scheduledTi
 	return true
 }
 
-// computePrevExecTime calculates the previous schedule time from the given time
-// by computing the schedule interval.
+// computePrevExecTime calculates the previous schedule fire time before next.
+// It walks forward from (next - 7 days) to find the last fire time before next.
+// This correctly handles non-uniform cron schedules (e.g., "0 9,17 * * *").
 func computePrevExecTime(next time.Time, schedule core.Schedule) time.Time {
-	nextNext := schedule.Parsed.Next(next.Add(time.Second))
-	duration := nextNext.Sub(next)
-	return next.Add(-duration)
+	if schedule.Parsed == nil {
+		return next
+	}
+	// Walk forward from 7 days before next to find the last fire time before next.
+	seed := next.Add(-7 * 24 * time.Hour)
+	var prev time.Time
+	t := schedule.Parsed.Next(seed)
+	for t.Before(next) {
+		prev = t
+		t = schedule.Parsed.Next(t)
+	}
+	if prev.IsZero() {
+		// Fallback: no previous fire time found within the 7-day window.
+		// Use interval heuristic as last resort.
+		nextNext := schedule.Parsed.Next(next.Add(time.Second))
+		return next.Add(-(nextNext.Sub(next)))
+	}
+	return prev
 }
 
 // createPlannedRun generates a run ID and constructs a PlannedRun.
@@ -637,16 +668,17 @@ func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
 
 // recomputeBuffer creates a new catch-up buffer for a DAG using the existing watermark.
 func (tp *TickPlanner) recomputeBuffer(ctx context.Context, dag *core.DAG) {
+	// Snapshot needed values under the lock to avoid reading the shared map
+	// after releasing it (Advance and handleEvent can modify DAGs concurrently).
 	tp.mu.RLock()
-	state := tp.watermarkState
+	lastTick := tp.watermarkState.LastTick
+	var lastScheduledTime time.Time
+	if wm, ok := tp.watermarkState.DAGs[dag.Name]; ok {
+		lastScheduledTime = wm.LastScheduledTime
+	}
 	tp.mu.RUnlock()
 
 	now := tp.cfg.Clock()
-	lastTick := state.LastTick
-	var lastScheduledTime time.Time
-	if wm, ok := state.DAGs[dag.Name]; ok {
-		lastScheduledTime = wm.LastScheduledTime
-	}
 
 	replayFrom := ComputeReplayFrom(dag.CatchupWindow, lastTick, lastScheduledTime, now)
 	missed := ComputeMissedIntervals(dag.Schedule, replayFrom, now)
