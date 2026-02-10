@@ -115,9 +115,6 @@ func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	if opts.TriggerType != "" {
 		args = append(args, fmt.Sprintf("--trigger-type=%s", opts.TriggerType))
 	}
-	if opts.ScheduledTime != "" {
-		args = append(args, fmt.Sprintf("--scheduled-time=%s", opts.ScheduledTime))
-	}
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
 	}
@@ -158,9 +155,6 @@ func (b *SubCmdBuilder) Enqueue(dag *core.DAG, opts EnqueueOptions) CmdSpec {
 	}
 	if opts.TriggerType != "" {
 		args = append(args, fmt.Sprintf("--trigger-type=%s", opts.TriggerType))
-	}
-	if opts.ScheduledTime != "" {
-		args = append(args, fmt.Sprintf("--scheduled-time=%s", opts.ScheduledTime))
 	}
 	args = append(args, dag.Location)
 
@@ -315,19 +309,17 @@ type StartOptions struct {
 	NameOverride  string // Optional DAG name override
 	FromRunID     string // Historic dag-run ID to use as a template
 	Target        string // Optional CLI argument override (DAG name or file path)
-	TriggerType   string // How this DAG run was initiated (scheduler, manual, webhook, subdag)
-	ScheduledTime string // Intended cron slot for this run (RFC3339)
+	TriggerType string // How this DAG run was initiated (scheduler, manual, webhook, subdag)
 }
 
 // EnqueueOptions contains options for enqueuing a dag-run.
 type EnqueueOptions struct {
-	Params        string // Parameters to pass to the DAG
-	Quiet         bool   // Whether to run in quiet mode
-	DAGRunID      string // ID for the dag-run
-	Queue         string // Queue name to enqueue to
-	NameOverride  string // Optional DAG name override
-	TriggerType   string // How this DAG run was initiated (scheduler, manual, webhook, subdag)
-	ScheduledTime string // Intended cron slot for this run (RFC3339)
+	Params       string // Parameters to pass to the DAG
+	Quiet        bool   // Whether to run in quiet mode
+	DAGRunID     string // ID for the dag-run
+	Queue        string // Queue name to enqueue to
+	NameOverride string // Optional DAG name override
+	TriggerType  string // How this DAG run was initiated (scheduler, manual, webhook, subdag)
 }
 
 // RestartOptions contains options for restarting a dag-run.

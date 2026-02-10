@@ -668,7 +668,6 @@ func (s *Scheduler) makeDispatchFunc(_ context.Context) DispatchFunc {
 			coordinatorv1.Operation_OPERATION_START,
 			runID,
 			item.TriggerType,
-			item.ScheduledTime.Format(time.RFC3339),
 		)
 
 		if err == nil {

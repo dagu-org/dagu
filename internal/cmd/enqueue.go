@@ -29,7 +29,7 @@ Examples:
 	)
 }
 
-var enqueueFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, queueFlag, defaultWorkingDirFlag, triggerTypeFlag, scheduledTimeFlag}
+var enqueueFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, queueFlag, defaultWorkingDirFlag, triggerTypeFlag}
 
 func runEnqueue(ctx *Context, args []string) error {
 	runID, err := ctx.StringParam("run-id")
@@ -65,15 +65,13 @@ func runEnqueue(ctx *Context, args []string) error {
 		return err
 	}
 
-	scheduledTime, _ := ctx.StringParam("scheduled-time")
-
-	return enqueueDAGRun(ctx, dag, runID, triggerType, scheduledTime)
+	return enqueueDAGRun(ctx, dag, runID, triggerType)
 }
 
 // enqueueDAGRun enqueues a dag-run to the queue.
 // The DAG location is cleared to allow concurrent queued runs (location is used
 // for unix pipe generation which would prevent parallel execution).
-func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string, triggerType core.TriggerType, scheduledTime string) error {
+func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string, triggerType core.TriggerType) error {
 	dag.Location = ""
 
 	if !ctx.Config.Queues.Enabled {
@@ -106,7 +104,6 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string, triggerType cor
 			exec.DAGRunRef{},
 		),
 		transform.WithTriggerType(triggerType),
-		transform.WithScheduledTime(scheduledTime),
 	}
 
 	dagStatus := transform.NewStatusBuilder(dag).Create(dagRunID, core.Queued, 0, time.Time{}, opts...)

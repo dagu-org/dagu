@@ -46,7 +46,6 @@ steps:
 			coordinatorv1.Operation_OPERATION_START,
 			"handle-job-test-123",
 			core.TriggerTypeScheduler,
-			"",
 		)
 
 		require.NoError(t, err)
@@ -62,7 +61,6 @@ steps:
 			"execute-dag-test-456",
 			nil,
 			core.TriggerTypeScheduler,
-			"",
 		)
 
 		require.Error(t, err)
@@ -81,7 +79,6 @@ steps:
 			coordinatorv1.Operation_OPERATION_START,
 			"handle-job-local-789",
 			core.TriggerTypeScheduler,
-			"",
 		)
 		require.NoError(t, err, "local execution with nil coordinator should succeed")
 	})
@@ -95,7 +92,6 @@ steps:
 			coordinatorv1.Operation_OPERATION_RETRY,
 			"handle-job-retry-999",
 			core.TriggerTypeScheduler,
-			"",
 		)
 
 		require.Error(t, err)

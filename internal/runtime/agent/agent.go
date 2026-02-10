@@ -138,9 +138,6 @@ type Agent struct {
 	// triggerType indicates how this DAG run was initiated.
 	triggerType core.TriggerType
 
-	// scheduledTime is the intended cron slot for this run (RFC3339).
-	scheduledTime string
-
 	// defaultExecMode is the server-level default execution mode.
 	defaultExecMode config.ExecutionMode
 
@@ -224,8 +221,6 @@ type Options struct {
 	PeerConfig config.Peer
 	// TriggerType indicates how this DAG run was initiated.
 	TriggerType core.TriggerType
-	// ScheduledTime is the intended cron slot for this run (RFC3339).
-	ScheduledTime string
 	// DefaultExecMode is the server-level default execution mode.
 	DefaultExecMode config.ExecutionMode
 }
@@ -261,7 +256,6 @@ func New(
 		queuedRun:        opts.QueuedRun,
 		attemptID:        opts.AttemptID,
 		triggerType:      opts.TriggerType,
-		scheduledTime:   opts.ScheduledTime,
 		defaultExecMode:  opts.DefaultExecMode,
 	}
 
@@ -945,8 +939,7 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 				transform.WithAttemptID(a.dagRunAttemptID),
 				transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
 				transform.WithTriggerType(a.triggerType),
-				transform.WithScheduledTime(a.scheduledTime),
-			)
+				)
 	}
 
 	runnerStatus := a.runner.Status(ctx, a.plan)
@@ -972,7 +965,6 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 		transform.WithPreconditions(a.dag.Preconditions),
 		transform.WithWorkerID(a.workerID),
 		transform.WithTriggerType(a.triggerType),
-		transform.WithScheduledTime(a.scheduledTime),
 	}
 
 	// If the current execution is a retry, copy timing data from the retry target.

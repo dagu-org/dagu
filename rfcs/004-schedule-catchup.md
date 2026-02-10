@@ -218,15 +218,7 @@ Catch-up runs must be distinguishable from normal scheduled runs everywhere they
 
 **New trigger type.** Add `catchup` to the existing trigger type enum (`scheduler`, `manual`, `webhook`, `subdag`, `retry`). Catch-up dispatches use `TriggerTypeCatchUp` instead of `TriggerTypeScheduler`. This makes catch-up runs filterable in every surface without inspecting metadata.
 
-**New `scheduledTime` field.** Add a `scheduledTime` field (RFC 3339 timestamp) to the DAG run record. This records the cron slot the run was intended for, distinct from `startedAt` (when it actually executed). The field is set for **all** scheduled and catch-up runs:
-
-| Run type | `triggerType` | `scheduledTime` | `startedAt` |
-|----------|---------------|-----------------|-------------|
-| Live scheduled run | `scheduler` | `2026-02-07T09:00:00Z` | `2026-02-07T09:00:02Z` |
-| Catch-up run | `catchup` | `2026-02-07T09:00:00Z` | `2026-02-07T12:15:03Z` |
-| Manual run | `manual` | *(empty)* | `2026-02-07T14:30:00Z` |
-
-For catch-up runs, the gap between `scheduledTime` and `startedAt` immediately tells the user how late the run is.
+**`scheduledTime` field.** The `scheduledTime` field (RFC 3339 timestamp) on the DAG run record and API schema is reserved for recording the cron slot a run was intended for. The field exists in the data model but is not yet populated — a proper mechanism to set it (at the scheduler level, not via CLI flags) is a future enhancement.
 
 ### DAG Identity and Manual Runs
 
@@ -298,19 +290,11 @@ If no DAGs have `catchupWindow` set or no intervals were missed, no catch-up log
 
 **Trigger badge in run list.** The DAG run table adds a trigger type badge column. Catch-up runs display a distinct "Catch-up" badge, visually differentiated from "Scheduled", "Manual", "Webhook", etc.
 
-**"Scheduled For" column.** A new column shows the `scheduledTime` — the intended cron slot. For live scheduled runs, this is approximately equal to "Started At". For catch-up runs, the gap between the two columns immediately communicates how late the run is.
-
-**Catch-up banner.** When a DAG has recent catch-up runs (within the last hour), the DAG detail page shows an informational banner:
-
-> 3 catch-up runs were dispatched for missed schedules between 09:00 and 12:00.
-
-This banner is informational only and auto-dismisses after 1 hour.
-
 ### API
 
 The API surfaces catch-up metadata:
 
-- `DAGRunSummary` includes `triggerType: "catchup"` (new enum value) and `scheduledTime` (new RFC 3339 field).
+- `DAGRunSummary` includes `triggerType: "catchup"` (new enum value). The `scheduledTime` field is reserved for future use.
 - The list runs endpoint supports filtering by trigger type: `?triggerType=catchup` returns only catch-up runs.
 
 ### CLI
@@ -431,14 +415,14 @@ level=INFO msg="Catch-up completed" dispatched=3 skipped=0 duration="0.3s"
 
 **2. Web UI — run list for hourly-etl:**
 
-| Run ID | Trigger | Scheduled For | Started At | Status |
-|--------|---------|---------------|------------|--------|
-| run-a1b2 | **Catch-up** | 2026-02-07 10:00 | 2026-02-07 12:02 | Success |
-| run-c3d4 | **Catch-up** | 2026-02-07 11:00 | 2026-02-07 12:02 | Success |
-| run-e5f6 | **Catch-up** | 2026-02-07 12:00 | 2026-02-07 12:02 | Success |
-| run-g7h8 | Scheduled | 2026-02-07 13:00 | 2026-02-07 13:00 | Success |
+| Run ID | Trigger | Started At | Status |
+|--------|---------|------------|--------|
+| run-a1b2 | **Catch-up** | 2026-02-07 12:02 | Success |
+| run-c3d4 | **Catch-up** | 2026-02-07 12:02 | Success |
+| run-e5f6 | **Catch-up** | 2026-02-07 12:02 | Success |
+| run-g7h8 | Scheduled | 2026-02-07 13:00 | Success |
 
-The "Catch-up" badge and the gap between "Scheduled For" and "Started At" make it immediately clear which runs were backfilled. The 13:00 run is a normal live-tick run with "Scheduled" badge.
+The "Catch-up" badge makes it immediately clear which runs were backfilled. The 13:00 run is a normal live-tick run with "Scheduled" badge.
 
 **3. Dry-run preview** (before enabling catch-up, or after config changes):
 
