@@ -1,7 +1,7 @@
 ---
 id: "004"
 title: "Schedule Catch-up and Backfill"
-status: draft
+status: implemented
 ---
 
 # RFC 004: Schedule Catch-up and Backfill
@@ -135,10 +135,25 @@ Each schedule entry is evaluated independently and the resulting candidates are 
 
 ### Watermarks
 
+Scheduler state is persisted via a `WatermarkStore` interface (`internal/core/exec/watermark.go`) with a file-based implementation (`internal/persis/filewatermark/store.go`). The state file (`<dataDir>/scheduler/state.json`) contains:
+
+```json
+{
+  "version": 1,
+  "lastTick": "2026-02-07T12:00:00Z",
+  "dags": {
+    "hourly-etl": {"lastScheduledTime": "2026-02-07T12:00:00Z"},
+    "daily-report": {"lastScheduledTime": "2026-02-07T09:00:00Z"}
+  }
+}
+```
+
 Two watermarks determine what needs replaying:
 
-1. **Scheduler watermark** — the last tick time the scheduler successfully dispatched, persisted to disk. On restart, the gap between this timestamp and `now` is the recovery window. If the watermark file is missing or corrupt, it is treated as `now` (no catch-up). The watermark is stored as a small JSON file under the scheduler data directory (e.g. `<dataDir>/scheduler/state.json`) and written atomically.
-2. **Per-DAG watermark** — derived from the most recent dag-run start time. Handles DAGs that were disabled/re-enabled independently of the scheduler lifecycle. Manual/API/inline runs with the same DAG name also advance this watermark.
+1. **Scheduler watermark** (`lastTick`) — the last tick time the scheduler processed. On restart, the gap between this timestamp and `now` is the recovery window. If the state file is missing or corrupt, it is treated as empty (no catch-up). Written atomically via temp file + rename.
+2. **Per-DAG watermark** (`dags[name].lastScheduledTime`) — tracks the most recent dispatched scheduled time per DAG. New DAGs get `lastScheduledTime = now` when first observed via the filesystem watcher. Deleted DAGs are pruned from state on startup.
+
+State is mutated in memory on every dispatch (zero disk I/O). A background goroutine flushes to disk every 5 seconds if dirty, with a final flush on shutdown. This bounds disk writes to ~12/minute regardless of DAG count.
 
 ### Replay Boundaries
 
@@ -146,44 +161,42 @@ When catch-up is triggered, the earliest timestamp worth replaying is:
 
 ```
 replayFrom = max(
-    now - catchupWindow,            // user-configured lookback horizon
-    schedulerWatermark,              // last tick the scheduler dispatched
-    firstSeenAt(dag),                // first time this DAG was observed
-    latestDagRunStartTime(dag),      // per-DAG watermark from history
+    now - catchupWindow,             // user-configured lookback horizon
+    state.LastTick,                  // last tick the scheduler dispatched
+    state.DAGs[name].LastScheduledTime, // per-DAG watermark from state store
 )
 ```
 
 This ensures:
 
 - You never replay intervals older than the configured window.
-- Brand-new DAGs with **no prior runs** get `firstSeenAt = now` on first observation, so catch-up never replays history that predates the DAG's existence.
-- If a DAG has prior run history, `latestDagRunStartTime` supersedes `firstSeenAt` for replay boundaries.
-- DAGs that were paused or backfilled manually inherit the timestamp of their latest run, avoiding duplicate work.
+- Brand-new DAGs get `LastScheduledTime = now` when first observed (via filesystem watcher), so catch-up never replays history that predates the DAG's existence.
+- DAGs that were paused or backfilled manually inherit the timestamp of their latest dispatched run, avoiding duplicate work.
 
 ### Catch-up Trigger Points
 
-1. **Scheduler restart** — scheduler watermark lags behind `now`, catch-up runs before the live loop starts.
-2. **DAG re-enable** — per-DAG watermark lags behind `now`, catch-up runs inline on the next tick.
-3. **Manual backfill while scheduler is down** — advances the per-DAG watermark, so the subsequent restart only replays the remaining gap.
+1. **Scheduler restart** — `state.LastTick` lags behind `now`, catch-up queues are populated before the live loop starts.
+2. **Manual backfill while scheduler is down** — advances the per-DAG watermark via the run dispatch, so the subsequent restart only replays the remaining gap.
 
 No catch-up work happens while the scheduler is healthy and processing ticks in real time.
 
 ### Ordering Guarantees
 
-Catch-up runs execute **synchronously before the live cron loop starts**:
+Catch-up uses **per-DAG in-memory queues** (`internal/service/scheduler/dagqueue.go`) that unify catch-up and live-tick runs into a single dispatch mechanism per DAG:
 
-1. Load scheduler watermark from disk (missing/corrupt = `now`).
-2. Snapshot all DAGs.
-3. Capture `catchupTo = now`.
-4. Dispatch catch-up runs sequentially, advancing the watermark after each successful dispatch to the scheduled time.
-5. If all catch-up dispatches succeed, set the watermark to `catchupTo`.
-6. Enter the live loop.
+1. Load scheduler state from disk (missing/corrupt = empty, no catch-up).
+2. For each DAG with `catchupWindow > 0`, compute missed intervals and create a buffered channel-based queue.
+3. Send all catch-up items into the queue, then start a consumer goroutine.
+4. Enter the live cron loop. Live-tick jobs for DAGs with queues are routed through the same queue; DAGs without `catchupWindow` dispatch directly (backward-compatible).
+5. Consumer goroutines process items in FIFO order, enforcing `overlapPolicy` per DAG.
 
-This guarantees no live tick fires while catch-up is in progress.
+This ensures:
+- Catch-up runs for a given DAG execute in chronological order.
+- Multiple DAGs catch up concurrently (each DAG has its own queue).
+- Live ticks merge naturally into the queue after catch-up items.
+- `overlapPolicy` is enforced at the queue level: `skip` discards items when a run is active; `all` waits for the active run to complete before dispatching the next.
 
-For DAG re-enable events, catch-up runs are dispatched inline within the current tick, before any live-scheduled jobs. Existing duplicate-execution guards prevent conflicts if a catch-up run and a live tick target the same schedule time.
-
-**Cron changes during downtime**: catch-up uses the **current** schedule expression from the snapshot. If a cron expression changed while the scheduler was down, missed intervals are computed against the new expression (not historical ones). This is a known limitation and a deliberate design choice to keep the scheduler stateless with respect to past cron definitions.
+**Cron changes during downtime**: catch-up uses the **current** schedule expression. If a cron expression changed while the scheduler was down, missed intervals are computed against the new expression (not historical ones). This is a deliberate design choice to keep the scheduler stateless with respect to past cron definitions.
 
 ### Watermark Semantics
 
@@ -215,12 +228,6 @@ Catch-up runs must be distinguishable from normal scheduled runs everywhere they
 
 For catch-up runs, the gap between `scheduledTime` and `startedAt` immediately tells the user how late the run is.
 
-### DAG Metadata Store
-
-The current per-DAG `.suspend` flag files are migrated to a per-DAG metadata store that also tracks `firstSeenAt`. Using per-DAG files (rather than a single shared file) preserves the natural atomicity of the current approach — concurrent writes from CLI, API, and scheduler never contend unless they target the same DAG.
-
-Legacy `.suspend` flag files are lazily imported on first access and then removed.
-
 ### DAG Identity and Manual Runs
 
 Watermarks and run history are tracked by **DAG name**. Any run that uses the same DAG name (including inline-spec or manual runs) updates the per-DAG watermark and can affect catch-up for scheduled runs of that name.
@@ -238,7 +245,7 @@ The scheduler watermark is tied to the directory lock (`dirLock`). Only the lock
 
 | Scenario | No `catchupWindow` (default) | `overlapPolicy: skip` | `overlapPolicy: all` |
 |----------|-------------------------------|------------------------|----------------------|
-| First deploy (no prior runs) | Run from now only | Run from now only (`firstSeenAt = now`, nothing to backfill) | Run from now only (`firstSeenAt = now`, nothing to backfill) |
+| First deploy (no prior runs) | Run from now only | Run from now only (new DAG gets `lastScheduledTime = now`, nothing to backfill) | Run from now only (new DAG gets `lastScheduledTime = now`, nothing to backfill) |
 | Scheduler restart after 3h downtime | Jobs resume from now | Run the **first** missed interval; skip others while it runs | Run **all** missed intervals sequentially within `catchupWindow` |
 | DAG disabled then re-enabled | Run from now only | Run the **first** missed interval within window | Backfill all missed runs within window |
 
@@ -335,8 +342,7 @@ Scheduler: running (catch-up in progress: 5/15 dispatched, 2 skipped)
 1. **No breaking changes** — existing DAGs keep running unchanged.
 2. **Default behavior preserved** — omitting `catchupWindow` means no catchup, matching current behavior.
 3. **Opt-in** — users enable catch-up per DAG by setting `catchupWindow`.
-4. **Pre-existing DAGs** — on first startup after migration, DAGs with prior runs are bounded by the latest run time; DAGs with no runs get `firstSeenAt = now`, preventing replay of ancient schedules.
-5. **Legacy flag files** — lazily imported into the new metadata store, then removed.
+4. **First startup** — if the watermark state file doesn't exist, it is initialized empty. New DAGs are tracked from the moment they are first observed (via filesystem watcher), preventing replay of ancient schedules.
 
 ## Examples
 

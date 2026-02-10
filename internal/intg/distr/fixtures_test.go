@@ -199,6 +199,7 @@ func (f *testFixture) startScheduler(timeout time.Duration) {
 		f.coord.ProcStore,
 		f.coord.ServiceRegistry,
 		f.coordinatorClient,
+		nil,
 	)
 	require.NoError(f.t, err)
 

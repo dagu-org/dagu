@@ -98,6 +98,14 @@ type DAG struct {
 	// SkipIfSuccessful indicates whether to skip the DAG if it was successful previously.
 	// E.g., when the DAG has already been executed manually before the scheduled time.
 	SkipIfSuccessful bool `json:"skipIfSuccessful,omitempty"`
+	// CatchupWindow is the lookback horizon for missed intervals. If set, enables
+	// catch-up: all missed cron intervals within this window are detected on
+	// scheduler restart or DAG re-enable. If omitted, no catch-up (current behavior).
+	CatchupWindow time.Duration `json:"catchupWindow,omitempty"`
+	// OverlapPolicy controls how multiple catch-up runs are handled.
+	// "skip" (default): skip new run if previous is still running.
+	// "all": execute all missed runs sequentially in chronological order.
+	OverlapPolicy OverlapPolicy `json:"overlapPolicy,omitempty"`
 	// Env contains a list of environment variables to be set before running the DAG.
 	// Note: This field is evaluated at build time and may contain secrets.
 	// It is excluded from JSON serialization to prevent secret leakage.

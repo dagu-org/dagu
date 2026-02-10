@@ -18,12 +18,16 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/dirlock"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
 // Job is the interface for the actual DAG.
 type Job interface {
+	// GetDAG returns the DAG associated with this job.
+	GetDAG(ctx context.Context) *core.DAG
 	// Start starts the DAG.
 	Start(ctx context.Context) error
 	// Stop stops the DAG.
@@ -56,6 +60,10 @@ type Scheduler struct {
 	instanceID          string          // Unique instance identifier for service registry
 	// queueProcessor is the processor for queued DAG runs
 	queueProcessor *QueueProcessor
+	watermarkStore exec.WatermarkStore // Persists scheduler watermark for catch-up
+	watermarkState *exec.SchedulerState // In-memory watermark state
+	watermarkDirty atomic.Bool          // Dirty flag for periodic flush
+	dagQueues      map[string]*DAGQueue // Per-DAG queues for catch-up (only for DAGs with CatchupWindow > 0)
 	stopOnce       sync.Once
 	lock           sync.Mutex
 	clock          Clock // Clock function for getting current time
@@ -79,6 +87,7 @@ func New(
 	procStore exec.ProcStore,
 	reg exec.ServiceRegistry,
 	coordinatorCli exec.Dispatcher,
+	watermarkStore exec.WatermarkStore,
 ) (*Scheduler, error) {
 	timeLoc := cfg.Core.Location
 	if timeLoc == nil {
@@ -115,6 +124,7 @@ func New(
 		healthServer:    healthServer,
 		serviceRegistry: reg,
 		queueProcessor:  processor,
+		watermarkStore:  watermarkStore,
 		clock:           time.Now, // Default to real time
 	}, nil
 }
@@ -214,10 +224,34 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		s.startZombieDetector(ctx)
 	}()
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s.startWatermarkFlusher(ctx)
+	}()
+
+	// Load watermark state for catch-up
+	if s.watermarkStore != nil {
+		state, err := s.watermarkStore.Load(ctx)
+		if err != nil {
+			logger.Error(ctx, "Failed to load watermark state", tag.Error(err))
+			// Non-fatal: continue without watermark (no catch-up)
+		} else {
+			s.watermarkState = state
+			logger.Info(ctx, "Loaded scheduler watermark",
+				slog.Time("lastTick", state.LastTick),
+				slog.Int("dagCount", len(state.DAGs)),
+			)
+		}
+	}
+
 	if err := s.entryReader.Init(ctx); err != nil {
 		logger.Error(ctx, "Failed to initialize entry reader", tag.Error(err))
 		return err
 	}
+
+	// Initialize catch-up queues for DAGs with CatchupWindow > 0
+	s.initCatchupQueues(ctx, &wg)
 
 	wg.Add(1)
 	go func() {
@@ -299,6 +333,7 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 		case <-timer.C:
 			_ = timer.Stop()
 			s.invokeJobs(ctx, tickTime)
+			s.updateWatermarkTick(tickTime)
 			tickTime = s.NextTick(tickTime)
 			timer.Reset(tickTime.Sub(s.clock()))
 		}
@@ -344,6 +379,12 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		if s.zombieDetector != nil {
 			s.zombieDetector.Stop(ctx)
 		}
+
+		// Close catch-up queues (signals consumers to exit)
+		s.closeCatchupQueues()
+
+		// Final watermark flush on shutdown
+		s.flushWatermark(ctx)
 
 		if err := s.dirLock.Unlock(); err != nil {
 			logger.Error(ctx, "Failed to release scheduler lock in Stop", tag.Error(err))
@@ -414,7 +455,22 @@ func (s *Scheduler) invokeJobs(ctx context.Context, now time.Time) {
 			slog.String("scheduledTime", job.Next.Format(time.RFC3339)),
 		)
 
-		// Launch job execution in goroutine
+		// For start jobs, route through per-DAG queue if one exists
+		if job.Type == ScheduleTypeStart {
+			if dag := job.Job.GetDAG(jobCtx); dag != nil {
+				if q, ok := s.dagQueues[dag.Name]; ok {
+					q.Send(QueueItem{
+						DAG:           dag,
+						ScheduledTime: job.Next,
+						TriggerType:   core.TriggerTypeScheduler,
+						ScheduleType:  job.Type,
+					})
+					continue
+				}
+			}
+		}
+
+		// No queue — dispatch directly as before
 		go func(ctx context.Context, job *ScheduledJob) {
 			if err := job.invoke(ctx); err != nil {
 				switch {
@@ -463,5 +519,195 @@ func (s *ScheduledJob) invoke(ctx context.Context) error {
 	default:
 		return fmt.Errorf("unknown schedule type: %v", s.Type)
 
+	}
+}
+
+// updateWatermarkTick updates the last tick time in the in-memory watermark state.
+func (s *Scheduler) updateWatermarkTick(tickTime time.Time) {
+	if s.watermarkState == nil {
+		return
+	}
+	s.watermarkState.LastTick = tickTime
+	s.watermarkDirty.Store(true)
+}
+
+// startWatermarkFlusher periodically flushes dirty watermark state to disk.
+// Runs every 5 seconds, writing at most 12 times per minute regardless of DAG count.
+func (s *Scheduler) startWatermarkFlusher(ctx context.Context) {
+	if s.watermarkStore == nil {
+		return
+	}
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.quit:
+			return
+		case <-ticker.C:
+			s.flushWatermark(ctx)
+		}
+	}
+}
+
+// flushWatermark writes the watermark state to disk if dirty.
+func (s *Scheduler) flushWatermark(ctx context.Context) {
+	if s.watermarkStore == nil || s.watermarkState == nil {
+		return
+	}
+	if !s.watermarkDirty.CompareAndSwap(true, false) {
+		return
+	}
+	if err := s.watermarkStore.Save(ctx, s.watermarkState); err != nil {
+		logger.Error(ctx, "Failed to flush watermark state", tag.Error(err))
+		// Re-mark as dirty so we try again next cycle
+		s.watermarkDirty.Store(true)
+	}
+}
+
+// initCatchupQueues creates per-DAG queues for DAGs with CatchupWindow > 0,
+// computes missed intervals, enqueues catch-up items, and starts consumer goroutines.
+func (s *Scheduler) initCatchupQueues(ctx context.Context, wg *sync.WaitGroup) {
+	if s.watermarkState == nil {
+		return
+	}
+
+	now := s.clock()
+	dags := s.entryReader.DAGs()
+	s.dagQueues = make(map[string]*DAGQueue, len(dags))
+
+	var totalMissed int
+
+	for _, dag := range dags {
+		if dag.CatchupWindow <= 0 {
+			continue
+		}
+
+		dagName := dag.Name
+
+		// Compute replay boundary
+		var lastTick time.Time
+		var lastScheduledTime time.Time
+
+		lastTick = s.watermarkState.LastTick
+		if wm, ok := s.watermarkState.DAGs[dagName]; ok {
+			lastScheduledTime = wm.LastScheduledTime
+		}
+
+		replayFrom := ComputeReplayFrom(dag.CatchupWindow, lastTick, lastScheduledTime, now)
+		missed := ComputeMissedIntervals(dag.Schedule, replayFrom, now)
+
+		if len(missed) == 0 {
+			continue
+		}
+
+		totalMissed += len(missed)
+
+		logger.Info(ctx, "Catch-up planned",
+			tag.DAG(dagName),
+			slog.Int("missedCount", len(missed)),
+			slog.Time("replayFrom", replayFrom),
+			slog.Time("replayTo", now),
+		)
+
+		// Create queue with enough buffer for catch-up items plus some headroom for live ticks
+		q := NewDAGQueue(dagName, dag.OverlapPolicy, len(missed)+10)
+		s.dagQueues[dagName] = q
+
+		// Enqueue catch-up items
+		for _, t := range missed {
+			q.Send(QueueItem{
+				DAG:           dag,
+				ScheduledTime: t,
+				TriggerType:   core.TriggerTypeCatchUp,
+				ScheduleType:  ScheduleTypeStart,
+			})
+		}
+
+		// Start consumer goroutine
+		procGroup := dag.ProcGroup()
+		dispatch := s.makeDispatchFunc(ctx)
+		isRunning := s.makeIsRunningFunc(procGroup)
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			q.Start(ctx, dispatch, isRunning)
+		}()
+	}
+
+	if totalMissed > 0 {
+		logger.Info(ctx, "Catch-up initialization complete",
+			slog.Int("dagCount", len(s.dagQueues)),
+			slog.Int("totalMissedRuns", totalMissed),
+		)
+	}
+}
+
+// makeDispatchFunc returns a DispatchFunc that dispatches a queue item via the DAG executor.
+func (s *Scheduler) makeDispatchFunc(_ context.Context) DispatchFunc {
+	return func(ctx context.Context, item QueueItem) error {
+		runID, err := s.runtimeManager.GenDAGRunID(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to generate run ID: %w", err)
+		}
+
+		logger.Info(ctx, "Dispatching queued run",
+			tag.DAG(item.DAG.Name),
+			tag.RunID(runID),
+			slog.String("triggerType", item.TriggerType.String()),
+			slog.String("scheduledTime", item.ScheduledTime.Format(time.RFC3339)),
+		)
+
+		err = s.dagExecutor.HandleJob(
+			ctx,
+			item.DAG,
+			coordinatorv1.Operation_OPERATION_START,
+			runID,
+			item.TriggerType,
+			item.ScheduledTime.Format(time.RFC3339),
+		)
+
+		if err == nil {
+			// Update watermark state for this DAG
+			s.updateWatermarkDAG(item.DAG.Name, item.ScheduledTime)
+		}
+
+		return err
+	}
+}
+
+// makeIsRunningFunc returns an IsRunningFunc that checks if a DAG has any active run.
+func (s *Scheduler) makeIsRunningFunc(procGroup string) IsRunningFunc {
+	return func(ctx context.Context, dagName string) (bool, error) {
+		count, err := s.procStore.CountAliveByDAGName(ctx, procGroup, dagName)
+		if err != nil {
+			return false, err
+		}
+		return count > 0, nil
+	}
+}
+
+// updateWatermarkDAG updates the per-DAG watermark after a dispatch.
+func (s *Scheduler) updateWatermarkDAG(dagName string, scheduledTime time.Time) {
+	if s.watermarkState == nil {
+		return
+	}
+	if s.watermarkState.DAGs == nil {
+		s.watermarkState.DAGs = make(map[string]exec.DAGWatermark)
+	}
+	s.watermarkState.DAGs[dagName] = exec.DAGWatermark{
+		LastScheduledTime: scheduledTime,
+	}
+	s.watermarkDirty.Store(true)
+}
+
+// closeCatchupQueues closes all per-DAG catch-up queues.
+func (s *Scheduler) closeCatchupQueues() {
+	for _, q := range s.dagQueues {
+		q.Close()
 	}
 }

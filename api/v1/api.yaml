@@ -4379,6 +4379,7 @@ components:
         - "webhook"
         - "subdag"
         - "retry"
+        - "catchup"
 
     NodeStatus:
       type: integer
@@ -4702,6 +4703,9 @@ components:
           description: "ID of the worker that executed this DAG-run ('local' for local execution)"
         triggerType:
           $ref: "#/components/schemas/TriggerType"
+        scheduledTime:
+          type: string
+          description: "The cron slot the run was intended for (RFC 3339). Set for scheduled and catch-up runs."
         tags:
           type: array
           items:

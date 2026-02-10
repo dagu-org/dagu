@@ -99,6 +99,7 @@ func (s *Scheduler) NewSchedulerInstance(t *testing.T) (*scheduler.Scheduler, er
 		s.ProcStore,
 		s.ServiceRegistry,
 		s.CoordinatorCli,
+		nil,
 	)
 }
 

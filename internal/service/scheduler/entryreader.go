@@ -35,6 +35,8 @@ type EntryReader interface {
 	Stop()
 	// Next returns the next scheduled jobs.
 	Next(ctx context.Context, now time.Time) ([]*ScheduledJob, error)
+	// DAGs returns a snapshot of all currently loaded DAG definitions.
+	DAGs() []*core.DAG
 }
 
 // ScheduledJob stores the next time a job should be run and the job itself.
@@ -204,6 +206,17 @@ func (er *entryReaderImpl) createJob(dag *core.DAG, next time.Time, schedule cro
 		Client:      er.dagRunMgr,
 		DAGExecutor: er.dagExecutor,
 	}
+}
+
+func (er *entryReaderImpl) DAGs() []*core.DAG {
+	er.lock.Lock()
+	defer er.lock.Unlock()
+
+	dags := make([]*core.DAG, 0, len(er.registry))
+	for _, dag := range er.registry {
+		dags = append(dags, dag)
+	}
+	return dags
 }
 
 func (er *entryReaderImpl) initialize(ctx context.Context) error {

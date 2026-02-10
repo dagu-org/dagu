@@ -7,6 +7,7 @@ const labels: Record<TriggerType, string> = {
   webhook: 'Webhook',
   subdag: 'Sub-DAG',
   retry: 'Retry',
+  catchup: 'Catch-up',
   unknown: 'Unknown',
 };
 

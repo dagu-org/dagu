@@ -36,6 +36,11 @@ type DAGRunJob struct {
 	DAGExecutor *DAGExecutor
 }
 
+// GetDAG returns the DAG associated with this job.
+func (j *DAGRunJob) GetDAG(_ context.Context) *core.DAG {
+	return j.DAG
+}
+
 // Start attempts to run the job if it is not already running and is ready.
 func (j *DAGRunJob) Start(ctx context.Context) error {
 	latestStatus, err := j.Client.GetLatestStatus(ctx, j.DAG)
@@ -64,7 +69,7 @@ func (j *DAGRunJob) Start(ctx context.Context) error {
 	}
 
 	// Handle the job execution (implements persistence-first for distributed execution)
-	return j.DAGExecutor.HandleJob(ctx, j.DAG, coordinatorv1.Operation_OPERATION_START, runID, core.TriggerTypeScheduler)
+	return j.DAGExecutor.HandleJob(ctx, j.DAG, coordinatorv1.Operation_OPERATION_START, runID, core.TriggerTypeScheduler, j.Next.Format(time.RFC3339))
 }
 
 // Ready checks whether the job can be safely started based on the latest status.

@@ -2089,6 +2089,8 @@ export interface components {
             /** @description ID of the worker that executed this DAG-run ('local' for local execution) */
             workerId?: string;
             triggerType?: components["schemas"]["TriggerType"];
+            /** @description The cron slot the run was intended for (RFC 3339). Set for scheduled and catch-up runs. */
+            scheduledTime?: string;
             /** @description List of tags for categorizing and filtering DAG runs */
             tags?: string[];
         };
@@ -7363,7 +7365,8 @@ export enum TriggerType {
     manual = "manual",
     webhook = "webhook",
     subdag = "subdag",
-    retry = "retry"
+    retry = "retry",
+    catchup = "catchup"
 }
 export enum NodeStatus {
     NotStarted = 0,

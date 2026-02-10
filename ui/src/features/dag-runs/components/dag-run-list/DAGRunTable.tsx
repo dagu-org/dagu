@@ -12,6 +12,7 @@ import {
 import { useConfig } from '../../../../contexts/ConfigContext';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
+import { TriggerTypeIndicator } from '../../../dags/components/common/TriggerTypeIndicator';
 import { StepDetailsTooltip } from './StepDetailsTooltip';
 
 interface DAGRunTableProps {
@@ -269,9 +270,12 @@ function DAGRunTable({
               </StepDetailsTooltip>
             </div>
 
-            {/* DAG-run ID */}
-            <div className="text-xs font-mono text-muted-foreground mb-2">
-              {dagRun.dagRunId}
+            {/* DAG-run ID and Trigger */}
+            <div className="flex items-center justify-between text-xs mb-2">
+              <span className="font-mono text-muted-foreground">
+                {dagRun.dagRunId}
+              </span>
+              <TriggerTypeIndicator type={dagRun.triggerType} />
             </div>
 
             {/* Timestamps */}
@@ -331,6 +335,9 @@ function DAGRunTable({
             </TableHead>
             <TableHead>
               Status
+            </TableHead>
+            <TableHead>
+              Trigger
             </TableHead>
             <TableHead>
               <div>Queued At</div>
@@ -394,6 +401,9 @@ function DAGRunTable({
                     </StatusChip>
                   </div>
                 </StepDetailsTooltip>
+              </TableCell>
+              <TableCell className="py-1 px-2">
+                <TriggerTypeIndicator type={dagRun.triggerType} />
               </TableCell>
               <TableCell className="py-1 px-2 text-left">
                 {dagRun.queuedAt || '-'}
