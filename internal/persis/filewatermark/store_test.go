@@ -1,7 +1,3 @@
-// Copyright 2024 The Dagu Authors
-//
-// Licensed under the GNU Affero General Public License, Version 3.0.
-
 package filewatermark
 
 import (

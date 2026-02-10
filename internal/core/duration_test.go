@@ -1,7 +1,3 @@
-// Copyright 2024 The Dagu Authors
-//
-// Licensed under the GNU Affero General Public License, Version 3.0.
-
 package core
 
 import (
@@ -82,9 +78,9 @@ func TestParseDuration(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "unknown unit",
-			input:   "5s",
-			wantErr: true,
+			name:  "seconds accepted",
+			input: "5s",
+			want:  5 * time.Second,
 		},
 		{
 			name:    "whitespace only",
