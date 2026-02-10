@@ -216,12 +216,17 @@ func (er *entryReaderImpl) handleFSEvent(ctx context.Context, event fsnotify.Eve
 	}
 }
 
-// sendEvent sends a DAGChangeEvent on the channel. Blocks until the event is consumed.
-func (er *entryReaderImpl) sendEvent(_ context.Context, event DAGChangeEvent) {
+// sendEvent sends a DAGChangeEvent on the channel.
+// Returns immediately if the entry reader is shutting down or the context is cancelled.
+func (er *entryReaderImpl) sendEvent(ctx context.Context, event DAGChangeEvent) {
 	if er.events == nil {
 		return
 	}
-	er.events <- event
+	select {
+	case er.events <- event:
+	case <-er.quit:
+	case <-ctx.Done():
+	}
 }
 
 func (er *entryReaderImpl) Stop() {

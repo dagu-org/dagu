@@ -361,7 +361,7 @@ func (s *Scheduler) Stop(ctx context.Context) {
 
 	s.stopOnce.Do(func() {
 		var wg sync.WaitGroup
-		wg.Add(3)
+		wg.Add(2)
 
 		close(s.quit)
 
@@ -375,10 +375,10 @@ func (s *Scheduler) Stop(ctx context.Context) {
 			s.stopCron(ctx)
 		}(ctx)
 
-		go func() {
-			defer wg.Done()
-			s.entryReader.Stop()
-		}()
+		// Stop the producer (entryReader) synchronously BEFORE the consumer (planner).
+		// This ensures er.quit is closed before drainEvents exits, so any in-flight
+		// sendEvent unblocks via the select on er.quit.
+		s.entryReader.Stop()
 
 		if s.zombieDetector != nil {
 			s.zombieDetector.Stop(ctx)
