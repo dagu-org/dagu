@@ -16,31 +16,10 @@ func TestParseOverlapPolicy(t *testing.T) {
 		want    OverlapPolicy
 		wantErr bool
 	}{
-		{
-			name:  "skip",
-			input: "skip",
-			want:  OverlapPolicySkip,
-		},
-		{
-			name:  "all",
-			input: "all",
-			want:  OverlapPolicyAll,
-		},
-		{
-			name:  "empty defaults to skip",
-			input: "",
-			want:  OverlapPolicySkip,
-		},
-		{
-			name:    "bogus is invalid",
-			input:   "bogus",
-			wantErr: true,
-		},
-		{
-			name:    "invalid value",
-			input:   "queue",
-			wantErr: true,
-		},
+		{name: "skip", input: "skip", want: OverlapPolicySkip},
+		{name: "all", input: "all", want: OverlapPolicyAll},
+		{name: "empty defaults to skip", input: "", want: OverlapPolicySkip},
+		{name: "invalid value", input: "bogus", wantErr: true},
 	}
 
 	for _, tt := range tests {

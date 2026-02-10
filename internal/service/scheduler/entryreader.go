@@ -71,8 +71,7 @@ type entryReaderImpl struct {
 func NewEntryReader(dir string, dagCli exec.DAGStore, drm runtime.Manager, de *DAGExecutor, executable string) EntryReader {
 	return &entryReaderImpl{
 		targetDir:   dir,
-		lock:        sync.Mutex{},
-		registry:    map[string]*core.DAG{},
+		registry:    make(map[string]*core.DAG),
 		dagStore:    dagCli,
 		dagRunMgr:   drm,
 		executable:  executable,

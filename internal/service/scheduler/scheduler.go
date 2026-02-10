@@ -65,15 +65,8 @@ type Scheduler struct {
 	clock               Clock            // Clock function for getting current time
 }
 
-// New constructs a Scheduler configured with the provided stores, runtime manager,
+// New constructs a Scheduler from the provided stores, runtime manager,
 // service registry, and dispatcher.
-//
-// It determines the scheduler time location from cfg.Core.Location (falls back to
-// time.Local), creates a directory lock, DAG executor, health server, and queue
-// processor, and sets the default clock to the real-time clock.
-//
-// The returned Scheduler is ready for startup; any initialization errors are
-// returned.
 func New(
 	cfg *config.Config,
 	er EntryReader,
@@ -163,13 +156,11 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Generate instance ID if not already set
 	if s.instanceID == "" {
 		hostname, _ := os.Hostname()
 		s.instanceID = fmt.Sprintf("%s-%d-%d", hostname, os.Getpid(), time.Now().Unix())
 	}
 
-	// Register with service registry as inactive initially
 	if s.serviceRegistry != nil {
 		hostname, _ := os.Hostname()
 		hostInfo := exec.HostInfo{
@@ -191,14 +182,12 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		}
 	}
 
-	// Start health check server only if not disabled
 	if !s.disableHealthServer {
 		if err := s.healthServer.Start(ctx); err != nil {
 			return fmt.Errorf("failed to start health check server: %w", err)
 		}
 	}
 
-	// Acquire directory lock first to prevent multiple scheduler instances
 	logger.Info(ctx, "Waiting to acquire scheduler lock")
 	if err := s.dirLock.Lock(ctx); err != nil {
 		return fmt.Errorf("failed to acquire scheduler lock: %w", err)
@@ -206,7 +195,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	logger.Info(ctx, "Acquired scheduler lock")
 
-	// Update status to active after acquiring lock
 	if s.serviceRegistry != nil {
 		if err := s.serviceRegistry.UpdateStatus(ctx, exec.ServiceNameScheduler, exec.ServiceStatusActive); err != nil {
 			logger.Error(ctx, "Failed to update status to active", tag.Error(err))
@@ -217,7 +205,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	sig := make(chan os.Signal, 1)
 
-	// Start the DAG file watcher
 	queueWatcher := s.queueStore.QueueWatcher(ctx)
 	notifyCh, err := queueWatcher.Start(ctx)
 	if err != nil {
@@ -226,7 +213,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	}
 	s.queueProcessor.Start(ctx, notifyCh)
 
-	// Handle OS signals for graceful shutdown
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	var wg sync.WaitGroup
@@ -254,7 +240,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		return err
 	}
 
-	// Initialize catch-up: load watermark and populate buffers
 	if err := s.catchupManager.Init(ctx, s.entryReader.DAGs()); err != nil {
 		logger.Error(ctx, "Failed to initialize catch-up manager", tag.Error(err))
 	}
@@ -387,7 +372,6 @@ func (s *Scheduler) Stop(ctx context.Context) {
 			s.zombieDetector.Stop(ctx)
 		}
 
-		// Final watermark flush on shutdown
 		s.catchupManager.Flush(ctx)
 
 		if err := s.dirLock.Unlock(); err != nil {
@@ -399,26 +383,22 @@ func (s *Scheduler) Stop(ctx context.Context) {
 }
 
 func (s *Scheduler) stopCron(ctx context.Context) {
-	// Update status to inactive before stopping
 	if s.serviceRegistry != nil {
 		if err := s.serviceRegistry.UpdateStatus(ctx, exec.ServiceNameScheduler, exec.ServiceStatusInactive); err != nil {
 			logger.Error(ctx, "Failed to update status to inactive", tag.Error(err))
 		}
 	}
 
-	// Stop health check server if it was started
 	if s.healthServer != nil && !s.disableHealthServer {
 		if err := s.healthServer.Stop(ctx); err != nil {
 			logger.Error(ctx, "Failed to stop health check server", tag.Error(err))
 		}
 	}
 
-	// Close DAG executor to release gRPC connections
 	if s.dagExecutor != nil {
 		s.dagExecutor.Close(ctx)
 	}
 
-	// Unregister from service registry
 	if s.serviceRegistry != nil {
 		s.serviceRegistry.Unregister(ctx)
 	}
@@ -428,21 +408,18 @@ func (s *Scheduler) stopCron(ctx context.Context) {
 
 // invokeJobs executes the scheduled jobs at the current time.
 func (s *Scheduler) invokeJobs(ctx context.Context, now time.Time) {
-	// Ensure the lock is held while running jobs
 	if !s.dirLock.IsHeldByMe() {
 		logger.Error(ctx, "Scheduler lock is not held, cannot run jobs")
 		return
 	}
 
-	// Get jobs scheduled to run at or before the current time
-	// Subtract a small buffer to avoid edge cases with exact timing
+	// Subtract one second to avoid edge cases with exact timing.
 	jobs, err := s.entryReader.Next(ctx, now.Add(-time.Second).In(s.location))
 	if err != nil {
 		logger.Error(ctx, "Failed to get next jobs", tag.Error(err))
 		return
 	}
 
-	// Sort the jobs by the next scheduled time for predictable execution order
 	sort.SliceStable(jobs, func(i, j int) bool {
 		return jobs[i].Next.Before(jobs[j].Next)
 	})
@@ -452,7 +429,6 @@ func (s *Scheduler) invokeJobs(ctx context.Context, now time.Time) {
 			break
 		}
 
-		// Create a child context for this specific job execution
 		jobCtx := logger.WithValues(ctx,
 			tag.Job(fmt.Sprintf("%v", job.Job)),
 			slog.String("jobType", job.Type.String()),
@@ -517,17 +493,11 @@ func (s *ScheduledJob) invoke(ctx context.Context) error {
 	switch s.Type {
 	case ScheduleTypeStart:
 		return s.Job.Start(ctx)
-
 	case ScheduleTypeStop:
 		return s.Job.Stop(ctx)
-
 	case ScheduleTypeRestart:
 		return s.Job.Restart(ctx)
-
 	default:
 		return fmt.Errorf("unknown schedule type: %v", s.Type)
-
 	}
 }
-
-

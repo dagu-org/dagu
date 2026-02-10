@@ -96,23 +96,26 @@ func TestStore_SaveAtomicity(t *testing.T) {
 	store := New(dir)
 	ctx := context.Background()
 
+	now := time.Now().Truncate(time.Second)
+
 	// Save initial state
 	state1 := &core.SchedulerState{
 		Version:  1,
-		LastTick: time.Now().Truncate(time.Second),
+		LastTick: now,
 		DAGs: map[string]core.DAGWatermark{
-			"dag1": {LastScheduledTime: time.Now().Truncate(time.Second)},
+			"dag1": {LastScheduledTime: now},
 		},
 	}
 	require.NoError(t, store.Save(ctx, state1))
 
 	// Save updated state
+	later := now.Add(time.Minute)
 	state2 := &core.SchedulerState{
 		Version:  1,
-		LastTick: time.Now().Add(time.Minute).Truncate(time.Second),
+		LastTick: later,
 		DAGs: map[string]core.DAGWatermark{
-			"dag1": {LastScheduledTime: time.Now().Add(time.Minute).Truncate(time.Second)},
-			"dag2": {LastScheduledTime: time.Now().Add(time.Minute).Truncate(time.Second)},
+			"dag1": {LastScheduledTime: later},
+			"dag2": {LastScheduledTime: later},
 		},
 	}
 	require.NoError(t, store.Save(ctx, state2))

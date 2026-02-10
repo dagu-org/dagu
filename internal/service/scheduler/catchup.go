@@ -35,18 +35,18 @@ const MaxMissedRuns = 1000
 // chronologically. Duplicates across schedules are removed.
 // If the total exceeds MaxMissedRuns, only the most recent runs are kept.
 func ComputeMissedIntervals(schedules []core.Schedule, replayFrom, replayTo time.Time) []time.Time {
-	seen := make(map[time.Time]bool)
+	seen := make(map[time.Time]struct{})
 	var result []time.Time
 
 	for _, sched := range schedules {
 		if sched.Parsed == nil {
 			continue
 		}
-		// Start after replayFrom (exclusive start) — replayFrom was already dispatched.
+		// Exclusive start: replayFrom was already dispatched.
 		t := sched.Parsed.Next(replayFrom)
 		for !t.After(replayTo) {
-			if !seen[t] {
-				seen[t] = true
+			if _, dup := seen[t]; !dup {
+				seen[t] = struct{}{}
 				result = append(result, t)
 			}
 			t = sched.Parsed.Next(t)

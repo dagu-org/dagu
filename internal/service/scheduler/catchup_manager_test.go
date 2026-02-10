@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -68,6 +67,27 @@ func newTestCatchupManager(store core.WatermarkStore) *CatchupManager {
 	})
 }
 
+// newMockWatermarkState creates a SchedulerState with the given lastTick and an
+// empty DAGs map. Most catchup manager tests share this setup.
+func newMockWatermarkState(lastTick time.Time) *core.SchedulerState {
+	return &core.SchedulerState{
+		Version:  1,
+		LastTick: lastTick,
+		DAGs:     make(map[string]core.DAGWatermark),
+	}
+}
+
+// newHourlyCatchupDAG creates a DAG with an hourly schedule ("0 * * * *") and a
+// 6-hour catchup window. Uses mustParseSchedule from catchup_test.go.
+func newHourlyCatchupDAG(t *testing.T, name string) *core.DAG {
+	t.Helper()
+	return &core.DAG{
+		Name:          name,
+		CatchupWindow: 6 * time.Hour,
+		Schedule:      []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+	}
+}
+
 func TestCatchupManager_InitNoWatermarkStore(t *testing.T) {
 	t.Parallel()
 	cm := NewCatchupManager(CatchupManagerConfig{})
@@ -91,26 +111,13 @@ func TestCatchupManager_InitLoadError(t *testing.T) {
 func TestCatchupManager_InitWithMissedRuns(t *testing.T) {
 	t.Parallel()
 
-	parsed, err := cron.ParseStandard("0 * * * *") // hourly
-	require.NoError(t, err)
-
 	store := &mockWatermarkStore{
-		state: &core.SchedulerState{
-			Version:  1,
-			LastTick: time.Date(2026, 2, 7, 9, 0, 0, 0, time.UTC),
-			DAGs:     make(map[string]core.DAGWatermark),
-		},
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 9, 0, 0, 0, time.UTC)),
 	}
 	cm := newTestCatchupManager(store)
 
-	dags := []*core.DAG{{
-		Name:          "test-dag",
-		CatchupWindow: 6 * time.Hour,
-		Schedule:      []core.Schedule{{Expression: "0 * * * *", Parsed: parsed}},
-	}}
-
-	err = cm.Init(context.Background(), dags)
-	require.NoError(t, err)
+	dag := newHourlyCatchupDAG(t, "test-dag")
+	require.NoError(t, cm.Init(context.Background(), []*core.DAG{dag}))
 
 	cm.mu.RLock()
 	buf, ok := cm.scheduleBuffers["test-dag"]
@@ -192,23 +199,12 @@ func TestCatchupManager_FlushSkipsWhenClean(t *testing.T) {
 func TestCatchupManager_RouteToBuffer(t *testing.T) {
 	t.Parallel()
 
-	parsed, err := cron.ParseStandard("0 * * * *")
-	require.NoError(t, err)
-
 	store := &mockWatermarkStore{
-		state: &core.SchedulerState{
-			Version:  1,
-			LastTick: time.Date(2026, 2, 7, 9, 0, 0, 0, time.UTC),
-			DAGs:     make(map[string]core.DAGWatermark),
-		},
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 9, 0, 0, 0, time.UTC)),
 	}
 	cm := newTestCatchupManager(store)
 
-	dag := &core.DAG{
-		Name:          "test-dag",
-		CatchupWindow: 6 * time.Hour,
-		Schedule:      []core.Schedule{{Expression: "0 * * * *", Parsed: parsed}},
-	}
+	dag := newHourlyCatchupDAG(t, "test-dag")
 	require.NoError(t, cm.Init(context.Background(), []*core.DAG{dag}))
 
 	// Should route to existing buffer
@@ -221,23 +217,15 @@ func TestCatchupManager_RouteToBuffer(t *testing.T) {
 	assert.True(t, routed)
 
 	// Should not route to non-existent buffer
-	routed = cm.RouteToBuffer("other-dag", QueueItem{})
-	assert.False(t, routed)
+	assert.False(t, cm.RouteToBuffer("other-dag", QueueItem{}))
 }
 
 func TestCatchupManager_ProcessBuffersDispatches(t *testing.T) {
 	t.Parallel()
 
-	parsed, err := cron.ParseStandard("0 * * * *")
-	require.NoError(t, err)
-
 	var dispatched []string
 	store := &mockWatermarkStore{
-		state: &core.SchedulerState{
-			Version:  1,
-			LastTick: time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC),
-			DAGs:     make(map[string]core.DAGWatermark),
-		},
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)),
 	}
 
 	cm := NewCatchupManager(CatchupManagerConfig{
@@ -257,11 +245,7 @@ func TestCatchupManager_ProcessBuffersDispatches(t *testing.T) {
 		},
 	})
 
-	dag := &core.DAG{
-		Name:          "my-dag",
-		CatchupWindow: 6 * time.Hour,
-		Schedule:      []core.Schedule{{Expression: "0 * * * *", Parsed: parsed}},
-	}
+	dag := newHourlyCatchupDAG(t, "my-dag")
 	require.NoError(t, cm.Init(context.Background(), []*core.DAG{dag}))
 
 	// ProcessBuffers drains one per tick
@@ -273,15 +257,8 @@ func TestCatchupManager_ProcessBuffersDispatches(t *testing.T) {
 func TestCatchupManager_ProcessBuffersSkipOverlap(t *testing.T) {
 	t.Parallel()
 
-	parsed, err := cron.ParseStandard("0 * * * *")
-	require.NoError(t, err)
-
 	store := &mockWatermarkStore{
-		state: &core.SchedulerState{
-			Version:  1,
-			LastTick: time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC),
-			DAGs:     make(map[string]core.DAGWatermark),
-		},
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)),
 	}
 
 	var dispatched int
@@ -302,12 +279,8 @@ func TestCatchupManager_ProcessBuffersSkipOverlap(t *testing.T) {
 		},
 	})
 
-	dag := &core.DAG{
-		Name:          "skip-dag",
-		CatchupWindow: 6 * time.Hour,
-		OverlapPolicy: core.OverlapPolicySkip,
-		Schedule:      []core.Schedule{{Expression: "0 * * * *", Parsed: parsed}},
-	}
+	dag := newHourlyCatchupDAG(t, "skip-dag")
+	dag.OverlapPolicy = core.OverlapPolicySkip
 	require.NoError(t, cm.Init(context.Background(), []*core.DAG{dag}))
 
 	cm.mu.RLock()
@@ -349,17 +322,13 @@ func TestCatchupManager_ConcurrentFlushAndAdvance(t *testing.T) {
 func TestCatchupManager_PrunesStaleDAGEntries(t *testing.T) {
 	t.Parallel()
 
-	store := &mockWatermarkStore{
-		state: &core.SchedulerState{
-			Version:  1,
-			LastTick: time.Date(2026, 2, 7, 9, 0, 0, 0, time.UTC),
-			DAGs: map[string]core.DAGWatermark{
-				"active-dag":  {LastScheduledTime: time.Date(2026, 2, 7, 8, 0, 0, 0, time.UTC)},
-				"deleted-dag": {LastScheduledTime: time.Date(2026, 2, 7, 7, 0, 0, 0, time.UTC)},
-				"gone-dag":    {LastScheduledTime: time.Date(2026, 2, 7, 6, 0, 0, 0, time.UTC)},
-			},
-		},
+	state := newMockWatermarkState(time.Date(2026, 2, 7, 9, 0, 0, 0, time.UTC))
+	state.DAGs = map[string]core.DAGWatermark{
+		"active-dag":  {LastScheduledTime: time.Date(2026, 2, 7, 8, 0, 0, 0, time.UTC)},
+		"deleted-dag": {LastScheduledTime: time.Date(2026, 2, 7, 7, 0, 0, 0, time.UTC)},
+		"gone-dag":    {LastScheduledTime: time.Date(2026, 2, 7, 6, 0, 0, 0, time.UTC)},
 	}
+	store := &mockWatermarkStore{state: state}
 	cm := newTestCatchupManager(store)
 
 	// Only "active-dag" still exists
@@ -380,23 +349,12 @@ func TestCatchupManager_PrunesStaleDAGEntries(t *testing.T) {
 func TestCatchupManager_RouteToBufferFullFallback(t *testing.T) {
 	t.Parallel()
 
-	parsed, err := cron.ParseStandard("0 * * * *")
-	require.NoError(t, err)
-
 	store := &mockWatermarkStore{
-		state: &core.SchedulerState{
-			Version:  1,
-			LastTick: time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC),
-			DAGs:     make(map[string]core.DAGWatermark),
-		},
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)),
 	}
 	cm := newTestCatchupManager(store)
 
-	dag := &core.DAG{
-		Name:          "test-dag",
-		CatchupWindow: 6 * time.Hour,
-		Schedule:      []core.Schedule{{Expression: "0 * * * *", Parsed: parsed}},
-	}
+	dag := newHourlyCatchupDAG(t, "test-dag")
 	require.NoError(t, cm.Init(context.Background(), []*core.DAG{dag}))
 
 	// Set the buffer max to a tiny size
@@ -416,38 +374,12 @@ func TestCatchupManager_RouteToBufferFullFallback(t *testing.T) {
 func TestCatchupManager_ProcessBuffersCleansEmpty(t *testing.T) {
 	t.Parallel()
 
-	parsed, err := cron.ParseStandard("0 * * * *")
-	require.NoError(t, err)
-
 	store := &mockWatermarkStore{
-		state: &core.SchedulerState{
-			Version:  1,
-			LastTick: time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC),
-			DAGs:     make(map[string]core.DAGWatermark),
-		},
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)),
 	}
+	cm := newTestCatchupManager(store)
 
-	cm := NewCatchupManager(CatchupManagerConfig{
-		WatermarkStore: store,
-		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
-			return nil
-		},
-		GenRunID: func(_ context.Context) (string, error) {
-			return "run-1", nil
-		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
-			return false, nil
-		},
-		Clock: func() time.Time {
-			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
-		},
-	})
-
-	dag := &core.DAG{
-		Name:          "drain-dag",
-		CatchupWindow: 6 * time.Hour,
-		Schedule:      []core.Schedule{{Expression: "0 * * * *", Parsed: parsed}},
-	}
+	dag := newHourlyCatchupDAG(t, "drain-dag")
 	require.NoError(t, cm.Init(context.Background(), []*core.DAG{dag}))
 
 	cm.mu.RLock()
@@ -470,16 +402,9 @@ func TestCatchupManager_ProcessBuffersCleansEmpty(t *testing.T) {
 func TestCatchupManager_ProcessBuffersDispatchError(t *testing.T) {
 	t.Parallel()
 
-	parsed, err := cron.ParseStandard("0 * * * *")
-	require.NoError(t, err)
-
 	var dispatched int
 	store := &mockWatermarkStore{
-		state: &core.SchedulerState{
-			Version:  1,
-			LastTick: time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC),
-			DAGs:     make(map[string]core.DAGWatermark),
-		},
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)),
 	}
 
 	cm := NewCatchupManager(CatchupManagerConfig{
@@ -499,11 +424,7 @@ func TestCatchupManager_ProcessBuffersDispatchError(t *testing.T) {
 		},
 	})
 
-	dag := &core.DAG{
-		Name:          "fail-dag",
-		CatchupWindow: 6 * time.Hour,
-		Schedule:      []core.Schedule{{Expression: "0 * * * *", Parsed: parsed}},
-	}
+	dag := newHourlyCatchupDAG(t, "fail-dag")
 	require.NoError(t, cm.Init(context.Background(), []*core.DAG{dag}))
 
 	cm.mu.RLock()
@@ -529,16 +450,9 @@ func TestCatchupManager_ProcessBuffersDispatchError(t *testing.T) {
 func TestCatchupManager_ProcessBuffersIsRunningError(t *testing.T) {
 	t.Parallel()
 
-	parsed, err := cron.ParseStandard("0 * * * *")
-	require.NoError(t, err)
-
 	var dispatched int
 	store := &mockWatermarkStore{
-		state: &core.SchedulerState{
-			Version:  1,
-			LastTick: time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC),
-			DAGs:     make(map[string]core.DAGWatermark),
-		},
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)),
 	}
 
 	cm := NewCatchupManager(CatchupManagerConfig{
@@ -558,11 +472,7 @@ func TestCatchupManager_ProcessBuffersIsRunningError(t *testing.T) {
 		},
 	})
 
-	dag := &core.DAG{
-		Name:          "err-dag",
-		CatchupWindow: 6 * time.Hour,
-		Schedule:      []core.Schedule{{Expression: "0 * * * *", Parsed: parsed}},
-	}
+	dag := newHourlyCatchupDAG(t, "err-dag")
 	require.NoError(t, cm.Init(context.Background(), []*core.DAG{dag}))
 
 	cm.mu.RLock()
@@ -606,38 +516,12 @@ func TestCatchupManager_NilWatermarkStoreFullPath(t *testing.T) {
 func TestCatchupManager_RouteToBufferAfterDrain(t *testing.T) {
 	t.Parallel()
 
-	parsed, err := cron.ParseStandard("0 * * * *")
-	require.NoError(t, err)
-
 	store := &mockWatermarkStore{
-		state: &core.SchedulerState{
-			Version:  1,
-			LastTick: time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC),
-			DAGs:     make(map[string]core.DAGWatermark),
-		},
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)),
 	}
+	cm := newTestCatchupManager(store)
 
-	cm := NewCatchupManager(CatchupManagerConfig{
-		WatermarkStore: store,
-		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
-			return nil
-		},
-		GenRunID: func(_ context.Context) (string, error) {
-			return "run-1", nil
-		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
-			return false, nil
-		},
-		Clock: func() time.Time {
-			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
-		},
-	})
-
-	dag := &core.DAG{
-		Name:          "route-dag",
-		CatchupWindow: 6 * time.Hour,
-		Schedule:      []core.Schedule{{Expression: "0 * * * *", Parsed: parsed}},
-	}
+	dag := newHourlyCatchupDAG(t, "route-dag")
 	require.NoError(t, cm.Init(context.Background(), []*core.DAG{dag}))
 
 	// RouteToBuffer should work initially

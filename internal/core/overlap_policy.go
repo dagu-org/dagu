@@ -2,18 +2,14 @@ package core
 
 import "fmt"
 
-// OverlapPolicy controls how multiple catch-up runs are handled.
+// OverlapPolicy controls behavior when a new run is triggered while a previous run is still active.
 type OverlapPolicy string
 
 const (
 	// OverlapPolicySkip skips a new run if the previous is still running.
-	// For catch-up: only the first missed interval runs; others are skipped
-	// while it's in progress.
 	OverlapPolicySkip OverlapPolicy = "skip"
 
-	// OverlapPolicyAll executes all missed runs sequentially (queued, one
-	// after another in chronological order). Ensures every missed interval
-	// is processed.
+	// OverlapPolicyAll queues all runs and executes them sequentially in chronological order.
 	OverlapPolicyAll OverlapPolicy = "all"
 )
 

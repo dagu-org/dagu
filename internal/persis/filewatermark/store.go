@@ -29,19 +29,22 @@ func New(baseDir string) *Store {
 
 // Load reads the scheduler state from the state file.
 // If the file is missing or corrupt, it returns a fresh empty state.
-func (s *Store) Load(_ context.Context) (*core.SchedulerState, error) {
+func (s *Store) Load(ctx context.Context) (*core.SchedulerState, error) {
 	path := s.statePath()
 
 	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
-		if os.IsNotExist(err) {
-			return newEmptyState(), nil
+		if !os.IsNotExist(err) {
+			logger.Warn(ctx, "Failed to read watermark state file, starting fresh",
+				tag.Error(err), tag.File(path))
 		}
 		return newEmptyState(), nil
 	}
 
 	var state core.SchedulerState
 	if err := json.Unmarshal(data, &state); err != nil {
+		logger.Warn(ctx, "Corrupt watermark state file, starting fresh",
+			tag.Error(err), tag.File(path))
 		return newEmptyState(), nil
 	}
 

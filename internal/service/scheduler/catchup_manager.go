@@ -127,13 +127,9 @@ func (cm *CatchupManager) initBuffers(ctx context.Context, dags []*core.DAG) {
 			continue
 		}
 
-		dagName := dag.Name
-
-		var lastTick time.Time
+		lastTick := state.LastTick
 		var lastScheduledTime time.Time
-
-		lastTick = state.LastTick
-		if wm, ok := state.DAGs[dagName]; ok {
+		if wm, ok := state.DAGs[dag.Name]; ok {
 			lastScheduledTime = wm.LastScheduledTime
 		}
 
@@ -147,14 +143,14 @@ func (cm *CatchupManager) initBuffers(ctx context.Context, dags []*core.DAG) {
 		totalMissed += len(missed)
 
 		logger.Info(ctx, "Catch-up planned",
-			tag.DAG(dagName),
+			tag.DAG(dag.Name),
 			slog.Int("missedCount", len(missed)),
 			slog.Time("replayFrom", replayFrom),
 			slog.Time("replayTo", now),
 		)
 
-		q := NewScheduleBuffer(dagName, dag.OverlapPolicy)
-		buffers[dagName] = q
+		q := NewScheduleBuffer(dag.Name, dag.OverlapPolicy)
+		buffers[dag.Name] = q
 
 		for _, t := range missed {
 			if !q.Send(QueueItem{
@@ -164,7 +160,7 @@ func (cm *CatchupManager) initBuffers(ctx context.Context, dags []*core.DAG) {
 				ScheduleType:  ScheduleTypeStart,
 			}) {
 				logger.Error(ctx, "Catch-up buffer full, dropping remaining items",
-					tag.DAG(dagName),
+					tag.DAG(dag.Name),
 					slog.Int("buffered", q.Len()),
 					slog.Int("dropped", len(missed)-q.Len()),
 				)
@@ -214,9 +210,7 @@ func (cm *CatchupManager) ProcessBuffers(ctx context.Context) {
 
 		running, err := cm.isRunning(ctx, item.DAG)
 		if err != nil {
-			// Treat as "not running" so the buffer keeps draining.
-			// If the DAG was deleted, dispatch will fail and the item is gone.
-			// If transient, the execution layer handles overlap.
+			// Default to "not running" so the buffer keeps draining.
 			logger.Error(ctx, "Failed to check if DAG is running, assuming not running",
 				tag.DAG(dagName),
 				tag.Error(err),
@@ -243,10 +237,8 @@ func (cm *CatchupManager) ProcessBuffers(ctx context.Context) {
 	}
 }
 
-// RouteToBuffer attempts to route a scheduled start job to its catch-up buffer.
-// Returns true if the item was buffered, false if no buffer exists for this DAG
-// or the buffer is full (caller should dispatch directly as fallback).
-// Called from invokeJobs in the cronLoop.
+// RouteToBuffer routes a scheduled start job to its catch-up buffer.
+// Returns true if buffered, false if no buffer exists or the buffer is full.
 func (cm *CatchupManager) RouteToBuffer(dagName string, item QueueItem) bool {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
@@ -290,7 +282,7 @@ func (cm *CatchupManager) Flush(ctx context.Context) {
 		return
 	}
 
-	// Snapshot under read lock to avoid concurrent map access during Save.
+	// Snapshot under read lock to avoid holding the lock during I/O.
 	cm.mu.RLock()
 	if cm.watermarkState == nil {
 		cm.mu.RUnlock()

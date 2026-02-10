@@ -127,11 +127,9 @@ func TestScheduleBuffer_PopCompacts(t *testing.T) {
 	assert.Equal(t, 10, q.Len())
 
 	// Verify remaining items are still correct (FIFO order preserved)
-	for i := range 10 {
-		item, ok := q.Pop()
+	for range 10 {
+		_, ok := q.Pop()
 		require.True(t, ok)
-		_ = item
-		_ = i
 	}
 	assert.Equal(t, 0, q.Len())
 }
