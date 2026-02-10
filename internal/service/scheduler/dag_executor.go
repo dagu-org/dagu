@@ -26,9 +26,9 @@ import (
 //
 // Execution Flow:
 //
-// 1. Scheduled Jobs (from DAGRunJob.Start):
+// 1. Scheduled Jobs (from TickPlanner.DispatchRun):
 //   - Operation: OPERATION_START
-//   - Flow: DAGRunJob.Start() → HandleJob() → EnqueueDAGRun() (for distributed)
+//   - Flow: TickPlanner.DispatchRun() → HandleJob() → EnqueueDAGRun() (for distributed)
 //   - This creates a persisted record with status=QUEUED before any dispatch attempt
 //   - Ensures the job is tracked and can be retried if coordinator/workers are down
 //

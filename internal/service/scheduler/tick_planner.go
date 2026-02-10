@@ -379,7 +379,7 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 				continue
 			}
 
-			// Guard: DAG must be running (matches DAGRunJob.Stop behavior)
+			// Guard: DAG must be running before issuing a stop
 			latestStatus, err := tp.cfg.GetLatestStatus(ctx, entry.dag)
 			if err != nil {
 				logger.Error(ctx, "Failed to fetch DAG status for stop schedule",

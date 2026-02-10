@@ -1152,3 +1152,59 @@ func TestTickPlanner_ConcurrentPlanAndEvents(t *testing.T) {
 	cancel()
 	tp.Stop(context.Background())
 }
+
+func TestComputePrevExecTime(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		schedule string
+		next     time.Time
+		want     time.Time
+	}{
+		{
+			name:     "HourlySchedule",
+			schedule: "0 * * * *",
+			next:     time.Date(2020, 1, 1, 2, 0, 0, 0, time.UTC),
+			want:     time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
+		},
+		{
+			name:     "EveryFiveMinutes",
+			schedule: "*/5 * * * *",
+			next:     time.Date(2020, 1, 1, 1, 5, 0, 0, time.UTC),
+			want:     time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
+		},
+		{
+			name:     "DailySchedule",
+			schedule: "0 0 * * *",
+			next:     time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC),
+			want:     time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:     "NonUniform_9_17",
+			schedule: "0 9,17 * * *",
+			next:     time.Date(2020, 1, 1, 17, 0, 0, 0, time.UTC),
+			want:     time.Date(2020, 1, 1, 9, 0, 0, 0, time.UTC),
+		},
+		{
+			name:     "NonUniform_9_17_AtMorning",
+			schedule: "0 9,17 * * *",
+			next:     time.Date(2020, 1, 2, 9, 0, 0, 0, time.UTC),
+			want:     time.Date(2020, 1, 1, 17, 0, 0, 0, time.UTC),
+		},
+		{
+			name:     "WeeklySchedule",
+			schedule: "0 9 * * 1",
+			next:     time.Date(2020, 1, 13, 9, 0, 0, 0, time.UTC), // Monday
+			want:     time.Date(2020, 1, 6, 9, 0, 0, 0, time.UTC),  // Previous Monday
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sched := mustParseSchedule(t, tt.schedule)
+			got := computePrevExecTime(tt.next, sched)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

@@ -67,46 +67,6 @@ func TestScheduler(t *testing.T) {
 	})
 }
 
-func TestPrevExecTime(t *testing.T) {
-	tests := []struct {
-		name     string
-		schedule string
-		now      time.Time
-		want     time.Time
-	}{
-		{
-			name:     "HourlySchedule",
-			schedule: "0 * * * *",
-			now:      time.Date(2020, 1, 1, 2, 0, 0, 0, time.UTC),
-			want:     time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
-		},
-		{
-			name:     "EveryFiveMinutes",
-			schedule: "*/5 * * * *",
-			now:      time.Date(2020, 1, 1, 1, 5, 0, 0, time.UTC),
-			want:     time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
-		},
-		{
-			name:     "DailySchedule",
-			schedule: "0 0 * * *",
-			now:      time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC),
-			want:     time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cronParser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
-			schedule, err := cronParser.Parse(tt.schedule)
-			require.NoError(t, err)
-
-			job := &scheduler.DAGRunJob{Schedule: schedule, Next: tt.now}
-			got := job.PrevExecTime()
-			require.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	clock := func() time.Time { return now }
