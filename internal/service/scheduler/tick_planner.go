@@ -100,7 +100,25 @@ type plannerEntry struct {
 }
 
 // NewTickPlanner creates a new TickPlanner with the given configuration.
+// Nil config fields are replaced with no-op defaults.
 func NewTickPlanner(cfg TickPlannerConfig) *TickPlanner {
+	if cfg.WatermarkStore == nil {
+		cfg.WatermarkStore = noopWatermarkStore{}
+	}
+	if cfg.IsSuspended == nil {
+		cfg.IsSuspended = func(context.Context, string) bool { return false }
+	}
+	if cfg.IsRunning == nil {
+		cfg.IsRunning = func(context.Context, *core.DAG) (bool, error) { return false, nil }
+	}
+	if cfg.GetLatestStatus == nil {
+		cfg.GetLatestStatus = func(context.Context, *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{}, nil
+		}
+	}
+	if cfg.Clock == nil {
+		cfg.Clock = time.Now
+	}
 	return &TickPlanner{
 		cfg:     cfg,
 		entries: make(map[string]*plannerEntry),
@@ -118,14 +136,10 @@ func (tp *TickPlanner) Init(ctx context.Context, dags []*core.DAG) error {
 		}
 	}
 
-	if tp.cfg.WatermarkStore == nil {
-		return nil
-	}
-
 	state, err := tp.cfg.WatermarkStore.Load(ctx)
 	if err != nil {
 		logger.Error(ctx, "Failed to load watermark state", tag.Error(err))
-		return nil
+		state = &SchedulerState{Version: 1, DAGs: make(map[string]DAGWatermark)}
 	}
 
 	// Prune stale DAG entries that no longer exist on disk.
@@ -165,10 +179,6 @@ func (tp *TickPlanner) initBuffers(ctx context.Context, dags []*core.DAG) {
 	tp.mu.RLock()
 	state := tp.watermarkState
 	tp.mu.RUnlock()
-
-	if state == nil {
-		return
-	}
 
 	now := tp.cfg.Clock()
 	var totalMissed int
@@ -239,11 +249,9 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 
 	for dagName, entry := range tp.entries {
 		// Check suspension
-		if tp.cfg.IsSuspended != nil {
-			dagBaseName := strings.TrimSuffix(filepath.Base(entry.dag.Location), filepath.Ext(entry.dag.Location))
-			if tp.cfg.IsSuspended(ctx, dagBaseName) {
-				continue
-			}
+		dagBaseName := strings.TrimSuffix(filepath.Base(entry.dag.Location), filepath.Ext(entry.dag.Location))
+		if tp.cfg.IsSuspended(ctx, dagBaseName) {
+			continue
 		}
 
 		// Check catchup buffer first (catchup has priority over live)
@@ -253,17 +261,13 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 			if !hasItem {
 				delete(tp.buffers, dagName)
 			} else {
-				var running bool
-				if tp.cfg.IsRunning != nil {
-					var err error
-					running, err = tp.cfg.IsRunning(ctx, item.DAG)
-					if err != nil {
-						logger.Error(ctx, "Failed to check if DAG is running, assuming not running",
-							tag.DAG(dagName),
-							tag.Error(err),
-						)
-						running = false
-					}
+				running, err := tp.cfg.IsRunning(ctx, item.DAG)
+				if err != nil {
+					logger.Error(ctx, "Failed to check if DAG is running, assuming not running",
+						tag.DAG(dagName),
+						tag.Error(err),
+					)
+					running = false
 				}
 
 				if !running {
@@ -329,22 +333,16 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 // shouldRun checks all guards for a live scheduled run.
 func (tp *TickPlanner) shouldRun(ctx context.Context, dag *core.DAG, scheduledTime time.Time, schedule core.Schedule) bool {
 	// Guard 1: isRunning (uses process-level check)
-	if tp.cfg.IsRunning != nil {
-		running, err := tp.cfg.IsRunning(ctx, dag)
-		if err != nil {
-			logger.Error(ctx, "Failed to check if DAG is running",
-				tag.DAG(dag.Name),
-				tag.Error(err),
-			)
-			return false
-		}
-		if running {
-			return false
-		}
+	running, err := tp.cfg.IsRunning(ctx, dag)
+	if err != nil {
+		logger.Error(ctx, "Failed to check if DAG is running",
+			tag.DAG(dag.Name),
+			tag.Error(err),
+		)
+		return false
 	}
-
-	if tp.cfg.GetLatestStatus == nil {
-		return true
+	if running {
+		return false
 	}
 
 	latestStatus, err := tp.cfg.GetLatestStatus(ctx, dag)
@@ -424,16 +422,9 @@ func (tp *TickPlanner) Advance(now time.Time) {
 	tp.mu.Lock()
 	defer tp.mu.Unlock()
 
-	if tp.watermarkState == nil {
-		return
-	}
-
 	tp.watermarkState.LastTick = now
 
 	for _, run := range tp.lastPlanResult {
-		if tp.watermarkState.DAGs == nil {
-			tp.watermarkState.DAGs = make(map[string]DAGWatermark)
-		}
 		tp.watermarkState.DAGs[run.DAG.Name] = DAGWatermark{
 			LastScheduledTime: run.ScheduledTime,
 		}
@@ -446,19 +437,12 @@ func (tp *TickPlanner) Advance(now time.Time) {
 // Flush writes the watermark state to disk if dirty.
 // Safe for concurrent use.
 func (tp *TickPlanner) Flush(ctx context.Context) {
-	if tp.cfg.WatermarkStore == nil {
-		return
-	}
 	if !tp.watermarkDirty.CompareAndSwap(true, false) {
 		return
 	}
 
 	// Snapshot under read lock to avoid holding the lock during I/O.
 	tp.mu.RLock()
-	if tp.watermarkState == nil {
-		tp.mu.RUnlock()
-		return
-	}
 	snapshot := &SchedulerState{
 		Version:  tp.watermarkState.Version,
 		LastTick: tp.watermarkState.LastTick,
@@ -475,10 +459,6 @@ func (tp *TickPlanner) Flush(ctx context.Context) {
 
 // StartFlusher runs the periodic watermark flusher. Blocks until ctx is done.
 func (tp *TickPlanner) StartFlusher(ctx context.Context) {
-	if tp.cfg.WatermarkStore == nil {
-		return
-	}
-
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
@@ -495,10 +475,6 @@ func (tp *TickPlanner) StartFlusher(ctx context.Context) {
 // drainEvents processes all queued DAG change events from the channel.
 // Non-blocking: processes all available events, then returns.
 func (tp *TickPlanner) drainEvents(ctx context.Context) {
-	if tp.cfg.Events == nil {
-		return
-	}
-
 	for {
 		select {
 		case event, ok := <-tp.cfg.Events:
@@ -525,15 +501,10 @@ func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
 		}
 		// Set watermark to now (new DAGs have no catchup)
 		tp.mu.Lock()
-		if tp.watermarkState != nil {
-			if tp.watermarkState.DAGs == nil {
-				tp.watermarkState.DAGs = make(map[string]DAGWatermark)
-			}
-			tp.watermarkState.DAGs[event.DAGName] = DAGWatermark{
-				LastScheduledTime: tp.cfg.Clock(),
-			}
-			tp.watermarkDirty.Store(true)
+		tp.watermarkState.DAGs[event.DAGName] = DAGWatermark{
+			LastScheduledTime: tp.cfg.Clock(),
 		}
+		tp.watermarkDirty.Store(true)
 		tp.mu.Unlock()
 		logger.Info(ctx, "Planner: DAG added", tag.DAG(event.DAGName))
 
@@ -556,10 +527,8 @@ func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
 		delete(tp.entries, event.DAGName)
 		delete(tp.buffers, event.DAGName)
 		tp.mu.Lock()
-		if tp.watermarkState != nil {
-			delete(tp.watermarkState.DAGs, event.DAGName)
-			tp.watermarkDirty.Store(true)
-		}
+		delete(tp.watermarkState.DAGs, event.DAGName)
+		tp.watermarkDirty.Store(true)
 		tp.mu.Unlock()
 		logger.Info(ctx, "Planner: DAG deleted", tag.DAG(event.DAGName))
 	}
@@ -570,10 +539,6 @@ func (tp *TickPlanner) recomputeBuffer(ctx context.Context, dag *core.DAG) {
 	tp.mu.RLock()
 	state := tp.watermarkState
 	tp.mu.RUnlock()
-
-	if state == nil {
-		return
-	}
 
 	now := tp.cfg.Clock()
 	lastTick := state.LastTick

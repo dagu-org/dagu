@@ -23,3 +23,16 @@ type WatermarkStore interface {
 	Load(ctx context.Context) (*SchedulerState, error)
 	Save(ctx context.Context, state *SchedulerState) error
 }
+
+// noopWatermarkStore is a no-op implementation used when no store is configured.
+type noopWatermarkStore struct{}
+
+var _ WatermarkStore = noopWatermarkStore{}
+
+func (noopWatermarkStore) Load(_ context.Context) (*SchedulerState, error) {
+	return &SchedulerState{Version: 1, DAGs: make(map[string]DAGWatermark)}, nil
+}
+
+func (noopWatermarkStore) Save(_ context.Context, _ *SchedulerState) error {
+	return nil
+}

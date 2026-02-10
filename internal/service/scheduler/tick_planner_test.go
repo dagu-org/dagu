@@ -108,8 +108,10 @@ func TestTickPlanner_InitLoadError(t *testing.T) {
 
 	err := tp.Init(context.Background(), nil)
 	require.NoError(t, err) // non-fatal
+	// Falls back to empty state on load error
 	tp.mu.RLock()
-	assert.Nil(t, tp.watermarkState)
+	assert.NotNil(t, tp.watermarkState)
+	assert.Equal(t, 1, tp.watermarkState.Version)
 	tp.mu.RUnlock()
 }
 
@@ -146,11 +148,13 @@ func TestTickPlanner_Advance(t *testing.T) {
 	assert.True(t, tp.watermarkDirty.Load())
 }
 
-func TestTickPlanner_AdvanceNilState(t *testing.T) {
+func TestTickPlanner_AdvanceBeforeInit(t *testing.T) {
 	t.Parallel()
 
 	tp := NewTickPlanner(TickPlannerConfig{})
-	// Should not panic with nil watermarkState
+	// Init must be called before Advance to set watermarkState.
+	// This test verifies Init+Advance works with all-default config.
+	require.NoError(t, tp.Init(context.Background(), nil))
 	tp.Advance(time.Now())
 }
 
@@ -502,8 +506,9 @@ func TestTickPlanner_NilWatermarkStoreFullPath(t *testing.T) {
 	tp.Plan(context.Background(), time.Now())
 	tp.Flush(context.Background())
 
+	// With noop defaults, watermarkState is always initialized
 	tp.mu.RLock()
-	assert.Nil(t, tp.watermarkState)
+	assert.NotNil(t, tp.watermarkState)
 	tp.mu.RUnlock()
 }
 

@@ -60,7 +60,8 @@ type Scheduler struct {
 	planner             *TickPlanner    // Unified scheduling decision module
 	stopOnce            sync.Once
 	lock                sync.Mutex
-	clock               Clock // Clock function for getting current time
+	clock               Clock                  // Clock function for getting current time
+	cancelCtx           context.CancelFunc     // Cancel function for the Start context
 }
 
 // New constructs a Scheduler from the provided stores, runtime manager,
@@ -163,6 +164,7 @@ func (s *Scheduler) DisableHealthServer() {
 
 func (s *Scheduler) Start(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
+	s.cancelCtx = cancel
 	defer cancel()
 
 	if s.instanceID == "" {
@@ -368,6 +370,9 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		wg.Add(3)
 
 		close(s.quit)
+		if s.cancelCtx != nil {
+			s.cancelCtx()
+		}
 
 		go func() {
 			defer wg.Done()
