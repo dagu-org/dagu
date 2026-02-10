@@ -168,6 +168,12 @@ func (s *Scheduler) SetGetLatestStatusFunc(fn GetLatestStatusFunc) {
 	s.planner.cfg.GetLatestStatus = fn
 }
 
+// SetDispatchFunc overrides the planner's Dispatch function for testing purposes.
+// This must be called before Start().
+func (s *Scheduler) SetDispatchFunc(fn DispatchFunc) {
+	s.planner.cfg.Dispatch = fn
+}
+
 // DisableHealthServer disables the health check server (used when running from start-all)
 func (s *Scheduler) DisableHealthServer() {
 	s.disableHealthServer = true

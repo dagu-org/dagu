@@ -55,6 +55,42 @@ func TestScheduler(t *testing.T) {
 		time.Sleep(time.Second + time.Millisecond*100)
 		require.GreaterOrEqual(t, restartCount.Load(), int32(1))
 	})
+	t.Run("Start", func(t *testing.T) {
+		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+
+		cronParser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+		parsed, err := cronParser.Parse("0 * * * *")
+		require.NoError(t, err)
+
+		entryReader := newMockJobManager()
+		entryReader.LoadedDAGs = []*core.DAG{
+			{
+				Name: "start-dag",
+				Schedule: []core.Schedule{
+					{Expression: "0 * * * *", Parsed: parsed},
+				},
+			},
+		}
+
+		th := test.SetupScheduler(t)
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
+		require.NoError(t, err)
+		sc.SetClock(func() time.Time { return now })
+
+		var dispatchCount atomic.Int32
+		sc.SetDispatchFunc(func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			dispatchCount.Add(1)
+			return nil
+		})
+
+		go func() {
+			_ = sc.Start(context.Background())
+		}()
+		defer sc.Stop(context.Background())
+
+		time.Sleep(time.Second + time.Millisecond*100)
+		require.GreaterOrEqual(t, dispatchCount.Load(), int32(1), "dispatch should have been called for start schedule")
+	})
 	t.Run("NextTick", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
 

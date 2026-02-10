@@ -1153,6 +1153,148 @@ func TestTickPlanner_ConcurrentPlanAndEvents(t *testing.T) {
 	tp.Stop(context.Background())
 }
 
+func TestTickPlanner_ShouldRunSkipIfSuccessful(t *testing.T) {
+	t.Parallel()
+
+	// DAG with SkipIfSuccessful=true, schedule fires at 12:00 hourly
+	// Latest status: succeeded, started at 11:30 (between prevExecTime=11:00 and scheduledTime=12:00)
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		IsSuspended: func(_ context.Context, _ string) bool { return false },
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{
+				Status:    core.Succeeded,
+				StartedAt: "2026-02-07T11:30:00Z",
+			}, nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) { return false, nil },
+		GenRunID:  func(_ context.Context) (string, error) { return "run-1", nil },
+		Clock:     func() time.Time { return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC) },
+		Events:    eventCh,
+	})
+
+	dag := &core.DAG{
+		Name:             "skip-success-dag",
+		SkipIfSuccessful: true,
+		Schedule:         []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+	}
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+	assert.Len(t, runs, 0, "should skip when SkipIfSuccessful and last run succeeded in interval")
+}
+
+func TestTickPlanner_ShouldRunAlreadyFinished(t *testing.T) {
+	t.Parallel()
+
+	// Latest status has StartedAt >= scheduledTime (12:00)
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		IsSuspended: func(_ context.Context, _ string) bool { return false },
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{
+				Status:    core.Succeeded,
+				StartedAt: "2026-02-07T12:00:00Z",
+			}, nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) { return false, nil },
+		GenRunID:  func(_ context.Context) (string, error) { return "run-1", nil },
+		Clock:     func() time.Time { return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC) },
+		Events:    eventCh,
+	})
+
+	dag := &core.DAG{
+		Name:     "already-finished-dag",
+		Schedule: []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+	}
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+	assert.Len(t, runs, 0, "should skip when last run started at/after scheduled time")
+}
+
+func TestTickPlanner_ShouldRunFailedPreviousRunNotSkipped(t *testing.T) {
+	t.Parallel()
+
+	// SkipIfSuccessful=true but last run failed — should NOT skip
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		IsSuspended: func(_ context.Context, _ string) bool { return false },
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{
+				Status:    core.Failed,
+				StartedAt: "2026-02-07T11:30:00Z",
+			}, nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) { return false, nil },
+		GenRunID:  func(_ context.Context) (string, error) { return "run-1", nil },
+		Clock:     func() time.Time { return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC) },
+		Events:    eventCh,
+	})
+
+	dag := &core.DAG{
+		Name:             "failed-run-dag",
+		SkipIfSuccessful: true,
+		Schedule:         []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+	}
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+	assert.Len(t, runs, 1, "should NOT skip when SkipIfSuccessful but last run failed")
+}
+
+func TestTickPlanner_DispatchRunStart(t *testing.T) {
+	t.Parallel()
+
+	var dispatched bool
+	tp := NewTickPlanner(TickPlannerConfig{
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			dispatched = true
+			return nil
+		},
+		Events: make(chan DAGChangeEvent, 1),
+	})
+	require.NoError(t, tp.Init(context.Background(), nil))
+
+	tp.DispatchRun(context.Background(), PlannedRun{
+		DAG:          &core.DAG{Name: "start-dag"},
+		RunID:        "run-1",
+		ScheduleType: ScheduleTypeStart,
+		TriggerType:  core.TriggerTypeScheduler,
+	})
+	assert.True(t, dispatched, "Dispatch callback should be invoked for ScheduleTypeStart")
+}
+
+func TestTickPlanner_StartStop(t *testing.T) {
+	t.Parallel()
+
+	tp, _ := newTestTickPlanner(&mockWatermarkStore{})
+	require.NoError(t, tp.Init(context.Background(), nil))
+
+	ctx := context.Background()
+	tp.Start(ctx)
+
+	// Let goroutines start
+	time.Sleep(50 * time.Millisecond)
+
+	// Stop should not hang
+	done := make(chan struct{})
+	go func() {
+		tp.Stop(ctx)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// success
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop did not complete in time")
+	}
+}
+
 func TestComputePrevExecTime(t *testing.T) {
 	t.Parallel()
 
