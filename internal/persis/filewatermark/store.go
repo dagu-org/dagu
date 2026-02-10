@@ -9,14 +9,14 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
-	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/core"
 )
 
 const stateFileName = "state.json"
 
-var _ exec.WatermarkStore = (*Store)(nil)
+var _ core.WatermarkStore = (*Store)(nil)
 
-// Store implements exec.WatermarkStore using a JSON file in the scheduler data directory.
+// Store implements core.WatermarkStore using a JSON file in the scheduler data directory.
 type Store struct {
 	baseDir string
 }
@@ -29,7 +29,7 @@ func New(baseDir string) *Store {
 
 // Load reads the scheduler state from the state file.
 // If the file is missing or corrupt, it returns a fresh empty state.
-func (s *Store) Load(_ context.Context) (*exec.SchedulerState, error) {
+func (s *Store) Load(_ context.Context) (*core.SchedulerState, error) {
 	path := s.statePath()
 
 	data, err := os.ReadFile(filepath.Clean(path))
@@ -40,20 +40,20 @@ func (s *Store) Load(_ context.Context) (*exec.SchedulerState, error) {
 		return newEmptyState(), nil
 	}
 
-	var state exec.SchedulerState
+	var state core.SchedulerState
 	if err := json.Unmarshal(data, &state); err != nil {
 		return newEmptyState(), nil
 	}
 
 	if state.DAGs == nil {
-		state.DAGs = make(map[string]exec.DAGWatermark)
+		state.DAGs = make(map[string]core.DAGWatermark)
 	}
 
 	return &state, nil
 }
 
 // Save writes the scheduler state atomically (temp file + rename).
-func (s *Store) Save(ctx context.Context, state *exec.SchedulerState) error {
+func (s *Store) Save(ctx context.Context, state *core.SchedulerState) error {
 	if err := os.MkdirAll(s.baseDir, 0o750); err != nil {
 		return fmt.Errorf("failed to create watermark directory: %w", err)
 	}
@@ -88,9 +88,9 @@ func (s *Store) statePath() string {
 	return filepath.Join(s.baseDir, stateFileName)
 }
 
-func newEmptyState() *exec.SchedulerState {
-	return &exec.SchedulerState{
+func newEmptyState() *core.SchedulerState {
+	return &core.SchedulerState{
 		Version: 1,
-		DAGs:    make(map[string]exec.DAGWatermark),
+		DAGs:    make(map[string]core.DAGWatermark),
 	}
 }

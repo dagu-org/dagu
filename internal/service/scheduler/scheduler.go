@@ -60,8 +60,8 @@ type Scheduler struct {
 	instanceID          string          // Unique instance identifier for service registry
 	// queueProcessor is the processor for queued DAG runs
 	queueProcessor *QueueProcessor
-	watermarkStore exec.WatermarkStore // Persists scheduler watermark for catch-up
-	watermarkState *exec.SchedulerState // In-memory watermark state
+	watermarkStore core.WatermarkStore // Persists scheduler watermark for catch-up
+	watermarkState *core.SchedulerState // In-memory watermark state
 	watermarkDirty atomic.Bool          // Dirty flag for periodic flush
 	dagQueues      map[string]*DAGQueue // Per-DAG queues for catch-up (only for DAGs with CatchupWindow > 0)
 	stopOnce       sync.Once
@@ -87,7 +87,7 @@ func New(
 	procStore exec.ProcStore,
 	reg exec.ServiceRegistry,
 	coordinatorCli exec.Dispatcher,
-	watermarkStore exec.WatermarkStore,
+	watermarkStore core.WatermarkStore,
 ) (*Scheduler, error) {
 	timeLoc := cfg.Core.Location
 	if timeLoc == nil {
@@ -696,9 +696,9 @@ func (s *Scheduler) updateWatermarkDAG(dagName string, scheduledTime time.Time) 
 		return
 	}
 	if s.watermarkState.DAGs == nil {
-		s.watermarkState.DAGs = make(map[string]exec.DAGWatermark)
+		s.watermarkState.DAGs = make(map[string]core.DAGWatermark)
 	}
-	s.watermarkState.DAGs[dagName] = exec.DAGWatermark{
+	s.watermarkState.DAGs[dagName] = core.DAGWatermark{
 		LastScheduledTime: scheduledTime,
 	}
 	s.watermarkDirty.Store(true)

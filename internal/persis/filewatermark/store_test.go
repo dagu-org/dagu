@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,10 +31,10 @@ func TestStore_SaveAndLoad(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now().Truncate(time.Second)
-	state := &exec.SchedulerState{
+	state := &core.SchedulerState{
 		Version:  1,
 		LastTick: now,
-		DAGs: map[string]exec.DAGWatermark{
+		DAGs: map[string]core.DAGWatermark{
 			"hourly-etl": {LastScheduledTime: now.Add(-time.Hour)},
 			"daily-report": {LastScheduledTime: now.Add(-24 * time.Hour)},
 		},
@@ -76,9 +76,9 @@ func TestStore_SaveCreatesDir(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "nested", "scheduler")
 	store := New(dir)
 
-	state := &exec.SchedulerState{
+	state := &core.SchedulerState{
 		Version: 1,
-		DAGs:    make(map[string]exec.DAGWatermark),
+		DAGs:    make(map[string]core.DAGWatermark),
 	}
 
 	err := store.Save(context.Background(), state)
@@ -97,20 +97,20 @@ func TestStore_SaveAtomicity(t *testing.T) {
 	ctx := context.Background()
 
 	// Save initial state
-	state1 := &exec.SchedulerState{
+	state1 := &core.SchedulerState{
 		Version:  1,
 		LastTick: time.Now().Truncate(time.Second),
-		DAGs: map[string]exec.DAGWatermark{
+		DAGs: map[string]core.DAGWatermark{
 			"dag1": {LastScheduledTime: time.Now().Truncate(time.Second)},
 		},
 	}
 	require.NoError(t, store.Save(ctx, state1))
 
 	// Save updated state
-	state2 := &exec.SchedulerState{
+	state2 := &core.SchedulerState{
 		Version:  1,
 		LastTick: time.Now().Add(time.Minute).Truncate(time.Second),
-		DAGs: map[string]exec.DAGWatermark{
+		DAGs: map[string]core.DAGWatermark{
 			"dag1": {LastScheduledTime: time.Now().Add(time.Minute).Truncate(time.Second)},
 			"dag2": {LastScheduledTime: time.Now().Add(time.Minute).Truncate(time.Second)},
 		},
