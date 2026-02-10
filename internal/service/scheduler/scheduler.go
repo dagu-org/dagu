@@ -63,7 +63,7 @@ type Scheduler struct {
 	watermarkStore core.WatermarkStore // Persists scheduler watermark for catch-up
 	watermarkState *core.SchedulerState // In-memory watermark state
 	watermarkDirty atomic.Bool          // Dirty flag for periodic flush
-	dagQueues      map[string]*DAGQueue // Per-DAG queues for catch-up (only for DAGs with CatchupWindow > 0)
+	scheduleBuffers      map[string]*ScheduleBuffer // Per-DAG queues for catch-up (only for DAGs with CatchupWindow > 0)
 	stopOnce       sync.Once
 	lock           sync.Mutex
 	clock          Clock // Clock function for getting current time
@@ -381,7 +381,7 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		}
 
 		// Close catch-up queues (signals consumers to exit)
-		s.closeCatchupQueues()
+		s.closeScheduleBuffers()
 
 		// Final watermark flush on shutdown
 		s.flushWatermark(ctx)
@@ -458,7 +458,7 @@ func (s *Scheduler) invokeJobs(ctx context.Context, now time.Time) {
 		// For start jobs, route through per-DAG queue if one exists
 		if job.Type == ScheduleTypeStart {
 			if dag := job.Job.GetDAG(jobCtx); dag != nil {
-				if q, ok := s.dagQueues[dag.Name]; ok {
+				if q, ok := s.scheduleBuffers[dag.Name]; ok {
 					q.Send(QueueItem{
 						DAG:           dag,
 						ScheduledTime: job.Next,
@@ -577,7 +577,7 @@ func (s *Scheduler) initCatchupQueues(ctx context.Context, wg *sync.WaitGroup) {
 
 	now := s.clock()
 	dags := s.entryReader.DAGs()
-	s.dagQueues = make(map[string]*DAGQueue, len(dags))
+	s.scheduleBuffers = make(map[string]*ScheduleBuffer, len(dags))
 
 	var totalMissed int
 
@@ -614,8 +614,8 @@ func (s *Scheduler) initCatchupQueues(ctx context.Context, wg *sync.WaitGroup) {
 		)
 
 		// Create queue with enough buffer for catch-up items plus some headroom for live ticks
-		q := NewDAGQueue(dagName, dag.OverlapPolicy)
-		s.dagQueues[dagName] = q
+		q := NewScheduleBuffer(dagName, dag.OverlapPolicy)
+		s.scheduleBuffers[dagName] = q
 
 		// Enqueue catch-up items
 		for _, t := range missed {
@@ -641,7 +641,7 @@ func (s *Scheduler) initCatchupQueues(ctx context.Context, wg *sync.WaitGroup) {
 
 	if totalMissed > 0 {
 		logger.Info(ctx, "Catch-up initialization complete",
-			slog.Int("dagCount", len(s.dagQueues)),
+			slog.Int("dagCount", len(s.scheduleBuffers)),
 			slog.Int("totalMissedRuns", totalMissed),
 		)
 	}
@@ -704,9 +704,9 @@ func (s *Scheduler) updateWatermarkDAG(dagName string, scheduledTime time.Time) 
 	s.watermarkDirty.Store(true)
 }
 
-// closeCatchupQueues closes all per-DAG catch-up queues.
-func (s *Scheduler) closeCatchupQueues() {
-	for _, q := range s.dagQueues {
+// closeScheduleBuffers closes all per-DAG catch-up queues.
+func (s *Scheduler) closeScheduleBuffers() {
+	for _, q := range s.scheduleBuffers {
 		q.Close()
 	}
 }

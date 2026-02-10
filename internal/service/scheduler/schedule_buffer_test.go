@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDAGQueue_BasicDispatch(t *testing.T) {
+func TestScheduleBuffer_BasicDispatch(t *testing.T) {
 	t.Parallel()
 
-	q := NewDAGQueue("test-dag", core.OverlapPolicyAll)
+	q := NewScheduleBuffer("test-dag", core.OverlapPolicyAll)
 
 	var dispatched []time.Time
 	var mu sync.Mutex
@@ -46,10 +46,10 @@ func TestDAGQueue_BasicDispatch(t *testing.T) {
 	assert.Equal(t, now.Add(time.Hour), dispatched[1])
 }
 
-func TestDAGQueue_SkipPolicy(t *testing.T) {
+func TestScheduleBuffer_SkipPolicy(t *testing.T) {
 	t.Parallel()
 
-	q := NewDAGQueue("test-dag", core.OverlapPolicySkip)
+	q := NewScheduleBuffer("test-dag", core.OverlapPolicySkip)
 
 	var dispatched []time.Time
 	var mu sync.Mutex
@@ -89,10 +89,10 @@ func TestDAGQueue_SkipPolicy(t *testing.T) {
 	assert.Equal(t, now, dispatched[0])
 }
 
-func TestDAGQueue_OrderPreservation(t *testing.T) {
+func TestScheduleBuffer_OrderPreservation(t *testing.T) {
 	t.Parallel()
 
-	q := NewDAGQueue("test-dag", core.OverlapPolicyAll)
+	q := NewScheduleBuffer("test-dag", core.OverlapPolicyAll)
 
 	var dispatched []time.Time
 	var mu sync.Mutex
@@ -131,10 +131,10 @@ func TestDAGQueue_OrderPreservation(t *testing.T) {
 	}
 }
 
-func TestDAGQueue_ContextCancellation(t *testing.T) {
+func TestScheduleBuffer_ContextCancellation(t *testing.T) {
 	t.Parallel()
 
-	q := NewDAGQueue("test-dag", core.OverlapPolicyAll)
+	q := NewScheduleBuffer("test-dag", core.OverlapPolicyAll)
 
 	dispatch := func(_ context.Context, _ QueueItem) error {
 		return nil

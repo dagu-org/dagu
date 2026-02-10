@@ -25,10 +25,10 @@ type QueueItem struct {
 	ScheduleType  ScheduleType
 }
 
-// DAGQueue is a per-DAG in-memory queue that unifies scheduled runs and
+// ScheduleBuffer is a per-DAG in-memory queue that unifies scheduled runs and
 // catch-up runs into one dispatch mechanism. OverlapPolicy is enforced at the
 // queue level.
-type DAGQueue struct {
+type ScheduleBuffer struct {
 	mu            sync.Mutex
 	cond          *sync.Cond
 	items         []QueueItem
@@ -37,9 +37,9 @@ type DAGQueue struct {
 	dagName       string
 }
 
-// NewDAGQueue creates a per-DAG queue with the given overlap policy.
-func NewDAGQueue(dagName string, policy core.OverlapPolicy) *DAGQueue {
-	q := &DAGQueue{
+// NewScheduleBuffer creates a per-DAG queue with the given overlap policy.
+func NewScheduleBuffer(dagName string, policy core.OverlapPolicy) *ScheduleBuffer {
+	q := &ScheduleBuffer{
 		overlapPolicy: policy,
 		dagName:       dagName,
 	}
@@ -48,7 +48,7 @@ func NewDAGQueue(dagName string, policy core.OverlapPolicy) *DAGQueue {
 }
 
 // Send enqueues an item (catch-up or live scheduled run).
-func (q *DAGQueue) Send(item QueueItem) {
+func (q *ScheduleBuffer) Send(item QueueItem) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -62,7 +62,7 @@ func (q *DAGQueue) Send(item QueueItem) {
 // Start runs the consumer loop. Pops items in FIFO order, respects
 // overlapPolicy, dispatches via the provided function. Exits when ctx is
 // cancelled or the queue is closed and drained.
-func (q *DAGQueue) Start(ctx context.Context, dispatch DispatchFunc, isRunning IsRunningFunc) {
+func (q *ScheduleBuffer) Start(ctx context.Context, dispatch DispatchFunc, isRunning IsRunningFunc) {
 	// Wake the consumer when the context is cancelled.
 	go func() {
 		<-ctx.Done()
@@ -79,7 +79,7 @@ func (q *DAGQueue) Start(ctx context.Context, dispatch DispatchFunc, isRunning I
 }
 
 // Close signals that no more items will be sent.
-func (q *DAGQueue) Close() {
+func (q *ScheduleBuffer) Close() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -89,7 +89,7 @@ func (q *DAGQueue) Close() {
 
 // dequeue blocks until an item is available, the queue is closed and empty,
 // or the context is cancelled.
-func (q *DAGQueue) dequeue(ctx context.Context) (QueueItem, bool) {
+func (q *ScheduleBuffer) dequeue(ctx context.Context) (QueueItem, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -106,7 +106,7 @@ func (q *DAGQueue) dequeue(ctx context.Context) (QueueItem, bool) {
 	return item, true
 }
 
-func (q *DAGQueue) processItem(ctx context.Context, item QueueItem, dispatch DispatchFunc, isRunning IsRunningFunc) {
+func (q *ScheduleBuffer) processItem(ctx context.Context, item QueueItem, dispatch DispatchFunc, isRunning IsRunningFunc) {
 	switch q.overlapPolicy {
 	case core.OverlapPolicySkip:
 		running, err := isRunning(ctx, q.dagName)
@@ -154,7 +154,7 @@ func (q *DAGQueue) processItem(ctx context.Context, item QueueItem, dispatch Dis
 }
 
 // waitUntilNotRunning polls with backoff until the DAG has no active runs.
-func (q *DAGQueue) waitUntilNotRunning(ctx context.Context, isRunning IsRunningFunc) error {
+func (q *ScheduleBuffer) waitUntilNotRunning(ctx context.Context, isRunning IsRunningFunc) error {
 	const (
 		initialInterval = 2 * time.Second
 		maxInterval     = 30 * time.Second
