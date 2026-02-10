@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // OverlapPolicy controls behavior when a new run is triggered while a previous run is still active.
 type OverlapPolicy string
@@ -16,7 +19,7 @@ const (
 // ParseOverlapPolicy parses a string into an OverlapPolicy.
 // Empty string defaults to OverlapPolicySkip.
 func ParseOverlapPolicy(s string) (OverlapPolicy, error) {
-	switch s {
+	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "", "skip":
 		return OverlapPolicySkip, nil
 	case "all":

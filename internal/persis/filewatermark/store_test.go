@@ -89,6 +89,27 @@ func TestStore_SaveCreatesDir(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestStore_LoadVersionMismatch(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	store := New(dir)
+
+	// Write state with a future version
+	data := []byte(`{"version":99,"lastTick":"2020-01-01T00:00:00Z","dags":{}}`)
+	err := os.MkdirAll(dir, 0o750)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(dir, stateFileName), data, 0o600)
+	require.NoError(t, err)
+
+	state, err := store.Load(context.Background())
+	require.NoError(t, err)
+	// Should return fresh state due to version mismatch
+	assert.Equal(t, 1, state.Version)
+	assert.Empty(t, state.DAGs)
+	assert.True(t, state.LastTick.IsZero())
+}
+
 func TestStore_SaveAtomicity(t *testing.T) {
 	t.Parallel()
 

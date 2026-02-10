@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -48,6 +49,18 @@ func (s *Store) Load(ctx context.Context) (*scheduler.SchedulerState, error) {
 		return newEmptyState(), nil
 	}
 
+	const expectedVersion = 1
+	if state.Version != 0 && state.Version != expectedVersion {
+		logger.Warn(ctx, "Watermark state version mismatch, starting fresh",
+			tag.File(path),
+			slog.Int("version", state.Version),
+		)
+		return newEmptyState(), nil
+	}
+	if state.Version == 0 {
+		state.Version = expectedVersion
+	}
+
 	if state.DAGs == nil {
 		state.DAGs = make(map[string]scheduler.DAGWatermark)
 	}
@@ -68,9 +81,10 @@ func (s *Store) Save(ctx context.Context, state *scheduler.SchedulerState) error
 
 	path := s.statePath()
 
-	// Write to temp file first for atomicity
+	// Write to temp file with fsync for durability, then rename for atomicity
 	tmpFile := path + ".tmp"
-	if err := os.WriteFile(tmpFile, data, 0o600); err != nil {
+	if err := writeFileSync(tmpFile, data, 0o600); err != nil {
+		_ = os.Remove(tmpFile)
 		return fmt.Errorf("failed to write temp state file: %w", err)
 	}
 
@@ -89,6 +103,24 @@ func (s *Store) Save(ctx context.Context, state *scheduler.SchedulerState) error
 
 func (s *Store) statePath() string {
 	return filepath.Join(s.baseDir, stateFileName)
+}
+
+// writeFileSync writes data to a file and calls fsync before closing.
+func writeFileSync(name string, data []byte, perm os.FileMode) error {
+	f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	if err != nil {
+		return err
+	}
+	_, writeErr := f.Write(data)
+	syncErr := f.Sync()
+	closeErr := f.Close()
+	if writeErr != nil {
+		return writeErr
+	}
+	if syncErr != nil {
+		return syncErr
+	}
+	return closeErr
 }
 
 func newEmptyState() *scheduler.SchedulerState {

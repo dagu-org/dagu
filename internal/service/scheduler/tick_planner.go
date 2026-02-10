@@ -87,6 +87,12 @@ type TickPlannerConfig struct {
 //   - entries and buffers are protected by entryMu (accessed from drainEvents
 //     goroutine and cronLoop's Plan).
 //   - watermarkState is shared with the flusher goroutine and protected by mu.
+//   - Plan() holds entryMu during I/O calls (IsSuspended, IsRunning,
+//     GetLatestStatus, GenRunID). This is intentional: the lock prevents
+//     event processing during planning, ensuring a consistent snapshot of
+//     entries for the entire plan cycle.
+//   - lastPlanResult is accessed only from cronLoop (Plan writes, Advance reads)
+//     and requires no lock. See field comment for details.
 type TickPlanner struct {
 	cfg TickPlannerConfig
 
@@ -100,7 +106,11 @@ type TickPlanner struct {
 	entries map[string]*plannerEntry
 	buffers map[string]*ScheduleBuffer
 
-	// last plan result (for Advance to update watermarks)
+	// lastPlanResult holds the runs from the most recent Plan() call.
+	// It is written by Plan() and read by Advance(). Both are called
+	// sequentially from the same goroutine (cronLoop in scheduler.go),
+	// so no lock is needed. Do NOT call Plan() or Advance() from
+	// different goroutines without external synchronization.
 	lastPlanResult []PlannedRun
 
 	// lifecycle
@@ -177,6 +187,9 @@ func (tp *TickPlanner) Init(ctx context.Context, dags []*core.DAG) error {
 	if err != nil {
 		logger.Error(ctx, "Failed to load watermark state", tag.Error(err))
 		state = &SchedulerState{Version: 1, DAGs: make(map[string]DAGWatermark)}
+	}
+	if state.DAGs == nil {
+		state.DAGs = make(map[string]DAGWatermark)
 	}
 
 	// Prune stale DAG entries that no longer exist on disk.
@@ -328,6 +341,12 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 						)
 					case core.OverlapPolicyAll:
 						// leave in buffer, retry next tick
+					default:
+						buf.Pop()
+						logger.Warn(ctx, "Unknown overlap policy, treating as skip",
+							tag.DAG(dagName),
+							slog.String("overlapPolicy", string(buf.overlapPolicy)),
+						)
 					}
 				}
 

@@ -120,7 +120,7 @@ func (er *entryReaderImpl) Start(ctx context.Context) {
 func (er *entryReaderImpl) handleFSEvent(ctx context.Context, event fsnotify.Event) {
 	fileName := filepath.Base(event.Name)
 
-	if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
+	if event.Op&(fsnotify.Create|fsnotify.Write) != 0 {
 		filePath := filepath.Join(er.targetDir, fileName)
 		dag, err := spec.Load(
 			ctx,
@@ -177,7 +177,7 @@ func (er *entryReaderImpl) handleFSEvent(ctx context.Context, event fsnotify.Eve
 		return
 	}
 
-	if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
+	if event.Op&(fsnotify.Rename|fsnotify.Remove) != 0 {
 		// Capture DAG name from registry before deleting
 		er.lock.Lock()
 		dag, existed := er.registry[fileName]
