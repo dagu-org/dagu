@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/robfig/cron/v3"
@@ -164,4 +165,108 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 
 	// Stop second scheduler to clean up
 	sc2.Stop(ctx)
+}
+
+func TestScheduler_StopSchedule(t *testing.T) {
+	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	cronParser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	parsed, err := cronParser.Parse("0 * * * *")
+	require.NoError(t, err)
+
+	entryReader := newMockJobManager()
+	entryReader.LoadedDAGs = []*core.DAG{
+		{
+			Name: "stop-dag",
+			StopSchedule: []core.Schedule{
+				{Expression: "0 * * * *", Parsed: parsed},
+			},
+		},
+	}
+
+	th := test.SetupScheduler(t)
+	sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
+	require.NoError(t, err)
+	sc.SetClock(func() time.Time { return now })
+
+	// GetLatestStatus must return Running for the stop guard
+	sc.SetGetLatestStatusFunc(func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+		return exec.DAGRunStatus{Status: core.Running}, nil
+	})
+
+	var stopCount atomic.Int32
+	sc.SetStopFunc(func(_ context.Context, _ *core.DAG) error {
+		stopCount.Add(1)
+		return nil
+	})
+
+	go func() {
+		_ = sc.Start(context.Background())
+	}()
+	defer sc.Stop(context.Background())
+
+	time.Sleep(time.Second + time.Millisecond*100)
+	require.GreaterOrEqual(t, stopCount.Load(), int32(1), "stop function should have been called")
+}
+
+func TestScheduler_GracefulShutdown(t *testing.T) {
+	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	cronParser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	parsed, err := cronParser.Parse("*/5 * * * *")
+	require.NoError(t, err)
+
+	entryReader := newMockJobManager()
+	entryReader.LoadedDAGs = []*core.DAG{
+		{
+			Name: "shutdown-dag",
+			Schedule: []core.Schedule{
+				{Expression: "*/5 * * * *", Parsed: parsed},
+			},
+		},
+	}
+
+	th := test.SetupScheduler(t)
+	sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
+	require.NoError(t, err)
+	sc.SetClock(func() time.Time { return now })
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- sc.Start(context.Background())
+	}()
+
+	// Wait until scheduler is running
+	deadline := time.After(5 * time.Second)
+	for !sc.IsRunning() {
+		select {
+		case <-deadline:
+			t.Fatal("scheduler did not start in time")
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	// Stop and verify it completes within 5 seconds
+	done := make(chan struct{})
+	go func() {
+		sc.Stop(context.Background())
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// success
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop() did not return within 5 seconds")
+	}
+
+	require.False(t, sc.IsRunning(), "scheduler should not be running after stop")
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("scheduler Start() did not return after Stop()")
+	}
 }

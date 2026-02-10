@@ -156,6 +156,18 @@ func (s *Scheduler) SetRestartFunc(fn RestartFunc) {
 	s.planner.cfg.Restart = fn
 }
 
+// SetStopFunc overrides the planner's stop function for testing purposes.
+// This must be called before Start().
+func (s *Scheduler) SetStopFunc(fn StopFunc) {
+	s.planner.cfg.Stop = fn
+}
+
+// SetGetLatestStatusFunc overrides the planner's GetLatestStatus function for testing purposes.
+// This must be called before Start().
+func (s *Scheduler) SetGetLatestStatusFunc(fn GetLatestStatusFunc) {
+	s.planner.cfg.GetLatestStatus = fn
+}
+
 // DisableHealthServer disables the health check server (used when running from start-all)
 func (s *Scheduler) DisableHealthServer() {
 	s.disableHealthServer = true

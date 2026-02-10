@@ -499,6 +499,9 @@ func (tp *TickPlanner) Advance(now time.Time) {
 	tp.watermarkState.LastTick = now
 
 	for _, run := range tp.lastPlanResult {
+		if run.ScheduleType != ScheduleTypeStart {
+			continue
+		}
 		tp.watermarkState.DAGs[run.DAG.Name] = DAGWatermark{
 			LastScheduledTime: run.ScheduledTime,
 		}

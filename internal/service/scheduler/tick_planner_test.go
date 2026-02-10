@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -741,4 +742,413 @@ func TestTickPlanner_PlanSuspendedStopSkipped(t *testing.T) {
 	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
 	runs := tp.Plan(context.Background(), now)
 	assert.Len(t, runs, 0, "suspended DAG's stop schedule should be skipped")
+}
+
+func TestTickPlanner_AdvanceIgnoresStopRestartWatermarks(t *testing.T) {
+	t.Parallel()
+
+	store := &mockWatermarkStore{}
+	tp, _ := newTestTickPlanner(store)
+	require.NoError(t, tp.Init(context.Background(), nil))
+
+	startTime := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	stopTime := time.Date(2026, 2, 7, 12, 30, 0, 0, time.UTC)
+	restartTime := time.Date(2026, 2, 7, 13, 0, 0, 0, time.UTC)
+
+	tp.lastPlanResult = []PlannedRun{
+		{
+			DAG:           &core.DAG{Name: "test-dag"},
+			RunID:         "run-1",
+			ScheduledTime: startTime,
+			ScheduleType:  ScheduleTypeStart,
+		},
+		{
+			DAG:           &core.DAG{Name: "test-dag"},
+			ScheduledTime: stopTime,
+			ScheduleType:  ScheduleTypeStop,
+		},
+		{
+			DAG:           &core.DAG{Name: "test-dag"},
+			ScheduledTime: restartTime,
+			ScheduleType:  ScheduleTypeRestart,
+		},
+	}
+
+	tp.Advance(startTime)
+
+	tp.mu.RLock()
+	wm, ok := tp.watermarkState.DAGs["test-dag"]
+	tp.mu.RUnlock()
+
+	require.True(t, ok, "watermark should exist for test-dag")
+	assert.Equal(t, startTime, wm.LastScheduledTime,
+		"watermark should reflect start time, not stop/restart")
+}
+
+func TestTickPlanner_PlanStopRestartWithNonUTCTimezone(t *testing.T) {
+	t.Parallel()
+
+	est := time.FixedZone("EST", -5*3600)
+
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{Status: core.Running}, nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "run-id", nil
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 20, 0, 0, 0, time.UTC)
+		},
+		Location: est,
+		Events:   eventCh,
+	})
+
+	// 3pm EST = 20:00 UTC
+	dag := &core.DAG{
+		Name:         "tz-stop-dag",
+		StopSchedule: []core.Schedule{mustParseSchedule(t, "0 15 * * *")},
+	}
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	// Tick at 20:00 UTC = 15:00 EST — should match the stop schedule
+	now := time.Date(2026, 2, 7, 20, 0, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+
+	require.Len(t, runs, 1, "stop schedule should fire in EST timezone")
+	assert.Equal(t, ScheduleTypeStop, runs[0].ScheduleType)
+}
+
+func TestTickPlanner_IsRunningErrorAssumesNotRunning(t *testing.T) {
+	t.Parallel()
+
+	store := &mockWatermarkStore{
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)),
+	}
+
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore: store,
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{}, nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, errors.New("proc store error")
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "run-1", nil
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+		Events: eventCh,
+	})
+
+	dag := newHourlyCatchupDAG(t, "err-running-dag")
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+
+	// IsRunning error should be logged, assumed not running, and catchup dispatched
+	assert.Len(t, runs, 1, "should still dispatch catchup run when IsRunning returns error")
+}
+
+func TestTickPlanner_GetLatestStatusErrorSkipsStop(t *testing.T) {
+	t.Parallel()
+
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{}, errors.New("status error")
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "run-id", nil
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+		Location: time.UTC,
+		Events:   eventCh,
+	})
+
+	dag := &core.DAG{
+		Name:         "status-err-dag",
+		StopSchedule: []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+	}
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+
+	assert.Len(t, runs, 0, "stop should be skipped when GetLatestStatus returns error")
+}
+
+func TestTickPlanner_GenRunIDErrorSkipsStartRun(t *testing.T) {
+	t.Parallel()
+
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{}, nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "", errors.New("id gen error")
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+		Events: eventCh,
+	})
+
+	dag := &core.DAG{
+		Name:     "genid-err-dag",
+		Schedule: []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+	}
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+
+	assert.Len(t, runs, 0, "start run should be skipped when GenRunID returns error")
+}
+
+func TestTickPlanner_DispatchRunStopError(t *testing.T) {
+	t.Parallel()
+
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		Stop: func(_ context.Context, _ *core.DAG) error {
+			return errors.New("stop failed")
+		},
+		Events: eventCh,
+	})
+	require.NoError(t, tp.Init(context.Background(), nil))
+
+	// Should not panic; error is logged internally
+	tp.DispatchRun(context.Background(), PlannedRun{
+		DAG:           &core.DAG{Name: "stop-err-dag"},
+		ScheduledTime: time.Now(),
+		ScheduleType:  ScheduleTypeStop,
+	})
+}
+
+func TestTickPlanner_DispatchRunRestartError(t *testing.T) {
+	t.Parallel()
+
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		Restart: func(_ context.Context, _ *core.DAG) error {
+			return errors.New("restart failed")
+		},
+		Events: eventCh,
+	})
+	require.NoError(t, tp.Init(context.Background(), nil))
+
+	// Should not panic; error is logged internally
+	tp.DispatchRun(context.Background(), PlannedRun{
+		DAG:           &core.DAG{Name: "restart-err-dag"},
+		ScheduledTime: time.Now(),
+		ScheduleType:  ScheduleTypeRestart,
+	})
+}
+
+func TestTickPlanner_StopRestartRunsHaveEmptyRunID(t *testing.T) {
+	t.Parallel()
+
+	// Use two DAGs: one for start (needs status != Running), one for stop+restart (needs Running)
+	startDAG := &core.DAG{
+		Name:     "start-dag",
+		Schedule: []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+	}
+	stopRestartDAG := &core.DAG{
+		Name:            "stop-restart-dag",
+		StopSchedule:    []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+		RestartSchedule: []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+	}
+
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, dag *core.DAG) (exec.DAGRunStatus, error) {
+			if dag.Name == "stop-restart-dag" {
+				return exec.DAGRunStatus{Status: core.Running}, nil
+			}
+			return exec.DAGRunStatus{}, nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "generated-run-id", nil
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+		Location: time.UTC,
+		Events:   eventCh,
+	})
+
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{startDAG, stopRestartDAG}))
+
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+
+	require.Len(t, runs, 3, "should produce start, stop, and restart runs")
+
+	var startRun, stopRun, restartRun *PlannedRun
+	for i := range runs {
+		switch runs[i].ScheduleType {
+		case ScheduleTypeStart:
+			startRun = &runs[i]
+		case ScheduleTypeStop:
+			stopRun = &runs[i]
+		case ScheduleTypeRestart:
+			restartRun = &runs[i]
+		}
+	}
+
+	require.NotNil(t, startRun, "start run should exist")
+	require.NotNil(t, stopRun, "stop run should exist")
+	require.NotNil(t, restartRun, "restart run should exist")
+
+	assert.NotEmpty(t, startRun.RunID, "start run should have a RunID")
+	assert.Empty(t, stopRun.RunID, "stop run should have empty RunID")
+	assert.Empty(t, restartRun.RunID, "restart run should have empty RunID")
+}
+
+func TestTickPlanner_CatchupBlocksStopRestartSchedules(t *testing.T) {
+	t.Parallel()
+
+	store := &mockWatermarkStore{
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 9, 0, 0, 0, time.UTC)),
+	}
+
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore: store,
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{Status: core.Running}, nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "catchup-run-id", nil
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+		Location: time.UTC,
+		Events:   eventCh,
+	})
+
+	dag := &core.DAG{
+		Name:            "catchup-blocks-dag",
+		CatchupWindow:   6 * time.Hour,
+		Schedule:        []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+		StopSchedule:    []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+		RestartSchedule: []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+	}
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+
+	// Should only produce the catchup run, not stop/restart
+	require.Len(t, runs, 1, "catchup should block stop/restart schedules")
+	assert.Equal(t, core.TriggerTypeCatchUp, runs[0].TriggerType)
+}
+
+func TestTickPlanner_ConcurrentPlanAndEvents(t *testing.T) {
+	t.Parallel()
+
+	store := &mockWatermarkStore{}
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore: store,
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{}, nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "run-id", nil
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+		Events: eventCh,
+	})
+	require.NoError(t, tp.Init(context.Background(), nil))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	tp.Start(ctx)
+
+	var wg sync.WaitGroup
+
+	// Push events concurrently
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := range 50 {
+			eventCh <- DAGChangeEvent{
+				Type: DAGChangeAdded,
+				DAG: &core.DAG{
+					Name:     fmt.Sprintf("dag-%d", i),
+					Schedule: []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+				},
+				DAGName: fmt.Sprintf("dag-%d", i),
+			}
+		}
+	}()
+
+	// Call Plan concurrently
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		for range 50 {
+			tp.Plan(context.Background(), now)
+		}
+	}()
+
+	wg.Wait()
+
+	// Allow drain goroutine to process remaining events
+	time.Sleep(50 * time.Millisecond)
+
+	cancel()
+	tp.Stop(context.Background())
 }
