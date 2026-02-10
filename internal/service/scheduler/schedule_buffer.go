@@ -23,7 +23,7 @@ type QueueItem struct {
 type ScheduleBuffer struct {
 	items         []QueueItem
 	overlapPolicy core.OverlapPolicy
-	dagName       string
+	dagName       string // retained for debugging and log context
 	maxItems      int
 }
 

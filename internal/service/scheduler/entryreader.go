@@ -59,6 +59,8 @@ func NewEntryReader(dir string, dagCli exec.DAGStore) EntryReader {
 	}
 }
 
+// setEvents wires the event channel used to notify the TickPlanner of DAG
+// changes. Must be called before Start().
 func (er *entryReaderImpl) setEvents(ch chan DAGChangeEvent) {
 	er.events = ch
 }
@@ -218,7 +220,6 @@ func (er *entryReaderImpl) Stop() {
 		}
 	})
 }
-
 
 func (er *entryReaderImpl) DAGs() []*core.DAG {
 	er.lock.Lock()

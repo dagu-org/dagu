@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { components, Status, TriggerType } from '../../../../api/v1/schema';
+import { triggerTypeLabels } from '../common/TriggerTypeIndicator';
 
 type Props = {
   status?: components['schemas']['DAGRunDetails'];
@@ -72,15 +73,6 @@ function truncateId(id: string): string {
   return `${id.slice(0, 8)}...${id.slice(-4)}`;
 }
 
-const triggerLabels: Record<TriggerType, string> = {
-  scheduler: 'Scheduled',
-  manual: 'Manual',
-  webhook: 'Webhook',
-  subdag: 'Sub-DAG',
-  retry: 'Retry',
-  catchup: 'Catch-up',
-  unknown: 'Unknown',
-};
 
 type PreconditionErrorsProps = {
   preconditions?: components['schemas']['Condition'][];
@@ -249,7 +241,7 @@ function DAGStatusOverview({ status, onViewLog }: Props): React.JSX.Element | nu
           <span>
             <span className="text-muted-foreground">Trigger </span>
             <span className="font-medium text-foreground">
-              {triggerLabels[status.triggerType] ?? status.triggerType}
+              {triggerTypeLabels[status.triggerType] ?? status.triggerType}
             </span>
           </span>
         )}

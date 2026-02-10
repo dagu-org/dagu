@@ -49,7 +49,11 @@ func ComputeMissedIntervals(schedules []core.Schedule, replayFrom, replayTo time
 				seen[t] = struct{}{}
 				result = append(result, t)
 			}
-			t = sched.Parsed.Next(t)
+			next := sched.Parsed.Next(t)
+			if !next.After(t) {
+				break // defensive: prevent infinite loop on degenerate schedule
+			}
+			t = next
 		}
 	}
 

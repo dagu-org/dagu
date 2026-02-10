@@ -143,7 +143,7 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	// Stop first scheduler
 	sc1.Stop(ctx)
 
-	// Wait for the first scheduler start
+	// Wait for the first scheduler to finish
 	select {
 	case err := <-errCh1:
 		require.NoError(t, err)

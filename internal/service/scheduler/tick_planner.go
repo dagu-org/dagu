@@ -362,7 +362,9 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 			continue
 		}
 
-		// Evaluate cron schedules for live start runs
+		// Evaluate cron schedules for live start runs.
+		// Start schedules use raw `now`: the robfig/cron library applies the
+		// schedule's timezone internally, so no extra conversion is needed.
 		for _, schedule := range entry.schedules {
 			if schedule.Parsed == nil {
 				continue
@@ -387,7 +389,9 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 		}
 
 		// Evaluate stop schedules.
-		// Use Location-adjusted time for timezone parity with the previous implementation.
+		// Stop and restart schedules convert `now` to the configured Location so
+		// that the cron evaluation matches the wall-clock time the user expects.
+		// This preserves parity with the legacy invokeJobs implementation.
 		evalTime := now.In(tp.cfg.Location)
 		for _, schedule := range entry.dag.StopSchedule {
 			if schedule.Parsed == nil {
