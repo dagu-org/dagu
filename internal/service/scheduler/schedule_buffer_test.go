@@ -1,164 +1,91 @@
 package scheduler
 
 import (
-	"context"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestScheduleBuffer_BasicDispatch(t *testing.T) {
-	t.Parallel()
-
-	q := NewScheduleBuffer("test-dag", core.OverlapPolicyAll)
-
-	var dispatched []time.Time
-	var mu sync.Mutex
-
-	dispatch := func(_ context.Context, item QueueItem) error {
-		mu.Lock()
-		dispatched = append(dispatched, item.ScheduledTime)
-		mu.Unlock()
-		return nil
-	}
-
-	isRunning := func(_ context.Context, _ string) (bool, error) {
-		return false, nil
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	now := time.Now()
-	q.Send(QueueItem{ScheduledTime: now, TriggerType: core.TriggerTypeCatchUp})
-	q.Send(QueueItem{ScheduledTime: now.Add(time.Hour), TriggerType: core.TriggerTypeCatchUp})
-	q.Close()
-
-	q.Start(ctx, dispatch, isRunning)
-
-	mu.Lock()
-	defer mu.Unlock()
-	assert.Len(t, dispatched, 2)
-	assert.Equal(t, now, dispatched[0])
-	assert.Equal(t, now.Add(time.Hour), dispatched[1])
-}
-
-func TestScheduleBuffer_SkipPolicy(t *testing.T) {
+func TestScheduleBuffer_SendAndPeek(t *testing.T) {
 	t.Parallel()
 
 	q := NewScheduleBuffer("test-dag", core.OverlapPolicySkip)
+	assert.Equal(t, 0, q.Len())
 
-	var dispatched []time.Time
-	var mu sync.Mutex
-
-	dispatch := func(_ context.Context, item QueueItem) error {
-		mu.Lock()
-		dispatched = append(dispatched, item.ScheduledTime)
-		mu.Unlock()
-		return nil
-	}
-
-	// First call: running, second call: not running
-	callCount := 0
-	var callMu sync.Mutex
-	isRunning := func(_ context.Context, _ string) (bool, error) {
-		callMu.Lock()
-		defer callMu.Unlock()
-		callCount++
-		// First item: not running, second item: running (should be skipped)
-		return callCount == 2, nil
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
+	_, ok := q.Peek()
+	assert.False(t, ok, "Peek on empty queue should return false")
 
 	now := time.Now()
 	q.Send(QueueItem{ScheduledTime: now, TriggerType: core.TriggerTypeCatchUp})
-	q.Send(QueueItem{ScheduledTime: now.Add(time.Hour), TriggerType: core.TriggerTypeCatchUp})
-	q.Close()
 
-	q.Start(ctx, dispatch, isRunning)
+	assert.Equal(t, 1, q.Len())
 
-	mu.Lock()
-	defer mu.Unlock()
-	// First should be dispatched, second skipped because isRunning returned true
-	assert.Len(t, dispatched, 1)
-	assert.Equal(t, now, dispatched[0])
+	item, ok := q.Peek()
+	require.True(t, ok)
+	assert.Equal(t, now, item.ScheduledTime)
+	// Peek does not remove the item
+	assert.Equal(t, 1, q.Len())
 }
 
-func TestScheduleBuffer_OrderPreservation(t *testing.T) {
+func TestScheduleBuffer_Pop(t *testing.T) {
 	t.Parallel()
 
 	q := NewScheduleBuffer("test-dag", core.OverlapPolicyAll)
 
-	var dispatched []time.Time
-	var mu sync.Mutex
+	_, ok := q.Pop()
+	assert.False(t, ok, "Pop on empty queue should return false")
 
-	dispatch := func(_ context.Context, item QueueItem) error {
-		mu.Lock()
-		dispatched = append(dispatched, item.ScheduledTime)
-		mu.Unlock()
-		return nil
-	}
+	now := time.Now()
+	q.Send(QueueItem{ScheduledTime: now})
 
-	isRunning := func(_ context.Context, _ string) (bool, error) {
-		return false, nil
-	}
+	item, ok := q.Pop()
+	require.True(t, ok)
+	assert.Equal(t, now, item.ScheduledTime)
+	assert.Equal(t, 0, q.Len())
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
+func TestScheduleBuffer_FIFOOrder(t *testing.T) {
+	t.Parallel()
+
+	q := NewScheduleBuffer("test-dag", core.OverlapPolicyAll)
 
 	base := time.Date(2026, 2, 7, 9, 0, 0, 0, time.UTC)
-	for i := range 10 {
+	for i := range 5 {
 		q.Send(QueueItem{
 			ScheduledTime: base.Add(time.Duration(i) * time.Hour),
 			TriggerType:   core.TriggerTypeCatchUp,
 		})
 	}
-	q.Close()
 
-	q.Start(ctx, dispatch, isRunning)
+	assert.Equal(t, 5, q.Len())
 
-	mu.Lock()
-	defer mu.Unlock()
-	assert.Len(t, dispatched, 10)
-	// Verify chronological order
-	for i := 1; i < len(dispatched); i++ {
-		assert.True(t, dispatched[i].After(dispatched[i-1]))
+	for i := range 5 {
+		item, ok := q.Pop()
+		require.True(t, ok)
+		assert.Equal(t, base.Add(time.Duration(i)*time.Hour), item.ScheduledTime)
 	}
+
+	assert.Equal(t, 0, q.Len())
 }
 
-func TestScheduleBuffer_ContextCancellation(t *testing.T) {
+func TestScheduleBuffer_Len(t *testing.T) {
 	t.Parallel()
 
-	q := NewScheduleBuffer("test-dag", core.OverlapPolicyAll)
+	q := NewScheduleBuffer("test-dag", core.OverlapPolicySkip)
+	assert.Equal(t, 0, q.Len())
 
-	dispatch := func(_ context.Context, _ QueueItem) error {
-		return nil
-	}
+	q.Send(QueueItem{ScheduledTime: time.Now()})
+	assert.Equal(t, 1, q.Len())
 
-	isRunning := func(_ context.Context, _ string) (bool, error) {
-		return false, nil
-	}
+	q.Send(QueueItem{ScheduledTime: time.Now()})
+	assert.Equal(t, 2, q.Len())
 
-	ctx, cancel := context.WithCancel(context.Background())
+	q.Pop()
+	assert.Equal(t, 1, q.Len())
 
-	done := make(chan struct{})
-	go func() {
-		q.Start(ctx, dispatch, isRunning)
-		close(done)
-	}()
-
-	// Cancel should cause Start to return
-	cancel()
-
-	select {
-	case <-done:
-		// Success
-	case <-time.After(2 * time.Second):
-		t.Fatal("Start did not return after context cancellation")
-	}
+	q.Pop()
+	assert.Equal(t, 0, q.Len())
 }

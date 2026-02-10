@@ -251,7 +251,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	}
 
 	// Initialize catch-up queues for DAGs with CatchupWindow > 0
-	s.initCatchupQueues(ctx, &wg)
+	s.initCatchupQueues(ctx)
 
 	wg.Add(1)
 	go func() {
@@ -333,7 +333,8 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 		case <-timer.C:
 			_ = timer.Stop()
 			s.invokeJobs(ctx, tickTime)
-			s.updateWatermarkTick(tickTime)
+			s.processBuffers(ctx)
+			s.advanceWatermark(tickTime)
 			tickTime = s.NextTick(tickTime)
 			timer.Reset(tickTime.Sub(s.clock()))
 		}
@@ -379,9 +380,6 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		if s.zombieDetector != nil {
 			s.zombieDetector.Stop(ctx)
 		}
-
-		// Close catch-up queues (signals consumers to exit)
-		s.closeScheduleBuffers()
 
 		// Final watermark flush on shutdown
 		s.flushWatermark(ctx)
@@ -522,8 +520,8 @@ func (s *ScheduledJob) invoke(ctx context.Context) error {
 	}
 }
 
-// updateWatermarkTick updates the last tick time in the in-memory watermark state.
-func (s *Scheduler) updateWatermarkTick(tickTime time.Time) {
+// advanceWatermark updates the last tick time in the in-memory watermark state.
+func (s *Scheduler) advanceWatermark(tickTime time.Time) {
 	if s.watermarkState == nil {
 		return
 	}
@@ -568,9 +566,9 @@ func (s *Scheduler) flushWatermark(ctx context.Context) {
 	}
 }
 
-// initCatchupQueues creates per-DAG queues for DAGs with CatchupWindow > 0,
-// computes missed intervals, enqueues catch-up items, and starts consumer goroutines.
-func (s *Scheduler) initCatchupQueues(ctx context.Context, wg *sync.WaitGroup) {
+// initCatchupQueues creates per-DAG queues for DAGs with CatchupWindow > 0
+// and enqueues catch-up items. The items are drained by processBuffers inside cronLoop.
+func (s *Scheduler) initCatchupQueues(ctx context.Context) {
 	if s.watermarkState == nil {
 		return
 	}
@@ -613,7 +611,6 @@ func (s *Scheduler) initCatchupQueues(ctx context.Context, wg *sync.WaitGroup) {
 			slog.Time("replayTo", now),
 		)
 
-		// Create queue with enough buffer for catch-up items plus some headroom for live ticks
 		q := NewScheduleBuffer(dagName, dag.OverlapPolicy)
 		s.scheduleBuffers[dagName] = q
 
@@ -626,17 +623,6 @@ func (s *Scheduler) initCatchupQueues(ctx context.Context, wg *sync.WaitGroup) {
 				ScheduleType:  ScheduleTypeStart,
 			})
 		}
-
-		// Start consumer goroutine
-		procGroup := dag.ProcGroup()
-		dispatch := s.makeDispatchFunc(ctx)
-		isRunning := s.makeIsRunningFunc(procGroup)
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			q.Start(ctx, dispatch, isRunning)
-		}()
 	}
 
 	if totalMissed > 0 {
@@ -647,47 +633,86 @@ func (s *Scheduler) initCatchupQueues(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-// makeDispatchFunc returns a DispatchFunc that dispatches a queue item via the DAG executor.
-func (s *Scheduler) makeDispatchFunc(_ context.Context) DispatchFunc {
-	return func(ctx context.Context, item QueueItem) error {
-		runID, err := s.runtimeManager.GenDAGRunID(ctx)
+// processBuffers drains one item per buffer each tick, respecting overlap policy.
+// Called from cronLoop — no concurrency, no locks needed.
+func (s *Scheduler) processBuffers(ctx context.Context) {
+	for dagName, buf := range s.scheduleBuffers {
+		item, ok := buf.Peek()
+		if !ok {
+			continue
+		}
+
+		running, err := s.isDagRunning(ctx, item.DAG)
 		if err != nil {
-			return fmt.Errorf("failed to generate run ID: %w", err)
+			logger.Error(ctx, "Failed to check if DAG is running",
+				tag.DAG(dagName),
+				tag.Error(err),
+			)
+			continue
 		}
 
-		logger.Info(ctx, "Dispatching queued run",
-			tag.DAG(item.DAG.Name),
-			tag.RunID(runID),
-			slog.String("triggerType", item.TriggerType.String()),
-			slog.String("scheduledTime", item.ScheduledTime.Format(time.RFC3339)),
-		)
-
-		err = s.dagExecutor.HandleJob(
-			ctx,
-			item.DAG,
-			coordinatorv1.Operation_OPERATION_START,
-			runID,
-			item.TriggerType,
-		)
-
-		if err == nil {
-			// Update watermark state for this DAG
-			s.updateWatermarkDAG(item.DAG.Name, item.ScheduledTime)
+		if !running {
+			buf.Pop()
+			s.dispatchBufferItem(ctx, item)
+			continue
 		}
 
-		return err
+		// DAG is running — apply overlap policy
+		switch buf.overlapPolicy {
+		case core.OverlapPolicySkip:
+			buf.Pop() // discard
+			logger.Info(ctx, "Catch-up run skipped (overlap policy: skip)",
+				tag.DAG(dagName),
+			)
+		case core.OverlapPolicyAll:
+			// leave in queue, retry next tick
+		}
 	}
 }
 
-// makeIsRunningFunc returns an IsRunningFunc that checks if a DAG has any active run.
-func (s *Scheduler) makeIsRunningFunc(procGroup string) IsRunningFunc {
-	return func(ctx context.Context, dagName string) (bool, error) {
-		count, err := s.procStore.CountAliveByDAGName(ctx, procGroup, dagName)
-		if err != nil {
-			return false, err
-		}
-		return count > 0, nil
+// dispatchBufferItem dispatches a single buffer item via the DAG executor.
+func (s *Scheduler) dispatchBufferItem(ctx context.Context, item QueueItem) {
+	runID, err := s.runtimeManager.GenDAGRunID(ctx)
+	if err != nil {
+		logger.Error(ctx, "Failed to generate run ID for catch-up dispatch",
+			tag.DAG(item.DAG.Name),
+			tag.Error(err),
+		)
+		return
 	}
+
+	logger.Info(ctx, "Dispatching queued run",
+		tag.DAG(item.DAG.Name),
+		tag.RunID(runID),
+		slog.String("triggerType", item.TriggerType.String()),
+		slog.String("scheduledTime", item.ScheduledTime.Format(time.RFC3339)),
+	)
+
+	err = s.dagExecutor.HandleJob(
+		ctx,
+		item.DAG,
+		coordinatorv1.Operation_OPERATION_START,
+		runID,
+		item.TriggerType,
+	)
+	if err != nil {
+		logger.Error(ctx, "Failed to dispatch catch-up run",
+			tag.DAG(item.DAG.Name),
+			tag.Error(err),
+		)
+		return
+	}
+
+	s.updateWatermarkDAG(item.DAG.Name, item.ScheduledTime)
+}
+
+// isDagRunning checks whether the given DAG has any active run.
+func (s *Scheduler) isDagRunning(ctx context.Context, dag *core.DAG) (bool, error) {
+	count, err := s.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 // updateWatermarkDAG updates the per-DAG watermark after a dispatch.
@@ -704,9 +729,3 @@ func (s *Scheduler) updateWatermarkDAG(dagName string, scheduledTime time.Time) 
 	s.watermarkDirty.Store(true)
 }
 
-// closeScheduleBuffers closes all per-DAG catch-up queues.
-func (s *Scheduler) closeScheduleBuffers() {
-	for _, q := range s.scheduleBuffers {
-		q.Close()
-	}
-}
