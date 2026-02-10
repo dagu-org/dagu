@@ -23,6 +23,7 @@ type Scheduler struct {
 	EntryReader    scheduler.EntryReader
 	QueueStore     exec.QueueStore
 	CoordinatorCli exec.Dispatcher
+	EventCh        chan scheduler.DAGChangeEvent
 }
 
 // SetupScheduler creates a test scheduler instance with all dependencies
@@ -68,7 +69,8 @@ func SetupScheduler(t *testing.T, opts ...HelperOption) *Scheduler {
 	// Create entry reader
 	coordinatorCli := coordinator.New(helper.ServiceRegistry, coordinator.DefaultConfig())
 	de := scheduler.NewDAGExecutor(coordinatorCli, runtime.NewSubCmdBuilder(helper.Config), helper.Config.DefaultExecMode)
-	em := scheduler.NewEntryReader(helper.Config.Paths.DAGsDir, ds, drm, de, "")
+	eventCh := make(chan scheduler.DAGChangeEvent, 256)
+	em := scheduler.NewEntryReader(helper.Config.Paths.DAGsDir, ds, drm, de, "", eventCh)
 
 	// Update helper with scheduler-specific stores
 	helper.DAGStore = ds
@@ -81,6 +83,7 @@ func SetupScheduler(t *testing.T, opts ...HelperOption) *Scheduler {
 		EntryReader:    em,
 		QueueStore:     qs,
 		CoordinatorCli: coordinatorCli,
+		EventCh:        eventCh,
 	}
 
 	return sch
@@ -100,6 +103,7 @@ func (s *Scheduler) NewSchedulerInstance(t *testing.T) (*scheduler.Scheduler, er
 		s.ServiceRegistry,
 		s.CoordinatorCli,
 		nil,
+		s.EventCh,
 	)
 }
 

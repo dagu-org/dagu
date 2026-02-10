@@ -75,6 +75,7 @@ func New(
 	reg exec.ServiceRegistry,
 	coordinatorCli exec.Dispatcher,
 	watermarkStore WatermarkStore,
+	events <-chan DAGChangeEvent,
 ) (*Scheduler, error) {
 	timeLoc := cfg.Core.Location
 	if timeLoc == nil {
@@ -125,7 +126,7 @@ func New(
 			)
 		},
 		Clock:  defaultClock,
-		Events: er.Events(),
+		Events: events,
 	})
 
 	return &Scheduler{

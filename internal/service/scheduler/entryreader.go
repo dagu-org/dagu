@@ -23,10 +23,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-// eventChannelSize is the buffer size for DAG change events.
-// Handles bursts (e.g., bulk DAG file copy) without blocking the file watcher.
-const eventChannelSize = 256
-
 // EntryReader is responsible for managing DAG definitions and watching for changes.
 type EntryReader interface {
 	// Init initializes the DAG registry by loading all DAGs from the target directory.
@@ -39,8 +35,6 @@ type EntryReader interface {
 	Stop()
 	// DAGs returns a snapshot of all currently loaded DAG definitions.
 	DAGs() []*core.DAG
-	// Events returns a receive-only channel of DAG lifecycle events.
-	Events() <-chan DAGChangeEvent
 	// StopRestartJobs returns stop and restart scheduled jobs due at the given time.
 	StopRestartJobs(ctx context.Context, now time.Time) []*ScheduledJob
 }
@@ -75,7 +69,7 @@ type entryReaderImpl struct {
 }
 
 // NewEntryReader creates a new DAG manager with the given configuration.
-func NewEntryReader(dir string, dagCli exec.DAGStore, drm runtime.Manager, de *DAGExecutor, executable string) EntryReader {
+func NewEntryReader(dir string, dagCli exec.DAGStore, drm runtime.Manager, de *DAGExecutor, executable string, events chan DAGChangeEvent) EntryReader {
 	return &entryReaderImpl{
 		targetDir:   dir,
 		registry:    make(map[string]*core.DAG),
@@ -84,7 +78,7 @@ func NewEntryReader(dir string, dagCli exec.DAGStore, drm runtime.Manager, de *D
 		executable:  executable,
 		dagExecutor: de,
 		quit:        make(chan struct{}),
-		events:      make(chan DAGChangeEvent, eventChannelSize),
+		events:      events,
 	}
 }
 
@@ -243,10 +237,6 @@ func (er *entryReaderImpl) Stop() {
 	})
 }
 
-// Events returns a receive-only channel of DAG lifecycle events.
-func (er *entryReaderImpl) Events() <-chan DAGChangeEvent {
-	return er.events
-}
 
 // StopRestartJobs returns stop and restart scheduled jobs due at the given time.
 func (er *entryReaderImpl) StopRestartJobs(ctx context.Context, now time.Time) []*ScheduledJob {

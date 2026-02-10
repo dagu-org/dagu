@@ -14,13 +14,10 @@ var _ scheduler.EntryReader = (*mockJobManager)(nil)
 type mockJobManager struct {
 	StopRestartEntries []*scheduler.ScheduledJob
 	LoadedDAGs         []*core.DAG
-	EventCh            chan scheduler.DAGChangeEvent
 }
 
 func newMockJobManager() *mockJobManager {
-	return &mockJobManager{
-		EventCh: make(chan scheduler.DAGChangeEvent, 256),
-	}
+	return &mockJobManager{}
 }
 
 func (er *mockJobManager) Init(_ context.Context) error {
@@ -35,10 +32,6 @@ func (er *mockJobManager) Stop() {
 
 func (er *mockJobManager) DAGs() []*core.DAG {
 	return er.LoadedDAGs
-}
-
-func (er *mockJobManager) Events() <-chan scheduler.DAGChangeEvent {
-	return er.EventCh
 }
 
 func (er *mockJobManager) StopRestartJobs(_ context.Context, _ time.Time) []*scheduler.ScheduledJob {

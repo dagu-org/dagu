@@ -12,7 +12,7 @@ import (
 
 func TestReadEntries(t *testing.T) {
 	t.Run("InvalidDirectory", func(t *testing.T) {
-		manager := scheduler.NewEntryReader("invalid_directory", nil, test.SetupScheduler(t).DAGRunMgr, nil, "")
+		manager := scheduler.NewEntryReader("invalid_directory", nil, test.SetupScheduler(t).DAGRunMgr, nil, "", nil)
 		err := manager.Init(context.Background())
 		require.Error(t, err)
 	})
@@ -25,16 +25,6 @@ func TestReadEntries(t *testing.T) {
 
 		dags := th.EntryReader.DAGs()
 		require.NotEmpty(t, dags, "DAGs should not be empty")
-	})
-	t.Run("EventsChannel", func(t *testing.T) {
-		th := test.SetupScheduler(t)
-		ctx := context.Background()
-
-		err := th.EntryReader.Init(ctx)
-		require.NoError(t, err)
-
-		ch := th.EntryReader.Events()
-		require.NotNil(t, ch, "Events channel should not be nil")
 	})
 	t.Run("StopRestartJobs", func(t *testing.T) {
 		th := test.SetupScheduler(t)
