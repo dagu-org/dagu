@@ -215,6 +215,14 @@ func (p *QueueProcessor) loop(ctx context.Context) {
 			wg.Add(1)
 			go func(queueName string) {
 				defer wg.Done()
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error(ctx, "Queue processing panicked",
+							tag.Queue(queueName),
+							tag.Error(panicToError(r)),
+						)
+					}
+				}()
 				queueCtx := logger.WithValues(ctx, tag.Queue(queueName))
 				p.ProcessQueueItems(queueCtx, queueName)
 			}(name)
@@ -297,6 +305,11 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 		wg.Add(1)
 		go func(queuedItem exec.QueuedItemData) {
 			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error(ctx, "Queue item processing panicked", tag.Error(panicToError(r)))
+				}
+			}()
 			if !p.processDAG(ctx, queuedItem, queueName, q.incInflight, q.decInflight) {
 				return
 			}

@@ -101,6 +101,11 @@ func (er *entryReaderImpl) Init(ctx context.Context) error {
 }
 
 func (er *entryReaderImpl) Start(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error(ctx, "Entry reader watcher panicked", tag.Error(panicToError(r)))
+		}
+	}()
 	for {
 		select {
 		case <-er.quit:
