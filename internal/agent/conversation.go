@@ -318,7 +318,8 @@ func (cm *ConversationManager) clearLoop() context.CancelFunc {
 }
 
 // ensureLoop creates the loop if it doesn't exist.
-// Uses a single critical section to prevent TOCTOU race conditions.
+// The lock is released during createLoop (which may be slow) and re-acquired
+// afterward with a double-check to handle concurrent callers.
 func (cm *ConversationManager) ensureLoop(provider llm.Provider, modelID string, resolvedModel string) error {
 	cm.mu.Lock()
 	if cm.loop != nil {
@@ -335,7 +336,6 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, modelID string,
 
 	cm.mu.Lock()
 	if cm.loop != nil {
-		// Another goroutine beat us; discard our loop
 		cm.mu.Unlock()
 		cancel()
 		return nil
@@ -414,7 +414,7 @@ func (cm *ConversationManager) createRecordMessageFunc() MessageRecordFunc {
 			msg.ID = uuid.New().String()
 		}
 
-		// Calculate cost for assistant messages with usage data
+		// Calculate and accumulate cost for assistant messages with usage data
 		if msg.Type == MessageTypeAssistant && msg.Usage != nil {
 			cost := cm.calculateCost(msg.Usage)
 			if cost > 0 {

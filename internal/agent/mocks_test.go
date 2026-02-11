@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"sync"
+	"testing"
 
 	"github.com/dagu-org/dagu/internal/llm"
 )
@@ -137,6 +138,13 @@ func (m *mockModelStore) Delete(_ context.Context, id string) error {
 	}
 	delete(m.models, id)
 	return nil
+}
+
+// addModel is a convenience method that adds a model to the store and returns the store
+// for chaining in test setup.
+func (m *mockModelStore) addModel(model *ModelConfig) *mockModelStore {
+	m.models[model.ID] = model
+	return m
 }
 
 var _ ModelStore = (*mockModelStore)(nil)
@@ -355,4 +363,46 @@ func newCapturingProvider(requestCh chan<- *llm.ChatRequest, response *llm.ChatR
 // simpleStopResponse creates a simple stop response for testing.
 func simpleStopResponse(content string) *llm.ChatResponse {
 	return &llm.ChatResponse{Content: content, FinishReason: "stop"}
+}
+
+// testModelConfig creates a ModelConfig with sensible defaults for testing.
+// The ID, Name, Provider, Model, and APIKey are all pre-filled.
+// Override fields after calling if needed (e.g., pricing).
+func testModelConfig(id string) *ModelConfig {
+	return &ModelConfig{
+		ID:       id,
+		Name:     "Test " + id,
+		Provider: "openai",
+		Model:    "gpt-4.1",
+		APIKey:   "test-key-" + id,
+	}
+}
+
+// testAPIWithModels creates an API instance pre-configured with the given model configs
+// and mock providers already cached. Returns the API and model store for further customization.
+func testAPIWithModels(t *testing.T, models ...*ModelConfig) (*API, *mockModelStore) {
+	t.Helper()
+
+	configStore := newMockConfigStore(true)
+	ms := newMockModelStore()
+
+	for _, m := range models {
+		ms.addModel(m)
+	}
+
+	if len(models) > 0 {
+		configStore.config.DefaultModelID = models[0].ID
+	}
+
+	api := NewAPI(APIConfig{
+		ConfigStore: configStore,
+		ModelStore:  ms,
+		WorkingDir:  t.TempDir(),
+	})
+
+	for _, m := range models {
+		api.providers.Set(m.ToLLMConfig(), &mockLLMProvider{})
+	}
+
+	return api, ms
 }

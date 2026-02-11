@@ -244,10 +244,7 @@ func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider
 	}
 
 	defaultID := a.getDefaultModelID(ctx)
-
-	if modelID == "" {
-		modelID = defaultID
-	}
+	modelID = cmp.Or(modelID, defaultID)
 	if modelID == "" {
 		return nil, nil, errors.New("no model configured")
 	}
@@ -260,6 +257,7 @@ func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider
 	if err != nil {
 		return nil, nil, err
 	}
+
 	provider, _, err := a.providers.GetOrCreate(model.ToLLMConfig())
 	if err != nil {
 		return nil, nil, err
@@ -553,10 +551,7 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 	messageWithContext := a.formatMessage(r.Context(), req.Message, req.DAGContexts)
 
-	// Update safe mode setting per request (allows toggling mid-conversation)
 	mgr.SetSafeMode(req.SafeMode)
-
-	// Update pricing if model changed
 	mgr.UpdatePricing(modelCfg.InputCostPer1M, modelCfg.OutputCostPer1M)
 
 	if err := mgr.AcceptUserMessage(r.Context(), provider, model, modelCfg.Model, messageWithContext); err != nil {
@@ -639,20 +634,19 @@ func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 	snapshot, next := mgr.SubscribeWithSnapshot(r.Context())
 	a.sendSSEMessage(w, snapshot)
 
+	type streamResult struct {
+		resp StreamResponse
+		cont bool
+	}
+
 	heartbeat := time.NewTicker(15 * time.Second)
 	defer heartbeat.Stop()
 
 	for {
-		// Check for heartbeat or next message in a select-free way:
-		// next() blocks, so we run it in a goroutine
-		type result struct {
-			resp StreamResponse
-			cont bool
-		}
-		ch := make(chan result, 1)
+		ch := make(chan streamResult, 1)
 		go func() {
 			resp, cont := next()
-			ch <- result{resp, cont}
+			ch <- streamResult{resp, cont}
 		}()
 
 		select {

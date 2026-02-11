@@ -111,7 +111,7 @@ func HashLLMConfig(cfg LLMConfig) string {
 		len(cfg.BaseURL), cfg.BaseURL,
 	)
 	hash := sha256.Sum256([]byte(data))
-	return hex.EncodeToString(hash[:]) // Full 32-byte hash
+	return hex.EncodeToString(hash[:])
 }
 
 // CreateLLMProvider creates an LLM provider from config.

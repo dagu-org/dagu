@@ -84,8 +84,8 @@ func TestProviderCache_InvalidateAll(t *testing.T) {
 		{Provider: "gemini", Model: "gemini-pro", APIKey: "key3"},
 	}
 
-	for i, cfg := range configs {
-		cache.Set(cfg, &mockLLMProvider{name: configs[i].Model})
+	for _, cfg := range configs {
+		cache.Set(cfg, &mockLLMProvider{name: cfg.Model})
 	}
 
 	cache.InvalidateAll()

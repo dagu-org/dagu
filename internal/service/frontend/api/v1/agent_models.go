@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	apigen "github.com/dagu-org/dagu/api/v1"
+	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
@@ -24,26 +24,26 @@ const (
 
 var (
 	errAgentModelStoreNotAvailable = &Error{
-		Code:       apigen.ErrorCodeForbidden,
+		Code:       api.ErrorCodeForbidden,
 		Message:    "Agent model management is not available",
 		HTTPStatus: http.StatusForbidden,
 	}
 
 	errModelNotFound = &Error{
-		Code:       apigen.ErrorCodeNotFound,
+		Code:       api.ErrorCodeNotFound,
 		Message:    "Model not found",
 		HTTPStatus: http.StatusNotFound,
 	}
 
 	errModelAlreadyExists = &Error{
-		Code:       apigen.ErrorCodeAlreadyExists,
+		Code:       api.ErrorCodeAlreadyExists,
 		Message:    "Model already exists",
 		HTTPStatus: http.StatusConflict,
 	}
 )
 
 // ListAgentModels returns all configured models. Requires admin role.
-func (a *API) ListAgentModels(ctx context.Context, _ apigen.ListAgentModelsRequestObject) (apigen.ListAgentModelsResponseObject, error) {
+func (a *API) ListAgentModels(ctx context.Context, _ api.ListAgentModelsRequestObject) (api.ListAgentModelsResponseObject, error) {
 	if err := a.requireAgentModelManagement(); err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func (a *API) ListAgentModels(ctx context.Context, _ apigen.ListAgentModelsReque
 	models, err := a.agentModelStore.List(ctx)
 	if err != nil {
 		logger.Error(ctx, "Failed to list agent models", tag.Error(err))
-		return nil, &Error{Code: apigen.ErrorCodeInternalError, Message: "Failed to list models", HTTPStatus: http.StatusInternalServerError}
+		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to list models", HTTPStatus: http.StatusInternalServerError}
 	}
 
 	cfg, _ := a.agentConfigStore.Load(ctx)
@@ -63,11 +63,11 @@ func (a *API) ListAgentModels(ctx context.Context, _ apigen.ListAgentModelsReque
 		defaultModelID = cfg.DefaultModelID
 	}
 
-	modelResponses := make([]apigen.ModelConfigResponse, 0, len(models))
+	modelResponses := make([]api.ModelConfigResponse, 0, len(models))
 	for _, m := range models {
 		modelResponses = append(modelResponses, toModelConfigResponse(m))
 	}
-	resp := apigen.ListAgentModels200JSONResponse{
+	resp := api.ListAgentModels200JSONResponse{
 		Models:         modelResponses,
 		DefaultModelId: ptrOf(defaultModelID),
 	}
@@ -76,7 +76,7 @@ func (a *API) ListAgentModels(ctx context.Context, _ apigen.ListAgentModelsReque
 }
 
 // CreateAgentModel creates a new model configuration. Requires admin role.
-func (a *API) CreateAgentModel(ctx context.Context, request apigen.CreateAgentModelRequestObject) (apigen.CreateAgentModelResponseObject, error) {
+func (a *API) CreateAgentModel(ctx context.Context, request api.CreateAgentModelRequestObject) (api.CreateAgentModelResponseObject, error) {
 	if err := a.requireAgentModelManagement(); err != nil {
 		return nil, err
 	}
@@ -89,13 +89,8 @@ func (a *API) CreateAgentModel(ctx context.Context, request apigen.CreateAgentMo
 
 	body := request.Body
 
-	// Validate provider
-	if _, err := llm.ParseProviderType(string(body.Provider)); err != nil {
-		return nil, &Error{
-			Code:       apigen.ErrorCodeBadRequest,
-			Message:    fmt.Sprintf("invalid provider '%s': valid options are anthropic, openai, gemini, openrouter, local", body.Provider),
-			HTTPStatus: http.StatusBadRequest,
-		}
+	if err := validateProvider(string(body.Provider)); err != nil {
+		return nil, err
 	}
 
 	// Generate or validate ID
@@ -106,7 +101,7 @@ func (a *API) CreateAgentModel(ctx context.Context, request apigen.CreateAgentMo
 	}
 	if err := agent.ValidateModelID(id); err != nil {
 		return nil, &Error{
-			Code:       apigen.ErrorCodeBadRequest,
+			Code:       api.ErrorCodeBadRequest,
 			Message:    fmt.Sprintf("invalid model ID: %v", err),
 			HTTPStatus: http.StatusBadRequest,
 		}
@@ -114,14 +109,14 @@ func (a *API) CreateAgentModel(ctx context.Context, request apigen.CreateAgentMo
 
 	if strings.TrimSpace(body.Name) == "" {
 		return nil, &Error{
-			Code:       apigen.ErrorCodeBadRequest,
+			Code:       api.ErrorCodeBadRequest,
 			Message:    "name is required and cannot be empty",
 			HTTPStatus: http.StatusBadRequest,
 		}
 	}
 	if strings.TrimSpace(body.Model) == "" {
 		return nil, &Error{
-			Code:       apigen.ErrorCodeBadRequest,
+			Code:       api.ErrorCodeBadRequest,
 			Message:    "model is required and cannot be empty",
 			HTTPStatus: http.StatusBadRequest,
 		}
@@ -147,7 +142,7 @@ func (a *API) CreateAgentModel(ctx context.Context, request apigen.CreateAgentMo
 			return nil, errModelAlreadyExists
 		}
 		logger.Error(ctx, "Failed to create agent model", tag.Error(err))
-		return nil, &Error{Code: apigen.ErrorCodeInternalError, Message: "Failed to create model", HTTPStatus: http.StatusInternalServerError}
+		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to create model", HTTPStatus: http.StatusInternalServerError}
 	}
 
 	// If this is the first model, auto-set as default
@@ -159,11 +154,11 @@ func (a *API) CreateAgentModel(ctx context.Context, request apigen.CreateAgentMo
 		"provider": string(body.Provider),
 	})
 
-	return apigen.CreateAgentModel201JSONResponse(toModelConfigResponse(model)), nil
+	return api.CreateAgentModel201JSONResponse(toModelConfigResponse(model)), nil
 }
 
 // UpdateAgentModel updates an existing model configuration. Requires admin role.
-func (a *API) UpdateAgentModel(ctx context.Context, request apigen.UpdateAgentModelRequestObject) (apigen.UpdateAgentModelResponseObject, error) {
+func (a *API) UpdateAgentModel(ctx context.Context, request api.UpdateAgentModelRequestObject) (api.UpdateAgentModelResponseObject, error) {
 	if err := a.requireAgentModelManagement(); err != nil {
 		return nil, err
 	}
@@ -174,45 +169,42 @@ func (a *API) UpdateAgentModel(ctx context.Context, request apigen.UpdateAgentMo
 		return nil, errInvalidRequestBody
 	}
 
+	body := request.Body
+
+	// Validate provider before applying updates to avoid mutating with invalid data.
+	if body.Provider != nil {
+		if err := validateProvider(string(*body.Provider)); err != nil {
+			return nil, err
+		}
+	}
+
 	existing, err := a.agentModelStore.GetByID(ctx, request.ModelId)
 	if err != nil {
 		if errors.Is(err, agent.ErrModelNotFound) {
 			return nil, errModelNotFound
 		}
-		return nil, &Error{Code: apigen.ErrorCodeInternalError, Message: "Failed to get model", HTTPStatus: http.StatusInternalServerError}
+		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to get model", HTTPStatus: http.StatusInternalServerError}
 	}
 
-	body := request.Body
 	applyModelUpdates(existing, body)
-
-	// Validate provider if it was updated
-	if body.Provider != nil {
-		if _, err := llm.ParseProviderType(string(*body.Provider)); err != nil {
-			return nil, &Error{
-				Code:       apigen.ErrorCodeBadRequest,
-				Message:    fmt.Sprintf("invalid provider '%s': valid options are anthropic, openai, gemini, openrouter, local", *body.Provider),
-				HTTPStatus: http.StatusBadRequest,
-			}
-		}
-	}
 
 	if err := a.agentModelStore.Update(ctx, existing); err != nil {
 		if errors.Is(err, agent.ErrModelAlreadyExists) {
 			return nil, errModelAlreadyExists
 		}
 		logger.Error(ctx, "Failed to update agent model", tag.Error(err))
-		return nil, &Error{Code: apigen.ErrorCodeInternalError, Message: "Failed to update model", HTTPStatus: http.StatusInternalServerError}
+		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to update model", HTTPStatus: http.StatusInternalServerError}
 	}
 
 	a.logAuditEntry(ctx, audit.CategoryAgent, auditActionModelUpdate, map[string]any{
 		"model_id": request.ModelId,
 	})
 
-	return apigen.UpdateAgentModel200JSONResponse(toModelConfigResponse(existing)), nil
+	return api.UpdateAgentModel200JSONResponse(toModelConfigResponse(existing)), nil
 }
 
 // DeleteAgentModel removes a model configuration. Requires admin role.
-func (a *API) DeleteAgentModel(ctx context.Context, request apigen.DeleteAgentModelRequestObject) (apigen.DeleteAgentModelResponseObject, error) {
+func (a *API) DeleteAgentModel(ctx context.Context, request api.DeleteAgentModelRequestObject) (api.DeleteAgentModelResponseObject, error) {
 	if err := a.requireAgentModelManagement(); err != nil {
 		return nil, err
 	}
@@ -225,7 +217,7 @@ func (a *API) DeleteAgentModel(ctx context.Context, request apigen.DeleteAgentMo
 			return nil, errModelNotFound
 		}
 		logger.Error(ctx, "Failed to delete agent model", tag.Error(err))
-		return nil, &Error{Code: apigen.ErrorCodeInternalError, Message: "Failed to delete model", HTTPStatus: http.StatusInternalServerError}
+		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to delete model", HTTPStatus: http.StatusInternalServerError}
 	}
 
 	// If deleted model was default, reset to first remaining
@@ -235,11 +227,11 @@ func (a *API) DeleteAgentModel(ctx context.Context, request apigen.DeleteAgentMo
 		"model_id": request.ModelId,
 	})
 
-	return apigen.DeleteAgentModel204Response{}, nil
+	return api.DeleteAgentModel204Response{}, nil
 }
 
 // SetDefaultAgentModel sets the default model. Requires admin role.
-func (a *API) SetDefaultAgentModel(ctx context.Context, request apigen.SetDefaultAgentModelRequestObject) (apigen.SetDefaultAgentModelResponseObject, error) {
+func (a *API) SetDefaultAgentModel(ctx context.Context, request api.SetDefaultAgentModelRequestObject) (api.SetDefaultAgentModelResponseObject, error) {
 	if err := a.requireAgentModelManagement(); err != nil {
 		return nil, err
 	}
@@ -257,7 +249,7 @@ func (a *API) SetDefaultAgentModel(ctx context.Context, request apigen.SetDefaul
 		if errors.Is(err, agent.ErrModelNotFound) {
 			return nil, errModelNotFound
 		}
-		return nil, &Error{Code: apigen.ErrorCodeInternalError, Message: "Failed to validate model", HTTPStatus: http.StatusInternalServerError}
+		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to validate model", HTTPStatus: http.StatusInternalServerError}
 	}
 
 	cfg, err := a.agentConfigStore.Load(ctx)
@@ -274,21 +266,21 @@ func (a *API) SetDefaultAgentModel(ctx context.Context, request apigen.SetDefaul
 		"model_id": modelID,
 	})
 
-	return apigen.SetDefaultAgentModel200JSONResponse{DefaultModelId: &modelID}, nil
+	return api.SetDefaultAgentModel200JSONResponse{DefaultModelId: &modelID}, nil
 }
 
-// ListModelPresets returns hardcoded model presets. Requires admin role.
-func (a *API) ListModelPresets(ctx context.Context, _ apigen.ListModelPresetsRequestObject) (apigen.ListModelPresetsResponseObject, error) {
+// ListModelPresets returns available model presets. Requires admin role.
+func (a *API) ListModelPresets(ctx context.Context, _ api.ListModelPresetsRequestObject) (api.ListModelPresetsResponseObject, error) {
 	if err := a.requireAdmin(ctx); err != nil {
 		return nil, err
 	}
 
 	allPresets := agent.GetModelPresets()
-	presets := make([]apigen.ModelPreset, 0, len(allPresets))
+	presets := make([]api.ModelPreset, 0, len(allPresets))
 	for _, p := range allPresets {
-		presets = append(presets, apigen.ModelPreset{
+		presets = append(presets, api.ModelPreset{
 			Name:             p.Name,
-			Provider:         apigen.ModelPresetProvider(p.Provider),
+			Provider:         api.ModelPresetProvider(p.Provider),
 			Model:            p.Model,
 			ContextWindow:    ptrOf(p.ContextWindow),
 			MaxOutputTokens:  ptrOf(p.MaxOutputTokens),
@@ -299,7 +291,18 @@ func (a *API) ListModelPresets(ctx context.Context, _ apigen.ListModelPresetsReq
 		})
 	}
 
-	return apigen.ListModelPresets200JSONResponse{Presets: presets}, nil
+	return api.ListModelPresets200JSONResponse{Presets: presets}, nil
+}
+
+func validateProvider(provider string) error {
+	if _, err := llm.ParseProviderType(provider); err != nil {
+		return &Error{
+			Code:       api.ErrorCodeBadRequest,
+			Message:    fmt.Sprintf("invalid provider '%s': valid options are anthropic, openai, gemini, openrouter, local", provider),
+			HTTPStatus: http.StatusBadRequest,
+		}
+	}
+	return nil
 }
 
 func (a *API) requireAgentModelManagement() error {
@@ -312,11 +315,11 @@ func (a *API) requireAgentModelManagement() error {
 	return nil
 }
 
-func toModelConfigResponse(m *agent.ModelConfig) apigen.ModelConfigResponse {
-	return apigen.ModelConfigResponse{
+func toModelConfigResponse(m *agent.ModelConfig) api.ModelConfigResponse {
+	return api.ModelConfigResponse{
 		Id:               m.ID,
 		Name:             m.Name,
-		Provider:         apigen.ModelConfigResponseProvider(m.Provider),
+		Provider:         api.ModelConfigResponseProvider(m.Provider),
 		Model:            m.Model,
 		ApiKeyConfigured: ptrOf(m.APIKey != ""),
 		BaseUrl:          ptrOf(m.BaseURL),
@@ -329,7 +332,7 @@ func toModelConfigResponse(m *agent.ModelConfig) apigen.ModelConfigResponse {
 	}
 }
 
-func applyModelUpdates(model *agent.ModelConfig, update *apigen.UpdateModelConfigRequest) {
+func applyModelUpdates(model *agent.ModelConfig, update *api.UpdateModelConfigRequest) {
 	if update.Name != nil && strings.TrimSpace(*update.Name) != "" {
 		model.Name = *update.Name
 	}

@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// agentTestSetup contains common test infrastructure for agent model tests.
+// agentTestSetup contains common test infrastructure for agent API tests.
 type agentTestSetup struct {
 	api         *apiV1.API
 	modelStore  *mockAgentModelStore
@@ -52,8 +52,6 @@ func adminCtx() context.Context {
 		Role:     auth.RoleAdmin,
 	})
 }
-
-// --- Mock agent model store ---
 
 type mockAgentModelStore struct {
 	models map[string]*agent.ModelConfig
@@ -101,8 +99,6 @@ func (m *mockAgentModelStore) Delete(_ context.Context, id string) error {
 
 var _ agent.ModelStore = (*mockAgentModelStore)(nil)
 
-// --- Mock agent config store ---
-
 type mockAgentConfigStore struct {
 	config *agent.Config
 }
@@ -122,13 +118,9 @@ func (m *mockAgentConfigStore) IsEnabled(_ context.Context) bool {
 
 var _ agent.ConfigStore = (*mockAgentConfigStore)(nil)
 
-// --- Helper functions ---
-
 func ptrTo[T any](v T) *T {
 	return &v
 }
-
-// --- Tests ---
 
 func TestListAgentModels(t *testing.T) {
 	t.Parallel()

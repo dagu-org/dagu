@@ -10,50 +10,29 @@ import (
 func TestGetModelPresets(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns non-empty slice", func(t *testing.T) {
-		t.Parallel()
+	presets := GetModelPresets()
+	require.NotEmpty(t, presets)
 
-		presets := GetModelPresets()
-		require.NotEmpty(t, presets)
-	})
+	validProviders := map[string]bool{
+		"anthropic":  true,
+		"openai":     true,
+		"gemini":     true,
+		"openrouter": true,
+		"local":      true,
+	}
 
-	t.Run("all presets have required fields", func(t *testing.T) {
-		t.Parallel()
+	for _, p := range presets {
+		t.Run(p.Name, func(t *testing.T) {
+			t.Parallel()
 
-		presets := GetModelPresets()
-		for _, p := range presets {
-			assert.NotEmpty(t, p.Name, "preset Name must not be empty")
-			assert.NotEmpty(t, p.Provider, "preset Provider must not be empty for %s", p.Name)
-			assert.NotEmpty(t, p.Model, "preset Model must not be empty for %s", p.Name)
-		}
-	})
-
-	t.Run("all presets have positive pricing", func(t *testing.T) {
-		t.Parallel()
-
-		presets := GetModelPresets()
-		for _, p := range presets {
-			assert.Greater(t, p.InputCostPer1M, 0.0, "InputCostPer1M should be > 0 for %s", p.Name)
-			assert.Greater(t, p.OutputCostPer1M, 0.0, "OutputCostPer1M should be > 0 for %s", p.Name)
-		}
-	})
-
-	t.Run("all presets have valid providers", func(t *testing.T) {
-		t.Parallel()
-
-		validProviders := map[string]bool{
-			"anthropic":  true,
-			"openai":     true,
-			"gemini":     true,
-			"openrouter": true,
-			"local":      true,
-		}
-
-		presets := GetModelPresets()
-		for _, p := range presets {
-			assert.True(t, validProviders[p.Provider], "provider %q is not valid for preset %s", p.Provider, p.Name)
-		}
-	})
+			assert.NotEmpty(t, p.Name, "Name must not be empty")
+			assert.NotEmpty(t, p.Provider, "Provider must not be empty")
+			assert.NotEmpty(t, p.Model, "Model must not be empty")
+			assert.Greater(t, p.InputCostPer1M, 0.0, "InputCostPer1M should be > 0")
+			assert.Greater(t, p.OutputCostPer1M, 0.0, "OutputCostPer1M should be > 0")
+			assert.True(t, validProviders[p.Provider], "provider %q is not valid", p.Provider)
+		})
+	}
 }
 
 func TestGetModelPresets_ReturnsCopy(t *testing.T) {

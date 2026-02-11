@@ -339,14 +339,15 @@ func TestConversationManager_GetModel(t *testing.T) {
 func TestConversationManager_CostTracking(t *testing.T) {
 	t.Parallel()
 
+	pricedConfig := ConversationManagerConfig{
+		InputCostPer1M:  3.0,
+		OutputCostPer1M: 15.0,
+	}
+
 	t.Run("calculateCost with usage", func(t *testing.T) {
 		t.Parallel()
 
-		cm := NewConversationManager(ConversationManagerConfig{
-			InputCostPer1M:  3.0,
-			OutputCostPer1M: 15.0,
-		})
-
+		cm := NewConversationManager(pricedConfig)
 		usage := &llm.Usage{PromptTokens: 1000, CompletionTokens: 500}
 		cost := cm.calculateCost(usage)
 
@@ -354,23 +355,17 @@ func TestConversationManager_CostTracking(t *testing.T) {
 		assert.InDelta(t, 0.0105, cost, 1e-9)
 	})
 
-	t.Run("calculateCost with nil usage", func(t *testing.T) {
+	t.Run("calculateCost with nil usage returns zero", func(t *testing.T) {
 		t.Parallel()
 
-		cm := NewConversationManager(ConversationManagerConfig{
-			InputCostPer1M:  3.0,
-			OutputCostPer1M: 15.0,
-		})
-
-		cost := cm.calculateCost(nil)
-		assert.Equal(t, 0.0, cost)
+		cm := NewConversationManager(pricedConfig)
+		assert.Equal(t, 0.0, cm.calculateCost(nil))
 	})
 
 	t.Run("addCost accumulates", func(t *testing.T) {
 		t.Parallel()
 
 		cm := NewConversationManager(ConversationManagerConfig{})
-
 		cm.addCost(0.01)
 		cm.addCost(0.01)
 		assert.InDelta(t, 0.02, cm.GetTotalCost(), 1e-9)
@@ -383,14 +378,12 @@ func TestConversationManager_CostTracking(t *testing.T) {
 		assert.Equal(t, 0.0, cm.GetTotalCost())
 	})
 
-	t.Run("calculateCost with zero pricing", func(t *testing.T) {
+	t.Run("calculateCost with zero pricing returns zero", func(t *testing.T) {
 		t.Parallel()
 
 		cm := NewConversationManager(ConversationManagerConfig{})
-
 		usage := &llm.Usage{PromptTokens: 1000, CompletionTokens: 500}
-		cost := cm.calculateCost(usage)
-		assert.Equal(t, 0.0, cost)
+		assert.Equal(t, 0.0, cm.calculateCost(usage))
 	})
 }
 
@@ -451,61 +444,56 @@ func TestConversationManager_LastActivity(t *testing.T) {
 func TestConversationManager_CostInRecordMessage(t *testing.T) {
 	t.Parallel()
 
+	const (
+		inputCost  = 3.0
+		outputCost = 15.0
+		// (1000 * 3 / 1_000_000) + (500 * 15 / 1_000_000) = 0.0105
+		expectedCostPerMsg = 0.0105
+	)
+
+	newPricedManager := func(onMessage func(context.Context, Message) error) *ConversationManager {
+		return NewConversationManager(ConversationManagerConfig{
+			InputCostPer1M:  inputCost,
+			OutputCostPer1M: outputCost,
+			OnMessage:       onMessage,
+		})
+	}
+
+	testUsage := &llm.Usage{PromptTokens: 1000, CompletionTokens: 500}
+
 	t.Run("assistant message with usage gets cost calculated", func(t *testing.T) {
 		t.Parallel()
 
 		var recordedMessages []Message
 		var mu sync.Mutex
 
-		cm := NewConversationManager(ConversationManagerConfig{
-			InputCostPer1M:  3.0,
-			OutputCostPer1M: 15.0,
-			OnMessage: func(_ context.Context, msg Message) error {
-				mu.Lock()
-				recordedMessages = append(recordedMessages, msg)
-				mu.Unlock()
-				return nil
-			},
+		cm := newPricedManager(func(_ context.Context, msg Message) error {
+			mu.Lock()
+			recordedMessages = append(recordedMessages, msg)
+			mu.Unlock()
+			return nil
 		})
 
 		recordFunc := cm.createRecordMessageFunc()
-
-		usage := &llm.Usage{PromptTokens: 1000, CompletionTokens: 500}
-		msg := Message{
-			Type:  MessageTypeAssistant,
-			Usage: usage,
-		}
-
-		err := recordFunc(context.Background(), msg)
+		err := recordFunc(context.Background(), Message{Type: MessageTypeAssistant, Usage: testUsage})
 		require.NoError(t, err)
 
-		// Verify cost is accumulated
-		assert.InDelta(t, 0.0105, cm.GetTotalCost(), 1e-9)
+		assert.InDelta(t, expectedCostPerMsg, cm.GetTotalCost(), 1e-9)
 
-		// Verify recorded message has Cost field set
 		mu.Lock()
 		require.Len(t, recordedMessages, 1)
 		require.NotNil(t, recordedMessages[0].Cost)
-		assert.InDelta(t, 0.0105, *recordedMessages[0].Cost, 1e-9)
+		assert.InDelta(t, expectedCostPerMsg, *recordedMessages[0].Cost, 1e-9)
 		mu.Unlock()
 	})
 
 	t.Run("user message does not get cost calculated", func(t *testing.T) {
 		t.Parallel()
 
-		cm := NewConversationManager(ConversationManagerConfig{
-			InputCostPer1M:  3.0,
-			OutputCostPer1M: 15.0,
-		})
-
+		cm := newPricedManager(nil)
 		recordFunc := cm.createRecordMessageFunc()
 
-		msg := Message{
-			Type:    MessageTypeUser,
-			Content: "hello",
-		}
-
-		err := recordFunc(context.Background(), msg)
+		err := recordFunc(context.Background(), Message{Type: MessageTypeUser, Content: "hello"})
 		require.NoError(t, err)
 
 		assert.Equal(t, 0.0, cm.GetTotalCost())
@@ -514,22 +502,17 @@ func TestConversationManager_CostInRecordMessage(t *testing.T) {
 	t.Run("multiple assistant messages accumulate cost", func(t *testing.T) {
 		t.Parallel()
 
-		cm := NewConversationManager(ConversationManagerConfig{
-			InputCostPer1M:  3.0,
-			OutputCostPer1M: 15.0,
-		})
-
+		cm := newPricedManager(nil)
 		recordFunc := cm.createRecordMessageFunc()
 
-		for i := 0; i < 3; i++ {
-			msg := Message{
+		for range 3 {
+			_ = recordFunc(context.Background(), Message{
 				Type:  MessageTypeAssistant,
-				Usage: &llm.Usage{PromptTokens: 1000, CompletionTokens: 500},
-			}
-			_ = recordFunc(context.Background(), msg)
+				Usage: testUsage,
+			})
 		}
 
-		assert.InDelta(t, 0.0105*3, cm.GetTotalCost(), 1e-9)
+		assert.InDelta(t, expectedCostPerMsg*3, cm.GetTotalCost(), 1e-9)
 	})
 }
 

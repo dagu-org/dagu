@@ -5,9 +5,10 @@ package agent
 // No API key or base URL is included — admin fills those in.
 //
 // Sources (verified 2026-02-11):
-//   Anthropic: https://platform.claude.com/docs/en/docs/about-claude/models
-//   OpenAI:    https://platform.openai.com/docs/models
-//   Gemini:    https://ai.google.dev/gemini-api/docs/models
+//
+//	Anthropic: https://platform.claude.com/docs/en/docs/about-claude/models
+//	OpenAI:    https://platform.openai.com/docs/models
+//	Gemini:    https://ai.google.dev/gemini-api/docs/models
 var modelPresets = []ModelConfig{
 	// --- Anthropic ---
 	// https://platform.claude.com/docs/en/docs/about-claude/models

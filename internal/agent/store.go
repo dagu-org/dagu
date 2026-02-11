@@ -10,10 +10,12 @@ import (
 
 // Sentinel errors for store operations.
 var (
+	// Conversation errors.
 	ErrConversationNotFound  = errors.New("conversation not found")
 	ErrInvalidConversationID = errors.New("invalid conversation ID")
 	ErrInvalidUserID         = errors.New("invalid user ID")
 
+	// Model errors.
 	ErrModelNotFound      = errors.New("model not found")
 	ErrModelAlreadyExists = errors.New("model already exists")
 	ErrInvalidModelID     = errors.New("invalid model ID")

@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 
@@ -176,14 +176,13 @@ func (s *Store) GetByID(_ context.Context, id string) (*agent.ModelConfig, error
 
 	s.mu.RLock()
 	filePath, exists := s.byID[id]
+	s.mu.RUnlock()
+
 	if !exists {
-		s.mu.RUnlock()
 		return nil, agent.ErrModelNotFound
 	}
 
 	model, err := loadModelFromFile(filePath)
-	s.mu.RUnlock()
-
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, agent.ErrModelNotFound
@@ -195,28 +194,28 @@ func (s *Store) GetByID(_ context.Context, id string) (*agent.ModelConfig, error
 }
 
 // List returns all model configurations, sorted by name.
-func (s *Store) List(ctx context.Context) ([]*agent.ModelConfig, error) {
+func (s *Store) List(_ context.Context) ([]*agent.ModelConfig, error) {
 	s.mu.RLock()
-	ids := make([]string, 0, len(s.byID))
-	for id := range s.byID {
-		ids = append(ids, id)
+	filePaths := make([]string, 0, len(s.byID))
+	for _, fp := range s.byID {
+		filePaths = append(filePaths, fp)
 	}
 	s.mu.RUnlock()
 
-	models := make([]*agent.ModelConfig, 0, len(ids))
-	for _, id := range ids {
-		model, err := s.GetByID(ctx, id)
+	models := make([]*agent.ModelConfig, 0, len(filePaths))
+	for _, fp := range filePaths {
+		model, err := loadModelFromFile(fp)
 		if err != nil {
-			if errors.Is(err, agent.ErrModelNotFound) {
+			if errors.Is(err, os.ErrNotExist) {
 				continue
 			}
-			return nil, err
+			return nil, fmt.Errorf("fileagentmodel: failed to load model: %w", err)
 		}
 		models = append(models, model)
 	}
 
-	sort.Slice(models, func(i, j int) bool {
-		return models[i].Name < models[j].Name
+	slices.SortFunc(models, func(a, b *agent.ModelConfig) int {
+		return strings.Compare(a.Name, b.Name)
 	})
 
 	return models, nil
@@ -244,9 +243,9 @@ func (s *Store) Update(_ context.Context, model *agent.ModelConfig) error {
 		return fmt.Errorf("fileagentmodel: failed to load existing model: %w", err)
 	}
 
-	// If name changed, check for conflicts
-	if existing.Name != model.Name && model.Name != "" {
-		if existingID, taken := s.byName[model.Name]; taken && existingID != model.ID {
+	nameChanged := model.Name != "" && existing.Name != model.Name
+	if nameChanged {
+		if takenByID, taken := s.byName[model.Name]; taken && takenByID != model.ID {
 			return agent.ErrModelAlreadyExists
 		}
 	}
@@ -255,8 +254,7 @@ func (s *Store) Update(_ context.Context, model *agent.ModelConfig) error {
 		return err
 	}
 
-	// Update name index after successful write
-	if existing.Name != model.Name && model.Name != "" {
+	if nameChanged {
 		delete(s.byName, existing.Name)
 		s.byName[model.Name] = model.ID
 	}
@@ -278,28 +276,17 @@ func (s *Store) Delete(_ context.Context, id string) error {
 		return agent.ErrModelNotFound
 	}
 
-	model, err := loadModelFromFile(filePath)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("fileagentmodel: failed to load model for deletion: %w", err)
-	}
-
 	if err := os.Remove(filePath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("fileagentmodel: failed to delete model file: %w", err)
 	}
 
 	delete(s.byID, id)
-	if model != nil {
-		delete(s.byName, model.Name)
-	} else {
-		var nameToDelete string
-		for name, modelID := range s.byName {
-			if modelID == id {
-				nameToDelete = name
-				break
-			}
-		}
-		if nameToDelete != "" {
-			delete(s.byName, nameToDelete)
+
+	// Clean up name index by reverse lookup.
+	for name, modelID := range s.byName {
+		if modelID == id {
+			delete(s.byName, name)
+			break
 		}
 	}
 

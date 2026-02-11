@@ -30,15 +30,9 @@ func newAPITestSetup(t *testing.T, enabled bool, withProvider bool, workingDir s
 
 	var modelStore ModelStore
 	if withProvider {
-		ms := newMockModelStore()
-		ms.models["test-model"] = &ModelConfig{
-			ID:       "test-model",
-			Name:     "Test Model",
-			Provider: "openai",
-			Model:    "gpt-4.1",
-			APIKey:   "test-key",
-		}
-		configStore.config.DefaultModelID = "test-model"
+		model := testModelConfig("test-model")
+		ms := newMockModelStore().addModel(model)
+		configStore.config.DefaultModelID = model.ID
 		modelStore = ms
 	}
 
@@ -52,13 +46,9 @@ func newAPITestSetup(t *testing.T, enabled bool, withProvider bool, workingDir s
 		WorkingDir:  workingDir,
 	})
 
-	// Pre-populate provider cache with mock provider for test model
 	if withProvider {
-		api.providers.Set(LLMConfig{
-			Provider: "openai",
-			Model:    "gpt-4.1",
-			APIKey:   "test-key",
-		}, &mockLLMProvider{})
+		model := testModelConfig("test-model")
+		api.providers.Set(model.ToLLMConfig(), &mockLLMProvider{})
 	}
 
 	r := chi.NewRouter()
@@ -238,29 +228,18 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 	t.Run("with conversation store persistence", func(t *testing.T) {
 		t.Parallel()
 
+		model := testModelConfig("test-model")
 		configStore := newMockConfigStore(true)
-		configStore.config.DefaultModelID = "test-model"
-		ms := newMockModelStore()
-		ms.models["test-model"] = &ModelConfig{
-			ID:       "test-model",
-			Name:     "Test Model",
-			Provider: "openai",
-			Model:    "gpt-4.1",
-			APIKey:   "test-key",
-		}
+		configStore.config.DefaultModelID = model.ID
 		convStore := newMockConversationStore()
 
 		api := NewAPI(APIConfig{
 			ConfigStore:       configStore,
-			ModelStore:        ms,
+			ModelStore:        newMockModelStore().addModel(model),
 			WorkingDir:        t.TempDir(),
 			ConversationStore: convStore,
 		})
-		api.providers.Set(LLMConfig{
-			Provider: "openai",
-			Model:    "gpt-4.1",
-			APIKey:   "test-key",
-		}, &mockLLMProvider{})
+		api.providers.Set(model.ToLLMConfig(), &mockLLMProvider{})
 
 		r := chi.NewRouter()
 		api.RegisterRoutes(r, nil)
@@ -660,27 +639,8 @@ func TestAPI_ResolveProvider(t *testing.T) {
 	t.Run("model found returns provider and config", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		configStore.config.DefaultModelID = "default-model"
-		ms := newMockModelStore()
-		ms.models["my-model"] = &ModelConfig{
-			ID:       "my-model",
-			Name:     "My Model",
-			Provider: "openai",
-			Model:    "gpt-4.1",
-			APIKey:   "key-123",
-		}
-
-		api := NewAPI(APIConfig{
-			ConfigStore: configStore,
-			ModelStore:  ms,
-			WorkingDir:  t.TempDir(),
-		})
-		api.providers.Set(LLMConfig{
-			Provider: "openai",
-			Model:    "gpt-4.1",
-			APIKey:   "key-123",
-		}, &mockLLMProvider{})
+		model := testModelConfig("my-model")
+		api, _ := testAPIWithModels(t, model)
 
 		provider, modelCfg, err := api.resolveProvider(context.Background(), "my-model")
 
@@ -693,27 +653,7 @@ func TestAPI_ResolveProvider(t *testing.T) {
 	t.Run("empty model ID uses default", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		configStore.config.DefaultModelID = "default-model"
-		ms := newMockModelStore()
-		ms.models["default-model"] = &ModelConfig{
-			ID:       "default-model",
-			Name:     "Default",
-			Provider: "openai",
-			Model:    "gpt-4.1",
-			APIKey:   "key-default",
-		}
-
-		api := NewAPI(APIConfig{
-			ConfigStore: configStore,
-			ModelStore:  ms,
-			WorkingDir:  t.TempDir(),
-		})
-		api.providers.Set(LLMConfig{
-			Provider: "openai",
-			Model:    "gpt-4.1",
-			APIKey:   "key-default",
-		}, &mockLLMProvider{})
+		api, _ := testAPIWithModels(t, testModelConfig("default-model"))
 
 		provider, modelCfg, err := api.resolveProvider(context.Background(), "")
 
@@ -725,27 +665,7 @@ func TestAPI_ResolveProvider(t *testing.T) {
 	t.Run("model not found falls back to default", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		configStore.config.DefaultModelID = "default-model"
-		ms := newMockModelStore()
-		ms.models["default-model"] = &ModelConfig{
-			ID:       "default-model",
-			Name:     "Default",
-			Provider: "openai",
-			Model:    "gpt-4.1",
-			APIKey:   "key-default",
-		}
-
-		api := NewAPI(APIConfig{
-			ConfigStore: configStore,
-			ModelStore:  ms,
-			WorkingDir:  t.TempDir(),
-		})
-		api.providers.Set(LLMConfig{
-			Provider: "openai",
-			Model:    "gpt-4.1",
-			APIKey:   "key-default",
-		}, &mockLLMProvider{})
+		api, _ := testAPIWithModels(t, testModelConfig("default-model"))
 
 		provider, modelCfg, err := api.resolveProvider(context.Background(), "deleted-model")
 
@@ -759,11 +679,10 @@ func TestAPI_ResolveProvider(t *testing.T) {
 
 		configStore := newMockConfigStore(true)
 		configStore.config.DefaultModelID = "also-missing"
-		ms := newMockModelStore()
 
 		api := NewAPI(APIConfig{
 			ConfigStore: configStore,
-			ModelStore:  ms,
+			ModelStore:  newMockModelStore(),
 			WorkingDir:  t.TempDir(),
 		})
 
@@ -787,13 +706,9 @@ func TestAPI_ResolveProvider(t *testing.T) {
 	t.Run("no model configured returns error", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		// No default model ID set
-		ms := newMockModelStore()
-
 		api := NewAPI(APIConfig{
-			ConfigStore: configStore,
-			ModelStore:  ms,
+			ConfigStore: newMockConfigStore(true),
+			ModelStore:  newMockModelStore(),
 			WorkingDir:  t.TempDir(),
 		})
 
@@ -809,29 +724,12 @@ func TestAPI_HandleNewConversation_PassesPricing(t *testing.T) {
 	t.Run("conversation manager receives pricing from model config", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		configStore.config.DefaultModelID = "priced-model"
-		ms := newMockModelStore()
-		ms.models["priced-model"] = &ModelConfig{
-			ID:              "priced-model",
-			Name:            "Priced Model",
-			Provider:        "openai",
-			Model:           "gpt-4.1",
-			APIKey:          "test-key",
-			InputCostPer1M:  3.0,
-			OutputCostPer1M: 15.0,
-		}
+		model := testModelConfig("priced-model")
+		model.InputCostPer1M = 3.0
+		model.OutputCostPer1M = 15.0
 
-		api := NewAPI(APIConfig{
-			ConfigStore: configStore,
-			ModelStore:  ms,
-			WorkingDir:  t.TempDir(),
-		})
-		api.providers.Set(LLMConfig{
-			Provider: "openai",
-			Model:    "gpt-4.1",
-			APIKey:   "test-key",
-		}, newStopProvider("hello"))
+		api, _ := testAPIWithModels(t, model)
+		api.providers.Set(model.ToLLMConfig(), newStopProvider("hello"))
 
 		r := chi.NewRouter()
 		api.RegisterRoutes(r, nil)
@@ -847,12 +745,10 @@ func TestAPI_HandleNewConversation_PassesPricing(t *testing.T) {
 		var resp NewConversationResponse
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 
-		// Look up the conversation manager and verify it has pricing
 		mgrVal, ok := api.conversations.Load(resp.ConversationID)
 		require.True(t, ok)
 		mgr := mgrVal.(*ConversationManager)
 
-		// Verify pricing is set by calculating a cost
 		usage := &llm.Usage{PromptTokens: 1_000_000, CompletionTokens: 0}
 		cost := mgr.calculateCost(usage)
 		assert.InDelta(t, 3.0, cost, 1e-9)
@@ -865,35 +761,18 @@ func TestAPI_HandleChat_UpdatesPricing(t *testing.T) {
 	t.Run("handleChat updates pricing from new model", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		configStore.config.DefaultModelID = "model-a"
-		ms := newMockModelStore()
-		ms.models["model-a"] = &ModelConfig{
-			ID:              "model-a",
-			Name:            "Model A",
-			Provider:        "openai",
-			Model:           "gpt-4.1",
-			APIKey:          "key-a",
-			InputCostPer1M:  3.0,
-			OutputCostPer1M: 15.0,
-		}
-		ms.models["model-b"] = &ModelConfig{
-			ID:              "model-b",
-			Name:            "Model B",
-			Provider:        "openai",
-			Model:           "gpt-5",
-			APIKey:          "key-b",
-			InputCostPer1M:  5.0,
-			OutputCostPer1M: 25.0,
-		}
+		modelA := testModelConfig("model-a")
+		modelA.InputCostPer1M = 3.0
+		modelA.OutputCostPer1M = 15.0
 
-		api := NewAPI(APIConfig{
-			ConfigStore: configStore,
-			ModelStore:  ms,
-			WorkingDir:  t.TempDir(),
-		})
-		api.providers.Set(LLMConfig{Provider: "openai", Model: "gpt-4.1", APIKey: "key-a"}, newStopProvider("a"))
-		api.providers.Set(LLMConfig{Provider: "openai", Model: "gpt-5", APIKey: "key-b"}, newStopProvider("b"))
+		modelB := testModelConfig("model-b")
+		modelB.Model = "gpt-5"
+		modelB.InputCostPer1M = 5.0
+		modelB.OutputCostPer1M = 25.0
+
+		api, _ := testAPIWithModels(t, modelA, modelB)
+		api.providers.Set(modelA.ToLLMConfig(), newStopProvider("a"))
+		api.providers.Set(modelB.ToLLMConfig(), newStopProvider("b"))
 
 		r := chi.NewRouter()
 		api.RegisterRoutes(r, nil)
@@ -918,7 +797,6 @@ func TestAPI_HandleChat_UpdatesPricing(t *testing.T) {
 		r.ServeHTTP(rec, req)
 		require.Equal(t, http.StatusAccepted, rec.Code)
 
-		// Verify pricing updated to model-b's pricing
 		mgrVal, ok := api.conversations.Load(convID)
 		require.True(t, ok)
 		mgr := mgrVal.(*ConversationManager)
@@ -934,69 +812,64 @@ func TestAPI_RequestBodySizeLimit(t *testing.T) {
 
 	oversizedBody := bytes.Repeat([]byte("x"), maxRequestBodySize+1)
 
-	t.Run("handleNewConversation rejects oversized body", func(t *testing.T) {
-		t.Parallel()
+	endpoints := []struct {
+		name        string
+		pathSuffix  string
+		needsConvID bool
+	}{
+		{"handleNewConversation", "/new", false},
+		{"handleChat", "/chat", true},
+		{"handleUserResponse", "/respond", true},
+	}
 
-		setup := newAPITestSetup(t, true, true, "")
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/conversations/new", bytes.NewReader(oversizedBody))
-		req.Header.Set("Content-Type", "application/json")
-		rec := httptest.NewRecorder()
-		setup.router.ServeHTTP(rec, req)
+	for _, ep := range endpoints {
+		t.Run(ep.name+" rejects oversized body", func(t *testing.T) {
+			t.Parallel()
 
-		assert.Equal(t, http.StatusBadRequest, rec.Code)
-	})
+			setup := newAPITestSetup(t, true, true, "")
+			path := "/api/v1/agent/conversations"
+			if ep.needsConvID {
+				convID := setup.createConversation(t, "hello")
+				path += "/" + convID
+			}
+			path += ep.pathSuffix
 
-	t.Run("handleChat rejects oversized body", func(t *testing.T) {
-		t.Parallel()
+			req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(oversizedBody))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			setup.router.ServeHTTP(rec, req)
 
-		setup := newAPITestSetup(t, true, true, "")
-		convID := setup.createConversation(t, "hello")
-
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/conversations/"+convID+"/chat", bytes.NewReader(oversizedBody))
-		req.Header.Set("Content-Type", "application/json")
-		rec := httptest.NewRecorder()
-		setup.router.ServeHTTP(rec, req)
-
-		assert.Equal(t, http.StatusBadRequest, rec.Code)
-	})
-
-	t.Run("handleUserResponse rejects oversized body", func(t *testing.T) {
-		t.Parallel()
-
-		setup := newAPITestSetup(t, true, true, "")
-		convID := setup.createConversation(t, "hello")
-
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/conversations/"+convID+"/respond", bytes.NewReader(oversizedBody))
-		req.Header.Set("Content-Type", "application/json")
-		rec := httptest.NewRecorder()
-		setup.router.ServeHTTP(rec, req)
-
-		assert.Equal(t, http.StatusBadRequest, rec.Code)
-	})
+			assert.Equal(t, http.StatusBadRequest, rec.Code)
+		})
+	}
 }
 
 func TestAPI_CleanupIdleConversations(t *testing.T) {
 	t.Parallel()
 
-	t.Run("removes idle non-working conversations", func(t *testing.T) {
-		t.Parallel()
-
-		api := NewAPI(APIConfig{
+	newTestAPI := func(t *testing.T) *API {
+		t.Helper()
+		return NewAPI(APIConfig{
 			ConfigStore: newMockConfigStore(true),
 			WorkingDir:  t.TempDir(),
 		})
+	}
 
-		// Create an idle conversation (old lastActivity)
-		idleMgr := NewConversationManager(ConversationManagerConfig{ID: "idle-conv"})
-		idleMgr.mu.Lock()
-		idleMgr.lastActivity = time.Now().Add(-1 * time.Hour)
-		idleMgr.mu.Unlock()
+	newIdleMgr := func(id string, working bool) *ConversationManager {
+		mgr := NewConversationManager(ConversationManagerConfig{ID: id})
+		mgr.mu.Lock()
+		mgr.lastActivity = time.Now().Add(-1 * time.Hour)
+		mgr.working = working
+		mgr.mu.Unlock()
+		return mgr
+	}
 
-		// Create an active conversation (recent lastActivity)
-		activeMgr := NewConversationManager(ConversationManagerConfig{ID: "active-conv"})
+	t.Run("removes idle non-working conversations", func(t *testing.T) {
+		t.Parallel()
 
-		api.conversations.Store("idle-conv", idleMgr)
-		api.conversations.Store("active-conv", activeMgr)
+		api := newTestAPI(t)
+		api.conversations.Store("idle-conv", newIdleMgr("idle-conv", false))
+		api.conversations.Store("active-conv", NewConversationManager(ConversationManagerConfig{ID: "active-conv"}))
 
 		api.cleanupIdleConversations()
 
@@ -1010,18 +883,8 @@ func TestAPI_CleanupIdleConversations(t *testing.T) {
 	t.Run("does not remove working conversations even if idle", func(t *testing.T) {
 		t.Parallel()
 
-		api := NewAPI(APIConfig{
-			ConfigStore: newMockConfigStore(true),
-			WorkingDir:  t.TempDir(),
-		})
-
-		workingMgr := NewConversationManager(ConversationManagerConfig{ID: "working-conv"})
-		workingMgr.mu.Lock()
-		workingMgr.lastActivity = time.Now().Add(-1 * time.Hour)
-		workingMgr.working = true
-		workingMgr.mu.Unlock()
-
-		api.conversations.Store("working-conv", workingMgr)
+		api := newTestAPI(t)
+		api.conversations.Store("working-conv", newIdleMgr("working-conv", true))
 
 		api.cleanupIdleConversations()
 
@@ -1032,12 +895,7 @@ func TestAPI_CleanupIdleConversations(t *testing.T) {
 	t.Run("does nothing with empty conversations", func(t *testing.T) {
 		t.Parallel()
 
-		api := NewAPI(APIConfig{
-			ConfigStore: newMockConfigStore(true),
-			WorkingDir:  t.TempDir(),
-		})
-
-		// Should not panic
+		api := newTestAPI(t)
 		api.cleanupIdleConversations()
 	})
 }
@@ -1050,7 +908,7 @@ func TestAPI_HandleUserResponse(t *testing.T) {
 
 		setup := newAPITestSetup(t, true, true, "")
 		rec := setup.postJSON("/api/v1/agent/conversations/non-existent/respond", UserPromptResponse{
-			PromptID: "some-prompt",
+			PromptID:         "some-prompt",
 			FreeTextResponse: "yes",
 		})
 
@@ -1064,7 +922,6 @@ func TestAPI_HandleUserResponse(t *testing.T) {
 		convID := setup.createConversation(t, "hello")
 
 		rec := setup.postJSON("/api/v1/agent/conversations/"+convID+"/respond", UserPromptResponse{
-			PromptID: "",
 			FreeTextResponse: "yes",
 		})
 

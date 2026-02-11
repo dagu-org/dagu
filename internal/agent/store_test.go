@@ -38,52 +38,58 @@ func TestGenerateSlugID(t *testing.T) {
 	}
 }
 
-func TestUniqueID_NoCollision(t *testing.T) {
+func TestUniqueID(t *testing.T) {
 	t.Parallel()
 
-	existing := map[string]struct{}{}
-	id := UniqueID("Claude Opus 4.6", existing)
-	assert.Equal(t, "claude-opus-4-6", id)
-}
-
-func TestUniqueID_Collision(t *testing.T) {
-	t.Parallel()
-
-	existing := map[string]struct{}{
-		"claude-opus-4-6": {},
+	tests := []struct {
+		name     string
+		input    string
+		existing map[string]struct{}
+		want     string
+	}{
+		{
+			name:     "no collision",
+			input:    "Claude Opus 4.6",
+			existing: map[string]struct{}{},
+			want:     "claude-opus-4-6",
+		},
+		{
+			name:     "single collision appends suffix",
+			input:    "Claude Opus 4.6",
+			existing: map[string]struct{}{"claude-opus-4-6": {}},
+			want:     "claude-opus-4-6-2",
+		},
+		{
+			name:  "multiple collisions increments suffix",
+			input: "Claude Opus 4.6",
+			existing: map[string]struct{}{
+				"claude-opus-4-6":   {},
+				"claude-opus-4-6-2": {},
+				"claude-opus-4-6-3": {},
+			},
+			want: "claude-opus-4-6-4",
+		},
+		{
+			name:     "empty name defaults to model",
+			input:    "",
+			existing: map[string]struct{}{},
+			want:     "model",
+		},
+		{
+			name:     "empty name with collision",
+			input:    "",
+			existing: map[string]struct{}{"model": {}},
+			want:     "model-2",
+		},
 	}
-	id := UniqueID("Claude Opus 4.6", existing)
-	assert.Equal(t, "claude-opus-4-6-2", id)
-}
 
-func TestUniqueID_MultipleCollisions(t *testing.T) {
-	t.Parallel()
-
-	existing := map[string]struct{}{
-		"claude-opus-4-6":   {},
-		"claude-opus-4-6-2": {},
-		"claude-opus-4-6-3": {},
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := UniqueID(tc.input, tc.existing)
+			assert.Equal(t, tc.want, got)
+		})
 	}
-	id := UniqueID("Claude Opus 4.6", existing)
-	assert.Equal(t, "claude-opus-4-6-4", id)
-}
-
-func TestUniqueID_EmptyNameUsesModel(t *testing.T) {
-	t.Parallel()
-
-	existing := map[string]struct{}{}
-	id := UniqueID("", existing)
-	assert.Equal(t, "model", id)
-}
-
-func TestUniqueID_EmptyNameCollision(t *testing.T) {
-	t.Parallel()
-
-	existing := map[string]struct{}{
-		"model": {},
-	}
-	id := UniqueID("", existing)
-	assert.Equal(t, "model-2", id)
 }
 
 func TestModelConfig_ToLLMConfig(t *testing.T) {
