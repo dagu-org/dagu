@@ -95,7 +95,6 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 
 		queue := getOrCreateQueue(queueMap, queueName, a.config)
 		queue.queuedCount = count
-		totalQueued += count
 	}
 
 	// Convert map to slice and calculate total capacity
@@ -106,7 +105,7 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 			Type:         api.QueueType(q.queueType),
 			Running:      q.running,
 			RunningCount: len(q.running),
-			QueuedCount:  q.queuedCount - len(q.running),
+			QueuedCount:  q.queuedCount,
 		}
 
 		// Include maxConcurrency for both global and DAG-based queues
@@ -115,6 +114,7 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 			totalCapacity += q.maxConcurrency
 		}
 
+		totalQueued += q.queuedCount
 		queues = append(queues, queue)
 	}
 
