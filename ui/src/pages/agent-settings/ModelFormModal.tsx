@@ -19,6 +19,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 import { getAuthHeaders } from '@/lib/authHeaders';
 
 type ModelConfig = components['schemas']['ModelConfigResponse'];
@@ -51,28 +52,48 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [description, setDescription] = useState('');
+  const [contextWindow, setContextWindow] = useState<number | ''>('');
+  const [maxOutputTokens, setMaxOutputTokens] = useState<number | ''>('');
+  const [inputCostPer1M, setInputCostPer1M] = useState<number | ''>('');
+  const [outputCostPer1M, setOutputCostPer1M] = useState<number | ''>('');
+  const [supportsThinking, setSupportsThinking] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Only populate fields when opening in edit mode.
+  // In create mode, preserve values so accidental close doesn't lose input.
   useEffect(() => {
-    if (open) {
-      if (model) {
-        setName(model.name);
-        setProvider(model.provider);
-        setModelId(model.model);
-        setBaseUrl(model.baseUrl ?? '');
-        setDescription(model.description ?? '');
-      } else {
-        setName('');
-        setProvider('anthropic');
-        setModelId('');
-        setBaseUrl('');
-        setDescription('');
-      }
+    if (open && model) {
+      setName(model.name);
+      setProvider(model.provider);
+      setModelId(model.model);
+      setBaseUrl(model.baseUrl ?? '');
+      setDescription(model.description ?? '');
+      setContextWindow(model.contextWindow ?? '');
+      setMaxOutputTokens(model.maxOutputTokens ?? '');
+      setInputCostPer1M(model.inputCostPer1M ?? '');
+      setOutputCostPer1M(model.outputCostPer1M ?? '');
+      setSupportsThinking(model.supportsThinking ?? false);
       setApiKey('');
+    }
+    if (open) {
       setError(null);
     }
   }, [open, model]);
+
+  function resetForm() {
+    setName('');
+    setProvider('anthropic');
+    setModelId('');
+    setApiKey('');
+    setBaseUrl('');
+    setDescription('');
+    setContextWindow('');
+    setMaxOutputTokens('');
+    setInputCostPer1M('');
+    setOutputCostPer1M('');
+    setSupportsThinking(false);
+  }
 
   const handlePresetSelect = (presetName: string) => {
     const preset = presets.find((p) => p.name === presetName);
@@ -81,6 +102,11 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
       setProvider(preset.provider);
       setModelId(preset.model);
       setDescription(preset.description ?? '');
+      setContextWindow(preset.contextWindow ?? '');
+      setMaxOutputTokens(preset.maxOutputTokens ?? '');
+      setInputCostPer1M(preset.inputCostPer1M ?? '');
+      setOutputCostPer1M(preset.outputCostPer1M ?? '');
+      setSupportsThinking(preset.supportsThinking ?? false);
     }
   };
 
@@ -92,12 +118,17 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
     try {
       const remoteNode = encodeURIComponent(appBarContext.selectedRemoteNode || 'local');
 
-      const body: Record<string, string | undefined> = {
+      const body: Record<string, unknown> = {
         name,
         provider,
         model: modelId,
         baseUrl: baseUrl || undefined,
         description: description || undefined,
+        contextWindow: contextWindow !== '' ? contextWindow : undefined,
+        maxOutputTokens: maxOutputTokens !== '' ? maxOutputTokens : undefined,
+        inputCostPer1M: inputCostPer1M !== '' ? inputCostPer1M : undefined,
+        outputCostPer1M: outputCostPer1M !== '' ? outputCostPer1M : undefined,
+        supportsThinking: supportsThinking || undefined,
       };
 
       if (apiKey) {
@@ -119,6 +150,7 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
         throw new Error(data.message || `Failed to ${isEditing ? 'update' : 'create'} model`);
       }
 
+      resetForm();
       onSuccess();
       onClose();
     } catch (err) {
@@ -130,7 +162,7 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Model' : 'Add Model'}</DialogTitle>
         </DialogHeader>
@@ -236,6 +268,71 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Description"
                 className="h-8"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="model-context-window" className="text-sm">Context Window (optional)</Label>
+                <Input
+                  id="model-context-window"
+                  type="number"
+                  min={0}
+                  value={contextWindow}
+                  onChange={(e) => setContextWindow(e.target.value ? Number(e.target.value) : '')}
+                  placeholder="e.g. 200000"
+                  className="h-8"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="model-max-output" className="text-sm">Max Output Tokens (optional)</Label>
+                <Input
+                  id="model-max-output"
+                  type="number"
+                  min={0}
+                  value={maxOutputTokens}
+                  onChange={(e) => setMaxOutputTokens(e.target.value ? Number(e.target.value) : '')}
+                  placeholder="e.g. 128000"
+                  className="h-8"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="model-input-cost" className="text-sm">Input Cost / 1M tokens (optional)</Label>
+                <Input
+                  id="model-input-cost"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={inputCostPer1M}
+                  onChange={(e) => setInputCostPer1M(e.target.value ? Number(e.target.value) : '')}
+                  placeholder="e.g. 3.00"
+                  className="h-8"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="model-output-cost" className="text-sm">Output Cost / 1M tokens (optional)</Label>
+                <Input
+                  id="model-output-cost"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={outputCostPer1M}
+                  onChange={(e) => setOutputCostPer1M(e.target.value ? Number(e.target.value) : '')}
+                  placeholder="e.g. 15.00"
+                  className="h-8"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label htmlFor="model-thinking" className="text-sm">Supports Thinking (optional)</Label>
+              <Switch
+                id="model-thinking"
+                checked={supportsThinking}
+                onCheckedChange={setSupportsThinking}
               />
             </div>
           </div>
