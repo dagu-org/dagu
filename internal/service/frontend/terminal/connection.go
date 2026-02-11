@@ -16,8 +16,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// Session represents an interactive terminal session.
-type Session struct {
+// Connection represents an interactive terminal connection.
+type Connection struct {
 	ID         string
 	User       *auth.User
 	IPAddress  string
@@ -34,9 +34,9 @@ type Session struct {
 	inEscSeq    bool   // true when processing an ANSI escape sequence
 }
 
-// NewSession creates a new terminal session.
-func NewSession(user *auth.User, shell string, conn *websocket.Conn, ipAddress string) *Session {
-	return &Session{
+// NewConnection creates a new terminal connection.
+func NewConnection(user *auth.User, shell string, conn *websocket.Conn, ipAddress string) *Connection {
+	return &Connection{
 		ID:         uuid.New().String(),
 		User:       user,
 		IPAddress:  ipAddress,
@@ -47,29 +47,29 @@ func NewSession(user *auth.User, shell string, conn *websocket.Conn, ipAddress s
 	}
 }
 
-// Run starts the terminal session and handles communication between
+// Run starts the terminal connection and handles communication between
 // the WebSocket and the PTY.
-func (s *Session) Run(ctx context.Context, auditSvc *audit.Service) error {
-	// Log session start
+func (c *Connection) Run(ctx context.Context, auditSvc *audit.Service) error {
+	// Log connection start
 	if auditSvc != nil {
-		_ = auditSvc.LogTerminalSessionStart(ctx, s.User.ID, s.User.Username, s.ID, s.IPAddress)
+		_ = auditSvc.LogTerminalConnectionStart(ctx, c.User.ID, c.User.Username, c.ID, c.IPAddress)
 	}
 
 	// Start PTY with shell
-	cmd := exec.Command(s.Shell) //nolint:gosec // shell path is from config, not user input
+	cmd := exec.Command(c.Shell) //nolint:gosec // shell path is from config, not user input
 	cmd.Env = os.Environ()
 
 	ptmx, err := pty.Start(cmd)
 	if err != nil {
-		s.sendError("Failed to start shell: " + err.Error())
+		c.sendError("Failed to start shell: " + err.Error())
 		if auditSvc != nil {
-			_ = auditSvc.LogTerminalSessionEnd(ctx, s.User.ID, s.User.Username, s.ID, "pty_error", s.IPAddress)
+			_ = auditSvc.LogTerminalConnectionEnd(ctx, c.User.ID, c.User.Username, c.ID, "pty_error", c.IPAddress)
 		}
 		return err
 	}
 
-	s.ptmx = ptmx
-	s.cmd = cmd
+	c.ptmx = ptmx
+	c.cmd = cmd
 
 	// Set initial size
 	_ = pty.Setsize(ptmx, &pty.Winsize{Rows: 24, Cols: 80})
@@ -84,11 +84,11 @@ func (s *Session) Run(ctx context.Context, auditSvc *audit.Service) error {
 	// Read from PTY and write to WebSocket
 	go func() {
 		defer wg.Done()
-		s.readFromPTY(ctx, done)
+		c.readFromPTY(ctx, done)
 	}()
 
 	// Read from WebSocket and write to PTY
-	s.readFromWebSocket(ctx, auditSvc)
+	c.readFromWebSocket(ctx, auditSvc)
 
 	// Set read deadline to unblock PTY read, then signal done
 	_ = ptmx.SetReadDeadline(time.Now())
@@ -100,16 +100,16 @@ func (s *Session) Run(ctx context.Context, auditSvc *audit.Service) error {
 	// Wait for command to finish
 	_ = cmd.Wait()
 
-	// Log session end
+	// Log connection end
 	if auditSvc != nil {
-		_ = auditSvc.LogTerminalSessionEnd(ctx, s.User.ID, s.User.Username, s.ID, "closed", s.IPAddress)
+		_ = auditSvc.LogTerminalConnectionEnd(ctx, c.User.ID, c.User.Username, c.ID, "closed", c.IPAddress)
 	}
 
 	return nil
 }
 
 // readFromPTY reads output from the PTY and sends it to the WebSocket.
-func (s *Session) readFromPTY(ctx context.Context, done chan struct{}) {
+func (c *Connection) readFromPTY(ctx context.Context, done chan struct{}) {
 	buf := make([]byte, 4096)
 	for {
 		select {
@@ -120,26 +120,26 @@ func (s *Session) readFromPTY(ctx context.Context, done chan struct{}) {
 		default:
 		}
 
-		n, err := s.ptmx.Read(buf)
+		n, err := c.ptmx.Read(buf)
 		if err != nil {
 			if err != io.EOF {
-				s.sendError("Shell closed: " + err.Error())
+				c.sendError("Shell closed: " + err.Error())
 			}
 			return
 		}
 
 		if n > 0 {
 			msg := NewOutputMessage(buf[:n])
-			s.sendMessage(ctx, msg)
-			s.updateLastActive()
+			c.sendMessage(ctx, msg)
+			c.updateLastActive()
 		}
 	}
 }
 
 // readFromWebSocket reads input from the WebSocket and writes to the PTY.
-func (s *Session) readFromWebSocket(ctx context.Context, auditSvc *audit.Service) {
+func (c *Connection) readFromWebSocket(ctx context.Context, auditSvc *audit.Service) {
 	for {
-		_, data, err := s.Conn.Read(ctx)
+		_, data, err := c.Conn.Read(ctx)
 		if err != nil {
 			return
 		}
@@ -149,7 +149,7 @@ func (s *Session) readFromWebSocket(ctx context.Context, auditSvc *audit.Service
 			continue
 		}
 
-		s.updateLastActive()
+		c.updateLastActive()
 
 		switch msg.Type {
 		case MessageTypeInput:
@@ -159,24 +159,24 @@ func (s *Session) readFromWebSocket(ctx context.Context, auditSvc *audit.Service
 			}
 			if len(input) > 0 {
 				// Write input to PTY
-				_, _ = s.ptmx.Write(input)
+				_, _ = c.ptmx.Write(input)
 
 				// Accumulate input for command logging
 				if auditSvc != nil {
-					s.accumulateAndLogCommand(ctx, auditSvc, input)
+					c.accumulateAndLogCommand(ctx, auditSvc, input)
 				}
 			}
 
 		case MessageTypeResize:
 			if msg.Cols > 0 && msg.Cols <= 500 && msg.Rows > 0 && msg.Rows <= 500 {
-				_ = pty.Setsize(s.ptmx, &pty.Winsize{
+				_ = pty.Setsize(c.ptmx, &pty.Winsize{
 					Rows: uint16(msg.Rows), //nolint:gosec // bounds checked above
 					Cols: uint16(msg.Cols), //nolint:gosec // bounds checked above
 				})
 			}
 
 		case MessageTypeClose:
-			s.Close()
+			c.Close()
 			return
 
 		case MessageTypeOutput, MessageTypeError:
@@ -186,11 +186,11 @@ func (s *Session) readFromWebSocket(ctx context.Context, auditSvc *audit.Service
 }
 
 // sendMessage sends a message to the WebSocket.
-func (s *Session) sendMessage(ctx context.Context, msg *Message) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (c *Connection) sendMessage(ctx context.Context, msg *Message) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	if s.closed {
+	if c.closed {
 		return
 	}
 
@@ -199,79 +199,79 @@ func (s *Session) sendMessage(ctx context.Context, msg *Message) {
 		return
 	}
 
-	_ = s.Conn.Write(ctx, websocket.MessageText, data)
+	_ = c.Conn.Write(ctx, websocket.MessageText, data)
 }
 
 // sendError sends an error message to the WebSocket.
-func (s *Session) sendError(errMsg string) {
+func (c *Connection) sendError(errMsg string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	s.sendMessage(ctx, NewErrorMessage(errMsg))
+	c.sendMessage(ctx, NewErrorMessage(errMsg))
 }
 
 // updateLastActive updates the last active timestamp.
-func (s *Session) updateLastActive() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.LastActive = time.Now()
+func (c *Connection) updateLastActive() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.LastActive = time.Now()
 }
 
-// Close closes the terminal session.
-func (s *Session) Close() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+// Close closes the terminal connection.
+func (c *Connection) Close() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	if s.closed {
+	if c.closed {
 		return
 	}
-	s.closed = true
+	c.closed = true
 
-	if s.ptmx != nil {
-		_ = s.ptmx.Close()
+	if c.ptmx != nil {
+		_ = c.ptmx.Close()
 	}
-	if s.cmd != nil && s.cmd.Process != nil {
-		_ = s.cmd.Process.Kill()
+	if c.cmd != nil && c.cmd.Process != nil {
+		_ = c.cmd.Process.Kill()
 	}
-	_ = s.Conn.Close(websocket.StatusNormalClosure, "session closed")
+	_ = c.Conn.Close(websocket.StatusNormalClosure, "connection closed")
 }
 
 // accumulateAndLogCommand accumulates input and logs complete commands when Enter is pressed.
-func (s *Session) accumulateAndLogCommand(ctx context.Context, auditSvc *audit.Service, input []byte) {
+func (c *Connection) accumulateAndLogCommand(ctx context.Context, auditSvc *audit.Service, input []byte) {
 	for _, b := range input {
 		// Handle ANSI escape sequences (e.g., arrow keys send ESC[A, ESC[B, etc.)
-		if s.inEscSeq {
+		if c.inEscSeq {
 			// Escape sequences end with a letter (A-Z, a-z)
 			if (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') {
-				s.inEscSeq = false
+				c.inEscSeq = false
 			}
 			continue
 		}
 
 		switch b {
 		case 27: // ESC - start of escape sequence
-			s.inEscSeq = true
+			c.inEscSeq = true
 		case '\r', '\n':
 			// Enter pressed - log the accumulated command
-			if len(s.inputBuffer) > 0 {
-				command := string(s.inputBuffer)
-				_ = auditSvc.LogTerminalCommand(ctx, s.User.ID, s.User.Username, s.ID, command, s.IPAddress)
-				s.inputBuffer = nil
+			if len(c.inputBuffer) > 0 {
+				command := string(c.inputBuffer)
+				_ = auditSvc.LogTerminalCommand(ctx, c.User.ID, c.User.Username, c.ID, command, c.IPAddress)
+				c.inputBuffer = nil
 			}
 		case 127, '\b':
 			// Backspace - remove last character from buffer
-			if len(s.inputBuffer) > 0 {
-				s.inputBuffer = s.inputBuffer[:len(s.inputBuffer)-1]
+			if len(c.inputBuffer) > 0 {
+				c.inputBuffer = c.inputBuffer[:len(c.inputBuffer)-1]
 			}
 		case 3:
 			// Ctrl+C - clear the buffer
-			s.inputBuffer = nil
+			c.inputBuffer = nil
 		case 21:
 			// Ctrl+U - clear the line
-			s.inputBuffer = nil
+			c.inputBuffer = nil
 		default:
 			// Regular character - add to buffer
 			if b >= 32 && b < 127 {
-				s.inputBuffer = append(s.inputBuffer, b)
+				c.inputBuffer = append(c.inputBuffer, b)
 			}
 		}
 	}

@@ -33,20 +33,20 @@ func (s *Service) Query(ctx context.Context, filter QueryFilter) (*QueryResult, 
 	return s.store.Query(ctx, filter)
 }
 
-// LogTerminalSessionStart logs the start of a terminal session.
-func (s *Service) LogTerminalSessionStart(ctx context.Context, userID, username, sessionID, ipAddress string) error {
-	details, _ := json.Marshal(map[string]string{"session_id": sessionID})
-	entry := NewEntry(CategoryTerminal, "session_start", userID, username).
+// LogTerminalConnectionStart logs the start of a terminal connection.
+func (s *Service) LogTerminalConnectionStart(ctx context.Context, userID, username, connectionID, ipAddress string) error {
+	details, _ := json.Marshal(map[string]string{"connection_id": connectionID})
+	entry := NewEntry(CategoryTerminal, "connection_start", userID, username).
 		WithDetails(string(details)).
 		WithIPAddress(ipAddress)
 	return s.Log(ctx, entry)
 }
 
-// LogTerminalCommand logs a command executed in a terminal session.
-func (s *Service) LogTerminalCommand(ctx context.Context, userID, username, sessionID, command, ipAddress string) error {
+// LogTerminalCommand logs a command executed in a terminal connection.
+func (s *Service) LogTerminalCommand(ctx context.Context, userID, username, connectionID, command, ipAddress string) error {
 	details, _ := json.Marshal(map[string]string{
-		"session_id": sessionID,
-		"command":    command,
+		"connection_id": connectionID,
+		"command":       command,
 	})
 	entry := NewEntry(CategoryTerminal, "command", userID, username).
 		WithDetails(string(details)).
@@ -54,13 +54,13 @@ func (s *Service) LogTerminalCommand(ctx context.Context, userID, username, sess
 	return s.Log(ctx, entry)
 }
 
-// LogTerminalSessionEnd logs the end of a terminal session.
-func (s *Service) LogTerminalSessionEnd(ctx context.Context, userID, username, sessionID, reason, ipAddress string) error {
+// LogTerminalConnectionEnd logs the end of a terminal connection.
+func (s *Service) LogTerminalConnectionEnd(ctx context.Context, userID, username, connectionID, reason, ipAddress string) error {
 	details, _ := json.Marshal(map[string]string{
-		"session_id": sessionID,
-		"reason":     reason,
+		"connection_id": connectionID,
+		"reason":        reason,
 	})
-	entry := NewEntry(CategoryTerminal, "session_end", userID, username).
+	entry := NewEntry(CategoryTerminal, "connection_end", userID, username).
 		WithDetails(string(details)).
 		WithIPAddress(ipAddress)
 	return s.Log(ctx, entry)

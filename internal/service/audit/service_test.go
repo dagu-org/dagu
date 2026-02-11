@@ -49,24 +49,24 @@ func TestService_Query(t *testing.T) {
 	assert.Equal(t, 2, result.Total)
 }
 
-func TestService_LogTerminalSessionStart(t *testing.T) {
+func TestService_LogTerminalConnectionStart(t *testing.T) {
 	store := &mockStore{}
 	svc := New(store)
 
-	err := svc.LogTerminalSessionStart(context.Background(), "user-123", "testuser", "session-456", "192.168.1.1")
+	err := svc.LogTerminalConnectionStart(context.Background(), "user-123", "testuser", "connection-456", "192.168.1.1")
 
 	require.NoError(t, err)
 	require.Len(t, store.entries, 1)
 	assert.Equal(t, CategoryTerminal, store.entries[0].Category)
-	assert.Equal(t, "session_start", store.entries[0].Action)
-	assert.Contains(t, store.entries[0].Details, "session-456")
+	assert.Equal(t, "connection_start", store.entries[0].Action)
+	assert.Contains(t, store.entries[0].Details, "connection-456")
 }
 
 func TestService_LogTerminalCommand(t *testing.T) {
 	store := &mockStore{}
 	svc := New(store)
 
-	err := svc.LogTerminalCommand(context.Background(), "user-123", "testuser", "session-456", "ls -la", "192.168.1.1")
+	err := svc.LogTerminalCommand(context.Background(), "user-123", "testuser", "connection-456", "ls -la", "192.168.1.1")
 
 	require.NoError(t, err)
 	require.Len(t, store.entries, 1)
@@ -74,15 +74,15 @@ func TestService_LogTerminalCommand(t *testing.T) {
 	assert.Contains(t, store.entries[0].Details, "ls -la")
 }
 
-func TestService_LogTerminalSessionEnd(t *testing.T) {
+func TestService_LogTerminalConnectionEnd(t *testing.T) {
 	store := &mockStore{}
 	svc := New(store)
 
-	err := svc.LogTerminalSessionEnd(context.Background(), "user-123", "testuser", "session-456", "closed", "192.168.1.1")
+	err := svc.LogTerminalConnectionEnd(context.Background(), "user-123", "testuser", "connection-456", "closed", "192.168.1.1")
 
 	require.NoError(t, err)
 	require.Len(t, store.entries, 1)
-	assert.Equal(t, "session_end", store.entries[0].Action)
+	assert.Equal(t, "connection_end", store.entries[0].Action)
 	assert.Contains(t, store.entries[0].Details, "closed")
 }
 
@@ -104,7 +104,7 @@ func TestService_LogTerminalCommand_SpecialCharacters(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			store.entries = nil
-			err := svc.LogTerminalCommand(context.Background(), "user-123", "testuser", "session-456", tc.command, "192.168.1.1")
+			err := svc.LogTerminalCommand(context.Background(), "user-123", "testuser", "connection-456", tc.command, "192.168.1.1")
 			require.NoError(t, err)
 			require.Len(t, store.entries, 1)
 			assert.Contains(t, store.entries[0].Details, "command")

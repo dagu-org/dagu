@@ -354,8 +354,8 @@ export default function AuditLogsPage() {
   const formatDetails = (entry: AuditEntry): string => {
     const details = parseDetails(entry.details);
     if (entry.category === 'terminal') {
-      if (entry.action === 'session_start' || entry.action === 'session_end') {
-        return `Session: ${details.session_id || 'N/A'}${details.reason ? ` (${details.reason})` : ''}`;
+      if (entry.action === 'connection_start' || entry.action === 'connection_end') {
+        return `Connection: ${details.connection_id || 'N/A'}${details.reason ? ` (${details.reason})` : ''}`;
       }
       if (entry.action === 'command') {
         return `Command: ${details.command || 'N/A'}`;
