@@ -336,6 +336,243 @@ func TestConversationManager_GetModel(t *testing.T) {
 	})
 }
 
+func TestConversationManager_CostTracking(t *testing.T) {
+	t.Parallel()
+
+	t.Run("calculateCost with usage", func(t *testing.T) {
+		t.Parallel()
+
+		cm := NewConversationManager(ConversationManagerConfig{
+			InputCostPer1M:  3.0,
+			OutputCostPer1M: 15.0,
+		})
+
+		usage := &llm.Usage{PromptTokens: 1000, CompletionTokens: 500}
+		cost := cm.calculateCost(usage)
+
+		// (1000 * 3 / 1_000_000) + (500 * 15 / 1_000_000) = 0.003 + 0.0075 = 0.0105
+		assert.InDelta(t, 0.0105, cost, 1e-9)
+	})
+
+	t.Run("calculateCost with nil usage", func(t *testing.T) {
+		t.Parallel()
+
+		cm := NewConversationManager(ConversationManagerConfig{
+			InputCostPer1M:  3.0,
+			OutputCostPer1M: 15.0,
+		})
+
+		cost := cm.calculateCost(nil)
+		assert.Equal(t, 0.0, cost)
+	})
+
+	t.Run("addCost accumulates", func(t *testing.T) {
+		t.Parallel()
+
+		cm := NewConversationManager(ConversationManagerConfig{})
+
+		cm.addCost(0.01)
+		cm.addCost(0.01)
+		assert.InDelta(t, 0.02, cm.GetTotalCost(), 1e-9)
+	})
+
+	t.Run("GetTotalCost starts at zero", func(t *testing.T) {
+		t.Parallel()
+
+		cm := NewConversationManager(ConversationManagerConfig{})
+		assert.Equal(t, 0.0, cm.GetTotalCost())
+	})
+
+	t.Run("calculateCost with zero pricing", func(t *testing.T) {
+		t.Parallel()
+
+		cm := NewConversationManager(ConversationManagerConfig{})
+
+		usage := &llm.Usage{PromptTokens: 1000, CompletionTokens: 500}
+		cost := cm.calculateCost(usage)
+		assert.Equal(t, 0.0, cost)
+	})
+}
+
+func TestConversationManager_UpdatePricing(t *testing.T) {
+	t.Parallel()
+
+	t.Run("updates pricing for subsequent cost calculations", func(t *testing.T) {
+		t.Parallel()
+
+		cm := NewConversationManager(ConversationManagerConfig{})
+
+		// Initially zero pricing
+		usage := &llm.Usage{PromptTokens: 1000, CompletionTokens: 500}
+		cost := cm.calculateCost(usage)
+		assert.Equal(t, 0.0, cost)
+
+		// Update pricing
+		cm.UpdatePricing(5.0, 25.0)
+
+		cost = cm.calculateCost(usage)
+		// (1000 * 5 / 1_000_000) + (500 * 25 / 1_000_000) = 0.005 + 0.0125 = 0.0175
+		assert.InDelta(t, 0.0175, cost, 1e-9)
+	})
+}
+
+func TestConversationManager_LastActivity(t *testing.T) {
+	t.Parallel()
+
+	t.Run("initial LastActivity is recent", func(t *testing.T) {
+		t.Parallel()
+
+		before := time.Now()
+		cm := NewConversationManager(ConversationManagerConfig{})
+		after := time.Now()
+
+		la := cm.LastActivity()
+		assert.False(t, la.Before(before), "LastActivity should not be before creation")
+		assert.False(t, la.After(after), "LastActivity should not be after creation")
+	})
+
+	t.Run("LastActivity updated on AcceptUserMessage", func(t *testing.T) {
+		t.Parallel()
+
+		cm := NewConversationManager(ConversationManagerConfig{})
+		initialActivity := cm.LastActivity()
+
+		time.Sleep(10 * time.Millisecond)
+
+		provider := newStopProvider("hi")
+		_ = cm.AcceptUserMessage(context.Background(), provider, "model", "model", "hello")
+		defer func() { _ = cm.Cancel(context.Background()) }()
+
+		updatedActivity := cm.LastActivity()
+		assert.True(t, updatedActivity.After(initialActivity), "LastActivity should be updated after AcceptUserMessage")
+	})
+}
+
+func TestConversationManager_CostInRecordMessage(t *testing.T) {
+	t.Parallel()
+
+	t.Run("assistant message with usage gets cost calculated", func(t *testing.T) {
+		t.Parallel()
+
+		var recordedMessages []Message
+		var mu sync.Mutex
+
+		cm := NewConversationManager(ConversationManagerConfig{
+			InputCostPer1M:  3.0,
+			OutputCostPer1M: 15.0,
+			OnMessage: func(_ context.Context, msg Message) error {
+				mu.Lock()
+				recordedMessages = append(recordedMessages, msg)
+				mu.Unlock()
+				return nil
+			},
+		})
+
+		recordFunc := cm.createRecordMessageFunc()
+
+		usage := &llm.Usage{PromptTokens: 1000, CompletionTokens: 500}
+		msg := Message{
+			Type:  MessageTypeAssistant,
+			Usage: usage,
+		}
+
+		err := recordFunc(context.Background(), msg)
+		require.NoError(t, err)
+
+		// Verify cost is accumulated
+		assert.InDelta(t, 0.0105, cm.GetTotalCost(), 1e-9)
+
+		// Verify recorded message has Cost field set
+		mu.Lock()
+		require.Len(t, recordedMessages, 1)
+		require.NotNil(t, recordedMessages[0].Cost)
+		assert.InDelta(t, 0.0105, *recordedMessages[0].Cost, 1e-9)
+		mu.Unlock()
+	})
+
+	t.Run("user message does not get cost calculated", func(t *testing.T) {
+		t.Parallel()
+
+		cm := NewConversationManager(ConversationManagerConfig{
+			InputCostPer1M:  3.0,
+			OutputCostPer1M: 15.0,
+		})
+
+		recordFunc := cm.createRecordMessageFunc()
+
+		msg := Message{
+			Type:    MessageTypeUser,
+			Content: "hello",
+		}
+
+		err := recordFunc(context.Background(), msg)
+		require.NoError(t, err)
+
+		assert.Equal(t, 0.0, cm.GetTotalCost())
+	})
+
+	t.Run("multiple assistant messages accumulate cost", func(t *testing.T) {
+		t.Parallel()
+
+		cm := NewConversationManager(ConversationManagerConfig{
+			InputCostPer1M:  3.0,
+			OutputCostPer1M: 15.0,
+		})
+
+		recordFunc := cm.createRecordMessageFunc()
+
+		for i := 0; i < 3; i++ {
+			msg := Message{
+				Type:  MessageTypeAssistant,
+				Usage: &llm.Usage{PromptTokens: 1000, CompletionTokens: 500},
+			}
+			_ = recordFunc(context.Background(), msg)
+		}
+
+		assert.InDelta(t, 0.0105*3, cm.GetTotalCost(), 1e-9)
+	})
+}
+
+func TestConversationManager_SetWorkingBroadcastsCost(t *testing.T) {
+	t.Parallel()
+
+	t.Run("broadcast includes TotalCost", func(t *testing.T) {
+		t.Parallel()
+
+		cm := NewConversationManager(ConversationManagerConfig{ID: "test"})
+
+		// Add some cost
+		cm.addCost(0.05)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		next := cm.Subscribe(ctx)
+
+		go func() {
+			time.Sleep(20 * time.Millisecond)
+			cm.SetWorking(true)
+		}()
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			resp, ok := next()
+			if ok && resp.ConversationState != nil {
+				assert.True(t, resp.ConversationState.Working)
+				assert.InDelta(t, 0.05, resp.ConversationState.TotalCost, 1e-9)
+			}
+		}()
+
+		select {
+		case <-done:
+			// Success
+		case <-time.After(500 * time.Millisecond):
+			t.Fatal("timeout waiting for broadcast")
+		}
+	})
+}
+
 func TestConversationManager_SetSafeMode(t *testing.T) {
 	t.Parallel()
 

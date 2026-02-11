@@ -296,6 +296,37 @@ func TestStore_Load_ReadPermissionError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to read config file")
 }
 
+func TestStore_Save_InvalidatesCache(t *testing.T) {
+	cache := fileutil.NewCache[*agent.Config]("test", 10, time.Hour)
+	store, _ := setupTestStore(t, WithConfigCache(cache))
+	ctx := context.Background()
+
+	// Save initial config
+	initialCfg := &agent.Config{
+		Enabled:        true,
+		DefaultModelID: "model-1",
+	}
+	require.NoError(t, store.Save(ctx, initialCfg))
+
+	// Load to populate cache
+	loaded, err := store.Load(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "model-1", loaded.DefaultModelID)
+
+	// Save updated config (should invalidate cache)
+	updatedCfg := &agent.Config{
+		Enabled:        false,
+		DefaultModelID: "model-2",
+	}
+	require.NoError(t, store.Save(ctx, updatedCfg))
+
+	// Load again - should return updated values, not stale cache
+	reloaded, err := store.Load(ctx)
+	require.NoError(t, err)
+	assert.False(t, reloaded.Enabled, "should return updated Enabled value")
+	assert.Equal(t, "model-2", reloaded.DefaultModelID, "should return updated DefaultModelID")
+}
+
 func TestStore_Save_RenameError(t *testing.T) {
 	store, dataDir := setupTestStore(t)
 	configPath := filepath.Join(dataDir, agentDirName, configFileName)
