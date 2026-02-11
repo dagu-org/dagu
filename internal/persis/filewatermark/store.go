@@ -107,7 +107,7 @@ func (s *Store) statePath() string {
 
 // writeFileSync writes data to a file and calls fsync before closing.
 func writeFileSync(name string, data []byte, perm os.FileMode) error {
-	f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	f, err := os.OpenFile(filepath.Clean(name), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm) //nolint:gosec // name is constructed internally from baseDir + ".tmp"
 	if err != nil {
 		return err
 	}

@@ -22,7 +22,7 @@ import (
 type DAGChangeType int
 
 const (
-	DAGChangeAdded   DAGChangeType = iota
+	DAGChangeAdded DAGChangeType = iota
 	DAGChangeUpdated
 	DAGChangeDeleted
 )
@@ -155,12 +155,12 @@ func NewTickPlanner(cfg TickPlannerConfig) *TickPlanner {
 	}
 	if cfg.GenRunID == nil {
 		cfg.GenRunID = func(context.Context) (string, error) {
-			return "", fmt.Errorf("GenRunID not configured")
+			return "", fmt.Errorf("genRunID not configured")
 		}
 	}
 	if cfg.Dispatch == nil {
 		cfg.Dispatch = func(context.Context, *core.DAG, string, core.TriggerType) error {
-			return fmt.Errorf("Dispatch not configured")
+			return fmt.Errorf("dispatch not configured")
 		}
 	}
 	return &TickPlanner{

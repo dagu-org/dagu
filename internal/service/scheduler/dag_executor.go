@@ -206,12 +206,14 @@ func (e *DAGExecutor) Restart(ctx context.Context, dag *core.DAG) error {
 	return runtime.Start(ctx, spec)
 }
 
-// Close closes any resources held by the DAGExecutor, including the coordinator client
+// Close closes any resources held by the DAGExecutor, including the coordinator client.
+// Note: we intentionally do NOT nil out coordinatorCli here because Close is called
+// from a goroutine in Stop while concurrent dispatchRun goroutines may still read
+// coordinatorCli via shouldUseDistributedExecution.
 func (e *DAGExecutor) Close(ctx context.Context) {
 	if e.coordinatorCli != nil {
 		if err := e.coordinatorCli.Cleanup(ctx); err != nil {
 			logger.Error(ctx, "Failed to cleanup coordinator client", tag.Error(err))
 		}
-		e.coordinatorCli = nil
 	}
 }
