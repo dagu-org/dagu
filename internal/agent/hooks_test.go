@@ -27,12 +27,12 @@ func TestHooks_AfterToolExec(t *testing.T) {
 	})
 
 	info := ToolExecInfo{
-		ToolName:       "bash",
-		Input:          json.RawMessage(`{"command":"ls"}`),
+		ToolName:  "bash",
+		Input:     json.RawMessage(`{"command":"ls"}`),
 		SessionID: "conv-1",
-		UserID:         "user-1",
-		Username:       "alice",
-		IPAddress:      "10.0.0.1",
+		UserID:    "user-1",
+		Username:  "alice",
+		IPAddress: "10.0.0.1",
 	}
 	result := ToolOut{Content: "file.txt", IsError: false}
 

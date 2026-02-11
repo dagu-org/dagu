@@ -19,12 +19,12 @@ func TestNewAgentAuditHook(t *testing.T) {
 	hook := newAgentAuditHook(svc)
 
 	info := agent.ToolExecInfo{
-		ToolName:       "bash",
-		Input:          json.RawMessage(`{"command":"echo hello"}`),
+		ToolName:  "bash",
+		Input:     json.RawMessage(`{"command":"echo hello"}`),
 		SessionID: "conv-123",
-		UserID:         "user-1",
-		Username:       "alice",
-		IPAddress:      "192.168.1.1",
+		UserID:    "user-1",
+		Username:  "alice",
+		IPAddress: "192.168.1.1",
 		Audit: &agent.AuditInfo{
 			Action:          "bash_exec",
 			DetailExtractor: agent.ExtractFields("command"),
@@ -58,11 +58,11 @@ func TestNewAgentAuditHook_FailedAction(t *testing.T) {
 	hook := newAgentAuditHook(svc)
 
 	info := agent.ToolExecInfo{
-		ToolName:       "bash",
-		Input:          json.RawMessage(`{"command":"exit 1"}`),
+		ToolName:  "bash",
+		Input:     json.RawMessage(`{"command":"exit 1"}`),
 		SessionID: "conv-456",
-		UserID:         "user-2",
-		Username:       "bob",
+		UserID:    "user-2",
+		Username:  "bob",
 		Audit: &agent.AuditInfo{
 			Action:          "bash_exec",
 			DetailExtractor: agent.ExtractFields("command"),
@@ -104,11 +104,11 @@ func TestNewAgentAuditHook_NilDetailExtractor(t *testing.T) {
 	hook := newAgentAuditHook(svc)
 
 	info := agent.ToolExecInfo{
-		ToolName:       "custom_tool",
-		Input:          json.RawMessage(`{"key":"value"}`),
+		ToolName:  "custom_tool",
+		Input:     json.RawMessage(`{"key":"value"}`),
 		SessionID: "conv-789",
-		UserID:         "user-3",
-		Username:       "charlie",
+		UserID:    "user-3",
+		Username:  "charlie",
 		Audit: &agent.AuditInfo{
 			Action:          "custom_action",
 			DetailExtractor: nil,

@@ -416,8 +416,8 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 		WorkingDir:   paths.DAGsDir,
 		Logger:       slog.Default(),
 		SessionStore: sessStore,
-		DAGStore:          dagStore,
-		Hooks:             hooks,
+		DAGStore:     dagStore,
+		Hooks:        hooks,
 		Environment: agent.EnvironmentInfo{
 			DAGsDir:        paths.DAGsDir,
 			LogDir:         paths.LogDir,

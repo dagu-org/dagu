@@ -150,7 +150,7 @@ func TestLoop_Go(t *testing.T) {
 		var recordedMessages []Message
 
 		loop := NewLoop(LoopConfig{
-			Provider:       newStopProvider("response"),
+			Provider:  newStopProvider("response"),
 			SessionID: "conv-1",
 			RecordMessage: func(_ context.Context, msg Message) error {
 				mu.Lock()
@@ -368,13 +368,13 @@ func TestLoop_ExecuteTool(t *testing.T) {
 		})
 
 		loop := NewLoop(LoopConfig{
-			Provider:       &mockLLMProvider{},
-			Tools:          CreateTools(""),
+			Provider:  &mockLLMProvider{},
+			Tools:     CreateTools(""),
 			SessionID: "conv-hook",
-			UserID:         "user-1",
-			Username:       "alice",
-			IPAddress:      "10.0.0.1",
-			Hooks:          hooks,
+			UserID:    "user-1",
+			Username:  "alice",
+			IPAddress: "10.0.0.1",
+			Hooks:     hooks,
 		})
 
 		result := loop.executeTool(context.Background(), llm.ToolCall{

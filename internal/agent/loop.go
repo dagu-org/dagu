@@ -284,13 +284,13 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 	}
 
 	info := ToolExecInfo{
-		ToolName:       tc.Function.Name,
-		Input:          input,
+		ToolName:  tc.Function.Name,
+		Input:     input,
 		SessionID: l.sessionID,
-		UserID:         l.userID,
-		Username:       l.username,
-		IPAddress:      l.ipAddress,
-		Audit:          tool.Audit,
+		UserID:    l.userID,
+		Username:  l.username,
+		IPAddress: l.ipAddress,
+		Audit:     tool.Audit,
 	}
 
 	if err := l.hooks.RunBeforeToolExec(ctx, info); err != nil {
@@ -403,9 +403,9 @@ func (l *Loop) recordToolResult(ctx context.Context, tc llm.ToolCall, result Too
 	}
 
 	msg := Message{
-		SessionID: l.sessionID,
-		Type:           MessageTypeUser, // Tool results are from user perspective
-		SequenceID:     seqID,
+		SessionID:  l.sessionID,
+		Type:       MessageTypeUser, // Tool results are from user perspective
+		SequenceID: seqID,
 		ToolResults: []ToolResult{{
 			ToolCallID: tc.ID,
 			Content:    result.Content,
@@ -434,11 +434,11 @@ func (l *Loop) recordErrorMessage(ctx context.Context, errMsg string) {
 	}
 
 	msg := Message{
-		SessionID: l.sessionID,
-		Type:           MessageTypeError,
-		SequenceID:     l.nextSequenceID(),
-		Content:        errMsg,
-		CreatedAt:      time.Now(),
+		SessionID:  l.sessionID,
+		Type:       MessageTypeError,
+		SequenceID: l.nextSequenceID(),
+		Content:    errMsg,
+		CreatedAt:  time.Now(),
 	}
 	if err := l.recordMessage(ctx, msg); err != nil {
 		l.logger.Error("failed to record error message", "error", err)
@@ -492,14 +492,14 @@ func (l *Loop) recordAssistantMessage(ctx context.Context, resp *llm.ChatRespons
 	}
 
 	msg := Message{
-		SessionID: l.sessionID,
-		Type:           MessageTypeAssistant,
-		SequenceID:     seqID,
-		Content:        resp.Content,
-		ToolCalls:      resp.ToolCalls,
-		Usage:          &resp.Usage,
-		CreatedAt:      time.Now(),
-		LLMData:        &assistantMessage,
+		SessionID:  l.sessionID,
+		Type:       MessageTypeAssistant,
+		SequenceID: seqID,
+		Content:    resp.Content,
+		ToolCalls:  resp.ToolCalls,
+		Usage:      &resp.Usage,
+		CreatedAt:  time.Now(),
+		LLMData:    &assistantMessage,
 	}
 	if err := l.recordMessage(ctx, msg); err != nil {
 		l.logger.Error("failed to record assistant message", "error", err)

@@ -178,9 +178,9 @@ func TestLoad_Env(t *testing.T) {
 			ProcDir:            filepath.Join(testPaths, "proc"),
 			QueueDir:           filepath.Join(testPaths, "queue"),
 			ServiceRegistryDir: filepath.Join(testPaths, "service-registry"),
-			UsersDir:           filepath.Join(testPaths, "data", "users"),                  // Derived from DataDir
-			APIKeysDir:         filepath.Join(testPaths, "data", "apikeys"),                // Derived from DataDir
-			WebhooksDir:        filepath.Join(testPaths, "data", "webhooks"),               // Derived from DataDir
+			UsersDir:           filepath.Join(testPaths, "data", "users"),             // Derived from DataDir
+			APIKeysDir:         filepath.Join(testPaths, "data", "apikeys"),           // Derived from DataDir
+			WebhooksDir:        filepath.Join(testPaths, "data", "webhooks"),          // Derived from DataDir
 			SessionsDir:        filepath.Join(testPaths, "data", "agent", "sessions"), // Derived from DataDir
 		},
 		UI: UI{
