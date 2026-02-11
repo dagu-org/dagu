@@ -1222,7 +1222,10 @@
           }
         },
         {
-          "if": { "properties": { "type": { "const": "router" } } },
+          "if": {
+            "properties": { "type": { "const": "router" } },
+            "required": ["type"]
+          },
           "then": {
             "required": ["value", "routes"]
           }
