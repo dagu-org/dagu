@@ -32,8 +32,8 @@ type BackoffConfig struct {
 func DefaultBackoffConfig() BackoffConfig {
 	return BackoffConfig{
 		InitialInterval: 500 * time.Millisecond,
-		MaxInterval:     60 * time.Second,
-		MaxRetries:      10,
+		MaxInterval:     5 * time.Second,
+		MaxRetries:      8,
 	}
 }
 
