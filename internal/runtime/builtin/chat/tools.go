@@ -1,4 +1,4 @@
-// Package chat provides an executor for chat (LLM-based conversation) steps.
+// Package chat provides an executor for chat (LLM-based session) steps.
 package chat
 
 import (

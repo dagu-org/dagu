@@ -1,4 +1,4 @@
-package fileconversation
+package filesession
 
 import (
 	"context"
@@ -21,9 +21,9 @@ func setupTestStore(t *testing.T) (*Store, context.Context) {
 	return store, context.Background()
 }
 
-func createTestConversation(id, userID string) *agent.Conversation {
+func createTestSession(id, userID string) *agent.Session {
 	now := time.Now()
-	return &agent.Conversation{
+	return &agent.Session{
 		ID:        id,
 		UserID:    userID,
 		CreatedAt: now,
@@ -91,7 +91,7 @@ func TestNew_DirectoryCreationFailure(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to create directory")
 }
 
-func TestNew_WithExistingConversations(t *testing.T) {
+func TestNew_WithExistingSessions(t *testing.T) {
 	tmpDir := t.TempDir()
 	ctx := context.Background()
 
@@ -99,53 +99,53 @@ func TestNew_WithExistingConversations(t *testing.T) {
 	store1, err := New(tmpDir)
 	require.NoError(t, err)
 
-	conv := createTestConversation("conv1", "user1")
-	require.NoError(t, store1.CreateConversation(ctx, conv))
+	sess := createTestSession("sess1", "user1")
+	require.NoError(t, store1.CreateSession(ctx, sess))
 
 	// Create second store - should rebuild index
 	store2, err := New(tmpDir)
 	require.NoError(t, err)
 
 	// Verify data is accessible
-	retrieved, err := store2.GetConversation(ctx, "conv1")
+	retrieved, err := store2.GetSession(ctx, "sess1")
 	require.NoError(t, err)
-	assert.Equal(t, "conv1", retrieved.ID)
+	assert.Equal(t, "sess1", retrieved.ID)
 }
 
-func TestValidateConversation(t *testing.T) {
+func TestValidateSession(t *testing.T) {
 	tests := []struct {
 		name          string
-		conv          *agent.Conversation
+		sess          *agent.Session
 		requireUserID bool
 		wantErr       error
 	}{
 		{
-			name:          "nil conversation",
-			conv:          nil,
+			name:          "nil session",
+			sess:          nil,
 			requireUserID: false,
 			wantErr:       nil, // returns generic error, not sentinel
 		},
 		{
 			name:          "empty ID",
-			conv:          &agent.Conversation{},
+			sess:          &agent.Session{},
 			requireUserID: false,
-			wantErr:       agent.ErrInvalidConversationID,
+			wantErr:       agent.ErrInvalidSessionID,
 		},
 		{
 			name:          "empty userID when required",
-			conv:          &agent.Conversation{ID: "123"},
+			sess:          &agent.Session{ID: "123"},
 			requireUserID: true,
 			wantErr:       agent.ErrInvalidUserID,
 		},
 		{
 			name:          "valid without userID check",
-			conv:          &agent.Conversation{ID: "123"},
+			sess:          &agent.Session{ID: "123"},
 			requireUserID: false,
 			wantErr:       nil,
 		},
 		{
 			name:          "valid with userID",
-			conv:          &agent.Conversation{ID: "123", UserID: "user1"},
+			sess:          &agent.Session{ID: "123", UserID: "user1"},
 			requireUserID: true,
 			wantErr:       nil,
 		},
@@ -153,12 +153,12 @@ func TestValidateConversation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateConversation(tt.conv, tt.requireUserID)
+			err := validateSession(tt.sess, tt.requireUserID)
 
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
-			} else if tt.conv == nil {
-				assert.Error(t, err) // nil conv returns error but not a sentinel
+			} else if tt.sess == nil {
+				assert.Error(t, err) // nil sess returns error but not a sentinel
 			} else {
 				assert.NoError(t, err)
 			}
@@ -166,25 +166,25 @@ func TestValidateConversation(t *testing.T) {
 	}
 }
 
-func TestStore_CreateConversation(t *testing.T) {
+func TestStore_CreateSession(t *testing.T) {
 	tests := []struct {
 		name    string
-		conv    *agent.Conversation
+		sess    *agent.Session
 		wantErr error
 	}{
 		{
-			name:    "valid conversation",
-			conv:    createTestConversation("conv1", "user1"),
+			name:    "valid session",
+			sess:    createTestSession("sess1", "user1"),
 			wantErr: nil,
 		},
 		{
 			name:    "empty ID",
-			conv:    &agent.Conversation{UserID: "user1"},
-			wantErr: agent.ErrInvalidConversationID,
+			sess:    &agent.Session{UserID: "user1"},
+			wantErr: agent.ErrInvalidSessionID,
 		},
 		{
 			name:    "empty userID",
-			conv:    &agent.Conversation{ID: "conv1"},
+			sess:    &agent.Session{ID: "sess1"},
 			wantErr: agent.ErrInvalidUserID,
 		},
 	}
@@ -192,7 +192,7 @@ func TestStore_CreateConversation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store, ctx := setupTestStore(t)
-			err := store.CreateConversation(ctx, tt.conv)
+			err := store.CreateSession(ctx, tt.sess)
 
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
@@ -203,19 +203,19 @@ func TestStore_CreateConversation(t *testing.T) {
 	}
 }
 
-func TestStore_CreateConversation_Duplicate(t *testing.T) {
+func TestStore_CreateSession_Duplicate(t *testing.T) {
 	store, ctx := setupTestStore(t)
 
-	conv := createTestConversation("conv1", "user1")
-	require.NoError(t, store.CreateConversation(ctx, conv))
+	sess := createTestSession("sess1", "user1")
+	require.NoError(t, store.CreateSession(ctx, sess))
 
 	// Try to create duplicate
-	err := store.CreateConversation(ctx, conv)
+	err := store.CreateSession(ctx, sess)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "already exists")
 }
 
-func TestStore_GetConversation(t *testing.T) {
+func TestStore_GetSession(t *testing.T) {
 	tests := []struct {
 		name    string
 		setup   func(*Store, context.Context)
@@ -225,22 +225,22 @@ func TestStore_GetConversation(t *testing.T) {
 		{
 			name: "exists",
 			setup: func(s *Store, ctx context.Context) {
-				_ = s.CreateConversation(ctx, createTestConversation("conv1", "user1"))
+				_ = s.CreateSession(ctx, createTestSession("sess1", "user1"))
 			},
-			id:      "conv1",
+			id:      "sess1",
 			wantErr: nil,
 		},
 		{
 			name:    "not found",
 			setup:   nil,
 			id:      "nonexistent",
-			wantErr: agent.ErrConversationNotFound,
+			wantErr: agent.ErrSessionNotFound,
 		},
 		{
 			name:    "empty ID",
 			setup:   nil,
 			id:      "",
-			wantErr: agent.ErrInvalidConversationID,
+			wantErr: agent.ErrInvalidSessionID,
 		},
 	}
 
@@ -251,21 +251,21 @@ func TestStore_GetConversation(t *testing.T) {
 				tt.setup(store, ctx)
 			}
 
-			conv, err := store.GetConversation(ctx, tt.id)
+			sess, err := store.GetSession(ctx, tt.id)
 
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
-				assert.Nil(t, conv)
+				assert.Nil(t, sess)
 			} else {
 				assert.NoError(t, err)
-				assert.NotNil(t, conv)
-				assert.Equal(t, tt.id, conv.ID)
+				assert.NotNil(t, sess)
+				assert.Equal(t, tt.id, sess.ID)
 			}
 		})
 	}
 }
 
-func TestStore_ListConversations(t *testing.T) {
+func TestStore_ListSessions(t *testing.T) {
 	tests := []struct {
 		name      string
 		setup     func(*Store, context.Context)
@@ -281,17 +281,17 @@ func TestStore_ListConversations(t *testing.T) {
 			wantErr:   agent.ErrInvalidUserID,
 		},
 		{
-			name:      "no conversations",
+			name:      "no sessions",
 			setup:     nil,
 			userID:    "user1",
 			wantCount: 0,
 			wantErr:   nil,
 		},
 		{
-			name: "multiple conversations",
+			name: "multiple sessions",
 			setup: func(s *Store, ctx context.Context) {
-				_ = s.CreateConversation(ctx, createTestConversation("conv1", "user1"))
-				_ = s.CreateConversation(ctx, createTestConversation("conv2", "user1"))
+				_ = s.CreateSession(ctx, createTestSession("sess1", "user1"))
+				_ = s.CreateSession(ctx, createTestSession("sess2", "user1"))
 			},
 			userID:    "user1",
 			wantCount: 2,
@@ -300,8 +300,8 @@ func TestStore_ListConversations(t *testing.T) {
 		{
 			name: "user isolation",
 			setup: func(s *Store, ctx context.Context) {
-				_ = s.CreateConversation(ctx, createTestConversation("conv1", "user1"))
-				_ = s.CreateConversation(ctx, createTestConversation("conv2", "user2"))
+				_ = s.CreateSession(ctx, createTestSession("sess1", "user1"))
+				_ = s.CreateSession(ctx, createTestSession("sess2", "user2"))
 			},
 			userID:    "user1",
 			wantCount: 1,
@@ -316,53 +316,53 @@ func TestStore_ListConversations(t *testing.T) {
 				tt.setup(store, ctx)
 			}
 
-			convs, err := store.ListConversations(ctx, tt.userID)
+			sessions, err := store.ListSessions(ctx, tt.userID)
 
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 			} else {
 				assert.NoError(t, err)
-				assert.Len(t, convs, tt.wantCount)
+				assert.Len(t, sessions, tt.wantCount)
 			}
 		})
 	}
 }
 
-func TestStore_UpdateConversation(t *testing.T) {
+func TestStore_UpdateSession(t *testing.T) {
 	tests := []struct {
 		name    string
-		setup   func(*Store, context.Context) *agent.Conversation
-		update  func(*agent.Conversation)
+		setup   func(*Store, context.Context) *agent.Session
+		update  func(*agent.Session)
 		wantErr error
 	}{
 		{
 			name: "update title",
-			setup: func(s *Store, ctx context.Context) *agent.Conversation {
-				conv := createTestConversation("conv1", "user1")
-				_ = s.CreateConversation(ctx, conv)
-				return conv
+			setup: func(s *Store, ctx context.Context) *agent.Session {
+				sess := createTestSession("sess1", "user1")
+				_ = s.CreateSession(ctx, sess)
+				return sess
 			},
-			update: func(conv *agent.Conversation) {
-				conv.Title = "Updated Title"
-				conv.UpdatedAt = time.Now()
+			update: func(sess *agent.Session) {
+				sess.Title = "Updated Title"
+				sess.UpdatedAt = time.Now()
 			},
 			wantErr: nil,
 		},
 		{
 			name:  "not found",
 			setup: nil,
-			update: func(conv *agent.Conversation) {
-				conv.ID = "nonexistent"
+			update: func(sess *agent.Session) {
+				sess.ID = "nonexistent"
 			},
-			wantErr: agent.ErrConversationNotFound,
+			wantErr: agent.ErrSessionNotFound,
 		},
 		{
 			name:  "empty ID",
 			setup: nil,
-			update: func(conv *agent.Conversation) {
-				conv.ID = ""
+			update: func(sess *agent.Session) {
+				sess.ID = ""
 			},
-			wantErr: agent.ErrInvalidConversationID,
+			wantErr: agent.ErrInvalidSessionID,
 		},
 	}
 
@@ -370,15 +370,15 @@ func TestStore_UpdateConversation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			store, ctx := setupTestStore(t)
 
-			var conv *agent.Conversation
+			var sess *agent.Session
 			if tt.setup != nil {
-				conv = tt.setup(store, ctx)
+				sess = tt.setup(store, ctx)
 			} else {
-				conv = &agent.Conversation{}
+				sess = &agent.Session{}
 			}
 
-			tt.update(conv)
-			err := store.UpdateConversation(ctx, conv)
+			tt.update(sess)
+			err := store.UpdateSession(ctx, sess)
 
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
@@ -386,15 +386,15 @@ func TestStore_UpdateConversation(t *testing.T) {
 				assert.NoError(t, err)
 
 				// Verify update persisted
-				retrieved, err := store.GetConversation(ctx, conv.ID)
+				retrieved, err := store.GetSession(ctx, sess.ID)
 				require.NoError(t, err)
-				assert.Equal(t, conv.Title, retrieved.Title)
+				assert.Equal(t, sess.Title, retrieved.Title)
 			}
 		})
 	}
 }
 
-func TestStore_DeleteConversation(t *testing.T) {
+func TestStore_DeleteSession(t *testing.T) {
 	tests := []struct {
 		name    string
 		setup   func(*Store, context.Context)
@@ -404,22 +404,22 @@ func TestStore_DeleteConversation(t *testing.T) {
 		{
 			name: "exists",
 			setup: func(s *Store, ctx context.Context) {
-				_ = s.CreateConversation(ctx, createTestConversation("conv1", "user1"))
+				_ = s.CreateSession(ctx, createTestSession("sess1", "user1"))
 			},
-			id:      "conv1",
+			id:      "sess1",
 			wantErr: nil,
 		},
 		{
 			name:    "not found",
 			setup:   nil,
 			id:      "nonexistent",
-			wantErr: agent.ErrConversationNotFound,
+			wantErr: agent.ErrSessionNotFound,
 		},
 		{
 			name:    "empty ID",
 			setup:   nil,
 			id:      "",
-			wantErr: agent.ErrInvalidConversationID,
+			wantErr: agent.ErrInvalidSessionID,
 		},
 	}
 
@@ -430,7 +430,7 @@ func TestStore_DeleteConversation(t *testing.T) {
 				tt.setup(store, ctx)
 			}
 
-			err := store.DeleteConversation(ctx, tt.id)
+			err := store.DeleteSession(ctx, tt.id)
 
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
@@ -438,8 +438,8 @@ func TestStore_DeleteConversation(t *testing.T) {
 				assert.NoError(t, err)
 
 				// Verify deletion
-				_, err := store.GetConversation(ctx, tt.id)
-				assert.ErrorIs(t, err, agent.ErrConversationNotFound)
+				_, err := store.GetSession(ctx, tt.id)
+				assert.ErrorIs(t, err, agent.ErrSessionNotFound)
 			}
 		})
 	}
@@ -447,46 +447,46 @@ func TestStore_DeleteConversation(t *testing.T) {
 
 func TestStore_AddMessage(t *testing.T) {
 	tests := []struct {
-		name           string
-		setup          func(*Store, context.Context)
-		conversationID string
-		msg            *agent.Message
-		wantErr        bool
-		errIs          error
+		name      string
+		setup     func(*Store, context.Context)
+		sessionID string
+		msg       *agent.Message
+		wantErr   bool
+		errIs     error
 	}{
 		{
 			name: "valid message",
 			setup: func(s *Store, ctx context.Context) {
-				_ = s.CreateConversation(ctx, createTestConversation("conv1", "user1"))
+				_ = s.CreateSession(ctx, createTestSession("sess1", "user1"))
 			},
-			conversationID: "conv1",
-			msg:            createTestMessage("msg1", "Hello", 1, agent.MessageTypeUser),
-			wantErr:        false,
+			sessionID: "sess1",
+			msg:       createTestMessage("msg1", "Hello", 1, agent.MessageTypeUser),
+			wantErr:   false,
 		},
 		{
-			name:           "empty convID",
-			setup:          nil,
-			conversationID: "",
-			msg:            createTestMessage("msg1", "Hello", 1, agent.MessageTypeUser),
-			wantErr:        true,
-			errIs:          agent.ErrInvalidConversationID,
+			name:      "empty sessionID",
+			setup:     nil,
+			sessionID: "",
+			msg:       createTestMessage("msg1", "Hello", 1, agent.MessageTypeUser),
+			wantErr:   true,
+			errIs:     agent.ErrInvalidSessionID,
 		},
 		{
-			name:           "conv not found",
-			setup:          nil,
-			conversationID: "nonexistent",
-			msg:            createTestMessage("msg1", "Hello", 1, agent.MessageTypeUser),
-			wantErr:        true,
-			errIs:          agent.ErrConversationNotFound,
+			name:      "session not found",
+			setup:     nil,
+			sessionID: "nonexistent",
+			msg:       createTestMessage("msg1", "Hello", 1, agent.MessageTypeUser),
+			wantErr:   true,
+			errIs:     agent.ErrSessionNotFound,
 		},
 		{
 			name: "nil message",
 			setup: func(s *Store, ctx context.Context) {
-				_ = s.CreateConversation(ctx, createTestConversation("conv1", "user1"))
+				_ = s.CreateSession(ctx, createTestSession("sess1", "user1"))
 			},
-			conversationID: "conv1",
-			msg:            nil,
-			wantErr:        true,
+			sessionID: "sess1",
+			msg:       nil,
+			wantErr:   true,
 		},
 	}
 
@@ -497,7 +497,7 @@ func TestStore_AddMessage(t *testing.T) {
 				tt.setup(store, ctx)
 			}
 
-			err := store.AddMessage(ctx, tt.conversationID, tt.msg)
+			err := store.AddMessage(ctx, tt.sessionID, tt.msg)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -513,45 +513,45 @@ func TestStore_AddMessage(t *testing.T) {
 
 func TestStore_GetMessages(t *testing.T) {
 	tests := []struct {
-		name           string
-		setup          func(*Store, context.Context)
-		conversationID string
-		wantCount      int
-		wantErr        error
+		name      string
+		setup     func(*Store, context.Context)
+		sessionID string
+		wantCount int
+		wantErr   error
 	}{
 		{
 			name: "with messages",
 			setup: func(s *Store, ctx context.Context) {
-				_ = s.CreateConversation(ctx, createTestConversation("conv1", "user1"))
-				_ = s.AddMessage(ctx, "conv1", createTestMessage("msg1", "Hello", 1, agent.MessageTypeUser))
-				_ = s.AddMessage(ctx, "conv1", createTestMessage("msg2", "Hi", 2, agent.MessageTypeAssistant))
+				_ = s.CreateSession(ctx, createTestSession("sess1", "user1"))
+				_ = s.AddMessage(ctx, "sess1", createTestMessage("msg1", "Hello", 1, agent.MessageTypeUser))
+				_ = s.AddMessage(ctx, "sess1", createTestMessage("msg2", "Hi", 2, agent.MessageTypeAssistant))
 			},
-			conversationID: "conv1",
-			wantCount:      2,
-			wantErr:        nil,
+			sessionID: "sess1",
+			wantCount: 2,
+			wantErr:   nil,
 		},
 		{
 			name: "no messages",
 			setup: func(s *Store, ctx context.Context) {
-				_ = s.CreateConversation(ctx, createTestConversation("conv1", "user1"))
+				_ = s.CreateSession(ctx, createTestSession("sess1", "user1"))
 			},
-			conversationID: "conv1",
-			wantCount:      0,
-			wantErr:        nil,
+			sessionID: "sess1",
+			wantCount: 0,
+			wantErr:   nil,
 		},
 		{
-			name:           "empty convID",
-			setup:          nil,
-			conversationID: "",
-			wantCount:      0,
-			wantErr:        agent.ErrInvalidConversationID,
+			name:      "empty sessionID",
+			setup:     nil,
+			sessionID: "",
+			wantCount: 0,
+			wantErr:   agent.ErrInvalidSessionID,
 		},
 		{
-			name:           "not found",
-			setup:          nil,
-			conversationID: "nonexistent",
-			wantCount:      0,
-			wantErr:        agent.ErrConversationNotFound,
+			name:      "not found",
+			setup:     nil,
+			sessionID: "nonexistent",
+			wantCount: 0,
+			wantErr:   agent.ErrSessionNotFound,
 		},
 	}
 
@@ -562,7 +562,7 @@ func TestStore_GetMessages(t *testing.T) {
 				tt.setup(store, ctx)
 			}
 
-			msgs, err := store.GetMessages(ctx, tt.conversationID)
+			msgs, err := store.GetMessages(ctx, tt.sessionID)
 
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
@@ -576,46 +576,46 @@ func TestStore_GetMessages(t *testing.T) {
 
 func TestStore_GetLatestSequenceID(t *testing.T) {
 	tests := []struct {
-		name           string
-		setup          func(*Store, context.Context)
-		conversationID string
-		want           int64
-		wantErr        error
+		name      string
+		setup     func(*Store, context.Context)
+		sessionID string
+		want      int64
+		wantErr   error
 	}{
 		{
 			name: "with messages",
 			setup: func(s *Store, ctx context.Context) {
-				_ = s.CreateConversation(ctx, createTestConversation("conv1", "user1"))
-				_ = s.AddMessage(ctx, "conv1", createTestMessage("msg1", "Hello", 1, agent.MessageTypeUser))
-				_ = s.AddMessage(ctx, "conv1", createTestMessage("msg2", "Hi", 5, agent.MessageTypeAssistant))
-				_ = s.AddMessage(ctx, "conv1", createTestMessage("msg3", "Ok", 3, agent.MessageTypeUser))
+				_ = s.CreateSession(ctx, createTestSession("sess1", "user1"))
+				_ = s.AddMessage(ctx, "sess1", createTestMessage("msg1", "Hello", 1, agent.MessageTypeUser))
+				_ = s.AddMessage(ctx, "sess1", createTestMessage("msg2", "Hi", 5, agent.MessageTypeAssistant))
+				_ = s.AddMessage(ctx, "sess1", createTestMessage("msg3", "Ok", 3, agent.MessageTypeUser))
 			},
-			conversationID: "conv1",
-			want:           5,
-			wantErr:        nil,
+			sessionID: "sess1",
+			want:      5,
+			wantErr:   nil,
 		},
 		{
 			name: "no messages returns 0",
 			setup: func(s *Store, ctx context.Context) {
-				_ = s.CreateConversation(ctx, createTestConversation("conv1", "user1"))
+				_ = s.CreateSession(ctx, createTestSession("sess1", "user1"))
 			},
-			conversationID: "conv1",
-			want:           0,
-			wantErr:        nil,
+			sessionID: "sess1",
+			want:      0,
+			wantErr:   nil,
 		},
 		{
-			name:           "empty convID",
-			setup:          nil,
-			conversationID: "",
-			want:           0,
-			wantErr:        agent.ErrInvalidConversationID,
+			name:      "empty sessionID",
+			setup:     nil,
+			sessionID: "",
+			want:      0,
+			wantErr:   agent.ErrInvalidSessionID,
 		},
 		{
-			name:           "not found",
-			setup:          nil,
-			conversationID: "nonexistent",
-			want:           0,
-			wantErr:        agent.ErrConversationNotFound,
+			name:      "not found",
+			setup:     nil,
+			sessionID: "nonexistent",
+			want:      0,
+			wantErr:   agent.ErrSessionNotFound,
 		},
 	}
 
@@ -626,7 +626,7 @@ func TestStore_GetLatestSequenceID(t *testing.T) {
 				tt.setup(store, ctx)
 			}
 
-			seqID, err := store.GetLatestSequenceID(ctx, tt.conversationID)
+			seqID, err := store.GetLatestSequenceID(ctx, tt.sessionID)
 
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
@@ -761,7 +761,7 @@ func TestRemoveFromSlice(t *testing.T) {
 	}
 }
 
-func TestConversationForStorage_SetTitleFromMessage(t *testing.T) {
+func TestSessionForStorage_SetTitleFromMessage(t *testing.T) {
 	tests := []struct {
 		name          string
 		initialTitle  string
@@ -802,20 +802,20 @@ func TestConversationForStorage_SetTitleFromMessage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			conv := &ConversationForStorage{
+			sess := &SessionForStorage{
 				ID:     "test",
 				Title:  tt.initialTitle,
 				UserID: "user1",
 			}
 
-			conv.setTitleFromMessage(tt.msg)
+			sess.setTitleFromMessage(tt.msg)
 
-			assert.Equal(t, tt.expectedTitle, conv.Title)
+			assert.Equal(t, tt.expectedTitle, sess.Title)
 		})
 	}
 }
 
-func TestStore_RemoveConversationFromUserIndex(t *testing.T) {
+func TestStore_RemoveSessionFromUserIndex(t *testing.T) {
 	tests := []struct {
 		name   string
 		setup  func(*Store, context.Context)
@@ -826,27 +826,27 @@ func TestStore_RemoveConversationFromUserIndex(t *testing.T) {
 		{
 			name: "remove with known userID",
 			setup: func(s *Store, ctx context.Context) {
-				_ = s.CreateConversation(ctx, createTestConversation("conv1", "user1"))
+				_ = s.CreateSession(ctx, createTestSession("sess1", "user1"))
 			},
-			id:     "conv1",
+			id:     "sess1",
 			userID: "user1",
 			verify: func(t *testing.T, s *Store) {
 				s.mu.RLock()
 				defer s.mu.RUnlock()
-				assert.NotContains(t, s.byUser["user1"], "conv1")
+				assert.NotContains(t, s.byUser["user1"], "sess1")
 			},
 		},
 		{
 			name: "remove with unknown userID searches all users",
 			setup: func(s *Store, ctx context.Context) {
-				_ = s.CreateConversation(ctx, createTestConversation("conv1", "user1"))
+				_ = s.CreateSession(ctx, createTestSession("sess1", "user1"))
 			},
-			id:     "conv1",
+			id:     "sess1",
 			userID: "", // unknown
 			verify: func(t *testing.T, s *Store) {
 				s.mu.RLock()
 				defer s.mu.RUnlock()
-				assert.NotContains(t, s.byUser["user1"], "conv1")
+				assert.NotContains(t, s.byUser["user1"], "sess1")
 			},
 		},
 	}
@@ -859,7 +859,7 @@ func TestStore_RemoveConversationFromUserIndex(t *testing.T) {
 			}
 
 			store.mu.Lock()
-			store.removeConversationFromUserIndex(tt.id, tt.userID)
+			store.removeSessionFromUserIndex(tt.id, tt.userID)
 			store.mu.Unlock()
 
 			tt.verify(t, store)
@@ -867,23 +867,23 @@ func TestStore_RemoveConversationFromUserIndex(t *testing.T) {
 	}
 }
 
-func TestStore_SortUserConversations(t *testing.T) {
+func TestStore_SortUserSessions(t *testing.T) {
 	store, ctx := setupTestStore(t)
 
 	now := time.Now()
-	convs := []*agent.Conversation{
-		{ID: "conv1", UserID: "user1", CreatedAt: now, UpdatedAt: now},
-		{ID: "conv2", UserID: "user1", CreatedAt: now, UpdatedAt: now.Add(time.Hour)},
-		{ID: "conv3", UserID: "user1", CreatedAt: now, UpdatedAt: now.Add(-time.Hour)},
+	sessions := []*agent.Session{
+		{ID: "sess1", UserID: "user1", CreatedAt: now, UpdatedAt: now},
+		{ID: "sess2", UserID: "user1", CreatedAt: now, UpdatedAt: now.Add(time.Hour)},
+		{ID: "sess3", UserID: "user1", CreatedAt: now, UpdatedAt: now.Add(-time.Hour)},
 	}
 
-	for _, conv := range convs {
-		require.NoError(t, store.CreateConversation(ctx, conv))
+	for _, sess := range sessions {
+		require.NoError(t, store.CreateSession(ctx, sess))
 	}
 
 	// Force re-sort
 	store.mu.Lock()
-	store.sortUserConversations("user1")
+	store.sortUserSessions("user1")
 	store.mu.Unlock()
 
 	// Verify order (most recent first)
@@ -891,12 +891,12 @@ func TestStore_SortUserConversations(t *testing.T) {
 	ids := store.byUser["user1"]
 	store.mu.RUnlock()
 
-	assert.Equal(t, "conv2", ids[0]) // newest
-	assert.Equal(t, "conv1", ids[1]) // middle
-	assert.Equal(t, "conv3", ids[2]) // oldest
+	assert.Equal(t, "sess2", ids[0]) // newest
+	assert.Equal(t, "sess1", ids[1]) // middle
+	assert.Equal(t, "sess3", ids[2]) // oldest
 }
 
-func TestStore_LoadConversationFromFile_Errors(t *testing.T) {
+func TestStore_LoadSessionFromFile_Errors(t *testing.T) {
 	tests := []struct {
 		name        string
 		setup       func(string) string // returns file path
@@ -907,8 +907,8 @@ func TestStore_LoadConversationFromFile_Errors(t *testing.T) {
 			name: "valid JSON",
 			setup: func(dir string) string {
 				path := filepath.Join(dir, "valid.json")
-				conv := &ConversationForStorage{ID: "test", UserID: "user1"}
-				data, _ := json.Marshal(conv)
+				sess := &SessionForStorage{ID: "test", UserID: "user1"}
+				data, _ := json.Marshal(sess)
 				_ = os.WriteFile(path, data, 0600)
 				return path
 			},
@@ -940,21 +940,21 @@ func TestStore_LoadConversationFromFile_Errors(t *testing.T) {
 			store, _ := New(tmpDir)
 			filePath := tt.setup(tmpDir)
 
-			conv, err := store.loadConversationFromFile(filePath)
+			sess, err := store.loadSessionFromFile(filePath)
 
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errContains)
-				assert.Nil(t, conv)
+				assert.Nil(t, sess)
 			} else {
 				require.NoError(t, err)
-				assert.NotNil(t, conv)
+				assert.NotNil(t, sess)
 			}
 		})
 	}
 }
 
-func TestStore_WriteConversationToFile_Errors(t *testing.T) {
+func TestStore_WriteSessionToFile_Errors(t *testing.T) {
 	t.Run("write to read-only directory", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		store, err := New(tmpDir)
@@ -965,10 +965,10 @@ func TestStore_WriteConversationToFile_Errors(t *testing.T) {
 		require.NoError(t, os.MkdirAll(readOnlyDir, 0500))
 		defer func() { _ = os.Chmod(readOnlyDir, 0750) }()
 
-		conv := &ConversationForStorage{ID: "test", UserID: "user1"}
+		sess := &SessionForStorage{ID: "test", UserID: "user1"}
 		filePath := filepath.Join(readOnlyDir, "test.json")
 
-		err = store.writeConversationToFile(filePath, conv)
+		err = store.writeSessionToFile(filePath, sess)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create temp file")
 	})
@@ -982,9 +982,9 @@ func TestStore_WriteConversationToFile_Errors(t *testing.T) {
 		targetPath := filepath.Join(tmpDir, "blocked.json")
 		require.NoError(t, os.MkdirAll(targetPath, 0750))
 
-		conv := &ConversationForStorage{ID: "test", UserID: "user1"}
+		sess := &SessionForStorage{ID: "test", UserID: "user1"}
 
-		err = store.writeConversationToFile(targetPath, conv)
+		err = store.writeSessionToFile(targetPath, sess)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to rename")
 	})
@@ -1001,8 +1001,8 @@ func TestStore_IndexUserDirectory_Errors(t *testing.T) {
 		require.NoError(t, os.WriteFile(invalidFile, []byte("{bad}"), 0600))
 
 		// Create valid file
-		validConv := &ConversationForStorage{ID: "valid", UserID: "user1"}
-		validData, _ := json.Marshal(validConv)
+		validSess := &SessionForStorage{ID: "valid", UserID: "user1"}
+		validData, _ := json.Marshal(validSess)
 		validFile := filepath.Join(userDir, "valid.json")
 		require.NoError(t, os.WriteFile(validFile, validData, 0600))
 
@@ -1050,9 +1050,9 @@ func TestStore_IndexUserDirectory_Errors(t *testing.T) {
 	})
 }
 
-func TestConversationForStorage_ToConversation(t *testing.T) {
+func TestSessionForStorage_ToSession(t *testing.T) {
 	now := time.Now()
-	stored := &ConversationForStorage{
+	stored := &SessionForStorage{
 		ID:        "test-id",
 		UserID:    "user-id",
 		Title:     "Test Title",
@@ -1061,18 +1061,18 @@ func TestConversationForStorage_ToConversation(t *testing.T) {
 		Messages:  []agent.Message{{ID: "msg1"}},
 	}
 
-	conv := stored.ToConversation()
+	sess := stored.ToSession()
 
-	assert.Equal(t, stored.ID, conv.ID)
-	assert.Equal(t, stored.UserID, conv.UserID)
-	assert.Equal(t, stored.Title, conv.Title)
-	assert.Equal(t, stored.CreatedAt, conv.CreatedAt)
-	assert.Equal(t, stored.UpdatedAt, conv.UpdatedAt)
+	assert.Equal(t, stored.ID, sess.ID)
+	assert.Equal(t, stored.UserID, sess.UserID)
+	assert.Equal(t, stored.Title, sess.Title)
+	assert.Equal(t, stored.CreatedAt, sess.CreatedAt)
+	assert.Equal(t, stored.UpdatedAt, sess.UpdatedAt)
 }
 
-func TestFromConversation(t *testing.T) {
+func TestFromSession(t *testing.T) {
 	now := time.Now()
-	conv := &agent.Conversation{
+	sess := &agent.Session{
 		ID:        "test-id",
 		UserID:    "user-id",
 		Title:     "Test Title",
@@ -1081,13 +1081,13 @@ func TestFromConversation(t *testing.T) {
 	}
 	msgs := []agent.Message{{ID: "msg1"}, {ID: "msg2"}}
 
-	stored := FromConversation(conv, msgs)
+	stored := FromSession(sess, msgs)
 
-	assert.Equal(t, conv.ID, stored.ID)
-	assert.Equal(t, conv.UserID, stored.UserID)
-	assert.Equal(t, conv.Title, stored.Title)
-	assert.Equal(t, conv.CreatedAt, stored.CreatedAt)
-	assert.Equal(t, conv.UpdatedAt, stored.UpdatedAt)
+	assert.Equal(t, sess.ID, stored.ID)
+	assert.Equal(t, sess.UserID, stored.UserID)
+	assert.Equal(t, sess.Title, stored.Title)
+	assert.Equal(t, sess.CreatedAt, stored.CreatedAt)
+	assert.Equal(t, sess.UpdatedAt, stored.UpdatedAt)
 	assert.Len(t, stored.Messages, 2)
 }
 
@@ -1099,70 +1099,70 @@ func TestStore_RebuildIndex(t *testing.T) {
 	store1, err := New(tmpDir)
 	require.NoError(t, err)
 
-	conv := createTestConversation("conv1", "user1")
-	require.NoError(t, store1.CreateConversation(ctx, conv))
+	sess := createTestSession("sess1", "user1")
+	require.NoError(t, store1.CreateSession(ctx, sess))
 
 	msg := createTestMessage("msg1", "Hello", 1, agent.MessageTypeUser)
-	require.NoError(t, store1.AddMessage(ctx, conv.ID, msg))
+	require.NoError(t, store1.AddMessage(ctx, sess.ID, msg))
 
 	// Simulate restart
 	store2, err := New(tmpDir)
 	require.NoError(t, err)
 
 	// Verify data persisted
-	retrieved, err := store2.GetConversation(ctx, "conv1")
+	retrieved, err := store2.GetSession(ctx, "sess1")
 	require.NoError(t, err)
-	assert.Equal(t, "conv1", retrieved.ID)
+	assert.Equal(t, "sess1", retrieved.ID)
 	assert.Equal(t, "Hello", retrieved.Title) // auto-generated from message
 
-	msgs, err := store2.GetMessages(ctx, "conv1")
+	msgs, err := store2.GetMessages(ctx, "sess1")
 	require.NoError(t, err)
 	assert.Len(t, msgs, 1)
 
-	convs, err := store2.ListConversations(ctx, "user1")
+	sessions, err := store2.ListSessions(ctx, "user1")
 	require.NoError(t, err)
-	assert.Len(t, convs, 1)
+	assert.Len(t, sessions, 1)
 }
 
-func TestStore_LoadConversationByID_FileDeleted(t *testing.T) {
+func TestStore_LoadSessionByID_FileDeleted(t *testing.T) {
 	store, ctx := setupTestStore(t)
 
-	// Create conversation
-	conv := createTestConversation("conv1", "user1")
-	require.NoError(t, store.CreateConversation(ctx, conv))
+	// Create session
+	sess := createTestSession("sess1", "user1")
+	require.NoError(t, store.CreateSession(ctx, sess))
 
 	// Delete the file directly (simulating external deletion)
 	store.mu.RLock()
-	filePath := store.byID["conv1"]
+	filePath := store.byID["sess1"]
 	store.mu.RUnlock()
 	require.NoError(t, os.Remove(filePath))
 
-	// Try to load - should return ErrConversationNotFound
-	_, err := store.GetConversation(ctx, "conv1")
-	assert.ErrorIs(t, err, agent.ErrConversationNotFound)
+	// Try to load - should return ErrSessionNotFound
+	_, err := store.GetSession(ctx, "sess1")
+	assert.ErrorIs(t, err, agent.ErrSessionNotFound)
 }
 
-func TestStore_ListConversations_SkipsDeletedFiles(t *testing.T) {
+func TestStore_ListSessions_SkipsDeletedFiles(t *testing.T) {
 	store, ctx := setupTestStore(t)
 
-	// Create two conversations
-	require.NoError(t, store.CreateConversation(ctx, createTestConversation("conv1", "user1")))
-	require.NoError(t, store.CreateConversation(ctx, createTestConversation("conv2", "user1")))
+	// Create two sessions
+	require.NoError(t, store.CreateSession(ctx, createTestSession("sess1", "user1")))
+	require.NoError(t, store.CreateSession(ctx, createTestSession("sess2", "user1")))
 
 	// Delete one file externally
 	store.mu.RLock()
-	filePath := store.byID["conv1"]
+	filePath := store.byID["sess1"]
 	store.mu.RUnlock()
 	require.NoError(t, os.Remove(filePath))
 
-	// List should skip the deleted conversation
-	convs, err := store.ListConversations(ctx, "user1")
+	// List should skip the deleted session
+	sessions, err := store.ListSessions(ctx, "user1")
 	require.NoError(t, err)
-	assert.Len(t, convs, 1)
-	assert.Equal(t, "conv2", convs[0].ID)
+	assert.Len(t, sessions, 1)
+	assert.Equal(t, "sess2", sessions[0].ID)
 }
 
-func TestStore_CreateConversation_UserDirCreationError(t *testing.T) {
+func TestStore_CreateSession_UserDirCreationError(t *testing.T) {
 	tmpDir := t.TempDir()
 	store, err := New(tmpDir)
 	require.NoError(t, err)
@@ -1171,32 +1171,32 @@ func TestStore_CreateConversation_UserDirCreationError(t *testing.T) {
 	userPath := filepath.Join(tmpDir, "user1")
 	require.NoError(t, os.WriteFile(userPath, []byte("block"), 0600))
 
-	conv := createTestConversation("conv1", "user1")
-	err = store.CreateConversation(context.Background(), conv)
+	sess := createTestSession("sess1", "user1")
+	err = store.CreateSession(context.Background(), sess)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create user directory")
 }
 
-func TestStore_DeleteConversation_FileAlreadyDeleted(t *testing.T) {
+func TestStore_DeleteSession_FileAlreadyDeleted(t *testing.T) {
 	store, ctx := setupTestStore(t)
 
-	// Create conversation
-	conv := createTestConversation("conv1", "user1")
-	require.NoError(t, store.CreateConversation(ctx, conv))
+	// Create session
+	sess := createTestSession("sess1", "user1")
+	require.NoError(t, store.CreateSession(ctx, sess))
 
 	// Delete file externally first
 	store.mu.RLock()
-	filePath := store.byID["conv1"]
+	filePath := store.byID["sess1"]
 	store.mu.RUnlock()
 	require.NoError(t, os.Remove(filePath))
 
-	// DeleteConversation should still work (clean up index)
-	err := store.DeleteConversation(ctx, "conv1")
+	// DeleteSession should still work (clean up index)
+	err := store.DeleteSession(ctx, "sess1")
 	require.NoError(t, err)
 
 	// Verify removed from index
-	_, err = store.GetConversation(ctx, "conv1")
-	assert.ErrorIs(t, err, agent.ErrConversationNotFound)
+	_, err = store.GetSession(ctx, "sess1")
+	assert.ErrorIs(t, err, agent.ErrSessionNotFound)
 }
 
 func TestStore_RebuildIndex_NonDirectorySkipped(t *testing.T) {
@@ -1228,33 +1228,33 @@ func TestStore_Options(t *testing.T) {
 func TestStore_CorruptedFileErrors(t *testing.T) {
 	tests := []struct {
 		name      string
-		operation func(*Store, context.Context, *agent.Conversation) error
+		operation func(*Store, context.Context, *agent.Session) error
 	}{
 		{
-			name: "UpdateConversation",
-			operation: func(s *Store, ctx context.Context, conv *agent.Conversation) error {
-				conv.Title = "New Title"
-				return s.UpdateConversation(ctx, conv)
+			name: "UpdateSession",
+			operation: func(s *Store, ctx context.Context, sess *agent.Session) error {
+				sess.Title = "New Title"
+				return s.UpdateSession(ctx, sess)
 			},
 		},
 		{
 			name: "AddMessage",
-			operation: func(s *Store, ctx context.Context, _ *agent.Conversation) error {
+			operation: func(s *Store, ctx context.Context, _ *agent.Session) error {
 				msg := createTestMessage("msg1", "Hello", 1, agent.MessageTypeUser)
-				return s.AddMessage(ctx, "conv1", msg)
+				return s.AddMessage(ctx, "sess1", msg)
 			},
 		},
 		{
 			name: "GetMessages",
-			operation: func(s *Store, ctx context.Context, _ *agent.Conversation) error {
-				_, err := s.GetMessages(ctx, "conv1")
+			operation: func(s *Store, ctx context.Context, _ *agent.Session) error {
+				_, err := s.GetMessages(ctx, "sess1")
 				return err
 			},
 		},
 		{
-			name: "DeleteConversation",
-			operation: func(s *Store, ctx context.Context, _ *agent.Conversation) error {
-				return s.DeleteConversation(ctx, "conv1")
+			name: "DeleteSession",
+			operation: func(s *Store, ctx context.Context, _ *agent.Session) error {
+				return s.DeleteSession(ctx, "sess1")
 			},
 		},
 	}
@@ -1263,16 +1263,16 @@ func TestStore_CorruptedFileErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			store, ctx := setupTestStore(t)
 
-			conv := createTestConversation("conv1", "user1")
-			require.NoError(t, store.CreateConversation(ctx, conv))
+			sess := createTestSession("sess1", "user1")
+			require.NoError(t, store.CreateSession(ctx, sess))
 
 			// Corrupt the file
 			store.mu.RLock()
-			filePath := store.byID["conv1"]
+			filePath := store.byID["sess1"]
 			store.mu.RUnlock()
 			require.NoError(t, os.WriteFile(filePath, []byte("{invalid}"), 0600))
 
-			err := tt.operation(store, ctx, conv)
+			err := tt.operation(store, ctx, sess)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "failed to load")
 		})
@@ -1281,36 +1281,36 @@ func TestStore_CorruptedFileErrors(t *testing.T) {
 
 func TestValidateMessageInput(t *testing.T) {
 	tests := []struct {
-		name           string
-		conversationID string
-		msg            *agent.Message
-		wantErr        bool
-		errIs          error
+		name      string
+		sessionID string
+		msg       *agent.Message
+		wantErr   bool
+		errIs     error
 	}{
 		{
-			name:           "valid",
-			conversationID: "conv1",
-			msg:            createTestMessage("msg1", "Hello", 1, agent.MessageTypeUser),
-			wantErr:        false,
+			name:      "valid",
+			sessionID: "sess1",
+			msg:       createTestMessage("msg1", "Hello", 1, agent.MessageTypeUser),
+			wantErr:   false,
 		},
 		{
-			name:           "empty conversation ID",
-			conversationID: "",
-			msg:            createTestMessage("msg1", "Hello", 1, agent.MessageTypeUser),
-			wantErr:        true,
-			errIs:          agent.ErrInvalidConversationID,
+			name:      "empty session ID",
+			sessionID: "",
+			msg:       createTestMessage("msg1", "Hello", 1, agent.MessageTypeUser),
+			wantErr:   true,
+			errIs:     agent.ErrInvalidSessionID,
 		},
 		{
-			name:           "nil message",
-			conversationID: "conv1",
-			msg:            nil,
-			wantErr:        true,
+			name:      "nil message",
+			sessionID: "sess1",
+			msg:       nil,
+			wantErr:   true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateMessageInput(tt.conversationID, tt.msg)
+			err := validateMessageInput(tt.sessionID, tt.msg)
 
 			if tt.wantErr {
 				require.Error(t, err)

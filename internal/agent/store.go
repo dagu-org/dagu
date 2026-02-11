@@ -10,10 +10,10 @@ import (
 
 // Sentinel errors for store operations.
 var (
-	// Conversation errors.
-	ErrConversationNotFound  = errors.New("conversation not found")
-	ErrInvalidConversationID = errors.New("invalid conversation ID")
-	ErrInvalidUserID         = errors.New("invalid user ID")
+	// Session errors.
+	ErrSessionNotFound  = errors.New("session not found")
+	ErrInvalidSessionID = errors.New("invalid session ID")
+	ErrInvalidUserID    = errors.New("invalid user ID")
 
 	// Model errors.
 	ErrModelNotFound          = errors.New("model not found")
@@ -148,46 +148,46 @@ type ModelStore interface {
 	Delete(ctx context.Context, id string) error
 }
 
-// ConversationStore defines the interface for conversation persistence.
+// SessionStore defines the interface for session persistence.
 // All implementations must be safe for concurrent use.
-type ConversationStore interface {
-	// CreateConversation creates a new conversation.
-	// Returns ErrInvalidConversationID if conv.ID is empty.
-	// Returns ErrInvalidUserID if conv.UserID is empty.
-	CreateConversation(ctx context.Context, conv *Conversation) error
+type SessionStore interface {
+	// CreateSession creates a new session.
+	// Returns ErrInvalidSessionID if sess.ID is empty.
+	// Returns ErrInvalidUserID if sess.UserID is empty.
+	CreateSession(ctx context.Context, sess *Session) error
 
-	// GetConversation retrieves a conversation by ID.
-	// Returns ErrInvalidConversationID if id is empty.
-	// Returns ErrConversationNotFound if the conversation does not exist.
-	GetConversation(ctx context.Context, id string) (*Conversation, error)
+	// GetSession retrieves a session by ID.
+	// Returns ErrInvalidSessionID if id is empty.
+	// Returns ErrSessionNotFound if the session does not exist.
+	GetSession(ctx context.Context, id string) (*Session, error)
 
-	// ListConversations returns all conversations for a user, sorted by UpdatedAt descending.
+	// ListSessions returns all sessions for a user, sorted by UpdatedAt descending.
 	// Returns ErrInvalidUserID if userID is empty.
-	// Returns an empty slice if the user has no conversations.
-	ListConversations(ctx context.Context, userID string) ([]*Conversation, error)
+	// Returns an empty slice if the user has no sessions.
+	ListSessions(ctx context.Context, userID string) ([]*Session, error)
 
-	// UpdateConversation updates conversation metadata such as Title and UpdatedAt.
-	// Returns ErrConversationNotFound if the conversation does not exist.
-	UpdateConversation(ctx context.Context, conv *Conversation) error
+	// UpdateSession updates session metadata such as Title and UpdatedAt.
+	// Returns ErrSessionNotFound if the session does not exist.
+	UpdateSession(ctx context.Context, sess *Session) error
 
-	// DeleteConversation removes a conversation and all its messages.
-	// Returns ErrInvalidConversationID if id is empty.
-	// Returns ErrConversationNotFound if the conversation does not exist.
-	DeleteConversation(ctx context.Context, id string) error
+	// DeleteSession removes a session and all its messages.
+	// Returns ErrInvalidSessionID if id is empty.
+	// Returns ErrSessionNotFound if the session does not exist.
+	DeleteSession(ctx context.Context, id string) error
 
-	// AddMessage appends a message to a conversation and updates the conversation's UpdatedAt.
-	// Returns ErrInvalidConversationID if conversationID is empty.
-	// Returns ErrConversationNotFound if the conversation does not exist.
-	AddMessage(ctx context.Context, conversationID string, msg *Message) error
+	// AddMessage appends a message to a session and updates the session's UpdatedAt.
+	// Returns ErrInvalidSessionID if sessionID is empty.
+	// Returns ErrSessionNotFound if the session does not exist.
+	AddMessage(ctx context.Context, sessionID string, msg *Message) error
 
-	// GetMessages retrieves all messages for a conversation, ordered by SequenceID ascending.
-	// Returns ErrInvalidConversationID if conversationID is empty.
-	// Returns ErrConversationNotFound if the conversation does not exist.
-	GetMessages(ctx context.Context, conversationID string) ([]Message, error)
+	// GetMessages retrieves all messages for a session, ordered by SequenceID ascending.
+	// Returns ErrInvalidSessionID if sessionID is empty.
+	// Returns ErrSessionNotFound if the session does not exist.
+	GetMessages(ctx context.Context, sessionID string) ([]Message, error)
 
-	// GetLatestSequenceID returns the highest sequence ID for a conversation.
-	// Returns 0 if the conversation has no messages.
-	// Returns ErrInvalidConversationID if conversationID is empty.
-	// Returns ErrConversationNotFound if the conversation does not exist.
-	GetLatestSequenceID(ctx context.Context, conversationID string) (int64, error)
+	// GetLatestSequenceID returns the highest sequence ID for a session.
+	// Returns 0 if the session has no messages.
+	// Returns ErrInvalidSessionID if sessionID is empty.
+	// Returns ErrSessionNotFound if the session does not exist.
+	GetLatestSequenceID(ctx context.Context, sessionID string) (int64, error)
 }

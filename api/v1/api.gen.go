@@ -379,7 +379,7 @@ type ChangePasswordRequest struct {
 	NewPassword string `json:"newPassword"`
 }
 
-// ChatMessage A single chat message in an LLM conversation
+// ChatMessage A single chat message in an LLM session
 type ChatMessage struct {
 	// Content Message content
 	Content string `json:"content"`
@@ -387,14 +387,14 @@ type ChatMessage struct {
 	// Metadata Metadata about an LLM API call
 	Metadata *ChatMessageMetadata `json:"metadata,omitempty"`
 
-	// Role Message role in the conversation
+	// Role Message role in the session
 	Role ChatMessageRole `json:"role"`
 
 	// ToolCalls Tool calls made by the assistant (only for assistant messages)
 	ToolCalls *[]ChatToolCall `json:"toolCalls,omitempty"`
 }
 
-// ChatMessageRole Message role in the conversation
+// ChatMessageRole Message role in the session
 type ChatMessageRole string
 
 // ChatMessageMetadata Metadata about an LLM API call

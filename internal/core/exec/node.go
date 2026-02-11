@@ -33,7 +33,7 @@ type Node struct {
 	RejectedBy string `json:"rejectedBy,omitempty"`
 	// RejectionReason stores the optional reason for rejection
 	RejectionReason string `json:"rejectionReason,omitempty"`
-	// ChatMessages stores the conversation messages for chat/LLM steps.
+	// ChatMessages stores the session messages for chat/LLM steps.
 	// This field is populated during execution and synced via status updates
 	// in shared-nothing mode where workers don't have filesystem access.
 	ChatMessages []LLMMessage `json:"chatMessages,omitempty"`

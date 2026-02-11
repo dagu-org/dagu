@@ -63,7 +63,7 @@ Currently:
 
 Three layers of protection:
 
-1. **System Prompt Injection**: The LLM is informed of the user's role and capabilities at conversation start. This allows the agent to:
+1. **System Prompt Injection**: The LLM is informed of the user's role and capabilities at session start. This allows the agent to:
    - Know what actions are available to this user
    - Proactively explain limitations
    - Avoid attempting forbidden actions

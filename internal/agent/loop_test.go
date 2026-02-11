@@ -151,7 +151,7 @@ func TestLoop_Go(t *testing.T) {
 
 		loop := NewLoop(LoopConfig{
 			Provider:       newStopProvider("response"),
-			ConversationID: "conv-1",
+			SessionID: "conv-1",
 			RecordMessage: func(_ context.Context, msg Message) error {
 				mu.Lock()
 				recordedMessages = append(recordedMessages, msg)
@@ -169,7 +169,7 @@ func TestLoop_Go(t *testing.T) {
 
 		require.NotEmpty(t, msgs)
 		assert.Equal(t, MessageTypeAssistant, msgs[0].Type)
-		assert.Equal(t, "conv-1", msgs[0].ConversationID)
+		assert.Equal(t, "conv-1", msgs[0].SessionID)
 	})
 
 	t.Run("handles tool calls", func(t *testing.T) {
@@ -370,7 +370,7 @@ func TestLoop_ExecuteTool(t *testing.T) {
 		loop := NewLoop(LoopConfig{
 			Provider:       &mockLLMProvider{},
 			Tools:          CreateTools(""),
-			ConversationID: "conv-hook",
+			SessionID: "conv-hook",
 			UserID:         "user-1",
 			Username:       "alice",
 			IPAddress:      "10.0.0.1",
@@ -388,7 +388,7 @@ func TestLoop_ExecuteTool(t *testing.T) {
 
 		assert.False(t, result.IsError)
 		assert.Equal(t, "think", capturedInfo.ToolName)
-		assert.Equal(t, "conv-hook", capturedInfo.ConversationID)
+		assert.Equal(t, "conv-hook", capturedInfo.SessionID)
 		assert.Equal(t, "user-1", capturedInfo.UserID)
 		assert.Equal(t, "alice", capturedInfo.Username)
 		assert.Equal(t, "10.0.0.1", capturedInfo.IPAddress)

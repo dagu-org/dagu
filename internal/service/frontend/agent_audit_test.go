@@ -21,7 +21,7 @@ func TestNewAgentAuditHook(t *testing.T) {
 	info := agent.ToolExecInfo{
 		ToolName:       "bash",
 		Input:          json.RawMessage(`{"command":"echo hello"}`),
-		ConversationID: "conv-123",
+		SessionID: "conv-123",
 		UserID:         "user-1",
 		Username:       "alice",
 		IPAddress:      "192.168.1.1",
@@ -45,7 +45,7 @@ func TestNewAgentAuditHook(t *testing.T) {
 	var details map[string]any
 	require.NoError(t, json.Unmarshal([]byte(entry.Details), &details))
 	assert.Equal(t, "echo hello", details["command"])
-	assert.Equal(t, "conv-123", details["conversation_id"])
+	assert.Equal(t, "conv-123", details["session_id"])
 	// command output should NOT be in audit details
 	assert.NotContains(t, entry.Details, "hello\n")
 }
@@ -60,7 +60,7 @@ func TestNewAgentAuditHook_FailedAction(t *testing.T) {
 	info := agent.ToolExecInfo{
 		ToolName:       "bash",
 		Input:          json.RawMessage(`{"command":"exit 1"}`),
-		ConversationID: "conv-456",
+		SessionID: "conv-456",
 		UserID:         "user-2",
 		Username:       "bob",
 		Audit: &agent.AuditInfo{
@@ -106,7 +106,7 @@ func TestNewAgentAuditHook_NilDetailExtractor(t *testing.T) {
 	info := agent.ToolExecInfo{
 		ToolName:       "custom_tool",
 		Input:          json.RawMessage(`{"key":"value"}`),
-		ConversationID: "conv-789",
+		SessionID: "conv-789",
 		UserID:         "user-3",
 		Username:       "charlie",
 		Audit: &agent.AuditInfo{
@@ -123,8 +123,8 @@ func TestNewAgentAuditHook_NilDetailExtractor(t *testing.T) {
 
 	var details map[string]any
 	require.NoError(t, json.Unmarshal([]byte(entry.Details), &details))
-	assert.Equal(t, "conv-789", details["conversation_id"])
-	// Only conversation_id should be present (no extracted details)
+	assert.Equal(t, "conv-789", details["session_id"])
+	// Only session_id should be present (no extracted details)
 	assert.Len(t, details, 1)
 }
 

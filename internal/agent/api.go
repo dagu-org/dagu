@@ -61,36 +61,36 @@ func getUserContextFromRequest(r *http.Request) (userID, username, ipAddress str
 
 // API handles HTTP requests for the agent.
 type API struct {
-	conversations sync.Map // id -> *ConversationManager (active conversations)
-	store         ConversationStore
-	configStore   ConfigStore
-	modelStore    ModelStore
-	providers     *ProviderCache
-	workingDir    string
-	logger        *slog.Logger
-	dagStore      exec.DAGStore // For resolving DAG file paths
-	environment   EnvironmentInfo
-	hooks         *Hooks
+	sessions    sync.Map // id -> *SessionManager (active sessions)
+	store       SessionStore
+	configStore ConfigStore
+	modelStore  ModelStore
+	providers   *ProviderCache
+	workingDir  string
+	logger      *slog.Logger
+	dagStore    exec.DAGStore // For resolving DAG file paths
+	environment EnvironmentInfo
+	hooks       *Hooks
 }
 
 // APIConfig contains configuration for the API.
 type APIConfig struct {
-	ConfigStore       ConfigStore
-	ModelStore        ModelStore
-	WorkingDir        string
-	Logger            *slog.Logger
-	ConversationStore ConversationStore
-	DAGStore          exec.DAGStore // For resolving DAG file paths
-	Environment       EnvironmentInfo
-	Hooks             *Hooks
+	ConfigStore  ConfigStore
+	ModelStore   ModelStore
+	WorkingDir   string
+	Logger       *slog.Logger
+	SessionStore SessionStore
+	DAGStore     exec.DAGStore // For resolving DAG file paths
+	Environment  EnvironmentInfo
+	Hooks        *Hooks
 }
 
-// ConversationWithState is a conversation with its current state.
-type ConversationWithState struct {
-	Conversation Conversation `json:"conversation"`
-	Working      bool         `json:"working"`
-	Model        string       `json:"model,omitempty"`
-	TotalCost    float64      `json:"total_cost"`
+// SessionWithState is a session with its current state.
+type SessionWithState struct {
+	Session   Session `json:"session"`
+	Working   bool    `json:"working"`
+	Model     string  `json:"model,omitempty"`
+	TotalCost float64 `json:"total_cost"`
 }
 
 // NewAPI creates a new API instance.
@@ -106,7 +106,7 @@ func NewAPI(cfg APIConfig) *API {
 		providers:   NewProviderCache(),
 		workingDir:  cfg.WorkingDir,
 		logger:      logger,
-		store:       cfg.ConversationStore,
+		store:       cfg.SessionStore,
 		dagStore:    cfg.DAGStore,
 		environment: cfg.Environment,
 		hooks:       cfg.Hooks,
@@ -125,13 +125,13 @@ func (a *API) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler) htt
 			r.Use(authMiddleware)
 		}
 
-		// Conversation management
-		r.Post("/conversations/new", a.handleNewConversation)
-		r.Get("/conversations", a.handleListConversations)
+		// Session management
+		r.Post("/sessions/new", a.handleNewSession)
+		r.Get("/sessions", a.handleListSessions)
 
-		// Single conversation operations
-		r.Route("/conversations/{id}", func(r chi.Router) {
-			r.Get("/", a.handleGetConversation)
+		// Single session operations
+		r.Route("/sessions/{id}", func(r chi.Router) {
+			r.Get("/", a.handleGetSession)
 			r.Post("/chat", a.handleChat)
 			r.Get("/stream", a.handleStream)
 			r.Post("/cancel", a.handleCancel)
@@ -220,9 +220,9 @@ func formatContextLine(ctx ResolvedDAGContext) string {
 
 // selectModel returns the first non-empty model from the provided choices,
 // falling back to the default model from config.
-// Priority: requestModel > conversationModel > config default.
-func selectModel(requestModel, conversationModel, configModel string) string {
-	return cmp.Or(requestModel, conversationModel, configModel)
+// Priority: requestModel > sessionModel > config default.
+func selectModel(requestModel, sessionModel, configModel string) string {
+	return cmp.Or(requestModel, sessionModel, configModel)
 }
 
 // getDefaultModelID returns the default model ID from config.
@@ -265,7 +265,7 @@ func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider
 	return provider, model, nil
 }
 
-// createMessageCallback returns a persistence callback for the given conversation ID.
+// createMessageCallback returns a persistence callback for the given session ID.
 // Returns nil if no store is configured.
 func (a *API) createMessageCallback(id string) func(ctx context.Context, msg Message) error {
 	if a.store == nil {
@@ -276,19 +276,19 @@ func (a *API) createMessageCallback(id string) func(ctx context.Context, msg Mes
 	}
 }
 
-// persistNewConversation saves a new conversation to the store if configured.
-func (a *API) persistNewConversation(ctx context.Context, id, userID string, now time.Time) {
+// persistNewSession saves a new session to the store if configured.
+func (a *API) persistNewSession(ctx context.Context, id, userID string, now time.Time) {
 	if a.store == nil {
 		return
 	}
-	conv := &Conversation{
+	sess := &Session{
 		ID:        id,
 		UserID:    userID,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
-	if err := a.store.CreateConversation(ctx, conv); err != nil {
-		a.logger.Warn("Failed to persist conversation", "error", err)
+	if err := a.store.CreateSession(ctx, sess); err != nil {
+		a.logger.Warn("Failed to persist session", "error", err)
 	}
 }
 
@@ -312,9 +312,9 @@ func (a *API) respondError(w http.ResponseWriter, status int, code api.ErrorCode
 	respondErrorDirect(w, status, code, message)
 }
 
-// handleNewConversation creates a new conversation and sends the first message.
-// POST /api/v1/agent/conversations/new
-func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
+// handleNewSession creates a new session and sends the first message.
+// POST /api/v1/agent/sessions/new
+func (a *API) handleNewSession(w http.ResponseWriter, r *http.Request) {
 	var req ChatRequest
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -340,7 +340,7 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 	id := uuid.New().String()
 	now := time.Now()
 
-	mgr := NewConversationManager(ConversationManagerConfig{
+	mgr := NewSessionManager(SessionManagerConfig{
 		ID:              id,
 		UserID:          userID,
 		Logger:          a.logger,
@@ -355,8 +355,8 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 		OutputCostPer1M: modelCfg.OutputCostPer1M,
 	})
 
-	a.persistNewConversation(r.Context(), id, userID, now)
-	a.conversations.Store(id, mgr)
+	a.persistNewSession(r.Context(), id, userID, now)
+	a.sessions.Store(id, mgr)
 
 	messageWithContext := a.formatMessage(r.Context(), req.Message, req.DAGContexts)
 	if err := mgr.AcceptUserMessage(r.Context(), provider, model, modelCfg.Model, messageWithContext); err != nil {
@@ -365,35 +365,35 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a.respondJSON(w, http.StatusCreated, NewConversationResponse{
-		ConversationID: id,
-		Status:         "accepted",
+	a.respondJSON(w, http.StatusCreated, NewSessionResponse{
+		SessionID: id,
+		Status:    "accepted",
 	})
 }
 
-// handleListConversations lists all conversations for the current user.
-// GET /api/v1/agent/conversations
-func (a *API) handleListConversations(w http.ResponseWriter, r *http.Request) {
+// handleListSessions lists all sessions for the current user.
+// GET /api/v1/agent/sessions
+func (a *API) handleListSessions(w http.ResponseWriter, r *http.Request) {
 	userID := getUserIDFromContext(r.Context())
 
 	activeIDs := make(map[string]struct{})
-	conversations := a.collectActiveConversations(userID, activeIDs)
-	conversations = a.appendPersistedConversations(r.Context(), userID, activeIDs, conversations)
+	sessions := a.collectActiveSessions(userID, activeIDs)
+	sessions = a.appendPersistedSessions(r.Context(), userID, activeIDs, sessions)
 
-	// Ensure we return [] instead of null in JSON when no conversations exist
-	if conversations == nil {
-		conversations = []ConversationWithState{}
+	// Ensure we return [] instead of null in JSON when no sessions exist
+	if sessions == nil {
+		sessions = []SessionWithState{}
 	}
 
-	a.respondJSON(w, http.StatusOK, conversations)
+	a.respondJSON(w, http.StatusOK, sessions)
 }
 
-// collectActiveConversations gathers active conversations for a user.
-func (a *API) collectActiveConversations(userID string, activeIDs map[string]struct{}) []ConversationWithState {
-	var conversations []ConversationWithState
+// collectActiveSessions gathers active sessions for a user.
+func (a *API) collectActiveSessions(userID string, activeIDs map[string]struct{}) []SessionWithState {
+	var sessions []SessionWithState
 
-	a.conversations.Range(func(key, value any) bool {
-		mgr, ok := value.(*ConversationManager)
+	a.sessions.Range(func(key, value any) bool {
+		mgr, ok := value.(*SessionManager)
 		if !ok {
 			return true // skip invalid entry
 		}
@@ -406,88 +406,88 @@ func (a *API) collectActiveConversations(userID string, activeIDs map[string]str
 			return true // skip invalid key
 		}
 		activeIDs[id] = struct{}{}
-		conversations = append(conversations, ConversationWithState{
-			Conversation: mgr.GetConversation(),
-			Working:      mgr.IsWorking(),
-			Model:        mgr.GetModel(),
-			TotalCost:    mgr.GetTotalCost(),
+		sessions = append(sessions, SessionWithState{
+			Session:   mgr.GetSession(),
+			Working:   mgr.IsWorking(),
+			Model:     mgr.GetModel(),
+			TotalCost: mgr.GetTotalCost(),
 		})
 		return true
 	})
 
-	return conversations
+	return sessions
 }
 
-// appendPersistedConversations adds non-active persisted conversations to the list.
-func (a *API) appendPersistedConversations(ctx context.Context, userID string, activeIDs map[string]struct{}, conversations []ConversationWithState) []ConversationWithState {
+// appendPersistedSessions adds non-active persisted sessions to the list.
+func (a *API) appendPersistedSessions(ctx context.Context, userID string, activeIDs map[string]struct{}, sessions []SessionWithState) []SessionWithState {
 	if a.store == nil {
-		return conversations
+		return sessions
 	}
 
-	persisted, err := a.store.ListConversations(ctx, userID)
+	persisted, err := a.store.ListSessions(ctx, userID)
 	if err != nil {
-		a.logger.Warn("Failed to list persisted conversations", "error", err)
-		return conversations
+		a.logger.Warn("Failed to list persisted sessions", "error", err)
+		return sessions
 	}
 
-	for _, conv := range persisted {
-		if _, exists := activeIDs[conv.ID]; exists {
+	for _, sess := range persisted {
+		if _, exists := activeIDs[sess.ID]; exists {
 			continue
 		}
-		conversations = append(conversations, ConversationWithState{
-			Conversation: *conv,
-			Working:      false,
+		sessions = append(sessions, SessionWithState{
+			Session: *sess,
+			Working: false,
 		})
 	}
 
-	return conversations
+	return sessions
 }
 
-// handleGetConversation returns conversation details and messages.
-// GET /api/v1/agent/conversations/{id}
-func (a *API) handleGetConversation(w http.ResponseWriter, r *http.Request) {
+// handleGetSession returns session details and messages.
+// GET /api/v1/agent/sessions/{id}
+func (a *API) handleGetSession(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID := getUserIDFromContext(r.Context())
 
-	// Check active conversations first
-	if mgr, ok := a.getActiveConversation(id, userID); ok {
+	// Check active sessions first
+	if mgr, ok := a.getActiveSession(id, userID); ok {
 		a.respondJSON(w, http.StatusOK, StreamResponse{
-			Messages:     mgr.GetMessages(),
-			Conversation: ptrTo(mgr.GetConversation()),
-			ConversationState: &ConversationState{
-				ConversationID: id,
-				Working:        mgr.IsWorking(),
-				Model:          mgr.GetModel(),
-				TotalCost:      mgr.GetTotalCost(),
+			Messages: mgr.GetMessages(),
+			Session:  ptrTo(mgr.GetSession()),
+			SessionState: &SessionState{
+				SessionID: id,
+				Working:   mgr.IsWorking(),
+				Model:     mgr.GetModel(),
+				TotalCost: mgr.GetTotalCost(),
 			},
 		})
 		return
 	}
 
-	// Fall back to store for inactive conversations
-	conv, messages, ok := a.getStoredConversation(r.Context(), id, userID)
+	// Fall back to store for inactive sessions
+	sess, messages, ok := a.getStoredSession(r.Context(), id, userID)
 	if !ok {
-		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Conversation not found")
+		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Session not found")
 		return
 	}
 
 	a.respondJSON(w, http.StatusOK, StreamResponse{
-		Messages:     messages,
-		Conversation: conv,
-		ConversationState: &ConversationState{
-			ConversationID: id,
-			Working:        false,
+		Messages: messages,
+		Session:  sess,
+		SessionState: &SessionState{
+			SessionID: id,
+			Working:   false,
 		},
 	})
 }
 
-// getActiveConversation retrieves an active conversation if it exists and belongs to the user.
-func (a *API) getActiveConversation(id, userID string) (*ConversationManager, bool) {
-	mgrValue, ok := a.conversations.Load(id)
+// getActiveSession retrieves an active session if it exists and belongs to the user.
+func (a *API) getActiveSession(id, userID string) (*SessionManager, bool) {
+	mgrValue, ok := a.sessions.Load(id)
 	if !ok {
 		return nil, false
 	}
-	mgr, ok := mgrValue.(*ConversationManager)
+	mgr, ok := mgrValue.(*SessionManager)
 	if !ok {
 		return nil, false
 	}
@@ -497,14 +497,14 @@ func (a *API) getActiveConversation(id, userID string) (*ConversationManager, bo
 	return mgr, true
 }
 
-// getStoredConversation retrieves a conversation from the store if it exists and belongs to the user.
-func (a *API) getStoredConversation(ctx context.Context, id, userID string) (*Conversation, []Message, bool) {
+// getStoredSession retrieves a session from the store if it exists and belongs to the user.
+func (a *API) getStoredSession(ctx context.Context, id, userID string) (*Session, []Message, bool) {
 	if a.store == nil {
 		return nil, nil, false
 	}
 
-	conv, err := a.store.GetConversation(ctx, id)
-	if err != nil || conv == nil || conv.UserID != userID {
+	sess, err := a.store.GetSession(ctx, id)
+	if err != nil || sess == nil || sess.UserID != userID {
 		return nil, nil, false
 	}
 
@@ -514,18 +514,18 @@ func (a *API) getStoredConversation(ctx context.Context, id, userID string) (*Co
 		messages = []Message{}
 	}
 
-	return conv, messages, true
+	return sess, messages, true
 }
 
-// handleChat sends a message to an existing conversation.
-// POST /api/v1/agent/conversations/{id}/chat
+// handleChat sends a message to an existing session.
+// POST /api/v1/agent/sessions/{id}/chat
 func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID, username, ipAddress := getUserContextFromRequest(r)
 
-	mgr, ok := a.getOrReactivateConversation(r.Context(), id, userID, username, ipAddress)
+	mgr, ok := a.getOrReactivateSession(r.Context(), id, userID, username, ipAddress)
 	if !ok {
-		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Conversation not found")
+		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Session not found")
 		return
 	}
 
@@ -563,25 +563,25 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 	a.respondJSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
 }
 
-// getOrReactivateConversation retrieves an active conversation or reactivates it from storage.
-func (a *API) getOrReactivateConversation(ctx context.Context, id, userID, username, ipAddress string) (*ConversationManager, bool) {
-	// Check active conversations first
-	if mgr, ok := a.getActiveConversation(id, userID); ok {
+// getOrReactivateSession retrieves an active session or reactivates it from storage.
+func (a *API) getOrReactivateSession(ctx context.Context, id, userID, username, ipAddress string) (*SessionManager, bool) {
+	// Check active sessions first
+	if mgr, ok := a.getActiveSession(id, userID); ok {
 		return mgr, true
 	}
 
 	// Try to reactivate from store
-	return a.reactivateConversation(ctx, id, userID, username, ipAddress)
+	return a.reactivateSession(ctx, id, userID, username, ipAddress)
 }
 
-// reactivateConversation restores a conversation from storage and makes it active.
-func (a *API) reactivateConversation(ctx context.Context, id, userID, username, ipAddress string) (*ConversationManager, bool) {
+// reactivateSession restores a session from storage and makes it active.
+func (a *API) reactivateSession(ctx context.Context, id, userID, username, ipAddress string) (*SessionManager, bool) {
 	if a.store == nil {
 		return nil, false
 	}
 
-	conv, err := a.store.GetConversation(ctx, id)
-	if err != nil || conv == nil || conv.UserID != userID {
+	sess, err := a.store.GetSession(ctx, id)
+	if err != nil || sess == nil || sess.UserID != userID {
 		return nil, false
 	}
 
@@ -596,7 +596,7 @@ func (a *API) reactivateConversation(ctx context.Context, id, userID, username, 
 		seqID = int64(len(messages))
 	}
 
-	mgr := NewConversationManager(ConversationManagerConfig{
+	mgr := NewSessionManager(SessionManagerConfig{
 		ID:          id,
 		UserID:      userID,
 		Logger:      a.logger,
@@ -605,25 +605,25 @@ func (a *API) reactivateConversation(ctx context.Context, id, userID, username, 
 		History:     messages,
 		SequenceID:  seqID,
 		Environment: a.environment,
-		SafeMode:    true, // Default to safe mode for reactivated conversations
+		SafeMode:    true, // Default to safe mode for reactivated sessions
 		Hooks:       a.hooks,
 		Username:    username,
 		IPAddress:   ipAddress,
 	})
-	a.conversations.Store(id, mgr)
+	a.sessions.Store(id, mgr)
 
 	return mgr, true
 }
 
-// handleStream provides SSE streaming for conversation updates.
-// GET /api/v1/agent/conversations/{id}/stream
+// handleStream provides SSE streaming for session updates.
+// GET /api/v1/agent/sessions/{id}/stream
 func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID := getUserIDFromContext(r.Context())
 
-	mgr, ok := a.getActiveConversation(id, userID)
+	mgr, ok := a.getActiveSession(id, userID)
 	if !ok {
-		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Conversation not found")
+		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Session not found")
 		return
 	}
 
@@ -703,21 +703,21 @@ func (a *API) sendSSEMessage(w http.ResponseWriter, data any) {
 	}
 }
 
-// handleCancel cancels an active conversation.
-// POST /api/v1/agent/conversations/{id}/cancel
+// handleCancel cancels an active session.
+// POST /api/v1/agent/sessions/{id}/cancel
 func (a *API) handleCancel(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID := getUserIDFromContext(r.Context())
 
-	mgr, ok := a.getActiveConversation(id, userID)
+	mgr, ok := a.getActiveSession(id, userID)
 	if !ok {
-		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Conversation not found")
+		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Session not found")
 		return
 	}
 
 	if err := mgr.Cancel(r.Context()); err != nil {
-		a.logger.Error("Failed to cancel conversation", "error", err)
-		a.respondError(w, http.StatusInternalServerError, api.ErrorCodeInternalError, "Failed to cancel conversation")
+		a.logger.Error("Failed to cancel session", "error", err)
+		a.respondError(w, http.StatusInternalServerError, api.ErrorCodeInternalError, "Failed to cancel session")
 		return
 	}
 
@@ -725,14 +725,14 @@ func (a *API) handleCancel(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleUserResponse submits a user's response to an agent prompt.
-// POST /api/v1/agent/conversations/{id}/respond
+// POST /api/v1/agent/sessions/{id}/respond
 func (a *API) handleUserResponse(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID := getUserIDFromContext(r.Context())
 
-	mgr, ok := a.getActiveConversation(id, userID)
+	mgr, ok := a.getActiveSession(id, userID)
 	if !ok {
-		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Conversation not found")
+		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Session not found")
 		return
 	}
 
@@ -756,13 +756,13 @@ func (a *API) handleUserResponse(w http.ResponseWriter, r *http.Request) {
 	a.respondJSON(w, http.StatusOK, map[string]string{"status": "accepted"})
 }
 
-// idleConversationTimeout is the duration after which idle conversations are cleaned up.
-const idleConversationTimeout = 30 * time.Minute
+// idleSessionTimeout is the duration after which idle sessions are cleaned up.
+const idleSessionTimeout = 30 * time.Minute
 
 // cleanupInterval is how often the cleanup goroutine runs.
 const cleanupInterval = 5 * time.Minute
 
-// StartCleanup begins periodic cleanup of idle conversations.
+// StartCleanup begins periodic cleanup of idle sessions.
 // It should be called once when the API is initialized and will
 // stop when the context is cancelled.
 func (a *API) StartCleanup(ctx context.Context) {
@@ -775,23 +775,23 @@ func (a *API) StartCleanup(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				a.cleanupIdleConversations()
+				a.cleanupIdleSessions()
 			}
 		}
 	}()
 }
 
-// cleanupIdleConversations removes conversations that have been idle too long and are not working.
-func (a *API) cleanupIdleConversations() {
-	cutoff := time.Now().Add(-idleConversationTimeout)
+// cleanupIdleSessions removes sessions that have been idle too long and are not working.
+func (a *API) cleanupIdleSessions() {
+	cutoff := time.Now().Add(-idleSessionTimeout)
 	var toDelete []string
 
-	a.conversations.Range(func(key, value any) bool {
+	a.sessions.Range(func(key, value any) bool {
 		id, ok := key.(string)
 		if !ok {
 			return true
 		}
-		mgr, ok := value.(*ConversationManager)
+		mgr, ok := value.(*SessionManager)
 		if !ok {
 			return true
 		}
@@ -802,8 +802,8 @@ func (a *API) cleanupIdleConversations() {
 	})
 
 	for _, id := range toDelete {
-		a.conversations.Delete(id)
-		a.logger.Debug("Cleaned up idle conversation", "conversation_id", id)
+		a.sessions.Delete(id)
+		a.logger.Debug("Cleaned up idle session", "session_id", id)
 	}
 }
 

@@ -79,15 +79,15 @@ func (s *apiTestSetup) get(path string) *httptest.ResponseRecorder {
 	return rec
 }
 
-// createConversation creates a new conversation and returns its ID.
-func (s *apiTestSetup) createConversation(t *testing.T, message string) string {
+// createSession creates a new session and returns its ID.
+func (s *apiTestSetup) createSession(t *testing.T, message string) string {
 	t.Helper()
-	rec := s.postJSON("/api/v1/agent/conversations/new", ChatRequest{Message: message})
+	rec := s.postJSON("/api/v1/agent/sessions/new", ChatRequest{Message: message})
 	require.Equal(t, http.StatusCreated, rec.Code)
 
-	var resp NewConversationResponse
+	var resp NewSessionResponse
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
-	return resp.ConversationID
+	return resp.SessionID
 }
 
 func TestNewAPI(t *testing.T) {
@@ -156,20 +156,20 @@ func TestAPI_EnabledMiddleware(t *testing.T) {
 	})
 }
 
-func TestAPI_HandleNewConversation(t *testing.T) {
+func TestAPI_HandleNewSession(t *testing.T) {
 	t.Parallel()
 
-	t.Run("creates conversation", func(t *testing.T) {
+	t.Run("creates session", func(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		rec := setup.postJSON("/api/v1/agent/conversations/new", ChatRequest{Message: "hello"})
+		rec := setup.postJSON("/api/v1/agent/sessions/new", ChatRequest{Message: "hello"})
 
 		assert.Equal(t, http.StatusCreated, rec.Code)
 
-		var resp NewConversationResponse
+		var resp NewSessionResponse
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
-		assert.NotEmpty(t, resp.ConversationID)
+		assert.NotEmpty(t, resp.SessionID)
 		assert.Equal(t, "accepted", resp.Status)
 	})
 
@@ -177,7 +177,7 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		rec := setup.postJSON("/api/v1/agent/conversations/new", ChatRequest{Message: ""})
+		rec := setup.postJSON("/api/v1/agent/sessions/new", ChatRequest{Message: ""})
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
@@ -186,7 +186,7 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, false, false, "")
-		rec := setup.postJSON("/api/v1/agent/conversations/new", ChatRequest{Message: "hello"})
+		rec := setup.postJSON("/api/v1/agent/sessions/new", ChatRequest{Message: "hello"})
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
@@ -196,7 +196,7 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 
 		setup := newAPITestSetup(t, true, true, "")
 
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/conversations/new", bytes.NewReader([]byte("invalid")))
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/sessions/new", bytes.NewReader([]byte("invalid")))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		setup.router.ServeHTTP(rec, req)
@@ -208,7 +208,7 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, false, "")
-		rec := setup.postJSON("/api/v1/agent/conversations/new", ChatRequest{Message: "hello"})
+		rec := setup.postJSON("/api/v1/agent/sessions/new", ChatRequest{Message: "hello"})
 
 		assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
 	})
@@ -217,7 +217,7 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		rec := setup.postJSON("/api/v1/agent/conversations/new", ChatRequest{
+		rec := setup.postJSON("/api/v1/agent/sessions/new", ChatRequest{
 			Message: "hello",
 			Model:   "test-model",
 		})
@@ -225,19 +225,19 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 		assert.Equal(t, http.StatusCreated, rec.Code)
 	})
 
-	t.Run("with conversation store persistence", func(t *testing.T) {
+	t.Run("with session store persistence", func(t *testing.T) {
 		t.Parallel()
 
 		model := testModelConfig("test-model")
 		configStore := newMockConfigStore(true)
 		configStore.config.DefaultModelID = model.ID
-		convStore := newMockConversationStore()
+		sessStore := newMockSessionStore()
 
 		api := NewAPI(APIConfig{
-			ConfigStore:       configStore,
-			ModelStore:        newMockModelStore().addModel(model),
-			WorkingDir:        t.TempDir(),
-			ConversationStore: convStore,
+			ConfigStore:  configStore,
+			ModelStore:   newMockModelStore().addModel(model),
+			WorkingDir:   t.TempDir(),
+			SessionStore: sessStore,
 		})
 		api.providers.Set(model.ToLLMConfig(), &mockLLMProvider{})
 
@@ -245,56 +245,56 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 		api.RegisterRoutes(r, nil)
 
 		body, _ := json.Marshal(ChatRequest{Message: "hello"})
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/conversations/new", bytes.NewReader(body))
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/sessions/new", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusCreated, rec.Code)
 
-		var resp NewConversationResponse
+		var resp NewSessionResponse
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 
-		assert.True(t, convStore.HasConversation(resp.ConversationID), "conversation should be persisted")
+		assert.True(t, sessStore.HasSession(resp.SessionID), "session should be persisted")
 	})
 }
 
-func TestAPI_HandleListConversations(t *testing.T) {
+func TestAPI_HandleListSessions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("returns empty list", func(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, false, "")
-		rec := setup.get("/api/v1/agent/conversations")
+		rec := setup.get("/api/v1/agent/sessions")
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 
-		var conversations []ConversationWithState
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &conversations))
-		assert.Empty(t, conversations)
+		var sessions []SessionWithState
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &sessions))
+		assert.Empty(t, sessions)
 	})
 
-	t.Run("returns active conversations", func(t *testing.T) {
+	t.Run("returns active sessions", func(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		setup.createConversation(t, "hello")
+		setup.createSession(t, "hello")
 
-		rec := setup.get("/api/v1/agent/conversations")
+		rec := setup.get("/api/v1/agent/sessions")
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 
-		var conversations []ConversationWithState
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &conversations))
-		assert.Len(t, conversations, 1)
+		var sessions []SessionWithState
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &sessions))
+		assert.Len(t, sessions, 1)
 	})
 
 	t.Run("agent disabled returns not found", func(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, false, false, "")
-		rec := setup.get("/api/v1/agent/conversations")
+		rec := setup.get("/api/v1/agent/sessions")
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
@@ -303,22 +303,22 @@ func TestAPI_HandleListConversations(t *testing.T) {
 func TestAPI_HandleCancel(t *testing.T) {
 	t.Parallel()
 
-	t.Run("not found for non-existent conversation", func(t *testing.T) {
+	t.Run("not found for non-existent session", func(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, false, "")
-		rec := setup.postJSON("/api/v1/agent/conversations/non-existent/cancel", nil)
+		rec := setup.postJSON("/api/v1/agent/sessions/non-existent/cancel", nil)
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
 
-	t.Run("cancels active conversation", func(t *testing.T) {
+	t.Run("cancels active session", func(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		convID := setup.createConversation(t, "hello")
+		sessID := setup.createSession(t, "hello")
 
-		rec := setup.postJSON("/api/v1/agent/conversations/"+convID+"/cancel", nil)
+		rec := setup.postJSON("/api/v1/agent/sessions/"+sessID+"/cancel", nil)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -328,54 +328,54 @@ func TestAPI_HandleCancel(t *testing.T) {
 	})
 }
 
-func TestAPI_HandleGetConversation(t *testing.T) {
+func TestAPI_HandleGetSession(t *testing.T) {
 	t.Parallel()
 
-	t.Run("not found for non-existent conversation", func(t *testing.T) {
+	t.Run("not found for non-existent session", func(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, false, "")
-		rec := setup.get("/api/v1/agent/conversations/non-existent")
+		rec := setup.get("/api/v1/agent/sessions/non-existent")
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
 
-	t.Run("returns active conversation", func(t *testing.T) {
+	t.Run("returns active session", func(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		convID := setup.createConversation(t, "hello")
+		sessID := setup.createSession(t, "hello")
 
-		rec := setup.get("/api/v1/agent/conversations/" + convID)
+		rec := setup.get("/api/v1/agent/sessions/" + sessID)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 
 		var getResp StreamResponse
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &getResp))
-		assert.NotNil(t, getResp.ConversationState)
-		assert.Equal(t, convID, getResp.ConversationState.ConversationID)
+		assert.NotNil(t, getResp.SessionState)
+		assert.Equal(t, sessID, getResp.SessionState.SessionID)
 	})
 }
 
 func TestAPI_HandleChat(t *testing.T) {
 	t.Parallel()
 
-	t.Run("not found for non-existent conversation", func(t *testing.T) {
+	t.Run("not found for non-existent session", func(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, false, "")
-		rec := setup.postJSON("/api/v1/agent/conversations/non-existent/chat", ChatRequest{Message: "hello"})
+		rec := setup.postJSON("/api/v1/agent/sessions/non-existent/chat", ChatRequest{Message: "hello"})
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
 
-	t.Run("sends message to existing conversation", func(t *testing.T) {
+	t.Run("sends message to existing session", func(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		convID := setup.createConversation(t, "hello")
+		sessID := setup.createSession(t, "hello")
 
-		rec := setup.postJSON("/api/v1/agent/conversations/"+convID+"/chat", ChatRequest{Message: "follow up"})
+		rec := setup.postJSON("/api/v1/agent/sessions/"+sessID+"/chat", ChatRequest{Message: "follow up"})
 
 		assert.Equal(t, http.StatusAccepted, rec.Code)
 
@@ -388,9 +388,9 @@ func TestAPI_HandleChat(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		convID := setup.createConversation(t, "hello")
+		sessID := setup.createSession(t, "hello")
 
-		rec := setup.postJSON("/api/v1/agent/conversations/"+convID+"/chat", ChatRequest{Message: ""})
+		rec := setup.postJSON("/api/v1/agent/sessions/"+sessID+"/chat", ChatRequest{Message: ""})
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
@@ -399,9 +399,9 @@ func TestAPI_HandleChat(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		convID := setup.createConversation(t, "hello")
+		sessID := setup.createSession(t, "hello")
 
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/conversations/"+convID+"/chat", bytes.NewReader([]byte("invalid")))
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/sessions/"+sessID+"/chat", bytes.NewReader([]byte("invalid")))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		setup.router.ServeHTTP(rec, req)
@@ -413,23 +413,23 @@ func TestAPI_HandleChat(t *testing.T) {
 func TestAPI_HandleStream(t *testing.T) {
 	t.Parallel()
 
-	t.Run("not found for non-existent conversation", func(t *testing.T) {
+	t.Run("not found for non-existent session", func(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, false, "")
-		rec := setup.get("/api/v1/agent/conversations/non-existent/stream")
+		rec := setup.get("/api/v1/agent/sessions/non-existent/stream")
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
 
-	t.Run("returns SSE headers for active conversation", func(t *testing.T) {
+	t.Run("returns SSE headers for active session", func(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		convID := setup.createConversation(t, "hello")
+		sessID := setup.createSession(t, "hello")
 
 		ctx, cancel := context.WithCancel(context.Background())
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/agent/conversations/"+convID+"/stream", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/agent/sessions/"+sessID+"/stream", nil)
 		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
 
@@ -577,35 +577,35 @@ func TestSelectModel(t *testing.T) {
 	tests := []struct {
 		name     string
 		request  string
-		conv     string
+		sess     string
 		config   string
 		expected string
 	}{
 		{
 			name:     "request model takes priority",
 			request:  "req-model",
-			conv:     "conv-model",
+			sess:     "sess-model",
 			config:   "cfg-model",
 			expected: "req-model",
 		},
 		{
-			name:     "conversation model when no request model",
+			name:     "session model when no request model",
 			request:  "",
-			conv:     "conv-model",
+			sess:     "sess-model",
 			config:   "cfg-model",
-			expected: "conv-model",
+			expected: "sess-model",
 		},
 		{
-			name:     "config model when no request or conversation model",
+			name:     "config model when no request or session model",
 			request:  "",
-			conv:     "",
+			sess:     "",
 			config:   "cfg-model",
 			expected: "cfg-model",
 		},
 		{
 			name:     "empty when all empty",
 			request:  "",
-			conv:     "",
+			sess:     "",
 			config:   "",
 			expected: "",
 		},
@@ -615,7 +615,7 @@ func TestSelectModel(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := selectModel(tc.request, tc.conv, tc.config)
+			result := selectModel(tc.request, tc.sess, tc.config)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
@@ -718,10 +718,10 @@ func TestAPI_ResolveProvider(t *testing.T) {
 	})
 }
 
-func TestAPI_HandleNewConversation_PassesPricing(t *testing.T) {
+func TestAPI_HandleNewSession_PassesPricing(t *testing.T) {
 	t.Parallel()
 
-	t.Run("conversation manager receives pricing from model config", func(t *testing.T) {
+	t.Run("session manager receives pricing from model config", func(t *testing.T) {
 		t.Parallel()
 
 		model := testModelConfig("priced-model")
@@ -735,19 +735,19 @@ func TestAPI_HandleNewConversation_PassesPricing(t *testing.T) {
 		api.RegisterRoutes(r, nil)
 
 		body, _ := json.Marshal(ChatRequest{Message: "hello"})
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/conversations/new", bytes.NewReader(body))
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/sessions/new", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusCreated, rec.Code)
 
-		var resp NewConversationResponse
+		var resp NewSessionResponse
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 
-		mgrVal, ok := api.conversations.Load(resp.ConversationID)
+		mgrVal, ok := api.sessions.Load(resp.SessionID)
 		require.True(t, ok)
-		mgr := mgrVal.(*ConversationManager)
+		mgr := mgrVal.(*SessionManager)
 
 		usage := &llm.Usage{PromptTokens: 1_000_000, CompletionTokens: 0}
 		cost := mgr.calculateCost(usage)
@@ -777,29 +777,29 @@ func TestAPI_HandleChat_UpdatesPricing(t *testing.T) {
 		r := chi.NewRouter()
 		api.RegisterRoutes(r, nil)
 
-		// Create conversation with model-a
+		// Create session with model-a
 		body, _ := json.Marshal(ChatRequest{Message: "hello", Model: "model-a"})
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/conversations/new", bytes.NewReader(body))
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/sessions/new", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, req)
 		require.Equal(t, http.StatusCreated, rec.Code)
 
-		var resp NewConversationResponse
+		var resp NewSessionResponse
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
-		convID := resp.ConversationID
+		sessID := resp.SessionID
 
 		// Send chat with model-b
 		body, _ = json.Marshal(ChatRequest{Message: "followup", Model: "model-b"})
-		req = httptest.NewRequest(http.MethodPost, "/api/v1/agent/conversations/"+convID+"/chat", bytes.NewReader(body))
+		req = httptest.NewRequest(http.MethodPost, "/api/v1/agent/sessions/"+sessID+"/chat", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		rec = httptest.NewRecorder()
 		r.ServeHTTP(rec, req)
 		require.Equal(t, http.StatusAccepted, rec.Code)
 
-		mgrVal, ok := api.conversations.Load(convID)
+		mgrVal, ok := api.sessions.Load(sessID)
 		require.True(t, ok)
-		mgr := mgrVal.(*ConversationManager)
+		mgr := mgrVal.(*SessionManager)
 
 		usage := &llm.Usage{PromptTokens: 1_000_000, CompletionTokens: 0}
 		cost := mgr.calculateCost(usage)
@@ -813,11 +813,11 @@ func TestAPI_RequestBodySizeLimit(t *testing.T) {
 	oversizedBody := bytes.Repeat([]byte("x"), maxRequestBodySize+1)
 
 	endpoints := []struct {
-		name        string
-		pathSuffix  string
-		needsConvID bool
+		name       string
+		pathSuffix string
+		needsSess  bool
 	}{
-		{"handleNewConversation", "/new", false},
+		{"handleNewSession", "/new", false},
 		{"handleChat", "/chat", true},
 		{"handleUserResponse", "/respond", true},
 	}
@@ -827,10 +827,10 @@ func TestAPI_RequestBodySizeLimit(t *testing.T) {
 			t.Parallel()
 
 			setup := newAPITestSetup(t, true, true, "")
-			path := "/api/v1/agent/conversations"
-			if ep.needsConvID {
-				convID := setup.createConversation(t, "hello")
-				path += "/" + convID
+			path := "/api/v1/agent/sessions"
+			if ep.needsSess {
+				sessID := setup.createSession(t, "hello")
+				path += "/" + sessID
 			}
 			path += ep.pathSuffix
 
@@ -844,7 +844,7 @@ func TestAPI_RequestBodySizeLimit(t *testing.T) {
 	}
 }
 
-func TestAPI_CleanupIdleConversations(t *testing.T) {
+func TestAPI_CleanupIdleSessions(t *testing.T) {
 	t.Parallel()
 
 	newTestAPI := func(t *testing.T) *API {
@@ -855,8 +855,8 @@ func TestAPI_CleanupIdleConversations(t *testing.T) {
 		})
 	}
 
-	newIdleMgr := func(id string, working bool) *ConversationManager {
-		mgr := NewConversationManager(ConversationManagerConfig{ID: id})
+	newIdleMgr := func(id string, working bool) *SessionManager {
+		mgr := NewSessionManager(SessionManagerConfig{ID: id})
 		mgr.mu.Lock()
 		mgr.lastActivity = time.Now().Add(-1 * time.Hour)
 		mgr.working = working
@@ -864,50 +864,50 @@ func TestAPI_CleanupIdleConversations(t *testing.T) {
 		return mgr
 	}
 
-	t.Run("removes idle non-working conversations", func(t *testing.T) {
+	t.Run("removes idle non-working sessions", func(t *testing.T) {
 		t.Parallel()
 
 		api := newTestAPI(t)
-		api.conversations.Store("idle-conv", newIdleMgr("idle-conv", false))
-		api.conversations.Store("active-conv", NewConversationManager(ConversationManagerConfig{ID: "active-conv"}))
+		api.sessions.Store("idle-sess", newIdleMgr("idle-sess", false))
+		api.sessions.Store("active-sess", NewSessionManager(SessionManagerConfig{ID: "active-sess"}))
 
-		api.cleanupIdleConversations()
+		api.cleanupIdleSessions()
 
-		_, idleExists := api.conversations.Load("idle-conv")
-		_, activeExists := api.conversations.Load("active-conv")
+		_, idleExists := api.sessions.Load("idle-sess")
+		_, activeExists := api.sessions.Load("active-sess")
 
-		assert.False(t, idleExists, "idle conversation should be removed")
-		assert.True(t, activeExists, "active conversation should remain")
+		assert.False(t, idleExists, "idle session should be removed")
+		assert.True(t, activeExists, "active session should remain")
 	})
 
-	t.Run("does not remove working conversations even if idle", func(t *testing.T) {
+	t.Run("does not remove working sessions even if idle", func(t *testing.T) {
 		t.Parallel()
 
 		api := newTestAPI(t)
-		api.conversations.Store("working-conv", newIdleMgr("working-conv", true))
+		api.sessions.Store("working-sess", newIdleMgr("working-sess", true))
 
-		api.cleanupIdleConversations()
+		api.cleanupIdleSessions()
 
-		_, exists := api.conversations.Load("working-conv")
-		assert.True(t, exists, "working conversation should not be removed even if idle")
+		_, exists := api.sessions.Load("working-sess")
+		assert.True(t, exists, "working session should not be removed even if idle")
 	})
 
-	t.Run("does nothing with empty conversations", func(t *testing.T) {
+	t.Run("does nothing with empty sessions", func(t *testing.T) {
 		t.Parallel()
 
 		api := newTestAPI(t)
-		api.cleanupIdleConversations()
+		api.cleanupIdleSessions()
 	})
 }
 
 func TestAPI_HandleUserResponse(t *testing.T) {
 	t.Parallel()
 
-	t.Run("not found for non-existent conversation", func(t *testing.T) {
+	t.Run("not found for non-existent session", func(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		rec := setup.postJSON("/api/v1/agent/conversations/non-existent/respond", UserPromptResponse{
+		rec := setup.postJSON("/api/v1/agent/sessions/non-existent/respond", UserPromptResponse{
 			PromptID:         "some-prompt",
 			FreeTextResponse: "yes",
 		})
@@ -919,9 +919,9 @@ func TestAPI_HandleUserResponse(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		convID := setup.createConversation(t, "hello")
+		sessID := setup.createSession(t, "hello")
 
-		rec := setup.postJSON("/api/v1/agent/conversations/"+convID+"/respond", UserPromptResponse{
+		rec := setup.postJSON("/api/v1/agent/sessions/"+sessID+"/respond", UserPromptResponse{
 			FreeTextResponse: "yes",
 		})
 

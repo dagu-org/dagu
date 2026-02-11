@@ -31,7 +31,7 @@ func NewThinkTool() *AgentTool {
 }
 
 // thinkRun acknowledges the thought without performing any action.
-// The thought content is automatically recorded in conversation history by the caller
+// The thought content is automatically recorded in session history by the caller
 // (agent loop), so the tool itself only needs to return an acknowledgment.
 func thinkRun(_ ToolContext, _ json.RawMessage) ToolOut {
 	return ToolOut{Content: "Thought recorded. Continue with your plan."}

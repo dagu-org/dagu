@@ -1091,7 +1091,7 @@
           "items": {
             "$ref": "#/definitions/llmMessage"
           },
-          "description": "Conversation messages for chat steps. Only valid when type is 'chat'. Supports variable substitution with ${VAR}."
+          "description": "Session messages for chat steps. Only valid when type is 'chat'. Supports variable substitution with ${VAR}."
         },
         "tools": {
           "type": "array",
@@ -2812,7 +2812,7 @@
         },
         "system": {
           "type": "string",
-          "description": "Default system prompt for conversations. Prepended to messages if specified."
+          "description": "Default system prompt for sessions. Prepended to messages if specified."
         },
         "temperature": {
           "type": "number",
@@ -2893,7 +2893,7 @@
           "description": "Message content. Supports variable substitution with ${VAR} syntax."
         }
       },
-      "description": "A single message in an LLM conversation."
+      "description": "A single message in an LLM session."
     },
     "executorType": {
       "type": "string",

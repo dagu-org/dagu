@@ -9,7 +9,7 @@ import (
 type ToolExecInfo struct {
 	ToolName       string
 	Input          json.RawMessage
-	ConversationID string
+	SessionID string
 	UserID         string
 	Username       string
 	IPAddress      string

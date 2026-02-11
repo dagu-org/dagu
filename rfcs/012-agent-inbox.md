@@ -346,7 +346,7 @@ When active: no browser notifications, no toasts. Badge still updates. Messages 
 | **Dashboard** | Login banner links to inbox. Dashboard = operational overview; inbox = personal notifications. |
 | **DAG Runs** | DAG Run detail page could show a "Messages" section for messages related to that run. Bidirectional navigation. |
 | **Audit Logs** | Separate purposes. Audit = compliance/admin. Inbox = personal. Message delivery is an auditable event. |
-| **Agent Chat** | Chat = real-time conversational. Inbox = async persistent. Agents can send inbox messages that persist beyond chat sessions. |
+| **Agent Chat** | Chat = real-time session-based. Inbox = async persistent. Agents can send inbox messages that persist beyond chat sessions. |
 
 ### Access Control
 
@@ -367,7 +367,7 @@ Not visible to unauthenticated users.
 
 - Email integration from inbox messages (inbox and `mailOn` remain separate channels)
 - Webhook delivery of inbox messages
-- Message threading/replies (for conversation, use Agent Chat)
+- Message threading/replies (for chat sessions, use Agent Chat)
 - @mentions
 - Rich media (images, charts) — deep-link instead
 - Custom notification sounds

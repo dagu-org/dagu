@@ -96,7 +96,7 @@ type step struct {
 	// Requires explicit type: chat (or future type: agent).
 	LLM *llmConfig `yaml:"llm,omitempty"`
 
-	// Messages contains the conversation messages for chat steps.
+	// Messages contains the session messages for chat steps.
 	// Only valid when type is "chat".
 	Messages []llmMessage `yaml:"messages,omitempty"`
 
@@ -149,7 +149,7 @@ type llmConfig struct {
 	// String example: "gpt-4o"
 	// Array example: [{provider: openai, name: gpt-4o}, {provider: anthropic, name: claude-sonnet-4-20250514}]
 	Model types.ModelValue `yaml:"model,omitempty"`
-	// System is the default system prompt for conversations.
+	// System is the default system prompt for sessions.
 	System string `yaml:"system,omitempty"`
 	// Temperature controls randomness (0.0-2.0).
 	Temperature *float64 `yaml:"temperature,omitempty"`
@@ -173,7 +173,7 @@ type llmConfig struct {
 	MaxToolIterations *int `yaml:"maxToolIterations,omitempty"`
 }
 
-// llmMessage defines a message in the LLM conversation.
+// llmMessage defines a message in the LLM session.
 type llmMessage struct {
 	// Role is the message role (system, user, assistant, tool).
 	Role string `yaml:"role,omitempty"`

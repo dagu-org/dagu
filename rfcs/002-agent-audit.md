@@ -27,19 +27,19 @@ No schema changes needed. Use the existing `agent` category for all agent tool e
 | Case | Category | Action | User | Details |
 |------|----------|--------|------|---------|
 | User runs DAG directly | dag | start | real user | dag_name |
-| Agent runs DAG | agent | dag_start | real user | dag_name, conversation_id |
-| Agent stops DAG | agent | dag_stop | real user | dag_name, run_id, conversation_id |
-| Agent executes bash | agent | bash_exec | real user | command, exit_code, conversation_id |
-| Agent reads file | agent | file_read | real user | path, conversation_id |
-| Agent modifies file | agent | file_patch | real user | path, conversation_id |
+| Agent runs DAG | agent | dag_start | real user | dag_name, session_id |
+| Agent stops DAG | agent | dag_stop | real user | dag_name, run_id, session_id |
+| Agent executes bash | agent | bash_exec | real user | command, exit_code, session_id |
+| Agent reads file | agent | file_read | real user | path, session_id |
+| Agent modifies file | agent | file_patch | real user | path, session_id |
 
 ### User Context
 
-Pass the authenticated user's identity from the conversation owner through agent tool executions, rather than defaulting to "admin".
+Pass the authenticated user's identity from the session owner through agent tool executions, rather than defaulting to "admin".
 
 ### Traceability
 
-Include `conversation_id` in the details field to trace actions back to specific agent conversations.
+Include `session_id` in the details field to trace actions back to specific agent sessions.
 
 ## Security Considerations
 

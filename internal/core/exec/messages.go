@@ -29,7 +29,7 @@ type ToolCallFunction struct {
 	Arguments string `json:"arguments"`
 }
 
-// LLMMessage represents a single message in the conversation.
+// LLMMessage represents a single message in the session.
 type LLMMessage struct {
 	// Role is the message role (system, user, assistant, tool).
 	Role core.LLMRole `json:"role"`

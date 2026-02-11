@@ -31,7 +31,7 @@ var (
 	ErrDeadlockDetected = errors.New("deadlock detected: no runnable nodes but DAG not finished")
 )
 
-// ChatMessagesHandler handles chat conversation messages for persistence.
+// ChatMessagesHandler handles chat session messages for persistence.
 type ChatMessagesHandler interface {
 	// WriteStepMessages writes messages for a single step.
 	WriteStepMessages(ctx context.Context, stepName string, messages []exec.LLMMessage) error

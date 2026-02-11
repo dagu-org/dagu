@@ -325,7 +325,7 @@ func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) error {
 		{"UsersDir", &cfg.Paths.UsersDir, def.Paths.UsersDir},
 		{"APIKeysDir", &cfg.Paths.APIKeysDir, def.Paths.APIKeysDir},
 		{"WebhooksDir", &cfg.Paths.WebhooksDir, def.Paths.WebhooksDir},
-		{"ConversationsDir", &cfg.Paths.ConversationsDir, def.Paths.ConversationsDir},
+		{"SessionsDir", &cfg.Paths.SessionsDir, def.Paths.SessionsDir},
 	}
 
 	for _, m := range pathMappings {
@@ -953,8 +953,8 @@ func (l *ConfigLoader) finalizePaths(cfg *Config) {
 		}
 	}
 
-	if cfg.Paths.ConversationsDir == "" {
-		cfg.Paths.ConversationsDir = filepath.Join(cfg.Paths.DataDir, "agent", "conversations")
+	if cfg.Paths.SessionsDir == "" {
+		cfg.Paths.SessionsDir = filepath.Join(cfg.Paths.DataDir, "agent", "sessions")
 	}
 
 	if cfg.Paths.Executable == "" {

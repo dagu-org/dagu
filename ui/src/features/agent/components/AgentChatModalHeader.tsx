@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
 import { useUserPreferences } from '@/contexts/UserPreference';
 
 import { useResizableDraggable } from '../hooks/useResizableDraggable';
-import { ConversationWithState } from '../types';
+import { SessionWithState } from '../types';
 import { formatCost } from '../utils/formatCost';
 
 function formatDate(dateStr: string): string {
@@ -33,11 +33,11 @@ function formatDate(dateStr: string): string {
 }
 
 type Props = {
-  conversationId: string | null;
-  conversations: ConversationWithState[];
+  sessionId: string | null;
+  sessions: SessionWithState[];
   totalCost?: number;
-  onSelectConversation: (id: string) => void;
-  onClearConversation: () => void;
+  onSelectSession: (id: string) => void;
+  onClearSession: () => void;
   onClose: () => void;
   dragHandlers?: ReturnType<typeof useResizableDraggable>['dragHandlers'];
   isMobile?: boolean;
@@ -45,11 +45,11 @@ type Props = {
 
 
 export function AgentChatModalHeader({
-  conversationId,
-  conversations,
+  sessionId,
+  sessions,
   totalCost,
-  onSelectConversation,
-  onClearConversation,
+  onSelectSession,
+  onClearSession,
   onClose,
   dragHandlers,
   isMobile,
@@ -67,26 +67,26 @@ export function AgentChatModalHeader({
       <div className="flex items-center gap-2 flex-1 min-w-0">
         <Terminal className="h-4 w-4 text-muted-foreground flex-shrink-0" />
         <Select
-          value={conversationId || 'new'}
-          onValueChange={onSelectConversation}
+          value={sessionId || 'new'}
+          onValueChange={onSelectSession}
         >
           <SelectTrigger className="h-6 w-auto max-w-[200px] px-2 text-xs bg-transparent border-none shadow-none hover:bg-accent">
-            <SelectValue placeholder="New conversation" />
+            <SelectValue placeholder="New session" />
           </SelectTrigger>
           <SelectContent className="bg-popover border-border">
             <SelectItem value="new" className="text-xs">
               <div className="flex items-center gap-1.5">
                 <Plus className="h-3 w-3" />
-                New conversation
+                New session
               </div>
             </SelectItem>
-            {conversations.map((conv) => (
+            {sessions.map((sess) => (
               <SelectItem
-                key={conv.conversation.id}
-                value={conv.conversation.id}
+                key={sess.session.id}
+                value={sess.session.id}
                 className="text-xs"
               >
-                {formatDate(conv.conversation.created_at)}
+                {formatDate(sess.session.created_at)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -127,9 +127,9 @@ export function AgentChatModalHeader({
           <Button
             variant="ghost"
             size="sm"
-            onClick={onClearConversation}
+            onClick={onClearSession}
             className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-            title="New conversation"
+            title="New session"
           >
             <Plus className="h-4 w-4" />
           </Button>
