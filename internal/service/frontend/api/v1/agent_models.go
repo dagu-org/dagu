@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	apigen "github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/agent"
@@ -67,7 +68,7 @@ func (a *API) ListAgentModels(ctx context.Context, _ apigen.ListAgentModelsReque
 		modelResponses = append(modelResponses, toModelConfigResponse(m))
 	}
 	resp := apigen.ListAgentModels200JSONResponse{
-		Models:         &modelResponses,
+		Models:         modelResponses,
 		DefaultModelId: ptrOf(defaultModelID),
 	}
 
@@ -89,7 +90,7 @@ func (a *API) CreateAgentModel(ctx context.Context, request apigen.CreateAgentMo
 	body := request.Body
 
 	// Validate provider
-	if _, err := llm.ParseProviderType(body.Provider); err != nil {
+	if _, err := llm.ParseProviderType(string(body.Provider)); err != nil {
 		return nil, &Error{
 			Code:       apigen.ErrorCodeBadRequest,
 			Message:    fmt.Sprintf("invalid provider '%s': valid options are anthropic, openai, gemini, openrouter, local", body.Provider),
@@ -103,11 +104,33 @@ func (a *API) CreateAgentModel(ctx context.Context, request apigen.CreateAgentMo
 		existingIDs := a.collectModelIDs(ctx)
 		id = agent.UniqueID(body.Name, existingIDs)
 	}
+	if err := agent.ValidateModelID(id); err != nil {
+		return nil, &Error{
+			Code:       apigen.ErrorCodeBadRequest,
+			Message:    fmt.Sprintf("invalid model ID: %v", err),
+			HTTPStatus: http.StatusBadRequest,
+		}
+	}
+
+	if strings.TrimSpace(body.Name) == "" {
+		return nil, &Error{
+			Code:       apigen.ErrorCodeBadRequest,
+			Message:    "name is required and cannot be empty",
+			HTTPStatus: http.StatusBadRequest,
+		}
+	}
+	if strings.TrimSpace(body.Model) == "" {
+		return nil, &Error{
+			Code:       apigen.ErrorCodeBadRequest,
+			Message:    "model is required and cannot be empty",
+			HTTPStatus: http.StatusBadRequest,
+		}
+	}
 
 	model := &agent.ModelConfig{
 		ID:               id,
 		Name:             body.Name,
-		Provider:         body.Provider,
+		Provider:         string(body.Provider),
 		Model:            body.Model,
 		APIKey:           valueOf(body.ApiKey),
 		BaseURL:          valueOf(body.BaseUrl),
@@ -133,7 +156,7 @@ func (a *API) CreateAgentModel(ctx context.Context, request apigen.CreateAgentMo
 	a.logAuditEntry(ctx, audit.CategoryAgent, auditActionModelCreate, map[string]any{
 		"model_id": id,
 		"name":     body.Name,
-		"provider": body.Provider,
+		"provider": string(body.Provider),
 	})
 
 	return apigen.CreateAgentModel201JSONResponse(toModelConfigResponse(model)), nil
@@ -161,6 +184,17 @@ func (a *API) UpdateAgentModel(ctx context.Context, request apigen.UpdateAgentMo
 
 	body := request.Body
 	applyModelUpdates(existing, body)
+
+	// Validate provider if it was updated
+	if body.Provider != nil {
+		if _, err := llm.ParseProviderType(string(*body.Provider)); err != nil {
+			return nil, &Error{
+				Code:       apigen.ErrorCodeBadRequest,
+				Message:    fmt.Sprintf("invalid provider '%s': valid options are anthropic, openai, gemini, openrouter, local", *body.Provider),
+				HTTPStatus: http.StatusBadRequest,
+			}
+		}
+	}
 
 	if err := a.agentModelStore.Update(ctx, existing); err != nil {
 		if errors.Is(err, agent.ErrModelAlreadyExists) {
@@ -249,11 +283,12 @@ func (a *API) ListModelPresets(ctx context.Context, _ apigen.ListModelPresetsReq
 		return nil, err
 	}
 
-	presets := make([]apigen.ModelPreset, 0, len(agent.ModelPresets))
-	for _, p := range agent.ModelPresets {
+	allPresets := agent.GetModelPresets()
+	presets := make([]apigen.ModelPreset, 0, len(allPresets))
+	for _, p := range allPresets {
 		presets = append(presets, apigen.ModelPreset{
 			Name:             p.Name,
-			Provider:         p.Provider,
+			Provider:         apigen.ModelPresetProvider(p.Provider),
 			Model:            p.Model,
 			ContextWindow:    ptrOf(p.ContextWindow),
 			MaxOutputTokens:  ptrOf(p.MaxOutputTokens),
@@ -264,7 +299,7 @@ func (a *API) ListModelPresets(ctx context.Context, _ apigen.ListModelPresetsReq
 		})
 	}
 
-	return apigen.ListModelPresets200JSONResponse{Presets: &presets}, nil
+	return apigen.ListModelPresets200JSONResponse{Presets: presets}, nil
 }
 
 func (a *API) requireAgentModelManagement() error {
@@ -281,7 +316,7 @@ func toModelConfigResponse(m *agent.ModelConfig) apigen.ModelConfigResponse {
 	return apigen.ModelConfigResponse{
 		Id:               m.ID,
 		Name:             m.Name,
-		Provider:         m.Provider,
+		Provider:         apigen.ModelConfigResponseProvider(m.Provider),
 		Model:            m.Model,
 		ApiKeyConfigured: ptrOf(m.APIKey != ""),
 		BaseUrl:          ptrOf(m.BaseURL),
@@ -295,13 +330,13 @@ func toModelConfigResponse(m *agent.ModelConfig) apigen.ModelConfigResponse {
 }
 
 func applyModelUpdates(model *agent.ModelConfig, update *apigen.UpdateModelConfigRequest) {
-	if update.Name != nil {
+	if update.Name != nil && strings.TrimSpace(*update.Name) != "" {
 		model.Name = *update.Name
 	}
 	if update.Provider != nil {
-		model.Provider = *update.Provider
+		model.Provider = string(*update.Provider)
 	}
-	if update.Model != nil {
+	if update.Model != nil && strings.TrimSpace(*update.Model) != "" {
 		model.Model = *update.Model
 	}
 	if update.ApiKey != nil {
@@ -348,7 +383,9 @@ func (a *API) autoSetDefaultModel(ctx context.Context, modelID string) {
 		return
 	}
 	cfg.DefaultModelID = modelID
-	_ = a.agentConfigStore.Save(ctx, cfg)
+	if err := a.agentConfigStore.Save(ctx, cfg); err != nil {
+		logger.Error(ctx, "Failed to auto-set default model", tag.Error(err))
+	}
 }
 
 func (a *API) resetDefaultIfNeeded(ctx context.Context, deletedModelID string) {
@@ -363,5 +400,7 @@ func (a *API) resetDefaultIfNeeded(ctx context.Context, deletedModelID string) {
 	} else {
 		cfg.DefaultModelID = models[0].ID
 	}
-	_ = a.agentConfigStore.Save(ctx, cfg)
+	if err := a.agentConfigStore.Save(ctx, cfg); err != nil {
+		logger.Error(ctx, "Failed to reset default model after deletion", tag.Error(err))
+	}
 }

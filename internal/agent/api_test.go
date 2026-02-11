@@ -652,3 +652,33 @@ func TestGetUserIDFromContext(t *testing.T) {
 		assert.Equal(t, defaultUserID, result)
 	})
 }
+
+func TestAPI_HandleUserResponse(t *testing.T) {
+	t.Parallel()
+
+	t.Run("not found for non-existent conversation", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAPITestSetup(t, true, true, "")
+		rec := setup.postJSON("/api/v1/agent/conversations/non-existent/respond", UserPromptResponse{
+			PromptID: "some-prompt",
+			FreeTextResponse: "yes",
+		})
+
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
+	t.Run("missing prompt_id returns bad request", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAPITestSetup(t, true, true, "")
+		convID := setup.createConversation(t, "hello")
+
+		rec := setup.postJSON("/api/v1/agent/conversations/"+convID+"/respond", UserPromptResponse{
+			PromptID: "",
+			FreeTextResponse: "yes",
+		})
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+}

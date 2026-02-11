@@ -3648,6 +3648,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListModelsResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         default:
           description: "Unexpected error"
           content:
@@ -3678,6 +3690,18 @@ paths:
                 $ref: "#/components/schemas/ModelConfigResponse"
         "400":
           description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
           content:
             application/json:
               schema:
@@ -3723,6 +3747,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ModelConfigResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "404":
           description: "Model not found"
           content:
@@ -3753,6 +3795,18 @@ paths:
       responses:
         "204":
           description: "Model deleted"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "404":
           description: "Model not found"
           content:
@@ -3780,23 +3834,26 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - modelId
-              properties:
-                modelId:
-                  type: string
-                  description: "Model ID to set as default"
+              $ref: "#/components/schemas/SetDefaultModelRequest"
       responses:
         "200":
           description: "Default model set"
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  defaultModelId:
-                    type: string
+                $ref: "#/components/schemas/SetDefaultModelResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "404":
           description: "Model not found"
           content:
@@ -3826,6 +3883,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListModelPresetsResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         default:
           description: "Unexpected error"
           content:
@@ -6255,6 +6324,7 @@ components:
           type: string
         provider:
           type: string
+          enum: [anthropic, openai, gemini, openrouter, local]
         model:
           type: string
         apiKeyConfigured:
@@ -6263,14 +6333,18 @@ components:
           type: string
         contextWindow:
           type: integer
+          minimum: 0
         maxOutputTokens:
           type: integer
+          minimum: 0
         inputCostPer1M:
           type: number
           format: double
+          minimum: 0
         outputCostPer1M:
           type: number
           format: double
+          minimum: 0
         supportsThinking:
           type: boolean
         description:
@@ -6291,6 +6365,7 @@ components:
           type: string
         provider:
           type: string
+          enum: [anthropic, openai, gemini, openrouter, local]
         model:
           type: string
         apiKey:
@@ -6299,14 +6374,18 @@ components:
           type: string
         contextWindow:
           type: integer
+          minimum: 0
         maxOutputTokens:
           type: integer
+          minimum: 0
         inputCostPer1M:
           type: number
           format: double
+          minimum: 0
         outputCostPer1M:
           type: number
           format: double
+          minimum: 0
         supportsThinking:
           type: boolean
         description:
@@ -6320,6 +6399,7 @@ components:
           type: string
         provider:
           type: string
+          enum: [anthropic, openai, gemini, openrouter, local]
         model:
           type: string
         apiKey:
@@ -6328,21 +6408,44 @@ components:
           type: string
         contextWindow:
           type: integer
+          minimum: 0
         maxOutputTokens:
           type: integer
+          minimum: 0
         inputCostPer1M:
           type: number
           format: double
+          minimum: 0
         outputCostPer1M:
           type: number
           format: double
+          minimum: 0
         supportsThinking:
           type: boolean
         description:
           type: string
 
+    SetDefaultModelRequest:
+      type: object
+      required:
+        - modelId
+      description: "Request to set the default model"
+      properties:
+        modelId:
+          type: string
+          description: "Model ID to set as default"
+
+    SetDefaultModelResponse:
+      type: object
+      description: "Response after setting the default model"
+      properties:
+        defaultModelId:
+          type: string
+
     ListModelsResponse:
       type: object
+      required:
+        - models
       description: "List of model configurations"
       properties:
         models:
@@ -6364,18 +6467,23 @@ components:
           type: string
         provider:
           type: string
+          enum: [anthropic, openai, gemini, openrouter, local]
         model:
           type: string
         contextWindow:
           type: integer
+          minimum: 0
         maxOutputTokens:
           type: integer
+          minimum: 0
         inputCostPer1M:
           type: number
           format: double
+          minimum: 0
         outputCostPer1M:
           type: number
           format: double
+          minimum: 0
         supportsThinking:
           type: boolean
         description:
@@ -6383,6 +6491,8 @@ components:
 
     ListModelPresetsResponse:
       type: object
+      required:
+        - presets
       description: "List of model presets"
       properties:
         presets:

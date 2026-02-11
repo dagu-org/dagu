@@ -124,7 +124,16 @@ func (s *Store) Save(_ context.Context, cfg *agent.Config) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return s.writeConfigToFile(s.configPath(), cfg)
+	if err := s.writeConfigToFile(s.configPath(), cfg); err != nil {
+		return err
+	}
+
+	// Invalidate cache after successful write so next Load picks up new data
+	if s.configCache != nil {
+		s.configCache.Invalidate(s.configPath())
+	}
+
+	return nil
 }
 
 // writeConfigToFile writes the config to a JSON file atomically.

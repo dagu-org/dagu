@@ -10,11 +10,14 @@ import (
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
+const defaultMaxCacheSize = 64
+
 // ProviderCache caches LLM providers keyed by config hash.
 // Safe for concurrent use.
 type ProviderCache struct {
-	mu    sync.RWMutex
-	cache map[string]cachedProvider
+	mu      sync.RWMutex
+	cache   map[string]cachedProvider
+	maxSize int
 }
 
 type cachedProvider struct {
@@ -25,7 +28,8 @@ type cachedProvider struct {
 // NewProviderCache creates a new empty provider cache.
 func NewProviderCache() *ProviderCache {
 	return &ProviderCache{
-		cache: make(map[string]cachedProvider),
+		cache:   make(map[string]cachedProvider),
+		maxSize: defaultMaxCacheSize,
 	}
 }
 
@@ -35,6 +39,7 @@ func (c *ProviderCache) Set(cfg LLMConfig, provider llm.Provider) {
 	hash := HashLLMConfig(cfg)
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.evictIfFullLocked()
 	c.cache[hash] = cachedProvider{
 		provider: provider,
 		model:    cfg.Model,
@@ -65,6 +70,7 @@ func (c *ProviderCache) GetOrCreate(cfg LLMConfig) (llm.Provider, string, error)
 		return nil, "", err
 	}
 
+	c.evictIfFullLocked()
 	c.cache[hash] = cachedProvider{
 		provider: provider,
 		model:    cfg.Model,
@@ -72,11 +78,40 @@ func (c *ProviderCache) GetOrCreate(cfg LLMConfig) (llm.Provider, string, error)
 	return provider, cfg.Model, nil
 }
 
-// HashLLMConfig creates a hash of the LLM config for cache invalidation.
+// Invalidate removes the cached provider for the given config.
+func (c *ProviderCache) Invalidate(cfg LLMConfig) {
+	hash := HashLLMConfig(cfg)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.cache, hash)
+}
+
+// InvalidateAll clears the entire provider cache.
+func (c *ProviderCache) InvalidateAll() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.cache = make(map[string]cachedProvider)
+}
+
+// evictIfFullLocked clears the cache when it reaches maxSize.
+// Must be called with c.mu held for writing.
+func (c *ProviderCache) evictIfFullLocked() {
+	if len(c.cache) >= c.maxSize {
+		c.cache = make(map[string]cachedProvider)
+	}
+}
+
+// HashLLMConfig creates a deterministic hash of the LLM config for cache keying.
+// Uses length-prefixed fields to prevent delimiter injection.
 func HashLLMConfig(cfg LLMConfig) string {
-	data := fmt.Sprintf("%s:%s:%s:%s", cfg.Provider, cfg.Model, cfg.APIKey, cfg.BaseURL)
+	data := fmt.Sprintf("%d:%s|%d:%s|%d:%s|%d:%s",
+		len(cfg.Provider), cfg.Provider,
+		len(cfg.Model), cfg.Model,
+		len(cfg.APIKey), cfg.APIKey,
+		len(cfg.BaseURL), cfg.BaseURL,
+	)
 	hash := sha256.Sum256([]byte(data))
-	return hex.EncodeToString(hash[:8])
+	return hex.EncodeToString(hash[:]) // Full 32-byte hash
 }
 
 // CreateLLMProvider creates an LLM provider from config.

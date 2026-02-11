@@ -428,6 +428,8 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 		},
 	})
 
+	api.StartCleanup(ctx)
+
 	logger.Info(ctx, "Agent API initialized")
 
 	return api, nil

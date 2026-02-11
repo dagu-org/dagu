@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -158,6 +159,13 @@ func (cm *ConversationManager) IsWorking() bool {
 	return cm.working
 }
 
+// LastActivity returns the time of the most recent activity in this conversation.
+func (cm *ConversationManager) LastActivity() time.Time {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	return cm.lastActivity
+}
+
 // GetModel returns the model ID used by this conversation.
 func (cm *ConversationManager) GetModel() string {
 	cm.mu.Lock()
@@ -300,19 +308,31 @@ func (cm *ConversationManager) clearLoop() context.CancelFunc {
 }
 
 // ensureLoop creates the loop if it doesn't exist.
+// Uses a single critical section to prevent TOCTOU race conditions.
 func (cm *ConversationManager) ensureLoop(provider llm.Provider, modelID string, resolvedModel string) error {
-	history, safeMode, needsInit := cm.prepareLoopInit(modelID)
-	if !needsInit {
+	cm.mu.Lock()
+	if cm.loop != nil {
+		cm.mu.Unlock()
 		return nil
 	}
+	cm.model = modelID
+	history := cm.extractLLMHistoryLocked()
+	safeMode := cm.safeMode
+	cm.mu.Unlock()
 
 	loopCtx, cancel := context.WithCancel(context.Background())
 	loopInstance := cm.createLoop(provider, resolvedModel, history, safeMode)
 
-	if !cm.trySetLoop(loopInstance, cancel) {
+	cm.mu.Lock()
+	if cm.loop != nil {
+		// Another goroutine beat us; discard our loop
+		cm.mu.Unlock()
 		cancel()
 		return nil
 	}
+	cm.loop = loopInstance
+	cm.loopCancel = cancel
+	cm.mu.Unlock()
 
 	go cm.runLoop(loopCtx, loopInstance)
 	return nil
@@ -346,8 +366,9 @@ func (cm *ConversationManager) createLoop(provider llm.Provider, model string, h
 func (cm *ConversationManager) runLoop(ctx context.Context, loop *Loop) {
 	defer func() {
 		if r := recover(); r != nil {
-			cm.logger.Error("conversation loop panicked", "panic", r)
+			cm.logger.Error("conversation loop panicked", "panic", r, "stack", string(debug.Stack()))
 		}
+		cm.SetWorking(false)
 		cm.logger.Info("conversation loop goroutine exiting")
 		cm.clearLoop()
 	}()
@@ -361,35 +382,6 @@ func (cm *ConversationManager) runLoop(ctx context.Context, loop *Loop) {
 	} else {
 		cm.logger.Error("conversation loop stopped with error", "error", err)
 	}
-}
-
-// prepareLoopInit checks if loop initialization is needed and extracts history.
-// Returns (history, safeMode, needsInit) where needsInit is false if loop already exists.
-func (cm *ConversationManager) prepareLoopInit(model string) ([]llm.Message, bool, bool) {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	if cm.loop != nil {
-		return nil, false, false
-	}
-
-	cm.model = model
-	return cm.extractLLMHistoryLocked(), cm.safeMode, true
-}
-
-// trySetLoop attempts to set the loop instance atomically.
-// Returns true if successful, false if another goroutine already set it.
-func (cm *ConversationManager) trySetLoop(loop *Loop, cancel context.CancelFunc) bool {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	if cm.loop != nil {
-		return false
-	}
-
-	cm.loop = loop
-	cm.loopCancel = cancel
-	return true
 }
 
 // extractLLMHistoryLocked converts stored messages to LLM format.

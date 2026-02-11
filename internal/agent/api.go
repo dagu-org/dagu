@@ -32,6 +32,9 @@ func respondErrorDirect(w http.ResponseWriter, status int, code api.ErrorCode, m
 	}
 }
 
+// maxRequestBodySize is the maximum allowed size for JSON request bodies (1 MB).
+const maxRequestBodySize = 1 << 20
+
 // defaultUserID is used when no user is authenticated (e.g., auth disabled).
 // This value should match the system's expected default user identifier.
 const defaultUserID = "admin"
@@ -225,6 +228,7 @@ func selectModel(requestModel, conversationModel, configModel string) string {
 func (a *API) getDefaultModelID(ctx context.Context) string {
 	cfg, err := a.configStore.Load(ctx)
 	if err != nil {
+		a.logger.Warn("Failed to load agent config for default model", "error", err)
 		return ""
 	}
 	return cfg.DefaultModelID
@@ -309,6 +313,7 @@ func (a *API) respondError(w http.ResponseWriter, status int, code api.ErrorCode
 // POST /api/v1/agent/conversations/new
 func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 	var req ChatRequest
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "Invalid JSON")
 		return
@@ -369,6 +374,11 @@ func (a *API) handleListConversations(w http.ResponseWriter, r *http.Request) {
 	activeIDs := make(map[string]struct{})
 	conversations := a.collectActiveConversations(userID, activeIDs)
 	conversations = a.appendPersistedConversations(r.Context(), userID, activeIDs, conversations)
+
+	// Ensure we return [] instead of null in JSON when no conversations exist
+	if conversations == nil {
+		conversations = []ConversationWithState{}
+	}
 
 	a.respondJSON(w, http.StatusOK, conversations)
 }
@@ -470,7 +480,10 @@ func (a *API) getActiveConversation(id, userID string) (*ConversationManager, bo
 	if !ok {
 		return nil, false
 	}
-	mgr := mgrValue.(*ConversationManager)
+	mgr, ok := mgrValue.(*ConversationManager)
+	if !ok {
+		return nil, false
+	}
 	if mgr.UserID() != userID {
 		return nil, false
 	}
@@ -510,6 +523,7 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req ChatRequest
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "Invalid JSON")
 		return
@@ -584,6 +598,7 @@ func (a *API) reactivateConversation(ctx context.Context, id, userID, username, 
 		History:     messages,
 		SequenceID:  seqID,
 		Environment: a.environment,
+		SafeMode:    true, // Default to safe mode for reactivated conversations
 		Hooks:       a.hooks,
 		Username:    username,
 		IPAddress:   ipAddress,
@@ -612,12 +627,41 @@ func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 	snapshot, next := mgr.SubscribeWithSnapshot(r.Context())
 	a.sendSSEMessage(w, snapshot)
 
+	heartbeat := time.NewTicker(15 * time.Second)
+	defer heartbeat.Stop()
+
 	for {
-		resp, cont := next()
-		if !cont {
-			break
+		// Check for heartbeat or next message in a select-free way:
+		// next() blocks, so we run it in a goroutine
+		type result struct {
+			resp StreamResponse
+			cont bool
 		}
-		a.sendSSEMessage(w, resp)
+		ch := make(chan result, 1)
+		go func() {
+			resp, cont := next()
+			ch <- result{resp, cont}
+		}()
+
+		select {
+		case res := <-ch:
+			if !res.cont {
+				return
+			}
+			a.sendSSEMessage(w, res.resp)
+			heartbeat.Reset(15 * time.Second)
+		case <-heartbeat.C:
+			// SSE comment as heartbeat to keep connection alive
+			if _, err := fmt.Fprint(w, ": heartbeat\n\n"); err != nil {
+				a.logger.Debug("SSE heartbeat write failed", "error", err)
+				return
+			}
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+		case <-r.Context().Done():
+			return
+		}
 	}
 }
 
@@ -639,7 +683,10 @@ func (a *API) sendSSEMessage(w http.ResponseWriter, data any) {
 		slog.Error("failed to marshal SSE data", "error", err)
 		return
 	}
-	fmt.Fprintf(w, "data: %s\n\n", jsonData)
+	if _, err := fmt.Fprintf(w, "data: %s\n\n", jsonData); err != nil {
+		a.logger.Debug("SSE write failed", "error", err)
+		return
+	}
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
 	}
@@ -679,6 +726,7 @@ func (a *API) handleUserResponse(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req UserPromptResponse
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "Invalid JSON")
 		return
@@ -695,6 +743,57 @@ func (a *API) handleUserResponse(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.respondJSON(w, http.StatusOK, map[string]string{"status": "accepted"})
+}
+
+// idleConversationTimeout is the duration after which idle conversations are cleaned up.
+const idleConversationTimeout = 30 * time.Minute
+
+// cleanupInterval is how often the cleanup goroutine runs.
+const cleanupInterval = 5 * time.Minute
+
+// StartCleanup begins periodic cleanup of idle conversations.
+// It should be called once when the API is initialized and will
+// stop when the context is cancelled.
+func (a *API) StartCleanup(ctx context.Context) {
+	go func() {
+		ticker := time.NewTicker(cleanupInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				a.cleanupIdleConversations()
+			}
+		}
+	}()
+}
+
+// cleanupIdleConversations removes conversations that have been idle too long and are not working.
+func (a *API) cleanupIdleConversations() {
+	cutoff := time.Now().Add(-idleConversationTimeout)
+	var toDelete []string
+
+	a.conversations.Range(func(key, value any) bool {
+		id, ok := key.(string)
+		if !ok {
+			return true
+		}
+		mgr, ok := value.(*ConversationManager)
+		if !ok {
+			return true
+		}
+		if !mgr.IsWorking() && mgr.LastActivity().Before(cutoff) {
+			toDelete = append(toDelete, id)
+		}
+		return true
+	})
+
+	for _, id := range toDelete {
+		a.conversations.Delete(id)
+		a.logger.Debug("Cleaned up idle conversation", "conversation_id", id)
+	}
 }
 
 // ptrTo returns a pointer to the given value.

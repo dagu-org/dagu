@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/agent"
@@ -124,8 +125,14 @@ func writeModelToFile(filePath string, model *agent.ModelConfig) error {
 }
 
 // modelFilePath returns the file path for a model ID.
-func (s *Store) modelFilePath(id string) string {
-	return filepath.Join(s.baseDir, id+modelFileExtension)
+// Callers must validate the ID before calling this method.
+func (s *Store) modelFilePath(id string) (string, error) {
+	p := filepath.Join(s.baseDir, id+modelFileExtension)
+	// Defense-in-depth: ensure the resolved path stays within baseDir
+	if !strings.HasPrefix(p, filepath.Clean(s.baseDir)+string(filepath.Separator)) {
+		return "", fmt.Errorf("fileagentmodel: path traversal detected for id %q", id)
+	}
+	return p, nil
 }
 
 // Create stores a new model configuration.
@@ -133,8 +140,8 @@ func (s *Store) Create(_ context.Context, model *agent.ModelConfig) error {
 	if model == nil {
 		return errors.New("fileagentmodel: model cannot be nil")
 	}
-	if model.ID == "" {
-		return agent.ErrInvalidModelID
+	if err := agent.ValidateModelID(model.ID); err != nil {
+		return err
 	}
 	if model.Name == "" {
 		return errors.New("fileagentmodel: model name is required")
@@ -147,7 +154,10 @@ func (s *Store) Create(_ context.Context, model *agent.ModelConfig) error {
 		return agent.ErrModelAlreadyExists
 	}
 
-	filePath := s.modelFilePath(model.ID)
+	filePath, err := s.modelFilePath(model.ID)
+	if err != nil {
+		return err
+	}
 	if err := writeModelToFile(filePath, model); err != nil {
 		return err
 	}
@@ -160,8 +170,8 @@ func (s *Store) Create(_ context.Context, model *agent.ModelConfig) error {
 
 // GetByID retrieves a model configuration by its unique ID.
 func (s *Store) GetByID(_ context.Context, id string) (*agent.ModelConfig, error) {
-	if id == "" {
-		return nil, agent.ErrInvalidModelID
+	if err := agent.ValidateModelID(id); err != nil {
+		return nil, err
 	}
 
 	s.mu.RLock()
@@ -217,8 +227,8 @@ func (s *Store) Update(_ context.Context, model *agent.ModelConfig) error {
 	if model == nil {
 		return errors.New("fileagentmodel: model cannot be nil")
 	}
-	if model.ID == "" {
-		return agent.ErrInvalidModelID
+	if err := agent.ValidateModelID(model.ID); err != nil {
+		return err
 	}
 
 	s.mu.Lock()
@@ -256,8 +266,8 @@ func (s *Store) Update(_ context.Context, model *agent.ModelConfig) error {
 
 // Delete removes a model configuration by its ID.
 func (s *Store) Delete(_ context.Context, id string) error {
-	if id == "" {
-		return agent.ErrInvalidModelID
+	if err := agent.ValidateModelID(id); err != nil {
+		return err
 	}
 
 	s.mu.Lock()

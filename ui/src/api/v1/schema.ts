@@ -2869,7 +2869,8 @@ export interface components {
         ModelConfigResponse: {
             id: string;
             name: string;
-            provider: string;
+            /** @enum {string} */
+            provider: ModelConfigResponseProvider;
             model: string;
             apiKeyConfigured?: boolean;
             baseUrl?: string;
@@ -2887,7 +2888,8 @@ export interface components {
             /** @description Optional custom ID (auto-generated from name if omitted) */
             id?: string;
             name: string;
-            provider: string;
+            /** @enum {string} */
+            provider: CreateModelConfigRequestProvider;
             model: string;
             apiKey?: string;
             baseUrl?: string;
@@ -2903,7 +2905,8 @@ export interface components {
         /** @description Request to update a model configuration */
         UpdateModelConfigRequest: {
             name?: string;
-            provider?: string;
+            /** @enum {string} */
+            provider?: UpdateModelConfigRequestProvider;
             model?: string;
             apiKey?: string;
             baseUrl?: string;
@@ -2916,15 +2919,25 @@ export interface components {
             supportsThinking?: boolean;
             description?: string;
         };
+        /** @description Request to set the default model */
+        SetDefaultModelRequest: {
+            /** @description Model ID to set as default */
+            modelId: string;
+        };
+        /** @description Response after setting the default model */
+        SetDefaultModelResponse: {
+            defaultModelId?: string;
+        };
         /** @description List of model configurations */
         ListModelsResponse: {
-            models?: components["schemas"]["ModelConfigResponse"][];
+            models: components["schemas"]["ModelConfigResponse"][];
             defaultModelId?: string;
         };
         /** @description Hardcoded model preset with metadata */
         ModelPreset: {
             name: string;
-            provider: string;
+            /** @enum {string} */
+            provider: ModelPresetProvider;
             model: string;
             contextWindow?: number;
             maxOutputTokens?: number;
@@ -2937,7 +2950,7 @@ export interface components {
         };
         /** @description List of model presets */
         ListModelPresetsResponse: {
-            presets?: components["schemas"]["ModelPreset"][];
+            presets: components["schemas"]["ModelPreset"][];
         };
     };
     responses: never;
@@ -7455,6 +7468,24 @@ export interface operations {
                     "application/json": components["schemas"]["ListModelsResponse"];
                 };
             };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unexpected error */
             default: {
                 headers: {
@@ -7493,6 +7524,24 @@ export interface operations {
             };
             /** @description Invalid request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7542,6 +7591,24 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Model not found */
             404: {
                 headers: {
@@ -7590,6 +7657,33 @@ export interface operations {
                     "application/json": components["schemas"]["ModelConfigResponse"];
                 };
             };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Model not found */
             404: {
                 headers: {
@@ -7622,10 +7716,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    /** @description Model ID to set as default */
-                    modelId: string;
-                };
+                "application/json": components["schemas"]["SetDefaultModelRequest"];
             };
         };
         responses: {
@@ -7635,9 +7726,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        defaultModelId?: string;
-                    };
+                    "application/json": components["schemas"]["SetDefaultModelResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Model not found */
@@ -7679,6 +7786,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListModelPresetsResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unexpected error */
@@ -7846,4 +7971,32 @@ export enum SyncSummary {
 export enum SyncAuthConfigType {
     token = "token",
     ssh = "ssh"
+}
+export enum ModelConfigResponseProvider {
+    anthropic = "anthropic",
+    openai = "openai",
+    gemini = "gemini",
+    openrouter = "openrouter",
+    local = "local"
+}
+export enum CreateModelConfigRequestProvider {
+    anthropic = "anthropic",
+    openai = "openai",
+    gemini = "gemini",
+    openrouter = "openrouter",
+    local = "local"
+}
+export enum UpdateModelConfigRequestProvider {
+    anthropic = "anthropic",
+    openai = "openai",
+    gemini = "gemini",
+    openrouter = "openrouter",
+    local = "local"
+}
+export enum ModelPresetProvider {
+    anthropic = "anthropic",
+    openai = "openai",
+    gemini = "gemini",
+    openrouter = "openrouter",
+    local = "local"
 }

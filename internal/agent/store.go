@@ -67,6 +67,27 @@ func (m *ModelConfig) ToLLMConfig() LLMConfig {
 	}
 }
 
+// validModelIDRegexp matches a valid model ID slug: lowercase alphanumeric segments separated by hyphens.
+var validModelIDRegexp = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+
+const maxModelIDLength = 128
+
+// ValidateModelID validates that id is a safe, well-formed model identifier.
+// It must be a non-empty slug (lowercase alphanumeric segments separated by hyphens)
+// and at most 128 characters. This prevents path traversal and other injection attacks.
+func ValidateModelID(id string) error {
+	if id == "" {
+		return ErrInvalidModelID
+	}
+	if len(id) > maxModelIDLength {
+		return fmt.Errorf("%w: exceeds maximum length of %d", ErrInvalidModelID, maxModelIDLength)
+	}
+	if !validModelIDRegexp.MatchString(id) {
+		return fmt.Errorf("%w: must match pattern [a-z0-9]+(-[a-z0-9]+)*", ErrInvalidModelID)
+	}
+	return nil
+}
+
 var slugRegexp = regexp.MustCompile(`[^a-z0-9]+`)
 
 // GenerateSlugID creates a URL-friendly slug from a name.
