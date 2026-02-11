@@ -57,6 +57,12 @@ export interface UserPromptResponse {
   cancelled?: boolean;
 }
 
+export interface TokenUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+
 export interface Message {
   id: string;
   conversation_id: string;
@@ -67,6 +73,8 @@ export interface Message {
   tool_results?: ToolResult[];
   ui_action?: UIAction;
   user_prompt?: UserPrompt;
+  usage?: TokenUsage;
+  cost?: number;
   created_at: string;
 }
 
@@ -81,6 +89,7 @@ export interface ConversationState {
   conversation_id: string;
   working: boolean;
   model?: string;
+  total_cost?: number;
 }
 
 export interface ConversationWithState {

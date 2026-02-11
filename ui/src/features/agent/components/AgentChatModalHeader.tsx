@@ -34,6 +34,7 @@ function formatDate(dateStr: string): string {
 type Props = {
   conversationId: string | null;
   conversations: ConversationWithState[];
+  totalCost?: number;
   onSelectConversation: (id: string) => void;
   onClearConversation: () => void;
   onClose: () => void;
@@ -41,9 +42,15 @@ type Props = {
   isMobile?: boolean;
 };
 
+function formatTotalCost(cost: number): string {
+  if (cost < 0.01) return `$${cost.toFixed(4)}`;
+  return `$${cost.toFixed(2)}`;
+}
+
 export function AgentChatModalHeader({
   conversationId,
   conversations,
+  totalCost,
   onSelectConversation,
   onClearConversation,
   onClose,
@@ -88,6 +95,11 @@ export function AgentChatModalHeader({
           </SelectContent>
         </Select>
       </div>
+      {totalCost != null && totalCost > 0 && (
+        <span className="text-[10px] text-muted-foreground/60 flex-shrink-0 tabular-nums">
+          {formatTotalCost(totalCost)}
+        </span>
+      )}
       <TooltipProvider delayDuration={300}>
         <div className="flex items-center gap-1 flex-shrink-0">
           <Tooltip>

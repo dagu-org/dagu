@@ -105,6 +105,8 @@ type Message struct {
 	ToolResults []ToolResult `json:"tool_results,omitempty"`
 	// Usage contains token usage statistics.
 	Usage *llm.Usage `json:"usage,omitempty"`
+	// Cost is the estimated cost of this message in USD.
+	Cost *float64 `json:"cost,omitempty"`
 	// CreatedAt is when this message was created.
 	CreatedAt time.Time `json:"created_at"`
 	// LLMData contains the original LLM message for provider reconstruction.
@@ -147,6 +149,8 @@ type ConversationState struct {
 	Working bool `json:"working"`
 	// Model is the LLM model being used for this conversation.
 	Model string `json:"model,omitempty"`
+	// TotalCost is the accumulated cost of the conversation in USD.
+	TotalCost float64 `json:"total_cost"`
 }
 
 // StreamResponse is sent over SSE to the UI.

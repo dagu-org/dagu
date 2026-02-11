@@ -38,6 +38,7 @@ export function AgentChatModal(): ReactElement | null {
     conversationId,
     messages,
     pendingUserMessage,
+    conversationState,
     conversations,
     isWorking,
     error,
@@ -125,6 +126,7 @@ export function AgentChatModal(): ReactElement | null {
       <AgentChatModalHeader
         conversationId={conversationId}
         conversations={conversations}
+        totalCost={conversationState?.total_cost}
         onSelectConversation={handleSelectConversation}
         onClearConversation={clearConversation}
         onClose={closeChat}

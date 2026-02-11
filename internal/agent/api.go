@@ -90,6 +90,7 @@ type ConversationWithState struct {
 	Conversation Conversation `json:"conversation"`
 	Working      bool         `json:"working"`
 	Model        string       `json:"model,omitempty"`
+	TotalCost    float64      `json:"total_cost"`
 }
 
 // NewAPI creates a new API instance.
@@ -234,12 +235,12 @@ func (a *API) getDefaultModelID(ctx context.Context) string {
 	return cfg.DefaultModelID
 }
 
-// resolveProvider resolves a model ID to an LLM provider.
+// resolveProvider resolves a model ID to an LLM provider and model config.
 // If modelID is empty, uses the default from config.
 // If the requested model is not found (e.g., deleted), falls back to the default.
-func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider, string, error) {
+func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider, *ModelConfig, error) {
 	if a.modelStore == nil {
-		return nil, "", errors.New("model store not configured")
+		return nil, nil, errors.New("model store not configured")
 	}
 
 	defaultID := a.getDefaultModelID(ctx)
@@ -248,7 +249,7 @@ func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider
 		modelID = defaultID
 	}
 	if modelID == "" {
-		return nil, "", errors.New("no model configured")
+		return nil, nil, errors.New("no model configured")
 	}
 
 	model, err := a.modelStore.GetByID(ctx, modelID)
@@ -257,9 +258,13 @@ func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider
 		model, err = a.modelStore.GetByID(ctx, defaultID)
 	}
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
-	return a.providers.GetOrCreate(model.ToLLMConfig())
+	provider, _, err := a.providers.GetOrCreate(model.ToLLMConfig())
+	if err != nil {
+		return nil, nil, err
+	}
+	return provider, model, nil
 }
 
 // createMessageCallback returns a persistence callback for the given conversation ID.
@@ -327,7 +332,7 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 	userID, username, ipAddress := getUserContextFromRequest(r)
 	model := selectModel(req.Model, "", a.getDefaultModelID(r.Context()))
 
-	provider, resolvedModel, err := a.resolveProvider(r.Context(), model)
+	provider, modelCfg, err := a.resolveProvider(r.Context(), model)
 	if err != nil {
 		a.logger.Error("Failed to get LLM provider", "error", err)
 		a.respondError(w, http.StatusServiceUnavailable, api.ErrorCodeInternalError, "Agent is not configured properly")
@@ -338,23 +343,25 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 
 	mgr := NewConversationManager(ConversationManagerConfig{
-		ID:          id,
-		UserID:      userID,
-		Logger:      a.logger,
-		WorkingDir:  a.workingDir,
-		OnMessage:   a.createMessageCallback(id),
-		Environment: a.environment,
-		SafeMode:    req.SafeMode,
-		Hooks:       a.hooks,
-		Username:    username,
-		IPAddress:   ipAddress,
+		ID:              id,
+		UserID:          userID,
+		Logger:          a.logger,
+		WorkingDir:      a.workingDir,
+		OnMessage:       a.createMessageCallback(id),
+		Environment:     a.environment,
+		SafeMode:        req.SafeMode,
+		Hooks:           a.hooks,
+		Username:        username,
+		IPAddress:       ipAddress,
+		InputCostPer1M:  modelCfg.InputCostPer1M,
+		OutputCostPer1M: modelCfg.OutputCostPer1M,
 	})
 
 	a.persistNewConversation(r.Context(), id, userID, now)
 	a.conversations.Store(id, mgr)
 
 	messageWithContext := a.formatMessage(r.Context(), req.Message, req.DAGContexts)
-	if err := mgr.AcceptUserMessage(r.Context(), provider, model, resolvedModel, messageWithContext); err != nil {
+	if err := mgr.AcceptUserMessage(r.Context(), provider, model, modelCfg.Model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		a.respondError(w, http.StatusInternalServerError, api.ErrorCodeInternalError, "Failed to process message")
 		return
@@ -405,6 +412,7 @@ func (a *API) collectActiveConversations(userID string, activeIDs map[string]str
 			Conversation: mgr.GetConversation(),
 			Working:      mgr.IsWorking(),
 			Model:        mgr.GetModel(),
+			TotalCost:    mgr.GetTotalCost(),
 		})
 		return true
 	})
@@ -452,6 +460,7 @@ func (a *API) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 				ConversationID: id,
 				Working:        mgr.IsWorking(),
 				Model:          mgr.GetModel(),
+				TotalCost:      mgr.GetTotalCost(),
 			},
 		})
 		return
@@ -536,7 +545,7 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 
 	model := selectModel(req.Model, mgr.GetModel(), a.getDefaultModelID(r.Context()))
 
-	provider, resolvedModel, err := a.resolveProvider(r.Context(), model)
+	provider, modelCfg, err := a.resolveProvider(r.Context(), model)
 	if err != nil {
 		a.logger.Error("Failed to get LLM provider", "error", err)
 		a.respondError(w, http.StatusServiceUnavailable, api.ErrorCodeInternalError, "Agent is not configured properly")
@@ -547,7 +556,10 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 	// Update safe mode setting per request (allows toggling mid-conversation)
 	mgr.SetSafeMode(req.SafeMode)
 
-	if err := mgr.AcceptUserMessage(r.Context(), provider, model, resolvedModel, messageWithContext); err != nil {
+	// Update pricing if model changed
+	mgr.UpdatePricing(modelCfg.InputCostPer1M, modelCfg.OutputCostPer1M)
+
+	if err := mgr.AcceptUserMessage(r.Context(), provider, model, modelCfg.Model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		a.respondError(w, http.StatusInternalServerError, api.ErrorCodeInternalError, "Failed to process message")
 		return
