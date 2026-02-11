@@ -187,12 +187,12 @@ func (cm *ConversationManager) GetConversation() Conversation {
 }
 
 // AcceptUserMessage enqueues a user message, ensuring the loop is ready first.
-func (cm *ConversationManager) AcceptUserMessage(ctx context.Context, provider llm.Provider, model string, content string) error {
+func (cm *ConversationManager) AcceptUserMessage(ctx context.Context, provider llm.Provider, modelID string, resolvedModel string, content string) error {
 	if provider == nil {
 		return errors.New("LLM provider is required")
 	}
 
-	if err := cm.ensureLoop(provider, model); err != nil {
+	if err := cm.ensureLoop(provider, modelID, resolvedModel); err != nil {
 		return err
 	}
 
@@ -300,14 +300,14 @@ func (cm *ConversationManager) clearLoop() context.CancelFunc {
 }
 
 // ensureLoop creates the loop if it doesn't exist.
-func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) error {
-	history, safeMode, needsInit := cm.prepareLoopInit(model)
+func (cm *ConversationManager) ensureLoop(provider llm.Provider, modelID string, resolvedModel string) error {
+	history, safeMode, needsInit := cm.prepareLoopInit(modelID)
 	if !needsInit {
 		return nil
 	}
 
 	loopCtx, cancel := context.WithCancel(context.Background())
-	loopInstance := cm.createLoop(provider, model, history, safeMode)
+	loopInstance := cm.createLoop(provider, resolvedModel, history, safeMode)
 
 	if !cm.trySetLoop(loopInstance, cancel) {
 		cancel()

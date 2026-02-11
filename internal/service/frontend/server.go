@@ -36,6 +36,7 @@ import (
 	"github.com/dagu-org/dagu/internal/gitsync"
 	_ "github.com/dagu-org/dagu/internal/llm/allproviders" // Register LLM providers
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
+	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
 	"github.com/dagu-org/dagu/internal/persis/fileconversation"
@@ -133,9 +134,17 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		logger.Warn(ctx, "Failed to create agent config store", tag.Error(err))
 	}
 
+	var agentModelStore *fileagentmodel.Store
+	if agentConfigStore != nil {
+		agentModelStore, err = fileagentmodel.New(filepath.Join(cfg.Paths.DataDir, "agent", "models"))
+		if err != nil {
+			logger.Warn(ctx, "Failed to create agent model store", tag.Error(err))
+		}
+	}
+
 	var agentAPI *agent.API
 	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, &cfg.Paths, dr, auditSvc)
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, &cfg.Paths, dr, auditSvc)
 		if err != nil {
 			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
 		}
@@ -245,6 +254,9 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	allAPIOptions := append(apiOpts, srv.tunnelAPIOpts...)
 	if srv.agentConfigStore != nil {
 		allAPIOptions = append(allAPIOptions, apiv1.WithAgentConfigStore(srv.agentConfigStore))
+	}
+	if agentModelStore != nil {
+		allAPIOptions = append(allAPIOptions, apiv1.WithAgentModelStore(agentModelStore))
 	}
 
 	srv.apiV1 = apiv1.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, allAPIOptions...)
@@ -386,8 +398,8 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 }
 
 // initAgentAPI creates and returns an agent API.
-// The API uses the config store to check enabled status and get provider dynamically.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *config.PathsConfig, dagStore exec.DAGStore, auditSvc *audit.Service) (*agent.API, error) {
+// The API uses the config store to check enabled status and resolve providers via the model store.
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, paths *config.PathsConfig, dagStore exec.DAGStore, auditSvc *audit.Service) (*agent.API, error) {
 	convStore, err := fileconversation.New(paths.ConversationsDir)
 	if err != nil {
 		logger.Warn(ctx, "Failed to create conversation store, persistence disabled", tag.Error(err))
@@ -400,6 +412,7 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *conf
 
 	api := agent.NewAPI(agent.APIConfig{
 		ConfigStore:       store,
+		ModelStore:        modelStore,
 		WorkingDir:        paths.DAGsDir,
 		Logger:            slog.Default(),
 		ConversationStore: convStore,

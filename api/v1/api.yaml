@@ -3632,6 +3632,207 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /settings/agent/models:
+    get:
+      summary: "List agent models"
+      description: "Returns all configured AI agent models. Requires admin role."
+      operationId: "listAgentModels"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "List of models"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListModelsResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create agent model"
+      description: "Creates a new AI agent model configuration. Requires admin role."
+      operationId: "createAgentModel"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateModelConfigRequest"
+      responses:
+        "201":
+          description: "Model created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelConfigResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Model already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/agent/models/{modelId}:
+    patch:
+      summary: "Update agent model"
+      description: "Updates an existing AI agent model configuration. Requires admin role."
+      operationId: "updateAgentModel"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: modelId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "Model ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateModelConfigRequest"
+      responses:
+        "200":
+          description: "Model updated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelConfigResponse"
+        "404":
+          description: "Model not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Delete agent model"
+      description: "Deletes an AI agent model configuration. Requires admin role."
+      operationId: "deleteAgentModel"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: modelId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "Model ID"
+      responses:
+        "204":
+          description: "Model deleted"
+        "404":
+          description: "Model not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/agent/default-model:
+    put:
+      summary: "Set default agent model"
+      description: "Sets the default model for the AI agent. Requires admin role."
+      operationId: "setDefaultAgentModel"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - modelId
+              properties:
+                modelId:
+                  type: string
+                  description: "Model ID to set as default"
+      responses:
+        "200":
+          description: "Default model set"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  defaultModelId:
+                    type: string
+        "404":
+          description: "Model not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/agent/model-presets:
+    get:
+      summary: "List model presets"
+      description: "Returns hardcoded model presets with metadata. Requires admin role."
+      operationId: "listModelPresets"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "List of model presets"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListModelPresetsResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   securitySchemes:
     basicAuth:
@@ -6024,25 +6225,9 @@ components:
         enabled:
           type: boolean
           description: "Whether the AI agent is enabled"
-        llm:
-          $ref: "#/components/schemas/AgentLLMConfig"
-
-    AgentLLMConfig:
-      type: object
-      description: "LLM configuration for the AI agent"
-      properties:
-        provider:
+        defaultModelId:
           type: string
-          description: "LLM provider (anthropic, openai, gemini, openrouter, local)"
-        model:
-          type: string
-          description: "Model ID"
-        apiKeyConfigured:
-          type: boolean
-          description: "Whether an API key is configured (actual key is not returned)"
-        baseUrl:
-          type: string
-          description: "Custom API endpoint URL (optional)"
+          description: "ID of the default model"
 
     UpdateAgentConfigRequest:
       type: object
@@ -6051,25 +6236,159 @@ components:
         enabled:
           type: boolean
           description: "Whether the AI agent is enabled"
-        llm:
-          $ref: "#/components/schemas/UpdateAgentLLMConfig"
+        defaultModelId:
+          type: string
+          description: "ID of the default model"
 
-    UpdateAgentLLMConfig:
+    ModelConfigResponse:
       type: object
-      description: "LLM configuration updates"
+      required:
+        - id
+        - name
+        - provider
+        - model
+      description: "Model configuration"
       properties:
+        id:
+          type: string
+        name:
+          type: string
         provider:
           type: string
-          description: "LLM provider (anthropic, openai, gemini, openrouter, local)"
         model:
           type: string
-          description: "Model ID"
-        apiKey:
-          type: string
-          description: "API key (only set if changing)"
+        apiKeyConfigured:
+          type: boolean
         baseUrl:
           type: string
-          description: "Custom API endpoint URL"
+        contextWindow:
+          type: integer
+        maxOutputTokens:
+          type: integer
+        inputCostPer1M:
+          type: number
+          format: double
+        outputCostPer1M:
+          type: number
+          format: double
+        supportsThinking:
+          type: boolean
+        description:
+          type: string
+
+    CreateModelConfigRequest:
+      type: object
+      required:
+        - name
+        - provider
+        - model
+      description: "Request to create a new model configuration"
+      properties:
+        id:
+          type: string
+          description: "Optional custom ID (auto-generated from name if omitted)"
+        name:
+          type: string
+        provider:
+          type: string
+        model:
+          type: string
+        apiKey:
+          type: string
+        baseUrl:
+          type: string
+        contextWindow:
+          type: integer
+        maxOutputTokens:
+          type: integer
+        inputCostPer1M:
+          type: number
+          format: double
+        outputCostPer1M:
+          type: number
+          format: double
+        supportsThinking:
+          type: boolean
+        description:
+          type: string
+
+    UpdateModelConfigRequest:
+      type: object
+      description: "Request to update a model configuration"
+      properties:
+        name:
+          type: string
+        provider:
+          type: string
+        model:
+          type: string
+        apiKey:
+          type: string
+        baseUrl:
+          type: string
+        contextWindow:
+          type: integer
+        maxOutputTokens:
+          type: integer
+        inputCostPer1M:
+          type: number
+          format: double
+        outputCostPer1M:
+          type: number
+          format: double
+        supportsThinking:
+          type: boolean
+        description:
+          type: string
+
+    ListModelsResponse:
+      type: object
+      description: "List of model configurations"
+      properties:
+        models:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelConfigResponse"
+        defaultModelId:
+          type: string
+
+    ModelPreset:
+      type: object
+      required:
+        - name
+        - provider
+        - model
+      description: "Hardcoded model preset with metadata"
+      properties:
+        name:
+          type: string
+        provider:
+          type: string
+        model:
+          type: string
+        contextWindow:
+          type: integer
+        maxOutputTokens:
+          type: integer
+        inputCostPer1M:
+          type: number
+          format: double
+        outputCostPer1M:
+          type: number
+          format: double
+        supportsThinking:
+          type: boolean
+        description:
+          type: string
+
+    ListModelPresetsResponse:
+      type: object
+      description: "List of model presets"
+      properties:
+        presets:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelPreset"
 
 # Apply security requirements globally
 security:

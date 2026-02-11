@@ -2,13 +2,10 @@ package agent
 
 import (
 	"context"
-	"errors"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/llm"
 )
-
-var errProviderNotConfigured = errors.New("provider not configured")
 
 // mockLLMProvider implements llm.Provider for testing.
 type mockLLMProvider struct {
@@ -45,18 +42,15 @@ var _ llm.Provider = (*mockLLMProvider)(nil)
 
 // mockConfigStore implements ConfigStore for testing.
 type mockConfigStore struct {
-	config   *Config
-	enabled  bool
-	provider llm.Provider
-	model    string
-	err      error
+	config  *Config
+	enabled bool
+	err     error
 }
 
 func newMockConfigStore(enabled bool) *mockConfigStore {
 	return &mockConfigStore{
 		config:  DefaultConfig(),
 		enabled: enabled,
-		model:   "test-model",
 	}
 }
 
@@ -79,17 +73,73 @@ func (m *mockConfigStore) IsEnabled(_ context.Context) bool {
 	return m.enabled
 }
 
-func (m *mockConfigStore) GetProvider(_ context.Context) (llm.Provider, string, error) {
-	if m.err != nil {
-		return nil, "", m.err
-	}
-	if m.provider == nil {
-		return nil, "", errProviderNotConfigured
-	}
-	return m.provider, m.model, nil
+var _ ConfigStore = (*mockConfigStore)(nil)
+
+// mockModelStore implements ModelStore for testing.
+type mockModelStore struct {
+	models map[string]*ModelConfig
+	err    error
 }
 
-var _ ConfigStore = (*mockConfigStore)(nil)
+func newMockModelStore() *mockModelStore {
+	return &mockModelStore{
+		models: make(map[string]*ModelConfig),
+	}
+}
+
+func (m *mockModelStore) Create(_ context.Context, model *ModelConfig) error {
+	if m.err != nil {
+		return m.err
+	}
+	m.models[model.ID] = model
+	return nil
+}
+
+func (m *mockModelStore) GetByID(_ context.Context, id string) (*ModelConfig, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	model, ok := m.models[id]
+	if !ok {
+		return nil, ErrModelNotFound
+	}
+	return model, nil
+}
+
+func (m *mockModelStore) List(_ context.Context) ([]*ModelConfig, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	var result []*ModelConfig
+	for _, model := range m.models {
+		result = append(result, model)
+	}
+	return result, nil
+}
+
+func (m *mockModelStore) Update(_ context.Context, model *ModelConfig) error {
+	if m.err != nil {
+		return m.err
+	}
+	if _, ok := m.models[model.ID]; !ok {
+		return ErrModelNotFound
+	}
+	m.models[model.ID] = model
+	return nil
+}
+
+func (m *mockModelStore) Delete(_ context.Context, id string) error {
+	if m.err != nil {
+		return m.err
+	}
+	if _, ok := m.models[id]; !ok {
+		return ErrModelNotFound
+	}
+	delete(m.models, id)
+	return nil
+}
+
+var _ ModelStore = (*mockModelStore)(nil)
 
 // mockConversationStore implements ConversationStore for testing.
 type mockConversationStore struct {

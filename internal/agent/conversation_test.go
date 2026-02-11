@@ -145,7 +145,7 @@ func TestConversationManager_AcceptUserMessage(t *testing.T) {
 		t.Parallel()
 
 		cm := NewConversationManager(ConversationManagerConfig{})
-		err := cm.AcceptUserMessage(context.Background(), nil, "model", "hello")
+		err := cm.AcceptUserMessage(context.Background(), nil, "model", "model", "hello")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "required")
@@ -157,7 +157,7 @@ func TestConversationManager_AcceptUserMessage(t *testing.T) {
 		provider := newStopProvider("hi")
 
 		cm := NewConversationManager(ConversationManagerConfig{})
-		err := cm.AcceptUserMessage(context.Background(), provider, "model", "hello")
+		err := cm.AcceptUserMessage(context.Background(), provider, "model", "model", "hello")
 
 		require.NoError(t, err)
 		assert.True(t, cm.IsWorking())
@@ -171,7 +171,7 @@ func TestConversationManager_AcceptUserMessage(t *testing.T) {
 		provider := newStopProvider("response")
 
 		cm := NewConversationManager(ConversationManagerConfig{})
-		_ = cm.AcceptUserMessage(context.Background(), provider, "model", "hello")
+		_ = cm.AcceptUserMessage(context.Background(), provider, "model", "model", "hello")
 
 		time.Sleep(50 * time.Millisecond)
 
@@ -252,7 +252,7 @@ func TestConversationManager_Cancel(t *testing.T) {
 		}
 
 		cm := NewConversationManager(ConversationManagerConfig{})
-		_ = cm.AcceptUserMessage(context.Background(), provider, "model", "hello")
+		_ = cm.AcceptUserMessage(context.Background(), provider, "model", "model", "hello")
 
 		time.Sleep(50 * time.Millisecond)
 
@@ -328,7 +328,7 @@ func TestConversationManager_GetModel(t *testing.T) {
 		provider := newStopProvider("hi")
 
 		cm := NewConversationManager(ConversationManagerConfig{})
-		_ = cm.AcceptUserMessage(context.Background(), provider, "test-model", "hello")
+		_ = cm.AcceptUserMessage(context.Background(), provider, "test-model", "test-model", "hello")
 
 		assert.Equal(t, "test-model", cm.GetModel())
 

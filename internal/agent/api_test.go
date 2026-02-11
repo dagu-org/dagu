@@ -26,8 +26,19 @@ func newAPITestSetup(t *testing.T, enabled bool, withProvider bool, workingDir s
 	t.Helper()
 
 	configStore := newMockConfigStore(enabled)
+
+	var modelStore ModelStore
 	if withProvider {
-		configStore.provider = &mockLLMProvider{}
+		ms := newMockModelStore()
+		ms.models["test-model"] = &ModelConfig{
+			ID:       "test-model",
+			Name:     "Test Model",
+			Provider: "openai",
+			Model:    "gpt-4.1",
+			APIKey:   "test-key",
+		}
+		configStore.config.DefaultModelID = "test-model"
+		modelStore = ms
 	}
 
 	if workingDir == "" {
@@ -36,8 +47,18 @@ func newAPITestSetup(t *testing.T, enabled bool, withProvider bool, workingDir s
 
 	api := NewAPI(APIConfig{
 		ConfigStore: configStore,
+		ModelStore:  modelStore,
 		WorkingDir:  workingDir,
 	})
+
+	// Pre-populate provider cache with mock provider for test model
+	if withProvider {
+		api.providers.Set(LLMConfig{
+			Provider: "openai",
+			Model:    "gpt-4.1",
+			APIKey:   "test-key",
+		}, &mockLLMProvider{})
+	}
 
 	r := chi.NewRouter()
 	api.RegisterRoutes(r, nil)
@@ -207,7 +228,7 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 		setup := newAPITestSetup(t, true, true, "")
 		rec := setup.postJSON("/api/v1/agent/conversations/new", ChatRequest{
 			Message: "hello",
-			Model:   "custom-model",
+			Model:   "test-model",
 		})
 
 		assert.Equal(t, http.StatusCreated, rec.Code)
@@ -217,14 +238,28 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 		t.Parallel()
 
 		configStore := newMockConfigStore(true)
-		configStore.provider = &mockLLMProvider{}
+		configStore.config.DefaultModelID = "test-model"
+		ms := newMockModelStore()
+		ms.models["test-model"] = &ModelConfig{
+			ID:       "test-model",
+			Name:     "Test Model",
+			Provider: "openai",
+			Model:    "gpt-4.1",
+			APIKey:   "test-key",
+		}
 		convStore := newMockConversationStore()
 
 		api := NewAPI(APIConfig{
 			ConfigStore:       configStore,
+			ModelStore:        ms,
 			WorkingDir:        t.TempDir(),
 			ConversationStore: convStore,
 		})
+		api.providers.Set(LLMConfig{
+			Provider: "openai",
+			Model:    "gpt-4.1",
+			APIKey:   "test-key",
+		}, &mockLLMProvider{})
 
 		r := chi.NewRouter()
 		api.RegisterRoutes(r, nil)

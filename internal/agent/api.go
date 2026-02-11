@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	api "github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -59,6 +61,8 @@ type API struct {
 	conversations sync.Map // id -> *ConversationManager (active conversations)
 	store         ConversationStore
 	configStore   ConfigStore
+	modelStore    ModelStore
+	providers     *ProviderCache
 	workingDir    string
 	logger        *slog.Logger
 	dagStore      exec.DAGStore // For resolving DAG file paths
@@ -69,6 +73,7 @@ type API struct {
 // APIConfig contains configuration for the API.
 type APIConfig struct {
 	ConfigStore       ConfigStore
+	ModelStore        ModelStore
 	WorkingDir        string
 	Logger            *slog.Logger
 	ConversationStore ConversationStore
@@ -93,6 +98,8 @@ func NewAPI(cfg APIConfig) *API {
 
 	return &API{
 		configStore: cfg.ConfigStore,
+		modelStore:  cfg.ModelStore,
+		providers:   NewProviderCache(),
 		workingDir:  cfg.WorkingDir,
 		logger:      logger,
 		store:       cfg.ConversationStore,
@@ -214,6 +221,43 @@ func selectModel(requestModel, conversationModel, configModel string) string {
 	return cmp.Or(requestModel, conversationModel, configModel)
 }
 
+// getDefaultModelID returns the default model ID from config.
+func (a *API) getDefaultModelID(ctx context.Context) string {
+	cfg, err := a.configStore.Load(ctx)
+	if err != nil {
+		return ""
+	}
+	return cfg.DefaultModelID
+}
+
+// resolveProvider resolves a model ID to an LLM provider.
+// If modelID is empty, uses the default from config.
+// If the requested model is not found (e.g., deleted), falls back to the default.
+func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider, string, error) {
+	if a.modelStore == nil {
+		return nil, "", errors.New("model store not configured")
+	}
+
+	defaultID := a.getDefaultModelID(ctx)
+
+	if modelID == "" {
+		modelID = defaultID
+	}
+	if modelID == "" {
+		return nil, "", errors.New("no model configured")
+	}
+
+	model, err := a.modelStore.GetByID(ctx, modelID)
+	if errors.Is(err, ErrModelNotFound) && defaultID != "" && defaultID != modelID {
+		// Requested model was deleted; fall back to default
+		model, err = a.modelStore.GetByID(ctx, defaultID)
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	return a.providers.GetOrCreate(model.ToLLMConfig())
+}
+
 // createMessageCallback returns a persistence callback for the given conversation ID.
 // Returns nil if no store is configured.
 func (a *API) createMessageCallback(id string) func(ctx context.Context, msg Message) error {
@@ -275,15 +319,16 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	provider, configModel, err := a.configStore.GetProvider(r.Context())
+	userID, username, ipAddress := getUserContextFromRequest(r)
+	model := selectModel(req.Model, "", a.getDefaultModelID(r.Context()))
+
+	provider, resolvedModel, err := a.resolveProvider(r.Context(), model)
 	if err != nil {
 		a.logger.Error("Failed to get LLM provider", "error", err)
 		a.respondError(w, http.StatusServiceUnavailable, api.ErrorCodeInternalError, "Agent is not configured properly")
 		return
 	}
 
-	userID, username, ipAddress := getUserContextFromRequest(r)
-	model := selectModel(req.Model, "", configModel)
 	id := uuid.New().String()
 	now := time.Now()
 
@@ -304,7 +349,7 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 	a.conversations.Store(id, mgr)
 
 	messageWithContext := a.formatMessage(r.Context(), req.Message, req.DAGContexts)
-	if err := mgr.AcceptUserMessage(r.Context(), provider, model, messageWithContext); err != nil {
+	if err := mgr.AcceptUserMessage(r.Context(), provider, model, resolvedModel, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		a.respondError(w, http.StatusInternalServerError, api.ErrorCodeInternalError, "Failed to process message")
 		return
@@ -475,20 +520,20 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	provider, configModel, err := a.configStore.GetProvider(r.Context())
+	model := selectModel(req.Model, mgr.GetModel(), a.getDefaultModelID(r.Context()))
+
+	provider, resolvedModel, err := a.resolveProvider(r.Context(), model)
 	if err != nil {
 		a.logger.Error("Failed to get LLM provider", "error", err)
 		a.respondError(w, http.StatusServiceUnavailable, api.ErrorCodeInternalError, "Agent is not configured properly")
 		return
 	}
-
-	model := selectModel(req.Model, mgr.GetModel(), configModel)
 	messageWithContext := a.formatMessage(r.Context(), req.Message, req.DAGContexts)
 
 	// Update safe mode setting per request (allows toggling mid-conversation)
 	mgr.SetSafeMode(req.SafeMode)
 
-	if err := mgr.AcceptUserMessage(r.Context(), provider, model, messageWithContext); err != nil {
+	if err := mgr.AcceptUserMessage(r.Context(), provider, model, resolvedModel, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		a.respondError(w, http.StatusInternalServerError, api.ErrorCodeInternalError, "Failed to process message")
 		return
