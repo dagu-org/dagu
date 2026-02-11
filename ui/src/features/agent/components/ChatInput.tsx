@@ -9,9 +9,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { useConfig } from '@/contexts/ConfigContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { getAuthHeaders } from '@/lib/authHeaders';
+import { useClient } from '@/hooks/api';
 import { DAGContext } from '../types';
 import { DAGPicker } from './DAGPicker';
 import { useDagPageContext } from '../hooks/useDagPageContext';
@@ -36,7 +35,7 @@ export function ChatInput({
   disabled,
   placeholder = 'Type a message...',
 }: ChatInputProps) {
-  const config = useConfig();
+  const client = useClient();
   const appBarContext = useContext(AppBarContext);
   const [message, setMessage] = useState('');
   const [isPending, setIsPending] = useState(false);
@@ -51,16 +50,17 @@ export function ChatInput({
 
   // Fetch available models
   useEffect(() => {
+    const controller = new AbortController();
+    const remoteNode = appBarContext.selectedRemoteNode || 'local';
+
     async function fetchModels() {
       try {
-        const remoteNode = encodeURIComponent(appBarContext.selectedRemoteNode || 'local');
-        const response = await fetch(
-          `${config.apiURL}/settings/agent/models?remoteNode=${remoteNode}`,
-          { headers: getAuthHeaders() }
-        );
-        if (!response.ok) return;
-        const data = await response.json();
-        const modelList: ModelOption[] = (data.models || []).map((m: { id: string; name: string }) => ({
+        const { data } = await client.GET('/settings/agent/models', {
+          params: { query: { remoteNode } },
+          signal: controller.signal,
+        });
+        if (!data) return;
+        const modelList: ModelOption[] = (data.models || []).map((m) => ({
           id: m.id,
           name: m.name,
         }));
@@ -75,7 +75,9 @@ export function ChatInput({
       }
     }
     fetchModels();
-  }, [config.apiURL, appBarContext.selectedRemoteNode]);
+
+    return () => controller.abort();
+  }, [client, appBarContext.selectedRemoteNode]);
 
   // Reset pending state when server confirms processing or after timeout fallback
   useEffect(() => {

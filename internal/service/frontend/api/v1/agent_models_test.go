@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"context"
+	"sort"
 	"testing"
 
 	apigen "github.com/dagu-org/dagu/api/v1"
@@ -78,6 +79,7 @@ func (m *mockAgentModelStore) List(_ context.Context) ([]*agent.ModelConfig, err
 	for _, model := range m.models {
 		result = append(result, model)
 	}
+	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
 	return result, nil
 }
 

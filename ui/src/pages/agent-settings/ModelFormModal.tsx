@@ -67,8 +67,6 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Only populate fields when opening in edit mode.
-  // In create mode, preserve values so accidental close doesn't lose input.
   useEffect(() => {
     if (open && model) {
       setConfigId(model.id);
@@ -83,6 +81,8 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
       setOutputCostPer1M(model.outputCostPer1M ?? '');
       setSupportsThinking(model.supportsThinking ?? false);
       setApiKey('');
+    } else if (open && !model) {
+      resetForm();
     }
     if (open) {
       setError(null);
@@ -141,7 +141,7 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
         maxOutputTokens: maxOutputTokens !== '' ? maxOutputTokens : undefined,
         inputCostPer1M: inputCostPer1M !== '' ? inputCostPer1M : undefined,
         outputCostPer1M: outputCostPer1M !== '' ? outputCostPer1M : undefined,
-        supportsThinking: supportsThinking || undefined,
+        supportsThinking,
       };
 
       if (apiKey) {

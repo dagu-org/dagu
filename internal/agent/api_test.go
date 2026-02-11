@@ -29,8 +29,9 @@ func newAPITestSetup(t *testing.T, enabled bool, withProvider bool, workingDir s
 	configStore := newMockConfigStore(enabled)
 
 	var modelStore ModelStore
+	var model *ModelConfig
 	if withProvider {
-		model := testModelConfig("test-model")
+		model = testModelConfig("test-model")
 		ms := newMockModelStore().addModel(model)
 		configStore.config.DefaultModelID = model.ID
 		modelStore = ms
@@ -47,7 +48,6 @@ func newAPITestSetup(t *testing.T, enabled bool, withProvider bool, workingDir s
 	})
 
 	if withProvider {
-		model := testModelConfig("test-model")
 		api.providers.Set(model.ToLLMConfig(), &mockLLMProvider{})
 	}
 

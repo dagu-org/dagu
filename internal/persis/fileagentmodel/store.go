@@ -95,6 +95,12 @@ func (s *Store) rebuildIndex() error {
 		}
 
 		s.byID[model.ID] = filePath
+		if existingID, exists := s.byName[model.Name]; exists {
+			slog.Warn("Duplicate model name in store, last file wins",
+				slog.String("name", model.Name),
+				slog.String("existingID", existingID),
+				slog.String("newID", model.ID))
+		}
 		s.byName[model.Name] = model.ID
 	}
 
@@ -152,6 +158,9 @@ func (s *Store) Create(_ context.Context, model *agent.ModelConfig) error {
 
 	if _, exists := s.byID[model.ID]; exists {
 		return agent.ErrModelAlreadyExists
+	}
+	if _, exists := s.byName[model.Name]; exists {
+		return agent.ErrModelNameAlreadyExists
 	}
 
 	filePath, err := s.modelFilePath(model.ID)

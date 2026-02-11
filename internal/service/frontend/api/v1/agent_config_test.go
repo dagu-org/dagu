@@ -65,9 +65,8 @@ func TestUpdateAgentConfig(t *testing.T) {
 
 		updateResp, ok := resp.(apigen.UpdateAgentConfig200JSONResponse)
 		require.True(t, ok)
-		// ptrOf returns nil for zero values (false), so Enabled will be nil
-		// Verify underlying config was updated
-		assert.False(t, setup.configStore.config.Enabled)
+		require.NotNil(t, updateResp.Enabled)
+		assert.False(t, *updateResp.Enabled)
 		// DefaultModelID should remain unchanged
 		require.NotNil(t, updateResp.DefaultModelId)
 		assert.Equal(t, "original", *updateResp.DefaultModelId)
@@ -146,7 +145,7 @@ func TestUpdateAgentConfig(t *testing.T) {
 	})
 }
 
-func TestBuildAgentConfigChanges(t *testing.T) {
+func TestUpdateAgentConfig_PersistsChanges(t *testing.T) {
 	t.Parallel()
 
 	t.Run("persists changes correctly", func(t *testing.T) {

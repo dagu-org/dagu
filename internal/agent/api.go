@@ -642,13 +642,18 @@ func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 	heartbeat := time.NewTicker(15 * time.Second)
 	defer heartbeat.Stop()
 
-	for {
-		ch := make(chan streamResult, 1)
-		go func() {
+	ch := make(chan streamResult, 1)
+	go func() {
+		for {
 			resp, cont := next()
 			ch <- streamResult{resp, cont}
-		}()
+			if !cont {
+				return
+			}
+		}
+	}()
 
+	for {
 		select {
 		case res := <-ch:
 			if !res.cont {

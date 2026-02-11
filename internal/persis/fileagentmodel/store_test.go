@@ -199,17 +199,7 @@ func TestStore_GetByID(t *testing.T) {
 
 		got, err := store.GetByID(ctx, "test-model")
 		require.NoError(t, err)
-		assert.Equal(t, model.ID, got.ID)
-		assert.Equal(t, model.Name, got.Name)
-		assert.Equal(t, model.Provider, got.Provider)
-		assert.Equal(t, model.Model, got.Model)
-		assert.Equal(t, model.APIKey, got.APIKey)
-		assert.Equal(t, model.ContextWindow, got.ContextWindow)
-		assert.Equal(t, model.MaxOutputTokens, got.MaxOutputTokens)
-		assert.Equal(t, model.InputCostPer1M, got.InputCostPer1M)
-		assert.Equal(t, model.OutputCostPer1M, got.OutputCostPer1M)
-		assert.Equal(t, model.SupportsThinking, got.SupportsThinking)
-		assert.Equal(t, model.Description, got.Description)
+		assert.Equal(t, model, got)
 	})
 
 	t.Run("not found", func(t *testing.T) {

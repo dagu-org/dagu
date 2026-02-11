@@ -26,7 +26,7 @@ func TestGenerateSlugID(t *testing.T) {
 		{name: "only special chars", input: "!@#$%", want: ""},
 		{name: "mixed whitespace", input: "hello\tworld\nnew", want: "hello-world-new"},
 		{name: "numbers only", input: "12345", want: "12345"},
-		{name: "unicode characters", input: "modele-francais", want: "modele-francais"},
+		{name: "unicode characters", input: "modèle-français", want: "mod-le-fran-ais"},
 	}
 
 	for _, tc := range tests {

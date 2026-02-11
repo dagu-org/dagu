@@ -100,7 +100,7 @@ func (a *API) requireAgentConfigManagement() error {
 
 func toAgentConfigResponse(cfg *agent.Config) api.AgentConfigResponse {
 	return api.AgentConfigResponse{
-		Enabled:        ptrOf(cfg.Enabled),
+		Enabled:        &cfg.Enabled,
 		DefaultModelId: ptrOf(cfg.DefaultModelID),
 	}
 }

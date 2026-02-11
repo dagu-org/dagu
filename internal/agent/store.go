@@ -16,9 +16,10 @@ var (
 	ErrInvalidUserID         = errors.New("invalid user ID")
 
 	// Model errors.
-	ErrModelNotFound      = errors.New("model not found")
-	ErrModelAlreadyExists = errors.New("model already exists")
-	ErrInvalidModelID     = errors.New("invalid model ID")
+	ErrModelNotFound          = errors.New("model not found")
+	ErrModelAlreadyExists     = errors.New("model already exists")
+	ErrModelNameAlreadyExists = errors.New("model name already exists")
+	ErrInvalidModelID         = errors.New("invalid model ID")
 )
 
 // Config holds the configuration for the AI agent feature.
@@ -101,11 +102,18 @@ func GenerateSlugID(name string) string {
 	return s
 }
 
+// maxSuffixLen reserves room for collision suffixes like "-999999999".
+const maxSuffixLen = 10
+
 // UniqueID generates a unique slug ID, appending "-2", "-3" etc. on collision.
+// The result is guaranteed to not exceed maxModelIDLength.
 func UniqueID(name string, existingIDs map[string]struct{}) string {
 	base := GenerateSlugID(name)
 	if base == "" {
 		base = "model"
+	}
+	if len(base) > maxModelIDLength-maxSuffixLen {
+		base = base[:maxModelIDLength-maxSuffixLen]
 	}
 	id := base
 	if _, exists := existingIDs[id]; !exists {

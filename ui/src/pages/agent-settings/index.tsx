@@ -20,8 +20,7 @@ import {
 } from '@/components/ui/table';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useIsAdmin } from '@/contexts/AuthContext';
-import { useConfig } from '@/contexts/ConfigContext';
-import { getAuthHeaders } from '@/lib/authHeaders';
+import { useClient } from '@/hooks/api';
 import ConfirmModal from '@/ui/ConfirmModal';
 import { ModelFormModal } from './ModelFormModal';
 
@@ -29,7 +28,7 @@ type ModelConfig = components['schemas']['ModelConfigResponse'];
 type ModelPreset = components['schemas']['ModelPreset'];
 
 export default function AgentSettingsPage(): React.ReactNode {
-  const config = useConfig();
+  const client = useClient();
   const isAdmin = useIsAdmin();
   const appBarContext = useContext(AppBarContext);
 
@@ -48,7 +47,7 @@ export default function AgentSettingsPage(): React.ReactNode {
   const [editingModel, setEditingModel] = useState<ModelConfig | null>(null);
   const [deletingModel, setDeletingModel] = useState<ModelConfig | null>(null);
 
-  const remoteNode = encodeURIComponent(appBarContext.selectedRemoteNode || 'local');
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
   useEffect(() => {
     appBarContext.setTitle('Agent Settings');
@@ -56,47 +55,42 @@ export default function AgentSettingsPage(): React.ReactNode {
 
   const fetchConfig = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${config.apiURL}/settings/agent?remoteNode=${remoteNode}`,
-        { headers: getAuthHeaders() }
-      );
-      if (!response.ok) throw new Error('Failed to fetch agent configuration');
-      const data = await response.json();
+      const { data, error: apiError } = await client.GET('/settings/agent', {
+        params: { query: { remoteNode } },
+      });
+      if (apiError) throw new Error('Failed to fetch agent configuration');
       setEnabled(data.enabled ?? false);
       setDefaultModelId(data.defaultModelId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load configuration');
     }
-  }, [config.apiURL, remoteNode]);
+  }, [client, remoteNode]);
 
   const fetchModels = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${config.apiURL}/settings/agent/models?remoteNode=${remoteNode}`,
-        { headers: getAuthHeaders() }
-      );
-      if (!response.ok) throw new Error('Failed to fetch models');
-      const data = await response.json();
+      const { data, error: apiError } = await client.GET('/settings/agent/models', {
+        params: { query: { remoteNode } },
+      });
+      if (apiError) throw new Error('Failed to fetch models');
       setModels(data.models || []);
       setDefaultModelId(data.defaultModelId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load models');
     }
-  }, [config.apiURL, remoteNode]);
+  }, [client, remoteNode]);
 
   const fetchPresets = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${config.apiURL}/settings/agent/model-presets?remoteNode=${remoteNode}`,
-        { headers: getAuthHeaders() }
-      );
-      if (!response.ok) return;
-      const data = await response.json();
-      setPresets(data.presets || []);
+      const { data } = await client.GET('/settings/agent/model-presets', {
+        params: { query: { remoteNode } },
+      });
+      if (data) {
+        setPresets(data.presets || []);
+      }
     } catch {
       // Presets are optional, don't show error
     }
-  }, [config.apiURL, remoteNode]);
+  }, [client, remoteNode]);
 
   useEffect(() => {
     async function load() {
@@ -112,26 +106,21 @@ export default function AgentSettingsPage(): React.ReactNode {
     setSuccess(null);
 
     try {
-      const response = await fetch(
-        `${config.apiURL}/settings/agent?remoteNode=${remoteNode}`,
-        {
-          method: 'PATCH',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ enabled, defaultModelId }),
-        }
-      );
+      const { data, error: apiError } = await client.PATCH('/settings/agent', {
+        params: { query: { remoteNode } },
+        body: { enabled, defaultModelId },
+      });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.message || 'Failed to save configuration');
+      if (apiError) {
+        throw new Error(apiError.message || 'Failed to save configuration');
       }
 
-      const data = await response.json();
       setEnabled(data.enabled ?? false);
       setDefaultModelId(data.defaultModelId);
       setSuccess('Configuration saved successfully');
 
-      setTimeout(() => window.location.reload(), 500);
+      // Re-fetch to ensure sidebar/nav reflects changes
+      await fetchConfig();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save configuration');
     } finally {
@@ -142,17 +131,12 @@ export default function AgentSettingsPage(): React.ReactNode {
   async function handleSetDefault(modelId: string): Promise<void> {
     setError(null);
     try {
-      const response = await fetch(
-        `${config.apiURL}/settings/agent/default-model?remoteNode=${remoteNode}`,
-        {
-          method: 'PUT',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ modelId }),
-        }
-      );
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.message || 'Failed to set default model');
+      const { error: apiError } = await client.PUT('/settings/agent/default-model', {
+        params: { query: { remoteNode } },
+        body: { modelId },
+      });
+      if (apiError) {
+        throw new Error(apiError.message || 'Failed to set default model');
       }
       setDefaultModelId(modelId);
     } catch (err) {
@@ -163,20 +147,15 @@ export default function AgentSettingsPage(): React.ReactNode {
   async function handleDeleteModel(): Promise<void> {
     if (!deletingModel) return;
     try {
-      const response = await fetch(
-        `${config.apiURL}/settings/agent/models/${deletingModel.id}?remoteNode=${remoteNode}`,
-        {
-          method: 'DELETE',
-          headers: getAuthHeaders(),
-        }
-      );
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.message || 'Failed to delete model');
+      const { error: apiError } = await client.DELETE('/settings/agent/models/{modelId}', {
+        params: { path: { modelId: deletingModel.id }, query: { remoteNode } },
+      });
+      if (apiError) {
+        throw new Error(apiError.message || 'Failed to delete model');
       }
       setError(null);
       setDeletingModel(null);
-      fetchModels();
+      await fetchModels();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete model');
     }
@@ -304,18 +283,18 @@ export default function AgentSettingsPage(): React.ReactNode {
               ) : (
                 models.map((m) => (
                   <TableRow key={m.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex flex-col">
-                        <span>{m.name}</span>
+                    <TableCell className="font-medium max-w-[200px]">
+                      <div className="flex flex-col overflow-hidden">
+                        <span className="truncate">{m.name}</span>
                         {m.description && (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-muted-foreground truncate">
                             {m.description}
                           </span>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                    <TableCell className="max-w-[160px]">
+                      <code className="text-xs bg-muted px-1.5 py-0.5 rounded truncate block">
                         {m.id}
                       </code>
                     </TableCell>
@@ -324,8 +303,8 @@ export default function AgentSettingsPage(): React.ReactNode {
                         {m.provider}
                       </span>
                     </TableCell>
-                    <TableCell>
-                      <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                    <TableCell className="max-w-[180px]">
+                      <code className="text-xs bg-muted px-1.5 py-0.5 rounded truncate block">
                         {m.model}
                       </code>
                     </TableCell>

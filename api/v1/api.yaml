@@ -6370,6 +6370,7 @@ components:
           type: string
         apiKey:
           type: string
+          writeOnly: true
         baseUrl:
           type: string
         contextWindow:
@@ -6404,6 +6405,7 @@ components:
           type: string
         apiKey:
           type: string
+          writeOnly: true
         baseUrl:
           type: string
         contextWindow:

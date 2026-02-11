@@ -11,6 +11,7 @@ import {
 
 import { cn } from '@/lib/utils';
 import { Message, TokenUsage, ToolCall, ToolResult, UIAction, UserPromptResponse } from '../types';
+import { formatCost } from '../utils/formatCost';
 import { CommandApprovalMessage } from './CommandApprovalMessage';
 import { ToolContentViewer } from './ToolViewers';
 import { UserPromptMessage } from './UserPromptMessage';
@@ -177,11 +178,6 @@ function UserMessage({ content, isPending }: { content: string; isPending?: bool
       </div>
     </div>
   );
-}
-
-function formatCost(cost: number): string {
-  if (cost < 0.01) return `$${cost.toFixed(4)}`;
-  return `$${cost.toFixed(2)}`;
 }
 
 function AssistantMessage({
