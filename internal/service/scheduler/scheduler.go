@@ -2,13 +2,10 @@ package scheduler
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -18,31 +15,20 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/dirlock"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
-
-// Job is the interface for the actual DAG.
-type Job interface {
-	// Start starts the DAG.
-	Start(ctx context.Context) error
-	// Stop stops the DAG.
-	Stop(ctx context.Context) error
-	// Restart restarts the DAG.
-	Restart(ctx context.Context) error
-}
 
 // Clock is a function that returns the current time.
 // It can be replaced for testing purposes.
 type Clock func() time.Time
 
 type Scheduler struct {
-	runtimeManager      runtime.Manager
 	entryReader         EntryReader
-	logDir              string
 	quit                chan any
 	running             atomic.Bool
-	location            *time.Location
 	dagRunStore         exec.DAGRunStore
 	queueStore          exec.QueueStore
 	procStore           exec.ProcStore
@@ -54,22 +40,15 @@ type Scheduler struct {
 	disableHealthServer bool            // Disable health server when running from start-all
 	zombieDetector      *ZombieDetector // Zombie DAG run detector
 	instanceID          string          // Unique instance identifier for service registry
-	// queueProcessor is the processor for queued DAG runs
-	queueProcessor *QueueProcessor
-	stopOnce       sync.Once
-	lock           sync.Mutex
-	clock          Clock // Clock function for getting current time
+	queueProcessor      *QueueProcessor // Processor for queued DAG runs
+	planner             *TickPlanner    // Unified scheduling decision module
+	stopOnce            sync.Once
+	lock                sync.Mutex
+	clock               Clock // Clock function for getting current time
 }
 
-// New constructs a Scheduler configured with the provided stores, runtime manager,
+// New constructs a Scheduler from the provided stores, runtime manager,
 // service registry, and dispatcher.
-//
-// It determines the scheduler time location from cfg.Core.Location (falls back to
-// time.Local), creates a directory lock, DAG executor, health server, and queue
-// processor, and sets the default clock to the real-time clock.
-//
-// The returned Scheduler is ready for startup; any initialization errors are
-// returned.
 func New(
 	cfg *config.Config,
 	er EntryReader,
@@ -79,6 +58,7 @@ func New(
 	procStore exec.ProcStore,
 	reg exec.ServiceRegistry,
 	coordinatorCli exec.Dispatcher,
+	watermarkStore WatermarkStore,
 ) (*Scheduler, error) {
 	timeLoc := cfg.Core.Location
 	if timeLoc == nil {
@@ -100,12 +80,49 @@ func New(
 		dagExecutor,
 		cfg.Queues,
 	)
+	defaultClock := Clock(time.Now)
+
+	// Resolve IsSuspended once at construction time and wire the event channel.
+	eventCh := make(chan DAGChangeEvent)
+	var isSuspended IsSuspendedFunc
+	if impl, ok := er.(*entryReaderImpl); ok {
+		isSuspended = impl.dagStore.IsSuspended
+		impl.setEvents(eventCh)
+	}
+
+	planner := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore:  watermarkStore,
+		IsSuspended:     isSuspended,
+		GetLatestStatus: drm.GetLatestStatus,
+		IsRunning: func(ctx context.Context, dag *core.DAG) (bool, error) {
+			count, err := procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
+			if err != nil {
+				return false, err
+			}
+			return count > 0, nil
+		},
+		GenRunID: drm.GenDAGRunID,
+		Dispatch: func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error {
+			return dagExecutor.HandleJob(
+				ctx, dag,
+				coordinatorv1.Operation_OPERATION_START,
+				runID, triggerType,
+			)
+		},
+		Stop: func(ctx context.Context, dag *core.DAG) error {
+			return drm.Stop(ctx, dag, "")
+		},
+		Restart: func(ctx context.Context, dag *core.DAG) error {
+			return dagExecutor.Restart(ctx, dag)
+		},
+		Clock:    defaultClock,
+		Location: timeLoc,
+		Events:   eventCh,
+	})
+
 	return &Scheduler{
-		logDir:          cfg.Paths.LogDir,
 		quit:            make(chan any),
-		location:        timeLoc,
 		entryReader:     er,
-		runtimeManager:  drm,
 		dagRunStore:     dagRunStore,
 		queueStore:      queueStore,
 		procStore:       procStore,
@@ -115,7 +132,8 @@ func New(
 		healthServer:    healthServer,
 		serviceRegistry: reg,
 		queueProcessor:  processor,
-		clock:           time.Now, // Default to real time
+		planner:         planner,
+		clock:           defaultClock,
 	}, nil
 }
 
@@ -123,6 +141,31 @@ func New(
 // This must be called before Start().
 func (s *Scheduler) SetClock(clock Clock) {
 	s.clock = clock
+	s.planner.cfg.Clock = clock
+}
+
+// SetRestartFunc overrides the planner's restart function for testing purposes.
+// This must be called before Start().
+func (s *Scheduler) SetRestartFunc(fn RestartFunc) {
+	s.planner.cfg.Restart = fn
+}
+
+// SetStopFunc overrides the planner's stop function for testing purposes.
+// This must be called before Start().
+func (s *Scheduler) SetStopFunc(fn StopFunc) {
+	s.planner.cfg.Stop = fn
+}
+
+// SetGetLatestStatusFunc overrides the planner's GetLatestStatus function for testing purposes.
+// This must be called before Start().
+func (s *Scheduler) SetGetLatestStatusFunc(fn GetLatestStatusFunc) {
+	s.planner.cfg.GetLatestStatus = fn
+}
+
+// SetDispatchFunc overrides the planner's Dispatch function for testing purposes.
+// This must be called before Start().
+func (s *Scheduler) SetDispatchFunc(fn DispatchFunc) {
+	s.planner.cfg.Dispatch = fn
 }
 
 // DisableHealthServer disables the health check server (used when running from start-all)
@@ -134,13 +177,11 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Generate instance ID if not already set
 	if s.instanceID == "" {
 		hostname, _ := os.Hostname()
 		s.instanceID = fmt.Sprintf("%s-%d-%d", hostname, os.Getpid(), time.Now().Unix())
 	}
 
-	// Register with service registry as inactive initially
 	if s.serviceRegistry != nil {
 		hostname, _ := os.Hostname()
 		hostInfo := exec.HostInfo{
@@ -162,14 +203,12 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		}
 	}
 
-	// Start health check server only if not disabled
 	if !s.disableHealthServer {
 		if err := s.healthServer.Start(ctx); err != nil {
 			return fmt.Errorf("failed to start health check server: %w", err)
 		}
 	}
 
-	// Acquire directory lock first to prevent multiple scheduler instances
 	logger.Info(ctx, "Waiting to acquire scheduler lock")
 	if err := s.dirLock.Lock(ctx); err != nil {
 		return fmt.Errorf("failed to acquire scheduler lock: %w", err)
@@ -177,7 +216,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	logger.Info(ctx, "Acquired scheduler lock")
 
-	// Update status to active after acquiring lock
 	if s.serviceRegistry != nil {
 		if err := s.serviceRegistry.UpdateStatus(ctx, exec.ServiceNameScheduler, exec.ServiceStatusActive); err != nil {
 			logger.Error(ctx, "Failed to update status to active", tag.Error(err))
@@ -188,7 +226,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	sig := make(chan os.Signal, 1)
 
-	// Start the DAG file watcher
 	queueWatcher := s.queueStore.QueueWatcher(ctx)
 	notifyCh, err := queueWatcher.Start(ctx)
 	if err != nil {
@@ -197,7 +234,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	}
 	s.queueProcessor.Start(ctx, notifyCh)
 
-	// Handle OS signals for graceful shutdown
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	var wg sync.WaitGroup
@@ -218,6 +254,14 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		logger.Error(ctx, "Failed to initialize entry reader", tag.Error(err))
 		return err
 	}
+
+	// planner.Init is best-effort: if watermark loading fails, Init falls back
+	// to an empty state internally, so catch-up windows replay from scratch.
+	if err := s.planner.Init(ctx, s.entryReader.DAGs()); err != nil {
+		logger.Error(ctx, "Failed to initialize tick planner", tag.Error(err))
+	}
+
+	s.planner.Start(ctx)
 
 	wg.Add(1)
 	go func() {
@@ -242,8 +286,17 @@ func (s *Scheduler) startZombieDetector(ctx context.Context) {
 		return
 	}
 
-	// Create zombie detector while holding lock
+	// Create zombie detector while holding lock. Check s.quit first to
+	// avoid starting after Stop() has already run. Both this check and
+	// Stop()'s close(s.quit) + zombieDetector.Stop() happen under s.lock,
+	// so there is no race.
 	s.lock.Lock()
+	select {
+	case <-s.quit:
+		s.lock.Unlock()
+		return
+	default:
+	}
 	s.zombieDetector = NewZombieDetector(
 		s.dagRunStore,
 		s.procStore,
@@ -298,7 +351,13 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 			return
 		case <-timer.C:
 			_ = timer.Stop()
-			s.invokeJobs(ctx, tickTime)
+
+			// Plan and dispatch all schedules (start, stop, restart)
+			for _, run := range s.planner.Plan(ctx, tickTime) {
+				s.dispatchRun(ctx, run)
+			}
+			s.planner.Advance(tickTime)
+
 			tickTime = s.NextTick(tickTime)
 			timer.Reset(tickTime.Sub(s.clock()))
 		}
@@ -322,7 +381,7 @@ func (s *Scheduler) Stop(ctx context.Context) {
 
 	s.stopOnce.Do(func() {
 		var wg sync.WaitGroup
-		wg.Add(3)
+		wg.Add(2)
 
 		close(s.quit)
 
@@ -336,14 +395,16 @@ func (s *Scheduler) Stop(ctx context.Context) {
 			s.stopCron(ctx)
 		}(ctx)
 
-		go func() {
-			defer wg.Done()
-			s.entryReader.Stop()
-		}()
+		// Stop the producer (entryReader) synchronously BEFORE the consumer (planner).
+		// This ensures er.quit is closed before drainEvents exits, so any in-flight
+		// sendEvent unblocks via the select on er.quit.
+		s.entryReader.Stop()
 
 		if s.zombieDetector != nil {
 			s.zombieDetector.Stop(ctx)
 		}
+
+		s.planner.Stop(ctx)
 
 		if err := s.dirLock.Unlock(); err != nil {
 			logger.Error(ctx, "Failed to release scheduler lock in Stop", tag.Error(err))
@@ -354,26 +415,22 @@ func (s *Scheduler) Stop(ctx context.Context) {
 }
 
 func (s *Scheduler) stopCron(ctx context.Context) {
-	// Update status to inactive before stopping
 	if s.serviceRegistry != nil {
 		if err := s.serviceRegistry.UpdateStatus(ctx, exec.ServiceNameScheduler, exec.ServiceStatusInactive); err != nil {
 			logger.Error(ctx, "Failed to update status to inactive", tag.Error(err))
 		}
 	}
 
-	// Stop health check server if it was started
 	if s.healthServer != nil && !s.disableHealthServer {
 		if err := s.healthServer.Stop(ctx); err != nil {
 			logger.Error(ctx, "Failed to stop health check server", tag.Error(err))
 		}
 	}
 
-	// Close DAG executor to release gRPC connections
 	if s.dagExecutor != nil {
 		s.dagExecutor.Close(ctx)
 	}
 
-	// Unregister from service registry
 	if s.serviceRegistry != nil {
 		s.serviceRegistry.Unregister(ctx)
 	}
@@ -381,87 +438,17 @@ func (s *Scheduler) stopCron(ctx context.Context) {
 	logger.Info(ctx, "Scheduler stopped")
 }
 
-// invokeJobs executes the scheduled jobs at the current time.
-func (s *Scheduler) invokeJobs(ctx context.Context, now time.Time) {
-	// Ensure the lock is held while running jobs
-	if !s.dirLock.IsHeldByMe() {
-		logger.Error(ctx, "Scheduler lock is not held, cannot run jobs")
-		return
-	}
-
-	// Get jobs scheduled to run at or before the current time
-	// Subtract a small buffer to avoid edge cases with exact timing
-	jobs, err := s.entryReader.Next(ctx, now.Add(-time.Second).In(s.location))
-	if err != nil {
-		logger.Error(ctx, "Failed to get next jobs", tag.Error(err))
-		return
-	}
-
-	// Sort the jobs by the next scheduled time for predictable execution order
-	sort.SliceStable(jobs, func(i, j int) bool {
-		return jobs[i].Next.Before(jobs[j].Next)
-	})
-
-	for _, job := range jobs {
-		if job.Next.After(now) {
-			break
-		}
-
-		// Create a child context for this specific job execution
-		jobCtx := logger.WithValues(ctx,
-			tag.Job(fmt.Sprintf("%v", job.Job)),
-			slog.String("jobType", job.Type.String()),
-			slog.String("scheduledTime", job.Next.Format(time.RFC3339)),
-		)
-
-		// Launch job execution in goroutine
-		go func(ctx context.Context, job *ScheduledJob) {
-			if err := job.invoke(ctx); err != nil {
-				switch {
-				case errors.Is(err, ErrJobFinished):
-					logger.Info(ctx, "Job already completed")
-				case errors.Is(err, ErrJobRunning):
-					logger.Info(ctx, "Job already in progress")
-				case errors.Is(err, ErrJobSkipped):
-					logger.Info(ctx, "Job execution skipped",
-						tag.Reason(err.Error()),
-					)
-				default:
-					logger.Error(ctx, "Job execution failed",
-						tag.Error(err),
-						tag.Type(fmt.Sprintf("%T", err)),
-					)
-				}
-			} else {
-				logger.Info(ctx, "Job completed successfully")
+// dispatchRun dispatches a planned run in a goroutine.
+func (s *Scheduler) dispatchRun(ctx context.Context, run PlannedRun) {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error(ctx, "Run dispatch panicked",
+					tag.DAG(run.DAG.Name),
+					tag.Error(panicToError(r)),
+				)
 			}
-		}(jobCtx, job)
-	}
-}
-
-// invoke invokes the job based on the schedule type.
-func (s *ScheduledJob) invoke(ctx context.Context) error {
-	if s.Job == nil {
-		return fmt.Errorf("job is nil")
-	}
-
-	logger.Info(ctx, "Starting operation",
-		tag.Type(s.Type.String()),
-		tag.Job(fmt.Sprintf("%v", s.Job)),
-	)
-
-	switch s.Type {
-	case ScheduleTypeStart:
-		return s.Job.Start(ctx)
-
-	case ScheduleTypeStop:
-		return s.Job.Stop(ctx)
-
-	case ScheduleTypeRestart:
-		return s.Job.Restart(ctx)
-
-	default:
-		return fmt.Errorf("unknown schedule type: %v", s.Type)
-
-	}
+		}()
+		s.planner.DispatchRun(ctx, run)
+	}()
 }

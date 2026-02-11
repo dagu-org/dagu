@@ -1,12 +1,13 @@
 import { TriggerType } from '@/api/v1/schema';
 import type { ReactElement } from 'react';
 
-const labels: Record<TriggerType, string> = {
+export const triggerTypeLabels: Record<TriggerType, string> = {
   scheduler: 'Scheduled',
   manual: 'Manual',
   webhook: 'Webhook',
   subdag: 'Sub-DAG',
   retry: 'Retry',
+  catchup: 'Catch-up',
   unknown: 'Unknown',
 };
 
@@ -21,7 +22,7 @@ export function TriggerTypeIndicator({ type }: Props): ReactElement | null {
 
   return (
     <span className="font-medium text-foreground/90 text-xs">
-      {labels[type] ?? type}
+      {triggerTypeLabels[type] ?? type}
     </span>
   );
 }

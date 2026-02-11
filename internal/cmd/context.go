@@ -29,6 +29,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
 	"github.com/dagu-org/dagu/internal/persis/filequeue"
 	"github.com/dagu-org/dagu/internal/persis/fileserviceregistry"
+	"github.com/dagu-org/dagu/internal/persis/filewatermark"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
@@ -335,9 +336,10 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	}
 
 	coordinatorCli := c.NewCoordinatorClient()
-	de := scheduler.NewDAGExecutor(coordinatorCli, runtime.NewSubCmdBuilder(c.Config), c.Config.DefaultExecMode)
-	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable)
-	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli)
+	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr)
+	watermarkDir := filepath.Join(c.Config.Paths.DataDir, "scheduler")
+	wmStore := filewatermark.New(watermarkDir)
+	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli, wmStore)
 }
 
 // StringParam retrieves a string parameter from the command line flags.

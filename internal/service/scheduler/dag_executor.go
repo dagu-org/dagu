@@ -26,9 +26,9 @@ import (
 //
 // Execution Flow:
 //
-// 1. Scheduled Jobs (from DAGRunJob.Start):
+// 1. Scheduled Jobs (from TickPlanner.DispatchRun):
 //   - Operation: OPERATION_START
-//   - Flow: DAGRunJob.Start() → HandleJob() → EnqueueDAGRun() (for distributed)
+//   - Flow: TickPlanner.DispatchRun() → HandleJob() → EnqueueDAGRun() (for distributed)
 //   - This creates a persisted record with status=QUEUED before any dispatch attempt
 //   - Ensures the job is tracked and can be retried if coordinator/workers are down
 //
@@ -206,12 +206,14 @@ func (e *DAGExecutor) Restart(ctx context.Context, dag *core.DAG) error {
 	return runtime.Start(ctx, spec)
 }
 
-// Close closes any resources held by the DAGExecutor, including the coordinator client
+// Close closes any resources held by the DAGExecutor, including the coordinator client.
+// Note: we intentionally do NOT nil out coordinatorCli here because Close is called
+// from a goroutine in Stop while concurrent dispatchRun goroutines may still read
+// coordinatorCli via shouldUseDistributedExecution.
 func (e *DAGExecutor) Close(ctx context.Context) {
 	if e.coordinatorCli != nil {
 		if err := e.coordinatorCli.Cleanup(ctx); err != nil {
 			logger.Error(ctx, "Failed to cleanup coordinator client", tag.Error(err))
 		}
-		e.coordinatorCli = nil
 	}
 }

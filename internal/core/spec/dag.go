@@ -46,6 +46,11 @@ type dag struct {
 	// SkipIfSuccessful is the flag to skip the DAG on schedule when it is
 	// executed manually before the schedule.
 	SkipIfSuccessful bool
+	// CatchupWindow is the lookback horizon for missed intervals (e.g. "6h", "2d12h").
+	// If set, enables catch-up on scheduler restart. If omitted, no catch-up.
+	CatchupWindow string
+	// OverlapPolicy controls how multiple catch-up runs are handled: "skip" or "all".
+	OverlapPolicy string
 	// LogDir is the directory where the logs are stored.
 	LogDir string
 	// LogOutput specifies how stdout and stderr are handled in log files.
@@ -400,6 +405,8 @@ var metadataTransformers = []transform{
 	{"queue", newTransformer("Queue", buildQueue)},
 	{"maxOutputSize", newTransformer("MaxOutputSize", buildMaxOutputSize)},
 	{"skipIfSuccessful", newTransformer("SkipIfSuccessful", buildSkipIfSuccessful)},
+	{"catchupWindow", newTransformer("CatchupWindow", buildCatchupWindow)},
+	{"overlapPolicy", newTransformer("OverlapPolicy", buildOverlapPolicy)},
 }
 
 // fullTransformers are only run when building the full DAG (not metadata-only)
@@ -641,6 +648,17 @@ func buildMaxOutputSize(_ BuildContext, d *dag) (int, error) {
 
 func buildSkipIfSuccessful(_ BuildContext, d *dag) (bool, error) {
 	return d.SkipIfSuccessful, nil
+}
+
+func buildCatchupWindow(_ BuildContext, d *dag) (time.Duration, error) {
+	if d.CatchupWindow == "" {
+		return 0, nil
+	}
+	return core.ParseDuration(d.CatchupWindow)
+}
+
+func buildOverlapPolicy(_ BuildContext, d *dag) (core.OverlapPolicy, error) {
+	return core.ParseOverlapPolicy(d.OverlapPolicy)
 }
 
 func buildLogDir(_ BuildContext, d *dag) (string, error) {

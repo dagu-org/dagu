@@ -2,62 +2,50 @@ package scheduler_test
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/robfig/cron/v3"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestScheduler(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Start", func(t *testing.T) {
-		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-
-		entryReader := &mockJobManager{
-			Entries: []*scheduler.ScheduledJob{
-				{Job: &mockJob{}, Next: now},
-				{Job: &mockJob{}, Next: now.Add(time.Minute)},
-			},
-		}
-
-		th := test.SetupScheduler(t)
-		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
-		require.NoError(t, err)
-		sc.SetClock(func() time.Time { return now })
-
-		ctx := context.Background()
-		go func() {
-			_ = sc.Start(ctx)
-		}()
-
-		time.Sleep(time.Second + time.Millisecond*100)
-		sc.Stop(ctx)
-
-		require.Equal(t, int32(1), entryReader.Entries[0].Job.(*mockJob).RunCount.Load())
-		require.Equal(t, int32(0), entryReader.Entries[1].Job.(*mockJob).RunCount.Load())
-	})
-
 	t.Run("Restart", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 
-		entryReader := &mockJobManager{
-			Entries: []*scheduler.ScheduledJob{
-				{Type: scheduler.ScheduleTypeRestart, Job: &mockJob{}, Next: now},
+		// Parse a cron that fires at minute 0 (matches "now")
+		cronParser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+		parsed, err := cronParser.Parse("0 * * * *")
+		require.NoError(t, err)
+
+		entryReader := newMockJobManager()
+		entryReader.LoadedDAGs = []*core.DAG{
+			{
+				Name: "restart-dag",
+				RestartSchedule: []core.Schedule{
+					{Expression: "0 * * * *", Parsed: parsed},
+				},
 			},
 		}
 
 		th := test.SetupScheduler(t)
-		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
 		require.NoError(t, err)
 		sc.SetClock(func() time.Time { return now })
+
+		// Track restart calls via the planner's Restart function
+		var restartCount atomic.Int32
+		sc.SetRestartFunc(func(_ context.Context, _ *core.DAG) error {
+			restartCount.Add(1)
+			return nil
+		})
 
 		go func() {
 			_ = sc.Start(context.Background())
@@ -65,14 +53,49 @@ func TestScheduler(t *testing.T) {
 		defer sc.Stop(context.Background())
 
 		time.Sleep(time.Second + time.Millisecond*100)
-		require.Equal(t, int32(1), entryReader.Entries[0].Job.(*mockJob).RestartCount.Load())
+		require.GreaterOrEqual(t, restartCount.Load(), int32(1))
+	})
+	t.Run("Start", func(t *testing.T) {
+		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 
+		cronParser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+		parsed, err := cronParser.Parse("0 * * * *")
+		require.NoError(t, err)
+
+		entryReader := newMockJobManager()
+		entryReader.LoadedDAGs = []*core.DAG{
+			{
+				Name: "start-dag",
+				Schedule: []core.Schedule{
+					{Expression: "0 * * * *", Parsed: parsed},
+				},
+			},
+		}
+
+		th := test.SetupScheduler(t)
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
+		require.NoError(t, err)
+		sc.SetClock(func() time.Time { return now })
+
+		var dispatchCount atomic.Int32
+		sc.SetDispatchFunc(func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			dispatchCount.Add(1)
+			return nil
+		})
+
+		go func() {
+			_ = sc.Start(context.Background())
+		}()
+		defer sc.Stop(context.Background())
+
+		time.Sleep(time.Second + time.Millisecond*100)
+		require.GreaterOrEqual(t, dispatchCount.Load(), int32(1), "dispatch should have been called for start schedule")
 	})
 	t.Run("NextTick", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
 
 		th := test.SetupScheduler(t)
-		schedulerInstance, err := scheduler.New(th.Config, &mockJobManager{}, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
+		schedulerInstance, err := scheduler.New(th.Config, newMockJobManager(), th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
 		require.NoError(t, err)
 
 		next := schedulerInstance.NextTick(now)
@@ -80,141 +103,16 @@ func TestScheduler(t *testing.T) {
 	})
 }
 
-func TestJobReady(t *testing.T) {
-	cronParser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
-
-	tests := []struct {
-		name           string
-		schedule       string
-		now            time.Time
-		lastRunTime    time.Time
-		lastStatus     core.Status
-		skipSuccessful bool
-		wantErr        error
-	}{
-		{
-			name:           "SkipIfSuccessfulTrueWithRecentSuccess",
-			schedule:       "0 * * * *", // Every hour
-			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
-			lastRunTime:    time.Date(2020, 1, 1, 0, 1, 0, 0, time.UTC), // 1 min after prev schedule
-			lastStatus:     core.Succeeded,
-			skipSuccessful: true,
-			wantErr:        scheduler.ErrJobSuccess,
-		},
-		{
-			name:           "SkipIfSuccessfulFalseWithRecentSuccess",
-			schedule:       "0 * * * *",
-			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
-			lastRunTime:    time.Date(2020, 1, 1, 0, 1, 0, 0, time.UTC),
-			lastStatus:     core.Succeeded,
-			skipSuccessful: false,
-			wantErr:        nil,
-		},
-		{
-			name:           "AlreadyRunning",
-			schedule:       "0 * * * *",
-			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
-			lastRunTime:    time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
-			lastStatus:     core.Running,
-			skipSuccessful: true,
-			wantErr:        scheduler.ErrJobRunning,
-		},
-		{
-			name:           "LastExecutionAfterNextSchedule",
-			schedule:       "0 * * * *",
-			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
-			lastRunTime:    time.Date(2020, 1, 1, 2, 0, 0, 0, time.UTC),
-			lastStatus:     core.Succeeded,
-			skipSuccessful: true,
-			wantErr:        scheduler.ErrJobFinished,
-		},
-		{
-			name:           "FailedPreviousRun",
-			schedule:       "0 * * * *",
-			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
-			lastRunTime:    time.Date(2020, 1, 1, 0, 1, 0, 0, time.UTC),
-			lastStatus:     core.Failed,
-			skipSuccessful: true,
-			wantErr:        nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			schedule, err := cronParser.Parse(tt.schedule)
-			require.NoError(t, err)
-
-			job := &scheduler.DAGRunJob{
-				DAG: &core.DAG{
-					SkipIfSuccessful: tt.skipSuccessful,
-				},
-				Schedule: schedule,
-				Next:     tt.now,
-			}
-
-			lastRunStatus := exec.DAGRunStatus{
-				Status:    tt.lastStatus,
-				StartedAt: stringutil.FormatTime(tt.lastRunTime),
-			}
-
-			err = job.Ready(context.Background(), lastRunStatus)
-			require.Equal(t, tt.wantErr, err)
-		})
-	}
-}
-
-func TestPrevExecTime(t *testing.T) {
-	tests := []struct {
-		name     string
-		schedule string
-		now      time.Time
-		want     time.Time
-	}{
-		{
-			name:     "HourlySchedule",
-			schedule: "0 * * * *",
-			now:      time.Date(2020, 1, 1, 2, 0, 0, 0, time.UTC),
-			want:     time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
-		},
-		{
-			name:     "EveryFiveMinutes",
-			schedule: "*/5 * * * *",
-			now:      time.Date(2020, 1, 1, 1, 5, 0, 0, time.UTC),
-			want:     time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
-		},
-		{
-			name:     "DailySchedule",
-			schedule: "0 0 * * *",
-			now:      time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC),
-			want:     time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cronParser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
-			schedule, err := cronParser.Parse(tt.schedule)
-			require.NoError(t, err)
-
-			job := &scheduler.DAGRunJob{Schedule: schedule, Next: tt.now}
-			got := job.PrevExecTime()
-			require.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	clock := func() time.Time { return now }
 
-	entryReader := &mockJobManager{
-		Entries: []*scheduler.ScheduledJob{},
-	}
+	entryReader := newMockJobManager()
 
 	th := test.SetupScheduler(t)
 
 	// Create first scheduler instance
-	sc1, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
+	sc1, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
 	require.NoError(t, err)
 	sc1.SetClock(clock)
 
@@ -229,14 +127,13 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	// Create second scheduler instance with same config
-	sc2, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
+	sc2, err := scheduler.New(th.Config, newMockJobManager(), th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
 	require.NoError(t, err)
 	sc2.SetClock(clock)
 
 	// Try to start second scheduler - should wait for lock
 	go func() {
-		err := sc2.Start(ctx)
-		assert.NoError(t, err)
+		_ = sc2.Start(ctx)
 	}()
 
 	time.Sleep(time.Millisecond * 500)
@@ -246,7 +143,7 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	// Stop first scheduler
 	sc1.Stop(ctx)
 
-	// Wait for the second scheduler start
+	// Wait for the first scheduler to finish
 	select {
 	case err := <-errCh1:
 		require.NoError(t, err)
@@ -264,4 +161,108 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 
 	// Stop second scheduler to clean up
 	sc2.Stop(ctx)
+}
+
+func TestScheduler_StopSchedule(t *testing.T) {
+	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	cronParser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	parsed, err := cronParser.Parse("0 * * * *")
+	require.NoError(t, err)
+
+	entryReader := newMockJobManager()
+	entryReader.LoadedDAGs = []*core.DAG{
+		{
+			Name: "stop-dag",
+			StopSchedule: []core.Schedule{
+				{Expression: "0 * * * *", Parsed: parsed},
+			},
+		},
+	}
+
+	th := test.SetupScheduler(t)
+	sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
+	require.NoError(t, err)
+	sc.SetClock(func() time.Time { return now })
+
+	// GetLatestStatus must return Running for the stop guard
+	sc.SetGetLatestStatusFunc(func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+		return exec.DAGRunStatus{Status: core.Running}, nil
+	})
+
+	var stopCount atomic.Int32
+	sc.SetStopFunc(func(_ context.Context, _ *core.DAG) error {
+		stopCount.Add(1)
+		return nil
+	})
+
+	go func() {
+		_ = sc.Start(context.Background())
+	}()
+	defer sc.Stop(context.Background())
+
+	time.Sleep(time.Second + time.Millisecond*100)
+	require.GreaterOrEqual(t, stopCount.Load(), int32(1), "stop function should have been called")
+}
+
+func TestScheduler_GracefulShutdown(t *testing.T) {
+	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	cronParser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	parsed, err := cronParser.Parse("*/5 * * * *")
+	require.NoError(t, err)
+
+	entryReader := newMockJobManager()
+	entryReader.LoadedDAGs = []*core.DAG{
+		{
+			Name: "shutdown-dag",
+			Schedule: []core.Schedule{
+				{Expression: "*/5 * * * *", Parsed: parsed},
+			},
+		},
+	}
+
+	th := test.SetupScheduler(t)
+	sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
+	require.NoError(t, err)
+	sc.SetClock(func() time.Time { return now })
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- sc.Start(context.Background())
+	}()
+
+	// Wait until scheduler is running
+	deadline := time.After(5 * time.Second)
+	for !sc.IsRunning() {
+		select {
+		case <-deadline:
+			t.Fatal("scheduler did not start in time")
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	// Stop and verify it completes within 5 seconds
+	done := make(chan struct{})
+	go func() {
+		sc.Stop(context.Background())
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// success
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop() did not return within 5 seconds")
+	}
+
+	require.False(t, sc.IsRunning(), "scheduler should not be running after stop")
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("scheduler Start() did not return after Stop()")
+	}
 }

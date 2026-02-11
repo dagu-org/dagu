@@ -7363,7 +7363,8 @@ export enum TriggerType {
     manual = "manual",
     webhook = "webhook",
     subdag = "subdag",
-    retry = "retry"
+    retry = "retry",
+    catchup = "catchup"
 }
 export enum NodeStatus {
     NotStarted = 0,
