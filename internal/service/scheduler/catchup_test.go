@@ -138,7 +138,7 @@ func TestComputeMissedIntervals(t *testing.T) {
 			}
 
 			got := ComputeMissedIntervals(schedules, tt.replayFrom, tt.replayTo)
-			assert.Len(t, got, tt.wantCount)
+			require.Len(t, got, tt.wantCount)
 
 			if tt.wantCount > 0 {
 				assert.Equal(t, tt.wantFirst, got[0])

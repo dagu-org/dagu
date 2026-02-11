@@ -508,14 +508,15 @@ func (tp *TickPlanner) shouldRun(ctx context.Context, dag *core.DAG, scheduledTi
 }
 
 // computePrevExecTime calculates the previous schedule fire time before next.
-// It walks forward from (next - 7 days) to find the last fire time before next.
+// It walks forward from (next - 32 days) to find the last fire time before next.
+// 32 days covers monthly schedules, the most common sparse cron interval.
 // This correctly handles non-uniform cron schedules (e.g., "0 9,17 * * *").
 func computePrevExecTime(next time.Time, schedule core.Schedule) time.Time {
 	if schedule.Parsed == nil {
 		return next
 	}
-	// Walk forward from 7 days before next to find the last fire time before next.
-	seed := next.Add(-7 * 24 * time.Hour)
+	// Walk forward from 32 days before next to find the last fire time before next.
+	seed := next.Add(-32 * 24 * time.Hour)
 	var prev time.Time
 	t := schedule.Parsed.Next(seed)
 	for t.Before(next) {

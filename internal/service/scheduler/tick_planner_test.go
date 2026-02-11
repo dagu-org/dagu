@@ -1118,17 +1118,23 @@ func TestTickPlanner_ConcurrentPlanAndEvents(t *testing.T) {
 
 	var wg sync.WaitGroup
 
+	// Pre-build DAGs outside goroutine to avoid t.Fatal from non-test goroutine
+	dags := make([]*core.DAG, 50)
+	for i := range 50 {
+		dags[i] = &core.DAG{
+			Name:     fmt.Sprintf("dag-%d", i),
+			Schedule: []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+		}
+	}
+
 	// Push events concurrently
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for i := range 50 {
 			eventCh <- DAGChangeEvent{
-				Type: DAGChangeAdded,
-				DAG: &core.DAG{
-					Name:     fmt.Sprintf("dag-%d", i),
-					Schedule: []core.Schedule{mustParseSchedule(t, "0 * * * *")},
-				},
+				Type:    DAGChangeAdded,
+				DAG:     dags[i],
 				DAGName: fmt.Sprintf("dag-%d", i),
 			}
 		}

@@ -17,10 +17,18 @@ func ParseDuration(s string) (time.Duration, error) {
 	if s == "" {
 		return 0, fmt.Errorf("empty duration string")
 	}
+	var convErr error
 	s = reDays.ReplaceAllStringFunc(s, func(v string) string {
-		n, _ := strconv.Atoi(strings.TrimSuffix(v, "d"))
+		n, err := strconv.Atoi(strings.TrimSuffix(v, "d"))
+		if err != nil {
+			convErr = fmt.Errorf("invalid day value in %q: %w", v, err)
+			return v
+		}
 		return strconv.Itoa(n*24) + "h"
 	})
+	if convErr != nil {
+		return 0, convErr
+	}
 	d, err := time.ParseDuration(s)
 	if err != nil {
 		return 0, err

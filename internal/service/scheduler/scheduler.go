@@ -255,6 +255,8 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		return err
 	}
 
+	// planner.Init is best-effort: if watermark loading fails, Init falls back
+	// to an empty state internally, so catch-up windows replay from scratch.
 	if err := s.planner.Init(ctx, s.entryReader.DAGs()); err != nil {
 		logger.Error(ctx, "Failed to initialize tick planner", tag.Error(err))
 	}
@@ -284,8 +286,17 @@ func (s *Scheduler) startZombieDetector(ctx context.Context) {
 		return
 	}
 
-	// Create zombie detector while holding lock
+	// Create zombie detector while holding lock. Check s.quit first to
+	// avoid starting after Stop() has already run. Both this check and
+	// Stop()'s close(s.quit) + zombieDetector.Stop() happen under s.lock,
+	// so there is no race.
 	s.lock.Lock()
+	select {
+	case <-s.quit:
+		s.lock.Unlock()
+		return
+	default:
+	}
 	s.zombieDetector = NewZombieDetector(
 		s.dagRunStore,
 		s.procStore,

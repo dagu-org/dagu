@@ -94,7 +94,9 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 		}
 
 		queue := getOrCreateQueue(queueMap, queueName, a.config)
-		queue.queuedCount = count
+		// Subtract running items to show only truly-waiting count,
+		// consistent with ListQueueItems which filters out running items.
+		queue.queuedCount = max(count-len(queue.running), 0)
 	}
 
 	// Convert map to slice and calculate total capacity

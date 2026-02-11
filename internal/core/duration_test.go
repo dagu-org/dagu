@@ -24,6 +24,8 @@ func TestParseDuration(t *testing.T) {
 		{name: "negative rejected", input: "-1h", wantErr: true},
 		{name: "whitespace trimmed", input: "  2h  ", want: 2 * time.Hour},
 		{name: "empty rejected", input: "", wantErr: true},
+		{name: "overflow day value", input: "99999999999999d", wantErr: true},
+		{name: "overflow day with other units", input: "99999999999999d1h", wantErr: true},
 	}
 
 	for _, tt := range tests {
