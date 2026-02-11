@@ -43,13 +43,13 @@ func ComputeMissedIntervals(schedules []core.Schedule, replayFrom, replayTo time
 			continue
 		}
 		// Exclusive start: replayFrom was already dispatched.
-		t := sched.Parsed.Next(replayFrom)
+		t := sched.Parsed.Next(replayFrom).Round(0)
 		for !t.After(replayTo) {
 			if _, dup := seen[t]; !dup {
 				seen[t] = struct{}{}
 				result = append(result, t)
 			}
-			next := sched.Parsed.Next(t)
+			next := sched.Parsed.Next(t).Round(0)
 			if !next.After(t) {
 				break // defensive: prevent infinite loop on degenerate schedule
 			}

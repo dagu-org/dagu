@@ -114,8 +114,9 @@ type TickPlanner struct {
 	lastPlanResult []PlannedRun
 
 	// lifecycle
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	started atomic.Bool
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
 }
 
 // plannerEntry tracks a single DAG's scheduling metadata.
@@ -303,7 +304,9 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 	var candidates []PlannedRun
 
 	for dagName, entry := range tp.entries {
-		// Check suspension
+		// Check suspension.
+		// IsSuspended is keyed by filename stem (not dag.Name), matching the
+		// file-based suspension flag system in filedag/store.go.
 		dagBaseName := strings.TrimSuffix(filepath.Base(entry.dag.Location), filepath.Ext(entry.dag.Location))
 		if tp.cfg.IsSuspended(ctx, dagBaseName) {
 			continue
@@ -335,18 +338,32 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 				} else {
 					switch buf.overlapPolicy {
 					case core.OverlapPolicySkip:
-						buf.Pop()
+						popped, _ := buf.Pop()
 						logger.Info(ctx, "Catch-up run skipped (overlap policy: skip)",
 							tag.DAG(dagName),
 						)
+						// Advance watermark past the skipped item so it won't be
+						// re-detected as missed on the next scheduler restart.
+						tp.mu.Lock()
+						tp.watermarkState.DAGs[dagName] = DAGWatermark{
+							LastScheduledTime: popped.ScheduledTime,
+						}
+						tp.watermarkDirty.Store(true)
+						tp.mu.Unlock()
 					case core.OverlapPolicyAll:
 						// leave in buffer, retry next tick
 					default:
-						buf.Pop()
+						popped, _ := buf.Pop()
 						logger.Warn(ctx, "Unknown overlap policy, treating as skip",
 							tag.DAG(dagName),
 							slog.String("overlapPolicy", string(buf.overlapPolicy)),
 						)
+						tp.mu.Lock()
+						tp.watermarkState.DAGs[dagName] = DAGWatermark{
+							LastScheduledTime: popped.ScheduledTime,
+						}
+						tp.watermarkDirty.Store(true)
+						tp.mu.Unlock()
 					}
 				}
 
@@ -556,6 +573,9 @@ func (tp *TickPlanner) Advance(now time.Time) {
 		if run.ScheduleType != ScheduleTypeStart {
 			continue
 		}
+		if run.TriggerType == core.TriggerTypeCatchUp {
+			continue // watermark updated in DispatchRun on success
+		}
 		tp.watermarkState.DAGs[run.DAG.Name] = DAGWatermark{
 			LastScheduledTime: run.ScheduledTime,
 		}
@@ -590,6 +610,9 @@ func (tp *TickPlanner) Flush(ctx context.Context) {
 
 // Start launches the internal goroutines (event drainer + watermark flusher).
 func (tp *TickPlanner) Start(ctx context.Context) {
+	if !tp.started.CompareAndSwap(false, true) {
+		return
+	}
 	ctx, tp.cancel = context.WithCancel(ctx)
 	tp.wg.Add(2)
 	go func() {
@@ -753,5 +776,16 @@ func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 			slog.String("scheduleType", run.ScheduleType.String()),
 			tag.Error(err),
 		)
+		return
+	}
+
+	// On successful catchup dispatch, advance the per-DAG watermark.
+	if run.TriggerType == core.TriggerTypeCatchUp && run.ScheduleType == ScheduleTypeStart {
+		tp.mu.Lock()
+		tp.watermarkState.DAGs[run.DAG.Name] = DAGWatermark{
+			LastScheduledTime: run.ScheduledTime,
+		}
+		tp.watermarkDirty.Store(true)
+		tp.mu.Unlock()
 	}
 }

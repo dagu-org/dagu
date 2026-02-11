@@ -111,8 +111,8 @@ func TestTickPlanner_InitLoadError(t *testing.T) {
 	require.NoError(t, err) // non-fatal
 	// Falls back to empty state on load error
 	tp.mu.RLock()
-	assert.NotNil(t, tp.watermarkState)
-	assert.Equal(t, 1, tp.watermarkState.Version)
+	require.NotNil(t, tp.watermarkState)
+	require.Equal(t, 1, tp.watermarkState.Version)
 	tp.mu.RUnlock()
 }
 
@@ -130,7 +130,7 @@ func TestTickPlanner_InitWithMissedRuns(t *testing.T) {
 	buf, ok := tp.buffers["test-dag"]
 	require.True(t, ok)
 	// Should have 3 missed: 10:00, 11:00, 12:00
-	assert.Equal(t, 3, buf.Len())
+	require.Equal(t, 3, buf.Len())
 }
 
 func TestTickPlanner_Advance(t *testing.T) {
@@ -144,9 +144,9 @@ func TestTickPlanner_Advance(t *testing.T) {
 	tp.Advance(tickTime)
 
 	tp.mu.RLock()
-	assert.Equal(t, tickTime, tp.watermarkState.LastTick)
+	require.Equal(t, tickTime, tp.watermarkState.LastTick)
 	tp.mu.RUnlock()
-	assert.True(t, tp.watermarkDirty.Load())
+	require.True(t, tp.watermarkDirty.Load())
 }
 
 func TestTickPlanner_AdvanceBeforeInit(t *testing.T) {
@@ -172,8 +172,8 @@ func TestTickPlanner_FlushWritesSnapshot(t *testing.T) {
 
 	saved := store.lastSaved()
 	require.NotNil(t, saved)
-	assert.Equal(t, tickTime, saved.LastTick)
-	assert.False(t, tp.watermarkDirty.Load())
+	require.Equal(t, tickTime, saved.LastTick)
+	require.False(t, tp.watermarkDirty.Load())
 }
 
 func TestTickPlanner_FlushRemarksDirtyOnError(t *testing.T) {

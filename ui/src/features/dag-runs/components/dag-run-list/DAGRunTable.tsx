@@ -271,8 +271,8 @@ function DAGRunTable({
             </div>
 
             {/* DAG-run ID and Trigger */}
-            <div className="flex items-center justify-between text-xs mb-2">
-              <span className="font-mono text-muted-foreground">
+            <div className="flex items-center justify-between text-xs mb-2 min-w-0">
+              <span className="font-mono text-muted-foreground truncate">
                 {dagRun.dagRunId}
               </span>
               <TriggerTypeIndicator type={dagRun.triggerType} />
