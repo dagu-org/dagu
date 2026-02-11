@@ -25,6 +25,11 @@ import { getAuthHeaders } from '@/lib/authHeaders';
 type ModelConfig = components['schemas']['ModelConfigResponse'];
 type ModelPreset = components['schemas']['ModelPreset'];
 
+// Mirrors internal/agent/store.go:GenerateSlugID
+function generateSlugId(name: string): string {
+  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
 const LLM_PROVIDERS = [
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'openai', label: 'OpenAI' },
@@ -46,6 +51,8 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
   const appBarContext = useContext(AppBarContext);
   const isEditing = !!model;
 
+  const [configId, setConfigId] = useState('');
+  const [customId, setCustomId] = useState(false);
   const [name, setName] = useState('');
   const [provider, setProvider] = useState('anthropic');
   const [modelId, setModelId] = useState('');
@@ -64,6 +71,7 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
   // In create mode, preserve values so accidental close doesn't lose input.
   useEffect(() => {
     if (open && model) {
+      setConfigId(model.id);
       setName(model.name);
       setProvider(model.provider);
       setModelId(model.model);
@@ -82,6 +90,8 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
   }, [open, model]);
 
   function resetForm() {
+    setConfigId('');
+    setCustomId(false);
     setName('');
     setProvider('anthropic');
     setModelId('');
@@ -98,6 +108,8 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
   const handlePresetSelect = (presetName: string) => {
     const preset = presets.find((p) => p.name === presetName);
     if (preset) {
+      setCustomId(false);
+      setConfigId(generateSlugId(preset.name));
       setName(preset.name);
       setProvider(preset.provider);
       setModelId(preset.model);
@@ -119,6 +131,7 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
       const remoteNode = encodeURIComponent(appBarContext.selectedRemoteNode || 'local');
 
       const body: Record<string, unknown> = {
+        id: !isEditing && configId ? configId : undefined,
         name,
         provider,
         model: modelId,
@@ -197,11 +210,38 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
               <Input
                 id="model-name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setName(v);
+                  if (!isEditing && !customId) {
+                    setConfigId(generateSlugId(v));
+                  }
+                }}
                 placeholder="My Model"
                 className="h-8"
                 required
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="model-config-id" className="text-sm">ID {isEditing ? '' : '(optional)'}</Label>
+              <Input
+                id="model-config-id"
+                value={configId}
+                onChange={(e) => {
+                  setConfigId(e.target.value);
+                  setCustomId(true);
+                }}
+                placeholder="Auto-generated from name if empty"
+                className="h-8"
+                readOnly={isEditing}
+                disabled={isEditing}
+              />
+              {!isEditing && (
+                <p className="text-xs text-muted-foreground">
+                  Lowercase letters, numbers, and hyphens only
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">

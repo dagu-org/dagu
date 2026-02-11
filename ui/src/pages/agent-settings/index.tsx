@@ -283,6 +283,7 @@ export default function AgentSettingsPage(): React.ReactNode {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[180px]">Name</TableHead>
+                <TableHead className="w-[140px]">ID</TableHead>
                 <TableHead className="w-[120px]">Provider</TableHead>
                 <TableHead className="w-[180px]">Model</TableHead>
                 <TableHead className="w-[100px]">API Key</TableHead>
@@ -294,7 +295,7 @@ export default function AgentSettingsPage(): React.ReactNode {
               {models.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={6}
+                    colSpan={7}
                     className="text-center text-muted-foreground py-8"
                   >
                     No models configured. Add a model to get started.
@@ -312,6 +313,11 @@ export default function AgentSettingsPage(): React.ReactNode {
                           </span>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                        {m.id}
+                      </code>
                     </TableCell>
                     <TableCell>
                       <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">
