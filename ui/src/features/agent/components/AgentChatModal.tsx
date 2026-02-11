@@ -78,8 +78,8 @@ export function AgentChatModal(): ReactElement | null {
   }, [isOpen, conversations, conversationId, selectConversation]);
 
   const handleSend = useCallback(
-    (message: string, dagContexts?: DAGContext[]): void => {
-      sendMessage(message, undefined, dagContexts).catch(() => {});
+    (message: string, dagContexts?: DAGContext[], model?: string): void => {
+      sendMessage(message, model, dagContexts).catch(() => {});
     },
     [sendMessage]
   );

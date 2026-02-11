@@ -1588,6 +1588,94 @@ export interface paths {
         patch: operations["updateAgentConfig"];
         trace?: never;
     };
+    "/settings/agent/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List agent models
+         * @description Returns all configured AI agent models. Requires admin role.
+         */
+        get: operations["listAgentModels"];
+        put?: never;
+        /**
+         * Create agent model
+         * @description Creates a new AI agent model configuration. Requires admin role.
+         */
+        post: operations["createAgentModel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/agent/models/{modelId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete agent model
+         * @description Deletes an AI agent model configuration. Requires admin role.
+         */
+        delete: operations["deleteAgentModel"];
+        options?: never;
+        head?: never;
+        /**
+         * Update agent model
+         * @description Updates an existing AI agent model configuration. Requires admin role.
+         */
+        patch: operations["updateAgentModel"];
+        trace?: never;
+    };
+    "/settings/agent/default-model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set default agent model
+         * @description Sets the default model for the AI agent. Requires admin role.
+         */
+        put: operations["setDefaultAgentModel"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/agent/model-presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List model presets
+         * @description Returns hardcoded model presets with metadata. Requires admin role.
+         */
+        get: operations["listModelPresets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2767,35 +2855,89 @@ export interface components {
         AgentConfigResponse: {
             /** @description Whether the AI agent is enabled */
             enabled?: boolean;
-            llm?: components["schemas"]["AgentLLMConfig"];
-        };
-        /** @description LLM configuration for the AI agent */
-        AgentLLMConfig: {
-            /** @description LLM provider (anthropic, openai, gemini, openrouter, local) */
-            provider?: string;
-            /** @description Model ID */
-            model?: string;
-            /** @description Whether an API key is configured (actual key is not returned) */
-            apiKeyConfigured?: boolean;
-            /** @description Custom API endpoint URL (optional) */
-            baseUrl?: string;
+            /** @description ID of the default model */
+            defaultModelId?: string;
         };
         /** @description Request to update AI agent configuration */
         UpdateAgentConfigRequest: {
             /** @description Whether the AI agent is enabled */
             enabled?: boolean;
-            llm?: components["schemas"]["UpdateAgentLLMConfig"];
+            /** @description ID of the default model */
+            defaultModelId?: string;
         };
-        /** @description LLM configuration updates */
-        UpdateAgentLLMConfig: {
-            /** @description LLM provider (anthropic, openai, gemini, openrouter, local) */
-            provider?: string;
-            /** @description Model ID */
-            model?: string;
-            /** @description API key (only set if changing) */
-            apiKey?: string;
-            /** @description Custom API endpoint URL */
+        /** @description Model configuration */
+        ModelConfigResponse: {
+            id: string;
+            name: string;
+            provider: string;
+            model: string;
+            apiKeyConfigured?: boolean;
             baseUrl?: string;
+            contextWindow?: number;
+            maxOutputTokens?: number;
+            /** Format: double */
+            inputCostPer1M?: number;
+            /** Format: double */
+            outputCostPer1M?: number;
+            supportsThinking?: boolean;
+            description?: string;
+        };
+        /** @description Request to create a new model configuration */
+        CreateModelConfigRequest: {
+            /** @description Optional custom ID (auto-generated from name if omitted) */
+            id?: string;
+            name: string;
+            provider: string;
+            model: string;
+            apiKey?: string;
+            baseUrl?: string;
+            contextWindow?: number;
+            maxOutputTokens?: number;
+            /** Format: double */
+            inputCostPer1M?: number;
+            /** Format: double */
+            outputCostPer1M?: number;
+            supportsThinking?: boolean;
+            description?: string;
+        };
+        /** @description Request to update a model configuration */
+        UpdateModelConfigRequest: {
+            name?: string;
+            provider?: string;
+            model?: string;
+            apiKey?: string;
+            baseUrl?: string;
+            contextWindow?: number;
+            maxOutputTokens?: number;
+            /** Format: double */
+            inputCostPer1M?: number;
+            /** Format: double */
+            outputCostPer1M?: number;
+            supportsThinking?: boolean;
+            description?: string;
+        };
+        /** @description List of model configurations */
+        ListModelsResponse: {
+            models?: components["schemas"]["ModelConfigResponse"][];
+            defaultModelId?: string;
+        };
+        /** @description Hardcoded model preset with metadata */
+        ModelPreset: {
+            name: string;
+            provider: string;
+            model: string;
+            contextWindow?: number;
+            maxOutputTokens?: number;
+            /** Format: double */
+            inputCostPer1M?: number;
+            /** Format: double */
+            outputCostPer1M?: number;
+            supportsThinking?: boolean;
+            description?: string;
+        };
+        /** @description List of model presets */
+        ListModelPresetsResponse: {
+            presets?: components["schemas"]["ModelPreset"][];
         };
     };
     responses: never;
@@ -7279,6 +7421,264 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listAgentModels: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of models */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListModelsResponse"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createAgentModel: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateModelConfigRequest"];
+            };
+        };
+        responses: {
+            /** @description Model created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelConfigResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Model already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteAgentModel: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description Model ID */
+                modelId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Model deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Model not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateAgentModel: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description Model ID */
+                modelId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateModelConfigRequest"];
+            };
+        };
+        responses: {
+            /** @description Model updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelConfigResponse"];
+                };
+            };
+            /** @description Model not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setDefaultAgentModel: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Model ID to set as default */
+                    modelId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Default model set */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        defaultModelId?: string;
+                    };
+                };
+            };
+            /** @description Model not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listModelPresets: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of model presets */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListModelPresetsResponse"];
                 };
             };
             /** @description Unexpected error */

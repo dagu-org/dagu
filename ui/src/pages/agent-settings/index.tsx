@@ -1,31 +1,32 @@
-import React, { useContext, useEffect, useState } from 'react';
-import { Bot, Loader2, Save } from 'lucide-react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
+import { Bot, Loader2, MoreHorizontal, Pencil, Plus, Save, Star, Trash2 } from 'lucide-react';
 import { components } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useIsAdmin } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { getAuthHeaders } from '@/lib/authHeaders';
+import ConfirmModal from '@/ui/ConfirmModal';
+import { ModelFormModal } from './ModelFormModal';
 
-type AgentConfig = components['schemas']['AgentConfigResponse'];
-
-const LLM_PROVIDERS = [
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'gemini', label: 'Google Gemini' },
-  { value: 'openrouter', label: 'OpenRouter' },
-  { value: 'local', label: 'Local' },
-];
+type ModelConfig = components['schemas']['ModelConfigResponse'];
+type ModelPreset = components['schemas']['ModelPreset'];
 
 export default function AgentSettingsPage(): React.ReactNode {
   const config = useConfig();
@@ -38,95 +39,146 @@ export default function AgentSettingsPage(): React.ReactNode {
   const [success, setSuccess] = useState<string | null>(null);
 
   const [enabled, setEnabled] = useState(false);
-  const [provider, setProvider] = useState('anthropic');
-  const [model, setModel] = useState('');
-  const [apiKey, setApiKey] = useState('');
-  const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
-  const [baseUrl, setBaseUrl] = useState('');
+  const [defaultModelId, setDefaultModelId] = useState<string | undefined>();
+  const [models, setModels] = useState<ModelConfig[]>([]);
+  const [presets, setPresets] = useState<ModelPreset[]>([]);
 
-  const remoteNode = encodeURIComponent(
-    appBarContext.selectedRemoteNode || 'local'
-  );
-  const agentSettingsUrl = `${config.apiURL}/settings/agent?remoteNode=${remoteNode}`;
+  // Modal states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingModel, setEditingModel] = useState<ModelConfig | null>(null);
+  const [deletingModel, setDeletingModel] = useState<ModelConfig | null>(null);
+
+  const remoteNode = encodeURIComponent(appBarContext.selectedRemoteNode || 'local');
 
   useEffect(() => {
     appBarContext.setTitle('Agent Settings');
   }, [appBarContext]);
 
-  function updateFormState(data: AgentConfig): void {
-    setEnabled(data.enabled ?? false);
-    if (data.llm) {
-      setProvider(data.llm.provider ?? 'anthropic');
-      setModel(data.llm.model ?? '');
-      setApiKeyConfigured(data.llm.apiKeyConfigured ?? false);
-      setBaseUrl(data.llm.baseUrl ?? '');
+  const fetchConfig = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `${config.apiURL}/settings/agent?remoteNode=${remoteNode}`,
+        { headers: getAuthHeaders() }
+      );
+      if (!response.ok) throw new Error('Failed to fetch agent configuration');
+      const data = await response.json();
+      setEnabled(data.enabled ?? false);
+      setDefaultModelId(data.defaultModelId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load configuration');
     }
-  }
+  }, [config.apiURL, remoteNode]);
+
+  const fetchModels = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `${config.apiURL}/settings/agent/models?remoteNode=${remoteNode}`,
+        { headers: getAuthHeaders() }
+      );
+      if (!response.ok) throw new Error('Failed to fetch models');
+      const data = await response.json();
+      setModels(data.models || []);
+      setDefaultModelId(data.defaultModelId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load models');
+    }
+  }, [config.apiURL, remoteNode]);
+
+  const fetchPresets = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `${config.apiURL}/settings/agent/model-presets?remoteNode=${remoteNode}`,
+        { headers: getAuthHeaders() }
+      );
+      if (!response.ok) return;
+      const data = await response.json();
+      setPresets(data.presets || []);
+    } catch {
+      // Presets are optional, don't show error
+    }
+  }, [config.apiURL, remoteNode]);
 
   useEffect(() => {
-    async function fetchConfig(): Promise<void> {
-      try {
-        const response = await fetch(agentSettingsUrl, {
-          headers: getAuthHeaders(),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch agent configuration');
-        }
-
-        const data: AgentConfig = await response.json();
-        updateFormState(data);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : 'Failed to load configuration'
-        );
-      } finally {
-        setIsLoading(false);
-      }
+    async function load() {
+      await Promise.all([fetchConfig(), fetchModels(), fetchPresets()]);
+      setIsLoading(false);
     }
+    load();
+  }, [fetchConfig, fetchModels, fetchPresets]);
 
-    fetchConfig();
-  }, [agentSettingsUrl]);
-
-  async function handleSave(): Promise<void> {
+  async function handleSaveConfig(): Promise<void> {
     setIsSaving(true);
     setError(null);
     setSuccess(null);
 
-    const llmConfig: Record<string, string | undefined> = {
-      provider,
-      model,
-      baseUrl: baseUrl || undefined,
-    };
-
-    if (apiKey) {
-      llmConfig.apiKey = apiKey;
-    }
-
     try {
-      const response = await fetch(agentSettingsUrl, {
-        method: 'PATCH',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ enabled, llm: llmConfig }),
-      });
+      const response = await fetch(
+        `${config.apiURL}/settings/agent?remoteNode=${remoteNode}`,
+        {
+          method: 'PATCH',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ enabled, defaultModelId }),
+        }
+      );
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.message || 'Failed to save configuration');
       }
 
-      const data: AgentConfig = await response.json();
-      updateFormState(data);
-      setApiKey('');
+      const data = await response.json();
+      setEnabled(data.enabled ?? false);
+      setDefaultModelId(data.defaultModelId);
       setSuccess('Configuration saved successfully');
 
       setTimeout(() => window.location.reload(), 500);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to save configuration'
-      );
+      setError(err instanceof Error ? err.message : 'Failed to save configuration');
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleSetDefault(modelId: string): Promise<void> {
+    setError(null);
+    try {
+      const response = await fetch(
+        `${config.apiURL}/settings/agent/default-model?remoteNode=${remoteNode}`,
+        {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ modelId }),
+        }
+      );
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to set default model');
+      }
+      setDefaultModelId(modelId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to set default model');
+    }
+  }
+
+  async function handleDeleteModel(): Promise<void> {
+    if (!deletingModel) return;
+    try {
+      const response = await fetch(
+        `${config.apiURL}/settings/agent/models/${deletingModel.id}?remoteNode=${remoteNode}`,
+        {
+          method: 'DELETE',
+          headers: getAuthHeaders(),
+        }
+      );
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to delete model');
+      }
+      setError(null);
+      setDeletingModel(null);
+      fetchModels();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete model');
     }
   }
 
@@ -169,7 +221,8 @@ export default function AgentSettingsPage(): React.ReactNode {
         </div>
       )}
 
-      <div className="card-obsidian p-4 space-y-6 max-w-xl">
+      {/* General Settings */}
+      <div className="card-obsidian p-4 space-y-4 max-w-xl">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="enabled" className="text-sm font-medium">
@@ -186,87 +239,9 @@ export default function AgentSettingsPage(): React.ReactNode {
           />
         </div>
 
-        {enabled && (
-          <div className="border-t pt-4 space-y-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Bot className="h-4 w-4" />
-              LLM Configuration
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="provider" className="text-sm">
-                Provider
-              </Label>
-              <Select value={provider} onValueChange={setProvider}>
-                <SelectTrigger id="provider" className="h-8">
-                  <SelectValue placeholder="Select provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  {LLM_PROVIDERS.map((p) => (
-                    <SelectItem key={p.value} value={p.value}>
-                      {p.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="model" className="text-sm">
-                Model
-              </Label>
-              <Input
-                id="model"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="claude-sonnet-4-5"
-                className="h-8"
-              />
-              <p className="text-xs text-muted-foreground">
-                The model ID to use for completions
-              </p>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="apiKey" className="text-sm">
-                API Key
-              </Label>
-              <Input
-                id="apiKey"
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder={apiKeyConfigured ? '********' : 'Enter API key'}
-                className="h-8"
-              />
-              <p className="text-xs text-muted-foreground">
-                {apiKeyConfigured
-                  ? 'An API key is configured. Leave empty to keep it unchanged.'
-                  : 'Required for external LLM providers'}
-              </p>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="baseUrl" className="text-sm">
-                Base URL (optional)
-              </Label>
-              <Input
-                id="baseUrl"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder="Custom API endpoint"
-                className="h-8"
-              />
-              <p className="text-xs text-muted-foreground">
-                Override the default API endpoint
-              </p>
-            </div>
-          </div>
-        )}
-
         <div className="pt-2">
           <Button
-            onClick={handleSave}
+            onClick={handleSaveConfig}
             disabled={isSaving}
             size="sm"
             className="h-8"
@@ -285,6 +260,154 @@ export default function AgentSettingsPage(): React.ReactNode {
           </Button>
         </div>
       </div>
+
+      {/* Models Table */}
+      {enabled && (
+        <div className="card-obsidian overflow-auto">
+          <div className="flex items-center justify-between p-4 pb-2">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Bot className="h-4 w-4 text-muted-foreground" />
+              Models
+            </div>
+            <Button
+              onClick={() => setShowCreateModal(true)}
+              size="sm"
+              className="h-8"
+            >
+              <Plus className="h-4 w-4 mr-1.5" />
+              Add Model
+            </Button>
+          </div>
+
+          <Table className="text-xs">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[180px]">Name</TableHead>
+                <TableHead className="w-[120px]">Provider</TableHead>
+                <TableHead className="w-[180px]">Model</TableHead>
+                <TableHead className="w-[100px]">API Key</TableHead>
+                <TableHead className="w-[80px]">Default</TableHead>
+                <TableHead className="w-[60px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {models.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="text-center text-muted-foreground py-8"
+                  >
+                    No models configured. Add a model to get started.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                models.map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex flex-col">
+                        <span>{m.name}</span>
+                        {m.description && (
+                          <span className="text-xs text-muted-foreground">
+                            {m.description}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">
+                        {m.provider}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                        {m.model}
+                      </code>
+                    </TableCell>
+                    <TableCell>
+                      <span className={`text-xs ${m.apiKeyConfigured ? 'text-green-600' : 'text-muted-foreground'}`}>
+                        {m.apiKeyConfigured ? 'Configured' : 'Not set'}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {m.id === defaultModelId && (
+                        <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                          <Star className="h-3 w-3 fill-current" />
+                          Default
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setEditingModel(m)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          {m.id !== defaultModelId && (
+                            <DropdownMenuItem onClick={() => handleSetDefault(m.id)}>
+                              <Star className="h-4 w-4 mr-2" />
+                              Set as Default
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem
+                            onClick={() => setDeletingModel(m)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Create Model Modal */}
+      <ModelFormModal
+        open={showCreateModal}
+        presets={presets}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={() => {
+          setShowCreateModal(false);
+          fetchModels();
+        }}
+      />
+
+      {/* Edit Model Modal */}
+      <ModelFormModal
+        open={!!editingModel}
+        model={editingModel || undefined}
+        presets={presets}
+        onClose={() => setEditingModel(null)}
+        onSuccess={() => {
+          setEditingModel(null);
+          fetchModels();
+        }}
+      />
+
+      {/* Delete Confirmation */}
+      <ConfirmModal
+        title="Delete Model"
+        buttonText="Delete"
+        visible={!!deletingModel}
+        dismissModal={() => setDeletingModel(null)}
+        onSubmit={handleDeleteModel}
+      >
+        <p>
+          Are you sure you want to delete the model &quot;{deletingModel?.name}
+          &quot;? This action cannot be undone.
+        </p>
+      </ConfirmModal>
     </div>
   );
 }
