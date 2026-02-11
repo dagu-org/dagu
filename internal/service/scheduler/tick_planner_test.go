@@ -439,7 +439,7 @@ func TestTickPlanner_HandleEvent_Updated(t *testing.T) {
 	// Entry should be updated
 	entry, ok := tp.entries["upd-dag"]
 	require.True(t, ok)
-	assert.Equal(t, "*/30 * * * *", entry.schedules[0].Expression)
+	assert.Equal(t, "*/30 * * * *", entry.dag.Schedule[0].Expression)
 }
 
 func TestTickPlanner_ConcurrentFlushAndAdvance(t *testing.T) {

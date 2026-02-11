@@ -138,23 +138,17 @@ func (er *entryReaderImpl) handleFSEvent(ctx context.Context, event fsnotify.Eve
 			return
 		}
 
-		// Determine add vs update by checking registry existence before updating
+		// Determine add vs update by checking registry before updating
 		er.lock.Lock()
-		_, existed := er.registry[fileName]
-
-		// Check if name changed (file is same but DAG name differs)
+		oldDAG, existed := er.registry[fileName]
 		var oldDAGName string
-		if existed {
-			oldDAG := er.registry[fileName]
-			if oldDAG.Name != dag.Name {
-				oldDAGName = oldDAG.Name
-			}
+		if existed && oldDAG.Name != dag.Name {
+			oldDAGName = oldDAG.Name
 		}
-
 		er.registry[fileName] = dag
 		er.lock.Unlock()
 
-		// If name changed, emit delete for old name first
+		// If the DAG name changed, emit delete for the old name first
 		if oldDAGName != "" {
 			er.sendEvent(ctx, DAGChangeEvent{
 				Type:    DAGChangeDeleted,
@@ -162,19 +156,15 @@ func (er *entryReaderImpl) handleFSEvent(ctx context.Context, event fsnotify.Eve
 			})
 		}
 
+		changeType := DAGChangeAdded
 		if existed && oldDAGName == "" {
-			er.sendEvent(ctx, DAGChangeEvent{
-				Type:    DAGChangeUpdated,
-				DAG:     dag,
-				DAGName: dag.Name,
-			})
-		} else {
-			er.sendEvent(ctx, DAGChangeEvent{
-				Type:    DAGChangeAdded,
-				DAG:     dag,
-				DAGName: dag.Name,
-			})
+			changeType = DAGChangeUpdated
 		}
+		er.sendEvent(ctx, DAGChangeEvent{
+			Type:    changeType,
+			DAG:     dag,
+			DAGName: dag.Name,
+		})
 		logger.Info(ctx, "DAG added/updated", tag.Name(fileName))
 		return
 	}

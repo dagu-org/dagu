@@ -121,8 +121,7 @@ type TickPlanner struct {
 
 // plannerEntry tracks a single DAG's scheduling metadata.
 type plannerEntry struct {
-	dag       *core.DAG
-	schedules []core.Schedule
+	dag *core.DAG
 }
 
 // NewTickPlanner creates a new TickPlanner with the given configuration.
@@ -178,10 +177,7 @@ func (tp *TickPlanner) Init(ctx context.Context, dags []*core.DAG) error {
 
 	// Populate entries from existing DAGs
 	for _, dag := range dags {
-		tp.entries[dag.Name] = &plannerEntry{
-			dag:       dag,
-			schedules: dag.Schedule,
-		}
+		tp.entries[dag.Name] = &plannerEntry{dag: dag}
 	}
 
 	state, err := tp.cfg.WatermarkStore.Load(ctx)
@@ -287,13 +283,7 @@ func (tp *TickPlanner) initBuffers(ctx context.Context, dags []*core.DAG) {
 		if dag.OverlapPolicy == core.OverlapPolicyLatest && q.Len() > 1 {
 			dropped := q.DropAllButLast()
 			totalMissed -= len(dropped)
-			// Advance watermark past discarded items to prevent re-computation on restart.
-			tp.mu.Lock()
-			tp.watermarkState.DAGs[dag.Name] = DAGWatermark{
-				LastScheduledTime: dropped[len(dropped)-1].ScheduledTime,
-			}
-			tp.watermarkDirty.Store(true)
-			tp.mu.Unlock()
+			tp.advanceDAGWatermark(dag.Name, dropped[len(dropped)-1].ScheduledTime)
 		}
 	}
 
@@ -344,12 +334,7 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 					// For "latest", collapse to most recent before popping.
 					if buf.overlapPolicy == core.OverlapPolicyLatest && buf.Len() > 1 {
 						dropped := buf.DropAllButLast()
-						tp.mu.Lock()
-						tp.watermarkState.DAGs[dagName] = DAGWatermark{
-							LastScheduledTime: dropped[len(dropped)-1].ScheduledTime,
-						}
-						tp.watermarkDirty.Store(true)
-						tp.mu.Unlock()
+						tp.advanceDAGWatermark(dagName, dropped[len(dropped)-1].ScheduledTime)
 						// Re-peek: front changed from oldest to latest
 						item, _ = buf.Peek()
 					}
@@ -366,26 +351,14 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 						logger.Info(ctx, "Catch-up run skipped (overlap policy: skip)",
 							tag.DAG(dagName),
 						)
-						// Advance watermark past the skipped item so it won't be
-						// re-detected as missed on the next scheduler restart.
-						tp.mu.Lock()
-						tp.watermarkState.DAGs[dagName] = DAGWatermark{
-							LastScheduledTime: popped.ScheduledTime,
-						}
-						tp.watermarkDirty.Store(true)
-						tp.mu.Unlock()
+						tp.advanceDAGWatermark(dagName, popped.ScheduledTime)
 					case core.OverlapPolicyAll:
 						// leave in buffer, retry next tick
 					case core.OverlapPolicyLatest:
 						// Collapse to latest, advance watermark past discarded items.
 						dropped := buf.DropAllButLast()
 						if len(dropped) > 0 {
-							tp.mu.Lock()
-							tp.watermarkState.DAGs[dagName] = DAGWatermark{
-								LastScheduledTime: dropped[len(dropped)-1].ScheduledTime,
-							}
-							tp.watermarkDirty.Store(true)
-							tp.mu.Unlock()
+							tp.advanceDAGWatermark(dagName, dropped[len(dropped)-1].ScheduledTime)
 						}
 						// Leave the single remaining (latest) item for retry next tick.
 					default:
@@ -394,12 +367,7 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 							tag.DAG(dagName),
 							slog.String("overlapPolicy", string(buf.overlapPolicy)),
 						)
-						tp.mu.Lock()
-						tp.watermarkState.DAGs[dagName] = DAGWatermark{
-							LastScheduledTime: popped.ScheduledTime,
-						}
-						tp.watermarkDirty.Store(true)
-						tp.mu.Unlock()
+						tp.advanceDAGWatermark(dagName, popped.ScheduledTime)
 					}
 				}
 
@@ -418,23 +386,14 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 		// Evaluate cron schedules for live start runs.
 		// Start schedules use raw `now`: the robfig/cron library applies the
 		// schedule's timezone internally, so no extra conversion is needed.
-		for _, schedule := range entry.schedules {
-			if schedule.Parsed == nil {
+		for _, schedule := range entry.dag.Schedule {
+			next, due := scheduleDueAt(schedule, now)
+			if !due {
 				continue
 			}
-
-			// Check if this schedule is due at this tick.
-			// We check if the schedule's next time after (now - 1 second) is <= now,
-			// matching the existing behavior in invokeJobs.
-			next := schedule.Parsed.Next(now.Add(-time.Second))
-			if next.After(now) {
-				continue
-			}
-
 			if !tp.shouldRun(ctx, entry.dag, next, schedule) {
 				continue
 			}
-
 			run, ok := tp.createPlannedRun(ctx, entry.dag, next, core.TriggerTypeScheduler)
 			if ok {
 				candidates = append(candidates, run)
@@ -447,11 +406,8 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 		// This preserves parity with the legacy invokeJobs implementation.
 		evalTime := now.In(tp.cfg.Location)
 		for _, schedule := range entry.dag.StopSchedule {
-			if schedule.Parsed == nil {
-				continue
-			}
-			next := schedule.Parsed.Next(evalTime.Add(-time.Second))
-			if next.After(evalTime) {
+			next, due := scheduleDueAt(schedule, evalTime)
+			if !due {
 				continue
 			}
 
@@ -473,16 +429,12 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 			})
 		}
 
-		// Evaluate restart schedules (no guard — fires unconditionally).
+		// Evaluate restart schedules (no guard -- fires unconditionally).
 		for _, schedule := range entry.dag.RestartSchedule {
-			if schedule.Parsed == nil {
+			next, due := scheduleDueAt(schedule, evalTime)
+			if !due {
 				continue
 			}
-			next := schedule.Parsed.Next(evalTime.Add(-time.Second))
-			if next.After(evalTime) {
-				continue
-			}
-
 			candidates = append(candidates, PlannedRun{
 				DAG:           entry.dag,
 				ScheduledTime: next,
@@ -579,6 +531,19 @@ func computePrevExecTime(next time.Time, schedule core.Schedule) time.Time {
 	return prev
 }
 
+// scheduleDueAt returns the next fire time if the schedule is due at the given
+// time, or the zero value if the schedule should not fire.
+func scheduleDueAt(schedule core.Schedule, now time.Time) (time.Time, bool) {
+	if schedule.Parsed == nil {
+		return time.Time{}, false
+	}
+	next := schedule.Parsed.Next(now.Add(-time.Second))
+	if next.After(now) {
+		return time.Time{}, false
+	}
+	return next, true
+}
+
 // createPlannedRun generates a run ID and constructs a PlannedRun.
 func (tp *TickPlanner) createPlannedRun(ctx context.Context, dag *core.DAG, scheduledTime time.Time, triggerType core.TriggerType) (PlannedRun, bool) {
 	runID, err := tp.cfg.GenRunID(ctx)
@@ -619,6 +584,17 @@ func (tp *TickPlanner) Advance(now time.Time) {
 
 	tp.watermarkDirty.Store(true)
 	tp.lastPlanResult = nil
+}
+
+// advanceDAGWatermark updates the per-DAG watermark to the given time
+// and marks the state as dirty. Caller must NOT hold tp.mu.
+func (tp *TickPlanner) advanceDAGWatermark(dagName string, scheduledTime time.Time) {
+	tp.mu.Lock()
+	tp.watermarkState.DAGs[dagName] = DAGWatermark{
+		LastScheduledTime: scheduledTime,
+	}
+	tp.watermarkDirty.Store(true)
+	tp.mu.Unlock()
 }
 
 // Flush writes the watermark state to disk if dirty.
@@ -709,27 +685,16 @@ func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
 		if event.DAG == nil {
 			return
 		}
-		tp.entries[event.DAGName] = &plannerEntry{
-			dag:       event.DAG,
-			schedules: event.DAG.Schedule,
-		}
+		tp.entries[event.DAGName] = &plannerEntry{dag: event.DAG}
 		// Set watermark to now (new DAGs have no catchup)
-		tp.mu.Lock()
-		tp.watermarkState.DAGs[event.DAGName] = DAGWatermark{
-			LastScheduledTime: tp.cfg.Clock(),
-		}
-		tp.watermarkDirty.Store(true)
-		tp.mu.Unlock()
+		tp.advanceDAGWatermark(event.DAGName, tp.cfg.Clock())
 		logger.Info(ctx, "Planner: DAG added", tag.DAG(event.DAGName))
 
 	case DAGChangeUpdated:
 		if event.DAG == nil {
 			return
 		}
-		tp.entries[event.DAGName] = &plannerEntry{
-			dag:       event.DAG,
-			schedules: event.DAG.Schedule,
-		}
+		tp.entries[event.DAGName] = &plannerEntry{dag: event.DAG}
 		// Remove existing buffer and recompute if catchupWindow > 0
 		delete(tp.buffers, event.DAGName)
 		if event.DAG.CatchupWindow > 0 {
@@ -783,12 +748,7 @@ func (tp *TickPlanner) recomputeBuffer(ctx context.Context, dag *core.DAG) {
 
 	if dag.OverlapPolicy == core.OverlapPolicyLatest && q.Len() > 1 {
 		dropped := q.DropAllButLast()
-		tp.mu.Lock()
-		tp.watermarkState.DAGs[dag.Name] = DAGWatermark{
-			LastScheduledTime: dropped[len(dropped)-1].ScheduledTime,
-		}
-		tp.watermarkDirty.Store(true)
-		tp.mu.Unlock()
+		tp.advanceDAGWatermark(dag.Name, dropped[len(dropped)-1].ScheduledTime)
 	}
 
 	tp.buffers[dag.Name] = q
@@ -828,11 +788,6 @@ func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 
 	// On successful catchup dispatch, advance the per-DAG watermark.
 	if run.TriggerType == core.TriggerTypeCatchUp && run.ScheduleType == ScheduleTypeStart {
-		tp.mu.Lock()
-		tp.watermarkState.DAGs[run.DAG.Name] = DAGWatermark{
-			LastScheduledTime: run.ScheduledTime,
-		}
-		tp.watermarkDirty.Store(true)
-		tp.mu.Unlock()
+		tp.advanceDAGWatermark(run.DAG.Name, run.ScheduledTime)
 	}
 }

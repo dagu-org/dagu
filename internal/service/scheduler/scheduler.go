@@ -26,12 +26,9 @@ import (
 type Clock func() time.Time
 
 type Scheduler struct {
-	runtimeManager      runtime.Manager
 	entryReader         EntryReader
-	logDir              string
 	quit                chan any
 	running             atomic.Bool
-	location            *time.Location
 	dagRunStore         exec.DAGRunStore
 	queueStore          exec.QueueStore
 	procStore           exec.ProcStore
@@ -124,11 +121,8 @@ func New(
 	})
 
 	return &Scheduler{
-		logDir:          cfg.Paths.LogDir,
 		quit:            make(chan any),
-		location:        timeLoc,
 		entryReader:     er,
-		runtimeManager:  drm,
 		dagRunStore:     dagRunStore,
 		queueStore:      queueStore,
 		procStore:       procStore,
