@@ -1295,6 +1295,159 @@ func TestTickPlanner_StartStop(t *testing.T) {
 	}
 }
 
+func TestTickPlanner_InitBuffersLatestCollapse(t *testing.T) {
+	t.Parallel()
+
+	// Watermark at 06:00, now at 12:00, hourly cron → 6 missed intervals.
+	// With "latest" policy, buffer should collapse to 1 item (12:00).
+	store := &mockWatermarkStore{
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 6, 0, 0, 0, time.UTC)),
+	}
+	tp, _ := newTestTickPlanner(store)
+
+	dag := &core.DAG{
+		Name:          "latest-init-dag",
+		CatchupWindow: 12 * time.Hour,
+		Schedule:      []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+		OverlapPolicy: core.OverlapPolicyLatest,
+	}
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	buf, ok := tp.buffers["latest-init-dag"]
+	require.True(t, ok, "buffer should exist")
+	assert.Equal(t, 1, buf.Len(), "latest policy should collapse buffer to 1 item")
+
+	item, ok := buf.Peek()
+	require.True(t, ok)
+	assert.Equal(t, time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC), item.ScheduledTime,
+		"remaining item should be the latest (12:00)")
+
+	// Watermark should be advanced past the discarded items
+	tp.mu.RLock()
+	wm, hasWM := tp.watermarkState.DAGs["latest-init-dag"]
+	tp.mu.RUnlock()
+	require.True(t, hasWM)
+	assert.Equal(t, time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC), wm.LastScheduledTime,
+		"watermark should be at the last discarded item (11:00)")
+}
+
+func TestTickPlanner_PlanLatestNotRunning(t *testing.T) {
+	t.Parallel()
+
+	store := &mockWatermarkStore{
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 9, 0, 0, 0, time.UTC)),
+	}
+
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore: store,
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{}, nil
+		},
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			return nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "run-latest", nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil // DAG is not running
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+		Events: eventCh,
+	})
+
+	dag := &core.DAG{
+		Name:          "latest-nr-dag",
+		CatchupWindow: 6 * time.Hour,
+		Schedule:      []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+		OverlapPolicy: core.OverlapPolicyLatest,
+	}
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+
+	// Should dispatch exactly 1 run — the latest (12:00), not the oldest (10:00)
+	require.Len(t, runs, 1)
+	assert.Equal(t, time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC), runs[0].ScheduledTime,
+		"should dispatch the latest interval, not the oldest")
+	assert.Equal(t, core.TriggerTypeCatchUp, runs[0].TriggerType)
+
+	// Buffer should be empty after dispatch
+	_, bufExists := tp.buffers["latest-nr-dag"]
+	assert.False(t, bufExists, "buffer should be cleaned up after draining")
+}
+
+func TestTickPlanner_PlanLatestRunning(t *testing.T) {
+	t.Parallel()
+
+	store := &mockWatermarkStore{
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 9, 0, 0, 0, time.UTC)),
+	}
+
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore: store,
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{}, nil
+		},
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			return nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "run-latest", nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return true, nil // DAG is running
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+		Events: eventCh,
+	})
+
+	dag := &core.DAG{
+		Name:          "latest-run-dag",
+		CatchupWindow: 6 * time.Hour,
+		Schedule:      []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+		OverlapPolicy: core.OverlapPolicyLatest,
+	}
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+
+	// No dispatch when DAG is running
+	assert.Len(t, runs, 0, "should not dispatch when DAG is running")
+
+	// Buffer should be collapsed to 1 item (the latest)
+	buf, ok := tp.buffers["latest-run-dag"]
+	require.True(t, ok, "buffer should still exist")
+	assert.Equal(t, 1, buf.Len(), "buffer should be collapsed to 1 item")
+
+	item, ok := buf.Peek()
+	require.True(t, ok)
+	assert.Equal(t, time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC), item.ScheduledTime,
+		"remaining item should be the latest (12:00)")
+
+	// Watermark should be advanced past discarded items
+	tp.mu.RLock()
+	wm, hasWM := tp.watermarkState.DAGs["latest-run-dag"]
+	tp.mu.RUnlock()
+	require.True(t, hasWM)
+	assert.Equal(t, time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC), wm.LastScheduledTime,
+		"watermark should be at the last discarded item (11:00)")
+}
+
 func TestComputePrevExecTime(t *testing.T) {
 	t.Parallel()
 

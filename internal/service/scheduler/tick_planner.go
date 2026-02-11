@@ -283,6 +283,18 @@ func (tp *TickPlanner) initBuffers(ctx context.Context, dags []*core.DAG) {
 				break
 			}
 		}
+
+		if dag.OverlapPolicy == core.OverlapPolicyLatest && q.Len() > 1 {
+			dropped := q.DropAllButLast()
+			totalMissed -= len(dropped)
+			// Advance watermark past discarded items to prevent re-computation on restart.
+			tp.mu.Lock()
+			tp.watermarkState.DAGs[dag.Name] = DAGWatermark{
+				LastScheduledTime: dropped[len(dropped)-1].ScheduledTime,
+			}
+			tp.watermarkDirty.Store(true)
+			tp.mu.Unlock()
+		}
 	}
 
 	if totalMissed > 0 {
@@ -329,6 +341,18 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 				}
 
 				if !running {
+					// For "latest", collapse to most recent before popping.
+					if buf.overlapPolicy == core.OverlapPolicyLatest && buf.Len() > 1 {
+						dropped := buf.DropAllButLast()
+						tp.mu.Lock()
+						tp.watermarkState.DAGs[dagName] = DAGWatermark{
+							LastScheduledTime: dropped[len(dropped)-1].ScheduledTime,
+						}
+						tp.watermarkDirty.Store(true)
+						tp.mu.Unlock()
+						// Re-peek: front changed from oldest to latest
+						item, _ = buf.Peek()
+					}
 					buf.Pop()
 					run, ok := tp.createPlannedRun(ctx, item.DAG, item.ScheduledTime, item.TriggerType)
 					if ok {
@@ -352,6 +376,18 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 						tp.mu.Unlock()
 					case core.OverlapPolicyAll:
 						// leave in buffer, retry next tick
+					case core.OverlapPolicyLatest:
+						// Collapse to latest, advance watermark past discarded items.
+						dropped := buf.DropAllButLast()
+						if len(dropped) > 0 {
+							tp.mu.Lock()
+							tp.watermarkState.DAGs[dagName] = DAGWatermark{
+								LastScheduledTime: dropped[len(dropped)-1].ScheduledTime,
+							}
+							tp.watermarkDirty.Store(true)
+							tp.mu.Unlock()
+						}
+						// Leave the single remaining (latest) item for retry next tick.
 					default:
 						popped, _ := buf.Pop()
 						logger.Warn(ctx, "Unknown overlap policy, treating as skip",
@@ -744,6 +780,17 @@ func (tp *TickPlanner) recomputeBuffer(ctx context.Context, dag *core.DAG) {
 			break
 		}
 	}
+
+	if dag.OverlapPolicy == core.OverlapPolicyLatest && q.Len() > 1 {
+		dropped := q.DropAllButLast()
+		tp.mu.Lock()
+		tp.watermarkState.DAGs[dag.Name] = DAGWatermark{
+			LastScheduledTime: dropped[len(dropped)-1].ScheduledTime,
+		}
+		tp.watermarkDirty.Store(true)
+		tp.mu.Unlock()
+	}
+
 	tp.buffers[dag.Name] = q
 
 	logger.Info(ctx, "Recomputed catch-up buffer",

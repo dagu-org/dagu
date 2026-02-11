@@ -14,6 +14,9 @@ const (
 
 	// OverlapPolicyAll queues all runs and executes them sequentially in chronological order.
 	OverlapPolicyAll OverlapPolicy = "all"
+
+	// OverlapPolicyLatest discards all but the most recent missed interval.
+	OverlapPolicyLatest OverlapPolicy = "latest"
 )
 
 // ParseOverlapPolicy parses a string into an OverlapPolicy.
@@ -24,7 +27,9 @@ func ParseOverlapPolicy(s string) (OverlapPolicy, error) {
 		return OverlapPolicySkip, nil
 	case "all":
 		return OverlapPolicyAll, nil
+	case "latest":
+		return OverlapPolicyLatest, nil
 	default:
-		return "", fmt.Errorf("invalid overlapPolicy %q: must be \"skip\" or \"all\"", s)
+		return "", fmt.Errorf("invalid overlapPolicy %q: must be \"skip\", \"all\", or \"latest\"", s)
 	}
 }

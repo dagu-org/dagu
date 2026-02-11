@@ -114,9 +114,9 @@
     },
     "overlapPolicy": {
       "type": "string",
-      "enum": ["skip", "all"],
+      "enum": ["skip", "all", "latest"],
       "default": "skip",
-      "description": "Controls what happens when a catchup run is ready but the DAG is still running from a previous run. \"skip\" (default) drops the catchup run and moves to the next. \"all\" keeps it in the buffer and retries on the next scheduler tick."
+      "description": "Controls what happens when a catchup run is ready but the DAG is still running from a previous run. \"skip\" (default) drops the catchup run and moves to the next. \"all\" keeps it in the buffer and retries on the next scheduler tick. \"latest\" discards all but the most recent missed interval."
     },
     "tags": {
       "oneOf": [

@@ -54,13 +54,14 @@ Add two optional top-level fields to the DAG spec. No changes to the `schedule` 
 name: hourly-etl
 schedule: "0 * * * *"           # Unchanged — no new schedule formats needed
 catchupWindow: "6h"            # Opt-in: enables catchup, sets lookback horizon
-overlapPolicy: all             # What to do when runs pile up: skip | all
+overlapPolicy: all             # What to do when runs pile up: skip | all | latest
 ```
 
 - **`catchupWindow`** — Duration string. If set, enables catchup. All missed intervals within the window are detected on scheduler restart or DAG re-enable. If omitted, no catchup (current behavior).
 - **`overlapPolicy`** — Controls how multiple catch-up runs are handled:
   - `skip` (default) — Skip new run if previous is still running. For catchup: only the first missed interval runs; others are skipped while it's in progress.
   - `all` — Execute all missed runs **sequentially** (queued, one after another in order). Ensures every missed interval is processed.
+  - `latest` — Discard all but the most recent missed interval. Only the newest interval is dispatched or kept for retry.
 
 Both fields apply DAG-wide to all start schedules. There is no per-schedule-entry configuration.
 
@@ -69,7 +70,7 @@ Both fields apply DAG-wide to all start schedules. There is no per-schedule-entr
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `catchupWindow` | duration | *(omitted)* | Lookback horizon for missed intervals. If set, enables catchup. If omitted, no catchup (current behavior) |
-| `overlapPolicy` | `skip` \| `all` | `skip` | How to handle multiple catch-up runs. `skip`: only first missed interval runs; `all`: every missed interval runs sequentially |
+| `overlapPolicy` | `skip` \| `all` \| `latest` | `skip` | How to handle multiple catch-up runs. `skip`: only first missed interval runs; `all`: every missed interval runs sequentially; `latest`: discard all but the newest missed interval |
 
 #### Duration Format
 
@@ -235,11 +236,11 @@ The scheduler watermark is tied to the directory lock (`dirLock`). Only the lock
 
 ## Behavior Matrix
 
-| Scenario | No `catchupWindow` (default) | `overlapPolicy: skip` | `overlapPolicy: all` |
-|----------|-------------------------------|------------------------|----------------------|
-| First deploy (no prior runs) | Run from now only | Run from now only (new DAG gets `lastScheduledTime = now`, nothing to backfill) | Run from now only (new DAG gets `lastScheduledTime = now`, nothing to backfill) |
-| Scheduler restart after 3h downtime | Jobs resume from now | Run the **first** missed interval; skip others while it runs | Run **all** missed intervals sequentially within `catchupWindow` |
-| DAG disabled then re-enabled | Run from now only | Run the **first** missed interval within window | Backfill all missed runs within window |
+| Scenario | No `catchupWindow` (default) | `overlapPolicy: skip` | `overlapPolicy: all` | `overlapPolicy: latest` |
+|----------|-------------------------------|------------------------|----------------------|------------------------|
+| First deploy (no prior runs) | Run from now only | Run from now only (new DAG gets `lastScheduledTime = now`, nothing to backfill) | Run from now only (new DAG gets `lastScheduledTime = now`, nothing to backfill) | Run from now only (new DAG gets `lastScheduledTime = now`, nothing to backfill) |
+| Scheduler restart after 3h downtime | Jobs resume from now | Run the **first** missed interval; skip others while it runs | Run **all** missed intervals sequentially within `catchupWindow` | Discard all but the **latest** missed interval; run only the newest |
+| DAG disabled then re-enabled | Run from now only | Run the **first** missed interval within window | Backfill all missed runs within window | Run only the **latest** missed interval within window |
 
 ## Safety Mechanisms
 

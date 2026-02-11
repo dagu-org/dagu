@@ -72,6 +72,23 @@ func (q *ScheduleBuffer) Pop() (QueueItem, bool) {
 	return item, true
 }
 
+// DropAllButLast removes all items except the last one from the queue.
+// Returns the dropped items in FIFO order. Returns nil if queue has 0 or 1 items.
+func (q *ScheduleBuffer) DropAllButLast() []QueueItem {
+	if len(q.items) <= 1 {
+		return nil
+	}
+	dropped := make([]QueueItem, len(q.items)-1)
+	copy(dropped, q.items[:len(q.items)-1])
+	last := q.items[len(q.items)-1]
+	// Clear references for GC
+	for i := range q.items {
+		q.items[i] = QueueItem{}
+	}
+	q.items = []QueueItem{last}
+	return dropped
+}
+
 // Len returns the number of items in the queue.
 func (q *ScheduleBuffer) Len() int {
 	return len(q.items)

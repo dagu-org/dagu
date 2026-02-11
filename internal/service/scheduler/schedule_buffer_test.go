@@ -90,6 +90,55 @@ func TestScheduleBuffer_Len(t *testing.T) {
 	assert.Equal(t, 0, q.Len())
 }
 
+func TestScheduleBuffer_DropAllButLast_MultipleItems(t *testing.T) {
+	t.Parallel()
+
+	q := NewScheduleBuffer("test-dag", core.OverlapPolicyLatest)
+
+	base := time.Date(2026, 2, 7, 9, 0, 0, 0, time.UTC)
+	for i := range 5 {
+		q.Send(QueueItem{
+			ScheduledTime: base.Add(time.Duration(i) * time.Hour),
+			TriggerType:   core.TriggerTypeCatchUp,
+		})
+	}
+	assert.Equal(t, 5, q.Len())
+
+	dropped := q.DropAllButLast()
+	assert.Len(t, dropped, 4)
+	assert.Equal(t, 1, q.Len())
+
+	// Dropped items should be in FIFO order
+	for i, d := range dropped {
+		assert.Equal(t, base.Add(time.Duration(i)*time.Hour), d.ScheduledTime)
+	}
+
+	// Remaining item should be the latest
+	item, ok := q.Peek()
+	require.True(t, ok)
+	assert.Equal(t, base.Add(4*time.Hour), item.ScheduledTime)
+}
+
+func TestScheduleBuffer_DropAllButLast_Empty(t *testing.T) {
+	t.Parallel()
+
+	q := NewScheduleBuffer("test-dag", core.OverlapPolicyLatest)
+	dropped := q.DropAllButLast()
+	assert.Nil(t, dropped)
+	assert.Equal(t, 0, q.Len())
+}
+
+func TestScheduleBuffer_DropAllButLast_SingleItem(t *testing.T) {
+	t.Parallel()
+
+	q := NewScheduleBuffer("test-dag", core.OverlapPolicyLatest)
+	q.Send(QueueItem{ScheduledTime: time.Now(), TriggerType: core.TriggerTypeCatchUp})
+
+	dropped := q.DropAllButLast()
+	assert.Nil(t, dropped)
+	assert.Equal(t, 1, q.Len())
+}
+
 func TestScheduleBuffer_CapacityLimit(t *testing.T) {
 	t.Parallel()
 

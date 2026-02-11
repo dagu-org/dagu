@@ -20,6 +20,8 @@ func TestParseOverlapPolicy(t *testing.T) {
 		{name: "empty defaults to skip", input: "", want: OverlapPolicySkip},
 		{name: "uppercase Skip", input: "Skip", want: OverlapPolicySkip},
 		{name: "uppercase ALL", input: "ALL", want: OverlapPolicyAll},
+		{name: "latest", input: "latest", want: OverlapPolicyLatest},
+		{name: "uppercase LATEST", input: "LATEST", want: OverlapPolicyLatest},
 		{name: "whitespace padded", input: "  skip  ", want: OverlapPolicySkip},
 		{name: "invalid value", input: "bogus", wantErr: true},
 	}
