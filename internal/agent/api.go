@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	api "github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -29,6 +31,9 @@ func respondErrorDirect(w http.ResponseWriter, status int, code api.ErrorCode, m
 		slog.Error("failed to encode error response", "error", err)
 	}
 }
+
+// maxRequestBodySize is the maximum allowed size for JSON request bodies (1 MB).
+const maxRequestBodySize = 1 << 20
 
 // defaultUserID is used when no user is authenticated (e.g., auth disabled).
 // This value should match the system's expected default user identifier.
@@ -59,6 +64,8 @@ type API struct {
 	conversations sync.Map // id -> *ConversationManager (active conversations)
 	store         ConversationStore
 	configStore   ConfigStore
+	modelStore    ModelStore
+	providers     *ProviderCache
 	workingDir    string
 	logger        *slog.Logger
 	dagStore      exec.DAGStore // For resolving DAG file paths
@@ -69,6 +76,7 @@ type API struct {
 // APIConfig contains configuration for the API.
 type APIConfig struct {
 	ConfigStore       ConfigStore
+	ModelStore        ModelStore
 	WorkingDir        string
 	Logger            *slog.Logger
 	ConversationStore ConversationStore
@@ -82,6 +90,7 @@ type ConversationWithState struct {
 	Conversation Conversation `json:"conversation"`
 	Working      bool         `json:"working"`
 	Model        string       `json:"model,omitempty"`
+	TotalCost    float64      `json:"total_cost"`
 }
 
 // NewAPI creates a new API instance.
@@ -93,6 +102,8 @@ func NewAPI(cfg APIConfig) *API {
 
 	return &API{
 		configStore: cfg.ConfigStore,
+		modelStore:  cfg.ModelStore,
+		providers:   NewProviderCache(),
 		workingDir:  cfg.WorkingDir,
 		logger:      logger,
 		store:       cfg.ConversationStore,
@@ -214,6 +225,46 @@ func selectModel(requestModel, conversationModel, configModel string) string {
 	return cmp.Or(requestModel, conversationModel, configModel)
 }
 
+// getDefaultModelID returns the default model ID from config.
+func (a *API) getDefaultModelID(ctx context.Context) string {
+	cfg, err := a.configStore.Load(ctx)
+	if err != nil {
+		a.logger.Warn("Failed to load agent config for default model", "error", err)
+		return ""
+	}
+	return cfg.DefaultModelID
+}
+
+// resolveProvider resolves a model ID to an LLM provider and model config.
+// If modelID is empty, uses the default from config.
+// If the requested model is not found (e.g., deleted), falls back to the default.
+func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider, *ModelConfig, error) {
+	if a.modelStore == nil {
+		return nil, nil, errors.New("model store not configured")
+	}
+
+	defaultID := a.getDefaultModelID(ctx)
+	modelID = cmp.Or(modelID, defaultID)
+	if modelID == "" {
+		return nil, nil, errors.New("no model configured")
+	}
+
+	model, err := a.modelStore.GetByID(ctx, modelID)
+	if errors.Is(err, ErrModelNotFound) && defaultID != "" && defaultID != modelID {
+		// Requested model was deleted; fall back to default
+		model, err = a.modelStore.GetByID(ctx, defaultID)
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+
+	provider, _, err := a.providers.GetOrCreate(model.ToLLMConfig())
+	if err != nil {
+		return nil, nil, err
+	}
+	return provider, model, nil
+}
+
 // createMessageCallback returns a persistence callback for the given conversation ID.
 // Returns nil if no store is configured.
 func (a *API) createMessageCallback(id string) func(ctx context.Context, msg Message) error {
@@ -265,6 +316,7 @@ func (a *API) respondError(w http.ResponseWriter, status int, code api.ErrorCode
 // POST /api/v1/agent/conversations/new
 func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 	var req ChatRequest
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "Invalid JSON")
 		return
@@ -275,36 +327,39 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	provider, configModel, err := a.configStore.GetProvider(r.Context())
+	userID, username, ipAddress := getUserContextFromRequest(r)
+	model := selectModel(req.Model, "", a.getDefaultModelID(r.Context()))
+
+	provider, modelCfg, err := a.resolveProvider(r.Context(), model)
 	if err != nil {
 		a.logger.Error("Failed to get LLM provider", "error", err)
 		a.respondError(w, http.StatusServiceUnavailable, api.ErrorCodeInternalError, "Agent is not configured properly")
 		return
 	}
 
-	userID, username, ipAddress := getUserContextFromRequest(r)
-	model := selectModel(req.Model, "", configModel)
 	id := uuid.New().String()
 	now := time.Now()
 
 	mgr := NewConversationManager(ConversationManagerConfig{
-		ID:          id,
-		UserID:      userID,
-		Logger:      a.logger,
-		WorkingDir:  a.workingDir,
-		OnMessage:   a.createMessageCallback(id),
-		Environment: a.environment,
-		SafeMode:    req.SafeMode,
-		Hooks:       a.hooks,
-		Username:    username,
-		IPAddress:   ipAddress,
+		ID:              id,
+		UserID:          userID,
+		Logger:          a.logger,
+		WorkingDir:      a.workingDir,
+		OnMessage:       a.createMessageCallback(id),
+		Environment:     a.environment,
+		SafeMode:        req.SafeMode,
+		Hooks:           a.hooks,
+		Username:        username,
+		IPAddress:       ipAddress,
+		InputCostPer1M:  modelCfg.InputCostPer1M,
+		OutputCostPer1M: modelCfg.OutputCostPer1M,
 	})
 
 	a.persistNewConversation(r.Context(), id, userID, now)
 	a.conversations.Store(id, mgr)
 
 	messageWithContext := a.formatMessage(r.Context(), req.Message, req.DAGContexts)
-	if err := mgr.AcceptUserMessage(r.Context(), provider, model, messageWithContext); err != nil {
+	if err := mgr.AcceptUserMessage(r.Context(), provider, model, modelCfg.Model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		a.respondError(w, http.StatusInternalServerError, api.ErrorCodeInternalError, "Failed to process message")
 		return
@@ -324,6 +379,11 @@ func (a *API) handleListConversations(w http.ResponseWriter, r *http.Request) {
 	activeIDs := make(map[string]struct{})
 	conversations := a.collectActiveConversations(userID, activeIDs)
 	conversations = a.appendPersistedConversations(r.Context(), userID, activeIDs, conversations)
+
+	// Ensure we return [] instead of null in JSON when no conversations exist
+	if conversations == nil {
+		conversations = []ConversationWithState{}
+	}
 
 	a.respondJSON(w, http.StatusOK, conversations)
 }
@@ -350,6 +410,7 @@ func (a *API) collectActiveConversations(userID string, activeIDs map[string]str
 			Conversation: mgr.GetConversation(),
 			Working:      mgr.IsWorking(),
 			Model:        mgr.GetModel(),
+			TotalCost:    mgr.GetTotalCost(),
 		})
 		return true
 	})
@@ -397,6 +458,7 @@ func (a *API) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 				ConversationID: id,
 				Working:        mgr.IsWorking(),
 				Model:          mgr.GetModel(),
+				TotalCost:      mgr.GetTotalCost(),
 			},
 		})
 		return
@@ -425,7 +487,10 @@ func (a *API) getActiveConversation(id, userID string) (*ConversationManager, bo
 	if !ok {
 		return nil, false
 	}
-	mgr := mgrValue.(*ConversationManager)
+	mgr, ok := mgrValue.(*ConversationManager)
+	if !ok {
+		return nil, false
+	}
 	if mgr.UserID() != userID {
 		return nil, false
 	}
@@ -465,6 +530,7 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req ChatRequest
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "Invalid JSON")
 		return
@@ -475,20 +541,20 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	provider, configModel, err := a.configStore.GetProvider(r.Context())
+	model := selectModel(req.Model, mgr.GetModel(), a.getDefaultModelID(r.Context()))
+
+	provider, modelCfg, err := a.resolveProvider(r.Context(), model)
 	if err != nil {
 		a.logger.Error("Failed to get LLM provider", "error", err)
 		a.respondError(w, http.StatusServiceUnavailable, api.ErrorCodeInternalError, "Agent is not configured properly")
 		return
 	}
-
-	model := selectModel(req.Model, mgr.GetModel(), configModel)
 	messageWithContext := a.formatMessage(r.Context(), req.Message, req.DAGContexts)
 
-	// Update safe mode setting per request (allows toggling mid-conversation)
 	mgr.SetSafeMode(req.SafeMode)
+	mgr.UpdatePricing(modelCfg.InputCostPer1M, modelCfg.OutputCostPer1M)
 
-	if err := mgr.AcceptUserMessage(r.Context(), provider, model, messageWithContext); err != nil {
+	if err := mgr.AcceptUserMessage(r.Context(), provider, model, modelCfg.Model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		a.respondError(w, http.StatusInternalServerError, api.ErrorCodeInternalError, "Failed to process message")
 		return
@@ -539,6 +605,7 @@ func (a *API) reactivateConversation(ctx context.Context, id, userID, username, 
 		History:     messages,
 		SequenceID:  seqID,
 		Environment: a.environment,
+		SafeMode:    true, // Default to safe mode for reactivated conversations
 		Hooks:       a.hooks,
 		Username:    username,
 		IPAddress:   ipAddress,
@@ -567,12 +634,45 @@ func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 	snapshot, next := mgr.SubscribeWithSnapshot(r.Context())
 	a.sendSSEMessage(w, snapshot)
 
-	for {
-		resp, cont := next()
-		if !cont {
-			break
+	type streamResult struct {
+		resp StreamResponse
+		cont bool
+	}
+
+	heartbeat := time.NewTicker(15 * time.Second)
+	defer heartbeat.Stop()
+
+	ch := make(chan streamResult, 1)
+	go func() {
+		for {
+			resp, cont := next()
+			ch <- streamResult{resp, cont}
+			if !cont {
+				return
+			}
 		}
-		a.sendSSEMessage(w, resp)
+	}()
+
+	for {
+		select {
+		case res := <-ch:
+			if !res.cont {
+				return
+			}
+			a.sendSSEMessage(w, res.resp)
+			heartbeat.Reset(15 * time.Second)
+		case <-heartbeat.C:
+			// SSE comment as heartbeat to keep connection alive
+			if _, err := fmt.Fprint(w, ": heartbeat\n\n"); err != nil {
+				a.logger.Debug("SSE heartbeat write failed", "error", err)
+				return
+			}
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+		case <-r.Context().Done():
+			return
+		}
 	}
 }
 
@@ -594,7 +694,10 @@ func (a *API) sendSSEMessage(w http.ResponseWriter, data any) {
 		slog.Error("failed to marshal SSE data", "error", err)
 		return
 	}
-	fmt.Fprintf(w, "data: %s\n\n", jsonData)
+	if _, err := fmt.Fprintf(w, "data: %s\n\n", jsonData); err != nil {
+		a.logger.Debug("SSE write failed", "error", err)
+		return
+	}
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
 	}
@@ -634,6 +737,7 @@ func (a *API) handleUserResponse(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req UserPromptResponse
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "Invalid JSON")
 		return
@@ -650,6 +754,57 @@ func (a *API) handleUserResponse(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.respondJSON(w, http.StatusOK, map[string]string{"status": "accepted"})
+}
+
+// idleConversationTimeout is the duration after which idle conversations are cleaned up.
+const idleConversationTimeout = 30 * time.Minute
+
+// cleanupInterval is how often the cleanup goroutine runs.
+const cleanupInterval = 5 * time.Minute
+
+// StartCleanup begins periodic cleanup of idle conversations.
+// It should be called once when the API is initialized and will
+// stop when the context is cancelled.
+func (a *API) StartCleanup(ctx context.Context) {
+	go func() {
+		ticker := time.NewTicker(cleanupInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				a.cleanupIdleConversations()
+			}
+		}
+	}()
+}
+
+// cleanupIdleConversations removes conversations that have been idle too long and are not working.
+func (a *API) cleanupIdleConversations() {
+	cutoff := time.Now().Add(-idleConversationTimeout)
+	var toDelete []string
+
+	a.conversations.Range(func(key, value any) bool {
+		id, ok := key.(string)
+		if !ok {
+			return true
+		}
+		mgr, ok := value.(*ConversationManager)
+		if !ok {
+			return true
+		}
+		if !mgr.IsWorking() && mgr.LastActivity().Before(cutoff) {
+			toDelete = append(toDelete, id)
+		}
+		return true
+	})
+
+	for _, id := range toDelete {
+		a.conversations.Delete(id)
+		a.logger.Debug("Cleaned up idle conversation", "conversation_id", id)
+	}
 }
 
 // ptrTo returns a pointer to the given value.

@@ -3,27 +3,29 @@ package agent
 import (
 	"context"
 	"errors"
-
-	"github.com/dagu-org/dagu/internal/llm"
+	"fmt"
+	"regexp"
+	"strings"
 )
 
 // Sentinel errors for store operations.
 var (
+	// Conversation errors.
 	ErrConversationNotFound  = errors.New("conversation not found")
 	ErrInvalidConversationID = errors.New("invalid conversation ID")
 	ErrInvalidUserID         = errors.New("invalid user ID")
-)
 
-// Default configuration values.
-const (
-	DefaultProvider = "anthropic"
-	DefaultModel    = "claude-sonnet-4-5"
+	// Model errors.
+	ErrModelNotFound          = errors.New("model not found")
+	ErrModelAlreadyExists     = errors.New("model already exists")
+	ErrModelNameAlreadyExists = errors.New("model name already exists")
+	ErrInvalidModelID         = errors.New("invalid model ID")
 )
 
 // Config holds the configuration for the AI agent feature.
 type Config struct {
-	Enabled bool      `json:"enabled"`
-	LLM     LLMConfig `json:"llm"`
+	Enabled        bool   `json:"enabled"`
+	DefaultModelID string `json:"defaultModelId,omitempty"`
 }
 
 // LLMConfig holds LLM provider configuration for the agent.
@@ -39,10 +41,89 @@ type LLMConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Enabled: true,
-		LLM: LLMConfig{
-			Provider: DefaultProvider,
-			Model:    DefaultModel,
-		},
+	}
+}
+
+// ModelConfig holds the configuration for a single LLM model.
+type ModelConfig struct {
+	ID               string  `json:"id"`
+	Name             string  `json:"name"`
+	Provider         string  `json:"provider"`
+	Model            string  `json:"model"`
+	APIKey           string  `json:"apiKey,omitempty"`
+	BaseURL          string  `json:"baseUrl,omitempty"`
+	ContextWindow    int     `json:"contextWindow,omitempty"`
+	MaxOutputTokens  int     `json:"maxOutputTokens,omitempty"`
+	InputCostPer1M   float64 `json:"inputCostPer1M,omitempty"`
+	OutputCostPer1M  float64 `json:"outputCostPer1M,omitempty"`
+	SupportsThinking bool    `json:"supportsThinking,omitempty"`
+	Description      string  `json:"description,omitempty"`
+}
+
+// ToLLMConfig converts a ModelConfig to an LLMConfig for provider creation.
+func (m *ModelConfig) ToLLMConfig() LLMConfig {
+	return LLMConfig{
+		Provider: m.Provider,
+		Model:    m.Model,
+		APIKey:   m.APIKey,
+		BaseURL:  m.BaseURL,
+	}
+}
+
+// validModelIDRegexp matches a valid model ID slug: lowercase alphanumeric segments separated by hyphens.
+var validModelIDRegexp = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+
+const maxModelIDLength = 128
+
+// ValidateModelID validates that id is a safe, well-formed model identifier.
+// It must be a non-empty slug (lowercase alphanumeric segments separated by hyphens)
+// and at most 128 characters. This prevents path traversal and other injection attacks.
+func ValidateModelID(id string) error {
+	if id == "" {
+		return ErrInvalidModelID
+	}
+	if len(id) > maxModelIDLength {
+		return fmt.Errorf("%w: exceeds maximum length of %d", ErrInvalidModelID, maxModelIDLength)
+	}
+	if !validModelIDRegexp.MatchString(id) {
+		return fmt.Errorf("%w: must match pattern [a-z0-9]+(-[a-z0-9]+)*", ErrInvalidModelID)
+	}
+	return nil
+}
+
+var slugRegexp = regexp.MustCompile(`[^a-z0-9]+`)
+
+// GenerateSlugID creates a URL-friendly slug from a name.
+// E.g., "Claude Opus 4.6" → "claude-opus-4-6"
+func GenerateSlugID(name string) string {
+	s := strings.ToLower(strings.TrimSpace(name))
+	s = slugRegexp.ReplaceAllString(s, "-")
+	s = strings.Trim(s, "-")
+	return s
+}
+
+// maxSuffixLen reserves room for collision suffixes like "-999999999".
+const maxSuffixLen = 10
+
+// UniqueID generates a unique slug ID, appending "-2", "-3" etc. on collision.
+// The result is guaranteed to not exceed maxModelIDLength.
+func UniqueID(name string, existingIDs map[string]struct{}) string {
+	base := GenerateSlugID(name)
+	if base == "" {
+		base = "model"
+	}
+	if len(base) > maxModelIDLength-maxSuffixLen {
+		base = base[:maxModelIDLength-maxSuffixLen]
+	}
+	id := base
+	if _, exists := existingIDs[id]; !exists {
+		return id
+	}
+	for i := 2; ; i++ {
+		id = fmt.Sprintf("%s-%d", base, i)
+		if _, exists := existingIDs[id]; !exists {
+			return id
+		}
 	}
 }
 
@@ -55,8 +136,16 @@ type ConfigStore interface {
 	Save(ctx context.Context, cfg *Config) error
 	// IsEnabled returns whether the agent feature is enabled.
 	IsEnabled(ctx context.Context) bool
-	// GetProvider returns the LLM provider and model name.
-	GetProvider(ctx context.Context) (llm.Provider, string, error)
+}
+
+// ModelStore defines the interface for model configuration persistence.
+// All implementations must be safe for concurrent use.
+type ModelStore interface {
+	Create(ctx context.Context, model *ModelConfig) error
+	GetByID(ctx context.Context, id string) (*ModelConfig, error)
+	List(ctx context.Context) ([]*ModelConfig, error)
+	Update(ctx context.Context, model *ModelConfig) error
+	Delete(ctx context.Context, id string) error
 }
 
 // ConversationStore defines the interface for conversation persistence.

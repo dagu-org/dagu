@@ -2,25 +2,19 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
-	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/dagu-org/dagu/internal/service/audit"
 )
 
 const (
 	auditActionAgentConfigUpdate = "agent_config_update"
 	auditFieldEnabled            = "enabled"
-	auditFieldLLM                = "llm"
-	auditFieldProvider           = "provider"
-	auditFieldModel              = "model"
-	auditFieldAPIKeyChanged      = "api_key_changed"
-	auditFieldBaseURL            = "base_url"
+	auditFieldDefaultModelID     = "default_model_id"
 )
 
 var (
@@ -85,13 +79,7 @@ func (a *API) UpdateAgentConfig(ctx context.Context, request api.UpdateAgentConf
 		return nil, errFailedToLoadAgentConfig
 	}
 
-	if err := applyAgentConfigUpdates(cfg, request.Body); err != nil {
-		return nil, &Error{
-			Code:       api.ErrorCodeBadRequest,
-			Message:    err.Error(),
-			HTTPStatus: http.StatusBadRequest,
-		}
-	}
+	applyAgentConfigUpdates(cfg, request.Body)
 
 	if err := a.agentConfigStore.Save(ctx, cfg); err != nil {
 		logger.Error(ctx, "Failed to save agent config", tag.Error(err))
@@ -112,76 +100,29 @@ func (a *API) requireAgentConfigManagement() error {
 
 func toAgentConfigResponse(cfg *agent.Config) api.AgentConfigResponse {
 	return api.AgentConfigResponse{
-		Enabled: ptrOf(cfg.Enabled),
-		Llm: &api.AgentLLMConfig{
-			Provider:         ptrOf(cfg.LLM.Provider),
-			Model:            ptrOf(cfg.LLM.Model),
-			ApiKeyConfigured: ptrOf(cfg.LLM.APIKey != ""),
-			BaseUrl:          ptrOf(cfg.LLM.BaseURL),
-		},
+		Enabled:        &cfg.Enabled,
+		DefaultModelId: ptrOf(cfg.DefaultModelID),
 	}
 }
 
 // applyAgentConfigUpdates applies non-nil fields from the update request to the agent configuration.
-// Only fields present in the update are modified, allowing partial updates.
-func applyAgentConfigUpdates(cfg *agent.Config, update *api.UpdateAgentConfigRequest) error {
+func applyAgentConfigUpdates(cfg *agent.Config, update *api.UpdateAgentConfigRequest) {
 	if update.Enabled != nil {
 		cfg.Enabled = *update.Enabled
 	}
-	return applyLLMConfigUpdates(&cfg.LLM, update.Llm)
-}
-
-func applyLLMConfigUpdates(cfg *agent.LLMConfig, update *api.UpdateAgentLLMConfig) error {
-	if update == nil {
-		return nil
+	if update.DefaultModelId != nil {
+		cfg.DefaultModelID = *update.DefaultModelId
 	}
-	if update.Provider != nil {
-		if _, err := llm.ParseProviderType(*update.Provider); err != nil {
-			return fmt.Errorf("invalid provider '%s': valid options are anthropic, openai, gemini, openrouter, local", *update.Provider)
-		}
-		cfg.Provider = *update.Provider
-	}
-	if update.Model != nil {
-		cfg.Model = *update.Model
-	}
-	if update.ApiKey != nil {
-		cfg.APIKey = *update.ApiKey
-	}
-	if update.BaseUrl != nil {
-		cfg.BaseURL = *update.BaseUrl
-	}
-	return nil
 }
 
 // buildAgentConfigChanges constructs a map of changed fields for audit logging.
-// Only non-nil fields from the update are included in the returned map.
 func buildAgentConfigChanges(update *api.UpdateAgentConfigRequest) map[string]any {
 	changes := make(map[string]any)
 	if update.Enabled != nil {
 		changes[auditFieldEnabled] = *update.Enabled
 	}
-	if llmChanges := buildLLMConfigChanges(update.Llm); len(llmChanges) > 0 {
-		changes[auditFieldLLM] = llmChanges
-	}
-	return changes
-}
-
-func buildLLMConfigChanges(update *api.UpdateAgentLLMConfig) map[string]any {
-	if update == nil {
-		return nil
-	}
-	changes := make(map[string]any)
-	if update.Provider != nil {
-		changes[auditFieldProvider] = *update.Provider
-	}
-	if update.Model != nil {
-		changes[auditFieldModel] = *update.Model
-	}
-	if update.ApiKey != nil {
-		changes[auditFieldAPIKeyChanged] = true
-	}
-	if update.BaseUrl != nil {
-		changes[auditFieldBaseURL] = *update.BaseUrl
+	if update.DefaultModelId != nil {
+		changes[auditFieldDefaultModelID] = *update.DefaultModelId
 	}
 	return changes
 }

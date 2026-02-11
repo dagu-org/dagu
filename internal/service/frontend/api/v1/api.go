@@ -57,6 +57,7 @@ type API struct {
 	defaultExecMode    config.ExecutionMode
 	dagWritesDisabled  bool // True when git sync read-only mode is active
 	agentConfigStore   agent.ConfigStore
+	agentModelStore    agent.ModelStore
 }
 
 // AuthService defines the interface for authentication operations.
@@ -127,6 +128,13 @@ func WithTunnelService(ts *tunnel.Service) APIOption {
 func WithAgentConfigStore(store agent.ConfigStore) APIOption {
 	return func(a *API) {
 		a.agentConfigStore = store
+	}
+}
+
+// WithAgentModelStore returns an APIOption that sets the API's agent model store.
+func WithAgentModelStore(store agent.ModelStore) APIOption {
+	return func(a *API) {
+		a.agentModelStore = store
 	}
 }
 

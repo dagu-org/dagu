@@ -38,6 +38,7 @@ export function AgentChatModal(): ReactElement | null {
     conversationId,
     messages,
     pendingUserMessage,
+    conversationState,
     conversations,
     isWorking,
     error,
@@ -78,8 +79,8 @@ export function AgentChatModal(): ReactElement | null {
   }, [isOpen, conversations, conversationId, selectConversation]);
 
   const handleSend = useCallback(
-    (message: string, dagContexts?: DAGContext[]): void => {
-      sendMessage(message, undefined, dagContexts).catch(() => {});
+    (message: string, dagContexts?: DAGContext[], model?: string): void => {
+      sendMessage(message, model, dagContexts).catch(() => {});
     },
     [sendMessage]
   );
@@ -125,6 +126,7 @@ export function AgentChatModal(): ReactElement | null {
       <AgentChatModalHeader
         conversationId={conversationId}
         conversations={conversations}
+        totalCost={conversationState?.total_cost}
         onSelectConversation={handleSelectConversation}
         onClearConversation={clearConversation}
         onClose={closeChat}

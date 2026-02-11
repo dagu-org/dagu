@@ -10,7 +10,8 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { Message, ToolCall, ToolResult, UIAction, UserPromptResponse } from '../types';
+import { Message, TokenUsage, ToolCall, ToolResult, UIAction, UserPromptResponse } from '../types';
+import { formatCost } from '../utils/formatCost';
 import { CommandApprovalMessage } from './CommandApprovalMessage';
 import { ToolContentViewer } from './ToolViewers';
 import { UserPromptMessage } from './UserPromptMessage';
@@ -93,6 +94,8 @@ function MessageItem({ message, onPromptRespond, answeredPrompts }: MessageItemP
         <AssistantMessage
           content={message.content ?? ''}
           toolCalls={message.tool_calls}
+          usage={message.usage}
+          cost={message.cost}
         />
       );
     case 'tool_use':
@@ -180,9 +183,13 @@ function UserMessage({ content, isPending }: { content: string; isPending?: bool
 function AssistantMessage({
   content,
   toolCalls,
+  usage,
+  cost,
 }: {
   content: string;
   toolCalls?: ToolCall[];
+  usage?: TokenUsage;
+  cost?: number;
 }): React.ReactNode {
   return (
     <div className="pl-1 space-y-1">
@@ -193,6 +200,12 @@ function AssistantMessage({
       )}
       {toolCalls && toolCalls.length > 0 && (
         <ToolCallList toolCalls={toolCalls} className="pl-4" />
+      )}
+      {usage && usage.total_tokens > 0 && (
+        <p className="text-[10px] text-muted-foreground/60 pl-4">
+          {usage.total_tokens.toLocaleString()} tokens
+          {cost != null && cost > 0 && ` · ${formatCost(cost)}`}
+        </p>
       )}
     </div>
   );

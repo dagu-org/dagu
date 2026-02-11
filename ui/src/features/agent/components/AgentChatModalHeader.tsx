@@ -21,6 +21,7 @@ import { useUserPreferences } from '@/contexts/UserPreference';
 
 import { useResizableDraggable } from '../hooks/useResizableDraggable';
 import { ConversationWithState } from '../types';
+import { formatCost } from '../utils/formatCost';
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString(undefined, {
@@ -34,6 +35,7 @@ function formatDate(dateStr: string): string {
 type Props = {
   conversationId: string | null;
   conversations: ConversationWithState[];
+  totalCost?: number;
   onSelectConversation: (id: string) => void;
   onClearConversation: () => void;
   onClose: () => void;
@@ -41,9 +43,11 @@ type Props = {
   isMobile?: boolean;
 };
 
+
 export function AgentChatModalHeader({
   conversationId,
   conversations,
+  totalCost,
   onSelectConversation,
   onClearConversation,
   onClose,
@@ -88,6 +92,11 @@ export function AgentChatModalHeader({
           </SelectContent>
         </Select>
       </div>
+      {totalCost != null && totalCost > 0 && (
+        <span className="text-[10px] text-muted-foreground/60 flex-shrink-0 tabular-nums">
+          {formatCost(totalCost)}
+        </span>
+      )}
       <TooltipProvider delayDuration={300}>
         <div className="flex items-center gap-1 flex-shrink-0">
           <Tooltip>

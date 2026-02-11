@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -37,6 +38,9 @@ type ConversationManager struct {
 	onMessage       func(ctx context.Context, msg Message) error
 	pendingPrompts  map[string]chan UserPromptResponse
 	promptsMu       sync.Mutex
+	inputCostPer1M  float64
+	outputCostPer1M float64
+	totalCost       float64
 }
 
 // ConversationManagerConfig contains configuration for creating a ConversationManager.
@@ -54,6 +58,8 @@ type ConversationManagerConfig struct {
 	Hooks           *Hooks
 	Username        string
 	IPAddress       string
+	InputCostPer1M  float64
+	OutputCostPer1M float64
 }
 
 // NewConversationManager creates a new ConversationManager.
@@ -86,6 +92,8 @@ func NewConversationManager(cfg ConversationManagerConfig) *ConversationManager 
 		hooks:           cfg.Hooks,
 		username:        cfg.Username,
 		ipAddress:       cfg.IPAddress,
+		inputCostPer1M:  cfg.InputCostPer1M,
+		outputCostPer1M: cfg.OutputCostPer1M,
 	}
 }
 
@@ -120,7 +128,7 @@ func (cm *ConversationManager) UserID() string {
 
 // SetWorking updates the agent working state and notifies subscribers.
 func (cm *ConversationManager) SetWorking(working bool) {
-	id, model, callback, changed := cm.updateWorkingState(working)
+	id, model, totalCost, callback, changed := cm.updateWorkingState(working)
 	if !changed {
 		return
 	}
@@ -130,6 +138,7 @@ func (cm *ConversationManager) SetWorking(working bool) {
 			ConversationID: id,
 			Working:        working,
 			Model:          model,
+			TotalCost:      totalCost,
 		},
 	})
 	if callback != nil {
@@ -138,17 +147,17 @@ func (cm *ConversationManager) SetWorking(working bool) {
 }
 
 // updateWorkingState atomically updates the working state and returns relevant data.
-// Returns (id, model, callback, changed) where changed indicates if the state actually changed.
-func (cm *ConversationManager) updateWorkingState(working bool) (string, string, func(string, bool), bool) {
+// Returns (id, model, totalCost, callback, changed) where changed indicates if the state actually changed.
+func (cm *ConversationManager) updateWorkingState(working bool) (string, string, float64, func(string, bool), bool) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
 	if cm.working == working {
-		return "", "", nil, false
+		return "", "", 0, nil, false
 	}
 
 	cm.working = working
-	return cm.id, cm.model, cm.onWorkingChange, true
+	return cm.id, cm.model, cm.totalCost, cm.onWorkingChange, true
 }
 
 // IsWorking returns the current agent working state.
@@ -156,6 +165,13 @@ func (cm *ConversationManager) IsWorking() bool {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	return cm.working
+}
+
+// LastActivity returns the time of the most recent activity in this conversation.
+func (cm *ConversationManager) LastActivity() time.Time {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	return cm.lastActivity
 }
 
 // GetModel returns the model ID used by this conversation.
@@ -187,12 +203,12 @@ func (cm *ConversationManager) GetConversation() Conversation {
 }
 
 // AcceptUserMessage enqueues a user message, ensuring the loop is ready first.
-func (cm *ConversationManager) AcceptUserMessage(ctx context.Context, provider llm.Provider, model string, content string) error {
+func (cm *ConversationManager) AcceptUserMessage(ctx context.Context, provider llm.Provider, modelID string, resolvedModel string, content string) error {
 	if provider == nil {
 		return errors.New("LLM provider is required")
 	}
 
-	if err := cm.ensureLoop(provider, model); err != nil {
+	if err := cm.ensureLoop(provider, modelID, resolvedModel); err != nil {
 		return err
 	}
 
@@ -256,6 +272,7 @@ func (cm *ConversationManager) SubscribeWithSnapshot(ctx context.Context) (Strea
 	lastSeq := cm.sequenceID
 	working := cm.working
 	model := cm.model
+	totalCost := cm.totalCost
 	id := cm.id
 	conv := Conversation{
 		ID:        id,
@@ -273,6 +290,7 @@ func (cm *ConversationManager) SubscribeWithSnapshot(ctx context.Context) (Strea
 			ConversationID: id,
 			Working:        working,
 			Model:          model,
+			TotalCost:      totalCost,
 		},
 	}, next
 }
@@ -300,19 +318,31 @@ func (cm *ConversationManager) clearLoop() context.CancelFunc {
 }
 
 // ensureLoop creates the loop if it doesn't exist.
-func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) error {
-	history, safeMode, needsInit := cm.prepareLoopInit(model)
-	if !needsInit {
+// The lock is released during createLoop (which may be slow) and re-acquired
+// afterward with a double-check to handle concurrent callers.
+func (cm *ConversationManager) ensureLoop(provider llm.Provider, modelID string, resolvedModel string) error {
+	cm.mu.Lock()
+	if cm.loop != nil {
+		cm.mu.Unlock()
 		return nil
 	}
+	cm.model = modelID
+	history := cm.extractLLMHistoryLocked()
+	safeMode := cm.safeMode
+	cm.mu.Unlock()
 
 	loopCtx, cancel := context.WithCancel(context.Background())
-	loopInstance := cm.createLoop(provider, model, history, safeMode)
+	loopInstance := cm.createLoop(provider, resolvedModel, history, safeMode)
 
-	if !cm.trySetLoop(loopInstance, cancel) {
+	cm.mu.Lock()
+	if cm.loop != nil {
+		cm.mu.Unlock()
 		cancel()
 		return nil
 	}
+	cm.loop = loopInstance
+	cm.loopCancel = cancel
+	cm.mu.Unlock()
 
 	go cm.runLoop(loopCtx, loopInstance)
 	return nil
@@ -346,8 +376,9 @@ func (cm *ConversationManager) createLoop(provider llm.Provider, model string, h
 func (cm *ConversationManager) runLoop(ctx context.Context, loop *Loop) {
 	defer func() {
 		if r := recover(); r != nil {
-			cm.logger.Error("conversation loop panicked", "panic", r)
+			cm.logger.Error("conversation loop panicked", "panic", r, "stack", string(debug.Stack()))
 		}
+		cm.SetWorking(false)
 		cm.logger.Info("conversation loop goroutine exiting")
 		cm.clearLoop()
 	}()
@@ -361,35 +392,6 @@ func (cm *ConversationManager) runLoop(ctx context.Context, loop *Loop) {
 	} else {
 		cm.logger.Error("conversation loop stopped with error", "error", err)
 	}
-}
-
-// prepareLoopInit checks if loop initialization is needed and extracts history.
-// Returns (history, safeMode, needsInit) where needsInit is false if loop already exists.
-func (cm *ConversationManager) prepareLoopInit(model string) ([]llm.Message, bool, bool) {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	if cm.loop != nil {
-		return nil, false, false
-	}
-
-	cm.model = model
-	return cm.extractLLMHistoryLocked(), cm.safeMode, true
-}
-
-// trySetLoop attempts to set the loop instance atomically.
-// Returns true if successful, false if another goroutine already set it.
-func (cm *ConversationManager) trySetLoop(loop *Loop, cancel context.CancelFunc) bool {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	if cm.loop != nil {
-		return false
-	}
-
-	cm.loop = loop
-	cm.loopCancel = cancel
-	return true
 }
 
 // extractLLMHistoryLocked converts stored messages to LLM format.
@@ -410,6 +412,15 @@ func (cm *ConversationManager) createRecordMessageFunc() MessageRecordFunc {
 		msg.ConversationID = cm.id
 		if msg.ID == "" {
 			msg.ID = uuid.New().String()
+		}
+
+		// Calculate and accumulate cost for assistant messages with usage data
+		if msg.Type == MessageTypeAssistant && msg.Usage != nil {
+			cost := cm.calculateCost(msg.Usage)
+			if cost > 0 {
+				msg.Cost = &cost
+			}
+			cm.addCost(cost)
 		}
 
 		msg.SequenceID = cm.appendMessage(msg)
@@ -536,4 +547,37 @@ func (cm *ConversationManager) nextSequenceID() int64 {
 
 	cm.sequenceID++
 	return cm.sequenceID
+}
+
+// GetTotalCost returns the accumulated cost of the conversation in USD.
+func (cm *ConversationManager) GetTotalCost() float64 {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	return cm.totalCost
+}
+
+// UpdatePricing updates the per-token pricing for this conversation.
+func (cm *ConversationManager) UpdatePricing(inputCostPer1M, outputCostPer1M float64) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	cm.inputCostPer1M = inputCostPer1M
+	cm.outputCostPer1M = outputCostPer1M
+}
+
+// calculateCost computes the cost of a single message from its token usage.
+func (cm *ConversationManager) calculateCost(usage *llm.Usage) float64 {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	if usage == nil {
+		return 0
+	}
+	return (float64(usage.PromptTokens) * cm.inputCostPer1M / 1_000_000) +
+		(float64(usage.CompletionTokens) * cm.outputCostPer1M / 1_000_000)
+}
+
+// addCost adds a cost amount to the running total.
+func (cm *ConversationManager) addCost(cost float64) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	cm.totalCost += cost
 }
