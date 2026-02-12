@@ -39,6 +39,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
+	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/persis/filesession"
 	"github.com/dagu-org/dagu/internal/persis/fileupgradecheck"
 	"github.com/dagu-org/dagu/internal/persis/fileuser"
@@ -410,6 +411,13 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 		hooks.OnAfterToolExec(newAgentAuditHook(auditSvc))
 	}
 
+	var memoryStore agent.MemoryStore
+	if ms, err := filememory.New(paths.DAGsDir); err != nil {
+		logger.Warn(ctx, "Failed to create memory store", tag.Error(err))
+	} else {
+		memoryStore = ms
+	}
+
 	api := agent.NewAPI(agent.APIConfig{
 		ConfigStore:  store,
 		ModelStore:   modelStore,
@@ -418,6 +426,7 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 		SessionStore: sessStore,
 		DAGStore:     dagStore,
 		Hooks:        hooks,
+		MemoryStore:  memoryStore,
 		Environment: agent.EnvironmentInfo{
 			DAGsDir:        paths.DAGsDir,
 			LogDir:         paths.LogDir,

@@ -31,6 +31,27 @@ Status: {{.CurrentDAG.Status}}{{end}}
 {{end}}
 </environment>
 
+{{if or .Memory.GlobalMemory .Memory.DAGMemory}}
+<memory>
+{{if .Memory.GlobalMemory}}
+<global_memory>
+{{.Memory.GlobalMemory}}
+</global_memory>
+{{end}}
+{{if .Memory.DAGMemory}}
+<dag_memory dag="{{.Memory.DAGName}}">
+{{.Memory.DAGMemory}}
+</dag_memory>
+{{end}}
+</memory>
+{{end}}
+
+<memory_paths>
+- Memory directory: {{.Memory.MemoryDir}}
+- Global memory: {{.Memory.MemoryDir}}/MEMORY.md
+{{if .Memory.DAGName}}- DAG memory: {{.Memory.MemoryDir}}/dags/{{.Memory.DAGName}}/MEMORY.md
+{{end}}</memory_paths>
+
 <rules>
 <safety>
 Do not start DAGs unless the user explicitly requests execution—starting a DAG triggers real processes that may have unintended side effects.
@@ -130,6 +151,24 @@ Do not use placeholders unless user explicitly requests dummy data for testing.
 2. Guide the user step-by-step to configure it.
 3. Proceed only after user confirms configuration is complete.
 </configuration>
+
+<memory_management>
+Consult your memory files to build on previous experience.
+When you learn something reusable, record it.
+
+Paths:
+- Global: {{.Memory.MemoryDir}}/MEMORY.md
+- Per-DAG: {{.Memory.MemoryDir}}/dags/<dag-name>/MEMORY.md
+
+Rules:
+- MEMORY.md is loaded into context automatically; keep under 200 lines
+- Use `read` and `patch` to manage memory files
+- Organize by topic, not chronologically
+- Save stable patterns, environment details, user preferences, and debugging insights
+- Do not save session-specific state, secrets, or unverified info
+- When the user says "remember this", save it immediately
+- When the user says "forget this", remove it
+</memory_management>
 
 <schema_reference>
 Use `read_schema` to look up DAG YAML structure:

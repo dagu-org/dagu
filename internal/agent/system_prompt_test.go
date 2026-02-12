@@ -18,7 +18,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			BaseConfigFile: "/config/base.yaml",
 		}
 
-		result := GenerateSystemPrompt(env, nil)
+		result := GenerateSystemPrompt(env, nil, MemoryContent{})
 
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "/dags")
@@ -33,7 +33,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			FilePath: "/dags/test-dag.yaml",
 		}
 
-		result := GenerateSystemPrompt(env, dag)
+		result := GenerateSystemPrompt(env, dag, MemoryContent{})
 
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "test-dag")
@@ -42,9 +42,66 @@ func TestGenerateSystemPrompt(t *testing.T) {
 	t.Run("works with empty environment", func(t *testing.T) {
 		t.Parallel()
 
-		result := GenerateSystemPrompt(EnvironmentInfo{}, nil)
+		result := GenerateSystemPrompt(EnvironmentInfo{}, nil, MemoryContent{})
 
 		assert.NotEmpty(t, result)
+	})
+
+	t.Run("no memory omits memory section", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+
+		result := GenerateSystemPrompt(env, nil, MemoryContent{})
+
+		assert.NotContains(t, result, "<global_memory>")
+		assert.NotContains(t, result, "<dag_memory")
+	})
+
+	t.Run("includes global memory only", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+		mem := MemoryContent{
+			GlobalMemory: "User prefers concise output.",
+			MemoryDir:    "/dags/agent-memory",
+		}
+
+		result := GenerateSystemPrompt(env, nil, mem)
+
+		assert.Contains(t, result, "<global_memory>")
+		assert.Contains(t, result, "User prefers concise output.")
+		assert.NotContains(t, result, "<dag_memory")
+	})
+
+	t.Run("includes both global and DAG memory", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+		mem := MemoryContent{
+			GlobalMemory: "Global info.",
+			DAGMemory:    "DAG-specific info.",
+			DAGName:      "my-etl",
+			MemoryDir:    "/dags/agent-memory",
+		}
+
+		result := GenerateSystemPrompt(env, nil, mem)
+
+		assert.Contains(t, result, "<global_memory>")
+		assert.Contains(t, result, "Global info.")
+		assert.Contains(t, result, `<dag_memory dag="my-etl">`)
+		assert.Contains(t, result, "DAG-specific info.")
+	})
+
+	t.Run("memory paths appear in output", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+		mem := MemoryContent{
+			MemoryDir: "/dags/agent-memory",
+			DAGName:   "test-dag",
+		}
+
+		result := GenerateSystemPrompt(env, nil, mem)
+
+		assert.Contains(t, result, "/dags/agent-memory/MEMORY.md")
+		assert.Contains(t, result, "/dags/agent-memory/dags/test-dag/MEMORY.md")
 	})
 }
 

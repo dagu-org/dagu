@@ -1,0 +1,253 @@
+package filememory
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestNew(t *testing.T) {
+	t.Parallel()
+
+	t.Run("creates directory", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		store, err := New(dir)
+		require.NoError(t, err)
+		require.NotNil(t, store)
+
+		info, err := os.Stat(filepath.Join(dir, agentMemoryDir))
+		require.NoError(t, err)
+		assert.True(t, info.IsDir())
+	})
+
+	t.Run("rejects empty dagsDir", func(t *testing.T) {
+		t.Parallel()
+		store, err := New("")
+		require.Error(t, err)
+		assert.Nil(t, store)
+		assert.Contains(t, err.Error(), "cannot be empty")
+	})
+}
+
+func TestLoadGlobalMemory(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("no file returns empty", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		content, err := store.LoadGlobalMemory(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, content)
+	})
+
+	t.Run("reads existing file", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		expected := "# Global Memory\n\nUser prefers concise output."
+		writeTestFile(t, store.globalMemoryPath(), expected)
+
+		content, err := store.LoadGlobalMemory(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, expected, content)
+	})
+
+	t.Run("truncates at max lines", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+
+		// Create content with more than maxLines
+		lines := make([]string, maxLines+50)
+		for i := range lines {
+			lines[i] = "line content"
+		}
+		writeTestFile(t, store.globalMemoryPath(), strings.Join(lines, "\n"))
+
+		content, err := store.LoadGlobalMemory(ctx)
+		require.NoError(t, err)
+		assert.Contains(t, content, "truncated at 200 lines")
+
+		// Count lines before truncation notice
+		resultLines := strings.Split(content, "\n")
+		// maxLines of content + 1 truncation notice line
+		assert.Equal(t, maxLines+1, len(resultLines))
+	})
+}
+
+func TestLoadDAGMemory(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("no file returns empty", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		content, err := store.LoadDAGMemory(ctx, "my-dag")
+		require.NoError(t, err)
+		assert.Empty(t, content)
+	})
+
+	t.Run("reads existing file", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		expected := "# DAG Memory\n\nThis DAG runs hourly."
+		dagDir := filepath.Join(store.baseDir, dagSubDir, "my-dag")
+		require.NoError(t, os.MkdirAll(dagDir, 0750))
+		writeTestFile(t, filepath.Join(dagDir, memoryFileName), expected)
+
+		content, err := store.LoadDAGMemory(ctx, "my-dag")
+		require.NoError(t, err)
+		assert.Equal(t, expected, content)
+	})
+
+	t.Run("truncates at max lines", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+
+		lines := make([]string, maxLines+10)
+		for i := range lines {
+			lines[i] = "dag line"
+		}
+		dagDir := filepath.Join(store.baseDir, dagSubDir, "big-dag")
+		require.NoError(t, os.MkdirAll(dagDir, 0750))
+		writeTestFile(t, filepath.Join(dagDir, memoryFileName), strings.Join(lines, "\n"))
+
+		content, err := store.LoadDAGMemory(ctx, "big-dag")
+		require.NoError(t, err)
+		assert.Contains(t, content, "truncated at 200 lines")
+	})
+
+	t.Run("rejects path traversal", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+
+		_, err := store.LoadDAGMemory(ctx, "../etc/passwd")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid dagName")
+	})
+
+	t.Run("rejects empty dagName", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+
+		_, err := store.LoadDAGMemory(ctx, "")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot be empty")
+	})
+}
+
+func TestSaveGlobalMemory(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("creates file", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		content := "# Memory\n\nSome info."
+		require.NoError(t, store.SaveGlobalMemory(ctx, content))
+
+		data, err := os.ReadFile(store.globalMemoryPath())
+		require.NoError(t, err)
+		assert.Equal(t, content, string(data))
+	})
+
+	t.Run("overwrites existing", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		require.NoError(t, store.SaveGlobalMemory(ctx, "old content"))
+		require.NoError(t, store.SaveGlobalMemory(ctx, "new content"))
+
+		data, err := os.ReadFile(store.globalMemoryPath())
+		require.NoError(t, err)
+		assert.Equal(t, "new content", string(data))
+	})
+}
+
+func TestSaveDAGMemory(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("creates file and parent dirs", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		content := "# DAG Memory\n\nPipeline details."
+		require.NoError(t, store.SaveDAGMemory(ctx, "my-pipeline", content))
+
+		data, err := os.ReadFile(store.dagMemoryPath("my-pipeline"))
+		require.NoError(t, err)
+		assert.Equal(t, content, string(data))
+	})
+
+	t.Run("overwrites existing", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		require.NoError(t, store.SaveDAGMemory(ctx, "my-dag", "old"))
+		require.NoError(t, store.SaveDAGMemory(ctx, "my-dag", "new"))
+
+		data, err := os.ReadFile(store.dagMemoryPath("my-dag"))
+		require.NoError(t, err)
+		assert.Equal(t, "new", string(data))
+	})
+
+	t.Run("rejects path traversal", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		err := store.SaveDAGMemory(ctx, "../escape", "bad")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid dagName")
+	})
+}
+
+func TestMemoryDir(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	store, err := New(dir)
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(dir, agentMemoryDir), store.MemoryDir())
+}
+
+func TestConcurrentAccess(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store := newTestStore(t)
+
+	var wg sync.WaitGroup
+	for range 20 {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			_ = store.SaveGlobalMemory(ctx, "concurrent write")
+		}()
+		go func() {
+			defer wg.Done()
+			_, _ = store.LoadGlobalMemory(ctx)
+		}()
+	}
+	wg.Wait()
+
+	// Verify file is valid after concurrent access
+	content, err := store.LoadGlobalMemory(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "concurrent write", content)
+}
+
+// newTestStore creates a Store backed by a temporary directory.
+func newTestStore(t *testing.T) *Store {
+	t.Helper()
+	dir := t.TempDir()
+	store, err := New(dir)
+	require.NoError(t, err)
+	return store
+}
+
+// writeTestFile writes content to a file, failing the test on error.
+func writeTestFile(t *testing.T, path, content string) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+}

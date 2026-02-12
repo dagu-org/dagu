@@ -117,6 +117,21 @@ type DAGDiff struct {
 	RemoteMessage string     `json:"remoteMessage,omitempty"`
 }
 
+const agentMemoryDir = "agent-memory"
+
+// isMemoryFile returns true if the file ID belongs to the agent-memory directory.
+func isMemoryFile(id string) bool {
+	return strings.HasPrefix(id, agentMemoryDir+"/")
+}
+
+// fileExtensionForID returns the file extension for a given ID.
+func fileExtensionForID(id string) string {
+	if isMemoryFile(id) {
+		return ".md"
+	}
+	return ".yaml"
+}
+
 // serviceImpl implements the Service interface.
 type serviceImpl struct {
 	cfg          *Config
@@ -200,7 +215,7 @@ func (s *serviceImpl) syncFilesToDAGsDir(_ context.Context, pullResult *PullResu
 	var synced []string
 	var conflicts []string
 
-	extensions := []string{".yaml", ".yml"}
+	extensions := []string{".yaml", ".yml", ".md"}
 	files, err := s.gitClient.ListFiles(extensions)
 	if err != nil {
 		return nil, nil, err
@@ -213,6 +228,11 @@ func (s *serviceImpl) syncFilesToDAGsDir(_ context.Context, pullResult *PullResu
 
 	for _, file := range files {
 		dagID := s.filePathToDAGID(file)
+
+		// Only allow .md files from agent-memory/ directory
+		if filepath.Ext(file) == ".md" && !isMemoryFile(dagID) {
+			continue
+		}
 		repoFilePath := s.gitClient.GetFilePath(file)
 		dagFilePath := s.dagIDToFilePath(dagID)
 
@@ -348,7 +368,52 @@ func (s *serviceImpl) scanLocalDAGs(state *State) error {
 		}
 	}
 
+	// Scan agent-memory directory for .md files
+	s.scanMemoryFiles(state)
+
 	return nil
+}
+
+// scanMemoryFiles scans the agent-memory directory for .md files and adds them as untracked.
+func (s *serviceImpl) scanMemoryFiles(state *State) {
+	memDir := filepath.Join(s.dagsDir, agentMemoryDir)
+
+	_ = filepath.WalkDir(memDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil // skip errors
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) != ".md" {
+			return nil
+		}
+
+		// Compute dagID relative to dagsDir, without extension
+		relPath, err := filepath.Rel(s.dagsDir, path)
+		if err != nil {
+			return nil
+		}
+		dagID := strings.TrimSuffix(relPath, filepath.Ext(relPath))
+
+		// Skip if already tracked
+		if _, exists := state.DAGs[dagID]; exists {
+			return nil
+		}
+
+		content, err := os.ReadFile(path) //nolint:gosec // path constructed from internal dagsDir
+		if err != nil {
+			return nil
+		}
+
+		now := time.Now()
+		state.DAGs[dagID] = &DAGState{
+			Status:     StatusUntracked,
+			LocalHash:  ComputeContentHash(content),
+			ModifiedAt: &now,
+		}
+		return nil
+	})
 }
 
 // refreshLocalHashes recalculates hashes for all tracked DAGs and updates status if modified.
@@ -885,7 +950,8 @@ func (s *serviceImpl) dagIDToFilePath(dagID string) string {
 	if err == nil {
 		dagID = decoded
 	}
-	return filepath.Join(s.dagsDir, dagID+".yaml")
+	ext := fileExtensionForID(dagID)
+	return filepath.Join(s.dagsDir, dagID+ext)
 }
 
 func (s *serviceImpl) dagIDToRepoPath(dagID string) string {
@@ -894,10 +960,11 @@ func (s *serviceImpl) dagIDToRepoPath(dagID string) string {
 	if err == nil {
 		dagID = decoded
 	}
+	ext := fileExtensionForID(dagID)
 	if s.cfg.Path != "" {
-		return filepath.Join(s.cfg.Path, dagID+".yaml")
+		return filepath.Join(s.cfg.Path, dagID+ext)
 	}
-	return dagID + ".yaml"
+	return dagID + ext
 }
 
 func (s *serviceImpl) ensureDir(dir string) error {
