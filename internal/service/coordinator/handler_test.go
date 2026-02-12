@@ -154,8 +154,7 @@ func (m *mockDAGRunAttempt) ReadStatus(_ context.Context) (*exec.DAGRunStatus, e
 		return nil, exec.ErrNoStatusData
 	}
 	// Return a copy to avoid pointer races
-	statusCopy := *m.status
-	return &statusCopy, nil
+	return new(*m.status), nil
 }
 func (m *mockDAGRunAttempt) ReadDAG(_ context.Context) (*core.DAG, error) { return nil, nil }
 func (m *mockDAGRunAttempt) SetDAG(_ *core.DAG)                           {}

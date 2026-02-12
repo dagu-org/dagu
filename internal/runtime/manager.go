@@ -191,8 +191,7 @@ func (m *Manager) GetCurrentStatus(ctx context.Context, dag *core.DAG, dagRunID 
 FALLBACK:
 	if dagRunID == "" {
 		// The DAG is not running so return the default status
-		status := exec.InitialStatus(dag)
-		return &status, nil
+		return new(exec.InitialStatus(dag)), nil
 	}
 	return m.getPersistedOrCurrentStatus(ctx, dag, dagRunID)
 }

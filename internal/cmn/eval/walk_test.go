@@ -441,8 +441,7 @@ func TestStringFields_PointerFieldErrors(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("PointerToStringWithInvalidCommand", func(t *testing.T) {
-		invalidCmd := "`invalid_command_xyz123`"
-		input := StructWithPointerErrors{StringPtr: &invalidCmd}
+		input := StructWithPointerErrors{StringPtr: new("`invalid_command_xyz123`")}
 
 		_, err := StringFields(ctx, input)
 		assert.Error(t, err)

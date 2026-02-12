@@ -167,8 +167,7 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 			currentMax = *chatReq.MaxTokens
 		}
 		if currentMax <= reasoningBudget {
-			newMax := reasoningBudget + 4096
-			chatReq.MaxTokens = &newMax
+			chatReq.MaxTokens = new(reasoningBudget + 4096)
 		}
 	}
 

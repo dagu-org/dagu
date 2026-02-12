@@ -383,8 +383,7 @@ func (s *Store) UpdateLastUsed(_ context.Context, id string) error {
 	}
 
 	// Update timestamp
-	now := time.Now().UTC()
-	key.LastUsedAt = &now
+	key.LastUsedAt = new(time.Now().UTC())
 
 	// Write updated key
 	if err := s.writeAPIKeyToFile(filePath, key); err != nil {

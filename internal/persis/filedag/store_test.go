@@ -496,8 +496,7 @@ steps:
 	}
 
 	// Test pagination
-	paginator := exec.NewPaginator(2, 2) // limit=2, offset=2
-	opts := exec.ListDAGsOptions{Paginator: &paginator}
+	opts := exec.ListDAGsOptions{Paginator: new(exec.NewPaginator(2, 2))}
 	result, errList, err := store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)

@@ -254,8 +254,7 @@ steps:
 			agent := dag.Agent()
 			tt.runFunc(t, th.Context, agent)
 
-			status := agent.Status(th.Context)
-			tt.validateFunc(t, &status)
+			tt.validateFunc(t, new(agent.Status(th.Context)))
 		})
 	}
 }

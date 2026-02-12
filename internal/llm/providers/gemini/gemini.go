@@ -316,8 +316,7 @@ func (p *Provider) buildGenerationConfig(req *llm.ChatRequest) *generationConfig
 			currentMax = *genConfig.MaxOutputTokens
 		}
 		if currentMax <= thinkingBudget {
-			newMax := thinkingBudget + 4096
-			genConfig.MaxOutputTokens = &newMax
+			genConfig.MaxOutputTokens = new(thinkingBudget + 4096)
 			hasConfig = true
 		}
 	}

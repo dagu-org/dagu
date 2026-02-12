@@ -113,8 +113,7 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 		f.workers = append(f.workers, w)
 	}
 
-	dag := coord.DAG(t, yaml)
-	f.dagWrapper = &dag
+	f.dagWrapper = new(coord.DAG(t, yaml))
 
 	return f
 }

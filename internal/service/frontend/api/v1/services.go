@@ -160,14 +160,12 @@ func (a *API) GetTunnelStatus(ctx context.Context, _ api.GetTunnelStatusRequestO
 
 	// Set provider if available
 	if info.Provider != "" {
-		p := api.TunnelStatusResponseProvider(info.Provider)
-		response.Provider = &p
+		response.Provider = new(api.TunnelStatusResponseProvider(info.Provider))
 	}
 
 	// Set startedAt if tunnel has been started
 	if !info.StartedAt.IsZero() {
-		startedAt := info.StartedAt
-		response.StartedAt = &startedAt
+		response.StartedAt = new(info.StartedAt)
 	}
 
 	return response, nil
