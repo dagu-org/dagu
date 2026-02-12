@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -71,26 +70,6 @@ func (a *API) checkSingletonQueued(ctx context.Context, dag *core.DAG) error {
 	return nil
 }
 
-// logDAGAudit logs a DAG-related audit event with the given action and details map.
-func (a *API) logDAGAudit(ctx context.Context, action string, details map[string]any) {
-	if a.auditService == nil {
-		return
-	}
-	currentUser, ok := auth.UserFromContext(ctx)
-	clientIP, _ := auth.ClientIPFromContext(ctx)
-
-	var userID, username string
-	if ok && currentUser != nil {
-		userID = currentUser.ID
-		username = currentUser.Username
-	}
-
-	detailsJSON, _ := json.Marshal(details)
-	entry := audit.NewEntry(audit.CategoryDAG, action, userID, username).
-		WithDetails(string(detailsJSON)).
-		WithIPAddress(clientIP)
-	_ = a.auditService.Log(ctx, entry)
-}
 
 // ValidateDAGSpec implements api.StrictServerInterface.
 func (a *API) ValidateDAGSpec(ctx context.Context, request api.ValidateDAGSpecRequestObject) (api.ValidateDAGSpecResponseObject, error) {
@@ -184,7 +163,7 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 		return nil, fmt.Errorf("error creating DAG: %w", err)
 	}
 
-	a.logDAGAudit(ctx, "dag_create", map[string]any{"dag_name": request.Body.Name})
+	a.logAudit(ctx, audit.CategoryDAG, "dag_create", map[string]any{"dag_name": request.Body.Name})
 
 	return &api.CreateNewDAG201JSONResponse{
 		Name: request.Body.Name,
@@ -217,7 +196,7 @@ func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject)
 		}
 	}
 
-	a.logDAGAudit(ctx, "dag_delete", map[string]any{"dag_name": request.FileName})
+	a.logAudit(ctx, audit.CategoryDAG, "dag_delete", map[string]any{"dag_name": request.FileName})
 
 	return &api.DeleteDAG204Response{}, nil
 }
@@ -280,7 +259,7 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 		}
 	}
 
-	a.logDAGAudit(ctx, "dag_update", map[string]any{"dag_name": request.FileName})
+	a.logAudit(ctx, audit.CategoryDAG, "dag_update", map[string]any{"dag_name": request.FileName})
 
 	return api.UpdateDAGSpec200JSONResponse{
 		Errors: errs,
@@ -330,7 +309,7 @@ func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject)
 		return nil, fmt.Errorf("failed to move DAG: %w", err)
 	}
 
-	a.logDAGAudit(ctx, "dag_rename", map[string]any{
+	a.logAudit(ctx, audit.CategoryDAG, "dag_rename", map[string]any{
 		"old_name": request.FileName,
 		"new_name": request.Body.NewFileName,
 	})
@@ -662,7 +641,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	if params != "" {
 		detailsMap["params"] = params
 	}
-	a.logDAGAudit(ctx, "dag_execute", detailsMap)
+	a.logAudit(ctx, audit.CategoryDAG, "dag_execute", detailsMap)
 
 	return api.ExecuteDAG200JSONResponse{
 		DagRunId: dagRunId,
@@ -738,6 +717,16 @@ func (a *API) ExecuteDAGSync(ctx context.Context, request api.ExecuteDAGSyncRequ
 	if err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, singleton); err != nil {
 		return nil, fmt.Errorf("error starting dag-run: %w", err)
 	}
+
+	detailsMap := map[string]any{
+		"dag_name":   request.FileName,
+		"dag_run_id": dagRunId,
+		"timeout":    timeout,
+	}
+	if params != "" {
+		detailsMap["params"] = params
+	}
+	a.logAudit(ctx, audit.CategoryDAG, "dag_execute_sync", detailsMap)
 
 	dagStatus, err := a.waitForDAGCompletion(ctx, dag, dagRunId, timeout)
 	if err != nil {
@@ -1031,7 +1020,7 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 	if request.Body.Params != nil && *request.Body.Params != "" {
 		enqueueDetails["params"] = *request.Body.Params
 	}
-	a.logDAGAudit(ctx, "dag_enqueue", enqueueDetails)
+	a.logAudit(ctx, audit.CategoryDAG, "dag_enqueue", enqueueDetails)
 
 	return api.EnqueueDAGDAGRun200JSONResponse{
 		DagRunId: dagRunId,
@@ -1095,7 +1084,7 @@ func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDA
 	if !request.Body.Suspend {
 		action = "dag_resume"
 	}
-	a.logDAGAudit(ctx, action, map[string]any{
+	a.logAudit(ctx, audit.CategoryDAG, action, map[string]any{
 		"dag_name":  request.FileName,
 		"suspended": request.Body.Suspend,
 	})
@@ -1178,7 +1167,7 @@ func (a *API) StopAllDAGRuns(ctx context.Context, request api.StopAllDAGRunsRequ
 	}
 
 	if len(stoppedRunIDs) > 0 {
-		a.logDAGAudit(ctx, "dag_stop_all", map[string]any{
+		a.logAudit(ctx, audit.CategoryDAG, "dag_stop_all", map[string]any{
 			"dag_name":        request.FileName,
 			"stopped_run_ids": stoppedRunIDs,
 			"count":           len(stoppedRunIDs),

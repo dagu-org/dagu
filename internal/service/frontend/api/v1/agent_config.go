@@ -86,7 +86,7 @@ func (a *API) UpdateAgentConfig(ctx context.Context, request api.UpdateAgentConf
 		return nil, errFailedToSaveAgentConfig
 	}
 
-	a.logAuditEntry(ctx, audit.CategoryAgent, auditActionAgentConfigUpdate, buildAgentConfigChanges(request.Body))
+	a.logAudit(ctx, audit.CategoryAgent, auditActionAgentConfigUpdate, buildAgentConfigChanges(request.Body))
 
 	return api.UpdateAgentConfig200JSONResponse(toAgentConfigResponse(cfg)), nil
 }

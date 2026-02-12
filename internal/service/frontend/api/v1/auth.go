@@ -60,12 +60,7 @@ func (a *API) Login(ctx context.Context, request api.LoginRequestObject) (api.Lo
 		return nil, err
 	}
 
-	// Log successful login
-	if a.auditService != nil {
-		entry := audit.NewEntry(audit.CategoryUser, "login", user.ID, user.Username).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
-	}
+	a.logAudit(ctx, audit.CategoryUser, "login", nil)
 
 	return api.Login200JSONResponse{
 		Token:     tokenResult.Token,
@@ -130,13 +125,7 @@ func (a *API) ChangePassword(ctx context.Context, request api.ChangePasswordRequ
 		return nil, err
 	}
 
-	// Log successful password change
-	if a.auditService != nil {
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		entry := audit.NewEntry(audit.CategoryUser, "password_change", user.ID, user.Username).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
-	}
+	a.logAudit(ctx, audit.CategoryUser, "password_change", nil)
 
 	return api.ChangePassword200JSONResponse{
 		Message: "Password changed successfully",
