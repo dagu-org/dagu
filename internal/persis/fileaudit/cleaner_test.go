@@ -174,9 +174,11 @@ func TestPurgeExpiredFiles_NonexistentDirectory(t *testing.T) {
 func TestPurgeExpiredFiles_LogsCleanupAuditEntry(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create an expired file
-	expiredDate := time.Now().UTC().AddDate(0, 0, -30).Format(dateFormat)
-	createTestFile(t, dir, expiredDate+auditFileExtension)
+	// Create two expired files with known dates
+	oldDate := time.Now().UTC().AddDate(0, 0, -30).Format(dateFormat)
+	olderDate := time.Now().UTC().AddDate(0, 0, -31).Format(dateFormat)
+	createTestFile(t, dir, oldDate+auditFileExtension)
+	createTestFile(t, dir, olderDate+auditFileExtension)
 
 	var mu sync.Mutex
 	var entries []*audit.Entry
@@ -195,8 +197,10 @@ func TestPurgeExpiredFiles_LogsCleanupAuditEntry(t *testing.T) {
 	assert.Equal(t, "audit_cleanup", entries[0].Action)
 	assert.Equal(t, "", entries[0].UserID)
 	assert.Equal(t, "system", entries[0].Username)
-	assert.Contains(t, entries[0].Details, `"files_removed":1`)
+	assert.Contains(t, entries[0].Details, `"files_removed":2`)
 	assert.Contains(t, entries[0].Details, `"retention_days":7`)
+	assert.Contains(t, entries[0].Details, `"purged_from"`)
+	assert.Contains(t, entries[0].Details, `"purged_to"`)
 }
 
 func TestPurgeExpiredFiles_NoEntryWhenNothingPurged(t *testing.T) {

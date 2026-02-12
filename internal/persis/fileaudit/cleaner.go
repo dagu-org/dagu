@@ -85,7 +85,7 @@ func (c *cleaner) purgeExpiredFiles() {
 	cutoff := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).
 		AddDate(0, 0, -c.retentionDays)
 
-	removed := 0
+	var purgedDates []string
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -110,18 +110,20 @@ func (c *cleaner) purgeExpiredFiles() {
 					slog.String("error", err.Error()))
 				continue
 			}
-			removed++
+			purgedDates = append(purgedDates, datePart)
 		}
 	}
 
-	if removed > 0 {
+	if len(purgedDates) > 0 {
 		slog.Info("fileaudit: purged expired audit log files",
-			slog.Int("removed", removed),
+			slog.Int("removed", len(purgedDates)),
 			slog.Int("retentionDays", c.retentionDays))
 
 		if c.appendFn != nil {
 			details, _ := json.Marshal(map[string]any{
-				"files_removed":  removed,
+				"purged_from":    purgedDates[0],
+				"purged_to":      purgedDates[len(purgedDates)-1],
+				"files_removed":  len(purgedDates),
 				"retention_days": c.retentionDays,
 			})
 			entry := audit.NewEntry(audit.CategorySystem, "audit_cleanup", "", "system").
