@@ -1,11 +1,14 @@
 package fileaudit
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/service/audit"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -147,9 +150,7 @@ func TestPurgeExpiredFiles_ZeroRetentionSkipsCleanup(t *testing.T) {
 }
 
 func TestCleaner_StopIsIdempotent(t *testing.T) {
-	dir := t.TempDir()
-
-	c := newCleaner(dir, 7)
+	c := newTestCleaner(t.TempDir(), 7)
 
 	// Calling stop multiple times should not panic
 	assert.NotPanics(t, func() {
@@ -166,6 +167,57 @@ func TestPurgeExpiredFiles_NonexistentDirectory(t *testing.T) {
 	assert.NotPanics(t, func() {
 		c.purgeExpiredFiles()
 	})
+}
+
+func TestPurgeExpiredFiles_LogsCleanupAuditEntry(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create two expired files with known dates
+	oldDate := time.Now().UTC().AddDate(0, 0, -30).Format(dateFormat)
+	olderDate := time.Now().UTC().AddDate(0, 0, -31).Format(dateFormat)
+	createTestFile(t, dir, oldDate+auditFileExtension)
+	createTestFile(t, dir, olderDate+auditFileExtension)
+
+	var mu sync.Mutex
+	var entries []*audit.Entry
+	fn := func(_ context.Context, entry *audit.Entry) error {
+		mu.Lock()
+		defer mu.Unlock()
+		entries = append(entries, entry)
+		return nil
+	}
+
+	c := &cleaner{baseDir: dir, retentionDays: 7, appendFn: fn, stopCh: make(chan struct{})}
+	c.purgeExpiredFiles()
+
+	require.Len(t, entries, 1)
+	assert.Equal(t, audit.CategorySystem, entries[0].Category)
+	assert.Equal(t, "audit_cleanup", entries[0].Action)
+	assert.Equal(t, "", entries[0].UserID)
+	assert.Equal(t, "system", entries[0].Username)
+	assert.Contains(t, entries[0].Details, `"files_removed":2`)
+	assert.Contains(t, entries[0].Details, `"retention_days":7`)
+	assert.Contains(t, entries[0].Details, `"purged_from"`)
+	assert.Contains(t, entries[0].Details, `"purged_to"`)
+}
+
+func TestPurgeExpiredFiles_NoEntryWhenNothingPurged(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create only a recent file — nothing to purge
+	recentDate := time.Now().UTC().AddDate(0, 0, -1).Format(dateFormat)
+	createTestFile(t, dir, recentDate+auditFileExtension)
+
+	called := false
+	fn := func(_ context.Context, _ *audit.Entry) error {
+		called = true
+		return nil
+	}
+
+	c := &cleaner{baseDir: dir, retentionDays: 7, appendFn: fn, stopCh: make(chan struct{})}
+	c.purgeExpiredFiles()
+
+	assert.False(t, called, "appendFn should not be called when no files are purged")
 }
 
 func TestPurgeExpiredFiles_BoundaryDate(t *testing.T) {

@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -36,27 +35,6 @@ var filenameUnsafeChars = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
 
 func sanitizeFilename(s string) string {
 	return filenameUnsafeChars.ReplaceAllString(s, "_")
-}
-
-// logDAGRunAudit logs a DAG-run related audit event.
-func (a *API) logDAGRunAudit(ctx context.Context, action string, details map[string]any) {
-	if a.auditService == nil {
-		return
-	}
-	currentUser, ok := auth.UserFromContext(ctx)
-	clientIP, _ := auth.ClientIPFromContext(ctx)
-
-	var userID, username string
-	if ok && currentUser != nil {
-		userID = currentUser.ID
-		username = currentUser.Username
-	}
-
-	detailsJSON, _ := json.Marshal(details)
-	entry := audit.NewEntry(audit.CategoryDAG, action, userID, username).
-		WithDetails(string(detailsJSON)).
-		WithIPAddress(clientIP)
-	_ = a.auditService.Log(ctx, entry)
 }
 
 // buildLogReadOptions constructs LogReadOptions from request parameters.
@@ -133,7 +111,7 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 	if params != "" {
 		detailsMap["params"] = params
 	}
-	a.logDAGRunAudit(ctx, "dag_execute", detailsMap)
+	a.logAudit(ctx, audit.CategoryDAG, "dag_execute", detailsMap)
 
 	return api.ExecuteDAGRunFromSpec200JSONResponse{
 		DagRunId: dagRunId,
@@ -202,7 +180,7 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 	if params != "" {
 		detailsMap["params"] = params
 	}
-	a.logDAGRunAudit(ctx, "dag_enqueue", detailsMap)
+	a.logAudit(ctx, audit.CategoryDAG, "dag_enqueue", detailsMap)
 
 	return api.EnqueueDAGRunFromSpec200JSONResponse{
 		DagRunId: dagRunId,
@@ -618,6 +596,13 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 	if err := a.dagRunMgr.UpdateStatus(ctx, ref, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
+
+	a.logAudit(ctx, audit.CategoryDAG, "dag_step_status_update", map[string]any{
+		"dag_name":   request.Name,
+		"dag_run_id": request.DagRunId,
+		"step_name":  request.StepName,
+		"new_status": nodeStatusMapping[request.Body.Status].String(),
+	})
 
 	return &api.UpdateDAGRunStepStatus200Response{}, nil
 }
@@ -1257,6 +1242,14 @@ func (a *API) UpdateSubDAGRunStepStatus(ctx context.Context, request api.UpdateS
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
 
+	a.logAudit(ctx, audit.CategoryDAG, "sub_dag_step_status_update", map[string]any{
+		"dag_name":       request.Name,
+		"dag_run_id":     request.DagRunId,
+		"sub_dag_run_id": request.SubDAGRunId,
+		"step_name":      request.StepName,
+		"new_status":     nodeStatusMapping[request.Body.Status].String(),
+	})
+
 	return &api.UpdateSubDAGRunStepStatus200Response{}, nil
 }
 
@@ -1349,7 +1342,7 @@ func (a *API) logRetryAudit(ctx context.Context, dagName, dagRunID, stepName str
 	if stepName != "" {
 		detailsMap["step_name"] = stepName
 	}
-	a.logDAGRunAudit(ctx, "dag_retry", detailsMap)
+	a.logAudit(ctx, audit.CategoryDAG, "dag_retry", detailsMap)
 }
 
 func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRequestObject) (api.TerminateDAGRunResponseObject, error) {
@@ -1430,7 +1423,7 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 		}
 	}
 
-	a.logDAGRunAudit(ctx, "dag_terminate", map[string]any{
+	a.logAudit(ctx, audit.CategoryDAG, "dag_terminate", map[string]any{
 		"dag_name":   request.Name,
 		"dag_run_id": request.DagRunId,
 	})
@@ -1479,7 +1472,7 @@ func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunReques
 		return nil, fmt.Errorf("error dequeueing dag-run: %w", err)
 	}
 
-	a.logDAGRunAudit(ctx, "dag_dequeue", map[string]any{
+	a.logAudit(ctx, audit.CategoryDAG, "dag_dequeue", map[string]any{
 		"dag_name":   request.Name,
 		"dag_run_id": request.DagRunId,
 	})
@@ -1595,7 +1588,7 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 	if nameOverride != "" {
 		detailsMap["name_override"] = nameOverride
 	}
-	a.logDAGRunAudit(ctx, "dag_reschedule", detailsMap)
+	a.logAudit(ctx, audit.CategoryDAG, "dag_reschedule", detailsMap)
 
 	return api.RescheduleDAGRun200JSONResponse{
 		DagRunId: newDagRunID,
@@ -1765,7 +1758,7 @@ func (a *API) logStepApproval(ctx context.Context, dagName, dagRunID, subDAGRunI
 		action = "sub_dag_step_approve"
 	}
 
-	a.logDAGRunAudit(ctx, action, detailsMap)
+	a.logAudit(ctx, audit.CategoryDAG, action, detailsMap)
 }
 
 func (a *API) logStepRejection(ctx context.Context, dagName, dagRunID, subDAGRunID, stepName string, reason *string) {
@@ -1786,7 +1779,7 @@ func (a *API) logStepRejection(ctx context.Context, dagName, dagRunID, subDAGRun
 		action = "sub_dag_step_reject"
 	}
 
-	a.logDAGRunAudit(ctx, action, detailsMap)
+	a.logAudit(ctx, audit.CategoryDAG, action, detailsMap)
 }
 
 func findStepByName(nodes []*exec.Node, stepName string) int {

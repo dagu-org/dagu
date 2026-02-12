@@ -148,7 +148,7 @@ func (a *API) CreateAgentModel(ctx context.Context, request api.CreateAgentModel
 	// If this is the first model, auto-set as default
 	a.autoSetDefaultModel(ctx, id)
 
-	a.logAuditEntry(ctx, audit.CategoryAgent, auditActionModelCreate, map[string]any{
+	a.logAudit(ctx, audit.CategoryAgent, auditActionModelCreate, map[string]any{
 		"model_id": id,
 		"name":     body.Name,
 		"provider": string(body.Provider),
@@ -196,7 +196,7 @@ func (a *API) UpdateAgentModel(ctx context.Context, request api.UpdateAgentModel
 		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to update model", HTTPStatus: http.StatusInternalServerError}
 	}
 
-	a.logAuditEntry(ctx, audit.CategoryAgent, auditActionModelUpdate, map[string]any{
+	a.logAudit(ctx, audit.CategoryAgent, auditActionModelUpdate, map[string]any{
 		"model_id": request.ModelId,
 	})
 
@@ -223,7 +223,7 @@ func (a *API) DeleteAgentModel(ctx context.Context, request api.DeleteAgentModel
 	// If deleted model was default, reset to first remaining
 	a.resetDefaultIfNeeded(ctx, request.ModelId)
 
-	a.logAuditEntry(ctx, audit.CategoryAgent, auditActionModelDelete, map[string]any{
+	a.logAudit(ctx, audit.CategoryAgent, auditActionModelDelete, map[string]any{
 		"model_id": request.ModelId,
 	})
 
@@ -262,7 +262,7 @@ func (a *API) SetDefaultAgentModel(ctx context.Context, request api.SetDefaultAg
 		return nil, errFailedToSaveAgentConfig
 	}
 
-	a.logAuditEntry(ctx, audit.CategoryAgent, auditActionModelSetDef, map[string]any{
+	a.logAudit(ctx, audit.CategoryAgent, auditActionModelSetDef, map[string]any{
 		"model_id": modelID,
 	})
 

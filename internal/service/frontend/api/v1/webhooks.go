@@ -118,7 +118,7 @@ func (a *API) CreateDAGWebhook(ctx context.Context, request api.CreateDAGWebhook
 	}
 
 	logger.Info(ctx, "Webhook created", tag.Name(request.FileName))
-	a.logWebhookAudit(ctx, "webhook_create", map[string]string{
+	a.logAudit(ctx, audit.CategoryWebhook, "webhook_create", map[string]any{
 		"dag_name":   request.FileName,
 		"webhook_id": result.Webhook.ID,
 	})
@@ -157,11 +157,11 @@ func (a *API) DeleteDAGWebhook(ctx context.Context, request api.DeleteDAGWebhook
 	}
 
 	logger.Info(ctx, "Webhook deleted", tag.Name(request.FileName))
-	auditDetails := map[string]string{"dag_name": request.FileName}
+	auditDetails := map[string]any{"dag_name": request.FileName}
 	if targetWebhook != nil {
 		auditDetails["webhook_id"] = targetWebhook.ID
 	}
-	a.logWebhookAudit(ctx, "webhook_delete", auditDetails)
+	a.logAudit(ctx, audit.CategoryWebhook, "webhook_delete", auditDetails)
 
 	return api.DeleteDAGWebhook204Response{}, nil
 }
@@ -191,7 +191,7 @@ func (a *API) RegenerateDAGWebhookToken(ctx context.Context, request api.Regener
 	}
 
 	logger.Info(ctx, "Webhook token regenerated", tag.Name(request.FileName))
-	a.logWebhookAudit(ctx, "webhook_token_regenerate", map[string]string{
+	a.logAudit(ctx, audit.CategoryWebhook, "webhook_token_regenerate", map[string]any{
 		"dag_name":   request.FileName,
 		"webhook_id": result.Webhook.ID,
 	})
@@ -230,7 +230,7 @@ func (a *API) ToggleDAGWebhook(ctx context.Context, request api.ToggleDAGWebhook
 		tag.Name(request.FileName),
 		tag.Key("enabled"), tag.Value(request.Body.Enabled),
 	)
-	a.logWebhookAudit(ctx, "webhook_toggle", map[string]any{
+	a.logAudit(ctx, audit.CategoryWebhook, "webhook_toggle", map[string]any{
 		"dag_name":   request.FileName,
 		"webhook_id": webhook.ID,
 		"enabled":    request.Body.Enabled,
@@ -443,31 +443,6 @@ func getCreatorID(ctx context.Context) string {
 		return user.ID
 	}
 	return "system"
-}
-
-// logWebhookAudit logs a webhook-related audit entry with the given action and details.
-func (a *API) logWebhookAudit(ctx context.Context, action string, details any) {
-	if a.auditService == nil {
-		return
-	}
-	currentUser, ok := auth.UserFromContext(ctx)
-	clientIP, _ := auth.ClientIPFromContext(ctx)
-
-	var userID, username string
-	if ok && currentUser != nil {
-		userID = currentUser.ID
-		username = currentUser.Username
-	}
-
-	detailsJSON, err := json.Marshal(details)
-	if err != nil {
-		logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
-		detailsJSON = []byte("{}")
-	}
-	entry := audit.NewEntry(audit.CategoryWebhook, action, userID, username).
-		WithDetails(string(detailsJSON)).
-		WithIPAddress(clientIP)
-	_ = a.auditService.Log(ctx, entry)
 }
 
 // marshalWebhookPayload returns the JSON representation of the webhook payload.

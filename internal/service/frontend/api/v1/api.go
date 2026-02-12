@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"path"
 	"reflect"
@@ -469,22 +470,44 @@ func (a *API) requireUserManagement() error {
 	return nil
 }
 
-// logAuditEntry logs an audit entry with the specified category and action details.
-// It silently returns if the audit service is not configured or if no user is present in the context.
-func (a *API) logAuditEntry(ctx context.Context, category audit.Category, action string, details any) {
-	user, ok := auth.UserFromContext(ctx)
-	if a.auditService == nil || !ok {
+// logAudit logs an audit entry with the specified category, action, and details.
+// It silently returns if the audit service is not configured.
+// User and IP are extracted from context; missing user is allowed (recorded as empty).
+func (a *API) logAudit(ctx context.Context, category audit.Category, action string, details any) {
+	if a.auditService == nil {
 		return
 	}
 
-	detailsJSON, _ := json.Marshal(details)
+	var userID, username string
+	if user, ok := auth.UserFromContext(ctx); ok && user != nil {
+		userID = user.ID
+		username = user.Username
+	}
+
 	clientIP, _ := auth.ClientIPFromContext(ctx)
 
-	entry := audit.NewEntry(category, action, user.ID, user.Username).
-		WithDetails(string(detailsJSON)).
+	var detailsStr string
+	if details != nil {
+		detailsJSON, err := json.Marshal(details)
+		if err != nil {
+			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+			detailsStr = "{}"
+		} else {
+			detailsStr = string(detailsJSON)
+		}
+	}
+
+	entry := audit.NewEntry(category, action, userID, username).
+		WithDetails(detailsStr).
 		WithIPAddress(clientIP)
 
-	_ = a.auditService.Log(ctx, entry)
+	if err := a.auditService.Log(ctx, entry); err != nil {
+		logger.Warn(ctx, "Failed to write audit log",
+			tag.Error(err),
+			slog.String("action", action),
+			slog.String("category", string(category)),
+		)
+	}
 }
 
 // ptrOf returns a pointer to v, or nil if v is the zero value for its type.

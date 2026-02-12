@@ -101,7 +101,7 @@ func (a *API) SyncPull(ctx context.Context, _ api.SyncPullRequestObject) (api.Sy
 		return nil, internalError(err)
 	}
 
-	a.logAuditEntry(ctx, audit.CategoryGitSync, "sync_pull", map[string]any{
+	a.logAudit(ctx, audit.CategoryGitSync, "sync_pull", map[string]any{
 		"synced":    result.Synced,
 		"modified":  result.Modified,
 		"conflicts": result.Conflicts,
@@ -132,7 +132,7 @@ func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestO
 		return nil, internalError(err)
 	}
 
-	a.logAuditEntry(ctx, audit.CategoryGitSync, "sync_publish_all", map[string]any{
+	a.logAudit(ctx, audit.CategoryGitSync, "sync_publish_all", map[string]any{
 		"message":  message,
 		"synced":   result.Synced,
 		"modified": result.Modified,
@@ -240,7 +240,7 @@ func (a *API) UpdateSyncConfig(ctx context.Context, req api.UpdateSyncConfigRequ
 		return nil, internalError(err)
 	}
 
-	a.logAuditEntry(ctx, audit.CategoryGitSync, "sync_config_update", map[string]any{
+	a.logAudit(ctx, audit.CategoryGitSync, "sync_config_update", map[string]any{
 		"enabled":      cfg.Enabled,
 		"repository":   cfg.Repository,
 		"branch":       cfg.Branch,
@@ -266,7 +266,7 @@ func (a *API) PublishDag(ctx context.Context, req api.PublishDagRequestObject) (
 		return handlePublishError(err)
 	}
 
-	a.logAuditEntry(ctx, audit.CategoryGitSync, "sync_publish", map[string]any{
+	a.logAudit(ctx, audit.CategoryGitSync, "sync_publish", map[string]any{
 		"dag_id":  req.Name,
 		"message": message,
 		"force":   force,
@@ -294,7 +294,7 @@ func (a *API) DiscardDagChanges(ctx context.Context, req api.DiscardDagChangesRe
 		return nil, internalError(err)
 	}
 
-	a.logAuditEntry(ctx, audit.CategoryGitSync, "sync_discard", map[string]string{"dag_id": req.Name})
+	a.logAudit(ctx, audit.CategoryGitSync, "sync_discard", map[string]any{"dag_id": req.Name})
 
 	return api.DiscardDagChanges200JSONResponse{
 		Message: "Changes discarded successfully",
