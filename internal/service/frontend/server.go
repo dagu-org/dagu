@@ -39,7 +39,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
-	"github.com/dagu-org/dagu/internal/persis/fileconversation"
+	"github.com/dagu-org/dagu/internal/persis/filesession"
 	"github.com/dagu-org/dagu/internal/persis/fileupgradecheck"
 	"github.com/dagu-org/dagu/internal/persis/fileuser"
 	"github.com/dagu-org/dagu/internal/persis/filewebhook"
@@ -400,9 +400,9 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 // initAgentAPI creates and returns an agent API.
 // The API uses the config store to check enabled status and resolve providers via the model store.
 func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, paths *config.PathsConfig, dagStore exec.DAGStore, auditSvc *audit.Service) (*agent.API, error) {
-	convStore, err := fileconversation.New(paths.ConversationsDir)
+	sessStore, err := filesession.New(paths.SessionsDir)
 	if err != nil {
-		logger.Warn(ctx, "Failed to create conversation store, persistence disabled", tag.Error(err))
+		logger.Warn(ctx, "Failed to create session store, persistence disabled", tag.Error(err))
 	}
 
 	hooks := agent.NewHooks()
@@ -411,13 +411,13 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 	}
 
 	api := agent.NewAPI(agent.APIConfig{
-		ConfigStore:       store,
-		ModelStore:        modelStore,
-		WorkingDir:        paths.DAGsDir,
-		Logger:            slog.Default(),
-		ConversationStore: convStore,
-		DAGStore:          dagStore,
-		Hooks:             hooks,
+		ConfigStore:  store,
+		ModelStore:   modelStore,
+		WorkingDir:   paths.DAGsDir,
+		Logger:       slog.Default(),
+		SessionStore: sessStore,
+		DAGStore:     dagStore,
+		Hooks:        hooks,
 		Environment: agent.EnvironmentInfo{
 			DAGsDir:        paths.DAGsDir,
 			LogDir:         paths.LogDir,
@@ -449,7 +449,7 @@ func newAgentAuditHook(auditSvc *audit.Service) agent.AfterToolExecHookFunc {
 		if result.IsError {
 			details["failed"] = true
 		}
-		details["conversation_id"] = info.ConversationID
+		details["session_id"] = info.SessionID
 
 		detailsJSON, _ := json.Marshal(details)
 		entry := audit.NewEntry(audit.CategoryAgent, info.Audit.Action, info.UserID, info.Username).

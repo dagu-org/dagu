@@ -93,7 +93,7 @@ type RunParams struct {
 	Params string
 }
 
-// ChatMessageHandler is an interface for executors that handle chat conversation messages.
+// ChatMessageHandler is an interface for executors that handle chat session messages.
 type ChatMessageHandler interface {
 	SetContext([]exec.LLMMessage)
 	GetMessages() []exec.LLMMessage

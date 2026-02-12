@@ -4,7 +4,7 @@ package llm
 
 import "time"
 
-// Role represents the role of a message sender in a conversation.
+// Role represents the role of a message sender in a session.
 type Role string
 
 const (
@@ -49,7 +49,7 @@ func ParseRole(s string) Role {
 	}
 }
 
-// Message represents a single message in a conversation.
+// Message represents a single message in a session.
 type Message struct {
 	// Role identifies who sent the message (system, user, assistant, or tool).
 	Role Role `json:"role"`
@@ -165,7 +165,7 @@ type ThinkingRequest struct {
 type ChatRequest struct {
 	// Model is the identifier of the model to use.
 	Model string
-	// Messages is the conversation history to send to the model.
+	// Messages is the session history to send to the model.
 	Messages []Message
 	// Temperature controls randomness in the response (0.0 to 2.0).
 	// Lower values make output more deterministic.

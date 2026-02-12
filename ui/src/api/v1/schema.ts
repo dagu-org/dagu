@@ -1725,10 +1725,10 @@ export interface components {
             /** @description Whether the DAG run was re-enqueued for execution */
             resumed: boolean;
         };
-        /** @description A single chat message in an LLM conversation */
+        /** @description A single chat message in an LLM session */
         ChatMessage: {
             /**
-             * @description Message role in the conversation
+             * @description Message role in the session
              * @enum {string}
              */
             role: ChatMessageRole;

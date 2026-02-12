@@ -6,28 +6,28 @@ import {
 } from 'react';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import type {
-  ConversationState,
-  ConversationWithState,
+  SessionState,
+  SessionWithState,
   Message,
 } from '../types';
 
 interface AgentChatContextType {
   isOpen: boolean;
-  conversationId: string | null;
+  sessionId: string | null;
   messages: Message[];
   pendingUserMessage: string | null;
-  conversationState: ConversationState | null;
-  conversations: ConversationWithState[];
+  sessionState: SessionState | null;
+  sessions: SessionWithState[];
   openChat: () => void;
   closeChat: () => void;
   toggleChat: () => void;
-  setConversationId: (id: string | null) => void;
+  setSessionId: (id: string | null) => void;
   setMessages: Dispatch<SetStateAction<Message[]>>;
-  setConversationState: (state: ConversationState | null) => void;
-  setConversations: (conversations: ConversationWithState[]) => void;
+  setSessionState: (state: SessionState | null) => void;
+  setSessions: (sessions: SessionWithState[]) => void;
   addMessage: (message: Message) => void;
   setPendingUserMessage: (message: string | null) => void;
-  clearConversation: () => void;
+  clearSession: () => void;
 }
 
 interface AgentChatProviderProps {
@@ -38,12 +38,12 @@ const AgentChatContext = createContext<AgentChatContextType | null>(null);
 
 export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNode {
   const [isOpen, setIsOpen] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
-  const [conversationState, setConversationState] =
-    useState<ConversationState | null>(null);
-  const [conversations, setConversations] = useState<ConversationWithState[]>(
+  const [sessionState, setSessionState] =
+    useState<SessionState | null>(null);
+  const [sessions, setSessions] = useState<SessionWithState[]>(
     []
   );
 
@@ -71,32 +71,32 @@ export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNo
     });
   }, []);
 
-  const clearConversation = useCallback(() => {
-    setConversationId(null);
+  const clearSession = useCallback(() => {
+    setSessionId(null);
     setMessages([]);
     setPendingUserMessage(null);
-    setConversationState(null);
+    setSessionState(null);
   }, []);
 
   return (
     <AgentChatContext.Provider
       value={{
         isOpen,
-        conversationId,
+        sessionId,
         messages,
         pendingUserMessage,
-        conversationState,
-        conversations,
+        sessionState,
+        sessions,
         openChat,
         closeChat,
         toggleChat,
-        setConversationId,
+        setSessionId,
         setMessages,
-        setConversationState,
-        setConversations,
+        setSessionState,
+        setSessions,
         addMessage,
         setPendingUserMessage,
-        clearConversation,
+        clearSession,
       }}
     >
       {children}

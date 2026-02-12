@@ -63,7 +63,7 @@ type NodeState struct {
 	// OutputVariables stores the output variables for the following steps.
 	// It only contains the local output variables.
 	OutputVariables *collections.SyncMap
-	// ChatMessages stores the chat conversation messages for message passing between steps.
+	// ChatMessages stores the chat session messages for message passing between steps.
 	ChatMessages []exec.LLMMessage
 	// ToolDefinitions stores the tool definitions that were available to the LLM during execution.
 	// This provides visibility into what tools/functions the LLM could call.
@@ -498,14 +498,14 @@ func (d *Data) MarkError(err error) {
 	d.inner.State.Status = core.NodeFailed
 }
 
-// SetChatMessages sets the chat conversation messages for the node.
+// SetChatMessages sets the chat session messages for the node.
 func (d *Data) SetChatMessages(messages []exec.LLMMessage) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.inner.State.ChatMessages = messages
 }
 
-// GetChatMessages returns the chat conversation messages for the node.
+// GetChatMessages returns the chat session messages for the node.
 func (d *Data) GetChatMessages() []exec.LLMMessage {
 	d.mu.RLock()
 	defer d.mu.RUnlock()

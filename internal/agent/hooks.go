@@ -7,13 +7,13 @@ import (
 
 // ToolExecInfo provides context about a tool execution for hooks.
 type ToolExecInfo struct {
-	ToolName       string
-	Input          json.RawMessage
-	ConversationID string
-	UserID         string
-	Username       string
-	IPAddress      string
-	Audit          *AuditInfo // from AgentTool.Audit; nil = not audited
+	ToolName  string
+	Input     json.RawMessage
+	SessionID string
+	UserID    string
+	Username  string
+	IPAddress string
+	Audit     *AuditInfo // from AgentTool.Audit; nil = not audited
 }
 
 // BeforeToolExecHookFunc is called before tool execution.

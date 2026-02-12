@@ -1,22 +1,22 @@
 ---
 id: "003"
-title: "Agent Conversation History Management"
+title: "Agent Session History Management"
 status: draft
 ---
 
-# RFC 003: Agent Conversation History Management
+# RFC 003: Agent Session History Management
 
 ## Summary
 
-Improve how agent conversation history is stored, retrieved, and displayed to support long-running conversations efficiently.
+Improve how agent session history is stored, retrieved, and displayed to support long-running sessions efficiently.
 
 ## Motivation
 
 Currently:
-1. All messages are loaded at once regardless of conversation length
-2. UI becomes slow and unresponsive with large conversations
+1. All messages are loaded at once regardless of session length
+2. UI becomes slow and unresponsive with large sessions
 3. No mechanism to incrementally load historical messages
-4. Memory usage grows unbounded with conversation length
+4. Memory usage grows unbounded with session length
 
 ## Proposal
 
@@ -29,7 +29,7 @@ Support paginated message retrieval:
 
 ### API Changes
 
-Add optional parameters to conversation retrieval:
+Add optional parameters to session retrieval:
 
 | Parameter | Description |
 |-----------|-------------|
@@ -49,17 +49,17 @@ Response includes:
 
 ### Store Interface
 
-Add paginated retrieval to `ConversationStore`:
+Add paginated retrieval to `SessionStore`:
 ```
-GetMessagesPaginated(ctx, conversationID, beforeSequenceID, limit) -> (messages, hasMore, error)
+GetMessagesPaginated(ctx, sessionID, beforeSequenceID, limit) -> (messages, hasMore, error)
 ```
 
 ## Future Considerations
 
-1. **Conversation archival**: Auto-archive old conversations
+1. **Session archival**: Auto-archive old sessions
 2. **Message retention**: Configurable retention policies
-3. **Conversation search**: Search across message history
-4. **Export**: Export conversation history
+3. **Session search**: Search across message history
+4. **Export**: Export session history
 
 ## Security Considerations
 

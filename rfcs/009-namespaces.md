@@ -219,7 +219,7 @@ The AI agent becomes namespace-aware. When a user interacts with the agent, the 
 
 - **Tool permissions follow namespace RBAC** — the agent's `bash`, `patch`, and `read` tools are restricted to DAGs and files within the active namespace, enforced by the user's namespace role (not their global role)
 - **DAG context is namespace-scoped** — when the agent references or operates on DAGs, it resolves names within the active namespace by default
-- **No cross-namespace operations** — the agent cannot access DAGs or files outside the active namespace; users must start a new conversation to work in a different namespace
+- **No cross-namespace operations** — the agent cannot access DAGs or files outside the active namespace; users must start a new session to work in a different namespace
 - **System prompt includes namespace context** — the LLM is informed of the active namespace, the user's role within it, and available DAGs scoped to that namespace
 
 Example agent interaction:
@@ -234,7 +234,7 @@ Agent:
   → Cannot access DAGs outside team-alpha
 ```
 
-Each conversation is locked to the namespace in which it was started. The agent cannot switch namespaces mid-conversation. Users must start a new conversation to work in a different namespace. Conversation history is visible across namespaces the user has access to, but each conversation is tagged with its originating namespace.
+Each session is locked to the namespace in which it was started. The agent cannot switch namespaces mid-session. Users must start a new session to work in a different namespace. Session history is visible across namespaces the user has access to, but each session is tagged with its originating namespace.
 
 Audit logging (RFC 002) includes the namespace in every agent action record for traceability.
 
@@ -245,7 +245,7 @@ Existing installations upgrade seamlessly:
 1. All current DAGs are moved into `default/` subdirectory
 2. All current run data is moved into `default/` subdirectory (dag-runs, proc, queue, suspend flags)
 3. Git sync state is moved into `default/` subdirectory
-4. Agent conversation history is tagged with the `default` namespace
+4. Agent session history is tagged with the `default` namespace
 5. Existing users receive their current global role unchanged
 6. No configuration changes are required
 
@@ -257,7 +257,7 @@ An automatic migration runs on first startup after upgrade.
 2. **No cross-namespace triggers** — DAGs cannot trigger or reference DAGs in other namespaces. All `run` references resolve within the same namespace. This avoids complex cross-namespace dependency graphs.
 3. **Secrets are per-namespace by default** — secrets are configured in `baseConfig` which is already namespace-scoped. No additional mechanism needed.
 4. **Git sync pushes independently per namespace** — when multiple namespaces share the same git repository, each namespace pushes independently. No coordination between namespaces.
-5. **Agent conversations are locked to a single namespace** — the agent cannot switch namespaces mid-conversation. Users start a new conversation to work in a different namespace.
+5. **Agent sessions are locked to a single namespace** — the agent cannot switch namespaces mid-session. Users start a new session to work in a different namespace.
 
 ## Out of Scope
 

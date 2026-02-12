@@ -27,19 +27,19 @@ func TestHooks_AfterToolExec(t *testing.T) {
 	})
 
 	info := ToolExecInfo{
-		ToolName:       "bash",
-		Input:          json.RawMessage(`{"command":"ls"}`),
-		ConversationID: "conv-1",
-		UserID:         "user-1",
-		Username:       "alice",
-		IPAddress:      "10.0.0.1",
+		ToolName:  "bash",
+		Input:     json.RawMessage(`{"command":"ls"}`),
+		SessionID: "sess-1",
+		UserID:    "user-1",
+		Username:  "alice",
+		IPAddress: "10.0.0.1",
 	}
 	result := ToolOut{Content: "file.txt", IsError: false}
 
 	hooks.RunAfterToolExec(context.Background(), info, result)
 
 	assert.Equal(t, "bash", captured.info.ToolName)
-	assert.Equal(t, "conv-1", captured.info.ConversationID)
+	assert.Equal(t, "sess-1", captured.info.SessionID)
 	assert.Equal(t, "user-1", captured.info.UserID)
 	assert.Equal(t, "alice", captured.info.Username)
 	assert.Equal(t, "10.0.0.1", captured.info.IPAddress)

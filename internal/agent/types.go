@@ -9,7 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
-// MessageType identifies the type of message in a conversation.
+// MessageType identifies the type of message in a session.
 type MessageType string
 
 // PromptType identifies the type of user prompt.
@@ -87,15 +87,15 @@ type UserPromptResponse struct {
 	Cancelled bool `json:"cancelled,omitempty"`
 }
 
-// Message represents a message in a conversation.
+// Message represents a message in a session.
 type Message struct {
 	// ID is the unique identifier for this message.
 	ID string `json:"id"`
-	// ConversationID links this message to its parent conversation.
-	ConversationID string `json:"conversation_id"`
+	// SessionID links this message to its parent session.
+	SessionID string `json:"session_id"`
 	// Type identifies the message type (user, assistant, error, ui_action, user_prompt).
 	Type MessageType `json:"type"`
-	// SequenceID orders messages within a conversation.
+	// SequenceID orders messages within a session.
 	SequenceID int64 `json:"sequence_id"`
 	// Content is the text content of the message.
 	Content string `json:"content,omitempty"`
@@ -127,29 +127,29 @@ type ToolResult struct {
 	IsError bool `json:"is_error,omitempty"`
 }
 
-// Conversation represents a chat conversation with metadata.
-type Conversation struct {
-	// ID is the unique identifier for this conversation.
+// Session represents a chat session with metadata.
+type Session struct {
+	// ID is the unique identifier for this session.
 	ID string `json:"id"`
-	// UserID identifies the user who owns this conversation.
+	// UserID identifies the user who owns this session.
 	UserID string `json:"user_id,omitempty"`
-	// Title is a human-readable name for the conversation.
+	// Title is a human-readable name for the session.
 	Title string `json:"title,omitempty"`
-	// CreatedAt is when this conversation was created.
+	// CreatedAt is when this session was created.
 	CreatedAt time.Time `json:"created_at"`
-	// UpdatedAt is when this conversation was last modified.
+	// UpdatedAt is when this session was last modified.
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// ConversationState represents the current state of a conversation.
-type ConversationState struct {
-	// ConversationID identifies which conversation this state belongs to.
-	ConversationID string `json:"conversation_id"`
+// SessionState represents the current state of a session.
+type SessionState struct {
+	// SessionID identifies which session this state belongs to.
+	SessionID string `json:"session_id"`
 	// Working indicates whether the agent is currently processing.
 	Working bool `json:"working"`
-	// Model is the LLM model being used for this conversation.
+	// Model is the LLM model being used for this session.
 	Model string `json:"model,omitempty"`
-	// TotalCost is the accumulated cost of the conversation in USD.
+	// TotalCost is the accumulated cost of the session in USD.
 	TotalCost float64 `json:"total_cost"`
 }
 
@@ -157,10 +157,10 @@ type ConversationState struct {
 type StreamResponse struct {
 	// Messages contains new or updated messages.
 	Messages []Message `json:"messages,omitempty"`
-	// Conversation contains conversation metadata updates.
-	Conversation *Conversation `json:"conversation,omitempty"`
-	// ConversationState contains the current processing state.
-	ConversationState *ConversationState `json:"conversation_state,omitempty"`
+	// Session contains session metadata updates.
+	Session *Session `json:"session,omitempty"`
+	// SessionState contains the current processing state.
+	SessionState *SessionState `json:"session_state,omitempty"`
 }
 
 // DAGContext contains a DAG reference from the frontend.
@@ -195,10 +195,10 @@ type ResolvedDAGContext struct {
 	RunStatus string
 }
 
-// NewConversationResponse is the response for creating a new conversation.
-type NewConversationResponse struct {
-	// ConversationID is the ID of the newly created conversation.
-	ConversationID string `json:"conversation_id"`
+// NewSessionResponse is the response for creating a new session.
+type NewSessionResponse struct {
+	// SessionID is the ID of the newly created session.
+	SessionID string `json:"session_id"`
 	// Status indicates the result of the creation request.
 	Status string `json:"status"`
 }

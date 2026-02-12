@@ -149,11 +149,11 @@ func (m *mockModelStore) addModel(model *ModelConfig) *mockModelStore {
 
 var _ ModelStore = (*mockModelStore)(nil)
 
-// mockConversationStore implements ConversationStore for testing.
-type mockConversationStore struct {
-	conversations map[string]*Conversation
-	messages      map[string][]Message
-	mu            sync.Mutex
+// mockSessionStore implements SessionStore for testing.
+type mockSessionStore struct {
+	sessions map[string]*Session
+	messages map[string][]Message
+	mu       sync.Mutex
 
 	createErr      error
 	getErr         error
@@ -165,57 +165,57 @@ type mockConversationStore struct {
 	getSeqIDErr    error
 }
 
-func newMockConversationStore() *mockConversationStore {
-	return &mockConversationStore{
-		conversations: make(map[string]*Conversation),
-		messages:      make(map[string][]Message),
+func newMockSessionStore() *mockSessionStore {
+	return &mockSessionStore{
+		sessions: make(map[string]*Session),
+		messages: make(map[string][]Message),
 	}
 }
 
-func (m *mockConversationStore) requireConversation(id string) error {
-	if _, exists := m.conversations[id]; !exists {
-		return ErrConversationNotFound
+func (m *mockSessionStore) requireSession(id string) error {
+	if _, exists := m.sessions[id]; !exists {
+		return ErrSessionNotFound
 	}
 	return nil
 }
 
-func (m *mockConversationStore) CreateConversation(_ context.Context, conv *Conversation) error {
+func (m *mockSessionStore) CreateSession(_ context.Context, sess *Session) error {
 	if m.createErr != nil {
 		return m.createErr
 	}
-	if conv.ID == "" {
-		return ErrInvalidConversationID
+	if sess.ID == "" {
+		return ErrInvalidSessionID
 	}
-	if conv.UserID == "" {
+	if sess.UserID == "" {
 		return ErrInvalidUserID
 	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.conversations[conv.ID] = conv
-	m.messages[conv.ID] = []Message{}
+	m.sessions[sess.ID] = sess
+	m.messages[sess.ID] = []Message{}
 	return nil
 }
 
-func (m *mockConversationStore) GetConversation(_ context.Context, id string) (*Conversation, error) {
+func (m *mockSessionStore) GetSession(_ context.Context, id string) (*Session, error) {
 	if m.getErr != nil {
 		return nil, m.getErr
 	}
 	if id == "" {
-		return nil, ErrInvalidConversationID
+		return nil, ErrInvalidSessionID
 	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if err := m.requireConversation(id); err != nil {
+	if err := m.requireSession(id); err != nil {
 		return nil, err
 	}
-	return m.conversations[id], nil
+	return m.sessions[id], nil
 }
 
-func (m *mockConversationStore) ListConversations(_ context.Context, userID string) ([]*Conversation, error) {
+func (m *mockSessionStore) ListSessions(_ context.Context, userID string) ([]*Session, error) {
 	if m.listErr != nil {
 		return nil, m.listErr
 	}
@@ -226,16 +226,16 @@ func (m *mockConversationStore) ListConversations(_ context.Context, userID stri
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	var result []*Conversation
-	for _, conv := range m.conversations {
-		if conv.UserID == userID {
-			result = append(result, conv)
+	var result []*Session
+	for _, sess := range m.sessions {
+		if sess.UserID == userID {
+			result = append(result, sess)
 		}
 	}
 	return result, nil
 }
 
-func (m *mockConversationStore) UpdateConversation(_ context.Context, conv *Conversation) error {
+func (m *mockSessionStore) UpdateSession(_ context.Context, sess *Session) error {
 	if m.updateErr != nil {
 		return m.updateErr
 	}
@@ -243,84 +243,84 @@ func (m *mockConversationStore) UpdateConversation(_ context.Context, conv *Conv
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if err := m.requireConversation(conv.ID); err != nil {
+	if err := m.requireSession(sess.ID); err != nil {
 		return err
 	}
-	m.conversations[conv.ID] = conv
+	m.sessions[sess.ID] = sess
 	return nil
 }
 
-func (m *mockConversationStore) DeleteConversation(_ context.Context, id string) error {
+func (m *mockSessionStore) DeleteSession(_ context.Context, id string) error {
 	if m.deleteErr != nil {
 		return m.deleteErr
 	}
 	if id == "" {
-		return ErrInvalidConversationID
+		return ErrInvalidSessionID
 	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if err := m.requireConversation(id); err != nil {
+	if err := m.requireSession(id); err != nil {
 		return err
 	}
-	delete(m.conversations, id)
+	delete(m.sessions, id)
 	delete(m.messages, id)
 	return nil
 }
 
-func (m *mockConversationStore) AddMessage(_ context.Context, conversationID string, msg *Message) error {
+func (m *mockSessionStore) AddMessage(_ context.Context, sessionID string, msg *Message) error {
 	if m.addMessageErr != nil {
 		return m.addMessageErr
 	}
-	if conversationID == "" {
-		return ErrInvalidConversationID
+	if sessionID == "" {
+		return ErrInvalidSessionID
 	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if err := m.requireConversation(conversationID); err != nil {
+	if err := m.requireSession(sessionID); err != nil {
 		return err
 	}
-	m.messages[conversationID] = append(m.messages[conversationID], *msg)
+	m.messages[sessionID] = append(m.messages[sessionID], *msg)
 	return nil
 }
 
-func (m *mockConversationStore) GetMessages(_ context.Context, conversationID string) ([]Message, error) {
+func (m *mockSessionStore) GetMessages(_ context.Context, sessionID string) ([]Message, error) {
 	if m.getMessagesErr != nil {
 		return nil, m.getMessagesErr
 	}
-	if conversationID == "" {
-		return nil, ErrInvalidConversationID
+	if sessionID == "" {
+		return nil, ErrInvalidSessionID
 	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if err := m.requireConversation(conversationID); err != nil {
+	if err := m.requireSession(sessionID); err != nil {
 		return nil, err
 	}
-	return m.messages[conversationID], nil
+	return m.messages[sessionID], nil
 }
 
-func (m *mockConversationStore) GetLatestSequenceID(_ context.Context, conversationID string) (int64, error) {
+func (m *mockSessionStore) GetLatestSequenceID(_ context.Context, sessionID string) (int64, error) {
 	if m.getSeqIDErr != nil {
 		return 0, m.getSeqIDErr
 	}
-	if conversationID == "" {
-		return 0, ErrInvalidConversationID
+	if sessionID == "" {
+		return 0, ErrInvalidSessionID
 	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if err := m.requireConversation(conversationID); err != nil {
+	if err := m.requireSession(sessionID); err != nil {
 		return 0, err
 	}
 
 	var maxSeq int64
-	for _, msg := range m.messages[conversationID] {
+	for _, msg := range m.messages[sessionID] {
 		if msg.SequenceID > maxSeq {
 			maxSeq = msg.SequenceID
 		}
@@ -328,15 +328,15 @@ func (m *mockConversationStore) GetLatestSequenceID(_ context.Context, conversat
 	return maxSeq, nil
 }
 
-// HasConversation checks if a conversation exists without returning an error.
-func (m *mockConversationStore) HasConversation(id string) bool {
+// HasSession checks if a session exists without returning an error.
+func (m *mockSessionStore) HasSession(id string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	_, exists := m.conversations[id]
+	_, exists := m.sessions[id]
 	return exists
 }
 
-var _ ConversationStore = (*mockConversationStore)(nil)
+var _ SessionStore = (*mockSessionStore)(nil)
 
 // newStopProvider creates a mock provider that returns a simple stop response.
 func newStopProvider(content string) *mockLLMProvider {

@@ -1,4 +1,4 @@
-// Package chat provides an executor for chat (LLM-based conversation) steps.
+// Package chat provides an executor for chat (LLM-based session) steps.
 package chat
 
 import (
@@ -139,12 +139,12 @@ func (e *Executor) Kill(sig os.Signal) error {
 	return nil
 }
 
-// SetContext sets the conversation context from prior steps.
+// SetContext sets the session context from prior steps.
 func (e *Executor) SetContext(messages []exec.LLMMessage) {
 	e.contextMessages = messages
 }
 
-// GetMessages returns the complete conversation messages after execution.
+// GetMessages returns the complete session messages after execution.
 // This includes inherited messages, step messages, and the assistant response.
 func (e *Executor) GetMessages() []exec.LLMMessage {
 	return e.savedMessages
@@ -529,7 +529,7 @@ func (e *Executor) runSimpleForModel(ctx context.Context, provider llmpkg.Provid
 		metadata.TotalTokens = usage.TotalTokens
 	}
 
-	// Save full conversation (inherited + step messages + response)
+	// Save full session (inherited + step messages + response)
 	e.savedMessages = append(allMessages, exec.LLMMessage{
 		Role:     exec.RoleAssistant,
 		Content:  responseContent,
@@ -543,7 +543,7 @@ func (e *Executor) runSimpleForModel(ctx context.Context, provider llmpkg.Provid
 // It implements a multi-turn loop where:
 // 1. Send messages + tools to LLM
 // 2. If LLM requests tool calls, execute them
-// 3. Add tool results to conversation
+// 3. Add tool results to session
 // 4. Repeat until LLM provides final response (no more tool calls) or max iterations
 func (e *Executor) runWithToolsForModel(ctx context.Context, provider llmpkg.Provider, allMessages []exec.LLMMessage, cfg *core.LLMConfig) error {
 	maxIterations := cfg.GetMaxToolIterations()
@@ -571,28 +571,28 @@ func (e *Executor) runWithToolsForModel(ctx context.Context, provider llmpkg.Pro
 	)
 
 	// Working copy of messages for the tool loop
-	conversationMessages := make([]exec.LLMMessage, len(allMessages))
-	copy(conversationMessages, allMessages)
+	sessionMessages := make([]exec.LLMMessage, len(allMessages))
+	copy(sessionMessages, allMessages)
 
 	for iteration := 0; iteration < maxIterations; iteration++ {
 		var done bool
 		var err error
-		conversationMessages, done, err = e.executeToolStep(ctx, provider, cfg, tools, conversationMessages, iteration)
+		sessionMessages, done, err = e.executeToolStep(ctx, provider, cfg, tools, sessionMessages, iteration)
 		if err != nil {
 			return err
 		}
 		if done {
-			e.savedMessages = conversationMessages
+			e.savedMessages = sessionMessages
 			return nil
 		}
 	}
 
 	// Max iterations reached
-	return e.handleMaxIterationsReached(ctx, maxIterations, conversationMessages)
+	return e.handleMaxIterationsReached(ctx, maxIterations, sessionMessages)
 }
 
 // executeToolStep performs a single iteration of the tool execution loop.
-// Returns updated messages, whether the conversation is done, and any error.
+// Returns updated messages, whether the session is done, and any error.
 func (e *Executor) executeToolStep(
 	ctx context.Context,
 	provider llmpkg.Provider,

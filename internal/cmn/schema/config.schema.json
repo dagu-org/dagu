@@ -476,9 +476,9 @@
           "type": "string",
           "description": "Directory for webhook configuration."
         },
-        "conversationsDir": {
+        "sessionsDir": {
           "type": "string",
-          "description": "Directory for conversation data storage."
+          "description": "Directory for session data storage."
         }
       }
     },

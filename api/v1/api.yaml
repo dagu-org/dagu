@@ -4162,12 +4162,12 @@ components:
 
     ChatMessage:
       type: object
-      description: "A single chat message in an LLM conversation"
+      description: "A single chat message in an LLM session"
       properties:
         role:
           type: string
           enum: [system, user, assistant, tool]
-          description: "Message role in the conversation"
+          description: "Message role in the session"
         content:
           type: string
           description: "Message content"

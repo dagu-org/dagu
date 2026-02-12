@@ -97,7 +97,7 @@ type Step struct {
 	// LLM contains the configuration for LLM-based executors (chat, agent, etc.).
 	// Used with explicit type: chat (or future type: agent).
 	LLM *LLMConfig `json:"llm,omitempty"`
-	// Messages contains the conversation messages for chat executor.
+	// Messages contains the session messages for chat executor.
 	// Only used when type is "chat".
 	Messages []LLMMessage `json:"messages,omitempty"`
 	// Router contains the routing configuration for router-type steps.
