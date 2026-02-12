@@ -1656,6 +1656,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/agent/memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get agent memory
+         * @description Returns global memory content and list of DAGs with memory. Requires admin role.
+         */
+        get: operations["getAgentMemory"];
+        /**
+         * Update global agent memory
+         * @description Updates the global MEMORY.md content. Requires admin role.
+         */
+        put: operations["updateAgentMemory"];
+        post?: never;
+        /**
+         * Clear global agent memory
+         * @description Deletes the global MEMORY.md file. Requires admin role.
+         */
+        delete: operations["deleteAgentMemory"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/agent/memory/dags/{dagName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get DAG-specific agent memory
+         * @description Returns memory content for a specific DAG. Requires admin role.
+         */
+        get: operations["getAgentDAGMemory"];
+        /**
+         * Update DAG-specific agent memory
+         * @description Updates the memory content for a specific DAG. Requires admin role.
+         */
+        put: operations["updateAgentDAGMemory"];
+        post?: never;
+        /**
+         * Clear DAG-specific agent memory
+         * @description Deletes the memory file for a specific DAG. Requires admin role.
+         */
+        delete: operations["deleteAgentDAGMemory"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/agent/model-presets": {
         parameters: {
             query?: never;
@@ -2951,6 +3007,25 @@ export interface components {
         /** @description List of model presets */
         ListModelPresetsResponse: {
             presets: components["schemas"]["ModelPreset"][];
+        };
+        /** @description Agent memory overview */
+        AgentMemoryResponse: {
+            /** @description Content of global MEMORY.md */
+            globalMemory?: string;
+            /** @description List of DAG names that have memory files */
+            dagMemories?: string[];
+            /** @description Root memory directory path */
+            memoryDir?: string;
+        };
+        /** @description DAG-specific memory content */
+        AgentDAGMemoryResponse: {
+            dagName: string;
+            content: string;
+        };
+        /** @description Request to update memory content */
+        UpdateAgentMemoryRequest: {
+            /** @description New memory content (markdown) */
+            content: string;
         };
     };
     responses: never;
@@ -7749,6 +7824,333 @@ export interface operations {
             };
             /** @description Model not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getAgentMemory: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Agent memory overview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentMemoryResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateAgentMemory: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentMemoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Memory updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteAgentMemory: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Memory cleared successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getAgentDAGMemory: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description Name of the DAG */
+                dagName: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description DAG memory content */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDAGMemoryResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateAgentDAGMemory: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description Name of the DAG */
+                dagName: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentMemoryRequest"];
+            };
+        };
+        responses: {
+            /** @description DAG memory updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteAgentDAGMemory: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description Name of the DAG */
+                dagName: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description DAG memory cleared successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

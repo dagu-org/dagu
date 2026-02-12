@@ -19,6 +19,15 @@ type MemoryStore interface {
 
 	// MemoryDir returns the root memory directory path.
 	MemoryDir() string
+
+	// ListDAGMemories returns the names of all DAGs that have memory files.
+	ListDAGMemories(ctx context.Context) ([]string, error)
+
+	// DeleteGlobalMemory removes the global MEMORY.md file.
+	DeleteGlobalMemory(ctx context.Context) error
+
+	// DeleteDAGMemory removes a DAG-specific MEMORY.md file.
+	DeleteDAGMemory(ctx context.Context, dagName string) error
 }
 
 // MemoryContent holds loaded memory for system prompt injection.

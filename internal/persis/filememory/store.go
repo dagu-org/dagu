@@ -17,7 +17,7 @@ import (
 var _ agent.MemoryStore = (*Store)(nil)
 
 const (
-	agentMemoryDir  = "agent-memory"
+	agentMemoryDir  = "memory"
 	dagSubDir       = "dags"
 	memoryFileName  = "MEMORY.md"
 	maxLines        = 200
@@ -26,16 +26,16 @@ const (
 )
 
 // Store implements a file-based memory store for the agent.
-// Memory files are stored under {dagsDir}/agent-memory/.
+// Memory files are stored under {dagsDir}/memory/.
 // Thread-safe through internal locking.
 type Store struct {
-	baseDir string // {dagsDir}/agent-memory
+	baseDir string // {dagsDir}/memory
 	mu      sync.RWMutex
 }
 
 // New creates a new file-based agent memory store.
 // The dagsDir is the DAGs directory (e.g., ~/.config/dagu/dags).
-// The memory files will be stored under {dagsDir}/agent-memory/.
+// The memory files will be stored under {dagsDir}/memory/.
 func New(dagsDir string) (*Store, error) {
 	if dagsDir == "" {
 		return nil, errors.New("filememory: dagsDir cannot be empty")
@@ -99,6 +99,63 @@ func (s *Store) SaveDAGMemory(_ context.Context, dagName string, content string)
 // MemoryDir returns the root memory directory path.
 func (s *Store) MemoryDir() string {
 	return s.baseDir
+}
+
+// ListDAGMemories returns the names of all DAGs that have memory files.
+func (s *Store) ListDAGMemories(_ context.Context) ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	dagsDir := filepath.Join(s.baseDir, dagSubDir)
+	entries, err := os.ReadDir(dagsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("filememory: failed to read dags directory: %w", err)
+	}
+
+	var names []string
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		memPath := filepath.Join(dagsDir, entry.Name(), memoryFileName)
+		if _, err := os.Stat(memPath); err == nil {
+			names = append(names, entry.Name())
+		}
+	}
+
+	return names, nil
+}
+
+// DeleteGlobalMemory removes the global MEMORY.md file.
+func (s *Store) DeleteGlobalMemory(_ context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	err := os.Remove(s.globalMemoryPath())
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("filememory: failed to delete global memory: %w", err)
+	}
+	return nil
+}
+
+// DeleteDAGMemory removes a DAG-specific MEMORY.md file and its directory.
+func (s *Store) DeleteDAGMemory(_ context.Context, dagName string) error {
+	if err := s.validateDAGName(dagName); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	dagDir := filepath.Join(s.baseDir, dagSubDir, dagName)
+	err := os.RemoveAll(dagDir)
+	if err != nil {
+		return fmt.Errorf("filememory: failed to delete DAG memory directory: %w", err)
+	}
+	return nil
 }
 
 // readMemoryFile reads a memory file and truncates it to maxLines.

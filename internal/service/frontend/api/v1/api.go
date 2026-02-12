@@ -59,6 +59,7 @@ type API struct {
 	dagWritesDisabled  bool // True when git sync read-only mode is active
 	agentConfigStore   agent.ConfigStore
 	agentModelStore    agent.ModelStore
+	agentMemoryStore   agent.MemoryStore
 }
 
 // AuthService defines the interface for authentication operations.
@@ -136,6 +137,13 @@ func WithAgentConfigStore(store agent.ConfigStore) APIOption {
 func WithAgentModelStore(store agent.ModelStore) APIOption {
 	return func(a *API) {
 		a.agentModelStore = store
+	}
+}
+
+// WithAgentMemoryStore returns an APIOption that sets the API's agent memory store.
+func WithAgentMemoryStore(store agent.MemoryStore) APIOption {
+	return func(a *API) {
+		a.agentMemoryStore = store
 	}
 }
 

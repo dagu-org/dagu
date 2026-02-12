@@ -117,9 +117,9 @@ type DAGDiff struct {
 	RemoteMessage string     `json:"remoteMessage,omitempty"`
 }
 
-const agentMemoryDir = "agent-memory"
+const agentMemoryDir = "memory"
 
-// isMemoryFile returns true if the file ID belongs to the agent-memory directory.
+// isMemoryFile returns true if the file ID belongs to the memory directory.
 func isMemoryFile(id string) bool {
 	return strings.HasPrefix(id, agentMemoryDir+"/")
 }
@@ -229,7 +229,7 @@ func (s *serviceImpl) syncFilesToDAGsDir(_ context.Context, pullResult *PullResu
 	for _, file := range files {
 		dagID := s.filePathToDAGID(file)
 
-		// Only allow .md files from agent-memory/ directory
+		// Only allow .md files from memory/ directory
 		if filepath.Ext(file) == ".md" && !isMemoryFile(dagID) {
 			continue
 		}
@@ -368,13 +368,13 @@ func (s *serviceImpl) scanLocalDAGs(state *State) error {
 		}
 	}
 
-	// Scan agent-memory directory for .md files
+	// Scan memory directory for .md files
 	s.scanMemoryFiles(state)
 
 	return nil
 }
 
-// scanMemoryFiles scans the agent-memory directory for .md files and adds them as untracked.
+// scanMemoryFiles scans the memory directory for .md files and adds them as untracked.
 func (s *serviceImpl) scanMemoryFiles(state *State) {
 	memDir := filepath.Join(s.dagsDir, agentMemoryDir)
 

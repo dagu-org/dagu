@@ -3867,6 +3867,241 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /settings/agent/memory:
+    get:
+      summary: "Get agent memory"
+      description: "Returns global memory content and list of DAGs with memory. Requires admin role."
+      operationId: "getAgentMemory"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Agent memory overview"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentMemoryResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      summary: "Update global agent memory"
+      description: "Updates the global MEMORY.md content. Requires admin role."
+      operationId: "updateAgentMemory"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentMemoryRequest"
+      responses:
+        "200":
+          description: "Memory updated successfully"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Clear global agent memory"
+      description: "Deletes the global MEMORY.md file. Requires admin role."
+      operationId: "deleteAgentMemory"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Memory cleared successfully"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/agent/memory/dags/{dagName}:
+    get:
+      summary: "Get DAG-specific agent memory"
+      description: "Returns memory content for a specific DAG. Requires admin role."
+      operationId: "getAgentDAGMemory"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: dagName
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          description: "Name of the DAG"
+      responses:
+        "200":
+          description: "DAG memory content"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentDAGMemoryResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      summary: "Update DAG-specific agent memory"
+      description: "Updates the memory content for a specific DAG. Requires admin role."
+      operationId: "updateAgentDAGMemory"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: dagName
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          description: "Name of the DAG"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentMemoryRequest"
+      responses:
+        "200":
+          description: "DAG memory updated successfully"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Clear DAG-specific agent memory"
+      description: "Deletes the memory file for a specific DAG. Requires admin role."
+      operationId: "deleteAgentDAGMemory"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: dagName
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          description: "Name of the DAG"
+      responses:
+        "200":
+          description: "DAG memory cleared successfully"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /settings/agent/model-presets:
     get:
       summary: "List model presets"
@@ -6501,6 +6736,44 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ModelPreset"
+
+    AgentMemoryResponse:
+      type: object
+      description: "Agent memory overview"
+      properties:
+        globalMemory:
+          type: string
+          description: "Content of global MEMORY.md"
+        dagMemories:
+          type: array
+          items:
+            type: string
+          description: "List of DAG names that have memory files"
+        memoryDir:
+          type: string
+          description: "Root memory directory path"
+
+    AgentDAGMemoryResponse:
+      type: object
+      required:
+        - dagName
+        - content
+      description: "DAG-specific memory content"
+      properties:
+        dagName:
+          type: string
+        content:
+          type: string
+
+    UpdateAgentMemoryRequest:
+      type: object
+      required:
+        - content
+      description: "Request to update memory content"
+      properties:
+        content:
+          type: string
+          description: "New memory content (markdown)"
 
 # Apply security requirements globally
 security:

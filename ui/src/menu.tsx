@@ -14,6 +14,7 @@ import {
   Activity,
   BarChart2,
   Bot,
+  Brain,
   GitBranch,
   Globe,
   History,
@@ -452,6 +453,16 @@ export const mainListItems = React.forwardRef<
                 onClick={onNavItemClick}
                 customColor={customColor}
               />
+              {config.agentEnabled && (
+                <NavItem
+                  to="/agent-memory"
+                  text="Agent Memory"
+                  icon={<Brain size={18} />}
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+              )}
             </div>
           )}
 

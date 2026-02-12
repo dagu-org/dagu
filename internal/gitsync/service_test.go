@@ -59,17 +59,17 @@ func TestService_PathHelpers(t *testing.T) {
 func TestIsMemoryFile(t *testing.T) {
 	t.Parallel()
 
-	assert.True(t, isMemoryFile("agent-memory/MEMORY"))
-	assert.True(t, isMemoryFile("agent-memory/dags/my-dag/MEMORY"))
+	assert.True(t, isMemoryFile("memory/MEMORY"))
+	assert.True(t, isMemoryFile("memory/dags/my-dag/MEMORY"))
 	assert.False(t, isMemoryFile("my-dag"))
-	assert.False(t, isMemoryFile("agent-memoryfile"))
+	assert.False(t, isMemoryFile("memoryfile"))
 }
 
 func TestFileExtensionForID(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, ".md", fileExtensionForID("agent-memory/MEMORY"))
-	assert.Equal(t, ".md", fileExtensionForID("agent-memory/dags/my-dag/MEMORY"))
+	assert.Equal(t, ".md", fileExtensionForID("memory/MEMORY"))
+	assert.Equal(t, ".md", fileExtensionForID("memory/dags/my-dag/MEMORY"))
 	assert.Equal(t, ".yaml", fileExtensionForID("my-dag"))
 	assert.Equal(t, ".yaml", fileExtensionForID("subdir/my-dag"))
 }
@@ -85,14 +85,14 @@ func TestDagIDToFilePath_MemoryFiles(t *testing.T) {
 
 	// Memory file
 	assert.Equal(t,
-		filepath.Join("/dags", "agent-memory", "MEMORY.md"),
-		s.dagIDToFilePath("agent-memory/MEMORY"),
+		filepath.Join("/dags", "memory", "MEMORY.md"),
+		s.dagIDToFilePath("memory/MEMORY"),
 	)
 
 	// DAG-specific memory
 	assert.Equal(t,
-		filepath.Join("/dags", "agent-memory", "dags", "my-dag", "MEMORY.md"),
-		s.dagIDToFilePath("agent-memory/dags/my-dag/MEMORY"),
+		filepath.Join("/dags", "memory", "dags", "my-dag", "MEMORY.md"),
+		s.dagIDToFilePath("memory/dags/my-dag/MEMORY"),
 	)
 }
 
@@ -107,8 +107,8 @@ func TestDagIDToRepoPath_MemoryFiles(t *testing.T) {
 
 	// Memory file
 	assert.Equal(t,
-		filepath.Join("subdir", "agent-memory", "MEMORY.md"),
-		s.dagIDToRepoPath("agent-memory/MEMORY"),
+		filepath.Join("subdir", "memory", "MEMORY.md"),
+		s.dagIDToRepoPath("memory/MEMORY"),
 	)
 }
 
@@ -119,8 +119,8 @@ func TestScanMemoryFiles(t *testing.T) {
 		cfg:     &Config{},
 	}
 
-	// Create agent-memory directory with files
-	memDir := filepath.Join(tempDir, "agent-memory")
+	// Create memory directory with files
+	memDir := filepath.Join(tempDir, "memory")
 	require.NoError(t, os.MkdirAll(memDir, 0750))
 	require.NoError(t, os.WriteFile(filepath.Join(memDir, "MEMORY.md"), []byte("global memory"), 0600))
 
@@ -132,12 +132,12 @@ func TestScanMemoryFiles(t *testing.T) {
 	s.scanMemoryFiles(state)
 
 	// Should find global memory
-	globalID := filepath.Join("agent-memory", "MEMORY")
+	globalID := filepath.Join("memory", "MEMORY")
 	assert.Contains(t, state.DAGs, globalID)
 	assert.Equal(t, StatusUntracked, state.DAGs[globalID].Status)
 
 	// Should find per-DAG memory
-	dagID := filepath.Join("agent-memory", "dags", "my-dag", "MEMORY")
+	dagID := filepath.Join("memory", "dags", "my-dag", "MEMORY")
 	assert.Contains(t, state.DAGs, dagID)
 	assert.Equal(t, StatusUntracked, state.DAGs[dagID].Status)
 }

@@ -62,7 +62,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		env := EnvironmentInfo{DAGsDir: "/dags"}
 		mem := MemoryContent{
 			GlobalMemory: "User prefers concise output.",
-			MemoryDir:    "/dags/agent-memory",
+			MemoryDir:    "/dags/memory",
 		}
 
 		result := GenerateSystemPrompt(env, nil, mem)
@@ -79,7 +79,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			GlobalMemory: "Global info.",
 			DAGMemory:    "DAG-specific info.",
 			DAGName:      "my-etl",
-			MemoryDir:    "/dags/agent-memory",
+			MemoryDir:    "/dags/memory",
 		}
 
 		result := GenerateSystemPrompt(env, nil, mem)
@@ -94,14 +94,14 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{DAGsDir: "/dags"}
 		mem := MemoryContent{
-			MemoryDir: "/dags/agent-memory",
+			MemoryDir: "/dags/memory",
 			DAGName:   "test-dag",
 		}
 
 		result := GenerateSystemPrompt(env, nil, mem)
 
-		assert.Contains(t, result, "/dags/agent-memory/MEMORY.md")
-		assert.Contains(t, result, "/dags/agent-memory/dags/test-dag/MEMORY.md")
+		assert.Contains(t, result, "/dags/memory/MEMORY.md")
+		assert.Contains(t, result, "/dags/memory/dags/test-dag/MEMORY.md")
 	})
 }
 

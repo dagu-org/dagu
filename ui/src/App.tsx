@@ -21,6 +21,7 @@ import { AgentChatModal, AgentChatProvider } from './features/agent';
 import Layout from './layouts/Layout';
 import fetchJson from './lib/fetchJson';
 import Dashboard from './pages';
+import AgentMemoryPage from './pages/agent-memory';
 import AgentSettingsPage from './pages/agent-settings';
 import APIKeysPage from './pages/api-keys';
 import AuditLogsPage from './pages/audit-logs';
@@ -156,6 +157,7 @@ function AppInner({ config }: Props): React.ReactElement {
                                         <Route path="/audit-logs" element={<AdminElement><AuditLogsPage /></AdminElement>} />
                                         <Route path="/git-sync" element={<AdminElement><GitSyncPage /></AdminElement>} />
                                         <Route path="/agent-settings" element={<AdminElement><AgentSettingsPage /></AdminElement>} />
+                                        <Route path="/agent-memory" element={<AdminElement><AgentMemoryPage /></AdminElement>} />
                                       </Routes>
                                     </Layout>
                                     {config.agentEnabled && <AgentChatModal />}

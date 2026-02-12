@@ -260,6 +260,11 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		allAPIOptions = append(allAPIOptions, apiv1.WithAgentModelStore(agentModelStore))
 	}
 
+	// Wire up agent memory store for the REST API
+	if memoryStore, err := filememory.New(cfg.Paths.DAGsDir); err == nil {
+		allAPIOptions = append(allAPIOptions, apiv1.WithAgentMemoryStore(memoryStore))
+	}
+
 	srv.apiV1 = apiv1.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, allAPIOptions...)
 
 	return srv, nil

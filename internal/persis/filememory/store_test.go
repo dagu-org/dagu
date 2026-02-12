@@ -212,6 +212,100 @@ func TestMemoryDir(t *testing.T) {
 	assert.Equal(t, filepath.Join(dir, agentMemoryDir), store.MemoryDir())
 }
 
+func TestListDAGMemories(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("empty when no DAG memories", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		names, err := store.ListDAGMemories(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, names)
+	})
+
+	t.Run("returns DAGs with memory files", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		require.NoError(t, store.SaveDAGMemory(ctx, "dag-a", "memory A"))
+		require.NoError(t, store.SaveDAGMemory(ctx, "dag-b", "memory B"))
+
+		names, err := store.ListDAGMemories(ctx)
+		require.NoError(t, err)
+		assert.Len(t, names, 2)
+		assert.Contains(t, names, "dag-a")
+		assert.Contains(t, names, "dag-b")
+	})
+
+	t.Run("ignores empty directories", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		require.NoError(t, store.SaveDAGMemory(ctx, "has-memory", "content"))
+
+		// Create empty directory (no MEMORY.md)
+		emptyDir := filepath.Join(store.baseDir, dagSubDir, "no-memory")
+		require.NoError(t, os.MkdirAll(emptyDir, 0750))
+
+		names, err := store.ListDAGMemories(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"has-memory"}, names)
+	})
+}
+
+func TestDeleteGlobalMemory(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("deletes existing file", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		require.NoError(t, store.SaveGlobalMemory(ctx, "some content"))
+
+		require.NoError(t, store.DeleteGlobalMemory(ctx))
+
+		content, err := store.LoadGlobalMemory(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, content)
+	})
+
+	t.Run("no error when file does not exist", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		require.NoError(t, store.DeleteGlobalMemory(ctx))
+	})
+}
+
+func TestDeleteDAGMemory(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("deletes existing DAG memory", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		require.NoError(t, store.SaveDAGMemory(ctx, "my-dag", "content"))
+
+		require.NoError(t, store.DeleteDAGMemory(ctx, "my-dag"))
+
+		content, err := store.LoadDAGMemory(ctx, "my-dag")
+		require.NoError(t, err)
+		assert.Empty(t, content)
+	})
+
+	t.Run("no error when DAG memory does not exist", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		require.NoError(t, store.DeleteDAGMemory(ctx, "nonexistent"))
+	})
+
+	t.Run("rejects path traversal", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		err := store.DeleteDAGMemory(ctx, "../escape")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid dagName")
+	})
+}
+
 func TestConcurrentAccess(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
