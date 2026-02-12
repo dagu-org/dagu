@@ -203,6 +203,9 @@ func (a *API) UpdateUser(ctx context.Context, request api.UpdateUserRequestObjec
 	if input.Role != nil {
 		changes["role"] = string(*input.Role)
 	}
+	if input.IsDisabled != nil {
+		changes["is_disabled"] = *input.IsDisabled
+	}
 	a.logAudit(ctx, audit.CategoryUser, "user_update", changes)
 
 	return api.UpdateUser200JSONResponse{

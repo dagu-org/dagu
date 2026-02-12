@@ -118,7 +118,7 @@ func (a *API) CreateDAGWebhook(ctx context.Context, request api.CreateDAGWebhook
 	}
 
 	logger.Info(ctx, "Webhook created", tag.Name(request.FileName))
-	a.logAudit(ctx, audit.CategoryWebhook, "webhook_create", map[string]string{
+	a.logAudit(ctx, audit.CategoryWebhook, "webhook_create", map[string]any{
 		"dag_name":   request.FileName,
 		"webhook_id": result.Webhook.ID,
 	})
@@ -157,7 +157,7 @@ func (a *API) DeleteDAGWebhook(ctx context.Context, request api.DeleteDAGWebhook
 	}
 
 	logger.Info(ctx, "Webhook deleted", tag.Name(request.FileName))
-	auditDetails := map[string]string{"dag_name": request.FileName}
+	auditDetails := map[string]any{"dag_name": request.FileName}
 	if targetWebhook != nil {
 		auditDetails["webhook_id"] = targetWebhook.ID
 	}
@@ -191,7 +191,7 @@ func (a *API) RegenerateDAGWebhookToken(ctx context.Context, request api.Regener
 	}
 
 	logger.Info(ctx, "Webhook token regenerated", tag.Name(request.FileName))
-	a.logAudit(ctx, audit.CategoryWebhook, "webhook_token_regenerate", map[string]string{
+	a.logAudit(ctx, audit.CategoryWebhook, "webhook_token_regenerate", map[string]any{
 		"dag_name":   request.FileName,
 		"webhook_id": result.Webhook.ID,
 	})

@@ -150,9 +150,7 @@ func TestPurgeExpiredFiles_ZeroRetentionSkipsCleanup(t *testing.T) {
 }
 
 func TestCleaner_StopIsIdempotent(t *testing.T) {
-	dir := t.TempDir()
-
-	c := newCleaner(dir, 7, nil)
+	c := newTestCleaner(t.TempDir(), 7)
 
 	// Calling stop multiple times should not panic
 	assert.NotPanics(t, func() {

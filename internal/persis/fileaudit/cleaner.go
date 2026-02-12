@@ -120,12 +120,17 @@ func (c *cleaner) purgeExpiredFiles() {
 			slog.Int("retentionDays", c.retentionDays))
 
 		if c.appendFn != nil {
-			details, _ := json.Marshal(map[string]any{
+			details, err := json.Marshal(map[string]any{
 				"purged_from":    purgedDates[0],
 				"purged_to":      purgedDates[len(purgedDates)-1],
 				"files_removed":  len(purgedDates),
 				"retention_days": c.retentionDays,
 			})
+			if err != nil {
+				slog.Warn("fileaudit: failed to marshal cleanup audit details",
+					slog.String("error", err.Error()))
+				details = []byte("{}")
+			}
 			entry := audit.NewEntry(audit.CategorySystem, "audit_cleanup", "", "system").
 				WithDetails(string(details))
 			if err := c.appendFn(context.Background(), entry); err != nil {

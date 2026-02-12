@@ -89,7 +89,7 @@ func (a *API) CreateAPIKey(ctx context.Context, request api.CreateAPIKeyRequestO
 		return nil, err
 	}
 
-	a.logAudit(ctx, audit.CategoryAPIKey, "api_key_create", map[string]string{
+	a.logAudit(ctx, audit.CategoryAPIKey, "api_key_create", map[string]any{
 		"key_id":   result.APIKey.ID,
 		"key_name": result.APIKey.Name,
 		"role":     string(result.APIKey.Role),
@@ -230,7 +230,7 @@ func (a *API) DeleteAPIKey(ctx context.Context, request api.DeleteAPIKeyRequestO
 		return nil, err
 	}
 
-	deleteDetails := map[string]string{"key_id": request.KeyId}
+	deleteDetails := map[string]any{"key_id": request.KeyId}
 	if targetKey != nil {
 		deleteDetails["key_name"] = targetKey.Name
 	}

@@ -294,7 +294,7 @@ func (a *API) DiscardDagChanges(ctx context.Context, req api.DiscardDagChangesRe
 		return nil, internalError(err)
 	}
 
-	a.logAudit(ctx, audit.CategoryGitSync, "sync_discard", map[string]string{"dag_id": req.Name})
+	a.logAudit(ctx, audit.CategoryGitSync, "sync_discard", map[string]any{"dag_id": req.Name})
 
 	return api.DiscardDagChanges200JSONResponse{
 		Message: "Changes discarded successfully",
