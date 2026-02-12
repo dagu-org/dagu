@@ -37,7 +37,6 @@ func sanitizeFilename(s string) string {
 	return filenameUnsafeChars.ReplaceAllString(s, "_")
 }
 
-
 // buildLogReadOptions constructs LogReadOptions from request parameters.
 func (a *API) buildLogReadOptions(head, tail, offset, limit *int) fileutil.LogReadOptions {
 	return fileutil.LogReadOptions{

@@ -445,7 +445,6 @@ func getCreatorID(ctx context.Context) string {
 	return "system"
 }
 
-
 // marshalWebhookPayload returns the JSON representation of the webhook payload.
 // Returns "{}" if no payload is provided.
 func marshalWebhookPayload(body *api.TriggerWebhookJSONRequestBody) (string, error) {

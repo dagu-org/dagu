@@ -70,7 +70,6 @@ func (a *API) checkSingletonQueued(ctx context.Context, dag *core.DAG) error {
 	return nil
 }
 
-
 // ValidateDAGSpec implements api.StrictServerInterface.
 func (a *API) ValidateDAGSpec(ctx context.Context, request api.ValidateDAGSpecRequestObject) (api.ValidateDAGSpecResponseObject, error) {
 	if request.Body == nil {
