@@ -120,7 +120,6 @@ func (m *mockAgentConfigStore) IsEnabled(_ context.Context) bool {
 
 var _ agent.ConfigStore = (*mockAgentConfigStore)(nil)
 
-
 func TestListAgentModels(t *testing.T) {
 	t.Parallel()
 

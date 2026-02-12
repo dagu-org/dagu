@@ -124,7 +124,6 @@ var configSchema = &jsonschema.Schema{
 	},
 }
 
-
 func init() {
 	core.RegisterExecutorConfigSchema("redis", configSchema)
 }

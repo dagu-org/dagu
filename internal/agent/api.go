@@ -806,4 +806,3 @@ func (a *API) cleanupIdleSessions() {
 		a.logger.Debug("Cleaned up idle session", "session_id", id)
 	}
 }
-

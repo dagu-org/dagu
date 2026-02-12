@@ -230,7 +230,6 @@ func containsIgnoreCase(slice []string, item string) bool {
 	return false
 }
 
-
 var configSchema = &jsonschema.Schema{
 	Type: "object",
 	// Note: bucket is not required here because it can come from DAG-level s3 config.

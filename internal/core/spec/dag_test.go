@@ -2193,7 +2193,6 @@ func TestBuildHITLStepsValidation(t *testing.T) {
 	}
 }
 
-
 func TestParseHealthcheck(t *testing.T) {
 	t.Parallel()
 

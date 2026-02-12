@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-
 func TestFlattenRows(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
