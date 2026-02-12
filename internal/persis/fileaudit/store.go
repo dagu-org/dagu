@@ -54,7 +54,7 @@ func New(baseDir string, retentionDays int) (*Store, error) {
 	s := &Store{baseDir: baseDir}
 
 	if retentionDays > 0 {
-		s.cleaner = newCleaner(baseDir, retentionDays)
+		s.cleaner = newCleaner(baseDir, retentionDays, s.Append)
 	}
 
 	return s, nil
