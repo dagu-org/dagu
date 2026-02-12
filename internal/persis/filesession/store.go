@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -240,10 +241,21 @@ func validateSession(sess *agent.Session, requireUserID bool) error {
 	if sess.ID == "" {
 		return fmt.Errorf("filesession: %w", agent.ErrInvalidSessionID)
 	}
+	if containsPathTraversal(sess.ID) {
+		return fmt.Errorf("filesession: %w: contains invalid characters", agent.ErrInvalidSessionID)
+	}
 	if requireUserID && sess.UserID == "" {
 		return fmt.Errorf("filesession: %w", agent.ErrInvalidUserID)
 	}
+	if requireUserID && containsPathTraversal(sess.UserID) {
+		return fmt.Errorf("filesession: %w: contains invalid characters", agent.ErrInvalidUserID)
+	}
 	return nil
+}
+
+// containsPathTraversal checks if an ID contains path separator or traversal characters.
+func containsPathTraversal(id string) bool {
+	return strings.ContainsAny(id, `/\`) || strings.Contains(id, "..")
 }
 
 // writeSessionToFile writes a session to a JSON file atomically.

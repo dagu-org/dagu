@@ -81,6 +81,8 @@ export interface Message {
 // Session types
 export interface Session {
   id: string;
+  user_id?: string;
+  title?: string;
   created_at: string;
   updated_at: string;
 }
@@ -96,6 +98,7 @@ export interface SessionWithState {
   session: Session;
   working: boolean;
   model?: string;
+  total_cost?: number;
 }
 
 // DAG context types

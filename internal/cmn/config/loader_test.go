@@ -544,6 +544,7 @@ paths:
 	assert.Equal(t, "/custom/data/queue", cfg.Paths.QueueDir)
 	assert.Equal(t, "/custom/data/service-registry", cfg.Paths.ServiceRegistryDir)
 	assert.Equal(t, "/custom/data/users", cfg.Paths.UsersDir)
+	assert.Equal(t, "/custom/data/agent/sessions", cfg.Paths.SessionsDir)
 }
 
 func TestLoad_EdgeCases_Errors(t *testing.T) {

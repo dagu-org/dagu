@@ -21,6 +21,7 @@ type SessionManager struct {
 	loop            *Loop
 	loopCancel      context.CancelFunc
 	mu              sync.Mutex
+	createdAt       time.Time
 	lastActivity    time.Time
 	model           string
 	messages        []Message
@@ -76,10 +77,12 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 
 	messages := copyMessages(cfg.History)
 
+	now := time.Now()
 	return &SessionManager{
 		id:              id,
 		userID:          cfg.UserID,
-		lastActivity:    time.Now(),
+		createdAt:       now,
+		lastActivity:    now,
 		logger:          logger.With("session_id", id),
 		subpub:          NewSubPub[StreamResponse](),
 		messages:        messages,
@@ -197,7 +200,7 @@ func (sm *SessionManager) GetSession() Session {
 	return Session{
 		ID:        sm.id,
 		UserID:    sm.userID,
-		CreatedAt: sm.lastActivity,
+		CreatedAt: sm.createdAt,
 		UpdatedAt: sm.lastActivity,
 	}
 }
@@ -277,7 +280,7 @@ func (sm *SessionManager) SubscribeWithSnapshot(ctx context.Context) (StreamResp
 	sess := Session{
 		ID:        id,
 		UserID:    sm.userID,
-		CreatedAt: sm.lastActivity,
+		CreatedAt: sm.createdAt,
 		UpdatedAt: sm.lastActivity,
 	}
 	next := sm.subpub.Subscribe(ctx, lastSeq)
@@ -407,6 +410,8 @@ func (sm *SessionManager) extractLLMHistoryLocked() []llm.Message {
 }
 
 // createRecordMessageFunc returns a function for recording messages to the session.
+// Persistence errors are logged but not propagated — the session continues operating
+// even if individual messages fail to persist, to avoid disrupting the user's workflow.
 func (sm *SessionManager) createRecordMessageFunc() MessageRecordFunc {
 	return func(ctx context.Context, msg Message) error {
 		msg.SessionID = sm.id
