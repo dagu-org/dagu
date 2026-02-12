@@ -453,7 +453,7 @@ func (a *API) handleGetSession(w http.ResponseWriter, r *http.Request) {
 	if mgr, ok := a.getActiveSession(id, userID); ok {
 		a.respondJSON(w, http.StatusOK, StreamResponse{
 			Messages: mgr.GetMessages(),
-			Session:  ptrTo(mgr.GetSession()),
+			Session:  new(mgr.GetSession()),
 			SessionState: &SessionState{
 				SessionID: id,
 				Working:   mgr.IsWorking(),
@@ -807,7 +807,3 @@ func (a *API) cleanupIdleSessions() {
 	}
 }
 
-// ptrTo returns a pointer to the given value.
-func ptrTo[T any](v T) *T {
-	return &v
-}

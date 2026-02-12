@@ -34,9 +34,9 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 		},
 		{
 			name:                    "no thinking, explicit max tokens",
-			maxTokens:               intPtr(8192),
+			maxTokens:               new(8192),
 			thinking:                nil,
-			expectedMaxOutputTokens: intPtr(8192),
+			expectedMaxOutputTokens: new(8192),
 			expectedHasThinking:     false,
 		},
 		{
@@ -44,33 +44,33 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			maxTokens: nil,
 			thinking: &llm.ThinkingRequest{
 				Enabled:      true,
-				BudgetTokens: intPtr(4096),
+				BudgetTokens: new(4096),
 			},
-			expectedMaxOutputTokens: intPtr(4096 + 4096),
+			expectedMaxOutputTokens: new(4096 + 4096),
 			expectedHasThinking:     true,
-			expectedThinkingBudget:  intPtr(4096),
+			expectedThinkingBudget:  new(4096),
 		},
 		{
 			name:      "thinking with budget, max tokens less than budget - auto adjust",
-			maxTokens: intPtr(2000),
+			maxTokens: new(2000),
 			thinking: &llm.ThinkingRequest{
 				Enabled:      true,
-				BudgetTokens: intPtr(4096),
+				BudgetTokens: new(4096),
 			},
-			expectedMaxOutputTokens: intPtr(4096 + 4096),
+			expectedMaxOutputTokens: new(4096 + 4096),
 			expectedHasThinking:     true,
-			expectedThinkingBudget:  intPtr(4096),
+			expectedThinkingBudget:  new(4096),
 		},
 		{
 			name:      "thinking with budget, max tokens greater than budget - use provided",
-			maxTokens: intPtr(16000),
+			maxTokens: new(16000),
 			thinking: &llm.ThinkingRequest{
 				Enabled:      true,
-				BudgetTokens: intPtr(4096),
+				BudgetTokens: new(4096),
 			},
-			expectedMaxOutputTokens: intPtr(16000),
+			expectedMaxOutputTokens: new(16000),
 			expectedHasThinking:     true,
-			expectedThinkingBudget:  intPtr(4096),
+			expectedThinkingBudget:  new(4096),
 		},
 		{
 			name:      "thinking with effort level low",
@@ -80,7 +80,7 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 				Effort:  llm.ThinkingEffortLow,
 			},
 			// Estimated budget 1024, so no adjustment needed with default
-			expectedMaxOutputTokens: intPtr(1024 + 4096),
+			expectedMaxOutputTokens: new(1024 + 4096),
 			expectedHasThinking:     true,
 			expectedThinkingLevel:   "low",
 		},
@@ -92,7 +92,7 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 				Effort:  llm.ThinkingEffortMedium,
 			},
 			// Estimated budget 4096, auto-adjust to 8192
-			expectedMaxOutputTokens: intPtr(4096 + 4096),
+			expectedMaxOutputTokens: new(4096 + 4096),
 			expectedHasThinking:     true,
 			expectedThinkingLevel:   "medium",
 		},
@@ -104,7 +104,7 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 				Effort:  llm.ThinkingEffortHigh,
 			},
 			// Estimated budget 8192, auto-adjust to 12288
-			expectedMaxOutputTokens: intPtr(8192 + 4096),
+			expectedMaxOutputTokens: new(8192 + 4096),
 			expectedHasThinking:     true,
 			expectedThinkingLevel:   "high",
 		},
@@ -116,7 +116,7 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 				Effort:  llm.ThinkingEffortXHigh,
 			},
 			// Estimated budget 16384, auto-adjust to 20480
-			expectedMaxOutputTokens: intPtr(16384 + 4096),
+			expectedMaxOutputTokens: new(16384 + 4096),
 			expectedHasThinking:     true,
 			expectedThinkingLevel:   "high", // xhigh maps to high for Gemini
 		},
@@ -169,8 +169,4 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			}
 		})
 	}
-}
-
-func intPtr(i int) *int {
-	return &i
 }

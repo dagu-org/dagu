@@ -120,9 +120,6 @@ func (m *mockAgentConfigStore) IsEnabled(_ context.Context) bool {
 
 var _ agent.ConfigStore = (*mockAgentConfigStore)(nil)
 
-func ptrTo[T any](v T) *T {
-	return &v
-}
 
 func TestListAgentModels(t *testing.T) {
 	t.Parallel()
@@ -186,7 +183,7 @@ func TestCreateAgentModel(t *testing.T) {
 				Name:     "Test Model",
 				Provider: "openai",
 				Model:    "gpt-4",
-				ApiKey:   ptrTo("sk-test"),
+				ApiKey:   new("sk-test"),
 			},
 		})
 		require.NoError(t, err)
@@ -220,7 +217,7 @@ func TestCreateAgentModel(t *testing.T) {
 
 		_, err := setup.api.CreateAgentModel(adminCtx(), apigen.CreateAgentModelRequestObject{
 			Body: &apigen.CreateModelConfigRequest{
-				Id:       ptrTo("INVALID ID"),
+				Id:       new("INVALID ID"),
 				Name:     "Test",
 				Provider: "openai",
 				Model:    "gpt-4",
@@ -269,7 +266,7 @@ func TestCreateAgentModel(t *testing.T) {
 
 		_, err := setup.api.CreateAgentModel(adminCtx(), apigen.CreateAgentModelRequestObject{
 			Body: &apigen.CreateModelConfigRequest{
-				Id:       ptrTo("test-model"),
+				Id:       new("test-model"),
 				Name:     "Duplicate",
 				Provider: "openai",
 				Model:    "gpt-4",

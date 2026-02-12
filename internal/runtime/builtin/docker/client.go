@@ -355,8 +355,7 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 	}
 
 	// Set init true to prevent zombie subprocess issues
-	init := true
-	c.cfg.Host.Init = &init
+	c.cfg.Host.Init = new(true)
 
 	ctx, cancel := context.WithCancel(ctx)
 	c.cancelMu.Lock()

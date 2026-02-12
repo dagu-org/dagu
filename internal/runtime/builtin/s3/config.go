@@ -230,8 +230,6 @@ func containsIgnoreCase(slice []string, item string) bool {
 	return false
 }
 
-// ptrFloat returns a pointer to a float64 value for use in JSON schema definitions.
-func ptrFloat(f float64) *float64 { return &f }
 
 var configSchema = &jsonschema.Schema{
 	Type: "object",
@@ -269,13 +267,13 @@ var configSchema = &jsonschema.Schema{
 		"tags": {Type: "object", Description: "Object tags as key-value pairs"},
 
 		// Transfer options
-		"partSize":    {Type: "integer", Minimum: ptrFloat(5), Description: "Multipart upload part size in MB (default: 10, min: 5)"},
-		"concurrency": {Type: "integer", Minimum: ptrFloat(1), Description: "Number of concurrent upload/download parts (default: 5)"},
+		"partSize":    {Type: "integer", Minimum: new(float64(5)), Description: "Multipart upload part size in MB (default: 10, min: 5)"},
+		"concurrency": {Type: "integer", Minimum: new(float64(1)), Description: "Number of concurrent upload/download parts (default: 5)"},
 
 		// List options
 		"prefix":       {Type: "string", Description: "Filter objects by key prefix"},
 		"delimiter":    {Type: "string", Description: "Delimiter for grouping keys (e.g., '/')"},
-		"maxKeys":      {Type: "integer", Minimum: ptrFloat(1), Description: "Maximum number of keys to return (default: 1000)"},
+		"maxKeys":      {Type: "integer", Minimum: new(float64(1)), Description: "Maximum number of keys to return (default: 1000)"},
 		"recursive":    {Type: "boolean", Description: "List all objects recursively (ignores delimiter)"},
 		"outputFormat": {Type: "string", Enum: []any{"json", "jsonl"}, Description: "Output format: json (default) or jsonl"},
 

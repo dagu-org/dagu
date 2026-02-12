@@ -350,8 +350,7 @@ func (e *Executor) runWithModel(ctx context.Context, model core.ModelEntry, allM
 
 	// Disable streaming if fallback is configured to avoid output corruption
 	if e.step.LLM.HasFallback() && effectiveCfg.StreamEnabled() {
-		stream := false
-		effectiveCfg.Stream = &stream
+		effectiveCfg.Stream = new(false)
 	}
 
 	// Create provider for this model

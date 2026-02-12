@@ -554,7 +554,7 @@ func TestBuildHistRetentionDays(t *testing.T) {
 		expected int
 	}{
 		{name: "NilDefaultsTo0", input: nil, expected: 0},
-		{name: "CustomValue", input: intPtr(365), expected: 365},
+		{name: "CustomValue", input: new(365), expected: 365},
 	}
 
 	for _, tt := range tests {
@@ -576,7 +576,7 @@ func TestBuildMaxCleanUpTime(t *testing.T) {
 		expected time.Duration
 	}{
 		{name: "NilDefaultsTo0", input: nil, expected: 0},
-		{name: "TenSeconds", input: intPtr(10), expected: 10 * time.Second},
+		{name: "TenSeconds", input: new(10), expected: 10 * time.Second},
 	}
 
 	for _, tt := range tests {
@@ -727,7 +727,7 @@ func TestBuildSSH(t *testing.T) {
 			input: &ssh{
 				User:          "admin",
 				Host:          "server.example.com",
-				StrictHostKey: boolPtr(false),
+				StrictHostKey: new(false),
 			},
 			expected: &core.SSHConfig{
 				User:          "admin",
@@ -2193,15 +2193,6 @@ func TestBuildHITLStepsValidation(t *testing.T) {
 	}
 }
 
-// Helper functions
-
-func intPtr(i int) *int {
-	return &i
-}
-
-func boolPtr(b bool) *bool {
-	return &b
-}
 
 func TestParseHealthcheck(t *testing.T) {
 	t.Parallel()
