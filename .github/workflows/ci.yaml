@@ -63,7 +63,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.5.0
+          version: v2.9.0
           args: --timeout=10m
 
   # Test Go code on multiple platforms
