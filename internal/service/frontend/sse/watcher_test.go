@@ -202,7 +202,7 @@ func TestWatcherBroadcast(t *testing.T) {
 
 		// Create a client and fill its buffer so sends fail
 		client := newTestClient(t)
-		for i := 0; i < 64; i++ {
+		for range 64 {
 			client.Send(&Event{Type: EventTypeData, Data: "fill"})
 		}
 
@@ -321,24 +321,20 @@ func TestWatcherConcurrentOperations(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Concurrent add/remove clients
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 10 {
+		wg.Go(func() {
 			client := newTestClient(t)
 			watcher.AddClient(client)
 			time.Sleep(10 * time.Millisecond)
 			watcher.RemoveClient(client)
-		}()
+		})
 	}
 
 	// Concurrent client count reads
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 10 {
+		wg.Go(func() {
 			_ = watcher.ClientCount()
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -517,7 +513,7 @@ func TestWatcherAdaptInterval(t *testing.T) {
 
 		// 2s fetch -> target = 3 * 2s = 6s
 		// Repeated calls should converge toward 6s via EMA
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			watcher.adaptInterval(2 * time.Second)
 		}
 
@@ -570,7 +566,7 @@ func TestWatcherErrorRecoveryResetsInterval(t *testing.T) {
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
 		// First, adapt to a slow fetch to increase interval
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			watcher.adaptInterval(2 * time.Second)
 		}
 
@@ -594,7 +590,7 @@ func TestWatcherErrorRecoveryResetsInterval(t *testing.T) {
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
 		// Adapt to slow fetches
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			watcher.adaptInterval(2 * time.Second)
 		}
 

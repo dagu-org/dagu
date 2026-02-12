@@ -33,7 +33,7 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 		},
 		{
 			name:                "no thinking, explicit max tokens",
-			maxTokens:           intPtr(8192),
+			maxTokens:           new(8192),
 			thinking:            nil,
 			expectedMaxTokens:   8192,
 			expectedHasThinking: false,
@@ -51,7 +51,7 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 		},
 		{
 			name:      "thinking enabled, max tokens less than budget - auto adjust",
-			maxTokens: intPtr(2000),
+			maxTokens: new(2000),
 			thinking: &llm.ThinkingRequest{
 				Enabled: true,
 				Effort:  llm.ThinkingEffortMedium, // 4096 budget
@@ -62,7 +62,7 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 		},
 		{
 			name:      "thinking enabled, max tokens equal to budget - auto adjust",
-			maxTokens: intPtr(4096),
+			maxTokens: new(4096),
 			thinking: &llm.ThinkingRequest{
 				Enabled: true,
 				Effort:  llm.ThinkingEffortMedium, // 4096 budget
@@ -73,7 +73,7 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 		},
 		{
 			name:      "thinking enabled, max tokens greater than budget - use provided",
-			maxTokens: intPtr(16000),
+			maxTokens: new(16000),
 			thinking: &llm.ThinkingRequest{
 				Enabled: true,
 				Effort:  llm.ThinkingEffortMedium, // 4096 budget
@@ -87,7 +87,7 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			maxTokens: nil,
 			thinking: &llm.ThinkingRequest{
 				Enabled:      true,
-				BudgetTokens: intPtr(10000),
+				BudgetTokens: new(10000),
 			},
 			expectedMaxTokens:   10000 + 4096, // budget + buffer
 			expectedHasThinking: true,
@@ -165,8 +165,4 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			}
 		})
 	}
-}
-
-func intPtr(i int) *int {
-	return &i
 }

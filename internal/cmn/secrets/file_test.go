@@ -479,7 +479,7 @@ func TestFileResolver_ConcurrentAccess(t *testing.T) {
 	done := make(chan bool, numGoroutines)
 	errors := make(chan error, numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		go func() {
 			value, err := resolver.Resolve(ctx, ref)
 			if err != nil {
@@ -492,7 +492,7 @@ func TestFileResolver_ConcurrentAccess(t *testing.T) {
 	}
 
 	// Wait for all goroutines
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		<-done
 	}
 

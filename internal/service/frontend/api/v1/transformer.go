@@ -31,8 +31,7 @@ func toStep(obj core.Step) api.Step {
 
 	var repeatMode *api.RepeatMode
 	if obj.RepeatPolicy.RepeatMode != "" {
-		mode := api.RepeatMode(obj.RepeatPolicy.RepeatMode)
-		repeatMode = &mode
+		repeatMode = new(api.RepeatMode(obj.RepeatPolicy.RepeatMode))
 	}
 
 	repeatPolicy := api.RepeatPolicy{
@@ -69,8 +68,7 @@ func toStep(obj core.Step) api.Step {
 	}
 
 	if obj.Timeout > 0 {
-		timeoutSec := int(obj.Timeout.Seconds())
-		step.TimeoutSec = &timeoutSec
+		step.TimeoutSec = new(int(obj.Timeout.Seconds()))
 	}
 
 	if obj.SubDAG != nil {
@@ -156,8 +154,7 @@ func toTriggerType(t core.TriggerType) *api.TriggerType {
 	if t == core.TriggerTypeUnknown {
 		return nil
 	}
-	triggerType := api.TriggerType(t.String())
-	return &triggerType
+	return new(api.TriggerType(t.String()))
 }
 
 func toDAGRunSummary(s exec.DAGRunStatus) api.DAGRunSummary {

@@ -59,8 +59,9 @@ func FormatTime(val time.Time) string {
 	return stringutil.FormatTime(val)
 }
 
+//go:fix inline
 func Time(t time.Time) *time.Time {
-	return &t
+	return new(t)
 }
 
 type PID int

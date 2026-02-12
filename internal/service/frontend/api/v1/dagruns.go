@@ -1890,10 +1890,10 @@ func (a *API) GetDAGRunLogsData(ctx context.Context, identifier string) (any, er
 	// Parse query params if present
 	pathPart := identifier
 	var queryParams url.Values
-	if idx := strings.Index(identifier, "?"); idx != -1 {
-		pathPart = identifier[:idx]
+	if before, after, ok := strings.Cut(identifier, "?"); ok {
+		pathPart = before
 		var err error
-		queryParams, err = url.ParseQuery(identifier[idx+1:])
+		queryParams, err = url.ParseQuery(after)
 		if err != nil {
 			logger.Warn(ctx, "Failed to parse query string in identifier",
 				tag.Error(err),

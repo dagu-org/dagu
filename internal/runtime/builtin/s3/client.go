@@ -66,11 +66,11 @@ func parseEndpoint(cfg *Config) (endpoint string, secure bool) {
 	secure = !cfg.DisableSSL
 
 	// Strip scheme if present and determine secure from scheme
-	if strings.HasPrefix(endpoint, "https://") {
-		endpoint = strings.TrimPrefix(endpoint, "https://")
+	if after, ok := strings.CutPrefix(endpoint, "https://"); ok {
+		endpoint = after
 		secure = true
-	} else if strings.HasPrefix(endpoint, "http://") {
-		endpoint = strings.TrimPrefix(endpoint, "http://")
+	} else if after, ok := strings.CutPrefix(endpoint, "http://"); ok {
+		endpoint = after
 		secure = false
 	}
 

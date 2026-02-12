@@ -110,7 +110,7 @@ func KebabToCamel(s string) string {
 	// Find the first non-empty part for the initial word
 	result := ""
 	startIdx := 0
-	for i := 0; i < len(parts); i++ {
+	for i := range parts {
 		if len(parts[i]) > 0 {
 			result = parts[i]
 			startIdx = i + 1

@@ -175,7 +175,7 @@ func waitForCoordinatorStart(t *testing.T, addr string) {
 
 	healthClient := grpc_health_v1.NewHealthClient(conn)
 
-	for i := 0; i < maxRetries; i++ {
+	for range maxRetries {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		resp, err := healthClient.Check(ctx, &grpc_health_v1.HealthCheckRequest{})
 		cancel()

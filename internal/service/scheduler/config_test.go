@@ -54,7 +54,7 @@ func TestConfigSet(t *testing.T) {
 		wg.Add(10)
 
 		// 5 goroutines setting the config
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			go func(val int) {
 				defer wg.Done()
 				configSet.Set(dagName, Config{ConcurrencyLimit: val})
@@ -62,7 +62,7 @@ func TestConfigSet(t *testing.T) {
 		}
 
 		// 5 goroutines getting the config
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			go func() {
 				defer wg.Done()
 				_ = configSet.Get(dagName)

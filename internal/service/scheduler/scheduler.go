@@ -238,17 +238,13 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	var wg sync.WaitGroup
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		s.startHeartbeat(ctx)
-	}()
+	})
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		s.startZombieDetector(ctx)
-	}()
+	})
 
 	if err := s.entryReader.Init(ctx); err != nil {
 		logger.Error(ctx, "Failed to initialize entry reader", tag.Error(err))
@@ -263,11 +259,9 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	s.planner.Start(ctx)
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		s.entryReader.Start(ctx)
-	}()
+	})
 
 	logger.Info(ctx, "Scheduler started")
 

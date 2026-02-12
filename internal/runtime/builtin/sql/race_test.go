@@ -27,7 +27,7 @@ func TestRace_ConcurrentExecutors(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	for i := 0; i < numExecutors; i++ {
+	for i := range numExecutors {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -86,10 +86,8 @@ func TestRace_ConnectionManagerConcurrent(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Test concurrent acquire/release/DB access
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range numGoroutines {
+		wg.Go(func() {
 
 			cm.Acquire()
 			defer cm.Release()
@@ -100,7 +98,7 @@ func TestRace_ConnectionManagerConcurrent(t *testing.T) {
 				// Ignore errors - we're testing for data races, not functionality
 				return
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -112,10 +110,8 @@ func TestRace_DriverRegistryConcurrent(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Test concurrent GetDriver calls
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range numGoroutines {
+		wg.Go(func() {
 
 			// Concurrent GetDriver calls
 			driver, ok := sqlexec.GetDriver("sqlite")
@@ -124,7 +120,7 @@ func TestRace_DriverRegistryConcurrent(t *testing.T) {
 				_ = driver.PlaceholderFormat()
 				_ = driver.SupportsAdvisoryLock()
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -157,7 +153,7 @@ func TestRace_TransactionConcurrent(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Test concurrent transaction creation and usage
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -192,22 +188,20 @@ func TestRace_ResultWriter(t *testing.T) {
 	numGoroutines := 10
 	var wg sync.WaitGroup
 
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range numGoroutines {
+		wg.Go(func() {
 
 			var buf bytes.Buffer
 			writer := sqlexec.NewResultWriter(&buf, "jsonl", "null", false)
 
 			_ = writer.WriteHeader([]string{"id", "name", "value"})
 
-			for j := 0; j < 100; j++ {
+			for j := range 100 {
 				_ = writer.WriteRow([]any{j, "test", 3.14})
 			}
 
 			_ = writer.Close()
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -230,7 +224,7 @@ func TestRace_ParamConversion(t *testing.T) {
 		{"id": 456},
 	}
 
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -260,7 +254,7 @@ func TestRace_ConfigParsing(t *testing.T) {
 		{"dsn": ":memory:", "transaction": true, "isolationLevel": "serializable"},
 	}
 
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -279,7 +273,7 @@ func TestRace_ExecutorKill(t *testing.T) {
 	numIterations := 5
 	tmpDir := t.TempDir()
 
-	for i := 0; i < numIterations; i++ {
+	for i := range numIterations {
 		// Use unique file-based database for each iteration
 		dbPath := filepath.Join(tmpDir, fmt.Sprintf("test_kill_%d.db", i))
 
@@ -307,19 +301,15 @@ func TestRace_ExecutorKill(t *testing.T) {
 		var wg sync.WaitGroup
 
 		// Start Run() in goroutine
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			// Run may succeed or be killed - either is fine
 			_ = exec.Run(ctx)
-		}()
+		})
 
 		// Kill() from another goroutine
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_ = exec.Kill(os.Interrupt)
-		}()
+		})
 
 		wg.Wait()
 	}

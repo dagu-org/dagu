@@ -295,7 +295,7 @@ func waitForServerStart(t *testing.T, addr string) {
 		retryDelay = 100 * time.Millisecond
 	)
 
-	for i := 0; i < maxRetries; i++ {
+	for range maxRetries {
 		conn, err := net.Dial("tcp", addr)
 		if err == nil {
 			_ = conn.Close()

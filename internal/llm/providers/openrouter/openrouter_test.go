@@ -33,9 +33,9 @@ func TestBuildRequestBody_ReasoningTokens(t *testing.T) {
 		},
 		{
 			name:                 "no reasoning, explicit max tokens",
-			maxTokens:            intPtr(8192),
+			maxTokens:            new(8192),
 			thinking:             nil,
-			expectedMaxTokens:    intPtr(8192),
+			expectedMaxTokens:    new(8192),
 			expectedHasReasoning: false,
 		},
 		{
@@ -43,33 +43,33 @@ func TestBuildRequestBody_ReasoningTokens(t *testing.T) {
 			maxTokens: nil,
 			thinking: &llm.ThinkingRequest{
 				Enabled:      true,
-				BudgetTokens: intPtr(4096),
+				BudgetTokens: new(4096),
 			},
-			expectedMaxTokens:       intPtr(4096 + 4096),
+			expectedMaxTokens:       new(4096 + 4096),
 			expectedHasReasoning:    true,
-			expectedReasoningBudget: intPtr(4096),
+			expectedReasoningBudget: new(4096),
 		},
 		{
 			name:      "reasoning with budget, max tokens less than budget - auto adjust",
-			maxTokens: intPtr(2000),
+			maxTokens: new(2000),
 			thinking: &llm.ThinkingRequest{
 				Enabled:      true,
-				BudgetTokens: intPtr(4096),
+				BudgetTokens: new(4096),
 			},
-			expectedMaxTokens:       intPtr(4096 + 4096),
+			expectedMaxTokens:       new(4096 + 4096),
 			expectedHasReasoning:    true,
-			expectedReasoningBudget: intPtr(4096),
+			expectedReasoningBudget: new(4096),
 		},
 		{
 			name:      "reasoning with budget, max tokens greater than budget - use provided",
-			maxTokens: intPtr(16000),
+			maxTokens: new(16000),
 			thinking: &llm.ThinkingRequest{
 				Enabled:      true,
-				BudgetTokens: intPtr(4096),
+				BudgetTokens: new(4096),
 			},
-			expectedMaxTokens:       intPtr(16000),
+			expectedMaxTokens:       new(16000),
 			expectedHasReasoning:    true,
-			expectedReasoningBudget: intPtr(4096),
+			expectedReasoningBudget: new(4096),
 		},
 		{
 			name:      "reasoning without budget (effort only) - no adjustment needed",
@@ -128,8 +128,4 @@ func TestBuildRequestBody_ReasoningTokens(t *testing.T) {
 			}
 		})
 	}
-}
-
-func intPtr(i int) *int {
-	return &i
 }

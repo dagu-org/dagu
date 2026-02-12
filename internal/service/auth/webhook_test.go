@@ -489,7 +489,7 @@ func TestGenerateWebhookToken(t *testing.T) {
 		t.Parallel()
 
 		tokens := make(map[string]bool)
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			parts, err := generateWebhookToken(4)
 			require.NoError(t, err)
 			assert.False(t, tokens[parts.fullToken], "Duplicate token generated")

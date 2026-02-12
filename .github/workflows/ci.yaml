@@ -27,7 +27,7 @@ on:
       - ".github/workflows/ci.yaml"
 
 env:
-  GO_VERSION: "1.25"
+  GO_VERSION: "1.26"
 
 jobs:
   # Spell check
@@ -58,12 +58,21 @@ jobs:
         run: |
           go fmt ./...
           # Fail if formatting changed any files
-          git diff --exit-code || (echo "Go files are not formatted. Please run 'go fmt ./...'" && exit 1)
+          git diff --exit-code || (echo "Go files are not formatted. Please run 'make fmt'" && exit 1)
+
+      - name: Check modernize (go fix)
+        run: |
+          diff=$(go fix -diff ./... 2>&1) || true
+          if [ -n "$diff" ]; then
+            echo "Go files need modernization. Please run 'make fmt'"
+            echo "$diff"
+            exit 1
+          fi
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.5.0
+          version: v2.9.0
           args: --timeout=10m
 
   # Test Go code on multiple platforms

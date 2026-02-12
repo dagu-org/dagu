@@ -79,7 +79,7 @@ func TestExponentialBackoffPolicy_ComputeNextInterval(t *testing.T) {
 		}
 
 		// Test that retries continue indefinitely
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			interval, err := policy.ComputeNextInterval(i, 0, nil)
 			require.NoError(t, err)
 			assert.LessOrEqual(t, interval, 1*time.Second)
@@ -251,7 +251,7 @@ func TestExponentialBackoffPolicy_EdgeCases(t *testing.T) {
 		}
 
 		// Should return 0 for all retries
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			interval, err := policy.ComputeNextInterval(i, 0, nil)
 			require.NoError(t, err)
 			assert.Equal(t, time.Duration(0), interval)
@@ -267,7 +267,7 @@ func TestExponentialBackoffPolicy_EdgeCases(t *testing.T) {
 		}
 
 		// Should return constant interval
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			interval, err := policy.ComputeNextInterval(i, 0, nil)
 			require.NoError(t, err)
 			assert.Equal(t, 100*time.Millisecond, interval)
@@ -312,11 +312,11 @@ func TestRetrier_ConcurrentUse(t *testing.T) {
 
 	// Run multiple goroutines
 	done := make(chan bool, 3)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		go func(id int) {
 			defer func() { done <- true }()
 
-			for j := 0; j < 3; j++ {
+			for range 3 {
 				_, err := retrier.Next(nil)
 				if err != nil {
 					t.Errorf("goroutine %d: unexpected error: %v", id, err)
@@ -327,7 +327,7 @@ func TestRetrier_ConcurrentUse(t *testing.T) {
 	}
 
 	// Wait for all goroutines to complete
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		select {
 		case <-done:
 		case <-time.After(5 * time.Second):
@@ -344,7 +344,7 @@ func TestConstantBackoffPolicy_ComputeNextInterval(t *testing.T) {
 		}
 
 		// All retries should have the same interval
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			interval, err := policy.ComputeNextInterval(i, 0, nil)
 			require.NoError(t, err)
 			assert.Equal(t, 100*time.Millisecond, interval)
@@ -364,7 +364,7 @@ func TestConstantBackoffPolicy_ComputeNextInterval(t *testing.T) {
 		}
 
 		// Test many retries
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			interval, err := policy.ComputeNextInterval(i, 0, nil)
 			require.NoError(t, err)
 			assert.Equal(t, 50*time.Millisecond, interval)
@@ -449,7 +449,7 @@ func TestLinearBackoffPolicy_ComputeNextInterval(t *testing.T) {
 		}
 
 		// Should behave like constant backoff
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			interval, err := policy.ComputeNextInterval(i, 0, nil)
 			require.NoError(t, err)
 			assert.Equal(t, 200*time.Millisecond, interval)
@@ -481,7 +481,7 @@ func TestRetrier_Reset(t *testing.T) {
 		retrier := NewRetrier(policy)
 
 		// Perform a few retries
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			_, err := retrier.Next(errors.New("test error"))
 			if err != nil {
 				t.Fatalf("unexpected error on retry %d: %v", i, err)
@@ -511,7 +511,7 @@ func TestRetrier_Reset(t *testing.T) {
 		retrier := NewRetrier(policy)
 
 		// Exhaust retries
-		for i := 0; i < 2; i++ {
+		for i := range 2 {
 			_, err := retrier.Next(errors.New("test error"))
 			if err != nil {
 				t.Fatalf("unexpected error on retry %d: %v", i, err)
@@ -528,7 +528,7 @@ func TestRetrier_Reset(t *testing.T) {
 		retrier.Reset()
 
 		// After reset, retries should work again
-		for i := 0; i < 2; i++ {
+		for i := range 2 {
 			_, err := retrier.Next(errors.New("test error"))
 			if err != nil {
 				t.Fatalf("unexpected error on retry %d after reset: %v", i, err)
@@ -545,7 +545,7 @@ func TestRetrier_WithDifferentPolicies(t *testing.T) {
 		retrier := NewRetrier(policy)
 
 		// Each retry should return the same interval
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			interval, err := retrier.Next(nil)
 			assert.NoError(t, err)
 			assert.Equal(t, 50*time.Millisecond, interval)

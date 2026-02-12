@@ -255,7 +255,7 @@ func TestStringFields_Map(t *testing.T) {
 		{
 			name: "MapWithPointerValues",
 			input: map[string]any{
-				"ptr": ptrString("$MAP_ENV"),
+				"ptr": new("$MAP_ENV"),
 			},
 			opts: []Option{WithOSExpansion()},
 			want: map[string]any{
@@ -737,8 +737,4 @@ func TestObject_ErrorPropagation(t *testing.T) {
 	input := S{Field: "`nonexistent_cmd_abc123`"}
 	_, err := Object(ctx, input, map[string]string{})
 	assert.Error(t, err)
-}
-
-func ptrString(s string) *string {
-	return &s
 }

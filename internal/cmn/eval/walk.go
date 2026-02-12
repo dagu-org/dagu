@@ -25,7 +25,7 @@ func walkValue(ctx context.Context, v reflect.Value, transform stringTransform) 
 		}
 		return reflect.ValueOf(s), nil
 
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if v.IsNil() {
 			return v, nil
 		}
@@ -62,8 +62,7 @@ func walkStruct(ctx context.Context, v reflect.Value, transform stringTransform)
 	result := reflect.New(v.Type()).Elem()
 	result.Set(v)
 
-	for i := range result.NumField() {
-		field := result.Field(i)
+	for _, field := range result.Fields() {
 		if !field.CanSet() {
 			continue
 		}
@@ -80,7 +79,7 @@ func walkStruct(ctx context.Context, v reflect.Value, transform stringTransform)
 // unwrapIndirections peels away interface and pointer wrappers from a reflect.Value,
 // returning the underlying concrete value.
 func unwrapIndirections(v reflect.Value) reflect.Value {
-	for (v.Kind() == reflect.Interface || v.Kind() == reflect.Ptr) && !v.IsNil() {
+	for (v.Kind() == reflect.Interface || v.Kind() == reflect.Pointer) && !v.IsNil() {
 		v = v.Elem()
 	}
 	return v

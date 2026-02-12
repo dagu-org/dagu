@@ -13,7 +13,7 @@ RUN rm -rf node_modules; \
   pnpm build
 
 # Stage 2: Go Builder
-FROM --platform=$TARGETPLATFORM golang:1.25-alpine AS go-builder
+FROM --platform=$TARGETPLATFORM golang:1.26-alpine AS go-builder
 ARG LDFLAGS
 ARG TARGETOS
 ARG TARGETARCH

@@ -1089,7 +1089,7 @@ func TestParseCoordinatorAddresses(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		input            interface{}
+		input            any
 		expectedAddrs    []string
 		expectedWarnings int // Number of expected warnings
 	}{
@@ -1104,11 +1104,11 @@ func TestParseCoordinatorAddresses(t *testing.T) {
 		{"IPv6 address", "[::1]:8080", []string{"[::1]:8080"}, 0},
 
 		// Valid []interface{} input tests (YAML)
-		{"empty interface slice", []interface{}{}, nil, 0},
-		{"interface slice with addresses", []interface{}{"host1:8080", "host2:9090"}, []string{"host1:8080", "host2:9090"}, 0},
-		{"interface slice filters non-strings", []interface{}{"host:8080", 123, "host2:9090"}, []string{"host:8080", "host2:9090"}, 0},
-		{"interface slice filters empty strings", []interface{}{"host:8080", "", "host2:9090"}, []string{"host:8080", "host2:9090"}, 0},
-		{"interface slice trims whitespace", []interface{}{" host1:8080 ", " host2:9090 "}, []string{"host1:8080", "host2:9090"}, 0},
+		{"empty interface slice", []any{}, nil, 0},
+		{"interface slice with addresses", []any{"host1:8080", "host2:9090"}, []string{"host1:8080", "host2:9090"}, 0},
+		{"interface slice filters non-strings", []any{"host:8080", 123, "host2:9090"}, []string{"host:8080", "host2:9090"}, 0},
+		{"interface slice filters empty strings", []any{"host:8080", "", "host2:9090"}, []string{"host:8080", "host2:9090"}, 0},
+		{"interface slice trims whitespace", []any{" host1:8080 ", " host2:9090 "}, []string{"host1:8080", "host2:9090"}, 0},
 
 		// Valid []string input tests
 		{"empty string slice", []string{}, nil, 0},

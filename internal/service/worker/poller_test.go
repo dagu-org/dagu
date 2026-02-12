@@ -274,11 +274,9 @@ func TestPollerContextCancellation(t *testing.T) {
 
 		// Run poller in background
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			poller.Run(ctx)
-		}()
+		})
 
 		// Wait for poll to start
 		time.Sleep(100 * time.Millisecond)
@@ -318,11 +316,9 @@ func TestPollerContextCancellation(t *testing.T) {
 
 		// Run poller in background
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			poller.Run(ctx)
-		}()
+		})
 
 		// Wait for execution to start
 		time.Sleep(100 * time.Millisecond)

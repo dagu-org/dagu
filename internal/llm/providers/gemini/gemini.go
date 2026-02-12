@@ -69,7 +69,7 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 	}
 
 	// Extract content and function calls from response
-	var content string
+	var content strings.Builder
 	var finishReason string
 	var toolCalls []llm.ToolCall
 	toolCallIdx := 0
@@ -79,7 +79,7 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 		finishReason = candidate.FinishReason
 		for _, p := range candidate.Content.Parts {
 			if p.Text != "" {
-				content += p.Text
+				content.WriteString(p.Text)
 			}
 			if p.FunctionCall != nil {
 				// Convert args map to JSON string for Arguments
@@ -109,7 +109,7 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 	}
 
 	return &llm.ChatResponse{
-		Content:      content,
+		Content:      content.String(),
 		FinishReason: finishReason,
 		Usage:        usage,
 		ToolCalls:    toolCalls,
@@ -316,8 +316,7 @@ func (p *Provider) buildGenerationConfig(req *llm.ChatRequest) *generationConfig
 			currentMax = *genConfig.MaxOutputTokens
 		}
 		if currentMax <= thinkingBudget {
-			newMax := thinkingBudget + 4096
-			genConfig.MaxOutputTokens = &newMax
+			genConfig.MaxOutputTokens = new(thinkingBudget + 4096)
 			hasConfig = true
 		}
 	}

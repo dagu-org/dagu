@@ -4,6 +4,7 @@ package schema
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 	"sync"
@@ -125,7 +126,7 @@ const maxNormalizationDepth = 10
 func (n *navigator) normalizeForNavigation(node map[string]any) map[string]any {
 	current := n.resolveRef(node)
 
-	for i := 0; i < maxNormalizationDepth; i++ {
+	for range maxNormalizationDepth {
 		changed := false
 
 		// Handle oneOf/anyOf - find variant with properties
@@ -233,8 +234,8 @@ func (n *navigator) resolveRef(node map[string]any) map[string]any {
 	}
 
 	// Handle "#/definitions/xxx" format
-	if strings.HasPrefix(ref, "#/definitions/") {
-		defName := strings.TrimPrefix(ref, "#/definitions/")
+	if after, ok0 := strings.CutPrefix(ref, "#/definitions/"); ok0 {
+		defName := after
 		if def, ok := n.defs[defName].(map[string]any); ok {
 			return n.resolveRef(def) // Recursively resolve nested refs
 		}
@@ -263,9 +264,7 @@ func (n *navigator) mergeAllOf(allOf []any) map[string]any {
 
 			// Merge properties
 			if props, ok := resolved["properties"].(map[string]any); ok {
-				for k, v := range props {
-					mergedProps[k] = v
-				}
+				maps.Copy(mergedProps, props)
 			}
 
 			// Collect required fields

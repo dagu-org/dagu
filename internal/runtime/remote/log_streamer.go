@@ -121,10 +121,7 @@ func (s *LogStreamer) StreamSchedulerLog(ctx context.Context, logFilePath string
 	// Split into chunks if necessary (scheduler logs can be large)
 	var sequence uint64 = 0
 	for len(data) > 0 {
-		chunkSize := len(data)
-		if chunkSize > maxChunkSize {
-			chunkSize = maxChunkSize
-		}
+		chunkSize := min(len(data), maxChunkSize)
 
 		chunkData := make([]byte, chunkSize)
 		copy(chunkData, data[:chunkSize])
@@ -246,10 +243,7 @@ func (w *stepLogWriter) flush() error {
 	w.buffer = w.buffer[:0]
 
 	for len(data) > 0 {
-		chunkSize := len(data)
-		if chunkSize > maxChunkSize {
-			chunkSize = maxChunkSize
-		}
+		chunkSize := min(len(data), maxChunkSize)
 
 		// Copy chunk data to avoid corruption if Send buffers the message
 		chunkData := make([]byte, chunkSize)
@@ -419,10 +413,7 @@ func (w *schedulerLogWriter) flush() error {
 	w.buffer = w.buffer[:0]
 
 	for len(data) > 0 {
-		chunkSize := len(data)
-		if chunkSize > maxChunkSize {
-			chunkSize = maxChunkSize
-		}
+		chunkSize := min(len(data), maxChunkSize)
 
 		chunkData := make([]byte, chunkSize)
 		copy(chunkData, data[:chunkSize])

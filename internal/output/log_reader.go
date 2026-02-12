@@ -3,6 +3,7 @@ package output
 import (
 	"bufio"
 	"os"
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -108,7 +109,7 @@ func readTailWithRingBuffer(scanner *bufio.Scanner, maxLines int) ([]string, int
 	} else {
 		result = make([]string, maxLines)
 		start := ringPos % maxLines
-		for i := 0; i < maxLines; i++ {
+		for i := range maxLines {
 			result[i] = ring[(start+i)%maxLines]
 		}
 	}
@@ -211,10 +212,8 @@ func isBinaryContent(data []byte) bool {
 	}
 
 	// Check for null bytes (strong indicator of binary)
-	for _, b := range data {
-		if b == 0 {
-			return true
-		}
+	if slices.Contains(data, 0) {
+		return true
 	}
 
 	// Count non-printable characters (excluding common whitespace)

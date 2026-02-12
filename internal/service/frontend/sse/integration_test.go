@@ -91,7 +91,7 @@ func TestSSEMultipleClientsOnSameTopic(t *testing.T) {
 	cancels := make([]context.CancelFunc, numClients)
 	pumpDones := make([]chan struct{}, numClients)
 
-	for i := 0; i < numClients; i++ {
+	for i := range numClients {
 		clients[i] = newTestClient(t)
 		err := hub.Subscribe(clients[i], "dagrun:shared-dag/run1")
 		require.NoError(t, err)
@@ -116,7 +116,7 @@ func TestSSEMultipleClientsOnSameTopic(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Cleanup
-	for i := 0; i < numClients; i++ {
+	for i := range numClients {
 		hub.Unsubscribe(clients[i])
 		cancels[i]()
 		<-pumpDones[i]
@@ -206,7 +206,7 @@ func TestSSEMultipleTopicTypes(t *testing.T) {
 		"dagruns:limit=50",
 	}
 
-	for i := 0; i < len(topics); i++ {
+	for i := range topics {
 		clients[i] = newTestClient(t)
 		err := hub.Subscribe(clients[i], topicStrings[i])
 		require.NoError(t, err)
@@ -239,10 +239,8 @@ func TestSSEConcurrentSubscribeUnsubscribe(t *testing.T) {
 	numOperations := 50
 
 	// Concurrent subscribe/unsubscribe
-	for i := 0; i < numOperations; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range numOperations {
+		wg.Go(func() {
 
 			client := newTestClient(t)
 			err := hub.Subscribe(client, "dagrun:concurrent-test/run1")
@@ -255,7 +253,7 @@ func TestSSEConcurrentSubscribeUnsubscribe(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 
 			hub.Unsubscribe(client)
-		}()
+		})
 	}
 
 	wg.Wait()

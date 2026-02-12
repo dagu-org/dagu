@@ -171,7 +171,7 @@ func TestRegistry_ConcurrentAccess(t *testing.T) {
 
 	// Concurrent finder access
 	done := make(chan bool)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		go func(i int) {
 			serviceName := exec.ServiceName(fmt.Sprintf("%s-%d", exec.ServiceNameCoordinator, i))
 			// Just verify we can get members without error
@@ -182,7 +182,7 @@ func TestRegistry_ConcurrentAccess(t *testing.T) {
 	}
 
 	// Wait for all goroutines
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		<-done
 	}
 }

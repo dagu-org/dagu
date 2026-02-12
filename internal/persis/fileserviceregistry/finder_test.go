@@ -199,7 +199,7 @@ func TestResolver_Members_ContextCancellation(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create many instances
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		inst := instanceInfo{
 			ID:     fmt.Sprintf("instance-%d", i),
 			Host:   "host",
@@ -498,7 +498,7 @@ func TestResolver_Members_CacheConcurrency(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create instances
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		inst := instanceInfo{
 			ID:     fmt.Sprintf("instance-%d", i),
 			Host:   fmt.Sprintf("host%d", i),
@@ -519,7 +519,7 @@ func TestResolver_Members_CacheConcurrency(t *testing.T) {
 	results := make(chan []exec.HostInfo, numGoroutines)
 	errors := make(chan error, numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		go func() {
 			members, err := finder.members(ctx)
 			if err != nil {
@@ -531,7 +531,7 @@ func TestResolver_Members_CacheConcurrency(t *testing.T) {
 	}
 
 	// Collect results
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		select {
 		case err := <-errors:
 			t.Fatalf("Unexpected error: %v", err)

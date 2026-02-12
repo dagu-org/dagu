@@ -254,10 +254,10 @@ type WorkerDef struct {
 	MaxActiveRuns int    `mapstructure:"maxActiveRuns"`
 	// Labels accepts either a string "key=value,key2=value2,..." or map[string]string.
 	// When string, parsed as comma-separated key=value pairs.
-	Labels interface{} `mapstructure:"labels"`
+	Labels any `mapstructure:"labels"`
 	// Coordinators accepts either a single string URL or []string of URLs.
 	// When string, used as single coordinator address.
-	Coordinators interface{}      `mapstructure:"coordinators"`
+	Coordinators any              `mapstructure:"coordinators"`
 	PostgresPool *PostgresPoolDef `mapstructure:"postgresPool"`
 }
 

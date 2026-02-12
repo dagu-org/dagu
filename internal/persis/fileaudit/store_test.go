@@ -47,7 +47,7 @@ func TestStore_Query(t *testing.T) {
 	require.NoError(t, err)
 
 	// Add entries
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		entry := audit.NewEntry(audit.CategoryUser, "login", "user-123", "testuser")
 		err = store.Append(context.Background(), entry)
 		require.NoError(t, err)
@@ -81,7 +81,7 @@ func TestStore_QueryWithPagination(t *testing.T) {
 	require.NoError(t, err)
 
 	// Add entries
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		entry := audit.NewEntry(audit.CategoryUser, "login", "user-123", "testuser")
 		err = store.Append(context.Background(), entry)
 		require.NoError(t, err)

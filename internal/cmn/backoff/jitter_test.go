@@ -14,7 +14,7 @@ func TestJitterFunc(t *testing.T) {
 		interval := 100 * time.Millisecond
 
 		// Should always return the same interval
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			result := jitterFunc(interval)
 			assert.Equal(t, interval, result)
 		}
@@ -27,7 +27,7 @@ func TestJitterFunc(t *testing.T) {
 		// Collect multiple samples
 		hasVariation := false
 		var results []time.Duration
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			result := jitterFunc(interval)
 			results = append(results, result)
 
@@ -54,7 +54,7 @@ func TestJitterFunc(t *testing.T) {
 		minSeen := interval
 		maxSeen := time.Duration(0)
 
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			result := jitterFunc(interval)
 
 			// Check bounds: should be between 0.5x and 1.5x interval
@@ -116,19 +116,16 @@ func TestWithJitter(t *testing.T) {
 		policy := WithJitter(basePolicy, FullJitter)
 
 		// Test multiple retries
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			interval, err := policy.ComputeNextInterval(i, 0, nil)
 			require.NoError(t, err)
 
 			// Calculate expected base interval
 			multiplier := 1
-			for j := 0; j < i; j++ {
+			for range i {
 				multiplier *= 2
 			}
-			expectedBase := time.Duration(100*time.Millisecond) * time.Duration(multiplier)
-			if expectedBase > 1*time.Second {
-				expectedBase = 1 * time.Second
-			}
+			expectedBase := min(time.Duration(100*time.Millisecond)*time.Duration(multiplier), 1*time.Second)
 
 			// Jittered interval should be between 0 and base
 			assert.GreaterOrEqual(t, interval, time.Duration(0))
@@ -152,7 +149,7 @@ func TestWithJitter(t *testing.T) {
 		hasVariation := false
 		var firstInterval time.Duration
 
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			interval, err := policy.ComputeNextInterval(i, 0, nil)
 			require.NoError(t, err)
 
@@ -202,11 +199,11 @@ func TestJitterFunc_ConcurrentUse(t *testing.T) {
 
 	// Run multiple goroutines applying jitter
 	done := make(chan bool, 10)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		go func() {
 			defer func() { done <- true }()
 
-			for j := 0; j < 100; j++ {
+			for range 100 {
 				result := jitterFunc(interval)
 				// Just verify bounds
 				if result < 0 || result > interval {
@@ -218,7 +215,7 @@ func TestJitterFunc_ConcurrentUse(t *testing.T) {
 	}
 
 	// Wait for all goroutines
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		select {
 		case <-done:
 		case <-time.After(5 * time.Second):

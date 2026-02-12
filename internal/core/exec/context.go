@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"maps"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
@@ -227,12 +228,8 @@ func NewContext(
 		EnvKeyDAGRunID:      dagRunID,
 		EnvKeyDAGName:       dag.Name,
 	}
-	for k, v := range stringutil.KeyValuesToMap(options.params) {
-		envs[k] = v
-	}
-	for k, v := range stringutil.KeyValuesToMap(dag.Env) {
-		envs[k] = v
-	}
+	maps.Copy(envs, stringutil.KeyValuesToMap(options.params))
+	maps.Copy(envs, stringutil.KeyValuesToMap(dag.Env))
 
 	secretEnvs := stringutil.KeyValuesToMap(options.secretEnvs)
 

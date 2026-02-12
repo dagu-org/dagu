@@ -97,7 +97,7 @@ var configSchema = &jsonschema.Schema{
 		"password":         {Type: "string", Description: "Password for extract/list only"},
 		"overwrite":        {Type: "boolean", Description: "Overwrite existing files"},
 		"preservePaths":    {Type: "boolean", Description: "Preserve directory structure (default: true)"},
-		"stripComponents":  {Type: "integer", Minimum: ptrFloat(0), Description: "Strip leading path components (must be >= 0)"},
+		"stripComponents":  {Type: "integer", Minimum: new(float64(0)), Description: "Strip leading path components (must be >= 0)"},
 		"include":          {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Glob patterns to include"},
 		"exclude":          {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Glob patterns to exclude"},
 		"dryRun":           {Type: "boolean", Description: "Simulate without making changes"},
@@ -107,8 +107,6 @@ var configSchema = &jsonschema.Schema{
 		"continueOnError":  {Type: "boolean", Description: "Continue on errors"},
 	},
 }
-
-func ptrFloat(f float64) *float64 { return &f }
 
 func init() {
 	core.RegisterExecutorConfigSchema("archive", configSchema)

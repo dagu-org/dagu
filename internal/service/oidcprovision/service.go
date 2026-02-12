@@ -150,7 +150,7 @@ func (s *Service) ProcessLogin(ctx context.Context, claims OIDCClaims) (*auth.Us
 	var username string
 	now := time.Now().UTC()
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	for attempt := range maxRetries {
 		username = s.generateUniqueUsername(ctx, claims)
 
 		user = &auth.User{

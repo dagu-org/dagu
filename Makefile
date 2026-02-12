@@ -353,6 +353,30 @@ clean-ui:
 		rm -rf node_modules; \
 		rm -rf .cache;
 
+# fmt auto-fixes all code style issues (go fix + go fmt + linter --fix).
+# AI agents and developers should run this before committing.
+.PHONY: fmt
+fmt:
+	@echo "${COLOR_GREEN}Running go fix...${COLOR_RESET}"
+	@go fix ./...
+	@echo "${COLOR_GREEN}Running go fmt...${COLOR_RESET}"
+	@go fmt ./...
+	@echo "${COLOR_GREEN}Running linter with --fix...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_golangci_lint)
+	@${LOCAL_BIN_DIR}/golangci-lint run --fix ./...
+
+# check verifies code style without modifying files (for CI).
+.PHONY: check
+check:
+	@echo "${COLOR_GREEN}Checking go fix...${COLOR_RESET}"
+	@diff=$$(go fix -diff ./... 2>&1); if [ -n "$$diff" ]; then echo "$$diff"; echo "${COLOR_RED}Run 'make fmt'${COLOR_RESET}"; exit 1; fi
+	@echo "${COLOR_GREEN}Checking go fmt...${COLOR_RESET}"
+	@go fmt ./...
+	@git diff --exit-code || (echo "${COLOR_RED}Run 'make fmt'${COLOR_RESET}" && exit 1)
+	@echo "${COLOR_GREEN}Running linter...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_golangci_lint)
+	@${LOCAL_BIN_DIR}/golangci-lint run --timeout=10m ./...
+
 # golangci-lint run linting tool.
 .PHONY: golangci-lint
 golangci-lint:

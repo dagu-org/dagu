@@ -238,10 +238,7 @@ func (p *RemoteProgressDisplay) truncateWorkerDisplay(maxWidth int) string {
 // completedAndPercent returns capped completed count and percentage.
 // Must be called with mu held.
 func (p *RemoteProgressDisplay) completedAndPercent() (completed, percent int) {
-	completed = p.completed
-	if completed > p.total {
-		completed = p.total
-	}
+	completed = min(p.completed, p.total)
 	if p.total > 0 {
 		percent = (completed * 100) / p.total
 	}

@@ -2,6 +2,7 @@ package spec
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"reflect"
 	"sort"
@@ -1106,9 +1107,7 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 	if s.Type != "" {
 		result.ExecutorConfig.Type = strings.TrimSpace(s.Type)
 	}
-	for k, v := range s.Config {
-		result.ExecutorConfig.Config[k] = v
-	}
+	maps.Copy(result.ExecutorConfig.Config, s.Config)
 
 	// Infer type from container field
 	if result.ExecutorConfig.Type == "" && result.Container != nil {

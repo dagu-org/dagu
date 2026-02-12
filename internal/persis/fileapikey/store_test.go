@@ -286,7 +286,7 @@ func TestStore_ConcurrentOperations(t *testing.T) {
 	errors := make(chan error, numGoroutines*3) // Create, List, Delete operations
 
 	// Concurrent creates
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -311,14 +311,12 @@ func TestStore_ConcurrentOperations(t *testing.T) {
 	wg.Wait()
 
 	// Concurrent reads
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range numGoroutines {
+		wg.Go(func() {
 			if _, err := store.List(ctx); err != nil {
 				errors <- err
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -728,7 +726,7 @@ func TestStore_ConcurrentEdgeCases(t *testing.T) {
 		errChan := make(chan error, numGoroutines)
 
 		// Concurrent updates to the same key
-		for i := 0; i < numGoroutines; i++ {
+		for i := range numGoroutines {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
@@ -766,10 +764,8 @@ func TestStore_ConcurrentEdgeCases(t *testing.T) {
 		duplicateCount := make(chan int, numGoroutines)
 
 		// Concurrent creates with the same name
-		for i := 0; i < numGoroutines; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range numGoroutines {
+			wg.Go(func() {
 				key := createTestAPIKey(t, "same-name-key")
 				err := store.Create(ctx, key)
 				switch err {
@@ -778,7 +774,7 @@ func TestStore_ConcurrentEdgeCases(t *testing.T) {
 				case auth.ErrAPIKeyAlreadyExists:
 					duplicateCount <- 1
 				}
-			}()
+			})
 		}
 
 		wg.Wait()
@@ -818,29 +814,25 @@ func TestStore_ConcurrentEdgeCases(t *testing.T) {
 		startChan := make(chan struct{})
 
 		// Start readers
-		for i := 0; i < numReaders; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range numReaders {
+			wg.Go(func() {
 				<-startChan
 				// Multiple reads - some might fail after delete
-				for j := 0; j < 5; j++ {
+				for range 5 {
 					_, err := store.GetByID(ctx, key.ID)
 					// Either success or not found is acceptable
 					if err != nil && err != auth.ErrAPIKeyNotFound {
 						t.Errorf("Unexpected error: %v", err)
 					}
 				}
-			}()
+			})
 		}
 
 		// Start delete
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			<-startChan
 			_ = store.Delete(ctx, key.ID)
-		}()
+		})
 
 		// Start all goroutines simultaneously
 		close(startChan)
@@ -863,14 +855,12 @@ func TestStore_ConcurrentEdgeCases(t *testing.T) {
 		var wg sync.WaitGroup
 		errChan := make(chan error, numGoroutines)
 
-		for i := 0; i < numGoroutines; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range numGoroutines {
+			wg.Go(func() {
 				if err := store.UpdateLastUsed(ctx, key.ID); err != nil {
 					errChan <- err
 				}
-			}()
+			})
 		}
 
 		wg.Wait()
@@ -940,7 +930,7 @@ func TestStore_ListEdgeCases(t *testing.T) {
 		const numKeys = 100
 
 		// Create many keys
-		for i := 0; i < numKeys; i++ {
+		for i := range numKeys {
 			key, err := auth.NewAPIKey(
 				"bulk-key-"+string(rune('0'+(i/100)%10))+string(rune('0'+(i/10)%10))+string(rune('0'+i%10)),
 				"Bulk key",

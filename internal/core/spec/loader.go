@@ -546,7 +546,7 @@ func (*mergeTransformer) Transformer(
 	typ reflect.Type,
 ) func(dst, src reflect.Value) error {
 	// mergo does not override a value with zero value for a pointer.
-	if typ == reflect.TypeOf(core.MailOn{}) {
+	if typ == reflect.TypeFor[core.MailOn]() {
 		// We need to explicitly override the value for a pointer with a zero
 		// value.
 		return func(dst, src reflect.Value) error {
@@ -559,7 +559,7 @@ func (*mergeTransformer) Transformer(
 	}
 
 	// Handle []string fields (like Env) by appending instead of replacing
-	if typ == reflect.TypeOf([]string{}) {
+	if typ == reflect.TypeFor[[]string]() {
 		return func(dst, src reflect.Value) error {
 			if !dst.CanSet() || src.Len() == 0 {
 				return nil
@@ -616,39 +616,39 @@ func decode(cm map[string]any) (*dag, error) {
 func TypedUnionDecodeHook() mapstructure.DecodeHookFunc {
 	return func(_ reflect.Type, to reflect.Type, data any) (any, error) {
 		// Handle types.ShellValue
-		if to == reflect.TypeOf(types.ShellValue{}) {
+		if to == reflect.TypeFor[types.ShellValue]() {
 			return decodeViaYAML[types.ShellValue](data)
 		}
 		// Handle types.StringOrArray
-		if to == reflect.TypeOf(types.StringOrArray{}) {
+		if to == reflect.TypeFor[types.StringOrArray]() {
 			return decodeViaYAML[types.StringOrArray](data)
 		}
 		// Handle types.ScheduleValue
-		if to == reflect.TypeOf(types.ScheduleValue{}) {
+		if to == reflect.TypeFor[types.ScheduleValue]() {
 			return decodeViaYAML[types.ScheduleValue](data)
 		}
 		// Handle types.EnvValue
-		if to == reflect.TypeOf(types.EnvValue{}) {
+		if to == reflect.TypeFor[types.EnvValue]() {
 			return decodeViaYAML[types.EnvValue](data)
 		}
 		// Handle types.ContinueOnValue
-		if to == reflect.TypeOf(types.ContinueOnValue{}) {
+		if to == reflect.TypeFor[types.ContinueOnValue]() {
 			return decodeViaYAML[types.ContinueOnValue](data)
 		}
 		// Handle types.PortValue
-		if to == reflect.TypeOf(types.PortValue{}) {
+		if to == reflect.TypeFor[types.PortValue]() {
 			return decodeViaYAML[types.PortValue](data)
 		}
 		// Handle types.LogOutputValue
-		if to == reflect.TypeOf(types.LogOutputValue{}) {
+		if to == reflect.TypeFor[types.LogOutputValue]() {
 			return decodeViaYAML[types.LogOutputValue](data)
 		}
 		// Handle types.ModelValue
-		if to == reflect.TypeOf(types.ModelValue{}) {
+		if to == reflect.TypeFor[types.ModelValue]() {
 			return decodeViaYAML[types.ModelValue](data)
 		}
 		// Handle types.TagsValue
-		if to == reflect.TypeOf(types.TagsValue{}) {
+		if to == reflect.TypeFor[types.TagsValue]() {
 			return decodeViaYAML[types.TagsValue](data)
 		}
 		return data, nil

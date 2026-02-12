@@ -79,13 +79,11 @@ func (c *Connection) Run(ctx context.Context, auditSvc *audit.Service) error {
 
 	// Use WaitGroup to track goroutine lifecycle
 	var wg sync.WaitGroup
-	wg.Add(1)
 
 	// Read from PTY and write to WebSocket
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		c.readFromPTY(ctx, done)
-	}()
+	})
 
 	// Read from WebSocket and write to PTY
 	c.readFromWebSocket(ctx, auditSvc)

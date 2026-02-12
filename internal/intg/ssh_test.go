@@ -662,8 +662,7 @@ func generateSSHKey(t *testing.T, keyPath, pubKeyPath string) {
 func stopSSHServer(t *testing.T, th test.Helper, dockerClient *client.Client, server *sshServerContainer) {
 	t.Helper()
 
-	timeout := 5
-	_ = dockerClient.ContainerStop(th.Context, server.containerID, container.StopOptions{Timeout: &timeout})
+	_ = dockerClient.ContainerStop(th.Context, server.containerID, container.StopOptions{Timeout: new(5)})
 	_ = dockerClient.ContainerRemove(th.Context, server.containerID, container.RemoveOptions{Force: true})
 }
 

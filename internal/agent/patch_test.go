@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -24,11 +25,12 @@ func TestMain(m *testing.M) {
 }
 
 func patchInput(path, operation string, extra ...string) json.RawMessage {
-	base := fmt.Sprintf(`{"path": %q, "operation": %q`, path, operation)
+	var base strings.Builder
+	base.WriteString(fmt.Sprintf(`{"path": %q, "operation": %q`, path, operation))
 	for i := 0; i < len(extra)-1; i += 2 {
-		base += fmt.Sprintf(`, %q: %q`, extra[i], extra[i+1])
+		base.WriteString(fmt.Sprintf(`, %q: %q`, extra[i], extra[i+1]))
 	}
-	return json.RawMessage(base + "}")
+	return json.RawMessage(base.String() + "}")
 }
 
 func TestPatchTool_Create(t *testing.T) {

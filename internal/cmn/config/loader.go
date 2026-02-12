@@ -672,7 +672,7 @@ func setDefaultIfZero(target *int, defaultValue int) {
 }
 
 // parseCoordinatorAddresses parses coordinator addresses from comma-separated strings or string slices.
-func parseCoordinatorAddresses(input interface{}) ([]string, []string) {
+func parseCoordinatorAddresses(input any) ([]string, []string) {
 	var addresses, warnings []string
 
 	validateAndAdd := func(addr string) {
@@ -704,11 +704,11 @@ func parseCoordinatorAddresses(input interface{}) ([]string, []string) {
 	switch v := input.(type) {
 	case string:
 		if v != "" {
-			for _, part := range strings.Split(v, ",") {
+			for part := range strings.SplitSeq(v, ",") {
 				validateAndAdd(part)
 			}
 		}
-	case []interface{}:
+	case []any:
 		for _, item := range v {
 			if addr, ok := item.(string); ok {
 				validateAndAdd(addr)
@@ -1360,7 +1360,7 @@ func (l *ConfigLoader) configureViper(configDir, configFile string) {
 }
 
 // parseLabels parses labels from comma-separated strings or map types.
-func parseLabels(input interface{}) map[string]string {
+func parseLabels(input any) map[string]string {
 	labels := make(map[string]string)
 
 	switch v := input.(type) {
@@ -1368,7 +1368,7 @@ func parseLabels(input interface{}) map[string]string {
 		if v == "" {
 			return labels
 		}
-		for _, pair := range strings.Split(v, ",") {
+		for pair := range strings.SplitSeq(v, ",") {
 			pair = strings.TrimSpace(pair)
 			if pair == "" {
 				continue
@@ -1381,13 +1381,13 @@ func parseLabels(input interface{}) map[string]string {
 				}
 			}
 		}
-	case map[string]interface{}:
+	case map[string]any:
 		for key, val := range v {
 			if strVal, ok := val.(string); ok {
 				labels[key] = strVal
 			}
 		}
-	case map[interface{}]interface{}:
+	case map[any]any:
 		for key, val := range v {
 			if keyStr, ok := key.(string); ok {
 				if valStr, ok := val.(string); ok {
@@ -1401,19 +1401,19 @@ func parseLabels(input interface{}) map[string]string {
 }
 
 // parseStringList parses comma-separated strings or string slices, filtering empty entries.
-func parseStringList(input interface{}) []string {
+func parseStringList(input any) []string {
 	var result []string
 
 	switch v := input.(type) {
 	case string:
 		if v != "" {
-			for _, s := range strings.Split(v, ",") {
+			for s := range strings.SplitSeq(v, ",") {
 				if trimmed := strings.TrimSpace(s); trimmed != "" {
 					result = append(result, trimmed)
 				}
 			}
 		}
-	case []interface{}:
+	case []any:
 		for _, item := range v {
 			if s, ok := item.(string); ok {
 				if trimmed := strings.TrimSpace(s); trimmed != "" {

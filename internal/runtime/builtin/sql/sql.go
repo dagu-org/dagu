@@ -290,8 +290,8 @@ func (e *sqlExecutor) getQuery() (string, error) {
 	// Check for script content
 	if e.step.Script != "" {
 		// Handle file:// prefix for external SQL files
-		if strings.HasPrefix(e.step.Script, "file://") {
-			filePath := strings.TrimPrefix(e.step.Script, "file://")
+		if after, ok := strings.CutPrefix(e.step.Script, "file://"); ok {
+			filePath := after
 			content, err := os.ReadFile(filePath)
 			if err != nil {
 				return "", fmt.Errorf("failed to read sql file %q: %w", filePath, err)

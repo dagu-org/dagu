@@ -110,8 +110,7 @@ func TestSessionManager_SetWorking(t *testing.T) {
 
 		sm := NewSessionManager(SessionManagerConfig{ID: "test"})
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		next := sm.Subscribe(ctx)
 
@@ -192,8 +191,7 @@ func TestSessionManager_Subscribe(t *testing.T) {
 
 		sm := NewSessionManager(SessionManagerConfig{ID: "test"})
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		next := sm.Subscribe(ctx)
 
@@ -222,8 +220,7 @@ func TestSessionManager_SubscribeWithSnapshot(t *testing.T) {
 			},
 		})
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		snapshot, _ := sm.SubscribeWithSnapshot(ctx)
 
@@ -527,8 +524,7 @@ func TestSessionManager_SetWorkingBroadcastsCost(t *testing.T) {
 		// Add some cost
 		sm.addCost(0.05)
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		next := sm.Subscribe(ctx)
 
@@ -578,7 +574,7 @@ func TestSessionManager_SetSafeMode(t *testing.T) {
 		sm := NewSessionManager(SessionManagerConfig{})
 
 		var wg sync.WaitGroup
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			wg.Add(1)
 			go func(val bool) {
 				defer wg.Done()

@@ -159,14 +159,14 @@ func (m *GlobalPoolManager) ReleasePool(dsn string) {
 }
 
 // Stats returns statistics about the pool manager.
-func (m *GlobalPoolManager) Stats() map[string]interface{} {
+func (m *GlobalPoolManager) Stats() map[string]any {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	poolStats := make(map[string]interface{})
+	poolStats := make(map[string]any)
 	for hash, entry := range m.pools {
 		stats := entry.db.Stats()
-		poolStats[hash] = map[string]interface{}{
+		poolStats[hash] = map[string]any{
 			"refCount":     atomic.LoadInt64(&entry.refCount),
 			"created":      entry.created,
 			"openConns":    stats.OpenConnections,
@@ -176,10 +176,10 @@ func (m *GlobalPoolManager) Stats() map[string]interface{} {
 		}
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"poolCount": len(m.pools),
 		"closed":    m.closed,
-		"config": map[string]interface{}{
+		"config": map[string]any{
 			"maxOpenConns":    m.config.MaxOpenConns,
 			"maxIdleConns":    m.config.MaxIdleConns,
 			"connMaxLifetime": m.config.ConnMaxLifetime.String(),

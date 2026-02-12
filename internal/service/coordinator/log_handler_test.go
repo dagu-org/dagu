@@ -438,7 +438,7 @@ func TestLogHandler_ConcurrentAccess(t *testing.T) {
 
 	// Launch multiple goroutines accessing the handler concurrently
 	done := make(chan bool)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		go func(idx int) {
 			chunk := &coordinatorv1.LogChunk{
 				DagName:    "test-dag",
@@ -469,7 +469,7 @@ func TestLogHandler_ConcurrentAccess(t *testing.T) {
 	}
 
 	// Wait for all goroutines
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		<-done
 	}
 }

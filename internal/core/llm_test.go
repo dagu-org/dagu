@@ -136,12 +136,12 @@ func TestLLMConfig_StreamEnabled(t *testing.T) {
 		},
 		{
 			name:   "explicit true",
-			config: &LLMConfig{Stream: boolPtr(true)},
+			config: &LLMConfig{Stream: new(true)},
 			want:   true,
 		},
 		{
 			name:   "explicit false",
-			config: &LLMConfig{Stream: boolPtr(false)},
+			config: &LLMConfig{Stream: new(false)},
 			want:   false,
 		},
 	}
@@ -154,8 +154,4 @@ func TestLLMConfig_StreamEnabled(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
-}
-
-func boolPtr(b bool) *bool {
-	return &b
 }

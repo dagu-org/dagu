@@ -79,7 +79,7 @@ func unescapeDollars(ctx context.Context, input string) string {
 
 func uniqueToken(input, base string) string {
 	const maxTokenAttempts = 1024
-	for i := 0; i < maxTokenAttempts; i++ {
+	for range maxTokenAttempts {
 		id := atomic.AddUint64(&dollarEscapeSeq, 1)
 		token := fmt.Sprintf("%s%d__", base, id)
 		if !strings.Contains(input, token) {

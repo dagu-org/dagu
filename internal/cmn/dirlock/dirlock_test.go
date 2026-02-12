@@ -295,7 +295,7 @@ func TestConcurrency(t *testing.T) {
 		var wg sync.WaitGroup
 		successCount := make([]int, numGoroutines)
 
-		for i := 0; i < numGoroutines; i++ {
+		for i := range numGoroutines {
 			wg.Add(1)
 			go func(id int) {
 				defer wg.Done()
@@ -304,7 +304,7 @@ func TestConcurrency(t *testing.T) {
 					RetryInterval: 5 * time.Millisecond,
 				})
 
-				for j := 0; j < numIterations; j++ {
+				for range numIterations {
 					ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 					if err := lock.Lock(ctx); err == nil {
 						successCount[id]++
@@ -385,7 +385,7 @@ func TestHeartbeat(t *testing.T) {
 		done := make(chan bool)
 		errCh := make(chan error, 1)
 		go func() {
-			for i := 0; i < 5; i++ {
+			for range 5 {
 				err := lock.Heartbeat(context.Background())
 				if err != nil {
 					errCh <- err
@@ -397,7 +397,7 @@ func TestHeartbeat(t *testing.T) {
 		}()
 
 		// Check lock status while heartbeat is running
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			require.True(t, lock.IsLocked())
 			require.True(t, lock.IsHeldByMe())
 			time.Sleep(5 * time.Millisecond)
