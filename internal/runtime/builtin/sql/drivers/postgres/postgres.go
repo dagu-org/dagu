@@ -102,12 +102,12 @@ func (d *PostgresDriver) BuildInsertQuery(table string, columns []string, rowCou
 	sb.WriteString(") VALUES ")
 
 	paramIdx := 1
-	for i := 0; i < rowCount; i++ {
+	for i := range rowCount {
 		if i > 0 {
 			sb.WriteString(", ")
 		}
 		sb.WriteString("(")
-		for j := 0; j < len(columns); j++ {
+		for j := range columns {
 			if j > 0 {
 				sb.WriteString(", ")
 			}

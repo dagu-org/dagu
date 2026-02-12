@@ -274,10 +274,9 @@ func estimateLineCount(filePath string) (int, bool, error) {
 	}
 
 	// For large files, sample the file to estimate average line length
-	sampleSize := int64(1024 * 1024) // 1MB sample
-	if sampleSize > fileSize {
-		sampleSize = fileSize
-	}
+	sampleSize := min(
+		// 1MB sample
+		int64(1024*1024), fileSize)
 
 	file, err := os.Open(filePath) //nolint:gosec
 	if err != nil {

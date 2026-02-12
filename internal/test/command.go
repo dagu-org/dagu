@@ -81,7 +81,7 @@ func withConfigFlag(args []string, cfg *config.Config) []string {
 	if cfg == nil || cfg.Paths.ConfigFileUsed == "" {
 		return args
 	}
-	for i := 0; i < len(args); i++ {
+	for i := range args {
 		arg := args[i]
 		if arg == "--config" || arg == "-c" || hasConfigInline(arg) {
 			return args

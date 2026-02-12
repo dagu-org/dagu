@@ -136,12 +136,9 @@ func (p *LinearBackoffPolicy) ComputeNextInterval(retryCount int, _ time.Duratio
 	}
 
 	// Calculate the interval using linear backoff
-	interval := p.InitialInterval + (time.Duration(retryCount) * p.Increment)
-
-	// Cap the interval at MaxInterval
-	if interval > p.MaxInterval {
-		interval = p.MaxInterval
-	}
+	interval := min(
+		// Cap the interval at MaxInterval
+		p.InitialInterval+(time.Duration(retryCount)*p.Increment), p.MaxInterval)
 
 	return interval, nil
 }

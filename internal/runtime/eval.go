@@ -34,7 +34,7 @@ func GenerateSubDAGRunID(ctx context.Context, params string, repeated bool) stri
 		// to avoid collisions with previous runs.
 		randomBytes := make([]byte, 8)
 		if _, err := rand.Read(randomBytes); err != nil {
-			randomBytes = []byte(fmt.Sprintf("%d", time.Now().UnixNano()))
+			randomBytes = fmt.Appendf(nil, "%d", time.Now().UnixNano())
 		}
 		return stringutil.Base58EncodeSHA256(
 			fmt.Sprintf("%s:%s:%s:%x", GetEnv(ctx).DAGRunID, GetEnv(ctx).Step.Name, params, randomBytes),

@@ -130,15 +130,11 @@ func (p *QueueProcessor) Start(ctx context.Context, notifyCh <-chan struct{}) {
 	defer p.lock.Unlock()
 
 	// Start the main loop of the processor
-	p.wg.Add(1)
-	go func() {
-		defer p.wg.Done()
+	p.wg.Go(func() {
 		p.loop(ctx)
-	}()
+	})
 
-	p.wg.Add(1)
-	go func() {
-		defer p.wg.Done()
+	p.wg.Go(func() {
 		for {
 			select {
 			case <-ctx.Done():
@@ -149,7 +145,7 @@ func (p *QueueProcessor) Start(ctx context.Context, notifyCh <-chan struct{}) {
 				p.wakeUp()
 			}
 		}
-	}()
+	})
 
 	p.wakeUp() // initial execution
 }

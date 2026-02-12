@@ -94,11 +94,9 @@ func (w *Watcher) Start(ctx context.Context) {
 // StartAsync starts the watcher in a background goroutine with proper WaitGroup handling.
 // This ensures wg.Add(1) is called BEFORE the goroutine starts, preventing races with Stop().
 func (w *Watcher) StartAsync(ctx context.Context) {
-	w.wg.Add(1)
-	go func() {
-		defer w.wg.Done()
+	w.wg.Go(func() {
 		w.Start(ctx)
-	}()
+	})
 }
 
 // Stop signals the watcher to stop polling and waits for it to finish.

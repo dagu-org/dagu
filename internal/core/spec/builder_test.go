@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -25,10 +26,8 @@ func (th *DAG) AssertEnv(t *testing.T, key, val string) {
 	th.t.Helper()
 
 	expected := key + "=" + val
-	for _, env := range th.Env {
-		if env == expected {
-			return
-		}
+	if slices.Contains(th.Env, expected) {
+		return
 	}
 	t.Errorf("expected env %s=%s not found", key, val)
 	for i, env := range th.Env {

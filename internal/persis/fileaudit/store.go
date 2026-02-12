@@ -163,10 +163,7 @@ func (s *Store) Query(_ context.Context, filter audit.QueryFilter) (*audit.Query
 	if limit <= 0 {
 		limit = 100 // Default limit
 	}
-	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(filter.Offset, 0)
 
 	// Apply offset
 	if offset >= len(allEntries) {

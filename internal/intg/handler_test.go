@@ -325,8 +325,8 @@ func TestHandlerOn_EnvironmentVariables(t *testing.T) {
 
 	// Helper to extract value from "KEY=value" format
 	extractValue := func(output string) string {
-		if idx := strings.Index(output, "="); idx != -1 {
-			return output[idx+1:]
+		if _, after, ok := strings.Cut(output, "="); ok {
+			return after
 		}
 		return output
 	}

@@ -223,9 +223,7 @@ func (r *registry) startHeartbeat(ctx context.Context, serviceName exec.ServiceN
 	ctx, cancel := context.WithCancel(ctx)
 	reg.cancel = cancel
 
-	reg.wg.Add(1)
-	go func() {
-		defer reg.wg.Done()
+	reg.wg.Go(func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
@@ -254,7 +252,7 @@ func (r *registry) startHeartbeat(ctx context.Context, serviceName exec.ServiceN
 				}
 			}
 		}
-	}()
+	})
 
 	return nil
 }

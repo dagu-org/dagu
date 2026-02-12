@@ -1003,11 +1003,11 @@ func TestRegistry_ConcurrentAccess(t *testing.T) {
 	errCh := make(chan error, numGoroutines*numOps)
 
 	// Concurrent registers
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			for j := 0; j < numOps; j++ {
+			for j := range numOps {
 				schema := []byte(`{"type": "object", "properties": {"prop": {"type": "string"}}}`)
 				if err := r.Register(fmt.Sprintf("schema_%d_%d", id, j), schema); err != nil {
 					errCh <- err
@@ -1017,27 +1017,23 @@ func TestRegistry_ConcurrentAccess(t *testing.T) {
 	}
 
 	// Concurrent navigates
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < numOps; j++ {
+	for range numGoroutines {
+		wg.Go(func() {
+			for range numOps {
 				if _, err := r.Navigate("base", ""); err != nil {
 					errCh <- err
 				}
 			}
-		}()
+		})
 	}
 
 	// Concurrent AvailableSchemas
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < numOps; j++ {
+	for range numGoroutines {
+		wg.Go(func() {
+			for range numOps {
 				_ = r.AvailableSchemas()
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

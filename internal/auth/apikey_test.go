@@ -282,7 +282,7 @@ func TestAPIKey_NilLastUsedAt(t *testing.T) {
 
 func TestNewAPIKey_GeneratesUniqueIDs(t *testing.T) {
 	ids := make(map[string]bool)
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		key, err := NewAPIKey("test", "", RoleViewer, "hash", "prefix", "creator")
 		require.NoError(t, err)
 		assert.False(t, ids[key.ID], "ID should be unique")

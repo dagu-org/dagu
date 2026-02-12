@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -886,12 +887,7 @@ type RetryPolicy struct {
 func (r *RetryPolicy) ShouldRetry(exitCode int) bool {
 	if len(r.ExitCodes) > 0 {
 		// If exit codes are specified, only retry for those codes
-		for _, code := range r.ExitCodes {
-			if exitCode == code {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(r.ExitCodes, exitCode)
 	}
 	// If no exit codes specified, retry for any non-zero exit code
 	return exitCode != 0

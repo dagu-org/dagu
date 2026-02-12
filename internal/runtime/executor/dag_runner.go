@@ -533,9 +533,9 @@ func extractOutputsFromNodes(nodes []*exec.Node) map[string]string {
 			// Handle both local format (KEY=value) and proto format (just value)
 			// Local format stores "KEY=value" as the value string
 			// Proto format stores just "value" directly
-			if strings.HasPrefix(v, k+"=") {
+			if after, ok0 := strings.CutPrefix(v, k+"="); ok0 {
 				// Local format: extract value after "KEY="
-				outputs[k] = strings.TrimPrefix(v, k+"=")
+				outputs[k] = after
 			} else {
 				// Proto format or already normalized: use value directly
 				outputs[k] = v

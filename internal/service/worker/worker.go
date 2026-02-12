@@ -119,11 +119,9 @@ func (w *Worker) Start(ctx context.Context) error {
 	}
 
 	// Start heartbeat goroutine
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		w.sendHeartbeats(internalCtx)
-	}()
+	})
 
 	// Wait for all goroutines to complete, then signal done
 	go func() {

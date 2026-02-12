@@ -58,7 +58,16 @@ jobs:
         run: |
           go fmt ./...
           # Fail if formatting changed any files
-          git diff --exit-code || (echo "Go files are not formatted. Please run 'go fmt ./...'" && exit 1)
+          git diff --exit-code || (echo "Go files are not formatted. Please run 'make fmt'" && exit 1)
+
+      - name: Check modernize (go fix)
+        run: |
+          diff=$(go fix -diff ./... 2>&1) || true
+          if [ -n "$diff" ]; then
+            echo "Go files need modernization. Please run 'make fmt'"
+            echo "$diff"
+            exit 1
+          fi
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9

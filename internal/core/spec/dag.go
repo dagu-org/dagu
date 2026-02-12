@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -484,9 +485,7 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 	// This allows YAML to reference env vars that were loaded from .env files
 	// before the rebuild.
 	buildEnv := make(map[string]string, len(ctx.opts.BuildEnv))
-	for k, v := range ctx.opts.BuildEnv {
-		buildEnv[k] = v
-	}
+	maps.Copy(buildEnv, ctx.opts.BuildEnv)
 	if len(buildEnv) > 0 {
 		baseScope = baseScope.WithEntries(buildEnv, eval.EnvSourceDotEnv)
 	}
@@ -719,9 +718,7 @@ func buildEnvs(ctx BuildContext, d *dag) ([]string, error) {
 	// This replaces the old pattern of using os.Setenv which caused race conditions.
 	if ctx.envScope != nil && len(vars) > 0 {
 		ctx.envScope.scope = ctx.envScope.scope.WithEntries(vars, eval.EnvSourceDAGEnv)
-		for k, v := range vars {
-			ctx.envScope.buildEnv[k] = v
-		}
+		maps.Copy(ctx.envScope.buildEnv, vars)
 	}
 
 	var envs []string

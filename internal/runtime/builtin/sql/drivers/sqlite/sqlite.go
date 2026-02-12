@@ -160,12 +160,12 @@ func (d *SQLiteDriver) BuildInsertQuery(table string, columns []string, rowCount
 	}
 	sb.WriteString(") VALUES ")
 
-	for i := 0; i < rowCount; i++ {
+	for i := range rowCount {
 		if i > 0 {
 			sb.WriteString(", ")
 		}
 		sb.WriteString("(")
-		for j := 0; j < len(columns); j++ {
+		for j := range columns {
 			if j > 0 {
 				sb.WriteString(", ")
 			}
@@ -185,8 +185,8 @@ func isMemoryDB(dsn string) bool {
 // extractDBPath extracts the file path from a SQLite DSN.
 func extractDBPath(dsn string) string {
 	// Handle "file:" prefix
-	if strings.HasPrefix(dsn, "file:") {
-		path := strings.TrimPrefix(dsn, "file:")
+	if after, ok := strings.CutPrefix(dsn, "file:"); ok {
+		path := after
 		// Remove query parameters
 		if idx := strings.Index(path, "?"); idx >= 0 {
 			path = path[:idx]
@@ -194,8 +194,8 @@ func extractDBPath(dsn string) string {
 		return path
 	}
 	// Plain file path
-	if idx := strings.Index(dsn, "?"); idx >= 0 {
-		return dsn[:idx]
+	if before, _, ok := strings.Cut(dsn, "?"); ok {
+		return before
 	}
 	return dsn
 }

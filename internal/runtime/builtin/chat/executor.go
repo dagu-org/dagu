@@ -235,9 +235,9 @@ func normalizeEnvVarExpr(expr string) string {
 		// Already in ${VAR} format, use as-is
 		return expr
 	}
-	if strings.HasPrefix(expr, "$") {
+	if after, ok := strings.CutPrefix(expr, "$"); ok {
 		// Convert $VAR to ${VAR}
-		return "${" + strings.TrimPrefix(expr, "$") + "}"
+		return "${" + after + "}"
 	}
 	// Plain variable name, wrap in ${...}
 	return "${" + expr + "}"
@@ -573,7 +573,7 @@ func (e *Executor) runWithToolsForModel(ctx context.Context, provider llmpkg.Pro
 	sessionMessages := make([]exec.LLMMessage, len(allMessages))
 	copy(sessionMessages, allMessages)
 
-	for iteration := 0; iteration < maxIterations; iteration++ {
+	for iteration := range maxIterations {
 		var done bool
 		var err error
 		sessionMessages, done, err = e.executeToolStep(ctx, provider, cfg, tools, sessionMessages, iteration)

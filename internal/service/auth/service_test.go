@@ -434,7 +434,7 @@ func TestService_ListUsers(t *testing.T) {
 	ctx := context.Background()
 
 	// Create multiple users
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		_, err := svc.CreateUser(ctx, CreateUserInput{
 			Username: fmt.Sprintf("user%d", i),
 			Password: "password123",
@@ -853,7 +853,7 @@ func TestService_ListAPIKeys(t *testing.T) {
 	ctx := context.Background()
 
 	// Create multiple API keys
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		_, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
 			Name: fmt.Sprintf("key-%d", i),
 			Role: auth.RoleViewer,
@@ -1174,7 +1174,7 @@ func TestGenerateAPIKey(t *testing.T) {
 func TestGenerateAPIKey_UniqueKeys(t *testing.T) {
 	// Generate multiple keys and verify they are unique
 	keys := make(map[string]bool)
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		keyParts, err := generateAPIKey(4)
 		require.NoError(t, err)
 		assert.False(t, keys[keyParts.fullKey], "Generated key should be unique")

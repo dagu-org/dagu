@@ -3,6 +3,8 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -358,12 +360,7 @@ func (d *Data) MatchExitCode(exitCodes []int) bool {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	for _, code := range exitCodes {
-		if code == d.inner.State.ExitCode {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(exitCodes, d.inner.State.ExitCode)
 }
 
 func (d *Data) getVariable(key string) (stringutil.KeyValue, bool) {
@@ -536,9 +533,7 @@ func (d *Data) GetApprovalInputs() map[string]string {
 	}
 
 	result := make(map[string]string, len(d.inner.State.ApprovalInputs))
-	for k, v := range d.inner.State.ApprovalInputs {
-		result[k] = v
-	}
+	maps.Copy(result, d.inner.State.ApprovalInputs)
 	return result
 }
 
@@ -553,7 +548,5 @@ func (d *Data) SetApprovalInputs(inputs map[string]string) {
 	}
 
 	d.inner.State.ApprovalInputs = make(map[string]string, len(inputs))
-	for k, v := range inputs {
-		d.inner.State.ApprovalInputs[k] = v
-	}
+	maps.Copy(d.inner.State.ApprovalInputs, inputs)
 }

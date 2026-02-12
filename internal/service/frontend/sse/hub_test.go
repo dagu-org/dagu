@@ -1,7 +1,6 @@
 package sse
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
@@ -301,8 +300,7 @@ func TestHubHeartbeat(t *testing.T) {
 	require.NoError(t, err)
 
 	// Start write pump
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	go client.WritePump(ctx)
 
 	// Wait for at least one heartbeat
@@ -324,25 +322,21 @@ func TestHubConcurrentOperations(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Concurrent subscribes
-	for i := 0; i < 20; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 20 {
+		wg.Go(func() {
 			client := newTestClient(t)
 			_ = hub.Subscribe(client, "dagrun:concurrent-id")
 			time.Sleep(10 * time.Millisecond)
 			hub.Unsubscribe(client)
-		}()
+		})
 	}
 
 	// Concurrent reads
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 10 {
+		wg.Go(func() {
 			_ = hub.ClientCount()
 			_ = hub.WatcherCount()
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -432,7 +426,7 @@ func TestHubSendHeartbeatsClientBufferFull(t *testing.T) {
 	require.NoError(t, err)
 
 	// Fill the client buffer so heartbeat will fail
-	for i := 0; i < 64; i++ {
+	for range 64 {
 		client.Send(&Event{Type: EventTypeData, Data: "fill"})
 	}
 

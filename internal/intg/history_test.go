@@ -316,7 +316,7 @@ steps:
 `)
 
 	// Create multiple runs
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		th.RunCommand(t, cmd.Start(), test.CmdTest{Args: []string{"start", dag.Location}})
 		time.Sleep(100 * time.Millisecond)
 	}

@@ -823,8 +823,7 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		h.mu.Unlock()
 
 		// Start zombie detector with short interval for testing
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		h.StartZombieDetector(ctx, 50*time.Millisecond)
 

@@ -730,7 +730,7 @@ func TestNodeInit(t *testing.T) {
 	// two different nodes don't interfere with each other
 	// and that multiple Init calls are safe
 	assert.NotPanics(t, func() {
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			node1.Init()
 			node2.Init()
 		}
@@ -1638,7 +1638,7 @@ func TestNodeChatMessages(t *testing.T) {
 
 		// Test concurrent access to message methods
 		done := make(chan bool)
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			go func(id int) {
 				messages := []exec.LLMMessage{
 					{Role: exec.RoleUser, Content: fmt.Sprintf("message %d", id)},
@@ -1650,7 +1650,7 @@ func TestNodeChatMessages(t *testing.T) {
 		}
 
 		// Wait for all goroutines
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			<-done
 		}
 	})

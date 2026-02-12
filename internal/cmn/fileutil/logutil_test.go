@@ -827,7 +827,7 @@ func TestEstimateLineCount(t *testing.T) {
 // Helper function to generate content with varying line lengths
 func generateVaryingLineLengths(lineCount int) string {
 	var builder strings.Builder
-	for i := 0; i < lineCount; i++ {
+	for i := range lineCount {
 		// Vary line length between 10 and 100 characters
 		lineLength := 10 + (i % 91)
 		line := strings.Repeat("x", lineLength) + "\n"

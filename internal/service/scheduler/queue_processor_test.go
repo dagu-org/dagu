@@ -70,7 +70,7 @@ func newQueueFixture(t *testing.T) *queueFixture {
 func (f *queueFixture) withDAG(name string, maxActiveRuns int) *queueFixture {
 	f.dag = &core.DAG{
 		Name: name, MaxActiveRuns: maxActiveRuns,
-		YamlData: []byte(fmt.Sprintf("name: %s\nmaxActiveRuns: %d\nsteps:\n  - name: test\n    command: echo hello", name, maxActiveRuns)),
+		YamlData: fmt.Appendf(nil, "name: %s\nmaxActiveRuns: %d\nsteps:\n  - name: test\n    command: echo hello", name, maxActiveRuns),
 		Steps:    []core.Step{{Name: "test", Command: "echo hello"}},
 	}
 	return f

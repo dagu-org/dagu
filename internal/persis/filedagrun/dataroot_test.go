@@ -120,7 +120,7 @@ func TestDataRootRuns(t *testing.T) {
 		root := setupTestDataRoot(t)
 
 		for date := 1; date <= 31; date++ {
-			for hour := 0; hour < 24; hour++ {
+			for hour := range 24 {
 				ts := exec.NewUTC(time.Date(2021, 1, date, hour, 0, 0, 0, time.UTC))
 				_ = root.CreateTestDAGRun(t, fmt.Sprintf("test-id-%d-%d", date, hour), ts)
 			}

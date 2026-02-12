@@ -88,7 +88,7 @@ func WithGlobalQueue(name string, maxActiveRuns int) func(*fixture) {
 // Enqueue adds n DAG runs to the queue.
 func (f *fixture) Enqueue(n int) *fixture {
 	f.runIDs = make([]string, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		f.runIDs[i] = f.enqueueOne()
 	}
 	return f

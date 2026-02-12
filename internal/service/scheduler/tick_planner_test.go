@@ -1128,9 +1128,7 @@ func TestTickPlanner_ConcurrentPlanAndEvents(t *testing.T) {
 	}
 
 	// Push events concurrently
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for i := range 50 {
 			eventCh <- DAGChangeEvent{
 				Type:    DAGChangeAdded,
@@ -1138,17 +1136,15 @@ func TestTickPlanner_ConcurrentPlanAndEvents(t *testing.T) {
 				DAGName: fmt.Sprintf("dag-%d", i),
 			}
 		}
-	}()
+	})
 
 	// Call Plan concurrently
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
 		for range 50 {
 			tp.Plan(context.Background(), now)
 		}
-	}()
+	})
 
 	wg.Wait()
 

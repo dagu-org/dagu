@@ -112,7 +112,7 @@ func TestDriverRegistry_ConcurrentAccess(t *testing.T) {
 
 	// Test concurrent registration and retrieval
 	done := make(chan bool)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		go func() {
 			registry.Register(&mockDriver{name: "test"})
 			_, _ = registry.Get("test")
@@ -120,7 +120,7 @@ func TestDriverRegistry_ConcurrentAccess(t *testing.T) {
 		}()
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		<-done
 	}
 
