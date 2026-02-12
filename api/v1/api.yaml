@@ -6397,11 +6397,18 @@ components:
 
     SyncPublishAllRequest:
       type: object
-      description: "Request to publish all modified DAGs"
+      description: "Request to publish selected DAGs"
+      required:
+        - dagIds
       properties:
         message:
           type: string
           description: "Commit message"
+        dagIds:
+          type: array
+          items:
+            type: string
+          description: "DAG IDs to publish"
 
     SyncConflictResponse:
       type: object

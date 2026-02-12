@@ -1,5 +1,6 @@
 import { components, SyncStatus, SyncSummary } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -35,7 +36,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
-import { useContext, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { DiffModal } from './DiffModal';
 
 type SyncStatusResponse = components['schemas']['SyncStatusResponse'];
@@ -110,6 +111,7 @@ export default function GitSyncPage() {
     open: boolean;
     dagId?: string;
   }>({ open: false });
+  const [selectedDags, setSelectedDags] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     appBarContext.setTitle('Git Sync');
@@ -137,6 +139,18 @@ export default function GitSyncPage() {
 
   const status = statusData as SyncStatusResponse | undefined;
   const config = configData as SyncConfigResponse | undefined;
+
+  // Auto-select all publishable DAGs when data changes
+  useEffect(() => {
+    if (!status?.dags) return;
+    const publishable = new Set<string>();
+    for (const [id, dag] of Object.entries(status.dags)) {
+      if (dag.status === SyncStatus.modified || dag.status === SyncStatus.untracked) {
+        publishable.add(id);
+      }
+    }
+    setSelectedDags(publishable);
+  }, [status?.dags]);
 
   // Handlers
   const handlePull = async () => {
@@ -171,7 +185,10 @@ export default function GitSyncPage() {
           })
         : await client.POST('/sync/publish-all', {
             params: { query: { remoteNode } },
-            body: { message: commitMessage || 'Batch update' },
+            body: {
+              message: commitMessage || 'Batch update',
+              dagIds: Array.from(selectedDags),
+            },
           });
 
       if (response.error) {
@@ -184,6 +201,7 @@ export default function GitSyncPage() {
         setPublishModal({ open: false });
         setDiffModal({ open: false });
         setCommitMessage('');
+        setSelectedDags(new Set());
         mutateStatus();
       }
     } catch (err) {
@@ -249,6 +267,47 @@ export default function GitSyncPage() {
       })
     : [];
 
+  // Publishable DAG IDs among currently visible (filtered) rows
+  const publishableDagIds = useMemo(
+    () =>
+      filteredDags
+        .filter(
+          ([, dag]) =>
+            dag.status === SyncStatus.modified ||
+            dag.status === SyncStatus.untracked
+        )
+        .map(([id]) => id),
+    [filteredDags]
+  );
+
+  const allPublishableSelected = useMemo(
+    () =>
+      publishableDagIds.length > 0 &&
+      publishableDagIds.every((id) => selectedDags.has(id)),
+    [publishableDagIds, selectedDags]
+  );
+
+  const handleToggleSelectAll = useCallback(() => {
+    setSelectedDags((prev) => {
+      const next = new Set(prev);
+      if (allPublishableSelected) {
+        for (const id of publishableDagIds) next.delete(id);
+      } else {
+        for (const id of publishableDagIds) next.add(id);
+      }
+      return next;
+    });
+  }, [allPublishableSelected, publishableDagIds]);
+
+  const handleToggleDag = useCallback((dagId: string) => {
+    setSelectedDags((prev) => {
+      const next = new Set(prev);
+      if (next.has(dagId)) next.delete(dagId);
+      else next.add(dagId);
+      return next;
+    });
+  }, []);
+
   const hasModifiedDags =
     status?.counts &&
     ((status.counts.modified || 0) > 0 || (status.counts.untracked || 0) > 0);
@@ -313,13 +372,13 @@ export default function GitSyncPage() {
             size="sm"
             className="h-8 w-8 p-0"
             onClick={() => setPublishModal({ open: true })}
-            disabled={!hasModifiedDags || !config?.pushEnabled || !canWrite}
+            disabled={selectedDags.size === 0 || !config?.pushEnabled || !canWrite}
             title={
               !canWrite
                 ? 'Write permission required'
                 : !config?.pushEnabled
                   ? 'Push disabled in read-only mode'
-                  : 'Publish all changes'
+                  : `Publish ${selectedDags.size} selected`
             }
           >
             <Upload className="h-4 w-4" />
@@ -390,6 +449,15 @@ export default function GitSyncPage() {
         <Table className="text-xs">
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8">
+                {publishableDagIds.length > 0 && (
+                  <Checkbox
+                    checked={allPublishableSelected}
+                    onCheckedChange={handleToggleSelectAll}
+                    aria-label="Select all publishable DAGs"
+                  />
+                )}
+              </TableHead>
               <TableHead>DAG</TableHead>
               <TableHead className="w-24">Status</TableHead>
               <TableHead className="w-28">Synced</TableHead>
@@ -400,7 +468,7 @@ export default function GitSyncPage() {
             {filteredDags.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={4}
+                  colSpan={5}
                   className="text-center text-muted-foreground py-8 text-xs"
                 >
                   {filter === 'all' ? 'No DAGs found' : `No ${filter} DAGs`}
@@ -414,12 +482,29 @@ export default function GitSyncPage() {
                   onClick={() => handleViewDiff(dagId)}
                 >
                   <TableCell onClick={(e) => e.stopPropagation()}>
-                    <a
-                      href={`/dags/${encodeURIComponent(dagId)}`}
-                      className="font-mono hover:underline"
-                    >
-                      {dagId}
-                    </a>
+                    {(dag.status === SyncStatus.modified ||
+                      dag.status === SyncStatus.untracked) && (
+                      <Checkbox
+                        checked={selectedDags.has(dagId)}
+                        onCheckedChange={() => handleToggleDag(dagId)}
+                        aria-label={`Select ${dagId}`}
+                      />
+                    )}
+                  </TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1.5">
+                      <a
+                        href={`/dags/${encodeURIComponent(dagId)}`}
+                        className="font-mono hover:underline"
+                      >
+                        {dagId}
+                      </a>
+                      {dagId.startsWith('memory/') && (
+                        <span className="text-[10px] px-1 py-0 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                          memory
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <StatusDot status={dag.status} />
@@ -537,7 +622,7 @@ export default function GitSyncPage() {
             <DialogTitle className="text-base">
               {publishModal.dagId
                 ? `Publish ${publishModal.dagId}`
-                : 'Publish All'}
+                : `Publish ${selectedDags.size} Selected`}
             </DialogTitle>
             <DialogDescription className="text-xs">
               Enter a commit message for this change.

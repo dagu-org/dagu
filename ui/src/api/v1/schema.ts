@@ -2845,10 +2845,12 @@ export interface components {
              */
             force: boolean;
         };
-        /** @description Request to publish all modified DAGs */
+        /** @description Request to publish selected DAGs */
         SyncPublishAllRequest: {
             /** @description Commit message */
             message?: string;
+            /** @description DAG IDs to publish */
+            dagIds: string[];
         };
         /** @description Response when a conflict is detected */
         SyncConflictResponse: {

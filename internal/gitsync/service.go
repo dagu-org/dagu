@@ -19,8 +19,8 @@ type Service interface {
 	// Publish commits and pushes a single DAG to the remote.
 	Publish(ctx context.Context, dagID, message string, force bool) (*SyncResult, error)
 
-	// PublishAll commits and pushes all modified DAGs.
-	PublishAll(ctx context.Context, message string) (*SyncResult, error)
+	// PublishAll commits and pushes the specified DAGs.
+	PublishAll(ctx context.Context, message string, dagIDs []string) (*SyncResult, error)
 
 	// Discard discards local changes for a DAG.
 	Discard(ctx context.Context, dagID string) error
@@ -526,8 +526,8 @@ func (s *serviceImpl) Publish(ctx context.Context, dagID, message string, force 
 	return result, nil
 }
 
-// PublishAll commits and pushes all modified DAGs.
-func (s *serviceImpl) PublishAll(ctx context.Context, message string) (*SyncResult, error) {
+// PublishAll commits and pushes the specified DAGs.
+func (s *serviceImpl) PublishAll(ctx context.Context, message string, dagIDs []string) (*SyncResult, error) {
 	if err := s.validatePushEnabled(); err != nil {
 		return nil, err
 	}
@@ -542,8 +542,7 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string) (*SyncResu
 		return nil, err
 	}
 
-	modifiedDAGs := s.findModifiedDAGs(state)
-	if len(modifiedDAGs) == 0 {
+	if len(dagIDs) == 0 {
 		return nil, ErrNoChanges
 	}
 
@@ -552,10 +551,10 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string) (*SyncResu
 	}
 
 	// Copy files and track which succeeded
-	successfulDAGs := make([]string, 0, len(modifiedDAGs))
-	stagedFiles := make([]string, 0, len(modifiedDAGs))
+	successfulDAGs := make([]string, 0, len(dagIDs))
+	stagedFiles := make([]string, 0, len(dagIDs))
 
-	for _, dagID := range modifiedDAGs {
+	for _, dagID := range dagIDs {
 		dagFilePath := s.dagIDToFilePath(dagID)
 		repoFilePath := s.dagIDToRepoPath(dagID)
 
@@ -1015,17 +1014,6 @@ func (s *serviceImpl) ensureRepoReady(ctx context.Context) error {
 		return s.gitClient.Clone(ctx)
 	}
 	return s.gitClient.Open()
-}
-
-// findModifiedDAGs returns all DAGs that have been modified or are untracked.
-func (s *serviceImpl) findModifiedDAGs(state *State) []string {
-	var modified []string
-	for dagID, dagState := range state.DAGs {
-		if dagState.Status == StatusModified || dagState.Status == StatusUntracked {
-			modified = append(modified, dagID)
-		}
-	}
-	return modified
 }
 
 // newSyncedDAGState creates a new DAGState in synced status.

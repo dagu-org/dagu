@@ -14,7 +14,7 @@ import (
 type SyncService interface {
 	Pull(ctx context.Context) (*gitsync.SyncResult, error)
 	Publish(ctx context.Context, dagID, message string, force bool) (*gitsync.SyncResult, error)
-	PublishAll(ctx context.Context, message string) (*gitsync.SyncResult, error)
+	PublishAll(ctx context.Context, message string, dagIDs []string) (*gitsync.SyncResult, error)
 	Discard(ctx context.Context, dagID string) error
 	GetStatus(ctx context.Context) (*gitsync.OverallStatus, error)
 	GetDAGStatus(ctx context.Context, dagID string) (*gitsync.DAGState, error)
@@ -120,11 +120,13 @@ func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestO
 	}
 
 	var message string
+	var dagIDs []string
 	if req.Body != nil {
 		message = valueOf(req.Body.Message)
+		dagIDs = req.Body.DagIds
 	}
 
-	result, err := a.syncService.PublishAll(ctx, message)
+	result, err := a.syncService.PublishAll(ctx, message, dagIDs)
 	if err != nil {
 		if gitsync.IsNotEnabled(err) {
 			return nil, errSyncNotConfigured
@@ -134,6 +136,7 @@ func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestO
 
 	a.logAudit(ctx, audit.CategoryGitSync, "sync_publish_all", map[string]any{
 		"message":  message,
+		"dag_ids":  dagIDs,
 		"synced":   result.Synced,
 		"modified": result.Modified,
 	})

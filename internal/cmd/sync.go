@@ -231,7 +231,17 @@ func runSyncPublish(ctx *Context, args []string) error {
 
 	if publishAll {
 		fmt.Println("Publishing all modified DAGs...")
-		result, err = syncSvc.PublishAll(ctx, message)
+		status, statusErr := syncSvc.GetStatus(ctx)
+		if statusErr != nil {
+			return fmt.Errorf("failed to get sync status: %w", statusErr)
+		}
+		var dagIDs []string
+		for id, dagState := range status.DAGs {
+			if dagState.Status == gitsync.StatusModified || dagState.Status == gitsync.StatusUntracked {
+				dagIDs = append(dagIDs, id)
+			}
+		}
+		result, err = syncSvc.PublishAll(ctx, message, dagIDs)
 	} else {
 		fmt.Printf("Publishing DAG: %s...\n", args[0])
 		result, err = syncSvc.Publish(ctx, args[0], message, force)
