@@ -314,7 +314,7 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 	}
 
 	// Prepare the WEBHOOK_PAYLOAD parameter
-	payload, err := marshalWebhookPayload(request.Body)
+	payload, err := marshalWebhookPayload(ctx, request.Body)
 	if err != nil {
 		logger.Warn(ctx, "Webhook: failed to marshal payload",
 			tag.Name(dag.Name),
@@ -446,14 +446,25 @@ func getCreatorID(ctx context.Context) string {
 }
 
 // marshalWebhookPayload returns the JSON representation of the webhook payload.
-// Returns "{}" if no payload is provided.
-func marshalWebhookPayload(body *api.TriggerWebhookJSONRequestBody) (string, error) {
-	if body == nil || body.Payload == nil {
-		return "{}", nil
+// If the structured "payload" field is present, it is used (backwards-compatible).
+// Otherwise, it falls back to the raw request body captured by the middleware.
+// Returns "{}" if neither is available.
+func marshalWebhookPayload(ctx context.Context, body *api.TriggerWebhookJSONRequestBody) (string, error) {
+	// If the structured "payload" field is present, use it (backwards-compatible).
+	if body != nil && body.Payload != nil {
+		payloadBytes, err := json.Marshal(*body.Payload)
+		if err != nil {
+			return "", err
+		}
+		return string(payloadBytes), nil
 	}
-	payloadBytes, err := json.Marshal(*body.Payload)
-	if err != nil {
-		return "", err
+
+	// Fall back to the raw body from context (captured by middleware).
+	if rawBody := rawBodyFromContext(ctx); len(rawBody) > 0 {
+		if json.Valid(rawBody) {
+			return string(rawBody), nil
+		}
 	}
-	return string(payloadBytes), nil
+
+	return "{}", nil
 }
