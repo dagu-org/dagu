@@ -439,3 +439,22 @@ func TestBashTool_SafeMode_SafeCommandNoApproval(t *testing.T) {
 	require.False(t, result.IsError)
 	require.Contains(t, result.Content, "hello")
 }
+
+func TestBashTool_SafeMode_SkipsLegacyPromptWhenPolicyChecked(t *testing.T) {
+	t.Parallel()
+
+	tool := NewBashTool()
+	input := json.RawMessage(`{"command": "rm testfile"}`)
+
+	promptCalled := false
+	ctx := ToolContext{
+		Context:        context.Background(),
+		SafeMode:       true,
+		PolicyChecked:  true,
+		EmitUserPrompt: func(_ UserPrompt) { promptCalled = true },
+	}
+
+	_ = tool.Run(ctx, input)
+
+	require.False(t, promptCalled, "legacy safe mode prompt should be skipped when policy already checked")
+}

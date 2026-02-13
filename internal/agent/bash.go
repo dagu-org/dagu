@@ -4,15 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"os/exec"
-	"slices"
 	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/llm"
-	"github.com/google/uuid"
 )
 
 const (
@@ -92,47 +88,6 @@ func matchesDangerousPattern(cmd, pattern string) bool {
 		strings.Contains(cmd, "\t"+pattern)
 }
 
-// requestApproval asks the user to approve a command before execution.
-func requestApproval(ctx ToolContext, cmd string) (bool, error) {
-	if ctx.EmitUserPrompt == nil || ctx.WaitUserResponse == nil {
-		return true, nil // No prompt mechanism, allow
-	}
-
-	promptID := uuid.New().String()
-	ctx.EmitUserPrompt(UserPrompt{
-		PromptID:   promptID,
-		PromptType: PromptTypeCommandApproval,
-		Question:   "Approve command?",
-		Command:    cmd,
-		WorkingDir: ctx.WorkingDir,
-		Options: []UserPromptOption{
-			{ID: "approve", Label: "Approve"},
-			{ID: "reject", Label: "Reject"},
-		},
-	})
-
-	// Timeout prevents indefinite blocking and channel leaks.
-	parentCtx := ctx.Context
-	if parentCtx == nil {
-		parentCtx = context.Background()
-	}
-	timeoutCtx, cancel := context.WithTimeout(parentCtx, approvalTimeout)
-	defer cancel()
-
-	resp, err := ctx.WaitUserResponse(timeoutCtx, promptID)
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return false, fmt.Errorf("approval timed out after %v", approvalTimeout)
-		}
-		return false, err
-	}
-	if resp.Cancelled {
-		return false, nil
-	}
-
-	return slices.Contains(resp.SelectedOptionIDs, "approve"), nil
-}
-
 func bashRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
 	var args BashToolInput
 	if err := json.Unmarshal(input, &args); err != nil {
@@ -145,8 +100,18 @@ func bashRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
 		return toolError("Permission denied: bash requires execute permission")
 	}
 
-	if toolCtx.SafeMode && commandRequiresApproval(args.Command) {
-		approved, err := requestApproval(toolCtx, args.Command)
+	// Legacy safe-mode approval is skipped when centralized policy already checked
+	// this command in a before-tool hook, to avoid duplicate prompts.
+	if toolCtx.SafeMode && !toolCtx.PolicyChecked && commandRequiresApproval(args.Command) {
+		approved, err := requestCommandApprovalWithOptions(
+			toolCtx.Context,
+			toolCtx.EmitUserPrompt,
+			toolCtx.WaitUserResponse,
+			args.Command,
+			toolCtx.WorkingDir,
+			"Approve command?",
+			true,
+		)
 		if err != nil {
 			return toolError("Approval failed: %v", err)
 		}

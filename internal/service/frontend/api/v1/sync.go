@@ -121,7 +121,7 @@ func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestO
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, errInvalidRequestBody
+		return nil, ErrInvalidRequestBody
 	}
 	message := valueOf(req.Body.Message)
 	var itemIDs []string
