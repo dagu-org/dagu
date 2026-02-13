@@ -310,6 +310,7 @@ type QueueConfig struct {
 
 // Coordinator represents the coordinator service configuration.
 type Coordinator struct {
+	Enabled   bool   // Default: true
 	ID        string // Default: hostname@port
 	Host      string // gRPC bind address
 	Advertise string // Registry address (auto-detected if empty)

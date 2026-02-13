@@ -197,6 +197,7 @@ func TestLoad_Env(t *testing.T) {
 		},
 		Queues: Queues{Enabled: false},
 		Coordinator: Coordinator{
+			Enabled:   true,
 			Host:      "0.0.0.0",
 			Advertise: "dagu-coordinator",
 			Port:      50099,
@@ -461,8 +462,9 @@ scheduler:
 			},
 		},
 		Coordinator: Coordinator{
-			Host: "coordinator.example.com",
-			Port: 8081,
+			Enabled: true,
+			Host:    "coordinator.example.com",
+			Port:    8081,
 		},
 		Worker: Worker{
 			ID:            "worker-1",
@@ -1234,6 +1236,38 @@ audit:
 			"DAGU_AUDIT_ENABLED": "false",
 		})
 		assert.False(t, cfg.Server.Audit.Enabled)
+	})
+}
+
+func TestLoad_Coordinator(t *testing.T) {
+	t.Run("CoordinatorDefault", func(t *testing.T) {
+		cfg := loadFromYAML(t, "# empty")
+		assert.True(t, cfg.Coordinator.Enabled)
+	})
+
+	t.Run("CoordinatorDisabled", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+coordinator:
+  enabled: false
+`)
+		assert.False(t, cfg.Coordinator.Enabled)
+	})
+
+	t.Run("CoordinatorDisabledFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_COORDINATOR_ENABLED": "false",
+		})
+		assert.False(t, cfg.Coordinator.Enabled)
+	})
+
+	t.Run("CoordinatorEnvOverridesYAML", func(t *testing.T) {
+		cfg := loadWithEnv(t, `
+coordinator:
+  enabled: true
+`, map[string]string{
+			"DAGU_COORDINATOR_ENABLED": "false",
+		})
+		assert.False(t, cfg.Coordinator.Enabled)
 	})
 }
 

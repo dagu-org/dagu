@@ -605,6 +605,10 @@
       "description": "Coordinator service configuration for distributed execution.",
       "additionalProperties": false,
       "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable the coordinator service for distributed execution. Default: true."
+        },
         "host": {
           "type": "string",
           "description": "Coordinator bind address."

@@ -300,7 +300,12 @@ func (c *Context) NewServer(rs *resource.Service, opts ...frontend.ServerOption)
 }
 
 // NewCoordinatorClient creates a new coordinator client using the global peer configuration.
+// Returns nil when the coordinator is disabled via configuration.
 func (c *Context) NewCoordinatorClient() coordinator.Client {
+	if !c.Config.Coordinator.Enabled {
+		return nil
+	}
+
 	coordinatorCliCfg := coordinator.DefaultConfig()
 	coordinatorCliCfg.CAFile = c.Config.Core.Peer.ClientCaFile
 	coordinatorCliCfg.CertFile = c.Config.Core.Peer.CertFile

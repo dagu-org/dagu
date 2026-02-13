@@ -72,6 +72,14 @@ func WithServerConfig(cfg *config.Server) HelperOption {
 	}
 }
 
+// WithCoordinatorEnabled re-enables the coordinator in test configuration.
+// By default, tests disable the coordinator since no coordinator is running.
+func WithCoordinatorEnabled() HelperOption {
+	return WithConfigMutator(func(cfg *config.Config) {
+		cfg.Coordinator.Enabled = true
+	})
+}
+
 // WithConfigMutator applies mutations to the loaded configuration after defaults are set.
 func WithConfigMutator(mutator func(*config.Config)) HelperOption {
 	return func(opts *Options) {
@@ -165,6 +173,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	cfg.Paths.UsersDir = filepath.Join(dataDir, "users")
 	cfg.Paths.SuspendFlagsDir = filepath.Join(tmpDir, "suspend-flags")
 	cfg.Paths.AdminLogsDir = filepath.Join(tmpDir, "admin-logs")
+	cfg.Coordinator.Enabled = false
 	if options.DAGsDir != "" {
 		cfg.Paths.DAGsDir = options.DAGsDir
 	}
@@ -312,13 +321,19 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 		configData["scheduler"] = scheduler
 	}
 
-	if cfg.Coordinator.Host != "" || cfg.Coordinator.Advertise != "" || cfg.Coordinator.Port != 0 {
-		configData["coordinator"] = map[string]any{
-			"host":      cfg.Coordinator.Host,
-			"advertise": cfg.Coordinator.Advertise,
-			"port":      cfg.Coordinator.Port,
-		}
+	coordData := map[string]any{
+		"enabled": cfg.Coordinator.Enabled,
 	}
+	if cfg.Coordinator.Host != "" {
+		coordData["host"] = cfg.Coordinator.Host
+	}
+	if cfg.Coordinator.Advertise != "" {
+		coordData["advertise"] = cfg.Coordinator.Advertise
+	}
+	if cfg.Coordinator.Port != 0 {
+		coordData["port"] = cfg.Coordinator.Port
+	}
+	configData["coordinator"] = coordData
 
 	if cfg.Worker.ID != "" || cfg.Worker.MaxActiveRuns != 0 || len(cfg.Worker.Labels) > 0 {
 		configData["worker"] = map[string]any{
