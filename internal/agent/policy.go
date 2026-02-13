@@ -53,7 +53,8 @@ func IsBashToolName(name string) bool {
 }
 
 //go:fix inline
-func boolPtr(v bool) *bool { return &v }
+//go:fix inline
+func boolPtr(v bool) *bool { return new(v) }
 
 func cloneBashRules(rules []BashRule) []BashRule {
 	if len(rules) == 0 {
@@ -67,7 +68,7 @@ func cloneBashRules(rules []BashRule) []BashRule {
 			Action:  rules[i].Action,
 		}
 		if rules[i].Enabled != nil {
-			out[i].Enabled = boolPtr(*rules[i].Enabled)
+			out[i].Enabled = new(*rules[i].Enabled)
 		}
 	}
 	return out
