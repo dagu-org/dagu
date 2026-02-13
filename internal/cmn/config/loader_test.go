@@ -1237,6 +1237,38 @@ audit:
 	})
 }
 
+func TestLoad_Coordinator(t *testing.T) {
+	t.Run("CoordinatorDefault", func(t *testing.T) {
+		cfg := loadFromYAML(t, "# empty")
+		assert.True(t, cfg.Coordinator.Enabled)
+	})
+
+	t.Run("CoordinatorDisabled", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+coordinator:
+  enabled: false
+`)
+		assert.False(t, cfg.Coordinator.Enabled)
+	})
+
+	t.Run("CoordinatorDisabledFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_COORDINATOR_ENABLED": "false",
+		})
+		assert.False(t, cfg.Coordinator.Enabled)
+	})
+
+	t.Run("CoordinatorEnvOverridesYAML", func(t *testing.T) {
+		cfg := loadWithEnv(t, `
+coordinator:
+  enabled: true
+`, map[string]string{
+			"DAGU_COORDINATOR_ENABLED": "false",
+		})
+		assert.False(t, cfg.Coordinator.Enabled)
+	})
+}
+
 func TestLoad_TunnelConfig(t *testing.T) {
 	t.Run("TunnelDefault", func(t *testing.T) {
 		cfg := loadFromYAML(t, "# empty")
