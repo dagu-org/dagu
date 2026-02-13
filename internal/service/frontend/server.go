@@ -143,9 +143,16 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		}
 	}
 
+	var memoryStore agent.MemoryStore
+	if ms, err := filememory.New(cfg.Paths.DAGsDir); err != nil {
+		logger.Warn(ctx, "Failed to create memory store", tag.Error(err))
+	} else {
+		memoryStore = ms
+	}
+
 	var agentAPI *agent.API
 	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, &cfg.Paths, dr, auditSvc)
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, &cfg.Paths, dr, auditSvc, memoryStore)
 		if err != nil {
 			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
 		}
@@ -260,8 +267,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		allAPIOptions = append(allAPIOptions, apiv1.WithAgentModelStore(agentModelStore))
 	}
 
-	// Wire up agent memory store for the REST API
-	if memoryStore, err := filememory.New(cfg.Paths.DAGsDir); err == nil {
+	if memoryStore != nil {
 		allAPIOptions = append(allAPIOptions, apiv1.WithAgentMemoryStore(memoryStore))
 	}
 
@@ -405,7 +411,7 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 
 // initAgentAPI creates and returns an agent API.
 // The API uses the config store to check enabled status and resolve providers via the model store.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, paths *config.PathsConfig, dagStore exec.DAGStore, auditSvc *audit.Service) (*agent.API, error) {
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, paths *config.PathsConfig, dagStore exec.DAGStore, auditSvc *audit.Service, memoryStore agent.MemoryStore) (*agent.API, error) {
 	sessStore, err := filesession.New(paths.SessionsDir)
 	if err != nil {
 		logger.Warn(ctx, "Failed to create session store, persistence disabled", tag.Error(err))
@@ -414,13 +420,6 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 	hooks := agent.NewHooks()
 	if auditSvc != nil {
 		hooks.OnAfterToolExec(newAgentAuditHook(auditSvc))
-	}
-
-	var memoryStore agent.MemoryStore
-	if ms, err := filememory.New(paths.DAGsDir); err != nil {
-		logger.Warn(ctx, "Failed to create memory store", tag.Error(err))
-	} else {
-		memoryStore = ms
 	}
 
 	api := agent.NewAPI(agent.APIConfig{

@@ -243,6 +243,10 @@ func runSyncPublish(ctx *Context, args []string) error {
 			}
 		}
 		sort.Strings(dagIDs)
+		if len(dagIDs) == 0 {
+			fmt.Println("No modified or untracked DAGs to publish")
+			return nil
+		}
 		result, err = syncSvc.PublishAll(ctx, message, dagIDs)
 	} else {
 		fmt.Printf("Publishing DAG: %s...\n", args[0])

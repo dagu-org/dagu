@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"sort"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/gitsync"
@@ -110,7 +111,7 @@ func (a *API) SyncPull(ctx context.Context, _ api.SyncPullRequestObject) (api.Sy
 	return api.SyncPull200JSONResponse(toAPISyncResult(result)), nil
 }
 
-// SyncPublishAll publishes all modified DAGs.
+// SyncPublishAll publishes selected DAGs.
 func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestObject) (api.SyncPublishAllResponseObject, error) {
 	if err := a.requireSyncService(); err != nil {
 		return nil, err
@@ -121,16 +122,25 @@ func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestO
 	if req.Body == nil {
 		return nil, errInvalidRequestBody
 	}
-	if len(req.Body.DagIds) == 0 {
+	message := valueOf(req.Body.Message)
+	var dagIDs []string
+	if req.Body.DagIds == nil {
+		status, err := a.syncService.GetStatus(ctx)
+		if err != nil {
+			return nil, internalError(err)
+		}
+		dagIDs = collectPublishableDAGIDs(status)
+	} else {
+		dagIDs = append(dagIDs, (*req.Body.DagIds)...)
+	}
+	if len(dagIDs) == 0 {
 		return nil, &Error{
 			Code:       api.ErrorCodeBadRequest,
-			Message:    "dagIds is required and must contain at least one DAG ID",
+			Message:    "No modified or untracked DAGs to publish",
 			HTTPStatus: http.StatusBadRequest,
 		}
 	}
-
-	message := valueOf(req.Body.Message)
-	dagIDs := req.Body.DagIds
+	sort.Strings(dagIDs)
 
 	result, err := a.syncService.PublishAll(ctx, message, dagIDs)
 	if err != nil {
@@ -156,6 +166,22 @@ func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestO
 	})
 
 	return api.SyncPublishAll200JSONResponse(toAPISyncResult(result)), nil
+}
+
+func collectPublishableDAGIDs(status *gitsync.OverallStatus) []string {
+	if status == nil {
+		return nil
+	}
+	dagIDs := make([]string, 0, len(status.DAGs))
+	for id, dag := range status.DAGs {
+		if dag == nil {
+			continue
+		}
+		if dag.Status == gitsync.StatusModified || dag.Status == gitsync.StatusUntracked {
+			dagIDs = append(dagIDs, id)
+		}
+	}
+	return dagIDs
 }
 
 // SyncTestConnection tests the connection to the remote repository.

@@ -280,13 +280,14 @@ func (a *API) createMessageCallback(id string) func(ctx context.Context, msg Mes
 }
 
 // persistNewSession saves a new session to the store if configured.
-func (a *API) persistNewSession(ctx context.Context, id, userID string, now time.Time) {
+func (a *API) persistNewSession(ctx context.Context, id, userID, dagName string, now time.Time) {
 	if a.store == nil {
 		return
 	}
 	sess := &Session{
 		ID:        id,
 		UserID:    userID,
+		DAGName:   dagName,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -367,7 +368,7 @@ func (a *API) handleNewSession(w http.ResponseWriter, r *http.Request) {
 		DAGName:         dagName,
 	})
 
-	a.persistNewSession(r.Context(), id, userID, now)
+	a.persistNewSession(r.Context(), id, userID, dagName, now)
 	a.sessions.Store(id, mgr)
 
 	messageWithContext := formatMessageWithContexts(req.Message, resolved)
@@ -622,6 +623,7 @@ func (a *API) reactivateSession(ctx context.Context, id, userID, username, ipAdd
 		Username:    username,
 		IPAddress:   ipAddress,
 		MemoryStore: a.memoryStore,
+		DAGName:     sess.DAGName,
 	})
 	a.sessions.Store(id, mgr)
 

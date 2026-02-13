@@ -16,25 +16,25 @@ const (
 )
 
 var (
-	errAgentMemoryNotAvailable = &Error{
+	ErrAgentMemoryNotAvailable = &Error{
 		Code:       api.ErrorCodeForbidden,
 		Message:    "Agent memory management is not available",
 		HTTPStatus: http.StatusForbidden,
 	}
 
-	errFailedToLoadMemory = &Error{
+	ErrFailedToLoadMemory = &Error{
 		Code:       api.ErrorCodeInternalError,
 		Message:    "Failed to load agent memory",
 		HTTPStatus: http.StatusInternalServerError,
 	}
 
-	errFailedToSaveMemory = &Error{
+	ErrFailedToSaveMemory = &Error{
 		Code:       api.ErrorCodeInternalError,
 		Message:    "Failed to save agent memory",
 		HTTPStatus: http.StatusInternalServerError,
 	}
 
-	errFailedToDeleteMemory = &Error{
+	ErrFailedToDeleteMemory = &Error{
 		Code:       api.ErrorCodeInternalError,
 		Message:    "Failed to delete agent memory",
 		HTTPStatus: http.StatusInternalServerError,
@@ -50,13 +50,13 @@ func (a *API) GetAgentMemory(ctx context.Context, _ api.GetAgentMemoryRequestObj
 	globalContent, err := a.agentMemoryStore.LoadGlobalMemory(ctx)
 	if err != nil {
 		logger.Error(ctx, "Failed to load global memory", tag.Error(err))
-		return nil, errFailedToLoadMemory
+		return nil, ErrFailedToLoadMemory
 	}
 
 	dagNames, err := a.agentMemoryStore.ListDAGMemories(ctx)
 	if err != nil {
 		logger.Error(ctx, "Failed to list DAG memories", tag.Error(err))
-		return nil, errFailedToLoadMemory
+		return nil, ErrFailedToLoadMemory
 	}
 
 	return api.GetAgentMemory200JSONResponse(api.AgentMemoryResponse{
@@ -77,7 +77,7 @@ func (a *API) UpdateAgentMemory(ctx context.Context, request api.UpdateAgentMemo
 
 	if err := a.agentMemoryStore.SaveGlobalMemory(ctx, request.Body.Content); err != nil {
 		logger.Error(ctx, "Failed to save global memory", tag.Error(err))
-		return nil, errFailedToSaveMemory
+		return nil, ErrFailedToSaveMemory
 	}
 
 	a.logAudit(ctx, audit.CategoryAgent, auditActionMemoryUpdate, map[string]any{"scope": "global"})
@@ -93,7 +93,7 @@ func (a *API) DeleteAgentMemory(ctx context.Context, _ api.DeleteAgentMemoryRequ
 
 	if err := a.agentMemoryStore.DeleteGlobalMemory(ctx); err != nil {
 		logger.Error(ctx, "Failed to delete global memory", tag.Error(err))
-		return nil, errFailedToDeleteMemory
+		return nil, ErrFailedToDeleteMemory
 	}
 
 	a.logAudit(ctx, audit.CategoryAgent, auditActionMemoryDelete, map[string]any{"scope": "global"})
@@ -110,7 +110,7 @@ func (a *API) GetAgentDAGMemory(ctx context.Context, request api.GetAgentDAGMemo
 	content, err := a.agentMemoryStore.LoadDAGMemory(ctx, request.DagName)
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG memory", tag.Error(err))
-		return nil, errFailedToLoadMemory
+		return nil, ErrFailedToLoadMemory
 	}
 
 	return api.GetAgentDAGMemory200JSONResponse(api.AgentDAGMemoryResponse{
@@ -130,7 +130,7 @@ func (a *API) UpdateAgentDAGMemory(ctx context.Context, request api.UpdateAgentD
 
 	if err := a.agentMemoryStore.SaveDAGMemory(ctx, request.DagName, request.Body.Content); err != nil {
 		logger.Error(ctx, "Failed to save DAG memory", tag.Error(err))
-		return nil, errFailedToSaveMemory
+		return nil, ErrFailedToSaveMemory
 	}
 
 	a.logAudit(ctx, audit.CategoryAgent, auditActionMemoryUpdate, map[string]any{
@@ -149,7 +149,7 @@ func (a *API) DeleteAgentDAGMemory(ctx context.Context, request api.DeleteAgentD
 
 	if err := a.agentMemoryStore.DeleteDAGMemory(ctx, request.DagName); err != nil {
 		logger.Error(ctx, "Failed to delete DAG memory", tag.Error(err))
-		return nil, errFailedToDeleteMemory
+		return nil, ErrFailedToDeleteMemory
 	}
 
 	a.logAudit(ctx, audit.CategoryAgent, auditActionMemoryDelete, map[string]any{
@@ -164,7 +164,7 @@ func (a *API) DeleteAgentDAGMemory(ctx context.Context, request api.DeleteAgentD
 // caller has admin privileges. Every agent-memory endpoint calls this.
 func (a *API) requireAgentMemoryAdmin(ctx context.Context) error {
 	if a.agentMemoryStore == nil {
-		return errAgentMemoryNotAvailable
+		return ErrAgentMemoryNotAvailable
 	}
 	return a.requireAdmin(ctx)
 }

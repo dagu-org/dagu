@@ -54,5 +54,5 @@ func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG, memory Me
 
 // fallbackPrompt returns a basic prompt when template execution fails.
 func fallbackPrompt(env EnvironmentInfo) string {
-	return "You are Hermio, an AI assistant for DAG workflows. DAGs Directory: " + env.DAGsDir
+	return "You are Tsumugi, an AI assistant for DAG workflows. DAGs Directory: " + env.DAGsDir
 }

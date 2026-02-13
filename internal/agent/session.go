@@ -206,6 +206,7 @@ func (sm *SessionManager) GetSession() Session {
 	return Session{
 		ID:        sm.id,
 		UserID:    sm.userID,
+		DAGName:   sm.dagName,
 		CreatedAt: sm.createdAt,
 		UpdatedAt: sm.lastActivity,
 	}
@@ -388,10 +389,16 @@ func (sm *SessionManager) loadMemory() MemoryContent {
 		return MemoryContent{}
 	}
 	ctx := context.Background()
-	global, _ := sm.memoryStore.LoadGlobalMemory(ctx)
+	global, err := sm.memoryStore.LoadGlobalMemory(ctx)
+	if err != nil {
+		sm.logger.Debug("failed to load global memory", "error", err)
+	}
 	var dagMem string
 	if sm.dagName != "" {
-		dagMem, _ = sm.memoryStore.LoadDAGMemory(ctx, sm.dagName)
+		dagMem, err = sm.memoryStore.LoadDAGMemory(ctx, sm.dagName)
+		if err != nil {
+			sm.logger.Debug("failed to load DAG memory", "error", err, "dag_name", sm.dagName)
+		}
 	}
 	return MemoryContent{
 		GlobalMemory: global,

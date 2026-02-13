@@ -55,6 +55,8 @@ func TestGenerateSystemPrompt(t *testing.T) {
 
 		assert.NotContains(t, result, "<global_memory>")
 		assert.NotContains(t, result, "<dag_memory")
+		assert.NotContains(t, result, "<memory_paths>")
+		assert.NotContains(t, result, "<memory_management>")
 	})
 
 	t.Run("includes global memory only", func(t *testing.T) {
@@ -114,7 +116,7 @@ func TestFallbackPrompt(t *testing.T) {
 		result := fallbackPrompt(EnvironmentInfo{DAGsDir: "/my/dags"})
 
 		assert.Contains(t, result, "/my/dags")
-		assert.Contains(t, result, "Hermio")
+		assert.Contains(t, result, "Tsumugi")
 	})
 
 	t.Run("works with empty environment", func(t *testing.T) {
@@ -123,6 +125,6 @@ func TestFallbackPrompt(t *testing.T) {
 		result := fallbackPrompt(EnvironmentInfo{})
 
 		assert.NotEmpty(t, result)
-		assert.Contains(t, result, "Hermio")
+		assert.Contains(t, result, "Tsumugi")
 	})
 }

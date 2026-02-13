@@ -10,6 +10,7 @@ export default function AgentMemoryPage(): React.ReactNode {
   const client = useClient();
   const isAdmin = useIsAdmin();
   const appBarContext = useContext(AppBarContext);
+  const { setTitle } = appBarContext;
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -31,10 +32,11 @@ export default function AgentMemoryPage(): React.ReactNode {
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
   useEffect(() => {
-    appBarContext.setTitle('Agent Memory');
-  }, [appBarContext]);
+    setTitle('Agent Memory');
+  }, [setTitle]);
 
   const fetchMemory = useCallback(async () => {
+    setIsLoading(true);
     try {
       const { data, error: apiError } = await client.GET('/settings/agent/memory', {
         params: { query: { remoteNode } },
@@ -152,14 +154,6 @@ export default function AgentMemoryPage(): React.ReactNode {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   const globalLineCount = globalMemory.split('\n').length;
 
   return (
@@ -169,6 +163,12 @@ export default function AgentMemoryPage(): React.ReactNode {
         <p className="text-sm text-muted-foreground">
           View and manage the AI agent's persistent memory
         </p>
+        {isLoading && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Loading memory...
+          </div>
+        )}
         {memoryDir && (
           <p className="text-xs text-muted-foreground mt-1 font-mono">{memoryDir}</p>
         )}
@@ -201,6 +201,7 @@ export default function AgentMemoryPage(): React.ReactNode {
         <textarea
           value={globalMemory}
           onChange={(e) => setGlobalMemory(e.target.value)}
+          disabled={isLoading}
           className="w-full h-64 p-3 text-sm font-mono bg-muted/50 border rounded-md resize-y focus:outline-none focus:ring-1 focus:ring-ring"
           placeholder="No global memory yet. The agent will write here when it learns something."
         />
@@ -208,7 +209,7 @@ export default function AgentMemoryPage(): React.ReactNode {
         <div className="flex gap-2">
           <Button
             onClick={handleSaveGlobal}
-            disabled={isSaving}
+            disabled={isSaving || isLoading}
             size="sm"
             className="h-8"
           >
@@ -229,7 +230,7 @@ export default function AgentMemoryPage(): React.ReactNode {
             variant="outline"
             size="sm"
             className="h-8"
-            disabled={!globalMemory}
+            disabled={!globalMemory || isLoading}
           >
             <Trash2 className="h-4 w-4 mr-1.5" />
             Clear
@@ -244,7 +245,11 @@ export default function AgentMemoryPage(): React.ReactNode {
           Per-DAG Memory
         </div>
 
-        {dagNames.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : dagNames.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4 text-center">
             No DAG-specific memories yet. The agent will create these when working with specific DAGs.
           </p>

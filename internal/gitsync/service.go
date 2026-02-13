@@ -612,11 +612,11 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string, dagIDs []s
 		}
 	}
 
-	// Commit
+	// Commit staged files only (do not restage ".")
 	if message == "" {
 		message = fmt.Sprintf("Update %d DAG(s)", len(successfulDAGs))
 	}
-	commitHash, err := s.gitClient.AddAndCommit(".", message)
+	commitHash, err := s.gitClient.CommitStaged(message)
 	if err != nil {
 		return nil, err
 	}

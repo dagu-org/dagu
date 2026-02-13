@@ -1450,8 +1450,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Publish all modified DAGs
-         * @description Commits and pushes all modified DAGs to the remote repository
+         * Publish selected DAGs
+         * @description Commits and pushes the specified DAG IDs. If dagIds is omitted, publishes all modified or untracked DAGs.
          */
         post: operations["syncPublishAll"];
         delete?: never;
@@ -2849,8 +2849,8 @@ export interface components {
         SyncPublishAllRequest: {
             /** @description Commit message */
             message?: string;
-            /** @description DAG IDs to publish */
-            dagIds: string[];
+            /** @description DAG IDs to publish. If omitted, all modified or untracked DAGs are published. */
+            dagIds?: string[];
         };
         /** @description Response when a conflict is detected */
         SyncConflictResponse: {
@@ -3015,13 +3015,13 @@ export interface components {
             /** @description Content of global MEMORY.md */
             globalMemory?: string;
             /** @description List of DAG names that have memory files */
-            dagMemories?: string[];
+            dagMemories?: components["schemas"]["DAGName"][];
             /** @description Root memory directory path */
             memoryDir?: string;
         };
         /** @description DAG-specific memory content */
         AgentDAGMemoryResponse: {
-            dagName: string;
+            dagName: components["schemas"]["DAGName"];
             content: string;
         };
         /** @description Request to update memory content */
@@ -8012,7 +8012,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Name of the DAG */
-                dagName: string;
+                dagName: components["schemas"]["DAGName"];
             };
             cookie?: never;
         };
@@ -8065,7 +8065,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Name of the DAG */
-                dagName: string;
+                dagName: components["schemas"]["DAGName"];
             };
             cookie?: never;
         };
@@ -8129,7 +8129,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Name of the DAG */
-                dagName: string;
+                dagName: components["schemas"]["DAGName"];
             };
             cookie?: never;
         };

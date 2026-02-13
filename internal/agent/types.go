@@ -133,6 +133,8 @@ type Session struct {
 	ID string `json:"id"`
 	// UserID identifies the user who owns this session.
 	UserID string `json:"user_id,omitempty"`
+	// DAGName stores the primary DAG context for this session's memory scope.
+	DAGName string `json:"dag_name,omitempty"`
 	// Title is a human-readable name for the session.
 	Title string `json:"title,omitempty"`
 	// CreatedAt is when this session was created.

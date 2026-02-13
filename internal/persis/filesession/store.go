@@ -29,6 +29,7 @@ const (
 type SessionForStorage struct {
 	ID        string          `json:"id"`
 	UserID    string          `json:"user_id"`
+	DAGName   string          `json:"dag_name,omitempty"`
 	Title     string          `json:"title,omitempty"`
 	CreatedAt time.Time       `json:"created_at"`
 	UpdatedAt time.Time       `json:"updated_at"`
@@ -40,6 +41,7 @@ func (c *SessionForStorage) ToSession() *agent.Session {
 	return &agent.Session{
 		ID:        c.ID,
 		UserID:    c.UserID,
+		DAGName:   c.DAGName,
 		Title:     c.Title,
 		CreatedAt: c.CreatedAt,
 		UpdatedAt: c.UpdatedAt,
@@ -51,6 +53,7 @@ func FromSession(sess *agent.Session, messages []agent.Message) *SessionForStora
 	return &SessionForStorage{
 		ID:        sess.ID,
 		UserID:    sess.UserID,
+		DAGName:   sess.DAGName,
 		Title:     sess.Title,
 		CreatedAt: sess.CreatedAt,
 		UpdatedAt: sess.UpdatedAt,

@@ -46,11 +46,13 @@ Status: {{.CurrentDAG.Status}}{{end}}
 </memory>
 {{end}}
 
+{{if .Memory.MemoryDir}}
 <memory_paths>
 - Memory directory: {{.Memory.MemoryDir}}
 - Global memory: {{.Memory.MemoryDir}}/MEMORY.md
 {{if .Memory.DAGName}}- DAG memory: {{.Memory.MemoryDir}}/dags/{{.Memory.DAGName}}/MEMORY.md
 {{end}}</memory_paths>
+{{end}}
 
 <rules>
 <safety>
@@ -152,6 +154,7 @@ Do not use placeholders unless user explicitly requests dummy data for testing.
 3. Proceed only after user confirms configuration is complete.
 </configuration>
 
+{{if .Memory.MemoryDir}}
 <memory_management>
 Consult your memory files to build on previous experience.
 When you learn something reusable, record it.
@@ -169,6 +172,7 @@ Rules:
 - When the user says "remember this", save it immediately
 - When the user says "forget this", remove it
 </memory_management>
+{{end}}
 
 <schema_reference>
 Use `read_schema` to look up DAG YAML structure:

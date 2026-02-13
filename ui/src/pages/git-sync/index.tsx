@@ -36,7 +36,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { DiffModal } from './DiffModal';
 
 type SyncStatusResponse = components['schemas']['SyncStatusResponse'];
@@ -86,6 +86,7 @@ function StatusDot({ status }: { status: SyncStatus }) {
 
 export default function GitSyncPage() {
   const appBarContext = useContext(AppBarContext);
+  const { setTitle } = appBarContext;
   const client = useClient();
   const canWrite = useCanWrite();
   const { showToast } = useSimpleToast();
@@ -112,10 +113,12 @@ export default function GitSyncPage() {
     dagId?: string;
   }>({ open: false });
   const [selectedDags, setSelectedDags] = useState<Set<string>>(new Set());
+  const userTouchedSelectionRef = useRef(false);
+  const prevPublishableRef = useRef<string>('');
 
   useEffect(() => {
-    appBarContext.setTitle('Git Sync');
-  }, [appBarContext]);
+    setTitle('Git Sync');
+  }, [setTitle]);
 
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
@@ -140,17 +143,55 @@ export default function GitSyncPage() {
   const status = statusData as SyncStatusResponse | undefined;
   const config = configData as SyncConfigResponse | undefined;
 
-  // Auto-select all publishable DAGs when data changes
-  useEffect(() => {
-    if (!status?.dags) return;
-    const publishable = new Set<string>();
-    for (const [id, dag] of Object.entries(status.dags)) {
-      if (dag.status === SyncStatus.modified || dag.status === SyncStatus.untracked) {
-        publishable.add(id);
-      }
-    }
-    setSelectedDags(publishable);
+  const publishableKey = useMemo(() => {
+    if (!status?.dags) return '';
+    return Object.entries(status.dags)
+      .filter(
+        ([, dag]) =>
+          dag.status === SyncStatus.modified ||
+          dag.status === SyncStatus.untracked
+      )
+      .map(([id]) => id)
+      .sort()
+      .join(',');
   }, [status?.dags]);
+
+  useEffect(() => {
+    userTouchedSelectionRef.current = false;
+    prevPublishableRef.current = '';
+    setSelectedDags(new Set());
+  }, [remoteNode]);
+
+  // Auto-select publishable DAGs without overriding user manual choices on polling.
+  useEffect(() => {
+    const next = publishableKey ? publishableKey.split(',') : [];
+    const prev = prevPublishableRef.current
+      ? prevPublishableRef.current.split(',')
+      : [];
+    const prevSet = new Set(prev);
+    const nextSet = new Set(next);
+
+    setSelectedDags((current) => {
+      if (!userTouchedSelectionRef.current) {
+        return new Set(next);
+      }
+
+      const updated = new Set<string>();
+      for (const id of current) {
+        if (nextSet.has(id)) {
+          updated.add(id);
+        }
+      }
+      for (const id of next) {
+        if (!prevSet.has(id)) {
+          updated.add(id)
+        }
+      }
+      return updated;
+    });
+
+    prevPublishableRef.current = publishableKey;
+  }, [publishableKey]);
 
   // Handlers
   const handlePull = async () => {
@@ -202,6 +243,7 @@ export default function GitSyncPage() {
         setDiffModal({ open: false });
         setCommitMessage('');
         setSelectedDags(new Set());
+        userTouchedSelectionRef.current = false;
         mutateStatus();
       }
     } catch (err) {
@@ -260,12 +302,16 @@ export default function GitSyncPage() {
   };
 
   // Filter DAGs by status
-  const filteredDags = status?.dags
-    ? Object.entries(status.dags).filter(([, dag]) => {
-        if (filter === 'all') return true;
-        return dag.status === filter;
-      })
-    : [];
+  const filteredDags = useMemo(
+    () =>
+      status?.dags
+        ? Object.entries(status.dags).filter(([, dag]) => {
+            if (filter === 'all') return true;
+            return dag.status === filter;
+          })
+        : [],
+    [status?.dags, filter]
+  );
 
   // Publishable DAG IDs among currently visible (filtered) rows
   const publishableDagIds = useMemo(
@@ -288,6 +334,7 @@ export default function GitSyncPage() {
   );
 
   const handleToggleSelectAll = useCallback(() => {
+    userTouchedSelectionRef.current = true;
     setSelectedDags((prev) => {
       const next = new Set(prev);
       if (allPublishableSelected) {
@@ -300,6 +347,7 @@ export default function GitSyncPage() {
   }, [allPublishableSelected, publishableDagIds]);
 
   const handleToggleDag = useCallback((dagId: string) => {
+    userTouchedSelectionRef.current = true;
     setSelectedDags((prev) => {
       const next = new Set(prev);
       if (next.has(dagId)) next.delete(dagId);

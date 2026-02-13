@@ -3332,8 +3332,8 @@ paths:
 
   /sync/publish-all:
     post:
-      summary: "Publish all modified DAGs"
-      description: "Commits and pushes all modified DAGs to the remote repository"
+      summary: "Publish selected DAGs"
+      description: "Commits and pushes the specified DAG IDs. If dagIds is omitted, publishes all modified or untracked DAGs."
       operationId: "syncPublishAll"
       tags:
         - "sync"
@@ -3987,8 +3987,7 @@ paths:
           in: path
           required: true
           schema:
-            type: string
-            minLength: 1
+            $ref: "#/components/schemas/DAGName"
           description: "Name of the DAG"
       responses:
         "200":
@@ -4028,8 +4027,7 @@ paths:
           in: path
           required: true
           schema:
-            type: string
-            minLength: 1
+            $ref: "#/components/schemas/DAGName"
           description: "Name of the DAG"
       requestBody:
         required: true
@@ -4077,8 +4075,7 @@ paths:
           in: path
           required: true
           schema:
-            type: string
-            minLength: 1
+            $ref: "#/components/schemas/DAGName"
           description: "Name of the DAG"
       responses:
         "200":
@@ -6398,8 +6395,6 @@ components:
     SyncPublishAllRequest:
       type: object
       description: "Request to publish selected DAGs"
-      required:
-        - dagIds
       properties:
         message:
           type: string
@@ -6408,7 +6403,7 @@ components:
           type: array
           items:
             type: string
-          description: "DAG IDs to publish"
+          description: "DAG IDs to publish. If omitted, all modified or untracked DAGs are published."
 
     SyncConflictResponse:
       type: object
@@ -6754,7 +6749,7 @@ components:
         dagMemories:
           type: array
           items:
-            type: string
+            $ref: "#/components/schemas/DAGName"
           description: "List of DAG names that have memory files"
         memoryDir:
           type: string
@@ -6768,7 +6763,7 @@ components:
       description: "DAG-specific memory content"
       properties:
         dagName:
-          type: string
+          $ref: "#/components/schemas/DAGName"
         content:
           type: string
 
