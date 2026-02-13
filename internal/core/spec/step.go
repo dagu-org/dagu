@@ -1525,9 +1525,19 @@ func buildStepSubDAG(ctx StepBuildContext, s *step, result *core.Step) error {
 		}
 
 		// Convert to string format "key=value key=value ..."
+		// For string-style params, positional params (no name) use SmartEscape
+		// to avoid quoting variable references like ${ITEM.xxx} — their
+		// expanded content should be re-split into separate KEY=VALUE pairs
+		// at runtime. Named params always use Escaped to preserve their
+		// values as single tokens after expansion.
+		_, isStringParams := s.Params.(string)
 		var paramsToJoin []string
 		for _, paramPair := range paramPairs {
-			paramsToJoin = append(paramsToJoin, paramPair.Escaped())
+			if isStringParams && paramPair.Name == "" {
+				paramsToJoin = append(paramsToJoin, paramPair.SmartEscape())
+			} else {
+				paramsToJoin = append(paramsToJoin, paramPair.Escaped())
+			}
 		}
 		paramsStr = strings.Join(paramsToJoin, " ")
 	}

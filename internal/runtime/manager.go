@@ -324,6 +324,11 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *core.DAG) (exec.DAGR
 				st = currentStatus
 			} else {
 				logger.Debug(ctx, "Failed to get current status from socket", tag.Error(err))
+				// Socket is unavailable while persisted status is still running.
+				// Verify process liveness and downgrade stale running status.
+				if err := m.checkAndUpdateStaleRunningStatus(ctx, attempt, st); err != nil {
+					logger.Error(ctx, "Failed to check and update stale running status", tag.Error(err))
+				}
 			}
 		}
 	}
