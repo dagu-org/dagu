@@ -953,6 +953,65 @@ steps:
 	require.Len(t, parallelNode.SubRuns, 3, "should dispatch exactly 3 worker instances for 3 JSON items")
 }
 
+// TestIssue1658_ParallelCallExpandedParamsSplitting tests that when a call step
+// uses parallel with items, params passed via variable expansion are correctly
+// split into individual KEY=VALUE pairs after expansion.
+// See: https://github.com/dagu-org/dagu/issues/1658
+func TestIssue1658_ParallelCallExpandedParamsSplitting(t *testing.T) {
+	const dagContent = `steps:
+  - command: |
+      echo '[{"name": "test", "extra": "A=1 B=2"}]'
+    output: ITEMS
+
+  - call: child-params-split
+    parallel:
+      items: ${ITEMS}
+    params: "NAME=${ITEM.name} ${ITEM.extra}"
+    output: RESULTS
+---
+name: child-params-split
+params:
+  - NAME: ""
+  - A: ""
+  - B: ""
+steps:
+  - script: |
+      if [ -z "$A" ] || [ -z "$B" ]; then
+        echo "FAIL: A='$A' B='$B' (expected A=1 B=2)"
+        exit 1
+      fi
+      echo "OK: NAME=$NAME A=$A B=$B"
+    output: CHECK_RESULT
+`
+
+	th := test.Setup(t)
+	dag := th.DAG(t, dagContent)
+	agent := dag.Agent()
+	err := agent.Run(agent.Context)
+	require.NoError(t, err)
+	dag.AssertLatestStatus(t, core.Succeeded)
+
+	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
+	require.NoError(t, statusErr)
+
+	require.Greater(t, len(dagStatus.Nodes), 1, "expected at least 2 nodes")
+	parallelNode := dagStatus.Nodes[1]
+	require.Equal(t, core.NodeSucceeded, parallelNode.Status)
+	require.Len(t, parallelNode.SubRuns, 1)
+
+	require.NotNil(t, parallelNode.OutputVariables, "no outputs recorded")
+	rawRaw, ok := parallelNode.OutputVariables.Load("RESULTS")
+	require.True(t, ok, "output RESULTS not found")
+	raw, ok := rawRaw.(string)
+	require.True(t, ok, "output RESULTS is not a string")
+	results := parseParallelResults(t, raw)
+	require.Equal(t, 1, results.Summary.Succeeded)
+
+	outputs := collectOutputs(results.Outputs, "CHECK_RESULT")
+	require.Len(t, outputs, 1)
+	require.Contains(t, outputs[0], "OK: NAME=test A=1 B=2")
+}
+
 type parallelSummary struct {
 	Total     int `json:"total"`
 	Succeeded int `json:"succeeded"`

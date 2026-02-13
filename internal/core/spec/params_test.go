@@ -79,6 +79,64 @@ func TestParamPairEscaped(t *testing.T) {
 	}
 }
 
+func TestParamPairSmartEscape(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		pair     paramPair
+		expected string
+	}{
+		{
+			name:     "NamedSimpleValue",
+			pair:     paramPair{Name: "foo", Value: "bar"},
+			expected: `foo=bar`,
+		},
+		{
+			name:     "NamedVariableRef",
+			pair:     paramPair{Name: "NAME", Value: "${ITEM.name}"},
+			expected: `NAME=${ITEM.name}`,
+		},
+		{
+			name:     "PositionalVariableRef",
+			pair:     paramPair{Name: "", Value: "${ITEM.extra}"},
+			expected: `${ITEM.extra}`,
+		},
+		{
+			name:     "NamedValueWithSpaces",
+			pair:     paramPair{Name: "msg", Value: "hello world"},
+			expected: `msg="hello world"`,
+		},
+		{
+			name:     "PositionalValueWithSpaces",
+			pair:     paramPair{Name: "", Value: "hello world"},
+			expected: `"hello world"`,
+		},
+		{
+			name:     "NamedEmptyValue",
+			pair:     paramPair{Name: "key", Value: ""},
+			expected: `key=""`,
+		},
+		{
+			name:     "PositionalEmptyValue",
+			pair:     paramPair{Name: "", Value: ""},
+			expected: `""`,
+		},
+		{
+			name:     "NamedValueWithQuotes",
+			pair:     paramPair{Name: "json", Value: `{"key":"value"}`},
+			expected: `json="{\"key\":\"value\"}"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, tt.pair.SmartEscape())
+		})
+	}
+}
+
 func TestParseStringParams(t *testing.T) {
 	t.Parallel()
 
