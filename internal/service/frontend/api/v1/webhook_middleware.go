@@ -73,6 +73,5 @@ func isWebhookTriggerPath(urlPath string) bool {
 	if !ok {
 		return false
 	}
-	after := after
 	return after != ""
 }
