@@ -393,7 +393,7 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 }
 
 // requireWebhookManagement checks if webhook management is enabled and
-// enforces admin role for all webhook management operations.
+// enforces developer-or-above role for all webhook management operations.
 func (a *API) requireWebhookManagement(ctx context.Context) error {
 	if a.authService == nil || !a.authService.HasWebhookStore() {
 		return &Error{
@@ -402,8 +402,8 @@ func (a *API) requireWebhookManagement(ctx context.Context) error {
 			HTTPStatus: http.StatusUnauthorized,
 		}
 	}
-	// Enforce admin role when auth is enabled
-	return a.requireAdmin(ctx)
+	// Enforce developer-or-above role when auth is enabled
+	return a.requireDeveloperOrAbove(ctx)
 }
 
 // extractWebhookToken extracts the token from the Authorization header.

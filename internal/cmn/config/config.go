@@ -436,10 +436,10 @@ func (c *Config) validateOIDCForBuiltin() error {
 	oidc := c.Server.Auth.OIDC
 
 	switch oidc.RoleMapping.DefaultRole {
-	case "admin", "manager", "operator", "viewer":
+	case "admin", "manager", "developer", "operator", "viewer":
 		// Valid roles
 	default:
-		return fmt.Errorf("OIDC roleMapping.defaultRole must be one of: admin, manager, operator, viewer (got: %q)", oidc.RoleMapping.DefaultRole)
+		return fmt.Errorf("OIDC roleMapping.defaultRole must be one of: admin, manager, developer, operator, viewer (got: %q)", oidc.RoleMapping.DefaultRole)
 	}
 
 	if !slices.Contains(oidc.Scopes, "email") {

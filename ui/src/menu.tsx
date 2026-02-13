@@ -6,7 +6,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { UserMenu } from '@/components/UserMenu';
-import { useIsAdmin, useCanWrite } from '@/contexts/AuthContext';
+import {
+  useCanAccessSystemStatus,
+  useCanManageWebhooks,
+  useCanViewAuditLogs,
+  useCanWrite,
+  useIsAdmin,
+} from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils';
 import { getResponsiveTitleClass } from '@/lib/text-utils';
@@ -227,6 +233,9 @@ export const mainListItems = React.forwardRef<
   const config = useConfig();
   const isAdmin = useIsAdmin();
   const canWrite = useCanWrite();
+  const canAccessSystemStatus = useCanAccessSystemStatus();
+  const canManageWebhooks = useCanManageWebhooks();
+  const canViewAuditLogs = useCanViewAuditLogs();
   const { preferences, updatePreference } = useUserPreferences();
   const { toggleChat } = useAgentChatContext();
 
@@ -352,7 +361,7 @@ export const mainListItems = React.forwardRef<
               onClick={onNavItemClick}
               customColor={customColor}
             />
-            {isAdmin && (
+            {canAccessSystemStatus && (
               <NavItem
                 to="/system-status"
                 text="System Status"
@@ -419,14 +428,6 @@ export const mainListItems = React.forwardRef<
                 onClick={onNavItemClick}
                 customColor={customColor}
               />
-              <NavItem
-                to="/webhooks"
-                text="Webhooks"
-                icon={<Webhook size={18} />}
-                isOpen={isOpen}
-                onClick={onNavItemClick}
-                customColor={customColor}
-              />
               {config.terminalEnabled && (
                 <NavItem
                   to="/terminal"
@@ -437,14 +438,6 @@ export const mainListItems = React.forwardRef<
                   customColor={customColor}
                 />
               )}
-              <NavItem
-                to="/audit-logs"
-                text="Audit Logs"
-                icon={<ScrollText size={18} />}
-                isOpen={isOpen}
-                onClick={onNavItemClick}
-                customColor={customColor}
-              />
               <NavItem
                 to="/agent-settings"
                 text="Agent Settings"
@@ -465,6 +458,33 @@ export const mainListItems = React.forwardRef<
               )}
             </div>
           )}
+
+          {(canManageWebhooks || canViewAuditLogs) &&
+            config.authMode === 'builtin' && (
+              <div className="space-y-0.5">
+                <SectionLabel label="Operations" isOpen={isOpen} customColor={customColor} />
+                {canManageWebhooks && (
+                  <NavItem
+                    to="/webhooks"
+                    text="Webhooks"
+                    icon={<Webhook size={18} />}
+                    isOpen={isOpen}
+                    onClick={onNavItemClick}
+                    customColor={customColor}
+                  />
+                )}
+                {canViewAuditLogs && (
+                  <NavItem
+                    to="/audit-logs"
+                    text="Audit Logs"
+                    icon={<ScrollText size={18} />}
+                    isOpen={isOpen}
+                    onClick={onNavItemClick}
+                    customColor={customColor}
+                  />
+                )}
+              </div>
+            )}
 
           {canWrite && config.gitSyncEnabled && (
             <div className="space-y-0.5">

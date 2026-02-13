@@ -29,6 +29,18 @@ File: {{.CurrentDAG.FilePath}}
 Status: {{.CurrentDAG.Status}}{{end}}
 </current_context>
 {{end}}
+
+{{if .User}}
+<authorization>
+Authenticated role: {{.User.Role}}
+- Can execute DAGs: {{.User.CanExecuteDAGs}}
+- Can write DAGs: {{.User.CanWriteDAGs}}
+- Can view audit logs: {{.User.CanViewAudit}}
+- Is admin: {{.User.IsAdmin}}
+
+Never attempt tool actions outside these capabilities.
+</authorization>
+{{end}}
 </environment>
 
 {{if or .Memory.GlobalMemory .Memory.DAGMemory}}

@@ -3,6 +3,7 @@ package agent
 import (
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,11 +19,12 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			BaseConfigFile: "/config/base.yaml",
 		}
 
-		result := GenerateSystemPrompt(env, nil, MemoryContent{})
+		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleDeveloper)
 
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "/dags")
 		assert.Contains(t, result, "/config/base.yaml")
+		assert.Contains(t, result, "Authenticated role: developer")
 	})
 
 	t.Run("includes current DAG context", func(t *testing.T) {
@@ -33,7 +35,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			FilePath: "/dags/test-dag.yaml",
 		}
 
-		result := GenerateSystemPrompt(env, dag, MemoryContent{})
+		result := GenerateSystemPrompt(env, dag, MemoryContent{}, auth.RoleAdmin)
 
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "test-dag")
@@ -42,7 +44,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 	t.Run("works with empty environment", func(t *testing.T) {
 		t.Parallel()
 
-		result := GenerateSystemPrompt(EnvironmentInfo{}, nil, MemoryContent{})
+		result := GenerateSystemPrompt(EnvironmentInfo{}, nil, MemoryContent{}, auth.RoleViewer)
 
 		assert.NotEmpty(t, result)
 	})
@@ -51,7 +53,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{DAGsDir: "/dags"}
 
-		result := GenerateSystemPrompt(env, nil, MemoryContent{})
+		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleViewer)
 
 		assert.NotContains(t, result, "<global_memory>")
 		assert.NotContains(t, result, "<dag_memory")
@@ -67,7 +69,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			MemoryDir:    "/dags/memory",
 		}
 
-		result := GenerateSystemPrompt(env, nil, mem)
+		result := GenerateSystemPrompt(env, nil, mem, auth.RoleViewer)
 
 		assert.Contains(t, result, "<global_memory>")
 		assert.Contains(t, result, "User prefers concise output.")
@@ -84,7 +86,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			MemoryDir:    "/dags/memory",
 		}
 
-		result := GenerateSystemPrompt(env, nil, mem)
+		result := GenerateSystemPrompt(env, nil, mem, auth.RoleViewer)
 
 		assert.Contains(t, result, "<global_memory>")
 		assert.Contains(t, result, "Global info.")
@@ -100,7 +102,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			DAGName:   "test-dag",
 		}
 
-		result := GenerateSystemPrompt(env, nil, mem)
+		result := GenerateSystemPrompt(env, nil, mem, auth.RoleViewer)
 
 		assert.Contains(t, result, "/dags/memory/MEMORY.md")
 		assert.Contains(t, result, "/dags/memory/dags/test-dag/MEMORY.md")
@@ -114,7 +116,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			DAGName:   "new-etl",
 		}
 
-		result := GenerateSystemPrompt(env, nil, mem)
+		result := GenerateSystemPrompt(env, nil, mem, auth.RoleViewer)
 
 		assert.Contains(t, result, "If DAG context is available, save memory to Per-DAG by default (not Global)")
 		assert.Contains(t, result, "After creating or updating a DAG, if anything should be remembered, create/update that DAG's memory file")
@@ -128,7 +130,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			MemoryDir: "/dags/memory",
 		}
 
-		result := GenerateSystemPrompt(env, nil, mem)
+		result := GenerateSystemPrompt(env, nil, mem, auth.RoleViewer)
 
 		assert.Contains(t, result, "If no DAG context is available, ask the user before writing to Global memory")
 	})

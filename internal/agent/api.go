@@ -38,6 +38,7 @@ const maxRequestBodySize = 1 << 20
 // defaultUserID is used when no user is authenticated (e.g., auth disabled).
 // This value should match the system's expected default user identifier.
 const defaultUserID = "admin"
+const defaultUserRole = auth.RoleAdmin
 
 // getUserIDFromContext extracts the user ID from the request context.
 // Returns "admin" if no user is authenticated (e.g., auth mode is "none").
@@ -49,11 +50,13 @@ func getUserIDFromContext(ctx context.Context) string {
 }
 
 // getUserContextFromRequest extracts user identity and IP from the request context.
-func getUserContextFromRequest(r *http.Request) (userID, username, ipAddress string) {
+func getUserContextFromRequest(r *http.Request) (userID, username string, role auth.Role, ipAddress string) {
 	userID, username = defaultUserID, defaultUserID
+	role = defaultUserRole
 	if user, ok := auth.UserFromContext(r.Context()); ok && user != nil {
 		userID = user.ID
 		username = user.Username
+		role = user.Role
 	}
 	ipAddress, _ = auth.ClientIPFromContext(r.Context())
 	return
@@ -331,7 +334,7 @@ func (a *API) handleNewSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, username, ipAddress := getUserContextFromRequest(r)
+	userID, username, role, ipAddress := getUserContextFromRequest(r)
 	model := selectModel(req.Model, "", a.getDefaultModelID(r.Context()))
 
 	provider, modelCfg, err := a.resolveProvider(r.Context(), model)
@@ -362,6 +365,7 @@ func (a *API) handleNewSession(w http.ResponseWriter, r *http.Request) {
 		Hooks:           a.hooks,
 		Username:        username,
 		IPAddress:       ipAddress,
+		Role:            role,
 		InputCostPer1M:  modelCfg.InputCostPer1M,
 		OutputCostPer1M: modelCfg.OutputCostPer1M,
 		MemoryStore:     a.memoryStore,
@@ -534,13 +538,14 @@ func (a *API) getStoredSession(ctx context.Context, id, userID string) (*Session
 // POST /api/v1/agent/sessions/{id}/chat
 func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	userID, username, ipAddress := getUserContextFromRequest(r)
+	userID, username, role, ipAddress := getUserContextFromRequest(r)
 
-	mgr, ok := a.getOrReactivateSession(r.Context(), id, userID, username, ipAddress)
+	mgr, ok := a.getOrReactivateSession(r.Context(), id, userID, username, role, ipAddress)
 	if !ok {
 		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Session not found")
 		return
 	}
+	mgr.UpdateUserContext(username, ipAddress, role)
 
 	var req ChatRequest
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
@@ -577,18 +582,18 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 }
 
 // getOrReactivateSession retrieves an active session or reactivates it from storage.
-func (a *API) getOrReactivateSession(ctx context.Context, id, userID, username, ipAddress string) (*SessionManager, bool) {
+func (a *API) getOrReactivateSession(ctx context.Context, id, userID, username string, role auth.Role, ipAddress string) (*SessionManager, bool) {
 	// Check active sessions first
 	if mgr, ok := a.getActiveSession(id, userID); ok {
 		return mgr, true
 	}
 
 	// Try to reactivate from store
-	return a.reactivateSession(ctx, id, userID, username, ipAddress)
+	return a.reactivateSession(ctx, id, userID, username, role, ipAddress)
 }
 
 // reactivateSession restores a session from storage and makes it active.
-func (a *API) reactivateSession(ctx context.Context, id, userID, username, ipAddress string) (*SessionManager, bool) {
+func (a *API) reactivateSession(ctx context.Context, id, userID, username string, role auth.Role, ipAddress string) (*SessionManager, bool) {
 	if a.store == nil {
 		return nil, false
 	}
@@ -624,6 +629,7 @@ func (a *API) reactivateSession(ctx context.Context, id, userID, username, ipAdd
 		IPAddress:   ipAddress,
 		MemoryStore: a.memoryStore,
 		DAGName:     sess.DAGName,
+		Role:        role,
 	})
 	a.sessions.Store(id, mgr)
 

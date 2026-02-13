@@ -35,16 +35,32 @@ func TestRoleMapper_GroupMappings(t *testing.T) {
 			config: RoleMapperConfig{
 				GroupsClaim: "groups",
 				GroupMappings: map[string]string{
-					"admins":    "admin",
-					"operators": "operator",
-					"viewers":   "viewer",
+					"admins":     "admin",
+					"developers": "developer",
+					"operators":  "operator",
+					"viewers":    "viewer",
 				},
 				DefaultRole: auth.RoleViewer,
 			},
 			claims: map[string]any{
-				"groups": []any{"viewers", "operators", "admins"},
+				"groups": []any{"viewers", "operators", "developers", "admins"},
 			},
 			expectedRole: auth.RoleAdmin,
+		},
+		{
+			name: "developer_wins_over_operator",
+			config: RoleMapperConfig{
+				GroupsClaim: "groups",
+				GroupMappings: map[string]string{
+					"developers": "developer",
+					"operators":  "operator",
+				},
+				DefaultRole: auth.RoleViewer,
+			},
+			claims: map[string]any{
+				"groups": []any{"operators", "developers"},
+			},
+			expectedRole: auth.RoleDeveloper,
 		},
 		{
 			name: "no_matching_group_fallback_to_default",

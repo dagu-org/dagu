@@ -11,6 +11,7 @@ func TestRole_Valid(t *testing.T) {
 	}{
 		{RoleAdmin, true},
 		{RoleManager, true},
+		{RoleDeveloper, true},
 		{RoleOperator, true},
 		{RoleViewer, true},
 		{Role("invalid"), false},
@@ -35,6 +36,7 @@ func TestRole_CanWrite(t *testing.T) {
 	}{
 		{RoleAdmin, true},
 		{RoleManager, true},
+		{RoleDeveloper, true},
 		{RoleOperator, false},
 		{RoleViewer, false},
 	}
@@ -55,6 +57,7 @@ func TestRole_CanExecute(t *testing.T) {
 	}{
 		{RoleAdmin, true},
 		{RoleManager, true},
+		{RoleDeveloper, true},
 		{RoleOperator, true},
 		{RoleViewer, false},
 	}
@@ -75,6 +78,7 @@ func TestRole_IsAdmin(t *testing.T) {
 	}{
 		{RoleAdmin, true},
 		{RoleManager, false},
+		{RoleDeveloper, false},
 		{RoleOperator, false},
 		{RoleViewer, false},
 	}
@@ -88,6 +92,27 @@ func TestRole_IsAdmin(t *testing.T) {
 	}
 }
 
+func TestRole_CanManageAudit(t *testing.T) {
+	tests := []struct {
+		role           Role
+		canManageAudit bool
+	}{
+		{RoleAdmin, true},
+		{RoleManager, true},
+		{RoleDeveloper, false},
+		{RoleOperator, false},
+		{RoleViewer, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.role), func(t *testing.T) {
+			if got := tt.role.CanManageAudit(); got != tt.canManageAudit {
+				t.Errorf("Role(%q).CanManageAudit() = %v, want %v", tt.role, got, tt.canManageAudit)
+			}
+		})
+	}
+}
+
 func TestParseRole(t *testing.T) {
 	tests := []struct {
 		input   string
@@ -96,6 +121,7 @@ func TestParseRole(t *testing.T) {
 	}{
 		{"admin", RoleAdmin, false},
 		{"manager", RoleManager, false},
+		{"developer", RoleDeveloper, false},
 		{"operator", RoleOperator, false},
 		{"viewer", RoleViewer, false},
 		{"invalid", "", true},
@@ -120,8 +146,8 @@ func TestParseRole(t *testing.T) {
 
 func TestAllRoles(t *testing.T) {
 	roles := AllRoles()
-	if len(roles) != 4 {
-		t.Errorf("AllRoles() returned %d roles, want 4", len(roles))
+	if len(roles) != 5 {
+		t.Errorf("AllRoles() returned %d roles, want 5", len(roles))
 	}
 
 	// Ensure modifying returned slice doesn't affect internal state
@@ -139,6 +165,7 @@ func TestRole_String(t *testing.T) {
 	}{
 		{RoleAdmin, "admin"},
 		{RoleManager, "manager"},
+		{RoleDeveloper, "developer"},
 		{RoleOperator, "operator"},
 		{RoleViewer, "viewer"},
 		{Role("custom"), "custom"},

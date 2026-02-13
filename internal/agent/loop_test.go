@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -374,6 +375,7 @@ func TestLoop_ExecuteTool(t *testing.T) {
 			UserID:    "user-1",
 			Username:  "alice",
 			IPAddress: "10.0.0.1",
+			Role:      auth.RoleManager,
 			Hooks:     hooks,
 		})
 
@@ -392,6 +394,7 @@ func TestLoop_ExecuteTool(t *testing.T) {
 		assert.Equal(t, "user-1", capturedInfo.UserID)
 		assert.Equal(t, "alice", capturedInfo.Username)
 		assert.Equal(t, "10.0.0.1", capturedInfo.IPAddress)
+		assert.Equal(t, auth.RoleManager, capturedInfo.Role)
 		assert.Equal(t, result.Content, capturedResult.Content)
 		// think tool has nil Audit (not audited)
 		assert.Nil(t, capturedInfo.Audit)

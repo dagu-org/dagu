@@ -130,20 +130,42 @@ func TestWebhooks_RequiresAuth(t *testing.T) {
 		ExpectStatus(http.StatusUnauthorized).Send(t)
 }
 
-// TestWebhooks_RequiresAdmin tests that non-admin users cannot access webhook management endpoints
-func TestWebhooks_RequiresAdmin(t *testing.T) {
+// TestWebhooks_RequiresDeveloperOrAbove tests that webhook management requires developer or above.
+func TestWebhooks_RequiresDeveloperOrAbove(t *testing.T) {
 	t.Parallel()
 	server := setupWebhookTestServer(t)
 	adminToken := getWebhookAdminToken(t, server)
 
-	// Create a non-admin user
+	// Create non-developer users.
+	server.Client().Post("/api/v1/users", api.CreateUserRequest{
+		Username: "operator-user",
+		Password: "operator1",
+		Role:     api.UserRoleOperator,
+	}).WithBearerToken(adminToken).ExpectStatus(http.StatusCreated).Send(t)
+
 	server.Client().Post("/api/v1/users", api.CreateUserRequest{
 		Username: "viewer-user",
 		Password: "viewerpass1",
 		Role:     api.UserRoleViewer,
 	}).WithBearerToken(adminToken).ExpectStatus(http.StatusCreated).Send(t)
 
-	// Login as viewer
+	// Create developer user.
+	server.Client().Post("/api/v1/users", api.CreateUserRequest{
+		Username: "developer-user",
+		Password: "developer1",
+		Role:     api.UserRoleDeveloper,
+	}).WithBearerToken(adminToken).ExpectStatus(http.StatusCreated).Send(t)
+
+	// Login as operator.
+	operatorResp := server.Client().Post("/api/v1/auth/login", api.LoginRequest{
+		Username: "operator-user",
+		Password: "operator1",
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	var operatorLogin api.LoginResponse
+	operatorResp.Unmarshal(t, &operatorLogin)
+
+	// Login as viewer.
 	viewerResp := server.Client().Post("/api/v1/auth/login", api.LoginRequest{
 		Username: "viewer-user",
 		Password: "viewerpass1",
@@ -152,7 +174,24 @@ func TestWebhooks_RequiresAdmin(t *testing.T) {
 	var viewerLogin api.LoginResponse
 	viewerResp.Unmarshal(t, &viewerLogin)
 
-	// Viewer should get forbidden for webhook management
+	// Login as developer.
+	developerResp := server.Client().Post("/api/v1/auth/login", api.LoginRequest{
+		Username: "developer-user",
+		Password: "developer1",
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	var developerLogin api.LoginResponse
+	developerResp.Unmarshal(t, &developerLogin)
+
+	// Operator and viewer should get forbidden for webhook management.
+	server.Client().Get("/api/v1/webhooks").
+		WithBearerToken(operatorLogin.Token).
+		ExpectStatus(http.StatusForbidden).Send(t)
+
+	server.Client().Post("/api/v1/dags/test-dag/webhook", nil).
+		WithBearerToken(operatorLogin.Token).
+		ExpectStatus(http.StatusForbidden).Send(t)
+
 	server.Client().Get("/api/v1/webhooks").
 		WithBearerToken(viewerLogin.Token).
 		ExpectStatus(http.StatusForbidden).Send(t)
@@ -160,6 +199,11 @@ func TestWebhooks_RequiresAdmin(t *testing.T) {
 	server.Client().Post("/api/v1/dags/test-dag/webhook", nil).
 		WithBearerToken(viewerLogin.Token).
 		ExpectStatus(http.StatusForbidden).Send(t)
+
+	// Developer can access webhook management endpoints.
+	server.Client().Get("/api/v1/webhooks").
+		WithBearerToken(developerLogin.Token).
+		ExpectStatus(http.StatusOK).Send(t)
 }
 
 // TestWebhooks_CRUD tests the full CRUD lifecycle of webhooks

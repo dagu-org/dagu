@@ -217,7 +217,7 @@ export interface paths {
         };
         /**
          * List distributed workers
-         * @description Retrieves information about distributed workers connected to the coordinator
+         * @description Retrieves information about distributed workers connected to the coordinator. Developer, manager, or admin only.
          */
         get: operations["getWorkers"];
         put?: never;
@@ -1170,7 +1170,7 @@ export interface paths {
         };
         /**
          * Get resource usage history
-         * @description Returns historical data for system resources
+         * @description Returns historical data for system resources. Developer, manager, or admin only.
          */
         get: operations["getResourceHistory"];
         put?: never;
@@ -1190,7 +1190,7 @@ export interface paths {
         };
         /**
          * Get scheduler service status
-         * @description Returns status information about all registered scheduler instances
+         * @description Returns status information about all registered scheduler instances. Developer, manager, or admin only.
          */
         get: operations["getSchedulerStatus"];
         put?: never;
@@ -1210,7 +1210,7 @@ export interface paths {
         };
         /**
          * Get coordinator service status
-         * @description Returns status information about all registered coordinator instances
+         * @description Returns status information about all registered coordinator instances. Developer, manager, or admin only.
          */
         get: operations["getCoordinatorStatus"];
         put?: never;
@@ -1230,7 +1230,7 @@ export interface paths {
         };
         /**
          * Get tunnel service status
-         * @description Returns status information about the tunnel service (Tailscale)
+         * @description Returns status information about the tunnel service (Tailscale). Developer, manager, or admin only.
          */
         get: operations["getTunnelStatus"];
         put?: never;
@@ -1297,7 +1297,7 @@ export interface paths {
         };
         /**
          * List all webhooks
-         * @description Returns a list of all webhooks across all DAGs. Admin only.
+         * @description Returns a list of all webhooks across all DAGs. Developer, manager, or admin only.
          */
         get: operations["listWebhooks"];
         put?: never;
@@ -1325,12 +1325,13 @@ export interface paths {
          * Create webhook for DAG
          * @description Creates a new webhook for the specified DAG. Returns the full webhook token,
          *     which is only shown once. Store it securely.
+         *     Developer, manager, or admin only.
          *
          */
         post: operations["createDAGWebhook"];
         /**
          * Delete webhook for DAG
-         * @description Removes the webhook configuration for the specified DAG.
+         * @description Removes the webhook configuration for the specified DAG. Developer, manager, or admin only.
          */
         delete: operations["deleteDAGWebhook"];
         options?: never;
@@ -1351,6 +1352,7 @@ export interface paths {
          * Regenerate webhook token
          * @description Generates a new token for the existing webhook. The old token becomes
          *     invalid immediately. Returns the new token, which is only shown once.
+         *     Developer, manager, or admin only.
          *
          */
         post: operations["regenerateDAGWebhookToken"];
@@ -1371,7 +1373,7 @@ export interface paths {
         put?: never;
         /**
          * Toggle webhook enabled state
-         * @description Enables or disables the webhook without changing the token.
+         * @description Enables or disables the webhook without changing the token. Developer, manager, or admin only.
          */
         post: operations["toggleDAGWebhook"];
         delete?: never;
@@ -1389,7 +1391,7 @@ export interface paths {
         };
         /**
          * List audit log entries
-         * @description Returns audit log entries matching the filter criteria. Admin only.
+         * @description Returns audit log entries matching the filter criteria. Manager or admin only.
          */
         get: operations["listAuditLogs"];
         put?: never;
@@ -2599,7 +2601,7 @@ export interface components {
             value: number;
         };
         /**
-         * @description User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution, operator: DAG execution only, viewer: read-only
+         * @description User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution with audit log access, developer: DAG CRUD and execution, operator: DAG execution only, viewer: read-only
          * @enum {string}
          */
         UserRole: UserRole;
@@ -7078,7 +7080,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Forbidden - requires admin role */
+            /** @description Forbidden - requires manager or admin role */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8385,6 +8387,7 @@ export enum QueueType {
 export enum UserRole {
     admin = "admin",
     manager = "manager",
+    developer = "developer",
     operator = "operator",
     viewer = "viewer"
 }

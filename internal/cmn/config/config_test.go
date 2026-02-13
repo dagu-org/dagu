@@ -365,7 +365,7 @@ func TestConfig_Validate(t *testing.T) {
 
 	t.Run("BuiltinAuth_OIDC_AllValidRoles", func(t *testing.T) {
 		t.Parallel()
-		validRoles := []string{"admin", "manager", "operator", "viewer"}
+		validRoles := []string{"admin", "manager", "developer", "operator", "viewer"}
 		for _, role := range validRoles {
 			cfg := validBaseConfig()
 			cfg.Server.Auth = Auth{

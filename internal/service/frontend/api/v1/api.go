@@ -402,6 +402,38 @@ func (a *API) requireAdmin(ctx context.Context) error {
 	return nil
 }
 
+// requireManagerOrAbove checks if the current user has manager or admin role.
+// Returns nil if auth is not enabled (authService is nil).
+func (a *API) requireManagerOrAbove(ctx context.Context) error {
+	if a.authService == nil {
+		return nil
+	}
+	user, ok := auth.UserFromContext(ctx)
+	if !ok {
+		return errAuthRequired
+	}
+	if !user.Role.CanManageAudit() {
+		return errInsufficientPermissions
+	}
+	return nil
+}
+
+// requireDeveloperOrAbove checks if the current user has developer, manager, or admin role.
+// Returns nil if auth is not enabled (authService is nil).
+func (a *API) requireDeveloperOrAbove(ctx context.Context) error {
+	if a.authService == nil {
+		return nil
+	}
+	user, ok := auth.UserFromContext(ctx)
+	if !ok {
+		return errAuthRequired
+	}
+	if !user.Role.CanWrite() {
+		return errInsufficientPermissions
+	}
+	return nil
+}
+
 // Predefined errors for common authorization failures.
 var (
 	errDAGWritesDisabled = &Error{

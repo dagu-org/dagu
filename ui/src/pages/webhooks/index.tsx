@@ -24,7 +24,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { TOKEN_KEY, useIsAdmin } from '@/contexts/AuthContext';
+import { TOKEN_KEY, useCanManageWebhooks } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import dayjs from '@/lib/dayjs';
 import ConfirmModal from '@/ui/ConfirmModal';
@@ -44,7 +44,7 @@ type WebhookDetails = components['schemas']['WebhookDetails'];
 
 export default function WebhooksPage() {
   const config = useConfig();
-  const isAdmin = useIsAdmin();
+  const canManageWebhooks = useCanManageWebhooks();
   const navigate = useNavigate();
   const appBarContext = useContext(AppBarContext);
   const [webhooks, setWebhooks] = useState<WebhookDetails[]>([]);
@@ -214,7 +214,7 @@ export default function WebhooksPage() {
     navigate(`/dags/${encodeURIComponent(dagName)}?tab=webhook`);
   };
 
-  if (!isAdmin) {
+  if (!canManageWebhooks) {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">

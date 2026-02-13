@@ -40,8 +40,8 @@ type dataPoint struct {
 
 // MemoryStore implements Store using a generic ring buffer
 type MemoryStore struct {
-	mu             sync.RWMutex
-	buffer         *RingBuffer[dataPoint]
+	mu               sync.RWMutex
+	buffer           *RingBuffer[dataPoint]
 	memoryTotalBytes uint64
 	memoryUsedBytes  uint64
 	diskTotalBytes   uint64
@@ -102,7 +102,12 @@ func (s *MemoryStore) GetHistory(duration time.Duration) *ResourceHistory {
 	})
 
 	if n == 0 {
-		return &ResourceHistory{}
+		return &ResourceHistory{
+			MemoryTotalBytes: s.memoryTotalBytes,
+			MemoryUsedBytes:  s.memoryUsedBytes,
+			DiskTotalBytes:   s.diskTotalBytes,
+			DiskUsedBytes:    s.diskUsedBytes,
+		}
 	}
 
 	cpu := make([]MetricPoint, 0, n)

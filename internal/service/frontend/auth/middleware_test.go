@@ -242,6 +242,7 @@ func TestMiddleware_APIKeyValidation_RolesPreserved(t *testing.T) {
 	}{
 		{"admin", auth.RoleAdmin, auth.RoleAdmin},
 		{"manager", auth.RoleManager, auth.RoleManager},
+		{"developer", auth.RoleDeveloper, auth.RoleDeveloper},
 		{"operator", auth.RoleOperator, auth.RoleOperator},
 		{"viewer", auth.RoleViewer, auth.RoleViewer},
 	}
