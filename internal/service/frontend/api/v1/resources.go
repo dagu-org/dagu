@@ -39,11 +39,20 @@ func (a *API) GetResourceHistory(ctx context.Context, request api.GetResourceHis
 	disk := convertMetrics(history.Disk)
 	load := convertMetrics(history.Load)
 
+	memoryTotalBytes := int64(history.MemoryTotalBytes)
+	memoryUsedBytes := int64(history.MemoryUsedBytes)
+	diskTotalBytes := int64(history.DiskTotalBytes)
+	diskUsedBytes := int64(history.DiskUsedBytes)
+
 	return api.GetResourceHistory200JSONResponse{
-		Cpu:    &cpu,
-		Memory: &mem,
-		Disk:   &disk,
-		Load:   &load,
+		Cpu:              &cpu,
+		Memory:           &mem,
+		Disk:             &disk,
+		Load:             &load,
+		MemoryTotalBytes: &memoryTotalBytes,
+		MemoryUsedBytes:  &memoryUsedBytes,
+		DiskTotalBytes:   &diskTotalBytes,
+		DiskUsedBytes:    &diskUsedBytes,
 	}, nil
 }
 

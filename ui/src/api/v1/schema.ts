@@ -2568,6 +2568,26 @@ export interface components {
             memory?: components["schemas"]["MetricPoint"][];
             disk?: components["schemas"]["MetricPoint"][];
             load?: components["schemas"]["MetricPoint"][];
+            /**
+             * Format: int64
+             * @description Total physical memory in bytes
+             */
+            memoryTotalBytes?: number;
+            /**
+             * Format: int64
+             * @description Used physical memory in bytes
+             */
+            memoryUsedBytes?: number;
+            /**
+             * Format: int64
+             * @description Total disk space in bytes
+             */
+            diskTotalBytes?: number;
+            /**
+             * Format: int64
+             * @description Used disk space in bytes
+             */
+            diskUsedBytes?: number;
         };
         MetricPoint: {
             /**

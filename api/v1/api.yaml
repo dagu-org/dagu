@@ -5893,6 +5893,22 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MetricPoint"
+        memoryTotalBytes:
+          type: integer
+          format: int64
+          description: Total physical memory in bytes
+        memoryUsedBytes:
+          type: integer
+          format: int64
+          description: Used physical memory in bytes
+        diskTotalBytes:
+          type: integer
+          format: int64
+          description: Total disk space in bytes
+        diskUsedBytes:
+          type: integer
+          format: int64
+          description: Used disk space in bytes
 
     MetricPoint:
       type: object
