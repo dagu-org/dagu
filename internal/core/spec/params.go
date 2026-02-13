@@ -252,7 +252,7 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 
 // paramRegex is a regex to match the parameters in the command.
 var paramRegex = regexp.MustCompile(
-	`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`(" + `?:\\"|[^"]*)` + "`" + `|[^"\s]+)`,
+	`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`[^`]*`" + `|[^"\s]+)`,
 )
 
 // backtickRegex matches backtick-enclosed commands for substitution.

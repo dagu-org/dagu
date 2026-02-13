@@ -245,6 +245,66 @@ steps:
 		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
 	})
 
+	t.Run("ExecuteDAGAllowsFewerPositionalParamsThanDeclared", func(t *testing.T) {
+		spec := `
+params: "p1 p2"
+steps:
+  - name: echo
+    command: echo "$1 $2"
+`
+		dagName := "test_positional_fewer_allowed"
+
+		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		params := "one"
+		resp := server.Client().Post("/api/v1/dags/"+dagName+"/start", api.ExecuteDAGJSONRequestBody{
+			Params: &params,
+		}).ExpectStatus(http.StatusOK).Send(t)
+
+		var execResp api.ExecuteDAG200JSONResponse
+		resp.Unmarshal(t, &execResp)
+		require.NotEmpty(t, execResp.DagRunId)
+		require.Eventually(t, func() bool {
+			url := fmt.Sprintf("/api/v1/dags/%s/dag-runs/%s", dagName, execResp.DagRunId)
+			statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)
+			var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+			statusResp.Unmarshal(t, &dagRunStatus)
+			return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
+		}, 5*time.Second, 500*time.Millisecond)
+
+		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
+	})
+
+	t.Run("ExecuteDAGRejectsTooManyPositionalParams", func(t *testing.T) {
+		spec := `
+params: "p1 p2"
+steps:
+  - name: echo
+    command: echo "$1 $2"
+`
+		dagName := "test_positional_too_many_rejected"
+
+		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		params := "one two three"
+		resp := server.Client().Post("/api/v1/dags/"+dagName+"/start", api.ExecuteDAGJSONRequestBody{
+			Params: &params,
+		}).ExpectStatus(http.StatusBadRequest).Send(t)
+
+		var errResp api.Error
+		resp.Unmarshal(t, &errResp)
+		require.Equal(t, api.ErrorCodeBadRequest, errResp.Code)
+		require.Contains(t, errResp.Message, "too many positional params: expected at most 2, got 3")
+
+		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
+	})
+
 	t.Run("EnqueueDAGRunFromSpec", func(t *testing.T) {
 		spec := `
 steps:
