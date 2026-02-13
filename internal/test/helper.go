@@ -72,6 +72,14 @@ func WithServerConfig(cfg *config.Server) HelperOption {
 	}
 }
 
+// WithCoordinatorEnabled re-enables the coordinator in test configuration.
+// By default, tests disable the coordinator since no coordinator is running.
+func WithCoordinatorEnabled() HelperOption {
+	return WithConfigMutator(func(cfg *config.Config) {
+		cfg.Coordinator.Enabled = true
+	})
+}
+
 // WithConfigMutator applies mutations to the loaded configuration after defaults are set.
 func WithConfigMutator(mutator func(*config.Config)) HelperOption {
 	return func(opts *Options) {
