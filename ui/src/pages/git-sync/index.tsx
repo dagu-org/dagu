@@ -92,6 +92,11 @@ function normalizeSyncItemKind(dagId: string, dag: SyncDAGState): SyncItemKind {
   return dagId.startsWith('memory/') ? 'memory' : 'dag';
 }
 
+function formatSyncDisplayName(dagId: string, kind: SyncItemKind): string {
+  const extension = kind === 'memory' ? '.md' : '.yaml';
+  return `${dagId}${extension}`;
+}
+
 // Subtle, readable status colors
 const summaryConfig: Record<
   SyncSummary,
@@ -708,7 +713,7 @@ export default function GitSyncPage() {
                         href={`/dags/${encodeURIComponent(dagId)}`}
                         className="font-mono hover:underline"
                       >
-                        {dagId}
+                        {formatSyncDisplayName(dagId, kind)}
                       </a>
                       {kind === 'memory' && (
                         <span className="text-[10px] px-1 py-0 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400">
