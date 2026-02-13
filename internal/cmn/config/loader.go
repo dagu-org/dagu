@@ -312,6 +312,7 @@ func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) error {
 		source string
 	}{
 		{"DAGsDir", &cfg.Paths.DAGsDir, def.Paths.DAGsDir},
+		{"AltDAGsDir", &cfg.Paths.AltDAGsDir, def.Paths.AltDagsDir},
 		{"SuspendFlagsDir", &cfg.Paths.SuspendFlagsDir, def.Paths.SuspendFlagsDir},
 		{"DataDir", &cfg.Paths.DataDir, def.Paths.DataDir},
 		{"LogDir", &cfg.Paths.LogDir, def.Paths.LogDir},
@@ -1250,6 +1251,7 @@ var envBindings = []envBinding{
 	// Paths
 	{key: "paths.dagsDir", env: "DAGS", isPath: true},
 	{key: "paths.dagsDir", env: "DAGS_DIR", isPath: true},
+	{key: "paths.altDagsDir", env: "ALT_DAGS_DIR", isPath: true},
 	{key: "paths.executable", env: "EXECUTABLE", isPath: true},
 	{key: "paths.logDir", env: "LOG_DIR", isPath: true},
 	{key: "paths.dataDir", env: "DATA_DIR", isPath: true},

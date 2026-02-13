@@ -181,6 +181,7 @@ type PathsDef struct {
 	SuspendFlagsDir    string `mapstructure:"suspendFlagsDir"`
 	AdminLogsDir       string `mapstructure:"adminLogsDir"`
 	BaseConfig         string `mapstructure:"baseConfig"`
+	AltDagsDir         string `mapstructure:"altDagsDir"`
 	DAGRunsDir         string `mapstructure:"dagRunsDir"`
 	QueueDir           string `mapstructure:"queueDir"`
 	ProcDir            string `mapstructure:"procDir"`

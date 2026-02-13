@@ -289,6 +289,7 @@ Full documentation is available at [docs.daguit.dev](https://docs.daguit.dev/).
 |---------------------|---------|-------------|
 | `DAGU_HOME` | - | Base directory that overrides all path configurations |
 | `DAGU_DAGS_DIR` | `~/.config/dagu/dags` | Directory for DAG definitions |
+| `DAGU_ALT_DAGS_DIR` | - | Additional directory to search for DAG definitions |
 | `DAGU_LOG_DIR` | `~/.local/share/dagu/logs` | Directory for log files |
 | `DAGU_DATA_DIR` | `~/.local/share/dagu/data` | Directory for application data |
 | `DAGU_SUSPEND_FLAGS_DIR` | `~/.local/share/dagu/suspend` | Directory for suspend flags |
