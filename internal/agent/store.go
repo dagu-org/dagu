@@ -93,23 +93,22 @@ func DefaultConfig() *Config {
 }
 
 // DefaultToolPolicy returns the default agent tool policy.
-// The default is strict for mutating/networking tools and deny-by-default for bash,
-// with user approval fallback on denied bash commands.
+// The default is permissive: all tools enabled and bash allowed unless rules deny.
 func DefaultToolPolicy() ToolPolicyConfig {
 	return ToolPolicyConfig{
 		Tools: map[string]bool{
 			"bash":        true,
 			"read":        true,
-			"patch":       false,
+			"patch":       true,
 			"think":       true,
 			"navigate":    true,
 			"read_schema": true,
-			"ask_user":    false,
-			"web_search":  false,
+			"ask_user":    true,
+			"web_search":  true,
 		},
 		Bash: BashPolicyConfig{
 			Rules:           []BashRule{},
-			DefaultBehavior: BashDefaultBehaviorDeny,
+			DefaultBehavior: BashDefaultBehaviorAllow,
 			DenyBehavior:    BashDenyBehaviorAskUser,
 		},
 	}

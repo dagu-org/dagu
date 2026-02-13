@@ -15,8 +15,10 @@ func TestResolveToolPolicy_Defaults(t *testing.T) {
 
 	assert.True(t, resolved.Tools[toolNameBash])
 	assert.True(t, resolved.Tools[toolNameRead])
-	assert.False(t, resolved.Tools[toolNamePatch])
-	assert.Equal(t, BashDefaultBehaviorDeny, resolved.Bash.DefaultBehavior)
+	assert.True(t, resolved.Tools[toolNamePatch])
+	assert.True(t, resolved.Tools[toolNameAskUser])
+	assert.True(t, resolved.Tools[toolNameWebSearch])
+	assert.Equal(t, BashDefaultBehaviorAllow, resolved.Bash.DefaultBehavior)
 	assert.Equal(t, BashDenyBehaviorAskUser, resolved.Bash.DenyBehavior)
 }
 

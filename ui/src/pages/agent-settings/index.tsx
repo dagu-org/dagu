@@ -69,12 +69,12 @@ const TOOL_CONFIGS: ToolConfig[] = [
 const DEFAULT_TOOL_TOGGLES: Record<string, boolean> = {
   bash: true,
   read: true,
-  patch: false,
+  patch: true,
   think: true,
   navigate: true,
   read_schema: true,
-  ask_user: false,
-  web_search: false,
+  ask_user: true,
+  web_search: true,
 };
 
 function createDefaultToolPolicy(): AgentToolPolicy {
@@ -82,7 +82,7 @@ function createDefaultToolPolicy(): AgentToolPolicy {
     tools: { ...DEFAULT_TOOL_TOGGLES },
     bash: {
       rules: [],
-      defaultBehavior: AgentBashPolicyDefaultBehavior.deny,
+      defaultBehavior: AgentBashPolicyDefaultBehavior.allow,
       denyBehavior: AgentBashPolicyDenyBehavior.ask_user,
     },
   };
