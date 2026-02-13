@@ -25,7 +25,7 @@ func newAgentPolicyHook(configStore agent.ConfigStore, auditSvc *audit.Service) 
 
 		cfg, err := configStore.Load(ctx)
 		if err != nil || cfg == nil {
-			logPolicyEvent(auditSvc, info, auditActionToolPolicyDenied, map[string]any{
+			logPolicyEvent(ctx, auditSvc, info, auditActionToolPolicyDenied, map[string]any{
 				"tool_name": info.ToolName,
 				"reason":    "failed to load policy configuration",
 			})
@@ -33,7 +33,7 @@ func newAgentPolicyHook(configStore agent.ConfigStore, auditSvc *audit.Service) 
 		}
 
 		if err := agent.ValidateToolPolicy(cfg.ToolPolicy); err != nil {
-			logPolicyEvent(auditSvc, info, auditActionToolPolicyDenied, map[string]any{
+			logPolicyEvent(ctx, auditSvc, info, auditActionToolPolicyDenied, map[string]any{
 				"tool_name": info.ToolName,
 				"reason":    "invalid policy configuration",
 			})
@@ -43,20 +43,20 @@ func newAgentPolicyHook(configStore agent.ConfigStore, auditSvc *audit.Service) 
 		policy := agent.ResolveToolPolicy(cfg.ToolPolicy)
 
 		if !agent.IsToolEnabledResolved(policy, info.ToolName) {
-			logPolicyEvent(auditSvc, info, auditActionToolPolicyDenied, map[string]any{
+			logPolicyEvent(ctx, auditSvc, info, auditActionToolPolicyDenied, map[string]any{
 				"tool_name": info.ToolName,
 				"reason":    "tool disabled",
 			})
 			return fmt.Errorf("tool %q is disabled by policy", info.ToolName)
 		}
 
-		if info.ToolName != "bash" {
+		if !agent.IsBashToolName(info.ToolName) {
 			return nil
 		}
 
-		decision, err := agent.EvaluateBashPolicy(policy, info.Input)
+		decision, err := agent.EvaluateBashPolicyResolved(policy, info.Input)
 		if err != nil {
-			logPolicyEvent(auditSvc, info, auditActionToolPolicyDenied, map[string]any{
+			logPolicyEvent(ctx, auditSvc, info, auditActionToolPolicyDenied, map[string]any{
 				"tool_name": info.ToolName,
 				"reason":    "bash policy evaluation failed",
 			})
@@ -81,26 +81,26 @@ func newAgentPolicyHook(configStore agent.ConfigStore, auditSvc *audit.Service) 
 			approved, approvalErr := info.RequestCommandApproval(ctx, decision.Command, reason)
 			if approvalErr != nil {
 				details["approval_result"] = "error"
-				logPolicyEvent(auditSvc, info, auditActionToolPolicyDenied, details)
+				logPolicyEvent(ctx, auditSvc, info, auditActionToolPolicyDenied, details)
 				return fmt.Errorf("bash command denied by policy (approval failed: %w)", approvalErr)
 			}
 			if approved {
 				details["approval_result"] = "approved"
-				logPolicyEvent(auditSvc, info, auditActionToolPolicyOverride, details)
+				logPolicyEvent(ctx, auditSvc, info, auditActionToolPolicyOverride, details)
 				return nil
 			}
 			details["approval_result"] = "rejected"
-			logPolicyEvent(auditSvc, info, auditActionToolPolicyDenied, details)
+			logPolicyEvent(ctx, auditSvc, info, auditActionToolPolicyDenied, details)
 			return fmt.Errorf("bash command denied by policy")
 		}
 
 		details["approval_result"] = "blocked"
-		logPolicyEvent(auditSvc, info, auditActionToolPolicyDenied, details)
+		logPolicyEvent(ctx, auditSvc, info, auditActionToolPolicyDenied, details)
 		return fmt.Errorf("bash command denied by policy")
 	}
 }
 
-func logPolicyEvent(auditSvc *audit.Service, info agent.ToolExecInfo, action string, details map[string]any) {
+func logPolicyEvent(ctx context.Context, auditSvc *audit.Service, info agent.ToolExecInfo, action string, details map[string]any) {
 	if auditSvc == nil {
 		return
 	}
@@ -116,7 +116,10 @@ func logPolicyEvent(auditSvc *audit.Service, info agent.ToolExecInfo, action str
 	entry := audit.NewEntry(audit.CategoryAgent, action, info.UserID, info.Username).
 		WithDetails(string(payload)).
 		WithIPAddress(info.IPAddress)
-	_ = auditSvc.Log(context.Background(), entry)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	_ = auditSvc.Log(ctx, entry)
 }
 
 func truncatePolicyAuditText(s string) string {

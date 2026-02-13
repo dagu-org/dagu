@@ -115,7 +115,7 @@ function canonicalizeToolPolicy(policy?: AgentToolPolicy): AgentToolPolicy {
     tools,
     bash: {
       rules,
-      defaultBehavior: normalized.bash?.defaultBehavior || AgentBashPolicyDefaultBehavior.deny,
+      defaultBehavior: normalized.bash?.defaultBehavior || AgentBashPolicyDefaultBehavior.allow,
       denyBehavior: normalized.bash?.denyBehavior || AgentBashPolicyDenyBehavior.ask_user,
     },
   };
@@ -259,9 +259,6 @@ export default function AgentSettingsPage(): React.ReactNode {
         toolPolicy: normalizedPolicy,
       });
       setSuccess('Configuration saved successfully');
-
-      // Re-fetch to ensure sidebar/nav reflects changes
-      await fetchConfig();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save configuration');
     } finally {
@@ -353,36 +350,76 @@ export default function AgentSettingsPage(): React.ReactNode {
       action: AgentBashRuleAction.allow,
       enabled: true,
     };
-    const rules = [...(normalizeToolPolicy(toolPolicy).bash?.rules || []), newRule];
-    updateBashPolicy('rules', rules);
+    setToolPolicy((prev) => {
+      const normalized = normalizeToolPolicy(prev);
+      return {
+        ...normalized,
+        bash: {
+          ...normalized.bash,
+          rules: [...(normalized.bash?.rules || []), newRule],
+        },
+      };
+    });
     setBashRuleIds((prev) => [...prev, nextBashRuleId()]);
   }
 
   function updateBashRule(index: number, patch: Partial<AgentBashRule>): void {
-    const rules = [...(normalizeToolPolicy(toolPolicy).bash?.rules || [])];
-    if (!rules[index]) return;
-    rules[index] = { ...rules[index], ...patch };
-    updateBashPolicy('rules', rules);
+    setToolPolicy((prev) => {
+      const normalized = normalizeToolPolicy(prev);
+      const rules = [...(normalized.bash?.rules || [])];
+      if (!rules[index]) return prev;
+      rules[index] = { ...rules[index], ...patch };
+      return {
+        ...normalized,
+        bash: {
+          ...normalized.bash,
+          rules,
+        },
+      };
+    });
   }
 
   function removeBashRule(index: number): void {
-    const rules = [...(normalizeToolPolicy(toolPolicy).bash?.rules || [])];
-    if (!rules[index]) return;
-    rules.splice(index, 1);
-    updateBashPolicy('rules', rules);
-    setBashRuleIds((prev) => prev.filter((_, idx) => idx !== index));
+    setToolPolicy((prev) => {
+      const normalized = normalizeToolPolicy(prev);
+      const rules = [...(normalized.bash?.rules || [])];
+      if (!rules[index]) return prev;
+      rules.splice(index, 1);
+      return {
+        ...normalized,
+        bash: {
+          ...normalized.bash,
+          rules,
+        },
+      };
+    });
+    setBashRuleIds((prev) => {
+      if (index < 0 || index >= prev.length) return prev;
+      return prev.filter((_, idx) => idx !== index);
+    });
   }
 
   function moveBashRule(index: number, direction: -1 | 1): void {
-    const rules = [...(normalizeToolPolicy(toolPolicy).bash?.rules || [])];
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= rules.length) return;
-    const [moved] = rules.splice(index, 1);
-    if (!moved) return;
-    rules.splice(targetIndex, 0, moved);
-    updateBashPolicy('rules', rules);
+    setToolPolicy((prev) => {
+      const normalized = normalizeToolPolicy(prev);
+      const rules = [...(normalized.bash?.rules || [])];
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= rules.length) return prev;
+      const [moved] = rules.splice(index, 1);
+      if (!moved) return prev;
+      rules.splice(targetIndex, 0, moved);
+      return {
+        ...normalized,
+        bash: {
+          ...normalized.bash,
+          rules,
+        },
+      };
+    });
     setBashRuleIds((prev) => {
       const ids = [...prev];
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= ids.length) return prev;
       const [movedID] = ids.splice(index, 1);
       if (!movedID) return prev;
       ids.splice(targetIndex, 0, movedID);

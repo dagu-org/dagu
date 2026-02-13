@@ -24,6 +24,9 @@ func requestCommandApprovalWithOptions(
 		}
 		return false, errors.New("approval channel unavailable")
 	}
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
 
 	promptID := uuid.New().String()
 	emit(UserPrompt{
@@ -38,9 +41,6 @@ func requestCommandApprovalWithOptions(
 		},
 	})
 
-	if parentCtx == nil {
-		parentCtx = context.Background()
-	}
 	timeoutCtx, cancel := context.WithTimeout(parentCtx, approvalTimeout)
 	defer cancel()
 

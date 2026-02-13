@@ -16,6 +16,9 @@ func TestResolveToolPolicy_Defaults(t *testing.T) {
 	assert.True(t, resolved.Tools[toolNameBash])
 	assert.True(t, resolved.Tools[toolNameRead])
 	assert.True(t, resolved.Tools[toolNamePatch])
+	assert.True(t, resolved.Tools[toolNameThink])
+	assert.True(t, resolved.Tools[toolNameNavigate])
+	assert.True(t, resolved.Tools[toolNameReadSchema])
 	assert.True(t, resolved.Tools[toolNameAskUser])
 	assert.True(t, resolved.Tools[toolNameWebSearch])
 	assert.Equal(t, BashDefaultBehaviorAllow, resolved.Bash.DefaultBehavior)
@@ -90,6 +93,21 @@ func TestEvaluateBashPolicy(t *testing.T) {
 		assert.False(t, decision.Allowed)
 		assert.Equal(t, "deny_git", decision.RuleName)
 		assert.Equal(t, BashDenyBehaviorAskUser, decision.DenyBehavior)
+	})
+
+	t.Run("disabled deny rule is ignored", func(t *testing.T) {
+		t.Parallel()
+		disabled := false
+		decision, err := EvaluateBashPolicy(ToolPolicyConfig{
+			Bash: BashPolicyConfig{
+				Rules: []BashRule{
+					{Name: "deny_git_disabled", Pattern: "^git\\s+", Action: BashRuleActionDeny, Enabled: &disabled},
+				},
+				DefaultBehavior: BashDefaultBehaviorAllow,
+			},
+		}, input)
+		require.NoError(t, err)
+		assert.True(t, decision.Allowed)
 	})
 
 	t.Run("no match uses default deny", func(t *testing.T) {
@@ -178,6 +196,8 @@ func TestHasUnsupportedShellConstructs(t *testing.T) {
 		{name: "subshell", cmd: "echo $(date)", want: true},
 		{name: "backticks", cmd: "echo `date`", want: true},
 		{name: "heredoc", cmd: "cat <<EOF\nhello\nEOF", want: true},
+		{name: "process substitution input", cmd: "cat <(date)", want: true},
+		{name: "process substitution output", cmd: "echo hi >(cat)", want: true},
 		{name: "backticks in single quote are ignored", cmd: "echo '`date`'", want: false},
 	}
 

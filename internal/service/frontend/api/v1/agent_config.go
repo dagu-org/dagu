@@ -20,31 +20,36 @@ const (
 )
 
 var (
-	errAgentConfigNotAvailable = &Error{
+	// ErrAgentConfigNotAvailable is returned when agent config management is disabled.
+	ErrAgentConfigNotAvailable = &Error{
 		Code:       api.ErrorCodeForbidden,
 		Message:    "Agent configuration management is not available",
 		HTTPStatus: http.StatusForbidden,
 	}
 
-	errFailedToLoadAgentConfig = &Error{
+	// ErrFailedToLoadAgentConfig is returned when reading config fails.
+	ErrFailedToLoadAgentConfig = &Error{
 		Code:       api.ErrorCodeInternalError,
 		Message:    "Failed to load agent configuration",
 		HTTPStatus: http.StatusInternalServerError,
 	}
 
-	errFailedToSaveAgentConfig = &Error{
+	// ErrFailedToSaveAgentConfig is returned when writing config fails.
+	ErrFailedToSaveAgentConfig = &Error{
 		Code:       api.ErrorCodeInternalError,
 		Message:    "Failed to save agent configuration",
 		HTTPStatus: http.StatusInternalServerError,
 	}
 
-	errInvalidRequestBody = &Error{
+	// ErrInvalidRequestBody is returned when the request body is missing or invalid.
+	ErrInvalidRequestBody = &Error{
 		Code:       api.ErrorCodeBadRequest,
 		Message:    "Invalid request body",
 		HTTPStatus: http.StatusBadRequest,
 	}
 
-	errInvalidToolPolicy = &Error{
+	// ErrInvalidToolPolicy is returned when tool policy validation fails.
+	ErrInvalidToolPolicy = &Error{
 		Code:       api.ErrorCodeBadRequest,
 		Message:    "Invalid tool policy configuration",
 		HTTPStatus: http.StatusBadRequest,
@@ -63,7 +68,7 @@ func (a *API) GetAgentConfig(ctx context.Context, _ api.GetAgentConfigRequestObj
 	cfg, err := a.agentConfigStore.Load(ctx)
 	if err != nil {
 		logger.Error(ctx, "Failed to load agent config", tag.Error(err))
-		return nil, errFailedToLoadAgentConfig
+		return nil, ErrFailedToLoadAgentConfig
 	}
 
 	return api.GetAgentConfig200JSONResponse(toAgentConfigResponse(cfg)), nil
@@ -78,22 +83,22 @@ func (a *API) UpdateAgentConfig(ctx context.Context, request api.UpdateAgentConf
 		return nil, err
 	}
 	if request.Body == nil {
-		return nil, errInvalidRequestBody
+		return nil, ErrInvalidRequestBody
 	}
 
 	cfg, err := a.agentConfigStore.Load(ctx)
 	if err != nil {
 		logger.Error(ctx, "Failed to load agent config", tag.Error(err))
-		return nil, errFailedToLoadAgentConfig
+		return nil, ErrFailedToLoadAgentConfig
 	}
 
 	if err := applyAgentConfigUpdates(cfg, request.Body); err != nil {
-		return nil, errInvalidToolPolicy
+		return nil, ErrInvalidToolPolicy
 	}
 
 	if err := a.agentConfigStore.Save(ctx, cfg); err != nil {
 		logger.Error(ctx, "Failed to save agent config", tag.Error(err))
-		return nil, errFailedToSaveAgentConfig
+		return nil, ErrFailedToSaveAgentConfig
 	}
 
 	a.logAudit(ctx, audit.CategoryAgent, auditActionAgentConfigUpdate, buildAgentConfigChanges(request.Body))
@@ -103,7 +108,7 @@ func (a *API) UpdateAgentConfig(ctx context.Context, request api.UpdateAgentConf
 
 func (a *API) requireAgentConfigManagement() error {
 	if a.agentConfigStore == nil {
-		return errAgentConfigNotAvailable
+		return ErrAgentConfigNotAvailable
 	}
 	return nil
 }

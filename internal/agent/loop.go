@@ -322,9 +322,12 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		},
 	}
 
+	beforeHooksRegistered := l.hooks.HasBeforeToolExecHooks()
 	if err := l.hooks.RunBeforeToolExec(ctx, info); err != nil {
 		return toolError("Blocked by policy: %v", err)
 	}
+	// Only reached on successful hook execution.
+	policyChecked := beforeHooksRegistered
 
 	result := tool.Run(ToolContext{
 		Context:          ctx,
@@ -334,7 +337,7 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		WaitUserResponse: l.waitUserResponse,
 		SafeMode:         safeMode,
 		Role:             role,
-		PolicyChecked:    l.hooks.HasBeforeToolExecHooks(),
+		PolicyChecked:    policyChecked,
 	}, input)
 
 	l.hooks.RunAfterToolExec(ctx, info, result)

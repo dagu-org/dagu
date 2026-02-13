@@ -72,7 +72,7 @@ func (a *API) UpdateAgentMemory(ctx context.Context, request api.UpdateAgentMemo
 		return nil, err
 	}
 	if request.Body == nil {
-		return nil, errInvalidRequestBody
+		return nil, ErrInvalidRequestBody
 	}
 
 	if err := a.agentMemoryStore.SaveGlobalMemory(ctx, request.Body.Content); err != nil {
@@ -125,7 +125,7 @@ func (a *API) UpdateAgentDAGMemory(ctx context.Context, request api.UpdateAgentD
 		return nil, err
 	}
 	if request.Body == nil {
-		return nil, errInvalidRequestBody
+		return nil, ErrInvalidRequestBody
 	}
 
 	if err := a.agentMemoryStore.SaveDAGMemory(ctx, request.DagName, request.Body.Content); err != nil {

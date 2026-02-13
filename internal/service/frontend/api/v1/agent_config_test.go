@@ -14,7 +14,7 @@ import (
 )
 
 //go:fix inline
-func strPtr(v string) *string { return new(v) }
+func strPtr(v string) *string { return &v }
 
 func TestGetAgentConfig(t *testing.T) {
 	t.Parallel()
@@ -37,7 +37,7 @@ func TestGetAgentConfig(t *testing.T) {
 		assert.Equal(t, "my-model", *getResp.DefaultModelId)
 		require.NotNil(t, getResp.ToolPolicy)
 		require.NotNil(t, getResp.ToolPolicy.Tools)
-		assert.Contains(t, *getResp.ToolPolicy.Tools, "bash")
+		require.Contains(t, *getResp.ToolPolicy.Tools, "bash")
 	})
 
 	t.Run("returns 403 when store not configured", func(t *testing.T) {
@@ -134,7 +134,7 @@ func TestUpdateAgentConfig(t *testing.T) {
 		enabled := true
 		rules := []apigen.AgentBashRule{
 			{
-				Name:    new("allow_git_status"),
+				Name:    strPtr("allow_git_status"),
 				Pattern: "^git\\s+status$",
 				Action:  action,
 				Enabled: &enabled,
@@ -160,11 +160,11 @@ func TestUpdateAgentConfig(t *testing.T) {
 		require.NotNil(t, updateResp.ToolPolicy)
 		require.NotNil(t, updateResp.ToolPolicy.Bash)
 		require.NotNil(t, updateResp.ToolPolicy.Bash.Rules)
-		assert.Len(t, *updateResp.ToolPolicy.Bash.Rules, 1)
+		require.Len(t, *updateResp.ToolPolicy.Bash.Rules, 1)
 		require.NotNil(t, updateResp.ToolPolicy.Bash.DefaultBehavior)
-		assert.Equal(t, defaultBehavior, *updateResp.ToolPolicy.Bash.DefaultBehavior)
+		require.Equal(t, defaultBehavior, *updateResp.ToolPolicy.Bash.DefaultBehavior)
 		require.NotNil(t, updateResp.ToolPolicy.Bash.DenyBehavior)
-		assert.Equal(t, denyBehavior, *updateResp.ToolPolicy.Bash.DenyBehavior)
+		require.Equal(t, denyBehavior, *updateResp.ToolPolicy.Bash.DenyBehavior)
 	})
 
 	t.Run("invalid tool policy returns error", func(t *testing.T) {

@@ -47,8 +47,13 @@ func IsKnownToolName(name string) bool {
 	return ok
 }
 
+// IsBashToolName reports whether a tool name is the bash tool.
+func IsBashToolName(name string) bool {
+	return name == toolNameBash
+}
+
 //go:fix inline
-func boolPtr(v bool) *bool { return new(v) }
+func boolPtr(v bool) *bool { return &v }
 
 func cloneBashRules(rules []BashRule) []BashRule {
 	if len(rules) == 0 {
@@ -62,7 +67,7 @@ func cloneBashRules(rules []BashRule) []BashRule {
 			Action:  rules[i].Action,
 		}
 		if rules[i].Enabled != nil {
-			out[i].Enabled = new(*rules[i].Enabled)
+			out[i].Enabled = boolPtr(*rules[i].Enabled)
 		}
 	}
 	return out
@@ -183,7 +188,11 @@ func isRuleEnabled(rule BashRule) bool {
 
 // EvaluateBashPolicy evaluates bash input against policy.
 func EvaluateBashPolicy(policy ToolPolicyConfig, input json.RawMessage) (BashPolicyDecision, error) {
-	resolved := ResolveToolPolicy(policy)
+	return EvaluateBashPolicyResolved(ResolveToolPolicy(policy), input)
+}
+
+// EvaluateBashPolicyResolved evaluates bash input against an already-resolved policy.
+func EvaluateBashPolicyResolved(resolved ToolPolicyConfig, input json.RawMessage) (BashPolicyDecision, error) {
 	if !IsToolEnabledResolved(resolved, toolNameBash) {
 		return BashPolicyDecision{
 			Allowed:      false,
@@ -204,7 +213,7 @@ func EvaluateBashPolicy(policy ToolPolicyConfig, input json.RawMessage) (BashPol
 		return BashPolicyDecision{
 			Allowed:      false,
 			DenyBehavior: resolved.Bash.DenyBehavior,
-			Reason:       "command denied: unsupported shell construct detected (`...`, $(), or heredoc)",
+			Reason:       "command denied: unsupported shell construct detected (`...`, $(), heredoc, or process substitution)",
 			Command:      command,
 		}, nil
 	}
@@ -406,6 +415,12 @@ func hasUnsupportedShellConstructs(command string) bool {
 			return true
 		}
 		if !inDouble && ch == '<' && i+1 < len(command) && command[i+1] == '<' {
+			return true
+		}
+		if ch == '<' && i+1 < len(command) && command[i+1] == '(' {
+			return true
+		}
+		if ch == '>' && i+1 < len(command) && command[i+1] == '(' {
 			return true
 		}
 	}
