@@ -250,6 +250,7 @@ type PathsConfig struct {
 	SuspendFlagsDir    string
 	AdminLogsDir       string
 	BaseConfig         string
+	AltDAGsDir         string
 	DAGRunsDir         string
 	QueueDir           string
 	ProcDir            string

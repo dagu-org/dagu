@@ -68,6 +68,7 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_PROC_DIR":             filepath.Join(testPaths, "proc"),
 		"DAGU_QUEUE_DIR":            filepath.Join(testPaths, "queue"),
 		"DAGU_SERVICE_REGISTRY_DIR": filepath.Join(testPaths, "service-registry"),
+		"DAGU_ALT_DAGS_DIR":         filepath.Join(testPaths, "alt-dags"),
 
 		"DAGU_LATEST_STATUS_TODAY": "true",
 
@@ -168,6 +169,7 @@ func TestLoad_Env(t *testing.T) {
 		},
 		Paths: PathsConfig{
 			DAGsDir:            filepath.Join(testPaths, "dags"),
+			AltDAGsDir:         filepath.Join(testPaths, "alt-dags"),
 			Executable:         filepath.Join(testPaths, "bin", "dagu"),
 			LogDir:             filepath.Join(testPaths, "logs"),
 			DataDir:            filepath.Join(testPaths, "data"),
