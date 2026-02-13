@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -119,6 +120,21 @@ func TestBashTool_Run(t *testing.T) {
 
 		assert.False(t, result.IsError)
 		assert.Contains(t, result.Content, "test")
+	})
+
+	t.Run("rejects role without execute permission", func(t *testing.T) {
+		t.Parallel()
+
+		tool := NewBashTool()
+		input := json.RawMessage(`{"command": "echo test"}`)
+
+		result := tool.Run(ToolContext{
+			Context: context.Background(),
+			Role:    auth.RoleViewer,
+		}, input)
+
+		assert.True(t, result.IsError)
+		assert.Contains(t, result.Content, "requires execute permission")
 	})
 }
 

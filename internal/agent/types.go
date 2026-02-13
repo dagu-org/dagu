@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
@@ -239,6 +240,9 @@ type ToolContext struct {
 	WaitUserResponse WaitUserResponseFunc
 	// SafeMode enables approval prompts for dangerous commands when true.
 	SafeMode bool
+	// Role is the authenticated role of the current user.
+	// Empty means role checks should be skipped (e.g., auth-disabled compatibility).
+	Role auth.Role
 }
 
 // AuditInfo configures how a tool's executions appear in audit logs.

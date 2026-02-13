@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/google/uuid"
 )
@@ -35,6 +36,7 @@ type SessionManager struct {
 	hooks           *Hooks
 	username        string
 	ipAddress       string
+	role            auth.Role
 	onWorkingChange func(id string, working bool)
 	onMessage       func(ctx context.Context, msg Message) error
 	pendingPrompts  map[string]chan UserPromptResponse
@@ -61,6 +63,7 @@ type SessionManagerConfig struct {
 	Hooks           *Hooks
 	Username        string
 	IPAddress       string
+	Role            auth.Role
 	InputCostPer1M  float64
 	OutputCostPer1M float64
 	MemoryStore     MemoryStore
@@ -99,10 +102,26 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		hooks:           cfg.Hooks,
 		username:        cfg.Username,
 		ipAddress:       cfg.IPAddress,
+		role:            cfg.Role,
 		inputCostPer1M:  cfg.InputCostPer1M,
 		outputCostPer1M: cfg.OutputCostPer1M,
 		memoryStore:     cfg.MemoryStore,
 		dagName:         cfg.DAGName,
+	}
+}
+
+// UpdateUserContext updates user metadata for an existing session and active loop.
+func (sm *SessionManager) UpdateUserContext(username, ipAddress string, role auth.Role) {
+	sm.mu.Lock()
+	sm.username = username
+	sm.ipAddress = ipAddress
+	sm.role = role
+	loop := sm.loop
+	userID := sm.userID
+	sm.mu.Unlock()
+
+	if loop != nil {
+		loop.SetUserContext(userID, username, ipAddress, role)
 	}
 }
 
@@ -368,7 +387,7 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		Tools:            CreateTools(sm.environment.DAGsDir),
 		RecordMessage:    sm.createRecordMessageFunc(),
 		Logger:           sm.logger,
-		SystemPrompt:     GenerateSystemPrompt(sm.environment, nil, memory),
+		SystemPrompt:     GenerateSystemPrompt(sm.environment, nil, memory, sm.role),
 		WorkingDir:       sm.workingDir,
 		SessionID:        sm.id,
 		OnWorking:        sm.SetWorking,
@@ -380,6 +399,7 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		UserID:           sm.userID,
 		Username:         sm.username,
 		IPAddress:        sm.ipAddress,
+		Role:             sm.role,
 	})
 }
 

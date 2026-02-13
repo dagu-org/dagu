@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -225,6 +226,18 @@ func TestPatchTool_WorkingDirectory(t *testing.T) {
 	content, err := os.ReadFile(filepath.Join(dir, "test.txt"))
 	require.NoError(t, err)
 	assert.Equal(t, "content", string(content))
+}
+
+func TestPatchTool_Permissions(t *testing.T) {
+	t.Parallel()
+
+	tool := NewPatchTool("")
+	filePath := filepath.Join(t.TempDir(), "test.txt")
+	input := patchInput(filePath, "create", "content", "content")
+
+	result := tool.Run(ToolContext{Role: auth.RoleOperator}, input)
+	assert.True(t, result.IsError)
+	assert.Contains(t, result.Content, "requires write permission")
 }
 
 func TestCountLines(t *testing.T) {

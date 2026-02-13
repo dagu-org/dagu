@@ -3,6 +3,8 @@ package agent
 import (
 	"context"
 	"encoding/json"
+
+	"github.com/dagu-org/dagu/internal/auth"
 )
 
 // ToolExecInfo provides context about a tool execution for hooks.
@@ -13,6 +15,7 @@ type ToolExecInfo struct {
 	UserID    string
 	Username  string
 	IPAddress string
+	Role      auth.Role
 	Audit     *AuditInfo // from AgentTool.Audit; nil = not audited
 }
 

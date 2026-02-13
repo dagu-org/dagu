@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
@@ -11,6 +12,10 @@ import (
 )
 
 func (a *API) GetResourceHistory(ctx context.Context, request api.GetResourceHistoryRequestObject) (api.GetResourceHistoryResponseObject, error) {
+	if err := a.requireDeveloperOrAbove(ctx); err != nil {
+		return nil, err
+	}
+
 	if a.resourceService == nil {
 		return api.GetResourceHistorydefaultJSONResponse{
 			Body: api.Error{
@@ -39,12 +44,28 @@ func (a *API) GetResourceHistory(ctx context.Context, request api.GetResourceHis
 	disk := convertMetrics(history.Disk)
 	load := convertMetrics(history.Load)
 
+	memoryTotalBytes := safeUint64ToInt64(history.MemoryTotalBytes)
+	memoryUsedBytes := safeUint64ToInt64(history.MemoryUsedBytes)
+	diskTotalBytes := safeUint64ToInt64(history.DiskTotalBytes)
+	diskUsedBytes := safeUint64ToInt64(history.DiskUsedBytes)
+
 	return api.GetResourceHistory200JSONResponse{
-		Cpu:    &cpu,
-		Memory: &mem,
-		Disk:   &disk,
-		Load:   &load,
+		Cpu:              &cpu,
+		Memory:           &mem,
+		Disk:             &disk,
+		Load:             &load,
+		MemoryTotalBytes: &memoryTotalBytes,
+		MemoryUsedBytes:  &memoryUsedBytes,
+		DiskTotalBytes:   &diskTotalBytes,
+		DiskUsedBytes:    &diskUsedBytes,
 	}, nil
+}
+
+func safeUint64ToInt64(v uint64) int64 {
+	if v > math.MaxInt64 {
+		return math.MaxInt64
+	}
+	return int64(v)
 }
 
 // convertMetrics converts a slice of resource.MetricPoint into a slice of api.MetricPoint by copying each point's Timestamp and Value.

@@ -192,7 +192,8 @@ export function APIKeyFormModal({ open, apiKey, onClose, onSuccess }: APIKeyForm
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin - Full access</SelectItem>
-                  <SelectItem value="manager">Manager - DAG CRUD and execution</SelectItem>
+                  <SelectItem value="manager">Manager - DAG CRUD, execution, and audit logs</SelectItem>
+                  <SelectItem value="developer">Developer - DAG CRUD and execution</SelectItem>
                   <SelectItem value="operator">Operator - DAG execution only</SelectItem>
                   <SelectItem value="viewer">Viewer - Read-only access</SelectItem>
                 </SelectContent>

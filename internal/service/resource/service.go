@@ -102,6 +102,7 @@ func (s *Service) loop(ctx context.Context) {
 
 func (s *Service) collect(ctx context.Context) {
 	var cpuVal, memVal, diskVal, loadVal float64
+	var memTotal, memUsed, diskTotal, diskUsed uint64
 
 	// CPU Usage
 	if cpuPercent, err := cpu.PercentWithContext(ctx, 100*time.Millisecond, false); err != nil {
@@ -115,6 +116,8 @@ func (s *Service) collect(ctx context.Context) {
 		logger.Error(ctx, "Failed to get memory usage", tag.Error(err))
 	} else {
 		memVal = memStat.UsedPercent
+		memTotal = memStat.Total
+		memUsed = memStat.Used
 	}
 
 	// Disk Usage (for data directory)
@@ -122,6 +125,8 @@ func (s *Service) collect(ctx context.Context) {
 		logger.Error(ctx, "Failed to get disk usage", tag.Error(err), tag.Path(s.config.Paths.DataDir))
 	} else {
 		diskVal = diskStat.UsedPercent
+		diskTotal = diskStat.Total
+		diskUsed = diskStat.Used
 	}
 
 	// Load Average
@@ -131,5 +136,5 @@ func (s *Service) collect(ctx context.Context) {
 		loadVal = loadStat.Load1
 	}
 
-	s.store.Add(cpuVal, memVal, diskVal, loadVal)
+	s.store.Add(cpuVal, memVal, diskVal, loadVal, memTotal, memUsed, diskTotal, diskUsed)
 }

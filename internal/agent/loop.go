@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/dagu-org/dagu/internal/llm"
 )
@@ -68,6 +69,8 @@ type LoopConfig struct {
 	Username string
 	// IPAddress is the client's IP address.
 	IPAddress string
+	// Role is the authenticated user's role.
+	Role auth.Role
 }
 
 // Loop manages a session turn with an LLM including tool execution.
@@ -94,6 +97,7 @@ type Loop struct {
 	userID           string
 	username         string
 	ipAddress        string
+	role             auth.Role
 }
 
 // NewLoop creates a new Loop instance.
@@ -123,6 +127,7 @@ func NewLoop(config LoopConfig) *Loop {
 		userID:           config.UserID,
 		username:         config.Username,
 		ipAddress:        config.IPAddress,
+		role:             config.Role,
 	}
 }
 
@@ -283,23 +288,28 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		input = json.RawMessage("{}")
 	}
 
+	l.mu.Lock()
+	safeMode := l.safeMode
+	userID := l.userID
+	username := l.username
+	ipAddress := l.ipAddress
+	role := l.role
+	l.mu.Unlock()
+
 	info := ToolExecInfo{
 		ToolName:  tc.Function.Name,
 		Input:     input,
 		SessionID: l.sessionID,
-		UserID:    l.userID,
-		Username:  l.username,
-		IPAddress: l.ipAddress,
+		UserID:    userID,
+		Username:  username,
+		IPAddress: ipAddress,
+		Role:      role,
 		Audit:     tool.Audit,
 	}
 
 	if err := l.hooks.RunBeforeToolExec(ctx, info); err != nil {
 		return toolError("Blocked by policy: %v", err)
 	}
-
-	l.mu.Lock()
-	safeMode := l.safeMode
-	l.mu.Unlock()
 
 	result := tool.Run(ToolContext{
 		Context:          ctx,
@@ -308,11 +318,22 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		EmitUserPrompt:   l.emitUserPrompt,
 		WaitUserResponse: l.waitUserResponse,
 		SafeMode:         safeMode,
+		Role:             role,
 	}, input)
 
 	l.hooks.RunAfterToolExec(ctx, info, result)
 
 	return result
+}
+
+// SetUserContext updates user metadata used for hooks and tool authorization.
+func (l *Loop) SetUserContext(userID, username, ipAddress string, role auth.Role) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.userID = userID
+	l.username = username
+	l.ipAddress = ipAddress
+	l.role = role
 }
 
 // handleToolCalls processes tool calls from the LLM response using iteration

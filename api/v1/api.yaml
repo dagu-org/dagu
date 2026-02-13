@@ -659,7 +659,7 @@ paths:
   /workers:
     get:
       summary: "List distributed workers"
-      description: "Retrieves information about distributed workers connected to the coordinator"
+      description: "Retrieves information about distributed workers connected to the coordinator. Developer, manager, or admin only."
       operationId: "getWorkers"
       tags:
         - "system"
@@ -2807,7 +2807,7 @@ paths:
   /services/resources/history:
     get:
       summary: "Get resource usage history"
-      description: "Returns historical data for system resources"
+      description: "Returns historical data for system resources. Developer, manager, or admin only."
       operationId: "getResourceHistory"
       tags:
         - "system"
@@ -2837,7 +2837,7 @@ paths:
   /services/scheduler:
     get:
       summary: "Get scheduler service status"
-      description: "Returns status information about all registered scheduler instances"
+      description: "Returns status information about all registered scheduler instances. Developer, manager, or admin only."
       operationId: "getSchedulerStatus"
       tags:
         - "system"
@@ -2860,7 +2860,7 @@ paths:
   /services/coordinator:
     get:
       summary: "Get coordinator service status"
-      description: "Returns status information about all registered coordinator instances"
+      description: "Returns status information about all registered coordinator instances. Developer, manager, or admin only."
       operationId: "getCoordinatorStatus"
       tags:
         - "system"
@@ -2883,7 +2883,7 @@ paths:
   /services/tunnel:
     get:
       summary: "Get tunnel service status"
-      description: "Returns status information about the tunnel service (Tailscale)"
+      description: "Returns status information about the tunnel service (Tailscale). Developer, manager, or admin only."
       operationId: "getTunnelStatus"
       tags:
         - "system"
@@ -3031,7 +3031,7 @@ paths:
   /webhooks:
     get:
       summary: "List all webhooks"
-      description: "Returns a list of all webhooks across all DAGs. Admin only."
+      description: "Returns a list of all webhooks across all DAGs. Developer, manager, or admin only."
       operationId: "listWebhooks"
       tags:
         - "webhooks"
@@ -3086,6 +3086,7 @@ paths:
       description: |
         Creates a new webhook for the specified DAG. Returns the full webhook token,
         which is only shown once. Store it securely.
+        Developer, manager, or admin only.
       operationId: "createDAGWebhook"
       tags:
         - "webhooks"
@@ -3114,7 +3115,7 @@ paths:
 
     delete:
       summary: "Delete webhook for DAG"
-      description: "Removes the webhook configuration for the specified DAG."
+      description: "Removes the webhook configuration for the specified DAG. Developer, manager, or admin only."
       operationId: "deleteDAGWebhook"
       tags:
         - "webhooks"
@@ -3143,6 +3144,7 @@ paths:
       description: |
         Generates a new token for the existing webhook. The old token becomes
         invalid immediately. Returns the new token, which is only shown once.
+        Developer, manager, or admin only.
       operationId: "regenerateDAGWebhookToken"
       tags:
         - "webhooks"
@@ -3172,7 +3174,7 @@ paths:
   /dags/{fileName}/webhook/toggle:
     post:
       summary: "Toggle webhook enabled state"
-      description: "Enables or disables the webhook without changing the token."
+      description: "Enables or disables the webhook without changing the token. Developer, manager, or admin only."
       operationId: "toggleDAGWebhook"
       tags:
         - "webhooks"
@@ -3208,7 +3210,7 @@ paths:
   /audit:
     get:
       summary: "List audit log entries"
-      description: "Returns audit log entries matching the filter criteria. Admin only."
+      description: "Returns audit log entries matching the filter criteria. Manager or admin only."
       operationId: "listAuditLogs"
       tags:
         - "audit"
@@ -3271,7 +3273,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "403":
-          description: "Forbidden - requires admin role"
+          description: "Forbidden - requires manager or admin role"
           content:
             application/json:
               schema:
@@ -5893,6 +5895,22 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MetricPoint"
+        memoryTotalBytes:
+          type: integer
+          format: int64
+          description: Total physical memory in bytes
+        memoryUsedBytes:
+          type: integer
+          format: int64
+          description: Used physical memory in bytes
+        diskTotalBytes:
+          type: integer
+          format: int64
+          description: Total disk space in bytes
+        diskUsedBytes:
+          type: integer
+          format: int64
+          description: Used disk space in bytes
 
     MetricPoint:
       type: object
@@ -5910,10 +5928,11 @@ components:
 
     UserRole:
       type: string
-      description: "User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution, operator: DAG execution only, viewer: read-only"
+      description: "User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution with audit log access, developer: DAG CRUD and execution, operator: DAG execution only, viewer: read-only"
       enum:
         - admin
         - manager
+        - developer
         - operator
         - viewer
 
