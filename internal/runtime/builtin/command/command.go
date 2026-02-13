@@ -351,19 +351,27 @@ func init() {
 		Shell:            true,
 		GetEvalOptions: func(ctx context.Context, step core.Step) []eval.Option {
 			env := runtime.GetEnv(ctx)
-			shell := env.Shell(ctx)
-			if len(shell) > 0 && shell[0] != "direct" {
-				// Shell will handle env expansion
-				return []eval.Option{
-					eval.WithoutExpandEnv(),
-					eval.WithoutDollarEscape(),
-				}
-			}
-			// No shell — Dagu must expand OS variables since no shell will do it.
-			return []eval.Option{eval.WithOSExpansion()}
+			return commandEvalOptions(env.Shell(ctx))
 		},
 	}
 	executor.RegisterExecutor("", NewCommand, validateCommandStep, caps)
 	executor.RegisterExecutor("shell", NewCommand, validateCommandStep, caps)
 	executor.RegisterExecutor("command", NewCommand, validateCommandStep, caps)
+}
+
+func commandEvalOptions(shell []string) []eval.Option {
+	if len(shell) == 0 || shell[0] == "direct" {
+		// No shell (or direct mode): Dagu must expand OS variables itself.
+		return []eval.Option{eval.WithOSExpansion()}
+	}
+
+	opts := []eval.Option{eval.WithoutDollarEscape()}
+
+	// Unix-like shells support ${VAR} natively, so avoid double expansion.
+	// Non-Unix shells (e.g., PowerShell/cmd) need Dagu-side ${VAR} expansion.
+	if cmdutil.IsUnixLikeShell(shell[0]) || cmdutil.IsNixShell(shell[0]) {
+		opts = append(opts, eval.WithoutExpandEnv())
+	}
+
+	return opts
 }
