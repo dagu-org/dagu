@@ -204,8 +204,11 @@ func CreateTempDAGFile(subDir, dagName string, yamlData []byte, extraDocs ...[]b
 		return "", fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
-	// Create a temporary file with a meaningful name
-	pattern := fmt.Sprintf("%s-*.yaml", dagName)
+	// Cap prefix so basename (without .yaml) stays within the 40-char DAG name
+	// limit. os.CreateTemp replaces '*' with up to 10 random digits, plus the
+	// '-' separator we add = 11 chars of overhead.
+	const maxTempPrefix = 29 // 40 (DAGNameMaxLen) - 11 (separator + random suffix)
+	pattern := fmt.Sprintf("%s-*.yaml", TruncString(dagName, maxTempPrefix))
 	tempFile, err := os.CreateTemp(tempDir, pattern)
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)

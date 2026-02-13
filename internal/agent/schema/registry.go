@@ -4,6 +4,7 @@ package schema
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 	"sync"
@@ -44,10 +45,11 @@ func (r *Registry) Navigate(schemaName, path string) (string, error) {
 	}
 
 	nav := &navigator{
-		root:   schema,
-		defs:   getDefinitions(schema),
-		path:   path,
-		output: &strings.Builder{},
+		root:       schema,
+		defs:       getDefinitions(schema),
+		path:       path,
+		schemaName: schemaName,
+		output:     &strings.Builder{},
 	}
 
 	return nav.navigate()
@@ -67,10 +69,11 @@ func (r *Registry) AvailableSchemas() []string {
 
 // navigator handles schema path navigation and formatting.
 type navigator struct {
-	root   map[string]any
-	defs   map[string]any
-	path   string
-	output *strings.Builder
+	root       map[string]any
+	defs       map[string]any
+	path       string
+	schemaName string
+	output     *strings.Builder
 }
 
 func (n *navigator) navigate() (string, error) {
@@ -123,7 +126,7 @@ const maxNormalizationDepth = 10
 func (n *navigator) normalizeForNavigation(node map[string]any) map[string]any {
 	current := n.resolveRef(node)
 
-	for i := 0; i < maxNormalizationDepth; i++ {
+	for range maxNormalizationDepth {
 		changed := false
 
 		// Handle oneOf/anyOf - find variant with properties
@@ -231,8 +234,8 @@ func (n *navigator) resolveRef(node map[string]any) map[string]any {
 	}
 
 	// Handle "#/definitions/xxx" format
-	if strings.HasPrefix(ref, "#/definitions/") {
-		defName := strings.TrimPrefix(ref, "#/definitions/")
+	if after, ok0 := strings.CutPrefix(ref, "#/definitions/"); ok0 {
+		defName := after
 		if def, ok := n.defs[defName].(map[string]any); ok {
 			return n.resolveRef(def) // Recursively resolve nested refs
 		}
@@ -261,9 +264,7 @@ func (n *navigator) mergeAllOf(allOf []any) map[string]any {
 
 			// Merge properties
 			if props, ok := resolved["properties"].(map[string]any); ok {
-				for k, v := range props {
-					mergedProps[k] = v
-				}
+				maps.Copy(mergedProps, props)
 			}
 
 			// Collect required fields
@@ -300,7 +301,7 @@ func (n *navigator) mergeAllOf(allOf []any) map[string]any {
 func (n *navigator) formatNode(node map[string]any, path string) {
 	// Header
 	if path == "" {
-		n.output.WriteString("# DAG Schema Root\n\n")
+		n.output.WriteString(fmt.Sprintf("# %s Schema Root\n\n", capitalizeFirst(n.schemaName)))
 	} else {
 		n.output.WriteString(fmt.Sprintf("# %s\n\n", path))
 	}
@@ -411,8 +412,6 @@ func (n *navigator) formatProperties(props map[string]any, parent map[string]any
 	}
 }
 
-// Helper functions
-
 // getUnionOptions returns the oneOf or anyOf array if present, nil otherwise.
 func getUnionOptions(node map[string]any) []any {
 	for _, key := range []string{"oneOf", "anyOf"} {
@@ -464,6 +463,13 @@ func getRequiredSet(node map[string]any) map[string]bool {
 		}
 	}
 	return result
+}
+
+func capitalizeFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
 
 func truncateDescription(v any) string {

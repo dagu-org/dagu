@@ -116,7 +116,7 @@ func TestAttempt_Compact(t *testing.T) {
 	file := filepath.Join(dir, "status.dat")
 
 	// Create test file with multiple status entries
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		testStatus := createTestStatus(core.Running)
 
 		if i == 9 {

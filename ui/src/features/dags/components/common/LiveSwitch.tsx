@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import ConfirmModal from '@/ui/ConfirmModal';
 import { useCallback, useContext, useState } from 'react';
-import { components } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v1/schema';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
 

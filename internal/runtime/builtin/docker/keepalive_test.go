@@ -185,7 +185,7 @@ func TestGetKeepaliveFile_Concurrent(t *testing.T) {
 	}
 
 	done := make(chan bool, 10)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		go func() {
 			path, err := GetKeepaliveFile(platform)
 			assert.NoError(t, err)
@@ -200,7 +200,7 @@ func TestGetKeepaliveFile_Concurrent(t *testing.T) {
 	}
 
 	// Wait for all goroutines
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		<-done
 	}
 }

@@ -27,7 +27,7 @@ func TestNewUser(t *testing.T) {
 
 	t.Run("generates unique IDs", func(t *testing.T) {
 		ids := make(map[string]bool)
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			user := NewUser("user", "hash", RoleViewer)
 			assert.False(t, ids[user.ID], "ID should be unique")
 			ids[user.ID] = true

@@ -131,6 +131,37 @@ steps:
 			},
 		},
 		{
+			name: "DollarEscape_NoShell",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+container:
+  image: %s
+steps:
+  - command: printf '%%s' '\$HOME'
+    output: DOLLAR_NO_SHELL_OUT1
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"DOLLAR_NO_SHELL_OUT1": "$HOME",
+			},
+		},
+		{
+			name: "DollarEscape_WithShell",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+container:
+  image: %s
+  shell: ["/bin/sh", "-c"]
+steps:
+  - command: 'echo "\$HOME"'
+    output: DOLLAR_SHELL_OUT1
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"DOLLAR_SHELL_OUT1": "$HOME",
+			},
+		},
+		{
 			name: "CommandWithArguments",
 			dagConfigFunc: func(_ string) string {
 				return fmt.Sprintf(`

@@ -50,6 +50,10 @@ func NewReadTool() *AgentTool {
 			},
 		},
 		Run: readRun,
+		Audit: &AuditInfo{
+			Action:          "file_read",
+			DetailExtractor: ExtractFields("path"),
+		},
 	}
 }
 
@@ -81,21 +85,17 @@ func validateReadableFile(path, displayPath string) *ToolOut {
 	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			out := toolError("File not found: %s", displayPath)
-			return &out
+			return new(toolError("File not found: %s", displayPath))
 		}
-		out := toolError("Failed to access file: %v", err)
-		return &out
+		return new(toolError("Failed to access file: %v", err))
 	}
 
 	if info.IsDir() {
-		out := toolError("%s is a directory, not a file. Use bash with 'ls' to list directory contents.", displayPath)
-		return &out
+		return new(toolError("%s is a directory, not a file. Use bash with 'ls' to list directory contents.", displayPath))
 	}
 
 	if info.Size() > maxReadSize {
-		out := toolError("File too large (%d bytes). Maximum size is %d bytes. Use offset and limit to read portions.", info.Size(), maxReadSize)
-		return &out
+		return new(toolError("File too large (%d bytes). Maximum size is %d bytes. Use offset and limit to read portions.", info.Size(), maxReadSize))
 	}
 
 	return nil

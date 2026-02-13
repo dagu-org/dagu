@@ -7,7 +7,7 @@ import (
 	goruntime "runtime"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -29,9 +29,9 @@ func TestDAGShell(t *testing.T) {
 	})
 
 	t.Run("ExpandsEnvVarsInShell", func(t *testing.T) {
-		// No t.Parallel() because we use t.Setenv
-		t.Setenv("TEST_SHELL", "/bin/zsh")
+		t.Parallel()
 		dag := &core.DAG{
+			Env:   []string{"TEST_SHELL=/bin/zsh"},
 			Shell: "$TEST_SHELL",
 		}
 		ctx := runtime.NewContext(context.Background(), dag, "test-run", "test.log")
@@ -40,9 +40,9 @@ func TestDAGShell(t *testing.T) {
 	})
 
 	t.Run("ExpandsEnvVarsInShellArgs", func(t *testing.T) {
-		// No t.Parallel() because we use t.Setenv
-		t.Setenv("TEST_SHELL_ARG", "-c")
+		t.Parallel()
 		dag := &core.DAG{
+			Env:       []string{"TEST_SHELL_ARG=-c"},
 			Shell:     "/bin/bash",
 			ShellArgs: []string{"$TEST_SHELL_ARG"},
 		}
@@ -118,9 +118,10 @@ func TestEnvShell(t *testing.T) {
 	})
 
 	t.Run("ExpandsStepShellWithEnvVars", func(t *testing.T) {
-		// No t.Parallel() because we use t.Setenv
-		t.Setenv("MY_STEP_SHELL", "/bin/fish")
-		dag := &core.DAG{}
+		t.Parallel()
+		dag := &core.DAG{
+			Env: []string{"MY_STEP_SHELL=/bin/fish"},
+		}
 		ctx := runtime.NewContext(context.Background(), dag, "test-run", "test.log")
 		step := core.Step{
 			Name:  "test-step",
@@ -132,9 +133,9 @@ func TestEnvShell(t *testing.T) {
 	})
 
 	t.Run("ExpandsDAGShellWithEnvVars", func(t *testing.T) {
-		// No t.Parallel() because we use t.Setenv
-		t.Setenv("MY_DAG_SHELL", "/bin/ksh")
+		t.Parallel()
 		dag := &core.DAG{
+			Env:   []string{"MY_DAG_SHELL=/bin/ksh"},
 			Shell: "$MY_DAG_SHELL",
 		}
 		ctx := runtime.NewContext(context.Background(), dag, "test-run", "test.log")
@@ -174,7 +175,7 @@ func TestEnv_AllEnvsMap(t *testing.T) {
 					"VAR2": "value2",
 					"ENV1": "env1",
 					"ENV2": "env2",
-				}, cmdutil.EnvSourceStepEnv)
+				}, eval.EnvSourceStepEnv)
 				return env
 			},
 			expected: map[string]string{
@@ -219,7 +220,7 @@ func TestEnv_AllEnvsMap(t *testing.T) {
 
 			// Check that all expected keys exist with correct values
 			for key, expectedValue := range tt.expected {
-				assert.Equal(t, expectedValue, result[key], "key %s should have value %s", key, expectedValue)
+				require.Equal(t, expectedValue, result[key], "key %s should have value %s", key, expectedValue)
 			}
 		})
 	}
@@ -481,7 +482,7 @@ func TestEnv_UserEnvsMap(t *testing.T) {
 				dag := &core.DAG{Env: []string{"DAG_VAR=dag_value"}}
 				ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
 				env := runtime.NewEnv(ctx, core.Step{Name: "test"})
-				env.Scope = env.Scope.WithEntry("OUTPUT_VAR", "output_value", cmdutil.EnvSourceOutput)
+				env.Scope = env.Scope.WithEntry("OUTPUT_VAR", "output_value", eval.EnvSourceOutput)
 				return ctx, env
 			},
 			expected: map[string]string{
@@ -501,7 +502,7 @@ func TestEnv_UserEnvsMap(t *testing.T) {
 				step := core.Step{Name: "test"}
 				env := runtime.NewEnv(ctx, step)
 				// Step env has highest precedence
-				env.Scope = env.Scope.WithEntry("KEY", "step", cmdutil.EnvSourceStepEnv)
+				env.Scope = env.Scope.WithEntry("KEY", "step", eval.EnvSourceStepEnv)
 
 				envCtx := runtime.WithEnv(ctx, env)
 				return envCtx, env
@@ -565,10 +566,10 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				env := runtime.NewEnv(ctx, core.Step{Name: "test"})
 
 				// Set output variable
-				env.Scope = env.Scope.WithEntry("FOO", "from_output", cmdutil.EnvSourceOutput)
+				env.Scope = env.Scope.WithEntry("FOO", "from_output", eval.EnvSourceOutput)
 
 				// Set step env (highest precedence)
-				env.Scope = env.Scope.WithEntry("FOO", "from_step", cmdutil.EnvSourceStepEnv)
+				env.Scope = env.Scope.WithEntry("FOO", "from_step", eval.EnvSourceStepEnv)
 
 				return ctx, env
 			},
@@ -588,7 +589,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				env := runtime.NewEnv(ctx, core.Step{Name: "test"})
 
 				// Set output variable (higher precedence than DAG)
-				env.Scope = env.Scope.WithEntry("BAR", "from_output", cmdutil.EnvSourceOutput)
+				env.Scope = env.Scope.WithEntry("BAR", "from_output", eval.EnvSourceOutput)
 
 				return ctx, env
 			},
@@ -628,10 +629,10 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				env.Scope = env.Scope.WithEntries(map[string]string{
 					"VAR1": "output1",
 					"VAR2": "output2",
-				}, cmdutil.EnvSourceOutput)
+				}, eval.EnvSourceOutput)
 
 				// Set step env (only for VAR1, highest precedence)
-				env.Scope = env.Scope.WithEntry("VAR1", "step1", cmdutil.EnvSourceStepEnv)
+				env.Scope = env.Scope.WithEntry("VAR1", "step1", eval.EnvSourceStepEnv)
 
 				return ctx, env
 			},

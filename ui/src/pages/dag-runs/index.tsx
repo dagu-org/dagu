@@ -2,7 +2,7 @@ import dayjs from 'dayjs';
 import { Layers, List, Search } from 'lucide-react';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import { Status } from '../../api/v2/schema';
+import { Status } from '../../api/v1/schema';
 import { Button } from '../../components/ui/button';
 import { DateRangePicker } from '../../components/ui/date-range-picker';
 import { Input } from '../../components/ui/input';

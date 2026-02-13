@@ -1,5 +1,5 @@
 import React from 'react';
-import { components } from '../../../api/v2/schema';
+import { components } from '../../../api/v1/schema';
 
 type RootDAGRunContextType = {
   data: components['schemas']['DAGRunDetails'] | undefined;

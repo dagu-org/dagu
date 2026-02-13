@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
 import { Code, Terminal, ChevronRight } from 'lucide-react';
-import { components } from '../../api/v2/schema';
+import { components } from '../../api/v1/schema';
 
 type CommandEntry = components['schemas']['CommandEntry'];
 

@@ -1,4 +1,4 @@
-import { ChatMessageRole } from '@/api/v2/schema';
+import { ChatMessageRole } from '@/api/v1/schema';
 import { Markdown } from '@/components/ui/markdown';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';

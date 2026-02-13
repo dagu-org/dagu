@@ -29,7 +29,7 @@ type Info struct {
 	Status    Status       `json:"status"`
 	PublicURL string       `json:"publicUrl,omitempty"`
 	Error     string       `json:"error,omitempty"`
-	StartedAt time.Time    `json:"startedAt,omitempty"`
+	StartedAt time.Time    `json:"startedAt"`
 	Mode      string       `json:"mode"` // "direct" or "funnel"
 	IsPublic  bool         `json:"isPublic"`
 }

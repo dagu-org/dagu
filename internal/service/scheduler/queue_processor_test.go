@@ -70,7 +70,7 @@ func newQueueFixture(t *testing.T) *queueFixture {
 func (f *queueFixture) withDAG(name string, maxActiveRuns int) *queueFixture {
 	f.dag = &core.DAG{
 		Name: name, MaxActiveRuns: maxActiveRuns,
-		YamlData: []byte(fmt.Sprintf("name: %s\nmaxActiveRuns: %d\nsteps:\n  - name: test\n    command: echo hello", name, maxActiveRuns)),
+		YamlData: fmt.Appendf(nil, "name: %s\nmaxActiveRuns: %d\nsteps:\n  - name: test\n    command: echo hello", name, maxActiveRuns),
 		Steps:    []core.Step{{Name: "test", Command: "echo hello"}},
 	}
 	return f
@@ -93,7 +93,7 @@ func (f *queueFixture) enqueueRuns(n int) *queueFixture {
 
 func (f *queueFixture) withProcessor(cfg config.Queues) *queueFixture {
 	f.processor = NewQueueProcessor(f.queueStore, f.dagRunStore, f.procStore,
-		NewDAGExecutor(nil, runtime.NewSubCmdBuilder(&config.Config{Paths: config.PathsConfig{Executable: "/usr/bin/dagu"}})),
+		NewDAGExecutor(nil, runtime.NewSubCmdBuilder(&config.Config{Paths: config.PathsConfig{Executable: "/usr/bin/dagu"}}), config.ExecutionModeLocal),
 		cfg, WithBackoffConfig(BackoffConfig{InitialInterval: 10 * time.Millisecond, MaxInterval: 50 * time.Millisecond, MaxRetries: 2}),
 	)
 	return f

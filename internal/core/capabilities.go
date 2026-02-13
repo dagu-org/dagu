@@ -3,7 +3,7 @@ package core
 import (
 	"context"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 )
 
 // ExecutorCapabilities defines what an executor can do.
@@ -26,7 +26,7 @@ type ExecutorCapabilities struct {
 	LLM bool
 	// GetEvalOptions returns eval options for command argument evaluation.
 	// If nil, default evaluation is used.
-	GetEvalOptions func(ctx context.Context, step Step) []cmdutil.EvalOption
+	GetEvalOptions func(ctx context.Context, step Step) []eval.Option
 }
 
 // executorCapabilitiesRegistry is a typed registry of executor capabilities.
@@ -100,7 +100,7 @@ func SupportsLLM(executorType string) bool {
 
 // EvalOptions returns eval options for this step's executor type.
 // Returns nil if no special eval options are needed.
-func (s Step) EvalOptions(ctx context.Context) []cmdutil.EvalOption {
+func (s Step) EvalOptions(ctx context.Context) []eval.Option {
 	caps := executorCapabilities.Get(s.ExecutorConfig.Type)
 	if caps.GetEvalOptions != nil {
 		return caps.GetEvalOptions(ctx, s)

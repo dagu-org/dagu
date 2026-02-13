@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom';
 import {
   PathsDagsGetParametersQueryOrder,
   PathsDagsGetParametersQuerySort,
-} from '../../api/v2/schema';
+} from '../../api/v1/schema';
 import SplitLayout from '../../components/SplitLayout';
 import { TabBar } from '../../components/TabBar';
 import { AppBarContext } from '../../contexts/AppBarContext';

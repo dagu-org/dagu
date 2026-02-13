@@ -66,6 +66,9 @@ type Definition struct {
 	Scheduler   *SchedulerDef   `mapstructure:"scheduler"`
 	Queues      *QueueConfigDef `mapstructure:"queues"`
 
+	// Execution
+	DefaultExecutionMode string `mapstructure:"defaultExecutionMode"`
+
 	// Features
 	Monitoring *MonitoringDef `mapstructure:"monitoring"`
 	Metrics    *string        `mapstructure:"metrics"` // "public" or "private"
@@ -185,7 +188,7 @@ type PathsDef struct {
 	UsersDir           string `mapstructure:"usersDir"`
 	APIKeysDir         string `mapstructure:"apiKeysDir"`
 	WebhooksDir        string `mapstructure:"webhooksDir"`
-	ConversationsDir   string `mapstructure:"conversationsDir"`
+	SessionsDir        string `mapstructure:"sessionsDir"`
 }
 
 // -----------------------------------------------------------------------------
@@ -251,10 +254,10 @@ type WorkerDef struct {
 	MaxActiveRuns int    `mapstructure:"maxActiveRuns"`
 	// Labels accepts either a string "key=value,key2=value2,..." or map[string]string.
 	// When string, parsed as comma-separated key=value pairs.
-	Labels interface{} `mapstructure:"labels"`
+	Labels any `mapstructure:"labels"`
 	// Coordinators accepts either a single string URL or []string of URLs.
 	// When string, used as single coordinator address.
-	Coordinators interface{}      `mapstructure:"coordinators"`
+	Coordinators any              `mapstructure:"coordinators"`
 	PostgresPool *PostgresPoolDef `mapstructure:"postgresPool"`
 }
 
@@ -305,7 +308,8 @@ type TerminalDef struct {
 
 // AuditDef configures the audit logging feature.
 type AuditDef struct {
-	Enabled *bool `mapstructure:"enabled"` // Default: true
+	Enabled       *bool `mapstructure:"enabled"`       // Default: true
+	RetentionDays *int  `mapstructure:"retentionDays"` // Default: 7
 }
 
 // -----------------------------------------------------------------------------

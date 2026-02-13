@@ -16,7 +16,7 @@ import {
 } from '@/ui/CustomDialog';
 import { Play, ListPlus, X } from 'lucide-react';
 import React from 'react';
-import { components } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v1/schema';
 import {
   Parameter,
   parseParams,

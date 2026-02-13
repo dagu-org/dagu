@@ -3,6 +3,7 @@ package sql
 import (
 	"context"
 	"database/sql"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -118,10 +119,5 @@ func ParseConflictTarget(target string) []string {
 
 // Contains checks if a string slice contains a specific string.
 func Contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, item)
 }

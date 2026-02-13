@@ -1,6 +1,6 @@
 import { Layers } from 'lucide-react';
 import React from 'react';
-import type { components } from '../../../api/v2/schema';
+import type { components } from '../../../api/v1/schema';
 import QueueCard from './QueueCard';
 
 interface QueueListProps {

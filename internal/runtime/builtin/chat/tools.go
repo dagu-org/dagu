@@ -1,4 +1,4 @@
-// Package chat provides an executor for chat (LLM-based conversation) steps.
+// Package chat provides an executor for LLM-based session steps.
 package chat
 
 import (
@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
-	exec1 "github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	llmpkg "github.com/dagu-org/dagu/internal/llm"
 )
 
@@ -46,7 +46,7 @@ func NewToolRegistry(ctx context.Context, dagNames []string) (*ToolRegistry, err
 		return nil, nil
 	}
 
-	rCtx := exec1.GetContext(ctx)
+	rCtx := exec.GetContext(ctx)
 
 	registry := &ToolRegistry{
 		tools:    make(map[string]*toolInfo),

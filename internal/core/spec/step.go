@@ -2,8 +2,10 @@ package spec
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -95,9 +97,15 @@ type step struct {
 	// Requires explicit type: chat (or future type: agent).
 	LLM *llmConfig `yaml:"llm,omitempty"`
 
-	// Messages contains the conversation messages for chat steps.
+	// Messages contains the session messages for chat steps.
 	// Only valid when type is "chat".
 	Messages []llmMessage `yaml:"messages,omitempty"`
+
+	// Router configuration (type: router)
+	// Value is the expression to evaluate for routing
+	Value string `yaml:"value,omitempty"`
+	// Routes maps patterns to target step names
+	Routes map[string][]string `yaml:"routes,omitempty"`
 }
 
 // repeatPolicy defines the repeat policy for a step.
@@ -142,7 +150,7 @@ type llmConfig struct {
 	// String example: "gpt-4o"
 	// Array example: [{provider: openai, name: gpt-4o}, {provider: anthropic, name: claude-sonnet-4-20250514}]
 	Model types.ModelValue `yaml:"model,omitempty"`
-	// System is the default system prompt for conversations.
+	// System is the default system prompt for sessions.
 	System string `yaml:"system,omitempty"`
 	// Temperature controls randomness (0.0-2.0).
 	Temperature *float64 `yaml:"temperature,omitempty"`
@@ -166,7 +174,7 @@ type llmConfig struct {
 	MaxToolIterations *int `yaml:"maxToolIterations,omitempty"`
 }
 
-// llmMessage defines a message in the LLM conversation.
+// llmMessage defines a message in the LLM session.
 type llmMessage struct {
 	// Role is the message role (system, user, assistant, tool).
 	Role string `yaml:"role,omitempty"`
@@ -277,6 +285,9 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	}
 	if err := buildStepMessages(s, result); err != nil {
 		errs = append(errs, wrapTransformError("messages", err))
+	}
+	if err := buildStepRouter(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("router", err))
 	}
 	if err := buildStepCommand(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("command", err))
@@ -1096,9 +1107,7 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 	if s.Type != "" {
 		result.ExecutorConfig.Type = strings.TrimSpace(s.Type)
 	}
-	for k, v := range s.Config {
-		result.ExecutorConfig.Config[k] = v
-	}
+	maps.Copy(result.ExecutorConfig.Config, s.Config)
 
 	// Infer type from container field
 	if result.ExecutorConfig.Type == "" && result.Container != nil {
@@ -1416,6 +1425,81 @@ func buildStepMessages(s *step, result *core.Step) error {
 			Content: msg.Content,
 		}
 	}
+
+	return nil
+}
+
+// buildStepRouter parses the router configuration from step fields.
+func buildStepRouter(_ StepBuildContext, s *step, result *core.Step) error {
+	if s.Type != "router" {
+		return nil
+	}
+
+	// Trim and validate value
+	s.Value = strings.TrimSpace(s.Value)
+	if s.Value == "" {
+		return core.NewValidationError("value", nil,
+			fmt.Errorf("router step requires 'value' field"))
+	}
+	if len(s.Routes) == 0 {
+		return core.NewValidationError("routes", nil,
+			fmt.Errorf("router step requires at least one route"))
+	}
+
+	// Convert map to ordered entries
+	var routes []core.RouteEntry
+	for pattern, targets := range s.Routes {
+		// Trim and validate pattern
+		pattern = strings.TrimSpace(pattern)
+		if pattern == "" {
+			return core.NewValidationError("routes", nil,
+				fmt.Errorf("route pattern cannot be empty"))
+		}
+
+		if len(targets) == 0 {
+			return core.NewValidationError("routes", pattern,
+				fmt.Errorf("route pattern %q has no targets", pattern))
+		}
+
+		// Trim and validate each target
+		var trimmedTargets []string
+		for _, target := range targets {
+			target = strings.TrimSpace(target)
+			if target == "" {
+				return core.NewValidationError("routes", pattern,
+					fmt.Errorf("route pattern %q has empty target", pattern))
+			}
+			trimmedTargets = append(trimmedTargets, target)
+		}
+
+		routes = append(routes, core.RouteEntry{
+			Pattern: pattern,
+			Targets: trimmedTargets,
+		})
+	}
+
+	// Sort: exact matches first, then regex (catch-all "re:.*" last)
+	sort.Slice(routes, func(i, j int) bool {
+		iIsRegex := strings.HasPrefix(routes[i].Pattern, "re:")
+		jIsRegex := strings.HasPrefix(routes[j].Pattern, "re:")
+		if iIsRegex != jIsRegex {
+			return !iIsRegex // exact matches first
+		}
+		// Catch-all patterns last
+		if routes[i].Pattern == "re:.*" {
+			return false
+		}
+		if routes[j].Pattern == "re:.*" {
+			return true
+		}
+		return routes[i].Pattern < routes[j].Pattern
+	})
+
+	result.Router = &core.RouterConfig{
+		Value:  s.Value,
+		Routes: routes,
+	}
+	result.ExecutorConfig.Type = core.ExecutorTypeRouter
 
 	return nil
 }

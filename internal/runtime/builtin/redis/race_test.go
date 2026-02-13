@@ -28,7 +28,7 @@ func TestRace_ConcurrentExecutors(t *testing.T) {
 	var wg sync.WaitGroup
 	errCh := make(chan error, numExecutors*2) // Buffer for potential errors
 
-	for i := 0; i < numExecutors; i++ {
+	for i := range numExecutors {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -87,7 +87,7 @@ func TestRace_GlobalPoolManagerConcurrent(t *testing.T) {
 	errCh := make(chan error, numGoroutines)
 
 	// Test concurrent GetOrCreateClient calls
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -150,7 +150,7 @@ func TestRace_ConfigParsing(t *testing.T) {
 		},
 	}
 
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -168,20 +168,18 @@ func TestRace_ResultWriter(t *testing.T) {
 	numGoroutines := 10
 	var wg sync.WaitGroup
 
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range numGoroutines {
+		wg.Go(func() {
 
 			var buf bytes.Buffer
 			writer := redisexec.NewResultWriter(&buf, "jsonl", "null")
 
-			for j := 0; j < 100; j++ {
+			for j := range 100 {
 				_ = writer.Write(map[string]any{"id": j, "name": "test"})
 			}
 
 			_ = writer.Flush()
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -197,7 +195,7 @@ func TestRace_ExecutorKill(t *testing.T) {
 	ctx := context.Background()
 	numIterations := 5
 
-	for i := 0; i < numIterations; i++ {
+	for range numIterations {
 		step := core.Step{
 			Name: "test-kill-race",
 			ExecutorConfig: core.ExecutorConfig{
@@ -218,19 +216,15 @@ func TestRace_ExecutorKill(t *testing.T) {
 		var wg sync.WaitGroup
 
 		// Start Run() in goroutine
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			// Run may succeed or be killed - either is fine
 			_ = exec.Run(ctx)
-		}()
+		})
 
 		// Kill() from another goroutine
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_ = exec.Kill(os.Interrupt)
-		}()
+		})
 
 		wg.Wait()
 	}
@@ -246,7 +240,7 @@ func TestRace_ExecutorClose(t *testing.T) {
 	ctx := context.Background()
 	numIterations := 5
 
-	for i := 0; i < numIterations; i++ {
+	for range numIterations {
 		step := core.Step{
 			Name: "test-close-race",
 			ExecutorConfig: core.ExecutorConfig{
@@ -270,12 +264,10 @@ func TestRace_ExecutorClose(t *testing.T) {
 		numClosers := 5
 
 		// Multiple goroutines trying to close
-		for j := 0; j < numClosers; j++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range numClosers {
+			wg.Go(func() {
 				_ = closer.Close()
-			}()
+			})
 		}
 
 		wg.Wait()
@@ -289,7 +281,7 @@ func TestRace_PoolManagerClose(t *testing.T) {
 		t.Skip("REDIS_TEST_HOST not set, skipping race test")
 	}
 
-	for iteration := 0; iteration < 3; iteration++ {
+	for range 3 {
 		pm := redisexec.NewGlobalRedisPoolManager(redisexec.GlobalPoolConfig{
 			MaxClients: 5,
 		})
@@ -300,10 +292,8 @@ func TestRace_PoolManagerClose(t *testing.T) {
 		numWorkers := 10
 
 		// Start workers getting clients
-		for i := 0; i < numWorkers; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range numWorkers {
+			wg.Go(func() {
 
 				cfg, err := redisexec.ParseConfig(ctx, map[string]any{
 					"host":    host,
@@ -322,7 +312,7 @@ func TestRace_PoolManagerClose(t *testing.T) {
 				_, _ = client.Ping(ctx).Result()
 
 				pm.ReleaseClient(cfg)
-			}()
+			})
 		}
 
 		// Close while workers are active
@@ -340,7 +330,7 @@ func TestRace_HashConfigConcurrent(t *testing.T) {
 	numGoroutines := 20
 	var wg sync.WaitGroup
 
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -386,7 +376,7 @@ func TestRace_MultiplePoolManagerOperations(t *testing.T) {
 	var wg sync.WaitGroup
 	numGoroutines := 30
 
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()

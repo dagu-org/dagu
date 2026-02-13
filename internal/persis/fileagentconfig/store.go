@@ -1,10 +1,7 @@
 package fileagentconfig
 
 import (
-	"cmp"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,7 +12,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
-	"github.com/dagu-org/dagu/internal/llm"
 )
 
 // Verify Store implements agent.ConfigStore at compile time.
@@ -30,21 +26,16 @@ const (
 
 // Environment variable names for agent configuration overrides.
 const (
-	envAgentEnabled     = "DAGU_AGENT_ENABLED"
-	envAgentLLMProvider = "DAGU_AGENT_LLM_PROVIDER"
-	envAgentLLMModel    = "DAGU_AGENT_LLM_MODEL"
-	envAgentLLMAPIKey   = "DAGU_AGENT_LLM_API_KEY" //nolint:gosec // constant name, not a credential
-	envAgentLLMBaseURL  = "DAGU_AGENT_LLM_BASE_URL"
+	envAgentEnabled = "DAGU_AGENT_ENABLED"
 )
 
 // Store implements a file-based singleton store for agent configuration.
 // The config is stored as a JSON file at {dataDir}/agent/config.json.
 // Thread-safe through internal locking.
 type Store struct {
-	baseDir       string
-	mu            sync.RWMutex
-	configCache   *fileutil.Cache[*agent.Config]
-	providerCache *providerCache
+	baseDir     string
+	mu          sync.RWMutex
+	configCache *fileutil.Cache[*agent.Config]
 }
 
 // Option is a functional option for configuring the Store.
@@ -55,68 +46,6 @@ func WithConfigCache(cache *fileutil.Cache[*agent.Config]) Option {
 	return func(s *Store) {
 		s.configCache = cache
 	}
-}
-
-// providerCache caches the LLM provider by config hash.
-type providerCache struct {
-	mu       sync.RWMutex
-	provider llm.Provider
-	model    string
-	cfgHash  string
-}
-
-func newProviderCache() *providerCache {
-	return &providerCache{}
-}
-
-func (c *providerCache) get(llmCfg agent.LLMConfig) (llm.Provider, string, error) {
-	hash := hashLLMConfig(llmCfg)
-
-	c.mu.RLock()
-	if c.cfgHash == hash && c.provider != nil {
-		defer c.mu.RUnlock()
-		return c.provider, c.model, nil
-	}
-	c.mu.RUnlock()
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	// Double-check after acquiring write lock
-	if c.cfgHash == hash && c.provider != nil {
-		return c.provider, c.model, nil
-	}
-
-	provider, err := createLLMProvider(llmCfg)
-	if err != nil {
-		return nil, "", err
-	}
-
-	c.provider = provider
-	c.model = llmCfg.Model
-	c.cfgHash = hash
-	return provider, c.model, nil
-}
-
-// hashLLMConfig creates a hash of the LLM config for cache invalidation.
-func hashLLMConfig(cfg agent.LLMConfig) string {
-	data := fmt.Sprintf("%s:%s:%s:%s", cfg.Provider, cfg.Model, cfg.APIKey, cfg.BaseURL)
-	hash := sha256.Sum256([]byte(data))
-	return hex.EncodeToString(hash[:8])
-}
-
-// createLLMProvider creates an LLM provider from the config.
-func createLLMProvider(agentCfg agent.LLMConfig) (llm.Provider, error) {
-	providerType, err := llm.ParseProviderType(agentCfg.Provider)
-	if err != nil {
-		return nil, fmt.Errorf("invalid LLM provider: %w", err)
-	}
-
-	cfg := llm.DefaultConfig()
-	cfg.APIKey = cmp.Or(agentCfg.APIKey, cfg.APIKey)
-	cfg.BaseURL = cmp.Or(agentCfg.BaseURL, cfg.BaseURL)
-
-	return llm.NewProvider(providerType, cfg)
 }
 
 // New creates a new file-based agent config store.
@@ -133,8 +62,7 @@ func New(dataDir string, opts ...Option) (*Store, error) {
 	}
 
 	s := &Store{
-		baseDir:       baseDir,
-		providerCache: newProviderCache(),
+		baseDir: baseDir,
 	}
 
 	for _, opt := range opts {
@@ -186,19 +114,6 @@ func (s *Store) IsEnabled(ctx context.Context) bool {
 	return cfg.Enabled
 }
 
-// GetProvider returns the cached LLM provider and model.
-// Creates the provider if config has changed since last call.
-func (s *Store) GetProvider(ctx context.Context) (llm.Provider, string, error) {
-	cfg, err := s.Load(ctx)
-	if err != nil {
-		return nil, "", err
-	}
-	if !cfg.Enabled {
-		return nil, "", errors.New("fileagentconfig: agent is disabled")
-	}
-	return s.providerCache.get(cfg.LLM)
-}
-
 // Save writes the agent configuration to the JSON file.
 // Uses atomic write (temp file + rename) to prevent corruption.
 func (s *Store) Save(_ context.Context, cfg *agent.Config) error {
@@ -209,7 +124,16 @@ func (s *Store) Save(_ context.Context, cfg *agent.Config) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return s.writeConfigToFile(s.configPath(), cfg)
+	if err := s.writeConfigToFile(s.configPath(), cfg); err != nil {
+		return err
+	}
+
+	// Invalidate cache after successful write so next Load picks up new data
+	if s.configCache != nil {
+		s.configCache.Invalidate(s.configPath())
+	}
+
+	return nil
 }
 
 // writeConfigToFile writes the config to a JSON file atomically.
@@ -241,17 +165,5 @@ func applyEnvOverrides(cfg *agent.Config) {
 		if enabled, err := strconv.ParseBool(v); err == nil {
 			cfg.Enabled = enabled
 		}
-	}
-
-	applyStringEnvOverride(envAgentLLMProvider, &cfg.LLM.Provider)
-	applyStringEnvOverride(envAgentLLMModel, &cfg.LLM.Model)
-	applyStringEnvOverride(envAgentLLMAPIKey, &cfg.LLM.APIKey)
-	applyStringEnvOverride(envAgentLLMBaseURL, &cfg.LLM.BaseURL)
-}
-
-// applyStringEnvOverride sets the target value if the environment variable is non-empty.
-func applyStringEnvOverride(envVar string, target *string) {
-	if v := os.Getenv(envVar); v != "" {
-		*target = v
 	}
 }

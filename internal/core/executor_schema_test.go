@@ -66,12 +66,10 @@ func TestValidateExecutorConfig_ConcurrentAccess(_ *testing.T) {
 	RegisterExecutorConfigSchema("test_concurrent", schema)
 
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 100 {
+		wg.Go(func() {
 			_ = ValidateExecutorConfig("test_concurrent", map[string]any{"value": 42})
-		}()
+		})
 	}
 	wg.Wait()
 }

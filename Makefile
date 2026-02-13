@@ -40,9 +40,9 @@ GOTESTSUM_ARGS=--format=standard-quiet
 GO_TEST_FLAGS=-v --race -ldflags=-extldflags=-Wl
 
 # OpenAPI configuration
-OAPI_SPEC_DIR_V2=./api/v2
-OAPI_SPEC_FILE_V2=${OAPI_SPEC_DIR_V2}/api.yaml
-OAPI_CONFIG_FILE_V2=${OAPI_SPEC_DIR_V2}/config.yaml
+OAPI_SPEC_DIR_V1=./api/v1
+OAPI_SPEC_FILE_V1=${OAPI_SPEC_DIR_V1}/api.yaml
+OAPI_CONFIG_FILE_V1=${OAPI_SPEC_DIR_V1}/config.yaml
 
 # Frontend directories
 
@@ -173,14 +173,14 @@ lint: golangci-lint
 api: api-validate
 	@echo "${COLOR_GREEN}Generating API...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_oapi_codegen}
-	@${LOCAL_BIN_DIR}/oapi-codegen --config=${OAPI_CONFIG_FILE_V2} ${OAPI_SPEC_FILE_V2}
+	@${LOCAL_BIN_DIR}/oapi-codegen --config=${OAPI_CONFIG_FILE_V1} ${OAPI_SPEC_FILE_V1}
 
 # api-validate validates the OpenAPI specification.
 .PHONY: api-validate
 api-validate:
 	@echo "${COLOR_GREEN}Validating API...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_kin_openapi_validate}
-	@${LOCAL_BIN_DIR}/validate ${OAPI_SPEC_FILE_V2}
+	@${LOCAL_BIN_DIR}/validate ${OAPI_SPEC_FILE_V1}
 
 # api generates the swagger server code.
 .PHONY: swagger
@@ -352,6 +352,30 @@ clean-ui:
 	@cd ui; \
 		rm -rf node_modules; \
 		rm -rf .cache;
+
+# fmt auto-fixes all code style issues (go fix + go fmt + linter --fix).
+# AI agents and developers should run this before committing.
+.PHONY: fmt
+fmt:
+	@echo "${COLOR_GREEN}Running go fix...${COLOR_RESET}"
+	@go fix ./...
+	@echo "${COLOR_GREEN}Running go fmt...${COLOR_RESET}"
+	@go fmt ./...
+	@echo "${COLOR_GREEN}Running linter with --fix...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_golangci_lint)
+	@${LOCAL_BIN_DIR}/golangci-lint run --fix ./...
+
+# check verifies code style without modifying files (for CI).
+.PHONY: check
+check:
+	@echo "${COLOR_GREEN}Checking go fix...${COLOR_RESET}"
+	@diff=$$(go fix -diff ./... 2>&1); if [ -n "$$diff" ]; then echo "$$diff"; echo "${COLOR_RED}Run 'make fmt'${COLOR_RESET}"; exit 1; fi
+	@echo "${COLOR_GREEN}Checking go fmt...${COLOR_RESET}"
+	@go fmt ./...
+	@git diff --exit-code || (echo "${COLOR_RED}Run 'make fmt'${COLOR_RESET}" && exit 1)
+	@echo "${COLOR_GREEN}Running linter...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_golangci_lint)
+	@${LOCAL_BIN_DIR}/golangci-lint run --timeout=10m ./...
 
 # golangci-lint run linting tool.
 .PHONY: golangci-lint

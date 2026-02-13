@@ -31,10 +31,10 @@ var configSchema = &jsonschema.Schema{
 		// Connection - Basic
 		"url":      {Type: "string", Format: "uri", Description: "Redis connection URL (redis://user:pass@host:port/db)"},
 		"host":     {Type: "string", Description: "Redis host (alternative to url)"},
-		"port":     {Type: "integer", Minimum: intPtr(1), Maximum: intPtr(65535), Description: "Redis port (default: 6379)"},
+		"port":     {Type: "integer", Minimum: new(float64(1)), Maximum: new(float64(65535)), Description: "Redis port (default: 6379)"},
 		"password": {Type: "string", Description: "Authentication password"},
 		"username": {Type: "string", Description: "ACL username (Redis 6+)"},
-		"db":       {Type: "integer", Minimum: intPtr(0), Maximum: intPtr(15), Description: "Database number (0-15)"},
+		"db":       {Type: "integer", Minimum: new(float64(0)), Maximum: new(float64(15)), Description: "Database number (0-15)"},
 
 		// Connection - TLS
 		"tls":           {Type: "boolean", Description: "Enable TLS"},
@@ -122,12 +122,6 @@ var configSchema = &jsonschema.Schema{
 		"timeout":       {Type: "integer", Description: "Command timeout in seconds"},
 		"maxResultSize": {Type: "integer", Description: "Max result size in bytes"},
 	},
-}
-
-// intPtr returns a pointer to a float64 for use in JSON schema.
-func intPtr(i int) *float64 {
-	f := float64(i)
-	return &f
 }
 
 func init() {

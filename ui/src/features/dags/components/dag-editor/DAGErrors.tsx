@@ -5,7 +5,7 @@
  */
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { components } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v1/schema';
 
 /**
  * Props for the DAGErrors component

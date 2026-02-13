@@ -502,13 +502,13 @@ func TestBuildParamsWithLocalSchemaReference(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, tmpFile.Close())
 
-	data := []byte(fmt.Sprintf(`
+	data := fmt.Appendf(nil, `
 params:
   schema: "%s"
   values:
     batch_size: 25
     environment: "staging"
-`, tmpFile.Name()))
+`, tmpFile.Name())
 
 	dag, err := LoadYAML(context.Background(), data)
 	require.NoError(t, err)
@@ -546,13 +546,13 @@ func TestBuildParamsWithRemoteSchemaReference(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
-	data := []byte(fmt.Sprintf(`
+	data := fmt.Appendf(nil, `
 params:
   schema: "%s/schemas/dag-params.json"
   values:
     batch_size: 50
     environment: "prod"
-`, server.URL))
+`, server.URL)
 
 	dag, err := LoadYAML(context.Background(), data)
 	require.NoError(t, err)
@@ -584,13 +584,13 @@ func TestBuildParamsSchemaResolution(t *testing.T) {
 			}
 		})
 
-		data := []byte(fmt.Sprintf(`
+		data := fmt.Appendf(nil, `
 workingDir: %s
 params:
   schema: "schema.json"
   values:
     environment: "dev"
-`, wd))
+`, wd)
 
 		dag, err := LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -651,13 +651,13 @@ params:
 		require.NoError(t, os.Chdir(cwd))
 		defer func() { _ = os.Chdir(orig) }()
 
-		data := []byte(fmt.Sprintf(`
+		data := fmt.Appendf(nil, `
 workingDir: %s
 params:
   schema: "schema.json"
   values:
     environment: "dev"
-`, wd))
+`, wd)
 
 		dag, err := LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -717,10 +717,10 @@ params:
 		require.NoError(t, err)
 		require.NoError(t, tmpFile.Close())
 
-		data := []byte(fmt.Sprintf(`
+		data := fmt.Appendf(nil, `
 params:
   schema: "%s"
-`, tmpFile.Name()))
+`, tmpFile.Name())
 
 		cliParams := "batch_size=100 environment=prod"
 		_, err = LoadYAML(context.Background(), data, WithParams(cliParams))
@@ -760,12 +760,12 @@ params:
 		require.NoError(t, err)
 		require.NoError(t, tmpFile.Close())
 
-		data := []byte(fmt.Sprintf(`
+		data := fmt.Appendf(nil, `
 params:
   schema: "%s"
   values:
     batch_size: 75
-`, tmpFile.Name()))
+`, tmpFile.Name())
 
 		dag, err := LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -811,7 +811,7 @@ params:
 		require.NoError(t, err)
 		require.NoError(t, tmpFile.Close())
 
-		data := []byte(fmt.Sprintf(`
+		data := fmt.Appendf(nil, `
 params:
   schema: "%s"
   values:
@@ -819,7 +819,7 @@ params:
     environment: "production"
     debug: false
     timeout: 600
-`, tmpFile.Name()))
+`, tmpFile.Name())
 
 		dag, err := LoadYAML(context.Background(), data)
 		require.NoError(t, err)

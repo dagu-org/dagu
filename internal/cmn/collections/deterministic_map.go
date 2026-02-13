@@ -2,7 +2,9 @@ package collections
 
 import (
 	"encoding/json"
+	"maps"
 	"sort"
+	"strings"
 )
 
 // DeterministicMap is a map that marshals to JSON with sorted keys
@@ -24,10 +26,11 @@ func (m DeterministicMap) MarshalJSON() ([]byte, error) {
 	sort.Strings(keys)
 
 	// Build the JSON manually to ensure order
-	result := "{"
+	var result strings.Builder
+	result.WriteString("{")
 	for i, k := range keys {
 		if i > 0 {
-			result += ","
+			result.WriteString(",")
 		}
 		// Marshal key and value
 		keyJSON, err := json.Marshal(k)
@@ -38,11 +41,11 @@ func (m DeterministicMap) MarshalJSON() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		result += string(keyJSON) + ":" + string(valueJSON)
+		result.WriteString(string(keyJSON) + ":" + string(valueJSON))
 	}
-	result += "}"
+	result.WriteString("}")
 
-	return []byte(result), nil
+	return []byte(result.String()), nil
 }
 
 // UnmarshalJSON implements json.Unmarshaler interface.
@@ -78,9 +81,7 @@ func (m DeterministicMap) Clone() DeterministicMap {
 	}
 
 	clone := make(DeterministicMap, len(m))
-	for k, v := range m {
-		clone[k] = v
-	}
+	maps.Copy(clone, m)
 	return clone
 }
 
@@ -92,8 +93,6 @@ func (m DeterministicMap) Merge(other DeterministicMap) DeterministicMap {
 		result = make(DeterministicMap)
 	}
 
-	for k, v := range other {
-		result[k] = v
-	}
+	maps.Copy(result, other)
 	return result
 }

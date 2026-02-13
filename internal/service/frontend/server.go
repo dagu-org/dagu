@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"mime"
@@ -24,8 +25,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	authmodel "github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
@@ -35,16 +36,18 @@ import (
 	"github.com/dagu-org/dagu/internal/gitsync"
 	_ "github.com/dagu-org/dagu/internal/llm/allproviders" // Register LLM providers
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
+	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
-	"github.com/dagu-org/dagu/internal/persis/fileconversation"
+	"github.com/dagu-org/dagu/internal/persis/filesession"
+	"github.com/dagu-org/dagu/internal/persis/fileupgradecheck"
 	"github.com/dagu-org/dagu/internal/persis/fileuser"
 	"github.com/dagu-org/dagu/internal/persis/filewebhook"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
-	apiv2 "github.com/dagu-org/dagu/internal/service/frontend/api/v2"
+	apiv1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	"github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/dagu-org/dagu/internal/service/frontend/metrics"
 	"github.com/dagu-org/dagu/internal/service/frontend/sse"
@@ -57,7 +60,7 @@ import (
 
 // Server represents the HTTP server for the frontend application.
 type Server struct {
-	apiV2            *apiv2.API
+	apiV1            *apiv1.API
 	agentAPI         *agent.API
 	agentConfigStore *fileagentconfig.Store
 	config           *config.Config
@@ -66,11 +69,12 @@ type Server struct {
 	builtinOIDCCfg   *auth.BuiltinOIDCConfig
 	authService      *authservice.Service
 	auditService     *audit.Service
+	auditStore       *fileaudit.Store
 	syncService      gitsync.Service
 	listener         net.Listener
 	sseHub           *sse.Hub
 	metricsRegistry  *prometheus.Registry
-	tunnelAPIOpts    []apiv2.APIOption
+	tunnelAPIOpts    []apiv1.APIOption
 	dagStore         exec.DAGStore
 }
 
@@ -88,7 +92,7 @@ func WithListener(l net.Listener) ServerOption {
 func WithTunnelService(ts *tunnel.Service) ServerOption {
 	return func(s *Server) {
 		if ts != nil {
-			s.tunnelAPIOpts = append(s.tunnelAPIOpts, apiv2.WithTunnelService(ts))
+			s.tunnelAPIOpts = append(s.tunnelAPIOpts, apiv1.WithTunnelService(ts))
 		}
 	}
 }
@@ -106,23 +110,23 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 
 	var (
-		apiOpts         []apiv2.APIOption
+		apiOpts         []apiv1.APIOption
 		builtinOIDCCfg  *auth.BuiltinOIDCConfig
 		oidcEnabled     bool
 		oidcButtonLabel string
 	)
 
-	auditSvc, err := initAuditService(cfg)
+	auditSvc, auditStore, err := initAuditService(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize audit service: %w", err)
 	}
 	if auditSvc != nil {
-		apiOpts = append(apiOpts, apiv2.WithAuditService(auditSvc))
+		apiOpts = append(apiOpts, apiv1.WithAuditService(auditSvc))
 	}
 
 	syncSvc := initSyncService(ctx, cfg)
 	if syncSvc != nil {
-		apiOpts = append(apiOpts, apiv2.WithSyncService(syncSvc))
+		apiOpts = append(apiOpts, apiv1.WithSyncService(syncSvc))
 	}
 
 	agentConfigStore, err := fileagentconfig.New(cfg.Paths.DataDir)
@@ -130,9 +134,17 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		logger.Warn(ctx, "Failed to create agent config store", tag.Error(err))
 	}
 
+	var agentModelStore *fileagentmodel.Store
+	if agentConfigStore != nil {
+		agentModelStore, err = fileagentmodel.New(filepath.Join(cfg.Paths.DataDir, "agent", "models"))
+		if err != nil {
+			logger.Warn(ctx, "Failed to create agent model store", tag.Error(err))
+		}
+	}
+
 	var agentAPI *agent.API
 	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, &cfg.Paths, dr)
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, &cfg.Paths, dr, auditSvc)
 		if err != nil {
 			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
 		}
@@ -145,7 +157,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			return nil, fmt.Errorf("failed to initialize builtin auth service: %w", err)
 		}
 		authSvc = result.AuthService
-		apiOpts = append(apiOpts, apiv2.WithAuthService(result.AuthService))
+		apiOpts = append(apiOpts, apiv1.WithAuthService(result.AuthService))
 
 		oidcCfg := cfg.Server.Auth.OIDC
 		if oidcCfg.IsConfigured() {
@@ -190,10 +202,17 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		}
 	}
 
-	// Check for updates asynchronously (populates cache for next startup)
-	go func() { _, _ = upgrade.CheckAndUpdateCache(config.Version) }()
+	upgradeStore, err := fileupgradecheck.New(cfg.Paths.DataDir)
+	if err != nil {
+		logger.Warn(ctx, "Failed to create upgrade check store", tag.Error(err))
+	}
 
-	updateAvailable, latestVersion := getUpdateInfo()
+	// Check for updates asynchronously (populates cache for next startup)
+	if upgradeStore != nil {
+		go func() { _, _ = upgrade.CheckAndUpdateCache(upgradeStore, config.Version) }()
+	}
+
+	updateAvailable, latestVersion := getUpdateInfo(upgradeStore)
 
 	srv := &Server{
 		config:           cfg,
@@ -202,6 +221,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		builtinOIDCCfg:   builtinOIDCCfg,
 		authService:      authSvc,
 		auditService:     auditSvc,
+		auditStore:       auditStore,
 		syncService:      syncSvc,
 		metricsRegistry:  mr,
 		dagStore:         dr,
@@ -233,17 +253,23 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	allAPIOptions := append(apiOpts, srv.tunnelAPIOpts...)
 	if srv.agentConfigStore != nil {
-		allAPIOptions = append(allAPIOptions, apiv2.WithAgentConfigStore(srv.agentConfigStore))
+		allAPIOptions = append(allAPIOptions, apiv1.WithAgentConfigStore(srv.agentConfigStore))
+	}
+	if agentModelStore != nil {
+		allAPIOptions = append(allAPIOptions, apiv1.WithAgentModelStore(agentModelStore))
 	}
 
-	srv.apiV2 = apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, allAPIOptions...)
+	srv.apiV1 = apiv1.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, allAPIOptions...)
 
 	return srv, nil
 }
 
 // getUpdateInfo returns update availability and latest version from cache.
-func getUpdateInfo() (updateAvailable bool, latestVersion string) {
-	cache := upgrade.GetCachedUpdateInfo()
+func getUpdateInfo(store upgrade.CacheStore) (updateAvailable bool, latestVersion string) {
+	if store == nil {
+		return false, ""
+	}
+	cache := upgrade.GetCachedUpdateInfo(store)
 	if cache == nil {
 		return false, ""
 	}
@@ -331,17 +357,17 @@ func initBuiltinAuthService(cfg *config.Config, collector *telemetry.Collector) 
 }
 
 // initAuditService creates a file-based audit store and service.
-func initAuditService(cfg *config.Config) (*audit.Service, error) {
+func initAuditService(cfg *config.Config) (*audit.Service, *fileaudit.Store, error) {
 	if !cfg.Server.Audit.Enabled {
-		return nil, nil
+		return nil, nil, nil
 	}
 
-	store, err := fileaudit.New(filepath.Join(cfg.Paths.AdminLogsDir, "audit"))
+	store, err := fileaudit.New(filepath.Join(cfg.Paths.AdminLogsDir, "audit"), cfg.Server.Audit.RetentionDays)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create audit store: %w", err)
+		return nil, nil, fmt.Errorf("failed to create audit store: %w", err)
 	}
 
-	return audit.New(store), nil
+	return audit.New(store), store, nil
 }
 
 // initSyncService creates and returns a Git sync service if enabled.
@@ -372,19 +398,26 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 }
 
 // initAgentAPI creates and returns an agent API.
-// The API uses the config store to check enabled status and get provider dynamically.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *config.PathsConfig, dagStore exec.DAGStore) (*agent.API, error) {
-	convStore, err := fileconversation.New(paths.ConversationsDir)
+// The API uses the config store to check enabled status and resolve providers via the model store.
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, paths *config.PathsConfig, dagStore exec.DAGStore, auditSvc *audit.Service) (*agent.API, error) {
+	sessStore, err := filesession.New(paths.SessionsDir)
 	if err != nil {
-		logger.Warn(ctx, "Failed to create conversation store, persistence disabled", tag.Error(err))
+		logger.Warn(ctx, "Failed to create session store, persistence disabled", tag.Error(err))
+	}
+
+	hooks := agent.NewHooks()
+	if auditSvc != nil {
+		hooks.OnAfterToolExec(newAgentAuditHook(auditSvc))
 	}
 
 	api := agent.NewAPI(agent.APIConfig{
-		ConfigStore:       store,
-		WorkingDir:        paths.DAGsDir,
-		Logger:            slog.Default(),
-		ConversationStore: convStore,
-		DAGStore:          dagStore,
+		ConfigStore:  store,
+		ModelStore:   modelStore,
+		WorkingDir:   paths.DAGsDir,
+		Logger:       slog.Default(),
+		SessionStore: sessStore,
+		DAGStore:     dagStore,
+		Hooks:        hooks,
 		Environment: agent.EnvironmentInfo{
 			DAGsDir:        paths.DAGsDir,
 			LogDir:         paths.LogDir,
@@ -395,9 +428,35 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *conf
 		},
 	})
 
+	api.StartCleanup(ctx)
+
 	logger.Info(ctx, "Agent API initialized")
 
 	return api, nil
+}
+
+// newAgentAuditHook returns a hook that logs agent tool executions to the audit service.
+func newAgentAuditHook(auditSvc *audit.Service) agent.AfterToolExecHookFunc {
+	return func(_ context.Context, info agent.ToolExecInfo, result agent.ToolOut) {
+		if info.Audit == nil {
+			return // tool opted out of audit
+		}
+
+		details := make(map[string]any)
+		if info.Audit.DetailExtractor != nil {
+			details = info.Audit.DetailExtractor(info.Input)
+		}
+		if result.IsError {
+			details["failed"] = true
+		}
+		details["session_id"] = info.SessionID
+
+		detailsJSON, _ := json.Marshal(details)
+		entry := audit.NewEntry(audit.CategoryAgent, info.Audit.Action, info.UserID, info.Username).
+			WithDetails(string(detailsJSON)).
+			WithIPAddress(info.IPAddress)
+		_ = auditSvc.Log(context.Background(), entry)
+	}
 }
 
 // sanitizedRequestLogger wraps httplog's RequestLogger with URL sanitization
@@ -453,7 +512,7 @@ func (srv *Server) Serve(ctx context.Context) error {
 		RequestHeaders:   srv.config.Core.Debug,
 		MessageFieldName: "msg",
 		ResponseHeaders:  false,
-		QuietDownRoutes:  []string{"/api/v2/events"},
+		QuietDownRoutes:  []string{"/api/v1/events"},
 		QuietDownPeriod:  10 * time.Second,
 	})
 
@@ -471,26 +530,26 @@ func (srv *Server) Serve(ctx context.Context) error {
 	}))
 	r.Use(middleware.RedirectSlashes)
 
-	apiV2BasePath := srv.configureAPIPath()
+	apiV1BasePath := srv.configureAPIPath()
 	scheme := srv.getScheme()
 
 	if err := srv.setupRoutes(ctx, r); err != nil {
 		return err
 	}
 
-	if err := srv.setupAPIRoutes(ctx, r, apiV2BasePath, scheme); err != nil {
+	if err := srv.setupAPIRoutes(ctx, r, apiV1BasePath, scheme); err != nil {
 		return err
 	}
 
 	if srv.config.Server.Terminal.Enabled && srv.authService != nil {
-		srv.setupTerminalRoute(ctx, r, apiV2BasePath)
+		srv.setupTerminalRoute(ctx, r, apiV1BasePath)
 	}
 
 	if srv.agentAPI != nil && srv.agentConfigStore != nil {
 		srv.setupAgentRoutes(ctx, r)
 	}
 
-	srv.setupSSERoute(ctx, r, apiV2BasePath)
+	srv.setupSSERoute(ctx, r, apiV1BasePath)
 
 	addr := net.JoinHostPort(srv.config.Server.Host, strconv.Itoa(srv.config.Server.Port))
 	srv.httpServer = &http.Server{
@@ -511,8 +570,8 @@ func (srv *Server) Serve(ctx context.Context) error {
 }
 
 func (srv *Server) configureAPIPath() string {
-	apiV2BasePath := path.Join(srv.config.Server.BasePath, "api/v2")
-	return ensureLeadingSlash(apiV2BasePath)
+	apiV1BasePath := path.Join(srv.config.Server.BasePath, "api/v1")
+	return ensureLeadingSlash(apiV1BasePath)
 }
 
 func (srv *Server) getScheme() string {
@@ -560,7 +619,7 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 
 func (srv *Server) evaluateBasePath(ctx context.Context) string {
 	basePath := srv.config.Server.BasePath
-	evaluated, err := cmdutil.EvalString(ctx, basePath)
+	evaluated, err := eval.String(ctx, basePath, eval.WithOSExpansion())
 	if err != nil {
 		logger.Warn(ctx, "Failed to evaluate server base path", tag.Path(basePath), tag.Error(err))
 		return basePath
@@ -579,10 +638,15 @@ func (srv *Server) setupAssetRoutes(r *chi.Mux, basePath string) {
 	r.Get(assetsPath, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "max-age=86400")
 
-		// Serve schema from shared package instead of embedded assets
+		// Serve schemas from shared package instead of embedded assets
 		if strings.HasSuffix(r.URL.Path, "dag.schema.json") {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write(cmnschema.DAGSchemaJSON)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "config.schema.json") {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(cmnschema.ConfigSchemaJSON)
 			return
 		}
 
@@ -626,11 +690,11 @@ func (srv *Server) buildOIDCAuthOptions(ctx context.Context) (*auth.Options, err
 	}, nil
 }
 
-func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV2BasePath, scheme string) error {
+func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath, scheme string) error {
 	var setupErr error
-	r.Route(apiV2BasePath, func(r chi.Router) {
-		url := fmt.Sprintf("%s://%s:%d%s", scheme, srv.config.Server.Host, srv.config.Server.Port, apiV2BasePath)
-		if err := srv.apiV2.ConfigureRoutes(ctx, r, url); err != nil {
+	r.Route(apiV1BasePath, func(r chi.Router) {
+		url := fmt.Sprintf("%s://%s:%d%s", scheme, srv.config.Server.Host, srv.config.Server.Port, apiV1BasePath)
+		if err := srv.apiV1.ConfigureRoutes(ctx, r, url); err != nil {
 			logger.Error(ctx, "Failed to configure API routes", tag.Error(err))
 			setupErr = err
 		}
@@ -638,14 +702,14 @@ func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV2BasePath
 	return setupErr
 }
 
-func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV2BasePath string) {
+func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV1BasePath string) {
 	termHandler := terminal.NewHandler(srv.authService, srv.auditService, terminal.GetDefaultShell())
-	wsPath := path.Join(apiV2BasePath, "terminal/ws")
+	wsPath := path.Join(apiV1BasePath, "terminal/ws")
 	r.Get(wsPath, termHandler.ServeHTTP)
 	logger.Info(ctx, "Terminal WebSocket route configured", slog.String("path", wsPath))
 }
 
-func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV2BasePath string) {
+func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath string) {
 	var sseMetrics *sse.Metrics
 	if srv.metricsRegistry != nil {
 		sseMetrics = sse.NewMetrics(srv.metricsRegistry)
@@ -662,29 +726,29 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV2BasePath 
 
 	handler := sse.NewHandler(srv.sseHub, remoteNodes, srv.authService)
 
-	r.Get(path.Join(apiV2BasePath, "events/dags"), handler.HandleDAGsListEvents)
-	r.Get(path.Join(apiV2BasePath, "events/dags/{fileName}"), handler.HandleDAGEvents)
-	r.Get(path.Join(apiV2BasePath, "events/dags/{fileName}/dag-runs"), handler.HandleDAGHistoryEvents)
-	r.Get(path.Join(apiV2BasePath, "events/dag-runs"), handler.HandleDAGRunsListEvents)
-	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}"), handler.HandleDAGRunEvents)
-	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}/logs"), handler.HandleDAGRunLogsEvents)
-	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}/logs/steps/{stepName}"), handler.HandleStepLogEvents)
-	r.Get(path.Join(apiV2BasePath, "events/queues"), handler.HandleQueuesListEvents)
-	r.Get(path.Join(apiV2BasePath, "events/queues/{name}/items"), handler.HandleQueueItemsEvents)
+	r.Get(path.Join(apiV1BasePath, "events/dags"), handler.HandleDAGsListEvents)
+	r.Get(path.Join(apiV1BasePath, "events/dags/{fileName}"), handler.HandleDAGEvents)
+	r.Get(path.Join(apiV1BasePath, "events/dags/{fileName}/dag-runs"), handler.HandleDAGHistoryEvents)
+	r.Get(path.Join(apiV1BasePath, "events/dag-runs"), handler.HandleDAGRunsListEvents)
+	r.Get(path.Join(apiV1BasePath, "events/dag-runs/{name}/{dagRunId}"), handler.HandleDAGRunEvents)
+	r.Get(path.Join(apiV1BasePath, "events/dag-runs/{name}/{dagRunId}/logs"), handler.HandleDAGRunLogsEvents)
+	r.Get(path.Join(apiV1BasePath, "events/dag-runs/{name}/{dagRunId}/logs/steps/{stepName}"), handler.HandleStepLogEvents)
+	r.Get(path.Join(apiV1BasePath, "events/queues"), handler.HandleQueuesListEvents)
+	r.Get(path.Join(apiV1BasePath, "events/queues/{name}/items"), handler.HandleQueueItemsEvents)
 
-	logger.Info(ctx, "SSE routes configured", slog.String("basePath", apiV2BasePath))
+	logger.Info(ctx, "SSE routes configured", slog.String("basePath", apiV1BasePath))
 }
 
 func (srv *Server) registerSSEFetchers() {
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAG, srv.apiV2.GetDAGDetailsData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGHistory, srv.apiV2.GetDAGHistoryData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGsList, srv.apiV2.GetDAGsListData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRun, srv.apiV2.GetDAGRunDetailsData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRuns, srv.apiV2.GetDAGRunsListData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRunLogs, srv.apiV2.GetDAGRunLogsData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeStepLog, srv.apiV2.GetStepLogData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeQueues, srv.apiV2.GetQueuesListData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeQueueItems, srv.apiV2.GetQueueItemsData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAG, srv.apiV1.GetDAGDetailsData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGHistory, srv.apiV1.GetDAGHistoryData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGsList, srv.apiV1.GetDAGsListData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRun, srv.apiV1.GetDAGRunDetailsData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRuns, srv.apiV1.GetDAGRunsListData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRunLogs, srv.apiV1.GetDAGRunLogsData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeStepLog, srv.apiV1.GetStepLogData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeQueues, srv.apiV1.GetQueuesListData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeQueueItems, srv.apiV1.GetQueueItemsData)
 }
 
 func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux) {
@@ -769,6 +833,12 @@ func (srv *Server) serveHTTP(tlsCfg *config.TLSConfig, hasListener bool) error {
 
 // Shutdown gracefully shuts down the server.
 func (srv *Server) Shutdown(ctx context.Context) error {
+	if srv.auditStore != nil {
+		if err := srv.auditStore.Close(); err != nil {
+			logger.Warn(ctx, "Failed to close audit store", tag.Error(err))
+		}
+	}
+
 	if srv.syncService != nil {
 		if err := srv.syncService.Stop(); err != nil {
 			logger.Warn(ctx, "Failed to stop git sync service", tag.Error(err))
@@ -804,11 +874,7 @@ func (srv *Server) setupGracefulShutdown(ctx context.Context) {
 		logger.Info(ctx, "Received shutdown signal", slog.String("signal", sig.String()))
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	srv.httpServer.SetKeepAlivesEnabled(false)
-	if err := srv.httpServer.Shutdown(shutdownCtx); err != nil {
+	if err := srv.Shutdown(ctx); err != nil {
 		logger.Error(ctx, "Failed to shutdown server gracefully", tag.Error(err))
 	}
 }

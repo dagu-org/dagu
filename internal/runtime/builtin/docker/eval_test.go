@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/stretchr/testify/assert"
@@ -41,7 +41,7 @@ func TestEvalContainerFields(t *testing.T) {
 			name: "ImageVariable",
 			setup: func(ctx context.Context) context.Context {
 				env := runtime.NewEnv(ctx, core.Step{Name: "test"})
-				env.Scope = env.Scope.WithEntry("IMAGE", "myimage:v1.0", cmdutil.EnvSourceStepEnv)
+				env.Scope = env.Scope.WithEntry("IMAGE", "myimage:v1.0", eval.EnvSourceStepEnv)
 				return runtime.WithEnv(ctx, env)
 			},
 			input: core.Container{
@@ -60,7 +60,7 @@ func TestEvalContainerFields(t *testing.T) {
 					"CONTAINER_NAME": "web-server",
 					"WORK_DIR":       "/var/www",
 					"NET":            "my-network",
-				}, cmdutil.EnvSourceStepEnv)
+				}, eval.EnvSourceStepEnv)
 				return runtime.WithEnv(ctx, env)
 			},
 			input: core.Container{
@@ -83,7 +83,7 @@ func TestEvalContainerFields(t *testing.T) {
 				env.Scope = env.Scope.WithEntries(map[string]string{
 					"HOST_PATH":      "/host/data",
 					"CONTAINER_PATH": "/container/data",
-				}, cmdutil.EnvSourceStepEnv)
+				}, eval.EnvSourceStepEnv)
 				return runtime.WithEnv(ctx, env)
 			},
 			input: core.Container{
@@ -102,7 +102,7 @@ func TestEvalContainerFields(t *testing.T) {
 				env.Scope = env.Scope.WithEntries(map[string]string{
 					"HOST_PORT":      "8080",
 					"CONTAINER_PORT": "80",
-				}, cmdutil.EnvSourceStepEnv)
+				}, eval.EnvSourceStepEnv)
 				return runtime.WithEnv(ctx, env)
 			},
 			input: core.Container{
@@ -121,7 +121,7 @@ func TestEvalContainerFields(t *testing.T) {
 				env.Scope = env.Scope.WithEntries(map[string]string{
 					"DB_HOST": "localhost",
 					"DB_PORT": "5432",
-				}, cmdutil.EnvSourceStepEnv)
+				}, eval.EnvSourceStepEnv)
 				return runtime.WithEnv(ctx, env)
 			},
 			input: core.Container{
@@ -140,7 +140,7 @@ func TestEvalContainerFields(t *testing.T) {
 				env.Scope = env.Scope.WithEntries(map[string]string{
 					"SCRIPT": "run.sh",
 					"ARG1":   "value1",
-				}, cmdutil.EnvSourceStepEnv)
+				}, eval.EnvSourceStepEnv)
 				return runtime.WithEnv(ctx, env)
 			},
 			input: core.Container{
@@ -156,7 +156,7 @@ func TestEvalContainerFields(t *testing.T) {
 			name: "UserWithVariable",
 			setup: func(ctx context.Context) context.Context {
 				env := runtime.NewEnv(ctx, core.Step{Name: "test"})
-				env.Scope = env.Scope.WithEntry("UID", "1000", cmdutil.EnvSourceStepEnv)
+				env.Scope = env.Scope.WithEntry("UID", "1000", eval.EnvSourceStepEnv)
 				return runtime.WithEnv(ctx, env)
 			},
 			input: core.Container{
@@ -172,7 +172,7 @@ func TestEvalContainerFields(t *testing.T) {
 			name: "NonEvaluatedFieldsRemainUnchanged",
 			setup: func(ctx context.Context) context.Context {
 				env := runtime.NewEnv(ctx, core.Step{Name: "test"})
-				env.Scope = env.Scope.WithEntry("POLICY", "always", cmdutil.EnvSourceStepEnv)
+				env.Scope = env.Scope.WithEntry("POLICY", "always", eval.EnvSourceStepEnv)
 				return runtime.WithEnv(ctx, env)
 			},
 			input: core.Container{
@@ -200,7 +200,7 @@ func TestEvalContainerFields(t *testing.T) {
 			name: "OutputFromPreviousStep",
 			setup: func(ctx context.Context) context.Context {
 				env := runtime.NewEnv(ctx, core.Step{Name: "test"})
-				env.Scope = env.Scope.WithEntry("IMAGE_TAG", "v2.0.0", cmdutil.EnvSourceOutput)
+				env.Scope = env.Scope.WithEntry("IMAGE_TAG", "v2.0.0", eval.EnvSourceOutput)
 				return runtime.WithEnv(ctx, env)
 			},
 			input: core.Container{
@@ -266,7 +266,7 @@ func TestEvalStringSlice(t *testing.T) {
 				env.Scope = env.Scope.WithEntries(map[string]string{
 					"VAR1": "value1",
 					"VAR2": "value2",
-				}, cmdutil.EnvSourceStepEnv)
+				}, eval.EnvSourceStepEnv)
 				return runtime.WithEnv(ctx, env)
 			},
 			input:    []string{"${VAR1}", "${VAR2}", "static"},

@@ -6,7 +6,7 @@ import {
   createMutateHook,
 } from 'swr-openapi';
 import { isMatch } from 'lodash-es';
-import type { paths } from '../api/v2/schema';
+import type { paths } from '../api/v1/schema';
 
 const authMiddleware: Middleware = {
   async onRequest({ request }) {

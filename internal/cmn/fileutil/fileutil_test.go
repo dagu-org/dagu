@@ -3,6 +3,7 @@ package fileutil
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -303,6 +304,27 @@ func TestCreateTempDAGFile(t *testing.T) {
 
 		// Should have newline inserted before separator
 		assert.Contains(t, contentStr, "name: parent-dag\n---\n", "newline should be inserted before separator when missing")
+	})
+
+	t.Run("LongDAGName_BasenameFitsLimit", func(t *testing.T) {
+		t.Parallel()
+
+		// A 40-char DAG name is at the max allowed length. The temp file
+		// basename (without .yaml) must still be ≤ 40 chars so that
+		// buildName / ValidateDAGName won't reject it.
+		longName := "aaaaaaaaaa_bbbbbbbbbbb_ccccccccccccccccc" // exactly 40 chars
+		require.Len(t, longName, 40)
+
+		yamlData := []byte("steps:\n  - name: step1\n    command: echo ok")
+		path, err := CreateTempDAGFile("test-subdir", longName, yamlData)
+		require.NoError(t, err)
+		require.NotEmpty(t, path)
+		t.Cleanup(func() { _ = os.Remove(path) })
+
+		base := filepath.Base(path)
+		nameWithoutExt := strings.TrimSuffix(base, filepath.Ext(base))
+		assert.LessOrEqual(t, len(nameWithoutExt), 40,
+			"basename without extension should be ≤ 40 chars, got %d: %s", len(nameWithoutExt), nameWithoutExt)
 	})
 
 	t.Run("EmptyExtraDocs", func(t *testing.T) {

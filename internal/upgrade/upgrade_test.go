@@ -17,7 +17,26 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-resty/resty/v2"
 )
+
+var _ CacheStore = (*mockCacheStore)(nil)
+
+// mockCacheStore implements CacheStore for testing.
+type mockCacheStore struct {
+	cache *UpgradeCheckCache
+	err   error
+}
+
+func (m *mockCacheStore) Load() (*UpgradeCheckCache, error) {
+	return m.cache, m.err
+}
+
+func (m *mockCacheStore) Save(cache *UpgradeCheckCache) error {
+	m.cache = cache
+	return m.err
+}
 
 func TestParseVersion(t *testing.T) {
 	tests := []struct {
@@ -535,76 +554,10 @@ func TestIsCacheValid(t *testing.T) {
 	}
 }
 
-func TestCacheSaveAndLoad(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("DAGU_HOME", tmpDir)
-
-	cache := &UpgradeCheckCache{
-		LastCheck:       time.Now().Truncate(time.Second),
-		LatestVersion:   "v1.30.3",
-		CurrentVersion:  "v1.30.0",
-		UpdateAvailable: true,
-	}
-
-	if err := SaveCache(cache); err != nil {
-		t.Fatalf("SaveCache() error: %v", err)
-	}
-
-	loaded, err := LoadCache()
-	if err != nil {
-		t.Fatalf("LoadCache() error: %v", err)
-	}
-	if loaded == nil {
-		t.Fatal("LoadCache() returned nil")
-	}
-	if loaded.LatestVersion != cache.LatestVersion {
-		t.Errorf("LoadCache().LatestVersion = %q, want %q", loaded.LatestVersion, cache.LatestVersion)
-	}
-	if loaded.CurrentVersion != cache.CurrentVersion {
-		t.Errorf("LoadCache().CurrentVersion = %q, want %q", loaded.CurrentVersion, cache.CurrentVersion)
-	}
-	if loaded.UpdateAvailable != cache.UpdateAvailable {
-		t.Errorf("LoadCache().UpdateAvailable = %v, want %v", loaded.UpdateAvailable, cache.UpdateAvailable)
-	}
-}
-
-func TestLoadCacheNonExistent(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("DAGU_HOME", tmpDir)
-
-	cache, err := LoadCache()
-	if err != nil {
-		t.Errorf("LoadCache() error for non-existent file: %v", err)
-	}
-	if cache != nil {
-		t.Error("LoadCache() should return nil for non-existent cache")
-	}
-}
-
-func TestLoadCacheInvalidJSON(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("DAGU_HOME", tmpDir)
-
-	cachePath := filepath.Join(tmpDir, CacheFileName)
-	if err := os.WriteFile(cachePath, []byte("invalid json{"), 0600); err != nil {
-		t.Fatalf("Failed to write test file: %v", err)
-	}
-
-	cache, err := LoadCache()
-	if err != nil {
-		t.Errorf("LoadCache() should not error on invalid JSON: %v", err)
-	}
-	if cache != nil {
-		t.Error("LoadCache() should return nil for invalid JSON")
-	}
-}
-
 func TestGetCachedUpdateInfo(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("DAGU_HOME", tmpDir)
-
 	t.Run("no cache exists", func(t *testing.T) {
-		if result := GetCachedUpdateInfo(); result != nil {
+		store := &mockCacheStore{}
+		if result := GetCachedUpdateInfo(store); result != nil {
 			t.Error("GetCachedUpdateInfo() should return nil when no cache exists")
 		}
 	})
@@ -616,11 +569,9 @@ func TestGetCachedUpdateInfo(t *testing.T) {
 			CurrentVersion:  "v1.30.0",
 			UpdateAvailable: true,
 		}
-		if err := SaveCache(cache); err != nil {
-			t.Fatalf("SaveCache() error: %v", err)
-		}
+		store := &mockCacheStore{cache: cache}
 
-		result := GetCachedUpdateInfo()
+		result := GetCachedUpdateInfo(store)
 		if result == nil {
 			t.Fatal("GetCachedUpdateInfo() should return cache")
 		}
@@ -636,54 +587,19 @@ func TestGetCachedUpdateInfo(t *testing.T) {
 			CurrentVersion:  "v1.30.0",
 			UpdateAvailable: true,
 		}
-		if err := SaveCache(cache); err != nil {
-			t.Fatalf("SaveCache() error: %v", err)
-		}
+		store := &mockCacheStore{cache: cache}
 
-		if result := GetCachedUpdateInfo(); result != nil {
+		if result := GetCachedUpdateInfo(store); result != nil {
 			t.Error("GetCachedUpdateInfo() should return nil for very stale cache")
 		}
 	})
 }
 
-func TestGetCacheDir(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("DAGU_HOME", tmpDir)
-
-	dir, err := GetCacheDir()
-	if err != nil {
-		t.Fatalf("GetCacheDir() error: %v", err)
-	}
-	if dir == "" {
-		t.Error("GetCacheDir() returned empty string")
-	}
-
-	info, err := os.Stat(dir)
-	if err != nil {
-		t.Errorf("GetCacheDir() returned non-existent directory: %v", err)
-	}
-	if !info.IsDir() {
-		t.Error("GetCacheDir() should return a directory")
-	}
-}
-
-func TestGetCachePath(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("DAGU_HOME", tmpDir)
-
-	path, err := GetCachePath()
-	if err != nil {
-		t.Fatalf("GetCachePath() error: %v", err)
-	}
-	if !strings.HasSuffix(path, CacheFileName) {
-		t.Errorf("GetCachePath() = %q, should end with %q", path, CacheFileName)
-	}
-}
-
 func TestCheckAndUpdateCacheDevVersion(t *testing.T) {
+	store := &mockCacheStore{}
 	devVersions := []string{"dev", "0.0.0"}
 	for _, v := range devVersions {
-		cache, err := CheckAndUpdateCache(v)
+		cache, err := CheckAndUpdateCache(store, v)
 		if err != nil {
 			t.Errorf("CheckAndUpdateCache(%s) error: %v", v, err)
 		}
@@ -694,20 +610,15 @@ func TestCheckAndUpdateCacheDevVersion(t *testing.T) {
 }
 
 func TestCheckAndUpdateCacheWithValidCache(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("DAGU_HOME", tmpDir)
-
 	cache := &UpgradeCheckCache{
 		LastCheck:       time.Now(),
 		LatestVersion:   "v1.30.3",
 		CurrentVersion:  "v1.30.0",
 		UpdateAvailable: true,
 	}
-	if err := SaveCache(cache); err != nil {
-		t.Fatalf("SaveCache() error: %v", err)
-	}
+	store := &mockCacheStore{cache: cache}
 
-	result, err := CheckAndUpdateCache("v1.30.0")
+	result, err := CheckAndUpdateCache(store, "v1.30.0")
 	if err != nil {
 		t.Fatalf("CheckAndUpdateCache() error: %v", err)
 	}
@@ -1218,8 +1129,39 @@ func TestFormatCheckResult(t *testing.T) {
 		}
 
 		output := FormatCheckResult(result)
-		if !strings.Contains(output, "latest version") {
-			t.Error("FormatCheckResult() should indicate running latest version")
+		if !strings.Contains(output, "Latest version") {
+			t.Error("FormatCheckResult() should show 'Latest version' label")
+		}
+	})
+
+	t.Run("specific version shows target label", func(t *testing.T) {
+		result := &Result{
+			CurrentVersion:         "1.30.0",
+			TargetVersion:          "v1.30.3",
+			UpgradeNeeded:          true,
+			SpecificVersionRequest: true,
+		}
+
+		output := FormatCheckResult(result)
+		if !strings.Contains(output, "Target version") {
+			t.Error("FormatCheckResult() should show 'Target version' when specific version requested")
+		}
+		if strings.Contains(output, "Latest version") {
+			t.Error("FormatCheckResult() should not show 'Latest version' when specific version requested")
+		}
+	})
+
+	t.Run("latest version shows latest label", func(t *testing.T) {
+		result := &Result{
+			CurrentVersion:         "1.30.0",
+			TargetVersion:          "v1.30.3",
+			UpgradeNeeded:          true,
+			SpecificVersionRequest: false,
+		}
+
+		output := FormatCheckResult(result)
+		if !strings.Contains(output, "Latest version") {
+			t.Error("FormatCheckResult() should show 'Latest version' when no specific version requested")
 		}
 	})
 }
@@ -1639,6 +1581,267 @@ func TestIsNumeric(t *testing.T) {
 				t.Errorf("isNumeric(%q) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestGetLatestReleaseRetryOnServerError(t *testing.T) {
+	release := Release{
+		TagName: "v1.30.3",
+		Name:    "Release v1.30.3",
+	}
+
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+		if attempts <= 2 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(release)
+	}))
+	defer server.Close()
+
+	client := newTestGitHubClient(server.URL)
+
+	ctx := context.Background()
+	result, err := client.GetLatestRelease(ctx, false)
+	if err != nil {
+		t.Fatalf("GetLatestRelease() error: %v", err)
+	}
+	if result.TagName != "v1.30.3" {
+		t.Errorf("GetLatestRelease().TagName = %q, want %q", result.TagName, "v1.30.3")
+	}
+	if attempts != 3 {
+		t.Errorf("expected 3 attempts, got %d", attempts)
+	}
+}
+
+func TestGetRelease404NotRetried(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	client := newTestGitHubClient(server.URL)
+
+	ctx := context.Background()
+	_, err := client.GetRelease(ctx, "v99.99.99")
+	if err == nil {
+		t.Fatal("GetRelease() expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("GetRelease() error should contain 'not found': %v", err)
+	}
+	if attempts != 1 {
+		t.Errorf("expected 1 attempt (no retry for 404), got %d", attempts)
+	}
+}
+
+// newTestGitHubClient creates a GitHubClient that redirects all requests
+// from the real GitHub API URL to the given test server URL.
+func newTestGitHubClient(serverURL string) *GitHubClient {
+	client := NewGitHubClient()
+	client.client.OnBeforeRequest(func(_ *resty.Client, req *resty.Request) error {
+		req.URL = strings.Replace(req.URL, githubAPIURL, serverURL+"/releases", 1)
+		return nil
+	})
+	return client
+}
+
+func TestDownloadRetryOnServerError(t *testing.T) {
+	content := []byte("test binary content")
+	hash := sha256.Sum256(content)
+	expectedHash := hex.EncodeToString(hash[:])
+
+	var getAttempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "HEAD" {
+			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(content)))
+			return
+		}
+		getAttempts++
+		if getAttempts <= 2 {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		_, _ = w.Write(content)
+	}))
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	destPath := filepath.Join(tmpDir, "downloaded-file")
+
+	ctx := context.Background()
+	err := Download(ctx, DownloadOptions{
+		URL:          server.URL + "/test-file",
+		Destination:  destPath,
+		ExpectedHash: expectedHash,
+	})
+	if err != nil {
+		t.Fatalf("Download() error: %v", err)
+	}
+
+	downloaded, err := os.ReadFile(destPath)
+	if err != nil {
+		t.Fatalf("Failed to read downloaded file: %v", err)
+	}
+	if string(downloaded) != string(content) {
+		t.Error("Download() content mismatch")
+	}
+	if getAttempts != 3 {
+		t.Errorf("expected 3 GET attempts, got %d", getAttempts)
+	}
+}
+
+func TestDownloadPermanent404(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "HEAD" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		attempts++
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	destPath := filepath.Join(tmpDir, "downloaded-file")
+
+	ctx := context.Background()
+	err := Download(ctx, DownloadOptions{
+		URL:         server.URL + "/not-found",
+		Destination: destPath,
+	})
+	if err == nil {
+		t.Fatal("Download() expected error, got nil")
+	}
+	if attempts != 1 {
+		t.Errorf("expected 1 attempt (no retry for 404), got %d", attempts)
+	}
+}
+
+func TestValidateVersionTag(t *testing.T) {
+	tests := []struct {
+		name    string
+		tag     string
+		wantErr bool
+	}{
+		{name: "valid tag", tag: "v1.30.3", wantErr: false},
+		{name: "valid prerelease", tag: "v1.30.0-rc.1", wantErr: false},
+		{name: "forward slash", tag: "v1.30.3/../../etc/passwd", wantErr: true},
+		{name: "backslash", tag: `v1.30.3\..\secret`, wantErr: true},
+		{name: "double dot traversal", tag: "v1.30.3..secret", wantErr: true},
+		{name: "control character", tag: "v1.30.3\x00", wantErr: true},
+		{name: "newline", tag: "v1.30.3\n", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateVersionTag(tt.tag)
+			if tt.wantErr && err == nil {
+				t.Errorf("ValidateVersionTag(%q) expected error, got nil", tt.tag)
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("ValidateVersionTag(%q) unexpected error: %v", tt.tag, err)
+			}
+		})
+	}
+}
+
+func TestInstallBackupTimestamp(t *testing.T) {
+	tmpDir := t.TempDir()
+	archivePath := filepath.Join(tmpDir, "dagu_1.30.3_darwin_arm64.tar.gz")
+	targetPath := filepath.Join(tmpDir, "target", "dagu")
+
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+		t.Fatalf("Failed to create target dir: %v", err)
+	}
+	if err := os.WriteFile(targetPath, []byte("old binary"), 0755); err != nil {
+		t.Fatalf("Failed to create old binary: %v", err)
+	}
+
+	createTestTarGz(t, archivePath, map[string]string{
+		"dagu": "#!/bin/sh\necho new",
+	})
+
+	// Create an existing .bak file
+	existingBak := targetPath + ".bak"
+	if err := os.WriteFile(existingBak, []byte("previous backup"), 0644); err != nil {
+		t.Fatalf("Failed to create existing backup: %v", err)
+	}
+
+	ctx := context.Background()
+	result, err := Install(ctx, InstallOptions{
+		ArchivePath:  archivePath,
+		TargetPath:   targetPath,
+		CreateBackup: true,
+	})
+	if err != nil {
+		t.Fatalf("Install() error: %v", err)
+	}
+
+	// The backup path should not be the plain .bak (it should be timestamped)
+	if result.BackupPath == existingBak {
+		t.Error("Install() should use timestamped backup name when .bak already exists")
+	}
+	if result.BackupPath == "" {
+		t.Fatal("Install() BackupPath should not be empty")
+	}
+
+	// Verify the original .bak is preserved
+	origContent, err := os.ReadFile(existingBak)
+	if err != nil {
+		t.Fatalf("Original .bak should still exist: %v", err)
+	}
+	if string(origContent) != "previous backup" {
+		t.Error("Original .bak content should be preserved")
+	}
+
+	// Verify the timestamped backup exists
+	if _, err := os.Stat(result.BackupPath); os.IsNotExist(err) {
+		t.Error("Timestamped backup should exist")
+	}
+}
+
+func TestReplaceWindowsBinary(t *testing.T) {
+	tmpDir := t.TempDir()
+	srcPath := filepath.Join(tmpDir, "source")
+	targetPath := filepath.Join(tmpDir, "target")
+
+	if err := os.WriteFile(srcPath, []byte("new binary"), 0755); err != nil {
+		t.Fatalf("Failed to create source: %v", err)
+	}
+	if err := os.WriteFile(targetPath, []byte("old binary"), 0644); err != nil {
+		t.Fatalf("Failed to create target: %v", err)
+	}
+
+	if err := replaceWindowsBinary(srcPath, targetPath, 0755); err != nil {
+		t.Fatalf("replaceWindowsBinary() error: %v", err)
+	}
+
+	content, err := os.ReadFile(targetPath)
+	if err != nil {
+		t.Fatalf("Failed to read target: %v", err)
+	}
+	if string(content) != "new binary" {
+		t.Error("replaceWindowsBinary() did not replace content")
+	}
+
+	info, err := os.Stat(targetPath)
+	if err != nil {
+		t.Fatalf("Failed to stat target: %v", err)
+	}
+	if info.Mode().Perm() != 0755 {
+		t.Errorf("replaceWindowsBinary() permissions = %o, want 0755", info.Mode().Perm())
+	}
+
+	// .old should have been cleaned up
+	if _, err := os.Stat(targetPath + ".old"); !os.IsNotExist(err) {
+		t.Error("replaceWindowsBinary() should clean up .old file")
 	}
 }
 

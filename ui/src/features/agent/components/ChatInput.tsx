@@ -1,13 +1,27 @@
-import { useState, useCallback, useEffect, useRef, KeyboardEvent } from 'react';
+import { useState, useCallback, useEffect, useRef, useContext, KeyboardEvent } from 'react';
 import { Send, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { AppBarContext } from '@/contexts/AppBarContext';
+import { useClient } from '@/hooks/api';
 import { DAGContext } from '../types';
 import { DAGPicker } from './DAGPicker';
 import { useDagPageContext } from '../hooks/useDagPageContext';
 
+interface ModelOption {
+  id: string;
+  name: string;
+}
+
 interface ChatInputProps {
-  onSend: (message: string, dagContexts?: DAGContext[]) => void;
+  onSend: (message: string, dagContexts?: DAGContext[], model?: string) => void;
   onCancel?: () => void;
   isWorking: boolean;
   disabled?: boolean;
@@ -21,14 +35,49 @@ export function ChatInput({
   disabled,
   placeholder = 'Type a message...',
 }: ChatInputProps) {
+  const client = useClient();
+  const appBarContext = useContext(AppBarContext);
   const [message, setMessage] = useState('');
   const [isPending, setIsPending] = useState(false);
   const [selectedDags, setSelectedDags] = useState<DAGContext[]>([]);
+  const [models, setModels] = useState<ModelOption[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>('');
   const currentPageDag = useDagPageContext();
   // Track IME composition state manually for reliable Japanese/Chinese input handling
   const isComposingRef = useRef(false);
 
   const showPauseButton = isPending || isWorking;
+
+  // Fetch available models
+  useEffect(() => {
+    const controller = new AbortController();
+    const remoteNode = appBarContext.selectedRemoteNode || 'local';
+
+    async function fetchModels() {
+      try {
+        const { data } = await client.GET('/settings/agent/models', {
+          params: { query: { remoteNode } },
+          signal: controller.signal,
+        });
+        if (!data) return;
+        const modelList: ModelOption[] = (data.models || []).map((m) => ({
+          id: m.id,
+          name: m.name,
+        }));
+        setModels(modelList);
+        if (data.defaultModelId) {
+          setSelectedModel(data.defaultModelId);
+        } else if (modelList.length > 0) {
+          setSelectedModel(modelList[0]!.id);
+        }
+      } catch {
+        // Models fetch is best-effort
+      }
+    }
+    fetchModels();
+
+    return () => controller.abort();
+  }, [client, appBarContext.selectedRemoteNode]);
 
   // Reset pending state when server confirms processing or after timeout fallback
   useEffect(() => {
@@ -61,9 +110,13 @@ export function ChatInput({
       ? [currentPageDag, ...additionalDags]
       : additionalDags;
 
-    onSend(trimmed, allContexts.length > 0 ? allContexts : undefined);
+    onSend(
+      trimmed,
+      allContexts.length > 0 ? allContexts : undefined,
+      selectedModel || undefined
+    );
     setMessage('');
-  }, [message, isPending, disabled, onSend, selectedDags, currentPageDag]);
+  }, [message, isPending, disabled, onSend, selectedDags, currentPageDag, selectedModel]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -94,6 +147,24 @@ export function ChatInput({
         currentPageDag={currentPageDag}
         disabled={disabled || showPauseButton}
       />
+
+      {/* Model selector row */}
+      {models.length > 0 && (
+        <div className="mb-1.5">
+          <Select value={selectedModel} onValueChange={setSelectedModel}>
+            <SelectTrigger className="h-7 text-xs w-auto min-w-[140px] max-w-[200px]">
+              <SelectValue placeholder="Select model" />
+            </SelectTrigger>
+            <SelectContent>
+              {models.map((m) => (
+                <SelectItem key={m.id} value={m.id} className="text-xs">
+                  {m.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Input row */}
       <div className="flex items-end gap-2">

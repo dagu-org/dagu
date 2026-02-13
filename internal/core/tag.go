@@ -222,10 +222,10 @@ func ParseTagFilter(s string) TagFilter {
 	}
 
 	// Negation filter
-	if strings.HasPrefix(s, "!") {
+	if after, ok := strings.CutPrefix(s, "!"); ok {
 		return TagFilter{
 			Type: TagFilterTypeNegation,
-			Key:  strings.ToLower(strings.TrimSpace(strings.TrimPrefix(s, "!"))),
+			Key:  strings.ToLower(strings.TrimSpace(after)),
 		}
 	}
 

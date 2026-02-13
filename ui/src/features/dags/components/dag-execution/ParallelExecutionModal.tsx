@@ -9,7 +9,7 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
 import { ExternalLink, Layers } from 'lucide-react';
 import React, { useContext, useMemo, useState } from 'react';
-import { components, StatusLabel } from '../../../../api/v2/schema';
+import { components, StatusLabel } from '../../../../api/v1/schema';
 import { STATUS_DISPLAY_LABELS, StatusDot } from '../common';
 
 type SubDAGRun = components['schemas']['SubDAGRun'];

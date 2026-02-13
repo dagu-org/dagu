@@ -57,9 +57,15 @@ export interface UserPromptResponse {
   cancelled?: boolean;
 }
 
+export interface TokenUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+
 export interface Message {
   id: string;
-  conversation_id: string;
+  session_id: string;
   type: MessageType;
   sequence_id: number;
   content?: string;
@@ -67,26 +73,32 @@ export interface Message {
   tool_results?: ToolResult[];
   ui_action?: UIAction;
   user_prompt?: UserPrompt;
+  usage?: TokenUsage;
+  cost?: number;
   created_at: string;
 }
 
-// Conversation types
-export interface Conversation {
+// Session types
+export interface Session {
   id: string;
+  user_id?: string;
+  title?: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface ConversationState {
-  conversation_id: string;
+export interface SessionState {
+  session_id: string;
   working: boolean;
   model?: string;
+  total_cost?: number;
 }
 
-export interface ConversationWithState {
-  conversation: Conversation;
+export interface SessionWithState {
+  session: Session;
   working: boolean;
   model?: string;
+  total_cost?: number;
 }
 
 // DAG context types
@@ -103,15 +115,15 @@ export interface ChatRequest {
   safe_mode?: boolean;
 }
 
-export interface NewConversationResponse {
-  conversation_id: string;
+export interface NewSessionResponse {
+  session_id: string;
   status: string;
 }
 
 export interface StreamResponse {
   messages?: Message[];
-  conversation?: Conversation;
-  conversation_state?: ConversationState;
+  session?: Session;
+  session_state?: SessionState;
 }
 
 // Tool input types for specialized viewers

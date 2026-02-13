@@ -92,7 +92,6 @@ func TestBuildParamsJSON(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			result, err := buildParamsJSON(tt.ctx, tt.dag)
@@ -554,7 +553,7 @@ func TestBuildHistRetentionDays(t *testing.T) {
 		expected int
 	}{
 		{name: "NilDefaultsTo0", input: nil, expected: 0},
-		{name: "CustomValue", input: intPtr(365), expected: 365},
+		{name: "CustomValue", input: new(365), expected: 365},
 	}
 
 	for _, tt := range tests {
@@ -576,7 +575,7 @@ func TestBuildMaxCleanUpTime(t *testing.T) {
 		expected time.Duration
 	}{
 		{name: "NilDefaultsTo0", input: nil, expected: 0},
-		{name: "TenSeconds", input: intPtr(10), expected: 10 * time.Second},
+		{name: "TenSeconds", input: new(10), expected: 10 * time.Second},
 	}
 
 	for _, tt := range tests {
@@ -593,9 +592,12 @@ func TestBuildWorkerSelector(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		input    map[string]string
-		expected map[string]string
+		name        string
+		input       any
+		expected    map[string]string
+		forceLocal  bool
+		expectErr   bool
+		errContains string
 	}{
 		{
 			name:     "Nil",
@@ -603,7 +605,7 @@ func TestBuildWorkerSelector(t *testing.T) {
 			expected: nil,
 		},
 		{
-			name:     "Empty",
+			name:     "EmptyMap",
 			input:    map[string]string{},
 			expected: nil,
 		},
@@ -617,14 +619,61 @@ func TestBuildWorkerSelector(t *testing.T) {
 			input:    map[string]string{" key ": " value "},
 			expected: map[string]string{"key": "value"},
 		},
+		{
+			name:       "StringLocal",
+			input:      "local",
+			forceLocal: true,
+		},
+		{
+			name:       "StringLocalUpperCase",
+			input:      "LOCAL",
+			forceLocal: true,
+		},
+		{
+			name:       "StringLocalMixedCase",
+			input:      "Local",
+			forceLocal: true,
+		},
+		{
+			name:       "StringLocalWithSpaces",
+			input:      "  local  ",
+			forceLocal: true,
+		},
+		{
+			name:        "UnsupportedString",
+			input:       "remote",
+			expectErr:   true,
+			errContains: "the only allowed string value is \"local\"",
+		},
+		{
+			name:     "MapStringAny",
+			input:    map[string]any{"env": "prod"},
+			expected: map[string]string{"env": "prod"},
+		},
+		{
+			name:     "MapStringAnyBoolValue",
+			input:    map[string]any{"gpu": true},
+			expected: map[string]string{"gpu": "true"},
+		},
+		{
+			name:     "MapStringAnyIntValue",
+			input:    map[string]any{"memory": 64},
+			expected: map[string]string{"memory": "64"},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			d := &dag{WorkerSelector: tt.input}
-			result, err := buildWorkerSelector(testBuildContext(), d)
+			result, forceLocal, err := buildWorkerSelector(testBuildContext(), d)
+			if tt.expectErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				return
+			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
+			assert.Equal(t, tt.forceLocal, forceLocal)
 		})
 	}
 }
@@ -677,7 +726,7 @@ func TestBuildSSH(t *testing.T) {
 			input: &ssh{
 				User:          "admin",
 				Host:          "server.example.com",
-				StrictHostKey: boolPtr(false),
+				StrictHostKey: new(false),
 			},
 			expected: &core.SSHConfig{
 				User:          "admin",
@@ -1268,10 +1317,10 @@ func TestBuildWorkingDir(t *testing.T) {
 			expected: "/custom/path",
 		},
 		{
-			name:     "DefaultFromFileDirectory",
+			name:     "EmptyWhenNoExplicitValue",
 			dag:      &dag{},
 			ctx:      BuildContext{file: "/path/to/dag.yaml"},
-			expected: "/path/to",
+			expected: "",
 		},
 		{
 			name: "FromOptionsDefault",
@@ -1281,6 +1330,12 @@ func TestBuildWorkingDir(t *testing.T) {
 				opts: BuildOpts{DefaultWorkingDir: "/default/dir"},
 			},
 			expected: "/default/dir",
+		},
+		{
+			name:     "EmptyWithNoFileOrDefault",
+			dag:      &dag{},
+			ctx:      BuildContext{},
+			expected: "",
 		},
 	}
 
@@ -1348,17 +1403,6 @@ func TestBuildWorkingDir_TildePreserved(t *testing.T) {
 	assert.Equal(t, "~/mydir", result)
 }
 
-func TestBuildWorkingDir_FallbackToCurrentDir(t *testing.T) {
-	t.Parallel()
-
-	ctx := BuildContext{} // No file, no default
-	d := &dag{}
-
-	result, err := buildWorkingDir(ctx, d)
-	require.NoError(t, err)
-	assert.NotEmpty(t, result) // Should fall back to cwd or home
-}
-
 func TestBuildWorkingDir_DefaultWorkingDir(t *testing.T) {
 	t.Parallel()
 
@@ -1384,20 +1428,6 @@ func TestBuildWorkingDir_RelativeNoFileContext(t *testing.T) {
 	require.NoError(t, err)
 	// Without file context, relative path is stored as-is
 	assert.Equal(t, "subdir", result)
-}
-
-func TestBuildWorkingDir_FallbackToFileDir(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	dagFile := filepath.Join(tmpDir, "dag.yaml")
-
-	ctx := BuildContext{file: dagFile}
-	d := &dag{} // No WorkingDir
-
-	result, err := buildWorkingDir(ctx, d)
-	require.NoError(t, err)
-	assert.Equal(t, tmpDir, result)
 }
 
 func TestBuildShell(t *testing.T) {
@@ -2162,16 +2192,6 @@ func TestBuildHITLStepsValidation(t *testing.T) {
 	}
 }
 
-// Helper functions
-
-func intPtr(i int) *int {
-	return &i
-}
-
-func boolPtr(b bool) *bool {
-	return &b
-}
-
 func TestParseHealthcheck(t *testing.T) {
 	t.Parallel()
 
@@ -2476,6 +2496,146 @@ func TestChainTypeDependsValidation(t *testing.T) {
 				Steps: map[string]any{
 					"step1": map[string]any{"command": "echo 1"},
 					"step2": map[string]any{"command": "echo 2", "depends": []string{"step1"}},
+				},
+			},
+			expectErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := tt.dag.build(testBuildContext())
+			if tt.expectErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, result)
+			}
+		})
+	}
+}
+
+func TestRouterNotAllowedInChainType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		dag         *dag
+		expectErr   bool
+		errContains string
+	}{
+		{
+			name: "ChainTypeWithRouterShouldError",
+			dag: &dag{
+				Type: "chain",
+				Steps: []any{
+					map[string]any{
+						"name":  "router",
+						"type":  "router",
+						"value": "${MODE}",
+						"routes": map[string]any{
+							"a": []string{"step_a"},
+						},
+					},
+					map[string]any{"name": "step_a", "command": "echo A"},
+				},
+			},
+			expectErr:   true,
+			errContains: "router steps require type 'graph'",
+		},
+		{
+			name: "DefaultTypeWithRouterShouldError",
+			dag: &dag{
+				// Default type is chain, so router should not be allowed
+				Steps: []any{
+					map[string]any{
+						"name":  "router",
+						"type":  "router",
+						"value": "${MODE}",
+						"routes": map[string]any{
+							"a": []string{"step_a"},
+						},
+					},
+					map[string]any{"name": "step_a", "command": "echo A"},
+				},
+			},
+			expectErr:   true,
+			errContains: "router steps require type 'graph'",
+		},
+		{
+			name: "GraphTypeWithRouterShouldWork",
+			dag: &dag{
+				Type: "graph",
+				Steps: []any{
+					map[string]any{
+						"name":  "router",
+						"type":  "router",
+						"value": "${MODE}",
+						"routes": map[string]any{
+							"a": []string{"step_a"},
+						},
+					},
+					map[string]any{"name": "step_a", "command": "echo A"},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name: "ChainTypeNestedParallelWithRouterShouldError",
+			dag: &dag{
+				Type: "chain",
+				Steps: []any{
+					map[string]any{"name": "step1", "command": "echo 1"},
+					[]any{
+						map[string]any{
+							"name":  "router",
+							"type":  "router",
+							"value": "${MODE}",
+							"routes": map[string]any{
+								"a": []string{"step_a"},
+							},
+						},
+						map[string]any{"name": "step_a", "command": "echo A"},
+					},
+				},
+			},
+			expectErr:   true,
+			errContains: "router steps require type 'graph'",
+		},
+		{
+			name: "ChainTypeMapFormWithRouterShouldError",
+			dag: &dag{
+				Type: "chain",
+				Steps: map[string]any{
+					"router": map[string]any{
+						"type":  "router",
+						"value": "${MODE}",
+						"routes": map[string]any{
+							"a": []string{"step_a"},
+						},
+					},
+					"step_a": map[string]any{"command": "echo A"},
+				},
+			},
+			expectErr:   true,
+			errContains: "router steps require type 'graph'",
+		},
+		{
+			name: "GraphTypeMapFormWithRouterShouldWork",
+			dag: &dag{
+				Type: "graph",
+				Steps: map[string]any{
+					"router": map[string]any{
+						"type":  "router",
+						"value": "${MODE}",
+						"routes": map[string]any{
+							"a": []string{"step_a"},
+						},
+					},
+					"step_a": map[string]any{"command": "echo A"},
 				},
 			},
 			expectErr: false,

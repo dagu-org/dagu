@@ -18,8 +18,8 @@ func TestBuildPublicEndpointPath(t *testing.T) {
 		{
 			name:     "empty base",
 			basePath: "",
-			suffix:   "api/v2/health",
-			want:     "/api/v2/health",
+			suffix:   "api/v1/health",
+			want:     "/api/v1/health",
 		},
 		{
 			name:     "empty suffix",
@@ -30,26 +30,26 @@ func TestBuildPublicEndpointPath(t *testing.T) {
 		{
 			name:     "both with slashes",
 			basePath: "/base/",
-			suffix:   "/api/v2/health",
-			want:     "/base/api/v2/health",
+			suffix:   "/api/v1/health",
+			want:     "/base/api/v1/health",
 		},
 		{
 			name:     "no slashes",
 			basePath: "base",
-			suffix:   "api/v2/health",
-			want:     "/base/api/v2/health",
+			suffix:   "api/v1/health",
+			want:     "/base/api/v1/health",
 		},
 		{
 			name:     "with whitespace",
 			basePath: " /base/ ",
-			suffix:   " api/v2/health ",
-			want:     "/base/api/v2/health",
+			suffix:   " api/v1/health ",
+			want:     "/base/api/v1/health",
 		},
 		{
 			name:     "multiple slashes",
 			basePath: "///base///",
-			suffix:   "///api/v2/health///",
-			want:     "/base/api/v2/health",
+			suffix:   "///api/v1/health///",
+			want:     "/base/api/v1/health",
 		},
 		{
 			name:     "base with trailing slash",

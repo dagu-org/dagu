@@ -8,24 +8,24 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { useAgentChatContext } from '../context/AgentChatContext';
 import { useAgentChat } from '../hooks/useAgentChat';
 import { useResizableDraggable } from '../hooks/useResizableDraggable';
-import { ConversationWithState, DAGContext } from '../types';
+import { SessionWithState, DAGContext } from '../types';
 import { AgentChatModalHeader } from './AgentChatModalHeader';
 import { ChatInput } from './ChatInput';
 import { ChatMessages } from './ChatMessages';
 import { ResizeHandles } from './ResizeHandles';
 
-function findLatestConversation(
-  conversations: ConversationWithState[]
-): ConversationWithState | null {
-  if (conversations.length === 0) return null;
+function findLatestSession(
+  sessions: SessionWithState[]
+): SessionWithState | null {
+  if (sessions.length === 0) return null;
 
-  let latest = conversations[0]!;
-  for (const conv of conversations) {
+  let latest = sessions[0]!;
+  for (const sess of sessions) {
     if (
-      new Date(conv.conversation.updated_at) >
-      new Date(latest.conversation.updated_at)
+      new Date(sess.session.updated_at) >
+      new Date(latest.session.updated_at)
     ) {
-      latest = conv;
+      latest = sess;
     }
   }
   return latest;
@@ -35,20 +35,21 @@ export function AgentChatModal(): ReactElement | null {
   const { isOpen, closeChat } = useAgentChatContext();
   const isMobile = useIsMobile();
   const {
-    conversationId,
+    sessionId,
     messages,
     pendingUserMessage,
-    conversations,
+    sessionState,
+    sessions,
     isWorking,
     error,
     answeredPrompts,
     setError,
     sendMessage,
-    cancelConversation,
-    clearConversation,
+    cancelSession,
+    clearSession,
     clearError,
-    fetchConversations,
-    selectConversation,
+    fetchSessions,
+    selectSession,
     respondToPrompt,
   } = useAgentChat();
   const { bounds, dragHandlers, resizeHandlers } = useResizableDraggable();
@@ -58,49 +59,49 @@ export function AgentChatModal(): ReactElement | null {
   useEffect(() => {
     if (isOpen) {
       hasAutoSelectedRef.current = false;
-      fetchConversations();
+      fetchSessions();
     }
-  }, [isOpen, fetchConversations]);
+  }, [isOpen, fetchSessions]);
 
   useEffect(() => {
     if (
       isOpen &&
-      conversations.length > 0 &&
-      !conversationId &&
+      sessions.length > 0 &&
+      !sessionId &&
       !hasAutoSelectedRef.current
     ) {
       hasAutoSelectedRef.current = true;
-      const latest = findLatestConversation(conversations);
+      const latest = findLatestSession(sessions);
       if (latest) {
-        selectConversation(latest.conversation.id).catch(() => {});
+        selectSession(latest.session.id).catch(() => {});
       }
     }
-  }, [isOpen, conversations, conversationId, selectConversation]);
+  }, [isOpen, sessions, sessionId, selectSession]);
 
   const handleSend = useCallback(
-    (message: string, dagContexts?: DAGContext[]): void => {
-      sendMessage(message, undefined, dagContexts).catch(() => {});
+    (message: string, dagContexts?: DAGContext[], model?: string): void => {
+      sendMessage(message, model, dagContexts).catch(() => {});
     },
     [sendMessage]
   );
 
   const handleCancel = useCallback((): void => {
-    cancelConversation().catch((err) =>
+    cancelSession().catch((err) =>
       setError(err instanceof Error ? err.message : 'Failed to cancel')
     );
-  }, [cancelConversation, setError]);
+  }, [cancelSession, setError]);
 
-  const handleSelectConversation = useCallback(
+  const handleSelectSession = useCallback(
     (value: string): void => {
       if (value === 'new') {
-        clearConversation();
+        clearSession();
         return;
       }
-      selectConversation(value).catch((err) =>
-        setError(err instanceof Error ? err.message : 'Failed to select conversation')
+      selectSession(value).catch((err) =>
+        setError(err instanceof Error ? err.message : 'Failed to select session')
       );
     },
-    [selectConversation, clearConversation, setError]
+    [selectSession, clearSession, setError]
   );
 
   if (!isOpen) return null;
@@ -123,10 +124,11 @@ export function AgentChatModal(): ReactElement | null {
   const content = (
     <>
       <AgentChatModalHeader
-        conversationId={conversationId}
-        conversations={conversations}
-        onSelectConversation={handleSelectConversation}
-        onClearConversation={clearConversation}
+        sessionId={sessionId}
+        sessions={sessions}
+        totalCost={sessionState?.total_cost}
+        onSelectSession={handleSelectSession}
+        onClearSession={clearSession}
         onClose={closeChat}
         dragHandlers={isMobile ? undefined : dragHandlers}
         isMobile={isMobile}

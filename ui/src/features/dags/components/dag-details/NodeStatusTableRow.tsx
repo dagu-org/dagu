@@ -44,7 +44,7 @@ import {
   NodeStatus,
   Status,
   Stream,
-} from '../../../../api/v2/schema';
+} from '../../../../api/v1/schema';
 import StyledTableRow from '../../../../ui/StyledTableRow';
 import { NodeStatusChip } from '../common';
 import { ApprovalModal } from '../dag-execution/ApprovalModal';

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -113,8 +114,7 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 		f.workers = append(f.workers, w)
 	}
 
-	dag := coord.DAG(t, yaml)
-	f.dagWrapper = &dag
+	f.dagWrapper = new(coord.DAG(t, yaml))
 
 	return f
 }
@@ -187,8 +187,7 @@ func (f *testFixture) waitForWorkerRegistration(workerID string, timeout time.Du
 func (f *testFixture) startScheduler(timeout time.Duration) {
 	f.t.Helper()
 
-	de := scheduler.NewDAGExecutor(f.coordinatorClient, runtime.NewSubCmdBuilder(f.coord.Config))
-	em := scheduler.NewEntryReader(f.coord.Config.Paths.DAGsDir, f.coord.DAGStore, f.coord.DAGRunMgr, de, "")
+	em := scheduler.NewEntryReader(f.coord.Config.Paths.DAGsDir, f.coord.DAGStore)
 
 	schedulerInst, err := scheduler.New(
 		f.coord.Config,
@@ -199,6 +198,7 @@ func (f *testFixture) startScheduler(timeout time.Duration) {
 		f.coord.ProcStore,
 		f.coord.ServiceRegistry,
 		f.coordinatorClient,
+		nil,
 	)
 	require.NoError(f.t, err)
 
@@ -259,12 +259,7 @@ func (f *testFixture) waitForStatusIn(expected []core.Status, timeout time.Durat
 		if err != nil {
 			return false
 		}
-		for _, exp := range expected {
-			if status.Status == exp {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(expected, status.Status)
 	}, timeout, 100*time.Millisecond, "timeout waiting for status in %v", expected)
 	return status
 }

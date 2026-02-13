@@ -1,6 +1,6 @@
 import { useCallback, useContext, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { components } from '../../../api/v2/schema';
+import { components } from '../../../api/v1/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { usePageContext } from '../../../contexts/PageContext';
 import { UnsavedChangesProvider } from '../../../contexts/UnsavedChangesContext';

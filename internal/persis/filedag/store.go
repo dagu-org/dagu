@@ -265,8 +265,7 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 	var errList []string
 
 	if opts.Paginator == nil {
-		p := exec.DefaultPaginator()
-		opts.Paginator = &p
+		opts.Paginator = new(exec.DefaultPaginator())
 	}
 
 	entries, err := os.ReadDir(store.baseDir)

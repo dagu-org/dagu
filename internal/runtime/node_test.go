@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -390,7 +391,7 @@ func TestNodeBuildSubDAGRuns(t *testing.T) {
 			},
 			setupEnv: func(ctx context.Context) context.Context {
 				env := runtime.GetEnv(ctx)
-				env.Scope = env.Scope.WithEntry("LIST_VAR", `["item1", "item2", "item3"]`, cmdutil.EnvSourceStepEnv)
+				env.Scope = env.Scope.WithEntry("LIST_VAR", `["item1", "item2", "item3"]`, eval.EnvSourceStepEnv)
 				return runtime.WithEnv(ctx, env)
 			},
 			expectCount: 3,
@@ -405,7 +406,7 @@ func TestNodeBuildSubDAGRuns(t *testing.T) {
 			},
 			setupEnv: func(ctx context.Context) context.Context {
 				env := runtime.GetEnv(ctx)
-				env.Scope = env.Scope.WithEntry("SPACE_VAR", "one two three", cmdutil.EnvSourceStepEnv)
+				env.Scope = env.Scope.WithEntry("SPACE_VAR", "one two three", eval.EnvSourceStepEnv)
 				return runtime.WithEnv(ctx, env)
 			},
 			expectCount: 3,
@@ -439,10 +440,15 @@ func TestNodeBuildSubDAGRuns(t *testing.T) {
 		{
 			name: "ParallelWithNoItems",
 			parallel: &core.ParallelConfig{
-				Variable: "${NONEXISTENT}",
+				Variable: "${EMPTY_VAR}",
 			},
 			subDAG: &core.SubDAG{
 				Name: "sub-dag",
+			},
+			setupEnv: func(ctx context.Context) context.Context {
+				env := runtime.GetEnv(ctx)
+				env.Scope = env.Scope.WithEntry("EMPTY_VAR", "", eval.EnvSourceStepEnv)
+				return runtime.WithEnv(ctx, env)
 			},
 			expectError:   true,
 			errorContains: "requires at least one item",
@@ -475,7 +481,7 @@ func TestNodeBuildSubDAGRuns(t *testing.T) {
 			},
 			setupEnv: func(ctx context.Context) context.Context {
 				env := runtime.GetEnv(ctx)
-				env.Scope = env.Scope.WithEntry("SPACE_VAR", "one two three", cmdutil.EnvSourceStepEnv)
+				env.Scope = env.Scope.WithEntry("SPACE_VAR", "one two three", eval.EnvSourceStepEnv)
 				return runtime.WithEnv(ctx, env)
 			},
 			expectCount: 3,
@@ -724,7 +730,7 @@ func TestNodeInit(t *testing.T) {
 	// two different nodes don't interfere with each other
 	// and that multiple Init calls are safe
 	assert.NotPanics(t, func() {
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			node1.Init()
 			node2.Init()
 		}
@@ -1632,7 +1638,7 @@ func TestNodeChatMessages(t *testing.T) {
 
 		// Test concurrent access to message methods
 		done := make(chan bool)
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			go func(id int) {
 				messages := []exec.LLMMessage{
 					{Role: exec.RoleUser, Content: fmt.Sprintf("message %d", id)},
@@ -1644,7 +1650,7 @@ func TestNodeChatMessages(t *testing.T) {
 		}
 
 		// Wait for all goroutines
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			<-done
 		}
 	})

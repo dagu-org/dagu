@@ -1,5 +1,5 @@
 import { Activity, AlertCircle, Clock, Heart, Package } from 'lucide-react';
-import type { components } from '../../../api/v2/schema';
+import type { components } from '../../../api/v1/schema';
 import { cn } from '../../../lib/utils';
 
 type HealthResponse = components['schemas']['HealthResponse'];

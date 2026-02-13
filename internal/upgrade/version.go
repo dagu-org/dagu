@@ -3,6 +3,7 @@ package upgrade
 import (
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/Masterminds/semver/v3"
 )
@@ -71,4 +72,21 @@ func NormalizeVersionTag(version string) string {
 // ExtractVersionFromTag extracts the version number from a tag like "v1.30.3".
 func ExtractVersionFromTag(tag string) string {
 	return strings.TrimPrefix(tag, "v")
+}
+
+// ValidateVersionTag rejects tags that contain path-traversal sequences,
+// directory separators, or control characters.
+func ValidateVersionTag(tag string) error {
+	if strings.Contains(tag, "/") || strings.Contains(tag, "\\") {
+		return fmt.Errorf("invalid version tag %q: contains path separator", tag)
+	}
+	if strings.Contains(tag, "..") {
+		return fmt.Errorf("invalid version tag %q: contains path traversal", tag)
+	}
+	for _, r := range tag {
+		if unicode.IsControl(r) {
+			return fmt.Errorf("invalid version tag %q: contains control character", tag)
+		}
+	}
+	return nil
 }

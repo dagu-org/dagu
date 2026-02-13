@@ -21,8 +21,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/term"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/cmn/mailer"
@@ -138,6 +138,9 @@ type Agent struct {
 	// triggerType indicates how this DAG run was initiated.
 	triggerType core.TriggerType
 
+	// defaultExecMode is the server-level default execution mode.
+	defaultExecMode config.ExecutionMode
+
 	// tracer is the OpenTelemetry tracer for the agent.
 	tracer *telemetry.Tracer
 
@@ -218,6 +221,8 @@ type Options struct {
 	PeerConfig config.Peer
 	// TriggerType indicates how this DAG run was initiated.
 	TriggerType core.TriggerType
+	// DefaultExecMode is the server-level default execution mode.
+	DefaultExecMode config.ExecutionMode
 }
 
 // New creates a new Agent.
@@ -251,6 +256,7 @@ func New(
 		queuedRun:        opts.QueuedRun,
 		attemptID:        opts.AttemptID,
 		triggerType:      opts.TriggerType,
+		defaultExecMode:  opts.DefaultExecMode,
 	}
 
 	// Initialize progress display if enabled
@@ -386,6 +392,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		runtime.WithParams(a.dag.Params),
 		runtime.WithCoordinator(coordinatorCli),
 		runtime.WithSecrets(secretEnvs),
+		runtime.WithDefaultExecMode(a.defaultExecMode),
 	}
 
 	if a.logWriterFactory != nil {
@@ -555,7 +562,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			}
 		}
 
-		sshConfig, err := cmdutil.EvalObject(ctx, ssh.Config{
+		sshConfig, err := eval.Object(ctx, ssh.Config{
 			User:          a.dag.SSH.User,
 			Host:          a.dag.SSH.Host,
 			Port:          a.dag.SSH.Port,
@@ -567,7 +574,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			ShellArgs:     a.dag.SSH.ShellArgs,
 			Timeout:       sshTimeout,
 			Bastion:       bastionCfg,
-		}, runtime.AllEnvsMap(ctx))
+		}, runtime.GetEnv(ctx).UserEnvsMap())
 		if err != nil {
 			initErr = fmt.Errorf("failed to evaluate ssh config: %w", err)
 			return initErr
@@ -1160,7 +1167,7 @@ func (a *Agent) resolveSecrets(ctx context.Context) ([]string, error) {
 	logger.Info(ctx, "Resolving secrets", tag.Count(len(a.dag.Secrets)))
 
 	envScope := a.buildEnvScopeForSecrets()
-	secretCtx := cmdutil.WithEnvScope(ctx, envScope)
+	secretCtx := eval.WithEnvScope(ctx, envScope)
 
 	baseDirs := a.buildSecretBaseDirs(envScope)
 	secretRegistry := secrets.NewRegistry(baseDirs...)
@@ -1175,8 +1182,8 @@ func (a *Agent) resolveSecrets(ctx context.Context) ([]string, error) {
 }
 
 // buildEnvScopeForSecrets creates an EnvScope with DAG env vars for secret resolution.
-func (a *Agent) buildEnvScopeForSecrets() *cmdutil.EnvScope {
-	envScope := cmdutil.NewEnvScope(nil, true)
+func (a *Agent) buildEnvScopeForSecrets() *eval.EnvScope {
+	envScope := eval.NewEnvScope(nil, true)
 	dagEnvs := make(map[string]string)
 	for _, env := range a.dag.Env {
 		if key, value, found := strings.Cut(env, "="); found {
@@ -1184,13 +1191,13 @@ func (a *Agent) buildEnvScopeForSecrets() *cmdutil.EnvScope {
 		}
 	}
 	if len(dagEnvs) > 0 {
-		envScope = envScope.WithEntries(dagEnvs, cmdutil.EnvSourceDAGEnv)
+		envScope = envScope.WithEntries(dagEnvs, eval.EnvSourceDAGEnv)
 	}
 	return envScope
 }
 
 // buildSecretBaseDirs returns base directories for file-based secret resolution.
-func (a *Agent) buildSecretBaseDirs(envScope *cmdutil.EnvScope) []string {
+func (a *Agent) buildSecretBaseDirs(envScope *eval.EnvScope) []string {
 	baseDirs := []string{envScope.Expand(a.dag.WorkingDir)}
 	if a.dag.Location != "" {
 		baseDirs = append(baseDirs, filepath.Dir(a.dag.Location))
@@ -1202,11 +1209,11 @@ func (a *Agent) buildSecretBaseDirs(envScope *cmdutil.EnvScope) []string {
 // environment variables and secrets. Results are stored in agent fields to
 // avoid mutating the original DAG struct.
 func (a *Agent) evaluateMailConfigs(ctx context.Context) error {
-	vars := runtime.AllEnvsMap(ctx)
+	vars := runtime.GetEnv(ctx).UserEnvsMap()
 
 	// Evaluate SMTP config if defined
 	if a.dag.SMTP != nil {
-		evaluated, err := cmdutil.EvalObject(ctx, *a.dag.SMTP, vars)
+		evaluated, err := eval.Object(ctx, *a.dag.SMTP, vars)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate smtp config: %w", err)
 		}
@@ -1215,7 +1222,7 @@ func (a *Agent) evaluateMailConfigs(ctx context.Context) error {
 
 	// Evaluate error mail config if defined
 	if a.dag.ErrorMail != nil {
-		evaluated, err := cmdutil.EvalObject(ctx, *a.dag.ErrorMail, vars)
+		evaluated, err := eval.Object(ctx, *a.dag.ErrorMail, vars)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate error mail config: %w", err)
 		}
@@ -1224,7 +1231,7 @@ func (a *Agent) evaluateMailConfigs(ctx context.Context) error {
 
 	// Evaluate info mail config if defined
 	if a.dag.InfoMail != nil {
-		evaluated, err := cmdutil.EvalObject(ctx, *a.dag.InfoMail, vars)
+		evaluated, err := eval.Object(ctx, *a.dag.InfoMail, vars)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate info mail config: %w", err)
 		}
@@ -1233,7 +1240,7 @@ func (a *Agent) evaluateMailConfigs(ctx context.Context) error {
 
 	// Evaluate wait mail config if defined
 	if a.dag.WaitMail != nil {
-		evaluated, err := cmdutil.EvalObject(ctx, *a.dag.WaitMail, vars)
+		evaluated, err := eval.Object(ctx, *a.dag.WaitMail, vars)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate wait mail config: %w", err)
 		}
@@ -1251,11 +1258,11 @@ func (a *Agent) evaluateRegistryAuths(ctx context.Context) error {
 		return nil
 	}
 
-	vars := runtime.AllEnvsMap(ctx)
+	vars := runtime.GetEnv(ctx).UserEnvsMap()
 	a.evaluatedRegistryAuths = make(map[string]*core.AuthConfig)
 
 	for registry, auth := range a.dag.RegistryAuths {
-		evaluatedAuth, err := cmdutil.EvalObject(ctx, *auth, vars)
+		evaluatedAuth, err := eval.Object(ctx, *auth, vars)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate registry auth for %s: %w", registry, err)
 		}
@@ -1300,8 +1307,8 @@ func (a *Agent) evaluateS3Config(ctx context.Context) error {
 		return nil
 	}
 
-	vars := runtime.AllEnvsMap(ctx)
-	evaluated, err := cmdutil.EvalObject(ctx, *a.dag.S3, vars)
+	vars := runtime.GetEnv(ctx).UserEnvsMap()
+	evaluated, err := eval.Object(ctx, *a.dag.S3, vars)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate s3 config: %w", err)
 	}

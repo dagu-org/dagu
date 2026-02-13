@@ -1,4 +1,4 @@
-import { Status } from '@/api/v2/schema';
+import { Status } from '@/api/v1/schema';
 import { getStatusColors } from '@/lib/status-utils';
 import React from 'react';
 

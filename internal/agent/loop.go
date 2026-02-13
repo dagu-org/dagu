@@ -36,7 +36,7 @@ type LoopConfig struct {
 	Provider llm.Provider
 	// Model is the model ID to use for requests.
 	Model string
-	// History is the initial conversation history.
+	// History is the initial session history.
 	History []llm.Message
 	// Tools is the list of tools available to the agent.
 	Tools []*AgentTool
@@ -48,8 +48,8 @@ type LoopConfig struct {
 	SystemPrompt string
 	// WorkingDir is the working directory for tools.
 	WorkingDir string
-	// ConversationID is the ID of the conversation.
-	ConversationID string
+	// SessionID is the ID of the session.
+	SessionID string
 	// OnWorking is called when the working state changes.
 	OnWorking func(working bool)
 	// EmitUIAction is called when a tool wants to emit a UI action.
@@ -60,9 +60,17 @@ type LoopConfig struct {
 	WaitUserResponse WaitUserResponseFunc
 	// SafeMode enables approval prompts for dangerous commands when true.
 	SafeMode bool
+	// Hooks provides lifecycle callbacks for tool execution.
+	Hooks *Hooks
+	// UserID is the authenticated user's ID.
+	UserID string
+	// Username is the authenticated user's display name.
+	Username string
+	// IPAddress is the client's IP address.
+	IPAddress string
 }
 
-// Loop manages a conversation turn with an LLM including tool execution.
+// Loop manages a session turn with an LLM including tool execution.
 type Loop struct {
 	provider         llm.Provider
 	model            string
@@ -75,13 +83,17 @@ type Loop struct {
 	logger           *slog.Logger
 	systemPrompt     string
 	workingDir       string
-	conversationID   string
+	sessionID        string
 	onWorking        func(working bool)
 	sequenceID       int64
 	emitUIAction     UIActionFunc
 	emitUserPrompt   EmitUserPromptFunc
 	waitUserResponse WaitUserResponseFunc
 	safeMode         bool
+	hooks            *Hooks
+	userID           string
+	username         string
+	ipAddress        string
 }
 
 // NewLoop creates a new Loop instance.
@@ -101,12 +113,16 @@ func NewLoop(config LoopConfig) *Loop {
 		logger:           logger,
 		systemPrompt:     config.SystemPrompt,
 		workingDir:       config.WorkingDir,
-		conversationID:   config.ConversationID,
+		sessionID:        config.SessionID,
 		onWorking:        config.OnWorking,
 		emitUIAction:     config.EmitUIAction,
 		emitUserPrompt:   config.EmitUserPrompt,
 		waitUserResponse: config.WaitUserResponse,
 		safeMode:         config.SafeMode,
+		hooks:            config.Hooks,
+		userID:           config.UserID,
+		username:         config.Username,
+		ipAddress:        config.IPAddress,
 	}
 }
 
@@ -125,20 +141,20 @@ func (l *Loop) SetSafeMode(enabled bool) {
 	l.safeMode = enabled
 }
 
-// Go runs the conversation loop until the context is canceled.
+// Go runs the session loop until the context is canceled.
 func (l *Loop) Go(ctx context.Context) error {
 	if l.provider == nil {
 		return fmt.Errorf("no LLM provider configured")
 	}
 
-	l.logger.Info("starting conversation loop", "tools", len(l.tools))
+	l.logger.Info("starting session loop", "tools", len(l.tools))
 
 	retrier := backoff.NewRetrier(backoff.NewExponentialBackoffPolicy(llmRetryInitialInterval))
 
 	for {
 		select {
 		case <-ctx.Done():
-			l.logger.Info("conversation loop canceled")
+			l.logger.Info("session loop canceled")
 			return ctx.Err()
 		default:
 		}
@@ -238,7 +254,7 @@ func (l *Loop) setWorking(working bool) {
 	}
 }
 
-// copyHistory returns a thread-safe copy of the conversation history.
+// copyHistory returns a thread-safe copy of the session history.
 func (l *Loop) copyHistory() []llm.Message {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -267,11 +283,25 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		input = json.RawMessage("{}")
 	}
 
+	info := ToolExecInfo{
+		ToolName:  tc.Function.Name,
+		Input:     input,
+		SessionID: l.sessionID,
+		UserID:    l.userID,
+		Username:  l.username,
+		IPAddress: l.ipAddress,
+		Audit:     tool.Audit,
+	}
+
+	if err := l.hooks.RunBeforeToolExec(ctx, info); err != nil {
+		return toolError("Blocked by policy: %v", err)
+	}
+
 	l.mu.Lock()
 	safeMode := l.safeMode
 	l.mu.Unlock()
 
-	return tool.Run(ToolContext{
+	result := tool.Run(ToolContext{
 		Context:          ctx,
 		WorkingDir:       l.workingDir,
 		EmitUIAction:     l.emitUIAction,
@@ -279,6 +309,10 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		WaitUserResponse: l.waitUserResponse,
 		SafeMode:         safeMode,
 	}, input)
+
+	l.hooks.RunAfterToolExec(ctx, info, result)
+
+	return result
 }
 
 // handleToolCalls processes tool calls from the LLM response using iteration
@@ -369,9 +403,9 @@ func (l *Loop) recordToolResult(ctx context.Context, tc llm.ToolCall, result Too
 	}
 
 	msg := Message{
-		ConversationID: l.conversationID,
-		Type:           MessageTypeUser, // Tool results are from user perspective
-		SequenceID:     seqID,
+		SessionID:  l.sessionID,
+		Type:       MessageTypeUser, // Tool results are from user perspective
+		SequenceID: seqID,
 		ToolResults: []ToolResult{{
 			ToolCallID: tc.ID,
 			Content:    result.Content,
@@ -393,18 +427,18 @@ func (l *Loop) nextSequenceID() int64 {
 	return l.sequenceID
 }
 
-// recordErrorMessage records an error message to the conversation.
+// recordErrorMessage records an error message to the session.
 func (l *Loop) recordErrorMessage(ctx context.Context, errMsg string) {
 	if l.recordMessage == nil {
 		return
 	}
 
 	msg := Message{
-		ConversationID: l.conversationID,
-		Type:           MessageTypeError,
-		SequenceID:     l.nextSequenceID(),
-		Content:        errMsg,
-		CreatedAt:      time.Now(),
+		SessionID:  l.sessionID,
+		Type:       MessageTypeError,
+		SequenceID: l.nextSequenceID(),
+		Content:    errMsg,
+		CreatedAt:  time.Now(),
 	}
 	if err := l.recordMessage(ctx, msg); err != nil {
 		l.logger.Error("failed to record error message", "error", err)
@@ -412,7 +446,7 @@ func (l *Loop) recordErrorMessage(ctx context.Context, errMsg string) {
 }
 
 // buildMessages prepares the message list for an LLM request by optionally
-// prepending the system prompt to the conversation history.
+// prepending the system prompt to the session history.
 func (l *Loop) buildMessages(history []llm.Message) []llm.Message {
 	if l.systemPrompt == "" {
 		return history
@@ -458,14 +492,14 @@ func (l *Loop) recordAssistantMessage(ctx context.Context, resp *llm.ChatRespons
 	}
 
 	msg := Message{
-		ConversationID: l.conversationID,
-		Type:           MessageTypeAssistant,
-		SequenceID:     seqID,
-		Content:        resp.Content,
-		ToolCalls:      resp.ToolCalls,
-		Usage:          &resp.Usage,
-		CreatedAt:      time.Now(),
-		LLMData:        &assistantMessage,
+		SessionID:  l.sessionID,
+		Type:       MessageTypeAssistant,
+		SequenceID: seqID,
+		Content:    resp.Content,
+		ToolCalls:  resp.ToolCalls,
+		Usage:      &resp.Usage,
+		CreatedAt:  time.Now(),
+		LLMData:    &assistantMessage,
 	}
 	if err := l.recordMessage(ctx, msg); err != nil {
 		l.logger.Error("failed to record assistant message", "error", err)

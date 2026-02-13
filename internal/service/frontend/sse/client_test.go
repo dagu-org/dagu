@@ -98,7 +98,7 @@ func TestClientSend(t *testing.T) {
 		require.NoError(t, err)
 
 		// Fill the buffer (64 items)
-		for i := 0; i < 64; i++ {
+		for i := range 64 {
 			ok := client.Send(&Event{Type: EventTypeData, Data: "test"})
 			assert.True(t, ok, "send %d should succeed", i)
 		}
@@ -289,14 +289,12 @@ func TestClientConcurrentSend(t *testing.T) {
 
 	// Concurrent sends
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < 10; j++ {
+	for range 10 {
+		wg.Go(func() {
+			for range 10 {
 				client.Send(&Event{Type: EventTypeData, Data: "concurrent"})
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

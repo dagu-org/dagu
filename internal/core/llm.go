@@ -2,7 +2,7 @@ package core
 
 import "fmt"
 
-// LLMRole represents the role of a message sender in a conversation.
+// LLMRole represents the role of a message sender in a session.
 type LLMRole string
 
 // LLM message role constants.
@@ -97,7 +97,7 @@ type LLMConfig struct {
 	// First model is primary, rest are tried in order if primary fails.
 	// When set, Provider/Model fields are ignored.
 	Models []ModelEntry `json:"models,omitempty"`
-	// System is the default system prompt for conversations.
+	// System is the default system prompt for sessions.
 	System string `json:"system,omitempty"`
 	// Temperature controls randomness (0.0-2.0).
 	Temperature *float64 `json:"temperature,omitempty"`
@@ -126,7 +126,7 @@ type LLMConfig struct {
 	MaxToolIterations *int `json:"maxToolIterations,omitempty"`
 }
 
-// LLMMessage represents a message in the LLM conversation.
+// LLMMessage represents a message in the LLM session.
 type LLMMessage struct {
 	// Role is the message role (system, user, assistant, tool).
 	Role LLMRole `json:"role,omitempty"`

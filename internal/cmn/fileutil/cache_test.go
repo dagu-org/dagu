@@ -1,7 +1,6 @@
 package fileutil
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -80,7 +79,7 @@ func TestCache_CapacityLimit(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Add 10 items
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		filePath := filepath.Join(tmpDir, "test"+string(rune('0'+i))+".txt")
 		require.NoError(t, os.WriteFile(filePath, []byte("content"), 0644))
 
@@ -215,8 +214,7 @@ func TestCache_StartEviction(t *testing.T) {
 
 	cache := NewCache[string]("test", 100, time.Hour)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	cache.StartEviction(ctx)
 
@@ -234,14 +232,14 @@ func TestCache_ConcurrentAccess(t *testing.T) {
 	// Create test files
 	const numFiles = 100
 	files := make([]string, numFiles)
-	for i := 0; i < numFiles; i++ {
+	for i := range numFiles {
 		files[i] = filepath.Join(tmpDir, "test"+string(rune('a'+i%26))+string(rune('0'+i/26))+".txt")
 		require.NoError(t, os.WriteFile(files[i], []byte("content"), 0644))
 	}
 
 	// Concurrent writes
 	done := make(chan bool)
-	for i := 0; i < numFiles; i++ {
+	for i := range numFiles {
 		go func(idx int) {
 			fi, _ := os.Stat(files[idx])
 			cache.Store(files[idx], idx, fi)
@@ -249,21 +247,21 @@ func TestCache_ConcurrentAccess(t *testing.T) {
 		}(i)
 	}
 
-	for i := 0; i < numFiles; i++ {
+	for range numFiles {
 		<-done
 	}
 
 	assert.Equal(t, numFiles, cache.Size())
 
 	// Concurrent reads
-	for i := 0; i < numFiles; i++ {
+	for i := range numFiles {
 		go func(idx int) {
 			_, _ = cache.Load(files[idx])
 			done <- true
 		}(i)
 	}
 
-	for i := 0; i < numFiles; i++ {
+	for range numFiles {
 		<-done
 	}
 }
@@ -277,7 +275,7 @@ func TestCache_ZeroCapacityMeansUnlimited(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Add many items
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		filePath := filepath.Join(tmpDir, "file"+string(rune('0'+i/10))+string(rune('0'+i%10))+".txt")
 		require.NoError(t, os.WriteFile(filePath, []byte("content"), 0644))
 
@@ -375,7 +373,7 @@ func TestCache_MixedExpirationAndCapacity(t *testing.T) {
 	cache := NewCache[string]("test", 3, time.Hour)
 
 	// Add 2 expired entries directly
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		expiredEntry := Entry[string]{
 			Data:         "expired",
 			Size:         10,
@@ -388,7 +386,7 @@ func TestCache_MixedExpirationAndCapacity(t *testing.T) {
 
 	// Add 4 valid entries via Store (these will have future expiration)
 	tmpDir := t.TempDir()
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		filePath := filepath.Join(tmpDir, "valid"+string(rune('0'+i))+".txt")
 		require.NoError(t, os.WriteFile(filePath, []byte("content"), 0644))
 		fi, _ := os.Stat(filePath)

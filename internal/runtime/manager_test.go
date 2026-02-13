@@ -159,7 +159,5 @@ steps:
 
 func testNewStatus(dag *core.DAG, dagRunID string, dagStatus core.Status, nodeStatus core.NodeStatus) exec.DAGRunStatus {
 	nodes := []runtime.NodeData{{State: runtime.NodeState{Status: nodeStatus}}}
-	tm := time.Now()
-	startedAt := &tm
-	return transform.NewStatusBuilder(dag).Create(dagRunID, dagStatus, 0, *startedAt, transform.WithNodes(nodes))
+	return transform.NewStatusBuilder(dag).Create(dagRunID, dagStatus, 0, time.Now(), transform.WithNodes(nodes))
 }

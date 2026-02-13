@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/google/jsonschema-go/jsonschema"
 )
@@ -129,27 +129,28 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 }
 
 func evalParamValue(ctx BuildContext, raw string, accumulatedVars map[string]string) (string, error) {
-	var evalOptions []cmdutil.EvalOption
+	var evalOptions []eval.Option
 
 	if len(accumulatedVars) > 0 {
-		evalOptions = append(evalOptions, cmdutil.WithVariables(accumulatedVars))
+		evalOptions = append(evalOptions, eval.WithVariables(accumulatedVars))
 	}
 
 	// Use envScope.buildEnv if available (new thread-safe approach),
 	// fall back to ctx.buildEnv for backward compatibility
 	if ctx.envScope != nil && len(ctx.envScope.buildEnv) > 0 {
-		evalOptions = append(evalOptions, cmdutil.WithVariables(ctx.envScope.buildEnv))
+		evalOptions = append(evalOptions, eval.WithVariables(ctx.envScope.buildEnv))
 	} else if ctx.buildEnv != nil {
-		evalOptions = append(evalOptions, cmdutil.WithVariables(ctx.buildEnv))
+		evalOptions = append(evalOptions, eval.WithVariables(ctx.buildEnv))
 	}
 
 	// Also set EnvScope on context for command substitution
 	evalCtx := ctx.ctx
 	if ctx.envScope != nil && ctx.envScope.scope != nil {
-		evalCtx = cmdutil.WithEnvScope(evalCtx, ctx.envScope.scope)
+		evalCtx = eval.WithEnvScope(evalCtx, ctx.envScope.scope)
 	}
 
-	return cmdutil.EvalString(evalCtx, raw, evalOptions...)
+	evalOptions = append(evalOptions, eval.WithOSExpansion())
+	return eval.String(evalCtx, raw, evalOptions...)
 }
 
 // parseParamValue parses the parameters for the DAG.
@@ -326,7 +327,7 @@ func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
 					func(match string) string {
 						var err error
 						cmdStr := strings.Trim(match, "`")
-						cmdStr, err = cmdutil.EvalString(ctx.ctx, cmdStr)
+						cmdStr, err = eval.String(ctx.ctx, cmdStr, eval.WithOSExpansion())
 						if err != nil {
 							cmdErr = err
 							// Leave the original command if it fails

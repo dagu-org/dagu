@@ -8,7 +8,7 @@ import {
 } from '@/ui/CustomDialog';
 import { Ban, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { components } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v1/schema';
 
 type Step = components['schemas']['Step'];
 

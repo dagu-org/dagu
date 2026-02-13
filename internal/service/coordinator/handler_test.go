@@ -154,8 +154,7 @@ func (m *mockDAGRunAttempt) ReadStatus(_ context.Context) (*exec.DAGRunStatus, e
 		return nil, exec.ErrNoStatusData
 	}
 	// Return a copy to avoid pointer races
-	statusCopy := *m.status
-	return &statusCopy, nil
+	return new(*m.status), nil
 }
 func (m *mockDAGRunAttempt) ReadDAG(_ context.Context) (*core.DAG, error) { return nil, nil }
 func (m *mockDAGRunAttempt) SetDAG(_ *core.DAG)                           {}
@@ -824,8 +823,7 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		h.mu.Unlock()
 
 		// Start zombie detector with short interval for testing
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		h.StartZombieDetector(ctx, 50*time.Millisecond)
 

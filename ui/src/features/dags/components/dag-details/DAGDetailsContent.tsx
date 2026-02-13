@@ -7,7 +7,7 @@ import {
   Webhook,
 } from 'lucide-react';
 import React, { useState } from 'react';
-import { components } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v1/schema';
 import { DAGStatus } from '../../components';
 import { DAGContext } from '../../contexts/DAGContext';
 import { LinkTab } from '../common';
@@ -324,7 +324,9 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
               <div className="h-6 flex-shrink-0" />
             </>
           ) : null}
-          {activeTab === 'spec' ? <DAGSpec fileName={fileName} localDags={localDags} /> : null}
+          {activeTab === 'spec' ? (
+            <DAGSpec key={fileName} fileName={fileName} localDags={localDags} />
+          ) : null}
           {activeTab === 'history' ? (
             <>
               <DAGExecutionHistory fileName={fileName || ''} />

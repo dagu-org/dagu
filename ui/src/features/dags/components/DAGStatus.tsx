@@ -17,7 +17,7 @@ import {
 import React, { useEffect, useState } from 'react';
 import { useCookies } from 'react-cookie';
 import { useNavigate } from 'react-router-dom';
-import { components, NodeStatus, Status, Stream } from '../../../api/v2/schema';
+import { components, NodeStatus, Status, Stream } from '../../../api/v1/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { useConfig } from '../../../contexts/ConfigContext';
 import { useClient } from '../../../hooks/api';

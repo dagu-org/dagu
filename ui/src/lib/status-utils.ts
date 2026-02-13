@@ -1,4 +1,4 @@
-import { NodeStatus, Status } from '@/api/v2/schema';
+import { NodeStatus, Status } from '@/api/v1/schema';
 
 /**
  * Get Tailwind CSS utility class for Status or NodeStatus enum.

@@ -205,8 +205,7 @@ func (c *ImportConfig) setDefaults() {
 	}
 	// HasHeader defaults to true for CSV/TSV (most files have headers)
 	if c.HasHeader == nil {
-		t := true
-		c.HasHeader = &t
+		c.HasHeader = new(true)
 	}
 }
 

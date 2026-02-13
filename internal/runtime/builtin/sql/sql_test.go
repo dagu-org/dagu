@@ -1844,15 +1844,13 @@ func TestConnectionManager_AcquireRelease_Concurrent(t *testing.T) {
 	var wg sync.WaitGroup
 	numGoroutines := 10
 
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range numGoroutines {
+		wg.Go(func() {
 			cm.Acquire()
 			// Simulate some work
 			time.Sleep(10 * time.Millisecond)
 			_ = cm.Release()
-		}()
+		})
 	}
 
 	wg.Wait()

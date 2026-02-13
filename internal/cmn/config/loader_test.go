@@ -43,7 +43,6 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_DEBUG":        "true",
 		"DAGU_HEADLESS":     "true",
 
-		"DAGU_WORK_DIR":      filepath.Join(testPaths, "work"),
 		"DAGU_DEFAULT_SHELL": "/bin/zsh",
 
 		"DAGU_UI_MAX_DASHBOARD_PAGE_LIMIT": "250",
@@ -165,7 +164,7 @@ func TestLoad_Env(t *testing.T) {
 			StrictValidation:  false,
 			Metrics:           MetricsAccessPrivate,
 			Terminal:          TerminalConfig{Enabled: true},
-			Audit:             AuditConfig{Enabled: false},
+			Audit:             AuditConfig{Enabled: false, RetentionDays: 7},
 		},
 		Paths: PathsConfig{
 			DAGsDir:            filepath.Join(testPaths, "dags"),
@@ -179,10 +178,10 @@ func TestLoad_Env(t *testing.T) {
 			ProcDir:            filepath.Join(testPaths, "proc"),
 			QueueDir:           filepath.Join(testPaths, "queue"),
 			ServiceRegistryDir: filepath.Join(testPaths, "service-registry"),
-			UsersDir:           filepath.Join(testPaths, "data", "users"),                  // Derived from DataDir
-			APIKeysDir:         filepath.Join(testPaths, "data", "apikeys"),                // Derived from DataDir
-			WebhooksDir:        filepath.Join(testPaths, "data", "webhooks"),               // Derived from DataDir
-			ConversationsDir:   filepath.Join(testPaths, "data", "agent", "conversations"), // Derived from DataDir
+			UsersDir:           filepath.Join(testPaths, "data", "users"),             // Derived from DataDir
+			APIKeysDir:         filepath.Join(testPaths, "data", "apikeys"),           // Derived from DataDir
+			WebhooksDir:        filepath.Join(testPaths, "data", "webhooks"),          // Derived from DataDir
+			SessionsDir:        filepath.Join(testPaths, "data", "agent", "sessions"), // Derived from DataDir
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
@@ -236,8 +235,9 @@ func TestLoad_Env(t *testing.T) {
 				BlockDurationSeconds: 1800,
 			},
 		},
-		Warnings: []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://auth.example.com)"},
-		Cache:    CacheModeNormal,
+		DefaultExecMode: ExecutionModeLocal,
+		Warnings:        []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://auth.example.com)"},
+		Cache:           CacheModeNormal,
 	}
 
 	assert.Equal(t, expected, cfg)
@@ -264,7 +264,7 @@ permissions:
   runDAGs: false
 debug: true
 basePath: "/dagu"
-apiBasePath: "/api/v2"
+apiBasePath: "/api/v1"
 tz: "UTC"
 logFormat: "json"
 headless: true
@@ -372,7 +372,7 @@ scheduler:
 			Host:              "0.0.0.0",
 			Port:              9090,
 			BasePath:          "/dagu",
-			APIBasePath:       "/api/v2",
+			APIBasePath:       "/api/v1",
 			Headless:          true,
 			LatestStatusToday: true,
 			Auth: Auth{
@@ -422,7 +422,7 @@ scheduler:
 			},
 			Metrics:  MetricsAccessPrivate,
 			Terminal: TerminalConfig{Enabled: false},
-			Audit:    AuditConfig{Enabled: true},
+			Audit:    AuditConfig{Enabled: true, RetentionDays: 7},
 		},
 		Paths: PathsConfig{
 			DAGsDir:            "/var/dagu/dags",
@@ -439,7 +439,7 @@ scheduler:
 			UsersDir:           "/var/dagu/data/users",
 			APIKeysDir:         "/var/dagu/data/apikeys",
 			WebhooksDir:        "/var/dagu/data/webhooks",
-			ConversationsDir:   "/var/dagu/data/agent/conversations",
+			SessionsDir:        "/var/dagu/data/agent/sessions",
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
@@ -486,8 +486,9 @@ scheduler:
 			Retention: 24 * time.Hour,
 			Interval:  5 * time.Second,
 		},
-		Warnings: []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://accounts.example.com)"},
-		Cache:    CacheModeNormal,
+		DefaultExecMode: ExecutionModeLocal,
+		Warnings:        []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://accounts.example.com)"},
+		Cache:           CacheModeNormal,
 	}
 
 	assert.Equal(t, expected, cfg)
@@ -543,6 +544,7 @@ paths:
 	assert.Equal(t, "/custom/data/queue", cfg.Paths.QueueDir)
 	assert.Equal(t, "/custom/data/service-registry", cfg.Paths.ServiceRegistryDir)
 	assert.Equal(t, "/custom/data/users", cfg.Paths.UsersDir)
+	assert.Equal(t, "/custom/data/agent/sessions", cfg.Paths.SessionsDir)
 }
 
 func TestLoad_EdgeCases_Errors(t *testing.T) {
@@ -655,7 +657,7 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 		def := Definition{
 			BasicAuthUsername:     "user",
 			BasicAuthPassword:     "pass",
-			APIBaseURL:            "/api/v2",
+			APIBaseURL:            "/api/v1",
 			IsAuthToken:           true,
 			AuthToken:             "token123",
 			DAGs:                  filepath.Join(testPaths, "legacy", "dags"),
@@ -680,7 +682,7 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 		assert.Equal(t, "user", cfg.Server.Auth.Basic.Username)
 		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
 		assert.Equal(t, "token123", cfg.Server.Auth.Token.Value)
-		assert.Equal(t, "/api/v2", cfg.Server.APIBasePath)
+		assert.Equal(t, "/api/v1", cfg.Server.APIBasePath)
 
 		// Paths - DAGsDir should take precedence over DAGs
 		assert.Equal(t, filepath.Join(testPaths, "new", "dags"), cfg.Paths.DAGsDir)
@@ -1087,7 +1089,7 @@ func TestParseCoordinatorAddresses(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		input            interface{}
+		input            any
 		expectedAddrs    []string
 		expectedWarnings int // Number of expected warnings
 	}{
@@ -1102,11 +1104,11 @@ func TestParseCoordinatorAddresses(t *testing.T) {
 		{"IPv6 address", "[::1]:8080", []string{"[::1]:8080"}, 0},
 
 		// Valid []interface{} input tests (YAML)
-		{"empty interface slice", []interface{}{}, nil, 0},
-		{"interface slice with addresses", []interface{}{"host1:8080", "host2:9090"}, []string{"host1:8080", "host2:9090"}, 0},
-		{"interface slice filters non-strings", []interface{}{"host:8080", 123, "host2:9090"}, []string{"host:8080", "host2:9090"}, 0},
-		{"interface slice filters empty strings", []interface{}{"host:8080", "", "host2:9090"}, []string{"host:8080", "host2:9090"}, 0},
-		{"interface slice trims whitespace", []interface{}{" host1:8080 ", " host2:9090 "}, []string{"host1:8080", "host2:9090"}, 0},
+		{"empty interface slice", []any{}, nil, 0},
+		{"interface slice with addresses", []any{"host1:8080", "host2:9090"}, []string{"host1:8080", "host2:9090"}, 0},
+		{"interface slice filters non-strings", []any{"host:8080", 123, "host2:9090"}, []string{"host:8080", "host2:9090"}, 0},
+		{"interface slice filters empty strings", []any{"host:8080", "", "host2:9090"}, []string{"host:8080", "host2:9090"}, 0},
+		{"interface slice trims whitespace", []any{" host1:8080 ", " host2:9090 "}, []string{"host1:8080", "host2:9090"}, 0},
 
 		// Valid []string input tests
 		{"empty string slice", []string{}, nil, 0},
@@ -1346,5 +1348,41 @@ tunnel:
 `)
 		assert.False(t, cfg.Tunnel.Enabled)
 		assert.Empty(t, cfg.Tunnel.Tailscale.Hostname)
+	})
+}
+
+func TestLoad_DefaultExecutionMode(t *testing.T) {
+	t.Run("DefaultIsLocal", func(t *testing.T) {
+		cfg := loadFromYAML(t, "# empty")
+		assert.Equal(t, ExecutionModeLocal, cfg.DefaultExecMode)
+	})
+
+	t.Run("SetToDistributed", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+defaultExecutionMode: distributed
+`)
+		assert.Equal(t, ExecutionModeDistributed, cfg.DefaultExecMode)
+	})
+
+	t.Run("SetToLocal", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+defaultExecutionMode: local
+`)
+		assert.Equal(t, ExecutionModeLocal, cfg.DefaultExecMode)
+	})
+
+	t.Run("FromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_DEFAULT_EXECUTION_MODE": "distributed",
+		})
+		assert.Equal(t, ExecutionModeDistributed, cfg.DefaultExecMode)
+	})
+
+	t.Run("InvalidValue", func(t *testing.T) {
+		err := loadWithErrorFromYAML(t, `
+defaultExecutionMode: invalid
+`)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid defaultExecutionMode")
 	})
 }

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -314,4 +315,48 @@ func DetectShebang(script string) (string, []string, error) {
 
 	// Split the shebang line into command and args
 	return SplitCommand(strings.TrimSpace(line))
+}
+
+var reEscapedKeyValue = regexp.MustCompile(`^[^\s=]+="[^"]+"$`)
+
+// BuildCommandEscapedString constructs a single shell-ready string from a command and its arguments.
+// It assumes that the command and arguments are already escaped.
+func BuildCommandEscapedString(command string, args []string) string {
+	if len(args) == 0 {
+		return command
+	}
+
+	quotedArgs := make([]string, 0, len(args))
+	for _, arg := range args {
+		quotedArgs = append(quotedArgs, quoteArgIfNeeded(arg))
+	}
+
+	return fmt.Sprintf("%s %s", command, strings.Join(quotedArgs, " "))
+}
+
+// quoteArgIfNeeded returns the argument quoted if it contains spaces and is not already quoted.
+func quoteArgIfNeeded(arg string) string {
+	// Empty string needs explicit quoting
+	if arg == "" {
+		return `""`
+	}
+
+	// Already quoted with double or single quotes
+	if (strings.HasPrefix(arg, `"`) && strings.HasSuffix(arg, `"`)) ||
+		(strings.HasPrefix(arg, `'`) && strings.HasSuffix(arg, `'`)) {
+		return arg
+	}
+
+	// No whitespace means no quoting needed
+	if strings.IndexFunc(arg, unicode.IsSpace) < 0 {
+		return arg
+	}
+
+	// Already escaped key=value format
+	if reEscapedKeyValue.MatchString(arg) {
+		return arg
+	}
+
+	// Escape any existing double quotes and wrap in double quotes
+	return fmt.Sprintf(`"%s"`, strings.ReplaceAll(arg, `"`, `\"`))
 }

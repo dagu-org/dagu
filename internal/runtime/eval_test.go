@@ -4,11 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func setupTestContext() context.Context {
@@ -29,7 +30,7 @@ func TestEvalString(t *testing.T) {
 	env.Scope = env.Scope.WithEntries(map[string]string{
 		"TEST_VAR":    "hello",
 		"ANOTHER_VAR": "world",
-	}, cmdutil.EnvSourceStepEnv)
+	}, eval.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
@@ -60,15 +61,15 @@ func TestEvalString(t *testing.T) {
 		{
 			name:     "NonExistentVariable",
 			input:    "${NON_EXISTENT}",
-			expected: "",
+			expected: "${NON_EXISTENT}",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := runtime.EvalString(ctx, tt.input)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expected, result)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -83,7 +84,7 @@ func TestEvalBool(t *testing.T) {
 		"ONE_VAR":     "1",
 		"ZERO_VAR":    "0",
 		"INVALID_VAR": "not-a-bool",
-	}, cmdutil.EnvSourceStepEnv)
+	}, eval.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
@@ -148,8 +149,8 @@ func TestEvalBool(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, result)
+				require.NoError(t, err)
+				require.Equal(t, tt.expected, result)
 			}
 		})
 	}
@@ -175,7 +176,7 @@ func TestEvalObject(t *testing.T) {
 		"NAME_VAR":   "John",
 		"DESC_VAR":   "Developer",
 		"NESTED_VAR": "NestedValue",
-	}, cmdutil.EnvSourceStepEnv)
+	}, eval.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	// Create a test struct
@@ -200,12 +201,12 @@ func TestEvalObject(t *testing.T) {
 
 	// Test EvalObject
 	result, err := runtime.EvalObject(ctx, testObj)
-	assert.NoError(t, err)
-	assert.Equal(t, expected, result)
+	require.NoError(t, err)
+	require.Equal(t, expected, result)
 
 	// Test with a non-struct type
 	_, err = runtime.EvalObject(ctx, "not a struct")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestEvalObjectWithExecutorConfig tests that EvalObject works correctly with the ExecutorConfig struct
@@ -219,7 +220,7 @@ func TestEvalObjectWithExecutorConfig(t *testing.T) {
 		"EXECUTOR_TYPE": "docker",
 		"HOST_VAR":      "localhost",
 		"PORT_VAR":      "8080",
-	}, cmdutil.EnvSourceStepEnv)
+	}, eval.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	// Create an ExecutorConfig with variables
@@ -248,20 +249,20 @@ func TestEvalObjectWithExecutorConfig(t *testing.T) {
 
 	// Test EvalObject
 	result, err := runtime.EvalObject(ctx, config.Config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Check Config map values
-	assert.Equal(t, expected.Config["host"], result["host"])
-	assert.Equal(t, expected.Config["port"], result["port"])
+	require.Equal(t, expected.Config["host"], result["host"])
+	require.Equal(t, expected.Config["port"], result["port"])
 
 	// Check nested map
 	nestedResult, ok := result["nested"].(map[string]any)
-	assert.True(t, ok, "nested should be a map[string]any")
+	require.True(t, ok, "nested should be a map[string]any")
 
 	nestedExpected, ok := expected.Config["nested"].(map[string]any)
-	assert.True(t, ok, "expected nested should be a map[string]any")
+	require.True(t, ok, "expected nested should be a map[string]any")
 
-	assert.Equal(t, nestedExpected["value"], nestedResult["value"])
+	require.Equal(t, nestedExpected["value"], nestedResult["value"])
 }
 
 func TestGenerateSubDAGRunID(t *testing.T) {
@@ -330,7 +331,7 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 		"VAR1": "value1",
 		"VAR2": "value2",
 		"NUM":  "42",
-	}, cmdutil.EnvSourceStepEnv)
+	}, eval.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
@@ -476,8 +477,8 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := runtime.EvalObject(ctx, tt.input)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expected, result)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -492,7 +493,7 @@ func TestEvalStringEdgeCases(t *testing.T) {
 		"EMPTY":   "",
 		"SPACES":  "  ",
 		"SPECIAL": "special!@#",
-	}, cmdutil.EnvSourceStepEnv)
+	}, eval.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
@@ -545,8 +546,8 @@ func TestEvalStringEdgeCases(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, result)
+				require.NoError(t, err)
+				require.Equal(t, tt.expected, result)
 			}
 		})
 	}
@@ -560,7 +561,7 @@ func TestEvalObjectWithDirectStringEvaluation(t *testing.T) {
 		"STRING_VAR": "evaluated_string",
 		"PATH_VAR":   "/path/to/file",
 		"COMBINED":   "prefix",
-	}, cmdutil.EnvSourceStepEnv)
+	}, eval.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
@@ -629,8 +630,8 @@ func TestEvalObjectWithDirectStringEvaluation(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, result)
+				require.NoError(t, err)
+				require.Equal(t, tt.expected, result)
 			}
 		})
 	}
@@ -650,7 +651,7 @@ func TestEvalBoolEdgeCases(t *testing.T) {
 		"OFF": "off",
 		"T":   "t",
 		"F":   "f",
-	}, cmdutil.EnvSourceStepEnv)
+	}, eval.EnvSourceStepEnv)
 
 	ctx = runtime.WithEnv(ctx, env)
 
@@ -728,8 +729,8 @@ func TestEvalBoolEdgeCases(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, result)
+				require.NoError(t, err)
+				require.Equal(t, tt.expected, result)
 			}
 		})
 	}

@@ -12,19 +12,19 @@ import (
 
 func TestStore_New(t *testing.T) {
 	t.Run("ValidDir", func(t *testing.T) {
-		store, err := New(t.TempDir())
+		store, err := New(t.TempDir(), 0)
 		require.NoError(t, err)
 		assert.NotNil(t, store)
 	})
 
 	t.Run("EmptyDir", func(t *testing.T) {
-		_, err := New("")
+		_, err := New("", 0)
 		assert.Error(t, err)
 	})
 }
 
 func TestStore_Append(t *testing.T) {
-	store, err := New(t.TempDir())
+	store, err := New(t.TempDir(), 0)
 	require.NoError(t, err)
 
 	entry := audit.NewEntry(audit.CategoryUser, "login", "user-123", "testuser").
@@ -35,7 +35,7 @@ func TestStore_Append(t *testing.T) {
 }
 
 func TestStore_AppendNilEntry(t *testing.T) {
-	store, err := New(t.TempDir())
+	store, err := New(t.TempDir(), 0)
 	require.NoError(t, err)
 
 	err = store.Append(context.Background(), nil)
@@ -43,11 +43,11 @@ func TestStore_AppendNilEntry(t *testing.T) {
 }
 
 func TestStore_Query(t *testing.T) {
-	store, err := New(t.TempDir())
+	store, err := New(t.TempDir(), 0)
 	require.NoError(t, err)
 
 	// Add entries
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		entry := audit.NewEntry(audit.CategoryUser, "login", "user-123", "testuser")
 		err = store.Append(context.Background(), entry)
 		require.NoError(t, err)
@@ -60,7 +60,7 @@ func TestStore_Query(t *testing.T) {
 }
 
 func TestStore_QueryWithCategory(t *testing.T) {
-	store, err := New(t.TempDir())
+	store, err := New(t.TempDir(), 0)
 	require.NoError(t, err)
 
 	// Add mixed entries
@@ -77,11 +77,11 @@ func TestStore_QueryWithCategory(t *testing.T) {
 }
 
 func TestStore_QueryWithPagination(t *testing.T) {
-	store, err := New(t.TempDir())
+	store, err := New(t.TempDir(), 0)
 	require.NoError(t, err)
 
 	// Add entries
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		entry := audit.NewEntry(audit.CategoryUser, "login", "user-123", "testuser")
 		err = store.Append(context.Background(), entry)
 		require.NoError(t, err)
@@ -94,7 +94,7 @@ func TestStore_QueryWithPagination(t *testing.T) {
 }
 
 func TestStore_QueryWithTimeRange(t *testing.T) {
-	store, err := New(t.TempDir())
+	store, err := New(t.TempDir(), 0)
 	require.NoError(t, err)
 
 	now := time.Now().UTC()
@@ -110,7 +110,7 @@ func TestStore_QueryWithTimeRange(t *testing.T) {
 }
 
 func TestStore_QueryOffsetBeyondTotal(t *testing.T) {
-	store, err := New(t.TempDir())
+	store, err := New(t.TempDir(), 0)
 	require.NoError(t, err)
 
 	err = store.Append(context.Background(), audit.NewEntry(audit.CategoryUser, "login", "u1", "user1"))

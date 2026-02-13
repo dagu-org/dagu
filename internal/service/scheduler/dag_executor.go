@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
@@ -25,9 +26,9 @@ import (
 //
 // Execution Flow:
 //
-// 1. Scheduled Jobs (from DAGRunJob.Start):
+// 1. Scheduled Jobs (from TickPlanner.DispatchRun):
 //   - Operation: OPERATION_START
-//   - Flow: DAGRunJob.Start() → HandleJob() → EnqueueDAGRun() (for distributed)
+//   - Flow: TickPlanner.DispatchRun() → HandleJob() → EnqueueDAGRun() (for distributed)
 //   - This creates a persisted record with status=QUEUED before any dispatch attempt
 //   - Ensures the job is tracked and can be retried if coordinator/workers are down
 //
@@ -47,18 +48,21 @@ import (
 // - HandleJob(): Entry point for new scheduled jobs (handles persistence)
 // - ExecuteDAG(): Executes/dispatches already-persisted jobs (no persistence)
 type DAGExecutor struct {
-	coordinatorCli exec.Dispatcher
-	subCmdBuilder  *runtime.SubCmdBuilder
+	coordinatorCli  exec.Dispatcher
+	subCmdBuilder   *runtime.SubCmdBuilder
+	defaultExecMode config.ExecutionMode
 }
 
 // NewDAGExecutor creates a new DAGExecutor instance.
 func NewDAGExecutor(
 	coordinatorCli exec.Dispatcher,
 	subCmdBuilder *runtime.SubCmdBuilder,
+	defaultExecMode config.ExecutionMode,
 ) *DAGExecutor {
 	return &DAGExecutor{
-		coordinatorCli: coordinatorCli,
-		subCmdBuilder:  subCmdBuilder,
+		coordinatorCli:  coordinatorCli,
+		subCmdBuilder:   subCmdBuilder,
+		defaultExecMode: defaultExecMode,
 	}
 }
 
@@ -159,14 +163,10 @@ func (e *DAGExecutor) ExecuteDAG(
 }
 
 // shouldUseDistributedExecution checks if distributed execution should be used.
-// Returns true only if:
-// 1. A coordinator client is configured (coordinator is available)
-// 2. The DAG has workerSelector labels (DAG explicitly requests distributed execution)
-//
-// This ensures backward compatibility - DAGs without workerSelector continue
-// to run locally even when a coordinator is configured.
+// Delegates to core.ShouldDispatchToCoordinator for consistent dispatch logic
+// across all execution paths (API, CLI, scheduler, sub-DAG).
 func (e *DAGExecutor) shouldUseDistributedExecution(dag *core.DAG) bool {
-	return e.coordinatorCli != nil && len(dag.WorkerSelector) > 0
+	return core.ShouldDispatchToCoordinator(dag, e.coordinatorCli != nil, e.defaultExecMode)
 }
 
 // dispatchToCoordinator dispatches a task to the coordinator for distributed execution.
@@ -206,12 +206,14 @@ func (e *DAGExecutor) Restart(ctx context.Context, dag *core.DAG) error {
 	return runtime.Start(ctx, spec)
 }
 
-// Close closes any resources held by the DAGExecutor, including the coordinator client
+// Close closes any resources held by the DAGExecutor, including the coordinator client.
+// Note: we intentionally do NOT nil out coordinatorCli here because Close is called
+// from a goroutine in Stop while concurrent dispatchRun goroutines may still read
+// coordinatorCli via shouldUseDistributedExecution.
 func (e *DAGExecutor) Close(ctx context.Context) {
 	if e.coordinatorCli != nil {
 		if err := e.coordinatorCli.Cleanup(ctx); err != nil {
 			logger.Error(ctx, "Failed to cleanup coordinator client", tag.Error(err))
 		}
-		e.coordinatorCli = nil
 	}
 }

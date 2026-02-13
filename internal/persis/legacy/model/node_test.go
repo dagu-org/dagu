@@ -350,7 +350,7 @@ func TestNodeWithAllStatuses(t *testing.T) {
 
 func TestNewNodesFromRuntimePreservesOrder(t *testing.T) {
 	var nodeDataList []runtime.NodeData
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		nodeDataList = append(nodeDataList, runtime.NodeData{
 			Step: core.Step{
 				Name: string(rune('A' + i)),
@@ -364,7 +364,7 @@ func TestNewNodesFromRuntimePreservesOrder(t *testing.T) {
 	nodes := model.NewNodesFromRuntime(nodeDataList)
 
 	assert.Len(t, nodes, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		assert.Equal(t, string(rune('A'+i)), nodes[i].Step.Name)
 	}
 }

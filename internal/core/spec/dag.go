@@ -4,13 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec/types"
 	"github.com/go-viper/mapstructure/v2"
@@ -44,6 +47,11 @@ type dag struct {
 	// SkipIfSuccessful is the flag to skip the DAG on schedule when it is
 	// executed manually before the schedule.
 	SkipIfSuccessful bool
+	// CatchupWindow is the lookback horizon for missed intervals (e.g. "6h", "2d12h").
+	// If set, enables catch-up on scheduler restart. If omitted, no catch-up.
+	CatchupWindow string
+	// OverlapPolicy controls how multiple catch-up runs are handled: "skip" or "all".
+	OverlapPolicy string
 	// LogDir is the directory where the logs are stored.
 	LogDir string
 	// LogOutput specifies how stdout and stderr are handled in log files.
@@ -95,7 +103,8 @@ type dag struct {
 	// OTel is the OpenTelemetry configuration.
 	OTel any
 	// WorkerSelector specifies required worker labels for execution.
-	WorkerSelector map[string]string
+	// Can be a map of label key-value pairs or the string "local" to force local execution.
+	WorkerSelector any
 	// Container is the container definition for the DAG.
 	// Can be a string (existing container name to exec into) or an object (container configuration).
 	Container any
@@ -388,7 +397,7 @@ var metadataTransformers = []transform{
 	{"params", newTransformer("Params", buildParams)},
 	{"defaultParams", newTransformer("DefaultParams", buildDefaultParams)},
 	{"paramsJSON", newTransformer("ParamsJSON", buildParamsJSON)},
-	{"workerSelector", newTransformer("WorkerSelector", buildWorkerSelector)},
+	{"workerSelector", &workerSelectorTransformer{}},
 	{"timeout", newTransformer("Timeout", buildTimeout)},
 	{"delay", newTransformer("Delay", buildDelay)},
 	{"restartWait", newTransformer("RestartWait", buildRestartWait)},
@@ -397,6 +406,8 @@ var metadataTransformers = []transform{
 	{"queue", newTransformer("Queue", buildQueue)},
 	{"maxOutputSize", newTransformer("MaxOutputSize", buildMaxOutputSize)},
 	{"skipIfSuccessful", newTransformer("SkipIfSuccessful", buildSkipIfSuccessful)},
+	{"catchupWindow", newTransformer("CatchupWindow", buildCatchupWindow)},
+	{"overlapPolicy", newTransformer("OverlapPolicy", buildOverlapPolicy)},
 }
 
 // fullTransformers are only run when building the full DAG (not metadata-only)
@@ -468,17 +479,15 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 
 	// Initialize shared envScope state for thread-safe env var handling.
 	// Start with OS environment as base layer.
-	baseScope := cmdutil.NewEnvScope(nil, true)
+	baseScope := eval.NewEnvScope(nil, true)
 
 	// Pre-populate with build env from options (for retry with dotenv).
 	// This allows YAML to reference env vars that were loaded from .env files
 	// before the rebuild.
 	buildEnv := make(map[string]string, len(ctx.opts.BuildEnv))
-	for k, v := range ctx.opts.BuildEnv {
-		buildEnv[k] = v
-	}
+	maps.Copy(buildEnv, ctx.opts.BuildEnv)
 	if len(buildEnv) > 0 {
-		baseScope = baseScope.WithEntries(buildEnv, cmdutil.EnvSourceDotEnv)
+		baseScope = baseScope.WithEntries(buildEnv, eval.EnvSourceDotEnv)
 	}
 
 	ctx.envScope = &envScopeState{
@@ -640,6 +649,17 @@ func buildSkipIfSuccessful(_ BuildContext, d *dag) (bool, error) {
 	return d.SkipIfSuccessful, nil
 }
 
+func buildCatchupWindow(_ BuildContext, d *dag) (time.Duration, error) {
+	if d.CatchupWindow == "" {
+		return 0, nil
+	}
+	return core.ParseDuration(d.CatchupWindow)
+}
+
+func buildOverlapPolicy(_ BuildContext, d *dag) (core.OverlapPolicy, error) {
+	return core.ParseOverlapPolicy(d.OverlapPolicy)
+}
+
 func buildLogDir(_ BuildContext, d *dag) (string, error) {
 	return d.LogDir, nil
 }
@@ -697,10 +717,8 @@ func buildEnvs(ctx BuildContext, d *dag) ([]string, error) {
 	// Add vars to the shared envScope state so subsequent transformers can use it.
 	// This replaces the old pattern of using os.Setenv which caused race conditions.
 	if ctx.envScope != nil && len(vars) > 0 {
-		ctx.envScope.scope = ctx.envScope.scope.WithEntries(vars, cmdutil.EnvSourceDAGEnv)
-		for k, v := range vars {
-			ctx.envScope.buildEnv[k] = v
-		}
+		ctx.envScope.scope = ctx.envScope.scope.WithEntries(vars, eval.EnvSourceDAGEnv)
+		maps.Copy(ctx.envScope.buildEnv, vars)
 	}
 
 	var envs []string
@@ -884,16 +902,82 @@ func parseParamsInternal(ctx BuildContext, d *dag) (*paramsResult, error) {
 	}, nil
 }
 
-func buildWorkerSelector(_ BuildContext, d *dag) (map[string]string, error) {
-	if len(d.WorkerSelector) == 0 {
-		return nil, nil
+// workerSelectorTransformer is a custom transformer that sets both WorkerSelector and ForceLocal fields.
+type workerSelectorTransformer struct{}
+
+func (t *workerSelectorTransformer) Transform(ctx BuildContext, in *dag, out reflect.Value) error {
+	ws, forceLocal, err := buildWorkerSelector(ctx, in)
+	if err != nil {
+		return err
 	}
 
-	ret := make(map[string]string)
-	for key, val := range d.WorkerSelector {
-		ret[strings.TrimSpace(key)] = strings.TrimSpace(val)
+	if ws != nil {
+		wsField := out.FieldByName("WorkerSelector")
+		if wsField.IsValid() && wsField.CanSet() {
+			wsField.Set(reflect.ValueOf(ws))
+		}
 	}
-	return ret, nil
+
+	if forceLocal {
+		flField := out.FieldByName("ForceLocal")
+		if flField.IsValid() && flField.CanSet() {
+			flField.SetBool(true)
+		}
+	}
+
+	return nil
+}
+
+func buildWorkerSelector(_ BuildContext, d *dag) (map[string]string, bool, error) {
+	if d.WorkerSelector == nil {
+		return nil, false, nil
+	}
+
+	switch v := d.WorkerSelector.(type) {
+	case string:
+		trimmed := strings.TrimSpace(v)
+		if strings.EqualFold(trimmed, "local") {
+			return nil, true, nil
+		}
+		return nil, false, fmt.Errorf("unsupported workerSelector string value %q; the only allowed string value is \"local\"", trimmed)
+
+	case map[string]string:
+		if len(v) == 0 {
+			return nil, false, nil
+		}
+		ret := make(map[string]string)
+		for key, val := range v {
+			ret[strings.TrimSpace(key)] = strings.TrimSpace(val)
+		}
+		return ret, false, nil
+
+	case map[string]any:
+		if len(v) == 0 {
+			return nil, false, nil
+		}
+		ret := make(map[string]string)
+		for key, val := range v {
+			ret[strings.TrimSpace(key)] = strings.TrimSpace(fmt.Sprint(val))
+		}
+		return ret, false, nil
+
+	case map[any]any:
+		if len(v) == 0 {
+			return nil, false, nil
+		}
+		ret := make(map[string]string)
+		for key, val := range v {
+			strKey, ok := key.(string)
+			if !ok {
+				return nil, false, fmt.Errorf("workerSelector keys must be strings, got %T", key)
+			}
+			ret[strings.TrimSpace(strKey)] = strings.TrimSpace(fmt.Sprint(val))
+		}
+		return ret, false, nil
+
+	default:
+		return nil, false, fmt.Errorf("workerSelector must be a map or \"local\", got %T", d.WorkerSelector)
+	}
 }
 
 // shellResult holds both shell and args for internal use
@@ -956,10 +1040,9 @@ func buildWorkingDir(ctx BuildContext, d *dag) (string, error) {
 	if ctx.opts.DefaultWorkingDir != "" {
 		return ctx.opts.DefaultWorkingDir, nil
 	}
-	if ctx.file != "" {
-		return filepath.Dir(ctx.file), nil
-	}
-	return getDefaultWorkingDir()
+	// Return empty to allow inheritance from base config.
+	// Default is applied post-merge in loadDAG.
+	return "", nil
 }
 
 // resolveWorkingDirPath resolves the working directory path at build time.
@@ -1652,6 +1735,10 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 					return nil, err
 				}
 
+				if err := validateNoRouterForChainType(result, st); err != nil {
+					return nil, err
+				}
+
 				injectChainDependencies(result, prevSteps, st)
 				builtSteps = append(builtSteps, st)
 				prevSteps = []*core.Step{st}
@@ -1668,6 +1755,10 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 						}
 
 						if err := validateNoDependsForChainType(result, st); err != nil {
+							return nil, err
+						}
+
+						if err := validateNoRouterForChainType(result, st); err != nil {
 							return nil, err
 						}
 
@@ -1689,6 +1780,10 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 		var steps []core.Step
 		for _, st := range builtSteps {
 			steps = append(steps, *st)
+		}
+		// Transform router steps: inject preconditions into targets
+		if err := transformRouterSteps(steps); err != nil {
+			return nil, err
 		}
 		return steps, nil
 
@@ -1716,7 +1811,15 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 				return nil, err
 			}
 
+			if err := validateNoRouterForChainType(result, builtStep); err != nil {
+				return nil, err
+			}
+
 			steps = append(steps, *builtStep)
+		}
+		// Transform router steps: inject preconditions into targets
+		if err := transformRouterSteps(steps); err != nil {
+			return nil, err
 		}
 		return steps, nil
 
@@ -1761,5 +1864,78 @@ func validateNoDependsForChainType(dag *core.DAG, step *core.Step) error {
 		return core.NewValidationError("depends", step.Depends,
 			fmt.Errorf("step '%s': %w", step.Name, core.ErrDependsNotAllowedInChainType))
 	}
+	return nil
+}
+
+// validateNoRouterForChainType returns an error if a router step is used in chain mode
+func validateNoRouterForChainType(dag *core.DAG, step *core.Step) error {
+	if dag.Type != core.TypeChain {
+		return nil
+	}
+	if step.Router != nil {
+		return core.NewValidationError("type", step.Name,
+			fmt.Errorf("step '%s': router steps require type 'graph'; change DAG type from 'chain' to 'graph' to use router steps", step.Name))
+	}
+	return nil
+}
+
+// transformRouterSteps processes router-type steps and injects preconditions
+// into their target steps. It modifies the steps slice in place.
+func transformRouterSteps(steps []core.Step) error {
+	// Build step index for lookup (using pointers to modify in place)
+	stepIndex := make(map[string]*core.Step)
+	for i := range steps {
+		stepIndex[steps[i].Name] = &steps[i]
+	}
+
+	for i := range steps {
+		if steps[i].Router == nil {
+			continue
+		}
+
+		router := steps[i].Router
+		routerName := steps[i].Name
+
+		// Track targets to detect duplicates across routes
+		seenTargets := make(map[string]string) // target -> first pattern that used it
+
+		// For each route, inject precondition into target steps
+		for _, route := range router.Routes {
+			for _, targetName := range route.Targets {
+				// Check for duplicate target
+				if firstPattern, exists := seenTargets[targetName]; exists {
+					return core.NewValidationError("routes", targetName,
+						fmt.Errorf("router %q: step %q is targeted by multiple routes (%q and %q); each step can only be a target of one route",
+							routerName, targetName, firstPattern, route.Pattern))
+				}
+				seenTargets[targetName] = route.Pattern
+
+				target, ok := stepIndex[targetName]
+				if !ok {
+					return core.NewValidationError("routes", targetName,
+						fmt.Errorf("router %q references non-existent step %q", routerName, targetName))
+				}
+
+				// Inject precondition: check if value matches pattern
+				condition := &core.Condition{
+					Condition: router.Value,
+					Expected:  route.Pattern,
+				}
+				target.Preconditions = append(target.Preconditions, condition)
+
+				// Add router as dependency if not already present
+				if !slices.Contains(target.Depends, routerName) {
+					target.Depends = append(target.Depends, routerName)
+				}
+
+				// Enable continueOn.skipped for proper flow
+				target.ContinueOn.Skipped = true
+			}
+		}
+
+		// Router itself allows downstream to continue
+		steps[i].ContinueOn.Skipped = true
+	}
+
 	return nil
 }

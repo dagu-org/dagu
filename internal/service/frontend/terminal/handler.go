@@ -26,7 +26,7 @@ func NewHandler(authSvc *authservice.Service, auditSvc *audit.Service, shell str
 	}
 }
 
-// ServeHTTP handles WebSocket upgrade and terminal session.
+// ServeHTTP handles WebSocket upgrade and terminal connection.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -62,9 +62,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create and run session
-	session := NewSession(user, h.shell, conn, ipAddress)
-	_ = session.Run(ctx, h.auditService)
+	// Create and run connection
+	tc := NewConnection(user, h.shell, conn, ipAddress)
+	_ = tc.Run(ctx, h.auditService)
 }
 
 // GetDefaultShell returns the default shell for the current system.

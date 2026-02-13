@@ -1,5 +1,5 @@
 import React from 'react';
-import { components, NodeStatus } from '../../../../api/v2/schema';
+import { components, NodeStatus } from '../../../../api/v1/schema';
 import {
   Tooltip,
   TooltipContent,

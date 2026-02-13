@@ -521,7 +521,7 @@ func TestStore_Concurrent(t *testing.T) {
 	errs := make(chan error, n*2)
 
 	// Concurrent creates
-	for i := 0; i < n; i++ {
+	for i := range n {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -534,14 +534,12 @@ func TestStore_Concurrent(t *testing.T) {
 	wg.Wait()
 
 	// Concurrent reads
-	for i := 0; i < n; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range n {
+		wg.Go(func() {
 			if _, err := store.List(ctx); err != nil {
 				errs <- err
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	close(errs)
@@ -565,10 +563,8 @@ func TestStore_ConcurrentSameDAG(t *testing.T) {
 	var successCount, dupCount int32
 	var mu sync.Mutex
 
-	for i := 0; i < n; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range n {
+		wg.Go(func() {
 			wh := newWebhook(t, "same-dag")
 			err := store.Create(ctx, wh)
 			mu.Lock()
@@ -579,7 +575,7 @@ func TestStore_ConcurrentSameDAG(t *testing.T) {
 				dupCount++
 			}
 			mu.Unlock()
-		}()
+		})
 	}
 	wg.Wait()
 

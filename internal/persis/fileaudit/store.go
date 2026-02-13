@@ -33,12 +33,15 @@ const (
 type Store struct {
 	baseDir string
 	mu      sync.Mutex
+	cleaner *cleaner
 }
 
 var _ audit.Store = (*Store)(nil)
 
 // New creates a new file-based audit store.
-func New(baseDir string) (*Store, error) {
+// If retentionDays > 0, a background cleaner goroutine is started to purge
+// expired audit log files. Use Close() to stop the cleaner on shutdown.
+func New(baseDir string, retentionDays int) (*Store, error) {
 	if baseDir == "" {
 		return nil, errors.New("fileaudit: baseDir cannot be empty")
 	}
@@ -48,7 +51,21 @@ func New(baseDir string) (*Store, error) {
 		return nil, fmt.Errorf("fileaudit: failed to create directory %s: %w", baseDir, err)
 	}
 
-	return &Store{baseDir: baseDir}, nil
+	s := &Store{baseDir: baseDir}
+
+	if retentionDays > 0 {
+		s.cleaner = newCleaner(baseDir, retentionDays, s.Append)
+	}
+
+	return s, nil
+}
+
+// Close stops the background cleaner if running.
+func (s *Store) Close() error {
+	if s.cleaner != nil {
+		s.cleaner.stop()
+	}
+	return nil
 }
 
 // auditFilePath returns the file path for a given date.
@@ -146,10 +163,7 @@ func (s *Store) Query(_ context.Context, filter audit.QueryFilter) (*audit.Query
 	if limit <= 0 {
 		limit = 100 // Default limit
 	}
-	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(filter.Offset, 0)
 
 	// Apply offset
 	if offset >= len(allEntries) {

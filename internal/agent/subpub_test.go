@@ -18,8 +18,7 @@ func TestSubPub_Subscribe(t *testing.T) {
 		t.Parallel()
 
 		sp := NewSubPub[string]()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		next := sp.Subscribe(ctx, 0)
 
@@ -37,8 +36,7 @@ func TestSubPub_Subscribe(t *testing.T) {
 		t.Parallel()
 
 		sp := NewSubPub[string]()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		next1 := sp.Subscribe(ctx, 0)
 		next2 := sp.Subscribe(ctx, 0)
@@ -109,8 +107,7 @@ func TestSubPub_Broadcast(t *testing.T) {
 		t.Parallel()
 
 		sp := NewSubPub[string]()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		next1 := sp.Subscribe(ctx, 0)
 		next2 := sp.Subscribe(ctx, 100) // High seqID
@@ -193,8 +190,7 @@ func TestSubPub_SlowSubscriberDisconnect(t *testing.T) {
 		t.Parallel()
 
 		sp := NewSubPub[int]()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		next := sp.Subscribe(ctx, 0)
 
@@ -235,7 +231,7 @@ func TestSubPub_ConcurrentAccess(t *testing.T) {
 		var wg sync.WaitGroup
 		receivedCounts := make([]atomic.Int32, numSubscribers)
 
-		for i := 0; i < numSubscribers; i++ {
+		for i := range numSubscribers {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
@@ -253,7 +249,7 @@ func TestSubPub_ConcurrentAccess(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 
 		var publishWg sync.WaitGroup
-		for i := 0; i < numMessages; i++ {
+		for i := range numMessages {
 			publishWg.Add(1)
 			go func(seq int) {
 				defer publishWg.Done()
@@ -282,32 +278,26 @@ func TestSubPub_ConcurrentAccess(t *testing.T) {
 
 		var wg sync.WaitGroup
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := 0; i < 50; i++ {
+		wg.Go(func() {
+			for i := range 50 {
 				sp.Publish(int64(i+1), "publish")
 			}
-		}()
+		})
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := 0; i < 50; i++ {
+		wg.Go(func() {
+			for range 50 {
 				sp.Broadcast("broadcast")
 			}
-		}()
+		})
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for {
 				_, ok := next()
 				if !ok {
 					return
 				}
 			}
-		}()
+		})
 
 		wg.Wait()
 	})

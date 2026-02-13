@@ -252,6 +252,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 
 	l.loadCacheConfig(&cfg, def)
+	l.loadExecutionModeConfig(&cfg, def)
 
 	if err := l.LoadLegacyFields(&cfg, def); err != nil {
 		return nil, err
@@ -324,7 +325,7 @@ func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) error {
 		{"UsersDir", &cfg.Paths.UsersDir, def.Paths.UsersDir},
 		{"APIKeysDir", &cfg.Paths.APIKeysDir, def.Paths.APIKeysDir},
 		{"WebhooksDir", &cfg.Paths.WebhooksDir, def.Paths.WebhooksDir},
-		{"ConversationsDir", &cfg.Paths.ConversationsDir, def.Paths.ConversationsDir},
+		{"SessionsDir", &cfg.Paths.SessionsDir, def.Paths.SessionsDir},
 	}
 
 	for _, m := range pathMappings {
@@ -563,6 +564,8 @@ func (l *ConfigLoader) loadServerDefaults(cfg *Config, def Definition) {
 	if def.Audit != nil && def.Audit.Enabled != nil {
 		cfg.Server.Audit.Enabled = *def.Audit.Enabled
 	}
+
+	cfg.Server.Audit.RetentionDays = l.v.GetInt("audit.retentionDays")
 }
 
 func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
@@ -669,7 +672,7 @@ func setDefaultIfZero(target *int, defaultValue int) {
 }
 
 // parseCoordinatorAddresses parses coordinator addresses from comma-separated strings or string slices.
-func parseCoordinatorAddresses(input interface{}) ([]string, []string) {
+func parseCoordinatorAddresses(input any) ([]string, []string) {
 	var addresses, warnings []string
 
 	validateAndAdd := func(addr string) {
@@ -701,11 +704,11 @@ func parseCoordinatorAddresses(input interface{}) ([]string, []string) {
 	switch v := input.(type) {
 	case string:
 		if v != "" {
-			for _, part := range strings.Split(v, ",") {
+			for part := range strings.SplitSeq(v, ",") {
 				validateAndAdd(part)
 			}
 		}
-	case []interface{}:
+	case []any:
 		for _, item := range v {
 			if addr, ok := item.(string); ok {
 				validateAndAdd(addr)
@@ -908,6 +911,14 @@ func setDefaultIfNotPositive(target *int, defaultValue int) {
 	}
 }
 
+func (l *ConfigLoader) loadExecutionModeConfig(cfg *Config, _ Definition) {
+	mode := ExecutionMode(l.v.GetString("defaultExecutionMode"))
+	if mode == "" {
+		mode = ExecutionModeLocal
+	}
+	cfg.DefaultExecMode = mode
+}
+
 func (l *ConfigLoader) loadCacheConfig(cfg *Config, def Definition) {
 	cfg.Cache = CacheModeNormal
 	if def.Cache == nil {
@@ -942,8 +953,8 @@ func (l *ConfigLoader) finalizePaths(cfg *Config) {
 		}
 	}
 
-	if cfg.Paths.ConversationsDir == "" {
-		cfg.Paths.ConversationsDir = filepath.Join(cfg.Paths.DataDir, "agent", "conversations")
+	if cfg.Paths.SessionsDir == "" {
+		cfg.Paths.SessionsDir = filepath.Join(cfg.Paths.DataDir, "agent", "sessions")
 	}
 
 	if cfg.Paths.Executable == "" {
@@ -1094,7 +1105,6 @@ func (l *ConfigLoader) setupViper(xdgConfig XDGConfig, homeDir, configFile, appH
 
 func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	// Paths
-	l.v.SetDefault("workDir", "")
 	l.v.SetDefault("skipExamples", false)
 	l.v.SetDefault("paths.dagsDir", paths.DAGsDir)
 	l.v.SetDefault("paths.suspendFlagsDir", paths.SuspendFlagsDir)
@@ -1108,7 +1118,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("port", 8080)
 	l.v.SetDefault("debug", false)
 	l.v.SetDefault("basePath", "")
-	l.v.SetDefault("apiBasePath", "/api/v2")
+	l.v.SetDefault("apiBasePath", "/api/v1")
 	l.v.SetDefault("latestStatusToday", false)
 	l.v.SetDefault("metrics", "private")
 	l.v.SetDefault("cache", "normal")
@@ -1133,6 +1143,9 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("ui.dags.sortField", "name")
 	l.v.SetDefault("ui.dags.sortOrder", "asc")
 
+	// Execution
+	l.v.SetDefault("defaultExecutionMode", string(ExecutionModeLocal))
+
 	// Queues
 	l.v.SetDefault("queues.enabled", true)
 
@@ -1142,6 +1155,9 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 
 	// Peer
 	l.v.SetDefault("peer.insecure", true)
+
+	// Audit
+	l.v.SetDefault("audit.retentionDays", 7)
 
 	// Monitoring
 	l.v.SetDefault("monitoring.retention", "24h")
@@ -1170,9 +1186,9 @@ var envBindings = []envBinding{
 
 	{key: "terminal.enabled", env: "TERMINAL_ENABLED"},
 	{key: "audit.enabled", env: "AUDIT_ENABLED"},
+	{key: "audit.retentionDays", env: "AUDIT_RETENTION_DAYS"},
 
 	// Core
-	{key: "workDir", env: "WORK_DIR", isPath: true},
 	{key: "defaultShell", env: "DEFAULT_SHELL"},
 	{key: "skipExamples", env: "SKIP_EXAMPLES"},
 
@@ -1245,6 +1261,9 @@ var envBindings = []envBinding{
 	{key: "paths.queueDir", env: "QUEUE_DIR", isPath: true},
 	{key: "paths.serviceRegistryDir", env: "SERVICE_REGISTRY_DIR", isPath: true},
 	{key: "paths.usersDir", env: "USERS_DIR", isPath: true},
+
+	// Execution
+	{key: "defaultExecutionMode", env: "DEFAULT_EXECUTION_MODE"},
 
 	// Queues
 	{key: "queues.enabled", env: "QUEUE_ENABLED"},
@@ -1341,7 +1360,7 @@ func (l *ConfigLoader) configureViper(configDir, configFile string) {
 }
 
 // parseLabels parses labels from comma-separated strings or map types.
-func parseLabels(input interface{}) map[string]string {
+func parseLabels(input any) map[string]string {
 	labels := make(map[string]string)
 
 	switch v := input.(type) {
@@ -1349,7 +1368,7 @@ func parseLabels(input interface{}) map[string]string {
 		if v == "" {
 			return labels
 		}
-		for _, pair := range strings.Split(v, ",") {
+		for pair := range strings.SplitSeq(v, ",") {
 			pair = strings.TrimSpace(pair)
 			if pair == "" {
 				continue
@@ -1362,13 +1381,13 @@ func parseLabels(input interface{}) map[string]string {
 				}
 			}
 		}
-	case map[string]interface{}:
+	case map[string]any:
 		for key, val := range v {
 			if strVal, ok := val.(string); ok {
 				labels[key] = strVal
 			}
 		}
-	case map[interface{}]interface{}:
+	case map[any]any:
 		for key, val := range v {
 			if keyStr, ok := key.(string); ok {
 				if valStr, ok := val.(string); ok {
@@ -1382,19 +1401,19 @@ func parseLabels(input interface{}) map[string]string {
 }
 
 // parseStringList parses comma-separated strings or string slices, filtering empty entries.
-func parseStringList(input interface{}) []string {
+func parseStringList(input any) []string {
 	var result []string
 
 	switch v := input.(type) {
 	case string:
 		if v != "" {
-			for _, s := range strings.Split(v, ",") {
+			for s := range strings.SplitSeq(v, ",") {
 				if trimmed := strings.TrimSpace(s); trimmed != "" {
 					result = append(result, trimmed)
 				}
 			}
 		}
-	case []interface{}:
+	case []any:
 		for _, item := range v {
 			if s, ok := item.(string); ok {
 				if trimmed := strings.TrimSpace(s); trimmed != "" {

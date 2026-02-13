@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { components } from '../../../api/v2/schema';
+import { components } from '../../../api/v1/schema';
 import {
   Card,
   CardContent,

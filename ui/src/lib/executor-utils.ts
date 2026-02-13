@@ -3,7 +3,7 @@
  *
  * @module lib/executor-utils
  */
-import type { components } from '@/api/v2/schema';
+import type { components } from '@/api/v1/schema';
 
 /**
  * Get displayable command from executor config when step.commands is empty.
@@ -48,6 +48,8 @@ export function getExecutorCommand(
       return config.expression ? `jq: ${config.expression}` : null;
     case 'docker':
       return config.image ? `docker: ${config.image}` : null;
+    case 'router':
+      return config.value ? `route: ${config.value}` : 'router';
     default:
       return null;
   }

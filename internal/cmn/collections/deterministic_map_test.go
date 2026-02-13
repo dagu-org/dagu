@@ -63,7 +63,7 @@ func TestDeterministicMap_MarshalJSON(t *testing.T) {
 			assert.Equal(t, tt.expected, string(result))
 
 			// Test determinism - marshal multiple times
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				result2, err := json.Marshal(tt.input)
 				require.NoError(t, err)
 				assert.Equal(t, string(result), string(result2), "marshaling should be deterministic")
@@ -406,7 +406,7 @@ func TestDeterministicMap_RealWorldSubDAGParams(t *testing.T) {
 			assert.Equal(t, tt.expected, string(data))
 
 			// Verify multiple marshals produce same result
-			for i := 0; i < 5; i++ {
+			for range 5 {
 				data2, err := json.Marshal(item.Params)
 				require.NoError(t, err)
 				assert.Equal(t, string(data), string(data2), "marshal should be deterministic")

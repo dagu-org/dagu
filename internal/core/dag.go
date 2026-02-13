@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
@@ -98,6 +98,12 @@ type DAG struct {
 	// SkipIfSuccessful indicates whether to skip the DAG if it was successful previously.
 	// E.g., when the DAG has already been executed manually before the scheduled time.
 	SkipIfSuccessful bool `json:"skipIfSuccessful,omitempty"`
+	// CatchupWindow is the lookback horizon for missed cron intervals.
+	// If set, enables catch-up on scheduler restart. If omitted, no catch-up.
+	CatchupWindow time.Duration `json:"catchupWindow,omitempty"`
+	// OverlapPolicy controls behavior when a new run is triggered while one is active.
+	// Defaults to "skip". See OverlapPolicy constants for options.
+	OverlapPolicy OverlapPolicy `json:"overlapPolicy,omitempty"`
 	// Env contains a list of environment variables to be set before running the DAG.
 	// Note: This field is evaluated at build time and may contain secrets.
 	// It is excluded from JSON serialization to prevent secret leakage.
@@ -158,6 +164,9 @@ type DAG struct {
 	// WorkerSelector defines labels required for worker selection in distributed execution.
 	// If specified, the DAG will only run on workers with matching tag.
 	WorkerSelector map[string]string `json:"workerSelector,omitempty"`
+	// ForceLocal forces the DAG to run locally even when the server default is distributed.
+	// Set by workerSelector: local in the DAG spec.
+	ForceLocal bool `json:"forceLocal,omitempty"`
 	// MaxOutputSize is the maximum size of step output to capture in bytes.
 	// Default is 1MB. Output exceeding this will return an error.
 	MaxOutputSize int `json:"maxOutputSize,omitempty"`
@@ -268,8 +277,7 @@ func (d *DAG) GetName() string {
 	return strings.TrimSuffix(filename, filepath.Ext(filename))
 }
 
-// String implements the Stringer interface.
-// String returns a formatted string representation of the DAG
+// String returns a formatted string representation of the DAG.
 func (d *DAG) String() string {
 	var sb strings.Builder
 
@@ -378,7 +386,7 @@ func (d *DAG) loadSingleDotEnvFile(ctx context.Context, resolver *fileutil.FileR
 		return
 	}
 
-	evaluatedPath, err := cmdutil.EvalString(ctx, filePath)
+	evaluatedPath, err := eval.String(ctx, filePath, eval.WithOSExpansion())
 	if err != nil {
 		logger.Warn(ctx, "Failed to evaluate filepath", tag.File(filePath), tag.Error(err))
 		return

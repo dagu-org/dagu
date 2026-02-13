@@ -2,7 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { useConfig } from '@/contexts/ConfigContext';
 import { TOKEN_KEY } from '@/contexts/AuthContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { components, UserRole } from '@/api/v2/schema';
+import { components, UserRole } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

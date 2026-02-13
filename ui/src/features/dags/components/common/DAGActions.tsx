@@ -19,7 +19,7 @@ import ActionButton from '@/ui/ActionButton';
 import StatusChip from '@/ui/StatusChip';
 import { AlertTriangle, Play, RefreshCw, Square } from 'lucide-react'; // Import lucide icons
 import React from 'react';
-import { components } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';

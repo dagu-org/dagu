@@ -114,7 +114,7 @@ func TestQueue_OrderingHighFrequency(t *testing.T) {
 
 	// Enqueue items very quickly
 	numItems := 10
-	for i := 0; i < numItems; i++ {
+	for i := range numItems {
 		err := queue.Enqueue(th.Context, exec.QueuePriorityLow, exec.DAGRunRef{
 			Name: "test-ordering",
 			ID:   fmt.Sprintf("run-%d", i),
@@ -125,7 +125,7 @@ func TestQueue_OrderingHighFrequency(t *testing.T) {
 	// Dequeue and verify order
 	// Note: After dequeue, the file is removed, so we can't call Data() anymore.
 	// We verify using the ID() method which contains the run-id in the filename.
-	for i := 0; i < numItems; i++ {
+	for i := range numItems {
 		item, err := queue.Dequeue(th.Context)
 		require.NoError(t, err)
 		require.Contains(t, item.ID(), fmt.Sprintf("run-%d", i), "expected items to be dequeued in order")

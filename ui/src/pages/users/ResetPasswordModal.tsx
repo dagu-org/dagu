@@ -1,7 +1,7 @@
 import { useState, useContext } from 'react';
 import { useConfig } from '@/contexts/ConfigContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { components } from '@/api/v2/schema';
+import { components } from '@/api/v1/schema';
 import {
   Dialog,
   DialogContent,

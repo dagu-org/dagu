@@ -76,8 +76,8 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 	}
 
 	// Process public path prefixes - ensure they have leading slash but preserve trailing slash
-	// The trailing slash is important for prefixes: "/api/v2/webhooks/" should only match
-	// paths like "/api/v2/webhooks/foo", not "/api/v2/webhooks" itself
+	// The trailing slash is important for prefixes: "/api/v1/webhooks/" should only match
+	// paths like "/api/v1/webhooks/foo", not "/api/v1/webhooks" itself
 	publicPrefixes := make([]string, 0, len(opts.PublicPathPrefixes))
 	for _, p := range opts.PublicPathPrefixes {
 		if p == "" {
@@ -268,8 +268,8 @@ func GetClientIP(r *http.Request) string {
 	// Check X-Forwarded-For header first (for proxies)
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		// Take the first IP in the chain
-		if idx := strings.Index(xff, ","); idx != -1 {
-			return strings.TrimSpace(xff[:idx])
+		if before, _, ok := strings.Cut(xff, ","); ok {
+			return strings.TrimSpace(before)
 		}
 		return strings.TrimSpace(xff)
 	}

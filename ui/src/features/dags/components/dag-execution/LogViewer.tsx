@@ -1,5 +1,5 @@
 import React from 'react';
-import { components, Stream } from '../../../../api/v2/schema';
+import { components, Stream } from '../../../../api/v1/schema';
 import ExecutionLog from './ExecutionLog';
 import LogSideModal from './LogSideModal';
 import StepLog from './StepLog';

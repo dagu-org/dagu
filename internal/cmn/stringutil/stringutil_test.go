@@ -725,7 +725,7 @@ func TestRandomString(t *testing.T) {
 		const stringLength = 10
 		strings := make(map[string]bool)
 
-		for i := 0; i < numStrings; i++ {
+		for range numStrings {
 			s := stringutil.RandomString(stringLength)
 			strings[s] = true
 		}

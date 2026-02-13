@@ -252,7 +252,7 @@ func TestShellQuoteArgs(t *testing.T) {
 func TestShellQuote_RoundTrip(t *testing.T) {
 	// Exhaustive list of characters to test
 	chars := ""
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		chars += string(rune(i))
 	}
 

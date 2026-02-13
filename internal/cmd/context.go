@@ -15,8 +15,8 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
@@ -29,6 +29,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
 	"github.com/dagu-org/dagu/internal/persis/filequeue"
 	"github.com/dagu-org/dagu/internal/persis/fileserviceregistry"
+	"github.com/dagu-org/dagu/internal/persis/filewatermark"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
@@ -335,9 +336,10 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	}
 
 	coordinatorCli := c.NewCoordinatorClient()
-	de := scheduler.NewDAGExecutor(coordinatorCli, runtime.NewSubCmdBuilder(c.Config))
-	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable)
-	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli)
+	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr)
+	watermarkDir := filepath.Join(c.Config.Paths.DataDir, "scheduler")
+	wmStore := filewatermark.New(watermarkDir)
+	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli, wmStore)
 }
 
 // StringParam retrieves a string parameter from the command line flags.
@@ -411,13 +413,13 @@ func (c *Context) OpenLogFile(
 // GenLogFileName generates a log file name based on the DAG and dag-run ID.
 func (c *Context) GenLogFileName(dag *core.DAG, dagRunID string) (string, error) {
 	// Read the global configuration for log directory.
-	baseLogDir, err := cmdutil.EvalString(c, c.Config.Paths.LogDir)
+	baseLogDir, err := eval.String(c, c.Config.Paths.LogDir, eval.WithOSExpansion())
 	if err != nil {
 		return "", fmt.Errorf("failed to expand log directory: %w", err)
 	}
 
 	// Read the log directory configuration from the DAG.
-	dagLogDir, err := cmdutil.EvalString(c, dag.LogDir)
+	dagLogDir, err := eval.String(c, dag.LogDir, eval.WithOSExpansion())
 	if err != nil {
 		return "", fmt.Errorf("failed to expand DAG log directory: %w", err)
 	}

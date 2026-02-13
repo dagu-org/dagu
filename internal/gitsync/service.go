@@ -379,8 +379,7 @@ func (s *serviceImpl) refreshLocalHashes(state *State) bool {
 		// Check if status should change
 		if dagState.Status == StatusSynced && currentHash != dagState.LastSyncedHash {
 			dagState.Status = StatusModified
-			now := time.Now()
-			dagState.ModifiedAt = &now
+			dagState.ModifiedAt = new(time.Now())
 			changed = true
 		} else if dagState.Status == StatusModified && currentHash == dagState.LastSyncedHash {
 			// User reverted changes manually - back to synced
@@ -623,8 +622,7 @@ func (s *serviceImpl) GetStatus(_ context.Context) (*OverallStatus, error) {
 	state, err := s.stateManager.GetState()
 	if err != nil {
 		status.Summary = SummaryError
-		errMsg := err.Error()
-		status.LastError = &errMsg
+		status.LastError = new(err.Error())
 		return status, nil
 	}
 
@@ -864,8 +862,7 @@ func (s *serviceImpl) runAutoSync(ctx context.Context) {
 
 func (s *serviceImpl) updateLastSyncError(err error) {
 	state, _ := s.stateManager.GetState()
-	errMsg := err.Error()
-	state.LastError = &errMsg
+	state.LastError = new(err.Error())
 	state.LastSyncStatus = "error"
 	_ = s.stateManager.Save(state)
 }
@@ -991,8 +988,7 @@ func (s *serviceImpl) updateSuccessState(commitHash string) {
 
 // updateSuccessStateWithCommit updates and saves the state after a successful sync.
 func (s *serviceImpl) updateSuccessStateWithCommit(state *State, commitHash string) {
-	now := time.Now()
-	state.LastSyncAt = &now
+	state.LastSyncAt = new(time.Now())
 	state.LastSyncCommit = commitHash
 	state.LastSyncStatus = "success"
 	state.LastError = nil

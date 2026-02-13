@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 package cmdutil
 
@@ -79,7 +78,7 @@ func TestKillMultipleProcessGroups(t *testing.T) {
 	cmds := make(map[string]*exec.Cmd)
 
 	// Start a few sleep processes
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		cmd := exec.Command("sleep", "10")
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			Setpgid: true,

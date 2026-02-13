@@ -238,7 +238,7 @@ func TestMaskingWriter_LargeWrite(t *testing.T) {
 
 	// Generate large input with secrets scattered throughout
 	var input strings.Builder
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		input.WriteString("Line ")
 		input.WriteString(string(rune('0' + (i % 10))))
 		input.WriteString(": The secret is secret123\n")

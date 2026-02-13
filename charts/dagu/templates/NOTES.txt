@@ -5,7 +5,11 @@ Make sure your storage class supports RWX access mode (e.g., NFS, EFS, CephFS).
 
 Components deployed:
   Scheduler: {{ .Values.scheduler.replicas }} replica(s)
-  Worker: {{ .Values.worker.replicas }} replica(s)
+  Worker Pools:
+  {{- range $poolName, $pool := .Values.workerPools }}
+    - {{ $poolName }}: {{ $pool.replicas }} replica(s)
+      {{- if $pool.labels }} (labels: {{ include "dagu.workerLabels" $pool.labels }}){{- end }}
+  {{- end }}
   UI: {{ .Values.ui.replicas }} replica(s)
 
 Access the UI:

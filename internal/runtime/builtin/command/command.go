@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
@@ -86,15 +87,33 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	}
 	e.mu.Unlock()
 
-	if err := e.cmd.Wait(); err != nil {
-		e.exitCode = exitCodeFromError(err)
-		if tail := e.stderrTail.Tail(); tail != "" {
-			return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
-		}
-		return err
-	}
+	// Wait for the command to finish or the context to be cancelled.
+	// This ensures timeout is enforced even if cmd.Wait() blocks due to
+	// stuck I/O or unkillable child processes.
+	waitDone := make(chan error, 1)
+	go func() {
+		waitDone <- e.cmd.Wait()
+	}()
 
-	return nil
+	select {
+	case <-ctx.Done():
+		// Context cancelled (timeout or manual cancellation)
+		// Kill the process to ensure it doesn't hang
+		_ = e.Kill(os.Kill)
+		// Wait for cmd.Wait() to return after killing
+		<-waitDone
+		e.exitCode = 124 // Standard timeout exit code
+		return ctx.Err()
+	case err := <-waitDone:
+		if err != nil {
+			e.exitCode = exitCodeFromError(err)
+			if tail := e.stderrTail.Tail(); tail != "" {
+				return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
+			}
+			return err
+		}
+		return nil
+	}
 }
 
 func (e *commandExecutor) SetStdout(out io.Writer) {
@@ -330,13 +349,18 @@ func init() {
 		MultipleCommands: true,
 		Script:           true,
 		Shell:            true,
-		GetEvalOptions: func(ctx context.Context, step core.Step) []cmdutil.EvalOption {
+		GetEvalOptions: func(ctx context.Context, step core.Step) []eval.Option {
 			env := runtime.GetEnv(ctx)
-			if len(env.Shell(ctx)) > 0 {
+			shell := env.Shell(ctx)
+			if len(shell) > 0 && shell[0] != "direct" {
 				// Shell will handle env expansion
-				return []cmdutil.EvalOption{cmdutil.WithoutExpandEnv()}
+				return []eval.Option{
+					eval.WithoutExpandEnv(),
+					eval.WithoutDollarEscape(),
+				}
 			}
-			return nil
+			// No shell — Dagu must expand OS variables since no shell will do it.
+			return []eval.Option{eval.WithOSExpansion()}
 		},
 	}
 	executor.RegisterExecutor("", NewCommand, validateCommandStep, caps)

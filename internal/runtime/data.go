@@ -3,12 +3,14 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/collections"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
@@ -63,7 +65,7 @@ type NodeState struct {
 	// OutputVariables stores the output variables for the following steps.
 	// It only contains the local output variables.
 	OutputVariables *collections.SyncMap
-	// ChatMessages stores the chat conversation messages for message passing between steps.
+	// ChatMessages stores the chat session messages for message passing between steps.
 	ChatMessages []exec.LLMMessage
 	// ToolDefinitions stores the tool definitions that were available to the LLM during execution.
 	// This provides visibility into what tools/functions the LLM could call.
@@ -283,11 +285,11 @@ func (d *Data) SetStatus(s core.NodeStatus) {
 	d.inner.State.Status = s
 }
 
-func (d *Data) StepInfo() cmdutil.StepInfo {
+func (d *Data) StepInfo() eval.StepInfo {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	return cmdutil.StepInfo{
+	return eval.StepInfo{
 		Stdout:   d.inner.State.Stdout,
 		Stderr:   d.inner.State.Stderr,
 		ExitCode: strconv.Itoa(d.inner.State.ExitCode),
@@ -358,12 +360,7 @@ func (d *Data) MatchExitCode(exitCodes []int) bool {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	for _, code := range exitCodes {
-		if code == d.inner.State.ExitCode {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(exitCodes, d.inner.State.ExitCode)
 }
 
 func (d *Data) getVariable(key string) (stringutil.KeyValue, bool) {
@@ -498,14 +495,14 @@ func (d *Data) MarkError(err error) {
 	d.inner.State.Status = core.NodeFailed
 }
 
-// SetChatMessages sets the chat conversation messages for the node.
+// SetChatMessages sets the chat session messages for the node.
 func (d *Data) SetChatMessages(messages []exec.LLMMessage) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.inner.State.ChatMessages = messages
 }
 
-// GetChatMessages returns the chat conversation messages for the node.
+// GetChatMessages returns the chat session messages for the node.
 func (d *Data) GetChatMessages() []exec.LLMMessage {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
@@ -536,9 +533,7 @@ func (d *Data) GetApprovalInputs() map[string]string {
 	}
 
 	result := make(map[string]string, len(d.inner.State.ApprovalInputs))
-	for k, v := range d.inner.State.ApprovalInputs {
-		result[k] = v
-	}
+	maps.Copy(result, d.inner.State.ApprovalInputs)
 	return result
 }
 
@@ -553,7 +548,5 @@ func (d *Data) SetApprovalInputs(inputs map[string]string) {
 	}
 
 	d.inner.State.ApprovalInputs = make(map[string]string, len(inputs))
-	for k, v := range inputs {
-		d.inner.State.ApprovalInputs[k] = v
-	}
+	maps.Copy(d.inner.State.ApprovalInputs, inputs)
 }

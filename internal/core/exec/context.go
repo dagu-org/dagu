@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"maps"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
@@ -20,11 +21,12 @@ type Context struct {
 	DAG                *core.DAG
 	DB                 Database
 	BaseEnv            *config.BaseEnv
-	EnvScope           *cmdutil.EnvScope // Unified environment scope - THE single source for all env vars
+	EnvScope           *eval.EnvScope // Unified environment scope - THE single source for all env vars
 	CoordinatorCli     Dispatcher
-	Shell              string           // Default shell for this DAG (from DAG.Shell)
-	LogEncodingCharset string           // Character encoding for log files (e.g., "utf-8", "shift_jis", "euc-jp")
-	LogWriterFactory   LogWriterFactory // For remote log streaming (nil = use local files)
+	Shell              string               // Default shell for this DAG (from DAG.Shell)
+	LogEncodingCharset string               // Character encoding for log files (e.g., "utf-8", "shift_jis", "euc-jp")
+	LogWriterFactory   LogWriterFactory     // For remote log streaming (nil = use local files)
+	DefaultExecMode    config.ExecutionMode // Server-level default execution mode (local or distributed)
 }
 
 // LogWriterFactory creates log writers for step stdout/stderr.
@@ -141,6 +143,7 @@ type contextOptions struct {
 	secretEnvs         []string
 	logEncodingCharset string
 	logWriterFactory   LogWriterFactory
+	defaultExecMode    config.ExecutionMode
 }
 
 // ContextOption configures optional parameters for NewContext.
@@ -196,6 +199,13 @@ func WithLogWriterFactory(factory LogWriterFactory) ContextOption {
 	}
 }
 
+// WithDefaultExecMode sets the server-level default execution mode.
+func WithDefaultExecMode(mode config.ExecutionMode) ContextOption {
+	return func(o *contextOptions) {
+		o.defaultExecMode = mode
+	}
+}
+
 // NewContext creates a new context with DAG execution metadata.
 // Required: ctx, dag, dagRunID, logFile
 // Optional: use ContextOption functions (WithDatabase, WithParams, etc.)
@@ -218,21 +228,17 @@ func NewContext(
 		EnvKeyDAGRunID:      dagRunID,
 		EnvKeyDAGName:       dag.Name,
 	}
-	for k, v := range stringutil.KeyValuesToMap(options.params) {
-		envs[k] = v
-	}
-	for k, v := range stringutil.KeyValuesToMap(dag.Env) {
-		envs[k] = v
-	}
+	maps.Copy(envs, stringutil.KeyValuesToMap(options.params))
+	maps.Copy(envs, stringutil.KeyValuesToMap(dag.Env))
 
 	secretEnvs := stringutil.KeyValuesToMap(options.secretEnvs)
 
 	// Build EnvScope with proper source tracking and layering
 	// Precedence (highest to lowest): Secrets > DAG Env > Params > OS
-	scope := cmdutil.NewEnvScope(nil, true) // OS layer
-	scope = scope.WithEntries(envs, cmdutil.EnvSourceDAGEnv)
+	scope := eval.NewEnvScope(nil, true) // OS layer
+	scope = scope.WithEntries(envs, eval.EnvSourceDAGEnv)
 	if len(secretEnvs) > 0 {
-		scope = scope.WithEntries(secretEnvs, cmdutil.EnvSourceSecret)
+		scope = scope.WithEntries(secretEnvs, eval.EnvSourceSecret)
 	}
 
 	return context.WithValue(ctx, dagCtxKey{}, Context{
@@ -246,6 +252,7 @@ func NewContext(
 		Shell:              dag.Shell,
 		LogEncodingCharset: options.logEncodingCharset,
 		LogWriterFactory:   options.logWriterFactory,
+		DefaultExecMode:    options.defaultExecMode,
 	})
 }
 

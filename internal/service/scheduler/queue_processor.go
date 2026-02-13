@@ -32,8 +32,8 @@ type BackoffConfig struct {
 func DefaultBackoffConfig() BackoffConfig {
 	return BackoffConfig{
 		InitialInterval: 500 * time.Millisecond,
-		MaxInterval:     60 * time.Second,
-		MaxRetries:      10,
+		MaxInterval:     5 * time.Second,
+		MaxRetries:      8,
 	}
 }
 
@@ -130,15 +130,11 @@ func (p *QueueProcessor) Start(ctx context.Context, notifyCh <-chan struct{}) {
 	defer p.lock.Unlock()
 
 	// Start the main loop of the processor
-	p.wg.Add(1)
-	go func() {
-		defer p.wg.Done()
+	p.wg.Go(func() {
 		p.loop(ctx)
-	}()
+	})
 
-	p.wg.Add(1)
-	go func() {
-		defer p.wg.Done()
+	p.wg.Go(func() {
 		for {
 			select {
 			case <-ctx.Done():
@@ -149,7 +145,7 @@ func (p *QueueProcessor) Start(ctx context.Context, notifyCh <-chan struct{}) {
 				p.wakeUp()
 			}
 		}
-	}()
+	})
 
 	p.wakeUp() // initial execution
 }
@@ -215,6 +211,14 @@ func (p *QueueProcessor) loop(ctx context.Context) {
 			wg.Add(1)
 			go func(queueName string) {
 				defer wg.Done()
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error(ctx, "Queue processing panicked",
+							tag.Queue(queueName),
+							tag.Error(panicToError(r)),
+						)
+					}
+				}()
 				queueCtx := logger.WithValues(ctx, tag.Queue(queueName))
 				p.ProcessQueueItems(queueCtx, queueName)
 			}(name)
@@ -297,6 +301,11 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 		wg.Add(1)
 		go func(queuedItem exec.QueuedItemData) {
 			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error(ctx, "Queue item processing panicked", tag.Error(panicToError(r)))
+				}
+			}()
 			if !p.processDAG(ctx, queuedItem, queueName, q.incInflight, q.decInflight) {
 				return
 			}

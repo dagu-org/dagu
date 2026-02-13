@@ -126,9 +126,7 @@ func runStartAll(ctx *Context, _ []string) error {
 	errCh := make(chan error, serviceCount)
 
 	// Start scheduler
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		logger.Info(serviceCtx, "Scheduler initialization",
 			tag.Dir(serviceCtx.Config.Paths.DAGsDir),
 		)
@@ -138,23 +136,19 @@ func runStartAll(ctx *Context, _ []string) error {
 			default:
 			}
 		}
-	}()
+	})
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		if err := coordinator.Start(serviceCtx); err != nil {
 			select {
 			case errCh <- fmt.Errorf("coordinator failed: %w", err):
 			default:
 			}
 		}
-	}()
+	})
 
 	// Start server
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		// Give scheduler and coordinator a moment to start
 		time.Sleep(100 * time.Millisecond)
 		logger.Info(serviceCtx, "Server initialization",
@@ -167,7 +161,7 @@ func runStartAll(ctx *Context, _ []string) error {
 			default:
 			}
 		}
-	}()
+	})
 
 	// Wait for signal or error
 	var firstErr error

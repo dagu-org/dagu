@@ -154,7 +154,7 @@ func TestSetAttemptID_Concurrent(t *testing.T) {
 	const goroutines = 100
 
 	// Concurrent writers
-	for i := 0; i < goroutines; i++ {
+	for i := range goroutines {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
@@ -163,12 +163,10 @@ func TestSetAttemptID_Concurrent(t *testing.T) {
 	}
 
 	// Concurrent readers
-	for i := 0; i < goroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range goroutines {
+		wg.Go(func() {
 			_ = streamer.getAttemptID() // Should not panic
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -292,7 +290,7 @@ func TestWrite_MultipleSmallWrites(t *testing.T) {
 	}
 
 	// Write 4 times = 32KB, should trigger flush on 4th write
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		n, err := writer.Write(smallData)
 		require.NoError(t, err)
 		assert.Equal(t, len(smallData), n)
@@ -978,15 +976,13 @@ func TestConcurrentWrites(t *testing.T) {
 	const goroutines = 100
 	const writesPerGoroutine = 10
 
-	for i := 0; i < goroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < writesPerGoroutine; j++ {
+	for range goroutines {
+		wg.Go(func() {
+			for range writesPerGoroutine {
 				_, err := writer.Write([]byte("data"))
 				assert.NoError(t, err)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -1007,11 +1003,9 @@ func TestConcurrentWriteAndClose(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Writer goroutines
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < 100; j++ {
+	for range 10 {
+		wg.Go(func() {
+			for range 100 {
 				_, err := writer.Write([]byte("data"))
 				// Either succeeds or returns ErrClosedPipe
 				if err != nil {
@@ -1019,15 +1013,13 @@ func TestConcurrentWriteAndClose(t *testing.T) {
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	// Close after a short delay
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_ = writer.Close()
-	}()
+	})
 
 	wg.Wait()
 }
@@ -1045,7 +1037,7 @@ func TestConcurrentSetAttemptID(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Concurrent SetAttemptID calls
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
@@ -1054,14 +1046,12 @@ func TestConcurrentSetAttemptID(t *testing.T) {
 	}
 
 	// Concurrent writes with separate writers (each gets its own stream)
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 10 {
+		wg.Go(func() {
 			writer := streamer.NewStepWriter(context.Background(), "step", exec.StreamTypeStdout)
 			_, _ = writer.Write(make([]byte, logBufferSize)) // Triggers flush which reads attemptID
 			_ = writer.Close()
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -1081,7 +1071,7 @@ func TestLogStreamer_FullLifecycle(t *testing.T) {
 	writer := streamer.NewStepWriter(context.Background(), "step1", exec.StreamTypeStdout)
 
 	// Multiple writes
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		data := make([]byte, 8*1024) // 8KB each, 40KB total
 		_, err := writer.Write(data)
 		require.NoError(t, err)
@@ -1268,7 +1258,7 @@ func TestLogStreamer_SequenceContinuity(t *testing.T) {
 	writer := streamer.NewStepWriter(context.Background(), "step", exec.StreamTypeStdout)
 
 	// Multiple flushes
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		data := make([]byte, logBufferSize)
 		_, _ = writer.Write(data)
 	}
@@ -1276,7 +1266,7 @@ func TestLogStreamer_SequenceContinuity(t *testing.T) {
 
 	// Verify sequences are strictly increasing with no gaps
 	chunks := mockStream.getSentChunks()
-	for i := 0; i < len(chunks); i++ {
+	for i := range chunks {
 		assert.Equal(t, uint64(i+1), chunks[i].Sequence, "sequence %d should be %d", i, i+1)
 	}
 }
@@ -1297,28 +1287,24 @@ func TestLogStreamer_RaceDetector(t *testing.T) {
 	var ops int64
 
 	// Multiple writers on same streamer (each gets its own stream)
-	for i := 0; i < 5; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 5 {
+		wg.Go(func() {
 			writer := streamer.NewStepWriter(context.Background(), "step", exec.StreamTypeStdout)
-			for j := 0; j < 20; j++ {
+			for range 20 {
 				_, _ = writer.Write([]byte("data"))
 				atomic.AddInt64(&ops, 1)
 			}
 			_ = writer.Close()
-		}()
+		})
 	}
 
 	// Concurrent SetAttemptID
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for i := 0; i < 100; i++ {
+	wg.Go(func() {
+		for i := range 100 {
 			streamer.SetAttemptID("attempt-" + string(rune('A'+i%26)))
 			atomic.AddInt64(&ops, 1)
 		}
-	}()
+	})
 
 	wg.Wait()
 	assert.Greater(t, ops, int64(0))

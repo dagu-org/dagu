@@ -90,7 +90,7 @@ func TestWorkerStart(t *testing.T) {
 		// Dispatch multiple tasks
 		// Note: We have 3 pollers, so we can dispatch 3 tasks immediately
 		// For the remaining tasks, we need to allow time for workers to re-poll
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			task := &coordinatorv1.Task{
 				DagRunId:   "run-" + string(rune('a'+i)),
 				Target:     "test.yaml",
@@ -446,7 +446,7 @@ func TestRunningTaskTracking(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Create first 3 tasks to fill all pollers
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			task := &coordinatorv1.Task{
 				DagRunId:       "task-" + string(rune('a'+i)),
 				Target:         "test.yaml",
@@ -459,7 +459,7 @@ func TestRunningTaskTracking(t *testing.T) {
 		}
 
 		// Wait for all 3 tasks to start
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			select {
 			case <-taskStarted:
 				// Task started

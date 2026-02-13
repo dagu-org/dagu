@@ -469,11 +469,11 @@ func (r *Renderer) renderError(errMsg string, prefix string) string {
 // cleanErrorMessage removes the "recent stderr (tail):" section from error messages.
 func cleanErrorMessage(errMsg string) string {
 	const stderrMarker = "recent stderr (tail):"
-	if idx := strings.Index(errMsg, "\n"+stderrMarker); idx != -1 {
-		return strings.TrimSpace(errMsg[:idx])
+	if before, _, ok := strings.Cut(errMsg, "\n"+stderrMarker); ok {
+		return strings.TrimSpace(before)
 	}
-	if idx := strings.Index(errMsg, stderrMarker); idx != -1 {
-		return strings.TrimSpace(errMsg[:idx])
+	if before, _, ok := strings.Cut(errMsg, stderrMarker); ok {
+		return strings.TrimSpace(before)
 	}
 	return errMsg
 }

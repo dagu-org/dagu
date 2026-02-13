@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import React from 'react';
 import { useCookies } from 'react-cookie';
-import { components, Status } from '../../../../api/v2/schema';
+import { components, Status } from '../../../../api/v1/schema';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import BorderedBox from '../../../../ui/BorderedBox';
 import { FlowchartType, Graph, TimelineChart } from './';

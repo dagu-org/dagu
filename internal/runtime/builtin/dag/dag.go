@@ -104,7 +104,7 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 // DetermineNodeStatus implements NodeStatusDeterminer.
 func (e *dagExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 	if e.result == nil {
-		return core.NodeFailed, fmt.Errorf("no result available for node status determination")
+		return core.NodeFailed, fmt.Errorf("sub DAG %q execution produced no result", e.child.DAG.Name)
 	}
 
 	// Check if the status is partial success or success

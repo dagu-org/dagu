@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -115,10 +116,8 @@ func matchPatternWithScanner(ctx context.Context, scanner *bufio.Scanner, patter
 		}
 
 		// Check for empty string patterns
-		for _, p := range literalPatterns {
-			if p == "" {
-				return true, nil
-			}
+		if slices.Contains(literalPatterns, "") {
+			return true, nil
 		}
 		// Check regex patterns against empty string
 		for _, re := range regexps {

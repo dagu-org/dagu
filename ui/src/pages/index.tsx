@@ -10,8 +10,8 @@ import {
 } from '@/components/ui/select';
 import { Filter } from 'lucide-react';
 import React from 'react';
-import type { components } from '../api/v2/schema';
-import { Status } from '../api/v2/schema';
+import type { components } from '../api/v1/schema';
+import { Status } from '../api/v1/schema';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 import { useSearchState } from '../contexts/SearchStateContext';

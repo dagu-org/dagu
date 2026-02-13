@@ -108,6 +108,16 @@
       "type": "boolean",
       "description": "When true, Dagu checks if this DAG has already succeeded since the last scheduled time. If it has, Dagu will skip the current scheduled run. This is useful for resource-intensive tasks or data processing jobs that shouldn't run twice. Note: Manual triggers always run regardless of this setting."
     },
+    "catchupWindow": {
+      "type": "string",
+      "description": "Lookback horizon for replaying missed cron runs when the scheduler restarts. Accepts Go duration syntax with day support (e.g. \"6h\", \"2d12h\", \"30m\"). Must be positive. If omitted, missed runs are not replayed."
+    },
+    "overlapPolicy": {
+      "type": "string",
+      "enum": ["skip", "all", "latest"],
+      "default": "skip",
+      "description": "Controls what happens when a catchup run is ready but the DAG is still running from a previous run. \"skip\" (default) drops the catchup run and moves to the next. \"all\" keeps it in the buffer and retries on the next scheduler tick. \"latest\" discards all but the most recent missed interval."
+    },
     "tags": {
       "oneOf": [
         {
@@ -117,7 +127,11 @@
         {
           "type": "object",
           "additionalProperties": {
-            "type": "string"
+            "oneOf": [
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "boolean" }
+            ]
           },
           "description": "Tags as key-value pairs in map notation"
         },
@@ -132,7 +146,11 @@
               {
                 "type": "object",
                 "additionalProperties": {
-                  "type": "string"
+                  "oneOf": [
+                    { "type": "string" },
+                    { "type": "number" },
+                    { "type": "boolean" }
+                  ]
                 },
                 "maxProperties": 1,
                 "description": "Single key-value pair"
@@ -470,11 +488,25 @@
       "description": "Configuration for controlling user interactions when starting DAG runs. Allows restricting parameter editing and custom run ID input."
     },
     "workerSelector": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "string"
-      },
-      "description": "Key-value pairs specifying worker label requirements for executing this DAG. The DAG will only run on workers that have all specified labels with matching values. For example: {\"gpu\": \"true\", \"memory\": \"64G\"} requires a worker with both gpu=true and memory=64G labels. This setting applies to the entire DAG; individual steps can override this with their own workerSelector."
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "boolean" }
+            ]
+          },
+          "description": "Key-value pairs specifying worker label requirements. Values can be strings, numbers, or booleans (non-string values are coerced to strings). For example: {\"gpu\": true, \"memory\": \"64G\"} requires a worker with gpu=true and memory=64G labels."
+        },
+        {
+          "type": "string",
+          "enum": ["local"],
+          "description": "Set to \"local\" to force this DAG to run locally even when the server default execution mode is distributed."
+        }
+      ],
+      "description": "Worker selection for this DAG. Use a map of label key-value pairs to target specific workers, or the string \"local\" to force local execution. This setting applies to the entire DAG; individual steps can override this with their own workerSelector."
     },
     "shell": {
       "oneOf": [
@@ -990,11 +1022,25 @@
           "description": "Configuration for parallel execution of sub DAGs. Only applicable when 'run' is specified. Allows processing multiple items concurrently using the same workflow definition."
         },
         "workerSelector": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Key-value pairs specifying worker label requirements for executing this step. The step will only run on workers that have all specified labels with matching values. For example: {\"gpu\": \"true\", \"memory\": \"64G\"} requires a worker with both gpu=true and memory=64G labels."
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": {
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "number" },
+                  { "type": "boolean" }
+                ]
+              },
+              "description": "Key-value pairs specifying worker label requirements. Values can be strings, numbers, or booleans (non-string values are coerced to strings). For example: {\"gpu\": true, \"memory\": \"64G\"} requires a worker with gpu=true and memory=64G labels."
+            },
+            {
+              "type": "string",
+              "enum": ["local"],
+              "description": "Set to \"local\" to force this step to run locally even when the server default execution mode is distributed."
+            }
+          ],
+          "description": "Worker selection for this step. Use a map of label key-value pairs to target specific workers, or the string \"local\" to force local execution."
         },
         "env": {
           "oneOf": [
@@ -1045,7 +1091,7 @@
           "items": {
             "$ref": "#/definitions/llmMessage"
           },
-          "description": "Conversation messages for chat steps. Only valid when type is 'chat'. Supports variable substitution with ${VAR}."
+          "description": "Session messages for chat steps. Only valid when type is 'chat'. Supports variable substitution with ${VAR}."
         },
         "tools": {
           "type": "array",
@@ -1053,6 +1099,23 @@
             "type": "string"
           },
           "description": "List of tool DAG names available to the LLM for function calling. Only valid when type is 'chat'. Tools are other DAGs that can be called by the LLM to perform specific tasks."
+        },
+        "value": {
+          "type": "string",
+          "description": "Expression to evaluate for router step routing (e.g., '${STATUS}'). Only used when type is 'router'. Router steps require DAG type 'graph'."
+        },
+        "routes": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "description": "Map of patterns to target step names for routing. Keys are patterns (exact match or 're:regex'), values are arrays of step names. Target steps automatically depend on the router (no explicit depends needed). Each step can only be targeted by one route. Only used when type is 'router'. Router steps require DAG type 'graph'."
         }
       },
       "allOf": [
@@ -1156,6 +1219,15 @@
             "properties": {
               "config": { "$ref": "#/definitions/s3ExecutorConfig" }
             }
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "router" } },
+            "required": ["type"]
+          },
+          "then": {
+            "required": ["value", "routes"]
           }
         }
       ]
@@ -2740,7 +2812,7 @@
         },
         "system": {
           "type": "string",
-          "description": "Default system prompt for conversations. Prepended to messages if specified."
+          "description": "Default system prompt for sessions. Prepended to messages if specified."
         },
         "temperature": {
           "type": "number",
@@ -2821,7 +2893,7 @@
           "description": "Message content. Supports variable substitution with ${VAR} syntax."
         }
       },
-      "description": "A single message in an LLM conversation."
+      "description": "A single message in an LLM session."
     },
     "executorType": {
       "type": "string",
@@ -2846,7 +2918,8 @@
         "hitl",
         "postgres",
         "sqlite",
-        "redis"
+        "redis",
+        "router"
       ],
       "description": "Type of executor to use for this step."
     },

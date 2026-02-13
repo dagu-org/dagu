@@ -1,4 +1,4 @@
-import { components } from '@/api/v2/schema';
+import { components } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,7 @@ const CATEGORIES = [
   { value: 'api_key', label: 'API Key' },
   { value: 'webhook', label: 'Webhook' },
   { value: 'git_sync', label: 'Git Sync' },
+  { value: 'agent', label: 'Agent' },
 ];
 
 const PAGE_SIZE = 50;
@@ -353,12 +354,17 @@ export default function AuditLogsPage() {
   const formatDetails = (entry: AuditEntry): string => {
     const details = parseDetails(entry.details);
     if (entry.category === 'terminal') {
-      if (entry.action === 'session_start' || entry.action === 'session_end') {
-        return `Session: ${details.session_id || 'N/A'}${details.reason ? ` (${details.reason})` : ''}`;
+      if (entry.action === 'connection_start' || entry.action === 'connection_end') {
+        return `Connection: ${details.connection_id || 'N/A'}${details.reason ? ` (${details.reason})` : ''}`;
       }
       if (entry.action === 'command') {
         return `Command: ${details.command || 'N/A'}`;
       }
+    }
+    if (entry.category === 'agent') {
+      if (entry.action === 'bash_exec') return `Command: ${details.command || 'N/A'}`;
+      if (entry.action === 'file_read') return `Path: ${details.path || 'N/A'}`;
+      if (entry.action === 'file_patch') return `${details.operation || 'patch'}: ${details.path || 'N/A'}`;
     }
     return entry.details || '-';
   };

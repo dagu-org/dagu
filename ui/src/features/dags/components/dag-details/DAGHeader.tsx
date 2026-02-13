@@ -1,7 +1,7 @@
 import { Calendar, RefreshCw, Server, Timer } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { components, Status } from '../../../../api/v2/schema';
+import { components, Status } from '../../../../api/v1/schema';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';

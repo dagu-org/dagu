@@ -75,13 +75,13 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 	}
 
 	// Extract content and tool calls from response
-	var content string
+	var content strings.Builder
 	var toolCalls []llm.ToolCall
 
 	for _, block := range resp.Content {
 		switch block.Type {
 		case "text":
-			content += block.Text
+			content.WriteString(block.Text)
 		case "tool_use":
 			// Convert input map to JSON string for Arguments
 			argsJSON, _ := json.Marshal(block.Input)
@@ -97,7 +97,7 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 	}
 
 	result := &llm.ChatResponse{
-		Content:      content,
+		Content:      content.String(),
 		FinishReason: resp.StopReason,
 		Usage: llm.Usage{
 			PromptTokens:     resp.Usage.InputTokens,

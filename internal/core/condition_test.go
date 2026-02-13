@@ -184,7 +184,7 @@ func TestCondition_ConcurrentAccess(t *testing.T) {
 	// Test concurrent access to error message
 	done := make(chan bool)
 	go func() {
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			condition.SetErrorMessage("message 1")
 			_ = condition.GetErrorMessage()
 		}
@@ -192,7 +192,7 @@ func TestCondition_ConcurrentAccess(t *testing.T) {
 	}()
 
 	go func() {
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			condition.SetErrorMessage("message 2")
 			_ = condition.GetErrorMessage()
 		}

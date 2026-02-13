@@ -53,9 +53,9 @@ export function useDAGSpecWithConflictDetection({
   // Track if user has started editing
   const hasUserEditedRef = useRef<boolean>(false);
 
-  // Track recently saved spec (to ignore our own saves coming back via SSE)
-  const recentlySavedSpecRef = useRef<string | null>(null);
-  const recentlySavedTimeRef = useRef<number>(0);
+  // Track pending save spec (to ignore our own saves coming back via SSE)
+  // Using flag-based approach instead of time-based window for reliability
+  const pendingSaveSpecRef = useRef<string | null>(null);
 
   // Conflict state
   const [conflict, setConflict] = useState<ConflictState>({
@@ -67,8 +67,7 @@ export function useDAGSpecWithConflictDetection({
   useEffect(() => {
     lastServerSpecRef.current = null;
     hasUserEditedRef.current = false;
-    recentlySavedSpecRef.current = null;
-    recentlySavedTimeRef.current = 0;
+    pendingSaveSpecRef.current = null;
     setCurrentValueState('');
     setConflict({ hasConflict: false, externalSpec: null });
   }, [fileName]);
@@ -87,15 +86,11 @@ export function useDAGSpecWithConflictDetection({
       return;
     }
 
-    // Check if this is our own save coming back (within 5 seconds)
-    const timeSinceSave = Date.now() - recentlySavedTimeRef.current;
-    if (
-      recentlySavedSpecRef.current === incomingSpec &&
-      timeSinceSave < 5000
-    ) {
+    // Check if this is our own save coming back (flag-based approach)
+    if (pendingSaveSpecRef.current === incomingSpec) {
       // This is our own save, update refs silently
       lastServerSpecRef.current = incomingSpec;
-      recentlySavedSpecRef.current = null;
+      pendingSaveSpecRef.current = null;
       return;
     }
 
@@ -152,8 +147,7 @@ export function useDAGSpecWithConflictDetection({
 
   // Called after successful save
   const markAsSaved = useCallback((savedSpec: string) => {
-    recentlySavedSpecRef.current = savedSpec;
-    recentlySavedTimeRef.current = Date.now();
+    pendingSaveSpecRef.current = savedSpec;
     lastServerSpecRef.current = savedSpec;
     hasUserEditedRef.current = false;
   }, []);

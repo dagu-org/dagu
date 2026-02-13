@@ -417,8 +417,7 @@ func (s *Store) UpdateLastUsed(_ context.Context, id string) error {
 	}
 
 	// Update timestamp
-	now := time.Now().UTC()
-	webhook.LastUsedAt = &now
+	webhook.LastUsedAt = new(time.Now().UTC())
 
 	// Write updated webhook
 	if err := s.writeWebhookToFile(filePath, webhook); err != nil {

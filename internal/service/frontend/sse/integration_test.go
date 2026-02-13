@@ -8,31 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// speedUpHubWatchers configures all watchers in the hub to use fast intervals for testing.
-// Note: This must be called BEFORE watchers start polling to avoid races.
-// In tests, call this after Subscribe but use proper synchronization.
-func speedUpHubWatchers(h *Hub) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	for _, w := range h.watchers {
-		// Use watcher's mutex to protect interval fields
-		w.mu.Lock()
-		w.baseInterval = 50 * time.Millisecond
-		w.maxInterval = 100 * time.Millisecond
-		w.currentInterval = 50 * time.Millisecond
-		// Also speed up backoff
-		policy := backoff.NewExponentialBackoffPolicy(50 * time.Millisecond)
-		policy.MaxInterval = 100 * time.Millisecond
-		w.errorBackoff = backoff.NewRetrier(policy)
-		w.mu.Unlock()
-	}
-}
 
 // TestSSEFullFlow tests the complete SSE flow:
 // Hub → Subscribe → Watcher → Fetch → Broadcast → Client
@@ -112,7 +91,7 @@ func TestSSEMultipleClientsOnSameTopic(t *testing.T) {
 	cancels := make([]context.CancelFunc, numClients)
 	pumpDones := make([]chan struct{}, numClients)
 
-	for i := 0; i < numClients; i++ {
+	for i := range numClients {
 		clients[i] = newTestClient(t)
 		err := hub.Subscribe(clients[i], "dagrun:shared-dag/run1")
 		require.NoError(t, err)
@@ -137,7 +116,7 @@ func TestSSEMultipleClientsOnSameTopic(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Cleanup
-	for i := 0; i < numClients; i++ {
+	for i := range numClients {
 		hub.Unsubscribe(clients[i])
 		cancels[i]()
 		<-pumpDones[i]
@@ -153,7 +132,7 @@ func TestSSEErrorRecovery(t *testing.T) {
 	registry := prometheus.NewRegistry()
 	metrics := NewMetrics(registry)
 
-	hub := NewHub(WithMetrics(metrics))
+	hub := NewHub(WithMetrics(metrics), WithWatcherInterval(50*time.Millisecond, 100*time.Millisecond))
 
 	// Fetcher that fails twice then succeeds
 	var callCount int32
@@ -172,9 +151,6 @@ func TestSSEErrorRecovery(t *testing.T) {
 	client := newTestClient(t)
 	err := hub.Subscribe(client, "dagrun:dag1/run1")
 	require.NoError(t, err)
-
-	// Speed up watcher intervals for faster test
-	speedUpHubWatchers(hub)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -230,7 +206,7 @@ func TestSSEMultipleTopicTypes(t *testing.T) {
 		"dagruns:limit=50",
 	}
 
-	for i := 0; i < len(topics); i++ {
+	for i := range topics {
 		clients[i] = newTestClient(t)
 		err := hub.Subscribe(clients[i], topicStrings[i])
 		require.NoError(t, err)
@@ -263,10 +239,8 @@ func TestSSEConcurrentSubscribeUnsubscribe(t *testing.T) {
 	numOperations := 50
 
 	// Concurrent subscribe/unsubscribe
-	for i := 0; i < numOperations; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range numOperations {
+		wg.Go(func() {
 
 			client := newTestClient(t)
 			err := hub.Subscribe(client, "dagrun:concurrent-test/run1")
@@ -279,7 +253,7 @@ func TestSSEConcurrentSubscribeUnsubscribe(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 
 			hub.Unsubscribe(client)
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -291,7 +265,7 @@ func TestSSEConcurrentSubscribeUnsubscribe(t *testing.T) {
 // TestSSEDataChangeDetection tests that data is only broadcast when it changes
 func TestSSEDataChangeDetection(t *testing.T) {
 	t.Parallel()
-	hub := NewHub()
+	hub := NewHub(WithWatcherInterval(50*time.Millisecond, 100*time.Millisecond))
 
 	// Fetcher that returns same data for multiple calls
 	var callCount int32
@@ -308,9 +282,6 @@ func TestSSEDataChangeDetection(t *testing.T) {
 	client := newTestClient(t)
 	err := hub.Subscribe(client, "dagrun:dag1/run1")
 	require.NoError(t, err)
-
-	// Speed up watcher intervals for faster test
-	speedUpHubWatchers(hub)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
