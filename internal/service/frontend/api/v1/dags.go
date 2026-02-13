@@ -21,6 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
+	"github.com/dagu-org/dagu/internal/core/startvalidation"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/service/audit"
@@ -905,6 +906,16 @@ func (a *API) dispatchStartToCoordinator(ctx context.Context, dag *core.DAG, dag
 }
 
 func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts startDAGRunOptions) error {
+	if err := startvalidation.ValidatePositionalParamCount(dag.DefaultParams, startvalidation.ParamInput{
+		RawParams: opts.params,
+	}); err != nil {
+		return &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    err.Error(),
+		}
+	}
+
 	// Check if this DAG should be dispatched to the coordinator for distributed execution
 	if core.ShouldDispatchToCoordinator(dag, a.coordinatorCli != nil, a.defaultExecMode) {
 		timeout := 5 * time.Second

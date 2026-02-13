@@ -119,12 +119,11 @@ steps:
     command: echo $1
 `)
 
-	t.Run("RejectsTooFewAfterDash", func(t *testing.T) {
+	t.Run("AllowsTooFewAfterDash", func(t *testing.T) {
 		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
 			Args: []string{"start", dagFile, "--", "only-one"},
 		})
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "invalid number of positional params: expected 2, got 1")
+		require.NoError(t, err)
 	})
 
 	t.Run("RejectsTooManyAfterDash", func(t *testing.T) {
@@ -132,15 +131,14 @@ steps:
 			Args: []string{"start", dagFile, "--", "one", "two", "three"},
 		})
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "invalid number of positional params: expected 2, got 3")
+		require.Contains(t, err.Error(), "too many positional params: expected at most 2, got 3")
 	})
 
-	t.Run("RejectsTooFewWithParamsFlag", func(t *testing.T) {
+	t.Run("AllowsTooFewWithParamsFlag", func(t *testing.T) {
 		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
 			Args: []string{"start", "--params", "only-one", dagFile},
 		})
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "invalid number of positional params: expected 2, got 1")
+		require.NoError(t, err)
 	})
 
 	t.Run("AllowsNamedOnlyWithPositionalDefaults", func(t *testing.T) {
