@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -540,4 +541,130 @@ func TestWebhooks_TriggerNonExistentDAG(t *testing.T) {
 	server.Client().Post("/api/v1/webhooks/nonexistent-dag", api.WebhookRequest{}).
 		WithBearerToken(webhookToken).
 		ExpectStatus(http.StatusUnauthorized).Send(t)
+}
+
+// TestIsWebhookTriggerPath tests the webhook trigger path matching helper.
+func TestIsWebhookTriggerPath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{"webhook trigger", "/api/v1/webhooks/my-dag", true},
+		{"webhook trigger with base path", "/base/api/v1/webhooks/my-dag", true},
+		{"webhook list (no segment)", "/api/v1/webhooks", false},
+		{"webhook list trailing slash", "/api/v1/webhooks/", false},
+		{"non-webhook path", "/api/v1/dags", false},
+		{"dag webhook management", "/api/v1/dags/my-dag/webhook", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := apiimpl.IsWebhookTriggerPath(tt.path)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestMarshalWebhookPayload_RawBodyFallback tests the raw body fallback behavior.
+func TestMarshalWebhookPayload_RawBodyFallback(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		body    *api.WebhookRequest
+		rawBody []byte
+		want    string
+	}{
+		{
+			name:    "structured payload takes precedence",
+			body:    &api.WebhookRequest{Payload: &map[string]any{"key": "val"}},
+			rawBody: []byte(`{"event":"push"}`),
+			want:    `{"key":"val"}`,
+		},
+		{
+			name:    "falls back to raw body when payload is nil",
+			body:    &api.WebhookRequest{},
+			rawBody: []byte(`{"event":"push","repo":"foo"}`),
+			want:    `{"event":"push","repo":"foo"}`,
+		},
+		{
+			name:    "raw body with dagRunId is passed through",
+			body:    &api.WebhookRequest{},
+			rawBody: []byte(`{"dagRunId":"abc","event":"push"}`),
+			want:    `{"dagRunId":"abc","event":"push"}`,
+		},
+		{
+			name:    "nil body falls back to raw body",
+			body:    nil,
+			rawBody: []byte(`{"event":"push"}`),
+			want:    `{"event":"push"}`,
+		},
+		{
+			name:    "no raw body returns empty object",
+			body:    &api.WebhookRequest{},
+			rawBody: nil,
+			want:    "{}",
+		},
+		{
+			name:    "invalid JSON raw body returns empty object",
+			body:    &api.WebhookRequest{},
+			rawBody: []byte(`not-json`),
+			want:    "{}",
+		},
+		{
+			name:    "empty raw body returns empty object",
+			body:    &api.WebhookRequest{},
+			rawBody: []byte{},
+			want:    "{}",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			if tt.rawBody != nil {
+				ctx = apiimpl.WithRawBody(ctx, tt.rawBody)
+			}
+			got, err := apiimpl.MarshalWebhookPayload(ctx, tt.body)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestWebhooks_TriggerWithArbitraryPayload tests triggering a webhook with
+// an arbitrary JSON body (no "payload" wrapper), simulating external services.
+func TestWebhooks_TriggerWithArbitraryPayload(t *testing.T) {
+	t.Parallel()
+	server := setupWebhookTestServer(t)
+	token := getWebhookAdminToken(t, server)
+
+	dagName := "webhook_arbitrary_payload_test"
+	createTestDAG(t, server, token, dagName)
+
+	createResp := server.Client().Post("/api/v1/dags/"+dagName+"/webhook", nil).
+		WithBearerToken(token).ExpectStatus(http.StatusCreated).Send(t)
+
+	var createResult api.WebhookCreateResponse
+	createResp.Unmarshal(t, &createResult)
+	webhookToken := createResult.Token
+
+	// Send an arbitrary JSON body WITHOUT the "payload" wrapper.
+	// This simulates what external services like GitHub would send.
+	arbitraryBody := map[string]any{
+		"event": "push",
+		"repo":  "foo/bar",
+		"ref":   "refs/heads/main",
+	}
+	triggerResp := server.Client().Post("/api/v1/webhooks/"+dagName, arbitraryBody).
+		WithBearerToken(webhookToken).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var triggerResult api.WebhookResponse
+	triggerResp.Unmarshal(t, &triggerResult)
+	assert.NotEmpty(t, triggerResult.DagRunId)
+	assert.Equal(t, dagName, triggerResult.DagName)
 }
