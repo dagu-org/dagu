@@ -243,7 +243,7 @@ type RemoteNodeDef struct {
 
 // CoordinatorDef configures the coordinator service.
 type CoordinatorDef struct {
-	Enabled   *bool  `mapstructure:"enabled"`   // Default: true
+	Enabled   *bool  `mapstructure:"enabled"` // Default: true
 	Host      string `mapstructure:"host"`
 	Advertise string `mapstructure:"advertise"` // Auto-detected if empty
 	Port      int    `mapstructure:"port"`
