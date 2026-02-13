@@ -1450,8 +1450,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Publish all modified DAGs
-         * @description Commits and pushes all modified DAGs to the remote repository
+         * Publish selected DAGs
+         * @description Commits and pushes the specified item IDs. If itemIds is omitted, publishes all modified or untracked items.
          */
         post: operations["syncPublishAll"];
         delete?: never;
@@ -1504,7 +1504,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/sync/dags/{name}/diff": {
+    "/sync/items/{itemId}/diff": {
         parameters: {
             query?: never;
             header?: never;
@@ -1512,10 +1512,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get diff for a DAG
-         * @description Returns the diff between local and remote versions of a DAG
+         * Get diff for a sync item
+         * @description Returns the diff between local and remote versions of a sync item
          */
-        get: operations["getSyncDAGDiff"];
+        get: operations["getSyncItemDiff"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1524,7 +1524,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dags/{name}/publish": {
+    "/sync/items/{itemId}/publish": {
         parameters: {
             query?: never;
             header?: never;
@@ -1534,17 +1534,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Publish a single DAG
-         * @description Commits and pushes a single DAG to the remote repository
+         * Publish a single sync item
+         * @description Commits and pushes a single sync item to the remote repository
          */
-        post: operations["publishDag"];
+        post: operations["publishSyncItem"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/dags/{name}/discard": {
+    "/sync/items/{itemId}/discard": {
         parameters: {
             query?: never;
             header?: never;
@@ -1554,10 +1554,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Discard local changes for a DAG
+         * Discard local changes for a sync item
          * @description Discards local changes and reverts to the version in the remote repository
          */
-        post: operations["discardDagChanges"];
+        post: operations["discardSyncItemChanges"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1651,6 +1651,62 @@ export interface paths {
         put: operations["setDefaultAgentModel"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/agent/memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get agent memory
+         * @description Returns global memory content and list of DAGs with memory. Requires admin role.
+         */
+        get: operations["getAgentMemory"];
+        /**
+         * Update global agent memory
+         * @description Updates the global MEMORY.md content. Requires admin role.
+         */
+        put: operations["updateAgentMemory"];
+        post?: never;
+        /**
+         * Clear global agent memory
+         * @description Deletes the global MEMORY.md file. Requires admin role.
+         */
+        delete: operations["deleteAgentMemory"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/agent/memory/dags/{dagName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get DAG-specific agent memory
+         * @description Returns memory content for a specific DAG. Requires admin role.
+         */
+        get: operations["getAgentDAGMemory"];
+        /**
+         * Update DAG-specific agent memory
+         * @description Updates the memory content for a specific DAG. Requires admin role.
+         */
+        put: operations["updateAgentDAGMemory"];
+        post?: never;
+        /**
+         * Clear DAG-specific agent memory
+         * @description Deletes the memory file for a specific DAG. Requires admin role.
+         */
+        delete: operations["deleteAgentDAGMemory"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2680,9 +2736,21 @@ export interface components {
          * @enum {string}
          */
         SyncSummary: SyncSummary;
-        /** @description Sync state for a single DAG */
-        SyncDAGState: {
+        /**
+         * @description Type of sync item
+         * @enum {string}
+         */
+        SyncItemKind: SyncItemKind;
+        /** @description Sync state for a single item */
+        SyncItem: {
+            /** @description Stable item identifier (file path without extension) */
+            itemId: string;
+            /** @description Relative file path with extension */
+            filePath: string;
+            /** @description Display-friendly item name */
+            displayName: string;
             status: components["schemas"]["SyncStatus"];
+            kind: components["schemas"]["SyncItemKind"];
             /** @description Commit hash when last synced */
             baseCommit?: string;
             /** @description Content hash when last synced */
@@ -2738,21 +2806,21 @@ export interface components {
             lastSyncStatus?: string;
             /** @description Error message from last failed sync */
             lastError?: string;
-            /** @description Sync state for each DAG */
-            dags?: {
-                [key: string]: components["schemas"]["SyncDAGState"];
-            };
+            /** @description Sync state for each item */
+            items: components["schemas"]["SyncItem"][];
             counts: components["schemas"]["SyncStatusCounts"];
         };
         /** @description Error during sync operation */
         SyncError: {
-            dagId?: string;
+            itemId?: string;
             message: string;
         };
-        /** @description Diff between local and remote versions of a DAG */
-        SyncDAGDiffResponse: {
-            /** @description The DAG identifier */
-            dagId: string;
+        /** @description Diff between local and remote versions of a sync item */
+        SyncItemDiffResponse: {
+            /** @description The item identifier */
+            itemId: string;
+            /** @description Relative file path with extension */
+            filePath: string;
             status: components["schemas"]["SyncStatus"];
             /** @description Current local file content */
             localContent: string;
@@ -2789,14 +2857,16 @@ export interface components {
              */
             force: boolean;
         };
-        /** @description Request to publish all modified DAGs */
+        /** @description Request to publish selected items */
         SyncPublishAllRequest: {
             /** @description Commit message */
             message?: string;
+            /** @description Item IDs to publish. If omitted, all modified or untracked items are published. */
+            itemIds?: string[];
         };
         /** @description Response when a conflict is detected */
         SyncConflictResponse: {
-            dagId: string;
+            itemId: string;
             remoteCommit?: string;
             remoteAuthor?: string;
             remoteMessage?: string;
@@ -2951,6 +3021,25 @@ export interface components {
         /** @description List of model presets */
         ListModelPresetsResponse: {
             presets: components["schemas"]["ModelPreset"][];
+        };
+        /** @description Agent memory overview */
+        AgentMemoryResponse: {
+            /** @description Content of global MEMORY.md */
+            globalMemory?: string;
+            /** @description List of DAG names that have memory files */
+            dagMemories?: components["schemas"]["DAGName"][];
+            /** @description Root memory directory path */
+            memoryDir?: string;
+        };
+        /** @description DAG-specific memory content */
+        AgentDAGMemoryResponse: {
+            dagName: components["schemas"]["DAGName"];
+            content: string;
+        };
+        /** @description Request to update memory content */
+        UpdateAgentMemoryRequest: {
+            /** @description New memory content (markdown) */
+            content: string;
         };
     };
     responses: never;
@@ -7189,7 +7278,7 @@ export interface operations {
             };
         };
     };
-    getSyncDAGDiff: {
+    getSyncItemDiff: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -7197,8 +7286,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description The DAG name (file name without extension) */
-                name: string;
+                /** @description The sync item identifier (file path without extension) */
+                itemId: string;
             };
             cookie?: never;
         };
@@ -7210,10 +7299,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SyncDAGDiffResponse"];
+                    "application/json": components["schemas"]["SyncItemDiffResponse"];
                 };
             };
-            /** @description DAG not found */
+            /** @description Item not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -7233,7 +7322,7 @@ export interface operations {
             };
         };
     };
-    publishDag: {
+    publishSyncItem: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -7241,8 +7330,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description The DAG name (file name without extension) */
-                name: string;
+                /** @description The sync item identifier (file path without extension) */
+                itemId: string;
             };
             cookie?: never;
         };
@@ -7252,7 +7341,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description DAG published successfully */
+            /** @description Item published successfully */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7261,7 +7350,7 @@ export interface operations {
                     "application/json": components["schemas"]["SyncResultResponse"];
                 };
             };
-            /** @description DAG not found */
+            /** @description Item not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -7290,7 +7379,7 @@ export interface operations {
             };
         };
     };
-    discardDagChanges: {
+    discardSyncItemChanges: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -7298,8 +7387,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description The DAG name (file name without extension) */
-                name: string;
+                /** @description The sync item identifier (file path without extension) */
+                itemId: string;
             };
             cookie?: never;
         };
@@ -7314,7 +7403,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessResponse"];
                 };
             };
-            /** @description DAG not found */
+            /** @description Item not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -7767,6 +7856,333 @@ export interface operations {
             };
         };
     };
+    getAgentMemory: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Agent memory overview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentMemoryResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateAgentMemory: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentMemoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Memory updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteAgentMemory: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Memory cleared successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getAgentDAGMemory: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description Name of the DAG */
+                dagName: components["schemas"]["DAGName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description DAG memory content */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDAGMemoryResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateAgentDAGMemory: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description Name of the DAG */
+                dagName: components["schemas"]["DAGName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentMemoryRequest"];
+            };
+        };
+        responses: {
+            /** @description DAG memory updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteAgentDAGMemory: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description Name of the DAG */
+                dagName: components["schemas"]["DAGName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description DAG memory cleared successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listModelPresets: {
         parameters: {
             query?: {
@@ -7967,6 +8383,10 @@ export enum SyncSummary {
     pending = "pending",
     conflict = "conflict",
     error = "error"
+}
+export enum SyncItemKind {
+    dag = "dag",
+    memory = "memory"
 }
 export enum SyncAuthConfigType {
     token = "token",

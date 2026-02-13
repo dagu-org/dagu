@@ -42,6 +42,8 @@ type SessionManager struct {
 	inputCostPer1M  float64
 	outputCostPer1M float64
 	totalCost       float64
+	memoryStore     MemoryStore
+	dagName         string
 }
 
 // SessionManagerConfig contains configuration for creating a SessionManager.
@@ -61,6 +63,8 @@ type SessionManagerConfig struct {
 	IPAddress       string
 	InputCostPer1M  float64
 	OutputCostPer1M float64
+	MemoryStore     MemoryStore
+	DAGName         string
 }
 
 // NewSessionManager creates a new SessionManager.
@@ -97,6 +101,8 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		ipAddress:       cfg.IPAddress,
 		inputCostPer1M:  cfg.InputCostPer1M,
 		outputCostPer1M: cfg.OutputCostPer1M,
+		memoryStore:     cfg.MemoryStore,
+		dagName:         cfg.DAGName,
 	}
 }
 
@@ -200,6 +206,7 @@ func (sm *SessionManager) GetSession() Session {
 	return Session{
 		ID:        sm.id,
 		UserID:    sm.userID,
+		DAGName:   sm.dagName,
 		CreatedAt: sm.createdAt,
 		UpdatedAt: sm.lastActivity,
 	}
@@ -353,6 +360,7 @@ func (sm *SessionManager) ensureLoop(provider llm.Provider, modelID string, reso
 
 // createLoop creates a new Loop instance with the current configuration.
 func (sm *SessionManager) createLoop(provider llm.Provider, model string, history []llm.Message, safeMode bool) *Loop {
+	memory := sm.loadMemory()
 	return NewLoop(LoopConfig{
 		Provider:         provider,
 		Model:            model,
@@ -360,7 +368,7 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		Tools:            CreateTools(sm.environment.DAGsDir),
 		RecordMessage:    sm.createRecordMessageFunc(),
 		Logger:           sm.logger,
-		SystemPrompt:     GenerateSystemPrompt(sm.environment, nil),
+		SystemPrompt:     GenerateSystemPrompt(sm.environment, nil, memory),
 		WorkingDir:       sm.workingDir,
 		SessionID:        sm.id,
 		OnWorking:        sm.SetWorking,
@@ -373,6 +381,31 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		Username:         sm.username,
 		IPAddress:        sm.ipAddress,
 	})
+}
+
+// loadMemory loads memory content from the memory store.
+func (sm *SessionManager) loadMemory() MemoryContent {
+	if sm.memoryStore == nil {
+		return MemoryContent{}
+	}
+	ctx := context.Background()
+	global, err := sm.memoryStore.LoadGlobalMemory(ctx)
+	if err != nil {
+		sm.logger.Debug("failed to load global memory", "error", err)
+	}
+	var dagMem string
+	if sm.dagName != "" {
+		dagMem, err = sm.memoryStore.LoadDAGMemory(ctx, sm.dagName)
+		if err != nil {
+			sm.logger.Debug("failed to load DAG memory", "error", err, "dag_name", sm.dagName)
+		}
+	}
+	return MemoryContent{
+		GlobalMemory: global,
+		DAGMemory:    dagMem,
+		DAGName:      sm.dagName,
+		MemoryDir:    sm.memoryStore.MemoryDir(),
+	}
 }
 
 // runLoop executes the session loop and handles cleanup.

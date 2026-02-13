@@ -18,7 +18,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			BaseConfigFile: "/config/base.yaml",
 		}
 
-		result := GenerateSystemPrompt(env, nil)
+		result := GenerateSystemPrompt(env, nil, MemoryContent{})
 
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "/dags")
@@ -33,7 +33,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			FilePath: "/dags/test-dag.yaml",
 		}
 
-		result := GenerateSystemPrompt(env, dag)
+		result := GenerateSystemPrompt(env, dag, MemoryContent{})
 
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "test-dag")
@@ -42,9 +42,95 @@ func TestGenerateSystemPrompt(t *testing.T) {
 	t.Run("works with empty environment", func(t *testing.T) {
 		t.Parallel()
 
-		result := GenerateSystemPrompt(EnvironmentInfo{}, nil)
+		result := GenerateSystemPrompt(EnvironmentInfo{}, nil, MemoryContent{})
 
 		assert.NotEmpty(t, result)
+	})
+
+	t.Run("no memory omits memory section", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+
+		result := GenerateSystemPrompt(env, nil, MemoryContent{})
+
+		assert.NotContains(t, result, "<global_memory>")
+		assert.NotContains(t, result, "<dag_memory")
+		assert.NotContains(t, result, "<memory_paths>")
+		assert.NotContains(t, result, "<memory_management>")
+	})
+
+	t.Run("includes global memory only", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+		mem := MemoryContent{
+			GlobalMemory: "User prefers concise output.",
+			MemoryDir:    "/dags/memory",
+		}
+
+		result := GenerateSystemPrompt(env, nil, mem)
+
+		assert.Contains(t, result, "<global_memory>")
+		assert.Contains(t, result, "User prefers concise output.")
+		assert.NotContains(t, result, "<dag_memory")
+	})
+
+	t.Run("includes both global and DAG memory", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+		mem := MemoryContent{
+			GlobalMemory: "Global info.",
+			DAGMemory:    "DAG-specific info.",
+			DAGName:      "my-etl",
+			MemoryDir:    "/dags/memory",
+		}
+
+		result := GenerateSystemPrompt(env, nil, mem)
+
+		assert.Contains(t, result, "<global_memory>")
+		assert.Contains(t, result, "Global info.")
+		assert.Contains(t, result, `<dag_memory dag="my-etl">`)
+		assert.Contains(t, result, "DAG-specific info.")
+	})
+
+	t.Run("memory paths appear in output", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+		mem := MemoryContent{
+			MemoryDir: "/dags/memory",
+			DAGName:   "test-dag",
+		}
+
+		result := GenerateSystemPrompt(env, nil, mem)
+
+		assert.Contains(t, result, "/dags/memory/MEMORY.md")
+		assert.Contains(t, result, "/dags/memory/dags/test-dag/MEMORY.md")
+	})
+
+	t.Run("memory management enforces DAG-first policy", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+		mem := MemoryContent{
+			MemoryDir: "/dags/memory",
+			DAGName:   "new-etl",
+		}
+
+		result := GenerateSystemPrompt(env, nil, mem)
+
+		assert.Contains(t, result, "If DAG context is available, save memory to Per-DAG by default (not Global)")
+		assert.Contains(t, result, "After creating or updating a DAG, if anything should be remembered, create/update that DAG's memory file")
+		assert.Contains(t, result, "Global memory is only for cross-DAG or user-wide stable preferences/policies")
+	})
+
+	t.Run("memory management requires confirmation before global write without DAG context", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+		mem := MemoryContent{
+			MemoryDir: "/dags/memory",
+		}
+
+		result := GenerateSystemPrompt(env, nil, mem)
+
+		assert.Contains(t, result, "If no DAG context is available, ask the user before writing to Global memory")
 	})
 }
 
@@ -57,7 +143,7 @@ func TestFallbackPrompt(t *testing.T) {
 		result := fallbackPrompt(EnvironmentInfo{DAGsDir: "/my/dags"})
 
 		assert.Contains(t, result, "/my/dags")
-		assert.Contains(t, result, "Hermio")
+		assert.Contains(t, result, "Tsumugi")
 	})
 
 	t.Run("works with empty environment", func(t *testing.T) {
@@ -66,6 +152,6 @@ func TestFallbackPrompt(t *testing.T) {
 		result := fallbackPrompt(EnvironmentInfo{})
 
 		assert.NotEmpty(t, result)
-		assert.Contains(t, result, "Hermio")
+		assert.Contains(t, result, "Tsumugi")
 	})
 }

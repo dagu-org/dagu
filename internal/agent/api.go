@@ -71,6 +71,7 @@ type API struct {
 	dagStore    exec.DAGStore // For resolving DAG file paths
 	environment EnvironmentInfo
 	hooks       *Hooks
+	memoryStore MemoryStore
 }
 
 // APIConfig contains configuration for the API.
@@ -83,6 +84,7 @@ type APIConfig struct {
 	DAGStore     exec.DAGStore // For resolving DAG file paths
 	Environment  EnvironmentInfo
 	Hooks        *Hooks
+	MemoryStore  MemoryStore
 }
 
 // SessionWithState is a session with its current state.
@@ -110,6 +112,7 @@ func NewAPI(cfg APIConfig) *API {
 		dagStore:    cfg.DAGStore,
 		environment: cfg.Environment,
 		hooks:       cfg.Hooks,
+		memoryStore: cfg.MemoryStore,
 	}
 }
 
@@ -277,13 +280,14 @@ func (a *API) createMessageCallback(id string) func(ctx context.Context, msg Mes
 }
 
 // persistNewSession saves a new session to the store if configured.
-func (a *API) persistNewSession(ctx context.Context, id, userID string, now time.Time) {
+func (a *API) persistNewSession(ctx context.Context, id, userID, dagName string, now time.Time) {
 	if a.store == nil {
 		return
 	}
 	sess := &Session{
 		ID:        id,
 		UserID:    userID,
+		DAGName:   dagName,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -340,6 +344,13 @@ func (a *API) handleNewSession(w http.ResponseWriter, r *http.Request) {
 	id := uuid.New().String()
 	now := time.Now()
 
+	// Extract primary DAG name from resolved contexts for per-DAG memory
+	resolved := a.resolveContexts(r.Context(), req.DAGContexts)
+	var dagName string
+	if len(resolved) > 0 {
+		dagName = resolved[0].DAGName
+	}
+
 	mgr := NewSessionManager(SessionManagerConfig{
 		ID:              id,
 		UserID:          userID,
@@ -353,12 +364,14 @@ func (a *API) handleNewSession(w http.ResponseWriter, r *http.Request) {
 		IPAddress:       ipAddress,
 		InputCostPer1M:  modelCfg.InputCostPer1M,
 		OutputCostPer1M: modelCfg.OutputCostPer1M,
+		MemoryStore:     a.memoryStore,
+		DAGName:         dagName,
 	})
 
-	a.persistNewSession(r.Context(), id, userID, now)
+	a.persistNewSession(r.Context(), id, userID, dagName, now)
 	a.sessions.Store(id, mgr)
 
-	messageWithContext := a.formatMessage(r.Context(), req.Message, req.DAGContexts)
+	messageWithContext := formatMessageWithContexts(req.Message, resolved)
 	if err := mgr.AcceptUserMessage(r.Context(), provider, model, modelCfg.Model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		a.respondError(w, http.StatusInternalServerError, api.ErrorCodeInternalError, "Failed to process message")
@@ -609,6 +622,8 @@ func (a *API) reactivateSession(ctx context.Context, id, userID, username, ipAdd
 		Hooks:       a.hooks,
 		Username:    username,
 		IPAddress:   ipAddress,
+		MemoryStore: a.memoryStore,
+		DAGName:     sess.DAGName,
 	})
 	a.sessions.Store(id, mgr)
 

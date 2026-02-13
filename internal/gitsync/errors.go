@@ -99,6 +99,23 @@ func (e *NetworkError) Unwrap() error {
 	return errors.Join(ErrNetworkError, e.Cause)
 }
 
+// InvalidDAGIDError represents an invalid DAG identifier.
+type InvalidDAGIDError struct {
+	DAGID  string
+	Reason string
+}
+
+func (e *InvalidDAGIDError) Error() string {
+	if e.Reason == "" {
+		return fmt.Sprintf("invalid DAG ID %q", e.DAGID)
+	}
+	return fmt.Sprintf("invalid DAG ID %q: %s", e.DAGID, e.Reason)
+}
+
+func (e *InvalidDAGIDError) Unwrap() error {
+	return ErrInvalidDAGID
+}
+
 // IsConflict checks if the error is a conflict error.
 func IsConflict(err error) bool {
 	return errors.Is(err, ErrConflict)
@@ -112,4 +129,9 @@ func IsNotEnabled(err error) bool {
 // IsDAGNotFound checks if the error indicates DAG was not found.
 func IsDAGNotFound(err error) bool {
 	return errors.Is(err, ErrDAGNotFound)
+}
+
+// IsInvalidDAGID checks if the error indicates DAG ID is invalid.
+func IsInvalidDAGID(err error) bool {
+	return errors.Is(err, ErrInvalidDAGID)
 }

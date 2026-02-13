@@ -34,15 +34,17 @@ type CurrentDAG struct {
 type systemPromptData struct {
 	EnvironmentInfo
 	CurrentDAG *CurrentDAG
+	Memory     MemoryContent
 }
 
-// GenerateSystemPrompt renders the system prompt template with the given environment
-// and optional DAG context.
-func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG) string {
+// GenerateSystemPrompt renders the system prompt template with the given environment,
+// optional DAG context, and memory content.
+func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG, memory MemoryContent) string {
 	var buf bytes.Buffer
 	data := systemPromptData{
 		EnvironmentInfo: env,
 		CurrentDAG:      currentDAG,
+		Memory:          memory,
 	}
 	if err := systemPromptTemplate.Execute(&buf, data); err != nil {
 		return fallbackPrompt(env)
@@ -52,5 +54,5 @@ func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG) string {
 
 // fallbackPrompt returns a basic prompt when template execution fails.
 func fallbackPrompt(env EnvironmentInfo) string {
-	return "You are Hermio, an AI assistant for DAG workflows. DAGs Directory: " + env.DAGsDir
+	return "You are Tsumugi, an AI assistant for DAG workflows. DAGs Directory: " + env.DAGsDir
 }

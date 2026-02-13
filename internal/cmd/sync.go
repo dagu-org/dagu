@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"sort"
 	"strings"
 	"text/tabwriter"
 
@@ -231,7 +232,22 @@ func runSyncPublish(ctx *Context, args []string) error {
 
 	if publishAll {
 		fmt.Println("Publishing all modified DAGs...")
-		result, err = syncSvc.PublishAll(ctx, message)
+		status, statusErr := syncSvc.GetStatus(ctx)
+		if statusErr != nil {
+			return fmt.Errorf("failed to get sync status: %w", statusErr)
+		}
+		var dagIDs []string
+		for id, dagState := range status.DAGs {
+			if dagState.Status == gitsync.StatusModified || dagState.Status == gitsync.StatusUntracked {
+				dagIDs = append(dagIDs, id)
+			}
+		}
+		sort.Strings(dagIDs)
+		if len(dagIDs) == 0 {
+			fmt.Println("No modified or untracked DAGs to publish")
+			return nil
+		}
+		result, err = syncSvc.PublishAll(ctx, message, dagIDs)
 	} else {
 		fmt.Printf("Publishing DAG: %s...\n", args[0])
 		result, err = syncSvc.Publish(ctx, args[0], message, force)
@@ -328,15 +344,9 @@ func runSyncDiscard(ctx *Context, args []string) error {
 
 // newSyncService creates a new GitSync service from the context configuration.
 func newSyncService(ctx *Context) (gitsync.Service, error) {
-	cfg := ctx.Config.GitSync
-
-	syncCfg := gitsync.NewConfigFromGlobal(cfg)
-
+	syncCfg := gitsync.NewConfigFromGlobal(ctx.Config.GitSync)
 	if !syncCfg.Enabled {
 		return nil, fmt.Errorf("git sync is not enabled, set gitSync.enabled=true in your config")
 	}
-
-	// Create the service
-	svc := gitsync.NewService(syncCfg, ctx.Config.Paths.DAGsDir, ctx.Config.Paths.DataDir)
-	return svc, nil
+	return gitsync.NewService(syncCfg, ctx.Config.Paths.DAGsDir, ctx.Config.Paths.DataDir), nil
 }
