@@ -154,9 +154,17 @@ func runStart(ctx *Context, args []string) error {
 			dag.Name = nameOverride
 		}
 	} else {
+		if err := validateStartArgumentSeparator(ctx, args); err != nil {
+			return err
+		}
+
 		// Load parameters and DAG
 		dag, params, err = loadDAGWithParams(ctx, args, isSubDAGRun)
 		if err != nil {
+			return err
+		}
+
+		if err := validateStartPositionalParamCount(ctx, args, dag); err != nil {
 			return err
 		}
 	}
