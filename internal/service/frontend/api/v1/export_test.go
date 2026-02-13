@@ -2,8 +2,8 @@ package api
 
 // Export internal functions for testing
 var (
-	ExtractWebhookToken    = extractWebhookToken
-	MarshalWebhookPayload  = marshalWebhookPayload
-	IsWebhookTriggerPath   = isWebhookTriggerPath
-	WithRawBody            = withRawBody
+	ExtractWebhookToken   = extractWebhookToken
+	MarshalWebhookPayload = marshalWebhookPayload
+	IsWebhookTriggerPath  = isWebhookTriggerPath
+	WithRawBody           = withRawBody
 )

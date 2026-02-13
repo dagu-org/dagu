@@ -69,10 +69,10 @@ func withRawBody(ctx context.Context, body []byte) context.Context {
 // in the path with a non-empty segment after it.
 func isWebhookTriggerPath(urlPath string) bool {
 	path := strings.TrimRight(urlPath, "/")
-	idx := strings.Index(path, "/webhooks/")
-	if idx < 0 {
+	_, after, ok := strings.Cut(path, "/webhooks/")
+	if !ok {
 		return false
 	}
-	after := path[idx+len("/webhooks/"):]
+	after := after
 	return after != ""
 }
