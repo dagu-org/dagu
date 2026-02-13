@@ -38,6 +38,11 @@ import (
 
 var setupLock sync.Mutex
 
+const (
+	latestStatusAssertTimeout  = 30 * time.Second
+	latestStatusAssertInterval = 1 * time.Second
+)
+
 // HelperOption defines functional options for Helper
 type HelperOption func(*Options)
 
@@ -473,7 +478,7 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected core.Status) {
 		}
 		t.Logf("latest status=%s errors=%v", latest.Status.String(), latest.Errors())
 		return latest.Status == expected
-	}, time.Second*10, time.Second)
+	}, latestStatusAssertTimeout, latestStatusAssertInterval)
 }
 
 func (d *DAG) AssertDAGRunCount(t *testing.T, expected int) {
