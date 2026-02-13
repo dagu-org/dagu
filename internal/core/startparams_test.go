@@ -1,4 +1,4 @@
-package startvalidation
+package core
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestValidateArgumentSeparator(t *testing.T) {
+func TestValidateStartArgs(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -35,7 +35,7 @@ func TestValidateArgumentSeparator(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := ValidateArgumentSeparator(tt.hasDash, tt.args)
+			err := ValidateStartArgs(tt.hasDash, tt.args)
 			if tt.wantErr == "" {
 				require.NoError(t, err)
 				return
@@ -46,60 +46,60 @@ func TestValidateArgumentSeparator(t *testing.T) {
 	}
 }
 
-func TestValidatePositionalParamCount(t *testing.T) {
+func TestValidateStartParams(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name          string
 		defaultParams string
-		input         ParamInput
+		input         StartParamInput
 		wantErr       string
 	}{
 		{
 			name:          "NoDeclaredParamsAllowsPositional",
 			defaultParams: "",
-			input:         ParamInput{DashArgs: []string{"success"}},
+			input:         StartParamInput{DashArgs: []string{"success"}},
 		},
 		{
 			name:          "NoDeclaredParamsAllowsNamedPairs",
 			defaultParams: "",
-			input:         ParamInput{DashArgs: []string{"key1=value1", "key2=value2"}},
+			input:         StartParamInput{DashArgs: []string{"key1=value1", "key2=value2"}},
 		},
 		{
 			name:          "AllowsNoProvidedParamsWhenDeclared",
 			defaultParams: "p1 p2",
-			input:         ParamInput{},
+			input:         StartParamInput{},
 		},
 		{
 			name:          "AllowsFewerThanDeclaredPositional",
 			defaultParams: "p1 p2",
-			input:         ParamInput{DashArgs: []string{"only-one"}},
+			input:         StartParamInput{DashArgs: []string{"only-one"}},
 		},
 		{
 			name:          "RejectsMoreThanDeclaredPositional",
 			defaultParams: "p1 p2",
-			input:         ParamInput{DashArgs: []string{"one", "two", "three"}},
+			input:         StartParamInput{DashArgs: []string{"one", "two", "three"}},
 			wantErr:       "too many positional params: expected at most 2, got 3",
 		},
 		{
 			name:          "NamedOnlyBypassesPositionalCount",
 			defaultParams: "p1 p2",
-			input:         ParamInput{RawParams: "KEY1=value1 KEY2=value2"},
+			input:         StartParamInput{RawParams: "KEY1=value1 KEY2=value2"},
 		},
 		{
 			name:          "JSONRawBypassesValidation",
 			defaultParams: "p1 p2",
-			input:         ParamInput{RawParams: `{"k":"v"}`},
+			input:         StartParamInput{RawParams: `{"k":"v"}`},
 		},
 		{
 			name:          "JSONDashBypassesValidation",
 			defaultParams: "p1 p2",
-			input:         ParamInput{DashArgs: []string{`{"k":"v"}`}},
+			input:         StartParamInput{DashArgs: []string{`{"k":"v"}`}},
 		},
 		{
 			name:          "NamedDeclaredParamCountsAsOneExpected",
 			defaultParams: "ITEM=default",
-			input:         ParamInput{DashArgs: []string{"server1"}},
+			input:         StartParamInput{DashArgs: []string{"server1"}},
 		},
 	}
 
@@ -107,7 +107,7 @@ func TestValidatePositionalParamCount(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := ValidatePositionalParamCount(tt.defaultParams, tt.input)
+			err := ValidateStartParams(tt.defaultParams, tt.input)
 			if tt.wantErr == "" {
 				require.NoError(t, err)
 				return

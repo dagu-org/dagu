@@ -1,4 +1,4 @@
-package startvalidation
+package core
 
 import (
 	"encoding/json"
@@ -14,9 +14,9 @@ type paramToken struct {
 	Value string
 }
 
-// ParamInput describes start params regardless of caller (CLI/API).
+// StartParamInput describes start params regardless of caller (CLI/API).
 // Use DashArgs for params passed after "--", or RawParams for --params style input.
-type ParamInput struct {
+type StartParamInput struct {
 	DashArgs  []string
 	RawParams string
 }
@@ -26,7 +26,7 @@ var paramTokenRegex = regexp.MustCompile(
 	`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`[^`]*`" + `|[^"\s]+)`,
 )
 
-func ValidateArgumentSeparator(hasDash bool, args []string) error {
+func ValidateStartArgs(hasDash bool, args []string) error {
 	if hasDash || len(args) <= 1 {
 		return nil
 	}
@@ -36,9 +36,9 @@ func ValidateArgumentSeparator(hasDash bool, args []string) error {
 	)
 }
 
-// ValidatePositionalParamCount validates positional params against declared defaults.
+// ValidateStartParams validates positional params against declared defaults.
 // Rule: allow 0..expected positional params; reject only when positional params exceed expected.
-func ValidatePositionalParamCount(defaultParams string, input ParamInput) error {
+func ValidateStartParams(defaultParams string, input StartParamInput) error {
 	provided, skipValidation := extractProvidedParamTokens(input)
 	if skipValidation || len(provided) == 0 {
 		return nil
@@ -63,7 +63,7 @@ func ValidatePositionalParamCount(defaultParams string, input ParamInput) error 
 	return nil
 }
 
-func extractProvidedParamTokens(input ParamInput) ([]paramToken, bool) {
+func extractProvidedParamTokens(input StartParamInput) ([]paramToken, bool) {
 	if len(input.DashArgs) > 0 {
 		if shouldSkipDashArgsPositionalValidation(input.DashArgs) {
 			return nil, true
