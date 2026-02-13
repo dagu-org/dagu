@@ -164,6 +164,82 @@ func TestParseStringParams(t *testing.T) {
 	}
 }
 
+func TestParseStringParams_NoEval_Matrix(t *testing.T) {
+	t.Parallel()
+
+	ctx := BuildContext{
+		ctx:  context.Background(),
+		opts: BuildOpts{Flags: BuildFlagNoEval},
+	}
+
+	tests := []struct {
+		name     string
+		input    string
+		expected []paramPair
+	}{
+		{
+			name:  "NamedBacktickWithInnerDoubleQuotes",
+			input: `cmd=` + "`echo \"hello world\"`",
+			expected: []paramPair{
+				{Name: "cmd", Value: "`echo \"hello world\"`"},
+			},
+		},
+		{
+			name:  "PositionalBacktickToken",
+			input: "`echo \"hello\"`",
+			expected: []paramPair{
+				{Name: "", Value: "`echo \"hello\"`"},
+			},
+		},
+		{
+			name:  "MixedNamedBacktickQuotedAndPositional",
+			input: `A=1 cmd=` + "`echo \"x\"`" + ` B="y z" bare`,
+			expected: []paramPair{
+				{Name: "A", Value: "1"},
+				{Name: "cmd", Value: "`echo \"x\"`"},
+				{Name: "B", Value: "y z"},
+				{Name: "", Value: "bare"},
+			},
+		},
+		{
+			name:  "EscapedQuotesInDoubleQuotedToken",
+			input: `X="a \"b\"" Y=2`,
+			expected: []paramPair{
+				{Name: "X", Value: `a "b\`},
+				{Name: "Y", Value: "2"},
+			},
+		},
+		{
+			name:     "EmptyInput",
+			input:    "",
+			expected: nil,
+		},
+		{
+			name:     "WhitespaceInput",
+			input:    "   ",
+			expected: nil,
+		},
+		{
+			name:  "UnterminatedDoubleQuoteFallback",
+			input: `A="unterminated B=2`,
+			expected: []paramPair{
+				{Name: "", Value: "A="},
+				{Name: "", Value: "unterminated"},
+				{Name: "B", Value: "2"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := parseStringParams(ctx, tt.input)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
 func TestParseStringParamsWithJSON(t *testing.T) {
 	t.Parallel()
 
