@@ -18,7 +18,7 @@ type paramToken struct {
 
 // paramTokenRegex matches positional and named params similarly to spec.parseStringParams.
 var paramTokenRegex = regexp.MustCompile(
-	`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`(" + `?:\\"|[^"]*)` + "`" + `|[^"\s]+)`,
+	`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`[^`]*`" + `|[^"\s]+)`,
 )
 
 func validateStartArgumentSeparator(ctx *Context, args []string) error {
@@ -43,11 +43,13 @@ func validateStartPositionalParamCount(ctx *Context, args []string, dag *core.DA
 		return nil
 	}
 
-	expected, err := countDeclaredPositionalParams(dag.DefaultParams)
-	if err != nil {
-		return err
-	}
 	got := countPositionalParams(provided)
+	if got == 0 {
+		// Named-only params should not trigger positional count validation.
+		return nil
+	}
+
+	expected := countDeclaredPositionalParams(dag.DefaultParams)
 	if got != expected {
 		return fmt.Errorf("invalid number of positional params: expected %d, got %d", expected, got)
 	}
@@ -109,9 +111,8 @@ func parseParamTokens(input string) []paramToken {
 		}
 		name := match[1]
 		value := match[2]
-		if strings.HasPrefix(value, `"`) {
-			value = strings.Trim(value, `"`)
-			value = strings.ReplaceAll(value, `\"`, `"`)
+		if strings.HasPrefix(value, `"`) && strings.HasSuffix(value, `"`) {
+			value = stringutil.RemoveQuotes(value)
 		}
 		tokens = append(tokens, paramToken{Name: name, Value: value})
 	}
@@ -128,9 +129,9 @@ func countPositionalParams(tokens []paramToken) int {
 	return count
 }
 
-func countDeclaredPositionalParams(defaultParams string) (int, error) {
+func countDeclaredPositionalParams(defaultParams string) int {
 	if strings.TrimSpace(defaultParams) == "" {
-		return 0, nil
+		return 0
 	}
 
 	count := 0
@@ -139,7 +140,7 @@ func countDeclaredPositionalParams(defaultParams string) (int, error) {
 			count++
 		}
 	}
-	return count, nil
+	return count
 }
 
 func isPositionalDefaultName(name string) bool {

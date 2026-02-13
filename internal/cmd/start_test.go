@@ -9,7 +9,6 @@ import (
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/test"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -138,6 +137,20 @@ steps:
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalid number of positional params: expected 2, got 1")
 	})
+
+	t.Run("AllowsNamedOnlyWithPositionalDefaults", func(t *testing.T) {
+		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", "--params", "KEY1=value1 KEY2=value2", dagFile},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("AllowsJSONParamsWithoutPositionalValidation", func(t *testing.T) {
+		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", "--params", `{"KEY":"value"}`, dagFile},
+		})
+		require.NoError(t, err)
+	})
 }
 
 func TestCmdStart_NamedParamsIgnorePositionalCount(t *testing.T) {
@@ -153,7 +166,7 @@ steps:
 	err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
 		Args: []string{"start", "--params", "KEY1=value1 KEY2=value2", dagFile},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestCmdStart_FromRunID(t *testing.T) {

@@ -147,6 +147,11 @@ func TestParseStringParams(t *testing.T) {
 			input:    "cmd=`echo hello`",
 			expected: []paramPair{{Name: "cmd", Value: "`echo hello`"}},
 		},
+		{
+			name:     "BacktickValueWithDoubleQuotes",
+			input:    `cmd=` + "`echo \"hello world\"`",
+			expected: []paramPair{{Name: "cmd", Value: "`echo \"hello world\"`"}},
+		},
 	}
 
 	for _, tt := range tests {
