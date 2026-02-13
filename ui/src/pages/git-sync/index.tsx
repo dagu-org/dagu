@@ -1,4 +1,9 @@
-import { components, SyncStatus, SyncSummary } from '@/api/v1/schema';
+import {
+  components,
+  SyncDAGKind,
+  SyncStatus,
+  SyncSummary,
+} from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -37,11 +42,55 @@ import {
   Upload,
 } from 'lucide-react';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { DiffModal } from './DiffModal';
 
 type SyncStatusResponse = components['schemas']['SyncStatusResponse'];
 type SyncConfigResponse = components['schemas']['SyncConfigResponse'];
 type SyncDAGDiffResponse = components['schemas']['SyncDAGDiffResponse'];
+type SyncDAGState = components['schemas']['SyncDAGState'];
+type StatusFilter = 'all' | 'modified' | 'untracked' | 'conflict';
+type TypeFilter = 'all' | 'dag' | 'memory';
+type SyncItemKind = 'dag' | 'memory';
+type SyncRow = { dagId: string; dag: SyncDAGState; kind: SyncItemKind };
+
+const statusFilters: StatusFilter[] = [
+  'all',
+  'modified',
+  'untracked',
+  'conflict',
+];
+const typeFilters: TypeFilter[] = ['all', 'dag', 'memory'];
+
+function parseStatusFilter(value: string | null): StatusFilter {
+  if (
+    value === 'all' ||
+    value === 'modified' ||
+    value === 'untracked' ||
+    value === 'conflict'
+  ) {
+    return value;
+  }
+  return 'all';
+}
+
+function parseTypeFilter(value: string | null): TypeFilter {
+  if (value === 'all' || value === 'dag' || value === 'memory') {
+    return value;
+  }
+  return 'all';
+}
+
+function normalizeSyncItemKind(dagId: string, dag: SyncDAGState): SyncItemKind {
+  const rawKind = (dag as { kind?: SyncDAGKind | string }).kind;
+  if (rawKind === SyncDAGKind.memory || rawKind === 'memory') {
+    return 'memory';
+  }
+  if (rawKind === SyncDAGKind.dag || rawKind === 'dag') {
+    return 'dag';
+  }
+  return dagId.startsWith('memory/') ? 'memory' : 'dag';
+}
 
 // Subtle, readable status colors
 const summaryConfig: Record<
@@ -101,9 +150,6 @@ export default function GitSyncPage() {
     dagId?: string;
   }>({ open: false });
   const [commitMessage, setCommitMessage] = useState('');
-  const [filter, setFilter] = useState<
-    'all' | 'modified' | 'untracked' | 'conflict'
-  >('all');
   const [diffModal, setDiffModal] = useState<{ open: boolean; dagId?: string }>(
     { open: false }
   );
@@ -115,6 +161,7 @@ export default function GitSyncPage() {
   const [selectedDags, setSelectedDags] = useState<Set<string>>(new Set());
   const userTouchedSelectionRef = useRef(false);
   const prevPublishableRef = useRef<string>('');
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     setTitle('Git Sync');
@@ -142,19 +189,55 @@ export default function GitSyncPage() {
 
   const status = statusData as SyncStatusResponse | undefined;
   const config = configData as SyncConfigResponse | undefined;
+  const statusFilter = parseStatusFilter(searchParams.get('status'));
+  const typeFilter = parseTypeFilter(searchParams.get('type'));
+
+  const setFilters = useCallback(
+    (next: Partial<{ status: StatusFilter; type: TypeFilter }>) => {
+      const nextStatus = next.status ?? statusFilter;
+      const nextType = next.type ?? typeFilter;
+      const params = new URLSearchParams(searchParams);
+
+      if (nextStatus === 'all') {
+        params.delete('status');
+      } else {
+        params.set('status', nextStatus);
+      }
+
+      if (nextType === 'all') {
+        params.delete('type');
+      } else {
+        params.set('type', nextType);
+      }
+
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams, statusFilter, typeFilter]
+  );
+
+  const syncRows = useMemo<SyncRow[]>(
+    () =>
+      status?.dags
+        ? Object.entries(status.dags).map(([dagId, dag]) => ({
+            dagId,
+            dag,
+            kind: normalizeSyncItemKind(dagId, dag),
+          }))
+        : [],
+    [status?.dags]
+  );
 
   const publishableKey = useMemo(() => {
-    if (!status?.dags) return '';
-    return Object.entries(status.dags)
+    return syncRows
       .filter(
-        ([, dag]) =>
+        ({ dag }) =>
           dag.status === SyncStatus.modified ||
           dag.status === SyncStatus.untracked
       )
-      .map(([id]) => id)
+      .map(({ dagId }) => dagId)
       .sort()
       .join(',');
-  }, [status?.dags]);
+  }, [syncRows]);
 
   useEffect(() => {
     userTouchedSelectionRef.current = false;
@@ -301,29 +384,28 @@ export default function GitSyncPage() {
     }
   };
 
-  // Filter DAGs by status
-  const filteredDags = useMemo(
+  const filteredRows = useMemo(
     () =>
-      status?.dags
-        ? Object.entries(status.dags).filter(([, dag]) => {
-            if (filter === 'all') return true;
-            return dag.status === filter;
-          })
-        : [],
-    [status?.dags, filter]
+      syncRows.filter(({ dag, kind }) => {
+        const typeMatches = typeFilter === 'all' || kind === typeFilter;
+        const statusMatches =
+          statusFilter === 'all' || dag.status === statusFilter;
+        return typeMatches && statusMatches;
+      }),
+    [syncRows, typeFilter, statusFilter]
   );
 
   // Publishable DAG IDs among currently visible (filtered) rows
   const publishableDagIds = useMemo(
     () =>
-      filteredDags
+      filteredRows
         .filter(
-          ([, dag]) =>
+          ({ dag }) =>
             dag.status === SyncStatus.modified ||
             dag.status === SyncStatus.untracked
         )
-        .map(([id]) => id),
-    [filteredDags]
+        .map(({ dagId }) => dagId),
+    [filteredRows]
   );
 
   const allPublishableSelected = useMemo(
@@ -356,11 +438,69 @@ export default function GitSyncPage() {
     });
   }, []);
 
-  const getFilterCount = (f: string): number => {
-    if (!status?.counts) return 0;
-    if (f === 'all') return Object.keys(status.dags || {}).length;
-    return status.counts[f as keyof typeof status.counts] || 0;
-  };
+  const typeCounts = useMemo(() => {
+    const counts: Record<TypeFilter, number> = {
+      all: syncRows.length,
+      dag: 0,
+      memory: 0,
+    };
+    for (const { kind } of syncRows) {
+      counts[kind] += 1;
+    }
+    return counts;
+  }, [syncRows]);
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<StatusFilter, number> = {
+      all: 0,
+      modified: 0,
+      untracked: 0,
+      conflict: 0,
+    };
+
+    for (const { dag, kind } of syncRows) {
+      if (typeFilter !== 'all' && kind !== typeFilter) {
+        continue;
+      }
+      counts.all += 1;
+      if (dag.status === SyncStatus.modified) counts.modified += 1;
+      if (dag.status === SyncStatus.untracked) counts.untracked += 1;
+      if (dag.status === SyncStatus.conflict) counts.conflict += 1;
+    }
+
+    return counts;
+  }, [syncRows, typeFilter]);
+
+  const rowByID = useMemo(
+    () => new Map(syncRows.map((row) => [row.dagId, row] as const)),
+    [syncRows]
+  );
+
+  const selectedCounts = useMemo(() => {
+    let dag = 0;
+    let memory = 0;
+    for (const dagID of selectedDags) {
+      const row = rowByID.get(dagID);
+      if (!row) continue;
+      if (row.kind === 'memory') memory += 1;
+      else dag += 1;
+    }
+    return { dag, memory, total: dag + memory };
+  }, [selectedDags, rowByID]);
+
+  const emptyStateMessage = useMemo(() => {
+    if (typeFilter === 'all' && statusFilter === 'all') {
+      return 'No items found';
+    }
+    if (typeFilter === 'all') {
+      return `No ${statusFilter} items`;
+    }
+    const typeLabel = typeFilter === 'dag' ? 'DAG' : 'memory';
+    if (statusFilter === 'all') {
+      return `No ${typeLabel} items`;
+    }
+    return `No ${typeLabel} items with ${statusFilter} status`;
+  }, [statusFilter, typeFilter]);
 
   // Not configured state
   if (!status?.enabled) {

@@ -6209,12 +6209,21 @@ components:
         - conflict
         - error
 
+    SyncDAGKind:
+      type: string
+      description: "Type of sync item"
+      enum:
+        - dag
+        - memory
+
     SyncDAGState:
       type: object
       description: "Sync state for a single DAG"
       properties:
         status:
           $ref: "#/components/schemas/SyncStatus"
+        kind:
+          $ref: "#/components/schemas/SyncDAGKind"
         baseCommit:
           type: string
           description: "Commit hash when last synced"
@@ -6247,6 +6256,7 @@ components:
           description: "When the conflict was detected"
       required:
         - status
+        - kind
 
     SyncStatusCounts:
       type: object

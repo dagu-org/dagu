@@ -2736,9 +2736,15 @@ export interface components {
          * @enum {string}
          */
         SyncSummary: SyncSummary;
+        /**
+         * @description Type of sync item
+         * @enum {string}
+         */
+        SyncDAGKind: SyncDAGKind;
         /** @description Sync state for a single DAG */
         SyncDAGState: {
             status: components["schemas"]["SyncStatus"];
+            kind: components["schemas"]["SyncDAGKind"];
             /** @description Commit hash when last synced */
             baseCommit?: string;
             /** @description Content hash when last synced */
@@ -8371,6 +8377,10 @@ export enum SyncSummary {
     pending = "pending",
     conflict = "conflict",
     error = "error"
+}
+export enum SyncDAGKind {
+    dag = "dag",
+    memory = "memory"
 }
 export enum SyncAuthConfigType {
     token = "token",

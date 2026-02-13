@@ -376,14 +376,33 @@ func toAPISyncStatus(s gitsync.SyncStatus) api.SyncStatus {
 	}
 }
 
+func toAPISyncDAGKind(dagID string, kind gitsync.DAGKind) api.SyncDAGKind {
+	if kind == "" {
+		kind = gitsync.KindForDAGID(dagID)
+	}
+
+	switch kind {
+	case gitsync.DAGKindMemory:
+		return api.SyncDAGKindMemory
+	case gitsync.DAGKindDAG:
+		return api.SyncDAGKindDag
+	default:
+		return api.SyncDAGKindDag
+	}
+}
+
 func toAPISyncDAGStates(states map[string]*gitsync.DAGState) *map[string]api.SyncDAGState {
 	if states == nil {
 		return nil
 	}
 	result := make(map[string]api.SyncDAGState)
 	for id, state := range states {
+		if state == nil {
+			continue
+		}
 		result[id] = api.SyncDAGState{
 			Status:             toAPISyncStatus(state.Status),
+			Kind:               toAPISyncDAGKind(id, state.Kind),
 			BaseCommit:         ptrOf(state.BaseCommit),
 			LastSyncedHash:     ptrOf(state.LastSyncedHash),
 			LastSyncedAt:       state.LastSyncedAt,

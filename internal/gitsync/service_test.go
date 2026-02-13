@@ -136,11 +136,13 @@ func TestScanMemoryFiles(t *testing.T) {
 	globalID := filepath.Join("memory", "MEMORY")
 	assert.Contains(t, state.DAGs, globalID)
 	assert.Equal(t, StatusUntracked, state.DAGs[globalID].Status)
+	assert.Equal(t, DAGKindMemory, state.DAGs[globalID].Kind)
 
 	// Should find per-DAG memory
 	dagID := filepath.Join("memory", "dags", "my-dag", "MEMORY")
 	assert.Contains(t, state.DAGs, dagID)
 	assert.Equal(t, StatusUntracked, state.DAGs[dagID].Status)
+	assert.Equal(t, DAGKindMemory, state.DAGs[dagID].Kind)
 }
 
 func TestScanLocalDAGs_IgnoresNonMemoryMd(t *testing.T) {
@@ -163,9 +165,51 @@ func TestScanLocalDAGs_IgnoresNonMemoryMd(t *testing.T) {
 
 	// Should find the yaml DAG
 	assert.Contains(t, state.DAGs, "my-dag")
+	assert.Equal(t, DAGKindDAG, state.DAGs["my-dag"].Kind)
 
 	// Should NOT find README.md (it's not a yaml DAG or memory file at root)
 	assert.NotContains(t, state.DAGs, "README")
+}
+
+func TestService_GetStatusBackfillsKinds(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	dagsDir := filepath.Join(tempDir, "dags")
+	dataDir := filepath.Join(tempDir, "data")
+	require.NoError(t, os.MkdirAll(dagsDir, 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(dagsDir, "memory"), 0755))
+	require.NoError(t, os.MkdirAll(dataDir, 0755))
+
+	cfg := &Config{
+		Enabled:    true,
+		Repository: "host.com/org/repo",
+		Branch:     "main",
+	}
+
+	svc := NewService(cfg, dagsDir, dataDir)
+	impl, ok := svc.(*serviceImpl)
+	require.True(t, ok)
+
+	now := time.Now()
+	state := &State{
+		Version: 1,
+		DAGs: map[string]*DAGState{
+			"example":           {Status: StatusModified, ModifiedAt: &now},
+			"memory/MEMORY":     {Status: StatusUntracked, ModifiedAt: &now},
+			"memory/dags/a/MEMORY": {Status: StatusUntracked, ModifiedAt: &now},
+		},
+	}
+	require.NoError(t, impl.stateManager.Save(state))
+
+	status, err := svc.GetStatus(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, status.DAGs["example"])
+	require.NotNil(t, status.DAGs["memory/MEMORY"])
+	require.NotNil(t, status.DAGs["memory/dags/a/MEMORY"])
+	assert.Equal(t, DAGKindDAG, status.DAGs["example"].Kind)
+	assert.Equal(t, DAGKindMemory, status.DAGs["memory/MEMORY"].Kind)
+	assert.Equal(t, DAGKindMemory, status.DAGs["memory/dags/a/MEMORY"].Kind)
 }
 
 func TestResolvePublishTargets(t *testing.T) {

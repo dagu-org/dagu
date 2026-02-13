@@ -118,13 +118,6 @@ type DAGDiff struct {
 	RemoteMessage string     `json:"remoteMessage,omitempty"`
 }
 
-const agentMemoryDir = "memory"
-
-// isMemoryFile returns true if the file ID belongs to the memory directory.
-func isMemoryFile(id string) bool {
-	return strings.HasPrefix(id, agentMemoryDir+"/")
-}
-
 // fileExtensionForID returns the file extension for a given ID.
 func fileExtensionForID(id string) string {
 	if isMemoryFile(id) {
@@ -259,6 +252,7 @@ func (s *serviceImpl) syncFilesToDAGsDir(_ context.Context, pullResult *PullResu
 			now := time.Now()
 			state.DAGs[dagID] = &DAGState{
 				Status:         StatusSynced,
+				Kind:           KindForDAGID(dagID),
 				BaseCommit:     pullResult.CurrentCommit,
 				LastSyncedHash: repoHash,
 				LastSyncedAt:   &now,
@@ -284,6 +278,7 @@ func (s *serviceImpl) syncFilesToDAGsDir(_ context.Context, pullResult *PullResu
 				now := time.Now()
 				state.DAGs[dagID] = &DAGState{
 					Status:             StatusConflict,
+					Kind:               KindForDAGID(dagID),
 					BaseCommit:         dagState.BaseCommit,
 					LastSyncedHash:     dagState.LastSyncedHash,
 					LastSyncedAt:       dagState.LastSyncedAt,
@@ -307,6 +302,7 @@ func (s *serviceImpl) syncFilesToDAGsDir(_ context.Context, pullResult *PullResu
 			now := time.Now()
 			state.DAGs[dagID] = &DAGState{
 				Status:         StatusSynced,
+				Kind:           KindForDAGID(dagID),
 				BaseCommit:     pullResult.CurrentCommit,
 				LastSyncedHash: repoHash,
 				LastSyncedAt:   &now,
@@ -364,6 +360,7 @@ func (s *serviceImpl) scanLocalDAGs(state *State) error {
 		now := time.Now()
 		state.DAGs[dagID] = &DAGState{
 			Status:     StatusUntracked,
+			Kind:       DAGKindDAG,
 			LocalHash:  ComputeContentHash(content),
 			ModifiedAt: &now,
 		}
@@ -410,6 +407,7 @@ func (s *serviceImpl) scanMemoryFiles(state *State) {
 		now := time.Now()
 		state.DAGs[dagID] = &DAGState{
 			Status:     StatusUntracked,
+			Kind:       DAGKindMemory,
 			LocalHash:  ComputeContentHash(content),
 			ModifiedAt: &now,
 		}
@@ -455,6 +453,19 @@ func (s *serviceImpl) refreshLocalHashes(state *State) bool {
 			dagState.Status = StatusSynced
 			changed = true
 		}
+	}
+	return changed
+}
+
+// ensureDAGKinds backfills missing kind values for backward-compatible state files.
+func (s *serviceImpl) ensureDAGKinds(state *State) bool {
+	changed := false
+	for dagID, dagState := range state.DAGs {
+		if dagState == nil || dagState.Kind != "" {
+			continue
+		}
+		dagState.Kind = KindForDAGID(dagID)
+		changed = true
 	}
 	return changed
 }
@@ -526,7 +537,7 @@ func (s *serviceImpl) Publish(ctx context.Context, dagID, message string, force 
 
 	// Update DAG state to synced
 	contentHash := ComputeContentHash(content)
-	state.DAGs[dagID] = s.newSyncedDAGState(commitHash, contentHash)
+	state.DAGs[dagID] = s.newSyncedDAGState(dagID, commitHash, contentHash)
 	s.updateSuccessStateWithCommit(state, commitHash)
 
 	result.Success = true
@@ -634,7 +645,7 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string, dagIDs []s
 		}
 		content, _ := os.ReadFile(dagFilePath) //nolint:gosec // path constructed from internal dagsDir
 		contentHash := ComputeContentHash(content)
-		state.DAGs[dagID] = s.newSyncedDAGState(commitHash, contentHash)
+		state.DAGs[dagID] = s.newSyncedDAGState(dagID, commitHash, contentHash)
 		result.Synced = append(result.Synced, dagID)
 	}
 
@@ -692,7 +703,7 @@ func (s *serviceImpl) Discard(_ context.Context, dagID string) error {
 
 	// Update state
 	contentHash := ComputeContentHash(repoContent)
-	state.DAGs[dagID] = s.newSyncedDAGState(dagState.BaseCommit, contentHash)
+	state.DAGs[dagID] = s.newSyncedDAGState(dagID, dagState.BaseCommit, contentHash)
 	_ = s.stateManager.Save(state) // Best effort - discard was successful, state will sync on next operation
 
 	return nil
@@ -725,9 +736,10 @@ func (s *serviceImpl) GetStatus(_ context.Context) (*OverallStatus, error) {
 
 	// Refresh hashes for existing DAGs to detect local modifications
 	hashesChanged := s.refreshLocalHashes(state)
+	kindsUpdated := s.ensureDAGKinds(state)
 
 	// Save state if anything changed (best effort - read-only operation)
-	if newDAGs || hashesChanged {
+	if newDAGs || hashesChanged || kindsUpdated {
 		_ = s.stateManager.Save(state)
 	}
 
@@ -769,6 +781,10 @@ func (s *serviceImpl) GetDAGStatus(_ context.Context, dagID string) (*DAGState, 
 	dagState := state.DAGs[dagID]
 	if dagState == nil {
 		return nil, &DAGNotFoundError{DAGID: dagID}
+	}
+	if dagState.Kind == "" {
+		dagState.Kind = KindForDAGID(dagID)
+		_ = s.stateManager.Save(state)
 	}
 
 	return dagState, nil
@@ -1235,10 +1251,11 @@ func (s *serviceImpl) ensureRepoReady(ctx context.Context) error {
 }
 
 // newSyncedDAGState creates a new DAGState in synced status.
-func (s *serviceImpl) newSyncedDAGState(commitHash, contentHash string) *DAGState {
+func (s *serviceImpl) newSyncedDAGState(dagID, commitHash, contentHash string) *DAGState {
 	now := time.Now()
 	return &DAGState{
 		Status:         StatusSynced,
+		Kind:           KindForDAGID(dagID),
 		BaseCommit:     commitHash,
 		LastSyncedHash: contentHash,
 		LastSyncedAt:   &now,

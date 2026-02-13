@@ -218,3 +218,27 @@ func TestSyncPublishAll_Validation(t *testing.T) {
 		assert.Equal(t, []string{"a", "b"}, gotIDs)
 	})
 }
+
+func TestToAPISyncDAGStates_IncludesKind(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	states := map[string]*gitsync.DAGState{
+		"alpha": {
+			Status:     gitsync.StatusModified,
+			Kind:       gitsync.DAGKindDAG,
+			ModifiedAt: &now,
+		},
+		"memory/MEMORY": {
+			Status:     gitsync.StatusUntracked,
+			ModifiedAt: &now, // No Kind set: should fallback by DAG ID
+		},
+	}
+
+	apiStates := toAPISyncDAGStates(states)
+	require.NotNil(t, apiStates)
+	require.Contains(t, *apiStates, "alpha")
+	require.Contains(t, *apiStates, "memory/MEMORY")
+	assert.Equal(t, apigen.SyncDAGKindDag, (*apiStates)["alpha"].Kind)
+	assert.Equal(t, apigen.SyncDAGKindMemory, (*apiStates)["memory/MEMORY"].Kind)
+}

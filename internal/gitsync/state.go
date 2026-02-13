@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -27,6 +28,32 @@ const (
 	// StatusConflict indicates a conflict between local and remote versions.
 	StatusConflict SyncStatus = "conflict"
 )
+
+const agentMemoryDir = "memory"
+
+// DAGKind represents the type of tracked item in git sync.
+type DAGKind string
+
+const (
+	// DAGKindDAG indicates a regular DAG definition file.
+	DAGKindDAG DAGKind = "dag"
+
+	// DAGKindMemory indicates an agent memory file under memory/.
+	DAGKindMemory DAGKind = "memory"
+)
+
+// KindForDAGID returns the DAG kind derived from a DAG ID.
+func KindForDAGID(id string) DAGKind {
+	if strings.HasPrefix(id, agentMemoryDir+"/") {
+		return DAGKindMemory
+	}
+	return DAGKindDAG
+}
+
+// isMemoryFile returns true if the file ID belongs to the memory directory.
+func isMemoryFile(id string) bool {
+	return KindForDAGID(id) == DAGKindMemory
+}
 
 // State represents the overall sync state.
 type State struct {
@@ -59,6 +86,9 @@ type State struct {
 type DAGState struct {
 	// Status is the current sync status.
 	Status SyncStatus `json:"status"`
+
+	// Kind identifies whether this item is a DAG or memory file.
+	Kind DAGKind `json:"kind,omitempty"`
 
 	// BaseCommit is the commit hash when the DAG was last synced.
 	BaseCommit string `json:"baseCommit,omitempty"`
