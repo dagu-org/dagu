@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"sort"
 	"strings"
 	"text/tabwriter"
 
@@ -241,6 +242,7 @@ func runSyncPublish(ctx *Context, args []string) error {
 				dagIDs = append(dagIDs, id)
 			}
 		}
+		sort.Strings(dagIDs)
 		result, err = syncSvc.PublishAll(ctx, message, dagIDs)
 	} else {
 		fmt.Printf("Publishing DAG: %s...\n", args[0])
@@ -338,15 +340,9 @@ func runSyncDiscard(ctx *Context, args []string) error {
 
 // newSyncService creates a new GitSync service from the context configuration.
 func newSyncService(ctx *Context) (gitsync.Service, error) {
-	cfg := ctx.Config.GitSync
-
-	syncCfg := gitsync.NewConfigFromGlobal(cfg)
-
+	syncCfg := gitsync.NewConfigFromGlobal(ctx.Config.GitSync)
 	if !syncCfg.Enabled {
 		return nil, fmt.Errorf("git sync is not enabled, set gitSync.enabled=true in your config")
 	}
-
-	// Create the service
-	svc := gitsync.NewService(syncCfg, ctx.Config.Paths.DAGsDir, ctx.Config.Paths.DataDir)
-	return svc, nil
+	return gitsync.NewService(syncCfg, ctx.Config.Paths.DAGsDir, ctx.Config.Paths.DataDir), nil
 }

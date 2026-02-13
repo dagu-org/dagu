@@ -387,10 +387,11 @@ func (sm *SessionManager) loadMemory() MemoryContent {
 	if sm.memoryStore == nil {
 		return MemoryContent{}
 	}
-	global, _ := sm.memoryStore.LoadGlobalMemory(context.Background())
+	ctx := context.Background()
+	global, _ := sm.memoryStore.LoadGlobalMemory(ctx)
 	var dagMem string
 	if sm.dagName != "" {
-		dagMem, _ = sm.memoryStore.LoadDAGMemory(context.Background(), sm.dagName)
+		dagMem, _ = sm.memoryStore.LoadDAGMemory(ctx, sm.dagName)
 	}
 	return MemoryContent{
 		GlobalMemory: global,

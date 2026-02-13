@@ -252,10 +252,18 @@ export default function AgentMemoryPage(): React.ReactNode {
           <div className="space-y-2">
             <div className="flex flex-wrap gap-2">
               {dagNames.map((name) => (
-                <button
+                <div
                   key={name}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleSelectDAG(name)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border transition-colors ${
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSelectDAG(name);
+                    }
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border transition-colors cursor-pointer ${
                     selectedDAG === name
                       ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-muted/50 hover:bg-muted border-border'
@@ -272,7 +280,7 @@ export default function AgentMemoryPage(): React.ReactNode {
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>
-                </button>
+                </div>
               ))}
             </div>
 

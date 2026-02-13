@@ -43,10 +43,7 @@ var (
 
 // GetAgentMemory returns global memory and list of DAGs with memory. Requires admin role.
 func (a *API) GetAgentMemory(ctx context.Context, _ api.GetAgentMemoryRequestObject) (api.GetAgentMemoryResponseObject, error) {
-	if err := a.requireAgentMemoryManagement(); err != nil {
-		return nil, err
-	}
-	if err := a.requireAdmin(ctx); err != nil {
+	if err := a.requireAgentMemoryAdmin(ctx); err != nil {
 		return nil, err
 	}
 
@@ -71,10 +68,7 @@ func (a *API) GetAgentMemory(ctx context.Context, _ api.GetAgentMemoryRequestObj
 
 // UpdateAgentMemory updates the global MEMORY.md content. Requires admin role.
 func (a *API) UpdateAgentMemory(ctx context.Context, request api.UpdateAgentMemoryRequestObject) (api.UpdateAgentMemoryResponseObject, error) {
-	if err := a.requireAgentMemoryManagement(); err != nil {
-		return nil, err
-	}
-	if err := a.requireAdmin(ctx); err != nil {
+	if err := a.requireAgentMemoryAdmin(ctx); err != nil {
 		return nil, err
 	}
 	if request.Body == nil {
@@ -93,10 +87,7 @@ func (a *API) UpdateAgentMemory(ctx context.Context, request api.UpdateAgentMemo
 
 // DeleteAgentMemory clears the global MEMORY.md. Requires admin role.
 func (a *API) DeleteAgentMemory(ctx context.Context, _ api.DeleteAgentMemoryRequestObject) (api.DeleteAgentMemoryResponseObject, error) {
-	if err := a.requireAgentMemoryManagement(); err != nil {
-		return nil, err
-	}
-	if err := a.requireAdmin(ctx); err != nil {
+	if err := a.requireAgentMemoryAdmin(ctx); err != nil {
 		return nil, err
 	}
 
@@ -112,10 +103,7 @@ func (a *API) DeleteAgentMemory(ctx context.Context, _ api.DeleteAgentMemoryRequ
 
 // GetAgentDAGMemory returns memory content for a specific DAG. Requires admin role.
 func (a *API) GetAgentDAGMemory(ctx context.Context, request api.GetAgentDAGMemoryRequestObject) (api.GetAgentDAGMemoryResponseObject, error) {
-	if err := a.requireAgentMemoryManagement(); err != nil {
-		return nil, err
-	}
-	if err := a.requireAdmin(ctx); err != nil {
+	if err := a.requireAgentMemoryAdmin(ctx); err != nil {
 		return nil, err
 	}
 
@@ -133,10 +121,7 @@ func (a *API) GetAgentDAGMemory(ctx context.Context, request api.GetAgentDAGMemo
 
 // UpdateAgentDAGMemory updates the memory content for a specific DAG. Requires admin role.
 func (a *API) UpdateAgentDAGMemory(ctx context.Context, request api.UpdateAgentDAGMemoryRequestObject) (api.UpdateAgentDAGMemoryResponseObject, error) {
-	if err := a.requireAgentMemoryManagement(); err != nil {
-		return nil, err
-	}
-	if err := a.requireAdmin(ctx); err != nil {
+	if err := a.requireAgentMemoryAdmin(ctx); err != nil {
 		return nil, err
 	}
 	if request.Body == nil {
@@ -158,10 +143,7 @@ func (a *API) UpdateAgentDAGMemory(ctx context.Context, request api.UpdateAgentD
 
 // DeleteAgentDAGMemory clears the memory for a specific DAG. Requires admin role.
 func (a *API) DeleteAgentDAGMemory(ctx context.Context, request api.DeleteAgentDAGMemoryRequestObject) (api.DeleteAgentDAGMemoryResponseObject, error) {
-	if err := a.requireAgentMemoryManagement(); err != nil {
-		return nil, err
-	}
-	if err := a.requireAdmin(ctx); err != nil {
+	if err := a.requireAgentMemoryAdmin(ctx); err != nil {
 		return nil, err
 	}
 
@@ -178,9 +160,11 @@ func (a *API) DeleteAgentDAGMemory(ctx context.Context, request api.DeleteAgentD
 	return api.DeleteAgentDAGMemory200Response{}, nil
 }
 
-func (a *API) requireAgentMemoryManagement() error {
+// requireAgentMemoryAdmin checks that the memory store is available and the
+// caller has admin privileges. Every agent-memory endpoint calls this.
+func (a *API) requireAgentMemoryAdmin(ctx context.Context) error {
 	if a.agentMemoryStore == nil {
 		return errAgentMemoryNotAvailable
 	}
-	return nil
+	return a.requireAdmin(ctx)
 }

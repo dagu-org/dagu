@@ -168,13 +168,11 @@ func (s *Store) readMemoryFile(path string) (string, error) {
 		}
 		return "", fmt.Errorf("filememory: failed to read %s: %w", path, err)
 	}
-
-	content := string(data)
-	return truncateToMaxLines(content, path), nil
+	return truncateToMaxLines(string(data), path), nil
 }
 
 // truncateToMaxLines truncates content to maxLines, appending a notice if truncated.
-func truncateToMaxLines(content string, path string) string {
+func truncateToMaxLines(content, path string) string {
 	lines := strings.Split(content, "\n")
 	if len(lines) <= maxLines {
 		return content

@@ -115,7 +115,7 @@ export default function GitSyncPage() {
 
   useEffect(() => {
     appBarContext.setTitle('Git Sync');
-  }, [appBarContext.setTitle]);
+  }, [appBarContext]);
 
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
@@ -307,10 +307,6 @@ export default function GitSyncPage() {
       return next;
     });
   }, []);
-
-  const hasModifiedDags =
-    status?.counts &&
-    ((status.counts.modified || 0) > 0 || (status.counts.untracked || 0) > 0);
 
   const getFilterCount = (f: string): number => {
     if (!status?.counts) return 0;

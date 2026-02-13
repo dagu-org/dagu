@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -426,7 +427,10 @@ func (s *serviceImpl) refreshLocalHashes(state *State) bool {
 		}
 
 		// Read current local file
-		filePath := s.dagIDToFilePath(dagID)
+		filePath, err := s.safeDAGIDToFilePath(dagID)
+		if err != nil {
+			continue
+		}
 		content, err := os.ReadFile(filePath) //nolint:gosec // path constructed from internal dagsDir
 		if err != nil {
 			// File might be deleted, skip for now
@@ -480,24 +484,30 @@ func (s *serviceImpl) Publish(ctx context.Context, dagID, message string, force 
 		return nil, err
 	}
 
+	dagFilePath, err := s.safeDAGIDToFilePath(dagID)
+	if err != nil {
+		return nil, err
+	}
+	repoFilePath, err := s.safeDAGIDToRepoPath(dagID)
+	if err != nil {
+		return nil, err
+	}
+	repoAbsPath := s.gitClient.GetFilePath(repoFilePath)
+
 	if err := s.gitClient.Open(); err != nil {
 		return nil, err
 	}
-
-	// Copy file to repo
-	dagFilePath := s.dagIDToFilePath(dagID)
-	repoFilePath := s.dagIDToRepoPath(dagID)
 
 	content, err := os.ReadFile(dagFilePath) //nolint:gosec // path constructed from internal dagsDir
 	if err != nil {
 		return nil, fmt.Errorf("failed to read DAG file: %w", err)
 	}
 
-	if err := s.ensureDir(filepath.Dir(s.gitClient.GetFilePath(repoFilePath))); err != nil {
+	if err := s.ensureDir(filepath.Dir(repoAbsPath)); err != nil {
 		return nil, err
 	}
 
-	if err := os.WriteFile(s.gitClient.GetFilePath(repoFilePath), content, 0600); err != nil {
+	if err := os.WriteFile(repoAbsPath, content, 0600); err != nil {
 		return nil, fmt.Errorf("failed to write to repo: %w", err)
 	}
 
@@ -542,8 +552,9 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string, dagIDs []s
 		return nil, err
 	}
 
-	if len(dagIDs) == 0 {
-		return nil, ErrNoChanges
+	publishTargets, err := s.resolvePublishTargets(state, dagIDs)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := s.gitClient.Open(); err != nil {
@@ -551,12 +562,19 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string, dagIDs []s
 	}
 
 	// Copy files and track which succeeded
-	successfulDAGs := make([]string, 0, len(dagIDs))
-	stagedFiles := make([]string, 0, len(dagIDs))
+	successfulDAGs := make([]string, 0, len(publishTargets))
+	stagedFiles := make([]string, 0, len(publishTargets))
 
-	for _, dagID := range dagIDs {
-		dagFilePath := s.dagIDToFilePath(dagID)
-		repoFilePath := s.dagIDToRepoPath(dagID)
+	for _, dagID := range publishTargets {
+		dagFilePath, err := s.safeDAGIDToFilePath(dagID)
+		if err != nil {
+			return nil, err
+		}
+		repoFilePath, err := s.safeDAGIDToRepoPath(dagID)
+		if err != nil {
+			return nil, err
+		}
+		repoAbsPath := s.gitClient.GetFilePath(repoFilePath)
 
 		content, err := os.ReadFile(dagFilePath) //nolint:gosec // path constructed from internal dagsDir
 		if err != nil {
@@ -564,12 +582,12 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string, dagIDs []s
 			continue
 		}
 
-		if err := s.ensureDir(filepath.Dir(s.gitClient.GetFilePath(repoFilePath))); err != nil {
+		if err := s.ensureDir(filepath.Dir(repoAbsPath)); err != nil {
 			result.Errors = append(result.Errors, SyncError{DAGID: dagID, Message: err.Error()})
 			continue
 		}
 
-		if err := os.WriteFile(s.gitClient.GetFilePath(repoFilePath), content, 0600); err != nil {
+		if err := os.WriteFile(repoAbsPath, content, 0600); err != nil {
 			result.Errors = append(result.Errors, SyncError{DAGID: dagID, Message: err.Error()})
 			continue
 		}
@@ -610,7 +628,10 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string, dagIDs []s
 
 	// Update state only for successfully published DAGs
 	for _, dagID := range successfulDAGs {
-		dagFilePath := s.dagIDToFilePath(dagID)
+		dagFilePath, err := s.safeDAGIDToFilePath(dagID)
+		if err != nil {
+			return nil, err
+		}
 		content, _ := os.ReadFile(dagFilePath) //nolint:gosec // path constructed from internal dagsDir
 		contentHash := ComputeContentHash(content)
 		state.DAGs[dagID] = s.newSyncedDAGState(commitHash, contentHash)
@@ -649,15 +670,22 @@ func (s *serviceImpl) Discard(_ context.Context, dagID string) error {
 		return err
 	}
 
+	repoFilePath, err := s.safeDAGIDToRepoPath(dagID)
+	if err != nil {
+		return err
+	}
+	dagFilePath, err := s.safeDAGIDToFilePath(dagID)
+	if err != nil {
+		return err
+	}
+
 	// Get content from repo
-	repoFilePath := s.dagIDToRepoPath(dagID)
 	repoContent, err := os.ReadFile(s.gitClient.GetFilePath(repoFilePath))
 	if err != nil {
 		return fmt.Errorf("failed to read repo file: %w", err)
 	}
 
 	// Write to DAGs directory
-	dagFilePath := s.dagIDToFilePath(dagID)
 	if err := os.WriteFile(dagFilePath, repoContent, 0600); err != nil {
 		return fmt.Errorf("failed to write DAG file: %w", err)
 	}
@@ -762,7 +790,10 @@ func (s *serviceImpl) GetDAGDiff(_ context.Context, dagID string) (*DAGDiff, err
 		return nil, &DAGNotFoundError{DAGID: dagID}
 	}
 
-	localPath := s.dagIDToFilePath(dagID)
+	localPath, err := s.safeDAGIDToFilePath(dagID)
+	if err != nil {
+		return nil, err
+	}
 	localContent, err := os.ReadFile(localPath) //nolint:gosec // path constructed from internal dagsDir
 	if err != nil {
 		return nil, fmt.Errorf("failed to read local file: %w", err)
@@ -804,7 +835,10 @@ func (s *serviceImpl) fetchRemoteContent(dagID, commitHash string) string {
 	if err := s.gitClient.Open(); err != nil {
 		return ""
 	}
-	repoPath := s.dagIDToRepoPath(dagID)
+	repoPath, err := s.safeDAGIDToRepoPath(dagID)
+	if err != nil {
+		return ""
+	}
 	content, err := s.gitClient.GetFileContentAtCommit(repoPath, commitHash)
 	if err != nil {
 		return ""
@@ -943,6 +977,81 @@ func (s *serviceImpl) filePathToDAGID(filePath string) string {
 	return dagID
 }
 
+// resolvePublishTargets validates and canonicalizes DAG IDs for batch publish.
+func (s *serviceImpl) resolvePublishTargets(state *State, dagIDs []string) ([]string, error) {
+	if len(dagIDs) == 0 {
+		return nil, &ValidationError{
+			Field:   "dagIds",
+			Message: "at least one DAG ID is required",
+		}
+	}
+
+	resolved := make([]string, 0, len(dagIDs))
+	seen := make(map[string]struct{}, len(dagIDs))
+	for i, dagID := range dagIDs {
+		if strings.TrimSpace(dagID) == "" {
+			return nil, &ValidationError{
+				Field:   fmt.Sprintf("dagIds[%d]", i),
+				Message: "DAG ID cannot be empty",
+			}
+		}
+
+		normalized, err := normalizeDAGID(dagID)
+		if err != nil {
+			return nil, err
+		}
+		if normalized != dagID {
+			return nil, &InvalidDAGIDError{
+				DAGID:  dagID,
+				Reason: fmt.Sprintf("must be normalized as %q", normalized),
+			}
+		}
+
+		if _, exists := seen[dagID]; exists {
+			continue
+		}
+		seen[dagID] = struct{}{}
+
+		dagState, exists := state.DAGs[dagID]
+		if !exists {
+			return nil, &ValidationError{
+				Field:   "dagIds",
+				Message: fmt.Sprintf("DAG %q is not tracked by git sync", dagID),
+			}
+		}
+
+		switch dagState.Status {
+		case StatusModified, StatusUntracked:
+			resolved = append(resolved, dagID)
+		case StatusConflict:
+			return nil, &ValidationError{
+				Field:   "dagIds",
+				Message: fmt.Sprintf("DAG %q has conflicts and cannot be batch-published", dagID),
+			}
+		case StatusSynced:
+			return nil, &ValidationError{
+				Field:   "dagIds",
+				Message: fmt.Sprintf("DAG %q has no local changes", dagID),
+			}
+		default:
+			return nil, &ValidationError{
+				Field:   "dagIds",
+				Message: fmt.Sprintf("DAG %q is in unsupported status %q", dagID, dagState.Status),
+			}
+		}
+	}
+
+	if len(resolved) == 0 {
+		return nil, &ValidationError{
+			Field:   "dagIds",
+			Message: "no publishable DAG IDs provided",
+		}
+	}
+
+	sort.Strings(resolved)
+	return resolved, nil
+}
+
 func (s *serviceImpl) dagIDToFilePath(dagID string) string {
 	// Decode if URL encoded
 	decoded, err := url.PathUnescape(dagID)
@@ -964,6 +1073,115 @@ func (s *serviceImpl) dagIDToRepoPath(dagID string) string {
 		return filepath.Join(s.cfg.Path, dagID+ext)
 	}
 	return dagID + ext
+}
+
+func decodeDAGID(dagID string) (string, error) {
+	decoded, err := url.PathUnescape(strings.TrimSpace(dagID))
+	if err != nil {
+		return "", &InvalidDAGIDError{
+			DAGID:  dagID,
+			Reason: "contains invalid URL escape sequence",
+		}
+	}
+	return decoded, nil
+}
+
+func normalizeDAGID(dagID string) (string, error) {
+	decoded, err := decodeDAGID(dagID)
+	if err != nil {
+		return "", err
+	}
+	if decoded == "" {
+		return "", &InvalidDAGIDError{DAGID: dagID, Reason: "cannot be empty"}
+	}
+	if filepath.IsAbs(decoded) {
+		return "", &InvalidDAGIDError{DAGID: dagID, Reason: "absolute paths are not allowed"}
+	}
+
+	clean := filepath.Clean(decoded)
+	if clean == "." || clean == ".." {
+		return "", &InvalidDAGIDError{DAGID: dagID, Reason: "must point to a DAG ID, not current/parent directory"}
+	}
+	if strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		return "", &InvalidDAGIDError{DAGID: dagID, Reason: "path traversal is not allowed"}
+	}
+
+	return clean, nil
+}
+
+func safeJoinWithinBase(baseDir, relativePath string) (string, error) {
+	if filepath.IsAbs(relativePath) {
+		return "", &InvalidDAGIDError{
+			DAGID:  relativePath,
+			Reason: "absolute paths are not allowed",
+		}
+	}
+
+	cleanRel := filepath.Clean(relativePath)
+	if cleanRel == "." || cleanRel == ".." {
+		return "", &InvalidDAGIDError{
+			DAGID:  relativePath,
+			Reason: "must be a valid relative path",
+		}
+	}
+	if strings.HasPrefix(cleanRel, ".."+string(filepath.Separator)) {
+		return "", &InvalidDAGIDError{
+			DAGID:  relativePath,
+			Reason: "path traversal is not allowed",
+		}
+	}
+
+	fullPath := filepath.Join(baseDir, cleanRel)
+	relToBase, err := filepath.Rel(baseDir, fullPath)
+	if err != nil {
+		return "", &InvalidDAGIDError{
+			DAGID:  relativePath,
+			Reason: "cannot resolve path safely",
+		}
+	}
+	if relToBase == ".." || strings.HasPrefix(relToBase, ".."+string(filepath.Separator)) {
+		return "", &InvalidDAGIDError{
+			DAGID:  relativePath,
+			Reason: "path escapes allowed base directory",
+		}
+	}
+
+	return fullPath, nil
+}
+
+func (s *serviceImpl) safeDAGIDToFilePath(dagID string) (string, error) {
+	normalized, err := normalizeDAGID(dagID)
+	if err != nil {
+		return "", err
+	}
+	ext := fileExtensionForID(normalized)
+	return safeJoinWithinBase(s.dagsDir, normalized+ext)
+}
+
+func (s *serviceImpl) safeDAGIDToRepoPath(dagID string) (string, error) {
+	normalized, err := normalizeDAGID(dagID)
+	if err != nil {
+		return "", err
+	}
+
+	ext := fileExtensionForID(normalized)
+	repoPath := normalized + ext
+	if s.cfg.Path != "" {
+		repoPath = filepath.Join(s.cfg.Path, repoPath)
+	}
+
+	safePath, err := safeJoinWithinBase(s.gitClient.repoPath, repoPath)
+	if err != nil {
+		return "", err
+	}
+	relPath, err := filepath.Rel(s.gitClient.repoPath, safePath)
+	if err != nil {
+		return "", &InvalidDAGIDError{
+			DAGID:  dagID,
+			Reason: "cannot resolve repository path",
+		}
+	}
+	return relPath, nil
 }
 
 func (s *serviceImpl) ensureDir(dir string) error {

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -165,4 +166,103 @@ func TestScanLocalDAGs_IgnoresNonMemoryMd(t *testing.T) {
 
 	// Should NOT find README.md (it's not a yaml DAG or memory file at root)
 	assert.NotContains(t, state.DAGs, "README")
+}
+
+func TestResolvePublishTargets(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	baseState := &State{
+		DAGs: map[string]*DAGState{
+			"alpha":    {Status: StatusModified, ModifiedAt: &now},
+			"beta":     {Status: StatusUntracked, ModifiedAt: &now},
+			"synced":   {Status: StatusSynced, LastSyncedAt: &now},
+			"conflict": {Status: StatusConflict, ConflictDetectedAt: &now},
+		},
+	}
+
+	s := &serviceImpl{}
+
+	t.Run("returns sorted unique publishable IDs", func(t *testing.T) {
+		targets, err := s.resolvePublishTargets(baseState, []string{"beta", "alpha", "beta"})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"alpha", "beta"}, targets)
+	})
+
+	t.Run("rejects empty dagIds", func(t *testing.T) {
+		_, err := s.resolvePublishTargets(baseState, nil)
+		require.Error(t, err)
+		var validationErr *ValidationError
+		require.ErrorAs(t, err, &validationErr)
+		assert.Equal(t, "dagIds", validationErr.Field)
+	})
+
+	t.Run("rejects unknown dag", func(t *testing.T) {
+		_, err := s.resolvePublishTargets(baseState, []string{"missing"})
+		require.Error(t, err)
+		var validationErr *ValidationError
+		require.ErrorAs(t, err, &validationErr)
+		assert.Contains(t, validationErr.Message, "not tracked")
+	})
+
+	t.Run("rejects synced dag", func(t *testing.T) {
+		_, err := s.resolvePublishTargets(baseState, []string{"synced"})
+		require.Error(t, err)
+		var validationErr *ValidationError
+		require.ErrorAs(t, err, &validationErr)
+		assert.Contains(t, validationErr.Message, "no local changes")
+	})
+
+	t.Run("rejects conflict dag", func(t *testing.T) {
+		_, err := s.resolvePublishTargets(baseState, []string{"conflict"})
+		require.Error(t, err)
+		var validationErr *ValidationError
+		require.ErrorAs(t, err, &validationErr)
+		assert.Contains(t, validationErr.Message, "has conflicts")
+	})
+}
+
+func TestSafeDAGIDPathValidation(t *testing.T) {
+	t.Parallel()
+
+	s := &serviceImpl{
+		dagsDir: "/dags",
+		cfg:     &Config{Path: "subdir"},
+		gitClient: &GitClient{
+			repoPath: "/repo",
+		},
+	}
+
+	t.Run("valid regular DAG path", func(t *testing.T) {
+		path, err := s.safeDAGIDToFilePath("my-dag")
+		require.NoError(t, err)
+		assert.Equal(t, "/dags/my-dag.yaml", path)
+	})
+
+	t.Run("valid memory path", func(t *testing.T) {
+		path, err := s.safeDAGIDToRepoPath("memory/MEMORY")
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Join("subdir", "memory", "MEMORY.md"), path)
+	})
+
+	t.Run("rejects traversal DAG ID", func(t *testing.T) {
+		_, err := s.safeDAGIDToFilePath("../etc/passwd")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrInvalidDAGID)
+	})
+
+	t.Run("rejects absolute DAG ID", func(t *testing.T) {
+		_, err := s.safeDAGIDToRepoPath("/tmp/file")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrInvalidDAGID)
+	})
+
+	t.Run("rejects non-canonical DAG ID", func(t *testing.T) {
+		_, err := s.resolvePublishTargets(
+			&State{DAGs: map[string]*DAGState{"a/b": {Status: StatusModified}}},
+			[]string{"a/./b"},
+		)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrInvalidDAGID)
+	})
 }

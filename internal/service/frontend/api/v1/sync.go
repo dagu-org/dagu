@@ -118,18 +118,32 @@ func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestO
 	if err := a.requireDAGWrite(ctx); err != nil {
 		return nil, err
 	}
-
-	var message string
-	var dagIDs []string
-	if req.Body != nil {
-		message = valueOf(req.Body.Message)
-		dagIDs = req.Body.DagIds
+	if req.Body == nil {
+		return nil, errInvalidRequestBody
 	}
+	if len(req.Body.DagIds) == 0 {
+		return nil, &Error{
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "dagIds is required and must contain at least one DAG ID",
+			HTTPStatus: http.StatusBadRequest,
+		}
+	}
+
+	message := valueOf(req.Body.Message)
+	dagIDs := req.Body.DagIds
 
 	result, err := a.syncService.PublishAll(ctx, message, dagIDs)
 	if err != nil {
 		if gitsync.IsNotEnabled(err) {
 			return nil, errSyncNotConfigured
+		}
+		var validationErr *gitsync.ValidationError
+		if errors.As(err, &validationErr) || gitsync.IsInvalidDAGID(err) || gitsync.IsDAGNotFound(err) {
+			return nil, &Error{
+				Code:       api.ErrorCodeBadRequest,
+				Message:    err.Error(),
+				HTTPStatus: http.StatusBadRequest,
+			}
 		}
 		return nil, internalError(err)
 	}
