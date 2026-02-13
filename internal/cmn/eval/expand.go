@@ -112,7 +112,7 @@ func expandWithShellContext(ctx context.Context, input string, opts *Options) (s
 		match := input[loc[0]:loc[1]]
 
 		// Single-quoted: preserve as-is.
-		if match[0] == '\'' {
+		if isSingleQuotedVar(input, loc[0], loc[1]) {
 			b.WriteString(match)
 			continue
 		}

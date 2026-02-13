@@ -294,6 +294,18 @@ func TestReplaceVars_EdgeCases(t *testing.T) {
 			vars:     map[string]string{"FOO123": "value"},
 			want:     "value",
 		},
+		{
+			name:     "VarFollowedBySingleQuote",
+			template: "${FOO}'",
+			vars:     map[string]string{"FOO": "bar"},
+			want:     "bar'",
+		},
+		{
+			name:     "SimpleVarFollowedBySingleQuote",
+			template: "$FOO'",
+			vars:     map[string]string{"FOO": "bar"},
+			want:     "bar'",
+		},
 	}
 
 	for _, tt := range tests {
@@ -390,62 +402,6 @@ func TestReplaceVarsWithScope(t *testing.T) {
 			r := &resolver{scope: tt.scope}
 			got := r.replaceVars(tt.template)
 			require.Equal(t, tt.want, got)
-		})
-	}
-}
-
-// --- extractVarKey ---
-
-func TestExtractVarKey(t *testing.T) {
-	tests := []struct {
-		name   string
-		match  string
-		wantK  string
-		wantOK bool
-	}{
-		{
-			name:   "BracedVar",
-			match:  "${FOO}",
-			wantK:  "FOO",
-			wantOK: true,
-		},
-		{
-			name:   "SimpleDollarVar",
-			match:  "$FOO",
-			wantK:  "FOO",
-			wantOK: true,
-		},
-		{
-			name:   "SingleQuotedBraced",
-			match:  "'${FOO}'",
-			wantK:  "",
-			wantOK: false,
-		},
-		{
-			name:   "SingleQuotedSimple",
-			match:  "'$FOO'",
-			wantK:  "",
-			wantOK: false,
-		},
-		{
-			name:   "VarWithUnderscore",
-			match:  "${FOO_BAR}",
-			wantK:  "FOO_BAR",
-			wantOK: true,
-		},
-		{
-			name:   "VarWithNumbers",
-			match:  "$VAR123",
-			wantK:  "VAR123",
-			wantOK: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotK, gotOK := extractVarKey(tt.match)
-			require.Equal(t, tt.wantK, gotK)
-			require.Equal(t, tt.wantOK, gotOK)
 		})
 	}
 }

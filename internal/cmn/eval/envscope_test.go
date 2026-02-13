@@ -748,6 +748,64 @@ func TestExpandWithLookup_SingleQuoted(t *testing.T) {
 	assert.Equal(t, "'$FOO' stays", result)
 }
 
+func TestExpandWithLookup_QuoteAdjacentCases(t *testing.T) {
+	lookup := func(key string) (string, bool) {
+		switch key {
+		case "FOO":
+			return "bar", true
+		case "BAR":
+			return "baz", true
+		default:
+			return "", false
+		}
+	}
+
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "BracedVarFollowedBySingleQuote",
+			input: "${FOO}'",
+			want:  "bar'",
+		},
+		{
+			name:  "SimpleVarFollowedBySingleQuote",
+			input: "$FOO'",
+			want:  "bar'",
+		},
+		{
+			name:  "SingleQuotedBracedPreserved",
+			input: "'${FOO}'",
+			want:  "'${FOO}'",
+		},
+		{
+			name:  "SingleQuotedSimplePreserved",
+			input: "'$FOO'",
+			want:  "'$FOO'",
+		},
+		{
+			name:  "MissingBracedVarFollowedBySingleQuote",
+			input: "${MISSING}'",
+			want:  "${MISSING}'",
+		},
+		{
+			name:  "MultipleVarsWithQuoteAdjacency",
+			input: "${FOO}' + $BAR'",
+			want:  "bar' + baz'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := expandWithLookup(tt.input, lookup)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestEnvScope_Debug_NoParent(t *testing.T) {
 	scope := NewEnvScope(nil, true)
 	debug := scope.Debug()
