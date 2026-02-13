@@ -195,8 +195,8 @@ func TestService_GetStatusBackfillsKinds(t *testing.T) {
 	state := &State{
 		Version: 1,
 		DAGs: map[string]*DAGState{
-			"example":           {Status: StatusModified, ModifiedAt: &now},
-			"memory/MEMORY":     {Status: StatusUntracked, ModifiedAt: &now},
+			"example":              {Status: StatusModified, ModifiedAt: &now},
+			"memory/MEMORY":        {Status: StatusUntracked, ModifiedAt: &now},
 			"memory/dags/a/MEMORY": {Status: StatusUntracked, ModifiedAt: &now},
 		},
 	}

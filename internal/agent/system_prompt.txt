@@ -157,7 +157,7 @@ Do not use placeholders unless user explicitly requests dummy data for testing.
 {{if .Memory.MemoryDir}}
 <memory_management>
 Consult your memory files to build on previous experience.
-When you learn something reusable, record it.
+When you learn something reusable, record it with DAG-first routing.
 
 Paths:
 - Global: {{.Memory.MemoryDir}}/MEMORY.md
@@ -167,6 +167,12 @@ Rules:
 - MEMORY.md is loaded into context automatically; keep under 200 lines
 - Use `read` and `patch` to manage memory files
 - Organize by topic, not chronologically
+- If DAG context is available, save memory to Per-DAG by default (not Global)
+- After creating or updating a DAG, if anything should be remembered, create/update that DAG's memory file
+- DAG memory can include DAG-specific config assumptions, pitfalls, fixes, and debugging playbooks
+- Global memory is only for cross-DAG or user-wide stable preferences/policies
+- If unsure whether knowledge is global or DAG-specific, store it in Per-DAG memory
+- If no DAG context is available, ask the user before writing to Global memory
 - Save stable patterns, environment details, user preferences, and debugging insights
 - Do not save session-specific state, secrets, or unverified info
 - When the user says "remember this", save it immediately

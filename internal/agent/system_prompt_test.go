@@ -105,6 +105,33 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		assert.Contains(t, result, "/dags/memory/MEMORY.md")
 		assert.Contains(t, result, "/dags/memory/dags/test-dag/MEMORY.md")
 	})
+
+	t.Run("memory management enforces DAG-first policy", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+		mem := MemoryContent{
+			MemoryDir: "/dags/memory",
+			DAGName:   "new-etl",
+		}
+
+		result := GenerateSystemPrompt(env, nil, mem)
+
+		assert.Contains(t, result, "If DAG context is available, save memory to Per-DAG by default (not Global)")
+		assert.Contains(t, result, "After creating or updating a DAG, if anything should be remembered, create/update that DAG's memory file")
+		assert.Contains(t, result, "Global memory is only for cross-DAG or user-wide stable preferences/policies")
+	})
+
+	t.Run("memory management requires confirmation before global write without DAG context", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+		mem := MemoryContent{
+			MemoryDir: "/dags/memory",
+		}
+
+		result := GenerateSystemPrompt(env, nil, mem)
+
+		assert.Contains(t, result, "If no DAG context is available, ask the user before writing to Global memory")
+	})
 }
 
 func TestFallbackPrompt(t *testing.T) {
