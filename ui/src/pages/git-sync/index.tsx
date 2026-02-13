@@ -591,39 +591,66 @@ export default function GitSyncPage() {
         </div>
       </div>
 
-      {/* Filter Tabs */}
+      {/* Filter Controls */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="inline-flex items-center rounded-md border border-border/60 bg-card p-0.5 text-xs">
+          {typeFilters.map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilters({ type: f })}
+              className={cn(
+                'px-2.5 py-1 rounded transition-colors',
+                typeFilter === f
+                  ? 'bg-muted text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {f === 'all' ? 'All' : f === 'dag' ? 'DAGs' : 'Memory'} ({typeCounts[f]})
+            </button>
+          ))}
+        </div>
+        {selectedCounts.total > 0 && (
+          <span className="text-xs text-muted-foreground">
+            Selected: {selectedCounts.dag} DAGs, {selectedCounts.memory} memory
+          </span>
+        )}
+      </div>
+
       <div
         className="flex items-center gap-1 text-xs border-b border-border/40"
         role="tablist"
-        aria-label="Filter DAGs by status"
+        aria-label="Filter items by status"
       >
-        {(['all', 'modified', 'untracked', 'conflict'] as const).map((f, index) => (
+        {statusFilters.map((f, index) => (
           <button
             key={f}
             role="tab"
-            aria-selected={filter === f}
-            tabIndex={filter === f ? 0 : -1}
-            onClick={() => setFilter(f)}
+            aria-selected={statusFilter === f}
+            tabIndex={statusFilter === f ? 0 : -1}
+            onClick={() => setFilters({ status: f })}
             onKeyDown={(e) => {
-              const filters = ['all', 'modified', 'untracked', 'conflict'] as const;
               if (e.key === 'ArrowRight') {
                 e.preventDefault();
-                const nextFilter = filters[(index + 1) % filters.length];
-                if (nextFilter) setFilter(nextFilter);
+                const nextFilter = statusFilters[(index + 1) % statusFilters.length];
+                if (nextFilter) setFilters({ status: nextFilter });
               } else if (e.key === 'ArrowLeft') {
                 e.preventDefault();
-                const prevFilter = filters[(index - 1 + filters.length) % filters.length];
-                if (prevFilter) setFilter(prevFilter);
+                const prevFilter =
+                  statusFilters[
+                    (index - 1 + statusFilters.length) % statusFilters.length
+                  ];
+                if (prevFilter) setFilters({ status: prevFilter });
               }
             }}
             className={cn(
               'px-3 py-1.5 border-b-2 -mb-px transition-colors focus:outline-none',
-              filter === f
+              statusFilter === f
                 ? 'border-foreground text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
           >
-            {f.charAt(0).toUpperCase() + f.slice(1)} ({getFilterCount(f)})
+            {f.charAt(0).toUpperCase() + f.slice(1)} ({statusCounts[f]})
           </button>
         ))}
       </div>
@@ -649,17 +676,17 @@ export default function GitSyncPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredDags.length === 0 ? (
+            {filteredRows.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={5}
                   className="text-center text-muted-foreground py-8 text-xs"
                 >
-                  {filter === 'all' ? 'No DAGs found' : `No ${filter} DAGs`}
+                  {emptyStateMessage}
                 </TableCell>
               </TableRow>
             ) : (
-              filteredDags.map(([dagId, dag]) => (
+              filteredRows.map(({ dagId, dag, kind }) => (
                 <TableRow
                   key={dagId}
                   className="h-9 cursor-pointer hover:bg-muted/50"
@@ -683,7 +710,7 @@ export default function GitSyncPage() {
                       >
                         {dagId}
                       </a>
-                      {dagId.startsWith('memory/') && (
+                      {kind === 'memory' && (
                         <span className="text-[10px] px-1 py-0 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400">
                           memory
                         </span>
