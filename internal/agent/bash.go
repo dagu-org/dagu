@@ -100,7 +100,9 @@ func bashRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
 		return toolError("Permission denied: bash requires execute permission")
 	}
 
-	if toolCtx.SafeMode && commandRequiresApproval(args.Command) {
+	// Legacy safe-mode approval is skipped when centralized policy already checked
+	// this command in a before-tool hook, to avoid duplicate prompts.
+	if toolCtx.SafeMode && !toolCtx.PolicyChecked && commandRequiresApproval(args.Command) {
 		approved, err := requestCommandApprovalWithOptions(
 			toolCtx.Context,
 			toolCtx.EmitUserPrompt,

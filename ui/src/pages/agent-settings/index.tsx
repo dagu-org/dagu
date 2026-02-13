@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Bot, Loader2, MoreHorizontal, Pencil, Plus, Save, Shield, Star, Trash2 } from 'lucide-react';
 import {
   AgentBashPolicyDefaultBehavior,
@@ -41,6 +41,13 @@ type ModelConfig = components['schemas']['ModelConfigResponse'];
 type ModelPreset = components['schemas']['ModelPreset'];
 type AgentToolPolicy = components['schemas']['AgentToolPolicy'];
 type AgentBashRule = components['schemas']['AgentBashRule'];
+type UpdateAgentConfigRequest = components['schemas']['UpdateAgentConfigRequest'];
+
+type SavedAgentConfig = {
+  enabled: boolean;
+  defaultModelId?: string;
+  toolPolicy: AgentToolPolicy;
+};
 
 type ToolConfig = {
   name: string;
@@ -92,6 +99,28 @@ function normalizeToolPolicy(policy?: AgentToolPolicy): AgentToolPolicy {
   return { tools, bash };
 }
 
+function canonicalizeToolPolicy(policy?: AgentToolPolicy): AgentToolPolicy {
+  const normalized = normalizeToolPolicy(policy);
+  const sortedToolsEntries = Object.entries(normalized.tools || {}).sort(([a], [b]) =>
+    a.localeCompare(b)
+  );
+  const tools = Object.fromEntries(sortedToolsEntries);
+  const rules = (normalized.bash?.rules || []).map((rule) => ({
+    ...rule,
+    name: rule.name || '',
+    enabled: rule.enabled ?? true,
+  }));
+
+  return {
+    tools,
+    bash: {
+      rules,
+      defaultBehavior: normalized.bash?.defaultBehavior || AgentBashPolicyDefaultBehavior.deny,
+      denyBehavior: normalized.bash?.denyBehavior || AgentBashPolicyDenyBehavior.ask_user,
+    },
+  };
+}
+
 export default function AgentSettingsPage(): React.ReactNode {
   const client = useClient();
   const isAdmin = useIsAdmin();
@@ -105,6 +134,8 @@ export default function AgentSettingsPage(): React.ReactNode {
   const [enabled, setEnabled] = useState(false);
   const [defaultModelId, setDefaultModelId] = useState<string | undefined>();
   const [toolPolicy, setToolPolicy] = useState<AgentToolPolicy>(createDefaultToolPolicy);
+  const [savedConfig, setSavedConfig] = useState<SavedAgentConfig | null>(null);
+  const [bashRuleIds, setBashRuleIds] = useState<string[]>([]);
   const [models, setModels] = useState<ModelConfig[]>([]);
   const [presets, setPresets] = useState<ModelPreset[]>([]);
 
@@ -114,6 +145,16 @@ export default function AgentSettingsPage(): React.ReactNode {
   const [deletingModel, setDeletingModel] = useState<ModelConfig | null>(null);
 
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const bashRuleIdCounter = useRef(0);
+
+  const nextBashRuleId = useCallback((): string => {
+    bashRuleIdCounter.current += 1;
+    return `bash_rule_${bashRuleIdCounter.current}`;
+  }, []);
+
+  const buildBashRuleIDs = useCallback((count: number): string[] => {
+    return Array.from({ length: count }, () => nextBashRuleId());
+  }, [nextBashRuleId]);
 
   useEffect(() => {
     appBarContext.setTitle('Agent Settings');
@@ -125,13 +166,20 @@ export default function AgentSettingsPage(): React.ReactNode {
         params: { query: { remoteNode } },
       });
       if (apiError) throw new Error('Failed to fetch agent configuration');
+      const normalizedPolicy = normalizeToolPolicy(data.toolPolicy);
       setEnabled(data.enabled ?? false);
       setDefaultModelId(data.defaultModelId);
-      setToolPolicy(normalizeToolPolicy(data.toolPolicy));
+      setToolPolicy(normalizedPolicy);
+      setSavedConfig({
+        enabled: data.enabled ?? false,
+        defaultModelId: data.defaultModelId,
+        toolPolicy: normalizedPolicy,
+      });
+      setBashRuleIds(buildBashRuleIDs(normalizedPolicy.bash?.rules?.length || 0));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load configuration');
     }
-  }, [client, remoteNode]);
+  }, [buildBashRuleIDs, client, remoteNode]);
 
   const fetchModels = useCallback(async () => {
     try {
@@ -173,18 +221,43 @@ export default function AgentSettingsPage(): React.ReactNode {
     setSuccess(null);
 
     try {
+      const requestBody: UpdateAgentConfigRequest = {};
+      const currentPolicyCanonical = canonicalizeToolPolicy(toolPolicy);
+      const savedPolicyCanonical = canonicalizeToolPolicy(savedConfig?.toolPolicy);
+
+      if (!savedConfig || enabled !== savedConfig.enabled) {
+        requestBody.enabled = enabled;
+      }
+      if (!savedConfig || defaultModelId !== savedConfig.defaultModelId) {
+        requestBody.defaultModelId = defaultModelId;
+      }
+      if (!savedConfig || JSON.stringify(currentPolicyCanonical) !== JSON.stringify(savedPolicyCanonical)) {
+        requestBody.toolPolicy = currentPolicyCanonical;
+      }
+
+      if (Object.keys(requestBody).length === 0) {
+        setSuccess('No changes to save');
+        return;
+      }
+
       const { data, error: apiError } = await client.PATCH('/settings/agent', {
         params: { query: { remoteNode } },
-        body: { enabled, defaultModelId, toolPolicy },
+        body: requestBody,
       });
 
       if (apiError) {
         throw new Error(apiError.message || 'Failed to save configuration');
       }
 
+      const normalizedPolicy = normalizeToolPolicy(data.toolPolicy);
       setEnabled(data.enabled ?? false);
       setDefaultModelId(data.defaultModelId);
-      setToolPolicy(normalizeToolPolicy(data.toolPolicy));
+      setToolPolicy(normalizedPolicy);
+      setSavedConfig({
+        enabled: data.enabled ?? false,
+        defaultModelId: data.defaultModelId,
+        toolPolicy: normalizedPolicy,
+      });
       setSuccess('Configuration saved successfully');
 
       // Re-fetch to ensure sidebar/nav reflects changes
@@ -231,6 +304,19 @@ export default function AgentSettingsPage(): React.ReactNode {
 
   const normalizedPolicy = normalizeToolPolicy(toolPolicy);
 
+  useEffect(() => {
+    const ruleCount = normalizedPolicy.bash?.rules?.length || 0;
+    setBashRuleIds((prev) => {
+      if (prev.length === ruleCount) {
+        return prev;
+      }
+      if (prev.length > ruleCount) {
+        return prev.slice(0, ruleCount);
+      }
+      return [...prev, ...buildBashRuleIDs(ruleCount - prev.length)];
+    });
+  }, [buildBashRuleIDs, normalizedPolicy.bash?.rules?.length]);
+
   function updateToolToggle(toolName: string, value: boolean): void {
     setToolPolicy((prev) => {
       const normalized = normalizeToolPolicy(prev);
@@ -269,6 +355,7 @@ export default function AgentSettingsPage(): React.ReactNode {
     };
     const rules = [...(normalizeToolPolicy(toolPolicy).bash?.rules || []), newRule];
     updateBashPolicy('rules', rules);
+    setBashRuleIds((prev) => [...prev, nextBashRuleId()]);
   }
 
   function updateBashRule(index: number, patch: Partial<AgentBashRule>): void {
@@ -283,6 +370,7 @@ export default function AgentSettingsPage(): React.ReactNode {
     if (!rules[index]) return;
     rules.splice(index, 1);
     updateBashPolicy('rules', rules);
+    setBashRuleIds((prev) => prev.filter((_, idx) => idx !== index));
   }
 
   function moveBashRule(index: number, direction: -1 | 1): void {
@@ -293,6 +381,13 @@ export default function AgentSettingsPage(): React.ReactNode {
     if (!moved) return;
     rules.splice(targetIndex, 0, moved);
     updateBashPolicy('rules', rules);
+    setBashRuleIds((prev) => {
+      const ids = [...prev];
+      const [movedID] = ids.splice(index, 1);
+      if (!movedID) return prev;
+      ids.splice(targetIndex, 0, movedID);
+      return ids;
+    });
   }
 
   if (!isAdmin) {
@@ -462,7 +557,7 @@ export default function AgentSettingsPage(): React.ReactNode {
             ) : (
               <div className="space-y-2">
                 {(normalizedPolicy.bash?.rules || []).map((rule, index) => (
-                  <div key={`${index}-${rule.name || 'rule'}`} className="rounded-md border border-border/60 p-2 space-y-2">
+                  <div key={bashRuleIds[index] || `bash_rule_fallback_${index}`} className="rounded-md border border-border/60 p-2 space-y-2">
                     <div className="grid gap-2 md:grid-cols-[1fr,2fr,150px,auto] items-end">
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Name</Label>

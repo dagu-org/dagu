@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"maps"
 	"net/http"
 
 	"github.com/dagu-org/dagu/api/v1"
@@ -151,9 +152,7 @@ func buildAgentConfigChanges(update *api.UpdateAgentConfigRequest) map[string]an
 func toAPIToolPolicy(policy agent.ToolPolicyConfig) *api.AgentToolPolicy {
 	resolved := agent.ResolveToolPolicy(policy)
 	tools := make(map[string]bool, len(resolved.Tools))
-	for name, enabled := range resolved.Tools {
-		tools[name] = enabled
-	}
+	maps.Copy(tools, resolved.Tools)
 
 	rules := make([]api.AgentBashRule, 0, len(resolved.Bash.Rules))
 	for _, rule := range resolved.Bash.Rules {
@@ -184,9 +183,7 @@ func toInternalToolPolicy(policy api.AgentToolPolicy) agent.ToolPolicyConfig {
 	}
 
 	if policy.Tools != nil {
-		for name, enabled := range *policy.Tools {
-			out.Tools[name] = enabled
-		}
+		maps.Copy(out.Tools, *policy.Tools)
 	}
 
 	if policy.Bash == nil {

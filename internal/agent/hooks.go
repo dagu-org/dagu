@@ -53,6 +53,11 @@ func (h *Hooks) OnAfterToolExec(fn AfterToolExecHookFunc) {
 	h.afterToolExec = append(h.afterToolExec, fn)
 }
 
+// HasBeforeToolExecHooks reports whether any before-exec hooks are registered.
+func (h *Hooks) HasBeforeToolExecHooks() bool {
+	return h != nil && len(h.beforeToolExec) > 0
+}
+
 // RunBeforeToolExec invokes all before-execution hooks in order.
 // Returns the first non-nil error, which blocks execution.
 // Safe to call on a nil receiver (returns nil).

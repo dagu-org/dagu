@@ -14,16 +14,16 @@ type stubAgentConfigStore struct {
 	cfg *agent.Config
 }
 
-func (s stubAgentConfigStore) Load(_ context.Context) (*agent.Config, error) {
+func (s *stubAgentConfigStore) Load(_ context.Context) (*agent.Config, error) {
 	return s.cfg, nil
 }
 
-func (s stubAgentConfigStore) Save(_ context.Context, cfg *agent.Config) error {
+func (s *stubAgentConfigStore) Save(_ context.Context, cfg *agent.Config) error {
 	s.cfg = cfg
 	return nil
 }
 
-func (s stubAgentConfigStore) IsEnabled(_ context.Context) bool {
+func (s *stubAgentConfigStore) IsEnabled(_ context.Context) bool {
 	return s.cfg != nil && s.cfg.Enabled
 }
 
@@ -42,7 +42,7 @@ func TestAgentPolicyHook(t *testing.T) {
 		cfg := agent.DefaultConfig()
 		cfg.ToolPolicy.Tools["patch"] = false
 
-		hook := newAgentPolicyHook(stubAgentConfigStore{cfg: cfg}, nil)
+		hook := newAgentPolicyHook(&stubAgentConfigStore{cfg: cfg}, nil)
 		err := hook(context.Background(), makeInfo("patch", `{"path":"a"}`))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "disabled")
@@ -59,7 +59,7 @@ func TestAgentPolicyHook(t *testing.T) {
 			},
 		}
 
-		hook := newAgentPolicyHook(stubAgentConfigStore{cfg: cfg}, nil)
+		hook := newAgentPolicyHook(&stubAgentConfigStore{cfg: cfg}, nil)
 		err := hook(context.Background(), agent.ToolExecInfo{
 			ToolName: "bash",
 			Input:    json.RawMessage(`{"command":"rm -rf /tmp/x"}`),
@@ -81,7 +81,7 @@ func TestAgentPolicyHook(t *testing.T) {
 			},
 		}
 
-		hook := newAgentPolicyHook(stubAgentConfigStore{cfg: cfg}, nil)
+		hook := newAgentPolicyHook(&stubAgentConfigStore{cfg: cfg}, nil)
 		err := hook(context.Background(), agent.ToolExecInfo{
 			ToolName: "bash",
 			Input:    json.RawMessage(`{"command":"rm -rf /tmp/x"}`),
@@ -104,7 +104,7 @@ func TestAgentPolicyHook(t *testing.T) {
 			},
 		}
 
-		hook := newAgentPolicyHook(stubAgentConfigStore{cfg: cfg}, nil)
+		hook := newAgentPolicyHook(&stubAgentConfigStore{cfg: cfg}, nil)
 		err := hook(context.Background(), makeInfo("bash", `{"command":"git status"}`))
 		require.NoError(t, err)
 	})

@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -46,7 +47,8 @@ func IsKnownToolName(name string) bool {
 	return ok
 }
 
-func boolPtr(v bool) *bool { return &v }
+//go:fix inline
+func boolPtr(v bool) *bool { return new(v) }
 
 func cloneBashRules(rules []BashRule) []BashRule {
 	if len(rules) == 0 {
@@ -60,7 +62,7 @@ func cloneBashRules(rules []BashRule) []BashRule {
 			Action:  rules[i].Action,
 		}
 		if rules[i].Enabled != nil {
-			out[i].Enabled = boolPtr(*rules[i].Enabled)
+			out[i].Enabled = new(*rules[i].Enabled)
 		}
 	}
 	return out
@@ -71,9 +73,7 @@ func cloneTools(tools map[string]bool) map[string]bool {
 		return map[string]bool{}
 	}
 	out := make(map[string]bool, len(tools))
-	for k, v := range tools {
-		out[k] = v
-	}
+	maps.Copy(out, tools)
 	return out
 }
 
@@ -89,9 +89,7 @@ func ResolveToolPolicy(policy ToolPolicyConfig) ToolPolicyConfig {
 		},
 	}
 
-	for name, enabled := range policy.Tools {
-		resolved.Tools[name] = enabled
-	}
+	maps.Copy(resolved.Tools, policy.Tools)
 
 	if policy.Bash.DefaultBehavior != "" {
 		resolved.Bash.DefaultBehavior = policy.Bash.DefaultBehavior
@@ -109,7 +107,11 @@ func ResolveToolPolicy(policy ToolPolicyConfig) ToolPolicyConfig {
 
 // IsToolEnabled reports whether the tool is enabled by the resolved policy.
 func IsToolEnabled(policy ToolPolicyConfig, toolName string) bool {
-	resolved := ResolveToolPolicy(policy)
+	return IsToolEnabledResolved(ResolveToolPolicy(policy), toolName)
+}
+
+// IsToolEnabledResolved reports whether a tool is enabled in an already-resolved policy.
+func IsToolEnabledResolved(resolved ToolPolicyConfig, toolName string) bool {
 	enabled, ok := resolved.Tools[toolName]
 	if !ok {
 		// Unknown tools are denied by default.
@@ -182,7 +184,7 @@ func isRuleEnabled(rule BashRule) bool {
 // EvaluateBashPolicy evaluates bash input against policy.
 func EvaluateBashPolicy(policy ToolPolicyConfig, input json.RawMessage) (BashPolicyDecision, error) {
 	resolved := ResolveToolPolicy(policy)
-	if !IsToolEnabled(resolved, toolNameBash) {
+	if !IsToolEnabledResolved(resolved, toolNameBash) {
 		return BashPolicyDecision{
 			Allowed:      false,
 			DenyBehavior: BashDenyBehaviorBlock,
@@ -198,6 +200,19 @@ func EvaluateBashPolicy(policy ToolPolicyConfig, input json.RawMessage) (BashPol
 		// Let the tool return its own validation error.
 		return BashPolicyDecision{Allowed: true}, nil
 	}
+	if hasUnsupportedShellConstructs(command) {
+		return BashPolicyDecision{
+			Allowed:      false,
+			DenyBehavior: resolved.Bash.DenyBehavior,
+			Reason:       "command denied: unsupported shell construct detected (`...`, $(), or heredoc)",
+			Command:      command,
+		}, nil
+	}
+
+	compiledRules, err := compileEnabledBashRules(resolved.Bash.Rules)
+	if err != nil {
+		return BashPolicyDecision{}, err
+	}
 
 	segments := splitShellCommandSegments(command)
 	if len(segments) == 0 {
@@ -205,10 +220,7 @@ func EvaluateBashPolicy(policy ToolPolicyConfig, input json.RawMessage) (BashPol
 	}
 
 	for _, segment := range segments {
-		matched, ruleName, action, err := matchBashRule(resolved.Bash.Rules, segment)
-		if err != nil {
-			return BashPolicyDecision{}, err
-		}
+		matched, ruleName, action := matchCompiledBashRule(compiledRules, segment)
 		if matched {
 			if action == BashRuleActionAllow {
 				continue
@@ -237,7 +249,14 @@ func EvaluateBashPolicy(policy ToolPolicyConfig, input json.RawMessage) (BashPol
 	return BashPolicyDecision{Allowed: true, Command: command}, nil
 }
 
-func matchBashRule(rules []BashRule, segment string) (matched bool, ruleName string, action BashRuleAction, err error) {
+type compiledBashRule struct {
+	name   string
+	action BashRuleAction
+	re     *regexp.Regexp
+}
+
+func compileEnabledBashRules(rules []BashRule) ([]compiledBashRule, error) {
+	out := make([]compiledBashRule, 0, len(rules))
 	for i, rule := range rules {
 		if !isRuleEnabled(rule) {
 			continue
@@ -245,23 +264,37 @@ func matchBashRule(rules []BashRule, segment string) (matched bool, ruleName str
 
 		re, compileErr := regexp.Compile(rule.Pattern)
 		if compileErr != nil {
-			return false, "", "", fmt.Errorf("invalid bash rule regex at index %d: %w", i, compileErr)
-		}
-		if !re.MatchString(segment) {
-			continue
+			return nil, fmt.Errorf("invalid bash rule regex at index %d: %w", i, compileErr)
 		}
 
 		name := rule.Name
 		if name == "" {
 			name = fmt.Sprintf("rule_%d", i)
 		}
-		return true, name, rule.Action, nil
+		out = append(out, compiledBashRule{
+			name:   name,
+			action: rule.Action,
+			re:     re,
+		})
 	}
-	return false, "", "", nil
+	return out, nil
+}
+
+func matchCompiledBashRule(rules []compiledBashRule, segment string) (matched bool, ruleName string, action BashRuleAction) {
+	for _, rule := range rules {
+		if !rule.re.MatchString(segment) {
+			continue
+		}
+		return true, rule.name, rule.action
+	}
+	return false, "", ""
 }
 
 // splitShellCommandSegments splits a shell command into executable segments while
 // respecting quoted strings and escaped characters.
+// Limitation: this is not a full shell parser and intentionally does not support
+// advanced syntax such as backticks, subshell command substitution, or heredocs.
+// EvaluateBashPolicy denies commands using those constructs.
 func splitShellCommandSegments(command string) []string {
 	command = strings.TrimSpace(strings.ReplaceAll(command, "\r\n", "\n"))
 	if command == "" {
@@ -334,4 +367,48 @@ func splitShellCommandSegments(command string) []string {
 
 	flush()
 	return segments
+}
+
+func hasUnsupportedShellConstructs(command string) bool {
+	var (
+		inSingle bool
+		inDouble bool
+		escaped  bool
+	)
+
+	for i := 0; i < len(command); i++ {
+		ch := command[i]
+
+		if escaped {
+			escaped = false
+			continue
+		}
+		if ch == '\\' && !inSingle {
+			escaped = true
+			continue
+		}
+		if ch == '\'' && !inDouble {
+			inSingle = !inSingle
+			continue
+		}
+		if ch == '"' && !inSingle {
+			inDouble = !inDouble
+			continue
+		}
+		if inSingle {
+			continue
+		}
+
+		if ch == '`' {
+			return true
+		}
+		if ch == '$' && i+1 < len(command) && command[i+1] == '(' {
+			return true
+		}
+		if !inDouble && ch == '<' && i+1 < len(command) && command[i+1] == '<' {
+			return true
+		}
+	}
+
+	return false
 }

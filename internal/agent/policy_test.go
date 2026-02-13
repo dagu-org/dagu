@@ -115,6 +115,19 @@ func TestEvaluateBashPolicy(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, decision.Allowed)
 	})
+
+	t.Run("unsupported shell constructs are denied", func(t *testing.T) {
+		t.Parallel()
+		decision, err := EvaluateBashPolicy(ToolPolicyConfig{
+			Bash: BashPolicyConfig{
+				DenyBehavior: BashDenyBehaviorAskUser,
+			},
+		}, json.RawMessage(`{"command":"echo $(uname -a)"}`))
+		require.NoError(t, err)
+		assert.False(t, decision.Allowed)
+		assert.Contains(t, decision.Reason, "unsupported shell construct")
+		assert.Equal(t, BashDenyBehaviorAskUser, decision.DenyBehavior)
+	})
 }
 
 func TestSplitShellCommandSegments(t *testing.T) {
@@ -143,11 +156,33 @@ func TestSplitShellCommandSegments(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			got := splitShellCommandSegments(tc.cmd)
 			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestHasUnsupportedShellConstructs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		cmd  string
+		want bool
+	}{
+		{name: "plain command", cmd: "git status", want: false},
+		{name: "subshell", cmd: "echo $(date)", want: true},
+		{name: "backticks", cmd: "echo `date`", want: true},
+		{name: "heredoc", cmd: "cat <<EOF\nhello\nEOF", want: true},
+		{name: "backticks in single quote are ignored", cmd: "echo '`date`'", want: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, hasUnsupportedShellConstructs(tc.cmd))
 		})
 	}
 }

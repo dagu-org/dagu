@@ -26,7 +26,7 @@ var (
 type Config struct {
 	Enabled        bool             `json:"enabled"`
 	DefaultModelID string           `json:"defaultModelId,omitempty"`
-	ToolPolicy     ToolPolicyConfig `json:"toolPolicy,omitempty"`
+	ToolPolicy     ToolPolicyConfig `json:"toolPolicy"`
 }
 
 // BashRuleAction is the decision a bash rule applies when matched.
@@ -72,7 +72,7 @@ type BashPolicyConfig struct {
 // Tools is a map of tool name to enabled/disabled state.
 type ToolPolicyConfig struct {
 	Tools map[string]bool  `json:"tools,omitempty"`
-	Bash  BashPolicyConfig `json:"bash,omitempty"`
+	Bash  BashPolicyConfig `json:"bash"`
 }
 
 // LLMConfig holds LLM provider configuration for the agent.

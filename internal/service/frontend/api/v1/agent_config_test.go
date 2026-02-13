@@ -13,7 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func strPtr(v string) *string { return &v }
+//go:fix inline
+func strPtr(v string) *string { return new(v) }
 
 func TestGetAgentConfig(t *testing.T) {
 	t.Parallel()
@@ -133,7 +134,7 @@ func TestUpdateAgentConfig(t *testing.T) {
 		enabled := true
 		rules := []apigen.AgentBashRule{
 			{
-				Name:    strPtr("allow_git_status"),
+				Name:    new("allow_git_status"),
 				Pattern: "^git\\s+status$",
 				Action:  action,
 				Enabled: &enabled,

@@ -42,7 +42,7 @@ func newAgentPolicyHook(configStore agent.ConfigStore, auditSvc *audit.Service) 
 
 		policy := agent.ResolveToolPolicy(cfg.ToolPolicy)
 
-		if !agent.IsToolEnabled(policy, info.ToolName) {
+		if !agent.IsToolEnabledResolved(policy, info.ToolName) {
 			logPolicyEvent(auditSvc, info, auditActionToolPolicyDenied, map[string]any{
 				"tool_name": info.ToolName,
 				"reason":    "tool disabled",
