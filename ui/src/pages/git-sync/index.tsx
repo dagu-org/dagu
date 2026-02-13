@@ -1,6 +1,6 @@
 import {
   components,
-  SyncDAGKind,
+  SyncItemKind,
   SyncStatus,
   SyncSummary,
 } from '@/api/v1/schema';
@@ -47,12 +47,12 @@ import { DiffModal } from './DiffModal';
 
 type SyncStatusResponse = components['schemas']['SyncStatusResponse'];
 type SyncConfigResponse = components['schemas']['SyncConfigResponse'];
-type SyncDAGDiffResponse = components['schemas']['SyncDAGDiffResponse'];
-type SyncDAGState = components['schemas']['SyncDAGState'];
+type SyncItemDiffResponse = components['schemas']['SyncItemDiffResponse'];
+type SyncItem = components['schemas']['SyncItem'];
 type StatusFilter = 'all' | 'modified' | 'untracked' | 'conflict';
 type TypeFilter = 'all' | 'dag' | 'memory';
-type SyncItemKind = 'dag' | 'memory';
-type SyncRow = { dagId: string; dag: SyncDAGState; kind: SyncItemKind };
+type UISyncKind = 'dag' | 'memory';
+type SyncRow = { itemId: string; item: SyncItem; kind: UISyncKind };
 
 const statusFilters: StatusFilter[] = [
   'all',
@@ -81,20 +81,11 @@ function parseTypeFilter(value: string | null): TypeFilter {
   return 'all';
 }
 
-function normalizeSyncItemKind(dagId: string, dag: SyncDAGState): SyncItemKind {
-  const rawKind = (dag as { kind?: SyncDAGKind | string }).kind;
-  if (rawKind === SyncDAGKind.memory || rawKind === 'memory') {
+function normalizeSyncItemKind(kind: SyncItemKind): UISyncKind {
+  if (kind === SyncItemKind.memory) {
     return 'memory';
   }
-  if (rawKind === SyncDAGKind.dag || rawKind === 'dag') {
-    return 'dag';
-  }
-  return dagId.startsWith('memory/') ? 'memory' : 'dag';
-}
-
-function formatSyncDisplayName(dagId: string, kind: SyncItemKind): string {
-  const extension = kind === 'memory' ? '.md' : '.yaml';
-  return `${dagId}${extension}`;
+  return 'dag';
 }
 
 // Subtle, readable status colors
@@ -152,16 +143,16 @@ export default function GitSyncPage() {
   const [showConfig, setShowConfig] = useState(false);
   const [publishModal, setPublishModal] = useState<{
     open: boolean;
-    dagId?: string;
+    itemId?: string;
   }>({ open: false });
   const [commitMessage, setCommitMessage] = useState('');
-  const [diffModal, setDiffModal] = useState<{ open: boolean; dagId?: string }>(
+  const [diffModal, setDiffModal] = useState<{ open: boolean; itemId?: string }>(
     { open: false }
   );
-  const [diffData, setDiffData] = useState<SyncDAGDiffResponse | null>(null);
+  const [diffData, setDiffData] = useState<SyncItemDiffResponse | null>(null);
   const [revertModal, setRevertModal] = useState<{
     open: boolean;
-    dagId?: string;
+    itemId?: string;
   }>({ open: false });
   const [selectedDags, setSelectedDags] = useState<Set<string>>(new Set());
   const userTouchedSelectionRef = useRef(false);
@@ -222,24 +213,24 @@ export default function GitSyncPage() {
 
   const syncRows = useMemo<SyncRow[]>(
     () =>
-      status?.dags
-        ? Object.entries(status.dags).map(([dagId, dag]) => ({
-            dagId,
-            dag,
-            kind: normalizeSyncItemKind(dagId, dag),
+      status?.items
+        ? status.items.map((item) => ({
+            itemId: item.itemId,
+            item,
+            kind: normalizeSyncItemKind(item.kind),
           }))
         : [],
-    [status?.dags]
+    [status?.items]
   );
 
   const publishableKey = useMemo(() => {
     return syncRows
       .filter(
-        ({ dag }) =>
-          dag.status === SyncStatus.modified ||
-          dag.status === SyncStatus.untracked
+        ({ item }) =>
+          item.status === SyncStatus.modified ||
+          item.status === SyncStatus.untracked
       )
-      .map(({ dagId }) => dagId)
+      .map(({ itemId }) => itemId)
       .sort()
       .join(',');
   }, [syncRows]);
@@ -250,7 +241,7 @@ export default function GitSyncPage() {
     setSelectedDags(new Set());
   }, [remoteNode]);
 
-  // Auto-select publishable DAGs without overriding user manual choices on polling.
+  // Auto-select publishable items without overriding user manual choices on polling.
   useEffect(() => {
     const next = publishableKey ? publishableKey.split(',') : [];
     const prev = prevPublishableRef.current
@@ -291,7 +282,7 @@ export default function GitSyncPage() {
       if (response.error) {
         showError(response.error.message || 'Pull failed');
       } else {
-        showToast(`Pulled ${response.data?.synced?.length || 0} DAGs`);
+        showToast(`Pulled ${response.data?.synced?.length || 0} items`);
         mutateStatus();
       }
     } catch (err) {
@@ -301,14 +292,14 @@ export default function GitSyncPage() {
     }
   };
 
-  const handlePublish = async (dagId?: string, force?: boolean) => {
+  const handlePublish = async (itemId?: string, force?: boolean) => {
     setIsPublishing(true);
     try {
-      const response = dagId
-        ? await client.POST('/dags/{name}/publish', {
-            params: { path: { name: dagId }, query: { remoteNode } },
+      const response = itemId
+        ? await client.POST('/sync/items/{itemId}/publish', {
+            params: { path: { itemId }, query: { remoteNode } },
             body: {
-              message: commitMessage || `Update ${dagId}`,
+              message: commitMessage || `Update ${itemId}`,
               force: force || false,
             },
           })
@@ -316,16 +307,16 @@ export default function GitSyncPage() {
             params: { query: { remoteNode } },
             body: {
               message: commitMessage || 'Batch update',
-              dagIds: Array.from(selectedDags),
+              itemIds: Array.from(selectedDags),
             },
           });
 
       if (response.error) {
         showError(response.error.message || 'Publish failed');
       } else {
-        const count = dagId
-          ? dagId
-          : `${response.data?.synced?.length || 0} DAGs`;
+        const count = itemId
+          ? itemId
+          : `${response.data?.synced?.length || 0} items`;
         showToast(`Published ${count}`);
         setPublishModal({ open: false });
         setDiffModal({ open: false });
@@ -341,15 +332,15 @@ export default function GitSyncPage() {
     }
   };
 
-  const handleDiscard = async (dagId: string) => {
+  const handleDiscard = async (itemId: string) => {
     try {
-      const response = await client.POST('/dags/{name}/discard', {
-        params: { path: { name: dagId }, query: { remoteNode } },
+      const response = await client.POST('/sync/items/{itemId}/discard', {
+        params: { path: { itemId }, query: { remoteNode } },
       });
       if (response.error) {
         showError(response.error.message || 'Discard failed');
       } else {
-        showToast(`Discarded changes to ${dagId}`);
+        showToast(`Discarded changes to ${itemId}`);
         mutateStatus();
       }
     } catch (err) {
@@ -374,15 +365,15 @@ export default function GitSyncPage() {
     }
   };
 
-  const handleViewDiff = async (dagId: string) => {
+  const handleViewDiff = async (itemId: string) => {
     // Fetch data first, then open modal
     try {
-      const response = await client.GET('/sync/dags/{name}/diff', {
-        params: { path: { name: dagId }, query: { remoteNode } },
+      const response = await client.GET('/sync/items/{itemId}/diff', {
+        params: { path: { itemId }, query: { remoteNode } },
       });
       if (response.data) {
         setDiffData(response.data);
-        setDiffModal({ open: true, dagId });
+        setDiffModal({ open: true, itemId });
       }
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to load diff');
@@ -391,33 +382,33 @@ export default function GitSyncPage() {
 
   const filteredRows = useMemo(
     () =>
-      syncRows.filter(({ dag, kind }) => {
+      syncRows.filter(({ item, kind }) => {
         const typeMatches = typeFilter === 'all' || kind === typeFilter;
         const statusMatches =
-          statusFilter === 'all' || dag.status === statusFilter;
+          statusFilter === 'all' || item.status === statusFilter;
         return typeMatches && statusMatches;
       }),
     [syncRows, typeFilter, statusFilter]
   );
 
   // Publishable DAG IDs among currently visible (filtered) rows
-  const publishableDagIds = useMemo(
+  const publishableItemIDs = useMemo(
     () =>
       filteredRows
         .filter(
-          ({ dag }) =>
-            dag.status === SyncStatus.modified ||
-            dag.status === SyncStatus.untracked
+          ({ item }) =>
+            item.status === SyncStatus.modified ||
+            item.status === SyncStatus.untracked
         )
-        .map(({ dagId }) => dagId),
+        .map(({ itemId }) => itemId),
     [filteredRows]
   );
 
   const allPublishableSelected = useMemo(
     () =>
-      publishableDagIds.length > 0 &&
-      publishableDagIds.every((id) => selectedDags.has(id)),
-    [publishableDagIds, selectedDags]
+      publishableItemIDs.length > 0 &&
+      publishableItemIDs.every((id) => selectedDags.has(id)),
+    [publishableItemIDs, selectedDags]
   );
 
   const handleToggleSelectAll = useCallback(() => {
@@ -425,20 +416,20 @@ export default function GitSyncPage() {
     setSelectedDags((prev) => {
       const next = new Set(prev);
       if (allPublishableSelected) {
-        for (const id of publishableDagIds) next.delete(id);
+        for (const id of publishableItemIDs) next.delete(id);
       } else {
-        for (const id of publishableDagIds) next.add(id);
+        for (const id of publishableItemIDs) next.add(id);
       }
       return next;
     });
-  }, [allPublishableSelected, publishableDagIds]);
+  }, [allPublishableSelected, publishableItemIDs]);
 
-  const handleToggleDag = useCallback((dagId: string) => {
+  const handleToggleItem = useCallback((itemId: string) => {
     userTouchedSelectionRef.current = true;
     setSelectedDags((prev) => {
       const next = new Set(prev);
-      if (next.has(dagId)) next.delete(dagId);
-      else next.add(dagId);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
       return next;
     });
   }, []);
@@ -463,21 +454,21 @@ export default function GitSyncPage() {
       conflict: 0,
     };
 
-    for (const { dag, kind } of syncRows) {
+    for (const { item, kind } of syncRows) {
       if (typeFilter !== 'all' && kind !== typeFilter) {
         continue;
       }
       counts.all += 1;
-      if (dag.status === SyncStatus.modified) counts.modified += 1;
-      if (dag.status === SyncStatus.untracked) counts.untracked += 1;
-      if (dag.status === SyncStatus.conflict) counts.conflict += 1;
+      if (item.status === SyncStatus.modified) counts.modified += 1;
+      if (item.status === SyncStatus.untracked) counts.untracked += 1;
+      if (item.status === SyncStatus.conflict) counts.conflict += 1;
     }
 
     return counts;
   }, [syncRows, typeFilter]);
 
   const rowByID = useMemo(
-    () => new Map(syncRows.map((row) => [row.dagId, row] as const)),
+    () => new Map(syncRows.map((row) => [row.itemId, row] as const)),
     [syncRows]
   );
 
@@ -660,17 +651,17 @@ export default function GitSyncPage() {
         ))}
       </div>
 
-      {/* DAGs Table */}
+      {/* Items Table */}
       <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm">
         <Table className="text-xs">
           <TableHeader>
             <TableRow>
               <TableHead className="w-8">
-                {publishableDagIds.length > 0 && (
+                {publishableItemIDs.length > 0 && (
                   <Checkbox
                     checked={allPublishableSelected}
                     onCheckedChange={handleToggleSelectAll}
-                    aria-label="Select all publishable DAGs"
+                    aria-label="Select all publishable items"
                   />
                 )}
               </TableHead>
@@ -691,29 +682,29 @@ export default function GitSyncPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredRows.map(({ dagId, dag, kind }) => (
+              filteredRows.map(({ itemId, item, kind }) => (
                 <TableRow
-                  key={dagId}
+                  key={itemId}
                   className="h-9 cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleViewDiff(dagId)}
+                  onClick={() => handleViewDiff(itemId)}
                 >
                   <TableCell onClick={(e) => e.stopPropagation()}>
-                    {(dag.status === SyncStatus.modified ||
-                      dag.status === SyncStatus.untracked) && (
+                    {(item.status === SyncStatus.modified ||
+                      item.status === SyncStatus.untracked) && (
                       <Checkbox
-                        checked={selectedDags.has(dagId)}
-                        onCheckedChange={() => handleToggleDag(dagId)}
-                        aria-label={`Select ${dagId}`}
+                        checked={selectedDags.has(itemId)}
+                        onCheckedChange={() => handleToggleItem(itemId)}
+                        aria-label={`Select ${itemId}`}
                       />
                     )}
                   </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-1.5">
                       <a
-                        href={`/dags/${encodeURIComponent(dagId)}`}
+                        href={`/dags/${encodeURIComponent(itemId)}`}
                         className="font-mono hover:underline"
                       >
-                        {formatSyncDisplayName(dagId, kind)}
+                        {item.displayName}
                       </a>
                       {kind === 'memory' && (
                         <span className="text-[10px] px-1 py-0 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400">
@@ -723,10 +714,10 @@ export default function GitSyncPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <StatusDot status={dag.status} />
+                    <StatusDot status={item.status} />
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {dag.lastSyncedAt ? dayjs(dag.lastSyncedAt).fromNow() : '-'}
+                    {item.lastSyncedAt ? dayjs(item.lastSyncedAt).fromNow() : '-'}
                   </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-0.5">
@@ -734,14 +725,14 @@ export default function GitSyncPage() {
                         variant="ghost"
                         size="sm"
                         className="h-6 w-6 p-0"
-                        onClick={() => handleViewDiff(dagId)}
+                        onClick={() => handleViewDiff(itemId)}
                         title="View diff"
                       >
                         <FileCode className="h-3 w-3" />
                       </Button>
-                      {(dag.status === SyncStatus.modified ||
-                        dag.status === SyncStatus.untracked ||
-                        dag.status === SyncStatus.conflict) &&
+                      {(item.status === SyncStatus.modified ||
+                        item.status === SyncStatus.untracked ||
+                        item.status === SyncStatus.conflict) &&
                         config?.pushEnabled &&
                         canWrite && (
                           <Button
@@ -749,22 +740,22 @@ export default function GitSyncPage() {
                             size="sm"
                             className="h-6 w-6 p-0"
                             onClick={() =>
-                              setPublishModal({ open: true, dagId })
+                              setPublishModal({ open: true, itemId })
                             }
                             title="Publish"
                           >
                             <Upload className="h-3 w-3" />
                           </Button>
                         )}
-                      {(dag.status === SyncStatus.modified ||
-                        dag.status === SyncStatus.conflict) &&
+                      {(item.status === SyncStatus.modified ||
+                        item.status === SyncStatus.conflict) &&
                         canWrite && (
                           <Button
                             variant="ghost"
                             size="sm"
                             className="h-6 w-6 p-0 text-muted-foreground hover:text-rose-600"
                             onClick={() =>
-                              setRevertModal({ open: true, dagId })
+                              setRevertModal({ open: true, itemId })
                             }
                             title="Discard"
                           >
@@ -836,8 +827,8 @@ export default function GitSyncPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base">
-              {publishModal.dagId
-                ? `Publish ${publishModal.dagId}`
+              {publishModal.itemId
+                ? `Publish ${publishModal.itemId}`
                 : `Publish ${selectedDags.size} Selected`}
             </DialogTitle>
             <DialogDescription className="text-xs">
@@ -853,8 +844,8 @@ export default function GitSyncPage() {
                 id="commit-message"
                 className="h-8 text-sm"
                 placeholder={
-                  publishModal.dagId
-                    ? `Update ${publishModal.dagId}`
+                  publishModal.itemId
+                    ? `Update ${publishModal.itemId}`
                     : 'Batch update'
                 }
                 value={commitMessage}
@@ -862,7 +853,7 @@ export default function GitSyncPage() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !isPublishing) {
                     e.preventDefault();
-                    handlePublish(publishModal.dagId);
+                    handlePublish(publishModal.itemId);
                   }
                 }}
               />
@@ -878,7 +869,7 @@ export default function GitSyncPage() {
             </Button>
             <Button
               size="sm"
-              onClick={() => handlePublish(publishModal.dagId)}
+              onClick={() => handlePublish(publishModal.itemId)}
               disabled={isPublishing}
             >
               {isPublishing ? (
@@ -901,7 +892,7 @@ export default function GitSyncPage() {
       <DiffModal
         open={diffModal.open}
         onOpenChange={(open) => setDiffModal({ open })}
-        dagId={diffModal.dagId || ''}
+        dagId={diffModal.itemId || ''}
         status={diffData?.status}
         localContent={diffData?.localContent}
         remoteContent={diffData?.remoteContent}
@@ -920,11 +911,11 @@ export default function GitSyncPage() {
             diffData?.status === SyncStatus.conflict)
         }
         onPublish={() => {
-          setPublishModal({ open: true, dagId: diffModal.dagId });
+          setPublishModal({ open: true, itemId: diffModal.itemId });
         }}
         onRevert={() => {
-          if (diffModal.dagId) {
-            setRevertModal({ open: true, dagId: diffModal.dagId });
+          if (diffModal.itemId) {
+            setRevertModal({ open: true, itemId: diffModal.itemId });
           }
         }}
       />
@@ -936,8 +927,8 @@ export default function GitSyncPage() {
         visible={revertModal.open}
         dismissModal={() => setRevertModal({ open: false })}
         onSubmit={() => {
-          if (revertModal.dagId) {
-            handleDiscard(revertModal.dagId);
+          if (revertModal.itemId) {
+            handleDiscard(revertModal.itemId);
           }
           setRevertModal({ open: false });
           setDiffModal({ open: false });
@@ -946,7 +937,7 @@ export default function GitSyncPage() {
         <p className="text-sm text-muted-foreground">
           Discard local changes to{' '}
           <span className="font-mono font-medium text-foreground">
-            {revertModal.dagId}
+            {revertModal.itemId}
           </span>
           ? This cannot be undone.
         </p>

@@ -1451,7 +1451,7 @@ export interface paths {
         put?: never;
         /**
          * Publish selected DAGs
-         * @description Commits and pushes the specified DAG IDs. If dagIds is omitted, publishes all modified or untracked DAGs.
+         * @description Commits and pushes the specified item IDs. If itemIds is omitted, publishes all modified or untracked items.
          */
         post: operations["syncPublishAll"];
         delete?: never;
@@ -1504,7 +1504,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/sync/dags/{name}/diff": {
+    "/sync/items/{itemId}/diff": {
         parameters: {
             query?: never;
             header?: never;
@@ -1512,10 +1512,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get diff for a DAG
-         * @description Returns the diff between local and remote versions of a DAG
+         * Get diff for a sync item
+         * @description Returns the diff between local and remote versions of a sync item
          */
-        get: operations["getSyncDAGDiff"];
+        get: operations["getSyncItemDiff"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1524,7 +1524,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dags/{name}/publish": {
+    "/sync/items/{itemId}/publish": {
         parameters: {
             query?: never;
             header?: never;
@@ -1534,17 +1534,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Publish a single DAG
-         * @description Commits and pushes a single DAG to the remote repository
+         * Publish a single sync item
+         * @description Commits and pushes a single sync item to the remote repository
          */
-        post: operations["publishDag"];
+        post: operations["publishSyncItem"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/dags/{name}/discard": {
+    "/sync/items/{itemId}/discard": {
         parameters: {
             query?: never;
             header?: never;
@@ -1554,10 +1554,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Discard local changes for a DAG
+         * Discard local changes for a sync item
          * @description Discards local changes and reverts to the version in the remote repository
          */
-        post: operations["discardDagChanges"];
+        post: operations["discardSyncItemChanges"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2740,11 +2740,17 @@ export interface components {
          * @description Type of sync item
          * @enum {string}
          */
-        SyncDAGKind: SyncDAGKind;
-        /** @description Sync state for a single DAG */
-        SyncDAGState: {
+        SyncItemKind: SyncItemKind;
+        /** @description Sync state for a single item */
+        SyncItem: {
+            /** @description Stable item identifier (file path without extension) */
+            itemId: string;
+            /** @description Relative file path with extension */
+            filePath: string;
+            /** @description Display-friendly item name */
+            displayName: string;
             status: components["schemas"]["SyncStatus"];
-            kind: components["schemas"]["SyncDAGKind"];
+            kind: components["schemas"]["SyncItemKind"];
             /** @description Commit hash when last synced */
             baseCommit?: string;
             /** @description Content hash when last synced */
@@ -2800,21 +2806,21 @@ export interface components {
             lastSyncStatus?: string;
             /** @description Error message from last failed sync */
             lastError?: string;
-            /** @description Sync state for each DAG */
-            dags?: {
-                [key: string]: components["schemas"]["SyncDAGState"];
-            };
+            /** @description Sync state for each item */
+            items: components["schemas"]["SyncItem"][];
             counts: components["schemas"]["SyncStatusCounts"];
         };
         /** @description Error during sync operation */
         SyncError: {
-            dagId?: string;
+            itemId?: string;
             message: string;
         };
-        /** @description Diff between local and remote versions of a DAG */
-        SyncDAGDiffResponse: {
-            /** @description The DAG identifier */
-            dagId: string;
+        /** @description Diff between local and remote versions of a sync item */
+        SyncItemDiffResponse: {
+            /** @description The item identifier */
+            itemId: string;
+            /** @description Relative file path with extension */
+            filePath: string;
             status: components["schemas"]["SyncStatus"];
             /** @description Current local file content */
             localContent: string;
@@ -2851,16 +2857,16 @@ export interface components {
              */
             force: boolean;
         };
-        /** @description Request to publish selected DAGs */
+        /** @description Request to publish selected items */
         SyncPublishAllRequest: {
             /** @description Commit message */
             message?: string;
-            /** @description DAG IDs to publish. If omitted, all modified or untracked DAGs are published. */
-            dagIds?: string[];
+            /** @description Item IDs to publish. If omitted, all modified or untracked items are published. */
+            itemIds?: string[];
         };
         /** @description Response when a conflict is detected */
         SyncConflictResponse: {
-            dagId: string;
+            itemId: string;
             remoteCommit?: string;
             remoteAuthor?: string;
             remoteMessage?: string;
@@ -7272,7 +7278,7 @@ export interface operations {
             };
         };
     };
-    getSyncDAGDiff: {
+    getSyncItemDiff: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -7280,8 +7286,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description The DAG name (file name without extension) */
-                name: string;
+                /** @description The sync item identifier (file path without extension) */
+                itemId: string;
             };
             cookie?: never;
         };
@@ -7293,10 +7299,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SyncDAGDiffResponse"];
+                    "application/json": components["schemas"]["SyncItemDiffResponse"];
                 };
             };
-            /** @description DAG not found */
+            /** @description Item not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -7316,7 +7322,7 @@ export interface operations {
             };
         };
     };
-    publishDag: {
+    publishSyncItem: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -7324,8 +7330,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description The DAG name (file name without extension) */
-                name: string;
+                /** @description The sync item identifier (file path without extension) */
+                itemId: string;
             };
             cookie?: never;
         };
@@ -7335,7 +7341,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description DAG published successfully */
+            /** @description Item published successfully */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7344,7 +7350,7 @@ export interface operations {
                     "application/json": components["schemas"]["SyncResultResponse"];
                 };
             };
-            /** @description DAG not found */
+            /** @description Item not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -7373,7 +7379,7 @@ export interface operations {
             };
         };
     };
-    discardDagChanges: {
+    discardSyncItemChanges: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -7381,8 +7387,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description The DAG name (file name without extension) */
-                name: string;
+                /** @description The sync item identifier (file path without extension) */
+                itemId: string;
             };
             cookie?: never;
         };
@@ -7397,7 +7403,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessResponse"];
                 };
             };
-            /** @description DAG not found */
+            /** @description Item not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -8378,7 +8384,7 @@ export enum SyncSummary {
     conflict = "conflict",
     error = "error"
 }
-export enum SyncDAGKind {
+export enum SyncItemKind {
     dag = "dag",
     memory = "memory"
 }

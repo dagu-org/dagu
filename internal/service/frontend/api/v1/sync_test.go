@@ -14,7 +14,7 @@ import (
 )
 
 type mockSyncService struct {
-	publishAllFn func(ctx context.Context, message string, dagIDs []string) (*gitsync.SyncResult, error)
+	publishAllFn func(ctx context.Context, message string, itemIDs []string) (*gitsync.SyncResult, error)
 	getStatusFn  func(context.Context) (*gitsync.OverallStatus, error)
 }
 
@@ -24,11 +24,11 @@ func (m *mockSyncService) Publish(_ context.Context, _ string, _ string, _ bool)
 	return nil, nil
 }
 
-func (m *mockSyncService) PublishAll(ctx context.Context, message string, dagIDs []string) (*gitsync.SyncResult, error) {
+func (m *mockSyncService) PublishAll(ctx context.Context, message string, itemIDs []string) (*gitsync.SyncResult, error) {
 	if m.publishAllFn == nil {
 		return nil, nil
 	}
-	return m.publishAllFn(ctx, message, dagIDs)
+	return m.publishAllFn(ctx, message, itemIDs)
 }
 
 func (m *mockSyncService) Discard(_ context.Context, _ string) error { return nil }
@@ -84,13 +84,13 @@ func TestSyncPublishAll_Validation(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
 	})
 
-	t.Run("returns 400 for empty dagIds", func(t *testing.T) {
+	t.Run("returns 400 for empty itemIds", func(t *testing.T) {
 		t.Parallel()
 
 		a := newSyncAPIForTest(&mockSyncService{})
 		_, err := a.SyncPublishAll(context.Background(), apigen.SyncPublishAllRequestObject{
 			Body: &apigen.SyncPublishAllRequest{
-				DagIds: ptrOf([]string{}),
+				ItemIds: ptrOf([]string{}),
 			},
 		})
 		require.Error(t, err)
@@ -116,11 +116,11 @@ func TestSyncPublishAll_Validation(t *testing.T) {
 					},
 				}, nil
 			},
-			publishAllFn: func(_ context.Context, _ string, dagIDs []string) (*gitsync.SyncResult, error) {
-				gotIDs = dagIDs
+			publishAllFn: func(_ context.Context, _ string, itemIDs []string) (*gitsync.SyncResult, error) {
+				gotIDs = itemIDs
 				return &gitsync.SyncResult{
 					Success:   true,
-					Synced:    dagIDs,
+					Synced:    itemIDs,
 					Timestamp: time.Now(),
 				}, nil
 			},
@@ -143,7 +143,7 @@ func TestSyncPublishAll_Validation(t *testing.T) {
 		a := newSyncAPIForTest(&mockSyncService{
 			publishAllFn: func(_ context.Context, _ string, _ []string) (*gitsync.SyncResult, error) {
 				return nil, &gitsync.ValidationError{
-					Field:   "dagIds",
+					Field:   "itemIds",
 					Message: "DAG \"missing\" is not tracked by git sync",
 				}
 			},
@@ -151,7 +151,7 @@ func TestSyncPublishAll_Validation(t *testing.T) {
 
 		_, err := a.SyncPublishAll(context.Background(), apigen.SyncPublishAllRequestObject{
 			Body: &apigen.SyncPublishAllRequest{
-				DagIds: ptrOf([]string{"missing"}),
+				ItemIds: ptrOf([]string{"missing"}),
 			},
 		})
 		require.Error(t, err)
@@ -176,7 +176,7 @@ func TestSyncPublishAll_Validation(t *testing.T) {
 
 		_, err := a.SyncPublishAll(context.Background(), apigen.SyncPublishAllRequestObject{
 			Body: &apigen.SyncPublishAllRequest{
-				DagIds: ptrOf([]string{"../etc/passwd"}),
+				ItemIds: ptrOf([]string{"../etc/passwd"}),
 			},
 		})
 		require.Error(t, err)
@@ -193,9 +193,9 @@ func TestSyncPublishAll_Validation(t *testing.T) {
 		var gotMessage string
 		var gotIDs []string
 		a := newSyncAPIForTest(&mockSyncService{
-			publishAllFn: func(_ context.Context, message string, dagIDs []string) (*gitsync.SyncResult, error) {
+			publishAllFn: func(_ context.Context, message string, itemIDs []string) (*gitsync.SyncResult, error) {
 				gotMessage = message
-				gotIDs = dagIDs
+				gotIDs = itemIDs
 				return &gitsync.SyncResult{
 					Success:   true,
 					Synced:    []string{"a"},
@@ -207,7 +207,7 @@ func TestSyncPublishAll_Validation(t *testing.T) {
 		resp, err := a.SyncPublishAll(context.Background(), apigen.SyncPublishAllRequestObject{
 			Body: &apigen.SyncPublishAllRequest{
 				Message: ptrOf("publish selected"),
-				DagIds:  ptrOf([]string{"b", "a"}),
+				ItemIds: ptrOf([]string{"b", "a"}),
 			},
 		})
 		require.NoError(t, err)
@@ -219,7 +219,7 @@ func TestSyncPublishAll_Validation(t *testing.T) {
 	})
 }
 
-func TestToAPISyncDAGStates_IncludesKind(t *testing.T) {
+func TestToAPISyncItems_IncludesKindAndPath(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
@@ -235,10 +235,16 @@ func TestToAPISyncDAGStates_IncludesKind(t *testing.T) {
 		},
 	}
 
-	apiStates := toAPISyncDAGStates(states)
-	require.NotNil(t, apiStates)
-	require.Contains(t, *apiStates, "alpha")
-	require.Contains(t, *apiStates, "memory/MEMORY")
-	assert.Equal(t, apigen.SyncDAGKindDag, (*apiStates)["alpha"].Kind)
-	assert.Equal(t, apigen.SyncDAGKindMemory, (*apiStates)["memory/MEMORY"].Kind)
+	apiItems := toAPISyncItems(states)
+	require.Len(t, apiItems, 2)
+
+	assert.Equal(t, "alpha", apiItems[0].ItemId)
+	assert.Equal(t, apigen.SyncItemKindDag, apiItems[0].Kind)
+	assert.Equal(t, "alpha.yaml", apiItems[0].FilePath)
+	assert.Equal(t, "alpha.yaml", apiItems[0].DisplayName)
+
+	assert.Equal(t, "memory/MEMORY", apiItems[1].ItemId)
+	assert.Equal(t, apigen.SyncItemKindMemory, apiItems[1].Kind)
+	assert.Equal(t, "memory/MEMORY.md", apiItems[1].FilePath)
+	assert.Equal(t, "memory/MEMORY.md", apiItems[1].DisplayName)
 }

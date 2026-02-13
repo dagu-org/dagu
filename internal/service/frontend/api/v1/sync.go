@@ -69,7 +69,7 @@ func (a *API) GetSyncStatus(ctx context.Context, _ api.GetSyncStatusRequestObjec
 		LastSyncCommit: ptrOf(status.LastSyncCommit),
 		LastSyncStatus: ptrOf(status.LastSyncStatus),
 		LastError:      status.LastError,
-		Dags:           toAPISyncDAGStates(status.DAGs),
+		Items:          toAPISyncItems(status.DAGs),
 		Counts:         toAPISyncCounts(status.Counts),
 	}, nil
 }
@@ -79,6 +79,7 @@ func disabledSyncStatusResponse() api.GetSyncStatus200JSONResponse {
 	return api.GetSyncStatus200JSONResponse{
 		Enabled: false,
 		Summary: api.SyncSummarySynced,
+		Items:   []api.SyncItem{},
 		Counts: api.SyncStatusCounts{
 			Synced:    0,
 			Modified:  0,
@@ -123,26 +124,26 @@ func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestO
 		return nil, errInvalidRequestBody
 	}
 	message := valueOf(req.Body.Message)
-	var dagIDs []string
-	if req.Body.DagIds == nil {
+	var itemIDs []string
+	if req.Body.ItemIds == nil {
 		status, err := a.syncService.GetStatus(ctx)
 		if err != nil {
 			return nil, internalError(err)
 		}
-		dagIDs = collectPublishableDAGIDs(status)
+		itemIDs = collectPublishableItemIDs(status)
 	} else {
-		dagIDs = append(dagIDs, (*req.Body.DagIds)...)
+		itemIDs = append(itemIDs, (*req.Body.ItemIds)...)
 	}
-	if len(dagIDs) == 0 {
+	if len(itemIDs) == 0 {
 		return nil, &Error{
 			Code:       api.ErrorCodeBadRequest,
-			Message:    "No modified or untracked DAGs to publish",
+			Message:    "No modified or untracked items to publish",
 			HTTPStatus: http.StatusBadRequest,
 		}
 	}
-	sort.Strings(dagIDs)
+	sort.Strings(itemIDs)
 
-	result, err := a.syncService.PublishAll(ctx, message, dagIDs)
+	result, err := a.syncService.PublishAll(ctx, message, itemIDs)
 	if err != nil {
 		if gitsync.IsNotEnabled(err) {
 			return nil, errSyncNotConfigured
@@ -160,7 +161,7 @@ func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestO
 
 	a.logAudit(ctx, audit.CategoryGitSync, "sync_publish_all", map[string]any{
 		"message":  message,
-		"dag_ids":  dagIDs,
+		"item_ids": itemIDs,
 		"synced":   result.Synced,
 		"modified": result.Modified,
 	})
@@ -168,20 +169,20 @@ func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestO
 	return api.SyncPublishAll200JSONResponse(toAPISyncResult(result)), nil
 }
 
-func collectPublishableDAGIDs(status *gitsync.OverallStatus) []string {
+func collectPublishableItemIDs(status *gitsync.OverallStatus) []string {
 	if status == nil {
 		return nil
 	}
-	dagIDs := make([]string, 0, len(status.DAGs))
-	for id, dag := range status.DAGs {
-		if dag == nil {
+	itemIDs := make([]string, 0, len(status.DAGs))
+	for id, item := range status.DAGs {
+		if item == nil {
 			continue
 		}
-		if dag.Status == gitsync.StatusModified || dag.Status == gitsync.StatusUntracked {
-			dagIDs = append(dagIDs, id)
+		if item.Status == gitsync.StatusModified || item.Status == gitsync.StatusUntracked {
+			itemIDs = append(itemIDs, id)
 		}
 	}
-	return dagIDs
+	return itemIDs
 }
 
 // SyncTestConnection tests the connection to the remote repository.
@@ -227,16 +228,16 @@ func (a *API) GetSyncConfig(ctx context.Context, _ api.GetSyncConfigRequestObjec
 	return api.GetSyncConfig200JSONResponse(toAPISyncConfig(cfg)), nil
 }
 
-// GetSyncDAGDiff returns the diff between local and remote versions of a DAG.
-func (a *API) GetSyncDAGDiff(ctx context.Context, req api.GetSyncDAGDiffRequestObject) (api.GetSyncDAGDiffResponseObject, error) {
+// GetSyncItemDiff returns the diff between local and remote versions of a sync item.
+func (a *API) GetSyncItemDiff(ctx context.Context, req api.GetSyncItemDiffRequestObject) (api.GetSyncItemDiffResponseObject, error) {
 	if err := a.requireSyncService(); err != nil {
 		return nil, err
 	}
 
-	diff, err := a.syncService.GetDAGDiff(ctx, req.Name)
+	diff, err := a.syncService.GetDAGDiff(ctx, req.ItemId)
 	if err != nil {
 		if gitsync.IsDAGNotFound(err) {
-			return api.GetSyncDAGDiff404JSONResponse{
+			return api.GetSyncItemDiff404JSONResponse{
 				Code:    api.ErrorCodeNotFound,
 				Message: err.Error(),
 			}, nil
@@ -244,8 +245,9 @@ func (a *API) GetSyncDAGDiff(ctx context.Context, req api.GetSyncDAGDiffRequestO
 		return nil, internalError(err)
 	}
 
-	return api.GetSyncDAGDiff200JSONResponse{
-		DagId:         diff.DAGID,
+	return api.GetSyncItemDiff200JSONResponse{
+		ItemId:        diff.DAGID,
+		FilePath:      syncItemFilePath(diff.DAGID, gitsync.KindForDAGID(diff.DAGID)),
 		Status:        toAPISyncStatus(diff.Status),
 		LocalContent:  diff.LocalContent,
 		RemoteContent: ptrOf(diff.RemoteContent),
@@ -293,8 +295,8 @@ func (a *API) UpdateSyncConfig(ctx context.Context, req api.UpdateSyncConfigRequ
 	return api.UpdateSyncConfig200JSONResponse(toAPISyncConfig(cfg)), nil
 }
 
-// PublishDag publishes a single DAG.
-func (a *API) PublishDag(ctx context.Context, req api.PublishDagRequestObject) (api.PublishDagResponseObject, error) {
+// PublishSyncItem publishes a single sync item.
+func (a *API) PublishSyncItem(ctx context.Context, req api.PublishSyncItemRequestObject) (api.PublishSyncItemResponseObject, error) {
 	if err := a.requireSyncService(); err != nil {
 		return nil, err
 	}
@@ -304,22 +306,22 @@ func (a *API) PublishDag(ctx context.Context, req api.PublishDagRequestObject) (
 
 	message, force := extractPublishOptions(req.Body)
 
-	result, err := a.syncService.Publish(ctx, req.Name, message, force)
+	result, err := a.syncService.Publish(ctx, req.ItemId, message, force)
 	if err != nil {
 		return handlePublishError(err)
 	}
 
 	a.logAudit(ctx, audit.CategoryGitSync, "sync_publish", map[string]any{
-		"dag_id":  req.Name,
+		"item_id": req.ItemId,
 		"message": message,
 		"force":   force,
 	})
 
-	return api.PublishDag200JSONResponse(toAPISyncResult(result)), nil
+	return api.PublishSyncItem200JSONResponse(toAPISyncResult(result)), nil
 }
 
-// DiscardDagChanges discards local changes for a DAG.
-func (a *API) DiscardDagChanges(ctx context.Context, req api.DiscardDagChangesRequestObject) (api.DiscardDagChangesResponseObject, error) {
+// DiscardSyncItemChanges discards local changes for a sync item.
+func (a *API) DiscardSyncItemChanges(ctx context.Context, req api.DiscardSyncItemChangesRequestObject) (api.DiscardSyncItemChangesResponseObject, error) {
 	if err := a.requireSyncService(); err != nil {
 		return nil, err
 	}
@@ -327,9 +329,9 @@ func (a *API) DiscardDagChanges(ctx context.Context, req api.DiscardDagChangesRe
 		return nil, err
 	}
 
-	if err := a.syncService.Discard(ctx, req.Name); err != nil {
+	if err := a.syncService.Discard(ctx, req.ItemId); err != nil {
 		if gitsync.IsDAGNotFound(err) {
-			return api.DiscardDagChanges404JSONResponse{
+			return api.DiscardSyncItemChanges404JSONResponse{
 				Code:    api.ErrorCodeNotFound,
 				Message: err.Error(),
 			}, nil
@@ -337,9 +339,9 @@ func (a *API) DiscardDagChanges(ctx context.Context, req api.DiscardDagChangesRe
 		return nil, internalError(err)
 	}
 
-	a.logAudit(ctx, audit.CategoryGitSync, "sync_discard", map[string]any{"dag_id": req.Name})
+	a.logAudit(ctx, audit.CategoryGitSync, "sync_discard", map[string]any{"item_id": req.ItemId})
 
-	return api.DiscardDagChanges200JSONResponse{
+	return api.DiscardSyncItemChanges200JSONResponse{
 		Message: "Changes discarded successfully",
 	}, nil
 }
@@ -376,33 +378,49 @@ func toAPISyncStatus(s gitsync.SyncStatus) api.SyncStatus {
 	}
 }
 
-func toAPISyncDAGKind(dagID string, kind gitsync.DAGKind) api.SyncDAGKind {
+func toAPISyncItemKind(itemID string, kind gitsync.DAGKind) api.SyncItemKind {
 	if kind == "" {
-		kind = gitsync.KindForDAGID(dagID)
+		kind = gitsync.KindForDAGID(itemID)
 	}
 
 	switch kind {
 	case gitsync.DAGKindMemory:
-		return api.SyncDAGKindMemory
+		return api.SyncItemKindMemory
 	case gitsync.DAGKindDAG:
-		return api.SyncDAGKindDag
+		return api.SyncItemKindDag
 	default:
-		return api.SyncDAGKindDag
+		return api.SyncItemKindDag
 	}
 }
 
-func toAPISyncDAGStates(states map[string]*gitsync.DAGState) *map[string]api.SyncDAGState {
-	if states == nil {
-		return nil
+func syncItemFilePath(itemID string, kind gitsync.DAGKind) string {
+	if kind == "" {
+		kind = gitsync.KindForDAGID(itemID)
 	}
-	result := make(map[string]api.SyncDAGState)
-	for id, state := range states {
+	ext := ".yaml"
+	if kind == gitsync.DAGKindMemory {
+		ext = ".md"
+	}
+	return itemID + ext
+}
+
+func toAPISyncItems(states map[string]*gitsync.DAGState) []api.SyncItem {
+	if states == nil {
+		return []api.SyncItem{}
+	}
+
+	result := make([]api.SyncItem, 0, len(states))
+	for itemID, state := range states {
 		if state == nil {
 			continue
 		}
-		result[id] = api.SyncDAGState{
+		filePath := syncItemFilePath(itemID, state.Kind)
+		result = append(result, api.SyncItem{
+			ItemId:             itemID,
+			FilePath:           filePath,
+			DisplayName:        filePath,
 			Status:             toAPISyncStatus(state.Status),
-			Kind:               toAPISyncDAGKind(id, state.Kind),
+			Kind:               toAPISyncItemKind(itemID, state.Kind),
 			BaseCommit:         ptrOf(state.BaseCommit),
 			LastSyncedHash:     ptrOf(state.LastSyncedHash),
 			LastSyncedAt:       state.LastSyncedAt,
@@ -412,9 +430,14 @@ func toAPISyncDAGStates(states map[string]*gitsync.DAGState) *map[string]api.Syn
 			RemoteAuthor:       ptrOf(state.RemoteAuthor),
 			RemoteMessage:      ptrOf(state.RemoteMessage),
 			ConflictDetectedAt: state.ConflictDetectedAt,
-		}
+		})
 	}
-	return &result
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].FilePath < result[j].FilePath
+	})
+
+	return result
 }
 
 func toAPISyncCounts(counts gitsync.StatusCounts) api.SyncStatusCounts {
@@ -445,7 +468,7 @@ func toAPISyncErrors(errors []gitsync.SyncError) *[]api.SyncError {
 	result := make([]api.SyncError, len(errors))
 	for i, e := range errors {
 		result[i] = api.SyncError{
-			DagId:   ptrOf(e.DAGID),
+			ItemId:  ptrOf(e.DAGID),
 			Message: e.Message,
 		}
 	}
@@ -524,7 +547,7 @@ func applyConfigUpdates(cfg *gitsync.Config, body *api.UpdateSyncConfigJSONReque
 }
 
 // extractPublishOptions extracts message and force options from the request body.
-func extractPublishOptions(body *api.PublishDagJSONRequestBody) (message string, force bool) {
+func extractPublishOptions(body *api.PublishSyncItemJSONRequestBody) (message string, force bool) {
 	if body == nil {
 		return "", false
 	}
@@ -538,11 +561,11 @@ func extractPublishOptions(body *api.PublishDagJSONRequestBody) (message string,
 }
 
 // handlePublishError handles errors from the publish operation.
-func handlePublishError(err error) (api.PublishDagResponseObject, error) {
+func handlePublishError(err error) (api.PublishSyncItemResponseObject, error) {
 	var conflictErr *gitsync.ConflictError
 	if errors.As(err, &conflictErr) {
-		return api.PublishDag409JSONResponse{
-			DagId:         conflictErr.DAGID,
+		return api.PublishSyncItem409JSONResponse{
+			ItemId:        conflictErr.DAGID,
 			RemoteCommit:  ptrOf(conflictErr.RemoteCommit),
 			RemoteAuthor:  ptrOf(conflictErr.RemoteAuthor),
 			RemoteMessage: ptrOf(conflictErr.RemoteMessage),
@@ -550,7 +573,7 @@ func handlePublishError(err error) (api.PublishDagResponseObject, error) {
 		}, nil
 	}
 	if gitsync.IsDAGNotFound(err) {
-		return api.PublishDag404JSONResponse{
+		return api.PublishSyncItem404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
 			Message: err.Error(),
 		}, nil

@@ -3333,7 +3333,7 @@ paths:
   /sync/publish-all:
     post:
       summary: "Publish selected DAGs"
-      description: "Commits and pushes the specified DAG IDs. If dagIds is omitted, publishes all modified or untracked DAGs."
+      description: "Commits and pushes the specified item IDs. If itemIds is omitted, publishes all modified or untracked items."
       operationId: "syncPublishAll"
       tags:
         - "sync"
@@ -3432,18 +3432,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /sync/dags/{name}/diff:
+  /sync/items/{itemId}/diff:
     get:
-      summary: "Get diff for a DAG"
-      description: "Returns the diff between local and remote versions of a DAG"
-      operationId: "getSyncDAGDiff"
+      summary: "Get diff for a sync item"
+      description: "Returns the diff between local and remote versions of a sync item"
+      operationId: "getSyncItemDiff"
       tags:
         - "sync"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - name: name
+        - name: itemId
           in: path
-          description: "The DAG name (file name without extension)"
+          description: "The sync item identifier (file path without extension)"
           required: true
           schema:
             type: string
@@ -3453,9 +3453,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SyncDAGDiffResponse"
+                $ref: "#/components/schemas/SyncItemDiffResponse"
         "404":
-          description: "DAG not found"
+          description: "Item not found"
           content:
             application/json:
               schema:
@@ -3467,19 +3467,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{name}/publish:
+  /sync/items/{itemId}/publish:
     post:
-      summary: "Publish a single DAG"
-      description: "Commits and pushes a single DAG to the remote repository"
-      operationId: "publishDag"
+      summary: "Publish a single sync item"
+      description: "Commits and pushes a single sync item to the remote repository"
+      operationId: "publishSyncItem"
       tags:
         - "sync"
-        - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - name: name
+        - name: itemId
           in: path
-          description: "The DAG name (file name without extension)"
+          description: "The sync item identifier (file path without extension)"
           required: true
           schema:
             type: string
@@ -3491,13 +3490,13 @@ paths:
               $ref: "#/components/schemas/SyncPublishRequest"
       responses:
         "200":
-          description: "DAG published successfully"
+          description: "Item published successfully"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SyncResultResponse"
         "404":
-          description: "DAG not found"
+          description: "Item not found"
           content:
             application/json:
               schema:
@@ -3515,19 +3514,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{name}/discard:
+  /sync/items/{itemId}/discard:
     post:
-      summary: "Discard local changes for a DAG"
+      summary: "Discard local changes for a sync item"
       description: "Discards local changes and reverts to the version in the remote repository"
-      operationId: "discardDagChanges"
+      operationId: "discardSyncItemChanges"
       tags:
         - "sync"
-        - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - name: name
+        - name: itemId
           in: path
-          description: "The DAG name (file name without extension)"
+          description: "The sync item identifier (file path without extension)"
           required: true
           schema:
             type: string
@@ -3539,7 +3537,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
         "404":
-          description: "DAG not found"
+          description: "Item not found"
           content:
             application/json:
               schema:
@@ -6209,21 +6207,30 @@ components:
         - conflict
         - error
 
-    SyncDAGKind:
+    SyncItemKind:
       type: string
       description: "Type of sync item"
       enum:
         - dag
         - memory
 
-    SyncDAGState:
+    SyncItem:
       type: object
-      description: "Sync state for a single DAG"
+      description: "Sync state for a single item"
       properties:
+        itemId:
+          type: string
+          description: "Stable item identifier (file path without extension)"
+        filePath:
+          type: string
+          description: "Relative file path with extension"
+        displayName:
+          type: string
+          description: "Display-friendly item name"
         status:
           $ref: "#/components/schemas/SyncStatus"
         kind:
-          $ref: "#/components/schemas/SyncDAGKind"
+          $ref: "#/components/schemas/SyncItemKind"
         baseCommit:
           type: string
           description: "Commit hash when last synced"
@@ -6255,6 +6262,9 @@ components:
           format: date-time
           description: "When the conflict was detected"
       required:
+        - itemId
+        - filePath
+        - displayName
         - status
         - kind
 
@@ -6304,36 +6314,40 @@ components:
         lastError:
           type: string
           description: "Error message from last failed sync"
-        dags:
-          type: object
-          additionalProperties:
-            $ref: "#/components/schemas/SyncDAGState"
-          description: "Sync state for each DAG"
+        items:
+          type: array
+          description: "Sync state for each item"
+          items:
+            $ref: "#/components/schemas/SyncItem"
         counts:
           $ref: "#/components/schemas/SyncStatusCounts"
       required:
         - enabled
         - summary
+        - items
         - counts
 
     SyncError:
       type: object
       description: "Error during sync operation"
       properties:
-        dagId:
+        itemId:
           type: string
         message:
           type: string
       required:
         - message
 
-    SyncDAGDiffResponse:
+    SyncItemDiffResponse:
       type: object
-      description: "Diff between local and remote versions of a DAG"
+      description: "Diff between local and remote versions of a sync item"
       properties:
-        dagId:
+        itemId:
           type: string
-          description: "The DAG identifier"
+          description: "The item identifier"
+        filePath:
+          type: string
+          description: "Relative file path with extension"
         status:
           $ref: "#/components/schemas/SyncStatus"
         localContent:
@@ -6352,7 +6366,8 @@ components:
           type: string
           description: "Commit message of the remote version"
       required:
-        - dagId
+        - itemId
+        - filePath
         - status
         - localContent
 
@@ -6404,22 +6419,22 @@ components:
 
     SyncPublishAllRequest:
       type: object
-      description: "Request to publish selected DAGs"
+      description: "Request to publish selected items"
       properties:
         message:
           type: string
           description: "Commit message"
-        dagIds:
+        itemIds:
           type: array
           items:
             type: string
-          description: "DAG IDs to publish. If omitted, all modified or untracked DAGs are published."
+          description: "Item IDs to publish. If omitted, all modified or untracked items are published."
 
     SyncConflictResponse:
       type: object
       description: "Response when a conflict is detected"
       properties:
-        dagId:
+        itemId:
           type: string
         remoteCommit:
           type: string
@@ -6430,7 +6445,7 @@ components:
         message:
           type: string
       required:
-        - dagId
+        - itemId
         - message
 
     SyncConnectionTestResponse:
