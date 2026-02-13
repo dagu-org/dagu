@@ -294,6 +294,18 @@ func TestReplaceVars_EdgeCases(t *testing.T) {
 			vars:     map[string]string{"FOO123": "value"},
 			want:     "value",
 		},
+		{
+			name:     "VarFollowedBySingleQuote",
+			template: "${FOO}'",
+			vars:     map[string]string{"FOO": "bar"},
+			want:     "bar'",
+		},
+		{
+			name:     "SimpleVarFollowedBySingleQuote",
+			template: "$FOO'",
+			vars:     map[string]string{"FOO": "bar"},
+			want:     "bar'",
+		},
 	}
 
 	for _, tt := range tests {
