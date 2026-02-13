@@ -10,6 +10,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/resource"
 	"github.com/spf13/cobra"
 )
@@ -26,9 +27,8 @@ and optionally 'dagu coordinator' into a single process. The web UI provides the
 interface, the scheduler handles automated DAG-run execution based on defined schedules,
 and the coordinator (when enabled) manages distributed task execution across workers.
 
-By default, start-all runs in single instance mode without the coordinator. The coordinator
-is only started when --coordinator.host is set to a non-localhost address (not 127.0.0.1
-or localhost), enabling distributed execution mode.
+The coordinator is enabled by default and can be disabled by setting coordinator.enabled=false
+in the config file or DAGU_COORDINATOR_ENABLED=false as an environment variable.
 
 Flags:
   --host string                     Host address to bind the web server to (default: 127.0.0.1)
@@ -44,10 +44,13 @@ Flags:
   --peer.skip-tls-verify            Skip TLS certificate verification (insecure)
 
 Example:
-  # Single instance mode (coordinator disabled)
+  # Default mode (coordinator enabled)
   dagu start-all
 
-  # Distributed mode (coordinator enabled)
+  # Disable coordinator
+  DAGU_COORDINATOR_ENABLED=false dagu start-all
+
+  # Distributed mode with coordinator on all interfaces
   dagu start-all --coordinator.host=0.0.0.0 --coordinator.port=50055
 
   # Production with both web and coordinator on all interfaces
@@ -109,10 +112,17 @@ func runStartAll(ctx *Context, _ []string) error {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
 
-	// Only start coordinator if not bound to localhost
-	coordinator, coordHandler, err := newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry, ctx.DAGRunStore)
-	if err != nil {
-		return fmt.Errorf("failed to initialize coordinator: %w", err)
+	// Initialize coordinator if enabled
+	var coord *coordinator.Service
+	var coordHandler *coordinator.Handler
+	if ctx.Config.Coordinator.Enabled {
+		var err error
+		coord, coordHandler, err = newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry, ctx.DAGRunStore)
+		if err != nil {
+			return fmt.Errorf("failed to initialize coordinator: %w", err)
+		}
+	} else {
+		logger.Info(serviceCtx, "Coordinator disabled via configuration")
 	}
 
 	// Start resource monitoring service (starts its own goroutine internally)
@@ -122,7 +132,7 @@ func runStartAll(ctx *Context, _ []string) error {
 
 	// WaitGroup to track all services
 	var wg sync.WaitGroup
-	serviceCount := 3 // scheduler + server + coordinator
+	serviceCount := 3 // scheduler + server + coordinator (max)
 	errCh := make(chan error, serviceCount)
 
 	// Start scheduler
@@ -138,14 +148,16 @@ func runStartAll(ctx *Context, _ []string) error {
 		}
 	})
 
-	wg.Go(func() {
-		if err := coordinator.Start(serviceCtx); err != nil {
-			select {
-			case errCh <- fmt.Errorf("coordinator failed: %w", err):
-			default:
+	if coord != nil {
+		wg.Go(func() {
+			if err := coord.Start(serviceCtx); err != nil {
+				select {
+				case errCh <- fmt.Errorf("coordinator failed: %w", err):
+				default:
+				}
 			}
-		}
-	})
+		})
+	}
 
 	// Start server
 	wg.Go(func() {
@@ -178,14 +190,16 @@ func runStartAll(ctx *Context, _ []string) error {
 	logger.Info(ctx, "Stopping all services")
 
 	// Stop coordinator first to unregister from service registry
-	if err := coordinator.Stop(ctx); err != nil {
-		logger.Error(ctx, "Failed to stop coordinator",
-			tag.Error(err),
-		)
+	if coord != nil {
+		if err := coord.Stop(ctx); err != nil {
+			logger.Error(ctx, "Failed to stop coordinator",
+				tag.Error(err),
+			)
+		}
+		// Clean up coordinator handler resources
+		coordHandler.WaitZombieDetector()
+		coordHandler.Close(ctx)
 	}
-	// Clean up coordinator handler resources
-	coordHandler.WaitZombieDetector()
-	coordHandler.Close(ctx)
 
 	// Stop resource service
 	if err := resourceService.Stop(ctx); err != nil {

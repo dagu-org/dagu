@@ -195,6 +195,7 @@ func TestLoad_Env(t *testing.T) {
 		},
 		Queues: Queues{Enabled: false},
 		Coordinator: Coordinator{
+			Enabled:   true,
 			Host:      "0.0.0.0",
 			Advertise: "dagu-coordinator",
 			Port:      50099,
@@ -459,8 +460,9 @@ scheduler:
 			},
 		},
 		Coordinator: Coordinator{
-			Host: "coordinator.example.com",
-			Port: 8081,
+			Enabled: true,
+			Host:    "coordinator.example.com",
+			Port:    8081,
 		},
 		Worker: Worker{
 			ID:            "worker-1",

@@ -613,6 +613,8 @@ func (l *ConfigLoader) loadQueuesConfig(cfg *Config, def Definition) {
 }
 
 func (l *ConfigLoader) loadCoordinatorConfig(cfg *Config, def Definition) {
+	cfg.Coordinator.Enabled = l.resolveCoordinatorEnabled(def)
+
 	if def.Coordinator == nil {
 		return
 	}
@@ -620,6 +622,16 @@ func (l *ConfigLoader) loadCoordinatorConfig(cfg *Config, def Definition) {
 	cfg.Coordinator.Host = def.Coordinator.Host
 	cfg.Coordinator.Advertise = def.Coordinator.Advertise
 	cfg.Coordinator.Port = def.Coordinator.Port
+}
+
+func (l *ConfigLoader) resolveCoordinatorEnabled(def Definition) bool {
+	if l.v.IsSet("coordinator.enabled") {
+		return l.v.GetBool("coordinator.enabled")
+	}
+	if def.Coordinator != nil && def.Coordinator.Enabled != nil {
+		return *def.Coordinator.Enabled
+	}
+	return true // Default: enabled
 }
 
 func (l *ConfigLoader) loadWorkerConfig(cfg *Config, def Definition) {
@@ -1125,6 +1137,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("logFormat", "text")
 
 	// Coordinator
+	l.v.SetDefault("coordinator.enabled", true)
 	l.v.SetDefault("coordinator.host", "127.0.0.1")
 	l.v.SetDefault("coordinator.advertise", "")
 	l.v.SetDefault("coordinator.port", 50055)
@@ -1269,6 +1282,7 @@ var envBindings = []envBinding{
 	{key: "queues.enabled", env: "QUEUE_ENABLED"},
 
 	// Coordinator
+	{key: "coordinator.enabled", env: "COORDINATOR_ENABLED"},
 	{key: "coordinator.host", env: "COORDINATOR_HOST"},
 	{key: "coordinator.advertise", env: "COORDINATOR_ADVERTISE"},
 	{key: "coordinator.port", env: "COORDINATOR_PORT"},
