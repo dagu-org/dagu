@@ -172,8 +172,12 @@ func expandWithLookup(s string, lookup func(key string) (string, bool)) string {
 		var key string
 		if loc[2] >= 0 { // Group 1: ${...}
 			key = s[loc[2]:loc[3]]
-		} else { // Group 2: $VAR
+		} else if loc[4] >= 0 { // Group 2: $VAR
 			key = s[loc[4]:loc[5]]
+		} else {
+			// Neither group captured — preserve original text.
+			b.WriteString(match)
+			continue
 		}
 
 		if val, found := lookup(key); found {

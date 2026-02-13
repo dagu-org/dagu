@@ -111,20 +111,12 @@ func (r *resolver) resolveJSONSource(name string) (string, bool) {
 	return r.lookupScopeNonOS(name)
 }
 
-// extractVarKey extracts the variable key from a regex match.
-// Returns the key and false if the match is single-quoted.
-func extractVarKey(match string) (string, bool) {
-	if match[0] == '\'' && match[len(match)-1] == '\'' {
-		return "", false
-	}
-	if strings.HasPrefix(match, "${") {
-		return match[2 : len(match)-1], true
-	}
-	return match[1:], true
-}
-
 // isSingleQuotedVar reports whether the matched variable token is enclosed
 // in single quotes in the original input (e.g., '${VAR}' or '$VAR').
+// Note: this is a simple adjacent-character heuristic. It may misidentify
+// nested quote contexts such as 'foo'${BAR}'baz' where the quote before
+// ${BAR} actually closes a prior segment. This is acceptable for the
+// targeted use cases (nu shell $'...' syntax, simple quoting).
 func isSingleQuotedVar(input string, start, end int) bool {
 	return start > 0 && end < len(input) && input[start-1] == '\'' && input[end] == '\''
 }
@@ -152,8 +144,12 @@ func (r *resolver) replaceVars(template string) string {
 		var key string
 		if loc[2] >= 0 { // Group 1: ${...}
 			key = template[loc[2]:loc[3]]
-		} else { // Group 2: $VAR
+		} else if loc[4] >= 0 { // Group 2: $VAR
 			key = template[loc[4]:loc[5]]
+		} else {
+			// Neither group captured — preserve original text.
+			b.WriteString(match)
+			continue
 		}
 
 		if strings.Contains(key, ".") {

@@ -36,9 +36,51 @@ func TestCommandExecutor_GetEvalOptions(t *testing.T) {
 		wantEscape    bool
 	}{
 		{
-			name:          "UnixShellDisablesDaguEnvExpansion",
+			name:          "EmptyShellDefaultsToUnix",
+			shell:         "",
+			wantExpandEnv: false,
+			wantExpandOS:  false,
+			wantEscape:    false,
+		},
+		{
+			name:          "DirectShellUsesOSExpansion",
+			shell:         "direct",
+			wantExpandEnv: true,
+			wantExpandOS:  true,
+			wantEscape:    true,
+		},
+		{
+			name:          "ShDisablesDaguEnvExpansion",
 			shell:         "/bin/sh",
 			wantExpandEnv: false,
+			wantExpandOS:  false,
+			wantEscape:    false,
+		},
+		{
+			name:          "BashDisablesDaguEnvExpansion",
+			shell:         "/bin/bash",
+			wantExpandEnv: false,
+			wantExpandOS:  false,
+			wantEscape:    false,
+		},
+		{
+			name:          "ZshDisablesDaguEnvExpansion",
+			shell:         "/bin/zsh",
+			wantExpandEnv: false,
+			wantExpandOS:  false,
+			wantEscape:    false,
+		},
+		{
+			name:          "FishKeepsDaguEnvExpansion",
+			shell:         "fish",
+			wantExpandEnv: true,
+			wantExpandOS:  false,
+			wantEscape:    false,
+		},
+		{
+			name:          "NuKeepsDaguEnvExpansion",
+			shell:         "nu",
+			wantExpandEnv: true,
 			wantExpandOS:  false,
 			wantEscape:    false,
 		},
@@ -62,13 +104,6 @@ func TestCommandExecutor_GetEvalOptions(t *testing.T) {
 			wantExpandEnv: true,
 			wantExpandOS:  false,
 			wantEscape:    false,
-		},
-		{
-			name:          "DirectShellUsesOSExpansion",
-			shell:         "direct",
-			wantExpandEnv: true,
-			wantExpandOS:  true,
-			wantEscape:    true,
 		},
 	}
 
