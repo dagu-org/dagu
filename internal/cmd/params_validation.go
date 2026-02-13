@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
@@ -43,13 +42,18 @@ func validateStartPositionalParamCount(ctx *Context, args []string, dag *core.DA
 		return nil
 	}
 
+	expected := countDeclaredPositionalParams(dag.DefaultParams)
+	if expected == 0 {
+		// No declared params means there is no positional-count contract to enforce.
+		return nil
+	}
+
 	got := countPositionalParams(provided)
 	if got == 0 {
 		// Named-only params should not trigger positional count validation.
 		return nil
 	}
 
-	expected := countDeclaredPositionalParams(dag.DefaultParams)
 	if got != expected {
 		return fmt.Errorf("invalid number of positional params: expected %d, got %d", expected, got)
 	}
@@ -61,7 +65,11 @@ func extractProvidedParamTokens(ctx *Context, args []string) ([]paramToken, bool
 		if argsLenAtDash >= len(args) {
 			return nil, false, nil
 		}
-		return parseParamsFromArgs(args[argsLenAtDash:]), false, nil
+		dashArgs := args[argsLenAtDash:]
+		if shouldSkipDashArgsPositionalValidation(dashArgs) {
+			return nil, true, nil
+		}
+		return parseParamsFromArgs(dashArgs), false, nil
 	}
 
 	raw, err := ctx.Command.Flags().GetString("params")
@@ -102,6 +110,16 @@ func parseParamsFromArgs(args []string) []paramToken {
 	return tokens
 }
 
+func shouldSkipDashArgsPositionalValidation(args []string) bool {
+	// JSON payloads are passed as a single arg after "--" and should bypass
+	// positional-count validation (same behavior as --params JSON input).
+	if len(args) != 1 {
+		return false
+	}
+	input := stringutil.RemoveQuotes(args[0])
+	return isJSONParams(input)
+}
+
 func parseParamTokens(input string) []paramToken {
 	matches := paramTokenRegex.FindAllStringSubmatch(strings.TrimSpace(input), -1)
 	tokens := make([]paramToken, 0, len(matches))
@@ -134,16 +152,5 @@ func countDeclaredPositionalParams(defaultParams string) int {
 		return 0
 	}
 
-	count := 0
-	for _, token := range parseParamTokens(defaultParams) {
-		if token.Name == "" || isPositionalDefaultName(token.Name) {
-			count++
-		}
-	}
-	return count
-}
-
-func isPositionalDefaultName(name string) bool {
-	n, err := strconv.Atoi(name)
-	return err == nil && n > 0
+	return len(parseParamTokens(defaultParams))
 }

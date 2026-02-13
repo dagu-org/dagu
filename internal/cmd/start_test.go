@@ -113,6 +113,11 @@ steps:
   - name: step1
     command: echo $1 $2
 `)
+	dagNoParamsFile := th.CreateDAGFile(t, "test-no-params.yaml", `
+steps:
+  - name: step1
+    command: echo $1
+`)
 
 	t.Run("RejectsTooFewAfterDash", func(t *testing.T) {
 		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
@@ -148,6 +153,27 @@ steps:
 	t.Run("AllowsJSONParamsWithoutPositionalValidation", func(t *testing.T) {
 		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
 			Args: []string{"start", "--params", `{"KEY":"value"}`, dagFile},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("AllowsJSONAfterDashWithoutPositionalValidation", func(t *testing.T) {
+		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", dagFile, "--", `{"KEY":"value"}`},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("AllowsNamedPairsWhenNoParamsDeclared", func(t *testing.T) {
+		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", dagNoParamsFile, "--", "key1=value1", "key2=value2"},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("AllowsPositionalWhenNoParamsDeclared", func(t *testing.T) {
+		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", dagNoParamsFile, "--", "success"},
 		})
 		require.NoError(t, err)
 	})
