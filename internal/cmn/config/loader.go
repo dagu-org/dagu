@@ -1137,7 +1137,6 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("logFormat", "text")
 
 	// Coordinator
-	l.v.SetDefault("coordinator.enabled", true)
 	l.v.SetDefault("coordinator.host", "127.0.0.1")
 	l.v.SetDefault("coordinator.advertise", "")
 	l.v.SetDefault("coordinator.port", 50055)
