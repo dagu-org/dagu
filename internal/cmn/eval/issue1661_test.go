@@ -39,7 +39,7 @@ func TestIssue1661_CommandLikeString_WithSingleQuoteAfterVar(t *testing.T) {
 		},
 	}
 
-scope = scope.
+	scope = scope.
 		WithEntry("BUCKET_PREFIX", "gs://", EnvSourceDAGEnv).
 		WithEntry("PROJECT_BUCKET", "my-bucket", EnvSourceDAGEnv)
 	ctx := WithEnvScope(context.Background(), scope)
