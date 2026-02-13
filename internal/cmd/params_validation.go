@@ -84,8 +84,9 @@ func isJSONParams(input string) bool {
 	if input == "" {
 		return false
 	}
-	if !((strings.HasPrefix(input, "{") && strings.HasSuffix(input, "}")) ||
-		(strings.HasPrefix(input, "[") && strings.HasSuffix(input, "]"))) {
+	isJSONObject := strings.HasPrefix(input, "{") && strings.HasSuffix(input, "}")
+	isJSONArray := strings.HasPrefix(input, "[") && strings.HasSuffix(input, "]")
+	if !isJSONObject && !isJSONArray {
 		return false
 	}
 	return json.Valid([]byte(input))
