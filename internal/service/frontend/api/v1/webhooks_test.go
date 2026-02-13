@@ -63,7 +63,7 @@ func TestExtractWebhookToken(t *testing.T) {
 }
 
 // setupWebhookTestServer creates a test server with builtin auth enabled
-func setupWebhookTestServer(t *testing.T) test.Server {
+func setupWebhookTestServer(t *testing.T, extraMutators ...func(*config.Config)) test.Server {
 	t.Helper()
 	return test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Mode = config.AuthModeBuiltin
@@ -71,6 +71,9 @@ func setupWebhookTestServer(t *testing.T) test.Server {
 		cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
 		cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
 		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
+		for _, m := range extraMutators {
+			m(cfg)
+		}
 	}))
 }
 
@@ -204,6 +207,13 @@ func TestWebhooks_RequiresDeveloperOrAbove(t *testing.T) {
 	server.Client().Get("/api/v1/webhooks").
 		WithBearerToken(developerLogin.Token).
 		ExpectStatus(http.StatusOK).Send(t)
+
+	// Developer can also create webhooks.
+	dagName := "webhook_dev_access_test"
+	createTestDAG(t, server, adminToken, dagName)
+	server.Client().Post("/api/v1/dags/"+dagName+"/webhook", nil).
+		WithBearerToken(developerLogin.Token).
+		ExpectStatus(http.StatusCreated).Send(t)
 }
 
 // TestWebhooks_CRUD tests the full CRUD lifecycle of webhooks

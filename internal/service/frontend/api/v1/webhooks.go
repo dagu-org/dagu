@@ -27,7 +27,7 @@ const (
 )
 
 // ListWebhooks returns all webhooks across all DAGs.
-// Requires admin role.
+// Requires developer role or above.
 func (a *API) ListWebhooks(ctx context.Context, _ api.ListWebhooksRequestObject) (api.ListWebhooksResponseObject, error) {
 	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
@@ -52,7 +52,7 @@ func (a *API) ListWebhooks(ctx context.Context, _ api.ListWebhooksRequestObject)
 }
 
 // GetDAGWebhook returns the webhook configuration for a specific DAG.
-// Requires admin role.
+// Requires developer role or above.
 func (a *API) GetDAGWebhook(ctx context.Context, request api.GetDAGWebhookRequestObject) (api.GetDAGWebhookResponseObject, error) {
 	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func (a *API) GetDAGWebhook(ctx context.Context, request api.GetDAGWebhookReques
 }
 
 // CreateDAGWebhook creates a new webhook for a DAG.
-// Requires admin role.
+// Requires developer role or above.
 func (a *API) CreateDAGWebhook(ctx context.Context, request api.CreateDAGWebhookRequestObject) (api.CreateDAGWebhookResponseObject, error) {
 	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
@@ -130,7 +130,7 @@ func (a *API) CreateDAGWebhook(ctx context.Context, request api.CreateDAGWebhook
 }
 
 // DeleteDAGWebhook removes the webhook for a DAG.
-// Requires admin role.
+// Requires developer role or above.
 func (a *API) DeleteDAGWebhook(ctx context.Context, request api.DeleteDAGWebhookRequestObject) (api.DeleteDAGWebhookResponseObject, error) {
 	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
@@ -167,7 +167,7 @@ func (a *API) DeleteDAGWebhook(ctx context.Context, request api.DeleteDAGWebhook
 }
 
 // RegenerateDAGWebhookToken generates a new token for an existing webhook.
-// Requires admin role.
+// Requires developer role or above.
 func (a *API) RegenerateDAGWebhookToken(ctx context.Context, request api.RegenerateDAGWebhookTokenRequestObject) (api.RegenerateDAGWebhookTokenResponseObject, error) {
 	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
@@ -203,7 +203,7 @@ func (a *API) RegenerateDAGWebhookToken(ctx context.Context, request api.Regener
 }
 
 // ToggleDAGWebhook enables or disables a webhook.
-// Requires admin role.
+// Requires developer role or above.
 func (a *API) ToggleDAGWebhook(ctx context.Context, request api.ToggleDAGWebhookRequestObject) (api.ToggleDAGWebhookResponseObject, error) {
 	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
@@ -63,7 +62,7 @@ func navigateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	if args.Path == "" {
 		return toolError("Path is required")
 	}
-	if isAdminOnlyPath(args.Path) && ctx.Role != auth.Role("") && !ctx.Role.IsAdmin() {
+	if isAdminOnlyPath(args.Path) && ctx.Role.IsSet() && !ctx.Role.IsAdmin() {
 		return toolError("Permission denied: navigation to %s requires admin role", args.Path)
 	}
 

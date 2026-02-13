@@ -39,6 +39,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "test-dag")
+		assert.Contains(t, result, "Authenticated role: admin")
 	})
 
 	t.Run("works with empty environment", func(t *testing.T) {
@@ -47,6 +48,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		result := GenerateSystemPrompt(EnvironmentInfo{}, nil, MemoryContent{}, auth.RoleViewer)
 
 		assert.NotEmpty(t, result)
+		assert.Contains(t, result, "Authenticated role: viewer")
 	})
 
 	t.Run("no memory omits memory section", func(t *testing.T) {

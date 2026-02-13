@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/llm"
@@ -87,7 +86,7 @@ func NewPatchTool(dagsDir string) *AgentTool {
 }
 
 func patchRun(ctx ToolContext, input json.RawMessage, dagsDir string) ToolOut {
-	if ctx.Role != auth.Role("") && !ctx.Role.CanWrite() {
+	if ctx.Role.IsSet() && !ctx.Role.CanWrite() {
 		return toolError("Permission denied: patch requires write permission")
 	}
 

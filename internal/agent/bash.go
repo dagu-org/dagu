@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/google/uuid"
 )
@@ -142,7 +141,7 @@ func bashRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
 	if args.Command == "" {
 		return toolError("Command is required")
 	}
-	if toolCtx.Role != auth.Role("") && !toolCtx.Role.CanExecute() {
+	if toolCtx.Role.IsSet() && !toolCtx.Role.CanExecute() {
 		return toolError("Permission denied: bash requires execute permission")
 	}
 

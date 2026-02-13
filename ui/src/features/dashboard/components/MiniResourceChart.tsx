@@ -89,7 +89,7 @@ function MiniResourceChart({
               }}
               itemStyle={{ color: 'var(--foreground)' }}
               labelStyle={{ color: 'var(--muted-foreground)' }}
-              formatter={(value: number) => [`${value.toFixed(1)}${unit}`, title]}
+              formatter={(value: number | string) => [`${Number(value).toFixed(1)}${unit}`, title]}
             />
             <Area
               type="monotone"

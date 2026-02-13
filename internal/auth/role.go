@@ -24,6 +24,8 @@ const (
 	RoleOperator Role = "operator"
 	// RoleViewer can only view DAGs and execution history (read-only).
 	RoleViewer Role = "viewer"
+	// RoleNone represents an unset or unauthenticated role.
+	RoleNone Role = ""
 )
 
 // allRoles contains all valid roles for iteration and validation.
@@ -41,6 +43,8 @@ func (r Role) Valid() bool {
 	switch r {
 	case RoleAdmin, RoleManager, RoleDeveloper, RoleOperator, RoleViewer:
 		return true
+	case RoleNone:
+		return false
 	}
 	return false
 }
@@ -48,6 +52,11 @@ func (r Role) Valid() bool {
 // String returns the string representation of the role.
 func (r Role) String() string {
 	return string(r)
+}
+
+// IsSet returns true if the role has been assigned (is not empty).
+func (r Role) IsSet() bool {
+	return r != RoleNone
 }
 
 // CanWrite returns true if the role can create, edit, or delete DAGs.
@@ -71,7 +80,6 @@ func (r Role) IsAdmin() bool {
 }
 
 // ParseRole converts a string to a Role.
-// ParseRole converts the input string to a Role and verifies it is one of the known roles.
 // If the input is not "admin", "manager", "developer", "operator", or "viewer", it returns an error describing the valid options.
 func ParseRole(s string) (Role, error) {
 	role := Role(s)
