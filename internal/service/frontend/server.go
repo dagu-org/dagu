@@ -424,6 +424,7 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 	}
 
 	hooks := agent.NewHooks()
+	hooks.OnBeforeToolExec(newAgentPolicyHook(store, auditSvc))
 	if auditSvc != nil {
 		hooks.OnAfterToolExec(newAgentAuditHook(auditSvc))
 	}

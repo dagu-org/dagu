@@ -1,6 +1,11 @@
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { Bot, Loader2, MoreHorizontal, Pencil, Plus, Save, Star, Trash2 } from 'lucide-react';
-import { components } from '@/api/v1/schema';
+import { Bot, Loader2, MoreHorizontal, Pencil, Plus, Save, Shield, Star, Trash2 } from 'lucide-react';
+import {
+  AgentBashPolicyDefaultBehavior,
+  AgentBashPolicyDenyBehavior,
+  AgentBashRuleAction,
+  components,
+} from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -9,6 +14,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import {
   Table,
@@ -26,6 +39,58 @@ import { ModelFormModal } from './ModelFormModal';
 
 type ModelConfig = components['schemas']['ModelConfigResponse'];
 type ModelPreset = components['schemas']['ModelPreset'];
+type AgentToolPolicy = components['schemas']['AgentToolPolicy'];
+type AgentBashRule = components['schemas']['AgentBashRule'];
+
+type ToolConfig = {
+  name: string;
+  label: string;
+  description: string;
+};
+
+const TOOL_CONFIGS: ToolConfig[] = [
+  { name: 'bash', label: 'Bash', description: 'Run shell commands' },
+  { name: 'read', label: 'Read', description: 'Read files' },
+  { name: 'patch', label: 'Patch', description: 'Create/edit/delete files' },
+  { name: 'think', label: 'Think', description: 'Internal reasoning tool' },
+  { name: 'navigate', label: 'Navigate', description: 'Navigate UI pages' },
+  { name: 'read_schema', label: 'Read Schema', description: 'Read DAG schema docs' },
+  { name: 'ask_user', label: 'Ask User', description: 'Ask interactive questions' },
+  { name: 'web_search', label: 'Web Search', description: 'Search the web' },
+];
+
+const DEFAULT_TOOL_TOGGLES: Record<string, boolean> = {
+  bash: true,
+  read: true,
+  patch: false,
+  think: true,
+  navigate: true,
+  read_schema: true,
+  ask_user: false,
+  web_search: false,
+};
+
+function createDefaultToolPolicy(): AgentToolPolicy {
+  return {
+    tools: { ...DEFAULT_TOOL_TOGGLES },
+    bash: {
+      rules: [],
+      defaultBehavior: AgentBashPolicyDefaultBehavior.deny,
+      denyBehavior: AgentBashPolicyDenyBehavior.ask_user,
+    },
+  };
+}
+
+function normalizeToolPolicy(policy?: AgentToolPolicy): AgentToolPolicy {
+  const defaults = createDefaultToolPolicy();
+  const tools = { ...defaults.tools, ...(policy?.tools || {}) };
+  const bash = {
+    rules: policy?.bash?.rules || defaults.bash?.rules || [],
+    defaultBehavior: policy?.bash?.defaultBehavior || defaults.bash?.defaultBehavior,
+    denyBehavior: policy?.bash?.denyBehavior || defaults.bash?.denyBehavior,
+  };
+  return { tools, bash };
+}
 
 export default function AgentSettingsPage(): React.ReactNode {
   const client = useClient();
@@ -39,6 +104,7 @@ export default function AgentSettingsPage(): React.ReactNode {
 
   const [enabled, setEnabled] = useState(false);
   const [defaultModelId, setDefaultModelId] = useState<string | undefined>();
+  const [toolPolicy, setToolPolicy] = useState<AgentToolPolicy>(createDefaultToolPolicy);
   const [models, setModels] = useState<ModelConfig[]>([]);
   const [presets, setPresets] = useState<ModelPreset[]>([]);
 
@@ -61,6 +127,7 @@ export default function AgentSettingsPage(): React.ReactNode {
       if (apiError) throw new Error('Failed to fetch agent configuration');
       setEnabled(data.enabled ?? false);
       setDefaultModelId(data.defaultModelId);
+      setToolPolicy(normalizeToolPolicy(data.toolPolicy));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load configuration');
     }
@@ -108,7 +175,7 @@ export default function AgentSettingsPage(): React.ReactNode {
     try {
       const { data, error: apiError } = await client.PATCH('/settings/agent', {
         params: { query: { remoteNode } },
-        body: { enabled, defaultModelId },
+        body: { enabled, defaultModelId, toolPolicy },
       });
 
       if (apiError) {
@@ -117,6 +184,7 @@ export default function AgentSettingsPage(): React.ReactNode {
 
       setEnabled(data.enabled ?? false);
       setDefaultModelId(data.defaultModelId);
+      setToolPolicy(normalizeToolPolicy(data.toolPolicy));
       setSuccess('Configuration saved successfully');
 
       // Re-fetch to ensure sidebar/nav reflects changes
@@ -159,6 +227,72 @@ export default function AgentSettingsPage(): React.ReactNode {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete model');
     }
+  }
+
+  const normalizedPolicy = normalizeToolPolicy(toolPolicy);
+
+  function updateToolToggle(toolName: string, value: boolean): void {
+    setToolPolicy((prev) => {
+      const normalized = normalizeToolPolicy(prev);
+      return {
+        ...normalized,
+        tools: {
+          ...normalized.tools,
+          [toolName]: value,
+        },
+      };
+    });
+  }
+
+  function updateBashPolicy<K extends keyof NonNullable<AgentToolPolicy['bash']>>(
+    key: K,
+    value: NonNullable<AgentToolPolicy['bash']>[K]
+  ): void {
+    setToolPolicy((prev) => {
+      const normalized = normalizeToolPolicy(prev);
+      return {
+        ...normalized,
+        bash: {
+          ...normalized.bash,
+          [key]: value,
+        },
+      };
+    });
+  }
+
+  function addBashRule(): void {
+    const newRule: AgentBashRule = {
+      name: '',
+      pattern: '',
+      action: AgentBashRuleAction.allow,
+      enabled: true,
+    };
+    const rules = [...(normalizeToolPolicy(toolPolicy).bash?.rules || []), newRule];
+    updateBashPolicy('rules', rules);
+  }
+
+  function updateBashRule(index: number, patch: Partial<AgentBashRule>): void {
+    const rules = [...(normalizeToolPolicy(toolPolicy).bash?.rules || [])];
+    if (!rules[index]) return;
+    rules[index] = { ...rules[index], ...patch };
+    updateBashPolicy('rules', rules);
+  }
+
+  function removeBashRule(index: number): void {
+    const rules = [...(normalizeToolPolicy(toolPolicy).bash?.rules || [])];
+    if (!rules[index]) return;
+    rules.splice(index, 1);
+    updateBashPolicy('rules', rules);
+  }
+
+  function moveBashRule(index: number, direction: -1 | 1): void {
+    const rules = [...(normalizeToolPolicy(toolPolicy).bash?.rules || [])];
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= rules.length) return;
+    const [moved] = rules.splice(index, 1);
+    if (!moved) return;
+    rules.splice(targetIndex, 0, moved);
+    updateBashPolicy('rules', rules);
   }
 
   if (!isAdmin) {
@@ -237,6 +371,160 @@ export default function AgentSettingsPage(): React.ReactNode {
               </>
             )}
           </Button>
+        </div>
+      </div>
+
+      {/* Tool Permissions */}
+      <div className="card-obsidian p-4 space-y-4">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Shield className="h-4 w-4 text-muted-foreground" />
+          Tool Permissions
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          {TOOL_CONFIGS.map((tool) => (
+            <div
+              key={tool.name}
+              className="rounded-md border border-border/60 p-3 flex items-start justify-between gap-3"
+            >
+              <div className="space-y-0.5 min-w-0">
+                <p className="text-sm font-medium">{tool.label}</p>
+                <p className="text-xs text-muted-foreground">{tool.description}</p>
+              </div>
+              <Switch
+                checked={normalizedPolicy.tools?.[tool.name] ?? false}
+                onCheckedChange={(checked) => updateToolToggle(tool.name, checked)}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="border border-border/60 rounded-md p-3 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Bash Command Policy</p>
+              <p className="text-xs text-muted-foreground">
+                Regex rules are checked top-down for each command segment.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">No Match Behavior</Label>
+              <Select
+                value={normalizedPolicy.bash?.defaultBehavior || AgentBashPolicyDefaultBehavior.deny}
+                onValueChange={(value) =>
+                  updateBashPolicy('defaultBehavior', value as AgentBashPolicyDefaultBehavior)
+                }
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={AgentBashPolicyDefaultBehavior.allow}>Allow</SelectItem>
+                  <SelectItem value={AgentBashPolicyDefaultBehavior.deny}>Deny</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">On Deny</Label>
+              <Select
+                value={normalizedPolicy.bash?.denyBehavior || AgentBashPolicyDenyBehavior.ask_user}
+                onValueChange={(value) =>
+                  updateBashPolicy('denyBehavior', value as AgentBashPolicyDenyBehavior)
+                }
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={AgentBashPolicyDenyBehavior.ask_user}>Ask User</SelectItem>
+                  <SelectItem value={AgentBashPolicyDenyBehavior.block}>Block</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Rules (ordered)</Label>
+              <Button size="sm" className="h-7 text-xs" variant="outline" onClick={addBashRule}>
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Add Rule
+              </Button>
+            </div>
+
+            {(normalizedPolicy.bash?.rules || []).length === 0 ? (
+              <div className="rounded-md border border-dashed border-border/80 p-3 text-xs text-muted-foreground">
+                No rules defined. Behavior falls back to "No Match Behavior".
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {(normalizedPolicy.bash?.rules || []).map((rule, index) => (
+                  <div key={`${index}-${rule.name || 'rule'}`} className="rounded-md border border-border/60 p-2 space-y-2">
+                    <div className="grid gap-2 md:grid-cols-[1fr,2fr,150px,auto] items-end">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Name</Label>
+                        <Input
+                          value={rule.name || ''}
+                          onChange={(e) => updateBashRule(index, { name: e.target.value })}
+                          className="h-8 text-xs"
+                          placeholder={`rule_${index + 1}`}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Regex Pattern</Label>
+                        <Input
+                          value={rule.pattern}
+                          onChange={(e) => updateBashRule(index, { pattern: e.target.value })}
+                          className="h-8 text-xs font-mono"
+                          placeholder="^git\\s+status$"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Action</Label>
+                        <Select
+                          value={rule.action}
+                          onValueChange={(value) =>
+                            updateBashRule(index, { action: value as AgentBashRuleAction })
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={AgentBashRuleAction.allow}>Allow</SelectItem>
+                            <SelectItem value={AgentBashRuleAction.deny}>Deny</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs text-muted-foreground">Enabled</Label>
+                          <Switch
+                            checked={rule.enabled ?? true}
+                            onCheckedChange={(checked) => updateBashRule(index, { enabled: checked })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => moveBashRule(index, -1)}>
+                        Up
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => moveBashRule(index, 1)}>
+                        Down
+                      </Button>
+                      <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => removeBashRule(index)}>
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

@@ -24,8 +24,55 @@ var (
 
 // Config holds the configuration for the AI agent feature.
 type Config struct {
-	Enabled        bool   `json:"enabled"`
-	DefaultModelID string `json:"defaultModelId,omitempty"`
+	Enabled        bool             `json:"enabled"`
+	DefaultModelID string           `json:"defaultModelId,omitempty"`
+	ToolPolicy     ToolPolicyConfig `json:"toolPolicy,omitempty"`
+}
+
+// BashRuleAction is the decision a bash rule applies when matched.
+type BashRuleAction string
+
+const (
+	BashRuleActionAllow BashRuleAction = "allow"
+	BashRuleActionDeny  BashRuleAction = "deny"
+)
+
+// BashDefaultBehavior defines behavior when no rule matches.
+type BashDefaultBehavior string
+
+const (
+	BashDefaultBehaviorAllow BashDefaultBehavior = "allow"
+	BashDefaultBehaviorDeny  BashDefaultBehavior = "deny"
+)
+
+// BashDenyBehavior defines behavior when a command is denied by policy.
+type BashDenyBehavior string
+
+const (
+	BashDenyBehaviorAskUser BashDenyBehavior = "ask_user"
+	BashDenyBehaviorBlock   BashDenyBehavior = "block"
+)
+
+// BashRule defines an ordered regex rule used for bash command policy checks.
+type BashRule struct {
+	Name    string         `json:"name,omitempty"`
+	Pattern string         `json:"pattern"`
+	Action  BashRuleAction `json:"action"`
+	Enabled *bool          `json:"enabled,omitempty"`
+}
+
+// BashPolicyConfig configures granular bash command policy behavior.
+type BashPolicyConfig struct {
+	Rules           []BashRule          `json:"rules,omitempty"`
+	DefaultBehavior BashDefaultBehavior `json:"defaultBehavior,omitempty"`
+	DenyBehavior    BashDenyBehavior    `json:"denyBehavior,omitempty"`
+}
+
+// ToolPolicyConfig configures agent tool permissions.
+// Tools is a map of tool name to enabled/disabled state.
+type ToolPolicyConfig struct {
+	Tools map[string]bool  `json:"tools,omitempty"`
+	Bash  BashPolicyConfig `json:"bash,omitempty"`
 }
 
 // LLMConfig holds LLM provider configuration for the agent.
@@ -40,7 +87,31 @@ type LLMConfig struct {
 // DefaultConfig returns the default agent configuration.
 func DefaultConfig() *Config {
 	return &Config{
-		Enabled: true,
+		Enabled:    true,
+		ToolPolicy: DefaultToolPolicy(),
+	}
+}
+
+// DefaultToolPolicy returns the default agent tool policy.
+// The default is strict for mutating/networking tools and deny-by-default for bash,
+// with user approval fallback on denied bash commands.
+func DefaultToolPolicy() ToolPolicyConfig {
+	return ToolPolicyConfig{
+		Tools: map[string]bool{
+			"bash":        true,
+			"read":        true,
+			"patch":       false,
+			"think":       true,
+			"navigate":    true,
+			"read_schema": true,
+			"ask_user":    false,
+			"web_search":  false,
+		},
+		Bash: BashPolicyConfig{
+			Rules:           []BashRule{},
+			DefaultBehavior: BashDefaultBehaviorDeny,
+			DenyBehavior:    BashDenyBehaviorAskUser,
+		},
 	}
 }
 

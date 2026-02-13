@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func strPtr(v string) *string { return &v }
+
 func TestGetAgentConfig(t *testing.T) {
 	t.Parallel()
 
@@ -32,6 +34,9 @@ func TestGetAgentConfig(t *testing.T) {
 		assert.True(t, *getResp.Enabled)
 		require.NotNil(t, getResp.DefaultModelId)
 		assert.Equal(t, "my-model", *getResp.DefaultModelId)
+		require.NotNil(t, getResp.ToolPolicy)
+		require.NotNil(t, getResp.ToolPolicy.Tools)
+		assert.Contains(t, *getResp.ToolPolicy.Tools, "bash")
 	})
 
 	t.Run("returns 403 when store not configured", func(t *testing.T) {
@@ -116,6 +121,73 @@ func TestUpdateAgentConfig(t *testing.T) {
 		// Verify config store was updated
 		assert.False(t, setup.configStore.config.Enabled)
 		assert.Equal(t, "new-default", setup.configStore.config.DefaultModelID)
+	})
+
+	t.Run("updates tool policy", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+		denyBehavior := apigen.AgentBashPolicyDenyBehaviorBlock
+		defaultBehavior := apigen.AgentBashPolicyDefaultBehaviorAllow
+		action := apigen.AgentBashRuleActionAllow
+		enabled := true
+		rules := []apigen.AgentBashRule{
+			{
+				Name:    strPtr("allow_git_status"),
+				Pattern: "^git\\s+status$",
+				Action:  action,
+				Enabled: &enabled,
+			},
+		}
+
+		resp, err := setup.api.UpdateAgentConfig(adminCtx(), apigen.UpdateAgentConfigRequestObject{
+			Body: &apigen.UpdateAgentConfigRequest{
+				ToolPolicy: &apigen.AgentToolPolicy{
+					Tools: &map[string]bool{"bash": true, "patch": true},
+					Bash: &apigen.AgentBashPolicy{
+						Rules:           &rules,
+						DefaultBehavior: &defaultBehavior,
+						DenyBehavior:    &denyBehavior,
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		updateResp, ok := resp.(apigen.UpdateAgentConfig200JSONResponse)
+		require.True(t, ok)
+		require.NotNil(t, updateResp.ToolPolicy)
+		require.NotNil(t, updateResp.ToolPolicy.Bash)
+		require.NotNil(t, updateResp.ToolPolicy.Bash.Rules)
+		assert.Len(t, *updateResp.ToolPolicy.Bash.Rules, 1)
+		require.NotNil(t, updateResp.ToolPolicy.Bash.DefaultBehavior)
+		assert.Equal(t, defaultBehavior, *updateResp.ToolPolicy.Bash.DefaultBehavior)
+		require.NotNil(t, updateResp.ToolPolicy.Bash.DenyBehavior)
+		assert.Equal(t, denyBehavior, *updateResp.ToolPolicy.Bash.DenyBehavior)
+	})
+
+	t.Run("invalid tool policy returns error", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+		action := apigen.AgentBashRuleActionAllow
+		rules := []apigen.AgentBashRule{
+			{
+				Pattern: "([",
+				Action:  action,
+			},
+		}
+
+		_, err := setup.api.UpdateAgentConfig(adminCtx(), apigen.UpdateAgentConfigRequestObject{
+			Body: &apigen.UpdateAgentConfigRequest{
+				ToolPolicy: &apigen.AgentToolPolicy{
+					Bash: &apigen.AgentBashPolicy{
+						Rules: &rules,
+					},
+				},
+			},
+		})
+		require.Error(t, err)
 	})
 
 	t.Run("nil body returns error", func(t *testing.T) {

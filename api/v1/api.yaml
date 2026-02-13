@@ -6578,6 +6578,8 @@ components:
         defaultModelId:
           type: string
           description: "ID of the default model"
+        toolPolicy:
+          $ref: "#/components/schemas/AgentToolPolicy"
 
     UpdateAgentConfigRequest:
       type: object
@@ -6589,6 +6591,55 @@ components:
         defaultModelId:
           type: string
           description: "ID of the default model"
+        toolPolicy:
+          $ref: "#/components/schemas/AgentToolPolicy"
+
+    AgentToolPolicy:
+      type: object
+      description: "Global tool permission policy for AI agent sessions"
+      properties:
+        tools:
+          type: object
+          description: "Per-tool enable/disable map"
+          additionalProperties:
+            type: boolean
+        bash:
+          $ref: "#/components/schemas/AgentBashPolicy"
+
+    AgentBashPolicy:
+      type: object
+      description: "Granular command policy for the bash tool"
+      properties:
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentBashRule"
+        defaultBehavior:
+          type: string
+          enum: [allow, deny]
+          description: "Behavior when no rule matches a command segment"
+        denyBehavior:
+          type: string
+          enum: [ask_user, block]
+          description: "Behavior when a command segment is denied"
+
+    AgentBashRule:
+      type: object
+      required:
+        - pattern
+        - action
+      properties:
+        name:
+          type: string
+        pattern:
+          type: string
+          description: "Regex pattern matched against each shell command segment"
+        action:
+          type: string
+          enum: [allow, deny]
+        enabled:
+          type: boolean
+          description: "Rule enabled state (default: true when omitted)"
 
     ModelConfigResponse:
       type: object

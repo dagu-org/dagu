@@ -7,6 +7,9 @@ import (
 	"github.com/dagu-org/dagu/internal/auth"
 )
 
+// RequestCommandApprovalFunc requests user approval for a command blocked by policy.
+type RequestCommandApprovalFunc func(ctx context.Context, command, reason string) (bool, error)
+
 // ToolExecInfo provides context about a tool execution for hooks.
 type ToolExecInfo struct {
 	ToolName  string
@@ -17,6 +20,9 @@ type ToolExecInfo struct {
 	IPAddress string
 	Role      auth.Role
 	Audit     *AuditInfo // from AgentTool.Audit; nil = not audited
+	// RequestCommandApproval prompts the user to approve command execution.
+	// It can be nil when prompts are unavailable.
+	RequestCommandApproval RequestCommandApprovalFunc
 }
 
 // BeforeToolExecHookFunc is called before tool execution.

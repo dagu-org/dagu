@@ -2949,6 +2949,7 @@ export interface components {
             enabled?: boolean;
             /** @description ID of the default model */
             defaultModelId?: string;
+            toolPolicy?: components["schemas"]["AgentToolPolicy"];
         };
         /** @description Request to update AI agent configuration */
         UpdateAgentConfigRequest: {
@@ -2956,6 +2957,38 @@ export interface components {
             enabled?: boolean;
             /** @description ID of the default model */
             defaultModelId?: string;
+            toolPolicy?: components["schemas"]["AgentToolPolicy"];
+        };
+        /** @description Global tool permission policy for AI agent sessions */
+        AgentToolPolicy: {
+            /** @description Per-tool enable/disable map */
+            tools?: {
+                [key: string]: boolean;
+            };
+            bash?: components["schemas"]["AgentBashPolicy"];
+        };
+        /** @description Granular command policy for the bash tool */
+        AgentBashPolicy: {
+            rules?: components["schemas"]["AgentBashRule"][];
+            /**
+             * @description Behavior when no rule matches a command segment
+             * @enum {string}
+             */
+            defaultBehavior?: AgentBashPolicyDefaultBehavior;
+            /**
+             * @description Behavior when a command segment is denied
+             * @enum {string}
+             */
+            denyBehavior?: AgentBashPolicyDenyBehavior;
+        };
+        AgentBashRule: {
+            name?: string;
+            /** @description Regex pattern matched against each shell command segment */
+            pattern: string;
+            /** @enum {string} */
+            action: AgentBashRuleAction;
+            /** @description Rule enabled state (default: true when omitted) */
+            enabled?: boolean;
         };
         /** @description Model configuration */
         ModelConfigResponse: {
@@ -8414,6 +8447,18 @@ export enum SyncItemKind {
 export enum SyncAuthConfigType {
     token = "token",
     ssh = "ssh"
+}
+export enum AgentBashPolicyDefaultBehavior {
+    allow = "allow",
+    deny = "deny"
+}
+export enum AgentBashPolicyDenyBehavior {
+    ask_user = "ask_user",
+    block = "block"
+}
+export enum AgentBashRuleAction {
+    allow = "allow",
+    deny = "deny"
 }
 export enum ModelConfigResponseProvider {
     anthropic = "anthropic",
