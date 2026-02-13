@@ -7,7 +7,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,6 +35,16 @@ func TestNew(t *testing.T) {
 		require.Error(t, err)
 		assert.Nil(t, store)
 		assert.Contains(t, err.Error(), "cannot be empty")
+	})
+
+	t.Run("with file cache option", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		cache := fileutil.NewCache[string]("memory_test", 10, time.Hour)
+		store, err := New(dir, WithFileCache(cache))
+		require.NoError(t, err)
+		require.NotNil(t, store)
+		assert.Equal(t, cache, store.fileCache)
 	})
 }
 
@@ -331,11 +343,91 @@ func TestConcurrentAccess(t *testing.T) {
 	assert.Equal(t, "concurrent write", content)
 }
 
+func TestCacheInvalidation(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("save global invalidates cache", func(t *testing.T) {
+		t.Parallel()
+		cache := fileutil.NewCache[string]("memory_test", 10, time.Hour)
+		store := newTestStoreWithOptions(t, WithFileCache(cache))
+
+		require.NoError(t, store.SaveGlobalMemory(ctx, "v1"))
+		_, err := store.LoadGlobalMemory(ctx)
+		require.NoError(t, err)
+
+		_, found := cache.Load(store.globalMemoryPath())
+		require.True(t, found)
+
+		require.NoError(t, store.SaveGlobalMemory(ctx, "v2"))
+		_, found = cache.Load(store.globalMemoryPath())
+		assert.False(t, found)
+	})
+
+	t.Run("delete global invalidates cache", func(t *testing.T) {
+		t.Parallel()
+		cache := fileutil.NewCache[string]("memory_test", 10, time.Hour)
+		store := newTestStoreWithOptions(t, WithFileCache(cache))
+
+		require.NoError(t, store.SaveGlobalMemory(ctx, "v1"))
+		_, err := store.LoadGlobalMemory(ctx)
+		require.NoError(t, err)
+
+		_, found := cache.Load(store.globalMemoryPath())
+		require.True(t, found)
+
+		require.NoError(t, store.DeleteGlobalMemory(ctx))
+		_, found = cache.Load(store.globalMemoryPath())
+		assert.False(t, found)
+	})
+
+	t.Run("save DAG invalidates cache", func(t *testing.T) {
+		t.Parallel()
+		cache := fileutil.NewCache[string]("memory_test", 10, time.Hour)
+		store := newTestStoreWithOptions(t, WithFileCache(cache))
+		path := store.dagMemoryPath("my-dag")
+
+		require.NoError(t, store.SaveDAGMemory(ctx, "my-dag", "v1"))
+		_, err := store.LoadDAGMemory(ctx, "my-dag")
+		require.NoError(t, err)
+
+		_, found := cache.Load(path)
+		require.True(t, found)
+
+		require.NoError(t, store.SaveDAGMemory(ctx, "my-dag", "v2"))
+		_, found = cache.Load(path)
+		assert.False(t, found)
+	})
+
+	t.Run("delete DAG invalidates cache", func(t *testing.T) {
+		t.Parallel()
+		cache := fileutil.NewCache[string]("memory_test", 10, time.Hour)
+		store := newTestStoreWithOptions(t, WithFileCache(cache))
+		path := store.dagMemoryPath("my-dag")
+
+		require.NoError(t, store.SaveDAGMemory(ctx, "my-dag", "v1"))
+		_, err := store.LoadDAGMemory(ctx, "my-dag")
+		require.NoError(t, err)
+
+		_, found := cache.Load(path)
+		require.True(t, found)
+
+		require.NoError(t, store.DeleteDAGMemory(ctx, "my-dag"))
+		_, found = cache.Load(path)
+		assert.False(t, found)
+	})
+}
+
 // newTestStore creates a Store backed by a temporary directory.
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
+	return newTestStoreWithOptions(t)
+}
+
+func newTestStoreWithOptions(t *testing.T, opts ...Option) *Store {
+	t.Helper()
 	dir := t.TempDir()
-	store, err := New(dir)
+	store, err := New(dir, opts...)
 	require.NoError(t, err)
 	return store
 }

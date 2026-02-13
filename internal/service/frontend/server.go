@@ -144,7 +144,13 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 
 	var memoryStore agent.MemoryStore
-	if ms, err := filememory.New(cfg.Paths.DAGsDir); err != nil {
+	cacheLimits := cfg.Cache.Limits()
+	memoryCache := fileutil.NewCache[string]("agent_memory", cacheLimits.DAG.Limit, cacheLimits.DAG.TTL)
+	memoryCache.StartEviction(ctx)
+	if collector != nil {
+		collector.RegisterCache(memoryCache)
+	}
+	if ms, err := filememory.New(cfg.Paths.DAGsDir, filememory.WithFileCache(memoryCache)); err != nil {
 		logger.Warn(ctx, "Failed to create memory store", tag.Error(err))
 	} else {
 		memoryStore = ms

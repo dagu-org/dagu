@@ -29,14 +29,25 @@ const (
 // Memory files are stored under {dagsDir}/memory/.
 // Thread-safe through internal locking.
 type Store struct {
-	baseDir string // {dagsDir}/memory
-	mu      sync.RWMutex
+	baseDir   string // {dagsDir}/memory
+	mu        sync.RWMutex
+	fileCache *fileutil.Cache[string]
+}
+
+// Option is a functional option for configuring the Store.
+type Option func(*Store)
+
+// WithFileCache sets the file cache for memory content.
+func WithFileCache(cache *fileutil.Cache[string]) Option {
+	return func(s *Store) {
+		s.fileCache = cache
+	}
 }
 
 // New creates a new file-based agent memory store.
 // The dagsDir is the DAGs directory (e.g., ~/.config/dagu/dags).
 // The memory files will be stored under {dagsDir}/memory/.
-func New(dagsDir string) (*Store, error) {
+func New(dagsDir string, opts ...Option) (*Store, error) {
 	if dagsDir == "" {
 		return nil, errors.New("filememory: dagsDir cannot be empty")
 	}
@@ -46,7 +57,11 @@ func New(dagsDir string) (*Store, error) {
 		return nil, fmt.Errorf("filememory: failed to create directory %s: %w", baseDir, err)
 	}
 
-	return &Store{baseDir: baseDir}, nil
+	s := &Store{baseDir: baseDir}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s, nil
 }
 
 // LoadGlobalMemory reads the global MEMORY.md, truncated to maxLines.
@@ -55,6 +70,9 @@ func (s *Store) LoadGlobalMemory(_ context.Context) (string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	if s.fileCache != nil {
+		return s.loadMemoryWithCache(s.globalMemoryPath())
+	}
 	return s.readMemoryFile(s.globalMemoryPath())
 }
 
@@ -68,7 +86,11 @@ func (s *Store) LoadDAGMemory(_ context.Context, dagName string) (string, error)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return s.readMemoryFile(s.dagMemoryPath(dagName))
+	path := s.dagMemoryPath(dagName)
+	if s.fileCache != nil {
+		return s.loadMemoryWithCache(path)
+	}
+	return s.readMemoryFile(path)
 }
 
 // SaveGlobalMemory writes content to the global MEMORY.md atomically.
@@ -76,7 +98,14 @@ func (s *Store) SaveGlobalMemory(_ context.Context, content string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return fileutil.WriteFileAtomic(s.globalMemoryPath(), []byte(content), filePermissions)
+	path := s.globalMemoryPath()
+	if err := fileutil.WriteFileAtomic(path, []byte(content), filePermissions); err != nil {
+		return err
+	}
+	if s.fileCache != nil {
+		s.fileCache.Invalidate(path)
+	}
+	return nil
 }
 
 // SaveDAGMemory writes content to a DAG-specific MEMORY.md atomically.
@@ -93,7 +122,14 @@ func (s *Store) SaveDAGMemory(_ context.Context, dagName string, content string)
 		return fmt.Errorf("filememory: failed to create DAG memory directory: %w", err)
 	}
 
-	return fileutil.WriteFileAtomic(s.dagMemoryPath(dagName), []byte(content), filePermissions)
+	path := s.dagMemoryPath(dagName)
+	if err := fileutil.WriteFileAtomic(path, []byte(content), filePermissions); err != nil {
+		return err
+	}
+	if s.fileCache != nil {
+		s.fileCache.Invalidate(path)
+	}
+	return nil
 }
 
 // MemoryDir returns the root memory directory path.
@@ -134,9 +170,13 @@ func (s *Store) DeleteGlobalMemory(_ context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	err := os.Remove(s.globalMemoryPath())
+	path := s.globalMemoryPath()
+	err := os.Remove(path)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("filememory: failed to delete global memory: %w", err)
+	}
+	if s.fileCache != nil {
+		s.fileCache.Invalidate(path)
 	}
 	return nil
 }
@@ -151,11 +191,29 @@ func (s *Store) DeleteDAGMemory(_ context.Context, dagName string) error {
 	defer s.mu.Unlock()
 
 	dagDir := filepath.Join(s.baseDir, dagSubDir, dagName)
+	memPath := s.dagMemoryPath(dagName)
 	err := os.RemoveAll(dagDir)
 	if err != nil {
 		return fmt.Errorf("filememory: failed to delete DAG memory directory: %w", err)
 	}
+	if s.fileCache != nil {
+		s.fileCache.Invalidate(memPath)
+	}
 	return nil
+}
+
+func (s *Store) loadMemoryWithCache(path string) (string, error) {
+	content, err := s.fileCache.LoadLatest(path, func() (string, error) {
+		return s.readMemoryFile(path)
+	})
+	if err != nil {
+		if os.IsNotExist(err) {
+			s.fileCache.Invalidate(path)
+			return "", nil
+		}
+		return "", err
+	}
+	return content, nil
 }
 
 // readMemoryFile reads a memory file and truncates it to maxLines.
