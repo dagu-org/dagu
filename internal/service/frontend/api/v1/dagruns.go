@@ -1302,7 +1302,7 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 
 	// For DAGs using a global queue, enqueue the retry so it respects queue capacity.
 	// Step retry is not supported via queue (queue processor does not pass step name).
-	if stepName == "" && a.config.Queues.Enabled && findGlobalQueueConfig(dag.ProcGroup(), a.config) != nil {
+	if stepName == "" && a.config.FindQueueConfig(dag.ProcGroup()) != nil {
 		if err := a.enqueueRetry(ctx, attempt, dag, request.DagRunId); err != nil {
 			return nil, err
 		}

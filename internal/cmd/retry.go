@@ -3,10 +3,12 @@ package cmd
 import (
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
@@ -77,6 +79,12 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("cannot retry DAG %q with workerSelector via CLI; use 'dagu enqueue' for distributed execution", dag.Name)
 	}
 
+	// For DAGs using a global queue, enqueue the retry so it respects queue capacity.
+	// Step retry is not supported via queue (queue processor does not pass step name).
+	if stepName == "" && ctx.Config.FindQueueConfig(dag.ProcGroup()) != nil {
+		return enqueueRetry(ctx, attempt, dag, status, dagRunID)
+	}
+
 	ctx.Context = logger.WithValues(ctx.Context, tag.DAG(dag.Name), tag.RunID(dagRunID))
 
 	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
@@ -97,6 +105,36 @@ func runRetry(ctx *Context, args []string) error {
 	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
 	return executeRetry(ctx, dag, status, status.DAGRun(), stepName, workerID)
+}
+
+// enqueueRetry updates the attempt status to Queued and enqueues the run so the
+// queue processor picks it up when capacity is available. Retries respect global
+// queue capacity instead of running immediately.
+func enqueueRetry(ctx *Context, attempt exec.DAGRunAttempt, dag *core.DAG, status *exec.DAGRunStatus, dagRunID string) error {
+	if status.Status == core.Queued {
+		// Already queued (e.g. duplicate retry), treat as success
+		logger.Info(ctx, "Retry already queued")
+		return nil
+	}
+	status.Status = core.Queued
+	status.QueuedAt = stringutil.FormatTime(time.Now())
+	status.TriggerType = core.TriggerTypeRetry
+	if err := attempt.Open(ctx); err != nil {
+		return fmt.Errorf("failed to open attempt: %w", err)
+	}
+	defer func() { _ = attempt.Close(ctx) }()
+	if err := attempt.Write(ctx, *status); err != nil {
+		return fmt.Errorf("failed to write status: %w", err)
+	}
+	dagRun := exec.NewDAGRunRef(dag.Name, dagRunID)
+	if err := ctx.QueueStore.Enqueue(ctx.Context, dag.ProcGroup(), exec.QueuePriorityLow, dagRun); err != nil {
+		return fmt.Errorf("failed to enqueue retry: %w", err)
+	}
+	logger.Info(ctx, "Enqueued retry; will run when queue capacity is available",
+		tag.DAG(dag.Name),
+		tag.RunID(dagRunID),
+	)
+	return nil
 }
 
 // executeRetry runs a retry of a DAG run using the original run's log file.

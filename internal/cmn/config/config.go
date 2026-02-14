@@ -303,6 +303,20 @@ type QueueConfig struct {
 	MaxActiveRuns int
 }
 
+// FindQueueConfig returns the queue config if the queue name is defined in config.
+// Returns nil if not found or queues are disabled.
+func (c *Config) FindQueueConfig(queueName string) *QueueConfig {
+	if !c.Queues.Enabled || c.Queues.Config == nil {
+		return nil
+	}
+	for i := range c.Queues.Config {
+		if c.Queues.Config[i].Name == queueName {
+			return &c.Queues.Config[i]
+		}
+	}
+	return nil
+}
+
 // Coordinator represents the coordinator service configuration.
 type Coordinator struct {
 	Enabled   bool   // Default: true
