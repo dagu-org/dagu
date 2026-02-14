@@ -4322,7 +4322,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description DAG is already running (singleton mode) */
+            /** @description DAG is already running (singleton mode) or dagRunId already exists */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5034,7 +5034,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description DAG is already running (singleton mode) */
+            /** @description DAG is already running or queued (singleton mode), or dagRunId already exists */
             409: {
                 headers: {
                     [name: string]: unknown;
