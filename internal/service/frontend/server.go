@@ -795,9 +795,14 @@ func (srv *Server) buildAgentAuthMiddleware(_ context.Context) func(http.Handler
 func (srv *Server) buildAgentAuthOptions() auth.Options {
 	authCfg := srv.config.Server.Auth
 
+	// When auth mode is "none", disable all authentication entirely.
+	if authCfg.Mode == config.AuthModeNone {
+		return auth.Options{Realm: "Dagu Agent"}
+	}
+
 	opts := auth.Options{
 		Realm:        "Dagu Agent",
-		AuthRequired: authCfg.Mode != config.AuthModeNone,
+		AuthRequired: true,
 	}
 
 	if authCfg.Basic.Username != "" && authCfg.Basic.Password != "" {
