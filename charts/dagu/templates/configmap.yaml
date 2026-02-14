@@ -14,8 +14,8 @@ data:
     # Server / UI
     host: "0.0.0.0"
     port: 8080
-    apiBasePath: "/api/v1"
-    defaultExecutionMode: "distributed"
+    api_base_path: "/api/v1"
+    default_execution_mode: "distributed"
 
     # Coordinator (distributed execution)
     coordinator:
@@ -28,18 +28,18 @@ data:
 
     # Paths (MUST be under `paths`)
     paths:
-      dataDir: /data
-      dagsDir: /data/dags
-      logDir: /data/logs
-      suspendFlagsDir: /data/suspend
-      adminLogsDir: /data/admin/logs
-      dagRunsDir: /data/dag-runs
-      queueDir: /data/queue
-      procDir: /data/proc
-      serviceRegistryDir: /data/services
-      apiKeysDir: /data/api-keys
-      webhooksDir: /data/webhooks
-      usersDir: /data/users
+      data_dir: /data
+      dags_dir: /data/dags
+      log_dir: /data/logs
+      suspend_flags_dir: /data/suspend
+      admin_logs_dir: /data/admin/logs
+      dag_runs_dir: /data/dag-runs
+      queue_dir: /data/queue
+      proc_dir: /data/proc
+      service_registry_dir: /data/services
+      api_keys_dir: /data/api-keys
+      webhooks_dir: /data/webhooks
+      users_dir: /data/users
 
     # Auth
     auth:
