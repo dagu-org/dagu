@@ -587,13 +587,6 @@
   border-radius: var(--radius-md);
   overflow: hidden;
   box-shadow: var(--shadow-sm);
-  transition: all 150ms ease-in-out;
-}
-
-.card-obsidian:hover,
-.card-container:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-md);
 }
 
 .dark .card-obsidian,
@@ -601,12 +594,6 @@
   background: var(--card);
   border-color: var(--border);
   box-shadow: none;
-}
-
-.dark .card-obsidian:hover,
-.dark .card-container:hover {
-  background: var(--surface-variant);
-  border-color: var(--border-strong);
 }
 
 /* Remove Radix Table internal borders within cards */
