@@ -185,6 +185,10 @@ func (l *ConfigLoader) Load() (*Config, error) {
 		}
 	}
 
+	if err := checkForLegacyKeys(l.v); err != nil {
+		return nil, err
+	}
+
 	configFileUsed, err := l.resolvePath("config file", l.v.ConfigFileUsed())
 	if err != nil {
 		return nil, err
@@ -276,7 +280,7 @@ func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
 		LogFormat:    def.LogFormat,
 		TZ:           def.TZ,
 		DefaultShell: def.DefaultShell,
-		SkipExamples: l.v.GetBool("skipExamples"),
+		SkipExamples: l.v.GetBool("skip_examples"),
 		BaseEnv:      baseEnv,
 		Peer:         l.loadPeerConfig(def.Peer),
 	}
@@ -296,7 +300,7 @@ func (l *ConfigLoader) loadPeerConfig(def PeerDef) Peer {
 		SkipTLSVerify: def.SkipTLSVerify,
 		Insecure:      def.Insecure,
 		MaxRetries:    def.MaxRetries,
-		RetryInterval: l.parseDuration("peer.retryInterval", def.RetryInterval),
+		RetryInterval: l.parseDuration("peer.retry_interval", def.RetryInterval),
 	}
 }
 
@@ -453,7 +457,7 @@ func (l *ConfigLoader) loadOIDCAuth(cfg *Config, auth *AuthDef) {
 	cfg.Server.Auth.OIDC.Issuer = oidc.Issuer
 	cfg.Server.Auth.OIDC.Scopes = parseStringList(l.v.Get("auth.oidc.scopes"))
 	cfg.Server.Auth.OIDC.Whitelist = parseStringList(l.v.Get("auth.oidc.whitelist"))
-	cfg.Server.Auth.OIDC.AllowedDomains = parseStringList(l.v.Get("auth.oidc.allowedDomains"))
+	cfg.Server.Auth.OIDC.AllowedDomains = parseStringList(l.v.Get("auth.oidc.allowed_domains"))
 	cfg.Server.Auth.OIDC.ButtonLabel = oidc.ButtonLabel
 
 	if oidc.AutoSignup != nil {
@@ -559,15 +563,15 @@ func (l *ConfigLoader) loadServerDefaults(cfg *Config, def Definition) {
 		cfg.Server.Audit.Enabled = *def.Audit.Enabled
 	}
 
-	cfg.Server.Audit.RetentionDays = l.v.GetInt("audit.retentionDays")
+	cfg.Server.Audit.RetentionDays = l.v.GetInt("audit.retention_days")
 }
 
 func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
-	cfg.UI.MaxDashboardPageLimit = l.v.GetInt("ui.maxDashboardPageLimit")
-	cfg.UI.NavbarTitle = l.v.GetString("ui.navbarTitle")
-	cfg.UI.LogEncodingCharset = l.v.GetString("ui.logEncodingCharset")
-	cfg.UI.DAGs.SortField = l.v.GetString("ui.dags.sortField")
-	cfg.UI.DAGs.SortOrder = l.v.GetString("ui.dags.sortOrder")
+	cfg.UI.MaxDashboardPageLimit = l.v.GetInt("ui.max_dashboard_page_limit")
+	cfg.UI.NavbarTitle = l.v.GetString("ui.navbar_title")
+	cfg.UI.LogEncodingCharset = l.v.GetString("ui.log_encoding_charset")
+	cfg.UI.DAGs.SortField = l.v.GetString("ui.dags.sort_field")
+	cfg.UI.DAGs.SortOrder = l.v.GetString("ui.dags.sort_order")
 
 	if def.UI == nil {
 		return
@@ -732,9 +736,9 @@ func parseCoordinatorAddresses(input any) ([]string, []string) {
 func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 	if def.Scheduler != nil {
 		cfg.Scheduler.Port = def.Scheduler.Port
-		cfg.Scheduler.LockStaleThreshold = l.parseDuration("scheduler.lockStaleThreshold", def.Scheduler.LockStaleThreshold)
-		cfg.Scheduler.LockRetryInterval = l.parseDuration("scheduler.lockRetryInterval", def.Scheduler.LockRetryInterval)
-		cfg.Scheduler.ZombieDetectionInterval = l.parseDuration("scheduler.zombieDetectionInterval", def.Scheduler.ZombieDetectionInterval)
+		cfg.Scheduler.LockStaleThreshold = l.parseDuration("scheduler.lock_stale_threshold", def.Scheduler.LockStaleThreshold)
+		cfg.Scheduler.LockRetryInterval = l.parseDuration("scheduler.lock_retry_interval", def.Scheduler.LockRetryInterval)
+		cfg.Scheduler.ZombieDetectionInterval = l.parseDuration("scheduler.zombie_detection_interval", def.Scheduler.ZombieDetectionInterval)
 	}
 
 	l.setSchedulerDefaults(cfg)
@@ -751,7 +755,7 @@ func (l *ConfigLoader) setSchedulerDefaults(cfg *Config) {
 		cfg.Scheduler.LockRetryInterval = 5 * time.Second
 	}
 	// Default ZombieDetectionInterval only if not explicitly set (0 disables detection)
-	if cfg.Scheduler.ZombieDetectionInterval <= 0 && !l.v.IsSet("scheduler.zombieDetectionInterval") {
+	if cfg.Scheduler.ZombieDetectionInterval <= 0 && !l.v.IsSet("scheduler.zombie_detection_interval") {
 		cfg.Scheduler.ZombieDetectionInterval = 45 * time.Second
 	}
 }
@@ -817,7 +821,7 @@ func (l *ConfigLoader) applyGitSyncDefinition(cfg *Config, def *GitSyncDef) {
 		if def.AutoSync.OnStartup != nil {
 			cfg.GitSync.AutoSync.OnStartup = *def.AutoSync.OnStartup
 		}
-		if l.v.IsSet("gitSync.autoSync.interval") {
+		if l.v.IsSet("git_sync.auto_sync.interval") {
 			cfg.GitSync.AutoSync.Interval = def.AutoSync.Interval
 		}
 	}
@@ -846,7 +850,7 @@ func (l *ConfigLoader) loadTunnelConfig(cfg *Config, def Definition) {
 	if def.Tunnel != nil && def.Tunnel.AllowTerminal != nil {
 		cfg.Tunnel.AllowTerminal = *def.Tunnel.AllowTerminal
 	}
-	cfg.Tunnel.AllowedIPs = parseStringList(l.v.Get("tunnel.allowedIPs"))
+	cfg.Tunnel.AllowedIPs = parseStringList(l.v.Get("tunnel.allowed_ips"))
 
 	l.loadTunnelRateLimiting(cfg, def)
 
@@ -918,7 +922,7 @@ func setDefaultIfNotPositive(target *int, defaultValue int) {
 }
 
 func (l *ConfigLoader) loadExecutionModeConfig(cfg *Config, _ Definition) {
-	mode := ExecutionMode(l.v.GetString("defaultExecutionMode"))
+	mode := ExecutionMode(l.v.GetString("default_execution_mode"))
 	if mode == "" {
 		mode = ExecutionModeLocal
 	}
@@ -1108,24 +1112,24 @@ func (l *ConfigLoader) setupViper(xdgConfig XDGConfig, homeDir, configFile, appH
 
 func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	// Paths
-	l.v.SetDefault("skipExamples", false)
-	l.v.SetDefault("paths.dagsDir", paths.DAGsDir)
-	l.v.SetDefault("paths.suspendFlagsDir", paths.SuspendFlagsDir)
-	l.v.SetDefault("paths.dataDir", paths.DataDir)
-	l.v.SetDefault("paths.logDir", paths.LogsDir)
-	l.v.SetDefault("paths.adminLogsDir", paths.AdminLogsDir)
-	l.v.SetDefault("paths.baseConfig", paths.BaseConfigFile)
+	l.v.SetDefault("skip_examples", false)
+	l.v.SetDefault("paths.dags_dir", paths.DAGsDir)
+	l.v.SetDefault("paths.suspend_flags_dir", paths.SuspendFlagsDir)
+	l.v.SetDefault("paths.data_dir", paths.DataDir)
+	l.v.SetDefault("paths.log_dir", paths.LogsDir)
+	l.v.SetDefault("paths.admin_logs_dir", paths.AdminLogsDir)
+	l.v.SetDefault("paths.base_config", paths.BaseConfigFile)
 
 	// Server
 	l.v.SetDefault("host", "127.0.0.1")
 	l.v.SetDefault("port", 8080)
 	l.v.SetDefault("debug", false)
-	l.v.SetDefault("basePath", "")
-	l.v.SetDefault("apiBasePath", "/api/v1")
-	l.v.SetDefault("latestStatusToday", false)
+	l.v.SetDefault("base_path", "")
+	l.v.SetDefault("api_base_path", "/api/v1")
+	l.v.SetDefault("latest_status_today", false)
 	l.v.SetDefault("metrics", "private")
 	l.v.SetDefault("cache", "normal")
-	l.v.SetDefault("logFormat", "text")
+	l.v.SetDefault("log_format", "text")
 
 	// Coordinator
 	l.v.SetDefault("coordinator.host", "127.0.0.1")
@@ -1133,34 +1137,34 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("coordinator.port", 50055)
 
 	// Worker
-	l.v.SetDefault("worker.maxActiveRuns", 100)
-	l.v.SetDefault("worker.postgresPool.maxOpenConns", 25)
-	l.v.SetDefault("worker.postgresPool.maxIdleConns", 5)
-	l.v.SetDefault("worker.postgresPool.connMaxLifetime", 300)
-	l.v.SetDefault("worker.postgresPool.connMaxIdleTime", 60)
+	l.v.SetDefault("worker.max_active_runs", 100)
+	l.v.SetDefault("worker.postgres_pool.max_open_conns", 25)
+	l.v.SetDefault("worker.postgres_pool.max_idle_conns", 5)
+	l.v.SetDefault("worker.postgres_pool.conn_max_lifetime", 300)
+	l.v.SetDefault("worker.postgres_pool.conn_max_idle_time", 60)
 
 	// UI
-	l.v.SetDefault("ui.navbarTitle", AppName)
-	l.v.SetDefault("ui.maxDashboardPageLimit", 100)
-	l.v.SetDefault("ui.logEncodingCharset", getDefaultLogEncodingCharset())
-	l.v.SetDefault("ui.dags.sortField", "name")
-	l.v.SetDefault("ui.dags.sortOrder", "asc")
+	l.v.SetDefault("ui.navbar_title", AppName)
+	l.v.SetDefault("ui.max_dashboard_page_limit", 100)
+	l.v.SetDefault("ui.log_encoding_charset", getDefaultLogEncodingCharset())
+	l.v.SetDefault("ui.dags.sort_field", "name")
+	l.v.SetDefault("ui.dags.sort_order", "asc")
 
 	// Execution
-	l.v.SetDefault("defaultExecutionMode", string(ExecutionModeLocal))
+	l.v.SetDefault("default_execution_mode", string(ExecutionModeLocal))
 
 	// Queues
 	l.v.SetDefault("queues.enabled", true)
 
 	// Scheduler
-	l.v.SetDefault("scheduler.lockStaleThreshold", "30s")
-	l.v.SetDefault("scheduler.lockRetryInterval", "5s")
+	l.v.SetDefault("scheduler.lock_stale_threshold", "30s")
+	l.v.SetDefault("scheduler.lock_retry_interval", "5s")
 
 	// Peer
 	l.v.SetDefault("peer.insecure", true)
 
 	// Audit
-	l.v.SetDefault("audit.retentionDays", 7)
+	l.v.SetDefault("audit.retention_days", 7)
 
 	// Monitoring
 	l.v.SetDefault("monitoring.retention", "24h")
@@ -1175,66 +1179,66 @@ type envBinding struct {
 
 var envBindings = []envBinding{
 	// Server
-	{key: "logFormat", env: "LOG_FORMAT"},
-	{key: "basePath", env: "BASE_PATH"},
-	{key: "apiBaseURL", env: "API_BASE_URL"},
+	{key: "log_format", env: "LOG_FORMAT"},
+	{key: "base_path", env: "BASE_PATH"},
+	{key: "api_base_url", env: "API_BASE_URL"},
 	{key: "tz", env: "TZ"},
 	{key: "host", env: "HOST"},
 	{key: "port", env: "PORT"},
 	{key: "debug", env: "DEBUG"},
 	{key: "headless", env: "HEADLESS"},
-	{key: "latestStatusToday", env: "LATEST_STATUS_TODAY"},
+	{key: "latest_status_today", env: "LATEST_STATUS_TODAY"},
 	{key: "metrics", env: "SERVER_METRICS"},
 	{key: "cache", env: "CACHE"},
 
 	{key: "terminal.enabled", env: "TERMINAL_ENABLED"},
 	{key: "audit.enabled", env: "AUDIT_ENABLED"},
-	{key: "audit.retentionDays", env: "AUDIT_RETENTION_DAYS"},
+	{key: "audit.retention_days", env: "AUDIT_RETENTION_DAYS"},
 
 	// Core
-	{key: "defaultShell", env: "DEFAULT_SHELL"},
-	{key: "skipExamples", env: "SKIP_EXAMPLES"},
+	{key: "default_shell", env: "DEFAULT_SHELL"},
+	{key: "skip_examples", env: "SKIP_EXAMPLES"},
 
 	// Scheduler
 	{key: "scheduler.port", env: "SCHEDULER_PORT"},
-	{key: "scheduler.lockStaleThreshold", env: "SCHEDULER_LOCK_STALE_THRESHOLD"},
-	{key: "scheduler.lockRetryInterval", env: "SCHEDULER_LOCK_RETRY_INTERVAL"},
-	{key: "scheduler.zombieDetectionInterval", env: "SCHEDULER_ZOMBIE_DETECTION_INTERVAL"},
+	{key: "scheduler.lock_stale_threshold", env: "SCHEDULER_LOCK_STALE_THRESHOLD"},
+	{key: "scheduler.lock_retry_interval", env: "SCHEDULER_LOCK_RETRY_INTERVAL"},
+	{key: "scheduler.zombie_detection_interval", env: "SCHEDULER_ZOMBIE_DETECTION_INTERVAL"},
 
 	// UI
-	{key: "ui.maxDashboardPageLimit", env: "UI_MAX_DASHBOARD_PAGE_LIMIT"},
-	{key: "ui.logEncodingCharset", env: "UI_LOG_ENCODING_CHARSET"},
-	{key: "ui.navbarColor", env: "UI_NAVBAR_COLOR"},
-	{key: "ui.navbarTitle", env: "UI_NAVBAR_TITLE"},
-	{key: "ui.dags.sortField", env: "UI_DAGS_SORT_FIELD"},
-	{key: "ui.dags.sortOrder", env: "UI_DAGS_SORT_ORDER"},
+	{key: "ui.max_dashboard_page_limit", env: "UI_MAX_DASHBOARD_PAGE_LIMIT"},
+	{key: "ui.log_encoding_charset", env: "UI_LOG_ENCODING_CHARSET"},
+	{key: "ui.navbar_color", env: "UI_NAVBAR_COLOR"},
+	{key: "ui.navbar_title", env: "UI_NAVBAR_TITLE"},
+	{key: "ui.dags.sort_field", env: "UI_DAGS_SORT_FIELD"},
+	{key: "ui.dags.sort_order", env: "UI_DAGS_SORT_ORDER"},
 	// UI (legacy)
-	{key: "ui.maxDashboardPageLimit", env: "MAX_DASHBOARD_PAGE_LIMIT"},
-	{key: "ui.logEncodingCharset", env: "LOG_ENCODING_CHARSET"},
-	{key: "ui.navbarColor", env: "NAVBAR_COLOR"},
-	{key: "ui.navbarTitle", env: "NAVBAR_TITLE"},
+	{key: "ui.max_dashboard_page_limit", env: "MAX_DASHBOARD_PAGE_LIMIT"},
+	{key: "ui.log_encoding_charset", env: "LOG_ENCODING_CHARSET"},
+	{key: "ui.navbar_color", env: "NAVBAR_COLOR"},
+	{key: "ui.navbar_title", env: "NAVBAR_TITLE"},
 
 	// Auth
 	{key: "auth.mode", env: "AUTH_MODE"},
 	{key: "auth.basic.username", env: "AUTH_BASIC_USERNAME"},
 	{key: "auth.basic.password", env: "AUTH_BASIC_PASSWORD"},
 	// Auth OIDC
-	{key: "auth.oidc.clientId", env: "AUTH_OIDC_CLIENT_ID"},
-	{key: "auth.oidc.clientSecret", env: "AUTH_OIDC_CLIENT_SECRET"},
-	{key: "auth.oidc.clientUrl", env: "AUTH_OIDC_CLIENT_URL"},
+	{key: "auth.oidc.client_id", env: "AUTH_OIDC_CLIENT_ID"},
+	{key: "auth.oidc.client_secret", env: "AUTH_OIDC_CLIENT_SECRET"},
+	{key: "auth.oidc.client_url", env: "AUTH_OIDC_CLIENT_URL"},
 	{key: "auth.oidc.issuer", env: "AUTH_OIDC_ISSUER"},
 	{key: "auth.oidc.scopes", env: "AUTH_OIDC_SCOPES"},
 	{key: "auth.oidc.whitelist", env: "AUTH_OIDC_WHITELIST"},
-	{key: "auth.oidc.autoSignup", env: "AUTH_OIDC_AUTO_SIGNUP"},
-	{key: "auth.oidc.allowedDomains", env: "AUTH_OIDC_ALLOWED_DOMAINS"},
-	{key: "auth.oidc.buttonLabel", env: "AUTH_OIDC_BUTTON_LABEL"},
+	{key: "auth.oidc.auto_signup", env: "AUTH_OIDC_AUTO_SIGNUP"},
+	{key: "auth.oidc.allowed_domains", env: "AUTH_OIDC_ALLOWED_DOMAINS"},
+	{key: "auth.oidc.button_label", env: "AUTH_OIDC_BUTTON_LABEL"},
 	// Auth OIDC Role Mapping
-	{key: "auth.oidc.roleMapping.defaultRole", env: "AUTH_OIDC_DEFAULT_ROLE"},
-	{key: "auth.oidc.roleMapping.groupsClaim", env: "AUTH_OIDC_GROUPS_CLAIM"},
-	{key: "auth.oidc.roleMapping.groupMappings", env: "AUTH_OIDC_GROUP_MAPPINGS"},
-	{key: "auth.oidc.roleMapping.roleAttributePath", env: "AUTH_OIDC_ROLE_ATTRIBUTE_PATH"},
-	{key: "auth.oidc.roleMapping.roleAttributeStrict", env: "AUTH_OIDC_ROLE_ATTRIBUTE_STRICT"},
-	{key: "auth.oidc.roleMapping.skipOrgRoleSync", env: "AUTH_OIDC_SKIP_ORG_ROLE_SYNC"},
+	{key: "auth.oidc.role_mapping.default_role", env: "AUTH_OIDC_DEFAULT_ROLE"},
+	{key: "auth.oidc.role_mapping.groups_claim", env: "AUTH_OIDC_GROUPS_CLAIM"},
+	{key: "auth.oidc.role_mapping.group_mappings", env: "AUTH_OIDC_GROUP_MAPPINGS"},
+	{key: "auth.oidc.role_mapping.role_attribute_path", env: "AUTH_OIDC_ROLE_ATTRIBUTE_PATH"},
+	{key: "auth.oidc.role_mapping.role_attribute_strict", env: "AUTH_OIDC_ROLE_ATTRIBUTE_STRICT"},
+	{key: "auth.oidc.role_mapping.skip_org_role_sync", env: "AUTH_OIDC_SKIP_ORG_ROLE_SYNC"},
 	// Auth (legacy)
 	{key: "auth.basic.username", env: "BASICAUTH_USERNAME"},
 	{key: "auth.basic.password", env: "BASICAUTH_PASSWORD"},
@@ -1245,27 +1249,27 @@ var envBindings = []envBinding{
 	{key: "auth.builtin.token.ttl", env: "AUTH_TOKEN_TTL"},
 
 	// TLS
-	{key: "tls.certFile", env: "CERT_FILE"},
-	{key: "tls.keyFile", env: "KEY_FILE"},
+	{key: "tls.cert_file", env: "CERT_FILE"},
+	{key: "tls.key_file", env: "KEY_FILE"},
 
 	// Paths
-	{key: "paths.dagsDir", env: "DAGS", isPath: true},
-	{key: "paths.dagsDir", env: "DAGS_DIR", isPath: true},
-	{key: "paths.altDagsDir", env: "ALT_DAGS_DIR", isPath: true},
+	{key: "paths.dags_dir", env: "DAGS", isPath: true},
+	{key: "paths.dags_dir", env: "DAGS_DIR", isPath: true},
+	{key: "paths.alt_dags_dir", env: "ALT_DAGS_DIR", isPath: true},
 	{key: "paths.executable", env: "EXECUTABLE", isPath: true},
-	{key: "paths.logDir", env: "LOG_DIR", isPath: true},
-	{key: "paths.dataDir", env: "DATA_DIR", isPath: true},
-	{key: "paths.suspendFlagsDir", env: "SUSPEND_FLAGS_DIR", isPath: true},
-	{key: "paths.adminLogsDir", env: "ADMIN_LOG_DIR", isPath: true},
-	{key: "paths.baseConfig", env: "BASE_CONFIG", isPath: true},
-	{key: "paths.dagRunsDir", env: "DAG_RUNS_DIR", isPath: true},
-	{key: "paths.procDir", env: "PROC_DIR", isPath: true},
-	{key: "paths.queueDir", env: "QUEUE_DIR", isPath: true},
-	{key: "paths.serviceRegistryDir", env: "SERVICE_REGISTRY_DIR", isPath: true},
-	{key: "paths.usersDir", env: "USERS_DIR", isPath: true},
+	{key: "paths.log_dir", env: "LOG_DIR", isPath: true},
+	{key: "paths.data_dir", env: "DATA_DIR", isPath: true},
+	{key: "paths.suspend_flags_dir", env: "SUSPEND_FLAGS_DIR", isPath: true},
+	{key: "paths.admin_logs_dir", env: "ADMIN_LOG_DIR", isPath: true},
+	{key: "paths.base_config", env: "BASE_CONFIG", isPath: true},
+	{key: "paths.dag_runs_dir", env: "DAG_RUNS_DIR", isPath: true},
+	{key: "paths.proc_dir", env: "PROC_DIR", isPath: true},
+	{key: "paths.queue_dir", env: "QUEUE_DIR", isPath: true},
+	{key: "paths.service_registry_dir", env: "SERVICE_REGISTRY_DIR", isPath: true},
+	{key: "paths.users_dir", env: "USERS_DIR", isPath: true},
 
 	// Execution
-	{key: "defaultExecutionMode", env: "DEFAULT_EXECUTION_MODE"},
+	{key: "default_execution_mode", env: "DEFAULT_EXECUTION_MODE"},
 
 	// Queues
 	{key: "queues.enabled", env: "QUEUE_ENABLED"},
@@ -1278,15 +1282,15 @@ var envBindings = []envBinding{
 
 	// Worker
 	{key: "worker.id", env: "WORKER_ID"},
-	{key: "worker.maxActiveRuns", env: "WORKER_MAX_ACTIVE_RUNS"},
+	{key: "worker.max_active_runs", env: "WORKER_MAX_ACTIVE_RUNS"},
 	{key: "worker.labels", env: "WORKER_LABELS"},
 	{key: "worker.coordinators", env: "WORKER_COORDINATORS"},
 
 	// Peer
-	{key: "peer.certFile", env: "PEER_CERT_FILE"},
-	{key: "peer.keyFile", env: "PEER_KEY_FILE"},
-	{key: "peer.clientCaFile", env: "PEER_CLIENT_CA_FILE"},
-	{key: "peer.skipTlsVerify", env: "PEER_SKIP_TLS_VERIFY"},
+	{key: "peer.cert_file", env: "PEER_CERT_FILE"},
+	{key: "peer.key_file", env: "PEER_KEY_FILE"},
+	{key: "peer.client_ca_file", env: "PEER_CLIENT_CA_FILE"},
+	{key: "peer.skip_tls_verify", env: "PEER_SKIP_TLS_VERIFY"},
 	{key: "peer.insecure", env: "PEER_INSECURE"},
 
 	// Monitoring
@@ -1294,41 +1298,41 @@ var envBindings = []envBinding{
 	{key: "monitoring.interval", env: "MONITORING_INTERVAL"},
 
 	// Worker PostgreSQL pool
-	{key: "worker.postgresPool.maxOpenConns", env: "WORKER_POSTGRES_POOL_MAX_OPEN_CONNS"},
-	{key: "worker.postgresPool.maxIdleConns", env: "WORKER_POSTGRES_POOL_MAX_IDLE_CONNS"},
-	{key: "worker.postgresPool.connMaxLifetime", env: "WORKER_POSTGRES_POOL_CONN_MAX_LIFETIME"},
-	{key: "worker.postgresPool.connMaxIdleTime", env: "WORKER_POSTGRES_POOL_CONN_MAX_IDLE_TIME"},
+	{key: "worker.postgres_pool.max_open_conns", env: "WORKER_POSTGRES_POOL_MAX_OPEN_CONNS"},
+	{key: "worker.postgres_pool.max_idle_conns", env: "WORKER_POSTGRES_POOL_MAX_IDLE_CONNS"},
+	{key: "worker.postgres_pool.conn_max_lifetime", env: "WORKER_POSTGRES_POOL_CONN_MAX_LIFETIME"},
+	{key: "worker.postgres_pool.conn_max_idle_time", env: "WORKER_POSTGRES_POOL_CONN_MAX_IDLE_TIME"},
 
 	// Tunnel
 	{key: "tunnel.enabled", env: "TUNNEL"},
 	{key: "tunnel.enabled", env: "TUNNEL_ENABLED"},
-	{key: "tunnel.tailscale.authKey", env: "TUNNEL_TAILSCALE_AUTH_KEY"},
+	{key: "tunnel.tailscale.auth_key", env: "TUNNEL_TAILSCALE_AUTH_KEY"},
 	{key: "tunnel.tailscale.hostname", env: "TUNNEL_TAILSCALE_HOSTNAME"},
 	{key: "tunnel.tailscale.funnel", env: "TUNNEL_TAILSCALE_FUNNEL"},
 	{key: "tunnel.tailscale.https", env: "TUNNEL_TAILSCALE_HTTPS"},
-	{key: "tunnel.tailscale.stateDir", env: "TUNNEL_TAILSCALE_STATE_DIR", isPath: true},
-	{key: "tunnel.allowTerminal", env: "TUNNEL_ALLOW_TERMINAL"},
-	{key: "tunnel.allowedIPs", env: "TUNNEL_ALLOWED_IPS"},
-	{key: "tunnel.rateLimiting.enabled", env: "TUNNEL_RATE_LIMITING_ENABLED"},
-	{key: "tunnel.rateLimiting.loginAttempts", env: "TUNNEL_RATE_LIMITING_LOGIN_ATTEMPTS"},
-	{key: "tunnel.rateLimiting.windowSeconds", env: "TUNNEL_RATE_LIMITING_WINDOW_SECONDS"},
-	{key: "tunnel.rateLimiting.blockDurationSeconds", env: "TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS"},
+	{key: "tunnel.tailscale.state_dir", env: "TUNNEL_TAILSCALE_STATE_DIR", isPath: true},
+	{key: "tunnel.allow_terminal", env: "TUNNEL_ALLOW_TERMINAL"},
+	{key: "tunnel.allowed_ips", env: "TUNNEL_ALLOWED_IPS"},
+	{key: "tunnel.rate_limiting.enabled", env: "TUNNEL_RATE_LIMITING_ENABLED"},
+	{key: "tunnel.rate_limiting.login_attempts", env: "TUNNEL_RATE_LIMITING_LOGIN_ATTEMPTS"},
+	{key: "tunnel.rate_limiting.window_seconds", env: "TUNNEL_RATE_LIMITING_WINDOW_SECONDS"},
+	{key: "tunnel.rate_limiting.block_duration_seconds", env: "TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS"},
 
 	// GitSync
-	{key: "gitSync.enabled", env: "GITSYNC_ENABLED"},
-	{key: "gitSync.repository", env: "GITSYNC_REPOSITORY"},
-	{key: "gitSync.branch", env: "GITSYNC_BRANCH"},
-	{key: "gitSync.path", env: "GITSYNC_PATH"},
-	{key: "gitSync.pushEnabled", env: "GITSYNC_PUSH_ENABLED"},
-	{key: "gitSync.auth.type", env: "GITSYNC_AUTH_TYPE"},
-	{key: "gitSync.auth.token", env: "GITSYNC_AUTH_TOKEN"},
-	{key: "gitSync.auth.sshKeyPath", env: "GITSYNC_AUTH_SSH_KEY_PATH", isPath: true},
-	{key: "gitSync.auth.sshPassphrase", env: "GITSYNC_AUTH_SSH_PASSPHRASE"},
-	{key: "gitSync.autoSync.enabled", env: "GITSYNC_AUTOSYNC_ENABLED"},
-	{key: "gitSync.autoSync.onStartup", env: "GITSYNC_AUTOSYNC_ON_STARTUP"},
-	{key: "gitSync.autoSync.interval", env: "GITSYNC_AUTOSYNC_INTERVAL"},
-	{key: "gitSync.commit.authorName", env: "GITSYNC_COMMIT_AUTHOR_NAME"},
-	{key: "gitSync.commit.authorEmail", env: "GITSYNC_COMMIT_AUTHOR_EMAIL"},
+	{key: "git_sync.enabled", env: "GITSYNC_ENABLED"},
+	{key: "git_sync.repository", env: "GITSYNC_REPOSITORY"},
+	{key: "git_sync.branch", env: "GITSYNC_BRANCH"},
+	{key: "git_sync.path", env: "GITSYNC_PATH"},
+	{key: "git_sync.push_enabled", env: "GITSYNC_PUSH_ENABLED"},
+	{key: "git_sync.auth.type", env: "GITSYNC_AUTH_TYPE"},
+	{key: "git_sync.auth.token", env: "GITSYNC_AUTH_TOKEN"},
+	{key: "git_sync.auth.ssh_key_path", env: "GITSYNC_AUTH_SSH_KEY_PATH", isPath: true},
+	{key: "git_sync.auth.ssh_passphrase", env: "GITSYNC_AUTH_SSH_PASSPHRASE"},
+	{key: "git_sync.auto_sync.enabled", env: "GITSYNC_AUTOSYNC_ENABLED"},
+	{key: "git_sync.auto_sync.on_startup", env: "GITSYNC_AUTOSYNC_ON_STARTUP"},
+	{key: "git_sync.auto_sync.interval", env: "GITSYNC_AUTOSYNC_INTERVAL"},
+	{key: "git_sync.commit.author_name", env: "GITSYNC_COMMIT_AUTHOR_NAME"},
+	{key: "git_sync.commit.author_email", env: "GITSYNC_COMMIT_AUTHOR_EMAIL"},
 }
 
 func (l *ConfigLoader) bindEnvironmentVariables() {

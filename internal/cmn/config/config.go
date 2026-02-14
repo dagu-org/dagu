@@ -408,7 +408,7 @@ func (c *Config) validateBuiltinAuth() error {
 	}
 
 	if c.Paths.UsersDir == "" {
-		return fmt.Errorf("builtin auth requires paths.usersDir to be set")
+		return fmt.Errorf("builtin auth requires paths.users_dir to be set")
 	}
 	if c.Server.Auth.Builtin.Admin.Username == "" {
 		return fmt.Errorf("builtin auth requires admin username to be set")
@@ -452,7 +452,7 @@ func (c *Config) validateExecutionMode() error {
 	case ExecutionModeLocal, ExecutionModeDistributed:
 		return nil
 	default:
-		return fmt.Errorf("invalid defaultExecutionMode: %q (must be one of: local, distributed)", c.DefaultExecMode)
+		return fmt.Errorf("invalid default_execution_mode: %q (must be one of: local, distributed)", c.DefaultExecMode)
 	}
 }
 
@@ -462,10 +462,10 @@ func (c *Config) validateGitSync() error {
 		return nil
 	}
 	if c.GitSync.Repository == "" {
-		return fmt.Errorf("git sync requires repository to be set (gitSync.repository)")
+		return fmt.Errorf("git sync requires repository to be set (git_sync.repository)")
 	}
 	if c.GitSync.Branch == "" {
-		return fmt.Errorf("git sync requires branch to be set (gitSync.branch)")
+		return fmt.Errorf("git sync requires branch to be set (git_sync.branch)")
 	}
 
 	switch c.GitSync.Auth.Type {
@@ -476,10 +476,10 @@ func (c *Config) validateGitSync() error {
 	}
 
 	if c.GitSync.Auth.Type == "ssh" && c.GitSync.Auth.SSHKeyPath == "" {
-		return fmt.Errorf("git sync SSH auth requires sshKeyPath to be set")
+		return fmt.Errorf("git sync SSH auth requires ssh_key_path to be set")
 	}
 	if c.GitSync.AutoSync.Interval < 0 {
-		return fmt.Errorf("git sync autoSync.interval must be non-negative (got: %d)", c.GitSync.AutoSync.Interval)
+		return fmt.Errorf("git sync auto_sync.interval must be non-negative (got: %d)", c.GitSync.AutoSync.Interval)
 	}
 	return nil
 }
@@ -503,13 +503,13 @@ func (c *Config) validateTunnelRateLimiting() error {
 		return nil
 	}
 	if rl.LoginAttempts <= 0 {
-		return fmt.Errorf("tunnel rate limiting loginAttempts must be positive")
+		return fmt.Errorf("tunnel rate limiting login_attempts must be positive")
 	}
 	if rl.WindowSeconds <= 0 {
-		return fmt.Errorf("tunnel rate limiting windowSeconds must be positive")
+		return fmt.Errorf("tunnel rate limiting window_seconds must be positive")
 	}
 	if rl.BlockDurationSeconds <= 0 {
-		return fmt.Errorf("tunnel rate limiting blockDurationSeconds must be positive")
+		return fmt.Errorf("tunnel rate limiting block_duration_seconds must be positive")
 	}
 	return nil
 }

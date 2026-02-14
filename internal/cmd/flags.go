@@ -203,6 +203,7 @@ var (
 		defaultValue: "100",
 		usage:        "Maximum number of active runs (default: 100)",
 		bindViper:    true,
+		viperKey:     "worker.max_active_runs",
 	}
 
 	workerLabelsFlag = commandLineFlag{
@@ -232,18 +233,21 @@ var (
 		name:      "peer.cert-file",
 		usage:     "Path to TLS certificate file for mutual TLS",
 		bindViper: true,
+		viperKey:  "peer.cert_file",
 	}
 
 	peerKeyFileFlag = commandLineFlag{
 		name:      "peer.key-file",
 		usage:     "Path to TLS key file for mutual TLS",
 		bindViper: true,
+		viperKey:  "peer.key_file",
 	}
 
 	peerClientCAFileFlag = commandLineFlag{
 		name:      "peer.client-ca-file",
 		usage:     "Path to CA certificate file for server verification",
 		bindViper: true,
+		viperKey:  "peer.client_ca_file",
 	}
 
 	peerSkipTLSVerifyFlag = commandLineFlag{
@@ -251,6 +255,7 @@ var (
 		usage:     "Skip TLS certificate verification (insecure)",
 		isBool:    true,
 		bindViper: true,
+		viperKey:  "peer.skip_tls_verify",
 	}
 )
 

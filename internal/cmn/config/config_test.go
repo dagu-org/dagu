@@ -148,7 +148,7 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.UI.MaxDashboardPageLimit = 1
 		err := cfg.Validate()
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "usersDir")
+		assert.Contains(t, err.Error(), "users_dir")
 	})
 
 	t.Run("BuiltinAuth_MissingTokenSecret", func(t *testing.T) {

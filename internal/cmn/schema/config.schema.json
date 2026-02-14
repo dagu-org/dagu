@@ -14,17 +14,17 @@
       "minimum": 0,
       "maximum": 65535
     },
-    "basePath": {
+    "base_path": {
       "type": "string",
       "description": "Base path for the web UI (e.g., '/dagu')."
     },
-    "apiBasePath": {
+    "api_base_path": {
       "type": "string",
       "description": "Base path for the API endpoints."
     },
-    "apiBaseURL": {
+    "api_base_url": {
       "type": "string",
-      "description": "Deprecated: use apiBasePath instead."
+      "description": "Deprecated: use api_base_path instead."
     },
     "headless": {
       "type": "boolean",
@@ -37,11 +37,11 @@
       "type": "boolean",
       "description": "Enable debug mode with verbose logging."
     },
-    "defaultShell": {
+    "default_shell": {
       "type": "string",
       "description": "Default shell for executing commands (e.g., '/bin/bash')."
     },
-    "logFormat": {
+    "log_format": {
       "type": "string",
       "description": "Log output format.",
       "enum": ["json", "text"]
@@ -53,42 +53,42 @@
     "auth": {
       "$ref": "#/definitions/AuthDef"
     },
-    "isBasicAuth": {
+    "is_basic_auth": {
       "type": "boolean",
       "description": "Deprecated: use auth.basic instead. Enable basic authentication."
     },
-    "basicAuthUsername": {
+    "basic_auth_username": {
       "type": "string",
       "description": "Deprecated: use auth.basic.username instead."
     },
-    "basicAuthPassword": {
+    "basic_auth_password": {
       "type": "string",
       "description": "Deprecated: use auth.basic.password instead."
     },
-    "isAuthToken": {
+    "is_auth_token": {
       "type": "boolean",
       "description": "Deprecated: use auth.token instead. Enable token authentication."
     },
-    "authToken": {
+    "auth_token": {
       "type": "string",
       "description": "Deprecated: use auth.token.value instead."
     },
-    "permissionWriteDAGs": {
+    "permission_write_dags": {
       "type": "boolean",
-      "description": "Deprecated: use permissions.writeDAGs instead. Allow writing DAG definitions."
+      "description": "Deprecated: use permissions.write_dags instead. Allow writing DAG definitions."
     },
-    "permissionRunDAGs": {
+    "permission_run_dags": {
       "type": "boolean",
-      "description": "Deprecated: use permissions.runDAGs instead. Allow running DAGs."
+      "description": "Deprecated: use permissions.run_dags instead. Allow running DAGs."
     },
     "permissions": {
       "$ref": "#/definitions/PermissionsDef"
     },
     "dags": {
       "type": "string",
-      "description": "Deprecated: use dagsDir or paths.dagsDir instead."
+      "description": "Deprecated: use dags_dir or paths.dags_dir instead."
     },
-    "dagsDir": {
+    "dags_dir": {
       "type": "string",
       "description": "Directory containing DAG YAML files."
     },
@@ -96,48 +96,48 @@
       "type": "string",
       "description": "Path to the dagu executable."
     },
-    "logDir": {
+    "log_dir": {
       "type": "string",
       "description": "Directory for log files."
     },
-    "dataDir": {
+    "data_dir": {
       "type": "string",
       "description": "Directory for application data."
     },
-    "suspendFlagsDir": {
+    "suspend_flags_dir": {
       "type": "string",
       "description": "Directory for DAG suspend flag files."
     },
-    "adminLogsDir": {
+    "admin_logs_dir": {
       "type": "string",
       "description": "Directory for admin log files."
     },
-    "baseConfig": {
+    "base_config": {
       "type": "string",
       "description": "Path to the base configuration file."
     },
     "paths": {
       "$ref": "#/definitions/PathsDef"
     },
-    "logEncodingCharset": {
+    "log_encoding_charset": {
       "type": "string",
-      "description": "Deprecated: use ui.logEncodingCharset instead. Character encoding for log display."
+      "description": "Deprecated: use ui.log_encoding_charset instead. Character encoding for log display."
     },
-    "navbarColor": {
+    "navbar_color": {
       "type": "string",
-      "description": "Deprecated: use ui.navbarColor instead. Navigation bar color."
+      "description": "Deprecated: use ui.navbar_color instead. Navigation bar color."
     },
-    "navbarTitle": {
+    "navbar_title": {
       "type": "string",
-      "description": "Deprecated: use ui.navbarTitle instead. Navigation bar title."
+      "description": "Deprecated: use ui.navbar_title instead. Navigation bar title."
     },
-    "maxDashboardPageLimit": {
+    "max_dashboard_page_limit": {
       "type": "integer",
-      "description": "Deprecated: use ui.maxDashboardPageLimit instead. Maximum items per dashboard page.",
+      "description": "Deprecated: use ui.max_dashboard_page_limit instead. Maximum items per dashboard page.",
       "minimum": 1,
       "maximum": 1000
     },
-    "latestStatusToday": {
+    "latest_status_today": {
       "type": "boolean",
       "description": "Deprecated. Show only today's latest status on the dashboard."
     },
@@ -147,7 +147,7 @@
     "peer": {
       "$ref": "#/definitions/PeerDef"
     },
-    "remoteNodes": {
+    "remote_nodes": {
       "type": "array",
       "description": "List of remote node connections for distributed monitoring.",
       "items": {
@@ -185,10 +185,10 @@
     "audit": {
       "$ref": "#/definitions/AuditDef"
     },
-    "gitSync": {
+    "git_sync": {
       "$ref": "#/definitions/GitSyncDef"
     },
-    "defaultExecutionMode": {
+    "default_execution_mode": {
       "type": "string",
       "description": "Default execution mode for DAGs. 'local' runs DAGs on the server process, 'distributed' dispatches to workers.",
       "enum": ["local", "distributed"],
@@ -204,15 +204,15 @@
       "description": "TLS/SSL encryption configuration.",
       "additionalProperties": false,
       "properties": {
-        "certFile": {
+        "cert_file": {
           "type": "string",
           "description": "Path to the TLS certificate file."
         },
-        "keyFile": {
+        "key_file": {
           "type": "string",
           "description": "Path to the TLS private key file."
         },
-        "caFile": {
+        "ca_file": {
           "type": "string",
           "description": "Path to the CA certificate file for client verification."
         }
@@ -273,15 +273,15 @@
       "description": "OIDC authentication configuration. Core fields are used by both standalone and builtin auth modes.",
       "additionalProperties": false,
       "properties": {
-        "clientId": {
+        "client_id": {
           "type": "string",
           "description": "OAuth client identifier."
         },
-        "clientSecret": {
+        "client_secret": {
           "type": "string",
           "description": "OAuth client secret."
         },
-        "clientUrl": {
+        "client_url": {
           "type": "string",
           "description": "Application callback URL."
         },
@@ -303,22 +303,22 @@
             "type": "string"
           }
         },
-        "autoSignup": {
+        "auto_signup": {
           "type": "boolean",
           "description": "Automatically create user accounts on first OIDC login. Default: true (builtin mode only)."
         },
-        "allowedDomains": {
+        "allowed_domains": {
           "type": "array",
           "description": "Allowed email domains for OIDC login.",
           "items": {
             "type": "string"
           }
         },
-        "buttonLabel": {
+        "button_label": {
           "type": "string",
           "description": "Label for the OIDC login button."
         },
-        "roleMapping": {
+        "role_mapping": {
           "$ref": "#/definitions/OIDCRoleMappingDef"
         }
       }
@@ -328,30 +328,30 @@
       "description": "Maps OIDC claims to Dagu roles.",
       "additionalProperties": false,
       "properties": {
-        "defaultRole": {
+        "default_role": {
           "type": "string",
           "description": "Default role assigned to users. Default: 'viewer'."
         },
-        "groupsClaim": {
+        "groups_claim": {
           "type": "string",
           "description": "OIDC claim containing group information. Default: 'groups'."
         },
-        "groupMappings": {
+        "group_mappings": {
           "type": "object",
           "description": "Mapping of IdP group names to Dagu role names.",
           "additionalProperties": {
             "type": "string"
           }
         },
-        "roleAttributePath": {
+        "role_attribute_path": {
           "type": "string",
           "description": "jq expression for extracting role from OIDC claims."
         },
-        "roleAttributeStrict": {
+        "role_attribute_strict": {
           "type": "boolean",
           "description": "Deny login if no valid role is found via role mapping."
         },
-        "skipOrgRoleSync": {
+        "skip_org_role_sync": {
           "type": "boolean",
           "description": "Only assign roles on first login, skip subsequent syncs."
         }
@@ -405,11 +405,11 @@
       "description": "UI and API permissions.",
       "additionalProperties": false,
       "properties": {
-        "writeDAGs": {
+        "write_dags": {
           "type": "boolean",
           "description": "Allow creating and editing DAG definitions."
         },
-        "runDAGs": {
+        "run_dags": {
           "type": "boolean",
           "description": "Allow executing DAG runs."
         }
@@ -420,7 +420,7 @@
       "description": "File system path configuration.",
       "additionalProperties": false,
       "properties": {
-        "dagsDir": {
+        "dags_dir": {
           "type": "string",
           "description": "Directory containing DAG YAML files."
         },
@@ -428,55 +428,55 @@
           "type": "string",
           "description": "Path to the dagu executable."
         },
-        "logDir": {
+        "log_dir": {
           "type": "string",
           "description": "Directory for log files."
         },
-        "dataDir": {
+        "data_dir": {
           "type": "string",
           "description": "Directory for application data."
         },
-        "suspendFlagsDir": {
+        "suspend_flags_dir": {
           "type": "string",
           "description": "Directory for DAG suspend flag files."
         },
-        "adminLogsDir": {
+        "admin_logs_dir": {
           "type": "string",
           "description": "Directory for admin log files."
         },
-        "baseConfig": {
+        "base_config": {
           "type": "string",
           "description": "Path to the base configuration file."
         },
-        "dagRunsDir": {
+        "dag_runs_dir": {
           "type": "string",
           "description": "Directory for DAG run history storage."
         },
-        "queueDir": {
+        "queue_dir": {
           "type": "string",
           "description": "Directory for queue persistence."
         },
-        "procDir": {
+        "proc_dir": {
           "type": "string",
           "description": "Directory for process tracking files."
         },
-        "serviceRegistryDir": {
+        "service_registry_dir": {
           "type": "string",
           "description": "Directory for service discovery data."
         },
-        "usersDir": {
+        "users_dir": {
           "type": "string",
           "description": "Directory for user data storage."
         },
-        "apiKeysDir": {
+        "api_keys_dir": {
           "type": "string",
           "description": "Directory for API key storage."
         },
-        "webhooksDir": {
+        "webhooks_dir": {
           "type": "string",
           "description": "Directory for webhook configuration."
         },
-        "sessionsDir": {
+        "sessions_dir": {
           "type": "string",
           "description": "Directory for session data storage."
         }
@@ -487,19 +487,19 @@
       "description": "User interface configuration.",
       "additionalProperties": false,
       "properties": {
-        "logEncodingCharset": {
+        "log_encoding_charset": {
           "type": "string",
           "description": "Character encoding for log display."
         },
-        "navbarColor": {
+        "navbar_color": {
           "type": "string",
           "description": "Navigation bar background color (CSS color value)."
         },
-        "navbarTitle": {
+        "navbar_title": {
           "type": "string",
           "description": "Navigation bar title text."
         },
-        "maxDashboardPageLimit": {
+        "max_dashboard_page_limit": {
           "type": "integer",
           "description": "Maximum number of items per dashboard page.",
           "minimum": 1,
@@ -515,11 +515,11 @@
       "description": "DAG list page configuration.",
       "additionalProperties": false,
       "properties": {
-        "sortField": {
+        "sort_field": {
           "type": "string",
           "description": "Field to sort DAGs by."
         },
-        "sortOrder": {
+        "sort_order": {
           "type": "string",
           "description": "Sort order for DAG list.",
           "enum": ["asc", "desc"]
@@ -531,19 +531,19 @@
       "description": "TLS configuration for peer gRPC connections.",
       "additionalProperties": false,
       "properties": {
-        "certFile": {
+        "cert_file": {
           "type": "string",
           "description": "Path to the peer TLS certificate file."
         },
-        "keyFile": {
+        "key_file": {
           "type": "string",
           "description": "Path to the peer TLS private key file."
         },
-        "clientCaFile": {
+        "client_ca_file": {
           "type": "string",
           "description": "Path to the client CA certificate file."
         },
-        "skipTlsVerify": {
+        "skip_tls_verify": {
           "type": "boolean",
           "description": "Skip TLS certificate verification."
         },
@@ -551,11 +551,11 @@
           "type": "boolean",
           "description": "Use h2c (HTTP/2 cleartext) instead of TLS."
         },
-        "maxRetries": {
+        "max_retries": {
           "type": "integer",
           "description": "Maximum number of connection retries. Default: 10."
         },
-        "retryInterval": {
+        "retry_interval": {
           "type": "string",
           "description": "Interval between connection retries. Default: '1s'."
         }
@@ -570,31 +570,31 @@
           "type": "string",
           "description": "Display name for the remote node."
         },
-        "apiBaseURL": {
+        "api_base_url": {
           "type": "string",
           "description": "Base URL of the remote node's API."
         },
-        "isBasicAuth": {
+        "is_basic_auth": {
           "type": "boolean",
           "description": "Enable basic auth for this remote node."
         },
-        "basicAuthUsername": {
+        "basic_auth_username": {
           "type": "string",
           "description": "Basic auth username for this remote node."
         },
-        "basicAuthPassword": {
+        "basic_auth_password": {
           "type": "string",
           "description": "Basic auth password for this remote node."
         },
-        "isAuthToken": {
+        "is_auth_token": {
           "type": "boolean",
           "description": "Enable token auth for this remote node."
         },
-        "authToken": {
+        "auth_token": {
           "type": "string",
           "description": "Auth token for this remote node."
         },
-        "skipTLSVerify": {
+        "skip_tls_verify": {
           "type": "boolean",
           "description": "Skip TLS certificate verification for this remote node."
         }
@@ -634,7 +634,7 @@
           "type": "string",
           "description": "Unique worker identifier."
         },
-        "maxActiveRuns": {
+        "max_active_runs": {
           "type": "integer",
           "description": "Maximum concurrent DAG runs for this worker."
         },
@@ -670,7 +670,7 @@
           ],
           "description": "Coordinator address(es) to connect to. Accepts a single string or an array."
         },
-        "postgresPool": {
+        "postgres_pool": {
           "$ref": "#/definitions/PostgresPoolDef"
         }
       }
@@ -680,19 +680,19 @@
       "description": "PostgreSQL connection pool configuration.",
       "additionalProperties": false,
       "properties": {
-        "maxOpenConns": {
+        "max_open_conns": {
           "type": "integer",
           "description": "Maximum number of open connections. Default: 25."
         },
-        "maxIdleConns": {
+        "max_idle_conns": {
           "type": "integer",
           "description": "Maximum number of idle connections. Default: 5."
         },
-        "connMaxLifetime": {
+        "conn_max_lifetime": {
           "type": "integer",
           "description": "Maximum connection lifetime in seconds. Default: 300."
         },
-        "connMaxIdleTime": {
+        "conn_max_idle_time": {
           "type": "integer",
           "description": "Maximum idle time in seconds. Default: 60."
         }
@@ -709,15 +709,15 @@
           "minimum": 0,
           "maximum": 65535
         },
-        "lockStaleThreshold": {
+        "lock_stale_threshold": {
           "type": "string",
           "description": "Duration after which a lock is considered stale. Default: '30s'."
         },
-        "lockRetryInterval": {
+        "lock_retry_interval": {
           "type": "string",
           "description": "Interval between lock retry attempts. Default: '5s'."
         },
-        "zombieDetectionInterval": {
+        "zombie_detection_interval": {
           "type": "string",
           "description": "Interval for detecting zombie processes. Default: '45s'. Set to '0' to disable."
         }
@@ -750,11 +750,11 @@
           "type": "string",
           "description": "Queue name."
         },
-        "maxActiveRuns": {
+        "max_active_runs": {
           "type": "integer",
-          "description": "Deprecated: use maxConcurrency instead."
+          "description": "Deprecated: use max_concurrency instead."
         },
-        "maxConcurrency": {
+        "max_concurrency": {
           "type": "integer",
           "description": "Maximum concurrent runs for this queue."
         }
@@ -794,6 +794,10 @@
         "enabled": {
           "type": "boolean",
           "description": "Enable audit logging. Default: true."
+        },
+        "retention_days": {
+          "type": "integer",
+          "description": "Number of days to retain audit logs. Default: 7."
         }
       }
     },
@@ -821,10 +825,10 @@
         "auth": {
           "$ref": "#/definitions/GitSyncAuthDef"
         },
-        "autoSync": {
+        "auto_sync": {
           "$ref": "#/definitions/GitSyncAutoSyncDef"
         },
-        "pushEnabled": {
+        "push_enabled": {
           "type": "boolean",
           "description": "Enable pushing changes back to the repository. Default: true."
         },
@@ -847,11 +851,11 @@
           "type": "string",
           "description": "Git access token."
         },
-        "sshKeyPath": {
+        "ssh_key_path": {
           "type": "string",
           "description": "Path to SSH private key file."
         },
-        "sshPassphrase": {
+        "ssh_passphrase": {
           "type": "string",
           "description": "Passphrase for the SSH key."
         }
@@ -866,7 +870,7 @@
           "type": "boolean",
           "description": "Enable automatic sync. Default: false."
         },
-        "onStartup": {
+        "on_startup": {
           "type": "boolean",
           "description": "Sync on application startup. Default: true."
         },
@@ -881,11 +885,11 @@
       "description": "Git commit metadata configuration.",
       "additionalProperties": false,
       "properties": {
-        "authorName": {
+        "author_name": {
           "type": "string",
           "description": "Commit author name. Default: 'Dagu'."
         },
-        "authorEmail": {
+        "author_email": {
           "type": "string",
           "description": "Commit author email. Default: 'dagu@localhost'."
         }
@@ -903,18 +907,18 @@
         "tailscale": {
           "$ref": "#/definitions/TailscaleTunnelDef"
         },
-        "allowTerminal": {
+        "allow_terminal": {
           "type": "boolean",
           "description": "Allow terminal access through tunnel. Default: false."
         },
-        "allowedIPs": {
+        "allowed_ips": {
           "type": "array",
           "description": "IP addresses allowed through the tunnel. Empty allows all.",
           "items": {
             "type": "string"
           }
         },
-        "rateLimiting": {
+        "rate_limiting": {
           "$ref": "#/definitions/TunnelRateLimitDef"
         }
       }
@@ -924,7 +928,7 @@
       "description": "Tailscale tunnel configuration.",
       "additionalProperties": false,
       "properties": {
-        "authKey": {
+        "auth_key": {
           "type": "string",
           "description": "Tailscale authentication key."
         },
@@ -940,7 +944,7 @@
           "type": "boolean",
           "description": "Enable HTTPS for tailnet-only access."
         },
-        "stateDir": {
+        "state_dir": {
           "type": "string",
           "description": "Tailscale state directory. Default: '$DAGU_HOME/tailscale'."
         }
@@ -955,15 +959,15 @@
           "type": "boolean",
           "description": "Enable rate limiting."
         },
-        "loginAttempts": {
+        "login_attempts": {
           "type": "integer",
           "description": "Maximum login attempts within the window. Default: 5."
         },
-        "windowSeconds": {
+        "window_seconds": {
           "type": "integer",
           "description": "Rate limit window duration in seconds. Default: 300."
         },
-        "blockDurationSeconds": {
+        "block_duration_seconds": {
           "type": "integer",
           "description": "Duration to block after exceeding limit in seconds. Default: 900."
         }
