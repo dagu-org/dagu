@@ -980,7 +980,7 @@ paths:
                 required:
                   - dagRunId
         "409":
-          description: "DAG is already running (singleton mode)"
+          description: "DAG is already running (singleton mode) or dagRunId already exists"
           content:
             application/json:
               schema:
@@ -1613,6 +1613,10 @@ paths:
                 queue:
                   type: string
                   description: "Override the queue to use for this DAG-run"
+                singleton:
+                  type: boolean
+                  description: "If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)"
+                  default: false
               required:
                 - spec
       responses:
@@ -1634,7 +1638,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: "A DAG with the same name is already queued beyond maxActiveRuns"
+          description: "DAG is already running or queued (singleton mode), or dagRunId already exists"
           content:
             application/json:
               schema:
