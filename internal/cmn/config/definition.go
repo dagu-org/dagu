@@ -212,8 +212,8 @@ type PeerDef struct {
 	ClientCaFile  string `mapstructure:"client_ca_file"`
 	SkipTLSVerify bool   `mapstructure:"skip_tls_verify"`
 	Insecure      bool   `mapstructure:"insecure"`       // Use h2c instead of TLS
-	MaxRetries    int    `mapstructure:"max_retries"`     // Default: 10
-	RetryInterval string `mapstructure:"retry_interval"`  // Default: 1s
+	MaxRetries    int    `mapstructure:"max_retries"`    // Default: 10
+	RetryInterval string `mapstructure:"retry_interval"` // Default: 1s
 }
 
 // RemoteNodeDef configures a remote node connection.
@@ -265,9 +265,9 @@ type PostgresPoolDef struct {
 // SchedulerDef configures the scheduler.
 type SchedulerDef struct {
 	Port                    int    `mapstructure:"port"`
-	LockStaleThreshold      string `mapstructure:"lock_stale_threshold"`       // Default: 30s
-	LockRetryInterval       string `mapstructure:"lock_retry_interval"`        // Default: 5s
-	ZombieDetectionInterval string `mapstructure:"zombie_detection_interval"`  // Default: 45s, 0 to disable
+	LockStaleThreshold      string `mapstructure:"lock_stale_threshold"`      // Default: 30s
+	LockRetryInterval       string `mapstructure:"lock_retry_interval"`       // Default: 5s
+	ZombieDetectionInterval string `mapstructure:"zombie_detection_interval"` // Default: 45s, 0 to disable
 }
 
 // QueueConfigDef configures global queue settings.
@@ -357,9 +357,9 @@ type TunnelDef struct {
 // TailscaleTunnelDef configures Tailscale tunnel settings.
 type TailscaleTunnelDef struct {
 	AuthKey  string `mapstructure:"auth_key"`
-	Hostname string `mapstructure:"hostname"` // Default: "dagu"
-	Funnel   *bool  `mapstructure:"funnel"`   // Public internet access
-	HTTPS    *bool  `mapstructure:"https"`    // HTTPS for tailnet-only access
+	Hostname string `mapstructure:"hostname"`  // Default: "dagu"
+	Funnel   *bool  `mapstructure:"funnel"`    // Public internet access
+	HTTPS    *bool  `mapstructure:"https"`     // HTTPS for tailnet-only access
 	StateDir string `mapstructure:"state_dir"` // Default: $DAGU_HOME/tailscale
 }
 
