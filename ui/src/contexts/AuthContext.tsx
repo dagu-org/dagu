@@ -210,7 +210,8 @@ export function useCanAccessSystemStatus(): boolean {
 export function useCanManageWebhooks(): boolean {
   const { user } = useAuth();
   const config = useConfig();
-  if (config.authMode !== 'builtin') return true;
+  // Webhooks require the builtin auth service (webhook token store).
+  if (config.authMode !== 'builtin') return false;
   if (!user) return false;
   return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY['developer'];
 }

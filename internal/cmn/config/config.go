@@ -171,7 +171,6 @@ const (
 type Auth struct {
 	Mode    AuthMode
 	Basic   AuthBasic
-	Token   AuthToken
 	OIDC    AuthOIDC
 	Builtin AuthBuiltin
 }
@@ -180,11 +179,6 @@ type Auth struct {
 type AuthBasic struct {
 	Username string
 	Password string
-}
-
-// AuthToken represents token-based authentication.
-type AuthToken struct {
-	Value string
 }
 
 // AuthBuiltin represents builtin authentication with RBAC.

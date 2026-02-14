@@ -277,8 +277,6 @@ func (a *API) createValidatorMiddleware(swagger *openapi3.T) func(http.Handler) 
 
 func (a *API) buildAuthOptions(ctx context.Context, basePath string) (frontendauth.Options, error) {
 	authConfig := a.config.Server.Auth
-	basicAuthEnabled := authConfig.Basic.Username != "" && authConfig.Basic.Password != ""
-	authRequired := authConfig.Mode != config.AuthModeNone || basicAuthEnabled || authConfig.Token.Value != ""
 
 	publicPaths := []string{
 		pathutil.BuildPublicEndpointPath(basePath, "api/v1/health"),
@@ -288,12 +286,24 @@ func (a *API) buildAuthOptions(ctx context.Context, basePath string) (frontendau
 		publicPaths = append(publicPaths, pathutil.BuildPublicEndpointPath(basePath, "api/v1/metrics"))
 	}
 
+	// When auth mode is "none", disable all authentication entirely.
+	// Any leftover token, basic auth, or OIDC settings in the config are ignored.
+	if authConfig.Mode == config.AuthModeNone {
+		return frontendauth.Options{
+			Realm:       "restricted",
+			PublicPaths: publicPaths,
+			PublicPathPrefixes: []string{
+				pathutil.BuildPublicEndpointPath(basePath, "api/v1/webhooks") + "/",
+			},
+		}, nil
+	}
+
+	basicAuthEnabled := authConfig.Basic.Username != "" && authConfig.Basic.Password != ""
+
 	authOptions := frontendauth.Options{
 		Realm:            "restricted",
-		APITokenEnabled:  authConfig.Token.Value != "",
-		APIToken:         authConfig.Token.Value,
 		BasicAuthEnabled: basicAuthEnabled,
-		AuthRequired:     authRequired,
+		AuthRequired:     true,
 		Creds:            map[string]string{authConfig.Basic.Username: authConfig.Basic.Password},
 		PublicPaths:      publicPaths,
 		PublicPathPrefixes: []string{
