@@ -83,14 +83,14 @@ func shellValueArray(args []string) types.ShellValue {
 }
 
 // Helper to create ContinueOnValue from string
-func continue_onValue(s string) types.ContinueOnValue {
+func continueOnValue(s string) types.ContinueOnValue {
 	var v types.ContinueOnValue
 	_ = yaml.Unmarshal([]byte(`"`+s+`"`), &v)
 	return v
 }
 
 // Helper to create ContinueOnValue from map
-func continue_onValueMap(m map[string]any) types.ContinueOnValue {
+func continueOnValueMap(m map[string]any) types.ContinueOnValue {
 	var v types.ContinueOnValue
 	data, _ := yaml.Marshal(m)
 	_ = yaml.Unmarshal(data, &v)
@@ -316,18 +316,18 @@ func TestBuildStepWorkingDir(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		working_dir string
-		expected    string
+		name       string
+		workingDir string
+		expected   string
 	}{
-		{name: "FromWorkingDir", working_dir: "/path/to/dir", expected: "/path/to/dir"},
-		{name: "Trimmed", working_dir: "  /path  ", expected: "/path"},
-		{name: "Empty", working_dir: "", expected: ""},
+		{name: "FromWorkingDir", workingDir: "/path/to/dir", expected: "/path/to/dir"},
+		{name: "Trimmed", workingDir: "  /path  ", expected: "/path"},
+		{name: "Empty", workingDir: "", expected: ""},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &step{WorkingDir: tt.working_dir}
+			s := &step{WorkingDir: tt.workingDir}
 			result, err := buildStepWorkingDir(testStepBuildContext(), s)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
@@ -463,23 +463,23 @@ func TestBuildStepContinueOn(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		continue_on types.ContinueOnValue
-		expected    core.ContinueOn
+		name       string
+		continueOn types.ContinueOnValue
+		expected   core.ContinueOn
 	}{
 		{
-			name:        "SkippedString",
-			continue_on: continue_onValue("skipped"),
-			expected:    core.ContinueOn{Skipped: true},
+			name:       "SkippedString",
+			continueOn: continueOnValue("skipped"),
+			expected:   core.ContinueOn{Skipped: true},
 		},
 		{
-			name:        "FailedString",
-			continue_on: continue_onValue("failed"),
-			expected:    core.ContinueOn{Failure: true},
+			name:       "FailedString",
+			continueOn: continueOnValue("failed"),
+			expected:   core.ContinueOn{Failure: true},
 		},
 		{
 			name: "ObjectWithMultipleFields",
-			continue_on: continue_onValueMap(map[string]any{
+			continueOn: continueOnValueMap(map[string]any{
 				"skipped":      true,
 				"failed":       true,
 				"mark_success": true,
@@ -487,15 +487,15 @@ func TestBuildStepContinueOn(t *testing.T) {
 			expected: core.ContinueOn{Skipped: true, Failure: true, MarkSuccess: true},
 		},
 		{
-			name:        "Empty",
-			continue_on: types.ContinueOnValue{},
-			expected:    core.ContinueOn{},
+			name:       "Empty",
+			continueOn: types.ContinueOnValue{},
+			expected:   core.ContinueOn{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &step{ContinueOn: tt.continue_on}
+			s := &step{ContinueOn: tt.continueOn}
 			result, err := buildStepContinueOn(testStepBuildContext(), s)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
@@ -507,19 +507,19 @@ func TestBuildStepRetryPolicy(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name         string
-		retry_policy *retryPolicy
-		expected     core.RetryPolicy
-		wantErr      bool
+		name        string
+		retryPolicy *retryPolicy
+		expected    core.RetryPolicy
+		wantErr     bool
 	}{
 		{
-			name:         "NilPolicy",
-			retry_policy: nil,
-			expected:     core.RetryPolicy{},
+			name:        "NilPolicy",
+			retryPolicy: nil,
+			expected:    core.RetryPolicy{},
 		},
 		{
 			name: "BasicPolicyWithIntValues",
-			retry_policy: &retryPolicy{
+			retryPolicy: &retryPolicy{
 				Limit:       3,
 				IntervalSec: 10,
 			},
@@ -530,7 +530,7 @@ func TestBuildStepRetryPolicy(t *testing.T) {
 		},
 		{
 			name: "PolicyWithStringLimit",
-			retry_policy: &retryPolicy{
+			retryPolicy: &retryPolicy{
 				Limit:       "${RETRY_LIMIT}",
 				IntervalSec: 5,
 			},
@@ -541,7 +541,7 @@ func TestBuildStepRetryPolicy(t *testing.T) {
 		},
 		{
 			name: "PolicyWithExitCodes",
-			retry_policy: &retryPolicy{
+			retryPolicy: &retryPolicy{
 				Limit:       2,
 				IntervalSec: 5,
 				ExitCode:    []int{1, 2, 3},
@@ -554,7 +554,7 @@ func TestBuildStepRetryPolicy(t *testing.T) {
 		},
 		{
 			name: "PolicyWithBackoffTrue",
-			retry_policy: &retryPolicy{
+			retryPolicy: &retryPolicy{
 				Limit:       3,
 				IntervalSec: 5,
 				Backoff:     true,
@@ -567,7 +567,7 @@ func TestBuildStepRetryPolicy(t *testing.T) {
 		},
 		{
 			name: "PolicyWithInvalidBackoffMultiplier",
-			retry_policy: &retryPolicy{
+			retryPolicy: &retryPolicy{
 				Limit:       3,
 				IntervalSec: 5,
 				Backoff:     0.5,
@@ -576,7 +576,7 @@ func TestBuildStepRetryPolicy(t *testing.T) {
 		},
 		{
 			name: "PolicyWithValidBackoffMultiplier",
-			retry_policy: &retryPolicy{
+			retryPolicy: &retryPolicy{
 				Limit:       3,
 				IntervalSec: 5,
 				Backoff:     2.5,
@@ -589,7 +589,7 @@ func TestBuildStepRetryPolicy(t *testing.T) {
 		},
 		{
 			name: "PolicyWithMaxInterval",
-			retry_policy: &retryPolicy{
+			retryPolicy: &retryPolicy{
 				Limit:          3,
 				IntervalSec:    5,
 				Backoff:        2.0,
@@ -604,14 +604,14 @@ func TestBuildStepRetryPolicy(t *testing.T) {
 		},
 		{
 			name: "MissingLimit",
-			retry_policy: &retryPolicy{
+			retryPolicy: &retryPolicy{
 				IntervalSec: 5,
 			},
 			wantErr: true,
 		},
 		{
 			name: "MissingIntervalSec",
-			retry_policy: &retryPolicy{
+			retryPolicy: &retryPolicy{
 				Limit: 3,
 			},
 			wantErr: true,
@@ -620,7 +620,7 @@ func TestBuildStepRetryPolicy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &step{RetryPolicy: tt.retry_policy}
+			s := &step{RetryPolicy: tt.retryPolicy}
 			result, err := buildStepRetryPolicy(testStepBuildContext(), s)
 
 			if tt.wantErr {
@@ -638,19 +638,19 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name          string
-		repeat_policy *repeatPolicy
-		expected      core.RepeatPolicy
-		wantErr       bool
+		name         string
+		repeatPolicy *repeatPolicy
+		expected     core.RepeatPolicy
+		wantErr      bool
 	}{
 		{
-			name:          "NilPolicy",
-			repeat_policy: nil,
-			expected:      core.RepeatPolicy{},
+			name:         "NilPolicy",
+			repeatPolicy: nil,
+			expected:     core.RepeatPolicy{},
 		},
 		{
 			name: "WhileModeWithCondition",
-			repeat_policy: &repeatPolicy{
+			repeatPolicy: &repeatPolicy{
 				Repeat:      "while",
 				Condition:   "test -f /tmp/flag",
 				IntervalSec: 5,
@@ -663,7 +663,7 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 		},
 		{
 			name: "UntilModeWithConditionAndExpected",
-			repeat_policy: &repeatPolicy{
+			repeatPolicy: &repeatPolicy{
 				Repeat:      "until",
 				Condition:   "cat /tmp/status",
 				Expected:    "done",
@@ -677,7 +677,7 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 		},
 		{
 			name: "LegacyBooleanTrue",
-			repeat_policy: &repeatPolicy{
+			repeatPolicy: &repeatPolicy{
 				Repeat:    true,
 				Condition: "test condition",
 			},
@@ -688,7 +688,7 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 		},
 		{
 			name: "WithExitCodes",
-			repeat_policy: &repeatPolicy{
+			repeatPolicy: &repeatPolicy{
 				Repeat:   "while",
 				ExitCode: []int{0, 1},
 			},
@@ -699,7 +699,7 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 		},
 		{
 			name: "WithLimit",
-			repeat_policy: &repeatPolicy{
+			repeatPolicy: &repeatPolicy{
 				Repeat:    "while",
 				Condition: "true",
 				Limit:     10,
@@ -712,7 +712,7 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 		},
 		{
 			name: "WithBackoff",
-			repeat_policy: &repeatPolicy{
+			repeatPolicy: &repeatPolicy{
 				Repeat:      "while",
 				Condition:   "true",
 				IntervalSec: 5,
@@ -727,7 +727,7 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 		},
 		{
 			name: "WithMaxInterval",
-			repeat_policy: &repeatPolicy{
+			repeatPolicy: &repeatPolicy{
 				Repeat:         "while",
 				Condition:      "true",
 				IntervalSec:    5,
@@ -744,21 +744,21 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 		},
 		{
 			name: "InvalidRepeatValue",
-			repeat_policy: &repeatPolicy{
+			repeatPolicy: &repeatPolicy{
 				Repeat: "invalid",
 			},
 			wantErr: true,
 		},
 		{
 			name: "WhileWithoutConditionOrExitCode",
-			repeat_policy: &repeatPolicy{
+			repeatPolicy: &repeatPolicy{
 				Repeat: "while",
 			},
 			wantErr: true,
 		},
 		{
 			name: "InvalidBackoff",
-			repeat_policy: &repeatPolicy{
+			repeatPolicy: &repeatPolicy{
 				Repeat:    "while",
 				Condition: "true",
 				Backoff:   0.5,
@@ -769,7 +769,7 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &step{RepeatPolicy: tt.repeat_policy}
+			s := &step{RepeatPolicy: tt.repeatPolicy}
 			result, err := buildStepRepeatPolicy(testStepBuildContext(), s)
 
 			if tt.wantErr {
@@ -792,21 +792,21 @@ func TestBuildStepSignalOnStop(t *testing.T) {
 	invalid := "INVALID"
 
 	tests := []struct {
-		name           string
-		signal_on_stop *string
-		expected       string
-		wantErr        bool
+		name         string
+		signalOnStop *string
+		expected     string
+		wantErr      bool
 	}{
-		{name: "Nil", signal_on_stop: nil, expected: ""},
-		{name: "SIGTERM", signal_on_stop: &sigTerm, expected: "SIGTERM"},
-		{name: "SIGKILL", signal_on_stop: &sigKill, expected: "SIGKILL"},
-		{name: "SIGINT", signal_on_stop: &sigInt, expected: "SIGINT"},
-		{name: "InvalidSignal", signal_on_stop: &invalid, wantErr: true},
+		{name: "Nil", signalOnStop: nil, expected: ""},
+		{name: "SIGTERM", signalOnStop: &sigTerm, expected: "SIGTERM"},
+		{name: "SIGKILL", signalOnStop: &sigKill, expected: "SIGKILL"},
+		{name: "SIGINT", signalOnStop: &sigInt, expected: "SIGINT"},
+		{name: "InvalidSignal", signalOnStop: &invalid, wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &step{SignalOnStop: tt.signal_on_stop}
+			s := &step{SignalOnStop: tt.signalOnStop}
 			result, err := buildStepSignalOnStop(testStepBuildContext(), s)
 
 			if tt.wantErr {
@@ -2463,67 +2463,67 @@ func TestValidateWorkerSelector(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name            string
-		executorType    string
-		worker_selector map[string]string
-		wantErr         bool
+		name           string
+		executorType   string
+		workerSelector map[string]string
+		wantErr        bool
 	}{
 		// Executors that support worker_selector
 		{
-			name:            "WorkerSelectorWithDAGExecutor",
-			executorType:    "dag",
-			worker_selector: map[string]string{"env": "prod"},
-			wantErr:         false,
+			name:           "WorkerSelectorWithDAGExecutor",
+			executorType:   "dag",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        false,
 		},
 		{
-			name:            "WorkerSelectorWithSubworkflowExecutor",
-			executorType:    "subworkflow",
-			worker_selector: map[string]string{"env": "prod"},
-			wantErr:         false,
+			name:           "WorkerSelectorWithSubworkflowExecutor",
+			executorType:   "subworkflow",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        false,
 		},
 		{
-			name:            "WorkerSelectorWithParallelExecutor",
-			executorType:    "parallel",
-			worker_selector: map[string]string{"env": "prod"},
-			wantErr:         false,
+			name:           "WorkerSelectorWithParallelExecutor",
+			executorType:   "parallel",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        false,
 		},
 		// Executors that do not support worker_selector
 		{
-			name:            "WorkerSelectorWithShellExecutor",
-			executorType:    "shell",
-			worker_selector: map[string]string{"env": "prod"},
-			wantErr:         true,
+			name:           "WorkerSelectorWithShellExecutor",
+			executorType:   "shell",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        true,
 		},
 		{
-			name:            "WorkerSelectorWithCommandExecutor",
-			executorType:    "command",
-			worker_selector: map[string]string{"env": "prod"},
-			wantErr:         true,
+			name:           "WorkerSelectorWithCommandExecutor",
+			executorType:   "command",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        true,
 		},
 		{
-			name:            "WorkerSelectorWithDockerExecutor",
-			executorType:    "docker",
-			worker_selector: map[string]string{"env": "prod"},
-			wantErr:         true,
+			name:           "WorkerSelectorWithDockerExecutor",
+			executorType:   "docker",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        true,
 		},
 		{
-			name:            "WorkerSelectorWithMailExecutor",
-			executorType:    "mail",
-			worker_selector: map[string]string{"env": "prod"},
-			wantErr:         true,
+			name:           "WorkerSelectorWithMailExecutor",
+			executorType:   "mail",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        true,
 		},
 		// Empty worker_selector - should always pass
 		{
-			name:            "NoWorkerSelectorWithShellExecutor",
-			executorType:    "shell",
-			worker_selector: nil,
-			wantErr:         false,
+			name:           "NoWorkerSelectorWithShellExecutor",
+			executorType:   "shell",
+			workerSelector: nil,
+			wantErr:        false,
 		},
 		{
-			name:            "EmptyWorkerSelectorWithShellExecutor",
-			executorType:    "shell",
-			worker_selector: map[string]string{},
-			wantErr:         false,
+			name:           "EmptyWorkerSelectorWithShellExecutor",
+			executorType:   "shell",
+			workerSelector: map[string]string{},
+			wantErr:        false,
 		},
 	}
 
@@ -2531,7 +2531,7 @@ func TestValidateWorkerSelector(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			result := &core.Step{
-				WorkerSelector: tt.worker_selector,
+				WorkerSelector: tt.workerSelector,
 				ExecutorConfig: core.ExecutorConfig{
 					Type: tt.executorType,
 				},

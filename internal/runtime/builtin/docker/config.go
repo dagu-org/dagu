@@ -82,10 +82,10 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*core.AuthC
 		return nil, fmt.Errorf("failed to decode config: %w", err)
 	}
 
-	var auto_remove bool
+	var autoRemove bool
 	if ret.Host.AutoRemove {
 		ret.Host.AutoRemove = false // Prevent removal by sdk
-		auto_remove = true
+		autoRemove = true
 	}
 
 	pull := core.PullPolicyMissing
@@ -133,7 +133,7 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*core.AuthC
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate auto_remove value: %w", err)
 		}
-		auto_remove = v
+		autoRemove = v
 	}
 
 	// Apply user-friendly shortcuts to nested fields
@@ -162,7 +162,7 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*core.AuthC
 		Host:          &ret.Host,
 		Network:       &ret.Network,
 		ExecOptions:   &ret.Exec,
-		AutoRemove:    auto_remove,
+		AutoRemove:    autoRemove,
 		AuthManager:   authManager,
 		Shell:         ret.Shell,
 	}), nil
@@ -249,8 +249,8 @@ func LoadConfig(workDir string, ct core.Container, registryAuths map[string]*cor
 		}
 	}
 
-	// auto_remove is the inverse of KeepContainer
-	auto_remove := !ct.KeepContainer
+	// autoRemove is the inverse of KeepContainer
+	autoRemove := !ct.KeepContainer
 
 	// Apply restart policy if specified
 	if ct.RestartPolicy != "" {
@@ -272,7 +272,7 @@ func LoadConfig(workDir string, ct core.Container, registryAuths map[string]*cor
 		Image:         ct.Image,
 		Platform:      ct.Platform,
 		Pull:          ct.PullPolicy,
-		AutoRemove:    auto_remove,
+		AutoRemove:    autoRemove,
 		Container:     containerConfig,
 		Host:          hostConfig,
 		Network:       networkConfig,

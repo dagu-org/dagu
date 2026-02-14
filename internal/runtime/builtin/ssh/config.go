@@ -74,7 +74,7 @@ func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
 		return nil, fmt.Errorf("failed to decode ssh config: %w", err)
 	}
 
-	shell, shell_args, err := parseShellConfig(def.Shell, def.ShellArgs)
+	shell, shellArgs, err := parseShellConfig(def.Shell, def.ShellArgs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse shell config: %w", err)
 	}
@@ -93,7 +93,7 @@ func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
 		StrictHostKey: def.StrictHostKey,
 		KnownHostFile: def.KnownHostFile,
 		Shell:         shell,
-		ShellArgs:     shell_args,
+		ShellArgs:     shellArgs,
 		Timeout:       timeout,
 		Bastion:       buildBastionFromMap(def.Bastion),
 	}

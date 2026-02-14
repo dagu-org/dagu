@@ -364,10 +364,10 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
-		name        string
-		config      commandConfig
-		script_file string
-		checkPath   string
+		name       string
+		config     commandConfig
+		scriptFile string
+		checkPath  string
 	}{
 		{
 			name: "SimpleCommand",
@@ -393,21 +393,21 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 				Ctx:   ctx,
 				Shell: []string{"/bin/sh"},
 			},
-			script_file: "/tmp/test.sh",
-			checkPath:   "/bin/sh",
+			scriptFile: "/tmp/test.sh",
+			checkPath:  "/bin/sh",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			script_file := tt.script_file
-			if script_file != "" {
+			scriptFile := tt.scriptFile
+			if scriptFile != "" {
 				tempDir := t.TempDir()
-				script_file = filepath.Join(tempDir, "test.sh")
-				require.NoError(t, os.WriteFile(script_file, []byte("#!/bin/sh\necho hello\n"), 0o755))
+				scriptFile = filepath.Join(tempDir, "test.sh")
+				require.NoError(t, os.WriteFile(scriptFile, []byte("#!/bin/sh\necho hello\n"), 0o755))
 			}
 
-			cmd, err := tt.config.newCmd(ctx, script_file)
+			cmd, err := tt.config.newCmd(ctx, scriptFile)
 			require.NoError(t, err)
 			require.NotNil(t, cmd)
 
@@ -488,8 +488,8 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 			}
 
 			// Check exit code
-			if exit_coder, ok := exec.(executor.ExitCoder); ok {
-				assert.Equal(t, tt.expectedCode, exit_coder.ExitCode())
+			if exitCoder, ok := exec.(executor.ExitCoder); ok {
+				assert.Equal(t, tt.expectedCode, exitCoder.ExitCode())
 			}
 		})
 	}
@@ -1071,28 +1071,28 @@ func TestSetupScript(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			script_file, err := setupScript(tmpDir, tt.script, tt.shell)
+			scriptFile, err := setupScript(tmpDir, tt.script, tt.shell)
 			require.NoError(t, err)
-			defer func() { _ = os.Remove(script_file) }()
+			defer func() { _ = os.Remove(scriptFile) }()
 
 			// Check file exists
-			_, err = os.Stat(script_file)
+			_, err = os.Stat(scriptFile)
 			require.NoError(t, err)
 
 			// Check content
-			content, err := os.ReadFile(script_file)
+			content, err := os.ReadFile(scriptFile)
 			require.NoError(t, err)
 			assert.Equal(t, tt.script, string(content))
 
 			// Check extension
 			if tt.expectedExt != "" {
-				assert.True(t, strings.HasSuffix(script_file, tt.expectedExt),
-					"expected extension %s, got %s", tt.expectedExt, filepath.Ext(script_file))
+				assert.True(t, strings.HasSuffix(scriptFile, tt.expectedExt),
+					"expected extension %s, got %s", tt.expectedExt, filepath.Ext(scriptFile))
 			}
 
 			// Check permissions (only on Unix - Windows doesn't have the same permission model)
 			if goruntime.GOOS != "windows" {
-				info, err := os.Stat(script_file)
+				info, err := os.Stat(scriptFile)
 				require.NoError(t, err)
 				// Check that it's executable (at least user execute bit)
 				assert.True(t, info.Mode()&0100 != 0, "script should be executable")
@@ -1425,22 +1425,22 @@ func TestCommandConfig_NewCmd_AllBranches(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create a test script file
-	script_file := filepath.Join(tmpDir, "test.sh")
-	require.NoError(t, os.WriteFile(script_file, []byte("echo hello"), 0o755))
+	scriptFile := filepath.Join(tmpDir, "test.sh")
+	require.NoError(t, os.WriteFile(scriptFile, []byte("echo hello"), 0o755))
 
 	// Create script with shebang
 	shebangScript := filepath.Join(tmpDir, "shebang.sh")
 	require.NoError(t, os.WriteFile(shebangScript, []byte("#!/bin/bash\necho shebang"), 0o755))
 
 	tests := []struct {
-		name        string
-		config      commandConfig
-		script_file string
-		checkPath   string
-		checkArgs   []string
+		name       string
+		config     commandConfig
+		scriptFile string
+		checkPath  string
+		checkArgs  []string
 	}{
 		{
-			name: "command + script_file (shellCommandBuilder path)",
+			name: "command + scriptFile (shellCommandBuilder path)",
 			config: commandConfig{
 				Ctx:              ctx,
 				Command:          "/bin/sh",
@@ -1448,28 +1448,28 @@ func TestCommandConfig_NewCmd_AllBranches(t *testing.T) {
 				Shell:            []string{"/bin/sh", "-e"},
 				ShellCommandArgs: "",
 			},
-			script_file: script_file,
-			checkPath:   "/bin/sh",
+			scriptFile: scriptFile,
+			checkPath:  "/bin/sh",
 		},
 		{
-			name: "shell + script_file with shebang",
+			name: "shell + scriptFile with shebang",
 			config: commandConfig{
 				Ctx:                ctx,
 				Shell:              []string{"/bin/sh"},
 				UserSpecifiedShell: false,
 			},
-			script_file: shebangScript,
-			checkPath:   "/bin/bash", // Should use shebang interpreter
+			scriptFile: shebangScript,
+			checkPath:  "/bin/bash", // Should use shebang interpreter
 		},
 		{
-			name: "shell + script_file without shebang",
+			name: "shell + scriptFile without shebang",
 			config: commandConfig{
 				Ctx:                ctx,
 				Shell:              []string{"/bin/sh"},
 				UserSpecifiedShell: false,
 			},
-			script_file: script_file,
-			checkPath:   "/bin/sh",
+			scriptFile: scriptFile,
+			checkPath:  "/bin/sh",
 		},
 		{
 			name: "shell + shellCommandArgs (no script)",
@@ -1495,7 +1495,7 @@ func TestCommandConfig_NewCmd_AllBranches(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd, err := tt.config.newCmd(ctx, tt.script_file)
+			cmd, err := tt.config.newCmd(ctx, tt.scriptFile)
 			require.NoError(t, err)
 			require.NotNil(t, cmd)
 
@@ -1647,11 +1647,11 @@ func TestCreateDirectCommand(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name        string
-		cmd         string
-		args        []string
-		script_file string
-		expected    []string
+		name       string
+		cmd        string
+		args       []string
+		scriptFile string
+		expected   []string
 	}{
 		{
 			name:     "simple command",
@@ -1660,11 +1660,11 @@ func TestCreateDirectCommand(t *testing.T) {
 			expected: []string{"echo", "hello"},
 		},
 		{
-			name:        "command with script",
-			cmd:         "/bin/sh",
-			args:        []string{"-x"},
-			script_file: "/tmp/script.sh",
-			expected:    []string{"/bin/sh", "-x", "/tmp/script.sh"},
+			name:       "command with script",
+			cmd:        "/bin/sh",
+			args:       []string{"-x"},
+			scriptFile: "/tmp/script.sh",
+			expected:   []string{"/bin/sh", "-x", "/tmp/script.sh"},
 		},
 		{
 			name:     "command without args",
@@ -1676,7 +1676,7 @@ func TestCreateDirectCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := createDirectCommand(ctx, tt.cmd, tt.args, tt.script_file)
+			cmd := createDirectCommand(ctx, tt.cmd, tt.args, tt.scriptFile)
 			assert.Equal(t, tt.expected, cmd.Args)
 		})
 	}
@@ -1833,8 +1833,8 @@ func TestCommandConfig_NewCmd_Errors(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create a test script file
-	script_file := filepath.Join(tmpDir, "test.sh")
-	require.NoError(t, os.WriteFile(script_file, []byte("echo hello"), 0o755))
+	scriptFile := filepath.Join(tmpDir, "test.sh")
+	require.NoError(t, os.WriteFile(scriptFile, []byte("echo hello"), 0o755))
 
 	t.Run("EmptyShellWithCommandAndScript", func(t *testing.T) {
 		config := commandConfig{
@@ -1843,7 +1843,7 @@ func TestCommandConfig_NewCmd_Errors(t *testing.T) {
 			Script:  "echo test",
 			Shell:   []string{}, // Empty shell will cause error in Build
 		}
-		_, err := config.newCmd(ctx, script_file)
+		_, err := config.newCmd(ctx, scriptFile)
 		assert.Error(t, err)
 	})
 
@@ -1906,7 +1906,7 @@ func TestCommandExecutor_Run_NewCmdError(t *testing.T) {
 		Ctx:     ctx,
 		Dir:     t.TempDir(),
 		Command: "/bin/sh",
-		Script:  "",         // No script, so script_file will be empty
+		Script:  "",         // No script, so scriptFile will be empty
 		Shell:   []string{}, // Empty shell will cause shellCommandBuilder.Build to fail
 	}
 
@@ -2138,8 +2138,8 @@ func TestCommandConfig_NewCmd_SplitCommandError(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create a script file
-	script_file := filepath.Join(tmpDir, "test.sh")
-	require.NoError(t, os.WriteFile(script_file, []byte("echo hello"), 0o755))
+	scriptFile := filepath.Join(tmpDir, "test.sh")
+	require.NoError(t, os.WriteFile(scriptFile, []byte("echo hello"), 0o755))
 
 	t.Run("shell+script path with valid shell", func(t *testing.T) {
 		// Create a script without shebang
@@ -2268,14 +2268,14 @@ func TestMultiCommandExecutor(t *testing.T) {
 
 	t.Run("MultipleCommandsExecuteSequentially", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		output_file := filepath.Join(tmpDir, "output.txt")
+		outputFile := filepath.Join(tmpDir, "output.txt")
 
 		step := core.Step{
 			Name: "test",
 			Commands: []core.CommandEntry{
-				{Command: "sh", Args: []string{"-c", `echo first >> "` + output_file + `"`}},
-				{Command: "sh", Args: []string{"-c", `echo second >> "` + output_file + `"`}},
-				{Command: "sh", Args: []string{"-c", `echo third >> "` + output_file + `"`}},
+				{Command: "sh", Args: []string{"-c", `echo first >> "` + outputFile + `"`}},
+				{Command: "sh", Args: []string{"-c", `echo second >> "` + outputFile + `"`}},
+				{Command: "sh", Args: []string{"-c", `echo third >> "` + outputFile + `"`}},
 			},
 		}
 
@@ -2287,21 +2287,21 @@ func TestMultiCommandExecutor(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify all commands executed in order
-		content, err := os.ReadFile(output_file)
+		content, err := os.ReadFile(outputFile)
 		require.NoError(t, err)
 		assert.Equal(t, "first\nsecond\nthird\n", string(content))
 	})
 
 	t.Run("StopsOnFirstFailure", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		output_file := filepath.Join(tmpDir, "output.txt")
+		outputFile := filepath.Join(tmpDir, "output.txt")
 
 		step := core.Step{
 			Name: "test",
 			Commands: []core.CommandEntry{
-				{Command: "sh", Args: []string{"-c", `echo first >> "` + output_file + `"`}},
+				{Command: "sh", Args: []string{"-c", `echo first >> "` + outputFile + `"`}},
 				{Command: "sh", Args: []string{"-c", "exit 1"}},
-				{Command: "sh", Args: []string{"-c", `echo third >> "` + output_file + `"`}},
+				{Command: "sh", Args: []string{"-c", `echo third >> "` + outputFile + `"`}},
 			},
 		}
 
@@ -2314,7 +2314,7 @@ func TestMultiCommandExecutor(t *testing.T) {
 		assert.Contains(t, err.Error(), "command 2 failed")
 
 		// Verify only the first command was executed
-		content, err := os.ReadFile(output_file)
+		content, err := os.ReadFile(outputFile)
 		require.NoError(t, err)
 		assert.Equal(t, "first\n", string(content))
 	})
@@ -2370,8 +2370,8 @@ func TestMultiCommandExecutor(t *testing.T) {
 		err = exec.Run(ctx)
 		require.Error(t, err)
 
-		exit_coder, ok := exec.(executor.ExitCoder)
+		exitCoder, ok := exec.(executor.ExitCoder)
 		require.True(t, ok)
-		assert.Equal(t, 42, exit_coder.ExitCode())
+		assert.Equal(t, 42, exitCoder.ExitCode())
 	})
 }

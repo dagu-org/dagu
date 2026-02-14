@@ -343,8 +343,8 @@ func TestSubDAGExecutor_Kill_MixedProcesses(t *testing.T) {
 		DAG:    subDAG,
 		dagCtx: dagCtx,
 		cmds: map[string]*exec.Cmd{
-			"local-run-1": {Process: &os.Process{Pid: 1234}},
-			"local-run-2": {Process: &os.Process{Pid: 5678}},
+			"local-run-1": {Process: &os.Process{Pid: 999999999}},
+			"local-run-2": {Process: &os.Process{Pid: 999999998}},
 		},
 		distributedRuns: map[string]bool{
 			"distributed-run-1": true,
@@ -435,7 +435,7 @@ func TestSubDAGExecutor_Kill_OnlyLocal(t *testing.T) {
 		DAG:    subDAG,
 		dagCtx: dagCtx,
 		cmds: map[string]*exec.Cmd{
-			"local-run-1": {Process: &os.Process{Pid: 1234}},
+			"local-run-1": {Process: &os.Process{Pid: 999999999}},
 		},
 		distributedRuns: make(map[string]bool),
 		killed:          make(chan struct{}),

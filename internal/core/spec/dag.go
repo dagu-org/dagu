@@ -84,7 +84,7 @@ type dag struct {
 	HistRetentionDays *int `yaml:"hist_retention_days,omitempty"`
 	// Preconditions is the condition to run the DAG.
 	Preconditions any `yaml:"preconditions,omitempty"`
-	// max_active_runs is the maximum number of concurrent dag-runs.
+	// MaxActiveRuns is the maximum number of concurrent dag-runs.
 	MaxActiveRuns int `yaml:"max_active_runs,omitempty"`
 	// MaxActiveSteps is the maximum number of concurrent steps.
 	MaxActiveSteps int `yaml:"max_active_steps,omitempty"`

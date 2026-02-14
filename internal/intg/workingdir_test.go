@@ -15,10 +15,10 @@ import (
 )
 
 // TestWorkingDirectoryResolution verifies working directory resolution:
-//  1. DAG-level workingDir sets the working directory for steps
-//  2. Step-level relative dir resolves against DAG's workingDir
-//  3. SubDAG with explicit workingDir uses its own context (overrides inherited)
-//  4. SubDAG without workingDir inherits parent's workingDir (for local execution)
+//  1. DAG-level working_dir sets the working directory for steps
+//  2. Step-level relative dir resolves against DAG's working_dir
+//  3. SubDAG with explicit working_dir uses its own context (overrides inherited)
+//  4. SubDAG without working_dir inherits parent's working_dir (for local execution)
 func TestWorkingDirectoryResolution(t *testing.T) {
 	th := test.Setup(t)
 

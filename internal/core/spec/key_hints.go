@@ -67,9 +67,10 @@ var legacyToSnakeCaseKey = map[string]string{
 	"baseURL":           "base_url",
 	"apiKeyName":        "api_key_name",
 	"maxToolIterations": "max_tool_iterations",
-	"precondition":      "preconditions",
-	"dir":               "working_dir",
-	"run":               "call",
+	// Semantic renames (not just casing changes): these map legacy keys to their new equivalents.
+	"precondition": "preconditions",
+	"dir":          "working_dir",
+	"run":          "call",
 }
 
 func withSnakeCaseKeyHint(err error) error {

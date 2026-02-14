@@ -596,7 +596,7 @@ steps:
 		assert.Empty(t, dag.BuildWarnings)
 	})
 	// ContinueOn success cases
-	continue_onTests := []struct {
+	continueOnTests := []struct {
 		name            string
 		yaml            string
 		wantSkipped     bool
@@ -659,7 +659,7 @@ steps:
 		},
 	}
 
-	for _, tt := range continue_onTests {
+	for _, tt := range continueOnTests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
@@ -677,7 +677,7 @@ steps:
 	}
 
 	// ContinueOn error cases
-	continue_onErrorTests := []struct {
+	continueOnErrorTests := []struct {
 		name        string
 		yaml        string
 		errContains []string
@@ -723,7 +723,7 @@ steps:
 		},
 	}
 
-	for _, tt := range continue_onErrorTests {
+	for _, tt := range continueOnErrorTests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			_, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
@@ -734,7 +734,7 @@ steps:
 		})
 	}
 	// RetryPolicy success tests
-	retry_policyTests := []struct {
+	retryPolicyTests := []struct {
 		name            string
 		yaml            string
 		wantLimit       int
@@ -790,7 +790,7 @@ steps:
 		},
 	}
 
-	for _, tt := range retry_policyTests {
+	for _, tt := range retryPolicyTests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
@@ -809,7 +809,7 @@ steps:
 	}
 
 	// RetryPolicy error tests
-	retry_policyErrorTests := []struct {
+	retryPolicyErrorTests := []struct {
 		name        string
 		yaml        string
 		errContains string
@@ -851,7 +851,7 @@ steps:
 		},
 	}
 
-	for _, tt := range retry_policyErrorTests {
+	for _, tt := range retryPolicyErrorTests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
@@ -861,7 +861,7 @@ steps:
 		})
 	}
 	// RepeatPolicy success tests
-	repeat_policyTests := []struct {
+	repeatPolicyTests := []struct {
 		name            string
 		yaml            string
 		wantMode        core.RepeatMode
@@ -1063,7 +1063,7 @@ steps:
 		},
 	}
 
-	for _, tt := range repeat_policyTests {
+	for _, tt := range repeatPolicyTests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
@@ -1176,7 +1176,7 @@ steps:
 		assert.Equal(t, &core.Condition{Condition: "${STATUS}", Expected: "success", Negate: true}, th.Steps[0].Preconditions[0])
 	})
 	// RepeatPolicy error tests
-	repeat_policyErrorTests := []struct {
+	repeatPolicyErrorTests := []struct {
 		name        string
 		yaml        string
 		errContains string
@@ -1259,7 +1259,7 @@ steps:
 		},
 	}
 
-	for _, tt := range repeat_policyErrorTests {
+	for _, tt := range repeatPolicyErrorTests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
@@ -2192,10 +2192,10 @@ steps:
 	}
 
 	// Pull policy variations
-	pull_policyTests := []struct {
-		name        string
-		pull_policy string
-		expected    core.PullPolicy
+	pullPolicyTests := []struct {
+		name       string
+		pullPolicy string
+		expected   core.PullPolicy
 	}{
 		{"Always", "always", core.PullPolicyAlways},
 		{"Never", "never", core.PullPolicyNever},
@@ -2204,13 +2204,13 @@ steps:
 		{"FalseString", "false", core.PullPolicyNever},
 	}
 
-	for _, tt := range pull_policyTests {
+	for _, tt := range pullPolicyTests {
 		t.Run("PullPolicy"+tt.name, func(t *testing.T) {
 			t.Parallel()
 			yaml := `
 container:
   image: alpine
-  pull_policy: ` + tt.pull_policy + `
+  pull_policy: ` + tt.pullPolicy + `
 steps:
   - name: step1
     command: echo test

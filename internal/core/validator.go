@@ -202,7 +202,7 @@ func validateStepWithValidator(step Step) error {
 		return nil
 	}
 	if err := validator(step); err != nil {
-		return NewValidationError("executorConfig", step.ExecutorConfig, err)
+		return NewValidationError("executor_config", step.ExecutorConfig, err)
 	}
 	return nil
 }

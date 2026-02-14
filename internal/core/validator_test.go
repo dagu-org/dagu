@@ -670,7 +670,7 @@ func TestValidateStepWithValidator(t *testing.T) {
 
 		var ve *ValidationError
 		require.ErrorAs(t, err, &ve)
-		assert.Equal(t, "executorConfig", ve.Field)
+		assert.Equal(t, "executor_config", ve.Field)
 		assert.ErrorIs(t, err, customErr)
 	})
 }

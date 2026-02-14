@@ -132,7 +132,7 @@ basePath: "%s"
 	if includeRemoteNodes {
 		configContent += fmt.Sprintf(`remoteNodes:
   - name: "dev"
-    apiBaseUrl: "http://127.0.0.1:%s%s/api/v1"
+    apiBaseURL: "http://127.0.0.1:%s%s/api/v1"
 `, port, basePath)
 	}
 

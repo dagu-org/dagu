@@ -418,9 +418,9 @@ func TestRedisExecutor_OutputFormats_Integration(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name          string
-		output_format string
-		contains      string
+		name         string
+		outputFormat string
+		contains     string
 	}{
 		{"json format", "json", "format-test"},
 		{"raw format", "raw", "format-test"},
@@ -436,7 +436,7 @@ func TestRedisExecutor_OutputFormats_Integration(t *testing.T) {
 						"host":          host,
 						"command":       "GET",
 						"key":           "test:format:key",
-						"output_format": tt.output_format,
+						"output_format": tt.outputFormat,
 					},
 				},
 			}
@@ -887,20 +887,20 @@ func TestTruncateString(t *testing.T) {
 
 	tests := []struct {
 		input    string
-		max_len  int
+		maxLen   int
 		expected string
 	}{
 		{"hello", 10, "hello"},
 		{"hello world", 5, "he..."},
 		{"hi", 2, "hi"},
-		{"hello", 3, "hel"}, // When max_len <= 3, no room for ellipsis
+		{"hello", 3, "hel"}, // When maxLen <= 3, no room for ellipsis
 		{"ab", 1, "a"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
-			result := redisexec.TruncateString(tt.input, tt.max_len)
+			result := redisexec.TruncateString(tt.input, tt.maxLen)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

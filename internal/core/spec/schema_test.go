@@ -172,11 +172,11 @@ func TestLoadSchemaFromFile(t *testing.T) {
 	t.Run("FromWorkingDir", func(t *testing.T) {
 		t.Parallel()
 
-		working_dir := t.TempDir()
-		schemaPath := filepath.Join(working_dir, "schema.json")
+		workingDir := t.TempDir()
+		schemaPath := filepath.Join(workingDir, "schema.json")
 		require.NoError(t, os.WriteFile(schemaPath, []byte(schemaContent), 0600))
 
-		data, err := loadSchemaFromFile(working_dir, "", "schema.json")
+		data, err := loadSchemaFromFile(workingDir, "", "schema.json")
 		require.NoError(t, err)
 		assert.Equal(t, schemaContent, string(data))
 	})
@@ -197,17 +197,17 @@ func TestLoadSchemaFromFile(t *testing.T) {
 	t.Run("WorkingDirTakesPrecedenceOverDAGDir", func(t *testing.T) {
 		t.Parallel()
 
-		working_dir := t.TempDir()
+		workingDir := t.TempDir()
 		dagDir := t.TempDir()
 
 		wdSchema := `{"type": "object", "title": "working-dir"}`
 		dagSchema := `{"type": "object", "title": "dag-dir"}`
 
-		require.NoError(t, os.WriteFile(filepath.Join(working_dir, "schema.json"), []byte(wdSchema), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(workingDir, "schema.json"), []byte(wdSchema), 0600))
 		require.NoError(t, os.WriteFile(filepath.Join(dagDir, "schema.json"), []byte(dagSchema), 0600))
 
 		dagPath := filepath.Join(dagDir, "dag.yaml")
-		data, err := loadSchemaFromFile(working_dir, dagPath, "schema.json")
+		data, err := loadSchemaFromFile(workingDir, dagPath, "schema.json")
 		require.NoError(t, err)
 		assert.Equal(t, wdSchema, string(data))
 	})
@@ -223,8 +223,8 @@ func TestLoadSchemaFromFile(t *testing.T) {
 	t.Run("FileNotFoundWithWorkingDir", func(t *testing.T) {
 		t.Parallel()
 
-		working_dir := t.TempDir()
-		_, err := loadSchemaFromFile(working_dir, "", "nonexistent.json")
+		workingDir := t.TempDir()
+		_, err := loadSchemaFromFile(workingDir, "", "nonexistent.json")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
@@ -242,13 +242,13 @@ func TestLoadSchemaFromFile(t *testing.T) {
 	t.Run("SubdirectoryPath", func(t *testing.T) {
 		t.Parallel()
 
-		working_dir := t.TempDir()
-		schemasDir := filepath.Join(working_dir, "schemas")
+		workingDir := t.TempDir()
+		schemasDir := filepath.Join(workingDir, "schemas")
 		require.NoError(t, os.MkdirAll(schemasDir, 0755))
 		schemaPath := filepath.Join(schemasDir, "params.json")
 		require.NoError(t, os.WriteFile(schemaPath, []byte(schemaContent), 0600))
 
-		data, err := loadSchemaFromFile(working_dir, "", "schemas/params.json")
+		data, err := loadSchemaFromFile(workingDir, "", "schemas/params.json")
 		require.NoError(t, err)
 		assert.Equal(t, schemaContent, string(data))
 	})
@@ -445,14 +445,14 @@ func TestResolveSchemaFromParams(t *testing.T) {
 	t.Run("UsesWorkingDirForResolution", func(t *testing.T) {
 		t.Parallel()
 
-		working_dir := t.TempDir()
-		schemaPath := filepath.Join(working_dir, "schema.json")
+		workingDir := t.TempDir()
+		schemaPath := filepath.Join(workingDir, "schema.json")
 		require.NoError(t, os.WriteFile(schemaPath, []byte(validSchemaContent), 0600))
 
 		params := map[string]any{
 			"schema": "schema.json",
 		}
-		resolved, err := resolveSchemaFromParams(params, working_dir, "")
+		resolved, err := resolveSchemaFromParams(params, workingDir, "")
 		require.NoError(t, err)
 		assert.NotNil(t, resolved)
 	})

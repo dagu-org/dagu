@@ -518,29 +518,29 @@ func TestSQLiteExecutor_OutputFormats(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name          string
-		output_format string
-		headers       bool
-		contains      []string
-		notContains   []string
+		name         string
+		outputFormat string
+		headers      bool
+		contains     []string
+		notContains  []string
 	}{
 		{
-			name:          "jsonl",
-			output_format: "jsonl",
-			contains:      []string{`"id":1`, `"name":"Alice"`},
+			name:         "jsonl",
+			outputFormat: "jsonl",
+			contains:     []string{`"id":1`, `"name":"Alice"`},
 		},
 		{
-			name:          "csv with headers",
-			output_format: "csv",
-			headers:       true,
-			contains:      []string{"id,name", "1,Alice"},
+			name:         "csv with headers",
+			outputFormat: "csv",
+			headers:      true,
+			contains:     []string{"id,name", "1,Alice"},
 		},
 		{
-			name:          "csv without headers",
-			output_format: "csv",
-			headers:       false,
-			contains:      []string{"1,Alice"},
-			notContains:   []string{"id,name"},
+			name:         "csv without headers",
+			outputFormat: "csv",
+			headers:      false,
+			contains:     []string{"1,Alice"},
+			notContains:  []string{"id,name"},
 		},
 	}
 
@@ -554,7 +554,7 @@ func TestSQLiteExecutor_OutputFormats(t *testing.T) {
 					Type: "sqlite",
 					Config: map[string]any{
 						"dsn":           ":memory:",
-						"output_format": tt.output_format,
+						"output_format": tt.outputFormat,
 						"headers":       tt.headers,
 					},
 				},
@@ -2358,7 +2358,7 @@ func TestSQLiteExecutor_StreamingOutput(t *testing.T) {
 
 	ctx := context.Background()
 	tmpDir := t.TempDir()
-	output_file := filepath.Join(tmpDir, "output.jsonl")
+	outputFile := filepath.Join(tmpDir, "output.jsonl")
 
 	step := core.Step{
 		Name: "test-streaming",
@@ -2367,7 +2367,7 @@ func TestSQLiteExecutor_StreamingOutput(t *testing.T) {
 			Config: map[string]any{
 				"dsn":           ":memory:",
 				"streaming":     true,
-				"output_file":   output_file,
+				"output_file":   outputFile,
 				"output_format": "jsonl",
 			},
 		},
@@ -2388,7 +2388,7 @@ func TestSQLiteExecutor_StreamingOutput(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify output file was created and contains data
-	content, err := os.ReadFile(output_file)
+	content, err := os.ReadFile(outputFile)
 	require.NoError(t, err)
 
 	output := string(content)
@@ -2403,7 +2403,7 @@ func TestSQLiteExecutor_StreamingOutputCSV(t *testing.T) {
 
 	ctx := context.Background()
 	tmpDir := t.TempDir()
-	output_file := filepath.Join(tmpDir, "output.csv")
+	outputFile := filepath.Join(tmpDir, "output.csv")
 
 	step := core.Step{
 		Name: "test-streaming-csv",
@@ -2412,7 +2412,7 @@ func TestSQLiteExecutor_StreamingOutputCSV(t *testing.T) {
 			Config: map[string]any{
 				"dsn":           ":memory:",
 				"streaming":     true,
-				"output_file":   output_file,
+				"output_file":   outputFile,
 				"output_format": "csv",
 				"headers":       true,
 			},
@@ -2430,7 +2430,7 @@ func TestSQLiteExecutor_StreamingOutputCSV(t *testing.T) {
 	err = exec.Run(ctx)
 	require.NoError(t, err)
 
-	content, err := os.ReadFile(output_file)
+	content, err := os.ReadFile(outputFile)
 	require.NoError(t, err)
 
 	output := string(content)
@@ -2446,7 +2446,7 @@ func TestSQLiteExecutor_StreamingOutputSubdir(t *testing.T) {
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 	// Create path in non-existent subdirectory
-	output_file := filepath.Join(tmpDir, "subdir", "nested", "output.jsonl")
+	outputFile := filepath.Join(tmpDir, "subdir", "nested", "output.jsonl")
 
 	step := core.Step{
 		Name: "test-streaming-subdir",
@@ -2455,7 +2455,7 @@ func TestSQLiteExecutor_StreamingOutputSubdir(t *testing.T) {
 			Config: map[string]any{
 				"dsn":           ":memory:",
 				"streaming":     true,
-				"output_file":   output_file,
+				"output_file":   outputFile,
 				"output_format": "jsonl",
 			},
 		},
@@ -2469,7 +2469,7 @@ func TestSQLiteExecutor_StreamingOutputSubdir(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify subdirectories were created and file exists
-	content, err := os.ReadFile(output_file)
+	content, err := os.ReadFile(outputFile)
 	require.NoError(t, err)
 	assert.Contains(t, string(content), `"value":1`)
 }
@@ -2518,6 +2518,7 @@ func TestSQLiteExecutor_SharedMemory(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
+	tableName := fmt.Sprintf("shared_test_%d", time.Now().UnixNano())
 
 	// First step creates the table with shared memory
 	step1 := core.Step{
@@ -2529,10 +2530,11 @@ func TestSQLiteExecutor_SharedMemory(t *testing.T) {
 				"shared_memory": true,
 			},
 		},
-		Script: `
-			CREATE TABLE shared_test (id INTEGER PRIMARY KEY, value TEXT);
-			INSERT INTO shared_test VALUES (1, 'shared');
-		`,
+		Script: fmt.Sprintf(`
+			CREATE TABLE IF NOT EXISTS %s (id INTEGER PRIMARY KEY, value TEXT);
+			DELETE FROM %s;
+			INSERT INTO %s VALUES (1, 'shared');
+		`, tableName, tableName, tableName),
 	}
 
 	exec1, err := newSQLiteExecutor(ctx, step1)
@@ -2553,13 +2555,13 @@ func TestSQLiteExecutor_ScriptFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create a SQL script file
-	script_file := filepath.Join(tmpDir, "script.sql")
+	scriptFile := filepath.Join(tmpDir, "script.sql")
 	scriptContent := `
 		CREATE TABLE from_file (id INTEGER, name TEXT);
 		INSERT INTO from_file VALUES (1, 'from file');
 		SELECT * FROM from_file;
 	`
-	err := os.WriteFile(script_file, []byte(scriptContent), 0644)
+	err := os.WriteFile(scriptFile, []byte(scriptContent), 0644)
 	require.NoError(t, err)
 
 	step := core.Step{
@@ -2571,7 +2573,7 @@ func TestSQLiteExecutor_ScriptFile(t *testing.T) {
 			},
 		},
 		// Use file:// prefix to load SQL from external file
-		Script: "file://" + script_file,
+		Script: "file://" + scriptFile,
 	}
 
 	exec, err := newSQLiteExecutor(ctx, step)

@@ -191,12 +191,12 @@ steps:
 		require.Equal(t, "${SMTP_USER}", dag.DAG.SMTP.Username)
 		require.Equal(t, "${SMTP_PASS}", dag.DAG.SMTP.Password)
 
-		// errorMail config preserves templates
+		// error_mail config preserves templates
 		require.NotNil(t, dag.DAG.ErrorMail)
 		require.Equal(t, "${SMTP_USER}", dag.DAG.ErrorMail.From)
 		require.Equal(t, []string{"${ADMIN_EMAIL}", "${OPS_EMAIL}"}, dag.DAG.ErrorMail.To)
 
-		// infoMail config preserves templates
+		// info_mail config preserves templates
 		require.NotNil(t, dag.DAG.InfoMail)
 		require.Equal(t, "${SMTP_USER}", dag.DAG.InfoMail.From)
 		require.Equal(t, []string{"${OPS_EMAIL}"}, dag.DAG.InfoMail.To)
