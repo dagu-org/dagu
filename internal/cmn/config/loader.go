@@ -440,6 +440,7 @@ func (l *ConfigLoader) loadAuthMode(cfg *Config, def Definition) bool {
 
 func (l *ConfigLoader) loadBasicAuth(cfg *Config, auth *AuthDef) {
 	if auth.Basic != nil {
+		cfg.Server.Auth.Basic.Enabled = auth.Basic.Enabled
 		cfg.Server.Auth.Basic.Username = auth.Basic.Username
 		cfg.Server.Auth.Basic.Password = auth.Basic.Password
 	}
@@ -517,7 +518,7 @@ func (l *ConfigLoader) warnBasicAuthWithBuiltin(cfg *Config) {
 		return
 	}
 
-	if cfg.Server.Auth.Basic.Username != "" || cfg.Server.Auth.Basic.Password != "" {
+	if cfg.Server.Auth.Basic.Enabled {
 		l.warnings = append(l.warnings, "Basic auth configuration is ignored when auth mode is 'builtin'; use builtin auth's admin credentials instead")
 	}
 }
@@ -977,8 +978,6 @@ func (l *ConfigLoader) finalizePaths(cfg *Config) {
 // LoadLegacyFields applies deprecated configuration fields to the current Config.
 func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) error {
 	if l.requires(SectionServer) {
-		setIfNotEmpty(&cfg.Server.Auth.Basic.Username, def.BasicAuthUsername)
-		setIfNotEmpty(&cfg.Server.Auth.Basic.Password, def.BasicAuthPassword)
 		setIfNotEmpty(&cfg.Server.APIBasePath, def.APIBaseURL)
 	}
 
@@ -1220,6 +1219,7 @@ var envBindings = []envBinding{
 
 	// Auth
 	{key: "auth.mode", env: "AUTH_MODE"},
+	{key: "auth.basic.enabled", env: "AUTH_BASIC_ENABLED"},
 	{key: "auth.basic.username", env: "AUTH_BASIC_USERNAME"},
 	{key: "auth.basic.password", env: "AUTH_BASIC_PASSWORD"},
 	// Auth OIDC
@@ -1239,9 +1239,6 @@ var envBindings = []envBinding{
 	{key: "auth.oidc.role_mapping.role_attribute_path", env: "AUTH_OIDC_ROLE_ATTRIBUTE_PATH"},
 	{key: "auth.oidc.role_mapping.role_attribute_strict", env: "AUTH_OIDC_ROLE_ATTRIBUTE_STRICT"},
 	{key: "auth.oidc.role_mapping.skip_org_role_sync", env: "AUTH_OIDC_SKIP_ORG_ROLE_SYNC"},
-	// Auth (legacy)
-	{key: "auth.basic.username", env: "BASICAUTH_USERNAME"},
-	{key: "auth.basic.password", env: "BASICAUTH_PASSWORD"},
 	// Auth (builtin)
 	{key: "auth.builtin.admin.username", env: "AUTH_ADMIN_USERNAME"},
 	{key: "auth.builtin.admin.password", env: "AUTH_ADMIN_PASSWORD"},

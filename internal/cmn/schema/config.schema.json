@@ -53,18 +53,6 @@
     "auth": {
       "$ref": "#/definitions/AuthDef"
     },
-    "is_basic_auth": {
-      "type": "boolean",
-      "description": "Deprecated: use auth.basic instead. Enable basic authentication."
-    },
-    "basic_auth_username": {
-      "type": "string",
-      "description": "Deprecated: use auth.basic.username instead."
-    },
-    "basic_auth_password": {
-      "type": "string",
-      "description": "Deprecated: use auth.basic.password instead."
-    },
     "is_auth_token": {
       "type": "boolean",
       "description": "Deprecated: use auth.token instead. Enable token authentication."
@@ -247,6 +235,10 @@
       "description": "Basic authentication credentials.",
       "additionalProperties": false,
       "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable basic authentication."
+        },
         "username": {
           "type": "string",
           "description": "Basic auth username."

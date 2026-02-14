@@ -50,6 +50,7 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_UI_NAVBAR_COLOR":             "#123456",
 		"DAGU_UI_NAVBAR_TITLE":             "Test Dagu",
 
+		"DAGU_AUTH_BASIC_ENABLED":  "true",
 		"DAGU_AUTH_BASIC_USERNAME": "testuser",
 		"DAGU_AUTH_BASIC_PASSWORD": "testpass",
 
@@ -139,7 +140,7 @@ func TestLoad_Env(t *testing.T) {
 			Headless:    true,
 			Auth: Auth{
 				Mode:  AuthModeOIDC, // Auto-detected from OIDC config
-				Basic: AuthBasic{Username: "testuser", Password: "testpass"},
+				Basic: AuthBasic{Enabled: true, Username: "testuser", Password: "testpass"},
 				OIDC: AuthOIDC{
 					ClientID:     "test-client-id",
 					ClientSecret: "test-secret",
@@ -290,6 +291,7 @@ ui:
     sort_order: "asc"
 auth:
   basic:
+    enabled: true
     username: "admin"
     password: "secret"
   oidc:
@@ -376,7 +378,7 @@ scheduler:
 			LatestStatusToday: true,
 			Auth: Auth{
 				Mode:  AuthModeOIDC, // Auto-detected from OIDC config
-				Basic: AuthBasic{Username: "admin", Password: "secret"},
+				Basic: AuthBasic{Enabled: true, Username: "admin", Password: "secret"},
 				OIDC: AuthOIDC{
 					ClientID:     "test-client-id",
 					ClientSecret: "test-client-secret",
@@ -612,6 +614,7 @@ auth:
     token:
       secret: test-secret
   basic:
+    enabled: true
     username: basicuser
     password: basicpass
 paths:
@@ -654,8 +657,6 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 		testPaths := filepath.Join(tempDir, "test")
 
 		def := Definition{
-			BasicAuthUsername:     "user",
-			BasicAuthPassword:     "pass",
 			APIBaseURL:            "/api/v1",
 			IsAuthToken:           true,
 			AuthToken:             "token123",
@@ -678,8 +679,6 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 		require.NoError(t, err)
 
 		// Auth
-		assert.Equal(t, "user", cfg.Server.Auth.Basic.Username)
-		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
 		assert.Equal(t, "/api/v1", cfg.Server.APIBasePath)
 
 		// Paths - DAGsDir should take precedence over DAGs

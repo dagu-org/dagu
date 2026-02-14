@@ -805,7 +805,7 @@ func (srv *Server) buildAgentAuthOptions() auth.Options {
 		AuthRequired: true,
 	}
 
-	if authCfg.Basic.Username != "" && authCfg.Basic.Password != "" {
+	if authCfg.Basic.Enabled {
 		opts.BasicAuthEnabled = true
 		opts.Creds = map[string]string{authCfg.Basic.Username: authCfg.Basic.Password}
 	}

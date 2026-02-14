@@ -177,6 +177,7 @@ type Auth struct {
 
 // AuthBasic represents basic authentication credentials.
 type AuthBasic struct {
+	Enabled  bool
 	Username string
 	Password string
 }

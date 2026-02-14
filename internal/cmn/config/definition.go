@@ -19,12 +19,9 @@ type Definition struct {
 	TZ           string `mapstructure:"tz"`
 
 	// Authentication
-	Auth              *AuthDef `mapstructure:"auth"`
-	IsBasicAuth       bool     `mapstructure:"is_basic_auth"`
-	BasicAuthUsername string   `mapstructure:"basic_auth_username"`
-	BasicAuthPassword string   `mapstructure:"basic_auth_password"`
-	IsAuthToken       bool     `mapstructure:"is_auth_token"`
-	AuthToken         string   `mapstructure:"auth_token"`
+	Auth        *AuthDef `mapstructure:"auth"`
+	IsAuthToken bool     `mapstructure:"is_auth_token"`
+	AuthToken   string   `mapstructure:"auth_token"`
 
 	// Permissions
 	PermissionWriteDAGs *bool          `mapstructure:"permission_write_dags"`
@@ -104,6 +101,7 @@ type AuthDef struct {
 
 // AuthBasicDef configures basic authentication credentials.
 type AuthBasicDef struct {
+	Enabled  bool   `mapstructure:"enabled"`
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
 }

@@ -410,7 +410,7 @@ func TestConfig_Validate(t *testing.T) {
 		cfg := validBaseConfig()
 		cfg.Server.Auth = Auth{
 			Mode:  AuthModeBuiltin,
-			Basic: AuthBasic{Username: "user", Password: "pass"},
+			Basic: AuthBasic{Enabled: true, Username: "user", Password: "pass"},
 			Builtin: AuthBuiltin{
 				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},
