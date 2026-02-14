@@ -6,50 +6,45 @@ type Definition struct {
 	// Server settings
 	Host        string  `mapstructure:"host"`
 	Port        int     `mapstructure:"port"`
-	BasePath    string  `mapstructure:"basePath"`
-	APIBasePath string  `mapstructure:"apiBasePath"`
-	APIBaseURL  string  `mapstructure:"apiBaseURL"` // Deprecated: use APIBasePath
+	BasePath    string  `mapstructure:"base_path"`
+	APIBasePath string  `mapstructure:"api_base_path"`
+	APIBaseURL  string  `mapstructure:"api_base_url"` // Deprecated: use APIBasePath
 	Headless    *bool   `mapstructure:"headless"`
 	TLS         *TLSDef `mapstructure:"tls"`
 
 	// Core settings
 	Debug        bool   `mapstructure:"debug"`
-	DefaultShell string `mapstructure:"defaultShell"`
-	LogFormat    string `mapstructure:"logFormat"` // "json" or "text"
+	DefaultShell string `mapstructure:"default_shell"`
+	LogFormat    string `mapstructure:"log_format"` // "json" or "text"
 	TZ           string `mapstructure:"tz"`
 
 	// Authentication
-	Auth              *AuthDef `mapstructure:"auth"`
-	IsBasicAuth       bool     `mapstructure:"isBasicAuth"`
-	BasicAuthUsername string   `mapstructure:"basicAuthUsername"`
-	BasicAuthPassword string   `mapstructure:"basicAuthPassword"`
-	IsAuthToken       bool     `mapstructure:"isAuthToken"`
-	AuthToken         string   `mapstructure:"authToken"`
+	Auth *AuthDef `mapstructure:"auth"`
 
 	// Permissions
-	PermissionWriteDAGs *bool          `mapstructure:"permissionWriteDAGs"`
-	PermissionRunDAGs   *bool          `mapstructure:"permissionRunDAGs"`
+	PermissionWriteDAGs *bool          `mapstructure:"permission_write_dags"`
+	PermissionRunDAGs   *bool          `mapstructure:"permission_run_dags"`
 	Permissions         PermissionsDef `mapstructure:"permissions"`
 
 	// Paths (legacy flat fields)
 	DAGs            string `mapstructure:"dags"` // Deprecated
-	DAGsDir         string `mapstructure:"dagsDir"`
+	DAGsDir         string `mapstructure:"dags_dir"`
 	Executable      string `mapstructure:"executable"`
-	LogDir          string `mapstructure:"logDir"`
-	DataDir         string `mapstructure:"dataDir"`
-	SuspendFlagsDir string `mapstructure:"suspendFlagsDir"`
-	AdminLogsDir    string `mapstructure:"adminLogsDir"`
-	BaseConfig      string `mapstructure:"baseConfig"`
+	LogDir          string `mapstructure:"log_dir"`
+	DataDir         string `mapstructure:"data_dir"`
+	SuspendFlagsDir string `mapstructure:"suspend_flags_dir"`
+	AdminLogsDir    string `mapstructure:"admin_logs_dir"`
+	BaseConfig      string `mapstructure:"base_config"`
 
 	// Paths (structured)
 	Paths *PathsDef `mapstructure:"paths"`
 
 	// UI settings (legacy flat fields)
-	LogEncodingCharset    string `mapstructure:"logEncodingCharset"`
-	NavbarColor           string `mapstructure:"navbarColor"`
-	NavbarTitle           string `mapstructure:"navbarTitle"`
-	MaxDashboardPageLimit int    `mapstructure:"maxDashboardPageLimit"`
-	LatestStatusToday     *bool  `mapstructure:"latestStatusToday"`
+	LogEncodingCharset    string `mapstructure:"log_encoding_charset"`
+	NavbarColor           string `mapstructure:"navbar_color"`
+	NavbarTitle           string `mapstructure:"navbar_title"`
+	MaxDashboardPageLimit int    `mapstructure:"max_dashboard_page_limit"`
+	LatestStatusToday     *bool  `mapstructure:"latest_status_today"`
 
 	// UI settings (structured)
 	UI *UIDef `mapstructure:"ui"`
@@ -58,7 +53,7 @@ type Definition struct {
 	Peer PeerDef `mapstructure:"peer"`
 
 	// Remote nodes
-	RemoteNodes []RemoteNodeDef `mapstructure:"remoteNodes"`
+	RemoteNodes []RemoteNodeDef `mapstructure:"remote_nodes"`
 
 	// Services
 	Coordinator *CoordinatorDef `mapstructure:"coordinator"`
@@ -67,7 +62,7 @@ type Definition struct {
 	Queues      *QueueConfigDef `mapstructure:"queues"`
 
 	// Execution
-	DefaultExecutionMode string `mapstructure:"defaultExecutionMode"`
+	DefaultExecutionMode string `mapstructure:"default_execution_mode"`
 
 	// Features
 	Monitoring *MonitoringDef `mapstructure:"monitoring"`
@@ -75,7 +70,7 @@ type Definition struct {
 	Cache      *string        `mapstructure:"cache"`   // "low", "normal", or "high"
 	Terminal   *TerminalDef   `mapstructure:"terminal"`
 	Audit      *AuditDef      `mapstructure:"audit"`
-	GitSync    *GitSyncDef    `mapstructure:"gitSync"`
+	GitSync    *GitSyncDef    `mapstructure:"git_sync"`
 	Tunnel     *TunnelDef     `mapstructure:"tunnel"`
 }
 
@@ -85,9 +80,9 @@ type Definition struct {
 
 // TLSDef configures TLS/SSL encryption.
 type TLSDef struct {
-	CertFile string `mapstructure:"certFile"`
-	KeyFile  string `mapstructure:"keyFile"`
-	CAFile   string `mapstructure:"caFile"`
+	CertFile string `mapstructure:"cert_file"`
+	KeyFile  string `mapstructure:"key_file"`
+	CAFile   string `mapstructure:"ca_file"`
 }
 
 // -----------------------------------------------------------------------------
@@ -104,6 +99,7 @@ type AuthDef struct {
 
 // AuthBasicDef configures basic authentication credentials.
 type AuthBasicDef struct {
+	Enabled  bool   `mapstructure:"enabled"`
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
 }
@@ -131,35 +127,35 @@ type TokenConfigDef struct {
 // Builtin-specific fields are only used when auth.mode=builtin.
 type AuthOIDCDef struct {
 	// ClientID is the OAuth client identifier (Go naming: ID not Id).
-	// mapstructure tag uses lowercase "clientId" for YAML compatibility.
-	ClientID     string `mapstructure:"clientId"`
-	ClientSecret string `mapstructure:"clientSecret"`
+	// mapstructure tag uses lowercase "client_id" for YAML compatibility.
+	ClientID     string `mapstructure:"client_id"`
+	ClientSecret string `mapstructure:"client_secret"`
 	// ClientURL is the application callback URL (Go naming: URL not Url).
-	// mapstructure tag uses lowercase "clientUrl" for YAML compatibility.
-	ClientURL      string              `mapstructure:"clientUrl"`
+	// mapstructure tag uses lowercase "client_url" for YAML compatibility.
+	ClientURL      string              `mapstructure:"client_url"`
 	Issuer         string              `mapstructure:"issuer"`
 	Scopes         []string            `mapstructure:"scopes"`
 	Whitelist      []string            `mapstructure:"whitelist"`
-	AutoSignup     *bool               `mapstructure:"autoSignup"` // Default: true (builtin mode only)
-	AllowedDomains []string            `mapstructure:"allowedDomains"`
-	ButtonLabel    string              `mapstructure:"buttonLabel"`
-	RoleMapping    *OIDCRoleMappingDef `mapstructure:"roleMapping"`
+	AutoSignup     *bool               `mapstructure:"auto_signup"` // Default: true (builtin mode only)
+	AllowedDomains []string            `mapstructure:"allowed_domains"`
+	ButtonLabel    string              `mapstructure:"button_label"`
+	RoleMapping    *OIDCRoleMappingDef `mapstructure:"role_mapping"`
 }
 
 // OIDCRoleMappingDef maps OIDC claims to Dagu roles.
 type OIDCRoleMappingDef struct {
-	DefaultRole         string            `mapstructure:"defaultRole"`         // Default: "viewer"
-	GroupsClaim         string            `mapstructure:"groupsClaim"`         // Default: "groups"
-	GroupMappings       map[string]string `mapstructure:"groupMappings"`       // IdP group -> Dagu role
-	RoleAttributePath   string            `mapstructure:"roleAttributePath"`   // jq expression for role extraction
-	RoleAttributeStrict *bool             `mapstructure:"roleAttributeStrict"` // Deny login if no valid role found
-	SkipOrgRoleSync     *bool             `mapstructure:"skipOrgRoleSync"`     // Only assign roles on first login
+	DefaultRole         string            `mapstructure:"default_role"`          // Default: "viewer"
+	GroupsClaim         string            `mapstructure:"groups_claim"`          // Default: "groups"
+	GroupMappings       map[string]string `mapstructure:"group_mappings"`        // IdP group -> Dagu role
+	RoleAttributePath   string            `mapstructure:"role_attribute_path"`   // jq expression for role extraction
+	RoleAttributeStrict *bool             `mapstructure:"role_attribute_strict"` // Deny login if no valid role found
+	SkipOrgRoleSync     *bool             `mapstructure:"skip_org_role_sync"`    // Only assign roles on first login
 }
 
 // PermissionsDef configures UI and API permissions.
 type PermissionsDef struct {
-	WriteDAGs *bool `mapstructure:"writeDAGs"`
-	RunDAGs   *bool `mapstructure:"runDAGs"`
+	WriteDAGs *bool `mapstructure:"write_dags"`
+	RunDAGs   *bool `mapstructure:"run_dags"`
 }
 
 // -----------------------------------------------------------------------------
@@ -168,22 +164,22 @@ type PermissionsDef struct {
 
 // PathsDef configures file system paths.
 type PathsDef struct {
-	DAGsDir            string `mapstructure:"dagsDir"`
+	DAGsDir            string `mapstructure:"dags_dir"`
 	Executable         string `mapstructure:"executable"`
-	LogDir             string `mapstructure:"logDir"`
-	DataDir            string `mapstructure:"dataDir"`
-	SuspendFlagsDir    string `mapstructure:"suspendFlagsDir"`
-	AdminLogsDir       string `mapstructure:"adminLogsDir"`
-	BaseConfig         string `mapstructure:"baseConfig"`
-	AltDagsDir         string `mapstructure:"altDagsDir"`
-	DAGRunsDir         string `mapstructure:"dagRunsDir"`
-	QueueDir           string `mapstructure:"queueDir"`
-	ProcDir            string `mapstructure:"procDir"`
-	ServiceRegistryDir string `mapstructure:"serviceRegistryDir"`
-	UsersDir           string `mapstructure:"usersDir"`
-	APIKeysDir         string `mapstructure:"apiKeysDir"`
-	WebhooksDir        string `mapstructure:"webhooksDir"`
-	SessionsDir        string `mapstructure:"sessionsDir"`
+	LogDir             string `mapstructure:"log_dir"`
+	DataDir            string `mapstructure:"data_dir"`
+	SuspendFlagsDir    string `mapstructure:"suspend_flags_dir"`
+	AdminLogsDir       string `mapstructure:"admin_logs_dir"`
+	BaseConfig         string `mapstructure:"base_config"`
+	AltDagsDir         string `mapstructure:"alt_dags_dir"`
+	DAGRunsDir         string `mapstructure:"dag_runs_dir"`
+	QueueDir           string `mapstructure:"queue_dir"`
+	ProcDir            string `mapstructure:"proc_dir"`
+	ServiceRegistryDir string `mapstructure:"service_registry_dir"`
+	UsersDir           string `mapstructure:"users_dir"`
+	APIKeysDir         string `mapstructure:"api_keys_dir"`
+	WebhooksDir        string `mapstructure:"webhooks_dir"`
+	SessionsDir        string `mapstructure:"sessions_dir"`
 }
 
 // -----------------------------------------------------------------------------
@@ -192,17 +188,17 @@ type PathsDef struct {
 
 // UIDef configures the user interface.
 type UIDef struct {
-	LogEncodingCharset    string      `mapstructure:"logEncodingCharset"`
-	NavbarColor           string      `mapstructure:"navbarColor"`
-	NavbarTitle           string      `mapstructure:"navbarTitle"`
-	MaxDashboardPageLimit int         `mapstructure:"maxDashboardPageLimit"`
+	LogEncodingCharset    string      `mapstructure:"log_encoding_charset"`
+	NavbarColor           string      `mapstructure:"navbar_color"`
+	NavbarTitle           string      `mapstructure:"navbar_title"`
+	MaxDashboardPageLimit int         `mapstructure:"max_dashboard_page_limit"`
 	DAGs                  *DAGListDef `mapstructure:"dags"`
 }
 
 // DAGListDef configures the DAGs list page.
 type DAGListDef struct {
-	SortField string `mapstructure:"sortField"`
-	SortOrder string `mapstructure:"sortOrder"`
+	SortField string `mapstructure:"sort_field"`
+	SortOrder string `mapstructure:"sort_order"`
 }
 
 // -----------------------------------------------------------------------------
@@ -211,25 +207,25 @@ type DAGListDef struct {
 
 // PeerDef configures TLS for peer gRPC connections.
 type PeerDef struct {
-	CertFile      string `mapstructure:"certFile"`
-	KeyFile       string `mapstructure:"keyFile"`
-	ClientCaFile  string `mapstructure:"clientCaFile"`
-	SkipTLSVerify bool   `mapstructure:"skipTlsVerify"`
-	Insecure      bool   `mapstructure:"insecure"`      // Use h2c instead of TLS
-	MaxRetries    int    `mapstructure:"maxRetries"`    // Default: 10
-	RetryInterval string `mapstructure:"retryInterval"` // Default: 1s
+	CertFile      string `mapstructure:"cert_file"`
+	KeyFile       string `mapstructure:"key_file"`
+	ClientCaFile  string `mapstructure:"client_ca_file"`
+	SkipTLSVerify bool   `mapstructure:"skip_tls_verify"`
+	Insecure      bool   `mapstructure:"insecure"`       // Use h2c instead of TLS
+	MaxRetries    int    `mapstructure:"max_retries"`    // Default: 10
+	RetryInterval string `mapstructure:"retry_interval"` // Default: 1s
 }
 
 // RemoteNodeDef configures a remote node connection.
 type RemoteNodeDef struct {
 	Name              string `mapstructure:"name"`
-	APIBaseURL        string `mapstructure:"apiBaseURL"`
-	IsBasicAuth       bool   `mapstructure:"isBasicAuth"`
-	BasicAuthUsername string `mapstructure:"basicAuthUsername"`
-	BasicAuthPassword string `mapstructure:"basicAuthPassword"`
-	IsAuthToken       bool   `mapstructure:"isAuthToken"`
-	AuthToken         string `mapstructure:"authToken"`
-	SkipTLSVerify     bool   `mapstructure:"skipTLSVerify"`
+	APIBaseURL        string `mapstructure:"api_base_url"`
+	IsBasicAuth       bool   `mapstructure:"is_basic_auth"`
+	BasicAuthUsername string `mapstructure:"basic_auth_username"`
+	BasicAuthPassword string `mapstructure:"basic_auth_password"`
+	IsAuthToken       bool   `mapstructure:"is_auth_token"`
+	AuthToken         string `mapstructure:"auth_token"`
+	SkipTLSVerify     bool   `mapstructure:"skip_tls_verify"`
 }
 
 // -----------------------------------------------------------------------------
@@ -247,31 +243,31 @@ type CoordinatorDef struct {
 // WorkerDef configures the worker.
 type WorkerDef struct {
 	ID            string `mapstructure:"id"`
-	MaxActiveRuns int    `mapstructure:"maxActiveRuns"`
+	MaxActiveRuns int    `mapstructure:"max_active_runs"`
 	// Labels accepts either a string "key=value,key2=value2,..." or map[string]string.
 	// When string, parsed as comma-separated key=value pairs.
 	Labels any `mapstructure:"labels"`
 	// Coordinators accepts either a single string URL or []string of URLs.
 	// When string, used as single coordinator address.
 	Coordinators any              `mapstructure:"coordinators"`
-	PostgresPool *PostgresPoolDef `mapstructure:"postgresPool"`
+	PostgresPool *PostgresPoolDef `mapstructure:"postgres_pool"`
 }
 
 // PostgresPoolDef configures PostgreSQL connection pooling.
 // Lifetime fields are specified in seconds.
 type PostgresPoolDef struct {
-	MaxOpenConns    int `mapstructure:"maxOpenConns"`    // Maximum open connections (default: 25)
-	MaxIdleConns    int `mapstructure:"maxIdleConns"`    // Maximum idle connections (default: 5)
-	ConnMaxLifetime int `mapstructure:"connMaxLifetime"` // Maximum connection lifetime in seconds (default: 300)
-	ConnMaxIdleTime int `mapstructure:"connMaxIdleTime"` // Maximum idle time in seconds (default: 60)
+	MaxOpenConns    int `mapstructure:"max_open_conns"`     // Maximum open connections (default: 25)
+	MaxIdleConns    int `mapstructure:"max_idle_conns"`     // Maximum idle connections (default: 5)
+	ConnMaxLifetime int `mapstructure:"conn_max_lifetime"`  // Maximum connection lifetime in seconds (default: 300)
+	ConnMaxIdleTime int `mapstructure:"conn_max_idle_time"` // Maximum idle time in seconds (default: 60)
 }
 
 // SchedulerDef configures the scheduler.
 type SchedulerDef struct {
 	Port                    int    `mapstructure:"port"`
-	LockStaleThreshold      string `mapstructure:"lockStaleThreshold"`      // Default: 30s
-	LockRetryInterval       string `mapstructure:"lockRetryInterval"`       // Default: 5s
-	ZombieDetectionInterval string `mapstructure:"zombieDetectionInterval"` // Default: 45s, 0 to disable
+	LockStaleThreshold      string `mapstructure:"lock_stale_threshold"`      // Default: 30s
+	LockRetryInterval       string `mapstructure:"lock_retry_interval"`       // Default: 5s
+	ZombieDetectionInterval string `mapstructure:"zombie_detection_interval"` // Default: 45s, 0 to disable
 }
 
 // QueueConfigDef configures global queue settings.
@@ -283,8 +279,8 @@ type QueueConfigDef struct {
 // QueueDef configures an individual queue.
 type QueueDef struct {
 	Name           string `mapstructure:"name"`
-	MaxActiveRuns  *int   `mapstructure:"maxActiveRuns"` // Deprecated: use MaxConcurrency
-	MaxConcurrency int    `mapstructure:"maxConcurrency"`
+	MaxActiveRuns  *int   `mapstructure:"max_active_runs"` // Deprecated: use MaxConcurrency
+	MaxConcurrency int    `mapstructure:"max_concurrency"`
 }
 
 // -----------------------------------------------------------------------------
@@ -304,8 +300,8 @@ type TerminalDef struct {
 
 // AuditDef configures the audit logging feature.
 type AuditDef struct {
-	Enabled       *bool `mapstructure:"enabled"`       // Default: true
-	RetentionDays *int  `mapstructure:"retentionDays"` // Default: 7
+	Enabled       *bool `mapstructure:"enabled"`        // Default: true
+	RetentionDays *int  `mapstructure:"retention_days"` // Default: 7
 }
 
 // -----------------------------------------------------------------------------
@@ -319,8 +315,8 @@ type GitSyncDef struct {
 	Branch      string              `mapstructure:"branch"` // Default: main
 	Path        string              `mapstructure:"path"`   // Subdirectory, empty for root
 	Auth        *GitSyncAuthDef     `mapstructure:"auth"`
-	AutoSync    *GitSyncAutoSyncDef `mapstructure:"autoSync"`
-	PushEnabled *bool               `mapstructure:"pushEnabled"` // Default: true
+	AutoSync    *GitSyncAutoSyncDef `mapstructure:"auto_sync"`
+	PushEnabled *bool               `mapstructure:"push_enabled"` // Default: true
 	Commit      *GitSyncCommitDef   `mapstructure:"commit"`
 }
 
@@ -328,21 +324,21 @@ type GitSyncDef struct {
 type GitSyncAuthDef struct {
 	Type          string `mapstructure:"type"` // "token" or "ssh", default: token
 	Token         string `mapstructure:"token"`
-	SSHKeyPath    string `mapstructure:"sshKeyPath"`
-	SSHPassphrase string `mapstructure:"sshPassphrase"`
+	SSHKeyPath    string `mapstructure:"ssh_key_path"`
+	SSHPassphrase string `mapstructure:"ssh_passphrase"`
 }
 
 // GitSyncAutoSyncDef configures automatic synchronization.
 type GitSyncAutoSyncDef struct {
-	Enabled   *bool `mapstructure:"enabled"`   // Default: false
-	OnStartup *bool `mapstructure:"onStartup"` // Default: true
-	Interval  int   `mapstructure:"interval"`  // Seconds, default: 300
+	Enabled   *bool `mapstructure:"enabled"`    // Default: false
+	OnStartup *bool `mapstructure:"on_startup"` // Default: true
+	Interval  int   `mapstructure:"interval"`   // Seconds, default: 300
 }
 
 // GitSyncCommitDef configures Git commit metadata.
 type GitSyncCommitDef struct {
-	AuthorName  string `mapstructure:"authorName"`  // Default: Dagu
-	AuthorEmail string `mapstructure:"authorEmail"` // Default: dagu@localhost
+	AuthorName  string `mapstructure:"author_name"`  // Default: Dagu
+	AuthorEmail string `mapstructure:"author_email"` // Default: dagu@localhost
 }
 
 // -----------------------------------------------------------------------------
@@ -353,24 +349,24 @@ type GitSyncCommitDef struct {
 type TunnelDef struct {
 	Enabled       *bool               `mapstructure:"enabled"` // Default: false
 	Tailscale     *TailscaleTunnelDef `mapstructure:"tailscale"`
-	AllowTerminal *bool               `mapstructure:"allowTerminal"` // Default: false
-	AllowedIPs    []string            `mapstructure:"allowedIPs"`    // Empty = allow all
-	RateLimiting  *TunnelRateLimitDef `mapstructure:"rateLimiting"`
+	AllowTerminal *bool               `mapstructure:"allow_terminal"` // Default: false
+	AllowedIPs    []string            `mapstructure:"allowed_ips"`    // Empty = allow all
+	RateLimiting  *TunnelRateLimitDef `mapstructure:"rate_limiting"`
 }
 
 // TailscaleTunnelDef configures Tailscale tunnel settings.
 type TailscaleTunnelDef struct {
-	AuthKey  string `mapstructure:"authKey"`
-	Hostname string `mapstructure:"hostname"` // Default: "dagu"
-	Funnel   *bool  `mapstructure:"funnel"`   // Public internet access
-	HTTPS    *bool  `mapstructure:"https"`    // HTTPS for tailnet-only access
-	StateDir string `mapstructure:"stateDir"` // Default: $DAGU_HOME/tailscale
+	AuthKey  string `mapstructure:"auth_key"`
+	Hostname string `mapstructure:"hostname"`  // Default: "dagu"
+	Funnel   *bool  `mapstructure:"funnel"`    // Public internet access
+	HTTPS    *bool  `mapstructure:"https"`     // HTTPS for tailnet-only access
+	StateDir string `mapstructure:"state_dir"` // Default: $DAGU_HOME/tailscale
 }
 
 // TunnelRateLimitDef configures rate limiting for tunnel auth endpoints.
 type TunnelRateLimitDef struct {
 	Enabled              *bool `mapstructure:"enabled"`
-	LoginAttempts        int   `mapstructure:"loginAttempts"`        // Default: 5
-	WindowSeconds        int   `mapstructure:"windowSeconds"`        // Default: 300
-	BlockDurationSeconds int   `mapstructure:"blockDurationSeconds"` // Default: 900
+	LoginAttempts        int   `mapstructure:"login_attempts"`         // Default: 5
+	WindowSeconds        int   `mapstructure:"window_seconds"`         // Default: 300
+	BlockDurationSeconds int   `mapstructure:"block_duration_seconds"` // Default: 900
 }

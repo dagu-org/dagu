@@ -50,6 +50,7 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_UI_NAVBAR_COLOR":             "#123456",
 		"DAGU_UI_NAVBAR_TITLE":             "Test Dagu",
 
+		"DAGU_AUTH_BASIC_ENABLED":  "true",
 		"DAGU_AUTH_BASIC_USERNAME": "testuser",
 		"DAGU_AUTH_BASIC_PASSWORD": "testpass",
 
@@ -139,7 +140,7 @@ func TestLoad_Env(t *testing.T) {
 			Headless:    true,
 			Auth: Auth{
 				Mode:  AuthModeOIDC, // Auto-detected from OIDC config
-				Basic: AuthBasic{Username: "testuser", Password: "testpass"},
+				Basic: AuthBasic{Enabled: true, Username: "testuser", Password: "testpass"},
 				OIDC: AuthOIDC{
 					ClientID:     "test-client-id",
 					ClientSecret: "test-secret",
@@ -261,41 +262,42 @@ func TestLoad_YAML(t *testing.T) {
 host: "0.0.0.0"
 port: 9090
 permissions:
-  writeDAGs: false
-  runDAGs: false
+  write_dags: false
+  run_dags: false
 debug: true
-basePath: "/dagu"
-apiBasePath: "/api/v1"
+base_path: "/dagu"
+api_base_path: "/api/v1"
 tz: "UTC"
-logFormat: "json"
+log_format: "json"
 headless: true
-latestStatusToday: true
-defaultShell: "/bin/bash"
-skipExamples: true
+latest_status_today: true
+default_shell: "/bin/bash"
+skip_examples: true
 paths:
-  dagsDir: "/var/dagu/dags"
-  logDir: "/var/dagu/logs"
-  dataDir: "/var/dagu/data"
-  suspendFlagsDir: "/var/dagu/suspend"
-  adminLogsDir: "/var/dagu/adminlogs"
-  baseConfig: "/var/dagu/base.yaml"
+  dags_dir: "/var/dagu/dags"
+  log_dir: "/var/dagu/logs"
+  data_dir: "/var/dagu/data"
+  suspend_flags_dir: "/var/dagu/suspend"
+  admin_logs_dir: "/var/dagu/adminlogs"
+  base_config: "/var/dagu/base.yaml"
   executable: "/usr/local/bin/dagu"
 ui:
-  navbarTitle: "Test Dagu"
-  navbarColor: "#ff5733"
-  logEncodingCharset: "iso-8859-1"
-  maxDashboardPageLimit: 50
+  navbar_title: "Test Dagu"
+  navbar_color: "#ff5733"
+  log_encoding_charset: "iso-8859-1"
+  max_dashboard_page_limit: 50
   dags:
-    sortField: "name"
-    sortOrder: "asc"
+    sort_field: "name"
+    sort_order: "asc"
 auth:
   basic:
+    enabled: true
     username: "admin"
     password: "secret"
   oidc:
-    clientId: "test-client-id"
-    clientSecret: "test-client-secret"
-    clientUrl: "http://localhost:8081"
+    client_id: "test-client-id"
+    client_secret: "test-client-secret"
+    client_url: "http://localhost:8081"
     issuer: "https://accounts.example.com"
     scopes:
       - "openid"
@@ -303,48 +305,48 @@ auth:
       - "email"
     whitelist:
       - "user@example.com"
-remoteNodes:
+remote_nodes:
   - name: "node1"
-    apiBaseURL: "http://node1.example.com/api"
-    isBasicAuth: true
-    basicAuthUsername: "nodeuser"
-    basicAuthPassword: "nodepass"
-    skipTLSVerify: true
+    api_base_url: "http://node1.example.com/api"
+    is_basic_auth: true
+    basic_auth_username: "nodeuser"
+    basic_auth_password: "nodepass"
+    skip_tls_verify: true
   - name: "node2"
-    apiBaseURL: "http://node2.example.com/api"
-    isAuthToken: true
-    authToken: "node-token-123"
+    api_base_url: "http://node2.example.com/api"
+    is_auth_token: true
+    auth_token: "node-token-123"
 tls:
-  certFile: "/path/to/cert.pem"
-  keyFile: "/path/to/key.pem"
-  caFile: "/path/to/ca.pem"
+  cert_file: "/path/to/cert.pem"
+  key_file: "/path/to/key.pem"
+  ca_file: "/path/to/ca.pem"
 peer:
-  certFile: "/path/to/peer-cert.pem"
-  keyFile: "/path/to/peer-key.pem"
-  clientCaFile: "/path/to/peer-ca.pem"
-  skipTLSVerify: false
+  cert_file: "/path/to/peer-cert.pem"
+  key_file: "/path/to/peer-key.pem"
+  client_ca_file: "/path/to/peer-ca.pem"
+  skip_tls_verify: false
   insecure: false
 queues:
   enabled: true
   config:
     - name: "critical"
-      maxActiveRuns: 5
+      max_active_runs: 5
     - name: "normal"
-      maxActiveRuns: 10
+      max_active_runs: 10
 coordinator:
   host: "coordinator.example.com"
   port: 8081
 worker:
   id: "worker-1"
-  maxActiveRuns: 50
+  max_active_runs: 50
   labels:
     env: "production"
     region: "us-west-2"
 scheduler:
   port: 7890
-  lockStaleThreshold: 50s
-  lockRetryInterval: 10s
-  zombieDetectionInterval: 60s
+  lock_stale_threshold: 50s
+  lock_retry_interval: 10s
+  zombie_detection_interval: 60s
 `)
 
 	utcLoc, _ := time.LoadLocation("UTC")
@@ -376,7 +378,7 @@ scheduler:
 			LatestStatusToday: true,
 			Auth: Auth{
 				Mode:  AuthModeOIDC, // Auto-detected from OIDC config
-				Basic: AuthBasic{Username: "admin", Password: "secret"},
+				Basic: AuthBasic{Enabled: true, Username: "admin", Password: "secret"},
 				OIDC: AuthOIDC{
 					ClientID:     "test-client-id",
 					ClientSecret: "test-client-secret",
@@ -535,7 +537,7 @@ worker:
 func TestLoad_EdgeCases_DerivedPaths(t *testing.T) {
 	cfg := loadFromYAML(t, `
 paths:
-  dataDir: "/custom/data"
+  data_dir: "/custom/data"
 `)
 	assert.Equal(t, "/custom/data", cfg.Paths.DataDir)
 	assert.Equal(t, "/custom/data/dag-runs", cfg.Paths.DAGRunsDir)
@@ -556,8 +558,8 @@ func TestLoad_EdgeCases_Errors(t *testing.T) {
 	t.Run("IncompleteTLS", func(t *testing.T) {
 		err := loadWithErrorFromYAML(t, `
 tls:
-  certFile: "/path/to/cert.pem"
-  keyFile: ""
+  cert_file: "/path/to/cert.pem"
+  key_file: ""
 `)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "TLS configuration incomplete")
@@ -578,7 +580,7 @@ tls:
 	t.Run("InvalidMaxDashboardPageLimit", func(t *testing.T) {
 		err := loadWithErrorFromYAML(t, `
 ui:
-  maxDashboardPageLimit: 0
+  max_dashboard_page_limit: 0
 `)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid max dashboard page limit")
@@ -587,18 +589,18 @@ ui:
 	t.Run("InvalidSchedulerDurations", func(t *testing.T) {
 		cfg := loadFromYAML(t, `
 scheduler:
-  lockStaleThreshold: "invalid"
-  lockRetryInterval: "bad-duration"
-  zombieDetectionInterval: "not-a-duration"
+  lock_stale_threshold: "invalid"
+  lock_retry_interval: "bad-duration"
+  zombie_detection_interval: "not-a-duration"
 `)
 		assert.Equal(t, 30*time.Second, cfg.Scheduler.LockStaleThreshold)
 		assert.Equal(t, 5*time.Second, cfg.Scheduler.LockRetryInterval)
 		assert.Equal(t, time.Duration(0), cfg.Scheduler.ZombieDetectionInterval)
 
 		require.Len(t, cfg.Warnings, 3)
-		assert.Contains(t, cfg.Warnings[0], "Invalid scheduler.lockStaleThreshold")
-		assert.Contains(t, cfg.Warnings[1], "Invalid scheduler.lockRetryInterval")
-		assert.Contains(t, cfg.Warnings[2], "Invalid scheduler.zombieDetectionInterval")
+		assert.Contains(t, cfg.Warnings[0], "Invalid scheduler.lock_stale_threshold")
+		assert.Contains(t, cfg.Warnings[1], "Invalid scheduler.lock_retry_interval")
+		assert.Contains(t, cfg.Warnings[2], "Invalid scheduler.zombie_detection_interval")
 	})
 
 	t.Run("BuiltinAuthWithBasicAuthWarning", func(t *testing.T) {
@@ -612,10 +614,11 @@ auth:
     token:
       secret: test-secret
   basic:
+    enabled: true
     username: basicuser
     password: basicpass
 paths:
-  usersDir: /tmp/users
+  users_dir: /tmp/users
 `, nil)
 		require.Len(t, cfg.Warnings, 1)
 		assert.Contains(t, cfg.Warnings[0], "Basic auth configuration is ignored when auth mode is 'builtin'")
@@ -654,11 +657,7 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 		testPaths := filepath.Join(tempDir, "test")
 
 		def := Definition{
-			BasicAuthUsername:     "user",
-			BasicAuthPassword:     "pass",
 			APIBaseURL:            "/api/v1",
-			IsAuthToken:           true,
-			AuthToken:             "token123",
 			DAGs:                  filepath.Join(testPaths, "legacy", "dags"),
 			DAGsDir:               filepath.Join(testPaths, "new", "dags"), // Takes precedence over DAGs
 			Executable:            filepath.Join(testPaths, "bin", "dagu"),
@@ -678,8 +677,6 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 		require.NoError(t, err)
 
 		// Auth
-		assert.Equal(t, "user", cfg.Server.Auth.Basic.Username)
-		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
 		assert.Equal(t, "/api/v1", cfg.Server.APIBasePath)
 
 		// Paths - DAGsDir should take precedence over DAGs
@@ -895,8 +892,8 @@ auth:
 auth:
   mode: "oidc"
   oidc:
-    clientId: "my-client-id"
-    clientSecret: "my-client-secret"
+    client_id: "my-client-id"
+    client_secret: "my-client-secret"
     issuer: "https://auth.example.com"
     scopes:
       - "openid"
@@ -1280,20 +1277,20 @@ func TestLoad_TunnelConfig(t *testing.T) {
 tunnel:
   enabled: true
   tailscale:
-    authKey: "tskey-yaml-test"
+    auth_key: "tskey-yaml-test"
     hostname: "yaml-dagu"
     funnel: false
     https: true
-    stateDir: "/var/dagu/tailscale"
-  allowTerminal: true
-  allowedIPs:
+    state_dir: "/var/dagu/tailscale"
+  allow_terminal: true
+  allowed_ips:
     - "192.168.1.0/24"
     - "10.0.0.0/8"
-  rateLimiting:
+  rate_limiting:
     enabled: true
-    loginAttempts: 5
-    windowSeconds: 300
-    blockDurationSeconds: 900
+    login_attempts: 5
+    window_seconds: 300
+    block_duration_seconds: 900
 `)
 		assert.True(t, cfg.Tunnel.Enabled)
 		assert.Equal(t, "tskey-yaml-test", cfg.Tunnel.Tailscale.AuthKey)
@@ -1339,7 +1336,7 @@ tunnel:
 tunnel:
   enabled: true
   tailscale:
-    authKey: "yaml-key"
+    auth_key: "yaml-key"
     hostname: "yaml-host"
     https: false
 `, map[string]string{
@@ -1389,14 +1386,14 @@ func TestLoad_DefaultExecutionMode(t *testing.T) {
 
 	t.Run("SetToDistributed", func(t *testing.T) {
 		cfg := loadFromYAML(t, `
-defaultExecutionMode: distributed
+default_execution_mode: distributed
 `)
 		assert.Equal(t, ExecutionModeDistributed, cfg.DefaultExecMode)
 	})
 
 	t.Run("SetToLocal", func(t *testing.T) {
 		cfg := loadFromYAML(t, `
-defaultExecutionMode: local
+default_execution_mode: local
 `)
 		assert.Equal(t, ExecutionModeLocal, cfg.DefaultExecMode)
 	})
@@ -1410,9 +1407,9 @@ defaultExecutionMode: local
 
 	t.Run("InvalidValue", func(t *testing.T) {
 		err := loadWithErrorFromYAML(t, `
-defaultExecutionMode: invalid
+default_execution_mode: invalid
 `)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid defaultExecutionMode")
+		assert.Contains(t, err.Error(), "invalid default_execution_mode")
 	})
 }
