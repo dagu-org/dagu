@@ -50,20 +50,6 @@ func TestMetrics_PrivateMode_WithBasicAuth(t *testing.T) {
 	require.NotEmpty(t, resp.Body)
 }
 
-func TestMetrics_PrivateMode_WithAPIToken(t *testing.T) {
-	t.Parallel()
-	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
-		cfg.Server.Auth.Token.Value = "test-api-token"
-		cfg.Server.Metrics = config.MetricsAccessPrivate
-	}))
-
-	resp := server.Client().Get("/api/v1/metrics").
-		WithBearerToken("test-api-token").
-		ExpectStatus(http.StatusOK).Send(t)
-	require.Contains(t, resp.Response.Header().Get("Content-Type"), "text/plain")
-	require.NotEmpty(t, resp.Body)
-}
-
 func TestMetrics_DefaultsToPrivate(t *testing.T) {
 	t.Parallel()
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {

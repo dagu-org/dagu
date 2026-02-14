@@ -198,7 +198,7 @@ func TestMiddleware_APIKeyValidation_WithJWTFallback(t *testing.T) {
 	assert.Equal(t, auth.RoleAdmin, handler.user.Role)
 }
 
-func TestMiddleware_APIKeyValidation_APIKeyPrioritizedOverStaticToken(t *testing.T) {
+func TestMiddleware_APIKeyValidation_BearerToken(t *testing.T) {
 	apiKeyValidator := newMockAPIKeyValidator()
 	apiKeyValidator.AddKey("dagu_testkey123456789", &auth.APIKey{
 		ID:   "key-id-1",
@@ -208,8 +208,6 @@ func TestMiddleware_APIKeyValidation_APIKeyPrioritizedOverStaticToken(t *testing
 
 	opts := Options{
 		APIKeyValidator: apiKeyValidator,
-		APITokenEnabled: true,
-		APIToken:        "dagu_testkey123456789", // Same token as API key
 	}
 	middleware := Middleware(opts)
 
@@ -217,7 +215,6 @@ func TestMiddleware_APIKeyValidation_APIKeyPrioritizedOverStaticToken(t *testing
 	server := httptest.NewServer(middleware(handler))
 	defer server.Close()
 
-	// API key should be checked before static API token
 	req, err := http.NewRequest(http.MethodGet, server.URL+"/test", nil)
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer dagu_testkey123456789")
@@ -229,7 +226,6 @@ func TestMiddleware_APIKeyValidation_APIKeyPrioritizedOverStaticToken(t *testing
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	require.NotNil(t, handler.user)
-	// Should be the API key user, not the static token admin user
 	assert.Equal(t, "apikey:key-id-1", handler.user.ID)
 	assert.Equal(t, auth.RoleOperator, handler.user.Role)
 }

@@ -409,7 +409,6 @@ func (l *ConfigLoader) loadServerAuth(cfg *Config, def Definition) {
 	}
 
 	l.loadBasicAuth(cfg, def.Auth)
-	l.loadTokenAuth(cfg, def.Auth)
 	l.loadOIDCAuth(cfg, def.Auth)
 	l.loadBuiltinAuth(cfg, def.Auth)
 	l.autoDetectAuthMode(cfg, explicitAuthMode)
@@ -439,12 +438,6 @@ func (l *ConfigLoader) loadBasicAuth(cfg *Config, auth *AuthDef) {
 	if auth.Basic != nil {
 		cfg.Server.Auth.Basic.Username = auth.Basic.Username
 		cfg.Server.Auth.Basic.Password = auth.Basic.Password
-	}
-}
-
-func (l *ConfigLoader) loadTokenAuth(cfg *Config, auth *AuthDef) {
-	if auth.Token != nil {
-		cfg.Server.Auth.Token.Value = auth.Token.Value
 	}
 }
 
@@ -983,9 +976,6 @@ func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) error {
 		setIfNotEmpty(&cfg.Server.Auth.Basic.Username, def.BasicAuthUsername)
 		setIfNotEmpty(&cfg.Server.Auth.Basic.Password, def.BasicAuthPassword)
 		setIfNotEmpty(&cfg.Server.APIBasePath, def.APIBaseURL)
-		if def.IsAuthToken {
-			cfg.Server.Auth.Token.Value = def.AuthToken
-		}
 	}
 
 	if err := l.loadLegacyPaths(cfg, def); err != nil {
@@ -1228,7 +1218,6 @@ var envBindings = []envBinding{
 	{key: "auth.mode", env: "AUTH_MODE"},
 	{key: "auth.basic.username", env: "AUTH_BASIC_USERNAME"},
 	{key: "auth.basic.password", env: "AUTH_BASIC_PASSWORD"},
-	{key: "auth.token.value", env: "AUTH_TOKEN"},
 	// Auth OIDC
 	{key: "auth.oidc.clientId", env: "AUTH_OIDC_CLIENT_ID"},
 	{key: "auth.oidc.clientSecret", env: "AUTH_OIDC_CLIENT_SECRET"},
@@ -1249,7 +1238,6 @@ var envBindings = []envBinding{
 	// Auth (legacy)
 	{key: "auth.basic.username", env: "BASICAUTH_USERNAME"},
 	{key: "auth.basic.password", env: "BASICAUTH_PASSWORD"},
-	{key: "auth.token.value", env: "AUTHTOKEN"},
 	// Auth (builtin)
 	{key: "auth.builtin.admin.username", env: "AUTH_ADMIN_USERNAME"},
 	{key: "auth.builtin.admin.password", env: "AUTH_ADMIN_PASSWORD"},

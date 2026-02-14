@@ -302,8 +302,6 @@ func (a *API) buildAuthOptions(ctx context.Context, basePath string) (frontendau
 
 	authOptions := frontendauth.Options{
 		Realm:            "restricted",
-		APITokenEnabled:  authConfig.Token.Value != "",
-		APIToken:         authConfig.Token.Value,
 		BasicAuthEnabled: basicAuthEnabled,
 		AuthRequired:     true,
 		Creds:            map[string]string{authConfig.Basic.Username: authConfig.Basic.Password},

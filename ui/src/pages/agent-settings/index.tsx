@@ -447,11 +447,31 @@ export default function AgentSettingsPage(): React.ReactNode {
 
   return (
     <div className="space-y-4 max-w-7xl pb-4">
-      <div>
-        <h1 className="text-lg font-semibold">Agent Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Configure the AI assistant for workflow generation
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold">Agent Settings</h1>
+          <p className="text-sm text-muted-foreground">
+            Configure the AI assistant for workflow generation
+          </p>
+        </div>
+        <Button
+          onClick={handleSaveConfig}
+          disabled={isSaving}
+          size="sm"
+          className="h-8"
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4 mr-1.5" />
+              Save Settings
+            </>
+          )}
+        </Button>
       </div>
 
       {error && (
@@ -482,27 +502,6 @@ export default function AgentSettingsPage(): React.ReactNode {
             checked={enabled}
             onCheckedChange={setEnabled}
           />
-        </div>
-
-        <div className="pt-2">
-          <Button
-            onClick={handleSaveConfig}
-            disabled={isSaving}
-            size="sm"
-            className="h-8"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-1.5" />
-                Save Settings
-              </>
-            )}
-          </Button>
         </div>
       </div>
 

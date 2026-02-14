@@ -98,7 +98,6 @@ type TLSDef struct {
 type AuthDef struct {
 	Mode    *string         `mapstructure:"mode"` // "none", "builtin", or "oidc"
 	Basic   *AuthBasicDef   `mapstructure:"basic"`
-	Token   *AuthTokenDef   `mapstructure:"token"`
 	OIDC    *AuthOIDCDef    `mapstructure:"oidc"`
 	Builtin *AuthBuiltinDef `mapstructure:"builtin"`
 }
@@ -107,11 +106,6 @@ type AuthDef struct {
 type AuthBasicDef struct {
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
-}
-
-// AuthTokenDef configures token-based authentication.
-type AuthTokenDef struct {
-	Value string `mapstructure:"value"`
 }
 
 // AuthBuiltinDef configures builtin authentication with RBAC.

@@ -52,7 +52,6 @@ func TestLoad_Env(t *testing.T) {
 
 		"DAGU_AUTH_BASIC_USERNAME": "testuser",
 		"DAGU_AUTH_BASIC_PASSWORD": "testpass",
-		"DAGU_AUTH_TOKEN":          "test-token-123",
 
 		"DAGU_CERT_FILE": filepath.Join(testPaths, "cert.pem"),
 		"DAGU_KEY_FILE":  filepath.Join(testPaths, "key.pem"),
@@ -141,7 +140,6 @@ func TestLoad_Env(t *testing.T) {
 			Auth: Auth{
 				Mode:  AuthModeOIDC, // Auto-detected from OIDC config
 				Basic: AuthBasic{Username: "testuser", Password: "testpass"},
-				Token: AuthToken{Value: "test-token-123"},
 				OIDC: AuthOIDC{
 					ClientID:     "test-client-id",
 					ClientSecret: "test-secret",
@@ -294,8 +292,6 @@ auth:
   basic:
     username: "admin"
     password: "secret"
-  token:
-    value: "api-token"
   oidc:
     clientId: "test-client-id"
     clientSecret: "test-client-secret"
@@ -381,7 +377,6 @@ scheduler:
 			Auth: Auth{
 				Mode:  AuthModeOIDC, // Auto-detected from OIDC config
 				Basic: AuthBasic{Username: "admin", Password: "secret"},
-				Token: AuthToken{Value: "api-token"},
 				OIDC: AuthOIDC{
 					ClientID:     "test-client-id",
 					ClientSecret: "test-client-secret",
@@ -685,7 +680,6 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 		// Auth
 		assert.Equal(t, "user", cfg.Server.Auth.Basic.Username)
 		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
-		assert.Equal(t, "token123", cfg.Server.Auth.Token.Value)
 		assert.Equal(t, "/api/v1", cfg.Server.APIBasePath)
 
 		// Paths - DAGsDir should take precedence over DAGs

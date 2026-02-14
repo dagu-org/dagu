@@ -810,11 +810,6 @@ func (srv *Server) buildAgentAuthOptions() auth.Options {
 		opts.Creds = map[string]string{authCfg.Basic.Username: authCfg.Basic.Password}
 	}
 
-	if authCfg.Token.Value != "" {
-		opts.APITokenEnabled = true
-		opts.APIToken = authCfg.Token.Value
-	}
-
 	if authCfg.Mode == config.AuthModeBuiltin && srv.authService != nil {
 		opts.JWTValidator = srv.authService
 		if srv.authService.HasAPIKeyStore() {

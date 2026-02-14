@@ -16,8 +16,6 @@ import (
 // Options configures the authentication middleware.
 type Options struct {
 	Realm            string
-	APITokenEnabled  bool
-	APIToken         string
 	BasicAuthEnabled bool
 	OIDCAuthEnabled  bool
 	OIDCProvider     *oidc.Provider
@@ -45,7 +43,6 @@ type Options struct {
 func DefaultOptions() Options {
 	return Options{
 		Realm:            "Restricted",
-		APITokenEnabled:  false,
 		BasicAuthEnabled: false,
 		OIDCAuthEnabled:  false,
 	}
@@ -65,7 +62,7 @@ func ClientIPMiddleware() func(next http.Handler) http.Handler {
 // Middleware creates an HTTP middleware for authentication.
 // It supports multiple authentication methods simultaneously:
 // - JWT Bearer tokens (if JWTValidator is set)
-// - Static API tokens (if APITokenEnabled)
+// - API keys with "dagu_" prefix (if APIKeyValidator is set)
 // - HTTP Basic Auth (if BasicAuthEnabled)
 // - OIDC (if OIDCAuthEnabled)
 // All configured methods work at the same time.
@@ -91,7 +88,7 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 
 	jwtEnabled := opts.JWTValidator != nil
 	apiKeyEnabled := opts.APIKeyValidator != nil
-	anyAuthEnabled := opts.BasicAuthEnabled || opts.APITokenEnabled || opts.OIDCAuthEnabled || jwtEnabled || apiKeyEnabled
+	anyAuthEnabled := opts.BasicAuthEnabled || opts.OIDCAuthEnabled || jwtEnabled || apiKeyEnabled
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -153,22 +150,6 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 				}
 			}
 
-			// Try static API token authentication if enabled
-			if opts.APITokenEnabled && checkAPIToken(r, opts.APIToken) {
-				// API token grants full admin access
-				// Inject a synthetic admin user so that permission checks (requireWrite,
-				// requireExecute, requireAdmin) work correctly in builtin auth mode
-				adminUser := &auth.User{
-					ID:       "api-token",
-					Username: "api-token",
-					Role:     auth.RoleAdmin,
-				}
-				ctx := auth.WithUser(r.Context(), adminUser)
-				ctx = auth.WithClientIP(ctx, GetClientIP(r))
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
-
 			// Try Basic Auth if enabled
 			if opts.BasicAuthEnabled {
 				if user, pass, ok := r.BasicAuth(); ok {
@@ -221,22 +202,6 @@ func OIDCMiddleware(opts Options) func(next http.Handler) http.Handler {
 			checkOIDCAuth(next, opts.OIDCProvider, opts.OIDCVerify, opts.OIDCConfig, opts.OIDCWhitelist, w, r)
 		})
 	}
-}
-
-// checkAPIToken validates the API token from the Authorization header.
-func checkAPIToken(r *http.Request, validToken string) bool {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		return false
-	}
-
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		return false
-	}
-
-	// Use constant time comparison to prevent timing attacks
-	token := strings.TrimPrefix(authHeader, "Bearer ")
-	return subtle.ConstantTimeCompare([]byte(token), []byte(validToken)) == 1
 }
 
 // checkBasicAuth validates the username and password.
