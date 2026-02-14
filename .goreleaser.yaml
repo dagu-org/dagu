@@ -30,6 +30,7 @@ builds:
 
 release:
   mode: keep-existing
+  prerelease: auto
 
 checksum:
   name_template: "checksums.txt"
@@ -45,7 +46,8 @@ changelog:
       - "^test:"
 
 brews:
-  - repository:
+  - skip_upload: auto
+    repository:
       owner: dagu-org
       name: homebrew-brew
     directory: Formula
@@ -62,7 +64,8 @@ brews:
       end
 
   # Deprecated brew tap:
-  - repository:
+  - skip_upload: auto
+    repository:
       owner: yohamta
       name: homebrew-tap
     directory: Formula
@@ -78,27 +81,3 @@ brews:
         working_dir var
       end
 
-snapcrafts:
-  - name: dagu
-    title: Dagu
-    summary: "A compact, portable, and language-agnostic workflow engine"
-    description: |
-      Dagu is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
-    confinement: strict
-    grade: stable
-    base: core24
-    license: "GPL-3.0"
-    builds:
-      - dagu
-    layout:
-      /usr/bin/dagu:
-        bind: $SNAP/dagu
-    apps:
-      dagu:
-        command: dagu start-all
-        daemon: simple
-        plugs:
-          - network
-          - home
-          - personal-files
-        restart_condition: "always"
