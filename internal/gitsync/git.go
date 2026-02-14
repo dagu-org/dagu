@@ -311,6 +311,31 @@ func (c *GitClient) AddAndCommit(filePath, message string) (string, error) {
 	return commit.String(), nil
 }
 
+// CommitStaged creates a commit from the currently staged changes.
+func (c *GitClient) CommitStaged(message string) (string, error) {
+	if err := c.requireRepo(); err != nil {
+		return "", err
+	}
+
+	wt, err := c.repo.Worktree()
+	if err != nil {
+		return "", fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	commit, err := wt.Commit(message, &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  c.cfg.GetAuthorName(),
+			Email: c.cfg.GetAuthorEmail(),
+			When:  time.Now(),
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to create commit: %w", err)
+	}
+
+	return commit.String(), nil
+}
+
 // Push pushes commits to the remote.
 func (c *GitClient) Push(ctx context.Context) error {
 	if err := c.requireRepo(); err != nil {

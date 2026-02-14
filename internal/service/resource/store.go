@@ -13,15 +13,19 @@ type MetricPoint struct {
 
 // ResourceHistory holds the history of resource usage
 type ResourceHistory struct {
-	CPU    []MetricPoint `json:"cpu"`
-	Memory []MetricPoint `json:"memory"`
-	Disk   []MetricPoint `json:"disk"`
-	Load   []MetricPoint `json:"load"`
+	CPU              []MetricPoint `json:"cpu"`
+	Memory           []MetricPoint `json:"memory"`
+	Disk             []MetricPoint `json:"disk"`
+	Load             []MetricPoint `json:"load"`
+	MemoryTotalBytes uint64        `json:"memoryTotalBytes"`
+	MemoryUsedBytes  uint64        `json:"memoryUsedBytes"`
+	DiskTotalBytes   uint64        `json:"diskTotalBytes"`
+	DiskUsedBytes    uint64        `json:"diskUsedBytes"`
 }
 
 // Store defines the interface for storing resource metrics
 type Store interface {
-	Add(cpu, memory, disk, load float64)
+	Add(cpu, memory, disk, load float64, memTotal, memUsed, diskTotal, diskUsed uint64)
 	GetHistory(duration time.Duration) *ResourceHistory
 }
 
@@ -36,8 +40,12 @@ type dataPoint struct {
 
 // MemoryStore implements Store using a generic ring buffer
 type MemoryStore struct {
-	mu     sync.RWMutex
-	buffer *RingBuffer[dataPoint]
+	mu               sync.RWMutex
+	buffer           *RingBuffer[dataPoint]
+	memoryTotalBytes uint64
+	memoryUsedBytes  uint64
+	diskTotalBytes   uint64
+	diskUsedBytes    uint64
 }
 
 var _ Store = (*MemoryStore)(nil)
@@ -56,7 +64,7 @@ func NewMemoryStore(retention, interval time.Duration) *MemoryStore {
 }
 
 // Add writes a new data point. Zero allocations, O(1).
-func (s *MemoryStore) Add(cpu, memory, disk, load float64) {
+func (s *MemoryStore) Add(cpu, memory, disk, load float64, memTotal, memUsed, diskTotal, diskUsed uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -67,6 +75,10 @@ func (s *MemoryStore) Add(cpu, memory, disk, load float64) {
 		Disk:      disk,
 		Load:      load,
 	})
+	s.memoryTotalBytes = memTotal
+	s.memoryUsedBytes = memUsed
+	s.diskTotalBytes = diskTotal
+	s.diskUsedBytes = diskUsed
 }
 
 // GetHistory returns metrics for the specified duration
@@ -90,7 +102,12 @@ func (s *MemoryStore) GetHistory(duration time.Duration) *ResourceHistory {
 	})
 
 	if n == 0 {
-		return &ResourceHistory{}
+		return &ResourceHistory{
+			MemoryTotalBytes: s.memoryTotalBytes,
+			MemoryUsedBytes:  s.memoryUsedBytes,
+			DiskTotalBytes:   s.diskTotalBytes,
+			DiskUsedBytes:    s.diskUsedBytes,
+		}
 	}
 
 	cpu := make([]MetricPoint, 0, n)
@@ -109,9 +126,13 @@ func (s *MemoryStore) GetHistory(duration time.Duration) *ResourceHistory {
 	})
 
 	return &ResourceHistory{
-		CPU:    cpu,
-		Memory: memory,
-		Disk:   disk,
-		Load:   load,
+		CPU:              cpu,
+		Memory:           memory,
+		Disk:             disk,
+		Load:             load,
+		MemoryTotalBytes: s.memoryTotalBytes,
+		MemoryUsedBytes:  s.memoryUsedBytes,
+		DiskTotalBytes:   s.diskTotalBytes,
+		DiskUsedBytes:    s.diskUsedBytes,
 	}
 }

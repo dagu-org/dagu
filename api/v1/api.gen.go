@@ -28,6 +28,24 @@ const (
 	BasicAuthScopes = "basicAuth.Scopes"
 )
 
+// Defines values for AgentBashPolicyDefaultBehavior.
+const (
+	AgentBashPolicyDefaultBehaviorAllow AgentBashPolicyDefaultBehavior = "allow"
+	AgentBashPolicyDefaultBehaviorDeny  AgentBashPolicyDefaultBehavior = "deny"
+)
+
+// Defines values for AgentBashPolicyDenyBehavior.
+const (
+	AgentBashPolicyDenyBehaviorAskUser AgentBashPolicyDenyBehavior = "ask_user"
+	AgentBashPolicyDenyBehaviorBlock   AgentBashPolicyDenyBehavior = "block"
+)
+
+// Defines values for AgentBashRuleAction.
+const (
+	AgentBashRuleActionAllow AgentBashRuleAction = "allow"
+	AgentBashRuleActionDeny  AgentBashRuleAction = "deny"
+)
+
 // Defines values for ChatMessageRole.
 const (
 	ChatMessageRoleAssistant ChatMessageRole = "assistant"
@@ -177,6 +195,12 @@ const (
 	SyncAuthConfigTypeToken SyncAuthConfigType = "token"
 )
 
+// Defines values for SyncItemKind.
+const (
+	SyncItemKindDag    SyncItemKind = "dag"
+	SyncItemKindMemory SyncItemKind = "memory"
+)
+
 // Defines values for SyncStatus.
 const (
 	SyncStatusConflict  SyncStatus = "conflict"
@@ -235,10 +259,11 @@ const (
 
 // Defines values for UserRole.
 const (
-	UserRoleAdmin    UserRole = "admin"
-	UserRoleManager  UserRole = "manager"
-	UserRoleOperator UserRole = "operator"
-	UserRoleViewer   UserRole = "viewer"
+	UserRoleAdmin     UserRole = "admin"
+	UserRoleDeveloper UserRole = "developer"
+	UserRoleManager   UserRole = "manager"
+	UserRoleOperator  UserRole = "operator"
+	UserRoleViewer    UserRole = "viewer"
 )
 
 // Defines values for WorkerHealthStatus.
@@ -289,7 +314,7 @@ type APIKey struct {
 	// Name Human-readable name
 	Name string `json:"name"`
 
-	// Role User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution, operator: DAG execution only, viewer: read-only
+	// Role User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution with audit log access, developer: DAG CRUD and execution, operator: DAG execution only, viewer: read-only
 	Role UserRole `json:"role"`
 
 	// UpdatedAt Last update timestamp
@@ -307,6 +332,37 @@ type APIKeysListResponse struct {
 	ApiKeys []APIKey `json:"apiKeys"`
 }
 
+// AgentBashPolicy Granular command policy for the bash tool
+type AgentBashPolicy struct {
+	// DefaultBehavior Behavior when no rule matches a command segment
+	DefaultBehavior *AgentBashPolicyDefaultBehavior `json:"defaultBehavior,omitempty"`
+
+	// DenyBehavior Behavior when a command segment is denied
+	DenyBehavior *AgentBashPolicyDenyBehavior `json:"denyBehavior,omitempty"`
+	Rules        *[]AgentBashRule             `json:"rules,omitempty"`
+}
+
+// AgentBashPolicyDefaultBehavior Behavior when no rule matches a command segment
+type AgentBashPolicyDefaultBehavior string
+
+// AgentBashPolicyDenyBehavior Behavior when a command segment is denied
+type AgentBashPolicyDenyBehavior string
+
+// AgentBashRule defines model for AgentBashRule.
+type AgentBashRule struct {
+	Action AgentBashRuleAction `json:"action"`
+
+	// Enabled Rule enabled state (default: true when omitted)
+	Enabled *bool   `json:"enabled,omitempty"`
+	Name    *string `json:"name,omitempty"`
+
+	// Pattern Regex pattern matched against each shell command segment
+	Pattern string `json:"pattern"`
+}
+
+// AgentBashRuleAction defines model for AgentBashRule.Action.
+type AgentBashRuleAction string
+
 // AgentConfigResponse AI Agent configuration
 type AgentConfigResponse struct {
 	// DefaultModelId ID of the default model
@@ -314,6 +370,38 @@ type AgentConfigResponse struct {
 
 	// Enabled Whether the AI agent is enabled
 	Enabled *bool `json:"enabled,omitempty"`
+
+	// ToolPolicy Global tool permission policy for AI agent sessions
+	ToolPolicy *AgentToolPolicy `json:"toolPolicy,omitempty"`
+}
+
+// AgentDAGMemoryResponse DAG-specific memory content
+type AgentDAGMemoryResponse struct {
+	Content string `json:"content"`
+
+	// DagName Name of the DAG
+	DagName DAGName `json:"dagName"`
+}
+
+// AgentMemoryResponse Agent memory overview
+type AgentMemoryResponse struct {
+	// DagMemories List of DAG names that have memory files
+	DagMemories *[]DAGName `json:"dagMemories,omitempty"`
+
+	// GlobalMemory Content of global MEMORY.md
+	GlobalMemory *string `json:"globalMemory,omitempty"`
+
+	// MemoryDir Root memory directory path
+	MemoryDir *string `json:"memoryDir,omitempty"`
+}
+
+// AgentToolPolicy Global tool permission policy for AI agent sessions
+type AgentToolPolicy struct {
+	// Bash Granular command policy for the bash tool
+	Bash *AgentBashPolicy `json:"bash,omitempty"`
+
+	// Tools Per-tool enable/disable map
+	Tools *map[string]bool `json:"tools,omitempty"`
 }
 
 // ApproveStepRequest Request body for approving a waiting step
@@ -516,7 +604,7 @@ type CreateAPIKeyRequest struct {
 	// Name Human-readable name
 	Name string `json:"name"`
 
-	// Role User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution, operator: DAG execution only, viewer: read-only
+	// Role User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution with audit log access, developer: DAG CRUD and execution, operator: DAG execution only, viewer: read-only
 	Role UserRole `json:"role"`
 }
 
@@ -555,7 +643,7 @@ type CreateUserRequest struct {
 	// Password User's password
 	Password string `json:"password"`
 
-	// Role User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution, operator: DAG execution only, viewer: read-only
+	// Role User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution with audit log access, developer: DAG CRUD and execution, operator: DAG execution only, viewer: read-only
 	Role UserRole `json:"role"`
 
 	// Username Unique username
@@ -1228,10 +1316,22 @@ type ResetPasswordRequest struct {
 
 // ResourceHistory defines model for ResourceHistory.
 type ResourceHistory struct {
-	Cpu    *[]MetricPoint `json:"cpu,omitempty"`
-	Disk   *[]MetricPoint `json:"disk,omitempty"`
-	Load   *[]MetricPoint `json:"load,omitempty"`
-	Memory *[]MetricPoint `json:"memory,omitempty"`
+	Cpu  *[]MetricPoint `json:"cpu,omitempty"`
+	Disk *[]MetricPoint `json:"disk,omitempty"`
+
+	// DiskTotalBytes Total disk space in bytes
+	DiskTotalBytes *int64 `json:"diskTotalBytes,omitempty"`
+
+	// DiskUsedBytes Used disk space in bytes
+	DiskUsedBytes *int64         `json:"diskUsedBytes,omitempty"`
+	Load          *[]MetricPoint `json:"load,omitempty"`
+	Memory        *[]MetricPoint `json:"memory,omitempty"`
+
+	// MemoryTotalBytes Total physical memory in bytes
+	MemoryTotalBytes *int64 `json:"memoryTotalBytes,omitempty"`
+
+	// MemoryUsedBytes Used physical memory in bytes
+	MemoryUsedBytes *int64 `json:"memoryUsedBytes,omitempty"`
 }
 
 // RunConfig Configuration for controlling user interactions when starting DAG runs
@@ -1559,7 +1659,7 @@ type SyncConfigUpdateRequest struct {
 
 // SyncConflictResponse Response when a conflict is detected
 type SyncConflictResponse struct {
-	DagId         string  `json:"dagId"`
+	ItemId        string  `json:"itemId"`
 	Message       string  `json:"message"`
 	RemoteAuthor  *string `json:"remoteAuthor,omitempty"`
 	RemoteCommit  *string `json:"remoteCommit,omitempty"`
@@ -1573,37 +1673,31 @@ type SyncConnectionTestResponse struct {
 	Success bool    `json:"success"`
 }
 
-// SyncDAGDiffResponse Diff between local and remote versions of a DAG
-type SyncDAGDiffResponse struct {
-	// DagId The DAG identifier
-	DagId string `json:"dagId"`
-
-	// LocalContent Current local file content
-	LocalContent string `json:"localContent"`
-
-	// RemoteAuthor Author of the remote commit
-	RemoteAuthor *string `json:"remoteAuthor,omitempty"`
-
-	// RemoteCommit Commit hash being compared against
-	RemoteCommit *string `json:"remoteCommit,omitempty"`
-
-	// RemoteContent Content from remote repository
-	RemoteContent *string `json:"remoteContent,omitempty"`
-
-	// RemoteMessage Commit message of the remote version
-	RemoteMessage *string `json:"remoteMessage,omitempty"`
-
-	// Status Sync status of a DAG
-	Status SyncStatus `json:"status"`
+// SyncError Error during sync operation
+type SyncError struct {
+	ItemId  *string `json:"itemId,omitempty"`
+	Message string  `json:"message"`
 }
 
-// SyncDAGState Sync state for a single DAG
-type SyncDAGState struct {
+// SyncItem Sync state for a single item
+type SyncItem struct {
 	// BaseCommit Commit hash when last synced
 	BaseCommit *string `json:"baseCommit,omitempty"`
 
 	// ConflictDetectedAt When the conflict was detected
 	ConflictDetectedAt *time.Time `json:"conflictDetectedAt,omitempty"`
+
+	// DisplayName Display-friendly item name
+	DisplayName string `json:"displayName"`
+
+	// FilePath Relative file path with extension
+	FilePath string `json:"filePath"`
+
+	// ItemId Stable item identifier (file path without extension)
+	ItemId string `json:"itemId"`
+
+	// Kind Type of sync item
+	Kind SyncItemKind `json:"kind"`
 
 	// LastSyncedAt When the DAG was last synced
 	LastSyncedAt *time.Time `json:"lastSyncedAt,omitempty"`
@@ -1630,14 +1724,41 @@ type SyncDAGState struct {
 	Status SyncStatus `json:"status"`
 }
 
-// SyncError Error during sync operation
-type SyncError struct {
-	DagId   *string `json:"dagId,omitempty"`
-	Message string  `json:"message"`
+// SyncItemDiffResponse Diff between local and remote versions of a sync item
+type SyncItemDiffResponse struct {
+	// FilePath Relative file path with extension
+	FilePath string `json:"filePath"`
+
+	// ItemId The item identifier
+	ItemId string `json:"itemId"`
+
+	// LocalContent Current local file content
+	LocalContent string `json:"localContent"`
+
+	// RemoteAuthor Author of the remote commit
+	RemoteAuthor *string `json:"remoteAuthor,omitempty"`
+
+	// RemoteCommit Commit hash being compared against
+	RemoteCommit *string `json:"remoteCommit,omitempty"`
+
+	// RemoteContent Content from remote repository
+	RemoteContent *string `json:"remoteContent,omitempty"`
+
+	// RemoteMessage Commit message of the remote version
+	RemoteMessage *string `json:"remoteMessage,omitempty"`
+
+	// Status Sync status of a DAG
+	Status SyncStatus `json:"status"`
 }
 
-// SyncPublishAllRequest Request to publish all modified DAGs
+// SyncItemKind Type of sync item
+type SyncItemKind string
+
+// SyncPublishAllRequest Request to publish selected items
 type SyncPublishAllRequest struct {
+	// ItemIds Item IDs to publish. If omitted, all modified or untracked items are published.
+	ItemIds *[]string `json:"itemIds,omitempty"`
+
 	// Message Commit message
 	Message *string `json:"message,omitempty"`
 }
@@ -1686,11 +1807,11 @@ type SyncStatusResponse struct {
 	// Counts Counts of DAGs in each sync status
 	Counts SyncStatusCounts `json:"counts"`
 
-	// Dags Sync state for each DAG
-	Dags *map[string]SyncDAGState `json:"dags,omitempty"`
-
 	// Enabled Whether Git sync is enabled
 	Enabled bool `json:"enabled"`
+
+	// Items Sync state for each item
+	Items []SyncItem `json:"items"`
 
 	// LastError Error message from last failed sync
 	LastError *string `json:"lastError,omitempty"`
@@ -1786,7 +1907,7 @@ type UpdateAPIKeyRequest struct {
 	// Name New name
 	Name *string `json:"name,omitempty"`
 
-	// Role User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution, operator: DAG execution only, viewer: read-only
+	// Role User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution with audit log access, developer: DAG CRUD and execution, operator: DAG execution only, viewer: read-only
 	Role *UserRole `json:"role,omitempty"`
 }
 
@@ -1797,6 +1918,15 @@ type UpdateAgentConfigRequest struct {
 
 	// Enabled Whether the AI agent is enabled
 	Enabled *bool `json:"enabled,omitempty"`
+
+	// ToolPolicy Global tool permission policy for AI agent sessions
+	ToolPolicy *AgentToolPolicy `json:"toolPolicy,omitempty"`
+}
+
+// UpdateAgentMemoryRequest Request to update memory content
+type UpdateAgentMemoryRequest struct {
+	// Content New memory content (markdown)
+	Content string `json:"content"`
 }
 
 // UpdateModelConfigRequest Request to update a model configuration
@@ -1822,7 +1952,7 @@ type UpdateUserRequest struct {
 	// IsDisabled Whether to disable the user account
 	IsDisabled *bool `json:"isDisabled,omitempty"`
 
-	// Role User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution, operator: DAG execution only, viewer: read-only
+	// Role User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution with audit log access, developer: DAG CRUD and execution, operator: DAG execution only, viewer: read-only
 	Role *UserRole `json:"role,omitempty"`
 
 	// Username New username (must be unique)
@@ -1843,7 +1973,7 @@ type User struct {
 	// IsDisabled Whether the user account is disabled
 	IsDisabled *bool `json:"isDisabled,omitempty"`
 
-	// Role User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution, operator: DAG execution only, viewer: read-only
+	// Role User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution with audit log access, developer: DAG CRUD and execution, operator: DAG execution only, viewer: read-only
 	Role UserRole `json:"role"`
 
 	// UpdatedAt Last update timestamp
@@ -1862,7 +1992,7 @@ type UserResponse struct {
 	User User `json:"user"`
 }
 
-// UserRole User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution, operator: DAG execution only, viewer: read-only
+// UserRole User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution with audit log access, developer: DAG CRUD and execution, operator: DAG execution only, viewer: read-only
 type UserRole string
 
 // UsersListResponse Response containing list of users
@@ -2095,6 +2225,9 @@ type EnqueueDAGRunFromSpecJSONBody struct {
 
 	// Queue Override the queue to use for this DAG-run
 	Queue *string `json:"queue,omitempty"`
+
+	// Singleton If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)
+	Singleton *bool `json:"singleton,omitempty"`
 
 	// Spec DAG specification in YAML format
 	Spec string `json:"spec"`
@@ -2630,18 +2763,6 @@ type ToggleDAGWebhookParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// DiscardDagChangesParams defines parameters for DiscardDagChanges.
-type DiscardDagChangesParams struct {
-	// RemoteNode name of the remote node
-	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
-}
-
-// PublishDagParams defines parameters for PublishDag.
-type PublishDagParams struct {
-	// RemoteNode name of the remote node
-	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
-}
-
 // ListQueuesParams defines parameters for ListQueues.
 type ListQueuesParams struct {
 	// RemoteNode name of the remote node
@@ -2711,6 +2832,42 @@ type SetDefaultAgentModelParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
+// DeleteAgentMemoryParams defines parameters for DeleteAgentMemory.
+type DeleteAgentMemoryParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// GetAgentMemoryParams defines parameters for GetAgentMemory.
+type GetAgentMemoryParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// UpdateAgentMemoryParams defines parameters for UpdateAgentMemory.
+type UpdateAgentMemoryParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// DeleteAgentDAGMemoryParams defines parameters for DeleteAgentDAGMemory.
+type DeleteAgentDAGMemoryParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// GetAgentDAGMemoryParams defines parameters for GetAgentDAGMemory.
+type GetAgentDAGMemoryParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// UpdateAgentDAGMemoryParams defines parameters for UpdateAgentDAGMemory.
+type UpdateAgentDAGMemoryParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
 // ListModelPresetsParams defines parameters for ListModelPresets.
 type ListModelPresetsParams struct {
 	// RemoteNode name of the remote node
@@ -2753,8 +2910,20 @@ type UpdateSyncConfigParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
-// GetSyncDAGDiffParams defines parameters for GetSyncDAGDiff.
-type GetSyncDAGDiffParams struct {
+// GetSyncItemDiffParams defines parameters for GetSyncItemDiff.
+type GetSyncItemDiffParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// DiscardSyncItemChangesParams defines parameters for DiscardSyncItemChanges.
+type DiscardSyncItemChangesParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// PublishSyncItemParams defines parameters for PublishSyncItem.
+type PublishSyncItemParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
@@ -2873,14 +3042,17 @@ type UpdateDAGSuspensionStateJSONRequestBody UpdateDAGSuspensionStateJSONBody
 // ToggleDAGWebhookJSONRequestBody defines body for ToggleDAGWebhook for application/json ContentType.
 type ToggleDAGWebhookJSONRequestBody = WebhookToggleRequest
 
-// PublishDagJSONRequestBody defines body for PublishDag for application/json ContentType.
-type PublishDagJSONRequestBody = SyncPublishRequest
-
 // UpdateAgentConfigJSONRequestBody defines body for UpdateAgentConfig for application/json ContentType.
 type UpdateAgentConfigJSONRequestBody = UpdateAgentConfigRequest
 
 // SetDefaultAgentModelJSONRequestBody defines body for SetDefaultAgentModel for application/json ContentType.
 type SetDefaultAgentModelJSONRequestBody = SetDefaultModelRequest
+
+// UpdateAgentMemoryJSONRequestBody defines body for UpdateAgentMemory for application/json ContentType.
+type UpdateAgentMemoryJSONRequestBody = UpdateAgentMemoryRequest
+
+// UpdateAgentDAGMemoryJSONRequestBody defines body for UpdateAgentDAGMemory for application/json ContentType.
+type UpdateAgentDAGMemoryJSONRequestBody = UpdateAgentMemoryRequest
 
 // CreateAgentModelJSONRequestBody defines body for CreateAgentModel for application/json ContentType.
 type CreateAgentModelJSONRequestBody = CreateModelConfigRequest
@@ -2890,6 +3062,9 @@ type UpdateAgentModelJSONRequestBody = UpdateModelConfigRequest
 
 // UpdateSyncConfigJSONRequestBody defines body for UpdateSyncConfig for application/json ContentType.
 type UpdateSyncConfigJSONRequestBody = SyncConfigUpdateRequest
+
+// PublishSyncItemJSONRequestBody defines body for PublishSyncItem for application/json ContentType.
+type PublishSyncItemJSONRequestBody = SyncPublishRequest
 
 // SyncPublishAllJSONRequestBody defines body for SyncPublishAll for application/json ContentType.
 type SyncPublishAllJSONRequestBody = SyncPublishAllRequest
@@ -3215,12 +3390,6 @@ type ServerInterface interface {
 	// Toggle webhook enabled state
 	// (POST /dags/{fileName}/webhook/toggle)
 	ToggleDAGWebhook(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params ToggleDAGWebhookParams)
-	// Discard local changes for a DAG
-	// (POST /dags/{name}/discard)
-	DiscardDagChanges(w http.ResponseWriter, r *http.Request, name string, params DiscardDagChangesParams)
-	// Publish a single DAG
-	// (POST /dags/{name}/publish)
-	PublishDag(w http.ResponseWriter, r *http.Request, name string, params PublishDagParams)
 	// Check server health status
 	// (GET /health)
 	GetHealthStatus(w http.ResponseWriter, r *http.Request)
@@ -3254,6 +3423,24 @@ type ServerInterface interface {
 	// Set default agent model
 	// (PUT /settings/agent/default-model)
 	SetDefaultAgentModel(w http.ResponseWriter, r *http.Request, params SetDefaultAgentModelParams)
+	// Clear global agent memory
+	// (DELETE /settings/agent/memory)
+	DeleteAgentMemory(w http.ResponseWriter, r *http.Request, params DeleteAgentMemoryParams)
+	// Get agent memory
+	// (GET /settings/agent/memory)
+	GetAgentMemory(w http.ResponseWriter, r *http.Request, params GetAgentMemoryParams)
+	// Update global agent memory
+	// (PUT /settings/agent/memory)
+	UpdateAgentMemory(w http.ResponseWriter, r *http.Request, params UpdateAgentMemoryParams)
+	// Clear DAG-specific agent memory
+	// (DELETE /settings/agent/memory/dags/{dagName})
+	DeleteAgentDAGMemory(w http.ResponseWriter, r *http.Request, dagName DAGName, params DeleteAgentDAGMemoryParams)
+	// Get DAG-specific agent memory
+	// (GET /settings/agent/memory/dags/{dagName})
+	GetAgentDAGMemory(w http.ResponseWriter, r *http.Request, dagName DAGName, params GetAgentDAGMemoryParams)
+	// Update DAG-specific agent memory
+	// (PUT /settings/agent/memory/dags/{dagName})
+	UpdateAgentDAGMemory(w http.ResponseWriter, r *http.Request, dagName DAGName, params UpdateAgentDAGMemoryParams)
 	// List model presets
 	// (GET /settings/agent/model-presets)
 	ListModelPresets(w http.ResponseWriter, r *http.Request, params ListModelPresetsParams)
@@ -3275,10 +3462,16 @@ type ServerInterface interface {
 	// Update Git sync configuration
 	// (PUT /sync/config)
 	UpdateSyncConfig(w http.ResponseWriter, r *http.Request, params UpdateSyncConfigParams)
-	// Get diff for a DAG
-	// (GET /sync/dags/{name}/diff)
-	GetSyncDAGDiff(w http.ResponseWriter, r *http.Request, name string, params GetSyncDAGDiffParams)
-	// Publish all modified DAGs
+	// Get diff for a sync item
+	// (GET /sync/items/{itemId}/diff)
+	GetSyncItemDiff(w http.ResponseWriter, r *http.Request, itemId string, params GetSyncItemDiffParams)
+	// Discard local changes for a sync item
+	// (POST /sync/items/{itemId}/discard)
+	DiscardSyncItemChanges(w http.ResponseWriter, r *http.Request, itemId string, params DiscardSyncItemChangesParams)
+	// Publish a single sync item
+	// (POST /sync/items/{itemId}/publish)
+	PublishSyncItem(w http.ResponseWriter, r *http.Request, itemId string, params PublishSyncItemParams)
+	// Publish selected DAGs
 	// (POST /sync/publish-all)
 	SyncPublishAll(w http.ResponseWriter, r *http.Request, params SyncPublishAllParams)
 	// Pull changes from remote repository
@@ -3689,18 +3882,6 @@ func (_ Unimplemented) ToggleDAGWebhook(w http.ResponseWriter, r *http.Request, 
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Discard local changes for a DAG
-// (POST /dags/{name}/discard)
-func (_ Unimplemented) DiscardDagChanges(w http.ResponseWriter, r *http.Request, name string, params DiscardDagChangesParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Publish a single DAG
-// (POST /dags/{name}/publish)
-func (_ Unimplemented) PublishDag(w http.ResponseWriter, r *http.Request, name string, params PublishDagParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
 // Check server health status
 // (GET /health)
 func (_ Unimplemented) GetHealthStatus(w http.ResponseWriter, r *http.Request) {
@@ -3767,6 +3948,42 @@ func (_ Unimplemented) SetDefaultAgentModel(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Clear global agent memory
+// (DELETE /settings/agent/memory)
+func (_ Unimplemented) DeleteAgentMemory(w http.ResponseWriter, r *http.Request, params DeleteAgentMemoryParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get agent memory
+// (GET /settings/agent/memory)
+func (_ Unimplemented) GetAgentMemory(w http.ResponseWriter, r *http.Request, params GetAgentMemoryParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update global agent memory
+// (PUT /settings/agent/memory)
+func (_ Unimplemented) UpdateAgentMemory(w http.ResponseWriter, r *http.Request, params UpdateAgentMemoryParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Clear DAG-specific agent memory
+// (DELETE /settings/agent/memory/dags/{dagName})
+func (_ Unimplemented) DeleteAgentDAGMemory(w http.ResponseWriter, r *http.Request, dagName DAGName, params DeleteAgentDAGMemoryParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get DAG-specific agent memory
+// (GET /settings/agent/memory/dags/{dagName})
+func (_ Unimplemented) GetAgentDAGMemory(w http.ResponseWriter, r *http.Request, dagName DAGName, params GetAgentDAGMemoryParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update DAG-specific agent memory
+// (PUT /settings/agent/memory/dags/{dagName})
+func (_ Unimplemented) UpdateAgentDAGMemory(w http.ResponseWriter, r *http.Request, dagName DAGName, params UpdateAgentDAGMemoryParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // List model presets
 // (GET /settings/agent/model-presets)
 func (_ Unimplemented) ListModelPresets(w http.ResponseWriter, r *http.Request, params ListModelPresetsParams) {
@@ -3809,13 +4026,25 @@ func (_ Unimplemented) UpdateSyncConfig(w http.ResponseWriter, r *http.Request, 
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Get diff for a DAG
-// (GET /sync/dags/{name}/diff)
-func (_ Unimplemented) GetSyncDAGDiff(w http.ResponseWriter, r *http.Request, name string, params GetSyncDAGDiffParams) {
+// Get diff for a sync item
+// (GET /sync/items/{itemId}/diff)
+func (_ Unimplemented) GetSyncItemDiff(w http.ResponseWriter, r *http.Request, itemId string, params GetSyncItemDiffParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Publish all modified DAGs
+// Discard local changes for a sync item
+// (POST /sync/items/{itemId}/discard)
+func (_ Unimplemented) DiscardSyncItemChanges(w http.ResponseWriter, r *http.Request, itemId string, params DiscardSyncItemChangesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Publish a single sync item
+// (POST /sync/items/{itemId}/publish)
+func (_ Unimplemented) PublishSyncItem(w http.ResponseWriter, r *http.Request, itemId string, params PublishSyncItemParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Publish selected DAGs
 // (POST /sync/publish-all)
 func (_ Unimplemented) SyncPublishAll(w http.ResponseWriter, r *http.Request, params SyncPublishAllParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -7154,94 +7383,6 @@ func (siw *ServerInterfaceWrapper) ToggleDAGWebhook(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
-// DiscardDagChanges operation middleware
-func (siw *ServerInterfaceWrapper) DiscardDagChanges(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "name" -------------
-	var name string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params DiscardDagChangesParams
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DiscardDagChanges(w, r, name, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// PublishDag operation middleware
-func (siw *ServerInterfaceWrapper) PublishDag(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "name" -------------
-	var name string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params PublishDagParams
-
-	// ------------- Optional query parameter "remoteNode" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PublishDag(w, r, name, params)
-	}))
-
-	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
-		handler = siw.HandlerMiddlewares[i](handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // GetHealthStatus operation middleware
 func (siw *ServerInterfaceWrapper) GetHealthStatus(w http.ResponseWriter, r *http.Request) {
 
@@ -7642,6 +7783,243 @@ func (siw *ServerInterfaceWrapper) SetDefaultAgentModel(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteAgentMemory operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAgentMemory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteAgentMemoryParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAgentMemory(w, r, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAgentMemory operation middleware
+func (siw *ServerInterfaceWrapper) GetAgentMemory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAgentMemoryParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAgentMemory(w, r, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAgentMemory operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAgentMemory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateAgentMemoryParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAgentMemory(w, r, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAgentDAGMemory operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAgentDAGMemory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "dagName" -------------
+	var dagName DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteAgentDAGMemoryParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAgentDAGMemory(w, r, dagName, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAgentDAGMemory operation middleware
+func (siw *ServerInterfaceWrapper) GetAgentDAGMemory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "dagName" -------------
+	var dagName DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAgentDAGMemoryParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAgentDAGMemory(w, r, dagName, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAgentDAGMemory operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAgentDAGMemory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "dagName" -------------
+	var dagName DAGName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dagName", chi.URLParam(r, "dagName"), &dagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dagName", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateAgentDAGMemoryParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAgentDAGMemory(w, r, dagName, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListModelPresets operation middleware
 func (siw *ServerInterfaceWrapper) ListModelPresets(w http.ResponseWriter, r *http.Request) {
 
@@ -7905,17 +8283,17 @@ func (siw *ServerInterfaceWrapper) UpdateSyncConfig(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
-// GetSyncDAGDiff operation middleware
-func (siw *ServerInterfaceWrapper) GetSyncDAGDiff(w http.ResponseWriter, r *http.Request) {
+// GetSyncItemDiff operation middleware
+func (siw *ServerInterfaceWrapper) GetSyncItemDiff(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
-	// ------------- Path parameter "name" -------------
-	var name string
+	// ------------- Path parameter "itemId" -------------
+	var itemId string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "itemId", chi.URLParam(r, "itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
 		return
 	}
 
@@ -7928,7 +8306,7 @@ func (siw *ServerInterfaceWrapper) GetSyncDAGDiff(w http.ResponseWriter, r *http
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params GetSyncDAGDiffParams
+	var params GetSyncItemDiffParams
 
 	// ------------- Optional query parameter "remoteNode" -------------
 
@@ -7939,7 +8317,95 @@ func (siw *ServerInterfaceWrapper) GetSyncDAGDiff(w http.ResponseWriter, r *http
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetSyncDAGDiff(w, r, name, params)
+		siw.Handler.GetSyncItemDiff(w, r, itemId, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DiscardSyncItemChanges operation middleware
+func (siw *ServerInterfaceWrapper) DiscardSyncItemChanges(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "itemId" -------------
+	var itemId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "itemId", chi.URLParam(r, "itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DiscardSyncItemChangesParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DiscardSyncItemChanges(w, r, itemId, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PublishSyncItem operation middleware
+func (siw *ServerInterfaceWrapper) PublishSyncItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "itemId" -------------
+	var itemId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "itemId", chi.URLParam(r, "itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PublishSyncItemParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PublishSyncItem(w, r, itemId, params)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8689,12 +9155,6 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/dags/{fileName}/webhook/toggle", wrapper.ToggleDAGWebhook)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/dags/{name}/discard", wrapper.DiscardDagChanges)
-	})
-	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/dags/{name}/publish", wrapper.PublishDag)
-	})
-	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.GetHealthStatus)
 	})
 	r.Group(func(r chi.Router) {
@@ -8728,6 +9188,24 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/settings/agent/default-model", wrapper.SetDefaultAgentModel)
 	})
 	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/settings/agent/memory", wrapper.DeleteAgentMemory)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/settings/agent/memory", wrapper.GetAgentMemory)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/settings/agent/memory", wrapper.UpdateAgentMemory)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/settings/agent/memory/dags/{dagName}", wrapper.DeleteAgentDAGMemory)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/settings/agent/memory/dags/{dagName}", wrapper.GetAgentDAGMemory)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/settings/agent/memory/dags/{dagName}", wrapper.UpdateAgentDAGMemory)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/settings/agent/model-presets", wrapper.ListModelPresets)
 	})
 	r.Group(func(r chi.Router) {
@@ -8749,7 +9227,13 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/sync/config", wrapper.UpdateSyncConfig)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/sync/dags/{name}/diff", wrapper.GetSyncDAGDiff)
+		r.Get(options.BaseURL+"/sync/items/{itemId}/diff", wrapper.GetSyncItemDiff)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/sync/items/{itemId}/discard", wrapper.DiscardSyncItemChanges)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/sync/items/{itemId}/publish", wrapper.PublishSyncItem)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/sync/publish-all", wrapper.SyncPublishAll)
@@ -11474,94 +11958,6 @@ func (response ToggleDAGWebhookdefaultJSONResponse) VisitToggleDAGWebhookRespons
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type DiscardDagChangesRequestObject struct {
-	Name   string `json:"name"`
-	Params DiscardDagChangesParams
-}
-
-type DiscardDagChangesResponseObject interface {
-	VisitDiscardDagChangesResponse(w http.ResponseWriter) error
-}
-
-type DiscardDagChanges200JSONResponse SuccessResponse
-
-func (response DiscardDagChanges200JSONResponse) VisitDiscardDagChangesResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type DiscardDagChanges404JSONResponse Error
-
-func (response DiscardDagChanges404JSONResponse) VisitDiscardDagChangesResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type DiscardDagChangesdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response DiscardDagChangesdefaultJSONResponse) VisitDiscardDagChangesResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
-type PublishDagRequestObject struct {
-	Name   string `json:"name"`
-	Params PublishDagParams
-	Body   *PublishDagJSONRequestBody
-}
-
-type PublishDagResponseObject interface {
-	VisitPublishDagResponse(w http.ResponseWriter) error
-}
-
-type PublishDag200JSONResponse SyncResultResponse
-
-func (response PublishDag200JSONResponse) VisitPublishDagResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type PublishDag404JSONResponse Error
-
-func (response PublishDag404JSONResponse) VisitPublishDagResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type PublishDag409JSONResponse SyncConflictResponse
-
-func (response PublishDag409JSONResponse) VisitPublishDagResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(409)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type PublishDagdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response PublishDagdefaultJSONResponse) VisitPublishDagResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
 type GetHealthStatusRequestObject struct {
 }
 
@@ -11961,6 +12357,307 @@ func (response SetDefaultAgentModeldefaultJSONResponse) VisitSetDefaultAgentMode
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
+type DeleteAgentMemoryRequestObject struct {
+	Params DeleteAgentMemoryParams
+}
+
+type DeleteAgentMemoryResponseObject interface {
+	VisitDeleteAgentMemoryResponse(w http.ResponseWriter) error
+}
+
+type DeleteAgentMemory200Response struct {
+}
+
+func (response DeleteAgentMemory200Response) VisitDeleteAgentMemoryResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type DeleteAgentMemory401JSONResponse Error
+
+func (response DeleteAgentMemory401JSONResponse) VisitDeleteAgentMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteAgentMemory403JSONResponse Error
+
+func (response DeleteAgentMemory403JSONResponse) VisitDeleteAgentMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteAgentMemorydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response DeleteAgentMemorydefaultJSONResponse) VisitDeleteAgentMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type GetAgentMemoryRequestObject struct {
+	Params GetAgentMemoryParams
+}
+
+type GetAgentMemoryResponseObject interface {
+	VisitGetAgentMemoryResponse(w http.ResponseWriter) error
+}
+
+type GetAgentMemory200JSONResponse AgentMemoryResponse
+
+func (response GetAgentMemory200JSONResponse) VisitGetAgentMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentMemory401JSONResponse Error
+
+func (response GetAgentMemory401JSONResponse) VisitGetAgentMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentMemory403JSONResponse Error
+
+func (response GetAgentMemory403JSONResponse) VisitGetAgentMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentMemorydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetAgentMemorydefaultJSONResponse) VisitGetAgentMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type UpdateAgentMemoryRequestObject struct {
+	Params UpdateAgentMemoryParams
+	Body   *UpdateAgentMemoryJSONRequestBody
+}
+
+type UpdateAgentMemoryResponseObject interface {
+	VisitUpdateAgentMemoryResponse(w http.ResponseWriter) error
+}
+
+type UpdateAgentMemory200Response struct {
+}
+
+func (response UpdateAgentMemory200Response) VisitUpdateAgentMemoryResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type UpdateAgentMemory400JSONResponse Error
+
+func (response UpdateAgentMemory400JSONResponse) VisitUpdateAgentMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAgentMemory401JSONResponse Error
+
+func (response UpdateAgentMemory401JSONResponse) VisitUpdateAgentMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAgentMemory403JSONResponse Error
+
+func (response UpdateAgentMemory403JSONResponse) VisitUpdateAgentMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAgentMemorydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response UpdateAgentMemorydefaultJSONResponse) VisitUpdateAgentMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type DeleteAgentDAGMemoryRequestObject struct {
+	DagName DAGName `json:"dagName"`
+	Params  DeleteAgentDAGMemoryParams
+}
+
+type DeleteAgentDAGMemoryResponseObject interface {
+	VisitDeleteAgentDAGMemoryResponse(w http.ResponseWriter) error
+}
+
+type DeleteAgentDAGMemory200Response struct {
+}
+
+func (response DeleteAgentDAGMemory200Response) VisitDeleteAgentDAGMemoryResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type DeleteAgentDAGMemory401JSONResponse Error
+
+func (response DeleteAgentDAGMemory401JSONResponse) VisitDeleteAgentDAGMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteAgentDAGMemory403JSONResponse Error
+
+func (response DeleteAgentDAGMemory403JSONResponse) VisitDeleteAgentDAGMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteAgentDAGMemorydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response DeleteAgentDAGMemorydefaultJSONResponse) VisitDeleteAgentDAGMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type GetAgentDAGMemoryRequestObject struct {
+	DagName DAGName `json:"dagName"`
+	Params  GetAgentDAGMemoryParams
+}
+
+type GetAgentDAGMemoryResponseObject interface {
+	VisitGetAgentDAGMemoryResponse(w http.ResponseWriter) error
+}
+
+type GetAgentDAGMemory200JSONResponse AgentDAGMemoryResponse
+
+func (response GetAgentDAGMemory200JSONResponse) VisitGetAgentDAGMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentDAGMemory401JSONResponse Error
+
+func (response GetAgentDAGMemory401JSONResponse) VisitGetAgentDAGMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentDAGMemory403JSONResponse Error
+
+func (response GetAgentDAGMemory403JSONResponse) VisitGetAgentDAGMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentDAGMemorydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetAgentDAGMemorydefaultJSONResponse) VisitGetAgentDAGMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type UpdateAgentDAGMemoryRequestObject struct {
+	DagName DAGName `json:"dagName"`
+	Params  UpdateAgentDAGMemoryParams
+	Body    *UpdateAgentDAGMemoryJSONRequestBody
+}
+
+type UpdateAgentDAGMemoryResponseObject interface {
+	VisitUpdateAgentDAGMemoryResponse(w http.ResponseWriter) error
+}
+
+type UpdateAgentDAGMemory200Response struct {
+}
+
+func (response UpdateAgentDAGMemory200Response) VisitUpdateAgentDAGMemoryResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type UpdateAgentDAGMemory400JSONResponse Error
+
+func (response UpdateAgentDAGMemory400JSONResponse) VisitUpdateAgentDAGMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAgentDAGMemory401JSONResponse Error
+
+func (response UpdateAgentDAGMemory401JSONResponse) VisitUpdateAgentDAGMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAgentDAGMemory403JSONResponse Error
+
+func (response UpdateAgentDAGMemory403JSONResponse) VisitUpdateAgentDAGMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAgentDAGMemorydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response UpdateAgentDAGMemorydefaultJSONResponse) VisitUpdateAgentDAGMemoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
 type ListModelPresetsRequestObject struct {
 	Params ListModelPresetsParams
 }
@@ -12303,39 +13000,127 @@ func (response UpdateSyncConfigdefaultJSONResponse) VisitUpdateSyncConfigRespons
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type GetSyncDAGDiffRequestObject struct {
-	Name   string `json:"name"`
-	Params GetSyncDAGDiffParams
+type GetSyncItemDiffRequestObject struct {
+	ItemId string `json:"itemId"`
+	Params GetSyncItemDiffParams
 }
 
-type GetSyncDAGDiffResponseObject interface {
-	VisitGetSyncDAGDiffResponse(w http.ResponseWriter) error
+type GetSyncItemDiffResponseObject interface {
+	VisitGetSyncItemDiffResponse(w http.ResponseWriter) error
 }
 
-type GetSyncDAGDiff200JSONResponse SyncDAGDiffResponse
+type GetSyncItemDiff200JSONResponse SyncItemDiffResponse
 
-func (response GetSyncDAGDiff200JSONResponse) VisitGetSyncDAGDiffResponse(w http.ResponseWriter) error {
+func (response GetSyncItemDiff200JSONResponse) VisitGetSyncItemDiffResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetSyncDAGDiff404JSONResponse Error
+type GetSyncItemDiff404JSONResponse Error
 
-func (response GetSyncDAGDiff404JSONResponse) VisitGetSyncDAGDiffResponse(w http.ResponseWriter) error {
+func (response GetSyncItemDiff404JSONResponse) VisitGetSyncItemDiffResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetSyncDAGDiffdefaultJSONResponse struct {
+type GetSyncItemDiffdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response GetSyncDAGDiffdefaultJSONResponse) VisitGetSyncDAGDiffResponse(w http.ResponseWriter) error {
+func (response GetSyncItemDiffdefaultJSONResponse) VisitGetSyncItemDiffResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type DiscardSyncItemChangesRequestObject struct {
+	ItemId string `json:"itemId"`
+	Params DiscardSyncItemChangesParams
+}
+
+type DiscardSyncItemChangesResponseObject interface {
+	VisitDiscardSyncItemChangesResponse(w http.ResponseWriter) error
+}
+
+type DiscardSyncItemChanges200JSONResponse SuccessResponse
+
+func (response DiscardSyncItemChanges200JSONResponse) VisitDiscardSyncItemChangesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DiscardSyncItemChanges404JSONResponse Error
+
+func (response DiscardSyncItemChanges404JSONResponse) VisitDiscardSyncItemChangesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DiscardSyncItemChangesdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response DiscardSyncItemChangesdefaultJSONResponse) VisitDiscardSyncItemChangesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type PublishSyncItemRequestObject struct {
+	ItemId string `json:"itemId"`
+	Params PublishSyncItemParams
+	Body   *PublishSyncItemJSONRequestBody
+}
+
+type PublishSyncItemResponseObject interface {
+	VisitPublishSyncItemResponse(w http.ResponseWriter) error
+}
+
+type PublishSyncItem200JSONResponse SyncResultResponse
+
+func (response PublishSyncItem200JSONResponse) VisitPublishSyncItemResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PublishSyncItem404JSONResponse Error
+
+func (response PublishSyncItem404JSONResponse) VisitPublishSyncItemResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PublishSyncItem409JSONResponse SyncConflictResponse
+
+func (response PublishSyncItem409JSONResponse) VisitPublishSyncItemResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PublishSyncItemdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response PublishSyncItemdefaultJSONResponse) VisitPublishSyncItemResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -13150,12 +13935,6 @@ type StrictServerInterface interface {
 	// Toggle webhook enabled state
 	// (POST /dags/{fileName}/webhook/toggle)
 	ToggleDAGWebhook(ctx context.Context, request ToggleDAGWebhookRequestObject) (ToggleDAGWebhookResponseObject, error)
-	// Discard local changes for a DAG
-	// (POST /dags/{name}/discard)
-	DiscardDagChanges(ctx context.Context, request DiscardDagChangesRequestObject) (DiscardDagChangesResponseObject, error)
-	// Publish a single DAG
-	// (POST /dags/{name}/publish)
-	PublishDag(ctx context.Context, request PublishDagRequestObject) (PublishDagResponseObject, error)
 	// Check server health status
 	// (GET /health)
 	GetHealthStatus(ctx context.Context, request GetHealthStatusRequestObject) (GetHealthStatusResponseObject, error)
@@ -13189,6 +13968,24 @@ type StrictServerInterface interface {
 	// Set default agent model
 	// (PUT /settings/agent/default-model)
 	SetDefaultAgentModel(ctx context.Context, request SetDefaultAgentModelRequestObject) (SetDefaultAgentModelResponseObject, error)
+	// Clear global agent memory
+	// (DELETE /settings/agent/memory)
+	DeleteAgentMemory(ctx context.Context, request DeleteAgentMemoryRequestObject) (DeleteAgentMemoryResponseObject, error)
+	// Get agent memory
+	// (GET /settings/agent/memory)
+	GetAgentMemory(ctx context.Context, request GetAgentMemoryRequestObject) (GetAgentMemoryResponseObject, error)
+	// Update global agent memory
+	// (PUT /settings/agent/memory)
+	UpdateAgentMemory(ctx context.Context, request UpdateAgentMemoryRequestObject) (UpdateAgentMemoryResponseObject, error)
+	// Clear DAG-specific agent memory
+	// (DELETE /settings/agent/memory/dags/{dagName})
+	DeleteAgentDAGMemory(ctx context.Context, request DeleteAgentDAGMemoryRequestObject) (DeleteAgentDAGMemoryResponseObject, error)
+	// Get DAG-specific agent memory
+	// (GET /settings/agent/memory/dags/{dagName})
+	GetAgentDAGMemory(ctx context.Context, request GetAgentDAGMemoryRequestObject) (GetAgentDAGMemoryResponseObject, error)
+	// Update DAG-specific agent memory
+	// (PUT /settings/agent/memory/dags/{dagName})
+	UpdateAgentDAGMemory(ctx context.Context, request UpdateAgentDAGMemoryRequestObject) (UpdateAgentDAGMemoryResponseObject, error)
 	// List model presets
 	// (GET /settings/agent/model-presets)
 	ListModelPresets(ctx context.Context, request ListModelPresetsRequestObject) (ListModelPresetsResponseObject, error)
@@ -13210,10 +14007,16 @@ type StrictServerInterface interface {
 	// Update Git sync configuration
 	// (PUT /sync/config)
 	UpdateSyncConfig(ctx context.Context, request UpdateSyncConfigRequestObject) (UpdateSyncConfigResponseObject, error)
-	// Get diff for a DAG
-	// (GET /sync/dags/{name}/diff)
-	GetSyncDAGDiff(ctx context.Context, request GetSyncDAGDiffRequestObject) (GetSyncDAGDiffResponseObject, error)
-	// Publish all modified DAGs
+	// Get diff for a sync item
+	// (GET /sync/items/{itemId}/diff)
+	GetSyncItemDiff(ctx context.Context, request GetSyncItemDiffRequestObject) (GetSyncItemDiffResponseObject, error)
+	// Discard local changes for a sync item
+	// (POST /sync/items/{itemId}/discard)
+	DiscardSyncItemChanges(ctx context.Context, request DiscardSyncItemChangesRequestObject) (DiscardSyncItemChangesResponseObject, error)
+	// Publish a single sync item
+	// (POST /sync/items/{itemId}/publish)
+	PublishSyncItem(ctx context.Context, request PublishSyncItemRequestObject) (PublishSyncItemResponseObject, error)
+	// Publish selected DAGs
 	// (POST /sync/publish-all)
 	SyncPublishAll(ctx context.Context, request SyncPublishAllRequestObject) (SyncPublishAllResponseObject, error)
 	// Pull changes from remote repository
@@ -15113,67 +15916,6 @@ func (sh *strictHandler) ToggleDAGWebhook(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// DiscardDagChanges operation middleware
-func (sh *strictHandler) DiscardDagChanges(w http.ResponseWriter, r *http.Request, name string, params DiscardDagChangesParams) {
-	var request DiscardDagChangesRequestObject
-
-	request.Name = name
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.DiscardDagChanges(ctx, request.(DiscardDagChangesRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "DiscardDagChanges")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(DiscardDagChangesResponseObject); ok {
-		if err := validResponse.VisitDiscardDagChangesResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// PublishDag operation middleware
-func (sh *strictHandler) PublishDag(w http.ResponseWriter, r *http.Request, name string, params PublishDagParams) {
-	var request PublishDagRequestObject
-
-	request.Name = name
-	request.Params = params
-
-	var body PublishDagJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.PublishDag(ctx, request.(PublishDagRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "PublishDag")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(PublishDagResponseObject); ok {
-		if err := validResponse.VisitPublishDagResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
 // GetHealthStatus operation middleware
 func (sh *strictHandler) GetHealthStatus(w http.ResponseWriter, r *http.Request) {
 	var request GetHealthStatusRequestObject
@@ -15471,6 +16213,179 @@ func (sh *strictHandler) SetDefaultAgentModel(w http.ResponseWriter, r *http.Req
 	}
 }
 
+// DeleteAgentMemory operation middleware
+func (sh *strictHandler) DeleteAgentMemory(w http.ResponseWriter, r *http.Request, params DeleteAgentMemoryParams) {
+	var request DeleteAgentMemoryRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteAgentMemory(ctx, request.(DeleteAgentMemoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteAgentMemory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteAgentMemoryResponseObject); ok {
+		if err := validResponse.VisitDeleteAgentMemoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAgentMemory operation middleware
+func (sh *strictHandler) GetAgentMemory(w http.ResponseWriter, r *http.Request, params GetAgentMemoryParams) {
+	var request GetAgentMemoryRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAgentMemory(ctx, request.(GetAgentMemoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAgentMemory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAgentMemoryResponseObject); ok {
+		if err := validResponse.VisitGetAgentMemoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateAgentMemory operation middleware
+func (sh *strictHandler) UpdateAgentMemory(w http.ResponseWriter, r *http.Request, params UpdateAgentMemoryParams) {
+	var request UpdateAgentMemoryRequestObject
+
+	request.Params = params
+
+	var body UpdateAgentMemoryJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateAgentMemory(ctx, request.(UpdateAgentMemoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateAgentMemory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateAgentMemoryResponseObject); ok {
+		if err := validResponse.VisitUpdateAgentMemoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteAgentDAGMemory operation middleware
+func (sh *strictHandler) DeleteAgentDAGMemory(w http.ResponseWriter, r *http.Request, dagName DAGName, params DeleteAgentDAGMemoryParams) {
+	var request DeleteAgentDAGMemoryRequestObject
+
+	request.DagName = dagName
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteAgentDAGMemory(ctx, request.(DeleteAgentDAGMemoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteAgentDAGMemory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteAgentDAGMemoryResponseObject); ok {
+		if err := validResponse.VisitDeleteAgentDAGMemoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAgentDAGMemory operation middleware
+func (sh *strictHandler) GetAgentDAGMemory(w http.ResponseWriter, r *http.Request, dagName DAGName, params GetAgentDAGMemoryParams) {
+	var request GetAgentDAGMemoryRequestObject
+
+	request.DagName = dagName
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAgentDAGMemory(ctx, request.(GetAgentDAGMemoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAgentDAGMemory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAgentDAGMemoryResponseObject); ok {
+		if err := validResponse.VisitGetAgentDAGMemoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateAgentDAGMemory operation middleware
+func (sh *strictHandler) UpdateAgentDAGMemory(w http.ResponseWriter, r *http.Request, dagName DAGName, params UpdateAgentDAGMemoryParams) {
+	var request UpdateAgentDAGMemoryRequestObject
+
+	request.DagName = dagName
+	request.Params = params
+
+	var body UpdateAgentDAGMemoryJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateAgentDAGMemory(ctx, request.(UpdateAgentDAGMemoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateAgentDAGMemory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateAgentDAGMemoryResponseObject); ok {
+		if err := validResponse.VisitUpdateAgentDAGMemoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListModelPresets operation middleware
 func (sh *strictHandler) ListModelPresets(w http.ResponseWriter, r *http.Request, params ListModelPresetsParams) {
 	var request ListModelPresetsRequestObject
@@ -15676,26 +16591,87 @@ func (sh *strictHandler) UpdateSyncConfig(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// GetSyncDAGDiff operation middleware
-func (sh *strictHandler) GetSyncDAGDiff(w http.ResponseWriter, r *http.Request, name string, params GetSyncDAGDiffParams) {
-	var request GetSyncDAGDiffRequestObject
+// GetSyncItemDiff operation middleware
+func (sh *strictHandler) GetSyncItemDiff(w http.ResponseWriter, r *http.Request, itemId string, params GetSyncItemDiffParams) {
+	var request GetSyncItemDiffRequestObject
 
-	request.Name = name
+	request.ItemId = itemId
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetSyncDAGDiff(ctx, request.(GetSyncDAGDiffRequestObject))
+		return sh.ssi.GetSyncItemDiff(ctx, request.(GetSyncItemDiffRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetSyncDAGDiff")
+		handler = middleware(handler, "GetSyncItemDiff")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetSyncDAGDiffResponseObject); ok {
-		if err := validResponse.VisitGetSyncDAGDiffResponse(w); err != nil {
+	} else if validResponse, ok := response.(GetSyncItemDiffResponseObject); ok {
+		if err := validResponse.VisitGetSyncItemDiffResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DiscardSyncItemChanges operation middleware
+func (sh *strictHandler) DiscardSyncItemChanges(w http.ResponseWriter, r *http.Request, itemId string, params DiscardSyncItemChangesParams) {
+	var request DiscardSyncItemChangesRequestObject
+
+	request.ItemId = itemId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DiscardSyncItemChanges(ctx, request.(DiscardSyncItemChangesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DiscardSyncItemChanges")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DiscardSyncItemChangesResponseObject); ok {
+		if err := validResponse.VisitDiscardSyncItemChangesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PublishSyncItem operation middleware
+func (sh *strictHandler) PublishSyncItem(w http.ResponseWriter, r *http.Request, itemId string, params PublishSyncItemParams) {
+	var request PublishSyncItemRequestObject
+
+	request.ItemId = itemId
+	request.Params = params
+
+	var body PublishSyncItemJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PublishSyncItem(ctx, request.(PublishSyncItemRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PublishSyncItem")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PublishSyncItemResponseObject); ok {
+		if err := validResponse.VisitPublishSyncItemResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -16076,349 +17052,368 @@ func (sh *strictHandler) GetWorkers(w http.ResponseWriter, r *http.Request, para
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"7/9fAAAA//9Ip1FobnECAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

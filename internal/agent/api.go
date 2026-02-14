@@ -38,6 +38,7 @@ const maxRequestBodySize = 1 << 20
 // defaultUserID is used when no user is authenticated (e.g., auth disabled).
 // This value should match the system's expected default user identifier.
 const defaultUserID = "admin"
+const defaultUserRole = auth.RoleAdmin
 
 // getUserIDFromContext extracts the user ID from the request context.
 // Returns "admin" if no user is authenticated (e.g., auth mode is "none").
@@ -49,11 +50,13 @@ func getUserIDFromContext(ctx context.Context) string {
 }
 
 // getUserContextFromRequest extracts user identity and IP from the request context.
-func getUserContextFromRequest(r *http.Request) (userID, username, ipAddress string) {
+func getUserContextFromRequest(r *http.Request) (userID, username string, role auth.Role, ipAddress string) {
 	userID, username = defaultUserID, defaultUserID
+	role = defaultUserRole
 	if user, ok := auth.UserFromContext(r.Context()); ok && user != nil {
 		userID = user.ID
 		username = user.Username
+		role = user.Role
 	}
 	ipAddress, _ = auth.ClientIPFromContext(r.Context())
 	return
@@ -71,6 +74,7 @@ type API struct {
 	dagStore    exec.DAGStore // For resolving DAG file paths
 	environment EnvironmentInfo
 	hooks       *Hooks
+	memoryStore MemoryStore
 }
 
 // APIConfig contains configuration for the API.
@@ -83,6 +87,7 @@ type APIConfig struct {
 	DAGStore     exec.DAGStore // For resolving DAG file paths
 	Environment  EnvironmentInfo
 	Hooks        *Hooks
+	MemoryStore  MemoryStore
 }
 
 // SessionWithState is a session with its current state.
@@ -110,6 +115,7 @@ func NewAPI(cfg APIConfig) *API {
 		dagStore:    cfg.DAGStore,
 		environment: cfg.Environment,
 		hooks:       cfg.Hooks,
+		memoryStore: cfg.MemoryStore,
 	}
 }
 
@@ -277,13 +283,14 @@ func (a *API) createMessageCallback(id string) func(ctx context.Context, msg Mes
 }
 
 // persistNewSession saves a new session to the store if configured.
-func (a *API) persistNewSession(ctx context.Context, id, userID string, now time.Time) {
+func (a *API) persistNewSession(ctx context.Context, id, userID, dagName string, now time.Time) {
 	if a.store == nil {
 		return
 	}
 	sess := &Session{
 		ID:        id,
 		UserID:    userID,
+		DAGName:   dagName,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -327,7 +334,7 @@ func (a *API) handleNewSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, username, ipAddress := getUserContextFromRequest(r)
+	userID, username, role, ipAddress := getUserContextFromRequest(r)
 	model := selectModel(req.Model, "", a.getDefaultModelID(r.Context()))
 
 	provider, modelCfg, err := a.resolveProvider(r.Context(), model)
@@ -340,6 +347,13 @@ func (a *API) handleNewSession(w http.ResponseWriter, r *http.Request) {
 	id := uuid.New().String()
 	now := time.Now()
 
+	// Extract primary DAG name from resolved contexts for per-DAG memory
+	resolved := a.resolveContexts(r.Context(), req.DAGContexts)
+	var dagName string
+	if len(resolved) > 0 {
+		dagName = resolved[0].DAGName
+	}
+
 	mgr := NewSessionManager(SessionManagerConfig{
 		ID:              id,
 		UserID:          userID,
@@ -351,14 +365,17 @@ func (a *API) handleNewSession(w http.ResponseWriter, r *http.Request) {
 		Hooks:           a.hooks,
 		Username:        username,
 		IPAddress:       ipAddress,
+		Role:            role,
 		InputCostPer1M:  modelCfg.InputCostPer1M,
 		OutputCostPer1M: modelCfg.OutputCostPer1M,
+		MemoryStore:     a.memoryStore,
+		DAGName:         dagName,
 	})
 
-	a.persistNewSession(r.Context(), id, userID, now)
+	a.persistNewSession(r.Context(), id, userID, dagName, now)
 	a.sessions.Store(id, mgr)
 
-	messageWithContext := a.formatMessage(r.Context(), req.Message, req.DAGContexts)
+	messageWithContext := formatMessageWithContexts(req.Message, resolved)
 	if err := mgr.AcceptUserMessage(r.Context(), provider, model, modelCfg.Model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		a.respondError(w, http.StatusInternalServerError, api.ErrorCodeInternalError, "Failed to process message")
@@ -521,13 +538,14 @@ func (a *API) getStoredSession(ctx context.Context, id, userID string) (*Session
 // POST /api/v1/agent/sessions/{id}/chat
 func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	userID, username, ipAddress := getUserContextFromRequest(r)
+	userID, username, role, ipAddress := getUserContextFromRequest(r)
 
-	mgr, ok := a.getOrReactivateSession(r.Context(), id, userID, username, ipAddress)
+	mgr, ok := a.getOrReactivateSession(r.Context(), id, userID, username, role, ipAddress)
 	if !ok {
 		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Session not found")
 		return
 	}
+	mgr.UpdateUserContext(username, ipAddress, role)
 
 	var req ChatRequest
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
@@ -564,18 +582,18 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 }
 
 // getOrReactivateSession retrieves an active session or reactivates it from storage.
-func (a *API) getOrReactivateSession(ctx context.Context, id, userID, username, ipAddress string) (*SessionManager, bool) {
+func (a *API) getOrReactivateSession(ctx context.Context, id, userID, username string, role auth.Role, ipAddress string) (*SessionManager, bool) {
 	// Check active sessions first
 	if mgr, ok := a.getActiveSession(id, userID); ok {
 		return mgr, true
 	}
 
 	// Try to reactivate from store
-	return a.reactivateSession(ctx, id, userID, username, ipAddress)
+	return a.reactivateSession(ctx, id, userID, username, role, ipAddress)
 }
 
 // reactivateSession restores a session from storage and makes it active.
-func (a *API) reactivateSession(ctx context.Context, id, userID, username, ipAddress string) (*SessionManager, bool) {
+func (a *API) reactivateSession(ctx context.Context, id, userID, username string, role auth.Role, ipAddress string) (*SessionManager, bool) {
 	if a.store == nil {
 		return nil, false
 	}
@@ -609,6 +627,9 @@ func (a *API) reactivateSession(ctx context.Context, id, userID, username, ipAdd
 		Hooks:       a.hooks,
 		Username:    username,
 		IPAddress:   ipAddress,
+		MemoryStore: a.memoryStore,
+		DAGName:     sess.DAGName,
+		Role:        role,
 	})
 	a.sessions.Store(id, mgr)
 

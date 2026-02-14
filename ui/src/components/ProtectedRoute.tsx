@@ -1,11 +1,11 @@
 import { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth, hasRole } from '@/contexts/AuthContext';
+import { useAuth, hasRole, type UserRole } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 
 type ProtectedRouteProps = {
   children: ReactNode;
-  requiredRole?: 'admin' | 'manager' | 'operator' | 'viewer';
+  requiredRole?: UserRole;
 };
 
 /**
@@ -13,7 +13,7 @@ type ProtectedRouteProps = {
  *
  * If `config.authMode` is not `'builtin'`, access is allowed and `children` are rendered. While auth state is loading the component renders `null`. If the user is not authenticated it redirects to `/login` and preserves the current location for post-login navigation. If a `requiredRole` is provided and the authenticated user lacks that role it redirects to `/`.
  *
- * @param requiredRole - Optional role required to access the route; one of `'admin' | 'manager' | 'operator' | 'viewer'`.
+ * @param requiredRole - Optional role required to access the route; one of `'admin' | 'manager' | 'developer' | 'operator' | 'viewer'`.
  * @returns The `children` element when access is allowed, `null` while auth state is loading, or a `Navigate` element that redirects the user when access is denied.
  */
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {

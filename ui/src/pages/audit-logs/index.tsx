@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { TOKEN_KEY, useIsAdmin } from '@/contexts/AuthContext';
+import { TOKEN_KEY, useCanViewAuditLogs } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import dayjs from '@/lib/dayjs';
 import { ChevronLeft, ChevronRight, RefreshCw, ScrollText } from 'lucide-react';
@@ -34,7 +34,7 @@ const PAGE_SIZE = 50;
 
 export default function AuditLogsPage() {
   const config = useConfig();
-  const isAdmin = useIsAdmin();
+  const canViewAuditLogs = useCanViewAuditLogs();
   const appBarContext = useContext(AppBarContext);
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [total, setTotal] = useState(0);
@@ -330,7 +330,7 @@ export default function AuditLogsPage() {
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-  if (!isAdmin) {
+  if (!canViewAuditLogs) {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">

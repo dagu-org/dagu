@@ -136,6 +136,7 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 	}
 
 	var dagRunId, params string
+	var singleton bool
 	if request.Body.DagRunId != nil {
 		dagRunId = *request.Body.DagRunId
 	}
@@ -149,7 +150,9 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 	if request.Body.Params != nil {
 		params = *request.Body.Params
 	}
-
+	if request.Body.Singleton != nil {
+		singleton = *request.Body.Singleton
+	}
 	dag, cleanup, err := a.loadInlineDAG(ctx, request.Body.Spec, request.Body.Name, dagRunId)
 	if err != nil {
 		return nil, err
@@ -165,6 +168,15 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 			HTTPStatus: http.StatusConflict,
 			Code:       api.ErrorCodeAlreadyExists,
 			Message:    fmt.Sprintf("dag-run ID %s already exists for DAG %s", dagRunId, dag.Name),
+		}
+	}
+
+	if singleton {
+		if err := a.checkSingletonRunning(ctx, dag); err != nil {
+			return nil, err
+		}
+		if err := a.checkSingletonQueued(ctx, dag); err != nil {
+			return nil, err
 		}
 	}
 

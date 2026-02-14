@@ -59,6 +59,7 @@ type API struct {
 	dagWritesDisabled  bool // True when git sync read-only mode is active
 	agentConfigStore   agent.ConfigStore
 	agentModelStore    agent.ModelStore
+	agentMemoryStore   agent.MemoryStore
 }
 
 // AuthService defines the interface for authentication operations.
@@ -136,6 +137,13 @@ func WithAgentConfigStore(store agent.ConfigStore) APIOption {
 func WithAgentModelStore(store agent.ModelStore) APIOption {
 	return func(a *API) {
 		a.agentModelStore = store
+	}
+}
+
+// WithAgentMemoryStore returns an APIOption that sets the API's agent memory store.
+func WithAgentMemoryStore(store agent.MemoryStore) APIOption {
+	return func(a *API) {
+		a.agentMemoryStore = store
 	}
 }
 
@@ -219,6 +227,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		r.Use(frontendauth.ClientIPMiddleware())
 		r.Use(frontendauth.Middleware(authOptions))
 		r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
+		r.Use(WebhookRawBodyMiddleware())
 
 		options := api.StrictHTTPServerOptions{
 			ResponseErrorHandlerFunc: a.handleError,
@@ -268,8 +277,6 @@ func (a *API) createValidatorMiddleware(swagger *openapi3.T) func(http.Handler) 
 
 func (a *API) buildAuthOptions(ctx context.Context, basePath string) (frontendauth.Options, error) {
 	authConfig := a.config.Server.Auth
-	basicAuthEnabled := authConfig.Basic.Username != "" && authConfig.Basic.Password != ""
-	authRequired := authConfig.Mode != config.AuthModeNone || basicAuthEnabled || authConfig.Token.Value != ""
 
 	publicPaths := []string{
 		pathutil.BuildPublicEndpointPath(basePath, "api/v1/health"),
@@ -279,12 +286,24 @@ func (a *API) buildAuthOptions(ctx context.Context, basePath string) (frontendau
 		publicPaths = append(publicPaths, pathutil.BuildPublicEndpointPath(basePath, "api/v1/metrics"))
 	}
 
+	// When auth mode is "none", disable all authentication entirely.
+	// Any leftover token, basic auth, or OIDC settings in the config are ignored.
+	if authConfig.Mode == config.AuthModeNone {
+		return frontendauth.Options{
+			Realm:       "restricted",
+			PublicPaths: publicPaths,
+			PublicPathPrefixes: []string{
+				pathutil.BuildPublicEndpointPath(basePath, "api/v1/webhooks") + "/",
+			},
+		}, nil
+	}
+
+	basicAuthEnabled := authConfig.Basic.Username != "" && authConfig.Basic.Password != ""
+
 	authOptions := frontendauth.Options{
 		Realm:            "restricted",
-		APITokenEnabled:  authConfig.Token.Value != "",
-		APIToken:         authConfig.Token.Value,
 		BasicAuthEnabled: basicAuthEnabled,
-		AuthRequired:     authRequired,
+		AuthRequired:     true,
 		Creds:            map[string]string{authConfig.Basic.Username: authConfig.Basic.Password},
 		PublicPaths:      publicPaths,
 		PublicPathPrefixes: []string{
@@ -389,6 +408,38 @@ func (a *API) requireAdmin(ctx context.Context) error {
 		return errAuthRequired
 	}
 	if !user.Role.IsAdmin() {
+		return errInsufficientPermissions
+	}
+	return nil
+}
+
+// requireManagerOrAbove checks if the current user has manager or admin role.
+// Returns nil if auth is not enabled (authService is nil).
+func (a *API) requireManagerOrAbove(ctx context.Context) error {
+	if a.authService == nil {
+		return nil
+	}
+	user, ok := auth.UserFromContext(ctx)
+	if !ok {
+		return errAuthRequired
+	}
+	if !user.Role.CanManageAudit() {
+		return errInsufficientPermissions
+	}
+	return nil
+}
+
+// requireDeveloperOrAbove checks if the current user has developer, manager, or admin role.
+// Returns nil if auth is not enabled (authService is nil).
+func (a *API) requireDeveloperOrAbove(ctx context.Context) error {
+	if a.authService == nil {
+		return nil
+	}
+	user, ok := auth.UserFromContext(ctx)
+	if !ok {
+		return errAuthRequired
+	}
+	if !user.Role.CanWrite() {
 		return errInsufficientPermissions
 	}
 	return nil

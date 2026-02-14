@@ -79,6 +79,64 @@ func TestParamPairEscaped(t *testing.T) {
 	}
 }
 
+func TestParamPairSmartEscape(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		pair     paramPair
+		expected string
+	}{
+		{
+			name:     "NamedSimpleValue",
+			pair:     paramPair{Name: "foo", Value: "bar"},
+			expected: `foo=bar`,
+		},
+		{
+			name:     "NamedVariableRef",
+			pair:     paramPair{Name: "NAME", Value: "${ITEM.name}"},
+			expected: `NAME=${ITEM.name}`,
+		},
+		{
+			name:     "PositionalVariableRef",
+			pair:     paramPair{Name: "", Value: "${ITEM.extra}"},
+			expected: `${ITEM.extra}`,
+		},
+		{
+			name:     "NamedValueWithSpaces",
+			pair:     paramPair{Name: "msg", Value: "hello world"},
+			expected: `msg="hello world"`,
+		},
+		{
+			name:     "PositionalValueWithSpaces",
+			pair:     paramPair{Name: "", Value: "hello world"},
+			expected: `"hello world"`,
+		},
+		{
+			name:     "NamedEmptyValue",
+			pair:     paramPair{Name: "key", Value: ""},
+			expected: `key=""`,
+		},
+		{
+			name:     "PositionalEmptyValue",
+			pair:     paramPair{Name: "", Value: ""},
+			expected: `""`,
+		},
+		{
+			name:     "NamedValueWithQuotes",
+			pair:     paramPair{Name: "json", Value: `{"key":"value"}`},
+			expected: `json="{\"key\":\"value\"}"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, tt.pair.SmartEscape())
+		})
+	}
+}
+
 func TestParseStringParams(t *testing.T) {
 	t.Parallel()
 
@@ -147,6 +205,11 @@ func TestParseStringParams(t *testing.T) {
 			input:    "cmd=`echo hello`",
 			expected: []paramPair{{Name: "cmd", Value: "`echo hello`"}},
 		},
+		{
+			name:     "BacktickValueWithDoubleQuotes",
+			input:    `cmd=` + "`echo \"hello world\"`",
+			expected: []paramPair{{Name: "cmd", Value: "`echo \"hello world\"`"}},
+		},
 	}
 
 	for _, tt := range tests {
@@ -155,6 +218,82 @@ func TestParseStringParams(t *testing.T) {
 			result, err := parseStringParams(ctx, tt.input)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestParseStringParams_NoEval_Matrix(t *testing.T) {
+	t.Parallel()
+
+	ctx := BuildContext{
+		ctx:  context.Background(),
+		opts: BuildOpts{Flags: BuildFlagNoEval},
+	}
+
+	tests := []struct {
+		name     string
+		input    string
+		expected []paramPair
+	}{
+		{
+			name:  "NamedBacktickWithInnerDoubleQuotes",
+			input: `cmd=` + "`echo \"hello world\"`",
+			expected: []paramPair{
+				{Name: "cmd", Value: "`echo \"hello world\"`"},
+			},
+		},
+		{
+			name:  "PositionalBacktickToken",
+			input: "`echo \"hello\"`",
+			expected: []paramPair{
+				{Name: "", Value: "`echo \"hello\"`"},
+			},
+		},
+		{
+			name:  "MixedNamedBacktickQuotedAndPositional",
+			input: `A=1 cmd=` + "`echo \"x\"`" + ` B="y z" bare`,
+			expected: []paramPair{
+				{Name: "A", Value: "1"},
+				{Name: "cmd", Value: "`echo \"x\"`"},
+				{Name: "B", Value: "y z"},
+				{Name: "", Value: "bare"},
+			},
+		},
+		{
+			name:  "EscapedQuotesInDoubleQuotedToken",
+			input: `X="a \"b\"" Y=2`,
+			expected: []paramPair{
+				{Name: "X", Value: `a "b\`},
+				{Name: "Y", Value: "2"},
+			},
+		},
+		{
+			name:     "EmptyInput",
+			input:    "",
+			expected: nil,
+		},
+		{
+			name:     "WhitespaceInput",
+			input:    "   ",
+			expected: nil,
+		},
+		{
+			name:  "UnterminatedDoubleQuoteFallback",
+			input: `A="unterminated B=2`,
+			expected: []paramPair{
+				{Name: "", Value: "A="},
+				{Name: "", Value: "unterminated"},
+				{Name: "B", Value: "2"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := parseStringParams(ctx, tt.input)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, got)
 		})
 	}
 }

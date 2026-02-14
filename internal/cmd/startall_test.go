@@ -11,7 +11,7 @@ import (
 
 func TestStartAllCommand(t *testing.T) {
 	t.Run("StartAll", func(t *testing.T) {
-		th := test.SetupCommand(t)
+		th := test.SetupCommand(t, test.WithCoordinatorEnabled())
 		go func() {
 			time.Sleep(time.Millisecond * 500)
 			th.Cancel()

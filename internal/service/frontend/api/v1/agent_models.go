@@ -84,7 +84,7 @@ func (a *API) CreateAgentModel(ctx context.Context, request api.CreateAgentModel
 		return nil, err
 	}
 	if request.Body == nil {
-		return nil, errInvalidRequestBody
+		return nil, ErrInvalidRequestBody
 	}
 
 	body := request.Body
@@ -166,7 +166,7 @@ func (a *API) UpdateAgentModel(ctx context.Context, request api.UpdateAgentModel
 		return nil, err
 	}
 	if request.Body == nil {
-		return nil, errInvalidRequestBody
+		return nil, ErrInvalidRequestBody
 	}
 
 	body := request.Body
@@ -239,7 +239,7 @@ func (a *API) SetDefaultAgentModel(ctx context.Context, request api.SetDefaultAg
 		return nil, err
 	}
 	if request.Body == nil {
-		return nil, errInvalidRequestBody
+		return nil, ErrInvalidRequestBody
 	}
 
 	modelID := request.Body.ModelId
@@ -254,12 +254,12 @@ func (a *API) SetDefaultAgentModel(ctx context.Context, request api.SetDefaultAg
 
 	cfg, err := a.agentConfigStore.Load(ctx)
 	if err != nil {
-		return nil, errFailedToLoadAgentConfig
+		return nil, ErrFailedToLoadAgentConfig
 	}
 
 	cfg.DefaultModelID = modelID
 	if err := a.agentConfigStore.Save(ctx, cfg); err != nil {
-		return nil, errFailedToSaveAgentConfig
+		return nil, ErrFailedToSaveAgentConfig
 	}
 
 	a.logAudit(ctx, audit.CategoryAgent, auditActionModelSetDef, map[string]any{
@@ -310,7 +310,7 @@ func (a *API) requireAgentModelManagement() error {
 		return errAgentModelStoreNotAvailable
 	}
 	if a.agentConfigStore == nil {
-		return errAgentConfigNotAvailable
+		return ErrAgentConfigNotAvailable
 	}
 	return nil
 }

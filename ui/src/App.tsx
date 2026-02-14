@@ -21,6 +21,7 @@ import { AgentChatModal, AgentChatProvider } from './features/agent';
 import Layout from './layouts/Layout';
 import fetchJson from './lib/fetchJson';
 import Dashboard from './pages';
+import AgentMemoryPage from './pages/agent-memory';
 import AgentSettingsPage from './pages/agent-settings';
 import APIKeysPage from './pages/api-keys';
 import AuditLogsPage from './pages/audit-logs';
@@ -69,6 +70,22 @@ function AdminElement({
   children: React.ReactElement;
 }): React.ReactElement {
   return <ProtectedRoute requiredRole="admin">{children}</ProtectedRoute>;
+}
+
+function ManagerElement({
+  children,
+}: {
+  children: React.ReactElement;
+}): React.ReactElement {
+  return <ProtectedRoute requiredRole="manager">{children}</ProtectedRoute>;
+}
+
+function DeveloperElement({
+  children,
+}: {
+  children: React.ReactElement;
+}): React.ReactElement {
+  return <ProtectedRoute requiredRole="developer">{children}</ProtectedRoute>;
 }
 
 function AppInner({ config }: Props): React.ReactElement {
@@ -148,14 +165,15 @@ function AppInner({ config }: Props): React.ReactElement {
                                         <Route path="/queues" element={<Queues />} />
                                         <Route path="/dag-runs" element={<DAGRuns />} />
                                         <Route path="/dag-runs/:name/:dagRunId" element={<DAGRunDetails />} />
-                                        <Route path="/system-status" element={<AdminElement><SystemStatus /></AdminElement>} />
+                                        <Route path="/system-status" element={<DeveloperElement><SystemStatus /></DeveloperElement>} />
                                         <Route path="/users" element={<AdminElement><UsersPage /></AdminElement>} />
                                         <Route path="/api-keys" element={<AdminElement><APIKeysPage /></AdminElement>} />
-                                        <Route path="/webhooks" element={<AdminElement><WebhooksPage /></AdminElement>} />
+                                        <Route path="/webhooks" element={<DeveloperElement><WebhooksPage /></DeveloperElement>} />
                                         <Route path="/terminal" element={<AdminElement><TerminalPage /></AdminElement>} />
-                                        <Route path="/audit-logs" element={<AdminElement><AuditLogsPage /></AdminElement>} />
+                                        <Route path="/audit-logs" element={<ManagerElement><AuditLogsPage /></ManagerElement>} />
                                         <Route path="/git-sync" element={<AdminElement><GitSyncPage /></AdminElement>} />
                                         <Route path="/agent-settings" element={<AdminElement><AgentSettingsPage /></AdminElement>} />
+                                        <Route path="/agent-memory" element={<AdminElement><AgentMemoryPage /></AdminElement>} />
                                       </Routes>
                                     </Layout>
                                     {config.agentEnabled && <AgentChatModal />}

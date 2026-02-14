@@ -25,6 +25,12 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           # Get short SHA (first 7 characters)
           echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+          # Detect prerelease (version contains '-')
+          if [[ "$VERSION" == *-* ]]; then
+            echo "IS_PRERELEASE=true" >> $GITHUB_ENV
+          else
+            echo "IS_PRERELEASE=false" >> $GITHUB_ENV
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -48,8 +54,8 @@ jobs:
           build-args: |
             LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ env.SHORT_SHA }}'
           tags: |
-            ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}
+            ${{ env.IS_PRERELEASE == 'false' && format('ghcr.io/{0}:latest', github.repository) || '' }}
   # Build and push alpine-based dev image
   docker-dev:
     runs-on: ubuntu-latest
@@ -68,6 +74,12 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           # Get short SHA (first 7 characters)
           echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+          # Detect prerelease (version contains '-')
+          if [[ "$VERSION" == *-* ]]; then
+            echo "IS_PRERELEASE=true" >> $GITHUB_ENV
+          else
+            echo "IS_PRERELEASE=false" >> $GITHUB_ENV
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -91,8 +103,8 @@ jobs:
           build-args: |
             LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ env.SHORT_SHA }}'
           tags: |
-            ghcr.io/${{ github.repository }}:dev
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}-dev
+            ${{ env.IS_PRERELEASE == 'false' && format('ghcr.io/{0}:dev', github.repository) || '' }}
   # Build and push ubuntu-based dev image
   docker-alpine:
     runs-on: ubuntu-latest
@@ -111,6 +123,12 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           # Get short SHA (first 7 characters)
           echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+          # Detect prerelease (version contains '-')
+          if [[ "$VERSION" == *-* ]]; then
+            echo "IS_PRERELEASE=true" >> $GITHUB_ENV
+          else
+            echo "IS_PRERELEASE=false" >> $GITHUB_ENV
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -134,5 +152,5 @@ jobs:
           build-args: |
             LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ env.SHORT_SHA }}'
           tags: |
-            ghcr.io/${{ github.repository }}:alpine
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}-alpine
+            ${{ env.IS_PRERELEASE == 'false' && format('ghcr.io/{0}:alpine', github.repository) || '' }}

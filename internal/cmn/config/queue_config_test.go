@@ -14,16 +14,16 @@ queues:
   enabled: true
   config:
     - name: Default
-      maxConcurrency: 3
+      max_concurrency: 3
     - name: HighLoad
-      maxConcurrency: 2
+      max_concurrency: 2
 `
 	v := viper.New()
 	v.SetConfigType("yaml")
 	err := v.ReadConfig(strings.NewReader(yaml))
 	require.NoError(t, err)
 
-	loader := NewConfigLoader(v, WithService(ServiceScheduler))
+	loader := NewConfigLoader(v, WithService(ServiceScheduler), WithAppHomeDir(t.TempDir()))
 	cfg, err := loader.Load()
 	require.NoError(t, err)
 
@@ -37,7 +37,7 @@ queues:
 	require.Len(t, cfg.Queues.Config, 2)
 
 	require.Equal(t, "Default", cfg.Queues.Config[0].Name)
-	require.Equal(t, 3, cfg.Queues.Config[0].MaxActiveRuns, "Expected maxConcurrency=3 but got %d", cfg.Queues.Config[0].MaxActiveRuns)
+	require.Equal(t, 3, cfg.Queues.Config[0].MaxActiveRuns, "Expected max_concurrency=3 but got %d", cfg.Queues.Config[0].MaxActiveRuns)
 
 	require.Equal(t, "HighLoad", cfg.Queues.Config[1].Name)
 	require.Equal(t, 2, cfg.Queues.Config[1].MaxActiveRuns)

@@ -28,7 +28,7 @@ func TestServer_StartWithConfig(t *testing.T) {
 			setupFunc: func(t *testing.T) (string, string) {
 				tempDir := t.TempDir()
 				configFile := filepath.Join(tempDir, "config.yaml")
-				configContent := `logDir: ${TMP_LOGS_DIR}/logs`
+				configContent := `log_dir: ${TMP_LOGS_DIR}/logs`
 				require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0600))
 
 				// Create DAG with inline YAML
@@ -49,7 +49,7 @@ func TestServer_StartWithConfig(t *testing.T) {
 				// Create DAG with inline YAML
 				th := test.Setup(t)
 				dagContent := `
-logDir: ${DAG_TMP_LOGS_DIR}/logs
+log_dir: ${DAG_TMP_LOGS_DIR}/logs
 steps:
   - name: step1
     command: echo "Hello, world!"
@@ -126,13 +126,13 @@ func writeServerConfig(t *testing.T, port, basePath string, includeRemoteNodes b
 
 	configContent := fmt.Sprintf(`host: "127.0.0.1"
 port: %s
-basePath: "%s"
+base_path: "%s"
 `, port, basePath)
 
 	if includeRemoteNodes {
-		configContent += fmt.Sprintf(`remoteNodes:
+		configContent += fmt.Sprintf(`remote_nodes:
   - name: "dev"
-    apiBaseUrl: "http://127.0.0.1:%s%s/api/v1"
+    api_base_url: "http://127.0.0.1:%s%s/api/v1"
 `, port, basePath)
 	}
 

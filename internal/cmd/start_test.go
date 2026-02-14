@@ -15,7 +15,7 @@ import (
 func TestStartCommand(t *testing.T) {
 	th := test.SetupCommand(t)
 
-	dagStart := th.DAG(t, `maxActiveRuns: 1
+	dagStart := th.DAG(t, `max_active_runs: 1
 steps:
   - name: "1"
     command: "true"
@@ -68,7 +68,7 @@ steps:
 }
 
 func TestCmdStart_BackwardCompatibility(t *testing.T) {
-	t.Run("ShouldAcceptParametersAfter", func(t *testing.T) {
+	t.Run("ShouldRejectParametersAfterWithoutSeparator", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		dagContent := `
 params: KEY1=default1 KEY2=default2
@@ -78,12 +78,11 @@ steps:
 `
 		dagFile := th.CreateDAGFile(t, "test-params.yaml", dagContent)
 
-		cli := cmd.Start()
-		cli.SetArgs([]string{dagFile, "--", "KEY1=value1", "KEY2=value2"})
-
-		// Execute will fail due to missing context setup, but we're testing
-		// that the command accepts the arguments
-		_ = cli.Execute()
+		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", dagFile, "KEY1=value1", "KEY2=value2"},
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "use '--' before parameters")
 	})
 
 	t.Run("ShouldAcceptParamsFlag", func(t *testing.T) {
@@ -103,6 +102,95 @@ steps:
 		// that the command accepts the arguments
 		_ = cli.Execute()
 	})
+}
+
+func TestCmdStart_PositionalParamValidation(t *testing.T) {
+	th := test.SetupCommand(t)
+
+	dagFile := th.CreateDAGFile(t, "test-positional-params.yaml", `
+params: "p1 p2"
+steps:
+  - name: step1
+    command: echo $1 $2
+`)
+	dagNoParamsFile := th.CreateDAGFile(t, "test-no-params.yaml", `
+steps:
+  - name: step1
+    command: echo $1
+`)
+
+	t.Run("AllowsTooFewAfterDash", func(t *testing.T) {
+		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", dagFile, "--", "only-one"},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("RejectsTooManyAfterDash", func(t *testing.T) {
+		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", dagFile, "--", "one", "two", "three"},
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "too many positional params: expected at most 2, got 3")
+	})
+
+	t.Run("AllowsTooFewWithParamsFlag", func(t *testing.T) {
+		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", "--params", "only-one", dagFile},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("AllowsNamedOnlyWithPositionalDefaults", func(t *testing.T) {
+		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", "--params", "KEY1=value1 KEY2=value2", dagFile},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("AllowsJSONParamsWithoutPositionalValidation", func(t *testing.T) {
+		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", "--params", `{"KEY":"value"}`, dagFile},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("AllowsJSONAfterDashWithoutPositionalValidation", func(t *testing.T) {
+		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", dagFile, "--", `{"KEY":"value"}`},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("AllowsNamedPairsWhenNoParamsDeclared", func(t *testing.T) {
+		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", dagNoParamsFile, "--", "key1=value1", "key2=value2"},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("AllowsPositionalWhenNoParamsDeclared", func(t *testing.T) {
+		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", dagNoParamsFile, "--", "success"},
+		})
+		require.NoError(t, err)
+	})
+}
+
+func TestCmdStart_NamedParamsIgnorePositionalCount(t *testing.T) {
+	th := test.SetupCommand(t)
+
+	dagFile := th.CreateDAGFile(t, "test-named-params.yaml", `
+params: KEY1=default1 KEY2=default2
+steps:
+  - name: step1
+    command: echo $KEY1 $KEY2
+`)
+
+	err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+		Args: []string{"start", "--params", "KEY1=value1 KEY2=value2", dagFile},
+	})
+	require.NoError(t, err)
 }
 
 func TestCmdStart_FromRunID(t *testing.T) {

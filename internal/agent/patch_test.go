@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -227,6 +228,18 @@ func TestPatchTool_WorkingDirectory(t *testing.T) {
 	assert.Equal(t, "content", string(content))
 }
 
+func TestPatchTool_Permissions(t *testing.T) {
+	t.Parallel()
+
+	tool := NewPatchTool("")
+	filePath := filepath.Join(t.TempDir(), "test.txt")
+	input := patchInput(filePath, "create", "content", "content")
+
+	result := tool.Run(ToolContext{Role: auth.RoleOperator}, input)
+	assert.True(t, result.IsError)
+	assert.Contains(t, result.Content, "requires write permission")
+}
+
 func TestCountLines(t *testing.T) {
 	t.Parallel()
 
@@ -358,7 +371,7 @@ func TestValidateIfDAGFile(t *testing.T) {
 		invalidDAG := `steps:
   - name: step1
     command: echo hello
-    timeoutSec: -1
+    timeout_sec: -1
 `
 		require.NoError(t, os.WriteFile(filePath, []byte(invalidDAG), 0o600))
 
@@ -390,7 +403,7 @@ func TestPatchTool_DAGValidation(t *testing.T) {
 		invalidDAG := `steps:
   - name: step1
     command: echo hello
-    timeoutSec: -1
+    timeout_sec: -1
 `
 		result := tool.Run(ToolContext{}, patchInput(filePath, "create", "content", invalidDAG))
 
@@ -425,12 +438,12 @@ func TestPatchTool_DAGValidation(t *testing.T) {
 		initialDAG := `steps:
   - name: step1
     command: echo hello
-    timeoutSec: 10
+    timeout_sec: 10
 `
 		require.NoError(t, os.WriteFile(filePath, []byte(initialDAG), 0o600))
 
 		// Replace valid timeout with invalid negative timeout
-		result := tool.Run(ToolContext{}, patchInput(filePath, "replace", "old_string", "timeoutSec: 10", "new_string", "timeoutSec: -1"))
+		result := tool.Run(ToolContext{}, patchInput(filePath, "replace", "old_string", "timeout_sec: 10", "new_string", "timeout_sec: -1"))
 
 		assert.False(t, result.IsError)
 		assert.Contains(t, result.Content, "Replaced")

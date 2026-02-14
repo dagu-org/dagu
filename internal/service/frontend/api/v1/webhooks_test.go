@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -63,7 +64,7 @@ func TestExtractWebhookToken(t *testing.T) {
 }
 
 // setupWebhookTestServer creates a test server with builtin auth enabled
-func setupWebhookTestServer(t *testing.T) test.Server {
+func setupWebhookTestServer(t *testing.T, extraMutators ...func(*config.Config)) test.Server {
 	t.Helper()
 	return test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Mode = config.AuthModeBuiltin
@@ -71,6 +72,9 @@ func setupWebhookTestServer(t *testing.T) test.Server {
 		cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
 		cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
 		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
+		for _, m := range extraMutators {
+			m(cfg)
+		}
 	}))
 }
 
@@ -130,20 +134,42 @@ func TestWebhooks_RequiresAuth(t *testing.T) {
 		ExpectStatus(http.StatusUnauthorized).Send(t)
 }
 
-// TestWebhooks_RequiresAdmin tests that non-admin users cannot access webhook management endpoints
-func TestWebhooks_RequiresAdmin(t *testing.T) {
+// TestWebhooks_RequiresDeveloperOrAbove tests that webhook management requires developer or above.
+func TestWebhooks_RequiresDeveloperOrAbove(t *testing.T) {
 	t.Parallel()
 	server := setupWebhookTestServer(t)
 	adminToken := getWebhookAdminToken(t, server)
 
-	// Create a non-admin user
+	// Create non-developer users.
+	server.Client().Post("/api/v1/users", api.CreateUserRequest{
+		Username: "operator-user",
+		Password: "operator1",
+		Role:     api.UserRoleOperator,
+	}).WithBearerToken(adminToken).ExpectStatus(http.StatusCreated).Send(t)
+
 	server.Client().Post("/api/v1/users", api.CreateUserRequest{
 		Username: "viewer-user",
 		Password: "viewerpass1",
 		Role:     api.UserRoleViewer,
 	}).WithBearerToken(adminToken).ExpectStatus(http.StatusCreated).Send(t)
 
-	// Login as viewer
+	// Create developer user.
+	server.Client().Post("/api/v1/users", api.CreateUserRequest{
+		Username: "developer-user",
+		Password: "developer1",
+		Role:     api.UserRoleDeveloper,
+	}).WithBearerToken(adminToken).ExpectStatus(http.StatusCreated).Send(t)
+
+	// Login as operator.
+	operatorResp := server.Client().Post("/api/v1/auth/login", api.LoginRequest{
+		Username: "operator-user",
+		Password: "operator1",
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	var operatorLogin api.LoginResponse
+	operatorResp.Unmarshal(t, &operatorLogin)
+
+	// Login as viewer.
 	viewerResp := server.Client().Post("/api/v1/auth/login", api.LoginRequest{
 		Username: "viewer-user",
 		Password: "viewerpass1",
@@ -152,7 +178,24 @@ func TestWebhooks_RequiresAdmin(t *testing.T) {
 	var viewerLogin api.LoginResponse
 	viewerResp.Unmarshal(t, &viewerLogin)
 
-	// Viewer should get forbidden for webhook management
+	// Login as developer.
+	developerResp := server.Client().Post("/api/v1/auth/login", api.LoginRequest{
+		Username: "developer-user",
+		Password: "developer1",
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	var developerLogin api.LoginResponse
+	developerResp.Unmarshal(t, &developerLogin)
+
+	// Operator and viewer should get forbidden for webhook management.
+	server.Client().Get("/api/v1/webhooks").
+		WithBearerToken(operatorLogin.Token).
+		ExpectStatus(http.StatusForbidden).Send(t)
+
+	server.Client().Post("/api/v1/dags/test-dag/webhook", nil).
+		WithBearerToken(operatorLogin.Token).
+		ExpectStatus(http.StatusForbidden).Send(t)
+
 	server.Client().Get("/api/v1/webhooks").
 		WithBearerToken(viewerLogin.Token).
 		ExpectStatus(http.StatusForbidden).Send(t)
@@ -160,6 +203,18 @@ func TestWebhooks_RequiresAdmin(t *testing.T) {
 	server.Client().Post("/api/v1/dags/test-dag/webhook", nil).
 		WithBearerToken(viewerLogin.Token).
 		ExpectStatus(http.StatusForbidden).Send(t)
+
+	// Developer can access webhook management endpoints.
+	server.Client().Get("/api/v1/webhooks").
+		WithBearerToken(developerLogin.Token).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	// Developer can also create webhooks.
+	dagName := "webhook_dev_access_test"
+	createTestDAG(t, server, adminToken, dagName)
+	server.Client().Post("/api/v1/dags/"+dagName+"/webhook", nil).
+		WithBearerToken(developerLogin.Token).
+		ExpectStatus(http.StatusCreated).Send(t)
 }
 
 // TestWebhooks_CRUD tests the full CRUD lifecycle of webhooks
@@ -486,4 +541,130 @@ func TestWebhooks_TriggerNonExistentDAG(t *testing.T) {
 	server.Client().Post("/api/v1/webhooks/nonexistent-dag", api.WebhookRequest{}).
 		WithBearerToken(webhookToken).
 		ExpectStatus(http.StatusUnauthorized).Send(t)
+}
+
+// TestIsWebhookTriggerPath tests the webhook trigger path matching helper.
+func TestIsWebhookTriggerPath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{"webhook trigger", "/api/v1/webhooks/my-dag", true},
+		{"webhook trigger with base path", "/base/api/v1/webhooks/my-dag", true},
+		{"webhook list (no segment)", "/api/v1/webhooks", false},
+		{"webhook list trailing slash", "/api/v1/webhooks/", false},
+		{"non-webhook path", "/api/v1/dags", false},
+		{"dag webhook management", "/api/v1/dags/my-dag/webhook", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := apiimpl.IsWebhookTriggerPath(tt.path)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestMarshalWebhookPayload_RawBodyFallback tests the raw body fallback behavior.
+func TestMarshalWebhookPayload_RawBodyFallback(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		body    *api.WebhookRequest
+		rawBody []byte
+		want    string
+	}{
+		{
+			name:    "structured payload takes precedence",
+			body:    &api.WebhookRequest{Payload: &map[string]any{"key": "val"}},
+			rawBody: []byte(`{"event":"push"}`),
+			want:    `{"key":"val"}`,
+		},
+		{
+			name:    "falls back to raw body when payload is nil",
+			body:    &api.WebhookRequest{},
+			rawBody: []byte(`{"event":"push","repo":"foo"}`),
+			want:    `{"event":"push","repo":"foo"}`,
+		},
+		{
+			name:    "raw body with dagRunId is passed through",
+			body:    &api.WebhookRequest{},
+			rawBody: []byte(`{"dagRunId":"abc","event":"push"}`),
+			want:    `{"dagRunId":"abc","event":"push"}`,
+		},
+		{
+			name:    "nil body falls back to raw body",
+			body:    nil,
+			rawBody: []byte(`{"event":"push"}`),
+			want:    `{"event":"push"}`,
+		},
+		{
+			name:    "no raw body returns empty object",
+			body:    &api.WebhookRequest{},
+			rawBody: nil,
+			want:    "{}",
+		},
+		{
+			name:    "invalid JSON raw body returns empty object",
+			body:    &api.WebhookRequest{},
+			rawBody: []byte(`not-json`),
+			want:    "{}",
+		},
+		{
+			name:    "empty raw body returns empty object",
+			body:    &api.WebhookRequest{},
+			rawBody: []byte{},
+			want:    "{}",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			if tt.rawBody != nil {
+				ctx = apiimpl.WithRawBody(ctx, tt.rawBody)
+			}
+			got, err := apiimpl.MarshalWebhookPayload(ctx, tt.body)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestWebhooks_TriggerWithArbitraryPayload tests triggering a webhook with
+// an arbitrary JSON body (no "payload" wrapper), simulating external services.
+func TestWebhooks_TriggerWithArbitraryPayload(t *testing.T) {
+	t.Parallel()
+	server := setupWebhookTestServer(t)
+	token := getWebhookAdminToken(t, server)
+
+	dagName := "webhook_arbitrary_payload_test"
+	createTestDAG(t, server, token, dagName)
+
+	createResp := server.Client().Post("/api/v1/dags/"+dagName+"/webhook", nil).
+		WithBearerToken(token).ExpectStatus(http.StatusCreated).Send(t)
+
+	var createResult api.WebhookCreateResponse
+	createResp.Unmarshal(t, &createResult)
+	webhookToken := createResult.Token
+
+	// Send an arbitrary JSON body WITHOUT the "payload" wrapper.
+	// This simulates what external services like GitHub would send.
+	arbitraryBody := map[string]any{
+		"event": "push",
+		"repo":  "foo/bar",
+		"ref":   "refs/heads/main",
+	}
+	triggerResp := server.Client().Post("/api/v1/webhooks/"+dagName, arbitraryBody).
+		WithBearerToken(webhookToken).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var triggerResult api.WebhookResponse
+	triggerResp.Unmarshal(t, &triggerResult)
+	assert.NotEmpty(t, triggerResult.DagRunId)
+	assert.Equal(t, dagName, triggerResult.DagName)
 }

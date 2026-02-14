@@ -119,30 +119,30 @@ PB_RELEASE_NAME=protoc-${PB_VERSION}-${OS}-${ARCH}
 # run starts the frontend server and the scheduler.
 .PHONY: run
 run: ${FE_BUNDLE_JS}
-	@echo "${COLOR_GREEN}Starting the frontend server and the scheduler...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Starting the frontend server and the scheduler...${COLOR_RESET}"
 	@DAGU_DEBUG=1 go run ./cmd start-all
 
 # server build the binary and start the server.
 .PHONY: run-server
 run-server: golangci-lint bin
-	@echo "${COLOR_GREEN}Starting the server...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Starting the server...${COLOR_RESET}"
 	${LOCAL_BIN_DIR}/${APP_NAME} server
 
 # scheduler build the binary and start the scheduler.
 .PHONY: run-scheduler
 run-scheduler: golangci-lint bin
-	@echo "${COLOR_GREEN}Starting the scheduler...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Starting the scheduler...${COLOR_RESET}"
 	${LOCAL_BIN_DIR}/${APP_NAME} scheduler
 
 # check if the frontend assets are built.
 ${FE_BUNDLE_JS}:
-	@echo "${COLOR_RED}Error: frontend assets are not built.${COLOR_RESET}"
-	@echo "${COLOR_RED}Please run 'make ui' before starting the server.${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_RED}Error: frontend assets are not built.${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_RED}Please run 'make ui' before starting the server.${COLOR_RESET}"
 
 # https starts the server with the HTTPS protocol.
 .PHONY: run-server-https
 run-server-https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
-	@echo "${COLOR_GREEN}Starting the server with HTTPS...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Starting the server with HTTPS...${COLOR_RESET}"
 	@DAGU_DEBUG=1 \
 		DAGU_CERT_FILE=${SERVER_CERT_FILE} \
 		DAGU_KEY_FILE=${SERVER_KEY_FILE} \
@@ -151,7 +151,7 @@ run-server-https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
 # test runs all tests.
 .PHONY: test
 test: bin
-	@echo "${COLOR_GREEN}Running tests...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Running tests...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
 	@go clean -testcache
 	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} ${TEST_TARGET}
@@ -159,7 +159,7 @@ test: bin
 # test-coverage runs all tests with coverage.
 .PHONY: test-coverage
 test-coverage:
-	@echo "${COLOR_GREEN}Running tests with coverage...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Running tests with coverage...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
 	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} -coverpkg=./... -coverprofile="coverage.out" -covermode=atomic ${TEST_TARGET}
 	@go tool cover -html=coverage.out
@@ -171,14 +171,14 @@ lint: golangci-lint
 # api generates the server code from the OpenAPI specification.
 .PHONY: api
 api: api-validate
-	@echo "${COLOR_GREEN}Generating API...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Generating API...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_oapi_codegen}
 	@${LOCAL_BIN_DIR}/oapi-codegen --config=${OAPI_CONFIG_FILE_V1} ${OAPI_SPEC_FILE_V1}
 
 # api-validate validates the OpenAPI specification.
 .PHONY: api-validate
 api-validate:
-	@echo "${COLOR_GREEN}Validating API...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Validating API...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_kin_openapi_validate}
 	@${LOCAL_BIN_DIR}/validate ${OAPI_SPEC_FILE_V1}
 
@@ -192,7 +192,7 @@ proto: protolint protoc
 # Lint proto files
 protolint:
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_protolint}
-	@echo "${GREEN}Linting proto files...${NC}"
+	@printf '%b\n' "${COLOR_GREEN}Linting proto files...${COLOR_RESET}"
 	@${LOCAL_BIN_DIR}/protolint lint ${SCRIPT_DIR}/proto
 
 # Generate Go code from proto files
@@ -200,14 +200,14 @@ protoc: ${LOCAL_DIR}/${PB_RELEASE_NAME}
 	@ln -sf ${LOCAL_DIR}/${PB_RELEASE_NAME}/bin/protoc ${LOCAL_BIN_DIR}/protoc
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_protoc_gen_go}
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_protoc_gen_go_grpc}
-	@echo "${GREEN}Generating Go code from proto files...${NC}"
+	@printf '%b\n' "${COLOR_GREEN}Generating Go code from proto files...${COLOR_RESET}"
 	@env PATH="${LOCAL_BIN_DIR}:/usr/local/bin:/usr/bin:/bin" ${LOCAL_BIN_DIR}/protoc --go_out=. --go_opt=paths=source_relative \
 	    --go-grpc_out=. --go-grpc_opt=paths=source_relative \
 	    proto/coordinator/v1/*.proto
 
 # Download protoc
 ${LOCAL_DIR}/${PB_RELEASE_NAME}:
-	@echo "${GREEN}Downloading protoc...${NC}"
+	@printf '%b\n' "${COLOR_GREEN}Downloading protoc...${COLOR_RESET}"
 	@mkdir -p ${LOCAL_BIN_DIR}
 	@curl -L ${PB_RELEASE_URL}/download/v${PB_VERSION}/${PB_RELEASE_NAME}.zip -o ${LOCAL_DIR}/${PB_RELEASE_NAME}.zip
 	@unzip ${LOCAL_DIR}/${PB_RELEASE_NAME} -d ${LOCAL_DIR}/${PB_RELEASE_NAME}
@@ -234,18 +234,18 @@ build-image: build-image-version
 .PHONY: build-image-version
 build-image-version:
 	@if [ -z "$(VERSION)" ]; then \
-		echo "${COLOR_RED}Error: VERSION is not set${COLOR_RESET}"; \
+		printf '%b\n' "${COLOR_RED}Error: VERSION is not set${COLOR_RESET}"; \
 		echo "Usage: make build-image VERSION={version}"; \
 		exit 1; \
 	fi
-	@echo "${COLOR_GREEN}Building the docker image with the version $(VERSION)...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Building the docker image with the version $(VERSION)...${COLOR_RESET}"
 	@$(DOCKER_CMD) -t ghcr.io/dagu-org/${APP_NAME}:$(VERSION) .
 
 # build-image-latest build the docker image with the latest tag and push to 
 # the registry.
 .PHONY: build-image-latest
 build-image-latest:
-	@echo "${COLOR_GREEN}Building the docker image...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Building the docker image...${COLOR_RESET}"
 	@$(DOCKER_CMD) -t ghcr.io/dagu-org/${APP_NAME}:latest .
 
 ${LOCAL_DIR}/merged:
@@ -254,7 +254,7 @@ ${LOCAL_DIR}/merged:
 # addlicense adds license header to all files.
 .PHONY: addlicense
 addlicense:
-	@echo "${COLOR_GREEN}Adding license headers...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Adding license headers...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_addlicense}
 	@${LOCAL_BIN_DIR}/addlicense \
 		-ignore "**/node_modules/**" \
@@ -288,14 +288,14 @@ cpuprof:
 # bin builds the go application.
 .PHONY: bin
 bin:
-	@echo "${COLOR_GREEN}Building the binary...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Building the binary...${COLOR_RESET}"
 	@mkdir -p ${BIN_DIR}
 	@go build -ldflags="$(LDFLAGS)" -o ${BIN_DIR}/${APP_NAME} ./cmd
 
 # build-keepalive builds the keepalive binary for all architectures using Zig.
 .PHONY: build-keepalive
 build-keepalive:
-	@echo "${COLOR_GREEN}Building keepalive binaries with Zig for all architectures...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Building keepalive binaries with Zig for all architectures...${COLOR_RESET}"
 	@mkdir -p internal/container/assets
 	@rm -rf internal/container/assets/keepalive_*
 	@cd internal/container/keepalive && \
@@ -312,16 +312,16 @@ build-keepalive:
 	zig build-exe main.zig -target s390x-linux-musl -O ReleaseSmall -femit-bin=../assets/keepalive_linux_s390x && \
 	echo "Skipping BSD targets (require additional setup)..."
 	@chmod +x internal/container/assets/keepalive_* 2>/dev/null || true
-	@echo "${COLOR_GREEN}Cleaning up build artifacts...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Cleaning up build artifacts...${COLOR_RESET}"
 	@rm -f internal/container/assets/keepalive_*.o internal/container/assets/keepalive_*.obj
-	@echo "${COLOR_GREEN}Generating checksums...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Generating checksums...${COLOR_RESET}"
 	@cd internal/container/assets && \
 		if command -v sha256sum >/dev/null 2>&1; then \
 			sha256sum keepalive_* > keepalive_checksums.txt; \
 		else \
 			shasum -a 256 keepalive_* > keepalive_checksums.txt; \
 		fi
-	@echo "${COLOR_GREEN}Done! Checksums saved to internal/container/assets/keepalive_checksums.txt${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Done! Checksums saved to internal/container/assets/keepalive_checksums.txt${COLOR_RESET}"
 
 .PHONY: ui
 # ui builds the frontend codes.
@@ -330,25 +330,25 @@ ui: clean-ui build-ui cp-assets
 # build-ui builds the frontend codes.
 .PHONY: build-ui
 build-ui:
-	@echo "${COLOR_GREEN}Building UI...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Building UI...${COLOR_RESET}"
 	@cd ui; \
 		pnpm install; \
 		NODE_OPTIONS="--max-old-space-size=8192" pnpm webpack --config webpack.dev.js --progress --color; \
 		pnpm webpack --config webpack.prod.js --progress --color
-	@echo "${COLOR_GREEN}Waiting for the build to finish...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Waiting for the build to finish...${COLOR_RESET}"
 	@sleep 3 # wait for the build to finish
 
 # build-ui-prod builds the frontend codes for production.
 .PHONY: cp-assets
 cp-assets:
-	@echo "${COLOR_GREEN}Copying UI assets...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Copying UI assets...${COLOR_RESET}"
 	@rm -f ${FE_ASSETS_DIR}/*
 	@cp ${FE_BUILD_DIR}/* ${FE_ASSETS_DIR}
 
 # clean-ui removes the UI build cache.
 .PHONY: clean-ui
 clean-ui:
-	@echo "${COLOR_GREEN}Cleaning UI build cache...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Cleaning UI build cache...${COLOR_RESET}"
 	@cd ui; \
 		rm -rf node_modules; \
 		rm -rf .cache;
@@ -357,37 +357,37 @@ clean-ui:
 # AI agents and developers should run this before committing.
 .PHONY: fmt
 fmt:
-	@echo "${COLOR_GREEN}Running go fix...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Running go fix...${COLOR_RESET}"
 	@go fix ./...
-	@echo "${COLOR_GREEN}Running go fmt...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Running go fmt...${COLOR_RESET}"
 	@go fmt ./...
-	@echo "${COLOR_GREEN}Running linter with --fix...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Running linter with --fix...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_golangci_lint)
 	@${LOCAL_BIN_DIR}/golangci-lint run --fix ./...
 
 # check verifies code style without modifying files (for CI).
 .PHONY: check
 check:
-	@echo "${COLOR_GREEN}Checking go fix...${COLOR_RESET}"
-	@diff=$$(go fix -diff ./... 2>&1); if [ -n "$$diff" ]; then echo "$$diff"; echo "${COLOR_RED}Run 'make fmt'${COLOR_RESET}"; exit 1; fi
-	@echo "${COLOR_GREEN}Checking go fmt...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Checking go fix...${COLOR_RESET}"
+	@diff=$$(go fix -diff ./... 2>&1); if [ -n "$$diff" ]; then echo "$$diff"; printf '%b\n' "${COLOR_RED}Run 'make fmt'${COLOR_RESET}"; exit 1; fi
+	@printf '%b\n' "${COLOR_GREEN}Checking go fmt...${COLOR_RESET}"
 	@go fmt ./...
-	@git diff --exit-code || (echo "${COLOR_RED}Run 'make fmt'${COLOR_RESET}" && exit 1)
-	@echo "${COLOR_GREEN}Running linter...${COLOR_RESET}"
+	@git diff --exit-code || (printf '%b\n' "${COLOR_RED}Run 'make fmt'${COLOR_RESET}" && exit 1)
+	@printf '%b\n' "${COLOR_GREEN}Running linter...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_golangci_lint)
 	@${LOCAL_BIN_DIR}/golangci-lint run --timeout=10m ./...
 
 # golangci-lint run linting tool.
 .PHONY: golangci-lint
 golangci-lint:
-	@echo "${COLOR_GREEN}Running linter...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Running linter...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_golangci_lint)
 	@${LOCAL_BIN_DIR}/golangci-lint run --fix ./...
 
 # changelog generates a changelog from the releases.
 .PHONY: changelog
 changelog:
-	@echo "${COLOR_GREEN}Running changelog...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Running changelog...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_changelog-from-release)
 	@${LOCAL_BIN_DIR}/changelog-from-release -r ${REMOTE_REPO_URL} -c > CHANGELOG.md
 
@@ -396,41 +396,41 @@ changelog:
 ##############################################################################
 
 ${CA_CERT_FILE}:
-	@echo "${COLOR_GREEN}Generating CA certificates...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Generating CA certificates...${COLOR_RESET}"
 	@openssl req -x509 -newkey rsa:4096 \
 		-nodes -days 365 -keyout ${CA_KEY_FILE} \
 		-out ${CA_CERT_FILE} \
 		-subj "$(DEV_CERT_SUBJ_CA)"
 
 ${SERVER_KEY_FILE}:
-	@echo "${COLOR_GREEN}Generating server key...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Generating server key...${COLOR_RESET}"
 	@openssl req -newkey rsa:4096 -nodes -keyout ${SERVER_KEY_FILE} \
 		-out ${SERVER_CERT_REQ} \
 		-subj "$(DEV_CERT_SUBJ_SERVER)"
 
 ${SERVER_CERT_FILE}: ${CA_CERT_FILE} ${SERVER_KEY_FILE}
-	@echo "${COLOR_GREEN}Generating server certificate...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Generating server certificate...${COLOR_RESET}"
 	@openssl x509 -req -in ${SERVER_CERT_REQ} -CA ${CA_CERT_FILE} -CAkey ${CA_KEY_FILE} \
 		-CAcreateserial -out ${SERVER_CERT_FILE} \
 		-extfile ${OPENSSL_CONF}
 
 ${CLIENT_KEY_FILE}:
-	@echo "${COLOR_GREEN}Generating client key...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Generating client key...${COLOR_RESET}"
 	@openssl req -newkey rsa:4096 -nodes -keyout ${CLIENT_KEY_FILE} \
 		-out ${CLIENT_CERT_REQ} \
 		-subj "$(DEV_CERT_SUBJ_CLIENT)"
 
 ${CLIENT_CERT_FILE}: ${CA_CERT_FILE} ${CLIENT_KEY_FILE}
-	@echo "${COLOR_GREEN}Generating client certificate...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Generating client certificate...${COLOR_RESET}"
 	@openssl x509 -req -in ${CLIENT_CERT_REQ} -days 60 -CA ${CA_CERT_FILE} \
 		-CAkey ${CA_KEY_FILE} -CAcreateserial -out ${CLIENT_CERT_FILE} \
 		-extfile ${OPENSSL_CONF}
 
 ${CERTS_DIR}:
-	@echo "${COLOR_GREEN}Creating the certificates directory...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Creating the certificates directory...${COLOR_RESET}"
 	@mkdir -p ${CERTS_DIR}
 
 .PHONY: certs-check
 certs-check:
-	@echo "${COLOR_GREEN}Checking CA certificate...${COLOR_RESET}"
+	@printf '%b\n' "${COLOR_GREEN}Checking CA certificate...${COLOR_RESET}"
 	@openssl x509 -in ${SERVER_CERT_FILE} -noout -text

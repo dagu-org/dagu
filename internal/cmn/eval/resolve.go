@@ -7,8 +7,9 @@ import (
 	"strings"
 )
 
-// reVarSubstitution matches $VAR, ${VAR}, '$VAR', '${VAR}' patterns for variable substitution.
-var reVarSubstitution = regexp.MustCompile(`[']{0,1}\$\{([^}]+)\}[']{0,1}|[']{0,1}\$([a-zA-Z0-9_][a-zA-Z0-9_]*)[']{0,1}`)
+// reVarSubstitution matches ${...} and $VAR patterns for variable substitution.
+// Quote handling is done by callers based on surrounding characters.
+var reVarSubstitution = regexp.MustCompile(`\$\{([^}]+)\}|\$([a-zA-Z0-9_][a-zA-Z0-9_]*)`)
 
 // reQuotedJSONRef matches quoted JSON references like "${FOO.bar}" and simple variables like "${VAR}"
 var reQuotedJSONRef = regexp.MustCompile(`"\$\{([A-Za-z0-9_]\w*(?:\.[^}]+)?)\}"`)
@@ -110,34 +111,60 @@ func (r *resolver) resolveJSONSource(name string) (string, bool) {
 	return r.lookupScopeNonOS(name)
 }
 
-// extractVarKey extracts the variable key from a regex match.
-// Returns the key and false if the match is single-quoted.
-func extractVarKey(match string) (string, bool) {
-	if match[0] == '\'' && match[len(match)-1] == '\'' {
-		return "", false
-	}
-	if strings.HasPrefix(match, "${") {
-		return match[2 : len(match)-1], true
-	}
-	return match[1:], true
+// isSingleQuotedVar reports whether the matched variable token is enclosed
+// in single quotes in the original input (e.g., '${VAR}' or '$VAR').
+// Note: this is a simple adjacent-character heuristic. It may misidentify
+// nested quote contexts such as 'foo'${BAR}'baz' where the quote before
+// ${BAR} actually closes a prior segment. This is acceptable for the
+// targeted use cases (nu shell $'...' syntax, simple quoting).
+func isSingleQuotedVar(input string, start, end int) bool {
+	return start > 0 && end < len(input) && input[start-1] == '\'' && input[end] == '\''
 }
 
 // replaceVars substitutes $VAR and ${VAR} patterns using all resolver sources.
 // JSON path references (containing dots) are skipped; those are handled by expandReferences.
 func (r *resolver) replaceVars(template string) string {
-	return reVarSubstitution.ReplaceAllStringFunc(template, func(match string) string {
-		key, ok := extractVarKey(match)
-		if !ok {
-			return match
+	matches := reVarSubstitution.FindAllStringSubmatchIndex(template, -1)
+	if len(matches) == 0 {
+		return template
+	}
+
+	var b strings.Builder
+	last := 0
+	for _, loc := range matches {
+		b.WriteString(template[last:loc[0]])
+		last = loc[1]
+
+		match := template[loc[0]:loc[1]]
+		if isSingleQuotedVar(template, loc[0], loc[1]) {
+			b.WriteString(match)
+			continue
 		}
+
+		var key string
+		if loc[2] >= 0 { // Group 1: ${...}
+			key = template[loc[2]:loc[3]]
+		} else if loc[4] >= 0 { // Group 2: $VAR
+			key = template[loc[4]:loc[5]]
+		} else {
+			// Neither group captured — preserve original text.
+			b.WriteString(match)
+			continue
+		}
+
 		if strings.Contains(key, ".") {
-			return match
+			b.WriteString(match)
+			continue
 		}
 		if val, found := r.resolve(key); found {
-			return val
+			b.WriteString(val)
+			continue
 		}
-		return match
-	})
+		b.WriteString(match)
+	}
+
+	b.WriteString(template[last:])
+	return b.String()
 }
 
 // expandReferences resolves JSON path and step property references in the input.

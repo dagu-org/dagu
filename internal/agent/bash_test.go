@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -119,6 +120,21 @@ func TestBashTool_Run(t *testing.T) {
 
 		assert.False(t, result.IsError)
 		assert.Contains(t, result.Content, "test")
+	})
+
+	t.Run("rejects role without execute permission", func(t *testing.T) {
+		t.Parallel()
+
+		tool := NewBashTool()
+		input := json.RawMessage(`{"command": "echo test"}`)
+
+		result := tool.Run(ToolContext{
+			Context: context.Background(),
+			Role:    auth.RoleViewer,
+		}, input)
+
+		assert.True(t, result.IsError)
+		assert.Contains(t, result.Content, "requires execute permission")
 	})
 }
 
@@ -422,4 +438,23 @@ func TestBashTool_SafeMode_SafeCommandNoApproval(t *testing.T) {
 	require.False(t, promptCalled, "safe commands should not request approval even with SafeMode=true")
 	require.False(t, result.IsError)
 	require.Contains(t, result.Content, "hello")
+}
+
+func TestBashTool_SafeMode_SkipsLegacyPromptWhenPolicyChecked(t *testing.T) {
+	t.Parallel()
+
+	tool := NewBashTool()
+	input := json.RawMessage(`{"command": "rm testfile"}`)
+
+	promptCalled := false
+	ctx := ToolContext{
+		Context:        context.Background(),
+		SafeMode:       true,
+		PolicyChecked:  true,
+		EmitUserPrompt: func(_ UserPrompt) { promptCalled = true },
+	}
+
+	_ = tool.Run(ctx, input)
+
+	require.False(t, promptCalled, "legacy safe mode prompt should be skipped when policy already checked")
 }

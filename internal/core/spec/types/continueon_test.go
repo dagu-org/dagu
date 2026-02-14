@@ -76,12 +76,12 @@ failed: true
 		},
 		{
 			name:         "MapWithExitCodesArray",
-			input:        "exitCode: [0, 1, 2]",
+			input:        "exit_code: [0, 1, 2]",
 			wantExitCode: []int{0, 1, 2},
 		},
 		{
 			name:         "MapWithSingleExitCode",
-			input:        "exitCode: 1",
+			input:        "exit_code: 1",
 			wantExitCode: []int{1},
 		},
 		{
@@ -94,9 +94,9 @@ failed: true
 			input: `
 skipped: true
 failed: true
-exitCode: [0, 1]
+exit_code: [0, 1]
 output: "OK"
-markSuccess: true
+mark_success: true
 `,
 			wantSkipped:     true,
 			wantFailed:      true,
@@ -124,7 +124,7 @@ markSuccess: true
 		},
 		{
 			name:        "InvalidExitCodeType",
-			input:       `exitCode: "not a number"`,
+			input:       `exit_code: "not a number"`,
 			wantErr:     true,
 			errContains: "cannot parse",
 		},
@@ -141,17 +141,17 @@ markSuccess: true
 		},
 		{
 			name:         "ExitCodeAsInt64",
-			input:        "exitCode: 255",
+			input:        "exit_code: 255",
 			wantExitCode: []int{255},
 		},
 		{
 			name:         "ExitCodeAsString",
-			input:        `exitCode: "42"`,
+			input:        `exit_code: "42"`,
 			wantExitCode: []int{42},
 		},
 		{
 			name:         "ExitCodeArrayWithMixedTypes",
-			input:        `exitCode: [0, "1", 2]`,
+			input:        `exit_code: [0, "1", 2]`,
 			wantExitCode: []int{0, 1, 2},
 		},
 		{
@@ -162,7 +162,7 @@ markSuccess: true
 		},
 		{
 			name:        "ExitCodeInvalidString",
-			input:       `exitCode: "not-a-number"`,
+			input:       `exit_code: "not-a-number"`,
 			wantErr:     true,
 			errContains: "cannot parse",
 		},
@@ -220,7 +220,7 @@ func TestContinueOnValue_InStruct(t *testing.T) {
 
 	type StepConfig struct {
 		Name       string                `yaml:"name"`
-		ContinueOn types.ContinueOnValue `yaml:"continueOn"`
+		ContinueOn types.ContinueOnValue `yaml:"continue_on"`
 	}
 
 	tests := []struct {
@@ -235,7 +235,7 @@ func TestContinueOnValue_InStruct(t *testing.T) {
 			name: "ContinueOnAsString",
 			input: `
 name: my-step
-continueOn: skipped
+continue_on: skipped
 `,
 			wantSkipped: true,
 		},
@@ -243,9 +243,9 @@ continueOn: skipped
 			name: "ContinueOnAsMap",
 			input: `
 name: my-step
-continueOn:
+continue_on:
   failed: true
-  exitCode: [0, 1]
+  exit_code: [0, 1]
 `,
 			wantFailed:   true,
 			wantExitCode: []int{0, 1},
@@ -327,23 +327,23 @@ func TestContinueOnValue_EdgeCases(t *testing.T) {
 		},
 		{
 			name:         "ExitCodeAsFloat",
-			input:        "exitCode: 1.0",
+			input:        "exit_code: 1.0",
 			wantExitCode: []int{1},
 		},
 		{
 			name:         "ExitCodeArrayWithFloat",
-			input:        "exitCode: [1.0, 2.0]",
+			input:        "exit_code: [1.0, 2.0]",
 			wantExitCode: []int{1, 2},
 		},
 		{
 			name:        "InvalidExitCodeTypeInArray",
-			input:       "exitCode: [true]",
+			input:       "exit_code: [true]",
 			wantErr:     true,
 			errContains: "expected int",
 		},
 		{
 			name:        "InvalidExitCodeTypeNotIntOrArray",
-			input:       "exitCode: {key: value}",
+			input:       "exit_code: {key: value}",
 			wantErr:     true,
 			errContains: "expected int or array",
 		},
@@ -365,7 +365,7 @@ func TestContinueOnValue_EdgeCases(t *testing.T) {
 		},
 		{
 			name:        "MarkSuccessInvalidType",
-			input:       `markSuccess: "yes"`,
+			input:       `mark_success: "yes"`,
 			wantErr:     true,
 			errContains: "expected bool",
 		},
@@ -377,7 +377,7 @@ func TestContinueOnValue_EdgeCases(t *testing.T) {
 		},
 		{
 			name:        "ExitCodeInvalidStringInArray",
-			input:       `exitCode: ["not-a-number"]`,
+			input:       `exit_code: ["not-a-number"]`,
 			wantErr:     true,
 			errContains: "cannot parse",
 		},

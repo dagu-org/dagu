@@ -122,14 +122,14 @@ func RequireAdmin() func(http.Handler) http.Handler {
 	return RequireRole(auth.RoleAdmin)
 }
 
-// RequireWrite returns middleware that permits requests only for users with the Admin or Manager role.
+// RequireWrite returns middleware that permits requests only for users with the Admin, Manager, or Developer role.
 func RequireWrite() func(http.Handler) http.Handler {
-	return RequireRole(auth.RoleAdmin, auth.RoleManager)
+	return RequireRole(auth.RoleAdmin, auth.RoleManager, auth.RoleDeveloper)
 }
 
-// RequireExecute is middleware that permits requests only from users with the Admin, Manager, or Operator role.
+// RequireExecute is middleware that permits requests only from users with the Admin, Manager, Developer, or Operator role.
 func RequireExecute() func(http.Handler) http.Handler {
-	return RequireRole(auth.RoleAdmin, auth.RoleManager, auth.RoleOperator)
+	return RequireRole(auth.RoleAdmin, auth.RoleManager, auth.RoleDeveloper, auth.RoleOperator)
 }
 
 // extractBearerToken extracts the bearer token from the request's Authorization header.

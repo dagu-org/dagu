@@ -75,7 +75,7 @@ shell: powershell
 #   "0 9 * * 1-5"    - Weekdays at 9 AM
 #   "0 0 1 * *"      - First day of each month
 
-histRetentionDays: 7  # Keep 7 days of history
+hist_retention_days: 7  # Keep 7 days of history
 
 steps:
   - command: |

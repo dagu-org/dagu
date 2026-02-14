@@ -14,6 +14,9 @@ import (
 // GetSchedulerStatus returns the status of all registered scheduler instances
 func (a *API) GetSchedulerStatus(ctx context.Context, _ api.GetSchedulerStatusRequestObject) (api.GetSchedulerStatusResponseObject, error) {
 	logger.Info(ctx, "GetSchedulerStatus called")
+	if err := a.requireDeveloperOrAbove(ctx); err != nil {
+		return nil, err
+	}
 
 	schedulers := []api.SchedulerInstance{}
 
@@ -69,6 +72,9 @@ func (a *API) GetSchedulerStatus(ctx context.Context, _ api.GetSchedulerStatusRe
 // GetCoordinatorStatus returns the status of all registered coordinator instances
 func (a *API) GetCoordinatorStatus(ctx context.Context, _ api.GetCoordinatorStatusRequestObject) (api.GetCoordinatorStatusResponseObject, error) {
 	logger.Info(ctx, "GetCoordinatorStatus called")
+	if err := a.requireDeveloperOrAbove(ctx); err != nil {
+		return nil, err
+	}
 
 	coordinators := []api.CoordinatorInstance{}
 
@@ -125,6 +131,9 @@ func (a *API) GetCoordinatorStatus(ctx context.Context, _ api.GetCoordinatorStat
 // GetTunnelStatus returns the status of the tunnel service
 func (a *API) GetTunnelStatus(ctx context.Context, _ api.GetTunnelStatusRequestObject) (api.GetTunnelStatusResponseObject, error) {
 	logger.Info(ctx, "GetTunnelStatus called")
+	if err := a.requireDeveloperOrAbove(ctx); err != nil {
+		return nil, err
+	}
 
 	// Return disabled if tunnel is not configured or service unavailable
 	if !a.config.Tunnel.Enabled || a.tunnelService == nil {

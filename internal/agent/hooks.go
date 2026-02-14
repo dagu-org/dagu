@@ -3,7 +3,12 @@ package agent
 import (
 	"context"
 	"encoding/json"
+
+	"github.com/dagu-org/dagu/internal/auth"
 )
+
+// RequestCommandApprovalFunc requests user approval for a command blocked by policy.
+type RequestCommandApprovalFunc func(ctx context.Context, command, reason string) (bool, error)
 
 // ToolExecInfo provides context about a tool execution for hooks.
 type ToolExecInfo struct {
@@ -13,7 +18,11 @@ type ToolExecInfo struct {
 	UserID    string
 	Username  string
 	IPAddress string
+	Role      auth.Role
 	Audit     *AuditInfo // from AgentTool.Audit; nil = not audited
+	// RequestCommandApproval prompts the user to approve command execution.
+	// It can be nil when prompts are unavailable.
+	RequestCommandApproval RequestCommandApprovalFunc
 }
 
 // BeforeToolExecHookFunc is called before tool execution.
@@ -42,6 +51,11 @@ func (h *Hooks) OnBeforeToolExec(fn BeforeToolExecHookFunc) {
 // OnAfterToolExec registers a hook called after tool execution.
 func (h *Hooks) OnAfterToolExec(fn AfterToolExecHookFunc) {
 	h.afterToolExec = append(h.afterToolExec, fn)
+}
+
+// HasBeforeToolExecHooks reports whether any before-exec hooks are registered.
+func (h *Hooks) HasBeforeToolExecHooks() bool {
+	return h != nil && len(h.beforeToolExec) > 0
 }
 
 // RunBeforeToolExec invokes all before-execution hooks in order.

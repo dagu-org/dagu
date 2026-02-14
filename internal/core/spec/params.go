@@ -252,7 +252,7 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 
 // paramRegex is a regex to match the parameters in the command.
 var paramRegex = regexp.MustCompile(
-	`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`(" + `?:\\"|[^"]*)` + "`" + `|[^"\s]+)`,
+	`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`[^`]*`" + `|[^"\s]+)`,
 )
 
 // backtickRegex matches backtick-enclosed commands for substitution.
@@ -372,4 +372,22 @@ func (p paramPair) Escaped() string {
 		return fmt.Sprintf("%s=%q", p.Name, p.Value)
 	}
 	return fmt.Sprintf("%q", p.Value)
+}
+
+// SmartEscape returns a string representation that only quotes values when
+// necessary (empty, or containing spaces/tabs/newlines/double-quotes).
+// This allows variable references like ${ITEM.xxx} to remain unquoted so
+// that their expanded content can be re-split into separate KEY=VALUE pairs.
+func (p paramPair) SmartEscape() string {
+	needsQuoting := p.Value == "" || strings.ContainsAny(p.Value, " \t\n\"")
+	if p.Name != "" {
+		if needsQuoting {
+			return fmt.Sprintf("%s=%q", p.Name, p.Value)
+		}
+		return fmt.Sprintf("%s=%s", p.Name, p.Value)
+	}
+	if needsQuoting {
+		return fmt.Sprintf("%q", p.Value)
+	}
+	return p.Value
 }

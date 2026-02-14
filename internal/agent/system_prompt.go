@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"embed"
 	"text/template"
+
+	"github.com/dagu-org/dagu/internal/auth"
 )
 
 //go:embed system_prompt.txt
@@ -30,19 +32,32 @@ type CurrentDAG struct {
 	Status   string
 }
 
+// UserCapabilities contains role and capability context for the current user.
+type UserCapabilities struct {
+	Role           string
+	CanExecuteDAGs bool
+	CanWriteDAGs   bool
+	CanViewAudit   bool
+	IsAdmin        bool
+}
+
 // systemPromptData contains all data for template rendering.
 type systemPromptData struct {
 	EnvironmentInfo
 	CurrentDAG *CurrentDAG
+	Memory     MemoryContent
+	User       *UserCapabilities
 }
 
-// GenerateSystemPrompt renders the system prompt template with the given environment
-// and optional DAG context.
-func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG) string {
+// GenerateSystemPrompt renders the system prompt template with the given environment,
+// optional DAG context, memory content, and user role capabilities.
+func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG, memory MemoryContent, role auth.Role) string {
 	var buf bytes.Buffer
 	data := systemPromptData{
 		EnvironmentInfo: env,
 		CurrentDAG:      currentDAG,
+		Memory:          memory,
+		User:            buildUserCapabilities(role),
 	}
 	if err := systemPromptTemplate.Execute(&buf, data); err != nil {
 		return fallbackPrompt(env)
@@ -50,7 +65,20 @@ func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG) string {
 	return buf.String()
 }
 
+func buildUserCapabilities(role auth.Role) *UserCapabilities {
+	if role == "" {
+		return nil
+	}
+	return &UserCapabilities{
+		Role:           role.String(),
+		CanExecuteDAGs: role.CanExecute(),
+		CanWriteDAGs:   role.CanWrite(),
+		CanViewAudit:   role.CanManageAudit(),
+		IsAdmin:        role.IsAdmin(),
+	}
+}
+
 // fallbackPrompt returns a basic prompt when template execution fails.
 func fallbackPrompt(env EnvironmentInfo) string {
-	return "You are Hermio, an AI assistant for DAG workflows. DAGs Directory: " + env.DAGsDir
+	return "You are Tsumugi, an AI assistant for DAG workflows. DAGs Directory: " + env.DAGsDir
 }

@@ -155,6 +155,28 @@ steps:
 		err := cli.UpdateStatus(ctx, root, status)
 		require.Error(t, err)
 	})
+	t.Run("GetLatestStatusMarksStaleRunningAsFailed", func(t *testing.T) {
+		dag := th.DAG(t, `steps:
+  - name: "1"
+    command: sleep 1
+`)
+
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+		now := time.Now()
+		ctx := th.Context
+
+		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, exec.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+		require.NoError(t, att.Open(ctx))
+
+		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		require.NoError(t, att.Write(ctx, runningStatus))
+		require.NoError(t, att.Close(ctx))
+
+		latest, err := th.DAGRunMgr.GetLatestStatus(ctx, dag.DAG)
+		require.NoError(t, err)
+		require.Equal(t, core.Failed, latest.Status)
+	})
 }
 
 func testNewStatus(dag *core.DAG, dagRunID string, dagStatus core.Status, nodeStatus core.NodeStatus) exec.DAGRunStatus {

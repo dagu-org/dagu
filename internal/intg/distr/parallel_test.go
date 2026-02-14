@@ -22,12 +22,12 @@ steps:
         - "item1"
         - "item2"
         - "item3"
-      maxConcurrent: 2
+      max_concurrent: 2
     output: RESULTS
 
 ---
 name: child-worker
-workerSelector:
+worker_selector:
   type: test-worker
 steps:
   - name: process
@@ -87,7 +87,7 @@ steps:
 
 ---
 name: child-regional
-workerSelector:
+worker_selector:
   type: test-worker
 steps:
   - name: process
@@ -134,7 +134,7 @@ steps:
 
 ---
 name: child-worker
-workerSelector:
+worker_selector:
   type: test-worker
 steps:
   - name: run
@@ -174,7 +174,7 @@ steps:
 
 ---
 name: child-nonexistent
-workerSelector:
+worker_selector:
   type: nonexistent-worker
 steps:
   - name: process
@@ -220,7 +220,7 @@ steps:
 
 ---
 name: child-distributed
-workerSelector:
+worker_selector:
   type: test-worker
 steps:
   - name: sleep

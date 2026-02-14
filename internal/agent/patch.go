@@ -86,6 +86,10 @@ func NewPatchTool(dagsDir string) *AgentTool {
 }
 
 func patchRun(ctx ToolContext, input json.RawMessage, dagsDir string) ToolOut {
+	if ctx.Role.IsSet() && !ctx.Role.CanWrite() {
+		return toolError("Permission denied: patch requires write permission")
+	}
+
 	var args PatchToolInput
 	if err := json.Unmarshal(input, &args); err != nil {
 		return toolError("Failed to parse input: %v", err)

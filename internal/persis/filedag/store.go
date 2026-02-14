@@ -81,15 +81,15 @@ func New(baseDir string, opts ...Option) exec.DAGStore {
 	if options.FlagsBaseDir == "" {
 		options.FlagsBaseDir = filepath.Join(baseDir, "flags")
 	}
-	uniqSearchPaths := make(map[string]struct{})
-	uniqSearchPaths[baseDir] = struct{}{}
-	uniqSearchPaths["."] = struct{}{}
-	for _, path := range options.SearchPaths {
-		uniqSearchPaths[path] = struct{}{}
-	}
-	searchPaths := make([]string, 0, len(uniqSearchPaths))
-	for path := range uniqSearchPaths {
-		searchPaths = append(searchPaths, path)
+	// Build search paths in deterministic order: baseDir first, then ".", then additional paths.
+	seen := make(map[string]struct{})
+	var searchPaths []string
+	for _, p := range append([]string{baseDir, "."}, options.SearchPaths...) {
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		searchPaths = append(searchPaths, p)
 	}
 
 	return &Storage{

@@ -30,9 +30,9 @@
           "description": "List of paths to .env files to load environment variables from. Files can be specified as absolute paths, or relative to: DAG file directory, base config directory, or user's home directory."
         }
       ],
-      "description": "Specifies .env files to load environment variables from. By default, '.env' is loaded. When files are specified, '.env' is automatically prepended to the list. All files are loaded sequentially with later files overriding earlier values. Set to empty array [] to disable all .env loading. Files are loaded relative to the DAG's workingDir."
+      "description": "Specifies .env files to load environment variables from. By default, '.env' is loaded. When files are specified, '.env' is automatically prepended to the list. All files are loaded sequentially with later files overriding earlier values. Set to empty array [] to disable all .env loading. Files are loaded relative to the DAG's working_dir."
     },
-    "workingDir": {
+    "working_dir": {
       "type": "string",
       "description": "Working directory for the DAG. All relative paths (including dotenv files) are resolved relative to this directory. Defaults to the directory containing the DAG file."
     },
@@ -104,15 +104,15 @@
       ],
       "description": "Schedule configuration for the DAG. Can be a simple cron expression, multiple cron expressions, or an object with start/stop/restart schedules. If omitted, the DAG will only run manually."
     },
-    "skipIfSuccessful": {
+    "skip_if_successful": {
       "type": "boolean",
       "description": "When true, Dagu checks if this DAG has already succeeded since the last scheduled time. If it has, Dagu will skip the current scheduled run. This is useful for resource-intensive tasks or data processing jobs that shouldn't run twice. Note: Manual triggers always run regardless of this setting."
     },
-    "catchupWindow": {
+    "catchup_window": {
       "type": "string",
       "description": "Lookback horizon for replaying missed cron runs when the scheduler restarts. Accepts Go duration syntax with day support (e.g. \"6h\", \"2d12h\", \"30m\"). Must be positive. If omitted, missed runs are not replayed."
     },
-    "overlapPolicy": {
+    "overlap_policy": {
       "type": "string",
       "enum": ["skip", "all", "latest"],
       "default": "skip",
@@ -203,17 +203,17 @@
       },
       "description": "List of external secret references resolved at runtime and exposed as environment variables. Each entry declares the target environment variable name, provider, key, and optional provider-specific options."
     },
-    "logDir": {
+    "log_dir": {
       "type": "string",
       "description": "Base directory for storing logs. Defaults to ${HOME}/.local/share/logs if not specified."
     },
-    "logOutput": {
+    "log_output": {
       "type": "string",
       "enum": ["separate", "merged"],
       "default": "separate",
       "description": "Controls how stdout and stderr are logged. 'separate' writes stdout to .out and stderr to .err files. 'merged' writes both to a single .log file with interleaved output."
     },
-    "handlerOn": {
+    "handler_on": {
       "type": "object",
       "properties": {
         "init": {
@@ -267,7 +267,7 @@
       },
       "description": "SMTP server configuration for sending email notifications."
     },
-    "mailOn": {
+    "mail_on": {
       "type": "object",
       "properties": {
         "failure": {
@@ -281,31 +281,31 @@
       },
       "description": "Configuration for sending email notifications on DAG success or failure."
     },
-    "errorMail": {
+    "error_mail": {
       "$ref": "#/definitions/mailConfig",
       "description": "Email configuration specifically for error notifications."
     },
-    "infoMail": {
+    "info_mail": {
       "$ref": "#/definitions/mailConfig",
       "description": "Email configuration for informational notifications."
     },
-    "timeoutSec": {
+    "timeout_sec": {
       "type": "integer",
       "description": "Maximum number of seconds allowed for the entire DAG to finish. If exceeded, the DAG is considered timed out."
     },
-    "delaySec": {
+    "delay_sec": {
       "type": "integer",
       "description": "Delay in seconds before starting the first node. Useful for staggering workloads."
     },
-    "restartWaitSec": {
+    "restart_wait_sec": {
       "type": "integer",
       "description": "Number of seconds to wait before restarting a failed or stopped DAG. Typically used with a process supervisor."
     },
-    "histRetentionDays": {
+    "hist_retention_days": {
       "type": "integer",
       "description": "Number of days to retain execution history. After this period, older run logs/history can be purged."
     },
-    "maxActiveRuns": {
+    "max_active_runs": {
       "type": "integer",
       "default": 1,
       "description": "DEPRECATED: This field is ignored for local (DAG-based) queues. For concurrency control, define a global queue in config and use the 'queue' field.",
@@ -315,18 +315,18 @@
       "type": "string",
       "description": "Name of the queue to assign this DAG to. If not specified, defaults to the DAG name. Used with global queue configuration to control concurrent execution across multiple DAGs."
     },
-    "maxActiveSteps": {
+    "max_active_steps": {
       "type": "integer",
       "description": "Maximum number of concurrent steps that can be active at once. Useful for limiting resource usage."
     },
-    "maxCleanUpTimeSec": {
+    "max_clean_up_time_sec": {
       "type": "integer",
       "description": "Maximum time in seconds to spend cleaning up (stopping steps, finalizing logs) before forcing shutdown. If exceeded, processes will be killed."
     },
-    "maxOutputSize": {
+    "max_output_size": {
       "type": "integer",
       "default": 1048576,
-      "description": "Maximum size in bytes for the output of each step. If a step's output exceeds this limit, it will fail with an error. Defaults to 1MB (1048576 bytes). This limit also applies to pattern matching in preconditions and continueOn conditions."
+      "description": "Maximum size in bytes for the output of each step. If a step's output exceeds this limit, it will fail with an error. Defaults to 1MB (1048576 bytes). This limit also applies to pattern matching in preconditions and continue_on conditions."
     },
     "preconditions": {
       "oneOf": [
@@ -392,7 +392,7 @@
       "$ref": "#/definitions/container",
       "description": "Default container configuration for all steps in the DAG. Steps can override this configuration with their own container settings."
     },
-    "registryAuths": {
+    "registry_auths": {
       "oneOf": [
         {
           "type": "string",
@@ -430,7 +430,7 @@
           "description": "Map of registry hostnames to authentication configurations. Registry hostnames should match the registry in your image names (e.g., 'docker.io', 'ghcr.io', 'gcr.io', '123456789012.dkr.ecr.us-east-1.amazonaws.com')."
         }
       ],
-      "description": "Authentication configuration for Docker container registries. Allows pulling images from private registries. Can be specified as a complete DOCKER_AUTH_CONFIG JSON string, or as a map of individual registry credentials. Authentication priority: 1) DAG-level registryAuths, 2) DOCKER_AUTH_CONFIG environment variable, 3) No authentication (public registries). Supports environment variable expansion with ${VAR} syntax."
+      "description": "Authentication configuration for Docker container registries. Allows pulling images from private registries. Can be specified as a complete DOCKER_AUTH_CONFIG JSON string, or as a map of individual registry credentials. Authentication priority: 1) DAG-level registry_auths, 2) DOCKER_AUTH_CONFIG environment variable, 3) No authentication (public registries). Supports environment variable expansion with ${VAR} syntax."
     },
     "ssh": {
       "$ref": "#/definitions/sshConfig",
@@ -470,16 +470,16 @@
       "$ref": "#/definitions/otelConfig",
       "description": "OpenTelemetry tracing configuration for distributed tracing of DAG execution."
     },
-    "runConfig": {
+    "run_config": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "disableParamEdit": {
+        "disable_param_edit": {
           "type": "boolean",
           "default": false,
           "description": "When true, prevents users from modifying DAG parameters when starting the DAG. Defaults to false (users can edit parameters)."
         },
-        "disableRunIdEdit": {
+        "disable_run_id_edit": {
           "type": "boolean",
           "default": false,
           "description": "When true, prevents users from entering custom run IDs when starting the DAG. Defaults to false (users can enter custom run IDs)."
@@ -487,7 +487,7 @@
       },
       "description": "Configuration for controlling user interactions when starting DAG runs. Allows restricting parameter editing and custom run ID input."
     },
-    "workerSelector": {
+    "worker_selector": {
       "oneOf": [
         {
           "type": "object",
@@ -506,7 +506,7 @@
           "description": "Set to \"local\" to force this DAG to run locally even when the server default execution mode is distributed."
         }
       ],
-      "description": "Worker selection for this DAG. Use a map of label key-value pairs to target specific workers, or the string \"local\" to force local execution. This setting applies to the entire DAG; individual steps can override this with their own workerSelector."
+      "description": "Worker selection for this DAG. Use a map of label key-value pairs to target specific workers, or the string \"local\" to force local execution. This setting applies to the entire DAG; individual steps can override this with their own worker_selector."
     },
     "shell": {
       "oneOf": [
@@ -603,9 +603,9 @@
           "type": "string",
           "description": "Brief description of what this step does. Helps document the step's purpose."
         },
-        "workingDir": {
+        "working_dir": {
           "type": "string",
-          "description": "Working directory for the step. Inherits from DAG's workingDir if not specified. Overrides DAG-level workingDir for this step."
+          "description": "Working directory for the step. Inherits from DAG's working_dir if not specified. Overrides DAG-level working_dir for this step."
         },
         "command": {
           "oneOf": [
@@ -639,7 +639,7 @@
           ],
           "description": "Shell to use for executing the command. Can be specified as a string with arguments (e.g., '/bin/bash -e') which will be automatically tokenized, or as an array for explicit argument separation. Overrides DAG-level shell if specified. Defaults to DAG-level shell, or $SHELL/sh if not specified."
         },
-        "shellPackages": {
+        "shell_packages": {
           "type": "array",
           "items": {
             "type": "string"
@@ -658,7 +658,7 @@
           "type": "string",
           "description": "File path where the step's standard error (stderr) will be written."
         },
-        "logOutput": {
+        "log_output": {
           "type": "string",
           "enum": ["separate", "merged"],
           "description": "Override DAG-level log output mode. 'separate' writes stdout to .out and stderr to .err files. 'merged' writes both to a single .log file."
@@ -707,7 +707,7 @@
             }
           ]
         },
-        "continueOn": {
+        "continue_on": {
           "oneOf": [
             {
               "type": "string",
@@ -725,7 +725,7 @@
                   "type": "boolean",
                   "description": "Continue dag-run even if this step is skipped due to preconditions"
                 },
-                "exitCode": {
+                "exit_code": {
                   "oneOf": [
                     {
                       "type": "integer",
@@ -759,7 +759,7 @@
                     }
                   ]
                 },
-                "markSuccess": {
+                "mark_success": {
                   "type": "boolean",
                   "description": "Mark the step as successful even if it technically failed but met continue conditions"
                 }
@@ -768,7 +768,7 @@
           ],
           "description": "Conditions under which the DAG should continue executing even if this step fails or is skipped. Can be a string ('skipped' or 'failed') or an object with detailed configuration."
         },
-        "retryPolicy": {
+        "retry_policy": {
           "type": "object",
           "properties": {
             "limit": {
@@ -782,7 +782,7 @@
               ],
               "description": "Maximum number of retry attempts"
             },
-            "intervalSec": {
+            "interval_sec": {
               "oneOf": [
                 {
                   "type": "integer"
@@ -806,11 +806,11 @@
               ],
               "description": "Exponential backoff multiplier for retry delays"
             },
-            "maxIntervalSec": {
+            "max_interval_sec": {
               "type": "integer",
               "description": "Maximum interval in seconds (caps exponential growth)"
             },
-            "exitCode": {
+            "exit_code": {
               "type": "array",
               "items": {
                 "type": "integer"
@@ -820,7 +820,7 @@
           },
           "description": "Configuration for automatically retrying failed steps."
         },
-        "repeatPolicy": {
+        "repeat_policy": {
           "type": "object",
           "properties": {
             "repeat": {
@@ -835,7 +835,7 @@
               ],
               "description": "Determines if and how the step should be repeated. Can be a boolean or a string ('while' or 'until')."
             },
-            "intervalSec": {
+            "interval_sec": {
               "type": "integer",
               "description": "Interval in seconds between repetitions"
             },
@@ -857,7 +857,7 @@
               ],
               "description": "Exponential backoff multiplier for repeat delays"
             },
-            "maxIntervalSec": {
+            "max_interval_sec": {
               "type": "integer",
               "description": "Maximum interval in seconds (caps exponential growth)"
             },
@@ -869,7 +869,7 @@
               "type": "string",
               "description": "Expected value or pattern to match against the condition result. Supports regex patterns with 're:' prefix."
             },
-            "exitCode": {
+            "exit_code": {
               "oneOf": [
                 { "type": "integer" },
                 { "type": "array", "items": { "type": "integer" } }
@@ -879,23 +879,9 @@
           },
           "description": "Configuration for repeatedly executing this step at fixed intervals or until a condition is met. Supports string matching, command substitution, and exit code checks."
         },
-        "mailOnError": {
+        "mail_on_error": {
           "type": "boolean",
           "description": "Send an email notification if this specific step fails."
-        },
-        "precondition": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/condition"
-              }
-            }
-          ],
-          "description": "Conditions that must be met before this step can run. Supports command exit codes, environment variables, and regex matching."
         },
         "preconditions": {
           "oneOf": [
@@ -909,13 +895,13 @@
               }
             }
           ],
-          "description": "Alternative name for precondition. Works exactly the same way."
+          "description": "Conditions that must be met before this step can run. Supports command exit codes, environment variables, and regex matching."
         },
-        "signalOnStop": {
+        "signal_on_stop": {
           "type": "string",
           "description": "Signal to send when stopping this step (e.g., SIGINT). If empty, uses same signal as parent process."
         },
-        "timeoutSec": {
+        "timeout_sec": {
           "type": "integer",
           "minimum": 0,
           "description": "Maximum execution time for the step in seconds. If set, this timeout takes precedence over the DAG-level timeout for this step."
@@ -1006,7 +992,7 @@
                     }
                   ]
                 },
-                "maxConcurrent": {
+                "max_concurrent": {
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 1000,
@@ -1021,7 +1007,7 @@
           ],
           "description": "Configuration for parallel execution of sub DAGs. Only applicable when 'run' is specified. Allows processing multiple items concurrently using the same workflow definition."
         },
-        "workerSelector": {
+        "worker_selector": {
           "oneOf": [
             {
               "type": "object",
@@ -1281,12 +1267,12 @@
           "type": "string",
           "description": "Text to prepend to the email subject line. Useful for filtering or categorizing notification emails."
         },
-        "attachLogs": {
+        "attach_logs": {
           "type": "boolean",
           "description": "When true, relevant log files will be attached to the notification email."
         }
       },
-      "description": "Configuration for email notifications, used by errorMail and infoMail settings."
+      "description": "Configuration for email notifications, used by error_mail and info_mail settings."
     },
     "otelConfig": {
       "type": "object",
@@ -1378,7 +1364,7 @@
       "properties": {
         "exec": {
           "type": "string",
-          "description": "Name of an existing running container to exec into. Dagu waits up to 120 seconds for the container to be running; fails if not running within timeout. Mutually exclusive with 'image'. When used, only 'user', 'workingDir', and 'env' are applicable."
+          "description": "Name of an existing running container to exec into. Dagu waits up to 120 seconds for the container to be running; fails if not running within timeout. Mutually exclusive with 'image'. When used, only 'user', 'working_dir', and 'env' are applicable."
         },
         "name": {
           "type": "string",
@@ -1388,7 +1374,7 @@
           "type": "string",
           "description": "Container image to use (e.g., 'python:3.11', 'node:20'). Mutually exclusive with 'exec'."
         },
-        "pullPolicy": {
+        "pull_policy": {
           "oneOf": [
             {
               "type": "boolean",
@@ -1432,13 +1418,13 @@
           "items": {
             "type": "string"
           },
-          "description": "Volume mounts for the container. Format: 'host_path:container_path[:mode]' where mode is 'ro' for read-only or 'rw' (default) for read-write. Relative paths (starting with './' or '.') are resolved relative to the DAG's workingDir. Not applicable in exec mode."
+          "description": "Volume mounts for the container. Format: 'host_path:container_path[:mode]' where mode is 'ro' for read-only or 'rw' (default) for read-write. Relative paths (starting with './' or '.') are resolved relative to the DAG's working_dir. Not applicable in exec mode."
         },
         "user": {
           "type": "string",
           "description": "User (and optionally group) to run the container as. Format: 'user' or 'user:group' (e.g., '1000' or '1000:1000')."
         },
-        "workingDir": {
+        "working_dir": {
           "type": "string",
           "description": "Working directory inside the container. Commands will be executed from this directory."
         },
@@ -1468,21 +1454,21 @@
           "items": { "type": "string" },
           "description": "Command to execute when startup is 'command'. Must be a non-empty array. Not applicable in exec mode."
         },
-        "waitFor": {
+        "wait_for": {
           "type": "string",
           "enum": ["running", "healthy"],
           "default": "running",
           "description": "Readiness condition before steps execute: 'running' waits for container to run; 'healthy' waits for Docker healthcheck to report healthy. Not applicable in exec mode."
         },
-        "logPattern": {
+        "log_pattern": {
           "type": "string",
           "description": "Optional regex; if set, waits for this pattern to appear in container logs before steps run. Not applicable in exec mode."
         },
-        "restartPolicy": {
+        "restart_policy": {
           "type": "string",
           "description": "Docker restart policy for the container: 'no', 'always', or 'unless-stopped'. Not applicable in exec mode."
         },
-        "keepContainer": {
+        "keep_container": {
           "type": "boolean",
           "default": false,
           "description": "Keep the container running after the step completes. Useful for debugging or when running services that need to persist between steps. Not applicable in exec mode."
@@ -1507,7 +1493,7 @@
               "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
               "description": "Maximum time to wait for a health check to complete (e.g., '3s', '10s'). Default is 30s."
             },
-            "startPeriod": {
+            "start_period": {
               "type": "string",
               "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
               "description": "Grace period for the container to initialize before health checks start counting failures (e.g., '10s', '1m'). Default is 0s."
@@ -1519,7 +1505,7 @@
             }
           },
           "required": ["test"],
-          "description": "Custom healthcheck configuration for the container. Allows 'waitFor: healthy' to work with images that don't have built-in healthchecks (e.g., postgres, mysql). Not applicable in exec mode."
+          "description": "Custom healthcheck configuration for the container. Allows 'wait_for: healthy' to work with images that don't have built-in healthchecks (e.g., postgres, mysql). Not applicable in exec mode."
         },
         "shell": {
           "type": "array",
@@ -1562,12 +1548,12 @@
           "type": "string",
           "description": "SSH password for authentication (not recommended; prefer key-based auth)."
         },
-        "strictHostKey": {
+        "strict_host_key": {
           "type": "boolean",
           "default": true,
           "description": "Enable strict host key checking. When true (default), verifies the server's host key against known_hosts. Set to false only for testing."
         },
-        "knownHostFile": {
+        "known_host_file": {
           "type": "string",
           "default": "~/.ssh/known_hosts",
           "description": "Path to the known_hosts file for host key verification. Defaults to ~/.ssh/known_hosts."
@@ -1603,15 +1589,15 @@
           "type": "string",
           "description": "Custom S3-compatible endpoint URL. Use for MinIO, LocalStack, or other S3-compatible services (e.g., 'http://localhost:9000')."
         },
-        "accessKeyId": {
+        "access_key_id": {
           "type": "string",
           "description": "AWS access key ID. Supports environment variable expansion (e.g., '${AWS_ACCESS_KEY_ID}')."
         },
-        "secretAccessKey": {
+        "secret_access_key": {
           "type": "string",
           "description": "AWS secret access key. Supports environment variable expansion (e.g., '${AWS_SECRET_ACCESS_KEY}')."
         },
-        "sessionToken": {
+        "session_token": {
           "type": "string",
           "description": "AWS session token for temporary credentials. Supports environment variable expansion."
         },
@@ -1623,12 +1609,12 @@
           "type": "string",
           "description": "Default S3 bucket name. Can be overridden at step level."
         },
-        "forcePathStyle": {
+        "force_path_style": {
           "type": "boolean",
           "default": false,
           "description": "Use path-style addressing (bucket in path instead of subdomain). Required for most S3-compatible services like MinIO."
         },
-        "disableSSL": {
+        "disable_ssl": {
           "type": "boolean",
           "default": false,
           "description": "Disable SSL/TLS for connections. Only use for local development with non-TLS endpoints."
@@ -1660,11 +1646,11 @@
               "type": "string",
               "description": "S3 key prefix for list and batch delete operations."
             },
-            "contentType": {
+            "content_type": {
               "type": "string",
               "description": "Content-Type header for uploaded objects. Auto-detected from file extension if not specified."
             },
-            "storageClass": {
+            "storage_class": {
               "type": "string",
               "enum": [
                 "STANDARD",
@@ -1693,7 +1679,7 @@
               "enum": ["AES256", "aws:kms"],
               "description": "Server-side encryption algorithm."
             },
-            "sseKmsKeyId": {
+            "sse_kms_key_id": {
               "type": "string",
               "description": "KMS key ID for SSE-KMS encryption."
             },
@@ -1710,7 +1696,7 @@
               ],
               "description": "Canned ACL for uploaded objects."
             },
-            "partSize": {
+            "part_size": {
               "type": "integer",
               "minimum": 5,
               "default": 10,
@@ -1722,7 +1708,7 @@
               "default": 5,
               "description": "Number of concurrent upload/download parts. Default: 5."
             },
-            "maxKeys": {
+            "max_keys": {
               "type": "integer",
               "minimum": 1,
               "maximum": 1000,
@@ -1738,7 +1724,7 @@
               "default": false,
               "description": "Recursively list all objects under prefix. Default: false."
             },
-            "outputFormat": {
+            "output_format": {
               "type": "string",
               "enum": ["json", "jsonl"],
               "default": "json",
@@ -1789,7 +1775,7 @@
           "type": "boolean",
           "description": "When true, formats output as JSON including status_code, headers, and parsed body."
         },
-        "skipTLSVerify": {
+        "skip_tls_verify": {
           "type": "boolean",
           "description": "Skip TLS certificate verification. WARNING: Only use for testing with self-signed certificates."
         }
@@ -1825,12 +1811,12 @@
           "type": "string",
           "description": "SSH password for authentication. Not recommended; prefer key-based authentication."
         },
-        "strictHostKey": {
+        "strict_host_key": {
           "type": "boolean",
           "default": true,
           "description": "Enable strict host key checking. When true (default), verifies server's host key against known_hosts."
         },
-        "knownHostFile": {
+        "known_host_file": {
           "type": "string",
           "default": "~/.ssh/known_hosts",
           "description": "Path to known_hosts file for host key verification."
@@ -1862,7 +1848,7 @@
           "type": "string",
           "description": "Docker image to use for creating a new container (e.g., 'python:3.11', 'alpine:latest')."
         },
-        "containerName": {
+        "container_name": {
           "type": "string",
           "description": "Name or ID of an existing container to exec into. Use this instead of image to run commands in an existing container."
         },
@@ -1885,11 +1871,11 @@
           "default": "missing",
           "description": "Image pull policy. 'always' pulls every time, 'never' uses only local, 'missing' pulls if not present."
         },
-        "autoRemove": {
+        "auto_remove": {
           "oneOf": [{ "type": "boolean" }, { "type": "string" }],
           "description": "Automatically remove the container after it exits."
         },
-        "workingDir": {
+        "working_dir": {
           "type": "string",
           "description": "Working directory inside the container. Shortcut that maps to container.WorkingDir."
         },
@@ -1916,7 +1902,7 @@
         "exec": {
           "type": "object",
           "additionalProperties": true,
-          "description": "Docker exec options (docker/api/types/container.ExecOptions). Only valid with containerName."
+          "description": "Docker exec options (docker/api/types/container.ExecOptions). Only valid with container_name."
         }
       },
       "description": "Docker executor configuration for running commands in containers."
@@ -1980,7 +1966,7 @@
           "default": "node:24-bookworm",
           "description": "Docker image to use as the runner for executing the GitHub Action."
         },
-        "autoRemove": {
+        "auto_remove": {
           "type": "boolean",
           "default": true,
           "description": "Automatically remove containers after execution."
@@ -1989,12 +1975,12 @@
           "type": "string",
           "description": "Docker network mode (e.g., 'host', 'bridge', or custom network name)."
         },
-        "githubInstance": {
+        "github_instance": {
           "type": "string",
           "default": "github.com",
           "description": "GitHub instance hostname for action resolution. Use for GitHub Enterprise."
         },
-        "dockerSocket": {
+        "docker_socket": {
           "type": "string",
           "description": "Custom Docker socket path. Leave empty for default."
         },
@@ -2013,17 +1999,17 @@
           },
           "description": "Artifact server configuration for GitHub Actions."
         },
-        "reuseContainers": {
+        "reuse_containers": {
           "type": "boolean",
           "default": false,
           "description": "Reuse containers between runs for faster execution."
         },
-        "forceRebuild": {
+        "force_rebuild": {
           "type": "boolean",
           "default": false,
           "description": "Force rebuild of action images."
         },
-        "containerOptions": {
+        "container_options": {
           "type": "string",
           "description": "Additional Docker run options as a string."
         },
@@ -2067,13 +2053,13 @@
         },
         "destination": {
           "type": "string",
-          "description": "Destination path for archive operations. Required for 'create' operation (unless dryRun)."
+          "description": "Destination path for archive operations. Required for 'create' operation (unless dry_run)."
         },
         "format": {
           "type": "string",
           "description": "Archive format (auto-detected from extension if not specified). Supports: tar, tar.gz, tar.bz2, zip, etc."
         },
-        "compressionLevel": {
+        "compression_level": {
           "type": "integer",
           "default": -1,
           "description": "Compression level. -1 for default, 0 for no compression, 1-9 for gzip/bzip2 levels."
@@ -2086,12 +2072,12 @@
           "type": "boolean",
           "description": "Overwrite existing files during extraction."
         },
-        "preservePaths": {
+        "preserve_paths": {
           "type": "boolean",
           "default": true,
           "description": "Preserve directory structure in archive."
         },
-        "stripComponents": {
+        "strip_components": {
           "type": "integer",
           "minimum": 0,
           "description": "Number of leading path components to strip during extraction."
@@ -2106,7 +2092,7 @@
           "items": { "type": "string" },
           "description": "Glob patterns for files to exclude."
         },
-        "dryRun": {
+        "dry_run": {
           "type": "boolean",
           "description": "Simulate the operation without making changes."
         },
@@ -2114,15 +2100,15 @@
           "type": "boolean",
           "description": "Enable verbose output showing processed files."
         },
-        "followSymlinks": {
+        "follow_symlinks": {
           "type": "boolean",
           "description": "Follow symbolic links when creating archives."
         },
-        "verifyIntegrity": {
+        "verify_integrity": {
           "type": "boolean",
           "description": "Verify archive integrity after creation."
         },
-        "continueOnError": {
+        "continue_on_error": {
           "type": "boolean",
           "description": "Continue processing even if individual files fail."
         }
@@ -2132,9 +2118,9 @@
     "sqlImportConfig": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["inputFile", "table"],
+      "required": ["input_file", "table"],
       "properties": {
-        "inputFile": {
+        "input_file": {
           "type": "string",
           "description": "Path to input file (CSV, TSV, or JSONL). Required."
         },
@@ -2147,7 +2133,7 @@
           "enum": ["csv", "tsv", "jsonl"],
           "description": "Input format. Auto-detected from file extension if not specified."
         },
-        "hasHeader": {
+        "has_header": {
           "type": "boolean",
           "default": true,
           "description": "Whether first row is a header row. Default: true for CSV/TSV files."
@@ -2161,34 +2147,34 @@
           "items": { "type": "string" },
           "description": "Explicit column names. Overrides header row if specified."
         },
-        "nullValues": {
+        "null_values": {
           "type": "array",
           "items": { "type": "string" },
           "description": "Values to treat as NULL. Default: ['', 'NULL', 'null', '\\N']."
         },
-        "batchSize": {
+        "batch_size": {
           "type": "integer",
           "minimum": 1,
           "default": 1000,
           "description": "Number of rows per INSERT statement. Default: 1000."
         },
-        "onConflict": {
+        "on_conflict": {
           "type": "string",
           "enum": ["error", "ignore", "replace"],
           "default": "error",
-          "description": "Conflict handling strategy. Default: 'error'. For PostgreSQL, 'replace' requires 'conflictTarget' to perform UPSERT (ON CONFLICT DO UPDATE); without it, falls back to DO NOTHING. SQLite uses INSERT OR REPLACE which replaces the entire row."
+          "description": "Conflict handling strategy. Default: 'error'. For PostgreSQL, 'replace' requires 'conflict_target' to perform UPSERT (ON CONFLICT DO UPDATE); without it, falls back to DO NOTHING. SQLite uses INSERT OR REPLACE which replaces the entire row."
         },
-        "skipRows": {
+        "skip_rows": {
           "type": "integer",
           "minimum": 0,
           "description": "Skip first N data rows."
         },
-        "maxRows": {
+        "max_rows": {
           "type": "integer",
           "minimum": 0,
           "description": "Maximum rows to import. 0 = unlimited."
         },
-        "dryRun": {
+        "dry_run": {
           "type": "boolean",
           "description": "Validate without actually importing data."
         }
@@ -2204,19 +2190,19 @@
           "type": "string",
           "description": "PostgreSQL connection string. Format: postgres://user:pass@host:port/dbname?sslmode=disable"
         },
-        "maxOpenConns": {
+        "max_open_conns": {
           "type": "integer",
           "minimum": 1,
           "default": 5,
           "description": "Maximum number of open connections. Default: 5."
         },
-        "maxIdleConns": {
+        "max_idle_conns": {
           "type": "integer",
           "minimum": 0,
           "default": 2,
           "description": "Maximum number of idle connections. Default: 2."
         },
-        "connMaxLifetime": {
+        "conn_max_lifetime": {
           "type": "integer",
           "minimum": 0,
           "default": 300,
@@ -2247,7 +2233,7 @@
           "type": "boolean",
           "description": "Wrap execution in a transaction."
         },
-        "isolationLevel": {
+        "isolation_level": {
           "type": "string",
           "enum": [
             "default",
@@ -2257,11 +2243,11 @@
           ],
           "description": "Transaction isolation level."
         },
-        "advisoryLock": {
+        "advisory_lock": {
           "type": "string",
           "description": "Named advisory lock. Prevents concurrent execution across distributed workers."
         },
-        "outputFormat": {
+        "output_format": {
           "type": "string",
           "enum": ["jsonl", "json", "csv"],
           "default": "jsonl",
@@ -2271,12 +2257,12 @@
           "type": "boolean",
           "description": "Include headers in CSV output."
         },
-        "nullString": {
+        "null_string": {
           "type": "string",
           "default": "null",
           "description": "String representation for NULL values. Default: 'null'."
         },
-        "maxRows": {
+        "max_rows": {
           "type": "integer",
           "minimum": 0,
           "description": "Maximum rows to return. 0 = unlimited."
@@ -2285,7 +2271,7 @@
           "type": "boolean",
           "description": "Stream results to file instead of stdout."
         },
-        "outputFile": {
+        "output_file": {
           "type": "string",
           "description": "File path for streaming output."
         },
@@ -2305,13 +2291,13 @@
           "type": "string",
           "description": "SQLite connection string. Format: file:./path/to/db.sqlite or :memory: for in-memory database."
         },
-        "maxOpenConns": {
+        "max_open_conns": {
           "type": "integer",
           "minimum": 1,
           "default": 5,
           "description": "Maximum number of open connections. Default: 5. Recommended: 1 for SQLite."
         },
-        "maxIdleConns": {
+        "max_idle_conns": {
           "type": "integer",
           "minimum": 0,
           "default": 2,
@@ -2342,11 +2328,11 @@
           "type": "boolean",
           "description": "Wrap execution in a transaction."
         },
-        "fileLock": {
+        "file_lock": {
           "type": "boolean",
           "description": "Use file locking for exclusive database access. Creates a .lock file."
         },
-        "outputFormat": {
+        "output_format": {
           "type": "string",
           "enum": ["jsonl", "json", "csv"],
           "default": "jsonl",
@@ -2356,12 +2342,12 @@
           "type": "boolean",
           "description": "Include headers in CSV output."
         },
-        "nullString": {
+        "null_string": {
           "type": "string",
           "default": "null",
           "description": "String representation for NULL values. Default: 'null'."
         },
-        "maxRows": {
+        "max_rows": {
           "type": "integer",
           "minimum": 0,
           "description": "Maximum rows to return. 0 = unlimited."
@@ -2370,7 +2356,7 @@
           "type": "boolean",
           "description": "Stream results to file instead of stdout."
         },
-        "outputFile": {
+        "output_file": {
           "type": "string",
           "description": "File path for streaming output."
         },
@@ -2419,19 +2405,19 @@
           "type": "boolean",
           "description": "Enable TLS connection."
         },
-        "tlsCert": {
+        "tls_cert": {
           "type": "string",
           "description": "Client certificate path for mTLS."
         },
-        "tlsKey": {
+        "tls_key": {
           "type": "string",
-          "description": "Client key path for mTLS. Must be provided with tlsCert."
+          "description": "Client key path for mTLS. Must be provided with tls_cert."
         },
-        "tlsCA": {
+        "tls_ca": {
           "type": "string",
           "description": "CA certificate path for TLS verification."
         },
-        "tlsSkipVerify": {
+        "tls_skip_verify": {
           "type": "boolean",
           "description": "Skip TLS certificate verification. WARNING: Only use for testing."
         },
@@ -2441,25 +2427,25 @@
           "default": "standalone",
           "description": "Connection mode. Default: standalone."
         },
-        "sentinelMaster": {
+        "sentinel_master": {
           "type": "string",
           "description": "Sentinel master name. Required when mode is 'sentinel'."
         },
-        "sentinelAddrs": {
+        "sentinel_addrs": {
           "type": "array",
           "items": {
             "type": "string"
           },
           "description": "Sentinel server addresses. Required when mode is 'sentinel'."
         },
-        "clusterAddrs": {
+        "cluster_addrs": {
           "type": "array",
           "items": {
             "type": "string"
           },
           "description": "Cluster node addresses. Required when mode is 'cluster'."
         },
-        "maxRetries": {
+        "max_retries": {
           "type": "integer",
           "minimum": 0,
           "default": 3,
@@ -2520,7 +2506,7 @@
               "type": "boolean",
               "description": "SET only if key exists."
             },
-            "keepTTL": {
+            "keep_ttl": {
               "type": "boolean",
               "description": "Preserve existing TTL when updating key (Redis 6+)."
             },
@@ -2562,7 +2548,7 @@
               "type": "string",
               "description": "Maximum score/value for ZRANGEBYSCORE, ZCOUNT."
             },
-            "withScores": {
+            "with_scores": {
               "type": "boolean",
               "description": "Include scores in ZRANGE output."
             },
@@ -2584,7 +2570,7 @@
               "type": "string",
               "description": "Stream key for XADD, XREAD."
             },
-            "streamID": {
+            "stream_id": {
               "type": "string",
               "description": "Stream message ID. Use '*' for auto-generation."
             },
@@ -2596,12 +2582,12 @@
               "type": "string",
               "description": "Consumer name for XREADGROUP."
             },
-            "streamFields": {
+            "stream_fields": {
               "type": "object",
               "additionalProperties": true,
               "description": "Stream entry fields for XADD."
             },
-            "maxLen": {
+            "max_len": {
               "type": "integer",
               "minimum": 0,
               "description": "Maximum stream length for XADD."
@@ -2611,7 +2597,7 @@
               "minimum": 0,
               "description": "Block timeout in milliseconds for XREAD, XREADGROUP."
             },
-            "noAck": {
+            "no_ack": {
               "type": "boolean",
               "description": "Skip acknowledging messages in XREADGROUP."
             },
@@ -2619,22 +2605,22 @@
               "type": "string",
               "description": "Inline Lua script to execute."
             },
-            "scriptFile": {
+            "script_file": {
               "type": "string",
               "description": "Path to Lua script file."
             },
-            "scriptSHA": {
+            "script_sha": {
               "type": "string",
               "description": "SHA of pre-loaded script. Use EVALSHA instead of EVAL."
             },
-            "scriptKeys": {
+            "script_keys": {
               "type": "array",
               "items": {
                 "type": "string"
               },
               "description": "KEYS array for Lua script."
             },
-            "scriptArgs": {
+            "script_args": {
               "type": "array",
               "description": "ARGV array for Lua script."
             },
@@ -2699,31 +2685,31 @@
               "type": "string",
               "description": "Distributed lock name. Acquires lock before executing command."
             },
-            "lockTimeout": {
+            "lock_timeout": {
               "type": "integer",
               "minimum": 1,
               "default": 30,
               "description": "Lock expiry in seconds. Default: 30."
             },
-            "lockRetry": {
+            "lock_retry": {
               "type": "integer",
               "minimum": 0,
               "default": 10,
               "description": "Lock acquisition retry attempts. Default: 10."
             },
-            "lockWait": {
+            "lock_wait": {
               "type": "integer",
               "minimum": 0,
               "default": 100,
               "description": "Wait between lock retries in milliseconds. Default: 100."
             },
-            "outputFormat": {
+            "output_format": {
               "type": "string",
               "enum": ["json", "jsonl", "raw", "csv"],
               "default": "json",
               "description": "Output format. Default: json."
             },
-            "nullValue": {
+            "null_value": {
               "type": "string",
               "default": "null",
               "description": "String representation for nil values. Default: 'null'."
@@ -2734,7 +2720,7 @@
               "default": 30,
               "description": "Command timeout in seconds. Default: 30."
             },
-            "maxResultSize": {
+            "max_result_size": {
               "type": "integer",
               "minimum": 0,
               "default": 10485760,
@@ -2800,10 +2786,10 @@
                   "provider": { "$ref": "#/definitions/llmProvider" },
                   "name": { "type": "string" },
                   "temperature": { "type": "number" },
-                  "maxTokens": { "type": "integer" },
-                  "topP": { "type": "number" },
-                  "baseURL": { "type": "string" },
-                  "apiKeyName": { "type": "string" }
+                  "max_tokens": { "type": "integer" },
+                  "top_p": { "type": "number" },
+                  "base_url": { "type": "string" },
+                  "api_key_name": { "type": "string" }
                 }
               }
             }
@@ -2820,22 +2806,22 @@
           "maximum": 2,
           "description": "Controls randomness in responses (0.0-2.0). Lower values are more deterministic."
         },
-        "maxTokens": {
+        "max_tokens": {
           "type": "integer",
           "minimum": 1,
           "description": "Maximum number of tokens to generate in the response."
         },
-        "topP": {
+        "top_p": {
           "type": "number",
           "minimum": 0,
           "maximum": 1,
           "description": "Nucleus sampling parameter (0.0-1.0). Alternative to temperature for controlling randomness."
         },
-        "baseURL": {
+        "base_url": {
           "type": "string",
           "description": "Custom API endpoint URL. Overrides the default endpoint for the provider."
         },
-        "apiKeyName": {
+        "api_key_name": {
           "type": "string",
           "description": "Name of the environment variable containing the API key. If not specified, the default for the provider is used (e.g., OPENAI_API_KEY)."
         },
@@ -2865,12 +2851,12 @@
           "enum": ["low", "medium", "high", "xhigh"],
           "description": "Reasoning effort level. Maps to provider-specific settings: low (minimal reasoning), medium (default), high (thorough), xhigh (maximum, OpenAI GPT-5.2+ only)."
         },
-        "budgetTokens": {
+        "budget_tokens": {
           "type": "integer",
           "minimum": 1,
           "description": "Explicit token budget for thinking (provider-specific). Anthropic: 1024-128K, Gemini 2.5: 128-32768. Overrides effort-based defaults."
         },
-        "includeInOutput": {
+        "include_in_output": {
           "type": "boolean",
           "default": false,
           "description": "Include thinking blocks in stdout output. When false (default), only the final response is shown."

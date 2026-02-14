@@ -905,6 +905,16 @@ func (a *API) dispatchStartToCoordinator(ctx context.Context, dag *core.DAG, dag
 }
 
 func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts startDAGRunOptions) error {
+	if err := core.ValidateStartParams(dag.DefaultParams, core.StartParamInput{
+		RawParams: opts.params,
+	}); err != nil {
+		return &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    err.Error(),
+		}
+	}
+
 	// Check if this DAG should be dispatched to the coordinator for distributed execution
 	if core.ShouldDispatchToCoordinator(dag, a.coordinatorCli != nil, a.defaultExecMode) {
 		timeout := 5 * time.Second

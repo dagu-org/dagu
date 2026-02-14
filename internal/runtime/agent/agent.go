@@ -619,9 +619,12 @@ func (a *Agent) Run(ctx context.Context) error {
 	// example, when started, stopped, or cancelled, etc.
 	progressCh := make(chan *runtime.Node)
 	progressDone := make(chan struct{})
+	var progressDrained bool
 	defer func() {
-		close(progressCh)
-		<-progressDone // Wait for progress updates to complete
+		if !progressDrained {
+			close(progressCh)
+			<-progressDone
+		}
 		if a.progressDisplay != nil {
 			// Give a small delay to ensure final render
 			time.Sleep(100 * time.Millisecond)
@@ -682,6 +685,14 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	lastErr := a.runner.Run(ctx, a.plan, progressCh)
+
+	// Drain the progress goroutine before computing the final status.
+	// This prevents the progress goroutine from overwriting the final
+	// status with a stale intermediate status (e.g., "Running" instead
+	// of "Failed") after the final writeStatus call below.
+	close(progressCh)
+	<-progressDone
+	progressDrained = true
 
 	if coordinatorCli != nil {
 		// Cleanup the coordinator client resources if it was created.

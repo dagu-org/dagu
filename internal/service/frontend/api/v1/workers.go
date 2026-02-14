@@ -13,6 +13,9 @@ import (
 
 // GetWorkers implements the getWorkers operation
 func (a *API) GetWorkers(ctx context.Context, _ api.GetWorkersRequestObject) (api.GetWorkersResponseObject, error) {
+	if err := a.requireDeveloperOrAbove(ctx); err != nil {
+		return nil, err
+	}
 	logger.Info(ctx, "GetWorkers called")
 
 	errors := []string{}

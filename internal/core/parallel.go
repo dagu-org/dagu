@@ -3,7 +3,7 @@ package core
 import "github.com/dagu-org/dagu/internal/cmn/collections"
 
 // ParallelConfig contains the configuration for parallel execution of a step.
-// MVP version supports basic parallel execution with maxConcurrent control.
+// MVP version supports basic parallel execution with max_concurrent control.
 type ParallelConfig struct {
 	// Variable is the name of a variable that contains the json array of items to process in parallel.
 	Variable string `json:"variable,omitempty"`
@@ -14,7 +14,7 @@ type ParallelConfig struct {
 
 	// MaxConcurrent is the maximum number of parallel executions.
 	// Default is 10 if not specified.
-	MaxConcurrent int `json:"maxConcurrent,omitempty"`
+	MaxConcurrent int `json:"max_concurrent,omitempty"`
 }
 
 // DefaultMaxConcurrent is the default maximum concurrent executions for parallel steps

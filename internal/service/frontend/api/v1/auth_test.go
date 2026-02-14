@@ -16,14 +16,12 @@ func TestAuth_Combinations(t *testing.T) {
 
 	type authConfig struct {
 		mode      config.AuthMode
-		token     string
 		basicUser string
 		basicPass string
 	}
 
 	type request struct {
 		name       string
-		token      string
 		basicUser  string
 		basicPass  string
 		wantStatus int
@@ -39,7 +37,6 @@ func TestAuth_Combinations(t *testing.T) {
 			config: authConfig{},
 			requests: []request{
 				{name: "no_creds", wantStatus: http.StatusOK},
-				{name: "random_token", token: "random", wantStatus: http.StatusOK},
 				{name: "random_basic", basicUser: "user", basicPass: "pass", wantStatus: http.StatusOK},
 			},
 		},
@@ -48,27 +45,7 @@ func TestAuth_Combinations(t *testing.T) {
 			config: authConfig{mode: config.AuthModeNone},
 			requests: []request{
 				{name: "no_creds", wantStatus: http.StatusOK},
-				{name: "random_token", token: "random", wantStatus: http.StatusOK},
 				{name: "random_basic", basicUser: "user", basicPass: "pass", wantStatus: http.StatusOK},
-			},
-		},
-
-		{
-			name:   "default_token",
-			config: authConfig{token: "secret-token"},
-			requests: []request{
-				{name: "no_creds", wantStatus: http.StatusUnauthorized},
-				{name: "valid_token", token: "secret-token", wantStatus: http.StatusOK},
-				{name: "wrong_token", token: "wrong", wantStatus: http.StatusUnauthorized},
-			},
-		},
-		{
-			name:   "mode_none_token",
-			config: authConfig{mode: config.AuthModeNone, token: "secret-token"},
-			requests: []request{
-				{name: "no_creds", wantStatus: http.StatusUnauthorized},
-				{name: "valid_token", token: "secret-token", wantStatus: http.StatusOK},
-				{name: "wrong_token", token: "wrong", wantStatus: http.StatusUnauthorized},
 			},
 		},
 
@@ -86,10 +63,10 @@ func TestAuth_Combinations(t *testing.T) {
 			name:   "mode_none_basic",
 			config: authConfig{mode: config.AuthModeNone, basicUser: "admin", basicPass: "secret"},
 			requests: []request{
-				{name: "no_creds", wantStatus: http.StatusUnauthorized},
+				{name: "no_creds", wantStatus: http.StatusOK},
 				{name: "valid_basic", basicUser: "admin", basicPass: "secret", wantStatus: http.StatusOK},
-				{name: "wrong_user", basicUser: "wrong", basicPass: "secret", wantStatus: http.StatusUnauthorized},
-				{name: "wrong_pass", basicUser: "admin", basicPass: "wrong", wantStatus: http.StatusUnauthorized},
+				{name: "wrong_user", basicUser: "wrong", basicPass: "secret", wantStatus: http.StatusOK},
+				{name: "wrong_pass", basicUser: "admin", basicPass: "wrong", wantStatus: http.StatusOK},
 			},
 		},
 
@@ -106,32 +83,9 @@ func TestAuth_Combinations(t *testing.T) {
 			name:   "mode_none_basic_special_chars",
 			config: authConfig{mode: config.AuthModeNone, basicUser: "admin", basicPass: "p@ss$word&with`special"},
 			requests: []request{
-				{name: "no_creds", wantStatus: http.StatusUnauthorized},
+				{name: "no_creds", wantStatus: http.StatusOK},
 				{name: "valid_basic", basicUser: "admin", basicPass: "p@ss$word&with`special", wantStatus: http.StatusOK},
-				{name: "wrong_pass", basicUser: "admin", basicPass: "wrong", wantStatus: http.StatusUnauthorized},
-			},
-		},
-
-		{
-			name:   "default_token_and_basic",
-			config: authConfig{token: "my-token", basicUser: "admin", basicPass: "secret"},
-			requests: []request{
-				{name: "no_creds", wantStatus: http.StatusUnauthorized},
-				{name: "valid_token", token: "my-token", wantStatus: http.StatusOK},
-				{name: "valid_basic", basicUser: "admin", basicPass: "secret", wantStatus: http.StatusOK},
-				{name: "wrong_token", token: "wrong", wantStatus: http.StatusUnauthorized},
-				{name: "wrong_basic", basicUser: "wrong", basicPass: "wrong", wantStatus: http.StatusUnauthorized},
-			},
-		},
-		{
-			name:   "mode_none_token_and_basic",
-			config: authConfig{mode: config.AuthModeNone, token: "my-token", basicUser: "admin", basicPass: "secret"},
-			requests: []request{
-				{name: "no_creds", wantStatus: http.StatusUnauthorized},
-				{name: "valid_token", token: "my-token", wantStatus: http.StatusOK},
-				{name: "valid_basic", basicUser: "admin", basicPass: "secret", wantStatus: http.StatusOK},
-				{name: "wrong_token", token: "wrong", wantStatus: http.StatusUnauthorized},
-				{name: "wrong_basic", basicUser: "wrong", basicPass: "wrong", wantStatus: http.StatusUnauthorized},
+				{name: "wrong_pass", basicUser: "admin", basicPass: "wrong", wantStatus: http.StatusOK},
 			},
 		},
 	}
@@ -142,7 +96,6 @@ func TestAuth_Combinations(t *testing.T) {
 
 			server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 				cfg.Server.Auth.Mode = tt.config.mode
-				cfg.Server.Auth.Token.Value = tt.config.token
 				cfg.Server.Auth.Basic.Username = tt.config.basicUser
 				cfg.Server.Auth.Basic.Password = tt.config.basicPass
 			}))
@@ -150,9 +103,6 @@ func TestAuth_Combinations(t *testing.T) {
 			for _, req := range tt.requests {
 				t.Run(req.name, func(t *testing.T) {
 					client := server.Client().Get("/api/v1/dag-runs")
-					if req.token != "" {
-						client = client.WithBearerToken(req.token)
-					}
 					if req.basicUser != "" {
 						client = client.WithBasicAuth(req.basicUser, req.basicPass)
 					}
@@ -168,14 +118,11 @@ func TestAuth_BuiltinMode(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		token     string // API token (not JWT)
 		basicUser string
 		basicPass string
 	}{
 		{name: "jwt_only"},
-		{name: "jwt_with_token", token: "api-token"},
 		{name: "jwt_with_basic", basicUser: "basicuser", basicPass: "basicpass"},
-		{name: "jwt_with_token_and_basic", token: "api-token", basicUser: "basicuser", basicPass: "basicpass"},
 	}
 
 	for _, tt := range tests {
@@ -188,7 +135,6 @@ func TestAuth_BuiltinMode(t *testing.T) {
 				cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
 				cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
 				cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
-				cfg.Server.Auth.Token.Value = tt.token
 				cfg.Server.Auth.Basic.Username = tt.basicUser
 				cfg.Server.Auth.Basic.Password = tt.basicPass
 			}))
@@ -211,18 +157,6 @@ func TestAuth_BuiltinMode(t *testing.T) {
 				WithBearerToken(loginResult.Token).
 				ExpectStatus(http.StatusOK).Send(t)
 
-			// With API token (if configured) - should succeed
-			if tt.token != "" {
-				server.Client().Get("/api/v1/dag-runs").
-					WithBearerToken(tt.token).
-					ExpectStatus(http.StatusOK).Send(t)
-
-				// Wrong API token - should fail
-				server.Client().Get("/api/v1/dag-runs").
-					WithBearerToken("wrong-token").
-					ExpectStatus(http.StatusUnauthorized).Send(t)
-			}
-
 			// With basic auth (if configured) - should succeed
 			if tt.basicUser != "" {
 				server.Client().Get("/api/v1/dag-runs").
@@ -236,49 +170,6 @@ func TestAuth_BuiltinMode(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TestAuth_BuiltinModeWriteExecute tests that API token can perform
-// write and execute operations in builtin mode
-func TestAuth_BuiltinModeWriteExecute(t *testing.T) {
-	t.Parallel()
-
-	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
-		cfg.Server.Auth.Mode = config.AuthModeBuiltin
-		cfg.Server.Auth.Builtin.Admin.Username = "admin"
-		cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
-		cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
-		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
-		cfg.Server.Auth.Token.Value = "my-api-token"
-	}))
-
-	spec := `
-steps:
-  - name: test
-    command: echo hello
-`
-
-	// Without auth - write should fail
-	server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
-		Name: "api_token_test_dag",
-		Spec: &spec,
-	}).ExpectStatus(http.StatusUnauthorized).Send(t)
-
-	// Create DAG with API token
-	server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
-		Name: "api_token_test_dag",
-		Spec: &spec,
-	}).WithBearerToken("my-api-token").ExpectStatus(http.StatusCreated).Send(t)
-
-	// Start DAG with API token
-	server.Client().Post("/api/v1/dags/api_token_test_dag/start", api.ExecuteDAGJSONRequestBody{}).
-		WithBearerToken("my-api-token").
-		ExpectStatus(http.StatusOK).Send(t)
-
-	// Delete DAG with API token
-	server.Client().Delete("/api/v1/dags/api_token_test_dag").
-		WithBearerToken("my-api-token").
-		ExpectStatus(http.StatusNoContent).Send(t)
 }
 
 // TestAuth_PublicPaths tests that public paths bypass authentication

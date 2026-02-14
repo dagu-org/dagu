@@ -260,10 +260,11 @@ func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names m
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,
 		Result:      &st,
+		TagName:     "yaml",
 		DecodeHook:  TypedUnionDecodeHook(),
 	})
 	if err := md.Decode(raw); err != nil {
-		return nil, core.NewValidationError("steps", raw, err)
+		return nil, core.NewValidationError("steps", raw, withSnakeCaseKeyHint(err))
 	}
 	builtStep, err := st.build(ctx)
 	if err != nil {

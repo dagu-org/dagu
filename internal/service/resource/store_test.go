@@ -15,8 +15,8 @@ func TestMemoryStore_AddAndGet(t *testing.T) {
 	store := NewMemoryStore(time.Hour, 10*time.Second)
 
 	// Add distinct values to verify correct metric mapping
-	store.Add(10.0, 20.0, 30.0, 1.5)
-	store.Add(15.0, 25.0, 35.0, 2.0)
+	store.Add(10.0, 20.0, 30.0, 1.5, 16_000_000_000, 4_000_000_000, 500_000_000_000, 200_000_000_000)
+	store.Add(15.0, 25.0, 35.0, 2.0, 16_000_000_000, 5_000_000_000, 500_000_000_000, 210_000_000_000)
 
 	history := store.GetHistory(time.Hour)
 
@@ -33,6 +33,12 @@ func TestMemoryStore_AddAndGet(t *testing.T) {
 	assert.Equal(t, 20.0, history.Memory[0].Value)
 	assert.Equal(t, 30.0, history.Disk[0].Value)
 	assert.Equal(t, 1.5, history.Load[0].Value)
+
+	// Verify absolute values (latest snapshot)
+	assert.Equal(t, uint64(16_000_000_000), history.MemoryTotalBytes)
+	assert.Equal(t, uint64(5_000_000_000), history.MemoryUsedBytes)
+	assert.Equal(t, uint64(500_000_000_000), history.DiskTotalBytes)
+	assert.Equal(t, uint64(210_000_000_000), history.DiskUsedBytes)
 }
 
 func TestMemoryStore_GetHistoryFiltering(t *testing.T) {
@@ -42,13 +48,13 @@ func TestMemoryStore_GetHistoryFiltering(t *testing.T) {
 		store := NewMemoryStore(time.Hour, 10*time.Second)
 
 		// Add old data
-		store.Add(1.0, 1.0, 1.0, 1.0)
+		store.Add(1.0, 1.0, 1.0, 1.0, 0, 0, 0, 0)
 
 		// Wait 2+ seconds so old point is at least 2 seconds in the past
 		time.Sleep(2100 * time.Millisecond)
 
 		// Add new data
-		store.Add(2.0, 2.0, 2.0, 2.0)
+		store.Add(2.0, 2.0, 2.0, 2.0, 0, 0, 0, 0)
 
 		// Long duration returns all points
 		history := store.GetHistory(time.Minute)
@@ -77,7 +83,7 @@ func TestMemoryStore_GetHistoryReturnsCopy(t *testing.T) {
 	t.Parallel()
 
 	store := NewMemoryStore(time.Hour, 10*time.Second)
-	store.Add(1.0, 1.0, 1.0, 1.0)
+	store.Add(1.0, 1.0, 1.0, 1.0, 0, 0, 0, 0)
 
 	history1 := store.GetHistory(time.Hour)
 	history2 := store.GetHistory(time.Hour)

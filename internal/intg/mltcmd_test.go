@@ -145,7 +145,7 @@ steps:
 		dag := th.DAG(t, `
 steps:
   - name: multi-cmd
-    workingDir: /tmp
+    working_dir: /tmp
     command:
       - pwd
       - echo "done"

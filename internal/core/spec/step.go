@@ -26,7 +26,7 @@ type step struct {
 	// Description is the description of the step.
 	Description string `yaml:"description,omitempty"`
 	// WorkingDir is the working directory of the step.
-	WorkingDir string `yaml:"workingDir,omitempty"`
+	WorkingDir string `yaml:"working_dir,omitempty"`
 	// Command is the command to run (on shell).
 	Command any `yaml:"command,omitempty"`
 	// Shell is the shell to run the command. Default is `$SHELL` or `sh`.
@@ -34,7 +34,7 @@ type step struct {
 	Shell types.ShellValue `yaml:"shell,omitempty"`
 	// ShellPackages is the list of packages to install.
 	// This is used only when the shell is `nix-shell`.
-	ShellPackages []string `yaml:"shellPackages,omitempty"`
+	ShellPackages []string `yaml:"shell_packages,omitempty"`
 	// Script is the script to run.
 	Script string `yaml:"script,omitempty"`
 	// Stdout is the file to write the stdout.
@@ -45,7 +45,7 @@ type step struct {
 	// Overrides the DAG-level logOutput setting.
 	// Can be "separate" (default) for separate .out and .err files,
 	// or "merged" for a single combined .log file.
-	LogOutput types.LogOutputValue `yaml:"logOutput,omitempty"`
+	LogOutput types.LogOutputValue `yaml:"log_output,omitempty"`
 	// Output is the variable name to store the output.
 	// Can be a string or an object with name, key, and omit fields.
 	Output any `yaml:"output,omitempty"`
@@ -53,19 +53,19 @@ type step struct {
 	Depends types.StringOrArray `yaml:"depends,omitempty"`
 	// ContinueOn is the condition to continue on.
 	// Can be a string ("skipped", "failed") or an object with detailed config.
-	ContinueOn types.ContinueOnValue `yaml:"continueOn,omitempty"`
+	ContinueOn types.ContinueOnValue `yaml:"continue_on,omitempty"`
 	// RetryPolicy is the retry policy.
-	RetryPolicy *retryPolicy `yaml:"retryPolicy,omitempty"`
+	RetryPolicy *retryPolicy `yaml:"retry_policy,omitempty"`
 	// RepeatPolicy is the repeat policy.
-	RepeatPolicy *repeatPolicy `yaml:"repeatPolicy,omitempty"`
+	RepeatPolicy *repeatPolicy `yaml:"repeat_policy,omitempty"`
 	// MailOnError is the flag to send mail on error.
-	MailOnError bool `yaml:"mailOnError,omitempty"`
+	MailOnError bool `yaml:"mail_on_error,omitempty"`
 	// Preconditions is the condition to run the step.
 	Preconditions any `yaml:"preconditions,omitempty"`
 	// SignalOnStop is the signal when the step is requested to stop.
 	// When it is empty, the same signal as the parent process is sent.
 	// It can be KILL when the process does not stop over the timeout.
-	SignalOnStop *string `yaml:"signalOnStop,omitempty"`
+	SignalOnStop *string `yaml:"signal_on_stop,omitempty"`
 	// Call is the name of a DAG to run as a sub dag-run.
 	Call string `yaml:"call,omitempty"`
 	// Params specifies the parameters for the sub dag-run.
@@ -74,14 +74,14 @@ type step struct {
 	// Can be:
 	// - Direct array reference: parallel: ${ITEMS}
 	// - Static array: parallel: [item1, item2]
-	// - Object configuration: parallel: {items: ${ITEMS}, maxConcurrent: 5}
+	// - Object configuration: parallel: {items: ${ITEMS}, max_concurrent: 5}
 	Parallel any `yaml:"parallel,omitempty"`
 	// WorkerSelector specifies required worker labels for execution.
-	WorkerSelector map[string]string `yaml:"workerSelector,omitempty"`
+	WorkerSelector map[string]string `yaml:"worker_selector,omitempty"`
 	// Env specifies the environment variables for the step.
 	Env types.EnvValue `yaml:"env,omitempty"`
 	// TimeoutSec specifies the maximum runtime for the step in seconds.
-	TimeoutSec int `yaml:"timeoutSec,omitempty"`
+	TimeoutSec int `yaml:"timeout_sec,omitempty"`
 	// Container specifies the container configuration for this step.
 	// If set, the step runs in its own container instead of the DAG-level container.
 	// Can be a string (existing container name to exec into) or an object (container configuration).
@@ -110,23 +110,23 @@ type step struct {
 
 // repeatPolicy defines the repeat policy for a step.
 type repeatPolicy struct {
-	Repeat         any    `yaml:"repeat,omitempty"`         // Flag to indicate if the step should be repeated, can be bool (legacy) or string ("while" or "until")
-	IntervalSec    int    `yaml:"intervalSec,omitempty"`    // Interval in seconds to wait before repeating the step
-	Limit          int    `yaml:"limit,omitempty"`          // Maximum number of times to repeat the step
-	Condition      string `yaml:"condition,omitempty"`      // Condition to check before repeating
-	Expected       string `yaml:"expected,omitempty"`       // Expected output to match before repeating
-	ExitCode       []int  `yaml:"exitCode,omitempty"`       // List of exit codes to consider for repeating the step
-	Backoff        any    `yaml:"backoff,omitempty"`        // Accepts bool or float
-	MaxIntervalSec int    `yaml:"maxIntervalSec,omitempty"` // Maximum interval in seconds
+	Repeat         any    `yaml:"repeat,omitempty"`           // Flag to indicate if the step should be repeated, can be bool (legacy) or string ("while" or "until")
+	IntervalSec    int    `yaml:"interval_sec,omitempty"`     // Interval in seconds to wait before repeating the step
+	Limit          int    `yaml:"limit,omitempty"`            // Maximum number of times to repeat the step
+	Condition      string `yaml:"condition,omitempty"`        // Condition to check before repeating
+	Expected       string `yaml:"expected,omitempty"`         // Expected output to match before repeating
+	ExitCode       []int  `yaml:"exit_code,omitempty"`        // List of exit codes to consider for repeating the step
+	Backoff        any    `yaml:"backoff,omitempty"`          // Accepts bool or float
+	MaxIntervalSec int    `yaml:"max_interval_sec,omitempty"` // Maximum interval in seconds
 }
 
 // retryPolicy defines the retry policy for a step.
 type retryPolicy struct {
 	Limit          any   `yaml:"limit,omitempty"`
-	IntervalSec    any   `yaml:"intervalSec,omitempty"`
-	ExitCode       []int `yaml:"exitCode,omitempty"`
+	IntervalSec    any   `yaml:"interval_sec,omitempty"`
+	ExitCode       []int `yaml:"exit_code,omitempty"`
 	Backoff        any   `yaml:"backoff,omitempty"` // Accepts bool or float
-	MaxIntervalSec int   `yaml:"maxIntervalSec,omitempty"`
+	MaxIntervalSec int   `yaml:"max_interval_sec,omitempty"`
 }
 
 // llmConfig defines the LLM configuration for a step.
@@ -137,9 +137,9 @@ type thinkingConfig struct {
 	// Effort controls reasoning depth: low, medium, high, xhigh.
 	Effort string `yaml:"effort,omitempty"`
 	// BudgetTokens sets explicit token budget (provider-specific).
-	BudgetTokens *int `yaml:"budgetTokens,omitempty"`
+	BudgetTokens *int `yaml:"budget_tokens,omitempty"`
 	// IncludeInOutput includes thinking blocks in stdout.
-	IncludeInOutput bool `yaml:"includeInOutput,omitempty"`
+	IncludeInOutput bool `yaml:"include_in_output,omitempty"`
 }
 
 type llmConfig struct {
@@ -155,14 +155,14 @@ type llmConfig struct {
 	// Temperature controls randomness (0.0-2.0).
 	Temperature *float64 `yaml:"temperature,omitempty"`
 	// MaxTokens is the maximum number of tokens to generate.
-	MaxTokens *int `yaml:"maxTokens,omitempty"`
+	MaxTokens *int `yaml:"max_tokens,omitempty"`
 	// TopP is the nucleus sampling parameter.
-	TopP *float64 `yaml:"topP,omitempty"`
+	TopP *float64 `yaml:"top_p,omitempty"`
 	// BaseURL is a custom API endpoint.
-	BaseURL string `yaml:"baseURL,omitempty"`
+	BaseURL string `yaml:"base_url,omitempty"`
 	// APIKeyName is the name of the environment variable containing the API key.
 	// If not specified, the default environment variable for the provider is used.
-	APIKeyName string `yaml:"apiKeyName,omitempty"`
+	APIKeyName string `yaml:"api_key_name,omitempty"`
 	// Stream enables or disables streaming output.
 	// Default is true.
 	Stream *bool `yaml:"stream,omitempty"`
@@ -171,7 +171,7 @@ type llmConfig struct {
 	// Tools is a list of DAG names to use as callable tools.
 	Tools []string `yaml:"tools,omitempty"`
 	// MaxToolIterations limits tool calling rounds (default: 10).
-	MaxToolIterations *int `yaml:"maxToolIterations,omitempty"`
+	MaxToolIterations *int `yaml:"max_tool_iterations,omitempty"`
 }
 
 // llmMessage defines a message in the LLM session.
@@ -219,26 +219,26 @@ var stepTransformers = []stepTransform{
 	{"name", newStepTransformer("Name", buildStepName)},
 	{"id", newStepTransformer("ID", buildStepID)},
 	{"description", newStepTransformer("Description", buildStepDescription)},
-	{"shellPackages", newStepTransformer("ShellPackages", buildStepShellPackages)},
+	{"shell_packages", newStepTransformer("ShellPackages", buildStepShellPackages)},
 	{"script", newStepTransformer("Script", buildStepScript)},
 	{"stdout", newStepTransformer("Stdout", buildStepStdout)},
 	{"stderr", newStepTransformer("Stderr", buildStepStderr)},
-	{"logOutput", newStepTransformer("LogOutput", buildStepLogOutput)},
-	{"mailOnError", newStepTransformer("MailOnError", buildStepMailOnError)},
-	{"workerSelector", newStepTransformer("WorkerSelector", buildStepWorkerSelector)},
-	{"workingDir", newStepTransformer("Dir", buildStepWorkingDir)},
+	{"log_output", newStepTransformer("LogOutput", buildStepLogOutput)},
+	{"mail_on_error", newStepTransformer("MailOnError", buildStepMailOnError)},
+	{"worker_selector", newStepTransformer("WorkerSelector", buildStepWorkerSelector)},
+	{"working_dir", newStepTransformer("Dir", buildStepWorkingDir)},
 	{"shell", newStepTransformer("Shell", buildStepShell)},
-	{"shellArgs", newStepTransformer("ShellArgs", buildStepShellArgs)},
+	{"shell_args", newStepTransformer("ShellArgs", buildStepShellArgs)},
 	{"timeout", newStepTransformer("Timeout", buildStepTimeout)},
 	{"depends", newStepTransformer("Depends", buildStepDepends)},
-	{"explicitlyNoDeps", newStepTransformer("ExplicitlyNoDeps", buildStepExplicitlyNoDeps)},
-	{"continueOn", newStepTransformer("ContinueOn", buildStepContinueOn)},
-	{"retryPolicy", newStepTransformer("RetryPolicy", buildStepRetryPolicy)},
-	{"repeatPolicy", newStepTransformer("RepeatPolicy", buildStepRepeatPolicy)},
-	{"signalOnStop", newStepTransformer("SignalOnStop", buildStepSignalOnStop)},
+	{"explicitly_no_deps", newStepTransformer("ExplicitlyNoDeps", buildStepExplicitlyNoDeps)},
+	{"continue_on", newStepTransformer("ContinueOn", buildStepContinueOn)},
+	{"retry_policy", newStepTransformer("RetryPolicy", buildStepRetryPolicy)},
+	{"repeat_policy", newStepTransformer("RepeatPolicy", buildStepRepeatPolicy)},
+	{"signal_on_stop", newStepTransformer("SignalOnStop", buildStepSignalOnStop)},
 	{"output", newStepTransformer("Output", buildStepOutput)},
-	{"outputKey", newStepTransformer("OutputKey", buildStepOutputKey)},
-	{"outputOmit", newStepTransformer("OutputOmit", buildStepOutputOmit)},
+	{"output_key", newStepTransformer("OutputKey", buildStepOutputKey)},
+	{"output_omit", newStepTransformer("OutputOmit", buildStepOutputOmit)},
 	{"env", newStepTransformer("Env", buildStepEnvs)},
 	{"preconditions", newStepTransformer("Preconditions", buildStepPreconditions)},
 }
@@ -317,7 +317,7 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 		errs = append(errs, wrapTransformError("dag", err))
 	}
 	if err := validateWorkerSelector(result); err != nil {
-		errs = append(errs, wrapTransformError("workerSelector", err))
+		errs = append(errs, wrapTransformError("worker_selector", err))
 	}
 	if err := validateLLM(result); err != nil {
 		errs = append(errs, wrapTransformError("llm", err))
@@ -347,10 +347,10 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 }
 
 // validateStdoutStderr checks that stdout and stderr don't point to the same file.
-// If both are specified and point to the same file, use logOutput: merged instead.
+// If both are specified and point to the same file, use log_output: merged instead.
 func validateStdoutStderr(s *core.Step) error {
 	if s.Stdout != "" && s.Stderr != "" && s.Stdout == s.Stderr {
-		return fmt.Errorf("stdout and stderr cannot point to the same file %q; use 'logOutput: merged' instead", s.Stdout)
+		return fmt.Errorf("stdout and stderr cannot point to the same file %q; use 'log_output: merged' instead", s.Stdout)
 	}
 	return nil
 }
@@ -457,7 +457,7 @@ func buildStepShellArgs(ctx StepBuildContext, s *step) ([]string, error) {
 
 func buildStepTimeout(_ StepBuildContext, s *step) (time.Duration, error) {
 	if s.TimeoutSec < 0 {
-		return 0, core.NewValidationError("timeoutSec", s.TimeoutSec, ErrTimeoutSecMustBeNonNegative)
+		return 0, core.NewValidationError("timeout_sec", s.TimeoutSec, ErrTimeoutSecMustBeNonNegative)
 	}
 	return time.Second * time.Duration(s.TimeoutSec), nil
 }
@@ -509,9 +509,9 @@ func buildStepRetryPolicy(_ StepBuildContext, s *step) (core.RetryPolicy, error)
 	}
 
 	// Parse backoff field
-	backoff, err := parseBackoffValue(s.RetryPolicy.Backoff, "retryPolicy.backoff")
+	backoff, err := parseBackoffValue(s.RetryPolicy.Backoff, "retry_policy.backoff")
 	if err != nil {
-		return core.RetryPolicy{}, core.NewValidationError("retryPolicy.backoff", s.RetryPolicy.Backoff, err)
+		return core.RetryPolicy{}, core.NewValidationError("retry_policy.backoff", s.RetryPolicy.Backoff, err)
 	}
 	result.Backoff = backoff
 
@@ -531,15 +531,15 @@ func parseRetryLimit(val any) (int, string, error) {
 		return int(v), "", nil
 	case uint64:
 		if v > math.MaxInt {
-			return 0, "", core.NewValidationError("retryPolicy.limit", v, fmt.Errorf("value %d exceeds maximum int", v))
+			return 0, "", core.NewValidationError("retry_policy.limit", v, fmt.Errorf("value %d exceeds maximum int", v))
 		}
 		return int(v), "", nil
 	case string:
 		return 0, v, nil
 	case nil:
-		return 0, "", core.NewValidationError("retryPolicy.limit", nil, fmt.Errorf("limit is required when retryPolicy is specified"))
+		return 0, "", core.NewValidationError("retry_policy.limit", nil, fmt.Errorf("limit is required when retry_policy is specified"))
 	default:
-		return 0, "", core.NewValidationError("retryPolicy.limit", v, fmt.Errorf("invalid type: %T", v))
+		return 0, "", core.NewValidationError("retry_policy.limit", v, fmt.Errorf("invalid type: %T", v))
 	}
 }
 
@@ -551,15 +551,15 @@ func parseRetryInterval(val any) (time.Duration, string, error) {
 		return time.Second * time.Duration(v), "", nil
 	case uint64:
 		if v > math.MaxInt64 {
-			return 0, "", core.NewValidationError("retryPolicy.intervalSec", v, fmt.Errorf("value %d exceeds maximum int64", v))
+			return 0, "", core.NewValidationError("retry_policy.interval_sec", v, fmt.Errorf("value %d exceeds maximum int64", v))
 		}
 		return time.Second * time.Duration(v), "", nil
 	case string:
 		return 0, v, nil
 	case nil:
-		return 0, "", core.NewValidationError("retryPolicy.intervalSec", nil, fmt.Errorf("intervalSec is required when retryPolicy is specified"))
+		return 0, "", core.NewValidationError("retry_policy.interval_sec", nil, fmt.Errorf("interval_sec is required when retry_policy is specified"))
 	default:
-		return 0, "", core.NewValidationError("retryPolicy.intervalSec", v, fmt.Errorf("invalid type: %T", v))
+		return 0, "", core.NewValidationError("retry_policy.interval_sec", v, fmt.Errorf("invalid type: %T", v))
 	}
 }
 
@@ -641,7 +641,7 @@ func buildStepRepeatPolicy(_ StepBuildContext, s *step) (core.RepeatPolicy, erro
 		switch v := rp.Repeat.(type) {
 		case string:
 			if (v == "while" || v == "until") && rp.Condition == "" && len(rp.ExitCode) == 0 {
-				return core.RepeatPolicy{}, fmt.Errorf("repeat mode '%s' requires either 'condition' or 'exitCode' to be specified", v)
+				return core.RepeatPolicy{}, fmt.Errorf("repeat mode '%s' requires either 'condition' or 'exit_code' to be specified", v)
 			}
 		}
 	}
@@ -662,7 +662,7 @@ func buildStepRepeatPolicy(_ StepBuildContext, s *step) (core.RepeatPolicy, erro
 	result.ExitCode = rp.ExitCode
 
 	// Parse backoff field
-	backoff, err := parseBackoffValue(rp.Backoff, "repeatPolicy.backoff")
+	backoff, err := parseBackoffValue(rp.Backoff, "repeat_policy.backoff")
 	if err != nil {
 		return core.RepeatPolicy{}, err
 	}
@@ -1012,9 +1012,9 @@ func validateWorkerSelector(result *core.Step) error {
 	}
 	if !core.SupportsWorkerSelector(result.ExecutorConfig.Type) {
 		return core.NewValidationError(
-			"workerSelector",
+			"worker_selector",
 			result.WorkerSelector,
-			fmt.Errorf("executor type %q does not support workerSelector field", result.ExecutorConfig.Type),
+			fmt.Errorf("executor type %q does not support worker_selector field", result.ExecutorConfig.Type),
 		)
 	}
 	return nil
@@ -1150,12 +1150,12 @@ func mergeRedisConfig(dagRedis *core.RedisConfig, stepConfig map[string]any) {
 	setIfMissing("username", dagRedis.Username)
 	setIfMissing("db", dagRedis.DB)
 	setIfMissing("tls", dagRedis.TLS)
-	setIfMissing("tlsSkipVerify", dagRedis.TLSSkipVerify)
+	setIfMissing("tls_skip_verify", dagRedis.TLSSkipVerify)
 	setIfMissing("mode", dagRedis.Mode)
-	setIfMissing("sentinelMaster", dagRedis.SentinelMaster)
-	setIfMissing("sentinelAddrs", dagRedis.SentinelAddrs)
-	setIfMissing("clusterAddrs", dagRedis.ClusterAddrs)
-	setIfMissing("maxRetries", dagRedis.MaxRetries)
+	setIfMissing("sentinel_master", dagRedis.SentinelMaster)
+	setIfMissing("sentinel_addrs", dagRedis.SentinelAddrs)
+	setIfMissing("cluster_addrs", dagRedis.ClusterAddrs)
+	setIfMissing("max_retries", dagRedis.MaxRetries)
 }
 
 // isRedisZeroValue checks if a value is a zero value for Redis config merging.
@@ -1218,7 +1218,7 @@ func buildStepParallel(_ StepBuildContext, s *step, result *core.Step) error {
 					return core.NewValidationError("parallel.items", val, fmt.Errorf("parallel.items must be string or array, got %T", val))
 				}
 
-			case "maxConcurrent":
+			case "max_concurrent":
 				switch mc := val.(type) {
 				case int:
 					result.Parallel.MaxConcurrent = mc
@@ -1226,13 +1226,13 @@ func buildStepParallel(_ StepBuildContext, s *step, result *core.Step) error {
 					result.Parallel.MaxConcurrent = int(mc)
 				case uint64:
 					if mc > math.MaxInt {
-						return core.NewValidationError("parallel.maxConcurrent", mc, fmt.Errorf("value %d exceeds maximum int", mc))
+						return core.NewValidationError("parallel.max_concurrent", mc, fmt.Errorf("value %d exceeds maximum int", mc))
 					}
 					result.Parallel.MaxConcurrent = int(mc)
 				case float64:
 					result.Parallel.MaxConcurrent = int(mc)
 				default:
-					return core.NewValidationError("parallel.maxConcurrent", val, fmt.Errorf("parallel.maxConcurrent must be int, got %T", val))
+					return core.NewValidationError("parallel.max_concurrent", val, fmt.Errorf("parallel.max_concurrent must be int, got %T", val))
 				}
 			}
 		}
@@ -1320,19 +1320,19 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 		}
 	}
 
-	// Validate maxTokens if specified
+	// Validate max_tokens if specified
 	if cfg.MaxTokens != nil {
 		if *cfg.MaxTokens < 1 {
-			return core.NewValidationError("llm.maxTokens", *cfg.MaxTokens,
-				fmt.Errorf("maxTokens must be at least 1"))
+			return core.NewValidationError("llm.max_tokens", *cfg.MaxTokens,
+				fmt.Errorf("max_tokens must be at least 1"))
 		}
 	}
 
-	// Validate topP range
+	// Validate top_p range
 	if cfg.TopP != nil {
 		if *cfg.TopP < 0.0 || *cfg.TopP > 1.0 {
-			return core.NewValidationError("llm.topP", *cfg.TopP,
-				fmt.Errorf("topP must be between 0.0 and 1.0"))
+			return core.NewValidationError("llm.top_p", *cfg.TopP,
+				fmt.Errorf("top_p must be between 0.0 and 1.0"))
 		}
 	}
 
@@ -1525,9 +1525,19 @@ func buildStepSubDAG(ctx StepBuildContext, s *step, result *core.Step) error {
 		}
 
 		// Convert to string format "key=value key=value ..."
+		// For string-style params, positional params (no name) use SmartEscape
+		// to avoid quoting variable references like ${ITEM.xxx} — their
+		// expanded content should be re-split into separate KEY=VALUE pairs
+		// at runtime. Named params always use Escaped to preserve their
+		// values as single tokens after expansion.
+		_, isStringParams := s.Params.(string)
 		var paramsToJoin []string
 		for _, paramPair := range paramPairs {
-			paramsToJoin = append(paramsToJoin, paramPair.Escaped())
+			if isStringParams && paramPair.Name == "" {
+				paramsToJoin = append(paramsToJoin, paramPair.SmartEscape())
+			} else {
+				paramsToJoin = append(paramsToJoin, paramPair.Escaped())
+			}
 		}
 		paramsStr = strings.Join(paramsToJoin, " ")
 	}

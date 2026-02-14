@@ -75,24 +75,24 @@ model:
 			wantErr: "temperature: must be between 0.0 and 2.0",
 		},
 		{
-			name: "invalid topP in model entry",
+			name: "invalid top_p in model entry",
 			yaml: `
 model:
   - provider: openai
     name: gpt-4
-    topP: 1.5
+    top_p: 1.5
 `,
-			wantErr: "topP: must be between 0.0 and 1.0",
+			wantErr: "top_p: must be between 0.0 and 1.0",
 		},
 		{
-			name: "invalid maxTokens in model entry",
+			name: "invalid max_tokens in model entry",
 			yaml: `
 model:
   - provider: openai
     name: gpt-4
-    maxTokens: 0
+    max_tokens: 0
 `,
-			wantErr: "maxTokens: must be at least 1",
+			wantErr: "max_tokens: must be at least 1",
 		},
 		{
 			name: "missing provider in model entry",

@@ -55,7 +55,7 @@ steps:
 
   - id: failure
     command: exit 42
-    continueOn:
+    continue_on:
       failure: true
 
   - depends:

@@ -70,7 +70,7 @@ steps:
   - name: process
     call: workflows/processor
     parallel:
-      maxConcurrent: 2
+      max_concurrent: 2
       items:
         - SOURCE: s3://customers
         - SOURCE: s3://products
@@ -87,7 +87,7 @@ steps:
     call: workflows/processor
     parallel:
       items: ${ITEMS}
-      maxConcurrent: 5
+      max_concurrent: 5
 `,
 			wantItems:    0,
 			wantVariable: "${ITEMS}",
@@ -103,7 +103,7 @@ steps:
       items:
         - item1
         - item2
-      maxConcurrent: 3
+      max_concurrent: 3
 `,
 			wantItems:     2,
 			wantMaxConc:   3,
@@ -137,10 +137,10 @@ steps:
     call: workflows/processor
     parallel:
       items: [1, 2, 3]
-      maxConcurrent: 0
+      max_concurrent: 0
 `,
 			wantErr:    true,
-			wantErrMsg: "maxConcurrent must be greater than 0",
+			wantErrMsg: "max_concurrent must be greater than 0",
 		},
 		{
 			name: "ErrorEmptyItems",
@@ -150,7 +150,7 @@ steps:
     call: workflows/processor
     parallel:
       items: []
-      maxConcurrent: 5
+      max_concurrent: 5
 `,
 			wantErr:    true,
 			wantErrMsg: "parallel must have either items array or variable reference",

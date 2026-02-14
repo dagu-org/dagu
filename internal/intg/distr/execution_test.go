@@ -16,7 +16,7 @@ func TestExecution_StatusPushing(t *testing.T) {
 		f := newTestFixture(t, `
 type: graph
 name: status-push-test
-workerSelector:
+worker_selector:
   test: "true"
 steps:
   - name: step1
@@ -45,7 +45,7 @@ func TestExecution_LogStreaming(t *testing.T) {
 		expectedOutput := "EXPECTED_OUTPUT_12345"
 		f := newTestFixture(t, `
 name: log-stream-test
-workerSelector:
+worker_selector:
   test: "true"
 steps:
   - name: echo-step
@@ -68,7 +68,7 @@ func TestExecution_LargeOutput(t *testing.T) {
 	t.Run("largeOutputStreamedCorrectly", func(t *testing.T) {
 		f := newTestFixture(t, `
 name: large-output-test
-workerSelector:
+worker_selector:
   test: "true"
 steps:
   - name: big-output
@@ -107,7 +107,7 @@ func TestExecution_StartCommand(t *testing.T) {
 		f := newTestFixture(t, `
 type: graph
 name: direct-start-test
-workerSelector:
+worker_selector:
   test: "true"
 steps:
   - name: step1
@@ -132,7 +132,7 @@ steps:
 	t.Run("directStartCommandExecution_NoNameField", func(t *testing.T) {
 		f := newTestFixture(t, `
 type: graph
-workerSelector:
+worker_selector:
   test: "true"
 steps:
   - name: step1
@@ -160,7 +160,7 @@ func TestExecution_SharedFSMode(t *testing.T) {
 		f := newTestFixture(t, `
 type: graph
 name: sharedfs-status-test
-workerSelector:
+worker_selector:
   test: "true"
 steps:
   - name: step1
@@ -185,7 +185,7 @@ steps:
 	t.Run("logsWrittenToSharedFilesystem", func(t *testing.T) {
 		f := newTestFixture(t, `
 name: sharedfs-log-test
-workerSelector:
+worker_selector:
   test: "true"
 steps:
   - name: echo-step
@@ -210,7 +210,7 @@ steps:
 		f := newTestFixture(t, `
 type: graph
 name: sharedfs-subprocess-test
-workerSelector:
+worker_selector:
   env: test
 steps:
   - name: task1
@@ -244,7 +244,7 @@ steps:
 		f := newTestFixture(t, `
 type: graph
 name: sharedfs-direct-start-test
-workerSelector:
+worker_selector:
   test: "true"
 steps:
   - name: step1
@@ -267,7 +267,7 @@ steps:
 	t.Run("directStartWithSharedFS_NoNameField", func(t *testing.T) {
 		f := newTestFixture(t, `
 type: graph
-workerSelector:
+worker_selector:
   test: "true"
 steps:
   - name: step1
@@ -292,7 +292,7 @@ func TestExecution_QueueLifecycle(t *testing.T) {
 	t.Run("queueItemRemovedAfterSuccess", func(t *testing.T) {
 		f := newTestFixture(t, `
 name: queue-cleanup-test
-workerSelector:
+worker_selector:
   test: "true"
 steps:
   - name: task1
@@ -319,7 +319,7 @@ steps:
 		f := newTestFixture(t, `
 type: graph
 name: scheduler-process-test
-workerSelector:
+worker_selector:
   env: prod
 steps:
   - name: step1

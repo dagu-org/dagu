@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
@@ -133,6 +134,8 @@ type Session struct {
 	ID string `json:"id"`
 	// UserID identifies the user who owns this session.
 	UserID string `json:"user_id,omitempty"`
+	// DAGName stores the primary DAG context for this session's memory scope.
+	DAGName string `json:"dag_name,omitempty"`
 	// Title is a human-readable name for the session.
 	Title string `json:"title,omitempty"`
 	// CreatedAt is when this session was created.
@@ -237,6 +240,12 @@ type ToolContext struct {
 	WaitUserResponse WaitUserResponseFunc
 	// SafeMode enables approval prompts for dangerous commands when true.
 	SafeMode bool
+	// Role is the authenticated role of the current user.
+	// Empty means role checks should be skipped (e.g., auth-disabled compatibility).
+	Role auth.Role
+	// PolicyChecked indicates a centralized policy hook has already run.
+	// Tools can use this to avoid duplicate legacy checks/prompts.
+	PolicyChecked bool
 }
 
 // AuditInfo configures how a tool's executions appear in audit logs.

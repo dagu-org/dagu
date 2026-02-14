@@ -300,7 +300,12 @@ func (c *Context) NewServer(rs *resource.Service, opts ...frontend.ServerOption)
 }
 
 // NewCoordinatorClient creates a new coordinator client using the global peer configuration.
+// Returns nil when the coordinator is disabled via configuration.
 func (c *Context) NewCoordinatorClient() coordinator.Client {
+	if !c.Config.Coordinator.Enabled {
+		return nil
+	}
+
 	coordinatorCliCfg := coordinator.DefaultConfig()
 	coordinatorCliCfg.CAFile = c.Config.Core.Peer.ClientCaFile
 	coordinatorCliCfg.CertFile = c.Config.Core.Peer.CertFile
@@ -377,10 +382,16 @@ type dagStoreConfig struct {
 
 // dagStore returns a new DAGRepository instance.
 func (c *Context) dagStore(cfg dagStoreConfig) (exec.DAGStore, error) {
+	// Merge configured alternate DAGs directory into search paths if provided
+	searchPaths := append([]string{}, cfg.SearchPaths...)
+	if c.Config != nil && c.Config.Paths.AltDAGsDir != "" {
+		searchPaths = append(searchPaths, c.Config.Paths.AltDAGsDir)
+	}
+
 	store := filedag.New(
 		c.Config.Paths.DAGsDir,
 		filedag.WithFlagsBaseDir(c.Config.Paths.SuspendFlagsDir),
-		filedag.WithSearchPaths(cfg.SearchPaths),
+		filedag.WithSearchPaths(searchPaths),
 		filedag.WithFileCache(cfg.Cache),
 		filedag.WithSkipExamples(c.Config.Core.SkipExamples),
 		filedag.WithSkipDirectoryCreation(cfg.SkipDirectoryCreation),

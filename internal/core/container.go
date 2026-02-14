@@ -16,7 +16,7 @@ type Container struct {
 	// Image is the container image to use.
 	Image string `yaml:"image,omitempty"`
 	// PullPolicy is the policy to pull the image (e.g., "Always", "IfNotPresent").
-	PullPolicy PullPolicy `yaml:"pullPolicy,omitempty"`
+	PullPolicy PullPolicy `yaml:"pull_policy,omitempty"`
 	// Env specifies environment variables for the container.
 	// Note: This field is evaluated at build time and may contain secrets.
 	// It is excluded from JSON serialization to prevent secret leakage.
@@ -26,7 +26,7 @@ type Container struct {
 	// User is the user to run the container as.
 	User string `yaml:"user,omitempty"` // User to run the container as
 	// WorkingDir is the working directory inside the container.
-	WorkingDir string `yaml:"workingDir,omitempty"` // Working directory inside the container
+	WorkingDir string `yaml:"working_dir,omitempty"` // Working directory inside the container
 	// Platform specifies the platform for the container (e.g., "linux/amd64").
 	Platform string `yaml:"platform,omitempty"` // Platform for the container
 	// Ports specifies the ports to expose from the container.
@@ -34,18 +34,18 @@ type Container struct {
 	// Network is the network configuration for the container.
 	Network string `yaml:"network,omitempty"` // Network configuration for the container
 	// KeepContainer is the flag to keep the container after the DAG run.
-	KeepContainer bool `yaml:"keepContainer,omitempty"` // Keep the container after the DAG run
+	KeepContainer bool `yaml:"keep_container,omitempty"` // Keep the container after the DAG run
 	// Startup determines how the DAG-level container starts up.
 	// One of: "keepalive" (default), "entrypoint", "command".
 	Startup ContainerStartup `yaml:"startup,omitempty"`
 	// Command is used when Startup == "command".
 	Command []string `yaml:"command,omitempty"`
 	// WaitFor determines readiness gate before steps run: "running" (default) or "healthy".
-	WaitFor ContainerWaitFor `yaml:"waitFor,omitempty"`
+	WaitFor ContainerWaitFor `yaml:"wait_for,omitempty"`
 	// LogPattern optionally waits for a regex to appear in container logs before proceeding.
-	LogPattern string `yaml:"logPattern,omitempty"`
+	LogPattern string `yaml:"log_pattern,omitempty"`
 	// RestartPolicy applies Docker restart policy for long-running containers ("no", "always", or "unless-stopped").
-	RestartPolicy string `yaml:"restartPolicy,omitempty"`
+	RestartPolicy string `yaml:"restart_policy,omitempty"`
 	// Healthcheck specifies a custom healthcheck for the container.
 	// If specified with waitFor: healthy, this healthcheck is used instead of
 	// relying on the image's built-in healthcheck.
@@ -71,7 +71,7 @@ type Healthcheck struct {
 	// Timeout is how long to wait for the health check to complete (e.g., "3s").
 	Timeout time.Duration `yaml:"timeout,omitempty"`
 	// StartPeriod is the grace period for the container to initialize (e.g., "10s").
-	StartPeriod time.Duration `yaml:"startPeriod,omitempty"`
+	StartPeriod time.Duration `yaml:"start_period,omitempty"`
 	// Retries is the number of consecutive failures needed to consider unhealthy.
 	Retries int `yaml:"retries,omitempty"`
 }

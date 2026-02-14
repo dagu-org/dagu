@@ -166,12 +166,12 @@ func TestNewExecutor_DAGLevelConfigMerging(t *testing.T) {
 			ExecutorConfig: core.ExecutorConfig{
 				Type: "s3",
 				Config: map[string]any{
-					"source":          "/tmp/test.txt",
-					"key":             "uploads/test.txt",
-					"bucket":          "step-bucket",
-					"region":          "ap-northeast-1",
-					"accessKeyId":     "step-key",
-					"secretAccessKey": "step-secret",
+					"source":            "/tmp/test.txt",
+					"key":               "uploads/test.txt",
+					"bucket":            "step-bucket",
+					"region":            "ap-northeast-1",
+					"access_key_id":     "step-key",
+					"secret_access_key": "step-secret",
 				},
 			},
 		}
@@ -206,15 +206,15 @@ func TestNewExecutor_DAGLevelConfigMerging(t *testing.T) {
 		ctx := context.Background()
 		ctx = WithS3Config(ctx, dagS3)
 
-		// Step only overrides endpoint and forcePathStyle
+		// Step only overrides endpoint and force_path_style
 		step := core.Step{
 			Name:     "list-step",
 			Commands: []core.CommandEntry{{Command: "list"}},
 			ExecutorConfig: core.ExecutorConfig{
 				Type: "s3",
 				Config: map[string]any{
-					"endpoint":       "http://production-s3:9000",
-					"forcePathStyle": false,
+					"endpoint":         "http://production-s3:9000",
+					"force_path_style": false,
 				},
 			},
 		}

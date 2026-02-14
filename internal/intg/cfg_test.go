@@ -107,7 +107,7 @@ steps:
 steps:
   - name: slow
     command: sleep 2
-    timeoutSec: 1
+    timeout_sec: 1
   - name: after
     depends: slow
     command: echo after
@@ -433,11 +433,11 @@ steps:
   - WORKDIR: $HOME
   - TILDE: ~/
 steps:
-  - workingDir: $TILDE
+  - working_dir: $TILDE
     command: echo $PWD
     output: OUT1
 
-  - workingDir: $WORKDIR
+  - working_dir: $WORKDIR
     command: echo $PWD
     output: OUT2
 `)
@@ -732,7 +732,7 @@ func TestStepWorkingDir(t *testing.T) {
 	// Test that step workingDir works
 	dag := th.DAG(t, `
 steps:
-  - workingDir: `+stepWorkDir+`
+  - working_dir: `+stepWorkDir+`
     command: pwd
     output: STEP_DIR
 `)

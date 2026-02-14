@@ -41,17 +41,17 @@ steps:
 
 const (
 	// Config keys for GitHub Action executor
-	configKeyRunner          = "runner"           // The Docker image to use as runner
-	configKeyAutoRemove      = "autoRemove"       // Automatically remove containers after execution
-	configKeyNetwork         = "network"          // Docker network mode
-	configKeyGitHubInstance  = "githubInstance"   // GitHub instance for action resolution
-	configKeyDockerSocket    = "dockerSocket"     // Custom Docker socket path
-	configKeyArtifacts       = "artifacts"        // Artifact server configuration
-	configKeyReuseContainers = "reuseContainers"  // Reuse containers between runs
-	configKeyForceRebuild    = "forceRebuild"     // Force rebuild of action images
-	configKeyContainerOpts   = "containerOptions" // Additional Docker run options
-	configKeyPrivileged      = "privileged"       // Run containers in privileged mode
-	configKeyCapabilities    = "capabilities"     // Linux capabilities configuration
+	configKeyRunner          = "runner"            // The Docker image to use as runner
+	configKeyAutoRemove      = "auto_remove"       // Automatically remove containers after execution
+	configKeyNetwork         = "network"           // Docker network mode
+	configKeyGitHubInstance  = "github_instance"   // GitHub instance for action resolution
+	configKeyDockerSocket    = "docker_socket"     // Custom Docker socket path
+	configKeyArtifacts       = "artifacts"         // Artifact server configuration
+	configKeyReuseContainers = "reuse_containers"  // Reuse containers between runs
+	configKeyForceRebuild    = "force_rebuild"     // Force rebuild of action images
+	configKeyContainerOpts   = "container_options" // Additional Docker run options
+	configKeyPrivileged      = "privileged"        // Run containers in privileged mode
+	configKeyCapabilities    = "capabilities"      // Linux capabilities configuration
 
 	// Act configuration defaults
 	defaultRunnerImage  = "node:24-bookworm"

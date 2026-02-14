@@ -15,6 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from '../../../components/ui/card';
+import { formatBytes } from '../../../lib/formatBytes';
 
 type MetricPoint = components['schemas']['MetricPoint'];
 
@@ -25,6 +26,8 @@ type ResourceChartProps = {
   unit?: string;
   isLoading?: boolean;
   error?: string;
+  totalBytes?: number;
+  usedBytes?: number;
 };
 
 function ResourceChart({
@@ -34,6 +37,8 @@ function ResourceChart({
   unit = '%',
   isLoading,
   error,
+  totalBytes,
+  usedBytes,
 }: ResourceChartProps): React.ReactElement {
   if (error) {
     return (
@@ -78,7 +83,14 @@ function ResourceChart({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <div>
+          <CardTitle className="text-sm font-medium">{title}</CardTitle>
+          {totalBytes != null && usedBytes != null && totalBytes > 0 && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {formatBytes(usedBytes)} / {formatBytes(totalBytes)}
+            </p>
+          )}
+        </div>
         <div className="text-2xl font-bold">
           {currentValue.toFixed(1)}
           {unit}
@@ -117,6 +129,7 @@ function ResourceChart({
                 }}
                 itemStyle={{ color: 'var(--foreground)' }}
                 labelStyle={{ color: 'var(--muted-foreground)' }}
+                formatter={(value: number | string) => [`${Number(value).toFixed(1)}${unit}`, title]}
               />
               <Area
                 type="monotone"

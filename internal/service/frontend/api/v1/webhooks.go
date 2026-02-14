@@ -27,7 +27,7 @@ const (
 )
 
 // ListWebhooks returns all webhooks across all DAGs.
-// Requires admin role.
+// Requires developer role or above.
 func (a *API) ListWebhooks(ctx context.Context, _ api.ListWebhooksRequestObject) (api.ListWebhooksResponseObject, error) {
 	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
@@ -52,7 +52,7 @@ func (a *API) ListWebhooks(ctx context.Context, _ api.ListWebhooksRequestObject)
 }
 
 // GetDAGWebhook returns the webhook configuration for a specific DAG.
-// Requires admin role.
+// Requires developer role or above.
 func (a *API) GetDAGWebhook(ctx context.Context, request api.GetDAGWebhookRequestObject) (api.GetDAGWebhookResponseObject, error) {
 	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func (a *API) GetDAGWebhook(ctx context.Context, request api.GetDAGWebhookReques
 }
 
 // CreateDAGWebhook creates a new webhook for a DAG.
-// Requires admin role.
+// Requires developer role or above.
 func (a *API) CreateDAGWebhook(ctx context.Context, request api.CreateDAGWebhookRequestObject) (api.CreateDAGWebhookResponseObject, error) {
 	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
@@ -130,7 +130,7 @@ func (a *API) CreateDAGWebhook(ctx context.Context, request api.CreateDAGWebhook
 }
 
 // DeleteDAGWebhook removes the webhook for a DAG.
-// Requires admin role.
+// Requires developer role or above.
 func (a *API) DeleteDAGWebhook(ctx context.Context, request api.DeleteDAGWebhookRequestObject) (api.DeleteDAGWebhookResponseObject, error) {
 	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
@@ -167,7 +167,7 @@ func (a *API) DeleteDAGWebhook(ctx context.Context, request api.DeleteDAGWebhook
 }
 
 // RegenerateDAGWebhookToken generates a new token for an existing webhook.
-// Requires admin role.
+// Requires developer role or above.
 func (a *API) RegenerateDAGWebhookToken(ctx context.Context, request api.RegenerateDAGWebhookTokenRequestObject) (api.RegenerateDAGWebhookTokenResponseObject, error) {
 	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
@@ -203,7 +203,7 @@ func (a *API) RegenerateDAGWebhookToken(ctx context.Context, request api.Regener
 }
 
 // ToggleDAGWebhook enables or disables a webhook.
-// Requires admin role.
+// Requires developer role or above.
 func (a *API) ToggleDAGWebhook(ctx context.Context, request api.ToggleDAGWebhookRequestObject) (api.ToggleDAGWebhookResponseObject, error) {
 	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
@@ -314,7 +314,7 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 	}
 
 	// Prepare the WEBHOOK_PAYLOAD parameter
-	payload, err := marshalWebhookPayload(request.Body)
+	payload, err := marshalWebhookPayload(ctx, request.Body)
 	if err != nil {
 		logger.Warn(ctx, "Webhook: failed to marshal payload",
 			tag.Name(dag.Name),
@@ -393,7 +393,7 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 }
 
 // requireWebhookManagement checks if webhook management is enabled and
-// enforces admin role for all webhook management operations.
+// enforces developer-or-above role for all webhook management operations.
 func (a *API) requireWebhookManagement(ctx context.Context) error {
 	if a.authService == nil || !a.authService.HasWebhookStore() {
 		return &Error{
@@ -402,8 +402,8 @@ func (a *API) requireWebhookManagement(ctx context.Context) error {
 			HTTPStatus: http.StatusUnauthorized,
 		}
 	}
-	// Enforce admin role when auth is enabled
-	return a.requireAdmin(ctx)
+	// Enforce developer-or-above role when auth is enabled
+	return a.requireDeveloperOrAbove(ctx)
 }
 
 // extractWebhookToken extracts the token from the Authorization header.
@@ -446,14 +446,25 @@ func getCreatorID(ctx context.Context) string {
 }
 
 // marshalWebhookPayload returns the JSON representation of the webhook payload.
-// Returns "{}" if no payload is provided.
-func marshalWebhookPayload(body *api.TriggerWebhookJSONRequestBody) (string, error) {
-	if body == nil || body.Payload == nil {
-		return "{}", nil
+// If the structured "payload" field is present, it is used (backwards-compatible).
+// Otherwise, it falls back to the raw request body captured by the middleware.
+// Returns "{}" if neither is available.
+func marshalWebhookPayload(ctx context.Context, body *api.TriggerWebhookJSONRequestBody) (string, error) {
+	// If the structured "payload" field is present, use it (backwards-compatible).
+	if body != nil && body.Payload != nil {
+		payloadBytes, err := json.Marshal(*body.Payload)
+		if err != nil {
+			return "", err
+		}
+		return string(payloadBytes), nil
 	}
-	payloadBytes, err := json.Marshal(*body.Payload)
-	if err != nil {
-		return "", err
+
+	// Fall back to the raw body from context (captured by middleware).
+	if rawBody := rawBodyFromContext(ctx); len(rawBody) > 0 {
+		if json.Valid(rawBody) {
+			return string(rawBody), nil
+		}
 	}
-	return string(payloadBytes), nil
+
+	return "{}", nil
 }

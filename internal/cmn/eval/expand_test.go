@@ -181,6 +181,42 @@ func TestExpandWithShellContext(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "'${VAR}'", result)
 	})
+
+	t.Run("VarFollowedBySingleQuote", func(t *testing.T) {
+		opts := NewOptions()
+		opts.Variables = []map[string]string{{"VAR": "value"}}
+
+		result, err := expandWithShellContext(context.Background(), "${VAR}'", opts)
+		require.NoError(t, err)
+		assert.Equal(t, "value'", result)
+	})
+
+	t.Run("SimpleVarFollowedBySingleQuote", func(t *testing.T) {
+		opts := NewOptions()
+		opts.Variables = []map[string]string{{"VAR": "value"}}
+
+		result, err := expandWithShellContext(context.Background(), "$VAR'", opts)
+		require.NoError(t, err)
+		assert.Equal(t, "value'", result)
+	})
+
+	t.Run("MissingVarFollowedBySingleQuoteWithoutExpandOS", func(t *testing.T) {
+		opts := NewOptions()
+		opts.ExpandOS = false
+
+		result, err := expandWithShellContext(context.Background(), "${MISSING}'", opts)
+		require.NoError(t, err)
+		assert.Equal(t, "${MISSING}'", result)
+	})
+
+	t.Run("SingleQuotedSimplePreserved", func(t *testing.T) {
+		opts := NewOptions()
+		opts.Variables = []map[string]string{{"VAR": "value"}}
+
+		result, err := expandWithShellContext(context.Background(), "'$VAR'", opts)
+		require.NoError(t, err)
+		assert.Equal(t, "'$VAR'", result)
+	})
 }
 
 func TestShellEnviron(t *testing.T) {

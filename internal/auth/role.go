@@ -7,7 +7,8 @@ import "fmt"
 //
 // Role hierarchy (most to least privileged):
 //   - admin: Full system access including user management
-//   - manager: Can create, edit, delete, run, and stop DAGs
+//   - manager: Can create, edit, delete, run, and stop DAGs, and view audit logs
+//   - developer: Can create, edit, delete, run, and stop DAGs
 //   - operator: Can run and stop DAGs (execute only)
 //   - viewer: Read-only access to DAGs and status
 type Role string
@@ -15,16 +16,20 @@ type Role string
 const (
 	// RoleAdmin has full access to all resources including user management.
 	RoleAdmin Role = "admin"
-	// RoleManager can create, edit, delete, run, and stop DAGs.
+	// RoleManager can create, edit, delete, run, and stop DAGs, and view audit logs.
 	RoleManager Role = "manager"
+	// RoleDeveloper can create, edit, delete, run, and stop DAGs.
+	RoleDeveloper Role = "developer"
 	// RoleOperator can run and stop DAGs (execute only, no edit).
 	RoleOperator Role = "operator"
 	// RoleViewer can only view DAGs and execution history (read-only).
 	RoleViewer Role = "viewer"
+	// RoleNone represents an unset or unauthenticated role.
+	RoleNone Role = ""
 )
 
 // allRoles contains all valid roles for iteration and validation.
-var allRoles = []Role{RoleAdmin, RoleManager, RoleOperator, RoleViewer}
+var allRoles = []Role{RoleAdmin, RoleManager, RoleDeveloper, RoleOperator, RoleViewer}
 
 // AllRoles returns a copy of all valid roles.
 func AllRoles() []Role {
@@ -36,8 +41,10 @@ func AllRoles() []Role {
 // Valid returns true if the role is a known valid role.
 func (r Role) Valid() bool {
 	switch r {
-	case RoleAdmin, RoleManager, RoleOperator, RoleViewer:
+	case RoleAdmin, RoleManager, RoleDeveloper, RoleOperator, RoleViewer:
 		return true
+	case RoleNone:
+		return false
 	}
 	return false
 }
@@ -47,14 +54,24 @@ func (r Role) String() string {
 	return string(r)
 }
 
+// IsSet returns true if the role has been assigned (is not empty).
+func (r Role) IsSet() bool {
+	return r != RoleNone
+}
+
 // CanWrite returns true if the role can create, edit, or delete DAGs.
 func (r Role) CanWrite() bool {
-	return r == RoleAdmin || r == RoleManager
+	return r == RoleAdmin || r == RoleManager || r == RoleDeveloper
 }
 
 // CanExecute returns true if the role can run or stop DAGs.
 func (r Role) CanExecute() bool {
-	return r == RoleAdmin || r == RoleManager || r == RoleOperator
+	return r == RoleAdmin || r == RoleManager || r == RoleDeveloper || r == RoleOperator
+}
+
+// CanManageAudit returns true if the role can view audit logs.
+func (r Role) CanManageAudit() bool {
+	return r == RoleAdmin || r == RoleManager
 }
 
 // IsAdmin returns true if the role has administrative privileges (user management).
@@ -63,12 +80,11 @@ func (r Role) IsAdmin() bool {
 }
 
 // ParseRole converts a string to a Role.
-// ParseRole converts the input string to a Role and verifies it is one of the known roles.
-// If the input is not "admin", "manager", "operator", or "viewer", it returns an error describing the valid options.
+// If the input is not "admin", "manager", "developer", "operator", or "viewer", it returns an error describing the valid options.
 func ParseRole(s string) (Role, error) {
 	role := Role(s)
 	if !role.Valid() {
-		return "", fmt.Errorf("invalid role: %q, must be one of: admin, manager, operator, viewer", s)
+		return "", fmt.Errorf("invalid role: %q, must be one of: admin, manager, developer, operator, viewer", s)
 	}
 	return role, nil
 }

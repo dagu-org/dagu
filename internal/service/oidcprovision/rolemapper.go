@@ -117,12 +117,13 @@ func (rm *RoleMapper) evaluateGroupMappings(claims map[string]any) (auth.Role, b
 		return "", false
 	}
 
-	// Role priority: admin > manager > operator > viewer
+	// Role priority: admin > manager > developer > operator > viewer
 	rolePriority := map[auth.Role]int{
-		auth.RoleAdmin:    4,
-		auth.RoleManager:  3,
-		auth.RoleOperator: 2,
-		auth.RoleViewer:   1,
+		auth.RoleAdmin:     5,
+		auth.RoleManager:   4,
+		auth.RoleDeveloper: 3,
+		auth.RoleOperator:  2,
+		auth.RoleViewer:    1,
 	}
 
 	var bestRole auth.Role

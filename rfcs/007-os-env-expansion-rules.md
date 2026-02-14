@@ -24,12 +24,11 @@ RFC 006 documents that for non-shell executors (docker, http, ssh, mail, jq), **
 ```yaml
 steps:
   - name: remote-backup
-    executor:
-      type: ssh
-      config:
-        host: myserver.com
-        user: deploy
-        command: "tar czf $HOME/backup.tar.gz /data"
+    type: ssh
+    config:
+      host: myserver.com
+      user: deploy
+      command: "tar czf $HOME/backup.tar.gz /data"
 ```
 
 The user intends `$HOME` to resolve on **the remote machine** (e.g., `/home/deploy`). Instead, Dagu expands it locally (e.g., `/Users/alice`) before sending the command over SSH, producing `tar czf /Users/alice/backup.tar.gz /data` on the remote host.
@@ -39,12 +38,11 @@ The user intends `$HOME` to resolve on **the remote machine** (e.g., `/home/depl
 ```yaml
 steps:
   - name: container-task
-    executor:
-      type: docker
-      config:
-        image: python:3.12
-        env:
-          - "WORKDIR=$HOME/app"
+    type: docker
+    config:
+      image: python:3.12
+      env:
+        - "WORKDIR=$HOME/app"
 ```
 
 The user may want the container's `$HOME` (e.g., `/root`), but Dagu substitutes the host machine's `$HOME` before creating the container.
@@ -84,7 +82,7 @@ Dagu should only expand variables that exist within its own scope:
 - **Step-level `env:`** fields
 - **Params** (named and positional)
 - **Secrets**
-- **Step outputs** (`stdout`, `stderr`, `exitCode`)
+- **Step outputs** (`stdout`, `stderr`, `exit_code`)
 - **Dagu built-in variables** (`DAG_NAME`, `DAG_RUN_ID`, etc.)
 
 If a variable reference (`$VAR` or `${VAR}`) does not match any of these, it is **left as-is** rather than falling through to the OS environment.
@@ -101,19 +99,17 @@ env:
 
 steps:
   - name: remote-backup
-    executor:
-      type: ssh
-      config:
-        host: myserver.com
-        command: "tar czf $HOME/backup.tar.gz /data"
-        # $HOME is NOT expanded - remote shell resolves it
+    type: ssh
+    config:
+      host: myserver.com
+      command: "tar czf $HOME/backup.tar.gz /data"
+      # $HOME is NOT expanded - remote shell resolves it
 
   - name: docker-build
-    executor:
-      type: docker
-      config:
-        image: "${REGISTRY}/app:latest"
-        # ${REGISTRY} IS expanded - defined in DAG env
+    type: docker
+    config:
+      image: "${REGISTRY}/app:latest"
+      # ${REGISTRY} IS expanded - defined in DAG env
 ```
 
 ### Behavior Comparison
@@ -180,13 +176,12 @@ secrets:
 
 steps:
   - name: query
-    executor:
-      type: ssh
-      config:
-        host: db-server
-        command: "psql -p ${DB_PASSWORD} -U $USER"
-        # ${DB_PASSWORD} → expanded (resolved secret, in scope)
-        # $USER → left as-is (OS-only, not in scope → remote shell resolves it)
+    type: ssh
+    config:
+      host: db-server
+      command: "psql -p ${DB_PASSWORD} -U $USER"
+      # ${DB_PASSWORD} → expanded (resolved secret, in scope)
+      # $USER → left as-is (OS-only, not in scope → remote shell resolves it)
 ```
 
 The same applies to `provider: file` — it reads the file directly, independent of `EnvScope`.
@@ -208,12 +203,11 @@ dotenv: .env
 
 steps:
   - name: migrate
-    executor:
-      type: ssh
-      config:
-        host: db-server
-        command: "DATABASE_URL=${DATABASE_URL} migrate up"
-        # ${DATABASE_URL} → expanded (loaded from .env into DAG scope)
+    type: ssh
+    config:
+      host: db-server
+      command: "DATABASE_URL=${DATABASE_URL} migrate up"
+      # ${DATABASE_URL} → expanded (loaded from .env into DAG scope)
 ```
 
 Loading order in `Agent.Run()`:
@@ -272,15 +266,14 @@ The SSH executor's `GetEvalOptions()` currently only conditionally disables shel
 ```yaml
 steps:
   - name: remote-deploy
-    executor:
-      type: ssh
-      config:
-        host: prod-server
-        user: deploy
-        command: |
-          cd $HOME/app
-          git pull
-          ./restart.sh
+    type: ssh
+    config:
+      host: prod-server
+      user: deploy
+      command: |
+        cd $HOME/app
+        git pull
+        ./restart.sh
 ```
 
 **Result:** `$HOME` is expanded to the local machine's home directory (e.g., `/Users/alice`), causing the remote command to `cd` to a non-existent path.
@@ -290,15 +283,14 @@ steps:
 ```yaml
 steps:
   - name: remote-deploy
-    executor:
-      type: ssh
-      config:
-        host: prod-server
-        user: deploy
-        command: |
-          cd $HOME/app
-          git pull
-          ./restart.sh
+    type: ssh
+    config:
+      host: prod-server
+      user: deploy
+      command: |
+        cd $HOME/app
+        git pull
+        ./restart.sh
 ```
 
 **Result:** `$HOME` is left as `$HOME`. The remote shell resolves it to the deploy user's home directory on `prod-server` (e.g., `/home/deploy`).
@@ -312,15 +304,14 @@ env:
 
 steps:
   - name: remote-deploy
-    executor:
-      type: ssh
-      config:
-        host: "${REMOTE_HOST}"      # Expanded: defined in DAG env
-        user: deploy
-        command: |
-          cd $HOME/app              # NOT expanded: left for remote shell
-          git checkout ${DEPLOY_BRANCH}  # Expanded: defined in DAG env
-          ./restart.sh
+    type: ssh
+    config:
+      host: "${REMOTE_HOST}"      # Expanded: defined in DAG env
+      user: deploy
+      command: |
+        cd $HOME/app              # NOT expanded: left for remote shell
+        git checkout ${DEPLOY_BRANCH}  # Expanded: defined in DAG env
+        ./restart.sh
 ```
 
 ### Docker: Container vs Host Variables
@@ -332,13 +323,12 @@ env:
 
 steps:
   - name: run-app
-    executor:
-      type: docker
-      config:
-        image: "${REGISTRY}/app:${APP_VERSION}"  # Expanded: both defined in DAG env
-        env:
-          - "CONFIG_DIR=$HOME/.config"           # NOT expanded: $HOME is the container's
-        command: ["./start.sh"]
+    type: docker
+    config:
+      image: "${REGISTRY}/app:${APP_VERSION}"  # Expanded: both defined in DAG env
+      env:
+        - "CONFIG_DIR=$HOME/.config"           # NOT expanded: $HOME is the container's
+      command: ["./start.sh"]
 ```
 
 ---
@@ -431,11 +421,10 @@ env:
   REMOTE_HOST: localhost
 steps:
   - name: test
-    executor:
-      type: ssh
-      config:
-        host: "${REMOTE_HOST}"
-        command: "echo $HOME"
+    type: ssh
+    config:
+      host: "${REMOTE_HOST}"
+      command: "echo $HOME"
 `
     // Verify: host is expanded to "localhost"
     // Verify: command contains literal "$HOME", not local home dir
@@ -447,12 +436,11 @@ env:
   REGISTRY: myregistry.com
 steps:
   - name: test
-    executor:
-      type: docker
-      config:
-        image: "${REGISTRY}/app:latest"
-        env:
-          - "WORKDIR=$HOME/app"
+    type: docker
+    config:
+      image: "${REGISTRY}/app:latest"
+      env:
+        - "WORKDIR=$HOME/app"
 `
     // Verify: image is expanded to "myregistry.com/app:latest"
     // Verify: env contains literal "$HOME/app"
@@ -464,11 +452,10 @@ env:
   HOME: "${HOME}"
 steps:
   - name: test
-    executor:
-      type: ssh
-      config:
-        host: localhost
-        command: "echo ${HOME}"
+    type: ssh
+    config:
+      host: localhost
+      command: "echo ${HOME}"
 `
     // Verify: ${HOME} is expanded (explicitly imported into DAG env)
 }

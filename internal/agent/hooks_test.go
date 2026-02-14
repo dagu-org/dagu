@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,6 +34,7 @@ func TestHooks_AfterToolExec(t *testing.T) {
 		UserID:    "user-1",
 		Username:  "alice",
 		IPAddress: "10.0.0.1",
+		Role:      auth.RoleDeveloper,
 	}
 	result := ToolOut{Content: "file.txt", IsError: false}
 
@@ -43,6 +45,7 @@ func TestHooks_AfterToolExec(t *testing.T) {
 	assert.Equal(t, "user-1", captured.info.UserID)
 	assert.Equal(t, "alice", captured.info.Username)
 	assert.Equal(t, "10.0.0.1", captured.info.IPAddress)
+	assert.Equal(t, auth.RoleDeveloper, captured.info.Role)
 	assert.Equal(t, "file.txt", captured.result.Content)
 	assert.False(t, captured.result.IsError)
 }

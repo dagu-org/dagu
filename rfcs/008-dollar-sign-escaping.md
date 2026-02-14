@@ -30,11 +30,10 @@ Users cannot include a literal `$` in any field that undergoes variable expansio
 ```yaml
 steps:
   - name: query
-    executor:
-      type: http
-      config:
-        url: https://api.example.com/graphql
-        body: '{"query": "{ user(id: $userId) { name } }"}'
+    type: http
+    config:
+      url: https://api.example.com/graphql
+      body: '{"query": "{ user(id: $userId) { name } }"}'
 ```
 
 Dagu attempts to expand `$userId` as a variable reference. If the variable is undefined, the literal `$userId` is preserved — but only by accident (undefined-variable passthrough). If the user happens to have an env var named `userId`, it silently substitutes the wrong value.

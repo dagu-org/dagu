@@ -53,7 +53,7 @@ steps:
         - "item1"
         - "item2"
         - "item3"
-      maxConcurrent: 3
+      max_concurrent: 3
 ` + childEcho,
 			expectedNodes:     1,
 			parallelNodeIndex: 0,
@@ -71,7 +71,7 @@ steps:
           VERSION: "1.0.1"
         - REGION: eu-west-1
           VERSION: "1.0.2"
-      maxConcurrent: 2
+      max_concurrent: 2
 ` + childProcess,
 			expectedNodes:     1,
 			parallelNodeIndex: 0,
@@ -327,7 +327,7 @@ func TestParallelExecution_OutputCaptureWithFailures(t *testing.T) {
         - "success"
         - "fail"
     output: RESULTS
-    continueOn:
+    continue_on:
       failure: true
 ---
 name: child-output-fail
@@ -395,9 +395,9 @@ steps:
         exit 0
       fi
     output: OUTPUT
-    retryPolicy:
+    retry_policy:
       limit: 1
-      intervalSec: 0
+      interval_sec: 0
 `, counterFile))
 
 	agent := dag.Agent()
@@ -435,9 +435,9 @@ func TestParallelExecution_MinimalRetry(t *testing.T) {
     parallel:
       items:
         - "item1"
-    retryPolicy:
+    retry_policy:
       limit: 1
-      intervalSec: 1
+      interval_sec: 1
     output: RESULTS
 ---
 name: child-fail
@@ -466,10 +466,10 @@ func TestParallelExecution_RetryAndContinueOn(t *testing.T) {
     parallel:
       items:
         - "item1"
-    retryPolicy:
+    retry_policy:
       limit: 1
-      intervalSec: 1
-    continueOn:
+      interval_sec: 1
+    continue_on:
       failure: true
     output: RESULTS
   - echo "This should run"
@@ -608,7 +608,7 @@ func TestParallelExecution_ExactlyMaxLimit(t *testing.T) {
     parallel:
       items:
 %s
-      maxConcurrent: 10
+      max_concurrent: 10
 ---
 name: child-echo
 params:
@@ -651,7 +651,7 @@ func TestParallelExecution_ObjectItemProperties(t *testing.T) {
   - call: sync-data
     parallel:
       items: ${CONFIGS}
-      maxConcurrent: 2
+      max_concurrent: 2
     params:
       - REGION: ${ITEM.region}
       - BUCKET: ${ITEM.bucket}
@@ -786,7 +786,7 @@ func TestParallelExecution_StaticObjectItems(t *testing.T) {
 	const dagContent = `steps:
   - call: deploy-service
     parallel:
-      maxConcurrent: 3
+      max_concurrent: 3
       items:
         - name: web-service
           port: 8080
@@ -801,7 +801,7 @@ func TestParallelExecution_StaticObjectItems(t *testing.T) {
       - SERVICE_NAME: ${ITEM.name}
       - PORT: ${ITEM.port}
       - REPLICAS: ${ITEM.replicas}
-    continueOn:
+    continue_on:
       failure: true
     output: DEPLOYMENT_RESULTS
 ---
@@ -874,10 +874,10 @@ func TestIssue1274_ParallelJSONSingleItem(t *testing.T) {
   - call: issue-1274-worker
     parallel:
       items: ${jsonList}
-      maxConcurrent: 1
+      max_concurrent: 1
     params:
       aJson: ${ITEM}
-    continueOn:
+    continue_on:
       skipped: true
 
 ---
@@ -920,10 +920,10 @@ func TestIssue1274_ParallelJSONMultipleItems(t *testing.T) {
   - call: issue-1274-worker-multi
     parallel:
       items: ${jsonList}
-      maxConcurrent: 1
+      max_concurrent: 1
     params:
       aJson: ${ITEM}
-    continueOn:
+    continue_on:
       skipped: true
 
 ---
@@ -951,6 +951,199 @@ steps:
 	parallelNode := dagStatus.Nodes[1]
 	require.Equal(t, core.NodeSucceeded, parallelNode.Status)
 	require.Len(t, parallelNode.SubRuns, 3, "should dispatch exactly 3 worker instances for 3 JSON items")
+}
+
+// TestIssue1658_ParallelCallExpandedParamsSplitting tests that when a call step
+// uses parallel with items, params passed via variable expansion are correctly
+// split into individual KEY=VALUE pairs after expansion.
+// See: https://github.com/dagu-org/dagu/issues/1658
+func TestIssue1658_ParallelCallExpandedParamsSplitting(t *testing.T) {
+	cases := []struct {
+		name            string
+		dag             string
+		expectedSubRuns int
+		verify          func(*testing.T, parallelResultsPayload)
+	}{
+		{
+			name: "positional_expands_to_multiple_params",
+			dag: `steps:
+  - command: |
+      echo '[{"name": "test", "extra": "A=1 B=2"}]'
+    output: ITEMS
+
+  - call: child-params-split
+    parallel:
+      items: ${ITEMS}
+    params: "NAME=${ITEM.name} ${ITEM.extra}"
+    output: RESULTS
+---
+name: child-params-split
+params:
+  - NAME: ""
+  - A: ""
+  - B: ""
+steps:
+  - script: |
+      if [ -z "$A" ] || [ -z "$B" ]; then
+        echo "FAIL: A='$A' B='$B' (expected A=1 B=2)"
+        exit 1
+      fi
+      echo "OK: NAME=$NAME A=$A B=$B"
+    output: CHECK_RESULT
+`,
+			expectedSubRuns: 1,
+			verify: func(t *testing.T, results parallelResultsPayload) {
+				require.Equal(t, 1, results.Summary.Succeeded)
+				outputs := collectOutputs(results.Outputs, "CHECK_RESULT")
+				require.Len(t, outputs, 1)
+				require.Contains(t, outputs[0], "OK: NAME=test A=1 B=2")
+			},
+		},
+		{
+			name: "multiple_items_different_expansions",
+			dag: `steps:
+  - command: |
+      echo '[{"name":"alpha","extra":"X=10 Y=20"}, {"name":"beta","extra":"X=30 Y=40"}]'
+    output: ITEMS
+
+  - call: child-multi-expand
+    parallel:
+      items: ${ITEMS}
+    params: "NAME=${ITEM.name} ${ITEM.extra}"
+    output: RESULTS
+---
+name: child-multi-expand
+params:
+  - NAME: ""
+  - X: ""
+  - Y: ""
+steps:
+  - script: |
+      if [ -z "$X" ] || [ -z "$Y" ]; then
+        echo "FAIL: NAME='$NAME' X='$X' Y='$Y'"
+        exit 1
+      fi
+      echo "OK: NAME=$NAME X=$X Y=$Y"
+    output: CHECK_RESULT
+`,
+			expectedSubRuns: 2,
+			verify: func(t *testing.T, results parallelResultsPayload) {
+				require.Equal(t, 2, results.Summary.Succeeded)
+				outputs := collectOutputs(results.Outputs, "CHECK_RESULT")
+				require.Len(t, outputs, 2)
+
+				var foundAlpha, foundBeta bool
+				for _, out := range outputs {
+					if strings.Contains(out, "OK: NAME=alpha X=10 Y=20") {
+						foundAlpha = true
+					}
+					if strings.Contains(out, "OK: NAME=beta X=30 Y=40") {
+						foundBeta = true
+					}
+				}
+				require.True(t, foundAlpha, "expected output for alpha item")
+				require.True(t, foundBeta, "expected output for beta item")
+			},
+		},
+		{
+			name: "named_param_with_spaces_preserved",
+			dag: `steps:
+  - command: |
+      echo '[{"label": "hello world", "id": "1"}]'
+    output: ITEMS
+
+  - call: child-named-spaces
+    parallel:
+      items: ${ITEMS}
+    params: "LABEL=${ITEM.label} ID=${ITEM.id}"
+    output: RESULTS
+---
+name: child-named-spaces
+params:
+  - LABEL: ""
+  - ID: ""
+steps:
+  - script: |
+      if [ "$LABEL" != "hello world" ]; then
+        echo "FAIL: LABEL='$LABEL' (expected 'hello world')"
+        exit 1
+      fi
+      if [ "$ID" != "1" ]; then
+        echo "FAIL: ID='$ID' (expected '1')"
+        exit 1
+      fi
+      echo "OK: LABEL=$LABEL ID=$ID"
+    output: CHECK_RESULT
+`,
+			expectedSubRuns: 1,
+			verify: func(t *testing.T, results parallelResultsPayload) {
+				require.Equal(t, 1, results.Summary.Succeeded)
+				outputs := collectOutputs(results.Outputs, "CHECK_RESULT")
+				require.Len(t, outputs, 1)
+				require.Contains(t, outputs[0], "OK: LABEL=hello world ID=1")
+			},
+		},
+		{
+			name: "positional_single_value_no_split",
+			dag: `steps:
+  - command: |
+      echo '[{"tag": "simple"}]'
+    output: ITEMS
+
+  - call: child-positional-single
+    parallel:
+      items: ${ITEMS}
+    params: "${ITEM.tag}"
+    output: RESULTS
+---
+name: child-positional-single
+params:
+  - TAG: ""
+steps:
+  - script: |
+      if [ "$1" != "simple" ]; then
+        echo "FAIL: \$1='$1' (expected 'simple')"
+        exit 1
+      fi
+      echo "OK: TAG=$1"
+    output: CHECK_RESULT
+`,
+			expectedSubRuns: 1,
+			verify: func(t *testing.T, results parallelResultsPayload) {
+				require.Equal(t, 1, results.Summary.Succeeded)
+				outputs := collectOutputs(results.Outputs, "CHECK_RESULT")
+				require.Len(t, outputs, 1)
+				require.Contains(t, outputs[0], "OK: TAG=simple")
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			th := test.Setup(t)
+			dag := th.DAG(t, tc.dag)
+			agent := dag.Agent()
+			err := agent.Run(agent.Context)
+			require.NoError(t, err)
+			dag.AssertLatestStatus(t, core.Succeeded)
+
+			dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
+			require.NoError(t, statusErr)
+
+			require.Greater(t, len(dagStatus.Nodes), 1, "expected at least 2 nodes")
+			parallelNode := dagStatus.Nodes[1]
+			require.Equal(t, core.NodeSucceeded, parallelNode.Status)
+			require.Len(t, parallelNode.SubRuns, tc.expectedSubRuns)
+
+			require.NotNil(t, parallelNode.OutputVariables, "no outputs recorded")
+			rawRaw, ok := parallelNode.OutputVariables.Load("RESULTS")
+			require.True(t, ok, "output RESULTS not found")
+			raw, ok := rawRaw.(string)
+			require.True(t, ok, "output RESULTS is not a string")
+			results := parseParallelResults(t, raw)
+			tc.verify(t, results)
+		})
+	}
 }
 
 type parallelSummary struct {

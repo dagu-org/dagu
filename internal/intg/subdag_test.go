@@ -172,7 +172,7 @@ steps:
         - TASK_ID=1 TASK_NAME=alpha
         - TASK_ID=2 TASK_NAME=beta
         - TASK_ID=3 TASK_NAME=gamma
-      maxConcurrent: 2
+      max_concurrent: 2
 
 ---
 
@@ -415,7 +415,7 @@ params:
   - TASK_NAME
 steps:
   - command: exit 1
-    continueOn:
+    continue_on:
       failure: true
 
   - exit 0
@@ -442,7 +442,7 @@ params:
   - TASK_NAME
 steps:
   - command: exit 1
-    continueOn:
+    continue_on:
       failure: true
 
   - exit 0
@@ -641,9 +641,9 @@ steps:
         fi
       fi
     output: STEP_OUTPUT
-    retryPolicy:
+    retry_policy:
       limit: 2
-      intervalSec: 1
+      interval_sec: 1
 `)
 
 		args := []string{"start", "--run-id", dagRunID, "parent_retry"}
@@ -707,9 +707,9 @@ steps:
         fi
       fi
     output: STEP_OUTPUT
-    retryPolicy:
+    retry_policy:
       limit: 2
-      intervalSec: 1
+      interval_sec: 1
 `)
 
 		args := []string{"start", "--run-id", dagRunID, "basic_retry"}

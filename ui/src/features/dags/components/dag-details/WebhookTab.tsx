@@ -310,7 +310,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
             {error}
           </CardDescription>
         </CardHeader>
-        <CardContent className="px-4 pb-3 pt-0">
+        <CardContent className="px-4 pb-3 pt-2">
           <Button variant="outline" size="sm" onClick={fetchWebhook}>
             Retry
           </Button>

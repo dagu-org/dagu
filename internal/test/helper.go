@@ -38,6 +38,11 @@ import (
 
 var setupLock sync.Mutex
 
+const (
+	latestStatusAssertTimeout  = 30 * time.Second
+	latestStatusAssertInterval = 1 * time.Second
+)
+
 // HelperOption defines functional options for Helper
 type HelperOption func(*Options)
 
@@ -70,6 +75,14 @@ func WithServerConfig(cfg *config.Server) HelperOption {
 	return func(opts *Options) {
 		opts.ServerConfig = cfg
 	}
+}
+
+// WithCoordinatorEnabled re-enables the coordinator in test configuration.
+// By default, tests disable the coordinator since no coordinator is running.
+func WithCoordinatorEnabled() HelperOption {
+	return WithConfigMutator(func(cfg *config.Config) {
+		cfg.Coordinator.Enabled = true
+	})
 }
 
 // WithConfigMutator applies mutations to the loaded configuration after defaults are set.
@@ -165,6 +178,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	cfg.Paths.UsersDir = filepath.Join(dataDir, "users")
 	cfg.Paths.SuspendFlagsDir = filepath.Join(tmpDir, "suspend-flags")
 	cfg.Paths.AdminLogsDir = filepath.Join(tmpDir, "admin-logs")
+	cfg.Coordinator.Enabled = false
 	if options.DAGsDir != "" {
 		cfg.Paths.DAGsDir = options.DAGsDir
 	}
@@ -252,27 +266,27 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 	t.Helper()
 
 	configData := map[string]any{
-		"debug":        cfg.Core.Debug,
-		"logFormat":    cfg.Core.LogFormat,
-		"defaultShell": cfg.Core.DefaultShell,
+		"debug":         cfg.Core.Debug,
+		"log_format":    cfg.Core.LogFormat,
+		"default_shell": cfg.Core.DefaultShell,
 	}
 	if cfg.Core.TZ != "" {
 		configData["tz"] = cfg.Core.TZ
 	}
 
 	configData["paths"] = map[string]any{
-		"dagsDir":            cfg.Paths.DAGsDir,
-		"logDir":             cfg.Paths.LogDir,
-		"dataDir":            cfg.Paths.DataDir,
-		"suspendFlagsDir":    cfg.Paths.SuspendFlagsDir,
-		"adminLogsDir":       cfg.Paths.AdminLogsDir,
-		"baseConfig":         cfg.Paths.BaseConfig,
-		"dagRunsDir":         cfg.Paths.DAGRunsDir,
-		"queueDir":           cfg.Paths.QueueDir,
-		"procDir":            cfg.Paths.ProcDir,
-		"serviceRegistryDir": cfg.Paths.ServiceRegistryDir,
-		"usersDir":           cfg.Paths.UsersDir,
-		"executable":         cfg.Paths.Executable,
+		"dags_dir":             cfg.Paths.DAGsDir,
+		"log_dir":              cfg.Paths.LogDir,
+		"data_dir":             cfg.Paths.DataDir,
+		"suspend_flags_dir":    cfg.Paths.SuspendFlagsDir,
+		"admin_logs_dir":       cfg.Paths.AdminLogsDir,
+		"base_config":          cfg.Paths.BaseConfig,
+		"dag_runs_dir":         cfg.Paths.DAGRunsDir,
+		"queue_dir":            cfg.Paths.QueueDir,
+		"proc_dir":             cfg.Paths.ProcDir,
+		"service_registry_dir": cfg.Paths.ServiceRegistryDir,
+		"users_dir":            cfg.Paths.UsersDir,
+		"executable":           cfg.Paths.Executable,
 	}
 
 	if cfg.Queues.Enabled || len(cfg.Queues.Config) > 0 {
@@ -284,7 +298,7 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 			for _, q := range cfg.Queues.Config {
 				entry := map[string]any{"name": q.Name}
 				if q.MaxActiveRuns > 0 {
-					entry["maxActiveRuns"] = q.MaxActiveRuns
+					entry["max_active_runs"] = q.MaxActiveRuns
 				}
 				configs = append(configs, entry)
 			}
@@ -300,51 +314,57 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 		scheduler["port"] = cfg.Scheduler.Port
 	}
 	if cfg.Scheduler.LockStaleThreshold > 0 {
-		scheduler["lockStaleThreshold"] = cfg.Scheduler.LockStaleThreshold.String()
+		scheduler["lock_stale_threshold"] = cfg.Scheduler.LockStaleThreshold.String()
 	}
 	if cfg.Scheduler.LockRetryInterval > 0 {
-		scheduler["lockRetryInterval"] = cfg.Scheduler.LockRetryInterval.String()
+		scheduler["lock_retry_interval"] = cfg.Scheduler.LockRetryInterval.String()
 	}
 	if cfg.Scheduler.ZombieDetectionInterval >= 0 {
-		scheduler["zombieDetectionInterval"] = cfg.Scheduler.ZombieDetectionInterval.String()
+		scheduler["zombie_detection_interval"] = cfg.Scheduler.ZombieDetectionInterval.String()
 	}
 	if len(scheduler) > 0 {
 		configData["scheduler"] = scheduler
 	}
 
-	if cfg.Coordinator.Host != "" || cfg.Coordinator.Advertise != "" || cfg.Coordinator.Port != 0 {
-		configData["coordinator"] = map[string]any{
-			"host":      cfg.Coordinator.Host,
-			"advertise": cfg.Coordinator.Advertise,
-			"port":      cfg.Coordinator.Port,
-		}
+	coordData := map[string]any{
+		"enabled": cfg.Coordinator.Enabled,
 	}
+	if cfg.Coordinator.Host != "" {
+		coordData["host"] = cfg.Coordinator.Host
+	}
+	if cfg.Coordinator.Advertise != "" {
+		coordData["advertise"] = cfg.Coordinator.Advertise
+	}
+	if cfg.Coordinator.Port != 0 {
+		coordData["port"] = cfg.Coordinator.Port
+	}
+	configData["coordinator"] = coordData
 
 	if cfg.Worker.ID != "" || cfg.Worker.MaxActiveRuns != 0 || len(cfg.Worker.Labels) > 0 {
 		configData["worker"] = map[string]any{
-			"id":            cfg.Worker.ID,
-			"maxActiveRuns": cfg.Worker.MaxActiveRuns,
-			"labels":        cfg.Worker.Labels,
+			"id":              cfg.Worker.ID,
+			"max_active_runs": cfg.Worker.MaxActiveRuns,
+			"labels":          cfg.Worker.Labels,
 		}
 	}
 
 	ui := map[string]any{}
 	if cfg.UI.LogEncodingCharset != "" {
-		ui["logEncodingCharset"] = cfg.UI.LogEncodingCharset
+		ui["log_encoding_charset"] = cfg.UI.LogEncodingCharset
 	}
 	if cfg.UI.NavbarColor != "" {
-		ui["navbarColor"] = cfg.UI.NavbarColor
+		ui["navbar_color"] = cfg.UI.NavbarColor
 	}
 	if cfg.UI.NavbarTitle != "" {
-		ui["navbarTitle"] = cfg.UI.NavbarTitle
+		ui["navbar_title"] = cfg.UI.NavbarTitle
 	}
 	if cfg.UI.MaxDashboardPageLimit != 0 {
-		ui["maxDashboardPageLimit"] = cfg.UI.MaxDashboardPageLimit
+		ui["max_dashboard_page_limit"] = cfg.UI.MaxDashboardPageLimit
 	}
 	if cfg.UI.DAGs.SortField != "" || cfg.UI.DAGs.SortOrder != "" {
 		ui["dags"] = map[string]any{
-			"sortField": cfg.UI.DAGs.SortField,
-			"sortOrder": cfg.UI.DAGs.SortOrder,
+			"sort_field": cfg.UI.DAGs.SortField,
+			"sort_order": cfg.UI.DAGs.SortOrder,
 		}
 	}
 	if len(ui) > 0 {
@@ -458,7 +478,7 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected core.Status) {
 		}
 		t.Logf("latest status=%s errors=%v", latest.Status.String(), latest.Errors())
 		return latest.Status == expected
-	}, time.Second*10, time.Second)
+	}, latestStatusAssertTimeout, latestStatusAssertInterval)
 }
 
 func (d *DAG) AssertDAGRunCount(t *testing.T, expected int) {

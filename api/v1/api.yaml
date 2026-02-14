@@ -659,7 +659,7 @@ paths:
   /workers:
     get:
       summary: "List distributed workers"
-      description: "Retrieves information about distributed workers connected to the coordinator"
+      description: "Retrieves information about distributed workers connected to the coordinator. Developer, manager, or admin only."
       operationId: "getWorkers"
       tags:
         - "system"
@@ -980,7 +980,7 @@ paths:
                 required:
                   - dagRunId
         "409":
-          description: "DAG is already running (singleton mode)"
+          description: "DAG is already running (singleton mode) or dagRunId already exists"
           content:
             application/json:
               schema:
@@ -1613,6 +1613,10 @@ paths:
                 queue:
                   type: string
                   description: "Override the queue to use for this DAG-run"
+                singleton:
+                  type: boolean
+                  description: "If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)"
+                  default: false
               required:
                 - spec
       responses:
@@ -1634,7 +1638,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: "A DAG with the same name is already queued beyond maxActiveRuns"
+          description: "DAG is already running or queued (singleton mode), or dagRunId already exists"
           content:
             application/json:
               schema:
@@ -2807,7 +2811,7 @@ paths:
   /services/resources/history:
     get:
       summary: "Get resource usage history"
-      description: "Returns historical data for system resources"
+      description: "Returns historical data for system resources. Developer, manager, or admin only."
       operationId: "getResourceHistory"
       tags:
         - "system"
@@ -2837,7 +2841,7 @@ paths:
   /services/scheduler:
     get:
       summary: "Get scheduler service status"
-      description: "Returns status information about all registered scheduler instances"
+      description: "Returns status information about all registered scheduler instances. Developer, manager, or admin only."
       operationId: "getSchedulerStatus"
       tags:
         - "system"
@@ -2860,7 +2864,7 @@ paths:
   /services/coordinator:
     get:
       summary: "Get coordinator service status"
-      description: "Returns status information about all registered coordinator instances"
+      description: "Returns status information about all registered coordinator instances. Developer, manager, or admin only."
       operationId: "getCoordinatorStatus"
       tags:
         - "system"
@@ -2883,7 +2887,7 @@ paths:
   /services/tunnel:
     get:
       summary: "Get tunnel service status"
-      description: "Returns status information about the tunnel service (Tailscale)"
+      description: "Returns status information about the tunnel service (Tailscale). Developer, manager, or admin only."
       operationId: "getTunnelStatus"
       tags:
         - "system"
@@ -3031,7 +3035,7 @@ paths:
   /webhooks:
     get:
       summary: "List all webhooks"
-      description: "Returns a list of all webhooks across all DAGs. Admin only."
+      description: "Returns a list of all webhooks across all DAGs. Developer, manager, or admin only."
       operationId: "listWebhooks"
       tags:
         - "webhooks"
@@ -3086,6 +3090,7 @@ paths:
       description: |
         Creates a new webhook for the specified DAG. Returns the full webhook token,
         which is only shown once. Store it securely.
+        Developer, manager, or admin only.
       operationId: "createDAGWebhook"
       tags:
         - "webhooks"
@@ -3114,7 +3119,7 @@ paths:
 
     delete:
       summary: "Delete webhook for DAG"
-      description: "Removes the webhook configuration for the specified DAG."
+      description: "Removes the webhook configuration for the specified DAG. Developer, manager, or admin only."
       operationId: "deleteDAGWebhook"
       tags:
         - "webhooks"
@@ -3143,6 +3148,7 @@ paths:
       description: |
         Generates a new token for the existing webhook. The old token becomes
         invalid immediately. Returns the new token, which is only shown once.
+        Developer, manager, or admin only.
       operationId: "regenerateDAGWebhookToken"
       tags:
         - "webhooks"
@@ -3172,7 +3178,7 @@ paths:
   /dags/{fileName}/webhook/toggle:
     post:
       summary: "Toggle webhook enabled state"
-      description: "Enables or disables the webhook without changing the token."
+      description: "Enables or disables the webhook without changing the token. Developer, manager, or admin only."
       operationId: "toggleDAGWebhook"
       tags:
         - "webhooks"
@@ -3208,7 +3214,7 @@ paths:
   /audit:
     get:
       summary: "List audit log entries"
-      description: "Returns audit log entries matching the filter criteria. Admin only."
+      description: "Returns audit log entries matching the filter criteria. Manager or admin only."
       operationId: "listAuditLogs"
       tags:
         - "audit"
@@ -3271,7 +3277,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "403":
-          description: "Forbidden - requires admin role"
+          description: "Forbidden - requires manager or admin role"
           content:
             application/json:
               schema:
@@ -3332,8 +3338,8 @@ paths:
 
   /sync/publish-all:
     post:
-      summary: "Publish all modified DAGs"
-      description: "Commits and pushes all modified DAGs to the remote repository"
+      summary: "Publish selected DAGs"
+      description: "Commits and pushes the specified item IDs. If itemIds is omitted, publishes all modified or untracked items."
       operationId: "syncPublishAll"
       tags:
         - "sync"
@@ -3432,18 +3438,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /sync/dags/{name}/diff:
+  /sync/items/{itemId}/diff:
     get:
-      summary: "Get diff for a DAG"
-      description: "Returns the diff between local and remote versions of a DAG"
-      operationId: "getSyncDAGDiff"
+      summary: "Get diff for a sync item"
+      description: "Returns the diff between local and remote versions of a sync item"
+      operationId: "getSyncItemDiff"
       tags:
         - "sync"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - name: name
+        - name: itemId
           in: path
-          description: "The DAG name (file name without extension)"
+          description: "The sync item identifier (file path without extension)"
           required: true
           schema:
             type: string
@@ -3453,9 +3459,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SyncDAGDiffResponse"
+                $ref: "#/components/schemas/SyncItemDiffResponse"
         "404":
-          description: "DAG not found"
+          description: "Item not found"
           content:
             application/json:
               schema:
@@ -3467,19 +3473,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{name}/publish:
+  /sync/items/{itemId}/publish:
     post:
-      summary: "Publish a single DAG"
-      description: "Commits and pushes a single DAG to the remote repository"
-      operationId: "publishDag"
+      summary: "Publish a single sync item"
+      description: "Commits and pushes a single sync item to the remote repository"
+      operationId: "publishSyncItem"
       tags:
         - "sync"
-        - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - name: name
+        - name: itemId
           in: path
-          description: "The DAG name (file name without extension)"
+          description: "The sync item identifier (file path without extension)"
           required: true
           schema:
             type: string
@@ -3491,13 +3496,13 @@ paths:
               $ref: "#/components/schemas/SyncPublishRequest"
       responses:
         "200":
-          description: "DAG published successfully"
+          description: "Item published successfully"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SyncResultResponse"
         "404":
-          description: "DAG not found"
+          description: "Item not found"
           content:
             application/json:
               schema:
@@ -3515,19 +3520,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dags/{name}/discard:
+  /sync/items/{itemId}/discard:
     post:
-      summary: "Discard local changes for a DAG"
+      summary: "Discard local changes for a sync item"
       description: "Discards local changes and reverts to the version in the remote repository"
-      operationId: "discardDagChanges"
+      operationId: "discardSyncItemChanges"
       tags:
         - "sync"
-        - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - name: name
+        - name: itemId
           in: path
-          description: "The DAG name (file name without extension)"
+          description: "The sync item identifier (file path without extension)"
           required: true
           schema:
             type: string
@@ -3539,7 +3543,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
         "404":
-          description: "DAG not found"
+          description: "Item not found"
           content:
             application/json:
               schema:
@@ -3856,6 +3860,238 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: "Model not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/agent/memory:
+    get:
+      summary: "Get agent memory"
+      description: "Returns global memory content and list of DAGs with memory. Requires admin role."
+      operationId: "getAgentMemory"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Agent memory overview"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentMemoryResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      summary: "Update global agent memory"
+      description: "Updates the global MEMORY.md content. Requires admin role."
+      operationId: "updateAgentMemory"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentMemoryRequest"
+      responses:
+        "200":
+          description: "Memory updated successfully"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Clear global agent memory"
+      description: "Deletes the global MEMORY.md file. Requires admin role."
+      operationId: "deleteAgentMemory"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Memory cleared successfully"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/agent/memory/dags/{dagName}:
+    get:
+      summary: "Get DAG-specific agent memory"
+      description: "Returns memory content for a specific DAG. Requires admin role."
+      operationId: "getAgentDAGMemory"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: dagName
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/DAGName"
+          description: "Name of the DAG"
+      responses:
+        "200":
+          description: "DAG memory content"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentDAGMemoryResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      summary: "Update DAG-specific agent memory"
+      description: "Updates the memory content for a specific DAG. Requires admin role."
+      operationId: "updateAgentDAGMemory"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: dagName
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/DAGName"
+          description: "Name of the DAG"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentMemoryRequest"
+      responses:
+        "200":
+          description: "DAG memory updated successfully"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Clear DAG-specific agent memory"
+      description: "Deletes the memory file for a specific DAG. Requires admin role."
+      operationId: "deleteAgentDAGMemory"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: dagName
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/DAGName"
+          description: "Name of the DAG"
+      responses:
+        "200":
+          description: "DAG memory cleared successfully"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
           content:
             application/json:
               schema:
@@ -5663,6 +5899,22 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MetricPoint"
+        memoryTotalBytes:
+          type: integer
+          format: int64
+          description: Total physical memory in bytes
+        memoryUsedBytes:
+          type: integer
+          format: int64
+          description: Used physical memory in bytes
+        diskTotalBytes:
+          type: integer
+          format: int64
+          description: Total disk space in bytes
+        diskUsedBytes:
+          type: integer
+          format: int64
+          description: Used disk space in bytes
 
     MetricPoint:
       type: object
@@ -5680,10 +5932,11 @@ components:
 
     UserRole:
       type: string
-      description: "User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution, operator: DAG execution only, viewer: read-only"
+      description: "User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution with audit log access, developer: DAG CRUD and execution, operator: DAG execution only, viewer: read-only"
       enum:
         - admin
         - manager
+        - developer
         - operator
         - viewer
 
@@ -5977,12 +6230,30 @@ components:
         - conflict
         - error
 
-    SyncDAGState:
+    SyncItemKind:
+      type: string
+      description: "Type of sync item"
+      enum:
+        - dag
+        - memory
+
+    SyncItem:
       type: object
-      description: "Sync state for a single DAG"
+      description: "Sync state for a single item"
       properties:
+        itemId:
+          type: string
+          description: "Stable item identifier (file path without extension)"
+        filePath:
+          type: string
+          description: "Relative file path with extension"
+        displayName:
+          type: string
+          description: "Display-friendly item name"
         status:
           $ref: "#/components/schemas/SyncStatus"
+        kind:
+          $ref: "#/components/schemas/SyncItemKind"
         baseCommit:
           type: string
           description: "Commit hash when last synced"
@@ -6014,7 +6285,11 @@ components:
           format: date-time
           description: "When the conflict was detected"
       required:
+        - itemId
+        - filePath
+        - displayName
         - status
+        - kind
 
     SyncStatusCounts:
       type: object
@@ -6062,36 +6337,40 @@ components:
         lastError:
           type: string
           description: "Error message from last failed sync"
-        dags:
-          type: object
-          additionalProperties:
-            $ref: "#/components/schemas/SyncDAGState"
-          description: "Sync state for each DAG"
+        items:
+          type: array
+          description: "Sync state for each item"
+          items:
+            $ref: "#/components/schemas/SyncItem"
         counts:
           $ref: "#/components/schemas/SyncStatusCounts"
       required:
         - enabled
         - summary
+        - items
         - counts
 
     SyncError:
       type: object
       description: "Error during sync operation"
       properties:
-        dagId:
+        itemId:
           type: string
         message:
           type: string
       required:
         - message
 
-    SyncDAGDiffResponse:
+    SyncItemDiffResponse:
       type: object
-      description: "Diff between local and remote versions of a DAG"
+      description: "Diff between local and remote versions of a sync item"
       properties:
-        dagId:
+        itemId:
           type: string
-          description: "The DAG identifier"
+          description: "The item identifier"
+        filePath:
+          type: string
+          description: "Relative file path with extension"
         status:
           $ref: "#/components/schemas/SyncStatus"
         localContent:
@@ -6110,7 +6389,8 @@ components:
           type: string
           description: "Commit message of the remote version"
       required:
-        - dagId
+        - itemId
+        - filePath
         - status
         - localContent
 
@@ -6162,17 +6442,22 @@ components:
 
     SyncPublishAllRequest:
       type: object
-      description: "Request to publish all modified DAGs"
+      description: "Request to publish selected items"
       properties:
         message:
           type: string
           description: "Commit message"
+        itemIds:
+          type: array
+          items:
+            type: string
+          description: "Item IDs to publish. If omitted, all modified or untracked items are published."
 
     SyncConflictResponse:
       type: object
       description: "Response when a conflict is detected"
       properties:
-        dagId:
+        itemId:
           type: string
         remoteCommit:
           type: string
@@ -6183,7 +6468,7 @@ components:
         message:
           type: string
       required:
-        - dagId
+        - itemId
         - message
 
     SyncConnectionTestResponse:
@@ -6297,6 +6582,8 @@ components:
         defaultModelId:
           type: string
           description: "ID of the default model"
+        toolPolicy:
+          $ref: "#/components/schemas/AgentToolPolicy"
 
     UpdateAgentConfigRequest:
       type: object
@@ -6308,6 +6595,55 @@ components:
         defaultModelId:
           type: string
           description: "ID of the default model"
+        toolPolicy:
+          $ref: "#/components/schemas/AgentToolPolicy"
+
+    AgentToolPolicy:
+      type: object
+      description: "Global tool permission policy for AI agent sessions"
+      properties:
+        tools:
+          type: object
+          description: "Per-tool enable/disable map"
+          additionalProperties:
+            type: boolean
+        bash:
+          $ref: "#/components/schemas/AgentBashPolicy"
+
+    AgentBashPolicy:
+      type: object
+      description: "Granular command policy for the bash tool"
+      properties:
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentBashRule"
+        defaultBehavior:
+          type: string
+          enum: [allow, deny]
+          description: "Behavior when no rule matches a command segment"
+        denyBehavior:
+          type: string
+          enum: [ask_user, block]
+          description: "Behavior when a command segment is denied"
+
+    AgentBashRule:
+      type: object
+      required:
+        - pattern
+        - action
+      properties:
+        name:
+          type: string
+        pattern:
+          type: string
+          description: "Regex pattern matched against each shell command segment"
+        action:
+          type: string
+          enum: [allow, deny]
+        enabled:
+          type: boolean
+          description: "Rule enabled state (default: true when omitted)"
 
     ModelConfigResponse:
       type: object
@@ -6501,6 +6837,44 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ModelPreset"
+
+    AgentMemoryResponse:
+      type: object
+      description: "Agent memory overview"
+      properties:
+        globalMemory:
+          type: string
+          description: "Content of global MEMORY.md"
+        dagMemories:
+          type: array
+          items:
+            $ref: "#/components/schemas/DAGName"
+          description: "List of DAG names that have memory files"
+        memoryDir:
+          type: string
+          description: "Root memory directory path"
+
+    AgentDAGMemoryResponse:
+      type: object
+      required:
+        - dagName
+        - content
+      description: "DAG-specific memory content"
+      properties:
+        dagName:
+          $ref: "#/components/schemas/DAGName"
+        content:
+          type: string
+
+    UpdateAgentMemoryRequest:
+      type: object
+      required:
+        - content
+      description: "Request to update memory content"
+      properties:
+        content:
+          type: string
+          description: "New memory content (markdown)"
 
 # Apply security requirements globally
 security:

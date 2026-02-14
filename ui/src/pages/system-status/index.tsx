@@ -255,6 +255,8 @@ function SystemStatus() {
           color="#73BF69"
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}
+          totalBytes={resourceData?.memoryTotalBytes}
+          usedBytes={resourceData?.memoryUsedBytes}
         />
         <ResourceChart
           title="Disk Usage"
@@ -262,6 +264,8 @@ function SystemStatus() {
           color="#73BF69"
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}
+          totalBytes={resourceData?.diskTotalBytes}
+          usedBytes={resourceData?.diskUsedBytes}
         />
         <ResourceChart
           title="Load Average"

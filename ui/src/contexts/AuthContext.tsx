@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useConfig } from './ConfigContext';
 
-type UserRole = 'admin' | 'manager' | 'operator' | 'viewer';
+export type UserRole = 'admin' | 'manager' | 'developer' | 'operator' | 'viewer';
 
 type User = {
   id: string;
@@ -25,8 +25,9 @@ export const TOKEN_KEY = 'dagu_auth_token';
 
 // Role hierarchy for permission checking
 const ROLE_HIERARCHY: Record<UserRole, number> = {
-  admin: 4,
-  manager: 3,
+  admin: 5,
+  manager: 4,
+  developer: 3,
   operator: 2,
   viewer: 1,
 };
@@ -157,7 +158,7 @@ export function useIsAdmin(): boolean {
  * Determines whether the current user is permitted to create or modify DAGs.
  *
  * In non-builtin auth mode this follows the `config.permissions.writeDags` flag.
- * In builtin auth mode the user must exist and have role `manager` or `admin`.
+ * In builtin auth mode the user must exist and have role `developer` or higher.
  *
  * @returns `true` if writing DAGs is permitted in the current context, `false` otherwise.
  */
@@ -166,7 +167,7 @@ export function useCanWrite(): boolean {
   const config = useConfig();
   if (config.authMode !== 'builtin') return config.permissions.writeDags;
   if (!user) return false;
-  return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY['manager'];
+  return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY['developer'];
 }
 
 /**
@@ -182,6 +183,52 @@ export function useCanExecute(): boolean {
   if (config.authMode !== 'builtin') return config.permissions.runDags;
   if (!user) return false;
   return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY['operator'];
+}
+
+/**
+ * Determine whether the current user can access system status pages.
+ *
+ * In builtin auth mode this requires role `developer` or higher.
+ *
+ * @returns `true` if system status access is permitted, `false` otherwise.
+ */
+export function useCanAccessSystemStatus(): boolean {
+  const { user } = useAuth();
+  const config = useConfig();
+  if (config.authMode !== 'builtin') return true;
+  if (!user) return false;
+  return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY['developer'];
+}
+
+/**
+ * Determine whether the current user can manage webhooks.
+ *
+ * In builtin auth mode this requires role `developer` or higher.
+ *
+ * @returns `true` if webhook management is permitted, `false` otherwise.
+ */
+export function useCanManageWebhooks(): boolean {
+  const { user } = useAuth();
+  const config = useConfig();
+  // Webhooks require the builtin auth service (webhook token store).
+  if (config.authMode !== 'builtin') return false;
+  if (!user) return false;
+  return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY['developer'];
+}
+
+/**
+ * Determine whether the current user can view audit logs.
+ *
+ * In builtin auth mode this requires role `manager` or higher.
+ *
+ * @returns `true` if audit log access is permitted, `false` otherwise.
+ */
+export function useCanViewAuditLogs(): boolean {
+  const { user } = useAuth();
+  const config = useConfig();
+  if (config.authMode !== 'builtin') return true;
+  if (!user) return false;
+  return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY['manager'];
 }
 
 /**

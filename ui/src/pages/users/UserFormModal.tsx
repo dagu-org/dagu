@@ -31,7 +31,8 @@ type UserFormModalProps = {
 
 const ROLES = [
   { value: 'admin', label: 'Admin', description: 'Full access including user management' },
-  { value: 'manager', label: 'Manager', description: 'DAG create/edit/delete and execution' },
+  { value: 'manager', label: 'Manager', description: 'DAG create/edit/delete, execution, and audit logs' },
+  { value: 'developer', label: 'Developer', description: 'DAG create/edit/delete and execution' },
   { value: 'operator', label: 'Operator', description: 'DAG execution only' },
   { value: 'viewer', label: 'Viewer', description: 'Read-only access' },
 ] as const;

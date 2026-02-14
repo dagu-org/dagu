@@ -20,52 +20,52 @@ func TestLogOutputValue_UnmarshalYAML(t *testing.T) {
 	}{
 		{
 			name:     "separate mode",
-			input:    "logOutput: separate",
+			input:    "log_output: separate",
 			wantMode: core.LogOutputSeparate,
 			wantSet:  true,
 		},
 		{
 			name:     "merged mode",
-			input:    "logOutput: merged",
+			input:    "log_output: merged",
 			wantMode: core.LogOutputMerged,
 			wantSet:  true,
 		},
 		{
 			name:     "merged mode uppercase",
-			input:    "logOutput: MERGED",
+			input:    "log_output: MERGED",
 			wantMode: core.LogOutputMerged,
 			wantSet:  true,
 		},
 		{
 			name:     "separate mode mixed case",
-			input:    "logOutput: Separate",
+			input:    "log_output: Separate",
 			wantMode: core.LogOutputSeparate,
 			wantSet:  true,
 		},
 		{
 			name:     "empty string defaults to separate",
-			input:    "logOutput: ''",
+			input:    "log_output: ''",
 			wantMode: core.LogOutputSeparate,
 			wantSet:  true,
 		},
 		{
 			name:        "invalid value",
-			input:       "logOutput: invalid",
+			input:       "log_output: invalid",
 			wantErr:     true,
-			errContains: "invalid logOutput value",
+			errContains: "invalid log_output value",
 		},
 		{
 			name:        "invalid value - both",
-			input:       "logOutput: both",
+			input:       "log_output: both",
 			wantErr:     true,
-			errContains: "invalid logOutput value",
+			errContains: "invalid log_output value",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var result struct {
-				LogOutput LogOutputValue `yaml:"logOutput"`
+				LogOutput LogOutputValue `yaml:"log_output"`
 			}
 
 			err := yaml.Unmarshal([]byte(tt.input), &result)
@@ -85,17 +85,17 @@ func TestLogOutputValue_UnmarshalYAML(t *testing.T) {
 
 func TestLogOutputValue_UnmarshalYAML_InvalidType(t *testing.T) {
 	var result struct {
-		LogOutput LogOutputValue `yaml:"logOutput"`
+		LogOutput LogOutputValue `yaml:"log_output"`
 	}
 
-	err := yaml.Unmarshal([]byte("logOutput:\n  - item1\n  - item2"), &result)
+	err := yaml.Unmarshal([]byte("log_output:\n  - item1\n  - item2"), &result)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "must be a string")
 }
 
 func TestLogOutputValue_DefaultValue(t *testing.T) {
 	var result struct {
-		LogOutput LogOutputValue `yaml:"logOutput"`
+		LogOutput LogOutputValue `yaml:"log_output"`
 	}
 
 	// When not set in YAML
@@ -141,11 +141,11 @@ func TestLogOutputMode_Constants(t *testing.T) {
 
 func TestLogOutputValue_UnmarshalYAML_NilValue(t *testing.T) {
 	var result struct {
-		LogOutput LogOutputValue `yaml:"logOutput"`
+		LogOutput LogOutputValue `yaml:"log_output"`
 	}
 
 	// Explicit null value in YAML
-	err := yaml.Unmarshal([]byte("logOutput: null"), &result)
+	err := yaml.Unmarshal([]byte("log_output: null"), &result)
 	require.NoError(t, err)
 	assert.True(t, result.LogOutput.IsZero())
 	assert.Equal(t, core.LogOutputSeparate, result.LogOutput.Mode())
@@ -153,11 +153,11 @@ func TestLogOutputValue_UnmarshalYAML_NilValue(t *testing.T) {
 
 func TestLogOutputValue_UnmarshalYAML_MapValue(t *testing.T) {
 	var result struct {
-		LogOutput LogOutputValue `yaml:"logOutput"`
+		LogOutput LogOutputValue `yaml:"log_output"`
 	}
 
 	// Map value should fail with "must be a string" error
-	err := yaml.Unmarshal([]byte("logOutput:\n  key: value"), &result)
+	err := yaml.Unmarshal([]byte("log_output:\n  key: value"), &result)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "must be a string")
 }

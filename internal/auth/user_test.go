@@ -35,7 +35,7 @@ func TestNewUser(t *testing.T) {
 	})
 
 	t.Run("supports all roles", func(t *testing.T) {
-		roles := []Role{RoleAdmin, RoleManager, RoleOperator, RoleViewer}
+		roles := []Role{RoleAdmin, RoleManager, RoleDeveloper, RoleOperator, RoleViewer}
 		for _, role := range roles {
 			user := NewUser("user", "hash", role)
 			assert.Equal(t, role, user.Role)

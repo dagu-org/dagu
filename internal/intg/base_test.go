@@ -24,8 +24,8 @@ func TestBaseDAGSpecialEnvVarsInHandler(t *testing.T) {
 	baseConfigPath := filepath.Join(tmpDir, "base.yaml")
 	outputFile := filepath.Join(tmpDir, "handler_output.txt")
 
-	// Create base DAG with handlerOn: failure that captures special env vars
-	baseConfig := `handlerOn:
+	// Create base DAG with handler_on: failure that captures special env vars
+	baseConfig := `handler_on:
   failure:
     command: |
       echo "DAG_NAME=${DAG_NAME}" >> ` + outputFile + `
@@ -48,7 +48,7 @@ func TestBaseDAGSpecialEnvVarsInHandler(t *testing.T) {
 	dag, err := spec.Load(th.Context, dagFile, spec.WithBaseConfig(baseConfigPath))
 	require.NoError(t, err)
 
-	// Verify base config was applied - handlerOn should be set
+	// Verify base config was applied - handler_on should be set
 	require.NotNil(t, dag.HandlerOn.Failure, "failure handler from base config should be set")
 
 	// Create agent and run
@@ -105,8 +105,8 @@ func TestSkipBaseHandlers_SubDAGDoesNotInheritHandlers(t *testing.T) {
 	baseConfigPath := filepath.Join(tmpDir, "base.yaml")
 	markerFile := filepath.Join(tmpDir, "marker.txt")
 
-	// Create base DAG with handlerOn: failure that writes a marker file
-	baseConfig := `handlerOn:
+	// Create base DAG with handler_on: failure that writes a marker file
+	baseConfig := `handler_on:
   failure:
     command: echo "BASE_FAILURE_HANDLER_RAN" >> ` + markerFile + `
 `
@@ -140,8 +140,8 @@ func TestSkipBaseHandlers_ExplicitHandlersStillWork(t *testing.T) {
 	baseMarkerFile := filepath.Join(tmpDir, "base_marker.txt")
 	dagMarkerFile := filepath.Join(tmpDir, "dag_marker.txt")
 
-	// Create base DAG with handlerOn: failure
-	baseConfig := `handlerOn:
+	// Create base DAG with handler_on: failure
+	baseConfig := `handler_on:
   failure:
     command: echo "BASE" >> ` + baseMarkerFile + `
 `
@@ -151,7 +151,7 @@ func TestSkipBaseHandlers_ExplicitHandlersStillWork(t *testing.T) {
 	th := test.Setup(t)
 
 	// Create a DAG file with its own failure handler
-	dagContent := `handlerOn:
+	dagContent := `handler_on:
   failure:
     command: echo "DAG" >> ` + dagMarkerFile + `
 
@@ -214,7 +214,7 @@ func TestSkipBaseHandlers_AllHandlerTypesSkipped(t *testing.T) {
 	baseConfigPath := filepath.Join(tmpDir, "base.yaml")
 
 	// Create base DAG with all handler types
-	baseConfig := `handlerOn:
+	baseConfig := `handler_on:
   init:
     command: "true"
   success:

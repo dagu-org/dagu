@@ -29,10 +29,10 @@ type ExecOptions struct {
 type execSpec struct {
 	Name           string            `yaml:"name,omitempty"`
 	Type           string            `yaml:"type,omitempty"`
-	WorkingDir     string            `yaml:"workingDir,omitempty"`
+	WorkingDir     string            `yaml:"working_dir,omitempty"`
 	Env            []string          `yaml:"env,omitempty"`
 	Dotenv         []string          `yaml:"dotenv,omitempty"`
-	WorkerSelector map[string]string `yaml:"workerSelector,omitempty"`
+	WorkerSelector map[string]string `yaml:"worker_selector,omitempty"`
 	Steps          []execStep        `yaml:"steps"`
 }
 

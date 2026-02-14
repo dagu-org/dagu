@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/dagu-org/dagu/internal/llm"
 )
@@ -16,9 +17,17 @@ const navigateDescription = "Navigate the user to a specific page in the Dagu UI
 	"Only use this when the user explicitly asks to navigate or view a page. " +
 	"Available paths: '/dags' for DAG list, '/dags/<dag-name>' for DAG details, " +
 	"'/dags/<dag-name>/<tab>' for specific tab (spec, history), '/dag-runs' for all DAG runs, " +
-	"'/dag-runs/<dag-name>/<run-id>' for specific run details, '/queues' for queues. " +
-	"Admin pages: '/system-status', '/users', '/api-keys', '/webhooks', '/terminal', " +
-	"'/audit-logs', '/git-sync', '/agent-settings'."
+	"'/dag-runs/<dag-name>/<run-id>' for specific run details, '/queues' for queues, " +
+	"'/system-status', '/webhooks', and '/audit-logs'. " +
+	"Admin-only pages: '/users', '/api-keys', '/terminal', '/git-sync', '/agent-settings'."
+
+var adminOnlyNavigatePaths = []string{
+	"/users",
+	"/api-keys",
+	"/terminal",
+	"/git-sync",
+	"/agent-settings",
+}
 
 // NewNavigateTool creates a new navigate tool for UI navigation.
 func NewNavigateTool() *AgentTool {
@@ -53,6 +62,9 @@ func navigateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	if args.Path == "" {
 		return toolError("Path is required")
 	}
+	if isAdminOnlyPath(args.Path) && ctx.Role.IsSet() && !ctx.Role.IsAdmin() {
+		return toolError("Permission denied: navigation to %s requires admin role", args.Path)
+	}
 
 	if ctx.EmitUIAction != nil {
 		ctx.EmitUIAction(UIAction{
@@ -62,4 +74,13 @@ func navigateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	}
 
 	return ToolOut{Content: fmt.Sprintf("Navigating user to %s", args.Path)}
+}
+
+func isAdminOnlyPath(path string) bool {
+	for _, prefix := range adminOnlyNavigatePaths {
+		if path == prefix || strings.HasPrefix(path, prefix+"/") {
+			return true
+		}
+	}
+	return false
 }

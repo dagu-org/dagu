@@ -9,7 +9,7 @@ import (
 )
 
 // ListAuditLogs returns audit log entries matching the filter criteria.
-// Requires admin role.
+// Requires manager or admin role.
 func (a *API) ListAuditLogs(ctx context.Context, request api.ListAuditLogsRequestObject) (api.ListAuditLogsResponseObject, error) {
 	// Check that audit service is configured
 	if a.auditService == nil {
@@ -20,8 +20,8 @@ func (a *API) ListAuditLogs(ctx context.Context, request api.ListAuditLogsReques
 		}
 	}
 
-	// Require admin role
-	if err := a.requireAdmin(ctx); err != nil {
+	// Require manager or admin role
+	if err := a.requireManagerOrAbove(ctx); err != nil {
 		return nil, err
 	}
 

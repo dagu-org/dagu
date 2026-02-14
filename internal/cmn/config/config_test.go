@@ -148,7 +148,7 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.UI.MaxDashboardPageLimit = 1
 		err := cfg.Validate()
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "usersDir")
+		assert.Contains(t, err.Error(), "users_dir")
 	})
 
 	t.Run("BuiltinAuth_MissingTokenSecret", func(t *testing.T) {
@@ -365,7 +365,7 @@ func TestConfig_Validate(t *testing.T) {
 
 	t.Run("BuiltinAuth_OIDC_AllValidRoles", func(t *testing.T) {
 		t.Parallel()
-		validRoles := []string{"admin", "manager", "operator", "viewer"}
+		validRoles := []string{"admin", "manager", "developer", "operator", "viewer"}
 		for _, role := range validRoles {
 			cfg := validBaseConfig()
 			cfg.Server.Auth = Auth{
@@ -410,7 +410,7 @@ func TestConfig_Validate(t *testing.T) {
 		cfg := validBaseConfig()
 		cfg.Server.Auth = Auth{
 			Mode:  AuthModeBuiltin,
-			Basic: AuthBasic{Username: "user", Password: "pass"},
+			Basic: AuthBasic{Enabled: true, Username: "user", Password: "pass"},
 			Builtin: AuthBuiltin{
 				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},

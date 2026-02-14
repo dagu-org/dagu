@@ -185,7 +185,7 @@ steps:
 		dagFile := th.DAG(t, `steps:
   - name: "check"
     command: "false"
-    continueOn:
+    continue_on:
       failure: true
   - name: "skipped"
     command: "echo 'This will be skipped'"

@@ -1055,6 +1055,7 @@ func TestSessionForStorage_ToSession(t *testing.T) {
 	stored := &SessionForStorage{
 		ID:        "test-id",
 		UserID:    "user-id",
+		DAGName:   "my-dag",
 		Title:     "Test Title",
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -1065,6 +1066,7 @@ func TestSessionForStorage_ToSession(t *testing.T) {
 
 	assert.Equal(t, stored.ID, sess.ID)
 	assert.Equal(t, stored.UserID, sess.UserID)
+	assert.Equal(t, stored.DAGName, sess.DAGName)
 	assert.Equal(t, stored.Title, sess.Title)
 	assert.Equal(t, stored.CreatedAt, sess.CreatedAt)
 	assert.Equal(t, stored.UpdatedAt, sess.UpdatedAt)
@@ -1075,6 +1077,7 @@ func TestFromSession(t *testing.T) {
 	sess := &agent.Session{
 		ID:        "test-id",
 		UserID:    "user-id",
+		DAGName:   "my-dag",
 		Title:     "Test Title",
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -1085,6 +1088,7 @@ func TestFromSession(t *testing.T) {
 
 	assert.Equal(t, sess.ID, stored.ID)
 	assert.Equal(t, sess.UserID, stored.UserID)
+	assert.Equal(t, sess.DAGName, stored.DAGName)
 	assert.Equal(t, sess.Title, stored.Title)
 	assert.Equal(t, sess.CreatedAt, stored.CreatedAt)
 	assert.Equal(t, sess.UpdatedAt, stored.UpdatedAt)

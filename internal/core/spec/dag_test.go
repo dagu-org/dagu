@@ -2069,30 +2069,30 @@ func TestBuildLogOutput(t *testing.T) {
 		},
 		{
 			name:     "ExplicitSeparate",
-			yaml:     "logoutput: separate",
+			yaml:     "log_output: separate",
 			expected: core.LogOutputSeparate,
 		},
 		{
 			name:     "Merged",
-			yaml:     "logoutput: merged",
+			yaml:     "log_output: merged",
 			expected: core.LogOutputMerged,
 		},
 		{
 			name:     "MergedUppercase",
-			yaml:     "logoutput: MERGED",
+			yaml:     "log_output: MERGED",
 			expected: core.LogOutputMerged,
 		},
 		{
 			name:        "InvalidValue",
-			yaml:        "logoutput: invalid",
+			yaml:        "log_output: invalid",
 			wantErr:     true,
-			errContains: "invalid logOutput value",
+			errContains: "invalid log_output value",
 		},
 		{
 			name:        "InvalidValue_Both",
-			yaml:        "logoutput: both",
+			yaml:        "log_output: both",
 			wantErr:     true,
-			errContains: "invalid logOutput value",
+			errContains: "invalid log_output value",
 		},
 	}
 
@@ -2291,12 +2291,12 @@ func TestParseHealthcheck(t *testing.T) {
 			wantErr: "invalid timeout",
 		},
 		{
-			name: "invalid startPeriod duration",
+			name: "invalid start_period duration",
 			input: &healthcheck{
 				Test:        []string{"CMD", "true"},
 				StartPeriod: "bad",
 			},
-			wantErr: "invalid startPeriod",
+			wantErr: "invalid start_period",
 		},
 	}
 
