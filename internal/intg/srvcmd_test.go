@@ -126,13 +126,13 @@ func writeServerConfig(t *testing.T, port, basePath string, includeRemoteNodes b
 
 	configContent := fmt.Sprintf(`host: "127.0.0.1"
 port: %s
-basePath: "%s"
+base_path: "%s"
 `, port, basePath)
 
 	if includeRemoteNodes {
-		configContent += fmt.Sprintf(`remoteNodes:
+		configContent += fmt.Sprintf(`remote_nodes:
   - name: "dev"
-    apiBaseURL: "http://127.0.0.1:%s%s/api/v1"
+    api_base_url: "http://127.0.0.1:%s%s/api/v1"
 `, port, basePath)
 	}
 
