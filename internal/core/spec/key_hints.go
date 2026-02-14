@@ -79,12 +79,12 @@ func withSnakeCaseKeyHint(err error) error {
 
 	msg := err.Error()
 	const marker = "has invalid keys:"
-	idx := strings.Index(msg, marker)
-	if idx == -1 {
+	_, after, ok := strings.Cut(msg, marker)
+	if !ok {
 		return err
 	}
 
-	raw := strings.TrimSpace(msg[idx+len(marker):])
+	raw := strings.TrimSpace(after)
 	if raw == "" {
 		return err
 	}
@@ -108,4 +108,3 @@ func withSnakeCaseKeyHint(err error) error {
 	}
 	return fmt.Errorf("%w; use snake_case keys (%s)", err, strings.Join(suggestions, ", "))
 }
-
