@@ -358,7 +358,7 @@ func TestValidateIfDAGFile(t *testing.T) {
 		invalidDAG := `steps:
   - name: step1
     command: echo hello
-    timeoutSec: -1
+    timeout_sec: -1
 `
 		require.NoError(t, os.WriteFile(filePath, []byte(invalidDAG), 0o600))
 
@@ -390,7 +390,7 @@ func TestPatchTool_DAGValidation(t *testing.T) {
 		invalidDAG := `steps:
   - name: step1
     command: echo hello
-    timeoutSec: -1
+    timeout_sec: -1
 `
 		result := tool.Run(ToolContext{}, patchInput(filePath, "create", "content", invalidDAG))
 
@@ -425,12 +425,12 @@ func TestPatchTool_DAGValidation(t *testing.T) {
 		initialDAG := `steps:
   - name: step1
     command: echo hello
-    timeoutSec: 10
+    timeout_sec: 10
 `
 		require.NoError(t, os.WriteFile(filePath, []byte(initialDAG), 0o600))
 
 		// Replace valid timeout with invalid negative timeout
-		result := tool.Run(ToolContext{}, patchInput(filePath, "replace", "old_string", "timeoutSec: 10", "new_string", "timeoutSec: -1"))
+		result := tool.Run(ToolContext{}, patchInput(filePath, "replace", "old_string", "timeout_sec: 10", "new_string", "timeout_sec: -1"))
 
 		assert.False(t, result.IsError)
 		assert.Contains(t, result.Content, "Replaced")

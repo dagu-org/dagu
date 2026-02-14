@@ -110,7 +110,7 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("FinishWithTimeout", func(t *testing.T) {
 		th := test.Setup(t)
-		timeoutDAG := th.DAG(t, `timeoutSec: 2
+		timeoutDAG := th.DAG(t, `timeout_sec: 2
 steps:
   - "sleep 1"
   - "sleep 2"
@@ -147,8 +147,8 @@ steps:
 	})
 	t.Run("ExitHandler", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `handlerOn:
-  Exit:
+		dag := th.DAG(t, `handler_on:
+  exit:
     command: "true"
 steps:
   - "true"
@@ -177,7 +177,7 @@ func TestAgent_WorkingDirExpansion(t *testing.T) {
 		t.Setenv("TEST_WORK_DIR", tempDir)
 
 		// Create DAG with WorkingDir using env var
-		dag := th.DAG(t, `workingDir: $TEST_WORK_DIR
+		dag := th.DAG(t, `working_dir: $TEST_WORK_DIR
 steps:
   - name: check-pwd
     command: pwd
@@ -197,7 +197,7 @@ steps:
 		// Create DAG with WorkingDir using DAG-defined env var
 		dag := th.DAG(t, `env:
   - CUSTOM_DIR=`+tempDir+`
-workingDir: $CUSTOM_DIR
+working_dir: $CUSTOM_DIR
 steps:
   - name: check-pwd
     command: pwd
@@ -214,7 +214,7 @@ steps:
 		th := test.Setup(t)
 
 		// Create DAG with WorkingDir using tilde
-		dag := th.DAG(t, `workingDir: ~
+		dag := th.DAG(t, `working_dir: ~
 steps:
   - name: check-pwd
     command: pwd
@@ -259,7 +259,7 @@ steps:
     command: "true"
   - name: "2"
     command: "false"
-    continueOn:
+    continue_on:
       failure: true
     depends: ["1"]
   - name: "3"
@@ -270,7 +270,7 @@ steps:
     preconditions:
       - condition: "`+"`"+`echo 0`+"`"+`"
         expected: "1"
-    continueOn:
+    continue_on:
       skipped: true
   - name: "5"
     command: "false"
@@ -284,7 +284,7 @@ steps:
       - condition: "`+"`"+`echo 0`+"`"+`"
         expected: "1"
     depends: ["6"]
-    continueOn:
+    continue_on:
       skipped: true
   - name: "8"
     command: "true"
@@ -326,7 +326,7 @@ steps:
     command: "true"
   - name: "2"
     command: "false"
-    continueOn:
+    continue_on:
       failure: true
     depends: ["1"]
   - name: "3"
@@ -337,7 +337,7 @@ steps:
     preconditions:
       - condition: "`+"`"+`echo 0`+"`"+`"
         expected: "1"
-    continueOn:
+    continue_on:
       skipped: true
   - name: "5"
     command: "false"
@@ -351,7 +351,7 @@ steps:
       - condition: "`+"`"+`echo 0`+"`"+`"
         expected: "1"
     depends: ["6"]
-    continueOn:
+    continue_on:
       skipped: true
   - name: "8"
     command: "true"

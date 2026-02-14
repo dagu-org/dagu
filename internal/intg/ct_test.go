@@ -43,7 +43,7 @@ steps:
   - type: docker
     config:
       image: alpine:3
-      autoRemove: true
+      auto_remove: true
     command: echo 123 abc $FOO $ABC
     output: DOCKER_EXEC_OUT1
 `,
@@ -58,8 +58,8 @@ steps:
   - type: docker
     config:
       image: alpine:3
-      autoRemove: true
-      containerName: dagu-autostart
+      auto_remove: true
+      container_name: dagu-autostart
     command: echo "container started"
     output: DOCKER_EXEC_OUT1
 `,
@@ -483,7 +483,7 @@ func TestDockerExecutor_ExecInExistingContainer(t *testing.T) {
 steps:
   - type: docker
     config:
-      containerName: %s
+      container_name: %s
       exec:
         working_dir: /
     command: echo hello-existing
@@ -506,7 +506,7 @@ steps:
   - type: docker
     config:
       image: %s
-      autoRemove: true
+      auto_remove: true
     command: sh -c 'echo first 1>&2; echo second 1>&2; exit 7'
 `, testImage)
 

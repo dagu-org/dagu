@@ -40,7 +40,7 @@ func NewReadSchemaTool() *AgentTool {
 						},
 						"path": map[string]any{
 							"type":        "string",
-							"description": "Dot-separated path to navigate (e.g., 'steps', 'steps.container', 'handlerOn.success'). Empty for root level.",
+							"description": "Dot-separated path to navigate (e.g., 'steps', 'steps.container', 'handler_on.success'). Empty for root level.",
 						},
 					},
 					"required": []string{"schema"},
