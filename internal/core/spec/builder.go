@@ -255,7 +255,7 @@ func normalizeStepData(ctx BuildContext, data []any) []any {
 }
 
 // buildStepFromRaw build core.Step from give raw data (map[string]any)
-func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names map[string]struct{}) (*core.Step, error) {
+func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names map[string]struct{}, defs *defaults) (*core.Step, error) {
 	var st step
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,
@@ -266,6 +266,7 @@ func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names m
 	if err := md.Decode(raw); err != nil {
 		return nil, core.NewValidationError("steps", raw, withSnakeCaseKeyHint(err))
 	}
+	applyDefaults(&st, defs)
 	builtStep, err := st.build(ctx)
 	if err != nil {
 		return nil, err

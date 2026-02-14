@@ -1085,3 +1085,208 @@ steps:
 	// With NoEval, environment variables should not be expanded
 	assert.Contains(t, dag.Env, "MY_VAR=${TEST_VAR}")
 }
+
+func TestDefaults_LoadDAG(t *testing.T) {
+	t.Parallel()
+
+	t.Run("StepsInheritDefaults", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, `
+defaults:
+  retry_policy:
+    limit: 3
+    interval_sec: 5
+  timeout_sec: 600
+  mail_on_error: true
+
+steps:
+  - name: step1
+    command: echo "hello"
+  - name: step2
+    command: echo "world"
+`)
+		dag, err := spec.Load(context.Background(), testDAG)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 2)
+
+		for _, step := range dag.Steps {
+			assert.Equal(t, 3, step.RetryPolicy.Limit, "step %s should inherit retry limit", step.Name)
+			assert.Equal(t, 5*time.Second, step.RetryPolicy.Interval, "step %s should inherit retry interval", step.Name)
+			assert.Equal(t, 600*time.Second, step.Timeout, "step %s should inherit timeout", step.Name)
+			assert.True(t, step.MailOnError, "step %s should inherit mail_on_error", step.Name)
+		}
+	})
+
+	t.Run("StepOverridesDefault", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, `
+defaults:
+  retry_policy:
+    limit: 3
+    interval_sec: 5
+  timeout_sec: 600
+
+steps:
+  - name: step1
+    command: echo "inherits"
+  - name: step2
+    command: echo "overrides"
+    retry_policy:
+      limit: 10
+      interval_sec: 30
+    timeout_sec: 300
+`)
+		dag, err := spec.Load(context.Background(), testDAG)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 2)
+
+		// step1 inherits defaults
+		assert.Equal(t, 3, dag.Steps[0].RetryPolicy.Limit)
+		assert.Equal(t, 600*time.Second, dag.Steps[0].Timeout)
+
+		// step2 overrides defaults
+		assert.Equal(t, 10, dag.Steps[1].RetryPolicy.Limit)
+		assert.Equal(t, 30*time.Second, dag.Steps[1].RetryPolicy.Interval)
+		assert.Equal(t, 300*time.Second, dag.Steps[1].Timeout)
+	})
+
+	t.Run("AdditiveEnvAndPreconditions", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, `
+defaults:
+  env:
+    - DEFAULT_VAR: default_value
+  preconditions:
+    - condition: "true"
+
+steps:
+  - name: step1
+    command: echo "only defaults"
+  - name: step2
+    command: echo "both"
+    env:
+      - STEP_VAR: step_value
+    preconditions:
+      - condition: "test -d /tmp"
+`)
+		dag, err := spec.Load(context.Background(), testDAG)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 2)
+
+		// step1 gets only defaults
+		assert.Contains(t, dag.Steps[0].Env, "DEFAULT_VAR=default_value")
+		require.Len(t, dag.Steps[0].Preconditions, 1)
+
+		// step2 gets both defaults + step-level (additive)
+		assert.Contains(t, dag.Steps[1].Env, "DEFAULT_VAR=default_value")
+		assert.Contains(t, dag.Steps[1].Env, "STEP_VAR=step_value")
+		require.Len(t, dag.Steps[1].Preconditions, 2)
+	})
+
+	t.Run("HandlersInheritDefaults", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, `
+defaults:
+  timeout_sec: 300
+
+handler_on:
+  failure:
+    command: echo "failure handler"
+  exit:
+    command: echo "exit handler"
+    timeout_sec: 60
+
+steps:
+  - name: step1
+    command: echo "test"
+`)
+		dag, err := spec.Load(context.Background(), testDAG)
+		require.NoError(t, err)
+
+		// failure handler inherits default timeout
+		require.NotNil(t, dag.HandlerOn.Failure)
+		assert.Equal(t, 300*time.Second, dag.HandlerOn.Failure.Timeout)
+
+		// exit handler overrides default timeout
+		require.NotNil(t, dag.HandlerOn.Exit)
+		assert.Equal(t, 60*time.Second, dag.HandlerOn.Exit.Timeout)
+	})
+
+	t.Run("BaseConfigDefaults", func(t *testing.T) {
+		t.Parallel()
+
+		base := createTempYAMLFile(t, `
+defaults:
+  timeout_sec: 300
+`)
+		child := createTempYAMLFile(t, `
+defaults:
+  timeout_sec: 600
+
+steps:
+  - name: step1
+    command: echo "test"
+`)
+		dag, err := spec.Load(context.Background(), child, spec.WithBaseConfig(base))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		// DAG-level defaults should override base config defaults
+		assert.Equal(t, 600*time.Second, dag.Steps[0].Timeout)
+	})
+
+	t.Run("UnknownKeyInDefaults", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, `
+defaults:
+  timeout_sec: 600
+  unknown_field: value
+
+steps:
+  - name: step1
+    command: echo "test"
+`)
+		_, err := spec.Load(context.Background(), testDAG)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "defaults")
+	})
+
+	t.Run("ContinueOnDefault", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, `
+defaults:
+  continue_on: failed
+
+steps:
+  - name: step1
+    command: echo "test"
+`)
+		dag, err := spec.Load(context.Background(), testDAG)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		assert.True(t, dag.Steps[0].ContinueOn.Failure)
+	})
+
+	t.Run("SignalOnStopDefault", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, `
+defaults:
+  signal_on_stop: SIGTERM
+
+steps:
+  - name: step1
+    command: echo "test"
+`)
+		dag, err := spec.Load(context.Background(), testDAG)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		assert.Equal(t, "SIGTERM", dag.Steps[0].SignalOnStop)
+	})
+}

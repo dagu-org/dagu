@@ -203,6 +203,149 @@
       },
       "description": "List of external secret references resolved at runtime and exposed as environment variables. Each entry declares the target environment variable name, provider, key, and optional provider-specific options."
     },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "retry_policy": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "oneOf": [
+                { "type": "integer" },
+                { "type": "string" }
+              ],
+              "description": "Maximum number of retry attempts"
+            },
+            "interval_sec": {
+              "oneOf": [
+                { "type": "integer" },
+                { "type": "string" }
+              ],
+              "description": "Seconds to wait between retry attempts"
+            },
+            "backoff": {
+              "oneOf": [
+                { "type": "boolean" },
+                { "type": "number" }
+              ],
+              "description": "Exponential backoff multiplier for retry delays"
+            },
+            "max_interval_sec": {
+              "type": "integer",
+              "description": "Maximum interval in seconds (caps exponential growth)"
+            },
+            "exit_code": {
+              "type": "array",
+              "items": { "type": "integer" },
+              "description": "Exit codes that should trigger a retry"
+            }
+          },
+          "description": "Default retry policy for all steps"
+        },
+        "continue_on": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["skipped", "failed"]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "failure": { "type": "boolean" },
+                "skipped": { "type": "boolean" },
+                "exit_code": {
+                  "oneOf": [
+                    { "type": "integer" },
+                    { "type": "string" },
+                    { "type": "array", "items": { "type": "integer" } }
+                  ]
+                },
+                "output": {
+                  "oneOf": [
+                    { "type": "string" },
+                    { "type": "array", "items": { "type": "string" } }
+                  ]
+                },
+                "mark_success": { "type": "boolean" }
+              }
+            }
+          ],
+          "description": "Default continue-on behavior for all steps"
+        },
+        "repeat_policy": {
+          "type": "object",
+          "properties": {
+            "repeat": {
+              "oneOf": [
+                { "type": "boolean" },
+                { "type": "string", "enum": ["while", "until"] }
+              ]
+            },
+            "interval_sec": { "type": "integer" },
+            "limit": { "type": "integer", "minimum": 1 },
+            "backoff": {
+              "oneOf": [
+                { "type": "boolean" },
+                { "type": "number" }
+              ]
+            },
+            "max_interval_sec": { "type": "integer" },
+            "condition": { "type": "string" },
+            "expected": { "type": "string" },
+            "exit_code": {
+              "oneOf": [
+                { "type": "integer" },
+                { "type": "array", "items": { "type": "integer" } }
+              ]
+            }
+          },
+          "description": "Default repeat policy for all steps"
+        },
+        "timeout_sec": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Default timeout in seconds for all steps"
+        },
+        "mail_on_error": {
+          "type": "boolean",
+          "description": "Default mail-on-error flag for all steps"
+        },
+        "signal_on_stop": {
+          "type": "string",
+          "description": "Default signal to send when stopping steps (e.g., SIGTERM)"
+        },
+        "env": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "object", "additionalProperties": true }
+                ]
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": true
+            }
+          ],
+          "description": "Default environment variables for all steps (additive with step-level env)"
+        },
+        "preconditions": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "array",
+              "items": { "$ref": "#/definitions/condition" }
+            }
+          ],
+          "description": "Default preconditions for all steps (additive with step-level preconditions)"
+        }
+      },
+      "description": "Default values for step configuration fields. Steps inherit these defaults and can override them individually. Most fields use full replacement when overridden; env and preconditions are additive."
+    },
     "log_dir": {
       "type": "string",
       "description": "Base directory for storing logs. Defaults to ${HOME}/.local/share/logs if not specified."
