@@ -1288,6 +1288,16 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 
 	stepName := valueOf(request.Body.StepName)
 
+	// For DAGs using a global queue, enqueue the retry so it respects queue capacity.
+	// Step retry is not supported via queue (queue processor does not pass step name).
+	if stepName == "" && a.config.Queues.Enabled && findGlobalQueueConfig(dag.ProcGroup(), a.config) != nil {
+		if err := a.enqueueRetry(ctx, attempt, dag, request.DagRunId); err != nil {
+			return nil, err
+		}
+		a.logRetryAudit(ctx, request.Name, request.DagRunId, stepName, false)
+		return api.RetryDAGRun200Response{}, nil
+	}
+
 	// Check if this DAG should be dispatched to the coordinator for distributed execution
 	if core.ShouldDispatchToCoordinator(dag, a.coordinatorCli != nil, a.defaultExecMode) {
 		// Get previous status for retry context
@@ -1331,6 +1341,35 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 	// Log local DAG retry
 	a.logRetryAudit(ctx, request.Name, request.DagRunId, stepName, false)
 	return api.RetryDAGRun200Response{}, nil
+}
+
+// enqueueRetry updates the attempt status to Queued and enqueues the run so the
+// queue processor picks it up when capacity is available. Retries respect global
+// queue capacity instead of running immediately.
+func (a *API) enqueueRetry(ctx context.Context, attempt exec.DAGRunAttempt, dag *core.DAG, dagRunID string) error {
+	status, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return fmt.Errorf("error reading status: %w", err)
+	}
+	if status.Status == core.Queued {
+		// Already queued (e.g. duplicate retry), treat as success
+		return nil
+	}
+	status.Status = core.Queued
+	status.QueuedAt = stringutil.FormatTime(time.Now())
+	status.TriggerType = core.TriggerTypeRetry
+	if err := attempt.Open(ctx); err != nil {
+		return fmt.Errorf("error opening attempt: %w", err)
+	}
+	defer func() { _ = attempt.Close(ctx) }()
+	if err := attempt.Write(ctx, *status); err != nil {
+		return fmt.Errorf("error writing status: %w", err)
+	}
+	dagRun := exec.NewDAGRunRef(dag.Name, dagRunID)
+	if err := a.queueStore.Enqueue(ctx, dag.ProcGroup(), exec.QueuePriorityLow, dagRun); err != nil {
+		return fmt.Errorf("error enqueueing retry: %w", err)
+	}
+	return nil
 }
 
 func (a *API) logRetryAudit(ctx context.Context, dagName, dagRunID, stepName string, distributed bool) {
