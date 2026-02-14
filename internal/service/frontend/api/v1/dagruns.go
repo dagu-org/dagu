@@ -127,7 +127,7 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 		return nil, err
 	}
 
-	if request.Body == nil || request.Body.Spec == "" {
+	if request.Body == nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeBadRequest,
@@ -135,7 +135,17 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 		}
 	}
 
-	var dagRunId, params string
+	if request.Body.Spec == nil && request.Body.Filename == nil || request.Body.Spec != nil && request.Body.Filename != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "either spec or filename is required (but not both)",
+		}
+	}
+
+	var dagRunId, params, filename, spec string
+	var singleton bool
+
 	if request.Body.DagRunId != nil {
 		dagRunId = *request.Body.DagRunId
 	}
@@ -149,8 +159,37 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 	if request.Body.Params != nil {
 		params = *request.Body.Params
 	}
+	if request.Body.Filename != nil {
+		filename = *request.Body.Filename
+	}
 
-	dag, cleanup, err := a.loadInlineDAG(ctx, request.Body.Spec, request.Body.Name, dagRunId)
+	if strings.HasSuffix(filename, ".yaml") || strings.HasSuffix(filename, ".yml") {
+		altDagsPath := a.config.Paths.AltDAGsDir
+		if altDagsPath == "" {
+			return nil, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "altDagsDir is not configured in config file",
+			}
+		}
+		absYamlFile := filepath.Join(altDagsPath, string(os.PathSeparator), filename)
+		yamlFileContent, err := os.ReadFile(absYamlFile) //nolint:gosec
+		if err != nil {
+			return nil, fmt.Errorf("error reading yaml file: %w", err)
+		}
+		spec = string(yamlFileContent)
+
+	} else if *request.Body.Spec != "" {
+		spec = *request.Body.Spec
+	} else {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "make sure file is yaml",
+		}
+	}
+
+	dag, cleanup, err := a.loadInlineDAG(ctx, spec, request.Body.Name, dagRunId)
 	if err != nil {
 		return nil, err
 	}
@@ -158,6 +197,19 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 
 	if request.Body.Queue != nil && *request.Body.Queue != "" {
 		dag.Queue = *request.Body.Queue
+	}
+
+	if request.Body.Singleton != nil {
+		singleton = *request.Body.Singleton
+	}
+
+	if singleton {
+		if err := a.checkSingletonRunning(ctx, dag); err != nil {
+			return nil, err
+		}
+		if err := a.checkSingletonQueued(ctx, dag); err != nil {
+			return nil, err
+		}
 	}
 
 	if _, err := a.dagRunStore.FindAttempt(ctx, exec.DAGRunRef{Name: dag.Name, ID: dagRunId}); !errors.Is(err, exec.ErrDAGRunIDNotFound) {

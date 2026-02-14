@@ -1613,8 +1613,16 @@ paths:
                 queue:
                   type: string
                   description: "Override the queue to use for this DAG-run"
-              required:
-                - spec
+                singleton:
+                  type: boolean
+                  description: "If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)"
+                  default: false
+                filename:
+                  type: string
+                  description: "Name of the YAML file stored in altDagsDir."
+              oneOf:
+                - required: [spec]
+                - required: [filename]
       responses:
         "200":
           description: "DAG-run successfully enqueued"

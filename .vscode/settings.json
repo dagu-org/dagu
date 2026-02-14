@@ -18,5 +18,9 @@
   "files.insertFinalNewline": true,
   "files.associations": {
     "*.gohtml": "html"
-  }
+  },
+  "cSpell.words": [
+    "gosec",
+    "nolint"
+  ]
 }
