@@ -22,7 +22,6 @@ This RFC documents the v1 variable expansion system in Dagu. It serves as a refe
 | `${step.stdout}` | `${download.stdout}` | Step stdout output |
 | `${step.stderr}` | `${fetch.stderr}` | Step stderr output |
 | `${step.exit_code}` | `${check.exit_code}` | Step exit code |
-| `${step.exitCode}` | `${check.exitCode}` | Step exit code (alternative) |
 | `${VAR:start:len}` | `${uid:0:8}` | String slicing |
 | `${VAR.path}` | `${response.data.id}` | JSON path extraction |
 | `` `cmd` `` | `` `date +%Y` `` | Command substitution |
@@ -177,30 +176,27 @@ steps:
 
   # Docker: $HOME is expanded by Dagu before container runs
   - name: docker-step
-    executor:
-      type: docker
-      config:
-        image: "${REGISTRY}/app:latest"  # Expanded to "myregistry.com/app:latest"
-        env:
-          - "DATA_DIR=$HOME/data"        # $HOME expanded by Dagu
+    type: docker
+    config:
+      image: "${REGISTRY}/app:latest"  # Expanded to "myregistry.com/app:latest"
+      env:
+        - "DATA_DIR=$HOME/data"        # $HOME expanded by Dagu
 
   # HTTP: All variables expanded before request
   - name: http-step
-    executor:
-      type: http
-      config:
-        url: "https://api.example.com/${API_VERSION}/data"
-        headers:
-          Authorization: "Bearer ${API_TOKEN}"
+    type: http
+    config:
+      url: "https://api.example.com/${API_VERSION}/data"
+      headers:
+        Authorization: "Bearer ${API_TOKEN}"
 
   # SSH: Variables expanded before connection
   - name: ssh-step
-    executor:
-      type: ssh
-      config:
-        host: "${REMOTE_HOST}"
-        user: "${REMOTE_USER}"
-        command: "ls -la"
+    type: ssh
+    config:
+      host: "${REMOTE_HOST}"
+      user: "${REMOTE_USER}"
+      command: "ls -la"
 ```
 
 **Why the difference?**
@@ -217,7 +213,6 @@ steps:
 ${step_name.stdout}      # Captured standard output
 ${step_name.stderr}      # Captured standard error
 ${step_name.exit_code}   # Exit code as string
-${step_name.exitCode}    # Alternative syntax for exit code
 ```
 
 ### String Slicing
