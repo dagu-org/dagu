@@ -19,9 +19,7 @@ type Definition struct {
 	TZ           string `mapstructure:"tz"`
 
 	// Authentication
-	Auth        *AuthDef `mapstructure:"auth"`
-	IsAuthToken bool     `mapstructure:"is_auth_token"`
-	AuthToken   string   `mapstructure:"auth_token"`
+	Auth *AuthDef `mapstructure:"auth"`
 
 	// Permissions
 	PermissionWriteDAGs *bool          `mapstructure:"permission_write_dags"`

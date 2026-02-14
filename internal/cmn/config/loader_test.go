@@ -658,8 +658,6 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 
 		def := Definition{
 			APIBaseURL:            "/api/v1",
-			IsAuthToken:           true,
-			AuthToken:             "token123",
 			DAGs:                  filepath.Join(testPaths, "legacy", "dags"),
 			DAGsDir:               filepath.Join(testPaths, "new", "dags"), // Takes precedence over DAGs
 			Executable:            filepath.Join(testPaths, "bin", "dagu"),

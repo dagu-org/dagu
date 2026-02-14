@@ -18,8 +18,6 @@ var legacyToSnakeCaseKey = map[string]string{
 	"apibaseurl":            "api_base_url",
 	"defaultshell":          "default_shell",
 	"logformat":             "log_format",
-	"isauthtoken":           "is_auth_token",
-	"authtoken":             "auth_token",
 	"permissionwritedags":   "permission_write_dags",
 	"permissionrundags":     "permission_run_dags",
 	"dagsdir":               "dags_dir",

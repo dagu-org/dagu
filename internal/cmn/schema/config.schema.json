@@ -53,14 +53,6 @@
     "auth": {
       "$ref": "#/definitions/AuthDef"
     },
-    "is_auth_token": {
-      "type": "boolean",
-      "description": "Deprecated: use auth.token instead. Enable token authentication."
-    },
-    "auth_token": {
-      "type": "string",
-      "description": "Deprecated: use auth.token.value instead."
-    },
     "permission_write_dags": {
       "type": "boolean",
       "description": "Deprecated: use permissions.write_dags instead. Allow writing DAG definitions."
