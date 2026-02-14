@@ -34,14 +34,14 @@ import (
 
 // Errors for container
 var (
-	ErrImageOrContainerShouldNotBeEmpty = errors.New("containerName or image must be specified")
+	ErrImageOrContainerShouldNotBeEmpty = errors.New("container_name or image must be specified")
 	ErrImageRequired                    = errors.New("image is required")
 	ErrInvalidVolumeFormat              = errors.New("invalid volume format")
 	ErrInvalidPortFormat                = errors.New("invalid port format")
 	ErrContainerIsNotRunning            = errors.New("container is not running")
 	// Validation errors for docker executor map config
-	ErrExecOnlyWithContainerName       = errors.New("'exec' options require 'containerName' (exec-in-existing mode)")
-	ErrInvalidOptionsWithContainerName = errors.New("'container', 'host', 'network', 'pull', 'platform', or 'autoRemove' not supported with 'containerName'")
+	ErrExecOnlyWithContainerName       = errors.New("'exec' options require 'container_name' (exec-in-existing mode)")
+	ErrInvalidOptionsWithContainerName = errors.New("'container', 'host', 'network', 'pull', 'platform', or 'auto_remove' not supported with 'container_name'")
 )
 
 // Constants for container operations
@@ -1066,7 +1066,7 @@ func parseRestartPolicy(s string) (container.RestartPolicy, error) {
 	case "unless-stopped":
 		return container.RestartPolicy{Name: "unless-stopped"}, nil
 	default:
-		return container.RestartPolicy{}, fmt.Errorf("invalid restartPolicy: %s (supported: no, always, unless-stopped)", s)
+		return container.RestartPolicy{}, fmt.Errorf("invalid restart_policy: %s (supported: no, always, unless-stopped)", s)
 	}
 }
 

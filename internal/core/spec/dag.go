@@ -23,98 +23,98 @@ import (
 // It mirrors the YAML structure and gets validated/transformed into core.DAG.
 type dag struct {
 	// Name is the name of the DAG.
-	Name string
+	Name string `yaml:"name,omitempty"`
 	// Group is the group of the DAG for grouping DAGs on the UI.
-	Group string
+	Group string `yaml:"group,omitempty"`
 	// Description is the description of the DAG.
-	Description string
+	Description string `yaml:"description,omitempty"`
 	// Type is the execution type for steps (graph, chain, or agent).
 	// Default is "graph" which uses dependency-based execution.
 	// "chain" executes steps in the order they are defined.
 	// "agent" is reserved for future agent-based execution.
-	Type string
+	Type string `yaml:"type,omitempty"`
 	// Shell is the default shell to use for all steps in this DAG.
 	// If not specified, the system default shell is used.
 	// Can be overridden at the step level.
 	// Can be a string (e.g., "bash -e") or an array (e.g., ["bash", "-e"]).
-	Shell types.ShellValue
+	Shell types.ShellValue `yaml:"shell,omitempty"`
 	// WorkingDir is working directory for DAG execution
-	WorkingDir string
+	WorkingDir string `yaml:"working_dir,omitempty"`
 	// Dotenv is the path to the dotenv file (string or []string).
-	Dotenv types.StringOrArray
+	Dotenv types.StringOrArray `yaml:"dotenv,omitempty"`
 	// Schedule is the cron schedule to run the DAG.
-	Schedule types.ScheduleValue
+	Schedule types.ScheduleValue `yaml:"schedule,omitempty"`
 	// SkipIfSuccessful is the flag to skip the DAG on schedule when it is
 	// executed manually before the schedule.
-	SkipIfSuccessful bool
+	SkipIfSuccessful bool `yaml:"skip_if_successful,omitempty"`
 	// CatchupWindow is the lookback horizon for missed intervals (e.g. "6h", "2d12h").
 	// If set, enables catch-up on scheduler restart. If omitted, no catch-up.
-	CatchupWindow string
+	CatchupWindow string `yaml:"catchup_window,omitempty"`
 	// OverlapPolicy controls how multiple catch-up runs are handled: "skip" or "all".
-	OverlapPolicy string
+	OverlapPolicy string `yaml:"overlap_policy,omitempty"`
 	// LogDir is the directory where the logs are stored.
-	LogDir string
+	LogDir string `yaml:"log_dir,omitempty"`
 	// LogOutput specifies how stdout and stderr are handled in log files.
 	// Can be "separate" (default) for separate .out and .err files,
 	// or "merged" for a single combined .log file.
-	LogOutput types.LogOutputValue
+	LogOutput types.LogOutputValue `yaml:"log_output,omitempty"`
 	// Env is the environment variables setting.
-	Env types.EnvValue
+	Env types.EnvValue `yaml:"env,omitempty"`
 	// HandlerOn is the handler configuration.
-	HandlerOn handlerOn
+	HandlerOn handlerOn `yaml:"handler_on,omitempty"`
 	// Steps is the list of steps to run.
-	Steps any // []step or map[string]step
+	Steps any `yaml:"steps,omitempty"` // []step or map[string]step
 	// SMTP is the SMTP configuration.
-	SMTP smtpConfig
+	SMTP smtpConfig `yaml:"smtp,omitempty"`
 	// MailOn is the mail configuration.
-	MailOn *mailOn
+	MailOn *mailOn `yaml:"mail_on,omitempty"`
 	// ErrorMail is the mail configuration for error.
-	ErrorMail mailConfig
+	ErrorMail mailConfig `yaml:"error_mail,omitempty"`
 	// InfoMail is the mail configuration for information.
-	InfoMail mailConfig
+	InfoMail mailConfig `yaml:"info_mail,omitempty"`
 	// WaitMail is the mail configuration for wait status.
-	WaitMail mailConfig
+	WaitMail mailConfig `yaml:"wait_mail,omitempty"`
 	// TimeoutSec is the timeout in seconds to finish the DAG.
-	TimeoutSec int
+	TimeoutSec int `yaml:"timeout_sec,omitempty"`
 	// DelaySec is the delay in seconds to start the first node.
-	DelaySec int
+	DelaySec int `yaml:"delay_sec,omitempty"`
 	// RestartWaitSec is the wait in seconds to when the DAG is restarted.
-	RestartWaitSec int
+	RestartWaitSec int `yaml:"restart_wait_sec,omitempty"`
 	// HistRetentionDays is the retention days of the dag-runs history.
-	HistRetentionDays *int
+	HistRetentionDays *int `yaml:"hist_retention_days,omitempty"`
 	// Preconditions is the condition to run the DAG.
-	Preconditions any
-	// maxActiveRuns is the maximum number of concurrent dag-runs.
-	MaxActiveRuns int
+	Preconditions any `yaml:"preconditions,omitempty"`
+	// MaxActiveRuns is the maximum number of concurrent dag-runs.
+	MaxActiveRuns int `yaml:"max_active_runs,omitempty"`
 	// MaxActiveSteps is the maximum number of concurrent steps.
-	MaxActiveSteps int
+	MaxActiveSteps int `yaml:"max_active_steps,omitempty"`
 	// Params is the default parameters for the steps.
-	Params any
+	Params any `yaml:"params,omitempty"`
 	// MaxCleanUpTimeSec is the maximum time in seconds to clean up the DAG.
 	// It is a wait time to kill the processes when it is requested to stop.
 	// If the time is exceeded, the process is killed.
-	MaxCleanUpTimeSec *int
+	MaxCleanUpTimeSec *int `yaml:"max_clean_up_time_sec,omitempty"`
 	// Tags is the tags for the DAG.
-	Tags types.TagsValue
+	Tags types.TagsValue `yaml:"tags,omitempty"`
 	// Queue is the name of the queue to assign this DAG to.
-	Queue string
+	Queue string `yaml:"queue,omitempty"`
 	// MaxOutputSize is the maximum size of the output for each step.
-	MaxOutputSize int
+	MaxOutputSize int `yaml:"max_output_size,omitempty"`
 	// OTel is the OpenTelemetry configuration.
-	OTel any
+	OTel any `yaml:"otel,omitempty"`
 	// WorkerSelector specifies required worker labels for execution.
 	// Can be a map of label key-value pairs or the string "local" to force local execution.
-	WorkerSelector any
+	WorkerSelector any `yaml:"worker_selector,omitempty"`
 	// Container is the container definition for the DAG.
 	// Can be a string (existing container name to exec into) or an object (container configuration).
-	Container any
+	Container any `yaml:"container,omitempty"`
 	// RunConfig contains configuration for controlling user interactions during DAG runs.
-	RunConfig *runConfig
+	RunConfig *runConfig `yaml:"run_config,omitempty"`
 	// RegistryAuths maps registry hostnames to authentication configs.
 	// Can be either a JSON string or a map of registry to auth config.
-	RegistryAuths any
+	RegistryAuths any `yaml:"registry_auths,omitempty"`
 	// SSH is the default SSH configuration for the DAG.
-	SSH *ssh
+	SSH *ssh `yaml:"ssh,omitempty"`
 	// S3 is the default S3 configuration for the DAG.
 	// Steps can inherit these settings without specifying them individually.
 	S3 *s3Config `yaml:"s3,omitempty"`
@@ -125,25 +125,25 @@ type dag struct {
 	// Steps can override this configuration by specifying their own config fields.
 	Redis *redisConfig `yaml:"redis,omitempty"`
 	// Secrets contains references to external secrets.
-	Secrets []secretRef
+	Secrets []secretRef `yaml:"secrets,omitempty"`
 }
 
 // handlerOn defines the steps to be executed on different events.
 type handlerOn struct {
-	Init    *step // Step to execute before steps (after preconditions pass)
-	Failure *step // Step to execute on failure
-	Success *step // Step to execute on success
-	Abort   *step // Step to execute on abort
-	Exit    *step // Step to execute on exit
-	Wait    *step // Step to execute when DAG enters wait status (HITL)
+	Init    *step `yaml:"init,omitempty"`    // Step to execute before steps (after preconditions pass)
+	Failure *step `yaml:"failure,omitempty"` // Step to execute on failure
+	Success *step `yaml:"success,omitempty"` // Step to execute on success
+	Abort   *step `yaml:"abort,omitempty"`   // Step to execute on abort
+	Exit    *step `yaml:"exit,omitempty"`    // Step to execute on exit
+	Wait    *step `yaml:"wait,omitempty"`    // Step to execute when DAG enters wait status (HITL)
 }
 
 // smtpConfig defines the SMTP configuration.
 type smtpConfig struct {
-	Host     string          // SMTP host
-	Port     types.PortValue // SMTP port (can be string or number)
-	Username string          // SMTP username
-	Password string          // SMTP password
+	Host     string          `yaml:"host,omitempty"`     // SMTP host
+	Port     types.PortValue `yaml:"port,omitempty"`     // SMTP port (can be string or number)
+	Username string          `yaml:"username,omitempty"` // SMTP username
+	Password string          `yaml:"password,omitempty"` // SMTP password
 }
 
 // IsZero returns true if all fields are empty/default.
@@ -153,10 +153,10 @@ func (s smtpConfig) IsZero() bool {
 
 // mailConfig defines the mail configuration.
 type mailConfig struct {
-	From       string              // Sender email address
-	To         types.StringOrArray // Recipient email address(es) - can be string or []string
-	Prefix     string              // Prefix for the email subject
-	AttachLogs bool                // Flag to attach logs to the email
+	From       string              `yaml:"from,omitempty"`        // Sender email address
+	To         types.StringOrArray `yaml:"to,omitempty"`          // Recipient email address(es) - can be string or []string
+	Prefix     string              `yaml:"prefix,omitempty"`      // Prefix for the email subject
+	AttachLogs bool                `yaml:"attach_logs,omitempty"` // Flag to attach logs to the email
 }
 
 // IsZero returns true if all fields are empty/default.
@@ -166,9 +166,9 @@ func (m mailConfig) IsZero() bool {
 
 // mailOn defines the conditions to send mail.
 type mailOn struct {
-	Failure bool // Send mail on failure
-	Success bool // Send mail on success
-	Wait    bool // Send mail on wait status
+	Failure bool `yaml:"failure,omitempty"` // Send mail on failure
+	Success bool `yaml:"success,omitempty"` // Send mail on success
+	Wait    bool `yaml:"wait,omitempty"`    // Send mail on wait status
 }
 
 // container defines the container configuration for the DAG.
@@ -181,7 +181,7 @@ type container struct {
 	// Image is the container image to use.
 	Image string `yaml:"image,omitempty"`
 	// PullPolicy is the policy to pull the image (e.g., "Always", "IfNotPresent").
-	PullPolicy any `yaml:"pullPolicy,omitempty"`
+	PullPolicy any `yaml:"pull_policy,omitempty"`
 	// Env specifies environment variables for the container.
 	Env any `yaml:"env,omitempty"` // Can be a map or struct
 	// Volumes specifies the volumes to mount in the container.
@@ -189,7 +189,7 @@ type container struct {
 	// User is the user to run the container as.
 	User string `yaml:"user,omitempty"` // User to run the container as
 	// WorkingDir is the working directory inside the container.
-	WorkingDir string `yaml:"workingDir,omitempty"` // Working directory inside the container
+	WorkingDir string `yaml:"working_dir,omitempty"` // Working directory inside the container
 	// Platform specifies the platform for the container (e.g., "linux/amd64").
 	Platform string `yaml:"platform,omitempty"` // Platform for the container
 	// Ports specifies the ports to expose from the container.
@@ -197,17 +197,17 @@ type container struct {
 	// Network is the network configuration for the container.
 	Network string `yaml:"network,omitempty"` // Network configuration for the container
 	// KeepContainer is the flag to keep the container after the DAG run.
-	KeepContainer bool `yaml:"keepContainer,omitempty"` // Keep the container after the DAG run
+	KeepContainer bool `yaml:"keep_container,omitempty"` // Keep the container after the DAG run
 	// Startup determines how the DAG-level container starts up.
 	Startup string `yaml:"startup,omitempty"`
 	// Command used when Startup == "command".
 	Command []string `yaml:"command,omitempty"`
 	// WaitFor readiness condition: running|healthy
-	WaitFor string `yaml:"waitFor,omitempty"`
+	WaitFor string `yaml:"wait_for,omitempty"`
 	// LogPattern regex to wait for in container logs.
-	LogPattern string `yaml:"logPattern,omitempty"`
+	LogPattern string `yaml:"log_pattern,omitempty"`
 	// RestartPolicy: no|always|unless-stopped
-	RestartPolicy string `yaml:"restartPolicy,omitempty"`
+	RestartPolicy string `yaml:"restart_policy,omitempty"`
 	// Healthcheck defines a custom healthcheck for the container.
 	Healthcheck *healthcheck `yaml:"healthcheck,omitempty"`
 	// Shell specifies the shell wrapper for executing step commands.
@@ -224,15 +224,15 @@ type healthcheck struct {
 	// Timeout is how long to wait for the check to complete (e.g., "3s").
 	Timeout string `yaml:"timeout,omitempty"`
 	// StartPeriod is the grace period for container initialization (e.g., "10s").
-	StartPeriod string `yaml:"startPeriod,omitempty"`
+	StartPeriod string `yaml:"start_period,omitempty"`
 	// Retries is the number of consecutive failures needed to mark unhealthy.
 	Retries int `yaml:"retries,omitempty"`
 }
 
 // runConfig defines configuration for controlling user interactions during DAG runs.
 type runConfig struct {
-	DisableParamEdit bool `yaml:"disableParamEdit,omitempty"` // Disable parameter editing when starting DAG
-	DisableRunIdEdit bool `yaml:"disableRunIdEdit,omitempty"` // Disable custom run ID specification
+	DisableParamEdit bool `yaml:"disable_param_edit,omitempty"`  // Disable parameter editing when starting DAG
+	DisableRunIdEdit bool `yaml:"disable_run_id_edit,omitempty"` // Disable custom run ID specification
 }
 
 // ssh defines the SSH configuration for the DAG.
@@ -248,9 +248,9 @@ type ssh struct {
 	// Password is the SSH password.
 	Password string `yaml:"password,omitempty"`
 	// StrictHostKey enables strict host key checking. Defaults to true if not specified.
-	StrictHostKey *bool `yaml:"strictHostKey,omitempty"`
+	StrictHostKey *bool `yaml:"strict_host_key,omitempty"`
 	// KnownHostFile is the path to the known_hosts file. Defaults to ~/.ssh/known_hosts.
-	KnownHostFile string `yaml:"knownHostFile,omitempty"`
+	KnownHostFile string `yaml:"known_host_file,omitempty"`
 	// Shell is the shell to use for remote command execution.
 	// Supports string or array syntax (e.g., "bash -e" or ["bash", "-e"]).
 	// If not specified, commands are executed directly without shell wrapping.
@@ -284,17 +284,17 @@ type s3Config struct {
 	// Use this for S3-compatible services like MinIO, LocalStack, etc.
 	Endpoint string `yaml:"endpoint,omitempty"`
 	// AccessKeyID is the AWS access key ID.
-	AccessKeyID string `yaml:"accessKeyId,omitempty"`
+	AccessKeyID string `yaml:"access_key_id,omitempty"`
 	// SecretAccessKey is the AWS secret access key.
-	SecretAccessKey string `yaml:"secretAccessKey,omitempty"`
+	SecretAccessKey string `yaml:"secret_access_key,omitempty"`
 	// SessionToken is the AWS session token (for temporary credentials).
-	SessionToken string `yaml:"sessionToken,omitempty"`
+	SessionToken string `yaml:"session_token,omitempty"`
 	// Profile is the AWS credentials profile name.
 	Profile string `yaml:"profile,omitempty"`
 	// ForcePathStyle enables path-style addressing (required for S3-compatible services).
-	ForcePathStyle bool `yaml:"forcePathStyle,omitempty"`
+	ForcePathStyle bool `yaml:"force_path_style,omitempty"`
 	// DisableSSL disables SSL for the connection (for local testing only).
-	DisableSSL bool `yaml:"disableSSL,omitempty"`
+	DisableSSL bool `yaml:"disable_ssl,omitempty"`
 	// Bucket is the default S3 bucket name.
 	// Can be overridden at the step level.
 	Bucket string `yaml:"bucket,omitempty"`
@@ -318,17 +318,17 @@ type redisConfig struct {
 	// TLS enables TLS connection.
 	TLS bool `yaml:"tls,omitempty"`
 	// TLSSkipVerify skips TLS certificate verification.
-	TLSSkipVerify bool `yaml:"tlsSkipVerify,omitempty"`
+	TLSSkipVerify bool `yaml:"tls_skip_verify,omitempty"`
 	// Mode is the connection mode (standalone, sentinel, cluster).
 	Mode string `yaml:"mode,omitempty"`
 	// SentinelMaster is the sentinel master name.
-	SentinelMaster string `yaml:"sentinelMaster,omitempty"`
+	SentinelMaster string `yaml:"sentinel_master,omitempty"`
 	// SentinelAddrs is the list of sentinel addresses.
-	SentinelAddrs []string `yaml:"sentinelAddrs,omitempty"`
+	SentinelAddrs []string `yaml:"sentinel_addrs,omitempty"`
 	// ClusterAddrs is the list of cluster node addresses.
-	ClusterAddrs []string `yaml:"clusterAddrs,omitempty"`
+	ClusterAddrs []string `yaml:"cluster_addrs,omitempty"`
 	// MaxRetries is the maximum number of retries.
-	MaxRetries int `yaml:"maxRetries,omitempty"`
+	MaxRetries int `yaml:"max_retries,omitempty"`
 }
 
 // secretRef defines a reference to an external secret.
@@ -392,47 +392,47 @@ var metadataTransformers = []transform{
 	{"tags", newTransformer("Tags", buildTags)},
 	{"env", newTransformer("Env", buildEnvs)},
 	{"schedule", newTransformer("Schedule", buildSchedule)},
-	{"stopSchedule", newTransformer("StopSchedule", buildStopSchedule)},
-	{"restartSchedule", newTransformer("RestartSchedule", buildRestartSchedule)},
+	{"stop_schedule", newTransformer("StopSchedule", buildStopSchedule)},
+	{"restart_schedule", newTransformer("RestartSchedule", buildRestartSchedule)},
 	{"params", newTransformer("Params", buildParams)},
-	{"defaultParams", newTransformer("DefaultParams", buildDefaultParams)},
-	{"paramsJSON", newTransformer("ParamsJSON", buildParamsJSON)},
-	{"workerSelector", &workerSelectorTransformer{}},
+	{"default_params", newTransformer("DefaultParams", buildDefaultParams)},
+	{"params_json", newTransformer("ParamsJSON", buildParamsJSON)},
+	{"worker_selector", &workerSelectorTransformer{}},
 	{"timeout", newTransformer("Timeout", buildTimeout)},
 	{"delay", newTransformer("Delay", buildDelay)},
-	{"restartWait", newTransformer("RestartWait", buildRestartWait)},
-	{"maxActiveRuns", newTransformer("MaxActiveRuns", buildMaxActiveRuns)},
-	{"maxActiveSteps", newTransformer("MaxActiveSteps", buildMaxActiveSteps)},
+	{"restart_wait", newTransformer("RestartWait", buildRestartWait)},
+	{"max_active_runs", newTransformer("MaxActiveRuns", buildMaxActiveRuns)},
+	{"max_active_steps", newTransformer("MaxActiveSteps", buildMaxActiveSteps)},
 	{"queue", newTransformer("Queue", buildQueue)},
-	{"maxOutputSize", newTransformer("MaxOutputSize", buildMaxOutputSize)},
-	{"skipIfSuccessful", newTransformer("SkipIfSuccessful", buildSkipIfSuccessful)},
-	{"catchupWindow", newTransformer("CatchupWindow", buildCatchupWindow)},
-	{"overlapPolicy", newTransformer("OverlapPolicy", buildOverlapPolicy)},
+	{"max_output_size", newTransformer("MaxOutputSize", buildMaxOutputSize)},
+	{"skip_if_successful", newTransformer("SkipIfSuccessful", buildSkipIfSuccessful)},
+	{"catchup_window", newTransformer("CatchupWindow", buildCatchupWindow)},
+	{"overlap_policy", newTransformer("OverlapPolicy", buildOverlapPolicy)},
 }
 
 // fullTransformers are only run when building the full DAG (not metadata-only)
 var fullTransformers = []transform{
-	{"logDir", newTransformer("LogDir", buildLogDir)},
-	{"logOutput", newTransformer("LogOutput", buildLogOutput)},
-	{"mailOn", newTransformer("MailOn", buildMailOn)},
-	{"runConfig", newTransformer("RunConfig", buildRunConfig)},
-	{"histRetentionDays", newTransformer("HistRetentionDays", buildHistRetentionDays)},
-	{"maxCleanUpTime", newTransformer("MaxCleanUpTime", buildMaxCleanUpTime)},
+	{"log_dir", newTransformer("LogDir", buildLogDir)},
+	{"log_output", newTransformer("LogOutput", buildLogOutput)},
+	{"mail_on", newTransformer("MailOn", buildMailOn)},
+	{"run_config", newTransformer("RunConfig", buildRunConfig)},
+	{"hist_retention_days", newTransformer("HistRetentionDays", buildHistRetentionDays)},
+	{"max_clean_up_time_sec", newTransformer("MaxCleanUpTime", buildMaxCleanUpTime)},
 	{"shell", newTransformer("Shell", buildShell)},
-	{"shellArgs", newTransformer("ShellArgs", buildShellArgs)},
-	{"workingDir", newTransformer("WorkingDir", buildWorkingDir)},
+	{"shell_args", newTransformer("ShellArgs", buildShellArgs)},
+	{"working_dir", newTransformer("WorkingDir", buildWorkingDir)},
 	{"container", newTransformer("Container", buildContainer)},
-	{"registryAuths", newTransformer("RegistryAuths", buildRegistryAuths)},
+	{"registry_auths", newTransformer("RegistryAuths", buildRegistryAuths)},
 	{"ssh", newTransformer("SSH", buildSSH)},
 	{"s3", newTransformer("S3", buildS3)},
 	{"llm", newTransformer("LLM", buildLLM)},
 	{"redis", newTransformer("Redis", buildRedis)},
 	{"secrets", newTransformer("Secrets", buildSecrets)},
 	{"dotenv", newTransformer("Dotenv", buildDotenv)},
-	{"smtpConfig", newTransformer("SMTP", buildSMTPConfig)},
-	{"errMailConfig", newTransformer("ErrorMail", buildErrMailConfig)},
-	{"infoMailConfig", newTransformer("InfoMail", buildInfoMailConfig)},
-	{"waitMailConfig", newTransformer("WaitMail", buildWaitMailConfig)},
+	{"smtp", newTransformer("SMTP", buildSMTPConfig)},
+	{"error_mail", newTransformer("ErrorMail", buildErrMailConfig)},
+	{"info_mail", newTransformer("InfoMail", buildInfoMailConfig)},
+	{"wait_mail", newTransformer("WaitMail", buildWaitMailConfig)},
 	{"preconditions", newTransformer("Preconditions", buildPreconditions)},
 	{"otel", newTransformer("OTel", buildOTel)},
 }
@@ -498,11 +498,11 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 	// Run the transformer pipeline
 	errs := runTransformers(ctx, d, result)
 
-	// Add deprecation warning for maxActiveRuns on local queues
-	// Both maxActiveRuns > 1 (concurrency) and maxActiveRuns < 0 (queue bypass) are deprecated
+	// Add deprecation warning for max_active_runs on local queues.
+	// Both max_active_runs > 1 (concurrency) and max_active_runs < 0 (queue bypass) are deprecated.
 	if result.Queue == "" && (result.MaxActiveRuns > 1 || result.MaxActiveRuns < 0) {
 		result.BuildWarnings = append(result.BuildWarnings, fmt.Sprintf(
-			"maxActiveRuns=%d is deprecated for local queues and will be ignored. "+
+			"max_active_runs=%d is deprecated for local queues and will be ignored. "+
 				"Use a global queue with 'queue:' field for concurrency control.",
 			result.MaxActiveRuns,
 		))
@@ -531,7 +531,7 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 	// Validate workerSelector compatibility with HITL steps
 	if len(result.WorkerSelector) > 0 && result.HasHITLSteps() {
 		errs = append(errs, core.NewValidationError(
-			"workerSelector",
+			"worker_selector",
 			result.WorkerSelector,
 			fmt.Errorf("DAG with HITL steps cannot be dispatched to workers"),
 		))
@@ -939,7 +939,7 @@ func buildWorkerSelector(_ BuildContext, d *dag) (map[string]string, bool, error
 		if strings.EqualFold(trimmed, "local") {
 			return nil, true, nil
 		}
-		return nil, false, fmt.Errorf("unsupported workerSelector string value %q; the only allowed string value is \"local\"", trimmed)
+		return nil, false, fmt.Errorf("unsupported worker_selector string value %q; the only allowed string value is \"local\"", trimmed)
 
 	case map[string]string:
 		if len(v) == 0 {
@@ -969,14 +969,14 @@ func buildWorkerSelector(_ BuildContext, d *dag) (map[string]string, bool, error
 		for key, val := range v {
 			strKey, ok := key.(string)
 			if !ok {
-				return nil, false, fmt.Errorf("workerSelector keys must be strings, got %T", key)
+				return nil, false, fmt.Errorf("worker_selector keys must be strings, got %T", key)
 			}
 			ret[strings.TrimSpace(strKey)] = strings.TrimSpace(fmt.Sprint(val))
 		}
 		return ret, false, nil
 
 	default:
-		return nil, false, fmt.Errorf("workerSelector must be a map or \"local\", got %T", d.WorkerSelector)
+		return nil, false, fmt.Errorf("worker_selector must be a map or \"local\", got %T", d.WorkerSelector)
 	}
 }
 
@@ -1099,7 +1099,9 @@ func buildContainerField(ctx BuildContext, raw any) (*core.Container, error) {
 		var c container
 		decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 			Result:           &c,
+			ErrorUnused:      true,
 			WeaklyTypedInput: true,
+			TagName:          "yaml",
 		})
 		if err != nil {
 			return nil, core.NewValidationError("container", nil,
@@ -1107,7 +1109,7 @@ func buildContainerField(ctx BuildContext, raw any) (*core.Container, error) {
 		}
 		if err := decoder.Decode(v); err != nil {
 			return nil, core.NewValidationError("container", nil,
-				fmt.Errorf("failed to decode container: %w", err))
+				fmt.Errorf("failed to decode container: %w", withSnakeCaseKeyHint(err)))
 		}
 		return buildContainerFromSpec(ctx, &c)
 
@@ -1147,7 +1149,7 @@ func buildContainerFromSpec(ctx BuildContext, c *container) (*core.Container, er
 			invalidFields = append(invalidFields, "name")
 		}
 		if c.PullPolicy != nil {
-			invalidFields = append(invalidFields, "pullPolicy")
+			invalidFields = append(invalidFields, "pull_policy")
 		}
 		if len(c.Volumes) > 0 {
 			invalidFields = append(invalidFields, "volumes")
@@ -1168,16 +1170,16 @@ func buildContainerFromSpec(ctx BuildContext, c *container) (*core.Container, er
 			invalidFields = append(invalidFields, "command")
 		}
 		if c.WaitFor != "" {
-			invalidFields = append(invalidFields, "waitFor")
+			invalidFields = append(invalidFields, "wait_for")
 		}
 		if c.LogPattern != "" {
-			invalidFields = append(invalidFields, "logPattern")
+			invalidFields = append(invalidFields, "log_pattern")
 		}
 		if c.RestartPolicy != "" {
-			invalidFields = append(invalidFields, "restartPolicy")
+			invalidFields = append(invalidFields, "restart_policy")
 		}
 		if c.KeepContainer {
-			invalidFields = append(invalidFields, "keepContainer")
+			invalidFields = append(invalidFields, "keep_container")
 		}
 		if c.Healthcheck != nil {
 			invalidFields = append(invalidFields, "healthcheck")
@@ -1212,7 +1214,7 @@ func buildContainerFromSpec(ctx BuildContext, c *container) (*core.Container, er
 	// Handle image mode (existing behavior)
 	pullPolicy, err := core.ParsePullPolicy(c.PullPolicy)
 	if err != nil {
-		return nil, core.NewValidationError("container.pullPolicy", c.PullPolicy, err)
+		return nil, core.NewValidationError("container.pull_policy", c.PullPolicy, err)
 	}
 
 	vars, err := loadVariables(ctx, c.Env)
@@ -1318,7 +1320,7 @@ func parseHealthcheck(h *healthcheck) (*core.Healthcheck, error) {
 	if h.StartPeriod != "" {
 		d, err := time.ParseDuration(h.StartPeriod)
 		if err != nil {
-			return nil, fmt.Errorf("invalid startPeriod %q: %w", h.StartPeriod, err)
+			return nil, fmt.Errorf("invalid start_period %q: %w", h.StartPeriod, err)
 		}
 		hc.StartPeriod = d
 	}
@@ -1389,7 +1391,7 @@ func buildRegistryAuths(_ BuildContext, d *dag) (map[string]*core.AuthConfig, er
 		}
 
 	default:
-		return nil, core.NewValidationError("registryAuths", d.RegistryAuths, fmt.Errorf("invalid type: %T", d.RegistryAuths))
+		return nil, core.NewValidationError("registry_auths", d.RegistryAuths, fmt.Errorf("invalid type: %T", d.RegistryAuths))
 	}
 
 	return registryAuths, nil
@@ -1527,19 +1529,19 @@ func buildLLM(_ BuildContext, d *dag) (*core.LLMConfig, error) {
 		}
 	}
 
-	// Validate topP range if specified
+	// Validate top_p range if specified
 	if cfg.TopP != nil {
 		if *cfg.TopP < 0.0 || *cfg.TopP > 1.0 {
-			return nil, core.NewValidationError("llm.topP", *cfg.TopP,
-				fmt.Errorf("topP must be between 0.0 and 1.0"))
+			return nil, core.NewValidationError("llm.top_p", *cfg.TopP,
+				fmt.Errorf("top_p must be between 0.0 and 1.0"))
 		}
 	}
 
-	// Validate maxTokens if specified
+	// Validate max_tokens if specified
 	if cfg.MaxTokens != nil {
 		if *cfg.MaxTokens < 1 {
-			return nil, core.NewValidationError("llm.maxTokens", *cfg.MaxTokens,
-				fmt.Errorf("maxTokens must be at least 1"))
+			return nil, core.NewValidationError("llm.max_tokens", *cfg.MaxTokens,
+				fmt.Errorf("max_tokens must be at least 1"))
 		}
 	}
 

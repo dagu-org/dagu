@@ -44,7 +44,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 		{
 			name: "MinimalConfigWithContainerName",
 			input: map[string]any{
-				"containerName": "my-container",
+				"container_name": "my-container",
 			},
 			expected: &Config{
 				ContainerName: "my-container",
@@ -61,15 +61,15 @@ func TestLoadConfigFromMap(t *testing.T) {
 				"platform": "linux/amd64",
 			},
 			expectError: true,
-			errorMsg:    "containerName or image must be specified",
+			errorMsg:    "container_name or image must be specified",
 		},
 		{
 			name: "FullConfigForNewContainerNoContainerName",
 			input: map[string]any{
-				"image":      "ubuntu:20.04",
-				"platform":   "linux/arm64",
-				"pull":       "always",
-				"autoRemove": true,
+				"image":       "ubuntu:20.04",
+				"platform":    "linux/arm64",
+				"pull":        "always",
+				"auto_remove": true,
 				"container": map[string]any{
 					"Env":        []string{"FOO=bar"},
 					"WorkingDir": "/app",
@@ -94,7 +94,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 					User:       "1000",
 				},
 				Host: &container.HostConfig{
-					AutoRemove: false, // Should be false because autoRemove is handled separately
+					AutoRemove: false, // Should be false because auto_remove is handled separately
 					Privileged: true,
 				},
 				Network: &network.NetworkingConfig{
@@ -106,7 +106,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 		{
 			name: "ExecModeWithContainerNameAndExecOptions",
 			input: map[string]any{
-				"containerName": "test-container",
+				"container_name": "test-container",
 				"exec": map[string]any{
 					"User":       "root",
 					"WorkingDir": "/tmp",
@@ -149,8 +149,8 @@ func TestLoadConfigFromMap(t *testing.T) {
 		{
 			name: "AutoRemoveExplicitTrueOverridesHostConfigFalse",
 			input: map[string]any{
-				"image":      "alpine",
-				"autoRemove": true,
+				"image":       "alpine",
+				"auto_remove": true,
 				"host": map[string]any{
 					"AutoRemove": false,
 				},
@@ -170,8 +170,8 @@ func TestLoadConfigFromMap(t *testing.T) {
 		{
 			name: "AutoRemoveStringValueTrue",
 			input: map[string]any{
-				"image":      "alpine",
-				"autoRemove": "true",
+				"image":       "alpine",
+				"auto_remove": "true",
 			},
 			expected: &Config{
 				Image:       "alpine",
@@ -186,8 +186,8 @@ func TestLoadConfigFromMap(t *testing.T) {
 		{
 			name: "AutoRemoveStringValueFalse",
 			input: map[string]any{
-				"image":      "alpine",
-				"autoRemove": "false",
+				"image":       "alpine",
+				"auto_remove": "false",
 			},
 			expected: &Config{
 				Image:       "alpine",
@@ -202,8 +202,8 @@ func TestLoadConfigFromMap(t *testing.T) {
 		{
 			name: "AutoRemoveStringValue1",
 			input: map[string]any{
-				"image":      "alpine",
-				"autoRemove": "1",
+				"image":       "alpine",
+				"auto_remove": "1",
 			},
 			expected: &Config{
 				Image:       "alpine",
@@ -218,8 +218,8 @@ func TestLoadConfigFromMap(t *testing.T) {
 		{
 			name: "AutoRemoveStringValue0",
 			input: map[string]any{
-				"image":      "alpine",
-				"autoRemove": "0",
+				"image":       "alpine",
+				"auto_remove": "0",
 			},
 			expected: &Config{
 				Image:       "alpine",
@@ -234,20 +234,20 @@ func TestLoadConfigFromMap(t *testing.T) {
 		{
 			name: "AutoRemoveInvalidValue",
 			input: map[string]any{
-				"image":      "alpine",
-				"autoRemove": "invalid",
+				"image":       "alpine",
+				"auto_remove": "invalid",
 			},
 			expectError: true,
-			errorMsg:    "failed to evaluate autoRemove value",
+			errorMsg:    "failed to evaluate auto_remove value",
 		},
 		{
 			name: "AutoRemoveUnsupportedType",
 			input: map[string]any{
-				"image":      "alpine",
-				"autoRemove": 123,
+				"image":       "alpine",
+				"auto_remove": 123,
 			},
 			expectError: true,
-			errorMsg:    "failed to evaluate autoRemove value",
+			errorMsg:    "failed to evaluate auto_remove value",
 		},
 		{
 			name: "PullPolicyNever",
@@ -418,11 +418,11 @@ func TestLoadConfigFromMap(t *testing.T) {
 		{
 			name: "BothImageAndContainerNameEmptyStrings",
 			input: map[string]any{
-				"image":         "",
-				"containerName": "",
+				"image":          "",
+				"container_name": "",
 			},
 			expectError: true,
-			errorMsg:    "containerName or image must be specified",
+			errorMsg:    "container_name or image must be specified",
 		},
 		{
 			name: "ErrorWhenExecProvidedWithImageOnly",
@@ -433,7 +433,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				},
 			},
 			expectError: true,
-			errorMsg:    "exec' options require 'containerName",
+			errorMsg:    "exec' options require 'container_name",
 		},
 		{
 			name: "PlatformAsNonStringType",
@@ -454,7 +454,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 		{
 			name: "ContainerNameAsNonStringTypeExecMode",
 			input: map[string]any{
-				"containerName": 123, // Not a string
+				"container_name": 123, // Not a string
 			},
 			expected: &Config{
 				ContainerName: "123",
@@ -530,8 +530,8 @@ func TestLoadConfigFromMap(t *testing.T) {
 		{
 			name: "AutoRemoveNilValue",
 			input: map[string]any{
-				"image":      "alpine",
-				"autoRemove": nil,
+				"image":       "alpine",
+				"auto_remove": nil,
 			},
 			expected: &Config{
 				Image:       "alpine",
@@ -562,8 +562,8 @@ func TestLoadConfigFromMap(t *testing.T) {
 		{
 			name: "ContainerNameNilValue",
 			input: map[string]any{
-				"image":         "alpine",
-				"containerName": nil,
+				"image":          "alpine",
+				"container_name": nil,
 			},
 			expected: &Config{
 				Image:         "alpine",
@@ -578,8 +578,8 @@ func TestLoadConfigFromMap(t *testing.T) {
 		{
 			name: "ImageNilValue",
 			input: map[string]any{
-				"image":         nil,
-				"containerName": "test",
+				"image":          nil,
+				"container_name": "test",
 			},
 			expected: &Config{
 				Image:         "",
@@ -594,8 +594,8 @@ func TestLoadConfigFromMap(t *testing.T) {
 		{
 			name: "WorkingDirShortcut",
 			input: map[string]any{
-				"image":      "alpine",
-				"workingDir": "/app",
+				"image":       "alpine",
+				"working_dir": "/app",
 			},
 			expected: &Config{
 				Image: "alpine",
@@ -628,9 +628,9 @@ func TestLoadConfigFromMap(t *testing.T) {
 		{
 			name: "WorkingDirAndVolumesShortcuts",
 			input: map[string]any{
-				"image":      "golang:1.22",
-				"workingDir": "/work",
-				"volumes":    []string{"$PWD:/work"},
+				"image":       "golang:1.22",
+				"working_dir": "/work",
+				"volumes":     []string{"$PWD:/work"},
 			},
 			expected: &Config{
 				Image: "golang:1.22",
@@ -648,8 +648,8 @@ func TestLoadConfigFromMap(t *testing.T) {
 		{
 			name: "WorkingDirShortcutDoesNotOverrideContainerWorkingDir",
 			input: map[string]any{
-				"image":      "alpine",
-				"workingDir": "/shortcut",
+				"image":       "alpine",
+				"working_dir": "/shortcut",
 				"container": map[string]any{
 					"WorkingDir": "/explicit",
 				},

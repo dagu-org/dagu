@@ -24,15 +24,15 @@ func TestHTTPExecutor_SkipTLSVerify(t *testing.T) {
 		}))
 		defer server.Close()
 
-		// Test with skipTLSVerify = true (should succeed)
+		// Test with skip_tls_verify = true (should succeed)
 		step := core.Step{
 			Commands: []core.CommandEntry{{Command: "GET", Args: []string{server.URL + "/test"}}},
 			ExecutorConfig: core.ExecutorConfig{
 				Type: "http",
 				Config: map[string]any{
-					"skipTLSVerify": true,
-					"silent":        true,
-					"json":          true,
+					"skip_tls_verify": true,
+					"silent":          true,
+					"json":            true,
 				},
 			},
 		}
@@ -59,14 +59,14 @@ func TestHTTPExecutor_SkipTLSVerify(t *testing.T) {
 		}))
 		defer server.Close()
 
-		// Test with skipTLSVerify = false (should fail due to certificate verification)
+		// Test with skip_tls_verify = false (should fail due to certificate verification)
 		step := core.Step{
 			Commands: []core.CommandEntry{{Command: "GET", Args: []string{server.URL + "/test"}}},
 			ExecutorConfig: core.ExecutorConfig{
 				Type: "http",
 				Config: map[string]any{
-					"skipTLSVerify": false,
-					"silent":        true,
+					"skip_tls_verify": false,
+					"silent":          true,
 				},
 			},
 		}
@@ -89,7 +89,7 @@ func TestHTTPExecutor_SkipTLSVerify(t *testing.T) {
 		step := core.Step{
 			Commands: []core.CommandEntry{{Command: "GET", Args: []string{"https://example.com"}}},
 			Script: `{
-				"skipTLSVerify": true,
+				"skip_tls_verify": true,
 				"timeout": 30,
 				"headers": {"Authorization": "Bearer token"}
 			}`,

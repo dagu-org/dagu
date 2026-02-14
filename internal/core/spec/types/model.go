@@ -15,8 +15,10 @@ import (
 //	model:
 //	  - provider: openai
 //	    name: gpt-4o
-//	  - provider: anthropic
-//	    name: claude-sonnet-4-20250514
+//	    max_tokens: 2000
+//	    top_p: 0.9
+//	    base_url: https://api.example.com
+//	    api_key_name: OPENAI_API_KEY
 type ModelValue struct {
 	raw     any          // Original value for error reporting
 	isSet   bool         // Whether the field was set in YAML
@@ -108,37 +110,37 @@ func parseModelEntry(m map[string]any, index int) (ModelEntry, error) {
 		entry.Temperature = &v
 	}
 
-	// Optional: maxTokens
-	if tokens, ok := m["maxTokens"]; ok {
+	// Optional: max_tokens
+	if tokens, ok := m["max_tokens"]; ok {
 		v, ok := toInt(tokens)
 		if !ok {
-			return entry, fmt.Errorf("model[%d].maxTokens: must be an integer", index)
+			return entry, fmt.Errorf("model[%d].max_tokens: must be an integer", index)
 		}
 		if v < 1 {
-			return entry, fmt.Errorf("model[%d].maxTokens: must be at least 1", index)
+			return entry, fmt.Errorf("model[%d].max_tokens: must be at least 1", index)
 		}
 		entry.MaxTokens = &v
 	}
 
-	// Optional: topP
-	if topP, ok := m["topP"]; ok {
+	// Optional: top_p
+	if topP, ok := m["top_p"]; ok {
 		v, ok := toFloat64(topP)
 		if !ok {
-			return entry, fmt.Errorf("model[%d].topP: must be a number", index)
+			return entry, fmt.Errorf("model[%d].top_p: must be a number", index)
 		}
 		if v < 0.0 || v > 1.0 {
-			return entry, fmt.Errorf("model[%d].topP: must be between 0.0 and 1.0", index)
+			return entry, fmt.Errorf("model[%d].top_p: must be between 0.0 and 1.0", index)
 		}
 		entry.TopP = &v
 	}
 
-	// Optional: baseURL
-	if baseURL, ok := m["baseURL"].(string); ok {
+	// Optional: base_url
+	if baseURL, ok := m["base_url"].(string); ok {
 		entry.BaseURL = baseURL
 	}
 
-	// Optional: apiKeyName
-	if apiKeyName, ok := m["apiKeyName"].(string); ok {
+	// Optional: api_key_name
+	if apiKeyName, ok := m["api_key_name"].(string); ok {
 		entry.APIKeyName = apiKeyName
 	}
 

@@ -46,13 +46,13 @@ func TestParseConfig(t *testing.T) {
 		{
 			name: "full config",
 			config: map[string]any{
-				"dsn":            "postgres://localhost/test",
-				"timeout":        120,
-				"transaction":    true,
-				"isolationLevel": "serializable",
-				"outputFormat":   "csv",
-				"headers":        true,
-				"maxRows":        1000,
+				"dsn":             "postgres://localhost/test",
+				"timeout":         120,
+				"transaction":     true,
+				"isolation_level": "serializable",
+				"output_format":   "csv",
+				"headers":         true,
+				"max_rows":        1000,
 			},
 			wantErr: false,
 			check: func(t *testing.T, cfg *sqlexec.Config) {
@@ -72,8 +72,8 @@ func TestParseConfig(t *testing.T) {
 		{
 			name: "invalid output format",
 			config: map[string]any{
-				"dsn":          "postgres://localhost/test",
-				"outputFormat": "invalid",
+				"dsn":           "postgres://localhost/test",
+				"output_format": "invalid",
 			},
 			wantErr: true,
 		},
@@ -553,9 +553,9 @@ func TestSQLiteExecutor_OutputFormats(t *testing.T) {
 				ExecutorConfig: core.ExecutorConfig{
 					Type: "sqlite",
 					Config: map[string]any{
-						"dsn":          ":memory:",
-						"outputFormat": tt.outputFormat,
-						"headers":      tt.headers,
+						"dsn":           ":memory:",
+						"output_format": tt.outputFormat,
+						"headers":       tt.headers,
 					},
 				},
 				Script: `
@@ -595,8 +595,8 @@ func TestSQLiteExecutor_MaxRows(t *testing.T) {
 		ExecutorConfig: core.ExecutorConfig{
 			Type: "sqlite",
 			Config: map[string]any{
-				"dsn":     ":memory:",
-				"maxRows": 2,
+				"dsn":      ":memory:",
+				"max_rows": 2,
 			},
 		},
 		Script: `
@@ -645,8 +645,8 @@ func TestParseConfig_IsolationLevels(t *testing.T) {
 			t.Parallel()
 
 			config := map[string]any{
-				"dsn":            "postgres://localhost/test",
-				"isolationLevel": tt.level,
+				"dsn":             "postgres://localhost/test",
+				"isolation_level": tt.level,
 			}
 			_, err := sqlexec.ParseConfig(context.Background(), config)
 			if tt.wantErr {
@@ -662,9 +662,9 @@ func TestParseConfig_Streaming(t *testing.T) {
 	t.Parallel()
 
 	config := map[string]any{
-		"dsn":        "postgres://localhost/test",
-		"streaming":  true,
-		"outputFile": "/tmp/output.jsonl",
+		"dsn":         "postgres://localhost/test",
+		"streaming":   true,
+		"output_file": "/tmp/output.jsonl",
 	}
 
 	cfg, err := sqlexec.ParseConfig(context.Background(), config)
@@ -677,8 +677,8 @@ func TestParseConfig_AdvisoryLock(t *testing.T) {
 	t.Parallel()
 
 	config := map[string]any{
-		"dsn":          "postgres://localhost/test",
-		"advisoryLock": "my_pipeline_lock",
+		"dsn":           "postgres://localhost/test",
+		"advisory_lock": "my_pipeline_lock",
 	}
 
 	cfg, err := sqlexec.ParseConfig(context.Background(), config)
@@ -690,8 +690,8 @@ func TestParseConfig_FileLock(t *testing.T) {
 	t.Parallel()
 
 	config := map[string]any{
-		"dsn":      "file:./test.db",
-		"fileLock": true,
+		"dsn":       "file:./test.db",
+		"file_lock": true,
 	}
 
 	cfg, err := sqlexec.ParseConfig(context.Background(), config)
@@ -713,8 +713,8 @@ func TestParseConfig_Import(t *testing.T) {
 			config: map[string]any{
 				"dsn": "file:./test.db",
 				"import": map[string]any{
-					"inputFile": "/path/to/data.csv",
-					"table":     "users",
+					"input_file": "/path/to/data.csv",
+					"table":      "users",
 				},
 			},
 			wantErr: false,
@@ -732,18 +732,18 @@ func TestParseConfig_Import(t *testing.T) {
 			config: map[string]any{
 				"dsn": "file:./test.db",
 				"import": map[string]any{
-					"inputFile":  "/path/to/data.tsv",
-					"table":      "users",
-					"format":     "tsv",
-					"hasHeader":  true,
-					"delimiter":  "\t",
-					"columns":    []string{"name", "age"},
-					"nullValues": []string{"NA", "N/A"},
-					"batchSize":  500,
-					"onConflict": "ignore",
-					"skipRows":   1,
-					"maxRows":    1000,
-					"dryRun":     true,
+					"input_file":  "/path/to/data.tsv",
+					"table":       "users",
+					"format":      "tsv",
+					"has_header":  true,
+					"delimiter":   "\t",
+					"columns":     []string{"name", "age"},
+					"null_values": []string{"NA", "N/A"},
+					"batch_size":  500,
+					"on_conflict": "ignore",
+					"skip_rows":   1,
+					"max_rows":    1000,
+					"dry_run":     true,
 				},
 			},
 			wantErr: false,
@@ -767,8 +767,8 @@ func TestParseConfig_Import(t *testing.T) {
 			config: map[string]any{
 				"dsn": "file:./test.db",
 				"import": map[string]any{
-					"inputFile": "/path/to/data.jsonl",
-					"table":     "users",
+					"input_file": "/path/to/data.jsonl",
+					"table":      "users",
 				},
 			},
 			wantErr: false,
@@ -778,7 +778,7 @@ func TestParseConfig_Import(t *testing.T) {
 			},
 		},
 		{
-			name: "missing inputFile",
+			name: "missing input_file",
 			config: map[string]any{
 				"dsn": "file:./test.db",
 				"import": map[string]any{
@@ -792,7 +792,7 @@ func TestParseConfig_Import(t *testing.T) {
 			config: map[string]any{
 				"dsn": "file:./test.db",
 				"import": map[string]any{
-					"inputFile": "/path/to/data.csv",
+					"input_file": "/path/to/data.csv",
 				},
 			},
 			wantErr: true,
@@ -802,45 +802,45 @@ func TestParseConfig_Import(t *testing.T) {
 			config: map[string]any{
 				"dsn": "file:./test.db",
 				"import": map[string]any{
-					"inputFile": "/path/to/data.csv",
-					"table":     "users",
-					"format":    "xml",
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "invalid onConflict",
-			config: map[string]any{
-				"dsn": "file:./test.db",
-				"import": map[string]any{
-					"inputFile":  "/path/to/data.csv",
+					"input_file": "/path/to/data.csv",
 					"table":      "users",
-					"onConflict": "crash",
+					"format":     "xml",
 				},
 			},
 			wantErr: true,
 		},
 		{
-			name: "negative batchSize",
+			name: "invalid on_conflict",
 			config: map[string]any{
 				"dsn": "file:./test.db",
 				"import": map[string]any{
-					"inputFile": "/path/to/data.csv",
-					"table":     "users",
-					"batchSize": -1,
+					"input_file":  "/path/to/data.csv",
+					"table":       "users",
+					"on_conflict": "crash",
 				},
 			},
 			wantErr: true,
 		},
 		{
-			name: "onConflict replace",
+			name: "negative batch_size",
 			config: map[string]any{
 				"dsn": "file:./test.db",
 				"import": map[string]any{
-					"inputFile":  "/path/to/data.csv",
+					"input_file": "/path/to/data.csv",
 					"table":      "users",
-					"onConflict": "replace",
+					"batch_size": -1,
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "on_conflict replace",
+			config: map[string]any{
+				"dsn": "file:./test.db",
+				"import": map[string]any{
+					"input_file":  "/path/to/data.csv",
+					"table":       "users",
+					"on_conflict": "replace",
 				},
 			},
 			wantErr: false,
@@ -908,10 +908,10 @@ func TestSQLiteExecutor_ImportCSV(t *testing.T) {
 			Config: map[string]any{
 				"dsn": dbPath,
 				"import": map[string]any{
-					"inputFile": csvPath,
-					"table":     "users",
-					"format":    "csv",
-					"hasHeader": true,
+					"input_file": csvPath,
+					"table":      "users",
+					"format":     "csv",
+					"has_header": true,
 				},
 			},
 		},
@@ -993,10 +993,10 @@ func TestSQLiteExecutor_ImportCSV_NoHeader(t *testing.T) {
 			Config: map[string]any{
 				"dsn": dbPath,
 				"import": map[string]any{
-					"inputFile": csvPath,
-					"table":     "users",
-					"hasHeader": false,
-					"columns":   []string{"name", "age", "city"},
+					"input_file": csvPath,
+					"table":      "users",
+					"has_header": false,
+					"columns":    []string{"name", "age", "city"},
 				},
 			},
 		},
@@ -1051,9 +1051,9 @@ func TestSQLiteExecutor_ImportJSONL(t *testing.T) {
 			Config: map[string]any{
 				"dsn": dbPath,
 				"import": map[string]any{
-					"inputFile": jsonlPath,
-					"table":     "users",
-					"columns":   []string{"name", "age", "city"},
+					"input_file": jsonlPath,
+					"table":      "users",
+					"columns":    []string{"name", "age", "city"},
 				},
 			},
 		},
@@ -1107,9 +1107,9 @@ func TestSQLiteExecutor_ImportWithTransaction(t *testing.T) {
 				"dsn":         dbPath,
 				"transaction": true,
 				"import": map[string]any{
-					"inputFile": csvPath,
-					"table":     "numbers",
-					"hasHeader": true,
+					"input_file": csvPath,
+					"table":      "numbers",
+					"has_header": true,
 				},
 			},
 		},
@@ -1162,10 +1162,10 @@ func TestSQLiteExecutor_ImportDryRun(t *testing.T) {
 			Config: map[string]any{
 				"dsn": dbPath,
 				"import": map[string]any{
-					"inputFile": csvPath,
-					"table":     "users",
-					"hasHeader": true,
-					"dryRun":    true,
+					"input_file": csvPath,
+					"table":      "users",
+					"has_header": true,
+					"dry_run":    true,
 				},
 			},
 		},
@@ -1244,10 +1244,10 @@ func TestSQLiteExecutor_ImportIgnoreConflict(t *testing.T) {
 			Config: map[string]any{
 				"dsn": dbPath,
 				"import": map[string]any{
-					"inputFile":  csvPath,
-					"table":      "users",
-					"hasHeader":  true,
-					"onConflict": "ignore",
+					"input_file":  csvPath,
+					"table":       "users",
+					"has_header":  true,
+					"on_conflict": "ignore",
 				},
 			},
 		},
@@ -1310,7 +1310,7 @@ func TestSQLiteExecutor_ImportMaxRows(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, setupExec.Run(ctx))
 
-	// Import with maxRows limit
+	// Import with max_rows limit
 	importStep := core.Step{
 		Name: "import",
 		ExecutorConfig: core.ExecutorConfig{
@@ -1318,10 +1318,10 @@ func TestSQLiteExecutor_ImportMaxRows(t *testing.T) {
 			Config: map[string]any{
 				"dsn": dbPath,
 				"import": map[string]any{
-					"inputFile": csvPath,
-					"table":     "numbers",
-					"hasHeader": true,
-					"maxRows":   3,
+					"input_file": csvPath,
+					"table":      "numbers",
+					"has_header": true,
+					"max_rows":   3,
 				},
 			},
 		},
@@ -1367,7 +1367,7 @@ func TestSQLiteExecutor_ImportSkipRows(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, setupExec.Run(ctx))
 
-	// Import with skipRows
+	// Import with skip_rows
 	importStep := core.Step{
 		Name: "import",
 		ExecutorConfig: core.ExecutorConfig{
@@ -1375,10 +1375,10 @@ func TestSQLiteExecutor_ImportSkipRows(t *testing.T) {
 			Config: map[string]any{
 				"dsn": dbPath,
 				"import": map[string]any{
-					"inputFile": csvPath,
-					"table":     "users",
-					"hasHeader": true,
-					"skipRows":  1, // Skip first data row (Alice)
+					"input_file": csvPath,
+					"table":      "users",
+					"has_header": true,
+					"skip_rows":  1, // Skip first data row (Alice)
 				},
 			},
 		},
@@ -1586,8 +1586,8 @@ func TestSQLiteExecutor_NullHandling(t *testing.T) {
 		ExecutorConfig: core.ExecutorConfig{
 			Type: "sqlite",
 			Config: map[string]any{
-				"dsn":        dbPath,
-				"nullString": "NULL",
+				"dsn":         dbPath,
+				"null_string": "NULL",
 			},
 		},
 		Script: `
@@ -2365,10 +2365,10 @@ func TestSQLiteExecutor_StreamingOutput(t *testing.T) {
 		ExecutorConfig: core.ExecutorConfig{
 			Type: "sqlite",
 			Config: map[string]any{
-				"dsn":          ":memory:",
-				"streaming":    true,
-				"outputFile":   outputFile,
-				"outputFormat": "jsonl",
+				"dsn":           ":memory:",
+				"streaming":     true,
+				"output_file":   outputFile,
+				"output_format": "jsonl",
 			},
 		},
 		Script: `
@@ -2410,11 +2410,11 @@ func TestSQLiteExecutor_StreamingOutputCSV(t *testing.T) {
 		ExecutorConfig: core.ExecutorConfig{
 			Type: "sqlite",
 			Config: map[string]any{
-				"dsn":          ":memory:",
-				"streaming":    true,
-				"outputFile":   outputFile,
-				"outputFormat": "csv",
-				"headers":      true,
+				"dsn":           ":memory:",
+				"streaming":     true,
+				"output_file":   outputFile,
+				"output_format": "csv",
+				"headers":       true,
 			},
 		},
 		Script: `
@@ -2453,10 +2453,10 @@ func TestSQLiteExecutor_StreamingOutputSubdir(t *testing.T) {
 		ExecutorConfig: core.ExecutorConfig{
 			Type: "sqlite",
 			Config: map[string]any{
-				"dsn":          ":memory:",
-				"streaming":    true,
-				"outputFile":   outputFile,
-				"outputFormat": "jsonl",
+				"dsn":           ":memory:",
+				"streaming":     true,
+				"output_file":   outputFile,
+				"output_format": "jsonl",
 			},
 		},
 		Script: `SELECT 1 as value;`,
@@ -2486,8 +2486,8 @@ func TestSQLiteExecutor_FileLock(t *testing.T) {
 		ExecutorConfig: core.ExecutorConfig{
 			Type: "sqlite",
 			Config: map[string]any{
-				"dsn":      dbPath,
-				"fileLock": true,
+				"dsn":       dbPath,
+				"file_lock": true,
 			},
 		},
 		Script: `
@@ -2518,6 +2518,7 @@ func TestSQLiteExecutor_SharedMemory(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
+	tableName := fmt.Sprintf("shared_test_%d", time.Now().UnixNano())
 
 	// First step creates the table with shared memory
 	step1 := core.Step{
@@ -2525,14 +2526,15 @@ func TestSQLiteExecutor_SharedMemory(t *testing.T) {
 		ExecutorConfig: core.ExecutorConfig{
 			Type: "sqlite",
 			Config: map[string]any{
-				"dsn":          ":memory:",
-				"sharedMemory": true,
+				"dsn":           ":memory:",
+				"shared_memory": true,
 			},
 		},
-		Script: `
-			CREATE TABLE shared_test (id INTEGER PRIMARY KEY, value TEXT);
-			INSERT INTO shared_test VALUES (1, 'shared');
-		`,
+		Script: fmt.Sprintf(`
+			CREATE TABLE IF NOT EXISTS %s (id INTEGER PRIMARY KEY, value TEXT);
+			DELETE FROM %s;
+			INSERT INTO %s VALUES (1, 'shared');
+		`, tableName, tableName, tableName),
 	}
 
 	exec1, err := newSQLiteExecutor(ctx, step1)
@@ -2542,7 +2544,7 @@ func TestSQLiteExecutor_SharedMemory(t *testing.T) {
 	require.NoError(t, err)
 
 	// Note: In a real DAG scenario, multiple steps would share the connection.
-	// This test verifies the sharedMemory config is properly processed.
+	// This test verifies the shared_memory config is properly processed.
 }
 
 // TestSQLiteExecutor_ScriptFile tests reading SQL from a file using file:// prefix.

@@ -53,7 +53,7 @@ steps:
         - "item1"
         - "item2"
         - "item3"
-      maxConcurrent: 3
+      max_concurrent: 3
 ` + childEcho,
 			expectedNodes:     1,
 			parallelNodeIndex: 0,
@@ -71,7 +71,7 @@ steps:
           VERSION: "1.0.1"
         - REGION: eu-west-1
           VERSION: "1.0.2"
-      maxConcurrent: 2
+      max_concurrent: 2
 ` + childProcess,
 			expectedNodes:     1,
 			parallelNodeIndex: 0,
@@ -327,7 +327,7 @@ func TestParallelExecution_OutputCaptureWithFailures(t *testing.T) {
         - "success"
         - "fail"
     output: RESULTS
-    continueOn:
+    continue_on:
       failure: true
 ---
 name: child-output-fail
@@ -395,9 +395,9 @@ steps:
         exit 0
       fi
     output: OUTPUT
-    retryPolicy:
+    retry_policy:
       limit: 1
-      intervalSec: 0
+      interval_sec: 0
 `, counterFile))
 
 	agent := dag.Agent()
@@ -435,9 +435,9 @@ func TestParallelExecution_MinimalRetry(t *testing.T) {
     parallel:
       items:
         - "item1"
-    retryPolicy:
+    retry_policy:
       limit: 1
-      intervalSec: 1
+      interval_sec: 1
     output: RESULTS
 ---
 name: child-fail
@@ -466,10 +466,10 @@ func TestParallelExecution_RetryAndContinueOn(t *testing.T) {
     parallel:
       items:
         - "item1"
-    retryPolicy:
+    retry_policy:
       limit: 1
-      intervalSec: 1
-    continueOn:
+      interval_sec: 1
+    continue_on:
       failure: true
     output: RESULTS
   - echo "This should run"
@@ -608,7 +608,7 @@ func TestParallelExecution_ExactlyMaxLimit(t *testing.T) {
     parallel:
       items:
 %s
-      maxConcurrent: 10
+      max_concurrent: 10
 ---
 name: child-echo
 params:
@@ -651,7 +651,7 @@ func TestParallelExecution_ObjectItemProperties(t *testing.T) {
   - call: sync-data
     parallel:
       items: ${CONFIGS}
-      maxConcurrent: 2
+      max_concurrent: 2
     params:
       - REGION: ${ITEM.region}
       - BUCKET: ${ITEM.bucket}
@@ -786,7 +786,7 @@ func TestParallelExecution_StaticObjectItems(t *testing.T) {
 	const dagContent = `steps:
   - call: deploy-service
     parallel:
-      maxConcurrent: 3
+      max_concurrent: 3
       items:
         - name: web-service
           port: 8080
@@ -801,7 +801,7 @@ func TestParallelExecution_StaticObjectItems(t *testing.T) {
       - SERVICE_NAME: ${ITEM.name}
       - PORT: ${ITEM.port}
       - REPLICAS: ${ITEM.replicas}
-    continueOn:
+    continue_on:
       failure: true
     output: DEPLOYMENT_RESULTS
 ---
@@ -874,10 +874,10 @@ func TestIssue1274_ParallelJSONSingleItem(t *testing.T) {
   - call: issue-1274-worker
     parallel:
       items: ${jsonList}
-      maxConcurrent: 1
+      max_concurrent: 1
     params:
       aJson: ${ITEM}
-    continueOn:
+    continue_on:
       skipped: true
 
 ---
@@ -920,10 +920,10 @@ func TestIssue1274_ParallelJSONMultipleItems(t *testing.T) {
   - call: issue-1274-worker-multi
     parallel:
       items: ${jsonList}
-      maxConcurrent: 1
+      max_concurrent: 1
     params:
       aJson: ${ITEM}
-    continueOn:
+    continue_on:
       skipped: true
 
 ---

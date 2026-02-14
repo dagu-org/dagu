@@ -32,11 +32,11 @@ steps:
  - name: exec-in-existing
    type: docker
    config:
-     containerName: <container-name>
-     autoRemove: true
+     container_name: <container-name>
+     auto_remove: true
      exec:
        user: root     # optional
-       workingDir: /  # optional
+       working_dir: /  # optional
        env:           # optional
          - MY_VAR=value
    command: echo "Hello from existing container"
@@ -45,7 +45,7 @@ steps:
    type: docker
    config:
      image: alpine:latest
-     autoRemove: true
+     auto_remove: true
    command: echo "Hello from new container"
 ```
 */

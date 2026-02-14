@@ -14,13 +14,13 @@ type Config struct {
 	// AWS Connection
 	Region          string `mapstructure:"region"`
 	Endpoint        string `mapstructure:"endpoint"`
-	AccessKeyID     string `mapstructure:"accessKeyId"`
-	SecretAccessKey string `mapstructure:"secretAccessKey"`
-	SessionToken    string `mapstructure:"sessionToken"`
+	AccessKeyID     string `mapstructure:"access_key_id"`
+	SecretAccessKey string `mapstructure:"secret_access_key"`
+	SessionToken    string `mapstructure:"session_token"`
 	Profile         string `mapstructure:"profile"`
 
 	// Path style access (for S3-compatible services like MinIO)
-	ForcePathStyle bool `mapstructure:"forcePathStyle"`
+	ForcePathStyle bool `mapstructure:"force_path_style"`
 
 	// Common
 	Bucket      string `mapstructure:"bucket"`
@@ -29,13 +29,13 @@ type Config struct {
 	Destination string `mapstructure:"destination"`
 
 	// Upload options
-	ContentType  string            `mapstructure:"contentType"`
-	StorageClass string            `mapstructure:"storageClass"`
+	ContentType  string            `mapstructure:"content_type"`
+	StorageClass string            `mapstructure:"storage_class"`
 	Metadata     map[string]string `mapstructure:"metadata"`
 
 	// Server-side encryption
-	ServerSideEncryption string `mapstructure:"sse"`         // AES256, aws:kms
-	SSEKMSKeyId          string `mapstructure:"sseKmsKeyId"` // KMS key ID for aws:kms
+	ServerSideEncryption string `mapstructure:"sse"`            // AES256, aws:kms
+	SSEKMSKeyId          string `mapstructure:"sse_kms_key_id"` // KMS key ID for aws:kms
 
 	// Access control
 	ACL string `mapstructure:"acl"` // private, public-read, etc.
@@ -44,21 +44,21 @@ type Config struct {
 	Tags map[string]string `mapstructure:"tags"`
 
 	// Transfer options
-	PartSize    int64 `mapstructure:"partSize"`    // MB, default 10
+	PartSize    int64 `mapstructure:"part_size"`   // MB, default 10
 	Concurrency int   `mapstructure:"concurrency"` // default 5
 
 	// List options
 	Prefix       string `mapstructure:"prefix"`
 	Delimiter    string `mapstructure:"delimiter"`
-	MaxKeys      int    `mapstructure:"maxKeys"`
+	MaxKeys      int    `mapstructure:"max_keys"`
 	Recursive    bool   `mapstructure:"recursive"`
-	OutputFormat string `mapstructure:"outputFormat"` // json, jsonl
+	OutputFormat string `mapstructure:"output_format"` // json, jsonl
 
 	// Delete options
 	Quiet bool `mapstructure:"quiet"` // Suppress output for delete
 
 	// Advanced options
-	DisableSSL bool `mapstructure:"disableSSL"` // For local testing only
+	DisableSSL bool `mapstructure:"disable_ssl"` // For local testing only
 }
 
 var (
@@ -181,7 +181,7 @@ func (c *Config) ValidateForOperation(operation string) error {
 
 	// Validate output format
 	if c.OutputFormat != "" && c.OutputFormat != "json" && c.OutputFormat != "jsonl" {
-		return fmt.Errorf("%w: outputFormat must be 'json' or 'jsonl'", ErrConfig)
+		return fmt.Errorf("%w: output_format must be 'json' or 'jsonl'", ErrConfig)
 	}
 
 	// Validate server-side encryption
@@ -191,7 +191,7 @@ func (c *Config) ValidateForOperation(operation string) error {
 		}
 		// KMS key ID is required for aws:kms
 		if strings.EqualFold(c.ServerSideEncryption, "aws:kms") && c.SSEKMSKeyId == "" {
-			return fmt.Errorf("%w: sseKmsKeyId is required when sse is 'aws:kms'", ErrConfig)
+			return fmt.Errorf("%w: sse_kms_key_id is required when sse is 'aws:kms'", ErrConfig)
 		}
 	}
 
@@ -210,12 +210,12 @@ func (c *Config) ValidateForOperation(operation string) error {
 
 	// Validate part size (must be >= 5 MB if specified, 0 means use default)
 	if c.PartSize != 0 && c.PartSize < 5 {
-		return fmt.Errorf("%w: partSize must be >= 5 MB", ErrConfig)
+		return fmt.Errorf("%w: part_size must be >= 5 MB", ErrConfig)
 	}
 
-	// Validate maxKeys (must be >= 1 if specified, 0 means use default)
+	// Validate max_keys (must be >= 1 if specified, 0 means use default)
 	if c.MaxKeys < 0 {
-		return fmt.Errorf("%w: maxKeys must be >= 0", ErrConfig)
+		return fmt.Errorf("%w: max_keys must be >= 0", ErrConfig)
 	}
 
 	return nil
@@ -236,13 +236,13 @@ var configSchema = &jsonschema.Schema{
 	// ValidateForOperation() checks for bucket at runtime after config merging.
 	Properties: map[string]*jsonschema.Schema{
 		// AWS Connection
-		"region":          {Type: "string", Description: "AWS region (e.g., us-east-1)"},
-		"endpoint":        {Type: "string", Description: "Custom S3-compatible endpoint URL"},
-		"accessKeyId":     {Type: "string", Description: "AWS access key ID"},
-		"secretAccessKey": {Type: "string", Description: "AWS secret access key"},
-		"sessionToken":    {Type: "string", Description: "AWS session token (for temporary credentials)"},
-		"profile":         {Type: "string", Description: "AWS credentials profile name"},
-		"forcePathStyle":  {Type: "boolean", Description: "Use path-style addressing (for S3-compatible services)"},
+		"region":            {Type: "string", Description: "AWS region (e.g., us-east-1)"},
+		"endpoint":          {Type: "string", Description: "Custom S3-compatible endpoint URL"},
+		"access_key_id":     {Type: "string", Description: "AWS access key ID"},
+		"secret_access_key": {Type: "string", Description: "AWS secret access key"},
+		"session_token":     {Type: "string", Description: "AWS session token (for temporary credentials)"},
+		"profile":           {Type: "string", Description: "AWS credentials profile name"},
+		"force_path_style":  {Type: "boolean", Description: "Use path-style addressing (for S3-compatible services)"},
 
 		// Common
 		"bucket":      {Type: "string", Description: "S3 bucket name (required)"},
@@ -251,13 +251,13 @@ var configSchema = &jsonschema.Schema{
 		"destination": {Type: "string", Description: "Local file path for download (required for download)"},
 
 		// Upload options
-		"contentType":  {Type: "string", Description: "Content-Type for the uploaded object"},
-		"storageClass": {Type: "string", Description: "Storage class (STANDARD, STANDARD_IA, etc.)"},
-		"metadata":     {Type: "object", Description: "Custom metadata key-value pairs"},
+		"content_type":  {Type: "string", Description: "Content-Type for the uploaded object"},
+		"storage_class": {Type: "string", Description: "Storage class (STANDARD, STANDARD_IA, etc.)"},
+		"metadata":      {Type: "object", Description: "Custom metadata key-value pairs"},
 
 		// Server-side encryption
-		"sse":         {Type: "string", Enum: []any{"AES256", "aws:kms"}, Description: "Server-side encryption type"},
-		"sseKmsKeyId": {Type: "string", Description: "KMS key ID (required when sse is 'aws:kms')"},
+		"sse":            {Type: "string", Enum: []any{"AES256", "aws:kms"}, Description: "Server-side encryption type"},
+		"sse_kms_key_id": {Type: "string", Description: "KMS key ID (required when sse is 'aws:kms')"},
 
 		// Access control
 		"acl": {Type: "string", Description: "Canned ACL (private, public-read, etc.)"},
@@ -266,21 +266,21 @@ var configSchema = &jsonschema.Schema{
 		"tags": {Type: "object", Description: "Object tags as key-value pairs"},
 
 		// Transfer options
-		"partSize":    {Type: "integer", Minimum: new(float64(5)), Description: "Multipart upload part size in MB (default: 10, min: 5)"},
+		"part_size":   {Type: "integer", Minimum: new(float64(5)), Description: "Multipart upload part size in MB (default: 10, min: 5)"},
 		"concurrency": {Type: "integer", Minimum: new(float64(1)), Description: "Number of concurrent upload/download parts (default: 5)"},
 
 		// List options
-		"prefix":       {Type: "string", Description: "Filter objects by key prefix"},
-		"delimiter":    {Type: "string", Description: "Delimiter for grouping keys (e.g., '/')"},
-		"maxKeys":      {Type: "integer", Minimum: new(float64(1)), Description: "Maximum number of keys to return (default: 1000)"},
-		"recursive":    {Type: "boolean", Description: "List all objects recursively (ignores delimiter)"},
-		"outputFormat": {Type: "string", Enum: []any{"json", "jsonl"}, Description: "Output format: json (default) or jsonl"},
+		"prefix":        {Type: "string", Description: "Filter objects by key prefix"},
+		"delimiter":     {Type: "string", Description: "Delimiter for grouping keys (e.g., '/')"},
+		"max_keys":      {Type: "integer", Minimum: new(float64(1)), Description: "Maximum number of keys to return (default: 1000)"},
+		"recursive":     {Type: "boolean", Description: "List all objects recursively (ignores delimiter)"},
+		"output_format": {Type: "string", Enum: []any{"json", "jsonl"}, Description: "Output format: json (default) or jsonl"},
 
 		// Delete options
 		"quiet": {Type: "boolean", Description: "Suppress output for delete operation"},
 
 		// Advanced
-		"disableSSL": {Type: "boolean", Description: "Disable SSL (for local testing only)"},
+		"disable_ssl": {Type: "boolean", Description: "Disable SSL (for local testing only)"},
 	},
 }
 

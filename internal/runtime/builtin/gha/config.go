@@ -8,15 +8,15 @@ import (
 var configSchema = &jsonschema.Schema{
 	Type: "object",
 	Properties: map[string]*jsonschema.Schema{
-		"runner":           {Type: "string", Description: "Docker image to use as runner"},
-		"autoRemove":       {Type: "boolean", Description: "Automatically remove containers after execution"},
-		"network":          {Type: "string", Description: "Docker network mode"},
-		"githubInstance":   {Type: "string", Description: "GitHub instance for action resolution"},
-		"dockerSocket":     {Type: "string", Description: "Custom Docker socket path"},
-		"reuseContainers":  {Type: "boolean", Description: "Reuse containers between runs"},
-		"forceRebuild":     {Type: "boolean", Description: "Force rebuild of action images"},
-		"containerOptions": {Type: "string", Description: "Additional Docker run options"},
-		"privileged":       {Type: "boolean", Description: "Run containers in privileged mode"},
+		"runner":            {Type: "string", Description: "Docker image to use as runner"},
+		"auto_remove":       {Type: "boolean", Description: "Automatically remove containers after execution"},
+		"network":           {Type: "string", Description: "Docker network mode"},
+		"github_instance":   {Type: "string", Description: "GitHub instance for action resolution"},
+		"docker_socket":     {Type: "string", Description: "Custom Docker socket path"},
+		"reuse_containers":  {Type: "boolean", Description: "Reuse containers between runs"},
+		"force_rebuild":     {Type: "boolean", Description: "Force rebuild of action images"},
+		"container_options": {Type: "string", Description: "Additional Docker run options"},
+		"privileged":        {Type: "boolean", Description: "Run containers in privileged mode"},
 		"artifacts": {
 			Type: "object",
 			Properties: map[string]*jsonschema.Schema{

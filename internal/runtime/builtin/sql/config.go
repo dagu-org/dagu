@@ -22,26 +22,26 @@ type Config struct {
 	Params any `mapstructure:"params"`
 
 	// Execution settings
-	Timeout        int    `mapstructure:"timeout"`        // Query timeout in seconds (default: 60)
-	Transaction    bool   `mapstructure:"transaction"`    // Wrap execution in transaction
-	IsolationLevel string `mapstructure:"isolationLevel"` // Transaction isolation level
+	Timeout        int    `mapstructure:"timeout"`         // Query timeout in seconds (default: 60)
+	Transaction    bool   `mapstructure:"transaction"`     // Wrap execution in transaction
+	IsolationLevel string `mapstructure:"isolation_level"` // Transaction isolation level
 
 	// Locking
-	AdvisoryLock string `mapstructure:"advisoryLock"` // Named advisory lock (PostgreSQL)
-	FileLock     bool   `mapstructure:"fileLock"`     // Use file locking (SQLite)
+	AdvisoryLock string `mapstructure:"advisory_lock"` // Named advisory lock (PostgreSQL)
+	FileLock     bool   `mapstructure:"file_lock"`     // Use file locking (SQLite)
 
 	// SQLite-specific options
-	SharedMemory bool `mapstructure:"sharedMemory"` // Enable shared cache for :memory: databases (SQLite)
+	SharedMemory bool `mapstructure:"shared_memory"` // Enable shared cache for :memory: databases (SQLite)
 
 	// Output settings
-	OutputFormat string `mapstructure:"outputFormat"` // jsonl (default), json, csv
-	Headers      bool   `mapstructure:"headers"`      // Include headers in CSV output
-	NullString   string `mapstructure:"nullString"`   // String representation for NULL values
+	OutputFormat string `mapstructure:"output_format"` // jsonl (default), json, csv
+	Headers      bool   `mapstructure:"headers"`       // Include headers in CSV output
+	NullString   string `mapstructure:"null_string"`   // String representation for NULL values
 
 	// Large result handling
-	MaxRows    int    `mapstructure:"maxRows"`    // Maximum rows to return (0 = unlimited)
-	Streaming  bool   `mapstructure:"streaming"`  // Stream results to file
-	OutputFile string `mapstructure:"outputFile"` // File path for streaming output
+	MaxRows    int    `mapstructure:"max_rows"`    // Maximum rows to return (0 = unlimited)
+	Streaming  bool   `mapstructure:"streaming"`   // Stream results to file
+	OutputFile string `mapstructure:"output_file"` // File path for streaming output
 
 	// Import settings
 	Import *ImportConfig `mapstructure:"import"` // Import data from file
@@ -50,34 +50,34 @@ type Config struct {
 // ImportConfig configures data import from CSV/TSV/JSONL files.
 type ImportConfig struct {
 	// Required fields
-	InputFile string `mapstructure:"inputFile"` // Path to input file
-	Table     string `mapstructure:"table"`     // Target table name
+	InputFile string `mapstructure:"input_file"` // Path to input file
+	Table     string `mapstructure:"table"`      // Target table name
 
 	// Format options
-	Format    string `mapstructure:"format"`    // csv, tsv, jsonl (auto-detect if empty)
-	HasHeader *bool  `mapstructure:"hasHeader"` // Whether first row is header (default: true for csv/tsv)
-	Delimiter string `mapstructure:"delimiter"` // Field delimiter (default: "," for csv, "\t" for tsv)
+	Format    string `mapstructure:"format"`     // csv, tsv, jsonl (auto-detect if empty)
+	HasHeader *bool  `mapstructure:"has_header"` // Whether first row is header (default: true for csv/tsv)
+	Delimiter string `mapstructure:"delimiter"`  // Field delimiter (default: "," for csv, "\t" for tsv)
 
 	// Column mapping
 	Columns []string `mapstructure:"columns"` // Explicit column names (overrides header)
 
 	// NULL handling
-	NullValues []string `mapstructure:"nullValues"` // Values to treat as NULL
+	NullValues []string `mapstructure:"null_values"` // Values to treat as NULL
 
 	// Batch settings
-	BatchSize int `mapstructure:"batchSize"` // Rows per INSERT statement (default: 1000)
+	BatchSize int `mapstructure:"batch_size"` // Rows per INSERT statement (default: 1000)
 
 	// Conflict handling
-	OnConflict     string   `mapstructure:"onConflict"`     // error (default), ignore, replace
-	ConflictTarget string   `mapstructure:"conflictTarget"` // Column(s) for conflict detection (required for PostgreSQL UPSERT with "replace")
-	UpdateColumns  []string `mapstructure:"updateColumns"`  // Columns to update on conflict (if empty, updates all non-key columns)
+	OnConflict     string   `mapstructure:"on_conflict"`     // error (default), ignore, replace
+	ConflictTarget string   `mapstructure:"conflict_target"` // Column(s) for conflict detection (required for PostgreSQL UPSERT with "replace")
+	UpdateColumns  []string `mapstructure:"update_columns"`  // Columns to update on conflict (if empty, updates all non-key columns)
 
 	// Row limits
-	SkipRows int `mapstructure:"skipRows"` // Skip first N data rows
-	MaxRows  int `mapstructure:"maxRows"`  // Limit import (0 = unlimited)
+	SkipRows int `mapstructure:"skip_rows"` // Skip first N data rows
+	MaxRows  int `mapstructure:"max_rows"`  // Limit import (0 = unlimited)
 
 	// Validation
-	DryRun bool `mapstructure:"dryRun"` // Validate without importing
+	DryRun bool `mapstructure:"dry_run"` // Validate without importing
 }
 
 // DefaultConfig returns a Config with default values.
@@ -116,7 +116,7 @@ func ParseConfig(_ context.Context, mapCfg map[string]any) (*Config, error) {
 	case "jsonl", "json", "csv":
 		// Valid
 	default:
-		return nil, fmt.Errorf("invalid outputFormat: %s (must be jsonl, json, or csv)", cfg.OutputFormat)
+		return nil, fmt.Errorf("invalid output_format: %s (must be jsonl, json, or csv)", cfg.OutputFormat)
 	}
 
 	// Validate isolation level if specified
@@ -125,7 +125,7 @@ func ParseConfig(_ context.Context, mapCfg map[string]any) (*Config, error) {
 		case "default", "read_committed", "repeatable_read", "serializable":
 			// Valid - "default" uses database's default isolation level
 		default:
-			return nil, fmt.Errorf("invalid isolationLevel: %s (valid: default, read_committed, repeatable_read, serializable)", cfg.IsolationLevel)
+			return nil, fmt.Errorf("invalid isolation_level: %s (valid: default, read_committed, repeatable_read, serializable)", cfg.IsolationLevel)
 		}
 	}
 
@@ -147,7 +147,7 @@ func ParseConfig(_ context.Context, mapCfg map[string]any) (*Config, error) {
 // validate checks required fields and valid values for ImportConfig.
 func (c *ImportConfig) validate() error {
 	if c.InputFile == "" {
-		return fmt.Errorf("inputFile is required")
+		return fmt.Errorf("input_file is required")
 	}
 	if c.Table == "" {
 		return fmt.Errorf("table is required")
@@ -163,27 +163,27 @@ func (c *ImportConfig) validate() error {
 		}
 	}
 
-	// Validate onConflict if specified
+	// Validate on_conflict if specified
 	if c.OnConflict != "" {
 		switch c.OnConflict {
 		case "error", "ignore", "replace":
 			// Valid
 		default:
-			return fmt.Errorf("invalid onConflict: %s (must be error, ignore, or replace)", c.OnConflict)
+			return fmt.Errorf("invalid on_conflict: %s (must be error, ignore, or replace)", c.OnConflict)
 		}
 	}
 
 	// Validate batch size
 	if c.BatchSize < 0 {
-		return fmt.Errorf("batchSize must be non-negative")
+		return fmt.Errorf("batch_size must be non-negative")
 	}
 
 	// Validate row limits
 	if c.SkipRows < 0 {
-		return fmt.Errorf("skipRows must be non-negative")
+		return fmt.Errorf("skip_rows must be non-negative")
 	}
 	if c.MaxRows < 0 {
-		return fmt.Errorf("maxRows must be non-negative")
+		return fmt.Errorf("max_rows must be non-negative")
 	}
 
 	return nil
@@ -232,22 +232,22 @@ var importConfigSchema = &jsonschema.Schema{
 	Type:        "object",
 	Description: "Import data from CSV/TSV/JSONL file",
 	Properties: map[string]*jsonschema.Schema{
-		"inputFile":      {Type: "string", Description: "Path to input file"},
-		"table":          {Type: "string", Description: "Target table name"},
-		"format":         {Type: "string", Enum: []any{"csv", "tsv", "jsonl"}, Description: "Input format (auto-detected from file extension if not specified)"},
-		"hasHeader":      {Type: "boolean", Description: "Whether first row is header (default: true)"},
-		"delimiter":      {Type: "string", Description: "Field delimiter (default: ',' for csv, '\\t' for tsv)"},
-		"columns":        {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Explicit column names"},
-		"nullValues":     {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Values to treat as NULL"},
-		"batchSize":      {Type: "integer", Description: "Rows per INSERT statement (default: 1000)"},
-		"onConflict":     {Type: "string", Enum: []any{"error", "ignore", "replace"}, Description: "Conflict handling (default: error)"},
-		"conflictTarget": {Type: "string", Description: "Column(s) for conflict detection (required for PostgreSQL UPSERT with 'replace')"},
-		"updateColumns":  {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Columns to update on conflict (if empty, updates all non-key columns)"},
-		"skipRows":       {Type: "integer", Description: "Skip first N data rows"},
-		"maxRows":        {Type: "integer", Description: "Limit import rows (0 = unlimited)"},
-		"dryRun":         {Type: "boolean", Description: "Validate without importing"},
+		"input_file":      {Type: "string", Description: "Path to input file"},
+		"table":           {Type: "string", Description: "Target table name"},
+		"format":          {Type: "string", Enum: []any{"csv", "tsv", "jsonl"}, Description: "Input format (auto-detected from file extension if not specified)"},
+		"has_header":      {Type: "boolean", Description: "Whether first row is header (default: true)"},
+		"delimiter":       {Type: "string", Description: "Field delimiter (default: ',' for csv, '\\t' for tsv)"},
+		"columns":         {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Explicit column names"},
+		"null_values":     {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Values to treat as NULL"},
+		"batch_size":      {Type: "integer", Description: "Rows per INSERT statement (default: 1000)"},
+		"on_conflict":     {Type: "string", Enum: []any{"error", "ignore", "replace"}, Description: "Conflict handling (default: error)"},
+		"conflict_target": {Type: "string", Description: "Column(s) for conflict detection (required for PostgreSQL UPSERT with 'replace')"},
+		"update_columns":  {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Columns to update on conflict (if empty, updates all non-key columns)"},
+		"skip_rows":       {Type: "integer", Description: "Skip first N data rows"},
+		"max_rows":        {Type: "integer", Description: "Limit import rows (0 = unlimited)"},
+		"dry_run":         {Type: "boolean", Description: "Validate without importing"},
 	},
-	Required: []string{"inputFile", "table"},
+	Required: []string{"input_file", "table"},
 }
 
 // JSON Schema for SQL executor configurations
@@ -262,17 +262,17 @@ var postgresConfigSchema = &jsonschema.Schema{
 				{Type: "array"},
 			},
 		},
-		"timeout":        {Type: "integer", Description: "Query timeout in seconds"},
-		"transaction":    {Type: "boolean", Description: "Wrap execution in transaction"},
-		"isolationLevel": {Type: "string", Enum: []any{"default", "read_committed", "repeatable_read", "serializable"}, Description: "Transaction isolation level"},
-		"advisoryLock":   {Type: "string", Description: "Named advisory lock"},
-		"outputFormat":   {Type: "string", Enum: []any{"jsonl", "json", "csv"}, Description: "Output format"},
-		"headers":        {Type: "boolean", Description: "Include headers in CSV output"},
-		"nullString":     {Type: "string", Description: "String representation for NULL values"},
-		"maxRows":        {Type: "integer", Description: "Maximum rows to return"},
-		"streaming":      {Type: "boolean", Description: "Stream results to file"},
-		"outputFile":     {Type: "string", Description: "File path for streaming output"},
-		"import":         importConfigSchema,
+		"timeout":         {Type: "integer", Description: "Query timeout in seconds"},
+		"transaction":     {Type: "boolean", Description: "Wrap execution in transaction"},
+		"isolation_level": {Type: "string", Enum: []any{"default", "read_committed", "repeatable_read", "serializable"}, Description: "Transaction isolation level"},
+		"advisory_lock":   {Type: "string", Description: "Named advisory lock"},
+		"output_format":   {Type: "string", Enum: []any{"jsonl", "json", "csv"}, Description: "Output format"},
+		"headers":         {Type: "boolean", Description: "Include headers in CSV output"},
+		"null_string":     {Type: "string", Description: "String representation for NULL values"},
+		"max_rows":        {Type: "integer", Description: "Maximum rows to return"},
+		"streaming":       {Type: "boolean", Description: "Stream results to file"},
+		"output_file":     {Type: "string", Description: "File path for streaming output"},
+		"import":          importConfigSchema,
 	},
 	Required: []string{"dsn"},
 }
@@ -288,17 +288,17 @@ var sqliteConfigSchema = &jsonschema.Schema{
 				{Type: "array"},
 			},
 		},
-		"timeout":      {Type: "integer", Description: "Query timeout in seconds"},
-		"transaction":  {Type: "boolean", Description: "Wrap execution in transaction"},
-		"fileLock":     {Type: "boolean", Description: "Use file locking for exclusive access"},
-		"sharedMemory": {Type: "boolean", Description: "Enable shared cache for :memory: databases to share data across DAG steps"},
-		"outputFormat": {Type: "string", Enum: []any{"jsonl", "json", "csv"}, Description: "Output format"},
-		"headers":      {Type: "boolean", Description: "Include headers in CSV output"},
-		"nullString":   {Type: "string", Description: "String representation for NULL values"},
-		"maxRows":      {Type: "integer", Description: "Maximum rows to return"},
-		"streaming":    {Type: "boolean", Description: "Stream results to file"},
-		"outputFile":   {Type: "string", Description: "File path for streaming output"},
-		"import":       importConfigSchema,
+		"timeout":       {Type: "integer", Description: "Query timeout in seconds"},
+		"transaction":   {Type: "boolean", Description: "Wrap execution in transaction"},
+		"file_lock":     {Type: "boolean", Description: "Use file locking for exclusive access"},
+		"shared_memory": {Type: "boolean", Description: "Enable shared cache for :memory: databases to share data across DAG steps"},
+		"output_format": {Type: "string", Enum: []any{"jsonl", "json", "csv"}, Description: "Output format"},
+		"headers":       {Type: "boolean", Description: "Include headers in CSV output"},
+		"null_string":   {Type: "string", Description: "String representation for NULL values"},
+		"max_rows":      {Type: "integer", Description: "Maximum rows to return"},
+		"streaming":     {Type: "boolean", Description: "Stream results to file"},
+		"output_file":   {Type: "string", Description: "File path for streaming output"},
+		"import":        importConfigSchema,
 	},
 	Required: []string{"dsn"},
 }

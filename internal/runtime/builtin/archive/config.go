@@ -14,18 +14,18 @@ type Config struct {
 	Source           string   `mapstructure:"source"`
 	Destination      string   `mapstructure:"destination"`
 	Format           string   `mapstructure:"format"`
-	CompressionLevel int      `mapstructure:"compressionLevel"`
+	CompressionLevel int      `mapstructure:"compression_level"`
 	Password         string   `mapstructure:"password"`
 	Overwrite        bool     `mapstructure:"overwrite"`
-	PreservePaths    bool     `mapstructure:"preservePaths"`
-	StripComponents  int      `mapstructure:"stripComponents"`
+	PreservePaths    bool     `mapstructure:"preserve_paths"`
+	StripComponents  int      `mapstructure:"strip_components"`
 	Include          []string `mapstructure:"include"`
 	Exclude          []string `mapstructure:"exclude"`
-	DryRun           bool     `mapstructure:"dryRun"`
+	DryRun           bool     `mapstructure:"dry_run"`
 	Verbose          bool     `mapstructure:"verbose"`
-	FollowSymlinks   bool     `mapstructure:"followSymlinks"`
-	VerifyIntegrity  bool     `mapstructure:"verifyIntegrity"`
-	ContinueOnError  bool     `mapstructure:"continueOnError"`
+	FollowSymlinks   bool     `mapstructure:"follow_symlinks"`
+	VerifyIntegrity  bool     `mapstructure:"verify_integrity"`
+	ContinueOnError  bool     `mapstructure:"continue_on_error"`
 }
 
 func defaultConfig() Config {
@@ -67,7 +67,7 @@ func validateConfig(operation string, cfg *Config) error {
 	}
 
 	if cfg.StripComponents < 0 {
-		return fmt.Errorf("%w: stripComponents must be >= 0", ErrConfig)
+		return fmt.Errorf("%w: strip_components must be >= 0", ErrConfig)
 	}
 
 	if cfg.Password != "" && operation != opExtract && operation != opList {
@@ -90,21 +90,21 @@ var configSchema = &jsonschema.Schema{
 	Type:     "object",
 	Required: []string{"source"},
 	Properties: map[string]*jsonschema.Schema{
-		"source":           {Type: "string", Description: "File or directory to archive/extract"},
-		"destination":      {Type: "string", Description: "Archive file path (required for create)"},
-		"format":           {Type: "string", Description: "Archive format (zip, tar, tar.gz, etc.)"},
-		"compressionLevel": {Type: "integer", Description: "Compression level (-1 for default)"},
-		"password":         {Type: "string", Description: "Password for extract/list only"},
-		"overwrite":        {Type: "boolean", Description: "Overwrite existing files"},
-		"preservePaths":    {Type: "boolean", Description: "Preserve directory structure (default: true)"},
-		"stripComponents":  {Type: "integer", Minimum: new(float64(0)), Description: "Strip leading path components (must be >= 0)"},
-		"include":          {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Glob patterns to include"},
-		"exclude":          {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Glob patterns to exclude"},
-		"dryRun":           {Type: "boolean", Description: "Simulate without making changes"},
-		"verbose":          {Type: "boolean", Description: "Enable verbose output"},
-		"followSymlinks":   {Type: "boolean", Description: "Follow symbolic links"},
-		"verifyIntegrity":  {Type: "boolean", Description: "Verify archive integrity"},
-		"continueOnError":  {Type: "boolean", Description: "Continue on errors"},
+		"source":            {Type: "string", Description: "File or directory to archive/extract"},
+		"destination":       {Type: "string", Description: "Archive file path (required for create)"},
+		"format":            {Type: "string", Description: "Archive format (zip, tar, tar.gz, etc.)"},
+		"compression_level": {Type: "integer", Description: "Compression level (-1 for default)"},
+		"password":          {Type: "string", Description: "Password for extract/list only"},
+		"overwrite":         {Type: "boolean", Description: "Overwrite existing files"},
+		"preserve_paths":    {Type: "boolean", Description: "Preserve directory structure (default: true)"},
+		"strip_components":  {Type: "integer", Minimum: new(float64(0)), Description: "Strip leading path components (must be >= 0)"},
+		"include":           {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Glob patterns to include"},
+		"exclude":           {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Glob patterns to exclude"},
+		"dry_run":           {Type: "boolean", Description: "Simulate without making changes"},
+		"verbose":           {Type: "boolean", Description: "Enable verbose output"},
+		"follow_symlinks":   {Type: "boolean", Description: "Follow symbolic links"},
+		"verify_integrity":  {Type: "boolean", Description: "Verify archive integrity"},
+		"continue_on_error": {Type: "boolean", Description: "Continue on errors"},
 	},
 }
 

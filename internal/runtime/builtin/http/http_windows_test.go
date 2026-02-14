@@ -273,15 +273,15 @@ func TestHTTPExecutor_WindowsSpecific(t *testing.T) {
 		}))
 		defer server.Close()
 
-		// Test with skipTLSVerify = true (should work)
+		// Test with skip_tls_verify = true (should work)
 		step := core.Step{
 			Command: "GET",
 			Args:    []string{server.URL},
 			ExecutorConfig: core.ExecutorConfig{
 				Type: "http",
 				Config: map[string]any{
-					"skipTLSVerify": true,
-					"silent":        true,
+					"skip_tls_verify": true,
+					"silent":          true,
 				},
 			},
 		}

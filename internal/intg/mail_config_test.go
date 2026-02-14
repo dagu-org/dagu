@@ -68,7 +68,7 @@ env:
   - WAIT_PREFIX: "[Waiting]"
   - OPS_EMAIL: ops@example.com
 
-waitMail:
+wait_mail:
   from: alerts@example.com
   to: ${OPS_EMAIL}
   prefix: ${WAIT_PREFIX}
@@ -103,7 +103,7 @@ env:
   - ADMIN1: admin1@example.com
   - ADMIN2: admin2@example.com
 
-errorMail:
+error_mail:
   from: alerts@example.com
   to:
     - ${ADMIN1}
@@ -157,14 +157,14 @@ smtp:
   username: ${SMTP_USER}
   password: ${SMTP_PASS}
 
-errorMail:
+error_mail:
   from: ${SMTP_USER}
   to:
     - ${ADMIN_EMAIL}
     - ${OPS_EMAIL}
   prefix: "[ERROR]"
 
-infoMail:
+info_mail:
   from: ${SMTP_USER}
   to: ${OPS_EMAIL}
   prefix: "[INFO]"
@@ -191,12 +191,12 @@ steps:
 		require.Equal(t, "${SMTP_USER}", dag.DAG.SMTP.Username)
 		require.Equal(t, "${SMTP_PASS}", dag.DAG.SMTP.Password)
 
-		// errorMail config preserves templates
+		// error_mail config preserves templates
 		require.NotNil(t, dag.DAG.ErrorMail)
 		require.Equal(t, "${SMTP_USER}", dag.DAG.ErrorMail.From)
 		require.Equal(t, []string{"${ADMIN_EMAIL}", "${OPS_EMAIL}"}, dag.DAG.ErrorMail.To)
 
-		// infoMail config preserves templates
+		// info_mail config preserves templates
 		require.NotNil(t, dag.DAG.InfoMail)
 		require.Equal(t, "${SMTP_USER}", dag.DAG.InfoMail.From)
 		require.Equal(t, []string{"${OPS_EMAIL}"}, dag.DAG.InfoMail.To)

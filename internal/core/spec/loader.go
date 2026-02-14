@@ -603,10 +603,11 @@ func decode(cm map[string]any) (*dag, error) {
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,
 		Result:      c,
-		TagName:     "",
+		TagName:     "yaml",
 		DecodeHook:  TypedUnionDecodeHook(),
 	})
 	err := md.Decode(cm)
+	err = withSnakeCaseKeyHint(err)
 
 	return c, err
 }

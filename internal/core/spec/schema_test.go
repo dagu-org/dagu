@@ -268,7 +268,7 @@ func TestLoadSchemaFromFile(t *testing.T) {
 		dagPath := filepath.Join(dagDir, "dag.yaml")
 		require.NoError(t, os.WriteFile(schemaPath, []byte(schemaContent), 0600))
 
-		// Whitespace-only workingDir should be skipped, fall back to dagDir
+		// Whitespace-only working_dir should be skipped, fall back to dagDir
 		data, err := loadSchemaFromFile("   ", dagPath, "schema.json")
 		require.NoError(t, err)
 		assert.Equal(t, schemaContent, string(data))
@@ -585,7 +585,7 @@ func TestBuildParamsSchemaResolution(t *testing.T) {
 		})
 
 		data := fmt.Appendf(nil, `
-workingDir: %s
+working_dir: %s
 params:
   schema: "schema.json"
   values:
@@ -652,7 +652,7 @@ params:
 		defer func() { _ = os.Chdir(orig) }()
 
 		data := fmt.Appendf(nil, `
-workingDir: %s
+working_dir: %s
 params:
   schema: "schema.json"
   values:

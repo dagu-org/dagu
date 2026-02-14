@@ -30,14 +30,14 @@ type http struct {
 }
 
 type httpConfig struct {
-	Timeout       int               `json:"timeout"`
-	Headers       map[string]string `json:"headers"`
-	Query         map[string]string `json:"query"`
-	Body          string            `json:"body"`
-	Silent        bool              `json:"silent"`
-	Debug         bool              `json:"debug"`
-	JSON          bool              `json:"json"`
-	SkipTLSVerify bool              `json:"skipTLSVerify"`
+	Timeout       int               `json:"timeout" mapstructure:"timeout"`
+	Headers       map[string]string `json:"headers" mapstructure:"headers"`
+	Query         map[string]string `json:"query" mapstructure:"query"`
+	Body          string            `json:"body" mapstructure:"body"`
+	Silent        bool              `json:"silent" mapstructure:"silent"`
+	Debug         bool              `json:"debug" mapstructure:"debug"`
+	JSON          bool              `json:"json" mapstructure:"json"`
+	SkipTLSVerify bool              `json:"skip_tls_verify" mapstructure:"skip_tls_verify"`
 }
 
 type httpJSONResult struct {
@@ -198,7 +198,7 @@ func decodeHTTPConfig(dat map[string]any, cfg *httpConfig) error {
 
 func decodeHTTPConfigFromString(_ context.Context, source string, target *httpConfig) error {
 	if len(source) > 0 {
-		if err := json.Unmarshal([]byte(source), &target); err != nil {
+		if err := json.Unmarshal([]byte(source), target); err != nil {
 			return err
 		}
 	}

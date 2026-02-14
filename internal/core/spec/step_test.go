@@ -480,9 +480,9 @@ func TestBuildStepContinueOn(t *testing.T) {
 		{
 			name: "ObjectWithMultipleFields",
 			continueOn: continueOnValueMap(map[string]any{
-				"skipped":     true,
-				"failed":      true,
-				"markSuccess": true,
+				"skipped":      true,
+				"failed":       true,
+				"mark_success": true,
 			}),
 			expected: core.ContinueOn{Skipped: true, Failure: true, MarkSuccess: true},
 		},
@@ -1484,8 +1484,8 @@ func TestBuildStepParallel(t *testing.T) {
 		{
 			name: "ObjectConfigWithItemsArray",
 			parallel: map[string]any{
-				"items":         []any{"a", "b"},
-				"maxConcurrent": 5,
+				"items":          []any{"a", "b"},
+				"max_concurrent": 5,
 			},
 			expected: &core.ParallelConfig{
 				Items: []core.ParallelItem{
@@ -1498,8 +1498,8 @@ func TestBuildStepParallel(t *testing.T) {
 		{
 			name: "ObjectConfigWithVariableReference",
 			parallel: map[string]any{
-				"items":         "${MY_ITEMS}",
-				"maxConcurrent": 3,
+				"items":          "${MY_ITEMS}",
+				"max_concurrent": 3,
 			},
 			expected: &core.ParallelConfig{
 				Variable:      "${MY_ITEMS}",
@@ -1509,8 +1509,8 @@ func TestBuildStepParallel(t *testing.T) {
 		{
 			name: "MaxConcurrentAsInt64",
 			parallel: map[string]any{
-				"items":         "${ITEMS}",
-				"maxConcurrent": int64(10),
+				"items":          "${ITEMS}",
+				"max_concurrent": int64(10),
 			},
 			expected: &core.ParallelConfig{
 				Variable:      "${ITEMS}",
@@ -1520,8 +1520,8 @@ func TestBuildStepParallel(t *testing.T) {
 		{
 			name: "MaxConcurrentAsFloat64",
 			parallel: map[string]any{
-				"items":         "${ITEMS}",
-				"maxConcurrent": float64(7),
+				"items":          "${ITEMS}",
+				"max_concurrent": float64(7),
 			},
 			expected: &core.ParallelConfig{
 				Variable:      "${ITEMS}",
@@ -1543,8 +1543,8 @@ func TestBuildStepParallel(t *testing.T) {
 		{
 			name: "InvalidMaxConcurrentType",
 			parallel: map[string]any{
-				"items":         "${ITEMS}",
-				"maxConcurrent": "invalid",
+				"items":          "${ITEMS}",
+				"max_concurrent": "invalid",
 			},
 			wantErr: true,
 		},
@@ -2468,7 +2468,7 @@ func TestValidateWorkerSelector(t *testing.T) {
 		workerSelector map[string]string
 		wantErr        bool
 	}{
-		// Executors that support workerSelector
+		// Executors that support worker_selector
 		{
 			name:           "WorkerSelectorWithDAGExecutor",
 			executorType:   "dag",
@@ -2487,7 +2487,7 @@ func TestValidateWorkerSelector(t *testing.T) {
 			workerSelector: map[string]string{"env": "prod"},
 			wantErr:        false,
 		},
-		// Executors that do not support workerSelector
+		// Executors that do not support worker_selector
 		{
 			name:           "WorkerSelectorWithShellExecutor",
 			executorType:   "shell",
@@ -2512,7 +2512,7 @@ func TestValidateWorkerSelector(t *testing.T) {
 			workerSelector: map[string]string{"env": "prod"},
 			wantErr:        true,
 		},
-		// Empty workerSelector - should always pass
+		// Empty worker_selector - should always pass
 		{
 			name:           "NoWorkerSelectorWithShellExecutor",
 			executorType:   "shell",
@@ -2540,7 +2540,7 @@ func TestValidateWorkerSelector(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "does not support workerSelector field")
+				assert.Contains(t, err.Error(), "does not support worker_selector field")
 				assert.Contains(t, err.Error(), tt.executorType)
 			} else {
 				assert.NoError(t, err)
@@ -2585,30 +2585,30 @@ func TestBuildStepLogOutput(t *testing.T) {
 		},
 		{
 			name:     "ExplicitSeparate",
-			yaml:     "logOutput: separate",
+			yaml:     "log_output: separate",
 			expected: core.LogOutputSeparate,
 		},
 		{
 			name:     "Merged",
-			yaml:     "logOutput: merged",
+			yaml:     "log_output: merged",
 			expected: core.LogOutputMerged,
 		},
 		{
 			name:     "MergedUppercase",
-			yaml:     "logOutput: MERGED",
+			yaml:     "log_output: MERGED",
 			expected: core.LogOutputMerged,
 		},
 		{
 			name:        "InvalidValue",
-			yaml:        "logOutput: invalid",
+			yaml:        "log_output: invalid",
 			wantErr:     true,
-			errContains: "invalid logOutput value",
+			errContains: "invalid log_output value",
 		},
 		{
 			name:        "InvalidValue_Both",
-			yaml:        "logOutput: both",
+			yaml:        "log_output: both",
 			wantErr:     true,
-			errContains: "invalid logOutput value",
+			errContains: "invalid log_output value",
 		},
 	}
 
@@ -2687,7 +2687,7 @@ func TestValidateStdoutStderr(t *testing.T) {
 			stdout:      "output.log",
 			stderr:      "output.log",
 			wantErr:     true,
-			errContains: "logOutput: merged",
+			errContains: "log_output: merged",
 		},
 	}
 
@@ -2729,7 +2729,7 @@ stderr: /tmp/combined.log
 	_, err = s.build(testStepBuildContext())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "stdout and stderr cannot point to the same file")
-	assert.Contains(t, err.Error(), "logOutput: merged")
+	assert.Contains(t, err.Error(), "log_output: merged")
 }
 
 func TestParseOutputConfig(t *testing.T) {
@@ -3376,7 +3376,7 @@ func TestBuildStepLLM(t *testing.T) {
 				LLM:  &llmConfig{Provider: "openai", Model: model("gpt-4"), MaxTokens: tokens(0)},
 			},
 			wantErr: true,
-			errMsg:  "llm.maxTokens",
+			errMsg:  "llm.max_tokens",
 		},
 		{
 			name: "TopPTooLow",
@@ -3385,7 +3385,7 @@ func TestBuildStepLLM(t *testing.T) {
 				LLM:  &llmConfig{Provider: "openai", Model: model("gpt-4"), TopP: temp(-0.1)},
 			},
 			wantErr: true,
-			errMsg:  "llm.topP",
+			errMsg:  "llm.top_p",
 		},
 		{
 			name: "TopPTooHigh",
@@ -3394,7 +3394,7 @@ func TestBuildStepLLM(t *testing.T) {
 				LLM:  &llmConfig{Provider: "openai", Model: model("gpt-4"), TopP: temp(1.1)},
 			},
 			wantErr: true,
-			errMsg:  "llm.topP",
+			errMsg:  "llm.top_p",
 		},
 		{
 			name: "ValidConfig",

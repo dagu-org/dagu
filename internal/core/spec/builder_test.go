@@ -609,7 +609,7 @@ steps:
 			yaml: `
 steps:
   - command: "echo 1"
-    continueOn:
+    continue_on:
       skipped: true
       failure: true
 `,
@@ -621,7 +621,7 @@ steps:
 			yaml: `
 steps:
   - command: "echo 1"
-    continueOn: skipped
+    continue_on: skipped
 `,
 			wantSkipped: true,
 			wantFailure: false,
@@ -631,7 +631,7 @@ steps:
 			yaml: `
 steps:
   - command: "echo 1"
-    continueOn: failed
+    continue_on: failed
 `,
 			wantSkipped: false,
 			wantFailure: true,
@@ -641,7 +641,7 @@ steps:
 			yaml: `
 steps:
   - command: "echo 1"
-    continueOn: SKIPPED
+    continue_on: SKIPPED
 `,
 			wantSkipped: true,
 		},
@@ -650,9 +650,9 @@ steps:
 			yaml: `
 steps:
   - command: "echo 1"
-    continueOn:
-      exitCode: [1, 2, 3]
-      markSuccess: true
+    continue_on:
+      exit_code: [1, 2, 3]
+      mark_success: true
 `,
 			wantExitCode:    []int{1, 2, 3},
 			wantMarkSuccess: true,
@@ -687,39 +687,39 @@ steps:
 			yaml: `
 steps:
   - command: "echo 1"
-    continueOn: invalid
+    continue_on: invalid
 `,
-			errContains: []string{"continueOn"},
+			errContains: []string{"continue_on"},
 		},
 		{
 			name: "ContinueOnInvalidFailureType",
 			yaml: `
 steps:
   - command: "echo 1"
-    continueOn:
+    continue_on:
       failure: "true"
 `,
-			errContains: []string{"continueOn.failure", "boolean"},
+			errContains: []string{"continue_on.failure", "bool"},
 		},
 		{
 			name: "ContinueOnInvalidSkippedType",
 			yaml: `
 steps:
   - command: "echo 1"
-    continueOn:
+    continue_on:
       skipped: 1
 `,
-			errContains: []string{"continueOn.skipped", "boolean"},
+			errContains: []string{"continue_on.skipped", "bool"},
 		},
 		{
 			name: "ContinueOnInvalidMarkSuccessType",
 			yaml: `
 steps:
   - command: "echo 1"
-    continueOn:
-      markSuccess: "yes"
+    continue_on:
+      mark_success: "yes"
 `,
-			errContains: []string{"continueOn.markSuccess", "boolean"},
+			errContains: []string{"continue_on.mark_success", "bool"},
 		},
 	}
 
@@ -747,9 +747,9 @@ steps:
 			yaml: `
 steps:
   - command: "echo 2"
-    retryPolicy:
+    retry_policy:
       limit: 3
-      intervalSec: 10
+      interval_sec: 10
 `,
 			wantLimit:    3,
 			wantInterval: 10 * time.Second,
@@ -760,11 +760,11 @@ steps:
 steps:
   - name: "test_backoff"
     command: "echo test"
-    retryPolicy:
+    retry_policy:
       limit: 5
-      intervalSec: 2
+      interval_sec: 2
       backoff: 2.0
-      maxIntervalSec: 30
+      max_interval_sec: 30
 `,
 			wantLimit:       5,
 			wantInterval:    2 * time.Second,
@@ -777,11 +777,11 @@ steps:
 steps:
   - name: "test_backoff_bool"
     command: "echo test"
-    retryPolicy:
+    retry_policy:
       limit: 3
-      intervalSec: 1
+      interval_sec: 1
       backoff: true
-      maxIntervalSec: 10
+      max_interval_sec: 10
 `,
 			wantLimit:       3,
 			wantInterval:    1 * time.Second,
@@ -820,9 +820,9 @@ steps:
 steps:
   - name: "test"
     command: "echo test"
-    retryPolicy:
+    retry_policy:
       limit: 3
-      intervalSec: 1
+      interval_sec: 1
       backoff: 0.8
 `,
 			errContains: "backoff must be greater than 1.0",
@@ -833,10 +833,10 @@ steps:
 steps:
   - name: "test"
     command: "echo test"
-    retryPolicy:
-      intervalSec: 5
+    retry_policy:
+      interval_sec: 5
 `,
-			errContains: "limit is required when retryPolicy is specified",
+			errContains: "limit is required when retry_policy is specified",
 		},
 		{
 			name: "RetryPolicyMissingIntervalSec",
@@ -844,10 +844,10 @@ steps:
 steps:
   - name: "test"
     command: "echo test"
-    retryPolicy:
+    retry_policy:
       limit: 3
 `,
-			errContains: "intervalSec is required when retryPolicy is specified",
+			errContains: "interval_sec is required when retry_policy is specified",
 		},
 	}
 
@@ -879,9 +879,9 @@ steps:
 			yaml: `
 steps:
   - command: "echo 2"
-    repeatPolicy:
+    repeat_policy:
       repeat: true
-      intervalSec: 60
+      interval_sec: 60
 `,
 			wantMode:     core.RepeatModeWhile,
 			wantInterval: 60 * time.Second,
@@ -893,10 +893,10 @@ steps:
 steps:
   - name: "repeat-while-condition"
     command: "echo test"
-    repeatPolicy:
+    repeat_policy:
       repeat: "while"
       condition: "echo hello"
-      intervalSec: 5
+      interval_sec: 5
       limit: 3
 `,
 			wantMode:      core.RepeatModeWhile,
@@ -911,11 +911,11 @@ steps:
 steps:
   - name: "repeat-until-condition"
     command: "echo test"
-    repeatPolicy:
+    repeat_policy:
       repeat: "until"
       condition: "echo hello"
       expected: "hello"
-      intervalSec: 10
+      interval_sec: 10
       limit: 5
 `,
 			wantMode:      core.RepeatModeUntil,
@@ -930,10 +930,10 @@ steps:
 steps:
   - name: "repeat-while-exitcode"
     command: "exit 1"
-    repeatPolicy:
+    repeat_policy:
       repeat: "while"
-      exitCode: [1, 2]
-      intervalSec: 15
+      exit_code: [1, 2]
+      interval_sec: 15
 `,
 			wantMode:        core.RepeatModeWhile,
 			wantInterval:    15 * time.Second,
@@ -946,10 +946,10 @@ steps:
 steps:
   - name: "repeat-until-exitcode"
     command: "exit 0"
-    repeatPolicy:
+    repeat_policy:
       repeat: "until"
-      exitCode: [0]
-      intervalSec: 20
+      exit_code: [0]
+      interval_sec: 20
 `,
 			wantMode:        core.RepeatModeUntil,
 			wantInterval:    20 * time.Second,
@@ -962,10 +962,10 @@ steps:
 steps:
   - name: "repeat-backward-compatibility-until"
     command: "echo test"
-    repeatPolicy:
+    repeat_policy:
       condition: "echo hello"
       expected: "hello"
-      intervalSec: 25
+      interval_sec: 25
 `,
 			wantMode:      core.RepeatModeUntil,
 			wantInterval:  25 * time.Second,
@@ -978,9 +978,9 @@ steps:
 steps:
   - name: "repeat-backward-compatibility-while"
     command: "echo test"
-    repeatPolicy:
+    repeat_policy:
       condition: "echo hello"
-      intervalSec: 30
+      interval_sec: 30
 `,
 			wantMode:      core.RepeatModeWhile,
 			wantInterval:  30 * time.Second,
@@ -993,10 +993,10 @@ steps:
 steps:
   - name: "repeat-condition"
     command: "echo hello"
-    repeatPolicy:
+    repeat_policy:
       condition: "echo hello"
       expected: "hello"
-      intervalSec: 1
+      interval_sec: 1
 `,
 			wantMode:      core.RepeatModeUntil,
 			wantInterval:  1 * time.Second,
@@ -1009,9 +1009,9 @@ steps:
 steps:
   - name: "repeat-exitcode"
     command: "exit 42"
-    repeatPolicy:
-      exitCode: [42]
-      intervalSec: 2
+    repeat_policy:
+      exit_code: [42]
+      interval_sec: 2
 `,
 			wantMode:     core.RepeatModeWhile,
 			wantInterval: 2 * time.Second,
@@ -1023,13 +1023,13 @@ steps:
 steps:
   - name: "test_repeat_backoff"
     command: "echo test"
-    repeatPolicy:
+    repeat_policy:
       repeat: while
-      intervalSec: 5
+      interval_sec: 5
       backoff: 1.5
-      maxIntervalSec: 60
+      max_interval_sec: 60
       limit: 10
-      exitCode: [1]
+      exit_code: [1]
 `,
 			wantMode:        core.RepeatModeWhile,
 			wantInterval:    5 * time.Second,
@@ -1044,11 +1044,11 @@ steps:
 steps:
   - name: "test_repeat_backoff_bool"
     command: "echo test"
-    repeatPolicy:
+    repeat_policy:
       repeat: until
-      intervalSec: 2
+      interval_sec: 2
       backoff: true
-      maxIntervalSec: 20
+      max_interval_sec: 20
       limit: 5
       condition: "echo done"
       expected: "done"
@@ -1099,7 +1099,7 @@ steps:
 steps:
   - command: echo 1
     name: step1
-    signalOnStop: SIGINT
+    signal_on_stop: SIGINT
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -1187,9 +1187,9 @@ steps:
 steps:
   - name: "invalid-repeat"
     command: "echo test"
-    repeatPolicy:
+    repeat_policy:
       repeat: "invalid"
-      intervalSec: 10
+      interval_sec: 10
 `,
 			errContains: "invalid value for repeat: 'invalid'",
 		},
@@ -1199,11 +1199,11 @@ steps:
 steps:
   - name: "while-no-condition"
     command: "echo test"
-    repeatPolicy:
+    repeat_policy:
       repeat: "while"
-      intervalSec: 10
+      interval_sec: 10
 `,
-			errContains: "repeat mode 'while' requires either 'condition' or 'exitCode' to be specified",
+			errContains: "repeat mode 'while' requires either 'condition' or 'exit_code' to be specified",
 		},
 		{
 			name: "RepeatPolicyUntilNoCondition",
@@ -1211,11 +1211,11 @@ steps:
 steps:
   - name: "until-no-condition"
     command: "echo test"
-    repeatPolicy:
+    repeat_policy:
       repeat: "until"
-      intervalSec: 10
+      interval_sec: 10
 `,
-			errContains: "repeat mode 'until' requires either 'condition' or 'exitCode' to be specified",
+			errContains: "repeat mode 'until' requires either 'condition' or 'exit_code' to be specified",
 		},
 		{
 			name: "RepeatPolicyInvalidType",
@@ -1223,9 +1223,9 @@ steps:
 steps:
   - name: "invalid-type"
     command: "echo test"
-    repeatPolicy:
+    repeat_policy:
       repeat: 123
-      intervalSec: 10
+      interval_sec: 10
 `,
 			errContains: "invalid value for repeat",
 		},
@@ -1235,11 +1235,11 @@ steps:
 steps:
   - name: "test"
     command: "echo test"
-    repeatPolicy:
+    repeat_policy:
       repeat: "while"
-      intervalSec: 1
+      interval_sec: 1
       backoff: 1.0
-      exitCode: [1]
+      exit_code: [1]
 `,
 			errContains: "backoff must be greater than 1.0",
 		},
@@ -1249,11 +1249,11 @@ steps:
 steps:
   - name: "test"
     command: "echo test"
-    repeatPolicy:
+    repeat_policy:
       repeat: "while"
-      intervalSec: 1
+      interval_sec: 1
       backoff: 0.5
-      exitCode: [1]
+      exit_code: [1]
 `,
 			errContains: "backoff must be greater than 1.0",
 		},
@@ -2082,7 +2082,7 @@ func TestContainer(t *testing.T) {
 			yaml: `
 container:
   image: python:3.11-slim
-  pullPolicy: always
+  pull_policy: always
 steps:
   - name: step1
     command: python script.py
@@ -2210,7 +2210,7 @@ steps:
 			yaml := `
 container:
   image: alpine
-  pullPolicy: ` + tt.pullPolicy + `
+  pull_policy: ` + tt.pullPolicy + `
 steps:
   - name: step1
     command: echo test
@@ -2259,7 +2259,7 @@ steps:
 container:
   exec: my-container
   user: root
-  workingDir: /app
+  working_dir: /app
   env:
     - MY_VAR: value
 steps:
@@ -2300,7 +2300,7 @@ steps:
     container:
       exec: my-step-container
       user: nobody
-      workingDir: /tmp
+      working_dir: /tmp
     command: echo test
 `
 		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
@@ -2323,7 +2323,7 @@ steps:
 			yaml: `
 container:
   image: alpine
-  pullPolicy: invalid_policy
+  pull_policy: invalid_policy
 steps:
   - name: step1
     command: echo test
@@ -2334,7 +2334,7 @@ steps:
 			name: "ContainerWithoutImage",
 			yaml: `
 container:
-  pullPolicy: always
+  pull_policy: always
   env:
     - FOO: bar
 steps:
@@ -2398,7 +2398,7 @@ steps:
 			yaml: `
 container:
   exec: my-container
-  pullPolicy: always
+  pull_policy: always
 steps:
   - name: step1
     command: echo test
@@ -2444,7 +2444,7 @@ steps:
 		yaml := `
 container:
   image: node:18-alpine
-  pullPolicy: missing
+  pull_policy: missing
   env:
     - NODE_ENV: production
     - API_KEY: secret123
@@ -2452,13 +2452,13 @@ container:
     - /data:/data:ro
     - /output:/output:rw
   user: "1000:1000"
-  workingDir: /app
+  working_dir: /app
   platform: linux/amd64
   ports:
     - "8080:8080"
     - "9090:9090"
   network: bridge
-  keepContainer: true
+  keep_container: true
 steps:
   - name: step1
     command: node app.js
@@ -2884,7 +2884,7 @@ func TestDAGLoadEnv(t *testing.T) {
 		require.NoError(t, err)
 
 		yaml := fmt.Sprintf(`
-workingDir: %s
+working_dir: %s
 dotenv: .env
 env:
   - LOAD_ENV_ENV_VAR: from_dag
@@ -3173,7 +3173,7 @@ func TestBuildLogOutput(t *testing.T) {
 
 		data := []byte(`
 name: test-dag
-logoutput: separate
+log_output: separate
 steps:
   - name: step1
     command: echo hello
@@ -3188,7 +3188,7 @@ steps:
 
 		data := []byte(`
 name: test-dag
-logoutput: merged
+log_output: merged
 steps:
   - name: step1
     command: echo hello
@@ -3222,11 +3222,11 @@ steps:
 
 		data := []byte(`
 name: test-dag
-logoutput: separate
+log_output: separate
 steps:
   - name: step1
     command: echo hello
-    logOutput: merged
+    log_output: merged
   - name: step2
     command: echo world
 `)
@@ -3248,11 +3248,11 @@ steps:
 
 		data := []byte(`
 name: test-dag
-logoutput: merged
+log_output: merged
 steps:
   - name: step1
     command: echo hello
-    logOutput: separate
+    log_output: separate
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -3269,11 +3269,11 @@ steps:
 
 		data := []byte(`
 name: test-dag
-logoutput: MERGED
+log_output: MERGED
 steps:
   - name: step1
     command: echo hello
-    logOutput: SEPARATE
+    log_output: SEPARATE
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -3287,14 +3287,14 @@ steps:
 
 		data := []byte(`
 name: test-dag
-logoutput: invalid
+log_output: invalid
 steps:
   - name: step1
     command: echo hello
 `)
 		_, err := spec.LoadYAML(context.Background(), data)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid logOutput value")
+		assert.Contains(t, err.Error(), "invalid log_output value")
 	})
 
 	t.Run("InvalidStepValue", func(t *testing.T) {
@@ -3305,11 +3305,11 @@ name: test-dag
 steps:
   - name: step1
     command: echo hello
-    logOutput: both
+    log_output: both
 `)
 		_, err := spec.LoadYAML(context.Background(), data)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid logOutput value")
+		assert.Contains(t, err.Error(), "invalid log_output value")
 	})
 }
 
@@ -3335,7 +3335,7 @@ steps:
 
 		data := []byte(`
 name: test-dag
-maxActiveRuns: 1
+max_active_runs: 1
 steps:
   - name: step1
     command: echo hello
@@ -3350,7 +3350,7 @@ steps:
 
 		data := []byte(`
 name: test-dag
-maxActiveRuns: 3
+max_active_runs: 3
 steps:
   - name: step1
     command: echo hello
@@ -3358,7 +3358,7 @@ steps:
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		require.Len(t, dag.BuildWarnings, 1)
-		assert.Contains(t, dag.BuildWarnings[0], "maxActiveRuns=3 is deprecated")
+		assert.Contains(t, dag.BuildWarnings[0], "max_active_runs=3 is deprecated")
 		assert.Contains(t, dag.BuildWarnings[0], "global queue")
 	})
 
@@ -3367,7 +3367,7 @@ steps:
 
 		data := []byte(`
 name: test-dag
-maxActiveRuns: -1
+max_active_runs: -1
 steps:
   - name: step1
     command: echo hello
@@ -3375,7 +3375,7 @@ steps:
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		require.Len(t, dag.BuildWarnings, 1)
-		assert.Contains(t, dag.BuildWarnings[0], "maxActiveRuns=-1 is deprecated")
+		assert.Contains(t, dag.BuildWarnings[0], "max_active_runs=-1 is deprecated")
 	})
 
 	t.Run("NoWarningWithGlobalQueue", func(t *testing.T) {
@@ -3384,7 +3384,7 @@ steps:
 		data := []byte(`
 name: test-dag
 queue: my-global-queue
-maxActiveRuns: 5
+max_active_runs: 5
 steps:
   - name: step1
     command: echo hello

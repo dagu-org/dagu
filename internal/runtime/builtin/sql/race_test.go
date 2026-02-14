@@ -248,10 +248,10 @@ func TestRace_ConfigParsing(t *testing.T) {
 	var wg sync.WaitGroup
 
 	configs := []map[string]any{
-		{"dsn": ":memory:", "outputFormat": "jsonl"},
-		{"dsn": ":memory:", "outputFormat": "json"},
-		{"dsn": ":memory:", "outputFormat": "csv", "headers": true},
-		{"dsn": ":memory:", "transaction": true, "isolationLevel": "serializable"},
+		{"dsn": ":memory:", "output_format": "jsonl"},
+		{"dsn": ":memory:", "output_format": "json"},
+		{"dsn": ":memory:", "output_format": "csv", "headers": true},
+		{"dsn": ":memory:", "transaction": true, "isolation_level": "serializable"},
 	}
 
 	for i := range numGoroutines {

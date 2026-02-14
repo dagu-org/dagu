@@ -33,7 +33,7 @@ container:
   image: %s
   startup: command
   command: ["minio", "server", "/data", "--console-address", ":9001"]
-  waitFor: running
+  wait_for: running
   volumes:
     - %s:/host-data:rw
   env:

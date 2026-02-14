@@ -23,7 +23,7 @@ func TestPartialSuccess(t *testing.T) {
 steps:
   - name: fail-step
     command: exit 1
-    continueOn:
+    continue_on:
       failure: true
 
   - name: success-step
@@ -37,9 +37,9 @@ steps:
 steps:
   - name: fail-step
     command: exit 1
-    continueOn:
+    continue_on:
       failure: true
-      markSuccess: true
+      mark_success: true
 
   - name: success-step
     command: echo "This step should run even if the previous one fails"
@@ -52,7 +52,7 @@ steps:
 steps:
   - name: fail-step
     command: exit 1
-    continueOn:
+    continue_on:
       failure: true
 `,
 			expectedStatus: core.Failed,
@@ -63,9 +63,9 @@ steps:
 steps:
   - name: fail-step
     command: exit 1
-    continueOn:
+    continue_on:
       failure: true
-      markSuccess: true
+      mark_success: true
 `,
 			expectedStatus: core.Succeeded,
 		},

@@ -62,10 +62,10 @@ func TestParseConfig_Valid(t *testing.T) {
 		{
 			name: "sentinel mode",
 			input: map[string]any{
-				"mode":           "sentinel",
-				"sentinelMaster": "mymaster",
-				"sentinelAddrs":  []string{"sentinel1:26379", "sentinel2:26379"},
-				"command":        "PING",
+				"mode":            "sentinel",
+				"sentinel_master": "mymaster",
+				"sentinel_addrs":  []string{"sentinel1:26379", "sentinel2:26379"},
+				"command":         "PING",
 			},
 			expected: func(t *testing.T, cfg *Config) {
 				assert.Equal(t, "sentinel", cfg.Mode)
@@ -76,9 +76,9 @@ func TestParseConfig_Valid(t *testing.T) {
 		{
 			name: "cluster mode",
 			input: map[string]any{
-				"mode":         "cluster",
-				"clusterAddrs": []string{"node1:6379", "node2:6379", "node3:6379"},
-				"command":      "PING",
+				"mode":          "cluster",
+				"cluster_addrs": []string{"node1:6379", "node2:6379", "node3:6379"},
+				"command":       "PING",
 			},
 			expected: func(t *testing.T, cfg *Config) {
 				assert.Equal(t, "cluster", cfg.Mode)
@@ -88,10 +88,10 @@ func TestParseConfig_Valid(t *testing.T) {
 		{
 			name: "with TLS",
 			input: map[string]any{
-				"host":          "localhost",
-				"tls":           true,
-				"tlsSkipVerify": true,
-				"command":       "PING",
+				"host":            "localhost",
+				"tls":             true,
+				"tls_skip_verify": true,
+				"command":         "PING",
 			},
 			expected: func(t *testing.T, cfg *Config) {
 				assert.True(t, cfg.TLS)
@@ -116,9 +116,9 @@ func TestParseConfig_Valid(t *testing.T) {
 		{
 			name: "with script",
 			input: map[string]any{
-				"host":       "localhost",
-				"script":     "return redis.call('GET', KEYS[1])",
-				"scriptKeys": []string{"mykey"},
+				"host":        "localhost",
+				"script":      "return redis.call('GET', KEYS[1])",
+				"script_keys": []string{"mykey"},
 			},
 			expected: func(t *testing.T, cfg *Config) {
 				assert.Equal(t, "return redis.call('GET', KEYS[1])", cfg.Script)
@@ -128,10 +128,10 @@ func TestParseConfig_Valid(t *testing.T) {
 		{
 			name: "output formats",
 			input: map[string]any{
-				"host":         "localhost",
-				"command":      "PING",
-				"outputFormat": "jsonl",
-				"nullValue":    "<nil>",
+				"host":          "localhost",
+				"command":       "PING",
+				"output_format": "jsonl",
+				"null_value":    "<nil>",
 			},
 			expected: func(t *testing.T, cfg *Config) {
 				assert.Equal(t, "jsonl", cfg.OutputFormat)
@@ -176,22 +176,22 @@ func TestParseConfig_Invalid(t *testing.T) {
 		{
 			name: "sentinel without master",
 			input: map[string]any{
-				"host":          "localhost",
-				"mode":          "sentinel",
-				"sentinelAddrs": []string{"s1:26379"},
-				"command":       "PING",
+				"host":           "localhost",
+				"mode":           "sentinel",
+				"sentinel_addrs": []string{"s1:26379"},
+				"command":        "PING",
 			},
-			errContains: "sentinelMaster is required",
+			errContains: "sentinel_master is required",
 		},
 		{
 			name: "sentinel without addrs",
 			input: map[string]any{
-				"host":           "localhost",
-				"mode":           "sentinel",
-				"sentinelMaster": "mymaster",
-				"command":        "PING",
+				"host":            "localhost",
+				"mode":            "sentinel",
+				"sentinel_master": "mymaster",
+				"command":         "PING",
 			},
-			errContains: "sentinelAddrs is required",
+			errContains: "sentinel_addrs is required",
 		},
 		{
 			name: "cluster without addrs",
@@ -200,16 +200,16 @@ func TestParseConfig_Invalid(t *testing.T) {
 				"mode":    "cluster",
 				"command": "PING",
 			},
-			errContains: "clusterAddrs is required",
+			errContains: "cluster_addrs is required",
 		},
 		{
 			name: "invalid output format",
 			input: map[string]any{
-				"host":         "localhost",
-				"command":      "PING",
-				"outputFormat": "xml",
+				"host":          "localhost",
+				"command":       "PING",
+				"output_format": "xml",
 			},
-			errContains: "invalid outputFormat",
+			errContains: "invalid output_format",
 		},
 		{
 			name: "negative timeout",
@@ -243,7 +243,7 @@ func TestParseConfig_Invalid(t *testing.T) {
 			input: map[string]any{
 				"host": "localhost",
 			},
-			errContains: "command, script, scriptFile, scriptSHA, or pipeline is required",
+			errContains: "command, script, script_file, script_sha, or pipeline is required",
 		},
 	}
 

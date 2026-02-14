@@ -32,7 +32,7 @@ steps:
     type: sqlite
     config:
       dsn: "%s"
-      outputFormat: jsonl
+      output_format: jsonl
     command: "SELECT id, name FROM users ORDER BY id"
     output: USERS
     depends: [init-db]
@@ -83,7 +83,7 @@ steps:
     type: sqlite
     config:
       dsn: "%s"
-      outputFormat: jsonl
+      output_format: jsonl
     command: "SELECT id, balance FROM accounts ORDER BY id"
     output: BALANCES
     depends: [transfer]
@@ -130,14 +130,14 @@ steps:
       UPDATE rollback_test SET value = 999 WHERE id = 1;
       SELECT * FROM nonexistent_table_for_error;
     depends: [setup]
-    continueOn:
+    continue_on:
       failure: true
 
   - name: verify-rollback
     type: sqlite
     config:
       dsn: "%s"
-      outputFormat: jsonl
+      output_format: jsonl
     command: "SELECT value FROM rollback_test WHERE id = 1"
     output: VALUE_AFTER_ROLLBACK
     depends: [failed-transaction]
@@ -146,7 +146,7 @@ steps:
 	// Run the DAG - it will have an error because one step fails
 	ag := dag.Agent()
 	_ = ag.Run(ag.Context)
-	// The DAG is partially_succeeded because one step failed (even with continueOn: failure: true)
+	// The DAG is partially_succeeded because one step failed (even with continue_on: failure: true)
 	// The value should still be 100 because the transaction was rolled back
 	dag.AssertLatestStatus(t, core.PartiallySucceeded)
 
@@ -167,7 +167,7 @@ steps:
     type: sqlite
     config:
       dsn: ":memory:"
-      outputFormat: jsonl
+      output_format: jsonl
     command: "SELECT NULL as null_text, NULL as null_int, NULL as null_bool, 'not_null' as regular_text, 42 as regular_int"
     output: NULL_VALUES
 `)
@@ -231,7 +231,7 @@ steps:
     type: sqlite
     config:
       dsn: ":memory:"
-      outputFormat: %s
+      output_format: %s
       headers: true
     script: |
       CREATE TABLE data (id INTEGER, name TEXT);
@@ -262,8 +262,8 @@ steps:
     type: sqlite
     config:
       dsn: ":memory:"
-      outputFormat: jsonl
-      maxRows: 5
+      output_format: jsonl
+      max_rows: 5
     script: |
       CREATE TABLE many_rows (id INTEGER PRIMARY KEY, value TEXT);
       INSERT INTO many_rows (value) VALUES ('row_1'), ('row_2'), ('row_3'), ('row_4'), ('row_5'), ('row_6'), ('row_7'), ('row_8'), ('row_9'), ('row_10');
@@ -317,7 +317,7 @@ steps:
     type: sqlite
     config:
       dsn: "%s"
-      outputFormat: jsonl
+      output_format: jsonl
       params:
         min_price: 1.00
     command: "SELECT name, price FROM products WHERE price >= :min_price ORDER BY name"
@@ -366,7 +366,7 @@ steps:
     type: sqlite
     config:
       dsn: "%s"
-      outputFormat: jsonl
+      output_format: jsonl
     command: "SELECT status FROM orders"
     output: ORDER_STATUS
     depends: [multi-statement]
@@ -392,7 +392,7 @@ steps:
     type: sqlite
     config:
       dsn: ":memory:"
-      outputFormat: jsonl
+      output_format: jsonl
     script: |
       CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT);
       INSERT INTO test (name) VALUES ('Alice'), ('Bob');
@@ -426,7 +426,7 @@ steps:
     config:
       dsn: ":memory:"
       transaction: true
-      outputFormat: jsonl
+      output_format: jsonl
     script: |
       CREATE TABLE counter (id INTEGER PRIMARY KEY, value INTEGER);
       INSERT INTO counter VALUES (1, 0);

@@ -527,8 +527,8 @@ func TestRegistry_Navigate_DagSchema(t *testing.T) {
 			want:    []string{"array"},
 		},
 		{
-			name:    "handlerOn",
-			path:    "handlerOn",
+			name:    "handler_on",
+			path:    "handler_on",
 			wantErr: false,
 			want:    []string{"success", "failure"},
 		},

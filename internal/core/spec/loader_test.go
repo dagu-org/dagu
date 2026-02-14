@@ -74,10 +74,10 @@ func TestLoad(t *testing.T) {
 		t.Parallel()
 
 		testDAG := createTempYAMLFile(t, `
-logDir: /var/log/dagu
-histRetentionDays: 90
-maxCleanUpTimeSec: 60
-mailOn:
+log_dir: /var/log/dagu
+hist_retention_days: 90
+max_clean_up_time_sec: 60
+mail_on:
   failure: true
 steps:
   - name: "1"
@@ -124,28 +124,28 @@ steps:
 		// MailOn: {Failure: true, Success: false}
 		base := createTempYAMLFile(t, `env:
   LOG_DIR: "${HOME}/logs"
-logDir: "${LOG_DIR}"
+log_dir: "${LOG_DIR}"
 smtp:
   host: "smtp.host"
   port: "25"
-errorMail:
+error_mail:
   from: "system@mail.com"
   to: "error@mail.com"
   prefix: "[ERROR]"
-infoMail:
+info_mail:
   from: "system@mail.com"
   to: "info@mail.com"
   prefix: "[INFO]"
-mailOn:
+mail_on:
   failure: true
 `)
 		// Overwrite the base config with the following values:
 		// MailOn: {Failure: false, Success: true}
-		testDAG := createTempYAMLFile(t, `mailOn:
+		testDAG := createTempYAMLFile(t, `mail_on:
   failure: false
   success: true
 
-histRetentionDays: 7
+hist_retention_days: 7
 
 steps:
   - name: "1"
@@ -161,28 +161,28 @@ steps:
 	t.Run("OverrideErrorMailPrefixOnly", func(t *testing.T) {
 		t.Parallel()
 
-		// Base config has errorMail with all fields set
-		base := createTempYAMLFile(t, `errorMail:
+		// Base config has error_mail with all fields set
+		base := createTempYAMLFile(t, `error_mail:
   from: "base@example.com"
   to: "error@example.com"
   prefix: "[BASE-ERROR]"
-  attachLogs: true
-infoMail:
+  attach_logs: true
+info_mail:
   from: "base@example.com"
   to: "info@example.com"
   prefix: "[BASE-INFO]"
-waitMail:
+wait_mail:
   from: "base@example.com"
   to: "wait@example.com"
   prefix: "[BASE-WAIT]"
 `)
 		// Child DAG only overrides prefix - this should work without
 		// requiring other fields to be specified (GitHub issue #1512)
-		testDAG := createTempYAMLFile(t, `errorMail:
+		testDAG := createTempYAMLFile(t, `error_mail:
   prefix: "[OVERRIDE-ERROR]"
-infoMail:
+info_mail:
   prefix: "[OVERRIDE-INFO]"
-waitMail:
+wait_mail:
   prefix: "[OVERRIDE-WAIT]"
 
 steps:
@@ -192,27 +192,27 @@ steps:
 		dag, err := spec.Load(context.Background(), testDAG, spec.WithBaseConfig(base))
 		require.NoError(t, err)
 
-		// Check if errorMail prefix is overridden
+		// Check if error_mail prefix is overridden
 		require.NotNil(t, dag.ErrorMail)
-		assert.Equal(t, "[OVERRIDE-ERROR]", dag.ErrorMail.Prefix, "errorMail prefix should be overridden")
+		assert.Equal(t, "[OVERRIDE-ERROR]", dag.ErrorMail.Prefix, "error_mail prefix should be overridden")
 		// Other fields should be inherited from base
-		assert.Equal(t, "base@example.com", dag.ErrorMail.From, "errorMail from should be inherited from base")
-		assert.Equal(t, []string{"error@example.com"}, dag.ErrorMail.To, "errorMail to should be inherited from base")
-		assert.True(t, dag.ErrorMail.AttachLogs, "errorMail attachLogs should be inherited from base")
+		assert.Equal(t, "base@example.com", dag.ErrorMail.From, "error_mail from should be inherited from base")
+		assert.Equal(t, []string{"error@example.com"}, dag.ErrorMail.To, "error_mail to should be inherited from base")
+		assert.True(t, dag.ErrorMail.AttachLogs, "error_mail attach_logs should be inherited from base")
 
-		// Check if infoMail prefix is overridden
+		// Check if info_mail prefix is overridden
 		require.NotNil(t, dag.InfoMail)
-		assert.Equal(t, "[OVERRIDE-INFO]", dag.InfoMail.Prefix, "infoMail prefix should be overridden")
+		assert.Equal(t, "[OVERRIDE-INFO]", dag.InfoMail.Prefix, "info_mail prefix should be overridden")
 		// Other fields should be inherited from base
-		assert.Equal(t, "base@example.com", dag.InfoMail.From, "infoMail from should be inherited from base")
-		assert.Equal(t, []string{"info@example.com"}, dag.InfoMail.To, "infoMail to should be inherited from base")
+		assert.Equal(t, "base@example.com", dag.InfoMail.From, "info_mail from should be inherited from base")
+		assert.Equal(t, []string{"info@example.com"}, dag.InfoMail.To, "info_mail to should be inherited from base")
 
-		// Check if waitMail prefix is overridden
+		// Check if wait_mail prefix is overridden
 		require.NotNil(t, dag.WaitMail)
-		assert.Equal(t, "[OVERRIDE-WAIT]", dag.WaitMail.Prefix, "waitMail prefix should be overridden")
+		assert.Equal(t, "[OVERRIDE-WAIT]", dag.WaitMail.Prefix, "wait_mail prefix should be overridden")
 		// Other fields should be inherited from base
-		assert.Equal(t, "base@example.com", dag.WaitMail.From, "waitMail from should be inherited from base")
-		assert.Equal(t, []string{"wait@example.com"}, dag.WaitMail.To, "waitMail to should be inherited from base")
+		assert.Equal(t, "base@example.com", dag.WaitMail.From, "wait_mail from should be inherited from base")
+		assert.Equal(t, []string{"wait@example.com"}, dag.WaitMail.To, "wait_mail to should be inherited from base")
 	})
 	t.Run("OverrideSMTPCredentialsOnly", func(t *testing.T) {
 		t.Parallel()
@@ -246,17 +246,17 @@ steps:
 	t.Run("WaitMailConfig", func(t *testing.T) {
 		t.Parallel()
 
-		// Test waitMail loading independently with all fields
+		// Test wait_mail loading independently with all fields
 		dagFile := createTempYAMLFile(t, `
-waitMail:
+wait_mail:
   from: "wait@example.com"
   to:
     - "approvers@example.com"
     - "managers@example.com"
   prefix: "[APPROVAL REQUIRED]"
-  attachLogs: false
+  attach_logs: false
 
-mailOn:
+mail_on:
   wait: true
 
 steps:
@@ -278,9 +278,9 @@ steps:
 	t.Run("WaitMailSingleRecipient", func(t *testing.T) {
 		t.Parallel()
 
-		// Test waitMail with single recipient (string format)
+		// Test wait_mail with single recipient (string format)
 		dagFile := createTempYAMLFile(t, `
-waitMail:
+wait_mail:
   from: "wait@example.com"
   to: "single@example.com"
   prefix: "[WAIT]"
@@ -308,19 +308,19 @@ func TestLoadBaseConfig(t *testing.T) {
 
 		testDAG := createTempYAMLFile(t, `env:
   LOG_DIR: "${HOME}/logs"
-logDir: "${LOG_DIR}"
+log_dir: "${LOG_DIR}"
 smtp:
   host: "smtp.host"
   port: "25"
-errorMail:
+error_mail:
   from: "system@mail.com"
   to: "error@mail.com"
   prefix: "[ERROR]"
-infoMail:
+info_mail:
   from: "system@mail.com"
   to: "info@mail.com"
   prefix: "[INFO]"
-mailOn:
+mail_on:
   failure: true
 `)
 		dag, err := spec.LoadBaseConfig(spec.BuildContext{}, testDAG)
@@ -336,10 +336,10 @@ env:
   BASE_ENV: "base_value"
   OVERWRITE_ENV: "base_overwrite_value"
 
-logDir: "/base/logs"
-logOutput: merged
-histRetentionDays: 90
-maxCleanUpTimeSec: 120
+log_dir: "/base/logs"
+log_output: merged
+hist_retention_days: 90
+max_clean_up_time_sec: 120
 
 llm:
   provider: openai
@@ -393,10 +393,10 @@ steps:
 env:
   BASE_ENV: "base_value"
 
-logDir: "/base/logs"
-logOutput: merged
-histRetentionDays: 90
-maxCleanUpTimeSec: 120
+log_dir: "/base/logs"
+log_output: merged
+hist_retention_days: 90
+max_clean_up_time_sec: 120
 
 llm:
   provider: openai
@@ -406,10 +406,10 @@ llm:
 
 		// Child DAG overrides specific fields
 		overrideDAG := createTempYAMLFile(t, `
-logDir: "/override/logs"
-logOutput: separate
-histRetentionDays: 7
-maxCleanUpTimeSec: 30
+log_dir: "/override/logs"
+log_output: separate
+hist_retention_days: 7
+max_clean_up_time_sec: 30
 
 llm:
   provider: anthropic
@@ -450,7 +450,7 @@ steps:
 		t.Parallel()
 
 		baseDAG := createTempYAMLFile(t, `
-workingDir: /shared/workspace
+working_dir: /shared/workspace
 `)
 
 		childDAG := createTempYAMLFile(t, `
@@ -462,7 +462,7 @@ steps:
 		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseDAG))
 		require.NoError(t, err)
 
-		// Child should inherit base's workingDir
+		// Child should inherit base's working_dir
 		assert.Equal(t, "/shared/workspace", dag.WorkingDir)
 	})
 
@@ -470,11 +470,11 @@ steps:
 		t.Parallel()
 
 		baseDAG := createTempYAMLFile(t, `
-workingDir: /shared/workspace
+working_dir: /shared/workspace
 `)
 
 		childDAG := createTempYAMLFile(t, `
-workingDir: /my/custom/dir
+working_dir: /my/custom/dir
 steps:
   - name: "step1"
     command: echo "test"
@@ -483,7 +483,7 @@ steps:
 		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseDAG))
 		require.NoError(t, err)
 
-		// Child's explicit workingDir should override base
+		// Child's explicit working_dir should override base
 		assert.Equal(t, "/my/custom/dir", dag.WorkingDir)
 	})
 }
@@ -636,7 +636,7 @@ steps:
 		baseConfig := `env:
   - ENV: production
   - API_KEY: secret123
-logDir: /base/logs
+log_dir: /base/logs
 smtp:
   host: smtp.example.com
   port: "587"
@@ -851,7 +851,7 @@ steps:
 		t.Parallel()
 
 		testDAG := createTempYAMLFile(t, `description: Test DAG with worker selector
-workerSelector:
+worker_selector:
   gpu: "true"
   memory: "64G"
 steps:
@@ -898,7 +898,7 @@ func TestWithDefaultWorkingDir(t *testing.T) {
 		// Create a temporary directory for default
 		defaultDir := t.TempDir()
 
-		// Create a DAG file without explicit workingDir
+		// Create a DAG file without explicit working_dir
 		testDAG := createTempYAMLFile(t, `steps:
   - name: test
     command: echo hello
@@ -927,17 +927,17 @@ func TestWithDefaultWorkingDir(t *testing.T) {
 		explicitDir := t.TempDir()
 		defaultDir := t.TempDir()
 
-		// Create a DAG file with explicit workingDir
-		testDAG := createTempYAMLFile(t, `workingDir: `+explicitDir+`
+		// Create a DAG file with explicit working_dir
+		testDAG := createTempYAMLFile(t, `working_dir: `+explicitDir+`
 steps:
   - name: test
     command: echo hello
 `)
-		// Load with WithDefaultWorkingDir option (should be ignored since DAG has explicit workingDir)
+		// Load with WithDefaultWorkingDir option (should be ignored since DAG has explicit working_dir)
 		dag, err := spec.Load(context.Background(), testDAG, spec.WithDefaultWorkingDir(defaultDir))
 		require.NoError(t, err)
 
-		// The explicit workingDir from the DAG should take precedence
+		// The explicit working_dir from the DAG should take precedence
 		assert.Equal(t, explicitDir, dag.WorkingDir)
 	})
 }
@@ -1021,7 +1021,7 @@ steps:
 		baseDir := t.TempDir()
 		baseConfig := filepath.Join(baseDir, "base.yaml")
 		require.NoError(t, os.WriteFile(baseConfig, []byte(`
-handlerOn:
+handler_on:
   success:
     command: echo base-success
 `), 0644))

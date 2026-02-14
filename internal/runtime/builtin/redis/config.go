@@ -19,20 +19,20 @@ type Config struct {
 	DB       int    `mapstructure:"db"`       // Database number (0-15)
 
 	// Connection - TLS
-	TLS           bool   `mapstructure:"tls"`           // Enable TLS
-	TLSCert       string `mapstructure:"tlsCert"`       // Client certificate path
-	TLSKey        string `mapstructure:"tlsKey"`        // Client key path
-	TLSCA         string `mapstructure:"tlsCA"`         // CA certificate path
-	TLSSkipVerify bool   `mapstructure:"tlsSkipVerify"` // Skip verification
+	TLS           bool   `mapstructure:"tls"`             // Enable TLS
+	TLSCert       string `mapstructure:"tls_cert"`        // Client certificate path
+	TLSKey        string `mapstructure:"tls_key"`         // Client key path
+	TLSCA         string `mapstructure:"tls_ca"`          // CA certificate path
+	TLSSkipVerify bool   `mapstructure:"tls_skip_verify"` // Skip verification
 
 	// Connection - High Availability
-	Mode           string   `mapstructure:"mode"`           // standalone, sentinel, cluster
-	SentinelMaster string   `mapstructure:"sentinelMaster"` // Sentinel master name
-	SentinelAddrs  []string `mapstructure:"sentinelAddrs"`  // Sentinel addresses
-	ClusterAddrs   []string `mapstructure:"clusterAddrs"`   // Cluster node addresses
+	Mode           string   `mapstructure:"mode"`            // standalone, sentinel, cluster
+	SentinelMaster string   `mapstructure:"sentinel_master"` // Sentinel master name
+	SentinelAddrs  []string `mapstructure:"sentinel_addrs"`  // Sentinel addresses
+	ClusterAddrs   []string `mapstructure:"cluster_addrs"`   // Cluster node addresses
 
 	// Connection - Retry
-	MaxRetries int `mapstructure:"maxRetries"` // Max retry attempts
+	MaxRetries int `mapstructure:"max_retries"` // Max retry attempts
 
 	// Command Execution
 	Command string         `mapstructure:"command"` // Redis command
@@ -44,12 +44,12 @@ type Config struct {
 	Fields  map[string]any `mapstructure:"fields"`  // Multiple hash fields
 
 	// Command Options
-	TTL     int    `mapstructure:"ttl"`     // Expiration in seconds
-	NX      bool   `mapstructure:"nx"`      // SET if not exists
-	XX      bool   `mapstructure:"xx"`      // SET if exists
-	KeepTTL bool   `mapstructure:"keepTTL"` // Preserve existing TTL
-	Count   int    `mapstructure:"count"`   // Count for SCAN, LPOP, etc.
-	Match   string `mapstructure:"match"`   // Pattern for SCAN
+	TTL     int    `mapstructure:"ttl"`      // Expiration in seconds
+	NX      bool   `mapstructure:"nx"`       // SET if not exists
+	XX      bool   `mapstructure:"xx"`       // SET if exists
+	KeepTTL bool   `mapstructure:"keep_ttl"` // Preserve existing TTL
+	Count   int    `mapstructure:"count"`    // Count for SCAN, LPOP, etc.
+	Match   string `mapstructure:"match"`    // Pattern for SCAN
 
 	// List Options
 	Position string `mapstructure:"position"` // BEFORE/AFTER for LINSERT
@@ -58,10 +58,10 @@ type Config struct {
 	Stop     int64  `mapstructure:"stop"`     // Range stop
 
 	// Sorted Set Options
-	Score      float64 `mapstructure:"score"`      // Member score
-	Min        string  `mapstructure:"min"`        // Range min
-	Max        string  `mapstructure:"max"`        // Range max
-	WithScores bool    `mapstructure:"withScores"` // Include scores in output
+	Score      float64 `mapstructure:"score"`       // Member score
+	Min        string  `mapstructure:"min"`         // Range min
+	Max        string  `mapstructure:"max"`         // Range max
+	WithScores bool    `mapstructure:"with_scores"` // Include scores in output
 
 	// Pub/Sub Options
 	Channel  string   `mapstructure:"channel"`  // Pub/Sub channel
@@ -69,21 +69,21 @@ type Config struct {
 	Message  any      `mapstructure:"message"`  // Message to publish
 
 	// Stream Options
-	Stream       string         `mapstructure:"stream"`       // Stream key
-	StreamID     string         `mapstructure:"streamID"`     // Message ID (* for auto)
-	Group        string         `mapstructure:"group"`        // Consumer group
-	Consumer     string         `mapstructure:"consumer"`     // Consumer name
-	StreamFields map[string]any `mapstructure:"streamFields"` // Stream entry fields
-	MaxLen       int64          `mapstructure:"maxLen"`       // MAXLEN for XADD
-	Block        int            `mapstructure:"block"`        // Block timeout (ms)
-	NoAck        bool           `mapstructure:"noAck"`        // NOACK for XREADGROUP
+	Stream       string         `mapstructure:"stream"`        // Stream key
+	StreamID     string         `mapstructure:"stream_id"`     // Message ID (* for auto)
+	Group        string         `mapstructure:"group"`         // Consumer group
+	Consumer     string         `mapstructure:"consumer"`      // Consumer name
+	StreamFields map[string]any `mapstructure:"stream_fields"` // Stream entry fields
+	MaxLen       int64          `mapstructure:"max_len"`       // MAXLEN for XADD
+	Block        int            `mapstructure:"block"`         // Block timeout (ms)
+	NoAck        bool           `mapstructure:"no_ack"`        // NOACK for XREADGROUP
 
 	// Scripting
-	Script     string   `mapstructure:"script"`     // Lua script
-	ScriptFile string   `mapstructure:"scriptFile"` // Path to Lua script file
-	ScriptSHA  string   `mapstructure:"scriptSHA"`  // Pre-loaded script SHA
-	ScriptKeys []string `mapstructure:"scriptKeys"` // KEYS for script
-	ScriptArgs []any    `mapstructure:"scriptArgs"` // ARGV for script
+	Script     string   `mapstructure:"script"`      // Lua script
+	ScriptFile string   `mapstructure:"script_file"` // Path to Lua script file
+	ScriptSHA  string   `mapstructure:"script_sha"`  // Pre-loaded script SHA
+	ScriptKeys []string `mapstructure:"script_keys"` // KEYS for script
+	ScriptArgs []any    `mapstructure:"script_args"` // ARGV for script
 
 	// Pipeline/Transaction
 	Pipeline []PipelineCommand `mapstructure:"pipeline"` // Batch commands
@@ -91,18 +91,18 @@ type Config struct {
 	Multi    bool              `mapstructure:"multi"`    // Use MULTI/EXEC
 
 	// Distributed Lock
-	Lock        string `mapstructure:"lock"`        // Lock name
-	LockTimeout int    `mapstructure:"lockTimeout"` // Lock expiry (seconds)
-	LockRetry   int    `mapstructure:"lockRetry"`   // Lock retry attempts
-	LockWait    int    `mapstructure:"lockWait"`    // Wait between retries (ms)
+	Lock        string `mapstructure:"lock"`         // Lock name
+	LockTimeout int    `mapstructure:"lock_timeout"` // Lock expiry (seconds)
+	LockRetry   int    `mapstructure:"lock_retry"`   // Lock retry attempts
+	LockWait    int    `mapstructure:"lock_wait"`    // Wait between retries (ms)
 
 	// Output
-	OutputFormat string `mapstructure:"outputFormat"` // json, jsonl, raw, csv
-	NullValue    string `mapstructure:"nullValue"`    // String for nil values
+	OutputFormat string `mapstructure:"output_format"` // json, jsonl, raw, csv
+	NullValue    string `mapstructure:"null_value"`    // String for nil values
 
 	// Execution
-	Timeout       int   `mapstructure:"timeout"`       // Command timeout (seconds)
-	MaxResultSize int64 `mapstructure:"maxResultSize"` // Max result size in bytes
+	Timeout       int   `mapstructure:"timeout"`         // Command timeout (seconds)
+	MaxResultSize int64 `mapstructure:"max_result_size"` // Max result size in bytes
 }
 
 // PipelineCommand represents a single command in a pipeline.
@@ -181,17 +181,17 @@ func (c *Config) validate() error {
 	// Sentinel mode requires master name and addresses
 	if c.Mode == "sentinel" {
 		if c.SentinelMaster == "" {
-			return fmt.Errorf("sentinelMaster is required for sentinel mode")
+			return fmt.Errorf("sentinel_master is required for sentinel mode")
 		}
 		if len(c.SentinelAddrs) == 0 {
-			return fmt.Errorf("sentinelAddrs is required for sentinel mode")
+			return fmt.Errorf("sentinel_addrs is required for sentinel mode")
 		}
 	}
 
 	// Cluster mode requires addresses
 	if c.Mode == "cluster" {
 		if len(c.ClusterAddrs) == 0 {
-			return fmt.Errorf("clusterAddrs is required for cluster mode")
+			return fmt.Errorf("cluster_addrs is required for cluster mode")
 		}
 	}
 
@@ -200,7 +200,7 @@ func (c *Config) validate() error {
 	case "json", "jsonl", "raw", "csv":
 		// Valid
 	default:
-		return fmt.Errorf("invalid outputFormat: %s (must be json, jsonl, raw, or csv)", c.OutputFormat)
+		return fmt.Errorf("invalid output_format: %s (must be json, jsonl, raw, or csv)", c.OutputFormat)
 	}
 
 	// Validate timeout
@@ -218,14 +218,14 @@ func (c *Config) validate() error {
 		return fmt.Errorf("port must be between 1 and 65535")
 	}
 
-	// Must have a command, script, scriptSHA, or pipeline
+	// Must have a command, script, script_sha, or pipeline
 	if c.Command == "" && c.Script == "" && c.ScriptFile == "" && c.ScriptSHA == "" && len(c.Pipeline) == 0 {
-		return fmt.Errorf("command, script, scriptFile, scriptSHA, or pipeline is required")
+		return fmt.Errorf("command, script, script_file, script_sha, or pipeline is required")
 	}
 
 	// Validate TLS certificate pair - both must be provided together
 	if (c.TLSCert != "" && c.TLSKey == "") || (c.TLSCert == "" && c.TLSKey != "") {
-		return fmt.Errorf("both tlsCert and tlsKey must be provided together")
+		return fmt.Errorf("both tls_cert and tls_key must be provided together")
 	}
 
 	return nil
