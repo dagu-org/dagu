@@ -19,7 +19,7 @@ steps:
 
 ---
 name: local-sub
-workerSelector:
+worker_selector:
   type: test-worker
 steps:
   - name: worker-task
@@ -42,7 +42,7 @@ steps:
 
 ---
 name: local-sub
-workerSelector:
+worker_selector:
   type: test-worker
 steps:
   - name: worker-task
@@ -80,7 +80,7 @@ steps:
 ---
 
 name: local-sub
-workerSelector:
+worker_selector:
   type: nonexistent-worker
 steps:
   - name: worker-task
@@ -104,7 +104,7 @@ func TestSubDAG_DifferentWorkers(t *testing.T) {
 	t.Run("parentAndChildOnDifferentWorkers", func(t *testing.T) {
 		childYAML := `
 name: child-remote
-workerSelector:
+worker_selector:
   type: child
 steps:
   - name: child-step
@@ -112,7 +112,7 @@ steps:
 `
 		f := newTestFixture(t, `
 name: parent-remote
-workerSelector:
+worker_selector:
   type: parent
 steps:
   - call: child-remote
@@ -143,7 +143,7 @@ params:
   - URL: default_value
 ---
 name: dotest
-workerSelector:
+worker_selector:
   foo: bar
 steps:
   - name: task

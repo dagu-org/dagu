@@ -18,10 +18,10 @@ func TestRepeatPolicy_WithLimit(t *testing.T) {
 	// Load DAG with repeat limit
 	dag := th.DAG(t, `steps:
   - command: echo "Executing step"
-    repeatPolicy:
+    repeat_policy:
       repeat: true
       limit: 3
-      intervalSec: 0
+      interval_sec: 0
 `)
 	agent := dag.Agent()
 
@@ -69,10 +69,10 @@ func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
         rm -f "$COUNTER_FILE"
       fi
     output: FINAL_COUNT
-    repeatPolicy:
+    repeat_policy:
       repeat: until
       limit: 5
-      intervalSec: 0
+      interval_sec: 0
       condition: "`+"`"+`[ -f /tmp/dagu_repeat_counter_test2 ] && cat /tmp/dagu_repeat_counter_test2 || echo 0`+"`"+`"
       expected: "10"
 `)
@@ -107,10 +107,10 @@ func TestRepeatPolicy_WithLimitReachedBeforeCondition(t *testing.T) {
 	// Load DAG that repeats with a limit
 	dag := th.DAG(t, `steps:
   - command: echo "Checking for flag file"
-    repeatPolicy:
+    repeat_policy:
       repeat: true
       limit: 3
-      intervalSec: 0
+      interval_sec: 0
 `)
 	agent := dag.Agent()
 
@@ -141,10 +141,10 @@ func TestRepeatPolicy_BooleanModeWhileUnconditional(t *testing.T) {
 	// Load DAG with boolean repeat mode (should repeat while step succeeds, like unconditional while)
 	dag := th.DAG(t, `steps:
   - command: echo "Unconditional while loop using boolean mode"
-    repeatPolicy:
+    repeat_policy:
       repeat: true
       limit: 3
-      intervalSec: 0
+      interval_sec: 0
 `)
 	agent := dag.Agent()
 
@@ -191,14 +191,14 @@ func TestRepeatPolicy_UntilWithExitCode(t *testing.T) {
         rm -f "$COUNT_FILE"
         exit 0
       fi
-    repeatPolicy:
+    repeat_policy:
       # Using backward compatibility mode: exitCode only infers "while" mode
       # but we can test "until" behavior with explicit condition that inverts logic
       repeat: "until"
-      exitCode: [0]  # Repeat until we get exit code 0
-      intervalSec: 0
-    continueOn:
-      exitCode: [1]
+      exit_code: [0]  # Repeat until we get exit code 0
+      interval_sec: 0
+    continue_on:
+      exit_code: [1]
 `)
 	agent := dag.Agent()
 
@@ -231,10 +231,10 @@ func TestRepeatPolicy_BackwardCompatibilityTrue(t *testing.T) {
 	// Load DAG with repeat: true (should work as "while" mode)
 	dag := th.DAG(t, `steps:
   - command: echo "Boolean true compatibility test"
-    repeatPolicy:
+    repeat_policy:
       repeat: true
       limit: 4
-      intervalSec: 0
+      interval_sec: 0
 `)
 	agent := dag.Agent()
 
@@ -287,10 +287,10 @@ func TestRepeatPolicy_OnExitCode(t *testing.T) {
           echo $((count + 1)) > "$COUNTER_FILE"
           exit 0
       fi
-    repeatPolicy:
-      exitCode: [1]
+    repeat_policy:
+      exit_code: [1]
       limit: 5
-      intervalSec: 0.1
+      interval_sec: 0.1
 `)
 	agent := dag.Agent()
 

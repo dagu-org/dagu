@@ -52,7 +52,7 @@ steps:
       port: "%s"
       user: %s
       key: "%s"
-      strictHostKey: false
+      strict_host_key: false
       direction: upload
       source: "%s"
       destination: /tmp/uploaded_file.txt
@@ -63,7 +63,7 @@ steps:
       port: "%s"
       user: %s
       key: "%s"
-      strictHostKey: false
+      strict_host_key: false
       shell: /bin/sh
     command: cat /tmp/uploaded_file.txt
     output: UPLOAD_VERIFY
@@ -97,7 +97,7 @@ steps:
       port: "%s"
       user: %s
       key: "%s"
-      strictHostKey: false
+      strict_host_key: false
       shell: /bin/sh
     script: |
       echo "sftp download test content" > /tmp/download_test.txt
@@ -108,7 +108,7 @@ steps:
       port: "%s"
       user: %s
       key: "%s"
-      strictHostKey: false
+      strict_host_key: false
       direction: download
       source: /tmp/download_test.txt
       destination: "%s"
@@ -151,7 +151,7 @@ steps:
       port: "%s"
       user: %s
       key: "%s"
-      strictHostKey: false
+      strict_host_key: false
       direction: upload
       source: "%s"
       destination: /tmp/uploaded_dir
@@ -162,7 +162,7 @@ steps:
       port: "%s"
       user: %s
       key: "%s"
-      strictHostKey: false
+      strict_host_key: false
       shell: /bin/sh
     script: |
       cat /tmp/uploaded_dir/file1.txt
@@ -198,7 +198,7 @@ steps:
       port: "%s"
       user: %s
       key: "%s"
-      strictHostKey: false
+      strict_host_key: false
       shell: /bin/sh
     script: |
       mkdir -p /tmp/remote_dir/subdir
@@ -211,7 +211,7 @@ steps:
       port: "%s"
       user: %s
       key: "%s"
-      strictHostKey: false
+      strict_host_key: false
       direction: download
       source: /tmp/remote_dir
       destination: "%s"

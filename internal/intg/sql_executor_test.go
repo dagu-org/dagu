@@ -130,7 +130,7 @@ steps:
       UPDATE rollback_test SET value = 999 WHERE id = 1;
       SELECT * FROM nonexistent_table_for_error;
     depends: [setup]
-    continueOn:
+    continue_on:
       failure: true
 
   - name: verify-rollback
@@ -146,7 +146,7 @@ steps:
 	// Run the DAG - it will have an error because one step fails
 	ag := dag.Agent()
 	_ = ag.Run(ag.Context)
-	// The DAG is partially_succeeded because one step failed (even with continueOn: failure: true)
+	// The DAG is partially_succeeded because one step failed (even with continue_on: failure: true)
 	// The value should still be 100 because the transaction was rolled back
 	dag.AssertLatestStatus(t, core.PartiallySucceeded)
 

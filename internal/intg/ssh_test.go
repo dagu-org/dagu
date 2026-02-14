@@ -50,7 +50,7 @@ func (s *sshServerContainer) sshConfig(shell string) string {
   port: "%s"
   user: %s
   key: "%s"
-  strictHostKey: false
+  strict_host_key: false
   shell: %s
 `, s.hostPort, sshTestUser, s.keyPath, shell)
 }
@@ -62,7 +62,7 @@ func (s *sshServerContainer) sshConfigNoShell() string {
   port: "%s"
   user: %s
   key: "%s"
-  strictHostKey: false
+  strict_host_key: false
 `, s.hostPort, sshTestUser, s.keyPath)
 }
 
@@ -73,7 +73,7 @@ func (s *sshServerContainer) sshPasswordConfig(shell string) string {
   port: "%s"
   user: %s
   password: "%s"
-  strictHostKey: false
+  strict_host_key: false
   shell: %s
 `, s.hostPort, sshTestUser, sshTestPass, shell)
 }
@@ -140,7 +140,7 @@ steps:
 steps:
   - name: workdir-test
     type: ssh
-    workingDir: /tmp
+    working_dir: /tmp
     command: pwd
     output: SSH_PWD_OUT
 `
@@ -181,7 +181,7 @@ steps:
 steps:
   - name: script-workdir-test
     type: ssh
-    workingDir: /tmp
+    working_dir: /tmp
     script: |
       echo "working in $(pwd)"
     output: SSH_SCRIPT_WORKDIR_OUT
@@ -214,7 +214,7 @@ steps:
 steps:
   - name: invalid-dir-test
     type: ssh
-    workingDir: /nonexistent/directory/path
+    working_dir: /nonexistent/directory/path
     command: echo "should not reach"
 `
 		dag := th.DAG(t, dagConfig)
@@ -234,7 +234,7 @@ steps:
       port: "%s"
       user: %s
       key: "%s"
-      strictHostKey: false
+      strict_host_key: false
       shell: /bin/sh
     command: echo "step config works"
     output: STEP_SSH_OUT
@@ -293,11 +293,11 @@ steps:
 	t.Run("StepWorkingDirOverridesDAGWorkingDir", func(t *testing.T) {
 		th := test.Setup(t)
 
-		dagConfig := "workingDir: /var\n\n" + sshServer.sshConfig("/bin/sh") + `
+		dagConfig := "working_dir: /var\n\n" + sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: step-override-test
     type: ssh
-    workingDir: /tmp
+    working_dir: /tmp
     command: pwd
     output: SSH_OVERRIDE_WORKDIR_OUT
 `
@@ -507,7 +507,7 @@ steps:
   port: "%s"
   user: %s
   key: "%s"
-  strictHostKey: false
+  strict_host_key: false
   shell: /bin/sh
   timeout: "10s"
 steps:

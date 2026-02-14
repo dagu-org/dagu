@@ -16,7 +16,7 @@ func TestGitHubActionsExecutor(t *testing.T) {
 
 		th := test.Setup(t)
 		dag := th.DAG(t, `
-workingDir: `+tmpDir+`
+working_dir: `+tmpDir+`
 steps:
   - name: test-action
     command: actions/checkout@v4

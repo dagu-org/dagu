@@ -3,7 +3,6 @@ package spec
 import (
 	"fmt"
 	"strings"
-	"unicode"
 )
 
 var legacyToSnakeCaseKey = map[string]string{
@@ -110,17 +109,3 @@ func withSnakeCaseKeyHint(err error) error {
 	return fmt.Errorf("%w; use snake_case keys (%s)", err, strings.Join(suggestions, ", "))
 }
 
-func camelToSnakeCase(s string) string {
-	var b strings.Builder
-	for i, r := range s {
-		if unicode.IsUpper(r) {
-			if i > 0 {
-				b.WriteByte('_')
-			}
-			b.WriteRune(unicode.ToLower(r))
-			continue
-		}
-		b.WriteRune(r)
-	}
-	return b.String()
-}

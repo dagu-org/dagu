@@ -68,7 +68,7 @@ env:
   - WAIT_PREFIX: "[Waiting]"
   - OPS_EMAIL: ops@example.com
 
-waitMail:
+wait_mail:
   from: alerts@example.com
   to: ${OPS_EMAIL}
   prefix: ${WAIT_PREFIX}
@@ -103,7 +103,7 @@ env:
   - ADMIN1: admin1@example.com
   - ADMIN2: admin2@example.com
 
-errorMail:
+error_mail:
   from: alerts@example.com
   to:
     - ${ADMIN1}
@@ -157,14 +157,14 @@ smtp:
   username: ${SMTP_USER}
   password: ${SMTP_PASS}
 
-errorMail:
+error_mail:
   from: ${SMTP_USER}
   to:
     - ${ADMIN_EMAIL}
     - ${OPS_EMAIL}
   prefix: "[ERROR]"
 
-infoMail:
+info_mail:
   from: ${SMTP_USER}
   to: ${OPS_EMAIL}
   prefix: "[INFO]"

@@ -21,11 +21,11 @@ func TestRetryPolicy_WithExponentialBackoff(t *testing.T) {
     command: |
       echo "Attempt at $(date +%s.%N)"
       exit 1
-    retryPolicy:
+    retry_policy:
       limit: 3
-      intervalSec: 1
+      interval_sec: 1
       backoff: 2.0
-      exitCode: [1]
+      exit_code: [1]
 `)
 	agent := dag.Agent()
 
@@ -68,11 +68,11 @@ func TestRetryPolicy_WithBackoffBoolean(t *testing.T) {
     command: |
       echo "Attempt at $(date +%s.%N)"
       exit 1
-    retryPolicy:
+    retry_policy:
       limit: 3
-      intervalSec: 1
+      interval_sec: 1
       backoff: true  # Should use default 2.0 multiplier
-      exitCode: [1]
+      exit_code: [1]
 `)
 	agent := dag.Agent()
 
@@ -112,12 +112,12 @@ func TestRepeatPolicy_WithExponentialBackoff(t *testing.T) {
     command: |
       echo "Execution at $(date +%s.%N)"
       exit 0
-    repeatPolicy:
+    repeat_policy:
       repeat: while
       limit: 4
-      intervalSec: 1
+      interval_sec: 1
       backoff: 2.0
-      exitCode: [0]  # Repeat while exit code is 0
+      exit_code: [0]  # Repeat while exit code is 0
 `)
 	agent := dag.Agent()
 

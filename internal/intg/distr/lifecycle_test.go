@@ -18,7 +18,7 @@ func TestCancellation_SingleTask(t *testing.T) {
 	t.Run("cancellationPropagatesToRemoteWorker", func(t *testing.T) {
 		f := newTestFixture(t, `
 name: cancel-test
-workerSelector:
+worker_selector:
   test: "true"
 steps:
   - name: long-task
@@ -63,7 +63,7 @@ params:
   - URL: default_value
 ---
 name: dotest
-workerSelector:
+worker_selector:
   foo: bar
 steps:
   - name: long-sleep
@@ -111,7 +111,7 @@ steps:
 
 ---
 name: local-sub
-workerSelector:
+worker_selector:
   type: test-worker
 steps:
   - name: worker-task
@@ -153,11 +153,11 @@ steps:
         - "task4"
         - "task5"
         - "task6"
-      maxConcurrent: 2
+      max_concurrent: 2
 
 ---
 name: child-task
-workerSelector:
+worker_selector:
   type: test-worker
 steps:
   - name: process
@@ -207,7 +207,7 @@ func TestCancellation_GracefulShutdown(t *testing.T) {
 		f := newTestFixture(t, `
 type: graph
 name: graceful-cancel-test
-workerSelector:
+worker_selector:
   test: "true"
 steps:
   - name: task1
@@ -251,11 +251,11 @@ steps:
         - "101"
         - "102"
         - "103"
-      maxConcurrent: 2
+      max_concurrent: 2
 
 ---
 name: child-sleep
-workerSelector:
+worker_selector:
   type: test-worker
 steps:
   - name: sleep
@@ -315,7 +315,7 @@ func TestRetry_WithWorkerSelector(t *testing.T) {
 		f := newTestFixture(t, `
 type: graph
 name: retry-cmd-test
-workerSelector:
+worker_selector:
   test: "true"
 steps:
   - name: task1
@@ -355,7 +355,7 @@ steps:
 	t.Run("retryDispatchesToCoordinator_NoNameField", func(t *testing.T) {
 		f := newTestFixture(t, `
 type: graph
-workerSelector:
+worker_selector:
   test: "true"
 steps:
   - name: task1
@@ -398,7 +398,7 @@ func TestRetry_PartialRetry(t *testing.T) {
 		f := newTestFixture(t, `
 type: graph
 name: partial-retry-test
-workerSelector:
+worker_selector:
   test: "true"
 steps:
   - name: step1
@@ -440,7 +440,7 @@ func TestRetry_SharedFSMode(t *testing.T) {
 	t.Run("retryWorksWithSharedFSWorker", func(t *testing.T) {
 		f := newTestFixture(t, `
 name: retry-sharedfs-test
-workerSelector:
+worker_selector:
   test: "true"
 steps:
   - name: task1
@@ -476,7 +476,7 @@ steps:
 
 	t.Run("retryWorksWithSharedFSWorker_NoNameField", func(t *testing.T) {
 		f := newTestFixture(t, `
-workerSelector:
+worker_selector:
   test: "true"
 steps:
   - name: task1

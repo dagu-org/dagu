@@ -108,7 +108,7 @@ steps:
 		workDir := filepath.Dir(dotenvPath)
 
 		dag := th.DAG(t, fmt.Sprintf(`
-workingDir: %q
+working_dir: %q
 dotenv: .env
 
 secrets:
@@ -272,7 +272,7 @@ steps:
 		require.NoError(t, os.WriteFile(secretFilePath, []byte(secretValue), 0600))
 
 		dag := th.DAG(t, `
-workingDir: `+workDir+`
+working_dir: `+workDir+`
 
 secrets:
   - name: RELATIVE_SECRET
@@ -367,7 +367,7 @@ steps:
 		// Create DAG with workingDir set to a different directory
 		// The secret file is NOT in workingDir, but in the DAG file's directory
 		dag := th.DAG(t, `
-workingDir: `+workDir+`
+working_dir: `+workDir+`
 
 secrets:
   - name: DAG_SECRET

@@ -46,7 +46,7 @@ func TestLocalQueueFIFOProcessing(t *testing.T) {
 	// This verifies that even with maxActiveRuns: 3, local queues process sequentially.
 	f := newFixture(t, `
 name: batch-dag
-maxActiveRuns: 3
+max_active_runs: 3
 steps:
   - name: sleep
     command: sleep 1
@@ -68,7 +68,7 @@ steps:
 func TestPriorityOrdering(t *testing.T) {
 	f := newFixture(t, `
 name: priority-dag
-maxActiveRuns: 1
+max_active_runs: 1
 steps:
   - name: echo
     command: echo done

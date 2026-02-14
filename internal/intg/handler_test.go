@@ -25,7 +25,7 @@ func TestHandlerOn(t *testing.T) {
 		{
 			name: "InitHandler_Success",
 			dagYAML: `
-handlerOn:
+handler_on:
   init:
     command: "true"
 
@@ -49,7 +49,7 @@ steps:
 		{
 			name: "InitHandler_Failure_StopsExecution",
 			dagYAML: `
-handlerOn:
+handler_on:
   init:
     command: exit 1
   exit:
@@ -80,7 +80,7 @@ steps:
 		{
 			name: "InitHandler_PreconditionSkip_StepsRun",
 			dagYAML: `
-handlerOn:
+handler_on:
   init:
     command: "echo init-should-not-run"
     preconditions: "false"
@@ -106,7 +106,7 @@ steps:
 			dagYAML: `
 preconditions: "false"
 
-handlerOn:
+handler_on:
   init:
     command: "echo init-should-not-run"
 
@@ -138,7 +138,7 @@ steps:
 		{
 			name: "FailureHandler",
 			dagYAML: `
-handlerOn:
+handler_on:
   failure:
     command: "true"
 
@@ -158,7 +158,7 @@ steps:
 		{
 			name: "SuccessHandler",
 			dagYAML: `
-handlerOn:
+handler_on:
   success:
     command: "true"
 
@@ -178,7 +178,7 @@ steps:
 		{
 			name: "ExitHandler",
 			dagYAML: `
-handlerOn:
+handler_on:
   exit:
     command: "true"
 
@@ -198,7 +198,7 @@ steps:
 		{
 			name: "WaitHandler_ExecutedOnWaitStatus",
 			dagYAML: `
-handlerOn:
+handler_on:
   wait:
     command: "true"
 
@@ -222,7 +222,7 @@ steps:
 		{
 			name: "WaitHandler_FailureDoesNotBlockWaitStatus",
 			dagYAML: `
-handlerOn:
+handler_on:
   wait:
     command: exit 1
 
@@ -265,7 +265,7 @@ func TestHandlerOn_Abort(t *testing.T) {
 
 	th := test.Setup(t)
 	dag := th.DAG(t, `
-handlerOn:
+handler_on:
   abort:
     command: "true"
 
@@ -338,7 +338,7 @@ func TestHandlerOn_EnvironmentVariables(t *testing.T) {
 		// Test that basic env vars (DAG_NAME, DAG_RUN_ID, DAG_RUN_LOG_FILE, DAG_RUN_STEP_NAME)
 		// are available in the init handler
 		dag := th.DAG(t, `
-handlerOn:
+handler_on:
   init:
     command: |
       echo "name:${DAG_NAME}|runid:${DAG_RUN_ID}|logfile:${DAG_RUN_LOG_FILE}|stepname:${DAG_RUN_STEP_NAME}"
@@ -385,7 +385,7 @@ steps:
 		// but steps haven't completed yet. This value is technically correct but not
 		// as useful as having the final status (which isn't known yet).
 		dag := th.DAG(t, `
-handlerOn:
+handler_on:
   init:
     command: echo "${DAG_RUN_STATUS}"
     output: INIT_STATUS
@@ -414,7 +414,7 @@ steps:
 		th := test.Setup(t)
 
 		dag := th.DAG(t, `
-handlerOn:
+handler_on:
   success:
     command: |
       echo "name:${DAG_NAME}|status:${DAG_RUN_STATUS}|stepname:${DAG_RUN_STEP_NAME}"
@@ -452,7 +452,7 @@ steps:
 		th := test.Setup(t)
 
 		dag := th.DAG(t, `
-handlerOn:
+handler_on:
   failure:
     command: |
       echo "name:${DAG_NAME}|status:${DAG_RUN_STATUS}|stepname:${DAG_RUN_STEP_NAME}"
@@ -490,7 +490,7 @@ steps:
 		th := test.Setup(t)
 
 		dag := th.DAG(t, `
-handlerOn:
+handler_on:
   exit:
     command: |
       echo "name:${DAG_NAME}|status:${DAG_RUN_STATUS}|stepname:${DAG_RUN_STEP_NAME}"
@@ -528,7 +528,7 @@ steps:
 		th := test.Setup(t)
 
 		dag := th.DAG(t, `
-handlerOn:
+handler_on:
   exit:
     command: |
       echo "status:${DAG_RUN_STATUS}"
@@ -560,7 +560,7 @@ steps:
 		th := test.Setup(t)
 
 		dag := th.DAG(t, `
-handlerOn:
+handler_on:
   abort:
     command: |
       echo "name:${DAG_NAME}|status:${DAG_RUN_STATUS}|stepname:${DAG_RUN_STEP_NAME}"
@@ -609,7 +609,7 @@ steps:
 		// DAG_RUN_STEP_STDOUT_FILE and DAG_RUN_STEP_STDERR_FILE are NOT set
 		// for handlers because node.SetupEnv is not called for handler execution
 		dag := th.DAG(t, `
-handlerOn:
+handler_on:
   success:
     command: |
       echo "stdout:${DAG_RUN_STEP_STDOUT_FILE:-UNSET}|stderr:${DAG_RUN_STEP_STDERR_FILE:-UNSET}"
@@ -642,7 +642,7 @@ steps:
 
 		// Handlers can access output variables from steps that have completed
 		dag := th.DAG(t, `
-handlerOn:
+handler_on:
   success:
     command: |
       echo "step_output:${STEP_OUTPUT}"
@@ -675,7 +675,7 @@ steps:
 
 		// Init handler runs BEFORE steps, so it cannot access step outputs
 		dag := th.DAG(t, `
-handlerOn:
+handler_on:
   init:
     command: |
       echo "step_output:${STEP_OUTPUT:-NOT_YET_AVAILABLE}"
@@ -710,7 +710,7 @@ steps:
 		// DAG_WAITING_STEPS should contain comma-separated list of waiting step names
 		dag := th.DAG(t, `
 type: graph
-handlerOn:
+handler_on:
   wait:
     command: |
       echo "waiting_steps:${DAG_WAITING_STEPS}"
@@ -752,7 +752,7 @@ steps:
 		// This test has a step with a hyphenated name to verify proper formatting
 		dag := th.DAG(t, `
 type: graph
-handlerOn:
+handler_on:
   wait:
     command: |
       echo "waiting_steps:${DAG_WAITING_STEPS}"

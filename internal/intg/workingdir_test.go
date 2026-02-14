@@ -37,14 +37,14 @@ func TestWorkingDirectoryResolution(t *testing.T) {
 
 	dag := th.DAG(t, `
 shell: `+shell+`
-workingDir: `+parentDir+`
+working_dir: `+parentDir+`
 steps:
   - name: parent_pwd
     command: `+pwdCmd+`
     output: PARENT_DIR
 
   - name: parent_relative_step
-    workingDir: ../child_scripts
+    working_dir: ../child_scripts
     command: `+pwdCmd+`
     output: PARENT_STEP_DIR
 
@@ -58,7 +58,7 @@ steps:
 
 name: child_with_wd
 shell: `+shell+`
-workingDir: `+childDir+`
+working_dir: `+childDir+`
 steps:
   - name: child_pwd
     command: `+pwdCmd+`

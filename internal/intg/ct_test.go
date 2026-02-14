@@ -182,7 +182,7 @@ steps:
 				return fmt.Sprintf(`
 container:
   image: %s
-  workingDir: /tmp
+  working_dir: /tmp
 steps:
   - command: pwd
     output: WORK_DIR_OUT1
@@ -244,7 +244,7 @@ steps:
 			dagConfigFunc: func(tempDir string) string {
 				subDir := fmt.Sprintf("%s/work", tempDir)
 				return fmt.Sprintf(`
-workingDir: %s
+working_dir: %s
 container:
   image: %s
   volumes:
@@ -397,7 +397,7 @@ func TestContainerPullPolicy(t *testing.T) {
 	pullPolicyTestDAG := fmt.Sprintf(`
 container:
   image: %s
-  pullPolicy: never
+  pull_policy: never
 steps:
   - command: echo 'pull policy test'
     output: OUT1
@@ -432,7 +432,7 @@ func TestContainerStartup_Entrypoint_WithHealthyFallback(t *testing.T) {
 container:
   image: %s
   startup: entrypoint
-  waitFor: healthy
+  wait_for: healthy
 steps:
   - command: echo entrypoint-ok
     output: ENTRYPOINT_OK
@@ -485,7 +485,7 @@ steps:
     config:
       containerName: %s
       exec:
-        workingDir: /
+        working_dir: /
     command: echo hello-existing
     output: EXEC_EXISTING_OUT
 `, containerName)
@@ -668,7 +668,7 @@ steps:
   - name: check-workdir
     container:
       image: %s
-      workingDir: /tmp
+      working_dir: /tmp
     command: pwd
     output: STEP_WORKDIR_OUT
 `, testImage)
@@ -791,7 +791,7 @@ steps:
   - name: pull-never
     container:
       image: %s
-      pullPolicy: never
+      pull_policy: never
     command: echo "pull never ok"
     output: PULL_NEVER_OUT
 `, testImage)
@@ -966,7 +966,7 @@ steps:
 			dagConfig: fmt.Sprintf(`
 container:
   exec: %s
-  workingDir: /tmp
+  working_dir: /tmp
 steps:
   - command: pwd
     output: EXEC_WORKDIR_OUT
@@ -1027,7 +1027,7 @@ steps:
 container:
   exec: %s
   user: root
-  workingDir: /tmp
+  working_dir: /tmp
   env:
     - CUSTOM_VAR=test123
 steps:
@@ -1162,9 +1162,9 @@ container:
     test: ["CMD", "test", "-f", "/tmp/ready"]
     interval: 1s
     timeout: 5s
-    startPeriod: 5s
+    start_period: 5s
     retries: 10
-  waitFor: healthy
+  wait_for: healthy
 steps:
   - command: echo "container is healthy"
     output: HEALTHCHECK_OUT
@@ -1195,9 +1195,9 @@ steps:
         test: ["CMD-SHELL", "test -f /tmp/step_ready"]
         interval: 500ms
         timeout: 3s
-        startPeriod: 3s
+        start_period: 3s
         retries: 10
-      waitFor: healthy
+      wait_for: healthy
     command: echo "step container healthy"
     output: STEP_HEALTHCHECK_OUT
 `, testImage)
