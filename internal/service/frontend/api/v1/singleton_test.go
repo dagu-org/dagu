@@ -121,4 +121,29 @@ steps:
 		// Clean up
 		_ = server.Client().Delete("/api/v1/dags/singleton_enq_q_dag").ExpectStatus(http.StatusNoContent).Send(t)
 	})
+
+	t.Run("EnqueueDAGRunFromSpecConflict", func(t *testing.T) {
+		spec := `
+name: singleton_inline_enq_dag
+steps:
+  - name: sleep
+    command: sleep 10
+`
+		name := "singleton_inline_enq_dag"
+		resp := server.Client().Post("/api/v1/dag-runs/enqueue", api.EnqueueDAGRunFromSpecJSONRequestBody{
+			Spec: spec,
+			Name: &name,
+		}).ExpectStatus(http.StatusOK).Send(t)
+
+		var enqueueResp api.EnqueueDAGRunFromSpec200JSONResponse
+		resp.Unmarshal(t, &enqueueResp)
+		require.NotEmpty(t, enqueueResp.DagRunId)
+
+		singleton := true
+		server.Client().Post("/api/v1/dag-runs/enqueue", api.EnqueueDAGRunFromSpecJSONRequestBody{
+			Spec:      spec,
+			Name:      &name,
+			Singleton: &singleton,
+		}).ExpectStatus(http.StatusConflict).Send(t)
+	})
 }

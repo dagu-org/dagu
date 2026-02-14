@@ -4322,7 +4322,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description DAG is already running (singleton mode) */
+            /** @description DAG is already running (singleton mode) or dagRunId already exists */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5005,6 +5005,11 @@ export interface operations {
                     dagRunId?: components["schemas"]["DAGRunId"] & unknown;
                     /** @description Override the queue to use for this DAG-run */
                     queue?: string;
+                    /**
+                     * @description If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)
+                     * @default false
+                     */
+                    singleton?: boolean;
                 };
             };
         };
@@ -5029,7 +5034,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description A DAG with the same name is already queued beyond maxActiveRuns */
+            /** @description DAG is already running or queued (singleton mode), or dagRunId already exists */
             409: {
                 headers: {
                     [name: string]: unknown;
