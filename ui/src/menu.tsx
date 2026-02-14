@@ -409,25 +409,29 @@ export const mainListItems = React.forwardRef<
             />
           </div>
 
-          {isAdmin && config.authMode === 'builtin' && (
+          {isAdmin && (
             <div className="space-y-0.5">
               <SectionLabel label="Admin" isOpen={isOpen} customColor={customColor} />
-              <NavItem
-                to="/users"
-                text="Users"
-                icon={<Users size={18} />}
-                isOpen={isOpen}
-                onClick={onNavItemClick}
-                customColor={customColor}
-              />
-              <NavItem
-                to="/api-keys"
-                text="API Keys"
-                icon={<KeyRound size={18} />}
-                isOpen={isOpen}
-                onClick={onNavItemClick}
-                customColor={customColor}
-              />
+              {config.authMode === 'builtin' && (
+                <NavItem
+                  to="/users"
+                  text="Users"
+                  icon={<Users size={18} />}
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+              )}
+              {config.authMode === 'builtin' && (
+                <NavItem
+                  to="/api-keys"
+                  text="API Keys"
+                  icon={<KeyRound size={18} />}
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+              )}
               {config.terminalEnabled && (
                 <NavItem
                   to="/terminal"
@@ -459,8 +463,7 @@ export const mainListItems = React.forwardRef<
             </div>
           )}
 
-          {(canManageWebhooks || canViewAuditLogs) &&
-            config.authMode === 'builtin' && (
+          {(canManageWebhooks || canViewAuditLogs) && (
               <div className="space-y-0.5">
                 <SectionLabel label="Operations" isOpen={isOpen} customColor={customColor} />
                 {canManageWebhooks && (
