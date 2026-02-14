@@ -57,10 +57,10 @@ func TestModelValue_UnmarshalYAML(t *testing.T) {
 - provider: openai
   name: gpt-4o
   temperature: 0.7
-  maxTokens: 2000
-  topP: 0.9
-  baseURL: https://api.example.com
-  apiKeyName: MY_API_KEY
+  max_tokens: 2000
+  top_p: 0.9
+  base_url: https://api.example.com
+  api_key_name: MY_API_KEY
 `,
 			wantIsArray: true,
 			wantLen:     1,
@@ -200,37 +200,37 @@ func TestModelValue_ValidationRanges(t *testing.T) {
 			input: `
 - provider: openai
   name: gpt-4o
-  topP: -0.1
+  top_p: -0.1
 `,
 			wantErr:     true,
-			errContains: "topP: must be between 0.0 and 1.0",
+			errContains: "top_p: must be between 0.0 and 1.0",
 		},
 		{
 			name: "TopPTooHigh",
 			input: `
 - provider: openai
   name: gpt-4o
-  topP: 1.5
+  top_p: 1.5
 `,
 			wantErr:     true,
-			errContains: "topP: must be between 0.0 and 1.0",
+			errContains: "top_p: must be between 0.0 and 1.0",
 		},
 		{
 			name: "MaxTokensTooLow",
 			input: `
 - provider: openai
   name: gpt-4o
-  maxTokens: 0
+  max_tokens: 0
 `,
 			wantErr:     true,
-			errContains: "maxTokens: must be at least 1",
+			errContains: "max_tokens: must be at least 1",
 		},
 		{
 			name: "MaxTokensValid",
 			input: `
 - provider: openai
   name: gpt-4o
-  maxTokens: 1
+  max_tokens: 1
 `,
 			wantErr: false,
 		},
@@ -249,20 +249,20 @@ func TestModelValue_ValidationRanges(t *testing.T) {
 			input: `
 - provider: openai
   name: gpt-4o
-  maxTokens: "many"
+  max_tokens: "many"
 `,
 			wantErr:     true,
-			errContains: "maxTokens: must be an integer",
+			errContains: "max_tokens: must be an integer",
 		},
 		{
 			name: "TopPNotANumber",
 			input: `
 - provider: openai
   name: gpt-4o
-  topP: "high"
+  top_p: "high"
 `,
 			wantErr:     true,
-			errContains: "topP: must be a number",
+			errContains: "top_p: must be a number",
 		},
 	}
 
@@ -355,10 +355,10 @@ func TestModelValue_EntryFields(t *testing.T) {
 - provider: openai
   name: gpt-4o
   temperature: 0.7
-  maxTokens: 2000
-  topP: 0.9
-  baseURL: https://api.example.com
-  apiKeyName: MY_API_KEY
+  max_tokens: 2000
+  top_p: 0.9
+  base_url: https://api.example.com
+  api_key_name: MY_API_KEY
 `
 	var m types.ModelValue
 	err := yaml.Unmarshal([]byte(input), &m)

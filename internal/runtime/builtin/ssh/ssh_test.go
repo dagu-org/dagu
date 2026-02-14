@@ -1005,7 +1005,7 @@ func TestGetDefaultSSHKeys(t *testing.T) {
 func TestGetHostKeyCallback_InsecureMode(t *testing.T) {
 	t.Parallel()
 
-	// When strictHostKey is false, should return InsecureIgnoreHostKey
+	// When strict_host_key is false, should return InsecureIgnoreHostKey
 	callback, err := getHostKeyCallback(false, "")
 	require.NoError(t, err)
 	require.NotNil(t, callback)

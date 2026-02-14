@@ -331,7 +331,7 @@ func TestValidateSteps(t *testing.T) {
 		assert.Contains(t, err.Error(), "only supported for child-DAGs")
 	})
 
-	t.Run("parallel config with maxConcurrent 0 fails", func(t *testing.T) {
+	t.Run("parallel config with max_concurrent 0 fails", func(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{
 			Steps: []Step{
@@ -347,10 +347,10 @@ func TestValidateSteps(t *testing.T) {
 		}
 		err := ValidateSteps(dag)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "maxConcurrent must be greater than 0")
+		assert.Contains(t, err.Error(), "max_concurrent must be greater than 0")
 	})
 
-	t.Run("parallel config with negative maxConcurrent fails", func(t *testing.T) {
+	t.Run("parallel config with negative max_concurrent fails", func(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{
 			Steps: []Step{
@@ -366,7 +366,7 @@ func TestValidateSteps(t *testing.T) {
 		}
 		err := ValidateSteps(dag)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "maxConcurrent must be greater than 0")
+		assert.Contains(t, err.Error(), "max_concurrent must be greater than 0")
 	})
 
 	t.Run("parallel config without items or variable fails", func(t *testing.T) {

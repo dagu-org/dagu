@@ -60,13 +60,13 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*core.AuthC
 		Host          container.HostConfig     `mapstructure:"host"`
 		Network       network.NetworkingConfig `mapstructure:"network"`
 		Exec          container.ExecOptions    `mapstructure:"exec"`
-		AutoRemove    any                      `mapstructure:"autoRemove"`
+		AutoRemove    any                      `mapstructure:"auto_remove"`
 		Pull          any                      `mapstructure:"pull"`
 		Platform      string                   `mapstructure:"platform"`
-		ContainerName string                   `mapstructure:"containerName"`
+		ContainerName string                   `mapstructure:"container_name"`
 		Image         string                   `mapstructure:"image"`
 		// User-friendly shortcuts (mapped to nested fields)
-		WorkingDir string   `mapstructure:"workingDir"`
+		WorkingDir string   `mapstructure:"working_dir"`
 		Volumes    []string `mapstructure:"volumes"`
 		Shell      []string `mapstructure:"shell"`
 	}{}
@@ -82,10 +82,10 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*core.AuthC
 		return nil, fmt.Errorf("failed to decode config: %w", err)
 	}
 
-	var autoRemove bool
+	var auto_remove bool
 	if ret.Host.AutoRemove {
 		ret.Host.AutoRemove = false // Prevent removal by sdk
-		autoRemove = true
+		auto_remove = true
 	}
 
 	pull := core.PullPolicyMissing
@@ -123,7 +123,7 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*core.AuthC
 	hasExec := hasKey("exec") && nonEmptyMap(data["exec"])
 
 	// Validation rules:
-	// - exec options are only valid with containerName (exec-in-existing mode)
+	// - exec options are only valid with container_name (exec-in-existing mode)
 	if hasImage && hasExec && !hasContainerName {
 		return nil, ErrExecOnlyWithContainerName
 	}
@@ -131,13 +131,13 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*core.AuthC
 	if ret.AutoRemove != nil {
 		v, err := stringutil.ParseBool(ret.AutoRemove)
 		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate autoRemove value: %w", err)
+			return nil, fmt.Errorf("failed to evaluate auto_remove value: %w", err)
 		}
-		autoRemove = v
+		auto_remove = v
 	}
 
 	// Apply user-friendly shortcuts to nested fields
-	// workingDir -> container.WorkingDir (only if container.WorkingDir is not already set)
+	// working_dir -> container.WorkingDir (only if container.WorkingDir is not already set)
 	if ret.WorkingDir != "" && ret.Container.WorkingDir == "" {
 		ret.Container.WorkingDir = ret.WorkingDir
 	}
@@ -162,7 +162,7 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*core.AuthC
 		Host:          &ret.Host,
 		Network:       &ret.Network,
 		ExecOptions:   &ret.Exec,
-		AutoRemove:    autoRemove,
+		AutoRemove:    auto_remove,
 		AuthManager:   authManager,
 		Shell:         ret.Shell,
 	}), nil
@@ -249,14 +249,14 @@ func LoadConfig(workDir string, ct core.Container, registryAuths map[string]*cor
 		}
 	}
 
-	// autoRemove is the inverse of KeepContainer
-	autoRemove := !ct.KeepContainer
+	// auto_remove is the inverse of KeepContainer
+	auto_remove := !ct.KeepContainer
 
 	// Apply restart policy if specified
 	if ct.RestartPolicy != "" {
 		rp, err := parseRestartPolicy(ct.RestartPolicy)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse restartPolicy: %w", err)
+			return nil, fmt.Errorf("failed to parse restart_policy: %w", err)
 		}
 		hostConfig.RestartPolicy = rp
 	}
@@ -272,7 +272,7 @@ func LoadConfig(workDir string, ct core.Container, registryAuths map[string]*cor
 		Image:         ct.Image,
 		Platform:      ct.Platform,
 		Pull:          ct.PullPolicy,
-		AutoRemove:    autoRemove,
+		AutoRemove:    auto_remove,
 		Container:     containerConfig,
 		Host:          hostConfig,
 		Network:       networkConfig,
@@ -302,36 +302,36 @@ func init() {
 }
 
 // configSchema defines the JSON schema for docker/container executor config.
-// Validates that either image or containerName is provided, and that exec
-// with image also requires containerName.
+// Validates that either image or container_name is provided, and that exec
+// with image also requires container_name.
 var configSchema = &jsonschema.Schema{
 	Type: "object",
 	Properties: map[string]*jsonschema.Schema{
-		"image":         {Type: "string", Description: "Docker image (for new container mode)"},
-		"containerName": {Type: "string", Description: "Container name (for exec mode or to name new container)"},
-		"platform":      {Type: "string", Description: "Target platform (e.g., linux/amd64)"},
-		"pull":          {Type: "string", Description: "Image pull policy (always, never, missing)"},
-		"autoRemove":    {Type: "boolean", Description: "Remove container after exit"},
-		"workingDir":    {Type: "string", Description: "Working directory inside container"},
-		"volumes":       {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Volume bindings (host:container)"},
-		"container":     {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
-		"host":          {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
-		"network":       {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
-		"exec":          {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
-		"shell":         {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Shell wrapper for step commands (e.g., [\"/bin/bash\", \"-c\"])"},
+		"image":          {Type: "string", Description: "Docker image (for new container mode)"},
+		"container_name": {Type: "string", Description: "Container name (for exec mode or to name new container)"},
+		"platform":       {Type: "string", Description: "Target platform (e.g., linux/amd64)"},
+		"pull":           {Type: "string", Description: "Image pull policy (always, never, missing)"},
+		"auto_remove":    {Type: "boolean", Description: "Remove container after exit"},
+		"working_dir":    {Type: "string", Description: "Working directory inside container"},
+		"volumes":        {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Volume bindings (host:container)"},
+		"container":      {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
+		"host":           {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
+		"network":        {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
+		"exec":           {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
+		"shell":          {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Shell wrapper for step commands (e.g., [\"/bin/bash\", \"-c\"])"},
 	},
 	AllOf: []*jsonschema.Schema{
-		// Require at least one of image or containerName
+		// Require at least one of image or container_name
 		{
 			AnyOf: []*jsonschema.Schema{
 				{Required: []string{"image"}},
-				{Required: []string{"containerName"}},
+				{Required: []string{"container_name"}},
 			},
 		},
-		// If exec + image, then containerName required
+		// If exec + image, then container_name required
 		{
 			If:   &jsonschema.Schema{Required: []string{"exec", "image"}},
-			Then: &jsonschema.Schema{Required: []string{"containerName"}},
+			Then: &jsonschema.Schema{Required: []string{"container_name"}},
 		},
 	},
 }

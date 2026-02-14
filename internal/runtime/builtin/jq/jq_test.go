@@ -66,8 +66,8 @@ func TestJQExecutor_RawOutput(t *testing.T) {
 		},
 		{
 			name:           "NullValueWithRawTrue",
-			query:          ".nullValue",
-			script:         `{"nullValue": null}`,
+			query:          ".null_value",
+			script:         `{"null_value": null}`,
 			raw:            true,
 			expectedOutput: "\n",
 		},

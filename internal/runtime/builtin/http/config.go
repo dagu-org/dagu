@@ -19,11 +19,11 @@ var configSchema = &jsonschema.Schema{
 			AdditionalProperties: &jsonschema.Schema{Type: "string"},
 			Description:          "Query parameters",
 		},
-		"body":          {Type: "string", Description: "Request body content"},
-		"silent":        {Type: "boolean", Description: "Suppress headers/status output on success"},
-		"debug":         {Type: "boolean", Description: "Enable debug mode"},
-		"json":          {Type: "boolean", Description: "Format output as JSON"},
-		"skipTLSVerify": {Type: "boolean", Description: "Skip TLS certificate verification"},
+		"body":            {Type: "string", Description: "Request body content"},
+		"silent":          {Type: "boolean", Description: "Suppress headers/status output on success"},
+		"debug":           {Type: "boolean", Description: "Enable debug mode"},
+		"json":            {Type: "boolean", Description: "Format output as JSON"},
+		"skip_tls_verify": {Type: "boolean", Description: "Skip TLS certificate verification"},
 	},
 }
 

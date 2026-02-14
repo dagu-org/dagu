@@ -22,7 +22,7 @@ func (l *LogOutputValue) UnmarshalYAML(data []byte) error {
 
 	var raw any
 	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("logOutput unmarshal error: %w", err)
+		return fmt.Errorf("log_output unmarshal error: %w", err)
 	}
 
 	switch v := raw.(type) {
@@ -34,7 +34,7 @@ func (l *LogOutputValue) UnmarshalYAML(data []byte) error {
 		case "merged":
 			l.mode = core.LogOutputMerged
 		default:
-			return fmt.Errorf("invalid logOutput value: %q (must be 'separate' or 'merged')", v)
+			return fmt.Errorf("invalid log_output value: %q (must be 'separate' or 'merged')", v)
 		}
 		return nil
 
@@ -43,7 +43,7 @@ func (l *LogOutputValue) UnmarshalYAML(data []byte) error {
 		return nil
 
 	default:
-		return fmt.Errorf("logOutput must be a string, got %T", v)
+		return fmt.Errorf("log_output must be a string, got %T", v)
 	}
 }
 

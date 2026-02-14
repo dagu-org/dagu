@@ -186,7 +186,7 @@ func validateParallelConfig(step Step) ErrorList {
 	}
 
 	if step.Parallel.MaxConcurrent <= 0 {
-		errs = append(errs, NewValidationError("parallel.maxConcurrent", step.Parallel.MaxConcurrent, fmt.Errorf("maxConcurrent must be greater than 0")))
+		errs = append(errs, NewValidationError("parallel.max_concurrent", step.Parallel.MaxConcurrent, fmt.Errorf("max_concurrent must be greater than 0")))
 	}
 
 	if len(step.Parallel.Items) == 0 && step.Parallel.Variable == "" {

@@ -30,97 +30,97 @@ func TestPostgresDriver_BuildInsertQuery(t *testing.T) {
 	driver := &PostgresDriver{}
 
 	tests := []struct {
-		name           string
-		table          string
-		columns        []string
-		rowCount       int
-		onConflict     string
-		conflictTarget string
-		updateColumns  []string
-		want           string
+		name            string
+		table           string
+		columns         []string
+		rowCount        int
+		on_conflict     string
+		conflict_target string
+		update_columns  []string
+		want            string
 	}{
 		{
-			name:       "single row",
-			table:      "users",
-			columns:    []string{"name", "age"},
-			rowCount:   1,
-			onConflict: "error",
-			want:       `INSERT INTO "users" ("name", "age") VALUES ($1, $2)`,
+			name:        "single row",
+			table:       "users",
+			columns:     []string{"name", "age"},
+			rowCount:    1,
+			on_conflict: "error",
+			want:        `INSERT INTO "users" ("name", "age") VALUES ($1, $2)`,
 		},
 		{
-			name:       "multiple rows",
-			table:      "users",
-			columns:    []string{"name", "age"},
-			rowCount:   3,
-			onConflict: "error",
-			want:       `INSERT INTO "users" ("name", "age") VALUES ($1, $2), ($3, $4), ($5, $6)`,
+			name:        "multiple rows",
+			table:       "users",
+			columns:     []string{"name", "age"},
+			rowCount:    3,
+			on_conflict: "error",
+			want:        `INSERT INTO "users" ("name", "age") VALUES ($1, $2), ($3, $4), ($5, $6)`,
 		},
 		{
-			name:       "with ignore",
-			table:      "users",
-			columns:    []string{"id", "name"},
-			rowCount:   2,
-			onConflict: "ignore",
-			want:       `INSERT INTO "users" ("id", "name") VALUES ($1, $2), ($3, $4) ON CONFLICT DO NOTHING`,
+			name:        "with ignore",
+			table:       "users",
+			columns:     []string{"id", "name"},
+			rowCount:    2,
+			on_conflict: "ignore",
+			want:        `INSERT INTO "users" ("id", "name") VALUES ($1, $2), ($3, $4) ON CONFLICT DO NOTHING`,
 		},
 		{
-			name:       "with replace no target",
-			table:      "users",
-			columns:    []string{"id", "name"},
-			rowCount:   1,
-			onConflict: "replace",
-			want:       `INSERT INTO "users" ("id", "name") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+			name:        "with replace no target",
+			table:       "users",
+			columns:     []string{"id", "name"},
+			rowCount:    1,
+			on_conflict: "replace",
+			want:        `INSERT INTO "users" ("id", "name") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
 		},
 		{
-			name:           "with replace and conflict target",
-			table:          "users",
-			columns:        []string{"id", "name", "email"},
-			rowCount:       1,
-			onConflict:     "replace",
-			conflictTarget: "id",
-			want:           `INSERT INTO "users" ("id", "name", "email") VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET "name" = EXCLUDED."name", "email" = EXCLUDED."email"`,
+			name:            "with replace and conflict target",
+			table:           "users",
+			columns:         []string{"id", "name", "email"},
+			rowCount:        1,
+			on_conflict:     "replace",
+			conflict_target: "id",
+			want:            `INSERT INTO "users" ("id", "name", "email") VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET "name" = EXCLUDED."name", "email" = EXCLUDED."email"`,
 		},
 		{
-			name:           "with replace and composite conflict target",
-			table:          "user_orgs",
-			columns:        []string{"user_id", "org_id", "role"},
-			rowCount:       1,
-			onConflict:     "replace",
-			conflictTarget: "user_id, org_id",
-			want:           `INSERT INTO "user_orgs" ("user_id", "org_id", "role") VALUES ($1, $2, $3) ON CONFLICT (user_id, org_id) DO UPDATE SET "role" = EXCLUDED."role"`,
+			name:            "with replace and composite conflict target",
+			table:           "user_orgs",
+			columns:         []string{"user_id", "org_id", "role"},
+			rowCount:        1,
+			on_conflict:     "replace",
+			conflict_target: "user_id, org_id",
+			want:            `INSERT INTO "user_orgs" ("user_id", "org_id", "role") VALUES ($1, $2, $3) ON CONFLICT (user_id, org_id) DO UPDATE SET "role" = EXCLUDED."role"`,
 		},
 		{
-			name:           "with replace and explicit update columns",
-			table:          "users",
-			columns:        []string{"id", "name", "email", "updated_at"},
-			rowCount:       1,
-			onConflict:     "replace",
-			conflictTarget: "id",
-			updateColumns:  []string{"name", "updated_at"},
-			want:           `INSERT INTO "users" ("id", "name", "email", "updated_at") VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET "name" = EXCLUDED."name", "updated_at" = EXCLUDED."updated_at"`,
+			name:            "with replace and explicit update columns",
+			table:           "users",
+			columns:         []string{"id", "name", "email", "updated_at"},
+			rowCount:        1,
+			on_conflict:     "replace",
+			conflict_target: "id",
+			update_columns:  []string{"name", "updated_at"},
+			want:            `INSERT INTO "users" ("id", "name", "email", "updated_at") VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET "name" = EXCLUDED."name", "updated_at" = EXCLUDED."updated_at"`,
 		},
 		{
-			name:       "single column",
-			table:      "items",
-			columns:    []string{"value"},
-			rowCount:   2,
-			onConflict: "error",
-			want:       `INSERT INTO "items" ("value") VALUES ($1), ($2)`,
+			name:        "single column",
+			table:       "items",
+			columns:     []string{"value"},
+			rowCount:    2,
+			on_conflict: "error",
+			want:        `INSERT INTO "items" ("value") VALUES ($1), ($2)`,
 		},
 		{
-			name:       "reserved word table name",
-			table:      "order",
-			columns:    []string{"select", "from"},
-			rowCount:   1,
-			onConflict: "error",
-			want:       `INSERT INTO "order" ("select", "from") VALUES ($1, $2)`,
+			name:        "reserved word table name",
+			table:       "order",
+			columns:     []string{"select", "from"},
+			rowCount:    1,
+			on_conflict: "error",
+			want:        `INSERT INTO "order" ("select", "from") VALUES ($1, $2)`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := driver.BuildInsertQuery(tt.table, tt.columns, tt.rowCount, tt.onConflict, tt.conflictTarget, tt.updateColumns)
+			got := driver.BuildInsertQuery(tt.table, tt.columns, tt.rowCount, tt.on_conflict, tt.conflict_target, tt.update_columns)
 			assert.Equal(t, tt.want, got)
 		})
 	}

@@ -61,7 +61,7 @@ func TestBuildRunnerConfig(t *testing.T) {
 			step: core.Step{
 				ExecutorConfig: core.ExecutorConfig{
 					Config: map[string]any{
-						"autoRemove": false,
+						"auto_remove": false,
 					},
 				},
 			},
@@ -93,7 +93,7 @@ func TestBuildRunnerConfig(t *testing.T) {
 			step: core.Step{
 				ExecutorConfig: core.ExecutorConfig{
 					Config: map[string]any{
-						"githubInstance": "github.company.com",
+						"github_instance": "github.company.com",
 					},
 				},
 			},
@@ -109,7 +109,7 @@ func TestBuildRunnerConfig(t *testing.T) {
 			step: core.Step{
 				ExecutorConfig: core.ExecutorConfig{
 					Config: map[string]any{
-						"dockerSocket": "/custom/docker.sock",
+						"docker_socket": "/custom/docker.sock",
 					},
 				},
 			},
@@ -125,7 +125,7 @@ func TestBuildRunnerConfig(t *testing.T) {
 			step: core.Step{
 				ExecutorConfig: core.ExecutorConfig{
 					Config: map[string]any{
-						"containerOptions": "--memory=2g --cpus=2",
+						"container_options": "--memory=2g --cpus=2",
 					},
 				},
 			},
@@ -141,7 +141,7 @@ func TestBuildRunnerConfig(t *testing.T) {
 			step: core.Step{
 				ExecutorConfig: core.ExecutorConfig{
 					Config: map[string]any{
-						"reuseContainers": true,
+						"reuse_containers": true,
 					},
 				},
 			},
@@ -157,7 +157,7 @@ func TestBuildRunnerConfig(t *testing.T) {
 			step: core.Step{
 				ExecutorConfig: core.ExecutorConfig{
 					Config: map[string]any{
-						"forceRebuild": true,
+						"force_rebuild": true,
 					},
 				},
 			},
@@ -295,15 +295,15 @@ func TestBuildRunnerConfig(t *testing.T) {
 			step: core.Step{
 				ExecutorConfig: core.ExecutorConfig{
 					Config: map[string]any{
-						"runner":           "catthehacker/ubuntu:full-latest",
-						"autoRemove":       false,
-						"network":          "host",
-						"githubInstance":   "github.enterprise.com",
-						"dockerSocket":     "/custom/socket",
-						"containerOptions": "--memory=4g",
-						"reuseContainers":  true,
-						"forceRebuild":     true,
-						"privileged":       true,
+						"runner":            "catthehacker/ubuntu:full-latest",
+						"auto_remove":       false,
+						"network":           "host",
+						"github_instance":   "github.enterprise.com",
+						"docker_socket":     "/custom/socket",
+						"container_options": "--memory=4g",
+						"reuse_containers":  true,
+						"force_rebuild":     true,
+						"privileged":        true,
 						"capabilities": map[string]any{
 							"add":  []string{"SYS_ADMIN"},
 							"drop": []string{"NET_RAW"},

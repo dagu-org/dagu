@@ -340,10 +340,10 @@ func TestRedisExecutor_Script_Integration(t *testing.T) {
 		ExecutorConfig: core.ExecutorConfig{
 			Type: "redis",
 			Config: map[string]any{
-				"host":       host,
-				"script":     "return redis.call('SET', KEYS[1], ARGV[1])",
-				"scriptKeys": []string{"test:script:key"},
-				"scriptArgs": []any{"script-value"},
+				"host":        host,
+				"script":      "return redis.call('SET', KEYS[1], ARGV[1])",
+				"script_keys": []string{"test:script:key"},
+				"script_args": []any{"script-value"},
 			},
 		},
 	}
@@ -418,9 +418,9 @@ func TestRedisExecutor_OutputFormats_Integration(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name         string
-		outputFormat string
-		contains     string
+		name          string
+		output_format string
+		contains      string
 	}{
 		{"json format", "json", "format-test"},
 		{"raw format", "raw", "format-test"},
@@ -433,10 +433,10 @@ func TestRedisExecutor_OutputFormats_Integration(t *testing.T) {
 				ExecutorConfig: core.ExecutorConfig{
 					Type: "redis",
 					Config: map[string]any{
-						"host":         host,
-						"command":      "GET",
-						"key":          "test:format:key",
-						"outputFormat": tt.outputFormat,
+						"host":          host,
+						"command":       "GET",
+						"key":           "test:format:key",
+						"output_format": tt.output_format,
 					},
 				},
 			}
@@ -694,12 +694,12 @@ func TestRedisExecutor_SortedSet_Integration(t *testing.T) {
 		ExecutorConfig: core.ExecutorConfig{
 			Type: "redis",
 			Config: map[string]any{
-				"host":       host,
-				"command":    "ZRANGE",
-				"key":        "test:zset:key",
-				"start":      0,
-				"stop":       -1,
-				"withScores": true,
+				"host":        host,
+				"command":     "ZRANGE",
+				"key":         "test:zset:key",
+				"start":       0,
+				"stop":        -1,
+				"with_scores": true,
 			},
 		},
 	}
@@ -887,20 +887,20 @@ func TestTruncateString(t *testing.T) {
 
 	tests := []struct {
 		input    string
-		maxLen   int
+		max_len  int
 		expected string
 	}{
 		{"hello", 10, "hello"},
 		{"hello world", 5, "he..."},
 		{"hi", 2, "hi"},
-		{"hello", 3, "hel"}, // When maxLen <= 3, no room for ellipsis
+		{"hello", 3, "hel"}, // When max_len <= 3, no room for ellipsis
 		{"ab", 1, "a"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
-			result := redisexec.TruncateString(tt.input, tt.maxLen)
+			result := redisexec.TruncateString(tt.input, tt.max_len)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

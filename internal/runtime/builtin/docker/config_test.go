@@ -20,23 +20,23 @@ func TestDockerConfigSchema(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "containerName only",
-			config:  map[string]any{"containerName": "my-container"},
+			name:    "container_name only",
+			config:  map[string]any{"container_name": "my-container"},
 			wantErr: false,
 		},
 		{
-			name:    "both image and containerName",
-			config:  map[string]any{"image": "alpine", "containerName": "my-container"},
+			name:    "both image and container_name",
+			config:  map[string]any{"image": "alpine", "container_name": "my-container"},
 			wantErr: false,
 		},
 		{
-			name:    "image with exec requires containerName",
+			name:    "image with exec requires container_name",
 			config:  map[string]any{"image": "alpine", "exec": map[string]any{"user": "root"}},
 			wantErr: true,
 		},
 		{
-			name:    "containerName with exec",
-			config:  map[string]any{"containerName": "my-container", "exec": map[string]any{"user": "root"}},
+			name:    "container_name with exec",
+			config:  map[string]any{"container_name": "my-container", "exec": map[string]any{"user": "root"}},
 			wantErr: false,
 		},
 		{

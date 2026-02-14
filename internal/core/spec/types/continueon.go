@@ -14,14 +14,14 @@ import (
 //
 // YAML examples:
 //
-//	continueOn: skipped
-//	continueOn: failed
-//	continueOn:
+//	continue_on: skipped
+//	continue_on: failed
+//	continue_on:
 //	  skipped: true
 //	  failed: true
-//	  exitCode: [0, 1]
+//	  exit_code: [0, 1]
 //	  output: ["pattern1", "pattern2"]
-//	  markSuccess: true
+//	  mark_success: true
 type ContinueOnValue struct {
 	raw         any      // Original value for error reporting
 	isSet       bool     // Whether the field was set in YAML
@@ -38,7 +38,7 @@ func (c *ContinueOnValue) UnmarshalYAML(data []byte) error {
 
 	var raw any
 	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("continueOn unmarshal error: %w", err)
+		return fmt.Errorf("continue_on unmarshal error: %w", err)
 	}
 	c.raw = raw
 
@@ -51,7 +51,7 @@ func (c *ContinueOnValue) UnmarshalYAML(data []byte) error {
 		case "failed":
 			c.failed = true
 		default:
-			return fmt.Errorf("continueOn: expected 'skipped' or 'failed', got %q", v)
+			return fmt.Errorf("continue_on: expected 'skipped' or 'failed', got %q", v)
 		}
 		return nil
 
@@ -64,7 +64,7 @@ func (c *ContinueOnValue) UnmarshalYAML(data []byte) error {
 		return nil
 
 	default:
-		return fmt.Errorf("continueOn must be string or map, got %T", v)
+		return fmt.Errorf("continue_on must be string or map, got %T", v)
 	}
 }
 
@@ -75,34 +75,34 @@ func (c *ContinueOnValue) parseMap(m map[string]any) error {
 			if b, ok := v.(bool); ok {
 				c.skipped = b
 			} else {
-				return fmt.Errorf("continueOn.skipped: expected boolean, got %T", v)
+				return fmt.Errorf("continue_on.skipped: expected bool, got %T", v)
 			}
 		case "failed", "failure":
 			if b, ok := v.(bool); ok {
 				c.failed = b
 			} else {
-				return fmt.Errorf("continueOn.%s: expected boolean, got %T", key, v)
+				return fmt.Errorf("continue_on.%s: expected bool, got %T", key, v)
 			}
-		case "exitCode":
+		case "exit_code":
 			codes, err := parseIntArray(v)
 			if err != nil {
-				return fmt.Errorf("continueOn.exitCode: %w", err)
+				return fmt.Errorf("continue_on.exit_code: %w", err)
 			}
 			c.exitCode = codes
 		case "output":
 			outputs, err := parseStringArray(v)
 			if err != nil {
-				return fmt.Errorf("continueOn.output: %w", err)
+				return fmt.Errorf("continue_on.output: %w", err)
 			}
 			c.output = outputs
-		case "markSuccess":
+		case "mark_success":
 			if b, ok := v.(bool); ok {
 				c.markSuccess = b
 			} else {
-				return fmt.Errorf("continueOn.markSuccess: expected boolean, got %T", v)
+				return fmt.Errorf("continue_on.mark_success: expected bool, got %T", v)
 			}
 		default:
-			return fmt.Errorf("continueOn: unknown key %q", key)
+			return fmt.Errorf("continue_on: unknown key %q", key)
 		}
 	}
 	return nil

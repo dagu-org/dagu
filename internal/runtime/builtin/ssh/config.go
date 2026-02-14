@@ -74,7 +74,7 @@ func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
 		return nil, fmt.Errorf("failed to decode ssh config: %w", err)
 	}
 
-	shell, shellArgs, err := parseShellConfig(def.Shell, def.ShellArgs)
+	shell, shell_args, err := parseShellConfig(def.Shell, def.ShellArgs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse shell config: %w", err)
 	}
@@ -93,7 +93,7 @@ func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
 		StrictHostKey: def.StrictHostKey,
 		KnownHostFile: def.KnownHostFile,
 		Shell:         shell,
-		ShellArgs:     shellArgs,
+		ShellArgs:     shell_args,
 		Timeout:       timeout,
 		Bastion:       buildBastionFromMap(def.Bastion),
 	}
@@ -168,17 +168,17 @@ func parseShellConfig(shell string, args []string) (string, []string, error) {
 var configSchema = &jsonschema.Schema{
 	Type: "object",
 	Properties: map[string]*jsonschema.Schema{
-		"user":          {Type: "string", Description: "SSH username"},
-		"host":          {Type: "string", Description: "SSH hostname"},
-		"ip":            {Type: "string", Description: "SSH host IP (alias for host)"},
-		"port":          {Type: "string", Description: "SSH port"},
-		"key":           {Type: "string", Description: "Path to private key file"},
-		"password":      {Type: "string", Description: "SSH password"},
-		"strictHostKey": {Type: "boolean", Description: "Enable strict host key checking"},
-		"knownHostFile": {Type: "string", Description: "Path to known_hosts file"},
-		"shell":         {Type: "string", Description: "Shell for remote execution"},
-		"shellArgs":     {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Additional shell arguments"},
-		"timeout":       {Type: "string", Description: "Connection timeout (e.g., '30s', '1m')"},
+		"user":            {Type: "string", Description: "SSH username"},
+		"host":            {Type: "string", Description: "SSH hostname"},
+		"ip":              {Type: "string", Description: "SSH host IP (alias for host)"},
+		"port":            {Type: "string", Description: "SSH port"},
+		"key":             {Type: "string", Description: "Path to private key file"},
+		"password":        {Type: "string", Description: "SSH password"},
+		"strict_host_key": {Type: "boolean", Description: "Enable strict host key checking"},
+		"known_host_file": {Type: "string", Description: "Path to known_hosts file"},
+		"shell":           {Type: "string", Description: "Shell for remote execution"},
+		"shell_args":      {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Additional shell arguments"},
+		"timeout":         {Type: "string", Description: "Connection timeout (e.g., '30s', '1m')"},
 		"bastion": {
 			Type:        "object",
 			Description: "Bastion/jump host configuration",
@@ -196,18 +196,18 @@ var configSchema = &jsonschema.Schema{
 var sftpConfigSchema = &jsonschema.Schema{
 	Type: "object",
 	Properties: map[string]*jsonschema.Schema{
-		"user":          {Type: "string", Description: "SSH username"},
-		"host":          {Type: "string", Description: "SSH hostname"},
-		"ip":            {Type: "string", Description: "SSH host IP (alias for host)"},
-		"port":          {Type: "string", Description: "SSH port"},
-		"key":           {Type: "string", Description: "Path to private key file"},
-		"password":      {Type: "string", Description: "SSH password"},
-		"strictHostKey": {Type: "boolean", Description: "Enable strict host key checking"},
-		"knownHostFile": {Type: "string", Description: "Path to known_hosts file"},
-		"timeout":       {Type: "string", Description: "Connection timeout (e.g., '30s', '1m')"},
-		"direction":     {Type: "string", Description: "Transfer direction: 'upload' or 'download'"},
-		"source":        {Type: "string", Description: "Source path (local for upload, remote for download)"},
-		"destination":   {Type: "string", Description: "Destination path (remote for upload, local for download)"},
+		"user":            {Type: "string", Description: "SSH username"},
+		"host":            {Type: "string", Description: "SSH hostname"},
+		"ip":              {Type: "string", Description: "SSH host IP (alias for host)"},
+		"port":            {Type: "string", Description: "SSH port"},
+		"key":             {Type: "string", Description: "Path to private key file"},
+		"password":        {Type: "string", Description: "SSH password"},
+		"strict_host_key": {Type: "boolean", Description: "Enable strict host key checking"},
+		"known_host_file": {Type: "string", Description: "Path to known_hosts file"},
+		"timeout":         {Type: "string", Description: "Connection timeout (e.g., '30s', '1m')"},
+		"direction":       {Type: "string", Description: "Transfer direction: 'upload' or 'download'"},
+		"source":          {Type: "string", Description: "Source path (local for upload, remote for download)"},
+		"destination":     {Type: "string", Description: "Destination path (remote for upload, local for download)"},
 		"bastion": {
 			Type:        "object",
 			Description: "Bastion/jump host configuration",

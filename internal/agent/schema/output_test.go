@@ -41,8 +41,8 @@ func TestNavigateDeepPaths(t *testing.T) {
 			want: []string{"oneOf", "cron", "start", "stop"},
 		},
 		{
-			name: "handlerOn.success",
-			path: "handlerOn.success",
+			name: "handler_on.success",
+			path: "handler_on.success",
 			want: []string{"object"},
 		},
 		{

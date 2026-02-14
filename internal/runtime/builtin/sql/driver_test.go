@@ -26,7 +26,7 @@ func (d *mockDriver) AcquireAdvisoryLock(_ context.Context, _ *sql.DB, _ string)
 func (d *mockDriver) ConvertNamedParams(query string, params map[string]any) (string, []any, error) {
 	return query, nil, nil
 }
-func (d *mockDriver) BuildInsertQuery(table string, columns []string, rowCount int, onConflict, conflictTarget string, updateColumns []string) string {
+func (d *mockDriver) BuildInsertQuery(table string, columns []string, rowCount int, on_conflict, conflict_target string, update_columns []string) string {
 	return ""
 }
 
