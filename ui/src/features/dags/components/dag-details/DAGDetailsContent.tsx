@@ -25,7 +25,7 @@ import WebhookTab from './WebhookTab';
 type DAGDetailsContentProps = {
   fileName: string;
   dag: components['schemas']['DAGDetails'];
-  currentDAGRun: components['schemas']['DAGRunDetails'];
+  currentDAGRun?: components['schemas']['DAGRunDetails'];
   refreshFn: () => void;
   formatDuration: (startDate: string, endDate: string) => string;
   activeTab: string;
@@ -318,7 +318,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
           </div>
         </div>
         <div className="flex-1 flex flex-col min-h-0">
-          {activeTab === 'status' ? (
+          {activeTab === 'status' && currentDAGRun ? (
             <>
               <DAGStatus dagRun={currentDAGRun} fileName={fileName || ''} />
               <div className="h-6 flex-shrink-0" />

@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/core"
@@ -35,9 +36,11 @@ func init() {
 
 // Executor runs the agent loop as a workflow step.
 type Executor struct {
-	step   core.Step
-	stdout io.Writer
-	stderr io.Writer
+	step       core.Step
+	stdout     io.Writer
+	stderr     io.Writer
+	mu         sync.Mutex
+	cancelLoop context.CancelFunc
 }
 
 func newAgentExecutor(_ context.Context, step core.Step) (executor.Executor, error) {
@@ -48,6 +51,11 @@ func (e *Executor) SetStdout(w io.Writer) { e.stdout = w }
 func (e *Executor) SetStderr(w io.Writer) { e.stderr = w }
 
 func (e *Executor) Kill(_ os.Signal) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.cancelLoop != nil {
+		e.cancelLoop()
+	}
 	return nil
 }
 
@@ -140,6 +148,10 @@ func (e *Executor) Run(ctx context.Context) error {
 	// Create a cancellable context for stopping the loop after completion.
 	loopCtx, cancelLoop := context.WithCancel(ctx)
 	defer cancelLoop()
+
+	e.mu.Lock()
+	e.cancelLoop = cancelLoop
+	e.mu.Unlock()
 
 	iteration := 0
 

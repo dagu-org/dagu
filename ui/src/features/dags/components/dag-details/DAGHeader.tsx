@@ -9,7 +9,7 @@ import { DAGActions } from '../common';
 
 interface DAGHeaderProps {
   dag: components['schemas']['DAG'] | components['schemas']['DAGDetails'];
-  currentDAGRun: components['schemas']['DAGRunDetails'];
+  currentDAGRun?: components['schemas']['DAGRunDetails'];
   fileName: string;
   refreshFn: () => void;
   formatDuration: (startDate: string, endDate: string) => string;
@@ -35,7 +35,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
 
   // Calculate duration between start and end times
   const calculateDuration = React.useCallback(() => {
-    if (!dagRunToDisplay.startedAt || dagRunToDisplay.startedAt === '-') {
+    if (!dagRunToDisplay?.startedAt || dagRunToDisplay.startedAt === '-') {
       return '--';
     }
 
@@ -45,14 +45,14 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
         : dayjs().toISOString();
 
     return formatDuration(dagRunToDisplay.startedAt, end);
-  }, [dagRunToDisplay.startedAt, dagRunToDisplay.finishedAt, formatDuration]);
+  }, [dagRunToDisplay?.startedAt, dagRunToDisplay?.finishedAt, formatDuration]);
 
   // Determine if the DAG is currently running
-  const isRunning = dagRunToDisplay.status === Status.Running;
+  const isRunning = dagRunToDisplay?.status === Status.Running;
 
   // Auto-update duration every second for running DAGs
   useEffect(() => {
-    if (isRunning && dagRunToDisplay.startedAt) {
+    if (isRunning && dagRunToDisplay?.startedAt) {
       // Initial calculation
       setCurrentDuration(calculateDuration());
 
@@ -67,10 +67,11 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
       // For non-running DAGs, calculate once
       setCurrentDuration(calculateDuration());
     }
-  }, [isRunning, dagRunToDisplay.startedAt, dagRunToDisplay.finishedAt]);
+  }, [isRunning, dagRunToDisplay?.startedAt, dagRunToDisplay?.finishedAt]);
 
   const handleRootDAGRunClick = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (!dagRunToDisplay) return;
     navigate(
       `/dags/${fileName}?dagRunId=${dagRunToDisplay.rootDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`
     );
@@ -78,6 +79,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
 
   const handleParentDAGRunClick = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (!dagRunToDisplay) return;
     navigate(
       `/dags/${fileName}?subDAGRunId=${dagRunToDisplay.parentDAGRunId}&dagRunId=${dagRunToDisplay.rootDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`
     );
@@ -127,51 +129,58 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [params.tab, handleRefresh]);
 
+  // Show actions for root DAG-runs or when no DAG-run data exists
+  const showActions =
+    !dagRunToDisplay ||
+    dagRunToDisplay.dagRunId === dagRunToDisplay.rootDAGRunId;
+
   return (
     <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
       {/* Header with title and actions */}
       <div className="flex items-start justify-between gap-6 mb-4">
         <div className="flex-1 min-w-0">
           {/* Breadcrumb navigation */}
-          <nav className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground mb-2">
-            {dagRunToDisplay.rootDAGRunId !== dagRunToDisplay.dagRunId && (
-              <>
-                <a
-                  href={`/dags/${fileName}?dagRunId=${dagRunToDisplay.rootDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`}
-                  onClick={handleRootDAGRunClick}
-                  className="text-primary hover:text-primary hover:underline transition-colors font-medium"
-                >
-                  {dagRunToDisplay.rootDAGRunName}
-                </a>
-                <span className="text-muted-foreground mx-1">/</span>
-              </>
-            )}
-
-            {dagRunToDisplay.parentDAGRunName &&
-              dagRunToDisplay.parentDAGRunId &&
-              dagRunToDisplay.parentDAGRunName !==
-                dagRunToDisplay.rootDAGRunName &&
-              dagRunToDisplay.parentDAGRunName !== dagRunToDisplay.name && (
+          {dagRunToDisplay && (
+            <nav className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground mb-2">
+              {dagRunToDisplay.rootDAGRunId !== dagRunToDisplay.dagRunId && (
                 <>
                   <a
-                    href={`/dags/${fileName}?dagRunId=${dagRunToDisplay.rootDAGRunId}&subDAGRunId=${dagRunToDisplay.parentDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`}
-                    onClick={handleParentDAGRunClick}
+                    href={`/dags/${fileName}?dagRunId=${dagRunToDisplay.rootDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`}
+                    onClick={handleRootDAGRunClick}
                     className="text-primary hover:text-primary hover:underline transition-colors font-medium"
                   >
-                    {dagRunToDisplay.parentDAGRunName}
+                    {dagRunToDisplay.rootDAGRunName}
                   </a>
                   <span className="text-muted-foreground mx-1">/</span>
                 </>
               )}
-          </nav>
+
+              {dagRunToDisplay.parentDAGRunName &&
+                dagRunToDisplay.parentDAGRunId &&
+                dagRunToDisplay.parentDAGRunName !==
+                  dagRunToDisplay.rootDAGRunName &&
+                dagRunToDisplay.parentDAGRunName !== dagRunToDisplay.name && (
+                  <>
+                    <a
+                      href={`/dags/${fileName}?dagRunId=${dagRunToDisplay.rootDAGRunId}&subDAGRunId=${dagRunToDisplay.parentDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`}
+                      onClick={handleParentDAGRunClick}
+                      className="text-primary hover:text-primary hover:underline transition-colors font-medium"
+                    >
+                      {dagRunToDisplay.parentDAGRunName}
+                    </a>
+                    <span className="text-muted-foreground mx-1">/</span>
+                  </>
+                )}
+            </nav>
+          )}
 
           <h1 className="text-2xl font-bold text-foreground truncate">
-            {dagRunToDisplay.name}
+            {dagRunToDisplay?.name || dag.name}
           </h1>
         </div>
 
-        {/* Actions */}
-        {dagRunToDisplay.dagRunId === dagRunToDisplay.rootDAGRunId && (
+        {/* Actions - always show for root runs or when no run data */}
+        {showActions && (
           <div className="flex-shrink-0">
             <DAGActions
               status={dagRunToDisplay}
@@ -186,7 +195,8 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
       </div>
 
       {/* Status and metadata row */}
-      {dagRunToDisplay.status !== undefined &&
+      {dagRunToDisplay &&
+        dagRunToDisplay.status !== undefined &&
         dagRunToDisplay.status !== null && (
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <StatusChip status={dagRunToDisplay.status} size="md">
