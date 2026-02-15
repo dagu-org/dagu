@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./assets/images/dagu-logo.webp" width="480" alt="Boltbase Logo">
+  <img src="./assets/images/logo.webp" width="480" alt="Boltbase Logo">
   <br/>
 
   <p>
