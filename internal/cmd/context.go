@@ -24,6 +24,8 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/telemetry"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
+	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
@@ -405,6 +407,28 @@ func (c *Context) dagStore(cfg dagStoreConfig) (exec.DAGStore, error) {
 	}
 
 	return store, nil
+}
+
+// agentStores creates the agent config and model stores from the config paths.
+// Returns (configStore, modelStore) as any-typed values for use in agent.Options.
+// Errors are logged as warnings; nil stores are returned if creation fails.
+func (c *Context) agentStores() (configStore any, modelStore any) {
+	acs, err := fileagentconfig.New(c.Config.Paths.DataDir)
+	if err != nil {
+		logger.Warn(c, "Failed to create agent config store", tag.Error(err))
+		return nil, nil
+	}
+	if acs == nil {
+		return nil, nil
+	}
+
+	ams, err := fileagentmodel.New(filepath.Join(c.Config.Paths.DataDir, "agent", "models"))
+	if err != nil {
+		logger.Warn(c, "Failed to create agent model store", tag.Error(err))
+		return acs, nil
+	}
+
+	return acs, ams
 }
 
 // OpenLogFile creates and opens a log file for a given dag-run.

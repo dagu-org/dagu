@@ -42,6 +42,10 @@ var (
 	WithLogWriterFactory = exec.WithLogWriterFactory
 	// WithDefaultExecMode sets the server-level default execution mode.
 	WithDefaultExecMode = exec.WithDefaultExecMode
+	// WithAgentConfigStore sets the agent configuration store.
+	WithAgentConfigStore = exec.WithAgentConfigStore
+	// WithAgentModelStore sets the agent model store.
+	WithAgentModelStore = exec.WithAgentModelStore
 )
 
 // LogWriterFactory is re-exported from execution package

@@ -160,6 +160,11 @@ type Agent struct {
 	// When set, the agent creates an attempt with this ID instead of generating a new one.
 	attemptID string
 
+	// agentConfigStore is the agent config store for agent step execution.
+	agentConfigStore any
+	// agentModelStore is the agent model store for agent step execution.
+	agentModelStore any
+
 	// Evaluated configs - these are expanded at runtime and stored separately
 	// to avoid mutating the original DAG struct.
 	evaluatedSMTP          *core.SMTPConfig
@@ -223,6 +228,10 @@ type Options struct {
 	TriggerType core.TriggerType
 	// DefaultExecMode is the server-level default execution mode.
 	DefaultExecMode config.ExecutionMode
+	// AgentConfigStore is the agent config store for agent step execution.
+	AgentConfigStore any
+	// AgentModelStore is the agent model store for agent step execution.
+	AgentModelStore any
 }
 
 // New creates a new Agent.
@@ -257,6 +266,8 @@ func New(
 		attemptID:        opts.AttemptID,
 		triggerType:      opts.TriggerType,
 		defaultExecMode:  opts.DefaultExecMode,
+		agentConfigStore: opts.AgentConfigStore,
+		agentModelStore:  opts.AgentModelStore,
 	}
 
 	// Initialize progress display if enabled
@@ -397,6 +408,12 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	if a.logWriterFactory != nil {
 		contextOpts = append(contextOpts, runtime.WithLogWriterFactory(a.logWriterFactory))
+	}
+	if a.agentConfigStore != nil {
+		contextOpts = append(contextOpts, runtime.WithAgentConfigStore(a.agentConfigStore))
+	}
+	if a.agentModelStore != nil {
+		contextOpts = append(contextOpts, runtime.WithAgentModelStore(a.agentModelStore))
 	}
 	ctx = runtime.NewContext(ctx, a.dag, a.dagRunID, a.logFile, contextOpts...)
 

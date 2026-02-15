@@ -390,6 +390,8 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 	// When running on a worker, the dag-run was already created by the coordinator.
 	queuedRun := workerID != "local"
 
+	agentConfigStore, agentModelStore := ctx.agentStores()
+
 	agentInstance := agent.New(
 		dagRunID,
 		d,
@@ -398,16 +400,18 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 		ctx.DAGRunMgr,
 		dr,
 		agent.Options{
-			ParentDAGRun:    parent,
-			ProgressDisplay: shouldEnableProgress(ctx),
-			WorkerID:        workerID,
-			QueuedRun:       queuedRun,
-			DAGRunStore:     ctx.DAGRunStore,
-			ServiceRegistry: ctx.ServiceRegistry,
-			RootDAGRun:      root,
-			PeerConfig:      ctx.Config.Core.Peer,
-			TriggerType:     triggerType,
-			DefaultExecMode: ctx.Config.DefaultExecMode,
+			ParentDAGRun:     parent,
+			ProgressDisplay:  shouldEnableProgress(ctx),
+			WorkerID:         workerID,
+			QueuedRun:        queuedRun,
+			DAGRunStore:      ctx.DAGRunStore,
+			ServiceRegistry:  ctx.ServiceRegistry,
+			RootDAGRun:       root,
+			PeerConfig:       ctx.Config.Core.Peer,
+			TriggerType:      triggerType,
+			DefaultExecMode:  ctx.Config.DefaultExecMode,
+			AgentConfigStore: agentConfigStore,
+			AgentModelStore:  agentModelStore,
 		},
 	)
 

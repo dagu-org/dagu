@@ -1,6 +1,7 @@
 package builtin
 
 import (
+	_ "github.com/dagu-org/dagu/internal/runtime/builtin/agentstep"
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin/archive"
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin/chat"
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin/command"
