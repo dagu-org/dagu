@@ -82,6 +82,7 @@ func TestAgentPolicyHook(t *testing.T) {
 		err := hook(context.Background(), agent.ToolExecInfo{
 			ToolName: "bash",
 			Input:    json.RawMessage(`{"command":"rm -rf /tmp/x"}`),
+			SafeMode: true,
 			RequestCommandApproval: func(_ context.Context, _ string, _ string) (bool, error) {
 				return true, nil
 			},
@@ -104,12 +105,33 @@ func TestAgentPolicyHook(t *testing.T) {
 		err := hook(context.Background(), agent.ToolExecInfo{
 			ToolName: "bash",
 			Input:    json.RawMessage(`{"command":"rm -rf /tmp/x"}`),
+			SafeMode: true,
 			RequestCommandApproval: func(_ context.Context, _ string, _ string) (bool, error) {
 				return false, nil
 			},
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "denied")
+	})
+
+	t.Run("allows denied command without prompt when safe mode is off", func(t *testing.T) {
+		t.Parallel()
+		cfg := agent.DefaultConfig()
+		cfg.ToolPolicy.Bash.Rules = []agent.BashRule{
+			{
+				Name:    "deny_rm",
+				Pattern: "^rm\\s+",
+				Action:  agent.BashRuleActionDeny,
+			},
+		}
+
+		hook := newAgentPolicyHook(&stubAgentConfigStore{cfg: cfg}, nil)
+		err := hook(context.Background(), agent.ToolExecInfo{
+			ToolName: "bash",
+			Input:    json.RawMessage(`{"command":"rm -rf /tmp/x"}`),
+			SafeMode: false,
+		})
+		require.NoError(t, err)
 	})
 
 	t.Run("allows bash matching allow rule", func(t *testing.T) {

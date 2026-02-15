@@ -5,23 +5,22 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/google/uuid"
 )
 
-func requestCommandApprovalWithOptions(
+const approvalTimeout = 5 * time.Minute
+
+func requestCommandApproval(
 	parentCtx context.Context,
 	emit EmitUserPromptFunc,
 	wait WaitUserResponseFunc,
 	cmd string,
 	workingDir string,
 	question string,
-	allowIfUnavailable bool,
 ) (bool, error) {
 	if emit == nil || wait == nil {
-		if allowIfUnavailable {
-			return true, nil
-		}
 		return false, errors.New("approval channel unavailable")
 	}
 	if parentCtx == nil {

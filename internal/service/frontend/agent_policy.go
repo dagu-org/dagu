@@ -73,6 +73,12 @@ func newAgentPolicyHook(configStore agent.ConfigStore, auditSvc *audit.Service) 
 			"command_segment": truncatePolicyAuditText(decision.Segment),
 		}
 
+		// When safe mode is off and deny behavior is ask_user, allow without prompting.
+		// Hard blocks (denyBehavior: "block") still apply regardless of safe mode.
+		if decision.DenyBehavior == agent.BashDenyBehaviorAskUser && !info.SafeMode {
+			return nil
+		}
+
 		if decision.DenyBehavior == agent.BashDenyBehaviorAskUser && info.RequestCommandApproval != nil {
 			reason := strings.TrimSpace(strings.Join([]string{
 				decision.Reason,

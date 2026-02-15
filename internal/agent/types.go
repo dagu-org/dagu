@@ -243,9 +243,6 @@ type ToolContext struct {
 	// Role is the authenticated role of the current user.
 	// Empty means role checks should be skipped (e.g., auth-disabled compatibility).
 	Role auth.Role
-	// PolicyChecked indicates a centralized policy hook has already run.
-	// Tools can use this to avoid duplicate legacy checks/prompts.
-	PolicyChecked bool
 }
 
 // AuditInfo configures how a tool's executions appear in audit logs.
