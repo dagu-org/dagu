@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/dagu-org/dagu/internal/agent/iface"
 )
 
 const (
@@ -56,13 +58,13 @@ func IsBashToolName(name string) bool {
 //go:fix inline
 func boolPtr(v bool) *bool { return new(v) }
 
-func cloneBashRules(rules []BashRule) []BashRule {
+func cloneBashRules(rules []iface.BashRule) []iface.BashRule {
 	if len(rules) == 0 {
 		return nil
 	}
-	out := make([]BashRule, len(rules))
+	out := make([]iface.BashRule, len(rules))
 	for i := range rules {
-		out[i] = BashRule{
+		out[i] = iface.BashRule{
 			Name:    rules[i].Name,
 			Pattern: rules[i].Pattern,
 			Action:  rules[i].Action,
@@ -84,11 +86,11 @@ func cloneTools(tools map[string]bool) map[string]bool {
 }
 
 // ResolveToolPolicy applies defaults to a potentially partial policy config.
-func ResolveToolPolicy(policy ToolPolicyConfig) ToolPolicyConfig {
-	defaults := DefaultToolPolicy()
-	resolved := ToolPolicyConfig{
+func ResolveToolPolicy(policy iface.ToolPolicyConfig) iface.ToolPolicyConfig {
+	defaults := iface.DefaultToolPolicy()
+	resolved := iface.ToolPolicyConfig{
 		Tools: cloneTools(defaults.Tools),
-		Bash: BashPolicyConfig{
+		Bash: iface.BashPolicyConfig{
 			Rules:           cloneBashRules(defaults.Bash.Rules),
 			DefaultBehavior: defaults.Bash.DefaultBehavior,
 			DenyBehavior:    defaults.Bash.DenyBehavior,
@@ -112,12 +114,12 @@ func ResolveToolPolicy(policy ToolPolicyConfig) ToolPolicyConfig {
 }
 
 // IsToolEnabled reports whether the tool is enabled by the resolved policy.
-func IsToolEnabled(policy ToolPolicyConfig, toolName string) bool {
+func IsToolEnabled(policy iface.ToolPolicyConfig, toolName string) bool {
 	return IsToolEnabledResolved(ResolveToolPolicy(policy), toolName)
 }
 
 // IsToolEnabledResolved reports whether a tool is enabled in an already-resolved policy.
-func IsToolEnabledResolved(resolved ToolPolicyConfig, toolName string) bool {
+func IsToolEnabledResolved(resolved iface.ToolPolicyConfig, toolName string) bool {
 	enabled, ok := resolved.Tools[toolName]
 	if !ok {
 		// Unknown tools are denied by default.
@@ -127,7 +129,7 @@ func IsToolEnabledResolved(resolved ToolPolicyConfig, toolName string) bool {
 }
 
 // ValidateToolPolicy validates policy settings before persistence.
-func ValidateToolPolicy(policy ToolPolicyConfig) error {
+func ValidateToolPolicy(policy iface.ToolPolicyConfig) error {
 	var errs []string
 
 	for toolName := range policy.Tools {
@@ -138,10 +140,10 @@ func ValidateToolPolicy(policy ToolPolicyConfig) error {
 
 	resolved := ResolveToolPolicy(policy)
 
-	if resolved.Bash.DefaultBehavior != BashDefaultBehaviorAllow && resolved.Bash.DefaultBehavior != BashDefaultBehaviorDeny {
+	if resolved.Bash.DefaultBehavior != iface.BashDefaultBehaviorAllow && resolved.Bash.DefaultBehavior != iface.BashDefaultBehaviorDeny {
 		errs = append(errs, "bash.defaultBehavior must be one of: allow, deny")
 	}
-	if resolved.Bash.DenyBehavior != BashDenyBehaviorAskUser && resolved.Bash.DenyBehavior != BashDenyBehaviorBlock {
+	if resolved.Bash.DenyBehavior != iface.BashDenyBehaviorAskUser && resolved.Bash.DenyBehavior != iface.BashDenyBehaviorBlock {
 		errs = append(errs, "bash.denyBehavior must be one of: ask_user, block")
 	}
 
@@ -150,7 +152,7 @@ func ValidateToolPolicy(policy ToolPolicyConfig) error {
 			errs = append(errs, fmt.Sprintf("bash.rules[%d].pattern is required", i))
 			continue
 		}
-		if rule.Action != BashRuleActionAllow && rule.Action != BashRuleActionDeny {
+		if rule.Action != iface.BashRuleActionAllow && rule.Action != iface.BashRuleActionDeny {
 			errs = append(errs, fmt.Sprintf("bash.rules[%d].action must be one of: allow, deny", i))
 		}
 		if _, err := regexp.Compile(rule.Pattern); err != nil {
@@ -167,7 +169,7 @@ func ValidateToolPolicy(policy ToolPolicyConfig) error {
 // BashPolicyDecision is the result of evaluating a bash command against policy.
 type BashPolicyDecision struct {
 	Allowed      bool
-	DenyBehavior BashDenyBehavior
+	DenyBehavior iface.BashDenyBehavior
 	Reason       string
 	Command      string
 	Segment      string
@@ -183,21 +185,21 @@ func ExtractBashCommand(input json.RawMessage) (string, error) {
 	return strings.TrimSpace(args.Command), nil
 }
 
-func isRuleEnabled(rule BashRule) bool {
+func isRuleEnabled(rule iface.BashRule) bool {
 	return rule.Enabled == nil || *rule.Enabled
 }
 
 // EvaluateBashPolicy evaluates bash input against policy.
-func EvaluateBashPolicy(policy ToolPolicyConfig, input json.RawMessage) (BashPolicyDecision, error) {
+func EvaluateBashPolicy(policy iface.ToolPolicyConfig, input json.RawMessage) (BashPolicyDecision, error) {
 	return EvaluateBashPolicyResolved(ResolveToolPolicy(policy), input)
 }
 
 // EvaluateBashPolicyResolved evaluates bash input against an already-resolved policy.
-func EvaluateBashPolicyResolved(resolved ToolPolicyConfig, input json.RawMessage) (BashPolicyDecision, error) {
+func EvaluateBashPolicyResolved(resolved iface.ToolPolicyConfig, input json.RawMessage) (BashPolicyDecision, error) {
 	if !IsToolEnabledResolved(resolved, toolNameBash) {
 		return BashPolicyDecision{
 			Allowed:      false,
-			DenyBehavior: BashDenyBehaviorBlock,
+			DenyBehavior: iface.BashDenyBehaviorBlock,
 			Reason:       "bash tool is disabled by policy",
 		}, nil
 	}
@@ -232,7 +234,7 @@ func EvaluateBashPolicyResolved(resolved ToolPolicyConfig, input json.RawMessage
 	for _, segment := range segments {
 		matched, ruleName, action := matchCompiledBashRule(compiledRules, segment)
 		if matched {
-			if action == BashRuleActionAllow {
+			if action == iface.BashRuleActionAllow {
 				continue
 			}
 			return BashPolicyDecision{
@@ -244,7 +246,7 @@ func EvaluateBashPolicyResolved(resolved ToolPolicyConfig, input json.RawMessage
 				RuleName:     ruleName,
 			}, nil
 		}
-		if resolved.Bash.DefaultBehavior == BashDefaultBehaviorAllow {
+		if resolved.Bash.DefaultBehavior == iface.BashDefaultBehaviorAllow {
 			continue
 		}
 		return BashPolicyDecision{
@@ -261,11 +263,11 @@ func EvaluateBashPolicyResolved(resolved ToolPolicyConfig, input json.RawMessage
 
 type compiledBashRule struct {
 	name   string
-	action BashRuleAction
+	action iface.BashRuleAction
 	re     *regexp.Regexp
 }
 
-func compileEnabledBashRules(rules []BashRule) ([]compiledBashRule, error) {
+func compileEnabledBashRules(rules []iface.BashRule) ([]compiledBashRule, error) {
 	out := make([]compiledBashRule, 0, len(rules))
 	for i, rule := range rules {
 		if !isRuleEnabled(rule) {
@@ -290,7 +292,7 @@ func compileEnabledBashRules(rules []BashRule) ([]compiledBashRule, error) {
 	return out, nil
 }
 
-func matchCompiledBashRule(rules []compiledBashRule, segment string) (matched bool, ruleName string, action BashRuleAction) {
+func matchCompiledBashRule(rules []compiledBashRule, segment string) (matched bool, ruleName string, action iface.BashRuleAction) {
 	for _, rule := range rules {
 		if !rule.re.MatchString(segment) {
 			continue

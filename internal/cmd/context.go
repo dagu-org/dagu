@@ -15,6 +15,7 @@ import (
 
 	"golang.org/x/term"
 
+	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
@@ -411,9 +412,9 @@ func (c *Context) dagStore(cfg dagStoreConfig) (exec.DAGStore, error) {
 }
 
 // agentStores creates the agent config, model, and memory stores from the config paths.
-// Returns (configStore, modelStore, memoryStore) as any-typed values for use in agent.Options.
+// Returns typed stores for use in agent.Options.
 // Errors are logged as warnings; nil stores are returned if creation fails.
-func (c *Context) agentStores() (configStore any, modelStore any, memoryStore any) {
+func (c *Context) agentStores() (configStore iface.ConfigStore, modelStore iface.ModelStore, memoryStore iface.MemoryStore) {
 	acs, err := fileagentconfig.New(c.Config.Paths.DataDir)
 	if err != nil {
 		logger.Warn(c, "Failed to create agent config store", tag.Error(err))

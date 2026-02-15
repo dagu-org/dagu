@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/llm"
@@ -71,12 +72,12 @@ func (e *Executor) Run(ctx context.Context) error {
 	}
 
 	// Resolve agent configuration from exec context.
-	configStore, ok := dagCtx.AgentConfigStore.(agent.ConfigStore)
-	if !ok || configStore == nil {
+	configStore := dagCtx.AgentConfigStore
+	if configStore == nil {
 		return fmt.Errorf("agent config store not available; ensure the agent feature is configured")
 	}
-	modelStore, ok := dagCtx.AgentModelStore.(agent.ModelStore)
-	if !ok || modelStore == nil {
+	modelStore := dagCtx.AgentModelStore
+	if modelStore == nil {
 		return fmt.Errorf("agent model store not available; ensure models are configured in Agent Settings")
 	}
 
@@ -113,9 +114,9 @@ func (e *Executor) Run(ctx context.Context) error {
 	tools := buildTools(dagCtx, stepCfg, globalPolicy, stdout)
 
 	// Load memory content if enabled.
-	var memoryContent agent.MemoryContent
+	var memoryContent iface.MemoryContent
 	if stepCfg != nil && stepCfg.Memory != nil && stepCfg.Memory.Enabled {
-		if memStore, ok := dagCtx.AgentMemoryStore.(agent.MemoryStore); ok && memStore != nil {
+		if memStore := dagCtx.AgentMemoryStore; memStore != nil {
 			dagName := ""
 			if dagCtx.DAG != nil {
 				dagName = dagCtx.DAG.Name
@@ -210,7 +211,7 @@ func (e *Executor) Run(ctx context.Context) error {
 
 // buildTools creates the tool list for the agent step.
 // Tools are filtered first by global policy, then by step-level config.
-func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy agent.ToolPolicyConfig, stdout io.Writer) []*agent.AgentTool {
+func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy iface.ToolPolicyConfig, stdout io.Writer) []*agent.AgentTool {
 	dagsDir := ""
 	if dagCtx.DAG != nil {
 		dagsDir = dagCtx.DAG.Location
@@ -258,7 +259,7 @@ func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy
 }
 
 // buildSystemPrompt generates the system prompt for the agent step.
-func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memory agent.MemoryContent) string {
+func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memory iface.MemoryContent) string {
 	env := agent.EnvironmentInfo{}
 	if dagCtx.DAG != nil {
 		env.DAGsDir = dagCtx.DAG.Location
@@ -286,13 +287,13 @@ func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memor
 }
 
 // loadMemoryContent loads memory content from the memory store for system prompt injection.
-func loadMemoryContent(ctx context.Context, store agent.MemoryStore, dagName string) agent.MemoryContent {
+func loadMemoryContent(ctx context.Context, store iface.MemoryStore, dagName string) iface.MemoryContent {
 	global, _ := store.LoadGlobalMemory(ctx)
 	var dagMem string
 	if dagName != "" {
 		dagMem, _ = store.LoadDAGMemory(ctx, dagName)
 	}
-	return agent.MemoryContent{
+	return iface.MemoryContent{
 		GlobalMemory: global,
 		DAGMemory:    dagMem,
 		DAGName:      dagName,
@@ -302,25 +303,25 @@ func loadMemoryContent(ctx context.Context, store agent.MemoryStore, dagName str
 
 // mergeStepBashPolicy merges step-level bash policy over the resolved global policy.
 // Step-level settings override global when specified; unset fields fall back to global.
-func mergeStepBashPolicy(global agent.ToolPolicyConfig, stepCfg *core.AgentStepConfig) agent.ToolPolicyConfig {
+func mergeStepBashPolicy(global iface.ToolPolicyConfig, stepCfg *core.AgentStepConfig) iface.ToolPolicyConfig {
 	if stepCfg == nil || stepCfg.Tools == nil || stepCfg.Tools.BashPolicy == nil {
 		return global
 	}
 	bp := stepCfg.Tools.BashPolicy
 	merged := global
 	if bp.DefaultBehavior != "" {
-		merged.Bash.DefaultBehavior = agent.BashDefaultBehavior(bp.DefaultBehavior)
+		merged.Bash.DefaultBehavior = iface.BashDefaultBehavior(bp.DefaultBehavior)
 	}
 	if bp.DenyBehavior != "" {
-		merged.Bash.DenyBehavior = agent.BashDenyBehavior(bp.DenyBehavior)
+		merged.Bash.DenyBehavior = iface.BashDenyBehavior(bp.DenyBehavior)
 	}
 	if len(bp.Rules) > 0 {
-		rules := make([]agent.BashRule, len(bp.Rules))
+		rules := make([]iface.BashRule, len(bp.Rules))
 		for i, r := range bp.Rules {
-			rules[i] = agent.BashRule{
+			rules[i] = iface.BashRule{
 				Name:    r.Name,
 				Pattern: r.Pattern,
-				Action:  agent.BashRuleAction(r.Action),
+				Action:  iface.BashRuleAction(r.Action),
 			}
 		}
 		merged.Bash.Rules = rules
@@ -329,7 +330,7 @@ func mergeStepBashPolicy(global agent.ToolPolicyConfig, stepCfg *core.AgentStepC
 }
 
 // buildPolicyHook returns a before-tool hook that enforces bash command policy.
-func buildPolicyHook(policy agent.ToolPolicyConfig) agent.BeforeToolExecHookFunc {
+func buildPolicyHook(policy iface.ToolPolicyConfig) agent.BeforeToolExecHookFunc {
 	return func(_ context.Context, info agent.ToolExecInfo) error {
 		if !agent.IsBashToolName(info.ToolName) {
 			return nil

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,8 +21,8 @@ func setupTestStore(t *testing.T) (*Store, string) {
 	return store, baseDir
 }
 
-func newTestModel(id, name string) *agent.ModelConfig {
-	return &agent.ModelConfig{
+func newTestModel(id, name string) *iface.ModelConfig {
+	return &iface.ModelConfig{
 		ID:       id,
 		Name:     name,
 		Provider: "anthropic",
@@ -30,7 +30,7 @@ func newTestModel(id, name string) *agent.ModelConfig {
 	}
 }
 
-func createModel(t *testing.T, store *Store, model *agent.ModelConfig) {
+func createModel(t *testing.T, store *Store, model *iface.ModelConfig) {
 	t.Helper()
 	err := store.Create(context.Background(), model)
 	require.NoError(t, err)
@@ -139,7 +139,7 @@ func TestStore_Create(t *testing.T) {
 				model := newTestModel(tt.id, "Test Model")
 				err := store.Create(ctx, model)
 				require.Error(t, err)
-				assert.ErrorIs(t, err, agent.ErrInvalidModelID)
+				assert.ErrorIs(t, err, iface.ErrInvalidModelID)
 			})
 		}
 	})
@@ -153,7 +153,7 @@ func TestStore_Create(t *testing.T) {
 		duplicate := newTestModel("my-model", "Different Name")
 		err := store.Create(ctx, duplicate)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, agent.ErrModelAlreadyExists)
+		assert.ErrorIs(t, err, iface.ErrModelAlreadyExists)
 	})
 
 	t.Run("nil model returns error", func(t *testing.T) {
@@ -208,7 +208,7 @@ func TestStore_GetByID(t *testing.T) {
 
 		got, err := store.GetByID(ctx, "nonexistent")
 		require.Error(t, err)
-		assert.ErrorIs(t, err, agent.ErrModelNotFound)
+		assert.ErrorIs(t, err, iface.ErrModelNotFound)
 		assert.Nil(t, got)
 	})
 
@@ -230,7 +230,7 @@ func TestStore_GetByID(t *testing.T) {
 				t.Parallel()
 				got, err := store.GetByID(ctx, tt.id)
 				require.Error(t, err)
-				assert.ErrorIs(t, err, agent.ErrInvalidModelID)
+				assert.ErrorIs(t, err, iface.ErrInvalidModelID)
 				assert.Nil(t, got)
 			})
 		}
@@ -295,7 +295,7 @@ func TestStore_Update(t *testing.T) {
 		model := newTestModel("update-me", "Original Name")
 		createModel(t, store, model)
 
-		updated := &agent.ModelConfig{
+		updated := &iface.ModelConfig{
 			ID:       "update-me",
 			Name:     "Updated Name",
 			Provider: "openai",
@@ -318,7 +318,7 @@ func TestStore_Update(t *testing.T) {
 		createModel(t, store, newTestModel("model-two", "Second Model"))
 
 		// Try to rename model-two to the name of model-one
-		updated := &agent.ModelConfig{
+		updated := &iface.ModelConfig{
 			ID:       "model-two",
 			Name:     "First Model",
 			Provider: "anthropic",
@@ -326,7 +326,7 @@ func TestStore_Update(t *testing.T) {
 		}
 		err := store.Update(ctx, updated)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, agent.ErrModelAlreadyExists)
+		assert.ErrorIs(t, err, iface.ErrModelAlreadyExists)
 	})
 
 	t.Run("update to same name is allowed", func(t *testing.T) {
@@ -334,7 +334,7 @@ func TestStore_Update(t *testing.T) {
 		store, _ := setupTestStore(t)
 		createModel(t, store, newTestModel("keep-name", "Keep This Name"))
 
-		updated := &agent.ModelConfig{
+		updated := &iface.ModelConfig{
 			ID:       "keep-name",
 			Name:     "Keep This Name",
 			Provider: "openai",
@@ -356,7 +356,7 @@ func TestStore_Update(t *testing.T) {
 		model := newTestModel("nonexistent", "Does Not Exist")
 		err := store.Update(ctx, model)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, agent.ErrModelNotFound)
+		assert.ErrorIs(t, err, iface.ErrModelNotFound)
 	})
 
 	t.Run("nil model returns error", func(t *testing.T) {
@@ -372,13 +372,13 @@ func TestStore_Update(t *testing.T) {
 		t.Parallel()
 		store, _ := setupTestStore(t)
 
-		model := &agent.ModelConfig{
+		model := &iface.ModelConfig{
 			ID:   "../../bad",
 			Name: "Bad Model",
 		}
 		err := store.Update(ctx, model)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, agent.ErrInvalidModelID)
+		assert.ErrorIs(t, err, iface.ErrInvalidModelID)
 	})
 }
 
@@ -408,7 +408,7 @@ func TestStore_Delete(t *testing.T) {
 		// Verify GetByID returns not found
 		got, err := store.GetByID(ctx, "delete-me")
 		require.Error(t, err)
-		assert.ErrorIs(t, err, agent.ErrModelNotFound)
+		assert.ErrorIs(t, err, iface.ErrModelNotFound)
 		assert.Nil(t, got)
 
 		// Verify List does not include the deleted model
@@ -423,7 +423,7 @@ func TestStore_Delete(t *testing.T) {
 
 		err := store.Delete(ctx, "nonexistent")
 		require.Error(t, err)
-		assert.ErrorIs(t, err, agent.ErrModelNotFound)
+		assert.ErrorIs(t, err, iface.ErrModelNotFound)
 	})
 
 	t.Run("invalid ID returns error", func(t *testing.T) {
@@ -444,7 +444,7 @@ func TestStore_Delete(t *testing.T) {
 				t.Parallel()
 				err := store.Delete(ctx, tt.id)
 				require.Error(t, err)
-				assert.ErrorIs(t, err, agent.ErrInvalidModelID)
+				assert.ErrorIs(t, err, iface.ErrInvalidModelID)
 			})
 		}
 	})
@@ -617,7 +617,7 @@ func TestStore_CreateAndRetrieveFullRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	store, _ := setupTestStore(t)
 
-	model := &agent.ModelConfig{
+	model := &iface.ModelConfig{
 		ID:               "full-model",
 		Name:             "Full Model",
 		Provider:         "anthropic",

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -167,7 +168,7 @@ func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root 
 }
 
 // agentStores creates the agent config, model, and memory stores from the config paths.
-func (h *remoteTaskHandler) agentStores(ctx context.Context) (configStore any, modelStore any, memoryStore any) {
+func (h *remoteTaskHandler) agentStores(ctx context.Context) (configStore iface.ConfigStore, modelStore iface.ModelStore, memoryStore iface.MemoryStore) {
 	acs, err := fileagentconfig.New(h.config.Paths.DataDir)
 	if err != nil {
 		logger.Warn(ctx, "Failed to create agent config store", tag.Error(err))

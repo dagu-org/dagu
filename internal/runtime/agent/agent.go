@@ -21,6 +21,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/term"
 
+	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -161,11 +162,11 @@ type Agent struct {
 	attemptID string
 
 	// agentConfigStore is the agent config store for agent step execution.
-	agentConfigStore any
+	agentConfigStore iface.ConfigStore
 	// agentModelStore is the agent model store for agent step execution.
-	agentModelStore any
+	agentModelStore iface.ModelStore
 	// agentMemoryStore is the agent memory store for agent step execution.
-	agentMemoryStore any
+	agentMemoryStore iface.MemoryStore
 
 	// Evaluated configs - these are expanded at runtime and stored separately
 	// to avoid mutating the original DAG struct.
@@ -231,11 +232,11 @@ type Options struct {
 	// DefaultExecMode is the server-level default execution mode.
 	DefaultExecMode config.ExecutionMode
 	// AgentConfigStore is the agent config store for agent step execution.
-	AgentConfigStore any
+	AgentConfigStore iface.ConfigStore
 	// AgentModelStore is the agent model store for agent step execution.
-	AgentModelStore any
+	AgentModelStore iface.ModelStore
 	// AgentMemoryStore is the agent memory store for agent step execution.
-	AgentMemoryStore any
+	AgentMemoryStore iface.MemoryStore
 }
 
 // New creates a new Agent.

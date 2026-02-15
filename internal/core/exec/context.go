@@ -6,6 +6,7 @@ import (
 	"io"
 	"maps"
 
+	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -27,9 +28,9 @@ type Context struct {
 	LogEncodingCharset string               // Character encoding for log files (e.g., "utf-8", "shift_jis", "euc-jp")
 	LogWriterFactory   LogWriterFactory     // For remote log streaming (nil = use local files)
 	DefaultExecMode    config.ExecutionMode // Server-level default execution mode (local or distributed)
-	AgentConfigStore   any                  // Agent config store (typed as any to avoid circular imports with agent package)
-	AgentModelStore    any                  // Agent model store (typed as any to avoid circular imports with agent package)
-	AgentMemoryStore   any                  // Agent memory store (typed as any to avoid circular imports with agent package)
+	AgentConfigStore   iface.ConfigStore
+	AgentModelStore    iface.ModelStore
+	AgentMemoryStore   iface.MemoryStore
 }
 
 // LogWriterFactory creates log writers for step stdout/stderr.
@@ -147,9 +148,9 @@ type contextOptions struct {
 	logEncodingCharset string
 	logWriterFactory   LogWriterFactory
 	defaultExecMode    config.ExecutionMode
-	agentConfigStore   any
-	agentModelStore    any
-	agentMemoryStore   any
+	agentConfigStore   iface.ConfigStore
+	agentModelStore    iface.ModelStore
+	agentMemoryStore   iface.MemoryStore
 }
 
 // ContextOption configures optional parameters for NewContext.
@@ -213,21 +214,21 @@ func WithDefaultExecMode(mode config.ExecutionMode) ContextOption {
 }
 
 // WithAgentConfigStore sets the agent configuration store.
-func WithAgentConfigStore(store any) ContextOption {
+func WithAgentConfigStore(store iface.ConfigStore) ContextOption {
 	return func(o *contextOptions) {
 		o.agentConfigStore = store
 	}
 }
 
 // WithAgentModelStore sets the agent model store.
-func WithAgentModelStore(store any) ContextOption {
+func WithAgentModelStore(store iface.ModelStore) ContextOption {
 	return func(o *contextOptions) {
 		o.agentModelStore = store
 	}
 }
 
 // WithAgentMemoryStore sets the agent memory store.
-func WithAgentMemoryStore(store any) ContextOption {
+func WithAgentMemoryStore(store iface.MemoryStore) ContextOption {
 	return func(o *contextOptions) {
 		o.agentMemoryStore = store
 	}
