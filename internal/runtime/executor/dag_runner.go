@@ -388,7 +388,7 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 			}
 			consecutiveErrors = 0 // Reset on success
 
-			if result.Status.IsActive() {
+			if result.Status.IsActive() || result.Status == core.NotStarted {
 				logger.Debug(waitCtx, "Sub DAG run not completed yet")
 				continue
 			}
@@ -440,7 +440,7 @@ func (e *SubDAGExecutor) waitForCancellation(ctx context.Context, dagRunID strin
 		}
 		lastStatus = status
 
-		if status != nil && !status.Status.IsActive() {
+		if status != nil && !status.Status.IsActive() && status.Status != core.NotStarted {
 			return status, nil
 		}
 
