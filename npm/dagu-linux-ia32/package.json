@@ -1,0 +1,10 @@
+{
+  "name": "@dagu-org/dagu-linux-ia32",
+  "version": "0.0.0-development",
+  "description": "Dagu binary for Linux 32-bit",
+  "repository": "github:dagu-org/dagu",
+  "license": "GPL-3.0",
+  "os": ["linux"],
+  "cpu": ["ia32"],
+  "files": ["bin/dagu"]
+}

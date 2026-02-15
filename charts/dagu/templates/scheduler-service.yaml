@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "boltbase.fullname" . }}-scheduler
+  name: {{ include "dagu.fullname" . }}-scheduler
   labels:
-    {{- include "boltbase.labels" . | nindent 4 }}
+    {{- include "dagu.labels" . | nindent 4 }}
     app.kubernetes.io/component: scheduler
 spec:
   type: ClusterIP
   selector:
-    {{- include "boltbase.labels" . | nindent 4 }}
+    {{- include "dagu.labels" . | nindent 4 }}
     app.kubernetes.io/component: scheduler
   ports:
     - name: health

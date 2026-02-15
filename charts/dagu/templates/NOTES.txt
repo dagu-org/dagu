@@ -1,6 +1,6 @@
-Boltbase has been installed successfully!
+Dagu has been installed successfully 🎉
 
-IMPORTANT: Boltbase requires a shared filesystem (ReadWriteMany) for state persistence.
+IMPORTANT: Dagu requires a shared filesystem (ReadWriteMany) for state persistence.
 Make sure your storage class supports RWX access mode (e.g., NFS, EFS, CephFS).
 
 Components deployed:
@@ -8,12 +8,12 @@ Components deployed:
   Worker Pools:
   {{- range $poolName, $pool := .Values.workerPools }}
     - {{ $poolName }}: {{ $pool.replicas }} replica(s)
-      {{- if $pool.labels }} (labels: {{ include "boltbase.workerLabels" $pool.labels }}){{- end }}
+      {{- if $pool.labels }} (labels: {{ include "dagu.workerLabels" $pool.labels }}){{- end }}
   {{- end }}
   UI: {{ .Values.ui.replicas }} replica(s)
 
 Access the UI:
-  kubectl port-forward svc/{{ include "boltbase.fullname" . }}-ui 8080:8080
+  kubectl port-forward svc/{{ include "dagu.fullname" . }}-ui 8080:8080
   Then visit http://localhost:8080
 
 Verify installation:
@@ -22,7 +22,7 @@ Verify installation:
 
 Troubleshooting RWX storage:
   If pods cannot start or mount the volume, check:
-  1. Verify PVC was created: kubectl get pvc {{ include "boltbase.fullname" . }}-data
-  2. Check PVC status: kubectl describe pvc {{ include "boltbase.fullname" . }}-data
+  1. Verify PVC was created: kubectl get pvc {{ include "dagu.fullname" . }}-data
+  2. Check PVC status: kubectl describe pvc {{ include "dagu.fullname" . }}-data
   3. Ensure storage class supports ReadWriteMany: kubectl get storageclass
   4. If using a custom storage class, set: --set persistence.storageClass=YOUR_STORAGE_CLASS

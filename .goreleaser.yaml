@@ -6,9 +6,9 @@ before:
     - go mod tidy
 
 builds:
-  - id: boltbase
+  - id: dagu
     dir: ./cmd
-    binary: boltbase
+    binary: dagu
     env:
       - CGO_ENABLED=0
     goos:
@@ -56,10 +56,10 @@ brews:
     license: "GNU General Public License v3.0"
     custom_block: |
       service do
-        run [opt_bin/"boltbase", "start-all"]
+        run [opt_bin/"dagu", "start-all"]
         keep_alive true
-        error_log_path var/"log/boltbase.log"
-        log_path var/"log/boltbase.log"
+        error_log_path var/"log/dagu.log"
+        log_path var/"log/dagu.log"
         working_dir var
       end
 
@@ -74,10 +74,10 @@ brews:
     license: "GNU General Public License v3.0"
     custom_block: |
       service do
-        run [opt_bin/"boltbase", "start-all"]
+        run [opt_bin/"dagu", "start-all"]
         keep_alive true
-        error_log_path var/"log/boltbase.log"
-        log_path var/"log/boltbase.log"
+        error_log_path var/"log/dagu.log"
+        log_path var/"log/dagu.log"
         working_dir var
       end
 

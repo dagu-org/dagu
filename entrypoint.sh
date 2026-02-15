@@ -5,30 +5,30 @@ if [ "$DOCKER_GID" != "-1" ]; then
   if ! getent group docker >/dev/null; then
     echo "Creating docker group with GID ${DOCKER_GID}"
     addgroup -g ${DOCKER_GID} docker
-    usermod -a -G docker boltbase
+    usermod -a -G docker dagu
   fi 
 
   echo "Changing docker group GID to ${DOCKER_GID}"
   groupmod -o -g "$DOCKER_GID" docker
 fi
 
-CURRENT_UID=$(id -u boltbase 2>/dev/null || echo -1)
-CURRENT_GID=$(getent group boltbase | cut -d: -f3 2>/dev/null || echo -1)
+CURRENT_UID=$(id -u dagu 2>/dev/null || echo -1)
+CURRENT_GID=$(getent group dagu | cut -d: -f3 2>/dev/null || echo -1)
 
 if [ "$CURRENT_UID" != "$PUID" ] || [ "$CURRENT_GID" != "$PGID" ]; then
-    groupmod -o -g "$PGID" boltbase
-    usermod -o -u "$PUID" boltbase
+    groupmod -o -g "$PGID" dagu
+    usermod -o -u "$PUID" dagu
 fi
 
-mkdir -p ${BOLTBASE_HOME:-/var/lib/boltbase}
+mkdir -p ${DAGU_HOME:-/var/lib/dagu}
 
-# If BOLTBASE_HOME is not set, try to guess if the legacy /home directory is being
-# used. If so set the HOME to /home/boltbase. Otherwise force the /var/lib/boltbase directory
-# as BOLTBASE_HOME
-if [ -z "$BOLTBASE_HOME" ]; then
-  # For ease of use set BOLTBASE_HOME to /var/lib/boltbase so all data is located in a
+# If DAGU_HOME is not set, try to guess if the legacy /home directory is being
+# used. If so set the HOME to /home/dagu. Otherwise force the /var/lib/dagu directory
+# as DAGU_HOME
+if [ -z "$DAGU_HOME" ]; then
+  # For ease of use set DAGU_HOME to /var/lib/dagu so all data is located in a
   # single directory following FHS conventions
-  export BOLTBASE_HOME=/var/lib/boltbase
+  export DAGU_HOME=/var/lib/dagu
 fi
 
 # Run all scripts in /etc/custom-init.d. It assumes that all scripts are
@@ -49,5 +49,5 @@ else
   RUN_GID=$PGID
 fi
 
-# Run the command as the boltbase user and optionally the docker group
+# Run the command as the dagu user and optionally the docker group
 exec sudo -E -n -u "#${PUID}" -g "#${RUN_GID}" -- "$@"

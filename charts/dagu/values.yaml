@@ -1,9 +1,9 @@
-# Default values for boltbase
-# Boltbase requires a shared filesystem (ReadWriteMany) for state persistence
+# Default values for dagu
+# Dagu requires a shared filesystem (ReadWriteMany) for state persistence
 
 # Image configuration
 image:
-  repository: ghcr.io/dagu-org/boltbase
+  repository: ghcr.io/dagu-org/dagu
   tag: latest
   pullPolicy: IfNotPresent
 
@@ -31,7 +31,7 @@ coordinator:
 
 # Worker pool configuration
 # Each pool creates a separate Kubernetes Deployment.
-# Pool names become part of the Deployment name: <release>-boltbase-worker-<poolName>
+# Pool names become part of the Deployment name: <release>-dagu-worker-<poolName>
 workerPools:
   general:
     replicas: 2
@@ -68,10 +68,10 @@ auth:
       username: "admin"
       password: "adminpass"  # CHANGEME
     token:
-      secret: "boltbase-secret-key"  # CHANGEME
+      secret: "dagu-secret-key"  # CHANGEME
       ttl: "24h"
 
-# Persistence - REQUIRED: Boltbase needs a shared filesystem (RWX)
+# Persistence - REQUIRED: Dagu needs a shared filesystem (RWX)
 # Use NFS, EFS, CephFS, or similar storage that supports ReadWriteMany
 persistence:
   enabled: true

@@ -1,6 +1,6 @@
-# Boltbase Helm Chart
+# Dagu Helm Chart
 
-A Helm chart for deploying Boltbase on Kubernetes.
+A Helm chart for deploying Dagu on Kubernetes.
 
 ## Prerequisites
 
@@ -8,7 +8,7 @@ A Helm chart for deploying Boltbase on Kubernetes.
 - Helm 3.0+
 - **A storage class that supports `ReadWriteMany` access mode** (required)
 
-Boltbase uses a shared filesystem for state persistence. You must have a storage class that supports `ReadWriteMany`:
+Dagu uses a shared filesystem for state persistence. You must have a storage class that supports `ReadWriteMany`:
 - NFS (via nfs-client-provisioner)
 - AWS EFS
 - CephFS
@@ -19,13 +19,13 @@ Boltbase uses a shared filesystem for state persistence. You must have a storage
 
 ```bash
 # Install with default values
-helm install boltbase ./charts/dagu
+helm install dagu ./charts/dagu
 
 # Install with custom storage class
-helm install boltbase ./charts/dagu --set persistence.storageClass=nfs-client
+helm install dagu ./charts/dagu --set persistence.storageClass=nfs-client
 
 # Install with custom image tag
-helm install boltbase ./charts/dagu --set image.tag=v1.12.0
+helm install dagu ./charts/dagu --set image.tag=v1.12.0
 ```
 
 ## Architecture
@@ -53,7 +53,7 @@ persistence:
 For local single-node clusters that don't support RWX:
 
 ```bash
-helm install boltbase charts/dagu \
+helm install dagu charts/dagu \
   --set persistence.accessMode=ReadWriteOnce \
   --set persistence.skipValidation=true \
   --set workerPools.general.replicas=1
@@ -121,20 +121,20 @@ auth:
       username: "admin"
       password: "adminpass"  # CHANGEME
     token:
-      secret: "boltbase-secret-key"  # CHANGEME
+      secret: "dagu-secret-key"  # CHANGEME
       ttl: "24h"
 ```
 
 To disable authentication:
 ```bash
-helm install boltbase ./charts/dagu --set auth.mode=none
+helm install dagu ./charts/dagu --set auth.mode=none
 ```
 
 ### Component Resources
 
 ```yaml
 image:
-  repository: ghcr.io/dagu-org/boltbase
+  repository: ghcr.io/dagu-org/dagu
   tag: latest
 
 coordinator:
@@ -172,7 +172,7 @@ ui:
 
 ```bash
 # Port forward to access UI
-kubectl port-forward svc/boltbase-ui 8080:8080
+kubectl port-forward svc/dagu-ui 8080:8080
 
 # Then visit http://localhost:8080
 # Default credentials: admin / adminpass
@@ -180,16 +180,16 @@ kubectl port-forward svc/boltbase-ui 8080:8080
 
 ## Current Constraints
 
-This chart reflects Boltbase's current architecture:
+This chart reflects Dagu's current architecture:
 
 - **Shared filesystem required**: All components must share the same RWX volume
 - **File-based state**: State is stored in files on the shared volume
-- **No database**: Boltbase does not use a database for state management
+- **No database**: Dagu does not use a database for state management
 
 ## Uninstall
 
 ```bash
-helm uninstall boltbase
+helm uninstall dagu
 ```
 
 **Warning**: This will delete the PersistentVolumeClaim and all data. Backup your DAGs and logs first!

@@ -1,6 +1,6 @@
 # Docker Assets
 
-This directory hosts Docker-centric deployment assets for Boltbase.
+This directory hosts Docker-centric deployment assets for Dagu.
 
 - `compose.minimal.yaml` – lightweight stack with scheduler, worker, and UI for local experiments.
 - `compose.prod.yaml` – production-like stack including OpenTelemetry collector and Prometheus.

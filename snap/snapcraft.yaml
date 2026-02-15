@@ -1,31 +1,31 @@
-name: boltbase
+name: dagu
 base: core24
 version: "1.16.4"
 summary: A compact, portable, and language-agnostic workflow engine for developers.
 description: |
-  Boltbase is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
-  Boltbase's design emphasizes minimal external dependencies: it operates solely as a single binary without requiring an external database. A browser-based graphical interface (UI) is provided for real-time monitoring, rendering the status and logs of workflows. This zero-dependency structure makes the system easy to install and well-suited to various infrastructures, including local or air-gapped systems. This local-first architecture also ensures that sensitive data or proprietary workflows remain secure.
+  Dagu is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
+  Dagu's design emphasizes minimal external dependencies: it operates solely as a single binary without requiring an external database. A browser-based graphical interface (UI) is provided for real-time monitoring, rendering the status and logs of workflows. This zero-dependency structure makes the system easy to install and well-suited to various infrastructures, including local or air-gapped systems. This local-first architecture also ensures that sensitive data or proprietary workflows remain secure.
 
 grade: stable
 confinement: strict
 
 parts:
-  boltbase:
+  dagu:
     plugin: dump
     source:
-      - on amd64: https://github.com/dagu-org/dagu/releases/download/v$SNAPCRAFT_PROJECT_VERSION/boltbase_$SNAPCRAFT_PROJECT_VERSION_linux_amd64.tar.gz
-      - on arm64: https://github.com/dagu-org/dagu/releases/download/v$SNAPCRAFT_PROJECT_VERSION/boltbase_$SNAPCRAFT_PROJECT_VERSION_linux_arm64.tar.gz
-      - on armhf: https://github.com/dagu-org/dagu/releases/download/v$SNAPCRAFT_PROJECT_VERSION/boltbase_$SNAPCRAFT_PROJECT_VERSION_linux_armv7.tar.gz
-      - on arm: https://github.com/dagu-org/dagu/releases/download/v$SNAPCRAFT_PROJECT_VERSION/boltbase_$SNAPCRAFT_PROJECT_VERSION_linux_armv6.tar.gz
-      - on i386: https://github.com/dagu-org/dagu/releases/download/v$SNAPCRAFT_PROJECT_VERSION/boltbase_$SNAPCRAFT_PROJECT_VERSION_linux_386.tar.gz
-      - on ppc64el: https://github.com/dagu-org/dagu/releases/download/v$SNAPCRAFT_PROJECT_VERSION/boltbase_$SNAPCRAFT_PROJECT_VERSION_linux_ppc64le.tar.gz
-      - on s390x: https://github.com/dagu-org/dagu/releases/download/v$SNAPCRAFT_PROJECT_VERSION/boltbase_$SNAPCRAFT_PROJECT_VERSION_linux_s390x.tar.gz
+      - on amd64: https://github.com/dagu-org/dagu/releases/download/v$SNAPCRAFT_PROJECT_VERSION/dagu_$SNAPCRAFT_PROJECT_VERSION_linux_amd64.tar.gz
+      - on arm64: https://github.com/dagu-org/dagu/releases/download/v$SNAPCRAFT_PROJECT_VERSION/dagu_$SNAPCRAFT_PROJECT_VERSION_linux_arm64.tar.gz
+      - on armhf: https://github.com/dagu-org/dagu/releases/download/v$SNAPCRAFT_PROJECT_VERSION/dagu_$SNAPCRAFT_PROJECT_VERSION_linux_armv7.tar.gz
+      - on arm: https://github.com/dagu-org/dagu/releases/download/v$SNAPCRAFT_PROJECT_VERSION/dagu_$SNAPCRAFT_PROJECT_VERSION_linux_armv6.tar.gz
+      - on i386: https://github.com/dagu-org/dagu/releases/download/v$SNAPCRAFT_PROJECT_VERSION/dagu_$SNAPCRAFT_PROJECT_VERSION_linux_386.tar.gz
+      - on ppc64el: https://github.com/dagu-org/dagu/releases/download/v$SNAPCRAFT_PROJECT_VERSION/dagu_$SNAPCRAFT_PROJECT_VERSION_linux_ppc64le.tar.gz
+      - on s390x: https://github.com/dagu-org/dagu/releases/download/v$SNAPCRAFT_PROJECT_VERSION/dagu_$SNAPCRAFT_PROJECT_VERSION_linux_s390x.tar.gz
     organize:
-      boltbase: bin/boltbase
+      dagu: bin/dagu
 
 apps:
-  boltbase:
-    command: bin/boltbase
+  dagu:
+    command: bin/dagu
     plugs:
       - network
       - network-bind
@@ -37,7 +37,7 @@ apps:
       - docker
 
   daemon:
-    command: bin/boltbase start-all
+    command: bin/dagu start-all
     daemon: simple
     restart-condition: always
     plugs:

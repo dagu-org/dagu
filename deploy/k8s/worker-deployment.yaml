@@ -1,30 +1,30 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: boltbase-worker
-  namespace: boltbase-dev
+  name: dagu-worker
+  namespace: dagu-dev
   labels:
-    app: boltbase
+    app: dagu
     component: worker
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: boltbase
+      app: dagu
       component: worker
   template:
     metadata:
       labels:
-        app: boltbase
+        app: dagu
         component: worker
     spec:
       containers:
-      - name: boltbase
+      - name: dagu
         # Use official latest image
-        image: ghcr.io/dagu-org/boltbase:latest
+        image: ghcr.io/dagu-org/dagu:latest
         imagePullPolicy: IfNotPresent
         command:
-          - boltbase
+          - dagu
           - worker
           - --worker.labels
           - environment=dev,region=local,cluster=k8s
@@ -35,18 +35,18 @@ spec:
           # - "50"
         envFrom:
         - configMapRef:
-            name: boltbase-config
+            name: dagu-config
         env:
         # Workers connect to coordinator via service DNS name
-        - name: BOLTBASE_COORDINATOR_HOST
-          value: "boltbase-server"
+        - name: DAGU_COORDINATOR_HOST
+          value: "dagu-server"
         - name: WORKER_ID
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
         volumeMounts:
-        - name: boltbase-data
-          mountPath: /var/lib/boltbase
+        - name: dagu-data
+          mountPath: /var/lib/dagu
         resources:
           requests:
             memory: "128Mi"
@@ -55,6 +55,6 @@ spec:
             memory: "256Mi"
             cpu: "200m"
       volumes:
-      - name: boltbase-data
+      - name: dagu-data
         persistentVolumeClaim:
-          claimName: boltbase-data
+          claimName: dagu-data

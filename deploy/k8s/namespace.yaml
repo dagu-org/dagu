@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: boltbase-dev
+  name: dagu-dev
   labels:
-    app: boltbase
+    app: dagu
     environment: dev

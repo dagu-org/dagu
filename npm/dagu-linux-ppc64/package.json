@@ -1,0 +1,10 @@
+{
+  "name": "@dagu-org/dagu-linux-ppc64",
+  "version": "0.0.0-development",
+  "description": "Dagu binary for Linux PowerPC 64-bit",
+  "repository": "github:dagu-org/dagu",
+  "license": "GPL-3.0",
+  "os": ["linux"],
+  "cpu": ["ppc64"],
+  "files": ["bin/dagu"]
+}

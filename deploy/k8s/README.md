@@ -1,15 +1,15 @@
-# Boltbase Kubernetes Local Setup
+# Dagu Kubernetes Local Setup
 
-This directory contains Kubernetes manifests for running Boltbase in distributed mode on your local machine for testing purposes.
+This directory contains Kubernetes manifests for running Dagu in distributed mode on your local machine for testing purposes.
 
 ## Architecture
 
-This setup deploys Boltbase in **distributed execution mode**:
+This setup deploys Dagu in **distributed execution mode**:
 
 - **1 Server Pod** (`start-all`): Runs Web UI, Scheduler, and Coordinator (gRPC)
 - **2 Worker Pods**: Poll the coordinator and execute DAG runs
 
-**Note**: The coordinator is only started by `start-all` when `BOLTBASE_COORDINATOR_HOST` is set to a non-localhost address (not `127.0.0.1` or `localhost`). This setup explicitly configures it to `0.0.0.0` to enable distributed execution.
+**Note**: The coordinator is only started by `start-all` when `DAGU_COORDINATOR_HOST` is set to a non-localhost address (not `127.0.0.1` or `localhost`). This setup explicitly configures it to `0.0.0.0` to enable distributed execution.
 
 ## Prerequisites
 
@@ -30,20 +30,20 @@ minikube start
 ### Option 3: kind (Kubernetes in Docker)
 ```bash
 brew install kind
-kind create cluster --name boltbase-test
+kind create cluster --name dagu-test
 ```
 
 ### Option 4: k3d (Fastest)
 ```bash
 brew install k3d
-k3d cluster create boltbase-test --agents 2
+k3d cluster create dagu-test --agents 2
 ```
 
 ## Setup Instructions
 
 ### 1. Deploy to Kubernetes
 
-The manifests use the official `ghcr.io/dagu-org/boltbase:latest` image by default, so you can deploy directly:
+The manifests use the official `ghcr.io/dagu-org/dagu:latest` image by default, so you can deploy directly:
 
 ```bash
 # Apply all manifests
@@ -59,19 +59,19 @@ kubectl apply -f deploy/k8s/worker-deployment.yaml
 
 **Optional: Use Local Development Image**
 
-If you're developing Boltbase and want to test local changes:
+If you're developing Dagu and want to test local changes:
 
 ```bash
 # Build local image
-docker build -t boltbase:local .
+docker build -t dagu:local .
 
 # Load into cluster (for kind/k3d)
-kind load docker-image boltbase:local --name boltbase-test
+kind load docker-image dagu:local --name dagu-test
 # OR
-k3d image import boltbase:local --cluster boltbase-test
+k3d image import dagu:local --cluster dagu-test
 
 # Update deployments to use local image
-sed -i '' 's|ghcr.io/dagu-org/boltbase:latest|boltbase:local|g' deploy/k8s/*-deployment.yaml
+sed -i '' 's|ghcr.io/dagu-org/dagu:latest|dagu:local|g' deploy/k8s/*-deployment.yaml
 sed -i '' 's|imagePullPolicy: Always|imagePullPolicy: IfNotPresent|g' deploy/k8s/*-deployment.yaml
 ```
 
@@ -79,17 +79,17 @@ sed -i '' 's|imagePullPolicy: Always|imagePullPolicy: IfNotPresent|g' deploy/k8s
 
 ```bash
 # Check all pods are running
-kubectl get pods -n boltbase-dev
+kubectl get pods -n dagu-dev
 
 # Expected output:
-# NAME                               READY   STATUS    RESTARTS   AGE
-# boltbase-server-xxxxxxxxxx-xxxxx   1/1     Running   0          1m
-# boltbase-worker-xxxxxxxxxx-xxxxx   1/1     Running   0          1m
-# boltbase-worker-xxxxxxxxxx-xxxxx   1/1     Running   0          1m
+# NAME                           READY   STATUS    RESTARTS   AGE
+# dagu-server-xxxxxxxxxx-xxxxx   1/1     Running   0          1m
+# dagu-worker-xxxxxxxxxx-xxxxx   1/1     Running   0          1m
+# dagu-worker-xxxxxxxxxx-xxxxx   1/1     Running   0          1m
 
 # Check logs
-kubectl logs -n boltbase-dev -l component=server
-kubectl logs -n boltbase-dev -l component=worker
+kubectl logs -n dagu-dev -l component=server
+kubectl logs -n dagu-dev -l component=worker
 ```
 
 ### 3. Access the Web UI
@@ -101,10 +101,10 @@ The server is exposed on NodePort 30080:
 open http://localhost:30080
 
 # For minikube specifically
-minikube service boltbase-server -n boltbase-dev
+minikube service dagu-server -n dagu-dev
 
 # For kind, you may need port-forwarding
-kubectl port-forward -n boltbase-dev service/boltbase-server 8080:8080
+kubectl port-forward -n dagu-dev service/dagu-server 8080:8080
 # Then access http://localhost:8080
 ```
 
@@ -114,13 +114,13 @@ kubectl port-forward -n boltbase-dev service/boltbase-server 8080:8080
 
 ```bash
 # Get the server pod name
-SERVER_POD=$(kubectl get pod -n boltbase-dev -l component=server -o jsonpath='{.items[0].metadata.name}')
+SERVER_POD=$(kubectl get pod -n dagu-dev -l component=server -o jsonpath='{.items[0].metadata.name}')
 
 # Copy example DAG
-kubectl cp deploy/k8s/example-dag.yaml boltbase-dev/$SERVER_POD:/var/lib/boltbase/dags/test-distributed.yaml
+kubectl cp deploy/k8s/example-dag.yaml dagu-dev/$SERVER_POD:/var/lib/dagu/dags/test-distributed.yaml
 
 # Or create directly
-kubectl exec -n boltbase-dev $SERVER_POD -- sh -c 'cat > /var/lib/boltbase/dags/test-distributed.yaml' < deploy/k8s/example-dag.yaml
+kubectl exec -n dagu-dev $SERVER_POD -- sh -c 'cat > /var/lib/dagu/dags/test-distributed.yaml' < deploy/k8s/example-dag.yaml
 ```
 
 ### 2. Trigger DAG Execution via Web UI
@@ -134,13 +134,13 @@ kubectl exec -n boltbase-dev $SERVER_POD -- sh -c 'cat > /var/lib/boltbase/dags/
 
 ```bash
 # Watch worker logs to see which worker picks up the job
-kubectl logs -n boltbase-dev -l component=worker -f
+kubectl logs -n dagu-dev -l component=worker -f
 
 # Check server logs
-kubectl logs -n boltbase-dev -l component=server -f
+kubectl logs -n dagu-dev -l component=server -f
 
 # View pod status
-kubectl get pods -n boltbase-dev -w
+kubectl get pods -n dagu-dev -w
 ```
 
 ### 4. Verify Distributed Execution
@@ -149,7 +149,7 @@ The example DAG outputs the hostname in each step. Check the logs to confirm dif
 
 ```bash
 # Get execution logs from the UI or via CLI
-kubectl exec -n boltbase-dev $SERVER_POD -- boltbase status test-distributed
+kubectl exec -n dagu-dev $SERVER_POD -- dagu status test-distributed
 ```
 
 ## Configuration
@@ -158,10 +158,10 @@ kubectl exec -n boltbase-dev $SERVER_POD -- boltbase status test-distributed
 
 ```bash
 # Scale to 5 workers
-kubectl scale deployment boltbase-worker -n boltbase-dev --replicas=5
+kubectl scale deployment dagu-worker -n dagu-dev --replicas=5
 
 # Verify
-kubectl get pods -n boltbase-dev -l component=worker
+kubectl get pods -n dagu-dev -l component=worker
 ```
 
 ### Worker Labels
@@ -170,7 +170,7 @@ Workers are configured with labels for capability-based task matching. Edit `wor
 
 ```yaml
 command:
-  - boltbase
+  - dagu
   - worker
   - --worker.labels
   - environment=dev,region=local,cluster=k8s,gpu=false
@@ -192,20 +192,20 @@ queue:
 
 Modify `configmap.yaml` to adjust configuration:
 
-- `BOLTBASE_COORDINATOR_HOST`: Bind address for coordinator gRPC server (set to `0.0.0.0` for distributed mode)
-- `BOLTBASE_COORDINATOR_ADVERTISE`: Address workers use to connect (set to service name `boltbase-server` for K8s)
-- `BOLTBASE_COORDINATOR_PORT`: Coordinator gRPC port (default: 50055)
-- `BOLTBASE_PEER_INSECURE`: Use insecure gRPC (true for local)
-- `BOLTBASE_TZ`: Timezone
+- `DAGU_COORDINATOR_HOST`: Bind address for coordinator gRPC server (set to `0.0.0.0` for distributed mode)
+- `DAGU_COORDINATOR_ADVERTISE`: Address workers use to connect (set to service name `dagu-server` for K8s)
+- `DAGU_COORDINATOR_PORT`: Coordinator gRPC port (default: 50055)
+- `DAGU_PEER_INSECURE`: Use insecure gRPC (true for local)
+- `DAGU_TZ`: Timezone
 
 **Important**: For distributed execution to work:
-- `BOLTBASE_COORDINATOR_HOST` must be set to `0.0.0.0` (not `127.0.0.1`)
-- `BOLTBASE_COORDINATOR_ADVERTISE` should be set to the service DNS name for K8s
+- `DAGU_COORDINATOR_HOST` must be set to `0.0.0.0` (not `127.0.0.1`)
+- `DAGU_COORDINATOR_ADVERTISE` should be set to the service DNS name for K8s
 
 After modifying:
 ```bash
 kubectl apply -f deploy/k8s/configmap.yaml
-kubectl rollout restart deployment -n boltbase-dev
+kubectl rollout restart deployment -n dagu-dev
 ```
 
 ### Using Specific Version
@@ -214,8 +214,8 @@ To pin to a specific version instead of `latest`:
 
 ```bash
 # Update both deployments
-kubectl set image deployment/boltbase-server -n boltbase-dev boltbase=ghcr.io/dagu-org/boltbase:v1.14.0
-kubectl set image deployment/boltbase-worker -n boltbase-dev boltbase=ghcr.io/dagu-org/boltbase:v1.14.0
+kubectl set image deployment/dagu-server -n dagu-dev dagu=ghcr.io/dagu-org/dagu:v1.14.0
+kubectl set image deployment/dagu-worker -n dagu-dev dagu=ghcr.io/dagu-org/dagu:v1.14.0
 ```
 
 ## Troubleshooting
@@ -224,35 +224,35 @@ kubectl set image deployment/boltbase-worker -n boltbase-dev boltbase=ghcr.io/da
 
 ```bash
 # Check pod events
-kubectl describe pod -n boltbase-dev -l app=boltbase
+kubectl describe pod -n dagu-dev -l app=dagu
 
 # Check if pods are pulling image
-kubectl get pods -n boltbase-dev -w
+kubectl get pods -n dagu-dev -w
 
 # If using local image, ensure it's loaded into cluster
-kind load docker-image boltbase:local --name boltbase-test
+kind load docker-image dagu:local --name dagu-test
 # OR
-k3d image import boltbase:local --cluster boltbase-test
+k3d image import dagu:local --cluster dagu-test
 ```
 
 ### Workers Not Connecting
 
 ```bash
 # Check worker logs for connection errors
-kubectl logs -n boltbase-dev -l component=worker
+kubectl logs -n dagu-dev -l component=worker
 
 # Verify service DNS resolution
-kubectl exec -n boltbase-dev $SERVER_POD -- nslookup boltbase-server
+kubectl exec -n dagu-dev $SERVER_POD -- nslookup dagu-server
 
 # Check coordinator is listening
-kubectl exec -n boltbase-dev $SERVER_POD -- netstat -tlnp | grep 50055
+kubectl exec -n dagu-dev $SERVER_POD -- netstat -tlnp | grep 50055
 ```
 
 ### PVC Not Binding
 
 ```bash
 # Check PVC status
-kubectl get pvc -n boltbase-dev
+kubectl get pvc -n dagu-dev
 
 # Check available storage classes
 kubectl get storageclass
@@ -269,10 +269,10 @@ minikube addons enable storage-provisioner
 curl http://localhost:30080/health
 
 # Port forward as fallback
-kubectl port-forward -n boltbase-dev service/boltbase-server 8080:8080
+kubectl port-forward -n dagu-dev service/dagu-server 8080:8080
 
 # Check service
-kubectl get svc -n boltbase-dev
+kubectl get svc -n dagu-dev
 ```
 
 ## Cleanup
@@ -282,30 +282,30 @@ kubectl get svc -n boltbase-dev
 kubectl delete -f deploy/k8s/
 
 # Or delete namespace (removes everything)
-kubectl delete namespace boltbase-dev
+kubectl delete namespace dagu-dev
 
 # For kind/k3d, delete the entire cluster
-kind delete cluster --name boltbase-test
+kind delete cluster --name dagu-test
 # OR
-k3d cluster delete boltbase-test
+k3d cluster delete dagu-test
 ```
 
 ## Advanced: Using with TLS
 
 For production-like testing with TLS:
 
-1. Generate certificates (see Boltbase docs)
+1. Generate certificates (see Dagu docs)
 2. Create TLS secret:
    ```bash
-   kubectl create secret tls boltbase-tls -n boltbase-dev \
+   kubectl create secret tls dagu-tls -n dagu-dev \
      --cert=path/to/cert.pem \
      --key=path/to/key.pem
    ```
 3. Update configmap:
    ```yaml
-   BOLTBASE_PEER_INSECURE: "false"
-   BOLTBASE_PEER_TLS_CERT_FILE: "/etc/tls/tls.crt"
-   BOLTBASE_PEER_TLS_KEY_FILE: "/etc/tls/tls.key"
+   DAGU_PEER_INSECURE: "false"
+   DAGU_PEER_TLS_CERT_FILE: "/etc/tls/tls.crt"
+   DAGU_PEER_TLS_KEY_FILE: "/etc/tls/tls.key"
    ```
 4. Mount secret in deployments
 

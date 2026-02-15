@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "boltbase.fullname" . }}-config
+  name: {{ include "dagu.fullname" . }}-config
   labels:
-    {{- include "boltbase.labels" . | nindent 4 }}
+    {{- include "dagu.labels" . | nindent 4 }}
 data:
-  boltbase.yaml: |
-    # Boltbase configuration for Kubernetes (v0 Helm chart)
+  dagu.yaml: |
+    # Dagu configuration for Kubernetes (v0 Helm chart)
     # This file intentionally includes only the minimal,
-    # schema-correct configuration required to run boltbase
+    # schema-correct configuration required to run dagu
     # in a distributed Kubernetes environment.
 
     # Server / UI

@@ -1,8 +1,8 @@
 #!/bin/sh
 #
-# Boltbase Installer Script
+# Dagu Installer Script
 #
-# This script downloads and installs the latest version of Boltbase.
+# This script downloads and installs the latest version of Dagu.
 #
 # Usage:
 #   curl -sSL https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | sh
@@ -27,15 +27,15 @@
 #   curl -sSL https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | sh -s -- --install-dir ~/bin
 #
 # Environment Variables:
-#   BOLTBASE_INSTALL_DIR         Override the default installation directory
+#   DAGU_INSTALL_DIR         Override the default installation directory
 #
 
 # Set up constants
 RELEASES_URL="https://github.com/dagu-org/dagu/releases"
-FILE_BASENAME="boltbase"
+FILE_BASENAME="dagu"
 
 # Default values
-BOLTBASE_INSTALL_DIR="${BOLTBASE_INSTALL_DIR:-$HOME/.local/bin}"
+DAGU_INSTALL_DIR="${DAGU_INSTALL_DIR:-$HOME/.local/bin}"
 WORKING_ROOT_DIR="/tmp"
 
 # Parse CLI arguments
@@ -47,11 +47,11 @@ while [ "$#" -gt 0 ]; do
       ;;
     --install-dir)
       shift
-      BOLTBASE_INSTALL_DIR="$1"
+      DAGU_INSTALL_DIR="$1"
       ;;
     --prefix) # For compatibility with some conventions
       shift
-      BOLTBASE_INSTALL_DIR="$1"
+      DAGU_INSTALL_DIR="$1"
       ;;
     --working-dir)
       shift
@@ -78,11 +78,11 @@ if [ -z "$VERSION" ]; then
 fi
 
 if [ -z "$VERSION" ]; then
-  echo "Failed to determine the Boltbase version to install." >&2
+  echo "Failed to determine the Dagu version to install." >&2
   exit 1
 fi
 
-echo "Installing Boltbase version: $VERSION"
+echo "Installing Dagu version: $VERSION"
 
 # Determine system and architecture
 SYSTEM="$(uname -s | awk '{print tolower($0)}')"
@@ -105,7 +105,7 @@ if [ -z "$NORMALIZED_WORKING_ROOT_DIR" ]; then
 fi
 
 # Create temporary working directory
-TMPDIR="$(mktemp -d "${NORMALIZED_WORKING_ROOT_DIR}/boltbase-installer.XXXXXX")" || {
+TMPDIR="$(mktemp -d "${NORMALIZED_WORKING_ROOT_DIR}/dagu-installer.XXXXXX")" || {
   echo "Failed to create temporary directory under: $WORKING_ROOT_DIR" >&2
   exit 1
 }
@@ -128,18 +128,18 @@ tar -xf "$TAR_FILE" -C "$TMPDIR" || {
 }
 
 # Ensure installation directory exists
-mkdir -p "$BOLTBASE_INSTALL_DIR" || {
-  echo "Failed to create installation directory: $BOLTBASE_INSTALL_DIR" >&2
+mkdir -p "$DAGU_INSTALL_DIR" || {
+  echo "Failed to create installation directory: $DAGU_INSTALL_DIR" >&2
   exit 1
 }
 
 # Move binary to destination
-INSTALL_PATH="${BOLTBASE_INSTALL_DIR}/boltbase"
-if [ -w "$BOLTBASE_INSTALL_DIR" ]; then
-  mv "${TMPDIR}/boltbase" "$INSTALL_PATH"
+INSTALL_PATH="${DAGU_INSTALL_DIR}/dagu"
+if [ -w "$DAGU_INSTALL_DIR" ]; then
+  mv "${TMPDIR}/dagu" "$INSTALL_PATH"
 else
-  echo "$BOLTBASE_INSTALL_DIR is not writable. Using sudo to install."
-  sudo mv "${TMPDIR}/boltbase" "$INSTALL_PATH"
+  echo "$DAGU_INSTALL_DIR is not writable. Using sudo to install."
+  sudo mv "${TMPDIR}/dagu" "$INSTALL_PATH"
 fi
 
 # Make binary executable
@@ -151,14 +151,14 @@ chmod +x "$INSTALL_PATH" || {
 # Clean up
 rm -rf "$TMPDIR"
 
-echo "Boltbase $VERSION has been installed to: $INSTALL_PATH"
+echo "Dagu $VERSION has been installed to: $INSTALL_PATH"
 
 # Check if install directory is in PATH and provide guidance if not
-if ! echo "$PATH" | tr ':' '\n' | grep -q "^$BOLTBASE_INSTALL_DIR$"; then
+if ! echo "$PATH" | tr ':' '\n' | grep -q "^$DAGU_INSTALL_DIR$"; then
   echo ""
-  echo "Warning: $BOLTBASE_INSTALL_DIR is not in your PATH."
+  echo "Warning: $DAGU_INSTALL_DIR is not in your PATH."
   echo "Add the following line to your shell profile (~/.zshrc, ~/.bashrc, or ~/.bash_profile):"
   echo ""
-  echo "  export PATH=\"\$PATH:$BOLTBASE_INSTALL_DIR\""
+  echo "  export PATH=\"\$PATH:$DAGU_INSTALL_DIR\""
   echo ""
 fi
