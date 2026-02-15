@@ -68,7 +68,7 @@ func runDry(ctx *Context, args []string) error {
 		return err
 	}
 
-	agentConfigStore, agentModelStore := ctx.agentStores()
+	agentConfigStore, agentModelStore, agentMemoryStore := ctx.agentStores()
 
 	ag := agent.New(
 		dagRunID,
@@ -86,6 +86,7 @@ func runDry(ctx *Context, args []string) error {
 			DefaultExecMode:  ctx.Config.DefaultExecMode,
 			AgentConfigStore: agentConfigStore,
 			AgentModelStore:  agentModelStore,
+			AgentMemoryStore: agentMemoryStore,
 		},
 	)
 

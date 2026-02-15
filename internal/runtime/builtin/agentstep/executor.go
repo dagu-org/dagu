@@ -112,8 +112,20 @@ func (e *Executor) Run(ctx context.Context) error {
 	// Build tools filtered by global policy (exclude navigate and ask_user; add output tool).
 	tools := buildTools(dagCtx, stepCfg, globalPolicy, stdout)
 
+	// Load memory content if enabled.
+	var memoryContent agent.MemoryContent
+	if stepCfg != nil && stepCfg.Memory != nil && stepCfg.Memory.Enabled {
+		if memStore, ok := dagCtx.AgentMemoryStore.(agent.MemoryStore); ok && memStore != nil {
+			dagName := ""
+			if dagCtx.DAG != nil {
+				dagName = dagCtx.DAG.Name
+			}
+			memoryContent = loadMemoryContent(ctx, memStore, dagName)
+		}
+	}
+
 	// Generate system prompt.
-	systemPrompt := buildSystemPrompt(dagCtx, stepCfg)
+	systemPrompt := buildSystemPrompt(dagCtx, stepCfg, memoryContent)
 
 	// Resolve safe mode and max iterations.
 	safeMode := true
@@ -139,8 +151,10 @@ func (e *Executor) Run(ctx context.Context) error {
 	}
 
 	// Register bash policy enforcement hook.
+	// Merge step-level bash policy over global policy (step overrides global).
+	effectivePolicy := mergeStepBashPolicy(globalPolicy, stepCfg)
 	hooks := agent.NewHooks()
-	hooks.OnBeforeToolExec(buildPolicyHook(globalPolicy))
+	hooks.OnBeforeToolExec(buildPolicyHook(effectivePolicy))
 
 	logf(stderr, "Starting (model: %s, tools: %d, safe_mode: %v, max_iterations: %d)",
 		modelCfg.Name, len(tools), safeMode, maxIterations)
@@ -173,11 +187,7 @@ func (e *Executor) Run(ctx context.Context) error {
 				if iteration >= maxIterations {
 					logf(stderr, "Max iterations reached (%d)", maxIterations)
 					cancelLoop()
-					return
 				}
-				// Agent finished processing a turn with no more tool calls.
-				// Cancel to stop the polling loop.
-				cancelLoop()
 			}
 		},
 	})
@@ -248,7 +258,7 @@ func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy
 }
 
 // buildSystemPrompt generates the system prompt for the agent step.
-func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig) string {
+func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memory agent.MemoryContent) string {
 	env := agent.EnvironmentInfo{}
 	if dagCtx.DAG != nil {
 		env.DAGsDir = dagCtx.DAG.Location
@@ -261,7 +271,7 @@ func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig) strin
 		}
 	}
 
-	prompt := agent.GenerateSystemPrompt(env, currentDAG, agent.MemoryContent{}, "")
+	prompt := agent.GenerateSystemPrompt(env, currentDAG, memory, "")
 
 	// Append instruction about the output tool.
 	prompt += "\n\n## Output\n\nWhen you have completed your task, use the `output` tool to write your final result. " +
@@ -273,6 +283,49 @@ func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig) strin
 	}
 
 	return prompt
+}
+
+// loadMemoryContent loads memory content from the memory store for system prompt injection.
+func loadMemoryContent(ctx context.Context, store agent.MemoryStore, dagName string) agent.MemoryContent {
+	global, _ := store.LoadGlobalMemory(ctx)
+	var dagMem string
+	if dagName != "" {
+		dagMem, _ = store.LoadDAGMemory(ctx, dagName)
+	}
+	return agent.MemoryContent{
+		GlobalMemory: global,
+		DAGMemory:    dagMem,
+		DAGName:      dagName,
+		MemoryDir:    store.MemoryDir(),
+	}
+}
+
+// mergeStepBashPolicy merges step-level bash policy over the resolved global policy.
+// Step-level settings override global when specified; unset fields fall back to global.
+func mergeStepBashPolicy(global agent.ToolPolicyConfig, stepCfg *core.AgentStepConfig) agent.ToolPolicyConfig {
+	if stepCfg == nil || stepCfg.Tools == nil || stepCfg.Tools.BashPolicy == nil {
+		return global
+	}
+	bp := stepCfg.Tools.BashPolicy
+	merged := global
+	if bp.DefaultBehavior != "" {
+		merged.Bash.DefaultBehavior = agent.BashDefaultBehavior(bp.DefaultBehavior)
+	}
+	if bp.DenyBehavior != "" {
+		merged.Bash.DenyBehavior = agent.BashDenyBehavior(bp.DenyBehavior)
+	}
+	if len(bp.Rules) > 0 {
+		rules := make([]agent.BashRule, len(bp.Rules))
+		for i, r := range bp.Rules {
+			rules[i] = agent.BashRule{
+				Name:    r.Name,
+				Pattern: r.Pattern,
+				Action:  agent.BashRuleAction(r.Action),
+			}
+		}
+		merged.Bash.Rules = rules
+	}
+	return merged
 }
 
 // buildPolicyHook returns a before-tool hook that enforces bash command policy.

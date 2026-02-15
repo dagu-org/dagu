@@ -1567,6 +1567,10 @@ func buildStepRouter(_ StepBuildContext, s *step, result *core.Step) error {
 // buildStepAgent parses the agent configuration from step fields.
 func buildStepAgent(_ StepBuildContext, s *step, result *core.Step) error {
 	if !core.SupportsAgent(result.ExecutorConfig.Type) {
+		if s.Agent != nil {
+			return core.NewValidationError("agent", result.ExecutorConfig.Type,
+				fmt.Errorf("agent configuration is only valid for steps with type %q", core.ExecutorTypeAgent))
+		}
 		return nil
 	}
 
@@ -1581,6 +1585,10 @@ func buildStepAgent(_ StepBuildContext, s *step, result *core.Step) error {
 
 		if s.Agent.MaxIterations != nil {
 			cfg.MaxIterations = *s.Agent.MaxIterations
+			if cfg.MaxIterations < 1 {
+				return core.NewValidationError("agent.max_iterations", cfg.MaxIterations,
+					fmt.Errorf("must be at least 1"))
+			}
 		}
 		if s.Agent.SafeMode != nil {
 			cfg.SafeMode = *s.Agent.SafeMode

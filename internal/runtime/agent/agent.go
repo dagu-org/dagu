@@ -164,6 +164,8 @@ type Agent struct {
 	agentConfigStore any
 	// agentModelStore is the agent model store for agent step execution.
 	agentModelStore any
+	// agentMemoryStore is the agent memory store for agent step execution.
+	agentMemoryStore any
 
 	// Evaluated configs - these are expanded at runtime and stored separately
 	// to avoid mutating the original DAG struct.
@@ -232,6 +234,8 @@ type Options struct {
 	AgentConfigStore any
 	// AgentModelStore is the agent model store for agent step execution.
 	AgentModelStore any
+	// AgentMemoryStore is the agent memory store for agent step execution.
+	AgentMemoryStore any
 }
 
 // New creates a new Agent.
@@ -266,8 +270,9 @@ func New(
 		attemptID:        opts.AttemptID,
 		triggerType:      opts.TriggerType,
 		defaultExecMode:  opts.DefaultExecMode,
-		agentConfigStore: opts.AgentConfigStore,
-		agentModelStore:  opts.AgentModelStore,
+		agentConfigStore:  opts.AgentConfigStore,
+		agentModelStore:   opts.AgentModelStore,
+		agentMemoryStore:  opts.AgentMemoryStore,
 	}
 
 	// Initialize progress display if enabled
@@ -414,6 +419,9 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	if a.agentModelStore != nil {
 		contextOpts = append(contextOpts, runtime.WithAgentModelStore(a.agentModelStore))
+	}
+	if a.agentMemoryStore != nil {
+		contextOpts = append(contextOpts, runtime.WithAgentMemoryStore(a.agentMemoryStore))
 	}
 	ctx = runtime.NewContext(ctx, a.dag, a.dagRunID, a.logFile, contextOpts...)
 

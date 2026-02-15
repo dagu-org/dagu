@@ -46,6 +46,8 @@ var (
 	WithAgentConfigStore = exec.WithAgentConfigStore
 	// WithAgentModelStore sets the agent model store.
 	WithAgentModelStore = exec.WithAgentModelStore
+	// WithAgentMemoryStore sets the agent memory store.
+	WithAgentMemoryStore = exec.WithAgentMemoryStore
 )
 
 // LogWriterFactory is re-exported from execution package

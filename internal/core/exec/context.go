@@ -29,6 +29,7 @@ type Context struct {
 	DefaultExecMode    config.ExecutionMode // Server-level default execution mode (local or distributed)
 	AgentConfigStore   any                  // Agent config store (typed as any to avoid circular imports with agent package)
 	AgentModelStore    any                  // Agent model store (typed as any to avoid circular imports with agent package)
+	AgentMemoryStore   any                  // Agent memory store (typed as any to avoid circular imports with agent package)
 }
 
 // LogWriterFactory creates log writers for step stdout/stderr.
@@ -148,6 +149,7 @@ type contextOptions struct {
 	defaultExecMode    config.ExecutionMode
 	agentConfigStore   any
 	agentModelStore    any
+	agentMemoryStore   any
 }
 
 // ContextOption configures optional parameters for NewContext.
@@ -224,6 +226,13 @@ func WithAgentModelStore(store any) ContextOption {
 	}
 }
 
+// WithAgentMemoryStore sets the agent memory store.
+func WithAgentMemoryStore(store any) ContextOption {
+	return func(o *contextOptions) {
+		o.agentMemoryStore = store
+	}
+}
+
 // NewContext creates a new context with DAG execution metadata.
 // Required: ctx, dag, dagRunID, logFile
 // Optional: use ContextOption functions (WithDatabase, WithParams, etc.)
@@ -273,6 +282,7 @@ func NewContext(
 		DefaultExecMode:    options.defaultExecMode,
 		AgentConfigStore:   options.agentConfigStore,
 		AgentModelStore:    options.agentModelStore,
+		AgentMemoryStore:   options.agentMemoryStore,
 	})
 }
 

@@ -17,6 +17,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
+	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
@@ -165,24 +166,30 @@ func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root 
 	return statusPusher, logStreamer
 }
 
-// agentStores creates the agent config and model stores from the config paths.
-func (h *remoteTaskHandler) agentStores(ctx context.Context) (configStore any, modelStore any) {
+// agentStores creates the agent config, model, and memory stores from the config paths.
+func (h *remoteTaskHandler) agentStores(ctx context.Context) (configStore any, modelStore any, memoryStore any) {
 	acs, err := fileagentconfig.New(h.config.Paths.DataDir)
 	if err != nil {
 		logger.Warn(ctx, "Failed to create agent config store", tag.Error(err))
-		return nil, nil
+		return nil, nil, nil
 	}
 	if acs == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	ams, err := fileagentmodel.New(filepath.Join(h.config.Paths.DataDir, "agent", "models"))
 	if err != nil {
 		logger.Warn(ctx, "Failed to create agent model store", tag.Error(err))
-		return acs, nil
+		return acs, nil, nil
 	}
 
-	return acs, ams
+	ms, err := filememory.New(h.config.Paths.DAGsDir)
+	if err != nil {
+		logger.Warn(ctx, "Failed to create agent memory store", tag.Error(err))
+		return acs, ams, nil
+	}
+
+	return acs, ams, ms
 }
 
 // loadDAG loads the DAG from task definition.
@@ -301,7 +308,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 	ctx = logger.WithLogger(ctx, logger.NewLogger(logger.WithWriter(logWriter)))
 
 	// Create agent stores for agent step execution
-	agentConfigStore, agentModelStore := h.agentStores(ctx)
+	agentConfigStore, agentModelStore, agentMemoryStore := h.agentStores(ctx)
 
 	// Build agent options
 	opts := agent.Options{
@@ -318,6 +325,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 		DefaultExecMode:  h.config.DefaultExecMode,
 		AgentConfigStore: agentConfigStore,
 		AgentModelStore:  agentModelStore,
+		AgentMemoryStore: agentMemoryStore,
 	}
 
 	// Add retry configuration if present
