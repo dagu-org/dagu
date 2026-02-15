@@ -1,4 +1,4 @@
-import { Save } from 'lucide-react';
+import { RotateCcw, Save } from 'lucide-react';
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Button } from '../../components/ui/button';
 import { useErrorModal } from '../../components/ui/error-modal';
@@ -49,6 +49,12 @@ function BaseConfigPage(): React.ReactNode {
     setCurrentValue(newValue || '');
     setHasUnsavedChanges(true);
   }, []);
+
+  const handleRevert = useCallback(() => {
+    setCurrentValue(null);
+    setHasUnsavedChanges(false);
+    mutate();
+  }, [mutate]);
 
   const handleSave = useCallback(async () => {
     if (currentValue === null) {
@@ -126,14 +132,25 @@ function BaseConfigPage(): React.ReactNode {
         className="min-h-[400px]"
         headerActions={
           editable ? (
-            <Button
-              title="Save changes (Ctrl+S / Cmd+S)"
-              disabled={!hasUnsavedChanges}
-              onClick={handleSave}
-            >
-              <Save className="h-4 w-4" />
-              Save
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                title="Revert to last saved version"
+                disabled={!hasUnsavedChanges}
+                onClick={handleRevert}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Revert
+              </Button>
+              <Button
+                title="Save changes (Ctrl+S / Cmd+S)"
+                disabled={!hasUnsavedChanges}
+                onClick={handleSave}
+              >
+                <Save className="h-4 w-4" />
+                Save
+              </Button>
+            </>
           ) : undefined
         }
       />

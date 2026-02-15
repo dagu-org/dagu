@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -52,6 +53,9 @@ func (a *API) GetBaseConfig(ctx context.Context, _ api.GetBaseConfigRequestObjec
 	}
 
 	errs := validateBaseConfig(ctx, yamlSpec)
+	if errs == nil {
+		errs = []string{}
+	}
 
 	return api.GetBaseConfig200JSONResponse{
 		Spec:   yamlSpec,
@@ -75,7 +79,7 @@ func (a *API) UpdateBaseConfig(ctx context.Context, request api.UpdateBaseConfig
 	if errs := validateBaseConfig(ctx, request.Body.Spec); len(errs) > 0 {
 		return nil, &Error{
 			Code:       api.ErrorCodeBadRequest,
-			Message:    errs[0],
+			Message:    strings.Join(errs, "; "),
 			HTTPStatus: http.StatusBadRequest,
 		}
 	}
