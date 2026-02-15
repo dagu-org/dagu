@@ -9,12 +9,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/agent/iface"
+	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 )
 
-// Verify Store implements iface.MemoryStore at compile time.
-var _ iface.MemoryStore = (*Store)(nil)
+// Verify Store implements agent.MemoryStore at compile time.
+var _ agent.MemoryStore = (*Store)(nil)
 
 const (
 	agentMemoryDir  = "memory"

@@ -23,6 +23,8 @@ const (
 	maxChunkSize = 3 * 1024 * 1024 // 3MB
 )
 
+var _ exec.LogWriterFactory = (*LogStreamer)(nil)
+
 // LogStreamer streams logs to coordinator via gRPC
 type LogStreamer struct {
 	client    coordinator.Client

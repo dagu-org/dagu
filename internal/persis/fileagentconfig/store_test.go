@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/agent/iface"
+	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +24,7 @@ func setupTestStore(t *testing.T, opts ...Option) (*Store, string) {
 	return store, dataDir
 }
 
-func writeConfig(t *testing.T, dataDir string, cfg *iface.Config) {
+func writeConfig(t *testing.T, dataDir string, cfg *agent.Config) {
 	t.Helper()
 	configPath := filepath.Join(dataDir, agentDirName, configFileName)
 	data, err := json.Marshal(cfg)
@@ -33,8 +33,8 @@ func writeConfig(t *testing.T, dataDir string, cfg *iface.Config) {
 	require.NoError(t, err)
 }
 
-func newTestConfig(enabled bool, defaultModelID string) *iface.Config {
-	return &iface.Config{
+func newTestConfig(enabled bool, defaultModelID string) *agent.Config {
+	return &agent.Config{
 		Enabled:        enabled,
 		DefaultModelID: defaultModelID,
 	}
@@ -62,7 +62,7 @@ func TestNew(t *testing.T) {
 
 	t.Run("with config cache option", func(t *testing.T) {
 		dataDir := t.TempDir()
-		cache := fileutil.NewCache[*iface.Config]("test", 10, time.Hour)
+		cache := fileutil.NewCache[*agent.Config]("test", 10, time.Hour)
 		store, err := New(dataDir, WithConfigCache(cache))
 		require.NoError(t, err)
 		assert.NotNil(t, store)
@@ -82,7 +82,7 @@ func TestNew_DirectoryCreationFailure(t *testing.T) {
 }
 
 func TestWithConfigCache(t *testing.T) {
-	cache := fileutil.NewCache[*iface.Config]("test-cache", 100, time.Hour)
+	cache := fileutil.NewCache[*agent.Config]("test-cache", 100, time.Hour)
 	store := &Store{}
 	WithConfigCache(cache)(store)
 	assert.Equal(t, cache, store.configCache)
@@ -128,7 +128,7 @@ func TestStore_Load(t *testing.T) {
 }
 
 func TestStore_Load_WithCache(t *testing.T) {
-	cache := fileutil.NewCache[*iface.Config]("test", 10, time.Hour)
+	cache := fileutil.NewCache[*agent.Config]("test", 10, time.Hour)
 	store, dataDir := setupTestStore(t, WithConfigCache(cache))
 	ctx := context.Background()
 
@@ -158,7 +158,7 @@ func TestStore_Save(t *testing.T) {
 
 	t.Run("valid config saves successfully", func(t *testing.T) {
 		store, _ := setupTestStore(t)
-		cfg := &iface.Config{
+		cfg := &agent.Config{
 			Enabled:        true,
 			DefaultModelID: "claude-sonnet-4-5",
 		}
@@ -173,7 +173,7 @@ func TestStore_Save(t *testing.T) {
 
 	t.Run("config with all fields", func(t *testing.T) {
 		store, _ := setupTestStore(t)
-		cfg := &iface.Config{
+		cfg := &agent.Config{
 			Enabled:        false,
 			DefaultModelID: "gpt-4-1",
 		}
@@ -229,7 +229,7 @@ func TestStore_Exists(t *testing.T) {
 }
 
 func TestApplyEnvOverrides(t *testing.T) {
-	baseConfig := func() *iface.Config {
+	baseConfig := func() *agent.Config {
 		return newTestConfig(true, "claude-sonnet-4-5")
 	}
 
@@ -256,7 +256,7 @@ func TestApplyEnvOverrides(t *testing.T) {
 }
 
 func TestDefaultConfig(t *testing.T) {
-	cfg := iface.DefaultConfig()
+	cfg := agent.DefaultConfig()
 	assert.NotNil(t, cfg)
 	assert.True(t, cfg.Enabled)
 	assert.Empty(t, cfg.DefaultModelID)
@@ -297,12 +297,12 @@ func TestStore_Load_ReadPermissionError(t *testing.T) {
 }
 
 func TestStore_Save_InvalidatesCache(t *testing.T) {
-	cache := fileutil.NewCache[*iface.Config]("test", 10, time.Hour)
+	cache := fileutil.NewCache[*agent.Config]("test", 10, time.Hour)
 	store, _ := setupTestStore(t, WithConfigCache(cache))
 	ctx := context.Background()
 
 	// Save initial config
-	initialCfg := &iface.Config{
+	initialCfg := &agent.Config{
 		Enabled:        true,
 		DefaultModelID: "model-1",
 	}
@@ -314,7 +314,7 @@ func TestStore_Save_InvalidatesCache(t *testing.T) {
 	assert.Equal(t, "model-1", loaded.DefaultModelID)
 
 	// Save updated config (should invalidate cache)
-	updatedCfg := &iface.Config{
+	updatedCfg := &agent.Config{
 		Enabled:        false,
 		DefaultModelID: "model-2",
 	}

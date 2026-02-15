@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
@@ -36,7 +35,7 @@ func NewProviderCache() *ProviderCache {
 
 // Set stores a provider in the cache for the given config.
 // Useful for testing to inject mock providers.
-func (c *ProviderCache) Set(cfg iface.LLMConfig, provider llm.Provider) {
+func (c *ProviderCache) Set(cfg LLMConfig, provider llm.Provider) {
 	hash := HashLLMConfig(cfg)
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -48,7 +47,7 @@ func (c *ProviderCache) Set(cfg iface.LLMConfig, provider llm.Provider) {
 }
 
 // GetOrCreate returns a cached provider for the given config, or creates one.
-func (c *ProviderCache) GetOrCreate(cfg iface.LLMConfig) (llm.Provider, string, error) {
+func (c *ProviderCache) GetOrCreate(cfg LLMConfig) (llm.Provider, string, error) {
 	hash := HashLLMConfig(cfg)
 
 	c.mu.RLock()
@@ -80,7 +79,7 @@ func (c *ProviderCache) GetOrCreate(cfg iface.LLMConfig) (llm.Provider, string, 
 }
 
 // Invalidate removes the cached provider for the given config.
-func (c *ProviderCache) Invalidate(cfg iface.LLMConfig) {
+func (c *ProviderCache) Invalidate(cfg LLMConfig) {
 	hash := HashLLMConfig(cfg)
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -104,7 +103,7 @@ func (c *ProviderCache) evictIfFullLocked() {
 
 // HashLLMConfig creates a deterministic hash of the LLM config for cache keying.
 // Uses length-prefixed fields to prevent delimiter injection.
-func HashLLMConfig(cfg iface.LLMConfig) string {
+func HashLLMConfig(cfg LLMConfig) string {
 	data := fmt.Sprintf("%d:%s|%d:%s|%d:%s|%d:%s",
 		len(cfg.Provider), cfg.Provider,
 		len(cfg.Model), cfg.Model,
@@ -116,7 +115,7 @@ func HashLLMConfig(cfg iface.LLMConfig) string {
 }
 
 // CreateLLMProvider creates an LLM provider from config.
-func CreateLLMProvider(agentCfg iface.LLMConfig) (llm.Provider, error) {
+func CreateLLMProvider(agentCfg LLMConfig) (llm.Provider, error) {
 	providerType, err := llm.ParseProviderType(agentCfg.Provider)
 	if err != nil {
 		return nil, fmt.Errorf("invalid LLM provider: %w", err)

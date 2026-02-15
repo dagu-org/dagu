@@ -21,7 +21,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/term"
 
-	"github.com/dagu-org/dagu/internal/agent/iface"
+	agentpkg "github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -162,11 +162,11 @@ type Agent struct {
 	attemptID string
 
 	// agentConfigStore is the agent config store for agent step execution.
-	agentConfigStore iface.ConfigStore
+	agentConfigStore agentpkg.ConfigStore
 	// agentModelStore is the agent model store for agent step execution.
-	agentModelStore iface.ModelStore
+	agentModelStore agentpkg.ModelStore
 	// agentMemoryStore is the agent memory store for agent step execution.
-	agentMemoryStore iface.MemoryStore
+	agentMemoryStore agentpkg.MemoryStore
 
 	// Evaluated configs - these are expanded at runtime and stored separately
 	// to avoid mutating the original DAG struct.
@@ -232,11 +232,11 @@ type Options struct {
 	// DefaultExecMode is the server-level default execution mode.
 	DefaultExecMode config.ExecutionMode
 	// AgentConfigStore is the agent config store for agent step execution.
-	AgentConfigStore iface.ConfigStore
+	AgentConfigStore agentpkg.ConfigStore
 	// AgentModelStore is the agent model store for agent step execution.
-	AgentModelStore iface.ModelStore
+	AgentModelStore agentpkg.ModelStore
 	// AgentMemoryStore is the agent memory store for agent step execution.
-	AgentMemoryStore iface.MemoryStore
+	AgentMemoryStore agentpkg.MemoryStore
 }
 
 // New creates a new Agent.
@@ -415,16 +415,19 @@ func (a *Agent) Run(ctx context.Context) error {
 	if a.logWriterFactory != nil {
 		contextOpts = append(contextOpts, runtime.WithLogWriterFactory(a.logWriterFactory))
 	}
+	ctx = runtime.NewContext(ctx, a.dag, a.dagRunID, a.logFile, contextOpts...)
+
+	// Inject agent stores into context via context.Value.
+	// This avoids a backwards dependency from the execution context to the agent package.
 	if a.agentConfigStore != nil {
-		contextOpts = append(contextOpts, runtime.WithAgentConfigStore(a.agentConfigStore))
+		ctx = agentpkg.WithConfigStore(ctx, a.agentConfigStore)
 	}
 	if a.agentModelStore != nil {
-		contextOpts = append(contextOpts, runtime.WithAgentModelStore(a.agentModelStore))
+		ctx = agentpkg.WithModelStore(ctx, a.agentModelStore)
 	}
 	if a.agentMemoryStore != nil {
-		contextOpts = append(contextOpts, runtime.WithAgentMemoryStore(a.agentMemoryStore))
+		ctx = agentpkg.WithMemoryStore(ctx, a.agentMemoryStore)
 	}
-	ctx = runtime.NewContext(ctx, a.dag, a.dagRunID, a.logFile, contextOpts...)
 
 	// Add structured logging context
 	logFields := []slog.Attr{

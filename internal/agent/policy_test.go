@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -12,7 +11,7 @@ import (
 func TestResolveToolPolicy_Defaults(t *testing.T) {
 	t.Parallel()
 
-	resolved := ResolveToolPolicy(iface.ToolPolicyConfig{})
+	resolved := ResolveToolPolicy(ToolPolicyConfig{})
 
 	assert.True(t, resolved.Tools[toolNameBash])
 	assert.True(t, resolved.Tools[toolNameRead])
@@ -22,8 +21,8 @@ func TestResolveToolPolicy_Defaults(t *testing.T) {
 	assert.True(t, resolved.Tools[toolNameReadSchema])
 	assert.True(t, resolved.Tools[toolNameAskUser])
 	assert.True(t, resolved.Tools[toolNameWebSearch])
-	assert.Equal(t, iface.BashDefaultBehaviorAllow, resolved.Bash.DefaultBehavior)
-	assert.Equal(t, iface.BashDenyBehaviorAskUser, resolved.Bash.DenyBehavior)
+	assert.Equal(t, BashDefaultBehaviorAllow, resolved.Bash.DefaultBehavior)
+	assert.Equal(t, BashDenyBehaviorAskUser, resolved.Bash.DenyBehavior)
 }
 
 func TestValidateToolPolicy(t *testing.T) {
@@ -31,7 +30,7 @@ func TestValidateToolPolicy(t *testing.T) {
 
 	t.Run("rejects unknown tools", func(t *testing.T) {
 		t.Parallel()
-		err := ValidateToolPolicy(iface.ToolPolicyConfig{
+		err := ValidateToolPolicy(ToolPolicyConfig{
 			Tools: map[string]bool{"unknown_tool": true},
 		})
 		require.Error(t, err)
@@ -40,10 +39,10 @@ func TestValidateToolPolicy(t *testing.T) {
 
 	t.Run("rejects invalid regex", func(t *testing.T) {
 		t.Parallel()
-		err := ValidateToolPolicy(iface.ToolPolicyConfig{
-			Bash: iface.BashPolicyConfig{
-				Rules: []iface.BashRule{
-					{Pattern: "([", Action: iface.BashRuleActionAllow},
+		err := ValidateToolPolicy(ToolPolicyConfig{
+			Bash: BashPolicyConfig{
+				Rules: []BashRule{
+					{Pattern: "([", Action: BashRuleActionAllow},
 				},
 			},
 		})
@@ -59,20 +58,20 @@ func TestEvaluateBashPolicy(t *testing.T) {
 
 	t.Run("tool disabled denies", func(t *testing.T) {
 		t.Parallel()
-		decision, err := EvaluateBashPolicy(iface.ToolPolicyConfig{
+		decision, err := EvaluateBashPolicy(ToolPolicyConfig{
 			Tools: map[string]bool{"bash": false},
 		}, input)
 		require.NoError(t, err)
 		assert.False(t, decision.Allowed)
-		assert.Equal(t, iface.BashDenyBehaviorBlock, decision.DenyBehavior)
+		assert.Equal(t, BashDenyBehaviorBlock, decision.DenyBehavior)
 	})
 
 	t.Run("matching allow rule permits", func(t *testing.T) {
 		t.Parallel()
-		decision, err := EvaluateBashPolicy(iface.ToolPolicyConfig{
-			Bash: iface.BashPolicyConfig{
-				Rules: []iface.BashRule{
-					{Name: "allow_git", Pattern: "^git\\s+", Action: iface.BashRuleActionAllow},
+		decision, err := EvaluateBashPolicy(ToolPolicyConfig{
+			Bash: BashPolicyConfig{
+				Rules: []BashRule{
+					{Name: "allow_git", Pattern: "^git\\s+", Action: BashRuleActionAllow},
 				},
 			},
 		}, input)
@@ -82,29 +81,29 @@ func TestEvaluateBashPolicy(t *testing.T) {
 
 	t.Run("matching deny rule blocks", func(t *testing.T) {
 		t.Parallel()
-		decision, err := EvaluateBashPolicy(iface.ToolPolicyConfig{
-			Bash: iface.BashPolicyConfig{
-				Rules: []iface.BashRule{
-					{Name: "deny_git", Pattern: "^git\\s+", Action: iface.BashRuleActionDeny},
+		decision, err := EvaluateBashPolicy(ToolPolicyConfig{
+			Bash: BashPolicyConfig{
+				Rules: []BashRule{
+					{Name: "deny_git", Pattern: "^git\\s+", Action: BashRuleActionDeny},
 				},
-				DenyBehavior: iface.BashDenyBehaviorAskUser,
+				DenyBehavior: BashDenyBehaviorAskUser,
 			},
 		}, input)
 		require.NoError(t, err)
 		assert.False(t, decision.Allowed)
 		assert.Equal(t, "deny_git", decision.RuleName)
-		assert.Equal(t, iface.BashDenyBehaviorAskUser, decision.DenyBehavior)
+		assert.Equal(t, BashDenyBehaviorAskUser, decision.DenyBehavior)
 	})
 
 	t.Run("disabled deny rule is ignored", func(t *testing.T) {
 		t.Parallel()
 		disabled := false
-		decision, err := EvaluateBashPolicy(iface.ToolPolicyConfig{
-			Bash: iface.BashPolicyConfig{
-				Rules: []iface.BashRule{
-					{Name: "deny_git_disabled", Pattern: "^git\\s+", Action: iface.BashRuleActionDeny, Enabled: &disabled},
+		decision, err := EvaluateBashPolicy(ToolPolicyConfig{
+			Bash: BashPolicyConfig{
+				Rules: []BashRule{
+					{Name: "deny_git_disabled", Pattern: "^git\\s+", Action: BashRuleActionDeny, Enabled: &disabled},
 				},
-				DefaultBehavior: iface.BashDefaultBehaviorAllow,
+				DefaultBehavior: BashDefaultBehaviorAllow,
 			},
 		}, input)
 		require.NoError(t, err)
@@ -113,12 +112,12 @@ func TestEvaluateBashPolicy(t *testing.T) {
 
 	t.Run("no match uses default deny", func(t *testing.T) {
 		t.Parallel()
-		decision, err := EvaluateBashPolicy(iface.ToolPolicyConfig{
-			Bash: iface.BashPolicyConfig{
-				Rules: []iface.BashRule{
-					{Name: "allow_ls", Pattern: "^ls\\b", Action: iface.BashRuleActionAllow},
+		decision, err := EvaluateBashPolicy(ToolPolicyConfig{
+			Bash: BashPolicyConfig{
+				Rules: []BashRule{
+					{Name: "allow_ls", Pattern: "^ls\\b", Action: BashRuleActionAllow},
 				},
-				DefaultBehavior: iface.BashDefaultBehaviorDeny,
+				DefaultBehavior: BashDefaultBehaviorDeny,
 			},
 		}, input)
 		require.NoError(t, err)
@@ -128,9 +127,9 @@ func TestEvaluateBashPolicy(t *testing.T) {
 
 	t.Run("no match with default allow permits", func(t *testing.T) {
 		t.Parallel()
-		decision, err := EvaluateBashPolicy(iface.ToolPolicyConfig{
-			Bash: iface.BashPolicyConfig{
-				DefaultBehavior: iface.BashDefaultBehaviorAllow,
+		decision, err := EvaluateBashPolicy(ToolPolicyConfig{
+			Bash: BashPolicyConfig{
+				DefaultBehavior: BashDefaultBehaviorAllow,
 			},
 		}, input)
 		require.NoError(t, err)
@@ -139,15 +138,15 @@ func TestEvaluateBashPolicy(t *testing.T) {
 
 	t.Run("unsupported shell constructs are denied", func(t *testing.T) {
 		t.Parallel()
-		decision, err := EvaluateBashPolicy(iface.ToolPolicyConfig{
-			Bash: iface.BashPolicyConfig{
-				DenyBehavior: iface.BashDenyBehaviorAskUser,
+		decision, err := EvaluateBashPolicy(ToolPolicyConfig{
+			Bash: BashPolicyConfig{
+				DenyBehavior: BashDenyBehaviorAskUser,
 			},
 		}, json.RawMessage(`{"command":"echo $(uname -a)"}`))
 		require.NoError(t, err)
 		assert.False(t, decision.Allowed)
 		assert.Contains(t, decision.Reason, "unsupported shell construct")
-		assert.Equal(t, iface.BashDenyBehaviorAskUser, decision.DenyBehavior)
+		assert.Equal(t, BashDenyBehaviorAskUser, decision.DenyBehavior)
 	})
 }
 

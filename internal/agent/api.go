@@ -13,7 +13,6 @@ import (
 	"time"
 
 	api "github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/go-chi/chi/v5"
@@ -66,28 +65,28 @@ func getUserContextFromRequest(r *http.Request) (userID, username string, role a
 type API struct {
 	sessions    sync.Map // id -> *SessionManager (active sessions)
 	store       SessionStore
-	configStore iface.ConfigStore
-	modelStore  iface.ModelStore
+	configStore ConfigStore
+	modelStore  ModelStore
 	providers   *ProviderCache
 	workingDir  string
 	logger      *slog.Logger
-	dagStore    iface.DAGMetadataStore // For resolving DAG file paths
+	dagStore    DAGMetadataStore // For resolving DAG file paths
 	environment EnvironmentInfo
 	hooks       *Hooks
-	memoryStore iface.MemoryStore
+	memoryStore MemoryStore
 }
 
 // APIConfig contains configuration for the API.
 type APIConfig struct {
-	ConfigStore  iface.ConfigStore
-	ModelStore   iface.ModelStore
+	ConfigStore  ConfigStore
+	ModelStore   ModelStore
 	WorkingDir   string
 	Logger       *slog.Logger
 	SessionStore SessionStore
-	DAGStore     iface.DAGMetadataStore // For resolving DAG file paths
+	DAGStore     DAGMetadataStore // For resolving DAG file paths
 	Environment  EnvironmentInfo
 	Hooks        *Hooks
-	MemoryStore  iface.MemoryStore
+	MemoryStore  MemoryStore
 }
 
 // SessionWithState is a session with its current state.
@@ -244,7 +243,7 @@ func (a *API) getDefaultModelID(ctx context.Context) string {
 // resolveProvider resolves a model ID to an LLM provider and model config.
 // If modelID is empty, uses the default from config.
 // If the requested model is not found (e.g., deleted), falls back to the default.
-func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider, *iface.ModelConfig, error) {
+func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider, *ModelConfig, error) {
 	if a.modelStore == nil {
 		return nil, nil, errors.New("model store not configured")
 	}
@@ -256,7 +255,7 @@ func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider
 	}
 
 	model, err := a.modelStore.GetByID(ctx, modelID)
-	if errors.Is(err, iface.ErrModelNotFound) && defaultID != "" && defaultID != modelID {
+	if errors.Is(err, ErrModelNotFound) && defaultID != "" && defaultID != modelID {
 		// Requested model was deleted; fall back to default
 		model, err = a.modelStore.GetByID(ctx, defaultID)
 	}

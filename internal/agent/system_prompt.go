@@ -5,7 +5,6 @@ import (
 	"embed"
 	"text/template"
 
-	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/auth"
 )
 
@@ -46,13 +45,13 @@ type UserCapabilities struct {
 type systemPromptData struct {
 	EnvironmentInfo
 	CurrentDAG *CurrentDAG
-	Memory     iface.MemoryContent
+	Memory     MemoryContent
 	User       *UserCapabilities
 }
 
 // GenerateSystemPrompt renders the system prompt template with the given environment,
 // optional DAG context, memory content, and user role capabilities.
-func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG, memory iface.MemoryContent, role auth.Role) string {
+func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG, memory MemoryContent, role auth.Role) string {
 	var buf bytes.Buffer
 	data := systemPromptData{
 		EnvironmentInfo: env,

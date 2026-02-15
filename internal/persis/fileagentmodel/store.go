@@ -12,12 +12,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/agent/iface"
+	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 )
 
-// Verify Store implements iface.ModelStore at compile time.
-var _ iface.ModelStore = (*Store)(nil)
+// Verify Store implements agent.ModelStore at compile time.
+var _ agent.ModelStore = (*Store)(nil)
 
 const (
 	modelFileExtension  = ".json"
@@ -108,13 +108,13 @@ func (s *Store) rebuildIndex() error {
 }
 
 // loadModelFromFile reads and parses a model config from a JSON file.
-func loadModelFromFile(filePath string) (*iface.ModelConfig, error) {
+func loadModelFromFile(filePath string) (*agent.ModelConfig, error) {
 	data, err := os.ReadFile(filePath) //nolint:gosec // filePath is constructed internally
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
 	}
 
-	var model iface.ModelConfig
+	var model agent.ModelConfig
 	if err := json.Unmarshal(data, &model); err != nil {
 		return nil, fmt.Errorf("failed to parse model file %s: %w", filePath, err)
 	}
@@ -123,7 +123,7 @@ func loadModelFromFile(filePath string) (*iface.ModelConfig, error) {
 }
 
 // writeModelToFile writes a model config to a JSON file atomically.
-func writeModelToFile(filePath string, model *iface.ModelConfig) error {
+func writeModelToFile(filePath string, model *agent.ModelConfig) error {
 	if err := fileutil.WriteJSONAtomic(filePath, model, filePermissions); err != nil {
 		return fmt.Errorf("fileagentmodel: %w", err)
 	}
@@ -142,11 +142,11 @@ func (s *Store) modelFilePath(id string) (string, error) {
 }
 
 // Create stores a new model configuration.
-func (s *Store) Create(_ context.Context, model *iface.ModelConfig) error {
+func (s *Store) Create(_ context.Context, model *agent.ModelConfig) error {
 	if model == nil {
 		return errors.New("fileagentmodel: model cannot be nil")
 	}
-	if err := iface.ValidateModelID(model.ID); err != nil {
+	if err := agent.ValidateModelID(model.ID); err != nil {
 		return err
 	}
 	if model.Name == "" {
@@ -157,10 +157,10 @@ func (s *Store) Create(_ context.Context, model *iface.ModelConfig) error {
 	defer s.mu.Unlock()
 
 	if _, exists := s.byID[model.ID]; exists {
-		return iface.ErrModelAlreadyExists
+		return agent.ErrModelAlreadyExists
 	}
 	if _, exists := s.byName[model.Name]; exists {
-		return iface.ErrModelNameAlreadyExists
+		return agent.ErrModelNameAlreadyExists
 	}
 
 	filePath, err := s.modelFilePath(model.ID)
@@ -178,8 +178,8 @@ func (s *Store) Create(_ context.Context, model *iface.ModelConfig) error {
 }
 
 // GetByID retrieves a model configuration by its unique ID.
-func (s *Store) GetByID(_ context.Context, id string) (*iface.ModelConfig, error) {
-	if err := iface.ValidateModelID(id); err != nil {
+func (s *Store) GetByID(_ context.Context, id string) (*agent.ModelConfig, error) {
+	if err := agent.ValidateModelID(id); err != nil {
 		return nil, err
 	}
 
@@ -188,13 +188,13 @@ func (s *Store) GetByID(_ context.Context, id string) (*iface.ModelConfig, error
 	s.mu.RUnlock()
 
 	if !exists {
-		return nil, iface.ErrModelNotFound
+		return nil, agent.ErrModelNotFound
 	}
 
 	model, err := loadModelFromFile(filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, iface.ErrModelNotFound
+			return nil, agent.ErrModelNotFound
 		}
 		return nil, fmt.Errorf("fileagentmodel: failed to load model %s: %w", id, err)
 	}
@@ -203,7 +203,7 @@ func (s *Store) GetByID(_ context.Context, id string) (*iface.ModelConfig, error
 }
 
 // List returns all model configurations, sorted by name.
-func (s *Store) List(_ context.Context) ([]*iface.ModelConfig, error) {
+func (s *Store) List(_ context.Context) ([]*agent.ModelConfig, error) {
 	s.mu.RLock()
 	filePaths := make([]string, 0, len(s.byID))
 	for _, fp := range s.byID {
@@ -211,7 +211,7 @@ func (s *Store) List(_ context.Context) ([]*iface.ModelConfig, error) {
 	}
 	s.mu.RUnlock()
 
-	models := make([]*iface.ModelConfig, 0, len(filePaths))
+	models := make([]*agent.ModelConfig, 0, len(filePaths))
 	for _, fp := range filePaths {
 		model, err := loadModelFromFile(fp)
 		if err != nil {
@@ -223,7 +223,7 @@ func (s *Store) List(_ context.Context) ([]*iface.ModelConfig, error) {
 		models = append(models, model)
 	}
 
-	slices.SortFunc(models, func(a, b *iface.ModelConfig) int {
+	slices.SortFunc(models, func(a, b *agent.ModelConfig) int {
 		return strings.Compare(a.Name, b.Name)
 	})
 
@@ -231,11 +231,11 @@ func (s *Store) List(_ context.Context) ([]*iface.ModelConfig, error) {
 }
 
 // Update modifies an existing model configuration.
-func (s *Store) Update(_ context.Context, model *iface.ModelConfig) error {
+func (s *Store) Update(_ context.Context, model *agent.ModelConfig) error {
 	if model == nil {
 		return errors.New("fileagentmodel: model cannot be nil")
 	}
-	if err := iface.ValidateModelID(model.ID); err != nil {
+	if err := agent.ValidateModelID(model.ID); err != nil {
 		return err
 	}
 
@@ -244,7 +244,7 @@ func (s *Store) Update(_ context.Context, model *iface.ModelConfig) error {
 
 	filePath, exists := s.byID[model.ID]
 	if !exists {
-		return iface.ErrModelNotFound
+		return agent.ErrModelNotFound
 	}
 
 	existing, err := loadModelFromFile(filePath)
@@ -255,7 +255,7 @@ func (s *Store) Update(_ context.Context, model *iface.ModelConfig) error {
 	nameChanged := model.Name != "" && existing.Name != model.Name
 	if nameChanged {
 		if takenByID, taken := s.byName[model.Name]; taken && takenByID != model.ID {
-			return iface.ErrModelAlreadyExists
+			return agent.ErrModelAlreadyExists
 		}
 	}
 
@@ -273,7 +273,7 @@ func (s *Store) Update(_ context.Context, model *iface.ModelConfig) error {
 
 // Delete removes a model configuration by its ID.
 func (s *Store) Delete(_ context.Context, id string) error {
-	if err := iface.ValidateModelID(id); err != nil {
+	if err := agent.ValidateModelID(id); err != nil {
 		return err
 	}
 
@@ -282,7 +282,7 @@ func (s *Store) Delete(_ context.Context, id string) error {
 
 	filePath, exists := s.byID[id]
 	if !exists {
-		return iface.ErrModelNotFound
+		return agent.ErrModelNotFound
 	}
 
 	if err := os.Remove(filePath); err != nil && !errors.Is(err, os.ErrNotExist) {
