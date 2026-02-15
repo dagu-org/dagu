@@ -108,7 +108,6 @@ func validateBaseConfig(ctx context.Context, yamlSpec string) []string {
 
 	_, err := spec.LoadYAML(ctx,
 		[]byte(yamlSpec),
-		spec.WithAllowBuildErrors(),
 		spec.WithoutEval(),
 	)
 
