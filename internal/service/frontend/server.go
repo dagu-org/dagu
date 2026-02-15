@@ -37,10 +37,10 @@ import (
 	"github.com/dagu-org/dagu/internal/gitsync"
 	_ "github.com/dagu-org/dagu/internal/llm/allproviders" // Register LLM providers
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
-	"github.com/dagu-org/dagu/internal/persis/filebaseconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
+	"github.com/dagu-org/dagu/internal/persis/filebaseconfig"
 	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/persis/filesession"
 	"github.com/dagu-org/dagu/internal/persis/fileupgradecheck"

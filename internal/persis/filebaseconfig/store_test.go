@@ -128,11 +128,9 @@ func TestConcurrentAccess(t *testing.T) {
 	}
 
 	for range 10 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, _ = store.GetSpec(ctx)
-		}()
+		})
 	}
 
 	wg.Wait()
