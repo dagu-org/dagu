@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,7 +33,7 @@ func TestGenerateSlugID(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := GenerateSlugID(tc.input)
+			got := iface.GenerateSlugID(tc.input)
 			assert.Equal(t, tc.want, got)
 		})
 	}
@@ -86,7 +87,7 @@ func TestUniqueID(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := UniqueID(tc.input, tc.existing)
+			got := iface.UniqueID(tc.input, tc.existing)
 			assert.Equal(t, tc.want, got)
 		})
 	}
@@ -98,7 +99,7 @@ func TestModelConfig_ToLLMConfig(t *testing.T) {
 	t.Run("maps all fields correctly", func(t *testing.T) {
 		t.Parallel()
 
-		mc := &ModelConfig{
+		mc := &iface.ModelConfig{
 			ID:               "test-model",
 			Name:             "Test Model",
 			Provider:         "anthropic",
@@ -124,7 +125,7 @@ func TestModelConfig_ToLLMConfig(t *testing.T) {
 	t.Run("handles empty optional fields", func(t *testing.T) {
 		t.Parallel()
 
-		mc := &ModelConfig{
+		mc := &iface.ModelConfig{
 			Provider: "openai",
 			Model:    "gpt-4",
 		}
@@ -156,7 +157,7 @@ func TestValidateModelID(t *testing.T) {
 		for _, id := range validIDs {
 			t.Run(id, func(t *testing.T) {
 				t.Parallel()
-				err := ValidateModelID(id)
+				err := iface.ValidateModelID(id)
 				assert.NoError(t, err, "expected %q to be valid", id)
 			})
 		}
@@ -185,9 +186,9 @@ func TestValidateModelID(t *testing.T) {
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
-				err := ValidateModelID(tc.id)
+				err := iface.ValidateModelID(tc.id)
 				require.Error(t, err, "expected %q to be invalid", tc.id)
-				assert.ErrorIs(t, err, ErrInvalidModelID)
+				assert.ErrorIs(t, err, iface.ErrInvalidModelID)
 			})
 		}
 	})
@@ -195,7 +196,7 @@ func TestValidateModelID(t *testing.T) {
 	t.Run("boundary length 128 is valid", func(t *testing.T) {
 		t.Parallel()
 		id := strings.Repeat("a", 128)
-		err := ValidateModelID(id)
+		err := iface.ValidateModelID(id)
 		assert.NoError(t, err, "128-char ID should be valid")
 	})
 }

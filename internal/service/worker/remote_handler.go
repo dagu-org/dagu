@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -15,6 +16,9 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
+	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
+	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
+	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
@@ -163,6 +167,32 @@ func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root 
 	return statusPusher, logStreamer
 }
 
+// agentStores creates the agent config, model, and memory stores from the config paths.
+func (h *remoteTaskHandler) agentStores(ctx context.Context) (configStore iface.ConfigStore, modelStore iface.ModelStore, memoryStore iface.MemoryStore) {
+	acs, err := fileagentconfig.New(h.config.Paths.DataDir)
+	if err != nil {
+		logger.Warn(ctx, "Failed to create agent config store", tag.Error(err))
+		return nil, nil, nil
+	}
+	if acs == nil {
+		return nil, nil, nil
+	}
+
+	ams, err := fileagentmodel.New(filepath.Join(h.config.Paths.DataDir, "agent", "models"))
+	if err != nil {
+		logger.Warn(ctx, "Failed to create agent model store", tag.Error(err))
+		return acs, nil, nil
+	}
+
+	ms, err := filememory.New(h.config.Paths.DAGsDir)
+	if err != nil {
+		logger.Warn(ctx, "Failed to create agent memory store", tag.Error(err))
+		return acs, ams, nil
+	}
+
+	return acs, ams, ms
+}
+
 // loadDAG loads the DAG from task definition.
 // Returns the loaded DAG and a cleanup function that should be called after task execution.
 func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Task) (*core.DAG, func(), error) {
@@ -278,6 +308,9 @@ func (h *remoteTaskHandler) executeDAGRun(
 	// Configure logger to use the streaming writer
 	ctx = logger.WithLogger(ctx, logger.NewLogger(logger.WithWriter(logWriter)))
 
+	// Create agent stores for agent step execution
+	agentConfigStore, agentModelStore, agentMemoryStore := h.agentStores(ctx)
+
 	// Build agent options
 	opts := agent.Options{
 		ParentDAGRun:     parent,
@@ -291,6 +324,9 @@ func (h *remoteTaskHandler) executeDAGRun(
 		RootDAGRun:       root,
 		PeerConfig:       h.peerConfig,
 		DefaultExecMode:  h.config.DefaultExecMode,
+		AgentConfigStore: agentConfigStore,
+		AgentModelStore:  agentModelStore,
+		AgentMemoryStore: agentMemoryStore,
 	}
 
 	// Add retry configuration if present

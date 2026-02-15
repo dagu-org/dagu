@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	apigen "github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/runtime"
 	apiV1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
@@ -226,7 +226,7 @@ func TestUpdateAgentConfig_PersistsChanges(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.configStore.config = &agent.Config{
+		setup.configStore.config = &iface.Config{
 			Enabled:        true,
 			DefaultModelID: "model-1",
 		}

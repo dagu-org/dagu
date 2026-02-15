@@ -763,35 +763,27 @@ func (h *Handler) GetDAGRunStatus(ctx context.Context, req *coordinatorv1.GetDAG
 	var attempt exec.DAGRunAttempt
 	var err error
 
-	// First check the cache for open attempts. This is critical for shared-nothing mode
-	// where ReportStatus writes to a cached attempt object. The write is buffered, so
-	// we need to read from the same cached attempt to see the latest status.
-	// The cached attempt's ReadStatus method will flush the buffer before reading.
-	h.attemptsMu.RLock()
-	cachedAttempt, found := h.openAttempts[req.DagRunId]
-	h.attemptsMu.RUnlock()
-
-	if found {
-		attempt = cachedAttempt
+	// Always read the latest attempt from disk rather than using the openAttempts
+	// cache. In shared-storage mode, the worker creates a separate attempt on disk
+	// that the cache doesn't know about. Reading from disk via FindSubAttempt/
+	// FindAttempt calls LatestAttempt which returns the newest attempt.
+	// In shared-nothing mode, only the coordinator's attempt exists on disk and
+	// ReportStatus writes to it (synced), so reading from disk is also correct.
+	if req.RootDagRunName != "" && req.RootDagRunId != "" {
+		// Look up as a sub-DAG
+		rootRef := exec.DAGRunRef{Name: req.RootDagRunName, ID: req.RootDagRunId}
+		attempt, err = h.dagRunStore.FindSubAttempt(ctx, rootRef, req.DagRunId)
 	} else {
-		// Fall back to finding the attempt on disk
-		// Check if this is a sub-DAG query (root info provided)
-		if req.RootDagRunName != "" && req.RootDagRunId != "" {
-			// Look up as a sub-DAG
-			rootRef := exec.DAGRunRef{Name: req.RootDagRunName, ID: req.RootDagRunId}
-			attempt, err = h.dagRunStore.FindSubAttempt(ctx, rootRef, req.DagRunId)
-		} else {
-			// Look up as a top-level DAG run
-			ref := exec.DAGRunRef{Name: req.DagName, ID: req.DagRunId}
-			attempt, err = h.dagRunStore.FindAttempt(ctx, ref)
-		}
+		// Look up as a top-level DAG run
+		ref := exec.DAGRunRef{Name: req.DagName, ID: req.DagRunId}
+		attempt, err = h.dagRunStore.FindAttempt(ctx, ref)
+	}
 
-		if err != nil {
-			// Not found is not an error, just return found=false
-			return &coordinatorv1.GetDAGRunStatusResponse{
-				Found: false,
-			}, nil
-		}
+	if err != nil {
+		// Not found is not an error, just return found=false
+		return &coordinatorv1.GetDAGRunStatusResponse{
+			Found: false,
+		}, nil
 	}
 
 	runStatus, err := attempt.ReadStatus(ctx)

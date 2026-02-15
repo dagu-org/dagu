@@ -578,7 +578,7 @@ func buildType(_ BuildContext, d *dag) (string, error) {
 // Builder functions - all return values instead of modifying result
 
 func buildName(ctx BuildContext, d *dag) (string, error) {
-	if ctx.opts.Name != "" {
+	if ctx.opts.Name != "" && ctx.index == 0 {
 		return strings.TrimSpace(ctx.opts.Name), nil
 	}
 	if name := strings.TrimSpace(d.Name); name != "" {

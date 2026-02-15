@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
@@ -57,9 +57,9 @@ type API struct {
 	tunnelService      *tunnel.Service
 	defaultExecMode    config.ExecutionMode
 	dagWritesDisabled  bool // True when git sync read-only mode is active
-	agentConfigStore   agent.ConfigStore
-	agentModelStore    agent.ModelStore
-	agentMemoryStore   agent.MemoryStore
+	agentConfigStore   iface.ConfigStore
+	agentModelStore    iface.ModelStore
+	agentMemoryStore   iface.MemoryStore
 }
 
 // AuthService defines the interface for authentication operations.
@@ -127,21 +127,21 @@ func WithTunnelService(ts *tunnel.Service) APIOption {
 }
 
 // WithAgentConfigStore returns an APIOption that sets the API's agent config store.
-func WithAgentConfigStore(store agent.ConfigStore) APIOption {
+func WithAgentConfigStore(store iface.ConfigStore) APIOption {
 	return func(a *API) {
 		a.agentConfigStore = store
 	}
 }
 
 // WithAgentModelStore returns an APIOption that sets the API's agent model store.
-func WithAgentModelStore(store agent.ModelStore) APIOption {
+func WithAgentModelStore(store iface.ModelStore) APIOption {
 	return func(a *API) {
 		a.agentModelStore = store
 	}
 }
 
 // WithAgentMemoryStore returns an APIOption that sets the API's agent memory store.
-func WithAgentMemoryStore(store agent.MemoryStore) APIOption {
+func WithAgentMemoryStore(store iface.MemoryStore) APIOption {
 	return func(a *API) {
 		a.agentMemoryStore = store
 	}

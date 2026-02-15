@@ -148,6 +148,8 @@ func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRu
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
+	agentConfigStore, agentModelStore, agentMemoryStore := ctx.agentStores()
+
 	agentInstance := agent.New(
 		dagRunID,
 		dag,
@@ -156,12 +158,15 @@ func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRu
 		cli,
 		dr,
 		agent.Options{
-			Dry:             false,
-			DAGRunStore:     ctx.DAGRunStore,
-			ServiceRegistry: ctx.ServiceRegistry,
-			RootDAGRun:      exec.NewDAGRunRef(dag.Name, dagRunID),
-			PeerConfig:      ctx.Config.Core.Peer,
-			DefaultExecMode: ctx.Config.DefaultExecMode,
+			Dry:              false,
+			DAGRunStore:      ctx.DAGRunStore,
+			ServiceRegistry:  ctx.ServiceRegistry,
+			RootDAGRun:       exec.NewDAGRunRef(dag.Name, dagRunID),
+			PeerConfig:       ctx.Config.Core.Peer,
+			DefaultExecMode:  ctx.Config.DefaultExecMode,
+			AgentConfigStore: agentConfigStore,
+			AgentModelStore:  agentModelStore,
+			AgentMemoryStore: agentMemoryStore,
 		})
 
 	listenSignals(ctx, agentInstance)

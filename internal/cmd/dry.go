@@ -68,6 +68,8 @@ func runDry(ctx *Context, args []string) error {
 		return err
 	}
 
+	agentConfigStore, agentModelStore, agentMemoryStore := ctx.agentStores()
+
 	ag := agent.New(
 		dagRunID,
 		dag,
@@ -76,12 +78,15 @@ func runDry(ctx *Context, args []string) error {
 		ctx.DAGRunMgr,
 		dagStore,
 		agent.Options{
-			Dry:             true,
-			DAGRunStore:     ctx.DAGRunStore,
-			ServiceRegistry: ctx.ServiceRegistry,
-			RootDAGRun:      exec.NewDAGRunRef(dag.Name, dagRunID),
-			PeerConfig:      ctx.Config.Core.Peer,
-			DefaultExecMode: ctx.Config.DefaultExecMode,
+			Dry:              true,
+			DAGRunStore:      ctx.DAGRunStore,
+			ServiceRegistry:  ctx.ServiceRegistry,
+			RootDAGRun:       exec.NewDAGRunRef(dag.Name, dagRunID),
+			PeerConfig:       ctx.Config.Core.Peer,
+			DefaultExecMode:  ctx.Config.DefaultExecMode,
+			AgentConfigStore: agentConfigStore,
+			AgentModelStore:  agentModelStore,
+			AgentMemoryStore: agentMemoryStore,
 		},
 	)
 

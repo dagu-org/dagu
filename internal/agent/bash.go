@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/llm"
@@ -15,11 +14,7 @@ const (
 	defaultBashTimeout = 120 * time.Second
 	maxBashTimeout     = 10 * time.Minute
 	maxOutputLength    = 100000
-	approvalTimeout    = 5 * time.Minute
 )
-
-// dangerousPatterns contains command prefixes that require user approval.
-var dangerousPatterns = []string{"rm ", "chmod ", "dagu start"}
 
 // BashToolInput defines the input parameters for the bash tool.
 type BashToolInput struct {
@@ -59,35 +54,6 @@ func NewBashTool() *AgentTool {
 	}
 }
 
-// commandRequiresApproval checks if a command matches dangerous patterns.
-func commandRequiresApproval(cmd string) bool {
-	cmd = strings.TrimSpace(cmd)
-	for _, pattern := range dangerousPatterns {
-		if matchesDangerousPattern(cmd, pattern) {
-			return true
-		}
-	}
-	return false
-}
-
-// matchesDangerousPattern checks if a command contains a dangerous pattern
-// either at the start or after common shell operators.
-func matchesDangerousPattern(cmd, pattern string) bool {
-	return strings.HasPrefix(cmd, pattern) ||
-		strings.Contains(cmd, " "+pattern) ||
-		strings.Contains(cmd, "|"+pattern) ||
-		strings.Contains(cmd, "| "+pattern) ||
-		strings.Contains(cmd, ";"+pattern) ||
-		strings.Contains(cmd, "; "+pattern) ||
-		strings.Contains(cmd, "&&"+pattern) ||
-		strings.Contains(cmd, "&& "+pattern) ||
-		strings.Contains(cmd, "||"+pattern) ||
-		strings.Contains(cmd, "|| "+pattern) ||
-		strings.Contains(cmd, "\n"+pattern) ||
-		strings.Contains(cmd, "\r\n"+pattern) ||
-		strings.Contains(cmd, "\t"+pattern)
-}
-
 func bashRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
 	var args BashToolInput
 	if err := json.Unmarshal(input, &args); err != nil {
@@ -98,26 +64,6 @@ func bashRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
 	}
 	if toolCtx.Role.IsSet() && !toolCtx.Role.CanExecute() {
 		return toolError("Permission denied: bash requires execute permission")
-	}
-
-	// Legacy safe-mode approval is skipped when centralized policy already checked
-	// this command in a before-tool hook, to avoid duplicate prompts.
-	if toolCtx.SafeMode && !toolCtx.PolicyChecked && commandRequiresApproval(args.Command) {
-		approved, err := requestCommandApprovalWithOptions(
-			toolCtx.Context,
-			toolCtx.EmitUserPrompt,
-			toolCtx.WaitUserResponse,
-			args.Command,
-			toolCtx.WorkingDir,
-			"Approve command?",
-			true,
-		)
-		if err != nil {
-			return toolError("Approval failed: %v", err)
-		}
-		if !approved {
-			return ToolOut{Content: "Command rejected by user"}
-		}
 	}
 
 	return executeCommand(toolCtx, args)

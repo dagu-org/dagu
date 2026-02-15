@@ -629,6 +629,43 @@ steps:
 		assert.Equal(t, "archive.sh", archiveDAG.Steps[0].Commands[0].Command)
 	})
 
+	t.Run("WithNamePreservesSubDAGNames", func(t *testing.T) {
+		t.Parallel()
+
+		// Multi-document YAML with parent + inline sub-DAG
+		multiDAGContent := `steps:
+  - name: call-child
+    call: child-task
+
+---
+name: child-task
+steps:
+  - name: do-work
+    command: echo "child executed"
+`
+		tmpFile := createTempYAMLFile(t, multiDAGContent)
+
+		// Load with WithName — simulates what the worker does when
+		// receiving a task from the coordinator
+		dag, err := spec.Load(context.Background(), tmpFile,
+			spec.WithName("custom-parent-name"))
+		require.NoError(t, err)
+
+		// Main DAG should use the overridden name
+		assert.Equal(t, "custom-parent-name", dag.Name)
+
+		// Sub-DAG must keep its own name, not the overridden name
+		require.NotNil(t, dag.LocalDAGs)
+		assert.Len(t, dag.LocalDAGs, 1)
+
+		_, wrongKey := dag.LocalDAGs["custom-parent-name"]
+		assert.False(t, wrongKey, "sub-DAG should NOT be stored under the parent's overridden name")
+
+		childDAG, exists := dag.LocalDAGs["child-task"]
+		require.True(t, exists, "sub-DAG should be stored under its own name 'child-task'")
+		assert.Equal(t, "child-task", childDAG.Name)
+	})
+
 	t.Run("MultiDAGWithBaseConfig", func(t *testing.T) {
 		t.Parallel()
 

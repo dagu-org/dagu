@@ -305,29 +305,26 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		IPAddress: ipAddress,
 		Role:      role,
 		Audit:     tool.Audit,
+		SafeMode:  safeMode,
 		RequestCommandApproval: func(ctx context.Context, command, reason string) (bool, error) {
 			question := "Command blocked by policy. Approve command?"
 			if reason != "" {
 				question = "Command blocked by policy (" + reason + "). Approve command?"
 			}
-			return requestCommandApprovalWithOptions(
+			return requestCommandApproval(
 				ctx,
 				l.emitUserPrompt,
 				l.waitUserResponse,
 				command,
 				l.workingDir,
 				question,
-				false,
 			)
 		},
 	}
 
-	beforeHooksRegistered := l.hooks.HasBeforeToolExecHooks()
 	if err := l.hooks.RunBeforeToolExec(ctx, info); err != nil {
 		return toolError("Blocked by policy: %v", err)
 	}
-	// Only reached on successful hook execution.
-	policyChecked := beforeHooksRegistered
 
 	result := tool.Run(ToolContext{
 		Context:          ctx,
@@ -337,7 +334,6 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		WaitUserResponse: l.waitUserResponse,
 		SafeMode:         safeMode,
 		Role:             role,
-		PolicyChecked:    policyChecked,
 	}, input)
 
 	l.hooks.RunAfterToolExec(ctx, info, result)

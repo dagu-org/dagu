@@ -1,6 +1,27 @@
-package agent
+package iface
 
 import "context"
+
+// ConfigStore provides access to agent configuration.
+// All implementations must be safe for concurrent use.
+type ConfigStore interface {
+	// Load reads the agent configuration.
+	Load(ctx context.Context) (*Config, error)
+	// Save writes the agent configuration.
+	Save(ctx context.Context, cfg *Config) error
+	// IsEnabled returns whether the agent feature is enabled.
+	IsEnabled(ctx context.Context) bool
+}
+
+// ModelStore defines the interface for model configuration persistence.
+// All implementations must be safe for concurrent use.
+type ModelStore interface {
+	Create(ctx context.Context, model *ModelConfig) error
+	GetByID(ctx context.Context, id string) (*ModelConfig, error)
+	List(ctx context.Context) ([]*ModelConfig, error)
+	Update(ctx context.Context, model *ModelConfig) error
+	Delete(ctx context.Context, id string) error
+}
 
 // MemoryStore provides access to agent memory files.
 // All implementations must be safe for concurrent use.
@@ -28,12 +49,4 @@ type MemoryStore interface {
 
 	// DeleteDAGMemory removes a DAG-specific MEMORY.md file.
 	DeleteDAGMemory(ctx context.Context, dagName string) error
-}
-
-// MemoryContent holds loaded memory for system prompt injection.
-type MemoryContent struct {
-	GlobalMemory string // Contents of global MEMORY.md (truncated)
-	DAGMemory    string // Contents of per-DAG MEMORY.md (truncated)
-	DAGName      string // Name of the DAG (empty if no DAG context)
-	MemoryDir    string // Root memory directory path
 }

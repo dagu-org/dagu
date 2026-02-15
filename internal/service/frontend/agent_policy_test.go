@@ -6,20 +6,21 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type stubAgentConfigStore struct {
-	cfg     *agent.Config
+	cfg     *iface.Config
 	loadErr error
 }
 
-func (s *stubAgentConfigStore) Load(_ context.Context) (*agent.Config, error) {
+func (s *stubAgentConfigStore) Load(_ context.Context) (*iface.Config, error) {
 	return s.cfg, s.loadErr
 }
 
-func (s *stubAgentConfigStore) Save(_ context.Context, cfg *agent.Config) error {
+func (s *stubAgentConfigStore) Save(_ context.Context, cfg *iface.Config) error {
 	s.cfg = cfg
 	return nil
 }
@@ -40,7 +41,7 @@ func TestAgentPolicyHook(t *testing.T) {
 
 	t.Run("blocks disabled non-bash tool", func(t *testing.T) {
 		t.Parallel()
-		cfg := agent.DefaultConfig()
+		cfg := iface.DefaultConfig()
 		cfg.ToolPolicy.Tools["patch"] = false
 
 		hook := newAgentPolicyHook(&stubAgentConfigStore{cfg: cfg}, nil)
@@ -69,12 +70,12 @@ func TestAgentPolicyHook(t *testing.T) {
 
 	t.Run("allows bash when user approves denied command", func(t *testing.T) {
 		t.Parallel()
-		cfg := agent.DefaultConfig()
-		cfg.ToolPolicy.Bash.Rules = []agent.BashRule{
+		cfg := iface.DefaultConfig()
+		cfg.ToolPolicy.Bash.Rules = []iface.BashRule{
 			{
 				Name:    "deny_rm",
 				Pattern: "^rm\\s+",
-				Action:  agent.BashRuleActionDeny,
+				Action:  iface.BashRuleActionDeny,
 			},
 		}
 
@@ -82,6 +83,7 @@ func TestAgentPolicyHook(t *testing.T) {
 		err := hook(context.Background(), agent.ToolExecInfo{
 			ToolName: "bash",
 			Input:    json.RawMessage(`{"command":"rm -rf /tmp/x"}`),
+			SafeMode: true,
 			RequestCommandApproval: func(_ context.Context, _ string, _ string) (bool, error) {
 				return true, nil
 			},
@@ -91,12 +93,12 @@ func TestAgentPolicyHook(t *testing.T) {
 
 	t.Run("blocks bash when user rejects denied command", func(t *testing.T) {
 		t.Parallel()
-		cfg := agent.DefaultConfig()
-		cfg.ToolPolicy.Bash.Rules = []agent.BashRule{
+		cfg := iface.DefaultConfig()
+		cfg.ToolPolicy.Bash.Rules = []iface.BashRule{
 			{
 				Name:    "deny_rm",
 				Pattern: "^rm\\s+",
-				Action:  agent.BashRuleActionDeny,
+				Action:  iface.BashRuleActionDeny,
 			},
 		}
 
@@ -104,6 +106,7 @@ func TestAgentPolicyHook(t *testing.T) {
 		err := hook(context.Background(), agent.ToolExecInfo{
 			ToolName: "bash",
 			Input:    json.RawMessage(`{"command":"rm -rf /tmp/x"}`),
+			SafeMode: true,
 			RequestCommandApproval: func(_ context.Context, _ string, _ string) (bool, error) {
 				return false, nil
 			},
@@ -112,14 +115,34 @@ func TestAgentPolicyHook(t *testing.T) {
 		assert.Contains(t, err.Error(), "denied")
 	})
 
+	t.Run("allows denied command without prompt when safe mode is off", func(t *testing.T) {
+		t.Parallel()
+		cfg := iface.DefaultConfig()
+		cfg.ToolPolicy.Bash.Rules = []iface.BashRule{
+			{
+				Name:    "deny_rm",
+				Pattern: "^rm\\s+",
+				Action:  iface.BashRuleActionDeny,
+			},
+		}
+
+		hook := newAgentPolicyHook(&stubAgentConfigStore{cfg: cfg}, nil)
+		err := hook(context.Background(), agent.ToolExecInfo{
+			ToolName: "bash",
+			Input:    json.RawMessage(`{"command":"rm -rf /tmp/x"}`),
+			SafeMode: false,
+		})
+		require.NoError(t, err)
+	})
+
 	t.Run("allows bash matching allow rule", func(t *testing.T) {
 		t.Parallel()
-		cfg := agent.DefaultConfig()
-		cfg.ToolPolicy.Bash.Rules = []agent.BashRule{
+		cfg := iface.DefaultConfig()
+		cfg.ToolPolicy.Bash.Rules = []iface.BashRule{
 			{
 				Name:    "allow_git",
 				Pattern: "^git\\s+",
-				Action:  agent.BashRuleActionAllow,
+				Action:  iface.BashRuleActionAllow,
 			},
 		}
 
@@ -130,15 +153,15 @@ func TestAgentPolicyHook(t *testing.T) {
 
 	t.Run("blocks bash when deny behavior is block", func(t *testing.T) {
 		t.Parallel()
-		cfg := agent.DefaultConfig()
-		cfg.ToolPolicy.Bash.Rules = []agent.BashRule{
+		cfg := iface.DefaultConfig()
+		cfg.ToolPolicy.Bash.Rules = []iface.BashRule{
 			{
 				Name:    "deny_rm",
 				Pattern: "^rm\\s+",
-				Action:  agent.BashRuleActionDeny,
+				Action:  iface.BashRuleActionDeny,
 			},
 		}
-		cfg.ToolPolicy.Bash.DenyBehavior = agent.BashDenyBehaviorBlock
+		cfg.ToolPolicy.Bash.DenyBehavior = iface.BashDenyBehaviorBlock
 
 		hook := newAgentPolicyHook(&stubAgentConfigStore{cfg: cfg}, nil)
 		err := hook(context.Background(), makeInfo("bash", `{"command":"rm -rf /tmp/x"}`))

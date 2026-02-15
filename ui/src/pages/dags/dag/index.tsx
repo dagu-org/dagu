@@ -197,7 +197,6 @@ function DAGDetails() {
 
   // Determine which DAG-run to display - fallback to latest when specific run is loading
   const displayDAGRun = currentDAGRun || dagData?.latestDAGRun;
-  const isDataReady = dagData?.dag && displayDAGRun;
 
   return (
     <UnsavedChangesProvider>
@@ -215,10 +214,10 @@ function DAGDetails() {
           }}
         >
           <div className="max-w-7xl flex flex-col">
-            {isDataReady && (
+            {dagData?.dag && (
               <>
                 <DAGHeader
-                  dag={dagData.dag!}
+                  dag={dagData.dag}
                   currentDAGRun={displayDAGRun}
                   fileName={fileName}
                   refreshFn={refreshData}
@@ -227,7 +226,7 @@ function DAGDetails() {
                 />
                 <DAGDetailsContent
                   fileName={fileName}
-                  dag={dagData.dag!}
+                  dag={dagData.dag}
                   currentDAGRun={displayDAGRun}
                   refreshFn={refreshData}
                   formatDuration={formatDuration}

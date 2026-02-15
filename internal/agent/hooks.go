@@ -20,6 +20,9 @@ type ToolExecInfo struct {
 	IPAddress string
 	Role      auth.Role
 	Audit     *AuditInfo // from AgentTool.Audit; nil = not audited
+	// SafeMode indicates whether the session has safe mode enabled.
+	// Hooks can use this to decide whether to prompt for approval.
+	SafeMode bool
 	// RequestCommandApproval prompts the user to approve command execution.
 	// It can be nil when prompts are unavailable.
 	RequestCommandApproval RequestCommandApprovalFunc

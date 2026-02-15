@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/service/audit"
 )
 
@@ -17,7 +18,7 @@ const (
 )
 
 // newAgentPolicyHook returns a before-tool hook that enforces agent tool policy.
-func newAgentPolicyHook(configStore agent.ConfigStore, auditSvc *audit.Service) agent.BeforeToolExecHookFunc {
+func newAgentPolicyHook(configStore iface.ConfigStore, auditSvc *audit.Service) agent.BeforeToolExecHookFunc {
 	return func(ctx context.Context, info agent.ToolExecInfo) error {
 		if configStore == nil {
 			return fmt.Errorf("agent policy unavailable")
@@ -73,7 +74,13 @@ func newAgentPolicyHook(configStore agent.ConfigStore, auditSvc *audit.Service) 
 			"command_segment": truncatePolicyAuditText(decision.Segment),
 		}
 
-		if decision.DenyBehavior == agent.BashDenyBehaviorAskUser && info.RequestCommandApproval != nil {
+		// When safe mode is off and deny behavior is ask_user, allow without prompting.
+		// Hard blocks (denyBehavior: "block") still apply regardless of safe mode.
+		if decision.DenyBehavior == iface.BashDenyBehaviorAskUser && !info.SafeMode {
+			return nil
+		}
+
+		if decision.DenyBehavior == iface.BashDenyBehaviorAskUser && info.RequestCommandApproval != nil {
 			reason := strings.TrimSpace(strings.Join([]string{
 				decision.Reason,
 				decision.RuleName,

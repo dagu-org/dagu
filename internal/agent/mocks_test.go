@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
@@ -41,28 +42,28 @@ func (m *mockLLMProvider) Name() string {
 
 var _ llm.Provider = (*mockLLMProvider)(nil)
 
-// mockConfigStore implements ConfigStore for testing.
+// mockConfigStore implements iface.ConfigStore for testing.
 type mockConfigStore struct {
-	config  *Config
+	config  *iface.Config
 	enabled bool
 	err     error
 }
 
 func newMockConfigStore(enabled bool) *mockConfigStore {
 	return &mockConfigStore{
-		config:  DefaultConfig(),
+		config:  iface.DefaultConfig(),
 		enabled: enabled,
 	}
 }
 
-func (m *mockConfigStore) Load(_ context.Context) (*Config, error) {
+func (m *mockConfigStore) Load(_ context.Context) (*iface.Config, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
 	return m.config, nil
 }
 
-func (m *mockConfigStore) Save(_ context.Context, cfg *Config) error {
+func (m *mockConfigStore) Save(_ context.Context, cfg *iface.Config) error {
 	if m.err != nil {
 		return m.err
 	}
@@ -74,21 +75,21 @@ func (m *mockConfigStore) IsEnabled(_ context.Context) bool {
 	return m.enabled
 }
 
-var _ ConfigStore = (*mockConfigStore)(nil)
+var _ iface.ConfigStore = (*mockConfigStore)(nil)
 
-// mockModelStore implements ModelStore for testing.
+// mockModelStore implements iface.ModelStore for testing.
 type mockModelStore struct {
-	models map[string]*ModelConfig
+	models map[string]*iface.ModelConfig
 	err    error
 }
 
 func newMockModelStore() *mockModelStore {
 	return &mockModelStore{
-		models: make(map[string]*ModelConfig),
+		models: make(map[string]*iface.ModelConfig),
 	}
 }
 
-func (m *mockModelStore) Create(_ context.Context, model *ModelConfig) error {
+func (m *mockModelStore) Create(_ context.Context, model *iface.ModelConfig) error {
 	if m.err != nil {
 		return m.err
 	}
@@ -96,34 +97,34 @@ func (m *mockModelStore) Create(_ context.Context, model *ModelConfig) error {
 	return nil
 }
 
-func (m *mockModelStore) GetByID(_ context.Context, id string) (*ModelConfig, error) {
+func (m *mockModelStore) GetByID(_ context.Context, id string) (*iface.ModelConfig, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
 	model, ok := m.models[id]
 	if !ok {
-		return nil, ErrModelNotFound
+		return nil, iface.ErrModelNotFound
 	}
 	return model, nil
 }
 
-func (m *mockModelStore) List(_ context.Context) ([]*ModelConfig, error) {
+func (m *mockModelStore) List(_ context.Context) ([]*iface.ModelConfig, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
-	var result []*ModelConfig
+	var result []*iface.ModelConfig
 	for _, model := range m.models {
 		result = append(result, model)
 	}
 	return result, nil
 }
 
-func (m *mockModelStore) Update(_ context.Context, model *ModelConfig) error {
+func (m *mockModelStore) Update(_ context.Context, model *iface.ModelConfig) error {
 	if m.err != nil {
 		return m.err
 	}
 	if _, ok := m.models[model.ID]; !ok {
-		return ErrModelNotFound
+		return iface.ErrModelNotFound
 	}
 	m.models[model.ID] = model
 	return nil
@@ -134,7 +135,7 @@ func (m *mockModelStore) Delete(_ context.Context, id string) error {
 		return m.err
 	}
 	if _, ok := m.models[id]; !ok {
-		return ErrModelNotFound
+		return iface.ErrModelNotFound
 	}
 	delete(m.models, id)
 	return nil
@@ -142,12 +143,12 @@ func (m *mockModelStore) Delete(_ context.Context, id string) error {
 
 // addModel is a convenience method that adds a model to the store and returns the store
 // for chaining in test setup.
-func (m *mockModelStore) addModel(model *ModelConfig) *mockModelStore {
+func (m *mockModelStore) addModel(model *iface.ModelConfig) *mockModelStore {
 	m.models[model.ID] = model
 	return m
 }
 
-var _ ModelStore = (*mockModelStore)(nil)
+var _ iface.ModelStore = (*mockModelStore)(nil)
 
 // mockSessionStore implements SessionStore for testing.
 type mockSessionStore struct {
@@ -365,11 +366,11 @@ func simpleStopResponse(content string) *llm.ChatResponse {
 	return &llm.ChatResponse{Content: content, FinishReason: "stop"}
 }
 
-// testModelConfig creates a ModelConfig with sensible defaults for testing.
+// testModelConfig creates a iface.ModelConfig with sensible defaults for testing.
 // The ID, Name, Provider, Model, and APIKey are all pre-filled.
 // Override fields after calling if needed (e.g., pricing).
-func testModelConfig(id string) *ModelConfig {
-	return &ModelConfig{
+func testModelConfig(id string) *iface.ModelConfig {
+	return &iface.ModelConfig{
 		ID:       id,
 		Name:     "Test " + id,
 		Provider: "openai",
@@ -380,7 +381,7 @@ func testModelConfig(id string) *ModelConfig {
 
 // testAPIWithModels creates an API instance pre-configured with the given model configs
 // and mock providers already cached. Returns the API and model store for further customization.
-func testAPIWithModels(t *testing.T, models ...*ModelConfig) (*API, *mockModelStore) {
+func testAPIWithModels(t *testing.T, models ...*iface.ModelConfig) (*API, *mockModelStore) {
 	t.Helper()
 
 	configStore := newMockConfigStore(true)

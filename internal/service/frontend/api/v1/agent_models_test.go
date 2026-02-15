@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	apigen "github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -26,8 +26,8 @@ type agentTestSetup struct {
 func newAgentTestSetup(t *testing.T) *agentTestSetup {
 	t.Helper()
 
-	ms := &mockAgentModelStore{models: make(map[string]*agent.ModelConfig)}
-	cs := &mockAgentConfigStore{config: agent.DefaultConfig()}
+	ms := &mockAgentModelStore{models: make(map[string]*iface.ModelConfig)}
+	cs := &mockAgentConfigStore{config: iface.DefaultConfig()}
 
 	cfg := &config.Config{}
 	a := apiV1.New(
@@ -55,27 +55,27 @@ func adminCtx() context.Context {
 }
 
 type mockAgentModelStore struct {
-	models map[string]*agent.ModelConfig
+	models map[string]*iface.ModelConfig
 }
 
-func (m *mockAgentModelStore) Create(_ context.Context, model *agent.ModelConfig) error {
+func (m *mockAgentModelStore) Create(_ context.Context, model *iface.ModelConfig) error {
 	if _, exists := m.models[model.ID]; exists {
-		return agent.ErrModelAlreadyExists
+		return iface.ErrModelAlreadyExists
 	}
 	m.models[model.ID] = model
 	return nil
 }
 
-func (m *mockAgentModelStore) GetByID(_ context.Context, id string) (*agent.ModelConfig, error) {
+func (m *mockAgentModelStore) GetByID(_ context.Context, id string) (*iface.ModelConfig, error) {
 	model, ok := m.models[id]
 	if !ok {
-		return nil, agent.ErrModelNotFound
+		return nil, iface.ErrModelNotFound
 	}
 	return model, nil
 }
 
-func (m *mockAgentModelStore) List(_ context.Context) ([]*agent.ModelConfig, error) {
-	var result []*agent.ModelConfig
+func (m *mockAgentModelStore) List(_ context.Context) ([]*iface.ModelConfig, error) {
+	var result []*iface.ModelConfig
 	for _, model := range m.models {
 		result = append(result, model)
 	}
@@ -83,9 +83,9 @@ func (m *mockAgentModelStore) List(_ context.Context) ([]*agent.ModelConfig, err
 	return result, nil
 }
 
-func (m *mockAgentModelStore) Update(_ context.Context, model *agent.ModelConfig) error {
+func (m *mockAgentModelStore) Update(_ context.Context, model *iface.ModelConfig) error {
 	if _, ok := m.models[model.ID]; !ok {
-		return agent.ErrModelNotFound
+		return iface.ErrModelNotFound
 	}
 	m.models[model.ID] = model
 	return nil
@@ -93,23 +93,23 @@ func (m *mockAgentModelStore) Update(_ context.Context, model *agent.ModelConfig
 
 func (m *mockAgentModelStore) Delete(_ context.Context, id string) error {
 	if _, ok := m.models[id]; !ok {
-		return agent.ErrModelNotFound
+		return iface.ErrModelNotFound
 	}
 	delete(m.models, id)
 	return nil
 }
 
-var _ agent.ModelStore = (*mockAgentModelStore)(nil)
+var _ iface.ModelStore = (*mockAgentModelStore)(nil)
 
 type mockAgentConfigStore struct {
-	config *agent.Config
+	config *iface.Config
 }
 
-func (m *mockAgentConfigStore) Load(_ context.Context) (*agent.Config, error) {
+func (m *mockAgentConfigStore) Load(_ context.Context) (*iface.Config, error) {
 	return m.config, nil
 }
 
-func (m *mockAgentConfigStore) Save(_ context.Context, cfg *agent.Config) error {
+func (m *mockAgentConfigStore) Save(_ context.Context, cfg *iface.Config) error {
 	m.config = cfg
 	return nil
 }
@@ -118,7 +118,7 @@ func (m *mockAgentConfigStore) IsEnabled(_ context.Context) bool {
 	return m.config.Enabled
 }
 
-var _ agent.ConfigStore = (*mockAgentConfigStore)(nil)
+var _ iface.ConfigStore = (*mockAgentConfigStore)(nil)
 
 func TestListAgentModels(t *testing.T) {
 	t.Parallel()
@@ -127,10 +127,10 @@ func TestListAgentModels(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["model-1"] = &agent.ModelConfig{
+		setup.modelStore.models["model-1"] = &iface.ModelConfig{
 			ID: "model-1", Name: "Model 1", Provider: "openai", Model: "gpt-4",
 		}
-		setup.modelStore.models["model-2"] = &agent.ModelConfig{
+		setup.modelStore.models["model-2"] = &iface.ModelConfig{
 			ID: "model-2", Name: "Model 2", Provider: "anthropic", Model: "claude-sonnet-4-5",
 		}
 		setup.configStore.config.DefaultModelID = "model-1"
@@ -259,7 +259,7 @@ func TestCreateAgentModel(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["test-model"] = &agent.ModelConfig{
+		setup.modelStore.models["test-model"] = &iface.ModelConfig{
 			ID: "test-model", Name: "Existing", Provider: "openai", Model: "gpt-4",
 		}
 
@@ -311,7 +311,7 @@ func TestUpdateAgentModel(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["model-1"] = &agent.ModelConfig{
+		setup.modelStore.models["model-1"] = &iface.ModelConfig{
 			ID: "model-1", Name: "Original", Provider: "openai", Model: "gpt-4",
 		}
 
@@ -349,7 +349,7 @@ func TestUpdateAgentModel(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["model-1"] = &agent.ModelConfig{
+		setup.modelStore.models["model-1"] = &iface.ModelConfig{
 			ID: "model-1", Name: "Test", Provider: "openai", Model: "gpt-4",
 		}
 
@@ -371,7 +371,7 @@ func TestDeleteAgentModel(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["model-1"] = &agent.ModelConfig{
+		setup.modelStore.models["model-1"] = &iface.ModelConfig{
 			ID: "model-1", Name: "Delete Me", Provider: "openai", Model: "gpt-4",
 		}
 
@@ -402,10 +402,10 @@ func TestDeleteAgentModel(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["model-1"] = &agent.ModelConfig{
+		setup.modelStore.models["model-1"] = &iface.ModelConfig{
 			ID: "model-1", Name: "Default Model", Provider: "openai", Model: "gpt-4",
 		}
-		setup.modelStore.models["model-2"] = &agent.ModelConfig{
+		setup.modelStore.models["model-2"] = &iface.ModelConfig{
 			ID: "model-2", Name: "Backup Model", Provider: "openai", Model: "gpt-3.5",
 		}
 		setup.configStore.config.DefaultModelID = "model-1"
@@ -427,7 +427,7 @@ func TestSetDefaultAgentModel(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["model-1"] = &agent.ModelConfig{
+		setup.modelStore.models["model-1"] = &iface.ModelConfig{
 			ID: "model-1", Name: "Test", Provider: "openai", Model: "gpt-4",
 		}
 
@@ -489,7 +489,7 @@ func TestApplyModelUpdates(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["m1"] = &agent.ModelConfig{
+		setup.modelStore.models["m1"] = &iface.ModelConfig{
 			ID: "m1", Name: "Original", Provider: "openai", Model: "gpt-4",
 			APIKey: "key1", BaseURL: "http://example.com",
 		}
@@ -512,7 +512,7 @@ func TestApplyModelUpdates(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["m1"] = &agent.ModelConfig{
+		setup.modelStore.models["m1"] = &iface.ModelConfig{
 			ID: "m1", Name: "Original", Provider: "openai", Model: "gpt-4",
 		}
 
@@ -534,7 +534,7 @@ func TestApplyModelUpdates(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["m1"] = &agent.ModelConfig{
+		setup.modelStore.models["m1"] = &iface.ModelConfig{
 			ID: "m1", Name: "Test", Provider: "openai", Model: "gpt-4",
 		}
 
@@ -556,7 +556,7 @@ func TestApplyModelUpdates(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["m1"] = &agent.ModelConfig{
+		setup.modelStore.models["m1"] = &iface.ModelConfig{
 			ID: "m1", Name: "Original", Provider: "openai", Model: "gpt-4",
 		}
 
@@ -646,10 +646,10 @@ func TestResetDefaultIfNeeded(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["model-a"] = &agent.ModelConfig{
+		setup.modelStore.models["model-a"] = &iface.ModelConfig{
 			ID: "model-a", Name: "A", Provider: "openai", Model: "gpt-4",
 		}
-		setup.modelStore.models["model-b"] = &agent.ModelConfig{
+		setup.modelStore.models["model-b"] = &iface.ModelConfig{
 			ID: "model-b", Name: "B", Provider: "openai", Model: "gpt-3.5",
 		}
 		setup.configStore.config.DefaultModelID = "model-a"
@@ -666,7 +666,7 @@ func TestResetDefaultIfNeeded(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["only-model"] = &agent.ModelConfig{
+		setup.modelStore.models["only-model"] = &iface.ModelConfig{
 			ID: "only-model", Name: "Only", Provider: "openai", Model: "gpt-4",
 		}
 		setup.configStore.config.DefaultModelID = "only-model"
@@ -683,10 +683,10 @@ func TestResetDefaultIfNeeded(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["model-a"] = &agent.ModelConfig{
+		setup.modelStore.models["model-a"] = &iface.ModelConfig{
 			ID: "model-a", Name: "A", Provider: "openai", Model: "gpt-4",
 		}
-		setup.modelStore.models["model-b"] = &agent.ModelConfig{
+		setup.modelStore.models["model-b"] = &iface.ModelConfig{
 			ID: "model-b", Name: "B", Provider: "openai", Model: "gpt-3.5",
 		}
 		setup.configStore.config.DefaultModelID = "model-b"

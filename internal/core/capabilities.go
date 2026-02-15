@@ -24,6 +24,8 @@ type ExecutorCapabilities struct {
 	WorkerSelector bool
 	// LLM indicates whether the executor supports the llm field.
 	LLM bool
+	// Agent indicates whether the executor supports the agent field.
+	Agent bool
 	// GetEvalOptions returns eval options for command argument evaluation.
 	// If nil, default evaluation is used.
 	GetEvalOptions func(ctx context.Context, step Step) []eval.Option
@@ -96,6 +98,11 @@ func SupportsWorkerSelector(executorType string) bool {
 // SupportsLLM returns whether the executor type supports the llm field.
 func SupportsLLM(executorType string) bool {
 	return executorCapabilities.Get(executorType).LLM
+}
+
+// SupportsAgent returns whether the executor type supports the agent field.
+func SupportsAgent(executorType string) bool {
+	return executorCapabilities.Get(executorType).Agent
 }
 
 // EvalOptions returns eval options for this step's executor type.

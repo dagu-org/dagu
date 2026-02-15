@@ -3,6 +3,7 @@ package agent
 import (
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -60,7 +61,7 @@ func TestGetModelPresets_ReturnsCopy(t *testing.T) {
 		assert.Equal(t, len(first), len(second))
 
 		// Append to first should not affect second
-		first = append(first, ModelConfig{Name: "extra"})
+		first = append(first, iface.ModelConfig{Name: "extra"})
 		assert.NotEqual(t, len(first), len(second))
 	})
 }

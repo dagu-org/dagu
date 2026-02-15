@@ -6,6 +6,7 @@ import (
 	"io"
 	"maps"
 
+	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -27,6 +28,9 @@ type Context struct {
 	LogEncodingCharset string               // Character encoding for log files (e.g., "utf-8", "shift_jis", "euc-jp")
 	LogWriterFactory   LogWriterFactory     // For remote log streaming (nil = use local files)
 	DefaultExecMode    config.ExecutionMode // Server-level default execution mode (local or distributed)
+	AgentConfigStore   iface.ConfigStore
+	AgentModelStore    iface.ModelStore
+	AgentMemoryStore   iface.MemoryStore
 }
 
 // LogWriterFactory creates log writers for step stdout/stderr.
@@ -144,6 +148,9 @@ type contextOptions struct {
 	logEncodingCharset string
 	logWriterFactory   LogWriterFactory
 	defaultExecMode    config.ExecutionMode
+	agentConfigStore   iface.ConfigStore
+	agentModelStore    iface.ModelStore
+	agentMemoryStore   iface.MemoryStore
 }
 
 // ContextOption configures optional parameters for NewContext.
@@ -206,6 +213,27 @@ func WithDefaultExecMode(mode config.ExecutionMode) ContextOption {
 	}
 }
 
+// WithAgentConfigStore sets the agent configuration store.
+func WithAgentConfigStore(store iface.ConfigStore) ContextOption {
+	return func(o *contextOptions) {
+		o.agentConfigStore = store
+	}
+}
+
+// WithAgentModelStore sets the agent model store.
+func WithAgentModelStore(store iface.ModelStore) ContextOption {
+	return func(o *contextOptions) {
+		o.agentModelStore = store
+	}
+}
+
+// WithAgentMemoryStore sets the agent memory store.
+func WithAgentMemoryStore(store iface.MemoryStore) ContextOption {
+	return func(o *contextOptions) {
+		o.agentMemoryStore = store
+	}
+}
+
 // NewContext creates a new context with DAG execution metadata.
 // Required: ctx, dag, dagRunID, logFile
 // Optional: use ContextOption functions (WithDatabase, WithParams, etc.)
@@ -253,6 +281,9 @@ func NewContext(
 		LogEncodingCharset: options.logEncodingCharset,
 		LogWriterFactory:   options.logWriterFactory,
 		DefaultExecMode:    options.defaultExecMode,
+		AgentConfigStore:   options.agentConfigStore,
+		AgentModelStore:    options.agentModelStore,
+		AgentMemoryStore:   options.agentMemoryStore,
 	})
 }
 

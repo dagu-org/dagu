@@ -7,6 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/audit"
@@ -113,7 +114,7 @@ func (a *API) requireAgentConfigManagement() error {
 	return nil
 }
 
-func toAgentConfigResponse(cfg *agent.Config) api.AgentConfigResponse {
+func toAgentConfigResponse(cfg *iface.Config) api.AgentConfigResponse {
 	return api.AgentConfigResponse{
 		Enabled:        &cfg.Enabled,
 		DefaultModelId: ptrOf(cfg.DefaultModelID),
@@ -122,7 +123,7 @@ func toAgentConfigResponse(cfg *agent.Config) api.AgentConfigResponse {
 }
 
 // applyAgentConfigUpdates applies non-nil fields from the update request to the agent configuration.
-func applyAgentConfigUpdates(cfg *agent.Config, update *api.UpdateAgentConfigRequest) error {
+func applyAgentConfigUpdates(cfg *iface.Config, update *api.UpdateAgentConfigRequest) error {
 	if update.Enabled != nil {
 		cfg.Enabled = *update.Enabled
 	}
@@ -154,7 +155,7 @@ func buildAgentConfigChanges(update *api.UpdateAgentConfigRequest) map[string]an
 	return changes
 }
 
-func toAPIToolPolicy(policy agent.ToolPolicyConfig) *api.AgentToolPolicy {
+func toAPIToolPolicy(policy iface.ToolPolicyConfig) *api.AgentToolPolicy {
 	resolved := agent.ResolveToolPolicy(policy)
 	tools := make(map[string]bool, len(resolved.Tools))
 	maps.Copy(tools, resolved.Tools)
@@ -182,8 +183,8 @@ func toAPIToolPolicy(policy agent.ToolPolicyConfig) *api.AgentToolPolicy {
 	}
 }
 
-func toInternalToolPolicy(policy api.AgentToolPolicy) agent.ToolPolicyConfig {
-	out := agent.ToolPolicyConfig{
+func toInternalToolPolicy(policy api.AgentToolPolicy) iface.ToolPolicyConfig {
+	out := iface.ToolPolicyConfig{
 		Tools: map[string]bool{},
 	}
 
@@ -196,17 +197,17 @@ func toInternalToolPolicy(policy api.AgentToolPolicy) agent.ToolPolicyConfig {
 	}
 
 	if policy.Bash.DefaultBehavior != nil {
-		out.Bash.DefaultBehavior = agent.BashDefaultBehavior(*policy.Bash.DefaultBehavior)
+		out.Bash.DefaultBehavior = iface.BashDefaultBehavior(*policy.Bash.DefaultBehavior)
 	}
 	if policy.Bash.DenyBehavior != nil {
-		out.Bash.DenyBehavior = agent.BashDenyBehavior(*policy.Bash.DenyBehavior)
+		out.Bash.DenyBehavior = iface.BashDenyBehavior(*policy.Bash.DenyBehavior)
 	}
 	if policy.Bash.Rules != nil {
-		out.Bash.Rules = make([]agent.BashRule, 0, len(*policy.Bash.Rules))
+		out.Bash.Rules = make([]iface.BashRule, 0, len(*policy.Bash.Rules))
 		for _, rule := range *policy.Bash.Rules {
-			r := agent.BashRule{
+			r := iface.BashRule{
 				Pattern: rule.Pattern,
-				Action:  agent.BashRuleAction(rule.Action),
+				Action:  iface.BashRuleAction(rule.Action),
 			}
 			if rule.Name != nil {
 				r.Name = *rule.Name

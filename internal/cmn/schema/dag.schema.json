@@ -1213,14 +1213,18 @@
         },
         "llm": {
           "$ref": "#/definitions/llmConfig",
-          "description": "LLM configuration for AI-powered steps. Required when type is 'chat' (or future type: agent)."
+          "description": "LLM configuration for AI-powered steps. Required when type is 'chat'. Not used by 'agent' type (agent resolves models from Agent Settings)."
+        },
+        "agent": {
+          "$ref": "#/definitions/agentStepConfig",
+          "description": "Agent configuration for AI agent steps. Only valid when type is 'agent'. Controls model, tools, safety, and iteration limits."
         },
         "messages": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/llmMessage"
           },
-          "description": "Session messages for chat steps. Only valid when type is 'chat'. Supports variable substitution with ${VAR}."
+          "description": "Session messages for chat and agent steps. Only valid when type is 'chat' or 'agent'. Supports variable substitution with ${VAR}."
         },
         "tools": {
           "type": "array",
@@ -3024,6 +3028,109 @@
       },
       "description": "A single message in an LLM session."
     },
+    "agentStepConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "type": "string",
+          "description": "Override the global default model for this step. Must match a model ID configured in Agent Settings."
+        },
+        "tools": {
+          "$ref": "#/definitions/agentToolsConfig"
+        },
+        "memory": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Whether to load global and per-DAG memory into agent context."
+            }
+          },
+          "description": "Memory configuration for the agent step."
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Additional instructions appended to the built-in system prompt."
+        },
+        "max_iterations": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 50,
+          "description": "Maximum number of tool call rounds before stopping. Default: 50."
+        },
+        "safe_mode": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable command approval via HITL for bash commands. Default: true."
+        }
+      },
+      "description": "Configuration for agent-type steps. Controls model selection, available tools, safety policies, and iteration limits."
+    },
+    "agentToolsConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["bash", "read", "patch", "think", "read_schema", "web_search", "output"]
+          },
+          "description": "List of tools to enable. When omitted, all tools are available."
+        },
+        "bash_policy": {
+          "$ref": "#/definitions/agentBashPolicy"
+        }
+      },
+      "description": "Configuration for which tools are available to the agent."
+    },
+    "agentBashPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default_behavior": {
+          "type": "string",
+          "enum": ["allow", "deny"],
+          "description": "Default action when no rule matches."
+        },
+        "deny_behavior": {
+          "type": "string",
+          "enum": ["block", "hitl"],
+          "description": "What happens when a command is denied: 'block' rejects it, 'hitl' asks for approval."
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/agentBashRule"
+          },
+          "description": "Ordered list of pattern-matching rules evaluated top-to-bottom."
+        }
+      },
+      "description": "Security policy for bash commands executed by the agent."
+    },
+    "agentBashRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pattern", "action"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable name for this rule."
+        },
+        "pattern": {
+          "type": "string",
+          "description": "Regex pattern to match against commands."
+        },
+        "action": {
+          "type": "string",
+          "enum": ["allow", "deny"],
+          "description": "Action to take when the pattern matches."
+        }
+      },
+      "description": "A single bash command policy rule."
+    },
     "executorType": {
       "type": "string",
       "enum": [
@@ -3048,7 +3155,8 @@
         "postgres",
         "sqlite",
         "redis",
-        "router"
+        "router",
+        "agent"
       ],
       "description": "Type of executor to use for this step."
     },
