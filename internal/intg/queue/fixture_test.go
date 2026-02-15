@@ -50,6 +50,9 @@ func newFixture(t *testing.T, dagYAML string, opts ...func(*fixture)) *fixture {
 			if len(f.globalQueues) > 0 {
 				c.Queues.Config = f.globalQueues
 			}
+			// Disable scheduler health server (port 8090) to avoid "address already in use"
+			// when multiple tests run in parallel
+			c.Scheduler.Port = 0
 		}),
 	}
 	f.th = test.SetupCommand(t, helperOpts...)

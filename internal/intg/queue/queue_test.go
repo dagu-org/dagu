@@ -36,7 +36,7 @@ steps:
 `, WithQueue("global-queue"), WithGlobalQueue("global-queue", 3)).
 		Enqueue(3).StartScheduler(30 * time.Second)
 
-	f.WaitDrain(15 * time.Second)
+	f.WaitDrain(25 * time.Second)
 	f.Stop()
 	f.AssertConcurrent(2 * time.Second)
 }

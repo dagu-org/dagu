@@ -746,7 +746,8 @@ func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 }
 
 func (l *ConfigLoader) setSchedulerDefaults(cfg *Config) {
-	if cfg.Scheduler.Port <= 0 {
+	// Only default port when not explicitly set (0 = disable health server)
+	if !l.v.IsSet("scheduler.port") && cfg.Scheduler.Port <= 0 {
 		cfg.Scheduler.Port = 8090
 	}
 	if cfg.Scheduler.LockStaleThreshold <= 0 {

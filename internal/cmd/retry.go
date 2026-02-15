@@ -77,9 +77,12 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("cannot retry DAG %q with workerSelector via CLI; use 'dagu enqueue' for distributed execution", dag.Name)
 	}
 
-	// For DAGs using a global queue, enqueue the retry so it respects queue capacity.
+	// For DAGs using a global queue: when invoked by the user, enqueue the retry
+	// so it respects queue capacity. When status is already Queued, we're being
+	// invoked by the queue processor to run the item—execute directly.
 	// Step retry is not supported via queue (queue processor does not pass step name).
-	if stepName == "" && ctx.Config.FindQueueConfig(dag.ProcGroup()) != nil {
+	queueConfig := ctx.Config.FindQueueConfig(dag.ProcGroup())
+	if stepName == "" && queueConfig != nil && status.Status != core.Queued {
 		return enqueueRetry(ctx, attempt, dag, status, dagRunID)
 	}
 
