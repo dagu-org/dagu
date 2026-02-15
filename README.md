@@ -17,6 +17,8 @@
   </p>
 </div>
 
+> **Note:** Boltbase is actively in development and not yet released. v1 remains Dagu.
+
 ## What is Boltbase?
 
 **(Formerly known as Dagu)** **Boltbase is a self-contained, lightweight workflow engine for enterprise and small teams.** Define workflows in simple YAML, execute them anywhere with a single binary, compose complex pipelines from reusable sub-workflows, and distribute tasks across workers. All without requiring databases, message brokers, or code changes to your existing scripts.
