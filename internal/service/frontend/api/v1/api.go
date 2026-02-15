@@ -18,6 +18,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core/baseconfig"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/audit"
@@ -60,6 +61,7 @@ type API struct {
 	agentConfigStore   agent.ConfigStore
 	agentModelStore    agent.ModelStore
 	agentMemoryStore   agent.MemoryStore
+	baseConfigStore    baseconfig.Store
 }
 
 // AuthService defines the interface for authentication operations.
@@ -123,6 +125,13 @@ func WithSyncService(ss SyncService) APIOption {
 func WithTunnelService(ts *tunnel.Service) APIOption {
 	return func(a *API) {
 		a.tunnelService = ts
+	}
+}
+
+// WithBaseConfigStore returns an APIOption that sets the API's base config store.
+func WithBaseConfigStore(store baseconfig.Store) APIOption {
+	return func(a *API) {
+		a.baseConfigStore = store
 	}
 }
 

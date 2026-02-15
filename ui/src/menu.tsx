@@ -21,6 +21,7 @@ import {
   BarChart2,
   Bot,
   Brain,
+  FileCog,
   GitBranch,
   Globe,
   History,
@@ -366,6 +367,16 @@ export const mainListItems = React.forwardRef<
                 to="/system-status"
                 text="System Status"
                 icon={<Activity size={18} />}
+                isOpen={isOpen}
+                onClick={onNavItemClick}
+                customColor={customColor}
+              />
+            )}
+            {canWrite && (
+              <NavItem
+                to="/base-config"
+                text="Base Config"
+                icon={<FileCog size={18} />}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
                 customColor={customColor}
