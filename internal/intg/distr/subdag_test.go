@@ -160,3 +160,41 @@ steps:
 		require.Equal(t, core.Succeeded, status.Status)
 	})
 }
+
+func TestSubDAG_ParentWithInlineChildOnWorker(t *testing.T) {
+	t.Run("parentDispatchedToWorkerWithInlineSubDAG", func(t *testing.T) {
+		// The parent DAG has a worker_selector so the entire multi-document
+		// YAML is sent to the worker. The worker loads it with
+		// WithName(task.Target), which previously overrode ALL document
+		// names (including inline sub-DAGs), causing LocalDAGs lookup to
+		// fail with "file does not exist".
+		//
+		// The inline child also has a worker_selector so it dispatches
+		// through the coordinator (shared-nothing workers don't have a
+		// local DAGRunStore for subprocess-based sub-DAG execution).
+		f := newTestFixture(t, `
+worker_selector:
+  test: "true"
+steps:
+  - name: call-child
+    call: inline-child
+---
+name: inline-child
+worker_selector:
+  test: "true"
+steps:
+  - name: task
+    command: echo "inline child executed"
+`)
+		defer f.cleanup()
+
+		require.NoError(t, f.enqueue())
+		f.waitForQueued()
+		f.startScheduler(30 * time.Second)
+
+		status := f.waitForStatus(core.Succeeded, 25*time.Second)
+
+		require.Equal(t, core.Succeeded, status.Status)
+		f.assertAllNodesSucceeded(status)
+	})
+}
