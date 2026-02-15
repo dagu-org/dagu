@@ -37,6 +37,7 @@ import (
 	"github.com/dagu-org/dagu/internal/gitsync"
 	_ "github.com/dagu-org/dagu/internal/llm/allproviders" // Register LLM providers
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
+	"github.com/dagu-org/dagu/internal/persis/filebaseconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
@@ -129,6 +130,15 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	syncSvc := initSyncService(ctx, cfg)
 	if syncSvc != nil {
 		apiOpts = append(apiOpts, apiv1.WithSyncService(syncSvc))
+	}
+
+	if cfg.Paths.BaseConfig != "" {
+		baseConfigStore, bcErr := filebaseconfig.New(cfg.Paths.BaseConfig)
+		if bcErr != nil {
+			logger.Warn(ctx, "Failed to create base config store", tag.Error(bcErr))
+		} else {
+			apiOpts = append(apiOpts, apiv1.WithBaseConfigStore(baseConfigStore))
+		}
 	}
 
 	agentConfigStore, err := fileagentconfig.New(cfg.Paths.DataDir)

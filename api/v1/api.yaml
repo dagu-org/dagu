@@ -3555,6 +3555,113 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /settings/base-config:
+    get:
+      summary: "Get base configuration"
+      description: "Returns the base DAG configuration YAML. Requires developer role or above."
+      operationId: "getBaseConfig"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Base configuration"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  spec:
+                    type: string
+                    description: "The base configuration in YAML format"
+                  errors:
+                    type: array
+                    items:
+                      type: string
+                    description: "List of validation errors in the configuration"
+                required:
+                  - spec
+                  - errors
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires developer role or above"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      summary: "Update base configuration"
+      description: "Updates the base DAG configuration YAML. Validates before saving. Requires developer role or above."
+      operationId: "updateBaseConfig"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                spec:
+                  type: string
+                  description: "The base configuration in YAML format"
+              required:
+                - spec
+      responses:
+        "200":
+          description: "Base configuration updated successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    items:
+                      type: string
+                    description: "List of validation warnings"
+                required:
+                  - errors
+        "400":
+          description: "Invalid configuration"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires developer role or above"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /settings/agent:
     get:
       summary: "Get agent configuration"
