@@ -1405,12 +1405,12 @@ func TestCommandExecutor_ScriptCleanup(t *testing.T) {
 	err = exec.Run(ctx)
 	require.NoError(t, err)
 
-	// Check that no dagu_script-* files remain in tmpDir
+	// Check that no boltbase_script-* files remain in tmpDir
 	entries, err := os.ReadDir(tmpDir)
 	require.NoError(t, err)
 
 	for _, entry := range entries {
-		assert.False(t, strings.HasPrefix(entry.Name(), "dagu_script-"),
+		assert.False(t, strings.HasPrefix(entry.Name(), "boltbase_script-"),
 			"temporary script file should be cleaned up: %s", entry.Name())
 	}
 }

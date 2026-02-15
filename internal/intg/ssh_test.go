@@ -156,7 +156,7 @@ steps:
 		th := test.Setup(t)
 
 		// Test multi-line script execution
-		// Note: Avoid shell variables with ${} as dagu expands them before sending to SSH
+		// Note: Avoid shell variables with ${} as boltbase expands them before sending to SSH
 		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: script-test
@@ -491,7 +491,7 @@ steps:
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunSuccess(t)
 		dag.AssertLatestStatus(t, core.Succeeded)
-		// GREETING is DAG-scoped → expanded by Dagu to "hello"
+		// GREETING is DAG-scoped → expanded by Boltbase to "hello"
 		// $USER is OS-only → left for the remote shell → resolves to sshTestUser
 		dag.AssertOutputs(t, map[string]any{
 			"MIXED_OUT": fmt.Sprintf("hello from %s", sshTestUser),
@@ -560,7 +560,7 @@ func startSSHServer(t *testing.T, th test.Helper, dockerClient *client.Client) *
 	require.NoError(t, err, "failed to read public key")
 
 	// Create container config
-	containerName := fmt.Sprintf("dagu-ssh-test-%d", time.Now().UnixNano())
+	containerName := fmt.Sprintf("boltbase-ssh-test-%d", time.Now().UnixNano())
 
 	// Setup script to configure SSH server
 	// Uses shell variables to reduce repetition
@@ -722,7 +722,7 @@ func trySSHConnection(t *testing.T, addr string, config *ssh.ClientConfig) bool 
 	}
 	defer func() { _ = session.Close() }()
 
-	session.Stdin = strings.NewReader("__dagu_exec(){\nset -e\necho test\n}\n__dagu_exec\n")
+	session.Stdin = strings.NewReader("__boltbase_exec(){\nset -e\necho test\n}\n__boltbase_exec\n")
 
 	var stdout, stderr strings.Builder
 	session.Stdout = &stdout

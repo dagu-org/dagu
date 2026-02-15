@@ -10,7 +10,7 @@ import type { paths } from '../api/v1/schema';
 
 const authMiddleware: Middleware = {
   async onRequest({ request }) {
-    const token = localStorage.getItem('dagu_auth_token');
+    const token = localStorage.getItem('boltbase_auth_token');
     if (token) {
       request.headers.set('Authorization', `Bearer ${token}`);
     }

@@ -241,7 +241,7 @@ export default function TerminalPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">
-          Terminal is not enabled. Set DAGU_TERMINAL_ENABLED=true to enable.
+          Terminal is not enabled. Set BOLTBASE_TERMINAL_ENABLED=true to enable.
         </p>
       </div>
     );

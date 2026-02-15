@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "description": "Schema for Dagu configuration file (base.yaml). Configures server settings, authentication, paths, UI, services, and features.",
+  "description": "Schema for Boltbase configuration file (base.yaml). Configures server settings, authentication, paths, UI, services, and features.",
   "additionalProperties": false,
   "properties": {
     "host": {
@@ -16,7 +16,7 @@
     },
     "base_path": {
       "type": "string",
-      "description": "Base path for the web UI (e.g., '/dagu')."
+      "description": "Base path for the web UI (e.g., '/boltbase')."
     },
     "api_base_path": {
       "type": "string",
@@ -74,7 +74,7 @@
     },
     "executable": {
       "type": "string",
-      "description": "Path to the dagu executable."
+      "description": "Path to the boltbase executable."
     },
     "log_dir": {
       "type": "string",
@@ -309,7 +309,7 @@
     },
     "OIDCRoleMappingDef": {
       "type": "object",
-      "description": "Maps OIDC claims to Dagu roles.",
+      "description": "Maps OIDC claims to Boltbase roles.",
       "additionalProperties": false,
       "properties": {
         "default_role": {
@@ -322,7 +322,7 @@
         },
         "group_mappings": {
           "type": "object",
-          "description": "Mapping of IdP group names to Dagu role names.",
+          "description": "Mapping of IdP group names to Boltbase role names.",
           "additionalProperties": {
             "type": "string"
           }
@@ -410,7 +410,7 @@
         },
         "executable": {
           "type": "string",
-          "description": "Path to the dagu executable."
+          "description": "Path to the boltbase executable."
         },
         "log_dir": {
           "type": "string",
@@ -871,11 +871,11 @@
       "properties": {
         "author_name": {
           "type": "string",
-          "description": "Commit author name. Default: 'Dagu'."
+          "description": "Commit author name. Default: 'Boltbase'."
         },
         "author_email": {
           "type": "string",
-          "description": "Commit author email. Default: 'dagu@localhost'."
+          "description": "Commit author email. Default: 'boltbase@localhost'."
         }
       }
     },
@@ -918,7 +918,7 @@
         },
         "hostname": {
           "type": "string",
-          "description": "Tailscale hostname. Default: 'dagu'."
+          "description": "Tailscale hostname. Default: 'boltbase'."
         },
         "funnel": {
           "type": "boolean",
@@ -930,7 +930,7 @@
         },
         "state_dir": {
           "type": "string",
-          "description": "Tailscale state directory. Default: '$DAGU_HOME/tailscale'."
+          "description": "Tailscale state directory. Default: '$BOLTBASE_HOME/tailscale'."
         }
       }
     },

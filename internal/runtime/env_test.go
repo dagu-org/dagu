@@ -239,7 +239,7 @@ func TestNewEnvForStep_WorkingDirectory(t *testing.T) {
 	// Create testdir in home for tilde tests
 	homeDir, err := os.UserHomeDir()
 	require.NoError(t, err)
-	homeTempDir := filepath.Join(homeDir, "dagu_test_workdir")
+	homeTempDir := filepath.Join(homeDir, "boltbase_test_workdir")
 	require.NoError(t, os.MkdirAll(homeTempDir, 0755))
 	t.Cleanup(func() { _ = os.RemoveAll(homeTempDir) })
 
@@ -280,7 +280,7 @@ func TestNewEnvForStep_WorkingDirectory(t *testing.T) {
 			name: "StepWithHomeDirectoryNotation",
 			step: core.Step{
 				Name: "test-step",
-				Dir:  "~/dagu_test_workdir",
+				Dir:  "~/boltbase_test_workdir",
 			},
 			dagWorkDir:  tempDir,
 			expectedDir: homeTempDir,
@@ -310,9 +310,9 @@ func TestNewEnvForStep_WorkingDirectory(t *testing.T) {
 				Name: "test-step",
 				Dir: func() string {
 					if goruntime.GOOS == "windows" {
-						return "$USERPROFILE\\dagu_test_workdir"
+						return "$USERPROFILE\\boltbase_test_workdir"
 					}
-					return "$HOME/dagu_test_workdir"
+					return "$HOME/boltbase_test_workdir"
 				}(),
 			},
 			dagWorkDir:  tempDir,
@@ -342,7 +342,7 @@ func TestNewEnvForStep_WorkingDirectory(t *testing.T) {
 				Name: "test-step",
 				Dir:  "", // Empty - should inherit DAG WorkingDir
 			},
-			dagWorkDir:  "~/dagu_test_workdir",
+			dagWorkDir:  "~/boltbase_test_workdir",
 			expectedDir: homeTempDir,
 		},
 		{
@@ -353,9 +353,9 @@ func TestNewEnvForStep_WorkingDirectory(t *testing.T) {
 			},
 			dagWorkDir: func() string {
 				if goruntime.GOOS == "windows" {
-					return "$USERPROFILE\\dagu_test_workdir"
+					return "$USERPROFILE\\boltbase_test_workdir"
 				}
-				return "$HOME/dagu_test_workdir"
+				return "$HOME/boltbase_test_workdir"
 			}(),
 			expectedDir: homeTempDir,
 		},

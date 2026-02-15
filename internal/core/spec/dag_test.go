@@ -463,10 +463,10 @@ func TestBuildSkipIfSuccessful(t *testing.T) {
 func TestBuildLogDir(t *testing.T) {
 	t.Parallel()
 
-	d := &dag{LogDir: "/var/log/dagu"}
+	d := &dag{LogDir: "/var/log/boltbase"}
 	result, err := buildLogDir(testBuildContext(), d)
 	require.NoError(t, err)
-	assert.Equal(t, "/var/log/dagu", result)
+	assert.Equal(t, "/var/log/boltbase", result)
 }
 
 func TestBuildMailOn(t *testing.T) {
@@ -1687,7 +1687,7 @@ func TestBuildOTel(t *testing.T) {
 				"insecure": true,
 				"timeout":  "30s",
 				"resource": map[string]any{
-					"service.name":    "dagu-test",
+					"service.name":    "boltbase-test",
 					"service.version": "1.0.0",
 				},
 			},
@@ -1700,7 +1700,7 @@ func TestBuildOTel(t *testing.T) {
 				Insecure: true,
 				Timeout:  30 * time.Second,
 				Resource: map[string]any{
-					"service.name":    "dagu-test",
+					"service.name":    "boltbase-test",
 					"service.version": "1.0.0",
 				},
 			},

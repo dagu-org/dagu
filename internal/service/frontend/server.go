@@ -304,7 +304,7 @@ func initBuiltinAuthService(cfg *config.Config, collector *telemetry.Collector) 
 	ctx := context.Background()
 
 	if cfg.Server.Auth.Builtin.Token.Secret == "" {
-		return nil, fmt.Errorf("builtin auth requires a non-empty token secret (set DAGU_AUTH_TOKEN_SECRET or server.auth.builtin.token.secret)")
+		return nil, fmt.Errorf("builtin auth requires a non-empty token secret (set BOLTBASE_AUTH_TOKEN_SECRET or server.auth.builtin.token.secret)")
 	}
 
 	userStore, err := fileuser.New(cfg.Paths.UsersDir)
@@ -797,11 +797,11 @@ func (srv *Server) buildAgentAuthOptions() auth.Options {
 
 	// When auth mode is "none", disable all authentication entirely.
 	if authCfg.Mode == config.AuthModeNone {
-		return auth.Options{Realm: "Dagu Agent"}
+		return auth.Options{Realm: "Boltbase Agent"}
 	}
 
 	opts := auth.Options{
-		Realm:        "Dagu Agent",
+		Realm:        "Boltbase Agent",
 		AuthRequired: true,
 	}
 

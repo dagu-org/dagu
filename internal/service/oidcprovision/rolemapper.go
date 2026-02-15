@@ -13,7 +13,7 @@ import (
 type RoleMapperConfig struct {
 	// GroupsClaim specifies the claim name containing groups (default: "groups")
 	GroupsClaim string
-	// GroupMappings maps IdP group names to Dagu roles
+	// GroupMappings maps IdP group names to Boltbase roles
 	GroupMappings map[string]string
 	// RoleAttributePath is a jq expression to extract role from claims
 	RoleAttributePath string
@@ -25,7 +25,7 @@ type RoleMapperConfig struct {
 	DefaultRole auth.Role
 }
 
-// RoleMapper maps OIDC claims to Dagu roles.
+// RoleMapper maps OIDC claims to Boltbase roles.
 type RoleMapper struct {
 	config  RoleMapperConfig
 	jqQuery *gojq.Code // Pre-compiled jq query for performance
@@ -54,7 +54,7 @@ func NewRoleMapper(config RoleMapperConfig) (*RoleMapper, error) {
 	return rm, nil
 }
 
-// MapRole determines the Dagu role from OIDC claims.
+// MapRole determines the Boltbase role from OIDC claims.
 // Evaluation order:
 //  1. RoleAttributePath (jq expression) if configured
 //  2. GroupMappings if configured

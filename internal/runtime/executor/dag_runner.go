@@ -624,9 +624,9 @@ func (e *SubDAGExecutor) Kill(sig os.Signal) error {
 	return errors.Join(errs...)
 }
 
-// executablePath returns the path to the dagu executable.
+// executablePath returns the path to the Boltbase executable.
 func executablePath() (string, error) {
-	if path := os.Getenv("DAGU_EXECUTABLE"); path != "" {
+	if path := os.Getenv("BOLTBASE_EXECUTABLE"); path != "" {
 		return path, nil
 	}
 	executable, err := os.Executable()

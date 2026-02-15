@@ -634,7 +634,7 @@ func TestWatcherFetchDurationMetrics(t *testing.T) {
 
 	found := false
 	for _, mf := range mfs {
-		if mf.GetName() == "dagu_sse_fetch_duration_seconds" {
+		if mf.GetName() == "boltbase_sse_fetch_duration_seconds" {
 			found = true
 			// Should have at least one metric
 			assert.NotEmpty(t, mf.GetMetric())

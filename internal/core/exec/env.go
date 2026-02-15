@@ -1,6 +1,6 @@
 package exec
 
-// Environment variable keys that are automatically set by Dagu during execution.
+// Environment variable keys that are automatically set by Boltbase during execution.
 const (
 	// EnvKeyDAGName holds the name of the currently executing DAG.
 	EnvKeyDAGName = "DAG_NAME"
@@ -25,5 +25,5 @@ const (
 
 	// EnvKeyDAGParamsJSON exposes the resolved parameters encoded as JSON.
 	// When params were provided as JSON, the original payload is preserved.
-	EnvKeyDAGParamsJSON = "DAGU_PARAMS_JSON"
+	EnvKeyDAGParamsJSON = "BOLTBASE_PARAMS_JSON"
 )

@@ -30,7 +30,7 @@ func TestSchedulerCommand(t *testing.T) {
 
 		th.RunCommand(t, cmd.Scheduler(), test.CmdTest{
 			Args:        []string{"scheduler", "--config", test.TestdataPath(t, "cli/config_test.yaml")},
-			ExpectedOut: []string{"dagu_test"},
+			ExpectedOut: []string{"boltbase_test"},
 		})
 	})
 }

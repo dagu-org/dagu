@@ -27,23 +27,23 @@ func Upgrade() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "upgrade [flags]",
-			Short: "Upgrade dagu to the latest version",
-			Long: `Upgrade the dagu binary to the latest version or a specified version.
+			Short: "Upgrade boltbase to the latest version",
+			Long: `Upgrade the boltbase binary to the latest version or a specified version.
 
 This command downloads the latest (or specified) release from GitHub, verifies
 the checksum, and replaces the current binary.
 
 Examples:
-  dagu upgrade                    # Upgrade to latest version
-  dagu upgrade --check            # Check if an update is available
-  dagu upgrade --version v1.30.0  # Upgrade to specific version
-  dagu upgrade --dry-run          # Show what would happen
-  dagu upgrade --backup           # Create backup before upgrade
-  dagu upgrade -y                 # Skip confirmation prompt
-  dagu upgrade -f                 # Allow downgrade to older version
-  dagu upgrade -y -f              # Skip prompt and allow downgrade
+  boltbase upgrade                    # Upgrade to latest version
+  boltbase upgrade --check            # Check if an update is available
+  boltbase upgrade --version v1.30.0  # Upgrade to specific version
+  boltbase upgrade --dry-run          # Show what would happen
+  boltbase upgrade --backup           # Create backup before upgrade
+  boltbase upgrade -y                 # Skip confirmation prompt
+  boltbase upgrade -f                 # Allow downgrade to older version
+  boltbase upgrade -y -f              # Skip prompt and allow downgrade
 
-Note: This command cannot be used if dagu was installed via Homebrew, Snap,
+Note: This command cannot be used if boltbase was installed via Homebrew, Snap,
 go install, or is running in Docker. Use the appropriate package manager instead.`,
 		},
 		upgradeFlags,

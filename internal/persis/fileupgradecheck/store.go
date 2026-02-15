@@ -30,7 +30,7 @@ type store struct {
 }
 
 // New creates a new file-based upgrade check store.
-// The dataDir is the base data directory (e.g., DAGU_HOME/data).
+// The dataDir is the base data directory (e.g., BOLTBASE_HOME/data).
 // The cache will be stored at {dataDir}/upgrade/upgrade-check.json.
 func New(dataDir string) (upgrade.CacheStore, error) {
 	if dataDir == "" {

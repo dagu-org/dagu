@@ -25,8 +25,8 @@ Flags:
   --step string (optional) Retry only the specified step.
 
 Examples:
-  dagu retry --run-id=abc123 my_dag
-  dagu retry --run-id=abc123 my_dag.yaml
+  boltbase retry --run-id=abc123 my_dag
+  boltbase retry --run-id=abc123 my_dag.yaml
 `,
 			Args: cobra.ExactArgs(1),
 		}, retryFlags, runRetry,
@@ -74,7 +74,7 @@ func runRetry(ctx *Context, args []string) error {
 	// Block retry via CLI for DAGs with workerSelector, UNLESS this is a distributed worker execution
 	// (indicated by --worker-id being set to something other than "local")
 	if len(dag.WorkerSelector) > 0 && workerID == "local" {
-		return fmt.Errorf("cannot retry DAG %q with workerSelector via CLI; use 'dagu enqueue' for distributed execution", dag.Name)
+		return fmt.Errorf("cannot retry DAG %q with workerSelector via CLI; use 'boltbase enqueue' for distributed execution", dag.Name)
 	}
 
 	ctx.Context = logger.WithValues(ctx.Context, tag.DAG(dag.Name), tag.RunID(dagRunID))

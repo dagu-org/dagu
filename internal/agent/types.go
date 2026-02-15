@@ -283,7 +283,7 @@ type AgentTool struct {
 	Audit *AuditInfo
 }
 
-// EnvironmentInfo contains Dagu environment paths for the system prompt.
+// EnvironmentInfo contains Boltbase environment paths for the system prompt.
 type EnvironmentInfo struct {
 	// DAGsDir is the directory containing DAG definition files.
 	DAGsDir string

@@ -46,7 +46,7 @@ func NewGitHubClient() *GitHubClient {
 	client := resty.New().
 		SetTimeout(defaultTimeout).
 		SetHeader("Accept", "application/vnd.github+json").
-		SetHeader("User-Agent", "dagu-upgrade-client")
+		SetHeader("User-Agent", "boltbase-upgrade-client")
 	return &GitHubClient{client: client}
 }
 

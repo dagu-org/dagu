@@ -45,7 +45,7 @@ func New(cfg llm.Config) (llm.Provider, error) {
 		config:     cfg,
 		httpClient: llm.NewHTTPClient(cfg),
 		SiteURL:    "https://github.com/dagu-org/dagu",
-		SiteName:   "Dagu Workflow Engine",
+		SiteName:   "Boltbase Workflow Engine",
 	}, nil
 }
 

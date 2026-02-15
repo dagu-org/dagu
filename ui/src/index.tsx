@@ -17,7 +17,7 @@ const config = getConfig();
 
 // Clear stale JWT token when not using builtin auth
 if (config.authMode !== 'builtin') {
-  localStorage.removeItem('dagu_auth_token');
+  localStorage.removeItem('boltbase_auth_token');
 }
 
 root.render(

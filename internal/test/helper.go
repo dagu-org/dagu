@@ -110,7 +110,7 @@ func WithLogPersistence() HelperOption {
 
 // Setup creates and returns a Helper preconfigured for tests.
 //
-// Setup prepares an isolated test environment: it creates a temporary DAGU_HOME, writes a minimal config file, initializes stores and a runtime manager, sets key environment variables (e.g. DEBUG, CI, TZ, DAGU_EXECUTABLE, DAGU_CONFIG, SHELL), installs a cancellable context, and registers cleanup to restore the working directory and remove the temp directory. Use the returned Helper to interact with the test runtime and stores.
+// Setup prepares an isolated test environment: it creates a temporary BOLTBASE_HOME, writes a minimal config file, initializes stores and a runtime manager, sets key environment variables (e.g. DEBUG, CI, TZ, BOLTBASE_EXECUTABLE, BOLTBASE_CONFIG, SHELL), installs a cancellable context, and registers cleanup to restore the working directory and remove the temp directory. Use the returned Helper to interact with the test runtime and stores.
 func Setup(t *testing.T, opts ...HelperOption) Helper {
 	setupLock.Lock()
 	defer setupLock.Unlock()
@@ -139,16 +139,16 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	_ = os.Setenv("TZ", "UTC")
 
 	random := uuid.New().String()
-	tmpDir := fileutil.MustTempDir(fmt.Sprintf("dagu-test-%s", random))
-	require.NoError(t, os.Setenv("DAGU_HOME", tmpDir))
+	tmpDir := fileutil.MustTempDir(fmt.Sprintf("boltbase-test-%s", random))
+	require.NoError(t, os.Setenv("BOLTBASE_HOME", tmpDir))
 
 	root := getProjectRoot(t)
-	executablePath := filepath.Join(root, ".local", "bin", "dagu")
+	executablePath := filepath.Join(root, ".local", "bin", "boltbase")
 	if runtime.GOOS == "windows" {
 		executablePath += ".exe"
 	}
 
-	_ = os.Setenv("DAGU_EXECUTABLE", executablePath)
+	_ = os.Setenv("BOLTBASE_EXECUTABLE", executablePath)
 
 	// on Windows, set SHELL to powershell
 	if runtime.GOOS == "windows" {
@@ -200,7 +200,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	configFile := filepath.Join(tmpDir, "config.yaml")
 	writeHelperConfigFile(t, cfg, configFile)
 	cfg.Paths.ConfigFileUsed = configFile
-	_ = os.Setenv("DAGU_CONFIG", configFile)
+	_ = os.Setenv("BOLTBASE_CONFIG", configFile)
 
 	ctx = config.WithConfig(ctx, cfg)
 

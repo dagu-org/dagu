@@ -79,7 +79,7 @@ func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
 		return nil, "", fmt.Errorf("failed to marshal generated DAG spec: %w", err)
 	}
 
-	tempFile, err := os.CreateTemp("", fmt.Sprintf("dagu-exec-%s-*.yaml", fileutil.SafeName(name)))
+	tempFile, err := os.CreateTemp("", fmt.Sprintf("boltbase-exec-%s-*.yaml", fileutil.SafeName(name)))
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create temporary DAG file: %w", err)
 	}

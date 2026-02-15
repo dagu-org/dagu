@@ -39,7 +39,7 @@ var (
 	}
 	shellFlag = commandLineFlag{
 		name:  flagShell,
-		usage: "Override shell binary for the command (default: use DAGU default shell)",
+		usage: "Override shell binary for the command (default: use Boltbase default shell)",
 	}
 	baseFlag = commandLineFlag{
 		name:  flagBase,
@@ -55,9 +55,9 @@ func Exec() *cobra.Command {
 		Long: `Execute a one-off command as a DAG run without creating a DAG YAML file.
 
 Examples:
-  dagu exec -- echo "hello world"
-  dagu exec --env FOO=bar -- sh -c 'echo $FOO'
-  dagu exec --worker-label role=batch -- python remote_script.py`,
+  boltbase exec -- echo "hello world"
+  boltbase exec --env FOO=bar -- sh -c 'echo $FOO'
+  boltbase exec --worker-label role=batch -- python remote_script.py`,
 		Args: cobra.ArbitraryArgs,
 	}
 
@@ -73,7 +73,7 @@ Examples:
 // runExec parses flags and arguments and executes the provided command as an inline DAG run.
 func runExec(ctx *Context, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("command is required (try: dagu exec -- <command>)")
+		return fmt.Errorf("command is required (try: boltbase exec -- <command>)")
 	}
 
 	runID, err := resolveRunID(ctx)

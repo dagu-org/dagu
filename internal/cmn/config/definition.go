@@ -142,11 +142,11 @@ type AuthOIDCDef struct {
 	RoleMapping    *OIDCRoleMappingDef `mapstructure:"role_mapping"`
 }
 
-// OIDCRoleMappingDef maps OIDC claims to Dagu roles.
+// OIDCRoleMappingDef maps OIDC claims to Boltbase roles.
 type OIDCRoleMappingDef struct {
 	DefaultRole         string            `mapstructure:"default_role"`          // Default: "viewer"
 	GroupsClaim         string            `mapstructure:"groups_claim"`          // Default: "groups"
-	GroupMappings       map[string]string `mapstructure:"group_mappings"`        // IdP group -> Dagu role
+	GroupMappings       map[string]string `mapstructure:"group_mappings"`        // IdP group -> Boltbase role
 	RoleAttributePath   string            `mapstructure:"role_attribute_path"`   // jq expression for role extraction
 	RoleAttributeStrict *bool             `mapstructure:"role_attribute_strict"` // Deny login if no valid role found
 	SkipOrgRoleSync     *bool             `mapstructure:"skip_org_role_sync"`    // Only assign roles on first login
@@ -337,8 +337,8 @@ type GitSyncAutoSyncDef struct {
 
 // GitSyncCommitDef configures Git commit metadata.
 type GitSyncCommitDef struct {
-	AuthorName  string `mapstructure:"author_name"`  // Default: Dagu
-	AuthorEmail string `mapstructure:"author_email"` // Default: dagu@localhost
+	AuthorName  string `mapstructure:"author_name"`  // Default: Boltbase
+	AuthorEmail string `mapstructure:"author_email"` // Default: boltbase@localhost
 }
 
 // -----------------------------------------------------------------------------
@@ -357,10 +357,10 @@ type TunnelDef struct {
 // TailscaleTunnelDef configures Tailscale tunnel settings.
 type TailscaleTunnelDef struct {
 	AuthKey  string `mapstructure:"auth_key"`
-	Hostname string `mapstructure:"hostname"`  // Default: "dagu"
+	Hostname string `mapstructure:"hostname"`  // Default: "boltbase"
 	Funnel   *bool  `mapstructure:"funnel"`    // Public internet access
 	HTTPS    *bool  `mapstructure:"https"`     // HTTPS for tailnet-only access
-	StateDir string `mapstructure:"state_dir"` // Default: $DAGU_HOME/tailscale
+	StateDir string `mapstructure:"state_dir"` // Default: $BOLTBASE_HOME/tailscale
 }
 
 // TunnelRateLimitDef configures rate limiting for tunnel auth endpoints.

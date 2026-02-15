@@ -19,7 +19,7 @@ func TestResolver(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 
 		_ = os.Setenv("TEST_APP_HOME", filepath.Join(tmpDir, config.AppSlug))
-		paths, err := config.ResolvePaths("TEST_APP_HOME", filepath.Join(tmpDir, ".dagu"), config.XDGConfig{})
+		paths, err := config.ResolvePaths("TEST_APP_HOME", filepath.Join(tmpDir, ".boltbase"), config.XDGConfig{})
 		require.NoError(t, err)
 
 		assert.Equal(t, config.Paths{
@@ -68,7 +68,7 @@ func TestResolver(t *testing.T) {
 			LogsDir:         filepath.Join(legacyPath, "logs"),
 			AdminLogsDir:    filepath.Join(legacyPath, "logs", "admin"),
 			BaseConfigFile:  filepath.Join(legacyPath, "base.yaml"),
-			Warnings:        []string{"Warning: Dagu legacy directory (" + legacyPath + ") structure detected. This is deprecated."},
+			Warnings:        []string{"Warning: Boltbase legacy directory (" + legacyPath + ") structure detected. This is deprecated."},
 		}, paths)
 	})
 	t.Run("XDGCONFIGHOME", func(t *testing.T) {

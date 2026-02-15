@@ -45,7 +45,7 @@ func WithFileCache(cache *fileutil.Cache[string]) Option {
 }
 
 // New creates a new file-based agent memory store.
-// The dagsDir is the DAGs directory (e.g., ~/.config/dagu/dags).
+// The dagsDir is the DAGs directory (e.g., ~/.config/boltbase/dags).
 // The memory files will be stored under {dagsDir}/memory/.
 func New(dagsDir string, opts ...Option) (*Store, error) {
 	if dagsDir == "" {

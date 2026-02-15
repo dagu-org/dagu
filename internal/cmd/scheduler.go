@@ -24,7 +24,7 @@ Flags:
   --dags string   Path to the directory containing DAG definition files
 
 Example:
-  dagu scheduler --dags=/path/to/dags
+  boltbase scheduler --dags=/path/to/dags
 
 This process runs continuously in the foreground until terminated.
 `,

@@ -19,23 +19,23 @@ type Metrics struct {
 func NewMetrics(registry *prometheus.Registry) *Metrics {
 	m := &Metrics{
 		clientsConnected: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "dagu_sse_clients_connected",
+			Name: "boltbase_sse_clients_connected",
 			Help: "Current number of connected SSE clients",
 		}),
 		watchersActive: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "dagu_sse_watchers_active",
+			Name: "boltbase_sse_watchers_active",
 			Help: "Current number of active SSE watchers",
 		}),
 		messagesSent: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "dagu_sse_messages_sent_total",
+			Name: "boltbase_sse_messages_sent_total",
 			Help: "Total number of SSE messages sent by type",
 		}, []string{"type"}),
 		fetchErrors: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "dagu_sse_fetch_errors_total",
+			Name: "boltbase_sse_fetch_errors_total",
 			Help: "Total number of SSE fetch errors by topic type",
 		}, []string{"topic_type"}),
 		fetchDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Name:    "dagu_sse_fetch_duration_seconds",
+			Name:    "boltbase_sse_fetch_duration_seconds",
 			Help:    "Duration of SSE data fetches by topic type",
 			Buckets: []float64{0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5},
 		}, []string{"topic_type"}),

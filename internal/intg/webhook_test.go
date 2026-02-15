@@ -49,7 +49,7 @@ steps:
 name: webhook-json-test
 
 params:
-  - WEBHOOK_PAYLOAD: '{"event":"push","repository":"dagu"}'
+  - WEBHOOK_PAYLOAD: '{"event":"push","repository":"boltbase"}'
 
 steps:
   - name: check-payload-contains-event

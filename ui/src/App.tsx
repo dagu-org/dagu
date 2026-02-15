@@ -42,7 +42,7 @@ type Props = {
   config: Config;
 };
 
-const REMOTE_NODE_STORAGE_KEY = 'dagu-selected-remote-node';
+const REMOTE_NODE_STORAGE_KEY = 'boltbase-selected-remote-node';
 
 function parseRemoteNodes(remoteNodesConfig: string): string[] {
   const nodes = remoteNodesConfig

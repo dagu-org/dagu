@@ -40,21 +40,21 @@ TLS Configuration (uses global peer settings):
   --peer.skip-tls-verify                   Skip TLS certificate verification (insecure)
 
 Example:
-  dagu worker
-  dagu worker --worker.max-active-runs=50
-  dagu worker --worker.id=worker-1 --worker.max-active-runs=200
+  boltbase worker
+  boltbase worker --worker.max-active-runs=50
+  boltbase worker --worker.id=worker-1 --worker.max-active-runs=200
 
   # Worker with labels for capability matching:
-  dagu worker --worker.labels gpu=true,memory=64G,region=us-east-1
-  dagu worker --worker.labels cpu-arch=amd64,instance-type=m5.xlarge
+  boltbase worker --worker.labels gpu=true,memory=64G,region=us-east-1
+  boltbase worker --worker.labels cpu-arch=amd64,instance-type=m5.xlarge
 
   # For TLS connections (when coordinator has TLS enabled):
-  dagu worker --peer.insecure=false --peer.cert-file=client.crt --peer.key-file=client.key
-  dagu worker --peer.insecure=false --peer.client-ca-file=ca.crt
-  dagu worker --peer.insecure=false --peer.skip-tls-verify  # For self-signed certificates
+  boltbase worker --peer.insecure=false --peer.cert-file=client.crt --peer.key-file=client.key
+  boltbase worker --peer.insecure=false --peer.client-ca-file=ca.crt
+  boltbase worker --peer.insecure=false --peer.skip-tls-verify  # For self-signed certificates
 
   # Shared-nothing deployment (worker doesn't need shared filesystem):
-  dagu worker --worker.coordinators=coordinator-1:50055,coordinator-2:50055
+  boltbase worker --worker.coordinators=coordinator-1:50055,coordinator-2:50055
 
 This process runs continuously in the foreground until terminated.
 `,

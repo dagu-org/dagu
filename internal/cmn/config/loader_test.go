@@ -34,78 +34,78 @@ func TestLoad_Env(t *testing.T) {
 	testPaths := filepath.Join(tempDir, "test")
 
 	testEnvs := map[string]string{
-		"DAGU_LOG_FORMAT":   "json",
-		"DAGU_BASE_PATH":    "/test/base",
-		"DAGU_API_BASE_URL": "/test/api",
-		"DAGU_TZ":           "Europe/Berlin",
-		"DAGU_HOST":         "test.example.com",
-		"DAGU_PORT":         "9876",
-		"DAGU_DEBUG":        "true",
-		"DAGU_HEADLESS":     "true",
+		"BOLTBASE_LOG_FORMAT":   "json",
+		"BOLTBASE_BASE_PATH":    "/test/base",
+		"BOLTBASE_API_BASE_URL": "/test/api",
+		"BOLTBASE_TZ":           "Europe/Berlin",
+		"BOLTBASE_HOST":         "test.example.com",
+		"BOLTBASE_PORT":         "9876",
+		"BOLTBASE_DEBUG":        "true",
+		"BOLTBASE_HEADLESS":     "true",
 
-		"DAGU_DEFAULT_SHELL": "/bin/zsh",
+		"BOLTBASE_DEFAULT_SHELL": "/bin/zsh",
 
-		"DAGU_UI_MAX_DASHBOARD_PAGE_LIMIT": "250",
-		"DAGU_UI_LOG_ENCODING_CHARSET":     "iso-8859-1",
-		"DAGU_UI_NAVBAR_COLOR":             "#123456",
-		"DAGU_UI_NAVBAR_TITLE":             "Test Dagu",
+		"BOLTBASE_UI_MAX_DASHBOARD_PAGE_LIMIT": "250",
+		"BOLTBASE_UI_LOG_ENCODING_CHARSET":     "iso-8859-1",
+		"BOLTBASE_UI_NAVBAR_COLOR":             "#123456",
+		"BOLTBASE_UI_NAVBAR_TITLE":             "Test Boltbase",
 
-		"DAGU_AUTH_BASIC_ENABLED":  "true",
-		"DAGU_AUTH_BASIC_USERNAME": "testuser",
-		"DAGU_AUTH_BASIC_PASSWORD": "testpass",
+		"BOLTBASE_AUTH_BASIC_ENABLED":  "true",
+		"BOLTBASE_AUTH_BASIC_USERNAME": "testuser",
+		"BOLTBASE_AUTH_BASIC_PASSWORD": "testpass",
 
-		"DAGU_CERT_FILE": filepath.Join(testPaths, "cert.pem"),
-		"DAGU_KEY_FILE":  filepath.Join(testPaths, "key.pem"),
+		"BOLTBASE_CERT_FILE": filepath.Join(testPaths, "cert.pem"),
+		"BOLTBASE_KEY_FILE":  filepath.Join(testPaths, "key.pem"),
 
-		"DAGU_DAGS_DIR":             filepath.Join(testPaths, "dags"),
-		"DAGU_EXECUTABLE":           filepath.Join(testPaths, "bin", "dagu"),
-		"DAGU_LOG_DIR":              filepath.Join(testPaths, "logs"),
-		"DAGU_DATA_DIR":             filepath.Join(testPaths, "data"),
-		"DAGU_SUSPEND_FLAGS_DIR":    filepath.Join(testPaths, "suspend"),
-		"DAGU_ADMIN_LOG_DIR":        filepath.Join(testPaths, "admin"),
-		"DAGU_BASE_CONFIG":          filepath.Join(testPaths, "base.yaml"),
-		"DAGU_DAG_RUNS_DIR":         filepath.Join(testPaths, "runs"),
-		"DAGU_PROC_DIR":             filepath.Join(testPaths, "proc"),
-		"DAGU_QUEUE_DIR":            filepath.Join(testPaths, "queue"),
-		"DAGU_SERVICE_REGISTRY_DIR": filepath.Join(testPaths, "service-registry"),
-		"DAGU_ALT_DAGS_DIR":         filepath.Join(testPaths, "alt-dags"),
+		"BOLTBASE_DAGS_DIR":             filepath.Join(testPaths, "dags"),
+		"BOLTBASE_EXECUTABLE":           filepath.Join(testPaths, "bin", "boltbase"),
+		"BOLTBASE_LOG_DIR":              filepath.Join(testPaths, "logs"),
+		"BOLTBASE_DATA_DIR":             filepath.Join(testPaths, "data"),
+		"BOLTBASE_SUSPEND_FLAGS_DIR":    filepath.Join(testPaths, "suspend"),
+		"BOLTBASE_ADMIN_LOG_DIR":        filepath.Join(testPaths, "admin"),
+		"BOLTBASE_BASE_CONFIG":          filepath.Join(testPaths, "base.yaml"),
+		"BOLTBASE_DAG_RUNS_DIR":         filepath.Join(testPaths, "runs"),
+		"BOLTBASE_PROC_DIR":             filepath.Join(testPaths, "proc"),
+		"BOLTBASE_QUEUE_DIR":            filepath.Join(testPaths, "queue"),
+		"BOLTBASE_SERVICE_REGISTRY_DIR": filepath.Join(testPaths, "service-registry"),
+		"BOLTBASE_ALT_DAGS_DIR":         filepath.Join(testPaths, "alt-dags"),
 
-		"DAGU_LATEST_STATUS_TODAY": "true",
+		"BOLTBASE_LATEST_STATUS_TODAY": "true",
 
-		"DAGU_QUEUE_ENABLED": "false",
+		"BOLTBASE_QUEUE_ENABLED": "false",
 
-		"DAGU_COORDINATOR_HOST":      "0.0.0.0",
-		"DAGU_COORDINATOR_ADVERTISE": "dagu-coordinator",
-		"DAGU_COORDINATOR_PORT":      "50099",
+		"BOLTBASE_COORDINATOR_HOST":      "0.0.0.0",
+		"BOLTBASE_COORDINATOR_ADVERTISE": "boltbase-coordinator",
+		"BOLTBASE_COORDINATOR_PORT":      "50099",
 
-		"DAGU_WORKER_ID":              "test-worker-123",
-		"DAGU_WORKER_MAX_ACTIVE_RUNS": "200",
+		"BOLTBASE_WORKER_ID":              "test-worker-123",
+		"BOLTBASE_WORKER_MAX_ACTIVE_RUNS": "200",
 
-		"DAGU_SCHEDULER_PORT":                      "9999",
-		"DAGU_SCHEDULER_ZOMBIE_DETECTION_INTERVAL": "90s",
+		"BOLTBASE_SCHEDULER_PORT":                      "9999",
+		"BOLTBASE_SCHEDULER_ZOMBIE_DETECTION_INTERVAL": "90s",
 
-		"DAGU_AUTH_OIDC_CLIENT_ID":     "test-client-id",
-		"DAGU_AUTH_OIDC_CLIENT_SECRET": "test-secret",
-		"DAGU_AUTH_OIDC_ISSUER":        "https://auth.example.com",
-		"DAGU_AUTH_OIDC_SCOPES":        "openid,profile,email",
+		"BOLTBASE_AUTH_OIDC_CLIENT_ID":     "test-client-id",
+		"BOLTBASE_AUTH_OIDC_CLIENT_SECRET": "test-secret",
+		"BOLTBASE_AUTH_OIDC_ISSUER":        "https://auth.example.com",
+		"BOLTBASE_AUTH_OIDC_SCOPES":        "openid,profile,email",
 
-		"DAGU_UI_DAGS_SORT_FIELD": "status",
-		"DAGU_UI_DAGS_SORT_ORDER": "desc",
+		"BOLTBASE_UI_DAGS_SORT_FIELD": "status",
+		"BOLTBASE_UI_DAGS_SORT_ORDER": "desc",
 
-		"DAGU_TERMINAL_ENABLED": "true",
+		"BOLTBASE_TERMINAL_ENABLED": "true",
 
-		"DAGU_AUDIT_ENABLED": "false",
+		"BOLTBASE_AUDIT_ENABLED": "false",
 
-		"DAGU_TUNNEL_ENABLED":                              "true",
-		"DAGU_TUNNEL_TAILSCALE_AUTH_KEY":                   "tskey-test-123",
-		"DAGU_TUNNEL_TAILSCALE_HOSTNAME":                   "test-dagu",
-		"DAGU_TUNNEL_TAILSCALE_FUNNEL":                     "false",
-		"DAGU_TUNNEL_TAILSCALE_HTTPS":                      "true",
-		"DAGU_TUNNEL_ALLOW_TERMINAL":                       "true",
-		"DAGU_TUNNEL_RATE_LIMITING_ENABLED":                "true",
-		"DAGU_TUNNEL_RATE_LIMITING_LOGIN_ATTEMPTS":         "10",
-		"DAGU_TUNNEL_RATE_LIMITING_WINDOW_SECONDS":         "600",
-		"DAGU_TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS": "1800",
+		"BOLTBASE_TUNNEL_ENABLED":                              "true",
+		"BOLTBASE_TUNNEL_TAILSCALE_AUTH_KEY":                   "tskey-test-123",
+		"BOLTBASE_TUNNEL_TAILSCALE_HOSTNAME":                   "test-boltbase",
+		"BOLTBASE_TUNNEL_TAILSCALE_FUNNEL":                     "false",
+		"BOLTBASE_TUNNEL_TAILSCALE_HTTPS":                      "true",
+		"BOLTBASE_TUNNEL_ALLOW_TERMINAL":                       "true",
+		"BOLTBASE_TUNNEL_RATE_LIMITING_ENABLED":                "true",
+		"BOLTBASE_TUNNEL_RATE_LIMITING_LOGIN_ATTEMPTS":         "10",
+		"BOLTBASE_TUNNEL_RATE_LIMITING_WINDOW_SECONDS":         "600",
+		"BOLTBASE_TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS": "1800",
 	}
 
 	for key, val := range testEnvs {
@@ -169,7 +169,7 @@ func TestLoad_Env(t *testing.T) {
 		Paths: PathsConfig{
 			DAGsDir:            filepath.Join(testPaths, "dags"),
 			AltDAGsDir:         filepath.Join(testPaths, "alt-dags"),
-			Executable:         filepath.Join(testPaths, "bin", "dagu"),
+			Executable:         filepath.Join(testPaths, "bin", "boltbase"),
 			LogDir:             filepath.Join(testPaths, "logs"),
 			DataDir:            filepath.Join(testPaths, "data"),
 			SuspendFlagsDir:    filepath.Join(testPaths, "suspend"),
@@ -187,7 +187,7 @@ func TestLoad_Env(t *testing.T) {
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
 			NavbarColor:           "#123456",
-			NavbarTitle:           "Test Dagu",
+			NavbarTitle:           "Test Boltbase",
 			MaxDashboardPageLimit: 250,
 			DAGs: DAGsConfig{
 				SortField: "status",
@@ -198,7 +198,7 @@ func TestLoad_Env(t *testing.T) {
 		Coordinator: Coordinator{
 			Enabled:   true,
 			Host:      "0.0.0.0",
-			Advertise: "dagu-coordinator",
+			Advertise: "boltbase-coordinator",
 			Port:      50099,
 		},
 		Worker: Worker{
@@ -226,7 +226,7 @@ func TestLoad_Env(t *testing.T) {
 			AllowTerminal: true,
 			Tailscale: TailscaleTunnelConfig{
 				AuthKey:  "tskey-test-123",
-				Hostname: "test-dagu",
+				Hostname: "test-boltbase",
 				Funnel:   false,
 				HTTPS:    true,
 			},
@@ -254,7 +254,7 @@ func TestLoad_WithAppHomeDir(t *testing.T) {
 	assert.Equal(t, filepath.Join(tempDir, "logs"), cfg.Paths.LogDir)
 
 	baseEnv := cfg.Core.BaseEnv.AsSlice()
-	require.Contains(t, baseEnv, fmt.Sprintf("DAGU_HOME=%s", tempDir))
+	require.Contains(t, baseEnv, fmt.Sprintf("BOLTBASE_HOME=%s", tempDir))
 }
 
 func TestLoad_YAML(t *testing.T) {
@@ -265,7 +265,7 @@ permissions:
   write_dags: false
   run_dags: false
 debug: true
-base_path: "/dagu"
+base_path: "/boltbase"
 api_base_path: "/api/v1"
 tz: "UTC"
 log_format: "json"
@@ -274,15 +274,15 @@ latest_status_today: true
 default_shell: "/bin/bash"
 skip_examples: true
 paths:
-  dags_dir: "/var/dagu/dags"
-  log_dir: "/var/dagu/logs"
-  data_dir: "/var/dagu/data"
-  suspend_flags_dir: "/var/dagu/suspend"
-  admin_logs_dir: "/var/dagu/adminlogs"
-  base_config: "/var/dagu/base.yaml"
-  executable: "/usr/local/bin/dagu"
+  dags_dir: "/var/boltbase/dags"
+  log_dir: "/var/boltbase/logs"
+  data_dir: "/var/boltbase/data"
+  suspend_flags_dir: "/var/boltbase/suspend"
+  admin_logs_dir: "/var/boltbase/adminlogs"
+  base_config: "/var/boltbase/base.yaml"
+  executable: "/usr/local/bin/boltbase"
 ui:
-  navbar_title: "Test Dagu"
+  navbar_title: "Test Boltbase"
   navbar_color: "#ff5733"
   log_encoding_charset: "iso-8859-1"
   max_dashboard_page_limit: 50
@@ -372,7 +372,7 @@ scheduler:
 		Server: Server{
 			Host:              "0.0.0.0",
 			Port:              9090,
-			BasePath:          "/dagu",
+			BasePath:          "/boltbase",
 			APIBasePath:       "/api/v1",
 			Headless:          true,
 			LatestStatusToday: true,
@@ -425,26 +425,26 @@ scheduler:
 			Audit:    AuditConfig{Enabled: true, RetentionDays: 7},
 		},
 		Paths: PathsConfig{
-			DAGsDir:            "/var/dagu/dags",
-			LogDir:             "/var/dagu/logs",
-			DataDir:            "/var/dagu/data",
-			SuspendFlagsDir:    "/var/dagu/suspend",
-			AdminLogsDir:       "/var/dagu/adminlogs",
-			BaseConfig:         "/var/dagu/base.yaml",
-			Executable:         "/usr/local/bin/dagu",
-			DAGRunsDir:         "/var/dagu/data/dag-runs",
-			ProcDir:            "/var/dagu/data/proc",
-			QueueDir:           "/var/dagu/data/queue",
-			ServiceRegistryDir: "/var/dagu/data/service-registry",
-			UsersDir:           "/var/dagu/data/users",
-			APIKeysDir:         "/var/dagu/data/apikeys",
-			WebhooksDir:        "/var/dagu/data/webhooks",
-			SessionsDir:        "/var/dagu/data/agent/sessions",
+			DAGsDir:            "/var/boltbase/dags",
+			LogDir:             "/var/boltbase/logs",
+			DataDir:            "/var/boltbase/data",
+			SuspendFlagsDir:    "/var/boltbase/suspend",
+			AdminLogsDir:       "/var/boltbase/adminlogs",
+			BaseConfig:         "/var/boltbase/base.yaml",
+			Executable:         "/usr/local/bin/boltbase",
+			DAGRunsDir:         "/var/boltbase/data/dag-runs",
+			ProcDir:            "/var/boltbase/data/proc",
+			QueueDir:           "/var/boltbase/data/queue",
+			ServiceRegistryDir: "/var/boltbase/data/service-registry",
+			UsersDir:           "/var/boltbase/data/users",
+			APIKeysDir:         "/var/boltbase/data/apikeys",
+			WebhooksDir:        "/var/boltbase/data/webhooks",
+			SessionsDir:        "/var/boltbase/data/agent/sessions",
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
 			NavbarColor:           "#ff5733",
-			NavbarTitle:           "Test Dagu",
+			NavbarTitle:           "Test Boltbase",
 			MaxDashboardPageLimit: 50,
 			DAGs: DAGsConfig{
 				SortField: "name",
@@ -525,7 +525,7 @@ worker:
 
 	t.Run("LabelsFromEnvironment", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_WORKER_LABELS": "instance-type=m5.xlarge,cpu-arch=amd64",
+			"BOLTBASE_WORKER_LABELS": "instance-type=m5.xlarge,cpu-arch=amd64",
 		})
 		assert.Equal(t, map[string]string{
 			"instance-type": "m5.xlarge",
@@ -629,13 +629,13 @@ func TestLoad_LegacyEnv(t *testing.T) {
 	tempDir := t.TempDir()
 
 	cfg := loadWithEnv(t, "# empty", map[string]string{
-		"DAGU__ADMIN_PORT":         "1234",
-		"DAGU__ADMIN_HOST":         "0.0.0.0",
-		"DAGU__ADMIN_NAVBAR_TITLE": "LegacyTitle",
-		"DAGU__ADMIN_NAVBAR_COLOR": "#abc123",
-		"DAGU__DATA":               filepath.Join(tempDir, "legacy", "data"),
-		"DAGU__SUSPEND_FLAGS_DIR":  filepath.Join(tempDir, "legacy", "suspend"),
-		"DAGU__ADMIN_LOGS_DIR":     filepath.Join(tempDir, "legacy", "adminlogs"),
+		"BOLTBASE__ADMIN_PORT":         "1234",
+		"BOLTBASE__ADMIN_HOST":         "0.0.0.0",
+		"BOLTBASE__ADMIN_NAVBAR_TITLE": "LegacyTitle",
+		"BOLTBASE__ADMIN_NAVBAR_COLOR": "#abc123",
+		"BOLTBASE__DATA":               filepath.Join(tempDir, "legacy", "data"),
+		"BOLTBASE__SUSPEND_FLAGS_DIR":  filepath.Join(tempDir, "legacy", "suspend"),
+		"BOLTBASE__ADMIN_LOGS_DIR":     filepath.Join(tempDir, "legacy", "adminlogs"),
 	})
 
 	assert.Equal(t, 1234, cfg.Server.Port)
@@ -660,7 +660,7 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 			APIBaseURL:            "/api/v1",
 			DAGs:                  filepath.Join(testPaths, "legacy", "dags"),
 			DAGsDir:               filepath.Join(testPaths, "new", "dags"), // Takes precedence over DAGs
-			Executable:            filepath.Join(testPaths, "bin", "dagu"),
+			Executable:            filepath.Join(testPaths, "bin", "boltbase"),
 			LogDir:                filepath.Join(testPaths, "logs"),
 			DataDir:               filepath.Join(testPaths, "data"),
 			SuspendFlagsDir:       filepath.Join(testPaths, "suspend"),
@@ -681,7 +681,7 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 
 		// Paths - DAGsDir should take precedence over DAGs
 		assert.Equal(t, filepath.Join(testPaths, "new", "dags"), cfg.Paths.DAGsDir)
-		assert.Equal(t, filepath.Join(testPaths, "bin", "dagu"), cfg.Paths.Executable)
+		assert.Equal(t, filepath.Join(testPaths, "bin", "boltbase"), cfg.Paths.Executable)
 		assert.Equal(t, filepath.Join(testPaths, "logs"), cfg.Paths.LogDir)
 		assert.Equal(t, filepath.Join(testPaths, "data"), cfg.Paths.DataDir)
 		assert.Equal(t, filepath.Join(testPaths, "suspend"), cfg.Paths.SuspendFlagsDir)
@@ -816,7 +816,7 @@ func TestBindEnv_AsPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			const envKey = "DAGU_DAGS_DIR"
+			const envKey = "BOLTBASE_DAGS_DIR"
 			t.Setenv(envKey, tt.envValue)
 
 			loader := NewConfigLoader(viper.New())
@@ -845,8 +845,8 @@ monitoring:
 
 	t.Run("FromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_MONITORING_RETENTION": "30m",
-			"DAGU_MONITORING_INTERVAL":  "15s",
+			"BOLTBASE_MONITORING_RETENTION": "30m",
+			"BOLTBASE_MONITORING_INTERVAL":  "15s",
 		})
 		assert.Equal(t, 30*time.Minute, cfg.Monitoring.Retention)
 		assert.Equal(t, 15*time.Second, cfg.Monitoring.Interval)
@@ -908,9 +908,9 @@ auth:
 
 	t.Run("AuthModeFromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_AUTH_MODE":         "builtin",
-			"DAGU_AUTH_TOKEN_SECRET": "test-secret",
-			"DAGU_PATHS_USERS_DIR":   t.TempDir(),
+			"BOLTBASE_AUTH_MODE":         "builtin",
+			"BOLTBASE_AUTH_TOKEN_SECRET": "test-secret",
+			"BOLTBASE_PATHS_USERS_DIR":   t.TempDir(),
 		})
 		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
 	})
@@ -954,11 +954,11 @@ auth:
 
 	t.Run("FromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_AUTH_MODE":           "builtin",
-			"DAGU_AUTH_ADMIN_USERNAME": "envadmin",
-			"DAGU_AUTH_ADMIN_PASSWORD": "envpassword123",
-			"DAGU_AUTH_TOKEN_SECRET":   "env-jwt-secret",
-			"DAGU_AUTH_TOKEN_TTL":      "48h",
+			"BOLTBASE_AUTH_MODE":           "builtin",
+			"BOLTBASE_AUTH_ADMIN_USERNAME": "envadmin",
+			"BOLTBASE_AUTH_ADMIN_PASSWORD": "envpassword123",
+			"BOLTBASE_AUTH_TOKEN_SECRET":   "env-jwt-secret",
+			"BOLTBASE_AUTH_TOKEN_TTL":      "48h",
 		})
 		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
 		assert.Equal(t, "envadmin", cfg.Server.Auth.Builtin.Admin.Username)
@@ -1019,7 +1019,7 @@ metrics: "private"
 
 	t.Run("MetricsAccessFromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_SERVER_METRICS": "public",
+			"BOLTBASE_SERVER_METRICS": "public",
 		})
 		assert.Equal(t, MetricsAccessPublic, cfg.Server.Metrics)
 	})
@@ -1073,7 +1073,7 @@ cache: invalid
 
 	t.Run("CacheModeFromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, ``, map[string]string{
-			"DAGU_CACHE": "low",
+			"BOLTBASE_CACHE": "low",
 		})
 		assert.Equal(t, CacheModeLow, cfg.Cache)
 	})
@@ -1160,14 +1160,14 @@ terminal:
 
 	t.Run("TerminalEnabledFromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_TERMINAL_ENABLED": "true",
+			"BOLTBASE_TERMINAL_ENABLED": "true",
 		})
 		assert.True(t, cfg.Server.Terminal.Enabled)
 	})
 
 	t.Run("TerminalDisabledFromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_TERMINAL_ENABLED": "false",
+			"BOLTBASE_TERMINAL_ENABLED": "false",
 		})
 		assert.False(t, cfg.Server.Terminal.Enabled)
 	})
@@ -1177,7 +1177,7 @@ terminal:
 terminal:
   enabled: false
 `, map[string]string{
-			"DAGU_TERMINAL_ENABLED": "true",
+			"BOLTBASE_TERMINAL_ENABLED": "true",
 		})
 		assert.True(t, cfg.Server.Terminal.Enabled)
 	})
@@ -1207,14 +1207,14 @@ audit:
 
 	t.Run("AuditEnabledFromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_AUDIT_ENABLED": "true",
+			"BOLTBASE_AUDIT_ENABLED": "true",
 		})
 		assert.True(t, cfg.Server.Audit.Enabled)
 	})
 
 	t.Run("AuditDisabledFromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_AUDIT_ENABLED": "false",
+			"BOLTBASE_AUDIT_ENABLED": "false",
 		})
 		assert.False(t, cfg.Server.Audit.Enabled)
 	})
@@ -1224,7 +1224,7 @@ audit:
 audit:
   enabled: true
 `, map[string]string{
-			"DAGU_AUDIT_ENABLED": "false",
+			"BOLTBASE_AUDIT_ENABLED": "false",
 		})
 		assert.False(t, cfg.Server.Audit.Enabled)
 	})
@@ -1246,7 +1246,7 @@ coordinator:
 
 	t.Run("CoordinatorDisabledFromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_COORDINATOR_ENABLED": "false",
+			"BOLTBASE_COORDINATOR_ENABLED": "false",
 		})
 		assert.False(t, cfg.Coordinator.Enabled)
 	})
@@ -1256,7 +1256,7 @@ coordinator:
 coordinator:
   enabled: true
 `, map[string]string{
-			"DAGU_COORDINATOR_ENABLED": "false",
+			"BOLTBASE_COORDINATOR_ENABLED": "false",
 		})
 		assert.False(t, cfg.Coordinator.Enabled)
 	})
@@ -1278,10 +1278,10 @@ tunnel:
   enabled: true
   tailscale:
     auth_key: "tskey-yaml-test"
-    hostname: "yaml-dagu"
+    hostname: "yaml-boltbase"
     funnel: false
     https: true
-    state_dir: "/var/dagu/tailscale"
+    state_dir: "/var/boltbase/tailscale"
   allow_terminal: true
   allowed_ips:
     - "192.168.1.0/24"
@@ -1294,10 +1294,10 @@ tunnel:
 `)
 		assert.True(t, cfg.Tunnel.Enabled)
 		assert.Equal(t, "tskey-yaml-test", cfg.Tunnel.Tailscale.AuthKey)
-		assert.Equal(t, "yaml-dagu", cfg.Tunnel.Tailscale.Hostname)
+		assert.Equal(t, "yaml-boltbase", cfg.Tunnel.Tailscale.Hostname)
 		assert.False(t, cfg.Tunnel.Tailscale.Funnel)
 		assert.True(t, cfg.Tunnel.Tailscale.HTTPS)
-		assert.Equal(t, "/var/dagu/tailscale", cfg.Tunnel.Tailscale.StateDir)
+		assert.Equal(t, "/var/boltbase/tailscale", cfg.Tunnel.Tailscale.StateDir)
 		assert.True(t, cfg.Tunnel.AllowTerminal)
 		assert.Equal(t, []string{"192.168.1.0/24", "10.0.0.0/8"}, cfg.Tunnel.AllowedIPs)
 		assert.True(t, cfg.Tunnel.RateLimiting.Enabled)
@@ -1308,20 +1308,20 @@ tunnel:
 
 	t.Run("TunnelFromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_TUNNEL_ENABLED":                              "true",
-			"DAGU_TUNNEL_TAILSCALE_AUTH_KEY":                   "tskey-env-test",
-			"DAGU_TUNNEL_TAILSCALE_HOSTNAME":                   "env-dagu",
-			"DAGU_TUNNEL_TAILSCALE_FUNNEL":                     "false",
-			"DAGU_TUNNEL_TAILSCALE_HTTPS":                      "true",
-			"DAGU_TUNNEL_ALLOW_TERMINAL":                       "true",
-			"DAGU_TUNNEL_RATE_LIMITING_ENABLED":                "true",
-			"DAGU_TUNNEL_RATE_LIMITING_LOGIN_ATTEMPTS":         "10",
-			"DAGU_TUNNEL_RATE_LIMITING_WINDOW_SECONDS":         "600",
-			"DAGU_TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS": "1800",
+			"BOLTBASE_TUNNEL_ENABLED":                              "true",
+			"BOLTBASE_TUNNEL_TAILSCALE_AUTH_KEY":                   "tskey-env-test",
+			"BOLTBASE_TUNNEL_TAILSCALE_HOSTNAME":                   "env-boltbase",
+			"BOLTBASE_TUNNEL_TAILSCALE_FUNNEL":                     "false",
+			"BOLTBASE_TUNNEL_TAILSCALE_HTTPS":                      "true",
+			"BOLTBASE_TUNNEL_ALLOW_TERMINAL":                       "true",
+			"BOLTBASE_TUNNEL_RATE_LIMITING_ENABLED":                "true",
+			"BOLTBASE_TUNNEL_RATE_LIMITING_LOGIN_ATTEMPTS":         "10",
+			"BOLTBASE_TUNNEL_RATE_LIMITING_WINDOW_SECONDS":         "600",
+			"BOLTBASE_TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS": "1800",
 		})
 		assert.True(t, cfg.Tunnel.Enabled)
 		assert.Equal(t, "tskey-env-test", cfg.Tunnel.Tailscale.AuthKey)
-		assert.Equal(t, "env-dagu", cfg.Tunnel.Tailscale.Hostname)
+		assert.Equal(t, "env-boltbase", cfg.Tunnel.Tailscale.Hostname)
 		assert.False(t, cfg.Tunnel.Tailscale.Funnel)
 		assert.True(t, cfg.Tunnel.Tailscale.HTTPS)
 		assert.True(t, cfg.Tunnel.AllowTerminal)
@@ -1340,8 +1340,8 @@ tunnel:
     hostname: "yaml-host"
     https: false
 `, map[string]string{
-			"DAGU_TUNNEL_TAILSCALE_AUTH_KEY": "env-key",
-			"DAGU_TUNNEL_TAILSCALE_HTTPS":    "true",
+			"BOLTBASE_TUNNEL_TAILSCALE_AUTH_KEY": "env-key",
+			"BOLTBASE_TUNNEL_TAILSCALE_HTTPS":    "true",
 		})
 		assert.True(t, cfg.Tunnel.Enabled)
 		assert.Equal(t, "env-key", cfg.Tunnel.Tailscale.AuthKey)
@@ -1400,7 +1400,7 @@ default_execution_mode: local
 
 	t.Run("FromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_DEFAULT_EXECUTION_MODE": "distributed",
+			"BOLTBASE_DEFAULT_EXECUTION_MODE": "distributed",
 		})
 		assert.Equal(t, ExecutionModeDistributed, cfg.DefaultExecMode)
 	})

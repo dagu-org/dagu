@@ -47,7 +47,7 @@ func TestWorkerCommand(t *testing.T) {
 
 		// Verify examples are present in long description
 		assert.Contains(t, cli.Long, "Example:")
-		assert.Contains(t, cli.Long, "dagu worker")
+		assert.Contains(t, cli.Long, "boltbase worker")
 	})
 }
 

@@ -40,7 +40,7 @@ func TestExecCommand(t *testing.T) {
 			name: "ExecWorkerLabelWithoutQueue",
 			args: []string{"exec", "--worker-label", "role=batch", "--", "sh", "-c", "echo hi"},
 			env: map[string]string{
-				"DAGU_QUEUE_ENABLED": "false",
+				"BOLTBASE_QUEUE_ENABLED": "false",
 			},
 			expectErr: "worker selector requires queues",
 		},

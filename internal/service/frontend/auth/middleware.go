@@ -31,7 +31,7 @@ type Options struct {
 	// When set, JWT Bearer tokens are accepted as an authentication method.
 	JWTValidator TokenValidator
 	// APIKeyValidator validates standalone API keys with roles.
-	// When set, API keys with the "dagu_" prefix are accepted as an authentication method.
+	// When set, API keys with the "boltbase_" prefix are accepted as an authentication method.
 	APIKeyValidator APIKeyValidator
 	// AuthRequired indicates whether authentication is required.
 	// When false (e.g., auth mode "none"), credentials are validated if provided
@@ -62,7 +62,7 @@ func ClientIPMiddleware() func(next http.Handler) http.Handler {
 // Middleware creates an HTTP middleware for authentication.
 // It supports multiple authentication methods simultaneously:
 // - JWT Bearer tokens (if JWTValidator is set)
-// - API keys with "dagu_" prefix (if APIKeyValidator is set)
+// - API keys with "boltbase_" prefix (if APIKeyValidator is set)
 // - HTTP Basic Auth (if BasicAuthEnabled)
 // - OIDC (if OIDCAuthEnabled)
 // All configured methods work at the same time.
@@ -130,9 +130,9 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 			}
 
 			// Try standalone API key authentication if enabled
-			// API keys have the "dagu_" prefix and have their own role assignment
+			// API keys have the "boltbase_" prefix and have their own role assignment
 			if apiKeyEnabled {
-				if token := extractBearerToken(r); token != "" && strings.HasPrefix(token, "dagu_") {
+				if token := extractBearerToken(r); token != "" && strings.HasPrefix(token, "boltbase_") {
 					apiKey, err := opts.APIKeyValidator.ValidateAPIKey(r.Context(), token)
 					if err == nil {
 						// API key valid - create synthetic user with the key's role

@@ -93,7 +93,7 @@ func (f *queueFixture) enqueueRuns(n int) *queueFixture {
 
 func (f *queueFixture) withProcessor(cfg config.Queues) *queueFixture {
 	f.processor = NewQueueProcessor(f.queueStore, f.dagRunStore, f.procStore,
-		NewDAGExecutor(nil, runtime.NewSubCmdBuilder(&config.Config{Paths: config.PathsConfig{Executable: "/usr/bin/dagu"}}), config.ExecutionModeLocal),
+		NewDAGExecutor(nil, runtime.NewSubCmdBuilder(&config.Config{Paths: config.PathsConfig{Executable: "/usr/bin/boltbase"}}), config.ExecutionModeLocal),
 		cfg, WithBackoffConfig(BackoffConfig{InitialInterval: 10 * time.Millisecond, MaxInterval: 50 * time.Millisecond, MaxRetries: 2}),
 	)
 	return f

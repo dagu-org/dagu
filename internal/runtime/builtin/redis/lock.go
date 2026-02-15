@@ -10,7 +10,7 @@ import (
 )
 
 // lockKeyPrefix is the prefix for lock keys.
-const lockKeyPrefix = "dagu:lock:"
+const lockKeyPrefix = "boltbase:lock:"
 
 // unlockScript is a Lua script for atomic unlock.
 // It only deletes the key if the value matches (to avoid deleting someone else's lock).

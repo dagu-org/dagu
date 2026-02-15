@@ -112,7 +112,7 @@ jobs:
       - name: Build (Windows)
         if: runner.os == 'Windows'
         run: |
-          go build -o .\.local\bin\dagu.exe .\cmd
+          go build -o .\.local\bin\boltbase.exe .\cmd
 
       - name: Test
         if: runner.os != 'Windows'

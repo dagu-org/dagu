@@ -75,7 +75,7 @@ func GetKeepaliveFile(platform specs.Platform) (string, error) {
 	}
 
 	// Create a unique temporary file for each keepalive binary
-	tmpFile, err := os.CreateTemp("", fmt.Sprintf("dagu-keepalive-%s-*", filename))
+	tmpFile, err := os.CreateTemp("", fmt.Sprintf("boltbase-keepalive-%s-*", filename))
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}

@@ -22,7 +22,7 @@ import (
 const (
 	testImage       = "alpine:3"
 	nginxTestImage  = "nginx:alpine"
-	containerPrefix = "dagu-test"
+	containerPrefix = "boltbase-test"
 )
 
 type dockerExecutorTest struct {
@@ -59,7 +59,7 @@ steps:
     config:
       image: alpine:3
       auto_remove: true
-      container_name: dagu-autostart
+      container_name: boltbase-autostart
     command: echo "container started"
     output: DOCKER_EXEC_OUT1
 `,
@@ -475,7 +475,7 @@ func TestDockerExecutor_ExecInExistingContainer(t *testing.T) {
 	require.NoError(t, err, "failed to create docker client")
 	defer func() { _ = dockerClient.Close() }()
 
-	containerName := fmt.Sprintf("dagu-existing-%d", time.Now().UnixNano())
+	containerName := fmt.Sprintf("boltbase-existing-%d", time.Now().UnixNano())
 	containerID := createLongRunningContainer(t, th, dockerClient, containerName)
 	defer removeContainer(t, th, dockerClient, containerID)
 
@@ -900,7 +900,7 @@ func TestContainerExecMode(t *testing.T) {
 	defer func() { _ = dockerClient.Close() }()
 
 	// Create a long-running container for exec tests
-	containerName := fmt.Sprintf("dagu-exec-mode-%d", time.Now().UnixNano())
+	containerName := fmt.Sprintf("boltbase-exec-mode-%d", time.Now().UnixNano())
 	containerID := createLongRunningContainer(t, th, dockerClient, containerName)
 	defer removeContainer(t, th, dockerClient, containerID)
 
@@ -1077,7 +1077,7 @@ func TestContainerExecNotFound(t *testing.T) {
 	th := test.Setup(t)
 
 	// Use a container name that definitely doesn't exist
-	nonExistentContainer := fmt.Sprintf("dagu-nonexistent-%d", time.Now().UnixNano())
+	nonExistentContainer := fmt.Sprintf("boltbase-nonexistent-%d", time.Now().UnixNano())
 
 	dagConfig := fmt.Sprintf(`
 container: %s
@@ -1099,7 +1099,7 @@ func TestContainerExecNotRunning(t *testing.T) {
 	defer func() { _ = dockerClient.Close() }()
 
 	// Create a container but don't start it
-	containerName := fmt.Sprintf("dagu-exec-stopped-%d", time.Now().UnixNano())
+	containerName := fmt.Sprintf("boltbase-exec-stopped-%d", time.Now().UnixNano())
 
 	info, err := dockerClient.Info(th.Context)
 	require.NoError(t, err)
@@ -1220,7 +1220,7 @@ func TestContainerExecVariableExpansion(t *testing.T) {
 	defer func() { _ = dockerClient.Close() }()
 
 	// Create a long-running container for exec tests
-	containerName := fmt.Sprintf("dagu-exec-var-%d", time.Now().UnixNano())
+	containerName := fmt.Sprintf("boltbase-exec-var-%d", time.Now().UnixNano())
 	containerID := createLongRunningContainer(t, th, dockerClient, containerName)
 	defer removeContainer(t, th, dockerClient, containerID)
 

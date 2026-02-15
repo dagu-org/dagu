@@ -128,7 +128,7 @@ func TestNewTracer(t *testing.T) {
 				Enabled:  true,
 				Endpoint: "localhost:4317",
 				Resource: map[string]any{
-					"service.name":           "dagu-test",
+					"service.name":           "boltbase-test",
 					"service.version":        "1.0.0",
 					"deployment.environment": "test",
 					"custom.int":             42,

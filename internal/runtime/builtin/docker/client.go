@@ -62,7 +62,7 @@ const (
 
 	// Keepalive settings
 	keepAliveSleepCmd   = "while true; do sleep 86400; done"
-	keepAliveTargetPath = "/__dagu_runner/keepalive"
+	keepAliveTargetPath = "/__boltbase_runner/keepalive"
 
 	// Log scanning buffer sizes
 	logScanInitialBuf = 64 * 1024

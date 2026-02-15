@@ -155,7 +155,7 @@ func TestUnescapeDollars_EmptyTokens(t *testing.T) {
 }
 
 func TestUniqueToken_Fallback(t *testing.T) {
-	const base = "__DAGU_DOLLAR_ESC__"
+	const base = "__BOLTBASE_DOLLAR_ESC__"
 	const maxTokenAttempts = 1024
 
 	prev := atomic.LoadUint64(&dollarEscapeSeq)

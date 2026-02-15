@@ -1,4 +1,4 @@
-// Package redis provides Redis executor capabilities for Dagu workflows.
+// Package redis provides Redis executor capabilities for Boltbase workflows.
 package redis
 
 import (

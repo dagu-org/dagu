@@ -19,8 +19,8 @@ func Dequeue() *cobra.Command {
 			Long: `Dequeue a DAG-run from the queue.
 
 Example:
-	dagu dequeue default --dag-run=dag_name:my_dag_run_id
-	dagu dequeue default
+	boltbase dequeue default --dag-run=dag_name:my_dag_run_id
+	boltbase dequeue default
 `,
 			Args: cobra.ExactArgs(1),
 		}, dequeueFlags, runDequeue,

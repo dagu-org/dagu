@@ -58,7 +58,7 @@ const (
 	defaultPlatform     = "ubuntu-latest"
 	defaultEventName    = "push"
 	defaultGitHubHost   = "github.com"
-	defaultWorkflowName = "Dagu GitHub Action"
+	defaultWorkflowName = "Boltbase GitHub Action"
 )
 
 var _ executor.Executor = (*githubAction)(nil)
@@ -70,25 +70,25 @@ type githubAction struct {
 	cancel func()
 }
 
-// daguJobLoggerFactory implements runner.JobLoggerFactory to integrate
-// act's logging with Dagu's stdout/stderr writers without hijacking global stdout/stderr
-type daguJobLoggerFactory struct {
+// boltbaseJobLoggerFactory implements runner.JobLoggerFactory to integrate
+// act's logging with Boltbase's stdout/stderr writers without hijacking global stdout/stderr
+type boltbaseJobLoggerFactory struct {
 	stdout io.Writer
 	stderr io.Writer
 }
 
-// daguLogrusHook intercepts log entries and routes them based on content
+// boltbaseLogrusHook intercepts log entries and routes them based on content
 // Raw output (container stdout/stderr) goes to stdout, other logs go to stderr
-type daguLogrusHook struct {
+type boltbaseLogrusHook struct {
 	stdout io.Writer
 	stderr io.Writer
 }
 
-func (h *daguLogrusHook) Levels() []logrus.Level {
+func (h *boltbaseLogrusHook) Levels() []logrus.Level {
 	return logrus.AllLevels
 }
 
-func (h *daguLogrusHook) Fire(entry *logrus.Entry) error {
+func (h *boltbaseLogrusHook) Fire(entry *logrus.Entry) error {
 	// Check if this is raw output from the container
 	if rawOutput, ok := entry.Data["raw_output"]; ok && rawOutput == true {
 		// Container output goes to stdout - write only the message, not formatted log entry
@@ -106,7 +106,7 @@ func (h *daguLogrusHook) Fire(entry *logrus.Entry) error {
 }
 
 // WithJobLogger creates a logrus logger that routes output appropriately
-func (f *daguJobLoggerFactory) WithJobLogger() *logrus.Logger {
+func (f *boltbaseJobLoggerFactory) WithJobLogger() *logrus.Logger {
 	logger := logrus.New()
 	logger.SetOutput(io.Discard) // Disable default output, use hook instead
 	logger.SetLevel(logrus.InfoLevel)
@@ -117,7 +117,7 @@ func (f *daguJobLoggerFactory) WithJobLogger() *logrus.Logger {
 		DisableTimestamp: false,
 	})
 	// Add hook to route output: raw_output to stdout, everything else to stderr
-	logger.AddHook(&daguLogrusHook{
+	logger.AddHook(&boltbaseLogrusHook{
 		stdout: f.stdout,
 		stderr: f.stderr,
 	})
@@ -159,7 +159,7 @@ func (e *githubAction) Run(ctx context.Context) error {
 	}
 
 	// Create temporary directory for workflow file (not for execution)
-	tmpDir, err := os.MkdirTemp("", "dagu-github-action-workflow-*")
+	tmpDir, err := os.MkdirTemp("", "boltbase-github-action-workflow-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
@@ -277,12 +277,12 @@ func (e *githubAction) generateEventJSON() (string, error) {
 	event := map[string]any{
 		"ref": "refs/heads/main",
 		"repository": map[string]any{
-			"name":      "dagu",
-			"full_name": "dagu-org/dagu",
+			"name":      "boltbase",
+			"full_name": "dagu-org/boltbase",
 			"private":   false,
 		},
 		"pusher": map[string]any{
-			"name": "dagu",
+			"name": "boltbase",
 		},
 	}
 
@@ -303,7 +303,7 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, tmpDir, workflow
 	defer file.Close()
 
 	// Create workflow planner
-	planner, err := model.NewSingleWorkflowPlanner("dagu-action", file)
+	planner, err := model.NewSingleWorkflowPlanner("boltbase-action", file)
 	if err != nil {
 		return fmt.Errorf("failed to create workflow planner: %w", err)
 	}
@@ -341,7 +341,7 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, tmpDir, workflow
 
 	// Inject custom JobLoggerFactory into context
 	// This routes container output (raw_output=true) to stdout and other logs to stderr
-	loggerFactory := &daguJobLoggerFactory{
+	loggerFactory := &boltbaseJobLoggerFactory{
 		stdout: e.stdout,
 		stderr: e.stderr,
 	}

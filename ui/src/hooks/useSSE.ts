@@ -48,7 +48,7 @@ function buildSSEUrl(apiURL: string, endpoint: string, remoteNode: string): URL 
   const url = new URL(`${apiURL}${endpoint}`, window.location.origin);
   url.searchParams.set('remoteNode', remoteNode);
 
-  const token = localStorage.getItem('dagu_auth_token');
+  const token = localStorage.getItem('boltbase_auth_token');
   if (token) {
     url.searchParams.set('token', token);
   }

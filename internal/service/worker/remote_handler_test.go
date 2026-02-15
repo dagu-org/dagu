@@ -645,7 +645,7 @@ func TestCreateAgentEnv(t *testing.T) {
 		defer env.cleanup()
 
 		// Should contain the expected path structure
-		expectedPath := filepath.Join(os.TempDir(), "dagu", "worker-logs", "worker-nested", "run-nested")
+		expectedPath := filepath.Join(os.TempDir(), "boltbase", "worker-logs", "worker-nested", "run-nested")
 		assert.Equal(t, expectedPath, env.logDir)
 	})
 }
