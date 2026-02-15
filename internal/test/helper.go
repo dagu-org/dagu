@@ -310,9 +310,8 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 	}
 
 	scheduler := map[string]any{}
-	if cfg.Scheduler.Port != 0 {
-		scheduler["port"] = cfg.Scheduler.Port
-	}
+	// Always write port so that 0 (disable health server) is preserved when loading
+	scheduler["port"] = cfg.Scheduler.Port
 	if cfg.Scheduler.LockStaleThreshold > 0 {
 		scheduler["lock_stale_threshold"] = cfg.Scheduler.LockStaleThreshold.String()
 	}
