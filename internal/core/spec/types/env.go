@@ -104,6 +104,20 @@ func stringifyValue(v any) string {
 	}
 }
 
+// Prepend returns a new EnvValue with other's entries before this value's entries.
+func (e EnvValue) Prepend(other EnvValue) EnvValue {
+	if other.IsZero() {
+		return e
+	}
+	combined := make([]EnvEntry, 0, len(other.entries)+len(e.entries))
+	combined = append(combined, other.entries...)
+	combined = append(combined, e.entries...)
+	return EnvValue{
+		isSet:   true,
+		entries: combined,
+	}
+}
+
 // IsZero returns true if env was not set in YAML.
 func (e EnvValue) IsZero() bool { return !e.isSet }
 

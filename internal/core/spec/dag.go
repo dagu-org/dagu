@@ -126,6 +126,9 @@ type dag struct {
 	Redis *redisConfig `yaml:"redis,omitempty"`
 	// Secrets contains references to external secrets.
 	Secrets []secretRef `yaml:"secrets,omitempty"`
+	// Defaults defines default values for step configuration fields.
+	// Steps inherit these defaults and can override them individually.
+	Defaults any `yaml:"defaults,omitempty"`
 }
 
 // handlerOn defines the steps to be executed on different events.
@@ -1605,16 +1608,21 @@ func buildHandlers(ctx BuildContext, d *dag, result *core.DAG) (core.HandlerOn, 
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: result}
 	var handlerOn core.HandlerOn
 
+	defs, err := decodeDefaults(d.Defaults)
+	if err != nil {
+		return handlerOn, err
+	}
+
 	// buildHandler is a helper that builds a single handler step.
 	buildHandler := func(s *step, name core.HandlerType) (*core.Step, error) {
 		if s == nil {
 			return nil, nil
 		}
 		s.Name = name.String()
+		applyDefaults(s, defs, nil)
 		return s.build(buildCtx)
 	}
 
-	var err error
 	if handlerOn.Init, err = buildHandler(d.HandlerOn.Init, core.HandlerOnInit); err != nil {
 		return handlerOn, err
 	}
@@ -1716,6 +1724,11 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: result}
 	names := make(map[string]struct{})
 
+	defs, err := decodeDefaults(d.Defaults)
+	if err != nil {
+		return nil, err
+	}
+
 	switch v := d.Steps.(type) {
 	case nil:
 		return nil, nil
@@ -1728,7 +1741,7 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 		for i, raw := range normalized {
 			switch v := raw.(type) {
 			case map[string]any:
-				st, err := buildStepFromRaw(buildCtx, i, v, names)
+				st, err := buildStepFromRaw(buildCtx, i, v, names, defs)
 				if err != nil {
 					return nil, err
 				}
@@ -1751,7 +1764,7 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 				for _, nested := range normalizedNested {
 					switch vv := nested.(type) {
 					case map[string]any:
-						st, err := buildStepFromRaw(buildCtx, i, vv, names)
+						st, err := buildStepFromRaw(buildCtx, i, vv, names, defs)
 						if err != nil {
 							return nil, err
 						}
@@ -1804,6 +1817,8 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 		for name, st := range stepsMap {
 			st.Name = name
 			names[st.Name] = struct{}{}
+			rawStep, _ := v[name].(map[string]any)
+			applyDefaults(&st, defs, rawStep)
 			builtStep, err := st.build(buildCtx)
 			if err != nil {
 				return nil, err
