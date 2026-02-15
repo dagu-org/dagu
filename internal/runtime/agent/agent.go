@@ -270,9 +270,9 @@ func New(
 		attemptID:        opts.AttemptID,
 		triggerType:      opts.TriggerType,
 		defaultExecMode:  opts.DefaultExecMode,
-		agentConfigStore:  opts.AgentConfigStore,
-		agentModelStore:   opts.AgentModelStore,
-		agentMemoryStore:  opts.AgentMemoryStore,
+		agentConfigStore: opts.AgentConfigStore,
+		agentModelStore:  opts.AgentModelStore,
+		agentMemoryStore: opts.AgentMemoryStore,
 	}
 
 	// Initialize progress display if enabled
