@@ -132,6 +132,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   // Show actions for root DAG-runs or when no DAG-run data exists
   const showActions =
     !dagRunToDisplay ||
+    !dagRunToDisplay.rootDAGRunId ||
     dagRunToDisplay.dagRunId === dagRunToDisplay.rootDAGRunId;
 
   return (
@@ -142,7 +143,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
           {/* Breadcrumb navigation */}
           {dagRunToDisplay && (
             <nav className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground mb-2">
-              {dagRunToDisplay.rootDAGRunId !== dagRunToDisplay.dagRunId && (
+              {dagRunToDisplay.rootDAGRunId && dagRunToDisplay.rootDAGRunId !== dagRunToDisplay.dagRunId && (
                 <>
                   <a
                     href={`/dags/${fileName}?dagRunId=${dagRunToDisplay.rootDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`}
