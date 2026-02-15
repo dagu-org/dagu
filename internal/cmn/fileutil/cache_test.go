@@ -255,6 +255,42 @@ func TestCache_LoadLatest_LoaderError(t *testing.T) {
 	assert.Equal(t, 0, cache.Size())
 }
 
+func TestCache_LoadLatest_EntryEvictedBetweenCheckAndGet(t *testing.T) {
+	t.Parallel()
+
+	// Use a very short TTL so the entry can expire between Peek (in isStale)
+	// and Get (in LoadLatest), exercising the TOCTOU fallback path.
+	cache := NewCache[string]("test", 100, 50*time.Millisecond)
+
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "test.txt")
+	require.NoError(t, os.WriteFile(filePath, []byte("content"), 0644))
+
+	// Prime the cache with an entry
+	fi, err := os.Stat(filePath)
+	require.NoError(t, err)
+	cache.Store(filePath, "cached-data", fi)
+
+	// Wait until just before expiration, then call LoadLatest.
+	// Even if the entry expires between isStale's Peek and LoadLatest's Get,
+	// LoadLatest must still return valid data via the loader fallback.
+	time.Sleep(40 * time.Millisecond)
+
+	loaderCalled := false
+	data, err := cache.LoadLatest(filePath, func() (string, error) {
+		loaderCalled = true
+		return "fresh-data", nil
+	})
+	require.NoError(t, err)
+
+	// Whether the cache hit or the loader was called, we must get valid data
+	if loaderCalled {
+		assert.Equal(t, "fresh-data", data)
+	} else {
+		assert.Equal(t, "cached-data", data)
+	}
+}
+
 func TestCache_StartEviction(t *testing.T) {
 	t.Parallel()
 

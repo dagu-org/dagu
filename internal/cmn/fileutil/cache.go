@@ -82,8 +82,9 @@ func (c *Cache[T]) LoadLatest(
 		return zero, err
 	}
 	if !stale {
-		e, _ := c.lru.Get(filePath)
-		return e.data, nil
+		if e, ok := c.lru.Get(filePath); ok {
+			return e.data, nil
+		}
 	}
 	data, err := loader()
 	if err != nil {
