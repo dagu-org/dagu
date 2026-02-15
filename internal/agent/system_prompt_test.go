@@ -3,7 +3,6 @@ package agent
 import (
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,7 +19,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			BaseConfigFile: "/config/base.yaml",
 		}
 
-		result := GenerateSystemPrompt(env, nil, iface.MemoryContent{}, auth.RoleDeveloper)
+		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleDeveloper)
 
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "/dags")
@@ -36,7 +35,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			FilePath: "/dags/test-dag.yaml",
 		}
 
-		result := GenerateSystemPrompt(env, dag, iface.MemoryContent{}, auth.RoleAdmin)
+		result := GenerateSystemPrompt(env, dag, MemoryContent{}, auth.RoleAdmin)
 
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "test-dag")
@@ -46,7 +45,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 	t.Run("works with empty environment", func(t *testing.T) {
 		t.Parallel()
 
-		result := GenerateSystemPrompt(EnvironmentInfo{}, nil, iface.MemoryContent{}, auth.RoleViewer)
+		result := GenerateSystemPrompt(EnvironmentInfo{}, nil, MemoryContent{}, auth.RoleViewer)
 
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "Authenticated role: viewer")
@@ -56,7 +55,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{DAGsDir: "/dags"}
 
-		result := GenerateSystemPrompt(env, nil, iface.MemoryContent{}, auth.RoleViewer)
+		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleViewer)
 
 		assert.NotContains(t, result, "<global_memory>")
 		assert.NotContains(t, result, "<dag_memory")
@@ -67,7 +66,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 	t.Run("includes global memory only", func(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{DAGsDir: "/dags"}
-		mem := iface.MemoryContent{
+		mem := MemoryContent{
 			GlobalMemory: "User prefers concise output.",
 			MemoryDir:    "/dags/memory",
 		}
@@ -82,7 +81,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 	t.Run("includes both global and DAG memory", func(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{DAGsDir: "/dags"}
-		mem := iface.MemoryContent{
+		mem := MemoryContent{
 			GlobalMemory: "Global info.",
 			DAGMemory:    "DAG-specific info.",
 			DAGName:      "my-etl",
@@ -100,7 +99,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 	t.Run("memory paths appear in output", func(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{DAGsDir: "/dags"}
-		mem := iface.MemoryContent{
+		mem := MemoryContent{
 			MemoryDir: "/dags/memory",
 			DAGName:   "test-dag",
 		}
@@ -114,7 +113,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 	t.Run("memory management enforces DAG-first policy", func(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{DAGsDir: "/dags"}
-		mem := iface.MemoryContent{
+		mem := MemoryContent{
 			MemoryDir: "/dags/memory",
 			DAGName:   "new-etl",
 		}
@@ -129,7 +128,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 	t.Run("memory management requires confirmation before global write without DAG context", func(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{DAGsDir: "/dags"}
-		mem := iface.MemoryContent{
+		mem := MemoryContent{
 			MemoryDir: "/dags/memory",
 		}
 

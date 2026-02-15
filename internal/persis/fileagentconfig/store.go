@@ -10,12 +10,12 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/agent/iface"
+	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 )
 
-// Verify Store implements iface.ConfigStore at compile time.
-var _ iface.ConfigStore = (*Store)(nil)
+// Verify Store implements agent.ConfigStore at compile time.
+var _ agent.ConfigStore = (*Store)(nil)
 
 const (
 	configFileName  = "config.json"
@@ -35,14 +35,14 @@ const (
 type Store struct {
 	baseDir     string
 	mu          sync.RWMutex
-	configCache *fileutil.Cache[*iface.Config]
+	configCache *fileutil.Cache[*agent.Config]
 }
 
 // Option is a functional option for configuring the Store.
 type Option func(*Store)
 
 // WithConfigCache sets the config cache for the store.
-func WithConfigCache(cache *fileutil.Cache[*iface.Config]) Option {
+func WithConfigCache(cache *fileutil.Cache[*agent.Config]) Option {
 	return func(s *Store) {
 		s.configCache = cache
 	}
@@ -76,7 +76,7 @@ func New(dataDir string, opts ...Option) (*Store, error) {
 // If the file doesn't exist, returns the default configuration.
 // Priority: Environment variables > JSON file > Defaults
 // Uses cache if available to avoid reading file on every request.
-func (s *Store) Load(_ context.Context) (*iface.Config, error) {
+func (s *Store) Load(_ context.Context) (*agent.Config, error) {
 	if s.configCache != nil {
 		return s.configCache.LoadLatest(s.configPath(), s.loadFromFile)
 	}
@@ -84,11 +84,11 @@ func (s *Store) Load(_ context.Context) (*iface.Config, error) {
 }
 
 // loadFromFile reads config directly from file.
-func (s *Store) loadFromFile() (*iface.Config, error) {
+func (s *Store) loadFromFile() (*agent.Config, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	cfg := iface.DefaultConfig()
+	cfg := agent.DefaultConfig()
 
 	data, err := os.ReadFile(s.configPath())
 	if err == nil {
@@ -116,7 +116,7 @@ func (s *Store) IsEnabled(ctx context.Context) bool {
 
 // Save writes the agent configuration to the JSON file.
 // Uses atomic write (temp file + rename) to prevent corruption.
-func (s *Store) Save(_ context.Context, cfg *iface.Config) error {
+func (s *Store) Save(_ context.Context, cfg *agent.Config) error {
 	if cfg == nil {
 		return errors.New("fileagentconfig: config cannot be nil")
 	}
@@ -137,7 +137,7 @@ func (s *Store) Save(_ context.Context, cfg *iface.Config) error {
 }
 
 // writeConfigToFile writes the config to a JSON file atomically.
-func (s *Store) writeConfigToFile(filePath string, cfg *iface.Config) error {
+func (s *Store) writeConfigToFile(filePath string, cfg *agent.Config) error {
 	if err := fileutil.WriteJSONAtomic(filePath, cfg, filePermissions); err != nil {
 		return fmt.Errorf("fileagentconfig: %w", err)
 	}
@@ -160,7 +160,7 @@ func (s *Store) configPath() string {
 
 // applyEnvOverrides applies environment variable overrides to the config.
 // Environment variables take precedence over JSON file values.
-func applyEnvOverrides(cfg *iface.Config) {
+func applyEnvOverrides(cfg *agent.Config) {
 	if v := os.Getenv(envAgentEnabled); v != "" {
 		if enabled, err := strconv.ParseBool(v); err == nil {
 			cfg.Enabled = enabled

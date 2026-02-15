@@ -1,7 +1,5 @@
 package agent
 
-import "github.com/dagu-org/dagu/internal/agent/iface"
-
 // modelPresets contains hardcoded model presets with metadata.
 // These are shown in the frontend as "quick add" options.
 // No API key or base URL is included — admin fills those in.
@@ -11,7 +9,7 @@ import "github.com/dagu-org/dagu/internal/agent/iface"
 //	Anthropic: https://platform.claude.com/docs/en/docs/about-claude/models
 //	OpenAI:    https://platform.openai.com/docs/models
 //	Gemini:    https://ai.google.dev/gemini-api/docs/models
-var modelPresets = []iface.ModelConfig{
+var modelPresets = []ModelConfig{
 	// --- Anthropic ---
 	// https://platform.claude.com/docs/en/docs/about-claude/models
 	// https://platform.claude.com/docs/en/docs/about-claude/pricing
@@ -66,8 +64,8 @@ var modelPresets = []iface.ModelConfig{
 }
 
 // GetModelPresets returns a copy of the built-in model presets.
-func GetModelPresets() []iface.ModelConfig {
-	result := make([]iface.ModelConfig, len(modelPresets))
+func GetModelPresets() []ModelConfig {
+	result := make([]ModelConfig, len(modelPresets))
 	copy(result, modelPresets)
 	return result
 }

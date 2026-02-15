@@ -9,7 +9,6 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/llm"
@@ -98,9 +97,9 @@ func (a *API) CreateAgentModel(ctx context.Context, request api.CreateAgentModel
 	id := valueOf(body.Id)
 	if id == "" {
 		existingIDs := a.collectModelIDs(ctx)
-		id = iface.UniqueID(body.Name, existingIDs)
+		id = agent.UniqueID(body.Name, existingIDs)
 	}
-	if err := iface.ValidateModelID(id); err != nil {
+	if err := agent.ValidateModelID(id); err != nil {
 		return nil, &Error{
 			Code:       api.ErrorCodeBadRequest,
 			Message:    fmt.Sprintf("invalid model ID: %v", err),
@@ -123,7 +122,7 @@ func (a *API) CreateAgentModel(ctx context.Context, request api.CreateAgentModel
 		}
 	}
 
-	model := &iface.ModelConfig{
+	model := &agent.ModelConfig{
 		ID:               id,
 		Name:             body.Name,
 		Provider:         string(body.Provider),
@@ -139,7 +138,7 @@ func (a *API) CreateAgentModel(ctx context.Context, request api.CreateAgentModel
 	}
 
 	if err := a.agentModelStore.Create(ctx, model); err != nil {
-		if errors.Is(err, iface.ErrModelAlreadyExists) {
+		if errors.Is(err, agent.ErrModelAlreadyExists) {
 			return nil, errModelAlreadyExists
 		}
 		logger.Error(ctx, "Failed to create agent model", tag.Error(err))
@@ -181,7 +180,7 @@ func (a *API) UpdateAgentModel(ctx context.Context, request api.UpdateAgentModel
 
 	existing, err := a.agentModelStore.GetByID(ctx, request.ModelId)
 	if err != nil {
-		if errors.Is(err, iface.ErrModelNotFound) {
+		if errors.Is(err, agent.ErrModelNotFound) {
 			return nil, errModelNotFound
 		}
 		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to get model", HTTPStatus: http.StatusInternalServerError}
@@ -190,7 +189,7 @@ func (a *API) UpdateAgentModel(ctx context.Context, request api.UpdateAgentModel
 	applyModelUpdates(existing, body)
 
 	if err := a.agentModelStore.Update(ctx, existing); err != nil {
-		if errors.Is(err, iface.ErrModelAlreadyExists) {
+		if errors.Is(err, agent.ErrModelAlreadyExists) {
 			return nil, errModelAlreadyExists
 		}
 		logger.Error(ctx, "Failed to update agent model", tag.Error(err))
@@ -214,7 +213,7 @@ func (a *API) DeleteAgentModel(ctx context.Context, request api.DeleteAgentModel
 	}
 
 	if err := a.agentModelStore.Delete(ctx, request.ModelId); err != nil {
-		if errors.Is(err, iface.ErrModelNotFound) {
+		if errors.Is(err, agent.ErrModelNotFound) {
 			return nil, errModelNotFound
 		}
 		logger.Error(ctx, "Failed to delete agent model", tag.Error(err))
@@ -247,7 +246,7 @@ func (a *API) SetDefaultAgentModel(ctx context.Context, request api.SetDefaultAg
 
 	// Validate model exists
 	if _, err := a.agentModelStore.GetByID(ctx, modelID); err != nil {
-		if errors.Is(err, iface.ErrModelNotFound) {
+		if errors.Is(err, agent.ErrModelNotFound) {
 			return nil, errModelNotFound
 		}
 		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to validate model", HTTPStatus: http.StatusInternalServerError}
@@ -316,7 +315,7 @@ func (a *API) requireAgentModelManagement() error {
 	return nil
 }
 
-func toModelConfigResponse(m *iface.ModelConfig) api.ModelConfigResponse {
+func toModelConfigResponse(m *agent.ModelConfig) api.ModelConfigResponse {
 	return api.ModelConfigResponse{
 		Id:               m.ID,
 		Name:             m.Name,
@@ -333,7 +332,7 @@ func toModelConfigResponse(m *iface.ModelConfig) api.ModelConfigResponse {
 	}
 }
 
-func applyModelUpdates(model *iface.ModelConfig, update *api.UpdateModelConfigRequest) {
+func applyModelUpdates(model *agent.ModelConfig, update *api.UpdateModelConfigRequest) {
 	if update.Name != nil && strings.TrimSpace(*update.Name) != "" {
 		model.Name = *update.Name
 	}

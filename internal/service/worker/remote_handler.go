@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/agent/iface"
+	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -21,7 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/runtime"
-	"github.com/dagu-org/dagu/internal/runtime/agent"
+	rtagent "github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/dagu-org/dagu/internal/runtime/remote"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -168,7 +168,7 @@ func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root 
 }
 
 // agentStores creates the agent config, model, and memory stores from the config paths.
-func (h *remoteTaskHandler) agentStores(ctx context.Context) (configStore iface.ConfigStore, modelStore iface.ModelStore, memoryStore iface.MemoryStore) {
+func (h *remoteTaskHandler) agentStores(ctx context.Context) (configStore agent.ConfigStore, modelStore agent.ModelStore, memoryStore agent.MemoryStore) {
 	acs, err := fileagentconfig.New(h.config.Paths.DataDir)
 	if err != nil {
 		logger.Warn(ctx, "Failed to create agent config store", tag.Error(err))
@@ -312,7 +312,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 	agentConfigStore, agentModelStore, agentMemoryStore := h.agentStores(ctx)
 
 	// Build agent options
-	opts := agent.Options{
+	opts := rtagent.Options{
 		ParentDAGRun:     parent,
 		WorkerID:         h.workerID,
 		StatusPusher:     statusPusher,
@@ -336,7 +336,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 	}
 
 	// Create the agent
-	agentInstance := agent.New(
+	agentInstance := rtagent.New(
 		dagRunID,
 		dag,
 		env.logDir,

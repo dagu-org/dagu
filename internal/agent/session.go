@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/google/uuid"
@@ -45,7 +44,7 @@ type SessionManager struct {
 	inputCostPer1M  float64
 	outputCostPer1M float64
 	totalCost       float64
-	memoryStore     iface.MemoryStore
+	memoryStore     MemoryStore
 	dagName         string
 }
 
@@ -67,7 +66,7 @@ type SessionManagerConfig struct {
 	Role            auth.Role
 	InputCostPer1M  float64
 	OutputCostPer1M float64
-	MemoryStore     iface.MemoryStore
+	MemoryStore     MemoryStore
 	DAGName         string
 }
 
@@ -405,9 +404,9 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 }
 
 // loadMemory loads memory content from the memory store.
-func (sm *SessionManager) loadMemory() iface.MemoryContent {
+func (sm *SessionManager) loadMemory() MemoryContent {
 	if sm.memoryStore == nil {
-		return iface.MemoryContent{}
+		return MemoryContent{}
 	}
 	ctx := context.Background()
 	global, err := sm.memoryStore.LoadGlobalMemory(ctx)
@@ -421,7 +420,7 @@ func (sm *SessionManager) loadMemory() iface.MemoryContent {
 			sm.logger.Debug("failed to load DAG memory", "error", err, "dag_name", sm.dagName)
 		}
 	}
-	return iface.MemoryContent{
+	return MemoryContent{
 		GlobalMemory: global,
 		DAGMemory:    dagMem,
 		DAGName:      sm.dagName,

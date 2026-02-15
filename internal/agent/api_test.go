@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -29,8 +28,8 @@ func newAPITestSetup(t *testing.T, enabled bool, withProvider bool, workingDir s
 
 	configStore := newMockConfigStore(enabled)
 
-	var modelStore iface.ModelStore
-	var model *iface.ModelConfig
+	var modelStore ModelStore
+	var model *ModelConfig
 	if withProvider {
 		model = testModelConfig("test-model")
 		ms := newMockModelStore().addModel(model)

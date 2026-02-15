@@ -5,7 +5,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/agent/iface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,7 +13,7 @@ func TestProviderCache_GetOrCreate_CachedOnSecondCall(t *testing.T) {
 	t.Parallel()
 
 	cache := NewProviderCache()
-	cfg := iface.LLMConfig{Provider: "anthropic", Model: "claude-opus-4", APIKey: "key1"}
+	cfg := LLMConfig{Provider: "anthropic", Model: "claude-opus-4", APIKey: "key1"}
 	mock := &mockLLMProvider{name: "test-provider"}
 
 	// Pre-populate via Set so GetOrCreate does not call CreateLLMProvider.
@@ -36,7 +35,7 @@ func TestProviderCache_Set(t *testing.T) {
 	t.Parallel()
 
 	cache := NewProviderCache()
-	cfg := iface.LLMConfig{Provider: "openai", Model: "gpt-4", APIKey: "sk-abc"}
+	cfg := LLMConfig{Provider: "openai", Model: "gpt-4", APIKey: "sk-abc"}
 	mock := &mockLLMProvider{name: "set-provider"}
 
 	cache.Set(cfg, mock)
@@ -51,7 +50,7 @@ func TestProviderCache_Invalidate(t *testing.T) {
 	t.Parallel()
 
 	cache := NewProviderCache()
-	cfg := iface.LLMConfig{Provider: "anthropic", Model: "claude-opus-4", APIKey: "key"}
+	cfg := LLMConfig{Provider: "anthropic", Model: "claude-opus-4", APIKey: "key"}
 
 	mockA := &mockLLMProvider{name: "provider-a"}
 	cache.Set(cfg, mockA)
@@ -79,7 +78,7 @@ func TestProviderCache_InvalidateAll(t *testing.T) {
 
 	cache := NewProviderCache()
 
-	configs := []iface.LLMConfig{
+	configs := []LLMConfig{
 		{Provider: "anthropic", Model: "claude-opus-4", APIKey: "key1"},
 		{Provider: "openai", Model: "gpt-4", APIKey: "key2"},
 		{Provider: "gemini", Model: "gemini-pro", APIKey: "key3"},
@@ -108,7 +107,7 @@ func TestProviderCache_InvalidateAll(t *testing.T) {
 func TestHashLLMConfig_Consistency(t *testing.T) {
 	t.Parallel()
 
-	cfg := iface.LLMConfig{
+	cfg := LLMConfig{
 		Provider: "anthropic",
 		Model:    "claude-opus-4",
 		APIKey:   "sk-abc123",
@@ -125,8 +124,8 @@ func TestHashLLMConfig_Consistency(t *testing.T) {
 func TestHashLLMConfig_DifferentConfigs(t *testing.T) {
 	t.Parallel()
 
-	cfgA := iface.LLMConfig{Provider: "anthropic", Model: "claude-opus-4", APIKey: "key"}
-	cfgB := iface.LLMConfig{Provider: "openai", Model: "gpt-4", APIKey: "key"}
+	cfgA := LLMConfig{Provider: "anthropic", Model: "claude-opus-4", APIKey: "key"}
+	cfgB := LLMConfig{Provider: "openai", Model: "gpt-4", APIKey: "key"}
 
 	assert.NotEqual(t, HashLLMConfig(cfgA), HashLLMConfig(cfgB))
 }
@@ -136,23 +135,23 @@ func TestHashLLMConfig_NoDelimiterInjection(t *testing.T) {
 
 	tests := []struct {
 		name string
-		a    iface.LLMConfig
-		b    iface.LLMConfig
+		a    LLMConfig
+		b    LLMConfig
 	}{
 		{
 			name: "colon in provider vs model boundary",
-			a:    iface.LLMConfig{Provider: "abc", Model: "def", APIKey: "k", BaseURL: "u"},
-			b:    iface.LLMConfig{Provider: "ab", Model: "cdef", APIKey: "k", BaseURL: "u"},
+			a:    LLMConfig{Provider: "abc", Model: "def", APIKey: "k", BaseURL: "u"},
+			b:    LLMConfig{Provider: "ab", Model: "cdef", APIKey: "k", BaseURL: "u"},
 		},
 		{
 			name: "pipe in values",
-			a:    iface.LLMConfig{Provider: "a|b", Model: "c", APIKey: "k", BaseURL: "u"},
-			b:    iface.LLMConfig{Provider: "a", Model: "b|c", APIKey: "k", BaseURL: "u"},
+			a:    LLMConfig{Provider: "a|b", Model: "c", APIKey: "k", BaseURL: "u"},
+			b:    LLMConfig{Provider: "a", Model: "b|c", APIKey: "k", BaseURL: "u"},
 		},
 		{
 			name: "colon in api key",
-			a:    iface.LLMConfig{Provider: "p", Model: "m", APIKey: "key:1", BaseURL: "u"},
-			b:    iface.LLMConfig{Provider: "p", Model: "m", APIKey: "key", BaseURL: "1|u"},
+			a:    LLMConfig{Provider: "p", Model: "m", APIKey: "key:1", BaseURL: "u"},
+			b:    LLMConfig{Provider: "p", Model: "m", APIKey: "key", BaseURL: "1|u"},
 		},
 	}
 
@@ -173,9 +172,9 @@ func TestProviderCache_ConcurrentAccess(t *testing.T) {
 	cache := NewProviderCache()
 	const goroutines = 50
 
-	configs := make([]iface.LLMConfig, goroutines)
+	configs := make([]LLMConfig, goroutines)
 	for i := range goroutines {
-		configs[i] = iface.LLMConfig{
+		configs[i] = LLMConfig{
 			Provider: "anthropic",
 			Model:    "model-" + strings.Repeat("x", i),
 			APIKey:   "key",
@@ -220,7 +219,7 @@ func TestProviderCache_Eviction(t *testing.T) {
 	cache := NewProviderCache()
 	cache.maxSize = 3
 
-	cfgs := []iface.LLMConfig{
+	cfgs := []LLMConfig{
 		{Provider: "p", Model: "m1", APIKey: "k"},
 		{Provider: "p", Model: "m2", APIKey: "k"},
 		{Provider: "p", Model: "m3", APIKey: "k"},
@@ -236,7 +235,7 @@ func TestProviderCache_Eviction(t *testing.T) {
 	cache.mu.RUnlock()
 
 	// Adding a 4th entry should trigger eviction (cache clears when full).
-	extraCfg := iface.LLMConfig{Provider: "p", Model: "m4", APIKey: "k"}
+	extraCfg := LLMConfig{Provider: "p", Model: "m4", APIKey: "k"}
 	cache.Set(extraCfg, &mockLLMProvider{name: "m4"})
 
 	cache.mu.RLock()
