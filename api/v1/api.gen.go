@@ -2898,6 +2898,24 @@ type UpdateAgentModelParams struct {
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 }
 
+// GetBaseConfigParams defines parameters for GetBaseConfig.
+type GetBaseConfigParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
+// UpdateBaseConfigJSONBody defines parameters for UpdateBaseConfig.
+type UpdateBaseConfigJSONBody struct {
+	// Spec The base configuration in YAML format
+	Spec string `json:"spec"`
+}
+
+// UpdateBaseConfigParams defines parameters for UpdateBaseConfig.
+type UpdateBaseConfigParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+}
+
 // GetSyncConfigParams defines parameters for GetSyncConfig.
 type GetSyncConfigParams struct {
 	// RemoteNode name of the remote node
@@ -3059,6 +3077,9 @@ type CreateAgentModelJSONRequestBody = CreateModelConfigRequest
 
 // UpdateAgentModelJSONRequestBody defines body for UpdateAgentModel for application/json ContentType.
 type UpdateAgentModelJSONRequestBody = UpdateModelConfigRequest
+
+// UpdateBaseConfigJSONRequestBody defines body for UpdateBaseConfig for application/json ContentType.
+type UpdateBaseConfigJSONRequestBody UpdateBaseConfigJSONBody
 
 // UpdateSyncConfigJSONRequestBody defines body for UpdateSyncConfig for application/json ContentType.
 type UpdateSyncConfigJSONRequestBody = SyncConfigUpdateRequest
@@ -3456,6 +3477,12 @@ type ServerInterface interface {
 	// Update agent model
 	// (PATCH /settings/agent/models/{modelId})
 	UpdateAgentModel(w http.ResponseWriter, r *http.Request, modelId string, params UpdateAgentModelParams)
+	// Get base configuration
+	// (GET /settings/base-config)
+	GetBaseConfig(w http.ResponseWriter, r *http.Request, params GetBaseConfigParams)
+	// Update base configuration
+	// (PUT /settings/base-config)
+	UpdateBaseConfig(w http.ResponseWriter, r *http.Request, params UpdateBaseConfigParams)
 	// Get Git sync configuration
 	// (GET /sync/config)
 	GetSyncConfig(w http.ResponseWriter, r *http.Request, params GetSyncConfigParams)
@@ -4011,6 +4038,18 @@ func (_ Unimplemented) DeleteAgentModel(w http.ResponseWriter, r *http.Request, 
 // Update agent model
 // (PATCH /settings/agent/models/{modelId})
 func (_ Unimplemented) UpdateAgentModel(w http.ResponseWriter, r *http.Request, modelId string, params UpdateAgentModelParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get base configuration
+// (GET /settings/base-config)
+func (_ Unimplemented) GetBaseConfig(w http.ResponseWriter, r *http.Request, params GetBaseConfigParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update base configuration
+// (PUT /settings/base-config)
+func (_ Unimplemented) UpdateBaseConfig(w http.ResponseWriter, r *http.Request, params UpdateBaseConfigParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -8213,6 +8252,76 @@ func (siw *ServerInterfaceWrapper) UpdateAgentModel(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// GetBaseConfig operation middleware
+func (siw *ServerInterfaceWrapper) GetBaseConfig(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetBaseConfigParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBaseConfig(w, r, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateBaseConfig operation middleware
+func (siw *ServerInterfaceWrapper) UpdateBaseConfig(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiTokenScopes, []string{})
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateBaseConfigParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateBaseConfig(w, r, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetSyncConfig operation middleware
 func (siw *ServerInterfaceWrapper) GetSyncConfig(w http.ResponseWriter, r *http.Request) {
 
@@ -9219,6 +9328,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/settings/agent/models/{modelId}", wrapper.UpdateAgentModel)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/settings/base-config", wrapper.GetBaseConfig)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/settings/base-config", wrapper.UpdateBaseConfig)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/sync/config", wrapper.GetSyncConfig)
@@ -12941,6 +13056,119 @@ func (response UpdateAgentModeldefaultJSONResponse) VisitUpdateAgentModelRespons
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
+type GetBaseConfigRequestObject struct {
+	Params GetBaseConfigParams
+}
+
+type GetBaseConfigResponseObject interface {
+	VisitGetBaseConfigResponse(w http.ResponseWriter) error
+}
+
+type GetBaseConfig200JSONResponse struct {
+	// Errors List of validation errors in the configuration
+	Errors []string `json:"errors"`
+
+	// Spec The base configuration in YAML format
+	Spec string `json:"spec"`
+}
+
+func (response GetBaseConfig200JSONResponse) VisitGetBaseConfigResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetBaseConfig401JSONResponse Error
+
+func (response GetBaseConfig401JSONResponse) VisitGetBaseConfigResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetBaseConfig403JSONResponse Error
+
+func (response GetBaseConfig403JSONResponse) VisitGetBaseConfigResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetBaseConfigdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetBaseConfigdefaultJSONResponse) VisitGetBaseConfigResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type UpdateBaseConfigRequestObject struct {
+	Params UpdateBaseConfigParams
+	Body   *UpdateBaseConfigJSONRequestBody
+}
+
+type UpdateBaseConfigResponseObject interface {
+	VisitUpdateBaseConfigResponse(w http.ResponseWriter) error
+}
+
+type UpdateBaseConfig200JSONResponse struct {
+	// Errors List of validation warnings
+	Errors []string `json:"errors"`
+}
+
+func (response UpdateBaseConfig200JSONResponse) VisitUpdateBaseConfigResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateBaseConfig400JSONResponse Error
+
+func (response UpdateBaseConfig400JSONResponse) VisitUpdateBaseConfigResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateBaseConfig401JSONResponse Error
+
+func (response UpdateBaseConfig401JSONResponse) VisitUpdateBaseConfigResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateBaseConfig403JSONResponse Error
+
+func (response UpdateBaseConfig403JSONResponse) VisitUpdateBaseConfigResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateBaseConfigdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response UpdateBaseConfigdefaultJSONResponse) VisitUpdateBaseConfigResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
 type GetSyncConfigRequestObject struct {
 	Params GetSyncConfigParams
 }
@@ -14001,6 +14229,12 @@ type StrictServerInterface interface {
 	// Update agent model
 	// (PATCH /settings/agent/models/{modelId})
 	UpdateAgentModel(ctx context.Context, request UpdateAgentModelRequestObject) (UpdateAgentModelResponseObject, error)
+	// Get base configuration
+	// (GET /settings/base-config)
+	GetBaseConfig(ctx context.Context, request GetBaseConfigRequestObject) (GetBaseConfigResponseObject, error)
+	// Update base configuration
+	// (PUT /settings/base-config)
+	UpdateBaseConfig(ctx context.Context, request UpdateBaseConfigRequestObject) (UpdateBaseConfigResponseObject, error)
 	// Get Git sync configuration
 	// (GET /sync/config)
 	GetSyncConfig(ctx context.Context, request GetSyncConfigRequestObject) (GetSyncConfigResponseObject, error)
@@ -16532,6 +16766,65 @@ func (sh *strictHandler) UpdateAgentModel(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// GetBaseConfig operation middleware
+func (sh *strictHandler) GetBaseConfig(w http.ResponseWriter, r *http.Request, params GetBaseConfigParams) {
+	var request GetBaseConfigRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetBaseConfig(ctx, request.(GetBaseConfigRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetBaseConfig")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetBaseConfigResponseObject); ok {
+		if err := validResponse.VisitGetBaseConfigResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateBaseConfig operation middleware
+func (sh *strictHandler) UpdateBaseConfig(w http.ResponseWriter, r *http.Request, params UpdateBaseConfigParams) {
+	var request UpdateBaseConfigRequestObject
+
+	request.Params = params
+
+	var body UpdateBaseConfigJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateBaseConfig(ctx, request.(UpdateBaseConfigRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateBaseConfig")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateBaseConfigResponseObject); ok {
+		if err := validResponse.VisitUpdateBaseConfigResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetSyncConfig operation middleware
 func (sh *strictHandler) GetSyncConfig(w http.ResponseWriter, r *http.Request, params GetSyncConfigParams) {
 	var request GetSyncConfigRequestObject
@@ -17381,39 +17674,42 @@ var swaggerSpec = []string{
 	"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",
-	"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",
-	"7/9fAAAA//9Ip1FobnECAA==",
+	"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",
+	"KNIEewBcUCHq+5fv/18AAAD//+b3DUFPegIA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

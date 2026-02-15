@@ -25,6 +25,7 @@ import AgentMemoryPage from './pages/agent-memory';
 import AgentSettingsPage from './pages/agent-settings';
 import APIKeysPage from './pages/api-keys';
 import AuditLogsPage from './pages/audit-logs';
+import BaseConfigPage from './pages/base-config';
 import DAGRuns from './pages/dag-runs';
 import DAGRunDetails from './pages/dag-runs/dag-run';
 import DAGs from './pages/dags';
@@ -166,6 +167,7 @@ function AppInner({ config }: Props): React.ReactElement {
                                         <Route path="/dag-runs" element={<DAGRuns />} />
                                         <Route path="/dag-runs/:name/:dagRunId" element={<DAGRunDetails />} />
                                         <Route path="/system-status" element={<DeveloperElement><SystemStatus /></DeveloperElement>} />
+                                        <Route path="/base-config" element={<DeveloperElement><BaseConfigPage /></DeveloperElement>} />
                                         <Route path="/users" element={<AdminElement><UsersPage /></AdminElement>} />
                                         <Route path="/api-keys" element={<AdminElement><APIKeysPage /></AdminElement>} />
                                         <Route path="/webhooks" element={<DeveloperElement><WebhooksPage /></DeveloperElement>} />
