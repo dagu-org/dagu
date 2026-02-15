@@ -42,30 +42,47 @@ func decodeDefaults(raw any) (*defaults, error) {
 }
 
 // applyDefaults merges default values into a step. Override fields are set only
-// when the step's field is at its zero value. Additive fields (env, preconditions)
-// prepend default entries before the step's own entries.
-func applyDefaults(s *step, d *defaults) {
+// when the step did not explicitly set its own value. Additive fields (env,
+// preconditions) prepend default entries before the step's own entries.
+//
+// The raw parameter is the original map[string]any from YAML decoding. When
+// available, key presence in raw is used to detect explicit values (including
+// zero values like timeout_sec: 0 or mail_on_error: false). When raw is nil
+// (e.g. handler steps), the function falls back to checking the step field's
+// Go zero value.
+func applyDefaults(s *step, d *defaults, raw map[string]any) {
 	if d == nil {
 		return
 	}
 
-	// Override fields: set if step's field is zero/nil
-	if s.RetryPolicy == nil && d.RetryPolicy != nil {
+	// shouldApply reports whether the default for key should be applied.
+	// When raw is available, checks that the key was NOT explicitly set in YAML.
+	// When raw is nil, falls back to checking the step field's zero value.
+	shouldApply := func(key string, isZero bool) bool {
+		if raw != nil {
+			_, ok := raw[key]
+			return !ok
+		}
+		return isZero
+	}
+
+	// Override fields: apply only if step did not explicitly set the field
+	if shouldApply("retry_policy", s.RetryPolicy == nil) && d.RetryPolicy != nil {
 		s.RetryPolicy = d.RetryPolicy
 	}
-	if s.ContinueOn.IsZero() && !d.ContinueOn.IsZero() {
+	if shouldApply("continue_on", s.ContinueOn.IsZero()) && !d.ContinueOn.IsZero() {
 		s.ContinueOn = d.ContinueOn
 	}
-	if s.RepeatPolicy == nil && d.RepeatPolicy != nil {
+	if shouldApply("repeat_policy", s.RepeatPolicy == nil) && d.RepeatPolicy != nil {
 		s.RepeatPolicy = d.RepeatPolicy
 	}
-	if s.TimeoutSec == 0 && d.TimeoutSec != 0 {
+	if shouldApply("timeout_sec", s.TimeoutSec == 0) && d.TimeoutSec != 0 {
 		s.TimeoutSec = d.TimeoutSec
 	}
-	if d.MailOnError != nil && !s.MailOnError {
+	if shouldApply("mail_on_error", !s.MailOnError) && d.MailOnError != nil {
 		s.MailOnError = *d.MailOnError
 	}
-	if s.SignalOnStop == nil && d.SignalOnStop != nil {
+	if shouldApply("signal_on_stop", s.SignalOnStop == nil) && d.SignalOnStop != nil {
 		s.SignalOnStop = d.SignalOnStop
 	}
 

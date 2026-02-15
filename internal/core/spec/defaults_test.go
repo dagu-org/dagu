@@ -3,7 +3,6 @@ package spec
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,23 +15,23 @@ func TestApplyDefaults(t *testing.T) {
 	t.Run("NilDefaults", func(t *testing.T) {
 		t.Parallel()
 		s := &step{TimeoutSec: 10}
-		applyDefaults(s, nil)
-		assert.Equal(t, 10, s.TimeoutSec)
+		applyDefaults(s, nil, nil)
+		require.Equal(t, 10, s.TimeoutSec)
 	})
 
 	t.Run("EmptyDefaults", func(t *testing.T) {
 		t.Parallel()
 		s := &step{TimeoutSec: 10}
-		applyDefaults(s, &defaults{})
-		assert.Equal(t, 10, s.TimeoutSec)
+		applyDefaults(s, &defaults{}, nil)
+		require.Equal(t, 10, s.TimeoutSec)
 	})
 
 	t.Run("RetryPolicy_Inherits", func(t *testing.T) {
 		t.Parallel()
 		rp := &retryPolicy{Limit: 3, IntervalSec: 5}
 		s := &step{}
-		applyDefaults(s, &defaults{RetryPolicy: rp})
-		assert.Equal(t, rp, s.RetryPolicy)
+		applyDefaults(s, &defaults{RetryPolicy: rp}, nil)
+		require.Equal(t, rp, s.RetryPolicy)
 	})
 
 	t.Run("RetryPolicy_StepOverrides", func(t *testing.T) {
@@ -40,18 +39,28 @@ func TestApplyDefaults(t *testing.T) {
 		stepRP := &retryPolicy{Limit: 10}
 		defRP := &retryPolicy{Limit: 3, IntervalSec: 5}
 		s := &step{RetryPolicy: stepRP}
-		applyDefaults(s, &defaults{RetryPolicy: defRP})
-		assert.Equal(t, stepRP, s.RetryPolicy)
-		assert.Equal(t, 10, s.RetryPolicy.Limit.(int))
+		applyDefaults(s, &defaults{RetryPolicy: defRP}, nil)
+		require.Equal(t, stepRP, s.RetryPolicy)
+		require.Equal(t, 10, s.RetryPolicy.Limit.(int))
+	})
+
+	t.Run("RetryPolicy_StepOverrides_WithRaw", func(t *testing.T) {
+		t.Parallel()
+		defRP := &retryPolicy{Limit: 3, IntervalSec: 5}
+		s := &step{}
+		raw := map[string]any{"retry_policy": map[string]any{"limit": 0}}
+		applyDefaults(s, &defaults{RetryPolicy: defRP}, raw)
+		// Step explicitly set retry_policy in raw, so default should NOT apply
+		require.Nil(t, s.RetryPolicy)
 	})
 
 	t.Run("ContinueOn_Inherits", func(t *testing.T) {
 		t.Parallel()
 		co := continueOnValue("failed")
 		s := &step{}
-		applyDefaults(s, &defaults{ContinueOn: co})
-		assert.False(t, s.ContinueOn.IsZero())
-		assert.True(t, s.ContinueOn.Failed())
+		applyDefaults(s, &defaults{ContinueOn: co}, nil)
+		require.False(t, s.ContinueOn.IsZero())
+		require.True(t, s.ContinueOn.Failed())
 	})
 
 	t.Run("ContinueOn_StepOverrides", func(t *testing.T) {
@@ -59,17 +68,17 @@ func TestApplyDefaults(t *testing.T) {
 		stepCO := continueOnValue("skipped")
 		defCO := continueOnValue("failed")
 		s := &step{ContinueOn: stepCO}
-		applyDefaults(s, &defaults{ContinueOn: defCO})
-		assert.True(t, s.ContinueOn.Skipped())
-		assert.False(t, s.ContinueOn.Failed())
+		applyDefaults(s, &defaults{ContinueOn: defCO}, nil)
+		require.True(t, s.ContinueOn.Skipped())
+		require.False(t, s.ContinueOn.Failed())
 	})
 
 	t.Run("RepeatPolicy_Inherits", func(t *testing.T) {
 		t.Parallel()
 		rp := &repeatPolicy{Repeat: "while", IntervalSec: 30}
 		s := &step{}
-		applyDefaults(s, &defaults{RepeatPolicy: rp})
-		assert.Equal(t, rp, s.RepeatPolicy)
+		applyDefaults(s, &defaults{RepeatPolicy: rp}, nil)
+		require.Equal(t, rp, s.RepeatPolicy)
 	})
 
 	t.Run("RepeatPolicy_StepOverrides", func(t *testing.T) {
@@ -77,71 +86,89 @@ func TestApplyDefaults(t *testing.T) {
 		stepRP := &repeatPolicy{Repeat: "until", IntervalSec: 10}
 		defRP := &repeatPolicy{Repeat: "while", IntervalSec: 30}
 		s := &step{RepeatPolicy: stepRP}
-		applyDefaults(s, &defaults{RepeatPolicy: defRP})
-		assert.Equal(t, stepRP, s.RepeatPolicy)
+		applyDefaults(s, &defaults{RepeatPolicy: defRP}, nil)
+		require.Equal(t, stepRP, s.RepeatPolicy)
 	})
 
 	t.Run("TimeoutSec_Inherits", func(t *testing.T) {
 		t.Parallel()
 		s := &step{}
-		applyDefaults(s, &defaults{TimeoutSec: 600})
-		assert.Equal(t, 600, s.TimeoutSec)
+		applyDefaults(s, &defaults{TimeoutSec: 600}, nil)
+		require.Equal(t, 600, s.TimeoutSec)
 	})
 
 	t.Run("TimeoutSec_StepOverrides", func(t *testing.T) {
 		t.Parallel()
 		s := &step{TimeoutSec: 300}
-		applyDefaults(s, &defaults{TimeoutSec: 600})
-		assert.Equal(t, 300, s.TimeoutSec)
+		applyDefaults(s, &defaults{TimeoutSec: 600}, nil)
+		require.Equal(t, 300, s.TimeoutSec)
+	})
+
+	t.Run("TimeoutSec_StepExplicitZero_WithRaw", func(t *testing.T) {
+		t.Parallel()
+		s := &step{}
+		raw := map[string]any{"timeout_sec": 0}
+		applyDefaults(s, &defaults{TimeoutSec: 600}, raw)
+		// Step explicitly set timeout_sec: 0 in raw, default should NOT apply
+		require.Equal(t, 0, s.TimeoutSec)
 	})
 
 	t.Run("MailOnError_Inherits_True", func(t *testing.T) {
 		t.Parallel()
 		s := &step{}
-		applyDefaults(s, &defaults{MailOnError: boolPtr(true)})
-		assert.True(t, s.MailOnError)
+		applyDefaults(s, &defaults{MailOnError: boolPtr(true)}, nil)
+		require.True(t, s.MailOnError)
 	})
 
 	t.Run("MailOnError_NilDefault_NoChange", func(t *testing.T) {
 		t.Parallel()
 		s := &step{}
-		applyDefaults(s, &defaults{MailOnError: nil})
-		assert.False(t, s.MailOnError)
+		applyDefaults(s, &defaults{MailOnError: nil}, nil)
+		require.False(t, s.MailOnError)
 	})
 
 	t.Run("MailOnError_StepTrue_DefaultFalse", func(t *testing.T) {
 		t.Parallel()
 		s := &step{MailOnError: true}
-		applyDefaults(s, &defaults{MailOnError: boolPtr(false)})
+		applyDefaults(s, &defaults{MailOnError: boolPtr(false)}, nil)
 		// Step already has true, default false doesn't override
-		assert.True(t, s.MailOnError)
+		require.True(t, s.MailOnError)
+	})
+
+	t.Run("MailOnError_StepExplicitFalse_WithRaw", func(t *testing.T) {
+		t.Parallel()
+		s := &step{}
+		raw := map[string]any{"mail_on_error": false}
+		applyDefaults(s, &defaults{MailOnError: boolPtr(true)}, raw)
+		// Step explicitly set mail_on_error: false in raw, default should NOT apply
+		require.False(t, s.MailOnError)
 	})
 
 	t.Run("SignalOnStop_Inherits", func(t *testing.T) {
 		t.Parallel()
 		s := &step{}
-		applyDefaults(s, &defaults{SignalOnStop: strPtr("SIGTERM")})
+		applyDefaults(s, &defaults{SignalOnStop: strPtr("SIGTERM")}, nil)
 		require.NotNil(t, s.SignalOnStop)
-		assert.Equal(t, "SIGTERM", *s.SignalOnStop)
+		require.Equal(t, "SIGTERM", *s.SignalOnStop)
 	})
 
 	t.Run("SignalOnStop_StepOverrides", func(t *testing.T) {
 		t.Parallel()
 		s := &step{SignalOnStop: strPtr("SIGINT")}
-		applyDefaults(s, &defaults{SignalOnStop: strPtr("SIGTERM")})
-		assert.Equal(t, "SIGINT", *s.SignalOnStop)
+		applyDefaults(s, &defaults{SignalOnStop: strPtr("SIGTERM")}, nil)
+		require.Equal(t, "SIGINT", *s.SignalOnStop)
 	})
 
 	t.Run("Env_Inherits_WhenStepEmpty", func(t *testing.T) {
 		t.Parallel()
 		defEnv := envValueMap(map[string]string{"LOG_LEVEL": "info"})
 		s := &step{}
-		applyDefaults(s, &defaults{Env: defEnv})
+		applyDefaults(s, &defaults{Env: defEnv}, nil)
 		require.False(t, s.Env.IsZero())
 		entries := s.Env.Entries()
 		require.Len(t, entries, 1)
-		assert.Equal(t, "LOG_LEVEL", entries[0].Key)
-		assert.Equal(t, "info", entries[0].Value)
+		require.Equal(t, "LOG_LEVEL", entries[0].Key)
+		require.Equal(t, "info", entries[0].Value)
 	})
 
 	t.Run("Env_Additive", func(t *testing.T) {
@@ -149,32 +176,32 @@ func TestApplyDefaults(t *testing.T) {
 		defEnv := envValueMap(map[string]string{"LOG_LEVEL": "info"})
 		stepEnv := envValueMap(map[string]string{"EXTRA": "true"})
 		s := &step{Env: stepEnv}
-		applyDefaults(s, &defaults{Env: defEnv})
+		applyDefaults(s, &defaults{Env: defEnv}, nil)
 
 		entries := s.Env.Entries()
 		require.Len(t, entries, 2)
 		// Default entry comes first
-		assert.Equal(t, "LOG_LEVEL", entries[0].Key)
-		assert.Equal(t, "EXTRA", entries[1].Key)
+		require.Equal(t, "LOG_LEVEL", entries[0].Key)
+		require.Equal(t, "EXTRA", entries[1].Key)
 	})
 
 	t.Run("Preconditions_Inherits_WhenStepNil", func(t *testing.T) {
 		t.Parallel()
 		defPrecond := "test -f /tmp/ready"
 		s := &step{}
-		applyDefaults(s, &defaults{Preconditions: defPrecond})
-		assert.Equal(t, defPrecond, s.Preconditions)
+		applyDefaults(s, &defaults{Preconditions: defPrecond}, nil)
+		require.Equal(t, defPrecond, s.Preconditions)
 	})
 
 	t.Run("Preconditions_Additive_StringAndString", func(t *testing.T) {
 		t.Parallel()
 		s := &step{Preconditions: "test -d /data"}
-		applyDefaults(s, &defaults{Preconditions: "test -f /tmp/ready"})
+		applyDefaults(s, &defaults{Preconditions: "test -f /tmp/ready"}, nil)
 		combined, ok := s.Preconditions.([]any)
 		require.True(t, ok)
-		assert.Len(t, combined, 2)
-		assert.Equal(t, "test -f /tmp/ready", combined[0])
-		assert.Equal(t, "test -d /data", combined[1])
+		require.Len(t, combined, 2)
+		require.Equal(t, "test -f /tmp/ready", combined[0])
+		require.Equal(t, "test -d /data", combined[1])
 	})
 
 	t.Run("Preconditions_Additive_ArrayAndArray", func(t *testing.T) {
@@ -182,13 +209,13 @@ func TestApplyDefaults(t *testing.T) {
 		defPrecond := []any{"check1", "check2"}
 		stepPrecond := []any{"check3"}
 		s := &step{Preconditions: stepPrecond}
-		applyDefaults(s, &defaults{Preconditions: defPrecond})
+		applyDefaults(s, &defaults{Preconditions: defPrecond}, nil)
 		combined, ok := s.Preconditions.([]any)
 		require.True(t, ok)
-		assert.Len(t, combined, 3)
-		assert.Equal(t, "check1", combined[0])
-		assert.Equal(t, "check2", combined[1])
-		assert.Equal(t, "check3", combined[2])
+		require.Len(t, combined, 3)
+		require.Equal(t, "check1", combined[0])
+		require.Equal(t, "check2", combined[1])
+		require.Equal(t, "check3", combined[2])
 	})
 
 	t.Run("AllFieldsSimultaneously", func(t *testing.T) {
@@ -205,17 +232,17 @@ func TestApplyDefaults(t *testing.T) {
 		}
 
 		s := &step{}
-		applyDefaults(s, d)
+		applyDefaults(s, d, nil)
 
-		assert.NotNil(t, s.RetryPolicy)
-		assert.False(t, s.ContinueOn.IsZero())
-		assert.NotNil(t, s.RepeatPolicy)
-		assert.Equal(t, 600, s.TimeoutSec)
-		assert.True(t, s.MailOnError)
+		require.NotNil(t, s.RetryPolicy)
+		require.False(t, s.ContinueOn.IsZero())
+		require.NotNil(t, s.RepeatPolicy)
+		require.Equal(t, 600, s.TimeoutSec)
+		require.True(t, s.MailOnError)
 		require.NotNil(t, s.SignalOnStop)
-		assert.Equal(t, "SIGTERM", *s.SignalOnStop)
-		assert.False(t, s.Env.IsZero())
-		assert.Equal(t, "test -f /ready", s.Preconditions)
+		require.Equal(t, "SIGTERM", *s.SignalOnStop)
+		require.False(t, s.Env.IsZero())
+		require.Equal(t, "test -f /ready", s.Preconditions)
 	})
 }
 
@@ -226,7 +253,7 @@ func TestDecodeDefaults(t *testing.T) {
 		t.Parallel()
 		d, err := decodeDefaults(nil)
 		require.NoError(t, err)
-		assert.Nil(t, d)
+		require.Nil(t, d)
 	})
 
 	t.Run("ValidAllFields", func(t *testing.T) {
@@ -249,17 +276,17 @@ func TestDecodeDefaults(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, d)
 
-		assert.NotNil(t, d.RetryPolicy)
-		assert.Equal(t, 3, d.RetryPolicy.Limit)
-		assert.False(t, d.ContinueOn.IsZero())
-		assert.NotNil(t, d.RepeatPolicy)
-		assert.Equal(t, 600, d.TimeoutSec)
+		require.NotNil(t, d.RetryPolicy)
+		require.Equal(t, 3, d.RetryPolicy.Limit)
+		require.False(t, d.ContinueOn.IsZero())
+		require.NotNil(t, d.RepeatPolicy)
+		require.Equal(t, 600, d.TimeoutSec)
 		require.NotNil(t, d.MailOnError)
-		assert.True(t, *d.MailOnError)
+		require.True(t, *d.MailOnError)
 		require.NotNil(t, d.SignalOnStop)
-		assert.Equal(t, "SIGTERM", *d.SignalOnStop)
-		assert.False(t, d.Env.IsZero())
-		assert.Equal(t, "test -f /ready", d.Preconditions)
+		require.Equal(t, "SIGTERM", *d.SignalOnStop)
+		require.False(t, d.Env.IsZero())
+		require.Equal(t, "test -f /ready", d.Preconditions)
 	})
 
 	t.Run("UnknownKey_Error", func(t *testing.T) {
@@ -270,9 +297,9 @@ func TestDecodeDefaults(t *testing.T) {
 		}
 
 		d, err := decodeDefaults(raw)
-		assert.Error(t, err)
-		assert.Nil(t, d)
-		assert.Contains(t, err.Error(), "defaults")
+		require.Error(t, err)
+		require.Nil(t, d)
+		require.Contains(t, err.Error(), "defaults")
 	})
 
 	t.Run("EmptyMap", func(t *testing.T) {
@@ -283,9 +310,9 @@ func TestDecodeDefaults(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, d)
 		// All fields at zero values
-		assert.Nil(t, d.RetryPolicy)
-		assert.True(t, d.ContinueOn.IsZero())
-		assert.Equal(t, 0, d.TimeoutSec)
+		require.Nil(t, d.RetryPolicy)
+		require.True(t, d.ContinueOn.IsZero())
+		require.Equal(t, 0, d.TimeoutSec)
 	})
 }
 
@@ -295,33 +322,33 @@ func TestCombinePreconditions(t *testing.T) {
 	t.Run("StringAndString", func(t *testing.T) {
 		t.Parallel()
 		result := combinePreconditions("a", "b")
-		assert.Equal(t, []any{"a", "b"}, result)
+		require.Equal(t, []any{"a", "b"}, result)
 	})
 
 	t.Run("ArrayAndArray", func(t *testing.T) {
 		t.Parallel()
 		result := combinePreconditions([]any{"a", "b"}, []any{"c"})
-		assert.Equal(t, []any{"a", "b", "c"}, result)
+		require.Equal(t, []any{"a", "b", "c"}, result)
 	})
 
 	t.Run("StringAndArray", func(t *testing.T) {
 		t.Parallel()
 		result := combinePreconditions("a", []any{"b", "c"})
-		assert.Equal(t, []any{"a", "b", "c"}, result)
+		require.Equal(t, []any{"a", "b", "c"}, result)
 	})
 
 	t.Run("ArrayAndString", func(t *testing.T) {
 		t.Parallel()
 		result := combinePreconditions([]any{"a", "b"}, "c")
-		assert.Equal(t, []any{"a", "b", "c"}, result)
+		require.Equal(t, []any{"a", "b", "c"}, result)
 	})
 
 	t.Run("MapAndString", func(t *testing.T) {
 		t.Parallel()
 		m := map[string]any{"condition": "test", "expected": "ok"}
 		result := combinePreconditions(m, "check")
-		assert.Len(t, result, 2)
-		assert.Equal(t, m, result[0])
-		assert.Equal(t, "check", result[1])
+		require.Len(t, result, 2)
+		require.Equal(t, m, result[0])
+		require.Equal(t, "check", result[1])
 	})
 }

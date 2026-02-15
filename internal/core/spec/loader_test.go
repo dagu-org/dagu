@@ -1111,10 +1111,10 @@ steps:
 		require.Len(t, dag.Steps, 2)
 
 		for _, step := range dag.Steps {
-			assert.Equal(t, 3, step.RetryPolicy.Limit, "step %s should inherit retry limit", step.Name)
-			assert.Equal(t, 5*time.Second, step.RetryPolicy.Interval, "step %s should inherit retry interval", step.Name)
-			assert.Equal(t, 600*time.Second, step.Timeout, "step %s should inherit timeout", step.Name)
-			assert.True(t, step.MailOnError, "step %s should inherit mail_on_error", step.Name)
+			require.Equal(t, 3, step.RetryPolicy.Limit, "step %s should inherit retry limit", step.Name)
+			require.Equal(t, 5*time.Second, step.RetryPolicy.Interval, "step %s should inherit retry interval", step.Name)
+			require.Equal(t, 600*time.Second, step.Timeout, "step %s should inherit timeout", step.Name)
+			require.True(t, step.MailOnError, "step %s should inherit mail_on_error", step.Name)
 		}
 	})
 
@@ -1143,13 +1143,13 @@ steps:
 		require.Len(t, dag.Steps, 2)
 
 		// step1 inherits defaults
-		assert.Equal(t, 3, dag.Steps[0].RetryPolicy.Limit)
-		assert.Equal(t, 600*time.Second, dag.Steps[0].Timeout)
+		require.Equal(t, 3, dag.Steps[0].RetryPolicy.Limit)
+		require.Equal(t, 600*time.Second, dag.Steps[0].Timeout)
 
 		// step2 overrides defaults
-		assert.Equal(t, 10, dag.Steps[1].RetryPolicy.Limit)
-		assert.Equal(t, 30*time.Second, dag.Steps[1].RetryPolicy.Interval)
-		assert.Equal(t, 300*time.Second, dag.Steps[1].Timeout)
+		require.Equal(t, 10, dag.Steps[1].RetryPolicy.Limit)
+		require.Equal(t, 30*time.Second, dag.Steps[1].RetryPolicy.Interval)
+		require.Equal(t, 300*time.Second, dag.Steps[1].Timeout)
 	})
 
 	t.Run("AdditiveEnvAndPreconditions", func(t *testing.T) {
@@ -1177,12 +1177,12 @@ steps:
 		require.Len(t, dag.Steps, 2)
 
 		// step1 gets only defaults
-		assert.Contains(t, dag.Steps[0].Env, "DEFAULT_VAR=default_value")
+		require.Contains(t, dag.Steps[0].Env, "DEFAULT_VAR=default_value")
 		require.Len(t, dag.Steps[0].Preconditions, 1)
 
 		// step2 gets both defaults + step-level (additive)
-		assert.Contains(t, dag.Steps[1].Env, "DEFAULT_VAR=default_value")
-		assert.Contains(t, dag.Steps[1].Env, "STEP_VAR=step_value")
+		require.Contains(t, dag.Steps[1].Env, "DEFAULT_VAR=default_value")
+		require.Contains(t, dag.Steps[1].Env, "STEP_VAR=step_value")
 		require.Len(t, dag.Steps[1].Preconditions, 2)
 	})
 
@@ -1209,11 +1209,11 @@ steps:
 
 		// failure handler inherits default timeout
 		require.NotNil(t, dag.HandlerOn.Failure)
-		assert.Equal(t, 300*time.Second, dag.HandlerOn.Failure.Timeout)
+		require.Equal(t, 300*time.Second, dag.HandlerOn.Failure.Timeout)
 
 		// exit handler overrides default timeout
 		require.NotNil(t, dag.HandlerOn.Exit)
-		assert.Equal(t, 60*time.Second, dag.HandlerOn.Exit.Timeout)
+		require.Equal(t, 60*time.Second, dag.HandlerOn.Exit.Timeout)
 	})
 
 	t.Run("BaseConfigDefaults", func(t *testing.T) {
@@ -1236,7 +1236,7 @@ steps:
 		require.Len(t, dag.Steps, 1)
 
 		// DAG-level defaults should override base config defaults
-		assert.Equal(t, 600*time.Second, dag.Steps[0].Timeout)
+		require.Equal(t, 600*time.Second, dag.Steps[0].Timeout)
 	})
 
 	t.Run("UnknownKeyInDefaults", func(t *testing.T) {
@@ -1253,7 +1253,7 @@ steps:
 `)
 		_, err := spec.Load(context.Background(), testDAG)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "defaults")
+		require.Contains(t, err.Error(), "defaults")
 	})
 
 	t.Run("ContinueOnDefault", func(t *testing.T) {
@@ -1270,7 +1270,7 @@ steps:
 		dag, err := spec.Load(context.Background(), testDAG)
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 1)
-		assert.True(t, dag.Steps[0].ContinueOn.Failure)
+		require.True(t, dag.Steps[0].ContinueOn.Failure)
 	})
 
 	t.Run("SignalOnStopDefault", func(t *testing.T) {
@@ -1287,6 +1287,6 @@ steps:
 		dag, err := spec.Load(context.Background(), testDAG)
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 1)
-		assert.Equal(t, "SIGTERM", dag.Steps[0].SignalOnStop)
+		require.Equal(t, "SIGTERM", dag.Steps[0].SignalOnStop)
 	})
 }

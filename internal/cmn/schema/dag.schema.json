@@ -321,7 +321,7 @@
               "type": "array",
               "items": {
                 "oneOf": [
-                  { "type": "string" },
+                  { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*=.*$" },
                   { "type": "object", "additionalProperties": true }
                 ]
               }

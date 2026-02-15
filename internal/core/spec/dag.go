@@ -1619,7 +1619,7 @@ func buildHandlers(ctx BuildContext, d *dag, result *core.DAG) (core.HandlerOn, 
 			return nil, nil
 		}
 		s.Name = name.String()
-		applyDefaults(s, defs)
+		applyDefaults(s, defs, nil)
 		return s.build(buildCtx)
 	}
 
@@ -1817,7 +1817,8 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 		for name, st := range stepsMap {
 			st.Name = name
 			names[st.Name] = struct{}{}
-			applyDefaults(&st, defs)
+			rawStep, _ := v[name].(map[string]any)
+			applyDefaults(&st, defs, rawStep)
 			builtStep, err := st.build(buildCtx)
 			if err != nil {
 				return nil, err

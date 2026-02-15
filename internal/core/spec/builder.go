@@ -266,7 +266,7 @@ func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names m
 	if err := md.Decode(raw); err != nil {
 		return nil, core.NewValidationError("steps", raw, withSnakeCaseKeyHint(err))
 	}
-	applyDefaults(&st, defs)
+	applyDefaults(&st, defs, raw)
 	builtStep, err := st.build(ctx)
 	if err != nil {
 		return nil, err

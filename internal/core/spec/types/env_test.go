@@ -337,11 +337,11 @@ func TestEnvValue_Prepend(t *testing.T) {
 		result := base.Prepend(other)
 		entries := result.Entries()
 		require.Len(t, entries, 2)
-		assert.Equal(t, "DEFAULT_KEY", entries[0].Key)
-		assert.Equal(t, "default_val", entries[0].Value)
-		assert.Equal(t, "STEP_KEY", entries[1].Key)
-		assert.Equal(t, "step_val", entries[1].Value)
-		assert.False(t, result.IsZero())
+		require.Equal(t, "DEFAULT_KEY", entries[0].Key)
+		require.Equal(t, "default_val", entries[0].Value)
+		require.Equal(t, "STEP_KEY", entries[1].Key)
+		require.Equal(t, "step_val", entries[1].Value)
+		require.False(t, result.IsZero())
 	})
 
 	t.Run("PrependZeroValue_NoChange", func(t *testing.T) {
@@ -352,7 +352,7 @@ func TestEnvValue_Prepend(t *testing.T) {
 		result := base.Prepend(zero)
 		entries := result.Entries()
 		require.Len(t, entries, 1)
-		assert.Equal(t, "KEY", entries[0].Key)
+		require.Equal(t, "KEY", entries[0].Key)
 	})
 
 	t.Run("PrependToZeroValue", func(t *testing.T) {
@@ -363,8 +363,8 @@ func TestEnvValue_Prepend(t *testing.T) {
 		result := base.Prepend(other)
 		entries := result.Entries()
 		require.Len(t, entries, 1)
-		assert.Equal(t, "KEY", entries[0].Key)
-		assert.False(t, result.IsZero())
+		require.Equal(t, "KEY", entries[0].Key)
+		require.False(t, result.IsZero())
 	})
 
 	t.Run("PrependMultipleEntries", func(t *testing.T) {
@@ -375,8 +375,8 @@ func TestEnvValue_Prepend(t *testing.T) {
 		result := base.Prepend(other)
 		entries := result.Entries()
 		require.Len(t, entries, 3)
-		assert.Equal(t, "A", entries[0].Key)
-		assert.Equal(t, "B", entries[1].Key)
-		assert.Equal(t, "C", entries[2].Key)
+		require.Equal(t, "A", entries[0].Key)
+		require.Equal(t, "B", entries[1].Key)
+		require.Equal(t, "C", entries[2].Key)
 	})
 }
