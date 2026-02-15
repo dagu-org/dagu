@@ -318,3 +318,65 @@ func TestEnvValue_AdditionalCoverage(t *testing.T) {
 		assert.Len(t, val, 1)
 	})
 }
+
+func TestEnvValue_Prepend(t *testing.T) {
+	t.Parallel()
+
+	parseEnv := func(t *testing.T, input string) types.EnvValue {
+		t.Helper()
+		var e types.EnvValue
+		require.NoError(t, yaml.Unmarshal([]byte(input), &e))
+		return e
+	}
+
+	t.Run("PrependEntries", func(t *testing.T) {
+		t.Parallel()
+		base := parseEnv(t, "- STEP_KEY=step_val")
+		other := parseEnv(t, "- DEFAULT_KEY=default_val")
+
+		result := base.Prepend(other)
+		entries := result.Entries()
+		require.Len(t, entries, 2)
+		assert.Equal(t, "DEFAULT_KEY", entries[0].Key)
+		assert.Equal(t, "default_val", entries[0].Value)
+		assert.Equal(t, "STEP_KEY", entries[1].Key)
+		assert.Equal(t, "step_val", entries[1].Value)
+		assert.False(t, result.IsZero())
+	})
+
+	t.Run("PrependZeroValue_NoChange", func(t *testing.T) {
+		t.Parallel()
+		base := parseEnv(t, "- KEY=val")
+		var zero types.EnvValue // IsZero() == true
+
+		result := base.Prepend(zero)
+		entries := result.Entries()
+		require.Len(t, entries, 1)
+		assert.Equal(t, "KEY", entries[0].Key)
+	})
+
+	t.Run("PrependToZeroValue", func(t *testing.T) {
+		t.Parallel()
+		var base types.EnvValue
+		other := parseEnv(t, "- KEY=val")
+
+		result := base.Prepend(other)
+		entries := result.Entries()
+		require.Len(t, entries, 1)
+		assert.Equal(t, "KEY", entries[0].Key)
+		assert.False(t, result.IsZero())
+	})
+
+	t.Run("PrependMultipleEntries", func(t *testing.T) {
+		t.Parallel()
+		base := parseEnv(t, "- C=3")
+		other := parseEnv(t, "- A=1\n- B=2")
+
+		result := base.Prepend(other)
+		entries := result.Entries()
+		require.Len(t, entries, 3)
+		assert.Equal(t, "A", entries[0].Key)
+		assert.Equal(t, "B", entries[1].Key)
+		assert.Equal(t, "C", entries[2].Key)
+	})
+}
