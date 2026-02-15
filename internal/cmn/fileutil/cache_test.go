@@ -1,6 +1,7 @@
 package fileutil
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -17,8 +18,6 @@ func TestNewCache(t *testing.T) {
 
 	assert.Equal(t, "test", cache.Name())
 	assert.Equal(t, 0, cache.Size())
-	assert.Equal(t, 100, cache.capacity)
-	assert.Equal(t, time.Hour, cache.ttl)
 }
 
 func TestCache_StoreAndLoad(t *testing.T) {
@@ -78,7 +77,7 @@ func TestCache_CapacityLimit(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	// Add 10 items
+	// Add 10 items — LRU enforces capacity immediately on Add
 	for i := range 10 {
 		filePath := filepath.Join(tmpDir, "test"+string(rune('0'+i))+".txt")
 		require.NoError(t, os.WriteFile(filePath, []byte("content"), 0644))
@@ -89,38 +88,37 @@ func TestCache_CapacityLimit(t *testing.T) {
 		cache.Store(filePath, "data", fi)
 	}
 
-	// Before eviction, all 10 items are stored
-	assert.Equal(t, 10, cache.Size())
-
-	// Trigger eviction
-	cache.evict()
-
-	// After eviction, should be exactly at capacity
+	// LRU enforces capacity on Add, so size is capped at 5
 	assert.Equal(t, 5, cache.Size())
 }
 
 func TestCache_TTLExpiration(t *testing.T) {
 	t.Parallel()
 
-	cache := NewCache[string]("test", 100, time.Hour)
+	// Use a very short TTL
+	cache := NewCache[string]("test", 100, 100*time.Millisecond)
 
-	// Directly insert an expired entry to test eviction logic
-	// (bypassing the Store method which adds jitter)
-	expiredEntry := Entry[string]{
-		Data:         "expired-data",
-		Size:         10,
-		LastModified: time.Now().Unix(),
-		ExpiresAt:    time.Now().Add(-time.Hour), // Already expired
-	}
-	cache.entries.Store("expired-key", expiredEntry)
-	cache.items.Add(1)
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "test.txt")
+	require.NoError(t, os.WriteFile(filePath, []byte("content"), 0644))
 
+	fi, err := os.Stat(filePath)
+	require.NoError(t, err)
+
+	cache.Store(filePath, "test-data", fi)
 	assert.Equal(t, 1, cache.Size())
 
-	// Trigger eviction
-	cache.evict()
+	// Verify the entry is accessible before expiration
+	data, ok := cache.Load(filePath)
+	assert.True(t, ok)
+	assert.Equal(t, "test-data", data)
 
-	// Expired item should be evicted
+	// Wait for TTL to expire (LRU sweeps every ttl/100 = 1ms)
+	time.Sleep(200 * time.Millisecond)
+
+	// Entry should be expired
+	_, ok = cache.Load(filePath)
+	assert.False(t, ok)
 	assert.Equal(t, 0, cache.Size())
 }
 
@@ -139,8 +137,7 @@ func TestCache_IsStale(t *testing.T) {
 	cache.Store(filePath, "test-data", fi)
 
 	t.Run("NotStaleWhenUnchanged", func(t *testing.T) {
-		entry := cache.Entry(filePath)
-		stale, _, err := cache.IsStale(filePath, entry)
+		stale, _, err := cache.IsStale(filePath)
 		require.NoError(t, err)
 		assert.False(t, stale)
 	})
@@ -150,8 +147,7 @@ func TestCache_IsStale(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 		require.NoError(t, os.WriteFile(filePath, []byte("new content"), 0644))
 
-		entry := cache.Entry(filePath)
-		stale, _, err := cache.IsStale(filePath, entry)
+		stale, _, err := cache.IsStale(filePath)
 		require.NoError(t, err)
 		assert.True(t, stale)
 	})
@@ -164,10 +160,24 @@ func TestCache_IsStale(t *testing.T) {
 		// Change file size
 		require.NoError(t, os.WriteFile(filePath, []byte("much longer content here"), 0644))
 
-		entry := cache.Entry(filePath)
-		stale, _, err := cache.IsStale(filePath, entry)
+		stale, _, err := cache.IsStale(filePath)
 		require.NoError(t, err)
 		assert.True(t, stale)
+	})
+
+	t.Run("StaleWhenNotCached", func(t *testing.T) {
+		otherPath := filepath.Join(tmpDir, "other.txt")
+		require.NoError(t, os.WriteFile(otherPath, []byte("content"), 0644))
+
+		stale, _, err := cache.IsStale(otherPath)
+		require.NoError(t, err)
+		assert.True(t, stale)
+	})
+
+	t.Run("ErrorWhenFileNotExist", func(t *testing.T) {
+		stale, _, err := cache.IsStale(filepath.Join(tmpDir, "nonexistent.txt"))
+		assert.True(t, stale)
+		assert.Error(t, err)
 	})
 }
 
@@ -209,6 +219,42 @@ func TestCache_LoadLatest(t *testing.T) {
 	assert.Equal(t, 2, loadCount)
 }
 
+func TestCache_LoadLatest_FileNotFound(t *testing.T) {
+	t.Parallel()
+
+	cache := NewCache[string]("test", 100, time.Hour)
+
+	loader := func() (string, error) {
+		return "data", nil
+	}
+
+	// LoadLatest on a non-existent file should return an error
+	_, err := cache.LoadLatest("/nonexistent/path/file.txt", loader)
+	assert.Error(t, err)
+}
+
+func TestCache_LoadLatest_LoaderError(t *testing.T) {
+	t.Parallel()
+
+	cache := NewCache[string]("test", 100, time.Hour)
+
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "test.txt")
+	require.NoError(t, os.WriteFile(filePath, []byte("content"), 0644))
+
+	loaderErr := fmt.Errorf("loader failed")
+	loader := func() (string, error) {
+		return "", loaderErr
+	}
+
+	// LoadLatest should propagate the loader error
+	_, err := cache.LoadLatest(filePath, loader)
+	assert.ErrorIs(t, err, loaderErr)
+
+	// Cache should remain empty after loader failure
+	assert.Equal(t, 0, cache.Size())
+}
+
 func TestCache_StartEviction(t *testing.T) {
 	t.Parallel()
 
@@ -216,10 +262,8 @@ func TestCache_StartEviction(t *testing.T) {
 
 	ctx := t.Context()
 
+	// StartEviction is a no-op but should not panic
 	cache.StartEviction(ctx)
-
-	// Verify the eviction goroutine starts without error
-	// The actual eviction logic is tested in TestCache_TTLExpiration and TestCache_CapacityLimit
 }
 
 func TestCache_ConcurrentAccess(t *testing.T) {
@@ -285,11 +329,7 @@ func TestCache_ZeroCapacityMeansUnlimited(t *testing.T) {
 		cache.Store(filePath, "data", fi)
 	}
 
-	assert.Equal(t, 100, cache.Size())
-
-	// Run eviction - should not remove anything (no expiration, no capacity limit)
-	cache.evict()
-
+	// All items should be stored (no capacity eviction)
 	assert.Equal(t, 100, cache.Size())
 }
 
@@ -369,23 +409,24 @@ func TestCache_InvalidateNonExistent(t *testing.T) {
 func TestCache_MixedExpirationAndCapacity(t *testing.T) {
 	t.Parallel()
 
-	// Cache with capacity of 3
-	cache := NewCache[string]("test", 3, time.Hour)
+	// Cache with capacity of 3 and short TTL
+	cache := NewCache[string]("test", 3, 100*time.Millisecond)
 
-	// Add 2 expired entries directly
-	for i := range 2 {
-		expiredEntry := Entry[string]{
-			Data:         "expired",
-			Size:         10,
-			LastModified: time.Now().Unix(),
-			ExpiresAt:    time.Now().Add(-time.Hour),
-		}
-		cache.entries.Store("expired-"+string(rune('0'+i)), expiredEntry)
-		cache.items.Add(1)
-	}
-
-	// Add 4 valid entries via Store (these will have future expiration)
 	tmpDir := t.TempDir()
+
+	// Add 2 entries that will expire
+	for i := range 2 {
+		filePath := filepath.Join(tmpDir, "expire"+string(rune('0'+i))+".txt")
+		require.NoError(t, os.WriteFile(filePath, []byte("content"), 0644))
+		fi, _ := os.Stat(filePath)
+		cache.Store(filePath, "expires", fi)
+	}
+	assert.Equal(t, 2, cache.Size())
+
+	// Wait for them to expire
+	time.Sleep(200 * time.Millisecond)
+
+	// Add 4 more entries (capacity is 3, but 2 expired so should fit 3)
 	for i := range 4 {
 		filePath := filepath.Join(tmpDir, "valid"+string(rune('0'+i))+".txt")
 		require.NoError(t, os.WriteFile(filePath, []byte("content"), 0644))
@@ -393,20 +434,79 @@ func TestCache_MixedExpirationAndCapacity(t *testing.T) {
 		cache.Store(filePath, "valid", fi)
 	}
 
-	// Total: 2 expired + 4 valid = 6 items
-	assert.Equal(t, 6, cache.Size())
-
-	// Run eviction
-	cache.evict()
-
-	// Should remove 2 expired first, then evict excess to reach capacity of 3
-	// Result: at most 3 items (could be exactly 3 if capacity eviction works)
+	// Should be at most capacity (3)
 	assert.LessOrEqual(t, cache.Size(), 3)
+}
 
-	// Verify no expired entries remain
-	cache.entries.Range(func(_, value any) bool {
-		entry := value.(Entry[string])
-		assert.True(t, time.Now().Before(entry.ExpiresAt), "Found expired entry after eviction")
-		return true
-	})
+func TestCache_LRUEvictionOrder(t *testing.T) {
+	t.Parallel()
+
+	// Capacity of 3
+	cache := NewCache[string]("test", 3, time.Hour)
+
+	tmpDir := t.TempDir()
+
+	// Create 4 files
+	var files []string
+	for i := range 4 {
+		fp := filepath.Join(tmpDir, "file"+string(rune('0'+i))+".txt")
+		require.NoError(t, os.WriteFile(fp, []byte("content"), 0644))
+		files = append(files, fp)
+	}
+
+	// Add first 3 entries
+	for i := range 3 {
+		fi, _ := os.Stat(files[i])
+		cache.Store(files[i], "data-"+string(rune('0'+i)), fi)
+	}
+	assert.Equal(t, 3, cache.Size())
+
+	// Access file0 to make it recently used
+	_, _ = cache.Load(files[0])
+
+	// Add file3 — should evict file1 (least recently used, since file0 was accessed)
+	fi, _ := os.Stat(files[3])
+	cache.Store(files[3], "data-3", fi)
+
+	assert.Equal(t, 3, cache.Size())
+
+	// file0 should still be present (was accessed recently)
+	_, ok := cache.Load(files[0])
+	assert.True(t, ok, "file0 should still be cached (recently accessed)")
+
+	// file1 should have been evicted (least recently used)
+	_, ok = cache.Load(files[1])
+	assert.False(t, ok, "file1 should have been evicted (LRU)")
+
+	// file2 should still be present
+	_, ok = cache.Load(files[2])
+	assert.True(t, ok, "file2 should still be cached")
+
+	// file3 should be present
+	_, ok = cache.Load(files[3])
+	assert.True(t, ok, "file3 should be cached (just added)")
+}
+
+func TestCache_TTLEvictionAutomatic(t *testing.T) {
+	t.Parallel()
+
+	// Short TTL - the LRU sweeps every ttl/100
+	cache := NewCache[string]("test", 100, 100*time.Millisecond)
+
+	tmpDir := t.TempDir()
+
+	// Add entries
+	for i := range 5 {
+		fp := filepath.Join(tmpDir, "file"+string(rune('0'+i))+".txt")
+		require.NoError(t, os.WriteFile(fp, []byte("content"), 0644))
+		fi, _ := os.Stat(fp)
+		cache.Store(fp, "data", fi)
+	}
+	assert.Equal(t, 5, cache.Size())
+
+	// Wait for TTL expiration + cleanup sweep
+	time.Sleep(200 * time.Millisecond)
+
+	// Entries should have been automatically evicted (no manual trigger needed)
+	assert.Equal(t, 0, cache.Size())
 }

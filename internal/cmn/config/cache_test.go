@@ -37,8 +37,8 @@ func TestCacheMode_Limits_Low(t *testing.T) {
 	assert.Equal(t, 500, limits.DAG.Limit)
 	assert.Equal(t, 12*time.Hour, limits.DAG.TTL)
 
-	assert.Equal(t, 5000, limits.DAGRun.Limit)
-	assert.Equal(t, 12*time.Hour, limits.DAGRun.TTL)
+	assert.Equal(t, 1000, limits.DAGRun.Limit)
+	assert.Equal(t, time.Hour, limits.DAGRun.TTL)
 
 	assert.Equal(t, 100, limits.APIKey.Limit)
 	assert.Equal(t, 15*time.Minute, limits.APIKey.TTL)
@@ -55,8 +55,8 @@ func TestCacheMode_Limits_Normal(t *testing.T) {
 	assert.Equal(t, 1000, limits.DAG.Limit)
 	assert.Equal(t, 12*time.Hour, limits.DAG.TTL)
 
-	assert.Equal(t, 10000, limits.DAGRun.Limit)
-	assert.Equal(t, 12*time.Hour, limits.DAGRun.TTL)
+	assert.Equal(t, 2000, limits.DAGRun.Limit)
+	assert.Equal(t, time.Hour, limits.DAGRun.TTL)
 
 	assert.Equal(t, 500, limits.APIKey.Limit)
 	assert.Equal(t, 15*time.Minute, limits.APIKey.TTL)
@@ -73,8 +73,8 @@ func TestCacheMode_Limits_High(t *testing.T) {
 	assert.Equal(t, 5000, limits.DAG.Limit)
 	assert.Equal(t, 12*time.Hour, limits.DAG.TTL)
 
-	assert.Equal(t, 50000, limits.DAGRun.Limit)
-	assert.Equal(t, 12*time.Hour, limits.DAGRun.TTL)
+	assert.Equal(t, 5000, limits.DAGRun.Limit)
+	assert.Equal(t, time.Hour, limits.DAGRun.TTL)
 
 	assert.Equal(t, 1000, limits.APIKey.Limit)
 	assert.Equal(t, 15*time.Minute, limits.APIKey.TTL)
