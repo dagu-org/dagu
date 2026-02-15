@@ -3,8 +3,6 @@ package spec
 import (
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/core/spec/types"
-	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -238,13 +236,13 @@ func TestDecodeDefaults(t *testing.T) {
 				"limit":        3,
 				"interval_sec": 5,
 			},
-			"continue_on":   "failed",
-			"repeat_policy": map[string]any{"repeat": "while", "interval_sec": 30},
-			"timeout_sec":   600,
-			"mail_on_error": true,
+			"continue_on":    "failed",
+			"repeat_policy":  map[string]any{"repeat": "while", "interval_sec": 30},
+			"timeout_sec":    600,
+			"mail_on_error":  true,
 			"signal_on_stop": "SIGTERM",
-			"env": []any{"LOG_LEVEL=info"},
-			"preconditions": "test -f /ready",
+			"env":            []any{"LOG_LEVEL=info"},
+			"preconditions":  "test -f /ready",
 		}
 
 		d, err := decodeDefaults(raw)
@@ -326,11 +324,4 @@ func TestCombinePreconditions(t *testing.T) {
 		assert.Equal(t, m, result[0])
 		assert.Equal(t, "check", result[1])
 	})
-}
-
-// Helper to create EnvValue from YAML
-func testEnvValue(yamlStr string) types.EnvValue {
-	var v types.EnvValue
-	_ = yaml.Unmarshal([]byte(yamlStr), &v)
-	return v
 }
