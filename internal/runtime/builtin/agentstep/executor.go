@@ -77,6 +77,9 @@ func (e *Executor) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to load agent config: %w", err)
 	}
 
+	// Resolve global tool policy for tool filtering and bash enforcement.
+	globalPolicy := agent.ResolveToolPolicy(agentCfg.ToolPolicy)
+
 	// Resolve model ID: step override → global default.
 	modelID := agentCfg.DefaultModelID
 	stepCfg := e.step.Agent
@@ -98,8 +101,8 @@ func (e *Executor) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to create LLM provider: %w", err)
 	}
 
-	// Build tools (exclude navigate and ask_user; add output tool).
-	tools := buildTools(dagCtx, stepCfg, stdout)
+	// Build tools filtered by global policy (exclude navigate and ask_user; add output tool).
+	tools := buildTools(dagCtx, stepCfg, globalPolicy, stdout)
 
 	// Generate system prompt.
 	systemPrompt := buildSystemPrompt(dagCtx, stepCfg)
@@ -127,6 +130,10 @@ func (e *Executor) Run(ctx context.Context) error {
 		})
 	}
 
+	// Register bash policy enforcement hook.
+	hooks := agent.NewHooks()
+	hooks.OnBeforeToolExec(buildPolicyHook(globalPolicy))
+
 	logf(stderr, "Starting (model: %s, tools: %d, safe_mode: %v, max_iterations: %d)",
 		modelCfg.Name, len(tools), safeMode, maxIterations)
 
@@ -142,6 +149,7 @@ func (e *Executor) Run(ctx context.Context) error {
 		Tools:        tools,
 		SystemPrompt: systemPrompt,
 		SafeMode:     safeMode,
+		Hooks:        hooks,
 		Logger:       slog.Default(),
 		RecordMessage: func(_ context.Context, msg agent.Message) error {
 			logMessage(stderr, msg)
@@ -179,7 +187,8 @@ func (e *Executor) Run(ctx context.Context) error {
 }
 
 // buildTools creates the tool list for the agent step.
-func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, stdout io.Writer) []*agent.AgentTool {
+// Tools are filtered first by global policy, then by step-level config.
+func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy agent.ToolPolicyConfig, stdout io.Writer) []*agent.AgentTool {
 	dagsDir := ""
 	if dagCtx.DAG != nil {
 		dagsDir = dagCtx.DAG.Location
@@ -194,6 +203,13 @@ func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, stdout io.Wr
 		"read_schema": agent.NewReadSchemaTool(),
 		"web_search":  agent.NewWebSearchTool(),
 		"output":      agent.NewOutputTool(stdout),
+	}
+
+	// Remove tools disabled by global policy (output is step-only, always kept).
+	for name := range allTools {
+		if name != "output" && !agent.IsToolEnabledResolved(globalPolicy, name) {
+			delete(allTools, name)
+		}
 	}
 
 	// If step specifies enabled tools, filter to only those.
@@ -211,7 +227,7 @@ func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, stdout io.Wr
 		return tools
 	}
 
-	// Default: all tools.
+	// Default: all globally-enabled tools.
 	var tools []*agent.AgentTool
 	for _, tool := range allTools {
 		tools = append(tools, tool)
@@ -245,6 +261,23 @@ func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig) strin
 	}
 
 	return prompt
+}
+
+// buildPolicyHook returns a before-tool hook that enforces bash command policy.
+func buildPolicyHook(policy agent.ToolPolicyConfig) agent.BeforeToolExecHookFunc {
+	return func(_ context.Context, info agent.ToolExecInfo) error {
+		if !agent.IsBashToolName(info.ToolName) {
+			return nil
+		}
+		decision, err := agent.EvaluateBashPolicyResolved(policy, info.Input)
+		if err != nil {
+			return fmt.Errorf("bash policy evaluation failed: %w", err)
+		}
+		if !decision.Allowed {
+			return fmt.Errorf("bash command denied by policy: %s", decision.Reason)
+		}
+		return nil
+	}
 }
 
 // logf writes a formatted log line to stderr with [agent] prefix.
