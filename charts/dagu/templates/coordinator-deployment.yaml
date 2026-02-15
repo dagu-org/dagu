@@ -1,39 +1,39 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "dagu.fullname" . }}-coordinator
+  name: {{ include "boltbase.fullname" . }}-coordinator
   labels:
-    {{- include "dagu.labels" . | nindent 4 }}
+    {{- include "boltbase.labels" . | nindent 4 }}
     app.kubernetes.io/component: coordinator
 spec:
   replicas: {{ .Values.coordinator.replicas }}
   selector:
     matchLabels:
-      {{- include "dagu.labels" . | nindent 6 }}
+      {{- include "boltbase.labels" . | nindent 6 }}
       app.kubernetes.io/component: coordinator
   template:
     metadata:
       labels:
-        {{- include "dagu.labels" . | nindent 8 }}
+        {{- include "boltbase.labels" . | nindent 8 }}
         app.kubernetes.io/component: coordinator
     spec:
       # Disable Kubernetes Service env var injection to avoid overriding
-      # dagu config values (e.g., scheduler.port) with Service URLs
+      # boltbase config values (e.g., scheduler.port) with Service URLs
       enableServiceLinks: false
       containers:
         - name: coordinator
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
-            - dagu
+            - boltbase
             - coordinator
             - --config
-            - /etc/dagu/dagu.yaml
+            - /etc/boltbase/boltbase.yaml
           env:
-            - name: DAGU_COORDINATOR_HOST
+            - name: BOLTBASE_COORDINATOR_HOST
               value: "0.0.0.0"
-            - name: DAGU_COORDINATOR_ADVERTISE
-              value: "{{ include "dagu.fullname" . }}-coordinator.{{ .Release.Namespace }}.svc.cluster.local"
+            - name: BOLTBASE_COORDINATOR_ADVERTISE
+              value: "{{ include "boltbase.fullname" . }}-coordinator.{{ .Release.Namespace }}.svc.cluster.local"
           ports:
             - name: grpc
               containerPort: 50055
@@ -42,7 +42,7 @@ spec:
             - name: data
               mountPath: /data
             - name: config
-              mountPath: /etc/dagu
+              mountPath: /etc/boltbase
           livenessProbe:
             tcpSocket:
               port: grpc
@@ -58,7 +58,7 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: {{ include "dagu.fullname" . }}-data
+            claimName: {{ include "boltbase.fullname" . }}-data
         - name: config
           configMap:
-            name: {{ include "dagu.fullname" . }}-config
+            name: {{ include "boltbase.fullname" . }}-config

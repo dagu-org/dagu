@@ -1,0 +1,10 @@
+{
+  "name": "@dagu-org/boltbase-win32-ia32",
+  "version": "0.0.0-development",
+  "description": "Boltbase binary for Windows 32-bit",
+  "repository": "github:dagu-org/dagu",
+  "license": "GPL-3.0",
+  "os": ["win32"],
+  "cpu": ["ia32"],
+  "files": ["bin/boltbase.exe"]
+}

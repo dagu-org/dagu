@@ -22,8 +22,8 @@ func Enqueue() *cobra.Command {
 			Long: `Enqueue a DAG-run to the queue.
 
 Examples:
-	dagu enqueue --run-id=run_id my_dag -- P1=foo P2=bar
-	dagu enqueue --name my_custom_name my_dag.yaml -- P1=foo P2=bar
+	boltbase enqueue --run-id=run_id my_dag -- P1=foo P2=bar
+	boltbase enqueue --name my_custom_name my_dag.yaml -- P1=foo P2=bar
 `,
 		}, enqueueFlags, runEnqueue,
 	)

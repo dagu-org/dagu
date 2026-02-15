@@ -88,10 +88,10 @@ steps:
 // the API endpoints are served under that base path and not on the root.
 func TestServer_BasePath(t *testing.T) {
 	port := findPort(t)
-	configFile := writeServerConfig(t, port, "/dagu", false)
+	configFile := writeServerConfig(t, port, "/boltbase", false)
 	stopServer := startServer(t, configFile, port)
 
-	requireHealthy(t, fmt.Sprintf("http://127.0.0.1:%s/dagu/api/v1/health", port))
+	requireHealthy(t, fmt.Sprintf("http://127.0.0.1:%s/boltbase/api/v1/health", port))
 
 	stopServer()
 }
@@ -103,7 +103,7 @@ func TestServer_RemoteNode(t *testing.T) {
 		basePath string
 	}{
 		{name: "root", basePath: ""},
-		{name: "with base path", basePath: "/dagu"},
+		{name: "with base path", basePath: "/boltbase"},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

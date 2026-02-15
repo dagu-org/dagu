@@ -30,9 +30,9 @@ Flags:
                                  Use this to check the status of nested DAG executions.
 
 Example:
-  dagu status --run-id=abc123 my_dag
-  dagu status my_dag  # Shows status of the most recent DAG-run
-  dagu status --run-id=abc123 --sub-run-id=def456 my_dag  # Shows status of a sub DAG-run
+  boltbase status --run-id=abc123 my_dag
+  boltbase status my_dag  # Shows status of the most recent DAG-run
+  boltbase status --run-id=abc123 --sub-run-id=def456 my_dag  # Shows status of a sub DAG-run
 `,
 			Args: cobra.ExactArgs(1),
 		}, statusFlags, runStatus,

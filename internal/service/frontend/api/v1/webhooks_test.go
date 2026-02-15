@@ -239,7 +239,7 @@ func TestWebhooks_CRUD(t *testing.T) {
 	assert.Equal(t, dagName, createResult.Webhook.DagName)
 	assert.True(t, createResult.Webhook.Enabled)
 	assert.NotEmpty(t, createResult.Webhook.TokenPrefix, "expected token prefix")
-	assert.Contains(t, createResult.Token, "dagu_wh_", "token should have webhook prefix")
+	assert.Contains(t, createResult.Token, "boltbase_wh_", "token should have webhook prefix")
 
 	webhookToken := createResult.Token
 
@@ -371,7 +371,7 @@ func TestWebhooks_RegenerateToken(t *testing.T) {
 	newToken := regenResult.Token
 
 	assert.NotEqual(t, oldToken, newToken, "new token should be different")
-	assert.Contains(t, newToken, "dagu_wh_", "new token should have webhook prefix")
+	assert.Contains(t, newToken, "boltbase_wh_", "new token should have webhook prefix")
 
 	// Old token should no longer work
 	server.Client().Post("/api/v1/webhooks/"+dagName, api.WebhookRequest{}).
@@ -516,7 +516,7 @@ func TestWebhooks_TriggerInvalidToken(t *testing.T) {
 
 	// Try with valid prefix but wrong token
 	server.Client().Post("/api/v1/webhooks/"+dagName, api.WebhookRequest{}).
-		WithBearerToken("dagu_wh_invalidtoken12345678901234567890").
+		WithBearerToken("boltbase_wh_invalidtoken12345678901234567890").
 		ExpectStatus(http.StatusUnauthorized).Send(t)
 }
 

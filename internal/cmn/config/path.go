@@ -69,7 +69,7 @@ func ResolvePaths(appHomeEnv, legacyPath string, xdg XDGConfig) (Paths, error) {
 	// If the legacy path exists, warn and use it.
 	case legacyPath != "" && fileutil.FileExists(legacyPath):
 		paths := setUnifiedPaths(legacyPath)
-		warning := fmt.Sprintf("Warning: Dagu legacy directory (%s) structure detected. This is deprecated.", legacyPath)
+		warning := fmt.Sprintf("Warning: Boltbase legacy directory (%s) structure detected. This is deprecated.", legacyPath)
 		paths.Warnings = append(paths.Warnings, warning)
 		return paths, nil
 	// Fallback to default XDG-based paths.

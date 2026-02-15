@@ -22,13 +22,13 @@ func StartAll() *cobra.Command {
 			Short: "Launch web UI server, scheduler, and optionally coordinator in a single process",
 			Long: `Simultaneously start the web UI server, scheduler, and optionally coordinator in a single command.
 
-This convenience command combines the functionality of 'dagu server', 'dagu scheduler',
-and optionally 'dagu coordinator' into a single process. The web UI provides the management
+This convenience command combines the functionality of 'boltbase server', 'boltbase scheduler',
+and optionally 'boltbase coordinator' into a single process. The web UI provides the management
 interface, the scheduler handles automated DAG-run execution based on defined schedules,
 and the coordinator (when enabled) manages distributed task execution across workers.
 
 The coordinator is enabled by default and can be disabled by setting coordinator.enabled=false
-in the config file or DAGU_COORDINATOR_ENABLED=false as an environment variable.
+in the config file or BOLTBASE_COORDINATOR_ENABLED=false as an environment variable.
 
 Flags:
   --host string                     Host address to bind the web server to (default: 127.0.0.1)
@@ -45,16 +45,16 @@ Flags:
 
 Example:
   # Default mode (coordinator enabled)
-  dagu start-all
+  boltbase start-all
 
   # Disable coordinator
-  DAGU_COORDINATOR_ENABLED=false dagu start-all
+  BOLTBASE_COORDINATOR_ENABLED=false boltbase start-all
 
   # Distributed mode with coordinator on all interfaces
-  dagu start-all --coordinator.host=0.0.0.0 --coordinator.port=50055
+  boltbase start-all --coordinator.host=0.0.0.0 --coordinator.port=50055
 
   # Production with both web and coordinator on all interfaces
-  dagu start-all --host=0.0.0.0 --port=8080 --coordinator.host=0.0.0.0
+  boltbase start-all --host=0.0.0.0 --port=8080 --coordinator.host=0.0.0.0
 
 This process runs continuously in the foreground until terminated.
 `,

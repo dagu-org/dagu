@@ -21,7 +21,7 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-export const TOKEN_KEY = 'dagu_auth_token';
+export const TOKEN_KEY = 'boltbase_auth_token';
 
 // Role hierarchy for permission checking
 const ROLE_HIERARCHY: Record<UserRole, number> = {

@@ -177,7 +177,7 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 				method: "GET",
 				config: map[string]any{
 					"headers": map[string]string{
-						"User-Agent":    "Dagu-Test/1.0",
+						"User-Agent":    "Boltbase-Test/1.0",
 						"Accept":        "application/json",
 						"Custom-Header": "cross-platform-test",
 					},

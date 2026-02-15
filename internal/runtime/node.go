@@ -27,9 +27,9 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
-// systemVarPrefix is the prefix for temporary variables used internally by Dagu
+// systemVarPrefix is the prefix for temporary variables used internally by Boltbase
 // to avoid conflicts with user-defined variables.
-const systemVarPrefix = "DAGU_"
+const systemVarPrefix = "BOLTBASE_"
 
 // Node is a node in a DAG. It executes a command.
 type Node struct {

@@ -44,7 +44,7 @@ func TestService_CreateWebhook(t *testing.T) {
 		assert.True(t, result.Webhook.Enabled)
 		assert.Equal(t, "admin-user", result.Webhook.CreatedBy)
 		assert.NotEmpty(t, result.FullToken)
-		assert.Contains(t, result.FullToken, "dagu_wh_")
+		assert.Contains(t, result.FullToken, "boltbase_wh_")
 	})
 
 	t.Run("EmptyDAGName", func(t *testing.T) {
@@ -130,7 +130,7 @@ func TestService_ValidateWebhookToken(t *testing.T) {
 		require.NoError(t, err)
 
 		// Try with valid prefix but wrong token
-		_, err = service.ValidateWebhookToken(ctx, "test-dag", "dagu_wh_wrongtoken12345")
+		_, err = service.ValidateWebhookToken(ctx, "test-dag", "boltbase_wh_wrongtoken12345")
 		assert.ErrorIs(t, err, ErrInvalidWebhookToken)
 	})
 
@@ -139,7 +139,7 @@ func TestService_ValidateWebhookToken(t *testing.T) {
 		service, _ := setupWebhookTestService(t)
 		ctx := context.Background()
 
-		_, err := service.ValidateWebhookToken(ctx, "nonexistent-dag", "dagu_wh_sometoken")
+		_, err := service.ValidateWebhookToken(ctx, "nonexistent-dag", "boltbase_wh_sometoken")
 		assert.ErrorIs(t, err, ErrInvalidWebhookToken)
 	})
 
@@ -186,7 +186,7 @@ func TestService_ValidateWebhookToken(t *testing.T) {
 		service := New(nil, Config{TokenSecret: "test"})
 		ctx := context.Background()
 
-		_, err := service.ValidateWebhookToken(ctx, "test-dag", "dagu_wh_token")
+		_, err := service.ValidateWebhookToken(ctx, "test-dag", "boltbase_wh_token")
 		assert.ErrorIs(t, err, ErrWebhookNotConfigured)
 	})
 
@@ -218,7 +218,7 @@ func TestService_RegenerateWebhookToken(t *testing.T) {
 
 		assert.NotEqual(t, original.FullToken, result.FullToken)
 		assert.Equal(t, original.Webhook.ID, result.Webhook.ID)
-		assert.Contains(t, result.FullToken, "dagu_wh_")
+		assert.Contains(t, result.FullToken, "boltbase_wh_")
 	})
 
 	t.Run("OldTokenInvalidated", func(t *testing.T) {
@@ -473,8 +473,8 @@ func TestGenerateWebhookToken(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify token starts with prefix
-		assert.True(t, len(parts.fullToken) > len("dagu_wh_"))
-		assert.Contains(t, parts.fullToken, "dagu_wh_")
+		assert.True(t, len(parts.fullToken) > len("boltbase_wh_"))
+		assert.Contains(t, parts.fullToken, "boltbase_wh_")
 
 		// Verify prefix is stored
 		assert.True(t, len(parts.tokenPrefix) >= webhookTokenPrefixLength ||

@@ -13,7 +13,7 @@ type NavigateToolInput struct {
 	Path string `json:"path"`
 }
 
-const navigateDescription = "Navigate the user to a specific page in the Dagu UI. " +
+const navigateDescription = "Navigate the user to a specific page in the Boltbase UI. " +
 	"Only use this when the user explicitly asks to navigate or view a page. " +
 	"Available paths: '/dags' for DAG list, '/dags/<dag-name>' for DAG details, " +
 	"'/dags/<dag-name>/<tab>' for specific tab (spec, history), '/dag-runs' for all DAG runs, " +

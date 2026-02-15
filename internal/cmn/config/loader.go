@@ -68,7 +68,7 @@ func WithConfigFile(configFile string) ConfigLoaderOption {
 }
 
 // WithAppHomeDir returns a ConfigLoaderOption that sets the application home directory
-// used by the ConfigLoader, overriding the default DAGU_HOME resolution.
+// used by the ConfigLoader, overriding the default BOLTBASE_HOME resolution.
 func WithAppHomeDir(dir string) ConfigLoaderOption {
 	return func(l *ConfigLoader) {
 		l.appHomeDir = dir
@@ -170,7 +170,7 @@ func (l *ConfigLoader) Load() (*Config, error) {
 	}
 
 	if l.appHomeDir != "" {
-		l.additionalBaseEnv = append(l.additionalBaseEnv, fmt.Sprintf("DAGU_HOME=%s", fileutil.ResolvePathOrBlank(l.appHomeDir)))
+		l.additionalBaseEnv = append(l.additionalBaseEnv, fmt.Sprintf("BOLTBASE_HOME=%s", fileutil.ResolvePathOrBlank(l.appHomeDir)))
 	}
 
 	warnings, err := l.setupViper(xdgConfig, homeDir, l.configFile, l.appHomeDir)
@@ -795,8 +795,8 @@ func (l *ConfigLoader) setGitSyncDefaults(cfg *Config) {
 	cfg.GitSync.Auth.Type = "token"
 	cfg.GitSync.AutoSync.OnStartup = true
 	cfg.GitSync.AutoSync.Interval = 300
-	cfg.GitSync.Commit.AuthorName = "Dagu"
-	cfg.GitSync.Commit.AuthorEmail = "dagu@localhost"
+	cfg.GitSync.Commit.AuthorName = "Boltbase"
+	cfg.GitSync.Commit.AuthorEmail = "boltbase@localhost"
 }
 
 func (l *ConfigLoader) applyGitSyncDefinition(cfg *Config, def *GitSyncDef) {
@@ -1036,18 +1036,18 @@ func (l *ConfigLoader) loadLegacyEnv(cfg *Config) {
 	}
 
 	legacyEnvs := map[string]legacyEnvMapping{
-		"DAGU__ADMIN_NAVBAR_COLOR": {
-			newKey:   "DAGU_NAVBAR_COLOR",
+		"BOLTBASE__ADMIN_NAVBAR_COLOR": {
+			newKey:   "BOLTBASE_NAVBAR_COLOR",
 			setter:   func(c *Config, v string) { c.UI.NavbarColor = v },
 			requires: SectionUI,
 		},
-		"DAGU__ADMIN_NAVBAR_TITLE": {
-			newKey:   "DAGU_NAVBAR_TITLE",
+		"BOLTBASE__ADMIN_NAVBAR_TITLE": {
+			newKey:   "BOLTBASE_NAVBAR_TITLE",
 			setter:   func(c *Config, v string) { c.UI.NavbarTitle = v },
 			requires: SectionUI,
 		},
-		"DAGU__ADMIN_PORT": {
-			newKey: "DAGU_PORT",
+		"BOLTBASE__ADMIN_PORT": {
+			newKey: "BOLTBASE_PORT",
 			setter: func(c *Config, v string) {
 				if i, err := strconv.Atoi(v); err == nil {
 					c.Server.Port = i
@@ -1055,23 +1055,23 @@ func (l *ConfigLoader) loadLegacyEnv(cfg *Config) {
 			},
 			requires: SectionServer,
 		},
-		"DAGU__ADMIN_HOST": {
-			newKey:   "DAGU_HOST",
+		"BOLTBASE__ADMIN_HOST": {
+			newKey:   "BOLTBASE_HOST",
 			setter:   func(c *Config, v string) { c.Server.Host = v },
 			requires: SectionServer,
 		},
-		"DAGU__DATA": {
-			newKey:   "DAGU_DATA_DIR",
+		"BOLTBASE__DATA": {
+			newKey:   "BOLTBASE_DATA_DIR",
 			setter:   func(c *Config, v string) { c.Paths.DataDir = fileutil.ResolvePathOrBlank(v) },
 			requires: SectionNone,
 		},
-		"DAGU__SUSPEND_FLAGS_DIR": {
-			newKey:   "DAGU_SUSPEND_FLAGS_DIR",
+		"BOLTBASE__SUSPEND_FLAGS_DIR": {
+			newKey:   "BOLTBASE_SUSPEND_FLAGS_DIR",
 			setter:   func(c *Config, v string) { c.Paths.SuspendFlagsDir = fileutil.ResolvePathOrBlank(v) },
 			requires: SectionNone,
 		},
-		"DAGU__ADMIN_LOGS_DIR": {
-			newKey:   "DAGU_ADMIN_LOG_DIR",
+		"BOLTBASE__ADMIN_LOGS_DIR": {
+			newKey:   "BOLTBASE_ADMIN_LOG_DIR",
 			setter:   func(c *Config, v string) { c.Paths.AdminLogsDir = fileutil.ResolvePathOrBlank(v) },
 			requires: SectionNone,
 		},
@@ -1096,7 +1096,7 @@ func (l *ConfigLoader) setupViper(xdgConfig XDGConfig, homeDir, configFile, appH
 	if appHomeOverride != "" {
 		paths = setUnifiedPaths(fileutil.ResolvePathOrBlank(appHomeOverride))
 	} else {
-		paths, err = ResolvePaths("DAGU_HOME", filepath.Join(homeDir, ".dagu"), xdgConfig)
+		paths, err = ResolvePaths("BOLTBASE_HOME", filepath.Join(homeDir, ".boltbase"), xdgConfig)
 		if err != nil {
 			return nil, err
 		}

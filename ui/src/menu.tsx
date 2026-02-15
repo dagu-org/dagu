@@ -58,7 +58,7 @@ type MainListItemsProps = {
   customColor?: boolean;
 };
 
-const DEFAULT_TITLE = 'Dagu';
+const DEFAULT_TITLE = 'Boltbase';
 
 function getTitleInitial(title: string): string {
   return title.charAt(0).toUpperCase();

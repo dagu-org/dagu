@@ -48,7 +48,7 @@ var (
 	replacer = strings.NewReplacer(
 		"\r\n", "", "\r", "", "\n", "", "%0a", "", "%0d", "",
 	)
-	boundary     = "==simple-boundary-dagu-mailer"
+	boundary     = "==simple-boundary-boltbase-mailer"
 	errFileEmpty = errors.New("file is empty")
 	mailTimeout  = 30 * time.Second
 )

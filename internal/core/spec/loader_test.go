@@ -74,7 +74,7 @@ func TestLoad(t *testing.T) {
 		t.Parallel()
 
 		testDAG := createTempYAMLFile(t, `
-log_dir: /var/log/dagu
+log_dir: /var/log/boltbase
 hist_retention_days: 90
 max_clean_up_time_sec: 60
 mail_on:

@@ -54,16 +54,16 @@ Flags:
 
 Example:
   # Basic usage
-  dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50055
+  boltbase coordinator --coordinator.host=0.0.0.0 --coordinator.port=50055
 
   # Bind to all interfaces and advertise service name (for containers/K8s)
-  dagu coordinator --coordinator.host=0.0.0.0 --coordinator.advertise=dagu-server
+  boltbase coordinator --coordinator.host=0.0.0.0 --coordinator.advertise=boltbase-server
 
   # With TLS
-  dagu coordinator --peer.cert-file=server.crt --peer.key-file=server.key
+  boltbase coordinator --peer.cert-file=server.crt --peer.key-file=server.key
 
   # With mutual TLS
-  dagu coordinator --peer.cert-file=server.crt --peer.key-file=server.key --peer.client-ca-file=ca.crt
+  boltbase coordinator --peer.cert-file=server.crt --peer.key-file=server.key --peer.client-ca-file=ca.crt
 
 This process runs continuously in the foreground until terminated.
 `,

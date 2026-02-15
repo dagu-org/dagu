@@ -124,7 +124,7 @@ steps:
 
 		dag := th.DAG(t, `type: graph
 params:
-  NAME: "Dagu"
+  NAME: "Boltbase"
   AGE: 30
 
 steps:
@@ -139,8 +139,8 @@ steps:
 		agent := dag.Agent()
 		agent.RunSuccess(t)
 		dag.AssertOutputs(t, map[string]any{
-			"OUT1": "Dagu",
-			"OUT2": "Hello, Dagu",
+			"OUT1": "Boltbase",
+			"OUT2": "Hello, Boltbase",
 		})
 	})
 
@@ -148,7 +148,7 @@ steps:
 		t.Parallel()
 
 		dag := th.DAG(t, `params:
-  - NAME: "Dagu"
+  - NAME: "Boltbase"
   - AGE: 30
 
 steps:
@@ -160,8 +160,8 @@ steps:
 		agent := dag.Agent()
 		agent.RunSuccess(t)
 		dag.AssertOutputs(t, map[string]any{
-			"OUT1": "Dagu",
-			"OUT2": "Hello, Dagu",
+			"OUT1": "Boltbase",
+			"OUT2": "Hello, Boltbase",
 		})
 	})
 
@@ -263,7 +263,7 @@ steps:
 		t.Parallel()
 
 		dag := th.DAG(t, `env:
-  - DATA_DIR: /tmp/dagu_test_integration
+  - DATA_DIR: /tmp/boltbase_test_integration
   - PROCESS_DATE: "`+"`"+`date '+%Y%m%d_%H%M%S'`+"`"+`"
 
 steps:

@@ -28,7 +28,7 @@ Flags:
                                    running DAG-run by the given DAG definition name.
 
 Example:
-  dagu stop --run-id=abc123 my_dag
+  boltbase stop --run-id=abc123 my_dag
 `,
 			Args: cobra.ExactArgs(1),
 		}, stopFlags, runStop,

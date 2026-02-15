@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-This document outlines the requirements for implementing dark mode in the Dagu UI. The implementation will provide a modern, developer-friendly dark theme as the default, with the ability to switch to light mode. The solution leverages existing CSS variable infrastructure and Tailwind CSS dark mode capabilities.
+This document outlines the requirements for implementing dark mode in the Boltbase UI. The implementation will provide a modern, developer-friendly dark theme as the default, with the ability to switch to light mode. The solution leverages existing CSS variable infrastructure and Tailwind CSS dark mode capabilities.
 
 ## 2. Business Requirements
 
@@ -10,7 +10,7 @@ This document outlines the requirements for implementing dark mode in the Dagu U
 - Provide a minimal, modern, and information-dense dark UI that developers prefer
 - Reduce eye strain for users working in low-light environments
 - Maintain consistency with modern development tools and IDEs
-- Enhance the professional appearance of the Dagu workflow orchestration engine
+- Enhance the professional appearance of the Boltbase workflow orchestration engine
 
 ### 2.2 Success Criteria
 - Dark mode is active by default on first visit

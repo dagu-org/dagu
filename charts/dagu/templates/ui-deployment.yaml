@@ -1,36 +1,36 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "dagu.fullname" . }}-ui
+  name: {{ include "boltbase.fullname" . }}-ui
   labels:
-    {{- include "dagu.labels" . | nindent 4 }}
+    {{- include "boltbase.labels" . | nindent 4 }}
     app.kubernetes.io/component: ui
 spec:
   replicas: {{ .Values.ui.replicas }}
   selector:
     matchLabels:
-      {{- include "dagu.labels" . | nindent 6 }}
+      {{- include "boltbase.labels" . | nindent 6 }}
       app.kubernetes.io/component: ui
   template:
     metadata:
       labels:
-        {{- include "dagu.labels" . | nindent 8 }}
+        {{- include "boltbase.labels" . | nindent 8 }}
         app.kubernetes.io/component: ui
     spec:
       # Disable Kubernetes Service env var injection to avoid overriding
-      # dagu config values (e.g., scheduler.port) with Service URLs
+      # boltbase config values (e.g., scheduler.port) with Service URLs
       enableServiceLinks: false
       containers:
         - name: ui
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
-            - dagu
+            - boltbase
             - server
             - --config
-            - /etc/dagu/dagu.yaml
+            - /etc/boltbase/boltbase.yaml
           env:
-            - name: DAGU_PORT
+            - name: BOLTBASE_PORT
               value: {{ .Values.ui.service.port | quote }}
           ports:
             - name: http
@@ -40,7 +40,7 @@ spec:
             - name: data
               mountPath: /data
             - name: config
-              mountPath: /etc/dagu
+              mountPath: /etc/boltbase
           livenessProbe:
             httpGet:
               path: /api/v1/health
@@ -58,7 +58,7 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: {{ include "dagu.fullname" . }}-data
+            claimName: {{ include "boltbase.fullname" . }}-data
         - name: config
           configMap:
-            name: {{ include "dagu.fullname" . }}-config
+            name: {{ include "boltbase.fullname" . }}-config

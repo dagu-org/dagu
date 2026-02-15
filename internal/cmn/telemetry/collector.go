@@ -76,43 +76,43 @@ func NewCollector(
 
 		// Initialize metric descriptors
 		infoDesc: prometheus.NewDesc(
-			"dagu_info",
-			"Dagu build information",
+			"boltbase_info",
+			"Boltbase build information",
 			[]string{"version", "go_version"},
 			nil,
 		),
 		uptimeDesc: prometheus.NewDesc(
-			"dagu_uptime_seconds",
+			"boltbase_uptime_seconds",
 			"Time since server start",
 			nil,
 			nil,
 		),
 		dagRunsCurrentlyDesc: prometheus.NewDesc(
-			"dagu_dag_runs_currently_running",
+			"boltbase_dag_runs_currently_running",
 			"Number of currently running DAG runs",
 			nil,
 			nil,
 		),
 		dagRunsQueuedDesc: prometheus.NewDesc(
-			"dagu_dag_runs_queued_total",
+			"boltbase_dag_runs_queued_total",
 			"Total number of DAG runs in queue",
 			nil,
 			nil,
 		),
 		dagRunsTotalDesc: prometheus.NewDesc(
-			"dagu_dag_runs_total",
+			"boltbase_dag_runs_total",
 			"Total number of DAG runs by status (today)",
 			[]string{"status"},
 			nil,
 		),
 		dagsTotalDesc: prometheus.NewDesc(
-			"dagu_dags_total",
+			"boltbase_dags_total",
 			"Total number of DAGs",
 			nil,
 			nil,
 		),
 		schedulerRunningDesc: prometheus.NewDesc(
-			"dagu_scheduler_running",
+			"boltbase_scheduler_running",
 			"Whether the scheduler is running",
 			nil,
 			nil,
@@ -120,31 +120,31 @@ func NewCollector(
 
 		// Per-DAG metric descriptors
 		dagRunsCurrentlyByDAGDesc: prometheus.NewDesc(
-			"dagu_dag_runs_currently_running_by_dag",
+			"boltbase_dag_runs_currently_running_by_dag",
 			"Number of currently running DAG runs per DAG",
 			[]string{"dag"},
 			nil,
 		),
 		dagRunsQueuedByDAGDesc: prometheus.NewDesc(
-			"dagu_dag_runs_queued_by_dag",
+			"boltbase_dag_runs_queued_by_dag",
 			"Number of queued DAG runs per DAG",
 			[]string{"dag"},
 			nil,
 		),
 		dagRunsTotalByDAGDesc: prometheus.NewDesc(
-			"dagu_dag_runs_total_by_dag",
+			"boltbase_dag_runs_total_by_dag",
 			"Total number of DAG runs by DAG and status (today)",
 			[]string{"dag", "status"},
 			nil,
 		),
 		dagRunDurationDesc: prometheus.NewDesc(
-			"dagu_dag_run_duration_seconds",
+			"boltbase_dag_run_duration_seconds",
 			"Duration of completed DAG runs in seconds",
 			[]string{"dag"},
 			nil,
 		),
 		queueWaitTimeDesc: prometheus.NewDesc(
-			"dagu_queue_wait_seconds",
+			"boltbase_queue_wait_seconds",
 			"Time spent waiting in queue before execution starts",
 			[]string{"dag"},
 			nil,
@@ -152,7 +152,7 @@ func NewCollector(
 
 		// Cache metrics
 		cacheEntriesDesc: prometheus.NewDesc(
-			"dagu_cache_entries_total",
+			"boltbase_cache_entries_total",
 			"Number of entries in cache",
 			[]string{"cache"},
 			nil,
@@ -493,11 +493,11 @@ func emitHistogram(
 	)
 }
 
-// NewRegistry creates a new Prometheus registry with Dagu collectors
+// NewRegistry creates a new Prometheus registry with Boltbase collectors
 func NewRegistry(collector *Collector) *prometheus.Registry {
 	registry := prometheus.NewRegistry()
 
-	// Register custom Dagu collector
+	// Register custom Boltbase collector
 	registry.MustRegister(collector)
 
 	// Optionally register Go runtime metrics

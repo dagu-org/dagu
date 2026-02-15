@@ -6,40 +6,40 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "dagu.fullname" $ }}-worker-{{ $poolName }}
+  name: {{ include "boltbase.fullname" $ }}-worker-{{ $poolName }}
   labels:
-    {{- include "dagu.labels" $ | nindent 4 }}
+    {{- include "boltbase.labels" $ | nindent 4 }}
     app.kubernetes.io/component: worker
-    dagu.io/worker-pool: {{ $poolName }}
+    boltbase.io/worker-pool: {{ $poolName }}
 spec:
   replicas: {{ $pool.replicas }}
   selector:
     matchLabels:
-      {{- include "dagu.selectorLabels" $ | nindent 6 }}
+      {{- include "boltbase.selectorLabels" $ | nindent 6 }}
       app.kubernetes.io/component: worker
-      dagu.io/worker-pool: {{ $poolName }}
+      boltbase.io/worker-pool: {{ $poolName }}
   template:
     metadata:
       labels:
-        {{- include "dagu.labels" $ | nindent 8 }}
+        {{- include "boltbase.labels" $ | nindent 8 }}
         app.kubernetes.io/component: worker
-        dagu.io/worker-pool: {{ $poolName }}
+        boltbase.io/worker-pool: {{ $poolName }}
     spec:
       # Disable Kubernetes Service env var injection to avoid overriding
-      # dagu config values (e.g., scheduler.port) with Service URLs
+      # boltbase config values (e.g., scheduler.port) with Service URLs
       enableServiceLinks: false
       containers:
         - name: worker
           image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag }}"
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
           command:
-            - dagu
+            - boltbase
             - worker
             - --config
-            - /etc/dagu/dagu.yaml
+            - /etc/boltbase/boltbase.yaml
             {{- if $pool.labels }}
             - --worker.labels
-            - {{ include "dagu.workerLabels" $pool.labels | quote }}
+            - {{ include "boltbase.workerLabels" $pool.labels | quote }}
             {{- end }}
           env:
             - name: WORKER_ID
@@ -50,7 +50,7 @@ spec:
             - name: data
               mountPath: /data
             - name: config
-              mountPath: /etc/dagu
+              mountPath: /etc/boltbase
           resources:
             {{- toYaml $pool.resources | nindent 12 }}
       {{- with $pool.nodeSelector }}
@@ -68,8 +68,8 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: {{ include "dagu.fullname" $ }}-data
+            claimName: {{ include "boltbase.fullname" $ }}-data
         - name: config
           configMap:
-            name: {{ include "dagu.fullname" $ }}-config
+            name: {{ include "boltbase.fullname" $ }}-config
 {{- end }}

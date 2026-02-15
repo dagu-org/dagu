@@ -305,16 +305,16 @@ func TestCleanup_NonExistentFile(t *testing.T) {
 
 func TestExecutablePath(t *testing.T) {
 	// Test with environment variable
-	testPath := "/custom/path/to/dagu"
-	_ = os.Setenv("DAGU_EXECUTABLE", testPath)
-	defer func() { _ = os.Unsetenv("DAGU_EXECUTABLE") }()
+	testPath := "/custom/path/to/boltbase"
+	_ = os.Setenv("BOLTBASE_EXECUTABLE", testPath)
+	defer func() { _ = os.Unsetenv("BOLTBASE_EXECUTABLE") }()
 
 	path, err := executablePath()
 	assert.NoError(t, err)
 	assert.Equal(t, testPath, path)
 
 	// Test without environment variable
-	_ = os.Unsetenv("DAGU_EXECUTABLE")
+	_ = os.Unsetenv("BOLTBASE_EXECUTABLE")
 	path, err = executablePath()
 	assert.NoError(t, err)
 	assert.NotEmpty(t, path)

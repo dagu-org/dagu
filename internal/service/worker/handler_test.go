@@ -193,7 +193,7 @@ func TestCreateTempDAGFile(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "steps:\n  - name: example\n", string(data))
 
-	expectedDir := filepath.Join(os.TempDir(), "dagu", "worker-dags") + string(os.PathSeparator)
+	expectedDir := filepath.Join(os.TempDir(), "boltbase", "worker-dags") + string(os.PathSeparator)
 	require.True(t, strings.HasPrefix(path, expectedDir), "expected %q to start with %q", path, expectedDir)
 }
 
@@ -204,7 +204,7 @@ func TestTaskHandlerStartWithDefinition(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	argsPath := filepath.Join(tmpDir, "args.txt")
-	fakeExec := filepath.Join(tmpDir, "fake-dagu.sh")
+	fakeExec := filepath.Join(tmpDir, "fake-boltbase.sh")
 
 	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + argsPath + "\n"
 	err := os.WriteFile(fakeExec, []byte(script), 0o700)

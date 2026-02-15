@@ -199,7 +199,7 @@ func (e *sshExecutor) buildScript() string {
 	}
 
 	// Wrap in function - shell MUST read entire body before executing
-	return fmt.Sprintf("__dagu_exec(){\n%s}\n__dagu_exec\n", body.String())
+	return fmt.Sprintf("__boltbase_exec(){\n%s}\n__boltbase_exec\n", body.String())
 }
 
 // buildCommandString constructs a command string from a CommandEntry.

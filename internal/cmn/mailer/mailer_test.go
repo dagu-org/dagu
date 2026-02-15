@@ -121,7 +121,7 @@ This is a plain text email.
 It has multiple lines.
 
 Best regards,
-Dagu Team`,
+Boltbase Team`,
 			expectNewlineProcessed: true,
 			description:            "Plain text should have newlines converted to <br /> tags",
 		},

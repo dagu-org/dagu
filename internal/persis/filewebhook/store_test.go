@@ -34,7 +34,7 @@ func setupStoreWithCache(t *testing.T) (*Store, string, *fileutil.Cache[*auth.We
 
 func newWebhook(t *testing.T, dagName string) *auth.Webhook {
 	t.Helper()
-	wh, err := auth.NewWebhook(dagName, "hash", "dagu_wh_", "admin")
+	wh, err := auth.NewWebhook(dagName, "hash", "boltbase_wh_", "admin")
 	require.NoError(t, err)
 	return wh
 }
@@ -595,7 +595,7 @@ func TestStore_UpdateLastUsedPreservesFields(t *testing.T) {
 	store, _ := setupStore(t)
 	ctx := context.Background()
 
-	wh, _ := auth.NewWebhook("dag", "secret-hash", "dagu_wh_", "creator")
+	wh, _ := auth.NewWebhook("dag", "secret-hash", "boltbase_wh_", "creator")
 	wh.Enabled = false
 	require.NoError(t, store.Create(ctx, wh))
 

@@ -161,7 +161,7 @@ func performSearchWithClient(ctx context.Context, query string, maxResults int, 
 	resp, err := client.R().
 		SetContext(ctx).
 		SetFormData(map[string]string{"q": query}).
-		SetHeader("User-Agent", "Mozilla/5.0 (compatible; DaguBot/1.0)").
+		SetHeader("User-Agent", "Mozilla/5.0 (compatible; BoltbaseBot/1.0)").
 		Post(searchURL)
 
 	if err != nil {

@@ -42,8 +42,8 @@ func TestNewMetrics(t *testing.T) {
 		metricNames[family.GetName()] = true
 	}
 
-	assert.True(t, metricNames["dagu_sse_clients_connected"])
-	assert.True(t, metricNames["dagu_sse_watchers_active"])
+	assert.True(t, metricNames["boltbase_sse_clients_connected"])
+	assert.True(t, metricNames["boltbase_sse_watchers_active"])
 }
 
 func TestMetricsClientConnectedDisconnected(t *testing.T) {

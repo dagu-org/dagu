@@ -33,9 +33,9 @@ jobs:
         run: |
           # Test asset name generation
           echo "Testing asset names..."
-          echo "Linux x64: dagu_${{ env.VERSION }}_Linux_x86_64.tar.gz"
-          echo "Darwin arm64: dagu_${{ env.VERSION }}_Darwin_arm64.tar.gz"
-          echo "Windows x64: dagu_${{ env.VERSION }}_Windows_x86_64.zip"
+          echo "Linux x64: boltbase_${{ env.VERSION }}_Linux_x86_64.tar.gz"
+          echo "Darwin arm64: boltbase_${{ env.VERSION }}_Darwin_arm64.tar.gz"
+          echo "Windows x64: boltbase_${{ env.VERSION }}_Windows_x86_64.zip"
 
       - name: Test Node.js script
         run: |
@@ -47,8 +47,8 @@ jobs:
             "name": "test-package",
             "version": "1.0.0",
             "optionalDependencies": {
-              "@dagu-org/dagu-linux-x64": "1.0.0",
-              "@dagu-org/dagu-darwin-arm64": "1.0.0"
+              "@dagu-org/boltbase-linux-x64": "1.0.0",
+              "@dagu-org/boltbase-darwin-arm64": "1.0.0"
             }
           }
           EOF
@@ -83,14 +83,14 @@ jobs:
         include:
           - platform: linux
             arch: x64
-            package: dagu-linux-x64
+            package: boltbase-linux-x64
           - platform: darwin
             arch: arm64
-            package: dagu-darwin-arm64
+            package: boltbase-darwin-arm64
     steps:
       - name: Test matrix variables
         run: |
           echo "Platform: ${{ matrix.platform }}"
           echo "Arch: ${{ matrix.arch }}"
           echo "Package: ${{ matrix.package }}"
-          echo "Asset would be: dagu_${{ env.VERSION }}_${{ matrix.platform }}_${{ matrix.arch }}.tar.gz"
+          echo "Asset would be: boltbase_${{ env.VERSION }}_${{ matrix.platform }}_${{ matrix.arch }}.tar.gz"

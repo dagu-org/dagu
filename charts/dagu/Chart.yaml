@@ -1,5 +1,5 @@
 apiVersion: v2
-name: dagu
+name: boltbase
 description: A DAG-based workflow engine
 type: application
 version: 0.1.0

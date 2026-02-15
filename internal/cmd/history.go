@@ -46,15 +46,15 @@ Default Behavior:
   All timestamps are displayed in UTC timezone.
 
 Examples:
-  dagu history                                # All runs from last 30 days
-  dagu history my-dag                         # All runs for specific DAG
-  dagu history --from 2026-01-01              # Runs since date
-  dagu history --last 7d                      # Last 7 days
-  dagu history --status failed                # Only failed runs
-  dagu history --format json                  # JSON output
-  dagu history --tags "prod,critical"         # Filter by tags (AND logic)
-  dagu history --limit 50                     # Limit to 50 results
-  dagu history my-dag --status failed --last 24h  # Combined filters
+  boltbase history                                # All runs from last 30 days
+  boltbase history my-dag                         # All runs for specific DAG
+  boltbase history --from 2026-01-01              # Runs since date
+  boltbase history --last 7d                      # Last 7 days
+  boltbase history --status failed                # Only failed runs
+  boltbase history --format json                  # JSON output
+  boltbase history --tags "prod,critical"         # Filter by tags (AND logic)
+  boltbase history --limit 50                     # Limit to 50 results
+  boltbase history my-dag --status failed --last 24h  # Combined filters
 `,
 			Args: cobra.MaximumNArgs(1),
 		},

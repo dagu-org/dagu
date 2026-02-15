@@ -1,22 +1,22 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: dagu-config
-  namespace: dagu-dev
+  name: boltbase-config
+  namespace: boltbase-dev
 data:
   # Coordinator gRPC port (host configured per-deployment)
-  DAGU_COORDINATOR_PORT: "50055"
+  BOLTBASE_COORDINATOR_PORT: "50055"
 
   # Server configuration
-  DAGU_HOST: "0.0.0.0"
-  DAGU_PORT: "8080"
+  BOLTBASE_HOST: "0.0.0.0"
+  BOLTBASE_PORT: "8080"
 
   # Data directories
-  DAGU_DAGS_DIR: "/var/lib/dagu/dags"
-  DAGU_HOME: "/var/lib/dagu"
+  BOLTBASE_DAGS_DIR: "/var/lib/boltbase/dags"
+  BOLTBASE_HOME: "/var/lib/boltbase"
 
   # Peer configuration (insecure for local testing)
-  DAGU_PEER_INSECURE: "true"
+  BOLTBASE_PEER_INSECURE: "true"
 
   # Optional: Timezone
-  DAGU_TZ: "UTC"
+  BOLTBASE_TZ: "UTC"

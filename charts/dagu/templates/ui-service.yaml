@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "dagu.fullname" . }}-ui
+  name: {{ include "boltbase.fullname" . }}-ui
   labels:
-    {{- include "dagu.labels" . | nindent 4 }}
+    {{- include "boltbase.labels" . | nindent 4 }}
     app.kubernetes.io/component: ui
 spec:
   type: ClusterIP
   selector:
-    {{- include "dagu.labels" . | nindent 4 }}
+    {{- include "boltbase.labels" . | nindent 4 }}
     app.kubernetes.io/component: ui
   ports:
     - name: http

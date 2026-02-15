@@ -24,9 +24,9 @@ export function parseTagParts(tag: string): { key: string; value: string | null 
 /**
  * Converts a step name to a valid Mermaid node ID by replacing
  * characters that could break Mermaid syntax (spaces, dashes, parentheses).
- * Uses 'dagutmp' as the replacement to avoid collisions with step names
+ * Uses 'boltbasetmp' as the replacement to avoid collisions with step names
  * that already contain underscores.
  */
 export function toMermaidNodeId(stepName: string): string {
-  return stepName.replace(/[\s-()]/g, 'dagutmp');
+  return stepName.replace(/[\s-()]/g, 'boltbasetmp');
 }

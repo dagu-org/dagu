@@ -53,8 +53,8 @@ type GitSyncAutoSyncConfig struct {
 
 // GitSyncCommitConfig holds configuration for Git commits.
 type GitSyncCommitConfig struct {
-	AuthorName  string // Default: "Dagu"
-	AuthorEmail string // Default: "dagu@localhost"
+	AuthorName  string // Default: "Boltbase"
+	AuthorEmail string // Default: "boltbase@localhost"
 }
 
 // TunnelConfig holds the configuration for tunnel services.
@@ -69,10 +69,10 @@ type TunnelConfig struct {
 // TailscaleTunnelConfig holds Tailscale settings.
 type TailscaleTunnelConfig struct {
 	AuthKey  string // Empty requires interactive login
-	Hostname string // Machine name in tailnet (default: "dagu")
+	Hostname string // Machine name in tailnet (default: "boltbase")
 	Funnel   bool   // Enable public internet access
 	HTTPS    bool   // Enable HTTPS for tailnet-only access
-	StateDir string // Default: $DAGU_HOME/tailscale
+	StateDir string // Default: $BOLTBASE_HOME/tailscale
 }
 
 // TunnelRateLimitConfig holds rate limiting configuration for auth endpoints.
@@ -226,11 +226,11 @@ func (o AuthOIDC) IsConfigured() bool {
 	return o.ClientID != "" && o.ClientSecret != "" && o.ClientURL != "" && o.Issuer != ""
 }
 
-// OIDCRoleMapping defines how OIDC claims are mapped to Dagu roles.
+// OIDCRoleMapping defines how OIDC claims are mapped to Boltbase roles.
 type OIDCRoleMapping struct {
 	DefaultRole         string            // Default: "viewer"
 	GroupsClaim         string            // Default: "groups"
-	GroupMappings       map[string]string // IdP group -> Dagu role
+	GroupMappings       map[string]string // IdP group -> Boltbase role
 	RoleAttributePath   string            // jq expression for role extraction
 	RoleAttributeStrict bool              // Deny login if no valid role found
 	SkipOrgRoleSync     bool              // Only assign roles on first login

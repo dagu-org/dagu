@@ -31,7 +31,7 @@ Flags:
                              the command will find the current running DAG-run by the given DAG name.
 
 Example:
-  dagu restart --run-id=abc123 my_dag
+  boltbase restart --run-id=abc123 my_dag
 `,
 			Args: cobra.ExactArgs(1),
 		}, restartFlags, runRestart,

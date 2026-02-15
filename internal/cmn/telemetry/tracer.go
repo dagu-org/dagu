@@ -136,7 +136,7 @@ func createGRPCExporter(ctx context.Context, config *core.OTelConfig) (sdktrace.
 // createResource creates the OpenTelemetry resource for the DAG
 func createResource(dag *core.DAG) (*resource.Resource, error) {
 	attrs := []attribute.KeyValue{
-		semconv.ServiceName("dagu"),
+		semconv.ServiceName("boltbase"),
 	}
 
 	// Add custom resource attributes from config

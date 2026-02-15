@@ -46,7 +46,7 @@ type Result struct {
 	SpecificVersionRequest bool
 }
 
-// InstallMethod represents how dagu was installed.
+// InstallMethod represents how boltbase was installed.
 type InstallMethod int
 
 const (
@@ -75,7 +75,7 @@ func (m InstallMethod) String() string {
 	return "unknown"
 }
 
-// DetectInstallMethod checks how dagu was installed.
+// DetectInstallMethod checks how boltbase was installed.
 func DetectInstallMethod() InstallMethod {
 	execPath, err := GetExecutablePath()
 	if err != nil {
@@ -110,14 +110,14 @@ func DetectInstallMethod() InstallMethod {
 	return InstallMethodBinary
 }
 
-// CanSelfUpgrade returns true if dagu can perform a self-upgrade.
+// CanSelfUpgrade returns true if boltbase can perform a self-upgrade.
 func CanSelfUpgrade() (bool, string) {
 	method := DetectInstallMethod()
 	switch method {
 	case InstallMethodHomebrew:
-		return false, "Installed via Homebrew. Use 'brew upgrade dagu' instead."
+		return false, "Installed via Homebrew. Use 'brew upgrade boltbase' instead."
 	case InstallMethodSnap:
-		return false, "Installed via Snap. Use 'snap refresh dagu' instead."
+		return false, "Installed via Snap. Use 'snap refresh boltbase' instead."
 	case InstallMethodDocker:
 		return false, "Running in Docker. Pull the latest image instead."
 	case InstallMethodGoInstall:
@@ -182,7 +182,7 @@ func FormatCheckResult(r *Result) string {
 	fmt.Fprintf(&sb, "%s:  %s\n", label, r.TargetVersion)
 
 	if r.UpgradeNeeded {
-		sb.WriteString("\nAn update is available. Run 'dagu upgrade' to update.\n")
+		sb.WriteString("\nAn update is available. Run 'boltbase upgrade' to update.\n")
 	} else {
 		sb.WriteString("\nYou are running the latest version.\n")
 	}
@@ -299,14 +299,14 @@ func UpgradeWithReleaseInfo(ctx context.Context, opts Options, info *ReleaseInfo
 	}
 
 	// Create temp directory for download
-	tempDir, err := os.MkdirTemp("", "dagu-upgrade-*")
+	tempDir, err := os.MkdirTemp("", "boltbase-upgrade-*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create internal backup of current binary (for restore on verify failure)
-	internalBackupPath := filepath.Join(tempDir, "dagu.prev")
+	internalBackupPath := filepath.Join(tempDir, "boltbase.prev")
 	if err := copyFile(execPath, internalBackupPath); err != nil {
 		return nil, fmt.Errorf("failed to create internal backup: %w", err)
 	}

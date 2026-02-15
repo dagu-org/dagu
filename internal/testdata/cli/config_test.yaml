@@ -1,6 +1,6 @@
 port: 54321
 headless: true
-dags: /tmp/.dagu_test
+dags: /tmp/.boltbase_test
 coordinator:
   host: 127.0.0.1
   port: 9876

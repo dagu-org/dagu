@@ -1,6 +1,6 @@
-# NPM Packages for Dagu
+# NPM Packages for Boltbase
 
-This directory contains the npm package structure for distributing Dagu binaries via npm.
+This directory contains the npm package structure for distributing Boltbase binaries via npm.
 
 ## Important Note on Versions
 
@@ -17,11 +17,11 @@ These versions are automatically updated during the release process:
 
 ```
 npm/
-├── dagu/                # Main package (users install this)
-├── dagu-linux-x64/      # Platform-specific packages
-├── dagu-linux-arm64/    # (automatically installed as dependencies)
-├── dagu-darwin-x64/
-├── dagu-darwin-arm64/
+├── boltbase/                # Main package (users install this)
+├── boltbase-linux-x64/      # Platform-specific packages
+├── boltbase-linux-arm64/    # (automatically installed as dependencies)
+├── boltbase-darwin-x64/
+├── boltbase-darwin-arm64/
 └── ...
 ```
 

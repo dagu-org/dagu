@@ -53,7 +53,7 @@ Shows overall sync status including:
 - Per-DAG status (synced, modified, untracked, conflict)
 
 Example:
-  dagu sync status`,
+  boltbase sync status`,
 			Args: cobra.NoArgs,
 		},
 		nil,
@@ -141,7 +141,7 @@ This command fetches and applies changes from the remote repository
 to your local DAG definitions.
 
 Example:
-  dagu sync pull`,
+  boltbase sync pull`,
 			Args: cobra.NoArgs,
 		},
 		nil,
@@ -198,8 +198,8 @@ When a DAG name is provided, only that DAG's changes are published.
 When no DAG name is provided with --all flag, all modified DAGs are published.
 
 Examples:
-  dagu sync publish my_dag -m "Updated schedule"
-  dagu sync publish --all -m "Batch update"`,
+  boltbase sync publish my_dag -m "Updated schedule"
+  boltbase sync publish --all -m "Batch update"`,
 		Args: cobra.MaximumNArgs(1),
 	}
 
@@ -295,8 +295,8 @@ the version from the remote repository.
 WARNING: This will permanently discard your local changes!
 
 Example:
-  dagu sync discard my_dag
-  dagu sync discard my_dag --yes`,
+  boltbase sync discard my_dag
+  boltbase sync discard my_dag --yes`,
 		Args: cobra.ExactArgs(1),
 	}
 

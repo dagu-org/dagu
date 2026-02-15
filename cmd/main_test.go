@@ -26,16 +26,16 @@ func TestRootCommand(t *testing.T) {
 	}{
 		{
 			name:        "HelpCommand",
-			args:        []string{"dagu", "--help"},
+			args:        []string{"boltbase", "--help"},
 			expectError: false,
 			expectContains: []string{
-				"Dagu is a compact, portable workflow engine",
+				"Boltbase is an AI-first, self-contained workflow engine",
 				"declarative model for orchestrating command execution",
 			},
 		},
 		{
 			name:        "InvalidCommand",
-			args:        []string{"dagu", "invalid-command"},
+			args:        []string{"boltbase", "invalid-command"},
 			expectError: true,
 			expectContains: []string{
 				"unknown command",
@@ -43,10 +43,10 @@ func TestRootCommand(t *testing.T) {
 		},
 		{
 			name:        "NoArguments",
-			args:        []string{"dagu"},
+			args:        []string{"boltbase"},
 			expectError: false,
 			expectContains: []string{
-				"Dagu is a compact, portable workflow engine",
+				"Boltbase is an AI-first, self-contained workflow engine",
 			},
 		},
 	}
@@ -189,7 +189,7 @@ func TestRootCommandStructure(t *testing.T) {
 
 func TestRootCommandMetadata(t *testing.T) {
 	assert.Equal(t, config.AppSlug, rootCmd.Use)
-	assert.Equal(t, "Dagu is a compact, portable workflow engine", rootCmd.Short)
+	assert.Equal(t, "Boltbase is an AI-first, self-contained workflow engine", rootCmd.Short)
 	assert.Contains(t, rootCmd.Long, "declarative model for orchestrating command execution")
 	assert.Contains(t, rootCmd.Long, "shell scripts, Python commands, containerized")
 }
@@ -222,8 +222,8 @@ func TestCommandHelp(t *testing.T) {
 func resetRootCommand() {
 	rootCmd = &cobra.Command{
 		Use:   config.AppSlug,
-		Short: "Dagu is a compact, portable workflow engine",
-		Long: `Dagu is a compact, portable workflow engine.
+		Short: "Boltbase is an AI-first, self-contained workflow engine",
+		Long: `Boltbase is an AI-first, self-contained workflow engine.
 
 It provides a declarative model for orchestrating command execution across
 diverse environments, including shell scripts, Python commands, containerized

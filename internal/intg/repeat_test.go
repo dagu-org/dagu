@@ -54,7 +54,7 @@ func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
 	// Load DAG with repeat limit and condition
 	dag := th.DAG(t, `steps:
   - script: |
-      COUNTER_FILE="/tmp/dagu_repeat_counter_test2"
+      COUNTER_FILE="/tmp/boltbase_repeat_counter_test2"
       COUNT=0
       if [ -f "$COUNTER_FILE" ]; then
         COUNT=$(cat "$COUNTER_FILE")
@@ -73,7 +73,7 @@ func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
       repeat: until
       limit: 5
       interval_sec: 0
-      condition: "`+"`"+`[ -f /tmp/dagu_repeat_counter_test2 ] && cat /tmp/dagu_repeat_counter_test2 || echo 0`+"`"+`"
+      condition: "`+"`"+`[ -f /tmp/boltbase_repeat_counter_test2 ] && cat /tmp/boltbase_repeat_counter_test2 || echo 0`+"`"+`"
       expected: "10"
 `)
 	agent := dag.Agent()
@@ -177,7 +177,7 @@ func TestRepeatPolicy_UntilWithExitCode(t *testing.T) {
 	// Load DAG with until mode and exitCode (should repeat until step returns exit code 0)
 	dag := th.DAG(t, `steps:
   - script: |
-      COUNT_FILE="/tmp/dagu_repeat_until_unconditional_test"
+      COUNT_FILE="/tmp/boltbase_repeat_until_unconditional_test"
       COUNT=0
       if [ -f "$COUNT_FILE" ]; then
         COUNT=$(cat "$COUNT_FILE")
@@ -262,7 +262,7 @@ func TestRepeatPolicy_BackwardCompatibilityTrue(t *testing.T) {
 }
 
 func TestRepeatPolicy_OnExitCode(t *testing.T) {
-	counterFile := "/tmp/dagu-test-counter-repeat-on-exitcode"
+	counterFile := "/tmp/boltbase-test-counter-repeat-on-exitcode"
 	_ = os.Remove(counterFile)
 	t.Cleanup(func() {
 		_ = os.Remove(counterFile)
@@ -273,7 +273,7 @@ func TestRepeatPolicy_OnExitCode(t *testing.T) {
 	dag := th.DAG(t, `steps:
   - command: |
       #!/bin/bash
-      COUNTER_FILE="/tmp/dagu-test-counter-repeat-on-exitcode"
+      COUNTER_FILE="/tmp/boltbase-test-counter-repeat-on-exitcode"
       if [ ! -f "$COUNTER_FILE" ]; then
           echo 1 > "$COUNTER_FILE"
           exit 1

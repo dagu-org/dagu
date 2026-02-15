@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * Check server health status
-         * @description Returns health information about the Dagu server
+         * @description Returns health information about the Boltbase server
          */
         get: operations["getHealthStatus"];
         put?: never;
@@ -1250,7 +1250,7 @@ export interface paths {
         };
         /**
          * Get Prometheus metrics
-         * @description Returns Prometheus-compatible metrics for monitoring Dagu operations
+         * @description Returns Prometheus-compatible metrics for monitoring Boltbase operations
          */
         get: operations["getMetrics"];
         put?: never;
@@ -1274,7 +1274,7 @@ export interface paths {
          * Trigger DAG execution via webhook
          * @description Triggers a DAG execution via webhook. The DAG must have a webhook configured
          *     and enabled. Authentication is performed using a bearer token generated when
-         *     the webhook was created (format: 'dagu_wh_...').
+         *     the webhook was created (format: 'boltbase_wh_...').
          *
          *     The request body is passed to the DAG as the WEBHOOK_PAYLOAD environment
          *     variable. The DAG run is enqueued and the endpoint returns immediately
@@ -6742,7 +6742,7 @@ export interface operations {
                 remoteNode?: components["parameters"]["RemoteNode"];
             };
             header?: {
-                /** @description Bearer token for webhook authentication (e.g., 'Bearer dagu_wh_...'). Required for authentication but marked optional in schema so the handler can return proper 401 responses. */
+                /** @description Bearer token for webhook authentication (e.g., 'Bearer boltbase_wh_...'). Required for authentication but marked optional in schema so the handler can return proper 401 responses. */
                 Authorization?: string;
             };
             path: {

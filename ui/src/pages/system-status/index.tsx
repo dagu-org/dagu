@@ -157,7 +157,7 @@ function SystemStatus() {
         <div>
           <h1 className="text-2xl font-bold">System Status</h1>
           <p className="text-sm text-muted-foreground">
-            Monitor and manage Dagu services and system health
+            Monitor and manage Boltbase services and system health
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -283,7 +283,7 @@ function SystemStatus() {
           Last updated: {lastUpdateTime.toLocaleTimeString()}
           {autoRefresh && ' • Refreshing every 5 seconds'}
         </div>
-        <div>Dagu v{config.version}</div>
+        <div>Boltbase v{config.version}</div>
       </div>
     </div>
   );

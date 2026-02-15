@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: dagu-dev
+namespace: boltbase-dev
 
 resources:
   - namespace.yaml
@@ -12,9 +12,9 @@ resources:
 
 # Optional: Add common labels to all resources
 commonLabels:
-  app: dagu
+  app: boltbase
   environment: local
 
 # Optional: Add common annotations
 commonAnnotations:
-  description: "Dagu distributed execution - local k8s setup"
+  description: "Boltbase distributed execution - local k8s setup"

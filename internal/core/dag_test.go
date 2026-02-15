@@ -21,7 +21,7 @@ func TestSockAddr(t *testing.T) {
 
 	t.Run("Location", func(t *testing.T) {
 		dag := &core.DAG{Location: "testdata/testDag.yml"}
-		require.Regexp(t, `^/tmp/@dagu_testdata_testDag_yml_[0-9a-f]+\.sock$`, dag.SockAddr(""))
+		require.Regexp(t, `^/tmp/@boltbase_testdata_testDag_yml_[0-9a-f]+\.sock$`, dag.SockAddr(""))
 	})
 	t.Run("MaxUnixSocketLength", func(t *testing.T) {
 		dag := &core.DAG{
@@ -32,7 +32,7 @@ func TestSockAddr(t *testing.T) {
 		require.LessOrEqual(t, 50, len(dag.SockAddr("")))
 		require.Equal(
 			t,
-			"/tmp/@dagu_testdata_testDagVeryLongNameThat_b92b71.sock",
+			"/tmp/@boltbase_testdata_testDagVeryLongName_b92b71.sock",
 			dag.SockAddr(""),
 		)
 	})
@@ -41,7 +41,7 @@ func TestSockAddr(t *testing.T) {
 
 		addr := core.SockAddr("mydag", "run123")
 
-		require.True(t, strings.HasPrefix(addr, "/tmp/@dagu_"))
+		require.True(t, strings.HasPrefix(addr, "/tmp/@boltbase_"))
 		require.True(t, strings.HasSuffix(addr, ".sock"))
 		require.Contains(t, addr, "mydag")
 
@@ -85,25 +85,25 @@ func TestSockAddr(t *testing.T) {
 		socketName := strings.TrimPrefix(addr, "/tmp/")
 
 		require.LessOrEqual(t, len(socketName), 50)
-		require.True(t, strings.HasPrefix(socketName, "@dagu_"))
+		require.True(t, strings.HasPrefix(socketName, "@boltbase_"))
 		require.True(t, strings.HasSuffix(socketName, ".sock"))
 	})
 
 	t.Run("EdgeCaseTruncation", func(t *testing.T) {
 		t.Parallel()
 
-		// Format: @dagu_ (6) + name (?) + _ (1) + hash (6) + .sock (5) = 50
-		// Max name length = 50 - 6 - 1 - 6 - 5 = 32
-		name32 := strings.Repeat("x", 32)
-		name33 := strings.Repeat("x", 33)
+		// Format: @boltbase_ (10) + name (?) + _ (1) + hash (6) + .sock (5) = 50
+		// Max name length = 50 - 10 - 1 - 6 - 5 = 28
+		name28 := strings.Repeat("x", 28)
+		name29 := strings.Repeat("x", 29)
 
-		socketName32 := strings.TrimPrefix(core.SockAddr(name32, "run123"), "/tmp/")
-		socketName33 := strings.TrimPrefix(core.SockAddr(name33, "run123"), "/tmp/")
+		socketName28 := strings.TrimPrefix(core.SockAddr(name28, "run123"), "/tmp/")
+		socketName29 := strings.TrimPrefix(core.SockAddr(name29, "run123"), "/tmp/")
 
-		require.LessOrEqual(t, len(socketName32), 50)
-		require.LessOrEqual(t, len(socketName33), 50)
-		require.Contains(t, socketName32, name32)
-		require.NotContains(t, socketName33, name33, "33-char name should be truncated")
+		require.LessOrEqual(t, len(socketName28), 50)
+		require.LessOrEqual(t, len(socketName29), 50)
+		require.Contains(t, socketName28, name28)
+		require.NotContains(t, socketName29, name29, "29-char name should be truncated")
 	})
 
 	t.Run("EmptyInputs", func(t *testing.T) {
@@ -116,7 +116,7 @@ func TestSockAddr(t *testing.T) {
 		}
 
 		for _, addr := range addrs {
-			require.True(t, strings.HasPrefix(addr, "/tmp/@dagu_"))
+			require.True(t, strings.HasPrefix(addr, "/tmp/@boltbase_"))
 			require.True(t, strings.HasSuffix(addr, ".sock"))
 		}
 	})

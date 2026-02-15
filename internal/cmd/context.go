@@ -111,14 +111,14 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get quiet flag: %w", err)
 	}
-	daguHome, err := cmd.Flags().GetString("dagu-home")
+	boltbaseHome, err := cmd.Flags().GetString("boltbase-home")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get dagu-home flag: %w", err)
+		return nil, fmt.Errorf("failed to get boltbase-home flag: %w", err)
 	}
 
 	var configLoaderOpts []config.ConfigLoaderOption
-	if daguHome != "" {
-		if resolvedHome := fileutil.ResolvePathOrBlank(daguHome); resolvedHome != "" {
+	if boltbaseHome != "" {
+		if resolvedHome := fileutil.ResolvePathOrBlank(boltbaseHome); resolvedHome != "" {
 			configLoaderOpts = append(configLoaderOpts, config.WithAppHomeDir(resolvedHome))
 		}
 	}

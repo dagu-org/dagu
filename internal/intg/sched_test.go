@@ -17,7 +17,7 @@ import (
 func TestCronScheduleRunsTwice(t *testing.T) {
 	t.Parallel()
 
-	tmpDir, err := os.MkdirTemp("", "dagu-cron-test-*")
+	tmpDir, err := os.MkdirTemp("", "boltbase-cron-test-*")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 

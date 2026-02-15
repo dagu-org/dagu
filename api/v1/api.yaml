@@ -2,18 +2,18 @@
 openapi: "3.0.0"
 info:
   version: "1.0.0"
-  title: "Dagu"
+  title: "Boltbase"
   contact:
     name: "Yota Hamada"
     url: "https://github.com/yottahmd"
-  description: API for controlling and monitoring Dagu server.
+  description: API for controlling and monitoring Boltbase server.
   license:
     name: "GPL-3.0"
     url: "https://github.com/dagu-org/dagu/blob/main/LICENSE.md"
 
 servers:
   - url: "{schema}://{host}/api/v1"
-    description: "Dagu API server"
+    description: "Boltbase API server"
     variables:
       schema:
         default: http
@@ -28,9 +28,9 @@ tags:
   - name: "dag-runs"
     description: "Operations for retrieving historical data and logs of DAG-run executions"
   - name: "system"
-    description: "System operations for monitoring and managing the Dagu server"
+    description: "System operations for monitoring and managing the Boltbase server"
   - name: "monitoring"
-    description: "Prometheus-compatible metrics for monitoring Dagu operations"
+    description: "Prometheus-compatible metrics for monitoring Boltbase operations"
   - name: "queues"
     description: "Operations for managing and monitoring execution queues"
   - name: "auth"
@@ -52,7 +52,7 @@ paths:
   /health:
     get:
       summary: "Check server health status"
-      description: "Returns health information about the Dagu server"
+      description: "Returns health information about the Boltbase server"
       operationId: "getHealthStatus"
       tags:
         - "system"
@@ -2910,7 +2910,7 @@ paths:
   /metrics:
     get:
       summary: "Get Prometheus metrics"
-      description: "Returns Prometheus-compatible metrics for monitoring Dagu operations"
+      description: "Returns Prometheus-compatible metrics for monitoring Boltbase operations"
       operationId: "getMetrics"
       tags:
         - "monitoring"
@@ -2922,35 +2922,35 @@ paths:
               schema:
                 type: string
                 example: |
-                  # HELP dagu_info Dagu build information
-                  # TYPE dagu_info gauge
-                  dagu_info{version="1.14.0",build_date="2024-01-01T12:00:00Z",go_version="1.21"} 1
+                  # HELP boltbase_info Boltbase build information
+                  # TYPE boltbase_info gauge
+                  boltbase_info{version="1.14.0",build_date="2024-01-01T12:00:00Z",go_version="1.21"} 1
 
-                  # HELP dagu_uptime_seconds Time since server start
-                  # TYPE dagu_uptime_seconds gauge
-                  dagu_uptime_seconds 3600
+                  # HELP boltbase_uptime_seconds Time since server start
+                  # TYPE boltbase_uptime_seconds gauge
+                  boltbase_uptime_seconds 3600
 
-                  # HELP dagu_dag_runs_currently_running Number of currently running DAG runs
-                  # TYPE dagu_dag_runs_currently_running gauge
-                  dagu_dag_runs_currently_running 5
+                  # HELP boltbase_dag_runs_currently_running Number of currently running DAG runs
+                  # TYPE boltbase_dag_runs_currently_running gauge
+                  boltbase_dag_runs_currently_running 5
 
-                  # HELP dagu_dag_runs_queued_total Total number of DAG runs in queue
-                  # TYPE dagu_dag_runs_queued_total gauge
-                  dagu_dag_runs_queued_total 8
+                  # HELP boltbase_dag_runs_queued_total Total number of DAG runs in queue
+                  # TYPE boltbase_dag_runs_queued_total gauge
+                  boltbase_dag_runs_queued_total 8
 
-                  # HELP dagu_dag_runs_total Total number of DAG runs by status
-                  # TYPE dagu_dag_runs_total counter
-                  dagu_dag_runs_total{status="success"} 2493
-                  dagu_dag_runs_total{status="error"} 15
-                  dagu_dag_runs_total{status="aborted"} 7
+                  # HELP boltbase_dag_runs_total Total number of DAG runs by status
+                  # TYPE boltbase_dag_runs_total counter
+                  boltbase_dag_runs_total{status="success"} 2493
+                  boltbase_dag_runs_total{status="error"} 15
+                  boltbase_dag_runs_total{status="aborted"} 7
 
-                  # HELP dagu_dags_total Total number of DAGs
-                  # TYPE dagu_dags_total gauge
-                  dagu_dags_total 45
+                  # HELP boltbase_dags_total Total number of DAGs
+                  # TYPE boltbase_dags_total gauge
+                  boltbase_dags_total 45
 
-                  # HELP dagu_scheduler_running Whether the scheduler is running
-                  # TYPE dagu_scheduler_running gauge
-                  dagu_scheduler_running 1
+                  # HELP boltbase_scheduler_running Whether the scheduler is running
+                  # TYPE boltbase_scheduler_running gauge
+                  boltbase_scheduler_running 1
         default:
           description: "Generic error response"
           content:
@@ -2964,7 +2964,7 @@ paths:
       description: |
         Triggers a DAG execution via webhook. The DAG must have a webhook configured
         and enabled. Authentication is performed using a bearer token generated when
-        the webhook was created (format: 'dagu_wh_...').
+        the webhook was created (format: 'boltbase_wh_...').
 
         The request body is passed to the DAG as the WEBHOOK_PAYLOAD environment
         variable. The DAG run is enqueued and the endpoint returns immediately
@@ -2981,7 +2981,7 @@ paths:
           required: false
           schema:
             type: string
-          description: "Bearer token for webhook authentication (e.g., 'Bearer dagu_wh_...'). Required for authentication but marked optional in schema so the handler can return proper 401 responses."
+          description: "Bearer token for webhook authentication (e.g., 'Bearer boltbase_wh_...'). Required for authentication but marked optional in schema so the handler can return proper 401 responses."
       requestBody:
         required: false
         content:

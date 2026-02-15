@@ -29,7 +29,7 @@ DATE=$(shell date +'%y%m%d%H%M%S')
 LDFLAGS=-X 'main.version=$(BUILD_VERSION)-$(DATE)'
 
 # Application name
-APP_NAME=dagu
+APP_NAME=boltbase
 
 # Docker image build configuration
 DOCKER_CMD := docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7,linux/arm64/v8 --builder container --build-arg LDFLAGS="$(LDFLAGS)" --push --no-cache
@@ -74,7 +74,7 @@ PKG_protoc_gen_go_grpc=google.golang.org/grpc/cmd/protoc-gen-go-grpc
 
 CERTS_DIR=${LOCAL_DIR}/certs
 
-DEV_CERT_SUBJ_CA="/C=TR/ST=ASIA/L=TOKYO/O=DEV/OU=DAGU/CN=*.dagu.dev/emailAddress=ca@dev.com"
+DEV_CERT_SUBJ_CA="/C=TR/ST=ASIA/L=TOKYO/O=DEV/OU=BOLTBASE/CN=*.boltbase.dev/emailAddress=ca@dev.com"
 DEV_CERT_SUBJ_SERVER="/C=TR/ST=ASIA/L=TOKYO/O=DEV/OU=SERVER/CN=*.server.dev/emailAddress=server@dev.com"
 DEV_CERT_SUBJ_CLIENT="/C=TR/ST=ASIA/L=TOKYO/O=DEV/OU=CLIENT/CN=*.client.dev/emailAddress=client@dev.com"
 DEV_CERT_SUBJ_ALT="subjectAltName=DNS:localhost"
@@ -120,7 +120,7 @@ PB_RELEASE_NAME=protoc-${PB_VERSION}-${OS}-${ARCH}
 .PHONY: run
 run: ${FE_BUNDLE_JS}
 	@printf '%b\n' "${COLOR_GREEN}Starting the frontend server and the scheduler...${COLOR_RESET}"
-	@DAGU_DEBUG=1 go run ./cmd start-all
+	@BOLTBASE_DEBUG=1 go run ./cmd start-all
 
 # server build the binary and start the server.
 .PHONY: run-server
@@ -143,9 +143,9 @@ ${FE_BUNDLE_JS}:
 .PHONY: run-server-https
 run-server-https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
 	@printf '%b\n' "${COLOR_GREEN}Starting the server with HTTPS...${COLOR_RESET}"
-	@DAGU_DEBUG=1 \
-		DAGU_CERT_FILE=${SERVER_CERT_FILE} \
-		DAGU_KEY_FILE=${SERVER_KEY_FILE} \
+	@BOLTBASE_DEBUG=1 \
+		BOLTBASE_CERT_FILE=${SERVER_CERT_FILE} \
+		BOLTBASE_KEY_FILE=${SERVER_KEY_FILE} \
 		go run ./cmd start-all
 
 # test runs all tests.

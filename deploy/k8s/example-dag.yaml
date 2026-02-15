@@ -1,5 +1,5 @@
 # Example DAG to test distributed execution
-# Place this in the dags directory: /var/lib/dagu/dags/
+# Place this in the dags directory: /var/lib/boltbase/dags/
 
 name: test-distributed
 description: Test DAG for distributed worker execution

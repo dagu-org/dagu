@@ -1,17 +1,17 @@
 {{- if not .Values.persistence.enabled }}
-{{- fail "Dagu requires persistence.enabled=true with a shared filesystem (ReadWriteMany)." }}
+{{- fail "Boltbase requires persistence.enabled=true with a shared filesystem (ReadWriteMany)." }}
 {{- end }}
 
 {{- if and (ne .Values.persistence.accessMode "ReadWriteMany") (not .Values.persistence.skipValidation) }}
-{{- fail (printf "Dagu requires ReadWriteMany access mode. Current persistence.accessMode is '%s'. Use --set persistence.skipValidation=true for local testing." .Values.persistence.accessMode) }}
+{{- fail (printf "Boltbase requires ReadWriteMany access mode. Current persistence.accessMode is '%s'. Use --set persistence.skipValidation=true for local testing." .Values.persistence.accessMode) }}
 {{- end }}
 
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "dagu.fullname" . }}-data
+  name: {{ include "boltbase.fullname" . }}-data
   labels:
-    {{- include "dagu.labels" . | nindent 4 }}
+    {{- include "boltbase.labels" . | nindent 4 }}
 spec:
   accessModes:
     - {{ .Values.persistence.accessMode }}

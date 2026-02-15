@@ -27,60 +27,60 @@ jobs:
           # Tier 1 - Essential platforms
           - platform: linux
             arch: x64
-            package: dagu-linux-x64
-            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_linux_amd64.tar.gz
+            package: boltbase-linux-x64
+            asset: boltbase_${{ github.event.release.tag_name || inputs.version }}_linux_amd64.tar.gz
           - platform: linux
             arch: arm64
-            package: dagu-linux-arm64
-            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_linux_arm64.tar.gz
+            package: boltbase-linux-arm64
+            asset: boltbase_${{ github.event.release.tag_name || inputs.version }}_linux_arm64.tar.gz
           - platform: darwin
             arch: x64
-            package: dagu-darwin-x64
-            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_darwin_amd64.tar.gz
+            package: boltbase-darwin-x64
+            asset: boltbase_${{ github.event.release.tag_name || inputs.version }}_darwin_amd64.tar.gz
           - platform: darwin
             arch: arm64
-            package: dagu-darwin-arm64
-            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_darwin_arm64.tar.gz
+            package: boltbase-darwin-arm64
+            asset: boltbase_${{ github.event.release.tag_name || inputs.version }}_darwin_arm64.tar.gz
           - platform: win32
             arch: x64
-            package: dagu-win32-x64
-            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_windows_amd64.tar.gz
+            package: boltbase-win32-x64
+            asset: boltbase_${{ github.event.release.tag_name || inputs.version }}_windows_amd64.tar.gz
 
           # Tier 2 - Important platforms
           - platform: linux
             arch: ia32
-            package: dagu-linux-ia32
-            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_linux_386.tar.gz
+            package: boltbase-linux-ia32
+            asset: boltbase_${{ github.event.release.tag_name || inputs.version }}_linux_386.tar.gz
           - platform: linux
             arch: armv7
-            package: dagu-linux-armv7
-            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_linux_armv7.tar.gz
+            package: boltbase-linux-armv7
+            asset: boltbase_${{ github.event.release.tag_name || inputs.version }}_linux_armv7.tar.gz
           - platform: win32
             arch: ia32
-            package: dagu-win32-ia32
-            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_windows_386.tar.gz
+            package: boltbase-win32-ia32
+            asset: boltbase_${{ github.event.release.tag_name || inputs.version }}_windows_386.tar.gz
           - platform: freebsd
             arch: x64
-            package: dagu-freebsd-x64
-            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_freebsd_amd64.tar.gz
+            package: boltbase-freebsd-x64
+            asset: boltbase_${{ github.event.release.tag_name || inputs.version }}_freebsd_amd64.tar.gz
 
           # Tier 3 - Less common platforms
           - platform: linux
             arch: armv6
-            package: dagu-linux-armv6
-            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_linux_armv6.tar.gz
+            package: boltbase-linux-armv6
+            asset: boltbase_${{ github.event.release.tag_name || inputs.version }}_linux_armv6.tar.gz
           - platform: linux
             arch: ppc64
-            package: dagu-linux-ppc64
-            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_linux_ppc64le.tar.gz
+            package: boltbase-linux-ppc64
+            asset: boltbase_${{ github.event.release.tag_name || inputs.version }}_linux_ppc64le.tar.gz
           - platform: linux
             arch: s390x
-            package: dagu-linux-s390x
-            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_linux_s390x.tar.gz
+            package: boltbase-linux-s390x
+            asset: boltbase_${{ github.event.release.tag_name || inputs.version }}_linux_s390x.tar.gz
           - platform: win32
             arch: arm64
-            package: dagu-win32-arm64
-            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_windows_arm64.tar.gz
+            package: boltbase-win32-arm64
+            asset: boltbase_${{ github.event.release.tag_name || inputs.version }}_windows_arm64.tar.gz
 
     steps:
       - name: Checkout code
@@ -116,14 +116,14 @@ jobs:
           cd npm/${{ matrix.package }}/bin
 
           # All assets are now .tar.gz
-          tar -xzf /tmp/${{ matrix.asset }} dagu || tar -xzf /tmp/${{ matrix.asset }} dagu.exe
+          tar -xzf /tmp/${{ matrix.asset }} boltbase || tar -xzf /tmp/${{ matrix.asset }} boltbase.exe
 
           # Verify binary exists
           if [[ "${{ matrix.platform }}" == "win32" ]]; then
-            test -f dagu.exe
+            test -f boltbase.exe
           else
-            test -f dagu
-            chmod +x dagu
+            test -f boltbase
+            chmod +x boltbase
           fi
 
       - name: Update package version
@@ -167,7 +167,7 @@ jobs:
 
       - name: Update main package version and dependencies
         run: |
-          cd npm/dagu
+          cd npm/boltbase
 
           # Strip 'v' prefix if present
           VERSION="${{ env.VERSION }}"
@@ -202,7 +202,7 @@ jobs:
 
       - name: Publish main package
         run: |
-          cd npm/dagu
+          cd npm/boltbase
           # Try to publish, but don't fail if version already exists
           npm publish --access public --provenance 2>&1 | tee publish.log || {
             if grep -q "cannot publish over the previously published versions" publish.log; then
@@ -225,11 +225,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            test-install: 'npm install -g @dagu-org/dagu'
+            test-install: 'npm install -g @dagu-org/boltbase'
           - os: macos-latest
-            test-install: 'npm install -g @dagu-org/dagu'
+            test-install: 'npm install -g @dagu-org/boltbase'
           - os: windows-latest
-            test-install: 'npm install -g @dagu-org/dagu'
+            test-install: 'npm install -g @dagu-org/boltbase'
 
     steps:
       - name: Setup Node.js
@@ -243,7 +243,7 @@ jobs:
           # Wait for package to be available with retries
           echo "Checking npm package availability..."
           for i in {1..30}; do
-            if npm view @dagu-org/dagu version 2>/dev/null; then
+            if npm view @dagu-org/boltbase version 2>/dev/null; then
               echo "Package is available!"
               break
             fi
@@ -257,8 +257,8 @@ jobs:
 
       - name: Verify installation
         run: |
-          dagu version
+          boltbase version
 
       - name: Test basic functionality
         run: |
-          dagu help
+          boltbase help

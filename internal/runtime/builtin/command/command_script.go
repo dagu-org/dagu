@@ -23,7 +23,7 @@ func setupScript(workDir, script string, shell []string) (string, error) {
 		shellCmd = shell[0]
 	}
 	ext := cmdutil.GetScriptExtension(shellCmd)
-	pattern := "dagu_script-*" + ext
+	pattern := "boltbase_script-*" + ext
 
 	file, err := os.CreateTemp(workDir, pattern)
 	if err != nil {

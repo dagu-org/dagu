@@ -131,7 +131,7 @@ func (f *fixture) StartScheduler(timeout time.Duration) *fixture {
 		th := f.th
 		th.Context = ctx
 		f.schedDone <- th.RunCommandWithError(f.t, cmd.Scheduler(), test.CmdTest{
-			Args:        []string{"scheduler", "--dagu-home", home},
+			Args:        []string{"scheduler", "--boltbase-home", home},
 			ExpectedOut: []string{"Scheduler started"},
 		})
 	}()

@@ -21,7 +21,7 @@ func Server() *cobra.Command {
 		&cobra.Command{
 			Use:   "server [flags]",
 			Short: "Start the web UI server for DAG management",
-			Long: `Launch the Dagu web server that provides a graphical interface for monitoring and managing DAGs.
+			Long: `Launch the Boltbase web server that provides a graphical interface for monitoring and managing DAGs.
 
 The web UI allows you to:
 - View and manage DAG definitions
@@ -36,7 +36,7 @@ Flags:
   --dags string    Path to the directory containing DAG definition files
 
 Example:
-  dagu server --host=0.0.0.0 --port=8080 --dags=/path/to/dags
+  boltbase server --host=0.0.0.0 --port=8080 --dags=/path/to/dags
 `,
 		}, serverFlags, runServer,
 	)

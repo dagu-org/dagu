@@ -2,7 +2,7 @@
 
 # Set up constants and URLs
 RELEASES_URL="https://github.com/dagu-org/dagu/releases"
-FILE_BASENAME="dagu"
+FILE_BASENAME="boltbase"
 
 # Parse CLI arguments
 while [ "$#" -gt 0 ]; do
@@ -25,7 +25,7 @@ done
 command -v curl >/dev/null 2>&1 || { echo "curl is not installed. Aborting." >&2; exit 1; }
 command -v tar >/dev/null 2>&1 || { echo "tar is not installed. Aborting." >&2; exit 1; }
 
-echo "Downloading Dagu version: $VERSION"
+echo "Downloading Boltbase version: $VERSION"
 
 # Retrieve the latest version if not specified
 if [ -z "$VERSION" ]; then
@@ -34,7 +34,7 @@ fi
 
 # Exit if VERSION is still empty
 if [ -z "$VERSION" ]; then
-    echo "Unable to get Dagu version." >&2
+    echo "Unable to get Boltbase version." >&2
     exit 1
 fi
 
@@ -56,21 +56,21 @@ TMPDIR=$(mktemp -d)
 export TAR_FILE="${TMPDIR}/${FILE_BASENAME}_$(uname -s)_${ARCHITECTURE}.tar.gz"
 
 # Download the binary
-echo "Downloading Dagu $VERSION..."
+echo "Downloading Boltbase $VERSION..."
 curl -sfLo "$TAR_FILE" "$RELEASES_URL/download/$VERSION/${FILE_BASENAME}_${VERSION:1}_$(uname -s)_${ARCHITECTURE}.tar.gz" || {
     echo "Failed to download the file. Check your internet connection and the URL." >&2
     exit 1
 }
 
 # Unpack and install
-tar -xf "$TAR_FILE" -C "$TMPDIR" && sudo mv "${TMPDIR}/dagu" /usr/local/bin/dagu && sudo chmod +x /usr/local/bin/dagu || {
-    echo "Failed to install Dagu." >&2
+tar -xf "$TAR_FILE" -C "$TMPDIR" && sudo mv "${TMPDIR}/boltbase" /usr/local/bin/boltbase && sudo chmod +x /usr/local/bin/boltbase || {
+    echo "Failed to install Boltbase." >&2
     exit 1
 }
 
 # Cleanup
 rm -rf "$TMPDIR"
-echo "Dagu installed successfully and is available at /usr/local/bin/dagu"
+echo "Boltbase installed successfully and is available at /usr/local/bin/boltbase"
 
 # Execute the binary with any provided arguments
-"/usr/local/bin/dagu" "$@"
+"/usr/local/bin/boltbase" "$@"

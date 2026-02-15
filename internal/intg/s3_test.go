@@ -17,7 +17,7 @@ const minioImage = "minio/minio:RELEASE.2024-10-02T17-50-41Z"
 func TestMinIOContainer_WithMCCommands(t *testing.T) {
 	t.Parallel()
 
-	tempDir, err := os.MkdirTemp("", "dagu-s3-test-*")
+	tempDir, err := os.MkdirTemp("", "boltbase-s3-test-*")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(tempDir) })
 

@@ -19,7 +19,7 @@ const (
 )
 
 // dangerousPatterns contains command prefixes that require user approval.
-var dangerousPatterns = []string{"rm ", "chmod ", "dagu start"}
+var dangerousPatterns = []string{"rm ", "chmod ", "boltbase start"}
 
 // BashToolInput defines the input parameters for the bash tool.
 type BashToolInput struct {

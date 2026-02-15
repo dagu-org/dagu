@@ -1,0 +1,8 @@
+node_modules/
+bin/boltbase
+bin/boltbase.exe
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+*.log

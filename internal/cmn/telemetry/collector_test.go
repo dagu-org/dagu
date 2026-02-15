@@ -398,33 +398,33 @@ func TestCollector_Collect_WithDAGRuns(t *testing.T) {
 		metricMap[*m.Name] = m
 	}
 
-	// Check dagu_info
-	assert.Contains(t, metricMap, "dagu_info")
-	assert.Equal(t, float64(1), *metricMap["dagu_info"].Metric[0].Gauge.Value)
+	// Check boltbase_info
+	assert.Contains(t, metricMap, "boltbase_info")
+	assert.Equal(t, float64(1), *metricMap["boltbase_info"].Metric[0].Gauge.Value)
 
-	// Check dagu_uptime_seconds
-	assert.Contains(t, metricMap, "dagu_uptime_seconds")
-	assert.Greater(t, *metricMap["dagu_uptime_seconds"].Metric[0].Gauge.Value, float64(0))
+	// Check boltbase_uptime_seconds
+	assert.Contains(t, metricMap, "boltbase_uptime_seconds")
+	assert.Greater(t, *metricMap["boltbase_uptime_seconds"].Metric[0].Gauge.Value, float64(0))
 
-	// Check dagu_scheduler_running
-	assert.Contains(t, metricMap, "dagu_scheduler_running")
-	assert.Equal(t, float64(1), *metricMap["dagu_scheduler_running"].Metric[0].Gauge.Value)
+	// Check boltbase_scheduler_running
+	assert.Contains(t, metricMap, "boltbase_scheduler_running")
+	assert.Equal(t, float64(1), *metricMap["boltbase_scheduler_running"].Metric[0].Gauge.Value)
 
-	// Check dagu_dags_total
-	assert.Contains(t, metricMap, "dagu_dags_total")
-	assert.Equal(t, float64(3), *metricMap["dagu_dags_total"].Metric[0].Gauge.Value)
+	// Check boltbase_dags_total
+	assert.Contains(t, metricMap, "boltbase_dags_total")
+	assert.Equal(t, float64(3), *metricMap["boltbase_dags_total"].Metric[0].Gauge.Value)
 
-	// Check dagu_dag_runs_currently_running
-	assert.Contains(t, metricMap, "dagu_dag_runs_currently_running")
-	assert.Equal(t, float64(1), *metricMap["dagu_dag_runs_currently_running"].Metric[0].Gauge.Value)
+	// Check boltbase_dag_runs_currently_running
+	assert.Contains(t, metricMap, "boltbase_dag_runs_currently_running")
+	assert.Equal(t, float64(1), *metricMap["boltbase_dag_runs_currently_running"].Metric[0].Gauge.Value)
 
-	// Check dagu_dag_runs_queued_total
-	assert.Contains(t, metricMap, "dagu_dag_runs_queued_total")
-	assert.Equal(t, float64(2), *metricMap["dagu_dag_runs_queued_total"].Metric[0].Gauge.Value)
+	// Check boltbase_dag_runs_queued_total
+	assert.Contains(t, metricMap, "boltbase_dag_runs_queued_total")
+	assert.Equal(t, float64(2), *metricMap["boltbase_dag_runs_queued_total"].Metric[0].Gauge.Value)
 
-	// Check dagu_dag_runs_total by status
-	assert.Contains(t, metricMap, "dagu_dag_runs_total")
-	for _, metric := range metricMap["dagu_dag_runs_total"].Metric {
+	// Check boltbase_dag_runs_total by status
+	assert.Contains(t, metricMap, "boltbase_dag_runs_total")
+	for _, metric := range metricMap["boltbase_dag_runs_total"].Metric {
 		for _, label := range metric.Label {
 			if *label.Name == "status" {
 				switch *label.Value {

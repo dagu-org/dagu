@@ -12,7 +12,7 @@ export default async function fetchJson<JSON = unknown>(
     Accept: 'application/json',
   };
 
-  const token = localStorage.getItem('dagu_auth_token');
+  const token = localStorage.getItem('boltbase_auth_token');
   if (token) {
     (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
   }

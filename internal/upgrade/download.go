@@ -62,7 +62,7 @@ func Download(ctx context.Context, opts DownloadOptions) error {
 
 	return backoff.Retry(ctx, func(ctx context.Context) error {
 		// Fresh temp file per attempt
-		tempFile, err := os.CreateTemp(dir, "dagu-download-*.tmp")
+		tempFile, err := os.CreateTemp(dir, "boltbase-download-*.tmp")
 		if err != nil {
 			return &nonRetriableError{err: fmt.Errorf("failed to create temp file: %w", err)}
 		}

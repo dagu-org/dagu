@@ -82,7 +82,7 @@ export function UserFormModal({ open, user, onClose, onSuccess }: UserFormModalP
     setIsLoading(true);
 
     try {
-      const token = localStorage.getItem('dagu_auth_token');
+      const token = localStorage.getItem('boltbase_auth_token');
       if (!token) {
         throw new Error('Not authenticated');
       }

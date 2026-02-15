@@ -108,13 +108,13 @@ func TestRoleMapper_GroupMappings(t *testing.T) {
 			config: RoleMapperConfig{
 				GroupsClaim: "realm_access.roles",
 				GroupMappings: map[string]string{
-					"dagu_admin": "admin",
+					"boltbase_admin": "admin",
 				},
 				DefaultRole: auth.RoleViewer,
 			},
 			claims: map[string]any{
 				"realm_access": map[string]any{
-					"roles": []any{"dagu_admin", "other_role"},
+					"roles": []any{"boltbase_admin", "other_role"},
 				},
 			},
 			expectedRole: auth.RoleAdmin,
@@ -223,7 +223,7 @@ func TestRoleMapper_JqExpression(t *testing.T) {
 		{
 			name: "jq_returns_invalid_role_fallback",
 			config: RoleMapperConfig{
-				RoleAttributePath: `"superuser"`, // not a valid Dagu role
+				RoleAttributePath: `"superuser"`, // not a valid Boltbase role
 				DefaultRole:       auth.RoleViewer,
 			},
 			claims:       map[string]any{},

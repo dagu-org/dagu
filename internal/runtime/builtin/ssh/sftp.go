@@ -164,7 +164,7 @@ func (e *sftpExecutor) uploadFile(ctx context.Context, sftpClient *sftp.Client, 
 	if _, err := rand.Read(randBytes[:]); err != nil {
 		return fmt.Errorf("failed to generate random suffix for temp file: %w", err)
 	}
-	tempPath := remotePath + ".dagu-tmp-" + hex.EncodeToString(randBytes[:])
+	tempPath := remotePath + ".boltbase-tmp-" + hex.EncodeToString(randBytes[:])
 
 	// Create temp file on remote
 	remoteFile, err := sftpClient.Create(tempPath)

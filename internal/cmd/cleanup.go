@@ -25,10 +25,10 @@ Use --retention-days to keep recent history.
 Active runs are never deleted for safety.
 
 Examples:
-  dagu cleanup my-workflow                      # Delete all history (with confirmation)
-  dagu cleanup --retention-days 30 my-workflow  # Keep last 30 days
-  dagu cleanup --dry-run my-workflow            # Preview what would be deleted
-  dagu cleanup -y my-workflow                   # Skip confirmation
+  boltbase cleanup my-workflow                      # Delete all history (with confirmation)
+  boltbase cleanup --retention-days 30 my-workflow  # Keep last 30 days
+  boltbase cleanup --dry-run my-workflow            # Preview what would be deleted
+  boltbase cleanup -y my-workflow                   # Skip confirmation
 `,
 			Args: cobra.ExactArgs(1),
 		},

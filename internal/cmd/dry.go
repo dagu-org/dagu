@@ -29,7 +29,7 @@ Parameters after the "--" separator are passed as execution parameters (either p
 allowing you to test different parameter configurations.
 
 Example:
-  dagu dry my_dag.yaml -- P1=foo P2=bar
+  boltbase dry my_dag.yaml -- P1=foo P2=bar
 `,
 			Args: cobra.MinimumNArgs(1),
 		}, dryFlags,

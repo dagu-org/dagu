@@ -17,7 +17,7 @@ func TestLoadBaseEnv(t *testing.T) {
 		expected bool
 	}{
 		{"TEST_VAR_BASE_ENV", false},
-		{"DAGU_TEST_BASE_ENV", true},
+		{"BOLTBASE_TEST_BASE_ENV", true},
 	}
 
 	for _, tc := range testCases {

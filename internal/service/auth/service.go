@@ -42,13 +42,13 @@ const (
 	// defaultTokenTTL is the default token time-to-live.
 	defaultTokenTTL = 24 * time.Hour
 	// apiKeyPrefix is the prefix for all API keys.
-	apiKeyPrefix = "dagu_"
+	apiKeyPrefix = "boltbase_"
 	// apiKeyRandomBytes is the number of random bytes for API key generation.
 	apiKeyRandomBytes = 32
 	// apiKeyPrefixLength is the length of the key prefix stored for identification.
 	apiKeyPrefixLength = 8
 	// webhookTokenPrefix is the fixed prefix for all webhook tokens.
-	webhookTokenPrefix = "dagu_wh_" //nolint:gosec // Not a credential, just a token prefix
+	webhookTokenPrefix = "boltbase_wh_" //nolint:gosec // Not a credential, just a token prefix
 	// webhookTokenRandomBytes is the number of random bytes for webhook token generation.
 	webhookTokenRandomBytes = 32
 	// webhookTokenPrefixLength is how many characters of the full token we persist.

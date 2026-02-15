@@ -1,11 +1,11 @@
-# Example production Docker Compose setup for Dagu with OpenTelemetry, Prometheus, and Grafana
+# Example production Docker Compose setup for Boltbase with OpenTelemetry, Prometheus, and Grafana
 version: "3.9"
 
 services:
   # OpenTelemetry stack for tracing (from docs/features/opentelemetry-testing.md)
   jaeger:
     image: jaegertracing/all-in-one:latest
-    networks: [dagu-net]
+    networks: [boltbase-net]
     ports:
       - "16686:16686" # Jaeger UI
       - "14250:14250" # gRPC ingest
@@ -20,9 +20,9 @@ services:
       - "4318:4318" # OTLP HTTP
     depends_on:
       - jaeger
-    networks: [dagu-net]
+    networks: [boltbase-net]
 
-  # Prometheus: scrapes metrics from OTel Collector and Dagu server
+  # Prometheus: scrapes metrics from OTel Collector and Boltbase server
   prometheus:
     image: prom/prometheus:latest
     volumes:
@@ -31,94 +31,94 @@ services:
       - "9090:9090"
     depends_on:
       - otel-collector
-      - dagu-server
-    networks: [dagu-net]
+      - boltbase-server
+    networks: [boltbase-net]
 
-  # Dagu control-plane: Coordinator (gRPC) for distributed workers
-  dagu-coordinator:
-    image: ghcr.io/dagu-org/dagu:latest
-    command: ["dagu", "coordinator"]
+  # Boltbase control-plane: Coordinator (gRPC) for distributed workers
+  boltbase-coordinator:
+    image: ghcr.io/dagu-org/boltbase:latest
+    command: ["boltbase", "coordinator"]
     environment:
       # Peer config: insecure by default; set TLS envs if needed
-      - DAGU_PEER_INSECURE=true
+      - BOLTBASE_PEER_INSECURE=true
       # Bind and advertise on container IP/DNS so workers can reach it
-      - DAGU_COORDINATOR_HOST=dagu-coordinator
-      - DAGU_COORDINATOR_PORT=50055
+      - BOLTBASE_COORDINATOR_HOST=boltbase-coordinator
+      - BOLTBASE_COORDINATOR_PORT=50055
     ports:
       - "50055:50055"
     volumes:
-      - dagu-data:/var/lib/dagu
-      - ./dags:/var/lib/dagu/dags:ro
-    networks: [dagu-net]
+      - boltbase-data:/var/lib/boltbase
+      - ./dags:/var/lib/boltbase/dags:ro
+    networks: [boltbase-net]
 
-  # Dagu scheduler service (reads DAGs and enqueues runs)
-  dagu-scheduler:
-    image: ghcr.io/dagu-org/dagu:latest
-    command: ["dagu", "scheduler"]
+  # Boltbase scheduler service (reads DAGs and enqueues runs)
+  boltbase-scheduler:
+    image: ghcr.io/dagu-org/boltbase:latest
+    command: ["boltbase", "scheduler"]
     environment:
-      - DAGU_COORDINATOR_HOST=dagu-coordinator
-      - DAGU_COORDINATOR_PORT=50055
-      - DAGU_SCHEDULER_PORT=8090
-      - DAGU_DAGS_DIR=/var/lib/dagu/dags
+      - BOLTBASE_COORDINATOR_HOST=boltbase-coordinator
+      - BOLTBASE_COORDINATOR_PORT=50055
+      - BOLTBASE_SCHEDULER_PORT=8090
+      - BOLTBASE_DAGS_DIR=/var/lib/boltbase/dags
       # Optional: set timezone, logging, etc
-      # - DAGU_TZ=UTC
-      # - DAGU_LOG_FORMAT=json
+      # - BOLTBASE_TZ=UTC
+      # - BOLTBASE_LOG_FORMAT=json
     depends_on:
-      - dagu-coordinator
+      - boltbase-coordinator
     ports:
       - "8090:8090" # Scheduler health
     volumes:
-      - dagu-data:/var/lib/dagu
-      - ./dags:/var/lib/dagu/dags:ro
-    networks: [dagu-net]
+      - boltbase-data:/var/lib/boltbase
+      - ./dags:/var/lib/boltbase/dags:ro
+    networks: [boltbase-net]
 
-  # Dagu web UI / API server
-  dagu-server:
-    image: ghcr.io/dagu-org/dagu:latest
-    command: ["dagu", "server"]
+  # Boltbase web UI / API server
+  boltbase-server:
+    image: ghcr.io/dagu-org/boltbase:latest
+    command: ["boltbase", "server"]
     environment:
-      - DAGU_COORDINATOR_HOST=dagu-coordinator
-      - DAGU_COORDINATOR_PORT=50055
-      - DAGU_HOST=0.0.0.0
-      - DAGU_PORT=8080
-      - DAGU_DAGS_DIR=/var/lib/dagu/dags
+      - BOLTBASE_COORDINATOR_HOST=boltbase-coordinator
+      - BOLTBASE_COORDINATOR_PORT=50055
+      - BOLTBASE_HOST=0.0.0.0
+      - BOLTBASE_PORT=8080
+      - BOLTBASE_DAGS_DIR=/var/lib/boltbase/dags
       # Builtin authentication (RBAC) - CHANGE TOKEN_SECRET IN PRODUCTION
-      - DAGU_AUTH_MODE=builtin
-      - DAGU_AUTH_TOKEN_SECRET=CHANGE_ME_TO_A_SECURE_RANDOM_STRING
+      - BOLTBASE_AUTH_MODE=builtin
+      - BOLTBASE_AUTH_TOKEN_SECRET=CHANGE_ME_TO_A_SECURE_RANDOM_STRING
       # Admin credentials: password auto-generated on first run, printed to stdout
-      # - DAGU_AUTH_ADMIN_USERNAME=admin # default is 'admin'
-      # - DAGU_AUTH_ADMIN_PASSWORD=      # set to use a specific password
-      # - DAGU_AUTH_TOKEN_TTL=24h        # default is 24h
+      # - BOLTBASE_AUTH_ADMIN_USERNAME=admin # default is 'admin'
+      # - BOLTBASE_AUTH_ADMIN_PASSWORD=      # set to use a specific password
+      # - BOLTBASE_AUTH_TOKEN_TTL=24h        # default is 24h
       # If behind a proxy, set base path
-      # - DAGU_BASE_PATH=/dagu
+      # - BOLTBASE_BASE_PATH=/boltbase
     depends_on:
-      - dagu-scheduler
-      - dagu-coordinator
+      - boltbase-scheduler
+      - boltbase-coordinator
     ports:
       - "8080:8080"
     volumes:
-      - dagu-data:/var/lib/dagu
-      - ./dags:/var/lib/dagu/dags:ro
-    networks: [dagu-net]
+      - boltbase-data:/var/lib/boltbase
+      - ./dags:/var/lib/boltbase/dags:ro
+    networks: [boltbase-net]
 
-  # Dagu worker (polls coordinator and executes tasks)
-  dagu-worker:
-    image: ghcr.io/dagu-org/dagu:latest
-    command: ["dagu", "worker"]
+  # Boltbase worker (polls coordinator and executes tasks)
+  boltbase-worker:
+    image: ghcr.io/dagu-org/boltbase:latest
+    command: ["boltbase", "worker"]
     environment:
-      - DAGU_COORDINATOR_HOST=dagu-coordinator
-      - DAGU_COORDINATOR_PORT=50055
+      - BOLTBASE_COORDINATOR_HOST=boltbase-coordinator
+      - BOLTBASE_COORDINATOR_PORT=50055
       # Optional worker tuning and labels
-      # - DAGU_WORKER_MAX_ACTIVE_RUNS=100
-      # - DAGU_WORKER_LABELS=region=us-east-1,instance-type=m5.large
+      # - BOLTBASE_WORKER_MAX_ACTIVE_RUNS=100
+      # - BOLTBASE_WORKER_LABELS=region=us-east-1,instance-type=m5.large
       # OTel: point DAGs to collector via per-DAG otel.endpoint: "otel-collector:4317"
     depends_on:
-      - dagu-coordinator
+      - boltbase-coordinator
     volumes:
-      - dagu-data:/var/lib/dagu
+      - boltbase-data:/var/lib/boltbase
       # Workers typically don't need DAG definitions, but sharing is harmless
-      - ./dags:/var/lib/dagu/dags:ro
-    networks: [dagu-net]
+      - ./dags:/var/lib/boltbase/dags:ro
+    networks: [boltbase-net]
 
   # Grafana: visualize Prometheus metrics
   grafana:
@@ -133,14 +133,14 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
-    networks: [dagu-net]
+    networks: [boltbase-net]
 
 volumes:
-  dagu-data:
+  boltbase-data:
     driver: local
   grafana-data:
     driver: local
 
 networks:
-  dagu-net:
+  boltbase-net:
     driver: bridge

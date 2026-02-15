@@ -1,6 +1,6 @@
-# Contributing to Dagu
+# Contributing to Boltbase
 
-Thank you for considering to help improve Dagu! We welcome contributions from anyone on the internet.
+Thank you for considering to help improve Boltbase! We welcome contributions from anyone on the internet.
 
 ## Quick Start
 
@@ -70,7 +70,7 @@ make test-coverage
 Starting the backend server on port 8080:
 
 ```bash
-DAGU_PORT=8080 make
+BOLTBASE_PORT=8080 make
 ```
 
 Starting the development server:
@@ -127,4 +127,4 @@ When requesting features, please describe:
 
 ## License
 
-By contributing to Dagu, you agree that your contributions will be licensed under the **GNU General Public License v3.0**.
+By contributing to Boltbase, you agree that your contributions will be licensed under the **GNU General Public License v3.0**.

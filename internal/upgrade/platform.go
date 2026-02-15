@@ -48,10 +48,10 @@ func Detect() Platform {
 }
 
 // AssetName returns the expected filename for this platform and version.
-// Format: dagu_<version_without_v>_<os>_<arch>.tar.gz
+// Format: boltbase_<version_without_v>_<os>_<arch>.tar.gz
 func (p Platform) AssetName(version string) string {
 	v := strings.TrimPrefix(version, "v")
-	return fmt.Sprintf("dagu_%s_%s_%s.tar.gz", v, p.OS, p.Arch)
+	return fmt.Sprintf("boltbase_%s_%s_%s.tar.gz", v, p.OS, p.Arch)
 }
 
 // String returns a human-readable representation of the platform.

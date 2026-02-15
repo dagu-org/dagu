@@ -39,7 +39,7 @@ func TestStartAllCommand(t *testing.T) {
 				"--config", test.TestdataPath(t, "cli/config_startall.yaml"),
 				fmt.Sprintf("--coordinator.port=%s", findPort(t)),
 			},
-			ExpectedOut: []string{"54322", "dagu_test", "Coordinator initialization"},
+			ExpectedOut: []string{"54322", "boltbase_test", "Coordinator initialization"},
 		})
 	})
 }

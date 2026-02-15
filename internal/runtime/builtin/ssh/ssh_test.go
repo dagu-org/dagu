@@ -310,8 +310,8 @@ func TestSSHExecutor_BuildScript_WithWorkingDir(t *testing.T) {
 	assert.Contains(t, script, "|| return 1")
 	assert.Contains(t, script, "set -e")
 	assert.Contains(t, script, "echo hello")
-	assert.Contains(t, script, "__dagu_exec(){")
-	assert.Contains(t, script, "__dagu_exec")
+	assert.Contains(t, script, "__boltbase_exec(){")
+	assert.Contains(t, script, "__boltbase_exec")
 }
 
 func TestSSHExecutor_BuildScript_WithScript(t *testing.T) {
@@ -330,7 +330,7 @@ func TestSSHExecutor_BuildScript_WithScript(t *testing.T) {
 	assert.Contains(t, script, "echo 'line1'")
 	assert.Contains(t, script, "echo 'line2'")
 	assert.Contains(t, script, "set -e")
-	assert.Contains(t, script, "__dagu_exec(){")
+	assert.Contains(t, script, "__boltbase_exec(){")
 }
 
 func TestSSHExecutor_BuildScript_WithCommands(t *testing.T) {
@@ -371,9 +371,9 @@ func TestSSHExecutor_BuildScript_FunctionWrapper(t *testing.T) {
 	script := exec.buildScript()
 
 	// Verify function wrapper format
-	assert.True(t, strings.HasPrefix(script, "__dagu_exec(){"))
-	assert.True(t, strings.HasSuffix(script, "__dagu_exec\n"))
-	assert.Contains(t, script, "}\n__dagu_exec")
+	assert.True(t, strings.HasPrefix(script, "__boltbase_exec(){"))
+	assert.True(t, strings.HasSuffix(script, "__boltbase_exec\n"))
+	assert.Contains(t, script, "}\n__boltbase_exec")
 }
 
 func TestSSHExecutor_ResolveShell_Fallback(t *testing.T) {

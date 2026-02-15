@@ -7,9 +7,9 @@ scrape_configs:
     static_configs:
       - targets: ['otel-collector:8889']
 
-  # Scrape Dagu server's Prometheus-compatible metrics endpoint
-  - job_name: 'dagu-server'
+  # Scrape Boltbase server's Prometheus-compatible metrics endpoint
+  - job_name: 'boltbase-server'
     metrics_path: /api/v1/metrics
     static_configs:
-      - targets: ['dagu-server:8080']
+      - targets: ['boltbase-server:8080']
 

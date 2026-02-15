@@ -51,8 +51,8 @@ Parameters after the "--" separator are passed as execution parameters (either p
 Flags can override default settings such as DAG-run ID, DAG name, or suppress output.
 
 Examples:
-  dagu start my_dag -- P1=foo P2=bar
-  dagu start --name my_custom_name my_dag.yaml -- P1=foo P2=bar
+  boltbase start my_dag -- P1=foo P2=bar
+  boltbase start --name my_custom_name my_dag.yaml -- P1=foo P2=bar
 
 This command parses the DAG definition, resolves parameters, and initiates the DAG-run execution.
 `,

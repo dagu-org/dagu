@@ -12,8 +12,8 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   config.AppSlug,
-	Short: "Dagu is a compact, portable workflow engine",
-	Long: `Dagu is a compact, portable workflow engine.
+	Short: "Boltbase is an AI-first, self-contained workflow engine",
+	Long: `Boltbase is an AI-first, self-contained workflow engine.
 
 It provides a declarative model for orchestrating command execution across
 diverse environments, including shell scripts, Python commands, containerized

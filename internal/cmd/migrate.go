@@ -39,7 +39,7 @@ This command will:
 - Report migration progress and any errors
 
 Example:
-  dagu migrate history`,
+  boltbase migrate history`,
 	}
 
 	return NewCommand(cmd, nil, func(ctx *Context, _ []string) error {

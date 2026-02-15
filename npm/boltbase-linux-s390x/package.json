@@ -1,0 +1,10 @@
+{
+  "name": "@dagu-org/boltbase-linux-s390x",
+  "version": "0.0.0-development",
+  "description": "Boltbase binary for Linux s390x",
+  "repository": "github:dagu-org/dagu",
+  "license": "GPL-3.0",
+  "os": ["linux"],
+  "cpu": ["s390x"],
+  "files": ["bin/boltbase"]
+}

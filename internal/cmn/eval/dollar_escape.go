@@ -15,7 +15,7 @@ type dollarEscapeKey struct{}
 
 var dollarEscapeSeq uint64
 
-// withDollarEscapes replaces \$ with sentinel tokens so Dagu expansion won't
+// withDollarEscapes replaces \$ with sentinel tokens so Boltbase expansion won't
 // treat them as variable prefixes. Only an unescaped backslash directly
 // preceding $ is treated as an escape; other backslashes are preserved.
 func withDollarEscapes(ctx context.Context, input string) (context.Context, string) {
@@ -26,7 +26,7 @@ func withDollarEscapes(ctx context.Context, input string) (context.Context, stri
 		ctx = context.Background()
 	}
 
-	token := uniqueToken(input, "__DAGU_DOLLAR_ESC__")
+	token := uniqueToken(input, "__BOLTBASE_DOLLAR_ESC__")
 	var b strings.Builder
 	b.Grow(len(input))
 

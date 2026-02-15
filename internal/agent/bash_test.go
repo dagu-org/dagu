@@ -328,9 +328,9 @@ func TestCommandRequiresApproval(t *testing.T) {
 		{"chmod in pipe", "ls |chmod 644 file", true},
 		{"chmod after semicolon", "echo test;chmod 777 file", true},
 
-		// dagu start commands (dangerous)
-		{"dagu start direct", "dagu start mydag", true},
-		{"dagu start with path", "dagu start /path/to/dag", true},
+		// boltbase start commands (dangerous)
+		{"boltbase start direct", "boltbase start mydag", true},
+		{"boltbase start with path", "boltbase start /path/to/dag", true},
 
 		// Edge cases
 		{"empty command", "", false},

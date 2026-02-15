@@ -18,7 +18,7 @@ func TestNewSubCmdBuilder(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
-			Executable:     "/path/to/dagu",
+			Executable:     "/path/to/boltbase",
 			ConfigFileUsed: "/path/to/config.yaml",
 		},
 		Core: config.Core{
@@ -34,8 +34,8 @@ func TestStart(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
-			Executable:     "/usr/bin/dagu",
-			ConfigFileUsed: "/etc/dagu/config.yaml",
+			Executable:     "/usr/bin/boltbase",
+			ConfigFileUsed: "/etc/boltbase/config.yaml",
 		},
 	}
 
@@ -50,10 +50,10 @@ func TestStart(t *testing.T) {
 		opts := runtime.StartOptions{}
 		spec := builder.Start(dag, opts)
 
-		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
+		assert.Equal(t, "/usr/bin/boltbase", spec.Executable)
 		assert.Contains(t, spec.Args, "start")
 		assert.Contains(t, spec.Args, "--config")
-		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
+		assert.Contains(t, spec.Args, "/etc/boltbase/config.yaml")
 		assert.Contains(t, spec.Args, "/path/to/dag.yaml")
 		assert.NotNil(t, spec.Env)
 	})
@@ -111,7 +111,7 @@ func TestStart(t *testing.T) {
 		t.Parallel()
 		cfgNoFile := &config.Config{
 			Paths: config.PathsConfig{
-				Executable:     "/usr/bin/dagu",
+				Executable:     "/usr/bin/boltbase",
 				ConfigFileUsed: "",
 			},
 		}
@@ -127,8 +127,8 @@ func TestEnqueue(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
-			Executable:     "/usr/bin/dagu",
-			ConfigFileUsed: "/etc/dagu/config.yaml",
+			Executable:     "/usr/bin/boltbase",
+			ConfigFileUsed: "/etc/boltbase/config.yaml",
 		},
 	}
 
@@ -144,10 +144,10 @@ func TestEnqueue(t *testing.T) {
 		opts := runtime.EnqueueOptions{}
 		spec := builder.Enqueue(dag, opts)
 
-		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
+		assert.Equal(t, "/usr/bin/boltbase", spec.Executable)
 		assert.Contains(t, spec.Args, "enqueue")
 		assert.Contains(t, spec.Args, "--config")
-		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
+		assert.Contains(t, spec.Args, "/etc/boltbase/config.yaml")
 		assert.Contains(t, spec.Args, "/path/to/dag.yaml")
 		assert.Equal(t, os.Stdout, spec.Stdout)
 		assert.Equal(t, os.Stderr, spec.Stderr)
@@ -220,8 +220,8 @@ func TestDequeue(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
-			Executable:     "/usr/bin/dagu",
-			ConfigFileUsed: "/etc/dagu/config.yaml",
+			Executable:     "/usr/bin/boltbase",
+			ConfigFileUsed: "/etc/boltbase/config.yaml",
 		},
 	}
 
@@ -237,13 +237,13 @@ func TestDequeue(t *testing.T) {
 		dagRun := exec.NewDAGRunRef("test-dag", "run-123")
 		spec := builder.Dequeue(dag, dagRun)
 
-		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
+		assert.Equal(t, "/usr/bin/boltbase", spec.Executable)
 		assert.Contains(t, spec.Args, "dequeue")
 		// Queue name should be the first argument after "dequeue"
 		assert.Equal(t, "test-dag", spec.Args[1])
 		assert.Contains(t, spec.Args, "--dag-run=test-dag:run-123")
 		assert.Contains(t, spec.Args, "--config")
-		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
+		assert.Contains(t, spec.Args, "/etc/boltbase/config.yaml")
 		assert.Equal(t, os.Stdout, spec.Stdout)
 		assert.Equal(t, os.Stderr, spec.Stderr)
 	})
@@ -252,7 +252,7 @@ func TestDequeue(t *testing.T) {
 		t.Parallel()
 		cfgNoFile := &config.Config{
 			Paths: config.PathsConfig{
-				Executable: "/usr/bin/dagu",
+				Executable: "/usr/bin/boltbase",
 			},
 		}
 		builderNoFile := runtime.NewSubCmdBuilder(cfgNoFile)
@@ -286,8 +286,8 @@ func TestRestart(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
-			Executable:     "/usr/bin/dagu",
-			ConfigFileUsed: "/etc/dagu/config.yaml",
+			Executable:     "/usr/bin/boltbase",
+			ConfigFileUsed: "/etc/boltbase/config.yaml",
 		},
 	}
 
@@ -303,10 +303,10 @@ func TestRestart(t *testing.T) {
 		opts := runtime.RestartOptions{}
 		spec := builder.Restart(dag, opts)
 
-		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
+		assert.Equal(t, "/usr/bin/boltbase", spec.Executable)
 		assert.Contains(t, spec.Args, "restart")
 		assert.Contains(t, spec.Args, "--config")
-		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
+		assert.Contains(t, spec.Args, "/etc/boltbase/config.yaml")
 		assert.Contains(t, spec.Args, "/path/to/dag.yaml")
 	})
 
@@ -324,7 +324,7 @@ func TestRestart(t *testing.T) {
 		t.Parallel()
 		cfgNoFile := &config.Config{
 			Paths: config.PathsConfig{
-				Executable: "/usr/bin/dagu",
+				Executable: "/usr/bin/boltbase",
 			},
 		}
 		builderNoFile := runtime.NewSubCmdBuilder(cfgNoFile)
@@ -339,8 +339,8 @@ func TestRetry(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
-			Executable:     "/usr/bin/dagu",
-			ConfigFileUsed: "/etc/dagu/config.yaml",
+			Executable:     "/usr/bin/boltbase",
+			ConfigFileUsed: "/etc/boltbase/config.yaml",
 		},
 	}
 
@@ -355,11 +355,11 @@ func TestRetry(t *testing.T) {
 		t.Parallel()
 		spec := builder.Retry(dag, "retry-run-id", "")
 
-		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
+		assert.Equal(t, "/usr/bin/boltbase", spec.Executable)
 		assert.Contains(t, spec.Args, "retry")
 		assert.Contains(t, spec.Args, "--run-id=retry-run-id")
 		assert.Contains(t, spec.Args, "--config")
-		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
+		assert.Contains(t, spec.Args, "/etc/boltbase/config.yaml")
 		assert.Contains(t, spec.Args, "test-dag")
 	})
 
@@ -384,7 +384,7 @@ func TestRetry(t *testing.T) {
 		t.Parallel()
 		cfgNoFile := &config.Config{
 			Paths: config.PathsConfig{
-				Executable: "/usr/bin/dagu",
+				Executable: "/usr/bin/boltbase",
 			},
 		}
 		builderNoFile := runtime.NewSubCmdBuilder(cfgNoFile)
@@ -398,8 +398,8 @@ func TestTaskStart(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
-			Executable:     "/usr/bin/dagu",
-			ConfigFileUsed: "/etc/dagu/config.yaml",
+			Executable:     "/usr/bin/boltbase",
+			ConfigFileUsed: "/etc/boltbase/config.yaml",
 		},
 	}
 
@@ -413,12 +413,12 @@ func TestTaskStart(t *testing.T) {
 		}
 		spec := builder.TaskStart(task)
 
-		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
+		assert.Equal(t, "/usr/bin/boltbase", spec.Executable)
 		assert.Contains(t, spec.Args, "start")
 		assert.Contains(t, spec.Args, "--run-id=task-run-id")
 
 		assert.Contains(t, spec.Args, "--config")
-		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
+		assert.Contains(t, spec.Args, "/etc/boltbase/config.yaml")
 		assert.Contains(t, spec.Args, "/path/to/task.yaml")
 	})
 
@@ -491,7 +491,7 @@ func TestTaskStart(t *testing.T) {
 		t.Parallel()
 		cfgNoFile := &config.Config{
 			Paths: config.PathsConfig{
-				Executable: "/usr/bin/dagu",
+				Executable: "/usr/bin/boltbase",
 			},
 		}
 		builderNoFile := runtime.NewSubCmdBuilder(cfgNoFile)
@@ -509,8 +509,8 @@ func TestTaskRetry(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
-			Executable:     "/usr/bin/dagu",
-			ConfigFileUsed: "/etc/dagu/config.yaml",
+			Executable:     "/usr/bin/boltbase",
+			ConfigFileUsed: "/etc/boltbase/config.yaml",
 		},
 	}
 
@@ -525,11 +525,11 @@ func TestTaskRetry(t *testing.T) {
 		}
 		spec := builder.TaskRetry(task)
 
-		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
+		assert.Equal(t, "/usr/bin/boltbase", spec.Executable)
 		assert.Contains(t, spec.Args, "retry")
 		assert.Contains(t, spec.Args, "--run-id=retry-run-id")
 		assert.Contains(t, spec.Args, "--config")
-		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
+		assert.Contains(t, spec.Args, "/etc/boltbase/config.yaml")
 		assert.Contains(t, spec.Args, "root-dag")
 	})
 
@@ -549,7 +549,7 @@ func TestTaskRetry(t *testing.T) {
 		t.Parallel()
 		cfgNoFile := &config.Config{
 			Paths: config.PathsConfig{
-				Executable: "/usr/bin/dagu",
+				Executable: "/usr/bin/boltbase",
 			},
 		}
 		builderNoFile := runtime.NewSubCmdBuilder(cfgNoFile)

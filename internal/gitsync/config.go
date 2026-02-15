@@ -62,11 +62,11 @@ type AutoSyncConfig struct {
 // CommitConfig holds configuration for Git commits.
 type CommitConfig struct {
 	// AuthorName is the name to use for commits.
-	// Defaults to "Dagu" if not specified.
+	// Defaults to "Boltbase" if not specified.
 	AuthorName string
 
 	// AuthorEmail is the email to use for commits.
-	// Defaults to "dagu@localhost" if not specified.
+	// Defaults to "boltbase@localhost" if not specified.
 	AuthorEmail string
 }
 
@@ -86,7 +86,7 @@ func (c *Config) GetAuthorName() string {
 	if c.Commit.AuthorName != "" {
 		return c.Commit.AuthorName
 	}
-	return "Dagu"
+	return "Boltbase"
 }
 
 // GetAuthorEmail returns the commit author email, using default if not set.
@@ -94,7 +94,7 @@ func (c *Config) GetAuthorEmail() string {
 	if c.Commit.AuthorEmail != "" {
 		return c.Commit.AuthorEmail
 	}
-	return "dagu@localhost"
+	return "boltbase@localhost"
 }
 
 // NewConfigFromGlobal creates a gitsync.Config from the global configuration.

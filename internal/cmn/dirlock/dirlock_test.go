@@ -238,7 +238,7 @@ func TestStaleDetection(t *testing.T) {
 
 	t.Run("CleanStaleLock", func(t *testing.T) {
 		// Create a stale lock manually
-		lockPath := filepath.Join(tmpDir, ".dagu_lock")
+		lockPath := filepath.Join(tmpDir, ".boltbase_lock")
 		err := os.Mkdir(lockPath, 0700)
 		require.NoError(t, err)
 
@@ -450,7 +450,7 @@ func TestEdgeCases(t *testing.T) {
 		info, err = lock.Info()
 		require.NoError(t, err)
 		require.NotNil(t, info)
-		require.Equal(t, ".dagu_lock", info.LockDirName)
+		require.Equal(t, ".boltbase_lock", info.LockDirName)
 		require.WithinDuration(t, time.Now(), info.AcquiredAt, 1*time.Second)
 
 		// Cleanup
