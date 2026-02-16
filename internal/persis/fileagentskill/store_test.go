@@ -104,9 +104,11 @@ func TestStore_Create(t *testing.T) {
 		err := store.Create(ctx, skill)
 		require.NoError(t, err)
 
-		// Verify file was created
-		filePath := filepath.Join(baseDir, "kubernetes.yaml")
-		_, err = os.Stat(filePath)
+		// Verify directory and SKILL.md were created
+		dirPath := filepath.Join(baseDir, "kubernetes")
+		_, err = os.Stat(dirPath)
+		require.NoError(t, err)
+		_, err = os.Stat(filepath.Join(dirPath, "SKILL.md"))
 		require.NoError(t, err)
 
 		// Verify can be retrieved
@@ -218,7 +220,6 @@ func TestStore_GetByID(t *testing.T) {
 		assert.Equal(t, skill.Tags, got.Tags)
 		assert.Equal(t, skill.Type, got.Type)
 		assert.Equal(t, skill.Knowledge, got.Knowledge)
-		assert.Equal(t, skill.SchemaVersion, got.SchemaVersion)
 	})
 
 	t.Run("not found", func(t *testing.T) {
@@ -411,16 +412,16 @@ func TestStore_Delete(t *testing.T) {
 		store, baseDir := setupTestStore(t)
 		createSkill(t, store, newTestSkill("delete-me", "Delete Me"))
 
-		// Verify file exists before deletion
-		filePath := filepath.Join(baseDir, "delete-me.yaml")
-		_, err := os.Stat(filePath)
+		// Verify directory exists before deletion
+		dirPath := filepath.Join(baseDir, "delete-me")
+		_, err := os.Stat(dirPath)
 		require.NoError(t, err)
 
 		err = store.Delete(ctx, "delete-me")
 		require.NoError(t, err)
 
-		// Verify file is removed
-		_, err = os.Stat(filePath)
+		// Verify directory is removed
+		_, err = os.Stat(dirPath)
 		assert.True(t, os.IsNotExist(err))
 
 		// Verify GetByID returns not found
@@ -528,16 +529,18 @@ func TestStore_RebuildIndex(t *testing.T) {
 		assert.Equal(t, "Beta Skill", skills[1].Name)
 		assert.Equal(t, "Gamma Skill", skills[2].Name)
 
-		// Verify files are still on disk
+		// Verify skill directories are still on disk
 		entries, err := os.ReadDir(baseDir)
 		require.NoError(t, err)
-		yamlFiles := 0
+		skillDirs := 0
 		for _, entry := range entries {
-			if filepath.Ext(entry.Name()) == ".yaml" {
-				yamlFiles++
+			if entry.IsDir() {
+				if _, serr := os.Stat(filepath.Join(baseDir, entry.Name(), "SKILL.md")); serr == nil {
+					skillDirs++
+				}
 			}
 		}
-		assert.Equal(t, 3, yamlFiles)
+		assert.Equal(t, 3, skillDirs)
 	})
 
 	t.Run("new store picks up existing files", func(t *testing.T) {
@@ -558,14 +561,15 @@ func TestStore_RebuildIndex(t *testing.T) {
 		assert.Equal(t, "Existing Skill", got.Name)
 	})
 
-	t.Run("rebuild skips invalid YAML files", func(t *testing.T) {
+	t.Run("rebuild skips invalid SKILL.md files", func(t *testing.T) {
 		t.Parallel()
 		store, baseDir := setupTestStore(t)
 		createSkill(t, store, newTestSkill("valid-skill", "Valid Skill"))
 
-		// Write an invalid YAML file
-		invalidPath := filepath.Join(baseDir, "corrupt.yaml")
-		require.NoError(t, os.WriteFile(invalidPath, []byte("{{invalid yaml}}"), 0600))
+		// Write a directory with an invalid SKILL.md
+		corruptDir := filepath.Join(baseDir, "corrupt")
+		require.NoError(t, os.MkdirAll(corruptDir, 0750))
+		require.NoError(t, os.WriteFile(filepath.Join(corruptDir, "SKILL.md"), []byte("no frontmatter"), 0600))
 
 		// Rebuild should not fail; it should skip the invalid file
 		err := store.rebuildIndex()
@@ -577,14 +581,15 @@ func TestStore_RebuildIndex(t *testing.T) {
 		assert.Equal(t, "Valid Skill", got.Name)
 	})
 
-	t.Run("rebuild skips non-yaml files", func(t *testing.T) {
+	t.Run("rebuild skips directories without SKILL.md", func(t *testing.T) {
 		t.Parallel()
 		store, baseDir := setupTestStore(t)
 		createSkill(t, store, newTestSkill("my-skill", "My Skill"))
 
-		// Write non-YAML files
+		// Write non-skill files and directories
 		require.NoError(t, os.WriteFile(filepath.Join(baseDir, "readme.txt"), []byte("hello"), 0600))
-		require.NoError(t, os.WriteFile(filepath.Join(baseDir, "data.json"), []byte("{}"), 0600))
+		emptyDir := filepath.Join(baseDir, "empty-dir")
+		require.NoError(t, os.MkdirAll(emptyDir, 0750))
 
 		err := store.rebuildIndex()
 		require.NoError(t, err)
@@ -595,21 +600,20 @@ func TestStore_RebuildIndex(t *testing.T) {
 		assert.Equal(t, "my-skill", skills[0].ID)
 	})
 
-	t.Run("rebuild picks up directory-based skills", func(t *testing.T) {
+	t.Run("rebuild picks up manually created SKILL.md", func(t *testing.T) {
 		t.Parallel()
 		baseDir := t.TempDir()
 
-		// Create a directory-based skill manually
+		// Create a skill directory manually with SKILL.md format
 		skillDir := filepath.Join(baseDir, "dir-skill")
 		require.NoError(t, os.MkdirAll(skillDir, 0750))
 
-		skillContent := `id: dir-skill
-schema_version: 1
+		skillContent := `---
 name: Directory Skill
-type: custom
-knowledge: Knowledge from directory skill
-`
-		require.NoError(t, os.WriteFile(filepath.Join(skillDir, "skill.yaml"), []byte(skillContent), 0600))
+description: A manually created skill
+---
+Knowledge from directory skill`
+		require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(skillContent), 0600))
 
 		// Create store — should pick up the directory-based skill
 		store, err := New(baseDir)
@@ -618,22 +622,23 @@ knowledge: Knowledge from directory skill
 		got, err := store.GetByID(ctx, "dir-skill")
 		require.NoError(t, err)
 		assert.Equal(t, "Directory Skill", got.Name)
+		assert.Equal(t, "A manually created skill", got.Description)
 		assert.Equal(t, "Knowledge from directory skill", got.Knowledge)
 	})
 }
 
-// Tests for skillFilePath
+// Tests for skillDirPath
 
-func TestStore_SkillFilePath(t *testing.T) {
+func TestStore_SkillDirPath(t *testing.T) {
 	t.Parallel()
 
 	t.Run("valid ID produces correct path", func(t *testing.T) {
 		t.Parallel()
 		store, baseDir := setupTestStore(t)
 
-		p, err := store.skillFilePath("my-skill")
+		p, err := store.skillDirPath("my-skill")
 		require.NoError(t, err)
-		assert.Equal(t, filepath.Join(baseDir, "my-skill.yaml"), p)
+		assert.Equal(t, filepath.Join(baseDir, "my-skill"), p)
 	})
 }
 
@@ -664,7 +669,6 @@ func TestStore_CreateAndRetrieveFullRoundTrip(t *testing.T) {
 	got, err := store.GetByID(ctx, "full-skill")
 	require.NoError(t, err)
 	assert.Equal(t, skill.ID, got.ID)
-	assert.Equal(t, skill.SchemaVersion, got.SchemaVersion)
 	assert.Equal(t, skill.Name, got.Name)
 	assert.Equal(t, skill.Description, got.Description)
 	assert.Equal(t, skill.Version, got.Version)

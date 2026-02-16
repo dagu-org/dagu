@@ -6618,6 +6618,7 @@ components:
       enum:
         - dag
         - memory
+        - skill
 
     SyncItem:
       type: object

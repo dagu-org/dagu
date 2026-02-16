@@ -9085,7 +9085,8 @@ export enum SyncSummary {
 }
 export enum SyncItemKind {
     dag = "dag",
-    memory = "memory"
+    memory = "memory",
+    skill = "skill"
 }
 export enum SyncAuthConfigType {
     token = "token",

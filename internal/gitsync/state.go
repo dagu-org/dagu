@@ -29,7 +29,10 @@ const (
 	StatusConflict SyncStatus = "conflict"
 )
 
-const agentMemoryDir = "memory"
+const (
+	agentMemoryDir = "memory"
+	agentSkillsDir = "skills"
+)
 
 // DAGKind represents the type of tracked item in git sync.
 type DAGKind string
@@ -40,6 +43,9 @@ const (
 
 	// DAGKindMemory indicates an agent memory file under memory/.
 	DAGKindMemory DAGKind = "memory"
+
+	// DAGKindSkill indicates an agent skill file under skills/.
+	DAGKindSkill DAGKind = "skill"
 )
 
 // KindForDAGID returns the DAG kind derived from a DAG ID.
@@ -47,12 +53,20 @@ func KindForDAGID(id string) DAGKind {
 	if strings.HasPrefix(id, agentMemoryDir+"/") {
 		return DAGKindMemory
 	}
+	if strings.HasPrefix(id, agentSkillsDir+"/") {
+		return DAGKindSkill
+	}
 	return DAGKindDAG
 }
 
 // isMemoryFile returns true if the file ID belongs to the memory directory.
 func isMemoryFile(id string) bool {
 	return KindForDAGID(id) == DAGKindMemory
+}
+
+// isSkillFile returns true if the file ID belongs to the skills directory.
+func isSkillFile(id string) bool {
+	return KindForDAGID(id) == DAGKindSkill
 }
 
 // State represents the overall sync state.

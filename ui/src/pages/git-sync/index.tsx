@@ -50,8 +50,8 @@ type SyncConfigResponse = components['schemas']['SyncConfigResponse'];
 type SyncItemDiffResponse = components['schemas']['SyncItemDiffResponse'];
 type SyncItem = components['schemas']['SyncItem'];
 type StatusFilter = 'all' | 'modified' | 'untracked' | 'conflict';
-type TypeFilter = 'all' | 'dag' | 'memory';
-type UISyncKind = 'dag' | 'memory';
+type TypeFilter = 'all' | 'dag' | 'memory' | 'skill';
+type UISyncKind = 'dag' | 'memory' | 'skill';
 type SyncRow = { itemId: string; item: SyncItem; kind: UISyncKind };
 
 const statusFilters: StatusFilter[] = [
@@ -60,7 +60,7 @@ const statusFilters: StatusFilter[] = [
   'untracked',
   'conflict',
 ];
-const typeFilters: TypeFilter[] = ['all', 'dag', 'memory'];
+const typeFilters: TypeFilter[] = ['all', 'dag', 'memory', 'skill'];
 
 function parseStatusFilter(value: string | null): StatusFilter {
   if (
@@ -75,16 +75,15 @@ function parseStatusFilter(value: string | null): StatusFilter {
 }
 
 function parseTypeFilter(value: string | null): TypeFilter {
-  if (value === 'all' || value === 'dag' || value === 'memory') {
+  if (value === 'all' || value === 'dag' || value === 'memory' || value === 'skill') {
     return value;
   }
   return 'all';
 }
 
 function normalizeSyncItemKind(kind: SyncItemKind): UISyncKind {
-  if (kind === SyncItemKind.memory) {
-    return 'memory';
-  }
+  if (kind === SyncItemKind.memory) return 'memory';
+  if (kind === SyncItemKind.skill) return 'skill';
   return 'dag';
 }
 
@@ -439,6 +438,7 @@ export default function GitSyncPage() {
       all: syncRows.length,
       dag: 0,
       memory: 0,
+      skill: 0,
     };
     for (const { kind } of syncRows) {
       counts[kind] += 1;
@@ -475,13 +475,15 @@ export default function GitSyncPage() {
   const selectedCounts = useMemo(() => {
     let dag = 0;
     let memory = 0;
+    let skill = 0;
     for (const dagID of selectedDags) {
       const row = rowByID.get(dagID);
       if (!row) continue;
       if (row.kind === 'memory') memory += 1;
+      else if (row.kind === 'skill') skill += 1;
       else dag += 1;
     }
-    return { dag, memory, total: dag + memory };
+    return { dag, memory, skill, total: dag + memory + skill };
   }, [selectedDags, rowByID]);
 
   const emptyStateMessage = useMemo(() => {
@@ -491,7 +493,7 @@ export default function GitSyncPage() {
     if (typeFilter === 'all') {
       return `No ${statusFilter} items`;
     }
-    const typeLabel = typeFilter === 'dag' ? 'DAG' : 'memory';
+    const typeLabel = typeFilter === 'dag' ? 'DAG' : typeFilter === 'skill' ? 'skill' : 'memory';
     if (statusFilter === 'all') {
       return `No ${typeLabel} items`;
     }
@@ -602,13 +604,13 @@ export default function GitSyncPage() {
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              {f === 'all' ? 'All' : f === 'dag' ? 'DAGs' : 'Memory'} ({typeCounts[f]})
+              {f === 'all' ? 'All' : f === 'dag' ? 'DAGs' : f === 'memory' ? 'Memory' : 'Skills'} ({typeCounts[f]})
             </button>
           ))}
         </div>
         {selectedCounts.total > 0 && (
           <span className="text-xs text-muted-foreground">
-            Selected: {selectedCounts.dag} DAGs, {selectedCounts.memory} memory
+            Selected: {selectedCounts.dag} DAGs, {selectedCounts.memory} memory{selectedCounts.skill > 0 ? `, ${selectedCounts.skill} skills` : ''}
           </span>
         )}
       </div>
@@ -709,6 +711,11 @@ export default function GitSyncPage() {
                       {kind === 'memory' && (
                         <span className="text-[10px] px-1 py-0 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400">
                           memory
+                        </span>
+                      )}
+                      {kind === 'skill' && (
+                        <span className="text-[10px] px-1 py-0 rounded bg-pink-500/10 text-pink-600 dark:text-pink-400">
+                          skill
                         </span>
                       )}
                     </div>
