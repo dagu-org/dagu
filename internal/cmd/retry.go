@@ -77,6 +77,15 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("cannot retry DAG %q with workerSelector via CLI; use 'dagu enqueue' for distributed execution", dag.Name)
 	}
 
+	// For DAGs using a global queue: when invoked by the user, enqueue the retry
+	// so it respects queue capacity. When status is already Queued, we're being
+	// invoked by the queue processor to run the item—execute directly.
+	// Step retry is not supported via queue (queue processor does not pass step name).
+	queueConfig := ctx.Config.FindQueueConfig(dag.ProcGroup())
+	if stepName == "" && queueConfig != nil && status.Status != core.Queued {
+		return enqueueRetry(ctx, attempt, dag, status, dagRunID)
+	}
+
 	ctx.Context = logger.WithValues(ctx.Context, tag.DAG(dag.Name), tag.RunID(dagRunID))
 
 	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
@@ -97,6 +106,20 @@ func runRetry(ctx *Context, args []string) error {
 	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
 	return executeRetry(ctx, dag, status, status.DAGRun(), stepName, workerID)
+}
+
+// enqueueRetry enqueues the retry and persists Queued status via exec.EnqueueRetry.
+// Retries respect global queue capacity because the queue processor picks them up
+// when capacity is available.
+func enqueueRetry(ctx *Context, attempt exec.DAGRunAttempt, dag *core.DAG, status *exec.DAGRunStatus, dagRunID string) error {
+	if err := exec.EnqueueRetry(ctx.Context, ctx.QueueStore, attempt, dag, status, dagRunID); err != nil {
+		return err
+	}
+	logger.Info(ctx, "Enqueued retry; will run when queue capacity is available",
+		tag.DAG(dag.Name),
+		tag.RunID(dagRunID),
+	)
+	return nil
 }
 
 // executeRetry runs a retry of a DAG run using the original run's log file.

@@ -368,8 +368,9 @@ func TestRunner(t *testing.T) {
 		)
 
 		go func() {
-			// Create file for successful retry
-			time.Sleep(time.Millisecond * 60) // wait for step 1 to start
+			// Create file after first retry (50ms) but before second (150ms) so that
+			// the first attempt and first retry fail, ensuring RetryCount > 0.
+			time.Sleep(time.Millisecond * 120)
 
 			// Create file during the retry interval
 			f, err := os.Create(file)
@@ -1988,7 +1989,8 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 50)
+			// Delay long enough that the first run and condition check see "continue"
+			time.Sleep(150 * time.Millisecond)
 			err := os.WriteFile(counterFile, []byte("stop"), 0600)
 			require.NoError(t, err)
 		}()
@@ -2069,7 +2071,8 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 50)
+			// Delay long enough that the first run and condition check see "waiting"
+			time.Sleep(150 * time.Millisecond)
 			err := os.WriteFile(counterFile, []byte("ready"), 0600)
 			require.NoError(t, err)
 		}()
