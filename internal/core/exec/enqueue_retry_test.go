@@ -30,7 +30,7 @@ func TestEnqueueRetry(t *testing.T) {
 			dag:      &core.DAG{Name: "test-dag"},
 			status:   &exec.DAGRunStatus{Status: core.Queued},
 			dagRunID: "run-1",
-			setupMocks: func(att *exec.MockDAGRunAttempt, qs *exec.MockQueueStore) {
+			setupMocks: func(_ *exec.MockDAGRunAttempt, _ *exec.MockQueueStore) {
 				// No mock setup needed — function should return early
 			},
 			assertMocks: func(t *testing.T, att *exec.MockDAGRunAttempt, qs *exec.MockQueueStore) {
@@ -64,7 +64,7 @@ func TestEnqueueRetry(t *testing.T) {
 			dag:      &core.DAG{Name: "test-dag"},
 			status:   &exec.DAGRunStatus{Status: core.Failed},
 			dagRunID: "run-3",
-			setupMocks: func(att *exec.MockDAGRunAttempt, qs *exec.MockQueueStore) {
+			setupMocks: func(att *exec.MockDAGRunAttempt, _ *exec.MockQueueStore) {
 				att.On("Open", mock.Anything).Return(errors.New("open error"))
 			},
 			assertMocks: func(t *testing.T, att *exec.MockDAGRunAttempt, qs *exec.MockQueueStore) {
@@ -79,12 +79,12 @@ func TestEnqueueRetry(t *testing.T) {
 			dag:      &core.DAG{Name: "test-dag"},
 			status:   &exec.DAGRunStatus{Status: core.Failed},
 			dagRunID: "run-4",
-			setupMocks: func(att *exec.MockDAGRunAttempt, qs *exec.MockQueueStore) {
+			setupMocks: func(att *exec.MockDAGRunAttempt, _ *exec.MockQueueStore) {
 				att.On("Open", mock.Anything).Return(nil)
 				att.On("Close", mock.Anything).Return(nil)
 				att.On("Write", mock.Anything, mock.Anything).Return(errors.New("write error"))
 			},
-			assertMocks: func(t *testing.T, att *exec.MockDAGRunAttempt, qs *exec.MockQueueStore) {
+			assertMocks: func(_ *testing.T, _ *exec.MockDAGRunAttempt, qs *exec.MockQueueStore) {
 				// Write fails before Enqueue, so Enqueue should never be called
 				qs.AssertNotCalled(t, "Enqueue", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			},
