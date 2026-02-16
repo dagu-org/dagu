@@ -1,4 +1,5 @@
 import React, { useCallback, useContext, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Loader2,
   MoreHorizontal,
@@ -17,13 +18,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useIsAdmin } from '@/contexts/AuthContext';
 import { useClient } from '@/hooks/api';
 import ConfirmModal from '@/ui/ConfirmModal';
-import { SkillFormModal } from './SkillFormModal';
 
 type SkillResponse = components['schemas']['SkillResponse'];
 
@@ -31,6 +30,7 @@ export default function AgentSkillsPage(): React.ReactNode {
   const client = useClient();
   const isAdmin = useIsAdmin();
   const appBarContext = useContext(AppBarContext);
+  const navigate = useNavigate();
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,8 +40,6 @@ export default function AgentSkillsPage(): React.ReactNode {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState<'all' | 'enabled' | 'disabled'>('all');
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editingSkill, setEditingSkill] = useState<SkillResponse | null>(null);
   const [deletingSkill, setDeletingSkill] = useState<SkillResponse | null>(null);
 
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
@@ -144,7 +142,7 @@ export default function AgentSkillsPage(): React.ReactNode {
             Manage knowledge and instruction sets for the AI agent
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)} size="sm" className="h-8">
+        <Button onClick={() => navigate('/agent-skills/new')} size="sm" className="h-8">
           <Plus className="h-4 w-4 mr-1.5" />
           Create Skill
         </Button>
@@ -231,7 +229,7 @@ export default function AgentSkillsPage(): React.ReactNode {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setEditingSkill(skill)}>
+                      <DropdownMenuItem onClick={() => navigate(`/agent-skills/${skill.id}`)}>
                         <Pencil className="h-4 w-4 mr-2" />
                         Edit
                       </DropdownMenuItem>
@@ -272,29 +270,6 @@ export default function AgentSkillsPage(): React.ReactNode {
           ))}
         </div>
       )}
-
-      {/* Create Skill Modal */}
-      <SkillFormModal
-        open={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={() => {
-          setShowCreateModal(false);
-          fetchSkills();
-          setSuccess('Skill created successfully');
-        }}
-      />
-
-      {/* Edit Skill Modal */}
-      <SkillFormModal
-        open={!!editingSkill}
-        skill={editingSkill || undefined}
-        onClose={() => setEditingSkill(null)}
-        onSuccess={() => {
-          setEditingSkill(null);
-          fetchSkills();
-          setSuccess('Skill updated successfully');
-        }}
-      />
 
       {/* Delete Confirmation */}
       <ConfirmModal
