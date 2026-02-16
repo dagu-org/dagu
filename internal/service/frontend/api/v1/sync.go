@@ -386,6 +386,8 @@ func toAPISyncItemKind(itemID string, kind gitsync.DAGKind) api.SyncItemKind {
 	switch kind {
 	case gitsync.DAGKindMemory:
 		return api.SyncItemKindMemory
+	case gitsync.DAGKindSkill:
+		return api.SyncItemKindSkill
 	case gitsync.DAGKindDAG:
 		return api.SyncItemKindDag
 	default:

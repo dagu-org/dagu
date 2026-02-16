@@ -140,10 +140,9 @@ func parseSkillFile(data []byte, id string) (*agent.Skill, error) {
 
 	frontmatterStr := rest[:closingIdx]
 	// Body starts after the closing "\n---\n"
-	bodyStart := closingIdx + 5 // len("\n---\n")
-	if bodyStart > len(rest) {
-		bodyStart = len(rest)
-	}
+	bodyStart := min(
+		// len("\n---\n")
+		closingIdx+5, len(rest))
 	body := rest[bodyStart:]
 
 	var fm skillFrontmatter
