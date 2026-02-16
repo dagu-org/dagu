@@ -3,6 +3,8 @@ package exec
 import (
 	"context"
 	"errors"
+
+	"github.com/stretchr/testify/mock"
 )
 
 // Errors for the queue
@@ -70,4 +72,82 @@ type QueuedItemData interface {
 	ID() string
 	// Data returns the data of the queued item
 	Data() (*DAGRunRef, error)
+}
+
+var _ QueueStore = (*MockQueueStore)(nil)
+
+// MockQueueStore is a mock implementation of QueueStore for testing.
+type MockQueueStore struct {
+	mock.Mock
+}
+
+func (m *MockQueueStore) Enqueue(ctx context.Context, name string, priority QueuePriority, dagRun DAGRunRef) error {
+	args := m.Called(ctx, name, priority, dagRun)
+	return args.Error(0)
+}
+
+func (m *MockQueueStore) DequeueByName(ctx context.Context, name string) (QueuedItemData, error) {
+	args := m.Called(ctx, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(QueuedItemData), args.Error(1)
+}
+
+func (m *MockQueueStore) DequeueByDAGRunID(ctx context.Context, name string, dagRun DAGRunRef) ([]QueuedItemData, error) {
+	args := m.Called(ctx, name, dagRun)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]QueuedItemData), args.Error(1)
+}
+
+func (m *MockQueueStore) Len(ctx context.Context, name string) (int, error) {
+	args := m.Called(ctx, name)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *MockQueueStore) List(ctx context.Context, name string) ([]QueuedItemData, error) {
+	args := m.Called(ctx, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]QueuedItemData), args.Error(1)
+}
+
+func (m *MockQueueStore) ListPaginated(ctx context.Context, name string, pg Paginator) (PaginatedResult[QueuedItemData], error) {
+	args := m.Called(ctx, name, pg)
+	return args.Get(0).(PaginatedResult[QueuedItemData]), args.Error(1)
+}
+
+func (m *MockQueueStore) All(ctx context.Context) ([]QueuedItemData, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]QueuedItemData), args.Error(1)
+}
+
+func (m *MockQueueStore) ListByDAGName(ctx context.Context, name, dagName string) ([]QueuedItemData, error) {
+	args := m.Called(ctx, name, dagName)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]QueuedItemData), args.Error(1)
+}
+
+func (m *MockQueueStore) QueueList(ctx context.Context) ([]string, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *MockQueueStore) QueueWatcher(ctx context.Context) QueueWatcher {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil
+	}
+	return args.Get(0).(QueueWatcher)
 }

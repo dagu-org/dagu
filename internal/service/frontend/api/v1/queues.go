@@ -254,7 +254,7 @@ func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, cfg *con
 	}
 
 	// Check if this is a global queue from config
-	if globalCfg := findGlobalQueueConfig(queueName, cfg); globalCfg != nil {
+	if globalCfg := cfg.FindQueueConfig(queueName); globalCfg != nil {
 		queue.queueType = "global"
 		queue.maxConcurrency = globalCfg.MaxActiveRuns
 	} else {
@@ -265,20 +265,6 @@ func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, cfg *con
 
 	queueMap[queueName] = queue
 	return queue
-}
-
-// findGlobalQueueConfig returns the queue config if this is a global queue defined in config.
-// Returns nil if not found or queues are disabled.
-func findGlobalQueueConfig(queueName string, cfg *config.Config) *config.QueueConfig {
-	if !cfg.Queues.Enabled || cfg.Queues.Config == nil {
-		return nil
-	}
-	for i := range cfg.Queues.Config {
-		if cfg.Queues.Config[i].Name == queueName {
-			return &cfg.Queues.Config[i]
-		}
-	}
-	return nil
 }
 
 // SSE Data Methods for Queues

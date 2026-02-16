@@ -454,3 +454,58 @@ func TestConfig_Validate(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
+
+func TestFindQueueConfig(t *testing.T) {
+	t.Parallel()
+
+	t.Run("QueuesDisabled", func(t *testing.T) {
+		t.Parallel()
+		cfg := &Config{
+			Queues: Queues{
+				Enabled: false,
+				Config:  []QueueConfig{{Name: "q1", MaxActiveRuns: 3}},
+			},
+		}
+		assert.Nil(t, cfg.FindQueueConfig("q1"))
+	})
+
+	t.Run("NilConfig", func(t *testing.T) {
+		t.Parallel()
+		cfg := &Config{
+			Queues: Queues{Enabled: true, Config: nil},
+		}
+		assert.Nil(t, cfg.FindQueueConfig("q1"))
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		t.Parallel()
+		cfg := &Config{
+			Queues: Queues{
+				Enabled: true,
+				Config: []QueueConfig{
+					{Name: "a", MaxActiveRuns: 2},
+					{Name: "b", MaxActiveRuns: 4},
+				},
+			},
+		}
+		assert.Nil(t, cfg.FindQueueConfig("c"))
+	})
+
+	t.Run("Found", func(t *testing.T) {
+		t.Parallel()
+		cfg := &Config{
+			Queues: Queues{
+				Enabled: true,
+				Config: []QueueConfig{
+					{Name: "a", MaxActiveRuns: 2},
+					{Name: "b", MaxActiveRuns: 4},
+				},
+			},
+		}
+		result := cfg.FindQueueConfig("a")
+		require.NotNil(t, result)
+		assert.Equal(t, "a", result.Name)
+		assert.Equal(t, 2, result.MaxActiveRuns)
+	})
+
+}
