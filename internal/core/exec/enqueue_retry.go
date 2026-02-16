@@ -10,8 +10,9 @@ import (
 )
 
 // EnqueueRetry enqueues a DAG run for retry and persists the Queued status.
-// It enqueues first, then persists status, so a failed enqueue never leaves
-// an orphaned Queued status. Retries respect global queue capacity because
+// It persists the Queued status first, then enqueues, so the queue processor
+// always sees the correct status when it picks up the item. If enqueue fails,
+// the status is rolled back. Retries respect global queue capacity because
 // the queue processor picks them up when capacity is available.
 func EnqueueRetry(
 	ctx context.Context,
@@ -30,18 +31,32 @@ func EnqueueRetry(
 	}
 	defer func() { _ = attempt.Close(ctx) }()
 
-	// Enqueue first; if this fails, no status change is persisted
-	dagRun := NewDAGRunRef(dag.Name, dagRunID)
-	if err := queueStore.Enqueue(ctx, dag.ProcGroup(), QueuePriorityLow, dagRun); err != nil {
-		return fmt.Errorf("enqueue retry: %w", err)
-	}
+	// Snapshot original values for rollback
+	origStatus := status.Status
+	origQueuedAt := status.QueuedAt
+	origTriggerType := status.TriggerType
 
-	// Only after successful enqueue, persist the Queued status
+	// Persist Queued status FIRST so the queue processor always sees
+	// the correct status when it picks up the item.
 	status.Status = core.Queued
 	status.QueuedAt = stringutil.FormatTime(time.Now())
 	status.TriggerType = core.TriggerTypeRetry
 	if err := attempt.Write(ctx, *status); err != nil {
+		status.Status = origStatus
+		status.QueuedAt = origQueuedAt
+		status.TriggerType = origTriggerType
 		return fmt.Errorf("write status: %w", err)
 	}
+
+	// Enqueue after status is persisted. If this fails, roll back the status.
+	dagRun := NewDAGRunRef(dag.Name, dagRunID)
+	if err := queueStore.Enqueue(ctx, dag.ProcGroup(), QueuePriorityLow, dagRun); err != nil {
+		status.Status = origStatus
+		status.QueuedAt = origQueuedAt
+		status.TriggerType = origTriggerType
+		_ = attempt.Write(ctx, *status) // best-effort rollback
+		return fmt.Errorf("enqueue retry: %w", err)
+	}
+
 	return nil
 }

@@ -48,13 +48,14 @@ func TestEnqueueRetry(t *testing.T) {
 			setupMocks: func(att *exec.MockDAGRunAttempt, qs *exec.MockQueueStore) {
 				att.On("Open", mock.Anything).Return(nil)
 				att.On("Close", mock.Anything).Return(nil)
-				qs.On("Enqueue", mock.Anything, "test-dag", exec.QueuePriorityLow,
-					exec.NewDAGRunRef("test-dag", "run-2")).Return(nil)
+				// Write is called BEFORE Enqueue to prevent race with queue processor
 				att.On("Write", mock.Anything, mock.MatchedBy(func(s exec.DAGRunStatus) bool {
 					return s.Status == core.Queued &&
 						s.TriggerType == core.TriggerTypeRetry &&
 						s.QueuedAt != ""
 				})).Return(nil)
+				qs.On("Enqueue", mock.Anything, "test-dag", exec.QueuePriorityLow,
+					exec.NewDAGRunRef("test-dag", "run-2")).Return(nil)
 			},
 			wantStatus: core.Queued,
 		},
@@ -74,37 +75,38 @@ func TestEnqueueRetry(t *testing.T) {
 			wantStatus: core.Failed,
 		},
 		{
-			name:     "EnqueueFails",
+			name:     "WriteFails",
 			dag:      &core.DAG{Name: "test-dag"},
 			status:   &exec.DAGRunStatus{Status: core.Failed},
 			dagRunID: "run-4",
 			setupMocks: func(att *exec.MockDAGRunAttempt, qs *exec.MockQueueStore) {
 				att.On("Open", mock.Anything).Return(nil)
 				att.On("Close", mock.Anything).Return(nil)
-				qs.On("Enqueue", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(errors.New("enqueue error"))
+				att.On("Write", mock.Anything, mock.Anything).Return(errors.New("write error"))
 			},
 			assertMocks: func(t *testing.T, att *exec.MockDAGRunAttempt, qs *exec.MockQueueStore) {
-				att.AssertNotCalled(t, "Write", mock.Anything, mock.Anything)
+				// Write fails before Enqueue, so Enqueue should never be called
+				qs.AssertNotCalled(t, "Enqueue", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			},
-			wantErr:    "enqueue retry",
-			wantStatus: core.Failed,
+			wantErr:    "write status",
+			wantStatus: core.Failed, // rolled back
 		},
 		{
-			name:     "WriteFails",
+			name:     "EnqueueFails",
 			dag:      &core.DAG{Name: "test-dag"},
 			status:   &exec.DAGRunStatus{Status: core.Failed},
 			dagRunID: "run-5",
 			setupMocks: func(att *exec.MockDAGRunAttempt, qs *exec.MockQueueStore) {
 				att.On("Open", mock.Anything).Return(nil)
 				att.On("Close", mock.Anything).Return(nil)
-				qs.On("Enqueue", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-				att.On("Write", mock.Anything, mock.Anything).Return(errors.New("write error"))
+				// First Write succeeds (persists Queued status)
+				// Second Write is the best-effort rollback
+				att.On("Write", mock.Anything, mock.Anything).Return(nil)
+				qs.On("Enqueue", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(errors.New("enqueue error"))
 			},
-			wantErr: "write status",
-			// Note: status is mutated to Queued before Write is called,
-			// so even on Write failure the in-memory status is Queued.
-			wantStatus: core.Queued,
+			wantErr:    "enqueue retry",
+			wantStatus: core.Failed, // rolled back
 		},
 	}
 
