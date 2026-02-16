@@ -23,6 +23,7 @@ import fetchJson from './lib/fetchJson';
 import Dashboard from './pages';
 import AgentMemoryPage from './pages/agent-memory';
 import AgentSettingsPage from './pages/agent-settings';
+import AgentSkillsPage from './pages/agent-skills';
 import APIKeysPage from './pages/api-keys';
 import AuditLogsPage from './pages/audit-logs';
 import BaseConfigPage from './pages/base-config';
@@ -176,6 +177,7 @@ function AppInner({ config }: Props): React.ReactElement {
                                         <Route path="/git-sync" element={<AdminElement><GitSyncPage /></AdminElement>} />
                                         <Route path="/agent-settings" element={<AdminElement><AgentSettingsPage /></AdminElement>} />
                                         <Route path="/agent-memory" element={<AdminElement><AgentMemoryPage /></AdminElement>} />
+                                        <Route path="/agent-skills" element={<AdminElement><AgentSkillsPage /></AdminElement>} />
                                       </Routes>
                                     </Layout>
                                     {config.agentEnabled && <AgentChatModal />}
