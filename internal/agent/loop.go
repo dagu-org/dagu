@@ -71,6 +71,8 @@ type LoopConfig struct {
 	IPAddress string
 	// Role is the authenticated user's role.
 	Role auth.Role
+	// SessionStore is used for delegate sub-session persistence.
+	SessionStore SessionStore
 }
 
 // Loop manages a session turn with an LLM including tool execution.
@@ -98,6 +100,7 @@ type Loop struct {
 	username         string
 	ipAddress        string
 	role             auth.Role
+	sessionStore     SessionStore
 }
 
 // NewLoop creates a new Loop instance.
@@ -128,6 +131,7 @@ func NewLoop(config LoopConfig) *Loop {
 		username:         config.Username,
 		ipAddress:        config.IPAddress,
 		role:             config.Role,
+		sessionStore:     config.SessionStore,
 	}
 }
 
@@ -326,6 +330,22 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		return toolError("Blocked by policy: %v", err)
 	}
 
+	// Build delegate context if session store is available (interactive chat).
+	var delegate *DelegateContext
+	if l.sessionStore != nil {
+		delegate = &DelegateContext{
+			Provider:     l.provider,
+			Model:        l.model,
+			SystemPrompt: l.systemPrompt,
+			Tools:        l.tools,
+			Hooks:        l.hooks,
+			Logger:       l.logger,
+			SessionStore: l.sessionStore,
+			ParentID:     l.sessionID,
+			UserID:       userID,
+		}
+	}
+
 	result := tool.Run(ToolContext{
 		Context:          ctx,
 		WorkingDir:       l.workingDir,
@@ -334,6 +354,7 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		WaitUserResponse: l.waitUserResponse,
 		SafeMode:         safeMode,
 		Role:             role,
+		Delegate:         delegate,
 	}, input)
 
 	l.hooks.RunAfterToolExec(ctx, info, result)
@@ -377,10 +398,64 @@ func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) er
 }
 
 // executeToolCalls runs all tool calls at the current depth level.
+// Delegate tool calls are executed in parallel; all others run sequentially.
 func (l *Loop) executeToolCalls(ctx context.Context, toolCalls []llm.ToolCall, depth int) {
-	for _, tc := range toolCalls {
-		l.logger.Debug("executing tool", "name", tc.Function.Name, "id", tc.ID, "depth", depth)
-		l.recordToolResult(ctx, tc, l.executeTool(ctx, tc))
+	type indexedCall struct {
+		index int
+		call  llm.ToolCall
+	}
+
+	var delegateCalls, otherCalls []indexedCall
+	for i, tc := range toolCalls {
+		if tc.Function.Name == delegateToolName {
+			delegateCalls = append(delegateCalls, indexedCall{i, tc})
+		} else {
+			otherCalls = append(otherCalls, indexedCall{i, tc})
+		}
+	}
+
+	// Pre-allocate results array to preserve original ordering.
+	type toolCallResult struct {
+		tc     llm.ToolCall
+		result ToolOut
+	}
+	results := make([]toolCallResult, len(toolCalls))
+
+	// Phase 1: Execute non-delegate calls sequentially (preserves existing behavior).
+	for _, ic := range otherCalls {
+		l.logger.Debug("executing tool", "name", ic.call.Function.Name, "id", ic.call.ID, "depth", depth)
+		results[ic.index] = toolCallResult{tc: ic.call, result: l.executeTool(ctx, ic.call)}
+	}
+
+	// Phase 2: Execute delegate calls in parallel (max 10).
+	if len(delegateCalls) > maxConcurrentDelegates {
+		for _, ic := range delegateCalls[maxConcurrentDelegates:] {
+			results[ic.index] = toolCallResult{
+				tc:     ic.call,
+				result: toolError("Maximum concurrent sub-agents (%d) exceeded", maxConcurrentDelegates),
+			}
+		}
+		delegateCalls = delegateCalls[:maxConcurrentDelegates]
+	}
+
+	if len(delegateCalls) > 0 {
+		var wg sync.WaitGroup
+		for _, ic := range delegateCalls {
+			wg.Add(1)
+			go func(idx int, tc llm.ToolCall) {
+				defer wg.Done()
+				l.logger.Debug("executing delegate tool", "id", tc.ID, "depth", depth)
+				results[idx] = toolCallResult{tc: tc, result: l.executeTool(ctx, tc)}
+			}(ic.index, ic.call)
+		}
+		wg.Wait()
+	}
+
+	// Record all results sequentially to maintain ordered history.
+	for _, r := range results {
+		if r.tc.ID != "" {
+			l.recordToolResult(ctx, r.tc, r.result)
+		}
 	}
 }
 
@@ -447,8 +522,9 @@ func (l *Loop) recordToolResult(ctx context.Context, tc llm.ToolCall, result Too
 			Content:    result.Content,
 			IsError:    result.IsError,
 		}},
-		CreatedAt: time.Now(),
-		LLMData:   &toolMessage,
+		CreatedAt:  time.Now(),
+		LLMData:    &toolMessage,
+		DelegateID: result.DelegateID,
 	}
 	if err := l.recordMessage(ctx, msg); err != nil {
 		l.logger.Error("failed to record tool result message", "error", err)

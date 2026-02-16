@@ -369,6 +369,7 @@ func (a *API) handleNewSession(w http.ResponseWriter, r *http.Request) {
 		OutputCostPer1M: modelCfg.OutputCostPer1M,
 		MemoryStore:     a.memoryStore,
 		DAGName:         dagName,
+		SessionStore:    a.store,
 	})
 
 	a.persistNewSession(r.Context(), id, userID, dagName, now)
@@ -448,6 +449,10 @@ func (a *API) appendPersistedSessions(ctx context.Context, userID string, active
 
 	for _, sess := range persisted {
 		if _, exists := activeIDs[sess.ID]; exists {
+			continue
+		}
+		// Exclude sub-sessions (delegate sessions) from the main listing.
+		if sess.ParentSessionID != "" {
 			continue
 		}
 		sessions = append(sessions, SessionWithState{
@@ -614,21 +619,22 @@ func (a *API) reactivateSession(ctx context.Context, id, userID, username string
 	}
 
 	mgr := NewSessionManager(SessionManagerConfig{
-		ID:          id,
-		UserID:      userID,
-		Logger:      a.logger,
-		WorkingDir:  a.workingDir,
-		OnMessage:   a.createMessageCallback(id),
-		History:     messages,
-		SequenceID:  seqID,
-		Environment: a.environment,
-		SafeMode:    true, // Default to safe mode for reactivated sessions
-		Hooks:       a.hooks,
-		Username:    username,
-		IPAddress:   ipAddress,
-		MemoryStore: a.memoryStore,
-		DAGName:     sess.DAGName,
-		Role:        role,
+		ID:           id,
+		UserID:       userID,
+		Logger:       a.logger,
+		WorkingDir:   a.workingDir,
+		OnMessage:    a.createMessageCallback(id),
+		History:      messages,
+		SequenceID:   seqID,
+		Environment:  a.environment,
+		SafeMode:     true, // Default to safe mode for reactivated sessions
+		Hooks:        a.hooks,
+		Username:     username,
+		IPAddress:    ipAddress,
+		MemoryStore:  a.memoryStore,
+		DAGName:      sess.DAGName,
+		Role:         role,
+		SessionStore: a.store,
 	})
 	a.sessions.Store(id, mgr)
 

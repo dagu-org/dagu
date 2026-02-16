@@ -18,6 +18,7 @@ func CreateTools(dagsDir string) []*AgentTool {
 		NewReadSchemaTool(),
 		NewAskUserTool(),
 		NewWebSearchTool(),
+		NewDelegateTool(),
 	}
 }
 

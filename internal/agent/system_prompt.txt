@@ -107,6 +107,7 @@ After creating or modifying DAGs, navigate to the UI page so the user can review
 - `think`: Reason through complex multi-step tasks before acting.
 - `navigate`: Open a UI page (/dags/<name>, /dag-runs/<name>/<id>).
 - `read_schema`: Look up DAG YAML structure. Use before creating/editing DAGs.
+- `delegate`: Spawn a sub-agent for a focused sub-task. The sub-agent works independently with the same tools and returns a summary. Use when a task benefits from dedicated, parallel execution. You can delegate multiple tasks simultaneously.
 </tools>
 
 <workflows>

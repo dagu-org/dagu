@@ -46,6 +46,7 @@ type SessionManager struct {
 	totalCost       float64
 	memoryStore     MemoryStore
 	dagName         string
+	sessionStore    SessionStore
 }
 
 // SessionManagerConfig contains configuration for creating a SessionManager.
@@ -68,6 +69,7 @@ type SessionManagerConfig struct {
 	OutputCostPer1M float64
 	MemoryStore     MemoryStore
 	DAGName         string
+	SessionStore    SessionStore
 }
 
 // NewSessionManager creates a new SessionManager.
@@ -107,6 +109,7 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		outputCostPer1M: cfg.OutputCostPer1M,
 		memoryStore:     cfg.MemoryStore,
 		dagName:         cfg.DAGName,
+		sessionStore:    cfg.SessionStore,
 	}
 }
 
@@ -400,6 +403,7 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		Username:         sm.username,
 		IPAddress:        sm.ipAddress,
 		Role:             sm.role,
+		SessionStore:     sm.sessionStore,
 	})
 }
 

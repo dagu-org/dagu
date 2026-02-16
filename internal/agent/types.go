@@ -4,6 +4,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/auth"
@@ -116,6 +117,8 @@ type Message struct {
 	UIAction *UIAction `json:"ui_action,omitempty"`
 	// UserPrompt contains a prompt when Type is MessageTypeUserPrompt.
 	UserPrompt *UserPrompt `json:"user_prompt,omitempty"`
+	// DelegateID references the sub-session ID for delegate tool results.
+	DelegateID string `json:"delegate_id,omitempty"`
 }
 
 // ToolResult represents the result of a tool call.
@@ -142,6 +145,10 @@ type Session struct {
 	CreatedAt time.Time `json:"created_at"`
 	// UpdatedAt is when this session was last modified.
 	UpdatedAt time.Time `json:"updated_at"`
+	// ParentSessionID links this session to its parent (non-empty = sub-session).
+	ParentSessionID string `json:"parent_session_id,omitempty"`
+	// DelegateTask is the task description given to the sub-agent.
+	DelegateTask string `json:"delegate_task,omitempty"`
 }
 
 // SessionState represents the current state of a session.
@@ -212,6 +219,8 @@ type ToolOut struct {
 	Content string
 	// IsError indicates whether the tool execution failed.
 	IsError bool
+	// DelegateID references the sub-session created by the delegate tool.
+	DelegateID string
 }
 
 // ToolFunc is the function signature for tool execution.
@@ -225,6 +234,28 @@ type EmitUserPromptFunc func(prompt UserPrompt)
 
 // WaitUserResponseFunc blocks until user responds to a prompt.
 type WaitUserResponseFunc func(ctx context.Context, promptID string) (UserPromptResponse, error)
+
+// DelegateContext provides configuration for spawning sub-agent loops.
+type DelegateContext struct {
+	// Provider is the LLM provider for sub-agent calls.
+	Provider llm.Provider
+	// Model is the LLM model identifier.
+	Model string
+	// SystemPrompt is the system prompt for sub-agents.
+	SystemPrompt string
+	// Tools is the parent's tool set (delegate will be filtered out).
+	Tools []*AgentTool
+	// Hooks is the parent's hook configuration.
+	Hooks *Hooks
+	// Logger is the logger for sub-agent operations.
+	Logger *slog.Logger
+	// SessionStore is used for persisting sub-sessions.
+	SessionStore SessionStore
+	// ParentID is the parent session ID.
+	ParentID string
+	// UserID is the user who owns the parent session.
+	UserID string
+}
 
 // ToolContext provides context for tool execution.
 type ToolContext struct {
@@ -243,6 +274,8 @@ type ToolContext struct {
 	// Role is the authenticated role of the current user.
 	// Empty means role checks should be skipped (e.g., auth-disabled compatibility).
 	Role auth.Role
+	// Delegate provides sub-agent spawning capability. Nil when not available.
+	Delegate *DelegateContext
 }
 
 // AuditInfo configures how a tool's executions appear in audit logs.
