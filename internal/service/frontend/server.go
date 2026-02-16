@@ -37,6 +37,7 @@ import (
 	_ "github.com/dagu-org/dagu/internal/llm/allproviders" // Register LLM providers
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
+	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
 	"github.com/dagu-org/dagu/internal/persis/filebaseconfig"
@@ -151,6 +152,13 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		if err != nil {
 			logger.Warn(ctx, "Failed to create agent model store", tag.Error(err))
 		}
+	}
+
+	var agentSkillStore agent.SkillStore
+	if skillStore, skillErr := fileagentskill.New(filepath.Join(cfg.Paths.DAGsDir, "skills")); skillErr != nil {
+		logger.Warn(ctx, "Failed to create agent skill store", tag.Error(skillErr))
+	} else {
+		agentSkillStore = skillStore
 	}
 
 	var memoryStore agent.MemoryStore
@@ -285,6 +293,9 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	if memoryStore != nil {
 		allAPIOptions = append(allAPIOptions, apiv1.WithAgentMemoryStore(memoryStore))
+	}
+	if agentSkillStore != nil {
+		allAPIOptions = append(allAPIOptions, apiv1.WithAgentSkillStore(agentSkillStore))
 	}
 
 	srv.apiV1 = apiv1.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, allAPIOptions...)

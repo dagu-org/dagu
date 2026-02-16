@@ -20,6 +20,7 @@ type Config struct {
 	Enabled        bool             `json:"enabled"`
 	DefaultModelID string           `json:"defaultModelId,omitempty"`
 	ToolPolicy     ToolPolicyConfig `json:"toolPolicy"`
+	EnabledSkills  []string         `json:"enabledSkills,omitempty"`
 }
 
 // BashRuleAction is the decision a bash rule applies when matched.

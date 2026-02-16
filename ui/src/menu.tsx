@@ -22,6 +22,7 @@ import {
   Bot,
   Brain,
   FileCog,
+  Sparkles,
   GitBranch,
   Globe,
   History,
@@ -466,6 +467,16 @@ export const mainListItems = React.forwardRef<
                   to="/agent-memory"
                   text="Agent Memory"
                   icon={<Brain size={18} />}
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+              )}
+              {config.agentEnabled && (
+                <NavItem
+                  to="/agent-skills"
+                  text="Agent Skills"
+                  icon={<Sparkles size={18} />}
                   isOpen={isOpen}
                   onClick={onNavItemClick}
                   customColor={customColor}

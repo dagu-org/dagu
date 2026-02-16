@@ -61,6 +61,7 @@ type API struct {
 	agentConfigStore   agent.ConfigStore
 	agentModelStore    agent.ModelStore
 	agentMemoryStore   agent.MemoryStore
+	agentSkillStore    agent.SkillStore
 	baseConfigStore    baseconfig.Store
 }
 
@@ -153,6 +154,13 @@ func WithAgentModelStore(store agent.ModelStore) APIOption {
 func WithAgentMemoryStore(store agent.MemoryStore) APIOption {
 	return func(a *API) {
 		a.agentMemoryStore = store
+	}
+}
+
+// WithAgentSkillStore returns an APIOption that sets the API's agent skill store.
+func WithAgentSkillStore(store agent.SkillStore) APIOption {
+	return func(a *API) {
+		a.agentSkillStore = store
 	}
 }
 

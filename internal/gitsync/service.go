@@ -120,7 +120,7 @@ type DAGDiff struct {
 
 // fileExtensionForID returns the file extension for a given ID.
 func fileExtensionForID(id string) string {
-	if isMemoryFile(id) {
+	if isMemoryFile(id) || isSkillFile(id) {
 		return ".md"
 	}
 	return ".yaml"
@@ -223,8 +223,8 @@ func (s *serviceImpl) syncFilesToDAGsDir(_ context.Context, pullResult *PullResu
 	for _, file := range files {
 		dagID := s.filePathToDAGID(file)
 
-		// Only allow .md files from memory/ directory
-		if filepath.Ext(file) == ".md" && !isMemoryFile(dagID) {
+		// Only allow .md files from memory/ or skills/ directories
+		if filepath.Ext(file) == ".md" && !isMemoryFile(dagID) && !isSkillFile(dagID) {
 			continue
 		}
 		repoFilePath := s.gitClient.GetFilePath(file)
@@ -369,6 +369,9 @@ func (s *serviceImpl) scanLocalDAGs(state *State) error {
 	// Scan memory directory for .md files
 	s.scanMemoryFiles(state)
 
+	// Scan skills directory for SKILL.md files
+	s.scanSkillFiles(state)
+
 	return nil
 }
 
@@ -413,6 +416,41 @@ func (s *serviceImpl) scanMemoryFiles(state *State) {
 		}
 		return nil
 	})
+}
+
+// scanSkillFiles scans the skills directory for SKILL.md files and adds them as untracked.
+func (s *serviceImpl) scanSkillFiles(state *State) {
+	skillDir := filepath.Join(s.dagsDir, agentSkillsDir)
+
+	entries, err := os.ReadDir(skillDir)
+	if err != nil {
+		return // skills directory may not exist yet
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		skillMDPath := filepath.Join(skillDir, entry.Name(), "SKILL.md")
+		content, err := os.ReadFile(skillMDPath) //nolint:gosec // path constructed from internal dagsDir
+		if err != nil {
+			continue
+		}
+
+		dagID := filepath.Join(agentSkillsDir, entry.Name(), "SKILL")
+		if _, exists := state.DAGs[dagID]; exists {
+			continue
+		}
+
+		now := time.Now()
+		state.DAGs[dagID] = &DAGState{
+			Status:     StatusUntracked,
+			Kind:       DAGKindSkill,
+			LocalHash:  ComputeContentHash(content),
+			ModifiedAt: &now,
+		}
+	}
 }
 
 // refreshLocalHashes recalculates hashes for all tracked DAGs and updates status if modified.

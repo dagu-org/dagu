@@ -3978,6 +3978,299 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /settings/agent/skills:
+    get:
+      summary: "List agent skills"
+      description: "Returns all configured agent skills with enabled status. Requires admin role."
+      operationId: "listAgentSkills"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "List of skills"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSkillsResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create agent skill"
+      description: "Creates a new agent skill. Requires admin role."
+      operationId: "createAgentSkill"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSkillRequest"
+      responses:
+        "201":
+          description: "Skill created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Skill already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/agent/skills/{skillId}:
+    get:
+      summary: "Get agent skill"
+      description: "Returns a single agent skill by ID. Requires admin role."
+      operationId: "getAgentSkill"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: skillId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "Skill ID"
+      responses:
+        "200":
+          description: "Skill details"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillResponse"
+        "400":
+          description: "Invalid skill ID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Skill not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    patch:
+      summary: "Update agent skill"
+      description: "Updates an existing agent skill. Requires admin role."
+      operationId: "updateAgentSkill"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: skillId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "Skill ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSkillRequest"
+      responses:
+        "200":
+          description: "Skill updated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Skill not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Delete agent skill"
+      description: "Deletes an agent skill. Requires admin role."
+      operationId: "deleteAgentSkill"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: skillId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "Skill ID"
+      responses:
+        "204":
+          description: "Skill deleted"
+        "400":
+          description: "Invalid skill ID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Skill not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/agent/enabled-skills:
+    put:
+      summary: "Set enabled agent skills"
+      description: "Sets the list of enabled skill IDs for the AI agent. Requires admin role."
+      operationId: "setEnabledSkills"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetEnabledSkillsRequest"
+      responses:
+        "200":
+          description: "Enabled skills updated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetEnabledSkillsResponse"
+        "400":
+          description: "Invalid skill ID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /settings/agent/memory:
     get:
       summary: "Get agent memory"
@@ -6343,6 +6636,7 @@ components:
       enum:
         - dag
         - memory
+        - skill
 
     SyncItem:
       type: object
@@ -6899,6 +7193,115 @@ components:
             $ref: "#/components/schemas/ModelConfigResponse"
         defaultModelId:
           type: string
+
+    SkillResponse:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - knowledge
+        - enabled
+      description: "Skill configuration"
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        version:
+          type: string
+        author:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        type:
+          type: string
+          enum: [builtin, custom]
+        knowledge:
+          type: string
+        enabled:
+          type: boolean
+
+    ListSkillsResponse:
+      type: object
+      required:
+        - skills
+      description: "List of skills"
+      properties:
+        skills:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkillResponse"
+
+    CreateSkillRequest:
+      type: object
+      required:
+        - name
+        - knowledge
+      description: "Request to create a new skill"
+      properties:
+        id:
+          type: string
+          description: "Optional custom ID (auto-generated from name if omitted)"
+        name:
+          type: string
+        description:
+          type: string
+        version:
+          type: string
+        author:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        knowledge:
+          type: string
+
+    UpdateSkillRequest:
+      type: object
+      description: "Request to update a skill (partial update)"
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        version:
+          type: string
+        author:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        knowledge:
+          type: string
+
+    SetEnabledSkillsRequest:
+      type: object
+      required:
+        - skillIds
+      description: "Request to set the list of enabled skill IDs"
+      properties:
+        skillIds:
+          type: array
+          items:
+            type: string
+
+    SetEnabledSkillsResponse:
+      type: object
+      required:
+        - enabledSkills
+      description: "Current enabled skills"
+      properties:
+        enabledSkills:
+          type: array
+          items:
+            type: string
 
     ModelPreset:
       type: object
