@@ -57,7 +57,10 @@ func (a *API) ListAgentSkills(ctx context.Context, _ api.ListAgentSkillsRequestO
 		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to list skills", HTTPStatus: http.StatusInternalServerError}
 	}
 
-	cfg, _ := a.agentConfigStore.Load(ctx)
+	cfg, err := a.agentConfigStore.Load(ctx)
+	if err != nil {
+		return nil, ErrFailedToLoadAgentConfig
+	}
 	var enabledSkills []string
 	if cfg != nil {
 		enabledSkills = cfg.EnabledSkills
@@ -169,7 +172,10 @@ func (a *API) GetAgentSkill(ctx context.Context, request api.GetAgentSkillReques
 		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to get skill", HTTPStatus: http.StatusInternalServerError}
 	}
 
-	cfg, _ := a.agentConfigStore.Load(ctx)
+	cfg, err := a.agentConfigStore.Load(ctx)
+	if err != nil {
+		return nil, ErrFailedToLoadAgentConfig
+	}
 	var enabledSkills []string
 	if cfg != nil {
 		enabledSkills = cfg.EnabledSkills
@@ -215,7 +221,10 @@ func (a *API) UpdateAgentSkill(ctx context.Context, request api.UpdateAgentSkill
 		"skill_id": request.SkillId,
 	})
 
-	cfg, _ := a.agentConfigStore.Load(ctx)
+	cfg, err := a.agentConfigStore.Load(ctx)
+	if err != nil {
+		return nil, ErrFailedToLoadAgentConfig
+	}
 	var enabledSkills []string
 	if cfg != nil {
 		enabledSkills = cfg.EnabledSkills
@@ -281,7 +290,7 @@ func (a *API) SetEnabledSkills(ctx context.Context, request api.SetEnabledSkills
 	}
 
 	cfg, err := a.agentConfigStore.Load(ctx)
-	if err != nil {
+	if err != nil || cfg == nil {
 		return nil, ErrFailedToLoadAgentConfig
 	}
 
@@ -337,7 +346,7 @@ func applySkillUpdates(skill *agent.Skill, update *api.UpdateSkillRequest) {
 	if update.Tags != nil {
 		skill.Tags = *update.Tags
 	}
-	if update.Knowledge != nil {
+	if update.Knowledge != nil && strings.TrimSpace(*update.Knowledge) != "" {
 		skill.Knowledge = *update.Knowledge
 	}
 }
@@ -360,7 +369,7 @@ func isSkillEnabled(enabledSkills []string, skillID string) bool {
 
 func (a *API) removeFromEnabledSkills(ctx context.Context, skillID string) {
 	cfg, err := a.agentConfigStore.Load(ctx)
-	if err != nil || !slices.Contains(cfg.EnabledSkills, skillID) {
+	if err != nil || cfg == nil || !slices.Contains(cfg.EnabledSkills, skillID) {
 		return
 	}
 

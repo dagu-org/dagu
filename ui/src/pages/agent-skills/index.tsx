@@ -69,23 +69,27 @@ export default function AgentSkillsPage(): React.ReactNode {
   async function handleToggleEnabled(skill: SkillResponse): Promise<void> {
     setError(null);
     setSuccess(null);
-    try {
-      const currentEnabled = skills.filter((s) => s.enabled).map((s) => s.id);
-      const newEnabled = skill.enabled
-        ? currentEnabled.filter((id) => id !== skill.id)
-        : [...currentEnabled, skill.id];
 
+    // Compute new enabled list using functional updater to avoid stale closure
+    const willEnable = !skill.enabled;
+    let newEnabled: string[] = [];
+    setSkills((prev) => {
+      const updated = prev.map((s) =>
+        s.id === skill.id ? { ...s, enabled: willEnable } : s
+      );
+      newEnabled = updated.filter((s) => s.enabled).map((s) => s.id);
+      return updated;
+    });
+
+    try {
       const { error: apiError } = await client.PUT('/settings/agent/enabled-skills', {
         params: { query: { remoteNode } },
         body: { skillIds: newEnabled },
       });
-      if (apiError) throw new Error(apiError.message || 'Failed to update enabled skills');
-
-      setSkills((prev) =>
-        prev.map((s) =>
-          s.id === skill.id ? { ...s, enabled: !skill.enabled } : s
-        )
-      );
+      if (apiError) {
+        await fetchSkills(); // Revert to server state
+        throw new Error(apiError.message || 'Failed to update enabled skills');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update skill');
     }
@@ -155,7 +159,7 @@ export default function AgentSkillsPage(): React.ReactNode {
       )}
 
       {success && (
-        <div className="p-3 text-sm text-green-600 bg-green-500/10 rounded-md">
+        <div className="p-3 text-sm text-green-600 dark:text-green-400 bg-green-500/10 rounded-md">
           {success}
         </div>
       )}

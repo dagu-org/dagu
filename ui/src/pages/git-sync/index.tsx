@@ -610,7 +610,7 @@ export default function GitSyncPage() {
         </div>
         {selectedCounts.total > 0 && (
           <span className="text-xs text-muted-foreground">
-            Selected: {selectedCounts.dag} DAGs, {selectedCounts.memory} memory{selectedCounts.skill > 0 ? `, ${selectedCounts.skill} skills` : ''}
+            Selected: {selectedCounts.dag} DAGs{selectedCounts.memory > 0 ? `, ${selectedCounts.memory} memory` : ''}{selectedCounts.skill > 0 ? `, ${selectedCounts.skill} skills` : ''}
           </span>
         )}
       </div>

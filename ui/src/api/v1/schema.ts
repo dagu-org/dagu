@@ -8327,6 +8327,15 @@ export interface operations {
                     "application/json": components["schemas"]["SkillResponse"];
                 };
             };
+            /** @description Invalid skill ID */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Not authenticated */
             401: {
                 headers: {
@@ -8386,6 +8395,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Invalid skill ID */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
             };
             /** @description Not authenticated */
             401: {
@@ -8523,6 +8541,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SetEnabledSkillsResponse"];
+                };
+            };
+            /** @description Invalid skill ID */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Not authenticated */

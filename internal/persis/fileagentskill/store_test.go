@@ -25,11 +25,10 @@ func setupTestStore(t *testing.T) (*Store, string) {
 
 func newTestSkill(id, name string) *agent.Skill {
 	return &agent.Skill{
-		ID:            id,
-		SchemaVersion: 1,
-		Name:          name,
-		Type:          agent.SkillTypeCustom,
-		Knowledge:     "Test knowledge content",
+		ID:        id,
+		Name:      name,
+		Type:      agent.SkillTypeCustom,
+		Knowledge: "Test knowledge content",
 	}
 }
 
@@ -207,7 +206,6 @@ func TestStore_GetByID(t *testing.T) {
 		skill.Version = "1.0.0"
 		skill.Author = "Test Author"
 		skill.Tags = []string{"test", "example"}
-		skill.SchemaVersion = 1
 		createSkill(t, store, skill)
 
 		got, err := store.GetByID(ctx, "test-skill")
@@ -345,7 +343,7 @@ func TestStore_Update(t *testing.T) {
 		}
 		err := store.Update(ctx, updated)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, agent.ErrSkillAlreadyExists)
+		assert.ErrorIs(t, err, agent.ErrSkillNameAlreadyExists)
 	})
 
 	t.Run("update to same name is allowed", func(t *testing.T) {
@@ -650,15 +648,14 @@ func TestStore_CreateAndRetrieveFullRoundTrip(t *testing.T) {
 	store, _ := setupTestStore(t)
 
 	skill := &agent.Skill{
-		ID:            "full-skill",
-		SchemaVersion: 1,
-		Name:          "Full Skill",
-		Description:   "A comprehensive test skill",
-		Version:       "2.1.0",
-		Author:        "Test Author",
-		Tags:          []string{"test", "integration", "full"},
-		Type:          agent.SkillTypeCustom,
-		Knowledge:     "Detailed knowledge content for testing.\n\nMultiple paragraphs.",
+		ID:          "full-skill",
+		Name:        "Full Skill",
+		Description: "A comprehensive test skill",
+		Version:     "2.1.0",
+		Author:      "Test Author",
+		Tags:        []string{"test", "integration", "full"},
+		Type:        agent.SkillTypeCustom,
+		Knowledge:   "Detailed knowledge content for testing.\n\nMultiple paragraphs.",
 	}
 
 	// Create

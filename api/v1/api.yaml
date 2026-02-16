@@ -4087,6 +4087,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SkillResponse"
+        "400":
+          description: "Invalid skill ID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "401":
           description: "Not authenticated"
           content:
@@ -4187,6 +4193,12 @@ paths:
       responses:
         "204":
           description: "Skill deleted"
+        "400":
+          description: "Invalid skill ID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "401":
           description: "Not authenticated"
           content:
@@ -4234,6 +4246,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SetEnabledSkillsResponse"
+        "400":
+          description: "Invalid skill ID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "401":
           description: "Not authenticated"
           content:

@@ -357,7 +357,7 @@ func (s *Store) Update(_ context.Context, skill *agent.Skill) error {
 	nameChanged := skill.Name != "" && existing.Name != skill.Name
 	if nameChanged {
 		if takenByID, taken := s.byName[skill.Name]; taken && takenByID != skill.ID {
-			return agent.ErrSkillAlreadyExists
+			return agent.ErrSkillNameAlreadyExists
 		}
 	}
 

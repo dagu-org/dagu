@@ -26,15 +26,14 @@ const (
 // Skill is the domain entity for a skill.
 // Field names align with the Agent Skills open standard (agentskills.io).
 type Skill struct {
-	ID            string    `yaml:"id"                    json:"id"`
-	SchemaVersion int       `yaml:"schema_version"        json:"schemaVersion"`
-	Name          string    `yaml:"name"                  json:"name"`
-	Description   string    `yaml:"description,omitempty" json:"description,omitempty"`
-	Version       string    `yaml:"version,omitempty"     json:"version,omitempty"`
-	Author        string    `yaml:"author,omitempty"      json:"author,omitempty"`
-	Tags          []string  `yaml:"tags,omitempty"        json:"tags,omitempty"`
-	Type          SkillType `yaml:"type"                  json:"type"`
-	Knowledge     string    `yaml:"knowledge"             json:"knowledge"`
+	ID          string    `yaml:"id"                    json:"id"`
+	Name        string    `yaml:"name"                  json:"name"`
+	Description string    `yaml:"description,omitempty" json:"description,omitempty"`
+	Version     string    `yaml:"version,omitempty"     json:"version,omitempty"`
+	Author      string    `yaml:"author,omitempty"      json:"author,omitempty"`
+	Tags        []string  `yaml:"tags,omitempty"        json:"tags,omitempty"`
+	Type        SkillType `yaml:"type"                  json:"type"`
+	Knowledge   string    `yaml:"knowledge"             json:"knowledge"`
 }
 
 // SkillStore defines the interface for skill persistence.
