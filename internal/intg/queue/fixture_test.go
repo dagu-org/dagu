@@ -194,6 +194,36 @@ func (f *fixture) collectStartTimes() []time.Time {
 	return times
 }
 
+// FailedRun creates a DAGRunAttempt with Failed status, simulating a completed but failed run.
+func (f *fixture) FailedRun() *fixture {
+	id := uuid.New().String()
+	att, err := f.th.DAGRunStore.CreateAttempt(f.th.Context, f.dag, time.Now(), id, exec.NewDAGRunAttemptOptions{})
+	require.NoError(f.t, err)
+	logFile := filepath.Join(f.th.Config.Paths.LogDir, f.dag.Name, id+".log")
+	require.NoError(f.t, os.MkdirAll(filepath.Dir(logFile), 0755))
+	st := transform.NewStatusBuilder(f.dag).Create(id, core.Failed, 0, time.Now(),
+		transform.WithLogFilePath(logFile),
+		transform.WithAttemptID(att.ID()),
+		transform.WithHierarchyRefs(exec.NewDAGRunRef(f.dag.Name, id), exec.DAGRunRef{}),
+	)
+	require.NoError(f.t, att.Open(f.th.Context))
+	require.NoError(f.t, att.Write(f.th.Context, st))
+	require.NoError(f.t, att.Close(f.th.Context))
+	f.runIDs = append(f.runIDs, id)
+	return f
+}
+
+// RetryEnqueue enqueues a previously failed run for retry using exec.EnqueueRetry.
+func (f *fixture) RetryEnqueue(runID string) *fixture {
+	ref := exec.NewDAGRunRef(f.dag.Name, runID)
+	att, err := f.th.DAGRunStore.FindAttempt(f.th.Context, ref)
+	require.NoError(f.t, err)
+	status, err := att.ReadStatus(f.th.Context)
+	require.NoError(f.t, err)
+	require.NoError(f.t, exec.EnqueueRetry(f.th.Context, f.th.QueueStore, att, f.dag, status, runID))
+	return f
+}
+
 func (f *fixture) cleanup() {
 	if f.cancel != nil {
 		f.cancel()
