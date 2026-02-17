@@ -213,6 +213,9 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		dc.RegisterSubSession(delegateID, subMgr)
 	}
 
+	// Set working state before notifying parent so the SSE snapshot has working=true.
+	subMgr.SetWorking(true)
+
 	// Notify parent that delegate started.
 	if dc.NotifyParent != nil {
 		dc.NotifyParent(StreamResponse{
