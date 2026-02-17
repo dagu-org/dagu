@@ -299,6 +299,13 @@ func (sm *SessionManager) AcceptUserMessage(ctx context.Context, provider llm.Pr
 		Messages: []Message{userMessage},
 	})
 
+	// Persist user message to store.
+	if sm.onMessage != nil {
+		if err := sm.onMessage(ctx, userMessage); err != nil {
+			sm.logger.Warn("failed to persist user message", "error", err)
+		}
+	}
+
 	loopInstance.QueueUserMessage(llmMsg)
 	sm.SetWorking(true)
 
