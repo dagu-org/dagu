@@ -94,6 +94,18 @@ interface MessageItemProps {
 function MessageItem({ message, onPromptRespond, answeredPrompts, delegateStatuses }: MessageItemProps): React.ReactNode {
   switch (message.type) {
     case 'user':
+      // Tool results arrive as "user" type messages with tool_results populated
+      if (message.tool_results && message.tool_results.length > 0) {
+        if (message.delegate_ids && message.delegate_ids.length > 0) {
+          return (
+            <DelegateResultsInline
+              delegateIds={message.delegate_ids}
+              delegateStatuses={delegateStatuses}
+            />
+          );
+        }
+        return <ToolResultMessage toolResults={message.tool_results} />;
+      }
       return <UserMessage content={message.content ?? ''} />;
     case 'assistant':
       return (
@@ -104,21 +116,6 @@ function MessageItem({ message, onPromptRespond, answeredPrompts, delegateStatus
           cost={message.cost}
         />
       );
-    case 'tool_use':
-      if (isDelegateToolCall(message.tool_calls)) {
-        return <DelegateToolCallBadge toolCalls={message.tool_calls ?? []} />;
-      }
-      return <ToolCallList toolCalls={message.tool_calls ?? []} />;
-    case 'tool_result':
-      if (message.delegate_ids && message.delegate_ids.length > 0) {
-        return (
-          <DelegateResultsInline
-            delegateIds={message.delegate_ids}
-            delegateStatuses={delegateStatuses}
-          />
-        );
-      }
-      return <ToolResultMessage toolResults={message.tool_results ?? []} />;
     case 'error':
       return <ErrorMessage content={message.content ?? ''} />;
     case 'ui_action':
@@ -208,6 +205,12 @@ function AssistantMessage({
   usage?: TokenUsage;
   cost?: number;
 }): React.ReactNode {
+  // Split tool calls into delegate vs non-delegate
+  const hasDelegateCall = isDelegateToolCall(toolCalls);
+  const nonDelegateCalls = hasDelegateCall
+    ? toolCalls?.filter((tc) => tc.function.name !== 'delegate')
+    : toolCalls;
+
   return (
     <div className="pl-1 space-y-1">
       {content && (
@@ -215,8 +218,13 @@ function AssistantMessage({
           {content}
         </p>
       )}
-      {toolCalls && toolCalls.length > 0 && (
-        <ToolCallList toolCalls={toolCalls} className="pl-4" />
+      {nonDelegateCalls && nonDelegateCalls.length > 0 && (
+        <ToolCallList toolCalls={nonDelegateCalls} className="pl-4" />
+      )}
+      {hasDelegateCall && toolCalls && (
+        <div className="pl-4">
+          <DelegateToolCallBadge toolCalls={toolCalls} />
+        </div>
       )}
       {usage && usage.total_tokens > 0 && (
         <p className="text-[10px] text-muted-foreground/60 pl-4">
