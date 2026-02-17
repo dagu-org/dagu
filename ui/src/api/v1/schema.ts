@@ -3373,7 +3373,7 @@ export interface components {
         };
         /** @description DAG reference for context-aware agent responses */
         AgentDAGContext: {
-            /** @description DAG file path or identifier */
+            /** @description DAG file path or name */
             dagFile: string;
             /** @description Specific run ID of the DAG */
             dagRunId?: string;
@@ -3412,7 +3412,10 @@ export interface components {
             sessionId: string;
             working: boolean;
             model?: string;
-            /** Format: double */
+            /**
+             * Format: double
+             * @description Total accumulated cost in USD
+             */
             totalCost: number;
         };
         /** @description Agent session with its current state */
@@ -3420,7 +3423,10 @@ export interface components {
             session: components["schemas"]["AgentSession"];
             working: boolean;
             model?: string;
-            /** Format: double */
+            /**
+             * Format: double
+             * @description Total accumulated cost in USD
+             */
             totalCost: number;
         };
         /** @description Function call details in a tool call */
@@ -3448,7 +3454,7 @@ export interface components {
         };
         /** @description UI action to be performed */
         AgentUIAction: {
-            type?: string;
+            type: string;
             path?: string;
         };
         /** @description Single option in a user prompt */
@@ -3492,9 +3498,9 @@ export interface components {
         };
         /** @description Session details including messages and current state */
         AgentSessionDetailResponse: {
-            messages?: components["schemas"]["AgentMessage"][];
-            session?: components["schemas"]["AgentSession"];
-            sessionState?: components["schemas"]["AgentSessionState"];
+            messages: components["schemas"]["AgentMessage"][];
+            session: components["schemas"]["AgentSession"];
+            sessionState: components["schemas"]["AgentSessionState"];
         };
         /** @description User's response to an agent prompt */
         AgentUserPromptResponse: {

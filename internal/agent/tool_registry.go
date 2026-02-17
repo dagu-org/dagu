@@ -28,13 +28,21 @@ var toolRegistry []ToolRegistration
 
 // RegisterTool adds a tool to the global registry.
 // Must be called from init() functions only — not safe for concurrent use.
+// Panics on duplicate name to catch registration bugs early.
 func RegisterTool(reg ToolRegistration) {
+	for _, existing := range toolRegistry {
+		if existing.Name == reg.Name {
+			panic("duplicate tool registration: " + reg.Name)
+		}
+	}
 	toolRegistry = append(toolRegistry, reg)
 }
 
-// RegisteredTools returns all registered tool metadata.
+// RegisteredTools returns a copy of all registered tool metadata.
 func RegisteredTools() []ToolRegistration {
-	return toolRegistry
+	out := make([]ToolRegistration, len(toolRegistry))
+	copy(out, toolRegistry)
+	return out
 }
 
 // RegisteredToolNames returns sorted names of all registered tools.

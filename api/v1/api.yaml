@@ -7720,7 +7720,8 @@ components:
       properties:
         dagFile:
           type: string
-          description: "DAG file path or identifier"
+          description: "DAG file path or name"
+          minLength: 1
         dagRunId:
           type: string
           description: "Specific run ID of the DAG"
@@ -7803,6 +7804,8 @@ components:
         totalCost:
           type: number
           format: double
+          minimum: 0
+          description: "Total accumulated cost in USD"
 
     AgentSessionWithState:
       type: object
@@ -7821,6 +7824,8 @@ components:
         totalCost:
           type: number
           format: double
+          minimum: 0
+          description: "Total accumulated cost in USD"
 
     AgentToolCallFunction:
       type: object
@@ -7869,14 +7874,19 @@ components:
       properties:
         promptTokens:
           type: integer
+          minimum: 0
         completionTokens:
           type: integer
+          minimum: 0
         totalTokens:
           type: integer
+          minimum: 0
 
     AgentUIAction:
       type: object
       description: "UI action to be performed"
+      required:
+        - type
       properties:
         type:
           type: string
@@ -7985,6 +7995,10 @@ components:
     AgentSessionDetailResponse:
       type: object
       description: "Session details including messages and current state"
+      required:
+        - messages
+        - session
+        - sessionState
       properties:
         messages:
           type: array

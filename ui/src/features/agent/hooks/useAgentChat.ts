@@ -207,12 +207,15 @@ export function useAgentChat() {
           const { delegate_id, messages: msgs } = data.delegate_messages;
           setDelegateMessages((prev) => {
             const existing = prev[delegate_id] || [];
+            const idxMap = new Map<string, number>();
+            existing.forEach((m, i) => idxMap.set(m.id, i));
             const updated = [...existing];
             for (const msg of msgs) {
-              const idx = updated.findIndex((m) => m.id === msg.id);
-              if (idx !== -1) {
+              const idx = idxMap.get(msg.id);
+              if (idx !== undefined) {
                 updated[idx] = msg;
               } else {
+                idxMap.set(msg.id, updated.length);
                 updated.push(msg);
               }
             }
@@ -231,8 +234,12 @@ export function useAgentChat() {
               task: evt.task,
               status: 'running',
               zIndex: zIndexCounterRef.current,
+              positionIndex: 0,
             };
-            setDelegates((prev) => [...prev, info]);
+            setDelegates((prev) => {
+              info.positionIndex = prev.length;
+              return [...prev, info];
+            });
             setDelegateStatuses((prev) => ({ ...prev, [evt.delegate_id]: info }));
           } else if (evt.type === 'completed') {
             // Update status instead of removing — let DelegatePanel play close animation
@@ -247,6 +254,7 @@ export function useAgentChat() {
                 task: evt.task,
                 status: 'completed',
                 zIndex: prev[evt.delegate_id]?.zIndex ?? 60,
+                positionIndex: prev[evt.delegate_id]?.positionIndex ?? 0,
               },
             }));
           }
@@ -378,6 +386,10 @@ export function useAgentChat() {
       setSessionId(id);
       setMessages(converted.messages || []);
       setAnsweredPrompts({});
+      setDelegates([]);
+      setDelegateStatuses({});
+      setDelegateMessages({});
+      delegateMessagesRef.current = {};
       if (converted.session_state) {
         setSessionState(converted.session_state);
       }
@@ -433,6 +445,7 @@ export function useAgentChat() {
         task,
         status: 'completed' as const,
         zIndex: zIndexCounterRef.current,
+        positionIndex: prev.length,
       }];
     });
   }, [client, remoteNode]);

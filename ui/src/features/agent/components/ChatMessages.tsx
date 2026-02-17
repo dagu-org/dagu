@@ -42,13 +42,12 @@ export function ChatMessages({
   }, [messages]);
 
   // Build set of tool call IDs that have received results (for determining delegate completion on reload)
-  // SSE messages use "tool_call_id" (Go JSON tag) while REST API messages use "tool_use_id" (via convertApiMessage)
   const completedToolCallIds = useMemo(() => {
     const ids = new Set<string>();
     for (const msg of messages) {
       if (msg.tool_results) {
         for (const tr of msg.tool_results) {
-          const id = tr.tool_use_id || (tr as unknown as Record<string, unknown>)['tool_call_id'] as string;
+          const id = tr.tool_use_id;
           if (id) ids.add(id);
         }
       }
@@ -76,10 +75,12 @@ export function ChatMessages({
 
   return (
     <div className="flex-1 overflow-y-auto p-2 space-y-2 font-mono text-xs bg-popover">
-      {messages.map((message) => (
+      {messages.map((message, idx) => (
         <MessageItem
           key={message.id}
           message={message}
+          messages={messages}
+          messageIndex={idx}
           onPromptRespond={onPromptRespond}
           answeredPrompts={answeredPrompts}
           delegateStatuses={delegateStatuses}
@@ -103,6 +104,8 @@ export function ChatMessages({
 
 interface MessageItemProps {
   message: Message;
+  messages: Message[];
+  messageIndex: number;
   onPromptRespond?: (response: UserPromptResponse, displayValue: string) => void;
   answeredPrompts?: Record<string, string>;
   delegateStatuses?: Record<string, DelegateInfo>;
@@ -110,7 +113,23 @@ interface MessageItemProps {
   completedToolCallIds?: Set<string>;
 }
 
-function MessageItem({ message, onPromptRespond, answeredPrompts, delegateStatuses, onOpenDelegate, completedToolCallIds }: MessageItemProps): React.ReactNode {
+function MessageItem({ message, messages, messageIndex, onPromptRespond, answeredPrompts, delegateStatuses, onOpenDelegate, completedToolCallIds }: MessageItemProps): React.ReactNode {
+  // Build a map of tool_call_id → delegate_ids from subsequent tool result messages
+  const delegateIdsForToolCalls = useMemo(() => {
+    const map = new Map<string, string[]>();
+    if (message.type !== 'assistant' || !message.tool_calls) return map;
+    // Look forward in messages for tool results with delegate_ids
+    for (let i = messageIndex + 1; i < messages.length; i++) {
+      const m = messages[i]!;
+      if (m.delegate_ids && m.delegate_ids.length > 0 && m.tool_results) {
+        for (const tr of m.tool_results) {
+          map.set(tr.tool_use_id, m.delegate_ids!);
+        }
+      }
+    }
+    return map;
+  }, [message, messages, messageIndex]);
+
   switch (message.type) {
     case 'user':
       if (message.tool_results && message.tool_results.length > 0) {
@@ -131,6 +150,7 @@ function MessageItem({ message, onPromptRespond, answeredPrompts, delegateStatus
           delegateStatuses={delegateStatuses}
           onOpenDelegate={onOpenDelegate}
           completedToolCallIds={completedToolCallIds}
+          delegateIdsForToolCalls={delegateIdsForToolCalls}
         />
       );
     case 'error':
@@ -219,6 +239,7 @@ function AssistantMessage({
   delegateStatuses,
   onOpenDelegate,
   completedToolCallIds,
+  delegateIdsForToolCalls,
 }: {
   content: string;
   toolCalls?: ToolCall[];
@@ -227,6 +248,7 @@ function AssistantMessage({
   delegateStatuses?: Record<string, DelegateInfo>;
   onOpenDelegate?: (id: string) => void;
   completedToolCallIds?: Set<string>;
+  delegateIdsForToolCalls?: Map<string, string[]>;
 }): React.ReactNode {
   const delegateCalls = toolCalls?.filter((tc) => tc.function.name === 'delegate') ?? [];
   const otherCalls = toolCalls?.filter((tc) => tc.function.name !== 'delegate') ?? [];
@@ -248,6 +270,7 @@ function AssistantMessage({
           delegateStatuses={delegateStatuses}
           onOpenDelegate={onOpenDelegate}
           isCompleted={completedToolCallIds?.has(tc.id) ?? false}
+          delegateIds={delegateIdsForToolCalls?.get(tc.id)}
         />
       ))}
       {usage && usage.total_tokens > 0 && (
@@ -275,11 +298,13 @@ function SubAgentChips({
   delegateStatuses,
   onOpenDelegate,
   isCompleted,
+  delegateIds,
 }: {
   toolCall: ToolCall;
   delegateStatuses?: Record<string, DelegateInfo>;
   onOpenDelegate?: (id: string) => void;
   isCompleted: boolean;
+  delegateIds?: string[];
 }): React.ReactNode {
   const tasks = useMemo(() => parseDelegateTasks(toolCall), [toolCall]);
 
@@ -288,9 +313,12 @@ function SubAgentChips({
   return (
     <div className="pl-4 space-y-0.5">
       {tasks.map((task, i) => {
-        const delegate = delegateStatuses
-          ? Object.values(delegateStatuses).find((d) => d.task === task)
-          : undefined;
+        const delegateId = delegateIds?.[i];
+        const delegate = delegateId
+          ? delegateStatuses?.[delegateId]
+          : delegateStatuses
+            ? Object.values(delegateStatuses).find((d) => d.task === task)
+            : undefined;
         // Completed if tool result exists OR delegate status says so
         const isRunning = !isCompleted && (!delegate || delegate.status === 'running');
         const canClick = !!delegate;

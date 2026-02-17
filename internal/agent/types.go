@@ -163,10 +163,20 @@ type SessionState struct {
 	TotalCost float64 `json:"total_cost"`
 }
 
+// DelegateEventType identifies the lifecycle phase of a delegate.
+type DelegateEventType string
+
+const (
+	// DelegateEventStarted indicates a delegate sub-agent has started.
+	DelegateEventStarted DelegateEventType = "started"
+	// DelegateEventCompleted indicates a delegate sub-agent has completed.
+	DelegateEventCompleted DelegateEventType = "completed"
+)
+
 // DelegateEvent notifies the parent SSE stream about delegate lifecycle changes.
 type DelegateEvent struct {
 	// Type is "started" or "completed".
-	Type string `json:"type"`
+	Type DelegateEventType `json:"type"`
 	// DelegateID is the sub-session ID.
 	DelegateID string `json:"delegate_id"`
 	// Task is the delegate task description.
@@ -285,6 +295,8 @@ type DelegateContext struct {
 	NotifyParent func(event StreamResponse)
 	// AddCost adds a cost amount to the parent session's running total. Nil if not available.
 	AddCost func(cost float64)
+	// DeregisterSubSession removes a completed sub-session from the SSE registry. Nil if not available.
+	DeregisterSubSession func(id string)
 }
 
 // ToolContext provides context for tool execution.

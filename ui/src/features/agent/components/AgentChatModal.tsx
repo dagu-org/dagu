@@ -213,14 +213,14 @@ export function AgentChatModal(): ReactElement | null {
         <ResizeHandles resizeHandlers={resizeHandlers} />
         {content}
       </div>
-      {delegates.map((d, i) => (
+      {delegates.map((d) => (
         <DelegatePanel
           key={d.id}
           delegateId={d.id}
           task={d.task}
           status={d.status}
           zIndex={d.zIndex}
-          index={i}
+          index={d.positionIndex}
           messages={delegateMessages[d.id] || []}
           onClose={() => removeDelegate(d.id)}
           onBringToFront={() => bringToFront(d.id)}

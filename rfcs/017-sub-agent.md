@@ -39,8 +39,12 @@ A new tool named `delegate` is added to the agent's tool set.
 
 ```json
 {
-  "task": "string (required) — description of the sub-task",
-  "max_iterations": "integer (optional, default: 20) — max tool-call rounds"
+  "tasks": [
+    {
+      "task": "string (required) — description of the sub-task",
+      "max_iterations": "integer (optional, default: 20) — max tool-call rounds"
+    }
+  ]
 }
 ```
 
@@ -64,12 +68,10 @@ A new tool named `delegate` is added to the agent's tool set.
 
 When the LLM returns multiple `delegate` tool calls in a single response, they execute concurrently:
 
-```
+```text
 Parent Loop
   ├─ LLM response: tool_calls: [
-  │     delegate(task: "Analyze configs"),
-  │     delegate(task: "Check resource limits"),
-  │     delegate(task: "Review health checks")
+  │     delegate(tasks: [{task: "Analyze configs"}, {task: "Check resource limits"}, {task: "Review health checks"}])
   │  ]
   │
   ├─ Non-delegate tools execute sequentially (existing behavior)
@@ -121,7 +123,7 @@ Session{
 
 ### Lifecycle
 
-```
+```text
 1. Parent LLM returns delegate tool call(s)
 2. For each delegate call:
    a. Generate sub-session ID (UUID)
@@ -181,8 +183,6 @@ This is explicitly out of scope for this RFC.
 ## Out of Scope
 
 - Recursive delegation (sub-agents spawning sub-agents)
-- Real-time streaming of sub-agent messages to the parent
 - Skill-based persona customization for sub-agents
 - Inter-sub-agent communication
 - Sub-agent resource quotas beyond iteration limits
-- Frontend implementation for expandable sub-session blocks

@@ -75,6 +75,8 @@ type LoopConfig struct {
 	SessionStore SessionStore
 	// RegisterSubSession registers a sub-session's SessionManager for SSE streaming.
 	RegisterSubSession func(id string, mgr *SessionManager)
+	// DeregisterSubSession removes a completed sub-session from the SSE registry.
+	DeregisterSubSession func(id string)
 	// NotifyParent broadcasts a delegate event to the parent session's SSE stream.
 	NotifyParent func(event StreamResponse)
 	// AddCost adds a cost amount to the parent session's running total.
@@ -107,9 +109,10 @@ type Loop struct {
 	ipAddress          string
 	role               auth.Role
 	sessionStore       SessionStore
-	registerSubSession func(id string, mgr *SessionManager)
-	notifyParent       func(event StreamResponse)
-	addCost            func(cost float64)
+	registerSubSession   func(id string, mgr *SessionManager)
+	deregisterSubSession func(id string)
+	notifyParent         func(event StreamResponse)
+	addCost              func(cost float64)
 }
 
 // NewLoop creates a new Loop instance.
@@ -141,9 +144,10 @@ func NewLoop(config LoopConfig) *Loop {
 		ipAddress:          config.IPAddress,
 		role:               config.Role,
 		sessionStore:       config.SessionStore,
-		registerSubSession: config.RegisterSubSession,
-		notifyParent:       config.NotifyParent,
-		addCost:            config.AddCost,
+		registerSubSession:   config.RegisterSubSession,
+		deregisterSubSession: config.DeregisterSubSession,
+		notifyParent:         config.NotifyParent,
+		addCost:              config.AddCost,
 	}
 }
 
@@ -355,9 +359,10 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 			SessionStore:       l.sessionStore,
 			ParentID:           l.sessionID,
 			UserID:             userID,
-			RegisterSubSession: l.registerSubSession,
-			NotifyParent:       l.notifyParent,
-			AddCost:            l.addCost,
+			RegisterSubSession:   l.registerSubSession,
+			DeregisterSubSession: l.deregisterSubSession,
+			NotifyParent:         l.notifyParent,
+			AddCost:              l.addCost,
 		}
 	}
 

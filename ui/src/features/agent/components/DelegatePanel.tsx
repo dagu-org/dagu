@@ -54,10 +54,12 @@ export function DelegatePanel({
     onBringToFront();
   }, [onBringToFront]);
 
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const handleClose = useCallback(() => {
     setIsClosing(true);
-    setTimeout(() => onClose(), 250);
-  }, [onClose]);
+    setTimeout(() => onCloseRef.current(), 250);
+  }, []);
 
   // Auto-close with CRT animation when delegate finishes (running → completed)
   const wasRunningRef = useRef(status === 'running');

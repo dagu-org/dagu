@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -489,11 +490,11 @@ func TestDelegateTool_ChildHasNoDelegateTool(t *testing.T) {
 func TestDelegateTool_MaxIterationsDefault(t *testing.T) {
 	t.Parallel()
 
-	var callCount int
+	var callCount atomic.Int32
 	provider := &mockLLMProvider{
 		chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
-			callCount++
-			return &llm.ChatResponse{Content: fmt.Sprintf("iter %d", callCount), FinishReason: "stop"}, nil
+			c := callCount.Add(1)
+			return &llm.ChatResponse{Content: fmt.Sprintf("iter %d", c), FinishReason: "stop"}, nil
 		},
 	}
 
@@ -509,7 +510,7 @@ func TestDelegateTool_MaxIterationsDefault(t *testing.T) {
 	}, singleTaskInput("iterate"))
 
 	assert.False(t, result.IsError)
-	assert.GreaterOrEqual(t, callCount, 1)
+	assert.GreaterOrEqual(t, int(callCount.Load()), 1)
 }
 
 func TestDelegateTool_MaxIterationsCustom(t *testing.T) {
@@ -671,7 +672,7 @@ func TestDelegateTool_NotifiesParentStarted(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	require.GreaterOrEqual(t, len(events), 1)
-	assert.Equal(t, "started", events[0].Type)
+	assert.Equal(t, DelegateEventStarted, events[0].Type)
 	assert.Equal(t, result.DelegateIDs[0], events[0].DelegateID)
 	assert.Equal(t, "notify test", events[0].Task)
 }
@@ -710,8 +711,8 @@ func TestDelegateTool_NotifiesParentCompleted(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	require.Len(t, events, 2) // started + completed
-	assert.Equal(t, "started", events[0].Type)
-	assert.Equal(t, "completed", events[1].Type)
+	assert.Equal(t, DelegateEventStarted, events[0].Type)
+	assert.Equal(t, DelegateEventCompleted, events[1].Type)
 	assert.Equal(t, result.DelegateIDs[0], events[1].DelegateID)
 	assert.Equal(t, "complete test", events[1].Task)
 	assert.GreaterOrEqual(t, events[1].Cost, float64(0))
@@ -757,9 +758,9 @@ func TestDelegateTool_MultipleTasksNotifications(t *testing.T) {
 	completedCount := 0
 	for _, e := range events {
 		switch e.Type {
-		case "started":
+		case DelegateEventStarted:
 			startedCount++
-		case "completed":
+		case DelegateEventCompleted:
 			completedCount++
 		}
 	}

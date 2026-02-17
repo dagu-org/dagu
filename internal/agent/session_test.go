@@ -606,24 +606,17 @@ func TestSessionManager_RecordMessage_PersistsViaCallback(t *testing.T) {
 	err := sm.AcceptUserMessage(context.Background(), provider, "m", "m", "hello")
 	require.NoError(t, err)
 
-	// Wait for the LLM to respond and message to be persisted
+	// Wait for the assistant message to be persisted (user message is persisted synchronously).
 	require.Eventually(t, func() bool {
 		mu.Lock()
 		defer mu.Unlock()
-		return len(persisted) >= 1
-	}, 5*time.Second, 50*time.Millisecond)
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	// Should have at least the assistant message persisted
-	var hasAssistant bool
-	for _, msg := range persisted {
-		if msg.Type == MessageTypeAssistant {
-			hasAssistant = true
+		for _, msg := range persisted {
+			if msg.Type == MessageTypeAssistant {
+				return true
+			}
 		}
-	}
-	assert.True(t, hasAssistant, "assistant message should be persisted via OnMessage callback")
+		return false
+	}, 5*time.Second, 50*time.Millisecond, "assistant message should be persisted via OnMessage callback")
 
 	_ = sm.Cancel(context.Background())
 }
@@ -644,7 +637,9 @@ func TestSessionManager_ConcurrentMessages(t *testing.T) {
 	}
 
 	// Wait for processing
-	time.Sleep(200 * time.Millisecond)
+	require.Eventually(t, func() bool {
+		return len(sm.GetMessages()) >= 3
+	}, 2*time.Second, 50*time.Millisecond, "should have at least 3 user messages")
 
 	msgs := sm.GetMessages()
 	assert.GreaterOrEqual(t, len(msgs), 3, "should have at least 3 user messages")

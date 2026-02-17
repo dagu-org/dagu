@@ -123,6 +123,7 @@ export interface DelegateInfo {
   task: string;
   status: 'running' | 'completed';
   zIndex: number;
+  positionIndex: number;
 }
 
 // API request/response types

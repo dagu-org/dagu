@@ -49,7 +49,8 @@ type SessionManager struct {
 	sessionStore       SessionStore
 	parentSessionID    string
 	delegateTask       string
-	registerSubSession func(id string, mgr *SessionManager)
+	registerSubSession   func(id string, mgr *SessionManager)
+	deregisterSubSession func(id string)
 }
 
 // SessionManagerConfig contains configuration for creating a SessionManager.
@@ -79,6 +80,8 @@ type SessionManagerConfig struct {
 	DelegateTask string
 	// RegisterSubSession registers a sub-session's SessionManager for SSE streaming.
 	RegisterSubSession func(id string, mgr *SessionManager)
+	// DeregisterSubSession removes a completed sub-session from the SSE registry.
+	DeregisterSubSession func(id string)
 }
 
 // NewSessionManager creates a new SessionManager.
@@ -121,7 +124,8 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		sessionStore:       cfg.SessionStore,
 		parentSessionID:    cfg.ParentSessionID,
 		delegateTask:       cfg.DelegateTask,
-		registerSubSession: cfg.RegisterSubSession,
+		registerSubSession:   cfg.RegisterSubSession,
+		deregisterSubSession: cfg.DeregisterSubSession,
 	}
 }
 
@@ -269,6 +273,7 @@ func (sm *SessionManager) RecordExternalMessage(ctx context.Context, msg Message
 	if sm.onMessage != nil {
 		if err := sm.onMessage(ctx, msg); err != nil {
 			sm.logger.Warn("failed to persist message", "error", err)
+			return err
 		}
 	}
 
@@ -355,10 +360,13 @@ func (sm *SessionManager) SubscribeWithSnapshot(ctx context.Context) (StreamResp
 	totalCost := sm.totalCost
 	id := sm.id
 	sess := Session{
-		ID:        id,
-		UserID:    sm.userID,
-		CreatedAt: sm.createdAt,
-		UpdatedAt: sm.lastActivity,
+		ID:              id,
+		UserID:          sm.userID,
+		DAGName:         sm.dagName,
+		ParentSessionID: sm.parentSessionID,
+		DelegateTask:    sm.delegateTask,
+		CreatedAt:       sm.createdAt,
+		UpdatedAt:       sm.lastActivity,
 	}
 	next := sm.subpub.Subscribe(ctx, lastSeq)
 	sm.mu.Unlock()
@@ -452,7 +460,8 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		IPAddress:          sm.ipAddress,
 		Role:               sm.role,
 		SessionStore:       sm.sessionStore,
-		RegisterSubSession: sm.registerSubSession,
+		RegisterSubSession:   sm.registerSubSession,
+		DeregisterSubSession: sm.deregisterSubSession,
 		NotifyParent: func(event StreamResponse) {
 			sm.subpub.Broadcast(event)
 		},

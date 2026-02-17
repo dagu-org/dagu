@@ -852,7 +852,7 @@ func TestLoop_BatchedDelegateExceedsMax(t *testing.T) {
 
 	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "do 12 things"})
 
-	err := waitForLoopDone(ctx, cancel, loop, 30*time.Second)
+	err := waitForLoopDone(ctx, cancel, loop, 10*time.Second)
 	assert.ErrorIs(t, err, context.Canceled)
 
 	store.mu.Lock()
@@ -871,9 +871,7 @@ func TestLoop_BatchedDelegateExceedsMax(t *testing.T) {
 func TestLoop_ExecuteTool_PassesSubSessionCallbacks(t *testing.T) {
 	t.Parallel()
 
-	registerCalled := false
-	notifyCalled := false
-	addCostCalled := false
+	var registerCalled, notifyCalled, addCostCalled atomic.Bool
 
 	store := newMockSessionStore()
 	require.NoError(t, store.CreateSession(context.Background(), &Session{
@@ -906,13 +904,13 @@ func TestLoop_ExecuteTool_PassesSubSessionCallbacks(t *testing.T) {
 		SessionStore: store,
 		UserID:       "user1",
 		RegisterSubSession: func(id string, mgr *SessionManager) {
-			registerCalled = true
+			registerCalled.Store(true)
 		},
 		NotifyParent: func(event StreamResponse) {
-			notifyCalled = true
+			notifyCalled.Store(true)
 		},
 		AddCost: func(cost float64) {
-			addCostCalled = true
+			addCostCalled.Store(true)
 		},
 		OnWorking: func(working bool) {
 			if !working {
@@ -926,7 +924,7 @@ func TestLoop_ExecuteTool_PassesSubSessionCallbacks(t *testing.T) {
 	err := waitForLoopDone(ctx, cancel, loop, 15*time.Second)
 	assert.ErrorIs(t, err, context.Canceled)
 
-	assert.True(t, registerCalled, "RegisterSubSession callback should be called during delegate execution")
-	assert.True(t, notifyCalled, "NotifyParent callback should be called during delegate execution")
-	assert.True(t, addCostCalled, "AddCost callback should be called during delegate execution")
+	assert.True(t, registerCalled.Load(), "RegisterSubSession callback should be called during delegate execution")
+	assert.True(t, notifyCalled.Load(), "NotifyParent callback should be called during delegate execution")
+	assert.True(t, addCostCalled.Load(), "AddCost callback should be called during delegate execution")
 }

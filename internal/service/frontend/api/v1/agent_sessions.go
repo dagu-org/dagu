@@ -96,7 +96,11 @@ func mapAgentError(err error) error {
 	case errors.Is(err, agent.ErrPromptExpired):
 		return errAgentPromptExpired
 	default:
-		return err
+		return &Error{
+			Code:       api.ErrorCodeInternalError,
+			Message:    err.Error(),
+			HTTPStatus: http.StatusInternalServerError,
+		}
 	}
 }
 
@@ -259,21 +263,18 @@ func toAPISessionDetail(resp *agent.StreamResponse) api.AgentSessionDetailRespon
 	out := api.AgentSessionDetailResponse{}
 
 	if resp.Session != nil {
-		sess := toAPISession(*resp.Session)
-		out.Session = &sess
+		out.Session = toAPISession(*resp.Session)
 	}
 	if resp.SessionState != nil {
-		state := api.AgentSessionState{
+		out.SessionState = api.AgentSessionState{
 			SessionId: resp.SessionState.SessionID,
 			Working:   resp.SessionState.Working,
 			Model:     ptrOf(resp.SessionState.Model),
 			TotalCost: resp.SessionState.TotalCost,
 		}
-		out.SessionState = &state
 	}
 	if resp.Messages != nil {
-		msgs := toAPIMessages(resp.Messages)
-		out.Messages = &msgs
+		out.Messages = toAPIMessages(resp.Messages)
 	}
 	return out
 }
@@ -342,7 +343,7 @@ func toAPIMessages(msgs []agent.Message) []api.AgentMessage {
 
 		if m.UIAction != nil {
 			msg.UiAction = &api.AgentUIAction{
-				Type: ptrOf(m.UIAction.Type),
+				Type: m.UIAction.Type,
 				Path: ptrOf(m.UIAction.Path),
 			}
 		}

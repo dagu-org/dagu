@@ -151,7 +151,8 @@ export default function AgentSettingsPage(): React.ReactNode {
       const tools: ToolMeta[] = data?.tools || [];
       setToolMetas(tools);
       return tools;
-    } catch {
+    } catch (err) {
+      console.error('Failed to load tool definitions', err);
       return [];
     }
   }, [client, remoteNode]);

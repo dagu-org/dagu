@@ -13,6 +13,7 @@ func TestResolveToolPolicy_Defaults(t *testing.T) {
 
 	resolved := ResolveToolPolicy(ToolPolicyConfig{})
 
+	assert.Len(t, resolved.Tools, len(RegisteredTools()), "tool count should match registry")
 	assert.True(t, resolved.Tools["bash"])
 	assert.True(t, resolved.Tools["read"])
 	assert.True(t, resolved.Tools["patch"])

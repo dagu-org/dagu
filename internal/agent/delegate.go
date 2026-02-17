@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -114,8 +115,11 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 
 	// Cap at maxConcurrentDelegates.
 	tasks := args.Tasks
+	truncated := 0
 	if len(tasks) > maxConcurrentDelegates {
+		truncated = len(tasks) - maxConcurrentDelegates
 		tasks = tasks[:maxConcurrentDelegates]
+		slog.Warn("Delegate tasks truncated", "requested", len(args.Tasks), "max", maxConcurrentDelegates)
 	}
 
 	// Run all tasks in parallel.
@@ -144,6 +148,10 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 			allFailed = false
 			summaries = append(summaries, fmt.Sprintf("%s: %s", prefix, r.Content))
 		}
+	}
+
+	if truncated > 0 {
+		summaries = append(summaries, fmt.Sprintf("(%d additional tasks truncated — max %d per call)", truncated, maxConcurrentDelegates))
 	}
 
 	return ToolOut{
@@ -231,7 +239,9 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		Type:    MessageTypeUser,
 		Content: task.Task,
 	}
-	_ = subMgr.RecordExternalMessage(ctx.Context, userMsg)
+	if err := subMgr.RecordExternalMessage(ctx.Context, userMsg); err != nil {
+		logger.Warn("Failed to record initial delegate message", "error", err)
+	}
 	forwardToParent(userMsg)
 
 	// Set working state before notifying parent so the SSE snapshot has working=true.
@@ -241,7 +251,7 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 	if dc.NotifyParent != nil {
 		dc.NotifyParent(StreamResponse{
 			DelegateEvent: &DelegateEvent{
-				Type:       "started",
+				Type:       DelegateEventStarted,
 				DelegateID: delegateID,
 				Task:       task.Task,
 			},
@@ -295,6 +305,7 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 				if iteration >= maxIterations {
 					logger.Info("Sub-agent max iterations reached", "max", maxIterations)
 				}
+				// Cancel to terminate the child loop — only one round is queued per delegate.
 				cancelChild()
 			}
 		},
@@ -321,7 +332,7 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 	if dc.NotifyParent != nil {
 		dc.NotifyParent(StreamResponse{
 			DelegateEvent: &DelegateEvent{
-				Type:       "completed",
+				Type:       DelegateEventCompleted,
 				DelegateID: delegateID,
 				Task:       task.Task,
 				Cost:       subCost,
@@ -329,7 +340,12 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		})
 	}
 
-	if err != nil && err != context.Canceled {
+	// Deregister sub-session from SSE registry to prevent memory leaks.
+	if dc.DeregisterSubSession != nil {
+		dc.DeregisterSubSession(delegateID)
+	}
+
+	if err != nil && !errors.Is(err, context.Canceled) {
 		logger.Error("Sub-agent failed", "error", err)
 		return singleDelegateResult{
 			DelegateID: delegateID,
@@ -374,10 +390,11 @@ func filterOutTool(tools []*AgentTool, name string) []*AgentTool {
 	return filtered
 }
 
-// truncate shortens a string to maxLen characters, appending "..." if truncated.
+// truncate shortens a string to maxLen runes, appending "..." if truncated.
 func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	return s[:maxLen] + "..."
+	return string(runes[:maxLen]) + "..."
 }

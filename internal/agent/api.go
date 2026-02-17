@@ -432,6 +432,9 @@ func (a *API) reactivateSession(ctx context.Context, id, userID, username string
 		RegisterSubSession: func(subID string, subMgr *SessionManager) {
 			a.sessions.Store(subID, subMgr)
 		},
+		DeregisterSubSession: func(subID string) {
+			a.sessions.Delete(subID)
+		},
 	})
 	a.sessions.Store(id, mgr)
 
@@ -587,16 +590,20 @@ func (a *API) CreateSession(ctx context.Context, userID, username string, role a
 		RegisterSubSession: func(subID string, subMgr *SessionManager) {
 			a.sessions.Store(subID, subMgr)
 		},
+		DeregisterSubSession: func(subID string) {
+			a.sessions.Delete(subID)
+		},
 	})
-
-	a.persistNewSession(ctx, id, userID, dagName, now)
-	a.sessions.Store(id, mgr)
 
 	messageWithContext := formatMessageWithContexts(req.Message, resolved)
 	if err := mgr.AcceptUserMessage(ctx, provider, model, modelCfg.Model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		return "", ErrFailedToProcessMessage
 	}
+
+	// Persist and store only after successful message acceptance to avoid orphaned sessions.
+	a.persistNewSession(ctx, id, userID, dagName, now)
+	a.sessions.Store(id, mgr)
 
 	return id, nil
 }
