@@ -26,7 +26,7 @@ const (
 	delegateToolName = "delegate"
 
 	// maxConcurrentDelegates is the maximum number of sub-agents that can run in parallel.
-	maxConcurrentDelegates = 10
+	maxConcurrentDelegates = 8
 
 	// defaultDelegateMaxIterations is the default max iterations for a sub-agent.
 	defaultDelegateMaxIterations = 20
@@ -210,6 +210,12 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	// Run the child loop synchronously. It returns context.Canceled when we cancel it.
 	err := loop.Go(childCtx)
 
+	// Roll up sub-agent cost to parent session.
+	subCost := subMgr.GetTotalCost()
+	if dc.AddCost != nil {
+		dc.AddCost(subCost)
+	}
+
 	// Notify parent that delegate completed.
 	if dc.NotifyParent != nil {
 		dc.NotifyParent(StreamResponse{
@@ -217,6 +223,7 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 				Type:       "completed",
 				DelegateID: delegateID,
 				Task:       args.Task,
+				Cost:       subCost,
 			},
 		})
 	}

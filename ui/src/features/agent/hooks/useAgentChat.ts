@@ -8,6 +8,7 @@ import { useClient } from '@/hooks/api';
 import { useAgentChatContext } from '../context/AgentChatContext';
 import { getAuthToken } from '@/lib/authHeaders';
 import {
+  CompletedDelegateInfo,
   DAGContext,
   DelegateInfo,
   Message,
@@ -153,6 +154,7 @@ export function useAgentChat() {
   const [error, setError] = useState<string | null>(null);
   const [answeredPrompts, setAnsweredPrompts] = useState<Record<string, string>>({});
   const [delegates, setDelegates] = useState<DelegateInfo[]>([]);
+  const [completedDelegates, setCompletedDelegates] = useState<CompletedDelegateInfo[]>([]);
   const zIndexCounterRef = useRef(60);
   const baseUrl = `${config.apiURL}/agent`;
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
@@ -203,15 +205,14 @@ export function useAgentChat() {
               id: evt.delegate_id,
               task: evt.task,
               status: 'running',
-              minimized: false,
               zIndex: zIndexCounterRef.current,
             }]);
           } else if (evt.type === 'completed') {
-            setDelegates((prev) => prev.map((d) =>
-              d.id === evt.delegate_id
-                ? { ...d, status: 'completed' as const, minimized: true }
-                : d
-            ));
+            setDelegates((prev) => prev.filter((d) => d.id !== evt.delegate_id));
+            setCompletedDelegates((prev) => [
+              ...prev,
+              { id: evt.delegate_id, task: evt.task, cost: evt.cost },
+            ]);
           }
         }
       } catch {
@@ -358,6 +359,7 @@ export function useAgentChat() {
     clearSession();
     setAnsweredPrompts({});
     setDelegates([]);
+    setCompletedDelegates([]);
   }, [clearSession]);
 
   const bringToFront = useCallback((delegateId: string) => {
@@ -367,13 +369,17 @@ export function useAgentChat() {
     ));
   }, []);
 
-  const toggleMinimize = useCallback((delegateId: string) => {
+  const reopenDelegate = useCallback((delegateId: string, task: string) => {
     zIndexCounterRef.current++;
-    setDelegates((prev) => prev.map((d) =>
-      d.id === delegateId
-        ? { ...d, minimized: !d.minimized, zIndex: zIndexCounterRef.current }
-        : d
-    ));
+    setDelegates((prev) => {
+      if (prev.some((d) => d.id === delegateId)) return prev;
+      return [...prev, {
+        id: delegateId,
+        task,
+        status: 'completed' as const,
+        zIndex: zIndexCounterRef.current,
+      }];
+    });
   }, []);
 
   const removeDelegate = useCallback((delegateId: string) => {
@@ -399,8 +405,9 @@ export function useAgentChat() {
     selectSession,
     respondToPrompt,
     delegates,
+    completedDelegates,
     bringToFront,
-    toggleMinimize,
+    reopenDelegate,
     removeDelegate,
   };
 }

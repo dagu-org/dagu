@@ -1,4 +1,4 @@
-import { ReactElement, useCallback, useEffect, useRef } from 'react';
+import { ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 
 import { AlertCircle, X } from 'lucide-react';
 
@@ -12,6 +12,7 @@ import { SessionWithState, DAGContext } from '../types';
 import { AgentChatModalHeader } from './AgentChatModalHeader';
 import { ChatInput } from './ChatInput';
 import { ChatMessages } from './ChatMessages';
+import { CompletedDelegatesList } from './CompletedDelegatesList';
 import { DelegatePanel } from './DelegatePanel';
 import { ResizeHandles } from './ResizeHandles';
 
@@ -55,16 +56,19 @@ export function AgentChatModal(): ReactElement | null {
     selectSession,
     respondToPrompt,
     delegates,
+    completedDelegates,
     bringToFront,
-    toggleMinimize,
+    reopenDelegate,
     removeDelegate,
   } = useAgentChat();
   const { bounds, dragHandlers, resizeHandlers } = useResizableDraggable();
 
   const hasAutoSelectedRef = useRef(false);
+  const [isClosing, setIsClosing] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
+      setIsClosing(false);
       hasAutoSelectedRef.current = false;
       fetchSessions();
     }
@@ -111,6 +115,14 @@ export function AgentChatModal(): ReactElement | null {
     [selectSession, clearSession, setError]
   );
 
+  const handleClose = useCallback(() => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsClosing(false);
+      closeChat();
+    }, 150);
+  }, [closeChat]);
+
   if (!isOpen) return null;
 
   const errorBanner = error && (
@@ -136,9 +148,13 @@ export function AgentChatModal(): ReactElement | null {
         totalCost={sessionState?.total_cost}
         onSelectSession={handleSelectSession}
         onClearSession={clearSession}
-        onClose={closeChat}
+        onClose={handleClose}
         dragHandlers={isMobile ? undefined : dragHandlers}
         isMobile={isMobile}
+      />
+      <CompletedDelegatesList
+        delegates={completedDelegates}
+        onReopen={reopenDelegate}
       />
       {errorBanner}
       <ChatMessages
@@ -165,7 +181,9 @@ export function AgentChatModal(): ReactElement | null {
           'fixed inset-0 z-50',
           'flex flex-col',
           'bg-popover dark:bg-zinc-950',
-          'animate-in slide-in-from-bottom-4 fade-in-0 duration-200'
+          isClosing
+            ? 'animate-out slide-out-to-bottom-4 fade-out-0 duration-150'
+            : 'animate-in slide-in-from-bottom-4 fade-in-0 duration-200'
         )}
       >
         {content}
@@ -182,7 +200,9 @@ export function AgentChatModal(): ReactElement | null {
           'flex flex-col',
           'bg-popover dark:bg-zinc-950 border border-border rounded-lg overflow-hidden',
           'shadow-xl dark:shadow-[0_0_30px_rgba(0,0,0,0.6)]',
-          'animate-in slide-in-from-bottom-4 fade-in-0 duration-200'
+          isClosing
+            ? 'animate-out slide-out-to-bottom-4 fade-out-0 duration-150'
+            : 'animate-in slide-in-from-bottom-4 fade-in-0 duration-200'
         )}
         style={{
           right: bounds.right,
@@ -202,12 +222,10 @@ export function AgentChatModal(): ReactElement | null {
           delegateId={d.id}
           task={d.task}
           status={d.status}
-          minimized={d.minimized}
           zIndex={d.zIndex}
           index={i}
           onClose={() => removeDelegate(d.id)}
           onBringToFront={() => bringToFront(d.id)}
-          onToggleMinimize={() => toggleMinimize(d.id)}
         />
       ))}
     </>

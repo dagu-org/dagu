@@ -864,7 +864,7 @@ func TestLoop_ExceedMaxConcurrentDelegates(t *testing.T) {
 	}
 	store.mu.Unlock()
 
-	assert.LessOrEqual(t, subCount, 10, "should have at most 10 sub-sessions")
+	assert.LessOrEqual(t, subCount, 8, "should have at most 8 sub-sessions")
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -876,7 +876,7 @@ func TestLoop_ExceedMaxConcurrentDelegates(t *testing.T) {
 			}
 		}
 	}
-	assert.Equal(t, 2, errorResults, "2 delegate calls should have been rejected")
+	assert.Equal(t, 4, errorResults, "4 delegate calls should have been rejected")
 }
 
 func TestLoop_ExecuteTool_PassesSubSessionCallbacks(t *testing.T) {
@@ -884,6 +884,7 @@ func TestLoop_ExecuteTool_PassesSubSessionCallbacks(t *testing.T) {
 
 	registerCalled := false
 	notifyCalled := false
+	addCostCalled := false
 
 	store := newMockSessionStore()
 	require.NoError(t, store.CreateSession(context.Background(), &Session{
@@ -921,6 +922,9 @@ func TestLoop_ExecuteTool_PassesSubSessionCallbacks(t *testing.T) {
 		NotifyParent: func(event StreamResponse) {
 			notifyCalled = true
 		},
+		AddCost: func(cost float64) {
+			addCostCalled = true
+		},
 		OnWorking: func(working bool) {
 			if !working {
 				cancel()
@@ -935,4 +939,5 @@ func TestLoop_ExecuteTool_PassesSubSessionCallbacks(t *testing.T) {
 
 	assert.True(t, registerCalled, "RegisterSubSession callback should be called during delegate execution")
 	assert.True(t, notifyCalled, "NotifyParent callback should be called during delegate execution")
+	assert.True(t, addCostCalled, "AddCost callback should be called during delegate execution")
 }

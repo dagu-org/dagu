@@ -1,37 +1,50 @@
-import { ReactElement, useCallback } from 'react';
-import { CheckCircle2, ChevronDown, ChevronUp, Loader2, X } from 'lucide-react';
+import { ReactElement, useCallback, useState } from 'react';
+import { CheckCircle2, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDelegateStream } from '../hooks/useDelegateStream';
+import { useResizableDraggable } from '../hooks/useResizableDraggable';
 import { ChatMessages } from './ChatMessages';
+import { ResizeHandles } from './ResizeHandles';
 
 interface DelegatePanelProps {
   delegateId: string;
   task: string;
   status: 'running' | 'completed';
-  minimized: boolean;
   zIndex: number;
   index: number;
   onClose: () => void;
   onBringToFront: () => void;
-  onToggleMinimize: () => void;
 }
 
 export function DelegatePanel({
   delegateId,
   task,
   status,
-  minimized,
   zIndex,
   index,
   onClose,
   onBringToFront,
-  onToggleMinimize,
 }: DelegatePanelProps): ReactElement {
   const { messages, isWorking } = useDelegateStream(delegateId);
+  const [isClosing, setIsClosing] = useState(false);
+  const { bounds, dragHandlers, resizeHandlers } = useResizableDraggable({
+    defaultWidth: 320,
+    defaultHeight: 360,
+    defaultRight: 468 + index * 30,
+    defaultBottom: 64 + index * 30,
+    minWidth: 280,
+    minHeight: 200,
+    storageKey: `delegate-panel-${delegateId}`,
+  });
 
   const handleMouseDown = useCallback(() => {
     onBringToFront();
   }, [onBringToFront]);
+
+  const handleClose = useCallback(() => {
+    setIsClosing(true);
+    setTimeout(() => onClose(), 150);
+  }, [onClose]);
 
   const truncatedTask = task.length > 40 ? task.slice(0, 40) + '...' : task;
   const isRunning = status === 'running' || isWorking;
@@ -43,25 +56,28 @@ export function DelegatePanel({
         'flex flex-col',
         'bg-popover dark:bg-zinc-950 border border-border rounded-lg overflow-hidden',
         'shadow-lg dark:shadow-[0_0_20px_rgba(0,0,0,0.5)]',
-        'transition-[height] duration-150 ease-in-out'
+        isClosing
+          ? 'animate-out slide-out-to-bottom-2 fade-out-0 duration-150'
+          : 'animate-in slide-in-from-bottom-2 fade-in-0 duration-200'
       )}
       style={{
-        right: 468,
-        bottom: 64 + index * (minimized ? 40 : 200),
-        width: 320,
-        height: minimized ? 32 : 360,
+        right: bounds.right,
+        bottom: bounds.bottom,
+        width: bounds.width,
+        height: bounds.height,
         zIndex,
       }}
       onMouseDown={handleMouseDown}
     >
+      <ResizeHandles resizeHandlers={resizeHandlers} />
       {/* Title bar */}
       <div
         className={cn(
           'flex items-center gap-1.5 px-2 h-8 min-h-[32px]',
           'bg-muted/50 dark:bg-zinc-900 border-b border-border',
-          'cursor-pointer select-none'
+          'cursor-move select-none'
         )}
-        onClick={onToggleMinimize}
+        {...dragHandlers}
       >
         {isRunning ? (
           <Loader2 className="h-3 w-3 text-blue-500 animate-spin flex-shrink-0" />
@@ -72,13 +88,8 @@ export function DelegatePanel({
           {truncatedTask}
         </span>
         <button
-          onClick={(e) => { e.stopPropagation(); onToggleMinimize(); }}
-          className="text-muted-foreground hover:text-foreground flex-shrink-0 p-0.5"
-        >
-          {minimized ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          onClick={(e) => { e.stopPropagation(); handleClose(); }}
+          onMouseDown={(e) => e.stopPropagation()}
           className="text-muted-foreground hover:text-foreground flex-shrink-0 p-0.5"
         >
           <X className="h-3 w-3" />
@@ -86,15 +97,13 @@ export function DelegatePanel({
       </div>
 
       {/* Body - messages */}
-      {!minimized && (
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <ChatMessages
-            messages={messages}
-            pendingUserMessage={null}
-            isWorking={isRunning}
-          />
-        </div>
-      )}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <ChatMessages
+          messages={messages}
+          pendingUserMessage={null}
+          isWorking={isRunning}
+        />
+      </div>
     </div>
   );
 }

@@ -171,6 +171,8 @@ type DelegateEvent struct {
 	DelegateID string `json:"delegate_id"`
 	// Task is the delegate task description.
 	Task string `json:"task"`
+	// Cost is the sub-agent's accumulated cost in USD (set on "completed").
+	Cost float64 `json:"cost,omitempty"`
 }
 
 // StreamResponse is sent over SSE to the UI.
@@ -271,6 +273,8 @@ type DelegateContext struct {
 	RegisterSubSession func(id string, mgr *SessionManager)
 	// NotifyParent broadcasts an event to the parent session's SSE stream. Nil if not available.
 	NotifyParent func(event StreamResponse)
+	// AddCost adds a cost amount to the parent session's running total. Nil if not available.
+	AddCost func(cost float64)
 }
 
 // ToolContext provides context for tool execution.

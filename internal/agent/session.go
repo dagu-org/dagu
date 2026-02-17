@@ -449,6 +449,7 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		NotifyParent: func(event StreamResponse) {
 			sm.subpub.Broadcast(event)
 		},
+		AddCost: sm.addCost,
 	})
 }
 

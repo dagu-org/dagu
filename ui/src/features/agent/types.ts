@@ -114,14 +114,20 @@ export interface DelegateEvent {
   type: 'started' | 'completed';
   delegate_id: string;
   task: string;
+  cost?: number;
 }
 
 export interface DelegateInfo {
   id: string;
   task: string;
   status: 'running' | 'completed';
-  minimized: boolean;
   zIndex: number;
+}
+
+export interface CompletedDelegateInfo {
+  id: string;
+  task: string;
+  cost?: number;
 }
 
 // API request/response types

@@ -77,6 +77,8 @@ type LoopConfig struct {
 	RegisterSubSession func(id string, mgr *SessionManager)
 	// NotifyParent broadcasts a delegate event to the parent session's SSE stream.
 	NotifyParent func(event StreamResponse)
+	// AddCost adds a cost amount to the parent session's running total.
+	AddCost func(cost float64)
 }
 
 // Loop manages a session turn with an LLM including tool execution.
@@ -107,6 +109,7 @@ type Loop struct {
 	sessionStore       SessionStore
 	registerSubSession func(id string, mgr *SessionManager)
 	notifyParent       func(event StreamResponse)
+	addCost            func(cost float64)
 }
 
 // NewLoop creates a new Loop instance.
@@ -140,6 +143,7 @@ func NewLoop(config LoopConfig) *Loop {
 		sessionStore:       config.SessionStore,
 		registerSubSession: config.RegisterSubSession,
 		notifyParent:       config.NotifyParent,
+		addCost:            config.AddCost,
 	}
 }
 
@@ -353,6 +357,7 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 			UserID:             userID,
 			RegisterSubSession: l.registerSubSession,
 			NotifyParent:       l.notifyParent,
+			AddCost:            l.addCost,
 		}
 	}
 

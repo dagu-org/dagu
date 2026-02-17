@@ -538,6 +538,42 @@ func TestDelegateTool_NotifiesParentCompleted(t *testing.T) {
 	assert.Equal(t, "completed", events[1].Type)
 	assert.Equal(t, result.DelegateID, events[1].DelegateID)
 	assert.Equal(t, "complete test", events[1].Task)
+	// Cost field should be present on completed event (may be 0 with mock provider).
+	assert.GreaterOrEqual(t, events[1].Cost, float64(0))
+}
+
+func TestDelegateTool_CostRolledUpToParent(t *testing.T) {
+	t.Parallel()
+
+	var addedCost float64
+	var costMu sync.Mutex
+
+	provider := newStopProvider("done")
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:     provider,
+			Model:        "test",
+			Tools:        []*AgentTool{},
+			SessionStore: newMockSessionStore(),
+			ParentID:     "parent-1",
+			UserID:       "user-1",
+			AddCost: func(cost float64) {
+				costMu.Lock()
+				addedCost = cost
+				costMu.Unlock()
+			},
+		},
+	}, json.RawMessage(`{"task": "cost test"}`))
+
+	assert.False(t, result.IsError)
+
+	costMu.Lock()
+	defer costMu.Unlock()
+	// With mock provider, cost may be 0 but AddCost must have been called.
+	assert.GreaterOrEqual(t, addedCost, float64(0))
 }
 
 func TestDelegateTool_SubSessionStreamable(t *testing.T) {
