@@ -1327,3 +1327,155 @@ func TestValidateMessageInput(t *testing.T) {
 		})
 	}
 }
+
+func TestStore_SubSession_RoundTrip(t *testing.T) {
+	store, ctx := setupTestStore(t)
+
+	now := time.Now()
+	sess := &agent.Session{
+		ID:              "sub-1",
+		UserID:          "user1",
+		ParentSessionID: "parent-1",
+		DelegateTask:    "analyze logs",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+
+	require.NoError(t, store.CreateSession(ctx, sess))
+
+	retrieved, err := store.GetSession(ctx, "sub-1")
+	require.NoError(t, err)
+	assert.Equal(t, "parent-1", retrieved.ParentSessionID)
+	assert.Equal(t, "analyze logs", retrieved.DelegateTask)
+	assert.Equal(t, "user1", retrieved.UserID)
+}
+
+func TestFromSession_WithDelegateFields(t *testing.T) {
+	now := time.Now()
+	sess := &agent.Session{
+		ID:              "sub-1",
+		UserID:          "user1",
+		ParentSessionID: "parent-1",
+		DelegateTask:    "run tests",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+
+	stored := FromSession(sess, nil)
+
+	assert.Equal(t, "parent-1", stored.ParentSessionID)
+	assert.Equal(t, "run tests", stored.DelegateTask)
+}
+
+func TestSessionForStorage_ToSession_WithDelegateFields(t *testing.T) {
+	now := time.Now()
+	stored := &SessionForStorage{
+		ID:              "sub-1",
+		UserID:          "user1",
+		ParentSessionID: "parent-1",
+		DelegateTask:    "deploy",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+
+	sess := stored.ToSession()
+
+	assert.Equal(t, "parent-1", sess.ParentSessionID)
+	assert.Equal(t, "deploy", sess.DelegateTask)
+}
+
+func TestStore_SubSession_FilteringPattern(t *testing.T) {
+	store, ctx := setupTestStore(t)
+
+	now := time.Now()
+
+	// Create parent session
+	parent := &agent.Session{
+		ID: "parent-1", UserID: "user1",
+		CreatedAt: now, UpdatedAt: now,
+	}
+	require.NoError(t, store.CreateSession(ctx, parent))
+
+	// Create sub-session
+	sub := &agent.Session{
+		ID: "sub-1", UserID: "user1",
+		ParentSessionID: "parent-1",
+		DelegateTask:    "sub-task",
+		CreatedAt:       now, UpdatedAt: now.Add(time.Second),
+	}
+	require.NoError(t, store.CreateSession(ctx, sub))
+
+	// ListSessions returns both
+	all, err := store.ListSessions(ctx, "user1")
+	require.NoError(t, err)
+	assert.Len(t, all, 2)
+
+	// Filter like appendPersistedSessions does
+	var topLevel []*agent.Session
+	for _, s := range all {
+		if s.ParentSessionID == "" {
+			topLevel = append(topLevel, s)
+		}
+	}
+	assert.Len(t, topLevel, 1)
+	assert.Equal(t, "parent-1", topLevel[0].ID)
+}
+
+func TestStore_RebuildIndex_PreservesSubSessionFields(t *testing.T) {
+	tmpDir := t.TempDir()
+	ctx := context.Background()
+
+	store1, err := New(tmpDir)
+	require.NoError(t, err)
+
+	now := time.Now()
+	sess := &agent.Session{
+		ID: "sub-1", UserID: "user1",
+		ParentSessionID: "parent-1",
+		DelegateTask:    "rebuild test",
+		CreatedAt:       now, UpdatedAt: now,
+	}
+	require.NoError(t, store1.CreateSession(ctx, sess))
+
+	// Simulate restart
+	store2, err := New(tmpDir)
+	require.NoError(t, err)
+
+	retrieved, err := store2.GetSession(ctx, "sub-1")
+	require.NoError(t, err)
+	assert.Equal(t, "parent-1", retrieved.ParentSessionID)
+	assert.Equal(t, "rebuild test", retrieved.DelegateTask)
+}
+
+func TestStore_SubSession_MessagesIsolated(t *testing.T) {
+	store, ctx := setupTestStore(t)
+
+	now := time.Now()
+	parent := &agent.Session{
+		ID: "parent-1", UserID: "user1",
+		CreatedAt: now, UpdatedAt: now,
+	}
+	sub := &agent.Session{
+		ID: "sub-1", UserID: "user1",
+		ParentSessionID: "parent-1",
+		CreatedAt:       now, UpdatedAt: now,
+	}
+	require.NoError(t, store.CreateSession(ctx, parent))
+	require.NoError(t, store.CreateSession(ctx, sub))
+
+	// Add messages to each
+	require.NoError(t, store.AddMessage(ctx, "parent-1",
+		createTestMessage("pmsg1", "parent message", 1, agent.MessageTypeUser)))
+	require.NoError(t, store.AddMessage(ctx, "sub-1",
+		createTestMessage("smsg1", "sub message", 1, agent.MessageTypeUser)))
+
+	parentMsgs, err := store.GetMessages(ctx, "parent-1")
+	require.NoError(t, err)
+	assert.Len(t, parentMsgs, 1)
+	assert.Equal(t, "parent message", parentMsgs[0].Content)
+
+	subMsgs, err := store.GetMessages(ctx, "sub-1")
+	require.NoError(t, err)
+	assert.Len(t, subMsgs, 1)
+	assert.Equal(t, "sub message", subMsgs[0].Content)
+}

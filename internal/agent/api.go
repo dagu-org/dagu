@@ -390,6 +390,11 @@ func (a *API) reactivateSession(ctx context.Context, id, userID, username string
 		return nil, false
 	}
 
+	// Prevent reactivating sub-sessions as top-level sessions.
+	if sess.ParentSessionID != "" {
+		return nil, false
+	}
+
 	messages, err := a.store.GetMessages(ctx, id)
 	if err != nil {
 		a.logger.Warn("Failed to load messages for reactivation", "error", err)

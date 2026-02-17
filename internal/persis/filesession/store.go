@@ -27,37 +27,43 @@ const (
 
 // SessionForStorage is the JSON-serializable format for sessions.
 type SessionForStorage struct {
-	ID        string          `json:"id"`
-	UserID    string          `json:"user_id"`
-	DAGName   string          `json:"dag_name,omitempty"`
-	Title     string          `json:"title,omitempty"`
-	CreatedAt time.Time       `json:"created_at"`
-	UpdatedAt time.Time       `json:"updated_at"`
-	Messages  []agent.Message `json:"messages"`
+	ID              string          `json:"id"`
+	UserID          string          `json:"user_id"`
+	DAGName         string          `json:"dag_name,omitempty"`
+	Title           string          `json:"title,omitempty"`
+	CreatedAt       time.Time       `json:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at"`
+	ParentSessionID string          `json:"parent_session_id,omitempty"`
+	DelegateTask    string          `json:"delegate_task,omitempty"`
+	Messages        []agent.Message `json:"messages"`
 }
 
 // ToSession converts a SessionForStorage to an agent.Session.
 func (c *SessionForStorage) ToSession() *agent.Session {
 	return &agent.Session{
-		ID:        c.ID,
-		UserID:    c.UserID,
-		DAGName:   c.DAGName,
-		Title:     c.Title,
-		CreatedAt: c.CreatedAt,
-		UpdatedAt: c.UpdatedAt,
+		ID:              c.ID,
+		UserID:          c.UserID,
+		DAGName:         c.DAGName,
+		Title:           c.Title,
+		CreatedAt:       c.CreatedAt,
+		UpdatedAt:       c.UpdatedAt,
+		ParentSessionID: c.ParentSessionID,
+		DelegateTask:    c.DelegateTask,
 	}
 }
 
 // FromSession creates a SessionForStorage from an agent.Session.
 func FromSession(sess *agent.Session, messages []agent.Message) *SessionForStorage {
 	return &SessionForStorage{
-		ID:        sess.ID,
-		UserID:    sess.UserID,
-		DAGName:   sess.DAGName,
-		Title:     sess.Title,
-		CreatedAt: sess.CreatedAt,
-		UpdatedAt: sess.UpdatedAt,
-		Messages:  messages,
+		ID:              sess.ID,
+		UserID:          sess.UserID,
+		DAGName:         sess.DAGName,
+		Title:           sess.Title,
+		CreatedAt:       sess.CreatedAt,
+		UpdatedAt:       sess.UpdatedAt,
+		ParentSessionID: sess.ParentSessionID,
+		DelegateTask:    sess.DelegateTask,
+		Messages:        messages,
 	}
 }
 

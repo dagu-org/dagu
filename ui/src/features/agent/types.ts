@@ -85,6 +85,8 @@ export interface Session {
   title?: string;
   created_at: string;
   updated_at: string;
+  parent_session_id?: string;
+  delegate_task?: string;
 }
 
 export interface SessionState {

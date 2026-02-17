@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -569,4 +570,311 @@ func runLoopForDuration(t *testing.T, loop *Loop, duration time.Duration) {
 	go func() { _ = loop.Go(ctx) }()
 
 	time.Sleep(duration)
+}
+
+// newEchoTool creates a simple tool that returns its input as output.
+func newEchoTool(name string) *AgentTool {
+	return &AgentTool{
+		Tool: llm.Tool{
+			Type: "function",
+			Function: llm.ToolFunction{
+				Name:        name,
+				Description: "echoes input",
+				Parameters:  map[string]any{"type": "object", "properties": map[string]any{}},
+			},
+		},
+		Run: func(_ ToolContext, input json.RawMessage) ToolOut {
+			return ToolOut{Content: "echo: " + string(input)}
+		},
+	}
+}
+
+func waitForLoopDone(ctx context.Context, cancel context.CancelFunc, loop *Loop, timeout time.Duration) error {
+	done := make(chan error, 1)
+	go func() { done <- loop.Go(ctx) }()
+
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(timeout):
+		cancel()
+		return <-done
+	}
+}
+
+func TestLoop_ToolCallFlow(t *testing.T) {
+	t.Parallel()
+
+	var recorded []Message
+	var mu sync.Mutex
+
+	provider := newSequenceProvider(
+		&llm.ChatResponse{
+			FinishReason: "tool_calls",
+			ToolCalls: []llm.ToolCall{{
+				ID:   "tc-1",
+				Type: "function",
+				Function: llm.ToolCallFunction{
+					Name:      "echo",
+					Arguments: `{"msg":"test"}`,
+				},
+			}},
+		},
+		&llm.ChatResponse{Content: "final answer", FinishReason: "stop"},
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	loop := NewLoop(LoopConfig{
+		Provider: provider,
+		Model:    "test",
+		Tools:    []*AgentTool{newEchoTool("echo")},
+		RecordMessage: func(_ context.Context, msg Message) error {
+			mu.Lock()
+			recorded = append(recorded, msg)
+			mu.Unlock()
+			return nil
+		},
+	})
+
+	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "run tool"})
+
+	err := waitForLoopDone(ctx, cancel, loop, 5*time.Second)
+	assert.ErrorIs(t, err, context.Canceled)
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Should have: assistant (tool_calls), tool result, assistant (final)
+	require.GreaterOrEqual(t, len(recorded), 3)
+	assert.Equal(t, MessageTypeAssistant, recorded[0].Type)
+	assert.NotEmpty(t, recorded[0].ToolCalls)
+	assert.Equal(t, MessageTypeUser, recorded[1].Type)
+	require.Len(t, recorded[1].ToolResults, 1)
+	assert.Equal(t, "tc-1", recorded[1].ToolResults[0].ToolCallID)
+	assert.Equal(t, MessageTypeAssistant, recorded[2].Type)
+	assert.Equal(t, "final answer", recorded[2].Content)
+}
+
+func TestLoop_DelegateToolIsolation(t *testing.T) {
+	t.Parallel()
+
+	store := newMockSessionStore()
+	parentID := "parent-sess"
+
+	require.NoError(t, store.CreateSession(context.Background(), &Session{
+		ID: parentID, UserID: "user1",
+		CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}))
+
+	provider := newSequenceProvider(
+		&llm.ChatResponse{
+			FinishReason: "tool_calls",
+			ToolCalls: []llm.ToolCall{{
+				ID:   "del-1",
+				Type: "function",
+				Function: llm.ToolCallFunction{
+					Name:      "delegate",
+					Arguments: `{"task": "sub task"}`,
+				},
+			}},
+		},
+		&llm.ChatResponse{Content: "parent done", FinishReason: "stop"},
+	)
+
+	var parentMessages []Message
+	var mu sync.Mutex
+
+	ctx, cancel := context.WithCancel(context.Background())
+	loop := NewLoop(LoopConfig{
+		Provider:     provider,
+		Model:        "test",
+		Tools:        []*AgentTool{NewDelegateTool(), newEchoTool("echo")},
+		SessionID:    parentID,
+		SessionStore: store,
+		UserID:       "user1",
+		RecordMessage: func(_ context.Context, msg Message) error {
+			mu.Lock()
+			parentMessages = append(parentMessages, msg)
+			mu.Unlock()
+			return nil
+		},
+	})
+
+	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "delegate this"})
+
+	err := waitForLoopDone(ctx, cancel, loop, 10*time.Second)
+	assert.ErrorIs(t, err, context.Canceled)
+
+	// Verify sub-session was created
+	store.mu.Lock()
+	var subSessions []*Session
+	for _, s := range store.sessions {
+		if s.ParentSessionID == parentID {
+			subSessions = append(subSessions, s)
+		}
+	}
+	store.mu.Unlock()
+
+	require.Len(t, subSessions, 1)
+	assert.Equal(t, parentID, subSessions[0].ParentSessionID)
+	assert.Equal(t, "sub task", subSessions[0].DelegateTask)
+
+	// Verify parent messages contain delegate tool result with DelegateID
+	mu.Lock()
+	defer mu.Unlock()
+	var hasDelegateResult bool
+	for _, msg := range parentMessages {
+		if len(msg.ToolResults) > 0 && msg.DelegateID != "" {
+			hasDelegateResult = true
+		}
+	}
+	assert.True(t, hasDelegateResult, "parent should have a delegate tool result with DelegateID")
+}
+
+func TestLoop_RecordMessageError(t *testing.T) {
+	t.Parallel()
+
+	provider := newStopProvider("hello")
+	ctx, cancel := context.WithCancel(context.Background())
+
+	loop := NewLoop(LoopConfig{
+		Provider: provider,
+		Model:    "test",
+		RecordMessage: func(_ context.Context, _ Message) error {
+			return errors.New("storage failure")
+		},
+	})
+
+	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
+
+	err := waitForLoopDone(ctx, cancel, loop, 5*time.Second)
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestLoop_ParallelDelegates(t *testing.T) {
+	t.Parallel()
+
+	store := newMockSessionStore()
+	parentID := "parent-parallel"
+
+	require.NoError(t, store.CreateSession(context.Background(), &Session{
+		ID: parentID, UserID: "user1",
+		CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}))
+
+	provider := newSequenceProvider(
+		&llm.ChatResponse{
+			FinishReason: "tool_calls",
+			ToolCalls: []llm.ToolCall{
+				{ID: "d1", Type: "function", Function: llm.ToolCallFunction{Name: "delegate", Arguments: `{"task":"task-1"}`}},
+				{ID: "d2", Type: "function", Function: llm.ToolCallFunction{Name: "delegate", Arguments: `{"task":"task-2"}`}},
+				{ID: "d3", Type: "function", Function: llm.ToolCallFunction{Name: "delegate", Arguments: `{"task":"task-3"}`}},
+			},
+		},
+		&llm.ChatResponse{Content: "all done", FinishReason: "stop"},
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	loop := NewLoop(LoopConfig{
+		Provider:     provider,
+		Model:        "test",
+		Tools:        []*AgentTool{NewDelegateTool()},
+		SessionID:    parentID,
+		SessionStore: store,
+		UserID:       "user1",
+	})
+
+	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "do 3 things"})
+
+	err := waitForLoopDone(ctx, cancel, loop, 15*time.Second)
+	assert.ErrorIs(t, err, context.Canceled)
+
+	store.mu.Lock()
+	var subCount int
+	for _, s := range store.sessions {
+		if s.ParentSessionID == parentID {
+			subCount++
+		}
+	}
+	store.mu.Unlock()
+
+	assert.Equal(t, 3, subCount, "should have 3 sub-sessions")
+}
+
+func TestLoop_ExceedMaxConcurrentDelegates(t *testing.T) {
+	t.Parallel()
+
+	store := newMockSessionStore()
+	parentID := "parent-exceed"
+
+	require.NoError(t, store.CreateSession(context.Background(), &Session{
+		ID: parentID, UserID: "user1",
+		CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}))
+
+	toolCalls := make([]llm.ToolCall, 12)
+	for i := range toolCalls {
+		toolCalls[i] = llm.ToolCall{
+			ID:   fmt.Sprintf("d%d", i),
+			Type: "function",
+			Function: llm.ToolCallFunction{
+				Name:      "delegate",
+				Arguments: fmt.Sprintf(`{"task":"task-%d"}`, i),
+			},
+		}
+	}
+
+	provider := newSequenceProvider(
+		&llm.ChatResponse{FinishReason: "tool_calls", ToolCalls: toolCalls},
+		&llm.ChatResponse{Content: "done", FinishReason: "stop"},
+	)
+
+	var recorded []Message
+	var mu sync.Mutex
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	loop := NewLoop(LoopConfig{
+		Provider:     provider,
+		Model:        "test",
+		Tools:        []*AgentTool{NewDelegateTool()},
+		SessionID:    parentID,
+		SessionStore: store,
+		UserID:       "user1",
+		RecordMessage: func(_ context.Context, msg Message) error {
+			mu.Lock()
+			recorded = append(recorded, msg)
+			mu.Unlock()
+			return nil
+		},
+	})
+
+	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "do 12 things"})
+
+	err := waitForLoopDone(ctx, cancel, loop, 30*time.Second)
+	assert.ErrorIs(t, err, context.Canceled)
+
+	store.mu.Lock()
+	var subCount int
+	for _, s := range store.sessions {
+		if s.ParentSessionID == parentID {
+			subCount++
+		}
+	}
+	store.mu.Unlock()
+
+	assert.LessOrEqual(t, subCount, 10, "should have at most 10 sub-sessions")
+
+	mu.Lock()
+	defer mu.Unlock()
+	var errorResults int
+	for _, msg := range recorded {
+		for _, tr := range msg.ToolResults {
+			if tr.IsError {
+				errorResults++
+			}
+		}
+	}
+	assert.Equal(t, 2, errorResults, "2 delegate calls should have been rejected")
 }

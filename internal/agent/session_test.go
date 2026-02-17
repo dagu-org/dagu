@@ -585,3 +585,69 @@ func TestSessionManager_SetSafeMode(t *testing.T) {
 		// If we reach here without race condition, test passes
 	})
 }
+
+func TestSessionManager_RecordMessage_PersistsViaCallback(t *testing.T) {
+	t.Parallel()
+
+	var persisted []Message
+	var mu sync.Mutex
+
+	provider := newStopProvider("persisted response")
+
+	sm := NewSessionManager(SessionManagerConfig{
+		OnMessage: func(_ context.Context, msg Message) error {
+			mu.Lock()
+			persisted = append(persisted, msg)
+			mu.Unlock()
+			return nil
+		},
+	})
+
+	err := sm.AcceptUserMessage(context.Background(), provider, "m", "m", "hello")
+	require.NoError(t, err)
+
+	// Wait for the LLM to respond and message to be persisted
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(persisted) >= 1
+	}, 5*time.Second, 50*time.Millisecond)
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Should have at least the assistant message persisted
+	var hasAssistant bool
+	for _, msg := range persisted {
+		if msg.Type == MessageTypeAssistant {
+			hasAssistant = true
+		}
+	}
+	assert.True(t, hasAssistant, "assistant message should be persisted via OnMessage callback")
+
+	_ = sm.Cancel(context.Background())
+}
+
+func TestSessionManager_ConcurrentMessages(t *testing.T) {
+	t.Parallel()
+
+	provider := newStopProvider("ok")
+
+	sm := NewSessionManager(SessionManagerConfig{})
+
+	// Send 3 messages in rapid succession
+	for i := range 3 {
+		err := sm.AcceptUserMessage(context.Background(), provider, "m", "m",
+			"message-"+string(rune('0'+i)))
+		require.NoError(t, err)
+		time.Sleep(10 * time.Millisecond) // Small delay to avoid same-instant
+	}
+
+	// Wait for processing
+	time.Sleep(200 * time.Millisecond)
+
+	msgs := sm.GetMessages()
+	assert.GreaterOrEqual(t, len(msgs), 3, "should have at least 3 user messages")
+
+	_ = sm.Cancel(context.Background())
+}

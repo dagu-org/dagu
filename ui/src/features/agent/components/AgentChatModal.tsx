@@ -19,11 +19,13 @@ function findLatestSession(
 ): SessionWithState | null {
   if (sessions.length === 0) return null;
 
-  let latest = sessions[0]!;
+  let latest: SessionWithState | null = null;
   for (const sess of sessions) {
+    if (sess.session.parent_session_id) continue;
     if (
+      !latest ||
       new Date(sess.session.updated_at) >
-      new Date(latest.session.updated_at)
+        new Date(latest.session.updated_at)
     ) {
       latest = sess;
     }

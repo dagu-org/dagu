@@ -112,8 +112,9 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	childCtx, cancelChild := context.WithCancel(ctx.Context)
 	defer cancelChild()
 
-	// Track last assistant content for summary extraction.
+	// Track last assistant content and errors for result extraction.
 	var lastAssistantContent string
+	var lastError string
 	iteration := 0
 
 	logger := dc.Logger
@@ -122,7 +123,16 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	}
 	logger = logger.With("delegate_id", delegateID, "task", truncate(args.Task, 100))
 
-	// Build RecordMessage that persists to sub-session and captures last assistant content.
+	// Build RecordMessage that persists to sub-session and captures results.
+	captureResult := func(msg Message) {
+		if msg.Type == MessageTypeAssistant && msg.Content != "" {
+			lastAssistantContent = msg.Content
+		}
+		if msg.Type == MessageTypeError {
+			lastError = msg.Content
+		}
+	}
+
 	var recordMessage MessageRecordFunc
 	if dc.SessionStore != nil {
 		recordMessage = func(msgCtx context.Context, msg Message) error {
@@ -130,16 +140,12 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 			if msg.ID == "" {
 				msg.ID = uuid.New().String()
 			}
-			if msg.Type == MessageTypeAssistant && msg.Content != "" {
-				lastAssistantContent = msg.Content
-			}
+			captureResult(msg)
 			return dc.SessionStore.AddMessage(msgCtx, delegateID, &msg)
 		}
 	} else {
 		recordMessage = func(_ context.Context, msg Message) error {
-			if msg.Type == MessageTypeAssistant && msg.Content != "" {
-				lastAssistantContent = msg.Content
-			}
+			captureResult(msg)
 			return nil
 		}
 	}
@@ -160,8 +166,11 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 				iteration++
 				if iteration >= maxIterations {
 					logger.Info("Sub-agent max iterations reached", "max", maxIterations)
-					cancelChild()
 				}
+				// Cancel the child loop after each complete processing cycle.
+				// The delegate queues exactly one task message, so the child
+				// should exit after the first LLM response (success or error).
+				cancelChild()
 			}
 		},
 	})
@@ -186,6 +195,17 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	}
 
 	logger.Info("Sub-agent completed", "iterations", iteration)
+
+	// Check if the child loop captured an error (e.g., provider failure).
+	// This handles cases where the loop exits via context cancellation
+	// but the underlying cause was an LLM error.
+	if lastAssistantContent == "" && lastError != "" {
+		return ToolOut{
+			Content:    fmt.Sprintf("Sub-agent failed: %s", lastError),
+			IsError:    true,
+			DelegateID: delegateID,
+		}
+	}
 
 	summary := lastAssistantContent
 	if summary == "" {

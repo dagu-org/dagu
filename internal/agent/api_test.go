@@ -2,8 +2,10 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -787,4 +789,370 @@ func TestAPI_ListTools(t *testing.T) {
 		assert.NotEmpty(t, tool.Label)
 		assert.NotEmpty(t, tool.Description)
 	}
+}
+
+// createAPIWithSessionStore creates an API with a mock session store and custom provider.
+func createAPIWithSessionStore(t *testing.T, provider llm.Provider) (*API, *mockSessionStore) {
+	t.Helper()
+
+	model := testModelConfig("test-model")
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = model.ID
+	sessStore := newMockSessionStore()
+
+	api := NewAPI(APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   newMockModelStore().addModel(model),
+		WorkingDir:   t.TempDir(),
+		SessionStore: sessStore,
+	})
+	api.providers.Set(model.ToLLMConfig(), provider)
+
+	return api, sessStore
+}
+
+func TestAPI_ListSessions_ExcludesSubSessions(t *testing.T) {
+	t.Parallel()
+
+	api, store := createAPIWithSessionStore(t, newStopProvider("hello"))
+
+	now := time.Now()
+
+	// Insert parent session
+	parentSess := &Session{
+		ID:        "parent-sess-1",
+		UserID:    defaultUserID,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	require.NoError(t, store.CreateSession(context.Background(), parentSess))
+
+	// Insert sub-session (has ParentSessionID set)
+	subSess := &Session{
+		ID:              "sub-sess-1",
+		UserID:          defaultUserID,
+		ParentSessionID: "parent-sess-1",
+		DelegateTask:    "analyze data",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	require.NoError(t, store.CreateSession(context.Background(), subSess))
+
+	sessions := api.ListSessions(context.Background(), defaultUserID)
+
+	// Should only contain the parent session, not the sub-session
+	assert.Len(t, sessions, 1)
+	assert.Equal(t, "parent-sess-1", sessions[0].Session.ID)
+}
+
+func TestAPI_ReactivateSession_RejectsSubSession(t *testing.T) {
+	t.Parallel()
+
+	api, store := createAPIWithSessionStore(t, newStopProvider("hello"))
+
+	now := time.Now()
+
+	// Insert a sub-session in the store
+	subSess := &Session{
+		ID:              "sub-sess-1",
+		UserID:          defaultUserID,
+		ParentSessionID: "parent-sess-1",
+		DelegateTask:    "sub task",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	require.NoError(t, store.CreateSession(context.Background(), subSess))
+
+	// SendMessage should fail because reactivateSession rejects sub-sessions
+	err := api.SendMessage(context.Background(), "sub-sess-1", defaultUserID, defaultUserID, defaultUserRole, "", ChatRequest{Message: "hello"})
+	assert.ErrorIs(t, err, ErrSessionNotFound)
+}
+
+func TestAPI_ReactivateSession_AcceptsParentSession(t *testing.T) {
+	t.Parallel()
+
+	api, store := createAPIWithSessionStore(t, newStopProvider("hello"))
+
+	now := time.Now()
+
+	// Insert a normal parent session in the store
+	parentSess := &Session{
+		ID:        "parent-sess-1",
+		UserID:    defaultUserID,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	require.NoError(t, store.CreateSession(context.Background(), parentSess))
+
+	// SendMessage should succeed by reactivating the session
+	err := api.SendMessage(context.Background(), "parent-sess-1", defaultUserID, defaultUserID, defaultUserRole, "", ChatRequest{Message: "hello"})
+	assert.NoError(t, err)
+
+	// Verify session is now active
+	_, ok := api.sessions.Load("parent-sess-1")
+	assert.True(t, ok, "session should be reactivated and active")
+}
+
+func TestAPI_GetSessionDetail_AllowsSubSession(t *testing.T) {
+	t.Parallel()
+
+	api, store := createAPIWithSessionStore(t, newStopProvider("hello"))
+
+	now := time.Now()
+
+	// Insert a sub-session in the store
+	subSess := &Session{
+		ID:              "sub-sess-1",
+		UserID:          defaultUserID,
+		ParentSessionID: "parent-sess-1",
+		DelegateTask:    "sub task",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	require.NoError(t, store.CreateSession(context.Background(), subSess))
+
+	// Add a message to the sub-session
+	require.NoError(t, store.AddMessage(context.Background(), "sub-sess-1", &Message{
+		ID:      "msg-1",
+		Type:    MessageTypeAssistant,
+		Content: "sub result",
+	}))
+
+	// GetSessionDetail should work for sub-sessions (read-only access is OK)
+	resp, err := api.GetSessionDetail(context.Background(), "sub-sess-1", defaultUserID)
+	require.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Equal(t, "sub-sess-1", resp.SessionState.SessionID)
+	assert.Len(t, resp.Messages, 1)
+	assert.Equal(t, "sub result", resp.Messages[0].Content)
+}
+
+func TestAPI_CreateSession_DelegateFlow(t *testing.T) {
+	t.Parallel()
+
+	provider := newDelegateProvider("analyze data")
+	api, store := createAPIWithSessionStore(t, provider)
+
+	sessID, err := api.CreateSession(context.Background(), defaultUserID, defaultUserID, defaultUserRole, "", ChatRequest{Message: "delegate test"})
+	require.NoError(t, err)
+	require.NotEmpty(t, sessID)
+
+	// Wait for the delegate flow to complete (parent loop processes delegate tool call,
+	// child loop runs, parent loop gets final response)
+	require.Eventually(t, func() bool {
+		mgr, ok := api.sessions.Load(sessID)
+		if !ok {
+			return false
+		}
+		return !mgr.(*SessionManager).IsWorking()
+	}, 10*time.Second, 100*time.Millisecond, "session should finish processing")
+
+	// Verify sub-session was created in the store
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	var subSessions []*Session
+	for _, sess := range store.sessions {
+		if sess.ParentSessionID == sessID {
+			subSessions = append(subSessions, sess)
+		}
+	}
+
+	require.Len(t, subSessions, 1, "should have exactly one sub-session")
+	assert.Equal(t, sessID, subSessions[0].ParentSessionID)
+	assert.Equal(t, "analyze data", subSessions[0].DelegateTask)
+	assert.Equal(t, defaultUserID, subSessions[0].UserID)
+}
+
+func TestAPI_CreateSession_ParentMessagesIntact(t *testing.T) {
+	t.Parallel()
+
+	provider := newDelegateProvider("sub task")
+	api, _ := createAPIWithSessionStore(t, provider)
+
+	sessID, err := api.CreateSession(context.Background(), defaultUserID, defaultUserID, defaultUserRole, "", ChatRequest{Message: "parent msg"})
+	require.NoError(t, err)
+
+	// Wait for processing to complete
+	require.Eventually(t, func() bool {
+		mgr, ok := api.sessions.Load(sessID)
+		if !ok {
+			return false
+		}
+		return !mgr.(*SessionManager).IsWorking()
+	}, 10*time.Second, 100*time.Millisecond)
+
+	mgr, ok := api.sessions.Load(sessID)
+	require.True(t, ok)
+	msgs := mgr.(*SessionManager).GetMessages()
+
+	// Parent messages should include:
+	// 1. User message
+	// 2. Assistant message with tool call
+	// 3. Tool result (delegate result)
+	// 4. Final assistant message
+	require.GreaterOrEqual(t, len(msgs), 3, "parent should have at least user + assistant + tool result messages")
+
+	// First message should be user
+	assert.Equal(t, MessageTypeUser, msgs[0].Type)
+	assert.Contains(t, msgs[0].Content, "parent msg")
+
+	// Check that there's a delegate result message (has DelegateID set)
+	var hasDelegateResult bool
+	for _, msg := range msgs {
+		if msg.DelegateID != "" {
+			hasDelegateResult = true
+			break
+		}
+	}
+	assert.True(t, hasDelegateResult, "parent messages should contain delegate tool result with DelegateID")
+}
+
+func TestAPI_CreateSession_MultipleDelegates(t *testing.T) {
+	t.Parallel()
+
+	var mu sync.Mutex
+	callCount := 0
+	provider := &mockLLMProvider{
+		chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+			mu.Lock()
+			callCount++
+			n := callCount
+			mu.Unlock()
+			if n == 1 {
+				// Return 2 delegate tool calls
+				return &llm.ChatResponse{
+					Content:      "",
+					FinishReason: "tool_calls",
+					ToolCalls: []llm.ToolCall{
+						{
+							ID:   "call-1",
+							Type: "function",
+							Function: llm.ToolCallFunction{
+								Name:      "delegate",
+								Arguments: `{"task": "task one"}`,
+							},
+						},
+						{
+							ID:   "call-2",
+							Type: "function",
+							Function: llm.ToolCallFunction{
+								Name:      "delegate",
+								Arguments: `{"task": "task two"}`,
+							},
+						},
+					},
+				}, nil
+			}
+			return &llm.ChatResponse{Content: fmt.Sprintf("done-%d", n), FinishReason: "stop"}, nil
+		},
+	}
+
+	api, store := createAPIWithSessionStore(t, provider)
+
+	sessID, err := api.CreateSession(context.Background(), defaultUserID, defaultUserID, defaultUserRole, "", ChatRequest{Message: "multi delegate"})
+	require.NoError(t, err)
+
+	// Wait for processing to complete
+	require.Eventually(t, func() bool {
+		mgr, ok := api.sessions.Load(sessID)
+		if !ok {
+			return false
+		}
+		return !mgr.(*SessionManager).IsWorking()
+	}, 10*time.Second, 100*time.Millisecond)
+
+	// Verify 2 sub-sessions were created
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	var subSessions []*Session
+	for _, sess := range store.sessions {
+		if sess.ParentSessionID == sessID {
+			subSessions = append(subSessions, sess)
+		}
+	}
+
+	assert.Len(t, subSessions, 2, "should have 2 sub-sessions for 2 delegate calls")
+
+	// Verify each has a different delegate task
+	tasks := map[string]bool{}
+	for _, sub := range subSessions {
+		tasks[sub.DelegateTask] = true
+	}
+	assert.Contains(t, tasks, "task one")
+	assert.Contains(t, tasks, "task two")
+}
+
+func TestAPI_CreateSession_PersistsToStore(t *testing.T) {
+	t.Parallel()
+
+	api, store := createAPIWithSessionStore(t, newStopProvider("persisted response"))
+
+	sessID, err := api.CreateSession(context.Background(), defaultUserID, defaultUserID, defaultUserRole, "", ChatRequest{Message: "persist test"})
+	require.NoError(t, err)
+
+	// Verify session exists in store
+	assert.True(t, store.HasSession(sessID), "session should be persisted to store")
+
+	// Wait for messages to be persisted
+	require.Eventually(t, func() bool {
+		store.mu.Lock()
+		defer store.mu.Unlock()
+		msgs, exists := store.messages[sessID]
+		if !exists {
+			return false
+		}
+		// Should have at least user + assistant messages
+		return len(msgs) >= 1
+	}, 5*time.Second, 50*time.Millisecond)
+
+	// Verify messages are persisted
+	store.mu.Lock()
+	msgs := store.messages[sessID]
+	store.mu.Unlock()
+
+	assert.GreaterOrEqual(t, len(msgs), 1, "should have persisted messages")
+
+	// Verify session metadata
+	sess, err := store.GetSession(context.Background(), sessID)
+	require.NoError(t, err)
+	assert.Equal(t, defaultUserID, sess.UserID)
+	assert.Empty(t, sess.ParentSessionID, "parent session should not have ParentSessionID")
+}
+
+func TestAPI_SendMessage_ReactivatesFromStore(t *testing.T) {
+	t.Parallel()
+
+	api, store := createAPIWithSessionStore(t, newStopProvider("reactivated response"))
+
+	// Create a session
+	sessID, err := api.CreateSession(context.Background(), defaultUserID, defaultUserID, defaultUserRole, "", ChatRequest{Message: "initial"})
+	require.NoError(t, err)
+
+	// Wait for initial processing
+	require.Eventually(t, func() bool {
+		mgr, ok := api.sessions.Load(sessID)
+		if !ok {
+			return false
+		}
+		return !mgr.(*SessionManager).IsWorking()
+	}, 5*time.Second, 50*time.Millisecond)
+
+	// Remove from active sessions (simulate cleanup)
+	api.sessions.Delete(sessID)
+
+	_, stillActive := api.sessions.Load(sessID)
+	require.False(t, stillActive, "session should be removed from active sessions")
+
+	// Verify it's still in the store
+	assert.True(t, store.HasSession(sessID), "session should still exist in store")
+
+	// SendMessage should reactivate from store
+	err = api.SendMessage(context.Background(), sessID, defaultUserID, defaultUserID, defaultUserRole, "", ChatRequest{Message: "follow up"})
+	assert.NoError(t, err)
+
+	// Verify session is now active again
+	_, reactivated := api.sessions.Load(sessID)
+	assert.True(t, reactivated, "session should be reactivated from store")
 }

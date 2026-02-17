@@ -85,6 +85,8 @@ function convertApiSessions(sessions: ApiSessionWithState[]): SessionWithState[]
       title: s.session.title,
       created_at: s.session.createdAt,
       updated_at: s.session.updatedAt,
+      parent_session_id: s.session.parentSessionId,
+      delegate_task: s.session.delegateTask,
     },
     working: s.working,
     model: s.model,
@@ -102,6 +104,8 @@ function convertApiSessionDetail(detail: ApiSessionDetail): StreamResponse {
           title: detail.session.title,
           created_at: detail.session.createdAt,
           updated_at: detail.session.updatedAt,
+          parent_session_id: detail.session.parentSessionId,
+          delegate_task: detail.session.delegateTask,
         }
       : undefined,
     session_state: detail.sessionState
