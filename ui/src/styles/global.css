@@ -779,6 +779,66 @@ select:focus-visible {
   background: var(--border-strong);
 }
 
+/* Agent modal sci-fi open animation */
+@keyframes agent-modal-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(20px);
+    filter: blur(4px);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0px);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Agent modal sci-fi close animation */
+@keyframes agent-modal-out {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.92) translateY(20px);
+    filter: blur(4px);
+  }
+}
+
+/* Sub-agent panel sci-fi open */
+@keyframes delegate-panel-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.9) translateX(20px);
+    filter: blur(4px);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0px);
+  }
+  100% {
+    transform: scale(1) translateX(0);
+  }
+}
+
+/* Sub-agent panel sci-fi close */
+@keyframes delegate-panel-out {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateX(0);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.9) translateX(20px);
+    filter: blur(4px);
+  }
+}
+
 /* Loading States */
 .skeleton {
   background: linear-gradient(

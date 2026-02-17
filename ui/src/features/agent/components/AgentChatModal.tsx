@@ -180,11 +180,13 @@ export function AgentChatModal(): ReactElement | null {
         className={cn(
           'fixed inset-0 z-50',
           'flex flex-col',
-          'bg-popover dark:bg-zinc-950',
-          isClosing
-            ? 'animate-out slide-out-to-bottom-4 fade-out-0 duration-150'
-            : 'animate-in slide-in-from-bottom-4 fade-in-0 duration-200'
+          'bg-card dark:bg-zinc-950'
         )}
+        style={{
+          animation: isClosing
+            ? 'agent-modal-out 150ms ease-in forwards'
+            : 'agent-modal-in 250ms ease-out',
+        }}
       >
         {content}
       </div>
@@ -198,11 +200,8 @@ export function AgentChatModal(): ReactElement | null {
         className={cn(
           'fixed z-50',
           'flex flex-col',
-          'bg-popover dark:bg-zinc-950 border border-border rounded-lg overflow-hidden',
-          'shadow-xl dark:shadow-[0_0_30px_rgba(0,0,0,0.6)]',
-          isClosing
-            ? 'animate-out slide-out-to-bottom-4 fade-out-0 duration-150'
-            : 'animate-in slide-in-from-bottom-4 fade-in-0 duration-200'
+          'bg-card dark:bg-zinc-950 border border-border-strong dark:border-border rounded-lg overflow-hidden',
+          'shadow-xl'
         )}
         style={{
           right: bounds.right,
@@ -211,6 +210,9 @@ export function AgentChatModal(): ReactElement | null {
           height: bounds.height,
           maxWidth: 'calc(100vw - 32px)',
           maxHeight: 'calc(100vh - 100px)',
+          animation: isClosing
+            ? 'agent-modal-out 150ms ease-in forwards'
+            : 'agent-modal-in 250ms ease-out',
         }}
       >
         <ResizeHandles resizeHandlers={resizeHandlers} />

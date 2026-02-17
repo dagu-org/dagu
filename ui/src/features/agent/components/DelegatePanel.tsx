@@ -30,8 +30,8 @@ export function DelegatePanel({
   const { bounds, dragHandlers, resizeHandlers } = useResizableDraggable({
     defaultWidth: 320,
     defaultHeight: 360,
-    defaultRight: 468 + index * 30,
-    defaultBottom: 64 + index * 30,
+    defaultRight: 468 + index * 332,
+    defaultBottom: 64,
     minWidth: 280,
     minHeight: 200,
     storageKey: `delegate-panel-${delegateId}`,
@@ -54,11 +54,8 @@ export function DelegatePanel({
       className={cn(
         'fixed',
         'flex flex-col',
-        'bg-popover dark:bg-zinc-950 border border-border rounded-lg overflow-hidden',
-        'shadow-lg dark:shadow-[0_0_20px_rgba(0,0,0,0.5)]',
-        isClosing
-          ? 'animate-out slide-out-to-bottom-2 fade-out-0 duration-150'
-          : 'animate-in slide-in-from-bottom-2 fade-in-0 duration-200'
+        'bg-card dark:bg-zinc-950 border border-border-strong dark:border-border rounded-lg overflow-hidden',
+        'shadow-lg'
       )}
       style={{
         right: bounds.right,
@@ -66,6 +63,9 @@ export function DelegatePanel({
         width: bounds.width,
         height: bounds.height,
         zIndex,
+        animation: isClosing
+          ? 'delegate-panel-out 150ms ease-in forwards'
+          : 'delegate-panel-in 250ms ease-out',
       }}
       onMouseDown={handleMouseDown}
     >
@@ -74,7 +74,7 @@ export function DelegatePanel({
       <div
         className={cn(
           'flex items-center gap-1.5 px-2 h-8 min-h-[32px]',
-          'bg-muted/50 dark:bg-zinc-900 border-b border-border',
+          'bg-secondary dark:bg-zinc-900 border-b border-border-strong dark:border-border',
           'cursor-move select-none'
         )}
         {...dragHandlers}
