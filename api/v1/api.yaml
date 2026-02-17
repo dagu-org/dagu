@@ -4538,6 +4538,297 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /settings/agent/tools:
+    get:
+      summary: "List agent tools"
+      description: "Returns metadata for all registered agent tools."
+      operationId: "listAgentTools"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "List of tools"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAgentToolsResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /agent/sessions:
+    post:
+      summary: "Create agent session"
+      description: "Creates a new agent session and sends the first message."
+      operationId: "createAgentSession"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentChatRequest"
+      responses:
+        "201":
+          description: "Session created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateAgentSessionResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: "Agent not configured"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: "List agent sessions"
+      description: "Lists all sessions for the current user."
+      operationId: "listAgentSessions"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "List of sessions"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AgentSessionWithState"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /agent/sessions/{sessionId}:
+    get:
+      summary: "Get agent session"
+      description: "Returns session details including messages and current state."
+      operationId: "getAgentSession"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/AgentSessionId"
+      responses:
+        "200":
+          description: "Session details"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentSessionDetailResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Session not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /agent/sessions/{sessionId}/chat:
+    post:
+      summary: "Send message to agent session"
+      description: "Sends a message to an existing agent session."
+      operationId: "chatAgentSession"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/AgentSessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentChatRequest"
+      responses:
+        "202":
+          description: "Message accepted"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentStatusResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Session not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: "Agent not configured"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /agent/sessions/{sessionId}/cancel:
+    post:
+      summary: "Cancel agent session"
+      description: "Cancels processing in an active agent session."
+      operationId: "cancelAgentSession"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/AgentSessionId"
+      responses:
+        "200":
+          description: "Session cancelled"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentStatusResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Session not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /agent/sessions/{sessionId}/respond:
+    post:
+      summary: "Respond to agent prompt"
+      description: "Submits user's response to an agent prompt."
+      operationId: "respondAgentSession"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/AgentSessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentUserPromptResponse"
+      responses:
+        "200":
+          description: "Response accepted"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentStatusResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Session not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: "Prompt expired or already answered"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   securitySchemes:
     basicAuth:
@@ -4713,6 +5004,15 @@ components:
       required: false
       schema:
         $ref: "#/components/schemas/Stream"
+
+    AgentSessionId:
+      name: sessionId
+      in: path
+      description: "Unique identifier of the agent session"
+      required: true
+      schema:
+        type: string
+        minLength: 1
 
   schemas:
     AuditEntry:
@@ -7385,6 +7685,339 @@ components:
         content:
           type: string
           description: "New memory content (markdown)"
+
+    AgentToolInfo:
+      type: object
+      description: "Metadata for a registered agent tool"
+      required:
+        - name
+        - label
+        - description
+      properties:
+        name:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+
+    ListAgentToolsResponse:
+      type: object
+      description: "List of agent tool metadata"
+      required:
+        - tools
+      properties:
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentToolInfo"
+
+    AgentDAGContext:
+      type: object
+      description: "DAG reference for context-aware agent responses"
+      required:
+        - dagFile
+      properties:
+        dagFile:
+          type: string
+          description: "DAG file path or identifier"
+        dagRunId:
+          type: string
+          description: "Specific run ID of the DAG"
+
+    AgentChatRequest:
+      type: object
+      description: "Request to send a chat message to the agent"
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: "User's input text"
+          minLength: 1
+        model:
+          type: string
+          description: "LLM model ID to use"
+        dagContexts:
+          type: array
+          description: "DAG references for context"
+          items:
+            $ref: "#/components/schemas/AgentDAGContext"
+        safeMode:
+          type: boolean
+          description: "Enable approval prompts for dangerous commands"
+
+    CreateAgentSessionResponse:
+      type: object
+      description: "Response after creating a new agent session"
+      required:
+        - sessionId
+        - status
+      properties:
+        sessionId:
+          type: string
+        status:
+          type: string
+
+    AgentSession:
+      type: object
+      description: "Agent chat session metadata"
+      required:
+        - id
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        dagName:
+          type: string
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        parentSessionId:
+          type: string
+        delegateTask:
+          type: string
+
+    AgentSessionState:
+      type: object
+      description: "Current processing state of an agent session"
+      required:
+        - sessionId
+        - working
+        - totalCost
+      properties:
+        sessionId:
+          type: string
+        working:
+          type: boolean
+        model:
+          type: string
+        totalCost:
+          type: number
+          format: double
+
+    AgentSessionWithState:
+      type: object
+      description: "Agent session with its current state"
+      required:
+        - session
+        - working
+        - totalCost
+      properties:
+        session:
+          $ref: "#/components/schemas/AgentSession"
+        working:
+          type: boolean
+        model:
+          type: string
+        totalCost:
+          type: number
+          format: double
+
+    AgentToolCallFunction:
+      type: object
+      description: "Function call details in a tool call"
+      required:
+        - name
+        - arguments
+      properties:
+        name:
+          type: string
+        arguments:
+          type: string
+
+    AgentToolCall:
+      type: object
+      description: "Tool call requested by the LLM"
+      required:
+        - id
+        - type
+        - function
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        function:
+          $ref: "#/components/schemas/AgentToolCallFunction"
+
+    AgentToolResult:
+      type: object
+      description: "Result from a tool execution"
+      required:
+        - toolCallId
+        - content
+      properties:
+        toolCallId:
+          type: string
+        content:
+          type: string
+        isError:
+          type: boolean
+
+    AgentTokenUsage:
+      type: object
+      description: "Token usage statistics from LLM"
+      properties:
+        promptTokens:
+          type: integer
+        completionTokens:
+          type: integer
+        totalTokens:
+          type: integer
+
+    AgentUIAction:
+      type: object
+      description: "UI action to be performed"
+      properties:
+        type:
+          type: string
+        path:
+          type: string
+
+    AgentUserPromptOption:
+      type: object
+      description: "Single option in a user prompt"
+      required:
+        - id
+        - label
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+
+    AgentUserPrompt:
+      type: object
+      description: "Question from the agent requiring user response"
+      required:
+        - promptId
+        - question
+        - allowFreeText
+        - multiSelect
+      properties:
+        promptId:
+          type: string
+        question:
+          type: string
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentUserPromptOption"
+        allowFreeText:
+          type: boolean
+        freeTextPlaceholder:
+          type: string
+        multiSelect:
+          type: boolean
+        promptType:
+          type: string
+          enum:
+            - general
+            - command_approval
+        command:
+          type: string
+        workingDir:
+          type: string
+
+    AgentMessage:
+      type: object
+      description: "A message in an agent session"
+      required:
+        - id
+        - sessionId
+        - type
+        - sequenceId
+        - createdAt
+      properties:
+        id:
+          type: string
+        sessionId:
+          type: string
+        type:
+          type: string
+          enum:
+            - user
+            - assistant
+            - error
+            - ui_action
+            - user_prompt
+        sequenceId:
+          type: integer
+          format: int64
+        content:
+          type: string
+        toolCalls:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentToolCall"
+        toolResults:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentToolResult"
+        usage:
+          $ref: "#/components/schemas/AgentTokenUsage"
+        cost:
+          type: number
+          format: double
+        createdAt:
+          type: string
+          format: date-time
+        uiAction:
+          $ref: "#/components/schemas/AgentUIAction"
+        userPrompt:
+          $ref: "#/components/schemas/AgentUserPrompt"
+        delegateId:
+          type: string
+
+    AgentSessionDetailResponse:
+      type: object
+      description: "Session details including messages and current state"
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentMessage"
+        session:
+          $ref: "#/components/schemas/AgentSession"
+        sessionState:
+          $ref: "#/components/schemas/AgentSessionState"
+
+    AgentUserPromptResponse:
+      type: object
+      description: "User's response to an agent prompt"
+      required:
+        - promptId
+      properties:
+        promptId:
+          type: string
+        selectedOptionIds:
+          type: array
+          items:
+            type: string
+        freeTextResponse:
+          type: string
+        cancelled:
+          type: boolean
+
+    AgentStatusResponse:
+      type: object
+      description: "Simple status response"
+      required:
+        - status
+      properties:
+        status:
+          type: string
 
 # Apply security requirements globally
 security:

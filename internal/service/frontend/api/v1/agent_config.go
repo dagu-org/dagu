@@ -106,6 +106,28 @@ func (a *API) UpdateAgentConfig(ctx context.Context, request api.UpdateAgentConf
 	return api.UpdateAgentConfig200JSONResponse(toAgentConfigResponse(cfg)), nil
 }
 
+// ListAgentTools returns metadata for all registered agent tools.
+func (a *API) ListAgentTools(ctx context.Context, _ api.ListAgentToolsRequestObject) (api.ListAgentToolsResponseObject, error) {
+	if err := a.requireAgentConfigManagement(); err != nil {
+		return nil, err
+	}
+	if err := a.requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+
+	regs := agent.RegisteredTools()
+	tools := make([]api.AgentToolInfo, len(regs))
+	for i, reg := range regs {
+		tools[i] = api.AgentToolInfo{
+			Name:        reg.Name,
+			Label:       reg.Label,
+			Description: reg.Description,
+		}
+	}
+
+	return api.ListAgentTools200JSONResponse{Tools: tools}, nil
+}
+
 func (a *API) requireAgentConfigManagement() error {
 	if a.agentConfigStore == nil {
 		return ErrAgentConfigNotAvailable

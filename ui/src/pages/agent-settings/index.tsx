@@ -33,7 +33,6 @@ import {
 } from '@/components/ui/table';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useIsAdmin } from '@/contexts/AuthContext';
-import { useConfig } from '@/contexts/ConfigContext';
 import { useClient } from '@/hooks/api';
 import ConfirmModal from '@/ui/ConfirmModal';
 import { ModelFormModal } from './ModelFormModal';
@@ -87,7 +86,7 @@ function canonicalizeToolPolicy(policy: AgentToolPolicy | undefined, tools: Tool
   const sortedToolsEntries = Object.entries(normalized.tools || {}).sort(([a], [b]) =>
     a.localeCompare(b)
   );
-  const tools = Object.fromEntries(sortedToolsEntries);
+  const sortedTools = Object.fromEntries(sortedToolsEntries);
   const rules = (normalized.bash?.rules || []).map((rule) => ({
     ...rule,
     name: rule.name || '',
@@ -95,7 +94,7 @@ function canonicalizeToolPolicy(policy: AgentToolPolicy | undefined, tools: Tool
   }));
 
   return {
-    tools,
+    tools: sortedTools,
     bash: {
       rules,
       defaultBehavior: normalized.bash?.defaultBehavior || AgentBashPolicyDefaultBehavior.allow,
@@ -106,7 +105,6 @@ function canonicalizeToolPolicy(policy: AgentToolPolicy | undefined, tools: Tool
 
 export default function AgentSettingsPage(): React.ReactNode {
   const client = useClient();
-  const config = useConfig();
   const isAdmin = useIsAdmin();
   const appBarContext = useContext(AppBarContext);
   const [toolMetas, setToolMetas] = useState<ToolMeta[]>([]);
@@ -147,15 +145,16 @@ export default function AgentSettingsPage(): React.ReactNode {
 
   const fetchTools = useCallback(async (): Promise<ToolMeta[]> => {
     try {
-      const resp = await fetch(`${config.apiURL}/agent/tools?remoteNode=${remoteNode}`);
-      if (!resp.ok) return [];
-      const data: ToolMeta[] = await resp.json();
-      setToolMetas(data);
-      return data;
+      const { data } = await client.GET('/settings/agent/tools', {
+        params: { query: { remoteNode } },
+      });
+      const tools: ToolMeta[] = data?.tools || [];
+      setToolMetas(tools);
+      return tools;
     } catch {
       return [];
     }
-  }, [config.apiURL, remoteNode]);
+  }, [client, remoteNode]);
 
   const fetchConfig = useCallback(async (tools: ToolMeta[]) => {
     try {
