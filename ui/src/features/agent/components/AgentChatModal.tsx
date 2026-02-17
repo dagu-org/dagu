@@ -200,7 +200,7 @@ export function AgentChatModal(): ReactElement | null {
         className={cn(
           'fixed z-50',
           'flex flex-col',
-          'bg-card dark:bg-zinc-950 border border-border-strong dark:border-border rounded-lg overflow-hidden',
+          'bg-card dark:bg-zinc-950 border border-border-strong rounded-lg overflow-hidden',
           'shadow-xl'
         )}
         style={{

@@ -54,7 +54,7 @@ export function DelegatePanel({
       className={cn(
         'fixed',
         'flex flex-col',
-        'bg-card dark:bg-zinc-950 border border-border-strong dark:border-border rounded-lg overflow-hidden',
+        'bg-card dark:bg-zinc-950 border border-border-strong rounded-lg overflow-hidden',
         'shadow-lg'
       )}
       style={{
@@ -74,7 +74,7 @@ export function DelegatePanel({
       <div
         className={cn(
           'flex items-center gap-1.5 px-2 h-8 min-h-[32px]',
-          'bg-secondary dark:bg-zinc-900 border-b border-border-strong dark:border-border',
+          'bg-secondary dark:bg-surface border-b border-border',
           'cursor-move select-none'
         )}
         {...dragHandlers}
@@ -97,7 +97,7 @@ export function DelegatePanel({
       </div>
 
       {/* Body - messages */}
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         <ChatMessages
           messages={messages}
           pendingUserMessage={null}
