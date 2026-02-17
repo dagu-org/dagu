@@ -819,7 +819,7 @@ func TestLoop_BatchedDelegateExceedsMax(t *testing.T) {
 
 	// Build a batched delegate call with 12 tasks (exceeds max of 8)
 	var tasks []string
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		tasks = append(tasks, fmt.Sprintf(`{"task":"task-%d"}`, i))
 	}
 	tasksJSON := "[" + strings.Join(tasks, ",") + "]"

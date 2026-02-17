@@ -295,13 +295,13 @@ func toAPIMessages(msgs []agent.Message) []api.AgentMessage {
 	result := make([]api.AgentMessage, len(msgs))
 	for i, m := range msgs {
 		msg := api.AgentMessage{
-			Id:         m.ID,
-			SessionId:  m.SessionID,
-			Type:       api.AgentMessageType(m.Type),
-			SequenceId: m.SequenceID,
-			Content:    ptrOf(m.Content),
-			CreatedAt:  m.CreatedAt,
-			Cost:       m.Cost,
+			Id:          m.ID,
+			SessionId:   m.SessionID,
+			Type:        api.AgentMessageType(m.Type),
+			SequenceId:  m.SequenceID,
+			Content:     ptrOf(m.Content),
+			CreatedAt:   m.CreatedAt,
+			Cost:        m.Cost,
 			DelegateIds: ptrOf(m.DelegateIDs),
 		}
 

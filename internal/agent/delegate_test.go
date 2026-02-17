@@ -335,7 +335,7 @@ func TestDelegateTool_ExceedsMaxTasks(t *testing.T) {
 
 	// Build more than maxConcurrentDelegates tasks
 	var tasks []delegateTask
-	for i := 0; i < maxConcurrentDelegates+4; i++ {
+	for i := range maxConcurrentDelegates + 4 {
 		tasks = append(tasks, delegateTask{Task: fmt.Sprintf("task %d", i)})
 	}
 	input, err := json.Marshal(delegateInput{Tasks: tasks})

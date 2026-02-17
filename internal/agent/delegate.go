@@ -213,6 +213,12 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		dc.RegisterSubSession(delegateID, subMgr)
 	}
 
+	// Record the task as the initial user message so it appears in the SSE snapshot.
+	_ = subMgr.RecordExternalMessage(ctx.Context, Message{
+		Type:    MessageTypeUser,
+		Content: task.Task,
+	})
+
 	// Set working state before notifying parent so the SSE snapshot has working=true.
 	subMgr.SetWorking(true)
 

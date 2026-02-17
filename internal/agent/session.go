@@ -17,33 +17,33 @@ import (
 // SessionManager manages a single active session.
 // It links the Loop with SSE streaming and handles state management.
 type SessionManager struct {
-	id              string
-	userID          string
-	loop            *Loop
-	loopCancel      context.CancelFunc
-	mu              sync.Mutex
-	createdAt       time.Time
-	lastActivity    time.Time
-	model           string
-	messages        []Message
-	subpub          *SubPub[StreamResponse]
-	working         bool
-	logger          *slog.Logger
-	workingDir      string
-	sequenceID      int64
-	environment     EnvironmentInfo
-	safeMode        bool
-	hooks           *Hooks
-	username        string
-	ipAddress       string
-	role            auth.Role
-	onWorkingChange func(id string, working bool)
-	onMessage       func(ctx context.Context, msg Message) error
-	pendingPrompts  map[string]chan UserPromptResponse
-	promptsMu       sync.Mutex
-	inputCostPer1M  float64
-	outputCostPer1M float64
-	totalCost       float64
+	id                 string
+	userID             string
+	loop               *Loop
+	loopCancel         context.CancelFunc
+	mu                 sync.Mutex
+	createdAt          time.Time
+	lastActivity       time.Time
+	model              string
+	messages           []Message
+	subpub             *SubPub[StreamResponse]
+	working            bool
+	logger             *slog.Logger
+	workingDir         string
+	sequenceID         int64
+	environment        EnvironmentInfo
+	safeMode           bool
+	hooks              *Hooks
+	username           string
+	ipAddress          string
+	role               auth.Role
+	onWorkingChange    func(id string, working bool)
+	onMessage          func(ctx context.Context, msg Message) error
+	pendingPrompts     map[string]chan UserPromptResponse
+	promptsMu          sync.Mutex
+	inputCostPer1M     float64
+	outputCostPer1M    float64
+	totalCost          float64
 	memoryStore        MemoryStore
 	dagName            string
 	sessionStore       SessionStore
@@ -97,25 +97,25 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 
 	now := time.Now()
 	return &SessionManager{
-		id:              id,
-		userID:          cfg.UserID,
-		createdAt:       now,
-		lastActivity:    now,
-		logger:          logger.With("session_id", id),
-		subpub:          NewSubPub[StreamResponse](),
-		messages:        messages,
-		workingDir:      cfg.WorkingDir,
-		onWorkingChange: cfg.OnWorkingChange,
-		onMessage:       cfg.OnMessage,
-		sequenceID:      cfg.SequenceID,
-		environment:     cfg.Environment,
-		safeMode:        cfg.SafeMode,
-		hooks:           cfg.Hooks,
-		username:        cfg.Username,
-		ipAddress:       cfg.IPAddress,
-		role:            cfg.Role,
-		inputCostPer1M:  cfg.InputCostPer1M,
-		outputCostPer1M: cfg.OutputCostPer1M,
+		id:                 id,
+		userID:             cfg.UserID,
+		createdAt:          now,
+		lastActivity:       now,
+		logger:             logger.With("session_id", id),
+		subpub:             NewSubPub[StreamResponse](),
+		messages:           messages,
+		workingDir:         cfg.WorkingDir,
+		onWorkingChange:    cfg.OnWorkingChange,
+		onMessage:          cfg.OnMessage,
+		sequenceID:         cfg.SequenceID,
+		environment:        cfg.Environment,
+		safeMode:           cfg.SafeMode,
+		hooks:              cfg.Hooks,
+		username:           cfg.Username,
+		ipAddress:          cfg.IPAddress,
+		role:               cfg.Role,
+		inputCostPer1M:     cfg.InputCostPer1M,
+		outputCostPer1M:    cfg.OutputCostPer1M,
 		memoryStore:        cfg.MemoryStore,
 		dagName:            cfg.DAGName,
 		sessionStore:       cfg.SessionStore,

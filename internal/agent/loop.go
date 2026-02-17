@@ -83,28 +83,28 @@ type LoopConfig struct {
 
 // Loop manages a session turn with an LLM including tool execution.
 type Loop struct {
-	provider         llm.Provider
-	model            string
-	tools            []*AgentTool
-	recordMessage    MessageRecordFunc
-	history          []llm.Message
-	messageQueue     []llm.Message
-	totalUsage       llm.Usage
-	mu               sync.Mutex
-	logger           *slog.Logger
-	systemPrompt     string
-	workingDir       string
-	sessionID        string
-	onWorking        func(working bool)
-	sequenceID       int64
-	emitUIAction     UIActionFunc
-	emitUserPrompt   EmitUserPromptFunc
-	waitUserResponse WaitUserResponseFunc
-	safeMode         bool
-	hooks            *Hooks
-	userID           string
-	username         string
-	ipAddress        string
+	provider           llm.Provider
+	model              string
+	tools              []*AgentTool
+	recordMessage      MessageRecordFunc
+	history            []llm.Message
+	messageQueue       []llm.Message
+	totalUsage         llm.Usage
+	mu                 sync.Mutex
+	logger             *slog.Logger
+	systemPrompt       string
+	workingDir         string
+	sessionID          string
+	onWorking          func(working bool)
+	sequenceID         int64
+	emitUIAction       UIActionFunc
+	emitUserPrompt     EmitUserPromptFunc
+	waitUserResponse   WaitUserResponseFunc
+	safeMode           bool
+	hooks              *Hooks
+	userID             string
+	username           string
+	ipAddress          string
 	role               auth.Role
 	sessionStore       SessionStore
 	registerSubSession func(id string, mgr *SessionManager)
@@ -120,25 +120,25 @@ func NewLoop(config LoopConfig) *Loop {
 	}
 
 	return &Loop{
-		provider:         config.Provider,
-		model:            config.Model,
-		history:          config.History,
-		tools:            config.Tools,
-		recordMessage:    config.RecordMessage,
-		messageQueue:     make([]llm.Message, 0),
-		logger:           logger,
-		systemPrompt:     config.SystemPrompt,
-		workingDir:       config.WorkingDir,
-		sessionID:        config.SessionID,
-		onWorking:        config.OnWorking,
-		emitUIAction:     config.EmitUIAction,
-		emitUserPrompt:   config.EmitUserPrompt,
-		waitUserResponse: config.WaitUserResponse,
-		safeMode:         config.SafeMode,
-		hooks:            config.Hooks,
-		userID:           config.UserID,
-		username:         config.Username,
-		ipAddress:        config.IPAddress,
+		provider:           config.Provider,
+		model:              config.Model,
+		history:            config.History,
+		tools:              config.Tools,
+		recordMessage:      config.RecordMessage,
+		messageQueue:       make([]llm.Message, 0),
+		logger:             logger,
+		systemPrompt:       config.SystemPrompt,
+		workingDir:         config.WorkingDir,
+		sessionID:          config.SessionID,
+		onWorking:          config.OnWorking,
+		emitUIAction:       config.EmitUIAction,
+		emitUserPrompt:     config.EmitUserPrompt,
+		waitUserResponse:   config.WaitUserResponse,
+		safeMode:           config.SafeMode,
+		hooks:              config.Hooks,
+		userID:             config.UserID,
+		username:           config.Username,
+		ipAddress:          config.IPAddress,
 		role:               config.Role,
 		sessionStore:       config.SessionStore,
 		registerSubSession: config.RegisterSubSession,
@@ -485,8 +485,8 @@ func (l *Loop) recordToolResult(ctx context.Context, tc llm.ToolCall, result Too
 			Content:    result.Content,
 			IsError:    result.IsError,
 		}},
-		CreatedAt:  time.Now(),
-		LLMData:    &toolMessage,
+		CreatedAt:   time.Now(),
+		LLMData:     &toolMessage,
 		DelegateIDs: result.DelegateIDs,
 	}
 	if err := l.recordMessage(ctx, msg); err != nil {
