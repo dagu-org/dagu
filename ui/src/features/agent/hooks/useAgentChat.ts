@@ -153,7 +153,12 @@ export function useAgentChat() {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [answeredPrompts, setAnsweredPrompts] = useState<Record<string, string>>({});
+  // delegates[] tracks which DelegatePanels are currently open
+  const [delegates, setDelegates] = useState<DelegateInfo[]>([]);
+  // delegateStatuses is a persistent lookup for ALL delegates (running + completed)
+  // used by ChatMessages for inline status display and task lookup
   const [delegateStatuses, setDelegateStatuses] = useState<Record<string, DelegateInfo>>({});
+  const zIndexCounterRef = useRef(60);
   const baseUrl = `${config.apiURL}/agent`;
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
@@ -198,15 +203,20 @@ export function useAgentChat() {
         if (data.delegate_event) {
           const evt = data.delegate_event;
           if (evt.type === 'started') {
-            setDelegateStatuses((prev) => ({
-              ...prev,
-              [evt.delegate_id]: {
-                id: evt.delegate_id,
-                task: evt.task,
-                status: 'running',
-              },
-            }));
+            zIndexCounterRef.current++;
+            const info: DelegateInfo = {
+              id: evt.delegate_id,
+              task: evt.task,
+              status: 'running',
+              zIndex: zIndexCounterRef.current,
+            };
+            setDelegates((prev) => [...prev, info]);
+            setDelegateStatuses((prev) => ({ ...prev, [evt.delegate_id]: info }));
           } else if (evt.type === 'completed') {
+            // Update status instead of removing — let DelegatePanel play close animation
+            setDelegates((prev) => prev.map((d) =>
+              d.id === evt.delegate_id ? { ...d, status: 'completed' as const } : d
+            ));
             setDelegateStatuses((prev) => ({
               ...prev,
               [evt.delegate_id]: {
@@ -214,7 +224,7 @@ export function useAgentChat() {
                 id: evt.delegate_id,
                 task: evt.task,
                 status: 'completed',
-                cost: evt.cost,
+                zIndex: prev[evt.delegate_id]?.zIndex ?? 60,
               },
             }));
           }
@@ -253,7 +263,6 @@ export function useAgentChat() {
       });
       if (apiError) throw new Error(apiError.message || 'Failed to create session');
       setSessionId(data.sessionId);
-      // Refresh sessions list to include the new one
       const { data: sessionsData } = await client.GET('/agent/sessions', {
         params: { query: { remoteNode } },
       });
@@ -319,7 +328,6 @@ export function useAgentChat() {
       if (apiError) throw new Error(apiError.message || 'Failed to submit response');
       setAnsweredPrompts(prev => ({ ...prev, [response.prompt_id]: displayValue }));
     } catch (err) {
-      // If prompt not found (e.g., after reload), mark as answered anyway to update UI
       setAnsweredPrompts(prev => ({ ...prev, [response.prompt_id]: displayValue }));
       setError(err instanceof Error ? err.message : 'Failed to submit response');
     }
@@ -347,7 +355,7 @@ export function useAgentChat() {
       const converted = convertApiSessionDetail(data);
       setSessionId(id);
       setMessages(converted.messages || []);
-      setAnsweredPrompts({}); // Clear answered prompts when switching sessions
+      setAnsweredPrompts({});
       if (converted.session_state) {
         setSessionState(converted.session_state);
       }
@@ -362,8 +370,33 @@ export function useAgentChat() {
   const handleClearSession = useCallback(() => {
     clearSession();
     setAnsweredPrompts({});
+    setDelegates([]);
     setDelegateStatuses({});
   }, [clearSession]);
+
+  const bringToFront = useCallback((delegateId: string) => {
+    zIndexCounterRef.current++;
+    setDelegates((prev) => prev.map((d) =>
+      d.id === delegateId ? { ...d, zIndex: zIndexCounterRef.current } : d
+    ));
+  }, []);
+
+  const reopenDelegate = useCallback((delegateId: string, task: string) => {
+    zIndexCounterRef.current++;
+    setDelegates((prev) => {
+      if (prev.some((d) => d.id === delegateId)) return prev;
+      return [...prev, {
+        id: delegateId,
+        task,
+        status: 'completed' as const,
+        zIndex: zIndexCounterRef.current,
+      }];
+    });
+  }, []);
+
+  const removeDelegate = useCallback((delegateId: string) => {
+    setDelegates((prev) => prev.filter((d) => d.id !== delegateId));
+  }, []);
 
   return {
     sessionId,
@@ -383,6 +416,10 @@ export function useAgentChat() {
     fetchSessions,
     selectSession,
     respondToPrompt,
+    delegates,
     delegateStatuses,
+    bringToFront,
+    reopenDelegate,
+    removeDelegate,
   };
 }

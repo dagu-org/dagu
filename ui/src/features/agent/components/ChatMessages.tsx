@@ -12,9 +12,7 @@ import {
 import { cn } from '@/lib/utils';
 import { DelegateInfo, Message, TokenUsage, ToolCall, ToolResult, UIAction, UserPromptResponse } from '../types';
 import { formatCost } from '../utils/formatCost';
-import { isDelegateToolCall, parseDelegateTasks } from '../utils/delegateUtils';
 import { CommandApprovalMessage } from './CommandApprovalMessage';
-import { InlineDelegateResult } from './InlineDelegateResult';
 import { ToolContentViewer } from './ToolViewers';
 import { UserPromptMessage } from './UserPromptMessage';
 
@@ -25,6 +23,7 @@ interface ChatMessagesProps {
   onPromptRespond?: (response: UserPromptResponse, displayValue: string) => void;
   answeredPrompts?: Record<string, string>;
   delegateStatuses?: Record<string, DelegateInfo>;
+  onOpenDelegate?: (id: string) => void;
 }
 
 export function ChatMessages({
@@ -34,11 +33,27 @@ export function ChatMessages({
   onPromptRespond,
   answeredPrompts,
   delegateStatuses,
+  onOpenDelegate,
 }: ChatMessagesProps): React.ReactNode {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Build set of tool call IDs that have received results (for determining delegate completion on reload)
+  // SSE messages use "tool_call_id" (Go JSON tag) while REST API messages use "tool_use_id" (via convertApiMessage)
+  const completedToolCallIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const msg of messages) {
+      if (msg.tool_results) {
+        for (const tr of msg.tool_results) {
+          const id = tr.tool_use_id || (tr as Record<string, unknown>)['tool_call_id'] as string;
+          if (id) ids.add(id);
+        }
+      }
+    }
+    return ids;
   }, [messages]);
 
   if (messages.length === 0) {
@@ -68,6 +83,8 @@ export function ChatMessages({
           onPromptRespond={onPromptRespond}
           answeredPrompts={answeredPrompts}
           delegateStatuses={delegateStatuses}
+          onOpenDelegate={onOpenDelegate}
+          completedToolCallIds={completedToolCallIds}
         />
       ))}
       {pendingUserMessage && (
@@ -89,20 +106,17 @@ interface MessageItemProps {
   onPromptRespond?: (response: UserPromptResponse, displayValue: string) => void;
   answeredPrompts?: Record<string, string>;
   delegateStatuses?: Record<string, DelegateInfo>;
+  onOpenDelegate?: (id: string) => void;
+  completedToolCallIds?: Set<string>;
 }
 
-function MessageItem({ message, onPromptRespond, answeredPrompts, delegateStatuses }: MessageItemProps): React.ReactNode {
+function MessageItem({ message, onPromptRespond, answeredPrompts, delegateStatuses, onOpenDelegate, completedToolCallIds }: MessageItemProps): React.ReactNode {
   switch (message.type) {
     case 'user':
-      // Tool results arrive as "user" type messages with tool_results populated
       if (message.tool_results && message.tool_results.length > 0) {
+        // Delegate results are already shown as SubAgentChips in the assistant message
         if (message.delegate_ids && message.delegate_ids.length > 0) {
-          return (
-            <DelegateResultsInline
-              delegateIds={message.delegate_ids}
-              delegateStatuses={delegateStatuses}
-            />
-          );
+          return null;
         }
         return <ToolResultMessage toolResults={message.tool_results} />;
       }
@@ -114,6 +128,9 @@ function MessageItem({ message, onPromptRespond, answeredPrompts, delegateStatus
           toolCalls={message.tool_calls}
           usage={message.usage}
           cost={message.cost}
+          delegateStatuses={delegateStatuses}
+          onOpenDelegate={onOpenDelegate}
+          completedToolCallIds={completedToolCallIds}
         />
       );
     case 'error':
@@ -199,17 +216,20 @@ function AssistantMessage({
   toolCalls,
   usage,
   cost,
+  delegateStatuses,
+  onOpenDelegate,
+  completedToolCallIds,
 }: {
   content: string;
   toolCalls?: ToolCall[];
   usage?: TokenUsage;
   cost?: number;
+  delegateStatuses?: Record<string, DelegateInfo>;
+  onOpenDelegate?: (id: string) => void;
+  completedToolCallIds?: Set<string>;
 }): React.ReactNode {
-  // Split tool calls into delegate vs non-delegate
-  const hasDelegateCall = isDelegateToolCall(toolCalls);
-  const nonDelegateCalls = hasDelegateCall
-    ? toolCalls?.filter((tc) => tc.function.name !== 'delegate')
-    : toolCalls;
+  const delegateCalls = toolCalls?.filter((tc) => tc.function.name === 'delegate') ?? [];
+  const otherCalls = toolCalls?.filter((tc) => tc.function.name !== 'delegate') ?? [];
 
   return (
     <div className="pl-1 space-y-1">
@@ -218,20 +238,84 @@ function AssistantMessage({
           {content}
         </p>
       )}
-      {nonDelegateCalls && nonDelegateCalls.length > 0 && (
-        <ToolCallList toolCalls={nonDelegateCalls} className="pl-4" />
+      {otherCalls.length > 0 && (
+        <ToolCallList toolCalls={otherCalls} className="pl-4" />
       )}
-      {hasDelegateCall && toolCalls && (
-        <div className="pl-4">
-          <DelegateToolCallBadge toolCalls={toolCalls} />
-        </div>
-      )}
+      {delegateCalls.map((tc) => (
+        <SubAgentChips
+          key={tc.id}
+          toolCall={tc}
+          delegateStatuses={delegateStatuses}
+          onOpenDelegate={onOpenDelegate}
+          isCompleted={completedToolCallIds?.has(tc.id) ?? false}
+        />
+      ))}
       {usage && usage.total_tokens > 0 && (
         <p className="text-[10px] text-muted-foreground/60 pl-4">
           {usage.total_tokens.toLocaleString()} tokens
           {cost != null && cost > 0 && ` · ${formatCost(cost)}`}
         </p>
       )}
+    </div>
+  );
+}
+
+function parseDelegateTasks(toolCall: ToolCall): string[] {
+  try {
+    const args = JSON.parse(toolCall.function.arguments);
+    if (Array.isArray(args.tasks)) {
+      return args.tasks.map((t: { task?: string }) => t.task || '').filter(Boolean);
+    }
+  } catch { /* ignore */ }
+  return [];
+}
+
+function SubAgentChips({
+  toolCall,
+  delegateStatuses,
+  onOpenDelegate,
+  isCompleted,
+}: {
+  toolCall: ToolCall;
+  delegateStatuses?: Record<string, DelegateInfo>;
+  onOpenDelegate?: (id: string) => void;
+  isCompleted: boolean;
+}): React.ReactNode {
+  const tasks = useMemo(() => parseDelegateTasks(toolCall), [toolCall]);
+
+  if (tasks.length === 0) return null;
+
+  return (
+    <div className="pl-4 space-y-0.5">
+      {tasks.map((task, i) => {
+        const delegate = delegateStatuses
+          ? Object.values(delegateStatuses).find((d) => d.task === task)
+          : undefined;
+        // Completed if tool result exists OR delegate status says so
+        const isRunning = !isCompleted && (!delegate || delegate.status === 'running');
+        const canClick = !!delegate;
+
+        return (
+          <button
+            key={i}
+            onClick={() => canClick && onOpenDelegate?.(delegate!.id)}
+            disabled={!canClick}
+            className={cn(
+              'flex items-center gap-1.5 px-2 py-1 rounded text-xs max-w-full',
+              'border transition-colors',
+              isRunning
+                ? 'border-orange-500/30 bg-orange-500/5 text-foreground'
+                : 'border-green-500/30 bg-green-500/5 text-foreground hover:bg-green-500/10 cursor-pointer',
+              !canClick && 'cursor-default'
+            )}
+          >
+            {isRunning
+              ? <Loader2 className="h-3 w-3 text-orange-600 dark:text-orange-400 animate-spin flex-shrink-0" />
+              : <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />}
+            <span className="truncate">{task.length > 50 ? task.slice(0, 50) + '...' : task}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -279,59 +363,6 @@ function ToolCallBadge({ toolCall }: { toolCall: ToolCall }): React.ReactNode {
           <ToolContentViewer toolName={toolCall.function.name} args={args} />
         </div>
       )}
-    </div>
-  );
-}
-
-function DelegateToolCallBadge({ toolCalls }: { toolCalls: ToolCall[] }): React.ReactNode {
-  const delegateCall = toolCalls.find((tc) => tc.function.name === 'delegate');
-  if (!delegateCall) return <ToolCallList toolCalls={toolCalls} />;
-
-  const tasks = parseDelegateTasks(delegateCall);
-  const nonDelegateCalls = toolCalls.filter((tc) => tc.function.name !== 'delegate');
-
-  return (
-    <div className="space-y-1">
-      {nonDelegateCalls.length > 0 && <ToolCallList toolCalls={nonDelegateCalls} />}
-      <div className="rounded border border-blue-500/30 bg-blue-500/5 text-xs overflow-hidden">
-        <div className="flex items-center gap-1.5 px-2 py-1.5">
-          <Loader2 className="h-3 w-3 text-blue-500 animate-spin" />
-          <span className="font-mono font-medium">delegate</span>
-          <span className="text-muted-foreground">
-            {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
-          </span>
-        </div>
-        {tasks.length > 0 && (
-          <div className="px-2 py-1 border-t border-blue-500/20 space-y-0.5">
-            {tasks.map((task, i) => (
-              <div key={i} className="flex items-center gap-1.5 text-muted-foreground">
-                <span className="text-[10px] text-blue-500/60">{i + 1}.</span>
-                <span className="truncate">{task}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function DelegateResultsInline({
-  delegateIds,
-  delegateStatuses,
-}: {
-  delegateIds: string[];
-  delegateStatuses?: Record<string, DelegateInfo>;
-}): React.ReactNode {
-  return (
-    <div className="pl-5 space-y-1">
-      {delegateIds.map((id) => (
-        <InlineDelegateResult
-          key={id}
-          delegateId={id}
-          delegateInfo={delegateStatuses?.[id]}
-        />
-      ))}
     </div>
   );
 }

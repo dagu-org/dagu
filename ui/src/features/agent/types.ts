@@ -122,7 +122,7 @@ export interface DelegateInfo {
   id: string;
   task: string;
   status: 'running' | 'completed';
-  cost?: number;
+  zIndex: number;
 }
 
 // API request/response types

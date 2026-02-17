@@ -12,6 +12,7 @@ import { SessionWithState, DAGContext } from '../types';
 import { AgentChatModalHeader } from './AgentChatModalHeader';
 import { ChatInput } from './ChatInput';
 import { ChatMessages } from './ChatMessages';
+import { DelegatePanel } from './DelegatePanel';
 import { ResizeHandles } from './ResizeHandles';
 
 function findLatestSession(
@@ -53,7 +54,11 @@ export function AgentChatModal(): ReactElement | null {
     fetchSessions,
     selectSession,
     respondToPrompt,
+    delegates,
     delegateStatuses,
+    bringToFront,
+    reopenDelegate,
+    removeDelegate,
   } = useAgentChat();
   const { bounds, dragHandlers, resizeHandlers } = useResizableDraggable();
 
@@ -107,6 +112,13 @@ export function AgentChatModal(): ReactElement | null {
     [selectSession, clearSession, setError]
   );
 
+  const handleOpenDelegate = useCallback((id: string) => {
+    const info = delegateStatuses[id];
+    if (info) {
+      reopenDelegate(id, info.task);
+    }
+  }, [delegateStatuses, reopenDelegate]);
+
   if (!isOpen) return null;
 
   const errorBanner = error && (
@@ -144,6 +156,7 @@ export function AgentChatModal(): ReactElement | null {
         onPromptRespond={respondToPrompt}
         answeredPrompts={answeredPrompts}
         delegateStatuses={delegateStatuses}
+        onOpenDelegate={handleOpenDelegate}
       />
       <ChatInput
         onSend={handleSend}
@@ -174,29 +187,43 @@ export function AgentChatModal(): ReactElement | null {
     );
   }
 
-  // Desktop: resizable/draggable window
+  // Desktop: resizable/draggable window + delegate panels
   return (
-    <div
-      className={cn(
-        'fixed z-50',
-        'flex flex-col',
-        'bg-card dark:bg-zinc-950 border border-border-strong rounded-lg overflow-hidden',
-        'shadow-xl'
-      )}
-      style={{
-        right: bounds.right,
-        bottom: bounds.bottom,
-        width: bounds.width,
-        height: bounds.height,
-        maxWidth: 'calc(100vw - 32px)',
-        maxHeight: 'calc(100vh - 100px)',
-        animation: isClosing
-          ? 'agent-modal-out 250ms ease-in forwards'
-          : 'agent-modal-in 400ms ease-out',
-      }}
-    >
-      <ResizeHandles resizeHandlers={resizeHandlers} />
-      {content}
-    </div>
+    <>
+      <div
+        className={cn(
+          'fixed z-50',
+          'flex flex-col',
+          'bg-card dark:bg-zinc-950 border border-border-strong rounded-lg overflow-hidden',
+          'shadow-xl'
+        )}
+        style={{
+          right: bounds.right,
+          bottom: bounds.bottom,
+          width: bounds.width,
+          height: bounds.height,
+          maxWidth: 'calc(100vw - 32px)',
+          maxHeight: 'calc(100vh - 100px)',
+          animation: isClosing
+            ? 'agent-modal-out 250ms ease-in forwards'
+            : 'agent-modal-in 400ms ease-out',
+        }}
+      >
+        <ResizeHandles resizeHandlers={resizeHandlers} />
+        {content}
+      </div>
+      {delegates.map((d, i) => (
+        <DelegatePanel
+          key={d.id}
+          delegateId={d.id}
+          task={d.task}
+          status={d.status}
+          zIndex={d.zIndex}
+          index={i}
+          onClose={() => removeDelegate(d.id)}
+          onBringToFront={() => bringToFront(d.id)}
+        />
+      ))}
+    </>
   );
 }

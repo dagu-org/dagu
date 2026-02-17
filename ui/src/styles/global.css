@@ -833,6 +833,13 @@ select:focus-visible {
   }
 }
 
+/* Sub-agent panel animations */
+@keyframes delegate-panel-in {
+  0% { opacity: 0; transform: scale(0.9) translateX(20px); filter: blur(4px); }
+  60% { opacity: 1; filter: blur(0px); }
+  100% { transform: scale(1) translateX(0); }
+}
+
 /* Loading States */
 .skeleton {
   background: linear-gradient(
