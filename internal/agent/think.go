@@ -6,6 +6,16 @@ import (
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
+func init() {
+	RegisterTool(ToolRegistration{
+		Name:           "think",
+		Label:          "Think",
+		Description:    "Step-by-step reasoning",
+		DefaultEnabled: true,
+		Factory:        func(_ ToolConfig) *AgentTool { return NewThinkTool() },
+	})
+}
+
 // NewThinkTool creates a think tool for step-by-step reasoning without action.
 func NewThinkTool() *AgentTool {
 	return &AgentTool{

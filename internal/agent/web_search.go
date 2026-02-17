@@ -16,6 +16,16 @@ import (
 	"golang.org/x/net/html"
 )
 
+func init() {
+	RegisterTool(ToolRegistration{
+		Name:           "web_search",
+		Label:          "Web Search",
+		Description:    "Search the internet",
+		DefaultEnabled: true,
+		Factory:        func(_ ToolConfig) *AgentTool { return NewWebSearchTool() },
+	})
+}
+
 const (
 	defaultWebSearchTimeout = 30 * time.Second
 	defaultMaxResults       = 5

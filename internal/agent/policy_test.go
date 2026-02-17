@@ -13,14 +13,15 @@ func TestResolveToolPolicy_Defaults(t *testing.T) {
 
 	resolved := ResolveToolPolicy(ToolPolicyConfig{})
 
-	assert.True(t, resolved.Tools[toolNameBash])
-	assert.True(t, resolved.Tools[toolNameRead])
-	assert.True(t, resolved.Tools[toolNamePatch])
-	assert.True(t, resolved.Tools[toolNameThink])
-	assert.True(t, resolved.Tools[toolNameNavigate])
-	assert.True(t, resolved.Tools[toolNameReadSchema])
-	assert.True(t, resolved.Tools[toolNameAskUser])
-	assert.True(t, resolved.Tools[toolNameWebSearch])
+	assert.True(t, resolved.Tools["bash"])
+	assert.True(t, resolved.Tools["read"])
+	assert.True(t, resolved.Tools["patch"])
+	assert.True(t, resolved.Tools["think"])
+	assert.True(t, resolved.Tools["navigate"])
+	assert.True(t, resolved.Tools["read_schema"])
+	assert.True(t, resolved.Tools["ask_user"])
+	assert.True(t, resolved.Tools["web_search"])
+	assert.True(t, resolved.Tools["delegate"])
 	assert.Equal(t, BashDefaultBehaviorAllow, resolved.Bash.DefaultBehavior)
 	assert.Equal(t, BashDenyBehaviorAskUser, resolved.Bash.DenyBehavior)
 }

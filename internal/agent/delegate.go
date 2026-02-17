@@ -11,6 +11,16 @@ import (
 	"github.com/google/uuid"
 )
 
+func init() {
+	RegisterTool(ToolRegistration{
+		Name:           "delegate",
+		Label:          "Delegate",
+		Description:    "Spawn sub-agents for parallel tasks",
+		DefaultEnabled: true,
+		Factory:        func(_ ToolConfig) *AgentTool { return NewDelegateTool() },
+	})
+}
+
 const (
 	// delegateToolName is the name of the delegate tool.
 	delegateToolName = "delegate"

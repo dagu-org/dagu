@@ -387,7 +387,7 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		Provider:         provider,
 		Model:            model,
 		History:          history,
-		Tools:            CreateTools(sm.environment.DAGsDir),
+		Tools:            CreateTools(ToolConfig{DAGsDir: sm.environment.DAGsDir}),
 		RecordMessage:    sm.createRecordMessageFunc(),
 		Logger:           sm.logger,
 		SystemPrompt:     GenerateSystemPrompt(sm.environment, nil, memory, sm.role),

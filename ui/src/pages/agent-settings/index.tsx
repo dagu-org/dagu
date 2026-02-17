@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Loader2, MoreHorizontal, Pencil, Plus, Save, Shield, Star, Trash2 } from 'lucide-react';
 import {
   AgentBashPolicyDefaultBehavior,
@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/table';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useIsAdmin } from '@/contexts/AuthContext';
+import { useConfig } from '@/contexts/ConfigContext';
 import { useClient } from '@/hooks/api';
 import ConfirmModal from '@/ui/ConfirmModal';
 import { ModelFormModal } from './ModelFormModal';
@@ -49,37 +50,19 @@ type SavedAgentConfig = {
   toolPolicy: AgentToolPolicy;
 };
 
-type ToolConfig = {
+type ToolMeta = {
   name: string;
   label: string;
   description: string;
 };
 
-const TOOL_CONFIGS: ToolConfig[] = [
-  { name: 'bash', label: 'Bash', description: 'Run shell commands' },
-  { name: 'read', label: 'Read', description: 'Read files' },
-  { name: 'patch', label: 'Patch', description: 'Create/edit/delete files' },
-  { name: 'think', label: 'Think', description: 'Internal reasoning tool' },
-  { name: 'navigate', label: 'Navigate', description: 'Navigate UI pages' },
-  { name: 'read_schema', label: 'Read Schema', description: 'Read DAG schema docs' },
-  { name: 'ask_user', label: 'Ask User', description: 'Ask interactive questions' },
-  { name: 'web_search', label: 'Web Search', description: 'Search the web' },
-];
-
-const DEFAULT_TOOL_TOGGLES: Record<string, boolean> = {
-  bash: true,
-  read: true,
-  patch: true,
-  think: true,
-  navigate: true,
-  read_schema: true,
-  ask_user: true,
-  web_search: true,
-};
-
-function createDefaultToolPolicy(): AgentToolPolicy {
+function createDefaultToolPolicy(tools: ToolMeta[]): AgentToolPolicy {
+  const toggles: Record<string, boolean> = {};
+  for (const t of tools) {
+    toggles[t.name] = true;
+  }
   return {
-    tools: { ...DEFAULT_TOOL_TOGGLES },
+    tools: toggles,
     bash: {
       rules: [],
       defaultBehavior: AgentBashPolicyDefaultBehavior.allow,
@@ -88,19 +71,19 @@ function createDefaultToolPolicy(): AgentToolPolicy {
   };
 }
 
-function normalizeToolPolicy(policy?: AgentToolPolicy): AgentToolPolicy {
-  const defaults = createDefaultToolPolicy();
-  const tools = { ...defaults.tools, ...(policy?.tools || {}) };
+function normalizeToolPolicy(policy: AgentToolPolicy | undefined, tools: ToolMeta[]): AgentToolPolicy {
+  const defaults = createDefaultToolPolicy(tools);
+  const merged = { ...defaults.tools, ...(policy?.tools || {}) };
   const bash = {
     rules: policy?.bash?.rules || defaults.bash?.rules || [],
     defaultBehavior: policy?.bash?.defaultBehavior || defaults.bash?.defaultBehavior,
     denyBehavior: policy?.bash?.denyBehavior || defaults.bash?.denyBehavior,
   };
-  return { tools, bash };
+  return { tools: merged, bash };
 }
 
-function canonicalizeToolPolicy(policy?: AgentToolPolicy): AgentToolPolicy {
-  const normalized = normalizeToolPolicy(policy);
+function canonicalizeToolPolicy(policy: AgentToolPolicy | undefined, tools: ToolMeta[]): AgentToolPolicy {
+  const normalized = normalizeToolPolicy(policy, tools);
   const sortedToolsEntries = Object.entries(normalized.tools || {}).sort(([a], [b]) =>
     a.localeCompare(b)
   );
@@ -123,8 +106,10 @@ function canonicalizeToolPolicy(policy?: AgentToolPolicy): AgentToolPolicy {
 
 export default function AgentSettingsPage(): React.ReactNode {
   const client = useClient();
+  const config = useConfig();
   const isAdmin = useIsAdmin();
   const appBarContext = useContext(AppBarContext);
+  const [toolMetas, setToolMetas] = useState<ToolMeta[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -133,7 +118,7 @@ export default function AgentSettingsPage(): React.ReactNode {
 
   const [enabled, setEnabled] = useState(false);
   const [defaultModelId, setDefaultModelId] = useState<string | undefined>();
-  const [toolPolicy, setToolPolicy] = useState<AgentToolPolicy>(createDefaultToolPolicy);
+  const [toolPolicy, setToolPolicy] = useState<AgentToolPolicy>(() => createDefaultToolPolicy([]));
   const [savedConfig, setSavedConfig] = useState<SavedAgentConfig | null>(null);
   const [bashRuleIds, setBashRuleIds] = useState<string[]>([]);
   const [models, setModels] = useState<ModelConfig[]>([]);
@@ -160,13 +145,25 @@ export default function AgentSettingsPage(): React.ReactNode {
     appBarContext.setTitle('Agent Settings');
   }, [appBarContext]);
 
-  const fetchConfig = useCallback(async () => {
+  const fetchTools = useCallback(async (): Promise<ToolMeta[]> => {
+    try {
+      const resp = await fetch(`${config.apiURL}/agent/tools?remoteNode=${remoteNode}`);
+      if (!resp.ok) return [];
+      const data: ToolMeta[] = await resp.json();
+      setToolMetas(data);
+      return data;
+    } catch {
+      return [];
+    }
+  }, [config.apiURL, remoteNode]);
+
+  const fetchConfig = useCallback(async (tools: ToolMeta[]) => {
     try {
       const { data, error: apiError } = await client.GET('/settings/agent', {
         params: { query: { remoteNode } },
       });
       if (apiError) throw new Error('Failed to fetch agent configuration');
-      const normalizedPolicy = normalizeToolPolicy(data.toolPolicy);
+      const normalizedPolicy = normalizeToolPolicy(data.toolPolicy, tools);
       setEnabled(data.enabled ?? false);
       setDefaultModelId(data.defaultModelId);
       setToolPolicy(normalizedPolicy);
@@ -209,11 +206,12 @@ export default function AgentSettingsPage(): React.ReactNode {
 
   useEffect(() => {
     async function load() {
-      await Promise.all([fetchConfig(), fetchModels(), fetchPresets()]);
+      const tools = await fetchTools();
+      await Promise.all([fetchConfig(tools), fetchModels(), fetchPresets()]);
       setIsLoading(false);
     }
     load();
-  }, [fetchConfig, fetchModels, fetchPresets]);
+  }, [fetchTools, fetchConfig, fetchModels, fetchPresets]);
 
   async function handleSaveConfig(): Promise<void> {
     setIsSaving(true);
@@ -222,8 +220,8 @@ export default function AgentSettingsPage(): React.ReactNode {
 
     try {
       const requestBody: UpdateAgentConfigRequest = {};
-      const currentPolicyCanonical = canonicalizeToolPolicy(toolPolicy);
-      const savedPolicyCanonical = canonicalizeToolPolicy(savedConfig?.toolPolicy);
+      const currentPolicyCanonical = canonicalizeToolPolicy(toolPolicy, toolMetas);
+      const savedPolicyCanonical = canonicalizeToolPolicy(savedConfig?.toolPolicy, toolMetas);
 
       if (!savedConfig || enabled !== savedConfig.enabled) {
         requestBody.enabled = enabled;
@@ -249,7 +247,7 @@ export default function AgentSettingsPage(): React.ReactNode {
         throw new Error(apiError.message || 'Failed to save configuration');
       }
 
-      const normalizedPolicy = normalizeToolPolicy(data.toolPolicy);
+      const normalizedPolicy = normalizeToolPolicy(data.toolPolicy, toolMetas);
       setEnabled(data.enabled ?? false);
       setDefaultModelId(data.defaultModelId);
       setToolPolicy(normalizedPolicy);
@@ -299,7 +297,7 @@ export default function AgentSettingsPage(): React.ReactNode {
     }
   }
 
-  const normalizedPolicy = normalizeToolPolicy(toolPolicy);
+  const normalizedPolicy = useMemo(() => normalizeToolPolicy(toolPolicy, toolMetas), [toolPolicy, toolMetas]);
 
   useEffect(() => {
     const ruleCount = normalizedPolicy.bash?.rules?.length || 0;
@@ -316,7 +314,7 @@ export default function AgentSettingsPage(): React.ReactNode {
 
   function updateToolToggle(toolName: string, value: boolean): void {
     setToolPolicy((prev) => {
-      const normalized = normalizeToolPolicy(prev);
+      const normalized = normalizeToolPolicy(prev, toolMetas);
       return {
         ...normalized,
         tools: {
@@ -332,7 +330,7 @@ export default function AgentSettingsPage(): React.ReactNode {
     value: NonNullable<AgentToolPolicy['bash']>[K]
   ): void {
     setToolPolicy((prev) => {
-      const normalized = normalizeToolPolicy(prev);
+      const normalized = normalizeToolPolicy(prev, toolMetas);
       return {
         ...normalized,
         bash: {
@@ -351,7 +349,7 @@ export default function AgentSettingsPage(): React.ReactNode {
       enabled: true,
     };
     setToolPolicy((prev) => {
-      const normalized = normalizeToolPolicy(prev);
+      const normalized = normalizeToolPolicy(prev, toolMetas);
       return {
         ...normalized,
         bash: {
@@ -365,7 +363,7 @@ export default function AgentSettingsPage(): React.ReactNode {
 
   function updateBashRule(index: number, patch: Partial<AgentBashRule>): void {
     setToolPolicy((prev) => {
-      const normalized = normalizeToolPolicy(prev);
+      const normalized = normalizeToolPolicy(prev, toolMetas);
       const rules = [...(normalized.bash?.rules || [])];
       if (!rules[index]) return prev;
       rules[index] = { ...rules[index], ...patch };
@@ -381,7 +379,7 @@ export default function AgentSettingsPage(): React.ReactNode {
 
   function removeBashRule(index: number): void {
     setToolPolicy((prev) => {
-      const normalized = normalizeToolPolicy(prev);
+      const normalized = normalizeToolPolicy(prev, toolMetas);
       const rules = [...(normalized.bash?.rules || [])];
       if (!rules[index]) return prev;
       rules.splice(index, 1);
@@ -401,7 +399,7 @@ export default function AgentSettingsPage(): React.ReactNode {
 
   function moveBashRule(index: number, direction: -1 | 1): void {
     setToolPolicy((prev) => {
-      const normalized = normalizeToolPolicy(prev);
+      const normalized = normalizeToolPolicy(prev, toolMetas);
       const rules = [...(normalized.bash?.rules || [])];
       const targetIndex = index + direction;
       if (targetIndex < 0 || targetIndex >= rules.length) return prev;
@@ -513,7 +511,7 @@ export default function AgentSettingsPage(): React.ReactNode {
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
-          {TOOL_CONFIGS.map((tool) => (
+          {toolMetas.map((tool) => (
             <div
               key={tool.name}
               className="rounded-md border border-border/60 p-3 flex items-start justify-between gap-3"

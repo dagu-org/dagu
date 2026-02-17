@@ -24,7 +24,7 @@ func TestNewLoop(t *testing.T) {
 		loop := NewLoop(LoopConfig{
 			Provider: &mockLLMProvider{name: "test"},
 			Model:    "test-model",
-			Tools:    CreateTools(""),
+			Tools:    CreateTools(ToolConfig{}),
 		})
 
 		assert.NotNil(t, loop)
@@ -201,7 +201,7 @@ func TestLoop_Go(t *testing.T) {
 
 		loop := NewLoop(LoopConfig{
 			Provider: provider,
-			Tools:    CreateTools(""),
+			Tools:    CreateTools(ToolConfig{}),
 		})
 		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
 
@@ -299,7 +299,7 @@ func TestLoop_ExecuteTool(t *testing.T) {
 
 		loop := NewLoop(LoopConfig{
 			Provider: &mockLLMProvider{},
-			Tools:    CreateTools(""),
+			Tools:    CreateTools(ToolConfig{}),
 		})
 
 		result := loop.executeTool(context.Background(), llm.ToolCall{
@@ -320,7 +320,7 @@ func TestLoop_ExecuteTool(t *testing.T) {
 
 		loop := NewLoop(LoopConfig{
 			Provider: &mockLLMProvider{},
-			Tools:    CreateTools(""),
+			Tools:    CreateTools(ToolConfig{}),
 		})
 
 		result := loop.executeTool(context.Background(), llm.ToolCall{
@@ -341,7 +341,7 @@ func TestLoop_ExecuteTool(t *testing.T) {
 
 		loop := NewLoop(LoopConfig{
 			Provider: &mockLLMProvider{},
-			Tools:    CreateTools(""),
+			Tools:    CreateTools(ToolConfig{}),
 		})
 
 		result := loop.executeTool(context.Background(), llm.ToolCall{
@@ -370,7 +370,7 @@ func TestLoop_ExecuteTool(t *testing.T) {
 
 		loop := NewLoop(LoopConfig{
 			Provider:  &mockLLMProvider{},
-			Tools:     CreateTools(""),
+			Tools:     CreateTools(ToolConfig{}),
 			SessionID: "conv-hook",
 			UserID:    "user-1",
 			Username:  "alice",
@@ -468,7 +468,7 @@ func TestLoop_ExecuteTool(t *testing.T) {
 
 		loop := NewLoop(LoopConfig{
 			Provider: &mockLLMProvider{},
-			Tools:    CreateTools(""),
+			Tools:    CreateTools(ToolConfig{}),
 			Hooks:    hooks,
 		})
 
@@ -534,7 +534,7 @@ func TestLoop_BuildToolDefinitions(t *testing.T) {
 
 		loop := NewLoop(LoopConfig{
 			Provider: &mockLLMProvider{},
-			Tools:    CreateTools(""),
+			Tools:    CreateTools(ToolConfig{}),
 		})
 
 		tools := loop.buildToolDefinitions()

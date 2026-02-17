@@ -9,6 +9,16 @@ import (
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
+func init() {
+	RegisterTool(ToolRegistration{
+		Name:           "read",
+		Label:          "Read",
+		Description:    "Read files",
+		DefaultEnabled: true,
+		Factory:        func(_ ToolConfig) *AgentTool { return NewReadTool() },
+	})
+}
+
 const (
 	maxReadSize      = 1024 * 1024
 	defaultLineLimit = 2000

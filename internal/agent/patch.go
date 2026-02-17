@@ -14,6 +14,16 @@ import (
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
+func init() {
+	RegisterTool(ToolRegistration{
+		Name:           "patch",
+		Label:          "Patch",
+		Description:    "Create/edit/delete files",
+		DefaultEnabled: true,
+		Factory:        func(cfg ToolConfig) *AgentTool { return NewPatchTool(cfg.DAGsDir) },
+	})
+}
+
 const (
 	dirPermission  = 0o750
 	filePermission = 0o600

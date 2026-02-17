@@ -5,46 +5,19 @@ import (
 	"fmt"
 	"maps"
 	"regexp"
-	"slices"
 	"strings"
 )
 
-const (
-	toolNameBash       = "bash"
-	toolNameRead       = "read"
-	toolNamePatch      = "patch"
-	toolNameThink      = "think"
-	toolNameNavigate   = "navigate"
-	toolNameReadSchema = "read_schema"
-	toolNameAskUser    = "ask_user"
-	toolNameWebSearch  = "web_search"
-)
+const toolNameBash = "bash"
 
-var knownToolNames = map[string]struct{}{
-	toolNameBash:       {},
-	toolNameRead:       {},
-	toolNamePatch:      {},
-	toolNameThink:      {},
-	toolNameNavigate:   {},
-	toolNameReadSchema: {},
-	toolNameAskUser:    {},
-	toolNameWebSearch:  {},
-}
-
-// KnownToolNames returns sorted known tool names.
+// KnownToolNames returns sorted names of all registered tools.
 func KnownToolNames() []string {
-	names := make([]string, 0, len(knownToolNames))
-	for name := range knownToolNames {
-		names = append(names, name)
-	}
-	slices.Sort(names)
-	return names
+	return RegisteredToolNames()
 }
 
-// IsKnownToolName reports whether the tool name is supported by the policy engine.
+// IsKnownToolName reports whether the tool name is registered.
 func IsKnownToolName(name string) bool {
-	_, ok := knownToolNames[name]
-	return ok
+	return IsRegisteredTool(name)
 }
 
 // IsBashToolName reports whether a tool name is the bash tool.

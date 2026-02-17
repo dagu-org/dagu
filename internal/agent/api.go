@@ -130,6 +130,9 @@ func (a *API) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler) htt
 			r.Use(authMiddleware)
 		}
 
+		// Tool metadata
+		r.Get("/tools", a.handleListTools)
+
 		// Session management
 		r.Post("/sessions/new", a.handleNewSession)
 		r.Get("/sessions", a.handleListSessions)
@@ -780,6 +783,24 @@ func (a *API) handleUserResponse(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.respondJSON(w, http.StatusOK, map[string]string{"status": "accepted"})
+}
+
+// toolInfo is the JSON response type for a registered tool.
+type toolInfo struct {
+	Name        string `json:"name"`
+	Label       string `json:"label"`
+	Description string `json:"description"`
+}
+
+// handleListTools returns metadata for all registered agent tools.
+// GET /api/v1/agent/tools
+func (a *API) handleListTools(w http.ResponseWriter, _ *http.Request) {
+	regs := RegisteredTools()
+	result := make([]toolInfo, len(regs))
+	for i, reg := range regs {
+		result[i] = toolInfo{Name: reg.Name, Label: reg.Label, Description: reg.Description}
+	}
+	a.respondJSON(w, http.StatusOK, result)
 }
 
 // idleSessionTimeout is the duration after which idle sessions are cleaned up.

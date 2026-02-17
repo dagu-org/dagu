@@ -8,6 +8,16 @@ import (
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
+func init() {
+	RegisterTool(ToolRegistration{
+		Name:           "read_schema",
+		Label:          "Read Schema",
+		Description:    "Navigate DAG JSON schemas",
+		DefaultEnabled: true,
+		Factory:        func(_ ToolConfig) *AgentTool { return NewReadSchemaTool() },
+	})
+}
+
 // ReadSchemaInput is the input schema for the read_schema tool.
 type ReadSchemaInput struct {
 	Schema string `json:"schema"`
