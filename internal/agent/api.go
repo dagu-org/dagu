@@ -286,13 +286,19 @@ func (a *API) collectActiveSessions(userID string, activeIDs map[string]struct{}
 			return true
 		}
 
+		sess := mgr.GetSession()
+		// Skip sub-sessions (delegate sessions) from the main listing.
+		if sess.ParentSessionID != "" {
+			return true
+		}
+
 		id, ok := key.(string)
 		if !ok {
 			return true // skip invalid key
 		}
 		activeIDs[id] = struct{}{}
 		sessions = append(sessions, SessionWithState{
-			Session:   mgr.GetSession(),
+			Session:   sess,
 			Working:   mgr.IsWorking(),
 			Model:     mgr.GetModel(),
 			TotalCost: mgr.GetTotalCost(),
@@ -423,6 +429,9 @@ func (a *API) reactivateSession(ctx context.Context, id, userID, username string
 		DAGName:      sess.DAGName,
 		Role:         role,
 		SessionStore: a.store,
+		RegisterSubSession: func(subID string, subMgr *SessionManager) {
+			a.sessions.Store(subID, subMgr)
+		},
 	})
 	a.sessions.Store(id, mgr)
 
@@ -575,6 +584,9 @@ func (a *API) CreateSession(ctx context.Context, userID, username string, role a
 		MemoryStore:     a.memoryStore,
 		DAGName:         dagName,
 		SessionStore:    a.store,
+		RegisterSubSession: func(subID string, subMgr *SessionManager) {
+			a.sessions.Store(subID, subMgr)
+		},
 	})
 
 	a.persistNewSession(ctx, id, userID, dagName, now)

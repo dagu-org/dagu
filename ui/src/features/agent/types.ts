@@ -109,6 +109,21 @@ export interface DAGContext {
   dag_run_id?: string;
 }
 
+// Delegate event types
+export interface DelegateEvent {
+  type: 'started' | 'completed';
+  delegate_id: string;
+  task: string;
+}
+
+export interface DelegateInfo {
+  id: string;
+  task: string;
+  status: 'running' | 'completed';
+  minimized: boolean;
+  zIndex: number;
+}
+
 // API request/response types
 export interface ChatRequest {
   message: string;
@@ -126,6 +141,7 @@ export interface StreamResponse {
   messages?: Message[];
   session?: Session;
   session_state?: SessionState;
+  delegate_event?: DelegateEvent;
 }
 
 // Tool input types for specialized viewers

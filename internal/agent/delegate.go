@@ -89,7 +89,13 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	delegateID := uuid.New().String()
 	dc := ctx.Delegate
 
-	// Create sub-session in the store.
+	logger := dc.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	logger = logger.With("delegate_id", delegateID, "task", truncate(args.Task, 100))
+
+	// Persist sub-session in the store.
 	if dc.SessionStore != nil {
 		now := time.Now()
 		subSession := &Session{
@@ -105,6 +111,41 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 		}
 	}
 
+	// Build onMessage callback for persistence.
+	var onMessage func(msgCtx context.Context, msg Message) error
+	if dc.SessionStore != nil {
+		onMessage = func(msgCtx context.Context, msg Message) error {
+			return dc.SessionStore.AddMessage(msgCtx, delegateID, &msg)
+		}
+	}
+
+	// Create a sub-SessionManager for SSE streaming of the delegate's messages.
+	subMgr := NewSessionManager(SessionManagerConfig{
+		ID:              delegateID,
+		UserID:          dc.UserID,
+		Logger:          logger,
+		WorkingDir:      ctx.WorkingDir,
+		OnMessage:       onMessage,
+		ParentSessionID: dc.ParentID,
+		DelegateTask:    args.Task,
+	})
+
+	// Register sub-session for SSE streaming.
+	if dc.RegisterSubSession != nil {
+		dc.RegisterSubSession(delegateID, subMgr)
+	}
+
+	// Notify parent that delegate started.
+	if dc.NotifyParent != nil {
+		dc.NotifyParent(StreamResponse{
+			DelegateEvent: &DelegateEvent{
+				Type:       "started",
+				DelegateID: delegateID,
+				Task:       args.Task,
+			},
+		})
+	}
+
 	// Filter out the delegate tool from child tools to prevent recursion.
 	childTools := filterOutTool(dc.Tools, delegateToolName)
 
@@ -117,13 +158,7 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	var lastError string
 	iteration := 0
 
-	logger := dc.Logger
-	if logger == nil {
-		logger = slog.Default()
-	}
-	logger = logger.With("delegate_id", delegateID, "task", truncate(args.Task, 100))
-
-	// Build RecordMessage that persists to sub-session and captures results.
+	// Build RecordMessage that publishes to sub-SessionManager's SubPub and captures results.
 	captureResult := func(msg Message) {
 		if msg.Type == MessageTypeAssistant && msg.Content != "" {
 			lastAssistantContent = msg.Content
@@ -133,21 +168,9 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 		}
 	}
 
-	var recordMessage MessageRecordFunc
-	if dc.SessionStore != nil {
-		recordMessage = func(msgCtx context.Context, msg Message) error {
-			msg.SessionID = delegateID
-			if msg.ID == "" {
-				msg.ID = uuid.New().String()
-			}
-			captureResult(msg)
-			return dc.SessionStore.AddMessage(msgCtx, delegateID, &msg)
-		}
-	} else {
-		recordMessage = func(_ context.Context, msg Message) error {
-			captureResult(msg)
-			return nil
-		}
+	recordMessage := func(msgCtx context.Context, msg Message) error {
+		captureResult(msg)
+		return subMgr.RecordExternalMessage(msgCtx, msg)
 	}
 
 	loop := NewLoop(LoopConfig{
@@ -162,6 +185,7 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 		Hooks:         dc.Hooks,
 		SafeMode:      ctx.SafeMode,
 		OnWorking: func(working bool) {
+			subMgr.SetWorking(working)
 			if !working {
 				iteration++
 				if iteration >= maxIterations {
@@ -185,6 +209,18 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 
 	// Run the child loop synchronously. It returns context.Canceled when we cancel it.
 	err := loop.Go(childCtx)
+
+	// Notify parent that delegate completed.
+	if dc.NotifyParent != nil {
+		dc.NotifyParent(StreamResponse{
+			DelegateEvent: &DelegateEvent{
+				Type:       "completed",
+				DelegateID: delegateID,
+				Task:       args.Task,
+			},
+		})
+	}
+
 	if err != nil && err != context.Canceled {
 		logger.Error("Sub-agent failed", "error", err)
 		return ToolOut{

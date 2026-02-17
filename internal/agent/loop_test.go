@@ -878,3 +878,61 @@ func TestLoop_ExceedMaxConcurrentDelegates(t *testing.T) {
 	}
 	assert.Equal(t, 2, errorResults, "2 delegate calls should have been rejected")
 }
+
+func TestLoop_ExecuteTool_PassesSubSessionCallbacks(t *testing.T) {
+	t.Parallel()
+
+	registerCalled := false
+	notifyCalled := false
+
+	store := newMockSessionStore()
+	require.NoError(t, store.CreateSession(context.Background(), &Session{
+		ID: "parent-cb", UserID: "user1",
+		CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}))
+
+	provider := newSequenceProvider(
+		&llm.ChatResponse{
+			FinishReason: "tool_calls",
+			ToolCalls: []llm.ToolCall{{
+				ID:   "del-cb",
+				Type: "function",
+				Function: llm.ToolCallFunction{
+					Name:      "delegate",
+					Arguments: `{"task": "callback test"}`,
+				},
+			}},
+		},
+		&llm.ChatResponse{Content: "done", FinishReason: "stop"},
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	loop := NewLoop(LoopConfig{
+		Provider:     provider,
+		Model:        "test",
+		Tools:        []*AgentTool{NewDelegateTool()},
+		SessionID:    "parent-cb",
+		SessionStore: store,
+		UserID:       "user1",
+		RegisterSubSession: func(id string, mgr *SessionManager) {
+			registerCalled = true
+		},
+		NotifyParent: func(event StreamResponse) {
+			notifyCalled = true
+		},
+		OnWorking: func(working bool) {
+			if !working {
+				cancel()
+			}
+		},
+	})
+
+	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test callbacks"})
+
+	err := waitForLoopDone(ctx, cancel, loop, 15*time.Second)
+	assert.ErrorIs(t, err, context.Canceled)
+
+	assert.True(t, registerCalled, "RegisterSubSession callback should be called during delegate execution")
+	assert.True(t, notifyCalled, "NotifyParent callback should be called during delegate execution")
+}

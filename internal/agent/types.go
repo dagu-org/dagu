@@ -163,6 +163,16 @@ type SessionState struct {
 	TotalCost float64 `json:"total_cost"`
 }
 
+// DelegateEvent notifies the parent SSE stream about delegate lifecycle changes.
+type DelegateEvent struct {
+	// Type is "started" or "completed".
+	Type string `json:"type"`
+	// DelegateID is the sub-session ID.
+	DelegateID string `json:"delegate_id"`
+	// Task is the delegate task description.
+	Task string `json:"task"`
+}
+
 // StreamResponse is sent over SSE to the UI.
 type StreamResponse struct {
 	// Messages contains new or updated messages.
@@ -171,6 +181,8 @@ type StreamResponse struct {
 	Session *Session `json:"session,omitempty"`
 	// SessionState contains the current processing state.
 	SessionState *SessionState `json:"session_state,omitempty"`
+	// DelegateEvent contains delegate lifecycle notifications.
+	DelegateEvent *DelegateEvent `json:"delegate_event,omitempty"`
 }
 
 // DAGContext contains a DAG reference from the frontend.
@@ -255,6 +267,10 @@ type DelegateContext struct {
 	ParentID string
 	// UserID is the user who owns the parent session.
 	UserID string
+	// RegisterSubSession registers a sub-session for SSE streaming. Nil if not available.
+	RegisterSubSession func(id string, mgr *SessionManager)
+	// NotifyParent broadcasts an event to the parent session's SSE stream. Nil if not available.
+	NotifyParent func(event StreamResponse)
 }
 
 // ToolContext provides context for tool execution.

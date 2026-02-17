@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -430,4 +431,205 @@ func TestDelegateTool_ContextCancellation(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("delegate did not return after context cancellation")
 	}
+}
+
+func TestDelegateTool_RegistersSubSession(t *testing.T) {
+	t.Parallel()
+
+	var registeredID string
+	var registeredMgr *SessionManager
+
+	provider := newStopProvider("sub result")
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:     provider,
+			Model:        "test",
+			Tools:        []*AgentTool{},
+			SessionStore: newMockSessionStore(),
+			ParentID:     "parent-1",
+			UserID:       "user-1",
+			RegisterSubSession: func(id string, mgr *SessionManager) {
+				registeredID = id
+				registeredMgr = mgr
+			},
+		},
+	}, json.RawMessage(`{"task": "register test"}`))
+
+	assert.False(t, result.IsError)
+	assert.Equal(t, result.DelegateID, registeredID)
+	assert.NotNil(t, registeredMgr)
+}
+
+func TestDelegateTool_NotifiesParentStarted(t *testing.T) {
+	t.Parallel()
+
+	var mu sync.Mutex
+	var events []DelegateEvent
+
+	provider := newStopProvider("sub result")
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:     provider,
+			Model:        "test",
+			Tools:        []*AgentTool{},
+			SessionStore: newMockSessionStore(),
+			ParentID:     "parent-1",
+			UserID:       "user-1",
+			NotifyParent: func(event StreamResponse) {
+				if event.DelegateEvent != nil {
+					mu.Lock()
+					events = append(events, *event.DelegateEvent)
+					mu.Unlock()
+				}
+			},
+		},
+	}, json.RawMessage(`{"task": "notify test"}`))
+
+	assert.False(t, result.IsError)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.GreaterOrEqual(t, len(events), 1)
+	assert.Equal(t, "started", events[0].Type)
+	assert.Equal(t, result.DelegateID, events[0].DelegateID)
+	assert.Equal(t, "notify test", events[0].Task)
+}
+
+func TestDelegateTool_NotifiesParentCompleted(t *testing.T) {
+	t.Parallel()
+
+	var mu sync.Mutex
+	var events []DelegateEvent
+
+	provider := newStopProvider("done")
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:     provider,
+			Model:        "test",
+			Tools:        []*AgentTool{},
+			SessionStore: newMockSessionStore(),
+			ParentID:     "parent-1",
+			UserID:       "user-1",
+			NotifyParent: func(event StreamResponse) {
+				if event.DelegateEvent != nil {
+					mu.Lock()
+					events = append(events, *event.DelegateEvent)
+					mu.Unlock()
+				}
+			},
+		},
+	}, json.RawMessage(`{"task": "complete test"}`))
+
+	assert.False(t, result.IsError)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Len(t, events, 2) // started + completed
+	assert.Equal(t, "started", events[0].Type)
+	assert.Equal(t, "completed", events[1].Type)
+	assert.Equal(t, result.DelegateID, events[1].DelegateID)
+	assert.Equal(t, "complete test", events[1].Task)
+}
+
+func TestDelegateTool_SubSessionStreamable(t *testing.T) {
+	t.Parallel()
+
+	var registeredMgr *SessionManager
+
+	provider := newStopProvider("streamed output")
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:     provider,
+			Model:        "test",
+			Tools:        []*AgentTool{},
+			SessionStore: newMockSessionStore(),
+			ParentID:     "parent-1",
+			UserID:       "user-1",
+			RegisterSubSession: func(id string, mgr *SessionManager) {
+				registeredMgr = mgr
+			},
+		},
+	}, json.RawMessage(`{"task": "stream test"}`))
+
+	assert.False(t, result.IsError)
+	require.NotNil(t, registeredMgr)
+
+	// After completion, the sub-SessionManager should have messages.
+	msgs := registeredMgr.GetMessages()
+	assert.NotEmpty(t, msgs, "sub-SessionManager should have recorded messages from child loop")
+
+	// At least one message should be an assistant message.
+	var hasAssistant bool
+	for _, msg := range msgs {
+		if msg.Type == MessageTypeAssistant {
+			hasAssistant = true
+			break
+		}
+	}
+	assert.True(t, hasAssistant, "sub-SessionManager should have an assistant message")
+}
+
+func TestDelegateTool_SubSessionWorkingState(t *testing.T) {
+	t.Parallel()
+
+	var registeredMgr *SessionManager
+
+	provider := newStopProvider("done")
+	tool := NewDelegateTool()
+	tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:     provider,
+			Model:        "test",
+			Tools:        []*AgentTool{},
+			SessionStore: newMockSessionStore(),
+			ParentID:     "parent-1",
+			UserID:       "user-1",
+			RegisterSubSession: func(id string, mgr *SessionManager) {
+				registeredMgr = mgr
+			},
+		},
+	}, json.RawMessage(`{"task": "working state test"}`))
+
+	require.NotNil(t, registeredMgr)
+	// After delegateRun returns, the sub-SessionManager should not be working.
+	assert.False(t, registeredMgr.IsWorking(), "sub-SessionManager should not be working after delegate completes")
+}
+
+func TestDelegateTool_NoCallbacks(t *testing.T) {
+	t.Parallel()
+
+	provider := newStopProvider("no callbacks result")
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:           provider,
+			Model:              "test",
+			Tools:              []*AgentTool{},
+			SessionStore:       newMockSessionStore(),
+			ParentID:           "parent-1",
+			UserID:             "user-1",
+			RegisterSubSession: nil,
+			NotifyParent:       nil,
+		},
+	}, json.RawMessage(`{"task": "no callbacks test"}`))
+
+	assert.False(t, result.IsError)
+	assert.Equal(t, "no callbacks result", result.Content)
+	assert.NotEmpty(t, result.DelegateID)
 }

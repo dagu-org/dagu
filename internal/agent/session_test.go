@@ -651,3 +651,100 @@ func TestSessionManager_ConcurrentMessages(t *testing.T) {
 
 	_ = sm.Cancel(context.Background())
 }
+
+func TestSessionManager_RecordExternalMessage(t *testing.T) {
+	t.Parallel()
+
+	var mu sync.Mutex
+	var persisted []Message
+
+	sm := NewSessionManager(SessionManagerConfig{
+		ID:     "ext-msg-test",
+		UserID: "user-1",
+		OnMessage: func(_ context.Context, msg Message) error {
+			mu.Lock()
+			persisted = append(persisted, msg)
+			mu.Unlock()
+			return nil
+		},
+	})
+
+	ctx := context.Background()
+
+	// Subscribe before publishing
+	next := sm.Subscribe(ctx)
+
+	// Record an external message
+	msg := Message{
+		Type:    MessageTypeAssistant,
+		Content: "external message",
+	}
+	err := sm.RecordExternalMessage(ctx, msg)
+	require.NoError(t, err)
+
+	// Verify message was published to SubPub
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		resp, ok := next()
+		if ok && len(resp.Messages) > 0 {
+			assert.Equal(t, "external message", resp.Messages[0].Content)
+			assert.Equal(t, "ext-msg-test", resp.Messages[0].SessionID)
+			assert.NotEmpty(t, resp.Messages[0].ID)
+		}
+	}()
+
+	select {
+	case <-done:
+		// Success
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for SubPub message")
+	}
+
+	// Verify message was persisted via onMessage
+	mu.Lock()
+	defer mu.Unlock()
+	require.Len(t, persisted, 1)
+	assert.Equal(t, "external message", persisted[0].Content)
+	assert.Equal(t, "ext-msg-test", persisted[0].SessionID)
+}
+
+func TestSessionManager_RecordExternalMessage_UpdatesLastActivity(t *testing.T) {
+	t.Parallel()
+
+	sm := NewSessionManager(SessionManagerConfig{
+		ID:     "activity-test",
+		UserID: "user-1",
+	})
+
+	initialActivity := sm.LastActivity()
+
+	time.Sleep(10 * time.Millisecond)
+
+	err := sm.RecordExternalMessage(context.Background(), Message{
+		Type:    MessageTypeAssistant,
+		Content: "update activity",
+	})
+	require.NoError(t, err)
+
+	updatedActivity := sm.LastActivity()
+	assert.True(t, updatedActivity.After(initialActivity), "LastActivity should be updated after RecordExternalMessage")
+}
+
+func TestSessionManager_GetSession_IncludesDelegateFields(t *testing.T) {
+	t.Parallel()
+
+	sm := NewSessionManager(SessionManagerConfig{
+		ID:              "delegate-sess",
+		UserID:          "user-1",
+		ParentSessionID: "parent-123",
+		DelegateTask:    "analyze data",
+	})
+
+	sess := sm.GetSession()
+
+	assert.Equal(t, "delegate-sess", sess.ID)
+	assert.Equal(t, "user-1", sess.UserID)
+	assert.Equal(t, "parent-123", sess.ParentSessionID)
+	assert.Equal(t, "analyze data", sess.DelegateTask)
+}

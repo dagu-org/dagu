@@ -44,9 +44,12 @@ type SessionManager struct {
 	inputCostPer1M  float64
 	outputCostPer1M float64
 	totalCost       float64
-	memoryStore     MemoryStore
-	dagName         string
-	sessionStore    SessionStore
+	memoryStore        MemoryStore
+	dagName            string
+	sessionStore       SessionStore
+	parentSessionID    string
+	delegateTask       string
+	registerSubSession func(id string, mgr *SessionManager)
 }
 
 // SessionManagerConfig contains configuration for creating a SessionManager.
@@ -70,6 +73,12 @@ type SessionManagerConfig struct {
 	MemoryStore     MemoryStore
 	DAGName         string
 	SessionStore    SessionStore
+	// ParentSessionID links this session to its parent (non-empty = sub-session).
+	ParentSessionID string
+	// DelegateTask is the task description given to the sub-agent.
+	DelegateTask string
+	// RegisterSubSession registers a sub-session's SessionManager for SSE streaming.
+	RegisterSubSession func(id string, mgr *SessionManager)
 }
 
 // NewSessionManager creates a new SessionManager.
@@ -107,9 +116,12 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		role:            cfg.Role,
 		inputCostPer1M:  cfg.InputCostPer1M,
 		outputCostPer1M: cfg.OutputCostPer1M,
-		memoryStore:     cfg.MemoryStore,
-		dagName:         cfg.DAGName,
-		sessionStore:    cfg.SessionStore,
+		memoryStore:        cfg.MemoryStore,
+		dagName:            cfg.DAGName,
+		sessionStore:       cfg.SessionStore,
+		parentSessionID:    cfg.ParentSessionID,
+		delegateTask:       cfg.DelegateTask,
+		registerSubSession: cfg.RegisterSubSession,
 	}
 }
 
@@ -226,12 +238,41 @@ func (sm *SessionManager) GetSession() Session {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	return Session{
-		ID:        sm.id,
-		UserID:    sm.userID,
-		DAGName:   sm.dagName,
-		CreatedAt: sm.createdAt,
-		UpdatedAt: sm.lastActivity,
+		ID:              sm.id,
+		UserID:          sm.userID,
+		DAGName:         sm.dagName,
+		ParentSessionID: sm.parentSessionID,
+		DelegateTask:    sm.delegateTask,
+		CreatedAt:       sm.createdAt,
+		UpdatedAt:       sm.lastActivity,
 	}
+}
+
+// RecordExternalMessage records a message from an external source (e.g., a delegate child loop).
+// It publishes the message to the SubPub for SSE streaming and persists it via onMessage.
+func (sm *SessionManager) RecordExternalMessage(ctx context.Context, msg Message) error {
+	msg.SessionID = sm.id
+	if msg.ID == "" {
+		msg.ID = uuid.New().String()
+	}
+
+	sm.mu.Lock()
+	sm.lastActivity = time.Now()
+	sm.mu.Unlock()
+
+	msg.SequenceID = sm.appendMessage(msg)
+
+	sm.subpub.Publish(msg.SequenceID, StreamResponse{
+		Messages: []Message{msg},
+	})
+
+	if sm.onMessage != nil {
+		if err := sm.onMessage(ctx, msg); err != nil {
+			sm.logger.Warn("failed to persist message", "error", err)
+		}
+	}
+
+	return nil
 }
 
 // AcceptUserMessage enqueues a user message, ensuring the loop is ready first.
@@ -384,26 +425,30 @@ func (sm *SessionManager) ensureLoop(provider llm.Provider, modelID string, reso
 func (sm *SessionManager) createLoop(provider llm.Provider, model string, history []llm.Message, safeMode bool) *Loop {
 	memory := sm.loadMemory()
 	return NewLoop(LoopConfig{
-		Provider:         provider,
-		Model:            model,
-		History:          history,
-		Tools:            CreateTools(ToolConfig{DAGsDir: sm.environment.DAGsDir}),
-		RecordMessage:    sm.createRecordMessageFunc(),
-		Logger:           sm.logger,
-		SystemPrompt:     GenerateSystemPrompt(sm.environment, nil, memory, sm.role),
-		WorkingDir:       sm.workingDir,
-		SessionID:        sm.id,
-		OnWorking:        sm.SetWorking,
-		EmitUIAction:     sm.createEmitUIActionFunc(),
-		EmitUserPrompt:   sm.createEmitUserPromptFunc(),
-		WaitUserResponse: sm.createWaitUserResponseFunc(),
-		SafeMode:         safeMode,
-		Hooks:            sm.hooks,
-		UserID:           sm.userID,
-		Username:         sm.username,
-		IPAddress:        sm.ipAddress,
-		Role:             sm.role,
-		SessionStore:     sm.sessionStore,
+		Provider:           provider,
+		Model:              model,
+		History:            history,
+		Tools:              CreateTools(ToolConfig{DAGsDir: sm.environment.DAGsDir}),
+		RecordMessage:      sm.createRecordMessageFunc(),
+		Logger:             sm.logger,
+		SystemPrompt:       GenerateSystemPrompt(sm.environment, nil, memory, sm.role),
+		WorkingDir:         sm.workingDir,
+		SessionID:          sm.id,
+		OnWorking:          sm.SetWorking,
+		EmitUIAction:       sm.createEmitUIActionFunc(),
+		EmitUserPrompt:     sm.createEmitUserPromptFunc(),
+		WaitUserResponse:   sm.createWaitUserResponseFunc(),
+		SafeMode:           safeMode,
+		Hooks:              sm.hooks,
+		UserID:             sm.userID,
+		Username:           sm.username,
+		IPAddress:          sm.ipAddress,
+		Role:               sm.role,
+		SessionStore:       sm.sessionStore,
+		RegisterSubSession: sm.registerSubSession,
+		NotifyParent: func(event StreamResponse) {
+			sm.subpub.Broadcast(event)
+		},
 	})
 }
 

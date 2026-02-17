@@ -73,6 +73,10 @@ type LoopConfig struct {
 	Role auth.Role
 	// SessionStore is used for delegate sub-session persistence.
 	SessionStore SessionStore
+	// RegisterSubSession registers a sub-session's SessionManager for SSE streaming.
+	RegisterSubSession func(id string, mgr *SessionManager)
+	// NotifyParent broadcasts a delegate event to the parent session's SSE stream.
+	NotifyParent func(event StreamResponse)
 }
 
 // Loop manages a session turn with an LLM including tool execution.
@@ -99,8 +103,10 @@ type Loop struct {
 	userID           string
 	username         string
 	ipAddress        string
-	role             auth.Role
-	sessionStore     SessionStore
+	role               auth.Role
+	sessionStore       SessionStore
+	registerSubSession func(id string, mgr *SessionManager)
+	notifyParent       func(event StreamResponse)
 }
 
 // NewLoop creates a new Loop instance.
@@ -130,8 +136,10 @@ func NewLoop(config LoopConfig) *Loop {
 		userID:           config.UserID,
 		username:         config.Username,
 		ipAddress:        config.IPAddress,
-		role:             config.Role,
-		sessionStore:     config.SessionStore,
+		role:               config.Role,
+		sessionStore:       config.SessionStore,
+		registerSubSession: config.RegisterSubSession,
+		notifyParent:       config.NotifyParent,
 	}
 }
 
@@ -334,15 +342,17 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 	var delegate *DelegateContext
 	if l.sessionStore != nil {
 		delegate = &DelegateContext{
-			Provider:     l.provider,
-			Model:        l.model,
-			SystemPrompt: l.systemPrompt,
-			Tools:        l.tools,
-			Hooks:        l.hooks,
-			Logger:       l.logger,
-			SessionStore: l.sessionStore,
-			ParentID:     l.sessionID,
-			UserID:       userID,
+			Provider:           l.provider,
+			Model:              l.model,
+			SystemPrompt:       l.systemPrompt,
+			Tools:              l.tools,
+			Hooks:              l.hooks,
+			Logger:             l.logger,
+			SessionStore:       l.sessionStore,
+			ParentID:           l.sessionID,
+			UserID:             userID,
+			RegisterSubSession: l.registerSubSession,
+			NotifyParent:       l.notifyParent,
 		}
 	}
 

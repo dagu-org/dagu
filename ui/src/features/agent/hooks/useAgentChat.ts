@@ -9,6 +9,7 @@ import { useAgentChatContext } from '../context/AgentChatContext';
 import { getAuthToken } from '@/lib/authHeaders';
 import {
   DAGContext,
+  DelegateInfo,
   Message,
   MessageType,
   PromptType,
@@ -151,6 +152,8 @@ export function useAgentChat() {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [answeredPrompts, setAnsweredPrompts] = useState<Record<string, string>>({});
+  const [delegates, setDelegates] = useState<DelegateInfo[]>([]);
+  const zIndexCounterRef = useRef(60);
   const baseUrl = `${config.apiURL}/agent`;
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
@@ -190,6 +193,26 @@ export function useAgentChat() {
 
         if (data.session_state) {
           setSessionState(data.session_state);
+        }
+
+        if (data.delegate_event) {
+          const evt = data.delegate_event;
+          if (evt.type === 'started') {
+            zIndexCounterRef.current++;
+            setDelegates((prev) => [...prev, {
+              id: evt.delegate_id,
+              task: evt.task,
+              status: 'running',
+              minimized: false,
+              zIndex: zIndexCounterRef.current,
+            }]);
+          } else if (evt.type === 'completed') {
+            setDelegates((prev) => prev.map((d) =>
+              d.id === evt.delegate_id
+                ? { ...d, status: 'completed' as const, minimized: true }
+                : d
+            ));
+          }
         }
       } catch {
         // SSE parse errors are transient, stream will continue
@@ -334,7 +357,28 @@ export function useAgentChat() {
   const handleClearSession = useCallback(() => {
     clearSession();
     setAnsweredPrompts({});
+    setDelegates([]);
   }, [clearSession]);
+
+  const bringToFront = useCallback((delegateId: string) => {
+    zIndexCounterRef.current++;
+    setDelegates((prev) => prev.map((d) =>
+      d.id === delegateId ? { ...d, zIndex: zIndexCounterRef.current } : d
+    ));
+  }, []);
+
+  const toggleMinimize = useCallback((delegateId: string) => {
+    zIndexCounterRef.current++;
+    setDelegates((prev) => prev.map((d) =>
+      d.id === delegateId
+        ? { ...d, minimized: !d.minimized, zIndex: zIndexCounterRef.current }
+        : d
+    ));
+  }, []);
+
+  const removeDelegate = useCallback((delegateId: string) => {
+    setDelegates((prev) => prev.filter((d) => d.id !== delegateId));
+  }, []);
 
   return {
     sessionId,
@@ -354,5 +398,9 @@ export function useAgentChat() {
     fetchSessions,
     selectSession,
     respondToPrompt,
+    delegates,
+    bringToFront,
+    toggleMinimize,
+    removeDelegate,
   };
 }
