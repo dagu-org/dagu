@@ -1,4 +1,4 @@
-import { ReactElement, useCallback, useEffect, useRef, useState } from 'react';
+import { ReactElement, useCallback, useEffect, useRef } from 'react';
 
 import { AlertCircle, X } from 'lucide-react';
 
@@ -36,7 +36,7 @@ function findLatestSession(
 }
 
 export function AgentChatModal(): ReactElement | null {
-  const { isOpen, closeChat } = useAgentChatContext();
+  const { isOpen, isClosing, closeChat } = useAgentChatContext();
   const isMobile = useIsMobile();
   const {
     sessionId,
@@ -64,11 +64,9 @@ export function AgentChatModal(): ReactElement | null {
   const { bounds, dragHandlers, resizeHandlers } = useResizableDraggable();
 
   const hasAutoSelectedRef = useRef(false);
-  const [isClosing, setIsClosing] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setIsClosing(false);
       hasAutoSelectedRef.current = false;
       fetchSessions();
     }
@@ -115,14 +113,6 @@ export function AgentChatModal(): ReactElement | null {
     [selectSession, clearSession, setError]
   );
 
-  const handleClose = useCallback(() => {
-    setIsClosing(true);
-    setTimeout(() => {
-      setIsClosing(false);
-      closeChat();
-    }, 250);
-  }, [closeChat]);
-
   if (!isOpen) return null;
 
   const errorBanner = error && (
@@ -148,7 +138,7 @@ export function AgentChatModal(): ReactElement | null {
         totalCost={sessionState?.total_cost}
         onSelectSession={handleSelectSession}
         onClearSession={clearSession}
-        onClose={handleClose}
+        onClose={closeChat}
         dragHandlers={isMobile ? undefined : dragHandlers}
         isMobile={isMobile}
       />

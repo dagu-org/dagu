@@ -782,35 +782,25 @@ select:focus-visible {
   background: var(--border-strong);
 }
 
-/* Agent modal — CRT power-on */
+/* Agent modal — CRT power-on (subtle) */
 @keyframes agent-modal-in {
   0% {
+    opacity: 0;
+    transform: scaleX(0.85) scaleY(0.01);
+    filter: brightness(2);
+  }
+  30% {
     opacity: 1;
-    transform: scaleX(0.6) scaleY(0.005);
-    filter: brightness(8);
+    transform: scaleX(0.95) scaleY(0.01);
+    filter: brightness(1.8);
   }
-  20% {
-    opacity: 1;
-    transform: scaleX(0.8) scaleY(0.005);
-    filter: brightness(5);
-  }
-  40% {
-    transform: scaleX(1.02) scaleY(1.04);
-    filter: brightness(1.4);
-  }
-  55% {
-    transform: scale(0.98);
-    filter: brightness(0.9);
-  }
-  65% {
-    transform: scale(1.01);
+  60% {
+    transform: scaleX(1.01) scaleY(1.02);
     filter: brightness(1.1);
   }
-  75% {
-    opacity: 0.5;
-  }
   80% {
-    opacity: 1;
+    transform: scale(0.995);
+    filter: brightness(1);
   }
   100% {
     transform: scale(1);
