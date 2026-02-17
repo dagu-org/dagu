@@ -120,7 +120,7 @@ export function AgentChatModal(): ReactElement | null {
     setTimeout(() => {
       setIsClosing(false);
       closeChat();
-    }, 150);
+    }, 250);
   }, [closeChat]);
 
   if (!isOpen) return null;
@@ -184,8 +184,8 @@ export function AgentChatModal(): ReactElement | null {
         )}
         style={{
           animation: isClosing
-            ? 'agent-modal-out 150ms ease-in forwards'
-            : 'agent-modal-in 250ms ease-out',
+            ? 'agent-modal-out 250ms ease-in forwards'
+            : 'agent-modal-in 400ms ease-out',
         }}
       >
         {content}
@@ -211,8 +211,8 @@ export function AgentChatModal(): ReactElement | null {
           maxWidth: 'calc(100vw - 32px)',
           maxHeight: 'calc(100vh - 100px)',
           animation: isClosing
-            ? 'agent-modal-out 150ms ease-in forwards'
-            : 'agent-modal-in 250ms ease-out',
+            ? 'agent-modal-out 250ms ease-in forwards'
+            : 'agent-modal-in 400ms ease-out',
         }}
       >
         <ResizeHandles resizeHandlers={resizeHandlers} />

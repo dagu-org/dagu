@@ -1,4 +1,4 @@
-import { ReactElement, useCallback, useState } from 'react';
+import { ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDelegateStream } from '../hooks/useDelegateStream';
@@ -37,14 +37,25 @@ export function DelegatePanel({
     storageKey: `delegate-panel-${delegateId}`,
   });
 
+  const prevStatusRef = useRef(status);
+
+  useEffect(() => {
+    if (prevStatusRef.current === 'running' && status === 'completed' && !isClosing) {
+      setIsClosing(true);
+      setTimeout(() => onClose(), 250);
+    }
+    prevStatusRef.current = status;
+  }, [status, isClosing, onClose]);
+
   const handleMouseDown = useCallback(() => {
     onBringToFront();
   }, [onBringToFront]);
 
   const handleClose = useCallback(() => {
+    if (isClosing) return;
     setIsClosing(true);
-    setTimeout(() => onClose(), 150);
-  }, [onClose]);
+    setTimeout(() => onClose(), 250);
+  }, [onClose, isClosing]);
 
   const truncatedTask = task.length > 40 ? task.slice(0, 40) + '...' : task;
   const isRunning = status === 'running' || isWorking;
@@ -64,8 +75,8 @@ export function DelegatePanel({
         height: bounds.height,
         zIndex,
         animation: isClosing
-          ? 'delegate-panel-out 150ms ease-in forwards'
-          : 'delegate-panel-in 250ms ease-out',
+          ? 'delegate-panel-out 250ms ease-in forwards'
+          : 'delegate-panel-in 400ms ease-out',
       }}
       onMouseDown={handleMouseDown}
     >

@@ -208,7 +208,9 @@ export function useAgentChat() {
               zIndex: zIndexCounterRef.current,
             }]);
           } else if (evt.type === 'completed') {
-            setDelegates((prev) => prev.filter((d) => d.id !== evt.delegate_id));
+            setDelegates((prev) => prev.map((d) =>
+              d.id === evt.delegate_id ? { ...d, status: 'completed' as const } : d
+            ));
             setCompletedDelegates((prev) => [
               ...prev,
               { id: evt.delegate_id, task: evt.task, cost: evt.cost },
