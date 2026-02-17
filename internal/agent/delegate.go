@@ -45,7 +45,7 @@ func NewDelegateTool() *AgentTool {
 			Type: "function",
 			Function: llm.ToolFunction{
 				Name:        delegateToolName,
-				Description: "Spawn a sub-agent for a focused sub-task. The sub-agent works independently with the same tools and returns a summary. Use when a task benefits from dedicated, parallel execution. You can delegate multiple tasks simultaneously.",
+				Description: fmt.Sprintf("Spawn a sub-agent for a focused sub-task. The sub-agent works independently with the same tools and returns a summary. Use when a task benefits from dedicated, parallel execution. You can delegate up to %d tasks simultaneously.", maxConcurrentDelegates),
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
