@@ -412,65 +412,13 @@ func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) er
 	return fmt.Errorf("max tool call depth (%d) reached", maxToolCallDepth)
 }
 
-// executeToolCalls runs all tool calls at the current depth level.
-// Delegate tool calls are executed in parallel; all others run sequentially.
+// executeToolCalls runs all tool calls sequentially at the current depth level.
+// The delegate tool handles its own parallelism internally.
 func (l *Loop) executeToolCalls(ctx context.Context, toolCalls []llm.ToolCall, depth int) {
-	type indexedCall struct {
-		index int
-		call  llm.ToolCall
-	}
-
-	var delegateCalls, otherCalls []indexedCall
-	for i, tc := range toolCalls {
-		if tc.Function.Name == delegateToolName {
-			delegateCalls = append(delegateCalls, indexedCall{i, tc})
-		} else {
-			otherCalls = append(otherCalls, indexedCall{i, tc})
-		}
-	}
-
-	// Pre-allocate results array to preserve original ordering.
-	type toolCallResult struct {
-		tc     llm.ToolCall
-		result ToolOut
-	}
-	results := make([]toolCallResult, len(toolCalls))
-
-	// Phase 1: Execute non-delegate calls sequentially (preserves existing behavior).
-	for _, ic := range otherCalls {
-		l.logger.Debug("executing tool", "name", ic.call.Function.Name, "id", ic.call.ID, "depth", depth)
-		results[ic.index] = toolCallResult{tc: ic.call, result: l.executeTool(ctx, ic.call)}
-	}
-
-	// Phase 2: Execute delegate calls in parallel (max 10).
-	if len(delegateCalls) > maxConcurrentDelegates {
-		for _, ic := range delegateCalls[maxConcurrentDelegates:] {
-			results[ic.index] = toolCallResult{
-				tc:     ic.call,
-				result: toolError("Maximum concurrent sub-agents (%d) exceeded", maxConcurrentDelegates),
-			}
-		}
-		delegateCalls = delegateCalls[:maxConcurrentDelegates]
-	}
-
-	if len(delegateCalls) > 0 {
-		var wg sync.WaitGroup
-		for _, ic := range delegateCalls {
-			wg.Add(1)
-			go func(idx int, tc llm.ToolCall) {
-				defer wg.Done()
-				l.logger.Debug("executing delegate tool", "id", tc.ID, "depth", depth)
-				results[idx] = toolCallResult{tc: tc, result: l.executeTool(ctx, tc)}
-			}(ic.index, ic.call)
-		}
-		wg.Wait()
-	}
-
-	// Record all results sequentially to maintain ordered history.
-	for _, r := range results {
-		if r.tc.ID != "" {
-			l.recordToolResult(ctx, r.tc, r.result)
-		}
+	for _, tc := range toolCalls {
+		l.logger.Debug("executing tool", "name", tc.Function.Name, "id", tc.ID, "depth", depth)
+		result := l.executeTool(ctx, tc)
+		l.recordToolResult(ctx, tc, result)
 	}
 }
 
@@ -539,7 +487,7 @@ func (l *Loop) recordToolResult(ctx context.Context, tc llm.ToolCall, result Too
 		}},
 		CreatedAt:  time.Now(),
 		LLMData:    &toolMessage,
-		DelegateID: result.DelegateID,
+		DelegateIDs: result.DelegateIDs,
 	}
 	if err := l.recordMessage(ctx, msg); err != nil {
 		l.logger.Error("failed to record tool result message", "error", err)

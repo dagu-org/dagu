@@ -75,6 +75,7 @@ export interface Message {
   user_prompt?: UserPrompt;
   usage?: TokenUsage;
   cost?: number;
+  delegate_ids?: string[];
   created_at: string;
 }
 
@@ -121,12 +122,6 @@ export interface DelegateInfo {
   id: string;
   task: string;
   status: 'running' | 'completed';
-  zIndex: number;
-}
-
-export interface CompletedDelegateInfo {
-  id: string;
-  task: string;
   cost?: number;
 }
 

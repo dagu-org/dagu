@@ -10,9 +10,11 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { Message, TokenUsage, ToolCall, ToolResult, UIAction, UserPromptResponse } from '../types';
+import { DelegateInfo, Message, TokenUsage, ToolCall, ToolResult, UIAction, UserPromptResponse } from '../types';
 import { formatCost } from '../utils/formatCost';
+import { isDelegateToolCall, parseDelegateTasks } from '../utils/delegateUtils';
 import { CommandApprovalMessage } from './CommandApprovalMessage';
+import { InlineDelegateResult } from './InlineDelegateResult';
 import { ToolContentViewer } from './ToolViewers';
 import { UserPromptMessage } from './UserPromptMessage';
 
@@ -22,6 +24,7 @@ interface ChatMessagesProps {
   isWorking: boolean;
   onPromptRespond?: (response: UserPromptResponse, displayValue: string) => void;
   answeredPrompts?: Record<string, string>;
+  delegateStatuses?: Record<string, DelegateInfo>;
 }
 
 export function ChatMessages({
@@ -30,6 +33,7 @@ export function ChatMessages({
   isWorking,
   onPromptRespond,
   answeredPrompts,
+  delegateStatuses,
 }: ChatMessagesProps): React.ReactNode {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +67,7 @@ export function ChatMessages({
           message={message}
           onPromptRespond={onPromptRespond}
           answeredPrompts={answeredPrompts}
+          delegateStatuses={delegateStatuses}
         />
       ))}
       {pendingUserMessage && (
@@ -83,9 +88,10 @@ interface MessageItemProps {
   message: Message;
   onPromptRespond?: (response: UserPromptResponse, displayValue: string) => void;
   answeredPrompts?: Record<string, string>;
+  delegateStatuses?: Record<string, DelegateInfo>;
 }
 
-function MessageItem({ message, onPromptRespond, answeredPrompts }: MessageItemProps): React.ReactNode {
+function MessageItem({ message, onPromptRespond, answeredPrompts, delegateStatuses }: MessageItemProps): React.ReactNode {
   switch (message.type) {
     case 'user':
       return <UserMessage content={message.content ?? ''} />;
@@ -99,8 +105,19 @@ function MessageItem({ message, onPromptRespond, answeredPrompts }: MessageItemP
         />
       );
     case 'tool_use':
+      if (isDelegateToolCall(message.tool_calls)) {
+        return <DelegateToolCallBadge toolCalls={message.tool_calls ?? []} />;
+      }
       return <ToolCallList toolCalls={message.tool_calls ?? []} />;
     case 'tool_result':
+      if (message.delegate_ids && message.delegate_ids.length > 0) {
+        return (
+          <DelegateResultsInline
+            delegateIds={message.delegate_ids}
+            delegateStatuses={delegateStatuses}
+          />
+        );
+      }
       return <ToolResultMessage toolResults={message.tool_results ?? []} />;
     case 'error':
       return <ErrorMessage content={message.content ?? ''} />;
@@ -254,6 +271,59 @@ function ToolCallBadge({ toolCall }: { toolCall: ToolCall }): React.ReactNode {
           <ToolContentViewer toolName={toolCall.function.name} args={args} />
         </div>
       )}
+    </div>
+  );
+}
+
+function DelegateToolCallBadge({ toolCalls }: { toolCalls: ToolCall[] }): React.ReactNode {
+  const delegateCall = toolCalls.find((tc) => tc.function.name === 'delegate');
+  if (!delegateCall) return <ToolCallList toolCalls={toolCalls} />;
+
+  const tasks = parseDelegateTasks(delegateCall);
+  const nonDelegateCalls = toolCalls.filter((tc) => tc.function.name !== 'delegate');
+
+  return (
+    <div className="space-y-1">
+      {nonDelegateCalls.length > 0 && <ToolCallList toolCalls={nonDelegateCalls} />}
+      <div className="rounded border border-blue-500/30 bg-blue-500/5 text-xs overflow-hidden">
+        <div className="flex items-center gap-1.5 px-2 py-1.5">
+          <Loader2 className="h-3 w-3 text-blue-500 animate-spin" />
+          <span className="font-mono font-medium">delegate</span>
+          <span className="text-muted-foreground">
+            {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
+          </span>
+        </div>
+        {tasks.length > 0 && (
+          <div className="px-2 py-1 border-t border-blue-500/20 space-y-0.5">
+            {tasks.map((task, i) => (
+              <div key={i} className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="text-[10px] text-blue-500/60">{i + 1}.</span>
+                <span className="truncate">{task}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DelegateResultsInline({
+  delegateIds,
+  delegateStatuses,
+}: {
+  delegateIds: string[];
+  delegateStatuses?: Record<string, DelegateInfo>;
+}): React.ReactNode {
+  return (
+    <div className="pl-5 space-y-1">
+      {delegateIds.map((id) => (
+        <InlineDelegateResult
+          key={id}
+          delegateId={id}
+          delegateInfo={delegateStatuses?.[id]}
+        />
+      ))}
     </div>
   );
 }

@@ -399,7 +399,7 @@ func newDelegateProvider(task string) *mockLLMProvider {
 						Type: "function",
 						Function: llm.ToolCallFunction{
 							Name:      "delegate",
-							Arguments: fmt.Sprintf(`{"task": %q}`, task),
+							Arguments: fmt.Sprintf(`{"tasks": [{"task": %q}]}`, task),
 						},
 					}},
 				}, nil

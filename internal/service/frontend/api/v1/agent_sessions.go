@@ -302,7 +302,7 @@ func toAPIMessages(msgs []agent.Message) []api.AgentMessage {
 			Content:    ptrOf(m.Content),
 			CreatedAt:  m.CreatedAt,
 			Cost:       m.Cost,
-			DelegateId: ptrOf(m.DelegateID),
+			DelegateIds: ptrOf(m.DelegateIDs),
 		}
 
 		if len(m.ToolCalls) > 0 {

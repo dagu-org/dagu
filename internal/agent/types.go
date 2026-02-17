@@ -117,8 +117,8 @@ type Message struct {
 	UIAction *UIAction `json:"ui_action,omitempty"`
 	// UserPrompt contains a prompt when Type is MessageTypeUserPrompt.
 	UserPrompt *UserPrompt `json:"user_prompt,omitempty"`
-	// DelegateID references the sub-session ID for delegate tool results.
-	DelegateID string `json:"delegate_id,omitempty"`
+	// DelegateIDs references the sub-session IDs for delegate tool results.
+	DelegateIDs []string `json:"delegate_ids,omitempty"`
 }
 
 // ToolResult represents the result of a tool call.
@@ -233,8 +233,8 @@ type ToolOut struct {
 	Content string
 	// IsError indicates whether the tool execution failed.
 	IsError bool
-	// DelegateID references the sub-session created by the delegate tool.
-	DelegateID string
+	// DelegateIDs references the sub-sessions created by the delegate tool.
+	DelegateIDs []string
 }
 
 // ToolFunc is the function signature for tool execution.

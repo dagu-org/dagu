@@ -3488,7 +3488,7 @@ export interface components {
             createdAt: string;
             uiAction?: components["schemas"]["AgentUIAction"];
             userPrompt?: components["schemas"]["AgentUserPrompt"];
-            delegateId?: string;
+            delegateIds?: string[];
         };
         /** @description Session details including messages and current state */
         AgentSessionDetailResponse: {

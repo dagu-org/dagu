@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -674,7 +675,7 @@ func TestLoop_DelegateToolIsolation(t *testing.T) {
 				Type: "function",
 				Function: llm.ToolCallFunction{
 					Name:      "delegate",
-					Arguments: `{"task": "sub task"}`,
+					Arguments: `{"tasks": [{"task": "sub task"}]}`,
 				},
 			}},
 		},
@@ -719,16 +720,16 @@ func TestLoop_DelegateToolIsolation(t *testing.T) {
 	assert.Equal(t, parentID, subSessions[0].ParentSessionID)
 	assert.Equal(t, "sub task", subSessions[0].DelegateTask)
 
-	// Verify parent messages contain delegate tool result with DelegateID
+	// Verify parent messages contain delegate tool result with DelegateIDs
 	mu.Lock()
 	defer mu.Unlock()
 	var hasDelegateResult bool
 	for _, msg := range parentMessages {
-		if len(msg.ToolResults) > 0 && msg.DelegateID != "" {
+		if len(msg.ToolResults) > 0 && len(msg.DelegateIDs) > 0 {
 			hasDelegateResult = true
 		}
 	}
-	assert.True(t, hasDelegateResult, "parent should have a delegate tool result with DelegateID")
+	assert.True(t, hasDelegateResult, "parent should have a delegate tool result with DelegateIDs")
 }
 
 func TestLoop_RecordMessageError(t *testing.T) {
@@ -751,11 +752,11 @@ func TestLoop_RecordMessageError(t *testing.T) {
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
-func TestLoop_ParallelDelegates(t *testing.T) {
+func TestLoop_BatchedDelegates(t *testing.T) {
 	t.Parallel()
 
 	store := newMockSessionStore()
-	parentID := "parent-parallel"
+	parentID := "parent-batched"
 
 	require.NoError(t, store.CreateSession(context.Background(), &Session{
 		ID: parentID, UserID: "user1",
@@ -765,11 +766,14 @@ func TestLoop_ParallelDelegates(t *testing.T) {
 	provider := newSequenceProvider(
 		&llm.ChatResponse{
 			FinishReason: "tool_calls",
-			ToolCalls: []llm.ToolCall{
-				{ID: "d1", Type: "function", Function: llm.ToolCallFunction{Name: "delegate", Arguments: `{"task":"task-1"}`}},
-				{ID: "d2", Type: "function", Function: llm.ToolCallFunction{Name: "delegate", Arguments: `{"task":"task-2"}`}},
-				{ID: "d3", Type: "function", Function: llm.ToolCallFunction{Name: "delegate", Arguments: `{"task":"task-3"}`}},
-			},
+			ToolCalls: []llm.ToolCall{{
+				ID:   "d1",
+				Type: "function",
+				Function: llm.ToolCallFunction{
+					Name:      "delegate",
+					Arguments: `{"tasks":[{"task":"task-1"},{"task":"task-2"},{"task":"task-3"}]}`,
+				},
+			}},
 		},
 		&llm.ChatResponse{Content: "all done", FinishReason: "stop"},
 	)
@@ -799,10 +803,10 @@ func TestLoop_ParallelDelegates(t *testing.T) {
 	}
 	store.mu.Unlock()
 
-	assert.Equal(t, 3, subCount, "should have 3 sub-sessions")
+	assert.Equal(t, 3, subCount, "should have 3 sub-sessions from batched delegate call")
 }
 
-func TestLoop_ExceedMaxConcurrentDelegates(t *testing.T) {
+func TestLoop_BatchedDelegateExceedsMax(t *testing.T) {
 	t.Parallel()
 
 	store := newMockSessionStore()
@@ -813,25 +817,27 @@ func TestLoop_ExceedMaxConcurrentDelegates(t *testing.T) {
 		CreatedAt: time.Now(), UpdatedAt: time.Now(),
 	}))
 
-	toolCalls := make([]llm.ToolCall, 12)
-	for i := range toolCalls {
-		toolCalls[i] = llm.ToolCall{
-			ID:   fmt.Sprintf("d%d", i),
-			Type: "function",
-			Function: llm.ToolCallFunction{
-				Name:      "delegate",
-				Arguments: fmt.Sprintf(`{"task":"task-%d"}`, i),
-			},
-		}
+	// Build a batched delegate call with 12 tasks (exceeds max of 8)
+	var tasks []string
+	for i := 0; i < 12; i++ {
+		tasks = append(tasks, fmt.Sprintf(`{"task":"task-%d"}`, i))
 	}
+	tasksJSON := "[" + strings.Join(tasks, ",") + "]"
 
 	provider := newSequenceProvider(
-		&llm.ChatResponse{FinishReason: "tool_calls", ToolCalls: toolCalls},
+		&llm.ChatResponse{
+			FinishReason: "tool_calls",
+			ToolCalls: []llm.ToolCall{{
+				ID:   "d1",
+				Type: "function",
+				Function: llm.ToolCallFunction{
+					Name:      "delegate",
+					Arguments: fmt.Sprintf(`{"tasks":%s}`, tasksJSON),
+				},
+			}},
+		},
 		&llm.ChatResponse{Content: "done", FinishReason: "stop"},
 	)
-
-	var recorded []Message
-	var mu sync.Mutex
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -842,12 +848,6 @@ func TestLoop_ExceedMaxConcurrentDelegates(t *testing.T) {
 		SessionID:    parentID,
 		SessionStore: store,
 		UserID:       "user1",
-		RecordMessage: func(_ context.Context, msg Message) error {
-			mu.Lock()
-			recorded = append(recorded, msg)
-			mu.Unlock()
-			return nil
-		},
 	})
 
 	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "do 12 things"})
@@ -864,19 +864,8 @@ func TestLoop_ExceedMaxConcurrentDelegates(t *testing.T) {
 	}
 	store.mu.Unlock()
 
-	assert.LessOrEqual(t, subCount, 8, "should have at most 8 sub-sessions")
-
-	mu.Lock()
-	defer mu.Unlock()
-	var errorResults int
-	for _, msg := range recorded {
-		for _, tr := range msg.ToolResults {
-			if tr.IsError {
-				errorResults++
-			}
-		}
-	}
-	assert.Equal(t, 4, errorResults, "4 delegate calls should have been rejected")
+	// Delegate tool caps at maxConcurrentDelegates internally
+	assert.Equal(t, maxConcurrentDelegates, subCount, "should have exactly maxConcurrentDelegates sub-sessions")
 }
 
 func TestLoop_ExecuteTool_PassesSubSessionCallbacks(t *testing.T) {
@@ -900,7 +889,7 @@ func TestLoop_ExecuteTool_PassesSubSessionCallbacks(t *testing.T) {
 				Type: "function",
 				Function: llm.ToolCallFunction{
 					Name:      "delegate",
-					Arguments: `{"task": "callback test"}`,
+					Arguments: `{"tasks": [{"task": "callback test"}]}`,
 				},
 			}},
 		},

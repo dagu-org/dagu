@@ -7977,8 +7977,10 @@ components:
           $ref: "#/components/schemas/AgentUIAction"
         userPrompt:
           $ref: "#/components/schemas/AgentUserPrompt"
-        delegateId:
-          type: string
+        delegateIds:
+          type: array
+          items:
+            type: string
 
     AgentSessionDetailResponse:
       type: object

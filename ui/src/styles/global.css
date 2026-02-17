@@ -833,67 +833,6 @@ select:focus-visible {
   }
 }
 
-/* Sub-agent panel — CRT boot (vertical line variant) */
-@keyframes delegate-panel-in {
-  0% {
-    opacity: 1;
-    transform: scaleX(0.005) scaleY(0.6);
-    filter: brightness(8);
-  }
-  20% {
-    opacity: 1;
-    transform: scaleX(0.005) scaleY(0.8);
-    filter: brightness(5);
-  }
-  40% {
-    transform: scaleX(1.04) scaleY(1.02);
-    filter: brightness(1.4);
-  }
-  55% {
-    transform: scale(0.98);
-    filter: brightness(0.9);
-  }
-  65% {
-    transform: scale(1.01);
-    filter: brightness(1.1);
-  }
-  75% {
-    opacity: 0.5;
-  }
-  80% {
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    filter: brightness(1);
-  }
-}
-
-/* Sub-agent panel — CRT shutdown (vertical line variant) */
-@keyframes delegate-panel-out {
-  0% {
-    opacity: 1;
-    transform: scale(1);
-    filter: brightness(1);
-  }
-  25% {
-    opacity: 0.4;
-  }
-  30% {
-    opacity: 1;
-    filter: brightness(1.6);
-  }
-  65% {
-    transform: scaleX(0.005) scaleY(0.8);
-    filter: brightness(5);
-  }
-  100% {
-    opacity: 0;
-    transform: scaleX(0.005) scaleY(0.4);
-    filter: brightness(8);
-  }
-}
-
 /* Loading States */
 .skeleton {
   background: linear-gradient(

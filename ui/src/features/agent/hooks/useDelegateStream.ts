@@ -50,6 +50,10 @@ export function useDelegateStream(delegateId: string) {
 
         if (data.session_state) {
           setIsWorking(data.session_state.working);
+          // Auto-close EventSource when delegate is no longer working
+          if (!data.session_state.working) {
+            es.close();
+          }
         }
       } catch {
         // Transient SSE parse error, ignore

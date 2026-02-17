@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/llm"
@@ -32,10 +34,23 @@ const (
 	defaultDelegateMaxIterations = 20
 )
 
-// delegateInput is the parsed input for the delegate tool.
-type delegateInput struct {
+// delegateTask is a single sub-task within a batched delegate call.
+type delegateTask struct {
 	Task          string `json:"task"`
 	MaxIterations int    `json:"max_iterations,omitempty"`
+}
+
+// delegateInput is the parsed input for the delegate tool.
+type delegateInput struct {
+	Tasks []delegateTask `json:"tasks"`
+}
+
+// singleDelegateResult holds the output of one sub-agent execution.
+type singleDelegateResult struct {
+	DelegateID string
+	Content    string
+	IsError    bool
+	Cost       float64
 }
 
 // NewDelegateTool creates a delegate tool for spawning sub-agent loops.
@@ -44,21 +59,37 @@ func NewDelegateTool() *AgentTool {
 		Tool: llm.Tool{
 			Type: "function",
 			Function: llm.ToolFunction{
-				Name:        delegateToolName,
-				Description: fmt.Sprintf("Spawn a sub-agent for a focused sub-task. The sub-agent works independently with the same tools and returns a summary. Use when a task benefits from dedicated, parallel execution. You can delegate up to %d tasks simultaneously.", maxConcurrentDelegates),
+				Name: delegateToolName,
+				Description: fmt.Sprintf(
+					"Spawn sub-agents for focused sub-tasks. Each sub-agent works independently "+
+						"with the same tools and returns a summary. All tasks run in parallel. "+
+						"Maximum %d tasks per call.",
+					maxConcurrentDelegates,
+				),
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
-						"task": map[string]any{
-							"type":        "string",
-							"description": "Description of the sub-task for the sub-agent to complete",
-						},
-						"max_iterations": map[string]any{
-							"type":        "integer",
-							"description": "Maximum number of tool-call rounds (default: 20)",
+						"tasks": map[string]any{
+							"type": "array",
+							"items": map[string]any{
+								"type": "object",
+								"properties": map[string]any{
+									"task": map[string]any{
+										"type":        "string",
+										"description": "Description of the sub-task for the sub-agent to complete",
+									},
+									"max_iterations": map[string]any{
+										"type":        "integer",
+										"description": "Maximum number of tool-call rounds (default: 20)",
+									},
+								},
+								"required": []string{"task"},
+							},
+							"maxItems":    maxConcurrentDelegates,
+							"description": "List of sub-tasks to delegate to sub-agents in parallel",
 						},
 					},
-					"required": []string{"task"},
+					"required": []string{"tasks"},
 				},
 			},
 		},
@@ -66,7 +97,7 @@ func NewDelegateTool() *AgentTool {
 	}
 }
 
-// delegateRun executes the delegate tool by spawning a sub-agent loop.
+// delegateRun executes the delegate tool by spawning sub-agent loops in parallel.
 func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	if ctx.Delegate == nil {
 		return toolError("Delegate capability is not available in this context")
@@ -77,23 +108,66 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 		return toolError("Invalid input: %v", err)
 	}
 
-	if args.Task == "" {
-		return toolError("Task description is required")
+	if len(args.Tasks) == 0 {
+		return toolError("At least one task is required")
 	}
+
+	// Cap at maxConcurrentDelegates.
+	tasks := args.Tasks
+	if len(tasks) > maxConcurrentDelegates {
+		tasks = tasks[:maxConcurrentDelegates]
+	}
+
+	// Run all tasks in parallel.
+	results := make([]singleDelegateResult, len(tasks))
+	var wg sync.WaitGroup
+	for i, task := range tasks {
+		wg.Add(1)
+		go func(idx int, t delegateTask) {
+			defer wg.Done()
+			results[idx] = runSingleDelegate(ctx, t)
+		}(i, task)
+	}
+	wg.Wait()
+
+	// Aggregate results.
+	var delegateIDs []string
+	var summaries []string
+	allFailed := true
+
+	for i, r := range results {
+		delegateIDs = append(delegateIDs, r.DelegateID)
+		prefix := fmt.Sprintf("[%d] %s", i+1, truncate(tasks[i].Task, 60))
+		if r.IsError {
+			summaries = append(summaries, fmt.Sprintf("%s: ERROR: %s", prefix, r.Content))
+		} else {
+			allFailed = false
+			summaries = append(summaries, fmt.Sprintf("%s: %s", prefix, r.Content))
+		}
+	}
+
+	return ToolOut{
+		Content:     strings.Join(summaries, "\n\n"),
+		IsError:     allFailed,
+		DelegateIDs: delegateIDs,
+	}
+}
+
+// runSingleDelegate executes one sub-agent for a single task.
+func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult {
+	dc := ctx.Delegate
+	delegateID := uuid.New().String()
 
 	maxIterations := defaultDelegateMaxIterations
-	if args.MaxIterations > 0 {
-		maxIterations = args.MaxIterations
+	if task.MaxIterations > 0 {
+		maxIterations = task.MaxIterations
 	}
-
-	delegateID := uuid.New().String()
-	dc := ctx.Delegate
 
 	logger := dc.Logger
 	if logger == nil {
 		logger = slog.Default()
 	}
-	logger = logger.With("delegate_id", delegateID, "task", truncate(args.Task, 100))
+	logger = logger.With("delegate_id", delegateID, "task", truncate(task.Task, 100))
 
 	// Persist sub-session in the store.
 	if dc.SessionStore != nil {
@@ -102,12 +176,16 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 			ID:              delegateID,
 			UserID:          dc.UserID,
 			ParentSessionID: dc.ParentID,
-			DelegateTask:    args.Task,
+			DelegateTask:    task.Task,
 			CreatedAt:       now,
 			UpdatedAt:       now,
 		}
 		if err := dc.SessionStore.CreateSession(ctx.Context, subSession); err != nil {
-			return toolError("Failed to create sub-session: %v", err)
+			return singleDelegateResult{
+				DelegateID: delegateID,
+				Content:    fmt.Sprintf("Failed to create sub-session: %v", err),
+				IsError:    true,
+			}
 		}
 	}
 
@@ -127,7 +205,7 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 		WorkingDir:      ctx.WorkingDir,
 		OnMessage:       onMessage,
 		ParentSessionID: dc.ParentID,
-		DelegateTask:    args.Task,
+		DelegateTask:    task.Task,
 	})
 
 	// Register sub-session for SSE streaming.
@@ -141,7 +219,7 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 			DelegateEvent: &DelegateEvent{
 				Type:       "started",
 				DelegateID: delegateID,
-				Task:       args.Task,
+				Task:       task.Task,
 			},
 		})
 	}
@@ -191,9 +269,6 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 				if iteration >= maxIterations {
 					logger.Info("Sub-agent max iterations reached", "max", maxIterations)
 				}
-				// Cancel the child loop after each complete processing cycle.
-				// The delegate queues exactly one task message, so the child
-				// should exit after the first LLM response (success or error).
 				cancelChild()
 			}
 		},
@@ -202,7 +277,7 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	// Queue the task as a user message.
 	loop.QueueUserMessage(llm.Message{
 		Role:    llm.RoleUser,
-		Content: args.Task,
+		Content: task.Task,
 	})
 
 	logger.Info("Starting sub-agent", "max_iterations", maxIterations)
@@ -222,7 +297,7 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 			DelegateEvent: &DelegateEvent{
 				Type:       "completed",
 				DelegateID: delegateID,
-				Task:       args.Task,
+				Task:       task.Task,
 				Cost:       subCost,
 			},
 		})
@@ -230,23 +305,23 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 
 	if err != nil && err != context.Canceled {
 		logger.Error("Sub-agent failed", "error", err)
-		return ToolOut{
+		return singleDelegateResult{
+			DelegateID: delegateID,
 			Content:    fmt.Sprintf("Sub-agent failed: %v", err),
 			IsError:    true,
-			DelegateID: delegateID,
+			Cost:       subCost,
 		}
 	}
 
 	logger.Info("Sub-agent completed", "iterations", iteration)
 
 	// Check if the child loop captured an error (e.g., provider failure).
-	// This handles cases where the loop exits via context cancellation
-	// but the underlying cause was an LLM error.
 	if lastAssistantContent == "" && lastError != "" {
-		return ToolOut{
+		return singleDelegateResult{
+			DelegateID: delegateID,
 			Content:    fmt.Sprintf("Sub-agent failed: %s", lastError),
 			IsError:    true,
-			DelegateID: delegateID,
+			Cost:       subCost,
 		}
 	}
 
@@ -255,9 +330,10 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 		summary = "Sub-agent completed but produced no output."
 	}
 
-	return ToolOut{
-		Content:    summary,
+	return singleDelegateResult{
 		DelegateID: delegateID,
+		Content:    summary,
+		Cost:       subCost,
 	}
 }
 

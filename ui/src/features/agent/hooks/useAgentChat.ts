@@ -8,7 +8,6 @@ import { useClient } from '@/hooks/api';
 import { useAgentChatContext } from '../context/AgentChatContext';
 import { getAuthToken } from '@/lib/authHeaders';
 import {
-  CompletedDelegateInfo,
   DAGContext,
   DelegateInfo,
   Message,
@@ -75,6 +74,7 @@ function convertApiMessage(msg: ApiMessage): Message {
         }
       : undefined,
     cost: msg.cost,
+    delegate_ids: msg.delegateIds ?? undefined,
     created_at: msg.createdAt,
   };
 }
@@ -153,9 +153,7 @@ export function useAgentChat() {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [answeredPrompts, setAnsweredPrompts] = useState<Record<string, string>>({});
-  const [delegates, setDelegates] = useState<DelegateInfo[]>([]);
-  const [completedDelegates, setCompletedDelegates] = useState<CompletedDelegateInfo[]>([]);
-  const zIndexCounterRef = useRef(60);
+  const [delegateStatuses, setDelegateStatuses] = useState<Record<string, DelegateInfo>>({});
   const baseUrl = `${config.apiURL}/agent`;
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
@@ -200,21 +198,25 @@ export function useAgentChat() {
         if (data.delegate_event) {
           const evt = data.delegate_event;
           if (evt.type === 'started') {
-            zIndexCounterRef.current++;
-            setDelegates((prev) => [...prev, {
-              id: evt.delegate_id,
-              task: evt.task,
-              status: 'running',
-              zIndex: zIndexCounterRef.current,
-            }]);
-          } else if (evt.type === 'completed') {
-            setDelegates((prev) => prev.map((d) =>
-              d.id === evt.delegate_id ? { ...d, status: 'completed' as const } : d
-            ));
-            setCompletedDelegates((prev) => [
+            setDelegateStatuses((prev) => ({
               ...prev,
-              { id: evt.delegate_id, task: evt.task, cost: evt.cost },
-            ]);
+              [evt.delegate_id]: {
+                id: evt.delegate_id,
+                task: evt.task,
+                status: 'running',
+              },
+            }));
+          } else if (evt.type === 'completed') {
+            setDelegateStatuses((prev) => ({
+              ...prev,
+              [evt.delegate_id]: {
+                ...prev[evt.delegate_id],
+                id: evt.delegate_id,
+                task: evt.task,
+                status: 'completed',
+                cost: evt.cost,
+              },
+            }));
           }
         }
       } catch {
@@ -360,33 +362,8 @@ export function useAgentChat() {
   const handleClearSession = useCallback(() => {
     clearSession();
     setAnsweredPrompts({});
-    setDelegates([]);
-    setCompletedDelegates([]);
+    setDelegateStatuses({});
   }, [clearSession]);
-
-  const bringToFront = useCallback((delegateId: string) => {
-    zIndexCounterRef.current++;
-    setDelegates((prev) => prev.map((d) =>
-      d.id === delegateId ? { ...d, zIndex: zIndexCounterRef.current } : d
-    ));
-  }, []);
-
-  const reopenDelegate = useCallback((delegateId: string, task: string) => {
-    zIndexCounterRef.current++;
-    setDelegates((prev) => {
-      if (prev.some((d) => d.id === delegateId)) return prev;
-      return [...prev, {
-        id: delegateId,
-        task,
-        status: 'completed' as const,
-        zIndex: zIndexCounterRef.current,
-      }];
-    });
-  }, []);
-
-  const removeDelegate = useCallback((delegateId: string) => {
-    setDelegates((prev) => prev.filter((d) => d.id !== delegateId));
-  }, []);
 
   return {
     sessionId,
@@ -406,10 +383,6 @@ export function useAgentChat() {
     fetchSessions,
     selectSession,
     respondToPrompt,
-    delegates,
-    completedDelegates,
-    bringToFront,
-    reopenDelegate,
-    removeDelegate,
+    delegateStatuses,
   };
 }

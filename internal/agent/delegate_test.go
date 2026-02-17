@@ -14,27 +14,56 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// singleTaskInput returns JSON for a batched delegate call with one task.
+func singleTaskInput(task string) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{"tasks": [{"task": %q}]}`, task))
+}
+
+// singleTaskInputWithIterations returns JSON for a batched delegate call with one task and max_iterations.
+func singleTaskInputWithIterations(task string, maxIter int) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{"tasks": [{"task": %q, "max_iterations": %d}]}`, task, maxIter))
+}
+
 func TestDelegateTool_NoDelegateContext(t *testing.T) {
 	t.Parallel()
 
 	tool := NewDelegateTool()
-	result := tool.Run(ToolContext{}, json.RawMessage(`{"task": "test"}`))
+	result := tool.Run(ToolContext{}, singleTaskInput("test"))
 
 	assert.True(t, result.IsError)
 	assert.Contains(t, result.Content, "not available")
 }
 
-func TestDelegateTool_EmptyTask(t *testing.T) {
+func TestDelegateTool_EmptyTasksArray(t *testing.T) {
 	t.Parallel()
 
 	tool := NewDelegateTool()
 	result := tool.Run(ToolContext{
 		Context:  context.Background(),
 		Delegate: &DelegateContext{},
-	}, json.RawMessage(`{"task": ""}`))
+	}, json.RawMessage(`{"tasks": []}`))
 
 	assert.True(t, result.IsError)
-	assert.Contains(t, result.Content, "required")
+	assert.Contains(t, result.Content, "At least one task")
+}
+
+func TestDelegateTool_EmptyTaskDescription(t *testing.T) {
+	t.Parallel()
+
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider: newStopProvider("ok"),
+			Model:    "test",
+			Tools:    []*AgentTool{},
+		},
+	}, json.RawMessage(`{"tasks": [{"task": ""}]}`))
+
+	// Empty task in array still runs but produces minimal result.
+	// The sub-agent receives an empty user message.
+	assert.False(t, result.IsError)
 }
 
 func TestDelegateTool_InvalidInput(t *testing.T) {
@@ -66,12 +95,23 @@ func TestDelegateTool_Schema(t *testing.T) {
 
 	props, ok := params["properties"].(map[string]any)
 	require.True(t, ok)
-	assert.Contains(t, props, "task")
-	assert.Contains(t, props, "max_iterations")
+	assert.Contains(t, props, "tasks")
+
+	tasksSchema, ok := props["tasks"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "array", tasksSchema["type"])
+	assert.Equal(t, maxConcurrentDelegates, tasksSchema["maxItems"])
+
+	items, ok := tasksSchema["items"].(map[string]any)
+	require.True(t, ok)
+	itemProps, ok := items["properties"].(map[string]any)
+	require.True(t, ok)
+	assert.Contains(t, itemProps, "task")
+	assert.Contains(t, itemProps, "max_iterations")
 
 	required, ok := params["required"].([]string)
 	require.True(t, ok)
-	assert.Contains(t, required, "task")
+	assert.Contains(t, required, "tasks")
 }
 
 func TestFilterOutTool(t *testing.T) {
@@ -154,16 +194,17 @@ func TestDelegateTool_PersistsSubSession(t *testing.T) {
 			ParentID:     "parent-1",
 			UserID:       "user-1",
 		},
-	}, json.RawMessage(`{"task": "analyze data"}`))
+	}, singleTaskInput("analyze data"))
 
 	assert.False(t, result.IsError)
-	assert.NotEmpty(t, result.DelegateID)
+	require.Len(t, result.DelegateIDs, 1)
+	assert.NotEmpty(t, result.DelegateIDs[0])
 
 	// Verify sub-session created in store
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
-	sess, exists := store.sessions[result.DelegateID]
+	sess, exists := store.sessions[result.DelegateIDs[0]]
 	require.True(t, exists, "sub-session should exist in store")
 	assert.Equal(t, "parent-1", sess.ParentSessionID)
 	assert.Equal(t, "analyze data", sess.DelegateTask)
@@ -188,15 +229,16 @@ func TestDelegateTool_RecordsMessagesToSubSession(t *testing.T) {
 			ParentID:     "parent-1",
 			UserID:       "user-1",
 		},
-	}, json.RawMessage(`{"task": "do stuff"}`))
+	}, singleTaskInput("do stuff"))
 
 	assert.False(t, result.IsError)
+	require.Len(t, result.DelegateIDs, 1)
 
 	// Verify messages were recorded to sub-session (not parent)
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
-	msgs, exists := store.messages[result.DelegateID]
+	msgs, exists := store.messages[result.DelegateIDs[0]]
 	require.True(t, exists, "sub-session should have messages")
 	assert.GreaterOrEqual(t, len(msgs), 1, "should have at least assistant message")
 
@@ -219,13 +261,13 @@ func TestDelegateTool_ReturnsLastAssistantContent(t *testing.T) {
 			Model:    "test",
 			Tools:    []*AgentTool{},
 		},
-	}, json.RawMessage(`{"task": "compute"}`))
+	}, singleTaskInput("compute"))
 
 	assert.False(t, result.IsError)
-	assert.Equal(t, "this is the final answer", result.Content)
+	assert.Contains(t, result.Content, "this is the final answer")
 }
 
-func TestDelegateTool_ReturnsDelegateID(t *testing.T) {
+func TestDelegateTool_ReturnsDelegateIDs(t *testing.T) {
 	t.Parallel()
 
 	provider := newStopProvider("ok")
@@ -239,13 +281,140 @@ func TestDelegateTool_ReturnsDelegateID(t *testing.T) {
 			Model:    "test",
 			Tools:    []*AgentTool{},
 		},
-	}, json.RawMessage(`{"task": "something"}`))
+	}, singleTaskInput("something"))
 
 	assert.False(t, result.IsError)
-	assert.NotEmpty(t, result.DelegateID)
+	require.Len(t, result.DelegateIDs, 1)
 	// Should be a valid UUID
-	_, err := uuid.Parse(result.DelegateID)
+	_, err := uuid.Parse(result.DelegateIDs[0])
 	assert.NoError(t, err, "DelegateID should be a valid UUID")
+}
+
+func TestDelegateTool_MultipleTasks(t *testing.T) {
+	t.Parallel()
+
+	provider := newStopProvider("task done")
+
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:     provider,
+			Model:        "test",
+			Tools:        []*AgentTool{},
+			SessionStore: newMockSessionStore(),
+			ParentID:     "parent-1",
+			UserID:       "user-1",
+		},
+	}, json.RawMessage(`{"tasks": [{"task": "task A"}, {"task": "task B"}, {"task": "task C"}]}`))
+
+	assert.False(t, result.IsError)
+	require.Len(t, result.DelegateIDs, 3)
+
+	// Each delegate ID should be unique and valid UUID
+	seen := make(map[string]bool)
+	for _, id := range result.DelegateIDs {
+		assert.NotEmpty(t, id)
+		_, err := uuid.Parse(id)
+		assert.NoError(t, err)
+		assert.False(t, seen[id], "delegate IDs should be unique")
+		seen[id] = true
+	}
+
+	// Content should reference all tasks
+	assert.Contains(t, result.Content, "task A")
+	assert.Contains(t, result.Content, "task B")
+	assert.Contains(t, result.Content, "task C")
+}
+
+func TestDelegateTool_ExceedsMaxTasks(t *testing.T) {
+	t.Parallel()
+
+	provider := newStopProvider("ok")
+
+	// Build more than maxConcurrentDelegates tasks
+	var tasks []delegateTask
+	for i := 0; i < maxConcurrentDelegates+4; i++ {
+		tasks = append(tasks, delegateTask{Task: fmt.Sprintf("task %d", i)})
+	}
+	input, err := json.Marshal(delegateInput{Tasks: tasks})
+	require.NoError(t, err)
+
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider: provider,
+			Model:    "test",
+			Tools:    []*AgentTool{},
+		},
+	}, input)
+
+	// Should succeed but only run maxConcurrentDelegates tasks
+	assert.False(t, result.IsError)
+	assert.Len(t, result.DelegateIDs, maxConcurrentDelegates)
+}
+
+func TestDelegateTool_PartialFailure(t *testing.T) {
+	t.Parallel()
+
+	callCount := 0
+	var mu sync.Mutex
+	provider := &mockLLMProvider{
+		chatFunc: func(_ context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
+			mu.Lock()
+			callCount++
+			n := callCount
+			mu.Unlock()
+			// Alternate: odd calls succeed, even calls fail
+			if n%2 == 0 {
+				return nil, fmt.Errorf("provider error")
+			}
+			return &llm.ChatResponse{Content: "success", FinishReason: "stop"}, nil
+		},
+	}
+
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider: provider,
+			Model:    "test",
+			Tools:    []*AgentTool{},
+		},
+	}, json.RawMessage(`{"tasks": [{"task": "task1"}, {"task": "task2"}]}`))
+
+	// Not all failed, so IsError should be false
+	assert.False(t, result.IsError)
+	assert.Len(t, result.DelegateIDs, 2)
+}
+
+func TestDelegateTool_AllTasksFail(t *testing.T) {
+	t.Parallel()
+
+	provider := &mockLLMProvider{
+		chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+			return nil, fmt.Errorf("provider down")
+		},
+	}
+
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider: provider,
+			Model:    "test",
+			Tools:    []*AgentTool{},
+		},
+	}, json.RawMessage(`{"tasks": [{"task": "fail1"}, {"task": "fail2"}]}`))
+
+	assert.True(t, result.IsError)
+	assert.Len(t, result.DelegateIDs, 2)
+	assert.Contains(t, result.Content, "ERROR")
 }
 
 func TestDelegateTool_WithoutSessionStore(t *testing.T) {
@@ -263,11 +432,12 @@ func TestDelegateTool_WithoutSessionStore(t *testing.T) {
 			Tools:    []*AgentTool{},
 			// No SessionStore
 		},
-	}, json.RawMessage(`{"task": "stateless task"}`))
+	}, singleTaskInput("stateless task"))
 
 	assert.False(t, result.IsError)
-	assert.Equal(t, "no store result", result.Content)
-	assert.NotEmpty(t, result.DelegateID)
+	assert.Contains(t, result.Content, "no store result")
+	require.Len(t, result.DelegateIDs, 1)
+	assert.NotEmpty(t, result.DelegateIDs[0])
 }
 
 func TestDelegateTool_ChildHasNoDelegateTool(t *testing.T) {
@@ -305,7 +475,7 @@ func TestDelegateTool_ChildHasNoDelegateTool(t *testing.T) {
 			Model:    "test",
 			Tools:    parentTools,
 		},
-	}, json.RawMessage(`{"task": "check tools"}`))
+	}, singleTaskInput("check tools"))
 
 	require.NotNil(t, capturedReq)
 
@@ -323,7 +493,6 @@ func TestDelegateTool_MaxIterationsDefault(t *testing.T) {
 	provider := &mockLLMProvider{
 		chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
 			callCount++
-			// Always return stop, but the onWorking callback tracks iterations
 			return &llm.ChatResponse{Content: fmt.Sprintf("iter %d", callCount), FinishReason: "stop"}, nil
 		},
 	}
@@ -337,10 +506,9 @@ func TestDelegateTool_MaxIterationsDefault(t *testing.T) {
 			Model:    "test",
 			Tools:    []*AgentTool{},
 		},
-	}, json.RawMessage(`{"task": "iterate"}`))
+	}, singleTaskInput("iterate"))
 
 	assert.False(t, result.IsError)
-	// With a simple stop provider, only 1 LLM call needed
 	assert.GreaterOrEqual(t, callCount, 1)
 }
 
@@ -358,7 +526,7 @@ func TestDelegateTool_MaxIterationsCustom(t *testing.T) {
 			Model:    "test",
 			Tools:    []*AgentTool{},
 		},
-	}, json.RawMessage(`{"task": "limited", "max_iterations": 2}`))
+	}, singleTaskInputWithIterations("limited", 2))
 
 	assert.False(t, result.IsError)
 	assert.NotEmpty(t, result.Content)
@@ -387,11 +555,12 @@ func TestDelegateTool_ProviderError(t *testing.T) {
 			ParentID:     "parent-1",
 			UserID:       "user-1",
 		},
-	}, json.RawMessage(`{"task": "fail"}`))
+	}, singleTaskInput("fail"))
 
 	assert.True(t, result.IsError)
 	assert.Contains(t, result.Content, "Sub-agent failed")
-	assert.NotEmpty(t, result.DelegateID)
+	require.Len(t, result.DelegateIDs, 1)
+	assert.NotEmpty(t, result.DelegateIDs[0])
 }
 
 func TestDelegateTool_ContextCancellation(t *testing.T) {
@@ -401,7 +570,6 @@ func TestDelegateTool_ContextCancellation(t *testing.T) {
 
 	provider := &mockLLMProvider{
 		chatFunc: func(ctx context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
-			// Block until context cancelled
 			<-ctx.Done()
 			return nil, ctx.Err()
 		},
@@ -418,7 +586,7 @@ func TestDelegateTool_ContextCancellation(t *testing.T) {
 				Model:    "test",
 				Tools:    []*AgentTool{},
 			},
-		}, json.RawMessage(`{"task": "cancelled"}`))
+		}, singleTaskInput("cancelled"))
 	}()
 
 	time.Sleep(50 * time.Millisecond)
@@ -426,8 +594,8 @@ func TestDelegateTool_ContextCancellation(t *testing.T) {
 
 	select {
 	case result := <-done:
-		// Should return gracefully (either error or empty content)
-		assert.NotEmpty(t, result.DelegateID)
+		require.Len(t, result.DelegateIDs, 1)
+		assert.NotEmpty(t, result.DelegateIDs[0])
 	case <-time.After(5 * time.Second):
 		t.Fatal("delegate did not return after context cancellation")
 	}
@@ -436,8 +604,8 @@ func TestDelegateTool_ContextCancellation(t *testing.T) {
 func TestDelegateTool_RegistersSubSession(t *testing.T) {
 	t.Parallel()
 
-	var registeredID string
-	var registeredMgr *SessionManager
+	var mu sync.Mutex
+	registrations := make(map[string]*SessionManager)
 
 	provider := newStopProvider("sub result")
 	tool := NewDelegateTool()
@@ -452,15 +620,21 @@ func TestDelegateTool_RegistersSubSession(t *testing.T) {
 			ParentID:     "parent-1",
 			UserID:       "user-1",
 			RegisterSubSession: func(id string, mgr *SessionManager) {
-				registeredID = id
-				registeredMgr = mgr
+				mu.Lock()
+				registrations[id] = mgr
+				mu.Unlock()
 			},
 		},
-	}, json.RawMessage(`{"task": "register test"}`))
+	}, singleTaskInput("register test"))
 
 	assert.False(t, result.IsError)
-	assert.Equal(t, result.DelegateID, registeredID)
-	assert.NotNil(t, registeredMgr)
+	require.Len(t, result.DelegateIDs, 1)
+
+	mu.Lock()
+	defer mu.Unlock()
+	mgr, ok := registrations[result.DelegateIDs[0]]
+	assert.True(t, ok)
+	assert.NotNil(t, mgr)
 }
 
 func TestDelegateTool_NotifiesParentStarted(t *testing.T) {
@@ -489,15 +663,16 @@ func TestDelegateTool_NotifiesParentStarted(t *testing.T) {
 				}
 			},
 		},
-	}, json.RawMessage(`{"task": "notify test"}`))
+	}, singleTaskInput("notify test"))
 
 	assert.False(t, result.IsError)
+	require.Len(t, result.DelegateIDs, 1)
 
 	mu.Lock()
 	defer mu.Unlock()
 	require.GreaterOrEqual(t, len(events), 1)
 	assert.Equal(t, "started", events[0].Type)
-	assert.Equal(t, result.DelegateID, events[0].DelegateID)
+	assert.Equal(t, result.DelegateIDs[0], events[0].DelegateID)
 	assert.Equal(t, "notify test", events[0].Task)
 }
 
@@ -527,19 +702,69 @@ func TestDelegateTool_NotifiesParentCompleted(t *testing.T) {
 				}
 			},
 		},
-	}, json.RawMessage(`{"task": "complete test"}`))
+	}, singleTaskInput("complete test"))
 
 	assert.False(t, result.IsError)
+	require.Len(t, result.DelegateIDs, 1)
 
 	mu.Lock()
 	defer mu.Unlock()
 	require.Len(t, events, 2) // started + completed
 	assert.Equal(t, "started", events[0].Type)
 	assert.Equal(t, "completed", events[1].Type)
-	assert.Equal(t, result.DelegateID, events[1].DelegateID)
+	assert.Equal(t, result.DelegateIDs[0], events[1].DelegateID)
 	assert.Equal(t, "complete test", events[1].Task)
-	// Cost field should be present on completed event (may be 0 with mock provider).
 	assert.GreaterOrEqual(t, events[1].Cost, float64(0))
+}
+
+func TestDelegateTool_MultipleTasksNotifications(t *testing.T) {
+	t.Parallel()
+
+	var mu sync.Mutex
+	var events []DelegateEvent
+
+	provider := newStopProvider("done")
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:     provider,
+			Model:        "test",
+			Tools:        []*AgentTool{},
+			SessionStore: newMockSessionStore(),
+			ParentID:     "parent-1",
+			UserID:       "user-1",
+			NotifyParent: func(event StreamResponse) {
+				if event.DelegateEvent != nil {
+					mu.Lock()
+					events = append(events, *event.DelegateEvent)
+					mu.Unlock()
+				}
+			},
+		},
+	}, json.RawMessage(`{"tasks": [{"task": "task A"}, {"task": "task B"}]}`))
+
+	assert.False(t, result.IsError)
+	require.Len(t, result.DelegateIDs, 2)
+
+	mu.Lock()
+	defer mu.Unlock()
+	// 2 tasks × 2 events (started + completed) = 4 events
+	require.Len(t, events, 4)
+
+	startedCount := 0
+	completedCount := 0
+	for _, e := range events {
+		switch e.Type {
+		case "started":
+			startedCount++
+		case "completed":
+			completedCount++
+		}
+	}
+	assert.Equal(t, 2, startedCount)
+	assert.Equal(t, 2, completedCount)
 }
 
 func TestDelegateTool_CostRolledUpToParent(t *testing.T) {
@@ -562,24 +787,24 @@ func TestDelegateTool_CostRolledUpToParent(t *testing.T) {
 			UserID:       "user-1",
 			AddCost: func(cost float64) {
 				costMu.Lock()
-				addedCost = cost
+				addedCost += cost
 				costMu.Unlock()
 			},
 		},
-	}, json.RawMessage(`{"task": "cost test"}`))
+	}, singleTaskInput("cost test"))
 
 	assert.False(t, result.IsError)
 
 	costMu.Lock()
 	defer costMu.Unlock()
-	// With mock provider, cost may be 0 but AddCost must have been called.
 	assert.GreaterOrEqual(t, addedCost, float64(0))
 }
 
 func TestDelegateTool_SubSessionStreamable(t *testing.T) {
 	t.Parallel()
 
-	var registeredMgr *SessionManager
+	var mu sync.Mutex
+	managers := make(map[string]*SessionManager)
 
 	provider := newStopProvider("streamed output")
 	tool := NewDelegateTool()
@@ -594,19 +819,24 @@ func TestDelegateTool_SubSessionStreamable(t *testing.T) {
 			ParentID:     "parent-1",
 			UserID:       "user-1",
 			RegisterSubSession: func(id string, mgr *SessionManager) {
-				registeredMgr = mgr
+				mu.Lock()
+				managers[id] = mgr
+				mu.Unlock()
 			},
 		},
-	}, json.RawMessage(`{"task": "stream test"}`))
+	}, singleTaskInput("stream test"))
 
 	assert.False(t, result.IsError)
+	require.Len(t, result.DelegateIDs, 1)
+
+	mu.Lock()
+	registeredMgr := managers[result.DelegateIDs[0]]
+	mu.Unlock()
 	require.NotNil(t, registeredMgr)
 
-	// After completion, the sub-SessionManager should have messages.
 	msgs := registeredMgr.GetMessages()
-	assert.NotEmpty(t, msgs, "sub-SessionManager should have recorded messages from child loop")
+	assert.NotEmpty(t, msgs, "sub-SessionManager should have recorded messages")
 
-	// At least one message should be an assistant message.
 	var hasAssistant bool
 	for _, msg := range msgs {
 		if msg.Type == MessageTypeAssistant {
@@ -620,7 +850,8 @@ func TestDelegateTool_SubSessionStreamable(t *testing.T) {
 func TestDelegateTool_SubSessionWorkingState(t *testing.T) {
 	t.Parallel()
 
-	var registeredMgr *SessionManager
+	var mu sync.Mutex
+	managers := make(map[string]*SessionManager)
 
 	provider := newStopProvider("done")
 	tool := NewDelegateTool()
@@ -635,14 +866,19 @@ func TestDelegateTool_SubSessionWorkingState(t *testing.T) {
 			ParentID:     "parent-1",
 			UserID:       "user-1",
 			RegisterSubSession: func(id string, mgr *SessionManager) {
-				registeredMgr = mgr
+				mu.Lock()
+				managers[id] = mgr
+				mu.Unlock()
 			},
 		},
-	}, json.RawMessage(`{"task": "working state test"}`))
+	}, singleTaskInput("working state test"))
 
-	require.NotNil(t, registeredMgr)
-	// After delegateRun returns, the sub-SessionManager should not be working.
-	assert.False(t, registeredMgr.IsWorking(), "sub-SessionManager should not be working after delegate completes")
+	mu.Lock()
+	defer mu.Unlock()
+	require.NotEmpty(t, managers)
+	for _, mgr := range managers {
+		assert.False(t, mgr.IsWorking(), "sub-SessionManager should not be working after delegate completes")
+	}
 }
 
 func TestDelegateTool_NoCallbacks(t *testing.T) {
@@ -663,9 +899,10 @@ func TestDelegateTool_NoCallbacks(t *testing.T) {
 			RegisterSubSession: nil,
 			NotifyParent:       nil,
 		},
-	}, json.RawMessage(`{"task": "no callbacks test"}`))
+	}, singleTaskInput("no callbacks test"))
 
 	assert.False(t, result.IsError)
-	assert.Equal(t, "no callbacks result", result.Content)
-	assert.NotEmpty(t, result.DelegateID)
+	assert.Contains(t, result.Content, "no callbacks result")
+	require.Len(t, result.DelegateIDs, 1)
+	assert.NotEmpty(t, result.DelegateIDs[0])
 }

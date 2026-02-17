@@ -997,15 +997,15 @@ func TestAPI_CreateSession_ParentMessagesIntact(t *testing.T) {
 	assert.Equal(t, MessageTypeUser, msgs[0].Type)
 	assert.Contains(t, msgs[0].Content, "parent msg")
 
-	// Check that there's a delegate result message (has DelegateID set)
+	// Check that there's a delegate result message (has DelegateIDs set)
 	var hasDelegateResult bool
 	for _, msg := range msgs {
-		if msg.DelegateID != "" {
+		if len(msg.DelegateIDs) > 0 {
 			hasDelegateResult = true
 			break
 		}
 	}
-	assert.True(t, hasDelegateResult, "parent messages should contain delegate tool result with DelegateID")
+	assert.True(t, hasDelegateResult, "parent messages should contain delegate tool result with DelegateIDs")
 }
 
 func TestAPI_CreateSession_MultipleDelegates(t *testing.T) {
@@ -1020,7 +1020,7 @@ func TestAPI_CreateSession_MultipleDelegates(t *testing.T) {
 			n := callCount
 			mu.Unlock()
 			if n == 1 {
-				// Return 2 delegate tool calls
+				// Return a single batched delegate tool call with 2 tasks
 				return &llm.ChatResponse{
 					Content:      "",
 					FinishReason: "tool_calls",
@@ -1030,15 +1030,7 @@ func TestAPI_CreateSession_MultipleDelegates(t *testing.T) {
 							Type: "function",
 							Function: llm.ToolCallFunction{
 								Name:      "delegate",
-								Arguments: `{"task": "task one"}`,
-							},
-						},
-						{
-							ID:   "call-2",
-							Type: "function",
-							Function: llm.ToolCallFunction{
-								Name:      "delegate",
-								Arguments: `{"task": "task two"}`,
+								Arguments: `{"tasks": [{"task": "task one"}, {"task": "task two"}]}`,
 							},
 						},
 					},
@@ -1073,7 +1065,7 @@ func TestAPI_CreateSession_MultipleDelegates(t *testing.T) {
 		}
 	}
 
-	assert.Len(t, subSessions, 2, "should have 2 sub-sessions for 2 delegate calls")
+	assert.Len(t, subSessions, 2, "should have 2 sub-sessions from batched delegate call")
 
 	// Verify each has a different delegate task
 	tasks := map[string]bool{}
