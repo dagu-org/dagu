@@ -30,8 +30,14 @@ export function DelegatePanel({
   const { bounds, dragHandlers, resizeHandlers } = useResizableDraggable({
     defaultWidth: 320,
     defaultHeight: 360,
-    defaultRight: 468 + index * 332,
-    defaultBottom: 64,
+    defaultRight: (() => {
+      const cols = Math.max(1, Math.floor((window.innerWidth - 468) / 332));
+      return 468 + (index % cols) * 332;
+    })(),
+    defaultBottom: (() => {
+      const cols = Math.max(1, Math.floor((window.innerWidth - 468) / 332));
+      return 64 + Math.floor(index / cols) * 380;
+    })(),
     minWidth: 280,
     minHeight: 200,
     storageKey: `delegate-panel-${delegateId}`,
