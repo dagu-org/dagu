@@ -213,11 +213,26 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		dc.RegisterSubSession(delegateID, subMgr)
 	}
 
-	// Record the task as the initial user message so it appears in the SSE snapshot.
-	_ = subMgr.RecordExternalMessage(ctx.Context, Message{
+	// Forward delegate messages to parent SSE so the frontend doesn't need
+	// separate EventSource connections per delegate (browser limits ~6).
+	forwardToParent := func(msg Message) {
+		if dc.NotifyParent != nil {
+			dc.NotifyParent(StreamResponse{
+				DelegateMessages: &DelegateMessages{
+					DelegateID: delegateID,
+					Messages:   []Message{msg},
+				},
+			})
+		}
+	}
+
+	// Record the task as the initial user message and forward to parent.
+	userMsg := Message{
 		Type:    MessageTypeUser,
 		Content: task.Task,
-	})
+	}
+	_ = subMgr.RecordExternalMessage(ctx.Context, userMsg)
+	forwardToParent(userMsg)
 
 	// Set working state before notifying parent so the SSE snapshot has working=true.
 	subMgr.SetWorking(true)
@@ -257,7 +272,9 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 
 	recordMessage := func(msgCtx context.Context, msg Message) error {
 		captureResult(msg)
-		return subMgr.RecordExternalMessage(msgCtx, msg)
+		err := subMgr.RecordExternalMessage(msgCtx, msg)
+		forwardToParent(msg)
+		return err
 	}
 
 	loop := NewLoop(LoopConfig{

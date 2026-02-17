@@ -48,7 +48,7 @@ export function ChatMessages({
     for (const msg of messages) {
       if (msg.tool_results) {
         for (const tr of msg.tool_results) {
-          const id = tr.tool_use_id || (tr as Record<string, unknown>)['tool_call_id'] as string;
+          const id = tr.tool_use_id || (tr as unknown as Record<string, unknown>)['tool_call_id'] as string;
           if (id) ids.add(id);
         }
       }

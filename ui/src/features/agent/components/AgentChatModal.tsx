@@ -56,6 +56,7 @@ export function AgentChatModal(): ReactElement | null {
     respondToPrompt,
     delegates,
     delegateStatuses,
+    delegateMessages,
     bringToFront,
     reopenDelegate,
     removeDelegate,
@@ -220,6 +221,7 @@ export function AgentChatModal(): ReactElement | null {
           status={d.status}
           zIndex={d.zIndex}
           index={i}
+          messages={delegateMessages[d.id] || []}
           onClose={() => removeDelegate(d.id)}
           onBringToFront={() => bringToFront(d.id)}
         />

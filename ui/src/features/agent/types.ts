@@ -138,11 +138,17 @@ export interface NewSessionResponse {
   status: string;
 }
 
+export interface DelegateMessages {
+  delegate_id: string;
+  messages: Message[];
+}
+
 export interface StreamResponse {
   messages?: Message[];
   session?: Session;
   session_state?: SessionState;
   delegate_event?: DelegateEvent;
+  delegate_messages?: DelegateMessages;
 }
 
 // Tool input types for specialized viewers

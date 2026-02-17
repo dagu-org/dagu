@@ -1,8 +1,8 @@
 import { ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useDelegateStream } from '../hooks/useDelegateStream';
 import { useResizableDraggable } from '../hooks/useResizableDraggable';
+import { Message } from '../types';
 import { ChatMessages } from './ChatMessages';
 import { ResizeHandles } from './ResizeHandles';
 
@@ -12,6 +12,7 @@ interface DelegatePanelProps {
   status: 'running' | 'completed';
   zIndex: number;
   index: number;
+  messages: Message[];
   onClose: () => void;
   onBringToFront: () => void;
 }
@@ -22,10 +23,10 @@ export function DelegatePanel({
   status,
   zIndex,
   index,
+  messages,
   onClose,
   onBringToFront,
 }: DelegatePanelProps): ReactElement {
-  const { messages, isWorking } = useDelegateStream(delegateId);
   const [isClosing, setIsClosing] = useState(false);
 
   // Grid layout: flow from top-left, wrap at window edge
@@ -70,7 +71,7 @@ export function DelegatePanel({
   }, [status, handleClose]);
 
   const truncatedTask = task.length > 40 ? task.slice(0, 40) + '...' : task;
-  const isRunning = status === 'running' || isWorking;
+  const isRunning = status === 'running';
 
   return (
     <div

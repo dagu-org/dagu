@@ -158,6 +158,9 @@ export function useAgentChat() {
   // delegateStatuses is a persistent lookup for ALL delegates (running + completed)
   // used by ChatMessages for inline status display and task lookup
   const [delegateStatuses, setDelegateStatuses] = useState<Record<string, DelegateInfo>>({});
+  // delegateMessages carries messages piped through parent SSE (no separate connections needed)
+  const [delegateMessages, setDelegateMessages] = useState<Record<string, Message[]>>({});
+  const delegateMessagesRef = useRef<Record<string, Message[]>>({});
   const zIndexCounterRef = useRef(60);
   const baseUrl = `${config.apiURL}/agent`;
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
@@ -198,6 +201,25 @@ export function useAgentChat() {
 
         if (data.session_state) {
           setSessionState(data.session_state);
+        }
+
+        if (data.delegate_messages) {
+          const { delegate_id, messages: msgs } = data.delegate_messages;
+          setDelegateMessages((prev) => {
+            const existing = prev[delegate_id] || [];
+            const updated = [...existing];
+            for (const msg of msgs) {
+              const idx = updated.findIndex((m) => m.id === msg.id);
+              if (idx !== -1) {
+                updated[idx] = msg;
+              } else {
+                updated.push(msg);
+              }
+            }
+            const next = { ...prev, [delegate_id]: updated };
+            delegateMessagesRef.current = next;
+            return next;
+          });
         }
 
         if (data.delegate_event) {
@@ -372,6 +394,8 @@ export function useAgentChat() {
     setAnsweredPrompts({});
     setDelegates([]);
     setDelegateStatuses({});
+    setDelegateMessages({});
+    delegateMessagesRef.current = {};
   }, [clearSession]);
 
   const bringToFront = useCallback((delegateId: string) => {
@@ -381,7 +405,26 @@ export function useAgentChat() {
     ));
   }, []);
 
-  const reopenDelegate = useCallback((delegateId: string, task: string) => {
+  const reopenDelegate = useCallback(async (delegateId: string, task: string) => {
+    // Fetch messages from REST API if not already piped
+    if (!delegateMessagesRef.current[delegateId]?.length) {
+      try {
+        const { data } = await client.GET('/agent/sessions/{sessionId}', {
+          params: { path: { sessionId: delegateId }, query: { remoteNode } },
+        });
+        if (data) {
+          const converted = convertApiSessionDetail(data);
+          const msgs = converted.messages || [];
+          setDelegateMessages((prev) => {
+            const next = { ...prev, [delegateId]: msgs };
+            delegateMessagesRef.current = next;
+            return next;
+          });
+        }
+      } catch {
+        // Best effort — panel will show empty state
+      }
+    }
     zIndexCounterRef.current++;
     setDelegates((prev) => {
       if (prev.some((d) => d.id === delegateId)) return prev;
@@ -392,7 +435,7 @@ export function useAgentChat() {
         zIndex: zIndexCounterRef.current,
       }];
     });
-  }, []);
+  }, [client, remoteNode]);
 
   const removeDelegate = useCallback((delegateId: string) => {
     setDelegates((prev) => prev.filter((d) => d.id !== delegateId));
@@ -418,6 +461,7 @@ export function useAgentChat() {
     respondToPrompt,
     delegates,
     delegateStatuses,
+    delegateMessages,
     bringToFront,
     reopenDelegate,
     removeDelegate,

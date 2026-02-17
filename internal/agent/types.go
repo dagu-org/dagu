@@ -175,6 +175,14 @@ type DelegateEvent struct {
 	Cost float64 `json:"cost,omitempty"`
 }
 
+// DelegateMessages carries delegate sub-agent messages piped through the parent SSE.
+type DelegateMessages struct {
+	// DelegateID is the sub-session ID.
+	DelegateID string `json:"delegate_id"`
+	// Messages are the delegate's messages.
+	Messages []Message `json:"messages"`
+}
+
 // StreamResponse is sent over SSE to the UI.
 type StreamResponse struct {
 	// Messages contains new or updated messages.
@@ -185,6 +193,8 @@ type StreamResponse struct {
 	SessionState *SessionState `json:"session_state,omitempty"`
 	// DelegateEvent contains delegate lifecycle notifications.
 	DelegateEvent *DelegateEvent `json:"delegate_event,omitempty"`
+	// DelegateMessages contains messages from a delegate piped through the parent SSE.
+	DelegateMessages *DelegateMessages `json:"delegate_messages,omitempty"`
 }
 
 // DAGContext contains a DAG reference from the frontend.
