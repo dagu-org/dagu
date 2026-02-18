@@ -150,6 +150,8 @@ export function useAgentChat() {
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const retryCountRef = useRef(0);
+  // Generation counter: incremented on clearSession to invalidate pending selectSession calls
+  const selectGenRef = useRef(0);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [answeredPrompts, setAnsweredPrompts] = useState<Record<string, string>>({});
@@ -387,10 +389,13 @@ export function useAgentChat() {
 
   const selectSession = useCallback(
     async (id: string): Promise<void> => {
+      const gen = ++selectGenRef.current;
       const { data, error: apiError } = await client.GET('/agent/sessions/{sessionId}', {
         params: { path: { sessionId: id }, query: { remoteNode } },
       });
       if (apiError) throw new Error(apiError.message || 'Failed to load session');
+      // Bail out if a clearSession (or newer selectSession) happened while awaiting
+      if (gen !== selectGenRef.current) return;
       const converted = convertApiSessionDetail(data);
       setSessionId(id);
       setMessages(converted.messages || []);
@@ -411,6 +416,7 @@ export function useAgentChat() {
   const clearError = useCallback(() => setError(null), []);
 
   const handleClearSession = useCallback(() => {
+    selectGenRef.current++; // invalidate any pending selectSession
     clearSession();
     setAnsweredPrompts({});
     setDelegates([]);
