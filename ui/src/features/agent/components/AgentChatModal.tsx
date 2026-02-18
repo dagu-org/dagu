@@ -64,12 +64,14 @@ export function AgentChatModal(): ReactElement | null {
   const { bounds, dragHandlers, resizeHandlers } = useResizableDraggable();
 
   const hasAutoSelectedRef = useRef(false);
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
       hasAutoSelectedRef.current = false;
       fetchSessions();
     }
+    wasOpenRef.current = isOpen;
   }, [isOpen, fetchSessions]);
 
   useEffect(() => {

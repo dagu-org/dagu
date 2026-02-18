@@ -595,15 +595,17 @@ func (a *API) CreateSession(ctx context.Context, userID, username string, role a
 		},
 	})
 
+	// Persist session before accepting the first message so that
+	// the onMessage callback (store.AddMessage) can find the session.
+	a.persistNewSession(ctx, id, userID, dagName, now)
+	a.sessions.Store(id, mgr)
+
 	messageWithContext := formatMessageWithContexts(req.Message, resolved)
 	if err := mgr.AcceptUserMessage(ctx, provider, model, modelCfg.Model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
+		a.sessions.Delete(id)
 		return "", ErrFailedToProcessMessage
 	}
-
-	// Persist and store only after successful message acceptance to avoid orphaned sessions.
-	a.persistNewSession(ctx, id, userID, dagName, now)
-	a.sessions.Store(id, mgr)
 
 	return id, nil
 }
