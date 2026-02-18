@@ -49,7 +49,7 @@ export function ToolResultMessage({ toolResults }: { toolResults: ToolResult[] }
   return (
     <div className="pl-5 space-y-1">
       {toolResults.map((tr) => (
-        <ToolResultItem key={tr.tool_use_id} result={tr} />
+        <ToolResultItem key={tr.tool_call_id} result={tr} />
       ))}
     </div>
   );

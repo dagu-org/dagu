@@ -350,6 +350,11 @@ func logf(w io.Writer, format string, args ...any) {
 	fmt.Fprintf(w, "[agent] %s\n", msg)
 }
 
+const (
+	toolCallArgsTruncateLen      = 200
+	assistantContentTruncateLen = 500
+)
+
 // logMessage writes a structured log entry for an agent message.
 func logMessage(w io.Writer, msg agent.Message) {
 	switch msg.Type {
@@ -357,16 +362,16 @@ func logMessage(w io.Writer, msg agent.Message) {
 		if len(msg.ToolCalls) > 0 {
 			for _, tc := range msg.ToolCalls {
 				args := tc.Function.Arguments
-				if len(args) > 200 {
-					args = args[:200] + "..."
+				if len(args) > toolCallArgsTruncateLen {
+					args = args[:toolCallArgsTruncateLen] + "..."
 				}
 				logf(w, "Tool call: %s %s", tc.Function.Name, args)
 			}
 		}
 		if msg.Content != "" {
 			content := msg.Content
-			if len(content) > 500 {
-				content = content[:500] + "..."
+			if len(content) > assistantContentTruncateLen {
+				content = content[:assistantContentTruncateLen] + "..."
 			}
 			logf(w, "Assistant: %s", strings.ReplaceAll(content, "\n", " "))
 		}

@@ -41,7 +41,7 @@ export function ChatMessages({
     for (const msg of messages) {
       if (msg.tool_results) {
         for (const tr of msg.tool_results) {
-          const id = tr.tool_use_id;
+          const id = tr.tool_call_id;
           if (id) ids.add(id);
         }
       }
@@ -114,7 +114,7 @@ function MessageItem({ message, messages, messageIndex, onPromptRespond, answere
       const m = messages[i]!;
       if (m.delegate_ids && m.delegate_ids.length > 0 && m.tool_results) {
         for (const tr of m.tool_results) {
-          map.set(tr.tool_use_id, m.delegate_ids!);
+          map.set(tr.tool_call_id, m.delegate_ids!);
         }
       }
     }

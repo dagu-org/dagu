@@ -457,7 +457,7 @@ func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 		cont bool
 	}
 
-	heartbeat := time.NewTicker(15 * time.Second)
+	heartbeat := time.NewTicker(heartbeatInterval)
 	defer heartbeat.Stop()
 
 	done := make(chan struct{})
@@ -485,7 +485,7 @@ func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			a.sendSSEMessage(w, res.resp)
-			heartbeat.Reset(15 * time.Second)
+			heartbeat.Reset(heartbeatInterval)
 		case <-heartbeat.C:
 			// SSE comment as heartbeat to keep connection alive
 			if _, err := fmt.Fprint(w, ": heartbeat\n\n"); err != nil {
@@ -737,6 +737,9 @@ func (a *API) EnabledMiddleware() func(http.Handler) http.Handler {
 func (a *API) HandleStream(w http.ResponseWriter, r *http.Request) {
 	a.handleStream(w, r)
 }
+
+// heartbeatInterval is the SSE heartbeat period to keep connections alive.
+const heartbeatInterval = 15 * time.Second
 
 // idleSessionTimeout is the duration after which idle sessions are cleaned up.
 const idleSessionTimeout = 30 * time.Minute

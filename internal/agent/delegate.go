@@ -31,6 +31,12 @@ const (
 
 	// maxConcurrentDelegates is the maximum number of sub-agents that can run in parallel.
 	maxConcurrentDelegates = 8
+
+	// taskSummaryTruncateLen is the max length for task text in result summaries.
+	taskSummaryTruncateLen = 60
+
+	// taskLogTruncateLen is the max length for task text in log context.
+	taskLogTruncateLen = 100
 )
 
 // delegateTask is a single sub-task within a batched delegate call.
@@ -146,7 +152,7 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 
 	for i, r := range results {
 		delegateIDs = append(delegateIDs, r.DelegateID)
-		prefix := fmt.Sprintf("[%d] %s", i+1, truncate(tasks[i].Task, 60))
+		prefix := fmt.Sprintf("[%d] %s", i+1, truncate(tasks[i].Task, taskSummaryTruncateLen))
 		if r.IsError {
 			summaries = append(summaries, fmt.Sprintf("%s: ERROR: %s", prefix, r.Content))
 		} else {
@@ -175,7 +181,7 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 	if logger == nil {
 		logger = slog.Default()
 	}
-	logger = logger.With("delegate_id", delegateID, "task", truncate(task.Task, 100))
+	logger = logger.With("delegate_id", delegateID, "task", truncate(task.Task, taskLogTruncateLen))
 
 	// Persist sub-session in the store.
 	if dc.SessionStore != nil {

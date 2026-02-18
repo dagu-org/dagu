@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { CheckCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DelegateInfo, ToolCall } from '../../types';
-import { TASK_TRUNCATE_LENGTH } from '../../constants';
+import { truncateTask } from '../../constants';
 
 function parseDelegateTasks(toolCall: ToolCall): string[] {
   try {
@@ -58,7 +58,7 @@ export function SubAgentChips({
             {isRunning
               ? <Loader2 className="h-3 w-3 text-orange-600 dark:text-orange-400 animate-spin flex-shrink-0" />
               : <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />}
-            <span className="truncate">{task.length > TASK_TRUNCATE_LENGTH ? task.slice(0, TASK_TRUNCATE_LENGTH) + '...' : task}</span>
+            <span className="truncate">{truncateTask(task)}</span>
           </button>
         );
       })}

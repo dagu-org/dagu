@@ -37,7 +37,7 @@ function convertApiMessage(msg: ApiMessage): Message {
       function: tc.function,
     })),
     tool_results: msg.toolResults?.map((tr) => ({
-      tool_use_id: tr.toolCallId,
+      tool_call_id: tr.toolCallId,
       content: tr.content,
       is_error: tr.isError,
     })),

@@ -62,7 +62,9 @@ export function AgentChatModal(): ReactElement | null {
     reopenDelegate,
     removeDelegate,
   } = useAgentChat();
-  const { bounds, dragHandlers, resizeHandlers } = useResizableDraggable();
+  const { bounds, dragHandlers, resizeHandlers } = useResizableDraggable({
+    storageKey: 'agent-chat-modal-bounds',
+  });
 
   const hasAutoSelectedRef = useRef(false);
   const wasOpenRef = useRef(false);

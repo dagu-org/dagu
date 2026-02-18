@@ -6,7 +6,7 @@ export type MessageType =
   | 'ui_action'
   | 'user_prompt';
 
-export type UIActionType = 'navigate' | 'refresh';
+export type UIActionType = 'navigate';
 
 export interface UIAction {
   type: UIActionType;
@@ -23,7 +23,7 @@ export interface ToolCall {
 }
 
 export interface ToolResult {
-  tool_use_id: string;
+  tool_call_id: string;
   content: string;
   is_error?: boolean;
 }

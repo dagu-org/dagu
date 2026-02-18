@@ -11,7 +11,7 @@ import {
   DELEGATE_PANEL_MIN_HEIGHT,
   DELEGATE_PANEL_MIN_WIDTH,
   DELEGATE_PANEL_WIDTH,
-  TASK_TRUNCATE_LENGTH,
+  truncateTask,
 } from '../constants';
 import { Message } from '../types';
 import { ChatMessages } from './ChatMessages';
@@ -54,7 +54,6 @@ export function DelegatePanel({
     defaultBottom: Math.max(0, window.innerHeight - top - DELEGATE_PANEL_HEIGHT),
     minWidth: DELEGATE_PANEL_MIN_WIDTH,
     minHeight: DELEGATE_PANEL_MIN_HEIGHT,
-    storageKey: 'delegate-panel-bounds',
   });
 
   const onCloseRef = useRef(onClose);
@@ -75,7 +74,7 @@ export function DelegatePanel({
     }
   }, [status, handleClose]);
 
-  const truncatedTask = task.length > TASK_TRUNCATE_LENGTH ? task.slice(0, TASK_TRUNCATE_LENGTH) + '...' : task;
+  const truncatedTask = truncateTask(task);
   const isRunning = status === 'running';
 
   return (
