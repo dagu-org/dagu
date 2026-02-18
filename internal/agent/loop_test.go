@@ -379,7 +379,7 @@ func TestLoop_ExecuteTool(t *testing.T) {
 				IPAddress: "10.0.0.1",
 				Role:      auth.RoleManager,
 			},
-			Hooks:     hooks,
+			Hooks: hooks,
 		})
 
 		result := loop.executeTool(context.Background(), llm.ToolCall{
@@ -739,8 +739,8 @@ func TestLoop_RecordMessageError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	loop := NewLoop(LoopConfig{
-		Provider: provider,
-		Model:    "test",
+		Provider:      provider,
+		Model:         "test",
 		RecordMessage: func(_ context.Context, _ Message) {},
 	})
 

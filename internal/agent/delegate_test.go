@@ -186,7 +186,7 @@ func TestDelegateTool_PersistsSubSession(t *testing.T) {
 			Tools:        []*AgentTool{},
 			SessionStore: store,
 			ParentID:     "parent-1",
-			User: UserIdentity{UserID: "user-1"},
+			User:         UserIdentity{UserID: "user-1"},
 		},
 	}, singleTaskInput("analyze data"))
 
@@ -221,7 +221,7 @@ func TestDelegateTool_RecordsMessagesToSubSession(t *testing.T) {
 			Tools:        []*AgentTool{},
 			SessionStore: store,
 			ParentID:     "parent-1",
-			User: UserIdentity{UserID: "user-1"},
+			User:         UserIdentity{UserID: "user-1"},
 		},
 	}, singleTaskInput("do stuff"))
 
@@ -299,7 +299,7 @@ func TestDelegateTool_MultipleTasks(t *testing.T) {
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
-			User: UserIdentity{UserID: "user-1"},
+			User:         UserIdentity{UserID: "user-1"},
 		},
 	}, json.RawMessage(`{"tasks": [{"task": "task A"}, {"task": "task B"}, {"task": "task C"}]}`))
 
@@ -501,7 +501,7 @@ func TestDelegateTool_ProviderError(t *testing.T) {
 			Tools:        []*AgentTool{},
 			SessionStore: store,
 			ParentID:     "parent-1",
-			User: UserIdentity{UserID: "user-1"},
+			User:         UserIdentity{UserID: "user-1"},
 		},
 	}, singleTaskInput("fail"))
 
@@ -813,7 +813,7 @@ func TestDelegateTool_NoCallbacks(t *testing.T) {
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
-			User: UserIdentity{UserID: "user-1"},
+			User:         UserIdentity{UserID: "user-1"},
 		},
 	}, singleTaskInput("no callbacks test"))
 

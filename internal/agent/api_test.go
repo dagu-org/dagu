@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
-	"sync/atomic"
+
 	"testing"
 	"time"
 
@@ -1185,8 +1185,6 @@ func TestAPI_CleanupIdleSessions_CancelsBeforeDelete(t *testing.T) {
 		WorkingDir:  t.TempDir(),
 	})
 
-	// Create a session manager that tracks whether Cancel was called.
-	var cancelled atomic.Bool
 	mgr := NewSessionManager(SessionManagerConfig{ID: "cleanup-cancel"})
 	mgr.mu.Lock()
 	mgr.lastActivity = time.Now().Add(-1 * time.Hour)
@@ -1205,8 +1203,4 @@ func TestAPI_CleanupIdleSessions_CancelsBeforeDelete(t *testing.T) {
 	// Session should be removed.
 	_, exists = api.sessions.Load("cleanup-cancel")
 	assert.False(t, exists, "idle session should be cleaned up")
-
-	// Cancel should not have been explicitly invoked since mgr was not working.
-	// (cleanupIdleSessions only deletes non-working sessions, so Cancel is not needed.)
-	assert.False(t, cancelled.Load(), "Cancel should not be called for non-working sessions")
 }

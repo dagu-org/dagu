@@ -3,13 +3,15 @@ import { CheckCircle2, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useResizableDraggable } from '../hooks/useResizableDraggable';
 import {
-  ANIMATION_DURATION_MS,
+  ANIMATION_CLOSE_DURATION_MS,
+  ANIMATION_OPEN_DURATION_MS,
   DELEGATE_PANEL_GAP,
   DELEGATE_PANEL_HEIGHT,
   DELEGATE_PANEL_MARGIN,
   DELEGATE_PANEL_MIN_HEIGHT,
   DELEGATE_PANEL_MIN_WIDTH,
   DELEGATE_PANEL_WIDTH,
+  TASK_TRUNCATE_LENGTH,
 } from '../constants';
 import { Message } from '../types';
 import { ChatMessages } from './ChatMessages';
@@ -59,7 +61,7 @@ export function DelegatePanel({
   onCloseRef.current = onClose;
   const handleClose = useCallback(() => {
     setIsClosing(true);
-    setTimeout(() => onCloseRef.current(), ANIMATION_DURATION_MS);
+    setTimeout(() => onCloseRef.current(), ANIMATION_CLOSE_DURATION_MS);
   }, []);
 
   // Auto-close with CRT animation when delegate finishes (running → completed)
@@ -73,7 +75,7 @@ export function DelegatePanel({
     }
   }, [status, handleClose]);
 
-  const truncatedTask = task.length > 40 ? task.slice(0, 40) + '...' : task;
+  const truncatedTask = task.length > TASK_TRUNCATE_LENGTH ? task.slice(0, TASK_TRUNCATE_LENGTH) + '...' : task;
   const isRunning = status === 'running';
 
   return (
@@ -91,8 +93,8 @@ export function DelegatePanel({
         height: bounds.height,
         zIndex,
         animation: isClosing
-          ? `agent-modal-out ${ANIMATION_DURATION_MS}ms ease-in forwards`
-          : `delegate-panel-in ${ANIMATION_DURATION_MS}ms ease-out`,
+          ? `agent-modal-out ${ANIMATION_CLOSE_DURATION_MS}ms ease-in forwards`
+          : `delegate-panel-in ${ANIMATION_OPEN_DURATION_MS}ms ease-out`,
       }}
       onMouseDown={onBringToFront}
     >

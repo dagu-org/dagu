@@ -5,6 +5,7 @@ import { AlertCircle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
 
+import { ANIMATION_CLOSE_DURATION_MS, ANIMATION_OPEN_DURATION_MS } from '../constants';
 import { useAgentChatContext } from '../context/AgentChatContext';
 import { useAgentChat } from '../hooks/useAgentChat';
 import { useResizableDraggable } from '../hooks/useResizableDraggable';
@@ -184,8 +185,8 @@ export function AgentChatModal(): ReactElement | null {
         )}
         style={{
           animation: isClosing
-            ? 'agent-modal-out 250ms ease-in forwards'
-            : 'agent-modal-in 400ms ease-out',
+            ? `agent-modal-out ${ANIMATION_CLOSE_DURATION_MS}ms ease-in forwards`
+            : `agent-modal-in ${ANIMATION_OPEN_DURATION_MS}ms ease-out`,
         }}
       >
         {content}
@@ -211,8 +212,8 @@ export function AgentChatModal(): ReactElement | null {
           maxWidth: 'calc(100vw - 32px)',
           maxHeight: 'calc(100vh - 100px)',
           animation: isClosing
-            ? 'agent-modal-out 250ms ease-in forwards'
-            : 'agent-modal-in 400ms ease-out',
+            ? `agent-modal-out ${ANIMATION_CLOSE_DURATION_MS}ms ease-in forwards`
+            : `agent-modal-in ${ANIMATION_OPEN_DURATION_MS}ms ease-out`,
         }}
       >
         <ResizeHandles resizeHandlers={resizeHandlers} />

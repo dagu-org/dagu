@@ -20,11 +20,6 @@ export function useDelegateManager() {
   const delegateStoreRef = useRef<Record<string, DelegateState>>({});
   const zIndexCounterRef = useRef(DELEGATE_PANEL_BASE_Z_INDEX);
 
-  const update = useCallback((next: Record<string, DelegateState>) => {
-    delegateStoreRef.current = next;
-    return next;
-  }, []);
-
   // Derived views
   const delegates = useMemo(() =>
     Object.values(delegateStore)
@@ -59,9 +54,10 @@ export function useDelegateManager() {
           isOpen: prev[snap.id]?.isOpen || false,
         };
       }
-      return update(next);
+      delegateStoreRef.current = next;
+      return next;
     });
-  }, [update]);
+  }, []);
 
   const handleDelegateMessages = useCallback((dm: DelegateMessages) => {
     const { delegate_id, messages: msgs } = dm;
@@ -84,34 +80,40 @@ export function useDelegateManager() {
           updated.push(msg);
         }
       }
-      return update({ ...prev, [delegate_id]: { ...entry, messages: updated } });
+      const next = { ...prev, [delegate_id]: { ...entry, messages: updated } };
+      delegateStoreRef.current = next;
+      return next;
     });
-  }, [update]);
+  }, []);
 
   const handleDelegateEvent = useCallback((evt: DelegateEvent) => {
     if (evt.type === 'started') {
       const zIndex = ++zIndexCounterRef.current;
-      setDelegateStore((prev) =>
-        update({
+      setDelegateStore((prev) => {
+        const next = {
           ...prev,
           [evt.delegate_id]: {
             info: { id: evt.delegate_id, task: evt.task, status: 'running' as const, zIndex, positionIndex: 0 },
             messages: prev[evt.delegate_id]?.messages || [],
             isOpen: true,
           },
-        })
-      );
+        };
+        delegateStoreRef.current = next;
+        return next;
+      });
     } else if (evt.type === 'completed') {
       setDelegateStore((prev) => {
         const existing = prev[evt.delegate_id];
         if (!existing) return prev;
-        return update({
+        const next = {
           ...prev,
           [evt.delegate_id]: { ...existing, info: { ...existing.info, status: 'completed' as const } },
-        });
+        };
+        delegateStoreRef.current = next;
+        return next;
       });
     }
-  }, [update]);
+  }, []);
 
   // --- State management ---
 
@@ -139,25 +141,29 @@ export function useDelegateManager() {
     setDelegateStore((prev) => {
       const entry = prev[delegateId];
       if (!entry) return prev;
-      return update({ ...prev, [delegateId]: { ...entry, info: { ...entry.info, zIndex: ++zIndexCounterRef.current } } });
+      const next = { ...prev, [delegateId]: { ...entry, info: { ...entry.info, zIndex: ++zIndexCounterRef.current } } };
+      delegateStoreRef.current = next;
+      return next;
     });
-  }, [update]);
+  }, []);
 
   const openDelegate = useCallback((delegateId: string, task: string, messages?: Message[]) => {
     setDelegateStore((prev) => {
       const entry = prev[delegateId];
       if (entry?.isOpen) return prev;
       const info = entry?.info || { id: delegateId, task, status: 'completed' as const, zIndex: 0, positionIndex: 0 };
-      return update({
+      const next = {
         ...prev,
         [delegateId]: {
           info: { ...info, zIndex: ++zIndexCounterRef.current },
           messages: messages || entry?.messages || [],
           isOpen: true,
         },
-      });
+      };
+      delegateStoreRef.current = next;
+      return next;
     });
-  }, [update]);
+  }, []);
 
   const setDelegateMessagesForId = useCallback((delegateId: string, task: string, msgs: Message[]) => {
     setDelegateStore((prev) => {
@@ -166,9 +172,11 @@ export function useDelegateManager() {
         messages: [],
         isOpen: false,
       };
-      return update({ ...prev, [delegateId]: { ...entry, messages: msgs } });
+      const next = { ...prev, [delegateId]: { ...entry, messages: msgs } };
+      delegateStoreRef.current = next;
+      return next;
     });
-  }, [update]);
+  }, []);
 
   const hasDelegateMessages = useCallback((delegateId: string): boolean => {
     return !!delegateStoreRef.current[delegateId]?.messages?.length;
@@ -178,9 +186,11 @@ export function useDelegateManager() {
     setDelegateStore((prev) => {
       const entry = prev[delegateId];
       if (!entry) return prev;
-      return update({ ...prev, [delegateId]: { ...entry, isOpen: false } });
+      const next = { ...prev, [delegateId]: { ...entry, isOpen: false } };
+      delegateStoreRef.current = next;
+      return next;
     });
-  }, [update]);
+  }, []);
 
   return {
     delegates,

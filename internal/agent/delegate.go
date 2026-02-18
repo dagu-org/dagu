@@ -207,8 +207,8 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 
 	// Create a sub-SessionManager for SSE streaming of the delegate's messages.
 	subMgr := NewSessionManager(SessionManagerConfig{
-		ID:   delegateID,
-		User: dc.User,
+		ID:              delegateID,
+		User:            dc.User,
 		Logger:          logger,
 		WorkingDir:      ctx.WorkingDir,
 		OnMessage:       onMessage,

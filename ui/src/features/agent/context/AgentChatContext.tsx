@@ -9,6 +9,7 @@ import {
 } from 'react';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 
+import { ANIMATION_CLOSE_DURATION_MS } from '../constants';
 import type { Message, SessionState, SessionWithState } from '../types';
 
 interface AgentChatContextType {
@@ -69,7 +70,7 @@ export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNo
       setIsClosing(false);
       setIsOpen(false);
       closeTimerRef.current = null;
-    }, 250);
+    }, ANIMATION_CLOSE_DURATION_MS);
   }, [isOpen, isClosing]);
 
   const toggleChat = useCallback(() => {

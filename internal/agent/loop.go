@@ -74,28 +74,28 @@ type LoopConfig struct {
 
 // Loop manages a session turn with an LLM including tool execution.
 type Loop struct {
-	provider             llm.Provider
-	model                string
-	tools                []*AgentTool
-	recordMessage        MessageRecordFunc
-	history              []llm.Message
-	messageQueue         []llm.Message
-	totalUsage           llm.Usage
-	mu                   sync.Mutex
-	logger               *slog.Logger
-	systemPrompt         string
-	workingDir           string
-	sessionID            string
-	onWorking            func(working bool)
-	sequenceID           int64
-	emitUIAction         UIActionFunc
-	emitUserPrompt       EmitUserPromptFunc
-	waitUserResponse     WaitUserResponseFunc
-	safeMode             bool
-	hooks                *Hooks
-	user                 UserIdentity
-	sessionStore SessionStore
-	registry     SubSessionRegistry
+	provider         llm.Provider
+	model            string
+	tools            []*AgentTool
+	recordMessage    MessageRecordFunc
+	history          []llm.Message
+	messageQueue     []llm.Message
+	totalUsage       llm.Usage
+	mu               sync.Mutex
+	logger           *slog.Logger
+	systemPrompt     string
+	workingDir       string
+	sessionID        string
+	onWorking        func(working bool)
+	sequenceID       int64
+	emitUIAction     UIActionFunc
+	emitUserPrompt   EmitUserPromptFunc
+	waitUserResponse WaitUserResponseFunc
+	safeMode         bool
+	hooks            *Hooks
+	user             UserIdentity
+	sessionStore     SessionStore
+	registry         SubSessionRegistry
 }
 
 // NewLoop creates a new Loop instance.
@@ -106,24 +106,24 @@ func NewLoop(config LoopConfig) *Loop {
 	}
 
 	return &Loop{
-		provider:             config.Provider,
-		model:                config.Model,
-		history:              config.History,
-		tools:                config.Tools,
-		recordMessage:        config.RecordMessage,
-		logger:               logger,
-		systemPrompt:         config.SystemPrompt,
-		workingDir:           config.WorkingDir,
-		sessionID:            config.SessionID,
-		onWorking:            config.OnWorking,
-		emitUIAction:         config.EmitUIAction,
-		emitUserPrompt:       config.EmitUserPrompt,
-		waitUserResponse:     config.WaitUserResponse,
-		safeMode:             config.SafeMode,
-		hooks:        config.Hooks,
-		user:         config.User,
-		sessionStore: config.SessionStore,
-		registry:     config.Registry,
+		provider:         config.Provider,
+		model:            config.Model,
+		history:          config.History,
+		tools:            config.Tools,
+		recordMessage:    config.RecordMessage,
+		logger:           logger,
+		systemPrompt:     config.SystemPrompt,
+		workingDir:       config.WorkingDir,
+		sessionID:        config.SessionID,
+		onWorking:        config.OnWorking,
+		emitUIAction:     config.EmitUIAction,
+		emitUserPrompt:   config.EmitUserPrompt,
+		waitUserResponse: config.WaitUserResponse,
+		safeMode:         config.SafeMode,
+		hooks:            config.Hooks,
+		user:             config.User,
+		sessionStore:     config.SessionStore,
+		registry:         config.Registry,
 	}
 }
 
