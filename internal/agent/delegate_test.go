@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,11 +18,6 @@ import (
 // singleTaskInput returns JSON for a batched delegate call with one task.
 func singleTaskInput(task string) json.RawMessage {
 	return json.RawMessage(fmt.Sprintf(`{"tasks": [{"task": %q}]}`, task))
-}
-
-// singleTaskInputWithIterations returns JSON for a batched delegate call with one task and max_iterations.
-func singleTaskInputWithIterations(task string, maxIter int) json.RawMessage {
-	return json.RawMessage(fmt.Sprintf(`{"tasks": [{"task": %q, "max_iterations": %d}]}`, task, maxIter))
 }
 
 func TestDelegateTool_NoDelegateContext(t *testing.T) {
@@ -109,7 +103,6 @@ func TestDelegateTool_Schema(t *testing.T) {
 	itemProps, ok := items["properties"].(map[string]any)
 	require.True(t, ok)
 	assert.Contains(t, itemProps, "task")
-	assert.Contains(t, itemProps, "max_iterations")
 
 	required, ok := params["required"].([]string)
 	require.True(t, ok)
@@ -486,52 +479,6 @@ func TestDelegateTool_ChildHasNoDelegateTool(t *testing.T) {
 		assert.NotEqual(t, "delegate", tool.Function.Name,
 			"child loop should not have delegate tool")
 	}
-}
-
-func TestDelegateTool_MaxIterationsDefault(t *testing.T) {
-	t.Parallel()
-
-	var callCount atomic.Int32
-	provider := &mockLLMProvider{
-		chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
-			c := callCount.Add(1)
-			return &llm.ChatResponse{Content: fmt.Sprintf("iter %d", c), FinishReason: "stop"}, nil
-		},
-	}
-
-	tool := NewDelegateTool()
-	result := tool.Run(ToolContext{
-		Context:    context.Background(),
-		WorkingDir: t.TempDir(),
-		Delegate: &DelegateContext{
-			Provider: provider,
-			Model:    "test",
-			Tools:    []*AgentTool{},
-		},
-	}, singleTaskInput("iterate"))
-
-	assert.False(t, result.IsError)
-	assert.GreaterOrEqual(t, int(callCount.Load()), 1)
-}
-
-func TestDelegateTool_MaxIterationsCustom(t *testing.T) {
-	t.Parallel()
-
-	provider := newStopProvider("done")
-
-	tool := NewDelegateTool()
-	result := tool.Run(ToolContext{
-		Context:    context.Background(),
-		WorkingDir: t.TempDir(),
-		Delegate: &DelegateContext{
-			Provider: provider,
-			Model:    "test",
-			Tools:    []*AgentTool{},
-		},
-	}, singleTaskInputWithIterations("limited", 2))
-
-	assert.False(t, result.IsError)
-	assert.NotEmpty(t, result.Content)
 }
 
 func TestDelegateTool_ProviderError(t *testing.T) {

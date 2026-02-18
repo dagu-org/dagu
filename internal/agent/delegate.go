@@ -31,15 +31,11 @@ const (
 
 	// maxConcurrentDelegates is the maximum number of sub-agents that can run in parallel.
 	maxConcurrentDelegates = 8
-
-	// defaultDelegateMaxIterations is the default max iterations for a sub-agent.
-	defaultDelegateMaxIterations = 20
 )
 
 // delegateTask is a single sub-task within a batched delegate call.
 type delegateTask struct {
-	Task          string `json:"task"`
-	MaxIterations int    `json:"max_iterations,omitempty"`
+	Task string `json:"task"`
 }
 
 // delegateInput is the parsed input for the delegate tool.
@@ -79,10 +75,6 @@ func NewDelegateTool() *AgentTool {
 									"task": map[string]any{
 										"type":        "string",
 										"description": "Description of the sub-task for the sub-agent to complete",
-									},
-									"max_iterations": map[string]any{
-										"type":        "integer",
-										"description": "Maximum number of tool-call rounds (default: 20)",
 									},
 								},
 								"required": []string{"task"},
@@ -172,11 +164,6 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult {
 	dc := ctx.Delegate
 	delegateID := uuid.New().String()
-
-	maxIterations := defaultDelegateMaxIterations
-	if task.MaxIterations > 0 {
-		maxIterations = task.MaxIterations
-	}
 
 	logger := dc.Logger
 	if logger == nil {
@@ -285,8 +272,6 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 	// Track last assistant content and errors for result extraction.
 	var lastAssistantContent string
 	var lastError string
-	iteration := 0
-
 	recordMessage := func(msgCtx context.Context, msg Message) error {
 		if msg.Type == MessageTypeAssistant && msg.Content != "" {
 			lastAssistantContent = msg.Content
@@ -324,11 +309,6 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		OnWorking: func(working bool) {
 			subMgr.SetWorking(working)
 			if !working {
-				iteration++
-				if iteration >= maxIterations {
-					logger.Info("Sub-agent max iterations reached", "max", maxIterations)
-				}
-				// Cancel to terminate the child loop — only one round is queued per delegate.
 				cancelChild()
 			}
 		},
@@ -340,7 +320,7 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		Content: task.Task,
 	})
 
-	logger.Info("Starting sub-agent", "max_iterations", maxIterations)
+	logger.Info("Starting sub-agent")
 
 	// Run the child loop synchronously. It returns context.Canceled when we cancel it.
 	err := loop.Go(childCtx)
@@ -378,7 +358,7 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		}
 	}
 
-	logger.Info("Sub-agent completed", "iterations", iteration)
+	logger.Info("Sub-agent completed")
 
 	// Check if the child loop captured an error (e.g., provider failure).
 	if lastAssistantContent == "" && lastError != "" {
