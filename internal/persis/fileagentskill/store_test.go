@@ -397,6 +397,22 @@ func TestStore_Update(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, agent.ErrInvalidSkillID)
 	})
+
+	t.Run("empty name returns error", func(t *testing.T) {
+		t.Parallel()
+		store, _ := setupTestStore(t)
+		createSkill(t, store, newTestSkill("update-me", "Original Name"))
+
+		skill := &agent.Skill{
+			ID:        "update-me",
+			Name:      "",
+			Type:      agent.SkillTypeCustom,
+			Knowledge: "Some knowledge",
+		}
+		err := store.Update(ctx, skill)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "skill name is required")
+	})
 }
 
 // Tests for Delete

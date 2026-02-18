@@ -97,7 +97,7 @@ func (a *API) CreateAgentModel(ctx context.Context, request api.CreateAgentModel
 	id := valueOf(body.Id)
 	if id == "" {
 		existingIDs := a.collectModelIDs(ctx)
-		id = agent.UniqueID(body.Name, existingIDs)
+		id = agent.UniqueID(body.Name, existingIDs, "model")
 	}
 	if err := agent.ValidateModelID(id); err != nil {
 		return nil, &Error{

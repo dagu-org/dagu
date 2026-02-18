@@ -167,11 +167,12 @@ func GenerateSlugID(name string) string {
 const maxSuffixLen = 10
 
 // UniqueID generates a unique slug ID, appending "-2", "-3" etc. on collision.
+// The fallback is used when the name produces an empty slug (e.g. only special characters).
 // The result is guaranteed to not exceed maxModelIDLength.
-func UniqueID(name string, existingIDs map[string]struct{}) string {
+func UniqueID(name string, existingIDs map[string]struct{}, fallback string) string {
 	base := GenerateSlugID(name)
 	if base == "" {
-		base = "model"
+		base = fallback
 	}
 	if len(base) > maxModelIDLength-maxSuffixLen {
 		base = base[:maxModelIDLength-maxSuffixLen]

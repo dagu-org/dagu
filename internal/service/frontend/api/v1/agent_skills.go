@@ -107,7 +107,7 @@ func (a *API) CreateAgentSkill(ctx context.Context, request api.CreateAgentSkill
 	id := valueOf(body.Id)
 	if id == "" {
 		existingIDs := a.collectSkillIDs(ctx)
-		id = agent.UniqueID(body.Name, existingIDs)
+		id = agent.UniqueID(body.Name, existingIDs, "skill")
 	}
 	if err := agent.ValidateSkillID(id); err != nil {
 		return nil, &Error{
@@ -253,8 +253,11 @@ func (a *API) DeleteAgentSkill(ctx context.Context, request api.DeleteAgentSkill
 		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to delete skill", HTTPStatus: http.StatusInternalServerError}
 	}
 
-	// Remove from enabled skills if present
-	a.removeFromEnabledSkills(ctx, request.SkillId)
+	// Remove from enabled skills if present (best-effort).
+	if err := a.removeFromEnabledSkills(ctx, request.SkillId); err != nil {
+		logger.Warn(ctx, "Failed to remove skill from enabled list after deletion",
+			tag.Error(err), tag.String("skill_id", request.SkillId))
+	}
 
 	a.logAudit(ctx, audit.CategoryAgent, auditActionSkillDelete, map[string]any{
 		"skill_id": request.SkillId,
@@ -275,17 +278,15 @@ func (a *API) SetEnabledSkills(ctx context.Context, request api.SetEnabledSkills
 		return nil, ErrInvalidRequestBody
 	}
 
-	// Validate all skill IDs exist
+	// Validate all skill IDs exist using a single List call.
+	knownIDs := a.collectSkillIDs(ctx)
 	for _, id := range request.Body.SkillIds {
-		if _, err := a.agentSkillStore.GetByID(ctx, id); err != nil {
-			if errors.Is(err, agent.ErrSkillNotFound) || errors.Is(err, agent.ErrInvalidSkillID) {
-				return nil, &Error{
-					Code:       api.ErrorCodeBadRequest,
-					Message:    fmt.Sprintf("skill not found: %s", id),
-					HTTPStatus: http.StatusBadRequest,
-				}
+		if _, exists := knownIDs[id]; !exists {
+			return nil, &Error{
+				Code:       api.ErrorCodeBadRequest,
+				Message:    fmt.Sprintf("skill not found: %s", id),
+				HTTPStatus: http.StatusBadRequest,
 			}
-			return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to validate skill", HTTPStatus: http.StatusInternalServerError}
 		}
 	}
 
@@ -367,16 +368,20 @@ func isSkillEnabled(enabledSkills []string, skillID string) bool {
 	return slices.Contains(enabledSkills, skillID)
 }
 
-func (a *API) removeFromEnabledSkills(ctx context.Context, skillID string) {
+func (a *API) removeFromEnabledSkills(ctx context.Context, skillID string) error {
 	cfg, err := a.agentConfigStore.Load(ctx)
-	if err != nil || cfg == nil || !slices.Contains(cfg.EnabledSkills, skillID) {
-		return
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	if cfg == nil || !slices.Contains(cfg.EnabledSkills, skillID) {
+		return nil
 	}
 
 	cfg.EnabledSkills = slices.DeleteFunc(cfg.EnabledSkills, func(id string) bool {
 		return id == skillID
 	})
 	if err := a.agentConfigStore.Save(ctx, cfg); err != nil {
-		logger.Error(ctx, "Failed to update enabled skills after deletion", tag.Error(err))
+		return fmt.Errorf("save config: %w", err)
 	}
+	return nil
 }

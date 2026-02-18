@@ -130,19 +130,18 @@ func parseSkillFile(data []byte, id string) (*agent.Skill, error) {
 	// Find the closing ---
 	rest := content[4:] // skip opening "---\n"
 	closingIdx := strings.Index(rest, "\n---\n")
+	delimLen := 5 // len("\n---\n")
 	if closingIdx == -1 {
 		// Try ending with just "---" at end of file (no trailing newline after body)
 		closingIdx = strings.Index(rest, "\n---")
+		delimLen = 4 // len("\n---")
 		if closingIdx == -1 {
 			return nil, fmt.Errorf("missing closing frontmatter delimiter")
 		}
 	}
 
 	frontmatterStr := rest[:closingIdx]
-	// Body starts after the closing "\n---\n"
-	bodyStart := min(
-		// len("\n---\n")
-		closingIdx+5, len(rest))
+	bodyStart := min(closingIdx+delimLen, len(rest))
 	body := rest[bodyStart:]
 
 	var fm skillFrontmatter
@@ -339,6 +338,9 @@ func (s *Store) Update(_ context.Context, skill *agent.Skill) error {
 	if err := agent.ValidateSkillID(skill.ID); err != nil {
 		return err
 	}
+	if skill.Name == "" {
+		return errors.New("fileagentskill: skill name is required")
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -387,18 +389,19 @@ func (s *Store) Delete(_ context.Context, id string) error {
 		return agent.ErrSkillNotFound
 	}
 
+	// Load the skill name before removing the directory for direct index cleanup.
+	filePath := filepath.Join(dirPath, skillFilename)
+	skill, loadErr := loadSkillFromFile(filePath, id)
+
 	if err := os.RemoveAll(dirPath); err != nil {
 		return fmt.Errorf("fileagentskill: failed to delete skill directory: %w", err)
 	}
 
 	delete(s.byID, id)
 
-	// Clean up name index by reverse lookup.
-	for name, skillID := range s.byName {
-		if skillID == id {
-			delete(s.byName, name)
-			break
-		}
+	// Clean up name index using the loaded skill name (O(1) lookup).
+	if loadErr == nil {
+		delete(s.byName, skill.Name)
 	}
 
 	return nil
