@@ -515,28 +515,24 @@ func TestRegistry_Navigate_DagSchema(t *testing.T) {
 		want    []string
 	}{
 		{
-			name:    "root level",
-			path:    "",
-			wantErr: false,
-			want:    []string{"steps", "schedule", "name"},
+			name: "root level",
+			path: "",
+			want: []string{"steps", "schedule", "name"},
 		},
 		{
-			name:    "steps field",
-			path:    "steps",
-			wantErr: false,
-			want:    []string{"array"},
+			name: "steps field",
+			path: "steps",
+			want: []string{"array"},
 		},
 		{
-			name:    "handler_on",
-			path:    "handler_on",
-			wantErr: false,
-			want:    []string{"success", "failure"},
+			name: "handler_on",
+			path: "handler_on",
+			want: []string{"success", "failure"},
 		},
 		{
 			name:    "invalid path",
 			path:    "nonexistent.field",
 			wantErr: true,
-			want:    nil,
 		},
 	}
 
@@ -552,9 +548,7 @@ func TestRegistry_Navigate_DagSchema(t *testing.T) {
 			require.NoError(t, err)
 
 			for _, want := range tt.want {
-				if !strings.Contains(result, want) {
-					t.Errorf("Navigate() result missing %q\nGot: %s", want, result)
-				}
+				assert.Contains(t, result, want)
 			}
 		})
 	}
@@ -953,7 +947,7 @@ func TestFormatNode(t *testing.T) {
 
 	t.Run("non-map property is skipped", func(t *testing.T) {
 		t.Parallel()
-		r := &Registry{schemas: make(map[string]map[string]any)}
+		r := newTestRegistry()
 		r.schemas["test"] = map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -969,7 +963,7 @@ func TestFormatNode(t *testing.T) {
 
 	t.Run("oneOf with non-map option is handled", func(t *testing.T) {
 		t.Parallel()
-		r := &Registry{schemas: make(map[string]map[string]any)}
+		r := newTestRegistry()
 		r.schemas["test"] = map[string]any{
 			"type": "object",
 			"properties": map[string]any{

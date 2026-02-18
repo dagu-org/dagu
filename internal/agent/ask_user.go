@@ -9,6 +9,16 @@ import (
 	"github.com/google/uuid"
 )
 
+func init() {
+	RegisterTool(ToolRegistration{
+		Name:           "ask_user",
+		Label:          "Ask User",
+		Description:    "Ask user questions",
+		DefaultEnabled: true,
+		Factory:        func(_ ToolConfig) *AgentTool { return NewAskUserTool() },
+	})
+}
+
 // AskUserToolInput is the input schema for the ask_user tool.
 type AskUserToolInput struct {
 	Question            string   `json:"question"`

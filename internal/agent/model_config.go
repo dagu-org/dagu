@@ -88,18 +88,15 @@ func DefaultConfig() *Config {
 
 // DefaultToolPolicy returns the default agent tool policy.
 // The default is permissive: all tools enabled and bash allowed unless rules deny.
+// Tool names and default-enabled states are derived from the tool registry.
 func DefaultToolPolicy() ToolPolicyConfig {
+	regs := RegisteredTools()
+	tools := make(map[string]bool, len(regs))
+	for _, reg := range regs {
+		tools[reg.Name] = reg.DefaultEnabled
+	}
 	return ToolPolicyConfig{
-		Tools: map[string]bool{
-			"bash":        true,
-			"read":        true,
-			"patch":       true,
-			"think":       true,
-			"navigate":    true,
-			"read_schema": true,
-			"ask_user":    true,
-			"web_search":  true,
-		},
+		Tools: tools,
 		Bash: BashPolicyConfig{
 			Rules:           []BashRule{},
 			DefaultBehavior: BashDefaultBehaviorAllow,

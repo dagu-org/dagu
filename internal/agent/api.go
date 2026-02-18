@@ -31,9 +31,6 @@ func respondErrorDirect(w http.ResponseWriter, status int, code api.ErrorCode, m
 	}
 }
 
-// maxRequestBodySize is the maximum allowed size for JSON request bodies (1 MB).
-const maxRequestBodySize = 1 << 20
-
 // defaultUserID is used when no user is authenticated (e.g., auth disabled).
 // This value should match the system's expected default user identifier.
 const defaultUserID = "admin"
@@ -46,19 +43,6 @@ func getUserIDFromContext(ctx context.Context) string {
 		return user.ID
 	}
 	return defaultUserID
-}
-
-// getUserContextFromRequest extracts user identity and IP from the request context.
-func getUserContextFromRequest(r *http.Request) (userID, username string, role auth.Role, ipAddress string) {
-	userID, username = defaultUserID, defaultUserID
-	role = defaultUserRole
-	if user, ok := auth.UserFromContext(r.Context()); ok && user != nil {
-		userID = user.ID
-		username = user.Username
-		role = user.Role
-	}
-	ipAddress, _ = auth.ClientIPFromContext(r.Context())
-	return
 }
 
 // API handles HTTP requests for the agent.
@@ -118,30 +102,15 @@ func NewAPI(cfg APIConfig) *API {
 	}
 }
 
-// RegisterRoutes registers the agent API routes on the given router.
-// The authMiddleware parameter should be the same auth middleware used for other API routes.
+// RegisterRoutes registers the agent SSE stream route on the given router.
+// All other agent endpoints are served through the OpenAPI handler.
 func (a *API) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler) http.Handler) {
 	r.Route("/api/v1/agent", func(r chi.Router) {
-		// Check if agent is enabled (must be first middleware)
 		r.Use(a.enabledMiddleware())
-
-		// Apply auth middleware to all agent routes
 		if authMiddleware != nil {
 			r.Use(authMiddleware)
 		}
-
-		// Session management
-		r.Post("/sessions/new", a.handleNewSession)
-		r.Get("/sessions", a.handleListSessions)
-
-		// Single session operations
-		r.Route("/sessions/{id}", func(r chi.Router) {
-			r.Get("/", a.handleGetSession)
-			r.Post("/chat", a.handleChat)
-			r.Get("/stream", a.handleStream)
-			r.Post("/cancel", a.handleCancel)
-			r.Post("/respond", a.handleUserResponse)
-		})
+		r.Get("/sessions/{id}/stream", a.handleStream)
 	})
 }
 
@@ -304,106 +273,6 @@ func (a *API) formatMessage(ctx context.Context, message string, contexts []DAGC
 	return formatMessageWithContexts(message, resolved)
 }
 
-// respondJSON writes a JSON response with the given status code.
-func (a *API) respondJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		slog.Error("failed to encode JSON response", "error", err)
-	}
-}
-
-// respondError writes a JSON error response matching the v2 API format.
-func (a *API) respondError(w http.ResponseWriter, status int, code api.ErrorCode, message string) {
-	respondErrorDirect(w, status, code, message)
-}
-
-// handleNewSession creates a new session and sends the first message.
-// POST /api/v1/agent/sessions/new
-func (a *API) handleNewSession(w http.ResponseWriter, r *http.Request) {
-	var req ChatRequest
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "Invalid JSON")
-		return
-	}
-
-	if req.Message == "" {
-		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "Message is required")
-		return
-	}
-
-	userID, username, role, ipAddress := getUserContextFromRequest(r)
-	model := selectModel(req.Model, "", a.getDefaultModelID(r.Context()))
-
-	provider, modelCfg, err := a.resolveProvider(r.Context(), model)
-	if err != nil {
-		a.logger.Error("Failed to get LLM provider", "error", err)
-		a.respondError(w, http.StatusServiceUnavailable, api.ErrorCodeInternalError, "Agent is not configured properly")
-		return
-	}
-
-	id := uuid.New().String()
-	now := time.Now()
-
-	// Extract primary DAG name from resolved contexts for per-DAG memory
-	resolved := a.resolveContexts(r.Context(), req.DAGContexts)
-	var dagName string
-	if len(resolved) > 0 {
-		dagName = resolved[0].DAGName
-	}
-
-	mgr := NewSessionManager(SessionManagerConfig{
-		ID:              id,
-		UserID:          userID,
-		Logger:          a.logger,
-		WorkingDir:      a.workingDir,
-		OnMessage:       a.createMessageCallback(id),
-		Environment:     a.environment,
-		SafeMode:        req.SafeMode,
-		Hooks:           a.hooks,
-		Username:        username,
-		IPAddress:       ipAddress,
-		Role:            role,
-		InputCostPer1M:  modelCfg.InputCostPer1M,
-		OutputCostPer1M: modelCfg.OutputCostPer1M,
-		MemoryStore:     a.memoryStore,
-		DAGName:         dagName,
-	})
-
-	a.persistNewSession(r.Context(), id, userID, dagName, now)
-	a.sessions.Store(id, mgr)
-
-	messageWithContext := formatMessageWithContexts(req.Message, resolved)
-	if err := mgr.AcceptUserMessage(r.Context(), provider, model, modelCfg.Model, messageWithContext); err != nil {
-		a.logger.Error("Failed to accept user message", "error", err)
-		a.respondError(w, http.StatusInternalServerError, api.ErrorCodeInternalError, "Failed to process message")
-		return
-	}
-
-	a.respondJSON(w, http.StatusCreated, NewSessionResponse{
-		SessionID: id,
-		Status:    "accepted",
-	})
-}
-
-// handleListSessions lists all sessions for the current user.
-// GET /api/v1/agent/sessions
-func (a *API) handleListSessions(w http.ResponseWriter, r *http.Request) {
-	userID := getUserIDFromContext(r.Context())
-
-	activeIDs := make(map[string]struct{})
-	sessions := a.collectActiveSessions(userID, activeIDs)
-	sessions = a.appendPersistedSessions(r.Context(), userID, activeIDs, sessions)
-
-	// Ensure we return [] instead of null in JSON when no sessions exist
-	if sessions == nil {
-		sessions = []SessionWithState{}
-	}
-
-	a.respondJSON(w, http.StatusOK, sessions)
-}
-
 // collectActiveSessions gathers active sessions for a user.
 func (a *API) collectActiveSessions(userID string, activeIDs map[string]struct{}) []SessionWithState {
 	var sessions []SessionWithState
@@ -417,13 +286,19 @@ func (a *API) collectActiveSessions(userID string, activeIDs map[string]struct{}
 			return true
 		}
 
+		sess := mgr.GetSession()
+		// Skip sub-sessions (delegate sessions) from the main listing.
+		if sess.ParentSessionID != "" {
+			return true
+		}
+
 		id, ok := key.(string)
 		if !ok {
 			return true // skip invalid key
 		}
 		activeIDs[id] = struct{}{}
 		sessions = append(sessions, SessionWithState{
-			Session:   mgr.GetSession(),
+			Session:   sess,
 			Working:   mgr.IsWorking(),
 			Model:     mgr.GetModel(),
 			TotalCost: mgr.GetTotalCost(),
@@ -450,6 +325,10 @@ func (a *API) appendPersistedSessions(ctx context.Context, userID string, active
 		if _, exists := activeIDs[sess.ID]; exists {
 			continue
 		}
+		// Exclude sub-sessions (delegate sessions) from the main listing.
+		if sess.ParentSessionID != "" {
+			continue
+		}
 		sessions = append(sessions, SessionWithState{
 			Session: *sess,
 			Working: false,
@@ -457,44 +336,6 @@ func (a *API) appendPersistedSessions(ctx context.Context, userID string, active
 	}
 
 	return sessions
-}
-
-// handleGetSession returns session details and messages.
-// GET /api/v1/agent/sessions/{id}
-func (a *API) handleGetSession(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	userID := getUserIDFromContext(r.Context())
-
-	// Check active sessions first
-	if mgr, ok := a.getActiveSession(id, userID); ok {
-		a.respondJSON(w, http.StatusOK, StreamResponse{
-			Messages: mgr.GetMessages(),
-			Session:  new(mgr.GetSession()),
-			SessionState: &SessionState{
-				SessionID: id,
-				Working:   mgr.IsWorking(),
-				Model:     mgr.GetModel(),
-				TotalCost: mgr.GetTotalCost(),
-			},
-		})
-		return
-	}
-
-	// Fall back to store for inactive sessions
-	sess, messages, ok := a.getStoredSession(r.Context(), id, userID)
-	if !ok {
-		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Session not found")
-		return
-	}
-
-	a.respondJSON(w, http.StatusOK, StreamResponse{
-		Messages: messages,
-		Session:  sess,
-		SessionState: &SessionState{
-			SessionID: id,
-			Working:   false,
-		},
-	})
 }
 
 // getActiveSession retrieves an active session if it exists and belongs to the user.
@@ -533,53 +374,6 @@ func (a *API) getStoredSession(ctx context.Context, id, userID string) (*Session
 	return sess, messages, true
 }
 
-// handleChat sends a message to an existing session.
-// POST /api/v1/agent/sessions/{id}/chat
-func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	userID, username, role, ipAddress := getUserContextFromRequest(r)
-
-	mgr, ok := a.getOrReactivateSession(r.Context(), id, userID, username, role, ipAddress)
-	if !ok {
-		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Session not found")
-		return
-	}
-	mgr.UpdateUserContext(username, ipAddress, role)
-
-	var req ChatRequest
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "Invalid JSON")
-		return
-	}
-
-	if req.Message == "" {
-		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "Message is required")
-		return
-	}
-
-	model := selectModel(req.Model, mgr.GetModel(), a.getDefaultModelID(r.Context()))
-
-	provider, modelCfg, err := a.resolveProvider(r.Context(), model)
-	if err != nil {
-		a.logger.Error("Failed to get LLM provider", "error", err)
-		a.respondError(w, http.StatusServiceUnavailable, api.ErrorCodeInternalError, "Agent is not configured properly")
-		return
-	}
-	messageWithContext := a.formatMessage(r.Context(), req.Message, req.DAGContexts)
-
-	mgr.SetSafeMode(req.SafeMode)
-	mgr.UpdatePricing(modelCfg.InputCostPer1M, modelCfg.OutputCostPer1M)
-
-	if err := mgr.AcceptUserMessage(r.Context(), provider, model, modelCfg.Model, messageWithContext); err != nil {
-		a.logger.Error("Failed to accept user message", "error", err)
-		a.respondError(w, http.StatusInternalServerError, api.ErrorCodeInternalError, "Failed to process message")
-		return
-	}
-
-	a.respondJSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
-}
-
 // getOrReactivateSession retrieves an active session or reactivates it from storage.
 func (a *API) getOrReactivateSession(ctx context.Context, id, userID, username string, role auth.Role, ipAddress string) (*SessionManager, bool) {
 	// Check active sessions first
@@ -602,6 +396,11 @@ func (a *API) reactivateSession(ctx context.Context, id, userID, username string
 		return nil, false
 	}
 
+	// Prevent reactivating sub-sessions as top-level sessions.
+	if sess.ParentSessionID != "" {
+		return nil, false
+	}
+
 	messages, err := a.store.GetMessages(ctx, id)
 	if err != nil {
 		a.logger.Warn("Failed to load messages for reactivation", "error", err)
@@ -614,21 +413,28 @@ func (a *API) reactivateSession(ctx context.Context, id, userID, username string
 	}
 
 	mgr := NewSessionManager(SessionManagerConfig{
-		ID:          id,
-		UserID:      userID,
-		Logger:      a.logger,
-		WorkingDir:  a.workingDir,
-		OnMessage:   a.createMessageCallback(id),
-		History:     messages,
-		SequenceID:  seqID,
-		Environment: a.environment,
-		SafeMode:    true, // Default to safe mode for reactivated sessions
-		Hooks:       a.hooks,
-		Username:    username,
-		IPAddress:   ipAddress,
-		MemoryStore: a.memoryStore,
-		DAGName:     sess.DAGName,
-		Role:        role,
+		ID:           id,
+		UserID:       userID,
+		Logger:       a.logger,
+		WorkingDir:   a.workingDir,
+		OnMessage:    a.createMessageCallback(id),
+		History:      messages,
+		SequenceID:   seqID,
+		Environment:  a.environment,
+		SafeMode:     true, // Default to safe mode for reactivated sessions
+		Hooks:        a.hooks,
+		Username:     username,
+		IPAddress:    ipAddress,
+		MemoryStore:  a.memoryStore,
+		DAGName:      sess.DAGName,
+		Role:         role,
+		SessionStore: a.store,
+		RegisterSubSession: func(subID string, subMgr *SessionManager) {
+			a.sessions.Store(subID, subMgr)
+		},
+		DeregisterSubSession: func(subID string) {
+			a.sessions.Delete(subID)
+		},
 	})
 	a.sessions.Store(id, mgr)
 
@@ -643,7 +449,7 @@ func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 
 	mgr, ok := a.getActiveSession(id, userID)
 	if !ok {
-		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Session not found")
+		respondErrorDirect(w, http.StatusNotFound, api.ErrorCodeNotFound, "Session not found")
 		return
 	}
 
@@ -723,57 +529,205 @@ func (a *API) sendSSEMessage(w http.ResponseWriter, data any) {
 	}
 }
 
-// handleCancel cancels an active session.
-// POST /api/v1/agent/sessions/{id}/cancel
-func (a *API) handleCancel(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	userID := getUserIDFromContext(r.Context())
-
-	mgr, ok := a.getActiveSession(id, userID)
-	if !ok {
-		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Session not found")
-		return
-	}
-
-	if err := mgr.Cancel(r.Context()); err != nil {
-		a.logger.Error("Failed to cancel session", "error", err)
-		a.respondError(w, http.StatusInternalServerError, api.ErrorCodeInternalError, "Failed to cancel session")
-		return
-	}
-
-	a.respondJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
+// ToolInfo contains metadata for a registered agent tool.
+type ToolInfo struct {
+	Name        string
+	Label       string
+	Description string
 }
 
-// handleUserResponse submits a user's response to an agent prompt.
-// POST /api/v1/agent/sessions/{id}/respond
-func (a *API) handleUserResponse(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	userID := getUserIDFromContext(r.Context())
+// ListTools returns metadata for all registered tools.
+func (a *API) ListTools() []ToolInfo {
+	regs := RegisteredTools()
+	result := make([]ToolInfo, len(regs))
+	for i, reg := range regs {
+		result[i] = ToolInfo{Name: reg.Name, Label: reg.Label, Description: reg.Description}
+	}
+	return result
+}
 
-	mgr, ok := a.getActiveSession(id, userID)
+// CreateSession creates a new session with the first message.
+// Returns the session ID on success.
+func (a *API) CreateSession(ctx context.Context, userID, username string, role auth.Role, ipAddress string, req ChatRequest) (string, error) {
+	if req.Message == "" {
+		return "", ErrMessageRequired
+	}
+
+	model := selectModel(req.Model, "", a.getDefaultModelID(ctx))
+
+	provider, modelCfg, err := a.resolveProvider(ctx, model)
+	if err != nil {
+		a.logger.Error("Failed to get LLM provider", "error", err)
+		return "", ErrAgentNotConfigured
+	}
+
+	id := uuid.New().String()
+	now := time.Now()
+
+	resolved := a.resolveContexts(ctx, req.DAGContexts)
+	var dagName string
+	if len(resolved) > 0 {
+		dagName = resolved[0].DAGName
+	}
+
+	mgr := NewSessionManager(SessionManagerConfig{
+		ID:              id,
+		UserID:          userID,
+		Logger:          a.logger,
+		WorkingDir:      a.workingDir,
+		OnMessage:       a.createMessageCallback(id),
+		Environment:     a.environment,
+		SafeMode:        req.SafeMode,
+		Hooks:           a.hooks,
+		Username:        username,
+		IPAddress:       ipAddress,
+		Role:            role,
+		InputCostPer1M:  modelCfg.InputCostPer1M,
+		OutputCostPer1M: modelCfg.OutputCostPer1M,
+		MemoryStore:     a.memoryStore,
+		DAGName:         dagName,
+		SessionStore:    a.store,
+		RegisterSubSession: func(subID string, subMgr *SessionManager) {
+			a.sessions.Store(subID, subMgr)
+		},
+		DeregisterSubSession: func(subID string) {
+			a.sessions.Delete(subID)
+		},
+	})
+
+	// Persist session before accepting the first message so that
+	// the onMessage callback (store.AddMessage) can find the session.
+	a.persistNewSession(ctx, id, userID, dagName, now)
+	a.sessions.Store(id, mgr)
+
+	messageWithContext := formatMessageWithContexts(req.Message, resolved)
+	if err := mgr.AcceptUserMessage(ctx, provider, model, modelCfg.Model, messageWithContext); err != nil {
+		a.logger.Error("Failed to accept user message", "error", err)
+		a.sessions.Delete(id)
+		return "", ErrFailedToProcessMessage
+	}
+
+	return id, nil
+}
+
+// ListSessions returns all sessions for the given user.
+func (a *API) ListSessions(ctx context.Context, userID string) []SessionWithState {
+	activeIDs := make(map[string]struct{})
+	sessions := a.collectActiveSessions(userID, activeIDs)
+	sessions = a.appendPersistedSessions(ctx, userID, activeIDs, sessions)
+
+	if sessions == nil {
+		sessions = []SessionWithState{}
+	}
+	return sessions
+}
+
+// GetSessionDetail returns session details including messages and state.
+func (a *API) GetSessionDetail(ctx context.Context, sessionID, userID string) (*StreamResponse, error) {
+	// Check active sessions first
+	if mgr, ok := a.getActiveSession(sessionID, userID); ok {
+		sess := mgr.GetSession()
+		return &StreamResponse{
+			Messages: mgr.GetMessages(),
+			Session:  &sess,
+			SessionState: &SessionState{
+				SessionID: sessionID,
+				Working:   mgr.IsWorking(),
+				Model:     mgr.GetModel(),
+				TotalCost: mgr.GetTotalCost(),
+			},
+		}, nil
+	}
+
+	// Fall back to store for inactive sessions
+	sess, messages, ok := a.getStoredSession(ctx, sessionID, userID)
 	if !ok {
-		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Session not found")
-		return
+		return nil, ErrSessionNotFound
 	}
 
-	var req UserPromptResponse
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "Invalid JSON")
-		return
+	return &StreamResponse{
+		Messages: messages,
+		Session:  sess,
+		SessionState: &SessionState{
+			SessionID: sessionID,
+			Working:   false,
+		},
+	}, nil
+}
+
+// SendMessage sends a message to an existing session.
+func (a *API) SendMessage(ctx context.Context, sessionID, userID, username string, role auth.Role, ipAddress string, req ChatRequest) error {
+	mgr, ok := a.getOrReactivateSession(ctx, sessionID, userID, username, role, ipAddress)
+	if !ok {
+		return ErrSessionNotFound
+	}
+	mgr.UpdateUserContext(username, ipAddress, role)
+
+	if req.Message == "" {
+		return ErrMessageRequired
 	}
 
-	if req.PromptID == "" {
-		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "prompt_id is required")
-		return
+	model := selectModel(req.Model, mgr.GetModel(), a.getDefaultModelID(ctx))
+
+	provider, modelCfg, err := a.resolveProvider(ctx, model)
+	if err != nil {
+		a.logger.Error("Failed to get LLM provider", "error", err)
+		return ErrAgentNotConfigured
+	}
+	messageWithContext := a.formatMessage(ctx, req.Message, req.DAGContexts)
+
+	mgr.SetSafeMode(req.SafeMode)
+	mgr.UpdatePricing(modelCfg.InputCostPer1M, modelCfg.OutputCostPer1M)
+
+	if err := mgr.AcceptUserMessage(ctx, provider, model, modelCfg.Model, messageWithContext); err != nil {
+		a.logger.Error("Failed to accept user message", "error", err)
+		return ErrFailedToProcessMessage
 	}
 
-	if !mgr.SubmitUserResponse(req) {
-		a.respondError(w, http.StatusGone, api.ErrorCodeNotFound, "Prompt expired or already answered")
-		return
+	return nil
+}
+
+// CancelSession cancels an active session.
+func (a *API) CancelSession(ctx context.Context, sessionID, userID string) error {
+	mgr, ok := a.getActiveSession(sessionID, userID)
+	if !ok {
+		return ErrSessionNotFound
 	}
 
-	a.respondJSON(w, http.StatusOK, map[string]string{"status": "accepted"})
+	if err := mgr.Cancel(ctx); err != nil {
+		a.logger.Error("Failed to cancel session", "error", err)
+		return ErrFailedToCancel
+	}
+
+	return nil
+}
+
+// SubmitUserResponse submits a user's response to an agent prompt.
+func (a *API) SubmitUserResponse(_ context.Context, sessionID, userID string, resp UserPromptResponse) error {
+	mgr, ok := a.getActiveSession(sessionID, userID)
+	if !ok {
+		return ErrSessionNotFound
+	}
+
+	if resp.PromptID == "" {
+		return ErrPromptIDRequired
+	}
+
+	if !mgr.SubmitUserResponse(resp) {
+		return ErrPromptExpired
+	}
+
+	return nil
+}
+
+// EnabledMiddleware returns middleware that checks if agent is enabled.
+func (a *API) EnabledMiddleware() func(http.Handler) http.Handler {
+	return a.enabledMiddleware()
+}
+
+// HandleStream provides SSE streaming for session updates.
+func (a *API) HandleStream(w http.ResponseWriter, r *http.Request) {
+	a.handleStream(w, r)
 }
 
 // idleSessionTimeout is the duration after which idle sessions are cleaned up.
@@ -813,6 +767,11 @@ func (a *API) cleanupIdleSessions() {
 		}
 		mgr, ok := value.(*SessionManager)
 		if !ok {
+			return true
+		}
+		// Skip delegate sub-sessions — their lifecycle is managed by the parent.
+		sess := mgr.GetSession()
+		if sess.ParentSessionID != "" {
 			return true
 		}
 		if !mgr.IsWorking() && mgr.LastActivity().Before(cutoff) {

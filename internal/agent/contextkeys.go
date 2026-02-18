@@ -18,12 +18,8 @@ func WithConfigStore(ctx context.Context, s ConfigStore) context.Context {
 // GetConfigStore retrieves a ConfigStore from the context.
 // Returns nil if no ConfigStore is set.
 func GetConfigStore(ctx context.Context) ConfigStore {
-	if v := ctx.Value(configStoreKey{}); v != nil {
-		if s, ok := v.(ConfigStore); ok {
-			return s
-		}
-	}
-	return nil
+	s, _ := ctx.Value(configStoreKey{}).(ConfigStore)
+	return s
 }
 
 // WithModelStore injects a ModelStore into the context.
@@ -34,12 +30,8 @@ func WithModelStore(ctx context.Context, s ModelStore) context.Context {
 // GetModelStore retrieves a ModelStore from the context.
 // Returns nil if no ModelStore is set.
 func GetModelStore(ctx context.Context) ModelStore {
-	if v := ctx.Value(modelStoreKey{}); v != nil {
-		if s, ok := v.(ModelStore); ok {
-			return s
-		}
-	}
-	return nil
+	s, _ := ctx.Value(modelStoreKey{}).(ModelStore)
+	return s
 }
 
 // WithMemoryStore injects a MemoryStore into the context.
@@ -50,10 +42,6 @@ func WithMemoryStore(ctx context.Context, s MemoryStore) context.Context {
 // GetMemoryStore retrieves a MemoryStore from the context.
 // Returns nil if no MemoryStore is set.
 func GetMemoryStore(ctx context.Context) MemoryStore {
-	if v := ctx.Value(memoryStoreKey{}); v != nil {
-		if s, ok := v.(MemoryStore); ok {
-			return s
-		}
-	}
-	return nil
+	s, _ := ctx.Value(memoryStoreKey{}).(MemoryStore)
+	return s
 }

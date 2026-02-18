@@ -1,11 +1,12 @@
 package schema
 
 import (
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// TestNavigateDeepPaths tests navigation through complex nested schema constructs.
 func TestNavigateDeepPaths(t *testing.T) {
 	t.Parallel()
 
@@ -55,18 +56,15 @@ func TestNavigateDeepPaths(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			result, err := DefaultRegistry.Navigate("dag", tt.path)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Navigate() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				require.Error(t, err)
 				return
 			}
-			if err != nil {
-				return
-			}
+			require.NoError(t, err)
 			for _, want := range tt.want {
-				if !strings.Contains(result, want) {
-					t.Errorf("Navigate() result missing %q\nGot:\n%s", want, result)
-				}
+				assert.Contains(t, result, want)
 			}
 		})
 	}

@@ -1,50 +1,24 @@
 package agent
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"maps"
 	"regexp"
-	"slices"
 	"strings"
 )
 
-const (
-	toolNameBash       = "bash"
-	toolNameRead       = "read"
-	toolNamePatch      = "patch"
-	toolNameThink      = "think"
-	toolNameNavigate   = "navigate"
-	toolNameReadSchema = "read_schema"
-	toolNameAskUser    = "ask_user"
-	toolNameWebSearch  = "web_search"
-)
+const toolNameBash = "bash"
 
-var knownToolNames = map[string]struct{}{
-	toolNameBash:       {},
-	toolNameRead:       {},
-	toolNamePatch:      {},
-	toolNameThink:      {},
-	toolNameNavigate:   {},
-	toolNameReadSchema: {},
-	toolNameAskUser:    {},
-	toolNameWebSearch:  {},
-}
-
-// KnownToolNames returns sorted known tool names.
+// KnownToolNames returns sorted names of all registered tools.
 func KnownToolNames() []string {
-	names := make([]string, 0, len(knownToolNames))
-	for name := range knownToolNames {
-		names = append(names, name)
-	}
-	slices.Sort(names)
-	return names
+	return RegisteredToolNames()
 }
 
-// IsKnownToolName reports whether the tool name is supported by the policy engine.
+// IsKnownToolName reports whether the tool name is registered.
 func IsKnownToolName(name string) bool {
-	_, ok := knownToolNames[name]
-	return ok
+	return IsRegisteredTool(name)
 }
 
 // IsBashToolName reports whether a tool name is the bash tool.
@@ -52,23 +26,20 @@ func IsBashToolName(name string) bool {
 	return name == toolNameBash
 }
 
-//go:fix inline
-//go:fix inline
-func boolPtr(v bool) *bool { return new(v) }
-
 func cloneBashRules(rules []BashRule) []BashRule {
 	if len(rules) == 0 {
 		return nil
 	}
 	out := make([]BashRule, len(rules))
-	for i := range rules {
+	for i, r := range rules {
 		out[i] = BashRule{
-			Name:    rules[i].Name,
-			Pattern: rules[i].Pattern,
-			Action:  rules[i].Action,
+			Name:    r.Name,
+			Pattern: r.Pattern,
+			Action:  r.Action,
 		}
-		if rules[i].Enabled != nil {
-			out[i].Enabled = new(*rules[i].Enabled)
+		if r.Enabled != nil {
+			v := *r.Enabled
+			out[i].Enabled = &v
 		}
 	}
 	return out
@@ -78,9 +49,7 @@ func cloneTools(tools map[string]bool) map[string]bool {
 	if len(tools) == 0 {
 		return map[string]bool{}
 	}
-	out := make(map[string]bool, len(tools))
-	maps.Copy(out, tools)
-	return out
+	return maps.Clone(tools)
 }
 
 // ResolveToolPolicy applies defaults to a potentially partial policy config.
@@ -277,12 +246,8 @@ func compileEnabledBashRules(rules []BashRule) ([]compiledBashRule, error) {
 			return nil, fmt.Errorf("invalid bash rule regex at index %d: %w", i, compileErr)
 		}
 
-		name := rule.Name
-		if name == "" {
-			name = fmt.Sprintf("rule_%d", i)
-		}
 		out = append(out, compiledBashRule{
-			name:   name,
+			name:   cmp.Or(rule.Name, fmt.Sprintf("rule_%d", i)),
 			action: rule.Action,
 			re:     re,
 		})

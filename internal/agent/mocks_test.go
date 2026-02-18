@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 
@@ -375,6 +376,54 @@ func testModelConfig(id string) *ModelConfig {
 		Provider: "openai",
 		Model:    "gpt-4.1",
 		APIKey:   "test-key-" + id,
+	}
+}
+
+// newDelegateProvider creates a mock provider that returns a delegate tool call
+// on the first Chat call and a stop response on subsequent calls.
+func newDelegateProvider(task string) *mockLLMProvider {
+	var mu sync.Mutex
+	callCount := 0
+	return &mockLLMProvider{
+		chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+			mu.Lock()
+			callCount++
+			n := callCount
+			mu.Unlock()
+			if n == 1 {
+				return &llm.ChatResponse{
+					Content:      "",
+					FinishReason: "tool_calls",
+					ToolCalls: []llm.ToolCall{{
+						ID:   "call-1",
+						Type: "function",
+						Function: llm.ToolCallFunction{
+							Name:      "delegate",
+							Arguments: fmt.Sprintf(`{"tasks": [{"task": %q}]}`, task),
+						},
+					}},
+				}, nil
+			}
+			return &llm.ChatResponse{Content: "done", FinishReason: "stop"}, nil
+		},
+	}
+}
+
+// newSequenceProvider creates a mock provider that returns responses in order.
+// After all responses are consumed, returns the last one repeatedly.
+func newSequenceProvider(responses ...*llm.ChatResponse) *mockLLMProvider {
+	var mu sync.Mutex
+	idx := 0
+	return &mockLLMProvider{
+		chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			resp := responses[idx]
+			if idx < len(responses)-1 {
+				idx++
+			}
+			return resp, nil
+		},
 	}
 }
 

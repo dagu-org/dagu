@@ -45,17 +45,14 @@ func TestWebSearchTool_Run(t *testing.T) {
 
 		input := json.RawMessage(`{"query": "golang"}`)
 
-		// Test with a mock server to avoid real HTTP requests
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`<html><body><div class="result link"><a class="result__a" href="https://golang.org">Go</a></div></body></html>`))
 		}))
 		defer server.Close()
 
-		// Create tool with custom client for testing
 		toolWithClient := NewWebSearchToolWithClient(server.Client(), server.URL)
 		result := toolWithClient.Run(ToolContext{}, input)
-		// Should not error with nil context
 		assert.False(t, result.IsError)
 		assert.Contains(t, result.Content, "golang.org")
 	})
@@ -111,7 +108,6 @@ func TestParseSearchResults(t *testing.T) {
 	t.Run("parses valid HTML with results", func(t *testing.T) {
 		t.Parallel()
 
-		// Simplified test HTML that matches the isResultDiv logic
 		htmlContent := `
 		<html>
 		<body>
@@ -285,7 +281,7 @@ func TestFormatSearchResults(t *testing.T) {
 
 		assert.Contains(t, output, "1. No Description")
 		assert.Contains(t, output, "URL: https://example.com")
-		assert.NotContains(t, output, "   \n\n") // No empty description line
+		assert.NotContains(t, output, "   \n\n")
 	})
 }
 
@@ -302,8 +298,6 @@ func TestWebSearchTool_ContextCancellation(t *testing.T) {
 		input := json.RawMessage(`{"query": "golang tutorials"}`)
 
 		result := tool.Run(ToolContext{Context: ctx}, input)
-
-		// Should fail due to cancelled context
 		assert.True(t, result.IsError)
 	})
 }
@@ -380,8 +374,6 @@ func TestGetTextContent(t *testing.T) {
 		assert.Equal(t, "spaced text", text)
 	})
 }
-
-// Helper functions for tests
 
 func parseHTMLFragment(fragment string) (*html.Node, error) {
 	return html.Parse(strings.NewReader(fragment))

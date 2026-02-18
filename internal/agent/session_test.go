@@ -92,7 +92,7 @@ func TestSessionManager_SetWorking(t *testing.T) {
 		})
 
 		sm.SetWorking(true)
-		sm.SetWorking(true) // Duplicate should be ignored
+		sm.SetWorking(true)
 		sm.SetWorking(false)
 
 		mu.Lock()
@@ -283,7 +283,6 @@ func TestSessionManager_GetMessages(t *testing.T) {
 		msgs := sm.GetMessages()
 		assert.Len(t, msgs, 2)
 
-		// Verify it's a copy (modification shouldn't affect original)
 		msgs[0].Content = "modified"
 		originalMsgs := sm.GetMessages()
 		assert.Equal(t, "first", originalMsgs[0].Content)
@@ -347,8 +346,6 @@ func TestSessionManager_CostTracking(t *testing.T) {
 		sm := NewSessionManager(pricedConfig)
 		usage := &llm.Usage{PromptTokens: 1000, CompletionTokens: 500}
 		cost := sm.calculateCost(usage)
-
-		// (1000 * 3 / 1_000_000) + (500 * 15 / 1_000_000) = 0.003 + 0.0075 = 0.0105
 		assert.InDelta(t, 0.0105, cost, 1e-9)
 	})
 
@@ -392,12 +389,10 @@ func TestSessionManager_UpdatePricing(t *testing.T) {
 
 		sm := NewSessionManager(SessionManagerConfig{})
 
-		// Initially zero pricing
 		usage := &llm.Usage{PromptTokens: 1000, CompletionTokens: 500}
 		cost := sm.calculateCost(usage)
 		assert.Equal(t, 0.0, cost)
 
-		// Update pricing
 		sm.UpdatePricing(5.0, 25.0)
 
 		cost = sm.calculateCost(usage)
@@ -520,8 +515,6 @@ func TestSessionManager_SetWorkingBroadcastsCost(t *testing.T) {
 		t.Parallel()
 
 		sm := NewSessionManager(SessionManagerConfig{ID: "test"})
-
-		// Add some cost
 		sm.addCost(0.05)
 
 		ctx := t.Context()
@@ -558,11 +551,8 @@ func TestSessionManager_SetSafeMode(t *testing.T) {
 	t.Run("SetSafeMode does not panic", func(t *testing.T) {
 		t.Parallel()
 
-		sm := NewSessionManager(SessionManagerConfig{
-			SafeMode: false,
-		})
+		sm := NewSessionManager(SessionManagerConfig{})
 
-		// Should not panic and should complete without error
 		assert.NotPanics(t, func() {
 			sm.SetSafeMode(true)
 		})
@@ -582,6 +572,156 @@ func TestSessionManager_SetSafeMode(t *testing.T) {
 			}(i%2 == 0)
 		}
 		wg.Wait()
-		// If we reach here without race condition, test passes
 	})
+}
+
+func TestSessionManager_RecordMessage_PersistsViaCallback(t *testing.T) {
+	t.Parallel()
+
+	var persisted []Message
+	var mu sync.Mutex
+
+	provider := newStopProvider("persisted response")
+
+	sm := NewSessionManager(SessionManagerConfig{
+		OnMessage: func(_ context.Context, msg Message) error {
+			mu.Lock()
+			persisted = append(persisted, msg)
+			mu.Unlock()
+			return nil
+		},
+	})
+
+	err := sm.AcceptUserMessage(context.Background(), provider, "m", "m", "hello")
+	require.NoError(t, err)
+
+	// Wait for the assistant message to be persisted (user message is persisted synchronously).
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		for _, msg := range persisted {
+			if msg.Type == MessageTypeAssistant {
+				return true
+			}
+		}
+		return false
+	}, 5*time.Second, 50*time.Millisecond, "assistant message should be persisted via OnMessage callback")
+
+	_ = sm.Cancel(context.Background())
+}
+
+func TestSessionManager_ConcurrentMessages(t *testing.T) {
+	t.Parallel()
+
+	provider := newStopProvider("ok")
+
+	sm := NewSessionManager(SessionManagerConfig{})
+
+	for i := range 3 {
+		err := sm.AcceptUserMessage(context.Background(), provider, "m", "m",
+			"message-"+string(rune('0'+i)))
+		require.NoError(t, err)
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	require.Eventually(t, func() bool {
+		return len(sm.GetMessages()) >= 3
+	}, 2*time.Second, 50*time.Millisecond, "should have at least 3 user messages")
+
+	msgs := sm.GetMessages()
+	assert.GreaterOrEqual(t, len(msgs), 3, "should have at least 3 user messages")
+
+	_ = sm.Cancel(context.Background())
+}
+
+func TestSessionManager_RecordExternalMessage(t *testing.T) {
+	t.Parallel()
+
+	var mu sync.Mutex
+	var persisted []Message
+
+	sm := NewSessionManager(SessionManagerConfig{
+		ID:     "ext-msg-test",
+		UserID: "user-1",
+		OnMessage: func(_ context.Context, msg Message) error {
+			mu.Lock()
+			persisted = append(persisted, msg)
+			mu.Unlock()
+			return nil
+		},
+	})
+
+	ctx := context.Background()
+	next := sm.Subscribe(ctx)
+
+	msg := Message{
+		Type:    MessageTypeAssistant,
+		Content: "external message",
+	}
+	err := sm.RecordExternalMessage(ctx, msg)
+	require.NoError(t, err)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		resp, ok := next()
+		if ok && len(resp.Messages) > 0 {
+			assert.Equal(t, "external message", resp.Messages[0].Content)
+			assert.Equal(t, "ext-msg-test", resp.Messages[0].SessionID)
+			assert.NotEmpty(t, resp.Messages[0].ID)
+		}
+	}()
+
+	select {
+	case <-done:
+		// Success
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for SubPub message")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Len(t, persisted, 1)
+	assert.Equal(t, "external message", persisted[0].Content)
+	assert.Equal(t, "ext-msg-test", persisted[0].SessionID)
+}
+
+func TestSessionManager_RecordExternalMessage_UpdatesLastActivity(t *testing.T) {
+	t.Parallel()
+
+	sm := NewSessionManager(SessionManagerConfig{
+		ID:     "activity-test",
+		UserID: "user-1",
+	})
+
+	initialActivity := sm.LastActivity()
+
+	time.Sleep(10 * time.Millisecond)
+
+	err := sm.RecordExternalMessage(context.Background(), Message{
+		Type:    MessageTypeAssistant,
+		Content: "update activity",
+	})
+	require.NoError(t, err)
+
+	updatedActivity := sm.LastActivity()
+	assert.True(t, updatedActivity.After(initialActivity), "LastActivity should be updated after RecordExternalMessage")
+}
+
+func TestSessionManager_GetSession_IncludesDelegateFields(t *testing.T) {
+	t.Parallel()
+
+	sm := NewSessionManager(SessionManagerConfig{
+		ID:              "delegate-sess",
+		UserID:          "user-1",
+		ParentSessionID: "parent-123",
+		DelegateTask:    "analyze data",
+	})
+
+	sess := sm.GetSession()
+
+	assert.Equal(t, "delegate-sess", sess.ID)
+	assert.Equal(t, "user-1", sess.UserID)
+	assert.Equal(t, "parent-123", sess.ParentSessionID)
+	assert.Equal(t, "analyze data", sess.DelegateTask)
 }

@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* Core Obsidian Semantic Colors */
   --color-background: var(--background);
@@ -28,6 +30,7 @@
   --color-destructive-foreground: var(--destructive-foreground);
 
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-surface: var(--surface);
@@ -427,14 +430,6 @@
   border-radius: var(--radius-md);
 }
 
-/* Typography densities */
-.text-balance {
-  text-wrap: balance;
-}
-.tracking-tight {
-  letter-spacing: -0.025em;
-}
-
 /* Status Indicators - Minimal Text-Only Style */
 .status-pill {
   display: inline-flex;
@@ -777,6 +772,64 @@ select:focus-visible {
 
 .dark ::-webkit-scrollbar-thumb:hover {
   background: var(--border-strong);
+}
+
+/* Agent modal — CRT power-on (subtle) */
+@keyframes agent-modal-in {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.85) scaleY(0.01);
+    filter: brightness(2);
+  }
+  30% {
+    opacity: 1;
+    transform: scaleX(0.95) scaleY(0.01);
+    filter: brightness(1.8);
+  }
+  60% {
+    transform: scaleX(1.01) scaleY(1.02);
+    filter: brightness(1.1);
+  }
+  80% {
+    transform: scale(0.995);
+    filter: brightness(1);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+/* Agent modal — CRT power-off */
+@keyframes agent-modal-out {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  25% {
+    opacity: 0.4;
+  }
+  30% {
+    opacity: 1;
+    filter: brightness(1.6);
+  }
+  65% {
+    transform: scaleX(0.8) scaleY(0.005);
+    filter: brightness(5);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(0.4) scaleY(0.005);
+    filter: brightness(8);
+  }
+}
+
+/* Sub-agent panel animations */
+@keyframes delegate-panel-in {
+  0% { opacity: 0; transform: scale(0.9) translateX(20px); filter: blur(4px); }
+  60% { opacity: 1; filter: blur(0px); }
+  100% { transform: scale(1) translateX(0); }
 }
 
 /* Loading States */

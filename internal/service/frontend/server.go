@@ -297,6 +297,9 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	if agentSkillStore != nil {
 		allAPIOptions = append(allAPIOptions, apiv1.WithAgentSkillStore(agentSkillStore))
 	}
+	if srv.agentAPI != nil {
+		allAPIOptions = append(allAPIOptions, apiv1.WithAgentAPI(srv.agentAPI))
+	}
 
 	srv.apiV1 = apiv1.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, allAPIOptions...)
 
@@ -587,7 +590,7 @@ func (srv *Server) Serve(ctx context.Context) error {
 	}
 
 	if srv.agentAPI != nil && srv.agentConfigStore != nil {
-		srv.setupAgentRoutes(ctx, r)
+		srv.setupAgentRoutes(ctx, r, apiV1BasePath)
 	}
 
 	srv.setupSSERoute(ctx, r, apiV1BasePath)
@@ -792,10 +795,13 @@ func (srv *Server) registerSSEFetchers() {
 	srv.sseHub.RegisterFetcher(sse.TopicTypeQueueItems, srv.apiV1.GetQueueItemsData)
 }
 
-func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux) {
+func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath string) {
 	authMiddleware := srv.buildAgentAuthMiddleware(ctx)
-	srv.agentAPI.RegisterRoutes(r, authMiddleware)
-	logger.Info(ctx, "Agent API routes configured")
+	// Only the SSE stream endpoint is registered as a manual route.
+	// All other agent endpoints are served through the OpenAPI handler.
+	streamPath := path.Join(apiV1BasePath, "agent/sessions/{id}/stream")
+	r.With(srv.agentAPI.EnabledMiddleware(), authMiddleware).Get(streamPath, srv.agentAPI.HandleStream)
+	logger.Info(ctx, "Agent SSE stream route configured")
 }
 
 func (srv *Server) buildAgentAuthMiddleware(_ context.Context) func(http.Handler) http.Handler {

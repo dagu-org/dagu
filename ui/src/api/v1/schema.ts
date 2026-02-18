@@ -1830,6 +1830,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/agent/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List agent tools
+         * @description Returns metadata for all registered agent tools.
+         */
+        get: operations["listAgentTools"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List agent sessions
+         * @description Lists all sessions for the current user.
+         */
+        get: operations["listAgentSessions"];
+        put?: never;
+        /**
+         * Create agent session
+         * @description Creates a new agent session and sends the first message.
+         */
+        post: operations["createAgentSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get agent session
+         * @description Returns session details including messages and current state.
+         */
+        get: operations["getAgentSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/sessions/{sessionId}/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send message to agent session
+         * @description Sends a message to an existing agent session.
+         */
+        post: operations["chatAgentSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/sessions/{sessionId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel agent session
+         * @description Cancels processing in an active agent session.
+         */
+        post: operations["cancelAgentSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/sessions/{sessionId}/respond": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Respond to agent prompt
+         * @description Submits user's response to an agent prompt.
+         */
+        post: operations["respondAgentSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3237,6 +3361,158 @@ export interface components {
             /** @description New memory content (markdown) */
             content: string;
         };
+        /** @description Metadata for a registered agent tool */
+        AgentToolInfo: {
+            name: string;
+            label: string;
+            description: string;
+        };
+        /** @description List of agent tool metadata */
+        ListAgentToolsResponse: {
+            tools: components["schemas"]["AgentToolInfo"][];
+        };
+        /** @description DAG reference for context-aware agent responses */
+        AgentDAGContext: {
+            /** @description DAG file path or name */
+            dagFile: string;
+            /** @description Specific run ID of the DAG */
+            dagRunId?: string;
+        };
+        /** @description Request to send a chat message to the agent */
+        AgentChatRequest: {
+            /** @description User's input text */
+            message: string;
+            /** @description LLM model ID to use */
+            model?: string;
+            /** @description DAG references for context */
+            dagContexts?: components["schemas"]["AgentDAGContext"][];
+            /** @description Enable approval prompts for dangerous commands */
+            safeMode?: boolean;
+        };
+        /** @description Response after creating a new agent session */
+        CreateAgentSessionResponse: {
+            sessionId: string;
+            status: string;
+        };
+        /** @description Agent chat session metadata */
+        AgentSession: {
+            id: string;
+            userId?: string;
+            dagName?: string;
+            title?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            parentSessionId?: string;
+            delegateTask?: string;
+        };
+        /** @description Current processing state of an agent session */
+        AgentSessionState: {
+            sessionId: string;
+            working: boolean;
+            model?: string;
+            /**
+             * Format: double
+             * @description Total accumulated cost in USD
+             */
+            totalCost: number;
+        };
+        /** @description Agent session with its current state */
+        AgentSessionWithState: {
+            session: components["schemas"]["AgentSession"];
+            working: boolean;
+            model?: string;
+            /**
+             * Format: double
+             * @description Total accumulated cost in USD
+             */
+            totalCost: number;
+        };
+        /** @description Function call details in a tool call */
+        AgentToolCallFunction: {
+            name: string;
+            arguments: string;
+        };
+        /** @description Tool call requested by the LLM */
+        AgentToolCall: {
+            id: string;
+            type: string;
+            function: components["schemas"]["AgentToolCallFunction"];
+        };
+        /** @description Result from a tool execution */
+        AgentToolResult: {
+            toolCallId: string;
+            content: string;
+            isError?: boolean;
+        };
+        /** @description Token usage statistics from LLM */
+        AgentTokenUsage: {
+            promptTokens?: number;
+            completionTokens?: number;
+            totalTokens?: number;
+        };
+        /** @description UI action to be performed */
+        AgentUIAction: {
+            type: string;
+            path?: string;
+        };
+        /** @description Single option in a user prompt */
+        AgentUserPromptOption: {
+            id: string;
+            label: string;
+            description?: string;
+        };
+        /** @description Question from the agent requiring user response */
+        AgentUserPrompt: {
+            promptId: string;
+            question: string;
+            options?: components["schemas"]["AgentUserPromptOption"][];
+            allowFreeText: boolean;
+            freeTextPlaceholder?: string;
+            multiSelect: boolean;
+            /** @enum {string} */
+            promptType?: AgentUserPromptPromptType;
+            command?: string;
+            workingDir?: string;
+        };
+        /** @description A message in an agent session */
+        AgentMessage: {
+            id: string;
+            sessionId: string;
+            /** @enum {string} */
+            type: AgentMessageType;
+            /** Format: int64 */
+            sequenceId: number;
+            content?: string;
+            toolCalls?: components["schemas"]["AgentToolCall"][];
+            toolResults?: components["schemas"]["AgentToolResult"][];
+            usage?: components["schemas"]["AgentTokenUsage"];
+            /** Format: double */
+            cost?: number;
+            /** Format: date-time */
+            createdAt: string;
+            uiAction?: components["schemas"]["AgentUIAction"];
+            userPrompt?: components["schemas"]["AgentUserPrompt"];
+            delegateIds?: string[];
+        };
+        /** @description Session details including messages and current state */
+        AgentSessionDetailResponse: {
+            messages: components["schemas"]["AgentMessage"][];
+            session: components["schemas"]["AgentSession"];
+            sessionState: components["schemas"]["AgentSessionState"];
+        };
+        /** @description User's response to an agent prompt */
+        AgentUserPromptResponse: {
+            promptId: string;
+            selectedOptionIds?: string[];
+            freeTextResponse?: string;
+            cancelled?: boolean;
+        };
+        /** @description Simple status response */
+        AgentStatusResponse: {
+            status: string;
+        };
     };
     responses: never;
     parameters: {
@@ -3278,6 +3554,8 @@ export interface components {
         Limit: number;
         /** @description Whether to return stdout or stderr logs */
         Stream: components["schemas"]["Stream"];
+        /** @description Unique identifier of the agent session */
+        AgentSessionId: string;
     };
     requestBodies: never;
     headers: never;
@@ -8958,6 +9236,416 @@ export interface operations {
             };
         };
     };
+    listAgentTools: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of tools */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAgentToolsResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listAgentSessions: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of sessions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSessionWithState"][];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createAgentSession: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Session created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateAgentSessionResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Agent not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getAgentSession: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description Unique identifier of the agent session */
+                sessionId: components["parameters"]["AgentSessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Session details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSessionDetailResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    chatAgentSession: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description Unique identifier of the agent session */
+                sessionId: components["parameters"]["AgentSessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Message accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentStatusResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Agent not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    cancelAgentSession: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description Unique identifier of the agent session */
+                sessionId: components["parameters"]["AgentSessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Session cancelled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentStatusResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    respondAgentSession: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description Unique identifier of the agent session */
+                sessionId: components["parameters"]["AgentSessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentUserPromptResponse"];
+            };
+        };
+        responses: {
+            /** @description Response accepted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentStatusResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Prompt expired or already answered */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
 }
 export enum PathsDagsGetParametersQuerySort {
     name = "name",
@@ -9162,4 +9850,15 @@ export enum ModelPresetProvider {
     gemini = "gemini",
     openrouter = "openrouter",
     local = "local"
+}
+export enum AgentUserPromptPromptType {
+    general = "general",
+    command_approval = "command_approval"
+}
+export enum AgentMessageType {
+    user = "user",
+    assistant = "assistant",
+    error = "error",
+    ui_action = "ui_action",
+    user_prompt = "user_prompt"
 }

@@ -2,17 +2,17 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
+  useRef,
   useState,
 } from 'react';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
-import type {
-  SessionState,
-  SessionWithState,
-  Message,
-} from '../types';
+
+import type { Message, SessionState, SessionWithState } from '../types';
 
 interface AgentChatContextType {
   isOpen: boolean;
+  isClosing: boolean;
   sessionId: string | null;
   messages: Message[];
   pendingUserMessage: string | null;
@@ -38,6 +38,11 @@ const AgentChatContext = createContext<AgentChatContextType | null>(null);
 
 export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNode {
   const [isOpen, setIsOpen] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => { if (closeTimerRef.current) clearTimeout(closeTimerRef.current); };
+  }, []);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
@@ -47,9 +52,32 @@ export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNo
     []
   );
 
-  const openChat = useCallback(() => setIsOpen(true), []);
-  const closeChat = useCallback(() => setIsOpen(false), []);
-  const toggleChat = useCallback(() => setIsOpen((prev) => !prev), []);
+  const openChat = useCallback(() => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setIsClosing(false);
+    setIsOpen(true);
+  }, []);
+
+  const closeChat = useCallback(() => {
+    if (!isOpen || isClosing) return;
+    setIsClosing(true);
+    closeTimerRef.current = setTimeout(() => {
+      setIsClosing(false);
+      setIsOpen(false);
+      closeTimerRef.current = null;
+    }, 250);
+  }, [isOpen, isClosing]);
+
+  const toggleChat = useCallback(() => {
+    if (isOpen) {
+      closeChat();
+    } else {
+      openChat();
+    }
+  }, [isOpen, closeChat, openChat]);
 
   const addMessage = useCallback((message: Message) => {
     // When a user message arrives from SSE, clear the pending message
@@ -82,6 +110,7 @@ export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNo
     <AgentChatContext.Provider
       value={{
         isOpen,
+        isClosing,
         sessionId,
         messages,
         pendingUserMessage,

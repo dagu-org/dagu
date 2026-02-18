@@ -10,6 +10,16 @@ import (
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
+func init() {
+	RegisterTool(ToolRegistration{
+		Name:           "bash",
+		Label:          "Bash",
+		Description:    "Run shell commands",
+		DefaultEnabled: true,
+		Factory:        func(_ ToolConfig) *AgentTool { return NewBashTool() },
+	})
+}
+
 const (
 	defaultBashTimeout = 120 * time.Second
 	maxBashTimeout     = 10 * time.Minute

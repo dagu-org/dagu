@@ -71,33 +71,48 @@ type LoopConfig struct {
 	IPAddress string
 	// Role is the authenticated user's role.
 	Role auth.Role
+	// SessionStore is used for delegate sub-session persistence.
+	SessionStore SessionStore
+	// RegisterSubSession registers a sub-session's SessionManager for SSE streaming.
+	RegisterSubSession func(id string, mgr *SessionManager)
+	// DeregisterSubSession removes a completed sub-session from the SSE registry.
+	DeregisterSubSession func(id string)
+	// NotifyParent broadcasts a delegate event to the parent session's SSE stream.
+	NotifyParent func(event StreamResponse)
+	// AddCost adds a cost amount to the parent session's running total.
+	AddCost func(cost float64)
 }
 
 // Loop manages a session turn with an LLM including tool execution.
 type Loop struct {
-	provider         llm.Provider
-	model            string
-	tools            []*AgentTool
-	recordMessage    MessageRecordFunc
-	history          []llm.Message
-	messageQueue     []llm.Message
-	totalUsage       llm.Usage
-	mu               sync.Mutex
-	logger           *slog.Logger
-	systemPrompt     string
-	workingDir       string
-	sessionID        string
-	onWorking        func(working bool)
-	sequenceID       int64
-	emitUIAction     UIActionFunc
-	emitUserPrompt   EmitUserPromptFunc
-	waitUserResponse WaitUserResponseFunc
-	safeMode         bool
-	hooks            *Hooks
-	userID           string
-	username         string
-	ipAddress        string
-	role             auth.Role
+	provider             llm.Provider
+	model                string
+	tools                []*AgentTool
+	recordMessage        MessageRecordFunc
+	history              []llm.Message
+	messageQueue         []llm.Message
+	totalUsage           llm.Usage
+	mu                   sync.Mutex
+	logger               *slog.Logger
+	systemPrompt         string
+	workingDir           string
+	sessionID            string
+	onWorking            func(working bool)
+	sequenceID           int64
+	emitUIAction         UIActionFunc
+	emitUserPrompt       EmitUserPromptFunc
+	waitUserResponse     WaitUserResponseFunc
+	safeMode             bool
+	hooks                *Hooks
+	userID               string
+	username             string
+	ipAddress            string
+	role                 auth.Role
+	sessionStore         SessionStore
+	registerSubSession   func(id string, mgr *SessionManager)
+	deregisterSubSession func(id string)
+	notifyParent         func(event StreamResponse)
+	addCost              func(cost float64)
 }
 
 // NewLoop creates a new Loop instance.
@@ -108,26 +123,30 @@ func NewLoop(config LoopConfig) *Loop {
 	}
 
 	return &Loop{
-		provider:         config.Provider,
-		model:            config.Model,
-		history:          config.History,
-		tools:            config.Tools,
-		recordMessage:    config.RecordMessage,
-		messageQueue:     make([]llm.Message, 0),
-		logger:           logger,
-		systemPrompt:     config.SystemPrompt,
-		workingDir:       config.WorkingDir,
-		sessionID:        config.SessionID,
-		onWorking:        config.OnWorking,
-		emitUIAction:     config.EmitUIAction,
-		emitUserPrompt:   config.EmitUserPrompt,
-		waitUserResponse: config.WaitUserResponse,
-		safeMode:         config.SafeMode,
-		hooks:            config.Hooks,
-		userID:           config.UserID,
-		username:         config.Username,
-		ipAddress:        config.IPAddress,
-		role:             config.Role,
+		provider:             config.Provider,
+		model:                config.Model,
+		history:              config.History,
+		tools:                config.Tools,
+		recordMessage:        config.RecordMessage,
+		logger:               logger,
+		systemPrompt:         config.SystemPrompt,
+		workingDir:           config.WorkingDir,
+		sessionID:            config.SessionID,
+		onWorking:            config.OnWorking,
+		emitUIAction:         config.EmitUIAction,
+		emitUserPrompt:       config.EmitUserPrompt,
+		waitUserResponse:     config.WaitUserResponse,
+		safeMode:             config.SafeMode,
+		hooks:                config.Hooks,
+		userID:               config.UserID,
+		username:             config.Username,
+		ipAddress:            config.IPAddress,
+		role:                 config.Role,
+		sessionStore:         config.SessionStore,
+		registerSubSession:   config.RegisterSubSession,
+		deregisterSubSession: config.DeregisterSubSession,
+		notifyParent:         config.NotifyParent,
+		addCost:              config.AddCost,
 	}
 }
 
@@ -208,6 +227,23 @@ func (l *Loop) sleepWithContext(ctx context.Context, d time.Duration) {
 
 // processLLMRequest sends a request to the LLM and handles the response.
 func (l *Loop) processLLMRequest(ctx context.Context) error {
+	resp, err := l.sendRequest(ctx)
+	if err != nil {
+		return err
+	}
+
+	if len(resp.ToolCalls) > 0 {
+		l.logger.Info("handling tool calls", "count", len(resp.ToolCalls))
+		return l.handleToolCalls(ctx, resp.ToolCalls)
+	}
+
+	l.setWorking(false)
+	return nil
+}
+
+// sendRequest builds, sends, and records an LLM request. On success it
+// accumulates usage and records the assistant message.
+func (l *Loop) sendRequest(ctx context.Context) (*llm.ChatResponse, error) {
 	history := l.copyHistory()
 	messages := l.buildMessages(history)
 	tools := l.buildToolDefinitions()
@@ -232,7 +268,7 @@ func (l *Loop) processLLMRequest(ctx context.Context) error {
 	if err != nil {
 		l.recordErrorMessage(ctx, fmt.Sprintf("LLM request failed: %v", err))
 		l.setWorking(false)
-		return fmt.Errorf("LLM request failed: %w", err)
+		return nil, fmt.Errorf("LLM request failed: %w", err)
 	}
 
 	l.logger.Debug("received LLM response",
@@ -242,14 +278,7 @@ func (l *Loop) processLLMRequest(ctx context.Context) error {
 
 	l.accumulateUsage(resp.Usage)
 	l.recordAssistantMessage(ctx, resp)
-
-	if len(resp.ToolCalls) > 0 {
-		l.logger.Info("handling tool calls", "count", len(resp.ToolCalls))
-		return l.handleToolCalls(ctx, resp.ToolCalls)
-	}
-
-	l.setWorking(false)
-	return nil
+	return resp, nil
 }
 
 // setWorking safely calls the onWorking callback if configured.
@@ -326,6 +355,26 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		return toolError("Blocked by policy: %v", err)
 	}
 
+	// Build delegate context if session store is available (interactive chat).
+	var delegate *DelegateContext
+	if l.sessionStore != nil {
+		delegate = &DelegateContext{
+			Provider:             l.provider,
+			Model:                l.model,
+			SystemPrompt:         l.systemPrompt,
+			Tools:                l.tools,
+			Hooks:                l.hooks,
+			Logger:               l.logger,
+			SessionStore:         l.sessionStore,
+			ParentID:             l.sessionID,
+			UserID:               userID,
+			RegisterSubSession:   l.registerSubSession,
+			DeregisterSubSession: l.deregisterSubSession,
+			NotifyParent:         l.notifyParent,
+			AddCost:              l.addCost,
+		}
+	}
+
 	result := tool.Run(ToolContext{
 		Context:          ctx,
 		WorkingDir:       l.workingDir,
@@ -334,6 +383,7 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		WaitUserResponse: l.waitUserResponse,
 		SafeMode:         safeMode,
 		Role:             role,
+		Delegate:         delegate,
 	}, input)
 
 	l.hooks.RunAfterToolExec(ctx, info, result)
@@ -355,9 +405,9 @@ func (l *Loop) SetUserContext(userID, username, ipAddress string, role auth.Role
 // instead of recursion to prevent stack overflow with long tool call chains.
 func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) error {
 	for depth := range maxToolCallDepth {
-		l.executeToolCalls(ctx, toolCalls, depth)
+		l.executeToolCalls(ctx, toolCalls)
 
-		resp, err := l.sendToolChainRequest(ctx, depth)
+		resp, err := l.sendRequest(ctx)
 		if err != nil {
 			return err
 		}
@@ -376,53 +426,14 @@ func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) er
 	return fmt.Errorf("max tool call depth (%d) reached", maxToolCallDepth)
 }
 
-// executeToolCalls runs all tool calls at the current depth level.
-func (l *Loop) executeToolCalls(ctx context.Context, toolCalls []llm.ToolCall, depth int) {
+// executeToolCalls runs all tool calls sequentially.
+// The delegate tool handles its own parallelism internally.
+func (l *Loop) executeToolCalls(ctx context.Context, toolCalls []llm.ToolCall) {
 	for _, tc := range toolCalls {
-		l.logger.Debug("executing tool", "name", tc.Function.Name, "id", tc.ID, "depth", depth)
-		l.recordToolResult(ctx, tc, l.executeTool(ctx, tc))
+		l.logger.Debug("executing tool", "name", tc.Function.Name, "id", tc.ID)
+		result := l.executeTool(ctx, tc)
+		l.recordToolResult(ctx, tc, result)
 	}
-}
-
-// sendToolChainRequest sends an LLM request after tool execution.
-func (l *Loop) sendToolChainRequest(ctx context.Context, depth int) (*llm.ChatResponse, error) {
-	history := l.copyHistory()
-	messages := l.buildMessages(history)
-	tools := l.buildToolDefinitions()
-
-	req := &llm.ChatRequest{
-		Model:    l.model,
-		Messages: messages,
-		Tools:    tools,
-	}
-
-	l.logger.Debug("sending LLM request (tool chain)",
-		"message_count", len(messages),
-		"tool_count", len(tools),
-		"model", l.model,
-		"depth", depth)
-
-	l.setWorking(true)
-
-	llmCtx, cancel := context.WithTimeout(ctx, llmRequestTimeout)
-	defer cancel()
-
-	resp, err := l.provider.Chat(llmCtx, req)
-	if err != nil {
-		l.recordErrorMessage(ctx, fmt.Sprintf("LLM request failed: %v", err))
-		l.setWorking(false)
-		return nil, fmt.Errorf("LLM request failed: %w", err)
-	}
-
-	l.logger.Debug("received LLM response (tool chain)",
-		"content_length", len(resp.Content),
-		"finish_reason", resp.FinishReason,
-		"tool_calls", len(resp.ToolCalls),
-		"depth", depth)
-
-	l.accumulateUsage(resp.Usage)
-	l.recordAssistantMessage(ctx, resp)
-	return resp, nil
 }
 
 // recordToolResult adds a tool result to history and records it.
@@ -447,8 +458,9 @@ func (l *Loop) recordToolResult(ctx context.Context, tc llm.ToolCall, result Too
 			Content:    result.Content,
 			IsError:    result.IsError,
 		}},
-		CreatedAt: time.Now(),
-		LLMData:   &toolMessage,
+		CreatedAt:   time.Now(),
+		LLMData:     &toolMessage,
+		DelegateIDs: result.DelegateIDs,
 	}
 	if err := l.recordMessage(ctx, msg); err != nil {
 		l.logger.Error("failed to record tool result message", "error", err)

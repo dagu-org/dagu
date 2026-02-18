@@ -8,6 +8,16 @@ import (
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
+func init() {
+	RegisterTool(ToolRegistration{
+		Name:           "navigate",
+		Label:          "Navigate",
+		Description:    "Navigate Dagu UI pages",
+		DefaultEnabled: true,
+		Factory:        func(_ ToolConfig) *AgentTool { return NewNavigateTool() },
+	})
+}
+
 // NavigateToolInput is the input schema for the navigate tool.
 type NavigateToolInput struct {
 	Path string `json:"path"`

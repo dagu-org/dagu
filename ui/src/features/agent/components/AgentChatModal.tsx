@@ -12,6 +12,7 @@ import { SessionWithState, DAGContext } from '../types';
 import { AgentChatModalHeader } from './AgentChatModalHeader';
 import { ChatInput } from './ChatInput';
 import { ChatMessages } from './ChatMessages';
+import { DelegatePanel } from './DelegatePanel';
 import { ResizeHandles } from './ResizeHandles';
 
 function findLatestSession(
@@ -19,11 +20,13 @@ function findLatestSession(
 ): SessionWithState | null {
   if (sessions.length === 0) return null;
 
-  let latest = sessions[0]!;
+  let latest: SessionWithState | null = null;
   for (const sess of sessions) {
+    if (sess.session.parent_session_id) continue;
     if (
+      !latest ||
       new Date(sess.session.updated_at) >
-      new Date(latest.session.updated_at)
+        new Date(latest.session.updated_at)
     ) {
       latest = sess;
     }
@@ -32,7 +35,7 @@ function findLatestSession(
 }
 
 export function AgentChatModal(): ReactElement | null {
-  const { isOpen, closeChat } = useAgentChatContext();
+  const { isOpen, isClosing, closeChat } = useAgentChatContext();
   const isMobile = useIsMobile();
   const {
     sessionId,
@@ -51,16 +54,24 @@ export function AgentChatModal(): ReactElement | null {
     fetchSessions,
     selectSession,
     respondToPrompt,
+    delegates,
+    delegateStatuses,
+    delegateMessages,
+    bringToFront,
+    reopenDelegate,
+    removeDelegate,
   } = useAgentChat();
   const { bounds, dragHandlers, resizeHandlers } = useResizableDraggable();
 
   const hasAutoSelectedRef = useRef(false);
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
       hasAutoSelectedRef.current = false;
       fetchSessions();
     }
+    wasOpenRef.current = isOpen;
   }, [isOpen, fetchSessions]);
 
   useEffect(() => {
@@ -104,6 +115,13 @@ export function AgentChatModal(): ReactElement | null {
     [selectSession, clearSession, setError]
   );
 
+  const handleOpenDelegate = useCallback((id: string) => {
+    const info = delegateStatuses[id];
+    if (info) {
+      reopenDelegate(id, info.task);
+    }
+  }, [delegateStatuses, reopenDelegate]);
+
   if (!isOpen) return null;
 
   const errorBanner = error && (
@@ -140,6 +158,8 @@ export function AgentChatModal(): ReactElement | null {
         isWorking={isWorking}
         onPromptRespond={respondToPrompt}
         answeredPrompts={answeredPrompts}
+        delegateStatuses={delegateStatuses}
+        onOpenDelegate={handleOpenDelegate}
       />
       <ChatInput
         onSend={handleSend}
@@ -157,36 +177,57 @@ export function AgentChatModal(): ReactElement | null {
         className={cn(
           'fixed inset-0 z-50',
           'flex flex-col',
-          'bg-popover dark:bg-zinc-950',
-          'animate-in slide-in-from-bottom-4 fade-in-0 duration-200'
+          'bg-card dark:bg-zinc-950'
         )}
+        style={{
+          animation: isClosing
+            ? 'agent-modal-out 250ms ease-in forwards'
+            : 'agent-modal-in 400ms ease-out',
+        }}
       >
         {content}
       </div>
     );
   }
 
-  // Desktop: resizable/draggable window
+  // Desktop: resizable/draggable window + delegate panels
   return (
-    <div
-      className={cn(
-        'fixed z-50',
-        'flex flex-col',
-        'bg-popover dark:bg-zinc-950 border border-border rounded-lg overflow-hidden',
-        'shadow-xl dark:shadow-[0_0_30px_rgba(0,0,0,0.6)]',
-        'animate-in slide-in-from-bottom-4 fade-in-0 duration-200'
-      )}
-      style={{
-        right: bounds.right,
-        bottom: bounds.bottom,
-        width: bounds.width,
-        height: bounds.height,
-        maxWidth: 'calc(100vw - 32px)',
-        maxHeight: 'calc(100vh - 100px)',
-      }}
-    >
-      <ResizeHandles resizeHandlers={resizeHandlers} />
-      {content}
-    </div>
+    <>
+      <div
+        className={cn(
+          'fixed z-50',
+          'flex flex-col',
+          'bg-card dark:bg-zinc-950 border border-border-strong rounded-lg overflow-hidden',
+          'shadow-xl'
+        )}
+        style={{
+          right: bounds.right,
+          bottom: bounds.bottom,
+          width: bounds.width,
+          height: bounds.height,
+          maxWidth: 'calc(100vw - 32px)',
+          maxHeight: 'calc(100vh - 100px)',
+          animation: isClosing
+            ? 'agent-modal-out 250ms ease-in forwards'
+            : 'agent-modal-in 400ms ease-out',
+        }}
+      >
+        <ResizeHandles resizeHandlers={resizeHandlers} />
+        {content}
+      </div>
+      {delegates.map((d) => (
+        <DelegatePanel
+          key={d.id}
+          delegateId={d.id}
+          task={d.task}
+          status={d.status}
+          zIndex={d.zIndex}
+          index={d.positionIndex}
+          messages={delegateMessages[d.id] || []}
+          onClose={() => removeDelegate(d.id)}
+          onBringToFront={() => bringToFront(d.id)}
+        />
+      ))}
+    </>
   );
 }

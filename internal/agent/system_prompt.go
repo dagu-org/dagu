@@ -2,27 +2,19 @@ package agent
 
 import (
 	"bytes"
-	"embed"
+	_ "embed"
 	"text/template"
 
 	"github.com/dagu-org/dagu/internal/auth"
 )
 
 //go:embed system_prompt.txt
-var systemPromptFS embed.FS
+var systemPromptRaw string
 
 // systemPromptTemplate is parsed once at package initialization.
 var systemPromptTemplate = template.Must(
-	template.New("system_prompt").Parse(mustReadPromptFile()),
+	template.New("system_prompt").Parse(systemPromptRaw),
 )
-
-func mustReadPromptFile() string {
-	content, err := systemPromptFS.ReadFile("system_prompt.txt")
-	if err != nil {
-		panic("failed to read embedded system_prompt.txt: " + err.Error())
-	}
-	return string(content)
-}
 
 // CurrentDAG contains context about the DAG being viewed.
 type CurrentDAG struct {

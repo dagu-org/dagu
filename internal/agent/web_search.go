@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -12,9 +13,18 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/llm"
-	"github.com/go-resty/resty/v2"
 	"golang.org/x/net/html"
 )
+
+func init() {
+	RegisterTool(ToolRegistration{
+		Name:           "web_search",
+		Label:          "Web Search",
+		Description:    "Search the internet",
+		DefaultEnabled: true,
+		Factory:        func(_ ToolConfig) *AgentTool { return NewWebSearchTool() },
+	})
+}
 
 const (
 	defaultWebSearchTimeout = 30 * time.Second
@@ -45,15 +55,15 @@ type HTTPDoer interface {
 
 // NewWebSearchTool creates a new web search tool for internet search.
 func NewWebSearchTool() *AgentTool {
-	return newWebSearchToolInternal(nil, "")
+	return newWebSearchTool(nil, "")
 }
 
 // NewWebSearchToolWithClient creates a web search tool with a custom HTTP client for testing.
 func NewWebSearchToolWithClient(client HTTPDoer, baseURL string) *AgentTool {
-	return newWebSearchToolInternal(client, baseURL)
+	return newWebSearchTool(client, baseURL)
 }
 
-func newWebSearchToolInternal(client HTTPDoer, baseURL string) *AgentTool {
+func newWebSearchTool(client HTTPDoer, baseURL string) *AgentTool {
 	return &AgentTool{
 		Tool: llm.Tool{
 			Type: "function",
@@ -77,16 +87,12 @@ func newWebSearchToolInternal(client HTTPDoer, baseURL string) *AgentTool {
 			},
 		},
 		Run: func(toolCtx ToolContext, input json.RawMessage) ToolOut {
-			return webSearchRunWithClient(toolCtx, input, client, baseURL)
+			return webSearchRun(toolCtx, input, client, baseURL)
 		},
 	}
 }
 
-func webSearchRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
-	return webSearchRunWithClient(toolCtx, input, nil, "")
-}
-
-func webSearchRunWithClient(toolCtx ToolContext, input json.RawMessage, client HTTPDoer, baseURL string) ToolOut {
+func webSearchRun(toolCtx ToolContext, input json.RawMessage, client HTTPDoer, baseURL string) ToolOut {
 	var args WebSearchToolInput
 	if err := json.Unmarshal(input, &args); err != nil {
 		return toolError("Failed to parse input: %v", err)
@@ -105,7 +111,7 @@ func webSearchRunWithClient(toolCtx ToolContext, input json.RawMessage, client H
 	ctx, cancel := context.WithTimeout(parentCtx, defaultWebSearchTimeout)
 	defer cancel()
 
-	results, err := performSearchWithClient(ctx, args.Query, maxResults, client, baseURL)
+	results, err := performSearch(ctx, args.Query, maxResults, client, baseURL)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return toolError("Search timed out after %v", defaultWebSearchTimeout)
@@ -127,61 +133,60 @@ func resolveMaxResults(maxResults int) int {
 	return min(maxResults, maxAllowedResults)
 }
 
-func performSearch(ctx context.Context, query string, maxResults int) ([]SearchResult, error) {
-	return performSearchWithClient(ctx, query, maxResults, nil, "")
-}
-
-func performSearchWithClient(ctx context.Context, query string, maxResults int, httpClient HTTPDoer, baseURL string) ([]SearchResult, error) {
+func performSearch(ctx context.Context, query string, maxResults int, httpClient HTTPDoer, baseURL string) ([]SearchResult, error) {
 	searchURL := duckDuckGoURL
 	if baseURL != "" {
 		searchURL = baseURL
 	}
 
-	client := resty.New().
-		SetTimeout(defaultWebSearchTimeout).
-		SetRetryCount(maxRetries).
-		SetRetryWaitTime(retryWaitTime).
-		AddRetryCondition(func(r *resty.Response, err error) bool {
-			if err != nil {
-				// Only retry on transient errors (timeout/connection errors)
-				var netErr net.Error
-				if errors.As(err, &netErr) && netErr.Timeout() {
-					return true
-				}
-				return false
+	doer := httpClient
+	if doer == nil {
+		doer = &http.Client{Timeout: defaultWebSearchTimeout}
+	}
+
+	var lastErr error
+	for attempt := range maxRetries + 1 {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(retryWaitTime):
 			}
-			code := r.StatusCode()
-			return code == 429 || code >= 500
-		})
+		}
 
-	if httpClient != nil {
-		client.SetTransport(&httpClientTransport{client: httpClient})
+		form := url.Values{"q": {query}}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, searchURL, strings.NewReader(form.Encode()))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; DaguBot/1.0)")
+
+		resp, err := doer.Do(req)
+		if err != nil {
+			lastErr = err
+			var netErr net.Error
+			if errors.As(err, &netErr) && netErr.Timeout() {
+				continue
+			}
+			return nil, fmt.Errorf("HTTP request failed: %w", err)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+
+		if resp.StatusCode == http.StatusOK {
+			return parseSearchResults(string(body), maxResults)
+		}
+
+		lastErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+			continue
+		}
+		return nil, lastErr
 	}
 
-	resp, err := client.R().
-		SetContext(ctx).
-		SetFormData(map[string]string{"q": query}).
-		SetHeader("User-Agent", "Mozilla/5.0 (compatible; DaguBot/1.0)").
-		Post(searchURL)
-
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
-	}
-
-	if resp.StatusCode() != 200 {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode())
-	}
-
-	return parseSearchResults(resp.String(), maxResults)
-}
-
-// httpClientTransport wraps an HTTPDoer to implement http.RoundTripper.
-type httpClientTransport struct {
-	client HTTPDoer
-}
-
-func (t *httpClientTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	return t.client.Do(req)
+	return nil, lastErr
 }
 
 func parseSearchResults(htmlContent string, maxResults int) ([]SearchResult, error) {

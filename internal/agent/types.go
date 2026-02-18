@@ -4,6 +4,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/auth"
@@ -116,6 +117,8 @@ type Message struct {
 	UIAction *UIAction `json:"ui_action,omitempty"`
 	// UserPrompt contains a prompt when Type is MessageTypeUserPrompt.
 	UserPrompt *UserPrompt `json:"user_prompt,omitempty"`
+	// DelegateIDs references the sub-session IDs for delegate tool results.
+	DelegateIDs []string `json:"delegate_ids,omitempty"`
 }
 
 // ToolResult represents the result of a tool call.
@@ -142,6 +145,10 @@ type Session struct {
 	CreatedAt time.Time `json:"created_at"`
 	// UpdatedAt is when this session was last modified.
 	UpdatedAt time.Time `json:"updated_at"`
+	// ParentSessionID links this session to its parent (non-empty = sub-session).
+	ParentSessionID string `json:"parent_session_id,omitempty"`
+	// DelegateTask is the task description given to the sub-agent.
+	DelegateTask string `json:"delegate_task,omitempty"`
 }
 
 // SessionState represents the current state of a session.
@@ -156,6 +163,36 @@ type SessionState struct {
 	TotalCost float64 `json:"total_cost"`
 }
 
+// DelegateEventType identifies the lifecycle phase of a delegate.
+type DelegateEventType string
+
+const (
+	// DelegateEventStarted indicates a delegate sub-agent has started.
+	DelegateEventStarted DelegateEventType = "started"
+	// DelegateEventCompleted indicates a delegate sub-agent has completed.
+	DelegateEventCompleted DelegateEventType = "completed"
+)
+
+// DelegateEvent notifies the parent SSE stream about delegate lifecycle changes.
+type DelegateEvent struct {
+	// Type is "started" or "completed".
+	Type DelegateEventType `json:"type"`
+	// DelegateID is the sub-session ID.
+	DelegateID string `json:"delegate_id"`
+	// Task is the delegate task description.
+	Task string `json:"task"`
+	// Cost is the sub-agent's accumulated cost in USD (set on "completed").
+	Cost float64 `json:"cost,omitempty"`
+}
+
+// DelegateMessages carries delegate sub-agent messages piped through the parent SSE.
+type DelegateMessages struct {
+	// DelegateID is the sub-session ID.
+	DelegateID string `json:"delegate_id"`
+	// Messages are the delegate's messages.
+	Messages []Message `json:"messages"`
+}
+
 // StreamResponse is sent over SSE to the UI.
 type StreamResponse struct {
 	// Messages contains new or updated messages.
@@ -164,6 +201,10 @@ type StreamResponse struct {
 	Session *Session `json:"session,omitempty"`
 	// SessionState contains the current processing state.
 	SessionState *SessionState `json:"session_state,omitempty"`
+	// DelegateEvent contains delegate lifecycle notifications.
+	DelegateEvent *DelegateEvent `json:"delegate_event,omitempty"`
+	// DelegateMessages contains messages from a delegate piped through the parent SSE.
+	DelegateMessages *DelegateMessages `json:"delegate_messages,omitempty"`
 }
 
 // DAGContext contains a DAG reference from the frontend.
@@ -212,6 +253,8 @@ type ToolOut struct {
 	Content string
 	// IsError indicates whether the tool execution failed.
 	IsError bool
+	// DelegateIDs references the sub-sessions created by the delegate tool.
+	DelegateIDs []string
 }
 
 // ToolFunc is the function signature for tool execution.
@@ -225,6 +268,36 @@ type EmitUserPromptFunc func(prompt UserPrompt)
 
 // WaitUserResponseFunc blocks until user responds to a prompt.
 type WaitUserResponseFunc func(ctx context.Context, promptID string) (UserPromptResponse, error)
+
+// DelegateContext provides configuration for spawning sub-agent loops.
+type DelegateContext struct {
+	// Provider is the LLM provider for sub-agent calls.
+	Provider llm.Provider
+	// Model is the LLM model identifier.
+	Model string
+	// SystemPrompt is the system prompt for sub-agents.
+	SystemPrompt string
+	// Tools is the parent's tool set (delegate will be filtered out).
+	Tools []*AgentTool
+	// Hooks is the parent's hook configuration.
+	Hooks *Hooks
+	// Logger is the logger for sub-agent operations.
+	Logger *slog.Logger
+	// SessionStore is used for persisting sub-sessions.
+	SessionStore SessionStore
+	// ParentID is the parent session ID.
+	ParentID string
+	// UserID is the user who owns the parent session.
+	UserID string
+	// RegisterSubSession registers a sub-session for SSE streaming. Nil if not available.
+	RegisterSubSession func(id string, mgr *SessionManager)
+	// NotifyParent broadcasts an event to the parent session's SSE stream. Nil if not available.
+	NotifyParent func(event StreamResponse)
+	// AddCost adds a cost amount to the parent session's running total. Nil if not available.
+	AddCost func(cost float64)
+	// DeregisterSubSession removes a completed sub-session from the SSE registry. Nil if not available.
+	DeregisterSubSession func(id string)
+}
 
 // ToolContext provides context for tool execution.
 type ToolContext struct {
@@ -243,6 +316,8 @@ type ToolContext struct {
 	// Role is the authenticated role of the current user.
 	// Empty means role checks should be skipped (e.g., auth-disabled compatibility).
 	Role auth.Role
+	// Delegate provides sub-agent spawning capability. Nil when not available.
+	Delegate *DelegateContext
 }
 
 // AuditInfo configures how a tool's executions appear in audit logs.

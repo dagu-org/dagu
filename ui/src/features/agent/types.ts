@@ -2,8 +2,6 @@
 export type MessageType =
   | 'user'
   | 'assistant'
-  | 'tool_use'
-  | 'tool_result'
   | 'error'
   | 'ui_action'
   | 'user_prompt';
@@ -75,6 +73,7 @@ export interface Message {
   user_prompt?: UserPrompt;
   usage?: TokenUsage;
   cost?: number;
+  delegate_ids?: string[];
   created_at: string;
 }
 
@@ -85,6 +84,8 @@ export interface Session {
   title?: string;
   created_at: string;
   updated_at: string;
+  parent_session_id?: string;
+  delegate_task?: string;
 }
 
 export interface SessionState {
@@ -107,23 +108,33 @@ export interface DAGContext {
   dag_run_id?: string;
 }
 
-// API request/response types
-export interface ChatRequest {
-  message: string;
-  model?: string;
-  dag_contexts?: DAGContext[];
-  safe_mode?: boolean;
+// Delegate event types
+export interface DelegateEvent {
+  type: 'started' | 'completed';
+  delegate_id: string;
+  task: string;
+  cost?: number;
 }
 
-export interface NewSessionResponse {
-  session_id: string;
-  status: string;
+export interface DelegateInfo {
+  id: string;
+  task: string;
+  status: 'running' | 'completed';
+  zIndex: number;
+  positionIndex: number;
+}
+
+export interface DelegateMessages {
+  delegate_id: string;
+  messages: Message[];
 }
 
 export interface StreamResponse {
   messages?: Message[];
   session?: Session;
   session_state?: SessionState;
+  delegate_event?: DelegateEvent;
+  delegate_messages?: DelegateMessages;
 }
 
 // Tool input types for specialized viewers

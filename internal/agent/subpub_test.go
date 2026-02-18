@@ -67,7 +67,7 @@ func TestSubPub_Publish(t *testing.T) {
 		defer cancel()
 
 		next := sp.Subscribe(ctx, 5)
-		received := collectMessages(ctx, cancel, next)
+		received := collectMessages(next)
 
 		sp.Publish(3, "old")     // seqID 3 <= 5, should NOT be received
 		sp.Publish(5, "current") // seqID 5 <= 5, should NOT be received
@@ -87,7 +87,7 @@ func TestSubPub_Publish(t *testing.T) {
 		defer cancel()
 
 		next := sp.Subscribe(ctx, 0)
-		received := collectMessages(ctx, cancel, next)
+		received := collectMessages(next)
 
 		sp.Publish(1, 1)
 		sp.Publish(2, 2)
@@ -178,7 +178,6 @@ func TestSubPub_ContextCancellation(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		// Publishing should clean up dead subscribers without panic
 		sp.Publish(1, "test")
 	})
 }
@@ -326,9 +325,7 @@ func TestMakeReceiver(t *testing.T) {
 	})
 }
 
-// collectMessages starts a goroutine that collects all messages from the next function
-// until the context is canceled. Returns a channel that receives the collected slice.
-func collectMessages[K any](ctx context.Context, cancel context.CancelFunc, next func() (K, bool)) <-chan []K {
+func collectMessages[K any](next func() (K, bool)) <-chan []K {
 	result := make(chan []K, 1)
 	go func() {
 		var msgs []K

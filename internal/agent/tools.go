@@ -5,20 +5,14 @@ import (
 	"path/filepath"
 )
 
-// CreateTools returns all available tools for the agent including bash, read,
-// patch, think, navigate, schema, and ask_user tools.
-// The dagsDir parameter is used by the patch tool for DAG file validation.
-func CreateTools(dagsDir string) []*AgentTool {
-	return []*AgentTool{
-		NewBashTool(),
-		NewReadTool(),
-		NewPatchTool(dagsDir),
-		NewThinkTool(),
-		NewNavigateTool(),
-		NewReadSchemaTool(),
-		NewAskUserTool(),
-		NewWebSearchTool(),
+// CreateTools returns all registered agent tools, constructed with the given config.
+func CreateTools(cfg ToolConfig) []*AgentTool {
+	regs := RegisteredTools()
+	tools := make([]*AgentTool, 0, len(regs))
+	for _, reg := range regs {
+		tools = append(tools, reg.Factory(cfg))
 	}
+	return tools
 }
 
 // GetToolByName finds a tool by name from the given slice, or nil if not found.
