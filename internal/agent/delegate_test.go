@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -904,4 +905,75 @@ func TestDelegateTool_NoCallbacks(t *testing.T) {
 	assert.Contains(t, result.Content, "no callbacks result")
 	require.Len(t, result.DelegateIDs, 1)
 	assert.NotEmpty(t, result.DelegateIDs[0])
+}
+
+func TestDelegateTool_SubAgentHookUserAttribution(t *testing.T) {
+	t.Parallel()
+
+	// Set up hooks to capture ToolExecInfo from the child loop's tool execution.
+	hooks := NewHooks()
+	var mu sync.Mutex
+	var capturedInfos []ToolExecInfo
+
+	hooks.OnAfterToolExec(func(_ context.Context, info ToolExecInfo, _ ToolOut) {
+		mu.Lock()
+		capturedInfos = append(capturedInfos, info)
+		mu.Unlock()
+	})
+
+	// Provider: first call returns a tool call for "think", second call returns stop.
+	provider := newSequenceProvider(
+		&llm.ChatResponse{
+			FinishReason: "tool_calls",
+			ToolCalls: []llm.ToolCall{{
+				ID:   "call-1",
+				Type: "function",
+				Function: llm.ToolCallFunction{
+					Name:      "think",
+					Arguments: `{"thought": "sub-agent thinking"}`,
+				},
+			}},
+		},
+		&llm.ChatResponse{Content: "done", FinishReason: "stop"},
+	)
+
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:     provider,
+			Model:        "test",
+			Tools:        CreateTools(ToolConfig{}),
+			Hooks:        hooks,
+			SessionStore: newMockSessionStore(),
+			ParentID:     "parent-1",
+			UserID:       "user-42",
+			Username:     "bob",
+			IPAddress:    "192.168.1.100",
+			Role:         auth.RoleManager,
+		},
+	}, singleTaskInput("test user attribution"))
+
+	assert.False(t, result.IsError)
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// The "think" tool should have been executed by the child loop.
+	require.NotEmpty(t, capturedInfos, "hook should have captured at least one tool execution")
+
+	var thinkInfo *ToolExecInfo
+	for i := range capturedInfos {
+		if capturedInfos[i].ToolName == "think" {
+			thinkInfo = &capturedInfos[i]
+			break
+		}
+	}
+	require.NotNil(t, thinkInfo, "should have captured 'think' tool execution")
+
+	assert.Equal(t, "user-42", thinkInfo.UserID)
+	assert.Equal(t, "bob", thinkInfo.Username)
+	assert.Equal(t, "192.168.1.100", thinkInfo.IPAddress)
+	assert.Equal(t, auth.RoleManager, thinkInfo.Role)
 }

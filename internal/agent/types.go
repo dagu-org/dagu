@@ -289,6 +289,12 @@ type DelegateContext struct {
 	ParentID string
 	// UserID is the user who owns the parent session.
 	UserID string
+	// Username is the authenticated user's display name.
+	Username string
+	// IPAddress is the client's IP address.
+	IPAddress string
+	// Role is the authenticated user's role.
+	Role auth.Role
 	// RegisterSubSession registers a sub-session for SSE streaming. Nil if not available.
 	RegisterSubSession func(id string, mgr *SessionManager)
 	// NotifyParent broadcasts an event to the parent session's SSE stream. Nil if not available.

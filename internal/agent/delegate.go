@@ -317,6 +317,10 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		SessionID:     delegateID,
 		Hooks:         dc.Hooks,
 		SafeMode:      ctx.SafeMode,
+		UserID:        dc.UserID,
+		Username:      dc.Username,
+		IPAddress:     dc.IPAddress,
+		Role:          dc.Role,
 		OnWorking: func(working bool) {
 			subMgr.SetWorking(working)
 			if !working {
