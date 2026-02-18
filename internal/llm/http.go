@@ -59,7 +59,7 @@ func (c *HTTPClient) Do(ctx context.Context, url string, body []byte, headers ma
 	for attempt := range c.maxRetries + 1 {
 		if attempt > 0 {
 			backoff := c.backoff(attempt)
-			slog.Warn("RESTY "+lastErr.Error(), "Attempt", attempt)
+			slog.Warn("HTTP request failed, retrying", "error", lastErr, "attempt", attempt)
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()

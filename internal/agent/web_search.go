@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/llm"
-	"github.com/go-resty/resty/v2"
 	"golang.org/x/net/html"
 )
 
@@ -139,47 +139,54 @@ func performSearch(ctx context.Context, query string, maxResults int, httpClient
 		searchURL = baseURL
 	}
 
-	client := resty.New().
-		SetTimeout(defaultWebSearchTimeout).
-		SetRetryCount(maxRetries).
-		SetRetryWaitTime(retryWaitTime).
-		AddRetryCondition(func(r *resty.Response, err error) bool {
-			if err != nil {
-				var netErr net.Error
-				return errors.As(err, &netErr) && netErr.Timeout()
+	doer := httpClient
+	if doer == nil {
+		doer = &http.Client{Timeout: defaultWebSearchTimeout}
+	}
+
+	var lastErr error
+	for attempt := range maxRetries + 1 {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(retryWaitTime):
 			}
-			code := r.StatusCode()
-			return code == 429 || code >= 500
-		})
+		}
 
-	if httpClient != nil {
-		client.SetTransport(&httpClientTransport{client: httpClient})
+		form := url.Values{"q": {query}}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, searchURL, strings.NewReader(form.Encode()))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; DaguBot/1.0)")
+
+		resp, err := doer.Do(req)
+		if err != nil {
+			lastErr = err
+			var netErr net.Error
+			if errors.As(err, &netErr) && netErr.Timeout() {
+				continue
+			}
+			return nil, fmt.Errorf("HTTP request failed: %w", err)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+
+		if resp.StatusCode == http.StatusOK {
+			return parseSearchResults(string(body), maxResults)
+		}
+
+		lastErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+			continue
+		}
+		return nil, lastErr
 	}
 
-	resp, err := client.R().
-		SetContext(ctx).
-		SetFormData(map[string]string{"q": query}).
-		SetHeader("User-Agent", "Mozilla/5.0 (compatible; DaguBot/1.0)").
-		Post(searchURL)
-
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
-	}
-
-	if resp.StatusCode() != 200 {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode())
-	}
-
-	return parseSearchResults(resp.String(), maxResults)
-}
-
-// httpClientTransport wraps an HTTPDoer to implement http.RoundTripper.
-type httpClientTransport struct {
-	client HTTPDoer
-}
-
-func (t *httpClientTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	return t.client.Do(req)
+	return nil, lastErr
 }
 
 func parseSearchResults(htmlContent string, maxResults int) ([]SearchResult, error) {
