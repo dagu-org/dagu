@@ -8064,6 +8064,29 @@ components:
           $ref: "#/components/schemas/AgentSession"
         sessionState:
           $ref: "#/components/schemas/AgentSessionState"
+        delegates:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentDelegateSnapshot"
+
+    AgentDelegateSnapshot:
+      type: object
+      description: "Snapshot of a delegate sub-agent's lifecycle state"
+      required:
+        - id
+        - task
+        - status
+      properties:
+        id:
+          type: string
+        task:
+          type: string
+        status:
+          type: string
+          enum: [running, completed]
+        cost:
+          type: number
+          format: double
 
     AgentUserPromptResponse:
       type: object

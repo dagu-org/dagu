@@ -177,9 +177,8 @@ func (e *Executor) Run(ctx context.Context) error {
 		SafeMode:     safeMode,
 		Hooks:        hooks,
 		Logger:       slog.Default(),
-		RecordMessage: func(_ context.Context, msg agent.Message) error {
+		RecordMessage: func(_ context.Context, msg agent.Message) {
 			logMessage(stderr, msg)
-			return nil
 		},
 		OnWorking: func(working bool) {
 			if !working {

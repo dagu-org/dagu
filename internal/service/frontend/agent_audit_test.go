@@ -22,9 +22,11 @@ func TestNewAgentAuditHook(t *testing.T) {
 		ToolName:  "bash",
 		Input:     json.RawMessage(`{"command":"echo hello"}`),
 		SessionID: "sess-123",
-		UserID:    "user-1",
-		Username:  "alice",
-		IPAddress: "192.168.1.1",
+		User: agent.UserIdentity{
+			UserID:    "user-1",
+			Username:  "alice",
+			IPAddress: "192.168.1.1",
+		},
 		Audit: &agent.AuditInfo{
 			Action:          "bash_exec",
 			DetailExtractor: agent.ExtractFields("command"),
@@ -61,8 +63,10 @@ func TestNewAgentAuditHook_FailedAction(t *testing.T) {
 		ToolName:  "bash",
 		Input:     json.RawMessage(`{"command":"exit 1"}`),
 		SessionID: "sess-456",
-		UserID:    "user-2",
-		Username:  "bob",
+		User: agent.UserIdentity{
+			UserID:   "user-2",
+			Username: "bob",
+		},
 		Audit: &agent.AuditInfo{
 			Action:          "bash_exec",
 			DetailExtractor: agent.ExtractFields("command"),
@@ -107,8 +111,10 @@ func TestNewAgentAuditHook_NilDetailExtractor(t *testing.T) {
 		ToolName:  "custom_tool",
 		Input:     json.RawMessage(`{"key":"value"}`),
 		SessionID: "sess-789",
-		UserID:    "user-3",
-		Username:  "charlie",
+		User: agent.UserIdentity{
+			UserID:   "user-3",
+			Username: "charlie",
+		},
 		Audit: &agent.AuditInfo{
 			Action:          "custom_action",
 			DetailExtractor: nil,

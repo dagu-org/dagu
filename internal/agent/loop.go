@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/dagu-org/dagu/internal/llm"
 )
@@ -29,7 +28,9 @@ const (
 )
 
 // MessageRecordFunc is called to record new messages to persistent storage.
-type MessageRecordFunc func(ctx context.Context, message Message) error
+// Implementations should log persistence errors internally rather than returning them,
+// since the session continues operating even if individual messages fail to persist.
+type MessageRecordFunc func(ctx context.Context, message Message)
 
 // LoopConfig contains configuration for creating a Loop.
 type LoopConfig struct {
@@ -63,24 +64,12 @@ type LoopConfig struct {
 	SafeMode bool
 	// Hooks provides lifecycle callbacks for tool execution.
 	Hooks *Hooks
-	// UserID is the authenticated user's ID.
-	UserID string
-	// Username is the authenticated user's display name.
-	Username string
-	// IPAddress is the client's IP address.
-	IPAddress string
-	// Role is the authenticated user's role.
-	Role auth.Role
+	// User is the authenticated user's identity.
+	User UserIdentity
 	// SessionStore is used for delegate sub-session persistence.
 	SessionStore SessionStore
-	// RegisterSubSession registers a sub-session's SessionManager for SSE streaming.
-	RegisterSubSession func(id string, mgr *SessionManager)
-	// DeregisterSubSession removes a completed sub-session from the SSE registry.
-	DeregisterSubSession func(id string)
-	// NotifyParent broadcasts a delegate event to the parent session's SSE stream.
-	NotifyParent func(event StreamResponse)
-	// AddCost adds a cost amount to the parent session's running total.
-	AddCost func(cost float64)
+	// Registry manages sub-session lifecycle for delegate tools.
+	Registry SubSessionRegistry
 }
 
 // Loop manages a session turn with an LLM including tool execution.
@@ -104,15 +93,9 @@ type Loop struct {
 	waitUserResponse     WaitUserResponseFunc
 	safeMode             bool
 	hooks                *Hooks
-	userID               string
-	username             string
-	ipAddress            string
-	role                 auth.Role
-	sessionStore         SessionStore
-	registerSubSession   func(id string, mgr *SessionManager)
-	deregisterSubSession func(id string)
-	notifyParent         func(event StreamResponse)
-	addCost              func(cost float64)
+	user                 UserIdentity
+	sessionStore SessionStore
+	registry     SubSessionRegistry
 }
 
 // NewLoop creates a new Loop instance.
@@ -137,16 +120,10 @@ func NewLoop(config LoopConfig) *Loop {
 		emitUserPrompt:       config.EmitUserPrompt,
 		waitUserResponse:     config.WaitUserResponse,
 		safeMode:             config.SafeMode,
-		hooks:                config.Hooks,
-		userID:               config.UserID,
-		username:             config.Username,
-		ipAddress:            config.IPAddress,
-		role:                 config.Role,
-		sessionStore:         config.SessionStore,
-		registerSubSession:   config.RegisterSubSession,
-		deregisterSubSession: config.DeregisterSubSession,
-		notifyParent:         config.NotifyParent,
-		addCost:              config.AddCost,
+		hooks:        config.Hooks,
+		user:         config.User,
+		sessionStore: config.SessionStore,
+		registry:     config.Registry,
 	}
 }
 
@@ -174,6 +151,9 @@ func (l *Loop) Go(ctx context.Context) error {
 	l.logger.Info("starting session loop", "tools", len(l.tools))
 
 	retrier := backoff.NewRetrier(backoff.NewExponentialBackoffPolicy(llmRetryInitialInterval))
+
+	idleTimer := time.NewTimer(idlePollingInterval)
+	defer idleTimer.Stop()
 
 	for {
 		select {
@@ -203,10 +183,11 @@ func (l *Loop) Go(ctx context.Context) error {
 			retrier.Reset()
 			l.logger.Info("finished processing queued messages")
 		} else {
+			idleTimer.Reset(idlePollingInterval)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(idlePollingInterval):
+			case <-idleTimer.C:
 			}
 		}
 	}
@@ -319,20 +300,14 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 
 	l.mu.Lock()
 	safeMode := l.safeMode
-	userID := l.userID
-	username := l.username
-	ipAddress := l.ipAddress
-	role := l.role
+	user := l.user
 	l.mu.Unlock()
 
 	info := ToolExecInfo{
 		ToolName:  tc.Function.Name,
 		Input:     input,
 		SessionID: l.sessionID,
-		UserID:    userID,
-		Username:  username,
-		IPAddress: ipAddress,
-		Role:      role,
+		User:      user,
 		Audit:     tool.Audit,
 		SafeMode:  safeMode,
 		RequestCommandApproval: func(ctx context.Context, command, reason string) (bool, error) {
@@ -355,26 +330,20 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		return toolError("Blocked by policy: %v", err)
 	}
 
-	// Build delegate context if session store is available (interactive chat).
+	// Build delegate context only for the delegate tool and only when a registry is available.
 	var delegate *DelegateContext
-	if l.sessionStore != nil {
+	if tc.Function.Name == delegateToolName && l.registry != nil {
 		delegate = &DelegateContext{
-			Provider:             l.provider,
-			Model:                l.model,
-			SystemPrompt:         l.systemPrompt,
-			Tools:                l.tools,
-			Hooks:                l.hooks,
-			Logger:               l.logger,
-			SessionStore:         l.sessionStore,
-			ParentID:             l.sessionID,
-			UserID:               userID,
-			Username:             username,
-			IPAddress:            ipAddress,
-			Role:                 role,
-			RegisterSubSession:   l.registerSubSession,
-			DeregisterSubSession: l.deregisterSubSession,
-			NotifyParent:         l.notifyParent,
-			AddCost:              l.addCost,
+			Provider:     l.provider,
+			Model:        l.model,
+			SystemPrompt: l.systemPrompt,
+			Tools:        l.tools,
+			Hooks:        l.hooks,
+			Logger:       l.logger,
+			SessionStore: l.sessionStore,
+			ParentID:     l.sessionID,
+			User:         user,
+			Registry:     l.registry,
 		}
 	}
 
@@ -385,7 +354,7 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		EmitUserPrompt:   l.emitUserPrompt,
 		WaitUserResponse: l.waitUserResponse,
 		SafeMode:         safeMode,
-		Role:             role,
+		Role:             user.Role,
 		Delegate:         delegate,
 	}, input)
 
@@ -395,13 +364,10 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 }
 
 // SetUserContext updates user metadata used for hooks and tool authorization.
-func (l *Loop) SetUserContext(userID, username, ipAddress string, role auth.Role) {
+func (l *Loop) SetUserContext(u UserIdentity) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.userID = userID
-	l.username = username
-	l.ipAddress = ipAddress
-	l.role = role
+	l.user = u
 }
 
 // handleToolCalls processes tool calls from the LLM response using iteration
@@ -465,9 +431,7 @@ func (l *Loop) recordToolResult(ctx context.Context, tc llm.ToolCall, result Too
 		LLMData:     &toolMessage,
 		DelegateIDs: result.DelegateIDs,
 	}
-	if err := l.recordMessage(ctx, msg); err != nil {
-		l.logger.Error("failed to record tool result message", "error", err)
-	}
+	l.recordMessage(ctx, msg)
 }
 
 // nextSequenceID increments and returns the next sequence ID.
@@ -491,9 +455,7 @@ func (l *Loop) recordErrorMessage(ctx context.Context, errMsg string) {
 		Content:    errMsg,
 		CreatedAt:  time.Now(),
 	}
-	if err := l.recordMessage(ctx, msg); err != nil {
-		l.logger.Error("failed to record error message", "error", err)
-	}
+	l.recordMessage(ctx, msg)
 }
 
 // buildMessages prepares the message list for an LLM request by optionally
@@ -552,7 +514,5 @@ func (l *Loop) recordAssistantMessage(ctx context.Context, resp *llm.ChatRespons
 		CreatedAt:  time.Now(),
 		LLMData:    &assistantMessage,
 	}
-	if err := l.recordMessage(ctx, msg); err != nil {
-		l.logger.Error("failed to record assistant message", "error", err)
-	}
+	l.recordMessage(ctx, msg)
 }

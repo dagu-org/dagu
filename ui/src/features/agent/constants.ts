@@ -1,0 +1,11 @@
+export const ANIMATION_DURATION_MS = 250;
+export const DELEGATE_PANEL_BASE_Z_INDEX = 60;
+export const TASK_TRUNCATE_LENGTH = 50;
+export const TOOL_RESULT_PREVIEW_LENGTH = 100;
+export const MAX_SSE_RETRIES = 3;
+export const DELEGATE_PANEL_WIDTH = 320;
+export const DELEGATE_PANEL_HEIGHT = 360;
+export const DELEGATE_PANEL_GAP = 12;
+export const DELEGATE_PANEL_MARGIN = 16;
+export const DELEGATE_PANEL_MIN_WIDTH = 280;
+export const DELEGATE_PANEL_MIN_HEIGHT = 200;

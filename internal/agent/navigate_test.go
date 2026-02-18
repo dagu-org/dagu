@@ -28,7 +28,7 @@ func TestNavigateTool_Run(t *testing.T) {
 
 		assert.False(t, result.IsError)
 		assert.Contains(t, result.Content, "/dags/test-dag")
-		assert.Equal(t, "navigate", emitted.Type)
+		assert.Equal(t, UIActionNavigate, emitted.Type)
 		assert.Equal(t, "/dags/test-dag", emitted.Path)
 	})
 

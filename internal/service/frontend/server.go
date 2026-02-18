@@ -558,9 +558,9 @@ func newAgentAuditHook(auditSvc *audit.Service) agent.AfterToolExecHookFunc {
 		details["session_id"] = info.SessionID
 
 		detailsJSON, _ := json.Marshal(details)
-		entry := audit.NewEntry(audit.CategoryAgent, info.Audit.Action, info.UserID, info.Username).
+		entry := audit.NewEntry(audit.CategoryAgent, info.Audit.Action, info.User.UserID, info.User.Username).
 			WithDetails(string(detailsJSON)).
-			WithIPAddress(info.IPAddress)
+			WithIPAddress(info.User.IPAddress)
 		_ = auditSvc.Log(context.Background(), entry)
 	}
 }

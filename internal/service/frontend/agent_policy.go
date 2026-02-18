@@ -119,9 +119,9 @@ func logPolicyEvent(ctx context.Context, auditSvc *audit.Service, info agent.Too
 	}
 
 	payload, _ := json.Marshal(details)
-	entry := audit.NewEntry(audit.CategoryAgent, action, info.UserID, info.Username).
+	entry := audit.NewEntry(audit.CategoryAgent, action, info.User.UserID, info.User.Username).
 		WithDetails(string(payload)).
-		WithIPAddress(info.IPAddress)
+		WithIPAddress(info.User.IPAddress)
 	if ctx == nil {
 		ctx = context.Background()
 	}

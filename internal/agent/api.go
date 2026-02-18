@@ -375,24 +375,24 @@ func (a *API) getStoredSession(ctx context.Context, id, userID string) (*Session
 }
 
 // getOrReactivateSession retrieves an active session or reactivates it from storage.
-func (a *API) getOrReactivateSession(ctx context.Context, id, userID, username string, role auth.Role, ipAddress string) (*SessionManager, bool) {
+func (a *API) getOrReactivateSession(ctx context.Context, id string, user UserIdentity) (*SessionManager, bool) {
 	// Check active sessions first
-	if mgr, ok := a.getActiveSession(id, userID); ok {
+	if mgr, ok := a.getActiveSession(id, user.UserID); ok {
 		return mgr, true
 	}
 
 	// Try to reactivate from store
-	return a.reactivateSession(ctx, id, userID, username, role, ipAddress)
+	return a.reactivateSession(ctx, id, user)
 }
 
 // reactivateSession restores a session from storage and makes it active.
-func (a *API) reactivateSession(ctx context.Context, id, userID, username string, role auth.Role, ipAddress string) (*SessionManager, bool) {
+func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentity) (*SessionManager, bool) {
 	if a.store == nil {
 		return nil, false
 	}
 
 	sess, err := a.store.GetSession(ctx, id)
-	if err != nil || sess == nil || sess.UserID != userID {
+	if err != nil || sess == nil || sess.UserID != user.UserID {
 		return nil, false
 	}
 
@@ -414,7 +414,7 @@ func (a *API) reactivateSession(ctx context.Context, id, userID, username string
 
 	mgr := NewSessionManager(SessionManagerConfig{
 		ID:           id,
-		UserID:       userID,
+		User:         user,
 		Logger:       a.logger,
 		WorkingDir:   a.workingDir,
 		OnMessage:    a.createMessageCallback(id),
@@ -423,19 +423,11 @@ func (a *API) reactivateSession(ctx context.Context, id, userID, username string
 		Environment:  a.environment,
 		SafeMode:     true, // Default to safe mode for reactivated sessions
 		Hooks:        a.hooks,
-		Username:     username,
-		IPAddress:    ipAddress,
 		MemoryStore:  a.memoryStore,
 		DAGName:      sess.DAGName,
-		Role:         role,
 		SessionStore: a.store,
-		RegisterSubSession: func(subID string, subMgr *SessionManager) {
-			a.sessions.Store(subID, subMgr)
-		},
-		DeregisterSubSession: func(subID string) {
-			a.sessions.Delete(subID)
-		},
 	})
+	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 	a.sessions.Store(id, mgr)
 
 	return mgr, true
@@ -468,11 +460,18 @@ func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 	heartbeat := time.NewTicker(15 * time.Second)
 	defer heartbeat.Stop()
 
+	done := make(chan struct{})
+	defer close(done)
+
 	ch := make(chan streamResult, 1)
 	go func() {
 		for {
 			resp, cont := next()
-			ch <- streamResult{resp, cont}
+			select {
+			case ch <- streamResult{resp, cont}:
+			case <-done:
+				return
+			}
 			if !cont {
 				return
 			}
@@ -548,7 +547,7 @@ func (a *API) ListTools() []ToolInfo {
 
 // CreateSession creates a new session with the first message.
 // Returns the session ID on success.
-func (a *API) CreateSession(ctx context.Context, userID, username string, role auth.Role, ipAddress string, req ChatRequest) (string, error) {
+func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequest) (string, error) {
 	if req.Message == "" {
 		return "", ErrMessageRequired
 	}
@@ -572,32 +571,24 @@ func (a *API) CreateSession(ctx context.Context, userID, username string, role a
 
 	mgr := NewSessionManager(SessionManagerConfig{
 		ID:              id,
-		UserID:          userID,
+		User:            user,
 		Logger:          a.logger,
 		WorkingDir:      a.workingDir,
 		OnMessage:       a.createMessageCallback(id),
 		Environment:     a.environment,
 		SafeMode:        req.SafeMode,
 		Hooks:           a.hooks,
-		Username:        username,
-		IPAddress:       ipAddress,
-		Role:            role,
 		InputCostPer1M:  modelCfg.InputCostPer1M,
 		OutputCostPer1M: modelCfg.OutputCostPer1M,
 		MemoryStore:     a.memoryStore,
 		DAGName:         dagName,
 		SessionStore:    a.store,
-		RegisterSubSession: func(subID string, subMgr *SessionManager) {
-			a.sessions.Store(subID, subMgr)
-		},
-		DeregisterSubSession: func(subID string) {
-			a.sessions.Delete(subID)
-		},
 	})
+	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 
 	// Persist session before accepting the first message so that
 	// the onMessage callback (store.AddMessage) can find the session.
-	a.persistNewSession(ctx, id, userID, dagName, now)
+	a.persistNewSession(ctx, id, user.UserID, dagName, now)
 	a.sessions.Store(id, mgr)
 
 	messageWithContext := formatMessageWithContexts(req.Message, resolved)
@@ -636,6 +627,7 @@ func (a *API) GetSessionDetail(ctx context.Context, sessionID, userID string) (*
 				Model:     mgr.GetModel(),
 				TotalCost: mgr.GetTotalCost(),
 			},
+			Delegates: mgr.GetDelegates(),
 		}, nil
 	}
 
@@ -645,6 +637,21 @@ func (a *API) GetSessionDetail(ctx context.Context, sessionID, userID string) (*
 		return nil, ErrSessionNotFound
 	}
 
+	// Build delegate snapshots from stored sub-sessions.
+	var delegates []DelegateSnapshot
+	if a.store != nil {
+		subSessions, err := a.store.ListSubSessions(ctx, sessionID)
+		if err == nil {
+			for _, sub := range subSessions {
+				delegates = append(delegates, DelegateSnapshot{
+					ID:     sub.ID,
+					Task:   sub.DelegateTask,
+					Status: DelegateStatusCompleted,
+				})
+			}
+		}
+	}
+
 	return &StreamResponse{
 		Messages: messages,
 		Session:  sess,
@@ -652,16 +659,17 @@ func (a *API) GetSessionDetail(ctx context.Context, sessionID, userID string) (*
 			SessionID: sessionID,
 			Working:   false,
 		},
+		Delegates: delegates,
 	}, nil
 }
 
 // SendMessage sends a message to an existing session.
-func (a *API) SendMessage(ctx context.Context, sessionID, userID, username string, role auth.Role, ipAddress string, req ChatRequest) error {
-	mgr, ok := a.getOrReactivateSession(ctx, sessionID, userID, username, role, ipAddress)
+func (a *API) SendMessage(ctx context.Context, sessionID string, user UserIdentity, req ChatRequest) error {
+	mgr, ok := a.getOrReactivateSession(ctx, sessionID, user)
 	if !ok {
 		return ErrSessionNotFound
 	}
-	mgr.UpdateUserContext(username, ipAddress, role)
+	mgr.UpdateUserContext(user)
 
 	if req.Message == "" {
 		return ErrMessageRequired
@@ -781,6 +789,11 @@ func (a *API) cleanupIdleSessions() {
 	})
 
 	for _, id := range toDelete {
+		if val, ok := a.sessions.Load(id); ok {
+			if mgr, ok := val.(*SessionManager); ok {
+				_ = mgr.Cancel(context.Background())
+			}
+		}
 		a.sessions.Delete(id)
 		a.logger.Debug("Cleaned up idle session", "session_id", id)
 	}

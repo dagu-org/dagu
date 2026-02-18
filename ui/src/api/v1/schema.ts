@@ -3501,6 +3501,16 @@ export interface components {
             messages: components["schemas"]["AgentMessage"][];
             session: components["schemas"]["AgentSession"];
             sessionState: components["schemas"]["AgentSessionState"];
+            delegates?: components["schemas"]["AgentDelegateSnapshot"][];
+        };
+        /** @description Snapshot of a delegate sub-agent's lifecycle state */
+        AgentDelegateSnapshot: {
+            id: string;
+            task: string;
+            /** @enum {string} */
+            status: AgentDelegateSnapshotStatus;
+            /** Format: double */
+            cost?: number;
         };
         /** @description User's response to an agent prompt */
         AgentUserPromptResponse: {
@@ -9861,4 +9871,8 @@ export enum AgentMessageType {
     error = "error",
     ui_action = "ui_action",
     user_prompt = "user_prompt"
+}
+export enum AgentDelegateSnapshotStatus {
+    running = "running",
+    completed = "completed"
 }

@@ -513,6 +513,33 @@ func (s *Store) loadSessionByID(id string) (*SessionForStorage, error) {
 	return stored, nil
 }
 
+// ListSubSessions returns all sub-sessions for a parent session.
+func (s *Store) ListSubSessions(_ context.Context, parentSessionID string) ([]*agent.Session, error) {
+	if parentSessionID == "" {
+		return nil, agent.ErrInvalidSessionID
+	}
+
+	s.mu.RLock()
+	// Collect all session IDs to check.
+	var allIDs []string
+	for id := range s.byID {
+		allIDs = append(allIDs, id)
+	}
+	s.mu.RUnlock()
+
+	var result []*agent.Session
+	for _, id := range allIDs {
+		stored, err := s.loadSessionByID(id)
+		if err != nil {
+			continue
+		}
+		if stored.ParentSessionID == parentSessionID {
+			result = append(result, stored.ToSession())
+		}
+	}
+	return result, nil
+}
+
 // GetLatestSequenceID returns the highest sequence ID for a session.
 func (s *Store) GetLatestSequenceID(_ context.Context, sessionID string) (int64, error) {
 	if sessionID == "" {

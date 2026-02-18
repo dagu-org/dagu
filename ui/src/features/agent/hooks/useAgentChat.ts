@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components } from '@/api/v1/schema';
 import { useConfig } from '@/contexts/ConfigContext';
@@ -6,10 +6,9 @@ import { useUserPreferences } from '@/contexts/UserPreference';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient } from '@/hooks/api';
 import { useAgentChatContext } from '../context/AgentChatContext';
-import { getAuthToken } from '@/lib/authHeaders';
 import {
   DAGContext,
-  DelegateInfo,
+  DelegateStatus,
   Message,
   MessageType,
   PromptType,
@@ -18,20 +17,12 @@ import {
   UIActionType,
   UserPromptResponse,
 } from '../types';
+import { useSSEConnection } from './useSSEConnection';
+import { useDelegateManager } from './useDelegateManager';
 
 type ApiSessionWithState = components['schemas']['AgentSessionWithState'];
 type ApiMessage = components['schemas']['AgentMessage'];
 type ApiSessionDetail = components['schemas']['AgentSessionDetailResponse'];
-
-function buildStreamUrl(baseUrl: string, sessionId: string, remoteNode: string): string {
-  const url = new URL(`${baseUrl}/sessions/${sessionId}/stream`, window.location.origin);
-  const token = getAuthToken();
-  if (token) {
-    url.searchParams.set('token', token);
-  }
-  url.searchParams.set('remoteNode', remoteNode);
-  return url.toString();
-}
 
 function convertApiMessage(msg: ApiMessage): Message {
   return {
@@ -118,14 +109,18 @@ function convertApiSessionDetail(detail: ApiSessionDetail): StreamResponse {
           total_cost: detail.sessionState.totalCost,
         }
       : undefined,
+    delegates: detail.delegates?.map((d) => ({
+      id: d.id,
+      task: d.task,
+      status: d.status as DelegateStatus,
+      cost: d.cost,
+    })),
   };
 }
 
 function toDagContextsBody(dagContexts?: DAGContext[]) {
   return dagContexts?.map((dc) => ({ dagFile: dc.dag_file, dagRunId: dc.dag_run_id }));
 }
-
-const MAX_SSE_RETRIES = 3;
 
 export function useAgentChat() {
   const config = useConfig();
@@ -148,148 +143,25 @@ export function useAgentChat() {
     clearSession,
   } = useAgentChatContext();
 
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const retryCountRef = useRef(0);
-  // Generation counter: incremented on clearSession to invalidate pending selectSession calls
   const selectGenRef = useRef(0);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [answeredPrompts, setAnsweredPrompts] = useState<Record<string, string>>({});
-  // delegates[] tracks which DelegatePanels are currently open
-  const [delegates, setDelegates] = useState<DelegateInfo[]>([]);
-  // delegateStatuses is a persistent lookup for ALL delegates (running + completed)
-  // used by ChatMessages for inline status display and task lookup
-  const [delegateStatuses, setDelegateStatuses] = useState<Record<string, DelegateInfo>>({});
-  // delegateMessages carries messages piped through parent SSE (no separate connections needed)
-  const [delegateMessages, setDelegateMessages] = useState<Record<string, Message[]>>({});
-  const delegateMessagesRef = useRef<Record<string, Message[]>>({});
-  const zIndexCounterRef = useRef(60);
+
   const baseUrl = `${config.apiURL}/agent`;
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
-  const closeEventSource = useCallback((): void => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-  }, []);
+  const dm = useDelegateManager();
 
-  useEffect(() => {
-    return closeEventSource;
-  }, [closeEventSource]);
-
-  useEffect(() => {
-    if (!sessionId) {
-      closeEventSource();
-      return;
-    }
-
-    eventSourceRef.current?.close();
-
-    const eventSource = new EventSource(buildStreamUrl(baseUrl, sessionId, remoteNode));
-    eventSourceRef.current = eventSource;
-
-    eventSource.onmessage = (event) => {
-      try {
-        const data: StreamResponse = JSON.parse(event.data);
-        retryCountRef.current = 0;
-
-        for (const msg of data.messages ?? []) {
-          addMessage(msg);
-          if (msg.type === 'ui_action' && msg.ui_action?.type === 'navigate' && msg.ui_action.path) {
-            navigate(msg.ui_action.path);
-          }
-        }
-
-        if (data.session_state) {
-          setSessionState(data.session_state);
-        }
-
-        if (data.delegate_messages) {
-          const { delegate_id, messages: msgs } = data.delegate_messages;
-          setDelegateMessages((prev) => {
-            const existing = prev[delegate_id] || [];
-            const idxMap = new Map<string, number>();
-            existing.forEach((m, i) => idxMap.set(m.id, i));
-            const updated = [...existing];
-            for (const msg of msgs) {
-              const idx = idxMap.get(msg.id);
-              if (idx !== undefined) {
-                updated[idx] = msg;
-              } else {
-                idxMap.set(msg.id, updated.length);
-                updated.push(msg);
-              }
-            }
-            const next = { ...prev, [delegate_id]: updated };
-            delegateMessagesRef.current = next;
-            return next;
-          });
-        }
-
-        if (data.delegate_event) {
-          const evt = data.delegate_event;
-          if (evt.type === 'started') {
-            zIndexCounterRef.current++;
-            const zIndex = zIndexCounterRef.current;
-            setDelegates((prev) => {
-              const info: DelegateInfo = {
-                id: evt.delegate_id,
-                task: evt.task,
-                status: 'running',
-                zIndex,
-                positionIndex: prev.length,
-              };
-              return [...prev, info];
-            });
-            setDelegateStatuses((prev) => ({
-              ...prev,
-              [evt.delegate_id]: {
-                id: evt.delegate_id,
-                task: evt.task,
-                status: 'running',
-                zIndex,
-                positionIndex: 0,
-              },
-            }));
-          } else if (evt.type === 'completed') {
-            // Update status instead of removing — let DelegatePanel play close animation
-            setDelegates((prev) => prev.map((d) =>
-              d.id === evt.delegate_id ? { ...d, status: 'completed' as const } : d
-            ));
-            setDelegateStatuses((prev) => ({
-              ...prev,
-              [evt.delegate_id]: {
-                ...prev[evt.delegate_id],
-                id: evt.delegate_id,
-                task: evt.task,
-                status: 'completed',
-                zIndex: prev[evt.delegate_id]?.zIndex ?? 60,
-                positionIndex: prev[evt.delegate_id]?.positionIndex ?? 0,
-              },
-            }));
-          }
-        }
-      } catch {
-        // SSE parse errors are transient, stream will continue
-      }
-    };
-
-    eventSource.onerror = () => {
-      if (eventSource.readyState === EventSource.CLOSED && retryCountRef.current < MAX_SSE_RETRIES) {
-        retryCountRef.current++;
-        setTimeout(() => {
-          if (sessionId && eventSourceRef.current === eventSource) {
-            setSessionId(sessionId);
-          }
-        }, 1000);
-      }
-    };
-
-    return () => {
-      eventSource.close();
-    };
-  }, [sessionId, baseUrl, remoteNode, addMessage, setSessionState, setSessionId, navigate, closeEventSource]);
+  useSSEConnection(sessionId, baseUrl, remoteNode, {
+    onMessage: addMessage,
+    onSessionState: setSessionState,
+    onDelegateSnapshots: dm.handleDelegateSnapshots,
+    onDelegateMessages: dm.handleDelegateMessages,
+    onDelegateEvent: dm.handleDelegateEvent,
+    onNavigate: (path) => navigate(path),
+    onPreConnect: dm.resetDelegates,
+  });
 
   const startSession = useCallback(
     async (message: string, model?: string, dagContexts?: DAGContext[]): Promise<string> => {
@@ -367,10 +239,9 @@ export function useAgentChat() {
         },
       });
       if (apiError) throw new Error(apiError.message || 'Failed to submit response');
+      setAnsweredPrompts(prev => ({ ...prev, [response.prompt_id]: displayValue }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit response');
-    } finally {
-      setAnsweredPrompts(prev => ({ ...prev, [response.prompt_id]: displayValue }));
     }
   }, [client, remoteNode, sessionId]);
 
@@ -394,21 +265,17 @@ export function useAgentChat() {
         params: { path: { sessionId: id }, query: { remoteNode } },
       });
       if (apiError) throw new Error(apiError.message || 'Failed to load session');
-      // Bail out if a clearSession (or newer selectSession) happened while awaiting
       if (gen !== selectGenRef.current) return;
       const converted = convertApiSessionDetail(data);
       setSessionId(id);
       setMessages(converted.messages || []);
       setAnsweredPrompts({});
-      setDelegates([]);
-      setDelegateStatuses({});
-      setDelegateMessages({});
-      delegateMessagesRef.current = {};
+      dm.restoreDelegates(converted.delegates || []);
       if (converted.session_state) {
         setSessionState(converted.session_state);
       }
     },
-    [client, remoteNode, setSessionId, setMessages, setSessionState]
+    [client, remoteNode, setSessionId, setMessages, setSessionState, dm]
   );
 
   const isWorking = isSending || sessionState?.working || false;
@@ -416,62 +283,28 @@ export function useAgentChat() {
   const clearError = useCallback(() => setError(null), []);
 
   const handleClearSession = useCallback(() => {
-    selectGenRef.current++; // invalidate any pending selectSession
+    selectGenRef.current++;
     clearSession();
     setAnsweredPrompts({});
-    setDelegates([]);
-    setDelegateStatuses({});
-    setDelegateMessages({});
-    delegateMessagesRef.current = {};
-  }, [clearSession]);
-
-  const bringToFront = useCallback((delegateId: string) => {
-    zIndexCounterRef.current++;
-    setDelegates((prev) => prev.map((d) =>
-      d.id === delegateId ? { ...d, zIndex: zIndexCounterRef.current } : d
-    ));
-  }, []);
+    dm.resetDelegates();
+  }, [clearSession, dm]);
 
   const reopenDelegate = useCallback(async (delegateId: string, task: string) => {
-    // Fetch messages from REST API if not already piped
-    if (!delegateMessagesRef.current[delegateId]?.length) {
+    if (!dm.hasDelegateMessages(delegateId)) {
       try {
         const { data } = await client.GET('/agent/sessions/{sessionId}', {
           params: { path: { sessionId: delegateId }, query: { remoteNode } },
         });
         if (data) {
-          const converted = convertApiSessionDetail(data);
-          const msgs = converted.messages || [];
-          setDelegateMessages((prev) => {
-            const next = { ...prev, [delegateId]: msgs };
-            delegateMessagesRef.current = next;
-            return next;
-          });
+          const msgs = convertApiSessionDetail(data).messages || [];
+          dm.setDelegateMessagesForId(delegateId, task, msgs);
         }
       } catch {
         // Best effort — panel will show empty state
       }
     }
-    zIndexCounterRef.current++;
-    setDelegates((prev) => {
-      if (prev.some((d) => d.id === delegateId)) return prev;
-      return [...prev, {
-        id: delegateId,
-        task,
-        status: 'completed' as const,
-        zIndex: zIndexCounterRef.current,
-        positionIndex: prev.length,
-      }];
-    });
-  }, [client, remoteNode]);
-
-  const removeDelegate = useCallback((delegateId: string) => {
-    setDelegates((prev) =>
-      prev
-        .filter((d) => d.id !== delegateId)
-        .map((d, idx) => ({ ...d, positionIndex: idx }))
-    );
-  }, []);
+    dm.openDelegate(delegateId, task);
+  }, [client, remoteNode, dm]);
 
   return {
     sessionId,
@@ -490,11 +323,11 @@ export function useAgentChat() {
     fetchSessions,
     selectSession,
     respondToPrompt,
-    delegates,
-    delegateStatuses,
-    delegateMessages,
-    bringToFront,
+    delegates: dm.delegates,
+    delegateStatuses: dm.delegateStatuses,
+    delegateMessages: dm.delegateMessages,
+    bringToFront: dm.bringToFront,
     reopenDelegate,
-    removeDelegate,
+    removeDelegate: dm.removeDelegate,
   };
 }

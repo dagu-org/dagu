@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -106,28 +107,33 @@ export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNo
     setSessionState(null);
   }, []);
 
+  const value = useMemo<AgentChatContextType>(() => ({
+    isOpen,
+    isClosing,
+    sessionId,
+    messages,
+    pendingUserMessage,
+    sessionState,
+    sessions,
+    openChat,
+    closeChat,
+    toggleChat,
+    setSessionId,
+    setMessages,
+    setSessionState,
+    setSessions,
+    addMessage,
+    setPendingUserMessage,
+    clearSession,
+  }), [
+    isOpen, isClosing, sessionId, messages, pendingUserMessage,
+    sessionState, sessions, openChat, closeChat, toggleChat,
+    setSessionId, setMessages, setSessionState, setSessions,
+    addMessage, setPendingUserMessage, clearSession,
+  ]);
+
   return (
-    <AgentChatContext.Provider
-      value={{
-        isOpen,
-        isClosing,
-        sessionId,
-        messages,
-        pendingUserMessage,
-        sessionState,
-        sessions,
-        openChat,
-        closeChat,
-        toggleChat,
-        setSessionId,
-        setMessages,
-        setSessionState,
-        setSessions,
-        addMessage,
-        setPendingUserMessage,
-        clearSession,
-      }}
-    >
+    <AgentChatContext.Provider value={value}>
       {children}
     </AgentChatContext.Provider>
   );

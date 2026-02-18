@@ -3,8 +3,6 @@ package agent
 import (
 	"context"
 	"encoding/json"
-
-	"github.com/dagu-org/dagu/internal/auth"
 )
 
 // RequestCommandApprovalFunc requests user approval for a command blocked by policy.
@@ -15,10 +13,7 @@ type ToolExecInfo struct {
 	ToolName  string
 	Input     json.RawMessage
 	SessionID string
-	UserID    string
-	Username  string
-	IPAddress string
-	Role      auth.Role
+	User      UserIdentity
 	Audit     *AuditInfo // from AgentTool.Audit; nil = not audited
 	// SafeMode indicates whether the session has safe mode enabled.
 	// Hooks can use this to decide whether to prompt for approval.

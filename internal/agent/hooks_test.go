@@ -31,10 +31,12 @@ func TestHooks_AfterToolExec(t *testing.T) {
 		ToolName:  "bash",
 		Input:     json.RawMessage(`{"command":"ls"}`),
 		SessionID: "sess-1",
-		UserID:    "user-1",
-		Username:  "alice",
-		IPAddress: "10.0.0.1",
-		Role:      auth.RoleDeveloper,
+		User: UserIdentity{
+			UserID:    "user-1",
+			Username:  "alice",
+			IPAddress: "10.0.0.1",
+			Role:      auth.RoleDeveloper,
+		},
 	}
 	result := ToolOut{Content: "file.txt", IsError: false}
 
@@ -42,10 +44,10 @@ func TestHooks_AfterToolExec(t *testing.T) {
 
 	assert.Equal(t, "bash", captured.info.ToolName)
 	assert.Equal(t, "sess-1", captured.info.SessionID)
-	assert.Equal(t, "user-1", captured.info.UserID)
-	assert.Equal(t, "alice", captured.info.Username)
-	assert.Equal(t, "10.0.0.1", captured.info.IPAddress)
-	assert.Equal(t, auth.RoleDeveloper, captured.info.Role)
+	assert.Equal(t, "user-1", captured.info.User.UserID)
+	assert.Equal(t, "alice", captured.info.User.Username)
+	assert.Equal(t, "10.0.0.1", captured.info.User.IPAddress)
+	assert.Equal(t, auth.RoleDeveloper, captured.info.User.Role)
 	assert.Equal(t, "file.txt", captured.result.Content)
 	assert.False(t, captured.result.IsError)
 }

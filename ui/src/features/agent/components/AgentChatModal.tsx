@@ -84,13 +84,16 @@ export function AgentChatModal(): ReactElement | null {
       hasAutoSelectedRef.current = true;
       const latest = findLatestSession(sessions);
       if (latest) {
-        selectSession(latest.session.id).catch(() => {});
+        selectSession(latest.session.id).catch((err) =>
+          setError(err instanceof Error ? err.message : 'Failed to load session')
+        );
       }
     }
   }, [isOpen, sessions, sessionId, selectSession]);
 
   const handleSend = useCallback(
     (message: string, dagContexts?: DAGContext[], model?: string): void => {
+      // sendMessage handles its own error reporting via setError internally
       sendMessage(message, model, dagContexts).catch(() => {});
     },
     [sendMessage]

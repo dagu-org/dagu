@@ -78,7 +78,7 @@ func navigateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 
 	if ctx.EmitUIAction != nil {
 		ctx.EmitUIAction(UIAction{
-			Type: "navigate",
+			Type: UIActionNavigate,
 			Path: args.Path,
 		})
 	}

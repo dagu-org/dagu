@@ -106,6 +106,12 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 		return toolError("At least one task is required")
 	}
 
+	for _, t := range args.Tasks {
+		if strings.TrimSpace(t.Task) == "" {
+			return toolError("Task description cannot be empty")
+		}
+	}
+
 	// Cap at maxConcurrentDelegates.
 	tasks := args.Tasks
 	truncated := 0
@@ -176,7 +182,7 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		now := time.Now()
 		subSession := &Session{
 			ID:              delegateID,
-			UserID:          dc.UserID,
+			UserID:          dc.User.UserID,
 			ParentSessionID: dc.ParentID,
 			DelegateTask:    task.Task,
 			CreatedAt:       now,
@@ -201,8 +207,8 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 
 	// Create a sub-SessionManager for SSE streaming of the delegate's messages.
 	subMgr := NewSessionManager(SessionManagerConfig{
-		ID:              delegateID,
-		UserID:          dc.UserID,
+		ID:   delegateID,
+		User: dc.User,
 		Logger:          logger,
 		WorkingDir:      ctx.WorkingDir,
 		OnMessage:       onMessage,
@@ -211,15 +217,15 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 	})
 
 	// Register sub-session for SSE streaming.
-	if dc.RegisterSubSession != nil {
-		dc.RegisterSubSession(delegateID, subMgr)
+	if dc.Registry != nil {
+		dc.Registry.RegisterSubSession(delegateID, subMgr)
 	}
 
 	// Forward delegate messages to parent SSE so the frontend doesn't need
 	// separate EventSource connections per delegate (browser limits ~6).
 	forwardToParent := func(msg Message) {
-		if dc.NotifyParent != nil {
-			dc.NotifyParent(StreamResponse{
+		if dc.Registry != nil {
+			dc.Registry.NotifyParent(StreamResponse{
 				DelegateMessages: &DelegateMessages{
 					DelegateID: delegateID,
 					Messages:   []Message{msg},
@@ -247,8 +253,9 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 	subMgr.SetWorking(true)
 
 	// Notify parent that delegate started.
-	if dc.NotifyParent != nil {
-		dc.NotifyParent(StreamResponse{
+	if dc.Registry != nil {
+		dc.Registry.ParentSessionManager().SetDelegateStarted(delegateID, task.Task)
+		dc.Registry.NotifyParent(StreamResponse{
 			DelegateEvent: &DelegateEvent{
 				Type:       DelegateEventStarted,
 				DelegateID: delegateID,
@@ -272,7 +279,7 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 	// Track last assistant content and errors for result extraction.
 	var lastAssistantContent string
 	var lastError string
-	recordMessage := func(msgCtx context.Context, msg Message) error {
+	recordMessage := func(msgCtx context.Context, msg Message) {
 		if msg.Type == MessageTypeAssistant && msg.Content != "" {
 			lastAssistantContent = msg.Content
 		}
@@ -286,9 +293,11 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		if msg.ID == "" {
 			msg.ID = uuid.New().String()
 		}
-		err := subMgr.RecordExternalMessage(msgCtx, msg)
+		msg.SessionID = delegateID
+		if err := subMgr.RecordExternalMessage(msgCtx, msg); err != nil {
+			logger.Warn("Failed to record delegate message", "error", err)
+		}
 		forwardToParent(msg)
-		return err
 	}
 
 	loop := NewLoop(LoopConfig{
@@ -302,10 +311,7 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		SessionID:     delegateID,
 		Hooks:         dc.Hooks,
 		SafeMode:      ctx.SafeMode,
-		UserID:        dc.UserID,
-		Username:      dc.Username,
-		IPAddress:     dc.IPAddress,
-		Role:          dc.Role,
+		User:          dc.User,
 		OnWorking: func(working bool) {
 			subMgr.SetWorking(working)
 			if !working {
@@ -327,13 +333,12 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 
 	// Roll up sub-agent cost to parent session.
 	subCost := subMgr.GetTotalCost()
-	if dc.AddCost != nil {
-		dc.AddCost(subCost)
-	}
+	if dc.Registry != nil {
+		dc.Registry.AddCost(subCost)
 
-	// Notify parent that delegate completed.
-	if dc.NotifyParent != nil {
-		dc.NotifyParent(StreamResponse{
+		// Notify parent that delegate completed.
+		dc.Registry.ParentSessionManager().SetDelegateCompleted(delegateID, subCost)
+		dc.Registry.NotifyParent(StreamResponse{
 			DelegateEvent: &DelegateEvent{
 				Type:       DelegateEventCompleted,
 				DelegateID: delegateID,
@@ -341,11 +346,9 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 				Cost:       subCost,
 			},
 		})
-	}
 
-	// Deregister sub-session from SSE registry to prevent memory leaks.
-	if dc.DeregisterSubSession != nil {
-		dc.DeregisterSubSession(delegateID)
+		// Deregister sub-session from SSE registry to prevent memory leaks.
+		dc.Registry.DeregisterSubSession(delegateID)
 	}
 
 	if err != nil && !errors.Is(err, context.Canceled) {

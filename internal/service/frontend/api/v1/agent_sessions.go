@@ -66,16 +66,19 @@ func (a *API) requireAgent(ctx context.Context) error {
 }
 
 // extractUserContext extracts user identity and IP from the request context.
-func extractUserContext(ctx context.Context) (userID, username string, role auth.Role, ipAddress string) {
-	userID, username = "admin", "admin"
-	role = auth.RoleAdmin
-	if user, ok := auth.UserFromContext(ctx); ok && user != nil {
-		userID = user.ID
-		username = user.Username
-		role = user.Role
+func extractUserContext(ctx context.Context) agent.UserIdentity {
+	u := agent.UserIdentity{
+		UserID:   "admin",
+		Username: "admin",
+		Role:     auth.RoleAdmin,
 	}
-	ipAddress, _ = auth.ClientIPFromContext(ctx)
-	return
+	if user, ok := auth.UserFromContext(ctx); ok && user != nil {
+		u.UserID = user.ID
+		u.Username = user.Username
+		u.Role = user.Role
+	}
+	u.IPAddress, _ = auth.ClientIPFromContext(ctx)
+	return u
 }
 
 // mapAgentError maps agent sentinel errors to API errors.
@@ -113,10 +116,10 @@ func (a *API) CreateAgentSession(ctx context.Context, request api.CreateAgentSes
 		return nil, errAgentBadRequest
 	}
 
-	userID, username, role, ipAddress := extractUserContext(ctx)
+	user := extractUserContext(ctx)
 	chatReq := toAgentChatRequest(request.Body)
 
-	sessionID, err := a.agentAPI.CreateSession(ctx, userID, username, role, ipAddress, chatReq)
+	sessionID, err := a.agentAPI.CreateSession(ctx, user, chatReq)
 	if err != nil {
 		return nil, mapAgentError(err)
 	}
@@ -133,8 +136,8 @@ func (a *API) ListAgentSessions(ctx context.Context, _ api.ListAgentSessionsRequ
 		return nil, err
 	}
 
-	userID, _, _, _ := extractUserContext(ctx)
-	sessions := a.agentAPI.ListSessions(ctx, userID)
+	user := extractUserContext(ctx)
+	sessions := a.agentAPI.ListSessions(ctx, user.UserID)
 
 	return api.ListAgentSessions200JSONResponse(toAPISessions(sessions)), nil
 }
@@ -145,8 +148,8 @@ func (a *API) GetAgentSession(ctx context.Context, request api.GetAgentSessionRe
 		return nil, err
 	}
 
-	userID, _, _, _ := extractUserContext(ctx)
-	detail, err := a.agentAPI.GetSessionDetail(ctx, request.SessionId, userID)
+	user := extractUserContext(ctx)
+	detail, err := a.agentAPI.GetSessionDetail(ctx, request.SessionId, user.UserID)
 	if err != nil {
 		return nil, mapAgentError(err)
 	}
@@ -163,10 +166,10 @@ func (a *API) ChatAgentSession(ctx context.Context, request api.ChatAgentSession
 		return nil, errAgentBadRequest
 	}
 
-	userID, username, role, ipAddress := extractUserContext(ctx)
+	user := extractUserContext(ctx)
 	chatReq := toAgentChatRequest(request.Body)
 
-	if err := a.agentAPI.SendMessage(ctx, request.SessionId, userID, username, role, ipAddress, chatReq); err != nil {
+	if err := a.agentAPI.SendMessage(ctx, request.SessionId, user, chatReq); err != nil {
 		return nil, mapAgentError(err)
 	}
 
@@ -179,8 +182,8 @@ func (a *API) CancelAgentSession(ctx context.Context, request api.CancelAgentSes
 		return nil, err
 	}
 
-	userID, _, _, _ := extractUserContext(ctx)
-	if err := a.agentAPI.CancelSession(ctx, request.SessionId, userID); err != nil {
+	user := extractUserContext(ctx)
+	if err := a.agentAPI.CancelSession(ctx, request.SessionId, user.UserID); err != nil {
 		return nil, mapAgentError(err)
 	}
 
@@ -196,10 +199,10 @@ func (a *API) RespondAgentSession(ctx context.Context, request api.RespondAgentS
 		return nil, errAgentBadRequest
 	}
 
-	userID, _, _, _ := extractUserContext(ctx)
+	user := extractUserContext(ctx)
 	resp := toAgentUserPromptResponse(request.Body)
 
-	if err := a.agentAPI.SubmitUserResponse(ctx, request.SessionId, userID, resp); err != nil {
+	if err := a.agentAPI.SubmitUserResponse(ctx, request.SessionId, user.UserID, resp); err != nil {
 		return nil, mapAgentError(err)
 	}
 
@@ -276,6 +279,19 @@ func toAPISessionDetail(resp *agent.StreamResponse) api.AgentSessionDetailRespon
 	if resp.Messages != nil {
 		out.Messages = toAPIMessages(resp.Messages)
 	}
+	if len(resp.Delegates) > 0 {
+		delegates := make([]api.AgentDelegateSnapshot, len(resp.Delegates))
+		for i, d := range resp.Delegates {
+			cost := d.Cost
+			delegates[i] = api.AgentDelegateSnapshot{
+				Id:     d.ID,
+				Task:   d.Task,
+				Status: api.AgentDelegateSnapshotStatus(d.Status),
+				Cost:   &cost,
+			}
+		}
+		out.Delegates = &delegates
+	}
 	return out
 }
 
@@ -343,7 +359,7 @@ func toAPIMessages(msgs []agent.Message) []api.AgentMessage {
 
 		if m.UIAction != nil {
 			msg.UiAction = &api.AgentUIAction{
-				Type: m.UIAction.Type,
+				Type: string(m.UIAction.Type),
 				Path: ptrOf(m.UIAction.Path),
 			}
 		}

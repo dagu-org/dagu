@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/google/uuid"
 )
@@ -18,7 +17,7 @@ import (
 // It links the Loop with SSE streaming and handles state management.
 type SessionManager struct {
 	id                   string
-	userID               string
+	user                 UserIdentity
 	loop                 *Loop
 	loopCancel           context.CancelFunc
 	mu                   sync.Mutex
@@ -34,9 +33,6 @@ type SessionManager struct {
 	environment          EnvironmentInfo
 	safeMode             bool
 	hooks                *Hooks
-	username             string
-	ipAddress            string
-	role                 auth.Role
 	onWorkingChange      func(id string, working bool)
 	onMessage            func(ctx context.Context, msg Message) error
 	pendingPrompts       map[string]chan UserPromptResponse
@@ -46,17 +42,17 @@ type SessionManager struct {
 	totalCost            float64
 	memoryStore          MemoryStore
 	dagName              string
-	sessionStore         SessionStore
-	parentSessionID      string
-	delegateTask         string
-	registerSubSession   func(id string, mgr *SessionManager)
-	deregisterSubSession func(id string)
+	sessionStore    SessionStore
+	parentSessionID string
+	delegateTask    string
+	registry        SubSessionRegistry
+	delegates       map[string]DelegateSnapshot // guarded by mu
 }
 
 // SessionManagerConfig contains configuration for creating a SessionManager.
 type SessionManagerConfig struct {
 	ID              string
-	UserID          string
+	User            UserIdentity
 	Logger          *slog.Logger
 	WorkingDir      string
 	OnWorkingChange func(id string, working bool)
@@ -66,9 +62,6 @@ type SessionManagerConfig struct {
 	Environment     EnvironmentInfo
 	SafeMode        bool
 	Hooks           *Hooks
-	Username        string
-	IPAddress       string
-	Role            auth.Role
 	InputCostPer1M  float64
 	OutputCostPer1M float64
 	MemoryStore     MemoryStore
@@ -78,10 +71,8 @@ type SessionManagerConfig struct {
 	ParentSessionID string
 	// DelegateTask is the task description given to the sub-agent.
 	DelegateTask string
-	// RegisterSubSession registers a sub-session's SessionManager for SSE streaming.
-	RegisterSubSession func(id string, mgr *SessionManager)
-	// DeregisterSubSession removes a completed sub-session from the SSE registry.
-	DeregisterSubSession func(id string)
+	// Registry manages sub-session lifecycle for delegate tools.
+	Registry SubSessionRegistry
 }
 
 // NewSessionManager creates a new SessionManager.
@@ -101,7 +92,7 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 	now := time.Now()
 	return &SessionManager{
 		id:                   id,
-		userID:               cfg.UserID,
+		user:                 cfg.User,
 		createdAt:            now,
 		lastActivity:         now,
 		logger:               logger.With("session_id", id),
@@ -114,34 +105,28 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		environment:          cfg.Environment,
 		safeMode:             cfg.SafeMode,
 		hooks:                cfg.Hooks,
-		username:             cfg.Username,
-		ipAddress:            cfg.IPAddress,
-		role:                 cfg.Role,
 		pendingPrompts:       make(map[string]chan UserPromptResponse),
+		delegates:            make(map[string]DelegateSnapshot),
 		inputCostPer1M:       cfg.InputCostPer1M,
 		outputCostPer1M:      cfg.OutputCostPer1M,
 		memoryStore:          cfg.MemoryStore,
 		dagName:              cfg.DAGName,
-		sessionStore:         cfg.SessionStore,
-		parentSessionID:      cfg.ParentSessionID,
-		delegateTask:         cfg.DelegateTask,
-		registerSubSession:   cfg.RegisterSubSession,
-		deregisterSubSession: cfg.DeregisterSubSession,
+		sessionStore:    cfg.SessionStore,
+		parentSessionID: cfg.ParentSessionID,
+		delegateTask:    cfg.DelegateTask,
+		registry:        cfg.Registry,
 	}
 }
 
 // UpdateUserContext updates user metadata for an existing session and active loop.
-func (sm *SessionManager) UpdateUserContext(username, ipAddress string, role auth.Role) {
+func (sm *SessionManager) UpdateUserContext(u UserIdentity) {
 	sm.mu.Lock()
-	sm.username = username
-	sm.ipAddress = ipAddress
-	sm.role = role
+	sm.user = u
 	loop := sm.loop
-	userID := sm.userID
 	sm.mu.Unlock()
 
 	if loop != nil {
-		loop.SetUserContext(userID, username, ipAddress, role)
+		loop.SetUserContext(u)
 	}
 }
 
@@ -171,7 +156,7 @@ func (sm *SessionManager) ID() string {
 
 // UserID returns the user ID that owns this session.
 func (sm *SessionManager) UserID() string {
-	return sm.userID
+	return sm.user.UserID
 }
 
 // SetWorking updates the agent working state and notifies subscribers.
@@ -244,7 +229,7 @@ func (sm *SessionManager) GetSession() Session {
 	defer sm.mu.Unlock()
 	return Session{
 		ID:              sm.id,
-		UserID:          sm.userID,
+		UserID:          sm.user.UserID,
 		DAGName:         sm.dagName,
 		ParentSessionID: sm.parentSessionID,
 		DelegateTask:    sm.delegateTask,
@@ -362,12 +347,19 @@ func (sm *SessionManager) SubscribeWithSnapshot(ctx context.Context) (StreamResp
 	id := sm.id
 	sess := Session{
 		ID:              id,
-		UserID:          sm.userID,
+		UserID:          sm.user.UserID,
 		DAGName:         sm.dagName,
 		ParentSessionID: sm.parentSessionID,
 		DelegateTask:    sm.delegateTask,
 		CreatedAt:       sm.createdAt,
 		UpdatedAt:       sm.lastActivity,
+	}
+	var delegates []DelegateSnapshot
+	if len(sm.delegates) > 0 {
+		delegates = make([]DelegateSnapshot, 0, len(sm.delegates))
+		for _, snap := range sm.delegates {
+			delegates = append(delegates, snap)
+		}
 	}
 	next := sm.subpub.Subscribe(ctx, lastSeq)
 	sm.mu.Unlock()
@@ -381,6 +373,7 @@ func (sm *SessionManager) SubscribeWithSnapshot(ctx context.Context) (StreamResp
 			Model:     model,
 			TotalCost: totalCost,
 		},
+		Delegates: delegates,
 	}, next
 }
 
@@ -441,32 +434,24 @@ func (sm *SessionManager) ensureLoop(provider llm.Provider, modelID string, reso
 func (sm *SessionManager) createLoop(provider llm.Provider, model string, history []llm.Message, safeMode bool) *Loop {
 	memory := sm.loadMemory()
 	return NewLoop(LoopConfig{
-		Provider:             provider,
-		Model:                model,
-		History:              history,
-		Tools:                CreateTools(ToolConfig{DAGsDir: sm.environment.DAGsDir}),
-		RecordMessage:        sm.createRecordMessageFunc(),
-		Logger:               sm.logger,
-		SystemPrompt:         GenerateSystemPrompt(sm.environment, nil, memory, sm.role),
-		WorkingDir:           sm.workingDir,
-		SessionID:            sm.id,
-		OnWorking:            sm.SetWorking,
-		EmitUIAction:         sm.createEmitUIActionFunc(),
-		EmitUserPrompt:       sm.createEmitUserPromptFunc(),
-		WaitUserResponse:     sm.createWaitUserResponseFunc(),
-		SafeMode:             safeMode,
-		Hooks:                sm.hooks,
-		UserID:               sm.userID,
-		Username:             sm.username,
-		IPAddress:            sm.ipAddress,
-		Role:                 sm.role,
-		SessionStore:         sm.sessionStore,
-		RegisterSubSession:   sm.registerSubSession,
-		DeregisterSubSession: sm.deregisterSubSession,
-		NotifyParent: func(event StreamResponse) {
-			sm.subpub.Broadcast(event)
-		},
-		AddCost: sm.addCost,
+		Provider:         provider,
+		Model:            model,
+		History:          history,
+		Tools:            CreateTools(ToolConfig{DAGsDir: sm.environment.DAGsDir}),
+		RecordMessage:    sm.createRecordMessageFunc(),
+		Logger:           sm.logger,
+		SystemPrompt:     GenerateSystemPrompt(sm.environment, nil, memory, sm.user.Role),
+		WorkingDir:       sm.workingDir,
+		SessionID:        sm.id,
+		OnWorking:        sm.SetWorking,
+		EmitUIAction:     sm.createEmitUIActionFunc(),
+		EmitUserPrompt:   sm.createEmitUserPromptFunc(),
+		WaitUserResponse: sm.createWaitUserResponseFunc(),
+		SafeMode:         safeMode,
+		Hooks:            sm.hooks,
+		User:             sm.user,
+		SessionStore:     sm.sessionStore,
+		Registry:         sm.registry,
 	})
 }
 
@@ -533,7 +518,7 @@ func (sm *SessionManager) extractLLMHistoryLocked() []llm.Message {
 // Persistence errors are logged but not propagated — the session continues operating
 // even if individual messages fail to persist, to avoid disrupting the user's workflow.
 func (sm *SessionManager) createRecordMessageFunc() MessageRecordFunc {
-	return func(ctx context.Context, msg Message) error {
+	return func(ctx context.Context, msg Message) {
 		msg.SessionID = sm.id
 		if msg.ID == "" {
 			msg.ID = uuid.New().String()
@@ -559,8 +544,6 @@ func (sm *SessionManager) createRecordMessageFunc() MessageRecordFunc {
 				sm.logger.Warn("failed to persist message", "error", err)
 			}
 		}
-
-		return nil
 	}
 }
 
@@ -697,9 +680,72 @@ func (sm *SessionManager) calculateCost(usage *llm.Usage) float64 {
 		(float64(usage.CompletionTokens) * sm.outputCostPer1M / 1_000_000)
 }
 
+// SetDelegateStarted records that a delegate sub-agent has started.
+func (sm *SessionManager) SetDelegateStarted(id, task string) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.delegates[id] = DelegateSnapshot{
+		ID:     id,
+		Task:   task,
+		Status: DelegateStatusRunning,
+	}
+}
+
+// SetDelegateCompleted records that a delegate sub-agent has completed.
+func (sm *SessionManager) SetDelegateCompleted(id string, cost float64) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	if snap, ok := sm.delegates[id]; ok {
+		snap.Status = DelegateStatusCompleted
+		snap.Cost = cost
+		sm.delegates[id] = snap
+	}
+}
+
+// GetDelegates returns snapshots of all tracked delegate sub-agents.
+func (sm *SessionManager) GetDelegates() []DelegateSnapshot {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	if len(sm.delegates) == 0 {
+		return nil
+	}
+	result := make([]DelegateSnapshot, 0, len(sm.delegates))
+	for _, snap := range sm.delegates {
+		result = append(result, snap)
+	}
+	return result
+}
+
 // addCost adds a cost amount to the running total.
 func (sm *SessionManager) addCost(cost float64) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	sm.totalCost += cost
+}
+
+// sessionRegistry implements SubSessionRegistry by combining
+// API-level session storage with SessionManager-level notifications.
+type sessionRegistry struct {
+	sessions *sync.Map       // API's active sessions map
+	parent   *SessionManager // parent session manager
+}
+
+func (r *sessionRegistry) RegisterSubSession(id string, mgr *SessionManager) {
+	r.sessions.Store(id, mgr)
+}
+
+func (r *sessionRegistry) DeregisterSubSession(id string) {
+	r.sessions.Delete(id)
+}
+
+func (r *sessionRegistry) NotifyParent(event StreamResponse) {
+	r.parent.subpub.Broadcast(event)
+}
+
+func (r *sessionRegistry) AddCost(cost float64) {
+	r.parent.addCost(cost)
+}
+
+func (r *sessionRegistry) ParentSessionManager() *SessionManager {
+	return r.parent
 }
