@@ -57,13 +57,9 @@ func (a *API) ListAgentSkills(ctx context.Context, _ api.ListAgentSkillsRequestO
 		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to list skills", HTTPStatus: http.StatusInternalServerError}
 	}
 
-	cfg, err := a.agentConfigStore.Load(ctx)
+	enabledSkills, err := a.loadEnabledSkills(ctx)
 	if err != nil {
-		return nil, ErrFailedToLoadAgentConfig
-	}
-	var enabledSkills []string
-	if cfg != nil {
-		enabledSkills = cfg.EnabledSkills
+		return nil, err
 	}
 
 	skillResponses := make([]api.SkillResponse, 0, len(skills))
@@ -172,13 +168,9 @@ func (a *API) GetAgentSkill(ctx context.Context, request api.GetAgentSkillReques
 		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to get skill", HTTPStatus: http.StatusInternalServerError}
 	}
 
-	cfg, err := a.agentConfigStore.Load(ctx)
+	enabledSkills, err := a.loadEnabledSkills(ctx)
 	if err != nil {
-		return nil, ErrFailedToLoadAgentConfig
-	}
-	var enabledSkills []string
-	if cfg != nil {
-		enabledSkills = cfg.EnabledSkills
+		return nil, err
 	}
 
 	return api.GetAgentSkill200JSONResponse(toSkillResponse(skill, isSkillEnabled(enabledSkills, skill.ID))), nil
@@ -221,13 +213,9 @@ func (a *API) UpdateAgentSkill(ctx context.Context, request api.UpdateAgentSkill
 		"skill_id": request.SkillId,
 	})
 
-	cfg, err := a.agentConfigStore.Load(ctx)
+	enabledSkills, err := a.loadEnabledSkills(ctx)
 	if err != nil {
-		return nil, ErrFailedToLoadAgentConfig
-	}
-	var enabledSkills []string
-	if cfg != nil {
-		enabledSkills = cfg.EnabledSkills
+		return nil, err
 	}
 
 	return api.UpdateAgentSkill200JSONResponse(toSkillResponse(existing, isSkillEnabled(enabledSkills, existing.ID))), nil
@@ -305,6 +293,17 @@ func (a *API) SetEnabledSkills(ctx context.Context, request api.SetEnabledSkills
 	})
 
 	return api.SetEnabledSkills200JSONResponse{EnabledSkills: cfg.EnabledSkills}, nil
+}
+
+func (a *API) loadEnabledSkills(ctx context.Context) ([]string, error) {
+	cfg, err := a.agentConfigStore.Load(ctx)
+	if err != nil {
+		return nil, ErrFailedToLoadAgentConfig
+	}
+	if cfg == nil {
+		return nil, nil
+	}
+	return cfg.EnabledSkills, nil
 }
 
 func (a *API) requireSkillManagement() error {

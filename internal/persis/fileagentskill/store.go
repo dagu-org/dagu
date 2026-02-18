@@ -356,7 +356,7 @@ func (s *Store) Update(_ context.Context, skill *agent.Skill) error {
 		return fmt.Errorf("fileagentskill: failed to load existing skill: %w", err)
 	}
 
-	nameChanged := skill.Name != "" && existing.Name != skill.Name
+	nameChanged := existing.Name != skill.Name
 	if nameChanged {
 		if takenByID, taken := s.byName[skill.Name]; taken && takenByID != skill.ID {
 			return agent.ErrSkillNameAlreadyExists

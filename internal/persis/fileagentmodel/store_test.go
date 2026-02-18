@@ -326,7 +326,23 @@ func TestStore_Update(t *testing.T) {
 		}
 		err := store.Update(ctx, updated)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, agent.ErrModelAlreadyExists)
+		assert.ErrorIs(t, err, agent.ErrModelNameAlreadyExists)
+	})
+
+	t.Run("empty name returns error", func(t *testing.T) {
+		t.Parallel()
+		store, _ := setupTestStore(t)
+		createModel(t, store, newTestModel("has-name", "Has A Name"))
+
+		updated := &agent.ModelConfig{
+			ID:       "has-name",
+			Name:     "",
+			Provider: "anthropic",
+			Model:    "claude-sonnet-4-5",
+		}
+		err := store.Update(ctx, updated)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "model name is required")
 	})
 
 	t.Run("update to same name is allowed", func(t *testing.T) {

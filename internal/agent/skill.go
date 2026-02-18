@@ -3,8 +3,6 @@ package agent
 import (
 	"context"
 	"errors"
-	"fmt"
-	"regexp"
 )
 
 // Sentinel errors for skill store operations.
@@ -46,23 +44,7 @@ type SkillStore interface {
 	Delete(ctx context.Context, id string) error
 }
 
-// validSkillIDRegexp matches a valid skill ID slug: lowercase alphanumeric segments separated by hyphens.
-var validSkillIDRegexp = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
-
-const maxSkillIDLength = 128
-
 // ValidateSkillID validates that id is a safe, well-formed skill identifier.
-// It must be a non-empty slug (lowercase alphanumeric segments separated by hyphens)
-// and at most 128 characters. This prevents path traversal and other injection attacks.
 func ValidateSkillID(id string) error {
-	if id == "" {
-		return ErrInvalidSkillID
-	}
-	if len(id) > maxSkillIDLength {
-		return fmt.Errorf("%w: exceeds maximum length of %d", ErrInvalidSkillID, maxSkillIDLength)
-	}
-	if !validSkillIDRegexp.MatchString(id) {
-		return fmt.Errorf("%w: must match pattern [a-z0-9]+(-[a-z0-9]+)*", ErrInvalidSkillID)
-	}
-	return nil
+	return validateSlugID(id, ErrInvalidSkillID)
 }
