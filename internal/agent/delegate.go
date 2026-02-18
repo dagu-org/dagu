@@ -128,6 +128,14 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	var wg sync.WaitGroup
 	for i, task := range tasks {
 		wg.Go(func() {
+			defer func() {
+				if r := recover(); r != nil {
+					results[i] = singleDelegateResult{
+						Content: fmt.Sprintf("Sub-agent panicked: %v", r),
+						IsError: true,
+					}
+				}
+			}()
 			results[i] = runSingleDelegate(ctx, task)
 		})
 	}

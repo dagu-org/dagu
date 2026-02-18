@@ -229,18 +229,27 @@ export function useAgentChat() {
           const evt = data.delegate_event;
           if (evt.type === 'started') {
             zIndexCounterRef.current++;
-            const info: DelegateInfo = {
-              id: evt.delegate_id,
-              task: evt.task,
-              status: 'running',
-              zIndex: zIndexCounterRef.current,
-              positionIndex: 0,
-            };
+            const zIndex = zIndexCounterRef.current;
             setDelegates((prev) => {
-              info.positionIndex = prev.length;
+              const info: DelegateInfo = {
+                id: evt.delegate_id,
+                task: evt.task,
+                status: 'running',
+                zIndex,
+                positionIndex: prev.length,
+              };
               return [...prev, info];
             });
-            setDelegateStatuses((prev) => ({ ...prev, [evt.delegate_id]: info }));
+            setDelegateStatuses((prev) => ({
+              ...prev,
+              [evt.delegate_id]: {
+                id: evt.delegate_id,
+                task: evt.task,
+                status: 'running',
+                zIndex,
+                positionIndex: 0,
+              },
+            }));
           } else if (evt.type === 'completed') {
             // Update status instead of removing — let DelegatePanel play close animation
             setDelegates((prev) => prev.map((d) =>
@@ -451,7 +460,11 @@ export function useAgentChat() {
   }, [client, remoteNode]);
 
   const removeDelegate = useCallback((delegateId: string) => {
-    setDelegates((prev) => prev.filter((d) => d.id !== delegateId));
+    setDelegates((prev) =>
+      prev
+        .filter((d) => d.id !== delegateId)
+        .map((d, idx) => ({ ...d, positionIndex: idx }))
+    );
   }, []);
 
   return {

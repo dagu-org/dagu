@@ -769,6 +769,11 @@ func (a *API) cleanupIdleSessions() {
 		if !ok {
 			return true
 		}
+		// Skip delegate sub-sessions — their lifecycle is managed by the parent.
+		sess := mgr.GetSession()
+		if sess.ParentSessionID != "" {
+			return true
+		}
 		if !mgr.IsWorking() && mgr.LastActivity().Before(cutoff) {
 			toDelete = append(toDelete, id)
 		}
