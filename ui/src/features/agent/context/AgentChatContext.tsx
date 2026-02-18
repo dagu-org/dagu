@@ -7,11 +7,8 @@ import {
   useState,
 } from 'react';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
-import type {
-  SessionState,
-  SessionWithState,
-  Message,
-} from '../types';
+
+import type { Message, SessionState, SessionWithState } from '../types';
 
 interface AgentChatContextType {
   isOpen: boolean;

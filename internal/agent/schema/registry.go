@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -59,12 +59,7 @@ func (r *Registry) Navigate(schemaName, path string) (string, error) {
 func (r *Registry) AvailableSchemas() []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	names := make([]string, 0, len(r.schemas))
-	for name := range r.schemas {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names
+	return slices.Sorted(maps.Keys(r.schemas))
 }
 
 // navigator handles schema path navigation and formatting.
@@ -106,11 +101,8 @@ func (n *navigator) navigatePath(node map[string]any, parts []string) (map[strin
 
 		next, ok := props[part].(map[string]any)
 		if !ok {
-			available := make([]string, 0, len(props))
-			for k := range props {
-				available = append(available, k)
-			}
-			return nil, fmt.Errorf("path %q: field %q not found (available: %s)", n.path, part, strings.Join(available, ", "))
+			return nil, fmt.Errorf("path %q: field %q not found (available: %s)",
+				n.path, part, strings.Join(slices.Sorted(maps.Keys(props)), ", "))
 		}
 
 		current = next
@@ -284,14 +276,11 @@ func (n *navigator) mergeAllOf(allOf []any) map[string]any {
 
 	// Deduplicate and set merged required fields
 	if len(requiredSet) > 0 {
-		allRequired := make([]any, 0, len(requiredSet))
-		for r := range requiredSet {
-			allRequired = append(allRequired, r)
+		sorted := slices.Sorted(maps.Keys(requiredSet))
+		allRequired := make([]any, len(sorted))
+		for i, s := range sorted {
+			allRequired[i] = s
 		}
-		// Sort for deterministic output
-		sort.Slice(allRequired, func(i, j int) bool {
-			return allRequired[i].(string) < allRequired[j].(string)
-		})
 		merged["required"] = allRequired
 	}
 

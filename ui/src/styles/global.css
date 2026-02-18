@@ -430,14 +430,6 @@
   border-radius: var(--radius-md);
 }
 
-/* Typography densities */
-.text-balance {
-  text-wrap: balance;
-}
-.tracking-tight {
-  letter-spacing: -0.025em;
-}
-
 /* Status Indicators - Minimal Text-Only Style */
 .status-pill {
   display: inline-flex;

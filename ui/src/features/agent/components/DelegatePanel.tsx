@@ -50,10 +50,6 @@ export function DelegatePanel({
     storageKey: `delegate-panel-${delegateId}`,
   });
 
-  const handleMouseDown = useCallback(() => {
-    onBringToFront();
-  }, [onBringToFront]);
-
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const handleClose = useCallback(() => {
@@ -93,7 +89,7 @@ export function DelegatePanel({
           ? 'agent-modal-out 250ms ease-in forwards'
           : 'delegate-panel-in 250ms ease-out',
       }}
-      onMouseDown={handleMouseDown}
+      onMouseDown={onBringToFront}
     >
       <ResizeHandles resizeHandlers={resizeHandlers} />
       {/* Title bar */}

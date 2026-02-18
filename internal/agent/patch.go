@@ -195,15 +195,8 @@ func isDAGFile(path, dagsDir string) bool {
 	if dagsDir == "" || !strings.HasSuffix(path, ".yaml") {
 		return false
 	}
-	cleanPath := filepath.Clean(path)
-	cleanDAGsDir := filepath.Clean(dagsDir)
-
-	// Use filepath.Rel to properly check path containment
-	rel, err := filepath.Rel(cleanDAGsDir, cleanPath)
-	if err != nil || strings.HasPrefix(rel, "..") {
-		return false
-	}
-	return true
+	rel, err := filepath.Rel(filepath.Clean(dagsDir), filepath.Clean(path))
+	return err == nil && !strings.HasPrefix(rel, "..")
 }
 
 // validateIfDAGFile validates the file if it's a DAG file, returning any validation errors.

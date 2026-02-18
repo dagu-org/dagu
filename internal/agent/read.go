@@ -79,8 +79,8 @@ func readRun(ctx ToolContext, input json.RawMessage) ToolOut {
 
 	path := resolvePath(args.Path, ctx.WorkingDir)
 
-	if errOut := validateReadableFile(path, args.Path); errOut != nil {
-		return *errOut
+	if out, ok := validateReadableFile(path, args.Path); !ok {
+		return out
 	}
 
 	content, err := os.ReadFile(path)
@@ -91,24 +91,24 @@ func readRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	return formatFileContent(string(content), args.Offset, args.Limit)
 }
 
-func validateReadableFile(path, displayPath string) *ToolOut {
+func validateReadableFile(path, displayPath string) (ToolOut, bool) {
 	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return new(toolError("File not found: %s", displayPath))
+			return toolError("File not found: %s", displayPath), false
 		}
-		return new(toolError("Failed to access file: %v", err))
+		return toolError("Failed to access file: %v", err), false
 	}
 
 	if info.IsDir() {
-		return new(toolError("%s is a directory, not a file. Use bash with 'ls' to list directory contents.", displayPath))
+		return toolError("%s is a directory, not a file. Use bash with 'ls' to list directory contents.", displayPath), false
 	}
 
 	if info.Size() > maxReadSize {
-		return new(toolError("File too large (%d bytes). Maximum size is %d bytes. Use offset and limit to read portions.", info.Size(), maxReadSize))
+		return toolError("File too large (%d bytes). Maximum size is %d bytes. Use offset and limit to read portions.", info.Size(), maxReadSize), false
 	}
 
-	return nil
+	return ToolOut{}, true
 }
 
 func formatFileContent(content string, requestedOffset, requestedLimit int) ToolOut {

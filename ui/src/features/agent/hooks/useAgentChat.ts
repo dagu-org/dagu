@@ -356,10 +356,10 @@ export function useAgentChat() {
         },
       });
       if (apiError) throw new Error(apiError.message || 'Failed to submit response');
-      setAnsweredPrompts(prev => ({ ...prev, [response.prompt_id]: displayValue }));
     } catch (err) {
-      setAnsweredPrompts(prev => ({ ...prev, [response.prompt_id]: displayValue }));
       setError(err instanceof Error ? err.message : 'Failed to submit response');
+    } finally {
+      setAnsweredPrompts(prev => ({ ...prev, [response.prompt_id]: displayValue }));
     }
   }, [client, remoteNode, sessionId]);
 
@@ -464,7 +464,6 @@ export function useAgentChat() {
     error,
     answeredPrompts,
     setError,
-    startSession,
     sendMessage,
     cancelSession,
     clearSession: handleClearSession,

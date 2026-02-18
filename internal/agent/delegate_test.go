@@ -891,14 +891,12 @@ func TestDelegateTool_NoCallbacks(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:           provider,
-			Model:              "test",
-			Tools:              []*AgentTool{},
-			SessionStore:       newMockSessionStore(),
-			ParentID:           "parent-1",
-			UserID:             "user-1",
-			RegisterSubSession: nil,
-			NotifyParent:       nil,
+			Provider:     provider,
+			Model:        "test",
+			Tools:        []*AgentTool{},
+			SessionStore: newMockSessionStore(),
+			ParentID:     "parent-1",
+			UserID:       "user-1",
 		},
 	}, singleTaskInput("no callbacks test"))
 

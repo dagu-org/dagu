@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Loader2, MoreHorizontal, Pencil, Plus, Save, Shield, Star, Trash2 } from 'lucide-react';
 import {
   AgentBashPolicyDefaultBehavior,
@@ -103,7 +103,7 @@ function canonicalizeToolPolicy(policy: AgentToolPolicy | undefined, tools: Tool
   };
 }
 
-export default function AgentSettingsPage(): React.ReactNode {
+export default function AgentSettingsPage(): ReactNode {
   const client = useClient();
   const isAdmin = useIsAdmin();
   const appBarContext = useContext(AppBarContext);

@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -126,11 +127,9 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	results := make([]singleDelegateResult, len(tasks))
 	var wg sync.WaitGroup
 	for i, task := range tasks {
-		wg.Add(1)
-		go func(idx int, t delegateTask) {
-			defer wg.Done()
-			results[idx] = runSingleDelegate(ctx, t)
-		}(i, task)
+		wg.Go(func() {
+			results[i] = runSingleDelegate(ctx, task)
+		})
 	}
 	wg.Wait()
 
@@ -270,18 +269,13 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 	var lastError string
 	iteration := 0
 
-	// Build RecordMessage that publishes to sub-SessionManager's SubPub and captures results.
-	captureResult := func(msg Message) {
+	recordMessage := func(msgCtx context.Context, msg Message) error {
 		if msg.Type == MessageTypeAssistant && msg.Content != "" {
 			lastAssistantContent = msg.Content
 		}
 		if msg.Type == MessageTypeError {
 			lastError = msg.Content
 		}
-	}
-
-	recordMessage := func(msgCtx context.Context, msg Message) error {
-		captureResult(msg)
 		err := subMgr.RecordExternalMessage(msgCtx, msg)
 		forwardToParent(msg)
 		return err
@@ -367,14 +361,9 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		}
 	}
 
-	summary := lastAssistantContent
-	if summary == "" {
-		summary = "Sub-agent completed but produced no output."
-	}
-
 	return singleDelegateResult{
 		DelegateID: delegateID,
-		Content:    summary,
+		Content:    cmp.Or(lastAssistantContent, "Sub-agent completed but produced no output."),
 		Cost:       subCost,
 	}
 }

@@ -2,8 +2,6 @@
 export type MessageType =
   | 'user'
   | 'assistant'
-  | 'tool_use'
-  | 'tool_result'
   | 'error'
   | 'ui_action'
   | 'user_prompt';
@@ -124,19 +122,6 @@ export interface DelegateInfo {
   status: 'running' | 'completed';
   zIndex: number;
   positionIndex: number;
-}
-
-// API request/response types
-export interface ChatRequest {
-  message: string;
-  model?: string;
-  dag_contexts?: DAGContext[];
-  safe_mode?: boolean;
-}
-
-export interface NewSessionResponse {
-  session_id: string;
-  status: string;
 }
 
 export interface DelegateMessages {

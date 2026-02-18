@@ -565,7 +565,7 @@ func waitForRequest(t *testing.T, requestCh <-chan *llm.ChatRequest, timeout tim
 
 func runLoopForDuration(t *testing.T, loop *Loop, duration time.Duration) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
 
 	go func() { _ = loop.Go(ctx) }()

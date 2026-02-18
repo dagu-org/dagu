@@ -55,15 +55,15 @@ type HTTPDoer interface {
 
 // NewWebSearchTool creates a new web search tool for internet search.
 func NewWebSearchTool() *AgentTool {
-	return newWebSearchToolInternal(nil, "")
+	return newWebSearchTool(nil, "")
 }
 
 // NewWebSearchToolWithClient creates a web search tool with a custom HTTP client for testing.
 func NewWebSearchToolWithClient(client HTTPDoer, baseURL string) *AgentTool {
-	return newWebSearchToolInternal(client, baseURL)
+	return newWebSearchTool(client, baseURL)
 }
 
-func newWebSearchToolInternal(client HTTPDoer, baseURL string) *AgentTool {
+func newWebSearchTool(client HTTPDoer, baseURL string) *AgentTool {
 	return &AgentTool{
 		Tool: llm.Tool{
 			Type: "function",
@@ -87,16 +87,12 @@ func newWebSearchToolInternal(client HTTPDoer, baseURL string) *AgentTool {
 			},
 		},
 		Run: func(toolCtx ToolContext, input json.RawMessage) ToolOut {
-			return webSearchRunWithClient(toolCtx, input, client, baseURL)
+			return webSearchRun(toolCtx, input, client, baseURL)
 		},
 	}
 }
 
-func webSearchRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
-	return webSearchRunWithClient(toolCtx, input, nil, "")
-}
-
-func webSearchRunWithClient(toolCtx ToolContext, input json.RawMessage, client HTTPDoer, baseURL string) ToolOut {
+func webSearchRun(toolCtx ToolContext, input json.RawMessage, client HTTPDoer, baseURL string) ToolOut {
 	var args WebSearchToolInput
 	if err := json.Unmarshal(input, &args); err != nil {
 		return toolError("Failed to parse input: %v", err)
@@ -115,7 +111,7 @@ func webSearchRunWithClient(toolCtx ToolContext, input json.RawMessage, client H
 	ctx, cancel := context.WithTimeout(parentCtx, defaultWebSearchTimeout)
 	defer cancel()
 
-	results, err := performSearchWithClient(ctx, args.Query, maxResults, client, baseURL)
+	results, err := performSearch(ctx, args.Query, maxResults, client, baseURL)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return toolError("Search timed out after %v", defaultWebSearchTimeout)
@@ -137,11 +133,7 @@ func resolveMaxResults(maxResults int) int {
 	return min(maxResults, maxAllowedResults)
 }
 
-func performSearch(ctx context.Context, query string, maxResults int) ([]SearchResult, error) {
-	return performSearchWithClient(ctx, query, maxResults, nil, "")
-}
-
-func performSearchWithClient(ctx context.Context, query string, maxResults int, httpClient HTTPDoer, baseURL string) ([]SearchResult, error) {
+func performSearch(ctx context.Context, query string, maxResults int, httpClient HTTPDoer, baseURL string) ([]SearchResult, error) {
 	searchURL := duckDuckGoURL
 	if baseURL != "" {
 		searchURL = baseURL
@@ -153,12 +145,8 @@ func performSearchWithClient(ctx context.Context, query string, maxResults int, 
 		SetRetryWaitTime(retryWaitTime).
 		AddRetryCondition(func(r *resty.Response, err error) bool {
 			if err != nil {
-				// Only retry on transient errors (timeout/connection errors)
 				var netErr net.Error
-				if errors.As(err, &netErr) && netErr.Timeout() {
-					return true
-				}
-				return false
+				return errors.As(err, &netErr) && netErr.Timeout()
 			}
 			code := r.StatusCode()
 			return code == 429 || code >= 500

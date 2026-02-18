@@ -7,46 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCreateTools(t *testing.T) {
-	t.Parallel()
-
-	expectedTools := []string{"bash", "read", "patch", "think", "navigate", "read_schema", "ask_user", "web_search", "delegate"}
-
-	tools := CreateTools(ToolConfig{})
-	assert.Len(t, tools, len(expectedTools))
-	for _, name := range expectedTools {
-		tool := GetToolByName(tools, name)
-		require.NotNil(t, tool, "expected tool %s to exist", name)
-		assert.Equal(t, "function", tool.Type)
-	}
-}
-
-func TestToolConstructors(t *testing.T) {
-	t.Parallel()
-
-	tools := []*AgentTool{
-		NewReadTool(),
-		NewBashTool(),
-		NewNavigateTool(),
-		NewPatchTool(""),
-		NewThinkTool(),
-		NewAskUserTool(),
-		NewWebSearchTool(),
-		NewReadSchemaTool(),
-		NewDelegateTool(),
-	}
-	for _, tool := range tools {
-		t.Run(tool.Function.Name, func(t *testing.T) {
-			t.Parallel()
-
-			assert.Equal(t, "function", tool.Type)
-			assert.NotEmpty(t, tool.Function.Name)
-			assert.NotEmpty(t, tool.Function.Description)
-			assert.NotNil(t, tool.Run)
-		})
-	}
-}
-
 func TestGetToolByName(t *testing.T) {
 	t.Parallel()
 

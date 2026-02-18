@@ -427,51 +427,6 @@ func newSequenceProvider(responses ...*llm.ChatResponse) *mockLLMProvider {
 	}
 }
 
-// newErrorOnceProvider creates a mock provider that fails on the first call
-// and returns the given response on subsequent calls.
-func newErrorOnceProvider(response *llm.ChatResponse) *mockLLMProvider {
-	var mu sync.Mutex
-	callCount := 0
-	return &mockLLMProvider{
-		chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
-			mu.Lock()
-			callCount++
-			n := callCount
-			mu.Unlock()
-			if n == 1 {
-				return nil, fmt.Errorf("transient error")
-			}
-			return response, nil
-		},
-	}
-}
-
-// newToolCallProvider creates a mock provider that always returns a tool call.
-// Useful for testing max depth limits.
-func newToolCallProvider(toolName, toolID string) *mockLLMProvider {
-	var mu sync.Mutex
-	callNum := 0
-	return &mockLLMProvider{
-		chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
-			mu.Lock()
-			callNum++
-			id := fmt.Sprintf("%s-%d", toolID, callNum)
-			mu.Unlock()
-			return &llm.ChatResponse{
-				FinishReason: "tool_calls",
-				ToolCalls: []llm.ToolCall{{
-					ID:   id,
-					Type: "function",
-					Function: llm.ToolCallFunction{
-						Name:      toolName,
-						Arguments: `{}`,
-					},
-				}},
-			}, nil
-		},
-	}
-}
-
 // testAPIWithModels creates an API instance pre-configured with the given model configs
 // and mock providers already cached. Returns the API and model store for further customization.
 func testAPIWithModels(t *testing.T, models ...*ModelConfig) (*API, *mockModelStore) {

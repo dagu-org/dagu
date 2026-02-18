@@ -17,38 +17,38 @@ import (
 // SessionManager manages a single active session.
 // It links the Loop with SSE streaming and handles state management.
 type SessionManager struct {
-	id                 string
-	userID             string
-	loop               *Loop
-	loopCancel         context.CancelFunc
-	mu                 sync.Mutex
-	createdAt          time.Time
-	lastActivity       time.Time
-	model              string
-	messages           []Message
-	subpub             *SubPub[StreamResponse]
-	working            bool
-	logger             *slog.Logger
-	workingDir         string
-	sequenceID         int64
-	environment        EnvironmentInfo
-	safeMode           bool
-	hooks              *Hooks
-	username           string
-	ipAddress          string
-	role               auth.Role
-	onWorkingChange    func(id string, working bool)
-	onMessage          func(ctx context.Context, msg Message) error
-	pendingPrompts     map[string]chan UserPromptResponse
-	promptsMu          sync.Mutex
-	inputCostPer1M     float64
-	outputCostPer1M    float64
-	totalCost          float64
-	memoryStore        MemoryStore
-	dagName            string
-	sessionStore       SessionStore
-	parentSessionID    string
-	delegateTask       string
+	id                   string
+	userID               string
+	loop                 *Loop
+	loopCancel           context.CancelFunc
+	mu                   sync.Mutex
+	createdAt            time.Time
+	lastActivity         time.Time
+	model                string
+	messages             []Message
+	subpub               *SubPub[StreamResponse]
+	working              bool
+	logger               *slog.Logger
+	workingDir           string
+	sequenceID           int64
+	environment          EnvironmentInfo
+	safeMode             bool
+	hooks                *Hooks
+	username             string
+	ipAddress            string
+	role                 auth.Role
+	onWorkingChange      func(id string, working bool)
+	onMessage            func(ctx context.Context, msg Message) error
+	pendingPrompts       map[string]chan UserPromptResponse
+	promptsMu            sync.Mutex
+	inputCostPer1M       float64
+	outputCostPer1M      float64
+	totalCost            float64
+	memoryStore          MemoryStore
+	dagName              string
+	sessionStore         SessionStore
+	parentSessionID      string
+	delegateTask         string
 	registerSubSession   func(id string, mgr *SessionManager)
 	deregisterSubSession func(id string)
 }
@@ -100,30 +100,31 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 
 	now := time.Now()
 	return &SessionManager{
-		id:                 id,
-		userID:             cfg.UserID,
-		createdAt:          now,
-		lastActivity:       now,
-		logger:             logger.With("session_id", id),
-		subpub:             NewSubPub[StreamResponse](),
-		messages:           messages,
-		workingDir:         cfg.WorkingDir,
-		onWorkingChange:    cfg.OnWorkingChange,
-		onMessage:          cfg.OnMessage,
-		sequenceID:         cfg.SequenceID,
-		environment:        cfg.Environment,
-		safeMode:           cfg.SafeMode,
-		hooks:              cfg.Hooks,
-		username:           cfg.Username,
-		ipAddress:          cfg.IPAddress,
-		role:               cfg.Role,
-		inputCostPer1M:     cfg.InputCostPer1M,
-		outputCostPer1M:    cfg.OutputCostPer1M,
-		memoryStore:        cfg.MemoryStore,
-		dagName:            cfg.DAGName,
-		sessionStore:       cfg.SessionStore,
-		parentSessionID:    cfg.ParentSessionID,
-		delegateTask:       cfg.DelegateTask,
+		id:                   id,
+		userID:               cfg.UserID,
+		createdAt:            now,
+		lastActivity:         now,
+		logger:               logger.With("session_id", id),
+		subpub:               NewSubPub[StreamResponse](),
+		messages:             messages,
+		workingDir:           cfg.WorkingDir,
+		onWorkingChange:      cfg.OnWorkingChange,
+		onMessage:            cfg.OnMessage,
+		sequenceID:           cfg.SequenceID,
+		environment:          cfg.Environment,
+		safeMode:             cfg.SafeMode,
+		hooks:                cfg.Hooks,
+		username:             cfg.Username,
+		ipAddress:            cfg.IPAddress,
+		role:                 cfg.Role,
+		pendingPrompts:       make(map[string]chan UserPromptResponse),
+		inputCostPer1M:       cfg.InputCostPer1M,
+		outputCostPer1M:      cfg.OutputCostPer1M,
+		memoryStore:          cfg.MemoryStore,
+		dagName:              cfg.DAGName,
+		sessionStore:         cfg.SessionStore,
+		parentSessionID:      cfg.ParentSessionID,
+		delegateTask:         cfg.DelegateTask,
 		registerSubSession:   cfg.RegisterSubSession,
 		deregisterSubSession: cfg.DeregisterSubSession,
 	}
@@ -440,26 +441,26 @@ func (sm *SessionManager) ensureLoop(provider llm.Provider, modelID string, reso
 func (sm *SessionManager) createLoop(provider llm.Provider, model string, history []llm.Message, safeMode bool) *Loop {
 	memory := sm.loadMemory()
 	return NewLoop(LoopConfig{
-		Provider:           provider,
-		Model:              model,
-		History:            history,
-		Tools:              CreateTools(ToolConfig{DAGsDir: sm.environment.DAGsDir}),
-		RecordMessage:      sm.createRecordMessageFunc(),
-		Logger:             sm.logger,
-		SystemPrompt:       GenerateSystemPrompt(sm.environment, nil, memory, sm.role),
-		WorkingDir:         sm.workingDir,
-		SessionID:          sm.id,
-		OnWorking:          sm.SetWorking,
-		EmitUIAction:       sm.createEmitUIActionFunc(),
-		EmitUserPrompt:     sm.createEmitUserPromptFunc(),
-		WaitUserResponse:   sm.createWaitUserResponseFunc(),
-		SafeMode:           safeMode,
-		Hooks:              sm.hooks,
-		UserID:             sm.userID,
-		Username:           sm.username,
-		IPAddress:          sm.ipAddress,
-		Role:               sm.role,
-		SessionStore:       sm.sessionStore,
+		Provider:             provider,
+		Model:                model,
+		History:              history,
+		Tools:                CreateTools(ToolConfig{DAGsDir: sm.environment.DAGsDir}),
+		RecordMessage:        sm.createRecordMessageFunc(),
+		Logger:               sm.logger,
+		SystemPrompt:         GenerateSystemPrompt(sm.environment, nil, memory, sm.role),
+		WorkingDir:           sm.workingDir,
+		SessionID:            sm.id,
+		OnWorking:            sm.SetWorking,
+		EmitUIAction:         sm.createEmitUIActionFunc(),
+		EmitUserPrompt:       sm.createEmitUserPromptFunc(),
+		WaitUserResponse:     sm.createWaitUserResponseFunc(),
+		SafeMode:             safeMode,
+		Hooks:                sm.hooks,
+		UserID:               sm.userID,
+		Username:             sm.username,
+		IPAddress:            sm.ipAddress,
+		Role:                 sm.role,
+		SessionStore:         sm.sessionStore,
 		RegisterSubSession:   sm.registerSubSession,
 		DeregisterSubSession: sm.deregisterSubSession,
 		NotifyParent: func(event StreamResponse) {
@@ -622,9 +623,6 @@ func (sm *SessionManager) createWaitUserResponseFunc() WaitUserResponseFunc {
 		ch := make(chan UserPromptResponse, 1)
 
 		sm.promptsMu.Lock()
-		if sm.pendingPrompts == nil {
-			sm.pendingPrompts = make(map[string]chan UserPromptResponse)
-		}
 		sm.pendingPrompts[promptID] = ch
 		sm.promptsMu.Unlock()
 
