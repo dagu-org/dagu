@@ -234,9 +234,14 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 	}
 
 	// Record the task as the initial user message and forward to parent.
+	// ID must be set before calling RecordExternalMessage because it takes
+	// Message by value — the caller's copy keeps the assigned ID so
+	// forwardToParent sends a message with a real ID (not "").
 	userMsg := Message{
-		Type:    MessageTypeUser,
-		Content: task.Task,
+		ID:        uuid.New().String(),
+		Type:      MessageTypeUser,
+		Content:   task.Task,
+		CreatedAt: time.Now(),
 	}
 	if err := subMgr.RecordExternalMessage(ctx.Context, userMsg); err != nil {
 		logger.Warn("Failed to record initial delegate message", "error", err)
@@ -275,6 +280,13 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		}
 		if msg.Type == MessageTypeError {
 			lastError = msg.Content
+		}
+		// Assign ID before RecordExternalMessage (which takes by value) so
+		// that forwardToParent sends a message with a real ID. Without this,
+		// every forwarded message has ID "" and the frontend dedup logic
+		// overwrites index 0, making only the last message visible.
+		if msg.ID == "" {
+			msg.ID = uuid.New().String()
 		}
 		err := subMgr.RecordExternalMessage(msgCtx, msg)
 		forwardToParent(msg)
