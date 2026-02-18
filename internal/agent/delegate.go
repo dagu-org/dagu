@@ -270,8 +270,13 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		})
 	}
 
-	// Filter out the delegate tool from child tools to prevent recursion.
+	// Filter out tools unavailable to sub-agents:
+	// - delegate: prevents recursion
+	// - ask_user: requires interactive user prompt channel
+	// - navigate: requires UI action channel
 	childTools := filterOutTool(dc.Tools, delegateToolName)
+	childTools = filterOutTool(childTools, "ask_user")
+	childTools = filterOutTool(childTools, "navigate")
 
 	// Create a cancellable context for the child loop.
 	childCtx, cancelChild := context.WithCancel(ctx.Context)
