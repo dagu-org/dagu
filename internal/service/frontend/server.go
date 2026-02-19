@@ -159,7 +159,13 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 
 	var agentSkillStore agent.SkillStore
-	if skillStore, skillErr := fileagentskill.New(filepath.Join(cfg.Paths.DAGsDir, "skills")); skillErr != nil {
+	skillsDir := filepath.Join(cfg.Paths.DAGsDir, "skills")
+	if !cfg.Core.SkipExamples {
+		if fileagentskill.SeedExampleSkills(skillsDir) && agentConfigStore != nil {
+			autoEnableExampleSkills(ctx, agentConfigStore)
+		}
+	}
+	if skillStore, skillErr := fileagentskill.New(skillsDir); skillErr != nil {
 		logger.Warn(ctx, "Failed to create agent skill store", tag.Error(skillErr))
 	} else {
 		agentSkillStore = skillStore
@@ -499,6 +505,30 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 		slog.String("branch", syncCfg.Branch))
 
 	return svc
+}
+
+// autoEnableExampleSkills adds example skill IDs to the agent config's enabled list.
+func autoEnableExampleSkills(ctx context.Context, configStore agent.ConfigStore) {
+	cfg, err := configStore.Load(ctx)
+	if err != nil {
+		logger.Warn(ctx, "Failed to load agent config for auto-enabling skills", tag.Error(err))
+		return
+	}
+
+	existing := make(map[string]struct{}, len(cfg.EnabledSkills))
+	for _, id := range cfg.EnabledSkills {
+		existing[id] = struct{}{}
+	}
+
+	for _, id := range fileagentskill.ExampleSkillIDs() {
+		if _, ok := existing[id]; !ok {
+			cfg.EnabledSkills = append(cfg.EnabledSkills, id)
+		}
+	}
+
+	if err := configStore.Save(ctx, cfg); err != nil {
+		logger.Warn(ctx, "Failed to auto-enable example skills", tag.Error(err))
+	}
 }
 
 // initAgentAPI creates and returns an agent API.

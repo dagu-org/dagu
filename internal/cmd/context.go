@@ -449,7 +449,13 @@ func (c *Context) agentStores() agentStoresResult {
 	}
 	result.MemoryStore = ms
 
-	ss, err := fileagentskill.New(filepath.Join(c.Config.Paths.DAGsDir, "skills"))
+	skillsDir := filepath.Join(c.Config.Paths.DAGsDir, "skills")
+	if !c.Config.Core.SkipExamples {
+		if fileagentskill.SeedExampleSkills(skillsDir) {
+			autoEnableExampleSkills(c, result.ConfigStore)
+		}
+	}
+	ss, err := fileagentskill.New(skillsDir)
 	if err != nil {
 		logger.Warn(c, "Failed to create agent skill store", tag.Error(err))
 		return result
@@ -457,6 +463,30 @@ func (c *Context) agentStores() agentStoresResult {
 	result.SkillStore = ss
 
 	return result
+}
+
+// autoEnableExampleSkills adds example skill IDs to the agent config's enabled list.
+func autoEnableExampleSkills(ctx context.Context, configStore agent.ConfigStore) {
+	cfg, err := configStore.Load(ctx)
+	if err != nil {
+		logger.Warn(ctx, "Failed to load agent config for auto-enabling skills", tag.Error(err))
+		return
+	}
+
+	existing := make(map[string]struct{}, len(cfg.EnabledSkills))
+	for _, id := range cfg.EnabledSkills {
+		existing[id] = struct{}{}
+	}
+
+	for _, id := range fileagentskill.ExampleSkillIDs() {
+		if _, ok := existing[id]; !ok {
+			cfg.EnabledSkills = append(cfg.EnabledSkills, id)
+		}
+	}
+
+	if err := configStore.Save(ctx, cfg); err != nil {
+		logger.Warn(ctx, "Failed to auto-enable example skills", tag.Error(err))
+	}
 }
 
 // OpenLogFile creates and opens a log file for a given dag-run.
