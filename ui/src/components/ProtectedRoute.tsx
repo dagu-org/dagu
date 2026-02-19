@@ -11,7 +11,7 @@ type ProtectedRouteProps = {
 /**
  * Renders `children` only when built-in authentication and optional role checks permit access; otherwise performs the appropriate redirect or renders nothing while auth state is loading.
  *
- * If `config.authMode` is not `'builtin'`, access is allowed and `children` are rendered. While auth state is loading the component renders `null`. If the user is not authenticated it redirects to `/login` and preserves the current location for post-login navigation. If a `requiredRole` is provided and the authenticated user lacks that role it redirects to `/`.
+ * If `config.authMode` is not `'builtin'`, access is allowed and `children` are rendered. While auth state is loading the component renders `null`. If `config.setupRequired` is true and the user is not authenticated, it redirects to `/setup` so the initial admin account can be created. If the user is not authenticated it redirects to `/login` and preserves the current location for post-login navigation. If a `requiredRole` is provided and the authenticated user lacks that role it redirects to `/`.
  *
  * @param requiredRole - Optional role required to access the route; one of `'admin' | 'manager' | 'developer' | 'operator' | 'viewer'`.
  * @returns The `children` element when access is allowed, `null` while auth state is loading, or a `Navigate` element that redirects the user when access is denied.

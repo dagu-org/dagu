@@ -512,9 +512,8 @@ func (l *ConfigLoader) setAuthDefaults(cfg *Config) {
 			weakSecrets := []string{"changeme", "secret", "password", "test", "dagu"}
 			for _, weak := range weakSecrets {
 				if strings.EqualFold(cfg.Server.Auth.Builtin.Token.Secret, weak) {
-					l.warnings = append(l.warnings, fmt.Sprintf(
-						"Token secret %q is a common default — use a strong random value for production",
-						cfg.Server.Auth.Builtin.Token.Secret))
+					l.warnings = append(l.warnings,
+						"Token secret is a well-known default value — use a strong random value for production")
 					break
 				}
 			}

@@ -77,23 +77,23 @@ func (s *Store) Resolve(_ context.Context) (auth.TokenSecret, error) {
 	}
 
 	if fileExists {
-		// File exists but is empty — safe to overwrite directly.
-		if err := os.WriteFile(path, []byte(secret), filePerm); err != nil { //nolint:gosec // path is constructed from trusted config dir + constant filename
-			return auth.TokenSecret{}, fmt.Errorf("failed to write token secret file %s: %w", path, err)
+		// File exists but is empty — remove it so writeExclusive can atomically create.
+		if err := os.Remove(path); err != nil {
+			return auth.TokenSecret{}, fmt.Errorf("failed to remove empty token secret file %s: %w", path, err)
 		}
-	} else {
-		// File doesn't exist — use exclusive create to prevent race conditions.
-		// If another process created the file first, read their secret instead.
-		if err := writeExclusive(path, []byte(secret), filePerm); err != nil {
-			if errors.Is(err, os.ErrExist) {
-				data, readErr := os.ReadFile(path) //nolint:gosec // path is constructed from trusted config dir + constant filename
-				if readErr != nil {
-					return auth.TokenSecret{}, fmt.Errorf("failed to read token secret after race: %w", readErr)
-				}
-				return auth.NewTokenSecretFromString(strings.TrimSpace(string(data)))
+	}
+
+	// Use exclusive create to prevent race conditions.
+	// If another process created the file first, read their secret instead.
+	if err := writeExclusive(path, []byte(secret), filePerm); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			data, readErr := os.ReadFile(path) //nolint:gosec // path is constructed from trusted config dir + constant filename
+			if readErr != nil {
+				return auth.TokenSecret{}, fmt.Errorf("failed to read token secret after race: %w", readErr)
 			}
-			return auth.TokenSecret{}, fmt.Errorf("failed to write token secret file %s: %w", path, err)
+			return auth.NewTokenSecretFromString(strings.TrimSpace(string(data)))
 		}
+		return auth.TokenSecret{}, fmt.Errorf("failed to write token secret file %s: %w", path, err)
 	}
 
 	return auth.NewTokenSecretFromString(secret)

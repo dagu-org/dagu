@@ -87,6 +87,7 @@ func (a *API) Setup(ctx context.Context, request api.SetupRequestObject) (api.Se
 	// Generate JWT for immediate login
 	tokenResult, err := a.authService.GenerateToken(user)
 	if err != nil {
+		logger.Warn(ctx, "Failed to generate token after setup", tag.Error(err))
 		return nil, err
 	}
 

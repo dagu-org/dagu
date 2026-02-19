@@ -118,8 +118,8 @@ auth:
   mode: "builtin"  # Options: "none", "basic", "builtin" (default)
   builtin:
     admin:
-      username: "admin"        # optional: skips setup page
-      password: ""             # optional: auto-generated if empty
+      username: "admin"        # setting username alone triggers the setup page
+      password: ""             # set both username+password to skip the setup page
     token:
       secret: ""               # optional: auto-generated at {data_dir}/auth/token_secret
       ttl: "24h"

@@ -205,7 +205,7 @@
       "properties": {
         "mode": {
           "type": "string",
-          "description": "Authentication mode.",
+          "description": "Authentication mode. Defaults to 'builtin'. OIDC is now configured under builtin mode (auth.oidc).",
           "enum": ["none", "basic", "builtin"]
         },
         "basic": {

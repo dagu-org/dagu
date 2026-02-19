@@ -305,6 +305,8 @@ func (a *API) createValidatorMiddleware(swagger *openapi3.T) func(http.Handler) 
 func (a *API) buildAuthOptions(_ context.Context, basePath string) (frontendauth.Options, error) {
 	authConfig := a.config.Server.Auth
 
+	// Setup endpoint is intentionally public — the handler enforces a one-time
+	// guard (returns 403 once an admin user exists).
 	publicPaths := []string{
 		pathutil.BuildPublicEndpointPath(basePath, "api/v1/health"),
 		pathutil.BuildPublicEndpointPath(basePath, "api/v1/auth/login"),

@@ -22,6 +22,8 @@ func (m *mockProvider) Resolve(_ context.Context) (auth.TokenSecret, error) {
 }
 
 func TestChainProvider(t *testing.T) {
+	t.Parallel()
+
 	validSecret, err := auth.NewTokenSecretFromString("valid-secret")
 	require.NoError(t, err)
 
@@ -29,6 +31,7 @@ func TestChainProvider(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("first provider succeeds", func(t *testing.T) {
+		t.Parallel()
 		chain := tokensecret.NewChain(
 			&mockProvider{secret: validSecret},
 			&mockProvider{secret: fallbackSecret},
@@ -39,6 +42,7 @@ func TestChainProvider(t *testing.T) {
 	})
 
 	t.Run("skips invalid and uses fallback", func(t *testing.T) {
+		t.Parallel()
 		chain := tokensecret.NewChain(
 			&mockProvider{err: auth.ErrInvalidTokenSecret},
 			&mockProvider{secret: fallbackSecret},
@@ -49,6 +53,7 @@ func TestChainProvider(t *testing.T) {
 	})
 
 	t.Run("fatal error stops chain", func(t *testing.T) {
+		t.Parallel()
 		fatalErr := errors.New("permission denied")
 		chain := tokensecret.NewChain(
 			&mockProvider{err: fatalErr},
@@ -59,6 +64,7 @@ func TestChainProvider(t *testing.T) {
 	})
 
 	t.Run("all providers exhausted", func(t *testing.T) {
+		t.Parallel()
 		chain := tokensecret.NewChain(
 			&mockProvider{err: auth.ErrInvalidTokenSecret},
 			&mockProvider{err: auth.ErrInvalidTokenSecret},
@@ -68,6 +74,7 @@ func TestChainProvider(t *testing.T) {
 	})
 
 	t.Run("empty chain", func(t *testing.T) {
+		t.Parallel()
 		chain := tokensecret.NewChain()
 		_, err := chain.Resolve(context.Background())
 		assert.ErrorIs(t, err, auth.ErrInvalidTokenSecret)

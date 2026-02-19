@@ -171,6 +171,8 @@ func logTunnelStatus(ctx *Context, svc *tunnel.Service) {
 		authStatus = "Basic (enabled)"
 	case config.AuthModeNone:
 		authStatus = "Disabled"
+	default:
+		authStatus = fmt.Sprintf("Unknown (%s)", ctx.Config.Server.Auth.Mode)
 	}
 
 	terminalStatus := "Disabled"

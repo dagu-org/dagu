@@ -625,7 +625,7 @@ paths:
 		require.NoError(t, err)
 		loadErr := testLoadWithError(t, WithConfigFile(configFile))
 		require.Error(t, loadErr)
-		assert.Contains(t, loadErr.Error(), "auth.basic credentials are set but auth.mode is")
+		require.Contains(t, loadErr.Error(), "auth.basic credentials are set but auth.mode is")
 	})
 }
 
@@ -897,12 +897,12 @@ auth:
 			"DAGU_AUTH_TOKEN_SECRET": "test-secret",
 			"DAGU_PATHS_USERS_DIR":   t.TempDir(),
 		})
-		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
+		require.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
 	})
 
 	t.Run("AuthModeDefaultBuiltin", func(t *testing.T) {
 		cfg := loadFromYAML(t, "# empty")
-		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
+		require.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
 	})
 
 	t.Run("AuthModeInvalid", func(t *testing.T) {
@@ -914,7 +914,7 @@ auth:
       username: admin
       password: testpassword
 `)
-		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
+		require.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
 		require.Len(t, cfg.Warnings, 1)
 		assert.Contains(t, cfg.Warnings[0], "Invalid auth.mode value")
 		assert.Contains(t, cfg.Warnings[0], "invalid_mode")

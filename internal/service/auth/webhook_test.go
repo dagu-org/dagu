@@ -19,7 +19,7 @@ func setupWebhookTestService(t *testing.T) (*Service, string) {
 	require.NoError(t, err)
 
 	service := New(nil, Config{
-		TokenSecret: mustTokenSecret("test-secret"),
+		TokenSecret: mustTokenSecret("test"),
 		TokenTTL:    time.Hour,
 		BcryptCost:  4, // Low cost for fast tests
 	}, WithWebhookStore(webhookStore))

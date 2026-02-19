@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 )
 
 // ErrInvalidTokenSecret indicates the token secret is empty or otherwise unusable.
@@ -73,6 +74,16 @@ func (ts TokenSecret) MarshalJSON() ([]byte, error) {
 // MarshalText prevents the secret from being serialized as text.
 func (ts TokenSecret) MarshalText() ([]byte, error) {
 	return []byte("[REDACTED]"), nil
+}
+
+// UnmarshalJSON rejects deserialization to prevent silent zero-value creation.
+func (ts *TokenSecret) UnmarshalJSON([]byte) error {
+	return fmt.Errorf("auth.TokenSecret must be constructed via NewTokenSecret or NewTokenSecretFromString, not deserialized from JSON")
+}
+
+// UnmarshalText rejects deserialization to prevent silent zero-value creation.
+func (ts *TokenSecret) UnmarshalText([]byte) error {
+	return fmt.Errorf("auth.TokenSecret must be constructed via NewTokenSecret or NewTokenSecretFromString, not deserialized from text")
 }
 
 // TokenSecretProvider resolves the JWT signing secret from a configured source.

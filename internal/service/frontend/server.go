@@ -364,15 +364,14 @@ func initBuiltinAuthService(ctx context.Context, cfg *config.Config, collector *
 
 	if adminUsername != "" {
 		// Env vars set admin credentials — EnsureAdminUser (env vars always win)
-		password, created, err := authSvc.EnsureAdminUser(ctx, adminUsername, adminPassword)
+		_, created, err := authSvc.EnsureAdminUser(ctx, adminUsername, adminPassword)
 		if err != nil {
 			return nil, fmt.Errorf("failed to ensure admin user: %w", err)
 		}
 		if created {
 			if adminPassword == "" {
 				logger.Warn(ctx, "Admin user created with auto-generated password — change it immediately",
-					slog.String("username", adminUsername),
-					slog.String("password", password))
+					slog.String("username", adminUsername))
 			} else {
 				logger.Info(ctx, "Created admin user", slog.String("username", adminUsername))
 			}
