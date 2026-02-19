@@ -32,7 +32,7 @@ steps:
 The `startup` field controls how the DAG-level container is initialized:
 
 - **`keepalive`** (default): Uses an internal keepalive process. Steps execute via `docker exec`.
-- **`entrypoint`**: Honors the image's ENTRYPOINT/CMD. The first step waits for the entrypoint to complete.
+- **`entrypoint`**: Honors the image's ENTRYPOINT/CMD. Waits for the container to reach running state, then executes steps via `docker exec`.
 - **`command`**: Runs the provided `command` array as the container process.
 
 ```yaml
@@ -58,9 +58,9 @@ steps:
   - ./run-tests.sh
 ```
 
-## Per-Step Container Override
+## Per-Step Container
 
-Individual steps can use a different container with `type: docker`:
+Individual steps can run in their own container using the step-level `container:` field (same syntax as DAG-level):
 
 ```yaml
 container:
@@ -71,9 +71,8 @@ steps:
     command: npm run build
 
   - name: test-python
-    type: docker
     command: pytest /tests
-    config:
+    container:
       image: python:3.13
       volumes:
         - ./tests:/tests
@@ -82,7 +81,9 @@ steps:
     command: npm run deploy
 ```
 
-### Docker Executor Config
+### Docker Executor (Advanced)
+
+Use `type: docker` with `config:` for advanced Docker SDK options:
 
 ```yaml
 steps:

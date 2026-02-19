@@ -67,7 +67,7 @@ Supported providers and their default API key environment variables:
 |----------|----------------|-------|
 | `openai` | `OPENAI_API_KEY` | GPT-4o, o1, o3, GPT-5 |
 | `anthropic` | `ANTHROPIC_API_KEY` | Claude 3.5, 4, 4.5 |
-| `gemini` | `GEMINI_API_KEY` | Gemini 2.5 |
+| `gemini` | `GOOGLE_API_KEY` | Gemini 2.5 |
 | `openrouter` | `OPENROUTER_API_KEY` | Multi-provider gateway |
 | `local` | — | Ollama, vLLM (use `base_url`) |
 
@@ -103,7 +103,7 @@ llm:
   model: claude-sonnet-4-20250514
   thinking:
     enabled: true
-    effort: high          # low, medium, high
+    effort: high          # low, medium, high, xhigh
     budget_tokens: 10000  # explicit token budget (optional)
 ```
 
@@ -118,9 +118,9 @@ steps:
     llm:
       provider: openai
       model: gpt-4o
-    tools:
-      - lookup-user       # another DAG that accepts params and returns output
-      - send-notification
+      tools:
+        - lookup-user       # another DAG that accepts params and returns output
+        - send-notification
     messages:
       - role: user
         content: "Find user ${USER_ID} and send them a welcome message."
@@ -156,7 +156,9 @@ Use `type: agent` for autonomous AI agents that can use tools (bash, read, patch
 steps:
   - name: analyze-logs
     type: agent
-    command: "Find errors in the log files and suggest fixes"
+    messages:
+      - role: user
+        content: "Find errors in the log files and suggest fixes"
     agent:
       max_iterations: 20
     output: ANALYSIS
@@ -170,7 +172,9 @@ The agent model is resolved from Agent Settings (configured in the web UI), not 
 steps:
   - name: fix-config
     type: agent
-    command: "Fix the YAML configuration issues"
+    messages:
+      - role: user
+        content: "Fix the YAML configuration issues"
     agent:
       model: my-model-id          # Override global default model
       max_iterations: 30          # Max tool call rounds (default: 50)
@@ -190,7 +194,9 @@ Control which tools are available and restrict bash commands:
 steps:
   - name: read-only-analysis
     type: agent
-    command: "Analyze the codebase structure"
+    messages:
+      - role: user
+        content: "Analyze the codebase structure"
     agent:
       tools:
         enabled:
@@ -220,7 +226,9 @@ type: graph
 steps:
   - name: research
     type: agent
-    command: "Research the topic and summarize findings"
+    messages:
+      - role: user
+        content: "Research the topic and summarize findings"
     output: FINDINGS
 
   - name: report
@@ -252,7 +260,9 @@ steps:
 
   - name: analyze
     type: agent
-    command: "Analyze these metrics and create visualizations: ${METRICS}"
+    messages:
+      - role: user
+        content: "Analyze these metrics and create visualizations: ${METRICS}"
     agent:
       max_iterations: 30
     output: ANALYSIS
