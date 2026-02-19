@@ -7,21 +7,14 @@ import (
 	"net/http"
 	"strings"
 
-	oidc "github.com/coreos/go-oidc"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
-	"golang.org/x/oauth2"
 )
 
 // Options configures the authentication middleware.
 type Options struct {
 	Realm            string
 	BasicAuthEnabled bool
-	OIDCAuthEnabled  bool
-	OIDCProvider     *oidc.Provider
-	OIDCVerify       *oidc.IDTokenVerifier
-	OIDCConfig       *oauth2.Config
-	OIDCWhitelist    []string
 	Creds            map[string]string
 	PublicPaths      []string
 	// PublicPathPrefixes are path prefixes that bypass authentication.
@@ -37,15 +30,6 @@ type Options struct {
 	// When false (e.g., auth mode "none"), credentials are validated if provided
 	// but unauthenticated requests are allowed through.
 	AuthRequired bool
-}
-
-// DefaultOptions provides sensible defaults for the middleware.
-func DefaultOptions() Options {
-	return Options{
-		Realm:            "Restricted",
-		BasicAuthEnabled: false,
-		OIDCAuthEnabled:  false,
-	}
 }
 
 // ClientIPMiddleware creates an HTTP middleware that adds the client IP to the request context.
@@ -88,7 +72,7 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 
 	jwtEnabled := opts.JWTValidator != nil
 	apiKeyEnabled := opts.APIKeyValidator != nil
-	anyAuthEnabled := opts.BasicAuthEnabled || opts.OIDCAuthEnabled || jwtEnabled || apiKeyEnabled
+	anyAuthEnabled := opts.BasicAuthEnabled || jwtEnabled || apiKeyEnabled
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -172,12 +156,6 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 				}
 			}
 
-			// Try OIDC Auth if enabled
-			if opts.OIDCAuthEnabled {
-				checkOIDCToken(next, opts.OIDCVerify, w, r)
-				return
-			}
-
 			// No credentials provided
 			// If auth is not required (e.g., mode "none"), allow the request through
 			if !opts.AuthRequired {
@@ -192,14 +170,6 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 			}
 
 			requireBearerAuth(w, opts.Realm)
-		})
-	}
-}
-
-func OIDCMiddleware(opts Options) func(next http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			checkOIDCAuth(next, opts.OIDCProvider, opts.OIDCVerify, opts.OIDCConfig, opts.OIDCWhitelist, w, r)
 		})
 	}
 }

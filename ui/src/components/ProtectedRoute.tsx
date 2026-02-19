@@ -31,6 +31,11 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     return null;
   }
 
+  // Redirect to setup if initial admin account hasn't been created yet
+  if (config.setupRequired) {
+    return <Navigate to="/setup" replace />;
+  }
+
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;

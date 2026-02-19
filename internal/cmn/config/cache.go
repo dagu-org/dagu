@@ -15,6 +15,7 @@ const (
 type CacheLimits struct {
 	DAG     CacheEntryLimits
 	DAGRun  CacheEntryLimits
+	User    CacheEntryLimits
 	APIKey  CacheEntryLimits
 	Webhook CacheEntryLimits
 }
@@ -32,6 +33,7 @@ func (m CacheMode) Limits() CacheLimits {
 		return CacheLimits{
 			DAG:     CacheEntryLimits{Limit: 500, TTL: 12 * time.Hour},
 			DAGRun:  CacheEntryLimits{Limit: 1000, TTL: time.Hour},
+			User:    CacheEntryLimits{Limit: 100, TTL: 15 * time.Minute},
 			APIKey:  CacheEntryLimits{Limit: 100, TTL: 15 * time.Minute},
 			Webhook: CacheEntryLimits{Limit: 100, TTL: 15 * time.Minute},
 		}
@@ -39,6 +41,7 @@ func (m CacheMode) Limits() CacheLimits {
 		return CacheLimits{
 			DAG:     CacheEntryLimits{Limit: 5000, TTL: 12 * time.Hour},
 			DAGRun:  CacheEntryLimits{Limit: 5000, TTL: time.Hour},
+			User:    CacheEntryLimits{Limit: 1000, TTL: 15 * time.Minute},
 			APIKey:  CacheEntryLimits{Limit: 1000, TTL: 15 * time.Minute},
 			Webhook: CacheEntryLimits{Limit: 1000, TTL: 15 * time.Minute},
 		}
@@ -46,6 +49,7 @@ func (m CacheMode) Limits() CacheLimits {
 		return CacheLimits{
 			DAG:     CacheEntryLimits{Limit: 1000, TTL: 12 * time.Hour},
 			DAGRun:  CacheEntryLimits{Limit: 2000, TTL: time.Hour},
+			User:    CacheEntryLimits{Limit: 500, TTL: 15 * time.Minute},
 			APIKey:  CacheEntryLimits{Limit: 500, TTL: 15 * time.Minute},
 			Webhook: CacheEntryLimits{Limit: 500, TTL: 15 * time.Minute},
 		}

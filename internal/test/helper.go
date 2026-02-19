@@ -370,6 +370,25 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 		configData["ui"] = ui
 	}
 
+	// Always write auth section so subprocesses use the same auth mode.
+	// Without this, subprocesses would default to "builtin" and auto-generate
+	// a different token secret, causing authentication mismatches.
+	authMode := string(cfg.Server.Auth.Mode)
+	if authMode == "" {
+		authMode = "none"
+	}
+	authData := map[string]any{
+		"mode": authMode,
+	}
+	if cfg.Server.Auth.Builtin.Token.Secret != "" {
+		authData["builtin"] = map[string]any{
+			"token": map[string]any{
+				"secret": cfg.Server.Auth.Builtin.Token.Secret,
+			},
+		}
+	}
+	configData["auth"] = authData
+
 	content, err := yaml.Marshal(configData)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(configPath, content, 0600))

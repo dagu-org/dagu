@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -13,7 +12,6 @@ import (
 	"time"
 
 	oidc "github.com/coreos/go-oidc"
-	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -23,13 +21,6 @@ import (
 	"github.com/dagu-org/dagu/internal/service/oidcprovision"
 	"golang.org/x/oauth2"
 )
-
-// OIDCConfig holds the initialized OIDC provider, verifier, and OAuth2 config
-type OIDCConfig struct {
-	Provider *oidc.Provider
-	Verifier *oidc.IDTokenVerifier
-	Config   *oauth2.Config
-}
 
 // Tunable constants for OIDC auth behaviour.
 const (
@@ -162,192 +153,6 @@ func initOIDCProviderCore(ctx context.Context, params oidcProviderParams) (*oidc
 		Verifier:     verifier,
 		OAuth2Config: oauth2Config,
 	}, nil
-}
-
-func InitVerifierAndConfig(ctx context.Context, i config.AuthOIDC) (_ *OIDCConfig, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("failed to init OIDC provider: %v", r)
-		}
-	}()
-
-	result, err := initOIDCProviderCore(ctx, oidcProviderParams{
-		Issuer:       i.Issuer,
-		ClientID:     i.ClientID,
-		ClientSecret: i.ClientSecret,
-		ClientURL:    i.ClientURL,
-		Scopes:       i.Scopes,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &OIDCConfig{
-		Provider: result.Provider,
-		Verifier: result.Verifier,
-		Config:   result.OAuth2Config,
-	}, nil
-}
-
-// callbackHandler returns a handler for processing the OIDC redirect.
-// The whitelist slice is converted once to a lookup map for efficiency.
-func callbackHandler(provider *oidc.Provider, verifier *oidc.IDTokenVerifier,
-	config *oauth2.Config, whitelist []string) func(w http.ResponseWriter, r *http.Request) {
-	var allowedEmails map[string]struct{}
-	if len(whitelist) > 0 {
-		allowedEmails = make(map[string]struct{}, len(whitelist))
-		for _, e := range whitelist {
-			allowedEmails[e] = struct{}{}
-		}
-	}
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.Background()
-		stateCookie, err := r.Cookie(cookieState)
-		if err != nil {
-			http.Error(w, "state not found", http.StatusBadRequest)
-			return
-		}
-		originalURL, err := r.Cookie(cookieOriginalURL)
-		if err != nil {
-			http.Error(w, "original url not found", http.StatusBadRequest)
-			return
-		}
-		if r.URL.Query().Get("state") != stateCookie.Value {
-			http.Error(w, "state did not match", http.StatusBadRequest)
-			return
-		}
-		oauth2Token, err := config.Exchange(ctx, r.URL.Query().Get("code"))
-		if err != nil {
-			http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		userInfo, err := provider.UserInfo(ctx, oauth2.StaticTokenSource(oauth2Token))
-		if err != nil {
-			http.Error(w, "Failed to get userinfo: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if allowedEmails != nil {
-			if _, ok := allowedEmails[userInfo.Email]; !ok {
-				http.Error(w, "No permissions", http.StatusForbidden)
-				return
-			}
-		}
-		rawIDToken, ok := oauth2Token.Extra("id_token").(string)
-		if !ok {
-			http.Error(w, "No id_token field in oauth2 token.", http.StatusInternalServerError)
-			return
-		}
-		idToken, err := verifier.Verify(ctx, rawIDToken)
-		if err != nil {
-			http.Error(w, "Failed to verify ID Token: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		nonceCookie, err := r.Cookie(cookieNonce)
-		if err != nil {
-			http.Error(w, "nonce not found", http.StatusBadRequest)
-			return
-		}
-		if idToken.Nonce != nonceCookie.Value {
-			http.Error(w, "nonce did not match", http.StatusBadRequest)
-			return
-		}
-		expireSeconds := int(time.Until(idToken.Expiry).Seconds())
-		if expireSeconds <= 0 {
-			expireSeconds = defaultTokenExpirySecs
-		}
-		setCookie(w, r, cookieOIDCToken, rawIDToken, expireSeconds)
-		clearOIDCStateCookies(w, r)
-		http.Redirect(w, r, originalURL.Value, http.StatusFound)
-	}
-}
-
-// verifyAndExtractUser verifies an ID token and extracts user information.
-func verifyAndExtractUser(verifier *oidc.IDTokenVerifier, raw string) (*auth.User, error) {
-	if verifier == nil {
-		return nil, errors.New("verifier is nil")
-	}
-	token, err := verifier.Verify(context.Background(), raw)
-	if err != nil {
-		return nil, err
-	}
-
-	var claims oidcprovision.OIDCClaims
-	if err := token.Claims(&claims); err != nil {
-		return nil, err
-	}
-
-	// Determine username with fallback: preferred_username -> email -> subject
-	username := cmp.Or(claims.PreferredUsername, claims.Email, claims.Subject)
-
-	return &auth.User{
-		ID:       claims.Subject,
-		Username: username,
-		Role:     auth.RoleAdmin, // OIDC users get admin by default
-	}, nil
-}
-
-func checkOIDCAuth(next http.Handler, provider *oidc.Provider, verifier *oidc.IDTokenVerifier,
-	config *oauth2.Config, whitelist []string, w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	// Fast-path: already authenticated and not hitting the callback endpoint.
-	if authorized, err := r.Cookie(cookieOIDCToken); err == nil && authorized.Value != "" && !strings.HasSuffix(config.RedirectURL, r.URL.Path) {
-		if user, err := verifyAndExtractUser(verifier, authorized.Value); err == nil {
-			// Add user and client IP to context
-			ctx = auth.WithUser(ctx, user)
-			ctx = auth.WithClientIP(ctx, GetClientIP(r))
-			next.ServeHTTP(w, r.WithContext(ctx))
-			return
-		}
-		logger.Warn(ctx, "OIDC cookie rejected: token verification failed during UI access",
-			tag.Path(r.URL.Path),
-			slog.String("method", r.Method))
-		clearCookie(w, r, cookieOIDCToken)
-	}
-	// Callback handling.
-	if strings.HasSuffix(config.RedirectURL, r.URL.Path) {
-		callbackHandler(provider, verifier, config, whitelist)(w, r)
-		return
-	}
-	// Initiate auth redirect.
-	state, nonce := stringutil.RandomString(16), stringutil.RandomString(16)
-	setCookie(w, r, cookieState, state, stateCookieExpiry)
-	setCookie(w, r, cookieNonce, nonce, stateCookieExpiry)
-	setCookie(w, r, cookieOriginalURL, r.URL.String(), stateCookieExpiry)
-	http.Redirect(w, r, config.AuthCodeURL(state, oidc.Nonce(nonce)), http.StatusFound)
-}
-
-func checkOIDCToken(next http.Handler, verifier *oidc.IDTokenVerifier, w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	authorized, err := r.Cookie(cookieOIDCToken)
-	if err != nil {
-		logger.Warn(ctx, "OIDC authentication failed: oidcToken cookie not found",
-			tag.Path(r.URL.Path),
-			slog.String("method", r.Method),
-			tag.Error(err))
-		http.Error(w, "Authentication required: OIDC token cookie not found", http.StatusUnauthorized)
-		return
-	}
-	if authorized.Value == "" {
-		logger.Warn(ctx, "OIDC authentication failed: oidcToken cookie is empty",
-			tag.Path(r.URL.Path),
-			slog.String("method", r.Method))
-		http.Error(w, "Authentication required: OIDC token is empty", http.StatusUnauthorized)
-		return
-	}
-	user, err := verifyAndExtractUser(verifier, authorized.Value)
-	if err != nil {
-		logger.Warn(ctx, "OIDC authentication failed: token verification failed",
-			tag.Path(r.URL.Path),
-			slog.String("method", r.Method),
-			tag.Error(err))
-		clearCookie(w, r, cookieOIDCToken)
-		http.Error(w, "Authentication failed: invalid or expired OIDC token", http.StatusUnauthorized)
-		return
-	}
-	// Add user and client IP to context
-	ctx = auth.WithUser(ctx, user)
-	ctx = auth.WithClientIP(ctx, GetClientIP(r))
-	next.ServeHTTP(w, r.WithContext(ctx))
 }
 
 func setCookie(w http.ResponseWriter, r *http.Request, name, value string, expire int) {

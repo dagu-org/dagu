@@ -50,7 +50,7 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_UI_NAVBAR_COLOR":             "#123456",
 		"DAGU_UI_NAVBAR_TITLE":             "Test Dagu",
 
-		"DAGU_AUTH_BASIC_ENABLED":  "true",
+		"DAGU_AUTH_MODE":           "basic",
 		"DAGU_AUTH_BASIC_USERNAME": "testuser",
 		"DAGU_AUTH_BASIC_PASSWORD": "testpass",
 
@@ -139,8 +139,8 @@ func TestLoad_Env(t *testing.T) {
 			APIBasePath: "/test/api",
 			Headless:    true,
 			Auth: Auth{
-				Mode:  AuthModeOIDC, // Auto-detected from OIDC config
-				Basic: AuthBasic{Enabled: true, Username: "testuser", Password: "testpass"},
+				Mode:  AuthModeBasic, // Explicit basic mode from env
+				Basic: AuthBasic{Username: "testuser", Password: "testpass"},
 				OIDC: AuthOIDC{
 					ClientID:     "test-client-id",
 					ClientSecret: "test-secret",
@@ -238,7 +238,7 @@ func TestLoad_Env(t *testing.T) {
 			},
 		},
 		DefaultExecMode: ExecutionModeLocal,
-		Warnings:        []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://auth.example.com)"},
+		Warnings:        nil,
 		Cache:           CacheModeNormal,
 	}
 
@@ -290,8 +290,8 @@ ui:
     sort_field: "name"
     sort_order: "asc"
 auth:
+  mode: "basic"
   basic:
-    enabled: true
     username: "admin"
     password: "secret"
   oidc:
@@ -377,8 +377,8 @@ scheduler:
 			Headless:          true,
 			LatestStatusToday: true,
 			Auth: Auth{
-				Mode:  AuthModeOIDC, // Auto-detected from OIDC config
-				Basic: AuthBasic{Enabled: true, Username: "admin", Password: "secret"},
+				Mode:  AuthModeBasic, // Explicit basic mode from YAML
+				Basic: AuthBasic{Username: "admin", Password: "secret"},
 				OIDC: AuthOIDC{
 					ClientID:     "test-client-id",
 					ClientSecret: "test-client-secret",
@@ -488,7 +488,7 @@ scheduler:
 			Interval:  5 * time.Second,
 		},
 		DefaultExecMode: ExecutionModeLocal,
-		Warnings:        []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://accounts.example.com)"},
+		Warnings:        nil,
 		Cache:           CacheModeNormal,
 	}
 
@@ -603,9 +603,10 @@ scheduler:
 		assert.Contains(t, cfg.Warnings[2], "Invalid scheduler.zombie_detection_interval")
 	})
 
-	t.Run("BuiltinAuthWithBasicAuthWarning", func(t *testing.T) {
+	t.Run("BuiltinAuthWithBasicAuthError", func(t *testing.T) {
 		t.Parallel()
-		cfg := loadWithEnv(t, `
+		configFile := filepath.Join(t.TempDir(), "config.yaml")
+		err := os.WriteFile(configFile, []byte(`
 auth:
   mode: builtin
   builtin:
@@ -614,14 +615,15 @@ auth:
     token:
       secret: test-secret
   basic:
-    enabled: true
     username: basicuser
     password: basicpass
 paths:
   users_dir: /tmp/users
-`, nil)
-		require.Len(t, cfg.Warnings, 1)
-		assert.Contains(t, cfg.Warnings[0], "Basic auth configuration is ignored when auth mode is 'builtin'")
+`), 0600)
+		require.NoError(t, err)
+		loadErr := testLoadWithError(t, WithConfigFile(configFile))
+		require.Error(t, loadErr)
+		assert.Contains(t, loadErr.Error(), "auth.basic credentials are set but auth.mode is")
 	})
 }
 
@@ -887,25 +889,6 @@ auth:
 		assert.Equal(t, 12*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
 	})
 
-	t.Run("AuthModeOIDC", func(t *testing.T) {
-		cfg := loadFromYAML(t, `
-auth:
-  mode: "oidc"
-  oidc:
-    client_id: "my-client-id"
-    client_secret: "my-client-secret"
-    issuer: "https://auth.example.com"
-    scopes:
-      - "openid"
-      - "profile"
-`)
-		assert.Equal(t, AuthModeOIDC, cfg.Server.Auth.Mode)
-		assert.Equal(t, "my-client-id", cfg.Server.Auth.OIDC.ClientID)
-		assert.Equal(t, "my-client-secret", cfg.Server.Auth.OIDC.ClientSecret)
-		assert.Equal(t, "https://auth.example.com", cfg.Server.Auth.OIDC.Issuer)
-		assert.Equal(t, []string{"openid", "profile"}, cfg.Server.Auth.OIDC.Scopes)
-	})
-
 	t.Run("AuthModeFromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
 			"DAGU_AUTH_MODE":         "builtin",
@@ -915,9 +898,9 @@ auth:
 		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
 	})
 
-	t.Run("AuthModeDefaultNone", func(t *testing.T) {
+	t.Run("AuthModeDefaultBuiltin", func(t *testing.T) {
 		cfg := loadFromYAML(t, "# empty")
-		assert.Equal(t, AuthModeNone, cfg.Server.Auth.Mode)
+		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
 	})
 
 	t.Run("AuthModeInvalid", func(t *testing.T) {
@@ -925,7 +908,7 @@ auth:
 auth:
   mode: "invalid_mode"
 `)
-		assert.Equal(t, AuthModeNone, cfg.Server.Auth.Mode)
+		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
 		require.Len(t, cfg.Warnings, 1)
 		assert.Contains(t, cfg.Warnings[0], "Invalid auth.mode value")
 		assert.Contains(t, cfg.Warnings[0], "invalid_mode")

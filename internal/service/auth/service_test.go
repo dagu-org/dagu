@@ -16,6 +16,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func mustTokenSecret(s string) auth.TokenSecret {
+	ts, err := auth.NewTokenSecretFromString(s)
+	if err != nil {
+		panic(err)
+	}
+	return ts
+}
+
 func setupTestService(t *testing.T) (*Service, func()) {
 	t.Helper()
 
@@ -31,7 +39,7 @@ func setupTestService(t *testing.T) (*Service, func()) {
 	}
 
 	config := Config{
-		TokenSecret: "test-secret-key-for-jwt-signing",
+		TokenSecret: mustTokenSecret("test-secret-key-for-jwt-signing"),
 		TokenTTL:    time.Hour,
 		BcryptCost:  4, // Low cost for faster tests
 	}
@@ -296,13 +304,13 @@ func TestService_EnsureAdminUser(t *testing.T) {
 		t.Errorf("Authenticate() admin error = %v", err)
 	}
 
-	// Second call should not create
-	_, created, err = svc.EnsureAdminUser(ctx, "admin2", "adminpass2")
+	// Second call with same username should not create (user already exists)
+	_, created, err = svc.EnsureAdminUser(ctx, "admin", "adminpass2")
 	if err != nil {
 		t.Fatalf("EnsureAdminUser() second call error = %v", err)
 	}
 	if created {
-		t.Error("EnsureAdminUser() should return created=false when users exist")
+		t.Error("EnsureAdminUser() should return created=false when user already exists")
 	}
 }
 
@@ -648,7 +656,7 @@ func TestService_ValidateToken_WrongSecret(t *testing.T) {
 	require.NoError(t, err)
 
 	config1 := Config{
-		TokenSecret: "secret-one",
+		TokenSecret: mustTokenSecret("secret-one"),
 		TokenTTL:    time.Hour,
 		BcryptCost:  4,
 	}
@@ -668,7 +676,7 @@ func TestService_ValidateToken_WrongSecret(t *testing.T) {
 
 	// Create service with different secret
 	config2 := Config{
-		TokenSecret: "secret-two",
+		TokenSecret: mustTokenSecret("secret-two"),
 		TokenTTL:    time.Hour,
 		BcryptCost:  4,
 	}
@@ -689,7 +697,7 @@ func TestService_ValidateToken_MissingSecret(t *testing.T) {
 
 	// Create service without secret
 	config := Config{
-		TokenSecret: "",
+		TokenSecret: auth.TokenSecret{},
 		TokenTTL:    time.Hour,
 		BcryptCost:  4,
 	}
@@ -728,7 +736,7 @@ func setupTestServiceWithAPIKeys(t *testing.T) (*Service, func()) {
 	require.NoError(t, err, "failed to create API key store")
 
 	config := Config{
-		TokenSecret: "test-secret-key-for-jwt-signing",
+		TokenSecret: mustTokenSecret("test-secret-key-for-jwt-signing"),
 		TokenTTL:    time.Hour,
 		BcryptCost:  4, // Low cost for faster tests
 	}

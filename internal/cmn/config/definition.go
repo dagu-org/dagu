@@ -91,7 +91,7 @@ type TLSDef struct {
 
 // AuthDef configures authentication for the application.
 type AuthDef struct {
-	Mode    *string         `mapstructure:"mode"` // "none", "builtin", or "oidc"
+	Mode    *string         `mapstructure:"mode"` // "none", "basic", or "builtin"
 	Basic   *AuthBasicDef   `mapstructure:"basic"`
 	OIDC    *AuthOIDCDef    `mapstructure:"oidc"`
 	Builtin *AuthBuiltinDef `mapstructure:"builtin"`
@@ -99,7 +99,6 @@ type AuthDef struct {
 
 // AuthBasicDef configures basic authentication credentials.
 type AuthBasicDef struct {
-	Enabled  bool   `mapstructure:"enabled"`
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
 }

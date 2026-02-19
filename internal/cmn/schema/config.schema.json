@@ -206,7 +206,7 @@
         "mode": {
           "type": "string",
           "description": "Authentication mode.",
-          "enum": ["none", "builtin", "oidc"]
+          "enum": ["none", "basic", "builtin"]
         },
         "basic": {
           "$ref": "#/definitions/AuthBasicDef"
@@ -227,10 +227,6 @@
       "description": "Basic authentication credentials.",
       "additionalProperties": false,
       "properties": {
-        "enabled": {
-          "type": "boolean",
-          "description": "Enable basic authentication."
-        },
         "username": {
           "type": "string",
           "description": "Basic auth username."

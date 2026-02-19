@@ -34,6 +34,7 @@ import DAGs from './pages/dags';
 import DAGDetails from './pages/dags/dag';
 import GitSyncPage from './pages/git-sync';
 import LoginPage from './pages/login';
+import SetupPage from './pages/setup';
 import Queues from './pages/queues';
 import Search from './pages/search';
 import SystemStatus from './pages/system-status';
@@ -151,6 +152,7 @@ function AppInner({ config }: Props): React.ReactElement {
                       <BrowserRouter basename={config.basePath}>
                         <Routes>
                           <Route path="/login" element={<LoginPage />} />
+                          <Route path="/setup" element={<SetupPage />} />
                           <Route
                             path="/*"
                             element={

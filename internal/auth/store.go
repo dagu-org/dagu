@@ -151,3 +151,13 @@ type WebhookStore interface {
 	// This is called when the webhook is triggered.
 	UpdateLastUsed(ctx context.Context, id string) error
 }
+
+// AuthStore is the unified interface for all auth-related persistence.
+// It provides access to the individual sub-stores via accessor methods,
+// since UserStore, APIKeyStore, and WebhookStore have overlapping method
+// names (Create, GetByID, etc.) with different signatures.
+type AuthStore interface {
+	Users() UserStore
+	APIKeys() APIKeyStore
+	Webhooks() WebhookStore
+}

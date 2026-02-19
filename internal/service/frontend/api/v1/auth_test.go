@@ -51,7 +51,7 @@ func TestAuth_Combinations(t *testing.T) {
 
 		{
 			name:   "default_basic",
-			config: authConfig{basicUser: "admin", basicPass: "secret"},
+			config: authConfig{mode: config.AuthModeBasic, basicUser: "admin", basicPass: "secret"},
 			requests: []request{
 				{name: "no_creds", wantStatus: http.StatusUnauthorized},
 				{name: "valid_basic", basicUser: "admin", basicPass: "secret", wantStatus: http.StatusOK},
@@ -72,7 +72,7 @@ func TestAuth_Combinations(t *testing.T) {
 
 		{
 			name:   "default_basic_special_chars",
-			config: authConfig{basicUser: "admin", basicPass: "p@ss$word&with`special"},
+			config: authConfig{mode: config.AuthModeBasic, basicUser: "admin", basicPass: "p@ss$word&with`special"},
 			requests: []request{
 				{name: "no_creds", wantStatus: http.StatusUnauthorized},
 				{name: "valid_basic", basicUser: "admin", basicPass: "p@ss$word&with`special", wantStatus: http.StatusOK},
@@ -116,60 +116,40 @@ func TestAuth_Combinations(t *testing.T) {
 func TestAuth_BuiltinMode(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name      string
-		basicUser string
-		basicPass string
-	}{
-		{name: "jwt_only"},
-		{name: "jwt_with_basic", basicUser: "basicuser", basicPass: "basicpass"},
-	}
+	t.Run("jwt_only", func(t *testing.T) {
+		t.Parallel()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+		server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+			cfg.Server.Auth.Mode = config.AuthModeBuiltin
+			cfg.Server.Auth.Builtin.Admin.Username = "admin"
+			cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
+			cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
+			cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
+		}))
 
-			server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
-				cfg.Server.Auth.Mode = config.AuthModeBuiltin
-				cfg.Server.Auth.Builtin.Admin.Username = "admin"
-				cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
-				cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
-				cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
-				cfg.Server.Auth.Basic.Username = tt.basicUser
-				cfg.Server.Auth.Basic.Password = tt.basicPass
-			}))
+		// Without auth - should fail
+		server.Client().Get("/api/v1/dag-runs").ExpectStatus(http.StatusUnauthorized).Send(t)
 
-			// Without auth - should fail
-			server.Client().Get("/api/v1/dag-runs").ExpectStatus(http.StatusUnauthorized).Send(t)
+		// Login to get JWT token
+		loginResp := server.Client().Post("/api/v1/auth/login", api.LoginRequest{
+			Username: "admin",
+			Password: "adminpass",
+		}).ExpectStatus(http.StatusOK).Send(t)
 
-			// Login to get JWT token
-			loginResp := server.Client().Post("/api/v1/auth/login", api.LoginRequest{
-				Username: "admin",
-				Password: "adminpass",
-			}).ExpectStatus(http.StatusOK).Send(t)
+		var loginResult api.LoginResponse
+		loginResp.Unmarshal(t, &loginResult)
+		require.NotEmpty(t, loginResult.Token)
 
-			var loginResult api.LoginResponse
-			loginResp.Unmarshal(t, &loginResult)
-			require.NotEmpty(t, loginResult.Token)
+		// With JWT token - should succeed
+		server.Client().Get("/api/v1/dag-runs").
+			WithBearerToken(loginResult.Token).
+			ExpectStatus(http.StatusOK).Send(t)
+	})
 
-			// With JWT token - should succeed
-			server.Client().Get("/api/v1/dag-runs").
-				WithBearerToken(loginResult.Token).
-				ExpectStatus(http.StatusOK).Send(t)
-
-			// With basic auth (if configured) - should succeed
-			if tt.basicUser != "" {
-				server.Client().Get("/api/v1/dag-runs").
-					WithBasicAuth(tt.basicUser, tt.basicPass).
-					ExpectStatus(http.StatusOK).Send(t)
-
-				// Wrong basic auth - should fail
-				server.Client().Get("/api/v1/dag-runs").
-					WithBasicAuth("wrong", "wrong").
-					ExpectStatus(http.StatusUnauthorized).Send(t)
-			}
-		})
-	}
+	// Basic auth is no longer available alongside builtin mode.
+	// Under the new auth model, basic auth is only available when
+	// auth.mode is explicitly set to "basic". Setting basic credentials
+	// under builtin mode is a configuration error.
 }
 
 // TestAuth_PublicPaths tests that public paths bypass authentication

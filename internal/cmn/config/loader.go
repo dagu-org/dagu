@@ -405,7 +405,7 @@ func (l *ConfigLoader) loadServerTLS(cfg *Config, def Definition) {
 }
 
 func (l *ConfigLoader) loadServerAuth(cfg *Config, def Definition) {
-	explicitAuthMode := l.loadAuthMode(cfg, def)
+	l.loadAuthMode(cfg, def)
 
 	if def.Auth == nil {
 		l.setAuthDefaults(cfg)
@@ -415,32 +415,27 @@ func (l *ConfigLoader) loadServerAuth(cfg *Config, def Definition) {
 	l.loadBasicAuth(cfg, def.Auth)
 	l.loadOIDCAuth(cfg, def.Auth)
 	l.loadBuiltinAuth(cfg, def.Auth)
-	l.autoDetectAuthMode(cfg, explicitAuthMode)
-	l.warnBasicAuthWithBuiltin(cfg)
 	l.setAuthDefaults(cfg)
 }
 
-func (l *ConfigLoader) loadAuthMode(cfg *Config, def Definition) bool {
+func (l *ConfigLoader) loadAuthMode(cfg *Config, def Definition) {
 	if def.Auth == nil || def.Auth.Mode == nil {
-		cfg.Server.Auth.Mode = AuthModeNone
-		return false
+		cfg.Server.Auth.Mode = AuthModeBuiltin
+		return
 	}
 
 	mode := AuthMode(*def.Auth.Mode)
 	switch mode {
-	case AuthModeNone, AuthModeBuiltin, AuthModeOIDC:
+	case AuthModeNone, AuthModeBasic, AuthModeBuiltin:
 		cfg.Server.Auth.Mode = mode
-		return true
 	default:
-		l.warnings = append(l.warnings, fmt.Sprintf("Invalid auth.mode value: %q, defaulting to 'none'", *def.Auth.Mode))
-		cfg.Server.Auth.Mode = AuthModeNone
-		return false
+		l.warnings = append(l.warnings, fmt.Sprintf("Invalid auth.mode value: %q, defaulting to 'builtin'", *def.Auth.Mode))
+		cfg.Server.Auth.Mode = AuthModeBuiltin
 	}
 }
 
 func (l *ConfigLoader) loadBasicAuth(cfg *Config, auth *AuthDef) {
 	if auth.Basic != nil {
-		cfg.Server.Auth.Basic.Enabled = auth.Basic.Enabled
 		cfg.Server.Auth.Basic.Username = auth.Basic.Username
 		cfg.Server.Auth.Basic.Password = auth.Basic.Password
 	}
@@ -498,28 +493,6 @@ func (l *ConfigLoader) loadBuiltinAuth(cfg *Config, auth *AuthDef) {
 	if auth.Builtin.Token != nil {
 		cfg.Server.Auth.Builtin.Token.Secret = auth.Builtin.Token.Secret
 		cfg.Server.Auth.Builtin.Token.TTL = l.parseDuration("auth.builtin.token.ttl", auth.Builtin.Token.TTL)
-	}
-}
-
-func (l *ConfigLoader) autoDetectAuthMode(cfg *Config, explicitAuthMode bool) {
-	if explicitAuthMode {
-		return
-	}
-
-	oidc := cfg.Server.Auth.OIDC
-	if oidc.ClientID != "" && oidc.ClientSecret != "" && oidc.Issuer != "" {
-		cfg.Server.Auth.Mode = AuthModeOIDC
-		l.warnings = append(l.warnings, fmt.Sprintf("Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: %s)", oidc.Issuer))
-	}
-}
-
-func (l *ConfigLoader) warnBasicAuthWithBuiltin(cfg *Config) {
-	if cfg.Server.Auth.Mode != AuthModeBuiltin {
-		return
-	}
-
-	if cfg.Server.Auth.Basic.Enabled {
-		l.warnings = append(l.warnings, "Basic auth configuration is ignored when auth mode is 'builtin'; use builtin auth's admin credentials instead")
 	}
 }
 

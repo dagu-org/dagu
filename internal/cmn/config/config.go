@@ -155,8 +155,8 @@ type AuthMode string
 
 const (
 	AuthModeNone    AuthMode = "none"
+	AuthModeBasic   AuthMode = "basic"
 	AuthModeBuiltin AuthMode = "builtin"
-	AuthModeOIDC    AuthMode = "oidc"
 )
 
 // MetricsAccess represents the access mode for the metrics endpoint.
@@ -177,7 +177,6 @@ type Auth struct {
 
 // AuthBasic represents basic authentication credentials.
 type AuthBasic struct {
-	Enabled  bool
 	Username string
 	Password string
 }
@@ -371,6 +370,9 @@ func (c *Config) Validate() error {
 	if err := c.validateUI(); err != nil {
 		return err
 	}
+	if err := c.validateBasicAuth(); err != nil {
+		return err
+	}
 	if err := c.validateBuiltinAuth(); err != nil {
 		return err
 	}
@@ -399,10 +401,10 @@ func (c *Config) validateServer() error {
 	}
 
 	switch c.Server.Auth.Mode {
-	case AuthModeNone, AuthModeBuiltin, AuthModeOIDC:
+	case AuthModeNone, AuthModeBasic, AuthModeBuiltin:
 		// Valid modes
 	default:
-		return fmt.Errorf("invalid auth mode: %q (must be one of: none, builtin, oidc)", c.Server.Auth.Mode)
+		return fmt.Errorf("invalid auth mode: %q (must be one of: none, basic, builtin)", c.Server.Auth.Mode)
 	}
 
 	return nil
@@ -416,6 +418,22 @@ func (c *Config) validateUI() error {
 	return nil
 }
 
+// validateBasicAuth validates the basic authentication configuration.
+func (c *Config) validateBasicAuth() error {
+	if c.Server.Auth.Mode == AuthModeBasic {
+		if c.Server.Auth.Basic.Username == "" || c.Server.Auth.Basic.Password == "" {
+			return fmt.Errorf("basic auth requires both username and password to be set")
+		}
+		return nil
+	}
+
+	// Error if basic credentials are set under a non-basic mode.
+	if c.Server.Auth.Basic.Username != "" || c.Server.Auth.Basic.Password != "" {
+		return fmt.Errorf("auth.basic credentials are set but auth.mode is %q; set auth.mode to 'basic' or remove the auth.basic section", c.Server.Auth.Mode)
+	}
+	return nil
+}
+
 // validateBuiltinAuth validates the builtin authentication configuration.
 func (c *Config) validateBuiltinAuth() error {
 	if c.Server.Auth.Mode != AuthModeBuiltin {
@@ -424,12 +442,6 @@ func (c *Config) validateBuiltinAuth() error {
 
 	if c.Paths.UsersDir == "" {
 		return fmt.Errorf("builtin auth requires paths.users_dir to be set")
-	}
-	if c.Server.Auth.Builtin.Admin.Username == "" {
-		return fmt.Errorf("builtin auth requires admin username to be set")
-	}
-	if c.Server.Auth.Builtin.Token.Secret == "" {
-		return fmt.Errorf("builtin auth requires token secret to be set (auth.builtin.token.secret or AUTH_TOKEN_SECRET env var)")
 	}
 	if c.Server.Auth.Builtin.Token.TTL <= 0 {
 		return fmt.Errorf("builtin auth requires a positive token TTL")

@@ -38,14 +38,13 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
 	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
-	"github.com/dagu-org/dagu/internal/persis/fileapikey"
+	"github.com/dagu-org/dagu/internal/auth/tokensecret"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
+	"github.com/dagu-org/dagu/internal/persis/fileauth"
 	"github.com/dagu-org/dagu/internal/persis/filebaseconfig"
 	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/persis/filesession"
 	"github.com/dagu-org/dagu/internal/persis/fileupgradecheck"
-	"github.com/dagu-org/dagu/internal/persis/fileuser"
-	"github.com/dagu-org/dagu/internal/persis/filewebhook"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
@@ -117,6 +116,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		builtinOIDCCfg  *auth.BuiltinOIDCConfig
 		oidcEnabled     bool
 		oidcButtonLabel string
+		setupRequired   bool
 	)
 
 	auditSvc, auditStore, err := initAuditService(cfg)
@@ -184,11 +184,12 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	var authSvc *authservice.Service
 	if cfg.Server.Auth.Mode == config.AuthModeBuiltin {
-		result, err := initBuiltinAuthService(cfg, collector)
+		result, err := initBuiltinAuthService(ctx, cfg, collector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize builtin auth service: %w", err)
 		}
 		authSvc = result.AuthService
+		setupRequired = result.SetupRequired
 		apiOpts = append(apiOpts, apiv1.WithAuthService(result.AuthService))
 
 		oidcCfg := cfg.Server.Auth.OIDC
@@ -273,6 +274,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			OIDCButtonLabel:       oidcButtonLabel,
 			TerminalEnabled:       cfg.Server.Terminal.Enabled && authSvc != nil,
 			GitSyncEnabled:        cfg.GitSync.Enabled,
+			SetupRequired:         setupRequired,
 			UpdateAvailable:       updateAvailable,
 			LatestVersion:         latestVersion,
 			AgentEnabledChecker:   agentConfigStore,
@@ -319,83 +321,100 @@ func getUpdateInfo(store upgrade.CacheStore) (updateAvailable bool, latestVersio
 }
 
 type builtinAuthResult struct {
-	AuthService *authservice.Service
-	UserStore   authmodel.UserStore
+	AuthService   *authservice.Service
+	UserStore     authmodel.UserStore
+	SetupRequired bool
 }
 
-// initBuiltinAuthService creates a file-based user store and authentication service.
-func initBuiltinAuthService(cfg *config.Config, collector *telemetry.Collector) (*builtinAuthResult, error) {
-	ctx := context.Background()
-
-	if cfg.Server.Auth.Builtin.Token.Secret == "" {
-		return nil, fmt.Errorf("builtin auth requires a non-empty token secret (set DAGU_AUTH_TOKEN_SECRET or server.auth.builtin.token.secret)")
-	}
-
-	userStore, err := fileuser.New(cfg.Paths.UsersDir)
+// initBuiltinAuthService creates the auth store and authentication service.
+// Uses the token secret provider chain to resolve the JWT signing secret
+// (auto-generating and persisting one if not configured).
+func initBuiltinAuthService(ctx context.Context, cfg *config.Config, collector *telemetry.Collector) (*builtinAuthResult, error) {
+	// Resolve token secret via provider chain
+	tokenSecret, err := buildTokenSecretProvider(cfg).Resolve(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create user store: %w", err)
+		return nil, fmt.Errorf("failed to resolve token secret: %w", err)
 	}
 
-	cacheLimits := cfg.Cache.Limits()
-
-	apiKeyCache := fileutil.NewCache[*authmodel.APIKey]("api_key", cacheLimits.APIKey.Limit, cacheLimits.APIKey.TTL)
-	apiKeyCache.StartEviction(ctx)
-	if collector != nil {
-		collector.RegisterCache(apiKeyCache)
-	}
-	apiKeyStore, err := fileapikey.New(cfg.Paths.APIKeysDir, fileapikey.WithFileCache(apiKeyCache))
+	// Create auth store (user, API key, webhook stores with caching)
+	authStore, err := fileauth.New(ctx, fileauth.Config{
+		UsersDir:    cfg.Paths.UsersDir,
+		APIKeysDir:  cfg.Paths.APIKeysDir,
+		WebhooksDir: cfg.Paths.WebhooksDir,
+		CacheLimits: cfg.Cache.Limits(),
+		Collector:   collector,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create API key store: %w", err)
+		return nil, fmt.Errorf("failed to create auth store: %w", err)
 	}
 
-	webhookCache := fileutil.NewCache[*authmodel.Webhook]("webhook", cacheLimits.Webhook.Limit, cacheLimits.Webhook.TTL)
-	webhookCache.StartEviction(ctx)
-	if collector != nil {
-		collector.RegisterCache(webhookCache)
-	}
-	webhookStore, err := filewebhook.New(cfg.Paths.WebhooksDir, filewebhook.WithFileCache(webhookCache))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create webhook store: %w", err)
-	}
-
-	authSvc := authservice.New(userStore, authservice.Config{
-		TokenSecret: cfg.Server.Auth.Builtin.Token.Secret,
+	authSvc := authservice.New(authStore.Users(), authservice.Config{
+		TokenSecret: tokenSecret,
 		TokenTTL:    cfg.Server.Auth.Builtin.Token.TTL,
 	},
-		authservice.WithAPIKeyStore(apiKeyStore),
-		authservice.WithWebhookStore(webhookStore),
+		authservice.WithAPIKeyStore(authStore.APIKeys()),
+		authservice.WithWebhookStore(authStore.Webhooks()),
 	)
 
-	password, created, err := authSvc.EnsureAdminUser(
-		ctx,
-		cfg.Server.Auth.Builtin.Admin.Username,
-		cfg.Server.Auth.Builtin.Admin.Password,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to ensure admin user: %w", err)
-	}
+	// Determine setup mode vs admin provisioning
+	setupRequired := false
+	adminUsername := cfg.Server.Auth.Builtin.Admin.Username
+	adminPassword := cfg.Server.Auth.Builtin.Admin.Password
 
-	if created {
-		if cfg.Server.Auth.Builtin.Admin.Password == "" {
-			// Auto-generated password: print to stdout (not structured logs)
-			fmt.Printf("\n"+
-				"================================================================================\n"+
-				"  ADMIN USER CREATED\n"+
-				"  Username: %s\n"+
-				"  Password: %s\n"+
-				"  NOTE: Please change this password immediately!\n"+
-				"================================================================================\n\n",
-				cfg.Server.Auth.Builtin.Admin.Username, password)
-		} else {
-			logger.Info(ctx, "Created admin user",
-				slog.String("username", cfg.Server.Auth.Builtin.Admin.Username))
+	if adminUsername != "" {
+		// Env vars set admin credentials — EnsureAdminUser (env vars always win)
+		password, created, err := authSvc.EnsureAdminUser(ctx, adminUsername, adminPassword)
+		if err != nil {
+			return nil, fmt.Errorf("failed to ensure admin user: %w", err)
 		}
+		if created {
+			if adminPassword == "" {
+				fmt.Printf("\n"+
+					"================================================================================\n"+
+					"  ADMIN USER CREATED\n"+
+					"  Username: %s\n"+
+					"  Password: %s\n"+
+					"  NOTE: Please change this password immediately!\n"+
+					"================================================================================\n\n",
+					adminUsername, password)
+			} else {
+				logger.Info(ctx, "Created admin user", slog.String("username", adminUsername))
+			}
+		}
+	} else {
+		// No admin env vars — check if setup page is needed
+		count, err := authSvc.CountUsers(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to count users: %w", err)
+		}
+		setupRequired = count == 0
 	}
 
 	return &builtinAuthResult{
-		AuthService: authSvc,
-		UserStore:   userStore,
+		AuthService:   authSvc,
+		UserStore:     authStore.Users(),
+		SetupRequired: setupRequired,
 	}, nil
+}
+
+// buildTokenSecretProvider constructs the token secret provider chain.
+// Priority: 1. Static from config/env, 2. File-based (auto-generate if missing).
+func buildTokenSecretProvider(cfg *config.Config) authmodel.TokenSecretProvider {
+	var providers []authmodel.TokenSecretProvider
+
+	// Static provider from config/env (highest priority)
+	if cfg.Server.Auth.Builtin.Token.Secret != "" {
+		staticProvider, err := tokensecret.NewStatic(cfg.Server.Auth.Builtin.Token.Secret)
+		if err == nil {
+			providers = append(providers, staticProvider)
+		}
+	}
+
+	// File provider (auto-generate if missing)
+	authDir := filepath.Join(cfg.Paths.DataDir, "auth")
+	providers = append(providers, tokensecret.NewFile(authDir))
+
+	return tokensecret.NewChain(providers...)
 }
 
 // initAuditService creates a file-based audit store and service.
@@ -643,16 +662,8 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 	srv.setupAssetRoutes(r, basePath)
 	srv.setupOIDCRoutes(r)
 
-	oidcAuthOptions, err := srv.buildOIDCAuthOptions(ctx)
-	if err != nil {
-		return err
-	}
-
 	indexHandler := srv.useTemplate(ctx, "index.gohtml", "index")
 	r.Route("/", func(r chi.Router) {
-		if oidcAuthOptions != nil {
-			r.Use(auth.OIDCMiddleware(*oidcAuthOptions))
-		}
 		r.Get("/*", func(w http.ResponseWriter, _ *http.Request) {
 			indexHandler(w, nil)
 		})
@@ -707,31 +718,6 @@ func (srv *Server) setupOIDCRoutes(r *chi.Mux) {
 	}
 	r.Get("/oidc-login", auth.BuiltinOIDCLoginHandler(srv.builtinOIDCCfg))
 	r.Get("/oidc-callback", auth.BuiltinOIDCCallbackHandler(srv.builtinOIDCCfg))
-}
-
-func (srv *Server) buildOIDCAuthOptions(ctx context.Context) (*auth.Options, error) {
-	authCfg := srv.config.Server.Auth
-	oidcCfg := authCfg.OIDC
-
-	if authCfg.Mode != config.AuthModeOIDC {
-		return nil, nil
-	}
-	if oidcCfg.ClientID == "" || oidcCfg.ClientSecret == "" || oidcCfg.Issuer == "" {
-		return nil, nil
-	}
-
-	verifierCfg, err := auth.InitVerifierAndConfig(ctx, oidcCfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize OIDC: %w", err)
-	}
-
-	return &auth.Options{
-		OIDCAuthEnabled: true,
-		OIDCWhitelist:   oidcCfg.Whitelist,
-		OIDCProvider:    verifierCfg.Provider,
-		OIDCVerify:      verifierCfg.Verifier,
-		OIDCConfig:      verifierCfg.Config,
-	}, nil
 }
 
 func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath, scheme string) error {
@@ -832,7 +818,7 @@ func (srv *Server) buildAgentAuthOptions() auth.Options {
 		AuthRequired: true,
 	}
 
-	if authCfg.Basic.Enabled {
+	if authCfg.Mode == config.AuthModeBasic {
 		opts.BasicAuthEnabled = true
 		opts.Creds = map[string]string{authCfg.Basic.Username: authCfg.Basic.Password}
 	}

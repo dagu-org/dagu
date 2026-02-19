@@ -58,8 +58,8 @@ const (
 
 // Config holds the configuration for the auth service.
 type Config struct {
-	// TokenSecret is the secret key for signing JWT tokens.
-	TokenSecret string
+	// TokenSecret is the opaque JWT signing key.
+	TokenSecret auth.TokenSecret
 	// TokenTTL is the token time-to-live.
 	TokenTTL time.Duration
 	// BcryptCost is the cost factor for bcrypt hashing.
@@ -158,7 +158,7 @@ type TokenResult struct {
 // GenerateToken creates a JWT token for the given user.
 // Returns the token string and its expiry time.
 func (s *Service) GenerateToken(user *auth.User) (*TokenResult, error) {
-	if s.config.TokenSecret == "" {
+	if !s.config.TokenSecret.IsValid() {
 		return nil, ErrMissingSecret
 	}
 
@@ -176,7 +176,7 @@ func (s *Service) GenerateToken(user *auth.User) (*TokenResult, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := token.SignedString([]byte(s.config.TokenSecret))
+	signedToken, err := token.SignedString(s.config.TokenSecret.SigningKey())
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func (s *Service) GenerateToken(user *auth.User) (*TokenResult, error) {
 
 // ValidateToken validates a JWT token and returns the claims.
 func (s *Service) ValidateToken(tokenString string) (*Claims, error) {
-	if s.config.TokenSecret == "" {
+	if !s.config.TokenSecret.IsValid() {
 		return nil, ErrMissingSecret
 	}
 
@@ -197,7 +197,7 @@ func (s *Service) ValidateToken(tokenString string) (*Claims, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return []byte(s.config.TokenSecret), nil
+		return s.config.TokenSecret.SigningKey(), nil
 	})
 
 	if err != nil {
@@ -394,34 +394,56 @@ func (s *Service) ResetPassword(ctx context.Context, userID, newPassword string)
 	return s.store.Update(ctx, user)
 }
 
-// EnsureAdminUser creates the admin user if no users exist.
-// Returns the generated password if a new admin was created.
-func (s *Service) EnsureAdminUser(ctx context.Context, username, password string) (string, bool, error) {
-	count, err := s.store.Count(ctx)
-	if err != nil {
-		return "", false, fmt.Errorf("failed to count users: %w", err)
-	}
+// CountUsers returns the total number of users in the store.
+func (s *Service) CountUsers(ctx context.Context) (int64, error) {
+	return s.store.Count(ctx)
+}
 
-	if count > 0 {
+// EnsureAdminUser ensures an admin user exists with the given credentials.
+// If the user already exists, the password is updated (env vars always win).
+// If no users exist, the admin is created.
+// Returns the password used and whether a new user was created.
+func (s *Service) EnsureAdminUser(ctx context.Context, username, password string) (string, bool, error) {
+	if username == "" {
 		return "", false, nil
 	}
 
 	// Generate password if not provided
 	generatedPassword := password
 	if generatedPassword == "" {
+		var err error
 		generatedPassword, err = generateSecurePassword(16)
 		if err != nil {
 			return "", false, fmt.Errorf("failed to generate password: %w", err)
 		}
 	}
 
+	// Check if user already exists — if so, update password (env vars always win)
+	existing, err := s.store.GetByUsername(ctx, username)
+	if err == nil {
+		passwordHash, hashErr := bcrypt.GenerateFromPassword([]byte(generatedPassword), s.config.BcryptCost)
+		if hashErr != nil {
+			return "", false, fmt.Errorf("failed to hash password: %w", hashErr)
+		}
+		existing.PasswordHash = string(passwordHash)
+		existing.Role = auth.RoleAdmin
+		existing.UpdatedAt = time.Now().UTC()
+		if updateErr := s.store.Update(ctx, existing); updateErr != nil {
+			return "", false, fmt.Errorf("failed to update admin user: %w", updateErr)
+		}
+		return "", false, nil
+	}
+	if !errors.Is(err, auth.ErrUserNotFound) {
+		return "", false, fmt.Errorf("failed to check admin user: %w", err)
+	}
+
+	// User doesn't exist — create
 	_, err = s.CreateUser(ctx, CreateUserInput{
 		Username: username,
 		Password: generatedPassword,
 		Role:     auth.RoleAdmin,
 	})
 	if err != nil {
-		// Handle race condition: another process may have created the admin user
 		if errors.Is(err, auth.ErrUserAlreadyExists) {
 			return "", false, nil
 		}

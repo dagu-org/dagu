@@ -14,6 +14,72 @@ import (
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 )
 
+// Setup creates the initial admin user during first-run setup.
+// Returns 403 if users already exist.
+func (a *API) Setup(ctx context.Context, request api.SetupRequestObject) (api.SetupResponseObject, error) {
+	if a.authService == nil {
+		return api.Setup403JSONResponse{
+			Code:    api.ErrorCodeForbidden,
+			Message: "Authentication is not enabled",
+		}, nil
+	}
+
+	if request.Body == nil {
+		return api.Setup400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: "Invalid request body",
+		}, nil
+	}
+
+	// Check if setup is still available (no users exist)
+	count, err := a.authService.CountUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if count > 0 {
+		return api.Setup403JSONResponse{
+			Code:    api.ErrorCodeForbidden,
+			Message: "Setup has already been completed",
+		}, nil
+	}
+
+	// Create admin user
+	user, err := a.authService.CreateUser(ctx, authservice.CreateUserInput{
+		Username: request.Body.Username,
+		Password: request.Body.Password,
+		Role:     auth.RoleAdmin,
+	})
+	if err != nil {
+		if errors.Is(err, authservice.ErrWeakPassword) {
+			return api.Setup400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: "Password does not meet security requirements",
+			}, nil
+		}
+		if errors.Is(err, auth.ErrUserAlreadyExists) {
+			return api.Setup403JSONResponse{
+				Code:    api.ErrorCodeForbidden,
+				Message: "Setup has already been completed",
+			}, nil
+		}
+		return nil, err
+	}
+
+	// Generate JWT for immediate login
+	tokenResult, err := a.authService.GenerateToken(user)
+	if err != nil {
+		return nil, err
+	}
+
+	a.logAudit(ctx, audit.CategoryUser, "setup_admin", nil)
+
+	return api.Setup200JSONResponse{
+		Token:     tokenResult.Token,
+		ExpiresAt: tokenResult.ExpiresAt,
+		User:      toAPIUser(user),
+	}, nil
+}
+
 // Login authenticates a user and returns a JWT token.
 func (a *API) Login(ctx context.Context, request api.LoginRequestObject) (api.LoginResponseObject, error) {
 	if a.authService == nil {

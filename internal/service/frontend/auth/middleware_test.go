@@ -362,7 +362,7 @@ func TestMiddleware_PublicPathPrefixes(t *testing.T) {
 }
 
 func TestMiddleware_NoAuthEnabled(t *testing.T) {
-	opts := DefaultOptions()
+	opts := Options{}
 	middleware := Middleware(opts)
 
 	handler := &testHandler{}

@@ -22,6 +22,7 @@ func TestHealthCheck(t *testing.T) {
 
 func TestHealthCheck_BypassesAuth(t *testing.T) {
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Mode = config.AuthModeBasic
 		cfg.Server.Auth.Basic.Username = "admin"
 		cfg.Server.Auth.Basic.Password = "secret"
 	}))

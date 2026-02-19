@@ -54,6 +54,13 @@ export default function LoginPage() {
     }
   }, [searchParams, navigate, from]);
 
+  // Redirect to setup if initial admin account hasn't been created yet
+  useEffect(() => {
+    if (config.setupRequired) {
+      navigate('/setup', { replace: true });
+    }
+  }, [config.setupRequired, navigate]);
+
   // Redirect if already authenticated - use useEffect to avoid render-phase side effects
   useEffect(() => {
     if (isAuthenticated) {

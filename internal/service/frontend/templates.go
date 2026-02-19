@@ -75,6 +75,7 @@ type funcsConfig struct {
 	TerminalEnabled       bool
 	GitSyncEnabled        bool
 
+	SetupRequired       bool
 	UpdateAvailable     bool
 	LatestVersion       string
 	AgentEnabledChecker AgentEnabledChecker
@@ -112,6 +113,7 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 			return boolStr(cfg.AgentEnabledChecker.IsEnabled(context.Background()))
 		},
 
+		"setupRequired":   func() string { return boolStr(cfg.SetupRequired) },
 		"updateAvailable": func() string { return boolStr(cfg.UpdateAvailable) },
 		"latestVersion":   func() string { return cfg.LatestVersion },
 
