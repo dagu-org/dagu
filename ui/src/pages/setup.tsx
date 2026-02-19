@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth, TOKEN_KEY } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +8,6 @@ import { AlertCircle, UserPlus } from 'lucide-react';
 
 export default function SetupPage() {
   const config = useConfig();
-  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const [username, setUsername] = useState('');
@@ -21,12 +19,8 @@ export default function SetupPage() {
   useEffect(() => {
     if (!config.setupRequired) {
       navigate('/login', { replace: true });
-      return;
     }
-    if (isAuthenticated) {
-      navigate('/', { replace: true });
-    }
-  }, [config.setupRequired, isAuthenticated, navigate]);
+  }, [config.setupRequired, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,8 +54,6 @@ export default function SetupPage() {
         throw new Error(data.message || 'Setup failed');
       }
 
-      const data = await response.json();
-      localStorage.setItem(TOKEN_KEY, data.token);
       navigate('/login?welcome=true', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Setup failed');

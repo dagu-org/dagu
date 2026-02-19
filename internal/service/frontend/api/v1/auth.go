@@ -5,9 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/cmn/dirlock"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/audit"
@@ -31,7 +34,17 @@ func (a *API) Setup(ctx context.Context, request api.SetupRequestObject) (api.Se
 		}, nil
 	}
 
-	// Check if setup is still available (no users exist)
+	// Acquire lock to prevent concurrent setup requests
+	lock := dirlock.New(a.config.Paths.UsersDir, &dirlock.LockOptions{
+		StaleThreshold: 30 * time.Second,
+		RetryInterval:  50 * time.Millisecond,
+	})
+	if err := lock.Lock(ctx); err != nil {
+		return nil, fmt.Errorf("failed to acquire setup lock: %w", err)
+	}
+	defer lock.Unlock()
+
+	// Under lock: check if setup is still available (no users exist)
 	count, err := a.authService.CountUsers(ctx)
 	if err != nil {
 		return nil, err
