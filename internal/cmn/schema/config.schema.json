@@ -211,9 +211,6 @@
         "basic": {
           "$ref": "#/definitions/AuthBasicDef"
         },
-        "token": {
-          "$ref": "#/definitions/AuthTokenDef"
-        },
         "oidc": {
           "$ref": "#/definitions/AuthOIDCDef"
         },
@@ -237,20 +234,9 @@
         }
       }
     },
-    "AuthTokenDef": {
-      "type": "object",
-      "description": "Token-based authentication configuration.",
-      "additionalProperties": false,
-      "properties": {
-        "value": {
-          "type": "string",
-          "description": "Authentication token value."
-        }
-      }
-    },
     "AuthOIDCDef": {
       "type": "object",
-      "description": "OIDC authentication configuration. Core fields are used by both standalone and builtin auth modes.",
+      "description": "OIDC authentication configuration for use with builtin auth mode.",
       "additionalProperties": false,
       "properties": {
         "client_id": {

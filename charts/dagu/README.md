@@ -115,13 +115,13 @@ By default, the chart uses builtin authentication. **Change these values in prod
 
 ```yaml
 auth:
-  mode: "builtin"  # Options: "none", "builtin", "oidc"
+  mode: "builtin"  # Options: "none", "basic", "builtin" (default)
   builtin:
     admin:
-      username: "admin"
-      password: "adminpass"  # CHANGEME
+      username: "admin"        # optional: skips setup page
+      password: ""             # optional: auto-generated if empty
     token:
-      secret: "dagu-secret-key"  # CHANGEME
+      secret: ""               # optional: auto-generated at {data_dir}/auth/token_secret
       ttl: "24h"
 ```
 

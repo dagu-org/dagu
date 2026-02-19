@@ -62,13 +62,13 @@ ui:
 
 # Authentication configuration
 auth:
-  mode: "builtin"  # Options: "none", "builtin", "oidc"
+  mode: "builtin"  # Options: "none", "basic", "builtin" (default)
   builtin:
     admin:
-      username: "admin"
-      password: "adminpass"  # CHANGEME
+      username: "admin"        # optional: skips setup page
+      password: ""             # optional: auto-generated if empty
     token:
-      secret: "dagu-secret-key"  # CHANGEME
+      secret: ""               # optional: auto-generated at {data_dir}/auth/token_secret
       ttl: "24h"
 
 # Persistence - REQUIRED: Dagu needs a shared filesystem (RWX)
