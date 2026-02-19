@@ -14,6 +14,7 @@ type AuthContextType = {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  setupRequired: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -48,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
   const [isLoading, setIsLoading] = useState(true);
+  const [setupRequired, setSetupRequired] = useState(config.setupRequired);
 
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
@@ -58,6 +60,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshUser = useCallback(async () => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
     if (!storedToken) {
+      // No token — check if setup is required via live API call.
+      // This overrides the static HTML config to handle browser caching.
+      try {
+        const res = await fetch(`${config.apiURL}/auth/setup-status`);
+        if (res.ok) {
+          const data = await res.json();
+          setSetupRequired(!!data.setupRequired);
+        }
+      } catch {
+        // If the API call fails, fall back to the static config value.
+      }
       setIsLoading(false);
       return;
     }
@@ -118,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         token,
         isAuthenticated: !!user,
         isLoading,
+        setupRequired,
         login,
         logout,
         refreshUser,

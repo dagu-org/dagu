@@ -385,6 +385,11 @@ func initBuiltinAuthService(ctx context.Context, cfg *config.Config, collector *
 		setupRequired = count == 0
 	}
 
+	logger.Info(ctx, "Builtin auth initialized",
+		slog.Bool("setupRequired", setupRequired),
+		slog.String("adminUsername", adminUsername),
+	)
+
 	return &builtinAuthResult{
 		AuthService:   authSvc,
 		UserStore:     authStore.Users(),
@@ -677,6 +682,7 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 	indexHandler := srv.useTemplate(ctx, "index.gohtml", "index")
 	r.Route("/", func(r chi.Router) {
 		r.Get("/*", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 			indexHandler(w, nil)
 		})
 	})

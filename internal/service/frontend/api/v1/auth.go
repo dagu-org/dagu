@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
@@ -98,6 +99,19 @@ func (a *API) Setup(ctx context.Context, request api.SetupRequestObject) (api.Se
 		ExpiresAt: tokenResult.ExpiresAt,
 		User:      toAPIUser(user),
 	}, nil
+}
+
+// handleSetupStatus returns whether initial admin setup is still required.
+// This is a public endpoint (no auth) so the frontend can check dynamically.
+func (a *API) handleSetupStatus(w http.ResponseWriter, r *http.Request) {
+	count, err := a.authService.CountUsers(r.Context())
+	if err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache, no-store")
+	fmt.Fprintf(w, `{"setupRequired":%t}`, count == 0)
 }
 
 // Login authenticates a user and returns a JWT token.

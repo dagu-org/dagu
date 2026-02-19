@@ -11,14 +11,14 @@ type ProtectedRouteProps = {
 /**
  * Renders `children` only when built-in authentication and optional role checks permit access; otherwise performs the appropriate redirect or renders nothing while auth state is loading.
  *
- * If `config.authMode` is not `'builtin'`, access is allowed and `children` are rendered. While auth state is loading the component renders `null`. If `config.setupRequired` is true and the user is not authenticated, it redirects to `/setup` so the initial admin account can be created. If the user is not authenticated it redirects to `/login` and preserves the current location for post-login navigation. If a `requiredRole` is provided and the authenticated user lacks that role it redirects to `/`.
+ * If `config.authMode` is not `'builtin'`, access is allowed and `children` are rendered. While auth state is loading the component renders `null`. If `setupRequired` is true (checked dynamically via API) and the user is not authenticated, it redirects to `/setup` so the initial admin account can be created. If the user is not authenticated it redirects to `/login` and preserves the current location for post-login navigation. If a `requiredRole` is provided and the authenticated user lacks that role it redirects to `/`.
  *
  * @param requiredRole - Optional role required to access the route; one of `'admin' | 'manager' | 'developer' | 'operator' | 'viewer'`.
  * @returns The `children` element when access is allowed, `null` while auth state is loading, or a `Navigate` element that redirects the user when access is denied.
  */
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const config = useConfig();
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, setupRequired, user } = useAuth();
   const location = useLocation();
 
   // If auth mode is not builtin, allow access
@@ -31,8 +31,10 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     return null;
   }
 
-  // Redirect to setup if initial admin account hasn't been created yet
-  if (config.setupRequired && !isAuthenticated) {
+  // Redirect to setup if initial admin account hasn't been created yet.
+  // Uses the dynamic setupRequired from AuthContext (fetched via API)
+  // rather than the static HTML config to avoid browser caching issues.
+  if (setupRequired && !isAuthenticated) {
     return <Navigate to="/setup" replace />;
   }
 

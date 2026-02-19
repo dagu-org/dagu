@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,7 @@ import { AlertCircle, UserPlus } from 'lucide-react';
 
 export default function SetupPage() {
   const config = useConfig();
+  const { setupRequired } = useAuth();
   const navigate = useNavigate();
 
   const [username, setUsername] = useState('');
@@ -17,10 +19,10 @@ export default function SetupPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (!config.setupRequired) {
+    if (!setupRequired) {
       navigate('/login', { replace: true });
     }
-  }, [config.setupRequired, navigate]);
+  }, [setupRequired, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
