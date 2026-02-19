@@ -250,11 +250,6 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		return err
 	}
 
-	// Public endpoint (registered before auth middleware).
-	if a.authService != nil {
-		r.Get("/auth/setup-status", a.handleSetupStatus)
-	}
-
 	r.Group(func(r chi.Router) {
 		r.Use(frontendauth.ClientIPMiddleware())
 		r.Use(frontendauth.Middleware(authOptions))

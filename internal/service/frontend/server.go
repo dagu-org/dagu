@@ -275,7 +275,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			OIDCButtonLabel:       oidcButtonLabel,
 			TerminalEnabled:       cfg.Server.Terminal.Enabled && authSvc != nil,
 			GitSyncEnabled:        cfg.GitSync.Enabled,
-			SetupRequired:         setupRequired,
+			SetupRequiredChecker:  &setupChecker{authSvc: authSvc, fallback: setupRequired},
 			UpdateAvailable:       updateAvailable,
 			LatestVersion:         latestVersion,
 			AgentEnabledChecker:   agentConfigStore,
@@ -325,6 +325,24 @@ type builtinAuthResult struct {
 	AuthService   *authservice.Service
 	UserStore     authmodel.UserStore
 	SetupRequired bool
+}
+
+// setupChecker implements SetupRequiredChecker by counting users via the auth service.
+// Falls back to the startup-time value if the auth service is unavailable.
+type setupChecker struct {
+	authSvc  *authservice.Service
+	fallback bool
+}
+
+func (s *setupChecker) IsSetupRequired(ctx context.Context) bool {
+	if s.authSvc == nil {
+		return s.fallback
+	}
+	count, err := s.authSvc.CountUsers(ctx)
+	if err != nil {
+		return s.fallback
+	}
+	return count == 0
 }
 
 // initBuiltinAuthService creates the auth store and authentication service.

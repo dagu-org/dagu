@@ -51,22 +51,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
-  const checkSetupStatus = useCallback(async () => {
-    try {
-      const res = await fetch(`${config.apiURL}/auth/setup-status`);
-      if (res.ok) {
-        const data = await res.json();
-        setSetupRequired(!!data.setupRequired);
-      }
-    } catch {
-      // Fall back to the static config value on failure.
-    }
-  }, [config.apiURL]);
-
   const refreshUser = useCallback(async () => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
     if (!storedToken) {
-      await checkSetupStatus();
       setIsLoading(false);
       return;
     }
@@ -84,15 +71,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(storedToken);
       } else {
         logout();
-        await checkSetupStatus();
       }
     } catch {
       logout();
-      await checkSetupStatus();
     } finally {
       setIsLoading(false);
     }
-  }, [config.apiURL, logout, checkSetupStatus]);
+  }, [config.apiURL, logout]);
 
   const login = useCallback(async (username: string, password: string) => {
     const response = await fetch(`${config.apiURL}/auth/login`, {
