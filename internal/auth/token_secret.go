@@ -37,10 +37,16 @@ func NewTokenSecretFromString(s string) (TokenSecret, error) {
 	return NewTokenSecret([]byte(s))
 }
 
-// SigningKey returns the raw key material for JWT signing.
+// SigningKey returns a copy of the raw key material for JWT signing.
 // This is the ONLY way to access the key bytes.
+// Returns a defensive copy to prevent callers from mutating the internal key.
 func (ts TokenSecret) SigningKey() []byte {
-	return ts.key
+	if len(ts.key) == 0 {
+		return nil
+	}
+	cp := make([]byte, len(ts.key))
+	copy(cp, ts.key)
+	return cp
 }
 
 // IsValid reports whether the TokenSecret holds usable key material.

@@ -369,14 +369,9 @@ func initBuiltinAuthService(ctx context.Context, cfg *config.Config, collector *
 		}
 		if created {
 			if adminPassword == "" {
-				fmt.Printf("\n"+
-					"================================================================================\n"+
-					"  ADMIN USER CREATED\n"+
-					"  Username: %s\n"+
-					"  Password: %s\n"+
-					"  NOTE: Please change this password immediately!\n"+
-					"================================================================================\n\n",
-					adminUsername, password)
+				logger.Warn(ctx, "Admin user created with auto-generated password — change it immediately",
+					slog.String("username", adminUsername),
+					slog.String("password", password))
 			} else {
 				logger.Info(ctx, "Created admin user", slog.String("username", adminUsername))
 			}

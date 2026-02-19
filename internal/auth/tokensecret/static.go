@@ -6,6 +6,8 @@ import (
 	"github.com/dagu-org/dagu/internal/auth"
 )
 
+var _ auth.TokenSecretProvider = (*StaticProvider)(nil)
+
 // StaticProvider resolves a token secret from a pre-configured string value.
 // It performs no I/O and has no side effects.
 type StaticProvider struct {

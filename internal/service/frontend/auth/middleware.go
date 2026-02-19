@@ -48,7 +48,6 @@ func ClientIPMiddleware() func(next http.Handler) http.Handler {
 // - JWT Bearer tokens (if JWTValidator is set)
 // - API keys with "dagu_" prefix (if APIKeyValidator is set)
 // - HTTP Basic Auth (if BasicAuthEnabled)
-// - OIDC (if OIDCAuthEnabled)
 // All configured methods work at the same time.
 func Middleware(opts Options) func(next http.Handler) http.Handler {
 	publicPaths := make(map[string]struct{}, len(opts.PublicPaths))

@@ -24,6 +24,8 @@ const (
 	filePerm = 0600
 )
 
+var _ auth.TokenSecretProvider = (*FileProvider)(nil)
+
 // FileProvider resolves a token secret from a file, auto-generating one if missing.
 // The secret file is stored at {dir}/token_secret.
 type FileProvider struct {
@@ -54,7 +56,7 @@ func (p *FileProvider) Resolve(_ context.Context) (auth.TokenSecret, error) {
 			return auth.NewTokenSecretFromString(content)
 		}
 		// Empty/whitespace-only file — treat as missing, fall through to generation.
-	} else if !os.IsNotExist(err) {
+	} else if !errors.Is(err, os.ErrNotExist) {
 		// Permission error or other I/O failure — fatal, do not skip.
 		return auth.TokenSecret{}, fmt.Errorf("failed to read token secret file %s: %w", path, err)
 	}

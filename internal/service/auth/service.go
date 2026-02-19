@@ -418,20 +418,24 @@ func (s *Service) EnsureAdminUser(ctx context.Context, username, password string
 		}
 	}
 
-	// Check if user already exists — if so, update password (env vars always win)
+	// Check if user already exists — if so, update only when password was explicitly provided.
+	// When password is empty (no env var), preserve existing credentials to avoid
+	// silently locking out the admin with an unknown random password on restart.
 	existing, err := s.store.GetByUsername(ctx, username)
 	if err == nil {
-		passwordHash, hashErr := bcrypt.GenerateFromPassword([]byte(generatedPassword), s.config.BcryptCost)
-		if hashErr != nil {
-			return "", false, fmt.Errorf("failed to hash password: %w", hashErr)
+		if password != "" {
+			passwordHash, hashErr := bcrypt.GenerateFromPassword([]byte(password), s.config.BcryptCost)
+			if hashErr != nil {
+				return "", false, fmt.Errorf("failed to hash password: %w", hashErr)
+			}
+			existing.PasswordHash = string(passwordHash)
 		}
-		existing.PasswordHash = string(passwordHash)
 		existing.Role = auth.RoleAdmin
 		existing.UpdatedAt = time.Now().UTC()
 		if updateErr := s.store.Update(ctx, existing); updateErr != nil {
 			return "", false, fmt.Errorf("failed to update admin user: %w", updateErr)
 		}
-		return generatedPassword, false, nil
+		return "", false, nil
 	}
 	if !errors.Is(err, auth.ErrUserNotFound) {
 		return "", false, fmt.Errorf("failed to check admin user: %w", err)

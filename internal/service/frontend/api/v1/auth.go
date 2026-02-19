@@ -69,6 +69,12 @@ func (a *API) Setup(ctx context.Context, request api.SetupRequestObject) (api.Se
 				Message: "Password does not meet security requirements",
 			}, nil
 		}
+		if errors.Is(err, auth.ErrInvalidUsername) {
+			return api.Setup400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: "Invalid username",
+			}, nil
+		}
 		if errors.Is(err, auth.ErrUserAlreadyExists) {
 			return api.Setup403JSONResponse{
 				Code:    api.ErrorCodeForbidden,

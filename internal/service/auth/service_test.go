@@ -304,22 +304,34 @@ func TestService_EnsureAdminUser(t *testing.T) {
 		t.Errorf("Authenticate() admin error = %v", err)
 	}
 
-	// Second call with same username should not create (user already exists)
-	password2, created, err := svc.EnsureAdminUser(ctx, "admin", "adminpass2")
+	// Second call with explicit password should update it
+	_, created, err = svc.EnsureAdminUser(ctx, "admin", "adminpass2")
 	if err != nil {
 		t.Fatalf("EnsureAdminUser() second call error = %v", err)
 	}
 	if created {
 		t.Error("EnsureAdminUser() should return created=false when user already exists")
 	}
-	if password2 != "adminpass2" {
-		t.Errorf("EnsureAdminUser() update path password = %v, want %v", password2, "adminpass2")
-	}
 
 	// Verify admin can authenticate with updated password
 	_, err = svc.Authenticate(ctx, "admin", "adminpass2")
 	if err != nil {
 		t.Errorf("Authenticate() admin with updated password error = %v", err)
+	}
+
+	// Third call with empty password should preserve existing credentials
+	_, created, err = svc.EnsureAdminUser(ctx, "admin", "")
+	if err != nil {
+		t.Fatalf("EnsureAdminUser() third call error = %v", err)
+	}
+	if created {
+		t.Error("EnsureAdminUser() should return created=false")
+	}
+
+	// Verify admin can still authenticate with previous password (not overwritten)
+	_, err = svc.Authenticate(ctx, "admin", "adminpass2")
+	if err != nil {
+		t.Errorf("Authenticate() admin password should be preserved when empty password provided: %v", err)
 	}
 }
 

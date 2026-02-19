@@ -7,6 +7,8 @@ import (
 	"github.com/dagu-org/dagu/internal/auth"
 )
 
+var _ auth.TokenSecretProvider = (*ChainProvider)(nil)
+
 // ChainProvider tries multiple TokenSecretProviders in priority order.
 //
 // Error semantics:

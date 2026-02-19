@@ -26,6 +26,12 @@ export default function SetupPage() {
     e.preventDefault();
     setError(null);
 
+    const trimmedUsername = username.trim();
+    if (trimmedUsername.length < 3) {
+      setError('Username must be at least 3 characters');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -42,7 +48,7 @@ export default function SetupPage() {
       const response = await fetch(`${config.apiURL}/auth/setup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: trimmedUsername, password }),
       });
 
       if (!response.ok) {

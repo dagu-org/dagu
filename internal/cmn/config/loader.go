@@ -421,6 +421,8 @@ func (l *ConfigLoader) loadServerAuth(cfg *Config, def Definition) {
 func (l *ConfigLoader) loadAuthMode(cfg *Config, def Definition) {
 	if def.Auth == nil || def.Auth.Mode == nil {
 		cfg.Server.Auth.Mode = AuthModeBuiltin
+		l.warnings = append(l.warnings, "No auth.mode configured — defaulting to 'builtin'. "+
+			"Set auth.mode to 'none' to disable authentication, or complete /setup to create an admin account.")
 		return
 	}
 

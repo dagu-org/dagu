@@ -387,6 +387,12 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 			},
 		}
 	}
+	if cfg.Server.Auth.Basic.Username != "" {
+		authData["basic"] = map[string]any{
+			"username": cfg.Server.Auth.Basic.Username,
+			"password": cfg.Server.Auth.Basic.Password,
+		}
+	}
 	configData["auth"] = authData
 
 	content, err := yaml.Marshal(configData)

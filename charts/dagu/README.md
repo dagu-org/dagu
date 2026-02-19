@@ -175,7 +175,7 @@ ui:
 kubectl port-forward svc/dagu-ui 8080:8080
 
 # Then visit http://localhost:8080
-# Default credentials: admin / adminpass
+# If no admin password was set, check server logs for the auto-generated password
 ```
 
 ## Current Constraints

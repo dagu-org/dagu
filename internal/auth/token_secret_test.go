@@ -28,13 +28,23 @@ func TestNewTokenSecret(t *testing.T) {
 		assert.ErrorIs(t, err, auth.ErrInvalidTokenSecret)
 	})
 
-	t.Run("defensive copy", func(t *testing.T) {
+	t.Run("defensive copy on construction", func(t *testing.T) {
 		original := []byte("secret")
 		ts, err := auth.NewTokenSecret(original)
 		require.NoError(t, err)
 
 		// Mutate original — TokenSecret must not be affected.
 		original[0] = 'X'
+		assert.Equal(t, []byte("secret"), ts.SigningKey())
+	})
+
+	t.Run("defensive copy on SigningKey output", func(t *testing.T) {
+		ts, err := auth.NewTokenSecret([]byte("secret"))
+		require.NoError(t, err)
+
+		// Mutate returned key — TokenSecret must not be affected.
+		key := ts.SigningKey()
+		key[0] = 'X'
 		assert.Equal(t, []byte("secret"), ts.SigningKey())
 	})
 }
