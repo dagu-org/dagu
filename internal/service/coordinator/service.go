@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
@@ -30,6 +31,7 @@ type Service struct {
 	configuredHost string
 
 	// For graceful shutdown
+	mu         sync.Mutex
 	stopCancel context.CancelFunc // Cancels the service's internal context
 }
 
@@ -66,7 +68,9 @@ func (srv *Service) Start(ctx context.Context) error {
 
 	// Create an internal context that can be cancelled by Stop()
 	internalCtx, cancel := context.WithCancel(ctx)
+	srv.mu.Lock()
 	srv.stopCancel = cancel
+	srv.mu.Unlock()
 
 	// Start the zombie detector to clean up runs from crashed workers
 	// Use configured interval or default to 45 seconds
@@ -135,8 +139,11 @@ func (srv *Service) Stop(ctx context.Context) error {
 	t.Stop()
 
 	// Cancel the internal context to signal zombie detector to stop
-	if srv.stopCancel != nil {
-		srv.stopCancel()
+	srv.mu.Lock()
+	cancel := srv.stopCancel
+	srv.mu.Unlock()
+	if cancel != nil {
+		cancel()
 	}
 
 	// Wait for zombie detector to finish before closing handler
