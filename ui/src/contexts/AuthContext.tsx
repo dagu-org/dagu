@@ -21,6 +21,7 @@ type AuthContextType = {
   isLoading: boolean;
   setupRequired: boolean;
   login: (username: string, password: string) => Promise<void>;
+  setup: (username: string, password: string) => Promise<SetupResult>;
   logout: () => void;
   refreshUser: () => Promise<void>;
   completeSetup: (result: SetupResult) => void;
@@ -99,6 +100,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   }, [config.apiURL]);
 
+  const setup = useCallback(async (username: string, password: string): Promise<SetupResult> => {
+    const response = await fetch(`${config.apiURL}/auth/setup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      const err = new Error(data.message || 'Setup failed');
+      (err as any).status = response.status;
+      throw err;
+    }
+
+    const data = await response.json();
+    return { token: data.token, user: data.user };
+  }, [config.apiURL]);
+
   const completeSetup = useCallback((result: SetupResult) => {
     localStorage.setItem(TOKEN_KEY, result.token);
     setToken(result.token);
@@ -123,6 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         setupRequired,
         login,
+        setup,
         completeSetup,
         logout,
         refreshUser,

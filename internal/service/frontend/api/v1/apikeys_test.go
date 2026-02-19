@@ -28,13 +28,19 @@ func getAdminToken(t *testing.T, server test.Server) string {
 
 func setupBuiltinAuthServer(t *testing.T) test.Server {
 	t.Helper()
-	return test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Mode = config.AuthModeBuiltin
-		cfg.Server.Auth.Builtin.Admin.Username = "admin"
-		cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
 		cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
 		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
 	}))
+
+	// Create admin via setup endpoint
+	server.Client().Post("/api/v1/auth/setup", api.SetupRequest{
+		Username: "admin",
+		Password: "adminpass",
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	return server
 }
 
 // TestAPIKeys_ListEmpty tests listing API keys when none exist

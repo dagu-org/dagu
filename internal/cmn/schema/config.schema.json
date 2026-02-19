@@ -328,26 +328,8 @@
       "description": "Builtin authentication with RBAC configuration.",
       "additionalProperties": false,
       "properties": {
-        "admin": {
-          "$ref": "#/definitions/AdminConfigDef"
-        },
         "token": {
           "$ref": "#/definitions/TokenConfigDef"
-        }
-      }
-    },
-    "AdminConfigDef": {
-      "type": "object",
-      "description": "Initial admin user configuration.",
-      "additionalProperties": false,
-      "properties": {
-        "username": {
-          "type": "string",
-          "description": "Admin username."
-        },
-        "password": {
-          "type": "string",
-          "description": "Admin password."
         }
       }
     },

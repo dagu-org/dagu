@@ -140,7 +140,6 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.Server.Auth = Auth{
 			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},
 			},
 		}
@@ -157,7 +156,6 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.Server.Auth = Auth{
 			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},
 			},
 		}
@@ -191,7 +189,6 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.Server.Auth = Auth{
 			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 0},
 			},
 		}
@@ -211,7 +208,6 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.Server.Auth = Auth{
 			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},
 			},
 			OIDC: AuthOIDC{
@@ -235,7 +231,6 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.Server.Auth = Auth{
 			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},
 			},
 			OIDC: AuthOIDC{
@@ -259,7 +254,6 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.Server.Auth = Auth{
 			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},
 			},
 			OIDC: AuthOIDC{
@@ -283,7 +277,6 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.Server.Auth = Auth{
 			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},
 			},
 			OIDC: AuthOIDC{
@@ -309,7 +302,6 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.Server.Auth = Auth{
 			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},
 			},
 			OIDC: AuthOIDC{
@@ -337,7 +329,6 @@ func TestConfig_Validate(t *testing.T) {
 			cfg.Server.Auth = Auth{
 				Mode: AuthModeBuiltin,
 				Builtin: AuthBuiltin{
-					Admin: AdminConfig{Username: "admin"},
 					Token: TokenConfig{Secret: "secret", TTL: 1},
 				},
 				OIDC: AuthOIDC{
@@ -377,7 +368,6 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.Server.Auth = Auth{
 			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},
 			},
 		}

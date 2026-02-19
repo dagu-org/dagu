@@ -488,10 +488,6 @@ func (l *ConfigLoader) loadBuiltinAuth(cfg *Config, auth *AuthDef) {
 		return
 	}
 
-	if auth.Builtin.Admin != nil {
-		cfg.Server.Auth.Builtin.Admin.Username = auth.Builtin.Admin.Username
-		cfg.Server.Auth.Builtin.Admin.Password = auth.Builtin.Admin.Password
-	}
 	if auth.Builtin.Token != nil {
 		cfg.Server.Auth.Builtin.Token.Secret = auth.Builtin.Token.Secret
 		cfg.Server.Auth.Builtin.Token.TTL = l.parseDuration("auth.builtin.token.ttl", auth.Builtin.Token.TTL)
@@ -515,13 +511,6 @@ func (l *ConfigLoader) setAuthDefaults(cfg *Config) {
 			}
 		}
 
-		// Warn when admin username is set without a password.
-		if cfg.Server.Auth.Builtin.Admin.Username != "" &&
-			cfg.Server.Auth.Builtin.Admin.Password == "" {
-			l.warnings = append(l.warnings, fmt.Sprintf(
-				"Admin user %q has no password configured — a random password will be auto-generated and logged on first startup",
-				cfg.Server.Auth.Builtin.Admin.Username))
-		}
 	}
 	if len(cfg.Server.Auth.OIDC.Scopes) == 0 {
 		cfg.Server.Auth.OIDC.Scopes = []string{"openid", "profile", "email"}
@@ -1233,8 +1222,6 @@ var envBindings = []envBinding{
 	{key: "auth.oidc.role_mapping.role_attribute_strict", env: "AUTH_OIDC_ROLE_ATTRIBUTE_STRICT"},
 	{key: "auth.oidc.role_mapping.skip_org_role_sync", env: "AUTH_OIDC_SKIP_ORG_ROLE_SYNC"},
 	// Auth (builtin)
-	{key: "auth.builtin.admin.username", env: "AUTH_ADMIN_USERNAME"},
-	{key: "auth.builtin.admin.password", env: "AUTH_ADMIN_PASSWORD"},
 	{key: "auth.builtin.token.secret", env: "AUTH_TOKEN_SECRET"},
 	{key: "auth.builtin.token.ttl", env: "AUTH_TOKEN_TTL"},
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sync/atomic"
 	"mime"
 	"net"
 	"net/http"
@@ -40,7 +41,9 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
 	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
-	"github.com/dagu-org/dagu/internal/persis/fileauth"
+	"github.com/dagu-org/dagu/internal/persis/fileapikey"
+	"github.com/dagu-org/dagu/internal/persis/fileuser"
+	"github.com/dagu-org/dagu/internal/persis/filewebhook"
 	"github.com/dagu-org/dagu/internal/persis/filebaseconfig"
 	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/persis/filesession"
@@ -185,12 +188,12 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	var authSvc *authservice.Service
 	if cfg.Server.Auth.Mode == config.AuthModeBuiltin {
-		result, err := initBuiltinAuthService(ctx, cfg, collector)
+		result, isSetupRequired, err := initBuiltinAuthService(ctx, cfg, collector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize builtin auth service: %w", err)
 		}
 		authSvc = result.AuthService
-		setupRequired = result.SetupRequired
+		setupRequired = isSetupRequired
 		apiOpts = append(apiOpts, apiv1.WithAuthService(result.AuthService))
 
 		oidcCfg := cfg.Server.Auth.OIDC
@@ -322,19 +325,22 @@ func getUpdateInfo(store upgrade.CacheStore) (updateAvailable bool, latestVersio
 }
 
 type builtinAuthResult struct {
-	AuthService   *authservice.Service
-	UserStore     authmodel.UserStore
-	SetupRequired bool
+	AuthService *authservice.Service
+	UserStore   authmodel.UserStore
 }
 
 // setupChecker implements SetupRequiredChecker by counting users via the auth service.
-// Falls back to the startup-time value if the auth service is unavailable.
+// Once users exist, caches the result to avoid hitting the store on every page load.
 type setupChecker struct {
-	authSvc  *authservice.Service
-	fallback bool
+	authSvc       *authservice.Service
+	fallback      bool
+	setupComplete atomic.Bool
 }
 
 func (s *setupChecker) IsSetupRequired(ctx context.Context) bool {
+	if s.setupComplete.Load() {
+		return false
+	}
 	if s.authSvc == nil {
 		return s.fallback
 	}
@@ -342,77 +348,79 @@ func (s *setupChecker) IsSetupRequired(ctx context.Context) bool {
 	if err != nil {
 		return s.fallback
 	}
-	return count == 0
+	if count > 0 {
+		s.setupComplete.Store(true)
+		return false
+	}
+	return true
 }
 
 // initBuiltinAuthService creates the auth store and authentication service.
 // Uses the token secret provider chain to resolve the JWT signing secret
 // (auto-generating and persisting one if not configured).
-func initBuiltinAuthService(ctx context.Context, cfg *config.Config, collector *telemetry.Collector) (*builtinAuthResult, error) {
+func initBuiltinAuthService(ctx context.Context, cfg *config.Config, collector *telemetry.Collector) (*builtinAuthResult, bool, error) {
 	// Resolve token secret via provider chain
 	tokenSecret, err := buildTokenSecretProvider(ctx, cfg).Resolve(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve token secret: %w", err)
+		return nil, false, fmt.Errorf("failed to resolve token secret: %w", err)
 	}
 
-	// Create auth store (user, API key, webhook stores with caching)
-	authStore, err := fileauth.New(ctx, fileauth.Config{
-		UsersDir:    cfg.Paths.UsersDir,
-		APIKeysDir:  cfg.Paths.APIKeysDir,
-		WebhooksDir: cfg.Paths.WebhooksDir,
-		CacheLimits: cfg.Cache.Limits(),
-		Collector:   collector,
-	})
+	// Create individual stores with caching
+	limits := cfg.Cache.Limits()
+
+	userCache := fileutil.NewCache[*authmodel.User]("user", limits.User.Limit, limits.User.TTL)
+	userCache.StartEviction(ctx)
+	if collector != nil {
+		collector.RegisterCache(userCache)
+	}
+	userStore, err := fileuser.New(cfg.Paths.UsersDir, fileuser.WithFileCache(userCache))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create auth store: %w", err)
+		return nil, false, fmt.Errorf("failed to create user store: %w", err)
 	}
 
-	authSvc := authservice.New(authStore.Users(), authservice.Config{
+	apiKeyCache := fileutil.NewCache[*authmodel.APIKey]("api_key", limits.APIKey.Limit, limits.APIKey.TTL)
+	apiKeyCache.StartEviction(ctx)
+	if collector != nil {
+		collector.RegisterCache(apiKeyCache)
+	}
+	apiKeyStore, err := fileapikey.New(cfg.Paths.APIKeysDir, fileapikey.WithFileCache(apiKeyCache))
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to create API key store: %w", err)
+	}
+
+	webhookCache := fileutil.NewCache[*authmodel.Webhook]("webhook", limits.Webhook.Limit, limits.Webhook.TTL)
+	webhookCache.StartEviction(ctx)
+	if collector != nil {
+		collector.RegisterCache(webhookCache)
+	}
+	webhookStore, err := filewebhook.New(cfg.Paths.WebhooksDir, filewebhook.WithFileCache(webhookCache))
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to create webhook store: %w", err)
+	}
+
+	authSvc := authservice.New(userStore, authservice.Config{
 		TokenSecret: tokenSecret,
 		TokenTTL:    cfg.Server.Auth.Builtin.Token.TTL,
 	},
-		authservice.WithAPIKeyStore(authStore.APIKeys()),
-		authservice.WithWebhookStore(authStore.Webhooks()),
+		authservice.WithAPIKeyStore(apiKeyStore),
+		authservice.WithWebhookStore(webhookStore),
 	)
 
-	// Determine setup mode vs admin provisioning
-	setupRequired := false
-	adminUsername := cfg.Server.Auth.Builtin.Admin.Username
-	adminPassword := cfg.Server.Auth.Builtin.Admin.Password
-
-	if adminUsername != "" {
-		// Env vars set admin credentials — EnsureAdminUser (env vars always win)
-		_, created, err := authSvc.EnsureAdminUser(ctx, adminUsername, adminPassword)
-		if err != nil {
-			return nil, fmt.Errorf("failed to ensure admin user: %w", err)
-		}
-		if created {
-			if adminPassword == "" {
-				logger.Warn(ctx, "Admin user created with auto-generated password — change it immediately",
-					slog.String("username", adminUsername))
-			} else {
-				logger.Info(ctx, "Created admin user", slog.String("username", adminUsername))
-			}
-		}
-	} else {
-		// No admin env vars — check if setup page is needed
-		count, err := authSvc.CountUsers(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to count users: %w", err)
-		}
-		setupRequired = count == 0
+	// Check if setup page is needed (no users exist yet)
+	count, err := authSvc.CountUsers(ctx)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to count users: %w", err)
 	}
+	setupRequired := count == 0
 
 	logger.Info(ctx, "Builtin auth initialized",
 		slog.Bool("setupRequired", setupRequired),
-		slog.String("adminUsername", adminUsername),
 	)
 
 	return &builtinAuthResult{
-		AuthService:   authSvc,
-		UserStore:     authStore.Users(),
-		SetupRequired: setupRequired,
-	}, nil
+		AuthService: authSvc,
+		UserStore:   userStore,
+	}, setupRequired, nil
 }
 
 // buildTokenSecretProvider constructs the token secret provider chain.

@@ -183,14 +183,7 @@ type AuthBasic struct {
 
 // AuthBuiltin represents builtin authentication with RBAC.
 type AuthBuiltin struct {
-	Admin AdminConfig
 	Token TokenConfig
-}
-
-// AdminConfig represents the initial admin user configuration.
-type AdminConfig struct {
-	Username string
-	Password string
 }
 
 // TokenConfig represents JWT token configuration.

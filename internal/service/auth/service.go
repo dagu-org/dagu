@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -121,6 +120,7 @@ func New(store auth.UserStore, config Config, opts ...Option) *Service {
 // dummyHash is a valid bcrypt hash used for timing attack prevention.
 // When a user is not found, we still perform a bcrypt comparison against this
 // hash to ensure consistent response times regardless of user existence.
+// IMPORTANT: This hash uses cost 12, which must match defaultBcryptCost.
 var dummyHash = []byte("$2a$12$K8gHXqrFdFvMwJBG0VlJGuAGz3FwBmTm8xnNQblN2tCxrQgPLmwHa")
 
 // Authenticate verifies credentials and returns the user if valid.
@@ -399,63 +399,6 @@ func (s *Service) CountUsers(ctx context.Context) (int64, error) {
 	return s.store.Count(ctx)
 }
 
-// EnsureAdminUser ensures an admin user exists with the given credentials.
-// If the user already exists, the password is updated (env vars always win).
-// If no users exist, the admin is created.
-// Returns the password used and whether a new user was created.
-func (s *Service) EnsureAdminUser(ctx context.Context, username, password string) (string, bool, error) {
-	if username == "" {
-		return "", false, nil
-	}
-
-	// Generate password if not provided
-	generatedPassword := password
-	if generatedPassword == "" {
-		var err error
-		generatedPassword, err = generateSecurePassword(16)
-		if err != nil {
-			return "", false, fmt.Errorf("failed to generate password: %w", err)
-		}
-	}
-
-	// Check if user already exists — if so, update only when password was explicitly provided.
-	// When password is empty (no env var), preserve existing credentials to avoid
-	// silently locking out the admin with an unknown random password on restart.
-	existing, err := s.store.GetByUsername(ctx, username)
-	if err == nil {
-		if password != "" {
-			passwordHash, hashErr := bcrypt.GenerateFromPassword([]byte(password), s.config.BcryptCost)
-			if hashErr != nil {
-				return "", false, fmt.Errorf("failed to hash password: %w", hashErr)
-			}
-			existing.PasswordHash = string(passwordHash)
-		}
-		existing.Role = auth.RoleAdmin
-		existing.UpdatedAt = time.Now().UTC()
-		if updateErr := s.store.Update(ctx, existing); updateErr != nil {
-			return "", false, fmt.Errorf("failed to update admin user: %w", updateErr)
-		}
-		return "", false, nil
-	}
-	if !errors.Is(err, auth.ErrUserNotFound) {
-		return "", false, fmt.Errorf("failed to check admin user: %w", err)
-	}
-
-	// User doesn't exist — create
-	_, err = s.CreateUser(ctx, CreateUserInput{
-		Username: username,
-		Password: generatedPassword,
-		Role:     auth.RoleAdmin,
-	})
-	if err != nil {
-		if errors.Is(err, auth.ErrUserAlreadyExists) {
-			return "", false, nil
-		}
-		return "", false, fmt.Errorf("failed to create admin user: %w", err)
-	}
-
-	return generatedPassword, true, nil
-}
 
 // validatePassword checks if a password meets the minimum requirements.
 func (s *Service) validatePassword(password string) error {
@@ -465,21 +408,6 @@ func (s *Service) validatePassword(password string) error {
 	return nil
 }
 
-// generateSecurePassword returns a URL-safe base64-encoded string of the requested length
-// built from cryptographically secure random bytes. It returns an error if a secure random
-// source cannot be read.
-func generateSecurePassword(length int) (string, error) {
-	// Calculate required bytes to produce at least 'length' base64 characters.
-	// Base64 encodes 3 bytes to 4 characters, so we need ceil(length * 3 / 4) bytes.
-	requiredBytes := (length*3 + 3) / 4
-	bytes := make([]byte, requiredBytes)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
-	}
-	// Use RawURLEncoding (no padding) and take exactly 'length' characters.
-	encoded := base64.RawURLEncoding.EncodeToString(bytes)
-	return encoded[:length], nil
-}
 
 // CreateAPIKeyInput contains the input for creating an API key.
 type CreateAPIKeyInput struct {
@@ -637,7 +565,7 @@ func (s *Service) DeleteAPIKey(ctx context.Context, id string) error {
 }
 
 // ValidateAPIKey validates an API key and returns the associated APIKey if valid.
-// Note: O(n) bcrypt comparisons (~100ms each). Fine for <100 keys.
+// Uses the stored KeyPrefix to skip non-matching keys before bcrypt comparison.
 func (s *Service) ValidateAPIKey(ctx context.Context, keySecret string) (*auth.APIKey, error) {
 	if s.apiKeyStore == nil {
 		return nil, ErrAPIKeyNotConfigured
@@ -653,7 +581,16 @@ func (s *Service) ValidateAPIKey(ctx context.Context, keySecret string) (*auth.A
 		return nil, fmt.Errorf("failed to list API keys: %w", err)
 	}
 
+	// Extract the candidate prefix for fast filtering before bcrypt.
+	var candidatePrefix string
+	if len(keySecret) >= apiKeyPrefixLength {
+		candidatePrefix = keySecret[:apiKeyPrefixLength]
+	}
+
 	for _, key := range keys {
+		if candidatePrefix != "" && key.KeyPrefix != candidatePrefix {
+			continue
+		}
 		if err := bcrypt.CompareHashAndPassword([]byte(key.KeyHash), []byte(keySecret)); err == nil {
 			// Update last used timestamp synchronously.
 			// This avoids goroutine leaks and race conditions with Delete.

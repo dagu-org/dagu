@@ -138,6 +138,23 @@ func (a *API) Login(ctx context.Context, request api.LoginRequestObject) (api.Lo
 				Message: "Invalid username or password",
 			}, nil
 		}
+		if errors.Is(err, authservice.ErrUserDisabled) {
+			if a.auditService != nil {
+				details, err := json.Marshal(map[string]string{"reason": "account_disabled"})
+				if err != nil {
+					logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+					details = []byte("{}")
+				}
+				entry := audit.NewEntry(audit.CategoryUser, "login_failed", "", request.Body.Username).
+					WithDetails(string(details)).
+					WithIPAddress(clientIP)
+				_ = a.auditService.Log(ctx, entry)
+			}
+			return api.Login401JSONResponse{
+				Code:    api.ErrorCodeUnauthorized,
+				Message: "Your account has been disabled",
+			}, nil
+		}
 		return nil, err
 	}
 

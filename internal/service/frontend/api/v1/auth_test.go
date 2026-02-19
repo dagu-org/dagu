@@ -121,11 +121,15 @@ func TestAuth_BuiltinMode(t *testing.T) {
 
 		server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 			cfg.Server.Auth.Mode = config.AuthModeBuiltin
-			cfg.Server.Auth.Builtin.Admin.Username = "admin"
-			cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
 			cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
 			cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
 		}))
+
+		// Create admin via setup
+		server.Client().Post("/api/v1/auth/setup", api.SetupRequest{
+			Username: "admin",
+			Password: "adminpass",
+		}).ExpectStatus(http.StatusOK).Send(t)
 
 		// Without auth - should fail
 		server.Client().Get("/api/v1/dag-runs").ExpectStatus(http.StatusUnauthorized).Send(t)
@@ -158,11 +162,15 @@ func TestAuth_PublicPaths(t *testing.T) {
 
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Mode = config.AuthModeBuiltin
-		cfg.Server.Auth.Builtin.Admin.Username = "admin"
-		cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
 		cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
 		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
 	}))
+
+	// Create admin via setup
+	server.Client().Post("/api/v1/auth/setup", api.SetupRequest{
+		Username: "admin",
+		Password: "adminpass",
+	}).ExpectStatus(http.StatusOK).Send(t)
 
 	// Health endpoint - public
 	server.Client().Get("/api/v1/health").ExpectStatus(http.StatusOK).Send(t)
@@ -191,16 +199,23 @@ func loginAndGetToken(t *testing.T, server test.Server, username, password strin
 	return result.Token
 }
 
-// builtinServer creates a test server with builtin auth and an auto-provisioned admin.
+// builtinServer creates a test server with builtin auth and creates an admin
+// via the setup endpoint.
 func builtinServer(t *testing.T) test.Server {
 	t.Helper()
-	return test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Mode = config.AuthModeBuiltin
-		cfg.Server.Auth.Builtin.Admin.Username = "admin"
-		cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
 		cfg.Server.Auth.Builtin.Token.Secret = "test-jwt-secret-key-integration"
 		cfg.Server.Auth.Builtin.Token.TTL = time.Hour
 	}))
+
+	// Create admin via setup endpoint
+	server.Client().Post("/api/v1/auth/setup", api.SetupRequest{
+		Username: "admin",
+		Password: "adminpass",
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	return server
 }
 
 // setupServer creates a test server with builtin auth but NO admin credentials,
@@ -337,6 +352,50 @@ func TestLogin(t *testing.T) {
 			Password: "",
 		}).ExpectStatus(http.StatusUnauthorized).Send(t)
 	})
+}
+
+func TestLogin_DisabledUser(t *testing.T) {
+	t.Parallel()
+
+	server := setupServer(t)
+
+	// Create admin via setup
+	setupResp := server.Client().Post("/api/v1/auth/setup", api.SetupRequest{
+		Username: "admin",
+		Password: "adminpass1",
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	var setupResult api.LoginResponse
+	setupResp.Unmarshal(t, &setupResult)
+	adminToken := setupResult.Token
+
+	// Create a second user
+	createResp := server.Client().Post("/api/v1/users", api.CreateUserRequest{
+		Username: "testuser",
+		Password: "testpass123",
+		Role:     api.UserRoleDeveloper,
+	}).WithBearerToken(adminToken).ExpectStatus(http.StatusCreated).Send(t)
+
+	var createResult api.UserResponse
+	createResp.Unmarshal(t, &createResult)
+
+	// Verify the user can login
+	server.Client().Post("/api/v1/auth/login", api.LoginRequest{
+		Username: "testuser",
+		Password: "testpass123",
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	// Disable the user
+	isDisabled := true
+	server.Client().Patch("/api/v1/users/"+createResult.User.Id, api.UpdateUserRequest{
+		IsDisabled: &isDisabled,
+	}).WithBearerToken(adminToken).ExpectStatus(http.StatusOK).Send(t)
+
+	// Login should now fail with 401
+	server.Client().Post("/api/v1/auth/login", api.LoginRequest{
+		Username: "testuser",
+		Password: "testpass123",
+	}).ExpectStatus(http.StatusUnauthorized).Send(t)
 }
 
 func TestGetCurrentUser(t *testing.T) {

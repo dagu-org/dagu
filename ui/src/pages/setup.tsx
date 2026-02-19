@@ -9,7 +9,7 @@ import { AlertCircle, UserPlus } from 'lucide-react';
 
 export default function SetupPage() {
   const config = useConfig();
-  const { setupRequired, completeSetup } = useAuth();
+  const { setupRequired, setup, completeSetup } = useAuth();
   const navigate = useNavigate();
 
   const [username, setUsername] = useState('');
@@ -50,26 +50,15 @@ export default function SetupPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${config.apiURL}/auth/setup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: trimmedUsername, password }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        if (response.status === 403) {
-          navigate('/login', { replace: true });
-          return;
-        }
-        throw new Error(data.message || 'Setup failed');
-      }
-
-      const data = await response.json();
+      const result = await setup(trimmedUsername, password);
       setSetupDone(true);
-      completeSetup({ token: data.token, user: data.user });
+      completeSetup(result);
       navigate('/', { replace: true });
     } catch (err) {
+      if ((err as any)?.status === 403) {
+        navigate('/login', { replace: true });
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Setup failed');
     } finally {
       setIsLoading(false);

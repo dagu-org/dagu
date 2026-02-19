@@ -88,8 +88,7 @@ When `auth.mode=builtin` **(default)**:
 
 - Auth stores are initialized (user store, API key store, webhook store)
 - JWT signing secret is resolved via the `TokenSecretProvider` chain — auto-generated and persisted if not configured (Section 2)
-- If no users exist and no admin credentials set via env vars → setup page mode (Section 3)
-- If admin credentials set via `DAGU_AUTH_ADMIN_USERNAME` / `DAGU_AUTH_ADMIN_PASSWORD` → admin user created at startup, normal login
+- If no users exist → setup page mode (Section 3)
 - RBAC enforced — users have roles (`admin`, `manager`, `developer`, `operator`, `viewer`)
 - Optional OIDC addon via `auth.oidc` config for SSO login
 - API keys and webhooks available for programmatic access
@@ -331,23 +330,6 @@ A new `/setup` route presents a clean welcome screen:
 - If `setupRequired` is false and user visits `/setup` → redirect to `/login`
 - After successful setup → store token, redirect to dashboard
 
-#### Headless / Docker Override
-
-When admin credentials are pre-configured via environment variables:
-
-```
-DAGU_AUTH_ADMIN_USERNAME=admin
-DAGU_AUTH_ADMIN_PASSWORD=s3cret
-```
-
-The server creates the admin user at startup (existing `EnsureAdminUser` behavior) and **skips** setup mode entirely. The setup page never appears. This preserves the Docker/CI workflow where credentials are injected via environment.
-
-**Priority:**
-
-1. If env vars set admin credentials → create admin at startup, no setup page
-2. If no env vars and no users exist → setup page mode
-3. If users already exist → normal login flow
-
 ### 4. Auth Store Interface
 
 A new unified interface abstracts all auth-related persistence. The current three stores (`fileuser`, `fileapikey`, `filewebhook`) are consolidated behind a single `AuthStore` interface that the auth service depends on.
@@ -452,22 +434,6 @@ The auth store handles internal cache setup, eviction scheduling, and telemetry 
 10. Frontend stores token → redirects to dashboard
 ```
 
-### Docker Deployment
-
-```dockerfile
-environment:
-  - DAGU_AUTH_ADMIN_USERNAME=admin
-  - DAGU_AUTH_ADMIN_PASSWORD=changeme123
-```
-
-```
-1. Server starts → builtin mode (default)
-2. Auto-generates JWT secret (persisted in volume)
-3. EnsureAdminUser creates admin with env var credentials
-4. setupRequired=false (user exists)
-5. User navigates to login page → enters credentials
-```
-
 ### Explicit No-Auth (Development)
 
 ```yaml
@@ -562,19 +528,6 @@ auth:
 ```
 
 OIDC users are created/updated on first login with role mapping applied. The login page shows both local credentials and a "Login with SSO" button.
-
-### Docker Compose with Pre-Configured Admin
-
-```yaml
-services:
-  dagu:
-    image: dagu:v2
-    environment:
-      - DAGU_AUTH_ADMIN_USERNAME=admin
-      - DAGU_AUTH_ADMIN_PASSWORD=${ADMIN_PASSWORD}
-    volumes:
-      - dagu-data:/data
-```
 
 ---
 
