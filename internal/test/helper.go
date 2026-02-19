@@ -179,6 +179,10 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	cfg.Paths.SuspendFlagsDir = filepath.Join(tmpDir, "suspend-flags")
 	cfg.Paths.AdminLogsDir = filepath.Join(tmpDir, "admin-logs")
 	cfg.Coordinator.Enabled = false
+	// Default to "none" in tests so auth setup (bcrypt, token generation)
+	// doesn't slow down tests that don't need authentication.
+	// Tests that need auth can override via WithConfigMutator.
+	cfg.Server.Auth.Mode = config.AuthModeNone
 	if options.DAGsDir != "" {
 		cfg.Paths.DAGsDir = options.DAGsDir
 	}

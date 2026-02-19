@@ -127,6 +127,8 @@ func writeServerConfig(t *testing.T, port, basePath string, includeRemoteNodes b
 	configContent := fmt.Sprintf(`host: "127.0.0.1"
 port: %s
 base_path: "%s"
+auth:
+  mode: none
 `, port, basePath)
 
 	if includeRemoteNodes {

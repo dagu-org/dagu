@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os/signal"
@@ -181,8 +183,14 @@ func runStartAll(ctx *Context, _ []string) error {
 	case <-signalCtx.Done():
 		logger.Info(ctx, "Received shutdown signal", slog.Any("signal", signalCtx.Err()))
 	case err := <-errCh:
-		firstErr = err
-		logger.Error(ctx, "Service failed, shutting down", tag.Error(err))
+		// If the context was already canceled (e.g. by a signal), services returning
+		// context.Canceled is expected shutdown behavior, not a failure.
+		if signalCtx.Err() != nil && errors.Is(err, context.Canceled) {
+			logger.Info(ctx, "Received shutdown signal", slog.Any("signal", signalCtx.Err()))
+		} else {
+			firstErr = err
+			logger.Error(ctx, "Service failed, shutting down", tag.Error(err))
+		}
 		stop() // Cancel the signal context to trigger shutdown of other services
 	}
 

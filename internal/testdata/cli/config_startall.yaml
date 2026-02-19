@@ -1,5 +1,7 @@
 port: 54322
 headless: true
 dags: /tmp/dagu_test
+auth:
+  mode: none
 coordinator:
   host: 0.0.0.0
