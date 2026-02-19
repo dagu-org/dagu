@@ -3288,12 +3288,13 @@ export interface components {
             tags?: string[];
             /** @enum {string} */
             type: SkillResponseType;
-            knowledge: string;
+            knowledge?: string;
             enabled: boolean;
         };
         /** @description List of skills */
         ListSkillsResponse: {
             skills: components["schemas"]["SkillResponse"][];
+            pagination: components["schemas"]["Pagination"];
         };
         /** @description Request to create a new skill */
         CreateSkillRequest: {
@@ -8474,6 +8475,14 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description page number of items to fetch (default is 1) */
+                page?: components["parameters"]["Page"];
+                /** @description number of items per page (default is 30, max is 100) */
+                perPage?: components["parameters"]["PerPage"];
+                /** @description Search query (matches name, description, tags) */
+                q?: string;
+                /** @description Comma-separated tag filter (AND semantics) */
+                tags?: string;
             };
             header?: never;
             path?: never;

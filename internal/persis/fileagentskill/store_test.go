@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -638,6 +639,101 @@ Knowledge from directory skill`
 		assert.Equal(t, "Directory Skill", got.Name)
 		assert.Equal(t, "A manually created skill", got.Description)
 		assert.Equal(t, "Knowledge from directory skill", got.Knowledge)
+	})
+}
+
+// Tests for Search
+
+func TestStore_Search(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("returns metadata with all fields", func(t *testing.T) {
+		t.Parallel()
+		store, _ := setupTestStore(t)
+
+		skill := &agent.Skill{
+			ID:          "my-skill",
+			Name:        "My Skill",
+			Description: "A test skill",
+			Version:     "1.2.3",
+			Author:      "Test Author",
+			Tags:        []string{"test", "example"},
+			Type:        agent.SkillTypeCustom,
+			Knowledge:   "Some knowledge content",
+		}
+		createSkill(t, store, skill)
+
+		result, err := store.Search(ctx, agent.SearchSkillsOptions{
+			Paginator: exec.DefaultPaginator(),
+		})
+		require.NoError(t, err)
+		require.Len(t, result.Items, 1)
+
+		m := result.Items[0]
+		assert.Equal(t, "my-skill", m.ID)
+		assert.Equal(t, "My Skill", m.Name)
+		assert.Equal(t, "A test skill", m.Description)
+		assert.Equal(t, "1.2.3", m.Version)
+		assert.Equal(t, "Test Author", m.Author)
+		assert.Equal(t, agent.SkillTypeCustom, m.Type)
+		assert.Equal(t, []string{"test", "example"}, m.Tags)
+		assert.Equal(t, len("Some knowledge content"), m.KnowledgeSize)
+	})
+
+	t.Run("pagination", func(t *testing.T) {
+		t.Parallel()
+		store, _ := setupTestStore(t)
+
+		for i := range 5 {
+			createSkill(t, store, newTestSkill(
+				fmt.Sprintf("skill-%02d", i),
+				fmt.Sprintf("Skill %02d", i),
+			))
+		}
+
+		result, err := store.Search(ctx, agent.SearchSkillsOptions{
+			Paginator: exec.NewPaginator(1, 2),
+		})
+		require.NoError(t, err)
+		assert.Len(t, result.Items, 2)
+		assert.Equal(t, 5, result.TotalCount)
+	})
+
+	t.Run("query filters by name", func(t *testing.T) {
+		t.Parallel()
+		store, _ := setupTestStore(t)
+
+		createSkill(t, store, newTestSkill("k8s", "Kubernetes"))
+		createSkill(t, store, newTestSkill("docker", "Docker"))
+
+		result, err := store.Search(ctx, agent.SearchSkillsOptions{
+			Paginator: exec.DefaultPaginator(),
+			Query:     "kube",
+		})
+		require.NoError(t, err)
+		require.Len(t, result.Items, 1)
+		assert.Equal(t, "k8s", result.Items[0].ID)
+	})
+
+	t.Run("tag filter", func(t *testing.T) {
+		t.Parallel()
+		store, _ := setupTestStore(t)
+
+		s1 := newTestSkill("tagged", "Tagged Skill")
+		s1.Tags = []string{"ops", "infra"}
+		createSkill(t, store, s1)
+
+		s2 := newTestSkill("untagged", "Untagged Skill")
+		createSkill(t, store, s2)
+
+		result, err := store.Search(ctx, agent.SearchSkillsOptions{
+			Paginator: exec.DefaultPaginator(),
+			Tags:      []string{"ops"},
+		})
+		require.NoError(t, err)
+		require.Len(t, result.Items, 1)
+		assert.Equal(t, "tagged", result.Items[0].ID)
 	})
 }
 

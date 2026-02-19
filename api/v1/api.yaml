@@ -4027,6 +4027,20 @@ paths:
         - "agent"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - name: q
+          in: query
+          description: "Search query (matches name, description, tags)"
+          required: false
+          schema:
+            type: string
+        - name: tags
+          in: query
+          description: "Comma-separated tag filter (AND semantics)"
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: "List of skills"
@@ -7556,7 +7570,6 @@ components:
         - id
         - name
         - type
-        - knowledge
         - enabled
       description: "Skill configuration"
       properties:
@@ -7586,12 +7599,15 @@ components:
       type: object
       required:
         - skills
+        - pagination
       description: "List of skills"
       properties:
         skills:
           type: array
           items:
             $ref: "#/components/schemas/SkillResponse"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
 
     CreateSkillRequest:
       type: object

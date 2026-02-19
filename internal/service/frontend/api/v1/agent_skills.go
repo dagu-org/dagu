@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/audit"
 )
 
@@ -42,8 +43,8 @@ var (
 	}
 )
 
-// ListAgentSkills returns all configured skills with enabled status. Requires admin role.
-func (a *API) ListAgentSkills(ctx context.Context, _ api.ListAgentSkillsRequestObject) (api.ListAgentSkillsResponseObject, error) {
+// ListAgentSkills returns paginated skills with optional search. Requires admin role.
+func (a *API) ListAgentSkills(ctx context.Context, request api.ListAgentSkillsRequestObject) (api.ListAgentSkillsResponseObject, error) {
 	if err := a.requireSkillManagement(); err != nil {
 		return nil, err
 	}
@@ -51,9 +52,16 @@ func (a *API) ListAgentSkills(ctx context.Context, _ api.ListAgentSkillsRequestO
 		return nil, err
 	}
 
-	skills, err := a.agentSkillStore.List(ctx)
+	pg := exec.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
+	tags := parseCommaSeparatedTags(request.Params.Tags)
+
+	result, err := a.agentSkillStore.Search(ctx, agent.SearchSkillsOptions{
+		Paginator: pg,
+		Query:     valueOf(request.Params.Q),
+		Tags:      tags,
+	})
 	if err != nil {
-		logger.Error(ctx, "Failed to list agent skills", tag.Error(err))
+		logger.Error(ctx, "Failed to search agent skills", tag.Error(err))
 		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to list skills", HTTPStatus: http.StatusInternalServerError}
 	}
 
@@ -62,12 +70,15 @@ func (a *API) ListAgentSkills(ctx context.Context, _ api.ListAgentSkillsRequestO
 		return nil, err
 	}
 
-	skillResponses := make([]api.SkillResponse, 0, len(skills))
-	for _, s := range skills {
-		skillResponses = append(skillResponses, toSkillResponse(s, isSkillEnabled(enabledSkills, s.ID)))
+	skillResponses := make([]api.SkillResponse, 0, len(result.Items))
+	for _, m := range result.Items {
+		skillResponses = append(skillResponses, toSkillMetadataResponse(m, isSkillEnabled(enabledSkills, m.ID)))
 	}
 
-	return api.ListAgentSkills200JSONResponse{Skills: skillResponses}, nil
+	return api.ListAgentSkills200JSONResponse{
+		Skills:     skillResponses,
+		Pagination: toPagination(*result),
+	}, nil
 }
 
 // CreateAgentSkill creates a new skill. Requires admin role.
@@ -325,7 +336,20 @@ func toSkillResponse(skill *agent.Skill, enabled bool) api.SkillResponse {
 		Author:      ptrOf(skill.Author),
 		Tags:        ptrOf(skill.Tags),
 		Type:        api.SkillResponseType(skill.Type),
-		Knowledge:   skill.Knowledge,
+		Knowledge:   ptrOf(skill.Knowledge),
+		Enabled:     enabled,
+	}
+}
+
+func toSkillMetadataResponse(m agent.SkillMetadata, enabled bool) api.SkillResponse {
+	return api.SkillResponse{
+		Id:          m.ID,
+		Name:        m.Name,
+		Description: ptrOf(m.Description),
+		Version:     ptrOf(m.Version),
+		Author:      ptrOf(m.Author),
+		Tags:        ptrOf(m.Tags),
+		Type:        api.SkillResponseType(m.Type),
 		Enabled:     enabled,
 	}
 }

@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Loader2,
@@ -21,10 +21,14 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useIsAdmin } from '@/contexts/AuthContext';
-import { useClient } from '@/hooks/api';
+import { useClient, useQuery } from '@/hooks/api';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { DAGPagination } from '@/features/dags/components/common';
 import ConfirmModal from '@/ui/ConfirmModal';
 
 type SkillResponse = components['schemas']['SkillResponse'];
+
+const DEFAULT_PER_PAGE = 30;
 
 export default function AgentSkillsPage(): React.ReactNode {
   const client = useClient();
@@ -32,54 +36,71 @@ export default function AgentSkillsPage(): React.ReactNode {
   const appBarContext = useContext(AppBarContext);
   const navigate = useNavigate();
 
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const [skills, setSkills] = useState<SkillResponse[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState<'all' | 'enabled' | 'disabled'>('all');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
 
   const [deletingSkill, setDeletingSkill] = useState<SkillResponse | null>(null);
 
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const debouncedQuery = useDebouncedValue(searchQuery, 300);
 
   useEffect(() => {
     appBarContext.setTitle('Agent Skills');
   }, [appBarContext]);
 
-  const fetchSkills = useCallback(async () => {
-    try {
-      const { data, error: apiError } = await client.GET('/settings/agent/skills', {
-        params: { query: { remoteNode } },
-      });
-      if (apiError) throw new Error('Failed to fetch skills');
-      setSkills(data.skills || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load skills');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [client, remoteNode]);
-
+  // Reset to page 1 when search query changes
   useEffect(() => {
-    fetchSkills();
-  }, [fetchSkills]);
+    setPage(1);
+  }, [debouncedQuery]);
+
+  const { data, mutate, isLoading } = useQuery(
+    '/settings/agent/skills',
+    {
+      params: {
+        query: {
+          remoteNode,
+          page,
+          perPage,
+          q: debouncedQuery || undefined,
+        },
+      },
+    },
+    { keepPreviousData: true }
+  );
+
+  const skills = data?.skills ?? [];
+  const pagination = data?.pagination;
 
   async function handleToggleEnabled(skill: SkillResponse): Promise<void> {
     setError(null);
     setSuccess(null);
 
-    // Compute new enabled list using functional updater to avoid stale closure
     const willEnable = !skill.enabled;
-    let newEnabled: string[] = [];
-    setSkills((prev) => {
-      const updated = prev.map((s) =>
-        s.id === skill.id ? { ...s, enabled: willEnable } : s
-      );
-      newEnabled = updated.filter((s) => s.enabled).map((s) => s.id);
-      return updated;
-    });
+
+    // Optimistically update the local data
+    await mutate(
+      (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          skills: current.skills.map((s) =>
+            s.id === skill.id ? { ...s, enabled: willEnable } : s
+          ),
+        };
+      },
+      { revalidate: false }
+    );
+
+    // Compute new enabled list from the optimistic state
+    const updatedSkills = skills.map((s) =>
+      s.id === skill.id ? { ...s, enabled: willEnable } : s
+    );
+    const newEnabled = updatedSkills.filter((s) => s.enabled).map((s) => s.id);
 
     try {
       const { error: apiError } = await client.PUT('/settings/agent/enabled-skills', {
@@ -87,7 +108,7 @@ export default function AgentSkillsPage(): React.ReactNode {
         body: { skillIds: newEnabled },
       });
       if (apiError) {
-        await fetchSkills(); // Revert to server state
+        await mutate(); // Revert to server state
         throw new Error(apiError.message || 'Failed to update enabled skills');
       }
     } catch (err) {
@@ -104,26 +125,16 @@ export default function AgentSkillsPage(): React.ReactNode {
       if (apiError) throw new Error(apiError.message || 'Failed to delete skill');
       setDeletingSkill(null);
       setSuccess(`Skill "${deletingSkill.name}" deleted`);
-      await fetchSkills();
+      await mutate();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete skill');
     }
   }
 
+  // Client-side post-filter for enabled/disabled tabs within the current page
   const filteredSkills = skills.filter((skill) => {
-    // Filter by tab
     if (filterTab === 'enabled' && !skill.enabled) return false;
     if (filterTab === 'disabled' && skill.enabled) return false;
-
-    // Filter by search
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return (
-        skill.name.toLowerCase().includes(q) ||
-        (skill.description?.toLowerCase().includes(q) ?? false) ||
-        (skill.tags?.some((tag) => tag.toLowerCase().includes(q)) ?? false)
-      );
-    }
     return true;
   });
 
@@ -196,7 +207,7 @@ export default function AgentSkillsPage(): React.ReactNode {
       </div>
 
       {/* Skills Grid */}
-      {isLoading ? (
+      {isLoading && !data ? (
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
@@ -204,7 +215,7 @@ export default function AgentSkillsPage(): React.ReactNode {
         <div className="card-obsidian p-8 text-center">
           <Sparkles className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
           <p className="text-sm text-muted-foreground">
-            {skills.length === 0
+            {skills.length === 0 && !debouncedQuery
               ? 'No skills configured. Create a skill to get started.'
               : 'No skills match your search criteria.'}
           </p>
@@ -272,6 +283,22 @@ export default function AgentSkillsPage(): React.ReactNode {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {pagination && pagination.totalPages > 1 && (
+        <div className="flex justify-end">
+          <DAGPagination
+            totalPages={pagination.totalPages}
+            page={page}
+            pageLimit={perPage}
+            pageChange={setPage}
+            onPageLimitChange={(limit) => {
+              setPerPage(limit);
+              setPage(1);
+            }}
+          />
         </div>
       )}
 

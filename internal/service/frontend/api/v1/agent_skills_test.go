@@ -102,8 +102,35 @@ func (m *mockSkillStore) Delete(_ context.Context, id string) error {
 	return nil
 }
 
-func (m *mockSkillStore) Search(_ context.Context, _ agent.SearchSkillsOptions) (*exec.PaginatedResult[agent.SkillMetadata], error) {
-	result := exec.NewPaginatedResult([]agent.SkillMetadata{}, 0, exec.DefaultPaginator())
+func (m *mockSkillStore) Search(_ context.Context, opts agent.SearchSkillsOptions) (*exec.PaginatedResult[agent.SkillMetadata], error) {
+	var items []agent.SkillMetadata
+	for _, s := range m.skills {
+		items = append(items, agent.SkillMetadata{
+			ID:            s.ID,
+			Name:          s.Name,
+			Description:   s.Description,
+			Tags:          s.Tags,
+			KnowledgeSize: len(s.Knowledge),
+			Version:       s.Version,
+			Author:        s.Author,
+			Type:          s.Type,
+		})
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].Name < items[j].Name })
+	pg := opts.Paginator
+	if pg.Limit() == 0 {
+		pg = exec.DefaultPaginator()
+	}
+	total := len(items)
+	offset := pg.Offset()
+	if offset > total {
+		offset = total
+	}
+	end := offset + pg.Limit()
+	if end > total {
+		end = total
+	}
+	result := exec.NewPaginatedResult(items[offset:end], total, pg)
 	return &result, nil
 }
 
@@ -185,7 +212,8 @@ func TestCreateAgentSkill(t *testing.T) {
 		createResp, ok := resp.(apigen.CreateAgentSkill201JSONResponse)
 		require.True(t, ok)
 		assert.Equal(t, "Kubernetes", createResp.Name)
-		assert.Equal(t, "K8s best practices", createResp.Knowledge)
+		require.NotNil(t, createResp.Knowledge)
+		assert.Equal(t, "K8s best practices", *createResp.Knowledge)
 		assert.NotEmpty(t, createResp.Id)
 		assert.Equal(t, apigen.SkillResponseType("custom"), createResp.Type)
 		assert.False(t, createResp.Enabled)
@@ -407,7 +435,8 @@ func TestUpdateAgentSkill(t *testing.T) {
 		updateResp, ok := resp.(apigen.UpdateAgentSkill200JSONResponse)
 		require.True(t, ok)
 		assert.Equal(t, "Updated Name", updateResp.Name)
-		assert.Equal(t, "Original knowledge", updateResp.Knowledge) // unchanged
+		require.NotNil(t, updateResp.Knowledge)
+		assert.Equal(t, "Original knowledge", *updateResp.Knowledge) // unchanged
 	})
 
 	t.Run("update knowledge", func(t *testing.T) {
@@ -430,7 +459,8 @@ func TestUpdateAgentSkill(t *testing.T) {
 
 		updateResp, ok := resp.(apigen.UpdateAgentSkill200JSONResponse)
 		require.True(t, ok)
-		assert.Equal(t, "New knowledge content", updateResp.Knowledge)
+		require.NotNil(t, updateResp.Knowledge)
+		assert.Equal(t, "New knowledge content", *updateResp.Knowledge)
 		assert.Equal(t, "My Skill", updateResp.Name) // unchanged
 	})
 
@@ -452,7 +482,8 @@ func TestUpdateAgentSkill(t *testing.T) {
 		updateResp, ok := resp.(apigen.UpdateAgentSkill200JSONResponse)
 		require.True(t, ok)
 		assert.Equal(t, "Original", updateResp.Name)
-		assert.Equal(t, "Original knowledge", updateResp.Knowledge)
+		require.NotNil(t, updateResp.Knowledge)
+		assert.Equal(t, "Original knowledge", *updateResp.Knowledge)
 	})
 
 	t.Run("empty-string name not applied", func(t *testing.T) {

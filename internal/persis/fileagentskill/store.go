@@ -44,6 +44,9 @@ type skillIndexEntry struct {
 	description   string
 	tags          []string
 	knowledgeSize int
+	version       string
+	author        string
+	skillType     agent.SkillType
 }
 
 // Store implements a file-based skill store.
@@ -122,6 +125,9 @@ func (s *Store) rebuildIndex() error {
 			description:   skill.Description,
 			tags:          skill.Tags,
 			knowledgeSize: len(skill.Knowledge),
+			version:       skill.Version,
+			author:        skill.Author,
+			skillType:     skill.Type,
 		}
 		if existingID, exists := s.byName[skill.Name]; exists {
 			slog.Warn("Duplicate skill name in store, last file wins",
@@ -286,6 +292,9 @@ func (s *Store) Create(_ context.Context, skill *agent.Skill) error {
 		description:   skill.Description,
 		tags:          skill.Tags,
 		knowledgeSize: len(skill.Knowledge),
+		version:       skill.Version,
+		author:        skill.Author,
+		skillType:     skill.Type,
 	}
 	s.byName[skill.Name] = skill.ID
 
@@ -383,6 +392,9 @@ func (s *Store) Search(_ context.Context, opts agent.SearchSkillsOptions) (*exec
 			Description:   entry.description,
 			Tags:          entry.tags,
 			KnowledgeSize: entry.knowledgeSize,
+			Version:       entry.version,
+			Author:        entry.author,
+			Type:          entry.skillType,
 		})
 	}
 
@@ -484,6 +496,9 @@ func (s *Store) Update(_ context.Context, skill *agent.Skill) error {
 	entry.description = skill.Description
 	entry.tags = skill.Tags
 	entry.knowledgeSize = len(skill.Knowledge)
+	entry.version = skill.Version
+	entry.author = skill.Author
+	entry.skillType = skill.Type
 
 	if nameChanged {
 		delete(s.byName, existing.Name)

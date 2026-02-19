@@ -62,7 +62,7 @@ export default function SkillEditorPage() {
       setName(data.name);
       setIdField(data.id);
       setDescription(data.description ?? '');
-      setKnowledge(data.knowledge);
+      setKnowledge(data.knowledge ?? '');
       setVersion(data.version ?? '');
       setAuthor(data.author ?? '');
       setTagsInput(data.tags?.join(', ') ?? '');
