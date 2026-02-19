@@ -588,6 +588,8 @@ ui:
 
 	t.Run("InvalidSchedulerDurations", func(t *testing.T) {
 		cfg := loadFromYAML(t, `
+auth:
+  mode: none
 scheduler:
   lock_stale_threshold: "invalid"
   lock_retry_interval: "bad-duration"
@@ -907,6 +909,10 @@ auth:
 		cfg := loadFromYAML(t, `
 auth:
   mode: "invalid_mode"
+  builtin:
+    admin:
+      username: admin
+      password: testpassword
 `)
 		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
 		require.Len(t, cfg.Warnings, 1)
@@ -1009,6 +1015,8 @@ metrics: "private"
 
 	t.Run("MetricsAccessInvalid", func(t *testing.T) {
 		cfg := loadFromYAML(t, `
+auth:
+  mode: none
 metrics: "invalid_value"
 `)
 		assert.Equal(t, MetricsAccessPrivate, cfg.Server.Metrics)
@@ -1047,6 +1055,8 @@ cache: high
 
 	t.Run("CacheModeInvalid", func(t *testing.T) {
 		cfg := loadFromYAML(t, `
+auth:
+  mode: none
 cache: invalid
 `)
 		assert.Equal(t, CacheModeNormal, cfg.Cache)

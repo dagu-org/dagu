@@ -397,6 +397,9 @@ func initBuiltinAuthService(ctx context.Context, cfg *config.Config, collector *
 func buildTokenSecretProvider(ctx context.Context, cfg *config.Config) authmodel.TokenSecretProvider {
 	var providers []authmodel.TokenSecretProvider
 
+	// File provider directory
+	authDir := filepath.Join(cfg.Paths.DataDir, "auth")
+
 	// Static provider from config/env (highest priority)
 	if cfg.Server.Auth.Builtin.Token.Secret != "" {
 		staticProvider, err := tokensecret.NewStatic(cfg.Server.Auth.Builtin.Token.Secret)
@@ -405,11 +408,21 @@ func buildTokenSecretProvider(ctx context.Context, cfg *config.Config) authmodel
 				tag.Error(err))
 		} else {
 			providers = append(providers, staticProvider)
+
+			// Warn if a file-based secret also exists with a different value.
+			secretPath := filepath.Join(authDir, "token_secret")
+			if data, readErr := os.ReadFile(secretPath); readErr == nil { //nolint:gosec // path is constructed from trusted config dir + constant filename
+				fileSecret := strings.TrimSpace(string(data))
+				if fileSecret != "" && fileSecret != cfg.Server.Auth.Builtin.Token.Secret {
+					logger.Warn(ctx, "Token secret in config differs from file-based secret — config value takes priority; "+
+						"removing it from config will switch to the file-based secret and invalidate existing sessions",
+						slog.String("file", secretPath))
+				}
+			}
 		}
 	}
 
 	// File provider (auto-generate if missing)
-	authDir := filepath.Join(cfg.Paths.DataDir, "auth")
 	providers = append(providers, tokensecret.NewFile(authDir))
 
 	return tokensecret.NewChain(providers...)

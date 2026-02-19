@@ -505,6 +505,29 @@ func (l *ConfigLoader) setAuthDefaults(cfg *Config) {
 	if cfg.Server.Auth.Builtin.Admin.Username == "" {
 		cfg.Server.Auth.Builtin.Admin.Username = "admin"
 	}
+
+	if cfg.Server.Auth.Mode == AuthModeBuiltin {
+		// Warn on weak/default token secrets.
+		if cfg.Server.Auth.Builtin.Token.Secret != "" {
+			weakSecrets := []string{"changeme", "secret", "password", "test", "dagu"}
+			for _, weak := range weakSecrets {
+				if strings.EqualFold(cfg.Server.Auth.Builtin.Token.Secret, weak) {
+					l.warnings = append(l.warnings, fmt.Sprintf(
+						"Token secret %q is a common default — use a strong random value for production",
+						cfg.Server.Auth.Builtin.Token.Secret))
+					break
+				}
+			}
+		}
+
+		// Warn when admin username is set without a password.
+		if cfg.Server.Auth.Builtin.Admin.Username != "" &&
+			cfg.Server.Auth.Builtin.Admin.Password == "" {
+			l.warnings = append(l.warnings, fmt.Sprintf(
+				"Admin user %q has no password configured — a random password will be auto-generated and logged on first startup",
+				cfg.Server.Auth.Builtin.Admin.Username))
+		}
+	}
 	if len(cfg.Server.Auth.OIDC.Scopes) == 0 {
 		cfg.Server.Auth.OIDC.Scopes = []string{"openid", "profile", "email"}
 	}
