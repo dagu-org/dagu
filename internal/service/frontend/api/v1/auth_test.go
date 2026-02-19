@@ -176,3 +176,257 @@ func TestAuth_PublicPaths(t *testing.T) {
 	// Other endpoints - require auth
 	server.Client().Get("/api/v1/dag-runs").ExpectStatus(http.StatusUnauthorized).Send(t)
 }
+
+// loginAndGetToken is a helper that logs in and returns the JWT token.
+func loginAndGetToken(t *testing.T, server test.Server, username, password string) string {
+	t.Helper()
+	resp := server.Client().Post("/api/v1/auth/login", api.LoginRequest{
+		Username: username,
+		Password: password,
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	var result api.LoginResponse
+	resp.Unmarshal(t, &result)
+	require.NotEmpty(t, result.Token)
+	return result.Token
+}
+
+// builtinServer creates a test server with builtin auth and an auto-provisioned admin.
+func builtinServer(t *testing.T) test.Server {
+	t.Helper()
+	return test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Mode = config.AuthModeBuiltin
+		cfg.Server.Auth.Builtin.Admin.Username = "admin"
+		cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
+		cfg.Server.Auth.Builtin.Token.Secret = "test-jwt-secret-key-integration"
+		cfg.Server.Auth.Builtin.Token.TTL = time.Hour
+	}))
+}
+
+// setupServer creates a test server with builtin auth but NO admin credentials,
+// so the setup page is active.
+func setupServer(t *testing.T) test.Server {
+	t.Helper()
+	return test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Mode = config.AuthModeBuiltin
+		cfg.Server.Auth.Builtin.Token.Secret = "test-jwt-secret-key-setup"
+		cfg.Server.Auth.Builtin.Token.TTL = time.Hour
+	}))
+}
+
+func TestSetup(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+
+		server := setupServer(t)
+
+		resp := server.Client().Post("/api/v1/auth/setup", api.SetupRequest{
+			Username: "myadmin",
+			Password: "securepass1",
+		}).ExpectStatus(http.StatusOK).Send(t)
+
+		var result api.LoginResponse
+		resp.Unmarshal(t, &result)
+		require.NotEmpty(t, result.Token)
+		require.Equal(t, "myadmin", result.User.Username)
+		require.Equal(t, api.UserRoleAdmin, result.User.Role)
+		require.False(t, result.ExpiresAt.IsZero())
+	})
+
+	t.Run("returns_valid_token", func(t *testing.T) {
+		t.Parallel()
+
+		server := setupServer(t)
+
+		resp := server.Client().Post("/api/v1/auth/setup", api.SetupRequest{
+			Username: "myadmin",
+			Password: "securepass1",
+		}).ExpectStatus(http.StatusOK).Send(t)
+
+		var result api.LoginResponse
+		resp.Unmarshal(t, &result)
+
+		// The returned token should grant access to protected endpoints
+		server.Client().Get("/api/v1/dag-runs").
+			WithBearerToken(result.Token).
+			ExpectStatus(http.StatusOK).Send(t)
+	})
+
+	t.Run("already_completed", func(t *testing.T) {
+		t.Parallel()
+
+		server := setupServer(t)
+
+		// First setup succeeds
+		server.Client().Post("/api/v1/auth/setup", api.SetupRequest{
+			Username: "myadmin",
+			Password: "securepass1",
+		}).ExpectStatus(http.StatusOK).Send(t)
+
+		// Second setup fails
+		server.Client().Post("/api/v1/auth/setup", api.SetupRequest{
+			Username: "another",
+			Password: "securepass2",
+		}).ExpectStatus(http.StatusForbidden).Send(t)
+	})
+
+	t.Run("weak_password", func(t *testing.T) {
+		t.Parallel()
+
+		server := setupServer(t)
+
+		server.Client().Post("/api/v1/auth/setup", api.SetupRequest{
+			Username: "myadmin",
+			Password: "short",
+		}).ExpectStatus(http.StatusBadRequest).Send(t)
+	})
+
+	t.Run("setup_is_public_path", func(t *testing.T) {
+		t.Parallel()
+
+		// Setup endpoint must be accessible without any authentication
+		// (no bearer token, no basic auth) since it's the first-run flow.
+		server := setupServer(t)
+
+		server.Client().Post("/api/v1/auth/setup", api.SetupRequest{
+			Username: "myadmin",
+			Password: "securepass1",
+		}).ExpectStatus(http.StatusOK).Send(t)
+	})
+}
+
+func TestLogin(t *testing.T) {
+	t.Parallel()
+
+	server := builtinServer(t)
+
+	t.Run("success", func(t *testing.T) {
+		resp := server.Client().Post("/api/v1/auth/login", api.LoginRequest{
+			Username: "admin",
+			Password: "adminpass",
+		}).ExpectStatus(http.StatusOK).Send(t)
+
+		var result api.LoginResponse
+		resp.Unmarshal(t, &result)
+		require.NotEmpty(t, result.Token)
+		require.Equal(t, "admin", result.User.Username)
+		require.Equal(t, api.UserRoleAdmin, result.User.Role)
+		require.False(t, result.ExpiresAt.IsZero())
+		require.NotEmpty(t, result.User.Id)
+	})
+
+	t.Run("invalid_password", func(t *testing.T) {
+		server.Client().Post("/api/v1/auth/login", api.LoginRequest{
+			Username: "admin",
+			Password: "wrongpass",
+		}).ExpectStatus(http.StatusUnauthorized).Send(t)
+	})
+
+	t.Run("invalid_username", func(t *testing.T) {
+		server.Client().Post("/api/v1/auth/login", api.LoginRequest{
+			Username: "nonexistent",
+			Password: "adminpass",
+		}).ExpectStatus(http.StatusUnauthorized).Send(t)
+	})
+
+	t.Run("empty_credentials", func(t *testing.T) {
+		server.Client().Post("/api/v1/auth/login", api.LoginRequest{
+			Username: "",
+			Password: "",
+		}).ExpectStatus(http.StatusUnauthorized).Send(t)
+	})
+}
+
+func TestGetCurrentUser(t *testing.T) {
+	t.Parallel()
+
+	server := builtinServer(t)
+
+	t.Run("authenticated", func(t *testing.T) {
+		token := loginAndGetToken(t, server, "admin", "adminpass")
+
+		resp := server.Client().Get("/api/v1/auth/me").
+			WithBearerToken(token).
+			ExpectStatus(http.StatusOK).Send(t)
+
+		var result api.UserResponse
+		resp.Unmarshal(t, &result)
+		require.Equal(t, "admin", result.User.Username)
+		require.Equal(t, api.UserRoleAdmin, result.User.Role)
+		require.NotEmpty(t, result.User.Id)
+	})
+
+	t.Run("unauthenticated", func(t *testing.T) {
+		server.Client().Get("/api/v1/auth/me").
+			ExpectStatus(http.StatusUnauthorized).Send(t)
+	})
+
+	t.Run("invalid_token", func(t *testing.T) {
+		server.Client().Get("/api/v1/auth/me").
+			WithBearerToken("invalid-jwt-token").
+			ExpectStatus(http.StatusUnauthorized).Send(t)
+	})
+}
+
+func TestChangePassword(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success_and_verify", func(t *testing.T) {
+		t.Parallel()
+
+		server := builtinServer(t)
+		token := loginAndGetToken(t, server, "admin", "adminpass")
+
+		// Change password
+		server.Client().Post("/api/v1/auth/change-password", api.ChangePasswordRequest{
+			CurrentPassword: "adminpass",
+			NewPassword:     "newpassword123",
+		}).WithBearerToken(token).ExpectStatus(http.StatusOK).Send(t)
+
+		// Can login with new password
+		loginAndGetToken(t, server, "admin", "newpassword123")
+
+		// Old password no longer works
+		server.Client().Post("/api/v1/auth/login", api.LoginRequest{
+			Username: "admin",
+			Password: "adminpass",
+		}).ExpectStatus(http.StatusUnauthorized).Send(t)
+	})
+
+	t.Run("wrong_current_password", func(t *testing.T) {
+		t.Parallel()
+
+		server := builtinServer(t)
+		token := loginAndGetToken(t, server, "admin", "adminpass")
+
+		server.Client().Post("/api/v1/auth/change-password", api.ChangePasswordRequest{
+			CurrentPassword: "wrongpassword",
+			NewPassword:     "newpassword123",
+		}).WithBearerToken(token).ExpectStatus(http.StatusUnauthorized).Send(t)
+	})
+
+	t.Run("weak_new_password", func(t *testing.T) {
+		t.Parallel()
+
+		server := builtinServer(t)
+		token := loginAndGetToken(t, server, "admin", "adminpass")
+
+		server.Client().Post("/api/v1/auth/change-password", api.ChangePasswordRequest{
+			CurrentPassword: "adminpass",
+			NewPassword:     "short",
+		}).WithBearerToken(token).ExpectStatus(http.StatusBadRequest).Send(t)
+	})
+
+	t.Run("unauthenticated", func(t *testing.T) {
+		t.Parallel()
+
+		server := builtinServer(t)
+
+		server.Client().Post("/api/v1/auth/change-password", api.ChangePasswordRequest{
+			CurrentPassword: "adminpass",
+			NewPassword:     "newpassword123",
+		}).ExpectStatus(http.StatusUnauthorized).Send(t)
+	})
+}
