@@ -179,6 +179,10 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	cfg.Paths.SuspendFlagsDir = filepath.Join(tmpDir, "suspend-flags")
 	cfg.Paths.AdminLogsDir = filepath.Join(tmpDir, "admin-logs")
 	cfg.Coordinator.Enabled = false
+	// Default to "none" in tests so auth setup (bcrypt, token generation)
+	// doesn't slow down tests that don't need authentication.
+	// Tests that need auth can override via WithConfigMutator.
+	cfg.Server.Auth.Mode = config.AuthModeNone
 	if options.DAGsDir != "" {
 		cfg.Paths.DAGsDir = options.DAGsDir
 	}
@@ -369,6 +373,31 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 	if len(ui) > 0 {
 		configData["ui"] = ui
 	}
+
+	// Always write auth section so subprocesses use the same auth mode.
+	// Without this, subprocesses would default to "builtin" and auto-generate
+	// a different token secret, causing authentication mismatches.
+	authMode := string(cfg.Server.Auth.Mode)
+	if authMode == "" {
+		authMode = "none"
+	}
+	authData := map[string]any{
+		"mode": authMode,
+	}
+	if cfg.Server.Auth.Builtin.Token.Secret != "" {
+		authData["builtin"] = map[string]any{
+			"token": map[string]any{
+				"secret": cfg.Server.Auth.Builtin.Token.Secret,
+			},
+		}
+	}
+	if cfg.Server.Auth.Basic.Username != "" {
+		authData["basic"] = map[string]any{
+			"username": cfg.Server.Auth.Basic.Username,
+			"password": cfg.Server.Auth.Basic.Password,
+		}
+	}
+	configData["auth"] = authData
 
 	content, err := yaml.Marshal(configData)
 	require.NoError(t, err)

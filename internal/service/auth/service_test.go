@@ -16,6 +16,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func mustTokenSecret(s string) auth.TokenSecret {
+	ts, err := auth.NewTokenSecretFromString(s)
+	if err != nil {
+		panic(err)
+	}
+	return ts
+}
+
 func setupTestService(t *testing.T) (*Service, func()) {
 	t.Helper()
 
@@ -31,7 +39,7 @@ func setupTestService(t *testing.T) (*Service, func()) {
 	}
 
 	config := Config{
-		TokenSecret: "test-secret-key-for-jwt-signing",
+		TokenSecret: mustTokenSecret("test-secret-key-for-jwt-signing"),
 		TokenTTL:    time.Hour,
 		BcryptCost:  4, // Low cost for faster tests
 	}
@@ -269,68 +277,6 @@ func TestService_ChangePassword_WrongOldPassword(t *testing.T) {
 	err = svc.ChangePassword(ctx, user.ID, "wrongpassword", "newpassword1")
 	if err != ErrPasswordMismatch {
 		t.Errorf("ChangePassword() with wrong old password error = %v, want %v", err, ErrPasswordMismatch)
-	}
-}
-
-func TestService_EnsureAdminUser(t *testing.T) {
-	svc, cleanup := setupTestService(t)
-	defer cleanup()
-
-	ctx := context.Background()
-
-	// First call should create admin
-	password, created, err := svc.EnsureAdminUser(ctx, "admin", "adminpass1")
-	if err != nil {
-		t.Fatalf("EnsureAdminUser() error = %v", err)
-	}
-	if !created {
-		t.Error("EnsureAdminUser() should return created=true")
-	}
-	if password != "adminpass1" {
-		t.Errorf("EnsureAdminUser() password = %v, want %v", password, "adminpass1")
-	}
-
-	// Verify admin can authenticate
-	_, err = svc.Authenticate(ctx, "admin", "adminpass1")
-	if err != nil {
-		t.Errorf("Authenticate() admin error = %v", err)
-	}
-
-	// Second call should not create
-	_, created, err = svc.EnsureAdminUser(ctx, "admin2", "adminpass2")
-	if err != nil {
-		t.Fatalf("EnsureAdminUser() second call error = %v", err)
-	}
-	if created {
-		t.Error("EnsureAdminUser() should return created=false when users exist")
-	}
-}
-
-func TestService_EnsureAdminUser_GeneratePassword(t *testing.T) {
-	svc, cleanup := setupTestService(t)
-	defer cleanup()
-
-	ctx := context.Background()
-
-	// Call with empty password should generate one
-	password, created, err := svc.EnsureAdminUser(ctx, "admin", "")
-	if err != nil {
-		t.Fatalf("EnsureAdminUser() error = %v", err)
-	}
-	if !created {
-		t.Error("EnsureAdminUser() should return created=true")
-	}
-	if password == "" {
-		t.Error("EnsureAdminUser() should generate a password")
-	}
-	if len(password) < 8 {
-		t.Error("Generated password should be at least 8 characters")
-	}
-
-	// Verify admin can authenticate with generated password
-	_, err = svc.Authenticate(ctx, "admin", password)
-	if err != nil {
-		t.Errorf("Authenticate() admin with generated password error = %v", err)
 	}
 }
 
@@ -648,7 +594,7 @@ func TestService_ValidateToken_WrongSecret(t *testing.T) {
 	require.NoError(t, err)
 
 	config1 := Config{
-		TokenSecret: "secret-one",
+		TokenSecret: mustTokenSecret("secret-one"),
 		TokenTTL:    time.Hour,
 		BcryptCost:  4,
 	}
@@ -668,7 +614,7 @@ func TestService_ValidateToken_WrongSecret(t *testing.T) {
 
 	// Create service with different secret
 	config2 := Config{
-		TokenSecret: "secret-two",
+		TokenSecret: mustTokenSecret("secret-two"),
 		TokenTTL:    time.Hour,
 		BcryptCost:  4,
 	}
@@ -689,7 +635,7 @@ func TestService_ValidateToken_MissingSecret(t *testing.T) {
 
 	// Create service without secret
 	config := Config{
-		TokenSecret: "",
+		TokenSecret: auth.TokenSecret{},
 		TokenTTL:    time.Hour,
 		BcryptCost:  4,
 	}
@@ -728,7 +674,7 @@ func setupTestServiceWithAPIKeys(t *testing.T) (*Service, func()) {
 	require.NoError(t, err, "failed to create API key store")
 
 	config := Config{
-		TokenSecret: "test-secret-key-for-jwt-signing",
+		TokenSecret: mustTokenSecret("test-secret-key-for-jwt-signing"),
 		TokenTTL:    time.Hour,
 		BcryptCost:  4, // Low cost for faster tests
 	}

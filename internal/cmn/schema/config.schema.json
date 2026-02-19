@@ -205,14 +205,11 @@
       "properties": {
         "mode": {
           "type": "string",
-          "description": "Authentication mode.",
-          "enum": ["none", "builtin", "oidc"]
+          "description": "Authentication mode. Defaults to 'builtin'. OIDC is now configured under builtin mode (auth.oidc).",
+          "enum": ["none", "basic", "builtin"]
         },
         "basic": {
           "$ref": "#/definitions/AuthBasicDef"
-        },
-        "token": {
-          "$ref": "#/definitions/AuthTokenDef"
         },
         "oidc": {
           "$ref": "#/definitions/AuthOIDCDef"
@@ -227,10 +224,6 @@
       "description": "Basic authentication credentials.",
       "additionalProperties": false,
       "properties": {
-        "enabled": {
-          "type": "boolean",
-          "description": "Enable basic authentication."
-        },
         "username": {
           "type": "string",
           "description": "Basic auth username."
@@ -241,20 +234,9 @@
         }
       }
     },
-    "AuthTokenDef": {
-      "type": "object",
-      "description": "Token-based authentication configuration.",
-      "additionalProperties": false,
-      "properties": {
-        "value": {
-          "type": "string",
-          "description": "Authentication token value."
-        }
-      }
-    },
     "AuthOIDCDef": {
       "type": "object",
-      "description": "OIDC authentication configuration. Core fields are used by both standalone and builtin auth modes.",
+      "description": "OIDC authentication configuration for use with builtin auth mode.",
       "additionalProperties": false,
       "properties": {
         "client_id": {
@@ -346,26 +328,8 @@
       "description": "Builtin authentication with RBAC configuration.",
       "additionalProperties": false,
       "properties": {
-        "admin": {
-          "$ref": "#/definitions/AdminConfigDef"
-        },
         "token": {
           "$ref": "#/definitions/TokenConfigDef"
-        }
-      }
-    },
-    "AdminConfigDef": {
-      "type": "object",
-      "description": "Initial admin user configuration.",
-      "additionalProperties": false,
-      "properties": {
-        "username": {
-          "type": "string",
-          "description": "Admin username."
-        },
-        "password": {
-          "type": "string",
-          "description": "Admin password."
         }
       }
     },

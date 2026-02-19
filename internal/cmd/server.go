@@ -50,7 +50,7 @@ var serverFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag, tunnelFlag, tu
 // It returns an error if the resource service fails to start, the server fails to initialize, or serving fails.
 func runServer(ctx *Context, _ []string) error {
 	// Create a context that will be cancelled on interrupt signal.
-	// This must be created BEFORE server initialization so OIDC provider init can be cancelled.
+	// This must be created BEFORE server initialization so auth provider init can be cancelled.
 	signalCtx, stop := signal.NotifyContext(ctx.Context, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -77,7 +77,7 @@ func runServer(ctx *Context, _ []string) error {
 
 	// Initialize resource monitoring service (defer cleanup, but don't start yet).
 	// Resource monitoring must start AFTER server init to avoid race condition
-	// with OIDC provider initialization (gopsutil conflicts with net/http dial).
+	// with auth provider initialization (gopsutil conflicts with net/http dial).
 	resourceService := resource.NewService(ctx.Config)
 	defer func() {
 		if err := resourceService.Stop(ctx); err != nil {
@@ -91,7 +91,7 @@ func runServer(ctx *Context, _ []string) error {
 		serverOpts = append(serverOpts, frontend.WithTunnelService(tunnelService))
 	}
 
-	// Initialize server (includes OIDC setup). Use serviceCtx so OIDC can
+	// Initialize server (includes auth setup). Use serviceCtx so auth providers can
 	// respond to termination signals during potentially slow network operations.
 	server, err := serviceCtx.NewServer(resourceService, serverOpts...)
 	if err != nil {
@@ -167,10 +167,12 @@ func logTunnelStatus(ctx *Context, svc *tunnel.Service) {
 	switch ctx.Config.Server.Auth.Mode {
 	case config.AuthModeBuiltin:
 		authStatus = "Builtin (enabled)"
-	case config.AuthModeOIDC:
-		authStatus = "OIDC (enabled)"
+	case config.AuthModeBasic:
+		authStatus = "Basic (enabled)"
 	case config.AuthModeNone:
 		authStatus = "Disabled"
+	default:
+		authStatus = fmt.Sprintf("Unknown (%s)", ctx.Config.Server.Auth.Mode)
 	}
 
 	terminalStatus := "Disabled"

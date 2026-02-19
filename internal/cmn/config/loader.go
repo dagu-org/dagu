@@ -405,7 +405,7 @@ func (l *ConfigLoader) loadServerTLS(cfg *Config, def Definition) {
 }
 
 func (l *ConfigLoader) loadServerAuth(cfg *Config, def Definition) {
-	explicitAuthMode := l.loadAuthMode(cfg, def)
+	l.loadAuthMode(cfg, def)
 
 	if def.Auth == nil {
 		l.setAuthDefaults(cfg)
@@ -415,32 +415,29 @@ func (l *ConfigLoader) loadServerAuth(cfg *Config, def Definition) {
 	l.loadBasicAuth(cfg, def.Auth)
 	l.loadOIDCAuth(cfg, def.Auth)
 	l.loadBuiltinAuth(cfg, def.Auth)
-	l.autoDetectAuthMode(cfg, explicitAuthMode)
-	l.warnBasicAuthWithBuiltin(cfg)
 	l.setAuthDefaults(cfg)
 }
 
-func (l *ConfigLoader) loadAuthMode(cfg *Config, def Definition) bool {
+func (l *ConfigLoader) loadAuthMode(cfg *Config, def Definition) {
 	if def.Auth == nil || def.Auth.Mode == nil {
-		cfg.Server.Auth.Mode = AuthModeNone
-		return false
+		cfg.Server.Auth.Mode = AuthModeBuiltin
+		l.warnings = append(l.warnings, "No auth.mode configured — defaulting to 'builtin'. "+
+			"Set auth.mode to 'none' to disable authentication, or complete /setup to create an admin account.")
+		return
 	}
 
 	mode := AuthMode(*def.Auth.Mode)
 	switch mode {
-	case AuthModeNone, AuthModeBuiltin, AuthModeOIDC:
+	case AuthModeNone, AuthModeBasic, AuthModeBuiltin:
 		cfg.Server.Auth.Mode = mode
-		return true
 	default:
-		l.warnings = append(l.warnings, fmt.Sprintf("Invalid auth.mode value: %q, defaulting to 'none'", *def.Auth.Mode))
-		cfg.Server.Auth.Mode = AuthModeNone
-		return false
+		l.warnings = append(l.warnings, fmt.Sprintf("Invalid auth.mode value: %q, defaulting to 'builtin'", *def.Auth.Mode))
+		cfg.Server.Auth.Mode = AuthModeBuiltin
 	}
 }
 
 func (l *ConfigLoader) loadBasicAuth(cfg *Config, auth *AuthDef) {
 	if auth.Basic != nil {
-		cfg.Server.Auth.Basic.Enabled = auth.Basic.Enabled
 		cfg.Server.Auth.Basic.Username = auth.Basic.Username
 		cfg.Server.Auth.Basic.Password = auth.Basic.Password
 	}
@@ -491,35 +488,9 @@ func (l *ConfigLoader) loadBuiltinAuth(cfg *Config, auth *AuthDef) {
 		return
 	}
 
-	if auth.Builtin.Admin != nil {
-		cfg.Server.Auth.Builtin.Admin.Username = auth.Builtin.Admin.Username
-		cfg.Server.Auth.Builtin.Admin.Password = auth.Builtin.Admin.Password
-	}
 	if auth.Builtin.Token != nil {
 		cfg.Server.Auth.Builtin.Token.Secret = auth.Builtin.Token.Secret
 		cfg.Server.Auth.Builtin.Token.TTL = l.parseDuration("auth.builtin.token.ttl", auth.Builtin.Token.TTL)
-	}
-}
-
-func (l *ConfigLoader) autoDetectAuthMode(cfg *Config, explicitAuthMode bool) {
-	if explicitAuthMode {
-		return
-	}
-
-	oidc := cfg.Server.Auth.OIDC
-	if oidc.ClientID != "" && oidc.ClientSecret != "" && oidc.Issuer != "" {
-		cfg.Server.Auth.Mode = AuthModeOIDC
-		l.warnings = append(l.warnings, fmt.Sprintf("Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: %s)", oidc.Issuer))
-	}
-}
-
-func (l *ConfigLoader) warnBasicAuthWithBuiltin(cfg *Config) {
-	if cfg.Server.Auth.Mode != AuthModeBuiltin {
-		return
-	}
-
-	if cfg.Server.Auth.Basic.Enabled {
-		l.warnings = append(l.warnings, "Basic auth configuration is ignored when auth mode is 'builtin'; use builtin auth's admin credentials instead")
 	}
 }
 
@@ -527,8 +498,19 @@ func (l *ConfigLoader) setAuthDefaults(cfg *Config) {
 	if cfg.Server.Auth.Builtin.Token.TTL <= 0 {
 		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
 	}
-	if cfg.Server.Auth.Builtin.Admin.Username == "" {
-		cfg.Server.Auth.Builtin.Admin.Username = "admin"
+	if cfg.Server.Auth.Mode == AuthModeBuiltin {
+		// Warn on weak/default token secrets.
+		if cfg.Server.Auth.Builtin.Token.Secret != "" {
+			weakSecrets := []string{"changeme", "secret", "password", "test", "dagu"}
+			for _, weak := range weakSecrets {
+				if strings.EqualFold(cfg.Server.Auth.Builtin.Token.Secret, weak) {
+					l.warnings = append(l.warnings,
+						"Token secret is a well-known default value — use a strong random value for production")
+					break
+				}
+			}
+		}
+
 	}
 	if len(cfg.Server.Auth.OIDC.Scopes) == 0 {
 		cfg.Server.Auth.OIDC.Scopes = []string{"openid", "profile", "email"}
@@ -1220,7 +1202,6 @@ var envBindings = []envBinding{
 
 	// Auth
 	{key: "auth.mode", env: "AUTH_MODE"},
-	{key: "auth.basic.enabled", env: "AUTH_BASIC_ENABLED"},
 	{key: "auth.basic.username", env: "AUTH_BASIC_USERNAME"},
 	{key: "auth.basic.password", env: "AUTH_BASIC_PASSWORD"},
 	// Auth OIDC
@@ -1241,8 +1222,6 @@ var envBindings = []envBinding{
 	{key: "auth.oidc.role_mapping.role_attribute_strict", env: "AUTH_OIDC_ROLE_ATTRIBUTE_STRICT"},
 	{key: "auth.oidc.role_mapping.skip_org_role_sync", env: "AUTH_OIDC_SKIP_ORG_ROLE_SYNC"},
 	// Auth (builtin)
-	{key: "auth.builtin.admin.username", env: "AUTH_ADMIN_USERNAME"},
-	{key: "auth.builtin.admin.password", env: "AUTH_ADMIN_PASSWORD"},
 	{key: "auth.builtin.token.secret", env: "AUTH_TOKEN_SECRET"},
 	{key: "auth.builtin.token.ttl", env: "AUTH_TOKEN_TTL"},
 

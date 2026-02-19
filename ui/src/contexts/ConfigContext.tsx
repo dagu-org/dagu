@@ -15,7 +15,7 @@ export type PathsConfig = {
   auditLogsDir: string;
 };
 
-export type AuthMode = 'none' | 'builtin' | 'oidc' | '';
+export type AuthMode = 'none' | 'basic' | 'builtin' | '';
 
 export type Config = {
   apiURL: string;
@@ -28,6 +28,7 @@ export type Config = {
   maxDashboardPageLimit: number;
   remoteNodes: string;
   authMode: AuthMode;
+  setupRequired: boolean;
   oidcEnabled: boolean;
   oidcButtonLabel: string;
   terminalEnabled: boolean;

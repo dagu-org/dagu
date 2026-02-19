@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -58,8 +57,8 @@ const (
 
 // Config holds the configuration for the auth service.
 type Config struct {
-	// TokenSecret is the secret key for signing JWT tokens.
-	TokenSecret string
+	// TokenSecret is the opaque JWT signing key.
+	TokenSecret auth.TokenSecret
 	// TokenTTL is the token time-to-live.
 	TokenTTL time.Duration
 	// BcryptCost is the cost factor for bcrypt hashing.
@@ -121,6 +120,7 @@ func New(store auth.UserStore, config Config, opts ...Option) *Service {
 // dummyHash is a valid bcrypt hash used for timing attack prevention.
 // When a user is not found, we still perform a bcrypt comparison against this
 // hash to ensure consistent response times regardless of user existence.
+// IMPORTANT: This hash uses cost 12, which must match defaultBcryptCost.
 var dummyHash = []byte("$2a$12$K8gHXqrFdFvMwJBG0VlJGuAGz3FwBmTm8xnNQblN2tCxrQgPLmwHa")
 
 // Authenticate verifies credentials and returns the user if valid.
@@ -158,7 +158,7 @@ type TokenResult struct {
 // GenerateToken creates a JWT token for the given user.
 // Returns the token string and its expiry time.
 func (s *Service) GenerateToken(user *auth.User) (*TokenResult, error) {
-	if s.config.TokenSecret == "" {
+	if !s.config.TokenSecret.IsValid() {
 		return nil, ErrMissingSecret
 	}
 
@@ -176,7 +176,7 @@ func (s *Service) GenerateToken(user *auth.User) (*TokenResult, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := token.SignedString([]byte(s.config.TokenSecret))
+	signedToken, err := token.SignedString(s.config.TokenSecret.SigningKey())
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func (s *Service) GenerateToken(user *auth.User) (*TokenResult, error) {
 
 // ValidateToken validates a JWT token and returns the claims.
 func (s *Service) ValidateToken(tokenString string) (*Claims, error) {
-	if s.config.TokenSecret == "" {
+	if !s.config.TokenSecret.IsValid() {
 		return nil, ErrMissingSecret
 	}
 
@@ -197,7 +197,7 @@ func (s *Service) ValidateToken(tokenString string) (*Claims, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return []byte(s.config.TokenSecret), nil
+		return s.config.TokenSecret.SigningKey(), nil
 	})
 
 	if err != nil {
@@ -394,41 +394,9 @@ func (s *Service) ResetPassword(ctx context.Context, userID, newPassword string)
 	return s.store.Update(ctx, user)
 }
 
-// EnsureAdminUser creates the admin user if no users exist.
-// Returns the generated password if a new admin was created.
-func (s *Service) EnsureAdminUser(ctx context.Context, username, password string) (string, bool, error) {
-	count, err := s.store.Count(ctx)
-	if err != nil {
-		return "", false, fmt.Errorf("failed to count users: %w", err)
-	}
-
-	if count > 0 {
-		return "", false, nil
-	}
-
-	// Generate password if not provided
-	generatedPassword := password
-	if generatedPassword == "" {
-		generatedPassword, err = generateSecurePassword(16)
-		if err != nil {
-			return "", false, fmt.Errorf("failed to generate password: %w", err)
-		}
-	}
-
-	_, err = s.CreateUser(ctx, CreateUserInput{
-		Username: username,
-		Password: generatedPassword,
-		Role:     auth.RoleAdmin,
-	})
-	if err != nil {
-		// Handle race condition: another process may have created the admin user
-		if errors.Is(err, auth.ErrUserAlreadyExists) {
-			return "", false, nil
-		}
-		return "", false, fmt.Errorf("failed to create admin user: %w", err)
-	}
-
-	return generatedPassword, true, nil
+// CountUsers returns the total number of users in the store.
+func (s *Service) CountUsers(ctx context.Context) (int64, error) {
+	return s.store.Count(ctx)
 }
 
 // validatePassword checks if a password meets the minimum requirements.
@@ -437,22 +405,6 @@ func (s *Service) validatePassword(password string) error {
 		return fmt.Errorf("%w: minimum length is %d characters", ErrWeakPassword, minPasswordLength)
 	}
 	return nil
-}
-
-// generateSecurePassword returns a URL-safe base64-encoded string of the requested length
-// built from cryptographically secure random bytes. It returns an error if a secure random
-// source cannot be read.
-func generateSecurePassword(length int) (string, error) {
-	// Calculate required bytes to produce at least 'length' base64 characters.
-	// Base64 encodes 3 bytes to 4 characters, so we need ceil(length * 3 / 4) bytes.
-	requiredBytes := (length*3 + 3) / 4
-	bytes := make([]byte, requiredBytes)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
-	}
-	// Use RawURLEncoding (no padding) and take exactly 'length' characters.
-	encoded := base64.RawURLEncoding.EncodeToString(bytes)
-	return encoded[:length], nil
 }
 
 // CreateAPIKeyInput contains the input for creating an API key.
@@ -611,7 +563,7 @@ func (s *Service) DeleteAPIKey(ctx context.Context, id string) error {
 }
 
 // ValidateAPIKey validates an API key and returns the associated APIKey if valid.
-// Note: O(n) bcrypt comparisons (~100ms each). Fine for <100 keys.
+// Uses the stored KeyPrefix to skip non-matching keys before bcrypt comparison.
 func (s *Service) ValidateAPIKey(ctx context.Context, keySecret string) (*auth.APIKey, error) {
 	if s.apiKeyStore == nil {
 		return nil, ErrAPIKeyNotConfigured
@@ -627,7 +579,16 @@ func (s *Service) ValidateAPIKey(ctx context.Context, keySecret string) (*auth.A
 		return nil, fmt.Errorf("failed to list API keys: %w", err)
 	}
 
+	// Extract the candidate prefix for fast filtering before bcrypt.
+	var candidatePrefix string
+	if len(keySecret) >= apiKeyPrefixLength {
+		candidatePrefix = keySecret[:apiKeyPrefixLength]
+	}
+
 	for _, key := range keys {
+		if candidatePrefix != "" && key.KeyPrefix != candidatePrefix {
+			continue
+		}
 		if err := bcrypt.CompareHashAndPassword([]byte(key.KeyHash), []byte(keySecret)); err == nil {
 			// Update last used timestamp synchronously.
 			// This avoids goroutine leaks and race conditions with Delete.

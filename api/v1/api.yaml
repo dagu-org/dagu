@@ -66,6 +66,46 @@ paths:
         default:
           description: "Unexpected error"
 
+  /auth/setup:
+    post:
+      summary: "Create initial admin account"
+      description: "Creates the first admin user during initial setup. Only available when no users exist. Returns a JWT token for immediate login."
+      operationId: "setup"
+      tags:
+        - "auth"
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetupRequest"
+      responses:
+        "200":
+          description: "Admin account created successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          description: "Invalid request (e.g., weak password)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Setup already completed (users exist)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /auth/login:
     post:
       summary: "Authenticate user and obtain JWT token"
@@ -6639,6 +6679,22 @@ components:
         - developer
         - operator
         - viewer
+
+    SetupRequest:
+      type: object
+      description: "Request body for initial admin account setup"
+      properties:
+        username:
+          type: string
+          description: "Admin username"
+          minLength: 1
+        password:
+          type: string
+          description: "Admin password"
+          minLength: 8
+      required:
+        - username
+        - password
 
     LoginRequest:
       type: object

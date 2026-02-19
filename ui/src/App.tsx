@@ -36,6 +36,7 @@ import GitSyncPage from './pages/git-sync';
 import LoginPage from './pages/login';
 import Queues from './pages/queues';
 import Search from './pages/search';
+import SetupPage from './pages/setup';
 import SystemStatus from './pages/system-status';
 import TerminalPage from './pages/terminal';
 import UsersPage from './pages/users';
@@ -151,6 +152,7 @@ function AppInner({ config }: Props): React.ReactElement {
                       <BrowserRouter basename={config.basePath}>
                         <Routes>
                           <Route path="/login" element={<LoginPage />} />
+                          <Route path="/setup" element={<SetupPage />} />
                           <Route
                             path="/*"
                             element={

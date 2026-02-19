@@ -39,6 +39,9 @@ type Store struct {
 	byUsername map[string]string
 	// byOIDCIdentity maps "issuer:subject" to user ID for OIDC users
 	byOIDCIdentity map[string]string
+
+	// fileCache caches user objects to avoid repeated file reads
+	fileCache *fileutil.Cache[*auth.User]
 }
 
 // oidcIdentityKey creates a composite key for the OIDC identity index.
@@ -52,7 +55,13 @@ var _ auth.UserStore = (*Store)(nil)
 // Option is a functional option for configuring the Store.
 type Option func(*Store)
 
-// New creates a new file-based user store.
+// WithFileCache sets the file cache for user objects.
+func WithFileCache(cache *fileutil.Cache[*auth.User]) Option {
+	return func(s *Store) {
+		s.fileCache = cache
+	}
+}
+
 // New creates a file-backed Store that persists users as per-user JSON files in baseDir.
 // The baseDir must be non-empty; provided Option functions are applied to the store.
 // If baseDir does not exist it is created with directory permissions 0750, and an initial
@@ -219,13 +228,26 @@ func (s *Store) GetByID(_ context.Context, id string) (*auth.User, error) {
 
 	s.mu.RLock()
 	filePath, exists := s.byID[id]
-	s.mu.RUnlock()
-
 	if !exists {
+		s.mu.RUnlock()
 		return nil, auth.ErrUserNotFound
 	}
 
-	user, err := s.loadUserFromFile(filePath)
+	var user *auth.User
+	var err error
+
+	// Use cache if available, otherwise load directly
+	if s.fileCache != nil {
+		user, err = s.fileCache.LoadLatest(filePath, func() (*auth.User, error) {
+			return s.loadUserFromFile(filePath)
+		})
+	} else {
+		// Load file while still holding the read lock to prevent TOCTOU race
+		// where a concurrent Delete could remove the file between index lookup and file read.
+		user, err = s.loadUserFromFile(filePath)
+	}
+	s.mu.RUnlock()
+
 	if err != nil {
 		// File might have been deleted externally
 		if errors.Is(err, os.ErrNotExist) {

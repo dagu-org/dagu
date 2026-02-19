@@ -91,7 +91,7 @@ type TLSDef struct {
 
 // AuthDef configures authentication for the application.
 type AuthDef struct {
-	Mode    *string         `mapstructure:"mode"` // "none", "builtin", or "oidc"
+	Mode    *string         `mapstructure:"mode"` // "none", "basic", or "builtin"
 	Basic   *AuthBasicDef   `mapstructure:"basic"`
 	OIDC    *AuthOIDCDef    `mapstructure:"oidc"`
 	Builtin *AuthBuiltinDef `mapstructure:"builtin"`
@@ -99,21 +99,13 @@ type AuthDef struct {
 
 // AuthBasicDef configures basic authentication credentials.
 type AuthBasicDef struct {
-	Enabled  bool   `mapstructure:"enabled"`
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
 }
 
 // AuthBuiltinDef configures builtin authentication with RBAC.
 type AuthBuiltinDef struct {
-	Admin *AdminConfigDef `mapstructure:"admin"`
 	Token *TokenConfigDef `mapstructure:"token"`
-}
-
-// AdminConfigDef configures the initial admin user.
-type AdminConfigDef struct {
-	Username string `mapstructure:"username"`
-	Password string `mapstructure:"password"`
 }
 
 // TokenConfigDef configures JWT token settings.
@@ -123,8 +115,7 @@ type TokenConfigDef struct {
 }
 
 // AuthOIDCDef configures OIDC authentication.
-// Core fields are used by both standalone and builtin auth modes.
-// Builtin-specific fields are only used when auth.mode=builtin.
+// These fields are used when auth.mode=builtin with an OIDC provider configured.
 type AuthOIDCDef struct {
 	// ClientID is the OAuth client identifier (Go naming: ID not Id).
 	// mapstructure tag uses lowercase "client_id" for YAML compatibility.

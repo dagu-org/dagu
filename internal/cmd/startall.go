@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os/signal"
@@ -88,11 +90,11 @@ func runStartAll(ctx *Context, _ []string) error {
 	}
 
 	// Create a context that will be cancelled on interrupt signal.
-	// This must be created BEFORE server initialization so OIDC provider init can be cancelled.
+	// This must be created BEFORE server initialization so auth provider init can be cancelled.
 	signalCtx, stop := signal.NotifyContext(ctx.Context, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Create a signal-aware context for services (used for OIDC init and all service operations)
+	// Create a signal-aware context for services (used for auth init and all service operations)
 	serviceCtx := ctx.WithContext(signalCtx)
 
 	// Initialize all services using the signal-aware context
@@ -106,7 +108,7 @@ func runStartAll(ctx *Context, _ []string) error {
 	// Initialize resource monitoring service
 	resourceService := resource.NewService(ctx.Config)
 
-	// Use serviceCtx so OIDC initialization can respond to termination signals
+	// Use serviceCtx so auth initialization can respond to termination signals
 	server, err := serviceCtx.NewServer(resourceService)
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
@@ -181,8 +183,14 @@ func runStartAll(ctx *Context, _ []string) error {
 	case <-signalCtx.Done():
 		logger.Info(ctx, "Received shutdown signal", slog.Any("signal", signalCtx.Err()))
 	case err := <-errCh:
-		firstErr = err
-		logger.Error(ctx, "Service failed, shutting down", tag.Error(err))
+		// If the context was already canceled (e.g. by a signal), services returning
+		// context.Canceled is expected shutdown behavior, not a failure.
+		if signalCtx.Err() != nil && errors.Is(err, context.Canceled) {
+			logger.Info(ctx, "Received shutdown signal", slog.Any("signal", signalCtx.Err()))
+		} else {
+			firstErr = err
+			logger.Error(ctx, "Service failed, shutting down", tag.Error(err))
+		}
 		stop() // Cancel the signal context to trigger shutdown of other services
 	}
 

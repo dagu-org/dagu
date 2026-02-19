@@ -140,7 +140,6 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.Server.Auth = Auth{
 			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},
 			},
 		}
@@ -151,47 +150,12 @@ func TestConfig_Validate(t *testing.T) {
 		assert.Contains(t, err.Error(), "users_dir")
 	})
 
-	t.Run("BuiltinAuth_MissingTokenSecret", func(t *testing.T) {
-		t.Parallel()
-		cfg := validBaseConfig()
-		cfg.Server.Auth = Auth{
-			Mode: AuthModeBuiltin,
-			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
-				Token: TokenConfig{Secret: "", TTL: 1},
-			},
-		}
-		cfg.Paths.UsersDir = "/tmp/users"
-		cfg.UI.MaxDashboardPageLimit = 1
-		err := cfg.Validate()
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "token secret")
-	})
-
-	t.Run("BuiltinAuth_MissingAdminUsername", func(t *testing.T) {
-		t.Parallel()
-		cfg := validBaseConfig()
-		cfg.Server.Auth = Auth{
-			Mode: AuthModeBuiltin,
-			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: ""},
-				Token: TokenConfig{Secret: "secret", TTL: 1},
-			},
-		}
-		cfg.Paths.UsersDir = "/tmp/users"
-		cfg.UI.MaxDashboardPageLimit = 1
-		err := cfg.Validate()
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "admin username")
-	})
-
 	t.Run("BuiltinAuth_ValidConfig", func(t *testing.T) {
 		t.Parallel()
 		cfg := validBaseConfig()
 		cfg.Server.Auth = Auth{
 			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},
 			},
 		}
@@ -225,7 +189,6 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.Server.Auth = Auth{
 			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 0},
 			},
 		}
@@ -245,7 +208,6 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.Server.Auth = Auth{
 			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},
 			},
 			OIDC: AuthOIDC{
@@ -269,7 +231,6 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.Server.Auth = Auth{
 			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},
 			},
 			OIDC: AuthOIDC{
@@ -293,7 +254,6 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.Server.Auth = Auth{
 			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},
 			},
 			OIDC: AuthOIDC{
@@ -317,7 +277,6 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.Server.Auth = Auth{
 			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},
 			},
 			OIDC: AuthOIDC{
@@ -343,7 +302,6 @@ func TestConfig_Validate(t *testing.T) {
 		cfg.Server.Auth = Auth{
 			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},
 			},
 			OIDC: AuthOIDC{
@@ -371,7 +329,6 @@ func TestConfig_Validate(t *testing.T) {
 			cfg.Server.Auth = Auth{
 				Mode: AuthModeBuiltin,
 				Builtin: AuthBuiltin{
-					Admin: AdminConfig{Username: "admin"},
 					Token: TokenConfig{Secret: "secret", TTL: 1},
 				},
 				OIDC: AuthOIDC{
@@ -409,10 +366,8 @@ func TestConfig_Validate(t *testing.T) {
 		t.Parallel()
 		cfg := validBaseConfig()
 		cfg.Server.Auth = Auth{
-			Mode:  AuthModeBuiltin,
-			Basic: AuthBasic{Enabled: true, Username: "user", Password: "pass"},
+			Mode: AuthModeBuiltin,
 			Builtin: AuthBuiltin{
-				Admin: AdminConfig{Username: "admin"},
 				Token: TokenConfig{Secret: "secret", TTL: 1},
 			},
 		}

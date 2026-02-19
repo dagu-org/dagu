@@ -66,16 +66,22 @@ func TestExtractWebhookToken(t *testing.T) {
 // setupWebhookTestServer creates a test server with builtin auth enabled
 func setupWebhookTestServer(t *testing.T, extraMutators ...func(*config.Config)) test.Server {
 	t.Helper()
-	return test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Mode = config.AuthModeBuiltin
-		cfg.Server.Auth.Builtin.Admin.Username = "admin"
-		cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
 		cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
 		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
 		for _, m := range extraMutators {
 			m(cfg)
 		}
 	}))
+
+	// Create admin via setup endpoint
+	server.Client().Post("/api/v1/auth/setup", api.SetupRequest{
+		Username: "admin",
+		Password: "adminpass",
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	return server
 }
 
 // getWebhookAdminToken authenticates as admin and returns the JWT token

@@ -96,6 +96,8 @@ type AuthService interface {
 	ToggleWebhook(ctx context.Context, dagName string, enabled bool) (*auth.Webhook, error)
 	ValidateWebhookToken(ctx context.Context, dagName, token string) (*auth.Webhook, error)
 	HasWebhookStore() bool
+	// Setup
+	CountUsers(ctx context.Context) (int64, error)
 }
 
 // APIOption is a functional option for configuring the API.
@@ -300,12 +302,15 @@ func (a *API) createValidatorMiddleware(swagger *openapi3.T) func(http.Handler) 
 	)
 }
 
-func (a *API) buildAuthOptions(ctx context.Context, basePath string) (frontendauth.Options, error) {
+func (a *API) buildAuthOptions(_ context.Context, basePath string) (frontendauth.Options, error) {
 	authConfig := a.config.Server.Auth
 
+	// Setup endpoint is intentionally public — the handler enforces a one-time
+	// guard (returns 403 once an admin user exists).
 	publicPaths := []string{
 		pathutil.BuildPublicEndpointPath(basePath, "api/v1/health"),
 		pathutil.BuildPublicEndpointPath(basePath, "api/v1/auth/login"),
+		pathutil.BuildPublicEndpointPath(basePath, "api/v1/auth/setup"),
 	}
 	if a.config.Server.Metrics == config.MetricsAccessPublic {
 		publicPaths = append(publicPaths, pathutil.BuildPublicEndpointPath(basePath, "api/v1/metrics"))
@@ -323,21 +328,18 @@ func (a *API) buildAuthOptions(ctx context.Context, basePath string) (frontendau
 		}, nil
 	}
 
-	basicAuthEnabled := authConfig.Basic.Username != "" && authConfig.Basic.Password != ""
-
 	authOptions := frontendauth.Options{
-		Realm:            "restricted",
-		BasicAuthEnabled: basicAuthEnabled,
-		AuthRequired:     true,
-		Creds:            map[string]string{authConfig.Basic.Username: authConfig.Basic.Password},
-		PublicPaths:      publicPaths,
+		Realm:        "restricted",
+		AuthRequired: true,
+		PublicPaths:  publicPaths,
 		PublicPathPrefixes: []string{
 			pathutil.BuildPublicEndpointPath(basePath, "api/v1/webhooks") + "/",
 		},
 	}
 
-	if err := a.configureOIDC(ctx, authConfig.OIDC, &authOptions); err != nil {
-		return frontendauth.Options{}, err
+	if authConfig.Mode == config.AuthModeBasic {
+		authOptions.BasicAuthEnabled = true
+		authOptions.Creds = map[string]string{authConfig.Basic.Username: authConfig.Basic.Password}
 	}
 
 	if err := a.configureBuiltinAuth(authConfig, &authOptions); err != nil {
@@ -345,24 +347,6 @@ func (a *API) buildAuthOptions(ctx context.Context, basePath string) (frontendau
 	}
 
 	return authOptions, nil
-}
-
-func (a *API) configureOIDC(ctx context.Context, oidcConfig config.AuthOIDC, opts *frontendauth.Options) error {
-	if oidcConfig.ClientID == "" || oidcConfig.ClientSecret == "" || oidcConfig.Issuer == "" {
-		return nil
-	}
-
-	oidcCfg, err := frontendauth.InitVerifierAndConfig(ctx, oidcConfig)
-	if err != nil {
-		return fmt.Errorf("failed to initialize OIDC: %w", err)
-	}
-
-	opts.OIDCAuthEnabled = true
-	opts.OIDCWhitelist = oidcConfig.Whitelist
-	opts.OIDCProvider = oidcCfg.Provider
-	opts.OIDCVerify = oidcCfg.Verifier
-	opts.OIDCConfig = oidcCfg.Config
-	return nil
 }
 
 func (a *API) configureBuiltinAuth(authConfig config.Auth, opts *frontendauth.Options) error {

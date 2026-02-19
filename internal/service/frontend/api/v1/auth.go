@@ -5,14 +5,100 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/cmn/dirlock"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 )
+
+// Setup creates the initial admin user during first-run setup.
+// Returns 403 if users already exist.
+func (a *API) Setup(ctx context.Context, request api.SetupRequestObject) (api.SetupResponseObject, error) {
+	if a.authService == nil {
+		return api.Setup403JSONResponse{
+			Code:    api.ErrorCodeForbidden,
+			Message: "Authentication is not enabled",
+		}, nil
+	}
+
+	if request.Body == nil {
+		return api.Setup400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: "Invalid request body",
+		}, nil
+	}
+
+	// Acquire lock to prevent concurrent setup requests
+	lock := dirlock.New(a.config.Paths.UsersDir, &dirlock.LockOptions{
+		StaleThreshold: 30 * time.Second,
+		RetryInterval:  50 * time.Millisecond,
+	})
+	if err := lock.Lock(ctx); err != nil {
+		return nil, fmt.Errorf("failed to acquire setup lock: %w", err)
+	}
+	defer func() { _ = lock.Unlock() }()
+
+	// Under lock: check if setup is still available (no users exist)
+	count, err := a.authService.CountUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if count > 0 {
+		return api.Setup403JSONResponse{
+			Code:    api.ErrorCodeForbidden,
+			Message: "Setup has already been completed",
+		}, nil
+	}
+
+	// Create admin user
+	user, err := a.authService.CreateUser(ctx, authservice.CreateUserInput{
+		Username: request.Body.Username,
+		Password: request.Body.Password,
+		Role:     auth.RoleAdmin,
+	})
+	if err != nil {
+		if errors.Is(err, authservice.ErrWeakPassword) {
+			return api.Setup400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: "Password does not meet security requirements",
+			}, nil
+		}
+		if errors.Is(err, auth.ErrInvalidUsername) {
+			return api.Setup400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: "Invalid username",
+			}, nil
+		}
+		if errors.Is(err, auth.ErrUserAlreadyExists) {
+			return api.Setup403JSONResponse{
+				Code:    api.ErrorCodeForbidden,
+				Message: "Setup has already been completed",
+			}, nil
+		}
+		return nil, err
+	}
+
+	// Generate JWT for immediate login
+	tokenResult, err := a.authService.GenerateToken(user)
+	if err != nil {
+		logger.Warn(ctx, "Failed to generate token after setup", tag.Error(err))
+		return nil, err
+	}
+
+	a.logAudit(ctx, audit.CategoryUser, "setup_admin", nil)
+
+	return api.Setup200JSONResponse{
+		Token:     tokenResult.Token,
+		ExpiresAt: tokenResult.ExpiresAt,
+		User:      toAPIUser(user),
+	}, nil
+}
 
 // Login authenticates a user and returns a JWT token.
 func (a *API) Login(ctx context.Context, request api.LoginRequestObject) (api.LoginResponseObject, error) {
@@ -50,6 +136,23 @@ func (a *API) Login(ctx context.Context, request api.LoginRequestObject) (api.Lo
 			return api.Login401JSONResponse{
 				Code:    api.ErrorCodeUnauthorized,
 				Message: "Invalid username or password",
+			}, nil
+		}
+		if errors.Is(err, authservice.ErrUserDisabled) {
+			if a.auditService != nil {
+				details, err := json.Marshal(map[string]string{"reason": "account_disabled"})
+				if err != nil {
+					logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+					details = []byte("{}")
+				}
+				entry := audit.NewEntry(audit.CategoryUser, "login_failed", "", request.Body.Username).
+					WithDetails(string(details)).
+					WithIPAddress(clientIP)
+				_ = a.auditService.Log(ctx, entry)
+			}
+			return api.Login401JSONResponse{
+				Code:    api.ErrorCodeUnauthorized,
+				Message: "Your account has been disabled",
 			}, nil
 		}
 		return nil, err
@@ -154,7 +257,6 @@ func toAPIUser(user *auth.User) api.User {
 	return apiUser
 }
 
-// preserving the input order.
 func toAPIUsers(users []*auth.User) []api.User {
 	result := make([]api.User, len(users))
 	for i, u := range users {

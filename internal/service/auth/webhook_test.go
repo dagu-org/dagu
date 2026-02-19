@@ -19,7 +19,7 @@ func setupWebhookTestService(t *testing.T) (*Service, string) {
 	require.NoError(t, err)
 
 	service := New(nil, Config{
-		TokenSecret: "test-secret",
+		TokenSecret: mustTokenSecret("test"),
 		TokenTTL:    time.Hour,
 		BcryptCost:  4, // Low cost for fast tests
 	}, WithWebhookStore(webhookStore))
@@ -79,7 +79,7 @@ func TestService_CreateWebhook(t *testing.T) {
 
 	t.Run("NoWebhookStore", func(t *testing.T) {
 		t.Parallel()
-		service := New(nil, Config{TokenSecret: "test"})
+		service := New(nil, Config{TokenSecret: mustTokenSecret("test")})
 		ctx := context.Background()
 
 		_, err := service.CreateWebhook(ctx, "test-dag", "admin")
@@ -183,7 +183,7 @@ func TestService_ValidateWebhookToken(t *testing.T) {
 
 	t.Run("NoWebhookStore", func(t *testing.T) {
 		t.Parallel()
-		service := New(nil, Config{TokenSecret: "test"})
+		service := New(nil, Config{TokenSecret: mustTokenSecret("test")})
 		ctx := context.Background()
 
 		_, err := service.ValidateWebhookToken(ctx, "test-dag", "dagu_wh_token")
@@ -269,7 +269,7 @@ func TestService_RegenerateWebhookToken(t *testing.T) {
 
 	t.Run("NoWebhookStore", func(t *testing.T) {
 		t.Parallel()
-		service := New(nil, Config{TokenSecret: "test"})
+		service := New(nil, Config{TokenSecret: mustTokenSecret("test")})
 		ctx := context.Background()
 
 		_, err := service.RegenerateWebhookToken(ctx, "test-dag")
@@ -323,7 +323,7 @@ func TestService_ToggleWebhook(t *testing.T) {
 
 	t.Run("NoWebhookStore", func(t *testing.T) {
 		t.Parallel()
-		service := New(nil, Config{TokenSecret: "test"})
+		service := New(nil, Config{TokenSecret: mustTokenSecret("test")})
 		ctx := context.Background()
 
 		_, err := service.ToggleWebhook(ctx, "test-dag", true)
@@ -363,7 +363,7 @@ func TestService_DeleteWebhook(t *testing.T) {
 
 	t.Run("NoWebhookStore", func(t *testing.T) {
 		t.Parallel()
-		service := New(nil, Config{TokenSecret: "test"})
+		service := New(nil, Config{TokenSecret: mustTokenSecret("test")})
 		ctx := context.Background()
 
 		err := service.DeleteWebhook(ctx, "test-dag")
@@ -403,7 +403,7 @@ func TestService_ListWebhooks(t *testing.T) {
 
 	t.Run("NoWebhookStore", func(t *testing.T) {
 		t.Parallel()
-		service := New(nil, Config{TokenSecret: "test"})
+		service := New(nil, Config{TokenSecret: mustTokenSecret("test")})
 		ctx := context.Background()
 
 		_, err := service.ListWebhooks(ctx)
@@ -440,7 +440,7 @@ func TestService_GetWebhookByDAGName(t *testing.T) {
 
 	t.Run("NoWebhookStore", func(t *testing.T) {
 		t.Parallel()
-		service := New(nil, Config{TokenSecret: "test"})
+		service := New(nil, Config{TokenSecret: mustTokenSecret("test")})
 		ctx := context.Background()
 
 		_, err := service.GetWebhookByDAGName(ctx, "test-dag")
@@ -459,7 +459,7 @@ func TestService_HasWebhookStore(t *testing.T) {
 
 	t.Run("WithoutStore", func(t *testing.T) {
 		t.Parallel()
-		service := New(nil, Config{TokenSecret: "test"})
+		service := New(nil, Config{TokenSecret: mustTokenSecret("test")})
 		assert.False(t, service.HasWebhookStore())
 	})
 }

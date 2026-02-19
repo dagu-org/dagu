@@ -111,17 +111,14 @@ workerSelector:
 
 ### Authentication
 
-By default, the chart uses builtin authentication. **Change these values in production!**
+By default, the chart uses builtin authentication. On first run, visit the UI to create an admin account via the setup page.
 
 ```yaml
 auth:
-  mode: "builtin"  # Options: "none", "builtin", "oidc"
+  mode: "builtin"  # Options: "none", "basic", "builtin" (default)
   builtin:
-    admin:
-      username: "admin"
-      password: "adminpass"  # CHANGEME
     token:
-      secret: "dagu-secret-key"  # CHANGEME
+      secret: ""               # optional: auto-generated at {data_dir}/auth/token_secret
       ttl: "24h"
 ```
 
@@ -175,7 +172,7 @@ ui:
 kubectl port-forward svc/dagu-ui 8080:8080
 
 # Then visit http://localhost:8080
-# Default credentials: admin / adminpass
+# On first run, you'll be prompted to create an admin account
 ```
 
 ## Current Constraints

@@ -53,6 +53,12 @@ func (srv *Server) useTemplate(ctx context.Context, layout, name string) func(ht
 	}
 }
 
+// SetupRequiredChecker determines whether initial admin setup is still needed.
+// Called on every HTML page render so the value is always up-to-date.
+type SetupRequiredChecker interface {
+	IsSetupRequired(ctx context.Context) bool
+}
+
 // AgentEnabledChecker provides the agent enabled status for template rendering.
 type AgentEnabledChecker interface {
 	IsEnabled(ctx context.Context) bool
@@ -75,9 +81,10 @@ type funcsConfig struct {
 	TerminalEnabled       bool
 	GitSyncEnabled        bool
 
-	UpdateAvailable     bool
-	LatestVersion       string
-	AgentEnabledChecker AgentEnabledChecker
+	SetupRequiredChecker SetupRequiredChecker
+	UpdateAvailable      bool
+	LatestVersion        string
+	AgentEnabledChecker  AgentEnabledChecker
 }
 
 func defaultFunctions(cfg *funcsConfig) template.FuncMap {
@@ -112,6 +119,12 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 			return boolStr(cfg.AgentEnabledChecker.IsEnabled(context.Background()))
 		},
 
+		"setupRequired": func() string {
+			if cfg.SetupRequiredChecker == nil {
+				return "false"
+			}
+			return boolStr(cfg.SetupRequiredChecker.IsSetupRequired(context.Background()))
+		},
 		"updateAvailable": func() string { return boolStr(cfg.UpdateAvailable) },
 		"latestVersion":   func() string { return cfg.LatestVersion },
 

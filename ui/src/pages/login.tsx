@@ -7,18 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertCircle, LogIn, KeyRound, CheckCircle } from 'lucide-react';
 
-/**
- * Renders the login page UI and handles authentication flow.
- *
- * The component shows username and password fields, displays an error banner when login fails,
- * and redirects the user to the intended destination after successful authentication.
- * When OIDC is enabled under builtin auth mode, a "Login with SSO" button is also displayed.
- *
- * @returns The rendered login page React element.
- */
 export default function LoginPage() {
   const config = useConfig();
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading, setupRequired } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -46,13 +37,21 @@ export default function LoginPage() {
     }
 
     if (errorParam) {
-      // Note: searchParams.get() already decodes URL params, no need for decodeURIComponent
       setError(errorParam);
     }
     if (welcomeParam === 'true') {
       setWelcomeMessage('Welcome! Your account has been created.');
     }
   }, [searchParams, navigate, from]);
+
+  // Redirect to setup page if initial admin account hasn't been created.
+  // Wait for auth state to settle (isLoading=false) to avoid acting on
+  // stale static config before the dynamic API check completes.
+  useEffect(() => {
+    if (!authLoading && setupRequired) {
+      navigate('/setup', { replace: true });
+    }
+  }, [authLoading, setupRequired, navigate]);
 
   // Redirect if already authenticated - use useEffect to avoid render-phase side effects
   useEffect(() => {
