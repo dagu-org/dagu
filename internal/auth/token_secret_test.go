@@ -72,7 +72,7 @@ func TestTokenSecret_Redaction(t *testing.T) {
 	})
 
 	t.Run("fmt Sprintf", func(t *testing.T) {
-		assert.Equal(t, "[REDACTED]", fmt.Sprintf("%s", ts))
+		assert.Equal(t, "[REDACTED]", ts.String())
 		assert.Equal(t, "auth.TokenSecret{[REDACTED]}", fmt.Sprintf("%#v", ts))
 	})
 
