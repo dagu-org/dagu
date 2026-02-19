@@ -8,6 +8,7 @@ import (
 	apigen "github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	apiV1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	"github.com/prometheus/client_golang/prometheus"
@@ -99,6 +100,11 @@ func (m *mockSkillStore) Delete(_ context.Context, id string) error {
 	}
 	delete(m.skills, id)
 	return nil
+}
+
+func (m *mockSkillStore) Search(_ context.Context, _ agent.SearchSkillsOptions) (*exec.PaginatedResult[agent.SkillMetadata], error) {
+	result := exec.NewPaginatedResult([]agent.SkillMetadata{}, 0, exec.DefaultPaginator())
+	return &result, nil
 }
 
 var _ agent.SkillStore = (*mockSkillStore)(nil)

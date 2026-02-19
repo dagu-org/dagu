@@ -111,12 +111,13 @@ After creating or modifying DAGs, navigate to the UI page so the user can review
 - `search_skills`: Discover available skills by keyword or tag. Returns summaries without loading full knowledge.
 </tools>
 
-{{if .AvailableSkills}}
+{{if or .AvailableSkills (gt .SkillCount 0)}}
 <available_skills>
-The following skills are available. Use the `use_skill` tool with the skill ID to load domain expertise when relevant.
-Use `search_skills` to discover additional skills by keyword or tag.
+{{if .AvailableSkills}}The following skills are available. Use `use_skill` with the skill ID to load domain expertise when relevant.
 {{range .AvailableSkills}}- {{.ID}}: {{.Name}}{{if .Description}} — {{.Description}}{{end}}
-{{end}}</available_skills>
+{{end}}{{else}}You have access to {{.SkillCount}} skills.
+{{end}}Use `search_skills` to discover skills by keyword or tag.
+</available_skills>
 {{end}}
 
 <workflows>

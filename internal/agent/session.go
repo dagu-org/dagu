@@ -440,7 +440,11 @@ func (sm *SessionManager) ensureLoop(provider llm.Provider, modelID string, reso
 func (sm *SessionManager) createLoop(provider llm.Provider, model string, history []llm.Message, safeMode bool) *Loop {
 	memory := sm.loadMemory()
 	allowedSkills := ToSkillSet(sm.enabledSkills)
-	skillSummaries := LoadSkillSummaries(context.Background(), sm.skillStore, sm.enabledSkills)
+	skillCount := len(sm.enabledSkills)
+	var skillSummaries []SkillSummary
+	if skillCount > 0 && skillCount <= SkillListThreshold {
+		skillSummaries = LoadSkillSummaries(context.Background(), sm.skillStore, sm.enabledSkills)
+	}
 	return NewLoop(LoopConfig{
 		Provider: provider,
 		Model:    model,
@@ -452,7 +456,7 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		}),
 		RecordMessage:    sm.createRecordMessageFunc(),
 		Logger:           sm.logger,
-		SystemPrompt:     GenerateSystemPrompt(sm.environment, nil, memory, sm.user.Role, skillSummaries),
+		SystemPrompt:     GenerateSystemPrompt(sm.environment, nil, memory, sm.user.Role, skillSummaries, skillCount),
 		WorkingDir:       sm.workingDir,
 		SessionID:        sm.id,
 		OnWorking:        sm.SetWorking,

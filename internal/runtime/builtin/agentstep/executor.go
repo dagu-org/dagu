@@ -113,7 +113,20 @@ func (e *Executor) Run(ctx context.Context) error {
 	skillStore := agent.GetSkillStore(ctx)
 	enabledSkills := resolveEnabledSkills(stepCfg, agentCfg)
 	allowedSkills := agent.ToSkillSet(enabledSkills)
-	skillSummaries := agent.LoadSkillSummaries(ctx, skillStore, enabledSkills)
+	skillCount := len(enabledSkills)
+	var skillSummaries []agent.SkillSummary
+	if skillCount > 0 && skillCount <= agent.SkillListThreshold {
+		skillSummaries = agent.LoadSkillSummaries(ctx, skillStore, enabledSkills)
+	}
+
+	// Warn about skills referenced in config but missing from the store.
+	if skillStore != nil {
+		for _, id := range enabledSkills {
+			if _, err := skillStore.GetByID(ctx, id); err != nil {
+				logf(stderr, "Warning: skill %q referenced in agent.skills not found in store", id)
+			}
+		}
+	}
 
 	// Build tools filtered by global policy (exclude navigate and ask_user; add output tool).
 	tools := buildTools(dagCtx, stepCfg, globalPolicy, skillStore, allowedSkills, stdout)
@@ -131,7 +144,7 @@ func (e *Executor) Run(ctx context.Context) error {
 	}
 
 	// Generate system prompt.
-	systemPrompt := buildSystemPrompt(dagCtx, stepCfg, memoryContent, skillSummaries)
+	systemPrompt := buildSystemPrompt(dagCtx, stepCfg, memoryContent, skillSummaries, skillCount)
 
 	// Resolve safe mode and max iterations.
 	safeMode := true
@@ -267,7 +280,7 @@ func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy
 }
 
 // buildSystemPrompt generates the system prompt for the agent step.
-func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memory agent.MemoryContent, availableSkills []agent.SkillSummary) string {
+func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memory agent.MemoryContent, availableSkills []agent.SkillSummary, skillCount int) string {
 	env := agent.EnvironmentInfo{}
 	if dagCtx.DAG != nil {
 		env.DAGsDir = dagCtx.DAG.Location
@@ -280,7 +293,7 @@ func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memor
 		}
 	}
 
-	prompt := agent.GenerateSystemPrompt(env, currentDAG, memory, "", availableSkills)
+	prompt := agent.GenerateSystemPrompt(env, currentDAG, memory, "", availableSkills, skillCount)
 
 	// Append instruction about the output tool.
 	prompt += "\n\n## Output\n\nWhen you have completed your task, use the `output` tool to write your final result. " +

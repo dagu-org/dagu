@@ -33,6 +33,10 @@ type UserCapabilities struct {
 	IsAdmin        bool
 }
 
+// SkillListThreshold is the maximum number of skills to list individually
+// in the system prompt. Above this, only the count is shown.
+const SkillListThreshold = 20
+
 // systemPromptData contains all data for template rendering.
 type systemPromptData struct {
 	EnvironmentInfo
@@ -40,11 +44,12 @@ type systemPromptData struct {
 	Memory          MemoryContent
 	User            *UserCapabilities
 	AvailableSkills []SkillSummary
+	SkillCount      int
 }
 
 // GenerateSystemPrompt renders the system prompt template with the given environment,
-// optional DAG context, memory content, user role capabilities, and available skills.
-func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG, memory MemoryContent, role auth.Role, availableSkills []SkillSummary) string {
+// optional DAG context, memory content, user role capabilities, available skills, and total skill count.
+func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG, memory MemoryContent, role auth.Role, availableSkills []SkillSummary, skillCount int) string {
 	var buf bytes.Buffer
 	data := systemPromptData{
 		EnvironmentInfo: env,
@@ -52,6 +57,7 @@ func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG, memory Me
 		Memory:          memory,
 		User:            buildUserCapabilities(role),
 		AvailableSkills: availableSkills,
+		SkillCount:      skillCount,
 	}
 	if err := systemPromptTemplate.Execute(&buf, data); err != nil {
 		return fallbackPrompt(env)

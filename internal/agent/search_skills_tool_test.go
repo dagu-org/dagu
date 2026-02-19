@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,6 +33,83 @@ func (s *testSkillStore) List(_ context.Context) ([]*Skill, error) {
 	}
 	return s.skills, nil
 }
+
+func (s *testSkillStore) Search(_ context.Context, opts SearchSkillsOptions) (*exec.PaginatedResult[SkillMetadata], error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+
+	queryLower := strings.ToLower(opts.Query)
+	var matched []SkillMetadata
+
+	for _, sk := range s.skills {
+		if opts.AllowedIDs != nil {
+			if _, ok := opts.AllowedIDs[sk.ID]; !ok {
+				continue
+			}
+		}
+		if len(opts.Tags) > 0 && !testHasAllTags(sk.Tags, opts.Tags) {
+			continue
+		}
+		if queryLower != "" && !testMatchesSkill(sk, queryLower) {
+			continue
+		}
+		matched = append(matched, SkillMetadata{
+			ID:          sk.ID,
+			Name:        sk.Name,
+			Description: sk.Description,
+			Tags:        sk.Tags,
+		})
+	}
+
+	pg := opts.Paginator
+	total := len(matched)
+	offset := pg.Offset()
+	limit := pg.Limit()
+	if offset > total {
+		offset = total
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	page := matched[offset:end]
+
+	result := exec.NewPaginatedResult(page, total, pg)
+	return &result, nil
+}
+
+func testHasAllTags(skillTags, required []string) bool {
+	tagSet := make(map[string]struct{}, len(skillTags))
+	for _, t := range skillTags {
+		tagSet[strings.ToLower(t)] = struct{}{}
+	}
+	for _, req := range required {
+		if _, ok := tagSet[strings.ToLower(req)]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func testMatchesSkill(skill *Skill, queryLower string) bool {
+	if strings.Contains(strings.ToLower(skill.Name), queryLower) {
+		return true
+	}
+	if strings.Contains(strings.ToLower(skill.Description), queryLower) {
+		return true
+	}
+	if strings.Contains(skill.ID, queryLower) {
+		return true
+	}
+	for _, tag := range skill.Tags {
+		if strings.Contains(strings.ToLower(tag), queryLower) {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *testSkillStore) Update(_ context.Context, _ *Skill) error { return nil }
 func (s *testSkillStore) Delete(_ context.Context, _ string) error { return nil }
 
@@ -231,4 +310,41 @@ func TestSearchSkills_InvalidInput(t *testing.T) {
 
 	assert.True(t, out.IsError)
 	assert.Contains(t, out.Content, "invalid input")
+}
+
+func TestSearchSkills_Pagination(t *testing.T) {
+	t.Parallel()
+	out := runSearchSkills(t, newTestSkillStore(), nil, map[string]any{
+		"per_page": 2,
+		"page":     1,
+	})
+
+	assert.Contains(t, out.Content, "Found 3 skill(s)")
+	assert.Contains(t, out.Content, `"total_count": 3`)
+	assert.Contains(t, out.Content, `"current_page": 1`)
+	assert.Contains(t, out.Content, `"total_pages": 2`)
+	assert.Contains(t, out.Content, `"has_next_page": true`)
+}
+
+func TestSearchSkills_PaginationPage2(t *testing.T) {
+	t.Parallel()
+	out := runSearchSkills(t, newTestSkillStore(), nil, map[string]any{
+		"per_page": 2,
+		"page":     2,
+	})
+
+	assert.Contains(t, out.Content, "Found 3 skill(s)")
+	assert.Contains(t, out.Content, `"current_page": 2`)
+	assert.Contains(t, out.Content, `"has_next_page": false`)
+}
+
+func TestSearchSkills_PaginationDefaultsApplied(t *testing.T) {
+	t.Parallel()
+	// Default: page=1, per_page=50 — should return all 3 skills in one page.
+	out := runSearchSkills(t, newTestSkillStore(), nil, map[string]any{})
+
+	assert.Contains(t, out.Content, `"total_count": 3`)
+	assert.Contains(t, out.Content, `"current_page": 1`)
+	assert.Contains(t, out.Content, `"total_pages": 1`)
+	assert.Contains(t, out.Content, `"has_next_page": false`)
 }

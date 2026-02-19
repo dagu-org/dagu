@@ -3,8 +3,8 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
@@ -25,8 +25,10 @@ func init() {
 
 // searchSkillsInput is the expected JSON input for the search_skills tool.
 type searchSkillsInput struct {
-	Query string   `json:"query,omitempty"`
-	Tags  []string `json:"tags,omitempty"`
+	Query   string   `json:"query,omitempty"`
+	Tags    []string `json:"tags,omitempty"`
+	Page    int      `json:"page,omitempty"`
+	PerPage int      `json:"per_page,omitempty"`
 }
 
 // NewSearchSkillsTool creates a tool that searches available skills by keyword or tag.
@@ -37,7 +39,7 @@ func NewSearchSkillsTool(store SkillStore, allowedSkills map[string]struct{}) *A
 			Type: "function",
 			Function: llm.ToolFunction{
 				Name:        "search_skills",
-				Description: "Search for available skills by keyword or tag. Returns skill summaries (ID, name, description, tags) without loading full knowledge. Use this to discover skills when you need domain expertise.",
+				Description: "Search for available skills by keyword or tag. Returns paginated skill summaries (ID, name, description, tags) without loading full knowledge. Use this to discover skills when you need domain expertise.",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
@@ -52,6 +54,14 @@ func NewSearchSkillsTool(store SkillStore, allowedSkills map[string]struct{}) *A
 							},
 							"description": "Optional list of tags to filter by. Skills must have ALL specified tags to match.",
 						},
+						"page": map[string]any{
+							"type":        "integer",
+							"description": "Page number for pagination (default: 1).",
+						},
+						"per_page": map[string]any{
+							"type":        "integer",
+							"description": "Number of results per page (default: 50, max: 200).",
+						},
 					},
 				},
 			},
@@ -64,12 +74,13 @@ func NewSearchSkillsTool(store SkillStore, allowedSkills map[string]struct{}) *A
 	}
 }
 
-// skillResult is the output format for a single skill in search results.
-type skillResult struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Description string   `json:"description,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
+// searchSkillsOutput is the structured output for paginated search results.
+type searchSkillsOutput struct {
+	TotalCount  int             `json:"total_count"`
+	CurrentPage int             `json:"current_page"`
+	TotalPages  int             `json:"total_pages"`
+	HasNextPage bool            `json:"has_next_page"`
+	Results     []SkillMetadata `json:"results"`
 }
 
 // makeSearchSkillsRun returns a ToolFunc that searches skills from the store.
@@ -80,41 +91,19 @@ func makeSearchSkillsRun(store SkillStore, allowedSkills map[string]struct{}) To
 			return toolError("invalid input: %v", err)
 		}
 
-		allSkills, err := store.List(ctx.Context)
+		pg := exec.NewPaginator(params.Page, params.PerPage)
+
+		result, err := store.Search(ctx.Context, SearchSkillsOptions{
+			Paginator:  pg,
+			Query:      params.Query,
+			Tags:       params.Tags,
+			AllowedIDs: allowedSkills,
+		})
 		if err != nil {
 			return toolError("failed to list skills: %v", err)
 		}
 
-		queryLower := strings.ToLower(params.Query)
-		var results []skillResult
-
-		for _, skill := range allSkills {
-			// Enforce allowed skills restriction.
-			if allowedSkills != nil {
-				if _, ok := allowedSkills[skill.ID]; !ok {
-					continue
-				}
-			}
-
-			// Apply tag filter: skill must have ALL specified tags.
-			if len(params.Tags) > 0 && !hasAllTags(skill.Tags, params.Tags) {
-				continue
-			}
-
-			// Apply keyword filter against name, description, and tags.
-			if queryLower != "" && !matchesQuery(skill, queryLower) {
-				continue
-			}
-
-			results = append(results, skillResult{
-				ID:          skill.ID,
-				Name:        skill.Name,
-				Description: skill.Description,
-				Tags:        skill.Tags,
-			})
-		}
-
-		if len(results) == 0 {
+		if result.TotalCount == 0 {
 			msg := "No skills found"
 			if params.Query != "" {
 				msg += fmt.Sprintf(" matching %q", params.Query)
@@ -125,42 +114,20 @@ func makeSearchSkillsRun(store SkillStore, allowedSkills map[string]struct{}) To
 			return ToolOut{Content: msg}
 		}
 
-		out, err := json.MarshalIndent(results, "", "  ")
+		output := searchSkillsOutput{
+			TotalCount:  result.TotalCount,
+			CurrentPage: result.CurrentPage,
+			TotalPages:  result.TotalPages,
+			HasNextPage: result.HasNextPage,
+			Results:     result.Items,
+		}
+
+		out, err := json.MarshalIndent(output, "", "  ")
 		if err != nil {
 			return toolError("failed to format results: %v", err)
 		}
 		return ToolOut{
-			Content: fmt.Sprintf("Found %d skill(s):\n%s", len(results), string(out)),
+			Content: fmt.Sprintf("Found %d skill(s):\n%s", result.TotalCount, string(out)),
 		}
 	}
-}
-
-// hasAllTags returns true if skillTags contains all of the required tags (case-insensitive).
-func hasAllTags(skillTags, required []string) bool {
-	tagSet := make(map[string]struct{}, len(skillTags))
-	for _, t := range skillTags {
-		tagSet[strings.ToLower(t)] = struct{}{}
-	}
-	for _, req := range required {
-		if _, ok := tagSet[strings.ToLower(req)]; !ok {
-			return false
-		}
-	}
-	return true
-}
-
-// matchesQuery checks if a skill matches a case-insensitive query against name, description, and tags.
-func matchesQuery(skill *Skill, queryLower string) bool {
-	if strings.Contains(strings.ToLower(skill.Name), queryLower) {
-		return true
-	}
-	if strings.Contains(strings.ToLower(skill.Description), queryLower) {
-		return true
-	}
-	for _, tag := range skill.Tags {
-		if strings.Contains(strings.ToLower(tag), queryLower) {
-			return true
-		}
-	}
-	return false
 }
