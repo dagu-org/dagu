@@ -89,7 +89,8 @@ func TestExampleSkillIDs(t *testing.T) {
 	t.Parallel()
 	ids := ExampleSkillIDs()
 
-	assert.Len(t, ids, 2)
+	assert.Len(t, ids, 3)
 	assert.Contains(t, ids, "dagu-ai-workflows")
 	assert.Contains(t, ids, "dagu-containers")
+	assert.Contains(t, ids, "dagu-server-worker")
 }
