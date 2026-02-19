@@ -399,7 +399,6 @@ func (s *Service) CountUsers(ctx context.Context) (int64, error) {
 	return s.store.Count(ctx)
 }
 
-
 // validatePassword checks if a password meets the minimum requirements.
 func (s *Service) validatePassword(password string) error {
 	if len(password) < minPasswordLength {
@@ -407,7 +406,6 @@ func (s *Service) validatePassword(password string) error {
 	}
 	return nil
 }
-
 
 // CreateAPIKeyInput contains the input for creating an API key.
 type CreateAPIKeyInput struct {
