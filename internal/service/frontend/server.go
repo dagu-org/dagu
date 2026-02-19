@@ -410,6 +410,7 @@ func buildTokenSecretProvider(ctx context.Context, cfg *config.Config) authmodel
 			providers = append(providers, staticProvider)
 
 			// Warn if a file-based secret also exists with a different value.
+			// Read errors are ignored — the file may not exist yet on first startup.
 			secretPath := filepath.Join(authDir, "token_secret")
 			if data, readErr := os.ReadFile(secretPath); readErr == nil { //nolint:gosec // path is constructed from trusted config dir + constant filename
 				fileSecret := strings.TrimSpace(string(data))

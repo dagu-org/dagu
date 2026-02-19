@@ -62,7 +62,6 @@ func WithFileCache(cache *fileutil.Cache[*auth.User]) Option {
 	}
 }
 
-// New creates a new file-based user store.
 // New creates a file-backed Store that persists users as per-user JSON files in baseDir.
 // The baseDir must be non-empty; provided Option functions are applied to the store.
 // If baseDir does not exist it is created with directory permissions 0750, and an initial
