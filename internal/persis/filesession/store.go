@@ -75,6 +75,7 @@ type Store struct {
 	mu        sync.RWMutex
 	byID      map[string]string    // session ID -> file path
 	byUser    map[string][]string  // user ID -> session IDs (sorted by UpdatedAt descending)
+	byParent  map[string][]string  // parent session ID -> child session IDs
 	updatedAt map[string]time.Time // session ID -> last update time
 }
 
@@ -97,6 +98,7 @@ func New(baseDir string, opts ...Option) (*Store, error) {
 		baseDir:   baseDir,
 		byID:      make(map[string]string),
 		byUser:    make(map[string][]string),
+		byParent:  make(map[string][]string),
 		updatedAt: make(map[string]time.Time),
 	}
 
@@ -124,6 +126,7 @@ func (s *Store) rebuildIndex() error {
 
 	s.byID = make(map[string]string)
 	s.byUser = make(map[string][]string)
+	s.byParent = make(map[string][]string)
 	s.updatedAt = make(map[string]time.Time)
 
 	userDirs, err := os.ReadDir(s.baseDir)
@@ -174,6 +177,9 @@ func (s *Store) indexUserDirectory(userID string) {
 		s.byID[sess.ID] = filePath
 		s.byUser[sess.UserID] = append(s.byUser[sess.UserID], sess.ID)
 		s.updatedAt[sess.ID] = sess.UpdatedAt
+		if sess.ParentSessionID != "" {
+			s.byParent[sess.ParentSessionID] = append(s.byParent[sess.ParentSessionID], sess.ID)
+		}
 	}
 }
 
@@ -237,6 +243,9 @@ func (s *Store) CreateSession(_ context.Context, sess *agent.Session) error {
 	s.byID[sess.ID] = filePath
 	s.byUser[sess.UserID] = append(s.byUser[sess.UserID], sess.ID)
 	s.updatedAt[sess.ID] = sess.UpdatedAt
+	if sess.ParentSessionID != "" {
+		s.byParent[sess.ParentSessionID] = append(s.byParent[sess.ParentSessionID], sess.ID)
+	}
 	s.sortUserSessions(sess.UserID)
 
 	return nil
@@ -375,10 +384,18 @@ func (s *Store) DeleteSession(_ context.Context, id string) error {
 	delete(s.updatedAt, id)
 
 	userID := ""
+	parentID := ""
 	if stored != nil {
 		userID = stored.UserID
+		parentID = stored.ParentSessionID
 	}
 	s.removeSessionFromUserIndex(id, userID)
+	if parentID != "" {
+		s.byParent[parentID] = removeFromSlice(s.byParent[parentID], id)
+		if len(s.byParent[parentID]) == 0 {
+			delete(s.byParent, parentID)
+		}
+	}
 
 	return nil
 }
@@ -514,28 +531,26 @@ func (s *Store) loadSessionByID(id string) (*SessionForStorage, error) {
 }
 
 // ListSubSessions returns all sub-sessions for a parent session.
-func (s *Store) ListSubSessions(_ context.Context, parentSessionID string) ([]*agent.Session, error) {
+func (s *Store) ListSubSessions(ctx context.Context, parentSessionID string) ([]*agent.Session, error) {
 	if parentSessionID == "" {
 		return nil, agent.ErrInvalidSessionID
 	}
 
 	s.mu.RLock()
-	// Collect all session IDs to check.
-	var allIDs []string
-	for id := range s.byID {
-		allIDs = append(allIDs, id)
-	}
+	childIDs := make([]string, len(s.byParent[parentSessionID]))
+	copy(childIDs, s.byParent[parentSessionID])
 	s.mu.RUnlock()
 
-	var result []*agent.Session
-	for _, id := range allIDs {
-		stored, err := s.loadSessionByID(id)
+	result := make([]*agent.Session, 0, len(childIDs))
+	for _, id := range childIDs {
+		sess, err := s.GetSession(ctx, id)
 		if err != nil {
-			continue
+			if errors.Is(err, agent.ErrSessionNotFound) {
+				continue
+			}
+			return nil, err
 		}
-		if stored.ParentSessionID == parentSessionID {
-			result = append(result, stored.ToSession())
-		}
+		result = append(result, sess)
 	}
 	return result, nil
 }

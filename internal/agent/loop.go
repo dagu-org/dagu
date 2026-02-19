@@ -191,6 +191,12 @@ func (l *Loop) Go(ctx context.Context) error {
 			retrier.Reset()
 			l.logger.Info("finished processing queued messages")
 		} else {
+			if !idleTimer.Stop() {
+				select {
+				case <-idleTimer.C:
+				default:
+				}
+			}
 			idleTimer.Reset(idlePollingInterval)
 			select {
 			case <-ctx.Done():

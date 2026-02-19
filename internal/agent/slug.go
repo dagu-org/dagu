@@ -57,10 +57,16 @@ func UniqueID(name string, existingIDs map[string]struct{}, fallback string) str
 	if _, exists := existingIDs[id]; !exists {
 		return id
 	}
-	for i := 2; ; i++ {
+	maxSuffix := 1
+	for n := maxSuffixLen - 1; n > 0; n-- {
+		maxSuffix *= 10
+	}
+	for i := 2; i < maxSuffix; i++ {
 		id = fmt.Sprintf("%s-%d", base, i)
 		if _, exists := existingIDs[id]; !exists {
 			return id
 		}
 	}
+	// Unreachable in practice: would require ~999,999,999 collisions.
+	return fmt.Sprintf("%s-%d", base, maxSuffix)
 }

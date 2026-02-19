@@ -300,6 +300,14 @@ func (s *Store) Delete(_ context.Context, id string) error {
 	// Clean up name index using the loaded model name (O(1) lookup).
 	if loadErr == nil {
 		delete(s.byName, model.Name)
+	} else {
+		// Fallback: scan byName to find and remove the entry pointing to this ID.
+		for name, mappedID := range s.byName {
+			if mappedID == id {
+				delete(s.byName, name)
+				break
+			}
+		}
 	}
 
 	return nil

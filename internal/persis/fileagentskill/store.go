@@ -406,6 +406,9 @@ func (s *Store) Search(_ context.Context, opts agent.SearchSkillsOptions) (*exec
 	// Apply pagination.
 	total := len(matched)
 	pg := opts.Paginator
+	if pg.Limit() == 0 {
+		pg = exec.DefaultPaginator()
+	}
 	offset := pg.Offset()
 	limit := pg.Limit()
 	if offset > total {
@@ -440,7 +443,7 @@ func matchesEntry(entry *skillIndexEntry, id, queryLower string) bool {
 	if strings.Contains(strings.ToLower(entry.description), queryLower) {
 		return true
 	}
-	if strings.Contains(id, queryLower) {
+	if strings.Contains(strings.ToLower(id), queryLower) {
 		return true
 	}
 	for _, tag := range entry.tags {

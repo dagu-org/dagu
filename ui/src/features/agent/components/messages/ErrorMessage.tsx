@@ -1,3 +1,4 @@
+import type React from 'react';
 import { XCircle } from 'lucide-react';
 
 export function ErrorMessage({ content }: { content: string }): React.ReactNode {

@@ -1177,7 +1177,7 @@ func TestAPI_GetSessionDetail_IncludesDelegates(t *testing.T) {
 	assert.Equal(t, "detail delegate", resp.Delegates[0].Task)
 }
 
-func TestAPI_CleanupIdleSessions_CancelsBeforeDelete(t *testing.T) {
+func TestAPI_CleanupIdleSessions_DeletesIdleSession(t *testing.T) {
 	t.Parallel()
 
 	api := NewAPI(APIConfig{

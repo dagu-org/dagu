@@ -59,6 +59,7 @@ func (a *API) ListAgentModels(ctx context.Context, _ api.ListAgentModelsRequestO
 
 	cfg, err := a.agentConfigStore.Load(ctx)
 	if err != nil {
+		logger.Error(ctx, "Failed to load agent config", tag.Error(err))
 		return nil, ErrFailedToLoadAgentConfig
 	}
 	defaultModelID := ""
@@ -257,6 +258,7 @@ func (a *API) SetDefaultAgentModel(ctx context.Context, request api.SetDefaultAg
 
 	cfg, err := a.agentConfigStore.Load(ctx)
 	if err != nil {
+		logger.Error(ctx, "Failed to load agent config", tag.Error(err))
 		return nil, ErrFailedToLoadAgentConfig
 	}
 

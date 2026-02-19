@@ -113,5 +113,6 @@ type SessionStore interface {
 
 	// ListSubSessions returns all sub-sessions for a parent session.
 	// Returns an empty slice if no sub-sessions exist.
+	// Returns ErrInvalidSessionID if parentSessionID is empty.
 	ListSubSessions(ctx context.Context, parentSessionID string) ([]*Session, error)
 }

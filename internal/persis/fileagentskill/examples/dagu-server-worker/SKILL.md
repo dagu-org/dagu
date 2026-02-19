@@ -223,13 +223,13 @@ queue: etl
 ## Paths Configuration
 
 **XDG layout** (default when `DAGU_HOME` is not set):
-```
+```text
 ~/.config/dagu/         # config.yaml, base.yaml, dags/
 ~/.local/share/dagu/    # data/, logs/
 ```
 
 **Unified layout** (when `DAGU_HOME` is set):
-```
+```text
 $DAGU_HOME/config.yaml
 $DAGU_HOME/dags/
 $DAGU_HOME/data/

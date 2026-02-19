@@ -204,16 +204,16 @@ steps:
           - think
           - output
           # bash, patch excluded = read-only agent
-      bash_policy:
-        default_behavior: deny
-        deny_behavior: block      # or "hitl" for human approval
-        rules:
-          - name: allow-ls
-            pattern: "^ls "
-            action: allow
-          - name: allow-cat
-            pattern: "^cat "
-            action: allow
+        bash_policy:
+          default_behavior: deny
+          deny_behavior: block      # or "hitl" for human approval
+          rules:
+            - name: allow-ls
+              pattern: "^ls "
+              action: allow
+            - name: allow-cat
+              pattern: "^cat "
+              action: allow
 ```
 
 ### Output Capture
