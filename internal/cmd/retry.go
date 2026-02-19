@@ -147,7 +147,7 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	agentConfigStore, agentModelStore, agentMemoryStore, agentSkillStore := ctx.agentStores()
+	as := ctx.agentStores()
 
 	agentInstance := agent.New(
 		status.DAGRunID,
@@ -168,10 +168,10 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 			PeerConfig:       ctx.Config.Core.Peer,
 			TriggerType:      core.TriggerTypeRetry,
 			DefaultExecMode:  ctx.Config.DefaultExecMode,
-			AgentConfigStore: agentConfigStore,
-			AgentModelStore:  agentModelStore,
-			AgentMemoryStore: agentMemoryStore,
-			AgentSkillStore:  agentSkillStore,
+			AgentConfigStore: as.ConfigStore,
+			AgentModelStore:  as.ModelStore,
+			AgentMemoryStore: as.MemoryStore,
+			AgentSkillStore:  as.SkillStore,
 		},
 	)
 

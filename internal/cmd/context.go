@@ -412,38 +412,51 @@ func (c *Context) dagStore(cfg dagStoreConfig) (exec.DAGStore, error) {
 	return store, nil
 }
 
-// agentStores creates the agent config, model, and memory stores from the config paths.
-// Returns typed stores for use in agent.Options.
+// agentStoresResult holds the agent stores created by agentStores().
+type agentStoresResult struct {
+	ConfigStore agent.ConfigStore
+	ModelStore  agent.ModelStore
+	MemoryStore agent.MemoryStore
+	SkillStore  agent.SkillStore
+}
+
+// agentStores creates the agent config, model, memory, and skill stores from the config paths.
 // Errors are logged as warnings; nil stores are returned if creation fails.
-func (c *Context) agentStores() (configStore agent.ConfigStore, modelStore agent.ModelStore, memoryStore agent.MemoryStore, skillStore agent.SkillStore) {
+func (c *Context) agentStores() agentStoresResult {
+	var result agentStoresResult
+
 	acs, err := fileagentconfig.New(c.Config.Paths.DataDir)
 	if err != nil {
 		logger.Warn(c, "Failed to create agent config store", tag.Error(err))
-		return nil, nil, nil, nil
+		return result
 	}
 	if acs == nil {
-		return nil, nil, nil, nil
+		return result
 	}
+	result.ConfigStore = acs
 
 	ams, err := fileagentmodel.New(filepath.Join(c.Config.Paths.DataDir, "agent", "models"))
 	if err != nil {
 		logger.Warn(c, "Failed to create agent model store", tag.Error(err))
-		return acs, nil, nil, nil
+		return result
 	}
+	result.ModelStore = ams
 
 	ms, err := filememory.New(c.Config.Paths.DAGsDir)
 	if err != nil {
 		logger.Warn(c, "Failed to create agent memory store", tag.Error(err))
-		return acs, ams, nil, nil
+		return result
 	}
+	result.MemoryStore = ms
 
 	ss, err := fileagentskill.New(filepath.Join(c.Config.Paths.DAGsDir, "skills"))
 	if err != nil {
 		logger.Warn(c, "Failed to create agent skill store", tag.Error(err))
-		return acs, ams, ms, nil
+		return result
 	}
+	result.SkillStore = ss
 
-	return acs, ams, ms, ss
+	return result
 }
 
 // OpenLogFile creates and opens a log file for a given dag-run.
