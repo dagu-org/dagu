@@ -1193,7 +1193,6 @@ var envBindings = []envBinding{
 
 	// Auth
 	{key: "auth.mode", env: "AUTH_MODE"},
-	{key: "auth.basic.enabled", env: "AUTH_BASIC_ENABLED"},
 	{key: "auth.basic.username", env: "AUTH_BASIC_USERNAME"},
 	{key: "auth.basic.password", env: "AUTH_BASIC_PASSWORD"},
 	// Auth OIDC
