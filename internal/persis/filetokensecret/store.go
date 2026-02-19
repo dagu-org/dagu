@@ -1,4 +1,5 @@
-package tokensecret
+// Package filetokensecret provides a file-based implementation of auth.TokenSecretProvider.
+package filetokensecret
 
 import (
 	"context"
@@ -24,17 +25,17 @@ const (
 	filePerm = 0600
 )
 
-var _ auth.TokenSecretProvider = (*FileProvider)(nil)
+var _ auth.TokenSecretProvider = (*Store)(nil)
 
-// FileProvider resolves a token secret from a file, auto-generating one if missing.
+// Store resolves a token secret from a file, auto-generating one if missing.
 // The secret file is stored at {dir}/token_secret.
-type FileProvider struct {
+type Store struct {
 	dir string
 }
 
-// NewFile creates a FileProvider that reads or generates a secret in the given directory.
-func NewFile(dir string) *FileProvider {
-	return &FileProvider{dir: dir}
+// New creates a Store that reads or generates a secret in the given directory.
+func New(dir string) *Store {
+	return &Store{dir: dir}
 }
 
 // Resolve reads the token secret from file, or generates and persists a new one.
@@ -43,8 +44,8 @@ func NewFile(dir string) *FileProvider {
 //   - File missing or empty/whitespace-only → auto-generate, persist, and return
 //   - Permission errors (read or write) → return fatal wrapped error (not ErrInvalidTokenSecret)
 //   - Successfully read or generated → return valid TokenSecret
-func (p *FileProvider) Resolve(_ context.Context) (auth.TokenSecret, error) {
-	path := filepath.Join(p.dir, secretFileName)
+func (s *Store) Resolve(_ context.Context) (auth.TokenSecret, error) {
+	path := filepath.Join(s.dir, secretFileName)
 
 	fileExists := false
 	data, err := os.ReadFile(path) //nolint:gosec // path is constructed from trusted config dir + constant filename
@@ -68,11 +69,11 @@ func (p *FileProvider) Resolve(_ context.Context) (auth.TokenSecret, error) {
 	}
 
 	// Ensure directory exists with correct permissions.
-	if err := os.MkdirAll(p.dir, dirPerm); err != nil {
-		return auth.TokenSecret{}, fmt.Errorf("failed to create auth directory %s: %w", p.dir, err)
+	if err := os.MkdirAll(s.dir, dirPerm); err != nil {
+		return auth.TokenSecret{}, fmt.Errorf("failed to create auth directory %s: %w", s.dir, err)
 	}
-	if err := os.Chmod(p.dir, dirPerm); err != nil {
-		return auth.TokenSecret{}, fmt.Errorf("failed to set auth directory permissions %s: %w", p.dir, err)
+	if err := os.Chmod(s.dir, dirPerm); err != nil {
+		return auth.TokenSecret{}, fmt.Errorf("failed to set auth directory permissions %s: %w", s.dir, err)
 	}
 
 	if fileExists {

@@ -41,6 +41,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
 	"github.com/dagu-org/dagu/internal/persis/fileauth"
+	"github.com/dagu-org/dagu/internal/persis/filetokensecret"
 	"github.com/dagu-org/dagu/internal/persis/filebaseconfig"
 	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/persis/filesession"
@@ -424,7 +425,7 @@ func buildTokenSecretProvider(ctx context.Context, cfg *config.Config) authmodel
 	}
 
 	// File provider (auto-generate if missing)
-	providers = append(providers, tokensecret.NewFile(authDir))
+	providers = append(providers, filetokensecret.New(authDir))
 
 	return tokensecret.NewChain(providers...)
 }

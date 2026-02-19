@@ -1,4 +1,4 @@
-package tokensecret_test
+package filetokensecret
 
 import (
 	"context"
@@ -7,18 +7,17 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/auth/tokensecret"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestFileProvider(t *testing.T) {
+func TestStore(t *testing.T) {
 	t.Run("auto-generates when file missing", func(t *testing.T) {
 		dir := t.TempDir()
 		authDir := filepath.Join(dir, "auth")
 
-		p := tokensecret.NewFile(authDir)
-		ts, err := p.Resolve(context.Background())
+		s := New(authDir)
+		ts, err := s.Resolve(context.Background())
 		require.NoError(t, err)
 		assert.True(t, ts.IsValid())
 
@@ -39,8 +38,8 @@ func TestFileProvider(t *testing.T) {
 		path := filepath.Join(dir, "token_secret")
 		require.NoError(t, os.WriteFile(path, []byte("existing-secret"), 0600))
 
-		p := tokensecret.NewFile(dir)
-		ts, err := p.Resolve(context.Background())
+		s := New(dir)
+		ts, err := s.Resolve(context.Background())
 		require.NoError(t, err)
 		assert.Equal(t, []byte("existing-secret"), ts.SigningKey())
 	})
@@ -50,8 +49,8 @@ func TestFileProvider(t *testing.T) {
 		path := filepath.Join(dir, "token_secret")
 		require.NoError(t, os.WriteFile(path, []byte(""), 0600))
 
-		p := tokensecret.NewFile(dir)
-		ts, err := p.Resolve(context.Background())
+		s := New(dir)
+		ts, err := s.Resolve(context.Background())
 		require.NoError(t, err)
 		assert.True(t, ts.IsValid())
 
@@ -66,8 +65,8 @@ func TestFileProvider(t *testing.T) {
 		path := filepath.Join(dir, "token_secret")
 		require.NoError(t, os.WriteFile(path, []byte("  \n\t  "), 0600))
 
-		p := tokensecret.NewFile(dir)
-		ts, err := p.Resolve(context.Background())
+		s := New(dir)
+		ts, err := s.Resolve(context.Background())
 		require.NoError(t, err)
 		assert.True(t, ts.IsValid())
 	})
@@ -76,12 +75,12 @@ func TestFileProvider(t *testing.T) {
 		dir := t.TempDir()
 		authDir := filepath.Join(dir, "auth")
 
-		p := tokensecret.NewFile(authDir)
+		s := New(authDir)
 
-		ts1, err := p.Resolve(context.Background())
+		ts1, err := s.Resolve(context.Background())
 		require.NoError(t, err)
 
-		ts2, err := p.Resolve(context.Background())
+		ts2, err := s.Resolve(context.Background())
 		require.NoError(t, err)
 
 		assert.Equal(t, ts1.SigningKey(), ts2.SigningKey())
@@ -91,8 +90,8 @@ func TestFileProvider(t *testing.T) {
 		dir := t.TempDir()
 		authDir := filepath.Join(dir, "auth")
 
-		p := tokensecret.NewFile(authDir)
-		_, err := p.Resolve(context.Background())
+		s := New(authDir)
+		_, err := s.Resolve(context.Background())
 		require.NoError(t, err)
 
 		info, err := os.Stat(authDir)
@@ -113,8 +112,8 @@ func TestFileProvider(t *testing.T) {
 		for i := range goroutines {
 			go func(idx int) {
 				defer wg.Done()
-				p := tokensecret.NewFile(authDir)
-				ts, err := p.Resolve(context.Background())
+				s := New(authDir)
+				ts, err := s.Resolve(context.Background())
 				errs[idx] = err
 				if err == nil {
 					secrets[idx] = ts.SigningKey()
