@@ -17,12 +17,15 @@ export default function SetupPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [setupDone, setSetupDone] = useState(false);
 
+  // Redirect away if setup is already complete (e.g., user navigated here directly).
+  // Skip if we just completed setup ourselves — the submit handler navigates to /.
   useEffect(() => {
-    if (!setupRequired) {
+    if (!setupRequired && !setupDone) {
       navigate('/login', { replace: true });
     }
-  }, [setupRequired, navigate]);
+  }, [setupRequired, setupDone, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +66,7 @@ export default function SetupPage() {
       }
 
       const data = await response.json();
+      setSetupDone(true);
       completeSetup({ token: data.token, user: data.user });
       navigate('/', { replace: true });
     } catch (err) {
