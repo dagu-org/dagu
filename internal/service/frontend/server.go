@@ -180,7 +180,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	var agentAPI *agent.API
 	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, &cfg.Paths, dr, auditSvc, memoryStore)
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSkillStore, &cfg.Paths, dr, auditSvc, memoryStore)
 		if err != nil {
 			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
 		}
@@ -503,7 +503,7 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 
 // initAgentAPI creates and returns an agent API.
 // The API uses the config store to check enabled status and resolve providers via the model store.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, paths *config.PathsConfig, dagStore exec.DAGStore, auditSvc *audit.Service, memoryStore agent.MemoryStore) (*agent.API, error) {
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, paths *config.PathsConfig, dagStore exec.DAGStore, auditSvc *audit.Service, memoryStore agent.MemoryStore) (*agent.API, error) {
 	sessStore, err := filesession.New(paths.SessionsDir)
 	if err != nil {
 		logger.Warn(ctx, "Failed to create session store, persistence disabled", tag.Error(err))
@@ -518,6 +518,7 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 	api := agent.NewAPI(agent.APIConfig{
 		ConfigStore:  store,
 		ModelStore:   modelStore,
+		SkillStore:   skillStore,
 		WorkingDir:   paths.DAGsDir,
 		Logger:       slog.Default(),
 		SessionStore: sessStore,

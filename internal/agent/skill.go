@@ -48,3 +48,47 @@ type SkillStore interface {
 func ValidateSkillID(id string) error {
 	return validateSlugID(id, ErrInvalidSkillID)
 }
+
+// SkillSummary contains lightweight skill metadata for system prompt listing.
+type SkillSummary struct {
+	ID          string
+	Name        string
+	Description string
+}
+
+// ToSkillSet converts a slice of skill IDs to a set for O(1) lookups.
+// Returns nil if the input is empty (meaning "all skills allowed").
+func ToSkillSet(ids []string) map[string]struct{} {
+	if len(ids) == 0 {
+		return nil
+	}
+	set := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		set[id] = struct{}{}
+	}
+	return set
+}
+
+// LoadSkillSummaries returns metadata for the given skill IDs.
+// Unknown or inaccessible skills are silently skipped.
+func LoadSkillSummaries(ctx context.Context, store SkillStore, enabledIDs []string) []SkillSummary {
+	if store == nil || len(enabledIDs) == 0 {
+		return nil
+	}
+	summaries := make([]SkillSummary, 0, len(enabledIDs))
+	for _, id := range enabledIDs {
+		skill, err := store.GetByID(ctx, id)
+		if err != nil {
+			continue
+		}
+		summaries = append(summaries, SkillSummary{
+			ID:          skill.ID,
+			Name:        skill.Name,
+			Description: skill.Description,
+		})
+	}
+	if len(summaries) == 0 {
+		return nil
+	}
+	return summaries
+}

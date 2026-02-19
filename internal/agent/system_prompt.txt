@@ -110,6 +110,13 @@ After creating or modifying DAGs, navigate to the UI page so the user can review
 - `delegate`: Spawn a sub-agent for a focused sub-task. The sub-agent works independently with the same tools and returns a summary. Use when a task benefits from dedicated, parallel execution. You can delegate multiple tasks simultaneously.
 </tools>
 
+{{if .AvailableSkills}}
+<available_skills>
+The following skills are available. Use the `use_skill` tool with the skill ID to load domain expertise when relevant.
+{{range .AvailableSkills}}- {{.ID}}: {{.Name}}{{if .Description}} — {{.Description}}{{end}}
+{{end}}</available_skills>
+{{end}}
+
 <workflows>
 ### Creating a New DAG
 1. Use `read_schema` to confirm available fields.

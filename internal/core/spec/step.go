@@ -192,6 +192,9 @@ type agentConfig struct {
 	Model string `yaml:"model,omitempty"`
 	// Tools configures which tools are available and their policies.
 	Tools *agentToolsConfig `yaml:"tools,omitempty"`
+	// Skills lists skill IDs the agent is allowed to use.
+	// If omitted, falls back to globally enabled skills.
+	Skills []string `yaml:"skills,omitempty"`
 	// Memory controls whether persistent memory is loaded.
 	Memory *agentMemoryConfig `yaml:"memory,omitempty"`
 	// Prompt is additional instructions appended to the built-in system prompt.
@@ -1612,6 +1615,10 @@ func buildStepAgent(_ StepBuildContext, s *step, result *core.Step) error {
 					})
 				}
 			}
+		}
+
+		if len(s.Agent.Skills) > 0 {
+			cfg.Skills = s.Agent.Skills
 		}
 
 		if s.Agent.Memory != nil {

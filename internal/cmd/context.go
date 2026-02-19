@@ -27,6 +27,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
+	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
 	"github.com/dagu-org/dagu/internal/persis/filememory"
@@ -414,29 +415,35 @@ func (c *Context) dagStore(cfg dagStoreConfig) (exec.DAGStore, error) {
 // agentStores creates the agent config, model, and memory stores from the config paths.
 // Returns typed stores for use in agent.Options.
 // Errors are logged as warnings; nil stores are returned if creation fails.
-func (c *Context) agentStores() (configStore agent.ConfigStore, modelStore agent.ModelStore, memoryStore agent.MemoryStore) {
+func (c *Context) agentStores() (configStore agent.ConfigStore, modelStore agent.ModelStore, memoryStore agent.MemoryStore, skillStore agent.SkillStore) {
 	acs, err := fileagentconfig.New(c.Config.Paths.DataDir)
 	if err != nil {
 		logger.Warn(c, "Failed to create agent config store", tag.Error(err))
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 	if acs == nil {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
 	ams, err := fileagentmodel.New(filepath.Join(c.Config.Paths.DataDir, "agent", "models"))
 	if err != nil {
 		logger.Warn(c, "Failed to create agent model store", tag.Error(err))
-		return acs, nil, nil
+		return acs, nil, nil, nil
 	}
 
 	ms, err := filememory.New(c.Config.Paths.DAGsDir)
 	if err != nil {
 		logger.Warn(c, "Failed to create agent memory store", tag.Error(err))
-		return acs, ams, nil
+		return acs, ams, nil, nil
 	}
 
-	return acs, ams, ms
+	ss, err := fileagentskill.New(filepath.Join(c.Config.Paths.DAGsDir, "skills"))
+	if err != nil {
+		logger.Warn(c, "Failed to create agent skill store", tag.Error(err))
+		return acs, ams, ms, nil
+	}
+
+	return acs, ams, ms, ss
 }
 
 // OpenLogFile creates and opens a log file for a given dag-run.

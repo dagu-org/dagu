@@ -3064,6 +3064,13 @@
           "type": "boolean",
           "default": true,
           "description": "Enable command approval via HITL for bash commands. Default: true."
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of skill IDs the agent is allowed to use. If omitted, falls back to globally enabled skills."
         }
       },
       "description": "Configuration for agent-type steps. Controls model selection, available tools, safety policies, and iteration limits."
@@ -3076,7 +3083,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["bash", "read", "patch", "think", "read_schema", "web_search", "output"]
+            "enum": ["bash", "read", "patch", "think", "read_schema", "web_search", "output", "use_skill"]
           },
           "description": "List of tools to enable. When omitted, all tools are available."
         },

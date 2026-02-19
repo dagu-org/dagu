@@ -51,6 +51,7 @@ type API struct {
 	store       SessionStore
 	configStore ConfigStore
 	modelStore  ModelStore
+	skillStore  SkillStore
 	providers   *ProviderCache
 	workingDir  string
 	logger      *slog.Logger
@@ -64,6 +65,7 @@ type API struct {
 type APIConfig struct {
 	ConfigStore  ConfigStore
 	ModelStore   ModelStore
+	SkillStore   SkillStore
 	WorkingDir   string
 	Logger       *slog.Logger
 	SessionStore SessionStore
@@ -91,6 +93,7 @@ func NewAPI(cfg APIConfig) *API {
 	return &API{
 		configStore: cfg.ConfigStore,
 		modelStore:  cfg.ModelStore,
+		skillStore:  cfg.SkillStore,
 		providers:   NewProviderCache(),
 		workingDir:  cfg.WorkingDir,
 		logger:      logger,
@@ -237,6 +240,15 @@ func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider
 		return nil, nil, err
 	}
 	return provider, model, nil
+}
+
+// loadEnabledSkills returns the list of enabled skill IDs from the agent config.
+func (a *API) loadEnabledSkills(ctx context.Context) []string {
+	cfg, err := a.configStore.Load(ctx)
+	if err != nil || cfg == nil {
+		return nil
+	}
+	return cfg.EnabledSkills
 }
 
 // createMessageCallback returns a persistence callback for the given session ID.
@@ -413,19 +425,21 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 	}
 
 	mgr := NewSessionManager(SessionManagerConfig{
-		ID:           id,
-		User:         user,
-		Logger:       a.logger,
-		WorkingDir:   a.workingDir,
-		OnMessage:    a.createMessageCallback(id),
-		History:      messages,
-		SequenceID:   seqID,
-		Environment:  a.environment,
-		SafeMode:     true, // Default to safe mode for reactivated sessions
-		Hooks:        a.hooks,
-		MemoryStore:  a.memoryStore,
-		DAGName:      sess.DAGName,
-		SessionStore: a.store,
+		ID:            id,
+		User:          user,
+		Logger:        a.logger,
+		WorkingDir:    a.workingDir,
+		OnMessage:     a.createMessageCallback(id),
+		History:       messages,
+		SequenceID:    seqID,
+		Environment:   a.environment,
+		SafeMode:      true, // Default to safe mode for reactivated sessions
+		Hooks:         a.hooks,
+		MemoryStore:   a.memoryStore,
+		SkillStore:    a.skillStore,
+		EnabledSkills: a.loadEnabledSkills(ctx),
+		DAGName:       sess.DAGName,
+		SessionStore:  a.store,
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 	a.sessions.Store(id, mgr)
@@ -581,6 +595,8 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 		InputCostPer1M:  modelCfg.InputCostPer1M,
 		OutputCostPer1M: modelCfg.OutputCostPer1M,
 		MemoryStore:     a.memoryStore,
+		SkillStore:      a.skillStore,
+		EnabledSkills:   a.loadEnabledSkills(ctx),
 		DAGName:         dagName,
 		SessionStore:    a.store,
 	})

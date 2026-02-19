@@ -36,20 +36,22 @@ type UserCapabilities struct {
 // systemPromptData contains all data for template rendering.
 type systemPromptData struct {
 	EnvironmentInfo
-	CurrentDAG *CurrentDAG
-	Memory     MemoryContent
-	User       *UserCapabilities
+	CurrentDAG      *CurrentDAG
+	Memory          MemoryContent
+	User            *UserCapabilities
+	AvailableSkills []SkillSummary
 }
 
 // GenerateSystemPrompt renders the system prompt template with the given environment,
-// optional DAG context, memory content, and user role capabilities.
-func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG, memory MemoryContent, role auth.Role) string {
+// optional DAG context, memory content, user role capabilities, and available skills.
+func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG, memory MemoryContent, role auth.Role, availableSkills []SkillSummary) string {
 	var buf bytes.Buffer
 	data := systemPromptData{
 		EnvironmentInfo: env,
 		CurrentDAG:      currentDAG,
 		Memory:          memory,
 		User:            buildUserCapabilities(role),
+		AvailableSkills: availableSkills,
 	}
 	if err := systemPromptTemplate.Execute(&buf, data); err != nil {
 		return fallbackPrompt(env)

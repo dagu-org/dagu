@@ -1,11 +1,21 @@
 package agent
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// stubSkillStore is a minimal SkillStore implementation for tests.
+type stubSkillStore struct{}
+
+func (s *stubSkillStore) Create(_ context.Context, _ *Skill) error      { return nil }
+func (s *stubSkillStore) GetByID(_ context.Context, _ string) (*Skill, error) { return nil, ErrSkillNotFound }
+func (s *stubSkillStore) List(_ context.Context) ([]*Skill, error)      { return nil, nil }
+func (s *stubSkillStore) Update(_ context.Context, _ *Skill) error      { return nil }
+func (s *stubSkillStore) Delete(_ context.Context, _ string) error      { return nil }
 
 func TestRegisteredTools_ContainsAllExpected(t *testing.T) {
 	t.Parallel()
@@ -13,7 +23,7 @@ func TestRegisteredTools_ContainsAllExpected(t *testing.T) {
 	expected := []string{
 		"bash", "read", "patch", "think",
 		"navigate", "read_schema", "ask_user",
-		"web_search", "delegate",
+		"web_search", "delegate", "use_skill",
 	}
 
 	regs := RegisteredTools()
@@ -67,7 +77,7 @@ func TestRegisteredTools_HaveMetadata(t *testing.T) {
 func TestRegisteredTools_FactoriesProduceValidTools(t *testing.T) {
 	t.Parallel()
 
-	cfg := ToolConfig{DAGsDir: "/tmp/test-dags"}
+	cfg := ToolConfig{DAGsDir: "/tmp/test-dags", SkillStore: &stubSkillStore{}}
 	for _, reg := range RegisteredTools() {
 		t.Run(reg.Name, func(t *testing.T) {
 			t.Parallel()
@@ -85,7 +95,7 @@ func TestRegisteredTools_FactoriesProduceValidTools(t *testing.T) {
 func TestCreateTools_UsesRegistry(t *testing.T) {
 	t.Parallel()
 
-	tools := CreateTools(ToolConfig{DAGsDir: "/tmp/dags"})
+	tools := CreateTools(ToolConfig{DAGsDir: "/tmp/dags", SkillStore: &stubSkillStore{}})
 	regs := RegisteredTools()
 
 	assert.Len(t, tools, len(regs), "CreateTools should produce one tool per registration")

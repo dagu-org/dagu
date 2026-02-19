@@ -6,11 +6,14 @@ import (
 )
 
 // CreateTools returns all registered agent tools, constructed with the given config.
+// Tools whose factory returns nil (e.g., when a required dependency is missing) are skipped.
 func CreateTools(cfg ToolConfig) []*AgentTool {
 	regs := RegisteredTools()
 	tools := make([]*AgentTool, 0, len(regs))
 	for _, reg := range regs {
-		tools = append(tools, reg.Factory(cfg))
+		if tool := reg.Factory(cfg); tool != nil {
+			tools = append(tools, tool)
+		}
 	}
 	return tools
 }

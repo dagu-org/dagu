@@ -41,6 +41,8 @@ type SessionManager struct {
 	outputCostPer1M float64
 	totalCost       float64
 	memoryStore     MemoryStore
+	skillStore      SkillStore
+	enabledSkills   []string
 	dagName         string
 	sessionStore    SessionStore
 	parentSessionID string
@@ -65,6 +67,8 @@ type SessionManagerConfig struct {
 	InputCostPer1M  float64
 	OutputCostPer1M float64
 	MemoryStore     MemoryStore
+	SkillStore      SkillStore
+	EnabledSkills   []string
 	DAGName         string
 	SessionStore    SessionStore
 	// ParentSessionID links this session to its parent (non-empty = sub-session).
@@ -110,6 +114,8 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		inputCostPer1M:  cfg.InputCostPer1M,
 		outputCostPer1M: cfg.OutputCostPer1M,
 		memoryStore:     cfg.MemoryStore,
+		skillStore:      cfg.SkillStore,
+		enabledSkills:   cfg.EnabledSkills,
 		dagName:         cfg.DAGName,
 		sessionStore:    cfg.SessionStore,
 		parentSessionID: cfg.ParentSessionID,
@@ -433,14 +439,20 @@ func (sm *SessionManager) ensureLoop(provider llm.Provider, modelID string, reso
 // createLoop creates a new Loop instance with the current configuration.
 func (sm *SessionManager) createLoop(provider llm.Provider, model string, history []llm.Message, safeMode bool) *Loop {
 	memory := sm.loadMemory()
+	allowedSkills := ToSkillSet(sm.enabledSkills)
+	skillSummaries := LoadSkillSummaries(context.Background(), sm.skillStore, sm.enabledSkills)
 	return NewLoop(LoopConfig{
-		Provider:         provider,
-		Model:            model,
-		History:          history,
-		Tools:            CreateTools(ToolConfig{DAGsDir: sm.environment.DAGsDir}),
+		Provider: provider,
+		Model:    model,
+		History:  history,
+		Tools: CreateTools(ToolConfig{
+			DAGsDir:       sm.environment.DAGsDir,
+			SkillStore:    sm.skillStore,
+			AllowedSkills: allowedSkills,
+		}),
 		RecordMessage:    sm.createRecordMessageFunc(),
 		Logger:           sm.logger,
-		SystemPrompt:     GenerateSystemPrompt(sm.environment, nil, memory, sm.user.Role),
+		SystemPrompt:     GenerateSystemPrompt(sm.environment, nil, memory, sm.user.Role, skillSummaries),
 		WorkingDir:       sm.workingDir,
 		SessionID:        sm.id,
 		OnWorking:        sm.SetWorking,
