@@ -100,7 +100,7 @@ func makeSearchSkillsRun(store SkillStore, allowedSkills map[string]struct{}) To
 			AllowedIDs: allowedSkills,
 		})
 		if err != nil {
-			return toolError("failed to list skills: %v", err)
+			return toolError("failed to search skills: %v", err)
 		}
 
 		if result.TotalCount == 0 {
