@@ -151,7 +151,7 @@ func TestLoad_Env(t *testing.T) {
 					RoleMapping:  OIDCRoleMapping{DefaultRole: "viewer"},
 				},
 				Builtin: AuthBuiltin{
-					Admin: AdminConfig{Username: "admin"},
+					Admin: AdminConfig{},
 					Token: TokenConfig{TTL: 24 * time.Hour},
 				},
 			},
@@ -391,7 +391,7 @@ scheduler:
 					RoleMapping:  OIDCRoleMapping{DefaultRole: "viewer"},
 				},
 				Builtin: AuthBuiltin{
-					Admin: AdminConfig{Username: "admin"},
+					Admin: AdminConfig{},
 					Token: TokenConfig{TTL: 24 * time.Hour},
 				},
 			},
