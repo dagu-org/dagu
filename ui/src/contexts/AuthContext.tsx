@@ -9,6 +9,11 @@ type User = {
   role: UserRole;
 };
 
+type SetupResult = {
+  token: string;
+  user: User;
+};
+
 type AuthContextType = {
   user: User | null;
   token: string | null;
@@ -18,6 +23,7 @@ type AuthContextType = {
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  completeSetup: (result: SetupResult) => void;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -124,6 +130,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   }, [config.apiURL]);
 
+  const completeSetup = useCallback((result: SetupResult) => {
+    localStorage.setItem(TOKEN_KEY, result.token);
+    setToken(result.token);
+    setUser(result.user);
+    setSetupRequired(false);
+  }, []);
+
   useEffect(() => {
     if (config.authMode === 'builtin') {
       refreshUser();
@@ -141,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         setupRequired,
         login,
+        completeSetup,
         logout,
         refreshUser,
       }}

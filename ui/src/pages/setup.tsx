@@ -9,7 +9,7 @@ import { AlertCircle, UserPlus } from 'lucide-react';
 
 export default function SetupPage() {
   const config = useConfig();
-  const { setupRequired } = useAuth();
+  const { setupRequired, completeSetup } = useAuth();
   const navigate = useNavigate();
 
   const [username, setUsername] = useState('');
@@ -62,7 +62,9 @@ export default function SetupPage() {
         throw new Error(data.message || 'Setup failed');
       }
 
-      navigate('/login?welcome=true', { replace: true });
+      const data = await response.json();
+      completeSetup({ token: data.token, user: data.user });
+      navigate('/', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Setup failed');
     } finally {
