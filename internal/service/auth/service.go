@@ -431,7 +431,7 @@ func (s *Service) EnsureAdminUser(ctx context.Context, username, password string
 		if updateErr := s.store.Update(ctx, existing); updateErr != nil {
 			return "", false, fmt.Errorf("failed to update admin user: %w", updateErr)
 		}
-		return "", false, nil
+		return generatedPassword, false, nil
 	}
 	if !errors.Is(err, auth.ErrUserNotFound) {
 		return "", false, fmt.Errorf("failed to check admin user: %w", err)

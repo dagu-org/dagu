@@ -4,13 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 )
 
 const (
@@ -44,8 +44,10 @@ func NewFile(dir string) *FileProvider {
 func (p *FileProvider) Resolve(_ context.Context) (auth.TokenSecret, error) {
 	path := filepath.Join(p.dir, secretFileName)
 
+	fileExists := false
 	data, err := os.ReadFile(path) //nolint:gosec // path is constructed from trusted config dir + constant filename
 	if err == nil {
+		fileExists = true
 		// File exists — check if it has usable content.
 		content := strings.TrimSpace(string(data))
 		if content != "" {
@@ -63,14 +65,32 @@ func (p *FileProvider) Resolve(_ context.Context) (auth.TokenSecret, error) {
 		return auth.TokenSecret{}, fmt.Errorf("failed to generate token secret: %w", err)
 	}
 
-	// Ensure directory exists.
+	// Ensure directory exists with correct permissions.
 	if err := os.MkdirAll(p.dir, dirPerm); err != nil {
 		return auth.TokenSecret{}, fmt.Errorf("failed to create auth directory %s: %w", p.dir, err)
 	}
+	if err := os.Chmod(p.dir, dirPerm); err != nil {
+		return auth.TokenSecret{}, fmt.Errorf("failed to set auth directory permissions %s: %w", p.dir, err)
+	}
 
-	// Persist atomically.
-	if err := fileutil.WriteFileAtomic(path, []byte(secret), filePerm); err != nil {
-		return auth.TokenSecret{}, fmt.Errorf("failed to write token secret file %s: %w", path, err)
+	if fileExists {
+		// File exists but is empty — safe to overwrite directly.
+		if err := os.WriteFile(path, []byte(secret), filePerm); err != nil { //nolint:gosec // path is constructed from trusted config dir + constant filename
+			return auth.TokenSecret{}, fmt.Errorf("failed to write token secret file %s: %w", path, err)
+		}
+	} else {
+		// File doesn't exist — use exclusive create to prevent race conditions.
+		// If another process created the file first, read their secret instead.
+		if err := writeExclusive(path, []byte(secret), filePerm); err != nil {
+			if errors.Is(err, os.ErrExist) {
+				data, readErr := os.ReadFile(path) //nolint:gosec // path is constructed from trusted config dir + constant filename
+				if readErr != nil {
+					return auth.TokenSecret{}, fmt.Errorf("failed to read token secret after race: %w", readErr)
+				}
+				return auth.NewTokenSecretFromString(strings.TrimSpace(string(data)))
+			}
+			return auth.TokenSecret{}, fmt.Errorf("failed to write token secret file %s: %w", path, err)
+		}
 	}
 
 	return auth.NewTokenSecretFromString(secret)
@@ -84,4 +104,40 @@ func generateSecret() (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(buf), nil
+}
+
+// writeExclusive atomically creates a file with content, failing if it already exists.
+// Writes to a temp file first, then hard-links to the target path. This ensures
+// that if the target file exists, it always contains complete content (no partial reads).
+// Returns os.ErrExist if the file already exists (another process won the race).
+func writeExclusive(path string, data []byte, perm os.FileMode) error {
+	// Write full content to a unique temp file in the same directory.
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".token_secret.*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer func() { _ = os.Remove(tmpPath) }() // Clean up temp file regardless.
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+
+	// Hard-link is atomic and fails if target exists, preventing race conditions.
+	if err := os.Link(tmpPath, path); err != nil {
+		if os.IsExist(err) {
+			return os.ErrExist
+		}
+		return err
+	}
+	return nil
 }

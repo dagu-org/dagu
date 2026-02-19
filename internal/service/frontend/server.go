@@ -331,7 +331,7 @@ type builtinAuthResult struct {
 // (auto-generating and persisting one if not configured).
 func initBuiltinAuthService(ctx context.Context, cfg *config.Config, collector *telemetry.Collector) (*builtinAuthResult, error) {
 	// Resolve token secret via provider chain
-	tokenSecret, err := buildTokenSecretProvider(cfg).Resolve(ctx)
+	tokenSecret, err := buildTokenSecretProvider(ctx, cfg).Resolve(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve token secret: %w", err)
 	}
@@ -399,13 +399,16 @@ func initBuiltinAuthService(ctx context.Context, cfg *config.Config, collector *
 
 // buildTokenSecretProvider constructs the token secret provider chain.
 // Priority: 1. Static from config/env, 2. File-based (auto-generate if missing).
-func buildTokenSecretProvider(cfg *config.Config) authmodel.TokenSecretProvider {
+func buildTokenSecretProvider(ctx context.Context, cfg *config.Config) authmodel.TokenSecretProvider {
 	var providers []authmodel.TokenSecretProvider
 
 	// Static provider from config/env (highest priority)
 	if cfg.Server.Auth.Builtin.Token.Secret != "" {
 		staticProvider, err := tokensecret.NewStatic(cfg.Server.Auth.Builtin.Token.Secret)
-		if err == nil {
+		if err != nil {
+			logger.Warn(ctx, "Invalid token secret from config, falling back to file-based secret",
+				tag.Error(err))
+		} else {
 			providers = append(providers, staticProvider)
 		}
 	}

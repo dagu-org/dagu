@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/auth/tokensecret"
@@ -97,5 +98,39 @@ func TestFileProvider(t *testing.T) {
 		info, err := os.Stat(authDir)
 		require.NoError(t, err)
 		assert.Equal(t, os.FileMode(0700), info.Mode().Perm())
+	})
+
+	t.Run("concurrent resolve converges to same secret", func(t *testing.T) {
+		dir := t.TempDir()
+		authDir := filepath.Join(dir, "auth")
+
+		const goroutines = 10
+		secrets := make([][]byte, goroutines)
+		errs := make([]error, goroutines)
+
+		var wg sync.WaitGroup
+		wg.Add(goroutines)
+		for i := range goroutines {
+			go func(idx int) {
+				defer wg.Done()
+				p := tokensecret.NewFile(authDir)
+				ts, err := p.Resolve(context.Background())
+				errs[idx] = err
+				if err == nil {
+					secrets[idx] = ts.SigningKey()
+				}
+			}(i)
+		}
+		wg.Wait()
+
+		// All goroutines should succeed.
+		for i, err := range errs {
+			require.NoError(t, err, "goroutine %d", i)
+		}
+
+		// All goroutines should converge to the same secret.
+		for i := 1; i < goroutines; i++ {
+			assert.Equal(t, secrets[0], secrets[i], "goroutine %d has different secret", i)
+		}
 	})
 }
