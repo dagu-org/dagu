@@ -37,10 +37,18 @@ const (
 	MessageTypeUserPrompt MessageType = "user_prompt"
 )
 
+// UIActionType identifies the type of UI action.
+type UIActionType string
+
+const (
+	// UIActionNavigate represents a navigation action.
+	UIActionNavigate UIActionType = "navigate"
+)
+
 // UIAction represents an action to be performed by the UI (e.g., navigate).
 type UIAction struct {
 	// Type is the action type (e.g., "navigate").
-	Type string `json:"type"`
+	Type UIActionType `json:"type"`
 	// Path is the target path for navigation actions.
 	Path string `json:"path,omitempty"`
 }
@@ -173,6 +181,28 @@ const (
 	DelegateEventCompleted DelegateEventType = "completed"
 )
 
+// DelegateStatus is a typed enum for delegate lifecycle state.
+type DelegateStatus string
+
+const (
+	// DelegateStatusRunning indicates a delegate sub-agent is currently running.
+	DelegateStatusRunning DelegateStatus = "running"
+	// DelegateStatusCompleted indicates a delegate sub-agent has completed.
+	DelegateStatusCompleted DelegateStatus = "completed"
+)
+
+// DelegateSnapshot tracks a sub-agent's lifecycle on the parent session.
+type DelegateSnapshot struct {
+	// ID is the sub-session ID.
+	ID string `json:"id"`
+	// Task is the delegate task description.
+	Task string `json:"task"`
+	// Status is the delegate's lifecycle state.
+	Status DelegateStatus `json:"status"`
+	// Cost is the sub-agent's accumulated cost in USD (set on completion).
+	Cost float64 `json:"cost,omitempty"`
+}
+
 // DelegateEvent notifies the parent SSE stream about delegate lifecycle changes.
 type DelegateEvent struct {
 	// Type is "started" or "completed".
@@ -205,6 +235,8 @@ type StreamResponse struct {
 	DelegateEvent *DelegateEvent `json:"delegate_event,omitempty"`
 	// DelegateMessages contains messages from a delegate piped through the parent SSE.
 	DelegateMessages *DelegateMessages `json:"delegate_messages,omitempty"`
+	// Delegates contains snapshots of all delegate sub-agents for state recovery.
+	Delegates []DelegateSnapshot `json:"delegates,omitempty"`
 }
 
 // DAGContext contains a DAG reference from the frontend.
@@ -269,6 +301,34 @@ type EmitUserPromptFunc func(prompt UserPrompt)
 // WaitUserResponseFunc blocks until user responds to a prompt.
 type WaitUserResponseFunc func(ctx context.Context, promptID string) (UserPromptResponse, error)
 
+// UserIdentity groups the authenticated user's identity fields.
+type UserIdentity struct {
+	// UserID is the authenticated user's ID.
+	UserID string
+	// Username is the authenticated user's display name.
+	Username string
+	// IPAddress is the client's IP address.
+	IPAddress string
+	// Role is the authenticated user's role.
+	Role auth.Role
+}
+
+// SubSessionRegistry manages sub-session lifecycle for delegate tools.
+// It consolidates the registration, notification, and cost tracking
+// callbacks that were previously separate function fields.
+type SubSessionRegistry interface {
+	// RegisterSubSession registers a sub-session's SessionManager for SSE streaming.
+	RegisterSubSession(id string, mgr *SessionManager)
+	// DeregisterSubSession removes a completed sub-session from the SSE registry.
+	DeregisterSubSession(id string)
+	// NotifyParent broadcasts an event to the parent session's SSE stream.
+	NotifyParent(event StreamResponse)
+	// AddCost adds a cost amount to the parent session's running total.
+	AddCost(cost float64)
+	// ParentSessionManager returns the parent session manager for delegate tracking.
+	ParentSessionManager() *SessionManager
+}
+
 // DelegateContext provides configuration for spawning sub-agent loops.
 type DelegateContext struct {
 	// Provider is the LLM provider for sub-agent calls.
@@ -287,16 +347,14 @@ type DelegateContext struct {
 	SessionStore SessionStore
 	// ParentID is the parent session ID.
 	ParentID string
-	// UserID is the user who owns the parent session.
-	UserID string
-	// RegisterSubSession registers a sub-session for SSE streaming. Nil if not available.
-	RegisterSubSession func(id string, mgr *SessionManager)
-	// NotifyParent broadcasts an event to the parent session's SSE stream. Nil if not available.
-	NotifyParent func(event StreamResponse)
-	// AddCost adds a cost amount to the parent session's running total. Nil if not available.
-	AddCost func(cost float64)
-	// DeregisterSubSession removes a completed sub-session from the SSE registry. Nil if not available.
-	DeregisterSubSession func(id string)
+	// User is the authenticated user's identity.
+	User UserIdentity
+	// Registry manages sub-session lifecycle. Nil if not available.
+	Registry SubSessionRegistry
+	// SkillStore provides skill loading for delegate skill pre-loading.
+	SkillStore SkillStore
+	// AllowedSkills restricts which skill IDs can be pre-loaded. Nil = all allowed.
+	AllowedSkills map[string]struct{}
 }
 
 // ToolContext provides context for tool execution.

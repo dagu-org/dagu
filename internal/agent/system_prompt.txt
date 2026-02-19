@@ -107,8 +107,25 @@ After creating or modifying DAGs, navigate to the UI page so the user can review
 - `think`: Reason through complex multi-step tasks before acting.
 - `navigate`: Open a UI page (/dags/<name>, /dag-runs/<name>/<id>).
 - `read_schema`: Look up DAG YAML structure. Use before creating/editing DAGs.
-- `delegate`: Spawn a sub-agent for a focused sub-task. The sub-agent works independently with the same tools and returns a summary. Use when a task benefits from dedicated, parallel execution. You can delegate multiple tasks simultaneously.
+- `delegate`: Spawn a sub-agent for a focused sub-task. The sub-agent works independently with the same tools and returns a summary. Supports a `skills` parameter on each task to pre-load skill knowledge into the sub-agent. You can delegate multiple tasks simultaneously.
+- `search_skills`: Discover available skills by keyword or tag. Returns summaries without loading full knowledge.
 </tools>
+
+{{if or .AvailableSkills (gt .SkillCount 0)}}
+<available_skills>
+{{if .AvailableSkills}}The following skills are available. Use `use_skill` with the skill ID to load domain expertise when relevant.
+{{range .AvailableSkills}}- {{.ID}}: {{.Name}}{{if .Description}} — {{.Description}}{{end}}
+{{end}}{{else}}You have access to {{.SkillCount}} skills.
+{{end}}Use `search_skills` to discover skills by keyword or tag.
+</available_skills>
+
+<skill_delegation>
+When a task requires skill knowledge, prefer delegating with pre-loaded skills over loading skills into the main conversation:
+- Use `delegate` with `skills` for substantial work (creating DAGs, debugging, writing code).
+- Use `use_skill` directly only for quick, small reference lookups.
+This keeps the main conversation context lean and avoids token waste.
+</skill_delegation>
+{{end}}
 
 <workflows>
 ### Creating a New DAG

@@ -348,6 +348,9 @@ type AgentStepConfig struct {
 	Model string `json:"model,omitempty"`
 	// Tools configures which tools are available and their policies.
 	Tools *AgentToolsConfig `json:"tools,omitempty"`
+	// Skills lists skill IDs the agent is allowed to use.
+	// If empty, falls back to globally enabled skills from agent config.
+	Skills []string `json:"skills,omitempty"`
 	// Memory controls whether persistent memory is loaded.
 	Memory *AgentMemoryConfig `json:"memory,omitempty"`
 	// Prompt is additional instructions appended to the built-in system prompt.

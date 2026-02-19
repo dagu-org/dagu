@@ -2,9 +2,6 @@ package agent
 
 import (
 	"errors"
-	"fmt"
-	"regexp"
-	"strings"
 )
 
 // Sentinel errors for model store operations.
@@ -131,61 +128,9 @@ func (m *ModelConfig) ToLLMConfig() LLMConfig {
 	}
 }
 
-// validModelIDRegexp matches a valid model ID slug: lowercase alphanumeric segments separated by hyphens.
-var validModelIDRegexp = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
-
-const maxModelIDLength = 128
-
 // ValidateModelID validates that id is a safe, well-formed model identifier.
-// It must be a non-empty slug (lowercase alphanumeric segments separated by hyphens)
-// and at most 128 characters. This prevents path traversal and other injection attacks.
 func ValidateModelID(id string) error {
-	if id == "" {
-		return ErrInvalidModelID
-	}
-	if len(id) > maxModelIDLength {
-		return fmt.Errorf("%w: exceeds maximum length of %d", ErrInvalidModelID, maxModelIDLength)
-	}
-	if !validModelIDRegexp.MatchString(id) {
-		return fmt.Errorf("%w: must match pattern [a-z0-9]+(-[a-z0-9]+)*", ErrInvalidModelID)
-	}
-	return nil
-}
-
-var slugRegexp = regexp.MustCompile(`[^a-z0-9]+`)
-
-// GenerateSlugID creates a URL-friendly slug from a name.
-// E.g., "Claude Opus 4.6" -> "claude-opus-4-6"
-func GenerateSlugID(name string) string {
-	s := strings.ToLower(strings.TrimSpace(name))
-	s = slugRegexp.ReplaceAllString(s, "-")
-	s = strings.Trim(s, "-")
-	return s
-}
-
-// maxSuffixLen reserves room for collision suffixes like "-999999999".
-const maxSuffixLen = 10
-
-// UniqueID generates a unique slug ID, appending "-2", "-3" etc. on collision.
-// The result is guaranteed to not exceed maxModelIDLength.
-func UniqueID(name string, existingIDs map[string]struct{}) string {
-	base := GenerateSlugID(name)
-	if base == "" {
-		base = "model"
-	}
-	if len(base) > maxModelIDLength-maxSuffixLen {
-		base = base[:maxModelIDLength-maxSuffixLen]
-	}
-	id := base
-	if _, exists := existingIDs[id]; !exists {
-		return id
-	}
-	for i := 2; ; i++ {
-		id = fmt.Sprintf("%s-%d", base, i)
-		if _, exists := existingIDs[id]; !exists {
-			return id
-		}
-	}
+	return validateSlugID(id, ErrInvalidModelID)
 }
 
 // MemoryContent holds loaded memory for system prompt injection.

@@ -174,7 +174,7 @@ func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject)
 		return nil, err
 	}
 
-	_, err := a.dagStore.GetMetadata(ctx, request.FileName)
+	_, err := a.dagStore.GetDetails(ctx, request.FileName, spec.WithAllowBuildErrors())
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,

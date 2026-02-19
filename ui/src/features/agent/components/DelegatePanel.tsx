@@ -2,6 +2,17 @@ import { ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useResizableDraggable } from '../hooks/useResizableDraggable';
+import {
+  ANIMATION_CLOSE_DURATION_MS,
+  ANIMATION_OPEN_DURATION_MS,
+  DELEGATE_PANEL_GAP,
+  DELEGATE_PANEL_HEIGHT,
+  DELEGATE_PANEL_MARGIN,
+  DELEGATE_PANEL_MIN_HEIGHT,
+  DELEGATE_PANEL_MIN_WIDTH,
+  DELEGATE_PANEL_WIDTH,
+  truncateTask,
+} from '../constants';
 import { Message } from '../types';
 import { ChatMessages } from './ChatMessages';
 import { ResizeHandles } from './ResizeHandles';
@@ -30,31 +41,26 @@ export function DelegatePanel({
   const [isClosing, setIsClosing] = useState(false);
 
   // Grid layout: flow from top-left, wrap at window edge
-  const PANEL_W = 320;
-  const PANEL_H = 360;
-  const GAP = 12;
-  const MARGIN = 16;
-  const cols = Math.max(1, Math.floor((window.innerWidth - MARGIN) / (PANEL_W + GAP)));
+  const cols = Math.max(1, Math.floor((window.innerWidth - DELEGATE_PANEL_MARGIN) / (DELEGATE_PANEL_WIDTH + DELEGATE_PANEL_GAP)));
   const row = Math.floor(index / cols);
   const col = index % cols;
-  const left = MARGIN + col * (PANEL_W + GAP);
-  const top = MARGIN + row * (PANEL_H + GAP);
+  const left = DELEGATE_PANEL_MARGIN + col * (DELEGATE_PANEL_WIDTH + DELEGATE_PANEL_GAP);
+  const top = DELEGATE_PANEL_MARGIN + row * (DELEGATE_PANEL_HEIGHT + DELEGATE_PANEL_GAP);
 
   const { bounds, dragHandlers, resizeHandlers } = useResizableDraggable({
-    defaultWidth: PANEL_W,
-    defaultHeight: PANEL_H,
-    defaultRight: Math.max(0, window.innerWidth - left - PANEL_W),
-    defaultBottom: Math.max(0, window.innerHeight - top - PANEL_H),
-    minWidth: 280,
-    minHeight: 200,
-    storageKey: `delegate-panel-${delegateId}`,
+    defaultWidth: DELEGATE_PANEL_WIDTH,
+    defaultHeight: DELEGATE_PANEL_HEIGHT,
+    defaultRight: Math.max(0, window.innerWidth - left - DELEGATE_PANEL_WIDTH),
+    defaultBottom: Math.max(0, window.innerHeight - top - DELEGATE_PANEL_HEIGHT),
+    minWidth: DELEGATE_PANEL_MIN_WIDTH,
+    minHeight: DELEGATE_PANEL_MIN_HEIGHT,
   });
 
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const handleClose = useCallback(() => {
     setIsClosing(true);
-    setTimeout(() => onCloseRef.current(), 250);
+    setTimeout(() => onCloseRef.current(), ANIMATION_CLOSE_DURATION_MS);
   }, []);
 
   // Auto-close with CRT animation when delegate finishes (running → completed)
@@ -68,7 +74,7 @@ export function DelegatePanel({
     }
   }, [status, handleClose]);
 
-  const truncatedTask = task.length > 40 ? task.slice(0, 40) + '...' : task;
+  const truncatedTask = truncateTask(task);
   const isRunning = status === 'running';
 
   return (
@@ -86,8 +92,8 @@ export function DelegatePanel({
         height: bounds.height,
         zIndex,
         animation: isClosing
-          ? 'agent-modal-out 250ms ease-in forwards'
-          : 'delegate-panel-in 250ms ease-out',
+          ? `agent-modal-out ${ANIMATION_CLOSE_DURATION_MS}ms ease-in forwards`
+          : `delegate-panel-in ${ANIMATION_OPEN_DURATION_MS}ms ease-out`,
       }}
       onMouseDown={onBringToFront}
     >

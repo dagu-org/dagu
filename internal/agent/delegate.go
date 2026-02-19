@@ -32,14 +32,17 @@ const (
 	// maxConcurrentDelegates is the maximum number of sub-agents that can run in parallel.
 	maxConcurrentDelegates = 8
 
-	// defaultDelegateMaxIterations is the default max iterations for a sub-agent.
-	defaultDelegateMaxIterations = 20
+	// taskSummaryTruncateLen is the max length for task text in result summaries.
+	taskSummaryTruncateLen = 60
+
+	// taskLogTruncateLen is the max length for task text in log context.
+	taskLogTruncateLen = 100
 )
 
 // delegateTask is a single sub-task within a batched delegate call.
 type delegateTask struct {
-	Task          string `json:"task"`
-	MaxIterations int    `json:"max_iterations,omitempty"`
+	Task   string   `json:"task"`
+	Skills []string `json:"skills,omitempty"`
 }
 
 // delegateInput is the parsed input for the delegate tool.
@@ -65,6 +68,7 @@ func NewDelegateTool() *AgentTool {
 				Description: fmt.Sprintf(
 					"Spawn sub-agents for focused sub-tasks. Each sub-agent works independently "+
 						"with the same tools and returns a summary. All tasks run in parallel. "+
+						"Use the 'skills' parameter on each task to pre-load skill knowledge into the sub-agent. "+
 						"Maximum %d tasks per call.",
 					maxConcurrentDelegates,
 				),
@@ -80,9 +84,11 @@ func NewDelegateTool() *AgentTool {
 										"type":        "string",
 										"description": "Description of the sub-task for the sub-agent to complete",
 									},
-									"max_iterations": map[string]any{
-										"type":        "integer",
-										"description": "Maximum number of tool-call rounds (default: 20)",
+									"skills": map[string]any{
+										"type":  "array",
+										"items": map[string]any{"type": "string"},
+										"description": "Optional skill IDs to pre-load into the sub-agent's context. " +
+											"The sub-agent starts with this knowledge already available, saving a round-trip.",
 									},
 								},
 								"required": []string{"task"},
@@ -112,6 +118,17 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 
 	if len(args.Tasks) == 0 {
 		return toolError("At least one task is required")
+	}
+
+	for _, t := range args.Tasks {
+		if strings.TrimSpace(t.Task) == "" {
+			return toolError("Task description cannot be empty")
+		}
+		for _, skillID := range t.Skills {
+			if strings.TrimSpace(skillID) == "" {
+				return toolError("Skill ID cannot be empty")
+			}
+		}
 	}
 
 	// Cap at maxConcurrentDelegates.
@@ -148,7 +165,7 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 
 	for i, r := range results {
 		delegateIDs = append(delegateIDs, r.DelegateID)
-		prefix := fmt.Sprintf("[%d] %s", i+1, truncate(tasks[i].Task, 60))
+		prefix := fmt.Sprintf("[%d] %s", i+1, truncate(tasks[i].Task, taskSummaryTruncateLen))
 		if r.IsError {
 			summaries = append(summaries, fmt.Sprintf("%s: ERROR: %s", prefix, r.Content))
 		} else {
@@ -173,23 +190,18 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 	dc := ctx.Delegate
 	delegateID := uuid.New().String()
 
-	maxIterations := defaultDelegateMaxIterations
-	if task.MaxIterations > 0 {
-		maxIterations = task.MaxIterations
-	}
-
 	logger := dc.Logger
 	if logger == nil {
 		logger = slog.Default()
 	}
-	logger = logger.With("delegate_id", delegateID, "task", truncate(task.Task, 100))
+	logger = logger.With("delegate_id", delegateID, "task", truncate(task.Task, taskLogTruncateLen))
 
 	// Persist sub-session in the store.
 	if dc.SessionStore != nil {
 		now := time.Now()
 		subSession := &Session{
 			ID:              delegateID,
-			UserID:          dc.UserID,
+			UserID:          dc.User.UserID,
 			ParentSessionID: dc.ParentID,
 			DelegateTask:    task.Task,
 			CreatedAt:       now,
@@ -215,7 +227,7 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 	// Create a sub-SessionManager for SSE streaming of the delegate's messages.
 	subMgr := NewSessionManager(SessionManagerConfig{
 		ID:              delegateID,
-		UserID:          dc.UserID,
+		User:            dc.User,
 		Logger:          logger,
 		WorkingDir:      ctx.WorkingDir,
 		OnMessage:       onMessage,
@@ -224,20 +236,45 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 	})
 
 	// Register sub-session for SSE streaming.
-	if dc.RegisterSubSession != nil {
-		dc.RegisterSubSession(delegateID, subMgr)
+	if dc.Registry != nil {
+		dc.Registry.RegisterSubSession(delegateID, subMgr)
 	}
 
 	// Forward delegate messages to parent SSE so the frontend doesn't need
 	// separate EventSource connections per delegate (browser limits ~6).
 	forwardToParent := func(msg Message) {
-		if dc.NotifyParent != nil {
-			dc.NotifyParent(StreamResponse{
+		if dc.Registry != nil {
+			dc.Registry.NotifyParent(StreamResponse{
 				DelegateMessages: &DelegateMessages{
 					DelegateID: delegateID,
 					Messages:   []Message{msg},
 				},
 			})
+		}
+	}
+
+	// Pre-load skill knowledge into the sub-agent's initial message.
+	userContent := task.Task
+	if len(task.Skills) > 0 && dc.SkillStore != nil {
+		var skillBlocks []string
+		for _, skillID := range task.Skills {
+			if dc.AllowedSkills != nil {
+				if _, ok := dc.AllowedSkills[skillID]; !ok {
+					logger.Warn("Delegate skill not allowed, skipping", "skill_id", skillID)
+					continue
+				}
+			}
+			skill, err := dc.SkillStore.GetByID(ctx.Context, skillID)
+			if err != nil {
+				logger.Warn("Failed to load delegate skill, skipping", "skill_id", skillID, "error", err)
+				continue
+			}
+			skillBlocks = append(skillBlocks, fmt.Sprintf(
+				"<skill name=%q id=%q>\n%s\n</skill>", skill.Name, skill.ID, skill.Knowledge,
+			))
+		}
+		if len(skillBlocks) > 0 {
+			userContent = strings.Join(skillBlocks, "\n\n") + "\n\nTask: " + task.Task
 		}
 	}
 
@@ -248,7 +285,7 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 	userMsg := Message{
 		ID:        uuid.New().String(),
 		Type:      MessageTypeUser,
-		Content:   task.Task,
+		Content:   userContent,
 		CreatedAt: time.Now(),
 	}
 	if err := subMgr.RecordExternalMessage(ctx.Context, userMsg); err != nil {
@@ -260,8 +297,9 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 	subMgr.SetWorking(true)
 
 	// Notify parent that delegate started.
-	if dc.NotifyParent != nil {
-		dc.NotifyParent(StreamResponse{
+	if dc.Registry != nil {
+		dc.Registry.ParentSessionManager().SetDelegateStarted(delegateID, task.Task)
+		dc.Registry.NotifyParent(StreamResponse{
 			DelegateEvent: &DelegateEvent{
 				Type:       DelegateEventStarted,
 				DelegateID: delegateID,
@@ -285,9 +323,7 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 	// Track last assistant content and errors for result extraction.
 	var lastAssistantContent string
 	var lastError string
-	iteration := 0
-
-	recordMessage := func(msgCtx context.Context, msg Message) error {
+	recordMessage := func(msgCtx context.Context, msg Message) {
 		if msg.Type == MessageTypeAssistant && msg.Content != "" {
 			lastAssistantContent = msg.Content
 		}
@@ -301,9 +337,11 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		if msg.ID == "" {
 			msg.ID = uuid.New().String()
 		}
-		err := subMgr.RecordExternalMessage(msgCtx, msg)
+		msg.SessionID = delegateID
+		if err := subMgr.RecordExternalMessage(msgCtx, msg); err != nil {
+			logger.Warn("Failed to record delegate message", "error", err)
+		}
 		forwardToParent(msg)
-		return err
 	}
 
 	loop := NewLoop(LoopConfig{
@@ -317,39 +355,34 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		SessionID:     delegateID,
 		Hooks:         dc.Hooks,
 		SafeMode:      ctx.SafeMode,
+		User:          dc.User,
 		OnWorking: func(working bool) {
 			subMgr.SetWorking(working)
 			if !working {
-				iteration++
-				if iteration >= maxIterations {
-					logger.Info("Sub-agent max iterations reached", "max", maxIterations)
-				}
-				// Cancel to terminate the child loop — only one round is queued per delegate.
 				cancelChild()
 			}
 		},
 	})
 
-	// Queue the task as a user message.
+	// Queue the task as a user message (with pre-loaded skill knowledge if any).
 	loop.QueueUserMessage(llm.Message{
 		Role:    llm.RoleUser,
-		Content: task.Task,
+		Content: userContent,
 	})
 
-	logger.Info("Starting sub-agent", "max_iterations", maxIterations)
+	logger.Info("Starting sub-agent")
 
 	// Run the child loop synchronously. It returns context.Canceled when we cancel it.
 	err := loop.Go(childCtx)
 
 	// Roll up sub-agent cost to parent session.
 	subCost := subMgr.GetTotalCost()
-	if dc.AddCost != nil {
-		dc.AddCost(subCost)
-	}
+	if dc.Registry != nil {
+		dc.Registry.AddCost(subCost)
 
-	// Notify parent that delegate completed.
-	if dc.NotifyParent != nil {
-		dc.NotifyParent(StreamResponse{
+		// Notify parent that delegate completed.
+		dc.Registry.ParentSessionManager().SetDelegateCompleted(delegateID, subCost)
+		dc.Registry.NotifyParent(StreamResponse{
 			DelegateEvent: &DelegateEvent{
 				Type:       DelegateEventCompleted,
 				DelegateID: delegateID,
@@ -357,11 +390,9 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 				Cost:       subCost,
 			},
 		})
-	}
 
-	// Deregister sub-session from SSE registry to prevent memory leaks.
-	if dc.DeregisterSubSession != nil {
-		dc.DeregisterSubSession(delegateID)
+		// Deregister sub-session from SSE registry to prevent memory leaks.
+		dc.Registry.DeregisterSubSession(delegateID)
 	}
 
 	if err != nil && !errors.Is(err, context.Canceled) {
@@ -374,7 +405,7 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		}
 	}
 
-	logger.Info("Sub-agent completed", "iterations", iteration)
+	logger.Info("Sub-agent completed")
 
 	// Check if the child loop captured an error (e.g., provider failure).
 	if lastAssistantContent == "" && lastError != "" {

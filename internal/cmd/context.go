@@ -27,6 +27,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
+	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
 	"github.com/dagu-org/dagu/internal/persis/filememory"
@@ -411,32 +412,79 @@ func (c *Context) dagStore(cfg dagStoreConfig) (exec.DAGStore, error) {
 	return store, nil
 }
 
-// agentStores creates the agent config, model, and memory stores from the config paths.
-// Returns typed stores for use in agent.Options.
+// agentStoresResult holds the agent stores created by agentStores().
+type agentStoresResult struct {
+	ConfigStore agent.ConfigStore
+	ModelStore  agent.ModelStore
+	MemoryStore agent.MemoryStore
+	SkillStore  agent.SkillStore
+}
+
+// agentStores creates the agent config, model, memory, and skill stores from the config paths.
 // Errors are logged as warnings; nil stores are returned if creation fails.
-func (c *Context) agentStores() (configStore agent.ConfigStore, modelStore agent.ModelStore, memoryStore agent.MemoryStore) {
+func (c *Context) agentStores() agentStoresResult {
+	var result agentStoresResult
+
 	acs, err := fileagentconfig.New(c.Config.Paths.DataDir)
 	if err != nil {
 		logger.Warn(c, "Failed to create agent config store", tag.Error(err))
-		return nil, nil, nil
+		return result
 	}
 	if acs == nil {
-		return nil, nil, nil
+		return result
 	}
+	result.ConfigStore = acs
 
 	ams, err := fileagentmodel.New(filepath.Join(c.Config.Paths.DataDir, "agent", "models"))
 	if err != nil {
 		logger.Warn(c, "Failed to create agent model store", tag.Error(err))
-		return acs, nil, nil
+		return result
 	}
+	result.ModelStore = ams
 
 	ms, err := filememory.New(c.Config.Paths.DAGsDir)
 	if err != nil {
 		logger.Warn(c, "Failed to create agent memory store", tag.Error(err))
-		return acs, ams, nil
+		return result
+	}
+	result.MemoryStore = ms
+
+	skillsDir := filepath.Join(c.Config.Paths.DAGsDir, "skills")
+	if fileagentskill.SeedExampleSkills(skillsDir) {
+		autoEnableExampleSkills(c, result.ConfigStore)
+	}
+	ss, err := fileagentskill.New(skillsDir)
+	if err != nil {
+		logger.Warn(c, "Failed to create agent skill store", tag.Error(err))
+		return result
+	}
+	result.SkillStore = ss
+
+	return result
+}
+
+// autoEnableExampleSkills adds example skill IDs to the agent config's enabled list.
+func autoEnableExampleSkills(ctx context.Context, configStore agent.ConfigStore) {
+	cfg, err := configStore.Load(ctx)
+	if err != nil {
+		logger.Warn(ctx, "Failed to load agent config for auto-enabling skills", tag.Error(err))
+		return
 	}
 
-	return acs, ams, ms
+	existing := make(map[string]struct{}, len(cfg.EnabledSkills))
+	for _, id := range cfg.EnabledSkills {
+		existing[id] = struct{}{}
+	}
+
+	for _, id := range fileagentskill.ExampleSkillIDs() {
+		if _, ok := existing[id]; !ok {
+			cfg.EnabledSkills = append(cfg.EnabledSkills, id)
+		}
+	}
+
+	if err := configStore.Save(ctx, cfg); err != nil {
+		logger.Warn(ctx, "Failed to auto-enable example skills", tag.Error(err))
+	}
 }
 
 // OpenLogFile creates and opens a log file for a given dag-run.

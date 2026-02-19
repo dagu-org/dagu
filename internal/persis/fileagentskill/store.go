@@ -14,6 +14,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/goccy/go-yaml"
 )
 
@@ -36,16 +37,29 @@ type skillFrontmatter struct {
 	Tags        []string `yaml:"tags,omitempty"`
 }
 
+// skillIndexEntry caches skill metadata in memory for fast search without file I/O.
+type skillIndexEntry struct {
+	dirPath       string
+	name          string
+	description   string
+	tags          []string
+	knowledgeSize int
+	version       string
+	author        string
+	skillType     agent.SkillType
+}
+
 // Store implements a file-based skill store.
 // Skills are stored as directories: {baseDir}/{id}/SKILL.md
 // Each SKILL.md contains YAML frontmatter (metadata) and a Markdown body (knowledge).
+// The in-memory index caches metadata for zero-I/O search operations.
 // Thread-safe through internal locking.
 type Store struct {
 	baseDir string
 
 	mu     sync.RWMutex
-	byID   map[string]string // skill ID -> directory path
-	byName map[string]string // skill name -> skill ID
+	byID   map[string]*skillIndexEntry // skill ID -> metadata + directory path
+	byName map[string]string           // skill name -> skill ID
 }
 
 // New creates a new file-based skill store.
@@ -57,7 +71,7 @@ func New(baseDir string) (*Store, error) {
 
 	store := &Store{
 		baseDir: baseDir,
-		byID:    make(map[string]string),
+		byID:    make(map[string]*skillIndexEntry),
 		byName:  make(map[string]string),
 	}
 
@@ -72,12 +86,12 @@ func New(baseDir string) (*Store, error) {
 	return store, nil
 }
 
-// rebuildIndex scans the directory and rebuilds the in-memory index.
+// rebuildIndex scans the directory and rebuilds the in-memory index with cached metadata.
 func (s *Store) rebuildIndex() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.byID = make(map[string]string)
+	s.byID = make(map[string]*skillIndexEntry)
 	s.byName = make(map[string]string)
 
 	entries, err := os.ReadDir(s.baseDir)
@@ -105,7 +119,16 @@ func (s *Store) rebuildIndex() error {
 			continue
 		}
 
-		s.byID[skill.ID] = dirPath
+		s.byID[skill.ID] = &skillIndexEntry{
+			dirPath:       dirPath,
+			name:          skill.Name,
+			description:   skill.Description,
+			tags:          skill.Tags,
+			knowledgeSize: len(skill.Knowledge),
+			version:       skill.Version,
+			author:        skill.Author,
+			skillType:     skill.Type,
+		}
 		if existingID, exists := s.byName[skill.Name]; exists {
 			slog.Warn("Duplicate skill name in store, last file wins",
 				slog.String("name", skill.Name),
@@ -130,19 +153,18 @@ func parseSkillFile(data []byte, id string) (*agent.Skill, error) {
 	// Find the closing ---
 	rest := content[4:] // skip opening "---\n"
 	closingIdx := strings.Index(rest, "\n---\n")
+	delimLen := 5 // len("\n---\n")
 	if closingIdx == -1 {
 		// Try ending with just "---" at end of file (no trailing newline after body)
 		closingIdx = strings.Index(rest, "\n---")
+		delimLen = 4 // len("\n---")
 		if closingIdx == -1 {
 			return nil, fmt.Errorf("missing closing frontmatter delimiter")
 		}
 	}
 
 	frontmatterStr := rest[:closingIdx]
-	// Body starts after the closing "\n---\n"
-	bodyStart := min(
-		// len("\n---\n")
-		closingIdx+5, len(rest))
+	bodyStart := min(closingIdx+delimLen, len(rest))
 	body := rest[bodyStart:]
 
 	var fm skillFrontmatter
@@ -264,27 +286,37 @@ func (s *Store) Create(_ context.Context, skill *agent.Skill) error {
 		return err
 	}
 
-	s.byID[skill.ID] = dirPath
+	s.byID[skill.ID] = &skillIndexEntry{
+		dirPath:       dirPath,
+		name:          skill.Name,
+		description:   skill.Description,
+		tags:          skill.Tags,
+		knowledgeSize: len(skill.Knowledge),
+		version:       skill.Version,
+		author:        skill.Author,
+		skillType:     skill.Type,
+	}
 	s.byName[skill.Name] = skill.ID
 
 	return nil
 }
 
 // GetByID retrieves a skill by its unique ID.
+// This reads the full skill file (including Knowledge) from disk.
 func (s *Store) GetByID(_ context.Context, id string) (*agent.Skill, error) {
 	if err := agent.ValidateSkillID(id); err != nil {
 		return nil, err
 	}
 
 	s.mu.RLock()
-	dirPath, exists := s.byID[id]
+	entry, exists := s.byID[id]
 	s.mu.RUnlock()
 
 	if !exists {
 		return nil, agent.ErrSkillNotFound
 	}
 
-	filePath := filepath.Join(dirPath, skillFilename)
+	filePath := filepath.Join(entry.dirPath, skillFilename)
 	skill, err := loadSkillFromFile(filePath, id)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -297,17 +329,18 @@ func (s *Store) GetByID(_ context.Context, id string) (*agent.Skill, error) {
 }
 
 // List returns all skills, sorted by name.
+// This reads full skill files from disk (including Knowledge).
 func (s *Store) List(_ context.Context) ([]*agent.Skill, error) {
 	s.mu.RLock()
 	entries := make([]struct {
 		id      string
 		dirPath string
 	}, 0, len(s.byID))
-	for id, dp := range s.byID {
+	for id, entry := range s.byID {
 		entries = append(entries, struct {
 			id      string
 			dirPath string
-		}{id, dp})
+		}{id, entry.dirPath})
 	}
 	s.mu.RUnlock()
 
@@ -331,6 +364,96 @@ func (s *Store) List(_ context.Context) ([]*agent.Skill, error) {
 	return skills, nil
 }
 
+// Search filters skills from the in-memory metadata cache with pagination.
+// This performs zero file I/O — all filtering is done against cached metadata.
+func (s *Store) Search(_ context.Context, opts agent.SearchSkillsOptions) (*exec.PaginatedResult[agent.SkillMetadata], error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	queryLower := strings.ToLower(opts.Query)
+
+	// Collect all matching entries from the cache.
+	var matched []agent.SkillMetadata
+	for id, entry := range s.byID {
+		if opts.AllowedIDs != nil {
+			if _, ok := opts.AllowedIDs[id]; !ok {
+				continue
+			}
+		}
+		if len(opts.Tags) > 0 && !hasAllTags(entry.tags, opts.Tags) {
+			continue
+		}
+		if queryLower != "" && !matchesEntry(entry, id, queryLower) {
+			continue
+		}
+		matched = append(matched, agent.SkillMetadata{
+			ID:            id,
+			Name:          entry.name,
+			Description:   entry.description,
+			Tags:          entry.tags,
+			KnowledgeSize: entry.knowledgeSize,
+			Version:       entry.version,
+			Author:        entry.author,
+			Type:          entry.skillType,
+		})
+	}
+
+	// Sort by name for deterministic pagination.
+	slices.SortFunc(matched, func(a, b agent.SkillMetadata) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	// Apply pagination.
+	total := len(matched)
+	pg := opts.Paginator
+	if pg.Limit() == 0 {
+		pg = exec.DefaultPaginator()
+	}
+	offset := pg.Offset()
+	limit := pg.Limit()
+	if offset > total {
+		offset = total
+	}
+	end := min(offset+limit, total)
+	page := matched[offset:end]
+
+	result := exec.NewPaginatedResult(page, total, pg)
+	return &result, nil
+}
+
+// hasAllTags returns true if skillTags contains all required tags (case-insensitive).
+func hasAllTags(skillTags, required []string) bool {
+	tagSet := make(map[string]struct{}, len(skillTags))
+	for _, t := range skillTags {
+		tagSet[strings.ToLower(t)] = struct{}{}
+	}
+	for _, req := range required {
+		if _, ok := tagSet[strings.ToLower(req)]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// matchesEntry checks if a cached skill entry matches a query against name, description, and tags.
+func matchesEntry(entry *skillIndexEntry, id, queryLower string) bool {
+	if strings.Contains(strings.ToLower(entry.name), queryLower) {
+		return true
+	}
+	if strings.Contains(strings.ToLower(entry.description), queryLower) {
+		return true
+	}
+	if strings.Contains(strings.ToLower(id), queryLower) {
+		return true
+	}
+	for _, tag := range entry.tags {
+		if strings.Contains(strings.ToLower(tag), queryLower) {
+			return true
+		}
+	}
+	return false
+}
+
 // Update modifies an existing skill.
 func (s *Store) Update(_ context.Context, skill *agent.Skill) error {
 	if skill == nil {
@@ -339,22 +462,25 @@ func (s *Store) Update(_ context.Context, skill *agent.Skill) error {
 	if err := agent.ValidateSkillID(skill.ID); err != nil {
 		return err
 	}
+	if skill.Name == "" {
+		return errors.New("fileagentskill: skill name is required")
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	dirPath, exists := s.byID[skill.ID]
+	entry, exists := s.byID[skill.ID]
 	if !exists {
 		return agent.ErrSkillNotFound
 	}
 
-	filePath := filepath.Join(dirPath, skillFilename)
+	filePath := filepath.Join(entry.dirPath, skillFilename)
 	existing, err := loadSkillFromFile(filePath, skill.ID)
 	if err != nil {
 		return fmt.Errorf("fileagentskill: failed to load existing skill: %w", err)
 	}
 
-	nameChanged := skill.Name != "" && existing.Name != skill.Name
+	nameChanged := existing.Name != skill.Name
 	if nameChanged {
 		if takenByID, taken := s.byName[skill.Name]; taken && takenByID != skill.ID {
 			return agent.ErrSkillNameAlreadyExists
@@ -364,6 +490,15 @@ func (s *Store) Update(_ context.Context, skill *agent.Skill) error {
 	if err := writeSkillToFile(filePath, skill); err != nil {
 		return err
 	}
+
+	// Update cached metadata.
+	entry.name = skill.Name
+	entry.description = skill.Description
+	entry.tags = skill.Tags
+	entry.knowledgeSize = len(skill.Knowledge)
+	entry.version = skill.Version
+	entry.author = skill.Author
+	entry.skillType = skill.Type
 
 	if nameChanged {
 		delete(s.byName, existing.Name)
@@ -382,24 +517,18 @@ func (s *Store) Delete(_ context.Context, id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	dirPath, exists := s.byID[id]
+	entry, exists := s.byID[id]
 	if !exists {
 		return agent.ErrSkillNotFound
 	}
 
-	if err := os.RemoveAll(dirPath); err != nil {
+	if err := os.RemoveAll(entry.dirPath); err != nil {
 		return fmt.Errorf("fileagentskill: failed to delete skill directory: %w", err)
 	}
 
+	// Clean up name index using cached metadata (no file I/O needed).
+	delete(s.byName, entry.name)
 	delete(s.byID, id)
-
-	// Clean up name index by reverse lookup.
-	for name, skillID := range s.byName {
-		if skillID == id {
-			delete(s.byName, name)
-			break
-		}
-	}
 
 	return nil
 }

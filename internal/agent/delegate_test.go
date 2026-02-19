@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -18,11 +18,6 @@ import (
 // singleTaskInput returns JSON for a batched delegate call with one task.
 func singleTaskInput(task string) json.RawMessage {
 	return json.RawMessage(fmt.Sprintf(`{"tasks": [{"task": %q}]}`, task))
-}
-
-// singleTaskInputWithIterations returns JSON for a batched delegate call with one task and max_iterations.
-func singleTaskInputWithIterations(task string, maxIter int) json.RawMessage {
-	return json.RawMessage(fmt.Sprintf(`{"tasks": [{"task": %q, "max_iterations": %d}]}`, task, maxIter))
 }
 
 func TestDelegateTool_NoDelegateContext(t *testing.T) {
@@ -62,9 +57,8 @@ func TestDelegateTool_EmptyTaskDescription(t *testing.T) {
 		},
 	}, json.RawMessage(`{"tasks": [{"task": ""}]}`))
 
-	// Empty task in array still runs but produces minimal result.
-	// The sub-agent receives an empty user message.
-	assert.False(t, result.IsError)
+	assert.True(t, result.IsError)
+	assert.Contains(t, result.Content, "Task description cannot be empty")
 }
 
 func TestDelegateTool_InvalidInput(t *testing.T) {
@@ -108,7 +102,6 @@ func TestDelegateTool_Schema(t *testing.T) {
 	itemProps, ok := items["properties"].(map[string]any)
 	require.True(t, ok)
 	assert.Contains(t, itemProps, "task")
-	assert.Contains(t, itemProps, "max_iterations")
 
 	required, ok := params["required"].([]string)
 	require.True(t, ok)
@@ -193,7 +186,7 @@ func TestDelegateTool_PersistsSubSession(t *testing.T) {
 			Tools:        []*AgentTool{},
 			SessionStore: store,
 			ParentID:     "parent-1",
-			UserID:       "user-1",
+			User:         UserIdentity{UserID: "user-1"},
 		},
 	}, singleTaskInput("analyze data"))
 
@@ -228,7 +221,7 @@ func TestDelegateTool_RecordsMessagesToSubSession(t *testing.T) {
 			Tools:        []*AgentTool{},
 			SessionStore: store,
 			ParentID:     "parent-1",
-			UserID:       "user-1",
+			User:         UserIdentity{UserID: "user-1"},
 		},
 	}, singleTaskInput("do stuff"))
 
@@ -306,7 +299,7 @@ func TestDelegateTool_MultipleTasks(t *testing.T) {
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
-			UserID:       "user-1",
+			User:         UserIdentity{UserID: "user-1"},
 		},
 	}, json.RawMessage(`{"tasks": [{"task": "task A"}, {"task": "task B"}, {"task": "task C"}]}`))
 
@@ -487,52 +480,6 @@ func TestDelegateTool_ChildHasNoDelegateTool(t *testing.T) {
 	}
 }
 
-func TestDelegateTool_MaxIterationsDefault(t *testing.T) {
-	t.Parallel()
-
-	var callCount atomic.Int32
-	provider := &mockLLMProvider{
-		chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
-			c := callCount.Add(1)
-			return &llm.ChatResponse{Content: fmt.Sprintf("iter %d", c), FinishReason: "stop"}, nil
-		},
-	}
-
-	tool := NewDelegateTool()
-	result := tool.Run(ToolContext{
-		Context:    context.Background(),
-		WorkingDir: t.TempDir(),
-		Delegate: &DelegateContext{
-			Provider: provider,
-			Model:    "test",
-			Tools:    []*AgentTool{},
-		},
-	}, singleTaskInput("iterate"))
-
-	assert.False(t, result.IsError)
-	assert.GreaterOrEqual(t, int(callCount.Load()), 1)
-}
-
-func TestDelegateTool_MaxIterationsCustom(t *testing.T) {
-	t.Parallel()
-
-	provider := newStopProvider("done")
-
-	tool := NewDelegateTool()
-	result := tool.Run(ToolContext{
-		Context:    context.Background(),
-		WorkingDir: t.TempDir(),
-		Delegate: &DelegateContext{
-			Provider: provider,
-			Model:    "test",
-			Tools:    []*AgentTool{},
-		},
-	}, singleTaskInputWithIterations("limited", 2))
-
-	assert.False(t, result.IsError)
-	assert.NotEmpty(t, result.Content)
-}
-
 func TestDelegateTool_ProviderError(t *testing.T) {
 	t.Parallel()
 
@@ -554,7 +501,7 @@ func TestDelegateTool_ProviderError(t *testing.T) {
 			Tools:        []*AgentTool{},
 			SessionStore: store,
 			ParentID:     "parent-1",
-			UserID:       "user-1",
+			User:         UserIdentity{UserID: "user-1"},
 		},
 	}, singleTaskInput("fail"))
 
@@ -605,9 +552,7 @@ func TestDelegateTool_ContextCancellation(t *testing.T) {
 func TestDelegateTool_RegistersSubSession(t *testing.T) {
 	t.Parallel()
 
-	var mu sync.Mutex
-	registrations := make(map[string]*SessionManager)
-
+	registry := newMockSubSessionRegistry()
 	provider := newStopProvider("sub result")
 	tool := NewDelegateTool()
 	result := tool.Run(ToolContext{
@@ -619,21 +564,17 @@ func TestDelegateTool_RegistersSubSession(t *testing.T) {
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
-			UserID:       "user-1",
-			RegisterSubSession: func(id string, mgr *SessionManager) {
-				mu.Lock()
-				registrations[id] = mgr
-				mu.Unlock()
-			},
+			User:         UserIdentity{UserID: "user-1"},
+			Registry:     registry,
 		},
 	}, singleTaskInput("register test"))
 
 	assert.False(t, result.IsError)
 	require.Len(t, result.DelegateIDs, 1)
 
-	mu.Lock()
-	defer mu.Unlock()
-	mgr, ok := registrations[result.DelegateIDs[0]]
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	mgr, ok := registry.registered[result.DelegateIDs[0]]
 	assert.True(t, ok)
 	assert.NotNil(t, mgr)
 }
@@ -641,9 +582,7 @@ func TestDelegateTool_RegistersSubSession(t *testing.T) {
 func TestDelegateTool_NotifiesParentStarted(t *testing.T) {
 	t.Parallel()
 
-	var mu sync.Mutex
-	var events []DelegateEvent
-
+	registry := newMockSubSessionRegistry()
 	provider := newStopProvider("sub result")
 	tool := NewDelegateTool()
 	result := tool.Run(ToolContext{
@@ -655,22 +594,22 @@ func TestDelegateTool_NotifiesParentStarted(t *testing.T) {
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
-			UserID:       "user-1",
-			NotifyParent: func(event StreamResponse) {
-				if event.DelegateEvent != nil {
-					mu.Lock()
-					events = append(events, *event.DelegateEvent)
-					mu.Unlock()
-				}
-			},
+			User:         UserIdentity{UserID: "user-1"},
+			Registry:     registry,
 		},
 	}, singleTaskInput("notify test"))
 
 	assert.False(t, result.IsError)
 	require.Len(t, result.DelegateIDs, 1)
 
-	mu.Lock()
-	defer mu.Unlock()
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	var events []DelegateEvent
+	for _, ev := range registry.events {
+		if ev.DelegateEvent != nil {
+			events = append(events, *ev.DelegateEvent)
+		}
+	}
 	require.GreaterOrEqual(t, len(events), 1)
 	assert.Equal(t, DelegateEventStarted, events[0].Type)
 	assert.Equal(t, result.DelegateIDs[0], events[0].DelegateID)
@@ -680,9 +619,7 @@ func TestDelegateTool_NotifiesParentStarted(t *testing.T) {
 func TestDelegateTool_NotifiesParentCompleted(t *testing.T) {
 	t.Parallel()
 
-	var mu sync.Mutex
-	var events []DelegateEvent
-
+	registry := newMockSubSessionRegistry()
 	provider := newStopProvider("done")
 	tool := NewDelegateTool()
 	result := tool.Run(ToolContext{
@@ -694,22 +631,22 @@ func TestDelegateTool_NotifiesParentCompleted(t *testing.T) {
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
-			UserID:       "user-1",
-			NotifyParent: func(event StreamResponse) {
-				if event.DelegateEvent != nil {
-					mu.Lock()
-					events = append(events, *event.DelegateEvent)
-					mu.Unlock()
-				}
-			},
+			User:         UserIdentity{UserID: "user-1"},
+			Registry:     registry,
 		},
 	}, singleTaskInput("complete test"))
 
 	assert.False(t, result.IsError)
 	require.Len(t, result.DelegateIDs, 1)
 
-	mu.Lock()
-	defer mu.Unlock()
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	var events []DelegateEvent
+	for _, ev := range registry.events {
+		if ev.DelegateEvent != nil {
+			events = append(events, *ev.DelegateEvent)
+		}
+	}
 	require.Len(t, events, 2) // started + completed
 	assert.Equal(t, DelegateEventStarted, events[0].Type)
 	assert.Equal(t, DelegateEventCompleted, events[1].Type)
@@ -721,9 +658,7 @@ func TestDelegateTool_NotifiesParentCompleted(t *testing.T) {
 func TestDelegateTool_MultipleTasksNotifications(t *testing.T) {
 	t.Parallel()
 
-	var mu sync.Mutex
-	var events []DelegateEvent
-
+	registry := newMockSubSessionRegistry()
 	provider := newStopProvider("done")
 	tool := NewDelegateTool()
 	result := tool.Run(ToolContext{
@@ -735,22 +670,22 @@ func TestDelegateTool_MultipleTasksNotifications(t *testing.T) {
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
-			UserID:       "user-1",
-			NotifyParent: func(event StreamResponse) {
-				if event.DelegateEvent != nil {
-					mu.Lock()
-					events = append(events, *event.DelegateEvent)
-					mu.Unlock()
-				}
-			},
+			User:         UserIdentity{UserID: "user-1"},
+			Registry:     registry,
 		},
 	}, json.RawMessage(`{"tasks": [{"task": "task A"}, {"task": "task B"}]}`))
 
 	assert.False(t, result.IsError)
 	require.Len(t, result.DelegateIDs, 2)
 
-	mu.Lock()
-	defer mu.Unlock()
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	var events []DelegateEvent
+	for _, ev := range registry.events {
+		if ev.DelegateEvent != nil {
+			events = append(events, *ev.DelegateEvent)
+		}
+	}
 	// 2 tasks × 2 events (started + completed) = 4 events
 	require.Len(t, events, 4)
 
@@ -771,9 +706,7 @@ func TestDelegateTool_MultipleTasksNotifications(t *testing.T) {
 func TestDelegateTool_CostRolledUpToParent(t *testing.T) {
 	t.Parallel()
 
-	var addedCost float64
-	var costMu sync.Mutex
-
+	registry := newMockSubSessionRegistry()
 	provider := newStopProvider("done")
 	tool := NewDelegateTool()
 	result := tool.Run(ToolContext{
@@ -785,28 +718,22 @@ func TestDelegateTool_CostRolledUpToParent(t *testing.T) {
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
-			UserID:       "user-1",
-			AddCost: func(cost float64) {
-				costMu.Lock()
-				addedCost += cost
-				costMu.Unlock()
-			},
+			User:         UserIdentity{UserID: "user-1"},
+			Registry:     registry,
 		},
 	}, singleTaskInput("cost test"))
 
 	assert.False(t, result.IsError)
 
-	costMu.Lock()
-	defer costMu.Unlock()
-	assert.GreaterOrEqual(t, addedCost, float64(0))
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	assert.GreaterOrEqual(t, registry.cost, float64(0))
 }
 
 func TestDelegateTool_SubSessionStreamable(t *testing.T) {
 	t.Parallel()
 
-	var mu sync.Mutex
-	managers := make(map[string]*SessionManager)
-
+	registry := newMockSubSessionRegistry()
 	provider := newStopProvider("streamed output")
 	tool := NewDelegateTool()
 	result := tool.Run(ToolContext{
@@ -818,21 +745,17 @@ func TestDelegateTool_SubSessionStreamable(t *testing.T) {
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
-			UserID:       "user-1",
-			RegisterSubSession: func(id string, mgr *SessionManager) {
-				mu.Lock()
-				managers[id] = mgr
-				mu.Unlock()
-			},
+			User:         UserIdentity{UserID: "user-1"},
+			Registry:     registry,
 		},
 	}, singleTaskInput("stream test"))
 
 	assert.False(t, result.IsError)
 	require.Len(t, result.DelegateIDs, 1)
 
-	mu.Lock()
-	registeredMgr := managers[result.DelegateIDs[0]]
-	mu.Unlock()
+	registry.mu.Lock()
+	registeredMgr := registry.registered[result.DelegateIDs[0]]
+	registry.mu.Unlock()
 	require.NotNil(t, registeredMgr)
 
 	msgs := registeredMgr.GetMessages()
@@ -851,9 +774,7 @@ func TestDelegateTool_SubSessionStreamable(t *testing.T) {
 func TestDelegateTool_SubSessionWorkingState(t *testing.T) {
 	t.Parallel()
 
-	var mu sync.Mutex
-	managers := make(map[string]*SessionManager)
-
+	registry := newMockSubSessionRegistry()
 	provider := newStopProvider("done")
 	tool := NewDelegateTool()
 	tool.Run(ToolContext{
@@ -865,19 +786,15 @@ func TestDelegateTool_SubSessionWorkingState(t *testing.T) {
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
-			UserID:       "user-1",
-			RegisterSubSession: func(id string, mgr *SessionManager) {
-				mu.Lock()
-				managers[id] = mgr
-				mu.Unlock()
-			},
+			User:         UserIdentity{UserID: "user-1"},
+			Registry:     registry,
 		},
 	}, singleTaskInput("working state test"))
 
-	mu.Lock()
-	defer mu.Unlock()
-	require.NotEmpty(t, managers)
-	for _, mgr := range managers {
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	require.NotEmpty(t, registry.registered)
+	for _, mgr := range registry.registered {
 		assert.False(t, mgr.IsWorking(), "sub-SessionManager should not be working after delegate completes")
 	}
 }
@@ -896,7 +813,7 @@ func TestDelegateTool_NoCallbacks(t *testing.T) {
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
-			UserID:       "user-1",
+			User:         UserIdentity{UserID: "user-1"},
 		},
 	}, singleTaskInput("no callbacks test"))
 
@@ -904,4 +821,346 @@ func TestDelegateTool_NoCallbacks(t *testing.T) {
 	assert.Contains(t, result.Content, "no callbacks result")
 	require.Len(t, result.DelegateIDs, 1)
 	assert.NotEmpty(t, result.DelegateIDs[0])
+}
+
+func TestDelegateTool_SubAgentHookUserAttribution(t *testing.T) {
+	t.Parallel()
+
+	// Set up hooks to capture ToolExecInfo from the child loop's tool execution.
+	hooks := NewHooks()
+	var mu sync.Mutex
+	var capturedInfos []ToolExecInfo
+
+	hooks.OnAfterToolExec(func(_ context.Context, info ToolExecInfo, _ ToolOut) {
+		mu.Lock()
+		capturedInfos = append(capturedInfos, info)
+		mu.Unlock()
+	})
+
+	// Provider: first call returns a tool call for "think", second call returns stop.
+	provider := newSequenceProvider(
+		&llm.ChatResponse{
+			FinishReason: "tool_calls",
+			ToolCalls: []llm.ToolCall{{
+				ID:   "call-1",
+				Type: "function",
+				Function: llm.ToolCallFunction{
+					Name:      "think",
+					Arguments: `{"thought": "sub-agent thinking"}`,
+				},
+			}},
+		},
+		&llm.ChatResponse{Content: "done", FinishReason: "stop"},
+	)
+
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:     provider,
+			Model:        "test",
+			Tools:        CreateTools(ToolConfig{}),
+			Hooks:        hooks,
+			SessionStore: newMockSessionStore(),
+			ParentID:     "parent-1",
+			User: UserIdentity{
+				UserID:    "user-42",
+				Username:  "bob",
+				IPAddress: "192.168.1.100",
+				Role:      auth.RoleManager,
+			},
+		},
+	}, singleTaskInput("test user attribution"))
+
+	assert.False(t, result.IsError)
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// The "think" tool should have been executed by the child loop.
+	require.NotEmpty(t, capturedInfos, "hook should have captured at least one tool execution")
+
+	var thinkInfo *ToolExecInfo
+	for i := range capturedInfos {
+		if capturedInfos[i].ToolName == "think" {
+			thinkInfo = &capturedInfos[i]
+			break
+		}
+	}
+	require.NotNil(t, thinkInfo, "should have captured 'think' tool execution")
+
+	assert.Equal(t, "user-42", thinkInfo.User.UserID)
+	assert.Equal(t, "bob", thinkInfo.User.Username)
+	assert.Equal(t, "192.168.1.100", thinkInfo.User.IPAddress)
+	assert.Equal(t, auth.RoleManager, thinkInfo.User.Role)
+}
+
+func TestDelegateTool_ForwardedMessagesHaveSessionID(t *testing.T) {
+	t.Parallel()
+
+	registry := newMockSubSessionRegistry()
+	store := newMockSessionStore()
+	provider := newStopProvider("sub output")
+
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:     provider,
+			Model:        "test",
+			Tools:        []*AgentTool{},
+			SessionStore: store,
+			ParentID:     "parent-1",
+			User:         UserIdentity{UserID: "user-1"},
+			Registry:     registry,
+		},
+	}, singleTaskInput("session id test"))
+
+	assert.False(t, result.IsError)
+	require.Len(t, result.DelegateIDs, 1)
+	delegateID := result.DelegateIDs[0]
+
+	// Check that registered sub-SessionManager has messages with the correct session ID.
+	registry.mu.Lock()
+	mgr := registry.registered[delegateID]
+	registry.mu.Unlock()
+	require.NotNil(t, mgr)
+
+	msgs := mgr.GetMessages()
+	require.NotEmpty(t, msgs)
+	for _, msg := range msgs {
+		assert.Equal(t, delegateID, msg.SessionID,
+			"forwarded message should have the delegate's session ID, got %q", msg.SessionID)
+	}
+}
+
+func TestDelegateTool_SubSessionHasUserContext(t *testing.T) {
+	t.Parallel()
+
+	registry := newMockSubSessionRegistry()
+	store := newMockSessionStore()
+	provider := newStopProvider("ok")
+
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:     provider,
+			Model:        "test",
+			Tools:        []*AgentTool{},
+			SessionStore: store,
+			ParentID:     "parent-1",
+			User: UserIdentity{
+				UserID:    "user-42",
+				Username:  "alice",
+				IPAddress: "10.0.0.1",
+				Role:      auth.RoleViewer,
+			},
+			Registry: registry,
+		},
+	}, singleTaskInput("user context test"))
+
+	assert.False(t, result.IsError)
+	require.Len(t, result.DelegateIDs, 1)
+
+	// The persisted sub-session should carry the parent's user ID.
+	store.mu.Lock()
+	sess, exists := store.sessions[result.DelegateIDs[0]]
+	store.mu.Unlock()
+	require.True(t, exists)
+	assert.Equal(t, "user-42", sess.UserID)
+}
+
+func TestDelegateTool_ParentTracksDelegate(t *testing.T) {
+	t.Parallel()
+
+	// Use a real SessionManager as the parent so SetDelegateStarted/Completed actually run.
+	parentMgr := NewSessionManager(SessionManagerConfig{
+		ID:   "parent-track",
+		User: UserIdentity{UserID: "user-1"},
+	})
+
+	// Create a registry that delegates to the real parent manager.
+	registry := &mockSubSessionRegistry{
+		registered: make(map[string]*SessionManager),
+		parent:     parentMgr,
+	}
+
+	provider := newStopProvider("tracked")
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:     provider,
+			Model:        "test",
+			Tools:        []*AgentTool{},
+			SessionStore: newMockSessionStore(),
+			ParentID:     "parent-track",
+			User:         UserIdentity{UserID: "user-1"},
+			Registry:     registry,
+		},
+	}, singleTaskInput("track delegate"))
+
+	assert.False(t, result.IsError)
+	require.Len(t, result.DelegateIDs, 1)
+
+	// The parent manager's delegates map should track this delegate as completed.
+	delegates := parentMgr.GetDelegates()
+	require.Len(t, delegates, 1)
+	assert.Equal(t, result.DelegateIDs[0], delegates[0].ID)
+	assert.Equal(t, DelegateStatusCompleted, delegates[0].Status)
+	assert.Equal(t, "track delegate", delegates[0].Task)
+}
+
+func TestDelegateTool_SkillsPreloaded(t *testing.T) {
+	t.Parallel()
+
+	var capturedReq *llm.ChatRequest
+	provider := &mockLLMProvider{
+		chatFunc: func(_ context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
+			capturedReq = req
+			return &llm.ChatResponse{Content: "done", FinishReason: "stop"}, nil
+		},
+	}
+
+	store := &testSkillStore{
+		skills: []*Skill{
+			{ID: "sql-expert", Name: "SQL Expert", Knowledge: "SELECT * FROM users;"},
+		},
+	}
+
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:   provider,
+			Model:      "test",
+			Tools:      []*AgentTool{},
+			SkillStore: store,
+		},
+	}, json.RawMessage(`{"tasks": [{"task": "write a query", "skills": ["sql-expert"]}]}`))
+
+	assert.False(t, result.IsError)
+	require.NotNil(t, capturedReq)
+
+	// The sub-agent's user message should contain pre-loaded skill knowledge.
+	require.NotEmpty(t, capturedReq.Messages)
+	var userContent string
+	for _, msg := range capturedReq.Messages {
+		if msg.Role == llm.RoleUser {
+			userContent = msg.Content
+		}
+	}
+	assert.Contains(t, userContent, `<skill name="SQL Expert" id="sql-expert">`)
+	assert.Contains(t, userContent, "SELECT * FROM users;")
+	assert.Contains(t, userContent, "Task: write a query")
+}
+
+func TestDelegateTool_SkillsNotFoundWarning(t *testing.T) {
+	t.Parallel()
+
+	provider := newStopProvider("done without skill")
+	store := &testSkillStore{skills: []*Skill{}}
+
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:   provider,
+			Model:      "test",
+			Tools:      []*AgentTool{},
+			SkillStore: store,
+		},
+	}, json.RawMessage(`{"tasks": [{"task": "do work", "skills": ["nonexistent"]}]}`))
+
+	// Should succeed — missing skills are warnings, not errors.
+	assert.False(t, result.IsError)
+	assert.Contains(t, result.Content, "done without skill")
+}
+
+func TestDelegateTool_SkillsNotAllowed(t *testing.T) {
+	t.Parallel()
+
+	var capturedReq *llm.ChatRequest
+	provider := &mockLLMProvider{
+		chatFunc: func(_ context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
+			capturedReq = req
+			return &llm.ChatResponse{Content: "done", FinishReason: "stop"}, nil
+		},
+	}
+
+	store := &testSkillStore{
+		skills: []*Skill{
+			{ID: "restricted-skill", Name: "Restricted", Knowledge: "secret knowledge"},
+		},
+	}
+
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:      provider,
+			Model:         "test",
+			Tools:         []*AgentTool{},
+			SkillStore:    store,
+			AllowedSkills: map[string]struct{}{"other-skill": {}},
+		},
+	}, json.RawMessage(`{"tasks": [{"task": "do work", "skills": ["restricted-skill"]}]}`))
+
+	assert.False(t, result.IsError)
+	require.NotNil(t, capturedReq)
+
+	// The sub-agent's user message should NOT contain the restricted skill.
+	var userContent string
+	for _, msg := range capturedReq.Messages {
+		if msg.Role == llm.RoleUser {
+			userContent = msg.Content
+		}
+	}
+	assert.NotContains(t, userContent, "secret knowledge")
+	assert.NotContains(t, userContent, "<skill")
+}
+
+func TestDelegateTool_EmptySkillIDRejected(t *testing.T) {
+	t.Parallel()
+
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:  context.Background(),
+		Delegate: &DelegateContext{},
+	}, json.RawMessage(`{"tasks": [{"task": "test", "skills": [""]}]}`))
+
+	assert.True(t, result.IsError)
+	assert.Contains(t, result.Content, "Skill ID cannot be empty")
+}
+
+func TestDelegateTool_Schema_IncludesSkills(t *testing.T) {
+	t.Parallel()
+
+	tool := NewDelegateTool()
+	params := tool.Function.Parameters
+
+	props, ok := params["properties"].(map[string]any)
+	require.True(t, ok)
+
+	tasksSchema, ok := props["tasks"].(map[string]any)
+	require.True(t, ok)
+
+	items, ok := tasksSchema["items"].(map[string]any)
+	require.True(t, ok)
+
+	itemProps, ok := items["properties"].(map[string]any)
+	require.True(t, ok)
+
+	assert.Contains(t, itemProps, "skills")
+	skillsSchema, ok := itemProps["skills"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "array", skillsSchema["type"])
 }

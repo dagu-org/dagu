@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/audit"
 )
 
@@ -42,8 +43,8 @@ var (
 	}
 )
 
-// ListAgentSkills returns all configured skills with enabled status. Requires admin role.
-func (a *API) ListAgentSkills(ctx context.Context, _ api.ListAgentSkillsRequestObject) (api.ListAgentSkillsResponseObject, error) {
+// ListAgentSkills returns paginated skills with optional search. Requires admin role.
+func (a *API) ListAgentSkills(ctx context.Context, request api.ListAgentSkillsRequestObject) (api.ListAgentSkillsResponseObject, error) {
 	if err := a.requireSkillManagement(); err != nil {
 		return nil, err
 	}
@@ -51,27 +52,33 @@ func (a *API) ListAgentSkills(ctx context.Context, _ api.ListAgentSkillsRequestO
 		return nil, err
 	}
 
-	skills, err := a.agentSkillStore.List(ctx)
+	pg := exec.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
+	tags := parseCommaSeparatedTags(request.Params.Tags)
+
+	result, err := a.agentSkillStore.Search(ctx, agent.SearchSkillsOptions{
+		Paginator: pg,
+		Query:     valueOf(request.Params.Q),
+		Tags:      tags,
+	})
 	if err != nil {
-		logger.Error(ctx, "Failed to list agent skills", tag.Error(err))
+		logger.Error(ctx, "Failed to search agent skills", tag.Error(err))
 		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to list skills", HTTPStatus: http.StatusInternalServerError}
 	}
 
-	cfg, err := a.agentConfigStore.Load(ctx)
+	enabledSkills, err := a.loadEnabledSkills(ctx)
 	if err != nil {
-		return nil, ErrFailedToLoadAgentConfig
-	}
-	var enabledSkills []string
-	if cfg != nil {
-		enabledSkills = cfg.EnabledSkills
+		return nil, err
 	}
 
-	skillResponses := make([]api.SkillResponse, 0, len(skills))
-	for _, s := range skills {
-		skillResponses = append(skillResponses, toSkillResponse(s, isSkillEnabled(enabledSkills, s.ID)))
+	skillResponses := make([]api.SkillResponse, 0, len(result.Items))
+	for _, m := range result.Items {
+		skillResponses = append(skillResponses, toSkillMetadataResponse(m, isSkillEnabled(enabledSkills, m.ID)))
 	}
 
-	return api.ListAgentSkills200JSONResponse{Skills: skillResponses}, nil
+	return api.ListAgentSkills200JSONResponse{
+		Skills:     skillResponses,
+		Pagination: toPagination(*result),
+	}, nil
 }
 
 // CreateAgentSkill creates a new skill. Requires admin role.
@@ -107,7 +114,7 @@ func (a *API) CreateAgentSkill(ctx context.Context, request api.CreateAgentSkill
 	id := valueOf(body.Id)
 	if id == "" {
 		existingIDs := a.collectSkillIDs(ctx)
-		id = agent.UniqueID(body.Name, existingIDs)
+		id = agent.UniqueID(body.Name, existingIDs, "skill")
 	}
 	if err := agent.ValidateSkillID(id); err != nil {
 		return nil, &Error{
@@ -172,13 +179,9 @@ func (a *API) GetAgentSkill(ctx context.Context, request api.GetAgentSkillReques
 		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to get skill", HTTPStatus: http.StatusInternalServerError}
 	}
 
-	cfg, err := a.agentConfigStore.Load(ctx)
+	enabledSkills, err := a.loadEnabledSkills(ctx)
 	if err != nil {
-		return nil, ErrFailedToLoadAgentConfig
-	}
-	var enabledSkills []string
-	if cfg != nil {
-		enabledSkills = cfg.EnabledSkills
+		return nil, err
 	}
 
 	return api.GetAgentSkill200JSONResponse(toSkillResponse(skill, isSkillEnabled(enabledSkills, skill.ID))), nil
@@ -221,13 +224,9 @@ func (a *API) UpdateAgentSkill(ctx context.Context, request api.UpdateAgentSkill
 		"skill_id": request.SkillId,
 	})
 
-	cfg, err := a.agentConfigStore.Load(ctx)
+	enabledSkills, err := a.loadEnabledSkills(ctx)
 	if err != nil {
-		return nil, ErrFailedToLoadAgentConfig
-	}
-	var enabledSkills []string
-	if cfg != nil {
-		enabledSkills = cfg.EnabledSkills
+		return nil, err
 	}
 
 	return api.UpdateAgentSkill200JSONResponse(toSkillResponse(existing, isSkillEnabled(enabledSkills, existing.ID))), nil
@@ -253,8 +252,11 @@ func (a *API) DeleteAgentSkill(ctx context.Context, request api.DeleteAgentSkill
 		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to delete skill", HTTPStatus: http.StatusInternalServerError}
 	}
 
-	// Remove from enabled skills if present
-	a.removeFromEnabledSkills(ctx, request.SkillId)
+	// Remove from enabled skills if present (best-effort).
+	if err := a.removeFromEnabledSkills(ctx, request.SkillId); err != nil {
+		logger.Warn(ctx, "Failed to remove skill from enabled list after deletion",
+			tag.Error(err), tag.String("skill_id", request.SkillId))
+	}
 
 	a.logAudit(ctx, audit.CategoryAgent, auditActionSkillDelete, map[string]any{
 		"skill_id": request.SkillId,
@@ -275,17 +277,15 @@ func (a *API) SetEnabledSkills(ctx context.Context, request api.SetEnabledSkills
 		return nil, ErrInvalidRequestBody
 	}
 
-	// Validate all skill IDs exist
+	// Validate all skill IDs exist using a single List call.
+	knownIDs := a.collectSkillIDs(ctx)
 	for _, id := range request.Body.SkillIds {
-		if _, err := a.agentSkillStore.GetByID(ctx, id); err != nil {
-			if errors.Is(err, agent.ErrSkillNotFound) || errors.Is(err, agent.ErrInvalidSkillID) {
-				return nil, &Error{
-					Code:       api.ErrorCodeBadRequest,
-					Message:    fmt.Sprintf("skill not found: %s", id),
-					HTTPStatus: http.StatusBadRequest,
-				}
+		if _, exists := knownIDs[id]; !exists {
+			return nil, &Error{
+				Code:       api.ErrorCodeBadRequest,
+				Message:    fmt.Sprintf("skill not found: %s", id),
+				HTTPStatus: http.StatusBadRequest,
 			}
-			return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to validate skill", HTTPStatus: http.StatusInternalServerError}
 		}
 	}
 
@@ -304,6 +304,17 @@ func (a *API) SetEnabledSkills(ctx context.Context, request api.SetEnabledSkills
 	})
 
 	return api.SetEnabledSkills200JSONResponse{EnabledSkills: cfg.EnabledSkills}, nil
+}
+
+func (a *API) loadEnabledSkills(ctx context.Context) ([]string, error) {
+	cfg, err := a.agentConfigStore.Load(ctx)
+	if err != nil {
+		return nil, ErrFailedToLoadAgentConfig
+	}
+	if cfg == nil {
+		return nil, nil
+	}
+	return cfg.EnabledSkills, nil
 }
 
 func (a *API) requireSkillManagement() error {
@@ -325,7 +336,20 @@ func toSkillResponse(skill *agent.Skill, enabled bool) api.SkillResponse {
 		Author:      ptrOf(skill.Author),
 		Tags:        ptrOf(skill.Tags),
 		Type:        api.SkillResponseType(skill.Type),
-		Knowledge:   skill.Knowledge,
+		Knowledge:   ptrOf(skill.Knowledge),
+		Enabled:     enabled,
+	}
+}
+
+func toSkillMetadataResponse(m agent.SkillMetadata, enabled bool) api.SkillResponse {
+	return api.SkillResponse{
+		Id:          m.ID,
+		Name:        m.Name,
+		Description: ptrOf(m.Description),
+		Version:     ptrOf(m.Version),
+		Author:      ptrOf(m.Author),
+		Tags:        ptrOf(m.Tags),
+		Type:        api.SkillResponseType(m.Type),
 		Enabled:     enabled,
 	}
 }
@@ -367,16 +391,20 @@ func isSkillEnabled(enabledSkills []string, skillID string) bool {
 	return slices.Contains(enabledSkills, skillID)
 }
 
-func (a *API) removeFromEnabledSkills(ctx context.Context, skillID string) {
+func (a *API) removeFromEnabledSkills(ctx context.Context, skillID string) error {
 	cfg, err := a.agentConfigStore.Load(ctx)
-	if err != nil || cfg == nil || !slices.Contains(cfg.EnabledSkills, skillID) {
-		return
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	if cfg == nil || !slices.Contains(cfg.EnabledSkills, skillID) {
+		return nil
 	}
 
 	cfg.EnabledSkills = slices.DeleteFunc(cfg.EnabledSkills, func(id string) bool {
 		return id == skillID
 	})
 	if err := a.agentConfigStore.Save(ctx, cfg); err != nil {
-		logger.Error(ctx, "Failed to update enabled skills after deletion", tag.Error(err))
+		return fmt.Errorf("save config: %w", err)
 	}
+	return nil
 }

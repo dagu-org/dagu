@@ -3,8 +3,8 @@ package agent
 import (
 	"context"
 	"errors"
-	"fmt"
-	"regexp"
+
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
 // Sentinel errors for skill store operations.
@@ -42,27 +42,77 @@ type SkillStore interface {
 	Create(ctx context.Context, skill *Skill) error
 	GetByID(ctx context.Context, id string) (*Skill, error)
 	List(ctx context.Context) ([]*Skill, error)
+	Search(ctx context.Context, opts SearchSkillsOptions) (*exec.PaginatedResult[SkillMetadata], error)
 	Update(ctx context.Context, skill *Skill) error
 	Delete(ctx context.Context, id string) error
 }
 
-// validSkillIDRegexp matches a valid skill ID slug: lowercase alphanumeric segments separated by hyphens.
-var validSkillIDRegexp = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+// SkillMetadata is a lightweight skill view excluding Knowledge.
+// Used for search results where loading full knowledge content is unnecessary.
+type SkillMetadata struct {
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	Description   string    `json:"description,omitempty"`
+	Tags          []string  `json:"tags,omitempty"`
+	KnowledgeSize int       `json:"knowledge_size"`
+	Version       string    `json:"version,omitempty"`
+	Author        string    `json:"author,omitempty"`
+	Type          SkillType `json:"type"`
+}
 
-const maxSkillIDLength = 128
+// SearchSkillsOptions configures a paginated skill search query.
+type SearchSkillsOptions struct {
+	Paginator  exec.Paginator      // page-based pagination (page=1, perPage=50 by default)
+	Query      string              // keyword filter (case-insensitive, matches name/description/tags)
+	Tags       []string            // require ALL specified tags (AND semantics)
+	AllowedIDs map[string]struct{} // nil = no restriction; non-nil = restrict to these IDs
+}
 
 // ValidateSkillID validates that id is a safe, well-formed skill identifier.
-// It must be a non-empty slug (lowercase alphanumeric segments separated by hyphens)
-// and at most 128 characters. This prevents path traversal and other injection attacks.
 func ValidateSkillID(id string) error {
-	if id == "" {
-		return ErrInvalidSkillID
+	return validateSlugID(id, ErrInvalidSkillID)
+}
+
+// SkillSummary contains lightweight skill metadata for system prompt listing.
+type SkillSummary struct {
+	ID          string
+	Name        string
+	Description string
+}
+
+// ToSkillSet converts a slice of skill IDs to a set for O(1) lookups.
+// Returns nil if the input is empty (meaning "all skills allowed").
+func ToSkillSet(ids []string) map[string]struct{} {
+	if len(ids) == 0 {
+		return nil
 	}
-	if len(id) > maxSkillIDLength {
-		return fmt.Errorf("%w: exceeds maximum length of %d", ErrInvalidSkillID, maxSkillIDLength)
+	set := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		set[id] = struct{}{}
 	}
-	if !validSkillIDRegexp.MatchString(id) {
-		return fmt.Errorf("%w: must match pattern [a-z0-9]+(-[a-z0-9]+)*", ErrInvalidSkillID)
+	return set
+}
+
+// LoadSkillSummaries returns metadata for the given skill IDs.
+// Unknown or inaccessible skills are silently skipped.
+func LoadSkillSummaries(ctx context.Context, store SkillStore, enabledIDs []string) []SkillSummary {
+	if store == nil || len(enabledIDs) == 0 {
+		return nil
 	}
-	return nil
+	summaries := make([]SkillSummary, 0, len(enabledIDs))
+	for _, id := range enabledIDs {
+		skill, err := store.GetByID(ctx, id)
+		if err != nil {
+			continue
+		}
+		summaries = append(summaries, SkillSummary{
+			ID:          skill.ID,
+			Name:        skill.Name,
+			Description: skill.Description,
+		})
+	}
+	if len(summaries) == 0 {
+		return nil
+	}
+	return summaries
 }

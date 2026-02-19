@@ -93,11 +93,16 @@ func (c *ProviderCache) InvalidateAll() {
 	c.cache = make(map[string]cachedProvider)
 }
 
-// evictIfFullLocked clears the cache when it reaches maxSize.
+// evictIfFullLocked evicts one random entry when the cache is full.
+// Uses Go's random map iteration order to avoid the thundering herd
+// problem that would occur from clearing all entries at once.
 // Must be called with c.mu held for writing.
 func (c *ProviderCache) evictIfFullLocked() {
 	if len(c.cache) >= c.maxSize {
-		c.cache = make(map[string]cachedProvider)
+		for k := range c.cache {
+			delete(c.cache, k)
+			break
+		}
 	}
 }
 

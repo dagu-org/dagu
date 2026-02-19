@@ -26,7 +26,7 @@ type agentTestSetup struct {
 func newAgentTestSetup(t *testing.T) *agentTestSetup {
 	t.Helper()
 
-	ms := &mockAgentModelStore{models: make(map[string]*agent.ModelConfig)}
+	ms := &mockAgentModelStore{models: make(map[string]*agent.ModelConfig), byName: make(map[string]string)}
 	cs := &mockAgentConfigStore{config: agent.DefaultConfig()}
 
 	cfg := &config.Config{}
@@ -56,13 +56,18 @@ func adminCtx() context.Context {
 
 type mockAgentModelStore struct {
 	models map[string]*agent.ModelConfig
+	byName map[string]string // name -> ID
 }
 
 func (m *mockAgentModelStore) Create(_ context.Context, model *agent.ModelConfig) error {
 	if _, exists := m.models[model.ID]; exists {
 		return agent.ErrModelAlreadyExists
 	}
+	if takenByID, exists := m.byName[model.Name]; exists && takenByID != model.ID {
+		return agent.ErrModelNameAlreadyExists
+	}
 	m.models[model.ID] = model
+	m.byName[model.Name] = model.ID
 	return nil
 }
 
@@ -84,19 +89,33 @@ func (m *mockAgentModelStore) List(_ context.Context) ([]*agent.ModelConfig, err
 }
 
 func (m *mockAgentModelStore) Update(_ context.Context, model *agent.ModelConfig) error {
-	if _, ok := m.models[model.ID]; !ok {
+	existing, ok := m.models[model.ID]
+	if !ok {
 		return agent.ErrModelNotFound
 	}
+	if takenByID, exists := m.byName[model.Name]; exists && takenByID != model.ID {
+		return agent.ErrModelNameAlreadyExists
+	}
+	delete(m.byName, existing.Name)
 	m.models[model.ID] = model
+	m.byName[model.Name] = model.ID
 	return nil
 }
 
 func (m *mockAgentModelStore) Delete(_ context.Context, id string) error {
-	if _, ok := m.models[id]; !ok {
+	model, ok := m.models[id]
+	if !ok {
 		return agent.ErrModelNotFound
 	}
+	delete(m.byName, model.Name)
 	delete(m.models, id)
 	return nil
+}
+
+// addModel is a test helper that populates both indexes.
+func (m *mockAgentModelStore) addModel(model *agent.ModelConfig) {
+	m.models[model.ID] = model
+	m.byName[model.Name] = model.ID
 }
 
 var _ agent.ModelStore = (*mockAgentModelStore)(nil)
@@ -127,12 +146,12 @@ func TestListAgentModels(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["model-1"] = &agent.ModelConfig{
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "model-1", Name: "Model 1", Provider: "openai", Model: "gpt-4",
-		}
-		setup.modelStore.models["model-2"] = &agent.ModelConfig{
+		})
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "model-2", Name: "Model 2", Provider: "anthropic", Model: "claude-sonnet-4-5",
-		}
+		})
 		setup.configStore.config.DefaultModelID = "model-1"
 
 		resp, err := setup.api.ListAgentModels(adminCtx(), apigen.ListAgentModelsRequestObject{})
@@ -259,14 +278,33 @@ func TestCreateAgentModel(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["test-model"] = &agent.ModelConfig{
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "test-model", Name: "Existing", Provider: "openai", Model: "gpt-4",
-		}
+		})
 
 		_, err := setup.api.CreateAgentModel(adminCtx(), apigen.CreateAgentModelRequestObject{
 			Body: &apigen.CreateModelConfigRequest{
 				Id:       new("test-model"),
 				Name:     "Duplicate",
+				Provider: "openai",
+				Model:    "gpt-4",
+			},
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("duplicate name returns 409", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+		setup.modelStore.addModel(&agent.ModelConfig{
+			ID: "existing-model", Name: "Taken Name", Provider: "openai", Model: "gpt-4",
+		})
+
+		_, err := setup.api.CreateAgentModel(adminCtx(), apigen.CreateAgentModelRequestObject{
+			Body: &apigen.CreateModelConfigRequest{
+				Id:       new("different-id"),
+				Name:     "Taken Name",
 				Provider: "openai",
 				Model:    "gpt-4",
 			},
@@ -311,9 +349,9 @@ func TestUpdateAgentModel(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["model-1"] = &agent.ModelConfig{
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "model-1", Name: "Original", Provider: "openai", Model: "gpt-4",
-		}
+		})
 
 		newName := "Updated Name"
 		resp, err := setup.api.UpdateAgentModel(adminCtx(), apigen.UpdateAgentModelRequestObject{
@@ -345,13 +383,34 @@ func TestUpdateAgentModel(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("name conflict returns 409", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+		setup.modelStore.addModel(&agent.ModelConfig{
+			ID: "model-1", Name: "First Model", Provider: "openai", Model: "gpt-4",
+		})
+		setup.modelStore.addModel(&agent.ModelConfig{
+			ID: "model-2", Name: "Second Model", Provider: "openai", Model: "gpt-4",
+		})
+
+		conflictName := "First Model"
+		_, err := setup.api.UpdateAgentModel(adminCtx(), apigen.UpdateAgentModelRequestObject{
+			ModelId: "model-2",
+			Body: &apigen.UpdateModelConfigRequest{
+				Name: &conflictName,
+			},
+		})
+		require.Error(t, err)
+	})
+
 	t.Run("invalid provider on update returns 400", func(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["model-1"] = &agent.ModelConfig{
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "model-1", Name: "Test", Provider: "openai", Model: "gpt-4",
-		}
+		})
 
 		badProvider := apigen.UpdateModelConfigRequestProvider("bad-provider")
 		_, err := setup.api.UpdateAgentModel(adminCtx(), apigen.UpdateAgentModelRequestObject{
@@ -371,9 +430,9 @@ func TestDeleteAgentModel(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["model-1"] = &agent.ModelConfig{
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "model-1", Name: "Delete Me", Provider: "openai", Model: "gpt-4",
-		}
+		})
 
 		resp, err := setup.api.DeleteAgentModel(adminCtx(), apigen.DeleteAgentModelRequestObject{
 			ModelId: "model-1",
@@ -402,12 +461,12 @@ func TestDeleteAgentModel(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["model-1"] = &agent.ModelConfig{
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "model-1", Name: "Default Model", Provider: "openai", Model: "gpt-4",
-		}
-		setup.modelStore.models["model-2"] = &agent.ModelConfig{
+		})
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "model-2", Name: "Backup Model", Provider: "openai", Model: "gpt-3.5",
-		}
+		})
 		setup.configStore.config.DefaultModelID = "model-1"
 
 		_, err := setup.api.DeleteAgentModel(adminCtx(), apigen.DeleteAgentModelRequestObject{
@@ -427,9 +486,9 @@ func TestSetDefaultAgentModel(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["model-1"] = &agent.ModelConfig{
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "model-1", Name: "Test", Provider: "openai", Model: "gpt-4",
-		}
+		})
 
 		resp, err := setup.api.SetDefaultAgentModel(adminCtx(), apigen.SetDefaultAgentModelRequestObject{
 			Body: &apigen.SetDefaultAgentModelJSONRequestBody{
@@ -489,10 +548,10 @@ func TestApplyModelUpdates(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["m1"] = &agent.ModelConfig{
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "m1", Name: "Original", Provider: "openai", Model: "gpt-4",
 			APIKey: "key1", BaseURL: "http://example.com",
-		}
+		})
 
 		// Update with all nil fields
 		resp, err := setup.api.UpdateAgentModel(adminCtx(), apigen.UpdateAgentModelRequestObject{
@@ -512,9 +571,9 @@ func TestApplyModelUpdates(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["m1"] = &agent.ModelConfig{
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "m1", Name: "Original", Provider: "openai", Model: "gpt-4",
-		}
+		})
 
 		emptyName := "  "
 		resp, err := setup.api.UpdateAgentModel(adminCtx(), apigen.UpdateAgentModelRequestObject{
@@ -534,9 +593,9 @@ func TestApplyModelUpdates(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["m1"] = &agent.ModelConfig{
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "m1", Name: "Test", Provider: "openai", Model: "gpt-4",
-		}
+		})
 
 		emptyModel := "  "
 		resp, err := setup.api.UpdateAgentModel(adminCtx(), apigen.UpdateAgentModelRequestObject{
@@ -556,9 +615,9 @@ func TestApplyModelUpdates(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["m1"] = &agent.ModelConfig{
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "m1", Name: "Original", Provider: "openai", Model: "gpt-4",
-		}
+		})
 
 		newName := "Updated"
 		newModel := "gpt-5"
@@ -646,12 +705,12 @@ func TestResetDefaultIfNeeded(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["model-a"] = &agent.ModelConfig{
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "model-a", Name: "A", Provider: "openai", Model: "gpt-4",
-		}
-		setup.modelStore.models["model-b"] = &agent.ModelConfig{
+		})
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "model-b", Name: "B", Provider: "openai", Model: "gpt-3.5",
-		}
+		})
 		setup.configStore.config.DefaultModelID = "model-a"
 
 		_, err := setup.api.DeleteAgentModel(adminCtx(), apigen.DeleteAgentModelRequestObject{
@@ -666,9 +725,9 @@ func TestResetDefaultIfNeeded(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["only-model"] = &agent.ModelConfig{
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "only-model", Name: "Only", Provider: "openai", Model: "gpt-4",
-		}
+		})
 		setup.configStore.config.DefaultModelID = "only-model"
 
 		_, err := setup.api.DeleteAgentModel(adminCtx(), apigen.DeleteAgentModelRequestObject{
@@ -683,12 +742,12 @@ func TestResetDefaultIfNeeded(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
-		setup.modelStore.models["model-a"] = &agent.ModelConfig{
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "model-a", Name: "A", Provider: "openai", Model: "gpt-4",
-		}
-		setup.modelStore.models["model-b"] = &agent.ModelConfig{
+		})
+		setup.modelStore.addModel(&agent.ModelConfig{
 			ID: "model-b", Name: "B", Provider: "openai", Model: "gpt-3.5",
-		}
+		})
 		setup.configStore.config.DefaultModelID = "model-b"
 
 		_, err := setup.api.DeleteAgentModel(adminCtx(), apigen.DeleteAgentModelRequestObject{

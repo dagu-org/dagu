@@ -35,7 +35,7 @@ export function useResizableDraggable(options: UseResizableDraggableOptions = {}
     defaultBottom = 64,
     minWidth = 320,
     minHeight = 400,
-    storageKey = 'agent-chat-modal-bounds',
+    storageKey,
   } = options;
 
   const [bounds, setBounds] = useState<Bounds>(() => {
@@ -43,7 +43,7 @@ export function useResizableDraggable(options: UseResizableDraggableOptions = {}
       return { right: defaultRight, bottom: defaultBottom, width: defaultWidth, height: defaultHeight };
     }
     try {
-      const stored = localStorage.getItem(storageKey);
+      const stored = storageKey ? localStorage.getItem(storageKey) : null;
       if (stored) {
         const parsed = JSON.parse(stored);
         // Validate bounds are within viewport
@@ -82,6 +82,7 @@ export function useResizableDraggable(options: UseResizableDraggableOptions = {}
   });
 
   const saveBounds = useCallback((b: Bounds) => {
+    if (!storageKey) return;
     try {
       localStorage.setItem(storageKey, JSON.stringify(b));
     } catch {

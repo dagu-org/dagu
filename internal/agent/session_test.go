@@ -31,7 +31,7 @@ func TestNewSessionManager(t *testing.T) {
 	t.Run("stores user ID", func(t *testing.T) {
 		t.Parallel()
 
-		sm := NewSessionManager(SessionManagerConfig{UserID: "user-123"})
+		sm := NewSessionManager(SessionManagerConfig{User: UserIdentity{UserID: "user-123"}})
 		assert.Equal(t, "user-123", sm.UserID())
 	})
 
@@ -213,8 +213,8 @@ func TestSessionManager_SubscribeWithSnapshot(t *testing.T) {
 		t.Parallel()
 
 		sm := NewSessionManager(SessionManagerConfig{
-			ID:     "test",
-			UserID: "user1",
+			ID:   "test",
+			User: UserIdentity{UserID: "user1"},
 			History: []Message{
 				{ID: "1", Content: "first"},
 			},
@@ -296,8 +296,8 @@ func TestSessionManager_GetSession(t *testing.T) {
 		t.Parallel()
 
 		sm := NewSessionManager(SessionManagerConfig{
-			ID:     "sess-123",
-			UserID: "user-456",
+			ID:   "sess-123",
+			User: UserIdentity{UserID: "user-456"},
 		})
 
 		sess := sm.GetSession()
@@ -467,8 +467,7 @@ func TestSessionManager_CostInRecordMessage(t *testing.T) {
 		})
 
 		recordFunc := sm.createRecordMessageFunc()
-		err := recordFunc(context.Background(), Message{Type: MessageTypeAssistant, Usage: testUsage})
-		require.NoError(t, err)
+		recordFunc(context.Background(), Message{Type: MessageTypeAssistant, Usage: testUsage})
 
 		assert.InDelta(t, expectedCostPerMsg, sm.GetTotalCost(), 1e-9)
 
@@ -485,8 +484,7 @@ func TestSessionManager_CostInRecordMessage(t *testing.T) {
 		sm := newPricedManager(nil)
 		recordFunc := sm.createRecordMessageFunc()
 
-		err := recordFunc(context.Background(), Message{Type: MessageTypeUser, Content: "hello"})
-		require.NoError(t, err)
+		recordFunc(context.Background(), Message{Type: MessageTypeUser, Content: "hello"})
 
 		assert.Equal(t, 0.0, sm.GetTotalCost())
 	})
@@ -498,7 +496,7 @@ func TestSessionManager_CostInRecordMessage(t *testing.T) {
 		recordFunc := sm.createRecordMessageFunc()
 
 		for range 3 {
-			_ = recordFunc(context.Background(), Message{
+			recordFunc(context.Background(), Message{
 				Type:  MessageTypeAssistant,
 				Usage: testUsage,
 			})
@@ -641,8 +639,8 @@ func TestSessionManager_RecordExternalMessage(t *testing.T) {
 	var persisted []Message
 
 	sm := NewSessionManager(SessionManagerConfig{
-		ID:     "ext-msg-test",
-		UserID: "user-1",
+		ID:   "ext-msg-test",
+		User: UserIdentity{UserID: "user-1"},
 		OnMessage: func(_ context.Context, msg Message) error {
 			mu.Lock()
 			persisted = append(persisted, msg)
@@ -690,8 +688,8 @@ func TestSessionManager_RecordExternalMessage_UpdatesLastActivity(t *testing.T) 
 	t.Parallel()
 
 	sm := NewSessionManager(SessionManagerConfig{
-		ID:     "activity-test",
-		UserID: "user-1",
+		ID:   "activity-test",
+		User: UserIdentity{UserID: "user-1"},
 	})
 
 	initialActivity := sm.LastActivity()
@@ -713,7 +711,7 @@ func TestSessionManager_GetSession_IncludesDelegateFields(t *testing.T) {
 
 	sm := NewSessionManager(SessionManagerConfig{
 		ID:              "delegate-sess",
-		UserID:          "user-1",
+		User:            UserIdentity{UserID: "user-1"},
 		ParentSessionID: "parent-123",
 		DelegateTask:    "analyze data",
 	})
@@ -724,4 +722,84 @@ func TestSessionManager_GetSession_IncludesDelegateFields(t *testing.T) {
 	assert.Equal(t, "user-1", sess.UserID)
 	assert.Equal(t, "parent-123", sess.ParentSessionID)
 	assert.Equal(t, "analyze data", sess.DelegateTask)
+}
+
+func TestSessionManager_DelegateSnapshot(t *testing.T) {
+	t.Parallel()
+
+	t.Run("GetDelegates returns nil initially", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "snap-test"})
+		assert.Nil(t, sm.GetDelegates())
+	})
+
+	t.Run("tracks started delegate", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "snap-test"})
+		sm.SetDelegateStarted("del-1", "task one")
+
+		delegates := sm.GetDelegates()
+		require.Len(t, delegates, 1)
+		assert.Equal(t, "del-1", delegates[0].ID)
+		assert.Equal(t, "task one", delegates[0].Task)
+		assert.Equal(t, DelegateStatusRunning, delegates[0].Status)
+	})
+
+	t.Run("tracks started then completed", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "snap-test"})
+		sm.SetDelegateStarted("del-1", "task one")
+		sm.SetDelegateCompleted("del-1", 0.05)
+
+		delegates := sm.GetDelegates()
+		require.Len(t, delegates, 1)
+		assert.Equal(t, DelegateStatusCompleted, delegates[0].Status)
+		assert.InDelta(t, 0.05, delegates[0].Cost, 1e-9)
+	})
+
+	t.Run("tracks multiple delegates", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "snap-test"})
+		sm.SetDelegateStarted("del-1", "task one")
+		sm.SetDelegateStarted("del-2", "task two")
+		sm.SetDelegateCompleted("del-1", 0.01)
+
+		delegates := sm.GetDelegates()
+		require.Len(t, delegates, 2)
+
+		byID := make(map[string]DelegateSnapshot)
+		for _, d := range delegates {
+			byID[d.ID] = d
+		}
+		assert.Equal(t, DelegateStatusCompleted, byID["del-1"].Status)
+		assert.Equal(t, DelegateStatusRunning, byID["del-2"].Status)
+	})
+}
+
+func TestSessionManager_SubscribeWithSnapshot_IncludesDelegates(t *testing.T) {
+	t.Parallel()
+
+	sm := NewSessionManager(SessionManagerConfig{
+		ID:   "snap-sub-test",
+		User: UserIdentity{UserID: "user1"},
+	})
+
+	sm.SetDelegateStarted("del-a", "analyze")
+	sm.SetDelegateCompleted("del-a", 0.02)
+	sm.SetDelegateStarted("del-b", "summarize")
+
+	ctx := t.Context()
+	snapshot, _ := sm.SubscribeWithSnapshot(ctx)
+
+	require.Len(t, snapshot.Delegates, 2)
+	byID := make(map[string]DelegateSnapshot)
+	for _, d := range snapshot.Delegates {
+		byID[d.ID] = d
+	}
+	assert.Equal(t, DelegateStatusCompleted, byID["del-a"].Status)
+	assert.Equal(t, DelegateStatusRunning, byID["del-b"].Status)
 }

@@ -238,6 +238,9 @@ func (s *Store) Update(_ context.Context, model *agent.ModelConfig) error {
 	if err := agent.ValidateModelID(model.ID); err != nil {
 		return err
 	}
+	if model.Name == "" {
+		return errors.New("fileagentmodel: model name is required")
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -252,10 +255,10 @@ func (s *Store) Update(_ context.Context, model *agent.ModelConfig) error {
 		return fmt.Errorf("fileagentmodel: failed to load existing model: %w", err)
 	}
 
-	nameChanged := model.Name != "" && existing.Name != model.Name
+	nameChanged := existing.Name != model.Name
 	if nameChanged {
 		if takenByID, taken := s.byName[model.Name]; taken && takenByID != model.ID {
-			return agent.ErrModelAlreadyExists
+			return agent.ErrModelNameAlreadyExists
 		}
 	}
 
@@ -285,17 +288,25 @@ func (s *Store) Delete(_ context.Context, id string) error {
 		return agent.ErrModelNotFound
 	}
 
+	// Load the model name before removing the file for direct index cleanup.
+	model, loadErr := loadModelFromFile(filePath)
+
 	if err := os.Remove(filePath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("fileagentmodel: failed to delete model file: %w", err)
 	}
 
 	delete(s.byID, id)
 
-	// Clean up name index by reverse lookup.
-	for name, modelID := range s.byName {
-		if modelID == id {
-			delete(s.byName, name)
-			break
+	// Clean up name index using the loaded model name (O(1) lookup).
+	if loadErr == nil {
+		delete(s.byName, model.Name)
+	} else {
+		// Fallback: scan byName to find and remove the entry pointing to this ID.
+		for name, mappedID := range s.byName {
+			if mappedID == id {
+				delete(s.byName, name)
+				break
+			}
 		}
 	}
 

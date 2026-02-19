@@ -155,11 +155,10 @@ func TestLoop_Go(t *testing.T) {
 		loop := NewLoop(LoopConfig{
 			Provider:  newStopProvider("response"),
 			SessionID: "conv-1",
-			RecordMessage: func(_ context.Context, msg Message) error {
+			RecordMessage: func(_ context.Context, msg Message) {
 				mu.Lock()
 				recordedMessages = append(recordedMessages, msg)
 				mu.Unlock()
-				return nil
 			},
 		})
 		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
@@ -374,11 +373,13 @@ func TestLoop_ExecuteTool(t *testing.T) {
 			Provider:  &mockLLMProvider{},
 			Tools:     CreateTools(ToolConfig{}),
 			SessionID: "conv-hook",
-			UserID:    "user-1",
-			Username:  "alice",
-			IPAddress: "10.0.0.1",
-			Role:      auth.RoleManager,
-			Hooks:     hooks,
+			User: UserIdentity{
+				UserID:    "user-1",
+				Username:  "alice",
+				IPAddress: "10.0.0.1",
+				Role:      auth.RoleManager,
+			},
+			Hooks: hooks,
 		})
 
 		result := loop.executeTool(context.Background(), llm.ToolCall{
@@ -393,10 +394,10 @@ func TestLoop_ExecuteTool(t *testing.T) {
 		assert.False(t, result.IsError)
 		assert.Equal(t, "think", capturedInfo.ToolName)
 		assert.Equal(t, "conv-hook", capturedInfo.SessionID)
-		assert.Equal(t, "user-1", capturedInfo.UserID)
-		assert.Equal(t, "alice", capturedInfo.Username)
-		assert.Equal(t, "10.0.0.1", capturedInfo.IPAddress)
-		assert.Equal(t, auth.RoleManager, capturedInfo.Role)
+		assert.Equal(t, "user-1", capturedInfo.User.UserID)
+		assert.Equal(t, "alice", capturedInfo.User.Username)
+		assert.Equal(t, "10.0.0.1", capturedInfo.User.IPAddress)
+		assert.Equal(t, auth.RoleManager, capturedInfo.User.Role)
 		assert.Equal(t, result.Content, capturedResult.Content)
 		// think tool has nil Audit (not audited)
 		assert.Nil(t, capturedInfo.Audit)
@@ -629,11 +630,10 @@ func TestLoop_ToolCallFlow(t *testing.T) {
 		Provider: provider,
 		Model:    "test",
 		Tools:    []*AgentTool{newEchoTool("echo")},
-		RecordMessage: func(_ context.Context, msg Message) error {
+		RecordMessage: func(_ context.Context, msg Message) {
 			mu.Lock()
 			recorded = append(recorded, msg)
 			mu.Unlock()
-			return nil
 		},
 	})
 
@@ -692,12 +692,12 @@ func TestLoop_DelegateToolIsolation(t *testing.T) {
 		Tools:        []*AgentTool{NewDelegateTool(), newEchoTool("echo")},
 		SessionID:    parentID,
 		SessionStore: store,
-		UserID:       "user1",
-		RecordMessage: func(_ context.Context, msg Message) error {
+		User:         UserIdentity{UserID: "user1"},
+		Registry:     newMockSubSessionRegistry(),
+		RecordMessage: func(_ context.Context, msg Message) {
 			mu.Lock()
 			parentMessages = append(parentMessages, msg)
 			mu.Unlock()
-			return nil
 		},
 	})
 
@@ -739,11 +739,9 @@ func TestLoop_RecordMessageError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	loop := NewLoop(LoopConfig{
-		Provider: provider,
-		Model:    "test",
-		RecordMessage: func(_ context.Context, _ Message) error {
-			return errors.New("storage failure")
-		},
+		Provider:      provider,
+		Model:         "test",
+		RecordMessage: func(_ context.Context, _ Message) {},
 	})
 
 	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
@@ -786,7 +784,8 @@ func TestLoop_BatchedDelegates(t *testing.T) {
 		Tools:        []*AgentTool{NewDelegateTool()},
 		SessionID:    parentID,
 		SessionStore: store,
-		UserID:       "user1",
+		User:         UserIdentity{UserID: "user1"},
+		Registry:     newMockSubSessionRegistry(),
 	})
 
 	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "do 3 things"})
@@ -847,7 +846,8 @@ func TestLoop_BatchedDelegateExceedsMax(t *testing.T) {
 		Tools:        []*AgentTool{NewDelegateTool()},
 		SessionID:    parentID,
 		SessionStore: store,
-		UserID:       "user1",
+		User:         UserIdentity{UserID: "user1"},
+		Registry:     newMockSubSessionRegistry(),
 	})
 
 	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "do 12 things"})
@@ -868,10 +868,10 @@ func TestLoop_BatchedDelegateExceedsMax(t *testing.T) {
 	assert.Equal(t, maxConcurrentDelegates, subCount, "should have exactly maxConcurrentDelegates sub-sessions")
 }
 
-func TestLoop_ExecuteTool_PassesSubSessionCallbacks(t *testing.T) {
+func TestLoop_ExecuteTool_PassesSubSessionRegistry(t *testing.T) {
 	t.Parallel()
 
-	var registerCalled, notifyCalled, addCostCalled atomic.Bool
+	registry := newMockSubSessionRegistry()
 
 	store := newMockSessionStore()
 	require.NoError(t, store.CreateSession(context.Background(), &Session{
@@ -902,16 +902,8 @@ func TestLoop_ExecuteTool_PassesSubSessionCallbacks(t *testing.T) {
 		Tools:        []*AgentTool{NewDelegateTool()},
 		SessionID:    "parent-cb",
 		SessionStore: store,
-		UserID:       "user1",
-		RegisterSubSession: func(id string, mgr *SessionManager) {
-			registerCalled.Store(true)
-		},
-		NotifyParent: func(event StreamResponse) {
-			notifyCalled.Store(true)
-		},
-		AddCost: func(cost float64) {
-			addCostCalled.Store(true)
-		},
+		User:         UserIdentity{UserID: "user1"},
+		Registry:     registry,
 		OnWorking: func(working bool) {
 			if !working {
 				cancel()
@@ -924,7 +916,133 @@ func TestLoop_ExecuteTool_PassesSubSessionCallbacks(t *testing.T) {
 	err := waitForLoopDone(ctx, cancel, loop, 15*time.Second)
 	assert.ErrorIs(t, err, context.Canceled)
 
-	assert.True(t, registerCalled.Load(), "RegisterSubSession callback should be called during delegate execution")
-	assert.True(t, notifyCalled.Load(), "NotifyParent callback should be called during delegate execution")
-	assert.True(t, addCostCalled.Load(), "AddCost callback should be called during delegate execution")
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	assert.NotEmpty(t, registry.registered, "RegisterSubSession should be called during delegate execution")
+	assert.NotEmpty(t, registry.events, "NotifyParent should be called during delegate execution")
+}
+
+func TestLoop_DelegateContextNilWhenNoRegistry(t *testing.T) {
+	t.Parallel()
+
+	// When registry is nil, the delegate tool should get no DelegateContext and return "not available".
+	provider := newSequenceProvider(
+		&llm.ChatResponse{
+			FinishReason: "tool_calls",
+			ToolCalls: []llm.ToolCall{{
+				ID:   "del-nil",
+				Type: "function",
+				Function: llm.ToolCallFunction{
+					Name:      "delegate",
+					Arguments: `{"tasks": [{"task": "no registry"}]}`,
+				},
+			}},
+		},
+		&llm.ChatResponse{Content: "recovered", FinishReason: "stop"},
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	loop := NewLoop(LoopConfig{
+		Provider: provider,
+		Model:    "test",
+		Tools:    []*AgentTool{NewDelegateTool()},
+		// No Registry set
+		OnWorking: func(working bool) {
+			if !working {
+				cancel()
+			}
+		},
+	})
+
+	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "try delegate"})
+
+	err := waitForLoopDone(ctx, cancel, loop, 10*time.Second)
+	assert.ErrorIs(t, err, context.Canceled)
+
+	// The loop should have recovered: the delegate tool returned an error, but the LLM responded with "recovered".
+	var history []llm.Message
+	loop.mu.Lock()
+	history = append(history, loop.history...)
+	loop.mu.Unlock()
+
+	var hasToolResult bool
+	for _, msg := range history {
+		if msg.Role == llm.RoleTool {
+			hasToolResult = true
+			assert.Contains(t, msg.Content, "not available",
+				"delegate tool result should indicate it's not available without a registry")
+		}
+	}
+	assert.True(t, hasToolResult, "loop should have a tool result in history")
+}
+
+func TestLoop_DelegateContextOnlyForDelegateTool(t *testing.T) {
+	t.Parallel()
+
+	// When registry IS set, non-delegate tools should still work normally.
+	registry := newMockSubSessionRegistry()
+
+	var mu sync.Mutex
+	var executedTools []string
+
+	thinkTool := &AgentTool{
+		Tool: llm.Tool{
+			Type: "function",
+			Function: llm.ToolFunction{
+				Name:        "think",
+				Description: "Think about something",
+				Parameters:  map[string]any{"type": "object", "properties": map[string]any{"thought": map[string]any{"type": "string"}}},
+			},
+		},
+		Run: func(_ ToolContext, _ json.RawMessage) ToolOut {
+			mu.Lock()
+			executedTools = append(executedTools, "think")
+			mu.Unlock()
+			return ToolOut{Content: "thought recorded"}
+		},
+	}
+
+	provider := newSequenceProvider(
+		&llm.ChatResponse{
+			FinishReason: "tool_calls",
+			ToolCalls: []llm.ToolCall{{
+				ID:   "think-1",
+				Type: "function",
+				Function: llm.ToolCallFunction{
+					Name:      "think",
+					Arguments: `{"thought": "testing non-delegate"}`,
+				},
+			}},
+		},
+		&llm.ChatResponse{Content: "done thinking", FinishReason: "stop"},
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	loop := NewLoop(LoopConfig{
+		Provider: provider,
+		Model:    "test",
+		Tools:    []*AgentTool{NewDelegateTool(), thinkTool},
+		Registry: registry,
+		OnWorking: func(working bool) {
+			if !working {
+				cancel()
+			}
+		},
+	})
+
+	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "think about it"})
+
+	err := waitForLoopDone(ctx, cancel, loop, 10*time.Second)
+	assert.ErrorIs(t, err, context.Canceled)
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Contains(t, executedTools, "think", "non-delegate tool should execute normally")
+
+	// No sub-sessions should have been registered since we only used the think tool.
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	assert.Empty(t, registry.registered, "no sub-sessions should be registered for non-delegate tools")
 }

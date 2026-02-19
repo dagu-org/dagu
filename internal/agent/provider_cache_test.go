@@ -234,7 +234,7 @@ func TestProviderCache_Eviction(t *testing.T) {
 	assert.Equal(t, 3, len(cache.cache), "cache should have 3 entries at capacity")
 	cache.mu.RUnlock()
 
-	// Adding a 4th entry should trigger eviction (cache clears when full).
+	// Adding a 4th entry should trigger eviction (one random entry removed, then new one added).
 	extraCfg := LLMConfig{Provider: "p", Model: "m4", APIKey: "k"}
 	cache.Set(extraCfg, &mockLLMProvider{name: "m4"})
 
@@ -242,10 +242,10 @@ func TestProviderCache_Eviction(t *testing.T) {
 	size := len(cache.cache)
 	cache.mu.RUnlock()
 
-	// After eviction the cache is cleared, then the new entry is added.
-	assert.Equal(t, 1, size, "cache should have 1 entry after eviction clears everything")
+	// After single-entry eviction: 3 - 1 + 1 = 3.
+	assert.Equal(t, 3, size, "cache should have 3 entries after single-entry eviction")
 
-	// The surviving entry should be the one just added.
+	// The newly added entry should always be present.
 	p, model, err := cache.GetOrCreate(extraCfg)
 	require.NoError(t, err)
 	assert.Equal(t, "m4", model)

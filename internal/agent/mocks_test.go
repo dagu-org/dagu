@@ -329,6 +329,23 @@ func (m *mockSessionStore) GetLatestSequenceID(_ context.Context, sessionID stri
 	return maxSeq, nil
 }
 
+func (m *mockSessionStore) ListSubSessions(_ context.Context, parentSessionID string) ([]*Session, error) {
+	if parentSessionID == "" {
+		return nil, ErrInvalidSessionID
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var result []*Session
+	for _, sess := range m.sessions {
+		if sess.ParentSessionID == parentSessionID {
+			result = append(result, sess)
+		}
+	}
+	return result, nil
+}
+
 // HasSession checks if a session exists without returning an error.
 func (m *mockSessionStore) HasSession(id string) bool {
 	m.mu.Lock()
@@ -426,6 +443,63 @@ func newSequenceProvider(responses ...*llm.ChatResponse) *mockLLMProvider {
 		},
 	}
 }
+
+// mockSubSessionRegistry implements SubSessionRegistry for testing.
+type mockSubSessionRegistry struct {
+	mu           sync.Mutex
+	registered   map[string]*SessionManager
+	deregistered []string
+	events       []StreamResponse
+	cost         float64
+	parent       *SessionManager
+}
+
+func newMockSubSessionRegistry() *mockSubSessionRegistry {
+	return &mockSubSessionRegistry{
+		registered: make(map[string]*SessionManager),
+		parent:     newMinimalSessionManager(),
+	}
+}
+
+// newMinimalSessionManager creates a SessionManager with minimum fields for testing.
+func newMinimalSessionManager() *SessionManager {
+	return NewSessionManager(SessionManagerConfig{
+		ID:   "test-parent",
+		User: UserIdentity{UserID: "test-user"},
+	})
+}
+
+func (r *mockSubSessionRegistry) RegisterSubSession(id string, mgr *SessionManager) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.registered[id] = mgr
+}
+
+func (r *mockSubSessionRegistry) DeregisterSubSession(id string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.deregistered = append(r.deregistered, id)
+}
+
+func (r *mockSubSessionRegistry) NotifyParent(event StreamResponse) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.events = append(r.events, event)
+}
+
+func (r *mockSubSessionRegistry) AddCost(cost float64) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.cost += cost
+}
+
+func (r *mockSubSessionRegistry) ParentSessionManager() *SessionManager {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.parent
+}
+
+var _ SubSessionRegistry = (*mockSubSessionRegistry)(nil)
 
 // testAPIWithModels creates an API instance pre-configured with the given model configs
 // and mock providers already cached. Returns the API and model store for further customization.

@@ -109,8 +109,27 @@ func (e *Executor) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to create LLM provider: %w", err)
 	}
 
+	// Resolve skill store and allowed skills.
+	skillStore := agent.GetSkillStore(ctx)
+	enabledSkills := resolveEnabledSkills(stepCfg, agentCfg)
+	allowedSkills := agent.ToSkillSet(enabledSkills)
+	skillCount := len(enabledSkills)
+	var skillSummaries []agent.SkillSummary
+	if skillCount > 0 && skillCount <= agent.SkillListThreshold {
+		skillSummaries = agent.LoadSkillSummaries(ctx, skillStore, enabledSkills)
+	}
+
+	// Warn about skills referenced in config but missing from the store.
+	if skillStore != nil {
+		for _, id := range enabledSkills {
+			if _, err := skillStore.GetByID(ctx, id); err != nil {
+				logf(stderr, "Warning: skill %q referenced in agent.skills not found in store", id)
+			}
+		}
+	}
+
 	// Build tools filtered by global policy (exclude navigate and ask_user; add output tool).
-	tools := buildTools(dagCtx, stepCfg, globalPolicy, stdout)
+	tools := buildTools(dagCtx, stepCfg, globalPolicy, skillStore, allowedSkills, stdout)
 
 	// Load memory content if enabled.
 	var memoryContent agent.MemoryContent
@@ -125,7 +144,7 @@ func (e *Executor) Run(ctx context.Context) error {
 	}
 
 	// Generate system prompt.
-	systemPrompt := buildSystemPrompt(dagCtx, stepCfg, memoryContent)
+	systemPrompt := buildSystemPrompt(dagCtx, stepCfg, memoryContent, skillSummaries, skillCount)
 
 	// Resolve safe mode and max iterations.
 	safeMode := true
@@ -170,16 +189,17 @@ func (e *Executor) Run(ctx context.Context) error {
 	iteration := 0
 
 	loop := agent.NewLoop(agent.LoopConfig{
-		Provider:     provider,
-		Model:        modelCfg.Model,
-		Tools:        tools,
-		SystemPrompt: systemPrompt,
-		SafeMode:     safeMode,
-		Hooks:        hooks,
-		Logger:       slog.Default(),
-		RecordMessage: func(_ context.Context, msg agent.Message) error {
+		Provider:      provider,
+		Model:         modelCfg.Model,
+		Tools:         tools,
+		SystemPrompt:  systemPrompt,
+		SafeMode:      safeMode,
+		Hooks:         hooks,
+		Logger:        slog.Default(),
+		SkillStore:    skillStore,
+		AllowedSkills: allowedSkills,
+		RecordMessage: func(_ context.Context, msg agent.Message) {
 			logMessage(stderr, msg)
-			return nil
 		},
 		OnWorking: func(working bool) {
 			if !working {
@@ -210,7 +230,7 @@ func (e *Executor) Run(ctx context.Context) error {
 
 // buildTools creates the tool list for the agent step.
 // Tools are filtered first by global policy, then by step-level config.
-func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy agent.ToolPolicyConfig, stdout io.Writer) []*agent.AgentTool {
+func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy agent.ToolPolicyConfig, skillStore agent.SkillStore, allowedSkills map[string]struct{}, stdout io.Writer) []*agent.AgentTool {
 	dagsDir := ""
 	if dagCtx.DAG != nil {
 		dagsDir = dagCtx.DAG.Location
@@ -225,6 +245,10 @@ func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy
 		"read_schema": agent.NewReadSchemaTool(),
 		"web_search":  agent.NewWebSearchTool(),
 		"output":      agent.NewOutputTool(stdout),
+	}
+	if skillStore != nil {
+		allTools["use_skill"] = agent.NewUseSkillTool(skillStore, allowedSkills)
+		allTools["search_skills"] = agent.NewSearchSkillsTool(skillStore, allowedSkills)
 	}
 
 	// Remove tools disabled by global policy (output is step-only, always kept).
@@ -258,7 +282,7 @@ func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy
 }
 
 // buildSystemPrompt generates the system prompt for the agent step.
-func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memory agent.MemoryContent) string {
+func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memory agent.MemoryContent, availableSkills []agent.SkillSummary, skillCount int) string {
 	env := agent.EnvironmentInfo{}
 	if dagCtx.DAG != nil {
 		env.DAGsDir = dagCtx.DAG.Location
@@ -271,7 +295,7 @@ func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memor
 		}
 	}
 
-	prompt := agent.GenerateSystemPrompt(env, currentDAG, memory, "")
+	prompt := agent.GenerateSystemPrompt(env, currentDAG, memory, "", availableSkills, skillCount)
 
 	// Append instruction about the output tool.
 	prompt += "\n\n## Output\n\nWhen you have completed your task, use the `output` tool to write your final result. " +
@@ -298,6 +322,18 @@ func loadMemoryContent(ctx context.Context, store agent.MemoryStore, dagName str
 		DAGName:      dagName,
 		MemoryDir:    store.MemoryDir(),
 	}
+}
+
+// resolveEnabledSkills returns the skill IDs the agent is allowed to use.
+// Step-level skills override global; if neither is set, returns nil (no skills).
+func resolveEnabledSkills(stepCfg *core.AgentStepConfig, agentCfg *agent.Config) []string {
+	if stepCfg != nil && len(stepCfg.Skills) > 0 {
+		return stepCfg.Skills
+	}
+	if agentCfg != nil {
+		return agentCfg.EnabledSkills
+	}
+	return nil
 }
 
 // mergeStepBashPolicy merges step-level bash policy over the resolved global policy.
@@ -351,6 +387,11 @@ func logf(w io.Writer, format string, args ...any) {
 	fmt.Fprintf(w, "[agent] %s\n", msg)
 }
 
+const (
+	toolCallArgsTruncateLen     = 200
+	assistantContentTruncateLen = 500
+)
+
 // logMessage writes a structured log entry for an agent message.
 func logMessage(w io.Writer, msg agent.Message) {
 	switch msg.Type {
@@ -358,16 +399,16 @@ func logMessage(w io.Writer, msg agent.Message) {
 		if len(msg.ToolCalls) > 0 {
 			for _, tc := range msg.ToolCalls {
 				args := tc.Function.Arguments
-				if len(args) > 200 {
-					args = args[:200] + "..."
+				if len(args) > toolCallArgsTruncateLen {
+					args = args[:toolCallArgsTruncateLen] + "..."
 				}
 				logf(w, "Tool call: %s %s", tc.Function.Name, args)
 			}
 		}
 		if msg.Content != "" {
 			content := msg.Content
-			if len(content) > 500 {
-				content = content[:500] + "..."
+			if len(content) > assistantContentTruncateLen {
+				content = content[:assistantContentTruncateLen] + "..."
 			}
 			logf(w, "Assistant: %s", strings.ReplaceAll(content, "\n", " "))
 		}

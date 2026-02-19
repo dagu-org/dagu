@@ -6,7 +6,7 @@ export type MessageType =
   | 'ui_action'
   | 'user_prompt';
 
-export type UIActionType = 'navigate' | 'refresh';
+export type UIActionType = 'navigate';
 
 export interface UIAction {
   type: UIActionType;
@@ -23,7 +23,7 @@ export interface ToolCall {
 }
 
 export interface ToolResult {
-  tool_use_id: string;
+  tool_call_id: string;
   content: string;
   is_error?: boolean;
 }
@@ -108,9 +108,15 @@ export interface DAGContext {
   dag_run_id?: string;
 }
 
+// Delegate status type shared across event and snapshot types
+export type DelegateStatus = 'running' | 'completed';
+
+// Delegate event type values sent by the backend ("started" | "completed")
+export type DelegateEventType = 'started' | 'completed';
+
 // Delegate event types
 export interface DelegateEvent {
-  type: 'started' | 'completed';
+  type: DelegateEventType;
   delegate_id: string;
   task: string;
   cost?: number;
@@ -119,7 +125,7 @@ export interface DelegateEvent {
 export interface DelegateInfo {
   id: string;
   task: string;
-  status: 'running' | 'completed';
+  status: DelegateStatus;
   zIndex: number;
   positionIndex: number;
 }
@@ -129,12 +135,21 @@ export interface DelegateMessages {
   messages: Message[];
 }
 
+// DelegateSnapshot is returned by the backend for state recovery on reconnect/reload.
+export interface DelegateSnapshot {
+  id: string;
+  task: string;
+  status: DelegateStatus;
+  cost?: number;
+}
+
 export interface StreamResponse {
   messages?: Message[];
   session?: Session;
   session_state?: SessionState;
   delegate_event?: DelegateEvent;
   delegate_messages?: DelegateMessages;
+  delegates?: DelegateSnapshot[];
 }
 
 // Tool input types for specialized viewers

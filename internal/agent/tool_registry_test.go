@@ -13,7 +13,8 @@ func TestRegisteredTools_ContainsAllExpected(t *testing.T) {
 	expected := []string{
 		"bash", "read", "patch", "think",
 		"navigate", "read_schema", "ask_user",
-		"web_search", "delegate",
+		"web_search", "delegate", "use_skill",
+		"search_skills",
 	}
 
 	regs := RegisteredTools()
@@ -67,7 +68,7 @@ func TestRegisteredTools_HaveMetadata(t *testing.T) {
 func TestRegisteredTools_FactoriesProduceValidTools(t *testing.T) {
 	t.Parallel()
 
-	cfg := ToolConfig{DAGsDir: "/tmp/test-dags"}
+	cfg := ToolConfig{DAGsDir: "/tmp/test-dags", SkillStore: &testSkillStore{}}
 	for _, reg := range RegisteredTools() {
 		t.Run(reg.Name, func(t *testing.T) {
 			t.Parallel()
@@ -85,7 +86,7 @@ func TestRegisteredTools_FactoriesProduceValidTools(t *testing.T) {
 func TestCreateTools_UsesRegistry(t *testing.T) {
 	t.Parallel()
 
-	tools := CreateTools(ToolConfig{DAGsDir: "/tmp/dags"})
+	tools := CreateTools(ToolConfig{DAGsDir: "/tmp/dags", SkillStore: &testSkillStore{}})
 	regs := RegisteredTools()
 
 	assert.Len(t, tools, len(regs), "CreateTools should produce one tool per registration")

@@ -57,7 +57,11 @@ func (a *API) ListAgentModels(ctx context.Context, _ api.ListAgentModelsRequestO
 		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to list models", HTTPStatus: http.StatusInternalServerError}
 	}
 
-	cfg, _ := a.agentConfigStore.Load(ctx)
+	cfg, err := a.agentConfigStore.Load(ctx)
+	if err != nil {
+		logger.Error(ctx, "Failed to load agent config", tag.Error(err))
+		return nil, ErrFailedToLoadAgentConfig
+	}
 	defaultModelID := ""
 	if cfg != nil {
 		defaultModelID = cfg.DefaultModelID
@@ -97,7 +101,7 @@ func (a *API) CreateAgentModel(ctx context.Context, request api.CreateAgentModel
 	id := valueOf(body.Id)
 	if id == "" {
 		existingIDs := a.collectModelIDs(ctx)
-		id = agent.UniqueID(body.Name, existingIDs)
+		id = agent.UniqueID(body.Name, existingIDs, "model")
 	}
 	if err := agent.ValidateModelID(id); err != nil {
 		return nil, &Error{
@@ -138,7 +142,7 @@ func (a *API) CreateAgentModel(ctx context.Context, request api.CreateAgentModel
 	}
 
 	if err := a.agentModelStore.Create(ctx, model); err != nil {
-		if errors.Is(err, agent.ErrModelAlreadyExists) {
+		if errors.Is(err, agent.ErrModelAlreadyExists) || errors.Is(err, agent.ErrModelNameAlreadyExists) {
 			return nil, errModelAlreadyExists
 		}
 		logger.Error(ctx, "Failed to create agent model", tag.Error(err))
@@ -189,7 +193,7 @@ func (a *API) UpdateAgentModel(ctx context.Context, request api.UpdateAgentModel
 	applyModelUpdates(existing, body)
 
 	if err := a.agentModelStore.Update(ctx, existing); err != nil {
-		if errors.Is(err, agent.ErrModelAlreadyExists) {
+		if errors.Is(err, agent.ErrModelAlreadyExists) || errors.Is(err, agent.ErrModelNameAlreadyExists) {
 			return nil, errModelAlreadyExists
 		}
 		logger.Error(ctx, "Failed to update agent model", tag.Error(err))
@@ -254,6 +258,7 @@ func (a *API) SetDefaultAgentModel(ctx context.Context, request api.SetDefaultAg
 
 	cfg, err := a.agentConfigStore.Load(ctx)
 	if err != nil {
+		logger.Error(ctx, "Failed to load agent config", tag.Error(err))
 		return nil, ErrFailedToLoadAgentConfig
 	}
 
