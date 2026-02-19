@@ -108,11 +108,13 @@ After creating or modifying DAGs, navigate to the UI page so the user can review
 - `navigate`: Open a UI page (/dags/<name>, /dag-runs/<name>/<id>).
 - `read_schema`: Look up DAG YAML structure. Use before creating/editing DAGs.
 - `delegate`: Spawn a sub-agent for a focused sub-task. The sub-agent works independently with the same tools and returns a summary. Use when a task benefits from dedicated, parallel execution. You can delegate multiple tasks simultaneously.
+- `search_skills`: Discover available skills by keyword or tag. Returns summaries without loading full knowledge.
 </tools>
 
 {{if .AvailableSkills}}
 <available_skills>
 The following skills are available. Use the `use_skill` tool with the skill ID to load domain expertise when relevant.
+Use `search_skills` to discover additional skills by keyword or tag.
 {{range .AvailableSkills}}- {{.ID}}: {{.Name}}{{if .Description}} — {{.Description}}{{end}}
 {{end}}</available_skills>
 {{end}}

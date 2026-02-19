@@ -3083,7 +3083,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["bash", "read", "patch", "think", "read_schema", "web_search", "output", "use_skill"]
+            "enum": ["bash", "read", "patch", "think", "read_schema", "web_search", "output", "use_skill", "search_skills"]
           },
           "description": "List of tools to enable. When omitted, all tools are available."
         },

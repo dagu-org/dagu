@@ -233,6 +233,7 @@ func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy
 	}
 	if skillStore != nil {
 		allTools["use_skill"] = agent.NewUseSkillTool(skillStore, allowedSkills)
+		allTools["search_skills"] = agent.NewSearchSkillsTool(skillStore, allowedSkills)
 	}
 
 	// Remove tools disabled by global policy (output is step-only, always kept).
