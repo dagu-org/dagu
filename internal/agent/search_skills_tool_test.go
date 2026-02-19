@@ -16,7 +16,7 @@ type testSkillStore struct {
 	err    error
 }
 
-func (s *testSkillStore) Create(_ context.Context, _ *Skill) error            { return nil }
+func (s *testSkillStore) Create(_ context.Context, _ *Skill) error { return nil }
 func (s *testSkillStore) GetByID(_ context.Context, id string) (*Skill, error) {
 	for _, sk := range s.skills {
 		if sk.ID == id {

@@ -373,7 +373,7 @@ func logf(w io.Writer, format string, args ...any) {
 }
 
 const (
-	toolCallArgsTruncateLen      = 200
+	toolCallArgsTruncateLen     = 200
 	assistantContentTruncateLen = 500
 )
 
