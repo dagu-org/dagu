@@ -411,10 +411,7 @@ func (s *Store) Search(_ context.Context, opts agent.SearchSkillsOptions) (*exec
 	if offset > total {
 		offset = total
 	}
-	end := offset + limit
-	if end > total {
-		end = total
-	}
+	end := min(offset+limit, total)
 	page := matched[offset:end]
 
 	result := exec.NewPaginatedResult(page, total, pg)

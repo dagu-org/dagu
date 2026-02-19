@@ -122,14 +122,8 @@ func (m *mockSkillStore) Search(_ context.Context, opts agent.SearchSkillsOption
 		pg = exec.DefaultPaginator()
 	}
 	total := len(items)
-	offset := pg.Offset()
-	if offset > total {
-		offset = total
-	}
-	end := offset + pg.Limit()
-	if end > total {
-		end = total
-	}
+	offset := min(pg.Offset(), total)
+	end := min(offset+pg.Limit(), total)
 	result := exec.NewPaginatedResult(items[offset:end], total, pg)
 	return &result, nil
 }
