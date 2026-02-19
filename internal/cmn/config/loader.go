@@ -502,10 +502,6 @@ func (l *ConfigLoader) setAuthDefaults(cfg *Config) {
 	if cfg.Server.Auth.Builtin.Token.TTL <= 0 {
 		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
 	}
-	if cfg.Server.Auth.Builtin.Admin.Username == "" {
-		cfg.Server.Auth.Builtin.Admin.Username = "admin"
-	}
-
 	if cfg.Server.Auth.Mode == AuthModeBuiltin {
 		// Warn on weak/default token secrets.
 		if cfg.Server.Auth.Builtin.Token.Secret != "" {

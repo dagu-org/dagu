@@ -118,7 +118,7 @@ auth:
   mode: "builtin"  # Options: "none", "basic", "builtin" (default)
   builtin:
     admin:
-      username: "admin"        # setting username alone triggers the setup page
+      username: ""             # omit to show setup page on first run
       password: ""             # set both username+password to skip the setup page
     token:
       secret: ""               # optional: auto-generated at {data_dir}/auth/token_secret
