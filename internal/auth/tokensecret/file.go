@@ -44,7 +44,7 @@ func NewFile(dir string) *FileProvider {
 func (p *FileProvider) Resolve(_ context.Context) (auth.TokenSecret, error) {
 	path := filepath.Join(p.dir, secretFileName)
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path is constructed from trusted config dir + constant filename
 	if err == nil {
 		// File exists — check if it has usable content.
 		content := strings.TrimSpace(string(data))

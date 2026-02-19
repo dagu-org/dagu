@@ -302,7 +302,7 @@ func (a *API) createValidatorMiddleware(swagger *openapi3.T) func(http.Handler) 
 	)
 }
 
-func (a *API) buildAuthOptions(ctx context.Context, basePath string) (frontendauth.Options, error) {
+func (a *API) buildAuthOptions(_ context.Context, basePath string) (frontendauth.Options, error) {
 	authConfig := a.config.Server.Auth
 
 	publicPaths := []string{

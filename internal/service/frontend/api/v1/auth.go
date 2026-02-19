@@ -42,7 +42,7 @@ func (a *API) Setup(ctx context.Context, request api.SetupRequestObject) (api.Se
 	if err := lock.Lock(ctx); err != nil {
 		return nil, fmt.Errorf("failed to acquire setup lock: %w", err)
 	}
-	defer lock.Unlock()
+	defer func() { _ = lock.Unlock() }()
 
 	// Under lock: check if setup is still available (no users exist)
 	count, err := a.authService.CountUsers(ctx)
