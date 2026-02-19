@@ -57,20 +57,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  // Fetches current setup status from the API, overriding the static
+  // HTML config value to handle browser caching scenarios.
+  const checkSetupStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`${config.apiURL}/auth/setup-status`);
+      if (res.ok) {
+        const data = await res.json();
+        setSetupRequired(!!data.setupRequired);
+      }
+    } catch {
+      // Fall back to the static config value on failure.
+    }
+  }, [config.apiURL]);
+
   const refreshUser = useCallback(async () => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
     if (!storedToken) {
-      // No token — check if setup is required via live API call.
-      // This overrides the static HTML config to handle browser caching.
-      try {
-        const res = await fetch(`${config.apiURL}/auth/setup-status`);
-        if (res.ok) {
-          const data = await res.json();
-          setSetupRequired(!!data.setupRequired);
-        }
-      } catch {
-        // If the API call fails, fall back to the static config value.
-      }
+      await checkSetupStatus();
       setIsLoading(false);
       return;
     }
@@ -87,14 +91,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.user);
         setToken(storedToken);
       } else {
+        // Token is invalid/expired — clear auth state and check if
+        // setup is required (handles stale-token + cached-HTML combo).
         logout();
+        await checkSetupStatus();
       }
     } catch {
       logout();
+      await checkSetupStatus();
     } finally {
       setIsLoading(false);
     }
-  }, [config.apiURL, logout]);
+  }, [config.apiURL, logout, checkSetupStatus]);
 
   const login = useCallback(async (username: string, password: string) => {
     const response = await fetch(`${config.apiURL}/auth/login`, {

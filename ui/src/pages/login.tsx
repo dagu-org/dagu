@@ -18,7 +18,7 @@ import { AlertCircle, LogIn, KeyRound, CheckCircle } from 'lucide-react';
  */
 export default function LoginPage() {
   const config = useConfig();
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, setupRequired } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -53,6 +53,13 @@ export default function LoginPage() {
       setWelcomeMessage('Welcome! Your account has been created.');
     }
   }, [searchParams, navigate, from]);
+
+  // Redirect to setup page if initial admin account hasn't been created
+  useEffect(() => {
+    if (setupRequired) {
+      navigate('/setup', { replace: true });
+    }
+  }, [setupRequired, navigate]);
 
   // Redirect if already authenticated - use useEffect to avoid render-phase side effects
   useEffect(() => {
