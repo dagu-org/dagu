@@ -250,8 +250,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		return err
 	}
 
-	// Public setup-status endpoint (before auth middleware).
-	// Returns whether initial admin setup is required.
+	// Public endpoint (registered before auth middleware).
 	if a.authService != nil {
 		r.Get("/auth/setup-status", a.handleSetupStatus)
 	}

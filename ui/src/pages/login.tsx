@@ -7,15 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertCircle, LogIn, KeyRound, CheckCircle } from 'lucide-react';
 
-/**
- * Renders the login page UI and handles authentication flow.
- *
- * The component shows username and password fields, displays an error banner when login fails,
- * and redirects the user to the intended destination after successful authentication.
- * When OIDC is enabled under builtin auth mode, a "Login with SSO" button is also displayed.
- *
- * @returns The rendered login page React element.
- */
 export default function LoginPage() {
   const config = useConfig();
   const { login, isAuthenticated, isLoading: authLoading, setupRequired } = useAuth();
@@ -46,7 +37,6 @@ export default function LoginPage() {
     }
 
     if (errorParam) {
-      // Note: searchParams.get() already decodes URL params, no need for decodeURIComponent
       setError(errorParam);
     }
     if (welcomeParam === 'true') {

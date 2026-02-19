@@ -254,7 +254,6 @@ func toAPIUser(user *auth.User) api.User {
 	return apiUser
 }
 
-// preserving the input order.
 func toAPIUsers(users []*auth.User) []api.User {
 	result := make([]api.User, len(users))
 	for i, u := range users {
