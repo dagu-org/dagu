@@ -163,7 +163,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		assert.Contains(t, result, "<available_skills>")
 		assert.Contains(t, result, "You have access to 100 skills")
 		assert.Contains(t, result, "search_skills")
-		assert.NotContains(t, result, "use_skill")
+		assert.NotContains(t, result, "Use `use_skill` with the skill ID")
 	})
 
 	t.Run("omits skills section when no skills", func(t *testing.T) {
@@ -173,6 +173,28 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleViewer, nil, 0)
 
 		assert.NotContains(t, result, "<available_skills>")
+		assert.NotContains(t, result, "<skill_delegation>")
+	})
+
+	t.Run("includes skill delegation guidance when skills available", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+		skills := []SkillSummary{{ID: "test", Name: "Test Skill"}}
+
+		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleViewer, skills, 1)
+
+		assert.Contains(t, result, "<skill_delegation>")
+		assert.Contains(t, result, "delegate")
+		assert.Contains(t, result, "use_skill")
+	})
+
+	t.Run("includes skill delegation guidance when only skill count", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+
+		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleViewer, nil, 50)
+
+		assert.Contains(t, result, "<skill_delegation>")
 	})
 }
 

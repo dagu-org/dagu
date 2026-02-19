@@ -55,10 +55,11 @@ func (s *testSkillStore) Search(_ context.Context, opts SearchSkillsOptions) (*e
 			continue
 		}
 		matched = append(matched, SkillMetadata{
-			ID:          sk.ID,
-			Name:        sk.Name,
-			Description: sk.Description,
-			Tags:        sk.Tags,
+			ID:            sk.ID,
+			Name:          sk.Name,
+			Description:   sk.Description,
+			Tags:          sk.Tags,
+			KnowledgeSize: len(sk.Knowledge),
 		})
 	}
 
@@ -291,7 +292,7 @@ func TestSearchSkills_KnowledgeNotLeaked(t *testing.T) {
 	assert.NotContains(t, out.Content, "SECRET SQL KNOWLEDGE")
 	assert.NotContains(t, out.Content, "SECRET DOCKER KNOWLEDGE")
 	assert.NotContains(t, out.Content, "SECRET GO KNOWLEDGE")
-	assert.NotContains(t, out.Content, "knowledge")
+	assert.NotContains(t, out.Content, "Knowledge")
 }
 
 func TestSearchSkills_StoreError(t *testing.T) {
@@ -300,7 +301,7 @@ func TestSearchSkills_StoreError(t *testing.T) {
 	out := runSearchSkills(t, store, nil, map[string]any{})
 
 	assert.True(t, out.IsError)
-	assert.Contains(t, out.Content, "failed to list skills")
+	assert.Contains(t, out.Content, "failed to search skills")
 }
 
 func TestSearchSkills_InvalidInput(t *testing.T) {

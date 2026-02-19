@@ -70,6 +70,10 @@ type LoopConfig struct {
 	SessionStore SessionStore
 	// Registry manages sub-session lifecycle for delegate tools.
 	Registry SubSessionRegistry
+	// SkillStore provides skill loading for delegate skill pre-loading.
+	SkillStore SkillStore
+	// AllowedSkills restricts which skill IDs can be pre-loaded by delegates. Nil = all allowed.
+	AllowedSkills map[string]struct{}
 }
 
 // Loop manages a session turn with an LLM including tool execution.
@@ -96,6 +100,8 @@ type Loop struct {
 	user             UserIdentity
 	sessionStore     SessionStore
 	registry         SubSessionRegistry
+	skillStore       SkillStore
+	allowedSkills    map[string]struct{}
 }
 
 // NewLoop creates a new Loop instance.
@@ -124,6 +130,8 @@ func NewLoop(config LoopConfig) *Loop {
 		user:             config.User,
 		sessionStore:     config.SessionStore,
 		registry:         config.Registry,
+		skillStore:       config.SkillStore,
+		allowedSkills:    config.AllowedSkills,
 	}
 }
 
@@ -334,16 +342,18 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 	var delegate *DelegateContext
 	if tc.Function.Name == delegateToolName && l.registry != nil {
 		delegate = &DelegateContext{
-			Provider:     l.provider,
-			Model:        l.model,
-			SystemPrompt: l.systemPrompt,
-			Tools:        l.tools,
-			Hooks:        l.hooks,
-			Logger:       l.logger,
-			SessionStore: l.sessionStore,
-			ParentID:     l.sessionID,
-			User:         user,
-			Registry:     l.registry,
+			Provider:      l.provider,
+			Model:         l.model,
+			SystemPrompt:  l.systemPrompt,
+			Tools:         l.tools,
+			Hooks:         l.hooks,
+			Logger:        l.logger,
+			SessionStore:  l.sessionStore,
+			ParentID:      l.sessionID,
+			User:          user,
+			Registry:      l.registry,
+			SkillStore:    l.skillStore,
+			AllowedSkills: l.allowedSkills,
 		}
 	}
 

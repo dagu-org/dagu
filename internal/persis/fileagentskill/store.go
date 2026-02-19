@@ -39,10 +39,11 @@ type skillFrontmatter struct {
 
 // skillIndexEntry caches skill metadata in memory for fast search without file I/O.
 type skillIndexEntry struct {
-	dirPath     string
-	name        string
-	description string
-	tags        []string
+	dirPath       string
+	name          string
+	description   string
+	tags          []string
+	knowledgeSize int
 }
 
 // Store implements a file-based skill store.
@@ -116,10 +117,11 @@ func (s *Store) rebuildIndex() error {
 		}
 
 		s.byID[skill.ID] = &skillIndexEntry{
-			dirPath:     dirPath,
-			name:        skill.Name,
-			description: skill.Description,
-			tags:        skill.Tags,
+			dirPath:       dirPath,
+			name:          skill.Name,
+			description:   skill.Description,
+			tags:          skill.Tags,
+			knowledgeSize: len(skill.Knowledge),
 		}
 		if existingID, exists := s.byName[skill.Name]; exists {
 			slog.Warn("Duplicate skill name in store, last file wins",
@@ -279,10 +281,11 @@ func (s *Store) Create(_ context.Context, skill *agent.Skill) error {
 	}
 
 	s.byID[skill.ID] = &skillIndexEntry{
-		dirPath:     dirPath,
-		name:        skill.Name,
-		description: skill.Description,
-		tags:        skill.Tags,
+		dirPath:       dirPath,
+		name:          skill.Name,
+		description:   skill.Description,
+		tags:          skill.Tags,
+		knowledgeSize: len(skill.Knowledge),
 	}
 	s.byName[skill.Name] = skill.ID
 
@@ -375,10 +378,11 @@ func (s *Store) Search(_ context.Context, opts agent.SearchSkillsOptions) (*exec
 			continue
 		}
 		matched = append(matched, agent.SkillMetadata{
-			ID:          id,
-			Name:        entry.name,
-			Description: entry.description,
-			Tags:        entry.tags,
+			ID:            id,
+			Name:          entry.name,
+			Description:   entry.description,
+			Tags:          entry.tags,
+			KnowledgeSize: entry.knowledgeSize,
 		})
 	}
 
@@ -479,6 +483,7 @@ func (s *Store) Update(_ context.Context, skill *agent.Skill) error {
 	entry.name = skill.Name
 	entry.description = skill.Description
 	entry.tags = skill.Tags
+	entry.knowledgeSize = len(skill.Knowledge)
 
 	if nameChanged {
 		delete(s.byName, existing.Name)

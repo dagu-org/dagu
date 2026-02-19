@@ -189,13 +189,15 @@ func (e *Executor) Run(ctx context.Context) error {
 	iteration := 0
 
 	loop := agent.NewLoop(agent.LoopConfig{
-		Provider:     provider,
-		Model:        modelCfg.Model,
-		Tools:        tools,
-		SystemPrompt: systemPrompt,
-		SafeMode:     safeMode,
-		Hooks:        hooks,
-		Logger:       slog.Default(),
+		Provider:      provider,
+		Model:         modelCfg.Model,
+		Tools:         tools,
+		SystemPrompt:  systemPrompt,
+		SafeMode:      safeMode,
+		Hooks:         hooks,
+		Logger:        slog.Default(),
+		SkillStore:    skillStore,
+		AllowedSkills: allowedSkills,
 		RecordMessage: func(_ context.Context, msg agent.Message) {
 			logMessage(stderr, msg)
 		},

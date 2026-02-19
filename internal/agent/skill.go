@@ -50,10 +50,11 @@ type SkillStore interface {
 // SkillMetadata is a lightweight skill view excluding Knowledge.
 // Used for search results where loading full knowledge content is unnecessary.
 type SkillMetadata struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Description string   `json:"description,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	Description   string   `json:"description,omitempty"`
+	Tags          []string `json:"tags,omitempty"`
+	KnowledgeSize int      `json:"knowledge_size"`
 }
 
 // SearchSkillsOptions configures a paginated skill search query.

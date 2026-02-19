@@ -468,6 +468,8 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		User:             sm.user,
 		SessionStore:     sm.sessionStore,
 		Registry:         sm.registry,
+		SkillStore:       sm.skillStore,
+		AllowedSkills:    allowedSkills,
 	})
 }
 

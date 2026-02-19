@@ -41,7 +41,8 @@ const (
 
 // delegateTask is a single sub-task within a batched delegate call.
 type delegateTask struct {
-	Task string `json:"task"`
+	Task   string   `json:"task"`
+	Skills []string `json:"skills,omitempty"`
 }
 
 // delegateInput is the parsed input for the delegate tool.
@@ -67,6 +68,7 @@ func NewDelegateTool() *AgentTool {
 				Description: fmt.Sprintf(
 					"Spawn sub-agents for focused sub-tasks. Each sub-agent works independently "+
 						"with the same tools and returns a summary. All tasks run in parallel. "+
+						"Use the 'skills' parameter on each task to pre-load skill knowledge into the sub-agent. "+
 						"Maximum %d tasks per call.",
 					maxConcurrentDelegates,
 				),
@@ -81,6 +83,12 @@ func NewDelegateTool() *AgentTool {
 									"task": map[string]any{
 										"type":        "string",
 										"description": "Description of the sub-task for the sub-agent to complete",
+									},
+									"skills": map[string]any{
+										"type":  "array",
+										"items": map[string]any{"type": "string"},
+										"description": "Optional skill IDs to pre-load into the sub-agent's context. " +
+											"The sub-agent starts with this knowledge already available, saving a round-trip.",
 									},
 								},
 								"required": []string{"task"},
@@ -115,6 +123,11 @@ func delegateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	for _, t := range args.Tasks {
 		if strings.TrimSpace(t.Task) == "" {
 			return toolError("Task description cannot be empty")
+		}
+		for _, skillID := range t.Skills {
+			if strings.TrimSpace(skillID) == "" {
+				return toolError("Skill ID cannot be empty")
+			}
 		}
 	}
 
@@ -240,6 +253,31 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		}
 	}
 
+	// Pre-load skill knowledge into the sub-agent's initial message.
+	userContent := task.Task
+	if len(task.Skills) > 0 && dc.SkillStore != nil {
+		var skillBlocks []string
+		for _, skillID := range task.Skills {
+			if dc.AllowedSkills != nil {
+				if _, ok := dc.AllowedSkills[skillID]; !ok {
+					logger.Warn("Delegate skill not allowed, skipping", "skill_id", skillID)
+					continue
+				}
+			}
+			skill, err := dc.SkillStore.GetByID(ctx.Context, skillID)
+			if err != nil {
+				logger.Warn("Failed to load delegate skill, skipping", "skill_id", skillID, "error", err)
+				continue
+			}
+			skillBlocks = append(skillBlocks, fmt.Sprintf(
+				"<skill name=%q id=%q>\n%s\n</skill>", skill.Name, skill.ID, skill.Knowledge,
+			))
+		}
+		if len(skillBlocks) > 0 {
+			userContent = strings.Join(skillBlocks, "\n\n") + "\n\nTask: " + task.Task
+		}
+	}
+
 	// Record the task as the initial user message and forward to parent.
 	// ID must be set before calling RecordExternalMessage because it takes
 	// Message by value — the caller's copy keeps the assigned ID so
@@ -247,7 +285,7 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 	userMsg := Message{
 		ID:        uuid.New().String(),
 		Type:      MessageTypeUser,
-		Content:   task.Task,
+		Content:   userContent,
 		CreatedAt: time.Now(),
 	}
 	if err := subMgr.RecordExternalMessage(ctx.Context, userMsg); err != nil {
@@ -326,10 +364,10 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		},
 	})
 
-	// Queue the task as a user message.
+	// Queue the task as a user message (with pre-loaded skill knowledge if any).
 	loop.QueueUserMessage(llm.Message{
 		Role:    llm.RoleUser,
-		Content: task.Task,
+		Content: userContent,
 	})
 
 	logger.Info("Starting sub-agent")

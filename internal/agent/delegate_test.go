@@ -1015,3 +1015,152 @@ func TestDelegateTool_ParentTracksDelegate(t *testing.T) {
 	assert.Equal(t, DelegateStatusCompleted, delegates[0].Status)
 	assert.Equal(t, "track delegate", delegates[0].Task)
 }
+
+func TestDelegateTool_SkillsPreloaded(t *testing.T) {
+	t.Parallel()
+
+	var capturedReq *llm.ChatRequest
+	provider := &mockLLMProvider{
+		chatFunc: func(_ context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
+			capturedReq = req
+			return &llm.ChatResponse{Content: "done", FinishReason: "stop"}, nil
+		},
+	}
+
+	store := &testSkillStore{
+		skills: []*Skill{
+			{ID: "sql-expert", Name: "SQL Expert", Knowledge: "SELECT * FROM users;"},
+		},
+	}
+
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:   provider,
+			Model:      "test",
+			Tools:      []*AgentTool{},
+			SkillStore: store,
+		},
+	}, json.RawMessage(`{"tasks": [{"task": "write a query", "skills": ["sql-expert"]}]}`))
+
+	assert.False(t, result.IsError)
+	require.NotNil(t, capturedReq)
+
+	// The sub-agent's user message should contain pre-loaded skill knowledge.
+	require.NotEmpty(t, capturedReq.Messages)
+	var userContent string
+	for _, msg := range capturedReq.Messages {
+		if msg.Role == llm.RoleUser {
+			userContent = msg.Content
+		}
+	}
+	assert.Contains(t, userContent, `<skill name="SQL Expert" id="sql-expert">`)
+	assert.Contains(t, userContent, "SELECT * FROM users;")
+	assert.Contains(t, userContent, "Task: write a query")
+}
+
+func TestDelegateTool_SkillsNotFoundWarning(t *testing.T) {
+	t.Parallel()
+
+	provider := newStopProvider("done without skill")
+	store := &testSkillStore{skills: []*Skill{}}
+
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:   provider,
+			Model:      "test",
+			Tools:      []*AgentTool{},
+			SkillStore: store,
+		},
+	}, json.RawMessage(`{"tasks": [{"task": "do work", "skills": ["nonexistent"]}]}`))
+
+	// Should succeed — missing skills are warnings, not errors.
+	assert.False(t, result.IsError)
+	assert.Contains(t, result.Content, "done without skill")
+}
+
+func TestDelegateTool_SkillsNotAllowed(t *testing.T) {
+	t.Parallel()
+
+	var capturedReq *llm.ChatRequest
+	provider := &mockLLMProvider{
+		chatFunc: func(_ context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
+			capturedReq = req
+			return &llm.ChatResponse{Content: "done", FinishReason: "stop"}, nil
+		},
+	}
+
+	store := &testSkillStore{
+		skills: []*Skill{
+			{ID: "restricted-skill", Name: "Restricted", Knowledge: "secret knowledge"},
+		},
+	}
+
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:    context.Background(),
+		WorkingDir: t.TempDir(),
+		Delegate: &DelegateContext{
+			Provider:      provider,
+			Model:         "test",
+			Tools:         []*AgentTool{},
+			SkillStore:    store,
+			AllowedSkills: map[string]struct{}{"other-skill": {}},
+		},
+	}, json.RawMessage(`{"tasks": [{"task": "do work", "skills": ["restricted-skill"]}]}`))
+
+	assert.False(t, result.IsError)
+	require.NotNil(t, capturedReq)
+
+	// The sub-agent's user message should NOT contain the restricted skill.
+	var userContent string
+	for _, msg := range capturedReq.Messages {
+		if msg.Role == llm.RoleUser {
+			userContent = msg.Content
+		}
+	}
+	assert.NotContains(t, userContent, "secret knowledge")
+	assert.NotContains(t, userContent, "<skill")
+}
+
+func TestDelegateTool_EmptySkillIDRejected(t *testing.T) {
+	t.Parallel()
+
+	tool := NewDelegateTool()
+	result := tool.Run(ToolContext{
+		Context:  context.Background(),
+		Delegate: &DelegateContext{},
+	}, json.RawMessage(`{"tasks": [{"task": "test", "skills": [""]}]}`))
+
+	assert.True(t, result.IsError)
+	assert.Contains(t, result.Content, "Skill ID cannot be empty")
+}
+
+func TestDelegateTool_Schema_IncludesSkills(t *testing.T) {
+	t.Parallel()
+
+	tool := NewDelegateTool()
+	params := tool.Function.Parameters
+
+	props, ok := params["properties"].(map[string]any)
+	require.True(t, ok)
+
+	tasksSchema, ok := props["tasks"].(map[string]any)
+	require.True(t, ok)
+
+	items, ok := tasksSchema["items"].(map[string]any)
+	require.True(t, ok)
+
+	itemProps, ok := items["properties"].(map[string]any)
+	require.True(t, ok)
+
+	assert.Contains(t, itemProps, "skills")
+	skillsSchema, ok := itemProps["skills"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "array", skillsSchema["type"])
+}

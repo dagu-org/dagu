@@ -351,6 +351,10 @@ type DelegateContext struct {
 	User UserIdentity
 	// Registry manages sub-session lifecycle. Nil if not available.
 	Registry SubSessionRegistry
+	// SkillStore provides skill loading for delegate skill pre-loading.
+	SkillStore SkillStore
+	// AllowedSkills restricts which skill IDs can be pre-loaded. Nil = all allowed.
+	AllowedSkills map[string]struct{}
 }
 
 // ToolContext provides context for tool execution.
