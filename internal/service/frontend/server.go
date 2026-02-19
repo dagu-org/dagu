@@ -160,10 +160,8 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	var agentSkillStore agent.SkillStore
 	skillsDir := filepath.Join(cfg.Paths.DAGsDir, "skills")
-	if !cfg.Core.SkipExamples {
-		if fileagentskill.SeedExampleSkills(skillsDir) && agentConfigStore != nil {
-			autoEnableExampleSkills(ctx, agentConfigStore)
-		}
+	if fileagentskill.SeedExampleSkills(skillsDir) && agentConfigStore != nil {
+		autoEnableExampleSkills(ctx, agentConfigStore)
 	}
 	if skillStore, skillErr := fileagentskill.New(skillsDir); skillErr != nil {
 		logger.Warn(ctx, "Failed to create agent skill store", tag.Error(skillErr))

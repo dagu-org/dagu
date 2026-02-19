@@ -450,10 +450,8 @@ func (c *Context) agentStores() agentStoresResult {
 	result.MemoryStore = ms
 
 	skillsDir := filepath.Join(c.Config.Paths.DAGsDir, "skills")
-	if !c.Config.Core.SkipExamples {
-		if fileagentskill.SeedExampleSkills(skillsDir) {
-			autoEnableExampleSkills(c, result.ConfigStore)
-		}
+	if fileagentskill.SeedExampleSkills(skillsDir) {
+		autoEnableExampleSkills(c, result.ConfigStore)
 	}
 	ss, err := fileagentskill.New(skillsDir)
 	if err != nil {
