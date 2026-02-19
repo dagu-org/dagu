@@ -305,7 +305,7 @@ Full documentation is available at [docs.daguit.dev](https://docs.daguit.dev/).
 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
-| `DAGU_AUTH_MODE` | `none` | Authentication mode: `none`, `builtin`, or `oidc` |
+| `DAGU_AUTH_MODE` | `builtin` | Authentication mode: `none`, `basic`, or `builtin` |
 | `DAGU_AUTH_BASIC_USERNAME` | - | Basic auth username |
 | `DAGU_AUTH_BASIC_PASSWORD` | - | Basic auth password |
 | `DAGU_AUTH_OIDC_CLIENT_ID` | - | OIDC client ID |
@@ -314,7 +314,6 @@ Full documentation is available at [docs.daguit.dev](https://docs.daguit.dev/).
 | `DAGU_AUTH_OIDC_ISSUER` | - | OIDC issuer URL |
 | `DAGU_AUTH_OIDC_SCOPES` | - | OIDC scopes (comma-separated) |
 | `DAGU_AUTH_OIDC_WHITELIST` | - | OIDC email whitelist (comma-separated) |
-| `DAGU_AUTH_OIDC_ENABLED` | `false` | Enable OIDC under builtin auth |
 | `DAGU_AUTH_OIDC_AUTO_SIGNUP` | `false` | Auto-create users on first OIDC login |
 | `DAGU_AUTH_OIDC_DEFAULT_ROLE` | `viewer` | Role for auto-created users |
 | `DAGU_AUTH_OIDC_ALLOWED_DOMAINS` | - | Allowed email domains (comma-separated) |
@@ -322,13 +321,11 @@ Full documentation is available at [docs.daguit.dev](https://docs.daguit.dev/).
 
 ### Builtin Authentication (RBAC)
 
-When `DAGU_AUTH_MODE=builtin`, a file-based user management system with role-based access control is enabled. Roles: `admin`, `manager`, `operator`, `viewer`.
+When `DAGU_AUTH_MODE=builtin`, a file-based user management system with role-based access control is enabled. Roles: `admin`, `manager`, `developer`, `operator`, `viewer`. On first startup, visit the web UI to create your admin account via the setup page.
 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
-| `DAGU_AUTH_ADMIN_USERNAME` | `admin` | Initial admin username |
-| `DAGU_AUTH_ADMIN_PASSWORD` | (auto-generated) | Initial admin password |
-| `DAGU_AUTH_TOKEN_SECRET` | - | JWT token secret for signing (required) |
+| `DAGU_AUTH_TOKEN_SECRET` | (auto-generated) | JWT token secret for signing (auto-generated if not set) |
 | `DAGU_AUTH_TOKEN_TTL` | `24h` | JWT token time-to-live |
 | `DAGU_USERS_DIR` | `{dataDir}/users` | Directory for user data files |
 

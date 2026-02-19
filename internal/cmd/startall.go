@@ -90,11 +90,11 @@ func runStartAll(ctx *Context, _ []string) error {
 	}
 
 	// Create a context that will be cancelled on interrupt signal.
-	// This must be created BEFORE server initialization so OIDC provider init can be cancelled.
+	// This must be created BEFORE server initialization so auth provider init can be cancelled.
 	signalCtx, stop := signal.NotifyContext(ctx.Context, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Create a signal-aware context for services (used for OIDC init and all service operations)
+	// Create a signal-aware context for services (used for auth init and all service operations)
 	serviceCtx := ctx.WithContext(signalCtx)
 
 	// Initialize all services using the signal-aware context
@@ -108,7 +108,7 @@ func runStartAll(ctx *Context, _ []string) error {
 	// Initialize resource monitoring service
 	resourceService := resource.NewService(ctx.Config)
 
-	// Use serviceCtx so OIDC initialization can respond to termination signals
+	// Use serviceCtx so auth initialization can respond to termination signals
 	server, err := serviceCtx.NewServer(resourceService)
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)

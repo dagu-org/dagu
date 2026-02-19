@@ -332,6 +332,8 @@ A new `/setup` route presents a clean welcome screen:
 
 ### 4. Auth Store Interface
 
+> **Implementation note**: The unified `AuthStore` interface described below was descoped during implementation. The three stores (`fileuser`, `fileapikey`, `filewebhook`) remain separate and are composed directly in `server.go`'s `initBuiltinAuthService`. This avoids unnecessary abstraction while keeping the same functional behavior.
+
 A new unified interface abstracts all auth-related persistence. The current three stores (`fileuser`, `fileapikey`, `filewebhook`) are consolidated behind a single `AuthStore` interface that the auth service depends on.
 
 #### Interface Design
