@@ -10,7 +10,6 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	apiV1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	"github.com/prometheus/client_golang/prometheus"
@@ -87,23 +86,6 @@ func (m *mockSessionStore) ListSessions(_ context.Context, userID string) ([]*ag
 		}
 	}
 	return result, nil
-}
-
-func (m *mockSessionStore) ListSessionsPaginated(_ context.Context, userID string, page, perPage int) (exec.PaginatedResult[*agent.Session], error) {
-	if userID == "" {
-		return exec.PaginatedResult[*agent.Session]{}, agent.ErrInvalidUserID
-	}
-	var all []*agent.Session
-	for _, s := range m.sessions {
-		if s.UserID == userID {
-			all = append(all, s)
-		}
-	}
-	pg := exec.NewPaginator(page, perPage)
-	total := len(all)
-	start := min(pg.Offset(), total)
-	end := min(pg.Offset()+pg.Limit(), total)
-	return exec.NewPaginatedResult(all[start:end], total, pg), nil
 }
 
 func (m *mockSessionStore) UpdateSession(_ context.Context, sess *agent.Session) error {

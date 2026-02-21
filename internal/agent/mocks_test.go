@@ -6,7 +6,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
@@ -330,31 +329,6 @@ func (m *mockSessionStore) GetLatestSequenceID(_ context.Context, sessionID stri
 	return maxSeq, nil
 }
 
-func (m *mockSessionStore) ListSessionsPaginated(_ context.Context, userID string, page, perPage int) (exec.PaginatedResult[*Session], error) {
-	if m.listErr != nil {
-		return exec.PaginatedResult[*Session]{}, m.listErr
-	}
-	if userID == "" {
-		return exec.PaginatedResult[*Session]{}, ErrInvalidUserID
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	var all []*Session
-	for _, sess := range m.sessions {
-		if sess.UserID == userID {
-			all = append(all, sess)
-		}
-	}
-
-	pg := exec.NewPaginator(page, perPage)
-	total := len(all)
-	start := min(pg.Offset(), total)
-	end := min(pg.Offset()+pg.Limit(), total)
-
-	return exec.NewPaginatedResult(all[start:end], total, pg), nil
-}
 
 func (m *mockSessionStore) ListSubSessions(_ context.Context, parentSessionID string) ([]*Session, error) {
 	if parentSessionID == "" {
