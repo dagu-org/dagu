@@ -375,7 +375,7 @@ export default function SetupPage() {
               </div>
             )}
 
-            <form onSubmit={handleStep2Submit} className="space-y-4">
+            <form onSubmit={handleStep2Submit} className="space-y-4" autoComplete="off">
               {/* Enable toggle */}
               <div className="flex items-center justify-between rounded-md border border-border/60 p-3">
                 <div className="flex items-center gap-2">
