@@ -81,6 +81,45 @@ func TestDAGWritesAllowedWhenGitSyncDisabled(t *testing.T) {
 	server.Client().Delete("/api/v1/dags/test_dag_gitsync_disabled").ExpectStatus(http.StatusNoContent).Send(t)
 }
 
+func TestCreateNewDAGPathTraversal(t *testing.T) {
+	server := test.SetupServer(t)
+
+	traversalNames := []string{
+		"../../tmp/traversal",
+		"../escape",
+		"foo/bar",
+		"../../../etc/malicious",
+	}
+
+	for _, name := range traversalNames {
+		t.Run("with_spec/"+name, func(t *testing.T) {
+			spec := "steps:\n  - command: echo test"
+			server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+				Name: name,
+				Spec: &spec,
+			}).ExpectStatus(http.StatusBadRequest).Send(t)
+		})
+
+		t.Run("without_spec/"+name, func(t *testing.T) {
+			server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+				Name: name,
+			}).ExpectStatus(http.StatusBadRequest).Send(t)
+		})
+	}
+
+	t.Run("empty_name", func(t *testing.T) {
+		server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: "",
+		}).ExpectStatus(http.StatusBadRequest).Send(t)
+	})
+
+	t.Run("dot_dot_name", func(t *testing.T) {
+		server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: "..",
+		}).ExpectStatus(http.StatusBadRequest).Send(t)
+	})
+}
+
 func TestDAG(t *testing.T) {
 	server := test.SetupServer(t)
 

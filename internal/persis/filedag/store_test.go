@@ -219,6 +219,32 @@ steps:
 	assert.Equal(t, exec.ErrDAGAlreadyExists, err)
 }
 
+func TestGenerateFilePathPreventsTraversal(t *testing.T) {
+	baseDir := "/base/dir"
+	store := New(baseDir, WithSkipExamples(true)).(*Storage)
+
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"parent traversal", "../../tmp/pwned"},
+		{"single parent", "../escape"},
+		{"subdirectory", "foo/bar"},
+		{"deep traversal", "../../../etc/malicious"},
+		{"empty string", ""},
+		{"dot dot", ".."},
+		{"normal name", "my-dag"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := store.generateFilePath(tc.input)
+			assert.Equal(t, baseDir, filepath.Dir(result),
+				"generated path must be directly inside baseDir")
+		})
+	}
+}
+
 func TestUpdateSpec(t *testing.T) {
 	tmpDir := fileutil.MustTempDir("test-update-spec")
 	defer func() {

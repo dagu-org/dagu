@@ -36,6 +36,9 @@ func ValidateDAGName(name string) error {
 	if name == "" {
 		return nil
 	}
+	if name == "." || name == ".." {
+		return ErrNameInvalidChars
+	}
 	if len(name) > DAGNameMaxLen {
 		return ErrNameTooLong
 	}
