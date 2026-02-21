@@ -134,7 +134,8 @@ func sessionAdminCtx() context.Context {
 	})
 }
 
-func ptrInt(v int) *int { return &v }
+//go:fix inline
+func ptrInt(v int) *int { return new(v) }
 
 func TestListAgentSessions(t *testing.T) {
 	t.Parallel()
@@ -146,8 +147,8 @@ func TestListAgentSessions(t *testing.T) {
 
 		resp, err := setup.api.ListAgentSessions(sessionAdminCtx(), apigen.ListAgentSessionsRequestObject{
 			Params: apigen.ListAgentSessionsParams{
-				Page:    ptrInt(1),
-				PerPage: ptrInt(10),
+				Page:    new(1),
+				PerPage: new(10),
 			},
 		})
 		require.NoError(t, err)
@@ -177,8 +178,8 @@ func TestListAgentSessions(t *testing.T) {
 
 		resp, err := setup.api.ListAgentSessions(sessionAdminCtx(), apigen.ListAgentSessionsRequestObject{
 			Params: apigen.ListAgentSessionsParams{
-				Page:    ptrInt(1),
-				PerPage: ptrInt(3),
+				Page:    new(1),
+				PerPage: new(3),
 			},
 		})
 		require.NoError(t, err)
@@ -210,8 +211,8 @@ func TestListAgentSessions(t *testing.T) {
 
 		resp, err := setup.api.ListAgentSessions(sessionAdminCtx(), apigen.ListAgentSessionsRequestObject{
 			Params: apigen.ListAgentSessionsParams{
-				Page:    ptrInt(2),
-				PerPage: ptrInt(3),
+				Page:    new(2),
+				PerPage: new(3),
 			},
 		})
 		require.NoError(t, err)
@@ -283,8 +284,8 @@ func TestListAgentSessions(t *testing.T) {
 
 		resp, err := setup.api.ListAgentSessions(sessionAdminCtx(), apigen.ListAgentSessionsRequestObject{
 			Params: apigen.ListAgentSessionsParams{
-				Page:    ptrInt(1),
-				PerPage: ptrInt(10),
+				Page:    new(1),
+				PerPage: new(10),
 			},
 		})
 		require.NoError(t, err)
@@ -316,8 +317,8 @@ func TestListAgentSessions(t *testing.T) {
 
 		resp, err := setup.api.ListAgentSessions(sessionAdminCtx(), apigen.ListAgentSessionsRequestObject{
 			Params: apigen.ListAgentSessionsParams{
-				Page:    ptrInt(1),
-				PerPage: ptrInt(10),
+				Page:    new(1),
+				PerPage: new(10),
 			},
 		})
 		require.NoError(t, err)
@@ -367,8 +368,8 @@ func TestListAgentSessions(t *testing.T) {
 
 		resp, err := setup.api.ListAgentSessions(sessionAdminCtx(), apigen.ListAgentSessionsRequestObject{
 			Params: apigen.ListAgentSessionsParams{
-				Page:    ptrInt(99),
-				PerPage: ptrInt(10),
+				Page:    new(99),
+				PerPage: new(10),
 			},
 		})
 		require.NoError(t, err)

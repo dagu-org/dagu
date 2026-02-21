@@ -329,7 +329,6 @@ func (m *mockSessionStore) GetLatestSequenceID(_ context.Context, sessionID stri
 	return maxSeq, nil
 }
 
-
 func (m *mockSessionStore) ListSubSessions(_ context.Context, parentSessionID string) ([]*Session, error) {
 	if parentSessionID == "" {
 		return nil, ErrInvalidSessionID
