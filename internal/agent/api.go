@@ -767,8 +767,8 @@ const idleSessionTimeout = 30 * time.Minute
 const cleanupInterval = 5 * time.Minute
 
 // stuckHeartbeatTimeout is the maximum time without a heartbeat before
-// a working session is considered stuck and cancelled (3x loopHeartbeatInterval).
-const stuckHeartbeatTimeout = 30 * time.Second
+// a working session is considered stuck and cancelled.
+const stuckHeartbeatTimeout = 3 * loopHeartbeatInterval
 
 // StartCleanup begins periodic cleanup of idle sessions.
 // It should be called once when the API is initialized and will

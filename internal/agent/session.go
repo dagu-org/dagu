@@ -15,6 +15,7 @@ import (
 
 // SessionManager manages a single active session.
 // It links the Loop with SSE streaming and handles state management.
+// Lock ordering: mu must be acquired before promptsMu when both are needed.
 type SessionManager struct {
 	id              string
 	user            UserIdentity
