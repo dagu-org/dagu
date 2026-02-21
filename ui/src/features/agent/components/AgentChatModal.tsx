@@ -124,9 +124,13 @@ export function AgentChatModal(): ReactElement | null {
   const handleOpenDelegate = useCallback((id: string) => {
     const info = delegateStatuses[id];
     if (info) {
-      reopenDelegate(id, info.task);
+      if (delegates.some((d) => d.id === id)) {
+        removeDelegate(id);
+      } else {
+        reopenDelegate(id, info.task);
+      }
     }
-  }, [delegateStatuses, reopenDelegate]);
+  }, [delegateStatuses, delegates, reopenDelegate, removeDelegate]);
 
   if (!isOpen) return null;
 
