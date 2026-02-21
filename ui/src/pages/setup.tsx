@@ -59,7 +59,7 @@ export default function SetupPage() {
   const [step1Loading, setStep1Loading] = useState(false);
 
   // Step 2 state
-  const [agentEnabled, setAgentEnabled] = useState(false);
+  const [agentEnabled, setAgentEnabled] = useState(true);
   const [selectedProvider, setSelectedProvider] = useState('anthropic');
   const [selectedModel, setSelectedModel] = useState('');
   const [apiKey, setApiKey] = useState('');
