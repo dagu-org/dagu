@@ -231,6 +231,8 @@ func TestGenerateFilePathPreventsTraversal(t *testing.T) {
 		{"single parent", "../escape"},
 		{"subdirectory", "foo/bar"},
 		{"deep traversal", "../../../etc/malicious"},
+		{"empty string", ""},
+		{"dot dot", ".."},
 		{"normal name", "my-dag"},
 	}
 

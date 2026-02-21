@@ -106,6 +106,18 @@ func TestCreateNewDAGPathTraversal(t *testing.T) {
 			}).ExpectStatus(http.StatusBadRequest).Send(t)
 		})
 	}
+
+	t.Run("empty_name", func(t *testing.T) {
+		server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: "",
+		}).ExpectStatus(http.StatusBadRequest).Send(t)
+	})
+
+	t.Run("dot_dot_name", func(t *testing.T) {
+		server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: "..",
+		}).ExpectStatus(http.StatusBadRequest).Send(t)
+	})
 }
 
 func TestDAG(t *testing.T) {
