@@ -881,11 +881,9 @@ func TestSessionManager_RecordHeartbeat(t *testing.T) {
 
 		var wg sync.WaitGroup
 		for range 10 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				sm.RecordHeartbeat()
-			}()
+			})
 		}
 		wg.Wait()
 
