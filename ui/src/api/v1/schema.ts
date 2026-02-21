@@ -1879,7 +1879,7 @@ export interface paths {
         };
         /**
          * List agent sessions
-         * @description Lists all sessions for the current user.
+         * @description Lists sessions for the current user with pagination.
          */
         get: operations["listAgentSessions"];
         put?: never;
@@ -3451,6 +3451,11 @@ export interface components {
         /** @description Agent session with its current state */
         AgentSessionWithState: components["schemas"]["AgentSessionState"] & {
             session: components["schemas"]["AgentSession"];
+        };
+        /** @description Paginated list of agent sessions */
+        ListAgentSessionsResponse: {
+            sessions: components["schemas"]["AgentSessionWithState"][];
+            pagination: components["schemas"]["Pagination"];
         };
         /** @description Function call details in a tool call */
         AgentToolCallFunction: {
@@ -9386,6 +9391,10 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description page number of items to fetch (default is 1) */
+                page?: components["parameters"]["Page"];
+                /** @description number of items per page (default is 30, max is 100) */
+                perPage?: components["parameters"]["PerPage"];
             };
             header?: never;
             path?: never;
@@ -9393,13 +9402,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description List of sessions */
+            /** @description Paginated list of sessions */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AgentSessionWithState"][];
+                    "application/json": components["schemas"]["ListAgentSessionsResponse"];
                 };
             };
             /** @description Not authenticated */

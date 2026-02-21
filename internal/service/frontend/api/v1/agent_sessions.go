@@ -130,16 +130,21 @@ func (a *API) CreateAgentSession(ctx context.Context, request api.CreateAgentSes
 	}, nil
 }
 
-// ListAgentSessions lists all sessions for the current user.
-func (a *API) ListAgentSessions(ctx context.Context, _ api.ListAgentSessionsRequestObject) (api.ListAgentSessionsResponseObject, error) {
+// ListAgentSessions lists sessions for the current user with pagination.
+func (a *API) ListAgentSessions(ctx context.Context, request api.ListAgentSessionsRequestObject) (api.ListAgentSessionsResponseObject, error) {
 	if err := a.requireAgent(ctx); err != nil {
 		return nil, err
 	}
 
 	user := extractUserContext(ctx)
-	sessions := a.agentAPI.ListSessions(ctx, user.UserID)
+	page := valueOf(request.Params.Page)
+	perPage := valueOf(request.Params.PerPage)
+	result := a.agentAPI.ListSessionsPaginated(ctx, user.UserID, page, perPage)
 
-	return api.ListAgentSessions200JSONResponse(toAPISessions(sessions)), nil
+	return api.ListAgentSessions200JSONResponse{
+		Sessions:   toAPISessions(result.Items),
+		Pagination: toPagination(result),
+	}, nil
 }
 
 // GetAgentSession returns session details including messages and state.

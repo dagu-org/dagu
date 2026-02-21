@@ -14,6 +14,7 @@ import (
 
 	api "github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -629,6 +630,41 @@ func (a *API) ListSessions(ctx context.Context, userID string) []SessionWithStat
 		sessions = []SessionWithState{}
 	}
 	return sessions
+}
+
+// ListSessionsPaginated returns a paginated list of sessions for the given user.
+// Active sessions appear first, followed by persisted inactive sessions.
+func (a *API) ListSessionsPaginated(ctx context.Context, userID string, page, perPage int) exec.PaginatedResult[SessionWithState] {
+	pg := exec.NewPaginator(page, perPage)
+
+	activeIDs := make(map[string]struct{})
+	activeSessions := a.collectActiveSessions(userID, activeIDs)
+
+	combined := make([]SessionWithState, 0, len(activeSessions))
+	combined = append(combined, activeSessions...)
+
+	if a.store != nil {
+		persisted, err := a.store.ListSessions(ctx, userID)
+		if err != nil {
+			a.logger.Warn("Failed to list persisted sessions", "error", err)
+		} else {
+			for _, sess := range persisted {
+				if _, exists := activeIDs[sess.ID]; exists {
+					continue
+				}
+				if sess.ParentSessionID != "" {
+					continue
+				}
+				combined = append(combined, SessionWithState{Session: *sess})
+			}
+		}
+	}
+
+	total := len(combined)
+	start := min(pg.Offset(), total)
+	end := min(pg.Offset()+pg.Limit(), total)
+
+	return exec.NewPaginatedResult(combined[start:end], total, pg)
 }
 
 // GetSessionDetail returns session details including messages and state.

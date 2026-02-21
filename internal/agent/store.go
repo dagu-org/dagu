@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
 // Sentinel errors for session store operations.
@@ -85,6 +86,10 @@ type SessionStore interface {
 	// Returns ErrInvalidUserID if userID is empty.
 	// Returns an empty slice if the user has no sessions.
 	ListSessions(ctx context.Context, userID string) ([]*Session, error)
+
+	// ListSessionsPaginated returns a page of sessions for a user, sorted by UpdatedAt descending.
+	// Returns ErrInvalidUserID if userID is empty.
+	ListSessionsPaginated(ctx context.Context, userID string, page, perPage int) (exec.PaginatedResult[*Session], error)
 
 	// UpdateSession updates session metadata such as Title and UpdatedAt.
 	// Returns ErrSessionNotFound if the session does not exist.

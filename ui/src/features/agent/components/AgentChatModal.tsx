@@ -45,6 +45,7 @@ export function AgentChatModal(): ReactElement | null {
     pendingUserMessage,
     sessionState,
     sessions,
+    hasMoreSessions,
     isWorking,
     error,
     answeredPrompts,
@@ -54,6 +55,7 @@ export function AgentChatModal(): ReactElement | null {
     clearSession,
     clearError,
     fetchSessions,
+    loadMoreSessions,
     selectSession,
     respondToPrompt,
     delegates,
@@ -187,6 +189,8 @@ export function AgentChatModal(): ReactElement | null {
           activeSessionId={sessionId}
           onSelectSession={handleSelectSession}
           onClose={toggleSidebar}
+          onLoadMore={loadMoreSessions}
+          hasMore={hasMoreSessions}
         />
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
           {errorBanner}

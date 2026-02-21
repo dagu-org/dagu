@@ -16,6 +16,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
 const (
@@ -331,6 +332,40 @@ func (s *Store) ListSessions(ctx context.Context, userID string) ([]*agent.Sessi
 	}
 
 	return sessions, nil
+}
+
+// ListSessionsPaginated returns a page of sessions for a user, sorted by UpdatedAt descending.
+func (s *Store) ListSessionsPaginated(ctx context.Context, userID string, page, perPage int) (exec.PaginatedResult[*agent.Session], error) {
+	if userID == "" {
+		return exec.PaginatedResult[*agent.Session]{}, agent.ErrInvalidUserID
+	}
+
+	pg := exec.NewPaginator(page, perPage)
+
+	s.mu.RLock()
+	allIDs := make([]string, len(s.byUser[userID]))
+	copy(allIDs, s.byUser[userID])
+	s.mu.RUnlock()
+
+	total := len(allIDs)
+
+	start := min(pg.Offset(), total)
+	end := min(pg.Offset()+pg.Limit(), total)
+	pageIDs := allIDs[start:end]
+
+	sessions := make([]*agent.Session, 0, len(pageIDs))
+	for _, id := range pageIDs {
+		sess, err := s.GetSession(ctx, id)
+		if err != nil {
+			if errors.Is(err, agent.ErrSessionNotFound) {
+				continue
+			}
+			return exec.PaginatedResult[*agent.Session]{}, err
+		}
+		sessions = append(sessions, sess)
+	}
+
+	return exec.NewPaginatedResult(sessions, total, pg), nil
 }
 
 // UpdateSession updates session metadata.

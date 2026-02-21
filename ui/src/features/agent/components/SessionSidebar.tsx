@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { ReactElement } from 'react';
 
 import { cn } from '@/lib/utils';
@@ -12,6 +13,8 @@ type Props = {
   activeSessionId: string | null;
   onSelectSession: (id: string) => void;
   onClose: () => void;
+  onLoadMore: () => void;
+  hasMore: boolean;
 };
 
 export function SessionSidebar({
@@ -21,7 +24,22 @@ export function SessionSidebar({
   activeSessionId,
   onSelectSession,
   onClose,
+  onLoadMore,
+  hasMore,
 }: Props): ReactElement | null {
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) onLoadMore(); },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, onLoadMore]);
+
   if (!isOpen) return null;
 
   const handleSelect = (id: string) => {
@@ -50,6 +68,7 @@ export function SessionSidebar({
             <span className="truncate">{formatDate(sess.session.created_at)}</span>
           </button>
         ))}
+        {hasMore && <div ref={sentinelRef} className="h-6 flex-shrink-0" />}
     </div>
   );
 

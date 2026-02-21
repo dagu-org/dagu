@@ -329,6 +329,125 @@ func TestStore_ListSessions(t *testing.T) {
 	}
 }
 
+func TestStore_ListSessionsPaginated(t *testing.T) {
+	tests := []struct {
+		name        string
+		setup       func(*Store, context.Context)
+		userID      string
+		page        int
+		perPage     int
+		wantCount   int
+		wantTotal   int
+		wantHasNext bool
+		wantErr     error
+	}{
+		{
+			name:    "empty userID",
+			userID:  "",
+			page:    1,
+			perPage: 10,
+			wantErr: agent.ErrInvalidUserID,
+		},
+		{
+			name:        "no sessions",
+			userID:      "user1",
+			page:        1,
+			perPage:     10,
+			wantCount:   0,
+			wantTotal:   0,
+			wantHasNext: false,
+		},
+		{
+			name: "first page",
+			setup: func(s *Store, ctx context.Context) {
+				for i := 0; i < 5; i++ {
+					require.NoError(t, s.CreateSession(ctx, createTestSession(fmt.Sprintf("s%d", i), "user1")))
+				}
+			},
+			userID:      "user1",
+			page:        1,
+			perPage:     3,
+			wantCount:   3,
+			wantTotal:   5,
+			wantHasNext: true,
+		},
+		{
+			name: "last page partial",
+			setup: func(s *Store, ctx context.Context) {
+				for i := 0; i < 5; i++ {
+					require.NoError(t, s.CreateSession(ctx, createTestSession(fmt.Sprintf("s%d", i), "user1")))
+				}
+			},
+			userID:      "user1",
+			page:        2,
+			perPage:     3,
+			wantCount:   2,
+			wantTotal:   5,
+			wantHasNext: false,
+		},
+		{
+			name: "page beyond range",
+			setup: func(s *Store, ctx context.Context) {
+				require.NoError(t, s.CreateSession(ctx, createTestSession("s1", "user1")))
+			},
+			userID:      "user1",
+			page:        5,
+			perPage:     10,
+			wantCount:   0,
+			wantTotal:   1,
+			wantHasNext: false,
+		},
+		{
+			name: "user isolation",
+			setup: func(s *Store, ctx context.Context) {
+				require.NoError(t, s.CreateSession(ctx, createTestSession("s1", "user1")))
+				require.NoError(t, s.CreateSession(ctx, createTestSession("s2", "user2")))
+				require.NoError(t, s.CreateSession(ctx, createTestSession("s3", "user1")))
+			},
+			userID:      "user1",
+			page:        1,
+			perPage:     10,
+			wantCount:   2,
+			wantTotal:   2,
+			wantHasNext: false,
+		},
+		{
+			name: "single item page",
+			setup: func(s *Store, ctx context.Context) {
+				for i := 0; i < 3; i++ {
+					require.NoError(t, s.CreateSession(ctx, createTestSession(fmt.Sprintf("s%d", i), "user1")))
+				}
+			},
+			userID:      "user1",
+			page:        2,
+			perPage:     1,
+			wantCount:   1,
+			wantTotal:   3,
+			wantHasNext: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store, ctx := setupTestStore(t)
+			if tt.setup != nil {
+				tt.setup(store, ctx)
+			}
+
+			result, err := store.ListSessionsPaginated(ctx, tt.userID, tt.page, tt.perPage)
+
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, result.Items, tt.wantCount)
+				assert.Equal(t, tt.wantTotal, result.TotalCount)
+				assert.Equal(t, tt.wantHasNext, result.HasNextPage)
+			}
+		})
+	}
+}
+
 func TestStore_UpdateSession(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -4677,21 +4677,21 @@ paths:
                 $ref: "#/components/schemas/Error"
     get:
       summary: "List agent sessions"
-      description: "Lists all sessions for the current user."
+      description: "Lists sessions for the current user with pagination."
       operationId: "listAgentSessions"
       tags:
         - "agent"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
       responses:
         "200":
-          description: "List of sessions"
+          description: "Paginated list of sessions"
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/AgentSessionWithState"
+                $ref: "#/components/schemas/ListAgentSessionsResponse"
         "401":
           description: "Not authenticated"
           content:
@@ -7895,6 +7895,20 @@ components:
           properties:
             session:
               $ref: "#/components/schemas/AgentSession"
+
+    ListAgentSessionsResponse:
+      type: object
+      description: "Paginated list of agent sessions"
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentSessionWithState"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      required:
+        - sessions
+        - pagination
 
     AgentToolCallFunction:
       type: object

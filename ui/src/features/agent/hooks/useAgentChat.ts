@@ -136,10 +136,15 @@ export function useAgentChat() {
     pendingUserMessage,
     sessionState,
     sessions,
+    hasMoreSessions,
+    sessionPage,
     setSessionId,
     setMessages,
     setSessionState,
     setSessions,
+    appendSessions,
+    setHasMoreSessions,
+    setSessionPage,
     addMessage,
     setPendingUserMessage,
     clearSession,
@@ -165,6 +170,33 @@ export function useAgentChat() {
     onPreConnect: dm.resetDelegates,
   });
 
+  const fetchSessionsPage = useCallback(async (page: number): Promise<void> => {
+    try {
+      const { data, error: apiError } = await client.GET('/agent/sessions', {
+        params: { query: { remoteNode, page, perPage: 30 } },
+      });
+      if (apiError) throw new Error(apiError.message || 'Failed to fetch sessions');
+      if (!data) return;
+
+      const converted = convertApiSessions(data.sessions);
+      if (page === 1) {
+        setSessions(converted);
+      } else {
+        appendSessions(converted);
+      }
+      setHasMoreSessions(data.pagination.currentPage < data.pagination.totalPages);
+      setSessionPage(page);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch sessions');
+      if (page === 1) setSessions([]);
+    }
+  }, [client, remoteNode, setSessions, appendSessions, setHasMoreSessions, setSessionPage]);
+
+  const loadMoreSessions = useCallback(async (): Promise<void> => {
+    if (!hasMoreSessions) return;
+    await fetchSessionsPage(sessionPage + 1);
+  }, [fetchSessionsPage, sessionPage, hasMoreSessions]);
+
   const startSession = useCallback(
     async (message: string, model?: string, dagContexts?: DAGContext[]): Promise<string> => {
       const { data, error: apiError } = await client.POST('/agent/sessions', {
@@ -178,13 +210,10 @@ export function useAgentChat() {
       });
       if (apiError) throw new Error(apiError.message || 'Failed to create session');
       setSessionId(data.sessionId);
-      const { data: sessionsData } = await client.GET('/agent/sessions', {
-        params: { query: { remoteNode } },
-      });
-      setSessions(sessionsData ? convertApiSessions(sessionsData) : []);
+      await fetchSessionsPage(1);
       return data.sessionId;
     },
-    [client, remoteNode, setSessionId, setSessions, preferences.safeMode]
+    [client, remoteNode, setSessionId, fetchSessionsPage, preferences.safeMode]
   );
 
   const sendMessage = useCallback(
@@ -248,17 +277,8 @@ export function useAgentChat() {
   }, [client, remoteNode, sessionId]);
 
   const fetchSessions = useCallback(async (): Promise<void> => {
-    try {
-      const { data, error: apiError } = await client.GET('/agent/sessions', {
-        params: { query: { remoteNode } },
-      });
-      if (apiError) throw new Error(apiError.message || 'Failed to fetch sessions');
-      setSessions(data ? convertApiSessions(data) : []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch sessions');
-      setSessions([]);
-    }
-  }, [client, remoteNode, setSessions]);
+    await fetchSessionsPage(1);
+  }, [fetchSessionsPage]);
 
   const selectSession = useCallback(
     async (id: string): Promise<void> => {
@@ -314,6 +334,7 @@ export function useAgentChat() {
     pendingUserMessage,
     sessionState,
     sessions,
+    hasMoreSessions,
     isWorking,
     error,
     answeredPrompts,
@@ -323,6 +344,7 @@ export function useAgentChat() {
     clearSession: handleClearSession,
     clearError,
     fetchSessions,
+    loadMoreSessions,
     selectSession,
     respondToPrompt,
     delegates: dm.delegates,
