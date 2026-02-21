@@ -5,6 +5,7 @@ import { getResponsiveTitleClass } from '@/lib/text-utils';
 import { Menu, Terminal, X } from 'lucide-react';
 import { useAgentChatContext } from '@/features/agent';
 import * as React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { mainListItems as MainListItems } from '../menu';
 
 /**
@@ -77,7 +78,17 @@ type LayoutProps = {
  */
 function Content({ navbarColor, children }: LayoutProps) {
   const config = useConfig();
-  const { toggleChat } = useAgentChatContext();
+  const { toggleChat, openChat } = useAgentChatContext();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Auto-open agent modal when redirected from setup with openAgent state
+  React.useEffect(() => {
+    if ((location.state as { openAgent?: boolean })?.openAgent) {
+      openChat();
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, openChat, navigate]);
   const hasCustomColor: boolean = Boolean(
     navbarColor && navbarColor.trim() !== ''
   );

@@ -9,7 +9,7 @@ import { ErrorModalProvider } from './components/ui/error-modal';
 import { ToastProvider } from './components/ui/simple-toast';
 import { AppBarContext } from './contexts/AppBarContext';
 import { AuthProvider } from './contexts/AuthContext';
-import { Config, ConfigContext } from './contexts/ConfigContext';
+import { Config, ConfigContext, ConfigUpdateContext } from './contexts/ConfigContext';
 import { PageContextProvider } from './contexts/PageContext';
 import { SchemaProvider } from './contexts/SchemaContext';
 import { SearchStateProvider } from './contexts/SearchStateContext';
@@ -92,7 +92,12 @@ function DeveloperElement({
   return <ProtectedRoute requiredRole="developer">{children}</ProtectedRoute>;
 }
 
-function AppInner({ config }: Props): React.ReactElement {
+function AppInner({ config: initialConfig }: Props): React.ReactElement {
+  const [config, setConfig] = React.useState(initialConfig);
+  const updateConfig = React.useCallback((patch: Partial<Config>) => {
+    setConfig((prev) => ({ ...prev, ...patch }));
+  }, []);
+
   const [title, setTitle] = React.useState<string>('');
   const { preferences } = useUserPreferences();
   const theme = preferences.theme || 'dark';
@@ -144,6 +149,7 @@ function AppInner({ config }: Props): React.ReactElement {
           }}
         >
           <ConfigContext.Provider value={config}>
+          <ConfigUpdateContext.Provider value={updateConfig}>
             <AuthProvider>
               <SearchStateProvider>
                 <SchemaProvider>
@@ -198,6 +204,7 @@ function AppInner({ config }: Props): React.ReactElement {
                 </SchemaProvider>
               </SearchStateProvider>
             </AuthProvider>
+          </ConfigUpdateContext.Provider>
           </ConfigContext.Provider>
         </AppBarContext.Provider>
       </SWRConfig>

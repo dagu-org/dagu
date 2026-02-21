@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useConfig } from '@/contexts/ConfigContext';
+import { useConfig, useUpdateConfig } from '@/contexts/ConfigContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient } from '@/hooks/api';
 import { components } from '@/api/v1/schema';
@@ -44,6 +44,7 @@ function generateSlugId(name: string): string {
 
 export default function SetupPage() {
   const config = useConfig();
+  const updateConfig = useUpdateConfig();
   const { setupRequired, setup, completeSetup } = useAuth();
   const navigate = useNavigate();
 
@@ -225,7 +226,8 @@ export default function SetupPage() {
         );
       }
 
-      navigate('/', { replace: true });
+      updateConfig({ agentEnabled: true });
+      navigate('/', { replace: true, state: { openAgent: true } });
     } catch (err) {
       setStep2Error(err instanceof Error ? err.message : 'Configuration failed');
     } finally {
