@@ -77,10 +77,11 @@ type APIConfig struct {
 
 // SessionWithState is a session with its current state.
 type SessionWithState struct {
-	Session   Session `json:"session"`
-	Working   bool    `json:"working"`
-	Model     string  `json:"model,omitempty"`
-	TotalCost float64 `json:"total_cost"`
+	Session          Session `json:"session"`
+	Working          bool    `json:"working"`
+	HasPendingPrompt bool    `json:"has_pending_prompt"`
+	Model            string  `json:"model,omitempty"`
+	TotalCost        float64 `json:"total_cost"`
 }
 
 // NewAPI creates a new API instance.
@@ -310,10 +311,11 @@ func (a *API) collectActiveSessions(userID string, activeIDs map[string]struct{}
 		}
 		activeIDs[id] = struct{}{}
 		sessions = append(sessions, SessionWithState{
-			Session:   sess,
-			Working:   mgr.IsWorking(),
-			Model:     mgr.GetModel(),
-			TotalCost: mgr.GetTotalCost(),
+			Session:          sess,
+			Working:          mgr.IsWorking(),
+			HasPendingPrompt: mgr.HasPendingPrompt(),
+			Model:            mgr.GetModel(),
+			TotalCost:        mgr.GetTotalCost(),
 		})
 		return true
 	})
@@ -638,10 +640,11 @@ func (a *API) GetSessionDetail(ctx context.Context, sessionID, userID string) (*
 			Messages: mgr.GetMessages(),
 			Session:  &sess,
 			SessionState: &SessionState{
-				SessionID: sessionID,
-				Working:   mgr.IsWorking(),
-				Model:     mgr.GetModel(),
-				TotalCost: mgr.GetTotalCost(),
+				SessionID:        sessionID,
+				Working:          mgr.IsWorking(),
+				HasPendingPrompt: mgr.HasPendingPrompt(),
+				Model:            mgr.GetModel(),
+				TotalCost:        mgr.GetTotalCost(),
 			},
 			Delegates: mgr.GetDelegates(),
 		}, nil
@@ -800,6 +803,14 @@ func (a *API) cleanupIdleSessions() {
 		sess := mgr.GetSession()
 		if sess.ParentSessionID != "" {
 			return true
+		}
+		// Detect stuck sessions: working but no heartbeat in 30s (3x the 10s interval).
+		if mgr.IsWorking() {
+			lastHB := mgr.LastHeartbeat()
+			if !lastHB.IsZero() && time.Since(lastHB) > 30*time.Second {
+				_ = mgr.Cancel(context.Background())
+				a.logger.Warn("Cancelled stuck session", "session_id", id)
+			}
 		}
 		if !mgr.IsWorking() && mgr.LastActivity().Before(cutoff) {
 			toDelete = append(toDelete, id)

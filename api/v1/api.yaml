@@ -7871,6 +7871,9 @@ components:
           type: string
         working:
           type: boolean
+        hasPendingPrompt:
+          type: boolean
+          description: "Whether the agent is waiting for user input"
         model:
           type: string
         totalCost:
@@ -7891,6 +7894,9 @@ components:
           $ref: "#/components/schemas/AgentSession"
         working:
           type: boolean
+        hasPendingPrompt:
+          type: boolean
+          description: "Whether the agent is waiting for user input"
         model:
           type: string
         totalCost:

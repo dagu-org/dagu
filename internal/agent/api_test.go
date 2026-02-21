@@ -1204,3 +1204,74 @@ func TestAPI_CleanupIdleSessions_DeletesIdleSession(t *testing.T) {
 	_, exists = api.sessions.Load("cleanup-cancel")
 	assert.False(t, exists, "idle session should be cleaned up")
 }
+
+func TestAPI_CleanupIdleSessions_CancelsStuckSession(t *testing.T) {
+	t.Parallel()
+
+	api := NewAPI(APIConfig{
+		ConfigStore: newMockConfigStore(true),
+		WorkingDir:  t.TempDir(),
+	})
+
+	mgr := NewSessionManager(SessionManagerConfig{ID: "stuck-sess"})
+	mgr.mu.Lock()
+	mgr.working = true
+	mgr.lastHeartbeat = time.Now().Add(-1 * time.Minute) // stale heartbeat
+	mgr.lastActivity = time.Now()                        // recent activity
+	mgr.mu.Unlock()
+
+	api.sessions.Store("stuck-sess", mgr)
+
+	api.cleanupIdleSessions()
+
+	// Session should have been cancelled (working set to false)
+	assert.False(t, mgr.IsWorking(), "stuck session should be cancelled")
+}
+
+func TestAPI_CleanupIdleSessions_DoesNotCancelHealthyWorkingSession(t *testing.T) {
+	t.Parallel()
+
+	api := NewAPI(APIConfig{
+		ConfigStore: newMockConfigStore(true),
+		WorkingDir:  t.TempDir(),
+	})
+
+	mgr := NewSessionManager(SessionManagerConfig{ID: "healthy-sess"})
+	mgr.mu.Lock()
+	mgr.working = true
+	mgr.lastHeartbeat = time.Now() // fresh heartbeat
+	mgr.lastActivity = time.Now()
+	mgr.mu.Unlock()
+
+	api.sessions.Store("healthy-sess", mgr)
+
+	api.cleanupIdleSessions()
+
+	// Session should still be working
+	_, exists := api.sessions.Load("healthy-sess")
+	assert.True(t, exists, "healthy working session should not be removed")
+}
+
+func TestAPI_CleanupIdleSessions_DoesNotCancelZeroHeartbeat(t *testing.T) {
+	t.Parallel()
+
+	api := NewAPI(APIConfig{
+		ConfigStore: newMockConfigStore(true),
+		WorkingDir:  t.TempDir(),
+	})
+
+	// Working session with zero heartbeat (loop hasn't started heartbeating yet)
+	mgr := NewSessionManager(SessionManagerConfig{ID: "no-hb-sess"})
+	mgr.mu.Lock()
+	mgr.working = true
+	mgr.lastActivity = time.Now()
+	mgr.mu.Unlock()
+
+	api.sessions.Store("no-hb-sess", mgr)
+
+	api.cleanupIdleSessions()
+
+	// Should not be cancelled because lastHeartbeat is zero
+	_, exists := api.sessions.Load("no-hb-sess")
+	assert.True(t, exists, "session with zero heartbeat should not be cancelled")
+}

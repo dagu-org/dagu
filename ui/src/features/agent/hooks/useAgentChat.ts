@@ -82,6 +82,7 @@ function convertApiSessions(sessions: ApiSessionWithState[]): SessionWithState[]
       delegate_task: s.session.delegateTask,
     },
     working: s.working,
+    has_pending_prompt: s.hasPendingPrompt,
     model: s.model,
     total_cost: s.totalCost,
   }));
@@ -105,6 +106,7 @@ function convertApiSessionDetail(detail: ApiSessionDetail): StreamResponse {
       ? {
           session_id: detail.sessionState.sessionId,
           working: detail.sessionState.working,
+          has_pending_prompt: detail.sessionState.hasPendingPrompt,
           model: detail.sessionState.model,
           total_cost: detail.sessionState.totalCost,
         }

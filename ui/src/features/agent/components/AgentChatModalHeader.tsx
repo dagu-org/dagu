@@ -86,7 +86,14 @@ export function AgentChatModalHeader({
                 value={sess.session.id}
                 className="text-xs"
               >
-                {formatDate(sess.session.created_at)}
+                <div className="flex items-center gap-1.5">
+                  {sess.has_pending_prompt ? (
+                    <span className="h-2 w-2 rounded-full bg-orange-400 flex-shrink-0" title="Waiting for input" />
+                  ) : sess.working ? (
+                    <span className="h-2 w-2 rounded-full bg-green-500 flex-shrink-0" title="Running" />
+                  ) : null}
+                  {formatDate(sess.session.created_at)}
+                </div>
               </SelectItem>
             ))}
           </SelectContent>

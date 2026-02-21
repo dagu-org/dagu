@@ -23,6 +23,7 @@ type SessionManager struct {
 	mu              sync.Mutex
 	createdAt       time.Time
 	lastActivity    time.Time
+	lastHeartbeat   time.Time
 	model           string
 	messages        []Message
 	subpub          *SubPub[StreamResponse]
@@ -213,6 +214,29 @@ func (sm *SessionManager) LastActivity() time.Time {
 	return sm.lastActivity
 }
 
+// HasPendingPrompt returns true if the session has pending user prompts.
+func (sm *SessionManager) HasPendingPrompt() bool {
+	sm.promptsMu.Lock()
+	defer sm.promptsMu.Unlock()
+	return len(sm.pendingPrompts) > 0
+}
+
+// RecordHeartbeat updates the heartbeat and activity timestamps.
+func (sm *SessionManager) RecordHeartbeat() {
+	sm.mu.Lock()
+	now := time.Now()
+	sm.lastHeartbeat = now
+	sm.lastActivity = now
+	sm.mu.Unlock()
+}
+
+// LastHeartbeat returns the time of the most recent heartbeat.
+func (sm *SessionManager) LastHeartbeat() time.Time {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	return sm.lastHeartbeat
+}
+
 // GetModel returns the model ID used by this session.
 func (sm *SessionManager) GetModel() string {
 	sm.mu.Lock()
@@ -351,6 +375,10 @@ func (sm *SessionManager) SubscribeWithSnapshot(ctx context.Context) (StreamResp
 	model := sm.model
 	totalCost := sm.totalCost
 	id := sm.id
+
+	sm.promptsMu.Lock()
+	hasPendingPrompt := len(sm.pendingPrompts) > 0
+	sm.promptsMu.Unlock()
 	sess := Session{
 		ID:              id,
 		UserID:          sm.user.UserID,
@@ -374,10 +402,11 @@ func (sm *SessionManager) SubscribeWithSnapshot(ctx context.Context) (StreamResp
 		Messages: msgs,
 		Session:  &sess,
 		SessionState: &SessionState{
-			SessionID: id,
-			Working:   working,
-			Model:     model,
-			TotalCost: totalCost,
+			SessionID:        id,
+			Working:          working,
+			HasPendingPrompt: hasPendingPrompt,
+			Model:            model,
+			TotalCost:        totalCost,
 		},
 		Delegates: delegates,
 	}, next
@@ -460,6 +489,7 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		WorkingDir:       sm.workingDir,
 		SessionID:        sm.id,
 		OnWorking:        sm.SetWorking,
+		OnHeartbeat:      sm.RecordHeartbeat,
 		EmitUIAction:     sm.createEmitUIActionFunc(),
 		EmitUserPrompt:   sm.createEmitUserPromptFunc(),
 		WaitUserResponse: sm.createWaitUserResponseFunc(),

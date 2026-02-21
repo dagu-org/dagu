@@ -803,3 +803,92 @@ func TestSessionManager_SubscribeWithSnapshot_IncludesDelegates(t *testing.T) {
 	assert.Equal(t, DelegateStatusCompleted, byID["del-a"].Status)
 	assert.Equal(t, DelegateStatusRunning, byID["del-b"].Status)
 }
+
+func TestSessionManager_HasPendingPrompt(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns false when no prompts pending", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "prompt-test"})
+		assert.False(t, sm.HasPendingPrompt())
+	})
+
+	t.Run("returns true when prompts are pending", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "prompt-test"})
+
+		// Simulate a pending prompt by adding to the map directly
+		sm.promptsMu.Lock()
+		sm.pendingPrompts["test-prompt"] = make(chan UserPromptResponse, 1)
+		sm.promptsMu.Unlock()
+
+		assert.True(t, sm.HasPendingPrompt())
+	})
+
+	t.Run("returns false after prompt is removed", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "prompt-test"})
+
+		sm.promptsMu.Lock()
+		sm.pendingPrompts["test-prompt"] = make(chan UserPromptResponse, 1)
+		sm.promptsMu.Unlock()
+
+		assert.True(t, sm.HasPendingPrompt())
+
+		sm.promptsMu.Lock()
+		delete(sm.pendingPrompts, "test-prompt")
+		sm.promptsMu.Unlock()
+
+		assert.False(t, sm.HasPendingPrompt())
+	})
+}
+
+func TestSessionManager_RecordHeartbeat(t *testing.T) {
+	t.Parallel()
+
+	t.Run("updates lastHeartbeat", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "hb-test"})
+		assert.True(t, sm.LastHeartbeat().IsZero())
+
+		sm.RecordHeartbeat()
+
+		hb := sm.LastHeartbeat()
+		assert.False(t, hb.IsZero())
+		assert.WithinDuration(t, time.Now(), hb, time.Second)
+	})
+
+	t.Run("updates lastActivity", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "hb-test"})
+		initialActivity := sm.LastActivity()
+
+		time.Sleep(10 * time.Millisecond)
+		sm.RecordHeartbeat()
+
+		assert.True(t, sm.LastActivity().After(initialActivity))
+	})
+
+	t.Run("is thread-safe", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "hb-test"})
+
+		var wg sync.WaitGroup
+		for range 10 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				sm.RecordHeartbeat()
+			}()
+		}
+		wg.Wait()
+
+		assert.False(t, sm.LastHeartbeat().IsZero())
+	})
+}

@@ -91,6 +91,7 @@ export interface Session {
 export interface SessionState {
   session_id: string;
   working: boolean;
+  has_pending_prompt?: boolean;
   model?: string;
   total_cost?: number;
 }
@@ -98,6 +99,7 @@ export interface SessionState {
 export interface SessionWithState {
   session: Session;
   working: boolean;
+  has_pending_prompt?: boolean;
   model?: string;
   total_cost?: number;
 }

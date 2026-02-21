@@ -253,10 +253,11 @@ func toAPISessions(sessions []agent.SessionWithState) []api.AgentSessionWithStat
 	result := make([]api.AgentSessionWithState, len(sessions))
 	for i, s := range sessions {
 		result[i] = api.AgentSessionWithState{
-			Session:   toAPISession(s.Session),
-			Working:   s.Working,
-			Model:     ptrOf(s.Model),
-			TotalCost: s.TotalCost,
+			Session:          toAPISession(s.Session),
+			Working:          s.Working,
+			HasPendingPrompt: ptrOf(s.HasPendingPrompt),
+			Model:            ptrOf(s.Model),
+			TotalCost:        s.TotalCost,
 		}
 	}
 	return result
@@ -270,10 +271,11 @@ func toAPISessionDetail(resp *agent.StreamResponse) api.AgentSessionDetailRespon
 	}
 	if resp.SessionState != nil {
 		out.SessionState = api.AgentSessionState{
-			SessionId: resp.SessionState.SessionID,
-			Working:   resp.SessionState.Working,
-			Model:     ptrOf(resp.SessionState.Model),
-			TotalCost: resp.SessionState.TotalCost,
+			SessionId:        resp.SessionState.SessionID,
+			Working:          resp.SessionState.Working,
+			HasPendingPrompt: ptrOf(resp.SessionState.HasPendingPrompt),
+			Model:            ptrOf(resp.SessionState.Model),
+			TotalCost:        resp.SessionState.TotalCost,
 		}
 	}
 	if resp.Messages != nil {

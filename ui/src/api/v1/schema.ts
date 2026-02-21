@@ -24,6 +24,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create initial admin account
+         * @description Creates the first admin user during initial setup. Only available when no users exist. Returns a JWT token for immediate login.
+         */
+        post: operations["setup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -2825,6 +2845,13 @@ export interface components {
          * @enum {string}
          */
         UserRole: UserRole;
+        /** @description Request body for initial admin account setup */
+        SetupRequest: {
+            /** @description Admin username */
+            username: string;
+            /** @description Admin password */
+            password: string;
+        };
         /** @description Request body for user login */
         LoginRequest: {
             /** @description User's username */
@@ -3412,6 +3439,8 @@ export interface components {
         AgentSessionState: {
             sessionId: string;
             working: boolean;
+            /** @description Whether the agent is waiting for user input */
+            hasPendingPrompt?: boolean;
             model?: string;
             /**
              * Format: double
@@ -3423,6 +3452,8 @@ export interface components {
         AgentSessionWithState: {
             session: components["schemas"]["AgentSession"];
             working: boolean;
+            /** @description Whether the agent is waiting for user input */
+            hasPendingPrompt?: boolean;
             model?: string;
             /**
              * Format: double
@@ -3598,6 +3629,57 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    setup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupRequest"];
+            };
+        };
+        responses: {
+            /** @description Admin account created successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResponse"];
+                };
+            };
+            /** @description Invalid request (e.g., weak password) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Setup already completed (users exist) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
