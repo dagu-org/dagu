@@ -130,16 +130,21 @@ func (a *API) CreateAgentSession(ctx context.Context, request api.CreateAgentSes
 	}, nil
 }
 
-// ListAgentSessions lists all sessions for the current user.
-func (a *API) ListAgentSessions(ctx context.Context, _ api.ListAgentSessionsRequestObject) (api.ListAgentSessionsResponseObject, error) {
+// ListAgentSessions lists sessions for the current user with pagination.
+func (a *API) ListAgentSessions(ctx context.Context, request api.ListAgentSessionsRequestObject) (api.ListAgentSessionsResponseObject, error) {
 	if err := a.requireAgent(ctx); err != nil {
 		return nil, err
 	}
 
 	user := extractUserContext(ctx)
-	sessions := a.agentAPI.ListSessions(ctx, user.UserID)
+	page := valueOf(request.Params.Page)
+	perPage := valueOf(request.Params.PerPage)
+	result := a.agentAPI.ListSessionsPaginated(ctx, user.UserID, page, perPage)
 
-	return api.ListAgentSessions200JSONResponse(toAPISessions(sessions)), nil
+	return api.ListAgentSessions200JSONResponse{
+		Sessions:   toAPISessions(result.Items),
+		Pagination: toPagination(result),
+	}, nil
 }
 
 // GetAgentSession returns session details including messages and state.
@@ -253,10 +258,12 @@ func toAPISessions(sessions []agent.SessionWithState) []api.AgentSessionWithStat
 	result := make([]api.AgentSessionWithState, len(sessions))
 	for i, s := range sessions {
 		result[i] = api.AgentSessionWithState{
-			Session:   toAPISession(s.Session),
-			Working:   s.Working,
-			Model:     ptrOf(s.Model),
-			TotalCost: s.TotalCost,
+			Session:          toAPISession(s.Session),
+			SessionId:        s.Session.ID,
+			Working:          s.Working,
+			HasPendingPrompt: ptrOf(s.HasPendingPrompt),
+			Model:            ptrOf(s.Model),
+			TotalCost:        s.TotalCost,
 		}
 	}
 	return result
@@ -270,10 +277,11 @@ func toAPISessionDetail(resp *agent.StreamResponse) api.AgentSessionDetailRespon
 	}
 	if resp.SessionState != nil {
 		out.SessionState = api.AgentSessionState{
-			SessionId: resp.SessionState.SessionID,
-			Working:   resp.SessionState.Working,
-			Model:     ptrOf(resp.SessionState.Model),
-			TotalCost: resp.SessionState.TotalCost,
+			SessionId:        resp.SessionState.SessionID,
+			Working:          resp.SessionState.Working,
+			HasPendingPrompt: ptrOf(resp.SessionState.HasPendingPrompt),
+			Model:            ptrOf(resp.SessionState.Model),
+			TotalCost:        resp.SessionState.TotalCost,
 		}
 	}
 	if resp.Messages != nil {

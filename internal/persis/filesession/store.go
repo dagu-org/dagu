@@ -71,18 +71,25 @@ func FromSession(sess *agent.Session, messages []agent.Message) *SessionForStora
 // Sessions are stored as individual JSON files in user-specific directories.
 // Thread-safe through internal locking.
 type Store struct {
-	baseDir   string
-	mu        sync.RWMutex
-	byID      map[string]string    // session ID -> file path
-	byUser    map[string][]string  // user ID -> session IDs (sorted by UpdatedAt descending)
-	byParent  map[string][]string  // parent session ID -> child session IDs
-	updatedAt map[string]time.Time // session ID -> last update time
+	baseDir    string
+	maxPerUser int // 0 = unlimited
+	mu         sync.RWMutex
+	byID       map[string]string    // session ID -> file path
+	byUser     map[string][]string  // user ID -> session IDs (sorted by UpdatedAt descending)
+	byParent   map[string][]string  // parent session ID -> child session IDs
+	updatedAt  map[string]time.Time // session ID -> last update time
 }
 
 var _ agent.SessionStore = (*Store)(nil)
 
 // Option is a functional option for configuring the Store.
 type Option func(*Store)
+
+// WithMaxPerUser configures automatic cleanup of the oldest sessions when a
+// user exceeds the given limit. A value of 0 or negative disables cleanup.
+func WithMaxPerUser(n int) Option {
+	return func(s *Store) { s.maxPerUser = n }
+}
 
 // New creates a new file-based session store.
 // The baseDir must be non-empty; provided Option functions are applied to the store.
@@ -247,6 +254,7 @@ func (s *Store) CreateSession(_ context.Context, sess *agent.Session) error {
 		s.byParent[sess.ParentSessionID] = append(s.byParent[sess.ParentSessionID], sess.ID)
 	}
 	s.sortUserSessions(sess.UserID)
+	s.enforceMaxSessionsLocked(sess.UserID)
 
 	return nil
 }
@@ -366,6 +374,12 @@ func (s *Store) DeleteSession(_ context.Context, id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.deleteSessionLocked(id)
+}
+
+// deleteSessionLocked removes a session file and its index entries.
+// Must be called with mu held.
+func (s *Store) deleteSessionLocked(id string) error {
 	filePath, exists := s.byID[id]
 	if !exists {
 		return agent.ErrSessionNotFound
@@ -424,6 +438,63 @@ func removeFromSlice(slice []string, target string) []string {
 		}
 	}
 	return slice
+}
+
+// enforceMaxSessionsLocked deletes the oldest top-level sessions for a user
+// when the count exceeds maxPerUser. Must be called with mu held.
+func (s *Store) enforceMaxSessionsLocked(userID string) {
+	if s.maxPerUser <= 0 {
+		return
+	}
+
+	sessIDs := s.byUser[userID] // already sorted by updatedAt desc
+
+	// Build sub-session set to exclude from counting.
+	subSessions := make(map[string]struct{})
+	for _, children := range s.byParent {
+		for _, childID := range children {
+			subSessions[childID] = struct{}{}
+		}
+	}
+
+	// Collect top-level sessions in order (newest first).
+	var topLevel []string
+	for _, id := range sessIDs {
+		if _, isSub := subSessions[id]; !isSub {
+			topLevel = append(topLevel, id)
+		}
+	}
+
+	if len(topLevel) <= s.maxPerUser {
+		return
+	}
+
+	// Delete excess (oldest = tail of sorted list).
+	excess := topLevel[s.maxPerUser:]
+	for _, id := range excess {
+		// Snapshot child IDs before iterating — deleteSessionLocked mutates
+		// s.byParent[id] via removeFromSlice, which shifts the backing array
+		// and would cause the range loop to skip elements.
+		children := append([]string{}, s.byParent[id]...)
+		for _, childID := range children {
+			if err := s.deleteSessionLocked(childID); err != nil {
+				slog.Warn("filesession: failed to delete sub-session during cleanup",
+					slog.String("session_id", childID),
+					slog.String("parent_id", id),
+					slog.String("error", err.Error()))
+			}
+		}
+		if err := s.deleteSessionLocked(id); err != nil {
+			slog.Warn("filesession: failed to delete session during cleanup",
+				slog.String("session_id", id),
+				slog.String("error", err.Error()))
+		}
+	}
+
+	slog.Info("filesession: purged excess sessions",
+		slog.String("user_id", userID),
+		slog.Int("removed", len(excess)),
+		slog.Int("max_per_user", s.maxPerUser))
 }
 
 // AddMessage appends a message to a session.

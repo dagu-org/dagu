@@ -3,6 +3,7 @@ package filesession
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1478,4 +1479,175 @@ func TestStore_SubSession_MessagesIsolated(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, subMsgs, 1)
 	assert.Equal(t, "sub message", subMsgs[0].Content)
+}
+
+func setupTestStoreWithMaxPerUser(t *testing.T, maxPerUser int) (*Store, context.Context) {
+	t.Helper()
+	store, err := New(t.TempDir(), WithMaxPerUser(maxPerUser))
+	require.NoError(t, err)
+	return store, context.Background()
+}
+
+func createTestSessionWithTime(id, userID string, updatedAt time.Time) *agent.Session {
+	return &agent.Session{
+		ID:        id,
+		UserID:    userID,
+		CreatedAt: updatedAt,
+		UpdatedAt: updatedAt,
+	}
+}
+
+func TestCreateSession_EnforcesMaxPerUser(t *testing.T) {
+	store, ctx := setupTestStoreWithMaxPerUser(t, 3)
+
+	base := time.Now()
+	// Create 5 sessions with increasing timestamps so ordering is deterministic.
+	for i := range 5 {
+		sess := createTestSessionWithTime(
+			fmt.Sprintf("sess-%d", i),
+			"user1",
+			base.Add(time.Duration(i)*time.Second),
+		)
+		require.NoError(t, store.CreateSession(ctx, sess))
+	}
+
+	// Newest 3 should survive, oldest 2 should be deleted.
+	for i := range 5 {
+		_, err := store.GetSession(ctx, fmt.Sprintf("sess-%d", i))
+		if i < 2 {
+			assert.ErrorIs(t, err, agent.ErrSessionNotFound, "session sess-%d should have been deleted", i)
+		} else {
+			assert.NoError(t, err, "session sess-%d should still exist", i)
+		}
+	}
+}
+
+func TestCreateSession_MaxPerUser_SubSessionsNotCounted(t *testing.T) {
+	store, ctx := setupTestStoreWithMaxPerUser(t, 3)
+
+	base := time.Now()
+	// Create 3 top-level sessions.
+	for i := range 3 {
+		sess := createTestSessionWithTime(
+			fmt.Sprintf("parent-%d", i),
+			"user1",
+			base.Add(time.Duration(i)*time.Second),
+		)
+		require.NoError(t, store.CreateSession(ctx, sess))
+	}
+
+	// Create 5 sub-sessions under parent-2 — these should NOT count toward limit.
+	for i := range 5 {
+		sub := createTestSessionWithTime(
+			fmt.Sprintf("sub-%d", i),
+			"user1",
+			base.Add(time.Duration(10+i)*time.Second),
+		)
+		sub.ParentSessionID = "parent-2"
+		require.NoError(t, store.CreateSession(ctx, sub))
+	}
+
+	// All 3 parents should still exist (sub-sessions don't count).
+	for i := range 3 {
+		_, err := store.GetSession(ctx, fmt.Sprintf("parent-%d", i))
+		assert.NoError(t, err, "parent-%d should still exist", i)
+	}
+}
+
+func TestCreateSession_MaxPerUser_DeletesSubSessionsWithParent(t *testing.T) {
+	store, ctx := setupTestStoreWithMaxPerUser(t, 2)
+
+	base := time.Now()
+	// Create parent-0 (oldest).
+	sess0 := createTestSessionWithTime("parent-0", "user1", base)
+	require.NoError(t, store.CreateSession(ctx, sess0))
+
+	// Create 4 sub-sessions under parent-0 (3+ to catch range-mutation bugs).
+	for i := range 4 {
+		sub := createTestSessionWithTime(
+			fmt.Sprintf("sub-%d", i),
+			"user1",
+			base.Add(time.Duration(1+i)*time.Second),
+		)
+		sub.ParentSessionID = "parent-0"
+		require.NoError(t, store.CreateSession(ctx, sub))
+	}
+
+	// Create parent-1 and parent-2, pushing parent-0 beyond the limit of 2.
+	sess1 := createTestSessionWithTime("parent-1", "user1", base.Add(10*time.Second))
+	require.NoError(t, store.CreateSession(ctx, sess1))
+
+	sess2 := createTestSessionWithTime("parent-2", "user1", base.Add(20*time.Second))
+	require.NoError(t, store.CreateSession(ctx, sess2))
+
+	// parent-0 should be deleted along with ALL its sub-sessions.
+	_, err := store.GetSession(ctx, "parent-0")
+	assert.ErrorIs(t, err, agent.ErrSessionNotFound)
+	for i := range 4 {
+		_, err = store.GetSession(ctx, fmt.Sprintf("sub-%d", i))
+		assert.ErrorIs(t, err, agent.ErrSessionNotFound, "sub-%d should have been deleted", i)
+	}
+
+	// parent-1 and parent-2 should survive.
+	_, err = store.GetSession(ctx, "parent-1")
+	assert.NoError(t, err)
+	_, err = store.GetSession(ctx, "parent-2")
+	assert.NoError(t, err)
+}
+
+func TestCreateSession_MaxPerUser_ZeroMeansUnlimited(t *testing.T) {
+	store, ctx := setupTestStoreWithMaxPerUser(t, 0)
+
+	base := time.Now()
+	for i := range 200 {
+		sess := createTestSessionWithTime(
+			fmt.Sprintf("sess-%d", i),
+			"user1",
+			base.Add(time.Duration(i)*time.Millisecond),
+		)
+		require.NoError(t, store.CreateSession(ctx, sess))
+	}
+
+	// All 200 should exist.
+	sessions, err := store.ListSessions(ctx, "user1")
+	require.NoError(t, err)
+	assert.Len(t, sessions, 200)
+}
+
+func TestCreateSession_MaxPerUser_MultipleUsers(t *testing.T) {
+	store, ctx := setupTestStoreWithMaxPerUser(t, 2)
+
+	base := time.Now()
+	// Create 4 sessions for user1.
+	for i := range 4 {
+		sess := createTestSessionWithTime(
+			fmt.Sprintf("u1-sess-%d", i),
+			"user1",
+			base.Add(time.Duration(i)*time.Second),
+		)
+		require.NoError(t, store.CreateSession(ctx, sess))
+	}
+
+	// Create 4 sessions for user2.
+	for i := range 4 {
+		sess := createTestSessionWithTime(
+			fmt.Sprintf("u2-sess-%d", i),
+			"user2",
+			base.Add(time.Duration(i)*time.Second),
+		)
+		require.NoError(t, store.CreateSession(ctx, sess))
+	}
+
+	// Each user should have exactly 2 sessions (the newest).
+	sessions1, err := store.ListSessions(ctx, "user1")
+	require.NoError(t, err)
+	assert.Len(t, sessions1, 2)
+	assert.Equal(t, "u1-sess-3", sessions1[0].ID)
+	assert.Equal(t, "u1-sess-2", sessions1[1].ID)
+
+	sessions2, err := store.ListSessions(ctx, "user2")
+	require.NoError(t, err)
+	assert.Len(t, sessions2, 2)
+	assert.Equal(t, "u2-sess-3", sessions2[0].ID)
+	assert.Equal(t, "u2-sess-2", sessions2[1].ID)
 }

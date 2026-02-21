@@ -165,6 +165,8 @@ type SessionState struct {
 	SessionID string `json:"session_id"`
 	// Working indicates whether the agent is currently processing.
 	Working bool `json:"working"`
+	// HasPendingPrompt indicates whether the agent is waiting for user input.
+	HasPendingPrompt bool `json:"has_pending_prompt"`
 	// Model is the LLM model being used for this session.
 	Model string `json:"model,omitempty"`
 	// TotalCost is the accumulated cost of the session in USD.

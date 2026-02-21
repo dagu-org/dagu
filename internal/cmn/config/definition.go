@@ -70,6 +70,7 @@ type Definition struct {
 	Cache      *string        `mapstructure:"cache"`   // "low", "normal", or "high"
 	Terminal   *TerminalDef   `mapstructure:"terminal"`
 	Audit      *AuditDef      `mapstructure:"audit"`
+	Session    *SessionDef    `mapstructure:"session"`
 	GitSync    *GitSyncDef    `mapstructure:"git_sync"`
 	Tunnel     *TunnelDef     `mapstructure:"tunnel"`
 }
@@ -293,6 +294,11 @@ type TerminalDef struct {
 type AuditDef struct {
 	Enabled       *bool `mapstructure:"enabled"`        // Default: true
 	RetentionDays *int  `mapstructure:"retention_days"` // Default: 7
+}
+
+// SessionDef configures agent session storage.
+type SessionDef struct {
+	MaxPerUser *int `mapstructure:"max_per_user"` // Default: 100; 0 = unlimited
 }
 
 // -----------------------------------------------------------------------------

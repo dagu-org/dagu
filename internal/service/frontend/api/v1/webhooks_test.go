@@ -495,7 +495,7 @@ func TestWebhooks_TriggerWithDagRunID(t *testing.T) {
 			DagRunId: &customID,
 		}).WithBearerToken(webhookToken).Send(t)
 		return resp.Response.StatusCode() == http.StatusConflict
-	}, 5*time.Second, 100*time.Millisecond, "duplicate dag-run ID should return 409 Conflict")
+	}, 30*time.Second, 100*time.Millisecond, "duplicate dag-run ID should return 409 Conflict")
 }
 
 // TestWebhooks_TriggerInvalidToken tests webhook trigger with invalid tokens

@@ -20,6 +20,8 @@ interface AgentChatContextType {
   pendingUserMessage: string | null;
   sessionState: SessionState | null;
   sessions: SessionWithState[];
+  hasMoreSessions: boolean;
+  sessionPage: number;
   openChat: () => void;
   closeChat: () => void;
   toggleChat: () => void;
@@ -27,6 +29,9 @@ interface AgentChatContextType {
   setMessages: Dispatch<SetStateAction<Message[]>>;
   setSessionState: (state: SessionState | null) => void;
   setSessions: (sessions: SessionWithState[]) => void;
+  appendSessions: (sessions: SessionWithState[]) => void;
+  setHasMoreSessions: (has: boolean) => void;
+  setSessionPage: (page: number) => void;
   addMessage: (message: Message) => void;
   setPendingUserMessage: (message: string | null) => void;
   clearSession: () => void;
@@ -50,9 +55,13 @@ export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNo
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
   const [sessionState, setSessionState] =
     useState<SessionState | null>(null);
-  const [sessions, setSessions] = useState<SessionWithState[]>(
-    []
-  );
+  const [sessions, setSessions] = useState<SessionWithState[]>([]);
+  const [hasMoreSessions, setHasMoreSessions] = useState(true);
+  const [sessionPage, setSessionPage] = useState(1);
+
+  const appendSessions = useCallback((newSessions: SessionWithState[]) => {
+    setSessions(prev => [...prev, ...newSessions]);
+  }, []);
 
   const openChat = useCallback(() => {
     if (closeTimerRef.current) {
@@ -116,6 +125,8 @@ export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNo
     pendingUserMessage,
     sessionState,
     sessions,
+    hasMoreSessions,
+    sessionPage,
     openChat,
     closeChat,
     toggleChat,
@@ -123,13 +134,18 @@ export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNo
     setMessages,
     setSessionState,
     setSessions,
+    appendSessions,
+    setHasMoreSessions,
+    setSessionPage,
     addMessage,
     setPendingUserMessage,
     clearSession,
   }), [
     isOpen, isClosing, sessionId, messages, pendingUserMessage,
-    sessionState, sessions, openChat, closeChat, toggleChat,
+    sessionState, sessions, hasMoreSessions, sessionPage,
+    openChat, closeChat, toggleChat,
     setSessionId, setMessages, setSessionState, setSessions,
+    appendSessions, setHasMoreSessions, setSessionPage,
     addMessage, setPendingUserMessage, clearSession,
   ]);
 

@@ -281,8 +281,7 @@ func (e *sqlExecutor) writeImportMetrics(metrics *ImportMetrics) {
 	if err != nil {
 		return
 	}
-	_, _ = e.stderr.Write(data)
-	_, _ = e.stderr.Write([]byte("\n"))
+	_, _ = e.stderr.Write(append(data, '\n'))
 }
 
 // getQuery extracts the SQL query from the step configuration.
@@ -587,8 +586,7 @@ func (e *sqlExecutor) writeMetrics(metrics *ExecutionMetrics) {
 	if err != nil {
 		return
 	}
-	_, _ = e.stderr.Write(data)
-	_, _ = e.stderr.Write([]byte("\n"))
+	_, _ = e.stderr.Write(append(data, '\n'))
 }
 
 // isSelectQuery determines if a query is a SELECT statement.

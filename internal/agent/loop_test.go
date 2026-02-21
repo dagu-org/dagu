@@ -243,6 +243,53 @@ func TestLoop_Go(t *testing.T) {
 		assert.Equal(t, "You are a helpful assistant.", capturedRequest.Messages[0].Content)
 	})
 
+	t.Run("calls OnHeartbeat during tool calls", func(t *testing.T) {
+		t.Parallel()
+
+		var mu sync.Mutex
+		heartbeatCount := 0
+
+		callCount := atomic.Int32{}
+		provider := &mockLLMProvider{
+			chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+				n := callCount.Add(1)
+				if n == 1 {
+					return &llm.ChatResponse{
+						FinishReason: "tool_calls",
+						ToolCalls: []llm.ToolCall{{
+							ID:   "hb-call",
+							Type: "function",
+							Function: llm.ToolCallFunction{
+								Name:      "think",
+								Arguments: `{"thought": "heartbeat test"}`,
+							},
+						}},
+					}, nil
+				}
+				return simpleStopResponse("done"), nil
+			},
+		}
+
+		loop := NewLoop(LoopConfig{
+			Provider: provider,
+			Tools:    CreateTools(ToolConfig{}),
+			OnHeartbeat: func() {
+				mu.Lock()
+				heartbeatCount++
+				mu.Unlock()
+			},
+		})
+		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
+
+		runLoopForDuration(t, loop, 500*time.Millisecond)
+
+		mu.Lock()
+		count := heartbeatCount
+		mu.Unlock()
+
+		require.GreaterOrEqual(t, count, 1, "OnHeartbeat should fire during tool call handling")
+	})
+
 	t.Run("accumulates token usage", func(t *testing.T) {
 		t.Parallel()
 
