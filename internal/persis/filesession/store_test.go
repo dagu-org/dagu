@@ -1562,8 +1562,8 @@ func TestCreateSession_MaxPerUser_DeletesSubSessionsWithParent(t *testing.T) {
 	sess0 := createTestSessionWithTime("parent-0", "user1", base)
 	require.NoError(t, store.CreateSession(ctx, sess0))
 
-	// Create sub-sessions under parent-0.
-	for i := range 2 {
+	// Create 4 sub-sessions under parent-0 (3+ to catch range-mutation bugs).
+	for i := range 4 {
 		sub := createTestSessionWithTime(
 			fmt.Sprintf("sub-%d", i),
 			"user1",
@@ -1580,13 +1580,13 @@ func TestCreateSession_MaxPerUser_DeletesSubSessionsWithParent(t *testing.T) {
 	sess2 := createTestSessionWithTime("parent-2", "user1", base.Add(20*time.Second))
 	require.NoError(t, store.CreateSession(ctx, sess2))
 
-	// parent-0 should be deleted along with its sub-sessions.
+	// parent-0 should be deleted along with ALL its sub-sessions.
 	_, err := store.GetSession(ctx, "parent-0")
 	assert.ErrorIs(t, err, agent.ErrSessionNotFound)
-	_, err = store.GetSession(ctx, "sub-0")
-	assert.ErrorIs(t, err, agent.ErrSessionNotFound)
-	_, err = store.GetSession(ctx, "sub-1")
-	assert.ErrorIs(t, err, agent.ErrSessionNotFound)
+	for i := range 4 {
+		_, err = store.GetSession(ctx, fmt.Sprintf("sub-%d", i))
+		assert.ErrorIs(t, err, agent.ErrSessionNotFound, "sub-%d should have been deleted", i)
+	}
 
 	// parent-1 and parent-2 should survive.
 	_, err = store.GetSession(ctx, "parent-1")

@@ -472,8 +472,11 @@ func (s *Store) enforceMaxSessionsLocked(userID string) {
 	// Delete excess (oldest = tail of sorted list).
 	excess := topLevel[s.maxPerUser:]
 	for _, id := range excess {
-		// Delete sub-sessions first.
-		for _, childID := range s.byParent[id] {
+		// Snapshot child IDs before iterating — deleteSessionLocked mutates
+		// s.byParent[id] via removeFromSlice, which shifts the backing array
+		// and would cause the range loop to skip elements.
+		children := append([]string{}, s.byParent[id]...)
+		for _, childID := range children {
 			if err := s.deleteSessionLocked(childID); err != nil {
 				slog.Warn("filesession: failed to delete sub-session during cleanup",
 					slog.String("session_id", childID),
