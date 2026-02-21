@@ -1,11 +1,11 @@
-import { ReactElement, useCallback, useEffect, useRef } from 'react';
+import { ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 
 import { AlertCircle, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
 
-import { ANIMATION_CLOSE_DURATION_MS, ANIMATION_OPEN_DURATION_MS } from '../constants';
+import { ANIMATION_CLOSE_DURATION_MS, ANIMATION_OPEN_DURATION_MS, SESSION_SIDEBAR_STORAGE_KEY } from '../constants';
 import { useAgentChatContext } from '../context/AgentChatContext';
 import { useAgentChat } from '../hooks/useAgentChat';
 import { useResizableDraggable } from '../hooks/useResizableDraggable';
@@ -15,6 +15,7 @@ import { ChatInput } from './ChatInput';
 import { ChatMessages } from './ChatMessages';
 import { DelegatePanel } from './DelegatePanel';
 import { ResizeHandles } from './ResizeHandles';
+import { SessionSidebar } from './SessionSidebar';
 
 function findLatestSession(
   sessions: SessionWithState[]
@@ -44,6 +45,7 @@ export function AgentChatModal(): ReactElement | null {
     pendingUserMessage,
     sessionState,
     sessions,
+    hasMoreSessions,
     isWorking,
     error,
     answeredPrompts,
@@ -53,6 +55,7 @@ export function AgentChatModal(): ReactElement | null {
     clearSession,
     clearError,
     fetchSessions,
+    loadMoreSessions,
     selectSession,
     respondToPrompt,
     delegates,
@@ -64,7 +67,24 @@ export function AgentChatModal(): ReactElement | null {
   } = useAgentChat();
   const { bounds, dragHandlers, resizeHandlers } = useResizableDraggable({
     storageKey: 'agent-chat-modal-bounds',
+    defaultWidth: 560,
   });
+
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem(SESSION_SIDEBAR_STORAGE_KEY);
+      return saved !== 'false';
+    } catch { return true; }
+  });
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(SESSION_SIDEBAR_STORAGE_KEY, String(next)); }
+      catch { /* ignore */ }
+      return next;
+    });
+  }, []);
 
   const hasAutoSelectedRef = useRef(false);
   const wasOpenRef = useRef(false);
@@ -125,9 +145,13 @@ export function AgentChatModal(): ReactElement | null {
   const handleOpenDelegate = useCallback((id: string) => {
     const info = delegateStatuses[id];
     if (info) {
-      reopenDelegate(id, info.task);
+      if (delegates.some((d) => d.id === id)) {
+        removeDelegate(id);
+      } else {
+        reopenDelegate(id, info.task);
+      }
     }
-  }, [delegateStatuses, reopenDelegate]);
+  }, [delegateStatuses, delegates, reopenDelegate, removeDelegate]);
 
   if (!isOpen) return null;
 
@@ -150,31 +174,45 @@ export function AgentChatModal(): ReactElement | null {
     <>
       <AgentChatModalHeader
         sessionId={sessionId}
-        sessions={sessions}
         totalCost={sessionState?.total_cost}
-        onSelectSession={handleSelectSession}
+        isSidebarOpen={sidebarOpen}
+        onToggleSidebar={toggleSidebar}
         onClearSession={clearSession}
         onClose={closeChat}
         dragHandlers={isMobile ? undefined : dragHandlers}
         isMobile={isMobile}
       />
-      {errorBanner}
-      <ChatMessages
-        messages={messages}
-        pendingUserMessage={pendingUserMessage}
-        isWorking={isWorking}
-        onPromptRespond={respondToPrompt}
-        answeredPrompts={answeredPrompts}
-        delegateStatuses={delegateStatuses}
-        onOpenDelegate={handleOpenDelegate}
-      />
-      <ChatInput
-        onSend={handleSend}
-        onCancel={handleCancel}
-        isWorking={isWorking}
-        placeholder="Ask me to create a DAG, run a command..."
-        initialValue={initialInputValue}
-      />
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
+        <SessionSidebar
+          isOpen={sidebarOpen}
+          isMobile={isMobile}
+          sessions={sessions}
+          activeSessionId={sessionId}
+          onSelectSession={handleSelectSession}
+          onClose={toggleSidebar}
+          onLoadMore={loadMoreSessions}
+          hasMore={hasMoreSessions}
+        />
+        <div className="flex flex-col flex-1 min-w-0 min-h-0">
+          {errorBanner}
+          <ChatMessages
+            messages={messages}
+            pendingUserMessage={pendingUserMessage}
+            isWorking={isWorking}
+            onPromptRespond={respondToPrompt}
+            answeredPrompts={answeredPrompts}
+            delegateStatuses={delegateStatuses}
+            onOpenDelegate={handleOpenDelegate}
+          />
+          <ChatInput
+            onSend={handleSend}
+            onCancel={handleCancel}
+            isWorking={isWorking}
+            placeholder="Ask me to create a DAG, run a command..."
+            initialValue={initialInputValue}
+          />
+        </div>
+      </div>
     </>
   );
 

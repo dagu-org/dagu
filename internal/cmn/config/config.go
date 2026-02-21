@@ -129,6 +129,7 @@ type Server struct {
 	Metrics           MetricsAccess // "private" or "public"
 	Terminal          TerminalConfig
 	Audit             AuditConfig
+	Session           SessionConfig
 }
 
 // TerminalConfig contains configuration for the web-based terminal feature.
@@ -140,6 +141,11 @@ type TerminalConfig struct {
 type AuditConfig struct {
 	Enabled       bool // Default: true
 	RetentionDays int  // Default: 7; 0 = keep forever
+}
+
+// SessionConfig contains configuration for agent session cleanup.
+type SessionConfig struct {
+	MaxPerUser int // Default: 100; 0 = unlimited
 }
 
 // Permission represents a permission string used in the application.
@@ -394,6 +400,10 @@ func (c *Config) validateServer() error {
 		// Valid modes
 	default:
 		return fmt.Errorf("invalid auth mode: %q (must be one of: none, basic, builtin)", c.Server.Auth.Mode)
+	}
+
+	if c.Server.Session.MaxPerUser < 0 {
+		return fmt.Errorf("session.max_per_user must be >= 0")
 	}
 
 	return nil

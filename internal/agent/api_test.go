@@ -237,6 +237,134 @@ func TestAPI_ListSessions(t *testing.T) {
 	})
 }
 
+func TestAPI_ListSessionsPaginated(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns empty result", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAPITestSetup(t, true, false, "")
+		result := setup.api.ListSessionsPaginated(context.Background(), defaultUserID, 1, 10)
+
+		assert.Empty(t, result.Items)
+		assert.Equal(t, 0, result.TotalCount)
+		assert.False(t, result.HasNextPage)
+	})
+
+	t.Run("paginates active sessions", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAPITestSetup(t, true, true, "")
+		setup.createSession(t, "hello1")
+		setup.createSession(t, "hello2")
+		setup.createSession(t, "hello3")
+
+		// First page
+		result := setup.api.ListSessionsPaginated(context.Background(), defaultUserID, 1, 2)
+		assert.Len(t, result.Items, 2)
+		assert.Equal(t, 3, result.TotalCount)
+		assert.True(t, result.HasNextPage)
+
+		// Second page
+		result = setup.api.ListSessionsPaginated(context.Background(), defaultUserID, 2, 2)
+		assert.Len(t, result.Items, 1)
+		assert.Equal(t, 3, result.TotalCount)
+		assert.False(t, result.HasNextPage)
+	})
+
+	t.Run("merges active and persisted sessions", func(t *testing.T) {
+		t.Parallel()
+
+		model := testModelConfig("test-model")
+		configStore := newMockConfigStore(true)
+		configStore.config.DefaultModelID = model.ID
+		sessStore := newMockSessionStore()
+
+		api := NewAPI(APIConfig{
+			ConfigStore:  configStore,
+			ModelStore:   newMockModelStore().addModel(model),
+			WorkingDir:   t.TempDir(),
+			SessionStore: sessStore,
+		})
+		api.providers.Set(model.ToLLMConfig(), &mockLLMProvider{})
+
+		// Create an active session via API
+		sessID, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "active"})
+		require.NoError(t, err)
+
+		// Add a persisted-only session directly to the store
+		persistedSess := &Session{
+			ID:        "persisted-1",
+			UserID:    defaultUserID,
+			CreatedAt: time.Now().Add(-time.Hour),
+			UpdatedAt: time.Now().Add(-time.Hour),
+		}
+		require.NoError(t, sessStore.CreateSession(context.Background(), persistedSess))
+
+		result := api.ListSessionsPaginated(context.Background(), defaultUserID, 1, 10)
+
+		assert.Equal(t, 2, result.TotalCount)
+		// Verify both sessions present
+		ids := make(map[string]bool)
+		for _, s := range result.Items {
+			ids[s.Session.ID] = true
+		}
+		assert.True(t, ids[sessID], "active session should be present")
+		assert.True(t, ids["persisted-1"], "persisted session should be present")
+	})
+
+	t.Run("excludes sub-sessions", func(t *testing.T) {
+		t.Parallel()
+
+		model := testModelConfig("test-model")
+		configStore := newMockConfigStore(true)
+		configStore.config.DefaultModelID = model.ID
+		sessStore := newMockSessionStore()
+
+		api := NewAPI(APIConfig{
+			ConfigStore:  configStore,
+			ModelStore:   newMockModelStore().addModel(model),
+			WorkingDir:   t.TempDir(),
+			SessionStore: sessStore,
+		})
+		api.providers.Set(model.ToLLMConfig(), &mockLLMProvider{})
+
+		// Create a parent session
+		_, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "parent"})
+		require.NoError(t, err)
+
+		// Add a sub-session directly to the store
+		subSess := &Session{
+			ID:              "sub-1",
+			UserID:          defaultUserID,
+			ParentSessionID: "some-parent",
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+		}
+		require.NoError(t, sessStore.CreateSession(context.Background(), subSess))
+
+		result := api.ListSessionsPaginated(context.Background(), defaultUserID, 1, 10)
+
+		// Sub-session should be excluded
+		assert.Equal(t, 1, result.TotalCount)
+		for _, s := range result.Items {
+			assert.Empty(t, s.Session.ParentSessionID, "sub-sessions should be excluded")
+		}
+	})
+
+	t.Run("no store falls back to active only", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAPITestSetup(t, true, true, "")
+		setup.createSession(t, "hello")
+
+		result := setup.api.ListSessionsPaginated(context.Background(), defaultUserID, 1, 10)
+
+		assert.Len(t, result.Items, 1)
+		assert.Equal(t, 1, result.TotalCount)
+	})
+}
+
 func TestAPI_CancelSession(t *testing.T) {
 	t.Parallel()
 
@@ -1203,4 +1331,75 @@ func TestAPI_CleanupIdleSessions_DeletesIdleSession(t *testing.T) {
 	// Session should be removed.
 	_, exists = api.sessions.Load("cleanup-cancel")
 	assert.False(t, exists, "idle session should be cleaned up")
+}
+
+func TestAPI_CleanupIdleSessions_CancelsStuckSession(t *testing.T) {
+	t.Parallel()
+
+	api := NewAPI(APIConfig{
+		ConfigStore: newMockConfigStore(true),
+		WorkingDir:  t.TempDir(),
+	})
+
+	mgr := NewSessionManager(SessionManagerConfig{ID: "stuck-sess"})
+	mgr.mu.Lock()
+	mgr.working = true
+	mgr.lastHeartbeat = time.Now().Add(-1 * time.Minute) // stale heartbeat
+	mgr.lastActivity = time.Now()                        // recent activity
+	mgr.mu.Unlock()
+
+	api.sessions.Store("stuck-sess", mgr)
+
+	api.cleanupIdleSessions()
+
+	// Session should have been cancelled (working set to false)
+	require.False(t, mgr.IsWorking(), "stuck session should be cancelled")
+}
+
+func TestAPI_CleanupIdleSessions_DoesNotCancelHealthyWorkingSession(t *testing.T) {
+	t.Parallel()
+
+	api := NewAPI(APIConfig{
+		ConfigStore: newMockConfigStore(true),
+		WorkingDir:  t.TempDir(),
+	})
+
+	mgr := NewSessionManager(SessionManagerConfig{ID: "healthy-sess"})
+	mgr.mu.Lock()
+	mgr.working = true
+	mgr.lastHeartbeat = time.Now() // fresh heartbeat
+	mgr.lastActivity = time.Now()
+	mgr.mu.Unlock()
+
+	api.sessions.Store("healthy-sess", mgr)
+
+	api.cleanupIdleSessions()
+
+	// Session should still be working
+	_, exists := api.sessions.Load("healthy-sess")
+	require.True(t, exists, "healthy working session should not be removed")
+}
+
+func TestAPI_CleanupIdleSessions_DoesNotCancelZeroHeartbeat(t *testing.T) {
+	t.Parallel()
+
+	api := NewAPI(APIConfig{
+		ConfigStore: newMockConfigStore(true),
+		WorkingDir:  t.TempDir(),
+	})
+
+	// Working session with zero heartbeat (loop hasn't started heartbeating yet)
+	mgr := NewSessionManager(SessionManagerConfig{ID: "no-hb-sess"})
+	mgr.mu.Lock()
+	mgr.working = true
+	mgr.lastActivity = time.Now()
+	mgr.mu.Unlock()
+
+	api.sessions.Store("no-hb-sess", mgr)
+
+	api.cleanupIdleSessions()
+
+	// Should not be cancelled because lastHeartbeat is zero
+	_, exists := api.sessions.Load("no-hb-sess")
+	require.True(t, exists, "session with zero heartbeat should not be cancelled")
 }

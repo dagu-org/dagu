@@ -25,6 +25,9 @@ const (
 	// maxToolCallDepth limits nested tool call chains to prevent infinite recursion.
 	// This can happen if an LLM continuously makes tool calls without producing a final response.
 	maxToolCallDepth = 50
+
+	// loopHeartbeatInterval is the interval at which the loop emits heartbeats.
+	loopHeartbeatInterval = 10 * time.Second
 )
 
 // MessageRecordFunc is called to record new messages to persistent storage.
@@ -54,6 +57,8 @@ type LoopConfig struct {
 	SessionID string
 	// OnWorking is called when the working state changes.
 	OnWorking func(working bool)
+	// OnHeartbeat is called periodically to signal the loop is alive.
+	OnHeartbeat func()
 	// EmitUIAction is called when a tool wants to emit a UI action.
 	EmitUIAction UIActionFunc
 	// EmitUserPrompt is called when a tool wants to emit a user prompt.
@@ -91,6 +96,7 @@ type Loop struct {
 	workingDir       string
 	sessionID        string
 	onWorking        func(working bool)
+	onHeartbeat      func()
 	sequenceID       int64
 	emitUIAction     UIActionFunc
 	emitUserPrompt   EmitUserPromptFunc
@@ -122,6 +128,7 @@ func NewLoop(config LoopConfig) *Loop {
 		workingDir:       config.WorkingDir,
 		sessionID:        config.SessionID,
 		onWorking:        config.OnWorking,
+		onHeartbeat:      config.OnHeartbeat,
 		emitUIAction:     config.EmitUIAction,
 		emitUserPrompt:   config.EmitUserPrompt,
 		waitUserResponse: config.WaitUserResponse,
@@ -163,11 +170,23 @@ func (l *Loop) Go(ctx context.Context) error {
 	idleTimer := time.NewTimer(idlePollingInterval)
 	defer idleTimer.Stop()
 
+	heartbeatTicker := time.NewTicker(loopHeartbeatInterval)
+	defer heartbeatTicker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			l.logger.Info("session loop canceled")
 			return ctx.Err()
+		default:
+		}
+
+		// Non-blocking heartbeat drain for progress between iterations.
+		select {
+		case <-heartbeatTicker.C:
+			if l.onHeartbeat != nil {
+				l.onHeartbeat()
+			}
 		default:
 		}
 
@@ -201,6 +220,10 @@ func (l *Loop) Go(ctx context.Context) error {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
+			case <-heartbeatTicker.C:
+				if l.onHeartbeat != nil {
+					l.onHeartbeat()
+				}
 			case <-idleTimer.C:
 			}
 		}
@@ -390,6 +413,11 @@ func (l *Loop) SetUserContext(u UserIdentity) {
 // instead of recursion to prevent stack overflow with long tool call chains.
 func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) error {
 	for depth := range maxToolCallDepth {
+		// Heartbeat so cleanup doesn't cancel long-running tool chains.
+		if l.onHeartbeat != nil {
+			l.onHeartbeat()
+		}
+
 		l.executeToolCalls(ctx, toolCalls)
 
 		resp, err := l.sendRequest(ctx)

@@ -287,6 +287,7 @@ export function ChatInput({
       <div className="flex items-end gap-2">
         <textarea
           ref={textareaRef}
+          autoFocus
           value={message}
           onChange={handleChange}
           onKeyDown={handleKeyDown}

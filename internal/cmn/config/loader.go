@@ -547,6 +547,8 @@ func (l *ConfigLoader) loadServerDefaults(cfg *Config, def Definition) {
 	}
 
 	cfg.Server.Audit.RetentionDays = l.v.GetInt("audit.retention_days")
+
+	cfg.Server.Session.MaxPerUser = l.v.GetInt("session.max_per_user")
 }
 
 func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
@@ -1148,6 +1150,9 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	// Audit
 	l.v.SetDefault("audit.retention_days", 7)
 
+	// Session
+	l.v.SetDefault("session.max_per_user", 100)
+
 	// Monitoring
 	l.v.SetDefault("monitoring.retention", "24h")
 	l.v.SetDefault("monitoring.interval", "5s")
@@ -1176,6 +1181,7 @@ var envBindings = []envBinding{
 	{key: "terminal.enabled", env: "TERMINAL_ENABLED"},
 	{key: "audit.enabled", env: "AUDIT_ENABLED"},
 	{key: "audit.retention_days", env: "AUDIT_RETENTION_DAYS"},
+	{key: "session.max_per_user", env: "SESSION_MAX_PER_USER"},
 
 	// Core
 	{key: "default_shell", env: "DEFAULT_SHELL"},

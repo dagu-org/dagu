@@ -74,6 +74,8 @@ paths:
       tags:
         - "auth"
       security: []
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
       requestBody:
         required: true
         content:
@@ -4675,21 +4677,21 @@ paths:
                 $ref: "#/components/schemas/Error"
     get:
       summary: "List agent sessions"
-      description: "Lists all sessions for the current user."
+      description: "Lists sessions for the current user with pagination."
       operationId: "listAgentSessions"
       tags:
         - "agent"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
       responses:
         "200":
-          description: "List of sessions"
+          description: "Paginated list of sessions"
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/AgentSessionWithState"
+                $ref: "#/components/schemas/ListAgentSessionsResponse"
         "401":
           description: "Not authenticated"
           content:
@@ -7871,6 +7873,9 @@ components:
           type: string
         working:
           type: boolean
+        hasPendingPrompt:
+          type: boolean
+          description: "Whether the agent is waiting for user input"
         model:
           type: string
         totalCost:
@@ -7882,22 +7887,28 @@ components:
     AgentSessionWithState:
       type: object
       description: "Agent session with its current state"
-      required:
-        - session
-        - working
-        - totalCost
+      allOf:
+        - $ref: "#/components/schemas/AgentSessionState"
+        - type: object
+          required:
+            - session
+          properties:
+            session:
+              $ref: "#/components/schemas/AgentSession"
+
+    ListAgentSessionsResponse:
+      type: object
+      description: "Paginated list of agent sessions"
       properties:
-        session:
-          $ref: "#/components/schemas/AgentSession"
-        working:
-          type: boolean
-        model:
-          type: string
-        totalCost:
-          type: number
-          format: double
-          minimum: 0
-          description: "Total accumulated cost in USD"
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentSessionWithState"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      required:
+        - sessions
+        - pagination
 
     AgentToolCallFunction:
       type: object

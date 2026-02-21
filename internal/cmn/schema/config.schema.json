@@ -165,6 +165,9 @@
     "audit": {
       "$ref": "#/definitions/AuditDef"
     },
+    "session": {
+      "$ref": "#/definitions/SessionDef"
+    },
     "git_sync": {
       "$ref": "#/definitions/GitSyncDef"
     },
@@ -746,6 +749,19 @@
         "retention_days": {
           "type": "integer",
           "description": "Number of days to retain audit logs. Default: 7."
+        }
+      }
+    },
+    "SessionDef": {
+      "type": "object",
+      "description": "Agent session storage configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "max_per_user": {
+          "type": "integer",
+          "description": "Maximum sessions to keep per user. Oldest sessions are deleted when exceeded. Default: 100. Set to 0 for unlimited.",
+          "minimum": 0,
+          "default": 100
         }
       }
     },

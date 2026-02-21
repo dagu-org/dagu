@@ -15,6 +15,7 @@ import (
 
 // SessionManager manages a single active session.
 // It links the Loop with SSE streaming and handles state management.
+// Lock ordering: mu must be acquired before promptsMu when both are needed.
 type SessionManager struct {
 	id              string
 	user            UserIdentity
@@ -23,6 +24,7 @@ type SessionManager struct {
 	mu              sync.Mutex
 	createdAt       time.Time
 	lastActivity    time.Time
+	lastHeartbeat   time.Time
 	model           string
 	messages        []Message
 	subpub          *SubPub[StreamResponse]
@@ -167,17 +169,18 @@ func (sm *SessionManager) UserID() string {
 
 // SetWorking updates the agent working state and notifies subscribers.
 func (sm *SessionManager) SetWorking(working bool) {
-	id, model, totalCost, callback, changed := sm.updateWorkingState(working)
+	id, model, totalCost, hasPendingPrompt, callback, changed := sm.updateWorkingState(working)
 	if !changed {
 		return
 	}
 	sm.logger.Debug("agent working state changed", "working", working)
 	sm.subpub.Broadcast(StreamResponse{
 		SessionState: &SessionState{
-			SessionID: id,
-			Working:   working,
-			Model:     model,
-			TotalCost: totalCost,
+			SessionID:        id,
+			Working:          working,
+			HasPendingPrompt: hasPendingPrompt,
+			Model:            model,
+			TotalCost:        totalCost,
 		},
 	})
 	if callback != nil {
@@ -186,17 +189,22 @@ func (sm *SessionManager) SetWorking(working bool) {
 }
 
 // updateWorkingState atomically updates the working state and returns relevant data.
-// Returns (id, model, totalCost, callback, changed) where changed indicates if the state actually changed.
-func (sm *SessionManager) updateWorkingState(working bool) (string, string, float64, func(string, bool), bool) {
+// Returns (id, model, totalCost, hasPendingPrompt, callback, changed) where changed indicates if the state actually changed.
+func (sm *SessionManager) updateWorkingState(working bool) (string, string, float64, bool, func(string, bool), bool) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
 	if sm.working == working {
-		return "", "", 0, nil, false
+		return "", "", 0, false, nil, false
 	}
 
 	sm.working = working
-	return sm.id, sm.model, sm.totalCost, sm.onWorkingChange, true
+
+	sm.promptsMu.Lock()
+	hasPending := len(sm.pendingPrompts) > 0
+	sm.promptsMu.Unlock()
+
+	return sm.id, sm.model, sm.totalCost, hasPending, sm.onWorkingChange, true
 }
 
 // IsWorking returns the current agent working state.
@@ -211,6 +219,29 @@ func (sm *SessionManager) LastActivity() time.Time {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	return sm.lastActivity
+}
+
+// HasPendingPrompt returns true if the session has pending user prompts.
+func (sm *SessionManager) HasPendingPrompt() bool {
+	sm.promptsMu.Lock()
+	defer sm.promptsMu.Unlock()
+	return len(sm.pendingPrompts) > 0
+}
+
+// RecordHeartbeat updates the heartbeat and activity timestamps.
+func (sm *SessionManager) RecordHeartbeat() {
+	sm.mu.Lock()
+	now := time.Now()
+	sm.lastHeartbeat = now
+	sm.lastActivity = now
+	sm.mu.Unlock()
+}
+
+// LastHeartbeat returns the time of the most recent heartbeat.
+func (sm *SessionManager) LastHeartbeat() time.Time {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	return sm.lastHeartbeat
 }
 
 // GetModel returns the model ID used by this session.
@@ -351,6 +382,10 @@ func (sm *SessionManager) SubscribeWithSnapshot(ctx context.Context) (StreamResp
 	model := sm.model
 	totalCost := sm.totalCost
 	id := sm.id
+
+	sm.promptsMu.Lock()
+	hasPendingPrompt := len(sm.pendingPrompts) > 0
+	sm.promptsMu.Unlock()
 	sess := Session{
 		ID:              id,
 		UserID:          sm.user.UserID,
@@ -374,10 +409,11 @@ func (sm *SessionManager) SubscribeWithSnapshot(ctx context.Context) (StreamResp
 		Messages: msgs,
 		Session:  &sess,
 		SessionState: &SessionState{
-			SessionID: id,
-			Working:   working,
-			Model:     model,
-			TotalCost: totalCost,
+			SessionID:        id,
+			Working:          working,
+			HasPendingPrompt: hasPendingPrompt,
+			Model:            model,
+			TotalCost:        totalCost,
 		},
 		Delegates: delegates,
 	}, next
@@ -460,6 +496,7 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		WorkingDir:       sm.workingDir,
 		SessionID:        sm.id,
 		OnWorking:        sm.SetWorking,
+		OnHeartbeat:      sm.RecordHeartbeat,
 		EmitUIAction:     sm.createEmitUIActionFunc(),
 		EmitUserPrompt:   sm.createEmitUserPromptFunc(),
 		WaitUserResponse: sm.createWaitUserResponseFunc(),

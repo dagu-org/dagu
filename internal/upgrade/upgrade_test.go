@@ -1213,8 +1213,7 @@ func TestGetLatestRelease(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewGitHubClient()
-	client.client.SetBaseURL(server.URL)
+	client := newTestGitHubClient(server.URL)
 
 	t.Run("without prerelease", func(t *testing.T) {
 		ctx := context.Background()

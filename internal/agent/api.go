@@ -14,6 +14,7 @@ import (
 
 	api "github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -77,10 +78,11 @@ type APIConfig struct {
 
 // SessionWithState is a session with its current state.
 type SessionWithState struct {
-	Session   Session `json:"session"`
-	Working   bool    `json:"working"`
-	Model     string  `json:"model,omitempty"`
-	TotalCost float64 `json:"total_cost"`
+	Session          Session `json:"session"`
+	Working          bool    `json:"working"`
+	HasPendingPrompt bool    `json:"has_pending_prompt"`
+	Model            string  `json:"model,omitempty"`
+	TotalCost        float64 `json:"total_cost"`
 }
 
 // NewAPI creates a new API instance.
@@ -310,10 +312,11 @@ func (a *API) collectActiveSessions(userID string, activeIDs map[string]struct{}
 		}
 		activeIDs[id] = struct{}{}
 		sessions = append(sessions, SessionWithState{
-			Session:   sess,
-			Working:   mgr.IsWorking(),
-			Model:     mgr.GetModel(),
-			TotalCost: mgr.GetTotalCost(),
+			Session:          sess,
+			Working:          mgr.IsWorking(),
+			HasPendingPrompt: mgr.HasPendingPrompt(),
+			Model:            mgr.GetModel(),
+			TotalCost:        mgr.GetTotalCost(),
 		})
 		return true
 	})
@@ -629,6 +632,41 @@ func (a *API) ListSessions(ctx context.Context, userID string) []SessionWithStat
 	return sessions
 }
 
+// ListSessionsPaginated returns a paginated list of sessions for the given user.
+// Active sessions appear first, followed by persisted inactive sessions.
+func (a *API) ListSessionsPaginated(ctx context.Context, userID string, page, perPage int) exec.PaginatedResult[SessionWithState] {
+	pg := exec.NewPaginator(page, perPage)
+
+	activeIDs := make(map[string]struct{})
+	activeSessions := a.collectActiveSessions(userID, activeIDs)
+
+	combined := make([]SessionWithState, 0, len(activeSessions))
+	combined = append(combined, activeSessions...)
+
+	if a.store != nil {
+		persisted, err := a.store.ListSessions(ctx, userID)
+		if err != nil {
+			a.logger.Warn("Failed to list persisted sessions", "error", err)
+		} else {
+			for _, sess := range persisted {
+				if _, exists := activeIDs[sess.ID]; exists {
+					continue
+				}
+				if sess.ParentSessionID != "" {
+					continue
+				}
+				combined = append(combined, SessionWithState{Session: *sess})
+			}
+		}
+	}
+
+	total := len(combined)
+	start := min(pg.Offset(), total)
+	end := min(pg.Offset()+pg.Limit(), total)
+
+	return exec.NewPaginatedResult(combined[start:end], total, pg)
+}
+
 // GetSessionDetail returns session details including messages and state.
 func (a *API) GetSessionDetail(ctx context.Context, sessionID, userID string) (*StreamResponse, error) {
 	// Check active sessions first
@@ -638,10 +676,11 @@ func (a *API) GetSessionDetail(ctx context.Context, sessionID, userID string) (*
 			Messages: mgr.GetMessages(),
 			Session:  &sess,
 			SessionState: &SessionState{
-				SessionID: sessionID,
-				Working:   mgr.IsWorking(),
-				Model:     mgr.GetModel(),
-				TotalCost: mgr.GetTotalCost(),
+				SessionID:        sessionID,
+				Working:          mgr.IsWorking(),
+				HasPendingPrompt: mgr.HasPendingPrompt(),
+				Model:            mgr.GetModel(),
+				TotalCost:        mgr.GetTotalCost(),
 			},
 			Delegates: mgr.GetDelegates(),
 		}, nil
@@ -763,6 +802,10 @@ const idleSessionTimeout = 30 * time.Minute
 // cleanupInterval is how often the cleanup goroutine runs.
 const cleanupInterval = 5 * time.Minute
 
+// stuckHeartbeatTimeout is the maximum time without a heartbeat before
+// a working session is considered stuck and cancelled.
+const stuckHeartbeatTimeout = 3 * loopHeartbeatInterval
+
 // StartCleanup begins periodic cleanup of idle sessions.
 // It should be called once when the API is initialized and will
 // stop when the context is cancelled.
@@ -801,6 +844,19 @@ func (a *API) cleanupIdleSessions() {
 		if sess.ParentSessionID != "" {
 			return true
 		}
+		// Detect stuck sessions: working but no heartbeat in 30s (3x the 10s interval).
+		if mgr.IsWorking() {
+			lastHB := mgr.LastHeartbeat()
+			if !lastHB.IsZero() && time.Since(lastHB) > stuckHeartbeatTimeout {
+				if err := mgr.Cancel(context.Background()); err != nil {
+					a.logger.Warn("Failed to cancel stuck session", "session_id", id, "error", err)
+				} else {
+					a.logger.Warn("Cancelled stuck session", "session_id", id)
+				}
+			}
+		}
+		// Cancelled sessions remain in the map until the next cleanup cycle
+		// so they can still be viewed or reactivated by the user.
 		if !mgr.IsWorking() && mgr.LastActivity().Before(cutoff) {
 			toDelete = append(toDelete, id)
 		}

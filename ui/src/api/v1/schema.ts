@@ -24,6 +24,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create initial admin account
+         * @description Creates the first admin user during initial setup. Only available when no users exist. Returns a JWT token for immediate login.
+         */
+        post: operations["setup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -1859,7 +1879,7 @@ export interface paths {
         };
         /**
          * List agent sessions
-         * @description Lists all sessions for the current user.
+         * @description Lists sessions for the current user with pagination.
          */
         get: operations["listAgentSessions"];
         put?: never;
@@ -2825,6 +2845,13 @@ export interface components {
          * @enum {string}
          */
         UserRole: UserRole;
+        /** @description Request body for initial admin account setup */
+        SetupRequest: {
+            /** @description Admin username */
+            username: string;
+            /** @description Admin password */
+            password: string;
+        };
         /** @description Request body for user login */
         LoginRequest: {
             /** @description User's username */
@@ -3412,6 +3439,8 @@ export interface components {
         AgentSessionState: {
             sessionId: string;
             working: boolean;
+            /** @description Whether the agent is waiting for user input */
+            hasPendingPrompt?: boolean;
             model?: string;
             /**
              * Format: double
@@ -3420,15 +3449,13 @@ export interface components {
             totalCost: number;
         };
         /** @description Agent session with its current state */
-        AgentSessionWithState: {
+        AgentSessionWithState: components["schemas"]["AgentSessionState"] & {
             session: components["schemas"]["AgentSession"];
-            working: boolean;
-            model?: string;
-            /**
-             * Format: double
-             * @description Total accumulated cost in USD
-             */
-            totalCost: number;
+        };
+        /** @description Paginated list of agent sessions */
+        ListAgentSessionsResponse: {
+            sessions: components["schemas"]["AgentSessionWithState"][];
+            pagination: components["schemas"]["Pagination"];
         };
         /** @description Function call details in a tool call */
         AgentToolCallFunction: {
@@ -3598,6 +3625,60 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    setup: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupRequest"];
+            };
+        };
+        responses: {
+            /** @description Admin account created successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResponse"];
+                };
+            };
+            /** @description Invalid request (e.g., weak password) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Setup already completed (users exist) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -9310,6 +9391,10 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description page number of items to fetch (default is 1) */
+                page?: components["parameters"]["Page"];
+                /** @description number of items per page (default is 30, max is 100) */
+                perPage?: components["parameters"]["PerPage"];
             };
             header?: never;
             path?: never;
@@ -9317,13 +9402,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description List of sessions */
+            /** @description Paginated list of sessions */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AgentSessionWithState"][];
+                    "application/json": components["schemas"]["ListAgentSessionsResponse"];
                 };
             };
             /** @description Not authenticated */

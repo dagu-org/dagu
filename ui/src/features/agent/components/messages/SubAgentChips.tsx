@@ -35,9 +35,14 @@ export function SubAgentChips({
     <div className="pl-4 space-y-0.5">
       {tasks.map((task, i) => {
         const delegateId = delegateIds?.[i];
-        const delegate = delegateId
+        let delegate = delegateId
           ? delegateStatuses?.[delegateId]
           : undefined;
+        // Fallback: when delegate_ids aren't available yet (delegate still
+        // running, no tool result), match by task text from delegate snapshots.
+        if (!delegate && !delegateId && delegateStatuses) {
+          delegate = Object.values(delegateStatuses).find((d) => d.task === task);
+        }
         const isRunning = !isCompleted && (!delegate || delegate.status === 'running');
         const canClick = !!delegate;
 
