@@ -35,6 +35,8 @@ interface AgentChatContextType {
   addMessage: (message: Message) => void;
   setPendingUserMessage: (message: string | null) => void;
   clearSession: () => void;
+  initialInputValue: string | null;
+  setInitialInputValue: (value: string | null) => void;
 }
 
 interface AgentChatProviderProps {
@@ -58,6 +60,7 @@ export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNo
   const [sessions, setSessions] = useState<SessionWithState[]>([]);
   const [hasMoreSessions, setHasMoreSessions] = useState(true);
   const [sessionPage, setSessionPage] = useState(1);
+  const [initialInputValue, setInitialInputValue] = useState<string | null>(null);
 
   const appendSessions = useCallback((newSessions: SessionWithState[]) => {
     setSessions(prev => [...prev, ...newSessions]);
@@ -140,6 +143,8 @@ export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNo
     addMessage,
     setPendingUserMessage,
     clearSession,
+    initialInputValue,
+    setInitialInputValue,
   }), [
     isOpen, isClosing, sessionId, messages, pendingUserMessage,
     sessionState, sessions, hasMoreSessions, sessionPage,
@@ -147,6 +152,7 @@ export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNo
     setSessionId, setMessages, setSessionState, setSessions,
     appendSessions, setHasMoreSessions, setSessionPage,
     addMessage, setPendingUserMessage, clearSession,
+    initialInputValue,
   ]);
 
   return (

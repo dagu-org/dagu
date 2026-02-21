@@ -27,6 +27,7 @@ interface ChatInputProps {
   isWorking: boolean;
   disabled?: boolean;
   placeholder?: string;
+  initialValue?: string | null;
 }
 
 export function ChatInput({
@@ -35,6 +36,7 @@ export function ChatInput({
   isWorking,
   disabled,
   placeholder = 'Type a message...',
+  initialValue,
 }: ChatInputProps) {
   const client = useClient();
   const appBarContext = useContext(AppBarContext);
@@ -87,6 +89,20 @@ export function ChatInput({
 
     return () => controller.abort();
   }, [client, appBarContext.selectedRemoteNode]);
+
+  // Pre-fill textarea with initial value (e.g., from setup wizard)
+  useEffect(() => {
+    if (initialValue) {
+      setMessage(initialValue);
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (el) {
+          el.style.height = 'auto';
+          el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+        }
+      });
+    }
+  }, [initialValue]);
 
   // Reset pending state when server confirms processing or after timeout fallback
   useEffect(() => {
