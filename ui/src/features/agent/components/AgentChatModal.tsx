@@ -36,7 +36,7 @@ function findLatestSession(
 }
 
 export function AgentChatModal(): ReactElement | null {
-  const { isOpen, isClosing, closeChat } = useAgentChatContext();
+  const { isOpen, isClosing, closeChat, initialInputValue, setInitialInputValue } = useAgentChatContext();
   const isMobile = useIsMobile();
   const {
     sessionId,
@@ -96,10 +96,11 @@ export function AgentChatModal(): ReactElement | null {
 
   const handleSend = useCallback(
     (message: string, dagContexts?: DAGContext[], model?: string): void => {
+      setInitialInputValue(null);
       // sendMessage handles its own error reporting via setError internally
       sendMessage(message, model, dagContexts).catch(() => {});
     },
-    [sendMessage]
+    [sendMessage, setInitialInputValue]
   );
 
   const handleCancel = useCallback((): void => {
@@ -172,6 +173,7 @@ export function AgentChatModal(): ReactElement | null {
         onCancel={handleCancel}
         isWorking={isWorking}
         placeholder="Ask me to create a DAG, run a command..."
+        initialValue={initialInputValue}
       />
     </>
   );

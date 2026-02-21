@@ -78,17 +78,19 @@ type LayoutProps = {
  */
 function Content({ navbarColor, children }: LayoutProps) {
   const config = useConfig();
-  const { toggleChat, openChat } = useAgentChatContext();
+  const { toggleChat, openChat, setInitialInputValue } = useAgentChatContext();
   const location = useLocation();
   const navigate = useNavigate();
 
   // Auto-open agent modal when redirected from setup with openAgent state
   React.useEffect(() => {
     if ((location.state as { openAgent?: boolean })?.openAgent) {
+      setInitialInputValue('Create a simple DAG that prints Hello World every minute');
       openChat();
       navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location.state, location.pathname, openChat, navigate]);
+  }, [location.state, location.pathname, openChat, setInitialInputValue, navigate]);
+
   const hasCustomColor: boolean = Boolean(
     navbarColor && navbarColor.trim() !== ''
   );

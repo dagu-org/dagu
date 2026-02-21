@@ -149,8 +149,8 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
           }}
         >
           <ConfigContext.Provider value={config}>
-          <ConfigUpdateContext.Provider value={updateConfig}>
-            <AuthProvider>
+            <ConfigUpdateContext.Provider value={updateConfig}>
+              <AuthProvider>
               <SearchStateProvider>
                 <SchemaProvider>
                   <ErrorModalProvider>
@@ -203,8 +203,8 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                   </ErrorModalProvider>
                 </SchemaProvider>
               </SearchStateProvider>
-            </AuthProvider>
-          </ConfigUpdateContext.Provider>
+              </AuthProvider>
+            </ConfigUpdateContext.Provider>
           </ConfigContext.Provider>
         </AppBarContext.Provider>
       </SWRConfig>

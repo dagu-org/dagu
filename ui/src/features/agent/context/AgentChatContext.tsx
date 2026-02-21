@@ -30,6 +30,8 @@ interface AgentChatContextType {
   addMessage: (message: Message) => void;
   setPendingUserMessage: (message: string | null) => void;
   clearSession: () => void;
+  initialInputValue: string | null;
+  setInitialInputValue: (value: string | null) => void;
 }
 
 interface AgentChatProviderProps {
@@ -53,6 +55,7 @@ export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNo
   const [sessions, setSessions] = useState<SessionWithState[]>(
     []
   );
+  const [initialInputValue, setInitialInputValue] = useState<string | null>(null);
 
   const openChat = useCallback(() => {
     if (closeTimerRef.current) {
@@ -126,11 +129,14 @@ export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNo
     addMessage,
     setPendingUserMessage,
     clearSession,
+    initialInputValue,
+    setInitialInputValue,
   }), [
     isOpen, isClosing, sessionId, messages, pendingUserMessage,
     sessionState, sessions, openChat, closeChat, toggleChat,
     setSessionId, setMessages, setSessionState, setSessions,
     addMessage, setPendingUserMessage, clearSession,
+    initialInputValue,
   ]);
 
   return (
