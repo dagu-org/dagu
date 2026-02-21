@@ -766,6 +766,10 @@ const idleSessionTimeout = 30 * time.Minute
 // cleanupInterval is how often the cleanup goroutine runs.
 const cleanupInterval = 5 * time.Minute
 
+// stuckHeartbeatTimeout is the maximum time without a heartbeat before
+// a working session is considered stuck and cancelled (3x loopHeartbeatInterval).
+const stuckHeartbeatTimeout = 30 * time.Second
+
 // StartCleanup begins periodic cleanup of idle sessions.
 // It should be called once when the API is initialized and will
 // stop when the context is cancelled.
@@ -807,7 +811,7 @@ func (a *API) cleanupIdleSessions() {
 		// Detect stuck sessions: working but no heartbeat in 30s (3x the 10s interval).
 		if mgr.IsWorking() {
 			lastHB := mgr.LastHeartbeat()
-			if !lastHB.IsZero() && time.Since(lastHB) > 30*time.Second {
+			if !lastHB.IsZero() && time.Since(lastHB) > stuckHeartbeatTimeout {
 				_ = mgr.Cancel(context.Background())
 				a.logger.Warn("Cancelled stuck session", "session_id", id)
 			}

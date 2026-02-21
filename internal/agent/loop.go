@@ -181,7 +181,7 @@ func (l *Loop) Go(ctx context.Context) error {
 		default:
 		}
 
-		// Non-blocking heartbeat check to catch long-running tool executions.
+		// Non-blocking heartbeat drain for progress between iterations.
 		select {
 		case <-heartbeatTicker.C:
 			if l.onHeartbeat != nil {
@@ -413,6 +413,11 @@ func (l *Loop) SetUserContext(u UserIdentity) {
 // instead of recursion to prevent stack overflow with long tool call chains.
 func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) error {
 	for depth := range maxToolCallDepth {
+		// Heartbeat so cleanup doesn't cancel long-running tool chains.
+		if l.onHeartbeat != nil {
+			l.onHeartbeat()
+		}
+
 		l.executeToolCalls(ctx, toolCalls)
 
 		resp, err := l.sendRequest(ctx)

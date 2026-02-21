@@ -175,10 +175,11 @@ func (sm *SessionManager) SetWorking(working bool) {
 	sm.logger.Debug("agent working state changed", "working", working)
 	sm.subpub.Broadcast(StreamResponse{
 		SessionState: &SessionState{
-			SessionID: id,
-			Working:   working,
-			Model:     model,
-			TotalCost: totalCost,
+			SessionID:        id,
+			Working:          working,
+			HasPendingPrompt: sm.HasPendingPrompt(),
+			Model:            model,
+			TotalCost:        totalCost,
 		},
 	})
 	if callback != nil {

@@ -243,47 +243,51 @@ func TestLoop_Go(t *testing.T) {
 		assert.Equal(t, "You are a helpful assistant.", capturedRequest.Messages[0].Content)
 	})
 
-	t.Run("calls OnHeartbeat callback", func(t *testing.T) {
+	t.Run("calls OnHeartbeat during tool calls", func(t *testing.T) {
 		t.Parallel()
 
 		var mu sync.Mutex
 		heartbeatCount := 0
 
-		loop := NewLoop(LoopConfig{
-			Provider: &mockLLMProvider{
-				chatFunc: func(ctx context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
-					// Block long enough for heartbeat to fire
-					select {
-					case <-ctx.Done():
-						return nil, ctx.Err()
-					case <-time.After(5 * time.Second):
-						return &llm.ChatResponse{Content: "late"}, nil
-					}
-				},
+		callCount := atomic.Int32{}
+		provider := &mockLLMProvider{
+			chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+				n := callCount.Add(1)
+				if n == 1 {
+					return &llm.ChatResponse{
+						FinishReason: "tool_calls",
+						ToolCalls: []llm.ToolCall{{
+							ID:   "hb-call",
+							Type: "function",
+							Function: llm.ToolCallFunction{
+								Name:      "think",
+								Arguments: `{"thought": "heartbeat test"}`,
+							},
+						}},
+					}, nil
+				}
+				return simpleStopResponse("done"), nil
 			},
+		}
+
+		loop := NewLoop(LoopConfig{
+			Provider: provider,
+			Tools:    CreateTools(ToolConfig{}),
 			OnHeartbeat: func() {
 				mu.Lock()
 				heartbeatCount++
 				mu.Unlock()
 			},
 		})
+		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
 
-		// Don't queue a message — the loop will sit idle, and the heartbeat
-		// should fire in the idle select.
-		ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
-		defer cancel()
-
-		_ = loop.Go(ctx)
+		runLoopForDuration(t, loop, 500*time.Millisecond)
 
 		mu.Lock()
 		count := heartbeatCount
 		mu.Unlock()
 
-		// The idle polling interval is 100ms and heartbeat is 10s,
-		// but since we're in a select with both, the heartbeat ticker
-		// may or may not fire in 250ms. In the idle case the heartbeat
-		// channel is checked. At minimum, verify it doesn't panic.
-		_ = count
+		assert.GreaterOrEqual(t, count, 1, "OnHeartbeat should fire during tool call handling")
 	})
 
 	t.Run("accumulates token usage", func(t *testing.T) {
