@@ -490,14 +490,11 @@ func (store *Storage) Rename(_ context.Context, oldID, newID string) error {
 }
 
 // generateFilePath generates the file path for a DAG by its name.
+// It uses filepath.Base to strip any directory components, preventing
+// path traversal attacks that could write files outside baseDir.
 func (store *Storage) generateFilePath(name string) string {
-	if strings.Contains(name, string(filepath.Separator)) {
-		filePath, err := filepath.Abs(name)
-		if err == nil {
-			return filePath
-		}
-	}
-	filePath := fileutil.EnsureYAMLExtension(path.Join(store.baseDir, name))
+	safeName := filepath.Base(name)
+	filePath := fileutil.EnsureYAMLExtension(path.Join(store.baseDir, safeName))
 	return filepath.Clean(filePath)
 }
 
