@@ -168,7 +168,7 @@ func (sm *SessionManager) UserID() string {
 
 // SetWorking updates the agent working state and notifies subscribers.
 func (sm *SessionManager) SetWorking(working bool) {
-	id, model, totalCost, callback, changed := sm.updateWorkingState(working)
+	id, model, totalCost, hasPendingPrompt, callback, changed := sm.updateWorkingState(working)
 	if !changed {
 		return
 	}
@@ -177,7 +177,7 @@ func (sm *SessionManager) SetWorking(working bool) {
 		SessionState: &SessionState{
 			SessionID:        id,
 			Working:          working,
-			HasPendingPrompt: sm.HasPendingPrompt(),
+			HasPendingPrompt: hasPendingPrompt,
 			Model:            model,
 			TotalCost:        totalCost,
 		},
@@ -188,17 +188,22 @@ func (sm *SessionManager) SetWorking(working bool) {
 }
 
 // updateWorkingState atomically updates the working state and returns relevant data.
-// Returns (id, model, totalCost, callback, changed) where changed indicates if the state actually changed.
-func (sm *SessionManager) updateWorkingState(working bool) (string, string, float64, func(string, bool), bool) {
+// Returns (id, model, totalCost, hasPendingPrompt, callback, changed) where changed indicates if the state actually changed.
+func (sm *SessionManager) updateWorkingState(working bool) (string, string, float64, bool, func(string, bool), bool) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
 	if sm.working == working {
-		return "", "", 0, nil, false
+		return "", "", 0, false, nil, false
 	}
 
 	sm.working = working
-	return sm.id, sm.model, sm.totalCost, sm.onWorkingChange, true
+
+	sm.promptsMu.Lock()
+	hasPending := len(sm.pendingPrompts) > 0
+	sm.promptsMu.Unlock()
+
+	return sm.id, sm.model, sm.totalCost, hasPending, sm.onWorkingChange, true
 }
 
 // IsWorking returns the current agent working state.

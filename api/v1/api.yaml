@@ -74,6 +74,8 @@ paths:
       tags:
         - "auth"
       security: []
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
       requestBody:
         required: true
         content:
@@ -7885,25 +7887,14 @@ components:
     AgentSessionWithState:
       type: object
       description: "Agent session with its current state"
-      required:
-        - session
-        - working
-        - totalCost
-      properties:
-        session:
-          $ref: "#/components/schemas/AgentSession"
-        working:
-          type: boolean
-        hasPendingPrompt:
-          type: boolean
-          description: "Whether the agent is waiting for user input"
-        model:
-          type: string
-        totalCost:
-          type: number
-          format: double
-          minimum: 0
-          description: "Total accumulated cost in USD"
+      allOf:
+        - $ref: "#/components/schemas/AgentSessionState"
+        - type: object
+          required:
+            - session
+          properties:
+            session:
+              $ref: "#/components/schemas/AgentSession"
 
     AgentToolCallFunction:
       type: object

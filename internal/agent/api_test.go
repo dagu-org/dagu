@@ -1225,7 +1225,7 @@ func TestAPI_CleanupIdleSessions_CancelsStuckSession(t *testing.T) {
 	api.cleanupIdleSessions()
 
 	// Session should have been cancelled (working set to false)
-	assert.False(t, mgr.IsWorking(), "stuck session should be cancelled")
+	require.False(t, mgr.IsWorking(), "stuck session should be cancelled")
 }
 
 func TestAPI_CleanupIdleSessions_DoesNotCancelHealthyWorkingSession(t *testing.T) {
@@ -1249,7 +1249,7 @@ func TestAPI_CleanupIdleSessions_DoesNotCancelHealthyWorkingSession(t *testing.T
 
 	// Session should still be working
 	_, exists := api.sessions.Load("healthy-sess")
-	assert.True(t, exists, "healthy working session should not be removed")
+	require.True(t, exists, "healthy working session should not be removed")
 }
 
 func TestAPI_CleanupIdleSessions_DoesNotCancelZeroHeartbeat(t *testing.T) {
@@ -1273,5 +1273,5 @@ func TestAPI_CleanupIdleSessions_DoesNotCancelZeroHeartbeat(t *testing.T) {
 
 	// Should not be cancelled because lastHeartbeat is zero
 	_, exists := api.sessions.Load("no-hb-sess")
-	assert.True(t, exists, "session with zero heartbeat should not be cancelled")
+	require.True(t, exists, "session with zero heartbeat should not be cancelled")
 }

@@ -811,7 +811,7 @@ func TestSessionManager_HasPendingPrompt(t *testing.T) {
 		t.Parallel()
 
 		sm := NewSessionManager(SessionManagerConfig{ID: "prompt-test"})
-		assert.False(t, sm.HasPendingPrompt())
+		require.False(t, sm.HasPendingPrompt())
 	})
 
 	t.Run("returns true when prompts are pending", func(t *testing.T) {
@@ -824,7 +824,7 @@ func TestSessionManager_HasPendingPrompt(t *testing.T) {
 		sm.pendingPrompts["test-prompt"] = make(chan UserPromptResponse, 1)
 		sm.promptsMu.Unlock()
 
-		assert.True(t, sm.HasPendingPrompt())
+		require.True(t, sm.HasPendingPrompt())
 	})
 
 	t.Run("returns false after prompt is removed", func(t *testing.T) {
@@ -836,13 +836,13 @@ func TestSessionManager_HasPendingPrompt(t *testing.T) {
 		sm.pendingPrompts["test-prompt"] = make(chan UserPromptResponse, 1)
 		sm.promptsMu.Unlock()
 
-		assert.True(t, sm.HasPendingPrompt())
+		require.True(t, sm.HasPendingPrompt())
 
 		sm.promptsMu.Lock()
 		delete(sm.pendingPrompts, "test-prompt")
 		sm.promptsMu.Unlock()
 
-		assert.False(t, sm.HasPendingPrompt())
+		require.False(t, sm.HasPendingPrompt())
 	})
 }
 

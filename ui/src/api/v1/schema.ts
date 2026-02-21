@@ -3449,17 +3449,8 @@ export interface components {
             totalCost: number;
         };
         /** @description Agent session with its current state */
-        AgentSessionWithState: {
+        AgentSessionWithState: components["schemas"]["AgentSessionState"] & {
             session: components["schemas"]["AgentSession"];
-            working: boolean;
-            /** @description Whether the agent is waiting for user input */
-            hasPendingPrompt?: boolean;
-            model?: string;
-            /**
-             * Format: double
-             * @description Total accumulated cost in USD
-             */
-            totalCost: number;
         };
         /** @description Function call details in a tool call */
         AgentToolCallFunction: {
@@ -3634,7 +3625,10 @@ export interface operations {
     };
     setup: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path?: never;
             cookie?: never;

@@ -254,6 +254,7 @@ func toAPISessions(sessions []agent.SessionWithState) []api.AgentSessionWithStat
 	for i, s := range sessions {
 		result[i] = api.AgentSessionWithState{
 			Session:          toAPISession(s.Session),
+			SessionId:        s.Session.ID,
 			Working:          s.Working,
 			HasPendingPrompt: ptrOf(s.HasPendingPrompt),
 			Model:            ptrOf(s.Model),

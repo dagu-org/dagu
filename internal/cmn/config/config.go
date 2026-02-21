@@ -402,6 +402,10 @@ func (c *Config) validateServer() error {
 		return fmt.Errorf("invalid auth mode: %q (must be one of: none, basic, builtin)", c.Server.Auth.Mode)
 	}
 
+	if c.Server.Session.MaxPerUser < 0 {
+		return fmt.Errorf("session.max_per_user must be >= 0")
+	}
+
 	return nil
 }
 

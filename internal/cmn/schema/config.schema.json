@@ -760,7 +760,8 @@
         "max_per_user": {
           "type": "integer",
           "description": "Maximum sessions to keep per user. Oldest sessions are deleted when exceeded. Default: 100. Set to 0 for unlimited.",
-          "minimum": 0
+          "minimum": 0,
+          "default": 100
         }
       }
     },

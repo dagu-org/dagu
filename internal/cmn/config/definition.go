@@ -298,7 +298,7 @@ type AuditDef struct {
 
 // SessionDef configures agent session storage.
 type SessionDef struct {
-	MaxPerUser *int `mapstructure:"max_per_user"` // Default: 100
+	MaxPerUser *int `mapstructure:"max_per_user"` // Default: 100; 0 = unlimited
 }
 
 // -----------------------------------------------------------------------------

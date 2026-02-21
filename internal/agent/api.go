@@ -812,10 +812,15 @@ func (a *API) cleanupIdleSessions() {
 		if mgr.IsWorking() {
 			lastHB := mgr.LastHeartbeat()
 			if !lastHB.IsZero() && time.Since(lastHB) > stuckHeartbeatTimeout {
-				_ = mgr.Cancel(context.Background())
-				a.logger.Warn("Cancelled stuck session", "session_id", id)
+				if err := mgr.Cancel(context.Background()); err != nil {
+					a.logger.Warn("Failed to cancel stuck session", "session_id", id, "error", err)
+				} else {
+					a.logger.Warn("Cancelled stuck session", "session_id", id)
+				}
 			}
 		}
+		// Cancelled sessions remain in the map until the next cleanup cycle
+		// so they can still be viewed or reactivated by the user.
 		if !mgr.IsWorking() && mgr.LastActivity().Before(cutoff) {
 			toDelete = append(toDelete, id)
 		}

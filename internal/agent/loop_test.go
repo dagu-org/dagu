@@ -287,7 +287,7 @@ func TestLoop_Go(t *testing.T) {
 		count := heartbeatCount
 		mu.Unlock()
 
-		assert.GreaterOrEqual(t, count, 1, "OnHeartbeat should fire during tool call handling")
+		require.GreaterOrEqual(t, count, 1, "OnHeartbeat should fire during tool call handling")
 	})
 
 	t.Run("accumulates token usage", func(t *testing.T) {
