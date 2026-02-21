@@ -489,9 +489,7 @@ func TestWebhooks_TriggerWithDagRunID(t *testing.T) {
 	triggerResp.Unmarshal(t, &triggerResult)
 	assert.Equal(t, customID, triggerResult.DagRunId)
 
-	// Wait for the DAG run to be recorded, then verify duplicate returns 409 Conflict.
-	// Use a generous timeout because each retry requires bcrypt token validation,
-	// which can take several seconds on resource-constrained CI runners.
+	// Wait for the DAG run to be recorded, then verify duplicate returns 409 Conflict
 	require.Eventually(t, func() bool {
 		resp := server.Client().Post("/api/v1/webhooks/"+dagName, api.WebhookRequest{
 			DagRunId: &customID,
