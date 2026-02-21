@@ -134,7 +134,10 @@ func runStartAll(ctx *Context, _ []string) error {
 
 	// WaitGroup to track all services
 	var wg sync.WaitGroup
-	serviceCount := 3 // scheduler + server + coordinator (max)
+	serviceCount := 2 // scheduler + server
+	if coord != nil {
+		serviceCount++
+	}
 	errCh := make(chan error, serviceCount)
 
 	// Start scheduler

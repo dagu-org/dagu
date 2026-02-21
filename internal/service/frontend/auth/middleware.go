@@ -23,7 +23,7 @@ type Options struct {
 	// JWTValidator validates JWT tokens for builtin auth mode.
 	// When set, JWT Bearer tokens are accepted as an authentication method.
 	JWTValidator TokenValidator
-	// APIKeyValidator validates standalone API keys with roles.
+	// APIKeyValidator validates API keys with roles.
 	// When set, API keys with the "dagu_" prefix are accepted as an authentication method.
 	APIKeyValidator APIKeyValidator
 	// AuthRequired indicates whether authentication is required.
@@ -97,40 +97,38 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 				return
 			}
 
-			// Try JWT token authentication if enabled (for builtin auth mode)
-			if jwtEnabled {
-				if token := extractBearerToken(r); token != "" {
-					user, err := opts.JWTValidator.GetUserFromToken(r.Context(), token)
-					if err == nil {
-						// JWT token valid - inject user and client IP into context
-						ctx := auth.WithUser(r.Context(), user)
-						ctx = auth.WithClientIP(ctx, GetClientIP(r))
-						next.ServeHTTP(w, r.WithContext(ctx))
-						return
-					}
-					// JWT validation failed, continue to try other methods
-				}
+			// Extract bearer token once for both JWT and API key checks
+			var bearerToken string
+			if jwtEnabled || apiKeyEnabled {
+				bearerToken = extractBearerToken(r)
 			}
 
-			// Try standalone API key authentication if enabled
-			// API keys have the "dagu_" prefix and have their own role assignment
-			if apiKeyEnabled {
-				if token := extractBearerToken(r); token != "" && strings.HasPrefix(token, "dagu_") {
-					apiKey, err := opts.APIKeyValidator.ValidateAPIKey(r.Context(), token)
-					if err == nil {
-						// API key valid - create synthetic user with the key's role
-						syntheticUser := &auth.User{
-							ID:       "apikey:" + apiKey.ID,
-							Username: "apikey:" + apiKey.Name,
-							Role:     apiKey.Role,
-						}
-						ctx := auth.WithUser(r.Context(), syntheticUser)
-						ctx = auth.WithClientIP(ctx, GetClientIP(r))
-						next.ServeHTTP(w, r.WithContext(ctx))
-						return
-					}
-					// API key validation failed, continue to try other methods
+			// Try JWT token authentication if enabled (for builtin auth mode)
+			if jwtEnabled && bearerToken != "" {
+				user, err := opts.JWTValidator.GetUserFromToken(r.Context(), bearerToken)
+				if err == nil {
+					ctx := auth.WithUser(r.Context(), user)
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
 				}
+				// JWT validation failed, continue to try other methods
+			}
+
+			// Try API key authentication if enabled
+			// API keys have the "dagu_" prefix and have their own role assignment
+			if apiKeyEnabled && bearerToken != "" && strings.HasPrefix(bearerToken, "dagu_") {
+				apiKey, err := opts.APIKeyValidator.ValidateAPIKey(r.Context(), bearerToken)
+				if err == nil {
+					syntheticUser := &auth.User{
+						ID:       "apikey:" + apiKey.ID,
+						Username: "apikey:" + apiKey.Name,
+						Role:     apiKey.Role,
+					}
+					ctx := auth.WithUser(r.Context(), syntheticUser)
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
+				}
+				// API key validation failed, continue to try other methods
 			}
 
 			// Try Basic Auth if enabled
@@ -138,14 +136,12 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 				if user, pass, ok := r.BasicAuth(); ok {
 					// Credentials were provided - must validate
 					if checkBasicAuth(user, pass, opts.Creds) {
-						// Create user and add to context
 						basicUser := &auth.User{
 							ID:       user,
 							Username: user,
 							Role:     auth.RoleAdmin,
 						}
 						ctx := auth.WithUser(r.Context(), basicUser)
-						ctx = auth.WithClientIP(ctx, GetClientIP(r))
 						next.ServeHTTP(w, r.WithContext(ctx))
 						return
 					}

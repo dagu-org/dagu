@@ -15,7 +15,7 @@ export type PathsConfig = {
   auditLogsDir: string;
 };
 
-export type AuthMode = 'none' | 'basic' | 'builtin' | '';
+export type AuthMode = 'none' | 'basic' | 'builtin';
 
 export type Config = {
   apiURL: string;

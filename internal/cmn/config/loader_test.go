@@ -722,7 +722,6 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 
 func loadWithEnv(t *testing.T, yamlContent string, env map[string]string) *Config {
 	t.Helper()
-	viper.Reset()
 
 	for k, v := range env {
 		t.Setenv(k, v)
@@ -733,7 +732,6 @@ func loadWithEnv(t *testing.T, yamlContent string, env map[string]string) *Confi
 
 func loadFromYAML(t *testing.T, yamlContent string) *Config {
 	t.Helper()
-	viper.Reset()
 
 	configFile := filepath.Join(t.TempDir(), "config.yaml")
 	err := os.WriteFile(configFile, []byte(yamlContent), 0600)
@@ -746,7 +744,6 @@ func loadFromYAML(t *testing.T, yamlContent string) *Config {
 
 func loadWithErrorFromYAML(t *testing.T, yamlContent string) error {
 	t.Helper()
-	viper.Reset()
 
 	configFile := filepath.Join(t.TempDir(), "config.yaml")
 	err := os.WriteFile(configFile, []byte(yamlContent), 0600)

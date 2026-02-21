@@ -279,17 +279,17 @@ func TestWebhooks_CRUD(t *testing.T) {
 	assert.NotEmpty(t, triggerResult.DagRunId)
 	assert.Equal(t, dagName, triggerResult.DagName)
 
-	// Wait for LastUsedAt to be updated
-	time.Sleep(100 * time.Millisecond)
-
 	// Verify LastUsedAt is updated
-	getResp2 := server.Client().Get("/api/v1/dags/" + dagName + "/webhook").
-		WithBearerToken(token).
-		ExpectStatus(http.StatusOK).Send(t)
-
-	var getResult2 api.WebhookDetails
-	getResp2.Unmarshal(t, &getResult2)
-	require.NotNil(t, getResult2.LastUsedAt, "LastUsedAt should be set after trigger")
+	require.Eventually(t, func() bool {
+		resp := server.Client().Get("/api/v1/dags/" + dagName + "/webhook").
+			WithBearerToken(token).Send(t)
+		if resp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+		var result api.WebhookDetails
+		resp.Unmarshal(t, &result)
+		return result.LastUsedAt != nil
+	}, 5*time.Second, 100*time.Millisecond, "LastUsedAt should be set after trigger")
 
 	// Delete webhook
 	server.Client().Delete("/api/v1/dags/" + dagName + "/webhook").
@@ -489,13 +489,13 @@ func TestWebhooks_TriggerWithDagRunID(t *testing.T) {
 	triggerResp.Unmarshal(t, &triggerResult)
 	assert.Equal(t, customID, triggerResult.DagRunId)
 
-	// Wait for the DAG run to be recorded
-	time.Sleep(100 * time.Millisecond)
-
-	// Try to trigger with same dag-run ID - should get 409 Conflict
-	server.Client().Post("/api/v1/webhooks/"+dagName, api.WebhookRequest{
-		DagRunId: &customID,
-	}).WithBearerToken(webhookToken).ExpectStatus(http.StatusConflict).Send(t)
+	// Wait for the DAG run to be recorded, then verify duplicate returns 409 Conflict
+	require.Eventually(t, func() bool {
+		resp := server.Client().Post("/api/v1/webhooks/"+dagName, api.WebhookRequest{
+			DagRunId: &customID,
+		}).WithBearerToken(webhookToken).Send(t)
+		return resp.Response.StatusCode() == http.StatusConflict
+	}, 5*time.Second, 100*time.Millisecond, "duplicate dag-run ID should return 409 Conflict")
 }
 
 // TestWebhooks_TriggerInvalidToken tests webhook trigger with invalid tokens
