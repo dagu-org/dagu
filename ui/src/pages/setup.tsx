@@ -471,6 +471,7 @@ export default function SetupPage() {
                           value={apiKey}
                           onChange={(e) => setApiKey(e.target.value)}
                           placeholder="Enter your API key"
+                          autoComplete="off"
                           className="h-9"
                         />
                       </div>
