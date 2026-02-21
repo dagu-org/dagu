@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useConfig, useUpdateConfig } from '@/contexts/ConfigContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient } from '@/hooks/api';
-import { components } from '@/api/v1/schema';
+import { components, CreateModelConfigRequestProvider } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,7 +16,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { getAuthHeaders } from '@/lib/authHeaders';
 import {
   AlertCircle,
   UserPlus,
@@ -35,11 +34,12 @@ const PROVIDERS = [
 ] as const;
 
 function generateSlugId(name: string): string {
-  return name
+  const slug = name
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
+  return slug || 'model';
 }
 
 export default function SetupPage() {
@@ -148,6 +148,10 @@ export default function SetupPage() {
     setStep2Error(null);
 
     if (!agentEnabled) {
+      await client.PATCH('/settings/agent', {
+        params: { query: { remoteNode } },
+        body: { enabled: false },
+      });
       navigate('/', { replace: true });
       return;
     }
@@ -180,39 +184,32 @@ export default function SetupPage() {
         throw new Error('Selected model not found');
       }
 
-      const modelBody: Record<string, unknown> = {
-        id: generateSlugId(preset.name),
-        name: preset.name,
-        provider: preset.provider,
-        model: preset.model,
-        apiKey: apiKey.trim(),
-        description: preset.description || undefined,
-        contextWindow: preset.contextWindow || undefined,
-        maxOutputTokens: preset.maxOutputTokens || undefined,
-        inputCostPer1M: preset.inputCostPer1M || undefined,
-        outputCostPer1M: preset.outputCostPer1M || undefined,
-        supportsThinking: preset.supportsThinking || false,
-      };
-
       // 3. Create model config
-      const createResp = await fetch(
-        `${config.apiURL}/settings/agent/models?remoteNode=${encodeURIComponent(remoteNode)}`,
+      const { data: createdModel, error: createError } = await client.POST(
+        '/settings/agent/models',
         {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify(modelBody),
+          params: { query: { remoteNode } },
+          body: {
+            id: generateSlugId(preset.name),
+            name: preset.name,
+            provider: preset.provider as CreateModelConfigRequestProvider,
+            model: preset.model,
+            apiKey: apiKey.trim(),
+            description: preset.description || undefined,
+            contextWindow: preset.contextWindow || undefined,
+            maxOutputTokens: preset.maxOutputTokens || undefined,
+            inputCostPer1M: preset.inputCostPer1M || undefined,
+            outputCostPer1M: preset.outputCostPer1M || undefined,
+            supportsThinking: preset.supportsThinking || false,
+          },
         }
       );
-
-      if (!createResp.ok) {
-        const data = await createResp.json().catch(() => ({}));
-        throw new Error(data.message || 'Failed to create model');
+      if (createError) {
+        throw new Error(createError.message || 'Failed to create model');
       }
 
-      const createdModel = await createResp.json();
-
       // 4. Set as default model
-      const modelId = createdModel.id || generateSlugId(preset.name);
+      const modelId = createdModel?.id || generateSlugId(preset.name);
       const { error: defaultError } = await client.PUT(
         '/settings/agent/default-model',
         {

@@ -94,6 +94,13 @@ export function ChatInput({
   useEffect(() => {
     if (initialValue) {
       setMessage(initialValue);
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (el) {
+          el.style.height = 'auto';
+          el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+        }
+      });
     }
   }, [initialValue]);
 
