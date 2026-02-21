@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { getAuthHeaders } from '@/lib/authHeaders';
 import {
   AlertCircle,
   UserPlus,
@@ -197,10 +198,7 @@ export default function SetupPage() {
         `${config.apiURL}/settings/agent/models?remoteNode=${encodeURIComponent(remoteNode)}`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('dagu_auth_token')}`,
-          },
+          headers: getAuthHeaders(),
           body: JSON.stringify(modelBody),
         }
       );
