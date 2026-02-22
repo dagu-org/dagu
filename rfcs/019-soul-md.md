@@ -159,7 +159,6 @@ Souls participate in Git sync alongside DAGs, memory, and skills:
 ## Out of Scope (Future Work)
 
 - Per-user soul preferences (different users see different default souls)
-- Per-DAG soul overrides in agent step configuration
 - Soul hot-reloading mid-session
 - Soul content validation/linting
 - Soul marketplace/sharing

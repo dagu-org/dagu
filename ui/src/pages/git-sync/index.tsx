@@ -497,7 +497,13 @@ export default function GitSyncPage() {
     if (typeFilter === 'all') {
       return `No ${statusFilter} items`;
     }
-    const typeLabel = typeFilter === 'dag' ? 'DAG' : typeFilter === 'skill' ? 'skill' : typeFilter === 'soul' ? 'soul' : 'memory';
+    const typeLabelMap: Record<string, string> = {
+      dag: 'DAG',
+      memory: 'memory',
+      skill: 'skill',
+      soul: 'soul',
+    };
+    const typeLabel = typeLabelMap[typeFilter] || typeFilter;
     if (statusFilter === 'all') {
       return `No ${typeLabel} items`;
     }
@@ -608,7 +614,7 @@ export default function GitSyncPage() {
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              {f === 'all' ? 'All' : f === 'dag' ? 'DAGs' : f === 'memory' ? 'Memory' : f === 'skill' ? 'Skills' : 'Souls'} ({typeCounts[f]})
+              {({ all: 'All', dag: 'DAGs', memory: 'Memory', skill: 'Skills', soul: 'Souls' } as Record<string, string>)[f]} ({typeCounts[f]})
             </button>
           ))}
         </div>

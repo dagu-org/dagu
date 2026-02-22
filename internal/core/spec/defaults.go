@@ -102,33 +102,51 @@ func applyDefaults(s *step, d *defaults, raw map[string]any) {
 	}
 
 	// Agent defaults: apply each field only if the step doesn't set it.
+	// Like the top-level shouldApply, we consult the raw YAML map so that
+	// explicit zero values (e.g. soul: "") are honoured and not overridden.
 	if d.Agent != nil {
 		if s.Agent == nil {
 			s.Agent = &agentConfig{}
 		}
 		a, da := s.Agent, d.Agent
-		if a.Model == "" && da.Model != "" {
+
+		var agentRaw map[string]any
+		if raw != nil {
+			if v, ok := raw["agent"].(map[string]any); ok {
+				agentRaw = v
+			}
+		}
+
+		shouldApplyAgent := func(key string, isZero bool) bool {
+			if agentRaw != nil {
+				_, ok := agentRaw[key]
+				return !ok
+			}
+			return isZero
+		}
+
+		if shouldApplyAgent("model", a.Model == "") && da.Model != "" {
 			a.Model = da.Model
 		}
-		if a.Tools == nil && da.Tools != nil {
+		if shouldApplyAgent("tools", a.Tools == nil) && da.Tools != nil {
 			a.Tools = da.Tools
 		}
-		if a.Skills == nil && da.Skills != nil {
+		if shouldApplyAgent("skills", a.Skills == nil) && da.Skills != nil {
 			a.Skills = da.Skills
 		}
-		if a.Soul == "" && da.Soul != "" {
+		if shouldApplyAgent("soul", a.Soul == "") && da.Soul != "" {
 			a.Soul = da.Soul
 		}
-		if a.Memory == nil && da.Memory != nil {
+		if shouldApplyAgent("memory", a.Memory == nil) && da.Memory != nil {
 			a.Memory = da.Memory
 		}
-		if a.Prompt == "" && da.Prompt != "" {
+		if shouldApplyAgent("prompt", a.Prompt == "") && da.Prompt != "" {
 			a.Prompt = da.Prompt
 		}
-		if a.MaxIterations == nil && da.MaxIterations != nil {
+		if shouldApplyAgent("max_iterations", a.MaxIterations == nil) && da.MaxIterations != nil {
 			a.MaxIterations = da.MaxIterations
 		}
-		if a.SafeMode == nil && da.SafeMode != nil {
+		if shouldApplyAgent("safe_mode", a.SafeMode == nil) && da.SafeMode != nil {
 			a.SafeMode = da.SafeMode
 		}
 	}

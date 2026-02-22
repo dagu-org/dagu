@@ -235,6 +235,7 @@ export function useAgentChat() {
             model,
             dagContexts: toDagContextsBody(dagContexts),
             safeMode: preferences.safeMode,
+            soulId: soulId || undefined,
           },
         });
         if (apiError) throw new Error(apiError.message || 'Failed to send message');

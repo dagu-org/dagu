@@ -13,7 +13,7 @@ import (
 
 func TestStore_CreateAndGetByID(t *testing.T) {
 	dir := t.TempDir()
-	store, err := New(dir)
+	store, err := New(context.Background(), dir)
 	require.NoError(t, err)
 
 	soul := &agent.Soul{
@@ -36,7 +36,7 @@ func TestStore_CreateAndGetByID(t *testing.T) {
 
 func TestStore_CreateDuplicate(t *testing.T) {
 	dir := t.TempDir()
-	store, err := New(dir)
+	store, err := New(context.Background(), dir)
 	require.NoError(t, err)
 
 	soul := &agent.Soul{
@@ -53,7 +53,7 @@ func TestStore_CreateDuplicate(t *testing.T) {
 
 func TestStore_List(t *testing.T) {
 	dir := t.TempDir()
-	store, err := New(dir)
+	store, err := New(context.Background(), dir)
 	require.NoError(t, err)
 
 	for _, s := range []*agent.Soul{
@@ -72,7 +72,7 @@ func TestStore_List(t *testing.T) {
 
 func TestStore_Update(t *testing.T) {
 	dir := t.TempDir()
-	store, err := New(dir)
+	store, err := New(context.Background(), dir)
 	require.NoError(t, err)
 
 	soul := &agent.Soul{
@@ -94,7 +94,7 @@ func TestStore_Update(t *testing.T) {
 
 func TestStore_Delete(t *testing.T) {
 	dir := t.TempDir()
-	store, err := New(dir)
+	store, err := New(context.Background(), dir)
 	require.NoError(t, err)
 
 	soul := &agent.Soul{
@@ -113,7 +113,7 @@ func TestStore_Delete(t *testing.T) {
 
 func TestStore_Search(t *testing.T) {
 	dir := t.TempDir()
-	store, err := New(dir)
+	store, err := New(context.Background(), dir)
 	require.NoError(t, err)
 
 	for _, s := range []*agent.Soul{
@@ -133,7 +133,7 @@ func TestStore_Search(t *testing.T) {
 
 func TestStore_GetNotFound(t *testing.T) {
 	dir := t.TempDir()
-	store, err := New(dir)
+	store, err := New(context.Background(), dir)
 	require.NoError(t, err)
 
 	_, err = store.GetByID(context.Background(), "nonexistent")
@@ -142,7 +142,7 @@ func TestStore_GetNotFound(t *testing.T) {
 
 func TestStore_InvalidID(t *testing.T) {
 	dir := t.TempDir()
-	store, err := New(dir)
+	store, err := New(context.Background(), dir)
 	require.NoError(t, err)
 
 	soul := &agent.Soul{
@@ -158,7 +158,7 @@ func TestSeedExampleSouls(t *testing.T) {
 	dir := t.TempDir()
 	soulsDir := filepath.Join(dir, "souls")
 
-	created := SeedExampleSouls(soulsDir)
+	created := SeedExampleSouls(context.Background(), soulsDir)
 	assert.True(t, created)
 
 	// Verify marker file exists
@@ -170,7 +170,7 @@ func TestSeedExampleSouls(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Second call should not re-seed
-	created = SeedExampleSouls(soulsDir)
+	created = SeedExampleSouls(context.Background(), soulsDir)
 	assert.False(t, created)
 }
 

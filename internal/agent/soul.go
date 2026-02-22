@@ -22,7 +22,7 @@ type Soul struct {
 	ID          string `yaml:"id"                    json:"id"`
 	Name        string `yaml:"name"                  json:"name"`
 	Description string `yaml:"description,omitempty" json:"description,omitempty"`
-	Content     string `yaml:"content"               json:"content"`
+	Content     string `yaml:"-"                     json:"content"`
 }
 
 // SoulStore defines the interface for soul persistence.

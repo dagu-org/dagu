@@ -48,9 +48,26 @@ type systemPromptData struct {
 	SoulContent     string
 }
 
-// GenerateSystemPrompt renders the system prompt template with the given environment,
-// optional DAG context, memory content, user role capabilities, available skills, total skill count, and optional soul.
-func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG, memory MemoryContent, role auth.Role, availableSkills []SkillSummary, skillCount int, soul *Soul) string {
+// SystemPromptParams holds all parameters for system prompt generation.
+type SystemPromptParams struct {
+	Env             EnvironmentInfo
+	CurrentDAG      *CurrentDAG
+	Memory          MemoryContent
+	Role            auth.Role
+	AvailableSkills []SkillSummary
+	SkillCount      int
+	Soul            *Soul
+}
+
+// GenerateSystemPrompt renders the system prompt template with the given parameters.
+func GenerateSystemPrompt(p SystemPromptParams) string {
+	env := p.Env
+	currentDAG := p.CurrentDAG
+	memory := p.Memory
+	role := p.Role
+	availableSkills := p.AvailableSkills
+	skillCount := p.SkillCount
+	soul := p.Soul
 	var buf bytes.Buffer
 	var soulContent string
 	if soul != nil {

@@ -147,8 +147,11 @@ func (e *Executor) Run(ctx context.Context) error {
 	var soul *agent.Soul
 	if stepCfg != nil && stepCfg.Soul != "" {
 		if soulStore := agent.GetSoulStore(ctx); soulStore != nil {
-			soul, _ = soulStore.GetByID(ctx, stepCfg.Soul)
-			if soul == nil {
+			var soulErr error
+			soul, soulErr = soulStore.GetByID(ctx, stepCfg.Soul)
+			if soulErr != nil {
+				logf(stderr, "Warning: soul %q not available: %v", stepCfg.Soul, soulErr)
+			} else if soul == nil {
 				logf(stderr, "Warning: soul %q not found in store", stepCfg.Soul)
 			}
 		}
@@ -306,7 +309,14 @@ func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memor
 		}
 	}
 
-	prompt := agent.GenerateSystemPrompt(env, currentDAG, memory, "", availableSkills, skillCount, soul)
+	prompt := agent.GenerateSystemPrompt(agent.SystemPromptParams{
+		Env:             env,
+		CurrentDAG:      currentDAG,
+		Memory:          memory,
+		AvailableSkills: availableSkills,
+		SkillCount:      skillCount,
+		Soul:            soul,
+	})
 
 	// Append instruction about the output tool.
 	prompt += "\n\n## Output\n\nWhen you have completed your task, use the `output` tool to write your final result. " +

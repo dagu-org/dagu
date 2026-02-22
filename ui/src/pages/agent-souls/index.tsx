@@ -58,9 +58,14 @@ export default function AgentSoulsPage(): React.ReactNode {
   }, [debouncedQuery]);
 
   useEffect(() => {
-    client.GET('/settings/agent', { params: { query: { remoteNode } } })
-      .then(({ data }) => { if (data) setDefaultSoulId(data.selectedSoulId); })
-      .catch(() => {});
+    (async () => {
+      try {
+        const { data } = await client.GET('/settings/agent', { params: { query: { remoteNode } } });
+        if (data) setDefaultSoulId(data.selectedSoulId);
+      } catch {
+        // Best-effort fetch
+      }
+    })();
   }, [client, remoteNode]);
 
   const { data, mutate, isLoading } = useQuery(

@@ -53,7 +53,7 @@ export function ChatInput({
   const [models, setModels] = useState<ModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [souls, setSouls] = useState<SoulOption[]>([]);
-  const [selectedSoul, setSelectedSoul] = useState<string>('');
+  const [selectedSoul, setSelectedSoul] = useState<string>('__default__');
   const currentPageDag = useDagPageContext();
   // Track IME composition state manually for reliable Japanese/Chinese input handling
   const isComposingRef = useRef(false);

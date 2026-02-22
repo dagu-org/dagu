@@ -14,6 +14,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/goccy/go-yaml"
 )
@@ -55,7 +57,7 @@ type Store struct {
 
 // New creates a new file-based soul store.
 // The baseDir is the directory where soul files are stored.
-func New(baseDir string) (*Store, error) {
+func New(ctx context.Context, baseDir string) (*Store, error) {
 	if baseDir == "" {
 		return nil, errors.New("fileagentsoul: baseDir cannot be empty")
 	}
@@ -70,7 +72,7 @@ func New(baseDir string) (*Store, error) {
 		return nil, fmt.Errorf("fileagentsoul: failed to create directory %s: %w", baseDir, err)
 	}
 
-	if err := store.rebuildIndex(); err != nil {
+	if err := store.rebuildIndex(ctx); err != nil {
 		return nil, fmt.Errorf("fileagentsoul: failed to build index: %w", err)
 	}
 
@@ -78,7 +80,7 @@ func New(baseDir string) (*Store, error) {
 }
 
 // rebuildIndex scans the directory and rebuilds the in-memory index with cached metadata.
-func (s *Store) rebuildIndex() error {
+func (s *Store) rebuildIndex(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -103,9 +105,9 @@ func (s *Store) rebuildIndex() error {
 
 		soul, err := loadSoulFromFile(filePath, id)
 		if err != nil {
-			slog.Warn("Failed to load soul file during index rebuild",
+			logger.Warn(ctx, "Failed to load soul file during index rebuild",
 				slog.String("file", filePath),
-				slog.String("error", err.Error()))
+				tag.Error(err))
 			continue
 		}
 
@@ -115,7 +117,7 @@ func (s *Store) rebuildIndex() error {
 			contentSize: len(soul.Content),
 		}
 		if existingID, exists := s.byName[soul.Name]; exists {
-			slog.Warn("Duplicate soul name in store, last file wins",
+			logger.Warn(ctx, "Duplicate soul name in store, last file wins",
 				slog.String("name", soul.Name),
 				slog.String("existingID", existingID),
 				slog.String("newID", soul.ID))
@@ -135,21 +137,45 @@ func parseSoulFile(data []byte, id string) (*agent.Soul, error) {
 		return nil, fmt.Errorf("missing frontmatter delimiter")
 	}
 
-	// Find the closing ---
+	// Find the closing --- by iterating lines to match exactly "---"
 	rest := content[4:] // skip opening "---\n"
-	closingIdx := strings.Index(rest, "\n---\n")
-	delimLen := 5 // len("\n---\n")
-	if closingIdx == -1 {
-		closingIdx = strings.Index(rest, "\n---")
-		delimLen = 4 // len("\n---")
-		if closingIdx == -1 {
-			return nil, fmt.Errorf("missing closing frontmatter delimiter")
+
+	closingIdx := -1
+	offset := 0
+	for offset < len(rest) {
+		nlPos := strings.Index(rest[offset:], "\n")
+		var line string
+		if nlPos == -1 {
+			line = rest[offset:]
+		} else {
+			line = rest[offset : offset+nlPos]
 		}
+		if strings.TrimRight(line, "\r") == "---" {
+			closingIdx = offset
+			break
+		}
+		if nlPos == -1 {
+			break
+		}
+		offset += nlPos + 1
 	}
 
-	frontmatterStr := rest[:closingIdx]
-	bodyStart := min(closingIdx+delimLen, len(rest))
-	body := rest[bodyStart:]
+	var frontmatterStr, body string
+	if closingIdx == -1 {
+		// No closing delimiter found: treat entire rest as frontmatter, no body
+		frontmatterStr = rest
+		body = ""
+	} else {
+		frontmatterStr = rest[:closingIdx]
+		// Skip past the "---\n" or "---\r\n" or "---" at EOF
+		afterDelim := closingIdx
+		nlPos := strings.Index(rest[afterDelim:], "\n")
+		if nlPos == -1 {
+			body = ""
+		} else {
+			body = rest[afterDelim+nlPos+1:]
+		}
+	}
 
 	var fm soulFrontmatter
 	if err := yaml.Unmarshal([]byte(frontmatterStr), &fm); err != nil {
@@ -407,17 +433,14 @@ func (s *Store) Update(_ context.Context, soul *agent.Soul) error {
 		return agent.ErrSoulNotFound
 	}
 
+	oldName := entry.name
+
 	filePath, err := s.soulFilePath(soul.ID)
 	if err != nil {
 		return err
 	}
 
-	existing, err := loadSoulFromFile(filePath, soul.ID)
-	if err != nil {
-		return fmt.Errorf("fileagentsoul: failed to load existing soul: %w", err)
-	}
-
-	nameChanged := existing.Name != soul.Name
+	nameChanged := oldName != soul.Name
 	if nameChanged {
 		if takenByID, taken := s.byName[soul.Name]; taken && takenByID != soul.ID {
 			return agent.ErrSoulNameAlreadyExists
@@ -434,7 +457,7 @@ func (s *Store) Update(_ context.Context, soul *agent.Soul) error {
 	entry.contentSize = len(soul.Content)
 
 	if nameChanged {
-		delete(s.byName, existing.Name)
+		delete(s.byName, oldName)
 		s.byName[soul.Name] = soul.ID
 	}
 

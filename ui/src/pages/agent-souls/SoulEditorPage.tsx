@@ -47,10 +47,14 @@ export default function SoulEditorPage() {
   useEffect(() => {
     if (isCreating || !soulId) return;
 
+    const controller = new AbortController();
+
     (async () => {
       const { data, error } = await client.GET('/settings/agent/souls/{soulId}', {
         params: { path: { soulId }, query: { remoteNode } },
+        signal: controller.signal,
       });
+      if (controller.signal.aborted) return;
       if (error) {
         showError(error.message || 'Failed to load soul');
         navigate('/agent-souls');
@@ -62,6 +66,8 @@ export default function SoulEditorPage() {
       setContent(data.content ?? '');
       setIsLoading(false);
     })();
+
+    return () => controller.abort();
   }, [soulId, isCreating, client, remoteNode, showError, navigate]);
 
   const handleSave = useCallback(async () => {

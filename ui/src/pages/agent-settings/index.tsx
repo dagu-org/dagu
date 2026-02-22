@@ -537,13 +537,16 @@ export default function AgentSettingsPage(): ReactNode {
               Select the soul that defines the agent&apos;s identity and communication style
             </p>
             <Select
-              value={selectedSoulId || 'default'}
-              onValueChange={(value) => setSelectedSoulId(value)}
+              value={selectedSoulId || '__none__'}
+              onValueChange={(value) => setSelectedSoulId(value === '__none__' ? undefined : value)}
             >
               <SelectTrigger className="h-8 text-xs max-w-[300px]">
                 <SelectValue placeholder="Select soul" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="__none__" className="text-xs">
+                  Default (no soul)
+                </SelectItem>
                 {souls.map((s) => (
                   <SelectItem key={s.id} value={s.id} className="text-xs">
                     {s.name}

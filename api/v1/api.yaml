@@ -4733,12 +4733,7 @@ paths:
         - "agent"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - name: soulId
-          in: path
-          required: true
-          schema:
-            type: string
-          description: "Soul ID"
+        - $ref: "#/components/parameters/SoulId"
       responses:
         "200":
           description: "Soul details"
@@ -4785,12 +4780,7 @@ paths:
         - "agent"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - name: soulId
-          in: path
-          required: true
-          schema:
-            type: string
-          description: "Soul ID"
+        - $ref: "#/components/parameters/SoulId"
       requestBody:
         required: true
         content:
@@ -4843,12 +4833,7 @@ paths:
         - "agent"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - name: soulId
-          in: path
-          required: true
-          schema:
-            type: string
-          description: "Soul ID"
+        - $ref: "#/components/parameters/SoulId"
       responses:
         "204":
           description: "Soul deleted"
@@ -5323,6 +5308,15 @@ components:
       schema:
         type: string
         minLength: 1
+
+    SoulId:
+      name: soulId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+      description: The soul ID
 
   schemas:
     AuditEntry:
@@ -7614,6 +7608,7 @@ components:
           $ref: "#/components/schemas/AgentToolPolicy"
         selectedSoulId:
           type: string
+          nullable: true
           description: "ID of the currently selected soul"
 
     UpdateAgentConfigRequest:
@@ -7630,6 +7625,7 @@ components:
           $ref: "#/components/schemas/AgentToolPolicy"
         selectedSoulId:
           type: string
+          nullable: true
           description: "ID of the soul to select"
 
     AgentToolPolicy:

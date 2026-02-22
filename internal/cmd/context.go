@@ -460,7 +460,7 @@ func (c *Context) agentStores() agentStoresResult {
 	result.SkillStore = ss
 
 	soulsDir := filepath.Join(c.Config.Paths.DAGsDir, "souls")
-	soulStore, err := fileagentsoul.New(soulsDir)
+	soulStore, err := fileagentsoul.New(c, soulsDir)
 	if err != nil {
 		logger.Warn(c, "Failed to create agent soul store", tag.Error(err))
 		return result

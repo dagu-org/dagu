@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strings"
 
@@ -37,6 +38,12 @@ var (
 	errSoulAlreadyExists = &Error{
 		Code:       api.ErrorCodeAlreadyExists,
 		Message:    "Soul already exists",
+		HTTPStatus: http.StatusConflict,
+	}
+
+	errSoulNameConflict = &Error{
+		Code:       api.ErrorCodeAlreadyExists,
+		Message:    "A soul with this name already exists",
 		HTTPStatus: http.StatusConflict,
 	}
 )
@@ -85,15 +92,17 @@ func (a *API) CreateAgentSoul(ctx context.Context, request api.CreateAgentSoulRe
 	}
 
 	body := request.Body
+	name := strings.TrimSpace(body.Name)
+	content := strings.TrimSpace(body.Content)
 
-	if strings.TrimSpace(body.Name) == "" {
+	if name == "" {
 		return nil, &Error{
 			Code:       api.ErrorCodeBadRequest,
 			Message:    "name is required and cannot be empty",
 			HTTPStatus: http.StatusBadRequest,
 		}
 	}
-	if strings.TrimSpace(body.Content) == "" {
+	if content == "" {
 		return nil, &Error{
 			Code:       api.ErrorCodeBadRequest,
 			Message:    "content is required and cannot be empty",
@@ -105,7 +114,7 @@ func (a *API) CreateAgentSoul(ctx context.Context, request api.CreateAgentSoulRe
 	id := valueOf(body.Id)
 	if id == "" {
 		existingIDs := a.collectSoulIDs(ctx)
-		id = agent.UniqueID(body.Name, existingIDs, "soul")
+		id = agent.UniqueID(name, existingIDs, "soul")
 	}
 	if err := agent.ValidateSoulID(id); err != nil {
 		return nil, &Error{
@@ -117,8 +126,8 @@ func (a *API) CreateAgentSoul(ctx context.Context, request api.CreateAgentSoulRe
 
 	soul := &agent.Soul{
 		ID:      id,
-		Name:    body.Name,
-		Content: body.Content,
+		Name:    name,
+		Content: content,
 	}
 	if body.Description != nil {
 		soul.Description = *body.Description
@@ -134,7 +143,7 @@ func (a *API) CreateAgentSoul(ctx context.Context, request api.CreateAgentSoulRe
 
 	a.logAudit(ctx, audit.CategoryAgent, auditActionSoulCreate, map[string]any{
 		"soul_id": id,
-		"name":    body.Name,
+		"name":    name,
 	})
 
 	return api.CreateAgentSoul201JSONResponse(toSoulResponse(soul)), nil
@@ -189,7 +198,10 @@ func (a *API) UpdateAgentSoul(ctx context.Context, request api.UpdateAgentSoulRe
 	applySoulUpdates(existing, request.Body)
 
 	if err := a.agentSoulStore.Update(ctx, existing); err != nil {
-		if errors.Is(err, agent.ErrSoulAlreadyExists) || errors.Is(err, agent.ErrSoulNameAlreadyExists) {
+		if errors.Is(err, agent.ErrSoulNameAlreadyExists) {
+			return nil, errSoulNameConflict
+		}
+		if errors.Is(err, agent.ErrSoulAlreadyExists) {
 			return nil, errSoulAlreadyExists
 		}
 		logger.Error(ctx, "Failed to update agent soul", tag.Error(err))
@@ -267,12 +279,14 @@ func applySoulUpdates(soul *agent.Soul, update *api.UpdateSoulRequest) {
 }
 
 func (a *API) collectSoulIDs(ctx context.Context) map[string]struct{} {
-	souls, err := a.agentSoulStore.List(ctx)
+	result, err := a.agentSoulStore.Search(ctx, agent.SearchSoulsOptions{
+		Paginator: exec.NewPaginator(1, math.MaxInt),
+	})
 	if err != nil {
 		return make(map[string]struct{})
 	}
-	ids := make(map[string]struct{}, len(souls))
-	for _, s := range souls {
+	ids := make(map[string]struct{}, len(result.Items))
+	for _, s := range result.Items {
 		ids[s.ID] = struct{}{}
 	}
 	return ids

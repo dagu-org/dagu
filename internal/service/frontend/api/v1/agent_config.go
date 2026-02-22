@@ -177,6 +177,9 @@ func buildAgentConfigChanges(update *api.UpdateAgentConfigRequest) map[string]an
 	if update.ToolPolicy != nil {
 		changes[auditFieldToolPolicy] = update.ToolPolicy
 	}
+	if update.SelectedSoulId != nil {
+		changes["selected_soul_id"] = *update.SelectedSoulId
+	}
 	return changes
 }
 

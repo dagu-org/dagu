@@ -172,8 +172,8 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	var agentSoulStore agent.SoulStore
 	soulsDir := filepath.Join(cfg.Paths.DAGsDir, "souls")
-	fileagentsoul.SeedExampleSouls(soulsDir)
-	if soulStore, soulErr := fileagentsoul.New(soulsDir); soulErr != nil {
+	fileagentsoul.SeedExampleSouls(ctx, soulsDir)
+	if soulStore, soulErr := fileagentsoul.New(ctx, soulsDir); soulErr != nil {
 		logger.Warn(ctx, "Failed to create agent soul store", tag.Error(soulErr))
 	} else {
 		agentSoulStore = soulStore

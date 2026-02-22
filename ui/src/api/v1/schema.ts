@@ -3250,7 +3250,7 @@ export interface components {
             defaultModelId?: string;
             toolPolicy?: components["schemas"]["AgentToolPolicy"];
             /** @description ID of the currently selected soul */
-            selectedSoulId?: string;
+            selectedSoulId?: string | null;
         };
         /** @description Request to update AI agent configuration */
         UpdateAgentConfigRequest: {
@@ -3260,7 +3260,7 @@ export interface components {
             defaultModelId?: string;
             toolPolicy?: components["schemas"]["AgentToolPolicy"];
             /** @description ID of the soul to select */
-            selectedSoulId?: string;
+            selectedSoulId?: string | null;
         };
         /** @description Global tool permission policy for AI agent sessions */
         AgentToolPolicy: {
@@ -3681,6 +3681,8 @@ export interface components {
         Stream: components["schemas"]["Stream"];
         /** @description Unique identifier of the agent session */
         AgentSessionId: string;
+        /** @description The soul ID */
+        SoulId: string;
     };
     requestBodies: never;
     headers: never;
@@ -9609,8 +9611,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description Soul ID */
-                soulId: string;
+                /** @description The soul ID */
+                soulId: components["parameters"]["SoulId"];
             };
             cookie?: never;
         };
@@ -9680,8 +9682,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description Soul ID */
-                soulId: string;
+                /** @description The soul ID */
+                soulId: components["parameters"]["SoulId"];
             };
             cookie?: never;
         };
@@ -9749,8 +9751,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description Soul ID */
-                soulId: string;
+                /** @description The soul ID */
+                soulId: components["parameters"]["SoulId"];
             };
             cookie?: never;
         };
