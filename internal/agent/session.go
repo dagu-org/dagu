@@ -494,8 +494,8 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 			SkillStore:    sm.skillStore,
 			AllowedSkills: allowedSkills,
 		}),
-		RecordMessage:    sm.createRecordMessageFunc(),
-		Logger:           sm.logger,
+		RecordMessage: sm.createRecordMessageFunc(),
+		Logger:        sm.logger,
 		SystemPrompt: GenerateSystemPrompt(SystemPromptParams{
 			Env:             sm.environment,
 			Memory:          memory,
