@@ -120,7 +120,7 @@ type DAGDiff struct {
 
 // fileExtensionForID returns the file extension for a given ID.
 func fileExtensionForID(id string) string {
-	if isMemoryFile(id) || isSkillFile(id) {
+	if isMemoryFile(id) || isSkillFile(id) || isSoulFile(id) {
 		return ".md"
 	}
 	return ".yaml"

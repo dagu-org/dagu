@@ -28,6 +28,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
 	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
+	"github.com/dagu-org/dagu/internal/persis/fileagentsoul"
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
 	"github.com/dagu-org/dagu/internal/persis/filememory"
@@ -418,6 +419,7 @@ type agentStoresResult struct {
 	ModelStore  agent.ModelStore
 	MemoryStore agent.MemoryStore
 	SkillStore  agent.SkillStore
+	SoulStore   agent.SoulStore
 }
 
 // agentStores creates the agent config, model, memory, and skill stores from the config paths.
@@ -450,9 +452,6 @@ func (c *Context) agentStores() agentStoresResult {
 	result.MemoryStore = ms
 
 	skillsDir := filepath.Join(c.Config.Paths.DAGsDir, "skills")
-	if fileagentskill.SeedExampleSkills(skillsDir) {
-		autoEnableExampleSkills(c, result.ConfigStore)
-	}
 	ss, err := fileagentskill.New(skillsDir)
 	if err != nil {
 		logger.Warn(c, "Failed to create agent skill store", tag.Error(err))
@@ -460,31 +459,15 @@ func (c *Context) agentStores() agentStoresResult {
 	}
 	result.SkillStore = ss
 
-	return result
-}
-
-// autoEnableExampleSkills adds example skill IDs to the agent config's enabled list.
-func autoEnableExampleSkills(ctx context.Context, configStore agent.ConfigStore) {
-	cfg, err := configStore.Load(ctx)
+	soulsDir := filepath.Join(c.Config.Paths.DAGsDir, "souls")
+	soulStore, err := fileagentsoul.New(soulsDir)
 	if err != nil {
-		logger.Warn(ctx, "Failed to load agent config for auto-enabling skills", tag.Error(err))
-		return
+		logger.Warn(c, "Failed to create agent soul store", tag.Error(err))
+		return result
 	}
+	result.SoulStore = soulStore
 
-	existing := make(map[string]struct{}, len(cfg.EnabledSkills))
-	for _, id := range cfg.EnabledSkills {
-		existing[id] = struct{}{}
-	}
-
-	for _, id := range fileagentskill.ExampleSkillIDs() {
-		if _, ok := existing[id]; !ok {
-			cfg.EnabledSkills = append(cfg.EnabledSkills, id)
-		}
-	}
-
-	if err := configStore.Save(ctx, cfg); err != nil {
-		logger.Warn(ctx, "Failed to auto-enable example skills", tag.Error(err))
-	}
+	return result
 }
 
 // OpenLogFile creates and opens a log file for a given dag-run.

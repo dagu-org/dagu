@@ -172,6 +172,7 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 			AgentModelStore:  as.ModelStore,
 			AgentMemoryStore: as.MemoryStore,
 			AgentSkillStore:  as.SkillStore,
+			AgentSoulStore:   as.SoulStore,
 		},
 	)
 

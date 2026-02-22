@@ -8,7 +8,7 @@ status: draft
 
 ## Summary
 
-A `delegate` tool that lets the Tsumugi agent spawn focused child agents (sub-agents) for parallel sub-task execution. Each sub-agent runs in its own session, uses the same tools (minus `delegate`), and returns a summary to the parent. This is a prerequisite for skills, which will later define specialized sub-agent personas.
+A `delegate` tool that lets the agent spawn focused child agents (sub-agents) for parallel sub-task execution. Each sub-agent runs in its own session, uses the same tools (minus `delegate`), and returns a summary to the parent. This is a prerequisite for skills, which will later define specialized sub-agent personas.
 
 ---
 

@@ -169,6 +169,8 @@ type Agent struct {
 	agentMemoryStore agentpkg.MemoryStore
 	// agentSkillStore is the agent skill store for agent step execution.
 	agentSkillStore agentpkg.SkillStore
+	// agentSoulStore is the agent soul store for agent step execution.
+	agentSoulStore agentpkg.SoulStore
 
 	// Evaluated configs - these are expanded at runtime and stored separately
 	// to avoid mutating the original DAG struct.
@@ -241,6 +243,8 @@ type Options struct {
 	AgentMemoryStore agentpkg.MemoryStore
 	// AgentSkillStore is the agent skill store for agent step execution.
 	AgentSkillStore agentpkg.SkillStore
+	// AgentSoulStore is the agent soul store for agent step execution.
+	AgentSoulStore agentpkg.SoulStore
 }
 
 // New creates a new Agent.
@@ -279,6 +283,7 @@ func New(
 		agentModelStore:  opts.AgentModelStore,
 		agentMemoryStore: opts.AgentMemoryStore,
 		agentSkillStore:  opts.AgentSkillStore,
+		agentSoulStore:   opts.AgentSoulStore,
 	}
 
 	// Initialize progress display if enabled
@@ -435,6 +440,9 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	if a.agentSkillStore != nil {
 		ctx = agentpkg.WithSkillStore(ctx, a.agentSkillStore)
+	}
+	if a.agentSoulStore != nil {
+		ctx = agentpkg.WithSoulStore(ctx, a.agentSoulStore)
 	}
 
 	// Add structured logging context
