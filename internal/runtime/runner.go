@@ -514,7 +514,9 @@ func (r *Runner) setupChatMessages(ctx context.Context, node *Node) {
 	}
 
 	step := node.Step()
-	if !core.SupportsLLM(step.ExecutorConfig.Type) {
+
+	executorType := step.ExecutorConfig.Type
+	if !core.SupportsLLM(executorType) && !core.SupportsAgent(executorType) {
 		return
 	}
 
@@ -547,18 +549,13 @@ func (r *Runner) saveChatMessages(ctx context.Context, node *Node) {
 		return
 	}
 
-	step := node.Step()
-	if !core.SupportsLLM(step.ExecutorConfig.Type) {
-		return
-	}
-
 	savedMsgs := node.GetChatMessages()
 	if len(savedMsgs) == 0 {
 		return
 	}
 
 	// Direct write - no read-modify-write cycle
-	if err := r.messagesHandler.WriteStepMessages(ctx, step.Name, savedMsgs); err != nil {
+	if err := r.messagesHandler.WriteStepMessages(ctx, node.Step().Name, savedMsgs); err != nil {
 		logger.Warn(ctx, "Failed to write chat messages", tag.Error(err))
 	}
 }
