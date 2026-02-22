@@ -351,6 +351,8 @@ type AgentStepConfig struct {
 	// Skills lists skill IDs the agent is allowed to use.
 	// If empty, falls back to globally enabled skills from agent config.
 	Skills []string `json:"skills,omitempty"`
+	// Soul is the soul ID for this step's agent identity.
+	Soul string `json:"soul,omitempty"`
 	// Memory controls whether persistent memory is loaded.
 	Memory *AgentMemoryConfig `json:"memory,omitempty"`
 	// Prompt is additional instructions appended to the built-in system prompt.

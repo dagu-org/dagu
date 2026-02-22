@@ -32,6 +32,7 @@ const (
 const (
 	agentMemoryDir = "memory"
 	agentSkillsDir = "skills"
+	agentSoulsDir  = "souls"
 )
 
 // DAGKind represents the type of tracked item in git sync.
@@ -46,6 +47,9 @@ const (
 
 	// DAGKindSkill indicates an agent skill file under skills/.
 	DAGKindSkill DAGKind = "skill"
+
+	// DAGKindSoul indicates an agent soul file under souls/.
+	DAGKindSoul DAGKind = "soul"
 )
 
 // KindForDAGID returns the DAG kind derived from a DAG ID.
@@ -55,6 +59,9 @@ func KindForDAGID(id string) DAGKind {
 	}
 	if strings.HasPrefix(id, agentSkillsDir+"/") {
 		return DAGKindSkill
+	}
+	if strings.HasPrefix(id, agentSoulsDir+"/") {
+		return DAGKindSoul
 	}
 	return DAGKindDAG
 }
@@ -67,6 +74,11 @@ func isMemoryFile(id string) bool {
 // isSkillFile returns true if the file ID belongs to the skills directory.
 func isSkillFile(id string) bool {
 	return KindForDAGID(id) == DAGKindSkill
+}
+
+// isSoulFile returns true if the file ID belongs to the souls directory.
+func isSoulFile(id string) bool {
+	return KindForDAGID(id) == DAGKindSoul
 }
 
 // State represents the overall sync state.

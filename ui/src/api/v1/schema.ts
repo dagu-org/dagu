@@ -1870,6 +1870,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/agent/souls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List agent souls
+         * @description Returns all configured agent souls (personalities). Requires admin role.
+         */
+        get: operations["listAgentSouls"];
+        put?: never;
+        /**
+         * Create agent soul
+         * @description Creates a new agent soul (personality). Requires admin role.
+         */
+        post: operations["createAgentSoul"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/agent/souls/{soulId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get agent soul
+         * @description Returns a single agent soul by ID. Requires admin role.
+         */
+        get: operations["getAgentSoul"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete agent soul
+         * @description Deletes an agent soul. Requires admin role.
+         */
+        delete: operations["deleteAgentSoul"];
+        options?: never;
+        head?: never;
+        /**
+         * Update agent soul
+         * @description Updates an existing agent soul. Requires admin role.
+         */
+        patch: operations["updateAgentSoul"];
+        trace?: never;
+    };
     "/agent/sessions": {
         parameters: {
             query?: never;
@@ -3197,6 +3249,8 @@ export interface components {
             /** @description ID of the default model */
             defaultModelId?: string;
             toolPolicy?: components["schemas"]["AgentToolPolicy"];
+            /** @description ID of the currently selected soul */
+            selectedSoulId?: string | null;
         };
         /** @description Request to update AI agent configuration */
         UpdateAgentConfigRequest: {
@@ -3205,6 +3259,8 @@ export interface components {
             /** @description ID of the default model */
             defaultModelId?: string;
             toolPolicy?: components["schemas"]["AgentToolPolicy"];
+            /** @description ID of the soul to select */
+            selectedSoulId?: string | null;
         };
         /** @description Global tool permission policy for AI agent sessions */
         AgentToolPolicy: {
@@ -3351,6 +3407,35 @@ export interface components {
         SetEnabledSkillsResponse: {
             enabledSkills: string[];
         };
+        /** @description Soul (agent personality) configuration */
+        SoulResponse: {
+            id: string;
+            name: string;
+            description?: string;
+            /** @description Markdown body content (identity definition) */
+            content?: string;
+        };
+        /** @description List of souls */
+        ListSoulsResponse: {
+            souls: components["schemas"]["SoulResponse"][];
+            pagination: components["schemas"]["Pagination"];
+        };
+        /** @description Request to create a new soul */
+        CreateSoulRequest: {
+            /** @description Optional custom ID (auto-generated from name if omitted) */
+            id?: string;
+            name: string;
+            description?: string;
+            /** @description Markdown body content (identity definition) */
+            content: string;
+        };
+        /** @description Request to update a soul (partial update) */
+        UpdateSoulRequest: {
+            name?: string;
+            description?: string;
+            /** @description Markdown body content (identity definition) */
+            content?: string;
+        };
         /** @description Hardcoded model preset with metadata */
         ModelPreset: {
             name: string;
@@ -3416,6 +3501,8 @@ export interface components {
             dagContexts?: components["schemas"]["AgentDAGContext"][];
             /** @description Enable approval prompts for dangerous commands */
             safeMode?: boolean;
+            /** @description Soul ID to use for this session (overrides default) */
+            soulId?: string;
         };
         /** @description Response after creating a new agent session */
         CreateAgentSessionResponse: {
@@ -3594,6 +3681,8 @@ export interface components {
         Stream: components["schemas"]["Stream"];
         /** @description Unique identifier of the agent session */
         AgentSessionId: string;
+        /** @description The soul ID */
+        SoulId: string;
     };
     requestBodies: never;
     headers: never;
@@ -9386,6 +9475,349 @@ export interface operations {
             };
         };
     };
+    listAgentSouls: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description page number of items to fetch (default is 1) */
+                page?: components["parameters"]["Page"];
+                /** @description number of items per page (default is 30, max is 100) */
+                perPage?: components["parameters"]["PerPage"];
+                /** @description Search query (matches name, description) */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of souls */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListSoulsResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createAgentSoul: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSoulRequest"];
+            };
+        };
+        responses: {
+            /** @description Soul created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoulResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Soul already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getAgentSoul: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description The soul ID */
+                soulId: components["parameters"]["SoulId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Soul details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoulResponse"];
+                };
+            };
+            /** @description Invalid soul ID */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Soul not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteAgentSoul: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description The soul ID */
+                soulId: components["parameters"]["SoulId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Soul deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid soul ID */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Soul not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateAgentSoul: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description The soul ID */
+                soulId: components["parameters"]["SoulId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSoulRequest"];
+            };
+        };
+        responses: {
+            /** @description Soul updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoulResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Soul not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listAgentSessions: {
         parameters: {
             query?: {
@@ -9905,7 +10337,8 @@ export enum SyncSummary {
 export enum SyncItemKind {
     dag = "dag",
     memory = "memory",
-    skill = "skill"
+    skill = "skill",
+    soul = "soul"
 }
 export enum SyncAuthConfigType {
     token = "token",

@@ -115,10 +115,10 @@ export function AgentChatModal(): ReactElement | null {
   }, [isOpen, sessions, sessionId, selectSession]);
 
   const handleSend = useCallback(
-    (message: string, dagContexts?: DAGContext[], model?: string): void => {
+    (message: string, dagContexts?: DAGContext[], model?: string, soulId?: string): void => {
       setInitialInputValue(null);
       // sendMessage handles its own error reporting via setError internally
-      sendMessage(message, model, dagContexts).catch(() => {});
+      sendMessage(message, model, dagContexts, soulId).catch(() => {});
     },
     [sendMessage, setInitialInputValue]
   );
@@ -210,6 +210,7 @@ export function AgentChatModal(): ReactElement | null {
             isWorking={isWorking}
             placeholder="Ask me to create a DAG, run a command..."
             initialValue={initialInputValue}
+            hasActiveSession={!!sessionId}
           />
         </div>
       </div>

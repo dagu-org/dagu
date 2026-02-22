@@ -8,7 +8,7 @@ status: draft
 
 ## Summary
 
-Introduce a new `type: agent` step that runs the Tsumugi AI agent within a DAG workflow. This enables agentic LLM execution — multi-turn tool calling with built-in tools (bash, file I/O, web search, reasoning) — as a first-class workflow step, bringing the same capabilities currently available only through the Web UI into automated pipelines.
+Introduce a new `type: agent` step that runs the AI agent within a DAG workflow. This enables agentic LLM execution — multi-turn tool calling with built-in tools (bash, file I/O, web search, reasoning) — as a first-class workflow step, bringing the same capabilities currently available only through the Web UI into automated pipelines.
 
 The existing `type: chat` step remains unchanged for simple, single-purpose LLM calls with DAG-based tools.
 
@@ -18,7 +18,7 @@ The existing `type: chat` step remains unchanged for simple, single-purpose LLM 
 
 ### Current State
 
-The AI agent Tsumugi operates exclusively through the Web UI. Users interact via a chat modal, and the agent executes tools (bash commands, file reads/edits, web search) in real time with SSE-based streaming.
+The AI agent operates exclusively through the Web UI. Users interact via a chat modal, and the agent executes tools (bash commands, file reads/edits, web search) in real time with SSE-based streaming.
 
 The existing `type: chat` step provides basic LLM interaction within DAGs, but it lacks the agent's core capabilities:
 
@@ -113,7 +113,7 @@ The `agent` block is optional. When omitted entirely, the step uses all defaults
 | `model` | string | global default | Model ID from the globally configured agent models (Agent Settings). Overrides the default model for this step only. |
 | `tools` | object | all enabled | Tool selection and policy. See [Section 3](#3-tools). |
 | `memory` | object | `{ enabled: false }` | Memory configuration. See [Section 4](#4-memory). |
-| `prompt` | string | — | Additional instructions appended to the built-in Tsumugi system prompt. Use this to constrain scope, set conventions, or provide task-specific context. |
+| `prompt` | string | — | Additional instructions appended to the built-in system prompt. Use this to constrain scope, set conventions, or provide task-specific context. |
 | `max_iterations` | int | 50 | Maximum tool call rounds before the agent stops. |
 | `safe_mode` | bool | true | Enable command approval. See [Section 5](#5-permission--security). |
 
@@ -335,7 +335,7 @@ The two step types serve different purposes and coexist:
 | Purpose | Simple LLM calls | Agentic multi-tool workflows |
 | Tools | DAG-based (other DAGs as tools) | Built-in (bash, read, patch, etc.) |
 | Memory | None | Global + per-DAG |
-| System prompt | Simple `system:` field | Built-in Tsumugi prompt (with optional `prompt` append) |
+| System prompt | Simple `system:` field | Built-in system prompt (with optional `prompt` append) |
 | Policy enforcement | None | Bash rules, tool restrictions |
 | User interaction | None | HITL integration |
 | Message passing | Yes (ChatMessageHandler) | Yes (ChatMessageHandler) |

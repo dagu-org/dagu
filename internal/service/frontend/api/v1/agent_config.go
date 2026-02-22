@@ -96,6 +96,17 @@ func (a *API) UpdateAgentConfig(ctx context.Context, request api.UpdateAgentConf
 		return nil, ErrInvalidToolPolicy
 	}
 
+	// Validate that the selected soul exists (only when explicitly changed).
+	if request.Body.SelectedSoulId != nil && cfg.SelectedSoulID != "" && a.agentSoulStore != nil {
+		if _, err := a.agentSoulStore.GetByID(ctx, cfg.SelectedSoulID); err != nil {
+			return nil, &Error{
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "Selected soul not found: " + cfg.SelectedSoulID,
+				HTTPStatus: http.StatusBadRequest,
+			}
+		}
+	}
+
 	if err := a.agentConfigStore.Save(ctx, cfg); err != nil {
 		logger.Error(ctx, "Failed to save agent config", tag.Error(err))
 		return nil, ErrFailedToSaveAgentConfig
@@ -140,6 +151,7 @@ func toAgentConfigResponse(cfg *agent.Config) api.AgentConfigResponse {
 		Enabled:        &cfg.Enabled,
 		DefaultModelId: ptrOf(cfg.DefaultModelID),
 		ToolPolicy:     toAPIToolPolicy(cfg.ToolPolicy),
+		SelectedSoulId: ptrOf(cfg.SelectedSoulID),
 	}
 }
 
@@ -158,6 +170,9 @@ func applyAgentConfigUpdates(cfg *agent.Config, update *api.UpdateAgentConfigReq
 		}
 		cfg.ToolPolicy = agent.ResolveToolPolicy(policy)
 	}
+	if update.SelectedSoulId != nil {
+		cfg.SelectedSoulID = *update.SelectedSoulId
+	}
 	return nil
 }
 
@@ -172,6 +187,9 @@ func buildAgentConfigChanges(update *api.UpdateAgentConfigRequest) map[string]an
 	}
 	if update.ToolPolicy != nil {
 		changes[auditFieldToolPolicy] = update.ToolPolicy
+	}
+	if update.SelectedSoulId != nil {
+		changes["selected_soul_id"] = *update.SelectedSoulId
 	}
 	return changes
 }

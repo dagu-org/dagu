@@ -196,6 +196,8 @@ type agentConfig struct {
 	// Skills lists skill IDs the agent is allowed to use.
 	// If omitted, falls back to globally enabled skills.
 	Skills []string `yaml:"skills,omitempty"`
+	// Soul is the soul ID for this step's agent identity.
+	Soul string `yaml:"soul,omitempty"`
 	// Memory controls whether persistent memory is loaded.
 	Memory *agentMemoryConfig `yaml:"memory,omitempty"`
 	// Prompt is additional instructions appended to the built-in system prompt.
@@ -1622,6 +1624,8 @@ func buildStepAgent(_ StepBuildContext, s *step, result *core.Step) error {
 			cfg.Skills = s.Agent.Skills
 		}
 
+		cfg.Soul = strings.TrimSpace(s.Agent.Soul)
+
 		if s.Agent.Memory != nil {
 			cfg.Memory = &core.AgentMemoryConfig{
 				Enabled: s.Agent.Memory.Enabled,
@@ -1633,11 +1637,11 @@ func buildStepAgent(_ StepBuildContext, s *step, result *core.Step) error {
 	return nil
 }
 
-// validSkillIDRegexp matches a valid skill ID: lowercase alphanumeric segments separated by hyphens.
-// Duplicated from agent.validSlugRegexp to avoid an import cycle (spec → agent → spec).
-var validSkillIDRegexp = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+// validSlugIDRegexp matches a valid slug ID: lowercase alphanumeric segments separated by hyphens.
+// Duplicated from agent.validSlugRegexp to avoid an import cycle (spec -> agent -> spec).
+var validSlugIDRegexp = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
-const maxSkillIDLength = 128
+const maxSlugIDLength = 128
 
 // validateAgent checks that agent steps have required configuration.
 func validateAgent(result *core.Step) error {
@@ -1652,9 +1656,15 @@ func validateAgent(result *core.Step) error {
 		)
 	}
 	for _, id := range result.Agent.Skills {
-		if id == "" || len(id) > maxSkillIDLength || !validSkillIDRegexp.MatchString(id) {
+		if id == "" || len(id) > maxSlugIDLength || !validSlugIDRegexp.MatchString(id) {
 			return core.NewValidationError("agent.skills", id,
-				fmt.Errorf("invalid skill ID %q: must be lowercase alphanumeric with hyphens, max %d chars", id, maxSkillIDLength))
+				fmt.Errorf("invalid skill ID %q: must be lowercase alphanumeric with hyphens, max %d chars", id, maxSlugIDLength))
+		}
+	}
+	if result.Agent.Soul != "" {
+		if len(result.Agent.Soul) > maxSlugIDLength || !validSlugIDRegexp.MatchString(result.Agent.Soul) {
+			return core.NewValidationError("agent.soul", result.Agent.Soul,
+				fmt.Errorf("invalid soul ID %q: must be lowercase alphanumeric with hyphens, max %d chars", result.Agent.Soul, maxSlugIDLength))
 		}
 	}
 	return nil

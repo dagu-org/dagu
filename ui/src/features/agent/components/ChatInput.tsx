@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useContext, KeyboardEvent, ChangeEvent } from 'react';
+import { useState, useCallback, useEffect, useRef, KeyboardEvent, ChangeEvent } from 'react';
 import { Send, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,25 +9,21 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { AppBarContext } from '@/contexts/AppBarContext';
-import { useClient } from '@/hooks/api';
 import { DAGContext } from '../types';
 import { DAGPicker } from './DAGPicker';
 import { SkillPicker, type SkillRef, type SkillPickerHandle } from './SkillPicker';
 import { useDagPageContext } from '../hooks/useDagPageContext';
-
-interface ModelOption {
-  id: string;
-  name: string;
-}
+import { useAvailableModels } from '../hooks/useAvailableModels';
+import { useAvailableSouls } from '../hooks/useAvailableSouls';
 
 interface ChatInputProps {
-  onSend: (message: string, dagContexts?: DAGContext[], model?: string) => void;
+  onSend: (message: string, dagContexts?: DAGContext[], model?: string, soulId?: string) => void;
   onCancel?: () => void;
   isWorking: boolean;
   disabled?: boolean;
   placeholder?: string;
   initialValue?: string | null;
+  hasActiveSession?: boolean;
 }
 
 export function ChatInput({
@@ -37,14 +33,13 @@ export function ChatInput({
   disabled,
   placeholder = 'Type a message...',
   initialValue,
+  hasActiveSession,
 }: ChatInputProps) {
-  const client = useClient();
-  const appBarContext = useContext(AppBarContext);
   const [message, setMessage] = useState('');
   const [isPending, setIsPending] = useState(false);
   const [selectedDags, setSelectedDags] = useState<DAGContext[]>([]);
-  const [models, setModels] = useState<ModelOption[]>([]);
-  const [selectedModel, setSelectedModel] = useState<string>('');
+  const { models, selectedModel, setSelectedModel } = useAvailableModels();
+  const { souls, selectedSoul, setSelectedSoul } = useAvailableSouls();
   const currentPageDag = useDagPageContext();
   // Track IME composition state manually for reliable Japanese/Chinese input handling
   const isComposingRef = useRef(false);
@@ -58,37 +53,6 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const showPauseButton = isPending || isWorking;
-
-  // Fetch available models
-  useEffect(() => {
-    const controller = new AbortController();
-    const remoteNode = appBarContext.selectedRemoteNode || 'local';
-
-    async function fetchModels() {
-      try {
-        const { data } = await client.GET('/settings/agent/models', {
-          params: { query: { remoteNode } },
-          signal: controller.signal,
-        });
-        if (!data) return;
-        const modelList: ModelOption[] = (data.models || []).map((m) => ({
-          id: m.id,
-          name: m.name,
-        }));
-        setModels(modelList);
-        if (data.defaultModelId) {
-          setSelectedModel(data.defaultModelId);
-        } else if (modelList.length > 0) {
-          setSelectedModel(modelList[0]!.id);
-        }
-      } catch {
-        // Models fetch is best-effort
-      }
-    }
-    fetchModels();
-
-    return () => controller.abort();
-  }, [client, appBarContext.selectedRemoteNode]);
 
   // Pre-fill textarea with initial value (e.g., from setup wizard)
   useEffect(() => {
@@ -142,14 +106,16 @@ export function ChatInput({
       finalMessage = `${prefix}\n${trimmed}`;
     }
 
+    const soulValue = selectedSoul && selectedSoul !== '__default__' ? selectedSoul : undefined;
     onSend(
       finalMessage,
       allContexts.length > 0 ? allContexts : undefined,
-      selectedModel || undefined
+      selectedModel || undefined,
+      soulValue
     );
     setMessage('');
     setSelectedSkills([]);
-  }, [message, isPending, disabled, onSend, selectedDags, currentPageDag, selectedModel, selectedSkills]);
+  }, [message, isPending, disabled, onSend, selectedDags, currentPageDag, selectedModel, selectedSkills, selectedSoul]);
 
   const handleChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -265,21 +231,38 @@ export function ChatInput({
         disabled={disabled || showPauseButton}
       />
 
-      {/* Model selector row */}
-      {models.length > 0 && (
-        <div className="mb-1.5">
-          <Select value={selectedModel} onValueChange={setSelectedModel}>
-            <SelectTrigger className="h-7 text-xs w-auto min-w-[140px] max-w-[200px]">
-              <SelectValue placeholder="Select model" />
-            </SelectTrigger>
-            <SelectContent>
-              {models.map((m) => (
-                <SelectItem key={m.id} value={m.id} className="text-xs">
-                  {m.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* Model & soul selector row */}
+      {(models.length > 0 || (souls.length > 0 && !hasActiveSession)) && (
+        <div className="mb-1.5 flex items-center gap-2">
+          {models.length > 0 && (
+            <Select value={selectedModel} onValueChange={setSelectedModel}>
+              <SelectTrigger className="h-7 text-xs w-auto min-w-[140px] max-w-[200px]">
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent>
+                {models.map((m) => (
+                  <SelectItem key={m.id} value={m.id} className="text-xs">
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {souls.length > 0 && !hasActiveSession && (
+            <Select value={selectedSoul} onValueChange={setSelectedSoul}>
+              <SelectTrigger className="h-7 text-xs w-auto min-w-[140px] max-w-[200px]">
+                <SelectValue placeholder="default" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__default__" className="text-xs">default</SelectItem>
+                {souls.map((s) => (
+                  <SelectItem key={s.id} value={s.id} className="text-xs">
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       )}
 

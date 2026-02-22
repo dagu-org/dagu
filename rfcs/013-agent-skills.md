@@ -8,7 +8,7 @@ status: draft
 
 ## Summary
 
-User-defined and built-in "skills" that extend the Tsumugi agent's expertise beyond core DAG management — enabling domain-specific knowledge, workflow templates, custom tools, and composable personas without modifying source code.
+User-defined and built-in "skills" that extend the agent's expertise beyond core DAG management — enabling domain-specific knowledge, workflow templates, custom tools, and composable personas without modifying source code.
 
 ---
 
@@ -16,7 +16,7 @@ User-defined and built-in "skills" that extend the Tsumugi agent's expertise bey
 
 Currently:
 
-1. **Single-persona agent** — Tsumugi only knows about DAG management. Users working in specific domains (Kubernetes, ETL pipelines, CI/CD, data science) must provide context manually every session.
+1. **Single-persona agent** — The agent only knows about DAG management. Users working in specific domains (Kubernetes, ETL pipelines, CI/CD, data science) must provide context manually every session.
 2. **No extensibility path** — adding new capabilities requires modifying Go source code and redeploying Dagu.
 3. **Knowledge is unstructured** — the memory system captures free-form notes, but there is no way to provide curated, reusable domain expertise that the agent can reliably apply.
 4. **Template workflows are manual** — users copy-paste YAML snippets from documentation. The agent cannot draw on a library of vetted, domain-specific templates.
@@ -24,8 +24,8 @@ Currently:
 
 ### Use Cases
 
-- A **platform team** installs a "Kubernetes" skill so Tsumugi can generate Kubernetes-aware DAGs with best practices for pod scheduling, resource limits, and health checks.
-- A **data engineer** enables an "ETL Best Practices" skill that teaches Tsumugi about idempotency patterns, incremental loads, and data validation steps.
+- A **platform team** installs a "Kubernetes" skill so the agent can generate Kubernetes-aware DAGs with best practices for pod scheduling, resource limits, and health checks.
+- A **data engineer** enables an "ETL Best Practices" skill that teaches the agent about idempotency patterns, incremental loads, and data validation steps.
 - An **SRE team** authors a custom "Incident Response" skill with runbook templates and on-call escalation workflows.
 - A **solo developer** composes "Docker" + "GitHub Actions" skills to get an agent that understands both container builds and CI/CD pipeline patterns.
 
@@ -74,7 +74,7 @@ Skills complement memory. Memory captures "what happened" and user preferences. 
 
 Clicking a card opens a detail panel showing the full description, component list (knowledge, templates, tools), and configuration options.
 
-**In-chat discovery**: Users can ask Tsumugi "what skills are available?" or "do you have a skill for Kubernetes?" The agent lists matching skills and can enable them on request (if the user has permission).
+**In-chat discovery**: Users can ask the agent "what skills are available?" or "do you have a skill for Kubernetes?" The agent lists matching skills and can enable them on request (if the user has permission).
 
 ### Enabling and Disabling Skills
 
@@ -89,7 +89,7 @@ Enabling a skill in chat:
 
 ```
 User: "Enable the Kubernetes skill for this session"
-Tsumugi: "Kubernetes skill enabled. I now have access to K8s-specific
+Agent: "Kubernetes skill enabled. I now have access to K8s-specific
           templates and best practices. How can I help?"
 ```
 
@@ -200,7 +200,7 @@ A knowledge-and-template skill that teaches the agent about Kubernetes-aware DAG
 
 ```
 User: "Create a DAG that deploys my app to staging"
-Tsumugi: "I'll use the Kubernetes deployment template. I need a few details:
+Agent: "I'll use the Kubernetes deployment template. I need a few details:
           - Container image and tag
           - Target namespace
           - Resource limits (or use defaults: 256Mi/500m)

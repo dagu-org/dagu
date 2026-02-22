@@ -259,6 +259,8 @@ type ChatRequest struct {
 	DAGContexts []DAGContext `json:"dag_contexts,omitempty"`
 	// SafeMode enables approval prompts for dangerous commands when true.
 	SafeMode bool `json:"safe_mode,omitempty"`
+	// SoulID overrides the default soul for this session.
+	SoulID string `json:"soul_id,omitempty"`
 }
 
 // ResolvedDAGContext contains server-resolved information for a DAG.

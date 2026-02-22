@@ -25,6 +25,8 @@ import AgentMemoryPage from './pages/agent-memory';
 import AgentSettingsPage from './pages/agent-settings';
 import AgentSkillsPage from './pages/agent-skills';
 import SkillEditorPage from './pages/agent-skills/SkillEditorPage';
+import AgentSoulsPage from './pages/agent-souls';
+import SoulEditorPage from './pages/agent-souls/SoulEditorPage';
 import APIKeysPage from './pages/api-keys';
 import AuditLogsPage from './pages/audit-logs';
 import BaseConfigPage from './pages/base-config';
@@ -189,6 +191,9 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                         <Route path="/agent-skills" element={<AdminElement><AgentSkillsPage /></AdminElement>} />
                                         <Route path="/agent-skills/new" element={<AdminElement><SkillEditorPage /></AdminElement>} />
                                         <Route path="/agent-skills/:skillId" element={<AdminElement><SkillEditorPage /></AdminElement>} />
+                                        <Route path="/agent-souls" element={<AdminElement><AgentSoulsPage /></AdminElement>} />
+                                        <Route path="/agent-souls/new" element={<AdminElement><SoulEditorPage /></AdminElement>} />
+                                        <Route path="/agent-souls/:soulId" element={<AdminElement><SoulEditorPage /></AdminElement>} />
                                       </Routes>
                                     </Layout>
                                     {config.agentEnabled && <AgentChatModal />}
