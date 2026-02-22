@@ -3,6 +3,7 @@ package agentstep
 import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/llm"
 )
 
 // convertMessage converts an agent.Message to one or more exec.LLMMessage values.
@@ -70,6 +71,40 @@ func convertAssistantMessage(msg agent.Message, modelCfg *agent.ModelConfig) exe
 	m.Metadata = metadata
 
 	return m
+}
+
+// contextToLLMHistory converts context messages to llm.Message for LoopConfig.History.
+// System messages are filtered out since the loop handles system prompt separately.
+func contextToLLMHistory(msgs []exec.LLMMessage) []llm.Message {
+	if len(msgs) == 0 {
+		return nil
+	}
+	var result []llm.Message
+	for _, msg := range msgs {
+		if msg.Role == exec.RoleSystem {
+			continue
+		}
+		m := llm.Message{
+			Role:       llm.Role(msg.Role),
+			Content:    msg.Content,
+			ToolCallID: msg.ToolCallID,
+		}
+		if len(msg.ToolCalls) > 0 {
+			m.ToolCalls = make([]llm.ToolCall, len(msg.ToolCalls))
+			for j, tc := range msg.ToolCalls {
+				m.ToolCalls[j] = llm.ToolCall{
+					ID:   tc.ID,
+					Type: tc.Type,
+					Function: llm.ToolCallFunction{
+						Name:      tc.Function.Name,
+						Arguments: tc.Function.Arguments,
+					},
+				}
+			}
+		}
+		result = append(result, m)
+	}
+	return result
 }
 
 // convertToolResultMessages converts a user message with tool results

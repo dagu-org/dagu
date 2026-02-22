@@ -209,12 +209,18 @@ func (e *Executor) Run(ctx context.Context) error {
 	e.cancelLoop = cancelLoop
 	e.mu.Unlock()
 
+	// Initialize savedMessages from context so GetMessages() returns the full chain.
+	if len(e.contextMessages) > 0 {
+		e.savedMessages = append([]exec.LLMMessage(nil), e.contextMessages...)
+	}
+
 	iteration := 0
 
 	loop := agent.NewLoop(agent.LoopConfig{
 		Provider:      provider,
 		Model:         modelCfg.Model,
 		Tools:         tools,
+		History:       contextToLLMHistory(e.contextMessages),
 		SystemPrompt:  systemPrompt,
 		SafeMode:      safeMode,
 		Hooks:         hooks,
