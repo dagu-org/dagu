@@ -210,6 +210,7 @@ export function AgentChatModal(): ReactElement | null {
             isWorking={isWorking}
             placeholder="Ask me to create a DAG, run a command..."
             initialValue={initialInputValue}
+            hasActiveSession={!!sessionId}
           />
         </div>
       </div>

@@ -33,6 +33,7 @@ interface ChatInputProps {
   disabled?: boolean;
   placeholder?: string;
   initialValue?: string | null;
+  hasActiveSession?: boolean;
 }
 
 export function ChatInput({
@@ -42,6 +43,7 @@ export function ChatInput({
   disabled,
   placeholder = 'Type a message...',
   initialValue,
+  hasActiveSession,
 }: ChatInputProps) {
   const client = useClient();
   const appBarContext = useContext(AppBarContext);
@@ -317,13 +319,13 @@ export function ChatInput({
               </SelectContent>
             </Select>
           )}
-          {souls.length > 0 && (
+          {souls.length > 0 && !hasActiveSession && (
             <Select value={selectedSoul} onValueChange={setSelectedSoul}>
               <SelectTrigger className="h-7 text-xs w-auto min-w-[140px] max-w-[200px]">
-                <SelectValue placeholder="Default soul" />
+                <SelectValue placeholder="default" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__default__" className="text-xs">Default soul</SelectItem>
+                <SelectItem value="__default__" className="text-xs">default</SelectItem>
                 {souls.map((s) => (
                   <SelectItem key={s.id} value={s.id} className="text-xs">
                     {s.name}
