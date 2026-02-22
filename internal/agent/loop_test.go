@@ -24,9 +24,8 @@ func TestNewLoop(t *testing.T) {
 		t.Parallel()
 
 		loop := NewLoop(LoopConfig{
-			Provider: &mockLLMProvider{name: "test"},
-			Model:    "test-model",
-			Tools:    CreateTools(ToolConfig{}),
+			Models: []ModelSlot{{Provider: &mockLLMProvider{name: "test"}, Model: "test-model", Name: "test-model"}},
+			Tools:  CreateTools(ToolConfig{}),
 		})
 
 		assert.NotNil(t, loop)
@@ -36,7 +35,7 @@ func TestNewLoop(t *testing.T) {
 		t.Parallel()
 
 		loop := NewLoop(LoopConfig{
-			Provider: &mockLLMProvider{},
+			Models: []ModelSlot{{Provider: &mockLLMProvider{}, Model: "", Name: ""}},
 		})
 
 		assert.NotNil(t, loop)
@@ -49,7 +48,7 @@ func TestLoop_QueueUserMessage(t *testing.T) {
 	t.Run("adds message to queue", func(t *testing.T) {
 		t.Parallel()
 
-		loop := NewLoop(LoopConfig{Provider: &mockLLMProvider{}})
+		loop := NewLoop(LoopConfig{Models: []ModelSlot{{Provider: &mockLLMProvider{}, Model: "", Name: ""}}})
 
 		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
 
@@ -66,7 +65,7 @@ func TestLoop_Go(t *testing.T) {
 	t.Run("returns error with nil provider", func(t *testing.T) {
 		t.Parallel()
 
-		loop := NewLoop(LoopConfig{Provider: nil})
+		loop := NewLoop(LoopConfig{})
 
 		err := loop.Go(context.Background())
 
@@ -81,8 +80,7 @@ func TestLoop_Go(t *testing.T) {
 		provider := newCapturingProvider(requestCh, simpleStopResponse("response"))
 
 		loop := NewLoop(LoopConfig{
-			Provider: provider,
-			Model:    "test-model",
+			Models: []ModelSlot{{Provider: provider, Model: "test-model", Name: "test-model"}},
 		})
 		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "hello"})
 
@@ -110,7 +108,7 @@ func TestLoop_Go(t *testing.T) {
 			},
 		}
 
-		loop := NewLoop(LoopConfig{Provider: provider})
+		loop := NewLoop(LoopConfig{Models: []ModelSlot{{Provider: provider, Model: "", Name: ""}}})
 		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
 
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
@@ -127,7 +125,7 @@ func TestLoop_Go(t *testing.T) {
 		var workingStates []bool
 
 		loop := NewLoop(LoopConfig{
-			Provider: newStopProvider("done"),
+			Models: []ModelSlot{{Provider: newStopProvider("done"), Model: "", Name: ""}},
 			OnWorking: func(working bool) {
 				mu.Lock()
 				workingStates = append(workingStates, working)
@@ -153,7 +151,7 @@ func TestLoop_Go(t *testing.T) {
 		var recordedMessages []Message
 
 		loop := NewLoop(LoopConfig{
-			Provider:  newStopProvider("response"),
+			Models:    []ModelSlot{{Provider: newStopProvider("response"), Model: "", Name: ""}},
 			SessionID: "conv-1",
 			RecordMessage: func(_ context.Context, msg Message) {
 				mu.Lock()
@@ -201,8 +199,8 @@ func TestLoop_Go(t *testing.T) {
 		}
 
 		loop := NewLoop(LoopConfig{
-			Provider: provider,
-			Tools:    CreateTools(ToolConfig{}),
+			Models: []ModelSlot{{Provider: provider, Model: "", Name: ""}},
+			Tools:  CreateTools(ToolConfig{}),
 		})
 		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
 
@@ -227,7 +225,7 @@ func TestLoop_Go(t *testing.T) {
 		provider := newCapturingProvider(requestCh, simpleStopResponse("response"))
 
 		loop := NewLoop(LoopConfig{
-			Provider:     provider,
+			Models:       []ModelSlot{{Provider: provider, Model: "", Name: ""}},
 			SystemPrompt: "You are a helpful assistant.",
 		})
 		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "hello"})
@@ -271,8 +269,8 @@ func TestLoop_Go(t *testing.T) {
 		}
 
 		loop := NewLoop(LoopConfig{
-			Provider: provider,
-			Tools:    CreateTools(ToolConfig{}),
+			Models: []ModelSlot{{Provider: provider, Model: "", Name: ""}},
+			Tools:  CreateTools(ToolConfig{}),
 			OnHeartbeat: func() {
 				mu.Lock()
 				heartbeatCount++
@@ -314,7 +312,7 @@ func TestLoop_Go(t *testing.T) {
 			},
 		}
 
-		loop := NewLoop(LoopConfig{Provider: provider})
+		loop := NewLoop(LoopConfig{Models: []ModelSlot{{Provider: provider, Model: "", Name: ""}}})
 		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -346,8 +344,8 @@ func TestLoop_ExecuteTool(t *testing.T) {
 		t.Parallel()
 
 		loop := NewLoop(LoopConfig{
-			Provider: &mockLLMProvider{},
-			Tools:    CreateTools(ToolConfig{}),
+			Models: []ModelSlot{{Provider: &mockLLMProvider{}, Model: "", Name: ""}},
+			Tools:  CreateTools(ToolConfig{}),
 		})
 
 		result := loop.executeTool(context.Background(), llm.ToolCall{
@@ -367,8 +365,8 @@ func TestLoop_ExecuteTool(t *testing.T) {
 		t.Parallel()
 
 		loop := NewLoop(LoopConfig{
-			Provider: &mockLLMProvider{},
-			Tools:    CreateTools(ToolConfig{}),
+			Models: []ModelSlot{{Provider: &mockLLMProvider{}, Model: "", Name: ""}},
+			Tools:  CreateTools(ToolConfig{}),
 		})
 
 		result := loop.executeTool(context.Background(), llm.ToolCall{
@@ -388,8 +386,8 @@ func TestLoop_ExecuteTool(t *testing.T) {
 		t.Parallel()
 
 		loop := NewLoop(LoopConfig{
-			Provider: &mockLLMProvider{},
-			Tools:    CreateTools(ToolConfig{}),
+			Models: []ModelSlot{{Provider: &mockLLMProvider{}, Model: "", Name: ""}},
+			Tools:  CreateTools(ToolConfig{}),
 		})
 
 		result := loop.executeTool(context.Background(), llm.ToolCall{
@@ -417,7 +415,7 @@ func TestLoop_ExecuteTool(t *testing.T) {
 		})
 
 		loop := NewLoop(LoopConfig{
-			Provider:  &mockLLMProvider{},
+			Models:    []ModelSlot{{Provider: &mockLLMProvider{}, Model: "", Name: ""}},
 			Tools:     CreateTools(ToolConfig{}),
 			SessionID: "conv-hook",
 			User: UserIdentity{
@@ -483,9 +481,9 @@ func TestLoop_ExecuteTool(t *testing.T) {
 		}
 
 		loop := NewLoop(LoopConfig{
-			Provider: &mockLLMProvider{},
-			Tools:    []*AgentTool{customTool},
-			Hooks:    hooks,
+			Models: []ModelSlot{{Provider: &mockLLMProvider{}, Model: "", Name: ""}},
+			Tools:  []*AgentTool{customTool},
+			Hooks:  hooks,
 		})
 
 		loop.executeTool(context.Background(), llm.ToolCall{
@@ -517,9 +515,9 @@ func TestLoop_ExecuteTool(t *testing.T) {
 		})
 
 		loop := NewLoop(LoopConfig{
-			Provider: &mockLLMProvider{},
-			Tools:    CreateTools(ToolConfig{}),
-			Hooks:    hooks,
+			Models: []ModelSlot{{Provider: &mockLLMProvider{}, Model: "", Name: ""}},
+			Tools:  CreateTools(ToolConfig{}),
+			Hooks:  hooks,
 		})
 
 		result := loop.executeTool(context.Background(), llm.ToolCall{
@@ -545,7 +543,7 @@ func TestLoop_BuildMessages(t *testing.T) {
 		t.Parallel()
 
 		loop := NewLoop(LoopConfig{
-			Provider:     &mockLLMProvider{},
+			Models:       []ModelSlot{{Provider: &mockLLMProvider{}, Model: "", Name: ""}},
 			SystemPrompt: "",
 		})
 
@@ -561,7 +559,7 @@ func TestLoop_BuildMessages(t *testing.T) {
 		t.Parallel()
 
 		loop := NewLoop(LoopConfig{
-			Provider:     &mockLLMProvider{},
+			Models:       []ModelSlot{{Provider: &mockLLMProvider{}, Model: "", Name: ""}},
 			SystemPrompt: "Be helpful.",
 		})
 
@@ -583,8 +581,8 @@ func TestLoop_BuildToolDefinitions(t *testing.T) {
 		t.Parallel()
 
 		loop := NewLoop(LoopConfig{
-			Provider: &mockLLMProvider{},
-			Tools:    CreateTools(ToolConfig{}),
+			Models: []ModelSlot{{Provider: &mockLLMProvider{}, Model: "", Name: ""}},
+			Tools:  CreateTools(ToolConfig{}),
 		})
 
 		tools := loop.buildToolDefinitions()
@@ -674,9 +672,8 @@ func TestLoop_ToolCallFlow(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	loop := NewLoop(LoopConfig{
-		Provider: provider,
-		Model:    "test",
-		Tools:    []*AgentTool{newEchoTool("echo")},
+		Models: []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
+		Tools:  []*AgentTool{newEchoTool("echo")},
 		RecordMessage: func(_ context.Context, msg Message) {
 			mu.Lock()
 			recorded = append(recorded, msg)
@@ -734,8 +731,7 @@ func TestLoop_DelegateToolIsolation(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	loop := NewLoop(LoopConfig{
-		Provider:     provider,
-		Model:        "test",
+		Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 		Tools:        []*AgentTool{NewDelegateTool(), newEchoTool("echo")},
 		SessionID:    parentID,
 		SessionStore: store,
@@ -786,8 +782,7 @@ func TestLoop_RecordMessageError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	loop := NewLoop(LoopConfig{
-		Provider:      provider,
-		Model:         "test",
+		Models:        []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 		RecordMessage: func(_ context.Context, _ Message) {},
 	})
 
@@ -826,8 +821,7 @@ func TestLoop_BatchedDelegates(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	loop := NewLoop(LoopConfig{
-		Provider:     provider,
-		Model:        "test",
+		Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 		Tools:        []*AgentTool{NewDelegateTool()},
 		SessionID:    parentID,
 		SessionStore: store,
@@ -888,8 +882,7 @@ func TestLoop_BatchedDelegateExceedsMax(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	loop := NewLoop(LoopConfig{
-		Provider:     provider,
-		Model:        "test",
+		Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 		Tools:        []*AgentTool{NewDelegateTool()},
 		SessionID:    parentID,
 		SessionStore: store,
@@ -944,8 +937,7 @@ func TestLoop_ExecuteTool_PassesSubSessionRegistry(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	loop := NewLoop(LoopConfig{
-		Provider:     provider,
-		Model:        "test",
+		Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 		Tools:        []*AgentTool{NewDelegateTool()},
 		SessionID:    "parent-cb",
 		SessionStore: store,
@@ -991,9 +983,8 @@ func TestLoop_DelegateContextNilWhenNoRegistry(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	loop := NewLoop(LoopConfig{
-		Provider: provider,
-		Model:    "test",
-		Tools:    []*AgentTool{NewDelegateTool()},
+		Models: []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
+		Tools:  []*AgentTool{NewDelegateTool()},
 		// No Registry set
 		OnWorking: func(working bool) {
 			if !working {
@@ -1068,8 +1059,7 @@ func TestLoop_DelegateContextOnlyForDelegateTool(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	loop := NewLoop(LoopConfig{
-		Provider: provider,
-		Model:    "test",
+		Models:   []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 		Tools:    []*AgentTool{NewDelegateTool(), thinkTool},
 		Registry: registry,
 		OnWorking: func(working bool) {

@@ -247,6 +247,70 @@ func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider
 	return provider, model, nil
 }
 
+// resolveModelSlots resolves model IDs from config into an ordered list of model slots.
+// The requestModel overrides the primary model; fallback models come from config.ModelIDs.
+func (a *API) resolveModelSlots(ctx context.Context, requestModel string) ([]ModelSlot, *ModelConfig, error) {
+	if a.modelStore == nil {
+		return nil, nil, errors.New("model store not configured")
+	}
+
+	cfg, err := a.configStore.Load(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to load agent config: %w", err)
+	}
+
+	// Build the ordered list of model IDs to try.
+	// If the request specifies a model, it becomes primary.
+	// Remaining models from config are appended as fallbacks (deduped).
+	configIDs := cfg.ResolveModelIDs()
+	primaryID := cmp.Or(requestModel, "")
+	if primaryID == "" && len(configIDs) > 0 {
+		primaryID = configIDs[0]
+	}
+	if primaryID == "" {
+		return nil, nil, errors.New("no model configured")
+	}
+
+	// Build deduplicated ordered list: primary first, then config fallbacks.
+	seen := map[string]bool{primaryID: true}
+	modelIDs := []string{primaryID}
+	for _, id := range configIDs {
+		if !seen[id] {
+			seen[id] = true
+			modelIDs = append(modelIDs, id)
+		}
+	}
+
+	var slots []ModelSlot
+	var primaryCfg *ModelConfig
+
+	for _, id := range modelIDs {
+		model, err := a.modelStore.GetByID(ctx, id)
+		if err != nil {
+			a.logger.Warn("Skipping unavailable model", "id", id, "error", err)
+			continue
+		}
+		provider, _, err := a.providers.GetOrCreate(model.ToLLMConfig())
+		if err != nil {
+			a.logger.Warn("Skipping model, provider creation failed", "id", id, "error", err)
+			continue
+		}
+		slots = append(slots, ModelSlot{
+			Provider: provider,
+			Model:    model.Model,
+			Name:     model.Name,
+		})
+		if primaryCfg == nil {
+			primaryCfg = model
+		}
+	}
+
+	if len(slots) == 0 {
+		return nil, nil, errors.New("no usable models configured")
+	}
+	return slots, primaryCfg, nil
+}
+
 // loadEnabledSkills returns the list of enabled skill IDs from the agent config.
 func (a *API) loadEnabledSkills(ctx context.Context) []string {
 	cfg, err := a.configStore.Load(ctx)
@@ -629,9 +693,9 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 
 	model := selectModel(req.Model, "", a.getDefaultModelID(ctx))
 
-	provider, modelCfg, err := a.resolveProvider(ctx, model)
+	slots, primaryCfg, err := a.resolveModelSlots(ctx, model)
 	if err != nil {
-		a.logger.Error("Failed to get LLM provider", "error", err)
+		a.logger.Error("Failed to resolve model slots", "error", err)
 		return "", ErrAgentNotConfigured
 	}
 
@@ -653,8 +717,8 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 		Environment:     a.environment,
 		SafeMode:        req.SafeMode,
 		Hooks:           a.hooks,
-		InputCostPer1M:  modelCfg.InputCostPer1M,
-		OutputCostPer1M: modelCfg.OutputCostPer1M,
+		InputCostPer1M:  primaryCfg.InputCostPer1M,
+		OutputCostPer1M: primaryCfg.OutputCostPer1M,
 		MemoryStore:     a.memoryStore,
 		SkillStore:      a.skillStore,
 		EnabledSkills:   a.loadEnabledSkills(ctx),
@@ -670,7 +734,7 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 	a.sessions.Store(id, mgr)
 
 	messageWithContext := formatMessageWithContexts(req.Message, resolved)
-	if err := mgr.AcceptUserMessage(ctx, provider, model, modelCfg.Model, messageWithContext); err != nil {
+	if err := mgr.AcceptUserMessage(ctx, slots, model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		a.sessions.Delete(id)
 		return "", ErrFailedToProcessMessage
@@ -791,17 +855,17 @@ func (a *API) SendMessage(ctx context.Context, sessionID string, user UserIdenti
 
 	model := selectModel(req.Model, mgr.GetModel(), a.getDefaultModelID(ctx))
 
-	provider, modelCfg, err := a.resolveProvider(ctx, model)
+	slots, primaryCfg, err := a.resolveModelSlots(ctx, model)
 	if err != nil {
-		a.logger.Error("Failed to get LLM provider", "error", err)
+		a.logger.Error("Failed to resolve model slots", "error", err)
 		return ErrAgentNotConfigured
 	}
 	messageWithContext := a.formatMessage(ctx, req.Message, req.DAGContexts)
 
 	mgr.SetSafeMode(req.SafeMode)
-	mgr.UpdatePricing(modelCfg.InputCostPer1M, modelCfg.OutputCostPer1M)
+	mgr.UpdatePricing(primaryCfg.InputCostPer1M, primaryCfg.OutputCostPer1M)
 
-	if err := mgr.AcceptUserMessage(ctx, provider, model, modelCfg.Model, messageWithContext); err != nil {
+	if err := mgr.AcceptUserMessage(ctx, slots, model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		return ErrFailedToProcessMessage
 	}

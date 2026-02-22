@@ -37,10 +37,9 @@ type MessageRecordFunc func(ctx context.Context, message Message)
 
 // LoopConfig contains configuration for creating a Loop.
 type LoopConfig struct {
-	// Provider is the LLM provider for making requests.
-	Provider llm.Provider
-	// Model is the model ID to use for requests.
-	Model string
+	// Models is the ordered list of model slots for fallback.
+	// The first model is primary; the rest are tried on transient failures.
+	Models []ModelSlot
 	// History is the initial session history.
 	History []llm.Message
 	// Tools is the list of tools available to the agent.
@@ -83,8 +82,7 @@ type LoopConfig struct {
 
 // Loop manages a session turn with an LLM including tool execution.
 type Loop struct {
-	provider         llm.Provider
-	model            string
+	models           []ModelSlot
 	tools            []*AgentTool
 	recordMessage    MessageRecordFunc
 	history          []llm.Message
@@ -118,8 +116,7 @@ func NewLoop(config LoopConfig) *Loop {
 	}
 
 	return &Loop{
-		provider:         config.Provider,
-		model:            config.Model,
+		models:           config.Models,
 		history:          config.History,
 		tools:            config.Tools,
 		recordMessage:    config.RecordMessage,
@@ -159,11 +156,11 @@ func (l *Loop) SetSafeMode(enabled bool) {
 
 // Go runs the session loop until the context is canceled.
 func (l *Loop) Go(ctx context.Context) error {
-	if l.provider == nil {
+	if len(l.models) == 0 {
 		return fmt.Errorf("no LLM provider configured")
 	}
 
-	l.logger.Info("starting session loop", "tools", len(l.tools))
+	l.logger.Info("starting session loop", "tools", len(l.tools), "models", len(l.models))
 
 	retrier := backoff.NewRetrier(backoff.NewExponentialBackoffPolicy(llmRetryInitialInterval))
 
@@ -261,42 +258,65 @@ func (l *Loop) processLLMRequest(ctx context.Context) error {
 
 // sendRequest builds, sends, and records an LLM request. On success it
 // accumulates usage and records the assistant message.
+// When multiple models are configured, it tries each in order on transient failures.
 func (l *Loop) sendRequest(ctx context.Context) (*llm.ChatResponse, error) {
 	history := l.copyHistory()
 	messages := l.buildMessages(history)
 	tools := l.buildToolDefinitions()
 
-	req := &llm.ChatRequest{
-		Model:    l.model,
-		Messages: messages,
-		Tools:    tools,
-	}
-
-	l.logger.Debug("sending LLM request",
-		"message_count", len(messages),
-		"tool_count", len(tools),
-		"model", l.model)
-
 	l.setWorking(true)
 
-	llmCtx, cancel := context.WithTimeout(ctx, llmRequestTimeout)
-	defer cancel()
+	var lastErr error
+	for i, slot := range l.models {
+		req := &llm.ChatRequest{
+			Model:    slot.Model,
+			Messages: messages,
+			Tools:    tools,
+		}
 
-	resp, err := l.provider.Chat(llmCtx, req)
-	if err != nil {
-		l.recordErrorMessage(ctx, fmt.Sprintf("LLM request failed: %v", err))
-		l.setWorking(false)
-		return nil, fmt.Errorf("LLM request failed: %w", err)
+		l.logger.Debug("sending LLM request",
+			"message_count", len(messages),
+			"tool_count", len(tools),
+			"model", slot.Name,
+			"slot_index", i)
+
+		llmCtx, cancel := context.WithTimeout(ctx, llmRequestTimeout)
+		resp, err := slot.Provider.Chat(llmCtx, req)
+		cancel()
+
+		if err == nil {
+			l.logger.Debug("received LLM response",
+				"content_length", len(resp.Content),
+				"finish_reason", resp.FinishReason,
+				"tool_calls", len(resp.ToolCalls),
+				"model", slot.Name)
+
+			l.accumulateUsage(resp.Usage)
+			l.recordAssistantMessage(ctx, resp)
+			return resp, nil
+		}
+
+		lastErr = err
+
+		// If this is the last model or the error is not retryable, stop.
+		if !llm.IsRetryable(err) {
+			l.logger.Warn("LLM request failed (non-retryable)", "model", slot.Name, "error", err)
+			break
+		}
+
+		// More models to try — log and continue.
+		if i < len(l.models)-1 {
+			l.logger.Warn("LLM request failed, trying next model",
+				"model", slot.Name, "error", err,
+				"next_model", l.models[i+1].Name)
+		} else {
+			l.logger.Warn("LLM request failed (last model)", "model", slot.Name, "error", err)
+		}
 	}
 
-	l.logger.Debug("received LLM response",
-		"content_length", len(resp.Content),
-		"finish_reason", resp.FinishReason,
-		"tool_calls", len(resp.ToolCalls))
-
-	l.accumulateUsage(resp.Usage)
-	l.recordAssistantMessage(ctx, resp)
-	return resp, nil
+	l.recordErrorMessage(ctx, fmt.Sprintf("LLM request failed: %v", lastErr))
+	l.setWorking(false)
+	return nil, fmt.Errorf("LLM request failed: %w", lastErr)
 }
 
 // setWorking safely calls the onWorking callback if configured.
@@ -371,8 +391,7 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 	var delegate *DelegateContext
 	if tc.Function.Name == delegateToolName && l.registry != nil {
 		delegate = &DelegateContext{
-			Provider:      l.provider,
-			Model:         l.model,
+			Models:        l.models,
 			SystemPrompt:  l.systemPrompt,
 			Tools:         l.tools,
 			Hooks:         l.hooks,

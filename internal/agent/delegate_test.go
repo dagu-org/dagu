@@ -51,8 +51,7 @@ func TestDelegateTool_EmptyTaskDescription(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider: newStopProvider("ok"),
-			Model:    "test",
+			Models: []ModelSlot{{Provider: newStopProvider("ok"), Model: "test", Name: "test"}},
 			Tools:    []*AgentTool{},
 		},
 	}, json.RawMessage(`{"tasks": [{"task": ""}]}`))
@@ -181,8 +180,7 @@ func TestDelegateTool_PersistsSubSession(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:     provider,
-			Model:        "test-model",
+			Models:       []ModelSlot{{Provider: provider, Model: "test-model", Name: "test-model"}},
 			Tools:        []*AgentTool{},
 			SessionStore: store,
 			ParentID:     "parent-1",
@@ -216,8 +214,7 @@ func TestDelegateTool_RecordsMessagesToSubSession(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:     provider,
-			Model:        "test",
+			Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:        []*AgentTool{},
 			SessionStore: store,
 			ParentID:     "parent-1",
@@ -251,8 +248,7 @@ func TestDelegateTool_ReturnsLastAssistantContent(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider: provider,
-			Model:    "test",
+			Models: []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:    []*AgentTool{},
 		},
 	}, singleTaskInput("compute"))
@@ -271,8 +267,7 @@ func TestDelegateTool_ReturnsDelegateIDs(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider: provider,
-			Model:    "test",
+			Models: []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:    []*AgentTool{},
 		},
 	}, singleTaskInput("something"))
@@ -294,8 +289,7 @@ func TestDelegateTool_MultipleTasks(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:     provider,
-			Model:        "test",
+			Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
@@ -340,8 +334,7 @@ func TestDelegateTool_ExceedsMaxTasks(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider: provider,
-			Model:    "test",
+			Models: []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:    []*AgentTool{},
 		},
 	}, input)
@@ -375,8 +368,7 @@ func TestDelegateTool_PartialFailure(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider: provider,
-			Model:    "test",
+			Models: []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:    []*AgentTool{},
 		},
 	}, json.RawMessage(`{"tasks": [{"task": "task1"}, {"task": "task2"}]}`))
@@ -400,8 +392,7 @@ func TestDelegateTool_AllTasksFail(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider: provider,
-			Model:    "test",
+			Models: []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:    []*AgentTool{},
 		},
 	}, json.RawMessage(`{"tasks": [{"task": "fail1"}, {"task": "fail2"}]}`))
@@ -421,8 +412,7 @@ func TestDelegateTool_WithoutSessionStore(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider: provider,
-			Model:    "test",
+			Models: []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:    []*AgentTool{},
 			// No SessionStore
 		},
@@ -465,8 +455,7 @@ func TestDelegateTool_ChildHasNoDelegateTool(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider: provider,
-			Model:    "test",
+			Models: []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:    parentTools,
 		},
 	}, singleTaskInput("check tools"))
@@ -496,8 +485,7 @@ func TestDelegateTool_ProviderError(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:     provider,
-			Model:        "test",
+			Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:        []*AgentTool{},
 			SessionStore: store,
 			ParentID:     "parent-1",
@@ -530,9 +518,8 @@ func TestDelegateTool_ContextCancellation(t *testing.T) {
 			Context:    ctx,
 			WorkingDir: t.TempDir(),
 			Delegate: &DelegateContext{
-				Provider: provider,
-				Model:    "test",
-				Tools:    []*AgentTool{},
+				Models: []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
+				Tools:  []*AgentTool{},
 			},
 		}, singleTaskInput("cancelled"))
 	}()
@@ -559,8 +546,7 @@ func TestDelegateTool_RegistersSubSession(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:     provider,
-			Model:        "test",
+			Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
@@ -589,8 +575,7 @@ func TestDelegateTool_NotifiesParentStarted(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:     provider,
-			Model:        "test",
+			Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
@@ -626,8 +611,7 @@ func TestDelegateTool_NotifiesParentCompleted(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:     provider,
-			Model:        "test",
+			Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
@@ -665,8 +649,7 @@ func TestDelegateTool_MultipleTasksNotifications(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:     provider,
-			Model:        "test",
+			Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
@@ -713,8 +696,7 @@ func TestDelegateTool_CostRolledUpToParent(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:     provider,
-			Model:        "test",
+			Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
@@ -740,8 +722,7 @@ func TestDelegateTool_SubSessionStreamable(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:     provider,
-			Model:        "test",
+			Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
@@ -781,8 +762,7 @@ func TestDelegateTool_SubSessionWorkingState(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:     provider,
-			Model:        "test",
+			Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
@@ -808,8 +788,7 @@ func TestDelegateTool_NoCallbacks(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:     provider,
-			Model:        "test",
+			Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-1",
@@ -858,8 +837,7 @@ func TestDelegateTool_SubAgentHookUserAttribution(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:     provider,
-			Model:        "test",
+			Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:        CreateTools(ToolConfig{}),
 			Hooks:        hooks,
 			SessionStore: newMockSessionStore(),
@@ -908,8 +886,7 @@ func TestDelegateTool_ForwardedMessagesHaveSessionID(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:     provider,
-			Model:        "test",
+			Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:        []*AgentTool{},
 			SessionStore: store,
 			ParentID:     "parent-1",
@@ -948,8 +925,7 @@ func TestDelegateTool_SubSessionHasUserContext(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:     provider,
-			Model:        "test",
+			Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:        []*AgentTool{},
 			SessionStore: store,
 			ParentID:     "parent-1",
@@ -995,8 +971,7 @@ func TestDelegateTool_ParentTracksDelegate(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:     provider,
-			Model:        "test",
+			Models:       []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:        []*AgentTool{},
 			SessionStore: newMockSessionStore(),
 			ParentID:     "parent-track",
@@ -1038,8 +1013,7 @@ func TestDelegateTool_SkillsPreloaded(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:   provider,
-			Model:      "test",
+			Models:     []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:      []*AgentTool{},
 			SkillStore: store,
 		},
@@ -1072,8 +1046,7 @@ func TestDelegateTool_SkillsNotFoundWarning(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:   provider,
-			Model:      "test",
+			Models:     []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:      []*AgentTool{},
 			SkillStore: store,
 		},
@@ -1106,8 +1079,7 @@ func TestDelegateTool_SkillsNotAllowed(t *testing.T) {
 		Context:    context.Background(),
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
-			Provider:      provider,
-			Model:         "test",
+			Models:        []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
 			Tools:         []*AgentTool{},
 			SkillStore:    store,
 			AllowedSkills: map[string]struct{}{"other-skill": {}},

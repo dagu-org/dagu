@@ -335,10 +335,8 @@ type SubSessionRegistry interface {
 
 // DelegateContext provides configuration for spawning sub-agent loops.
 type DelegateContext struct {
-	// Provider is the LLM provider for sub-agent calls.
-	Provider llm.Provider
-	// Model is the LLM model identifier.
-	Model string
+	// Models is the ordered list of model slots for sub-agent fallback.
+	Models []ModelSlot
 	// SystemPrompt is the system prompt for sub-agents.
 	SystemPrompt string
 	// Tools is the parent's tool set (delegate will be filtered out).

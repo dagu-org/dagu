@@ -308,12 +308,12 @@ func (sm *SessionManager) RecordExternalMessage(ctx context.Context, msg Message
 }
 
 // AcceptUserMessage enqueues a user message, ensuring the loop is ready first.
-func (sm *SessionManager) AcceptUserMessage(ctx context.Context, provider llm.Provider, modelID string, resolvedModel string, content string) error {
-	if provider == nil {
-		return errors.New("LLM provider is required")
+func (sm *SessionManager) AcceptUserMessage(ctx context.Context, models []ModelSlot, modelID string, content string) error {
+	if len(models) == 0 {
+		return errors.New("at least one model slot is required")
 	}
 
-	if err := sm.ensureLoop(provider, modelID, resolvedModel); err != nil {
+	if err := sm.ensureLoop(models, modelID); err != nil {
 		return err
 	}
 
@@ -448,7 +448,7 @@ func (sm *SessionManager) clearLoop() context.CancelFunc {
 // ensureLoop creates the loop if it doesn't exist.
 // The lock is released during createLoop (which may be slow) and re-acquired
 // afterward with a double-check to handle concurrent callers.
-func (sm *SessionManager) ensureLoop(provider llm.Provider, modelID string, resolvedModel string) error {
+func (sm *SessionManager) ensureLoop(models []ModelSlot, modelID string) error {
 	sm.mu.Lock()
 	if sm.loop != nil {
 		sm.mu.Unlock()
@@ -460,7 +460,7 @@ func (sm *SessionManager) ensureLoop(provider llm.Provider, modelID string, reso
 	sm.mu.Unlock()
 
 	loopCtx, cancel := context.WithCancel(context.Background())
-	loopInstance := sm.createLoop(provider, resolvedModel, history, safeMode)
+	loopInstance := sm.createLoop(models, history, safeMode)
 
 	sm.mu.Lock()
 	if sm.loop != nil {
@@ -477,7 +477,7 @@ func (sm *SessionManager) ensureLoop(provider llm.Provider, modelID string, reso
 }
 
 // createLoop creates a new Loop instance with the current configuration.
-func (sm *SessionManager) createLoop(provider llm.Provider, model string, history []llm.Message, safeMode bool) *Loop {
+func (sm *SessionManager) createLoop(models []ModelSlot, history []llm.Message, safeMode bool) *Loop {
 	memory := sm.loadMemory()
 	allowedSkills := ToSkillSet(sm.enabledSkills)
 	skillCount := len(sm.enabledSkills)
@@ -486,9 +486,8 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		skillSummaries = LoadSkillSummaries(context.Background(), sm.skillStore, sm.enabledSkills)
 	}
 	return NewLoop(LoopConfig{
-		Provider: provider,
-		Model:    model,
-		History:  history,
+		Models:  models,
+		History: history,
 		Tools: CreateTools(ToolConfig{
 			DAGsDir:       sm.environment.DAGsDir,
 			SkillStore:    sm.skillStore,

@@ -144,7 +144,7 @@ func TestSessionManager_AcceptUserMessage(t *testing.T) {
 		t.Parallel()
 
 		sm := NewSessionManager(SessionManagerConfig{})
-		err := sm.AcceptUserMessage(context.Background(), nil, "config-id", "provider-model", "hello")
+		err := sm.AcceptUserMessage(context.Background(), nil, "config-id", "hello")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "required")
@@ -156,7 +156,7 @@ func TestSessionManager_AcceptUserMessage(t *testing.T) {
 		provider := newStopProvider("hi")
 
 		sm := NewSessionManager(SessionManagerConfig{})
-		err := sm.AcceptUserMessage(context.Background(), provider, "config-id", "provider-model", "hello")
+		err := sm.AcceptUserMessage(context.Background(), []ModelSlot{{Provider: provider, Model: "provider-model", Name: "provider-model"}}, "config-id", "hello")
 
 		require.NoError(t, err)
 		assert.True(t, sm.IsWorking())
@@ -170,7 +170,7 @@ func TestSessionManager_AcceptUserMessage(t *testing.T) {
 		provider := newStopProvider("response")
 
 		sm := NewSessionManager(SessionManagerConfig{})
-		_ = sm.AcceptUserMessage(context.Background(), provider, "config-id", "provider-model", "hello")
+		_ = sm.AcceptUserMessage(context.Background(), []ModelSlot{{Provider: provider, Model: "provider-model", Name: "provider-model"}}, "config-id", "hello")
 
 		time.Sleep(50 * time.Millisecond)
 
@@ -249,7 +249,7 @@ func TestSessionManager_Cancel(t *testing.T) {
 		}
 
 		sm := NewSessionManager(SessionManagerConfig{})
-		_ = sm.AcceptUserMessage(context.Background(), provider, "config-id", "provider-model", "hello")
+		_ = sm.AcceptUserMessage(context.Background(), []ModelSlot{{Provider: provider, Model: "provider-model", Name: "provider-model"}}, "config-id", "hello")
 
 		time.Sleep(50 * time.Millisecond)
 
@@ -324,7 +324,7 @@ func TestSessionManager_GetModel(t *testing.T) {
 		provider := newStopProvider("hi")
 
 		sm := NewSessionManager(SessionManagerConfig{})
-		_ = sm.AcceptUserMessage(context.Background(), provider, "test-model", "test-model", "hello")
+		_ = sm.AcceptUserMessage(context.Background(), []ModelSlot{{Provider: provider, Model: "test-model", Name: "test-model"}}, "test-model", "hello")
 
 		assert.Equal(t, "test-model", sm.GetModel())
 
@@ -425,7 +425,7 @@ func TestSessionManager_LastActivity(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 
 		provider := newStopProvider("hi")
-		_ = sm.AcceptUserMessage(context.Background(), provider, "config-id", "provider-model", "hello")
+		_ = sm.AcceptUserMessage(context.Background(), []ModelSlot{{Provider: provider, Model: "provider-model", Name: "provider-model"}}, "config-id", "hello")
 		defer func() { _ = sm.Cancel(context.Background()) }()
 
 		updatedActivity := sm.LastActivity()
@@ -590,7 +590,7 @@ func TestSessionManager_RecordMessage_PersistsViaCallback(t *testing.T) {
 		},
 	})
 
-	err := sm.AcceptUserMessage(context.Background(), provider, "m", "m", "hello")
+	err := sm.AcceptUserMessage(context.Background(), []ModelSlot{{Provider: provider, Model: "m", Name: "m"}}, "m", "hello")
 	require.NoError(t, err)
 
 	// Wait for the assistant message to be persisted (user message is persisted synchronously).
@@ -616,7 +616,7 @@ func TestSessionManager_ConcurrentMessages(t *testing.T) {
 	sm := NewSessionManager(SessionManagerConfig{})
 
 	for i := range 3 {
-		err := sm.AcceptUserMessage(context.Background(), provider, "m", "m",
+		err := sm.AcceptUserMessage(context.Background(), []ModelSlot{{Provider: provider, Model: "m", Name: "m"}}, "m",
 			"message-"+string(rune('0'+i)))
 		require.NoError(t, err)
 		time.Sleep(10 * time.Millisecond)

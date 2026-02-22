@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Loader2, MoreHorizontal, Pencil, Plus, Save, Shield, Star, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Bot, Loader2, MoreHorizontal, Pencil, Plus, Save, Shield, Star, Trash2, X } from 'lucide-react';
 import {
   AgentBashPolicyDefaultBehavior,
   AgentBashPolicyDenyBehavior,
@@ -51,6 +51,7 @@ type SoulOption = {
 type SavedAgentConfig = {
   enabled: boolean;
   defaultModelId?: string;
+  modelIds?: string[];
   selectedSoulId?: string;
   toolPolicy: AgentToolPolicy;
 };
@@ -122,6 +123,7 @@ export default function AgentSettingsPage(): ReactNode {
 
   const [enabled, setEnabled] = useState(false);
   const [defaultModelId, setDefaultModelId] = useState<string | undefined>();
+  const [modelIds, setModelIds] = useState<string[]>([]);
   const [toolPolicy, setToolPolicy] = useState<AgentToolPolicy>(() => createDefaultToolPolicy([]));
   const [savedConfig, setSavedConfig] = useState<SavedAgentConfig | null>(null);
   const [bashRuleIds, setBashRuleIds] = useState<string[]>([]);
@@ -174,11 +176,13 @@ export default function AgentSettingsPage(): ReactNode {
       const normalizedPolicy = normalizeToolPolicy(data.toolPolicy, tools);
       setEnabled(data.enabled ?? false);
       setDefaultModelId(data.defaultModelId);
+      setModelIds(data.modelIds || []);
       setSelectedSoulId(data.selectedSoulId);
       setToolPolicy(normalizedPolicy);
       setSavedConfig({
         enabled: data.enabled ?? false,
         defaultModelId: data.defaultModelId,
+        modelIds: data.modelIds || [],
         selectedSoulId: data.selectedSoulId,
         toolPolicy: normalizedPolicy,
       });
@@ -252,6 +256,9 @@ export default function AgentSettingsPage(): ReactNode {
       if (!savedConfig || defaultModelId !== savedConfig.defaultModelId) {
         requestBody.defaultModelId = defaultModelId;
       }
+      if (!savedConfig || JSON.stringify(modelIds) !== JSON.stringify(savedConfig.modelIds)) {
+        requestBody.modelIds = modelIds;
+      }
       if (!savedConfig || selectedSoulId !== savedConfig.selectedSoulId) {
         requestBody.selectedSoulId = selectedSoulId;
       }
@@ -276,11 +283,13 @@ export default function AgentSettingsPage(): ReactNode {
       const normalizedPolicy = normalizeToolPolicy(data.toolPolicy, toolMetas);
       setEnabled(data.enabled ?? false);
       setDefaultModelId(data.defaultModelId);
+      setModelIds(data.modelIds || []);
       setSelectedSoulId(data.selectedSoulId);
       setToolPolicy(normalizedPolicy);
       setSavedConfig({
         enabled: data.enabled ?? false,
         defaultModelId: data.defaultModelId,
+        modelIds: data.modelIds || [],
         selectedSoulId: data.selectedSoulId,
         toolPolicy: normalizedPolicy,
       });
@@ -826,6 +835,109 @@ export default function AgentSettingsPage(): ReactNode {
               )}
             </TableBody>
           </Table>
+        </div>
+      )}
+
+      {/* Model Fallback Order */}
+      {enabled && models.length > 1 && (
+        <div className="card-obsidian p-4 space-y-3 max-w-xl">
+          <div>
+            <p className="text-sm font-medium">Model Fallback Order</p>
+            <p className="text-xs text-muted-foreground">
+              When a model fails with a transient error (rate limit, server error), the next model in this list is tried.
+            </p>
+          </div>
+
+          {modelIds.length === 0 ? (
+            <div className="rounded-md border border-dashed border-border/80 p-3 text-xs text-muted-foreground">
+              No fallback order configured. Only the default model will be used.
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {modelIds.map((id, index) => {
+                const model = models.find((m) => m.id === id);
+                return (
+                  <div
+                    key={id}
+                    className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-1.5 text-xs"
+                  >
+                    <span className="text-muted-foreground w-5 shrink-0">{index + 1}.</span>
+                    <span className="font-medium truncate flex-1">
+                      {model?.name || id}
+                    </span>
+                    {index === 0 && (
+                      <span className="text-xs text-amber-600 shrink-0">Primary</span>
+                    )}
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        disabled={index === 0}
+                        onClick={() => {
+                          setModelIds((prev) => {
+                            const next = [...prev];
+                            [next[index - 1]!, next[index]!] = [next[index]!, next[index - 1]!];
+                            return next;
+                          });
+                        }}
+                      >
+                        <ArrowUp className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        disabled={index === modelIds.length - 1}
+                        onClick={() => {
+                          setModelIds((prev) => {
+                            const next = [...prev];
+                            [next[index]!, next[index + 1]!] = [next[index + 1]!, next[index]!];
+                            return next;
+                          });
+                        }}
+                      >
+                        <ArrowDown className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                        onClick={() => setModelIds((prev) => prev.filter((_, i) => i !== index))}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Add model to fallback list */}
+          {(() => {
+            const available = models.filter((m) => !modelIds.includes(m.id));
+            if (available.length === 0) return null;
+            return (
+              <Select
+                value=""
+                onValueChange={(value) => {
+                  if (value) setModelIds((prev) => [...prev, value]);
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Add model to fallback list..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {available.map((m) => (
+                    <SelectItem key={m.id} value={m.id} className="text-xs">
+                      {m.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            );
+          })()}
         </div>
       )}
 

@@ -7604,6 +7604,11 @@ components:
         defaultModelId:
           type: string
           description: "ID of the default model"
+        modelIds:
+          type: array
+          items:
+            type: string
+          description: "Ordered list of model IDs for fallback (primary first)"
         toolPolicy:
           $ref: "#/components/schemas/AgentToolPolicy"
         selectedSoulId:
@@ -7621,6 +7626,11 @@ components:
         defaultModelId:
           type: string
           description: "ID of the default model"
+        modelIds:
+          type: array
+          items:
+            type: string
+          description: "Ordered list of model IDs for fallback (primary first)"
         toolPolicy:
           $ref: "#/components/schemas/AgentToolPolicy"
         selectedSoulId:

@@ -346,6 +346,9 @@ const (
 type AgentStepConfig struct {
 	// Model overrides the global default model for this step.
 	Model string `json:"model,omitempty"`
+	// Models is an ordered list of model IDs for fallback.
+	// When non-empty, takes precedence over Model.
+	Models []string `json:"models,omitempty"`
 	// Tools configures which tools are available and their policies.
 	Tools *AgentToolsConfig `json:"tools,omitempty"`
 	// Skills lists skill IDs the agent is allowed to use.

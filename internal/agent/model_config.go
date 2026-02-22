@@ -2,6 +2,8 @@ package agent
 
 import (
 	"errors"
+
+	"github.com/dagu-org/dagu/internal/llm"
 )
 
 // Sentinel errors for model store operations.
@@ -16,9 +18,32 @@ var (
 type Config struct {
 	Enabled        bool             `json:"enabled"`
 	DefaultModelID string           `json:"defaultModelId,omitempty"`
+	ModelIDs       []string         `json:"modelIds,omitempty"`
 	ToolPolicy     ToolPolicyConfig `json:"toolPolicy"`
 	EnabledSkills  []string         `json:"enabledSkills,omitempty"`
 	SelectedSoulID string           `json:"selectedSoulId,omitempty"`
+}
+
+// ResolveModelIDs returns the ordered list of model IDs to use.
+// ModelIDs takes precedence when non-empty; otherwise falls back to [DefaultModelID].
+func (c *Config) ResolveModelIDs() []string {
+	if len(c.ModelIDs) > 0 {
+		return c.ModelIDs
+	}
+	if c.DefaultModelID != "" {
+		return []string{c.DefaultModelID}
+	}
+	return nil
+}
+
+// ModelSlot holds a resolved LLM provider and model for the agent loop.
+type ModelSlot struct {
+	// Provider is the LLM provider instance.
+	Provider llm.Provider
+	// Model is the model identifier sent in requests.
+	Model string
+	// Name is a human-readable name for logging.
+	Name string
 }
 
 // BashRuleAction is the decision a bash rule applies when matched.

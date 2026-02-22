@@ -191,6 +191,8 @@ type llmMessage struct {
 type agentConfig struct {
 	// Model overrides the global default model for this step.
 	Model string `yaml:"model,omitempty"`
+	// Models is an ordered list of model IDs for fallback.
+	Models []string `yaml:"models,omitempty"`
 	// Tools configures which tools are available and their policies.
 	Tools *agentToolsConfig `yaml:"tools,omitempty"`
 	// Skills lists skill IDs the agent is allowed to use.
@@ -1587,6 +1589,7 @@ func buildStepAgent(_ StepBuildContext, s *step, result *core.Step) error {
 
 	if s.Agent != nil {
 		cfg.Model = strings.TrimSpace(s.Agent.Model)
+		cfg.Models = s.Agent.Models
 		cfg.Prompt = s.Agent.Prompt
 
 		if s.Agent.MaxIterations != nil {

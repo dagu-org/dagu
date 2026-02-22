@@ -88,25 +88,34 @@ func (e *Executor) Run(ctx context.Context) error {
 	// Resolve global tool policy for tool filtering and bash enforcement.
 	globalPolicy := agent.ResolveToolPolicy(agentCfg.ToolPolicy)
 
-	// Resolve model ID: step override → global default.
-	modelID := agentCfg.DefaultModelID
+	// Resolve model IDs: step models → step model → global config.
 	stepCfg := e.step.Agent
-	if stepCfg != nil && stepCfg.Model != "" {
-		modelID = stepCfg.Model
-	}
-	if modelID == "" {
+	modelIDs := resolveModelIDs(stepCfg, agentCfg)
+	if len(modelIDs) == 0 {
 		return fmt.Errorf("no model configured; set a default model in Agent Settings or specify agent.model in the step")
 	}
 
-	modelCfg, err := modelStore.GetByID(ctx, modelID)
-	if err != nil {
-		return fmt.Errorf("failed to get model %q: %w", modelID, err)
+	// Create model slots for all configured models.
+	var modelSlots []agent.ModelSlot
+	for _, id := range modelIDs {
+		cfg, err := modelStore.GetByID(ctx, id)
+		if err != nil {
+			logf(stderr, "Warning: model %q not found, skipping: %v", id, err)
+			continue
+		}
+		provider, err := agent.CreateLLMProvider(cfg.ToLLMConfig())
+		if err != nil {
+			logf(stderr, "Warning: provider for %q failed, skipping: %v", id, err)
+			continue
+		}
+		modelSlots = append(modelSlots, agent.ModelSlot{
+			Provider: provider,
+			Model:    cfg.Model,
+			Name:     cfg.Name,
+		})
 	}
-
-	// Create LLM provider.
-	provider, err := agent.CreateLLMProvider(modelCfg.ToLLMConfig())
-	if err != nil {
-		return fmt.Errorf("failed to create LLM provider: %w", err)
+	if len(modelSlots) == 0 {
+		return fmt.Errorf("no usable models configured (tried %d)", len(modelIDs))
 	}
 
 	// Resolve skill store and allowed skills.
@@ -189,8 +198,12 @@ func (e *Executor) Run(ctx context.Context) error {
 	hooks := agent.NewHooks()
 	hooks.OnBeforeToolExec(buildPolicyHook(effectivePolicy))
 
-	logf(stderr, "Starting (model: %s, tools: %d, safe_mode: %v, max_iterations: %d)",
-		modelCfg.Name, len(tools), safeMode, maxIterations)
+	modelNames := make([]string, len(modelSlots))
+	for i, s := range modelSlots {
+		modelNames[i] = s.Name
+	}
+	logf(stderr, "Starting (models: %v, tools: %d, safe_mode: %v, max_iterations: %d)",
+		modelNames, len(tools), safeMode, maxIterations)
 
 	// Create a cancellable context for stopping the loop after completion.
 	loopCtx, cancelLoop := context.WithCancel(ctx)
@@ -203,8 +216,7 @@ func (e *Executor) Run(ctx context.Context) error {
 	iteration := 0
 
 	loop := agent.NewLoop(agent.LoopConfig{
-		Provider:      provider,
-		Model:         modelCfg.Model,
+		Models:        modelSlots,
 		Tools:         tools,
 		SystemPrompt:  systemPrompt,
 		SafeMode:      safeMode,
@@ -343,6 +355,18 @@ func loadMemoryContent(ctx context.Context, store agent.MemoryStore, dagName str
 		DAGName:      dagName,
 		MemoryDir:    store.MemoryDir(),
 	}
+}
+
+// resolveModelIDs returns the ordered list of model IDs to use.
+// Priority: step.Models → step.Model → global config.
+func resolveModelIDs(stepCfg *core.AgentStepConfig, agentCfg *agent.Config) []string {
+	if stepCfg != nil && len(stepCfg.Models) > 0 {
+		return stepCfg.Models
+	}
+	if stepCfg != nil && stepCfg.Model != "" {
+		return []string{stepCfg.Model}
+	}
+	return agentCfg.ResolveModelIDs()
 }
 
 // resolveEnabledSkills returns the skill IDs the agent is allowed to use.

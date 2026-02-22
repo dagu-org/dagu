@@ -3248,6 +3248,8 @@ export interface components {
             enabled?: boolean;
             /** @description ID of the default model */
             defaultModelId?: string;
+            /** @description Ordered list of model IDs for fallback (primary first) */
+            modelIds?: string[];
             toolPolicy?: components["schemas"]["AgentToolPolicy"];
             /** @description ID of the currently selected soul */
             selectedSoulId?: string | null;
@@ -3258,6 +3260,8 @@ export interface components {
             enabled?: boolean;
             /** @description ID of the default model */
             defaultModelId?: string;
+            /** @description Ordered list of model IDs for fallback (primary first) */
+            modelIds?: string[];
             toolPolicy?: components["schemas"]["AgentToolPolicy"];
             /** @description ID of the soul to select */
             selectedSoulId?: string | null;

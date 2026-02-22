@@ -398,17 +398,40 @@ func (a *API) autoSetDefaultModel(ctx context.Context, modelID string) {
 
 func (a *API) resetDefaultIfNeeded(ctx context.Context, deletedModelID string) {
 	cfg, err := a.agentConfigStore.Load(ctx)
-	if err != nil || cfg.DefaultModelID != deletedModelID {
+	if err != nil {
 		return
 	}
 
-	models, err := a.agentModelStore.List(ctx)
-	if err != nil || len(models) == 0 {
-		cfg.DefaultModelID = ""
-	} else {
-		cfg.DefaultModelID = models[0].ID
+	changed := false
+
+	// Remove the deleted model from the fallback list.
+	if len(cfg.ModelIDs) > 0 {
+		filtered := make([]string, 0, len(cfg.ModelIDs))
+		for _, id := range cfg.ModelIDs {
+			if id != deletedModelID {
+				filtered = append(filtered, id)
+			}
+		}
+		if len(filtered) != len(cfg.ModelIDs) {
+			cfg.ModelIDs = filtered
+			changed = true
+		}
 	}
-	if err := a.agentConfigStore.Save(ctx, cfg); err != nil {
-		logger.Error(ctx, "Failed to reset default model after deletion", tag.Error(err))
+
+	// Reset the default model if the deleted model was the default.
+	if cfg.DefaultModelID == deletedModelID {
+		models, err := a.agentModelStore.List(ctx)
+		if err != nil || len(models) == 0 {
+			cfg.DefaultModelID = ""
+		} else {
+			cfg.DefaultModelID = models[0].ID
+		}
+		changed = true
+	}
+
+	if changed {
+		if err := a.agentConfigStore.Save(ctx, cfg); err != nil {
+			logger.Error(ctx, "Failed to update config after model deletion", tag.Error(err))
+		}
 	}
 }

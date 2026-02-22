@@ -147,12 +147,16 @@ func (a *API) requireAgentConfigManagement() error {
 }
 
 func toAgentConfigResponse(cfg *agent.Config) api.AgentConfigResponse {
-	return api.AgentConfigResponse{
+	resp := api.AgentConfigResponse{
 		Enabled:        &cfg.Enabled,
 		DefaultModelId: ptrOf(cfg.DefaultModelID),
 		ToolPolicy:     toAPIToolPolicy(cfg.ToolPolicy),
 		SelectedSoulId: ptrOf(cfg.SelectedSoulID),
 	}
+	if len(cfg.ModelIDs) > 0 {
+		resp.ModelIds = &cfg.ModelIDs
+	}
+	return resp
 }
 
 // applyAgentConfigUpdates applies non-nil fields from the update request to the agent configuration.
@@ -162,6 +166,9 @@ func applyAgentConfigUpdates(cfg *agent.Config, update *api.UpdateAgentConfigReq
 	}
 	if update.DefaultModelId != nil {
 		cfg.DefaultModelID = *update.DefaultModelId
+	}
+	if update.ModelIds != nil {
+		cfg.ModelIDs = *update.ModelIds
 	}
 	if update.ToolPolicy != nil {
 		policy := toInternalToolPolicy(*update.ToolPolicy)
@@ -184,6 +191,9 @@ func buildAgentConfigChanges(update *api.UpdateAgentConfigRequest) map[string]an
 	}
 	if update.DefaultModelId != nil {
 		changes[auditFieldDefaultModelID] = *update.DefaultModelId
+	}
+	if update.ModelIds != nil {
+		changes["model_ids"] = *update.ModelIds
 	}
 	if update.ToolPolicy != nil {
 		changes[auditFieldToolPolicy] = update.ToolPolicy

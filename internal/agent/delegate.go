@@ -345,8 +345,7 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 	}
 
 	loop := NewLoop(LoopConfig{
-		Provider:      dc.Provider,
-		Model:         dc.Model,
+		Models:        dc.Models,
 		Tools:         childTools,
 		RecordMessage: recordMessage,
 		Logger:        logger,
