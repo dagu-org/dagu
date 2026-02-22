@@ -14,6 +14,7 @@ func convertMessage(msg agent.Message, modelCfg *agent.ModelConfig) []exec.LLMMe
 		return []exec.LLMMessage{convertAssistantMessage(msg, modelCfg)}
 
 	case agent.MessageTypeUser:
+		// When ToolResults are present, the message is a tool-result payload; Content is unused.
 		if len(msg.ToolResults) > 0 {
 			return convertToolResultMessages(msg)
 		}

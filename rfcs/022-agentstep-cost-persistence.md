@@ -55,7 +55,7 @@ In the `RecordMessage` callback (line 215), convert `agent.Message` → `exec.LL
 ```go
 RecordMessage: func(_ context.Context, msg agent.Message) {
     logMessage(stderr, msg)
-    e.savedMessages = append(e.savedMessages, convertMessage(msg, modelCfg))
+    e.savedMessages = append(e.savedMessages, convertMessage(msg, modelCfg)...)
 },
 ```
 
@@ -91,7 +91,7 @@ No changes needed. `DAGRunStatusProto` is a JSON-serialized `DAGRunStatus` struc
 | `internal/core/exec/messages.go:49` | Add `Cost` to `LLMMessageMetadata` |
 | `internal/runtime/builtin/agentstep/executor.go:38-44` | Add `contextMessages`/`savedMessages` fields, implement `ChatMessageHandler` |
 | `internal/runtime/builtin/agentstep/executor.go:215` | Convert `agent.Message` → `exec.LLMMessage` in `RecordMessage` callback |
-| `internal/runtime/builtin/chat/executor.go:757-768` | Populate new `Cost` field in `createResponseMetadata()` |
+| `internal/runtime/builtin/chat/executor.go:757-768` | Populate new `Cost` field in `createResponseMetadata()` (deferred — see RFC 021) |
 | `internal/runtime/executor/executor.go:96` | `ChatMessageHandler` interface (no changes, already exists) |
 | `internal/runtime/node.go:192-213` | Runtime capture logic (no changes, already works) |
 

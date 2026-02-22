@@ -87,6 +87,7 @@ func TestConvertMessage_AssistantWithToolCalls(t *testing.T) {
 
 	assert.Equal(t, "call_2", m.ToolCalls[1].ID)
 	assert.Equal(t, "read", m.ToolCalls[1].Function.Name)
+	assert.Equal(t, `{"path":"/tmp/test"}`, m.ToolCalls[1].Function.Arguments)
 }
 
 func TestConvertMessage_UserNoToolResults(t *testing.T) {
@@ -163,6 +164,7 @@ func TestConvertMessage_ErrorType(t *testing.T) {
 	require.Len(t, result, 1)
 	assert.Equal(t, exec.RoleAssistant, result[0].Role)
 	assert.Equal(t, "something went wrong", result[0].Content)
+	assert.Nil(t, result[0].Metadata, "error messages should not carry LLM metadata")
 }
 
 func TestConvertMessage_UnknownType(t *testing.T) {

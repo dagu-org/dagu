@@ -514,6 +514,12 @@ func (r *Runner) setupChatMessages(ctx context.Context, node *Node) {
 	}
 
 	step := node.Step()
+
+	executorType := step.ExecutorConfig.Type
+	if !core.SupportsLLM(executorType) && !core.SupportsAgent(executorType) {
+		return
+	}
+
 	if len(step.Depends) == 0 {
 		return
 	}

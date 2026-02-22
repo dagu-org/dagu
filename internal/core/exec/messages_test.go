@@ -93,7 +93,6 @@ func TestLLMMessageMetadata_CostJSONRoundTrip(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, meta, decoded)
-		assert.InDelta(t, 0.0042, decoded.Cost, 1e-9)
 	})
 
 	t.Run("ZeroCostOmittedFromJSON", func(t *testing.T) {

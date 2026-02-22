@@ -72,7 +72,7 @@ RFC 022 handles adding `Cost` to `LLMMessageMetadata`, implementing `ChatMessage
 
 ### 3. New API Endpoint
 
-```
+```http
 GET /api/v1/agent/cost-summary?month=YYYY-MM&userId=optional
 ```
 
@@ -103,6 +103,10 @@ AgentCostEntry:
     totalTokens:
       type: integer
       description: "Sum of input + output tokens"
+    source:
+      type: string
+      enum: [agent_chat, chat_step, agent_step]
+      description: "Cost origin"
     totalCost:
       type: number
       format: double
@@ -144,7 +148,7 @@ Follows the audit log permission pattern:
 | Viewer | Own costs only |
 | Developer | Own costs only |
 
-The handler uses `requireManagerOrAbove` from the existing auth middleware. Non-manager users have the `userId` parameter forced to their own ID.
+The handler uses `requireAuthenticated` from the existing auth middleware. Non-manager users have the `userId` parameter forced to their own ID, ensuring they can only view their own costs. Admin and Manager roles may specify any `userId` or omit it to see all users.
 
 ### 5. UI Page
 

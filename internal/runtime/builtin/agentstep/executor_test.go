@@ -18,12 +18,12 @@ func TestExecutor_SetContextAndGetMessages(t *testing.T) {
 	assert.Empty(t, e.GetMessages())
 
 	// SetContext stores messages.
-	ctx := []exec.LLMMessage{
+	msgs := []exec.LLMMessage{
 		{Role: exec.RoleSystem, Content: "be helpful"},
 		{Role: exec.RoleUser, Content: "hello"},
 	}
-	e.SetContext(ctx)
-	assert.Equal(t, ctx, e.contextMessages)
+	e.SetContext(msgs)
+	assert.Equal(t, msgs, e.contextMessages)
 
 	// GetMessages returns savedMessages, not contextMessages.
 	assert.Empty(t, e.GetMessages())

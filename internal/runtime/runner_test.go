@@ -3075,6 +3075,9 @@ func TestRunner_ChatMessagesHandler(t *testing.T) {
 		// allow the step through (setup/save calls won't panic).
 		plan := r.newPlan(t, agentStep("agent_fail"))
 		_ = plan.assertRun(t, core.Failed)
+
+		// Handler must not be called: step failed so saveChatMessages is skipped.
+		assert.Equal(t, 0, handler.writeCalls)
 	})
 }
 
