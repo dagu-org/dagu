@@ -57,6 +57,8 @@ type LLMMessageMetadata struct {
 	CompletionTokens int `json:"completionTokens,omitempty"`
 	// TotalTokens is the sum of prompt and completion tokens.
 	TotalTokens int `json:"totalTokens,omitempty"`
+	// Cost is the estimated USD cost for this API call.
+	Cost float64 `json:"cost,omitempty"`
 }
 
 // ToolDefinition represents a tool that was available to the LLM.

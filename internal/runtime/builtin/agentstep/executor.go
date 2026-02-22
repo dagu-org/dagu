@@ -24,6 +24,7 @@ import (
 )
 
 var _ executor.Executor = (*Executor)(nil)
+var _ executor.ChatMessageHandler = (*Executor)(nil)
 
 func init() {
 	executor.RegisterExecutor(
@@ -36,11 +37,13 @@ func init() {
 
 // Executor runs the agent loop as a workflow step.
 type Executor struct {
-	step       core.Step
-	stdout     io.Writer
-	stderr     io.Writer
-	mu         sync.Mutex
-	cancelLoop context.CancelFunc
+	step            core.Step
+	stdout          io.Writer
+	stderr          io.Writer
+	mu              sync.Mutex
+	cancelLoop      context.CancelFunc
+	contextMessages []exec.LLMMessage
+	savedMessages   []exec.LLMMessage
 }
 
 func newAgentExecutor(_ context.Context, step core.Step) (executor.Executor, error) {
@@ -49,6 +52,12 @@ func newAgentExecutor(_ context.Context, step core.Step) (executor.Executor, err
 
 func (e *Executor) SetStdout(w io.Writer) { e.stdout = w }
 func (e *Executor) SetStderr(w io.Writer) { e.stderr = w }
+
+// SetContext sets the session context from prior steps.
+func (e *Executor) SetContext(msgs []exec.LLMMessage) { e.contextMessages = msgs }
+
+// GetMessages returns the collected messages after execution.
+func (e *Executor) GetMessages() []exec.LLMMessage { return e.savedMessages }
 
 func (e *Executor) Kill(_ os.Signal) error {
 	e.mu.Lock()
@@ -214,6 +223,8 @@ func (e *Executor) Run(ctx context.Context) error {
 		AllowedSkills: allowedSkills,
 		RecordMessage: func(_ context.Context, msg agent.Message) {
 			logMessage(stderr, msg)
+			converted := convertMessage(msg, modelCfg)
+			e.savedMessages = append(e.savedMessages, converted...)
 		},
 		OnWorking: func(working bool) {
 			if !working {

@@ -514,7 +514,7 @@ func (r *Runner) setupChatMessages(ctx context.Context, node *Node) {
 	}
 
 	step := node.Step()
-	if !core.SupportsLLM(step.ExecutorConfig.Type) {
+	if !core.SupportsLLM(step.ExecutorConfig.Type) && !core.SupportsAgent(step.ExecutorConfig.Type) {
 		return
 	}
 
@@ -548,7 +548,7 @@ func (r *Runner) saveChatMessages(ctx context.Context, node *Node) {
 	}
 
 	step := node.Step()
-	if !core.SupportsLLM(step.ExecutorConfig.Type) {
+	if !core.SupportsLLM(step.ExecutorConfig.Type) && !core.SupportsAgent(step.ExecutorConfig.Type) {
 		return
 	}
 

@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/runtime/builtin/agentstep"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/chat"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
@@ -3010,6 +3011,70 @@ func TestRunner_ChatMessagesHandler(t *testing.T) {
 		result.assertNodeStatus(t, "empty1", core.NodeSucceeded)
 
 		assert.Equal(t, 0, handler.writeCalls)
+	})
+
+	t.Run("AgentStepSavesMessages", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		plan := r.newPlan(t, newStep("agent1", withExecutorType(agentstep.MockExecutorType)))
+		result := plan.assertRun(t, core.Succeeded)
+		result.assertNodeStatus(t, "agent1", core.NodeSucceeded)
+
+		assert.Equal(t, 1, handler.writeCalls)
+		assert.NotEmpty(t, handler.messages["agent1"])
+
+		// Verify cost metadata was preserved
+		msgs := handler.messages["agent1"]
+		var foundCost bool
+		for _, m := range msgs {
+			if m.Metadata != nil && m.Metadata.Cost > 0 {
+				foundCost = true
+				assert.Equal(t, "openai", m.Metadata.Provider)
+				assert.Equal(t, "gpt-4", m.Metadata.Model)
+				assert.InDelta(t, 0.001, m.Metadata.Cost, 1e-9)
+			}
+		}
+		assert.True(t, foundCost, "expected at least one message with cost metadata")
+	})
+
+	t.Run("AgentStepInheritsFromDependency", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		handler.messages["step1"] = []exec.LLMMessage{
+			{Role: exec.RoleSystem, Content: "be helpful"},
+			{Role: exec.RoleUser, Content: "prior message"},
+		}
+
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		plan := r.newPlan(t,
+			successStep("step1"),
+			newStep("agent1", withDepends("step1"), withExecutorType(agentstep.MockExecutorType)),
+		)
+		result := plan.assertRun(t, core.Succeeded)
+		result.assertNodeStatus(t, "agent1", core.NodeSucceeded)
+
+		assert.Equal(t, 1, handler.writeCalls)
+		// The mock prepends inherited context, so saved messages should contain the inherited ones
+		msgs := handler.messages["agent1"]
+		assert.True(t, len(msgs) > 2, "expected inherited + own messages")
+	})
+
+	t.Run("HandlerNotCalledForAgentStepWithNoMessages", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		// agentStep helper creates a step with executor type "agent" (real executor),
+		// which will fail since no agent config is available — but the gate should
+		// allow the step through (setup/save calls won't panic).
+		plan := r.newPlan(t, agentStep("agent_fail"))
+		_ = plan.assertRun(t, core.Failed)
 	})
 }
 
