@@ -52,7 +52,7 @@ func TestDelegateTool_EmptyTaskDescription(t *testing.T) {
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
 			Models: []ModelSlot{{Provider: newStopProvider("ok"), Model: "test", Name: "test"}},
-			Tools:    []*AgentTool{},
+			Tools:  []*AgentTool{},
 		},
 	}, json.RawMessage(`{"tasks": [{"task": ""}]}`))
 
@@ -249,7 +249,7 @@ func TestDelegateTool_ReturnsLastAssistantContent(t *testing.T) {
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
 			Models: []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
-			Tools:    []*AgentTool{},
+			Tools:  []*AgentTool{},
 		},
 	}, singleTaskInput("compute"))
 
@@ -268,7 +268,7 @@ func TestDelegateTool_ReturnsDelegateIDs(t *testing.T) {
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
 			Models: []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
-			Tools:    []*AgentTool{},
+			Tools:  []*AgentTool{},
 		},
 	}, singleTaskInput("something"))
 
@@ -335,7 +335,7 @@ func TestDelegateTool_ExceedsMaxTasks(t *testing.T) {
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
 			Models: []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
-			Tools:    []*AgentTool{},
+			Tools:  []*AgentTool{},
 		},
 	}, input)
 
@@ -369,7 +369,7 @@ func TestDelegateTool_PartialFailure(t *testing.T) {
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
 			Models: []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
-			Tools:    []*AgentTool{},
+			Tools:  []*AgentTool{},
 		},
 	}, json.RawMessage(`{"tasks": [{"task": "task1"}, {"task": "task2"}]}`))
 
@@ -393,7 +393,7 @@ func TestDelegateTool_AllTasksFail(t *testing.T) {
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
 			Models: []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
-			Tools:    []*AgentTool{},
+			Tools:  []*AgentTool{},
 		},
 	}, json.RawMessage(`{"tasks": [{"task": "fail1"}, {"task": "fail2"}]}`))
 
@@ -413,7 +413,7 @@ func TestDelegateTool_WithoutSessionStore(t *testing.T) {
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
 			Models: []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
-			Tools:    []*AgentTool{},
+			Tools:  []*AgentTool{},
 			// No SessionStore
 		},
 	}, singleTaskInput("stateless task"))
@@ -456,7 +456,7 @@ func TestDelegateTool_ChildHasNoDelegateTool(t *testing.T) {
 		WorkingDir: t.TempDir(),
 		Delegate: &DelegateContext{
 			Models: []ModelSlot{{Provider: provider, Model: "test", Name: "test"}},
-			Tools:    parentTools,
+			Tools:  parentTools,
 		},
 	}, singleTaskInput("check tools"))
 
