@@ -43,9 +43,15 @@ type AgentToolPolicy = components['schemas']['AgentToolPolicy'];
 type AgentBashRule = components['schemas']['AgentBashRule'];
 type UpdateAgentConfigRequest = components['schemas']['UpdateAgentConfigRequest'];
 
+type SoulOption = {
+  id: string;
+  name: string;
+};
+
 type SavedAgentConfig = {
   enabled: boolean;
   defaultModelId?: string;
+  selectedSoulId?: string;
   toolPolicy: AgentToolPolicy;
 };
 
@@ -121,6 +127,8 @@ export default function AgentSettingsPage(): ReactNode {
   const [bashRuleIds, setBashRuleIds] = useState<string[]>([]);
   const [models, setModels] = useState<ModelConfig[]>([]);
   const [presets, setPresets] = useState<ModelPreset[]>([]);
+  const [souls, setSouls] = useState<SoulOption[]>([]);
+  const [selectedSoulId, setSelectedSoulId] = useState<string | undefined>();
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -166,10 +174,12 @@ export default function AgentSettingsPage(): ReactNode {
       const normalizedPolicy = normalizeToolPolicy(data.toolPolicy, tools);
       setEnabled(data.enabled ?? false);
       setDefaultModelId(data.defaultModelId);
+      setSelectedSoulId(data.selectedSoulId);
       setToolPolicy(normalizedPolicy);
       setSavedConfig({
         enabled: data.enabled ?? false,
         defaultModelId: data.defaultModelId,
+        selectedSoulId: data.selectedSoulId,
         toolPolicy: normalizedPolicy,
       });
       setBashRuleIds(buildBashRuleIDs(normalizedPolicy.bash?.rules?.length || 0));
@@ -204,14 +214,27 @@ export default function AgentSettingsPage(): ReactNode {
     }
   }, [client, remoteNode]);
 
+  const fetchSouls = useCallback(async () => {
+    try {
+      const { data } = await client.GET('/settings/agent/souls', {
+        params: { query: { remoteNode } },
+      });
+      if (data) {
+        setSouls((data.souls || []).map((s) => ({ id: s.id, name: s.name })));
+      }
+    } catch {
+      // Souls fetch is best-effort
+    }
+  }, [client, remoteNode]);
+
   useEffect(() => {
     async function load() {
       const tools = await fetchTools();
-      await Promise.all([fetchConfig(tools), fetchModels(), fetchPresets()]);
+      await Promise.all([fetchConfig(tools), fetchModels(), fetchPresets(), fetchSouls()]);
       setIsLoading(false);
     }
     load();
-  }, [fetchTools, fetchConfig, fetchModels, fetchPresets]);
+  }, [fetchTools, fetchConfig, fetchModels, fetchPresets, fetchSouls]);
 
   async function handleSaveConfig(): Promise<void> {
     setIsSaving(true);
@@ -228,6 +251,9 @@ export default function AgentSettingsPage(): ReactNode {
       }
       if (!savedConfig || defaultModelId !== savedConfig.defaultModelId) {
         requestBody.defaultModelId = defaultModelId;
+      }
+      if (!savedConfig || selectedSoulId !== savedConfig.selectedSoulId) {
+        requestBody.selectedSoulId = selectedSoulId;
       }
       if (!savedConfig || JSON.stringify(currentPolicyCanonical) !== JSON.stringify(savedPolicyCanonical)) {
         requestBody.toolPolicy = currentPolicyCanonical;
@@ -250,10 +276,12 @@ export default function AgentSettingsPage(): ReactNode {
       const normalizedPolicy = normalizeToolPolicy(data.toolPolicy, toolMetas);
       setEnabled(data.enabled ?? false);
       setDefaultModelId(data.defaultModelId);
+      setSelectedSoulId(data.selectedSoulId);
       setToolPolicy(normalizedPolicy);
       setSavedConfig({
         enabled: data.enabled ?? false,
         defaultModelId: data.defaultModelId,
+        selectedSoulId: data.selectedSoulId,
         toolPolicy: normalizedPolicy,
       });
       setSuccess('Configuration saved successfully');
@@ -501,6 +529,30 @@ export default function AgentSettingsPage(): ReactNode {
             onCheckedChange={setEnabled}
           />
         </div>
+
+        {souls.length > 0 && (
+          <div className="space-y-1">
+            <Label className="text-sm font-medium">Agent Personality</Label>
+            <p className="text-xs text-muted-foreground">
+              Select the soul that defines the agent&apos;s identity and communication style
+            </p>
+            <Select
+              value={selectedSoulId || 'default'}
+              onValueChange={(value) => setSelectedSoulId(value)}
+            >
+              <SelectTrigger className="h-8 text-xs max-w-[300px]">
+                <SelectValue placeholder="Select soul" />
+              </SelectTrigger>
+              <SelectContent>
+                {souls.map((s) => (
+                  <SelectItem key={s.id} value={s.id} className="text-xs">
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       {/* Tool Permissions */}

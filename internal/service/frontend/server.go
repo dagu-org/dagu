@@ -40,6 +40,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
 	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
+	"github.com/dagu-org/dagu/internal/persis/fileagentsoul"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
 	"github.com/dagu-org/dagu/internal/persis/filebaseconfig"
@@ -169,6 +170,15 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		agentSkillStore = skillStore
 	}
 
+	var agentSoulStore agent.SoulStore
+	soulsDir := filepath.Join(cfg.Paths.DAGsDir, "souls")
+	fileagentsoul.SeedExampleSouls(soulsDir)
+	if soulStore, soulErr := fileagentsoul.New(soulsDir); soulErr != nil {
+		logger.Warn(ctx, "Failed to create agent soul store", tag.Error(soulErr))
+	} else {
+		agentSoulStore = soulStore
+	}
+
 	var memoryStore agent.MemoryStore
 	cacheLimits := cfg.Cache.Limits()
 	memoryCache := fileutil.NewCache[string]("agent_memory", cacheLimits.DAG.Limit, cacheLimits.DAG.TTL)
@@ -184,7 +194,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	var agentAPI *agent.API
 	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSkillStore, &cfg.Paths, cfg.Server.Session.MaxPerUser, dr, auditSvc, memoryStore)
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSkillStore, agentSoulStore, &cfg.Paths, cfg.Server.Session.MaxPerUser, dr, auditSvc, memoryStore)
 		if err != nil {
 			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
 		}
@@ -306,6 +316,9 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 	if agentSkillStore != nil {
 		allAPIOptions = append(allAPIOptions, apiv1.WithAgentSkillStore(agentSkillStore))
+	}
+	if agentSoulStore != nil {
+		allAPIOptions = append(allAPIOptions, apiv1.WithAgentSoulStore(agentSoulStore))
 	}
 	if srv.agentAPI != nil {
 		allAPIOptions = append(allAPIOptions, apiv1.WithAgentAPI(srv.agentAPI))
@@ -531,7 +544,7 @@ func autoEnableExampleSkills(ctx context.Context, configStore agent.ConfigStore)
 
 // initAgentAPI creates and returns an agent API.
 // The API uses the config store to check enabled status and resolve providers via the model store.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, paths *config.PathsConfig, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, memoryStore agent.MemoryStore) (*agent.API, error) {
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, soulStore agent.SoulStore, paths *config.PathsConfig, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, memoryStore agent.MemoryStore) (*agent.API, error) {
 	sessStore, err := filesession.New(paths.SessionsDir, filesession.WithMaxPerUser(sessionMaxPerUser))
 	if err != nil {
 		logger.Warn(ctx, "Failed to create session store, persistence disabled", tag.Error(err))
@@ -547,6 +560,7 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 		ConfigStore:  store,
 		ModelStore:   modelStore,
 		SkillStore:   skillStore,
+		SoulStore:    soulStore,
 		WorkingDir:   paths.DAGsDir,
 		Logger:       slog.Default(),
 		SessionStore: sessStore,

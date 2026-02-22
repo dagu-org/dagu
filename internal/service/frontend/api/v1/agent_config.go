@@ -140,6 +140,7 @@ func toAgentConfigResponse(cfg *agent.Config) api.AgentConfigResponse {
 		Enabled:        &cfg.Enabled,
 		DefaultModelId: ptrOf(cfg.DefaultModelID),
 		ToolPolicy:     toAPIToolPolicy(cfg.ToolPolicy),
+		SelectedSoulId: ptrOf(cfg.SelectedSoulID),
 	}
 }
 
@@ -157,6 +158,9 @@ func applyAgentConfigUpdates(cfg *agent.Config, update *api.UpdateAgentConfigReq
 			return err
 		}
 		cfg.ToolPolicy = agent.ResolveToolPolicy(policy)
+	}
+	if update.SelectedSoulId != nil {
+		cfg.SelectedSoulID = *update.SelectedSoulId
 	}
 	return nil
 }

@@ -223,8 +223,8 @@ func (s *serviceImpl) syncFilesToDAGsDir(_ context.Context, pullResult *PullResu
 	for _, file := range files {
 		dagID := s.filePathToDAGID(file)
 
-		// Only allow .md files from memory/ or skills/ directories
-		if filepath.Ext(file) == ".md" && !isMemoryFile(dagID) && !isSkillFile(dagID) {
+		// Only allow .md files from memory/, skills/, or souls/ directories
+		if filepath.Ext(file) == ".md" && !isMemoryFile(dagID) && !isSkillFile(dagID) && !isSoulFile(dagID) {
 			continue
 		}
 		repoFilePath := s.gitClient.GetFilePath(file)
@@ -372,6 +372,9 @@ func (s *serviceImpl) scanLocalDAGs(state *State) error {
 	// Scan skills directory for SKILL.md files
 	s.scanSkillFiles(state)
 
+	// Scan souls directory for .md files
+	s.scanSoulFiles(state)
+
 	return nil
 }
 
@@ -447,6 +450,41 @@ func (s *serviceImpl) scanSkillFiles(state *State) {
 		state.DAGs[dagID] = &DAGState{
 			Status:     StatusUntracked,
 			Kind:       DAGKindSkill,
+			LocalHash:  ComputeContentHash(content),
+			ModifiedAt: &now,
+		}
+	}
+}
+
+// scanSoulFiles scans the souls directory for .md files and adds them as untracked.
+func (s *serviceImpl) scanSoulFiles(state *State) {
+	soulDir := filepath.Join(s.dagsDir, agentSoulsDir)
+
+	entries, err := os.ReadDir(soulDir)
+	if err != nil {
+		return // souls directory may not exist yet
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" {
+			continue
+		}
+
+		soulPath := filepath.Join(soulDir, entry.Name())
+		content, err := os.ReadFile(soulPath) //nolint:gosec // path constructed from internal dagsDir
+		if err != nil {
+			continue
+		}
+
+		dagID := filepath.Join(agentSoulsDir, strings.TrimSuffix(entry.Name(), ".md"))
+		if _, exists := state.DAGs[dagID]; exists {
+			continue
+		}
+
+		now := time.Now()
+		state.DAGs[dagID] = &DAGState{
+			Status:     StatusUntracked,
+			Kind:       DAGKindSoul,
 			LocalHash:  ComputeContentHash(content),
 			ModifiedAt: &now,
 		}

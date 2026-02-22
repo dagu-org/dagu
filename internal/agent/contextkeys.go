@@ -10,6 +10,7 @@ type configStoreKey struct{}
 type modelStoreKey struct{}
 type memoryStoreKey struct{}
 type skillStoreKey struct{}
+type soulStoreKey struct{}
 
 // WithConfigStore injects a ConfigStore into the context.
 func WithConfigStore(ctx context.Context, s ConfigStore) context.Context {
@@ -56,5 +57,17 @@ func WithSkillStore(ctx context.Context, s SkillStore) context.Context {
 // Returns nil if no SkillStore is set.
 func GetSkillStore(ctx context.Context) SkillStore {
 	s, _ := ctx.Value(skillStoreKey{}).(SkillStore)
+	return s
+}
+
+// WithSoulStore injects a SoulStore into the context.
+func WithSoulStore(ctx context.Context, s SoulStore) context.Context {
+	return context.WithValue(ctx, soulStoreKey{}, s)
+}
+
+// GetSoulStore retrieves a SoulStore from the context.
+// Returns nil if no SoulStore is set.
+func GetSoulStore(ctx context.Context) SoulStore {
+	s, _ := ctx.Value(soulStoreKey{}).(SoulStore)
 	return s
 }

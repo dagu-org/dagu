@@ -4629,6 +4629,266 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /settings/agent/souls:
+    get:
+      summary: "List agent souls"
+      description: "Returns all configured agent souls (personalities). Requires admin role."
+      operationId: "listAgentSouls"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - name: q
+          in: query
+          description: "Search query (matches name, description, tags)"
+          required: false
+          schema:
+            type: string
+        - name: tags
+          in: query
+          description: "Comma-separated tag filter (AND semantics)"
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "List of souls"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSoulsResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create agent soul"
+      description: "Creates a new agent soul (personality). Requires admin role."
+      operationId: "createAgentSoul"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSoulRequest"
+      responses:
+        "201":
+          description: "Soul created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoulResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Soul already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/agent/souls/{soulId}:
+    get:
+      summary: "Get agent soul"
+      description: "Returns a single agent soul by ID. Requires admin role."
+      operationId: "getAgentSoul"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: soulId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "Soul ID"
+      responses:
+        "200":
+          description: "Soul details"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoulResponse"
+        "400":
+          description: "Invalid soul ID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Soul not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    patch:
+      summary: "Update agent soul"
+      description: "Updates an existing agent soul. Requires admin role."
+      operationId: "updateAgentSoul"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: soulId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "Soul ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSoulRequest"
+      responses:
+        "200":
+          description: "Soul updated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoulResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Soul not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Delete agent soul"
+      description: "Deletes an agent soul. Requires admin role."
+      operationId: "deleteAgentSoul"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: soulId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "Soul ID"
+      responses:
+        "204":
+          description: "Soul deleted"
+        "400":
+          description: "Invalid soul ID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Soul not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /agent/sessions:
     post:
       summary: "Create agent session"
@@ -7009,6 +7269,7 @@ components:
         - dag
         - memory
         - skill
+        - soul
 
     SyncItem:
       type: object
@@ -7357,6 +7618,9 @@ components:
           description: "ID of the default model"
         toolPolicy:
           $ref: "#/components/schemas/AgentToolPolicy"
+        selectedSoulId:
+          type: string
+          description: "ID of the currently selected soul"
 
     UpdateAgentConfigRequest:
       type: object
@@ -7370,6 +7634,9 @@ components:
           description: "ID of the default model"
         toolPolicy:
           $ref: "#/components/schemas/AgentToolPolicy"
+        selectedSoulId:
+          type: string
+          description: "ID of the soul to select"
 
     AgentToolPolicy:
       type: object
@@ -7676,6 +7943,91 @@ components:
           type: array
           items:
             type: string
+
+    SoulResponse:
+      type: object
+      required:
+        - id
+        - name
+      description: "Soul (agent personality) configuration"
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        version:
+          type: string
+        author:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        content:
+          type: string
+          description: "Markdown body content (identity definition)"
+
+    ListSoulsResponse:
+      type: object
+      required:
+        - souls
+        - pagination
+      description: "List of souls"
+      properties:
+        souls:
+          type: array
+          items:
+            $ref: "#/components/schemas/SoulResponse"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    CreateSoulRequest:
+      type: object
+      required:
+        - name
+        - content
+      description: "Request to create a new soul"
+      properties:
+        id:
+          type: string
+          description: "Optional custom ID (auto-generated from name if omitted)"
+        name:
+          type: string
+        description:
+          type: string
+        version:
+          type: string
+        author:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        content:
+          type: string
+          description: "Markdown body content (identity definition)"
+
+    UpdateSoulRequest:
+      type: object
+      description: "Request to update a soul (partial update)"
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        version:
+          type: string
+        author:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        content:
+          type: string
+          description: "Markdown body content (identity definition)"
 
     ModelPreset:
       type: object

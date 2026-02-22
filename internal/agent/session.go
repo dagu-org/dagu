@@ -51,6 +51,7 @@ type SessionManager struct {
 	delegateTask    string
 	registry        SubSessionRegistry
 	delegates       map[string]DelegateSnapshot // guarded by mu
+	soul            *Soul
 }
 
 // SessionManagerConfig contains configuration for creating a SessionManager.
@@ -79,6 +80,8 @@ type SessionManagerConfig struct {
 	DelegateTask string
 	// Registry manages sub-session lifecycle for delegate tools.
 	Registry SubSessionRegistry
+	// Soul is the active soul for this session (nil means use default prompt).
+	Soul *Soul
 }
 
 // NewSessionManager creates a new SessionManager.
@@ -123,6 +126,7 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		parentSessionID: cfg.ParentSessionID,
 		delegateTask:    cfg.DelegateTask,
 		registry:        cfg.Registry,
+		soul:            cfg.Soul,
 	}
 }
 
@@ -492,7 +496,7 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		}),
 		RecordMessage:    sm.createRecordMessageFunc(),
 		Logger:           sm.logger,
-		SystemPrompt:     GenerateSystemPrompt(sm.environment, nil, memory, sm.user.Role, skillSummaries, skillCount),
+		SystemPrompt:     GenerateSystemPrompt(sm.environment, nil, memory, sm.user.Role, skillSummaries, skillCount, sm.soul),
 		WorkingDir:       sm.workingDir,
 		SessionID:        sm.id,
 		OnWorking:        sm.SetWorking,

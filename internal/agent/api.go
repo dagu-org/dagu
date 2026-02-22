@@ -60,6 +60,7 @@ type API struct {
 	environment EnvironmentInfo
 	hooks       *Hooks
 	memoryStore MemoryStore
+	soulStore   SoulStore
 }
 
 // APIConfig contains configuration for the API.
@@ -67,6 +68,7 @@ type APIConfig struct {
 	ConfigStore  ConfigStore
 	ModelStore   ModelStore
 	SkillStore   SkillStore
+	SoulStore    SoulStore
 	WorkingDir   string
 	Logger       *slog.Logger
 	SessionStore SessionStore
@@ -96,6 +98,7 @@ func NewAPI(cfg APIConfig) *API {
 		configStore: cfg.ConfigStore,
 		modelStore:  cfg.ModelStore,
 		skillStore:  cfg.SkillStore,
+		soulStore:   cfg.SoulStore,
 		providers:   NewProviderCache(),
 		workingDir:  cfg.WorkingDir,
 		logger:      logger,
@@ -251,6 +254,36 @@ func (a *API) loadEnabledSkills(ctx context.Context) []string {
 		return nil
 	}
 	return cfg.EnabledSkills
+}
+
+// loadSelectedSoul returns the selected soul from the agent config.
+// Falls back to "default" soul if the configured soul is not found.
+// Returns nil if no soul store is configured or no soul is available.
+func (a *API) loadSelectedSoul(ctx context.Context) *Soul {
+	if a.soulStore == nil {
+		return nil
+	}
+	cfg, err := a.configStore.Load(ctx)
+	if err != nil || cfg == nil {
+		return nil
+	}
+	soulID := cfg.SelectedSoulID
+	if soulID == "" {
+		soulID = "default"
+	}
+	soul, err := a.soulStore.GetByID(ctx, soulID)
+	if err != nil {
+		// Fall back to "default" if the configured soul was not found.
+		if soulID != "default" {
+			soul, err = a.soulStore.GetByID(ctx, "default")
+			if err != nil {
+				return nil
+			}
+		} else {
+			return nil
+		}
+	}
+	return soul
 }
 
 // createMessageCallback returns a persistence callback for the given session ID.
@@ -443,6 +476,7 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		EnabledSkills: a.loadEnabledSkills(ctx),
 		DAGName:       sess.DAGName,
 		SessionStore:  a.store,
+		Soul:          a.loadSelectedSoul(ctx),
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 	a.sessions.Store(id, mgr)
@@ -602,6 +636,7 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 		EnabledSkills:   a.loadEnabledSkills(ctx),
 		DAGName:         dagName,
 		SessionStore:    a.store,
+		Soul:            a.loadSelectedSoul(ctx),
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 

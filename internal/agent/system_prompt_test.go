@@ -19,7 +19,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			BaseConfigFile: "/config/base.yaml",
 		}
 
-		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleDeveloper, nil, 0)
+		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleDeveloper, nil, 0, nil)
 
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "/dags")
@@ -35,7 +35,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			FilePath: "/dags/test-dag.yaml",
 		}
 
-		result := GenerateSystemPrompt(env, dag, MemoryContent{}, auth.RoleAdmin, nil, 0)
+		result := GenerateSystemPrompt(env, dag, MemoryContent{}, auth.RoleAdmin, nil, 0, nil)
 
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "test-dag")
@@ -45,7 +45,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 	t.Run("works with empty environment", func(t *testing.T) {
 		t.Parallel()
 
-		result := GenerateSystemPrompt(EnvironmentInfo{}, nil, MemoryContent{}, auth.RoleViewer, nil, 0)
+		result := GenerateSystemPrompt(EnvironmentInfo{}, nil, MemoryContent{}, auth.RoleViewer, nil, 0, nil)
 
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "Authenticated role: viewer")
@@ -55,7 +55,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{DAGsDir: "/dags"}
 
-		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleViewer, nil, 0)
+		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleViewer, nil, 0, nil)
 
 		assert.NotContains(t, result, "<global_memory>")
 		assert.NotContains(t, result, "<dag_memory")
@@ -71,7 +71,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			MemoryDir:    "/dags/memory",
 		}
 
-		result := GenerateSystemPrompt(env, nil, mem, auth.RoleViewer, nil, 0)
+		result := GenerateSystemPrompt(env, nil, mem, auth.RoleViewer, nil, 0, nil)
 
 		assert.Contains(t, result, "<global_memory>")
 		assert.Contains(t, result, "User prefers concise output.")
@@ -88,7 +88,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			MemoryDir:    "/dags/memory",
 		}
 
-		result := GenerateSystemPrompt(env, nil, mem, auth.RoleViewer, nil, 0)
+		result := GenerateSystemPrompt(env, nil, mem, auth.RoleViewer, nil, 0, nil)
 
 		assert.Contains(t, result, "<global_memory>")
 		assert.Contains(t, result, "Global info.")
@@ -104,7 +104,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			DAGName:   "test-dag",
 		}
 
-		result := GenerateSystemPrompt(env, nil, mem, auth.RoleViewer, nil, 0)
+		result := GenerateSystemPrompt(env, nil, mem, auth.RoleViewer, nil, 0, nil)
 
 		assert.Contains(t, result, "/dags/memory/MEMORY.md")
 		assert.Contains(t, result, "/dags/memory/dags/test-dag/MEMORY.md")
@@ -118,7 +118,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			DAGName:   "new-etl",
 		}
 
-		result := GenerateSystemPrompt(env, nil, mem, auth.RoleViewer, nil, 0)
+		result := GenerateSystemPrompt(env, nil, mem, auth.RoleViewer, nil, 0, nil)
 
 		assert.Contains(t, result, "If DAG context is available, save memory to Per-DAG by default (not Global)")
 		assert.Contains(t, result, "After creating or updating a DAG, if anything should be remembered, create/update that DAG's memory file")
@@ -132,7 +132,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			MemoryDir: "/dags/memory",
 		}
 
-		result := GenerateSystemPrompt(env, nil, mem, auth.RoleViewer, nil, 0)
+		result := GenerateSystemPrompt(env, nil, mem, auth.RoleViewer, nil, 0, nil)
 
 		assert.Contains(t, result, "If no DAG context is available, ask the user before writing to Global memory")
 	})
@@ -145,7 +145,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			{ID: "docker-deploy", Name: "Docker Deployment", Description: "Container best practices"},
 		}
 
-		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleViewer, skills, 2)
+		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleViewer, skills, 2, nil)
 
 		assert.Contains(t, result, "<available_skills>")
 		assert.Contains(t, result, "sql-optimizer")
@@ -158,7 +158,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{DAGsDir: "/dags"}
 
-		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleViewer, nil, 100)
+		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleViewer, nil, 100, nil)
 
 		assert.Contains(t, result, "<available_skills>")
 		assert.Contains(t, result, "You have access to 100 skills")
@@ -170,7 +170,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{DAGsDir: "/dags"}
 
-		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleViewer, nil, 0)
+		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleViewer, nil, 0, nil)
 
 		assert.NotContains(t, result, "<available_skills>")
 		assert.NotContains(t, result, "<skill_delegation>")
@@ -181,7 +181,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		env := EnvironmentInfo{DAGsDir: "/dags"}
 		skills := []SkillSummary{{ID: "test", Name: "Test Skill"}}
 
-		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleViewer, skills, 1)
+		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleViewer, skills, 1, nil)
 
 		assert.Contains(t, result, "<skill_delegation>")
 		assert.Contains(t, result, "delegate")
@@ -192,7 +192,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{DAGsDir: "/dags"}
 
-		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleViewer, nil, 50)
+		result := GenerateSystemPrompt(env, nil, MemoryContent{}, auth.RoleViewer, nil, 50, nil)
 
 		assert.Contains(t, result, "<skill_delegation>")
 	})
@@ -207,7 +207,7 @@ func TestFallbackPrompt(t *testing.T) {
 		result := fallbackPrompt(EnvironmentInfo{DAGsDir: "/my/dags"})
 
 		assert.Contains(t, result, "/my/dags")
-		assert.Contains(t, result, "Tsumugi")
+		assert.Contains(t, result, "Dagu Assistant")
 	})
 
 	t.Run("works with empty environment", func(t *testing.T) {
@@ -216,6 +216,6 @@ func TestFallbackPrompt(t *testing.T) {
 		result := fallbackPrompt(EnvironmentInfo{})
 
 		assert.NotEmpty(t, result)
-		assert.Contains(t, result, "Tsumugi")
+		assert.Contains(t, result, "Dagu Assistant")
 	})
 }

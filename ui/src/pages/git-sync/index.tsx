@@ -50,8 +50,8 @@ type SyncConfigResponse = components['schemas']['SyncConfigResponse'];
 type SyncItemDiffResponse = components['schemas']['SyncItemDiffResponse'];
 type SyncItem = components['schemas']['SyncItem'];
 type StatusFilter = 'all' | 'modified' | 'untracked' | 'conflict';
-type TypeFilter = 'all' | 'dag' | 'memory' | 'skill';
-type UISyncKind = 'dag' | 'memory' | 'skill';
+type TypeFilter = 'all' | 'dag' | 'memory' | 'skill' | 'soul';
+type UISyncKind = 'dag' | 'memory' | 'skill' | 'soul';
 type SyncRow = { itemId: string; item: SyncItem; kind: UISyncKind };
 
 const statusFilters: StatusFilter[] = [
@@ -60,7 +60,7 @@ const statusFilters: StatusFilter[] = [
   'untracked',
   'conflict',
 ];
-const typeFilters: TypeFilter[] = ['all', 'dag', 'memory', 'skill'];
+const typeFilters: TypeFilter[] = ['all', 'dag', 'memory', 'skill', 'soul'];
 
 function parseStatusFilter(value: string | null): StatusFilter {
   if (
@@ -75,7 +75,7 @@ function parseStatusFilter(value: string | null): StatusFilter {
 }
 
 function parseTypeFilter(value: string | null): TypeFilter {
-  if (value === 'all' || value === 'dag' || value === 'memory' || value === 'skill') {
+  if (value === 'all' || value === 'dag' || value === 'memory' || value === 'skill' || value === 'soul') {
     return value;
   }
   return 'all';
@@ -84,6 +84,7 @@ function parseTypeFilter(value: string | null): TypeFilter {
 function normalizeSyncItemKind(kind: SyncItemKind): UISyncKind {
   if (kind === SyncItemKind.memory) return 'memory';
   if (kind === SyncItemKind.skill) return 'skill';
+  if (kind === SyncItemKind.soul) return 'soul';
   return 'dag';
 }
 
@@ -439,6 +440,7 @@ export default function GitSyncPage() {
       dag: 0,
       memory: 0,
       skill: 0,
+      soul: 0,
     };
     for (const { kind } of syncRows) {
       counts[kind] += 1;
@@ -476,14 +478,16 @@ export default function GitSyncPage() {
     let dag = 0;
     let memory = 0;
     let skill = 0;
+    let soul = 0;
     for (const dagID of selectedDags) {
       const row = rowByID.get(dagID);
       if (!row) continue;
       if (row.kind === 'memory') memory += 1;
       else if (row.kind === 'skill') skill += 1;
+      else if (row.kind === 'soul') soul += 1;
       else dag += 1;
     }
-    return { dag, memory, skill, total: dag + memory + skill };
+    return { dag, memory, skill, soul, total: dag + memory + skill + soul };
   }, [selectedDags, rowByID]);
 
   const emptyStateMessage = useMemo(() => {
@@ -493,7 +497,7 @@ export default function GitSyncPage() {
     if (typeFilter === 'all') {
       return `No ${statusFilter} items`;
     }
-    const typeLabel = typeFilter === 'dag' ? 'DAG' : typeFilter === 'skill' ? 'skill' : 'memory';
+    const typeLabel = typeFilter === 'dag' ? 'DAG' : typeFilter === 'skill' ? 'skill' : typeFilter === 'soul' ? 'soul' : 'memory';
     if (statusFilter === 'all') {
       return `No ${typeLabel} items`;
     }
@@ -604,13 +608,13 @@ export default function GitSyncPage() {
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              {f === 'all' ? 'All' : f === 'dag' ? 'DAGs' : f === 'memory' ? 'Memory' : 'Skills'} ({typeCounts[f]})
+              {f === 'all' ? 'All' : f === 'dag' ? 'DAGs' : f === 'memory' ? 'Memory' : f === 'skill' ? 'Skills' : 'Souls'} ({typeCounts[f]})
             </button>
           ))}
         </div>
         {selectedCounts.total > 0 && (
           <span className="text-xs text-muted-foreground">
-            Selected: {selectedCounts.dag} DAGs{selectedCounts.memory > 0 ? `, ${selectedCounts.memory} memory` : ''}{selectedCounts.skill > 0 ? `, ${selectedCounts.skill} skills` : ''}
+            Selected: {selectedCounts.dag} DAGs{selectedCounts.memory > 0 ? `, ${selectedCounts.memory} memory` : ''}{selectedCounts.skill > 0 ? `, ${selectedCounts.skill} skills` : ''}{selectedCounts.soul > 0 ? `, ${selectedCounts.soul} souls` : ''}
           </span>
         )}
       </div>
@@ -716,6 +720,11 @@ export default function GitSyncPage() {
                       {kind === 'skill' && (
                         <span className="text-[10px] px-1 py-0 rounded bg-pink-500/10 text-pink-600 dark:text-pink-400">
                           skill
+                        </span>
+                      )}
+                      {kind === 'soul' && (
+                        <span className="text-[10px] px-1 py-0 rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                          soul
                         </span>
                       )}
                     </div>

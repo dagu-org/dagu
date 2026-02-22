@@ -1,5 +1,5 @@
 // Package agentstep provides an executor for agent-type workflow steps.
-// It wraps the agent.Loop to run the Tsumugi AI agent as a single-shot
+// It wraps the agent.Loop to run the AI agent as a single-shot
 // step within a DAG workflow.
 package agentstep
 
@@ -295,7 +295,7 @@ func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memor
 		}
 	}
 
-	prompt := agent.GenerateSystemPrompt(env, currentDAG, memory, "", availableSkills, skillCount)
+	prompt := agent.GenerateSystemPrompt(env, currentDAG, memory, "", availableSkills, skillCount, nil)
 
 	// Append instruction about the output tool.
 	prompt += "\n\n## Output\n\nWhen you have completed your task, use the `output` tool to write your final result. " +

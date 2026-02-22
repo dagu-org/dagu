@@ -45,12 +45,17 @@ type systemPromptData struct {
 	User            *UserCapabilities
 	AvailableSkills []SkillSummary
 	SkillCount      int
+	SoulContent     string
 }
 
 // GenerateSystemPrompt renders the system prompt template with the given environment,
-// optional DAG context, memory content, user role capabilities, available skills, and total skill count.
-func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG, memory MemoryContent, role auth.Role, availableSkills []SkillSummary, skillCount int) string {
+// optional DAG context, memory content, user role capabilities, available skills, total skill count, and optional soul.
+func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG, memory MemoryContent, role auth.Role, availableSkills []SkillSummary, skillCount int, soul *Soul) string {
 	var buf bytes.Buffer
+	var soulContent string
+	if soul != nil {
+		soulContent = soul.Content
+	}
 	data := systemPromptData{
 		EnvironmentInfo: env,
 		CurrentDAG:      currentDAG,
@@ -58,6 +63,7 @@ func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG, memory Me
 		User:            buildUserCapabilities(role),
 		AvailableSkills: availableSkills,
 		SkillCount:      skillCount,
+		SoulContent:     soulContent,
 	}
 	if err := systemPromptTemplate.Execute(&buf, data); err != nil {
 		return fallbackPrompt(env)
@@ -80,5 +86,5 @@ func buildUserCapabilities(role auth.Role) *UserCapabilities {
 
 // fallbackPrompt returns a basic prompt when template execution fails.
 func fallbackPrompt(env EnvironmentInfo) string {
-	return "You are Tsumugi, an AI assistant for DAG workflows. DAGs Directory: " + env.DAGsDir
+	return "You are Dagu Assistant, an AI assistant for DAG workflows. DAGs Directory: " + env.DAGsDir
 }
