@@ -635,26 +635,24 @@ func redactTokenFromRequest(r *http.Request) *http.Request {
 
 // Serve starts the HTTP server and configures routes.
 func (srv *Server) Serve(ctx context.Context) error {
-	logLevel := slog.LevelInfo
-	if srv.config.Core.Debug {
-		logLevel = slog.LevelDebug
-	}
-
-	requestLogger := httplog.NewLogger("http", httplog.Options{
-		LogLevel:         logLevel,
-		JSON:             srv.config.Core.LogFormat == "json",
-		Concise:          true,
-		RequestHeaders:   srv.config.Core.Debug,
-		MessageFieldName: "msg",
-		ResponseHeaders:  false,
-		QuietDownRoutes:  []string{"/api/v1/events"},
-		QuietDownPeriod:  10 * time.Second,
-	})
-
 	r := chi.NewMux()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Compress(5))
 	if srv.config.Server.AccessLog {
+		logLevel := slog.LevelInfo
+		if srv.config.Core.Debug {
+			logLevel = slog.LevelDebug
+		}
+		requestLogger := httplog.NewLogger("http", httplog.Options{
+			LogLevel:         logLevel,
+			JSON:             srv.config.Core.LogFormat == "json",
+			Concise:          true,
+			RequestHeaders:   srv.config.Core.Debug,
+			MessageFieldName: "msg",
+			ResponseHeaders:  false,
+			QuietDownRoutes:  []string{"/api/v1/events"},
+			QuietDownPeriod:  10 * time.Second,
+		})
 		r.Use(sanitizedRequestLogger(requestLogger))
 	}
 	r.Use(middleware.Recoverer)
