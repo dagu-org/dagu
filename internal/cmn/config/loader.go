@@ -396,7 +396,7 @@ func (l *ConfigLoader) loadServerFlags(cfg *Config, def Definition) {
 			cfg.Server.AccessLog = AccessLogMode(*def.AccessLog)
 		default:
 			l.warnings = append(l.warnings, fmt.Sprintf(
-				"Invalid access_log value: %q, defaulting to 'all'", *def.AccessLog))
+				"Invalid access_log_mode value: %q, defaulting to 'all'", *def.AccessLog))
 		}
 	}
 	if def.LatestStatusToday != nil {
@@ -1124,7 +1124,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("metrics", "private")
 	l.v.SetDefault("cache", "normal")
 	l.v.SetDefault("log_format", "text")
-	l.v.SetDefault("access_log", "all")
+	l.v.SetDefault("access_log_mode", "all")
 
 	// Coordinator
 	l.v.SetDefault("coordinator.host", "127.0.0.1")
@@ -1178,7 +1178,7 @@ type envBinding struct {
 var envBindings = []envBinding{
 	// Server
 	{key: "log_format", env: "LOG_FORMAT"},
-	{key: "access_log", env: "ACCESS_LOG"},
+	{key: "access_log_mode", env: "ACCESS_LOG_MODE"},
 	{key: "base_path", env: "BASE_PATH"},
 	{key: "api_base_url", env: "API_BASE_URL"},
 	{key: "tz", env: "TZ"},

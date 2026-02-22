@@ -37,7 +37,7 @@
       "type": "boolean",
       "description": "Enable debug mode with verbose logging."
     },
-    "access_log": {
+    "access_log_mode": {
       "type": "string",
       "enum": ["all", "non-public", "none"],
       "description": "HTTP access log mode. 'all' logs every request, 'non-public' skips public endpoints (/health, /auth/login, /auth/setup), 'none' disables access logging entirely. Default: 'all'.",

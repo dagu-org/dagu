@@ -13,11 +13,11 @@ type Definition struct {
 	TLS         *TLSDef `mapstructure:"tls"`
 
 	// Core settings
-	Debug        bool   `mapstructure:"debug"`
-	DefaultShell string `mapstructure:"default_shell"`
-	LogFormat    string `mapstructure:"log_format"`  // "json" or "text"
-	AccessLog    *string `mapstructure:"access_log"` // "all" (default), "non-public", or "none"
-	TZ           string `mapstructure:"tz"`
+	Debug        bool    `mapstructure:"debug"`
+	DefaultShell string  `mapstructure:"default_shell"`
+	LogFormat    string  `mapstructure:"log_format"`      // "json" or "text"
+	AccessLog    *string `mapstructure:"access_log_mode"` // "all" (default), "non-public", or "none"
+	TZ           string  `mapstructure:"tz"`
 
 	// Authentication
 	Auth *AuthDef `mapstructure:"auth"`
