@@ -37,6 +37,11 @@
       "type": "boolean",
       "description": "Enable debug mode with verbose logging."
     },
+    "access_log": {
+      "type": "boolean",
+      "description": "Enable HTTP access logging. Default: true.",
+      "default": true
+    },
     "default_shell": {
       "type": "string",
       "description": "Default shell for executing commands (e.g., '/bin/bash')."

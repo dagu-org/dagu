@@ -654,7 +654,9 @@ func (srv *Server) Serve(ctx context.Context) error {
 	r := chi.NewMux()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Compress(5))
-	r.Use(sanitizedRequestLogger(requestLogger))
+	if srv.config.Server.AccessLog {
+		r.Use(sanitizedRequestLogger(requestLogger))
+	}
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},

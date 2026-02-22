@@ -93,6 +93,7 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_UI_DAGS_SORT_ORDER": "desc",
 
 		"DAGU_TERMINAL_ENABLED": "true",
+		"DAGU_ACCESS_LOG":       "false",
 
 		"DAGU_AUDIT_ENABLED": "false",
 
@@ -138,6 +139,7 @@ func TestLoad_Env(t *testing.T) {
 			BasePath:    "/test/base",
 			APIBasePath: "/test/api",
 			Headless:    true,
+			AccessLog:   false,
 			Auth: Auth{
 				Mode:  AuthModeBasic, // Explicit basic mode from env
 				Basic: AuthBasic{Username: "testuser", Password: "testpass"},
@@ -375,6 +377,7 @@ scheduler:
 			BasePath:          "/dagu",
 			APIBasePath:       "/api/v1",
 			Headless:          true,
+			AccessLog:         true,
 			LatestStatusToday: true,
 			Auth: Auth{
 				Mode:  AuthModeBasic, // Explicit basic mode from YAML

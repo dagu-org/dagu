@@ -120,6 +120,7 @@ type Server struct {
 	BasePath          string // URL path for reverse proxy subpath hosting
 	APIBasePath       string
 	Headless          bool
+	AccessLog         bool // Default: true; false disables HTTP access logging
 	LatestStatusToday bool
 	TLS               *TLSConfig
 	Auth              Auth

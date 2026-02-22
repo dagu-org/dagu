@@ -389,6 +389,11 @@ func (l *ConfigLoader) loadServerFlags(cfg *Config, def Definition) {
 	if def.Headless != nil {
 		cfg.Server.Headless = *def.Headless
 	}
+	if def.AccessLog != nil {
+		cfg.Server.AccessLog = *def.AccessLog
+	} else {
+		cfg.Server.AccessLog = true
+	}
 	if def.LatestStatusToday != nil {
 		cfg.Server.LatestStatusToday = *def.LatestStatusToday
 	}
@@ -1114,6 +1119,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("metrics", "private")
 	l.v.SetDefault("cache", "normal")
 	l.v.SetDefault("log_format", "text")
+	l.v.SetDefault("access_log", true)
 
 	// Coordinator
 	l.v.SetDefault("coordinator.host", "127.0.0.1")
@@ -1167,6 +1173,7 @@ type envBinding struct {
 var envBindings = []envBinding{
 	// Server
 	{key: "log_format", env: "LOG_FORMAT"},
+	{key: "access_log", env: "ACCESS_LOG"},
 	{key: "base_path", env: "BASE_PATH"},
 	{key: "api_base_url", env: "API_BASE_URL"},
 	{key: "tz", env: "TZ"},

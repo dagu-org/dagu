@@ -15,7 +15,8 @@ type Definition struct {
 	// Core settings
 	Debug        bool   `mapstructure:"debug"`
 	DefaultShell string `mapstructure:"default_shell"`
-	LogFormat    string `mapstructure:"log_format"` // "json" or "text"
+	LogFormat    string `mapstructure:"log_format"`  // "json" or "text"
+	AccessLog    *bool  `mapstructure:"access_log"` // Default: true; false disables HTTP access logging
 	TZ           string `mapstructure:"tz"`
 
 	// Authentication
