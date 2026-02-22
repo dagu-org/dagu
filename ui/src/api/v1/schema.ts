@@ -3510,6 +3510,8 @@ export interface components {
             dagContexts?: components["schemas"]["AgentDAGContext"][];
             /** @description Enable approval prompts for dangerous commands */
             safeMode?: boolean;
+            /** @description Soul ID to use for this session (overrides default) */
+            soulId?: string;
         };
         /** @description Response after creating a new agent session */
         CreateAgentSessionResponse: {

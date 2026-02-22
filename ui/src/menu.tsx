@@ -22,6 +22,7 @@ import {
   Bot,
   Brain,
   FileCog,
+  Ghost,
   Sparkles,
   GitBranch,
   Globe,
@@ -477,6 +478,16 @@ export const mainListItems = React.forwardRef<
                   to="/agent-skills"
                   text="Agent Skills"
                   icon={<Sparkles size={18} />}
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+              )}
+              {config.agentEnabled && (
+                <NavItem
+                  to="/agent-souls"
+                  text="Agent Souls"
+                  icon={<Ghost size={18} />}
                   isOpen={isOpen}
                   onClick={onNavItemClick}
                   customColor={customColor}

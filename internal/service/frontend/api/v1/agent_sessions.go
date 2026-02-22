@@ -226,6 +226,9 @@ func toAgentChatRequest(req *api.AgentChatRequest) agent.ChatRequest {
 	if req.SafeMode != nil {
 		out.SafeMode = *req.SafeMode
 	}
+	if req.SoulId != nil {
+		out.SoulID = *req.SoulId
+	}
 	if req.DagContexts != nil {
 		for _, dc := range *req.DagContexts {
 			ctx := agent.DAGContext{DAGFile: dc.DagFile}

@@ -198,7 +198,7 @@ export function useAgentChat() {
   }, [fetchSessionsPage, sessionPage, hasMoreSessions]);
 
   const startSession = useCallback(
-    async (message: string, model?: string, dagContexts?: DAGContext[]): Promise<string> => {
+    async (message: string, model?: string, dagContexts?: DAGContext[], soulId?: string): Promise<string> => {
       const { data, error: apiError } = await client.POST('/agent/sessions', {
         params: { query: { remoteNode } },
         body: {
@@ -206,6 +206,7 @@ export function useAgentChat() {
           model,
           dagContexts: toDagContextsBody(dagContexts),
           safeMode: preferences.safeMode,
+          soulId: soulId || undefined,
         },
       });
       if (apiError) throw new Error(apiError.message || 'Failed to create session');
@@ -217,14 +218,14 @@ export function useAgentChat() {
   );
 
   const sendMessage = useCallback(
-    async (message: string, model?: string, dagContexts?: DAGContext[]): Promise<void> => {
+    async (message: string, model?: string, dagContexts?: DAGContext[], soulId?: string): Promise<void> => {
       setIsSending(true);
       setError(null);
       setPendingUserMessage(message);
 
       try {
         if (!sessionId) {
-          await startSession(message, model, dagContexts);
+          await startSession(message, model, dagContexts, soulId);
           return;
         }
         const { error: apiError } = await client.POST('/agent/sessions/{sessionId}/chat', {

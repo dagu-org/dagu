@@ -8173,6 +8173,9 @@ components:
         safeMode:
           type: boolean
           description: "Enable approval prompts for dangerous commands"
+        soulId:
+          type: string
+          description: "Soul ID to use for this session (overrides default)"
 
     CreateAgentSessionResponse:
       type: object

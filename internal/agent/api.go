@@ -256,6 +256,20 @@ func (a *API) loadEnabledSkills(ctx context.Context) []string {
 	return cfg.EnabledSkills
 }
 
+// loadSoulWithOverride loads a soul by explicit ID override, falling back to the
+// global default from config. Use this for session creation where the client may
+// specify a soul.
+func (a *API) loadSoulWithOverride(ctx context.Context, overrideID string) *Soul {
+	if overrideID != "" && a.soulStore != nil {
+		soul, err := a.soulStore.GetByID(ctx, overrideID)
+		if err == nil {
+			return soul
+		}
+		a.logger.Debug("override soul not found, falling back to default", "soulId", overrideID, "error", err)
+	}
+	return a.loadSelectedSoul(ctx)
+}
+
 // loadSelectedSoul returns the selected soul from the agent config.
 // Falls back to "default" soul if the configured soul is not found.
 // Returns nil if no soul store is configured or no soul is available.
@@ -642,7 +656,7 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 		EnabledSkills:   a.loadEnabledSkills(ctx),
 		DAGName:         dagName,
 		SessionStore:    a.store,
-		Soul:            a.loadSelectedSoul(ctx),
+		Soul:            a.loadSoulWithOverride(ctx, req.SoulID),
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 

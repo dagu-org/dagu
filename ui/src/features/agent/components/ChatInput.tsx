@@ -21,8 +21,13 @@ interface ModelOption {
   name: string;
 }
 
+interface SoulOption {
+  id: string;
+  name: string;
+}
+
 interface ChatInputProps {
-  onSend: (message: string, dagContexts?: DAGContext[], model?: string) => void;
+  onSend: (message: string, dagContexts?: DAGContext[], model?: string, soulId?: string) => void;
   onCancel?: () => void;
   isWorking: boolean;
   disabled?: boolean;
@@ -45,6 +50,8 @@ export function ChatInput({
   const [selectedDags, setSelectedDags] = useState<DAGContext[]>([]);
   const [models, setModels] = useState<ModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
+  const [souls, setSouls] = useState<SoulOption[]>([]);
+  const [selectedSoul, setSelectedSoul] = useState<string>('');
   const currentPageDag = useDagPageContext();
   // Track IME composition state manually for reliable Japanese/Chinese input handling
   const isComposingRef = useRef(false);
@@ -86,6 +93,32 @@ export function ChatInput({
       }
     }
     fetchModels();
+
+    return () => controller.abort();
+  }, [client, appBarContext.selectedRemoteNode]);
+
+  // Fetch available souls
+  useEffect(() => {
+    const controller = new AbortController();
+    const remoteNode = appBarContext.selectedRemoteNode || 'local';
+
+    async function fetchSouls() {
+      try {
+        const { data } = await client.GET('/settings/agent/souls', {
+          params: { query: { remoteNode } },
+          signal: controller.signal,
+        });
+        if (!data) return;
+        const soulList: SoulOption[] = (data.souls || []).map((s) => ({
+          id: s.id,
+          name: s.name,
+        }));
+        setSouls(soulList);
+      } catch {
+        // Souls fetch is best-effort
+      }
+    }
+    fetchSouls();
 
     return () => controller.abort();
   }, [client, appBarContext.selectedRemoteNode]);
@@ -142,14 +175,16 @@ export function ChatInput({
       finalMessage = `${prefix}\n${trimmed}`;
     }
 
+    const soulValue = selectedSoul && selectedSoul !== '__default__' ? selectedSoul : undefined;
     onSend(
       finalMessage,
       allContexts.length > 0 ? allContexts : undefined,
-      selectedModel || undefined
+      selectedModel || undefined,
+      soulValue
     );
     setMessage('');
     setSelectedSkills([]);
-  }, [message, isPending, disabled, onSend, selectedDags, currentPageDag, selectedModel, selectedSkills]);
+  }, [message, isPending, disabled, onSend, selectedDags, currentPageDag, selectedModel, selectedSkills, selectedSoul]);
 
   const handleChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -265,21 +300,38 @@ export function ChatInput({
         disabled={disabled || showPauseButton}
       />
 
-      {/* Model selector row */}
-      {models.length > 0 && (
-        <div className="mb-1.5">
-          <Select value={selectedModel} onValueChange={setSelectedModel}>
-            <SelectTrigger className="h-7 text-xs w-auto min-w-[140px] max-w-[200px]">
-              <SelectValue placeholder="Select model" />
-            </SelectTrigger>
-            <SelectContent>
-              {models.map((m) => (
-                <SelectItem key={m.id} value={m.id} className="text-xs">
-                  {m.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* Model & soul selector row */}
+      {(models.length > 0 || souls.length > 0) && (
+        <div className="mb-1.5 flex items-center gap-2">
+          {models.length > 0 && (
+            <Select value={selectedModel} onValueChange={setSelectedModel}>
+              <SelectTrigger className="h-7 text-xs w-auto min-w-[140px] max-w-[200px]">
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent>
+                {models.map((m) => (
+                  <SelectItem key={m.id} value={m.id} className="text-xs">
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {souls.length > 0 && (
+            <Select value={selectedSoul} onValueChange={setSelectedSoul}>
+              <SelectTrigger className="h-7 text-xs w-auto min-w-[140px] max-w-[200px]">
+                <SelectValue placeholder="Default soul" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__default__" className="text-xs">Default soul</SelectItem>
+                {souls.map((s) => (
+                  <SelectItem key={s.id} value={s.id} className="text-xs">
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       )}
 
