@@ -405,6 +405,8 @@ func syncItemFilePath(itemID string, kind gitsync.DAGKind) string {
 	switch kind {
 	case gitsync.DAGKindMemory, gitsync.DAGKindSkill, gitsync.DAGKindSoul:
 		ext = ".md"
+	case gitsync.DAGKindDAG:
+		// default .yaml extension
 	}
 	return itemID + ext
 }
