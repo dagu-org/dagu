@@ -131,55 +131,42 @@ func (s *Store) rebuildIndex(ctx context.Context) error {
 // parseSoulFile parses a soul .md file into an agent.Soul.
 // The file format is YAML frontmatter between --- delimiters, followed by markdown body.
 func parseSoulFile(data []byte, id string) (*agent.Soul, error) {
-	content := string(data)
+	// Normalize CRLF to LF upfront.
+	content := strings.ReplaceAll(string(data), "\r\n", "\n")
 
 	if !strings.HasPrefix(content, "---\n") {
-		return nil, fmt.Errorf("missing frontmatter delimiter")
+		return nil, fmt.Errorf("missing opening frontmatter delimiter")
 	}
 
-	// Find the closing --- by iterating lines to match exactly "---"
 	rest := content[4:] // skip opening "---\n"
 
-	closingIdx := -1
-	offset := 0
-	for offset < len(rest) {
-		nlPos := strings.Index(rest[offset:], "\n")
-		var line string
-		if nlPos == -1 {
-			line = rest[offset:]
+	// Find closing delimiter as a whole line.
+	closingIdx := strings.Index(rest, "\n---\n")
+	if closingIdx == -1 {
+		// Check for closing "---" at EOF without trailing newline.
+		if strings.HasSuffix(rest, "\n---") {
+			closingIdx = len(rest) - 3
 		} else {
-			line = rest[offset : offset+nlPos]
+			return nil, fmt.Errorf("missing closing frontmatter delimiter")
 		}
-		if strings.TrimRight(line, "\r") == "---" {
-			closingIdx = offset
-			break
-		}
-		if nlPos == -1 {
-			break
-		}
-		offset += nlPos + 1
 	}
 
-	var frontmatterStr, body string
-	if closingIdx == -1 {
-		// No closing delimiter found: treat entire rest as frontmatter, no body
-		frontmatterStr = rest
-		body = ""
-	} else {
-		frontmatterStr = rest[:closingIdx]
-		// Skip past the "---\n" or "---\r\n" or "---" at EOF
-		afterDelim := closingIdx
-		nlPos := strings.Index(rest[afterDelim:], "\n")
-		if nlPos == -1 {
-			body = ""
-		} else {
-			body = rest[afterDelim+nlPos+1:]
-		}
+	frontmatterStr := rest[:closingIdx]
+
+	// Extract body: skip past the "\n---\n" delimiter.
+	afterDelim := closingIdx + 5 // len("\n---\n")
+	var body string
+	if afterDelim <= len(rest) {
+		body = rest[afterDelim:]
 	}
 
 	var fm soulFrontmatter
 	if err := yaml.Unmarshal([]byte(frontmatterStr), &fm); err != nil {
 		return nil, fmt.Errorf("failed to parse frontmatter: %w", err)
+	}
+
+	if fm.Name == "" {
+		return nil, fmt.Errorf("frontmatter field 'name' is required")
 	}
 
 	return &agent.Soul{
@@ -301,9 +288,9 @@ func (s *Store) GetByID(_ context.Context, id string) (*agent.Soul, error) {
 	}
 
 	s.mu.RLock()
-	_, exists := s.byID[id]
-	s.mu.RUnlock()
+	defer s.mu.RUnlock()
 
+	_, exists := s.byID[id]
 	if !exists {
 		return nil, agent.ErrSoulNotFound
 	}
@@ -328,11 +315,12 @@ func (s *Store) GetByID(_ context.Context, id string) (*agent.Soul, error) {
 // This reads full soul files from disk (including Content).
 func (s *Store) List(_ context.Context) ([]*agent.Soul, error) {
 	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	ids := make([]string, 0, len(s.byID))
 	for id := range s.byID {
 		ids = append(ids, id)
 	}
-	s.mu.RUnlock()
 
 	souls := make([]*agent.Soul, 0, len(ids))
 	for _, id := range ids {

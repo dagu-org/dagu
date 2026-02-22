@@ -113,7 +113,11 @@ func (a *API) CreateAgentSoul(ctx context.Context, request api.CreateAgentSoulRe
 	// Generate or validate ID.
 	id := valueOf(body.Id)
 	if id == "" {
-		existingIDs := a.collectSoulIDs(ctx)
+		existingIDs, err := a.collectSoulIDs(ctx)
+		if err != nil {
+			logger.Error(ctx, "Failed to collect soul IDs", tag.Error(err))
+			return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to generate soul ID", HTTPStatus: http.StatusInternalServerError}
+		}
 		id = agent.UniqueID(name, existingIDs, "soul")
 	}
 	if err := agent.ValidateSoulID(id); err != nil {
@@ -278,16 +282,16 @@ func applySoulUpdates(soul *agent.Soul, update *api.UpdateSoulRequest) {
 	}
 }
 
-func (a *API) collectSoulIDs(ctx context.Context) map[string]struct{} {
+func (a *API) collectSoulIDs(ctx context.Context) (map[string]struct{}, error) {
 	result, err := a.agentSoulStore.Search(ctx, agent.SearchSoulsOptions{
 		Paginator: exec.NewPaginator(1, math.MaxInt),
 	})
 	if err != nil {
-		return make(map[string]struct{})
+		return nil, fmt.Errorf("failed to collect soul IDs: %w", err)
 	}
 	ids := make(map[string]struct{}, len(result.Items))
 	for _, s := range result.Items {
 		ids[s.ID] = struct{}{}
 	}
-	return ids
+	return ids, nil
 }

@@ -36,6 +36,8 @@ export default function SoulEditorPage() {
   const [content, setContent] = useState('');
   const [isLoading, setIsLoading] = useState(!isCreating);
   const [isSaving, setIsSaving] = useState(false);
+  const [nameTouched, setNameTouched] = useState(false);
+  const [contentTouched, setContentTouched] = useState(false);
 
   const saveHandlerRef = useRef<(() => Promise<void>) | undefined>(undefined);
 
@@ -71,6 +73,8 @@ export default function SoulEditorPage() {
   }, [soulId, isCreating, client, remoteNode, showError, navigate]);
 
   const handleSave = useCallback(async () => {
+    setNameTouched(true);
+    setContentTouched(true);
     if (!name || !content) return;
     setIsSaving(true);
 
@@ -178,10 +182,14 @@ export default function SoulEditorPage() {
                   setIdField(generateSlugId(v));
                 }
               }}
+              onBlur={() => setNameTouched(true)}
               placeholder="My Soul"
               className="h-7 text-sm"
               required
             />
+            {nameTouched && !name && (
+              <p className="text-destructive text-xs">Name is required</p>
+            )}
           </div>
           <div className="space-y-1">
             <Label htmlFor="soul-description" className="text-xs">Description</Label>
@@ -220,6 +228,11 @@ export default function SoulEditorPage() {
           onChange={(v) => setContent(v ?? '')}
         />
       </div>
+      {contentTouched && !content && (
+        <div className="px-4 py-1 border-t">
+          <p className="text-destructive text-xs">Content is required</p>
+        </div>
+      )}
     </div>
   );
 }

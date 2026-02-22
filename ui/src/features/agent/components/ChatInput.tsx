@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useContext, KeyboardEvent, ChangeEvent } from 'react';
+import { useState, useCallback, useEffect, useRef, KeyboardEvent, ChangeEvent } from 'react';
 import { Send, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,22 +9,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { AppBarContext } from '@/contexts/AppBarContext';
-import { useClient } from '@/hooks/api';
 import { DAGContext } from '../types';
 import { DAGPicker } from './DAGPicker';
 import { SkillPicker, type SkillRef, type SkillPickerHandle } from './SkillPicker';
 import { useDagPageContext } from '../hooks/useDagPageContext';
-
-interface ModelOption {
-  id: string;
-  name: string;
-}
-
-interface SoulOption {
-  id: string;
-  name: string;
-}
+import { useAvailableModels } from '../hooks/useAvailableModels';
+import { useAvailableSouls } from '../hooks/useAvailableSouls';
 
 interface ChatInputProps {
   onSend: (message: string, dagContexts?: DAGContext[], model?: string, soulId?: string) => void;
@@ -45,15 +35,11 @@ export function ChatInput({
   initialValue,
   hasActiveSession,
 }: ChatInputProps) {
-  const client = useClient();
-  const appBarContext = useContext(AppBarContext);
   const [message, setMessage] = useState('');
   const [isPending, setIsPending] = useState(false);
   const [selectedDags, setSelectedDags] = useState<DAGContext[]>([]);
-  const [models, setModels] = useState<ModelOption[]>([]);
-  const [selectedModel, setSelectedModel] = useState<string>('');
-  const [souls, setSouls] = useState<SoulOption[]>([]);
-  const [selectedSoul, setSelectedSoul] = useState<string>('__default__');
+  const { models, selectedModel, setSelectedModel } = useAvailableModels();
+  const { souls, selectedSoul, setSelectedSoul } = useAvailableSouls();
   const currentPageDag = useDagPageContext();
   // Track IME composition state manually for reliable Japanese/Chinese input handling
   const isComposingRef = useRef(false);
@@ -67,63 +53,6 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const showPauseButton = isPending || isWorking;
-
-  // Fetch available models
-  useEffect(() => {
-    const controller = new AbortController();
-    const remoteNode = appBarContext.selectedRemoteNode || 'local';
-
-    async function fetchModels() {
-      try {
-        const { data } = await client.GET('/settings/agent/models', {
-          params: { query: { remoteNode } },
-          signal: controller.signal,
-        });
-        if (!data) return;
-        const modelList: ModelOption[] = (data.models || []).map((m) => ({
-          id: m.id,
-          name: m.name,
-        }));
-        setModels(modelList);
-        if (data.defaultModelId) {
-          setSelectedModel(data.defaultModelId);
-        } else if (modelList.length > 0) {
-          setSelectedModel(modelList[0]!.id);
-        }
-      } catch {
-        // Models fetch is best-effort
-      }
-    }
-    fetchModels();
-
-    return () => controller.abort();
-  }, [client, appBarContext.selectedRemoteNode]);
-
-  // Fetch available souls
-  useEffect(() => {
-    const controller = new AbortController();
-    const remoteNode = appBarContext.selectedRemoteNode || 'local';
-
-    async function fetchSouls() {
-      try {
-        const { data } = await client.GET('/settings/agent/souls', {
-          params: { query: { remoteNode } },
-          signal: controller.signal,
-        });
-        if (!data) return;
-        const soulList: SoulOption[] = (data.souls || []).map((s) => ({
-          id: s.id,
-          name: s.name,
-        }));
-        setSouls(soulList);
-      } catch {
-        // Souls fetch is best-effort
-      }
-    }
-    fetchSouls();
-
-    return () => controller.abort();
-  }, [client, appBarContext.selectedRemoteNode]);
 
   // Pre-fill textarea with initial value (e.g., from setup wizard)
   useEffect(() => {

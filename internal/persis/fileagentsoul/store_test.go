@@ -2,8 +2,10 @@ package fileagentsoul
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/agent"
@@ -158,19 +160,21 @@ func TestSeedExampleSouls(t *testing.T) {
 	dir := t.TempDir()
 	soulsDir := filepath.Join(dir, "souls")
 
-	created := SeedExampleSouls(context.Background(), soulsDir)
+	created, err := SeedExampleSouls(context.Background(), soulsDir)
+	require.NoError(t, err)
 	assert.True(t, created)
 
 	// Verify marker file exists
-	_, err := os.Stat(filepath.Join(soulsDir, examplesMarkerFile))
-	assert.NoError(t, err)
+	_, statErr := os.Stat(filepath.Join(soulsDir, examplesMarkerFile))
+	assert.NoError(t, statErr)
 
 	// Verify default soul exists
-	_, err = os.Stat(filepath.Join(soulsDir, "default.md"))
-	assert.NoError(t, err)
+	_, statErr = os.Stat(filepath.Join(soulsDir, "default.md"))
+	assert.NoError(t, statErr)
 
 	// Second call should not re-seed
-	created = SeedExampleSouls(context.Background(), soulsDir)
+	created, err = SeedExampleSouls(context.Background(), soulsDir)
+	require.NoError(t, err)
 	assert.False(t, created)
 }
 
@@ -190,4 +194,133 @@ You are a test soul.
 	assert.Equal(t, "Test Soul", soul.Name)
 	assert.Equal(t, "A test", soul.Description)
 	assert.Equal(t, "# Identity\n\nYou are a test soul.", soul.Content)
+}
+
+func TestParseSoulFile_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		wantErr     bool
+		errContains string
+		wantName    string
+		wantContent string
+	}{
+		{
+			name:        "missing opening delimiter",
+			input:       "name: Test\n---\nBody here",
+			wantErr:     true,
+			errContains: "missing opening frontmatter delimiter",
+		},
+		{
+			name:        "missing closing delimiter",
+			input:       "---\nname: Test\nBody without closing",
+			wantErr:     true,
+			errContains: "missing closing frontmatter delimiter",
+		},
+		{
+			name:        "empty name in frontmatter",
+			input:       "---\nname: \"\"\ndescription: test\n---\nBody here",
+			wantErr:     true,
+			errContains: "name",
+		},
+		{
+			name:        "CRLF line endings",
+			input:       "---\r\nname: CRLF Soul\r\n---\r\nBody with CRLF\r\n",
+			wantName:    "CRLF Soul",
+			wantContent: "Body with CRLF",
+		},
+		{
+			name:        "template-like syntax in body",
+			input:       "---\nname: Template Soul\n---\nYou are {{.Something}} and use {{template}} things",
+			wantName:    "Template Soul",
+			wantContent: "You are {{.Something}} and use {{template}} things",
+		},
+		{
+			name:        "no body after closing delimiter",
+			input:       "---\nname: No Body\n---\n",
+			wantName:    "No Body",
+			wantContent: "",
+		},
+		{
+			name:        "closing delimiter at EOF without trailing newline",
+			input:       "---\nname: EOF Soul\n---",
+			wantName:    "EOF Soul",
+			wantContent: "",
+		},
+		{
+			name:        "triple dash in body that is NOT a delimiter",
+			input:       "---\nname: Dash Soul\n---\nSome text\n--- not a delimiter\nMore text",
+			wantName:    "Dash Soul",
+			wantContent: "Some text\n--- not a delimiter\nMore text",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			soul, err := parseSoulFile([]byte(tt.input), "test-id")
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantName, soul.Name)
+			assert.Equal(t, tt.wantContent, soul.Content)
+		})
+	}
+}
+
+func TestStore_ConcurrentAccess(t *testing.T) {
+	dir := t.TempDir()
+	store, err := New(context.Background(), dir)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	// Pre-populate 10 souls.
+	for i := 0; i < 10; i++ {
+		require.NoError(t, store.Create(ctx, &agent.Soul{
+			ID:      fmt.Sprintf("soul-%d", i),
+			Name:    fmt.Sprintf("Soul %d", i),
+			Content: fmt.Sprintf("Content for soul %d", i),
+		}))
+	}
+
+	var wg sync.WaitGroup
+
+	// 10 goroutines doing reads.
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			for j := 0; j < 20; j++ {
+				id := fmt.Sprintf("soul-%d", idx)
+				_, _ = store.GetByID(ctx, id)
+				_, _ = store.List(ctx)
+				_, _ = store.Search(ctx, agent.SearchSoulsOptions{Query: "Soul"})
+			}
+		}(i)
+	}
+
+	// 10 goroutines doing writes (create + delete).
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			for j := 0; j < 5; j++ {
+				id := fmt.Sprintf("new-soul-%d-%d", idx, j)
+				soul := &agent.Soul{
+					ID:      id,
+					Name:    fmt.Sprintf("New Soul %d-%d", idx, j),
+					Content: "concurrent content",
+				}
+				_ = store.Create(ctx, soul)
+				_ = store.Delete(ctx, id)
+			}
+		}(i)
+	}
+
+	wg.Wait()
 }

@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	_ "embed"
+	"strings"
 	"text/template"
 
 	"github.com/dagu-org/dagu/internal/auth"
@@ -37,6 +38,11 @@ type UserCapabilities struct {
 // in the system prompt. Above this, only the count is shown.
 const SkillListThreshold = 20
 
+// soulPlaceholder is an internal marker that replaces soul content during
+// template execution to prevent user-controlled content from being interpreted
+// as Go template directives.
+const soulPlaceholder = "\x00__SOUL_CONTENT__\x00"
+
 // systemPromptData contains all data for template rendering.
 type systemPromptData struct {
 	EnvironmentInfo
@@ -69,9 +75,15 @@ func GenerateSystemPrompt(p SystemPromptParams) string {
 	skillCount := p.SkillCount
 	soul := p.Soul
 	var buf bytes.Buffer
-	var soulContent string
+	var rawSoulContent string
 	if soul != nil {
-		soulContent = soul.Content
+		rawSoulContent = soul.Content
+	}
+	// Use a placeholder during template execution to prevent user-controlled
+	// soul content from being interpreted as Go template directives.
+	templateSoulContent := soulPlaceholder
+	if rawSoulContent == "" {
+		templateSoulContent = ""
 	}
 	data := systemPromptData{
 		EnvironmentInfo: env,
@@ -80,12 +92,16 @@ func GenerateSystemPrompt(p SystemPromptParams) string {
 		User:            buildUserCapabilities(role),
 		AvailableSkills: availableSkills,
 		SkillCount:      skillCount,
-		SoulContent:     soulContent,
+		SoulContent:     templateSoulContent,
 	}
 	if err := systemPromptTemplate.Execute(&buf, data); err != nil {
 		return fallbackPrompt(env)
 	}
-	return buf.String()
+	result := buf.String()
+	if rawSoulContent != "" {
+		result = strings.Replace(result, soulPlaceholder, rawSoulContent, 1)
+	}
+	return result
 }
 
 func buildUserCapabilities(role auth.Role) *UserCapabilities {

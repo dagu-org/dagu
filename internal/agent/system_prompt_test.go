@@ -207,6 +207,22 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "test soul identity")
 	})
+
+	t.Run("template-like syntax in soul content is not evaluated", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+		soul := &Soul{Content: "You are {{.Name}} and use {{template}} things"}
+
+		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Role: auth.RoleViewer, Soul: soul})
+
+		assert.NotEmpty(t, result)
+		// The literal template syntax must appear in output, not be evaluated.
+		assert.Contains(t, result, "You are {{.Name}} and use {{template}} things")
+		// The identity tag must be present (soul content is rendered).
+		assert.Contains(t, result, "<identity>")
+		// Fallback prompt must NOT be used.
+		assert.NotContains(t, result, "You are Dagu Assistant, an AI assistant")
+	})
 }
 
 func TestFallbackPrompt(t *testing.T) {

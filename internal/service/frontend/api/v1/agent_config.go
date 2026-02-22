@@ -96,6 +96,17 @@ func (a *API) UpdateAgentConfig(ctx context.Context, request api.UpdateAgentConf
 		return nil, ErrInvalidToolPolicy
 	}
 
+	// Validate that the selected soul exists.
+	if cfg.SelectedSoulID != "" && a.agentSoulStore != nil {
+		if _, err := a.agentSoulStore.GetByID(ctx, cfg.SelectedSoulID); err != nil {
+			return nil, &Error{
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "Selected soul not found: " + cfg.SelectedSoulID,
+				HTTPStatus: http.StatusBadRequest,
+			}
+		}
+	}
+
 	if err := a.agentConfigStore.Save(ctx, cfg); err != nil {
 		logger.Error(ctx, "Failed to save agent config", tag.Error(err))
 		return nil, ErrFailedToSaveAgentConfig

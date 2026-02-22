@@ -3,13 +3,13 @@ package fileagentsoul
 import (
 	"context"
 	"embed"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
-	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 )
 
 //go:embed examples/*.md
@@ -38,27 +38,25 @@ func init() {
 }
 
 // SeedExampleSouls writes bundled example souls to baseDir if not already seeded.
-// Returns true if examples were created this call.
-func SeedExampleSouls(ctx context.Context, baseDir string) bool {
+// Returns true if examples were created this call, and an error if seeding failed.
+func SeedExampleSouls(ctx context.Context, baseDir string) (bool, error) {
 	markerPath := filepath.Join(baseDir, examplesMarkerFile)
 	if _, err := os.Stat(markerPath); err == nil {
-		return false // already seeded
+		return false, nil // already seeded
 	}
 	if hasExistingSouls(baseDir) {
-		return false
+		return false, nil
 	}
 
 	if err := os.MkdirAll(baseDir, soulDirPermissions); err != nil {
-		logger.Warn(ctx, "Failed to create souls directory", slog.String("dir", baseDir), tag.Error(err))
-		return false
+		return false, fmt.Errorf("failed to create souls directory %s: %w", baseDir, err)
 	}
 
 	logger.Info(ctx, "Creating example souls for first-time users", slog.String("dir", baseDir))
 
 	entries, err := exampleSoulsFS.ReadDir("examples")
 	if err != nil {
-		logger.Warn(ctx, "Failed to read embedded example souls", tag.Error(err))
-		return false
+		return false, fmt.Errorf("failed to read embedded example souls: %w", err)
 	}
 
 	created := 0
@@ -72,8 +70,7 @@ func SeedExampleSouls(ctx context.Context, baseDir string) bool {
 
 		data, readErr := exampleSoulsFS.ReadFile("examples/" + entry.Name())
 		if readErr != nil {
-			logger.Warn(ctx, "Failed to read embedded example soul", slog.String("name", entry.Name()), tag.Error(readErr))
-			continue
+			return false, fmt.Errorf("failed to read embedded example soul %s: %w", entry.Name(), readErr)
 		}
 
 		destPath := filepath.Join(baseDir, entry.Name())
@@ -82,24 +79,22 @@ func SeedExampleSouls(ctx context.Context, baseDir string) bool {
 		}
 
 		if err := os.WriteFile(destPath, data, filePermissions); err != nil {
-			logger.Warn(ctx, "Failed to write example soul", slog.String("path", destPath), tag.Error(err))
-		} else {
-			created++
+			return false, fmt.Errorf("failed to write example soul %s: %w", destPath, err)
 		}
+		created++
 	}
 
 	if created == 0 {
-		return false
+		return false, nil
 	}
 
 	markerContent := []byte("# This file indicates that example souls have been created.\n# Delete this file to re-create examples on next startup.\n")
 	if err := os.WriteFile(markerPath, markerContent, filePermissions); err != nil {
-		logger.Warn(ctx, "Failed to create examples marker file", tag.Error(err))
-		return false
+		return false, fmt.Errorf("failed to create examples marker file: %w", err)
 	}
 
 	logger.Info(ctx, "Example souls created successfully")
-	return true
+	return true, nil
 }
 
 // hasExistingSouls checks if the directory already contains soul .md files.
