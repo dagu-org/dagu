@@ -145,7 +145,7 @@ func parseSoulFile(data []byte, id string) (*agent.Soul, error) {
 	if closingIdx == -1 {
 		// Check for closing "---" at EOF without trailing newline.
 		if strings.HasSuffix(rest, "\n---") {
-			closingIdx = len(rest) - 3
+			closingIdx = len(rest) - 4 // point at the \n before ---
 		} else {
 			return nil, fmt.Errorf("missing closing frontmatter delimiter")
 		}

@@ -96,8 +96,8 @@ func (a *API) UpdateAgentConfig(ctx context.Context, request api.UpdateAgentConf
 		return nil, ErrInvalidToolPolicy
 	}
 
-	// Validate that the selected soul exists.
-	if cfg.SelectedSoulID != "" && a.agentSoulStore != nil {
+	// Validate that the selected soul exists (only when explicitly changed).
+	if request.Body.SelectedSoulId != nil && cfg.SelectedSoulID != "" && a.agentSoulStore != nil {
 		if _, err := a.agentSoulStore.GetByID(ctx, cfg.SelectedSoulID); err != nil {
 			return nil, &Error{
 				Code:       api.ErrorCodeBadRequest,

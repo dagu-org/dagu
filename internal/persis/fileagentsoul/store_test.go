@@ -280,7 +280,7 @@ func TestStore_ConcurrentAccess(t *testing.T) {
 	ctx := context.Background()
 
 	// Pre-populate 10 souls.
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		require.NoError(t, store.Create(ctx, &agent.Soul{
 			ID:      fmt.Sprintf("soul-%d", i),
 			Name:    fmt.Sprintf("Soul %d", i),
@@ -291,11 +291,11 @@ func TestStore_ConcurrentAccess(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// 10 goroutines doing reads.
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			for j := 0; j < 20; j++ {
+			for range 20 {
 				id := fmt.Sprintf("soul-%d", idx)
 				_, _ = store.GetByID(ctx, id)
 				_, _ = store.List(ctx)
@@ -305,11 +305,11 @@ func TestStore_ConcurrentAccess(t *testing.T) {
 	}
 
 	// 10 goroutines doing writes (create + delete).
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			for j := 0; j < 5; j++ {
+			for j := range 5 {
 				id := fmt.Sprintf("new-soul-%d-%d", idx, j)
 				soul := &agent.Soul{
 					ID:      id,
