@@ -93,7 +93,7 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_UI_DAGS_SORT_ORDER": "desc",
 
 		"DAGU_TERMINAL_ENABLED": "true",
-		"DAGU_ACCESS_LOG":       "false",
+		"DAGU_ACCESS_LOG":       "none",
 
 		"DAGU_AUDIT_ENABLED": "false",
 
@@ -139,7 +139,7 @@ func TestLoad_Env(t *testing.T) {
 			BasePath:    "/test/base",
 			APIBasePath: "/test/api",
 			Headless:    true,
-			AccessLog:   false,
+			AccessLog:   AccessLogNone,
 			Auth: Auth{
 				Mode:  AuthModeBasic, // Explicit basic mode from env
 				Basic: AuthBasic{Username: "testuser", Password: "testpass"},
@@ -377,7 +377,7 @@ scheduler:
 			BasePath:          "/dagu",
 			APIBasePath:       "/api/v1",
 			Headless:          true,
-			AccessLog:         true,
+			AccessLog:         AccessLogAll,
 			LatestStatusToday: true,
 			Auth: Auth{
 				Mode:  AuthModeBasic, // Explicit basic mode from YAML
@@ -990,6 +990,53 @@ metrics: "invalid_value"
 		require.Len(t, cfg.Warnings, 1)
 		assert.Contains(t, cfg.Warnings[0], "Invalid server.metrics value")
 		assert.Contains(t, cfg.Warnings[0], "invalid_value")
+	})
+}
+
+func TestLoad_AccessLogMode(t *testing.T) {
+	t.Run("AccessLogAll", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+access_log: "all"
+`)
+		assert.Equal(t, AccessLogAll, cfg.Server.AccessLog)
+	})
+
+	t.Run("AccessLogNonPublic", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+access_log: "non-public"
+`)
+		assert.Equal(t, AccessLogNonPublic, cfg.Server.AccessLog)
+	})
+
+	t.Run("AccessLogNone", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+access_log: "none"
+`)
+		assert.Equal(t, AccessLogNone, cfg.Server.AccessLog)
+	})
+
+	t.Run("AccessLogDefault", func(t *testing.T) {
+		cfg := loadFromYAML(t, "# empty")
+		assert.Equal(t, AccessLogAll, cfg.Server.AccessLog)
+	})
+
+	t.Run("AccessLogFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_ACCESS_LOG": "non-public",
+		})
+		assert.Equal(t, AccessLogNonPublic, cfg.Server.AccessLog)
+	})
+
+	t.Run("AccessLogInvalid", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: none
+access_log: "invalid"
+`)
+		assert.Equal(t, AccessLogAll, cfg.Server.AccessLog)
+		require.Len(t, cfg.Warnings, 1)
+		assert.Contains(t, cfg.Warnings[0], "Invalid access_log value")
+		assert.Contains(t, cfg.Warnings[0], "invalid")
 	})
 }
 

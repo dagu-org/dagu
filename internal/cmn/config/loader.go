@@ -389,10 +389,15 @@ func (l *ConfigLoader) loadServerFlags(cfg *Config, def Definition) {
 	if def.Headless != nil {
 		cfg.Server.Headless = *def.Headless
 	}
+	cfg.Server.AccessLog = AccessLogAll
 	if def.AccessLog != nil {
-		cfg.Server.AccessLog = *def.AccessLog
-	} else {
-		cfg.Server.AccessLog = true
+		switch AccessLogMode(*def.AccessLog) {
+		case AccessLogAll, AccessLogNonPublic, AccessLogNone:
+			cfg.Server.AccessLog = AccessLogMode(*def.AccessLog)
+		default:
+			l.warnings = append(l.warnings, fmt.Sprintf(
+				"Invalid access_log value: %q, defaulting to 'all'", *def.AccessLog))
+		}
 	}
 	if def.LatestStatusToday != nil {
 		cfg.Server.LatestStatusToday = *def.LatestStatusToday
@@ -1119,7 +1124,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("metrics", "private")
 	l.v.SetDefault("cache", "normal")
 	l.v.SetDefault("log_format", "text")
-	l.v.SetDefault("access_log", true)
+	l.v.SetDefault("access_log", "all")
 
 	// Coordinator
 	l.v.SetDefault("coordinator.host", "127.0.0.1")
