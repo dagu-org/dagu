@@ -15,7 +15,6 @@ import (
 	api "github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -200,53 +199,6 @@ func formatContextLine(ctx ResolvedDAGContext) string {
 	return fmt.Sprintf("- %s (%s)", cmp.Or(ctx.DAGName, "unknown"), strings.Join(parts, ", "))
 }
 
-// selectModel returns the first non-empty model from the provided choices,
-// falling back to the default model from config.
-// Priority: requestModel > sessionModel > config default.
-func selectModel(requestModel, sessionModel, configModel string) string {
-	return cmp.Or(requestModel, sessionModel, configModel)
-}
-
-// getDefaultModelID returns the default model ID from config.
-func (a *API) getDefaultModelID(ctx context.Context) string {
-	cfg, err := a.configStore.Load(ctx)
-	if err != nil {
-		a.logger.Warn("Failed to load agent config for default model", "error", err)
-		return ""
-	}
-	return cfg.DefaultModelID
-}
-
-// resolveProvider resolves a model ID to an LLM provider and model config.
-// If modelID is empty, uses the default from config.
-// If the requested model is not found (e.g., deleted), falls back to the default.
-func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider, *ModelConfig, error) {
-	if a.modelStore == nil {
-		return nil, nil, errors.New("model store not configured")
-	}
-
-	defaultID := a.getDefaultModelID(ctx)
-	modelID = cmp.Or(modelID, defaultID)
-	if modelID == "" {
-		return nil, nil, errors.New("no model configured")
-	}
-
-	model, err := a.modelStore.GetByID(ctx, modelID)
-	if errors.Is(err, ErrModelNotFound) && defaultID != "" && defaultID != modelID {
-		// Requested model was deleted; fall back to default
-		model, err = a.modelStore.GetByID(ctx, defaultID)
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-
-	provider, _, err := a.providers.GetOrCreate(model.ToLLMConfig())
-	if err != nil {
-		return nil, nil, err
-	}
-	return provider, model, nil
-}
-
 // resolveModelSlots resolves model IDs from config into an ordered list of model slots.
 // The requestModel overrides the primary model; fallback models come from config.ModelIDs.
 func (a *API) resolveModelSlots(ctx context.Context, requestModel string) ([]ModelSlot, *ModelConfig, error) {
@@ -263,7 +215,7 @@ func (a *API) resolveModelSlots(ctx context.Context, requestModel string) ([]Mod
 	// If the request specifies a model, it becomes primary.
 	// Remaining models from config are appended as fallbacks (deduped).
 	configIDs := cfg.ResolveModelIDs()
-	primaryID := cmp.Or(requestModel, "")
+	primaryID := requestModel
 	if primaryID == "" && len(configIDs) > 0 {
 		primaryID = configIDs[0]
 	}
@@ -691,9 +643,7 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 		return "", ErrMessageRequired
 	}
 
-	model := selectModel(req.Model, "", a.getDefaultModelID(ctx))
-
-	slots, primaryCfg, err := a.resolveModelSlots(ctx, model)
+	slots, primaryCfg, err := a.resolveModelSlots(ctx, req.Model)
 	if err != nil {
 		a.logger.Error("Failed to resolve model slots", "error", err)
 		return "", ErrAgentNotConfigured
@@ -734,7 +684,7 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 	a.sessions.Store(id, mgr)
 
 	messageWithContext := formatMessageWithContexts(req.Message, resolved)
-	if err := mgr.AcceptUserMessage(ctx, slots, model, messageWithContext); err != nil {
+	if err := mgr.AcceptUserMessage(ctx, slots, primaryCfg.ID, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		a.sessions.Delete(id)
 		return "", ErrFailedToProcessMessage
@@ -853,7 +803,7 @@ func (a *API) SendMessage(ctx context.Context, sessionID string, user UserIdenti
 		return ErrMessageRequired
 	}
 
-	model := selectModel(req.Model, mgr.GetModel(), a.getDefaultModelID(ctx))
+	model := cmp.Or(req.Model, mgr.GetModel())
 
 	slots, primaryCfg, err := a.resolveModelSlots(ctx, model)
 	if err != nil {

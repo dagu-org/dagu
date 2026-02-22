@@ -225,7 +225,7 @@ func (a *API) DeleteAgentModel(ctx context.Context, request api.DeleteAgentModel
 	}
 
 	// If deleted model was default, reset to first remaining
-	a.resetDefaultIfNeeded(ctx, request.ModelId)
+	a.cleanupDeletedModel(ctx, request.ModelId)
 
 	a.logAudit(ctx, audit.CategoryAgent, auditActionModelDelete, map[string]any{
 		"model_id": request.ModelId,
@@ -396,7 +396,7 @@ func (a *API) autoSetDefaultModel(ctx context.Context, modelID string) {
 	}
 }
 
-func (a *API) resetDefaultIfNeeded(ctx context.Context, deletedModelID string) {
+func (a *API) cleanupDeletedModel(ctx context.Context, deletedModelID string) {
 	cfg, err := a.agentConfigStore.Load(ctx)
 	if err != nil {
 		return
