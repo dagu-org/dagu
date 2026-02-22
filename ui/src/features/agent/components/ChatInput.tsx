@@ -303,7 +303,7 @@ export function ChatInput({
       />
 
       {/* Model & soul selector row */}
-      {(models.length > 0 || souls.length > 0) && (
+      {(models.length > 0 || (souls.length > 0 && !hasActiveSession)) && (
         <div className="mb-1.5 flex items-center gap-2">
           {models.length > 0 && (
             <Select value={selectedModel} onValueChange={setSelectedModel}>
