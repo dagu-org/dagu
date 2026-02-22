@@ -4642,13 +4642,7 @@ paths:
         - $ref: "#/components/parameters/PerPage"
         - name: q
           in: query
-          description: "Search query (matches name, description, tags)"
-          required: false
-          schema:
-            type: string
-        - name: tags
-          in: query
-          description: "Comma-separated tag filter (AND semantics)"
+          description: "Search query (matches name, description)"
           required: false
           schema:
             type: string
@@ -7957,14 +7951,6 @@ components:
           type: string
         description:
           type: string
-        version:
-          type: string
-        author:
-          type: string
-        tags:
-          type: array
-          items:
-            type: string
         content:
           type: string
           description: "Markdown body content (identity definition)"
@@ -7997,14 +7983,6 @@ components:
           type: string
         description:
           type: string
-        version:
-          type: string
-        author:
-          type: string
-        tags:
-          type: array
-          items:
-            type: string
         content:
           type: string
           description: "Markdown body content (identity definition)"
@@ -8017,14 +7995,6 @@ components:
           type: string
         description:
           type: string
-        version:
-          type: string
-        author:
-          type: string
-        tags:
-          type: array
-          items:
-            type: string
         content:
           type: string
           description: "Markdown body content (identity definition)"

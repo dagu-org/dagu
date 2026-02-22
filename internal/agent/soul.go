@@ -19,13 +19,10 @@ var (
 // Each soul defines identity, priorities, and communication style
 // that get injected into the system prompt.
 type Soul struct {
-	ID          string   `yaml:"id"                    json:"id"`
-	Name        string   `yaml:"name"                  json:"name"`
-	Description string   `yaml:"description,omitempty" json:"description,omitempty"`
-	Version     string   `yaml:"version,omitempty"     json:"version,omitempty"`
-	Author      string   `yaml:"author,omitempty"      json:"author,omitempty"`
-	Tags        []string `yaml:"tags,omitempty"        json:"tags,omitempty"`
-	Content     string   `yaml:"content"               json:"content"`
+	ID          string `yaml:"id"                    json:"id"`
+	Name        string `yaml:"name"                  json:"name"`
+	Description string `yaml:"description,omitempty" json:"description,omitempty"`
+	Content     string `yaml:"content"               json:"content"`
 }
 
 // SoulStore defines the interface for soul persistence.
@@ -42,20 +39,16 @@ type SoulStore interface {
 // SoulMetadata is a lightweight soul view excluding Content.
 // Used for search results where loading full content is unnecessary.
 type SoulMetadata struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Description string   `json:"description,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
-	ContentSize int      `json:"content_size"`
-	Version     string   `json:"version,omitempty"`
-	Author      string   `json:"author,omitempty"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	ContentSize int    `json:"content_size"`
 }
 
 // SearchSoulsOptions configures a paginated soul search query.
 type SearchSoulsOptions struct {
 	Paginator exec.Paginator
 	Query     string
-	Tags      []string
 }
 
 // ValidateSoulID validates that id is a safe, well-formed soul identifier.

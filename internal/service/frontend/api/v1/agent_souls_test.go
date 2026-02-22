@@ -109,10 +109,7 @@ func (m *mockSoulStore) Search(_ context.Context, opts agent.SearchSoulsOptions)
 			ID:          s.ID,
 			Name:        s.Name,
 			Description: s.Description,
-			Tags:        s.Tags,
 			ContentSize: len(s.Content),
-			Version:     s.Version,
-			Author:      s.Author,
 		})
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Name < items[j].Name })
@@ -236,9 +233,6 @@ func TestCreateAgentSoul(t *testing.T) {
 				Name:        "Full Soul",
 				Content:     "Full identity content.",
 				Description: new("A full soul"),
-				Version:     new("1.0.0"),
-				Author:      new("Test Author"),
-				Tags:        &[]string{"tag1", "tag2"},
 			},
 		})
 		require.NoError(t, err)
@@ -248,10 +242,6 @@ func TestCreateAgentSoul(t *testing.T) {
 		assert.Equal(t, "Full Soul", createResp.Name)
 		require.NotNil(t, createResp.Description)
 		assert.Equal(t, "A full soul", *createResp.Description)
-		require.NotNil(t, createResp.Version)
-		assert.Equal(t, "1.0.0", *createResp.Version)
-		require.NotNil(t, createResp.Author)
-		assert.Equal(t, "Test Author", *createResp.Author)
 	})
 
 	t.Run("empty name returns error", func(t *testing.T) {

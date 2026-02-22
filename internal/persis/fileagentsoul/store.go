@@ -29,21 +29,15 @@ const (
 // soulFrontmatter holds the YAML fields in the soul file frontmatter.
 // The ID is derived from the filename, not stored in the file.
 type soulFrontmatter struct {
-	Name        string   `yaml:"name"`
-	Description string   `yaml:"description,omitempty"`
-	Version     string   `yaml:"version,omitempty"`
-	Author      string   `yaml:"author,omitempty"`
-	Tags        []string `yaml:"tags,omitempty"`
+	Name        string `yaml:"name"`
+	Description string `yaml:"description,omitempty"`
 }
 
 // soulIndexEntry caches soul metadata in memory for fast search without file I/O.
 type soulIndexEntry struct {
 	name        string
 	description string
-	tags        []string
 	contentSize int
-	version     string
-	author      string
 }
 
 // Store implements a file-based soul store.
@@ -118,10 +112,7 @@ func (s *Store) rebuildIndex() error {
 		s.byID[soul.ID] = &soulIndexEntry{
 			name:        soul.Name,
 			description: soul.Description,
-			tags:        soul.Tags,
 			contentSize: len(soul.Content),
-			version:     soul.Version,
-			author:      soul.Author,
 		}
 		if existingID, exists := s.byName[soul.Name]; exists {
 			slog.Warn("Duplicate soul name in store, last file wins",
@@ -169,9 +160,6 @@ func parseSoulFile(data []byte, id string) (*agent.Soul, error) {
 		ID:          id,
 		Name:        fm.Name,
 		Description: fm.Description,
-		Version:     fm.Version,
-		Author:      fm.Author,
-		Tags:        fm.Tags,
 		Content:     strings.TrimRight(body, "\n"),
 	}, nil
 }
@@ -181,9 +169,6 @@ func marshalSoulFile(soul *agent.Soul) ([]byte, error) {
 	fm := soulFrontmatter{
 		Name:        soul.Name,
 		Description: soul.Description,
-		Version:     soul.Version,
-		Author:      soul.Author,
-		Tags:        soul.Tags,
 	}
 
 	fmBytes, err := yaml.Marshal(fm)
@@ -275,10 +260,7 @@ func (s *Store) Create(_ context.Context, soul *agent.Soul) error {
 	s.byID[soul.ID] = &soulIndexEntry{
 		name:        soul.Name,
 		description: soul.Description,
-		tags:        soul.Tags,
 		contentSize: len(soul.Content),
-		version:     soul.Version,
-		author:      soul.Author,
 	}
 	s.byName[soul.Name] = soul.ID
 
@@ -359,9 +341,6 @@ func (s *Store) Search(_ context.Context, opts agent.SearchSoulsOptions) (*exec.
 
 	var matched []agent.SoulMetadata
 	for id, entry := range s.byID {
-		if len(opts.Tags) > 0 && !hasAllTags(entry.tags, opts.Tags) {
-			continue
-		}
 		if queryLower != "" && !matchesSoulEntry(entry, id, queryLower) {
 			continue
 		}
@@ -369,10 +348,7 @@ func (s *Store) Search(_ context.Context, opts agent.SearchSoulsOptions) (*exec.
 			ID:          id,
 			Name:        entry.name,
 			Description: entry.description,
-			Tags:        entry.tags,
 			ContentSize: entry.contentSize,
-			Version:     entry.version,
-			Author:      entry.author,
 		})
 	}
 
@@ -397,21 +373,7 @@ func (s *Store) Search(_ context.Context, opts agent.SearchSoulsOptions) (*exec.
 	return &result, nil
 }
 
-// hasAllTags returns true if soulTags contains all required tags (case-insensitive).
-func hasAllTags(soulTags, required []string) bool {
-	tagSet := make(map[string]struct{}, len(soulTags))
-	for _, t := range soulTags {
-		tagSet[strings.ToLower(t)] = struct{}{}
-	}
-	for _, req := range required {
-		if _, ok := tagSet[strings.ToLower(req)]; !ok {
-			return false
-		}
-	}
-	return true
-}
-
-// matchesSoulEntry checks if a cached soul entry matches a query against name, description, and tags.
+// matchesSoulEntry checks if a cached soul entry matches a query against name, description, and id.
 func matchesSoulEntry(entry *soulIndexEntry, id, queryLower string) bool {
 	if strings.Contains(strings.ToLower(entry.name), queryLower) {
 		return true
@@ -421,11 +383,6 @@ func matchesSoulEntry(entry *soulIndexEntry, id, queryLower string) bool {
 	}
 	if strings.Contains(strings.ToLower(id), queryLower) {
 		return true
-	}
-	for _, tag := range entry.tags {
-		if strings.Contains(strings.ToLower(tag), queryLower) {
-			return true
-		}
 	}
 	return false
 }
@@ -474,10 +431,7 @@ func (s *Store) Update(_ context.Context, soul *agent.Soul) error {
 	// Update cached metadata.
 	entry.name = soul.Name
 	entry.description = soul.Description
-	entry.tags = soul.Tags
 	entry.contentSize = len(soul.Content)
-	entry.version = soul.Version
-	entry.author = soul.Author
 
 	if nameChanged {
 		delete(s.byName, existing.Name)

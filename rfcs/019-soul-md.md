@@ -49,11 +49,6 @@ YAML frontmatter + Markdown body (consistent with the skill file pattern):
 ---
 name: Dagu Assistant
 description: General-purpose workflow automation assistant
-version: "1.0"
-author: Dagu
-tags:
-  - general
-  - default
 ---
 
 # Identity
@@ -96,9 +91,6 @@ type Soul struct {
     ID          string
     Name        string
     Description string
-    Version     string
-    Author      string
-    Tags        []string
     Content     string   // markdown body -- injected as identity
 }
 
@@ -142,7 +134,6 @@ At session creation time, the selected soul is loaded and its `Content` is injec
 Ships embedded in the binary and is seeded on first startup (via `.examples-created` marker file):
 
 - **Name:** Dagu Assistant
-- **Tags:** general, default
 - **Content:** Generic workflow automation identity with safety-first priorities and concise communication style
 
 ---

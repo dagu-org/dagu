@@ -3412,9 +3412,6 @@ export interface components {
             id: string;
             name: string;
             description?: string;
-            version?: string;
-            author?: string;
-            tags?: string[];
             /** @description Markdown body content (identity definition) */
             content?: string;
         };
@@ -3429,9 +3426,6 @@ export interface components {
             id?: string;
             name: string;
             description?: string;
-            version?: string;
-            author?: string;
-            tags?: string[];
             /** @description Markdown body content (identity definition) */
             content: string;
         };
@@ -3439,9 +3433,6 @@ export interface components {
         UpdateSoulRequest: {
             name?: string;
             description?: string;
-            version?: string;
-            author?: string;
-            tags?: string[];
             /** @description Markdown body content (identity definition) */
             content?: string;
         };
@@ -9491,10 +9482,8 @@ export interface operations {
                 page?: components["parameters"]["Page"];
                 /** @description number of items per page (default is 30, max is 100) */
                 perPage?: components["parameters"]["PerPage"];
-                /** @description Search query (matches name, description, tags) */
+                /** @description Search query (matches name, description) */
                 q?: string;
-                /** @description Comma-separated tag filter (AND semantics) */
-                tags?: string;
             };
             header?: never;
             path?: never;

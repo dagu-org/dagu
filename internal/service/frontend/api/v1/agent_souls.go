@@ -51,12 +51,10 @@ func (a *API) ListAgentSouls(ctx context.Context, request api.ListAgentSoulsRequ
 	}
 
 	pg := exec.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
-	tags := parseCommaSeparatedTags(request.Params.Tags)
 
 	result, err := a.agentSoulStore.Search(ctx, agent.SearchSoulsOptions{
 		Paginator: pg,
 		Query:     valueOf(request.Params.Q),
-		Tags:      tags,
 	})
 	if err != nil {
 		logger.Error(ctx, "Failed to search agent souls", tag.Error(err))
@@ -124,15 +122,6 @@ func (a *API) CreateAgentSoul(ctx context.Context, request api.CreateAgentSoulRe
 	}
 	if body.Description != nil {
 		soul.Description = *body.Description
-	}
-	if body.Version != nil {
-		soul.Version = *body.Version
-	}
-	if body.Author != nil {
-		soul.Author = *body.Author
-	}
-	if body.Tags != nil {
-		soul.Tags = *body.Tags
 	}
 
 	if err := a.agentSoulStore.Create(ctx, soul); err != nil {
@@ -253,9 +242,6 @@ func toSoulResponse(soul *agent.Soul) api.SoulResponse {
 		Id:          soul.ID,
 		Name:        soul.Name,
 		Description: ptrOf(soul.Description),
-		Version:     ptrOf(soul.Version),
-		Author:      ptrOf(soul.Author),
-		Tags:        ptrOf(soul.Tags),
 		Content:     ptrOf(soul.Content),
 	}
 }
@@ -265,9 +251,6 @@ func toSoulMetadataResponse(m agent.SoulMetadata) api.SoulResponse {
 		Id:          m.ID,
 		Name:        m.Name,
 		Description: ptrOf(m.Description),
-		Version:     ptrOf(m.Version),
-		Author:      ptrOf(m.Author),
-		Tags:        ptrOf(m.Tags),
 	}
 }
 
@@ -277,15 +260,6 @@ func applySoulUpdates(soul *agent.Soul, update *api.UpdateSoulRequest) {
 	}
 	if update.Description != nil {
 		soul.Description = *update.Description
-	}
-	if update.Version != nil {
-		soul.Version = *update.Version
-	}
-	if update.Author != nil {
-		soul.Author = *update.Author
-	}
-	if update.Tags != nil {
-		soul.Tags = *update.Tags
 	}
 	if update.Content != nil && strings.TrimSpace(*update.Content) != "" {
 		soul.Content = strings.TrimSpace(*update.Content)

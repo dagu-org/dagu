@@ -20,9 +20,6 @@ func TestStore_CreateAndGetByID(t *testing.T) {
 		ID:          "test-soul",
 		Name:        "Test Soul",
 		Description: "A test soul",
-		Version:     "1.0",
-		Author:      "Test",
-		Tags:        []string{"test"},
 		Content:     "# Identity\n\nYou are a test soul.",
 	}
 
@@ -120,8 +117,8 @@ func TestStore_Search(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, s := range []*agent.Soul{
-		{ID: "ops-soul", Name: "Ops Assistant", Tags: []string{"ops"}, Content: "ops"},
-		{ID: "dev-soul", Name: "Dev Assistant", Tags: []string{"dev"}, Content: "dev"},
+		{ID: "ops-soul", Name: "Ops Assistant", Content: "ops"},
+		{ID: "dev-soul", Name: "Dev Assistant", Content: "dev"},
 	} {
 		require.NoError(t, store.Create(context.Background(), s))
 	}
@@ -181,10 +178,6 @@ func TestParseSoulFile(t *testing.T) {
 	data := []byte(`---
 name: Test Soul
 description: A test
-version: "1.0"
-author: Tester
-tags:
-  - test
 ---
 # Identity
 

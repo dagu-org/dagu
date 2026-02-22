@@ -34,9 +34,6 @@ export default function SoulEditorPage() {
   const [customId, setCustomId] = useState(false);
   const [description, setDescription] = useState('');
   const [content, setContent] = useState('');
-  const [version, setVersion] = useState('');
-  const [author, setAuthor] = useState('');
-  const [tagsInput, setTagsInput] = useState('');
   const [isLoading, setIsLoading] = useState(!isCreating);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -63,26 +60,15 @@ export default function SoulEditorPage() {
       setIdField(data.id);
       setDescription(data.description ?? '');
       setContent(data.content ?? '');
-      setVersion(data.version ?? '');
-      setAuthor(data.author ?? '');
-      setTagsInput(data.tags?.join(', ') ?? '');
       setIsLoading(false);
     })();
   }, [soulId, isCreating, client, remoteNode, showError, navigate]);
-
-  function parseTags(input: string): string[] {
-    return input
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
-  }
 
   const handleSave = useCallback(async () => {
     if (!name || !content) return;
     setIsSaving(true);
 
     try {
-      const tags = parseTags(tagsInput);
       if (isCreating) {
         const { error } = await client.POST('/settings/agent/souls', {
           params: { query: { remoteNode } },
@@ -91,9 +77,6 @@ export default function SoulEditorPage() {
             name,
             content,
             description: description || undefined,
-            version: version || undefined,
-            author: author || undefined,
-            tags: tags.length > 0 ? tags : undefined,
           },
         });
         if (error) throw new Error(error.message || 'Failed to create soul');
@@ -105,9 +88,6 @@ export default function SoulEditorPage() {
             name,
             content,
             description: description || undefined,
-            version: version || undefined,
-            author: author || undefined,
-            tags: tags.length > 0 ? tags : undefined,
           },
         });
         if (error) throw new Error(error.message || 'Failed to update soul');
@@ -120,7 +100,7 @@ export default function SoulEditorPage() {
       setIsSaving(false);
     }
   }, [
-    name, content, description, version, author, tagsInput, idField,
+    name, content, description, idField,
     isCreating, soulId, client, remoteNode, showToast, showError, navigate,
   ]);
 
@@ -208,8 +188,8 @@ export default function SoulEditorPage() {
             />
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-3">
-          {isCreating && (
+        {isCreating && (
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="soul-id" className="text-xs">ID</Label>
               <Input
@@ -223,38 +203,8 @@ export default function SoulEditorPage() {
                 className="h-7 text-sm"
               />
             </div>
-          )}
-          <div className="space-y-1">
-            <Label htmlFor="soul-version" className="text-xs">Version</Label>
-            <Input
-              id="soul-version"
-              value={version}
-              onChange={(e) => setVersion(e.target.value)}
-              placeholder="1.0.0"
-              className="h-7 text-sm"
-            />
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="soul-author" className="text-xs">Author</Label>
-            <Input
-              id="soul-author"
-              value={author}
-              onChange={(e) => setAuthor(e.target.value)}
-              placeholder="Author name"
-              className="h-7 text-sm"
-            />
-          </div>
-          <div className={`space-y-1 ${isCreating ? '' : 'col-span-2'}`}>
-            <Label htmlFor="soul-tags" className="text-xs">Tags</Label>
-            <Input
-              id="soul-tags"
-              value={tagsInput}
-              onChange={(e) => setTagsInput(e.target.value)}
-              placeholder="personality, assistant, devops"
-              className="h-7 text-sm"
-            />
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Monaco editor */}

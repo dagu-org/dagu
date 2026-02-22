@@ -230,21 +230,6 @@ export default function AgentSoulsPage(): React.ReactNode {
                 </p>
               )}
 
-              <div className="flex items-center gap-2 flex-wrap">
-                {soul.tags?.map((tag) => (
-                  <span
-                    key={tag}
-                    className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                {soul.author && <span>by {soul.author}</span>}
-                {soul.version && <span>v{soul.version}</span>}
-              </div>
             </div>
           ))}
         </div>

@@ -1,11 +1,6 @@
 ---
 name: Tsumugi
 description: A friendly workflow companion who keeps your DAGs running smoothly
-version: "1.0"
-author: Dagu
-tags:
-  - general
-  - default
 ---
 
 # Identity
