@@ -273,7 +273,7 @@ func toSoulMetadataResponse(m agent.SoulMetadata) api.SoulResponse {
 
 func applySoulUpdates(soul *agent.Soul, update *api.UpdateSoulRequest) {
 	if update.Name != nil && strings.TrimSpace(*update.Name) != "" {
-		soul.Name = *update.Name
+		soul.Name = strings.TrimSpace(*update.Name)
 	}
 	if update.Description != nil {
 		soul.Description = *update.Description
@@ -288,7 +288,7 @@ func applySoulUpdates(soul *agent.Soul, update *api.UpdateSoulRequest) {
 		soul.Tags = *update.Tags
 	}
 	if update.Content != nil && strings.TrimSpace(*update.Content) != "" {
-		soul.Content = *update.Content
+		soul.Content = strings.TrimSpace(*update.Content)
 	}
 }
 

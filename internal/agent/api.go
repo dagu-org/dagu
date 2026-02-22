@@ -264,7 +264,11 @@ func (a *API) loadSelectedSoul(ctx context.Context) *Soul {
 		return nil
 	}
 	cfg, err := a.configStore.Load(ctx)
-	if err != nil || cfg == nil {
+	if err != nil {
+		a.logger.Debug("failed to load agent config for soul selection", "error", err)
+		return nil
+	}
+	if cfg == nil {
 		return nil
 	}
 	soulID := cfg.SelectedSoulID
@@ -273,13 +277,15 @@ func (a *API) loadSelectedSoul(ctx context.Context) *Soul {
 	}
 	soul, err := a.soulStore.GetByID(ctx, soulID)
 	if err != nil {
-		// Fall back to "default" if the configured soul was not found.
 		if soulID != "default" {
+			a.logger.Debug("selected soul not found, falling back to default", "soulId", soulID, "error", err)
 			soul, err = a.soulStore.GetByID(ctx, "default")
 			if err != nil {
+				a.logger.Debug("default soul not found", "error", err)
 				return nil
 			}
 		} else {
+			a.logger.Debug("default soul not found", "error", err)
 			return nil
 		}
 	}

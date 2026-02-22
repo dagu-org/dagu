@@ -143,8 +143,19 @@ func (e *Executor) Run(ctx context.Context) error {
 		}
 	}
 
+	// Load soul if step specifies one.
+	var soul *agent.Soul
+	if stepCfg != nil && stepCfg.Soul != "" {
+		if soulStore := agent.GetSoulStore(ctx); soulStore != nil {
+			soul, _ = soulStore.GetByID(ctx, stepCfg.Soul)
+			if soul == nil {
+				logf(stderr, "Warning: soul %q not found in store", stepCfg.Soul)
+			}
+		}
+	}
+
 	// Generate system prompt.
-	systemPrompt := buildSystemPrompt(dagCtx, stepCfg, memoryContent, skillSummaries, skillCount)
+	systemPrompt := buildSystemPrompt(dagCtx, stepCfg, memoryContent, skillSummaries, skillCount, soul)
 
 	// Resolve safe mode and max iterations.
 	safeMode := true
@@ -282,7 +293,7 @@ func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy
 }
 
 // buildSystemPrompt generates the system prompt for the agent step.
-func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memory agent.MemoryContent, availableSkills []agent.SkillSummary, skillCount int) string {
+func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memory agent.MemoryContent, availableSkills []agent.SkillSummary, skillCount int, soul *agent.Soul) string {
 	env := agent.EnvironmentInfo{}
 	if dagCtx.DAG != nil {
 		env.DAGsDir = dagCtx.DAG.Location
@@ -295,7 +306,7 @@ func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memor
 		}
 	}
 
-	prompt := agent.GenerateSystemPrompt(env, currentDAG, memory, "", availableSkills, skillCount, nil)
+	prompt := agent.GenerateSystemPrompt(env, currentDAG, memory, "", availableSkills, skillCount, soul)
 
 	// Append instruction about the output tool.
 	prompt += "\n\n## Output\n\nWhen you have completed your task, use the `output` tool to write your final result. " +

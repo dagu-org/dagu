@@ -196,6 +196,8 @@ type agentConfig struct {
 	// Skills lists skill IDs the agent is allowed to use.
 	// If omitted, falls back to globally enabled skills.
 	Skills []string `yaml:"skills,omitempty"`
+	// Soul is the soul ID for this step's agent identity.
+	Soul string `yaml:"soul,omitempty"`
 	// Memory controls whether persistent memory is loaded.
 	Memory *agentMemoryConfig `yaml:"memory,omitempty"`
 	// Prompt is additional instructions appended to the built-in system prompt.
@@ -1622,6 +1624,8 @@ func buildStepAgent(_ StepBuildContext, s *step, result *core.Step) error {
 			cfg.Skills = s.Agent.Skills
 		}
 
+		cfg.Soul = strings.TrimSpace(s.Agent.Soul)
+
 		if s.Agent.Memory != nil {
 			cfg.Memory = &core.AgentMemoryConfig{
 				Enabled: s.Agent.Memory.Enabled,
@@ -1655,6 +1659,12 @@ func validateAgent(result *core.Step) error {
 		if id == "" || len(id) > maxSkillIDLength || !validSkillIDRegexp.MatchString(id) {
 			return core.NewValidationError("agent.skills", id,
 				fmt.Errorf("invalid skill ID %q: must be lowercase alphanumeric with hyphens, max %d chars", id, maxSkillIDLength))
+		}
+	}
+	if result.Agent.Soul != "" {
+		if len(result.Agent.Soul) > maxSkillIDLength || !validSkillIDRegexp.MatchString(result.Agent.Soul) {
+			return core.NewValidationError("agent.soul", result.Agent.Soul,
+				fmt.Errorf("invalid soul ID %q: must be lowercase alphanumeric with hyphens, max %d chars", result.Agent.Soul, maxSkillIDLength))
 		}
 	}
 	return nil

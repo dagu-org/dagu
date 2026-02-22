@@ -17,6 +17,21 @@ type defaults struct {
 	SignalOnStop  *string               `yaml:"signal_on_stop,omitempty"`
 	Env           types.EnvValue        `yaml:"env,omitempty"`
 	Preconditions any                   `yaml:"preconditions,omitempty"`
+	Agent         *agentDefaults        `yaml:"agent,omitempty"`
+}
+
+// agentDefaults defines default values for agent step configuration.
+// Fields mirror agentConfig; each is applied only when the step does not
+// explicitly set its own value.
+type agentDefaults struct {
+	Model         string             `yaml:"model,omitempty"`
+	Tools         *agentToolsConfig  `yaml:"tools,omitempty"`
+	Skills        []string           `yaml:"skills,omitempty"`
+	Soul          string             `yaml:"soul,omitempty"`
+	Memory        *agentMemoryConfig `yaml:"memory,omitempty"`
+	Prompt        string             `yaml:"prompt,omitempty"`
+	MaxIterations *int               `yaml:"max_iterations,omitempty"`
+	SafeMode      *bool              `yaml:"safe_mode,omitempty"`
 }
 
 // decodeDefaults decodes a raw value (from YAML) into a typed *defaults struct.
@@ -84,6 +99,38 @@ func applyDefaults(s *step, d *defaults, raw map[string]any) {
 	}
 	if shouldApply("signal_on_stop", s.SignalOnStop == nil) && d.SignalOnStop != nil {
 		s.SignalOnStop = d.SignalOnStop
+	}
+
+	// Agent defaults: apply each field only if the step doesn't set it.
+	if d.Agent != nil {
+		if s.Agent == nil {
+			s.Agent = &agentConfig{}
+		}
+		a, da := s.Agent, d.Agent
+		if a.Model == "" && da.Model != "" {
+			a.Model = da.Model
+		}
+		if a.Tools == nil && da.Tools != nil {
+			a.Tools = da.Tools
+		}
+		if a.Skills == nil && da.Skills != nil {
+			a.Skills = da.Skills
+		}
+		if a.Soul == "" && da.Soul != "" {
+			a.Soul = da.Soul
+		}
+		if a.Memory == nil && da.Memory != nil {
+			a.Memory = da.Memory
+		}
+		if a.Prompt == "" && da.Prompt != "" {
+			a.Prompt = da.Prompt
+		}
+		if a.MaxIterations == nil && da.MaxIterations != nil {
+			a.MaxIterations = da.MaxIterations
+		}
+		if a.SafeMode == nil && da.SafeMode != nil {
+			a.SafeMode = da.SafeMode
+		}
 	}
 
 	// Additive fields: prepend defaults before step values

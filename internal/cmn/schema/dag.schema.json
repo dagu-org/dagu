@@ -342,6 +342,10 @@
             }
           ],
           "description": "Default preconditions for all steps (additive with step-level preconditions)"
+        },
+        "agent": {
+          "$ref": "#/definitions/agentStepConfig",
+          "description": "Default agent configuration for all agent-type steps. Each field is applied only when the step does not set its own value."
         }
       },
       "description": "Default values for step configuration fields. Steps inherit these defaults and can override them individually. Most fields use full replacement when overridden; env and preconditions are additive."
@@ -3071,6 +3075,10 @@
             "type": "string"
           },
           "description": "List of skill IDs the agent is allowed to use. If omitted, falls back to globally enabled skills."
+        },
+        "soul": {
+          "type": "string",
+          "description": "Soul ID for this step's agent identity. When omitted, inherits from defaults.agent.soul or uses the built-in default."
         }
       },
       "description": "Configuration for agent-type steps. Controls model selection, available tools, safety policies, and iteration limits."
