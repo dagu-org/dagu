@@ -120,6 +120,7 @@ type Server struct {
 	BasePath          string // URL path for reverse proxy subpath hosting
 	APIBasePath       string
 	Headless          bool
+	AccessLog         AccessLogMode // "all" (default), "non-public", or "none"
 	LatestStatusToday bool
 	TLS               *TLSConfig
 	Auth              Auth
@@ -163,6 +164,15 @@ const (
 	AuthModeNone    AuthMode = "none"
 	AuthModeBasic   AuthMode = "basic"
 	AuthModeBuiltin AuthMode = "builtin"
+)
+
+// AccessLogMode represents the HTTP access log mode.
+type AccessLogMode string
+
+const (
+	AccessLogAll       AccessLogMode = "all"
+	AccessLogNonPublic AccessLogMode = "non-public"
+	AccessLogNone      AccessLogMode = "none"
 )
 
 // MetricsAccess represents the access mode for the metrics endpoint.

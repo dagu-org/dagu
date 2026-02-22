@@ -53,6 +53,7 @@ import (
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
 	apiv1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	"github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/dagu-org/dagu/internal/service/frontend/metrics"
@@ -633,28 +634,65 @@ func redactTokenFromRequest(r *http.Request) *http.Request {
 	return redacted
 }
 
+// buildPublicPaths returns the set of public endpoint paths that should be
+// excluded from access logging in "non-public" mode.
+func buildPublicPaths(basePath string, metrics config.MetricsAccess) map[string]struct{} {
+	paths := []string{
+		pathutil.BuildPublicEndpointPath(basePath, "api/v1/health"),
+		pathutil.BuildPublicEndpointPath(basePath, "api/v1/auth/login"),
+		pathutil.BuildPublicEndpointPath(basePath, "api/v1/auth/setup"),
+	}
+	if metrics == config.MetricsAccessPublic {
+		paths = append(paths, pathutil.BuildPublicEndpointPath(basePath, "api/v1/metrics"))
+	}
+	set := make(map[string]struct{}, len(paths))
+	for _, p := range paths {
+		set[p] = struct{}{}
+	}
+	return set
+}
+
+// skipPathsMiddleware wraps a middleware to skip it for requests matching any of the given paths.
+func skipPathsMiddleware(mw func(http.Handler) http.Handler, skip map[string]struct{}) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		wrapped := mw(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if _, ok := skip[r.URL.Path]; ok {
+				next.ServeHTTP(w, r)
+				return
+			}
+			wrapped.ServeHTTP(w, r)
+		})
+	}
+}
+
 // Serve starts the HTTP server and configures routes.
 func (srv *Server) Serve(ctx context.Context) error {
-	logLevel := slog.LevelInfo
-	if srv.config.Core.Debug {
-		logLevel = slog.LevelDebug
-	}
-
-	requestLogger := httplog.NewLogger("http", httplog.Options{
-		LogLevel:         logLevel,
-		JSON:             srv.config.Core.LogFormat == "json",
-		Concise:          true,
-		RequestHeaders:   srv.config.Core.Debug,
-		MessageFieldName: "msg",
-		ResponseHeaders:  false,
-		QuietDownRoutes:  []string{"/api/v1/events"},
-		QuietDownPeriod:  10 * time.Second,
-	})
-
 	r := chi.NewMux()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Compress(5))
-	r.Use(sanitizedRequestLogger(requestLogger))
+	if srv.config.Server.AccessLog != config.AccessLogNone {
+		logLevel := slog.LevelInfo
+		if srv.config.Core.Debug {
+			logLevel = slog.LevelDebug
+		}
+		requestLogger := httplog.NewLogger("http", httplog.Options{
+			LogLevel:         logLevel,
+			JSON:             srv.config.Core.LogFormat == "json",
+			Concise:          true,
+			RequestHeaders:   srv.config.Core.Debug,
+			MessageFieldName: "msg",
+			ResponseHeaders:  false,
+			QuietDownRoutes:  []string{"/api/v1/events"},
+			QuietDownPeriod:  10 * time.Second,
+		})
+		logMiddleware := sanitizedRequestLogger(requestLogger)
+		if srv.config.Server.AccessLog == config.AccessLogNonPublic {
+			skipPaths := buildPublicPaths(srv.config.Server.BasePath, srv.config.Server.Metrics)
+			logMiddleware = skipPathsMiddleware(logMiddleware, skipPaths)
+		}
+		r.Use(logMiddleware)
+	}
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
