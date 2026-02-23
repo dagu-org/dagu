@@ -49,5 +49,7 @@ else
   RUN_GID=$PGID
 fi
 
-# Run the command as the dagu user and optionally the docker group
-exec sudo -E -n -u "#${PUID}" -g "#${RUN_GID}" -- "$@"
+# Run the command as the dagu user and optionally the docker group.
+# -E preserves env vars (DAGU_HOME, etc.); -H overrides HOME to the target user's
+# home directory so that ~ expands correctly (see #1698).
+exec sudo -E -H -n -u "#${PUID}" -g "#${RUN_GID}" -- "$@"
