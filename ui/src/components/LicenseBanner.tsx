@@ -5,7 +5,7 @@ import * as React from 'react';
 
 function daysUntilExpiry(expiryISO: string): number {
   if (!expiryISO) return Infinity;
-  return dayjs(expiryISO).diff(dayjs(), 'day', true);
+  return Math.ceil(dayjs(expiryISO).diff(dayjs(), 'day', true));
 }
 
 export function LicenseBanner() {
