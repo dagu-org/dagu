@@ -302,17 +302,3 @@ func TestState_IsCommunity(t *testing.T) {
 // Compile-time check: *State satisfies the Checker interface.
 var _ Checker = (*State)(nil)
 
-// TestState_ImplementsChecker ensures State satisfies the Checker interface at runtime.
-func TestState_ImplementsChecker(t *testing.T) {
-	t.Parallel()
-	var s State
-	var _ Checker = &s
-	require.NotPanics(t, func() {
-		var c Checker = &s
-		_ = c.IsFeatureEnabled(FeatureAudit)
-		_ = c.Plan()
-		_ = c.IsGracePeriod()
-		_ = c.IsCommunity()
-		_ = c.Claims()
-	})
-}

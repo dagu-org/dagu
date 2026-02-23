@@ -44,7 +44,7 @@ func newMockCloudServer(t *testing.T, cfg mockCloudServerConfig) *httptest.Serve
 
 // activateHandlerFn returns an HTTP handler that responds 200 with a signed token.
 func activateHandlerFn(token, heartbeatSecret string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(ActivateResponse{
@@ -56,7 +56,7 @@ func activateHandlerFn(token, heartbeatSecret string) http.HandlerFunc {
 
 // heartbeatHandlerFn returns an HTTP handler that responds 200 with a refreshed token.
 func heartbeatHandlerFn(token string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(HeartbeatResponse{Token: token})
@@ -66,7 +66,7 @@ func heartbeatHandlerFn(token string) http.HandlerFunc {
 // errorHandlerFn returns an HTTP handler that responds with the given status code
 // and a JSON body carrying the given message.
 func errorHandlerFn(statusCode int, message string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(statusCode)
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": message})
@@ -581,7 +581,7 @@ func TestManager_doHeartbeat(t *testing.T) {
 		pub, _ := testKeyPair(t)
 		callCount := 0
 		srv := newMockCloudServer(t, mockCloudServerConfig{
-			heartbeatHandler: func(w http.ResponseWriter, r *http.Request) {
+			heartbeatHandler: func(w http.ResponseWriter, _ *http.Request) {
 				callCount++
 				w.WriteHeader(http.StatusOK)
 			},
@@ -656,7 +656,7 @@ func TestManager_doHeartbeat(t *testing.T) {
 		token := signToken(t, priv, claims)
 
 		// Start and immediately close the server to produce connection-refused errors.
-		deadSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+		deadSrv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 		deadSrv.Close()
 
 		m := NewManager(ManagerConfig{

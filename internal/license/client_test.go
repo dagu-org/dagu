@@ -105,7 +105,7 @@ func TestCloudClient_Activate(t *testing.T) {
 	t.Run("500 with JSON error body returns CloudError with extracted message", func(t *testing.T) {
 		t.Parallel()
 
-		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(map[string]string{"message": "server error"})
@@ -131,7 +131,7 @@ func TestCloudClient_Activate(t *testing.T) {
 	t.Run("500 with plain text body returns CloudError with raw body as message", func(t *testing.T) {
 		t.Parallel()
 
-		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte("internal server error"))
 		})
@@ -157,7 +157,7 @@ func TestCloudClient_Activate(t *testing.T) {
 		t.Parallel()
 
 		// Close the server immediately so all connections are refused.
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+		server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 		server.Close()
 
 		client := NewCloudClient(server.URL)
@@ -176,7 +176,7 @@ func TestCloudClient_Activate(t *testing.T) {
 	t.Run("200 with invalid JSON body returns unmarshal error", func(t *testing.T) {
 		t.Parallel()
 
-		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("this is not json {{{"))
 		})
@@ -237,7 +237,7 @@ func TestCloudClient_Heartbeat(t *testing.T) {
 	t.Run("410 Gone returns CloudError with status 410", func(t *testing.T) {
 		t.Parallel()
 
-		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusGone)
 			_ = json.NewEncoder(w).Encode(map[string]string{"message": "license has been revoked"})
@@ -262,7 +262,7 @@ func TestCloudClient_Heartbeat(t *testing.T) {
 	t.Run("401 Unauthorized returns CloudError with status 401", func(t *testing.T) {
 		t.Parallel()
 
-		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
 			_ = json.NewEncoder(w).Encode(map[string]string{"message": "unauthorized"})
@@ -290,7 +290,7 @@ func TestCloudClient_Heartbeat(t *testing.T) {
 		// Use a channel to keep the handler blocked until the test is done,
 		// ensuring the context cancellation is the first thing the client sees.
 		blockCh := make(chan struct{})
-		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			<-blockCh
 		})
 

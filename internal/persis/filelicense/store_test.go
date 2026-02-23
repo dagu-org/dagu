@@ -25,6 +25,7 @@ func sampleActivationData() *license.ActivationData {
 
 // TestSaveLoad_RoundTrip verifies that all fields survive a Save → Load cycle.
 func TestSaveLoad_RoundTrip(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	s := New(dir)
 
@@ -44,6 +45,7 @@ func TestSaveLoad_RoundTrip(t *testing.T) {
 // TestSave_Overwrite verifies that a second Save replaces the first;
 // Load must return the most-recently-saved data.
 func TestSave_Overwrite(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	s := New(dir)
 
@@ -76,6 +78,7 @@ func TestSave_Overwrite(t *testing.T) {
 // TestSave_CreatesNestedDirectories verifies that Save creates the target
 // directory (including intermediate directories) when it does not yet exist.
 func TestSave_CreatesNestedDirectories(t *testing.T) {
+	t.Parallel()
 	base := t.TempDir()
 	dir := filepath.Join(base, "a", "b", "c", "license")
 
@@ -90,6 +93,7 @@ func TestSave_CreatesNestedDirectories(t *testing.T) {
 // TestSave_FilePermissions verifies that the activation file is written with
 // 0600 permissions (owner read/write only).
 func TestSave_FilePermissions(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	s := New(dir)
 
@@ -106,6 +110,7 @@ func TestSave_FilePermissions(t *testing.T) {
 // TestSave_DirectoryPermissions verifies that Save creates the directory with
 // 0700 permissions (owner read/write/execute only).
 func TestSave_DirectoryPermissions(t *testing.T) {
+	t.Parallel()
 	base := t.TempDir()
 	dir := filepath.Join(base, "license_dir")
 
@@ -122,6 +127,7 @@ func TestSave_DirectoryPermissions(t *testing.T) {
 // TestSave_PrettyPrintedJSON verifies that the file contains indented JSON
 // (i.e. json.MarshalIndent was used rather than json.Marshal).
 func TestSave_PrettyPrintedJSON(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	s := New(dir)
 
@@ -143,6 +149,7 @@ func TestSave_PrettyPrintedJSON(t *testing.T) {
 // TestLoad_NoFile verifies that Load returns (nil, nil) when the activation
 // file does not exist yet (fresh installation).
 func TestLoad_NoFile(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	s := New(dir)
 
@@ -154,6 +161,7 @@ func TestLoad_NoFile(t *testing.T) {
 // TestLoad_InvalidJSON verifies that Load returns an error whose message
 // contains "unmarshal" when the file contains malformed JSON.
 func TestLoad_InvalidJSON(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	s := New(dir)
 
@@ -171,6 +179,7 @@ func TestLoad_InvalidJSON(t *testing.T) {
 // "read") when the activation file cannot be read because a plain file
 // sits in the path where the directory should be.
 func TestLoad_ReadError(t *testing.T) {
+	t.Parallel()
 	base := t.TempDir()
 
 	// Place a regular file where the license directory would be, so that
@@ -190,6 +199,7 @@ func TestLoad_ReadError(t *testing.T) {
 // TestRemove_DeletesExistingFile verifies that Remove causes the activation
 // file to disappear from disk; a subsequent Load returns (nil, nil).
 func TestRemove_DeletesExistingFile(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	s := New(dir)
 
@@ -203,6 +213,7 @@ func TestRemove_DeletesExistingFile(t *testing.T) {
 // TestRemove_NoFile verifies that Remove does not return an error when the
 // activation file does not exist (idempotent operation).
 func TestRemove_NoFile(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	s := New(dir)
 
@@ -213,6 +224,7 @@ func TestRemove_NoFile(t *testing.T) {
 // TestRemove_ThenLoad verifies that after Remove the subsequent Load returns
 // (nil, nil).
 func TestRemove_ThenLoad(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	s := New(dir)
 
@@ -242,7 +254,7 @@ func TestConcurrency_SaveAndLoad(t *testing.T) {
 		wg.Add(2)
 
 		// Writer goroutine
-		go func(idx int) {
+		go func(_ int) {
 			defer wg.Done()
 			ad := &license.ActivationData{
 				Token:           "tok-concurrent",
@@ -256,7 +268,7 @@ func TestConcurrency_SaveAndLoad(t *testing.T) {
 		}(i)
 
 		// Reader goroutine
-		go func(idx int) {
+		go func(_ int) {
 			defer wg.Done()
 			if _, err := s.Load(); err != nil {
 				errCh <- err
@@ -289,7 +301,7 @@ func TestConcurrency_SaveAndRemove(t *testing.T) {
 		wg.Add(2)
 
 		// Saver
-		go func(idx int) {
+		go func(_ int) {
 			defer wg.Done()
 			ad := &license.ActivationData{
 				Token:    "tok-race",
@@ -301,7 +313,7 @@ func TestConcurrency_SaveAndRemove(t *testing.T) {
 		}(i)
 
 		// Remover
-		go func(idx int) {
+		go func(_ int) {
 			defer wg.Done()
 			// Remove may legitimately fail-not-exist if a concurrent Remove won
 			// the race; that is handled inside Remove already and returns nil.
@@ -325,6 +337,7 @@ func TestConcurrency_SaveAndRemove(t *testing.T) {
 // and then saving again with different values, Load reflects only the
 // latest write.
 func TestSaveLoad_OverwriteReturnsUpdatedData(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	s := New(dir)
 
