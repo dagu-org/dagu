@@ -8,6 +8,8 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/license"
+	"github.com/dagu-org/dagu/internal/service/frontend"
 	apiimpl "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
@@ -63,17 +65,40 @@ func TestExtractWebhookToken(t *testing.T) {
 	}
 }
 
-// setupWebhookTestServer creates a test server with builtin auth enabled
-func setupWebhookTestServer(t *testing.T, extraMutators ...func(*config.Config)) test.Server {
+// setupWebhookTestServer creates a test server with builtin auth enabled.
+// It accepts config mutators and optional HelperOptions for additional setup (e.g. license manager).
+func setupWebhookTestServer(t *testing.T, extraMutators ...any) test.Server {
 	t.Helper()
-	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
-		cfg.Server.Auth.Mode = config.AuthModeBuiltin
-		cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
-		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
-		for _, m := range extraMutators {
-			m(cfg)
+
+	var configMutators []func(*config.Config)
+	var helperOpts []test.HelperOption
+	for _, m := range extraMutators {
+		switch v := m.(type) {
+		case func(*config.Config):
+			configMutators = append(configMutators, v)
+		case test.HelperOption:
+			helperOpts = append(helperOpts, v)
 		}
-	}))
+	}
+
+	// By default, inject a license manager with rbac so user-management endpoints work.
+	// Tests that need to verify unlicensed behavior should pass their own HelperOptions.
+	defaultLM := license.NewTestManager(license.FeatureRBAC, license.FeatureAudit)
+
+	opts := []test.HelperOption{
+		test.WithConfigMutator(func(cfg *config.Config) {
+			cfg.Server.Auth.Mode = config.AuthModeBuiltin
+			cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
+			cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
+			for _, m := range configMutators {
+				m(cfg)
+			}
+		}),
+		test.WithServerOptions(frontend.WithLicenseManager(defaultLM)),
+	}
+	opts = append(opts, helperOpts...)
+
+	server := test.SetupServer(t, opts...)
 
 	// Create admin via setup endpoint
 	server.Client().Post("/api/v1/auth/setup", api.SetupRequest{

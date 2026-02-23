@@ -11,8 +11,11 @@ import (
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 )
 
-// ListUsers returns a list of all users. Requires admin role.
+// ListUsers returns a list of all users. Requires admin role and RBAC license.
 func (a *API) ListUsers(ctx context.Context, _ api.ListUsersRequestObject) (api.ListUsersResponseObject, error) {
+	if err := a.requireLicensedRBAC(); err != nil {
+		return nil, err
+	}
 	if err := a.requireUserManagement(); err != nil {
 		return nil, err
 	}

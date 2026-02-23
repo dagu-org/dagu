@@ -1,7 +1,7 @@
 import { Theme } from '@radix-ui/themes';
 import '@radix-ui/themes/styles.css';
 import React from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
 import { SWRConfig } from 'swr';
 
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -11,6 +11,7 @@ import { AppBarContext } from './contexts/AppBarContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { Config, ConfigContext, ConfigUpdateContext } from './contexts/ConfigContext';
 import { useHasFeature } from './hooks/useLicense';
+import { Shield } from 'lucide-react';
 import { PageContextProvider } from './contexts/PageContext';
 import { SchemaProvider } from './contexts/SchemaContext';
 import { SearchStateProvider } from './contexts/SearchStateContext';
@@ -105,8 +106,19 @@ function LicensedRoute({
 }): React.ReactElement {
   const hasFeature = useHasFeature(feature);
   if (hasFeature) return children;
-  // Feature not licensed: redirect to home
-  return <Navigate to="/" replace />;
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
+      <Shield size={48} className="text-muted-foreground" />
+      <h2 className="text-xl font-semibold">Pro License Required</h2>
+      <p className="text-sm text-muted-foreground max-w-md">
+        This feature requires a Dagu Pro license. Visit the{' '}
+        <Link to="/license" className="text-primary underline underline-offset-2">
+          License
+        </Link>{' '}
+        page to activate your license.
+      </p>
+    </div>
+  );
 }
 
 function AppInner({ config: initialConfig }: Props): React.ReactElement {

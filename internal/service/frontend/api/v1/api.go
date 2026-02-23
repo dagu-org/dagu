@@ -503,6 +503,11 @@ var (
 		Code:       api.ErrorCodeForbidden,
 		Message:    "User management requires a Dagu Pro license",
 	}
+	errAuditNotLicensed = &Error{
+		HTTPStatus: http.StatusForbidden,
+		Code:       api.ErrorCodeForbidden,
+		Message:    "Audit logs require a Dagu Pro license",
+	}
 )
 
 // requireDAGWrite checks all permissions for DAG write operations:
@@ -553,17 +558,23 @@ func (a *API) requireUserManagement() error {
 }
 
 // requireLicensedRBAC checks if the RBAC feature is licensed.
-// Returns nil if no license manager is set (community mode - no gating).
 func (a *API) requireLicensedRBAC() error {
 	if a.licenseManager == nil {
-		return nil
-	}
-	checker := a.licenseManager.Checker()
-	if checker.IsCommunity() {
-		return nil
-	}
-	if !checker.IsFeatureEnabled(license.FeatureRBAC) {
 		return errRBACNotLicensed
+	}
+	if !a.licenseManager.Checker().IsFeatureEnabled(license.FeatureRBAC) {
+		return errRBACNotLicensed
+	}
+	return nil
+}
+
+// requireLicensedAudit checks if the audit feature is licensed.
+func (a *API) requireLicensedAudit() error {
+	if a.licenseManager == nil {
+		return errAuditNotLicensed
+	}
+	if !a.licenseManager.Checker().IsFeatureEnabled(license.FeatureAudit) {
+		return errAuditNotLicensed
 	}
 	return nil
 }

@@ -7,6 +7,8 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/license"
+	"github.com/dagu-org/dagu/internal/service/frontend"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,11 +30,16 @@ func getAdminToken(t *testing.T, server test.Server) string {
 
 func setupBuiltinAuthServer(t *testing.T) test.Server {
 	t.Helper()
-	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
-		cfg.Server.Auth.Mode = config.AuthModeBuiltin
-		cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
-		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
-	}))
+	server := test.SetupServer(t,
+		test.WithConfigMutator(func(cfg *config.Config) {
+			cfg.Server.Auth.Mode = config.AuthModeBuiltin
+			cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
+			cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
+		}),
+		test.WithServerOptions(frontend.WithLicenseManager(
+			license.NewTestManager(license.FeatureRBAC, license.FeatureAudit),
+		)),
+	)
 
 	// Create admin via setup endpoint
 	server.Client().Post("/api/v1/auth/setup", api.SetupRequest{

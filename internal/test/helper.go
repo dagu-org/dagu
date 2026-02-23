@@ -22,6 +22,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/core"
 	exec1 "github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/service/frontend"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
@@ -53,6 +54,7 @@ type Options struct {
 	ConfigMutators       []func(*config.Config)
 	CoordinatorHost      string
 	CoordinatorPort      int
+	ServerOptions        []frontend.ServerOption
 	// Coordinator handler options for shared-nothing worker tests
 	WithStatusPersistence bool // Enable status persistence via DAGRunStore
 	WithLogPersistence    bool // Enable log persistence to filesystem
@@ -105,6 +107,13 @@ func WithStatusPersistence() HelperOption {
 func WithLogPersistence() HelperOption {
 	return func(opts *Options) {
 		opts.WithLogPersistence = true
+	}
+}
+
+// WithServerOptions appends frontend.ServerOption values to be passed when creating the test server.
+func WithServerOptions(serverOpts ...frontend.ServerOption) HelperOption {
+	return func(opts *Options) {
+		opts.ServerOptions = append(opts.ServerOptions, serverOpts...)
 	}
 }
 
@@ -226,6 +235,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		QueueStore:      queueStore,
 		ServiceRegistry: serviceMonitor,
 		SubCmdBuilder:   runtimepkg.NewSubCmdBuilder(cfg),
+		ServerOptions:   options.ServerOptions,
 
 		tmpDir: tmpDir,
 	}
@@ -417,6 +427,7 @@ type Helper struct {
 	QueueStore      exec1.QueueStore
 	ServiceRegistry exec1.ServiceRegistry
 	SubCmdBuilder   *runtimepkg.SubCmdBuilder
+	ServerOptions   []frontend.ServerOption
 
 	tmpDir string
 }

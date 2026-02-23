@@ -9,8 +9,12 @@ import (
 )
 
 // ListAuditLogs returns audit log entries matching the filter criteria.
-// Requires manager or admin role.
+// Requires audit license and manager or admin role.
 func (a *API) ListAuditLogs(ctx context.Context, request api.ListAuditLogsRequestObject) (api.ListAuditLogsResponseObject, error) {
+	if err := a.requireLicensedAudit(); err != nil {
+		return nil, err
+	}
+
 	// Check that audit service is configured
 	if a.auditService == nil {
 		return nil, &Error{

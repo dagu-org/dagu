@@ -8,6 +8,5 @@ export function useLicense(): LicenseStatus {
 
 export function useHasFeature(feature: string): boolean {
   const license = useLicense();
-  if (license.community) return true;
   return license.features.includes(feature);
 }

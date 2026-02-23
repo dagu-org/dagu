@@ -429,10 +429,10 @@ export const mainListItems = React.forwardRef<
           {isAdmin && (
             <div className="space-y-0.5">
               <SectionLabel label="Admin" isOpen={isOpen} customColor={customColor} />
-              {config.authMode === 'builtin' && hasRbac && (
+              {config.authMode === 'builtin' && (
                 <NavItem
                   to="/users"
-                  text="Users"
+                  text={hasRbac ? 'Users' : 'Users (Pro)'}
                   icon={<Users size={18} />}
                   isOpen={isOpen}
                   onClick={onNavItemClick}
@@ -521,10 +521,10 @@ export const mainListItems = React.forwardRef<
                     customColor={customColor}
                   />
                 )}
-                {canViewAuditLogs && hasAudit && (
+                {canViewAuditLogs && (
                   <NavItem
                     to="/audit-logs"
-                    text="Audit Logs"
+                    text={hasAudit ? 'Audit Logs' : 'Audit Logs (Pro)'}
                     icon={<ScrollText size={18} />}
                     isOpen={isOpen}
                     onClick={onNavItemClick}
