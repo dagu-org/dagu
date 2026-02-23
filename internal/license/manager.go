@@ -271,7 +271,7 @@ func (m *Manager) doHeartbeat(ctx context.Context, ad *ActivationData) {
 	}
 
 	resp, err := m.client.Heartbeat(ctx, HeartbeatRequest{
-		LicenseID:       claims.ActivationID,
+		LicenseID:       claims.ID,
 		ServerID:        ad.ServerID,
 		HeartbeatSecret: ad.HeartbeatSecret,
 		ClientVersion:   config.Version,
