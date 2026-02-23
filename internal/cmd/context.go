@@ -217,13 +217,18 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	var licMgr *license.Manager
 	switch cmd.Name() {
 	case "server", "start-all":
+		pubKey, pubKeyErr := license.PublicKey()
+		if pubKeyErr != nil {
+			logger.Warn(ctx, "Failed to load license public key", tag.Error(pubKeyErr))
+			break
+		}
 		licenseDir := filepath.Join(cfg.Paths.DataDir, "license")
 		licStore := filelicense.New(licenseDir)
 		licMgr = license.NewManager(license.ManagerConfig{
 			LicenseDir: licenseDir,
 			ConfigKey:  cfg.License.Key,
 			CloudURL:   cfg.License.CloudURL,
-		}, licStore, slog.Default())
+		}, pubKey, licStore, slog.Default())
 		if err := licMgr.Start(ctx); err != nil {
 			logger.Warn(ctx, "License manager initialization failed", tag.Error(err))
 		}

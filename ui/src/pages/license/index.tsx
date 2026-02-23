@@ -1,14 +1,16 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { useConfig } from '@/contexts/ConfigContext';
+import { useConfig, useUpdateConfig } from '@/contexts/ConfigContext';
 import { TOKEN_KEY } from '@/contexts/AuthContext';
+import dayjs from '@/lib/dayjs';
 import { CheckCircle2, Shield, XCircle } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
 
 export default function LicensePage() {
   const config = useConfig();
   const { license } = config;
+  const updateConfig = useUpdateConfig();
   const appBarContext = useContext(AppBarContext);
 
   const [key, setKey] = useState('');
@@ -41,8 +43,18 @@ export default function LicensePage() {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.message || 'Activation failed');
       }
-      // Reload to pick up new license state from server-rendered config
-      window.location.reload();
+      const data = await response.json();
+      updateConfig({
+        license: {
+          valid: true,
+          plan: data.plan || 'pro',
+          features: data.features || [],
+          expiry: data.expiry || '',
+          gracePeriod: false,
+          community: false,
+        },
+      });
+      setKey('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Activation failed');
     } finally {
@@ -101,7 +113,7 @@ export default function LicensePage() {
           {license.expiry && (
             <>
               <span className="text-muted-foreground">Expires</span>
-              <span>{new Date(license.expiry).toLocaleDateString()}</span>
+              <span>{dayjs(license.expiry).format('YYYY-MM-DD')}</span>
             </>
           )}
         </div>

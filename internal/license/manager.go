@@ -36,14 +36,15 @@ type Manager struct {
 	pubKey ed25519.PublicKey
 	logger *slog.Logger
 
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	cancelMu sync.Mutex
+	cancel   context.CancelFunc
+	wg       sync.WaitGroup
 
 	heartbeatOnce sync.Once
 }
 
 // NewManager creates a new license manager.
-func NewManager(cfg ManagerConfig, store ActivationStore, logger *slog.Logger) *Manager {
+func NewManager(cfg ManagerConfig, pubKey ed25519.PublicKey, store ActivationStore, logger *slog.Logger) *Manager {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -52,7 +53,7 @@ func NewManager(cfg ManagerConfig, store ActivationStore, logger *slog.Logger) *
 		state:  &State{},
 		store:  store,
 		client: NewCloudClient(cfg.CloudURL),
-		pubKey: PublicKey(),
+		pubKey: pubKey,
 		logger: logger,
 	}
 }
@@ -118,8 +119,11 @@ func (m *Manager) Start(ctx context.Context) error {
 
 // Stop cancels the heartbeat goroutine and waits for completion.
 func (m *Manager) Stop() {
-	if m.cancel != nil {
-		m.cancel()
+	m.cancelMu.Lock()
+	cancel := m.cancel
+	m.cancelMu.Unlock()
+	if cancel != nil {
+		cancel()
 	}
 	m.wg.Wait()
 }
@@ -158,7 +162,11 @@ func (m *Manager) activate(ctx context.Context, key string) (*ActivationData, er
 		return nil, fmt.Errorf("failed to get server ID: %w", err)
 	}
 
-	hostname, _ := os.Hostname()
+	hostname, err := os.Hostname()
+	if err != nil {
+		m.logger.Warn("Failed to get hostname", slog.String("error", err.Error()))
+		hostname = "unknown"
+	}
 
 	resp, err := m.client.Activate(ctx, ActivateRequest{
 		Key:         key,
@@ -188,7 +196,9 @@ func (m *Manager) activate(ctx context.Context, key string) (*ActivationData, er
 func (m *Manager) startHeartbeat(ad *ActivationData) {
 	m.heartbeatOnce.Do(func() {
 		ctx, cancel := context.WithCancel(context.Background())
+		m.cancelMu.Lock()
 		m.cancel = cancel
+		m.cancelMu.Unlock()
 		m.wg.Add(1)
 		go m.heartbeatLoop(ctx, ad)
 	})

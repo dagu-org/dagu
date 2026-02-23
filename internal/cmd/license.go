@@ -34,6 +34,12 @@ func licenseActivate() *cobra.Command {
 			Args:  cobra.ExactArgs(1),
 		}, nil, func(ctx *Context, args []string) error {
 			key := args[0]
+
+			pubKey, err := license.PublicKey()
+			if err != nil {
+				return fmt.Errorf("failed to load license public key: %w", err)
+			}
+
 			licenseDir := filepath.Join(ctx.Config.Paths.DataDir, "license")
 			store := filelicense.New(licenseDir)
 
@@ -41,7 +47,7 @@ func licenseActivate() *cobra.Command {
 				LicenseDir: licenseDir,
 				ConfigKey:  key,
 				CloudURL:   ctx.Config.License.CloudURL,
-			}, store, slog.Default())
+			}, pubKey, store, slog.Default())
 
 			result, err := mgr.ActivateWithKey(ctx, key)
 			if err != nil {
@@ -86,6 +92,11 @@ func licenseCheck() *cobra.Command {
 			Use:   "check",
 			Short: "Display current license status",
 		}, nil, func(ctx *Context, _ []string) error {
+			pubKey, err := license.PublicKey()
+			if err != nil {
+				return fmt.Errorf("failed to load license public key: %w", err)
+			}
+
 			licenseDir := filepath.Join(ctx.Config.Paths.DataDir, "license")
 			store := filelicense.New(licenseDir)
 
@@ -93,7 +104,7 @@ func licenseCheck() *cobra.Command {
 				LicenseDir: licenseDir,
 				ConfigKey:  ctx.Config.License.Key,
 				CloudURL:   ctx.Config.License.CloudURL,
-			}, store, slog.Default())
+			}, pubKey, store, slog.Default())
 
 			if err := mgr.Start(ctx); err != nil {
 				return err

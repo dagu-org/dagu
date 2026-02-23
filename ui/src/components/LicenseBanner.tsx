@@ -1,12 +1,11 @@
 import { useConfig } from '@/contexts/ConfigContext';
+import dayjs from '@/lib/dayjs';
 import { X } from 'lucide-react';
 import * as React from 'react';
 
 function daysUntilExpiry(expiryISO: string): number {
   if (!expiryISO) return Infinity;
-  const now = new Date();
-  const expiry = new Date(expiryISO);
-  return Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  return dayjs(expiryISO).diff(dayjs(), 'day', true);
 }
 
 export function LicenseBanner() {
@@ -26,10 +25,10 @@ export function LicenseBanner() {
   // Grace period: non-dismissible amber banner
   if (license.gracePeriod) {
     const graceEnd = license.expiry
-      ? new Date(new Date(license.expiry).getTime() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString()
+      ? dayjs(license.expiry).add(14, 'day').format('YYYY-MM-DD')
       : 'soon';
     return (
-      <div className="bg-amber-50 dark:bg-amber-950 border-b border-amber-200 dark:border-amber-800 px-4 py-1.5 flex items-center text-sm">
+      <div role="status" className="bg-amber-50 dark:bg-amber-950 border-b border-amber-200 dark:border-amber-800 px-4 py-1.5 flex items-center text-sm">
         <span className="text-amber-800 dark:text-amber-200">
           Your Dagu Pro license has expired. Features will be disabled on {graceEnd}. Please{' '}
           <a
@@ -53,7 +52,7 @@ export function LicenseBanner() {
   // 7-day urgent banner
   if (days <= 7 && !dismissed7d) {
     return (
-      <div className="bg-orange-50 dark:bg-orange-950 border-b border-orange-200 dark:border-orange-800 px-4 py-1.5 flex items-center justify-between text-sm">
+      <div role="alert" className="bg-orange-50 dark:bg-orange-950 border-b border-orange-200 dark:border-orange-800 px-4 py-1.5 flex items-center justify-between text-sm">
         <span className="text-orange-800 dark:text-orange-200">
           Your Dagu Pro license expires in {days} day{days !== 1 ? 's' : ''}! Please{' '}
           <a
@@ -82,7 +81,7 @@ export function LicenseBanner() {
   // 30-day warning banner
   if (days <= 30 && !dismissed30d) {
     return (
-      <div className="bg-yellow-50 dark:bg-yellow-950 border-b border-yellow-200 dark:border-yellow-800 px-4 py-1.5 flex items-center justify-between text-sm">
+      <div role="status" className="bg-yellow-50 dark:bg-yellow-950 border-b border-yellow-200 dark:border-yellow-800 px-4 py-1.5 flex items-center justify-between text-sm">
         <span className="text-yellow-800 dark:text-yellow-200">
           Your Dagu Pro license expires in {days} day{days !== 1 ? 's' : ''}. Please{' '}
           <a
