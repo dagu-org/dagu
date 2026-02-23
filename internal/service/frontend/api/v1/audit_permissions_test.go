@@ -7,8 +7,6 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/license"
-	"github.com/dagu-org/dagu/internal/service/frontend"
 	"github.com/dagu-org/dagu/internal/test"
 )
 
@@ -87,13 +85,12 @@ func TestAudit_RequiresManagerOrAbove(t *testing.T) {
 }
 
 // setupLicensedAuditTestServer creates a test server with audit enabled and a
-// license manager that has both "audit" and "rbac" features.
+// license manager that has both "audit" and "rbac" features (via setupWebhookTestServer defaults).
 func setupLicensedAuditTestServer(t *testing.T) test.Server {
 	t.Helper()
-	lm := license.NewTestManager(license.FeatureAudit, license.FeatureRBAC)
 	return setupWebhookTestServer(t, func(cfg *config.Config) {
 		cfg.Server.Audit.Enabled = true
-	}, test.WithServerOptions(frontend.WithLicenseManager(lm)))
+	})
 }
 
 func TestAudit_RequiresLicense(t *testing.T) {

@@ -7,7 +7,6 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/license"
 	"github.com/dagu-org/dagu/internal/service/frontend"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
@@ -146,9 +145,7 @@ func TestActivateLicense_RequiresAdmin_BuiltinMode(t *testing.T) {
 			cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key-license-admin"
 			cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
 		}),
-		test.WithServerOptions(frontend.WithLicenseManager(
-			license.NewTestManager(license.FeatureRBAC, license.FeatureAudit),
-		)),
+		test.WithServerOptions(frontend.WithLicenseManager(defaultTestLicenseManager())),
 	)
 
 	// Bootstrap admin.

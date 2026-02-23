@@ -65,40 +65,28 @@ func TestExtractWebhookToken(t *testing.T) {
 	}
 }
 
-// setupWebhookTestServer creates a test server with builtin auth enabled.
-// It accepts config mutators and optional HelperOptions for additional setup (e.g. license manager).
-func setupWebhookTestServer(t *testing.T, extraMutators ...any) test.Server {
+// defaultTestLicenseManager returns a license manager with all Pro features
+// enabled, for use in tests that need licensed endpoints (user management, audit, etc.).
+func defaultTestLicenseManager() *license.Manager {
+	return license.NewTestManager(license.FeatureRBAC, license.FeatureAudit)
+}
+
+// setupWebhookTestServer creates a test server with builtin auth and a default
+// Pro license. Extra config mutators are applied after the base auth config.
+func setupWebhookTestServer(t *testing.T, extraMutators ...func(*config.Config)) test.Server {
 	t.Helper()
 
-	var configMutators []func(*config.Config)
-	var helperOpts []test.HelperOption
-	for _, m := range extraMutators {
-		switch v := m.(type) {
-		case func(*config.Config):
-			configMutators = append(configMutators, v)
-		case test.HelperOption:
-			helperOpts = append(helperOpts, v)
-		}
-	}
-
-	// By default, inject a license manager with rbac so user-management endpoints work.
-	// Tests that need to verify unlicensed behavior should pass their own HelperOptions.
-	defaultLM := license.NewTestManager(license.FeatureRBAC, license.FeatureAudit)
-
-	opts := []test.HelperOption{
+	server := test.SetupServer(t,
 		test.WithConfigMutator(func(cfg *config.Config) {
 			cfg.Server.Auth.Mode = config.AuthModeBuiltin
 			cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
 			cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
-			for _, m := range configMutators {
+			for _, m := range extraMutators {
 				m(cfg)
 			}
 		}),
-		test.WithServerOptions(frontend.WithLicenseManager(defaultLM)),
-	}
-	opts = append(opts, helperOpts...)
-
-	server := test.SetupServer(t, opts...)
+		test.WithServerOptions(frontend.WithLicenseManager(defaultTestLicenseManager())),
+	)
 
 	// Create admin via setup endpoint
 	server.Client().Post("/api/v1/auth/setup", api.SetupRequest{

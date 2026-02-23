@@ -7,7 +7,6 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/license"
 	"github.com/dagu-org/dagu/internal/service/frontend"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -230,9 +229,7 @@ func setupServer(t *testing.T) test.Server {
 			cfg.Server.Auth.Builtin.Token.Secret = "test-jwt-secret-key-setup"
 			cfg.Server.Auth.Builtin.Token.TTL = time.Hour
 		}),
-		test.WithServerOptions(frontend.WithLicenseManager(
-			license.NewTestManager(license.FeatureRBAC, license.FeatureAudit),
-		)),
+		test.WithServerOptions(frontend.WithLicenseManager(defaultTestLicenseManager())),
 	)
 }
 
