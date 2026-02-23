@@ -74,6 +74,7 @@ type Definition struct {
 	Session    *SessionDef    `mapstructure:"session"`
 	GitSync    *GitSyncDef    `mapstructure:"git_sync"`
 	Tunnel     *TunnelDef     `mapstructure:"tunnel"`
+	License    *LicenseDef    `mapstructure:"license"`
 }
 
 // -----------------------------------------------------------------------------
@@ -367,4 +368,14 @@ type TunnelRateLimitDef struct {
 	LoginAttempts        int   `mapstructure:"login_attempts"`         // Default: 5
 	WindowSeconds        int   `mapstructure:"window_seconds"`         // Default: 300
 	BlockDurationSeconds int   `mapstructure:"block_duration_seconds"` // Default: 900
+}
+
+// -----------------------------------------------------------------------------
+// License Configuration
+// -----------------------------------------------------------------------------
+
+// LicenseDef configures license activation.
+type LicenseDef struct {
+	Key      string `mapstructure:"key"`
+	CloudURL string `mapstructure:"cloud_url"`
 }

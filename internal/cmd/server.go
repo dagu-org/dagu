@@ -57,6 +57,11 @@ func runServer(ctx *Context, _ []string) error {
 	// Create a signal-aware context for services
 	serviceCtx := ctx.WithContext(signalCtx)
 
+	// Stop license manager on shutdown
+	if ctx.LicenseManager != nil {
+		defer ctx.LicenseManager.Stop()
+	}
+
 	logger.Info(serviceCtx, "Server initialization",
 		tag.Host(serviceCtx.Config.Server.Host),
 		tag.Port(serviceCtx.Config.Server.Port),

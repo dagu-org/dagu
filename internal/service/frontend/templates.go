@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/license"
 )
 
 //go:embed templates/* assets/*
@@ -85,6 +86,7 @@ type funcsConfig struct {
 	UpdateAvailable      bool
 	LatestVersion        string
 	AgentEnabledChecker  AgentEnabledChecker
+	LicenseChecker       license.Checker
 }
 
 func defaultFunctions(cfg *funcsConfig) template.FuncMap {
@@ -127,6 +129,52 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 		},
 		"updateAvailable": func() string { return boolStr(cfg.UpdateAvailable) },
 		"latestVersion":   func() string { return cfg.LatestVersion },
+
+		// License functions
+		"licenseValid": func() string {
+			if cfg.LicenseChecker == nil || cfg.LicenseChecker.IsCommunity() {
+				return "false"
+			}
+			return "true"
+		},
+		"licensePlan": func() string {
+			if cfg.LicenseChecker == nil {
+				return ""
+			}
+			return cfg.LicenseChecker.Plan()
+		},
+		"licenseExpiry": func() string {
+			if cfg.LicenseChecker == nil {
+				return ""
+			}
+			claims := cfg.LicenseChecker.Claims()
+			if claims == nil || claims.ExpiresAt == nil {
+				return ""
+			}
+			return claims.ExpiresAt.Format("2006-01-02T15:04:05Z")
+		},
+		"licenseFeatures": func() string {
+			if cfg.LicenseChecker == nil {
+				return ""
+			}
+			claims := cfg.LicenseChecker.Claims()
+			if claims == nil {
+				return ""
+			}
+			return strings.Join(claims.Features, ",")
+		},
+		"licenseGracePeriod": func() string {
+			if cfg.LicenseChecker == nil {
+				return "false"
+			}
+			return boolStr(cfg.LicenseChecker.IsGracePeriod())
+		},
+		"licenseCommunity": func() string {
+			if cfg.LicenseChecker == nil {
+				return "true"
+			}
+			return boolStr(cfg.LicenseChecker.IsCommunity())
+		},
 
 		// Path configuration functions
 		"pathDAGsDir":            func() string { return cfg.Paths.DAGsDir },

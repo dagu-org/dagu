@@ -98,15 +98,16 @@ const (
 	SectionMonitoring                            // 128
 	SectionGitSync                               // 256
 	SectionTunnel                                // 512
+	SectionLicense                               // 1024
 
 	// SectionAll combines all sections (useful for ServiceNone/CLI)
-	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel
+	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel | SectionLicense
 )
 
 // serviceRequirements maps services to their required config sections using bitwise OR.
 var serviceRequirements = map[Service]ConfigSection{
 	ServiceNone:        SectionAll,
-	ServiceServer:      SectionServer | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel,
+	ServiceServer:      SectionServer | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel | SectionLicense,
 	ServiceScheduler:   SectionScheduler | SectionCoordinator | SectionQueues,
 	ServiceWorker:      SectionWorker | SectionCoordinator,
 	ServiceCoordinator: SectionCoordinator,
@@ -247,6 +248,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		{SectionMonitoring, func() { l.loadMonitoringConfig(&cfg, def) }},
 		{SectionGitSync, func() { l.loadGitSyncConfig(&cfg, def) }},
 		{SectionTunnel, func() { l.loadTunnelConfig(&cfg, def) }},
+		{SectionLicense, func() { l.loadLicenseConfig(&cfg, def) }},
 	}
 
 	for _, sl := range sectionLoaders {
@@ -917,6 +919,14 @@ func setDefaultIfNotPositive(target *int, defaultValue int) {
 	}
 }
 
+func (l *ConfigLoader) loadLicenseConfig(cfg *Config, def Definition) {
+	if def.License == nil {
+		return
+	}
+	cfg.License.Key = def.License.Key
+	cfg.License.CloudURL = def.License.CloudURL
+}
+
 func (l *ConfigLoader) loadExecutionModeConfig(cfg *Config, _ Definition) {
 	mode := ExecutionMode(l.v.GetString("default_execution_mode"))
 	if mode == "" {
@@ -1312,6 +1322,10 @@ var envBindings = []envBinding{
 	{key: "tunnel.rate_limiting.login_attempts", env: "TUNNEL_RATE_LIMITING_LOGIN_ATTEMPTS"},
 	{key: "tunnel.rate_limiting.window_seconds", env: "TUNNEL_RATE_LIMITING_WINDOW_SECONDS"},
 	{key: "tunnel.rate_limiting.block_duration_seconds", env: "TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS"},
+
+	// License
+	{key: "license.key", env: "LICENSE_KEY"},
+	{key: "license.cloud_url", env: "LICENSE_CLOUD_URL"},
 
 	// GitSync
 	{key: "git_sync.enabled", env: "GITSYNC_ENABLED"},

@@ -17,6 +17,15 @@ export type PathsConfig = {
 
 export type AuthMode = 'none' | 'basic' | 'builtin';
 
+export type LicenseStatus = {
+  valid: boolean;
+  plan: string;
+  expiry: string;
+  features: string[];
+  gracePeriod: boolean;
+  community: boolean;
+};
+
 export type Config = {
   apiURL: string;
   basePath: string;
@@ -40,6 +49,7 @@ export type Config = {
     writeDags: boolean;
     runDags: boolean;
   };
+  license: LicenseStatus;
   paths: PathsConfig;
 };
 

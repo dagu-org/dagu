@@ -20,6 +20,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/baseconfig"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/license"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
@@ -65,6 +66,7 @@ type API struct {
 	agentSoulStore     agent.SoulStore
 	agentAPI           *agent.API
 	baseConfigStore    baseconfig.Store
+	licenseManager     *license.Manager
 }
 
 // AuthService defines the interface for authentication operations.
@@ -172,6 +174,13 @@ func WithAgentSkillStore(store agent.SkillStore) APIOption {
 func WithAgentSoulStore(store agent.SoulStore) APIOption {
 	return func(a *API) {
 		a.agentSoulStore = store
+	}
+}
+
+// WithLicenseManager returns an APIOption that sets the API's license manager.
+func WithLicenseManager(m *license.Manager) APIOption {
+	return func(a *API) {
+		a.licenseManager = m
 	}
 }
 
@@ -489,6 +498,11 @@ var (
 		Code:       api.ErrorCodeUnauthorized,
 		Message:    "User management is not enabled",
 	}
+	errRBACNotLicensed = &Error{
+		HTTPStatus: http.StatusForbidden,
+		Code:       api.ErrorCodeForbidden,
+		Message:    "User management requires a Dagu Pro license",
+	}
 )
 
 // requireDAGWrite checks all permissions for DAG write operations:
@@ -534,6 +548,22 @@ func (a *API) requireExecute(ctx context.Context) error {
 func (a *API) requireUserManagement() error {
 	if a.authService == nil {
 		return errUserManagementDisabled
+	}
+	return nil
+}
+
+// requireLicensedRBAC checks if the RBAC feature is licensed.
+// Returns nil if no license manager is set (community mode - no gating).
+func (a *API) requireLicensedRBAC() error {
+	if a.licenseManager == nil {
+		return nil
+	}
+	checker := a.licenseManager.Checker()
+	if checker.IsCommunity() {
+		return nil
+	}
+	if !checker.IsFeatureEnabled(license.FeatureRBAC) {
+		return errRBACNotLicensed
 	}
 	return nil
 }

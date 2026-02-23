@@ -5124,6 +5124,62 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /license/activate:
+    post:
+      summary: "Activate a license key"
+      description: "Exchanges a license key for a signed JWT token. Admin only."
+      operationId: "activateLicense"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - key
+              properties:
+                key:
+                  type: string
+                  description: "License key (e.g. DAGU-XXXX-XXXX-XXXX-XXXX)"
+      responses:
+        "200":
+          description: "Activation successful"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plan:
+                    type: string
+                  features:
+                    type: array
+                    items:
+                      type: string
+                  expiry:
+                    type: string
+        "400":
+          description: "Invalid key or activation failed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Insufficient permissions"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   securitySchemes:
     basicAuth:

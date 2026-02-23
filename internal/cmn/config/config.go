@@ -21,6 +21,7 @@ type Config struct {
 	Cache           CacheMode
 	GitSync         GitSyncConfig
 	Tunnel          TunnelConfig
+	License         LicenseConfig
 	Warnings        []string
 }
 
@@ -84,6 +85,12 @@ type TunnelRateLimitConfig struct {
 }
 
 const TunnelProviderTailscale = "tailscale"
+
+// LicenseConfig holds the configuration for license activation.
+type LicenseConfig struct {
+	Key      string
+	CloudURL string
+}
 
 // ExecutionMode represents the default execution mode for DAGs.
 type ExecutionMode string

@@ -26,6 +26,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	authmodel "github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/license"
 	"github.com/dagu-org/dagu/internal/auth/tokensecret"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
@@ -84,6 +85,7 @@ type Server struct {
 	metricsRegistry  *prometheus.Registry
 	tunnelAPIOpts    []apiv1.APIOption
 	dagStore         exec.DAGStore
+	licenseManager   *license.Manager
 }
 
 // ServerOption is a functional option for configuring the Server.
@@ -93,6 +95,15 @@ type ServerOption func(*Server)
 func WithListener(l net.Listener) ServerOption {
 	return func(s *Server) {
 		s.listener = l
+	}
+}
+
+// WithLicenseManager sets the license manager for feature gating.
+func WithLicenseManager(m *license.Manager) ServerOption {
+	return func(s *Server) {
+		if m != nil {
+			s.licenseManager = m
+		}
 	}
 }
 
@@ -268,6 +279,8 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	updateAvailable, latestVersion := getUpdateInfo(upgradeStore)
 
+	// Note: SSO/OIDC gating is applied after opts are processed (see below)
+
 	srv := &Server{
 		config:           cfg,
 		agentAPI:         agentAPI,
@@ -304,6 +317,35 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	for _, opt := range opts {
 		opt(srv)
+	}
+
+	// Populate license checker in funcsConfig after opts
+	if srv.licenseManager != nil {
+		srv.funcsConfig.LicenseChecker = srv.licenseManager.Checker()
+	}
+
+	// License feature gating (only when a license IS present)
+	if srv.licenseManager != nil {
+		checker := srv.licenseManager.Checker()
+		if !checker.IsCommunity() {
+			// Gate audit
+			if !checker.IsFeatureEnabled(license.FeatureAudit) {
+				srv.auditService = nil
+				srv.auditStore = nil
+			}
+			// Gate SSO/OIDC
+			if !checker.IsFeatureEnabled(license.FeatureSSO) {
+				if srv.builtinOIDCCfg != nil {
+					logger.Error(ctx, "SSO (OIDC) requires a Dagu Pro license; OIDC login is disabled")
+					srv.builtinOIDCCfg = nil
+				}
+			}
+		}
+	}
+
+	// Pass license manager to API
+	if srv.licenseManager != nil {
+		apiOpts = append(apiOpts, apiv1.WithLicenseManager(srv.licenseManager))
 	}
 
 	allAPIOptions := append(apiOpts, srv.tunnelAPIOpts...)

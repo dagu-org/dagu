@@ -32,6 +32,14 @@
           },
           updateAvailable: "{{ updateAvailable }}" === "true",
           latestVersion: "{{ latestVersion }}",
+          license: {
+            valid: "{{ licenseValid }}" === "true",
+            plan: "{{ licensePlan }}",
+            expiry: "{{ licenseExpiry }}",
+            features: "{{ licenseFeatures }}".split(",").filter(Boolean),
+            gracePeriod: "{{ licenseGracePeriod }}" === "true",
+            community: "{{ licenseCommunity }}" === "true",
+          },
           paths: {
             dagsDir: "{{ js pathDAGsDir }}",
             logDir: "{{ js pathLogDir }}",

@@ -23,6 +23,7 @@ import {
   Brain,
   FileCog,
   Ghost,
+  Shield,
   Sparkles,
   GitBranch,
   Globe,
@@ -234,6 +235,7 @@ export const mainListItems = React.forwardRef<
   MainListItemsProps
 >(function MainListItems({ isOpen = false, onNavItemClick, onToggle, customColor = false }, ref) {
   const config = useConfig();
+  const { license } = config;
   const isAdmin = useIsAdmin();
   const canWrite = useCanWrite();
   const canAccessSystemStatus = useCanAccessSystemStatus();
@@ -425,7 +427,7 @@ export const mainListItems = React.forwardRef<
           {isAdmin && (
             <div className="space-y-0.5">
               <SectionLabel label="Admin" isOpen={isOpen} customColor={customColor} />
-              {config.authMode === 'builtin' && (
+              {config.authMode === 'builtin' && (license.community || license.features.includes('rbac')) && (
                 <NavItem
                   to="/users"
                   text="Users"
@@ -493,6 +495,14 @@ export const mainListItems = React.forwardRef<
                   customColor={customColor}
                 />
               )}
+              <NavItem
+                to="/license"
+                text="License"
+                icon={<Shield size={18} />}
+                isOpen={isOpen}
+                onClick={onNavItemClick}
+                customColor={customColor}
+              />
             </div>
           )}
 
@@ -509,7 +519,7 @@ export const mainListItems = React.forwardRef<
                     customColor={customColor}
                   />
                 )}
-                {canViewAuditLogs && (
+                {canViewAuditLogs && (license.community || license.features.includes('audit')) && (
                   <NavItem
                     to="/audit-logs"
                     text="Audit Logs"
