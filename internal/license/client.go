@@ -39,9 +39,10 @@ func NewCloudClient(baseURL string) *CloudClient {
 
 // ActivateRequest is the request body for license activation.
 type ActivateRequest struct {
-	Key         string `json:"key"`
-	ServerID    string `json:"server_id"`
-	MachineName string `json:"machine_name"`
+	Key           string `json:"key"`
+	ServerID      string `json:"server_id"`
+	MachineName   string `json:"machine_name"`
+	ClientVersion string `json:"client_version,omitempty"`
 }
 
 // ActivateResponse is the response body from license activation.
@@ -55,6 +56,7 @@ type HeartbeatRequest struct {
 	LicenseID       string `json:"license_id"`
 	ServerID        string `json:"server_id"`
 	HeartbeatSecret string `json:"heartbeat_secret"`
+	ClientVersion   string `json:"client_version,omitempty"`
 }
 
 // HeartbeatResponse is the response body from heartbeat.

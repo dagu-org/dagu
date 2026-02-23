@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useConfig, useUpdateConfig } from '@/contexts/ConfigContext';
 import { useClient } from '@/hooks/api';
+import { LICENSE_CONSOLE_URL } from '@/lib/constants';
 import dayjs from '@/lib/dayjs';
 import { CheckCircle2, Shield, XCircle } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
@@ -147,7 +148,7 @@ export default function LicensePage() {
           Enter your license key to activate Dagu Pro features. You can obtain a
           key from{' '}
           <a
-            href="https://console.dagu.sh"
+            href={LICENSE_CONSOLE_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="underline hover:no-underline"

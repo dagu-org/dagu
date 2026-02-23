@@ -14,6 +14,8 @@ type State struct {
 	token  string
 }
 
+var _ Checker = (*State)(nil)
+
 // Update atomically replaces the license state.
 func (s *State) Update(claims *LicenseClaims, token string) {
 	s.mu.Lock()

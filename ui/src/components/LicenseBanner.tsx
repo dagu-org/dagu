@@ -1,4 +1,5 @@
 import { useConfig } from '@/contexts/ConfigContext';
+import { LICENSE_CONSOLE_URL } from '@/lib/constants';
 import dayjs from '@/lib/dayjs';
 import { X } from 'lucide-react';
 import * as React from 'react';
@@ -35,7 +36,7 @@ export function LicenseBanner() {
         <span className="text-amber-800 dark:text-amber-200">
           Your Dagu Pro license has expired. Features will be disabled on {graceEnd}. Please{' '}
           <a
-            href="https://console.dagu.sh"
+            href={LICENSE_CONSOLE_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="underline hover:no-underline"
@@ -59,7 +60,7 @@ export function LicenseBanner() {
         <span className="text-orange-800 dark:text-orange-200">
           Your Dagu Pro license {days === 0 ? 'expires today' : `expires in ${days} day${days !== 1 ? 's' : ''}`}! Please{' '}
           <a
-            href="https://console.dagu.sh"
+            href={LICENSE_CONSOLE_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="underline hover:no-underline"
@@ -88,7 +89,7 @@ export function LicenseBanner() {
         <span className="text-yellow-800 dark:text-yellow-200">
           Your Dagu Pro license {days === 0 ? 'expires today' : `expires in ${days} day${days !== 1 ? 's' : ''}`}. Please{' '}
           <a
-            href="https://console.dagu.sh"
+            href={LICENSE_CONSOLE_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="underline hover:no-underline"

@@ -8,16 +8,22 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// VerifyToken parses and verifies a JWT license token using the given Ed25519 public key.
-// It rejects tokens that use algorithms other than EdDSA.
-func VerifyToken(pubKey ed25519.PublicKey, tokenString string) (*LicenseClaims, error) {
-	claims := &LicenseClaims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (any, error) {
+// eddsaKeyFunc returns a jwt.Keyfunc that validates the signing method is EdDSA
+// and provides the given Ed25519 public key for signature verification.
+func eddsaKeyFunc(pubKey ed25519.PublicKey) jwt.Keyfunc {
+	return func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodEd25519); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
 		return pubKey, nil
-	}, jwt.WithValidMethods([]string{"EdDSA"}))
+	}
+}
+
+// VerifyToken parses and verifies a JWT license token using the given Ed25519 public key.
+// It rejects tokens that use algorithms other than EdDSA.
+func VerifyToken(pubKey ed25519.PublicKey, tokenString string) (*LicenseClaims, error) {
+	claims := &LicenseClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, eddsaKeyFunc(pubKey), jwt.WithValidMethods([]string{"EdDSA"}))
 	if err != nil {
 		return nil, fmt.Errorf("token verification failed: %w", err)
 	}
@@ -32,12 +38,7 @@ func VerifyToken(pubKey ed25519.PublicKey, tokenString string) (*LicenseClaims, 
 // It still enforces EdDSA signature verification.
 func VerifyTokenLenient(pubKey ed25519.PublicKey, tokenString string) (*LicenseClaims, error) {
 	claims := &LicenseClaims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodEd25519); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
-		}
-		return pubKey, nil
-	}, jwt.WithValidMethods([]string{"EdDSA"}), jwt.WithoutClaimsValidation())
+	token, err := jwt.ParseWithClaims(tokenString, claims, eddsaKeyFunc(pubKey), jwt.WithValidMethods([]string{"EdDSA"}), jwt.WithoutClaimsValidation())
 	if err != nil {
 		return nil, fmt.Errorf("token verification failed: %w", err)
 	}

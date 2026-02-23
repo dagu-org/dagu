@@ -9,6 +9,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/dagu-org/dagu/internal/cmn/config"
 )
 
 const heartbeatInterval = 24 * time.Hour
@@ -172,9 +174,10 @@ func (m *Manager) activate(ctx context.Context, key string) (*ActivationData, er
 	}
 
 	resp, err := m.client.Activate(ctx, ActivateRequest{
-		Key:         key,
-		ServerID:    serverID,
-		MachineName: hostname,
+		Key:           key,
+		ServerID:      serverID,
+		MachineName:   hostname,
+		ClientVersion: config.Version,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("activation request failed: %w", err)
@@ -235,6 +238,7 @@ func (m *Manager) doHeartbeat(ctx context.Context, ad *ActivationData) {
 		LicenseID:       claims.ActivationID,
 		ServerID:        ad.ServerID,
 		HeartbeatSecret: ad.HeartbeatSecret,
+		ClientVersion:   config.Version,
 	})
 	if err != nil {
 		var cloudErr *CloudError
