@@ -1,6 +1,8 @@
 package license
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -16,6 +18,26 @@ const (
 	SourceActivationFile                 // activation.json (has token)
 	SourceFileJWT                        // file-based JWT (DAGU_LICENSE_FILE or default path)
 )
+
+// String returns a human-readable name for the discovery source.
+func (s DiscoverySource) String() string {
+	switch s {
+	case SourceNone:
+		return "none"
+	case SourceEnvInline:
+		return "environment"
+	case SourceEnvKey:
+		return "environment-key"
+	case SourceConfigKey:
+		return "config-key"
+	case SourceActivationFile:
+		return "activation-file"
+	case SourceFileJWT:
+		return "file"
+	default:
+		return "unknown"
+	}
+}
 
 // NeedsHeartbeat returns true if this source requires periodic heartbeats.
 func (s DiscoverySource) NeedsHeartbeat() bool {
@@ -89,7 +111,12 @@ func Discover(licenseDir, configKey string, store ActivationStore) (*DiscoveryRe
 	}
 	if filePath != "" {
 		data, err := os.ReadFile(filePath) //nolint:gosec // path from env or config
-		if err == nil {
+		if err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				return nil, fmt.Errorf("failed to read license file %s: %w", filePath, err)
+			}
+			// File does not exist — fall through to next source.
+		} else {
 			token := string(data)
 			if token != "" {
 				return &DiscoveryResult{

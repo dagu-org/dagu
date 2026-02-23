@@ -3,6 +3,7 @@ package license
 import (
 	"crypto/ed25519"
 	"fmt"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -43,5 +44,16 @@ func VerifyTokenLenient(pubKey ed25519.PublicKey, tokenString string) (*LicenseC
 	if !token.Valid {
 		return nil, fmt.Errorf("token is not valid")
 	}
+
+	// Manually validate nbf and iat claims that were skipped by WithoutClaimsValidation.
+	// Expiry (exp) is intentionally not checked here to allow grace period evaluation.
+	now := time.Now()
+	if claims.NotBefore != nil && now.Before(claims.NotBefore.Time) {
+		return nil, fmt.Errorf("token is not yet valid (nbf)")
+	}
+	if claims.IssuedAt != nil && claims.IssuedAt.After(now) {
+		return nil, fmt.Errorf("token has a future issued-at time (iat)")
+	}
+
 	return claims, nil
 }

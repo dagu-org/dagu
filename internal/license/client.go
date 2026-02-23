@@ -14,6 +14,9 @@ import (
 
 const defaultCloudURL = "https://console.dagu.sh"
 
+// maxResponseSize is the maximum number of bytes read from a Cloud API response (1 MB).
+const maxResponseSize = 1 << 20
+
 // CloudClient communicates with the Dagu Cloud API for license operations.
 type CloudClient struct {
 	baseURL string
@@ -106,7 +109,7 @@ func (c *CloudClient) doJSON(ctx context.Context, method, path string, reqBody, 
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	respData, err := io.ReadAll(resp.Body)
+	respData, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
 	if err != nil {
 		return fmt.Errorf("failed to read response: %w", err)
 	}

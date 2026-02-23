@@ -20,7 +20,7 @@ const (
 // Store implements license.ActivationStore using file-based persistence.
 type Store struct {
 	dir string
-	mu  sync.Mutex
+	mu  sync.RWMutex
 }
 
 // New creates a new file-based activation store at the given directory.
@@ -31,8 +31,8 @@ func New(dir string) *Store {
 // Load reads the activation data from disk.
 // Returns nil, nil when the file does not exist.
 func (s *Store) Load() (*license.ActivationData, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	path := filepath.Join(s.dir, activationFile)
 	data, err := os.ReadFile(path) //nolint:gosec // path is constructed from trusted config dir

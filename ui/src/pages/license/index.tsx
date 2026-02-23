@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useConfig, useUpdateConfig } from '@/contexts/ConfigContext';
-import { TOKEN_KEY } from '@/contexts/AuthContext';
+import { useClient } from '@/hooks/api';
 import dayjs from '@/lib/dayjs';
 import { CheckCircle2, Shield, XCircle } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
@@ -12,49 +12,45 @@ export default function LicensePage() {
   const { license } = config;
   const updateConfig = useUpdateConfig();
   const appBarContext = useContext(AppBarContext);
+  const client = useClient();
 
   const [key, setKey] = useState('');
   const [activating, setActivating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     appBarContext.setTitle('License');
   }, [appBarContext]);
 
-  async function handleActivate() {
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+
+  async function handleActivate(e?: React.FormEvent) {
+    if (e) e.preventDefault();
     if (!key.trim()) return;
     setActivating(true);
     setError(null);
+    setSuccess(false);
     try {
-      const token = localStorage.getItem(TOKEN_KEY);
-      const remoteNode = appBarContext.selectedRemoteNode || 'local';
-      const response = await fetch(
-        `${config.apiURL}/license/activate?remoteNode=${remoteNode}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ key: key.trim() }),
-        }
-      );
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.message || 'Activation failed');
+      const { data, error: apiError } = await client.POST('/license/activate', {
+        params: { query: { remoteNode } },
+        body: { key: key.trim() },
+      });
+      if (apiError) {
+        throw new Error(apiError.message || 'Activation failed');
       }
-      const data = await response.json();
       updateConfig({
         license: {
           valid: true,
-          plan: data.plan || 'pro',
-          features: data.features || [],
-          expiry: data.expiry || '',
+          plan: data?.plan || 'pro',
+          features: data?.features || [],
+          expiry: data?.expiry || '',
           gracePeriod: false,
           community: false,
         },
       });
       setKey('');
+      setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Activation failed');
     } finally {
@@ -122,24 +118,30 @@ export default function LicensePage() {
       {/* Activation form */}
       <div className="card-obsidian p-4 space-y-3">
         <div className="text-sm font-medium">Activate License Key</div>
-        <div className="flex gap-2">
+        <form onSubmit={handleActivate} className="flex gap-2">
           <Input
             value={key}
             onChange={(e) => setKey(e.target.value)}
             placeholder="DAGU-XXXX-XXXX-XXXX-XXXX"
             className="font-mono text-sm h-8"
+            aria-label="License key"
           />
           <Button
+            type="submit"
             size="sm"
             className="h-8 flex-shrink-0"
-            onClick={handleActivate}
             disabled={activating || !key.trim()}
           >
             {activating ? 'Activating...' : 'Activate'}
           </Button>
-        </div>
+        </form>
         {error && (
-          <div className="text-sm text-destructive">{error}</div>
+          <div role="alert" className="text-sm text-destructive">{error}</div>
+        )}
+        {success && (
+          <div role="status" className="text-sm text-green-600 dark:text-green-400">
+            License activated successfully.
+          </div>
         )}
         <p className="text-xs text-muted-foreground">
           Enter your license key to activate Dagu Pro features. You can obtain a

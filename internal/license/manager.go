@@ -36,11 +36,10 @@ type Manager struct {
 	pubKey ed25519.PublicKey
 	logger *slog.Logger
 
-	cancelMu sync.Mutex
-	cancel   context.CancelFunc
-	wg       sync.WaitGroup
-
-	heartbeatOnce sync.Once
+	cancelMu         sync.Mutex
+	cancel           context.CancelFunc
+	wg               sync.WaitGroup
+	heartbeatRunning bool
 }
 
 // NewManager creates a new license manager.
@@ -64,6 +63,8 @@ func (m *Manager) Checker() Checker {
 }
 
 // Start performs discovery, optional activation, JWT verification, and starts the heartbeat loop.
+// It always returns nil for graceful degradation: license errors are logged but never prevent
+// the application from starting.
 func (m *Manager) Start(ctx context.Context) error {
 	result, err := Discover(m.cfg.LicenseDir, m.cfg.ConfigKey, m.store)
 	if err != nil {
@@ -106,7 +107,7 @@ func (m *Manager) Start(ctx context.Context) error {
 	m.logger.Info("License loaded",
 		slog.String("plan", claims.Plan),
 		slog.Any("features", claims.Features),
-		slog.String("source", fmt.Sprintf("%d", result.Source)),
+		slog.String("source", result.Source.String()),
 	)
 
 	// Start heartbeat loop if the source requires it
@@ -120,7 +121,9 @@ func (m *Manager) Start(ctx context.Context) error {
 // Stop cancels the heartbeat goroutine and waits for completion.
 func (m *Manager) Stop() {
 	m.cancelMu.Lock()
+	m.heartbeatRunning = false
 	cancel := m.cancel
+	m.cancel = nil
 	m.cancelMu.Unlock()
 	if cancel != nil {
 		cancel()
@@ -194,14 +197,16 @@ func (m *Manager) activate(ctx context.Context, key string) (*ActivationData, er
 }
 
 func (m *Manager) startHeartbeat(ad *ActivationData) {
-	m.heartbeatOnce.Do(func() {
-		ctx, cancel := context.WithCancel(context.Background())
-		m.cancelMu.Lock()
-		m.cancel = cancel
-		m.cancelMu.Unlock()
-		m.wg.Add(1)
-		go m.heartbeatLoop(ctx, ad)
-	})
+	m.cancelMu.Lock()
+	defer m.cancelMu.Unlock()
+	if m.heartbeatRunning {
+		return
+	}
+	m.heartbeatRunning = true
+	ctx, cancel := context.WithCancel(context.Background())
+	m.cancel = cancel
+	m.wg.Add(1)
+	go m.heartbeatLoop(ctx, ad)
 }
 
 func (m *Manager) heartbeatLoop(ctx context.Context, ad *ActivationData) {
@@ -264,10 +269,11 @@ func (m *Manager) doHeartbeat(ctx context.Context, ad *ActivationData) {
 
 	m.state.Update(newClaims, resp.Token)
 
-	// Persist the refreshed token
+	// Persist the refreshed token using a copy to avoid mutating the shared ActivationData.
 	if m.store != nil {
-		ad.Token = resp.Token
-		if err := m.store.Save(ad); err != nil {
+		updated := *ad
+		updated.Token = resp.Token
+		if err := m.store.Save(&updated); err != nil {
 			m.logger.Warn("Failed to persist refreshed token",
 				slog.String("error", err.Error()))
 		}

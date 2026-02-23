@@ -36,7 +36,7 @@
             valid: "{{ licenseValid }}" === "true",
             plan: "{{ licensePlan }}",
             expiry: "{{ licenseExpiry }}",
-            features: "{{ licenseFeatures }}".split(",").filter(Boolean),
+            features: JSON.parse('{{ licenseFeatures }}'),
             gracePeriod: "{{ licenseGracePeriod }}" === "true",
             community: "{{ licenseCommunity }}" === "true",
           },

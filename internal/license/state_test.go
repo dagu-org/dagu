@@ -130,12 +130,9 @@ func TestState_IsFeatureEnabled(t *testing.T) {
 		assert.False(t, s.IsFeatureEnabled(FeatureSSO))
 	})
 
-	t.Run("nil ExpiresAt returns false", func(t *testing.T) {
+	t.Run("perpetual token (nil ExpiresAt) enables claimed features", func(t *testing.T) {
 		t.Parallel()
 		var s State
-		// ExpiresAt is nil: the first condition in IsFeatureEnabled fails (nil != nil is false but
-		// the nil check means the branch is not taken), then isInGracePeriod also returns false for
-		// nil ExpiresAt.
 		claims := &LicenseClaims{
 			RegisteredClaims: jwt.RegisteredClaims{
 				ExpiresAt: nil,
@@ -144,9 +141,11 @@ func TestState_IsFeatureEnabled(t *testing.T) {
 			Features: []string{FeatureAudit, FeatureRBAC, FeatureSSO},
 		}
 		s.Update(claims, "tok")
-		assert.False(t, s.IsFeatureEnabled(FeatureAudit))
-		assert.False(t, s.IsFeatureEnabled(FeatureRBAC))
-		assert.False(t, s.IsFeatureEnabled(FeatureSSO))
+		assert.True(t, s.IsFeatureEnabled(FeatureAudit))
+		assert.True(t, s.IsFeatureEnabled(FeatureRBAC))
+		assert.True(t, s.IsFeatureEnabled(FeatureSSO))
+		// A feature not in the claims should still return false.
+		assert.False(t, s.IsFeatureEnabled("nonexistent-feature"))
 	})
 }
 

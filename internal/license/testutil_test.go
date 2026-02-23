@@ -2,6 +2,7 @@ package license
 
 import (
 	"crypto/ed25519"
+	"sync"
 	"testing"
 	"time"
 
@@ -76,6 +77,7 @@ func expiredPastGraceClaims() *LicenseClaims {
 
 // mockActivationStore is a test double for ActivationStore.
 type mockActivationStore struct {
+	mu          sync.Mutex
 	data        *ActivationData
 	loadErr     error
 	saveErr     error
@@ -85,10 +87,14 @@ type mockActivationStore struct {
 }
 
 func (m *mockActivationStore) Load() (*ActivationData, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return m.data, m.loadErr
 }
 
 func (m *mockActivationStore) Save(data *ActivationData) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.saveCalls++
 	if m.saveErr != nil {
 		return m.saveErr
@@ -98,6 +104,8 @@ func (m *mockActivationStore) Save(data *ActivationData) error {
 }
 
 func (m *mockActivationStore) Remove() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.removeCalls++
 	if m.removeErr != nil {
 		return m.removeErr

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 
 	"github.com/dagu-org/dagu/api/v1"
@@ -31,9 +32,10 @@ func (a *API) ActivateLicense(ctx context.Context, request api.ActivateLicenseRe
 
 	result, err := a.licenseManager.ActivateWithKey(ctx, request.Body.Key)
 	if err != nil {
+		slog.Warn("License activation failed", "error", err)
 		return nil, &Error{
 			Code:       api.ErrorCodeBadRequest,
-			Message:    err.Error(),
+			Message:    "License activation failed. Please verify your license key and try again.",
 			HTTPStatus: http.StatusBadRequest,
 		}
 	}

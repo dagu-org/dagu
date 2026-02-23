@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"embed"
+	"encoding/json"
 	"io"
 	"net/http"
 	"path"
@@ -155,13 +156,17 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 		},
 		"licenseFeatures": func() string {
 			if cfg.LicenseChecker == nil {
-				return ""
+				return "[]"
 			}
 			claims := cfg.LicenseChecker.Claims()
-			if claims == nil {
-				return ""
+			if claims == nil || len(claims.Features) == 0 {
+				return "[]"
 			}
-			return strings.Join(claims.Features, ",")
+			b, err := json.Marshal(claims.Features)
+			if err != nil {
+				return "[]"
+			}
+			return string(b)
 		},
 		"licenseGracePeriod": func() string {
 			if cfg.LicenseChecker == nil {

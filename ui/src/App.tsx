@@ -9,7 +9,8 @@ import { ErrorModalProvider } from './components/ui/error-modal';
 import { ToastProvider } from './components/ui/simple-toast';
 import { AppBarContext } from './contexts/AppBarContext';
 import { AuthProvider } from './contexts/AuthContext';
-import { Config, ConfigContext, ConfigUpdateContext, useConfig } from './contexts/ConfigContext';
+import { Config, ConfigContext, ConfigUpdateContext } from './contexts/ConfigContext';
+import { useHasFeature } from './hooks/useLicense';
 import { PageContextProvider } from './contexts/PageContext';
 import { SchemaProvider } from './contexts/SchemaContext';
 import { SearchStateProvider } from './contexts/SearchStateContext';
@@ -102,11 +103,8 @@ function LicensedRoute({
   feature: string;
   children: React.ReactElement;
 }): React.ReactElement {
-  const config = useConfig();
-  // Community mode: no gating
-  if (config.license.community) return <>{children}</>;
-  // Licensed mode: check feature
-  if (config.license.features.includes(feature)) return <>{children}</>;
+  const hasFeature = useHasFeature(feature);
+  if (hasFeature) return children;
   // Feature not licensed: redirect to home
   return <Navigate to="/" replace />;
 }

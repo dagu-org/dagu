@@ -14,6 +14,7 @@ import {
   useIsAdmin,
 } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
+import { useHasFeature } from '@/hooks/useLicense';
 import { cn } from '@/lib/utils';
 import { getResponsiveTitleClass } from '@/lib/text-utils';
 import {
@@ -235,8 +236,9 @@ export const mainListItems = React.forwardRef<
   MainListItemsProps
 >(function MainListItems({ isOpen = false, onNavItemClick, onToggle, customColor = false }, ref) {
   const config = useConfig();
-  const { license } = config;
   const isAdmin = useIsAdmin();
+  const hasRbac = useHasFeature('rbac');
+  const hasAudit = useHasFeature('audit');
   const canWrite = useCanWrite();
   const canAccessSystemStatus = useCanAccessSystemStatus();
   const canManageWebhooks = useCanManageWebhooks();
@@ -427,7 +429,7 @@ export const mainListItems = React.forwardRef<
           {isAdmin && (
             <div className="space-y-0.5">
               <SectionLabel label="Admin" isOpen={isOpen} customColor={customColor} />
-              {config.authMode === 'builtin' && (license.community || license.features.includes('rbac')) && (
+              {config.authMode === 'builtin' && hasRbac && (
                 <NavItem
                   to="/users"
                   text="Users"
@@ -519,7 +521,7 @@ export const mainListItems = React.forwardRef<
                     customColor={customColor}
                   />
                 )}
-                {canViewAuditLogs && (license.community || license.features.includes('audit')) && (
+                {canViewAuditLogs && hasAudit && (
                   <NavItem
                     to="/audit-logs"
                     text="Audit Logs"

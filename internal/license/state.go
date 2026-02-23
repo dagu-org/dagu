@@ -49,8 +49,13 @@ func (s *State) IsFeatureEnabled(feature string) bool {
 		return false
 	}
 
+	// Perpetual tokens (nil ExpiresAt) have all claimed features enabled.
+	if s.claims.ExpiresAt == nil {
+		return true
+	}
+
 	// If the token has not expired, the feature is enabled.
-	if s.claims.ExpiresAt != nil && s.claims.ExpiresAt.After(time.Now()) {
+	if s.claims.ExpiresAt.After(time.Now()) {
 		return true
 	}
 
