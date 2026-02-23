@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -313,7 +314,7 @@ func TestManager_Start_ActivationFile(t *testing.T) {
 		t.Setenv("DAGU_LICENSE_KEY", "")
 		t.Setenv("DAGU_LICENSE_FILE", "")
 
-		// Cloud URL is set to an unreachable address; heartbeat won't fire in the 24-hour interval.
+		// Cloud URL is unreachable; the immediate heartbeat fails gracefully and state stays cached.
 		m := NewManager(ManagerConfig{
 			LicenseDir: t.TempDir(),
 			CloudURL:   "http://127.0.0.1:0",
@@ -777,6 +778,47 @@ func TestManager_startHeartbeat_Idempotent(t *testing.T) {
 
 		// If two goroutines were started the wg counter would be 2.
 		// Stop cancels the context and waits — an incorrect count would deadlock.
+		stopWithTimeout(t, m, 5*time.Second)
+	})
+}
+
+func TestManager_heartbeatLoop_immediate(t *testing.T) {
+	t.Parallel()
+
+	t.Run("heartbeat fires immediately on startup before ticker", func(t *testing.T) {
+		t.Parallel()
+
+		pub, priv := testKeyPair(t)
+		claims := validClaims()
+		token := signToken(t, priv, claims)
+		refreshedToken := signToken(t, priv, validClaims())
+
+		var callCount atomic.Int32
+		handler := heartbeatHandlerFn(refreshedToken)
+		srv := newMockCloudServer(t, mockCloudServerConfig{
+			heartbeatHandler: func(w http.ResponseWriter, _ *http.Request) {
+				callCount.Add(1)
+				handler(w, nil)
+			},
+		})
+
+		m := NewManager(ManagerConfig{
+			LicenseDir: t.TempDir(),
+			CloudURL:   srv.URL,
+		}, pub, nil, slog.Default())
+		m.state.Update(claims, token)
+
+		m.startHeartbeat(makeAD("server-001"))
+
+		// Give the goroutine time to execute the immediate heartbeat.
+		require.Eventually(t, func() bool {
+			return callCount.Load() >= 1
+		}, 2*time.Second, 50*time.Millisecond,
+			"immediate heartbeat must fire on startup")
+
+		assert.Equal(t, int32(1), callCount.Load(),
+			"exactly one heartbeat call expected (immediate); ticker has not fired yet")
+
 		stopWithTimeout(t, m, 5*time.Second)
 	})
 }

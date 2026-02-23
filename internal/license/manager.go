@@ -215,6 +215,9 @@ func (m *Manager) startHeartbeat(ad *ActivationData) {
 func (m *Manager) heartbeatLoop(ctx context.Context, ad *ActivationData) {
 	defer m.wg.Done()
 
+	// Immediate heartbeat on startup to refresh the JWT.
+	m.doHeartbeat(ctx, ad)
+
 	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
 
