@@ -623,7 +623,7 @@ func TestManager_doHeartbeat(t *testing.T) {
 		assert.Equal(t, 1, store.removeCalls)
 	})
 
-	t.Run("401 Unauthorized leaves state unchanged", func(t *testing.T) {
+	t.Run("401 Unauthorized clears state and removes stored activation", func(t *testing.T) {
 		t.Parallel()
 
 		pub, priv := testKeyPair(t)
@@ -643,10 +643,8 @@ func TestManager_doHeartbeat(t *testing.T) {
 
 		m.doHeartbeat(context.Background(), makeAD("server-001"))
 
-		assert.False(t, m.Checker().IsCommunity(), "state must remain after 401")
-		assert.Equal(t, "pro", m.Checker().Plan())
-		assert.Equal(t, 0, store.removeCalls)
-		assert.Equal(t, 0, store.saveCalls)
+		assert.True(t, m.Checker().IsCommunity(), "state must be cleared after 401")
+		assert.Equal(t, 1, store.removeCalls)
 	})
 
 	t.Run("network error leaves state unchanged with cached token", func(t *testing.T) {

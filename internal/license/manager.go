@@ -254,9 +254,13 @@ func (m *Manager) doHeartbeat(ctx context.Context, ad *ActivationData) {
 					_ = m.store.Remove()
 				}
 				return
-			case 401: // Unauthorized - re-activation needed
-				m.logger.Error("License heartbeat unauthorized, re-activation may be needed",
+			case 401: // Unauthorized - deactivated or credentials invalid
+				m.logger.Error("License heartbeat unauthorized, license may have been deactivated",
 					slog.String("error", cloudErr.Message))
+				m.state.Update(nil, "")
+				if m.store != nil {
+					_ = m.store.Remove()
+				}
 				return
 			}
 		}
