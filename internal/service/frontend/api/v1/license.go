@@ -51,3 +51,29 @@ func (a *API) ActivateLicense(ctx context.Context, request api.ActivateLicenseRe
 		Expiry:   &expiry,
 	}, nil
 }
+
+// DeactivateLicense handles license deactivation from the frontend.
+func (a *API) DeactivateLicense(ctx context.Context, _ api.DeactivateLicenseRequestObject) (api.DeactivateLicenseResponseObject, error) {
+	if err := a.requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+
+	if a.licenseManager == nil {
+		return nil, &Error{
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "License management is not available",
+			HTTPStatus: http.StatusBadRequest,
+		}
+	}
+
+	if err := a.licenseManager.Deactivate(ctx); err != nil {
+		return nil, &Error{
+			Code:       api.ErrorCodeBadRequest,
+			Message:    err.Error(),
+			HTTPStatus: http.StatusBadRequest,
+		}
+	}
+
+	msg := "License deactivated"
+	return api.DeactivateLicense200JSONResponse{Message: &msg}, nil
+}

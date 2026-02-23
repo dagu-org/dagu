@@ -37,6 +37,7 @@ type Manager struct {
 	client *CloudClient
 	pubKey ed25519.PublicKey
 	logger *slog.Logger
+	source DiscoverySource
 
 	cancelMu         sync.Mutex
 	cancel           context.CancelFunc
@@ -64,6 +65,11 @@ func (m *Manager) Checker() Checker {
 	return m.state
 }
 
+// Source returns the discovery source of the current license.
+func (m *Manager) Source() DiscoverySource {
+	return m.source
+}
+
 // Start performs discovery, optional activation, JWT verification, and starts the heartbeat loop.
 // It always returns nil for graceful degradation: license errors are logged but never prevent
 // the application from starting.
@@ -73,6 +79,8 @@ func (m *Manager) Start(ctx context.Context) error {
 		m.logger.Warn("License discovery failed", slog.String("error", err.Error()))
 		return nil // graceful degradation
 	}
+
+	m.source = result.Source
 
 	if result.Source == SourceNone {
 		m.logger.Debug("No license configured, running in community mode")
@@ -133,6 +141,30 @@ func (m *Manager) Stop() {
 	m.wg.Wait()
 }
 
+// Deactivate stops the heartbeat, clears in-memory state, and removes persisted activation data.
+// It returns an error if the license was configured via an environment variable (the user must
+// remove the env var instead) or if there is no active license to deactivate.
+func (m *Manager) Deactivate(_ context.Context) error {
+	if m.source.IsEnv() {
+		return fmt.Errorf("cannot deactivate: license is configured via environment variable; remove DAGU_LICENSE or DAGU_LICENSE_KEY instead")
+	}
+	if m.state.IsCommunity() {
+		return fmt.Errorf("no active license to deactivate")
+	}
+
+	m.Stop()
+	m.state.Update(nil, "")
+	m.source = SourceNone
+
+	if m.store != nil {
+		if err := m.store.Remove(); err != nil {
+			return fmt.Errorf("failed to remove activation data: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // ActivateWithKey performs activation with the given key and updates internal state.
 // This is used by the API handler for frontend-initiated activation.
 func (m *Manager) ActivateWithKey(ctx context.Context, key string) (*ActivationResult, error) {
@@ -146,6 +178,7 @@ func (m *Manager) ActivateWithKey(ctx context.Context, key string) (*ActivationR
 		return nil, fmt.Errorf("activated token verification failed: %w", verifyErr)
 	}
 
+	m.source = SourceActivationFile
 	m.state.Update(claims, ad.Token)
 
 	// Start heartbeat if not already running
@@ -248,13 +281,13 @@ func (m *Manager) doHeartbeat(ctx context.Context, ad *ActivationData) {
 		if errors.As(err, &cloudErr) {
 			switch cloudErr.StatusCode {
 			case 410: // Gone - license revoked
-				m.logger.Error("License has been revoked")
-				m.clearLicense()
+				m.logger.Error("License has been revoked, clearing in-memory state")
+				m.state.Update(nil, "")
 				return
 			case 401: // Unauthorized - deactivated or credentials invalid
 				m.logger.Error("License heartbeat unauthorized, license may have been deactivated",
 					slog.String("error", cloudErr.Message))
-				m.clearLicense()
+				m.state.Update(nil, "")
 				return
 			}
 		}
@@ -286,11 +319,4 @@ func (m *Manager) doHeartbeat(ctx context.Context, ad *ActivationData) {
 
 	m.logger.Debug("License heartbeat successful",
 		slog.String("plan", newClaims.Plan))
-}
-
-func (m *Manager) clearLicense() {
-	m.state.Update(nil, "")
-	if m.store != nil {
-		_ = m.store.Remove()
-	}
 }

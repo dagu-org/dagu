@@ -39,6 +39,11 @@ func (s DiscoverySource) String() string {
 	}
 }
 
+// IsEnv returns true if the license was discovered from an environment variable.
+func (s DiscoverySource) IsEnv() bool {
+	return s == SourceEnvInline || s == SourceEnvKey
+}
+
 // NeedsHeartbeat returns true if this source requires periodic heartbeats.
 func (s DiscoverySource) NeedsHeartbeat() bool {
 	switch s {

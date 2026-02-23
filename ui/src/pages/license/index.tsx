@@ -5,7 +5,8 @@ import { useConfig, useUpdateConfig } from '@/contexts/ConfigContext';
 import { useClient } from '@/hooks/api';
 import { LICENSE_CONSOLE_URL } from '@/lib/constants';
 import dayjs from '@/lib/dayjs';
-import { CheckCircle2, Shield, XCircle } from 'lucide-react';
+import ConfirmModal from '@/ui/ConfirmModal';
+import { AlertTriangle, CheckCircle2, Info, Shield, XCircle } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
 
 export default function LicensePage() {
@@ -17,8 +18,10 @@ export default function LicensePage() {
 
   const [key, setKey] = useState('');
   const [activating, setActivating] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     appBarContext.setTitle('License');
@@ -31,7 +34,7 @@ export default function LicensePage() {
     if (!key.trim()) return;
     setActivating(true);
     setError(null);
-    setSuccess(false);
+    setSuccessMessage(null);
     try {
       const { data, error: apiError } = await client.POST('/license/activate', {
         params: { query: { remoteNode } },
@@ -48,14 +51,46 @@ export default function LicensePage() {
           expiry: data?.expiry || '',
           gracePeriod: false,
           community: false,
+          source: 'file',
         },
       });
       setKey('');
-      setSuccess(true);
+      setSuccessMessage('License activated successfully.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Activation failed');
     } finally {
       setActivating(false);
+    }
+  }
+
+  async function handleDeactivate() {
+    setShowDeactivateConfirm(false);
+    setDeactivating(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const { error: apiError } = await client.POST('/license/deactivate', {
+        params: { query: { remoteNode } },
+      });
+      if (apiError) {
+        throw new Error(apiError.message || 'Deactivation failed');
+      }
+      updateConfig({
+        license: {
+          valid: false,
+          plan: '',
+          features: [],
+          expiry: '',
+          gracePeriod: false,
+          community: true,
+          source: '',
+        },
+      });
+      setSuccessMessage('License deactivated. Running in community mode.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Deactivation failed');
+    } finally {
+      setDeactivating(false);
     }
   }
 
@@ -116,6 +151,41 @@ export default function LicensePage() {
         </div>
       </div>
 
+      {/* Deactivate license */}
+      {license.valid && (
+        <div className="card-obsidian p-4 space-y-3">
+          <div className="text-sm font-medium">Deactivate License</div>
+          {license.source === 'env' ? (
+            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+              <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <span>
+                This license is configured via an environment variable
+                (<code className="text-xs">DAGU_LICENSE</code> or{' '}
+                <code className="text-xs">DAGU_LICENSE_KEY</code>). To
+                deactivate, remove the environment variable and restart Dagu.
+              </span>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Remove the license from this machine and return to community
+                mode.
+              </p>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-8"
+                disabled={deactivating}
+                onClick={() => setShowDeactivateConfirm(true)}
+              >
+                <AlertTriangle className="h-3.5 w-3.5" />
+                {deactivating ? 'Deactivating...' : 'Deactivate License'}
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Activation form */}
       <div className="card-obsidian p-4 space-y-3">
         <div className="text-sm font-medium">Activate License Key</div>
@@ -139,9 +209,9 @@ export default function LicensePage() {
         {error && (
           <div role="alert" className="text-sm text-destructive">{error}</div>
         )}
-        {success && (
+        {successMessage && (
           <div role="status" className="text-sm text-green-600 dark:text-green-400">
-            License activated successfully.
+            {successMessage}
           </div>
         )}
         <p className="text-xs text-muted-foreground">
@@ -158,6 +228,20 @@ export default function LicensePage() {
           .
         </p>
       </div>
+
+      <ConfirmModal
+        title="Deactivate License"
+        buttonText="Deactivate"
+        visible={showDeactivateConfirm}
+        dismissModal={() => setShowDeactivateConfirm(false)}
+        onSubmit={handleDeactivate}
+      >
+        <p className="text-sm">
+          This will deactivate the license on this machine and return to
+          community mode. Pro features (audit, RBAC, SSO) will be disabled
+          immediately.
+        </p>
+      </ConfirmModal>
     </div>
   );
 }

@@ -88,6 +88,7 @@ type funcsConfig struct {
 	LatestVersion        string
 	AgentEnabledChecker  AgentEnabledChecker
 	LicenseChecker       license.Checker
+	LicenseManager       *license.Manager
 }
 
 func defaultFunctions(cfg *funcsConfig) template.FuncMap {
@@ -179,6 +180,18 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 				return "true"
 			}
 			return boolStr(cfg.LicenseChecker.IsCommunity())
+		},
+		"licenseSource": func() string {
+			if cfg.LicenseManager == nil {
+				return ""
+			}
+			if cfg.LicenseManager.Source().IsEnv() {
+				return "env"
+			}
+			if cfg.LicenseManager.Source() == license.SourceNone {
+				return ""
+			}
+			return "file"
 		},
 
 		// Path configuration functions

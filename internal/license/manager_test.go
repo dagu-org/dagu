@@ -600,7 +600,7 @@ func TestManager_doHeartbeat(t *testing.T) {
 		assert.True(t, m.Checker().IsCommunity())
 	})
 
-	t.Run("410 Gone clears state and calls store.Remove", func(t *testing.T) {
+	t.Run("410 Gone clears in-memory state but does not remove stored activation", func(t *testing.T) {
 		t.Parallel()
 
 		pub, _ := testKeyPair(t)
@@ -619,11 +619,11 @@ func TestManager_doHeartbeat(t *testing.T) {
 
 		m.doHeartbeat(context.Background(), makeAD("server-001"))
 
-		assert.True(t, m.Checker().IsCommunity(), "state must be cleared after 410 Gone")
-		assert.Equal(t, 1, store.removeCalls)
+		assert.True(t, m.Checker().IsCommunity(), "in-memory state must be cleared after 410 Gone")
+		assert.Equal(t, 0, store.removeCalls, "stored activation must NOT be removed by heartbeat failure")
 	})
 
-	t.Run("401 Unauthorized clears state and removes stored activation", func(t *testing.T) {
+	t.Run("401 Unauthorized clears in-memory state but does not remove stored activation", func(t *testing.T) {
 		t.Parallel()
 
 		pub, priv := testKeyPair(t)
@@ -643,8 +643,8 @@ func TestManager_doHeartbeat(t *testing.T) {
 
 		m.doHeartbeat(context.Background(), makeAD("server-001"))
 
-		assert.True(t, m.Checker().IsCommunity(), "state must be cleared after 401")
-		assert.Equal(t, 1, store.removeCalls)
+		assert.True(t, m.Checker().IsCommunity(), "in-memory state must be cleared after 401")
+		assert.Equal(t, 0, store.removeCalls, "stored activation must NOT be removed by heartbeat failure")
 	})
 
 	t.Run("network error leaves state unchanged with cached token", func(t *testing.T) {
@@ -879,5 +879,208 @@ func TestManager_activate_StoreEdgeCases(t *testing.T) {
 		assert.Equal(t, "pro", result.Plan)
 
 		stopWithTimeout(t, m, 5*time.Second)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Source
+// ---------------------------------------------------------------------------
+
+func TestManager_Source(t *testing.T) {
+	t.Run("returns SourceEnvInline after Start with DAGU_LICENSE", func(t *testing.T) {
+		pub, priv := testKeyPair(t)
+		token := signToken(t, priv, validClaims())
+
+		t.Setenv("DAGU_LICENSE", token)
+		t.Setenv("DAGU_LICENSE_KEY", "")
+		t.Setenv("DAGU_LICENSE_FILE", "")
+
+		m := NewManager(ManagerConfig{LicenseDir: t.TempDir()}, pub, nil, slog.Default())
+		require.NoError(t, m.Start(context.Background()))
+
+		assert.Equal(t, SourceEnvInline, m.Source())
+	})
+
+	t.Run("returns SourceActivationFile after Start with store data", func(t *testing.T) {
+		pub, priv := testKeyPair(t)
+		token := signToken(t, priv, validClaims())
+
+		store := &mockActivationStore{data: &ActivationData{
+			Token:           token,
+			HeartbeatSecret: "hb",
+			LicenseKey:      "key",
+			ServerID:        "srv",
+		}}
+
+		t.Setenv("DAGU_LICENSE", "")
+		t.Setenv("DAGU_LICENSE_KEY", "")
+		t.Setenv("DAGU_LICENSE_FILE", "")
+
+		m := NewManager(ManagerConfig{
+			LicenseDir: t.TempDir(),
+			CloudURL:   "http://127.0.0.1:0",
+		}, pub, store, slog.Default())
+		require.NoError(t, m.Start(context.Background()))
+
+		assert.Equal(t, SourceActivationFile, m.Source())
+
+		stopWithTimeout(t, m, 5*time.Second)
+	})
+
+	t.Run("returns SourceNone when no license configured", func(t *testing.T) {
+		pub, _ := testKeyPair(t)
+
+		t.Setenv("DAGU_LICENSE", "")
+		t.Setenv("DAGU_LICENSE_KEY", "")
+		t.Setenv("DAGU_LICENSE_FILE", "")
+
+		m := NewManager(ManagerConfig{LicenseDir: t.TempDir()}, pub, nil, slog.Default())
+		require.NoError(t, m.Start(context.Background()))
+
+		assert.Equal(t, SourceNone, m.Source())
+	})
+
+	t.Run("returns SourceActivationFile after ActivateWithKey", func(t *testing.T) {
+		pub, priv := testKeyPair(t)
+		token := signToken(t, priv, validClaims())
+
+		srv := newMockCloudServer(t, mockCloudServerConfig{
+			activateHandler: activateHandlerFn(token, "hb-secret"),
+		})
+
+		m := NewManager(ManagerConfig{
+			LicenseDir: t.TempDir(),
+			CloudURL:   srv.URL,
+		}, pub, nil, slog.Default())
+
+		_, err := m.ActivateWithKey(context.Background(), "my-key")
+		require.NoError(t, err)
+
+		assert.Equal(t, SourceActivationFile, m.Source())
+
+		stopWithTimeout(t, m, 5*time.Second)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Deactivate
+// ---------------------------------------------------------------------------
+
+func TestManager_Deactivate(t *testing.T) {
+	t.Run("success clears state removes file and stops heartbeat", func(t *testing.T) {
+		pub, priv := testKeyPair(t)
+		token := signToken(t, priv, validClaims())
+
+		store := &mockActivationStore{data: &ActivationData{
+			Token:           token,
+			HeartbeatSecret: "hb",
+			LicenseKey:      "key",
+			ServerID:        "srv",
+		}}
+
+		t.Setenv("DAGU_LICENSE", "")
+		t.Setenv("DAGU_LICENSE_KEY", "")
+		t.Setenv("DAGU_LICENSE_FILE", "")
+
+		m := NewManager(ManagerConfig{
+			LicenseDir: t.TempDir(),
+			CloudURL:   "http://127.0.0.1:0",
+		}, pub, store, slog.Default())
+		require.NoError(t, m.Start(context.Background()))
+
+		assert.False(t, m.Checker().IsCommunity())
+
+		err := m.Deactivate(context.Background())
+		require.NoError(t, err)
+
+		assert.True(t, m.Checker().IsCommunity(), "state must be cleared after deactivate")
+		assert.Equal(t, SourceNone, m.Source(), "source must be reset to SourceNone")
+		assert.Equal(t, 1, store.removeCalls, "store.Remove must be called")
+	})
+
+	t.Run("error when source is env var", func(t *testing.T) {
+		pub, priv := testKeyPair(t)
+		token := signToken(t, priv, validClaims())
+
+		t.Setenv("DAGU_LICENSE", token)
+		t.Setenv("DAGU_LICENSE_KEY", "")
+		t.Setenv("DAGU_LICENSE_FILE", "")
+
+		m := NewManager(ManagerConfig{LicenseDir: t.TempDir()}, pub, nil, slog.Default())
+		require.NoError(t, m.Start(context.Background()))
+
+		assert.False(t, m.Checker().IsCommunity())
+
+		err := m.Deactivate(context.Background())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "environment variable")
+		assert.False(t, m.Checker().IsCommunity(), "state must not be cleared on env deactivate error")
+	})
+
+	t.Run("error when no active license", func(t *testing.T) {
+		pub, _ := testKeyPair(t)
+
+		t.Setenv("DAGU_LICENSE", "")
+		t.Setenv("DAGU_LICENSE_KEY", "")
+		t.Setenv("DAGU_LICENSE_FILE", "")
+
+		m := NewManager(ManagerConfig{LicenseDir: t.TempDir()}, pub, nil, slog.Default())
+		require.NoError(t, m.Start(context.Background()))
+
+		err := m.Deactivate(context.Background())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no active license")
+	})
+
+	t.Run("idempotent second call returns no active license error", func(t *testing.T) {
+		pub, priv := testKeyPair(t)
+		token := signToken(t, priv, validClaims())
+
+		store := &mockActivationStore{data: &ActivationData{
+			Token:           token,
+			HeartbeatSecret: "hb",
+			LicenseKey:      "key",
+			ServerID:        "srv",
+		}}
+
+		t.Setenv("DAGU_LICENSE", "")
+		t.Setenv("DAGU_LICENSE_KEY", "")
+		t.Setenv("DAGU_LICENSE_FILE", "")
+
+		m := NewManager(ManagerConfig{
+			LicenseDir: t.TempDir(),
+			CloudURL:   "http://127.0.0.1:0",
+		}, pub, store, slog.Default())
+		require.NoError(t, m.Start(context.Background()))
+
+		err := m.Deactivate(context.Background())
+		require.NoError(t, err)
+
+		// Second call should return "no active license" error
+		err = m.Deactivate(context.Background())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no active license")
+	})
+
+	t.Run("nil store does not cause error", func(t *testing.T) {
+		pub, priv := testKeyPair(t)
+		token := signToken(t, priv, validClaims())
+
+		t.Setenv("DAGU_LICENSE", "")
+		t.Setenv("DAGU_LICENSE_KEY", "")
+		t.Setenv("DAGU_LICENSE_FILE", "")
+
+		dir := t.TempDir()
+		jwtPath := filepath.Join(dir, "license.jwt")
+		require.NoError(t, os.WriteFile(jwtPath, []byte(token), 0600))
+
+		m := NewManager(ManagerConfig{LicenseDir: dir}, pub, nil, slog.Default())
+		require.NoError(t, m.Start(context.Background()))
+
+		assert.False(t, m.Checker().IsCommunity())
+
+		err := m.Deactivate(context.Background())
+		require.NoError(t, err)
+		assert.True(t, m.Checker().IsCommunity())
 	})
 }

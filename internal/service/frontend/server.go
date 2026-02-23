@@ -319,9 +319,10 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		opt(srv)
 	}
 
-	// Populate license checker in funcsConfig after opts
+	// Populate license checker and manager in funcsConfig after opts
 	if srv.licenseManager != nil {
 		srv.funcsConfig.LicenseChecker = srv.licenseManager.Checker()
+		srv.funcsConfig.LicenseManager = srv.licenseManager
 	}
 
 	// License feature gating

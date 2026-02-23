@@ -210,3 +210,96 @@ func TestActivateLicense_AdminToken_NoLicenseManager(t *testing.T) {
 	assert.Equal(t, api.ErrorCodeBadRequest, errResp.Code)
 	assert.Contains(t, errResp.Message, "License management is not available")
 }
+
+// ---------------------------------------------------------------------------
+// DeactivateLicense
+// ---------------------------------------------------------------------------
+
+// TestDeactivateLicense_NoLicenseManager verifies that when no license manager
+// is configured, the deactivate endpoint returns 400.
+func TestDeactivateLicense_NoLicenseManager(t *testing.T) {
+	t.Parallel()
+
+	server := test.SetupServer(t)
+
+	resp := server.Client().Post("/api/v1/license/deactivate", nil).
+		ExpectStatus(http.StatusBadRequest).Send(t)
+
+	var errResp api.Error
+	resp.Unmarshal(t, &errResp)
+	assert.Equal(t, api.ErrorCodeBadRequest, errResp.Code)
+	assert.Contains(t, errResp.Message, "License management is not available")
+}
+
+// TestDeactivateLicense_RequiresAdmin_BuiltinMode verifies that a non-admin user
+// is forbidden from calling the license deactivation endpoint.
+func TestDeactivateLicense_RequiresAdmin_BuiltinMode(t *testing.T) {
+	t.Parallel()
+
+	server := test.SetupServer(t,
+		test.WithConfigMutator(func(cfg *config.Config) {
+			cfg.Server.Auth.Mode = config.AuthModeBuiltin
+			cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-deactivate-admin"
+			cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
+		}),
+		test.WithServerOptions(frontend.WithLicenseManager(defaultTestLicenseManager())),
+	)
+
+	// Bootstrap admin.
+	server.Client().Post("/api/v1/auth/setup", api.SetupRequest{
+		Username: "admin",
+		Password: "adminpass",
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	adminToken := getAdminToken(t, server)
+
+	// Create a viewer user.
+	server.Client().Post("/api/v1/users", api.CreateUserRequest{
+		Username: "viewer-deactivate",
+		Password: "viewerpass1",
+		Role:     api.UserRoleViewer,
+	}).WithBearerToken(adminToken).ExpectStatus(http.StatusCreated).Send(t)
+
+	// Obtain a viewer token.
+	viewerResp := server.Client().Post("/api/v1/auth/login", api.LoginRequest{
+		Username: "viewer-deactivate",
+		Password: "viewerpass1",
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	var viewerLogin api.LoginResponse
+	viewerResp.Unmarshal(t, &viewerLogin)
+	require.NotEmpty(t, viewerLogin.Token)
+
+	// Viewer must be forbidden from deactivating a license.
+	server.Client().Post("/api/v1/license/deactivate", nil).
+		WithBearerToken(viewerLogin.Token).
+		ExpectStatus(http.StatusForbidden).Send(t)
+}
+
+// TestDeactivateLicense_AdminToken_NoLicenseManager verifies that an authenticated
+// admin user receives 400 when no license manager is configured.
+func TestDeactivateLicense_AdminToken_NoLicenseManager(t *testing.T) {
+	t.Parallel()
+
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Mode = config.AuthModeBuiltin
+		cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-deactivate-noLM"
+		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
+	}))
+
+	server.Client().Post("/api/v1/auth/setup", api.SetupRequest{
+		Username: "admin",
+		Password: "adminpass",
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	adminToken := getAdminToken(t, server)
+
+	resp := server.Client().Post("/api/v1/license/deactivate", nil).
+		WithBearerToken(adminToken).
+		ExpectStatus(http.StatusBadRequest).Send(t)
+
+	var errResp api.Error
+	resp.Unmarshal(t, &errResp)
+	assert.Equal(t, api.ErrorCodeBadRequest, errResp.Code)
+	assert.Contains(t, errResp.Message, "License management is not available")
+}

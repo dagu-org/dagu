@@ -39,6 +39,7 @@
             features: JSON.parse('{{ licenseFeatures }}'),
             gracePeriod: "{{ licenseGracePeriod }}" === "true",
             community: "{{ licenseCommunity }}" === "true",
+            source: "{{ licenseSource }}",
           },
           paths: {
             dagsDir: "{{ js pathDAGsDir }}",

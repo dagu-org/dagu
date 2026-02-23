@@ -73,10 +73,26 @@ func licenseDeactivate() *cobra.Command {
 			Use:   "deactivate",
 			Short: "Remove the local license activation",
 		}, nil, func(ctx *Context, _ []string) error {
+			pubKey, err := license.PublicKey()
+			if err != nil {
+				return fmt.Errorf("failed to load license public key: %w", err)
+			}
+
 			licenseDir := filepath.Join(ctx.Config.Paths.DataDir, "license")
 			store := filelicense.New(licenseDir)
 
-			if err := store.Remove(); err != nil {
+			mgr := license.NewManager(license.ManagerConfig{
+				LicenseDir: licenseDir,
+				ConfigKey:  ctx.Config.License.Key,
+				CloudURL:   ctx.Config.License.CloudURL,
+			}, pubKey, store, slog.Default())
+
+			if err := mgr.Start(ctx); err != nil {
+				return err
+			}
+			defer mgr.Stop()
+
+			if err := mgr.Deactivate(ctx); err != nil {
 				return fmt.Errorf("deactivation failed: %w", err)
 			}
 

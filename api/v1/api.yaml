@@ -5180,6 +5180,44 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /license/deactivate:
+    post:
+      summary: "Deactivate the current license"
+      description: "Removes local activation data and returns to community mode. Admin only."
+      operationId: "deactivateLicense"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "License deactivated"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "400":
+          description: "No active license or license configured via env var"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Insufficient permissions"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   securitySchemes:
     basicAuth:
