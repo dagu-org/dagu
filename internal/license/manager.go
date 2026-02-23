@@ -91,12 +91,20 @@ func (m *Manager) Start(ctx context.Context) error {
 	if result.LicenseKey != "" && result.Token == "" {
 		activationResult, activateErr := m.activate(ctx, result.LicenseKey)
 		if activateErr != nil {
-			m.logger.Warn("License activation failed, running in community mode",
+			cached := m.loadCachedActivation(result.LicenseKey)
+			if cached == nil {
+				m.logger.Warn("License activation failed, running in community mode",
+					slog.String("error", activateErr.Error()))
+				return nil // graceful degradation
+			}
+			m.logger.Info("License activation failed, using cached activation (offline mode)",
 				slog.String("error", activateErr.Error()))
-			return nil // graceful degradation
+			result.Token = cached.Token
+			result.Activation = cached
+		} else {
+			result.Token = activationResult.Token
+			result.Activation = activationResult
 		}
-		result.Token = activationResult.Token
-		result.Activation = activationResult
 	}
 
 	// Verify the token
@@ -230,6 +238,21 @@ func (m *Manager) activate(ctx context.Context, key string) (*ActivationData, er
 	}
 
 	return ad, nil
+}
+
+func (m *Manager) loadCachedActivation(licenseKey string) *ActivationData {
+	if m.store == nil {
+		return nil
+	}
+	cached, err := m.store.Load()
+	if err != nil {
+		m.logger.Debug("Failed to load cached activation", slog.String("error", err.Error()))
+		return nil
+	}
+	if cached == nil || cached.Token == "" || cached.LicenseKey != licenseKey {
+		return nil
+	}
+	return cached
 }
 
 func (m *Manager) startHeartbeat(ad *ActivationData) {

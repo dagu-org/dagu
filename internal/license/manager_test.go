@@ -291,6 +291,127 @@ func TestManager_Start_EnvLicenseKey(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Start — offline fallback via cached activation
+// ---------------------------------------------------------------------------
+
+func TestManager_Start_OfflineFallback(t *testing.T) {
+	// Subtests use t.Setenv so the parent must not call t.Parallel.
+
+	t.Run("offline with cached activation loads license", func(t *testing.T) {
+		pub, priv := testKeyPair(t)
+		claims := validClaims()
+		token := signToken(t, priv, claims)
+
+		srv := newMockCloudServer(t, mockCloudServerConfig{
+			activateHandler: errorHandlerFn(http.StatusInternalServerError, "server unreachable"),
+		})
+
+		store := &mockActivationStore{data: &ActivationData{
+			Token:           token,
+			HeartbeatSecret: "hb-secret",
+			LicenseKey:      "my-license-key",
+			ServerID:        "server-001",
+		}}
+
+		t.Setenv("DAGU_LICENSE", "")
+		t.Setenv("DAGU_LICENSE_KEY", "my-license-key")
+		t.Setenv("DAGU_LICENSE_FILE", "")
+
+		m := NewManager(ManagerConfig{
+			LicenseDir: t.TempDir(),
+			CloudURL:   srv.URL,
+		}, pub, store, slog.Default())
+
+		err := m.Start(context.Background())
+		require.NoError(t, err)
+
+		checker := m.Checker()
+		assert.False(t, checker.IsCommunity(), "cached activation should yield non-community mode")
+		assert.Equal(t, "pro", checker.Plan())
+
+		stopWithTimeout(t, m, 5*time.Second)
+	})
+
+	t.Run("offline without cache falls back to community mode", func(t *testing.T) {
+		pub, _ := testKeyPair(t)
+
+		srv := newMockCloudServer(t, mockCloudServerConfig{
+			activateHandler: errorHandlerFn(http.StatusInternalServerError, "server unreachable"),
+		})
+
+		store := &mockActivationStore{data: nil}
+
+		t.Setenv("DAGU_LICENSE", "")
+		t.Setenv("DAGU_LICENSE_KEY", "my-license-key")
+		t.Setenv("DAGU_LICENSE_FILE", "")
+
+		m := NewManager(ManagerConfig{
+			LicenseDir: t.TempDir(),
+			CloudURL:   srv.URL,
+		}, pub, store, slog.Default())
+
+		err := m.Start(context.Background())
+		require.NoError(t, err)
+
+		assert.True(t, m.Checker().IsCommunity(), "no cached data should fall back to community mode")
+	})
+
+	t.Run("offline with key mismatch falls back to community mode", func(t *testing.T) {
+		pub, priv := testKeyPair(t)
+		token := signToken(t, priv, validClaims())
+
+		srv := newMockCloudServer(t, mockCloudServerConfig{
+			activateHandler: errorHandlerFn(http.StatusInternalServerError, "server unreachable"),
+		})
+
+		store := &mockActivationStore{data: &ActivationData{
+			Token:           token,
+			HeartbeatSecret: "hb-secret",
+			LicenseKey:      "different-key",
+			ServerID:        "server-001",
+		}}
+
+		t.Setenv("DAGU_LICENSE", "")
+		t.Setenv("DAGU_LICENSE_KEY", "my-license-key")
+		t.Setenv("DAGU_LICENSE_FILE", "")
+
+		m := NewManager(ManagerConfig{
+			LicenseDir: t.TempDir(),
+			CloudURL:   srv.URL,
+		}, pub, store, slog.Default())
+
+		err := m.Start(context.Background())
+		require.NoError(t, err)
+
+		assert.True(t, m.Checker().IsCommunity(), "mismatched key should fall back to community mode")
+	})
+
+	t.Run("offline with store load error falls back to community mode", func(t *testing.T) {
+		pub, _ := testKeyPair(t)
+
+		srv := newMockCloudServer(t, mockCloudServerConfig{
+			activateHandler: errorHandlerFn(http.StatusInternalServerError, "server unreachable"),
+		})
+
+		store := &mockActivationStore{loadErr: errors.New("disk read failure")}
+
+		t.Setenv("DAGU_LICENSE", "")
+		t.Setenv("DAGU_LICENSE_KEY", "my-license-key")
+		t.Setenv("DAGU_LICENSE_FILE", "")
+
+		m := NewManager(ManagerConfig{
+			LicenseDir: t.TempDir(),
+			CloudURL:   srv.URL,
+		}, pub, store, slog.Default())
+
+		err := m.Start(context.Background())
+		require.NoError(t, err)
+
+		assert.True(t, m.Checker().IsCommunity(), "store load error should fall back to community mode")
+	})
+}
+
+// ---------------------------------------------------------------------------
 // Start — activation file (store has valid token)
 // ---------------------------------------------------------------------------
 
