@@ -249,18 +249,12 @@ func (m *Manager) doHeartbeat(ctx context.Context, ad *ActivationData) {
 			switch cloudErr.StatusCode {
 			case 410: // Gone - license revoked
 				m.logger.Error("License has been revoked")
-				m.state.Update(nil, "")
-				if m.store != nil {
-					_ = m.store.Remove()
-				}
+				m.clearLicense()
 				return
 			case 401: // Unauthorized - deactivated or credentials invalid
 				m.logger.Error("License heartbeat unauthorized, license may have been deactivated",
 					slog.String("error", cloudErr.Message))
-				m.state.Update(nil, "")
-				if m.store != nil {
-					_ = m.store.Remove()
-				}
+				m.clearLicense()
 				return
 			}
 		}
@@ -292,4 +286,11 @@ func (m *Manager) doHeartbeat(ctx context.Context, ad *ActivationData) {
 
 	m.logger.Debug("License heartbeat successful",
 		slog.String("plan", newClaims.Plan))
+}
+
+func (m *Manager) clearLicense() {
+	m.state.Update(nil, "")
+	if m.store != nil {
+		_ = m.store.Remove()
+	}
 }
