@@ -324,21 +324,17 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		srv.funcsConfig.LicenseChecker = srv.licenseManager.Checker()
 	}
 
-	// License feature gating (only when a license IS present)
+	// License feature gating
 	if srv.licenseManager != nil {
 		checker := srv.licenseManager.Checker()
-		if !checker.IsCommunity() {
-			// Gate audit
-			if !checker.IsFeatureEnabled(license.FeatureAudit) {
-				srv.auditService = nil
-				srv.auditStore = nil
-			}
-			// Gate SSO/OIDC
-			if !checker.IsFeatureEnabled(license.FeatureSSO) {
-				if srv.builtinOIDCCfg != nil {
-					logger.Error(ctx, "SSO (OIDC) requires a Dagu Pro license; OIDC login is disabled")
-					srv.builtinOIDCCfg = nil
-				}
+		if !checker.IsFeatureEnabled(license.FeatureAudit) {
+			srv.auditService = nil
+			srv.auditStore = nil
+		}
+		if !checker.IsFeatureEnabled(license.FeatureSSO) {
+			if srv.builtinOIDCCfg != nil {
+				logger.Error(ctx, "SSO (OIDC) requires a Dagu Pro license; OIDC login is disabled")
+				srv.builtinOIDCCfg = nil
 			}
 		}
 	}
