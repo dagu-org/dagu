@@ -490,8 +490,8 @@ func TestManager_ActivateWithKey(t *testing.T) {
 	t.Run("token signed with wrong key returns verification error", func(t *testing.T) {
 		t.Parallel()
 
-		pub, _ := testKeyPair(t)        // manager's public key
-		_, wrongPriv := testKeyPair(t)  // private key NOT corresponding to pub
+		pub, _ := testKeyPair(t)       // manager's public key
+		_, wrongPriv := testKeyPair(t) // private key NOT corresponding to pub
 		claims := validClaims()
 		token := signToken(t, wrongPriv, claims) // signed with the wrong key
 

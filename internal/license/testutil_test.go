@@ -76,11 +76,11 @@ func expiredPastGraceClaims() *LicenseClaims {
 
 // mockActivationStore is a test double for ActivationStore.
 type mockActivationStore struct {
-	data       *ActivationData
-	loadErr    error
-	saveErr    error
-	removeErr  error
-	saveCalls  int
+	data        *ActivationData
+	loadErr     error
+	saveErr     error
+	removeErr   error
+	saveCalls   int
 	removeCalls int
 }
 

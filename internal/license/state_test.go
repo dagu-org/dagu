@@ -301,4 +301,3 @@ func TestState_IsCommunity(t *testing.T) {
 
 // Compile-time check: *State satisfies the Checker interface.
 var _ Checker = (*State)(nil)
-

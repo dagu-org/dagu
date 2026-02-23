@@ -26,7 +26,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	authmodel "github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/license"
 	"github.com/dagu-org/dagu/internal/auth/tokensecret"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
@@ -37,6 +36,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/telemetry"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/gitsync"
+	"github.com/dagu-org/dagu/internal/license"
 	_ "github.com/dagu-org/dagu/internal/llm/allproviders" // Register LLM providers
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"

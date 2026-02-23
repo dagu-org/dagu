@@ -239,6 +239,7 @@ func TestRemove_ThenLoad(t *testing.T) {
 // TestConcurrency_SaveAndLoad verifies that concurrent Save and Load
 // operations do not trigger a data race (run with -race flag).
 func TestConcurrency_SaveAndLoad(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	s := New(dir)
 
@@ -250,11 +251,11 @@ func TestConcurrency_SaveAndLoad(t *testing.T) {
 	// Pre-populate so Load never races on an absent file returning nil.
 	require.NoError(t, s.Save(sampleActivationData()))
 
-	for i := range numWorkers {
+	for range numWorkers {
 		wg.Add(2)
 
 		// Writer goroutine
-		go func(_ int) {
+		go func() {
 			defer wg.Done()
 			ad := &license.ActivationData{
 				Token:           "tok-concurrent",
@@ -265,15 +266,15 @@ func TestConcurrency_SaveAndLoad(t *testing.T) {
 			if err := s.Save(ad); err != nil {
 				errCh <- err
 			}
-		}(i)
+		}()
 
 		// Reader goroutine
-		go func(_ int) {
+		go func() {
 			defer wg.Done()
 			if _, err := s.Load(); err != nil {
 				errCh <- err
 			}
-		}(i)
+		}()
 	}
 
 	wg.Wait()
@@ -289,6 +290,7 @@ func TestConcurrency_SaveAndLoad(t *testing.T) {
 // TestConcurrency_SaveAndRemove verifies that interleaved Save and Remove
 // operations do not trigger a data race.
 func TestConcurrency_SaveAndRemove(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	s := New(dir)
 
@@ -297,11 +299,11 @@ func TestConcurrency_SaveAndRemove(t *testing.T) {
 	var wg sync.WaitGroup
 	errCh := make(chan error, numWorkers*2)
 
-	for i := range numWorkers {
+	for range numWorkers {
 		wg.Add(2)
 
 		// Saver
-		go func(_ int) {
+		go func() {
 			defer wg.Done()
 			ad := &license.ActivationData{
 				Token:    "tok-race",
@@ -310,17 +312,17 @@ func TestConcurrency_SaveAndRemove(t *testing.T) {
 			if err := s.Save(ad); err != nil {
 				errCh <- err
 			}
-		}(i)
+		}()
 
 		// Remover
-		go func(_ int) {
+		go func() {
 			defer wg.Done()
 			// Remove may legitimately fail-not-exist if a concurrent Remove won
 			// the race; that is handled inside Remove already and returns nil.
 			if err := s.Remove(); err != nil {
 				errCh <- err
 			}
-		}(i)
+		}()
 	}
 
 	wg.Wait()
