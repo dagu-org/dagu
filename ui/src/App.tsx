@@ -4,6 +4,8 @@ import React from 'react';
 import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
 import { SWRConfig } from 'swr';
 
+import { Shield } from 'lucide-react';
+
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorModalProvider } from './components/ui/error-modal';
 import { ToastProvider } from './components/ui/simple-toast';
@@ -11,7 +13,6 @@ import { AppBarContext } from './contexts/AppBarContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { Config, ConfigContext, ConfigUpdateContext } from './contexts/ConfigContext';
 import { useHasFeature } from './hooks/useLicense';
-import { Shield } from 'lucide-react';
 import { PageContextProvider } from './contexts/PageContext';
 import { SchemaProvider } from './contexts/SchemaContext';
 import { SearchStateProvider } from './contexts/SearchStateContext';
@@ -207,7 +208,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                         <Route path="/dag-runs/:name/:dagRunId" element={<DAGRunDetails />} />
                                         <Route path="/system-status" element={<DeveloperElement><SystemStatus /></DeveloperElement>} />
                                         <Route path="/base-config" element={<DeveloperElement><BaseConfigPage /></DeveloperElement>} />
-                                        <Route path="/users" element={<AdminElement><LicensedRoute feature="rbac"><UsersPage /></LicensedRoute></AdminElement>} />
+                                        <Route path="/users" element={<AdminElement><UsersPage /></AdminElement>} />
                                         <Route path="/api-keys" element={<AdminElement><APIKeysPage /></AdminElement>} />
                                         <Route path="/webhooks" element={<DeveloperElement><WebhooksPage /></DeveloperElement>} />
                                         <Route path="/terminal" element={<AdminElement><TerminalPage /></AdminElement>} />

@@ -17,10 +17,12 @@ import {
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { TOKEN_KEY, useAuth, useIsAdmin } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
+import { useHasFeature } from '@/hooks/useLicense';
 import dayjs from '@/lib/dayjs';
 import ConfirmModal from '@/ui/ConfirmModal';
 import {
   Ban,
+  Info,
   Key,
   MoreHorizontal,
   Pencil,
@@ -29,6 +31,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { useCallback, useContext, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ResetPasswordModal } from './ResetPasswordModal';
 import { UserFormModal } from './UserFormModal';
 
@@ -45,6 +48,7 @@ export default function UsersPage() {
   const config = useConfig();
   const { user: currentUser } = useAuth();
   const isAdmin = useIsAdmin();
+  const hasRbac = useHasFeature('rbac');
   const appBarContext = useContext(AppBarContext);
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -163,19 +167,34 @@ export default function UsersPage() {
             Manage user accounts and their roles
           </p>
         </div>
-        <Button
-          onClick={() => setShowCreateModal(true)}
-          size="sm"
-          className="h-8"
-        >
-          <UserPlus className="h-4 w-4 mr-1.5" />
-          Add User
-        </Button>
+        {hasRbac && (
+          <Button
+            onClick={() => setShowCreateModal(true)}
+            size="sm"
+            className="h-8"
+          >
+            <UserPlus className="h-4 w-4 mr-1.5" />
+            Add User
+          </Button>
+        )}
       </div>
 
       {error && (
         <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
           {error}
+        </div>
+      )}
+
+      {!hasRbac && (
+        <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground bg-muted/50 rounded-md">
+          <Info className="h-4 w-4 shrink-0" />
+          <span>
+            User management features (create, edit, delete) require a{' '}
+            <Link to="/license" className="text-primary underline underline-offset-2">
+              Pro license
+            </Link>
+            . Password reset is available for all admins.
+          </span>
         </div>
       )}
 
@@ -258,10 +277,12 @@ export default function UsersPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setEditingUser(user)}>
-                          <Pencil className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
+                        {hasRbac && (
+                          <DropdownMenuItem onClick={() => setEditingUser(user)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                        )}
                         {isAdmin && (
                           <DropdownMenuItem
                             onClick={() => setResetPasswordUser(user)}
@@ -270,7 +291,7 @@ export default function UsersPage() {
                             Reset Password
                           </DropdownMenuItem>
                         )}
-                        {isAdmin && user.id !== currentUser?.id && (
+                        {hasRbac && isAdmin && user.id !== currentUser?.id && (
                           <DropdownMenuItem
                             onClick={() => handleToggleDisabled(user)}
                           >
@@ -287,14 +308,16 @@ export default function UsersPage() {
                             )}
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem
-                          onClick={() => setDeletingUser(user)}
-                          className="text-destructive"
-                          disabled={user.id === currentUser?.id}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
+                        {hasRbac && (
+                          <DropdownMenuItem
+                            onClick={() => setDeletingUser(user)}
+                            className="text-destructive"
+                            disabled={user.id === currentUser?.id}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

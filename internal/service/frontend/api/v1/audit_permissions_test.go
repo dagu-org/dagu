@@ -8,6 +8,7 @@ import (
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/test"
+	"github.com/stretchr/testify/require"
 )
 
 // setupAuditTestServer creates a test server with audit enabled but NO license
@@ -102,4 +103,35 @@ func TestAudit_RequiresLicense(t *testing.T) {
 	server.Client().Get("/api/v1/audit").
 		WithBearerToken(adminToken).
 		ExpectStatus(http.StatusForbidden).Send(t)
+}
+
+// TestCommunityMode_ListUsersAndResetPassword verifies that community-mode admins
+// can list users and reset passwords without an RBAC license.
+func TestCommunityMode_ListUsersAndResetPassword(t *testing.T) {
+	t.Parallel()
+	// Community mode: no license manager.
+	server := setupAuditTestServer(t)
+	adminToken := getWebhookAdminToken(t, server)
+
+	// ListUsers should succeed (no RBAC license required).
+	resp := server.Client().Get("/api/v1/users").
+		WithBearerToken(adminToken).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var listResult api.UsersListResponse
+	resp.Unmarshal(t, &listResult)
+	require.NotEmpty(t, listResult.Users, "should have at least the admin user")
+
+	// ResetUserPassword should succeed (no RBAC license required).
+	adminUserID := listResult.Users[0].Id
+	server.Client().Post("/api/v1/users/"+adminUserID+"/reset-password", api.ResetPasswordRequest{
+		NewPassword: "newadminpass1",
+	}).WithBearerToken(adminToken).ExpectStatus(http.StatusOK).Send(t)
+
+	// CreateUser should fail — RBAC-gated.
+	server.Client().Post("/api/v1/users", api.CreateUserRequest{
+		Username: "should-fail",
+		Password: "password123",
+		Role:     api.UserRoleViewer,
+	}).WithBearerToken(adminToken).ExpectStatus(http.StatusForbidden).Send(t)
 }

@@ -11,11 +11,8 @@ import (
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 )
 
-// ListUsers returns a list of all users. Requires admin role and RBAC license.
+// ListUsers returns a list of all users. Requires admin role.
 func (a *API) ListUsers(ctx context.Context, _ api.ListUsersRequestObject) (api.ListUsersResponseObject, error) {
-	if err := a.requireLicensedRBAC(); err != nil {
-		return nil, err
-	}
 	if err := a.requireUserManagement(); err != nil {
 		return nil, err
 	}
@@ -277,9 +274,6 @@ func (a *API) DeleteUser(ctx context.Context, request api.DeleteUserRequestObjec
 
 // ResetUserPassword resets a user's password. Requires admin role.
 func (a *API) ResetUserPassword(ctx context.Context, request api.ResetUserPasswordRequestObject) (api.ResetUserPasswordResponseObject, error) {
-	if err := a.requireLicensedRBAC(); err != nil {
-		return nil, err
-	}
 	if err := a.requireUserManagement(); err != nil {
 		return nil, err
 	}
