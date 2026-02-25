@@ -14,4 +14,5 @@ type Checker interface {
 	IsGracePeriod() bool
 	IsCommunity() bool
 	Claims() *LicenseClaims
+	WarningCode() string
 }

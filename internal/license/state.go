@@ -93,6 +93,16 @@ func (s *State) isInGracePeriod() bool {
 	return time.Now().Before(expiry.Add(gracePeriod))
 }
 
+// WarningCode returns the warning code from the license claims.
+func (s *State) WarningCode() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.claims == nil {
+		return ""
+	}
+	return s.claims.WarningCode
+}
+
 // IsCommunity returns true when no license is loaded.
 func (s *State) IsCommunity() bool {
 	s.mu.RLock()

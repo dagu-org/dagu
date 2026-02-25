@@ -6,6 +6,29 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestLicenseClaims_WarningCode(t *testing.T) {
+	t.Parallel()
+
+	t.Run("round-trips when set", func(t *testing.T) {
+		t.Parallel()
+		claims := &LicenseClaims{
+			Plan:        "pro",
+			Features:    []string{FeatureAudit},
+			WarningCode: "MACHINE_LIMIT_EXCEEDED",
+		}
+		assert.Equal(t, "MACHINE_LIMIT_EXCEEDED", claims.WarningCode)
+	})
+
+	t.Run("defaults to empty string when absent", func(t *testing.T) {
+		t.Parallel()
+		claims := &LicenseClaims{
+			Plan:     "pro",
+			Features: []string{FeatureAudit},
+		}
+		assert.Equal(t, "", claims.WarningCode)
+	})
+}
+
 func TestLicenseClaims_HasFeature(t *testing.T) {
 	t.Parallel()
 

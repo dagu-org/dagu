@@ -252,6 +252,7 @@ func TestState_Concurrency(t *testing.T) {
 				_ = s.Plan()
 				_ = s.IsGracePeriod()
 				_ = s.IsCommunity()
+				_ = s.WarningCode()
 			}
 		}(i)
 	}
@@ -295,6 +296,33 @@ func TestState_IsCommunity(t *testing.T) {
 		s.Update(validClaims(), "tok")
 		s.Update(nil, "")
 		assert.True(t, s.IsCommunity())
+	})
+}
+
+// TestState_WarningCode verifies WarningCode() accessor.
+func TestState_WarningCode(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns empty string when claims are nil", func(t *testing.T) {
+		t.Parallel()
+		var s State
+		assert.Equal(t, "", s.WarningCode())
+	})
+
+	t.Run("returns empty string when warning code is empty", func(t *testing.T) {
+		t.Parallel()
+		var s State
+		s.Update(validClaims(), "tok")
+		assert.Equal(t, "", s.WarningCode())
+	})
+
+	t.Run("returns warning code when set", func(t *testing.T) {
+		t.Parallel()
+		var s State
+		claims := validClaims()
+		claims.WarningCode = "MACHINE_LIMIT_EXCEEDED"
+		s.Update(claims, "tok")
+		assert.Equal(t, "MACHINE_LIMIT_EXCEEDED", s.WarningCode())
 	})
 }
 

@@ -7,6 +7,11 @@ import * as React from 'react';
 // Must match the backend grace period duration
 const GRACE_PERIOD_DAYS = 14;
 
+const warningMessages: Record<string, string> = {
+  MACHINE_LIMIT_EXCEEDED:
+    'This license is active on more machines than allowed. Deactivate extra machines or contact your administrator.',
+};
+
 function daysUntilExpiry(expiryISO: string): number {
   if (!expiryISO) return Infinity;
   return Math.max(0, Math.ceil(dayjs(expiryISO).diff(dayjs(), 'day', true)));
@@ -25,6 +30,21 @@ export function LicenseBanner() {
 
   // Community mode: no banner
   if (license.community) return null;
+
+  // Warning code banner: non-dismissible
+  if (license.warningCode) {
+    const message =
+      warningMessages[license.warningCode] ??
+      'There is an issue with your license. Contact your administrator.';
+    return (
+      <div
+        role="alert"
+        className="bg-red-50 dark:bg-red-950 border-b border-red-200 dark:border-red-800 px-4 py-1.5 flex items-center text-sm"
+      >
+        <span className="text-red-800 dark:text-red-200">{message}</span>
+      </div>
+    );
+  }
 
   // Grace period: non-dismissible amber banner
   if (license.gracePeriod) {

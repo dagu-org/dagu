@@ -25,6 +25,7 @@ export type LicenseStatus = {
   gracePeriod: boolean;
   community: boolean;
   source: string;
+  warningCode: string;
 };
 
 export type Config = {

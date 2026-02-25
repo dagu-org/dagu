@@ -181,6 +181,16 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 			}
 			return boolStr(cfg.LicenseChecker.IsCommunity())
 		},
+		"licenseWarningCode": func() string {
+			if cfg.LicenseChecker == nil {
+				return ""
+			}
+			claims := cfg.LicenseChecker.Claims()
+			if claims == nil {
+				return ""
+			}
+			return claims.WarningCode
+		},
 		"licenseSource": func() string {
 			if cfg.LicenseManager == nil {
 				return ""
