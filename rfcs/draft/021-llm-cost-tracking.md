@@ -1,9 +1,3 @@
----
-id: "021"
-title: "LLM API Cost Tracking"
-status: draft
----
-
 # RFC 021: LLM API Cost Tracking
 
 ## Summary
@@ -19,7 +13,7 @@ The agent already captures per-message cost (`Message.Cost`) and token usage (`M
 1. **View aggregated costs** — administrators cannot see how much LLM usage costs per user or per month.
 2. **Attribute costs** — there is no breakdown of which users are driving LLM spend.
 3. **Recover session cost** — restarting the server loses the in-memory `totalCost`; the only way to recover it is to re-sum all message costs.
-4. **Track DAG step LLM costs** — the `chat` executor records token counts but not USD cost; the `agentstep` executor doesn't persist cost at all (only logs to stderr). See RFC 022 for executor-level changes.
+4. **Track DAG step LLM costs** — the `chat` executor records token counts but not USD cost. (The `agentstep` executor now persists per-message cost via RFC 022, but there is still no aggregated view.) See RFC 022 for executor-level changes.
 
 ### Use Cases
 

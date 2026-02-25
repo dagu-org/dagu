@@ -1,9 +1,3 @@
----
-id: "015"
-title: "Agent Model Fallback"
-status: draft
----
-
 # RFC 015: Agent Model Fallback
 
 ## Summary

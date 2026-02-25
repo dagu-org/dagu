@@ -1,9 +1,3 @@
----
-id: "023"
-title: "Dedicated LLM Cost Store"
-status: draft
----
-
 # RFC 023: Dedicated LLM Cost Store
 
 ## Summary

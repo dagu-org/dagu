@@ -1,9 +1,3 @@
----
-id: "009"
-title: "Namespaces"
-status: draft
----
-
 # RFC 009: Namespaces
 
 ## Summary

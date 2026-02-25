@@ -1,9 +1,3 @@
----
-id: "002"
-title: "Agent Audit Logging"
-status: draft
----
-
 # RFC 002: Agent Audit Logging
 
 ## Summary

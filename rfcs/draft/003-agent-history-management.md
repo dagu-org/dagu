@@ -1,9 +1,3 @@
----
-id: "003"
-title: "Agent Session History Management"
-status: draft
----
-
 # RFC 003: Agent Session History Management
 
 ## Summary

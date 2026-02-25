@@ -1,9 +1,3 @@
----
-id: "005"
-title: "Variable Expansion Syntax Refactoring"
-status: draft
----
-
 # RFC 005: Variable Expansion Syntax Refactoring
 
 ## Summary

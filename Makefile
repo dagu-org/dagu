@@ -277,6 +277,21 @@ addlicense:
 		-f scripts/header.txt \
 		.
 
+# rfc creates a new RFC draft with the next available number.
+# Usage: make rfc NAME=my-feature-name
+.PHONY: rfc
+rfc:
+	@if [ -z "$(NAME)" ]; then \
+		printf '%b\n' "${COLOR_RED}Error: NAME is not set${COLOR_RESET}"; \
+		echo "Usage: make rfc NAME=my-feature-name"; \
+		exit 1; \
+	fi
+	@NEXT=$$(find rfcs -name '*.md' ! -name 'README.md' ! -name 'TEMPLATE.md' | sed 's/.*\///' | grep -oE '^[0-9]+' | sort -n | tail -1 | awk '{printf "%03d", $$1+1}'); \
+	if [ -z "$$NEXT" ]; then NEXT="001"; fi; \
+	FILE="rfcs/draft/$${NEXT}-$(NAME).md"; \
+	sed "s/RFC NNN: Title/RFC $${NEXT}: $(NAME)/" rfcs/TEMPLATE.md > "$$FILE"; \
+	printf '%b\n' "${COLOR_GREEN}Created $$FILE${COLOR_RESET}"
+
 # cpuprof opens the CPU profile in the browser.
 cpuprof:
 	@go tool pprof -http=:9999 cpu.prof

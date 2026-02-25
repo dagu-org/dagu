@@ -1,9 +1,3 @@
----
-id: "013"
-title: "Agent Skills"
-status: draft
----
-
 # RFC 013: Agent Skills
 
 ## Summary
@@ -20,7 +14,7 @@ Currently:
 2. **No extensibility path** — adding new capabilities requires modifying Go source code and redeploying Dagu.
 3. **Knowledge is unstructured** — the memory system captures free-form notes, but there is no way to provide curated, reusable domain expertise that the agent can reliably apply.
 4. **Template workflows are manual** — users copy-paste YAML snippets from documentation. The agent cannot draw on a library of vetted, domain-specific templates.
-5. **Tool set is fixed** — the 8 built-in tools serve general DAG operations well, but domain-specific actions (e.g., "dry-run a Helm chart", "validate a dbt model") require composing bash commands from scratch every time.
+5. **Tool set is fixed** — the existing built-in tools serve general DAG operations well, but domain-specific actions (e.g., "dry-run a Helm chart", "validate a dbt model") require composing bash commands from scratch every time.
 
 ### Use Cases
 

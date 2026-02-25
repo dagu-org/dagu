@@ -1,9 +1,3 @@
----
-id: "012"
-title: "Agent In-box"
-status: draft
----
-
 # RFC 012: Agent In-box
 
 ## Summary
