@@ -1,31 +1,41 @@
 package license
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLicenseClaims_WarningCode(t *testing.T) {
 	t.Parallel()
 
-	t.Run("round-trips when set", func(t *testing.T) {
+	t.Run("round-trips through JSON when set", func(t *testing.T) {
 		t.Parallel()
-		claims := &LicenseClaims{
+		original := &LicenseClaims{
 			Plan:        "pro",
 			Features:    []string{FeatureAudit},
 			WarningCode: "MACHINE_LIMIT_EXCEEDED",
 		}
-		assert.Equal(t, "MACHINE_LIMIT_EXCEEDED", claims.WarningCode)
+		data, err := json.Marshal(original)
+		require.NoError(t, err)
+		assert.Contains(t, string(data), `"wc"`)
+
+		var decoded LicenseClaims
+		require.NoError(t, json.Unmarshal(data, &decoded))
+		assert.Equal(t, "MACHINE_LIMIT_EXCEEDED", decoded.WarningCode)
 	})
 
-	t.Run("defaults to empty string when absent", func(t *testing.T) {
+	t.Run("omitted from JSON when empty", func(t *testing.T) {
 		t.Parallel()
-		claims := &LicenseClaims{
+		original := &LicenseClaims{
 			Plan:     "pro",
 			Features: []string{FeatureAudit},
 		}
-		assert.Equal(t, "", claims.WarningCode)
+		data, err := json.Marshal(original)
+		require.NoError(t, err)
+		assert.NotContains(t, string(data), `"wc"`)
 	})
 }
 

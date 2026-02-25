@@ -185,11 +185,7 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 			if cfg.LicenseChecker == nil {
 				return ""
 			}
-			claims := cfg.LicenseChecker.Claims()
-			if claims == nil {
-				return ""
-			}
-			return claims.WarningCode
+			return cfg.LicenseChecker.WarningCode()
 		},
 		"licenseSource": func() string {
 			if cfg.LicenseManager == nil {
