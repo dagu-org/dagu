@@ -1,6 +1,7 @@
 package filedoc
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -8,9 +9,31 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// marshalDocFile produces doc file content with optional frontmatter (test helper).
+func marshalDocFile(title, content string) []byte {
+	var buf bytes.Buffer
+	if title != "" {
+		fm := docFrontmatter{Title: title}
+		fmBytes, err := yaml.Marshal(fm)
+		if err == nil {
+			buf.WriteString("---\n")
+			buf.Write(fmBytes)
+			buf.WriteString("---\n")
+		}
+	}
+	if content != "" {
+		buf.WriteString(content)
+		if !strings.HasSuffix(content, "\n") {
+			buf.WriteString("\n")
+		}
+	}
+	return buf.Bytes()
+}
 
 func newTestStore(t *testing.T) *Store {
 	t.Helper()

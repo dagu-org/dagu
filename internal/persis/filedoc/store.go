@@ -1,7 +1,6 @@
 package filedoc
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -98,27 +97,6 @@ func parseDocFile(data []byte, id string) (*agent.Doc, error) {
 		Title:   title,
 		Content: content,
 	}, nil
-}
-
-// marshalDocFile produces the doc file content with optional frontmatter.
-func marshalDocFile(title, content string) []byte {
-	var buf bytes.Buffer
-	if title != "" {
-		fm := docFrontmatter{Title: title}
-		fmBytes, err := yaml.Marshal(fm)
-		if err == nil {
-			buf.WriteString("---\n")
-			buf.Write(fmBytes)
-			buf.WriteString("---\n")
-		}
-	}
-	if content != "" {
-		buf.WriteString(content)
-		if !strings.HasSuffix(content, "\n") {
-			buf.WriteString("\n")
-		}
-	}
-	return buf.Bytes()
 }
 
 // titleFromID derives a display title from a doc ID.
