@@ -9,7 +9,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { SyncStatus } from '@/api/v1/schema';
 import { useUserPreferences } from '@/contexts/UserPreference';
-import { Upload, RotateCcw, Trash2, EyeOff, RefreshCw } from 'lucide-react';
+import { Upload, RotateCcw, Trash2, EyeOff, RefreshCw, X } from 'lucide-react';
+import { DialogClose } from '@/components/ui/dialog';
 
 interface DiffModalProps {
   open: boolean;
@@ -89,9 +90,13 @@ export function DiffModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col p-0 duration-100">
-        <DialogHeader className="px-4 py-3 border-b border-border/40">
+      <DialogContent hideCloseButton className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col p-0 duration-100">
+        <DialogHeader className="px-4 py-3 border-b border-border/40 flex flex-row items-center justify-between space-y-0">
           <DialogTitle className="text-sm font-mono">{dagId}</DialogTitle>
+          <DialogClose className="p-1.5 rounded-md opacity-70 transition-opacity hover:opacity-100 hover:bg-muted">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
         </DialogHeader>
         <div className="flex-1 overflow-auto">
           <ReactDiffViewer
