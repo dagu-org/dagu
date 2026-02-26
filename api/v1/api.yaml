@@ -5575,7 +5575,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /docs/{docPath}:
+  /docs/doc:
     get:
       summary: "Get document"
       description: "Returns a single document by path."
@@ -5584,8 +5584,8 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - name: docPath
-          in: path
+        - name: path
+          in: query
           description: "Document path (may include slashes for nested docs)"
           required: true
           schema:
@@ -5618,9 +5618,9 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - name: docPath
-          in: path
-          description: "Document path"
+        - name: path
+          in: query
+          description: "Document path (may include slashes for nested docs)"
           required: true
           schema:
             type: string
@@ -5661,9 +5661,9 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - name: docPath
-          in: path
-          description: "Document path"
+        - name: path
+          in: query
+          description: "Document path (may include slashes for nested docs)"
           required: true
           schema:
             type: string
@@ -5683,7 +5683,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /docs/{docPath}/rename:
+  /docs/doc/rename:
     post:
       summary: "Rename document"
       description: "Renames/moves a document to a new path. Requires DAG write permission."
@@ -5692,9 +5692,9 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - name: docPath
-          in: path
-          description: "Current document path"
+        - name: path
+          in: query
+          description: "Current document path (may include slashes for nested docs)"
           required: true
           schema:
             type: string

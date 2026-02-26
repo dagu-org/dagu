@@ -2210,7 +2210,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/docs/{docPath}": {
+    "/docs/doc": {
         parameters: {
             query?: never;
             header?: never;
@@ -2238,7 +2238,7 @@ export interface paths {
         patch: operations["updateDoc"];
         trace?: never;
     };
-    "/docs/{docPath}/rename": {
+    "/docs/doc/rename": {
         parameters: {
             query?: never;
             header?: never;
@@ -3680,6 +3680,7 @@ export interface components {
         DocResponse: {
             id: string;
             title: string;
+            /** @description Full file content including YAML frontmatter */
             content: string;
             createdAt?: string;
             updatedAt?: string;
@@ -3718,12 +3719,12 @@ export interface components {
         CreateDocRequest: {
             /** @description Document path (e.g., runbooks/deploy-guide) */
             id: string;
-            /** @description Markdown content */
+            /** @description Full file content including optional YAML frontmatter */
             content: string;
         };
         /** @description Request to update document content */
         UpdateDocRequest: {
-            /** @description New markdown content */
+            /** @description Full file content including optional YAML frontmatter */
             content: string;
         };
         /** @description Request to rename/move a document */
@@ -11007,15 +11008,14 @@ export interface operations {
     };
     getDoc: {
         parameters: {
-            query?: {
+            query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Document path (may include slashes for nested docs) */
+                path: string;
             };
             header?: never;
-            path: {
-                /** @description Document path (may include slashes for nested docs) */
-                docPath: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -11051,15 +11051,14 @@ export interface operations {
     };
     deleteDoc: {
         parameters: {
-            query?: {
+            query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Document path (may include slashes for nested docs) */
+                path: string;
             };
             header?: never;
-            path: {
-                /** @description Document path */
-                docPath: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -11093,15 +11092,14 @@ export interface operations {
     };
     updateDoc: {
         parameters: {
-            query?: {
+            query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Document path (may include slashes for nested docs) */
+                path: string;
             };
             header?: never;
-            path: {
-                /** @description Document path */
-                docPath: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody: {
@@ -11143,15 +11141,14 @@ export interface operations {
     };
     renameDoc: {
         parameters: {
-            query?: {
+            query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Current document path (may include slashes for nested docs) */
+                path: string;
             };
             header?: never;
-            path: {
-                /** @description Current document path */
-                docPath: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody: {

@@ -135,7 +135,7 @@ func (a *API) GetDoc(ctx context.Context, request api.GetDocRequestObject) (api.
 		return nil, err
 	}
 
-	doc, err := a.docStore.Get(ctx, request.DocPath)
+	doc, err := a.docStore.Get(ctx, request.Params.Path)
 	if err != nil {
 		if errors.Is(err, agent.ErrDocNotFound) {
 			return nil, errDocNotFound
@@ -210,7 +210,7 @@ func (a *API) UpdateDoc(ctx context.Context, request api.UpdateDocRequestObject)
 		return nil, ErrInvalidRequestBody
 	}
 
-	if err := a.docStore.Update(ctx, request.DocPath, request.Body.Content); err != nil {
+	if err := a.docStore.Update(ctx, request.Params.Path, request.Body.Content); err != nil {
 		if errors.Is(err, agent.ErrDocNotFound) {
 			return nil, errDocNotFound
 		}
@@ -226,7 +226,7 @@ func (a *API) UpdateDoc(ctx context.Context, request api.UpdateDocRequestObject)
 	}
 
 	a.logAudit(ctx, audit.CategoryAgent, auditActionDocUpdate, map[string]any{
-		"doc_id": request.DocPath,
+		"doc_id": request.Params.Path,
 	})
 
 	msg := "Document updated"
@@ -242,7 +242,7 @@ func (a *API) DeleteDoc(ctx context.Context, request api.DeleteDocRequestObject)
 		return nil, err
 	}
 
-	if err := a.docStore.Delete(ctx, request.DocPath); err != nil {
+	if err := a.docStore.Delete(ctx, request.Params.Path); err != nil {
 		if errors.Is(err, agent.ErrDocNotFound) {
 			return nil, errDocNotFound
 		}
@@ -258,7 +258,7 @@ func (a *API) DeleteDoc(ctx context.Context, request api.DeleteDocRequestObject)
 	}
 
 	a.logAudit(ctx, audit.CategoryAgent, auditActionDocDelete, map[string]any{
-		"doc_id": request.DocPath,
+		"doc_id": request.Params.Path,
 	})
 
 	return api.DeleteDoc204Response{}, nil
@@ -284,7 +284,7 @@ func (a *API) RenameDoc(ctx context.Context, request api.RenameDocRequestObject)
 		}
 	}
 
-	if err := a.docStore.Rename(ctx, request.DocPath, request.Body.NewPath); err != nil {
+	if err := a.docStore.Rename(ctx, request.Params.Path, request.Body.NewPath); err != nil {
 		if errors.Is(err, agent.ErrDocNotFound) {
 			return nil, errDocNotFound
 		}
@@ -303,7 +303,7 @@ func (a *API) RenameDoc(ctx context.Context, request api.RenameDocRequestObject)
 	}
 
 	a.logAudit(ctx, audit.CategoryAgent, auditActionDocRename, map[string]any{
-		"old_path": request.DocPath,
+		"old_path": request.Params.Path,
 		"new_path": request.Body.NewPath,
 	})
 
