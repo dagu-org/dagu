@@ -76,9 +76,9 @@ func (a *API) CreateRemoteNode(ctx context.Context, request api.CreateRemoteNode
 		}
 	}
 
-	authMode := remotenode.AuthModeNone
-	if body.AuthMode != nil {
-		authMode = remotenode.AuthMode(*body.AuthMode)
+	authMode := remotenode.AuthTypeNone
+	if body.AuthType != nil {
+		authMode = remotenode.AuthType(*body.AuthType)
 	}
 
 	node := remotenode.NewRemoteNode(body.Name, valueOf(body.Description), body.ApiBaseUrl, authMode)
@@ -167,8 +167,8 @@ func (a *API) UpdateRemoteNode(ctx context.Context, request api.UpdateRemoteNode
 	if body.ApiBaseUrl != nil && *body.ApiBaseUrl != "" {
 		existing.APIBaseURL = *body.ApiBaseUrl
 	}
-	if body.AuthMode != nil {
-		existing.AuthMode = remotenode.AuthMode(*body.AuthMode)
+	if body.AuthType != nil {
+		existing.AuthType = remotenode.AuthType(*body.AuthType)
 	}
 	if body.BasicAuthUsername != nil {
 		existing.BasicAuthUsername = *body.BasicAuthUsername
@@ -304,12 +304,12 @@ func testNodeConnection(node *remotenode.RemoteNode) api.TestRemoteNodeConnectio
 	}
 
 	// Apply auth
-	switch node.AuthMode {
-	case remotenode.AuthModeBasic:
+	switch node.AuthType {
+	case remotenode.AuthTypeBasic:
 		req.SetBasicAuth(node.BasicAuthUsername, node.BasicAuthPassword)
-	case remotenode.AuthModeToken:
+	case remotenode.AuthTypeToken:
 		req.Header.Set("Authorization", "Bearer "+node.AuthToken)
-	case remotenode.AuthModeNone:
+	case remotenode.AuthTypeNone:
 		// No auth needed
 	}
 
@@ -358,7 +358,7 @@ func toRemoteNodeResponseFromNode(n *remotenode.RemoteNode, source remotenode.So
 		Name:           n.Name,
 		Description:    ptrOf(n.Description),
 		ApiBaseUrl:     n.APIBaseURL,
-		AuthMode:       api.RemoteNodeResponseAuthMode(n.AuthMode),
+		AuthType:       api.RemoteNodeResponseAuthType(n.AuthType),
 		HasCredentials: ptrOf(hasCreds),
 		SkipTlsVerify:  ptrOf(n.SkipTLSVerify),
 		Source:         api.RemoteNodeResponseSource(source),

@@ -9007,7 +9007,7 @@ components:
         apiBaseUrl:
           type: string
           description: "Base URL of the remote Dagu instance API"
-        authMode:
+        authType:
           type: string
           enum: ["none", "basic", "token"]
           default: "none"
@@ -9035,7 +9035,7 @@ components:
           type: string
         apiBaseUrl:
           type: string
-        authMode:
+        authType:
           type: string
           enum: ["none", "basic", "token"]
         basicAuthUsername:
@@ -9053,7 +9053,7 @@ components:
         - id
         - name
         - apiBaseUrl
-        - authMode
+        - authType
         - source
       properties:
         id:
@@ -9064,7 +9064,7 @@ components:
           type: string
         apiBaseUrl:
           type: string
-        authMode:
+        authType:
           type: string
           enum: ["none", "basic", "token"]
         hasCredentials:

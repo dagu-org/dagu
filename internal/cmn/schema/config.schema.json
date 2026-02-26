@@ -539,10 +539,10 @@
           "type": "string",
           "description": "Base URL of the remote node's API."
         },
-        "auth_mode": {
+        "auth_type": {
           "type": "string",
           "enum": ["none", "basic", "token"],
-          "description": "Authentication mode for this remote node."
+          "description": "Authentication type for this remote node."
         },
         "basic_auth_username": {
           "type": "string",

@@ -3870,7 +3870,7 @@ export interface components {
              * @default none
              * @enum {string}
              */
-            authMode: CreateRemoteNodeRequestAuthMode;
+            authType: CreateRemoteNodeRequestAuthType;
             /** @description Username for basic auth */
             basicAuthUsername?: string;
             /** @description Password for basic auth */
@@ -3888,7 +3888,7 @@ export interface components {
             description?: string;
             apiBaseUrl?: string;
             /** @enum {string} */
-            authMode?: UpdateRemoteNodeRequestAuthMode;
+            authType?: UpdateRemoteNodeRequestAuthType;
             basicAuthUsername?: string;
             basicAuthPassword?: string;
             authToken?: string;
@@ -3900,7 +3900,7 @@ export interface components {
             description?: string;
             apiBaseUrl: string;
             /** @enum {string} */
-            authMode: RemoteNodeResponseAuthMode;
+            authType: RemoteNodeResponseAuthType;
             /** @description Whether credentials are configured (values are never returned) */
             hasCredentials?: boolean;
             skipTlsVerify?: boolean;
@@ -11328,17 +11328,17 @@ export enum AgentDelegateSnapshotStatus {
     running = "running",
     completed = "completed"
 }
-export enum CreateRemoteNodeRequestAuthMode {
+export enum CreateRemoteNodeRequestAuthType {
     none = "none",
     basic = "basic",
     token = "token"
 }
-export enum UpdateRemoteNodeRequestAuthMode {
+export enum UpdateRemoteNodeRequestAuthType {
     none = "none",
     basic = "basic",
     token = "token"
 }
-export enum RemoteNodeResponseAuthMode {
+export enum RemoteNodeResponseAuthType {
     none = "none",
     basic = "basic",
     token = "token"

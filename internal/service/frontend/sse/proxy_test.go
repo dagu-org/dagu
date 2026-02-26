@@ -229,7 +229,7 @@ func TestApplyNodeAuth(t *testing.T) {
 		t.Parallel()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		node := config.RemoteNode{
-			AuthMode:          "basic",
+			AuthType:          "basic",
 			BasicAuthUsername: "user",
 			BasicAuthPassword: "pass",
 		}
@@ -246,7 +246,7 @@ func TestApplyNodeAuth(t *testing.T) {
 		t.Parallel()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		node := config.RemoteNode{
-			AuthMode:  "token",
+			AuthType:  "token",
 			AuthToken: "my-token-123",
 		}
 
@@ -402,7 +402,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 			{
 				Name:              "remote1",
 				APIBaseURL:        remoteServer.URL,
-				AuthMode:          "basic",
+				AuthType:          "basic",
 				BasicAuthUsername: "testuser",
 				BasicAuthPassword: "testpass",
 			},

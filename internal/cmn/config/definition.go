@@ -215,7 +215,7 @@ type RemoteNodeDef struct {
 	Name              string `mapstructure:"name"`
 	Description       string `mapstructure:"description"`
 	APIBaseURL        string `mapstructure:"api_base_url"`
-	AuthMode          string `mapstructure:"auth_mode"`
+	AuthType          string `mapstructure:"auth_type"`
 	BasicAuthUsername string `mapstructure:"basic_auth_username"`
 	BasicAuthPassword string `mapstructure:"basic_auth_password"`
 	AuthToken         string `mapstructure:"auth_token"`

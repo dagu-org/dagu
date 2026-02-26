@@ -312,13 +312,13 @@ remote_nodes:
   - name: "node1"
     description: "Primary processing node"
     api_base_url: "http://node1.example.com/api"
-    auth_mode: basic
+    auth_type: basic
     basic_auth_username: "nodeuser"
     basic_auth_password: "nodepass"
     skip_tls_verify: true
   - name: "node2"
     api_base_url: "http://node2.example.com/api"
-    auth_mode: token
+    auth_type: token
     auth_token: "node-token-123"
 tls:
   cert_file: "/path/to/cert.pem"
@@ -409,7 +409,7 @@ scheduler:
 					Name:              "node1",
 					Description:       "Primary processing node",
 					APIBaseURL:        "http://node1.example.com/api",
-					AuthMode:          "basic",
+					AuthType:          "basic",
 					BasicAuthUsername: "nodeuser",
 					BasicAuthPassword: "nodepass",
 					SkipTLSVerify:     true,
@@ -417,7 +417,7 @@ scheduler:
 				{
 					Name:       "node2",
 					APIBaseURL: "http://node2.example.com/api",
-					AuthMode:   "token",
+					AuthType:   "token",
 					AuthToken:  "node-token-123",
 				},
 			},

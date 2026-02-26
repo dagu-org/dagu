@@ -133,7 +133,7 @@ func ToConfigNode(n *RemoteNode) config.RemoteNode {
 		Name:              n.Name,
 		Description:       n.Description,
 		APIBaseURL:        n.APIBaseURL,
-		AuthMode:          string(n.AuthMode),
+		AuthType:          string(n.AuthType),
 		BasicAuthUsername: n.BasicAuthUsername,
 		BasicAuthPassword: n.BasicAuthPassword,
 		AuthToken:         n.AuthToken,
@@ -144,16 +144,16 @@ func ToConfigNode(n *RemoteNode) config.RemoteNode {
 // FromConfigNode converts a config.RemoteNode to a domain RemoteNode.
 // Config nodes receive a synthetic ID of "cfg:<name>".
 func FromConfigNode(cn config.RemoteNode) *RemoteNode {
-	authMode := AuthMode(cn.AuthMode)
-	if authMode == "" {
-		authMode = AuthModeNone
+	authType := AuthType(cn.AuthType)
+	if authType == "" {
+		authType = AuthTypeNone
 	}
 	return &RemoteNode{
 		ID:                ConfigNodeIDPrefix + cn.Name,
 		Name:              cn.Name,
 		Description:       cn.Description,
 		APIBaseURL:        cn.APIBaseURL,
-		AuthMode:          authMode,
+		AuthType:          authType,
 		BasicAuthUsername: cn.BasicAuthUsername,
 		BasicAuthPassword: cn.BasicAuthPassword,
 		AuthToken:         cn.AuthToken,
