@@ -12,24 +12,38 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestService_GetStatus(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "gitsync-svc-test-*")
-	require.NoError(t, err)
-	defer func() { _ = os.RemoveAll(tempDir) }()
+// --- Test helpers ---
 
+var (
+	testCfgReadOnly  = &Config{Enabled: true, Repository: "r", Branch: "main"}
+	testCfgReadWrite = &Config{Enabled: true, Repository: "r", Branch: "main", PushEnabled: true}
+	testCfgPushOff   = &Config{Enabled: true, Repository: "r", Branch: "main", PushEnabled: false}
+)
+
+// newTestService creates a service with temp directories for testing.
+func newTestService(t *testing.T, cfg *Config) (*serviceImpl, string) {
+	t.Helper()
+	tempDir := t.TempDir()
 	dagsDir := filepath.Join(tempDir, "dags")
 	dataDir := filepath.Join(tempDir, "data")
 	require.NoError(t, os.MkdirAll(dagsDir, 0755))
 	require.NoError(t, os.MkdirAll(dataDir, 0755))
+	svc := NewService(cfg, dagsDir, dataDir)
+	return svc.(*serviceImpl), dagsDir
+}
 
+// --- Pre-existing tests ---
+
+func TestService_GetStatus(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{
 		Enabled:    true,
 		Repository: "host.com/org/repo",
 		Branch:     "main",
 	}
+	impl, _ := newTestService(t, cfg)
 
-	svc := NewService(cfg, dagsDir, dataDir)
-	status, err := svc.GetStatus(context.Background())
+	status, err := impl.GetStatus(context.Background())
 	require.NoError(t, err)
 
 	require.True(t, status.Enabled)
@@ -317,6 +331,8 @@ func TestSafeDAGIDPathValidation(t *testing.T) {
 	})
 }
 
+// --- Phase 1: Reconciliation tests ---
+
 func TestReconcile_SyncedFileDeleted(t *testing.T) {
 	t.Parallel()
 	tempDir := t.TempDir()
@@ -527,6 +543,7 @@ func TestReconcile_SyncedFileStillExists(t *testing.T) {
 
 func TestReconcile_BackwardCompatibility(t *testing.T) {
 	t.Parallel()
+
 	tempDir := t.TempDir()
 	dagsDir := filepath.Join(tempDir, "dags")
 	dataDir := filepath.Join(tempDir, "data")
@@ -591,17 +608,17 @@ func TestStatusCounts_IncludesMissing(t *testing.T) {
 func TestSummaryPriority_MissingBetweenConflictAndPending(t *testing.T) {
 	t.Parallel()
 
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
 	cfg := &Config{
 		Enabled:    true,
 		Repository: "host.com/org/repo",
 		Branch:     "main",
 	}
+
+	tempDir := t.TempDir()
+	dagsDir := filepath.Join(tempDir, "dags")
+	dataDir := filepath.Join(tempDir, "data")
+	require.NoError(t, os.MkdirAll(dagsDir, 0755))
+	require.NoError(t, os.MkdirAll(dataDir, 0755))
 
 	svc := NewService(cfg, dagsDir, dataDir)
 	impl := svc.(*serviceImpl)
@@ -640,6 +657,8 @@ func TestSummaryPriority_MissingBetweenConflictAndPending(t *testing.T) {
 		assert.Equal(t, SummaryConflict, status.Summary)
 	})
 }
+
+// --- Phase 2: Stat-before-hash tests ---
 
 func TestStatBeforeHash_SkipsUnchangedFile(t *testing.T) {
 	t.Parallel()
@@ -788,22 +807,17 @@ func TestResolvePublishTargets_RejectsMissing(t *testing.T) {
 	assert.Contains(t, validationErr.Message, "missing from disk")
 }
 
+// --- Phase 3: Forget + Cleanup tests ---
+
 func TestForget_MissingItem(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main"}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
+	impl, _ := newTestService(t, testCfgReadOnly)
 	now := time.Now()
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{
 		"my-dag": {Status: StatusMissing, PreviousStatus: "synced", MissingAt: &now},
 	}}))
 
-	forgotten, err := svc.Forget(context.Background(), []string{"my-dag"})
+	forgotten, err := impl.Forget(context.Background(), []string{"my-dag"})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"my-dag"}, forgotten)
 
@@ -813,114 +827,73 @@ func TestForget_MissingItem(t *testing.T) {
 
 func TestForget_UntrackedItem(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main"}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
+	impl, _ := newTestService(t, testCfgReadOnly)
 	now := time.Now()
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{
 		"my-dag": {Status: StatusUntracked, ModifiedAt: &now},
 	}}))
 
-	forgotten, err := svc.Forget(context.Background(), []string{"my-dag"})
+	forgotten, err := impl.Forget(context.Background(), []string{"my-dag"})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"my-dag"}, forgotten)
 }
 
 func TestForget_ConflictItem(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main"}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
+	impl, _ := newTestService(t, testCfgReadOnly)
 	now := time.Now()
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{
 		"my-dag": {Status: StatusConflict, ConflictDetectedAt: &now},
 	}}))
 
-	forgotten, err := svc.Forget(context.Background(), []string{"my-dag"})
+	forgotten, err := impl.Forget(context.Background(), []string{"my-dag"})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"my-dag"}, forgotten)
 }
 
 func TestForget_SyncedItem_Rejected(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main"}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
+	impl, _ := newTestService(t, testCfgReadOnly)
 	now := time.Now()
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{
 		"my-dag": {Status: StatusSynced, LastSyncedAt: &now},
 	}}))
 
-	_, err := svc.Forget(context.Background(), []string{"my-dag"})
+	_, err := impl.Forget(context.Background(), []string{"my-dag"})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrCannotForget)
 }
 
 func TestForget_ModifiedItem_Rejected(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main"}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
+	impl, _ := newTestService(t, testCfgReadOnly)
 	now := time.Now()
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{
 		"my-dag": {Status: StatusModified, ModifiedAt: &now},
 	}}))
 
-	_, err := svc.Forget(context.Background(), []string{"my-dag"})
+	_, err := impl.Forget(context.Background(), []string{"my-dag"})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrCannotForget)
 }
 
 func TestForget_NotFound(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main"}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
+	impl, _ := newTestService(t, testCfgReadOnly)
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{}}))
 
-	_, err := svc.Forget(context.Background(), []string{"nonexistent"})
+	_, err := impl.Forget(context.Background(), []string{"nonexistent"})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrDAGNotFound)
 }
 
 func TestCleanup_RemovesAllMissing(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
+	impl, dagsDir := newTestService(t, testCfgReadOnly)
 
 	// Create file on disk for synced item
 	require.NoError(t, os.WriteFile(filepath.Join(dagsDir, "synced-dag.yaml"), []byte("ok"), 0600))
 
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main"}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
 	now := time.Now()
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{
 		"missing-a":  {Status: StatusMissing, PreviousStatus: "synced", MissingAt: &now},
@@ -928,7 +901,7 @@ func TestCleanup_RemovesAllMissing(t *testing.T) {
 		"synced-dag": {Status: StatusSynced, LastSyncedAt: &now},
 	}}))
 
-	forgotten, err := svc.Cleanup(context.Background())
+	forgotten, err := impl.Cleanup(context.Background())
 	require.NoError(t, err)
 	assert.Len(t, forgotten, 2)
 	assert.Contains(t, forgotten, "missing-a")
@@ -939,6 +912,18 @@ func TestCleanup_RemovesAllMissing(t *testing.T) {
 	assert.NotContains(t, state.DAGs, "missing-b")
 	assert.Contains(t, state.DAGs, "synced-dag")
 }
+
+func TestCleanup_NoMissingItems(t *testing.T) {
+	t.Parallel()
+	impl, _ := newTestService(t, testCfgReadOnly)
+	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{}}))
+
+	forgotten, err := impl.Cleanup(context.Background())
+	require.NoError(t, err)
+	assert.Len(t, forgotten, 0)
+}
+
+// --- Phase 4: Remote deletion detection tests ---
 
 func TestReconcileAfterPull_AutoForget_BothAbsent(t *testing.T) {
 	t.Parallel()
@@ -1023,57 +1008,39 @@ func TestPull_DuplicatePrevention(t *testing.T) {
 	assert.NotContains(t, state.DAGs, "old-name")
 }
 
+// --- Phase 5: Delete tests ---
+
 func TestDelete_UntrackedItem_Rejected(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main", PushEnabled: true}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
+	impl, _ := newTestService(t, testCfgReadWrite)
 	now := time.Now()
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{
 		"my-dag": {Status: StatusUntracked, ModifiedAt: &now},
 	}}))
 
-	err := svc.Delete(context.Background(), "my-dag", "", false)
+	err := impl.Delete(context.Background(), "my-dag", "", false)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrCannotDeleteUntracked)
 }
 
 func TestDelete_PushDisabled_Rejected(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
+	impl, _ := newTestService(t, testCfgPushOff)
 
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main", PushEnabled: false}, dagsDir, dataDir)
-
-	err := svc.Delete(context.Background(), "my-dag", "", false)
+	err := impl.Delete(context.Background(), "my-dag", "", false)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrPushDisabled)
 }
 
 func TestDelete_ModifiedItem_WithoutForce_Rejected(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main", PushEnabled: true}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
+	impl, _ := newTestService(t, testCfgReadWrite)
 	now := time.Now()
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{
 		"my-dag": {Status: StatusModified, ModifiedAt: &now},
 	}}))
 
-	err := svc.Delete(context.Background(), "my-dag", "", false)
+	err := impl.Delete(context.Background(), "my-dag", "", false)
 	require.Error(t, err)
 	var validationErr *ValidationError
 	assert.ErrorAs(t, err, &validationErr)
@@ -1081,105 +1048,55 @@ func TestDelete_ModifiedItem_WithoutForce_Rejected(t *testing.T) {
 
 func TestDelete_NotFound(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main", PushEnabled: true}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
+	impl, _ := newTestService(t, testCfgReadWrite)
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{}}))
 
-	err := svc.Delete(context.Background(), "nonexistent", "", false)
+	err := impl.Delete(context.Background(), "nonexistent", "", false)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrDAGNotFound)
 }
 
 func TestDeleteAllMissing_PushDisabled_Rejected(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
+	impl, _ := newTestService(t, testCfgPushOff)
 
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main", PushEnabled: false}, dagsDir, dataDir)
-
-	_, err := svc.DeleteAllMissing(context.Background(), "")
+	_, err := impl.DeleteAllMissing(context.Background(), "")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrPushDisabled)
 }
 
 func TestDeleteAllMissing_NoMissingItems(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main", PushEnabled: true}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
+	impl, _ := newTestService(t, testCfgReadWrite)
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{
 		"synced-dag": {Status: StatusSynced},
 	}}))
 
-	deleted, err := svc.DeleteAllMissing(context.Background(), "")
+	deleted, err := impl.DeleteAllMissing(context.Background(), "")
 	require.NoError(t, err)
 	assert.Nil(t, deleted)
-}
-
-func TestCleanup_NoMissingItems(t *testing.T) {
-	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main"}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
-	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{}}))
-
-	forgotten, err := svc.Cleanup(context.Background())
-	require.NoError(t, err)
-	assert.Len(t, forgotten, 0)
 }
 
 // --- Phase 6: Move tests ---
 
 func TestMove_PushDisabled_Rejected(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
+	impl, _ := newTestService(t, testCfgPushOff)
 
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main", PushEnabled: false}, dagsDir, dataDir)
-
-	err := svc.Move(context.Background(), "old", "new", "", false)
+	err := impl.Move(context.Background(), "old", "new", "", false)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrPushDisabled)
 }
 
 func TestMove_UntrackedSource_Rejected(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main", PushEnabled: true}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
+	impl, _ := newTestService(t, testCfgReadWrite)
 	now := time.Now()
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{
 		"my-dag": {Status: StatusUntracked, ModifiedAt: &now},
 	}}))
 
-	err := svc.Move(context.Background(), "my-dag", "new-dag", "", false)
+	err := impl.Move(context.Background(), "my-dag", "new-dag", "", false)
 	require.Error(t, err)
 	var validationErr *ValidationError
 	assert.ErrorAs(t, err, &validationErr)
@@ -1188,38 +1105,24 @@ func TestMove_UntrackedSource_Rejected(t *testing.T) {
 
 func TestMove_NotFound(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main", PushEnabled: true}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
+	impl, _ := newTestService(t, testCfgReadWrite)
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{}}))
 
-	err := svc.Move(context.Background(), "nonexistent", "new-dag", "", false)
+	err := impl.Move(context.Background(), "nonexistent", "new-dag", "", false)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrDAGNotFound)
 }
 
 func TestMove_CrossKind_Rejected(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main", PushEnabled: true}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
+	impl, _ := newTestService(t, testCfgReadWrite)
 	now := time.Now()
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{
 		"my-dag": {Status: StatusSynced, ModifiedAt: &now},
 	}}))
 
 	// Trying to move a DAG to a memory path
-	err := svc.Move(context.Background(), "my-dag", "memory/NEW", "", false)
+	err := impl.Move(context.Background(), "my-dag", "memory/NEW", "", false)
 	require.Error(t, err)
 	var validationErr *ValidationError
 	assert.ErrorAs(t, err, &validationErr)
@@ -1228,14 +1131,7 @@ func TestMove_CrossKind_Rejected(t *testing.T) {
 
 func TestMove_ConflictSource_WithoutForce_Rejected(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main", PushEnabled: true}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
+	impl, _ := newTestService(t, testCfgReadWrite)
 	now := time.Now()
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{
 		"my-dag": {
@@ -1247,7 +1143,7 @@ func TestMove_ConflictSource_WithoutForce_Rejected(t *testing.T) {
 		},
 	}}))
 
-	err := svc.Move(context.Background(), "my-dag", "new-dag", "", false)
+	err := impl.Move(context.Background(), "my-dag", "new-dag", "", false)
 	require.Error(t, err)
 	var conflictErr *ConflictError
 	assert.ErrorAs(t, err, &conflictErr)
@@ -1255,21 +1151,14 @@ func TestMove_ConflictSource_WithoutForce_Rejected(t *testing.T) {
 
 func TestMove_DestinationAlreadyTracked_Rejected(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main", PushEnabled: true}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
+	impl, _ := newTestService(t, testCfgReadWrite)
 	now := time.Now()
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{
 		"old-dag": {Status: StatusSynced, ModifiedAt: &now},
 		"new-dag": {Status: StatusSynced, ModifiedAt: &now},
 	}}))
 
-	err := svc.Move(context.Background(), "old-dag", "new-dag", "", false)
+	err := impl.Move(context.Background(), "old-dag", "new-dag", "", false)
 	require.Error(t, err)
 	var validationErr *ValidationError
 	assert.ErrorAs(t, err, &validationErr)
@@ -1278,21 +1167,14 @@ func TestMove_DestinationAlreadyTracked_Rejected(t *testing.T) {
 
 func TestMove_SourceNoFileAndNoDestFile_Rejected(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main", PushEnabled: true}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
+	impl, _ := newTestService(t, testCfgReadWrite)
 	now := time.Now()
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{
 		"my-dag": {Status: StatusSynced, ModifiedAt: &now},
 	}}))
 
 	// Neither old file nor new file exists on disk
-	err := svc.Move(context.Background(), "my-dag", "new-dag", "", false)
+	err := impl.Move(context.Background(), "my-dag", "new-dag", "", false)
 	require.Error(t, err)
 	var validationErr *ValidationError
 	assert.ErrorAs(t, err, &validationErr)
@@ -1301,14 +1183,7 @@ func TestMove_SourceNoFileAndNoDestFile_Rejected(t *testing.T) {
 
 func TestMove_DestinationUntracked_Allowed(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
-
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main", PushEnabled: true}, dagsDir, dataDir)
-	impl := svc.(*serviceImpl)
+	impl, dagsDir := newTestService(t, testCfgReadWrite)
 	now := time.Now()
 	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{
 		"old-dag": {Status: StatusMissing, MissingAt: &now, PreviousStatus: "synced"},
@@ -1319,7 +1194,7 @@ func TestMove_DestinationUntracked_Allowed(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dagsDir, "new-dag.yaml"), []byte("content"), 0600))
 
 	// This will fail at gitClient.Open() because there's no real repo, but it should pass all validations
-	err := svc.Move(context.Background(), "old-dag", "new-dag", "", false)
+	err := impl.Move(context.Background(), "old-dag", "new-dag", "", false)
 	// We expect an error from git operations (no actual repo), not from validation
 	require.Error(t, err)
 	// Should NOT be a validation error or DAGNotFound — those are pre-git checks
@@ -1330,19 +1205,13 @@ func TestMove_DestinationUntracked_Allowed(t *testing.T) {
 
 func TestMove_InvalidDAGID_Rejected(t *testing.T) {
 	t.Parallel()
-	tempDir := t.TempDir()
-	dagsDir := filepath.Join(tempDir, "dags")
-	dataDir := filepath.Join(tempDir, "data")
-	require.NoError(t, os.MkdirAll(dagsDir, 0755))
-	require.NoError(t, os.MkdirAll(dataDir, 0755))
+	impl, _ := newTestService(t, testCfgReadWrite)
 
-	svc := NewService(&Config{Enabled: true, Repository: "r", Branch: "main", PushEnabled: true}, dagsDir, dataDir)
-
-	err := svc.Move(context.Background(), "../etc/passwd", "new-dag", "", false)
+	err := impl.Move(context.Background(), "../etc/passwd", "new-dag", "", false)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrInvalidDAGID)
 
-	err = svc.Move(context.Background(), "old-dag", "../etc/shadow", "", false)
+	err = impl.Move(context.Background(), "old-dag", "../etc/shadow", "", false)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrInvalidDAGID)
 }

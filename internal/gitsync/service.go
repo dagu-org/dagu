@@ -1107,11 +1107,9 @@ func (s *serviceImpl) Delete(ctx context.Context, itemID, message string, force 
 		return err
 	}
 
-	if err := s.gitClient.RemoveFile(repoPath); err != nil {
-		// File might not exist in repo (missing items), try to commit anyway
-		// but don't fail — the state cleanup is still valuable
-		_ = err
-	}
+	// File might not exist in repo (missing items) — ignore removal errors
+	// since the state cleanup is still valuable.
+	_ = s.gitClient.RemoveFile(repoPath)
 
 	// Commit and push
 	if message == "" {
@@ -1155,11 +1153,11 @@ func (s *serviceImpl) DeleteAllMissing(ctx context.Context, message string) ([]s
 		if dagState.Status != StatusMissing {
 			continue
 		}
-		missingIDs = append(missingIDs, dagID)
 		repoPath, err := s.safeDAGIDToRepoPath(dagID)
 		if err != nil {
 			continue
 		}
+		missingIDs = append(missingIDs, dagID)
 		repoPaths = append(repoPaths, repoPath)
 	}
 
@@ -1172,11 +1170,8 @@ func (s *serviceImpl) DeleteAllMissing(ctx context.Context, message string) ([]s
 		return nil, err
 	}
 
-	// Stage all removals
-	if err := s.gitClient.RemoveFiles(repoPaths); err != nil {
-		// Some files may not exist in repo, that's OK
-		_ = err
-	}
+	// Stage all removals — some files may not exist in repo, that's OK.
+	_ = s.gitClient.RemoveFiles(repoPaths)
 
 	if message == "" {
 		message = fmt.Sprintf("Delete %d missing item(s)", len(missingIDs))
@@ -1357,11 +1352,8 @@ func (s *serviceImpl) Move(ctx context.Context, oldID, newID, message string, fo
 		return fmt.Errorf("failed to write to repo: %w", err)
 	}
 
-	// Stage removal of old path
-	if err := s.gitClient.RemoveFile(oldRepoPath); err != nil {
-		// Old file might not exist in repo for some edge cases, ignore
-		_ = err
-	}
+	// Stage removal of old path — may not exist in repo for edge cases.
+	_ = s.gitClient.RemoveFile(oldRepoPath)
 
 	// Stage addition of new path
 	if message == "" {
@@ -1924,8 +1916,8 @@ func (s *serviceImpl) validateEnabled() error {
 
 // validatePushEnabled checks if push operations are allowed.
 func (s *serviceImpl) validatePushEnabled() error {
-	if !s.cfg.Enabled {
-		return ErrNotEnabled
+	if err := s.validateEnabled(); err != nil {
+		return err
 	}
 	if !s.cfg.PushEnabled {
 		return ErrPushDisabled

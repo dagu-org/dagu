@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"slices"
@@ -322,18 +321,9 @@ func runSyncDiscard(ctx *Context, args []string) error {
 	fmt.Printf("Discarding local changes for DAG: %s\n", dagName)
 	fmt.Println("WARNING: This will permanently discard your local changes!")
 
-	if !skipConfirm {
-		fmt.Print("Are you sure? [y/N]: ")
-		reader := bufio.NewReader(os.Stdin)
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			return fmt.Errorf("failed to read input: %w", err)
-		}
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input != "y" && input != "yes" {
-			fmt.Println("Aborted")
-			return nil
-		}
+	if !skipConfirm && !confirmAction("Are you sure?") {
+		fmt.Println("Aborted")
+		return nil
 	}
 
 	if err := syncSvc.Discard(ctx, dagName); err != nil {
@@ -378,18 +368,9 @@ func runSyncForget(ctx *Context, args []string) error {
 
 	fmt.Printf("Forgetting %d item(s): %s\n", len(args), strings.Join(args, ", "))
 
-	if !skipConfirm {
-		fmt.Print("Are you sure? [y/N]: ")
-		reader := bufio.NewReader(os.Stdin)
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			return fmt.Errorf("failed to read input: %w", err)
-		}
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input != "y" && input != "yes" {
-			fmt.Println("Aborted")
-			return nil
-		}
+	if !skipConfirm && !confirmAction("Are you sure?") {
+		fmt.Println("Aborted")
+		return nil
 	}
 
 	forgotten, err := syncSvc.Forget(ctx, args)
@@ -460,19 +441,10 @@ func runSyncCleanup(ctx *Context, _ []string) error {
 		return nil
 	}
 
-	if !skipConfirm {
-		fmt.Println("This will remove all missing items from sync state.")
-		fmt.Print("Are you sure? [y/N]: ")
-		reader := bufio.NewReader(os.Stdin)
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			return fmt.Errorf("failed to read input: %w", err)
-		}
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input != "y" && input != "yes" {
-			fmt.Println("Aborted")
-			return nil
-		}
+	fmt.Println("This will remove all missing items from sync state.")
+	if !skipConfirm && !confirmAction("Are you sure?") {
+		fmt.Println("Aborted")
+		return nil
 	}
 
 	forgotten, err := syncSvc.Cleanup(ctx)
@@ -561,19 +533,10 @@ func runSyncDelete(ctx *Context, args []string) error {
 			return nil
 		}
 
-		if !skipConfirm {
-			fmt.Println("This will delete all missing items from the remote repository.")
-			fmt.Print("Are you sure? [y/N]: ")
-			reader := bufio.NewReader(os.Stdin)
-			input, err := reader.ReadString('\n')
-			if err != nil {
-				return fmt.Errorf("failed to read input: %w", err)
-			}
-			input = strings.TrimSpace(strings.ToLower(input))
-			if input != "y" && input != "yes" {
-				fmt.Println("Aborted")
-				return nil
-			}
+		fmt.Println("This will delete all missing items from the remote repository.")
+		if !skipConfirm && !confirmAction("Are you sure?") {
+			fmt.Println("Aborted")
+			return nil
 		}
 
 		deleted, err := syncSvc.DeleteAllMissing(ctx, message)
@@ -599,18 +562,9 @@ func runSyncDelete(ctx *Context, args []string) error {
 	fmt.Printf("Deleting item: %s\n", itemID)
 	fmt.Println("WARNING: This will delete the item from the remote repository!")
 
-	if !skipConfirm {
-		fmt.Print("Are you sure? [y/N]: ")
-		reader := bufio.NewReader(os.Stdin)
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			return fmt.Errorf("failed to read input: %w", err)
-		}
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input != "y" && input != "yes" {
-			fmt.Println("Aborted")
-			return nil
-		}
+	if !skipConfirm && !confirmAction("Are you sure?") {
+		fmt.Println("Aborted")
+		return nil
 	}
 
 	if err := syncSvc.Delete(ctx, itemID, message, force); err != nil {
@@ -664,18 +618,9 @@ func runSyncMove(ctx *Context, args []string) error {
 
 	fmt.Printf("Moving %s → %s\n", oldID, newID)
 
-	if !skipConfirm {
-		fmt.Print("Are you sure? [y/N]: ")
-		reader := bufio.NewReader(os.Stdin)
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			return fmt.Errorf("failed to read input: %w", err)
-		}
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input != "y" && input != "yes" {
-			fmt.Println("Aborted")
-			return nil
-		}
+	if !skipConfirm && !confirmAction("Are you sure?") {
+		fmt.Println("Aborted")
+		return nil
 	}
 
 	if err := syncSvc.Move(ctx, oldID, newID, message, force); err != nil {
