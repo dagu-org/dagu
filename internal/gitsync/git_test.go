@@ -103,3 +103,72 @@ func TestGitClient_LocalOps(t *testing.T) {
 	require.Len(t, files, 1)
 	require.Equal(t, testFile, files[0])
 }
+
+func TestGitClient_AddAndCommit_NoChanges(t *testing.T) {
+	repoPath := t.TempDir()
+
+	repo, err := git.PlainInit(repoPath, false)
+	require.NoError(t, err)
+
+	cfg := &Config{
+		Enabled:    true,
+		Repository: repoPath,
+		Branch:     "main",
+		Commit: CommitConfig{
+			AuthorName:  "Test User",
+			AuthorEmail: "test@example.com",
+		},
+	}
+	c := NewGitClient(cfg, repoPath)
+	c.repo = repo
+
+	// Create and commit a file
+	testFile := "dag.yaml"
+	require.NoError(t, os.WriteFile(filepath.Join(repoPath, testFile), []byte("content"), 0644))
+	firstHash, err := c.AddAndCommit(testFile, "first commit")
+	require.NoError(t, err)
+	require.NotEmpty(t, firstHash)
+
+	// Re-write identical content and commit again — should return HEAD, not error
+	require.NoError(t, os.WriteFile(filepath.Join(repoPath, testFile), []byte("content"), 0644))
+
+	// Re-open the repo (as Publish does)
+	c2 := NewGitClient(cfg, repoPath)
+	require.NoError(t, c2.Open())
+
+	secondHash, err := c2.AddAndCommit(testFile, "duplicate commit")
+	require.NoError(t, err)
+	require.Equal(t, firstHash, secondHash, "should return existing HEAD hash when content unchanged")
+}
+
+func TestGitClient_CommitStaged_NoChanges(t *testing.T) {
+	repoPath := t.TempDir()
+
+	repo, err := git.PlainInit(repoPath, false)
+	require.NoError(t, err)
+
+	cfg := &Config{
+		Enabled:    true,
+		Repository: repoPath,
+		Branch:     "main",
+		Commit: CommitConfig{
+			AuthorName:  "Test User",
+			AuthorEmail: "test@example.com",
+		},
+	}
+	c := NewGitClient(cfg, repoPath)
+	c.repo = repo
+
+	// Create and commit a file
+	require.NoError(t, os.WriteFile(filepath.Join(repoPath, "dag.yaml"), []byte("content"), 0644))
+	firstHash, err := c.AddAndCommit("dag.yaml", "first commit")
+	require.NoError(t, err)
+
+	// CommitStaged with no staged changes should return HEAD
+	c2 := NewGitClient(cfg, repoPath)
+	require.NoError(t, c2.Open())
+
+	hash, err := c2.CommitStaged("empty commit")
+	require.NoError(t, err)
+	require.Equal(t, firstHash, hash)
+}
