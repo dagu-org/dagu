@@ -5579,6 +5579,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "409":
+          description: "Name already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
     delete:
       summary: "Delete a remote node"
       description: "Deletes a store-managed remote node"

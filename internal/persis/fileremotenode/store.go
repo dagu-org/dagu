@@ -223,14 +223,13 @@ func (s *Store) GetByID(_ context.Context, id string) (*remotenode.RemoteNode, e
 
 	s.mu.RLock()
 	filePath, exists := s.byID[id]
+	s.mu.RUnlock()
+
 	if !exists {
-		s.mu.RUnlock()
 		return nil, remotenode.ErrRemoteNodeNotFound
 	}
 
 	node, err := s.loadNodeFromFile(filePath)
-	s.mu.RUnlock()
-
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, remotenode.ErrRemoteNodeNotFound

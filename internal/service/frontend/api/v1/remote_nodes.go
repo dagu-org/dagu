@@ -185,9 +185,9 @@ func (a *API) UpdateRemoteNode(ctx context.Context, request api.UpdateRemoteNode
 
 	if err := a.remoteNodeStore.Update(ctx, existing); err != nil {
 		if errors.Is(err, remotenode.ErrRemoteNodeAlreadyExists) {
-			return api.UpdateRemoteNode403JSONResponse{
+			return api.UpdateRemoteNode409JSONResponse{
 				Code:    api.ErrorCodeAlreadyExists,
-				Message: "A remote node with this name already exists",
+				Message: "Remote node with this name already exists",
 			}, nil
 		}
 		return nil, fmt.Errorf("failed to update remote node: %w", err)
