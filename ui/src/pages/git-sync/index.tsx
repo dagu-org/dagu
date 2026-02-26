@@ -173,7 +173,7 @@ export default function GitSyncPage() {
         query: { remoteNode },
       },
     },
-    { refreshInterval: 5000 }
+    { refreshInterval: 30000 }
   );
 
   // Fetch sync config
