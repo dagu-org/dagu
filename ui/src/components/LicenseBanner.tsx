@@ -19,7 +19,9 @@ function daysUntilExpiry(expiryISO: string): number {
 
 export function LicenseBanner() {
   const config = useConfig();
-  const { license } = config;
+  const license = config?.license;
+
+  if (!license) return null;
 
   const expiryKey = license.expiry ?? 'none';
   const [dismissed30d, setDismissed30d] = React.useState(false);
