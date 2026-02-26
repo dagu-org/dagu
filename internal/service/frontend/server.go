@@ -337,8 +337,8 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 
 	// Add audit service to API only if licensed (or no license manager)
-	if auditSvc != nil && (srv.licenseManager == nil || srv.licenseManager.Checker().IsFeatureEnabled(license.FeatureAudit)) {
-		apiOpts = append(apiOpts, apiv1.WithAuditService(auditSvc))
+	if srv.auditService != nil {
+		apiOpts = append(apiOpts, apiv1.WithAuditService(srv.auditService))
 	}
 
 	// Pass license manager to API

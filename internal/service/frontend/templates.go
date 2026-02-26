@@ -139,9 +139,6 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 				return "false"
 			}
 			claims := cfg.LicenseChecker.Claims()
-			if claims == nil {
-				return "false"
-			}
 			if claims.ExpiresAt == nil {
 				return "true" // perpetual
 			}
