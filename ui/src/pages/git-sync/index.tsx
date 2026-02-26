@@ -51,6 +51,7 @@ import { DiffModal } from './DiffModal';
 import { ForgetDialog } from './ForgetDialog';
 import { MoveDialog } from './MoveDialog';
 import { RowActionMenu } from './RowActionMenu';
+import { useSyncReconcile } from './useSyncReconcile';
 
 type SyncStatusResponse = components['schemas']['SyncStatusResponse'];
 type SyncConfigResponse = components['schemas']['SyncConfigResponse'];
@@ -173,11 +174,6 @@ export default function GitSyncPage() {
   const [moveModal, setMoveModal] = useState<{ open: boolean; itemId?: string }>({ open: false });
   const [cleanupModal, setCleanupModal] = useState(false);
   const [deleteMissingModal, setDeleteMissingModal] = useState(false);
-  const [forgettingItemId, setForgettingItemId] = useState<string | null>(null);
-  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
-  const [movingItemId, setMovingItemId] = useState<string | null>(null);
-  const [isCleaningUp, setIsCleaningUp] = useState(false);
-  const [isDeletingMissing, setIsDeletingMissing] = useState(false);
   const [selectedDags, setSelectedDags] = useState<Set<string>>(new Set());
   const userTouchedSelectionRef = useRef(false);
   const prevPublishableRef = useRef<string>('');
@@ -209,6 +205,12 @@ export default function GitSyncPage() {
 
   const status = statusData as SyncStatusResponse | undefined;
   const config = configData as SyncConfigResponse | undefined;
+
+  const reconcile = useSyncReconcile({
+    remoteNode,
+    onSuccess: () => mutateStatus(),
+  });
+
   const statusFilter = parseStatusFilter(searchParams.get('status'));
   const typeFilter = parseTypeFilter(searchParams.get('type'));
 
@@ -401,113 +403,6 @@ export default function GitSyncPage() {
       }
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to load diff');
-    }
-  };
-
-  const handleForget = async (itemId: string) => {
-    setForgettingItemId(itemId);
-    try {
-      const response = await client.POST('/sync/items/{itemId}/forget', {
-        params: { path: { itemId }, query: { remoteNode } },
-      });
-      if (response.error) {
-        showError(response.error.message || 'Forget failed');
-      } else {
-        showToast(`Removed ${itemId} from sync tracking`);
-        setForgetModal({ open: false });
-        setDiffModal({ open: false });
-        mutateStatus();
-      }
-    } catch (err) {
-      showError(err instanceof Error ? err.message : 'Forget failed');
-    } finally {
-      setForgettingItemId(null);
-    }
-  };
-
-  const handleDelete = async (itemId: string, force: boolean) => {
-    setDeletingItemId(itemId);
-    try {
-      const response = await client.POST('/sync/items/{itemId}/delete', {
-        params: { path: { itemId }, query: { remoteNode } },
-        body: { message: `Delete ${itemId}`, force },
-      });
-      if (response.error) {
-        showError(response.error.message || 'Delete failed');
-      } else {
-        showToast(`Deleted ${itemId}`);
-        setDeleteModal({ open: false });
-        setDiffModal({ open: false });
-        mutateStatus();
-      }
-    } catch (err) {
-      showError(err instanceof Error ? err.message : 'Delete failed');
-    } finally {
-      setDeletingItemId(null);
-    }
-  };
-
-  const handleMove = async (itemId: string, newItemId: string, message: string, force: boolean) => {
-    setMovingItemId(itemId);
-    try {
-      const response = await client.POST('/sync/items/{itemId}/move', {
-        params: { path: { itemId }, query: { remoteNode } },
-        body: { newItemId, message, force },
-      });
-      if (response.error) {
-        showError(response.error.message || 'Move failed');
-      } else {
-        showToast(`Moved ${itemId} to ${newItemId}`);
-        setMoveModal({ open: false });
-        mutateStatus();
-      }
-    } catch (err) {
-      showError(err instanceof Error ? err.message : 'Move failed');
-    } finally {
-      setMovingItemId(null);
-    }
-  };
-
-  const handleCleanup = async () => {
-    setIsCleaningUp(true);
-    try {
-      const response = await client.POST('/sync/cleanup', {
-        params: { query: { remoteNode } },
-      });
-      if (response.error) {
-        showError(response.error.message || 'Cleanup failed');
-      } else {
-        const count = response.data?.forgotten?.length || 0;
-        showToast(`Cleaned up ${count} missing item${count !== 1 ? 's' : ''}`);
-        setCleanupModal(false);
-        mutateStatus();
-      }
-    } catch (err) {
-      showError(err instanceof Error ? err.message : 'Cleanup failed');
-    } finally {
-      setIsCleaningUp(false);
-    }
-  };
-
-  const handleDeleteMissing = async (message: string) => {
-    setIsDeletingMissing(true);
-    try {
-      const response = await client.POST('/sync/delete-missing', {
-        params: { query: { remoteNode } },
-        body: { message },
-      });
-      if (response.error) {
-        showError(response.error.message || 'Delete missing failed');
-      } else {
-        const count = response.data?.deleted?.length || 0;
-        showToast(`Deleted ${count} missing item${count !== 1 ? 's' : ''}`);
-        setDeleteMissingModal(false);
-        mutateStatus();
-      }
-    } catch (err) {
-      showError(err instanceof Error ? err.message : 'Delete missing failed');
-    } finally {
-      setIsDeletingMissing(false);
     }
   };
 
@@ -1133,8 +1028,8 @@ export default function GitSyncPage() {
             ? () => setDeleteModal({ open: true, itemId: diffModal.itemId })
             : undefined
         }
-        isForgetting={!!forgettingItemId}
-        isDeleting={!!deletingItemId}
+        isForgetting={reconcile.isForgetting}
+        isDeleting={reconcile.isDeleting}
       />
 
       {/* Revert Confirmation Modal */}
@@ -1164,9 +1059,12 @@ export default function GitSyncPage() {
       <ForgetDialog
         open={forgetModal.open}
         itemId={forgetModal.itemId || ''}
-        isForgetting={!!forgettingItemId}
-        onConfirm={() => {
-          if (forgetModal.itemId) handleForget(forgetModal.itemId);
+        isForgetting={reconcile.isForgetting}
+        onConfirm={async () => {
+          if (forgetModal.itemId && await reconcile.handleForget(forgetModal.itemId)) {
+            setForgetModal({ open: false });
+            setDiffModal({ open: false });
+          }
         }}
         onCancel={() => setForgetModal({ open: false })}
       />
@@ -1180,9 +1078,12 @@ export default function GitSyncPage() {
             ? rowByID.get(deleteModal.itemId)?.item.status || SyncStatus.synced
             : SyncStatus.synced
         }
-        isDeleting={!!deletingItemId}
-        onConfirm={(force) => {
-          if (deleteModal.itemId) handleDelete(deleteModal.itemId, force);
+        isDeleting={reconcile.isDeleting}
+        onConfirm={async (force) => {
+          if (deleteModal.itemId && await reconcile.handleDelete(deleteModal.itemId, force)) {
+            setDeleteModal({ open: false });
+            setDiffModal({ open: false });
+          }
         }}
         onCancel={() => setDeleteModal({ open: false })}
       />
@@ -1201,9 +1102,11 @@ export default function GitSyncPage() {
             ? rowByID.get(moveModal.itemId)?.item.status || SyncStatus.synced
             : SyncStatus.synced
         }
-        isMoving={!!movingItemId}
-        onConfirm={(newItemId, message, force) => {
-          if (moveModal.itemId) handleMove(moveModal.itemId, newItemId, message, force);
+        isMoving={reconcile.isMoving}
+        onConfirm={async (newItemId, message, force) => {
+          if (moveModal.itemId && await reconcile.handleMove(moveModal.itemId, newItemId, message, force)) {
+            setMoveModal({ open: false });
+          }
         }}
         onCancel={() => setMoveModal({ open: false })}
       />
@@ -1212,8 +1115,12 @@ export default function GitSyncPage() {
       <CleanupDialog
         open={cleanupModal}
         missingCount={missingCount}
-        isCleaningUp={isCleaningUp}
-        onConfirm={handleCleanup}
+        isCleaningUp={reconcile.isCleaningUp}
+        onConfirm={async () => {
+          if (await reconcile.handleCleanup()) {
+            setCleanupModal(false);
+          }
+        }}
         onCancel={() => setCleanupModal(false)}
       />
 
@@ -1221,8 +1128,12 @@ export default function GitSyncPage() {
       <DeleteMissingDialog
         open={deleteMissingModal}
         missingCount={missingCount}
-        isDeletingMissing={isDeletingMissing}
-        onConfirm={handleDeleteMissing}
+        isDeletingMissing={reconcile.isDeletingMissing}
+        onConfirm={async (message) => {
+          if (await reconcile.handleDeleteMissing(message)) {
+            setDeleteMissingModal(false);
+          }
+        }}
         onCancel={() => setDeleteMissingModal(false)}
       />
     </div>
