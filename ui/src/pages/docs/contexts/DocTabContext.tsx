@@ -74,21 +74,17 @@ export function DocTabProvider({ children }: { children: React.ReactNode }) {
   }, [tabs, activeTabId]);
 
   const openDoc = useCallback((docPath: string, title: string) => {
-    // Check if already open
-    const existing = tabs.find(t => t.docPath === docPath);
-    if (existing) {
-      setActiveTabId(existing.id);
-      return;
-    }
-
-    const newTab: DocTab = {
-      id: generateTabId(),
-      docPath,
-      title,
-    };
-    setTabs(prev => [...prev, newTab]);
-    setActiveTabId(newTab.id);
-  }, [tabs]);
+    setTabs(prev => {
+      const existing = prev.find(t => t.docPath === docPath);
+      if (existing) {
+        setActiveTabId(existing.id);
+        return prev;
+      }
+      const newTab: DocTab = { id: generateTabId(), docPath, title };
+      setActiveTabId(newTab.id);
+      return [...prev, newTab];
+    });
+  }, []);
 
   const closeTab = useCallback((tabId: string) => {
     setTabs(prev => {

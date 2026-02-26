@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from '@/ui/CustomDialog';
 import { Check, X } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 
 type Props = {
   visible: boolean;
@@ -30,7 +30,7 @@ export function CreateDocModal({ visible, parentDir, onSubmit, onDismiss }: Prop
     }
   }, [visible, parentDir]);
 
-  const handleSubmit = () => {
+  const handleSubmit = useCallback(() => {
     const trimmed = path.trim();
     if (!trimmed) {
       setError('Path is required');
@@ -41,7 +41,7 @@ export function CreateDocModal({ visible, parentDir, onSubmit, onDismiss }: Prop
       return;
     }
     onSubmit(trimmed);
-  };
+  }, [path, onSubmit]);
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -67,7 +67,7 @@ export function CreateDocModal({ visible, parentDir, onSubmit, onDismiss }: Prop
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [visible, onDismiss, path]);
+  }, [visible, onDismiss, handleSubmit]);
 
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && onDismiss()}>

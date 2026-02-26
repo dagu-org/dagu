@@ -7,6 +7,6 @@ export function useDocSSE(
   docPath: string,
   enabled: boolean = true
 ): SSEState<DocResponse> {
-  const endpoint = `/events/docs/${encodeURIComponent(docPath)}`;
+  const endpoint = `/events/docs/${docPath}`;
   return useSSE<DocResponse>(endpoint, enabled);
 }

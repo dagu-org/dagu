@@ -231,13 +231,9 @@ func (s *Store) Get(_ context.Context, id string) (*agent.Doc, error) {
 		return nil, fmt.Errorf("filedoc: failed to read file %s: %w", filePath, err)
 	}
 
-	// Check it's not a directory
 	info, err := os.Stat(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("filedoc: failed to stat file %s: %w", filePath, err)
-	}
-	if info.IsDir() {
-		return nil, agent.ErrDocNotFound
 	}
 
 	doc, err := parseDocFile(data, id)

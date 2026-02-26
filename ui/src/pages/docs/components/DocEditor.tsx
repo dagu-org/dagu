@@ -29,7 +29,6 @@ export function DocEditor({ docPath }: DocEditorProps) {
   });
 
   const {
-    isConnected,
     shouldUseFallback,
     doc,
     currentValue,
@@ -68,10 +67,6 @@ export function DocEditor({ docPath }: DocEditorProps) {
   const saveHandlerRef = useRef<(() => Promise<void>) | null>(null);
 
   const handleSave = useCallback(async () => {
-    if (!currentValue && currentValue !== '') return;
-
-    markAsSaved(currentValue);
-
     const { error } = await client.PATCH('/docs/{docPath}', {
       params: { path: { docPath }, query: { remoteNode } },
       body: { content: currentValue },
@@ -82,6 +77,7 @@ export function DocEditor({ docPath }: DocEditorProps) {
       return;
     }
 
+    markAsSaved(currentValue);
     showToast('Document saved');
   }, [currentValue, docPath, remoteNode, client, markAsSaved, showToast, showError]);
 

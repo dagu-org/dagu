@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from '@/ui/CustomDialog';
 import { Check, X } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 
 type Props = {
   visible: boolean;
@@ -30,7 +30,7 @@ export function RenameDocModal({ visible, currentPath, onSubmit, onDismiss }: Pr
     }
   }, [visible, currentPath]);
 
-  const handleSubmit = () => {
+  const handleSubmit = useCallback(() => {
     const trimmed = newPath.trim();
     if (!trimmed) {
       setError('Path is required');
@@ -45,7 +45,7 @@ export function RenameDocModal({ visible, currentPath, onSubmit, onDismiss }: Pr
       return;
     }
     onSubmit(trimmed);
-  };
+  }, [newPath, currentPath, onSubmit]);
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -63,7 +63,7 @@ export function RenameDocModal({ visible, currentPath, onSubmit, onDismiss }: Pr
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [visible, onDismiss, newPath]);
+  }, [visible, onDismiss, handleSubmit]);
 
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && onDismiss()}>

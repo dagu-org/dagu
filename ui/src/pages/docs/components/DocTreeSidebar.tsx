@@ -64,14 +64,16 @@ export function DocTreeSidebar({
   useEffect(() => {
     if (!activeDocId) return;
     const parts = activeDocId.split('/');
-    const newExpanded = new Set(expandedDirs);
-    let path = '';
-    for (let i = 0; i < parts.length - 1; i++) {
-      const part = parts[i] as string;
-      path = path ? `${path}/${part}` : part;
-      newExpanded.add(path);
-    }
-    setExpandedDirs(newExpanded);
+    setExpandedDirs(prev => {
+      const newExpanded = new Set(prev);
+      let path = '';
+      for (let i = 0; i < parts.length - 1; i++) {
+        const part = parts[i] as string;
+        path = path ? `${path}/${part}` : part;
+        newExpanded.add(path);
+      }
+      return newExpanded;
+    });
   }, [activeDocId]);
 
   const toggleDir = useCallback((id: string) => {

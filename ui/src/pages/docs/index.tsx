@@ -14,7 +14,7 @@ function DocsPageInner() {
 
   useEffect(() => {
     appBarContext.setTitle('Documents');
-  }, []);
+  }, [appBarContext]);
 
   // Derive active doc ID from URL
   const activeDocId = location.pathname.replace(/^\/docs\/?/, '') || null;
@@ -25,7 +25,7 @@ function DocsPageInner() {
       const title = activeDocId.split('/').pop() || activeDocId;
       openDoc(activeDocId, title);
     }
-  }, [activeDocId]);
+  }, [activeDocId, openDoc]);
 
   // Sync tab changes to URL
   useEffect(() => {
@@ -35,7 +35,7 @@ function DocsPageInner() {
     } else if (!currentDocPath && activeDocId) {
       navigate('/docs', { replace: true });
     }
-  }, [activeTabId, tabs]);
+  }, [activeTabId, tabs, getActiveDocPath, navigate, activeDocId]);
 
   const handleSelectDoc = useCallback((id: string, title: string) => {
     navigate(`/docs/${id}`);
