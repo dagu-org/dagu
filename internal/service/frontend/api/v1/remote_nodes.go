@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
@@ -64,12 +65,15 @@ func (a *API) CreateRemoteNode(ctx context.Context, request api.CreateRemoteNode
 		}, nil
 	}
 
-	// Check name uniqueness across both sources
-	if a.remoteNodeResolver != nil && a.remoteNodeResolver.NameExists(ctx, body.Name) {
-		return api.CreateRemoteNode409JSONResponse{
-			Code:    api.ErrorCodeAlreadyExists,
-			Message: fmt.Sprintf("Remote node with name %q already exists", body.Name),
-		}, nil
+	// Check if name conflicts with a config-sourced node.
+	// Store-level name uniqueness is enforced atomically by the store itself.
+	if a.remoteNodeResolver != nil {
+		if _, err := a.remoteNodeResolver.GetByName(ctx, body.Name); err == nil {
+			return api.CreateRemoteNode409JSONResponse{
+				Code:    api.ErrorCodeAlreadyExists,
+				Message: fmt.Sprintf("Remote node with name %q already exists", body.Name),
+			}, nil
+		}
 	}
 
 	authType := remotenode.AuthTypeNone
@@ -102,19 +106,13 @@ func (a *API) CreateRemoteNode(ctx context.Context, request api.CreateRemoteNode
 }
 
 // GetRemoteNode returns a single remote node by ID.
+// Supports both store nodes (UUID) and config nodes (cfg:<name>).
 func (a *API) GetRemoteNode(ctx context.Context, request api.GetRemoteNodeRequestObject) (api.GetRemoteNodeResponseObject, error) {
 	if err := a.requireAdmin(ctx); err != nil {
 		return nil, err
 	}
 
-	if a.remoteNodeStore == nil {
-		return api.GetRemoteNode404JSONResponse{
-			Code:    api.ErrorCodeNotFound,
-			Message: "Remote node not found",
-		}, nil
-	}
-
-	node, err := a.remoteNodeStore.GetByID(ctx, request.RemoteNodeId)
+	node, err := a.resolveRemoteNode(ctx, request.RemoteNodeId)
 	if err != nil {
 		if errors.Is(err, remotenode.ErrRemoteNodeNotFound) {
 			return api.GetRemoteNode404JSONResponse{
@@ -125,7 +123,12 @@ func (a *API) GetRemoteNode(ctx context.Context, request api.GetRemoteNodeReques
 		return nil, fmt.Errorf("failed to get remote node: %w", err)
 	}
 
-	return api.GetRemoteNode200JSONResponse(toRemoteNodeResponseFromNode(node, remotenode.SourceStore)), nil
+	source := remotenode.SourceStore
+	if strings.HasPrefix(request.RemoteNodeId, remotenode.ConfigNodeIDPrefix) {
+		source = remotenode.SourceConfig
+	}
+
+	return api.GetRemoteNode200JSONResponse(toRemoteNodeResponseFromNode(node, source)), nil
 }
 
 // UpdateRemoteNode updates a store-managed remote node with PATCH semantics.
@@ -245,19 +248,13 @@ func (a *API) DeleteRemoteNode(ctx context.Context, request api.DeleteRemoteNode
 }
 
 // TestRemoteNodeConnection tests connectivity to a remote node.
+// Supports both store nodes (UUID) and config nodes (cfg:<name>).
 func (a *API) TestRemoteNodeConnection(ctx context.Context, request api.TestRemoteNodeConnectionRequestObject) (api.TestRemoteNodeConnectionResponseObject, error) {
 	if err := a.requireAdmin(ctx); err != nil {
 		return nil, err
 	}
 
-	if a.remoteNodeStore == nil {
-		return api.TestRemoteNodeConnection404JSONResponse{
-			Code:    api.ErrorCodeNotFound,
-			Message: "Remote node not found",
-		}, nil
-	}
-
-	node, err := a.remoteNodeStore.GetByID(ctx, request.RemoteNodeId)
+	node, err := a.resolveRemoteNode(ctx, request.RemoteNodeId)
 	if err != nil {
 		if errors.Is(err, remotenode.ErrRemoteNodeNotFound) {
 			return api.TestRemoteNodeConnection404JSONResponse{
@@ -270,6 +267,28 @@ func (a *API) TestRemoteNodeConnection(ctx context.Context, request api.TestRemo
 
 	result := testNodeConnection(node)
 	return api.TestRemoteNodeConnection200JSONResponse(result), nil
+}
+
+// resolveRemoteNode looks up a remote node by ID.
+// IDs prefixed with "cfg:" are config-sourced nodes resolved by name.
+// All other IDs are looked up in the store by UUID.
+func (a *API) resolveRemoteNode(ctx context.Context, id string) (*remotenode.RemoteNode, error) {
+	if name, ok := strings.CutPrefix(id, remotenode.ConfigNodeIDPrefix); ok {
+		if a.remoteNodeResolver == nil {
+			return nil, remotenode.ErrRemoteNodeNotFound
+		}
+		cn, err := a.remoteNodeResolver.GetByName(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		return remotenode.FromConfigNode(*cn), nil
+	}
+
+	// Store-managed node — look up by UUID
+	if a.remoteNodeStore == nil {
+		return nil, remotenode.ErrRemoteNodeNotFound
+	}
+	return a.remoteNodeStore.GetByID(ctx, id)
 }
 
 // testNodeConnection performs a health check against a remote node.

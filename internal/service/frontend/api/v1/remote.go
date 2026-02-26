@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -35,13 +36,21 @@ func WithRemoteNode(resolver *remotenode.Resolver, remoteNodes map[string]config
 			// Try resolver first (covers both config and store nodes)
 			var remoteNode config.RemoteNode
 			if resolver != nil {
-				if cn, err := resolver.GetByName(r.Context(), remoteNodeName); err == nil {
+				cn, err := resolver.GetByName(r.Context(), remoteNodeName)
+				if err == nil {
 					remoteNode = *cn
-				} else {
+				} else if errors.Is(err, remotenode.ErrRemoteNodeNotFound) {
 					WriteErrorResponse(w, &Error{
 						HTTPStatus: http.StatusBadRequest,
 						Code:       api.ErrorCodeBadRequest,
 						Message:    fmt.Sprintf("remote node %s not found", remoteNodeName),
+					})
+					return
+				} else {
+					WriteErrorResponse(w, &Error{
+						HTTPStatus: http.StatusInternalServerError,
+						Code:       api.ErrorCodeInternalError,
+						Message:    fmt.Sprintf("failed to resolve remote node %s", remoteNodeName),
 					})
 					return
 				}

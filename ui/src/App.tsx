@@ -137,10 +137,6 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
     parseRemoteNodes(config.remoteNodes)
   );
 
-  React.useEffect(() => {
-    setRemoteNodes(parseRemoteNodes(config.remoteNodes));
-  }, [config.remoteNodes]);
-
   const [selectedRemoteNode, setSelectedRemoteNode] = React.useState<string>(
     () => getStoredRemoteNode(remoteNodes)
   );

@@ -68,7 +68,7 @@ func TestToConfigNode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := toConfigNode(tt.input)
+			result := ToConfigNode(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -94,6 +94,7 @@ func TestFromConfigNode(t *testing.T) {
 				SkipTLSVerify:     true,
 			},
 			expected: &RemoteNode{
+				ID:                "cfg:node1",
 				Name:              "node1",
 				Description:       "Test node",
 				APIBaseURL:        "http://example.com/api",
@@ -112,6 +113,7 @@ func TestFromConfigNode(t *testing.T) {
 				AuthToken:   "tok-123",
 			},
 			expected: &RemoteNode{
+				ID:         "cfg:node2",
 				Name:       "node2",
 				APIBaseURL: "http://example.com/api",
 				AuthType:   AuthTypeToken,
@@ -125,6 +127,7 @@ func TestFromConfigNode(t *testing.T) {
 				APIBaseURL: "http://example.com/api",
 			},
 			expected: &RemoteNode{
+				ID:         "cfg:node3",
 				Name:       "node3",
 				APIBaseURL: "http://example.com/api",
 				AuthType:   AuthTypeNone,
@@ -135,7 +138,7 @@ func TestFromConfigNode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := fromConfigNode(tt.input)
+			result := FromConfigNode(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -154,8 +157,8 @@ func TestRoundTripConfigNode(t *testing.T) {
 		SkipTLSVerify:     true,
 	}
 
-	cn := toConfigNode(original)
-	result := fromConfigNode(cn)
+	cn := ToConfigNode(original)
+	result := FromConfigNode(cn)
 
 	assert.Equal(t, original.Name, result.Name)
 	assert.Equal(t, original.Description, result.Description)

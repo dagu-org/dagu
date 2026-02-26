@@ -48,7 +48,7 @@ func (r *Resolver) GetByName(ctx context.Context, name string) (*config.RemoteNo
 	if r.store != nil {
 		node, err := r.store.GetByName(ctx, name)
 		if err == nil {
-			cn := toConfigNode(node)
+			cn := ToConfigNode(node)
 			return &cn, nil
 		}
 		// Only fall through if not found; other errors are real failures
@@ -102,7 +102,7 @@ func (r *Resolver) ListAll(ctx context.Context) ([]ResolvedNode, error) {
 			continue
 		}
 		result = append(result, ResolvedNode{
-			RemoteNode: fromConfigNode(cn),
+			RemoteNode: FromConfigNode(cn),
 			Source:     SourceConfig,
 		})
 	}
@@ -129,9 +129,12 @@ func (r *Resolver) NameExists(ctx context.Context, name string) bool {
 	return err == nil
 }
 
-// toConfigNode converts a domain RemoteNode to config.RemoteNode
+// ConfigNodeIDPrefix is prepended to config node names to form a synthetic ID.
+const ConfigNodeIDPrefix = "cfg:"
+
+// ToConfigNode converts a domain RemoteNode to config.RemoteNode
 // for backward compatibility with proxy/SSE middleware.
-func toConfigNode(n *RemoteNode) config.RemoteNode {
+func ToConfigNode(n *RemoteNode) config.RemoteNode {
 	cn := config.RemoteNode{
 		Name:              n.Name,
 		Description:       n.Description,
@@ -152,8 +155,9 @@ func toConfigNode(n *RemoteNode) config.RemoteNode {
 	return cn
 }
 
-// fromConfigNode converts a config.RemoteNode to a domain RemoteNode.
-func fromConfigNode(cn config.RemoteNode) *RemoteNode {
+// FromConfigNode converts a config.RemoteNode to a domain RemoteNode.
+// Config nodes receive a synthetic ID of "cfg:<name>".
+func FromConfigNode(cn config.RemoteNode) *RemoteNode {
 	authType := AuthTypeNone
 	if cn.IsBasicAuth {
 		authType = AuthTypeBasic
@@ -161,6 +165,7 @@ func fromConfigNode(cn config.RemoteNode) *RemoteNode {
 		authType = AuthTypeToken
 	}
 	return &RemoteNode{
+		ID:                ConfigNodeIDPrefix + cn.Name,
 		Name:              cn.Name,
 		Description:       cn.Description,
 		APIBaseURL:        cn.APIBaseURL,

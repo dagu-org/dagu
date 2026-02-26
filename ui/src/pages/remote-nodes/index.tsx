@@ -264,8 +264,15 @@ export default function RemoteNodesPage() {
                   <TableRow key={node.id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
-                        <Globe className="h-3.5 w-3.5 text-muted-foreground" />
-                        {node.name}
+                        <Globe className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <div>
+                          <div>{node.name}</div>
+                          {node.description && (
+                            <div className="text-muted-foreground font-normal text-[11px]">
+                              {node.description}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground font-mono text-xs">
