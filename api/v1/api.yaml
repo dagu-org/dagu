@@ -8631,6 +8631,7 @@ components:
           type: string
         content:
           type: string
+          description: "Full file content including YAML frontmatter"
         createdAt:
           type: string
         updatedAt:
@@ -8724,7 +8725,7 @@ components:
           description: "Document path (e.g., runbooks/deploy-guide)"
         content:
           type: string
-          description: "Markdown content"
+          description: "Full file content including optional YAML frontmatter"
 
     UpdateDocRequest:
       type: object
@@ -8734,7 +8735,7 @@ components:
       properties:
         content:
           type: string
-          description: "New markdown content"
+          description: "Full file content including optional YAML frontmatter"
 
     RenameDocRequest:
       type: object

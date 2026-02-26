@@ -12,6 +12,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/persis/filedag/grep"
 	"github.com/goccy/go-yaml"
@@ -60,10 +62,12 @@ func (s *Store) docFilePath(id string) (string, error) {
 
 // parseDocFile parses a doc .md file into an agent.Doc.
 // The file format is optional YAML frontmatter between --- delimiters, followed by markdown body.
+// Content always contains the full file (including frontmatter); frontmatter is only parsed to extract the title.
 func parseDocFile(data []byte, id string) (*agent.Doc, error) {
 	content := strings.ReplaceAll(string(data), "\r\n", "\n")
+	content = strings.TrimRight(content, "\n")
 
-	var title, body string
+	var title string
 
 	if strings.HasPrefix(content, "---\n") {
 		rest := content[4:]
@@ -72,30 +76,17 @@ func parseDocFile(data []byte, id string) (*agent.Doc, error) {
 		if closingIdx == -1 {
 			if strings.HasSuffix(rest, "\n---") {
 				closingIdx = len(rest) - 4
-			} else {
-				// No closing delimiter — treat entire content as body.
-				body = content
 			}
 		}
 
 		if closingIdx >= 0 {
 			frontmatterStr := rest[:closingIdx]
 
-			afterDelim := closingIdx + 5 // len("\n---\n")
-			if afterDelim <= len(rest) {
-				body = rest[afterDelim:]
-			}
-
 			var fm docFrontmatter
-			if err := yaml.Unmarshal([]byte(frontmatterStr), &fm); err != nil {
-				// Invalid frontmatter — treat entire content as body.
-				body = content
-			} else {
+			if err := yaml.Unmarshal([]byte(frontmatterStr), &fm); err == nil {
 				title = fm.Title
 			}
 		}
-	} else {
-		body = content
 	}
 
 	if title == "" {
@@ -105,7 +96,7 @@ func parseDocFile(data []byte, id string) (*agent.Doc, error) {
 	return &agent.Doc{
 		ID:      id,
 		Title:   title,
-		Content: strings.TrimRight(body, "\n"),
+		Content: content,
 	}, nil
 }
 
@@ -138,8 +129,8 @@ func titleFromID(id string) string {
 }
 
 // List returns a paginated tree of doc nodes.
-func (s *Store) List(_ context.Context, page, perPage int) (*exec.PaginatedResult[*agent.DocTreeNode], error) {
-	tree, err := s.buildTree()
+func (s *Store) List(ctx context.Context, page, perPage int) (*exec.PaginatedResult[*agent.DocTreeNode], error) {
+	tree, err := s.buildTree(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +149,7 @@ func (s *Store) List(_ context.Context, page, perPage int) (*exec.PaginatedResul
 }
 
 // ListFlat returns a paginated flat list of doc metadata sorted alphabetically.
-func (s *Store) ListFlat(_ context.Context, page, perPage int) (*exec.PaginatedResult[agent.DocMetadata], error) {
+func (s *Store) ListFlat(ctx context.Context, page, perPage int) (*exec.PaginatedResult[agent.DocMetadata], error) {
 	var items []agent.DocMetadata
 
 	err := filepath.WalkDir(s.baseDir, func(path string, d os.DirEntry, err error) error {
@@ -174,6 +165,11 @@ func (s *Store) ListFlat(_ context.Context, page, perPage int) (*exec.PaginatedR
 			return nil
 		}
 		id := strings.TrimSuffix(relPath, ".md")
+
+		if err := agent.ValidateDocID(id); err != nil {
+			logger.Debug(ctx, "Skipping non-conforming doc file", tag.File(relPath), tag.Reason(err.Error()))
+			return nil
+		}
 
 		data, err := os.ReadFile(path) //nolint:gosec // path constructed from baseDir
 		if err != nil {
@@ -241,7 +237,7 @@ func (s *Store) Get(_ context.Context, id string) (*agent.Doc, error) {
 		return nil, fmt.Errorf("filedoc: failed to parse doc %s: %w", id, err)
 	}
 
-	doc.CreatedAt = info.ModTime().UTC().Format(time.RFC3339)
+	doc.CreatedAt = fileCreationTime(info).UTC().Format(time.RFC3339)
 	doc.UpdatedAt = info.ModTime().UTC().Format(time.RFC3339)
 
 	return doc, nil
@@ -267,7 +263,10 @@ func (s *Store) Create(_ context.Context, id, content string) error {
 		return fmt.Errorf("filedoc: failed to create parent directories: %w", err)
 	}
 
-	data := marshalDocFile("", content)
+	data := []byte(content)
+	if len(data) > 0 && data[len(data)-1] != '\n' {
+		data = append(data, '\n')
+	}
 	if err := fileutil.WriteFileAtomic(filePath, data, filePermissions); err != nil {
 		return fmt.Errorf("filedoc: failed to write file: %w", err)
 	}
@@ -290,22 +289,10 @@ func (s *Store) Update(_ context.Context, id, content string) error {
 		return agent.ErrDocNotFound
 	}
 
-	// Preserve existing title from frontmatter.
-	existingData, err := os.ReadFile(filePath) //nolint:gosec // path validated
-	if err != nil {
-		return fmt.Errorf("filedoc: failed to read existing file: %w", err)
+	data := []byte(content)
+	if len(data) > 0 && data[len(data)-1] != '\n' {
+		data = append(data, '\n')
 	}
-	existingDoc, err := parseDocFile(existingData, id)
-	if err != nil {
-		existingDoc = &agent.Doc{}
-	}
-
-	title := existingDoc.Title
-	if title == titleFromID(id) {
-		title = "" // Don't write default title to frontmatter.
-	}
-
-	data := marshalDocFile(title, content)
 	if err := fileutil.WriteFileAtomic(filePath, data, filePermissions); err != nil {
 		return fmt.Errorf("filedoc: failed to write file: %w", err)
 	}
@@ -377,7 +364,7 @@ func (s *Store) Rename(_ context.Context, oldID, newID string) error {
 }
 
 // Search searches all docs for the given query pattern.
-func (s *Store) Search(_ context.Context, query string) ([]*agent.DocSearchResult, error) {
+func (s *Store) Search(ctx context.Context, query string) ([]*agent.DocSearchResult, error) {
 	var results []*agent.DocSearchResult
 
 	err := filepath.WalkDir(s.baseDir, func(path string, d os.DirEntry, err error) error {
@@ -385,6 +372,17 @@ func (s *Store) Search(_ context.Context, query string) ([]*agent.DocSearchResul
 			return nil
 		}
 		if d.IsDir() || filepath.Ext(path) != ".md" {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(s.baseDir, path)
+		if err != nil {
+			return nil
+		}
+		id := strings.TrimSuffix(relPath, ".md")
+
+		if err := agent.ValidateDocID(id); err != nil {
+			logger.Debug(ctx, "Skipping non-conforming doc file", tag.File(relPath), tag.Reason(err.Error()))
 			return nil
 		}
 
@@ -397,12 +395,6 @@ func (s *Store) Search(_ context.Context, query string) ([]*agent.DocSearchResul
 		if err != nil {
 			return nil // no match or error — skip
 		}
-
-		relPath, err := filepath.Rel(s.baseDir, path)
-		if err != nil {
-			return nil
-		}
-		id := strings.TrimSuffix(relPath, ".md")
 
 		doc, parseErr := parseDocFile(data, id)
 		title := id
@@ -429,7 +421,7 @@ func (s *Store) Search(_ context.Context, query string) ([]*agent.DocSearchResul
 }
 
 // buildTree builds a tree of DocTreeNode from the filesystem.
-func (s *Store) buildTree() ([]*agent.DocTreeNode, error) {
+func (s *Store) buildTree(ctx context.Context) ([]*agent.DocTreeNode, error) {
 	root := make(map[string]*agent.DocTreeNode)
 	var topLevel []*agent.DocTreeNode
 
@@ -470,6 +462,11 @@ func (s *Store) buildTree() ([]*agent.DocTreeNode, error) {
 
 		id := strings.TrimSuffix(relPath, ".md")
 
+		if err := agent.ValidateDocID(id); err != nil {
+			logger.Debug(ctx, "Skipping non-conforming doc file", tag.File(relPath), tag.Reason(err.Error()))
+			return nil
+		}
+
 		data, readErr := os.ReadFile(path) //nolint:gosec // path constructed from baseDir
 		var title string
 		if readErr == nil {
@@ -483,7 +480,7 @@ func (s *Store) buildTree() ([]*agent.DocTreeNode, error) {
 
 		node := &agent.DocTreeNode{
 			ID:    id,
-			Name:  strings.TrimSuffix(d.Name(), ".md"),
+			Name:  d.Name(),
 			Title: title,
 			Type:  "file",
 		}
