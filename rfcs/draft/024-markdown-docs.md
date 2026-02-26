@@ -16,7 +16,7 @@ Add a built-in documentation layer to Dagu — markdown files stored in `{DAGsDi
 | Agent system prompt awareness of docs directory | Document templates or scaffolding |
 | Full-text content search via `GET /docs/search?q={query}` | Collaborative real-time editing |
 | Tab-based multi-document editor with WYSIWYG and raw modes | Server-side parsing or injection of `[Doc: ...]` content |
-| Server-side atomic rename via `POST /docs/{docPath}/rename` | Custom doc-specific reconciliation logic (handled by RFC 026's generic system) |
+| Server-side atomic rename via `POST /docs/doc/rename?path={docPath}` | Custom doc-specific reconciliation logic (handled by RFC 026's generic system) |
 | Paginated document listing with `page`/`perPage` query params | |
 | `@`-trigger doc mention in agent chat with fuzzy-search picker | |
 | Flat-list query parameter on `GET /docs` for picker consumption | |
@@ -63,14 +63,16 @@ Documents support nested directories (unlike flat souls/skills). The document ID
 | GET | `/docs` | List documents (tree structure, paginated) |
 | POST | `/docs` | Create document |
 | GET | `/docs/search` | Search document content |
-| GET | `/docs/{docPath}` | Get document content and metadata |
-| PATCH | `/docs/{docPath}` | Update document |
-| DELETE | `/docs/{docPath}` | Delete document (auto-removes empty parent directories) |
-| POST | `/docs/{docPath}/rename` | Rename/move document (server-side atomic `os.Rename`) |
+| GET | `/docs/doc?path={docPath}` | Get document content and metadata |
+| PATCH | `/docs/doc?path={docPath}` | Update document |
+| DELETE | `/docs/doc?path={docPath}` | Delete document (auto-removes empty parent directories) |
+| POST | `/docs/doc/rename?path={docPath}` | Rename/move document (server-side atomic `os.Rename`) |
 
-`GET /docs/{docPath}`, `PATCH /docs/{docPath}`, `DELETE /docs/{docPath}`, and `POST /docs/{docPath}/rename` all return **404 Not Found** if the resolved path is a directory rather than a `.md` file. The `{docPath}` parameter must resolve to an individual document.
+Individual document endpoints use `/docs/doc` with a `path` query parameter rather than embedding the document path in the URL. This avoids routing complexity from slash-containing doc paths (e.g., `runbooks/deployment`).
 
-Mutation endpoints (`POST /docs`, `PATCH /docs/{docPath}`, `DELETE /docs/{docPath}`, `POST /docs/{docPath}/rename`) require write permission via `requireDAGWrite()` — the same guard used for DAG mutations. This enforces both the server-level `write_dags` permission flag and the user's RBAC role (`admin`, `manager`, or `developer`). Read endpoints (`GET /docs`, `GET /docs/{docPath}`, `GET /docs/search`) are available to all authenticated users.
+`GET /docs/doc`, `PATCH /docs/doc`, `DELETE /docs/doc`, and `POST /docs/doc/rename` all return **404 Not Found** if the resolved path is a directory rather than a `.md` file. The `path` query parameter must resolve to an individual document.
+
+Mutation endpoints (`POST /docs`, `PATCH /docs/doc`, `DELETE /docs/doc`, `POST /docs/doc/rename`) require write permission via `requireDAGWrite()` — the same guard used for DAG mutations. This enforces both the server-level `write_dags` permission flag and the user's RBAC role (`admin`, `manager`, or `developer`). Read endpoints (`GET /docs`, `GET /docs/doc`, `GET /docs/search`) are available to all authenticated users.
 
 The `GET /docs` endpoint accepts the following query parameters:
 
@@ -169,7 +171,7 @@ type docFrontmatter struct {
 
 #### Rename Endpoint
 
-`POST /docs/{docPath}/rename` performs an atomic server-side rename:
+`POST /docs/doc/rename?path={docPath}` performs an atomic server-side rename:
 
 Request body:
 ```json
@@ -181,8 +183,7 @@ Request body:
 Response (200):
 ```json
 {
-  "id": "runbooks/deployment-v2",
-  "title": "Deployment Runbook"
+  "message": "Document renamed to runbooks/deployment-v2"
 }
 ```
 
@@ -211,8 +212,7 @@ Response:
         }
       ]
     }
-  ],
-  "errors": []
+  ]
 }
 ```
 
@@ -426,7 +426,7 @@ const (
 
 Topic identifier format: `doc:runbooks/deployment` (using the doc ID as the topic identifier).
 
-**FetchFunc** — `GetDocContentData` reads the document from disk via the doc store's `Get(id)` method and returns the same structure as `GET /docs/{docPath}` (id, title, content, createdAt, updatedAt). Registered in `registerSSEFetchers()`:
+**FetchFunc** — `GetDocContentData` reads the document from disk via the doc store's `Get(id)` method and returns the same structure as `GET /docs/doc?path={docPath}` (id, title, content, createdAt, updatedAt). Registered in `registerSSEFetchers()`:
 
 ```go
 srv.sseHub.RegisterFetcher(sse.TopicTypeDoc, srv.apiV1.GetDocContentData)
@@ -578,11 +578,11 @@ Document access follows the same RBAC model as DAGs, using the existing role hie
 | operator | Yes | No |
 | viewer | Yes | No |
 
-**Backend enforcement** — All mutation endpoints (`POST /docs`, `PATCH /docs/{docPath}`, `DELETE /docs/{docPath}`, `POST /docs/{docPath}/rename`) call `requireDAGWrite()` (`internal/service/frontend/api/v1/api.go`), which checks two conditions:
+**Backend enforcement** — All mutation endpoints (`POST /docs`, `PATCH /docs/doc`, `DELETE /docs/doc`, `POST /docs/doc/rename`) call `requireDAGWrite()` (`internal/service/frontend/api/v1/api.go`), which checks two conditions:
 1. The server-level `config.permissions.write_dags` flag must be `true`
 2. The user's role must satisfy `CanWrite()` — i.e., `admin`, `manager`, or `developer`
 
-Read endpoints (`GET /docs`, `GET /docs/{docPath}`, `GET /docs/search`) are available to all authenticated users regardless of role.
+Read endpoints (`GET /docs`, `GET /docs/doc`, `GET /docs/search`) are available to all authenticated users regardless of role.
 
 **Frontend enforcement** — The `canWrite` flag (from `useCanWrite()` in `ui/src/contexts/AuthContext.tsx` or `config.permissions.writeDags`) controls UI visibility of mutation controls. When `canWrite` is `false`:
 - Create, rename, and delete buttons are hidden
@@ -667,7 +667,7 @@ The `DocTabContext` provides:
 - Otherwise a new tab is created and becomes active
 - The URL updates to `/docs/${docPath}` to reflect the active tab
 
-**Editor per tab** — Each active tab loads document content from `GET /docs/{docPath}`.
+**Editor per tab** — Each active tab loads document content from `GET /docs/doc?path={docPath}`.
 
 **Header bar** — Compact bar with:
 - `FileText` icon + document title (truncated, from front matter `title` or `docPath`)
@@ -694,7 +694,7 @@ There is no auto-save. Saving is explicit only:
 - **Save button** in the editor header (disabled when no unsaved changes)
 - **`Ctrl+S` / `Cmd+S`** keyboard shortcut triggers immediate save
 
-On save, a `PATCH /docs/{docPath}` request fires with `{ content }`. Uses the `saveHandlerRef` pattern from the skill editor to avoid stale closures.
+On save, a `PATCH /docs/doc?path={docPath}` request fires with `{ content }`. Uses the `saveHandlerRef` pattern from the skill editor to avoid stale closures.
 
 The unsaved-changes guard integrates with `UnsavedChangesContext` (from `ui/src/contexts/UnsavedChangesContext.tsx`) to:
 - Show amber dot on tabs with pending edits
@@ -714,11 +714,11 @@ A `Dialog` component with:
 
 #### Delete Confirmation
 
-Uses the existing `ConfirmModal` component. Shows doc path in `font-mono`, calls `DELETE /docs/{docPath}`. If the deleted doc has an open tab, the tab is closed. Empty parent directories are auto-cleaned by the server after deletion.
+Uses the existing `ConfirmModal` component. Shows doc path in `font-mono`, calls `DELETE /docs/doc?path={docPath}`. If the deleted doc has an open tab, the tab is closed. Empty parent directories are auto-cleaned by the server after deletion.
 
 #### Rename
 
-A dialog showing the current path (read-only) and new path (editable, validated against the doc ID pattern). On submit, calls `POST /docs/{docPath}/rename` with `{ newPath }`. On success: refreshes tree, updates the tab's `docPath` and `title` if the renamed doc has an open tab, and updates the URL to `/docs/${newPath}`.
+A dialog showing the current path (read-only) and new path (editable, validated against the doc ID pattern). On submit, calls `POST /docs/doc/rename?path={docPath}` with `{ newPath }`. On success: refreshes tree, updates the tab's `docPath` and `title` if the renamed doc has an open tab, and updates the URL to `/docs/${newPath}`.
 
 #### Responsive Behavior
 
@@ -842,7 +842,7 @@ This replaces the originally proposed `reconcileDocState()` with the generic rec
 
 A document's ID is derived from its filesystem path, so renaming a file changes its identity. Two rename paths are supported:
 
-1. **API rename** — `POST /docs/{docPath}/rename` performs `os.Rename` on the server, updating the file path atomically. The doc store's `Rename` method creates target parent directories and cleans up empty source directories.
+1. **API rename** — `POST /docs/doc/rename?path={docPath}` performs `os.Rename` on the server, updating the file path atomically. The doc store's `Rename` method creates target parent directories and cleans up empty source directories.
 
 2. **Git sync rename** — The reconciliation system handles this automatically: the old entry transitions to `missing`, and `scanDocFiles()` discovers the new file as `untracked`. During pull, content-hash-based duplicate prevention (RFC 026) ensures the `missing` entry for the old name is auto-forgotten when the same content appears under the new name — preventing ghost entries. For explicit atomic renames across local and remote, `sync mv` (RFC 026) is available.
 
@@ -869,7 +869,7 @@ A document's ID is derived from its filesystem path, so renaming a file changes 
 - Rich mode uses Milkdown WYSIWYG editor with GFM support (tables, task lists, strikethrough).
 - Raw mode uses the existing Monaco `MarkdownEditor`; editor mode preference persisted in `localStorage`.
 - Create Document and Rename modals use existing `Dialog` components; Delete uses `ConfirmModal`.
-- `POST /docs/{docPath}/rename` performs atomic server-side rename via `os.Rename`.
+- `POST /docs/doc/rename?path={docPath}` performs atomic server-side rename via `os.Rename`.
 - `GET /docs/search?q={query}` performs full-text content search using the grep library, with 2 lines of context before and after.
 - On mobile (< 768px), tree and editor display one at a time with back-button navigation.
 - `canWrite` permission gates all mutation controls (create, edit, rename, delete buttons).
@@ -896,6 +896,6 @@ A document's ID is derived from its filesystem path, so renaming a file changes 
 - Agent `navigate` tool supports `/docs` and `/docs/{docPath}` paths.
 - Agent system prompt includes docs directory in `<environment>`, navigate paths in `<tools>`, and document workflows in `<workflows>`.
 - `GET /docs?flat=true` returns a paginated, alphabetically sorted response.
-- `GET /docs/{docPath}` returns 404 for directory paths.
+- `GET /docs/doc?path={docPath}` returns 404 for directory paths.
 - Non-conforming filenames under `docs/` are silently skipped from listings with debug-level logging.
 - Write operations require `developer` role or above (same as DAG writes via `requireDAGWrite()`); `operator` and `viewer` roles have read-only access.
