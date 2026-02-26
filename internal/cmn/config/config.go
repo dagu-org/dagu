@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"slices"
 	"time"
 )
@@ -21,6 +22,7 @@ type Config struct {
 	Cache           CacheMode
 	GitSync         GitSyncConfig
 	Tunnel          TunnelConfig
+	License         LicenseConfig
 	Warnings        []string
 }
 
@@ -84,6 +86,12 @@ type TunnelRateLimitConfig struct {
 }
 
 const TunnelProviderTailscale = "tailscale"
+
+// LicenseConfig holds the configuration for license activation.
+type LicenseConfig struct {
+	Key      string
+	CloudURL string
+}
 
 // ExecutionMode represents the default execution mode for DAGs.
 type ExecutionMode string
@@ -390,6 +398,9 @@ func (c *Config) Validate() error {
 	if err := c.validateTunnel(); err != nil {
 		return err
 	}
+	if err := c.validateLicense(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -553,4 +564,21 @@ func (c *Config) validateTunnelRateLimiting() error {
 // IsTunnelPublic returns true if the tunnel exposes the service to the public internet.
 func (c *Config) IsTunnelPublic() bool {
 	return c.Tunnel.Enabled && c.Tunnel.Tailscale.Funnel
+}
+
+// validateLicense validates the license configuration.
+func (c *Config) validateLicense() error {
+	if c.License.CloudURL != "" {
+		u, err := url.Parse(c.License.CloudURL)
+		if err != nil {
+			return fmt.Errorf("invalid license cloud URL: %w", err)
+		}
+		if u.Scheme == "" || u.Host == "" {
+			return fmt.Errorf("license cloud URL must include scheme and host (e.g., https://cloud.example.com)")
+		}
+		if u.Scheme != "https" {
+			return fmt.Errorf("license cloud URL must use HTTPS")
+		}
+	}
+	return nil
 }

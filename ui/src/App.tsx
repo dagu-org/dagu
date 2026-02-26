@@ -1,8 +1,10 @@
 import { Theme } from '@radix-ui/themes';
 import '@radix-ui/themes/styles.css';
 import React from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
 import { SWRConfig } from 'swr';
+
+import { Shield } from 'lucide-react';
 
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorModalProvider } from './components/ui/error-modal';
@@ -10,6 +12,7 @@ import { ToastProvider } from './components/ui/simple-toast';
 import { AppBarContext } from './contexts/AppBarContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { Config, ConfigContext, ConfigUpdateContext } from './contexts/ConfigContext';
+import { useHasFeature } from './hooks/useLicense';
 import { PageContextProvider } from './contexts/PageContext';
 import { SchemaProvider } from './contexts/SchemaContext';
 import { SearchStateProvider } from './contexts/SearchStateContext';
@@ -35,6 +38,7 @@ import DAGRunDetails from './pages/dag-runs/dag-run';
 import DAGs from './pages/dags';
 import DAGDetails from './pages/dags/dag';
 import GitSyncPage from './pages/git-sync';
+import LicensePage from './pages/license';
 import LoginPage from './pages/login';
 import Queues from './pages/queues';
 import Search from './pages/search';
@@ -92,6 +96,30 @@ function DeveloperElement({
   children: React.ReactElement;
 }): React.ReactElement {
   return <ProtectedRoute requiredRole="developer">{children}</ProtectedRoute>;
+}
+
+function LicensedRoute({
+  feature,
+  children,
+}: {
+  feature: string;
+  children: React.ReactElement;
+}): React.ReactElement {
+  const hasFeature = useHasFeature(feature);
+  if (hasFeature) return children;
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
+      <Shield size={48} className="text-muted-foreground" />
+      <h2 className="text-xl font-semibold">Pro License Required</h2>
+      <p className="text-sm text-muted-foreground max-w-md">
+        This feature requires a Dagu Pro license. Visit the{' '}
+        <Link to="/license" className="text-primary underline underline-offset-2">
+          License
+        </Link>{' '}
+        page to activate your license.
+      </p>
+    </div>
+  );
 }
 
 function AppInner({ config: initialConfig }: Props): React.ReactElement {
@@ -184,7 +212,8 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                         <Route path="/api-keys" element={<AdminElement><APIKeysPage /></AdminElement>} />
                                         <Route path="/webhooks" element={<DeveloperElement><WebhooksPage /></DeveloperElement>} />
                                         <Route path="/terminal" element={<AdminElement><TerminalPage /></AdminElement>} />
-                                        <Route path="/audit-logs" element={<ManagerElement><AuditLogsPage /></ManagerElement>} />
+                                        <Route path="/audit-logs" element={<ManagerElement><LicensedRoute feature="audit"><AuditLogsPage /></LicensedRoute></ManagerElement>} />
+                                        <Route path="/license" element={<AdminElement><LicensePage /></AdminElement>} />
                                         <Route path="/git-sync" element={<AdminElement><GitSyncPage /></AdminElement>} />
                                         <Route path="/agent-settings" element={<AdminElement><AgentSettingsPage /></AdminElement>} />
                                         <Route path="/agent-memory" element={<AdminElement><AgentMemoryPage /></AdminElement>} />

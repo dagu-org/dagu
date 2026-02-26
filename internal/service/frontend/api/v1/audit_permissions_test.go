@@ -3,22 +3,34 @@ package api_test
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/test"
+	"github.com/stretchr/testify/require"
 )
 
+// setupAuditTestServer creates a test server with audit enabled but NO license
+// manager so it can be used to verify license gating.
 func setupAuditTestServer(t *testing.T) test.Server {
 	t.Helper()
-	return setupWebhookTestServer(t, func(cfg *config.Config) {
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Mode = config.AuthModeBuiltin
+		cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
+		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
 		cfg.Server.Audit.Enabled = true
-	})
+	}))
+	server.Client().Post("/api/v1/auth/setup", api.SetupRequest{
+		Username: "admin",
+		Password: "adminpass",
+	}).ExpectStatus(http.StatusOK).Send(t)
+	return server
 }
 
 func TestAudit_RequiresManagerOrAbove(t *testing.T) {
 	t.Parallel()
-	server := setupAuditTestServer(t)
+	server := setupLicensedAuditTestServer(t)
 	adminToken := getWebhookAdminToken(t, server)
 
 	// Create users for each role below manager.
@@ -71,4 +83,55 @@ func TestAudit_RequiresManagerOrAbove(t *testing.T) {
 	server.Client().Get("/api/v1/audit").
 		WithBearerToken(viewerToken).
 		ExpectStatus(http.StatusForbidden).Send(t)
+}
+
+// setupLicensedAuditTestServer creates a test server with audit enabled and a
+// license manager that has both "audit" and "rbac" features (via setupWebhookTestServer defaults).
+func setupLicensedAuditTestServer(t *testing.T) test.Server {
+	t.Helper()
+	return setupWebhookTestServer(t, func(cfg *config.Config) {
+		cfg.Server.Audit.Enabled = true
+	})
+}
+
+func TestAudit_RequiresLicense(t *testing.T) {
+	t.Parallel()
+	// Server with audit enabled but NO license manager — community mode.
+	server := setupAuditTestServer(t)
+	adminToken := getWebhookAdminToken(t, server)
+
+	server.Client().Get("/api/v1/audit").
+		WithBearerToken(adminToken).
+		ExpectStatus(http.StatusForbidden).Send(t)
+}
+
+// TestCommunityMode_ListUsersAndResetPassword verifies that community-mode admins
+// can list users and reset passwords without an RBAC license.
+func TestCommunityMode_ListUsersAndResetPassword(t *testing.T) {
+	t.Parallel()
+	// Community mode: no license manager.
+	server := setupAuditTestServer(t)
+	adminToken := getWebhookAdminToken(t, server)
+
+	// ListUsers should succeed (no RBAC license required).
+	resp := server.Client().Get("/api/v1/users").
+		WithBearerToken(adminToken).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var listResult api.UsersListResponse
+	resp.Unmarshal(t, &listResult)
+	require.NotEmpty(t, listResult.Users, "should have at least the admin user")
+
+	// ResetUserPassword should succeed (no RBAC license required).
+	adminUserID := listResult.Users[0].Id
+	server.Client().Post("/api/v1/users/"+adminUserID+"/reset-password", api.ResetPasswordRequest{
+		NewPassword: "newadminpass1",
+	}).WithBearerToken(adminToken).ExpectStatus(http.StatusOK).Send(t)
+
+	// CreateUser should fail — RBAC-gated.
+	server.Client().Post("/api/v1/users", api.CreateUserRequest{
+		Username: "should-fail",
+		Password: "password123",
+		Role:     api.UserRoleViewer,
+	}).WithBearerToken(adminToken).ExpectStatus(http.StatusForbidden).Send(t)
 }

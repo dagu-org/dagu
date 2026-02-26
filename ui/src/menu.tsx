@@ -14,6 +14,7 @@ import {
   useIsAdmin,
 } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
+import { useHasFeature } from '@/hooks/useLicense';
 import { cn } from '@/lib/utils';
 import { getResponsiveTitleClass } from '@/lib/text-utils';
 import {
@@ -23,6 +24,7 @@ import {
   Brain,
   FileCog,
   Ghost,
+  Shield,
   Sparkles,
   GitBranch,
   Globe,
@@ -235,6 +237,8 @@ export const mainListItems = React.forwardRef<
 >(function MainListItems({ isOpen = false, onNavItemClick, onToggle, customColor = false }, ref) {
   const config = useConfig();
   const isAdmin = useIsAdmin();
+  const hasRbac = useHasFeature('rbac');
+  const hasAudit = useHasFeature('audit');
   const canWrite = useCanWrite();
   const canAccessSystemStatus = useCanAccessSystemStatus();
   const canManageWebhooks = useCanManageWebhooks();
@@ -428,7 +432,7 @@ export const mainListItems = React.forwardRef<
               {config.authMode === 'builtin' && (
                 <NavItem
                   to="/users"
-                  text="Users"
+                  text={hasRbac ? 'Users' : 'Users (Pro)'}
                   icon={<Users size={18} />}
                   isOpen={isOpen}
                   onClick={onNavItemClick}
@@ -493,6 +497,14 @@ export const mainListItems = React.forwardRef<
                   customColor={customColor}
                 />
               )}
+              <NavItem
+                to="/license"
+                text="License"
+                icon={<Shield size={18} />}
+                isOpen={isOpen}
+                onClick={onNavItemClick}
+                customColor={customColor}
+              />
             </div>
           )}
 
@@ -512,7 +524,7 @@ export const mainListItems = React.forwardRef<
                 {canViewAuditLogs && (
                   <NavItem
                     to="/audit-logs"
-                    text="Audit Logs"
+                    text={hasAudit ? 'Audit Logs' : 'Audit Logs (Pro)'}
                     icon={<ScrollText size={18} />}
                     isOpen={isOpen}
                     onClick={onNavItemClick}

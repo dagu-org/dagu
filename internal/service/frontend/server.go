@@ -36,6 +36,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/telemetry"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/gitsync"
+	"github.com/dagu-org/dagu/internal/license"
 	_ "github.com/dagu-org/dagu/internal/llm/allproviders" // Register LLM providers
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
@@ -84,6 +85,7 @@ type Server struct {
 	metricsRegistry  *prometheus.Registry
 	tunnelAPIOpts    []apiv1.APIOption
 	dagStore         exec.DAGStore
+	licenseManager   *license.Manager
 }
 
 // ServerOption is a functional option for configuring the Server.
@@ -93,6 +95,15 @@ type ServerOption func(*Server)
 func WithListener(l net.Listener) ServerOption {
 	return func(s *Server) {
 		s.listener = l
+	}
+}
+
+// WithLicenseManager sets the license manager for feature gating.
+func WithLicenseManager(m *license.Manager) ServerOption {
+	return func(s *Server) {
+		if m != nil {
+			s.licenseManager = m
+		}
 	}
 }
 
@@ -129,10 +140,6 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize audit service: %w", err)
 	}
-	if auditSvc != nil {
-		apiOpts = append(apiOpts, apiv1.WithAuditService(auditSvc))
-	}
-
 	syncSvc := initSyncService(ctx, cfg)
 	if syncSvc != nil {
 		apiOpts = append(apiOpts, apiv1.WithSyncService(syncSvc))
@@ -268,6 +275,8 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	updateAvailable, latestVersion := getUpdateInfo(upgradeStore)
 
+	// Note: SSO/OIDC gating is applied after opts are processed (see below)
+
 	srv := &Server{
 		config:           cfg,
 		agentAPI:         agentAPI,
@@ -304,6 +313,37 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	for _, opt := range opts {
 		opt(srv)
+	}
+
+	// Populate license checker and manager in funcsConfig after opts
+	if srv.licenseManager != nil {
+		srv.funcsConfig.LicenseChecker = srv.licenseManager.Checker()
+		srv.funcsConfig.LicenseManager = srv.licenseManager
+	}
+
+	// License feature gating
+	if srv.licenseManager != nil {
+		checker := srv.licenseManager.Checker()
+		if !checker.IsFeatureEnabled(license.FeatureAudit) {
+			srv.auditService = nil
+			srv.auditStore = nil
+		}
+		if !checker.IsFeatureEnabled(license.FeatureSSO) {
+			if srv.builtinOIDCCfg != nil {
+				logger.Error(ctx, "SSO (OIDC) requires a Dagu Pro license; OIDC login is disabled")
+				srv.builtinOIDCCfg = nil
+			}
+		}
+	}
+
+	// Add audit service to API only if licensed (or no license manager)
+	if srv.auditService != nil {
+		apiOpts = append(apiOpts, apiv1.WithAuditService(srv.auditService))
+	}
+
+	// Pass license manager to API
+	if srv.licenseManager != nil {
+		apiOpts = append(apiOpts, apiv1.WithLicenseManager(srv.licenseManager))
 	}
 
 	allAPIOptions := append(apiOpts, srv.tunnelAPIOpts...)

@@ -49,6 +49,7 @@ func init() {
 	rootCmd.AddCommand(cmd.Cleanup())
 	rootCmd.AddCommand(cmd.Sync())
 	rootCmd.AddCommand(cmd.Upgrade())
+	rootCmd.AddCommand(cmd.License())
 
 	config.Version = version
 }

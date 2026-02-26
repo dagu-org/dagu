@@ -25,12 +25,14 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/telemetry"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/license"
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
 	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
 	"github.com/dagu-org/dagu/internal/persis/fileagentsoul"
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
+	"github.com/dagu-org/dagu/internal/persis/filelicense"
 	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
 	"github.com/dagu-org/dagu/internal/persis/filequeue"
@@ -62,7 +64,8 @@ type Context struct {
 	QueueStore      exec.QueueStore
 	ServiceRegistry exec.ServiceRegistry
 
-	Proc exec.ProcHandle
+	Proc           exec.ProcHandle
+	LicenseManager *license.Manager
 }
 
 // WithContext returns a new Context with a different underlying context.Context.
@@ -80,6 +83,7 @@ func (c *Context) WithContext(ctx context.Context) *Context {
 		QueueStore:      c.QueueStore,
 		ServiceRegistry: c.ServiceRegistry,
 		Proc:            c.Proc,
+		LicenseManager:  c.LicenseManager,
 	}
 }
 
@@ -209,6 +213,27 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	qs := filequeue.New(cfg.Paths.QueueDir)
 	sm := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
+	// Initialize license manager for server commands
+	var licMgr *license.Manager
+	switch cmd.Name() {
+	case "server", "start-all":
+		pubKey, pubKeyErr := license.PublicKey()
+		if pubKeyErr != nil {
+			logger.Warn(ctx, "Failed to load license public key", tag.Error(pubKeyErr))
+			break
+		}
+		licenseDir := filepath.Join(cfg.Paths.DataDir, "license")
+		licStore := filelicense.New(licenseDir)
+		licMgr = license.NewManager(license.ManagerConfig{
+			LicenseDir: licenseDir,
+			ConfigKey:  cfg.License.Key,
+			CloudURL:   cfg.License.CloudURL,
+		}, pubKey, licStore, slog.Default())
+		if err := licMgr.Start(ctx); err != nil {
+			logger.Warn(ctx, "License manager initialization failed", tag.Error(err))
+		}
+	}
+
 	// Log key configuration settings for debugging
 	logger.Debug(ctx, "Configuration loaded",
 		tag.Config(cfg.Paths.ConfigFileUsed),
@@ -231,6 +256,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		ProcStore:       ps,
 		QueueStore:      qs,
 		ServiceRegistry: sm,
+		LicenseManager:  licMgr,
 	}, nil
 }
 
@@ -301,6 +327,10 @@ func (c *Context) NewServer(rs *resource.Service, opts ...frontend.ServerOption)
 	collector.RegisterCache(dc)
 
 	mr := telemetry.NewRegistry(collector)
+
+	if c.LicenseManager != nil {
+		opts = append(opts, frontend.WithLicenseManager(c.LicenseManager))
+	}
 
 	return frontend.NewServer(c.Context, c.Config, dr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.DAGRunMgr, cc, c.ServiceRegistry, mr, collector, rs, opts...)
 }

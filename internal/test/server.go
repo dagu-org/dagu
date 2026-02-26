@@ -86,11 +86,12 @@ func (srv *Server) runServer(t *testing.T, listener net.Listener, errChan chan<-
 	mr := telemetry.NewRegistry(collector)
 
 	// Pass the pre-bound listener to the server to avoid port race conditions
+	serverOpts := append([]frontend.ServerOption{frontend.WithListener(listener)}, srv.ServerOptions...)
 	server, err := frontend.NewServer(
 		srv.Context, srv.Config, srv.DAGStore, srv.DAGRunStore,
 		srv.QueueStore, srv.ProcStore, srv.DAGRunMgr, cc,
 		srv.ServiceRegistry, mr, collector, nil,
-		frontend.WithListener(listener),
+		serverOpts...,
 	)
 	if err != nil {
 		errChan <- fmt.Errorf("failed to create server: %w", err)

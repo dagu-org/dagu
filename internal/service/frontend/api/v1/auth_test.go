@@ -7,6 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/service/frontend"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -222,11 +223,14 @@ func builtinServer(t *testing.T) test.Server {
 // so the setup page is active.
 func setupServer(t *testing.T) test.Server {
 	t.Helper()
-	return test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
-		cfg.Server.Auth.Mode = config.AuthModeBuiltin
-		cfg.Server.Auth.Builtin.Token.Secret = "test-jwt-secret-key-setup"
-		cfg.Server.Auth.Builtin.Token.TTL = time.Hour
-	}))
+	return test.SetupServer(t,
+		test.WithConfigMutator(func(cfg *config.Config) {
+			cfg.Server.Auth.Mode = config.AuthModeBuiltin
+			cfg.Server.Auth.Builtin.Token.Secret = "test-jwt-secret-key-setup"
+			cfg.Server.Auth.Builtin.Token.TTL = time.Hour
+		}),
+		test.WithServerOptions(frontend.WithLicenseManager(defaultTestLicenseManager())),
+	)
 }
 
 func TestSetup(t *testing.T) {

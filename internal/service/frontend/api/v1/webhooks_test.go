@@ -8,6 +8,8 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/license"
+	"github.com/dagu-org/dagu/internal/service/frontend"
 	apiimpl "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
@@ -63,17 +65,28 @@ func TestExtractWebhookToken(t *testing.T) {
 	}
 }
 
-// setupWebhookTestServer creates a test server with builtin auth enabled
+// defaultTestLicenseManager returns a license manager with all Pro features
+// enabled, for use in tests that need licensed endpoints (user management, audit, etc.).
+func defaultTestLicenseManager() *license.Manager {
+	return license.NewTestManager(license.FeatureRBAC, license.FeatureAudit)
+}
+
+// setupWebhookTestServer creates a test server with builtin auth and a default
+// Pro license. Extra config mutators are applied after the base auth config.
 func setupWebhookTestServer(t *testing.T, extraMutators ...func(*config.Config)) test.Server {
 	t.Helper()
-	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
-		cfg.Server.Auth.Mode = config.AuthModeBuiltin
-		cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
-		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
-		for _, m := range extraMutators {
-			m(cfg)
-		}
-	}))
+
+	server := test.SetupServer(t,
+		test.WithConfigMutator(func(cfg *config.Config) {
+			cfg.Server.Auth.Mode = config.AuthModeBuiltin
+			cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
+			cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
+			for _, m := range extraMutators {
+				m(cfg)
+			}
+		}),
+		test.WithServerOptions(frontend.WithLicenseManager(defaultTestLicenseManager())),
+	)
 
 	// Create admin via setup endpoint
 	server.Client().Post("/api/v1/auth/setup", api.SetupRequest{

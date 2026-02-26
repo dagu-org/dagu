@@ -38,6 +38,9 @@ func (a *API) CreateUser(ctx context.Context, request api.CreateUserRequestObjec
 	if err := a.requireAdmin(ctx); err != nil {
 		return nil, err
 	}
+	if err := a.requireLicensedRBAC(); err != nil {
+		return nil, err
+	}
 
 	if request.Body == nil {
 		return nil, &Error{
@@ -131,6 +134,9 @@ func (a *API) UpdateUser(ctx context.Context, request api.UpdateUserRequestObjec
 	if err := a.requireAdmin(ctx); err != nil {
 		return nil, err
 	}
+	if err := a.requireLicensedRBAC(); err != nil {
+		return nil, err
+	}
 
 	if request.Body == nil {
 		return nil, &Error{
@@ -219,6 +225,9 @@ func (a *API) DeleteUser(ctx context.Context, request api.DeleteUserRequestObjec
 		return nil, err
 	}
 	if err := a.requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	if err := a.requireLicensedRBAC(); err != nil {
 		return nil, err
 	}
 

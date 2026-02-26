@@ -32,6 +32,16 @@
           },
           updateAvailable: "{{ updateAvailable }}" === "true",
           latestVersion: "{{ latestVersion }}",
+          license: {
+            valid: "{{ licenseValid }}" === "true",
+            plan: "{{ licensePlan }}",
+            expiry: "{{ licenseExpiry }}",
+            features: (() => { try { return JSON.parse('{{ licenseFeatures }}'); } catch { return []; } })(),
+            gracePeriod: "{{ licenseGracePeriod }}" === "true",
+            community: "{{ licenseCommunity }}" === "true",
+            source: "{{ licenseSource }}",
+            warningCode: "{{ licenseWarningCode }}",
+          },
           paths: {
             dagsDir: "{{ js pathDAGsDir }}",
             logDir: "{{ js pathLogDir }}",
