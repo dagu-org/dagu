@@ -23,7 +23,6 @@ import {
   Bot,
   Brain,
   FileCog,
-  FileText,
   Ghost,
   Shield,
   Sparkles,
@@ -421,14 +420,6 @@ export const mainListItems = React.forwardRef<
               to="/search"
               text="Search"
               icon={<Search size={18} />}
-              isOpen={isOpen}
-              onClick={onNavItemClick}
-              customColor={customColor}
-            />
-            <NavItem
-              to="/docs"
-              text="Documents"
-              icon={<FileText size={18} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
               customColor={customColor}
