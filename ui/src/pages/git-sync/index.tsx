@@ -34,6 +34,7 @@ import { cn } from '@/lib/utils';
 import ConfirmModal from '@/ui/ConfirmModal';
 import {
   Download,
+  EyeOff,
   FileCode,
   GitBranch,
   RefreshCw,
@@ -43,13 +44,19 @@ import {
 } from 'lucide-react';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { CleanupDialog } from './CleanupDialog';
+import { DeleteDialog } from './DeleteDialog';
+import { DeleteMissingDialog } from './DeleteMissingDialog';
 import { DiffModal } from './DiffModal';
+import { ForgetDialog } from './ForgetDialog';
+import { MoveDialog } from './MoveDialog';
+import { RowActionMenu } from './RowActionMenu';
 
 type SyncStatusResponse = components['schemas']['SyncStatusResponse'];
 type SyncConfigResponse = components['schemas']['SyncConfigResponse'];
 type SyncItemDiffResponse = components['schemas']['SyncItemDiffResponse'];
 type SyncItem = components['schemas']['SyncItem'];
-type StatusFilter = 'all' | 'modified' | 'untracked' | 'conflict';
+type StatusFilter = 'all' | 'modified' | 'untracked' | 'conflict' | 'missing';
 type TypeFilter = 'all' | 'dag' | 'memory' | 'skill' | 'soul';
 type UISyncKind = 'dag' | 'memory' | 'skill' | 'soul';
 type SyncRow = { itemId: string; item: SyncItem; kind: UISyncKind };
@@ -59,6 +66,7 @@ const statusFilters: StatusFilter[] = [
   'modified',
   'untracked',
   'conflict',
+  'missing',
 ];
 const typeFilters: TypeFilter[] = ['all', 'dag', 'memory', 'skill', 'soul'];
 
@@ -67,7 +75,8 @@ function parseStatusFilter(value: string | null): StatusFilter {
     value === 'all' ||
     value === 'modified' ||
     value === 'untracked' ||
-    value === 'conflict'
+    value === 'conflict' ||
+    value === 'missing'
   ) {
     return value;
   }
@@ -109,6 +118,10 @@ const summaryConfig: Record<
     label: 'Error',
     badgeClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400',
   },
+  [SyncSummary.missing]: {
+    label: 'Missing',
+    badgeClass: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
+  },
 };
 
 // Status configuration for dots
@@ -117,6 +130,7 @@ const statusConfig: Record<SyncStatus, { color: string; label: string }> = {
   [SyncStatus.modified]: { color: 'bg-amber-500', label: 'modified' },
   [SyncStatus.untracked]: { color: 'bg-blue-500', label: 'untracked' },
   [SyncStatus.conflict]: { color: 'bg-rose-500', label: 'conflict' },
+  [SyncStatus.missing]: { color: 'bg-slate-400', label: 'missing' },
 };
 
 function StatusDot({ status }: { status: SyncStatus }) {
@@ -154,6 +168,16 @@ export default function GitSyncPage() {
     open: boolean;
     itemId?: string;
   }>({ open: false });
+  const [forgetModal, setForgetModal] = useState<{ open: boolean; itemId?: string }>({ open: false });
+  const [deleteModal, setDeleteModal] = useState<{ open: boolean; itemId?: string }>({ open: false });
+  const [moveModal, setMoveModal] = useState<{ open: boolean; itemId?: string }>({ open: false });
+  const [cleanupModal, setCleanupModal] = useState(false);
+  const [deleteMissingModal, setDeleteMissingModal] = useState(false);
+  const [forgettingItemId, setForgettingItemId] = useState<string | null>(null);
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+  const [movingItemId, setMovingItemId] = useState<string | null>(null);
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
+  const [isDeletingMissing, setIsDeletingMissing] = useState(false);
   const [selectedDags, setSelectedDags] = useState<Set<string>>(new Set());
   const userTouchedSelectionRef = useRef(false);
   const prevPublishableRef = useRef<string>('');
@@ -380,6 +404,113 @@ export default function GitSyncPage() {
     }
   };
 
+  const handleForget = async (itemId: string) => {
+    setForgettingItemId(itemId);
+    try {
+      const response = await client.POST('/sync/items/{itemId}/forget', {
+        params: { path: { itemId }, query: { remoteNode } },
+      });
+      if (response.error) {
+        showError(response.error.message || 'Forget failed');
+      } else {
+        showToast(`Removed ${itemId} from sync tracking`);
+        setForgetModal({ open: false });
+        setDiffModal({ open: false });
+        mutateStatus();
+      }
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Forget failed');
+    } finally {
+      setForgettingItemId(null);
+    }
+  };
+
+  const handleDelete = async (itemId: string, force: boolean) => {
+    setDeletingItemId(itemId);
+    try {
+      const response = await client.POST('/sync/items/{itemId}/delete', {
+        params: { path: { itemId }, query: { remoteNode } },
+        body: { message: `Delete ${itemId}`, force },
+      });
+      if (response.error) {
+        showError(response.error.message || 'Delete failed');
+      } else {
+        showToast(`Deleted ${itemId}`);
+        setDeleteModal({ open: false });
+        setDiffModal({ open: false });
+        mutateStatus();
+      }
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Delete failed');
+    } finally {
+      setDeletingItemId(null);
+    }
+  };
+
+  const handleMove = async (itemId: string, newItemId: string, message: string, force: boolean) => {
+    setMovingItemId(itemId);
+    try {
+      const response = await client.POST('/sync/items/{itemId}/move', {
+        params: { path: { itemId }, query: { remoteNode } },
+        body: { newItemId, message, force },
+      });
+      if (response.error) {
+        showError(response.error.message || 'Move failed');
+      } else {
+        showToast(`Moved ${itemId} to ${newItemId}`);
+        setMoveModal({ open: false });
+        mutateStatus();
+      }
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Move failed');
+    } finally {
+      setMovingItemId(null);
+    }
+  };
+
+  const handleCleanup = async () => {
+    setIsCleaningUp(true);
+    try {
+      const response = await client.POST('/sync/cleanup', {
+        params: { query: { remoteNode } },
+      });
+      if (response.error) {
+        showError(response.error.message || 'Cleanup failed');
+      } else {
+        const count = response.data?.forgotten?.length || 0;
+        showToast(`Cleaned up ${count} missing item${count !== 1 ? 's' : ''}`);
+        setCleanupModal(false);
+        mutateStatus();
+      }
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Cleanup failed');
+    } finally {
+      setIsCleaningUp(false);
+    }
+  };
+
+  const handleDeleteMissing = async (message: string) => {
+    setIsDeletingMissing(true);
+    try {
+      const response = await client.POST('/sync/delete-missing', {
+        params: { query: { remoteNode } },
+        body: { message },
+      });
+      if (response.error) {
+        showError(response.error.message || 'Delete missing failed');
+      } else {
+        const count = response.data?.deleted?.length || 0;
+        showToast(`Deleted ${count} missing item${count !== 1 ? 's' : ''}`);
+        setDeleteMissingModal(false);
+        mutateStatus();
+      }
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Delete missing failed');
+    } finally {
+      setIsDeletingMissing(false);
+    }
+  };
+
   const filteredRows = useMemo(
     () =>
       syncRows.filter(({ item, kind }) => {
@@ -454,6 +585,7 @@ export default function GitSyncPage() {
       modified: 0,
       untracked: 0,
       conflict: 0,
+      missing: 0,
     };
 
     for (const { item, kind } of syncRows) {
@@ -464,6 +596,7 @@ export default function GitSyncPage() {
       if (item.status === SyncStatus.modified) counts.modified += 1;
       if (item.status === SyncStatus.untracked) counts.untracked += 1;
       if (item.status === SyncStatus.conflict) counts.conflict += 1;
+      if (item.status === SyncStatus.missing) counts.missing += 1;
     }
 
     return counts;
@@ -509,6 +642,8 @@ export default function GitSyncPage() {
     }
     return `No ${typeLabel} items with ${statusFilter} status`;
   }, [statusFilter, typeFilter]);
+
+  const missingCount = status?.counts?.missing || 0;
 
   // Not configured state
   if (!status?.enabled) {
@@ -575,6 +710,30 @@ export default function GitSyncPage() {
           >
             <Upload className="h-4 w-4" />
           </Button>
+          {missingCount > 0 && canWrite && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-xs"
+              onClick={() => setCleanupModal(true)}
+              title="Remove missing items from sync tracking"
+            >
+              <EyeOff className="h-4 w-4 mr-1" />
+              Cleanup
+            </Button>
+          )}
+          {missingCount > 0 && config?.pushEnabled && canWrite && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-xs text-destructive hover:text-destructive"
+              onClick={() => setDeleteMissingModal(true)}
+              title="Delete all missing items from remote repository"
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete Missing
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -769,6 +928,21 @@ export default function GitSyncPage() {
                             <Upload className="h-3 w-3" />
                           </Button>
                         )}
+                      {item.status === SyncStatus.missing &&
+                        config?.pushEnabled &&
+                        canWrite && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-rose-600"
+                            onClick={() =>
+                              setDeleteModal({ open: true, itemId })
+                            }
+                            title="Delete from remote"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
                       {(item.status === SyncStatus.modified ||
                         item.status === SyncStatus.conflict) &&
                         canWrite && (
@@ -784,6 +958,15 @@ export default function GitSyncPage() {
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         )}
+                      <RowActionMenu
+                        itemId={itemId}
+                        status={item.status}
+                        pushEnabled={!!config?.pushEnabled}
+                        canWrite={canWrite}
+                        onForget={(id) => setForgetModal({ open: true, itemId: id })}
+                        onDelete={(id) => setDeleteModal({ open: true, itemId: id })}
+                        onMove={(id) => setMoveModal({ open: true, itemId: id })}
+                      />
                     </div>
                   </TableCell>
                 </TableRow>
@@ -940,6 +1123,18 @@ export default function GitSyncPage() {
             setRevertModal({ open: true, itemId: diffModal.itemId });
           }
         }}
+        onForget={
+          diffData?.status === SyncStatus.missing && canWrite && diffModal.itemId
+            ? () => setForgetModal({ open: true, itemId: diffModal.itemId })
+            : undefined
+        }
+        onDelete={
+          diffData?.status === SyncStatus.missing && canWrite && config?.pushEnabled && diffModal.itemId
+            ? () => setDeleteModal({ open: true, itemId: diffModal.itemId })
+            : undefined
+        }
+        isForgetting={!!forgettingItemId}
+        isDeleting={!!deletingItemId}
       />
 
       {/* Revert Confirmation Modal */}
@@ -964,6 +1159,72 @@ export default function GitSyncPage() {
           ? This cannot be undone.
         </p>
       </ConfirmModal>
+
+      {/* Forget Dialog */}
+      <ForgetDialog
+        open={forgetModal.open}
+        itemId={forgetModal.itemId || ''}
+        isForgetting={!!forgettingItemId}
+        onConfirm={() => {
+          if (forgetModal.itemId) handleForget(forgetModal.itemId);
+        }}
+        onCancel={() => setForgetModal({ open: false })}
+      />
+
+      {/* Delete Dialog */}
+      <DeleteDialog
+        open={deleteModal.open}
+        itemId={deleteModal.itemId || ''}
+        itemStatus={
+          deleteModal.itemId
+            ? rowByID.get(deleteModal.itemId)?.item.status || SyncStatus.synced
+            : SyncStatus.synced
+        }
+        isDeleting={!!deletingItemId}
+        onConfirm={(force) => {
+          if (deleteModal.itemId) handleDelete(deleteModal.itemId, force);
+        }}
+        onCancel={() => setDeleteModal({ open: false })}
+      />
+
+      {/* Move Dialog */}
+      <MoveDialog
+        open={moveModal.open}
+        itemId={moveModal.itemId || ''}
+        itemKind={
+          moveModal.itemId
+            ? rowByID.get(moveModal.itemId)?.kind || 'dag'
+            : 'dag'
+        }
+        itemStatus={
+          moveModal.itemId
+            ? rowByID.get(moveModal.itemId)?.item.status || SyncStatus.synced
+            : SyncStatus.synced
+        }
+        isMoving={!!movingItemId}
+        onConfirm={(newItemId, message, force) => {
+          if (moveModal.itemId) handleMove(moveModal.itemId, newItemId, message, force);
+        }}
+        onCancel={() => setMoveModal({ open: false })}
+      />
+
+      {/* Cleanup Dialog */}
+      <CleanupDialog
+        open={cleanupModal}
+        missingCount={missingCount}
+        isCleaningUp={isCleaningUp}
+        onConfirm={handleCleanup}
+        onCancel={() => setCleanupModal(false)}
+      />
+
+      {/* Delete Missing Dialog */}
+      <DeleteMissingDialog
+        open={deleteMissingModal}
+        missingCount={missingCount}
+        isDeletingMissing={isDeletingMissing}
+        onConfirm={handleDeleteMissing}
+        onCancel={() => setDeleteMissingModal(false)}
+      />
     </div>
   );
 }

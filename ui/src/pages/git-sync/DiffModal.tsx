@@ -9,7 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { SyncStatus } from '@/api/v1/schema';
 import { useUserPreferences } from '@/contexts/UserPreference';
-import { Upload, RotateCcw } from 'lucide-react';
+import { Upload, RotateCcw, Trash2, EyeOff, RefreshCw } from 'lucide-react';
 
 interface DiffModalProps {
   open: boolean;
@@ -24,6 +24,10 @@ interface DiffModalProps {
   canRevert?: boolean;
   onPublish?: () => void;
   onRevert?: () => void;
+  onForget?: () => void;
+  onDelete?: () => void;
+  isForgetting?: boolean;
+  isDeleting?: boolean;
 }
 
 export function DiffModal({
@@ -39,6 +43,10 @@ export function DiffModal({
   canRevert,
   onPublish,
   onRevert,
+  onForget,
+  onDelete,
+  isForgetting,
+  isDeleting,
 }: DiffModalProps) {
   const { preferences } = useUserPreferences();
   const isDarkMode = preferences.theme === 'dark';
@@ -66,6 +74,11 @@ export function DiffModal({
         return {
           left: 'Remote',
           right: 'Local (identical)',
+        };
+      case SyncStatus.missing:
+        return {
+          left: remoteCommit ? `Remote (${remoteCommit.slice(0, 7)})` : 'Remote',
+          right: 'Local (missing)',
         };
       default:
         return { left: 'Remote', right: 'Local' };
@@ -133,7 +146,40 @@ export function DiffModal({
             }}
           />
         </div>
-        {(canPublish || canRevert) && (
+        {status === SyncStatus.missing && (onForget || onDelete) ? (
+          <DialogFooter className="px-4 py-3 border-t border-border/40">
+            {onForget && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onForget}
+                disabled={isForgetting}
+              >
+                {isForgetting ? (
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <EyeOff className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                Forget
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={onDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                Delete from Remote
+              </Button>
+            )}
+          </DialogFooter>
+        ) : (canPublish || canRevert) ? (
           <DialogFooter className="px-4 py-3 border-t border-border/40">
             {canRevert && onRevert && (
               <Button
@@ -153,7 +199,7 @@ export function DiffModal({
               </Button>
             )}
           </DialogFooter>
-        )}
+        ) : null}
       </DialogContent>
     </Dialog>
   );
