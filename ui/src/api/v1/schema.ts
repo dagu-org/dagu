@@ -1586,6 +1586,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sync/items/{itemId}/forget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Forget a sync item
+         * @description Removes the state entry for a missing, untracked, or conflict sync item. Synced and modified items are rejected.
+         */
+        post: operations["forgetSyncItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sync/items/{itemId}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete a sync item
+         * @description Removes an item from remote repository (git rm + commit + push), local disk, and sync state
+         */
+        post: operations["deleteSyncItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sync/items/{itemId}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move a sync item
+         * @description Atomically renames an item across local filesystem, remote repository, and sync state
+         */
+        post: operations["moveSyncItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sync/delete-missing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete all missing sync items
+         * @description Removes all missing items from remote repository, local disk, and sync state
+         */
+        post: operations["syncDeleteMissing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sync/cleanup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cleanup missing sync items
+         * @description Removes all missing entries from sync state
+         */
+        post: operations["syncCleanup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/base-config": {
         parameters: {
             query?: never;
@@ -3139,6 +3239,13 @@ export interface components {
              * @description When the conflict was detected
              */
             conflictDetectedAt?: string;
+            /** @description Status before transitioning to missing */
+            previousStatus?: components["schemas"]["SyncStatus"];
+            /**
+             * Format: date-time
+             * @description When the file was first detected as missing
+             */
+            missingAt?: string;
         };
         /** @description Counts of DAGs in each sync status */
         SyncStatusCounts: {
@@ -3146,6 +3253,7 @@ export interface components {
             modified: number;
             untracked: number;
             conflict: number;
+            missing: number;
         };
         /** @description Overall Git sync status */
         SyncStatusResponse: {
@@ -8123,6 +8231,284 @@ export interface operations {
             };
         };
     };
+    forgetSyncItem: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description The sync item identifier (file path without extension) */
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Item forgotten successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"];
+                };
+            };
+            /** @description Item cannot be forgotten */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Item not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteSyncItem: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description The sync item identifier (file path without extension) */
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Commit message for the deletion */
+                    message?: string;
+                    /** @description Force delete even if item has local modifications */
+                    force?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Item deleted successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"];
+                };
+            };
+            /** @description Item cannot be deleted */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Item not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    moveSyncItem: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description The current sync item identifier (file path without extension) */
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The new item identifier to rename to */
+                    newItemId: string;
+                    /** @description Commit message for the move */
+                    message?: string;
+                    /** @description Force move even if item has conflicts */
+                    force?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Item moved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"];
+                };
+            };
+            /** @description Item cannot be moved */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Item not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict detected */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncConflictResponse"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    syncDeleteMissing: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Commit message for the deletion */
+                    message?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Missing items deleted successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description List of deleted item IDs */
+                        deleted: string[];
+                        /** @description Summary message */
+                        message: string;
+                    };
+                };
+            };
+            /** @description Cannot delete */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    syncCleanup: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cleanup completed successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description List of forgotten item IDs */
+                        forgotten: string[];
+                        /** @description Summary message */
+                        message: string;
+                    };
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getBaseConfig: {
         parameters: {
             query?: {
@@ -10479,12 +10865,14 @@ export enum SyncStatus {
     synced = "synced",
     modified = "modified",
     untracked = "untracked",
-    conflict = "conflict"
+    conflict = "conflict",
+    missing = "missing"
 }
 export enum SyncSummary {
     synced = "synced",
     pending = "pending",
     conflict = "conflict",
+    missing = "missing",
     error = "error"
 }
 export enum SyncItemKind {

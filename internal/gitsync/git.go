@@ -311,6 +311,44 @@ func (c *GitClient) AddAndCommit(filePath, message string) (string, error) {
 	return commit.String(), nil
 }
 
+// RemoveFile stages a file removal (does not commit).
+func (c *GitClient) RemoveFile(filePath string) error {
+	if err := c.requireRepo(); err != nil {
+		return err
+	}
+
+	wt, err := c.repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	if _, err := wt.Remove(filePath); err != nil {
+		return fmt.Errorf("failed to stage removal of %s: %w", filePath, err)
+	}
+
+	return nil
+}
+
+// RemoveFiles stages multiple file removals (does not commit).
+func (c *GitClient) RemoveFiles(filePaths []string) error {
+	if err := c.requireRepo(); err != nil {
+		return err
+	}
+
+	wt, err := c.repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	for _, filePath := range filePaths {
+		if _, err := wt.Remove(filePath); err != nil {
+			return fmt.Errorf("failed to stage removal of %s: %w", filePath, err)
+		}
+	}
+
+	return nil
+}
+
 // CommitStaged creates a commit from the currently staged changes.
 func (c *GitClient) CommitStaged(message string) (string, error) {
 	if err := c.requireRepo(); err != nil {
