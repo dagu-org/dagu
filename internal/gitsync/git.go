@@ -2,6 +2,7 @@ package gitsync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -283,6 +284,8 @@ type CommitInfo struct {
 }
 
 // AddAndCommit stages a file and creates a commit.
+// If the file content is already identical to HEAD (no changes), it returns
+// the current HEAD hash instead of failing with an empty-commit error.
 func (c *GitClient) AddAndCommit(filePath, message string) (string, error) {
 	if err := c.requireRepo(); err != nil {
 		return "", err
@@ -305,6 +308,11 @@ func (c *GitClient) AddAndCommit(filePath, message string) (string, error) {
 		},
 	})
 	if err != nil {
+		if errors.Is(err, git.ErrEmptyCommit) {
+			// Content already matches HEAD — return HEAD hash so the
+			// caller can proceed with push and state update.
+			return c.GetHeadCommit()
+		}
 		return "", fmt.Errorf("failed to create commit: %w", err)
 	}
 
@@ -350,6 +358,7 @@ func (c *GitClient) RemoveFiles(filePaths []string) error {
 }
 
 // CommitStaged creates a commit from the currently staged changes.
+// If no changes are staged (clean tree), it returns the current HEAD hash.
 func (c *GitClient) CommitStaged(message string) (string, error) {
 	if err := c.requireRepo(); err != nil {
 		return "", err
@@ -368,6 +377,9 @@ func (c *GitClient) CommitStaged(message string) (string, error) {
 		},
 	})
 	if err != nil {
+		if errors.Is(err, git.ErrEmptyCommit) {
+			return c.GetHeadCommit()
+		}
 		return "", fmt.Errorf("failed to create commit: %w", err)
 	}
 
