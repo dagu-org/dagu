@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add a built-in documentation layer to Dagu — markdown files stored in `{DAGsDir}/docs/`, browsable and editable in the web UI with WYSIWYG rendering, git-synced alongside DAGs, and accessible to the AI agent as readable/writable context.
+Add a built-in documentation layer to Dagu — markdown files stored in `{DAGsDir}/docs/`, browsable and editable in the web UI with edit/preview rendering, git-synced alongside DAGs, and accessible to the AI agent as readable/writable context.
 
 ---
 
@@ -15,7 +15,7 @@ Add a built-in documentation layer to Dagu — markdown files stored in `{DAGsDi
 | Git sync integration as a new `doc` kind | Access control per document |
 | Agent system prompt awareness of docs directory | Document templates or scaffolding |
 | Full-text content search via `GET /docs/search?q={query}` | Collaborative real-time editing |
-| Tab-based multi-document editor with WYSIWYG and raw modes | Server-side parsing or injection of `[Doc: ...]` content |
+| Tab-based multi-document editor with edit and preview modes | Server-side parsing or injection of `[Doc: ...]` content |
 | Server-side atomic rename via `POST /docs/doc/rename?path={docPath}` | Custom doc-specific reconciliation logic (handled by RFC 026's generic system) |
 | Paginated document listing with `page`/`perPage` query params | |
 | `@`-trigger doc mention in agent chat with fuzzy-search picker | |
@@ -544,8 +544,8 @@ flowchart LR
     Split --> TabEditor[Tab-Based Editor]
     TabEditor --> TabBar[DocTabBar]
     TabEditor --> Editor[Active Tab Editor]
-    Editor --> WYSIWYG[Rich Mode — Milkdown]
-    Editor --> Raw[Raw Mode — Monaco]
+    Editor --> Edit[Edit Mode — Monaco]
+    Editor --> Preview[Preview Mode — react-markdown]
     Tree -->|open in tab| TabBar
     Tree -->|create/rename/delete| API[REST API]
     Editor -->|Ctrl+S save| API
@@ -672,21 +672,20 @@ The `DocTabContext` provides:
 **Header bar** — Compact bar with:
 - `FileText` icon + document title (truncated, from front matter `title` or `docPath`)
 - Unsaved-changes indicator: amber dot (`h-2 w-2 rounded-full bg-amber-500`), visible when content differs from last saved
-- Editor mode toggle: pill-style segmented control with "Rich" and "Raw" buttons, persisted in `localStorage` under key `doc-editor-mode`
+- Editor mode toggle: pill-style segmented control with "Edit" and "Preview" buttons, persisted in `localStorage` under key `doc-editor-mode`
 - Save button (`Save` icon, `h-7`, gated by `canWrite`), disabled when no unsaved changes
 
-**Rich mode** — Milkdown WYSIWYG editor wrapped in a `DocWysiwygEditor` component:
-- GFM plugin for tables, task lists, strikethrough
-- Headings, lists, code blocks, blockquotes, links
-- Front matter `---` block is rendered as-is (raw text block at the top of the document), not hidden or stripped
-- Dark/light theme sync via `MutationObserver` on `document.documentElement.classList` (same pattern as `MarkdownEditor`)
-- Outputs raw markdown — no HTML-only state
-
-**Raw mode** — The existing `MarkdownEditor` (Monaco) component from `components/editors/MarkdownEditor.tsx`:
+**Edit mode** — The existing `MarkdownEditor` (Monaco) component from `components/editors/MarkdownEditor.tsx`:
 - Markdown language, JetBrains Mono font, 13px, no minimap, word wrap on
-- Same dark/light theme sync
+- Dark/light theme sync
+- The `readOnly` prop is controlled by `canWrite`
 
-Both modes read and write the same `content` state string. Switching mode transfers content without loss. The `readOnly` prop is controlled by `canWrite`.
+**Preview mode** — The existing `Markdown` component from `components/ui/markdown.tsx` using `react-markdown` with `remark-gfm`:
+- Read-only rendered view of the document content with GFM support (tables, task lists, strikethrough)
+- Scrollable container matching editor dimensions
+- Dark/light theme sync inherited from the app theme
+
+Both modes share the same `content` state string. Switching mode is instant with no content transformation. Save is only available in Edit mode.
 
 #### Explicit Save
 
@@ -738,7 +737,6 @@ ui/src/pages/docs/
     DocTabEditorPanel.tsx       -- Tab bar + active tab editor container
     DocTabBar.tsx               -- Tab strip (following TabBar.tsx pattern)
     DocEditor.tsx               -- Editor with header, mode toggle, save
-    DocWysiwygEditor.tsx        -- Milkdown WYSIWYG wrapper
     CreateDocModal.tsx          -- New document dialog
     RenameDocModal.tsx          -- Rename document dialog
     DocExternalChangeDialog.tsx -- External change conflict dialog (follows ExternalChangeDialog pattern)
@@ -805,7 +803,7 @@ File-based implementation under `persis/`. The doc store follows the **DAG store
 | Full-text search endpoint | No search / client-side search | Mirrors `GET /dags/search?q=` pattern; reuses `grep.Grep` library; essential for discoverability in large doc trees |
 | Server-side atomic rename | Client-side create + delete | `os.Rename` is atomic on POSIX filesystems; avoids partial failure states; single API call instead of two |
 | Auto-create/delete directories | Explicit directory create/delete endpoints | Reduces API surface; no orphan empty directories; user never needs to manage directory lifecycle separately |
-| Milkdown WYSIWYG with raw (Monaco) toggle | Raw-only editing (Monaco) | Milkdown adds ~150KB gzipped but provides true rich editing for non-technical runbook authors; raw toggle preserves power-user workflow; wrapping in `DocWysiwygEditor` isolates the dependency for future swap |
+| Edit/Preview toggle (Monaco + react-markdown) | WYSIWYG editor (Milkdown, Tiptap, BlockNote) | Reuses two existing components (`MarkdownEditor`, `Markdown`) with zero new dependencies; WYSIWYG adds bundle size and complexity without proportional benefit for developer-oriented documentation; preview mode provides rendered view when needed |
 | Recursive directory scanning for sync | Flat scanning (like souls/skills) | Nested directories require recursive traversal; sync item IDs include the relative path to preserve hierarchy |
 | `[Doc: id \| title]` text tags in message | Dedicated `docContexts` API field | Follows established skill pattern; no API schema changes needed |
 | Metadata only (id + title) in tags | Pre-load doc content into message | Docs can be large; metadata-only lets agent decide what to read |
@@ -814,7 +812,7 @@ File-based implementation under `persis/`. The doc store follows the **DAG store
 | Filesystem scanning (DAG store pattern) | Cached in-memory index (skill/soul pattern) | Docs change via agent, user CLI, and git sync — cached index goes stale between API calls |
 | Docs use RFC 026 generic reconciliation | Custom `reconcileDocState()` | RFC 026 provides `missing` status, auto-forget, duplicate prevention, and explicit operations (`forget`, `delete`, `sync mv`) for all item kinds — doc-specific logic would duplicate existing infrastructure |
 | API rename + reconciliation for git sync renames | Custom doc rename tracking | API provides atomic `os.Rename`; reconciliation auto-detects git-side renames (missing + new untracked); `sync mv` provides explicit atomic remote rename; content-hash duplicate prevention during pull prevents ghost entries |
-| No document size limits | Max document size validation | Responsibility is on the user; avoids arbitrary restrictions; consistent with how DAG files and skill/soul files are handled. Note: documents >500KB may degrade Milkdown (Rich mode) rendering performance; Monaco (Raw mode) handles large files better |
+| No document size limits | Max document size validation | Responsibility is on the user; avoids arbitrary restrictions; consistent with how DAG files and skill/soul files are handled |
 | Renaming breaks `[Doc: id \| title]` references | Track and update cross-references on rename | `[Doc: ...]` tags in agent chat history are immutable message text; updating past messages introduces complexity and data integrity concerns. Known limitation — out of scope for initial implementation |
 
 ---
@@ -866,8 +864,8 @@ A document's ID is derived from its filesystem path, so renaming a file changes 
 - Unsaved-changes indicator (amber dot) shown on tab label and editor header; navigation-away guard via `UnsavedChangesContext`.
 - Tree sidebar renders the nested directory structure from `GET /docs` with expand/collapse and depth indentation.
 - Context menu on tree nodes exposes Rename and Delete for files; New Document and Delete for directories.
-- Rich mode uses Milkdown WYSIWYG editor with GFM support (tables, task lists, strikethrough).
-- Raw mode uses the existing Monaco `MarkdownEditor`; editor mode preference persisted in `localStorage`.
+- Edit mode uses the existing Monaco `MarkdownEditor`; editor mode preference persisted in `localStorage`.
+- Preview mode uses the existing `Markdown` component (`react-markdown` with `remark-gfm`) for rendered view.
 - Create Document and Rename modals use existing `Dialog` components; Delete uses `ConfirmModal`.
 - `POST /docs/doc/rename?path={docPath}` performs atomic server-side rename via `os.Rename`.
 - `GET /docs/search?q={query}` performs full-text content search using the grep library, with 2 lines of context before and after.
