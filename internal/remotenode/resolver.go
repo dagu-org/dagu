@@ -134,6 +134,7 @@ func (r *Resolver) NameExists(ctx context.Context, name string) bool {
 func toConfigNode(n *RemoteNode) config.RemoteNode {
 	cn := config.RemoteNode{
 		Name:              n.Name,
+		Description:       n.Description,
 		APIBaseURL:        n.APIBaseURL,
 		BasicAuthUsername: n.BasicAuthUsername,
 		BasicAuthPassword: n.BasicAuthPassword,
@@ -161,6 +162,7 @@ func fromConfigNode(cn config.RemoteNode) *RemoteNode {
 	}
 	return &RemoteNode{
 		Name:              cn.Name,
+		Description:       cn.Description,
 		APIBaseURL:        cn.APIBaseURL,
 		AuthType:          authType,
 		BasicAuthUsername: cn.BasicAuthUsername,

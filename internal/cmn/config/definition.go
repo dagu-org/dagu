@@ -213,6 +213,7 @@ type PeerDef struct {
 // RemoteNodeDef configures a remote node connection.
 type RemoteNodeDef struct {
 	Name              string `mapstructure:"name"`
+	Description       string `mapstructure:"description"`
 	APIBaseURL        string `mapstructure:"api_base_url"`
 	IsBasicAuth       bool   `mapstructure:"is_basic_auth"`
 	BasicAuthUsername string `mapstructure:"basic_auth_username"`

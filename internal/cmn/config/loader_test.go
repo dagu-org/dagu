@@ -309,6 +309,7 @@ auth:
       - "user@example.com"
 remote_nodes:
   - name: "node1"
+    description: "Primary processing node"
     api_base_url: "http://node1.example.com/api"
     is_basic_auth: true
     basic_auth_username: "nodeuser"
@@ -405,6 +406,7 @@ scheduler:
 			RemoteNodes: []RemoteNode{
 				{
 					Name:              "node1",
+					Description:       "Primary processing node",
 					APIBaseURL:        "http://node1.example.com/api",
 					IsBasicAuth:       true,
 					BasicAuthUsername: "nodeuser",

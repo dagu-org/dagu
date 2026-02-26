@@ -436,6 +436,10 @@
         "sessions_dir": {
           "type": "string",
           "description": "Directory for session data storage."
+        },
+        "remote_nodes_dir": {
+          "type": "string",
+          "description": "Directory for remote node data storage."
         }
       }
     },
@@ -526,6 +530,10 @@
         "name": {
           "type": "string",
           "description": "Display name for the remote node."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description for the remote node."
         },
         "api_base_url": {
           "type": "string",

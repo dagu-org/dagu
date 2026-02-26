@@ -288,6 +288,7 @@ type DAGsConfig struct {
 // RemoteNode represents a remote node configuration.
 type RemoteNode struct {
 	Name              string
+	Description       string
 	APIBaseURL        string
 	IsBasicAuth       bool
 	BasicAuthUsername string
