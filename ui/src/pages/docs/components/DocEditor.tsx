@@ -5,8 +5,9 @@ import { useDocContentWithConflictDetection } from '@/hooks/useDocContentWithCon
 import { useSimpleToast } from '@/components/ui/simple-toast';
 import { useErrorModal } from '@/components/ui/error-modal';
 import MarkdownEditor from '@/components/editors/MarkdownEditor';
+import { DocWysiwygEditor } from './DocWysiwygEditor';
 import { Button } from '@/components/ui/button';
-import { FileText, Save } from 'lucide-react';
+import { FileText, Loader2, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { DocExternalChangeDialog } from './DocExternalChangeDialog';
@@ -110,6 +111,10 @@ export function DocEditor({ docPath }: DocEditorProps) {
     localStorage.setItem('doc-editor-mode', editorMode);
   }, [editorMode]);
 
+  // Track whether initial content has been loaded (via SSE or REST fallback)
+  // so the WYSIWYG editor only mounts once content is available.
+  const contentLoaded = doc != null || fallbackLoaded;
+
   const title = doc?.title || docPath.split('/').pop() || docPath;
 
   return (
@@ -178,15 +183,16 @@ export function DocEditor({ docPath }: DocEditorProps) {
             onChange={canWrite ? (v) => setCurrentValue(v || '') : undefined}
             readOnly={!canWrite}
           />
-        ) : (
-          // Rich mode placeholder - Milkdown can be integrated later
-          <div className="h-full overflow-auto p-4">
-            <MarkdownEditor
-              value={currentValue}
-              onChange={canWrite ? (v) => setCurrentValue(v || '') : undefined}
-              readOnly={!canWrite}
-            />
+        ) : !contentLoaded ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
           </div>
+        ) : (
+          <DocWysiwygEditor
+            value={currentValue}
+            onChange={canWrite ? (v) => setCurrentValue(v) : undefined}
+            readOnly={!canWrite}
+          />
         )}
       </div>
     </div>
