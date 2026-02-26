@@ -576,6 +576,9 @@ func (c *Config) validateLicense() error {
 		if u.Scheme == "" || u.Host == "" {
 			return fmt.Errorf("license cloud URL must include scheme and host (e.g., https://cloud.example.com)")
 		}
+		if u.Scheme != "https" {
+			return fmt.Errorf("license cloud URL must use HTTPS")
+		}
 	}
 	return nil
 }

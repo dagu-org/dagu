@@ -78,6 +78,41 @@ func TestState_Update(t *testing.T) {
 	})
 }
 
+func TestState_ClaimsDeepCopy(t *testing.T) {
+	t.Parallel()
+
+	t.Run("mutating returned claims does not affect state", func(t *testing.T) {
+		t.Parallel()
+		var s State
+		s.Update(validClaims(), "tok")
+
+		got := s.Claims()
+		require.NotNil(t, got)
+		got.Features = append(got.Features, "mutated-feature")
+		got.Plan = "mutated-plan"
+
+		original := s.Claims()
+		require.NotNil(t, original)
+		assert.Equal(t, "pro", original.Plan)
+		assert.NotContains(t, original.Features, "mutated-feature")
+	})
+
+	t.Run("mutating input claims does not affect stored state", func(t *testing.T) {
+		t.Parallel()
+		var s State
+		claims := validClaims()
+		s.Update(claims, "tok")
+
+		claims.Features = append(claims.Features, "injected")
+		claims.Plan = "injected-plan"
+
+		got := s.Claims()
+		require.NotNil(t, got)
+		assert.Equal(t, "pro", got.Plan)
+		assert.NotContains(t, got.Features, "injected")
+	})
+}
+
 func TestState_IsFeatureEnabled(t *testing.T) {
 	t.Parallel()
 

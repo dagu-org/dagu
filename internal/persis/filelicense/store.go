@@ -66,8 +66,31 @@ func (s *Store) Save(ad *license.ActivationData) error {
 	}
 
 	path := filepath.Join(s.dir, activationFile)
-	if err := os.WriteFile(path, data, filePerm); err != nil {
-		return fmt.Errorf("failed to write activation file: %w", err)
+
+	// Atomic write: write to temp file, sync, then rename.
+	tmp, err := os.CreateTemp(s.dir, ".activation-*.tmp")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName) //nolint:errcheck // best-effort cleanup on error
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("failed to write temp file: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("failed to sync temp file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
+	if err := os.Chmod(tmpName, filePerm); err != nil {
+		return fmt.Errorf("failed to set permissions on temp file: %w", err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("failed to rename temp file: %w", err)
 	}
 
 	return nil

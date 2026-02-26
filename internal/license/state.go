@@ -20,7 +20,7 @@ var _ Checker = (*State)(nil)
 func (s *State) Update(claims *LicenseClaims, token string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.claims = claims
+	s.claims = cloneClaims(claims)
 	s.token = token
 }
 
@@ -31,11 +31,24 @@ func (s *State) Token() string {
 	return s.token
 }
 
-// Claims returns the current license claims.
+// Claims returns a deep copy of the current license claims.
 func (s *State) Claims() *LicenseClaims {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.claims
+	return cloneClaims(s.claims)
+}
+
+// cloneClaims returns a deep copy of claims, or nil if claims is nil.
+func cloneClaims(c *LicenseClaims) *LicenseClaims {
+	if c == nil {
+		return nil
+	}
+	cp := *c
+	if c.Features != nil {
+		cp.Features = make([]string, len(c.Features))
+		copy(cp.Features, c.Features)
+	}
+	return &cp
 }
 
 // IsFeatureEnabled returns true if the feature is available.

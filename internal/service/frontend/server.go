@@ -140,10 +140,6 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize audit service: %w", err)
 	}
-	if auditSvc != nil {
-		apiOpts = append(apiOpts, apiv1.WithAuditService(auditSvc))
-	}
-
 	syncSvc := initSyncService(ctx, cfg)
 	if syncSvc != nil {
 		apiOpts = append(apiOpts, apiv1.WithSyncService(syncSvc))
@@ -338,6 +334,11 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 				srv.builtinOIDCCfg = nil
 			}
 		}
+	}
+
+	// Add audit service to API only if licensed (or no license manager)
+	if auditSvc != nil && (srv.licenseManager == nil || srv.licenseManager.Checker().IsFeatureEnabled(license.FeatureAudit)) {
+		apiOpts = append(apiOpts, apiv1.WithAuditService(auditSvc))
 	}
 
 	// Pass license manager to API

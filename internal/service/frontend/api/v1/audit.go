@@ -11,6 +11,11 @@ import (
 // ListAuditLogs returns audit log entries matching the filter criteria.
 // Requires audit license and manager or admin role.
 func (a *API) ListAuditLogs(ctx context.Context, request api.ListAuditLogsRequestObject) (api.ListAuditLogsResponseObject, error) {
+	// Require manager or admin role (auth before license check)
+	if err := a.requireManagerOrAbove(ctx); err != nil {
+		return nil, err
+	}
+
 	if err := a.requireLicensedAudit(); err != nil {
 		return nil, err
 	}
@@ -22,11 +27,6 @@ func (a *API) ListAuditLogs(ctx context.Context, request api.ListAuditLogsReques
 			Message:    "Audit logging is not configured",
 			HTTPStatus: http.StatusServiceUnavailable,
 		}
-	}
-
-	// Require manager or admin role
-	if err := a.requireManagerOrAbove(ctx); err != nil {
-		return nil, err
 	}
 
 	// Build filter from query parameters

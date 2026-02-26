@@ -30,6 +30,9 @@ func GetOrCreateServerID(licenseDir string) (string, error) {
 			}
 			id := strings.TrimSpace(string(data))
 			if id != "" {
+				if _, parseErr := uuid.Parse(id); parseErr != nil {
+					return regenerateServerID(idPath)
+				}
 				return id, nil
 			}
 			// File exists but is empty — regenerate.

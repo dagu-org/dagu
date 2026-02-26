@@ -50,17 +50,32 @@ func TestGetOrCreateServerID(t *testing.T) {
 		assert.Equal(t, known, id)
 	})
 
-	t.Run("trims leading and trailing whitespace from existing file", func(t *testing.T) {
+	t.Run("trims whitespace and returns valid UUID from file", func(t *testing.T) {
 		t.Parallel()
 
 		dir := t.TempDir()
-		raw := " some-id \n"
+		known := "01900000-0000-7000-8000-000000000042"
+		raw := " " + known + " \n"
 		idPath := filepath.Join(dir, "server_id")
 		require.NoError(t, os.WriteFile(idPath, []byte(raw), 0600))
 
 		id, err := GetOrCreateServerID(dir)
 		require.NoError(t, err)
-		assert.Equal(t, "some-id", id)
+		assert.Equal(t, known, id)
+	})
+
+	t.Run("regenerates when server_id file contains non-UUID data", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		idPath := filepath.Join(dir, "server_id")
+		require.NoError(t, os.WriteFile(idPath, []byte("corrupted-not-a-uuid"), 0600))
+
+		id, err := GetOrCreateServerID(dir)
+		require.NoError(t, err)
+		assert.NotEqual(t, "corrupted-not-a-uuid", id)
+		_, parseErr := uuid.Parse(id)
+		assert.NoError(t, parseErr, "regenerated ID should be a valid UUID")
 	})
 
 	t.Run("generates new UUID when server_id file is empty", func(t *testing.T) {

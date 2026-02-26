@@ -40,15 +40,16 @@ func (a *API) ActivateLicense(ctx context.Context, request api.ActivateLicenseRe
 		}
 	}
 
-	var expiry string
+	var expiry *string
 	if !result.Expiry.IsZero() {
-		expiry = result.Expiry.Format("2006-01-02T15:04:05Z")
+		s := result.Expiry.Format("2006-01-02T15:04:05Z")
+		expiry = &s
 	}
 
 	return api.ActivateLicense200JSONResponse{
 		Plan:     &result.Plan,
 		Features: &result.Features,
-		Expiry:   &expiry,
+		Expiry:   expiry,
 	}, nil
 }
 
@@ -67,9 +68,10 @@ func (a *API) DeactivateLicense(ctx context.Context, _ api.DeactivateLicenseRequ
 	}
 
 	if err := a.licenseManager.Deactivate(ctx); err != nil {
+		slog.Warn("License deactivation failed", "error", err)
 		return nil, &Error{
 			Code:       api.ErrorCodeBadRequest,
-			Message:    err.Error(),
+			Message:    "License deactivation failed. Please try again.",
 			HTTPStatus: http.StatusBadRequest,
 		}
 	}

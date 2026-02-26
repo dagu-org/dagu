@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -137,7 +138,17 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 			if cfg.LicenseChecker == nil || cfg.LicenseChecker.IsCommunity() {
 				return "false"
 			}
-			return "true"
+			claims := cfg.LicenseChecker.Claims()
+			if claims == nil {
+				return "false"
+			}
+			if claims.ExpiresAt == nil {
+				return "true" // perpetual
+			}
+			if claims.ExpiresAt.After(time.Now()) || cfg.LicenseChecker.IsGracePeriod() {
+				return "true"
+			}
+			return "false"
 		},
 		"licensePlan": func() string {
 			if cfg.LicenseChecker == nil {

@@ -32,13 +32,13 @@ func (a *API) ListUsers(ctx context.Context, _ api.ListUsersRequestObject) (api.
 
 // CreateUser creates a new user. Requires admin role.
 func (a *API) CreateUser(ctx context.Context, request api.CreateUserRequestObject) (api.CreateUserResponseObject, error) {
-	if err := a.requireLicensedRBAC(); err != nil {
-		return nil, err
-	}
 	if err := a.requireUserManagement(); err != nil {
 		return nil, err
 	}
 	if err := a.requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	if err := a.requireLicensedRBAC(); err != nil {
 		return nil, err
 	}
 
@@ -128,13 +128,13 @@ func (a *API) GetUser(ctx context.Context, request api.GetUserRequestObject) (ap
 
 // UpdateUser updates a user's information. Requires admin role.
 func (a *API) UpdateUser(ctx context.Context, request api.UpdateUserRequestObject) (api.UpdateUserResponseObject, error) {
-	if err := a.requireLicensedRBAC(); err != nil {
-		return nil, err
-	}
 	if err := a.requireUserManagement(); err != nil {
 		return nil, err
 	}
 	if err := a.requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	if err := a.requireLicensedRBAC(); err != nil {
 		return nil, err
 	}
 
@@ -221,13 +221,13 @@ func (a *API) UpdateUser(ctx context.Context, request api.UpdateUserRequestObjec
 
 // DeleteUser deletes a user account. Requires admin role. Cannot delete yourself.
 func (a *API) DeleteUser(ctx context.Context, request api.DeleteUserRequestObject) (api.DeleteUserResponseObject, error) {
-	if err := a.requireLicensedRBAC(); err != nil {
-		return nil, err
-	}
 	if err := a.requireUserManagement(); err != nil {
 		return nil, err
 	}
 	if err := a.requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	if err := a.requireLicensedRBAC(); err != nil {
 		return nil, err
 	}
 

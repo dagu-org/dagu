@@ -21,12 +21,14 @@ export function LicenseBanner() {
   const config = useConfig();
   const { license } = config;
 
-  const [dismissed30d, setDismissed30d] = React.useState(() => {
-    return localStorage.getItem(`license-banner-dismissed-30d-${license.expiry}`) === 'true';
-  });
-  const [dismissed7d, setDismissed7d] = React.useState(() => {
-    return localStorage.getItem(`license-banner-dismissed-7d-${license.expiry}`) === 'true';
-  });
+  const expiryKey = license.expiry ?? 'none';
+  const [dismissed30d, setDismissed30d] = React.useState(false);
+  const [dismissed7d, setDismissed7d] = React.useState(false);
+
+  React.useEffect(() => {
+    setDismissed30d(localStorage.getItem(`license-banner-dismissed-30d-${expiryKey}`) === 'true');
+    setDismissed7d(localStorage.getItem(`license-banner-dismissed-7d-${expiryKey}`) === 'true');
+  }, [expiryKey]);
 
   // Community mode: no banner
   if (license.community) return null;
@@ -90,7 +92,7 @@ export function LicenseBanner() {
         </span>
         <button
           onClick={() => {
-            localStorage.setItem(`license-banner-dismissed-7d-${license.expiry}`, 'true');
+            localStorage.setItem(`license-banner-dismissed-7d-${expiryKey}`, 'true');
             setDismissed7d(true);
           }}
           className="p-0.5 hover:bg-orange-100 dark:hover:bg-orange-900 rounded"
@@ -119,7 +121,7 @@ export function LicenseBanner() {
         </span>
         <button
           onClick={() => {
-            localStorage.setItem(`license-banner-dismissed-30d-${license.expiry}`, 'true');
+            localStorage.setItem(`license-banner-dismissed-30d-${expiryKey}`, 'true');
             setDismissed30d(true);
           }}
           className="p-0.5 hover:bg-yellow-100 dark:hover:bg-yellow-900 rounded"
