@@ -47,6 +47,17 @@ func (a *API) requireDocManagement() error {
 	return nil
 }
 
+func validateDocPath(path string) error {
+	if err := agent.ValidateDocID(path); err != nil {
+		return &Error{
+			Code:       api.ErrorCodeBadRequest,
+			Message:    fmt.Sprintf("invalid doc path: %v", err),
+			HTTPStatus: http.StatusBadRequest,
+		}
+	}
+	return nil
+}
+
 // ListDocs returns documents as tree or flat list.
 func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (api.ListDocsResponseObject, error) {
 	if err := a.requireDocManagement(); err != nil {
@@ -105,12 +116,8 @@ func (a *API) CreateDoc(ctx context.Context, request api.CreateDocRequestObject)
 	}
 
 	id := request.Body.Id
-	if err := agent.ValidateDocID(id); err != nil {
-		return nil, &Error{
-			Code:       api.ErrorCodeBadRequest,
-			Message:    fmt.Sprintf("invalid doc ID: %v", err),
-			HTTPStatus: http.StatusBadRequest,
-		}
+	if err := validateDocPath(id); err != nil {
+		return nil, err
 	}
 
 	if err := a.docStore.Create(ctx, id, request.Body.Content); err != nil {
@@ -134,18 +141,14 @@ func (a *API) GetDoc(ctx context.Context, request api.GetDocRequestObject) (api.
 	if err := a.requireDocManagement(); err != nil {
 		return nil, err
 	}
+	if err := validateDocPath(request.Params.Path); err != nil {
+		return nil, err
+	}
 
 	doc, err := a.docStore.Get(ctx, request.Params.Path)
 	if err != nil {
 		if errors.Is(err, agent.ErrDocNotFound) {
 			return nil, errDocNotFound
-		}
-		if errors.Is(err, agent.ErrInvalidDocID) {
-			return nil, &Error{
-				Code:       api.ErrorCodeBadRequest,
-				Message:    fmt.Sprintf("invalid doc path: %v", err),
-				HTTPStatus: http.StatusBadRequest,
-			}
 		}
 		return nil, internalError(err)
 	}
@@ -209,17 +212,13 @@ func (a *API) UpdateDoc(ctx context.Context, request api.UpdateDocRequestObject)
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
+	if err := validateDocPath(request.Params.Path); err != nil {
+		return nil, err
+	}
 
 	if err := a.docStore.Update(ctx, request.Params.Path, request.Body.Content); err != nil {
 		if errors.Is(err, agent.ErrDocNotFound) {
 			return nil, errDocNotFound
-		}
-		if errors.Is(err, agent.ErrInvalidDocID) {
-			return nil, &Error{
-				Code:       api.ErrorCodeBadRequest,
-				Message:    fmt.Sprintf("invalid doc path: %v", err),
-				HTTPStatus: http.StatusBadRequest,
-			}
 		}
 		logger.Error(ctx, "Failed to update doc", tag.Error(err))
 		return nil, internalError(err)
@@ -241,17 +240,13 @@ func (a *API) DeleteDoc(ctx context.Context, request api.DeleteDocRequestObject)
 	if err := a.requireDAGWrite(ctx); err != nil {
 		return nil, err
 	}
+	if err := validateDocPath(request.Params.Path); err != nil {
+		return nil, err
+	}
 
 	if err := a.docStore.Delete(ctx, request.Params.Path); err != nil {
 		if errors.Is(err, agent.ErrDocNotFound) {
 			return nil, errDocNotFound
-		}
-		if errors.Is(err, agent.ErrInvalidDocID) {
-			return nil, &Error{
-				Code:       api.ErrorCodeBadRequest,
-				Message:    fmt.Sprintf("invalid doc path: %v", err),
-				HTTPStatus: http.StatusBadRequest,
-			}
 		}
 		logger.Error(ctx, "Failed to delete doc", tag.Error(err))
 		return nil, internalError(err)
@@ -275,13 +270,11 @@ func (a *API) RenameDoc(ctx context.Context, request api.RenameDocRequestObject)
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
-
-	if err := agent.ValidateDocID(request.Body.NewPath); err != nil {
-		return nil, &Error{
-			Code:       api.ErrorCodeBadRequest,
-			Message:    fmt.Sprintf("invalid new path: %v", err),
-			HTTPStatus: http.StatusBadRequest,
-		}
+	if err := validateDocPath(request.Params.Path); err != nil {
+		return nil, err
+	}
+	if err := validateDocPath(request.Body.NewPath); err != nil {
+		return nil, err
 	}
 
 	if err := a.docStore.Rename(ctx, request.Params.Path, request.Body.NewPath); err != nil {
@@ -290,13 +283,6 @@ func (a *API) RenameDoc(ctx context.Context, request api.RenameDocRequestObject)
 		}
 		if errors.Is(err, agent.ErrDocAlreadyExists) {
 			return nil, errDocAlreadyExists
-		}
-		if errors.Is(err, agent.ErrInvalidDocID) {
-			return nil, &Error{
-				Code:       api.ErrorCodeBadRequest,
-				Message:    fmt.Sprintf("invalid doc path: %v", err),
-				HTTPStatus: http.StatusBadRequest,
-			}
 		}
 		logger.Error(ctx, "Failed to rename doc", tag.Error(err))
 		return nil, internalError(err)
