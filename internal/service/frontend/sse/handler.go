@@ -93,6 +93,13 @@ func (h *Handler) HandleQueuesListEvents(w http.ResponseWriter, r *http.Request)
 	h.handleSSE(w, r, buildTopic(TopicTypeQueues, sanitizeQueryForTopic(r.URL.RawQuery)))
 }
 
+// HandleDocEvents handles SSE connections for document content.
+// Endpoint: GET /events/docs/*
+func (h *Handler) HandleDocEvents(w http.ResponseWriter, r *http.Request) {
+	docPath := chi.URLParam(r, "*")
+	h.handleSSE(w, r, buildTopic(TopicTypeDoc, docPath))
+}
+
 // HandleDAGsListEvents handles SSE connections for the DAGs list.
 // Endpoint: GET /events/dags
 func (h *Handler) HandleDAGsListEvents(w http.ResponseWriter, r *http.Request) {

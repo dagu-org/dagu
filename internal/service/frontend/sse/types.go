@@ -37,6 +37,7 @@ const (
 	TopicTypeQueueItems TopicType = "queueitems"
 	TopicTypeQueues     TopicType = "queues"
 	TopicTypeDAGsList   TopicType = "dagslist"
+	TopicTypeDoc        TopicType = "doc"
 )
 
 // FetchFunc fetches data for a given identifier. The returned data is JSON

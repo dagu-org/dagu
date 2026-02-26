@@ -47,6 +47,7 @@ import SystemStatus from './pages/system-status';
 import TerminalPage from './pages/terminal';
 import UsersPage from './pages/users';
 import WebhooksPage from './pages/webhooks';
+import DocsPage from './pages/docs';
 
 type Props = {
   config: Config;
@@ -203,6 +204,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                         <Route path="/dags/:fileName/:tab" element={<DAGDetails />} />
                                         <Route path="/dags/:fileName/" element={<DAGDetails />} />
                                         <Route path="/search/" element={<Search />} />
+                                        <Route path="/docs/*" element={<DocsPage />} />
                                         <Route path="/queues" element={<Queues />} />
                                         <Route path="/dag-runs" element={<DAGRuns />} />
                                         <Route path="/dag-runs/:name/:dagRunId" element={<DAGRunDetails />} />
