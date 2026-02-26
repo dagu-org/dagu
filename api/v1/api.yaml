@@ -3597,6 +3597,246 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /sync/items/{itemId}/forget:
+    post:
+      summary: "Forget a sync item"
+      description: "Removes the state entry for a missing, untracked, or conflict sync item. Synced and modified items are rejected."
+      operationId: "forgetSyncItem"
+      tags:
+        - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: itemId
+          in: path
+          description: "The sync item identifier (file path without extension)"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Item forgotten successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: "Item cannot be forgotten"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Item not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /sync/items/{itemId}/delete:
+    post:
+      summary: "Delete a sync item"
+      description: "Removes an item from remote repository (git rm + commit + push), local disk, and sync state"
+      operationId: "deleteSyncItem"
+      tags:
+        - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: itemId
+          in: path
+          description: "The sync item identifier (file path without extension)"
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: "Commit message for the deletion"
+                force:
+                  type: boolean
+                  description: "Force delete even if item has local modifications"
+      responses:
+        "200":
+          description: "Item deleted successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: "Item cannot be deleted"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Item not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /sync/items/{itemId}/move:
+    post:
+      summary: "Move a sync item"
+      description: "Atomically renames an item across local filesystem, remote repository, and sync state"
+      operationId: "moveSyncItem"
+      tags:
+        - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: itemId
+          in: path
+          description: "The current sync item identifier (file path without extension)"
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newItemId:
+                  type: string
+                  description: "The new item identifier to rename to"
+                message:
+                  type: string
+                  description: "Commit message for the move"
+                force:
+                  type: boolean
+                  description: "Force move even if item has conflicts"
+              required:
+                - newItemId
+      responses:
+        "200":
+          description: "Item moved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: "Item cannot be moved"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Item not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /sync/delete-missing:
+    post:
+      summary: "Delete all missing sync items"
+      description: "Removes all missing items from remote repository, local disk, and sync state"
+      operationId: "syncDeleteMissing"
+      tags:
+        - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: "Commit message for the deletion"
+      responses:
+        "200":
+          description: "Missing items deleted successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: array
+                    items:
+                      type: string
+                    description: "List of deleted item IDs"
+                  message:
+                    type: string
+                    description: "Summary message"
+                required:
+                  - deleted
+                  - message
+        "400":
+          description: "Cannot delete"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /sync/cleanup:
+    post:
+      summary: "Cleanup missing sync items"
+      description: "Removes all missing entries from sync state"
+      operationId: "syncCleanup"
+      tags:
+        - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Cleanup completed successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  forgotten:
+                    type: array
+                    items:
+                      type: string
+                    description: "List of forgotten item IDs"
+                  message:
+                    type: string
+                    description: "Summary message"
+                required:
+                  - forgotten
+                  - message
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /settings/base-config:
     get:
       summary: "Get base configuration"
@@ -7334,6 +7574,7 @@ components:
         - modified
         - untracked
         - conflict
+        - missing
 
     SyncSummary:
       type: string
@@ -7342,6 +7583,7 @@ components:
         - synced
         - pending
         - conflict
+        - missing
         - error
 
     SyncItemKind:
@@ -7400,6 +7642,13 @@ components:
           type: string
           format: date-time
           description: "When the conflict was detected"
+        previousStatus:
+          type: string
+          description: "Status before transitioning to missing"
+        missingAt:
+          type: string
+          format: date-time
+          description: "When the file was first detected as missing"
       required:
         - itemId
         - filePath
@@ -7419,11 +7668,14 @@ components:
           type: integer
         conflict:
           type: integer
+        missing:
+          type: integer
       required:
         - synced
         - modified
         - untracked
         - conflict
+        - missing
 
     SyncStatusResponse:
       type: object

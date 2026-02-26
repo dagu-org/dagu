@@ -33,6 +33,18 @@ func (m *mockSyncService) PublishAll(ctx context.Context, message string, itemID
 
 func (m *mockSyncService) Discard(_ context.Context, _ string) error { return nil }
 
+func (m *mockSyncService) Forget(_ context.Context, _ []string) ([]string, error) { return nil, nil }
+
+func (m *mockSyncService) Cleanup(_ context.Context) ([]string, error) { return nil, nil }
+
+func (m *mockSyncService) Delete(_ context.Context, _ string, _ string, _ bool) error { return nil }
+
+func (m *mockSyncService) DeleteAllMissing(_ context.Context, _ string) ([]string, error) {
+	return nil, nil
+}
+
+func (m *mockSyncService) Move(_ context.Context, _, _, _ string, _ bool) error { return nil }
+
 func (m *mockSyncService) GetStatus(ctx context.Context) (*gitsync.OverallStatus, error) {
 	if m.getStatusFn != nil {
 		return m.getStatusFn(ctx)

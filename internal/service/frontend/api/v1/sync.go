@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 
@@ -17,6 +18,11 @@ type SyncService interface {
 	Publish(ctx context.Context, dagID, message string, force bool) (*gitsync.SyncResult, error)
 	PublishAll(ctx context.Context, message string, dagIDs []string) (*gitsync.SyncResult, error)
 	Discard(ctx context.Context, dagID string) error
+	Forget(ctx context.Context, itemIDs []string) ([]string, error)
+	Cleanup(ctx context.Context) ([]string, error)
+	Delete(ctx context.Context, itemID, message string, force bool) error
+	DeleteAllMissing(ctx context.Context, message string) ([]string, error)
+	Move(ctx context.Context, oldID, newID, message string, force bool) error
 	GetStatus(ctx context.Context) (*gitsync.OverallStatus, error)
 	GetDAGStatus(ctx context.Context, dagID string) (*gitsync.DAGState, error)
 	GetDAGDiff(ctx context.Context, dagID string) (*gitsync.DAGDiff, error)
@@ -85,6 +91,7 @@ func disabledSyncStatusResponse() api.GetSyncStatus200JSONResponse {
 			Modified:  0,
 			Untracked: 0,
 			Conflict:  0,
+			Missing:   0,
 		},
 	}
 }
@@ -346,6 +353,228 @@ func (a *API) DiscardSyncItemChanges(ctx context.Context, req api.DiscardSyncIte
 	}, nil
 }
 
+// ForgetSyncItem removes a sync item's state entry.
+func (a *API) ForgetSyncItem(ctx context.Context, req api.ForgetSyncItemRequestObject) (api.ForgetSyncItemResponseObject, error) {
+	if err := a.requireSyncService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireDAGWrite(ctx); err != nil {
+		return nil, err
+	}
+
+	forgotten, err := a.syncService.Forget(ctx, []string{req.ItemId})
+	if err != nil {
+		if gitsync.IsDAGNotFound(err) {
+			return api.ForgetSyncItem404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: err.Error(),
+			}, nil
+		}
+		if errors.Is(err, gitsync.ErrCannotForget) {
+			return api.ForgetSyncItem400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: err.Error(),
+			}, nil
+		}
+		return nil, internalError(err)
+	}
+
+	a.logAudit(ctx, audit.CategoryGitSync, "sync_forget", map[string]any{
+		"item_id":   req.ItemId,
+		"forgotten": forgotten,
+	})
+
+	return api.ForgetSyncItem200JSONResponse{
+		Message: fmt.Sprintf("Forgotten item: %s", req.ItemId),
+	}, nil
+}
+
+// SyncCleanup removes all missing entries from sync state.
+func (a *API) SyncCleanup(ctx context.Context, _ api.SyncCleanupRequestObject) (api.SyncCleanupResponseObject, error) {
+	if err := a.requireSyncService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireDAGWrite(ctx); err != nil {
+		return nil, err
+	}
+
+	forgotten, err := a.syncService.Cleanup(ctx)
+	if err != nil {
+		return nil, internalError(err)
+	}
+
+	a.logAudit(ctx, audit.CategoryGitSync, "sync_cleanup", map[string]any{
+		"forgotten": forgotten,
+	})
+
+	message := fmt.Sprintf("Cleaned up %d missing item(s)", len(forgotten))
+	return api.SyncCleanup200JSONResponse{
+		Forgotten: forgotten,
+		Message:   message,
+	}, nil
+}
+
+// DeleteSyncItem deletes a sync item from remote, local, and state.
+func (a *API) DeleteSyncItem(ctx context.Context, req api.DeleteSyncItemRequestObject) (api.DeleteSyncItemResponseObject, error) {
+	if err := a.requireSyncService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireDAGWrite(ctx); err != nil {
+		return nil, err
+	}
+
+	var message string
+	var force bool
+	if req.Body != nil {
+		if req.Body.Message != nil {
+			message = *req.Body.Message
+		}
+		if req.Body.Force != nil {
+			force = *req.Body.Force
+		}
+	}
+
+	if err := a.syncService.Delete(ctx, req.ItemId, message, force); err != nil {
+		if gitsync.IsDAGNotFound(err) {
+			return api.DeleteSyncItem404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: err.Error(),
+			}, nil
+		}
+		if errors.Is(err, gitsync.ErrCannotDeleteUntracked) || errors.Is(err, gitsync.ErrPushDisabled) {
+			return api.DeleteSyncItem400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: err.Error(),
+			}, nil
+		}
+		var validationErr *gitsync.ValidationError
+		if errors.As(err, &validationErr) {
+			return api.DeleteSyncItem400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: err.Error(),
+			}, nil
+		}
+		return nil, internalError(err)
+	}
+
+	a.logAudit(ctx, audit.CategoryGitSync, "sync_delete", map[string]any{
+		"item_id": req.ItemId,
+		"force":   force,
+	})
+
+	return api.DeleteSyncItem200JSONResponse{
+		Message: fmt.Sprintf("Deleted item: %s", req.ItemId),
+	}, nil
+}
+
+// SyncDeleteMissing deletes all missing items from remote, local, and state.
+func (a *API) SyncDeleteMissing(ctx context.Context, req api.SyncDeleteMissingRequestObject) (api.SyncDeleteMissingResponseObject, error) {
+	if err := a.requireSyncService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireDAGWrite(ctx); err != nil {
+		return nil, err
+	}
+
+	var message string
+	if req.Body != nil && req.Body.Message != nil {
+		message = *req.Body.Message
+	}
+
+	deleted, err := a.syncService.DeleteAllMissing(ctx, message)
+	if err != nil {
+		if errors.Is(err, gitsync.ErrPushDisabled) {
+			return nil, &Error{
+				Code:       api.ErrorCodeBadRequest,
+				Message:    err.Error(),
+				HTTPStatus: http.StatusBadRequest,
+			}
+		}
+		return nil, internalError(err)
+	}
+
+	a.logAudit(ctx, audit.CategoryGitSync, "sync_delete_missing", map[string]any{
+		"deleted": deleted,
+	})
+
+	if deleted == nil {
+		deleted = []string{}
+	}
+
+	return api.SyncDeleteMissing200JSONResponse{
+		Deleted: deleted,
+		Message: fmt.Sprintf("Deleted %d missing item(s)", len(deleted)),
+	}, nil
+}
+
+// MoveSyncItem atomically renames an item across local, remote, and state.
+func (a *API) MoveSyncItem(ctx context.Context, req api.MoveSyncItemRequestObject) (api.MoveSyncItemResponseObject, error) {
+	if err := a.requireSyncService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireDAGWrite(ctx); err != nil {
+		return nil, err
+	}
+	if req.Body == nil {
+		return nil, ErrInvalidRequestBody
+	}
+
+	var message string
+	var force bool
+	if req.Body.Message != nil {
+		message = *req.Body.Message
+	}
+	if req.Body.Force != nil {
+		force = *req.Body.Force
+	}
+
+	if err := a.syncService.Move(ctx, req.ItemId, req.Body.NewItemId, message, force); err != nil {
+		if gitsync.IsDAGNotFound(err) {
+			return api.MoveSyncItem404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: err.Error(),
+			}, nil
+		}
+		if errors.Is(err, gitsync.ErrPushDisabled) {
+			return api.MoveSyncItem400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: err.Error(),
+			}, nil
+		}
+		var validationErr *gitsync.ValidationError
+		if errors.As(err, &validationErr) {
+			return api.MoveSyncItem400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: err.Error(),
+			}, nil
+		}
+		var conflictErr *gitsync.ConflictError
+		if errors.As(err, &conflictErr) {
+			return api.MoveSyncItem400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: err.Error(),
+			}, nil
+		}
+		if gitsync.IsInvalidDAGID(err) {
+			return api.MoveSyncItem400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: err.Error(),
+			}, nil
+		}
+		return nil, internalError(err)
+	}
+
+	a.logAudit(ctx, audit.CategoryGitSync, "sync_move", map[string]any{
+		"old_item_id": req.ItemId,
+		"new_item_id": req.Body.NewItemId,
+		"force":       force,
+	})
+
+	return api.MoveSyncItem200JSONResponse{
+		Message: fmt.Sprintf("Moved %s to %s", req.ItemId, req.Body.NewItemId),
+	}, nil
+}
+
 // Helper functions for type conversion
 
 func toAPISyncSummary(s gitsync.SummaryStatus) api.SyncSummary {
@@ -356,6 +585,8 @@ func toAPISyncSummary(s gitsync.SummaryStatus) api.SyncSummary {
 		return api.SyncSummaryPending
 	case gitsync.SummaryConflict:
 		return api.SyncSummaryConflict
+	case gitsync.SummaryMissing:
+		return api.SyncSummaryMissing
 	case gitsync.SummaryError:
 		return api.SyncSummaryError
 	default:
@@ -373,6 +604,8 @@ func toAPISyncStatus(s gitsync.SyncStatus) api.SyncStatus {
 		return api.SyncStatusUntracked
 	case gitsync.StatusConflict:
 		return api.SyncStatusConflict
+	case gitsync.StatusMissing:
+		return api.SyncStatusMissing
 	default:
 		return api.SyncStatusSynced
 	}
@@ -422,7 +655,7 @@ func toAPISyncItems(states map[string]*gitsync.DAGState) []api.SyncItem {
 			continue
 		}
 		filePath := syncItemFilePath(itemID, state.Kind)
-		result = append(result, api.SyncItem{
+		item := api.SyncItem{
 			ItemId:             itemID,
 			FilePath:           filePath,
 			DisplayName:        filePath,
@@ -437,7 +670,12 @@ func toAPISyncItems(states map[string]*gitsync.DAGState) []api.SyncItem {
 			RemoteAuthor:       ptrOf(state.RemoteAuthor),
 			RemoteMessage:      ptrOf(state.RemoteMessage),
 			ConflictDetectedAt: state.ConflictDetectedAt,
-		})
+			MissingAt:          state.MissingAt,
+		}
+		if state.PreviousStatus != "" {
+			item.PreviousStatus = ptrOf(state.PreviousStatus)
+		}
+		result = append(result, item)
 	}
 
 	sort.Slice(result, func(i, j int) bool {
@@ -453,6 +691,7 @@ func toAPISyncCounts(counts gitsync.StatusCounts) api.SyncStatusCounts {
 		Modified:  counts.Modified,
 		Untracked: counts.Untracked,
 		Conflict:  counts.Conflict,
+		Missing:   counts.Missing,
 	}
 }
 

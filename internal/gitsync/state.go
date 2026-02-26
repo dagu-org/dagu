@@ -27,6 +27,9 @@ const (
 
 	// StatusConflict indicates a conflict between local and remote versions.
 	StatusConflict SyncStatus = "conflict"
+
+	// StatusMissing indicates a previously tracked file is no longer on disk.
+	StatusMissing SyncStatus = "missing"
 )
 
 const (
@@ -142,6 +145,18 @@ type DAGState struct {
 
 	// ConflictDetectedAt is when the conflict was detected.
 	ConflictDetectedAt *time.Time `json:"conflictDetectedAt,omitempty"`
+
+	// PreviousStatus is the status before transitioning to missing.
+	PreviousStatus string `json:"previousStatus,omitempty"`
+
+	// MissingAt is when the file was first detected as missing.
+	MissingAt *time.Time `json:"missingAt,omitempty"`
+
+	// LastStatModTime is the file modification time used for stat-before-hash optimization.
+	LastStatModTime *time.Time `json:"lastStatModTime,omitempty"`
+
+	// LastStatSize is the file size used for stat-before-hash optimization.
+	LastStatSize *int64 `json:"lastStatSize,omitempty"`
 }
 
 // StateManager manages the sync state persistence.

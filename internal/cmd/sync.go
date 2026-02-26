@@ -34,6 +34,10 @@ Available Commands:
 	cmd.AddCommand(syncPull())
 	cmd.AddCommand(syncPublish())
 	cmd.AddCommand(syncDiscard())
+	cmd.AddCommand(syncForget())
+	cmd.AddCommand(syncCleanup())
+	cmd.AddCommand(syncDelete())
+	cmd.AddCommand(syncMove())
 
 	return cmd
 }
@@ -99,9 +103,10 @@ func runSyncStatus(ctx *Context, _ []string) error {
 	fmt.Printf("  Modified:  %d\n", status.Counts.Modified)
 	fmt.Printf("  Untracked: %d\n", status.Counts.Untracked)
 	fmt.Printf("  Conflict:  %d\n", status.Counts.Conflict)
+	fmt.Printf("  Missing:   %d\n", status.Counts.Missing)
 
 	// Print per-DAG status if there are any non-synced DAGs
-	if status.Counts.Modified > 0 || status.Counts.Untracked > 0 || status.Counts.Conflict > 0 {
+	if status.Counts.Modified > 0 || status.Counts.Untracked > 0 || status.Counts.Conflict > 0 || status.Counts.Missing > 0 {
 		fmt.Printf("\nDAGs with pending changes:\n")
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		_, _ = fmt.Fprintln(w, "  NAME\tSTATUS\tMODIFIED AT")
@@ -339,6 +344,345 @@ func runSyncDiscard(ctx *Context, args []string) error {
 	}
 
 	fmt.Println("Changes discarded successfully")
+	return nil
+}
+
+// syncForget removes state entries for missing/untracked/conflict items.
+func syncForget() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "forget <item-id> [item-id...]",
+		Short: "Forget sync items",
+		Long: `Remove state entries for missing, untracked, or conflict sync items.
+
+This command removes items from the sync state without deleting them from the
+remote repository. Only missing, untracked, and conflict items can be forgotten.
+
+Example:
+  dagu sync forget my_dag
+  dagu sync forget my_dag other_dag --yes`,
+		Args: cobra.MinimumNArgs(1),
+	}
+
+	cmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
+
+	return NewCommand(cmd, nil, runSyncForget)
+}
+
+func runSyncForget(ctx *Context, args []string) error {
+	syncSvc, err := newSyncService(ctx)
+	if err != nil {
+		return err
+	}
+
+	skipConfirm, _ := ctx.Command.Flags().GetBool("yes")
+
+	fmt.Printf("Forgetting %d item(s): %s\n", len(args), strings.Join(args, ", "))
+
+	if !skipConfirm {
+		fmt.Print("Are you sure? [y/N]: ")
+		reader := bufio.NewReader(os.Stdin)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("failed to read input: %w", err)
+		}
+		input = strings.TrimSpace(strings.ToLower(input))
+		if input != "y" && input != "yes" {
+			fmt.Println("Aborted")
+			return nil
+		}
+	}
+
+	forgotten, err := syncSvc.Forget(ctx, args)
+	if err != nil {
+		return fmt.Errorf("failed to forget: %w", err)
+	}
+
+	fmt.Printf("Forgotten %d item(s)\n", len(forgotten))
+	return nil
+}
+
+// syncCleanup removes all missing entries from state.
+func syncCleanup() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "cleanup",
+		Short: "Cleanup missing sync items",
+		Long: `Remove all missing entries from the sync state.
+
+This command removes all items with "missing" status from the sync state.
+These are items that were previously tracked but whose files have been deleted.
+
+Example:
+  dagu sync cleanup
+  dagu sync cleanup --yes
+  dagu sync cleanup --dry-run`,
+		Args: cobra.NoArgs,
+	}
+
+	cmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
+	cmd.Flags().Bool("dry-run", false, "Show what would be cleaned up without making changes")
+
+	return NewCommand(cmd, nil, runSyncCleanup)
+}
+
+func runSyncCleanup(ctx *Context, _ []string) error {
+	syncSvc, err := newSyncService(ctx)
+	if err != nil {
+		return err
+	}
+
+	dryRun, _ := ctx.Command.Flags().GetBool("dry-run")
+	skipConfirm, _ := ctx.Command.Flags().GetBool("yes")
+
+	if dryRun {
+		// Get status to show what would be cleaned up
+		status, err := syncSvc.GetStatus(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get sync status: %w", err)
+		}
+
+		var missing []string
+		for id, dagState := range status.DAGs {
+			if dagState.Status == gitsync.StatusMissing {
+				missing = append(missing, id)
+			}
+		}
+		slices.Sort(missing)
+
+		if len(missing) == 0 {
+			fmt.Println("No missing items to clean up")
+			return nil
+		}
+
+		fmt.Printf("Would clean up %d missing item(s):\n", len(missing))
+		for _, id := range missing {
+			fmt.Printf("  - %s\n", id)
+		}
+		return nil
+	}
+
+	if !skipConfirm {
+		fmt.Println("This will remove all missing items from sync state.")
+		fmt.Print("Are you sure? [y/N]: ")
+		reader := bufio.NewReader(os.Stdin)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("failed to read input: %w", err)
+		}
+		input = strings.TrimSpace(strings.ToLower(input))
+		if input != "y" && input != "yes" {
+			fmt.Println("Aborted")
+			return nil
+		}
+	}
+
+	forgotten, err := syncSvc.Cleanup(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup: %w", err)
+	}
+
+	if len(forgotten) == 0 {
+		fmt.Println("No missing items to clean up")
+	} else {
+		fmt.Printf("Cleaned up %d missing item(s)\n", len(forgotten))
+		for _, id := range forgotten {
+			fmt.Printf("  - %s\n", id)
+		}
+	}
+	return nil
+}
+
+// syncDelete deletes items from remote, local disk, and state.
+func syncDelete() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete <item-id>",
+		Short: "Delete a sync item from remote",
+		Long: `Delete a sync item from the remote repository, local disk, and sync state.
+
+This command performs a git rm + commit + push to remove the item from remote.
+Untracked items cannot be deleted (use 'forget' instead).
+Modified items require --force.
+
+Use --all-missing to delete all missing items at once.
+
+Examples:
+  dagu sync delete my_dag -m "Remove old workflow"
+  dagu sync delete my_dag --force -y
+  dagu sync delete --all-missing -m "Clean up deleted items"
+  dagu sync delete --all-missing --dry-run`,
+		Args: cobra.MaximumNArgs(1),
+	}
+
+	cmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
+	cmd.Flags().StringP("message", "m", "", "Commit message")
+	cmd.Flags().Bool("force", false, "Force delete even with local modifications")
+	cmd.Flags().Bool("all-missing", false, "Delete all missing items")
+	cmd.Flags().Bool("dry-run", false, "Show what would be deleted without making changes")
+
+	return NewCommand(cmd, nil, runSyncDelete)
+}
+
+func runSyncDelete(ctx *Context, args []string) error {
+	syncSvc, err := newSyncService(ctx)
+	if err != nil {
+		return err
+	}
+
+	allMissing, _ := ctx.Command.Flags().GetBool("all-missing")
+	dryRun, _ := ctx.Command.Flags().GetBool("dry-run")
+	message, _ := ctx.Command.Flags().GetString("message")
+	force, _ := ctx.Command.Flags().GetBool("force")
+	skipConfirm, _ := ctx.Command.Flags().GetBool("yes")
+
+	if allMissing {
+		if len(args) > 0 {
+			return fmt.Errorf("cannot specify both an item ID and --all-missing")
+		}
+
+		if dryRun {
+			status, err := syncSvc.GetStatus(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get sync status: %w", err)
+			}
+			var missing []string
+			for id, dagState := range status.DAGs {
+				if dagState.Status == gitsync.StatusMissing {
+					missing = append(missing, id)
+				}
+			}
+			slices.Sort(missing)
+			if len(missing) == 0 {
+				fmt.Println("No missing items to delete")
+				return nil
+			}
+			fmt.Printf("Would delete %d missing item(s) from remote:\n", len(missing))
+			for _, id := range missing {
+				fmt.Printf("  - %s\n", id)
+			}
+			return nil
+		}
+
+		if !skipConfirm {
+			fmt.Println("This will delete all missing items from the remote repository.")
+			fmt.Print("Are you sure? [y/N]: ")
+			reader := bufio.NewReader(os.Stdin)
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("failed to read input: %w", err)
+			}
+			input = strings.TrimSpace(strings.ToLower(input))
+			if input != "y" && input != "yes" {
+				fmt.Println("Aborted")
+				return nil
+			}
+		}
+
+		deleted, err := syncSvc.DeleteAllMissing(ctx, message)
+		if err != nil {
+			return fmt.Errorf("failed to delete missing items: %w", err)
+		}
+		if len(deleted) == 0 {
+			fmt.Println("No missing items to delete")
+		} else {
+			fmt.Printf("Deleted %d missing item(s) from remote\n", len(deleted))
+			for _, id := range deleted {
+				fmt.Printf("  - %s\n", id)
+			}
+		}
+		return nil
+	}
+
+	if len(args) == 0 {
+		return fmt.Errorf("provide an item ID or use --all-missing")
+	}
+
+	itemID := args[0]
+	fmt.Printf("Deleting item: %s\n", itemID)
+	fmt.Println("WARNING: This will delete the item from the remote repository!")
+
+	if !skipConfirm {
+		fmt.Print("Are you sure? [y/N]: ")
+		reader := bufio.NewReader(os.Stdin)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("failed to read input: %w", err)
+		}
+		input = strings.TrimSpace(strings.ToLower(input))
+		if input != "y" && input != "yes" {
+			fmt.Println("Aborted")
+			return nil
+		}
+	}
+
+	if err := syncSvc.Delete(ctx, itemID, message, force); err != nil {
+		return fmt.Errorf("failed to delete: %w", err)
+	}
+
+	fmt.Println("Item deleted successfully")
+	return nil
+}
+
+// syncMove atomically renames an item across local, remote, and state.
+func syncMove() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "mv <old-id> <new-id>",
+		Short: "Move/rename a sync item",
+		Long: `Atomically rename a sync item across local filesystem, remote repository, and sync state.
+
+Both source and destination must be of the same kind (DAG, memory, skill, soul).
+
+Supports two modes:
+  - Preemptive: source file exists on disk → reads it, writes to new location,
+    stages removal+addition in repo, commits and pushes.
+  - Retroactive: source is missing but new file already exists at destination →
+    reads new file, stages old removal + new addition, commits and pushes.
+
+Examples:
+  dagu sync mv old_dag new_dag -m "Rename workflow"
+  dagu sync mv old_dag new_dag --force -y
+  dagu sync mv memory/OLD memory/NEW`,
+		Args: cobra.ExactArgs(2),
+	}
+
+	cmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
+	cmd.Flags().StringP("message", "m", "", "Commit message")
+	cmd.Flags().Bool("force", false, "Force move even with conflicts")
+
+	return NewCommand(cmd, nil, runSyncMove)
+}
+
+func runSyncMove(ctx *Context, args []string) error {
+	syncSvc, err := newSyncService(ctx)
+	if err != nil {
+		return err
+	}
+
+	oldID := args[0]
+	newID := args[1]
+	message, _ := ctx.Command.Flags().GetString("message")
+	force, _ := ctx.Command.Flags().GetBool("force")
+	skipConfirm, _ := ctx.Command.Flags().GetBool("yes")
+
+	fmt.Printf("Moving %s → %s\n", oldID, newID)
+
+	if !skipConfirm {
+		fmt.Print("Are you sure? [y/N]: ")
+		reader := bufio.NewReader(os.Stdin)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("failed to read input: %w", err)
+		}
+		input = strings.TrimSpace(strings.ToLower(input))
+		if input != "y" && input != "yes" {
+			fmt.Println("Aborted")
+			return nil
+		}
+	}
+
+	if err := syncSvc.Move(ctx, oldID, newID, message, force); err != nil {
+		return fmt.Errorf("failed to move: %w", err)
+	}
+
+	fmt.Println("Item moved successfully")
 	return nil
 }
 
