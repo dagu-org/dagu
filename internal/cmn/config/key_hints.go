@@ -95,10 +95,9 @@ var legacyToSnakeCaseKey = map[string]string{
 
 	// Remote nodes (array items use lowercased camelCase too)
 	"remotenodes.apibaseurl":        "remote_nodes.api_base_url",
-	"remotenodes.isbasicauth":       "remote_nodes.is_basic_auth",
+	"remotenodes.authmode":          "remote_nodes.auth_mode",
 	"remotenodes.basicauthusername": "remote_nodes.basic_auth_username",
 	"remotenodes.basicauthpassword": "remote_nodes.basic_auth_password",
-	"remotenodes.isauthtoken":       "remote_nodes.is_auth_token",
 	"remotenodes.authtoken":         "remote_nodes.auth_token",
 	"remotenodes.skiptlsverify":     "remote_nodes.skip_tls_verify",
 

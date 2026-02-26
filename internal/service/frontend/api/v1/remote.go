@@ -205,9 +205,10 @@ func (h *remoteNodeProxy) doRequest(body any, r *http.Request, node config.Remot
 
 	// Copy headers from the original request if needed
 	// But we need to override authorization headers
-	if node.IsBasicAuth {
+	switch node.AuthMode {
+	case "basic":
 		req.SetBasicAuth(node.BasicAuthUsername, node.BasicAuthPassword)
-	} else if node.IsAuthToken {
+	case "token":
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", node.AuthToken))
 	}
 	for k, v := range r.Header {

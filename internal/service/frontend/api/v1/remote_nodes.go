@@ -76,12 +76,12 @@ func (a *API) CreateRemoteNode(ctx context.Context, request api.CreateRemoteNode
 		}
 	}
 
-	authType := remotenode.AuthTypeNone
-	if body.AuthType != nil {
-		authType = remotenode.AuthType(*body.AuthType)
+	authMode := remotenode.AuthModeNone
+	if body.AuthMode != nil {
+		authMode = remotenode.AuthMode(*body.AuthMode)
 	}
 
-	node := remotenode.NewRemoteNode(body.Name, valueOf(body.Description), body.ApiBaseUrl, authType)
+	node := remotenode.NewRemoteNode(body.Name, valueOf(body.Description), body.ApiBaseUrl, authMode)
 	node.BasicAuthUsername = valueOf(body.BasicAuthUsername)
 	node.BasicAuthPassword = valueOf(body.BasicAuthPassword)
 	node.AuthToken = valueOf(body.AuthToken)
@@ -167,8 +167,8 @@ func (a *API) UpdateRemoteNode(ctx context.Context, request api.UpdateRemoteNode
 	if body.ApiBaseUrl != nil && *body.ApiBaseUrl != "" {
 		existing.APIBaseURL = *body.ApiBaseUrl
 	}
-	if body.AuthType != nil {
-		existing.AuthType = remotenode.AuthType(*body.AuthType)
+	if body.AuthMode != nil {
+		existing.AuthMode = remotenode.AuthMode(*body.AuthMode)
 	}
 	if body.BasicAuthUsername != nil {
 		existing.BasicAuthUsername = *body.BasicAuthUsername
@@ -304,12 +304,12 @@ func testNodeConnection(node *remotenode.RemoteNode) api.TestRemoteNodeConnectio
 	}
 
 	// Apply auth
-	switch node.AuthType {
-	case remotenode.AuthTypeBasic:
+	switch node.AuthMode {
+	case remotenode.AuthModeBasic:
 		req.SetBasicAuth(node.BasicAuthUsername, node.BasicAuthPassword)
-	case remotenode.AuthTypeToken:
+	case remotenode.AuthModeToken:
 		req.Header.Set("Authorization", "Bearer "+node.AuthToken)
-	case remotenode.AuthTypeNone:
+	case remotenode.AuthModeNone:
 		// No auth needed
 	}
 
@@ -358,7 +358,7 @@ func toRemoteNodeResponseFromNode(n *remotenode.RemoteNode, source remotenode.So
 		Name:           n.Name,
 		Description:    ptrOf(n.Description),
 		ApiBaseUrl:     n.APIBaseURL,
-		AuthType:       api.RemoteNodeResponseAuthType(n.AuthType),
+		AuthMode:       api.RemoteNodeResponseAuthMode(n.AuthMode),
 		HasCredentials: ptrOf(hasCreds),
 		SkipTlsVerify:  ptrOf(n.SkipTLSVerify),
 		Source:         api.RemoteNodeResponseSource(source),

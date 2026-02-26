@@ -6,13 +6,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// AuthType represents the authentication method for a remote node.
-type AuthType string
+// AuthMode represents the authentication method for a remote node.
+type AuthMode string
 
 const (
-	AuthTypeNone  AuthType = "none"
-	AuthTypeBasic AuthType = "basic"
-	AuthTypeToken AuthType = "token"
+	AuthModeNone  AuthMode = "none"
+	AuthModeBasic AuthMode = "basic"
+	AuthModeToken AuthMode = "token"
 )
 
 // RemoteNode is the domain model for a managed remote node.
@@ -21,7 +21,7 @@ type RemoteNode struct {
 	Name              string
 	Description       string
 	APIBaseURL        string
-	AuthType          AuthType
+	AuthMode          AuthMode
 	BasicAuthUsername string
 	BasicAuthPassword string // plaintext in memory, encrypted at rest
 	AuthToken         string // plaintext in memory, encrypted at rest
@@ -31,14 +31,14 @@ type RemoteNode struct {
 }
 
 // NewRemoteNode creates a RemoteNode with a new UUID and current timestamps.
-func NewRemoteNode(name, description, apiBaseURL string, authType AuthType) *RemoteNode {
+func NewRemoteNode(name, description, apiBaseURL string, authMode AuthMode) *RemoteNode {
 	now := time.Now().UTC()
 	return &RemoteNode{
 		ID:          uuid.New().String(),
 		Name:        name,
 		Description: description,
 		APIBaseURL:  apiBaseURL,
-		AuthType:    authType,
+		AuthMode:    authMode,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -51,7 +51,7 @@ type RemoteNodeForStorage struct {
 	Name                 string    `json:"name"`
 	Description          string    `json:"description,omitempty"`
 	APIBaseURL           string    `json:"api_base_url"`
-	AuthType             AuthType  `json:"auth_type"`
+	AuthMode             AuthMode  `json:"auth_mode"`
 	BasicAuthUsername    string    `json:"basic_auth_username,omitempty"`
 	BasicAuthPasswordEnc string    `json:"basic_auth_password_enc,omitempty"`
 	AuthTokenEnc         string    `json:"auth_token_enc,omitempty"`
@@ -69,7 +69,7 @@ func (n *RemoteNode) ToStorage() *RemoteNodeForStorage {
 		Name:              n.Name,
 		Description:       n.Description,
 		APIBaseURL:        n.APIBaseURL,
-		AuthType:          n.AuthType,
+		AuthMode:          n.AuthMode,
 		BasicAuthUsername: n.BasicAuthUsername,
 		SkipTLSVerify:     n.SkipTLSVerify,
 		CreatedAt:         n.CreatedAt,
@@ -86,7 +86,7 @@ func (s *RemoteNodeForStorage) ToRemoteNode() *RemoteNode {
 		Name:              s.Name,
 		Description:       s.Description,
 		APIBaseURL:        s.APIBaseURL,
-		AuthType:          s.AuthType,
+		AuthMode:          s.AuthMode,
 		BasicAuthUsername: s.BasicAuthUsername,
 		SkipTLSVerify:     s.SkipTLSVerify,
 		CreatedAt:         s.CreatedAt,

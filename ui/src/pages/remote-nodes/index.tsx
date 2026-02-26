@@ -280,7 +280,7 @@ export default function RemoteNodesPage() {
                     </TableCell>
                     <TableCell>
                       <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                        {node.authType}
+                        {node.authMode}
                       </span>
                     </TableCell>
                     <TableCell>

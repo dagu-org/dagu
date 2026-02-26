@@ -290,10 +290,9 @@ type RemoteNode struct {
 	Name              string
 	Description       string
 	APIBaseURL        string
-	IsBasicAuth       bool
+	AuthMode          string
 	BasicAuthUsername string
 	BasicAuthPassword string
-	IsAuthToken       bool
 	AuthToken         string
 	SkipTLSVerify     bool
 }

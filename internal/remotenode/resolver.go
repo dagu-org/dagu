@@ -129,41 +129,31 @@ const ConfigNodeIDPrefix = "cfg:"
 // ToConfigNode converts a domain RemoteNode to config.RemoteNode
 // for backward compatibility with proxy/SSE middleware.
 func ToConfigNode(n *RemoteNode) config.RemoteNode {
-	cn := config.RemoteNode{
+	return config.RemoteNode{
 		Name:              n.Name,
 		Description:       n.Description,
 		APIBaseURL:        n.APIBaseURL,
+		AuthMode:          string(n.AuthMode),
 		BasicAuthUsername: n.BasicAuthUsername,
 		BasicAuthPassword: n.BasicAuthPassword,
 		AuthToken:         n.AuthToken,
 		SkipTLSVerify:     n.SkipTLSVerify,
 	}
-	switch n.AuthType {
-	case AuthTypeBasic:
-		cn.IsBasicAuth = true
-	case AuthTypeToken:
-		cn.IsAuthToken = true
-	case AuthTypeNone:
-		// No auth needed
-	}
-	return cn
 }
 
 // FromConfigNode converts a config.RemoteNode to a domain RemoteNode.
 // Config nodes receive a synthetic ID of "cfg:<name>".
 func FromConfigNode(cn config.RemoteNode) *RemoteNode {
-	authType := AuthTypeNone
-	if cn.IsBasicAuth {
-		authType = AuthTypeBasic
-	} else if cn.IsAuthToken {
-		authType = AuthTypeToken
+	authMode := AuthMode(cn.AuthMode)
+	if authMode == "" {
+		authMode = AuthModeNone
 	}
 	return &RemoteNode{
 		ID:                ConfigNodeIDPrefix + cn.Name,
 		Name:              cn.Name,
 		Description:       cn.Description,
 		APIBaseURL:        cn.APIBaseURL,
-		AuthType:          authType,
+		AuthMode:          authMode,
 		BasicAuthUsername: cn.BasicAuthUsername,
 		BasicAuthPassword: cn.BasicAuthPassword,
 		AuthToken:         cn.AuthToken,

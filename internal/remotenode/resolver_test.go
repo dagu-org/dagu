@@ -21,7 +21,7 @@ func TestToConfigNode(t *testing.T) {
 				Name:              "node1",
 				Description:       "Test node",
 				APIBaseURL:        "http://example.com/api",
-				AuthType:          AuthTypeBasic,
+				AuthMode:          AuthModeBasic,
 				BasicAuthUsername: "user",
 				BasicAuthPassword: "pass",
 				SkipTLSVerify:     true,
@@ -30,7 +30,7 @@ func TestToConfigNode(t *testing.T) {
 				Name:              "node1",
 				Description:       "Test node",
 				APIBaseURL:        "http://example.com/api",
-				IsBasicAuth:       true,
+				AuthMode:          "basic",
 				BasicAuthUsername: "user",
 				BasicAuthPassword: "pass",
 				SkipTLSVerify:     true,
@@ -41,14 +41,14 @@ func TestToConfigNode(t *testing.T) {
 			input: &RemoteNode{
 				Name:       "node2",
 				APIBaseURL: "http://example.com/api",
-				AuthType:   AuthTypeToken,
+				AuthMode:   AuthModeToken,
 				AuthToken:  "tok-123",
 			},
 			expected: config.RemoteNode{
-				Name:        "node2",
-				APIBaseURL:  "http://example.com/api",
-				IsAuthToken: true,
-				AuthToken:   "tok-123",
+				Name:       "node2",
+				APIBaseURL: "http://example.com/api",
+				AuthMode:   "token",
+				AuthToken:  "tok-123",
 			},
 		},
 		{
@@ -56,11 +56,12 @@ func TestToConfigNode(t *testing.T) {
 			input: &RemoteNode{
 				Name:       "node3",
 				APIBaseURL: "http://example.com/api",
-				AuthType:   AuthTypeNone,
+				AuthMode:   AuthModeNone,
 			},
 			expected: config.RemoteNode{
 				Name:       "node3",
 				APIBaseURL: "http://example.com/api",
+				AuthMode:   "none",
 			},
 		},
 	}
@@ -88,7 +89,7 @@ func TestFromConfigNode(t *testing.T) {
 				Name:              "node1",
 				Description:       "Test node",
 				APIBaseURL:        "http://example.com/api",
-				IsBasicAuth:       true,
+				AuthMode:          "basic",
 				BasicAuthUsername: "user",
 				BasicAuthPassword: "pass",
 				SkipTLSVerify:     true,
@@ -98,7 +99,7 @@ func TestFromConfigNode(t *testing.T) {
 				Name:              "node1",
 				Description:       "Test node",
 				APIBaseURL:        "http://example.com/api",
-				AuthType:          AuthTypeBasic,
+				AuthMode:          AuthModeBasic,
 				BasicAuthUsername: "user",
 				BasicAuthPassword: "pass",
 				SkipTLSVerify:     true,
@@ -107,16 +108,16 @@ func TestFromConfigNode(t *testing.T) {
 		{
 			name: "token auth without description",
 			input: config.RemoteNode{
-				Name:        "node2",
-				APIBaseURL:  "http://example.com/api",
-				IsAuthToken: true,
-				AuthToken:   "tok-123",
+				Name:       "node2",
+				APIBaseURL: "http://example.com/api",
+				AuthMode:   "token",
+				AuthToken:  "tok-123",
 			},
 			expected: &RemoteNode{
 				ID:         "cfg:node2",
 				Name:       "node2",
 				APIBaseURL: "http://example.com/api",
-				AuthType:   AuthTypeToken,
+				AuthMode:   AuthModeToken,
 				AuthToken:  "tok-123",
 			},
 		},
@@ -130,7 +131,7 @@ func TestFromConfigNode(t *testing.T) {
 				ID:         "cfg:node3",
 				Name:       "node3",
 				APIBaseURL: "http://example.com/api",
-				AuthType:   AuthTypeNone,
+				AuthMode:   AuthModeNone,
 			},
 		},
 	}
@@ -151,7 +152,7 @@ func TestRoundTripConfigNode(t *testing.T) {
 		Name:              "roundtrip",
 		Description:       "Round-trip test",
 		APIBaseURL:        "http://example.com/api",
-		AuthType:          AuthTypeBasic,
+		AuthMode:          AuthModeBasic,
 		BasicAuthUsername: "user",
 		BasicAuthPassword: "pass",
 		SkipTLSVerify:     true,
@@ -163,7 +164,7 @@ func TestRoundTripConfigNode(t *testing.T) {
 	assert.Equal(t, original.Name, result.Name)
 	assert.Equal(t, original.Description, result.Description)
 	assert.Equal(t, original.APIBaseURL, result.APIBaseURL)
-	assert.Equal(t, original.AuthType, result.AuthType)
+	assert.Equal(t, original.AuthMode, result.AuthMode)
 	assert.Equal(t, original.BasicAuthUsername, result.BasicAuthUsername)
 	assert.Equal(t, original.BasicAuthPassword, result.BasicAuthPassword)
 	assert.Equal(t, original.SkipTLSVerify, result.SkipTLSVerify)

@@ -2,7 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { useConfig } from '@/contexts/ConfigContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { TOKEN_KEY } from '@/contexts/AuthContext';
-import { components, CreateRemoteNodeRequestAuthType } from '@/api/v1/schema';
+import { components, CreateRemoteNodeRequestAuthMode } from '@/api/v1/schema';
 import {
   Dialog,
   DialogContent,
@@ -44,7 +44,7 @@ export function RemoteNodeFormModal({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [apiBaseUrl, setApiBaseUrl] = useState('');
-  const [authType, setAuthType] = useState<string>('none');
+  const [authMode, setAuthMode] = useState<string>('none');
   const [basicAuthUsername, setBasicAuthUsername] = useState('');
   const [basicAuthPassword, setBasicAuthPassword] = useState('');
   const [authToken, setAuthToken] = useState('');
@@ -57,7 +57,7 @@ export function RemoteNodeFormModal({
       setName(node.name);
       setDescription(node.description || '');
       setApiBaseUrl(node.apiBaseUrl);
-      setAuthType(node.authType);
+      setAuthMode(node.authMode);
       setSkipTlsVerify(node.skipTlsVerify || false);
       setBasicAuthUsername('');
       setBasicAuthPassword('');
@@ -66,7 +66,7 @@ export function RemoteNodeFormModal({
       setName('');
       setDescription('');
       setApiBaseUrl('');
-      setAuthType('none');
+      setAuthMode('none');
       setBasicAuthUsername('');
       setBasicAuthPassword('');
       setAuthToken('');
@@ -110,13 +110,13 @@ export function RemoteNodeFormModal({
           name,
           description,
           apiBaseUrl,
-          authType,
+          authMode,
           skipTlsVerify,
         };
-        if (authType === 'basic') {
+        if (authMode === 'basic') {
           if (basicAuthUsername) body.basicAuthUsername = basicAuthUsername;
           if (basicAuthPassword) body.basicAuthPassword = basicAuthPassword;
-        } else if (authType === 'token') {
+        } else if (authMode === 'token') {
           if (authToken) body.authToken = authToken;
         }
 
@@ -141,13 +141,13 @@ export function RemoteNodeFormModal({
           name,
           description,
           apiBaseUrl,
-          authType: authType as CreateRemoteNodeRequestAuthType,
+          authMode: authMode as CreateRemoteNodeRequestAuthMode,
           skipTlsVerify,
         };
-        if (authType === 'basic') {
+        if (authMode === 'basic') {
           body.basicAuthUsername = basicAuthUsername;
           body.basicAuthPassword = basicAuthPassword;
-        } else if (authType === 'token') {
+        } else if (authMode === 'token') {
           body.authToken = authToken;
         }
 
@@ -242,10 +242,10 @@ export function RemoteNodeFormModal({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="authType" className="text-sm">
+            <Label htmlFor="authMode" className="text-sm">
               Authentication
             </Label>
-            <Select value={authType} onValueChange={setAuthType}>
+            <Select value={authMode} onValueChange={setAuthMode}>
               <SelectTrigger className="h-9">
                 <SelectValue />
               </SelectTrigger>
@@ -257,7 +257,7 @@ export function RemoteNodeFormModal({
             </Select>
           </div>
 
-          {authType === 'basic' && (
+          {authMode === 'basic' && (
             <>
               <div className="space-y-1.5">
                 <Label htmlFor="basicAuthUsername" className="text-sm">
@@ -290,7 +290,7 @@ export function RemoteNodeFormModal({
             </>
           )}
 
-          {authType === 'token' && (
+          {authMode === 'token' && (
             <div className="space-y-1.5">
               <Label htmlFor="authToken" className="text-sm">
                 Token

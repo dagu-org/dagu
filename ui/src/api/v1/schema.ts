@@ -3866,11 +3866,11 @@ export interface components {
             /** @description Base URL of the remote Dagu instance API */
             apiBaseUrl: string;
             /**
-             * @description Authentication type
+             * @description Authentication mode
              * @default none
              * @enum {string}
              */
-            authType: CreateRemoteNodeRequestAuthType;
+            authMode: CreateRemoteNodeRequestAuthMode;
             /** @description Username for basic auth */
             basicAuthUsername?: string;
             /** @description Password for basic auth */
@@ -3888,7 +3888,7 @@ export interface components {
             description?: string;
             apiBaseUrl?: string;
             /** @enum {string} */
-            authType?: UpdateRemoteNodeRequestAuthType;
+            authMode?: UpdateRemoteNodeRequestAuthMode;
             basicAuthUsername?: string;
             basicAuthPassword?: string;
             authToken?: string;
@@ -3900,7 +3900,7 @@ export interface components {
             description?: string;
             apiBaseUrl: string;
             /** @enum {string} */
-            authType: RemoteNodeResponseAuthType;
+            authMode: RemoteNodeResponseAuthMode;
             /** @description Whether credentials are configured (values are never returned) */
             hasCredentials?: boolean;
             skipTlsVerify?: boolean;
@@ -11059,6 +11059,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description Name already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     testRemoteNodeConnection: {
@@ -11319,17 +11328,17 @@ export enum AgentDelegateSnapshotStatus {
     running = "running",
     completed = "completed"
 }
-export enum CreateRemoteNodeRequestAuthType {
+export enum CreateRemoteNodeRequestAuthMode {
     none = "none",
     basic = "basic",
     token = "token"
 }
-export enum UpdateRemoteNodeRequestAuthType {
+export enum UpdateRemoteNodeRequestAuthMode {
     none = "none",
     basic = "basic",
     token = "token"
 }
-export enum RemoteNodeResponseAuthType {
+export enum RemoteNodeResponseAuthMode {
     none = "none",
     basic = "basic",
     token = "token"

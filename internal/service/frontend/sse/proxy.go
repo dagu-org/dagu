@@ -156,10 +156,10 @@ func pathWithOptionalQuery(basePath, query string) string {
 
 // applyNodeAuth adds authentication headers based on node configuration.
 func applyNodeAuth(req *http.Request, node config.RemoteNode) {
-	switch {
-	case node.IsBasicAuth:
+	switch node.AuthMode {
+	case "basic":
 		req.SetBasicAuth(node.BasicAuthUsername, node.BasicAuthPassword)
-	case node.IsAuthToken:
+	case "token":
 		req.Header.Set("Authorization", "Bearer "+node.AuthToken)
 	}
 }
