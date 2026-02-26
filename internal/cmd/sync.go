@@ -600,6 +600,7 @@ Examples:
 	cmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
 	cmd.Flags().StringP("message", "m", "", "Commit message")
 	cmd.Flags().Bool("force", false, "Force move even with conflicts")
+	cmd.Flags().Bool("dry-run", false, "Show what would be moved without making changes")
 
 	return NewCommand(cmd, nil, runSyncMove)
 }
@@ -614,7 +615,29 @@ func runSyncMove(ctx *Context, args []string) error {
 	newID := args[1]
 	message, _ := ctx.Command.Flags().GetString("message")
 	force, _ := ctx.Command.Flags().GetBool("force")
+	dryRun, _ := ctx.Command.Flags().GetBool("dry-run")
 	skipConfirm, _ := ctx.Command.Flags().GetBool("yes")
+
+	if dryRun {
+		status, err := syncSvc.GetStatus(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get sync status: %w", err)
+		}
+		oldState, exists := status.DAGs[oldID]
+		if !exists {
+			return fmt.Errorf("item not found: %s", oldID)
+		}
+		mode := "preemptive"
+		if oldState.Status == gitsync.StatusMissing {
+			mode = "retroactive"
+		}
+		fmt.Printf("Would move:\n")
+		fmt.Printf("  - %s → %s (%s, currently %s)\n", oldID, newID, mode, oldState.Status)
+		if !force && oldState.Status == gitsync.StatusConflict {
+			fmt.Println("\nNote: source has conflict status; use --force to allow move")
+		}
+		return nil
+	}
 
 	fmt.Printf("Moving %s → %s\n", oldID, newID)
 

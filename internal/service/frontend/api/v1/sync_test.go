@@ -14,8 +14,13 @@ import (
 )
 
 type mockSyncService struct {
-	publishAllFn func(ctx context.Context, message string, itemIDs []string) (*gitsync.SyncResult, error)
-	getStatusFn  func(context.Context) (*gitsync.OverallStatus, error)
+	publishAllFn     func(ctx context.Context, message string, itemIDs []string) (*gitsync.SyncResult, error)
+	getStatusFn      func(context.Context) (*gitsync.OverallStatus, error)
+	forgetFn         func(ctx context.Context, itemIDs []string) ([]string, error)
+	cleanupFn        func(ctx context.Context) ([]string, error)
+	deleteFn         func(ctx context.Context, itemID, message string, force bool) error
+	deleteAllMissing func(ctx context.Context, message string) ([]string, error)
+	moveFn           func(ctx context.Context, oldID, newID, message string, force bool) error
 }
 
 func (m *mockSyncService) Pull(_ context.Context) (*gitsync.SyncResult, error) { return nil, nil }
@@ -33,17 +38,40 @@ func (m *mockSyncService) PublishAll(ctx context.Context, message string, itemID
 
 func (m *mockSyncService) Discard(_ context.Context, _ string) error { return nil }
 
-func (m *mockSyncService) Forget(_ context.Context, _ []string) ([]string, error) { return nil, nil }
-
-func (m *mockSyncService) Cleanup(_ context.Context) ([]string, error) { return nil, nil }
-
-func (m *mockSyncService) Delete(_ context.Context, _ string, _ string, _ bool) error { return nil }
-
-func (m *mockSyncService) DeleteAllMissing(_ context.Context, _ string) ([]string, error) {
+func (m *mockSyncService) Forget(ctx context.Context, itemIDs []string) ([]string, error) {
+	if m.forgetFn != nil {
+		return m.forgetFn(ctx, itemIDs)
+	}
 	return nil, nil
 }
 
-func (m *mockSyncService) Move(_ context.Context, _, _, _ string, _ bool) error { return nil }
+func (m *mockSyncService) Cleanup(ctx context.Context) ([]string, error) {
+	if m.cleanupFn != nil {
+		return m.cleanupFn(ctx)
+	}
+	return nil, nil
+}
+
+func (m *mockSyncService) Delete(ctx context.Context, itemID, message string, force bool) error {
+	if m.deleteFn != nil {
+		return m.deleteFn(ctx, itemID, message, force)
+	}
+	return nil
+}
+
+func (m *mockSyncService) DeleteAllMissing(ctx context.Context, message string) ([]string, error) {
+	if m.deleteAllMissing != nil {
+		return m.deleteAllMissing(ctx, message)
+	}
+	return nil, nil
+}
+
+func (m *mockSyncService) Move(ctx context.Context, oldID, newID, message string, force bool) error {
+	if m.moveFn != nil {
+		return m.moveFn(ctx, oldID, newID, message, force)
+	}
+	return nil
+}
 
 func (m *mockSyncService) GetStatus(ctx context.Context) (*gitsync.OverallStatus, error) {
 	if m.getStatusFn != nil {
@@ -228,6 +256,316 @@ func TestSyncPublishAll_Validation(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "publish selected", gotMessage)
 		assert.Equal(t, []string{"a", "b"}, gotIDs)
+	})
+}
+
+func TestForgetSyncItem(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns 404 when item not found", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			forgetFn: func(_ context.Context, _ []string) ([]string, error) {
+				return nil, &gitsync.DAGNotFoundError{DAGID: "missing-dag"}
+			},
+		})
+
+		resp, err := a.ForgetSyncItem(context.Background(), apigen.ForgetSyncItemRequestObject{
+			ItemId: "missing-dag",
+		})
+		require.NoError(t, err)
+		_, ok := resp.(apigen.ForgetSyncItem404JSONResponse)
+		assert.True(t, ok)
+	})
+
+	t.Run("returns 400 when item cannot be forgotten", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			forgetFn: func(_ context.Context, _ []string) ([]string, error) {
+				return nil, gitsync.ErrCannotForget
+			},
+		})
+
+		resp, err := a.ForgetSyncItem(context.Background(), apigen.ForgetSyncItemRequestObject{
+			ItemId: "synced-dag",
+		})
+		require.NoError(t, err)
+		errResp, ok := resp.(apigen.ForgetSyncItem400JSONResponse)
+		assert.True(t, ok)
+		assert.Contains(t, errResp.Message, "cannot be forgotten")
+	})
+
+	t.Run("returns 200 on success", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			forgetFn: func(_ context.Context, itemIDs []string) ([]string, error) {
+				return itemIDs, nil
+			},
+		})
+
+		resp, err := a.ForgetSyncItem(context.Background(), apigen.ForgetSyncItemRequestObject{
+			ItemId: "my-dag",
+		})
+		require.NoError(t, err)
+		_, ok := resp.(apigen.ForgetSyncItem200JSONResponse)
+		assert.True(t, ok)
+	})
+}
+
+func TestSyncCleanup(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns 200 with forgotten list", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			cleanupFn: func(_ context.Context) ([]string, error) {
+				return []string{"dag-a", "dag-b"}, nil
+			},
+		})
+
+		resp, err := a.SyncCleanup(context.Background(), apigen.SyncCleanupRequestObject{})
+		require.NoError(t, err)
+		r, ok := resp.(apigen.SyncCleanup200JSONResponse)
+		require.True(t, ok)
+		assert.Equal(t, []string{"dag-a", "dag-b"}, r.Forgotten)
+		assert.Contains(t, r.Message, "2")
+	})
+}
+
+func TestDeleteSyncItem(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns 400 when push disabled", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			deleteFn: func(_ context.Context, _, _ string, _ bool) error {
+				return gitsync.ErrPushDisabled
+			},
+		})
+
+		resp, err := a.DeleteSyncItem(context.Background(), apigen.DeleteSyncItemRequestObject{
+			ItemId: "my-dag",
+		})
+		require.NoError(t, err)
+		errResp, ok := resp.(apigen.DeleteSyncItem400JSONResponse)
+		assert.True(t, ok)
+		assert.Contains(t, errResp.Message, "push")
+	})
+
+	t.Run("returns 400 when item is untracked", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			deleteFn: func(_ context.Context, _, _ string, _ bool) error {
+				return gitsync.ErrCannotDeleteUntracked
+			},
+		})
+
+		resp, err := a.DeleteSyncItem(context.Background(), apigen.DeleteSyncItemRequestObject{
+			ItemId: "my-dag",
+		})
+		require.NoError(t, err)
+		errResp, ok := resp.(apigen.DeleteSyncItem400JSONResponse)
+		assert.True(t, ok)
+		assert.Contains(t, errResp.Message, "untracked")
+	})
+
+	t.Run("returns 404 when item not found", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			deleteFn: func(_ context.Context, _, _ string, _ bool) error {
+				return &gitsync.DAGNotFoundError{DAGID: "missing"}
+			},
+		})
+
+		resp, err := a.DeleteSyncItem(context.Background(), apigen.DeleteSyncItemRequestObject{
+			ItemId: "missing",
+		})
+		require.NoError(t, err)
+		_, ok := resp.(apigen.DeleteSyncItem404JSONResponse)
+		assert.True(t, ok)
+	})
+
+	t.Run("returns 200 on success", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			deleteFn: func(_ context.Context, _, _ string, _ bool) error {
+				return nil
+			},
+		})
+
+		resp, err := a.DeleteSyncItem(context.Background(), apigen.DeleteSyncItemRequestObject{
+			ItemId: "my-dag",
+			Body: &apigen.DeleteSyncItemJSONRequestBody{
+				Message: ptrOf("remove old dag"),
+				Force:   ptrOf(true),
+			},
+		})
+		require.NoError(t, err)
+		_, ok := resp.(apigen.DeleteSyncItem200JSONResponse)
+		assert.True(t, ok)
+	})
+}
+
+func TestSyncDeleteMissing(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns 400 when push disabled", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			deleteAllMissing: func(_ context.Context, _ string) ([]string, error) {
+				return nil, gitsync.ErrPushDisabled
+			},
+		})
+
+		_, err := a.SyncDeleteMissing(context.Background(), apigen.SyncDeleteMissingRequestObject{})
+		require.Error(t, err)
+		var apiErr *Error
+		require.ErrorAs(t, err, &apiErr)
+		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+	})
+
+	t.Run("returns 200 with deleted list", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			deleteAllMissing: func(_ context.Context, _ string) ([]string, error) {
+				return []string{"dag-x", "dag-y"}, nil
+			},
+		})
+
+		resp, err := a.SyncDeleteMissing(context.Background(), apigen.SyncDeleteMissingRequestObject{
+			Body: &apigen.SyncDeleteMissingJSONRequestBody{
+				Message: ptrOf("clean up"),
+			},
+		})
+		require.NoError(t, err)
+		r, ok := resp.(apigen.SyncDeleteMissing200JSONResponse)
+		require.True(t, ok)
+		assert.Equal(t, []string{"dag-x", "dag-y"}, r.Deleted)
+		assert.Contains(t, r.Message, "2")
+	})
+}
+
+func TestMoveSyncItem(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns 400 for nil request body", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{})
+		_, err := a.MoveSyncItem(context.Background(), apigen.MoveSyncItemRequestObject{
+			ItemId: "old-dag",
+		})
+		require.Error(t, err)
+		var apiErr *Error
+		require.ErrorAs(t, err, &apiErr)
+		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+	})
+
+	t.Run("returns 400 when push disabled", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			moveFn: func(_ context.Context, _, _, _ string, _ bool) error {
+				return gitsync.ErrPushDisabled
+			},
+		})
+
+		resp, err := a.MoveSyncItem(context.Background(), apigen.MoveSyncItemRequestObject{
+			ItemId: "old-dag",
+			Body: &apigen.MoveSyncItemJSONRequestBody{
+				NewItemId: "new-dag",
+			},
+		})
+		require.NoError(t, err)
+		errResp, ok := resp.(apigen.MoveSyncItem400JSONResponse)
+		assert.True(t, ok)
+		assert.Contains(t, errResp.Message, "push")
+	})
+
+	t.Run("returns 400 for validation error", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			moveFn: func(_ context.Context, _, _, _ string, _ bool) error {
+				return &gitsync.ValidationError{
+					Field:   "newItemId",
+					Message: "cannot move across kinds",
+				}
+			},
+		})
+
+		resp, err := a.MoveSyncItem(context.Background(), apigen.MoveSyncItemRequestObject{
+			ItemId: "old-dag",
+			Body: &apigen.MoveSyncItemJSONRequestBody{
+				NewItemId: "memory/new",
+			},
+		})
+		require.NoError(t, err)
+		errResp, ok := resp.(apigen.MoveSyncItem400JSONResponse)
+		assert.True(t, ok)
+		assert.Contains(t, errResp.Message, "cannot move across kinds")
+	})
+
+	t.Run("returns 404 when source not found", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			moveFn: func(_ context.Context, _, _, _ string, _ bool) error {
+				return &gitsync.DAGNotFoundError{DAGID: "missing"}
+			},
+		})
+
+		resp, err := a.MoveSyncItem(context.Background(), apigen.MoveSyncItemRequestObject{
+			ItemId: "missing",
+			Body: &apigen.MoveSyncItemJSONRequestBody{
+				NewItemId: "new-dag",
+			},
+		})
+		require.NoError(t, err)
+		_, ok := resp.(apigen.MoveSyncItem404JSONResponse)
+		assert.True(t, ok)
+	})
+
+	t.Run("returns 200 on success", func(t *testing.T) {
+		t.Parallel()
+
+		var gotOld, gotNew, gotMsg string
+		var gotForce bool
+		a := newSyncAPIForTest(&mockSyncService{
+			moveFn: func(_ context.Context, oldID, newID, message string, force bool) error {
+				gotOld = oldID
+				gotNew = newID
+				gotMsg = message
+				gotForce = force
+				return nil
+			},
+		})
+
+		resp, err := a.MoveSyncItem(context.Background(), apigen.MoveSyncItemRequestObject{
+			ItemId: "old-dag",
+			Body: &apigen.MoveSyncItemJSONRequestBody{
+				NewItemId: "new-dag",
+				Message:   ptrOf("rename workflow"),
+				Force:     ptrOf(true),
+			},
+		})
+		require.NoError(t, err)
+		_, ok := resp.(apigen.MoveSyncItem200JSONResponse)
+		assert.True(t, ok)
+		assert.Equal(t, "old-dag", gotOld)
+		assert.Equal(t, "new-dag", gotNew)
+		assert.Equal(t, "rename workflow", gotMsg)
+		assert.True(t, gotForce)
 	})
 }
 

@@ -328,6 +328,9 @@ func (s *serviceImpl) syncFilesToDAGsDir(_ context.Context, pullResult *PullResu
 					RemoteMessage:      remoteMessage,
 					ConflictDetectedAt: &now,
 				}
+				if fi, err := os.Stat(dagFilePath); err == nil {
+					updateStatCache(state.DAGs[dagID], fi)
+				}
 				conflicts = append(conflicts, dagID)
 			}
 			// Local modified but remote unchanged - preserve local changes
@@ -1395,6 +1398,9 @@ func (s *serviceImpl) GetStatus(_ context.Context) (*OverallStatus, error) {
 	if !s.cfg.Enabled {
 		return status, nil
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	status.Repository = s.cfg.Repository
 	status.Branch = s.cfg.Branch
