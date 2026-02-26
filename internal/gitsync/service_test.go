@@ -1113,6 +1113,19 @@ func TestMove_NotFound(t *testing.T) {
 	assert.ErrorIs(t, err, ErrDAGNotFound)
 }
 
+func TestMove_NonCanonicalID_Rejected(t *testing.T) {
+	t.Parallel()
+	impl, _ := newTestService(t, testCfgReadWrite)
+
+	err := impl.Move(context.Background(), "a/./b", "new-dag", "", false)
+	require.Error(t, err)
+	assert.True(t, IsInvalidDAGID(err))
+
+	err = impl.Move(context.Background(), "my-dag", "a/../b", "", false)
+	require.Error(t, err)
+	assert.True(t, IsInvalidDAGID(err))
+}
+
 func TestMove_CrossKind_Rejected(t *testing.T) {
 	t.Parallel()
 	impl, _ := newTestService(t, testCfgReadWrite)

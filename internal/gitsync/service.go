@@ -200,8 +200,8 @@ func (s *serviceImpl) Pull(ctx context.Context) (*SyncResult, error) {
 	// Get current commit
 	currentCommit, _ := s.gitClient.GetHeadCommit()
 
-	// Sync files to DAGs directory
-	syncedDAGs, conflicts, err := s.syncFilesToDAGsDir(ctx, pullResult)
+	// Sync files to DAGs directory and save state with sync metadata
+	syncedDAGs, conflicts, err := s.syncFilesToDAGsDir(ctx, pullResult, currentCommit)
 	if err != nil {
 		result.Success = false
 		result.Message = "Failed to sync files"
@@ -215,14 +215,12 @@ func (s *serviceImpl) Pull(ctx context.Context) (*SyncResult, error) {
 	result.Success = true
 	result.Message = s.buildPullMessage(pullResult.AlreadyUpToDate, syncedDAGs, conflicts)
 
-	// Update sync state
-	s.updateSuccessState(currentCommit)
-
 	return result, nil
 }
 
 // syncFilesToDAGsDir syncs files from the repo to the DAGs directory.
-func (s *serviceImpl) syncFilesToDAGsDir(_ context.Context, pullResult *PullResult) ([]string, []string, error) {
+// It updates sync metadata and saves state in a single write.
+func (s *serviceImpl) syncFilesToDAGsDir(_ context.Context, pullResult *PullResult, commitHash string) ([]string, []string, error) {
 	var synced []string
 	var conflicts []string
 
@@ -365,9 +363,9 @@ func (s *serviceImpl) syncFilesToDAGsDir(_ context.Context, pullResult *PullResu
 	// Scan for local DAGs not in the repo
 	_ = s.scanLocalDAGs(state)
 
-	if err := s.stateManager.Save(state); err != nil {
-		return synced, conflicts, fmt.Errorf("failed to save state: %w", err)
-	}
+	// Update sync metadata and save state in a single write
+	s.updateSuccessStateWithCommit(state, commitHash)
+
 	return synced, conflicts, nil
 }
 
@@ -1203,14 +1201,20 @@ func (s *serviceImpl) Move(ctx context.Context, oldID, newID, message string, fo
 		return err
 	}
 
-	// Normalize both IDs
-	oldID, err := normalizeDAGID(oldID)
+	// Validate both IDs are canonical
+	normalized, err := normalizeDAGID(oldID)
 	if err != nil {
 		return err
 	}
-	newID, err = normalizeDAGID(newID)
+	if normalized != oldID {
+		return &InvalidDAGIDError{DAGID: oldID, Reason: fmt.Sprintf("must be normalized as %q", normalized)}
+	}
+	normalized, err = normalizeDAGID(newID)
 	if err != nil {
 		return err
+	}
+	if normalized != newID {
+		return &InvalidDAGIDError{DAGID: newID, Reason: fmt.Sprintf("must be normalized as %q", normalized)}
 	}
 
 	// Validate same kind
@@ -1499,7 +1503,7 @@ func (s *serviceImpl) GetDAGDiff(_ context.Context, dagID string) (*DAGDiff, err
 		Status: dagState.Status,
 	}
 
-	// For missing items, local content is empty; remote content comes from BaseCommit
+	// Missing items have no local file — handle before os.ReadFile below.
 	if dagState.Status == StatusMissing {
 		diff.LocalContent = ""
 		diff.RemoteContent = s.fetchRemoteContent(dagID, dagState.BaseCommit)
@@ -1689,7 +1693,6 @@ func (s *serviceImpl) filePathToDAGID(filePath string) string {
 	// Remove extension
 	ext := filepath.Ext(filePath)
 	dagID := strings.TrimSuffix(filePath, ext)
-	// URL encode for safety
 	return dagID
 }
 
@@ -1972,19 +1975,6 @@ func (s *serviceImpl) newSyncedDAGState(dagID, commitHash, contentHash string) *
 		LastSyncedAt:   &now,
 		LocalHash:      contentHash,
 	}
-}
-
-// updateSuccessState updates the global sync state after a successful pull.
-func (s *serviceImpl) updateSuccessState(commitHash string) {
-	state, err := s.stateManager.GetState()
-	if err != nil {
-		// Initialize new state if loading fails
-		state = &State{
-			Version: 1,
-			DAGs:    make(map[string]*DAGState),
-		}
-	}
-	s.updateSuccessStateWithCommit(state, commitHash)
 }
 
 // updateSuccessStateWithCommit updates and saves the state after a successful sync.

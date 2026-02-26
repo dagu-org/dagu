@@ -550,9 +550,12 @@ func (a *API) MoveSyncItem(ctx context.Context, req api.MoveSyncItemRequestObjec
 		}
 		var conflictErr *gitsync.ConflictError
 		if errors.As(err, &conflictErr) {
-			return api.MoveSyncItem400JSONResponse{
-				Code:    api.ErrorCodeBadRequest,
-				Message: err.Error(),
+			return api.MoveSyncItem409JSONResponse{
+				ItemId:        conflictErr.DAGID,
+				RemoteCommit:  ptrOf(conflictErr.RemoteCommit),
+				RemoteAuthor:  ptrOf(conflictErr.RemoteAuthor),
+				RemoteMessage: ptrOf(conflictErr.RemoteMessage),
+				Message:       conflictErr.Error(),
 			}, nil
 		}
 		if gitsync.IsInvalidDAGID(err) {
@@ -611,10 +614,15 @@ func toAPISyncStatus(s gitsync.SyncStatus) api.SyncStatus {
 	}
 }
 
-func toAPISyncItemKind(itemID string, kind gitsync.DAGKind) api.SyncItemKind {
+func resolveKind(itemID string, kind gitsync.DAGKind) gitsync.DAGKind {
 	if kind == "" {
-		kind = gitsync.KindForDAGID(itemID)
+		return gitsync.KindForDAGID(itemID)
 	}
+	return kind
+}
+
+func toAPISyncItemKind(itemID string, kind gitsync.DAGKind) api.SyncItemKind {
+	kind = resolveKind(itemID, kind)
 
 	switch kind {
 	case gitsync.DAGKindMemory:
@@ -631,9 +639,7 @@ func toAPISyncItemKind(itemID string, kind gitsync.DAGKind) api.SyncItemKind {
 }
 
 func syncItemFilePath(itemID string, kind gitsync.DAGKind) string {
-	if kind == "" {
-		kind = gitsync.KindForDAGID(itemID)
-	}
+	kind = resolveKind(itemID, kind)
 	ext := ".yaml"
 	switch kind {
 	case gitsync.DAGKindMemory, gitsync.DAGKindSkill, gitsync.DAGKindSoul:

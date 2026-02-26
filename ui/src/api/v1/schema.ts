@@ -8399,6 +8399,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description Conflict detected */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncConflictResponse"];
+                };
+            };
             /** @description Unexpected error */
             default: {
                 headers: {

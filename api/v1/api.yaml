@@ -3744,6 +3744,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "409":
+          description: "Conflict detected"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncConflictResponse"
         default:
           description: "Unexpected error"
           content:
