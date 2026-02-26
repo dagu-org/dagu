@@ -764,14 +764,11 @@ export default function GitSyncPage() {
                       />
                     )}
                   </TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
+                  <TableCell>
                     <div className="flex items-center gap-1.5">
-                      <a
-                        href={`/dags/${encodeURIComponent(itemId)}`}
-                        className="font-mono hover:underline"
-                      >
+                      <span className="font-mono">
                         {item.displayName}
-                      </a>
+                      </span>
                       {kind === 'memory' && (
                         <span className="text-[10px] px-1 py-0 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400">
                           memory
