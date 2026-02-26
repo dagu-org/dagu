@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/remotenode"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/go-chi/chi/v5"
@@ -19,16 +18,14 @@ const maxQueryLength = 4096
 // Each handler method builds a topic string and delegates to handleSSE.
 type Handler struct {
 	hub          *Hub
-	remoteNodes  map[string]config.RemoteNode
 	nodeResolver *remotenode.Resolver
 	authService  *authservice.Service
 }
 
 // NewHandler creates a new SSE handler
-func NewHandler(hub *Hub, remoteNodes map[string]config.RemoteNode, nodeResolver *remotenode.Resolver, authService *authservice.Service) *Handler {
+func NewHandler(hub *Hub, nodeResolver *remotenode.Resolver, authService *authservice.Service) *Handler {
 	return &Handler{
 		hub:          hub,
-		remoteNodes:  remoteNodes,
 		nodeResolver: nodeResolver,
 		authService:  authService,
 	}

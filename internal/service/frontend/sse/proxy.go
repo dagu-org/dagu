@@ -15,21 +15,12 @@ import (
 // proxyToRemoteNode proxies the SSE request to a remote node.
 // The topic parameter contains the full topic string (e.g., "dagrun:mydag/run123").
 func (h *Handler) proxyToRemoteNode(w http.ResponseWriter, r *http.Request, nodeName, topic string) {
-	// Try resolver first (covers both config and store nodes), then fall back to static map
-	var node config.RemoteNode
-	if h.nodeResolver != nil {
-		cn, err := h.nodeResolver.GetByName(r.Context(), nodeName)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("unknown remote node: %s", nodeName), http.StatusBadRequest)
-			return
-		}
-		node = *cn
-	} else if rn, ok := h.remoteNodes[nodeName]; ok {
-		node = rn
-	} else {
+	cn, err := h.nodeResolver.GetByName(r.Context(), nodeName)
+	if err != nil {
 		http.Error(w, fmt.Sprintf("unknown remote node: %s", nodeName), http.StatusBadRequest)
 		return
 	}
+	node := *cn
 
 	remoteURL := buildRemoteURL(node.APIBaseURL, topic, r.URL.Query().Get("token"))
 

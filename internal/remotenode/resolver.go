@@ -66,7 +66,7 @@ func (r *Resolver) GetByName(ctx context.Context, name string) (*config.RemoteNo
 }
 
 // GetByID retrieves a store-managed remote node by ID.
-// Config nodes have no ID, so this only works for store nodes.
+// Config nodes use synthetic IDs (cfg:<name>) and are resolved via GetByName.
 func (r *Resolver) GetByID(ctx context.Context, id string) (*RemoteNode, error) {
 	if r.store == nil {
 		return nil, ErrRemoteNodeNotFound
@@ -121,12 +121,6 @@ func (r *Resolver) ListNames(ctx context.Context) ([]string, error) {
 		names = append(names, n.Name)
 	}
 	return names, nil
-}
-
-// NameExists checks if a node name exists in either source.
-func (r *Resolver) NameExists(ctx context.Context, name string) bool {
-	_, err := r.GetByName(ctx, name)
-	return err == nil
 }
 
 // ConfigNodeIDPrefix is prepended to config node names to form a synthetic ID.

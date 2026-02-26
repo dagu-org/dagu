@@ -22,48 +22,33 @@ import (
 
 // WithRemoteNode is a middleware that checks if the request has a "remoteNode" query parameter.
 // If it does, it proxies the request to the specified remote node.
-// It tries the resolver first (for dynamic store nodes), then falls back to the static map.
-func WithRemoteNode(resolver *remotenode.Resolver, remoteNodes map[string]config.RemoteNode, apiBasePath string) func(next http.Handler) http.Handler {
+func WithRemoteNode(resolver *remotenode.Resolver, apiBasePath string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			// Check if the request has a "remoteNode" query parameter
 			remoteNodeName := r.URL.Query().Get("remoteNode")
 			if remoteNodeName == "" || remoteNodeName == "local" {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			// Try resolver first (covers both config and store nodes)
-			var remoteNode config.RemoteNode
-			if resolver != nil {
-				cn, err := resolver.GetByName(r.Context(), remoteNodeName)
-				if err == nil {
-					remoteNode = *cn
-				} else if errors.Is(err, remotenode.ErrRemoteNodeNotFound) {
+			cn, err := resolver.GetByName(r.Context(), remoteNodeName)
+			if err != nil {
+				if errors.Is(err, remotenode.ErrRemoteNodeNotFound) {
 					WriteErrorResponse(w, &Error{
 						HTTPStatus: http.StatusBadRequest,
 						Code:       api.ErrorCodeBadRequest,
 						Message:    fmt.Sprintf("remote node %s not found", remoteNodeName),
 					})
-					return
 				} else {
 					WriteErrorResponse(w, &Error{
 						HTTPStatus: http.StatusInternalServerError,
 						Code:       api.ErrorCodeInternalError,
 						Message:    fmt.Sprintf("failed to resolve remote node %s", remoteNodeName),
 					})
-					return
 				}
-			} else if rn, ok := remoteNodes[remoteNodeName]; ok {
-				remoteNode = rn
-			} else {
-				WriteErrorResponse(w, &Error{
-					HTTPStatus: http.StatusBadRequest,
-					Code:       api.ErrorCodeBadRequest,
-					Message:    fmt.Sprintf("remote node %s not found", remoteNodeName),
-				})
 				return
 			}
+			remoteNode := *cn
 			// If the parameter is present, we need to handle the request differently
 			// Call the handleRemoteNodeProxy function to proxy the request
 			remoteNodeHandler := &remoteNodeProxy{
@@ -142,15 +127,10 @@ func WithRemoteNode(resolver *remotenode.Resolver, remoteNodes map[string]config
 				return
 			}
 
-			// If the status code is not 200, write the error response
+			// Write the successful response
 			w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
-			if resp != nil {
-				// If we have a response, write it to the response writer
-				_, err = w.Write(respData)
-				if err != nil {
-					// If there was an error writing the response, log it
-					logger.Error(r.Context(), "Failed to write response", tag.Error(err))
-				}
+			if _, err = w.Write(respData); err != nil {
+				logger.Error(r.Context(), "Failed to write response", tag.Error(err))
 			}
 		}
 

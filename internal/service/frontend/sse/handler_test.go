@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/remotenode"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,15 +17,13 @@ import (
 func TestNewHandler(t *testing.T) {
 	t.Parallel()
 	hub := NewHub()
-	remoteNodes := map[string]config.RemoteNode{
-		"node1": {Name: "node1"},
-	}
+	resolver := remotenode.NewResolver([]config.RemoteNode{{Name: "node1"}}, nil)
 
-	handler := NewHandler(hub, remoteNodes, nil, nil)
+	handler := NewHandler(hub, resolver, nil)
 
 	require.NotNil(t, handler)
 	assert.Same(t, hub, handler.hub)
-	assert.NotNil(t, handler.remoteNodes)
+	assert.NotNil(t, handler.nodeResolver)
 	assert.Nil(t, handler.authService)
 }
 
@@ -96,7 +95,7 @@ func setupHandler(t *testing.T) (*Handler, *Hub) {
 	hub.Start()
 	t.Cleanup(hub.Shutdown)
 
-	handler := NewHandler(hub, map[string]config.RemoteNode{}, nil, nil)
+	handler := NewHandler(hub, nil, nil)
 	return handler, hub
 }
 
@@ -276,13 +275,10 @@ func TestHandleSSERemoteProxy(t *testing.T) {
 	hub.Start()
 	defer hub.Shutdown()
 
-	remoteNodes := map[string]config.RemoteNode{
-		"remote1": {
-			Name:       "remote1",
-			APIBaseURL: remoteServer.URL,
-		},
-	}
-	handler := NewHandler(hub, remoteNodes, nil, nil)
+	resolver := remotenode.NewResolver([]config.RemoteNode{
+		{Name: "remote1", APIBaseURL: remoteServer.URL},
+	}, nil)
+	handler := NewHandler(hub, resolver, nil)
 
 	w := newMockFlusher()
 	params := map[string]string{"fileName": "mydag.yaml"}
@@ -316,7 +312,7 @@ func TestHandleSSELocalNode(t *testing.T) {
 func TestValidateAuthNoService(t *testing.T) {
 	t.Parallel()
 	hub := NewHub()
-	handler := NewHandler(hub, nil, nil, nil)
+	handler := NewHandler(hub, nil, nil)
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/test", nil)
@@ -334,7 +330,7 @@ func TestHandleSSEMaxClients(t *testing.T) {
 	hub.Start()
 	defer hub.Shutdown()
 
-	handler := NewHandler(hub, map[string]config.RemoteNode{}, nil, nil)
+	handler := NewHandler(hub, nil, nil)
 
 	// First client - use longer timeout
 	w1 := newMockFlusher()

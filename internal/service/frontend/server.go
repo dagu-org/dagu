@@ -955,12 +955,7 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 	srv.sseHub.Start()
 	srv.registerSSEFetchers()
 
-	remoteNodes := make(map[string]config.RemoteNode)
-	for _, n := range srv.config.Server.RemoteNodes {
-		remoteNodes[n.Name] = n
-	}
-
-	handler := sse.NewHandler(srv.sseHub, remoteNodes, srv.remoteNodeResolver, srv.authService)
+	handler := sse.NewHandler(srv.sseHub, srv.remoteNodeResolver, srv.authService)
 
 	r.Get(path.Join(apiV1BasePath, "events/dags"), handler.HandleDAGsListEvents)
 	r.Get(path.Join(apiV1BasePath, "events/dags/{fileName}"), handler.HandleDAGEvents)

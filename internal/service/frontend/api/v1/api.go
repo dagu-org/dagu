@@ -45,7 +45,6 @@ type API struct {
 	dagRunMgr          runtime.Manager
 	queueStore         exec.QueueStore
 	procStore          exec.ProcStore
-	remoteNodes        map[string]config.RemoteNode
 	remoteNodeResolver *remotenode.Resolver
 	remoteNodeStore    remotenode.Store
 	apiBasePath        string
@@ -225,11 +224,6 @@ func New(
 	rs *resource.Service,
 	opts ...APIOption,
 ) *API {
-	remoteNodes := make(map[string]config.RemoteNode)
-	for _, n := range cfg.Server.RemoteNodes {
-		remoteNodes[n.Name] = n
-	}
-
 	a := &API{
 		dagStore:           dr,
 		dagRunStore:        drs,
@@ -237,7 +231,6 @@ func New(
 		procStore:          ps,
 		dagRunMgr:          drm,
 		logEncodingCharset: cfg.UI.LogEncodingCharset,
-		remoteNodes:        remoteNodes,
 		subCmdBuilder:      runtime.NewSubCmdBuilder(cfg),
 		apiBasePath:        cfg.Server.APIBasePath,
 		config:             cfg,
@@ -287,7 +280,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 	r.Group(func(r chi.Router) {
 		r.Use(frontendauth.ClientIPMiddleware())
 		r.Use(frontendauth.Middleware(authOptions))
-		r.Use(WithRemoteNode(a.remoteNodeResolver, a.remoteNodes, a.apiBasePath))
+		r.Use(WithRemoteNode(a.remoteNodeResolver, a.apiBasePath))
 		r.Use(WebhookRawBodyMiddleware())
 
 		options := api.StrictHTTPServerOptions{
