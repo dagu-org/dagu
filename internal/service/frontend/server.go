@@ -28,6 +28,7 @@ import (
 	authmodel "github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/auth/tokensecret"
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/crypto"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -46,11 +47,13 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
 	"github.com/dagu-org/dagu/internal/persis/filebaseconfig"
 	"github.com/dagu-org/dagu/internal/persis/filememory"
+	"github.com/dagu-org/dagu/internal/persis/fileremotenode"
 	"github.com/dagu-org/dagu/internal/persis/filesession"
 	"github.com/dagu-org/dagu/internal/persis/filetokensecret"
 	"github.com/dagu-org/dagu/internal/persis/fileupgradecheck"
 	"github.com/dagu-org/dagu/internal/persis/fileuser"
 	"github.com/dagu-org/dagu/internal/persis/filewebhook"
+	"github.com/dagu-org/dagu/internal/remotenode"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
@@ -69,23 +72,24 @@ import (
 
 // Server represents the HTTP server for the frontend application.
 type Server struct {
-	apiV1            *apiv1.API
-	agentAPI         *agent.API
-	agentConfigStore *fileagentconfig.Store
-	config           *config.Config
-	httpServer       *http.Server
-	funcsConfig      funcsConfig
-	builtinOIDCCfg   *auth.BuiltinOIDCConfig
-	authService      *authservice.Service
-	auditService     *audit.Service
-	auditStore       *fileaudit.Store
-	syncService      gitsync.Service
-	listener         net.Listener
-	sseHub           *sse.Hub
-	metricsRegistry  *prometheus.Registry
-	tunnelAPIOpts    []apiv1.APIOption
-	dagStore         exec.DAGStore
-	licenseManager   *license.Manager
+	apiV1              *apiv1.API
+	agentAPI           *agent.API
+	agentConfigStore   *fileagentconfig.Store
+	config             *config.Config
+	httpServer         *http.Server
+	funcsConfig        funcsConfig
+	builtinOIDCCfg     *auth.BuiltinOIDCConfig
+	authService        *authservice.Service
+	auditService       *audit.Service
+	auditStore         *fileaudit.Store
+	syncService        gitsync.Service
+	listener           net.Listener
+	sseHub             *sse.Hub
+	metricsRegistry    *prometheus.Registry
+	tunnelAPIOpts      []apiv1.APIOption
+	dagStore           exec.DAGStore
+	licenseManager     *license.Manager
+	remoteNodeResolver *remotenode.Resolver
 }
 
 // ServerOption is a functional option for configuring the Server.
@@ -263,6 +267,40 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		}
 	}
 
+	// Initialize remote node store and resolver
+	var remoteNodeResolver *remotenode.Resolver
+	encKey, encErr := crypto.ResolveKey(cfg.Paths.DataDir)
+	if encErr != nil {
+		logger.Warn(ctx, "Failed to resolve encryption key for remote node store", tag.Error(encErr))
+	}
+	if encErr == nil {
+		enc, encErr := crypto.NewEncryptor(encKey)
+		if encErr != nil {
+			logger.Warn(ctx, "Failed to create encryptor for remote node store", tag.Error(encErr))
+		} else {
+			rnStore, rnErr := fileremotenode.New(cfg.Paths.RemoteNodesDir, enc)
+			if rnErr != nil {
+				logger.Warn(ctx, "Failed to create remote node store", tag.Error(rnErr))
+			} else {
+				remoteNodeResolver = remotenode.NewResolver(cfg.Server.RemoteNodes, rnStore)
+				apiOpts = append(apiOpts,
+					apiv1.WithRemoteNodeResolver(remoteNodeResolver),
+					apiv1.WithRemoteNodeStore(rnStore),
+				)
+			}
+		}
+	}
+	if remoteNodeResolver == nil {
+		// Fallback: resolver with config nodes only (no store)
+		remoteNodeResolver = remotenode.NewResolver(cfg.Server.RemoteNodes, nil)
+		apiOpts = append(apiOpts, apiv1.WithRemoteNodeResolver(remoteNodeResolver))
+	}
+
+	// Update template remote nodes list to include store-managed nodes
+	if names, err := remoteNodeResolver.ListNames(ctx); err == nil && len(names) > 0 {
+		remoteNodes = names
+	}
+
 	upgradeStore, err := fileupgradecheck.New(cfg.Paths.DataDir)
 	if err != nil {
 		logger.Warn(ctx, "Failed to create upgrade check store", tag.Error(err))
@@ -278,16 +316,17 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	// Note: SSO/OIDC gating is applied after opts are processed (see below)
 
 	srv := &Server{
-		config:           cfg,
-		agentAPI:         agentAPI,
-		agentConfigStore: agentConfigStore,
-		builtinOIDCCfg:   builtinOIDCCfg,
-		authService:      authSvc,
-		auditService:     auditSvc,
-		auditStore:       auditStore,
-		syncService:      syncSvc,
-		metricsRegistry:  mr,
-		dagStore:         dr,
+		config:             cfg,
+		agentAPI:           agentAPI,
+		agentConfigStore:   agentConfigStore,
+		builtinOIDCCfg:     builtinOIDCCfg,
+		authService:        authSvc,
+		auditService:       auditSvc,
+		auditStore:         auditStore,
+		syncService:        syncSvc,
+		metricsRegistry:    mr,
+		dagStore:           dr,
+		remoteNodeResolver: remoteNodeResolver,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
 			NavbarTitle:           cfg.UI.NavbarTitle,
@@ -921,7 +960,7 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 		remoteNodes[n.Name] = n
 	}
 
-	handler := sse.NewHandler(srv.sseHub, remoteNodes, srv.authService)
+	handler := sse.NewHandler(srv.sseHub, remoteNodes, srv.remoteNodeResolver, srv.authService)
 
 	r.Get(path.Join(apiV1BasePath, "events/dags"), handler.HandleDAGsListEvents)
 	r.Get(path.Join(apiV1BasePath, "events/dags/{fileName}"), handler.HandleDAGEvents)

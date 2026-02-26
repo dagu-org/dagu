@@ -16,11 +16,13 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/remotenode"
 )
 
 // WithRemoteNode is a middleware that checks if the request has a "remoteNode" query parameter.
 // If it does, it proxies the request to the specified remote node.
-func WithRemoteNode(remoteNodes map[string]config.RemoteNode, apiBasePath string) func(next http.Handler) http.Handler {
+// It tries the resolver first (for dynamic store nodes), then falls back to the static map.
+func WithRemoteNode(resolver *remotenode.Resolver, remoteNodes map[string]config.RemoteNode, apiBasePath string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			// Check if the request has a "remoteNode" query parameter
@@ -29,9 +31,23 @@ func WithRemoteNode(remoteNodes map[string]config.RemoteNode, apiBasePath string
 				next.ServeHTTP(w, r)
 				return
 			}
-			remoteNode, ok := remoteNodes[remoteNodeName]
-			if !ok {
-				// remote node not found, return bad request
+
+			// Try resolver first (covers both config and store nodes)
+			var remoteNode config.RemoteNode
+			if resolver != nil {
+				if cn, err := resolver.GetByName(r.Context(), remoteNodeName); err == nil {
+					remoteNode = *cn
+				} else {
+					WriteErrorResponse(w, &Error{
+						HTTPStatus: http.StatusBadRequest,
+						Code:       api.ErrorCodeBadRequest,
+						Message:    fmt.Sprintf("remote node %s not found", remoteNodeName),
+					})
+					return
+				}
+			} else if rn, ok := remoteNodes[remoteNodeName]; ok {
+				remoteNode = rn
+			} else {
 				WriteErrorResponse(w, &Error{
 					HTTPStatus: http.StatusBadRequest,
 					Code:       api.ErrorCodeBadRequest,

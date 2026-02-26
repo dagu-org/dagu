@@ -266,6 +266,7 @@ type PathsConfig struct {
 	APIKeysDir         string
 	WebhooksDir        string
 	SessionsDir        string
+	RemoteNodesDir     string
 	ConfigFileUsed     string
 }
 

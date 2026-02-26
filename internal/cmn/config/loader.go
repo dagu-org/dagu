@@ -961,6 +961,7 @@ func (l *ConfigLoader) finalizePaths(cfg *Config) {
 		{&cfg.Paths.UsersDir, "users"},
 		{&cfg.Paths.APIKeysDir, "apikeys"},
 		{&cfg.Paths.WebhooksDir, "webhooks"},
+		{&cfg.Paths.RemoteNodesDir, "remote-nodes"},
 	}
 
 	for _, dp := range derivedPaths {

@@ -21,6 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/baseconfig"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/license"
+	"github.com/dagu-org/dagu/internal/remotenode"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
@@ -45,6 +46,8 @@ type API struct {
 	queueStore         exec.QueueStore
 	procStore          exec.ProcStore
 	remoteNodes        map[string]config.RemoteNode
+	remoteNodeResolver *remotenode.Resolver
+	remoteNodeStore    remotenode.Store
 	apiBasePath        string
 	logEncodingCharset string
 	config             *config.Config
@@ -184,6 +187,20 @@ func WithLicenseManager(m *license.Manager) APIOption {
 	}
 }
 
+// WithRemoteNodeResolver returns an APIOption that sets the remote node resolver.
+func WithRemoteNodeResolver(r *remotenode.Resolver) APIOption {
+	return func(a *API) {
+		a.remoteNodeResolver = r
+	}
+}
+
+// WithRemoteNodeStore returns an APIOption that sets the remote node store.
+func WithRemoteNodeStore(s remotenode.Store) APIOption {
+	return func(a *API) {
+		a.remoteNodeStore = s
+	}
+}
+
 // WithAgentAPI returns an APIOption that sets the API's agent API instance.
 func WithAgentAPI(a *agent.API) APIOption {
 	return func(api *API) {
@@ -270,7 +287,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 	r.Group(func(r chi.Router) {
 		r.Use(frontendauth.ClientIPMiddleware())
 		r.Use(frontendauth.Middleware(authOptions))
-		r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
+		r.Use(WithRemoteNode(a.remoteNodeResolver, a.remoteNodes, a.apiBasePath))
 		r.Use(WebhookRawBodyMiddleware())
 
 		options := api.StrictHTTPServerOptions{

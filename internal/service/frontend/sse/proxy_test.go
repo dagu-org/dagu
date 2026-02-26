@@ -309,7 +309,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 	t.Run("unknown remote node", func(t *testing.T) {
 		t.Parallel()
 		hub := NewHub()
-		handler := NewHandler(hub, map[string]config.RemoteNode{}, nil)
+		handler := NewHandler(hub, map[string]config.RemoteNode{}, nil, nil)
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/events/dag-runs/test", nil)
@@ -340,7 +340,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 				APIBaseURL: remoteServer.URL,
 			},
 		}
-		handler := NewHandler(hub, remoteNodes, nil)
+		handler := NewHandler(hub, remoteNodes, nil, nil)
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/events/dag-runs/mydag/run123?token=abc", nil)
@@ -365,7 +365,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 				APIBaseURL: remoteServer.URL,
 			},
 		}
-		handler := NewHandler(hub, remoteNodes, nil)
+		handler := NewHandler(hub, remoteNodes, nil, nil)
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/events/dag-runs/test", nil)
@@ -384,7 +384,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 				APIBaseURL: "http://invalid-host:99999",
 			},
 		}
-		handler := NewHandler(hub, remoteNodes, nil)
+		handler := NewHandler(hub, remoteNodes, nil, nil)
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/events/dag-runs/test", nil)
@@ -415,7 +415,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 				BasicAuthPassword: "testpass",
 			},
 		}
-		handler := NewHandler(hub, remoteNodes, nil)
+		handler := NewHandler(hub, remoteNodes, nil, nil)
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/events/dag-runs/test", nil)
@@ -478,7 +478,7 @@ func TestProxyToRemoteNodeNonFlusher(t *testing.T) {
 			APIBaseURL: remoteServer.URL,
 		},
 	}
-	handler := NewHandler(hub, remoteNodes, nil)
+	handler := NewHandler(hub, remoteNodes, nil, nil)
 
 	// Use nonFlusher which doesn't implement http.Flusher
 	w := &nonFlusher{}

@@ -498,6 +498,14 @@ export const mainListItems = React.forwardRef<
                 />
               )}
               <NavItem
+                to="/remote-nodes"
+                text="Remote Nodes"
+                icon={<Globe size={18} />}
+                isOpen={isOpen}
+                onClick={onNavItemClick}
+                customColor={customColor}
+              />
+              <NavItem
                 to="/license"
                 text="License"
                 icon={<Shield size={18} />}

@@ -20,7 +20,7 @@ func TestNewHandler(t *testing.T) {
 		"node1": {Name: "node1"},
 	}
 
-	handler := NewHandler(hub, remoteNodes, nil)
+	handler := NewHandler(hub, remoteNodes, nil, nil)
 
 	require.NotNil(t, handler)
 	assert.Same(t, hub, handler.hub)
@@ -96,7 +96,7 @@ func setupHandler(t *testing.T) (*Handler, *Hub) {
 	hub.Start()
 	t.Cleanup(hub.Shutdown)
 
-	handler := NewHandler(hub, map[string]config.RemoteNode{}, nil)
+	handler := NewHandler(hub, map[string]config.RemoteNode{}, nil, nil)
 	return handler, hub
 }
 
@@ -282,7 +282,7 @@ func TestHandleSSERemoteProxy(t *testing.T) {
 			APIBaseURL: remoteServer.URL,
 		},
 	}
-	handler := NewHandler(hub, remoteNodes, nil)
+	handler := NewHandler(hub, remoteNodes, nil, nil)
 
 	w := newMockFlusher()
 	params := map[string]string{"fileName": "mydag.yaml"}
@@ -316,7 +316,7 @@ func TestHandleSSELocalNode(t *testing.T) {
 func TestValidateAuthNoService(t *testing.T) {
 	t.Parallel()
 	hub := NewHub()
-	handler := NewHandler(hub, nil, nil)
+	handler := NewHandler(hub, nil, nil, nil)
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/test", nil)
@@ -334,7 +334,7 @@ func TestHandleSSEMaxClients(t *testing.T) {
 	hub.Start()
 	defer hub.Shutdown()
 
-	handler := NewHandler(hub, map[string]config.RemoteNode{}, nil)
+	handler := NewHandler(hub, map[string]config.RemoteNode{}, nil, nil)
 
 	// First client - use longer timeout
 	w1 := newMockFlusher()
