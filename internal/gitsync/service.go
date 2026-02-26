@@ -1000,7 +1000,8 @@ func (s *serviceImpl) Forget(_ context.Context, itemIDs []string) ([]string, err
 		return nil, err
 	}
 
-	var forgotten []string
+	// Phase 1: validate all IDs before mutating state.
+	var toForget []string
 	for _, itemID := range itemIDs {
 		dagState, exists := state.DAGs[itemID]
 		if !exists {
@@ -1012,9 +1013,15 @@ func (s *serviceImpl) Forget(_ context.Context, itemIDs []string) ([]string, err
 			return nil, fmt.Errorf("%w: %q is %s — only missing, untracked, or conflict items can be forgotten",
 				ErrCannotForget, itemID, dagState.Status)
 		case StatusMissing, StatusUntracked, StatusConflict:
-			delete(state.DAGs, itemID)
-			forgotten = append(forgotten, itemID)
+			toForget = append(toForget, itemID)
 		}
+	}
+
+	// Phase 2: delete all validated entries.
+	var forgotten []string
+	for _, itemID := range toForget {
+		delete(state.DAGs, itemID)
+		forgotten = append(forgotten, itemID)
 	}
 
 	if len(forgotten) > 0 {
@@ -1100,7 +1107,9 @@ func (s *serviceImpl) Delete(ctx context.Context, itemID, message string, force 
 	if err != nil {
 		return err
 	}
-	_ = os.Remove(localPath)
+	if err := os.Remove(localPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove local file %q: %w", itemID, err)
+	}
 
 	// Stage removal in repo
 	repoPath, err := s.safeDAGIDToRepoPath(itemID)
@@ -1108,9 +1117,11 @@ func (s *serviceImpl) Delete(ctx context.Context, itemID, message string, force 
 		return err
 	}
 
-	// File might not exist in repo (missing items) — ignore removal errors
-	// since the state cleanup is still valuable.
-	_ = s.gitClient.RemoveFile(repoPath)
+	// For missing items the file won't exist in the repo — ignore that error.
+	// For other statuses, a real staging failure should be surfaced.
+	if err := s.gitClient.RemoveFile(repoPath); err != nil && dagState.Status != StatusMissing {
+		return fmt.Errorf("failed to stage removal of %q: %w", itemID, err)
+	}
 
 	// Commit and push
 	if message == "" {
@@ -1171,7 +1182,8 @@ func (s *serviceImpl) DeleteAllMissing(ctx context.Context, message string) ([]s
 		return nil, err
 	}
 
-	// Stage all removals — some files may not exist in repo, that's OK.
+	// Stage all removals — all items here are missing by definition,
+	// so files may not exist in the repo. Ignore errors from RemoveFiles.
 	_ = s.gitClient.RemoveFiles(repoPaths)
 
 	if message == "" {

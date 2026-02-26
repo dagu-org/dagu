@@ -420,17 +420,20 @@ func TestSyncDeleteMissing(t *testing.T) {
 	t.Run("returns 400 when push disabled", func(t *testing.T) {
 		t.Parallel()
 
+		var called bool
 		a := newSyncAPIForTest(&mockSyncService{
 			deleteAllMissing: func(_ context.Context, _ string) ([]string, error) {
+				called = true
 				return nil, gitsync.ErrPushDisabled
 			},
 		})
 
-		_, err := a.SyncDeleteMissing(context.Background(), apigen.SyncDeleteMissingRequestObject{})
-		require.Error(t, err)
-		var apiErr *Error
-		require.ErrorAs(t, err, &apiErr)
-		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+		resp, err := a.SyncDeleteMissing(context.Background(), apigen.SyncDeleteMissingRequestObject{})
+		require.NoError(t, err)
+		assert.True(t, called, "deleteAllMissing should have been invoked")
+		errResp, ok := resp.(apigen.SyncDeleteMissing400JSONResponse)
+		assert.True(t, ok)
+		assert.Contains(t, errResp.Message, "push")
 	})
 
 	t.Run("returns 200 with deleted list", func(t *testing.T) {
@@ -534,6 +537,32 @@ func TestMoveSyncItem(t *testing.T) {
 		require.NoError(t, err)
 		_, ok := resp.(apigen.MoveSyncItem404JSONResponse)
 		assert.True(t, ok)
+	})
+
+	t.Run("returns 409 for conflict error", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			moveFn: func(_ context.Context, _, _, _ string, _ bool) error {
+				return &gitsync.ConflictError{
+					DAGID:         "old-dag",
+					RemoteCommit:  "abc123",
+					RemoteAuthor:  "alice",
+					RemoteMessage: "conflicting change",
+				}
+			},
+		})
+
+		resp, err := a.MoveSyncItem(context.Background(), apigen.MoveSyncItemRequestObject{
+			ItemId: "old-dag",
+			Body: &apigen.MoveSyncItemJSONRequestBody{
+				NewItemId: "new-dag",
+			},
+		})
+		require.NoError(t, err)
+		conflictResp, ok := resp.(apigen.MoveSyncItem409JSONResponse)
+		assert.True(t, ok)
+		assert.Equal(t, "old-dag", conflictResp.ItemId)
 	})
 
 	t.Run("returns 200 on success", func(t *testing.T) {

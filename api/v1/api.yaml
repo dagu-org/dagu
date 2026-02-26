@@ -3767,7 +3767,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -7649,7 +7649,7 @@ components:
           format: date-time
           description: "When the conflict was detected"
         previousStatus:
-          type: string
+          $ref: "#/components/schemas/SyncStatus"
           description: "Status before transitioning to missing"
         missingAt:
           type: string

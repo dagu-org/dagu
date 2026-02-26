@@ -559,6 +559,13 @@ func runSyncDelete(ctx *Context, args []string) error {
 	}
 
 	itemID := args[0]
+
+	if dryRun {
+		fmt.Printf("Would delete:\n")
+		fmt.Printf("  - %s\n", itemID)
+		return nil
+	}
+
 	fmt.Printf("Deleting item: %s\n", itemID)
 	fmt.Println("WARNING: This will delete the item from the remote repository!")
 

@@ -460,6 +460,7 @@ func (a *API) DeleteSyncItem(ctx context.Context, req api.DeleteSyncItemRequestO
 	a.logAudit(ctx, audit.CategoryGitSync, "sync_delete", map[string]any{
 		"item_id": req.ItemId,
 		"force":   force,
+		"message": message,
 	})
 
 	return api.DeleteSyncItem200JSONResponse{
@@ -484,11 +485,10 @@ func (a *API) SyncDeleteMissing(ctx context.Context, req api.SyncDeleteMissingRe
 	deleted, err := a.syncService.DeleteAllMissing(ctx, message)
 	if err != nil {
 		if errors.Is(err, gitsync.ErrPushDisabled) {
-			return nil, &Error{
-				Code:       api.ErrorCodeBadRequest,
-				Message:    err.Error(),
-				HTTPStatus: http.StatusBadRequest,
-			}
+			return api.SyncDeleteMissing400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: err.Error(),
+			}, nil
 		}
 		return nil, internalError(err)
 	}
@@ -571,6 +571,7 @@ func (a *API) MoveSyncItem(ctx context.Context, req api.MoveSyncItemRequestObjec
 		"old_item_id": req.ItemId,
 		"new_item_id": req.Body.NewItemId,
 		"force":       force,
+		"message":     message,
 	})
 
 	return api.MoveSyncItem200JSONResponse{
@@ -679,7 +680,7 @@ func toAPISyncItems(states map[string]*gitsync.DAGState) []api.SyncItem {
 			MissingAt:          state.MissingAt,
 		}
 		if state.PreviousStatus != "" {
-			item.PreviousStatus = ptrOf(state.PreviousStatus)
+			item.PreviousStatus = ptrOf(api.SyncStatus(state.PreviousStatus))
 		}
 		result = append(result, item)
 	}

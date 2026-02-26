@@ -3240,7 +3240,7 @@ export interface components {
              */
             conflictDetectedAt?: string;
             /** @description Status before transitioning to missing */
-            previousStatus?: string;
+            previousStatus?: components["schemas"]["SyncStatus"];
             /**
              * Format: date-time
              * @description When the file was first detected as missing
@@ -8429,7 +8429,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
                 "application/json": {
                     /** @description Commit message for the deletion */
