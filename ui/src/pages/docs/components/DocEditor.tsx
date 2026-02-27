@@ -1,5 +1,7 @@
 import MarkdownEditor from '@/components/editors/MarkdownEditor';
+import { MermaidBlock } from '@/components/ui/mermaid-block';
 import { useSimpleToast } from '@/components/ui/simple-toast';
+import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import './DocPreview.css';
@@ -197,7 +199,24 @@ function DocEditor({ tabId, docPath }: Props) {
         ) : (
           <div className="h-full overflow-y-auto p-6">
             <div className="doc-preview max-w-none">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  code({ className: codeClassName, children }) {
+                    if (codeClassName === 'language-mermaid') {
+                      return <MermaidBlock code={String(children)} />;
+                    }
+                    return <code className={codeClassName}>{children}</code>;
+                  },
+                  pre({ children }) {
+                    const child = children as React.ReactElement;
+                    if (child?.type === MermaidBlock) {
+                      return <>{children}</>;
+                    }
+                    return <pre>{children}</pre>;
+                  },
+                }}
+              >
                 {currentValue}
               </ReactMarkdown>
             </div>
