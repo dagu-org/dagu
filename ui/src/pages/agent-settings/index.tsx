@@ -53,6 +53,8 @@ type SavedAgentConfig = {
   defaultModelId?: string;
   selectedSoulId?: string;
   toolPolicy: AgentToolPolicy;
+  webSearchEnabled: boolean;
+  webSearchMaxUses?: number;
 };
 
 type ToolMeta = {
@@ -129,6 +131,8 @@ export default function AgentSettingsPage(): ReactNode {
   const [presets, setPresets] = useState<ModelPreset[]>([]);
   const [souls, setSouls] = useState<SoulOption[]>([]);
   const [selectedSoulId, setSelectedSoulId] = useState<string | undefined>();
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [webSearchMaxUses, setWebSearchMaxUses] = useState<number | undefined>();
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -176,11 +180,15 @@ export default function AgentSettingsPage(): ReactNode {
       setDefaultModelId(data.defaultModelId);
       setSelectedSoulId(data.selectedSoulId);
       setToolPolicy(normalizedPolicy);
+      setWebSearchEnabled(data.webSearch?.enabled ?? false);
+      setWebSearchMaxUses(data.webSearch?.maxUses ?? undefined);
       setSavedConfig({
         enabled: data.enabled ?? false,
         defaultModelId: data.defaultModelId,
         selectedSoulId: data.selectedSoulId,
         toolPolicy: normalizedPolicy,
+        webSearchEnabled: data.webSearch?.enabled ?? false,
+        webSearchMaxUses: data.webSearch?.maxUses ?? undefined,
       });
       setBashRuleIds(buildBashRuleIDs(normalizedPolicy.bash?.rules?.length || 0));
     } catch (err) {
@@ -258,6 +266,12 @@ export default function AgentSettingsPage(): ReactNode {
       if (!savedConfig || JSON.stringify(currentPolicyCanonical) !== JSON.stringify(savedPolicyCanonical)) {
         requestBody.toolPolicy = currentPolicyCanonical;
       }
+      if (!savedConfig || webSearchEnabled !== savedConfig.webSearchEnabled || webSearchMaxUses !== savedConfig.webSearchMaxUses) {
+        requestBody.webSearch = {
+          enabled: webSearchEnabled,
+          maxUses: webSearchMaxUses,
+        };
+      }
 
       if (Object.keys(requestBody).length === 0) {
         setSuccess('No changes to save');
@@ -278,11 +292,15 @@ export default function AgentSettingsPage(): ReactNode {
       setDefaultModelId(data.defaultModelId);
       setSelectedSoulId(data.selectedSoulId);
       setToolPolicy(normalizedPolicy);
+      setWebSearchEnabled(data.webSearch?.enabled ?? false);
+      setWebSearchMaxUses(data.webSearch?.maxUses ?? undefined);
       setSavedConfig({
         enabled: data.enabled ?? false,
         defaultModelId: data.defaultModelId,
         selectedSoulId: data.selectedSoulId,
         toolPolicy: normalizedPolicy,
+        webSearchEnabled: data.webSearch?.enabled ?? false,
+        webSearchMaxUses: data.webSearch?.maxUses ?? undefined,
       });
       setSuccess('Configuration saved successfully');
     } catch (err) {
@@ -554,6 +572,42 @@ export default function AgentSettingsPage(): ReactNode {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        )}
+      </div>
+
+      {/* Web Search */}
+      <div className="card-obsidian p-4 space-y-4 max-w-xl">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="web-search" className="text-sm font-medium">
+              Web Search
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Enable provider-native web search for agent sessions
+            </p>
+          </div>
+          <Switch
+            id="web-search"
+            checked={webSearchEnabled}
+            onCheckedChange={setWebSearchEnabled}
+          />
+        </div>
+
+        {webSearchEnabled && (
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Max Uses per Request</Label>
+            <Input
+              type="number"
+              min={1}
+              className="h-8 text-xs max-w-[200px]"
+              placeholder="No limit"
+              value={webSearchMaxUses ?? ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                setWebSearchMaxUses(val === '' ? undefined : parseInt(val, 10));
+              }}
+            />
           </div>
         )}
       </div>

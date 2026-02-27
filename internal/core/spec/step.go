@@ -147,6 +147,28 @@ type thinkingConfig struct {
 	IncludeInOutput bool `yaml:"include_in_output,omitempty"`
 }
 
+// webSearchConfig configures provider-native web search for LLM steps.
+type webSearchConfig struct {
+	// Enabled activates provider-native web search.
+	Enabled bool `yaml:"enabled,omitempty"`
+	// MaxUses limits search invocations per request.
+	MaxUses *int `yaml:"max_uses,omitempty"`
+	// AllowedDomains restricts results to these domains (Anthropic only).
+	AllowedDomains []string `yaml:"allowed_domains,omitempty"`
+	// BlockedDomains excludes results from these domains (Anthropic only).
+	BlockedDomains []string `yaml:"blocked_domains,omitempty"`
+	// UserLocation localizes search results.
+	UserLocation *webSearchUserLocation `yaml:"user_location,omitempty"`
+}
+
+// webSearchUserLocation provides approximate location for search localization.
+type webSearchUserLocation struct {
+	City     string `yaml:"city,omitempty"`
+	Region   string `yaml:"region,omitempty"`
+	Country  string `yaml:"country,omitempty"`
+	Timezone string `yaml:"timezone,omitempty"`
+}
+
 type llmConfig struct {
 	// Provider is the LLM provider (openai, anthropic, gemini, openrouter, local).
 	// Used for single model config (backward compatible).
@@ -177,6 +199,8 @@ type llmConfig struct {
 	Tools []string `yaml:"tools,omitempty"`
 	// MaxToolIterations limits tool calling rounds (default: 10).
 	MaxToolIterations *int `yaml:"max_tool_iterations,omitempty"`
+	// WebSearch configures provider-native web search.
+	WebSearch *webSearchConfig `yaml:"web_search,omitempty"`
 }
 
 // llmMessage defines a message in the LLM session.
@@ -206,6 +230,9 @@ type agentConfig struct {
 	MaxIterations *int `yaml:"max_iterations,omitempty"`
 	// SafeMode enables command approval via HITL.
 	SafeMode *bool `yaml:"safe_mode,omitempty"`
+	// WebSearch configures provider-native web search for this agent step.
+	// Overrides the global agent web search setting.
+	WebSearch *webSearchConfig `yaml:"web_search,omitempty"`
 }
 
 // agentToolsConfig configures available tools and policies.
@@ -1421,9 +1448,32 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 		Thinking:          thinking,
 		Tools:             cfg.Tools,
 		MaxToolIterations: cfg.MaxToolIterations,
+		WebSearch:         buildWebSearchConfig(cfg.WebSearch),
 	}
 
 	return nil
+}
+
+// buildWebSearchConfig converts webSearchConfig to core.WebSearchConfig.
+func buildWebSearchConfig(cfg *webSearchConfig) *core.WebSearchConfig {
+	if cfg == nil {
+		return nil
+	}
+	result := &core.WebSearchConfig{
+		Enabled:        cfg.Enabled,
+		MaxUses:        cfg.MaxUses,
+		AllowedDomains: cfg.AllowedDomains,
+		BlockedDomains: cfg.BlockedDomains,
+	}
+	if cfg.UserLocation != nil {
+		result.UserLocation = &core.WebSearchUserLocation{
+			City:     cfg.UserLocation.City,
+			Region:   cfg.UserLocation.Region,
+			Country:  cfg.UserLocation.Country,
+			Timezone: cfg.UserLocation.Timezone,
+		}
+	}
+	return result
 }
 
 // convertModelEntries converts types.ModelEntry slice to core.ModelEntry slice with validation.
@@ -1631,6 +1681,8 @@ func buildStepAgent(_ StepBuildContext, s *step, result *core.Step) error {
 				Enabled: s.Agent.Memory.Enabled,
 			}
 		}
+
+		cfg.WebSearch = buildWebSearchConfig(s.Agent.WebSearch)
 	}
 
 	result.Agent = cfg

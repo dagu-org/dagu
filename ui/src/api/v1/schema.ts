@@ -3471,6 +3471,7 @@ export interface components {
             toolPolicy?: components["schemas"]["AgentToolPolicy"];
             /** @description ID of the currently selected soul */
             selectedSoulId?: string | null;
+            webSearch?: components["schemas"]["AgentWebSearchConfig"];
         };
         /** @description Request to update AI agent configuration */
         UpdateAgentConfigRequest: {
@@ -3481,6 +3482,7 @@ export interface components {
             toolPolicy?: components["schemas"]["AgentToolPolicy"];
             /** @description ID of the soul to select */
             selectedSoulId?: string | null;
+            webSearch?: components["schemas"]["AgentWebSearchConfig"];
         };
         /** @description Global tool permission policy for AI agent sessions */
         AgentToolPolicy: {
@@ -3512,6 +3514,13 @@ export interface components {
             action: AgentBashRuleAction;
             /** @description Rule enabled state (default: true when omitted) */
             enabled?: boolean;
+        };
+        /** @description Provider-native web search configuration for agent sessions */
+        AgentWebSearchConfig: {
+            /** @description Whether provider-native web search is enabled */
+            enabled?: boolean;
+            /** @description Maximum number of search invocations per request */
+            maxUses?: number;
         };
         /** @description Model configuration */
         ModelConfigResponse: {

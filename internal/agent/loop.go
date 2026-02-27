@@ -79,6 +79,8 @@ type LoopConfig struct {
 	SkillStore SkillStore
 	// AllowedSkills restricts which skill IDs can be pre-loaded by delegates. Nil = all allowed.
 	AllowedSkills map[string]struct{}
+	// WebSearch configures provider-native web search for requests.
+	WebSearch *llm.WebSearchRequest
 }
 
 // Loop manages a session turn with an LLM including tool execution.
@@ -108,6 +110,7 @@ type Loop struct {
 	registry         SubSessionRegistry
 	skillStore       SkillStore
 	allowedSkills    map[string]struct{}
+	webSearch        *llm.WebSearchRequest
 }
 
 // NewLoop creates a new Loop instance.
@@ -139,6 +142,7 @@ func NewLoop(config LoopConfig) *Loop {
 		registry:         config.Registry,
 		skillStore:       config.SkillStore,
 		allowedSkills:    config.AllowedSkills,
+		webSearch:        config.WebSearch,
 	}
 }
 
@@ -267,9 +271,10 @@ func (l *Loop) sendRequest(ctx context.Context) (*llm.ChatResponse, error) {
 	tools := l.buildToolDefinitions()
 
 	req := &llm.ChatRequest{
-		Model:    l.model,
-		Messages: messages,
-		Tools:    tools,
+		Model:     l.model,
+		Messages:  messages,
+		Tools:     tools,
+		WebSearch: l.webSearch,
 	}
 
 	l.logger.Debug("sending LLM request",

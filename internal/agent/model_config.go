@@ -19,6 +19,15 @@ type Config struct {
 	ToolPolicy     ToolPolicyConfig `json:"toolPolicy"`
 	EnabledSkills  []string         `json:"enabledSkills,omitempty"`
 	SelectedSoulID string           `json:"selectedSoulId,omitempty"`
+	WebSearch      *WebSearchConfig `json:"webSearch,omitempty"`
+}
+
+// WebSearchConfig configures provider-native web search for agent sessions.
+type WebSearchConfig struct {
+	// Enabled activates provider-native web search.
+	Enabled bool `json:"enabled,omitempty"`
+	// MaxUses limits search invocations per request.
+	MaxUses *int `json:"maxUses,omitempty"`
 }
 
 // BashRuleAction is the decision a bash rule applies when matched.

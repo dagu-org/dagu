@@ -147,12 +147,19 @@ func (a *API) requireAgentConfigManagement() error {
 }
 
 func toAgentConfigResponse(cfg *agent.Config) api.AgentConfigResponse {
-	return api.AgentConfigResponse{
+	resp := api.AgentConfigResponse{
 		Enabled:        &cfg.Enabled,
 		DefaultModelId: ptrOf(cfg.DefaultModelID),
 		ToolPolicy:     toAPIToolPolicy(cfg.ToolPolicy),
 		SelectedSoulId: ptrOf(cfg.SelectedSoulID),
 	}
+	if cfg.WebSearch != nil {
+		resp.WebSearch = &api.AgentWebSearchConfig{
+			Enabled: &cfg.WebSearch.Enabled,
+			MaxUses: cfg.WebSearch.MaxUses,
+		}
+	}
+	return resp
 }
 
 // applyAgentConfigUpdates applies non-nil fields from the update request to the agent configuration.
@@ -172,6 +179,14 @@ func applyAgentConfigUpdates(cfg *agent.Config, update *api.UpdateAgentConfigReq
 	}
 	if update.SelectedSoulId != nil {
 		cfg.SelectedSoulID = *update.SelectedSoulId
+	}
+	if update.WebSearch != nil {
+		ws := &agent.WebSearchConfig{}
+		if update.WebSearch.Enabled != nil {
+			ws.Enabled = *update.WebSearch.Enabled
+		}
+		ws.MaxUses = update.WebSearch.MaxUses
+		cfg.WebSearch = ws
 	}
 	return nil
 }

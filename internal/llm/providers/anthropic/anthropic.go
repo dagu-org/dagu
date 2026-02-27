@@ -93,6 +93,8 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 					Arguments: string(argsJSON),
 				},
 			})
+		case "server_tool_use", "web_search_tool_result":
+			// Provider-internal blocks from web search; skip silently.
 		}
 	}
 
@@ -150,6 +152,33 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 	// Add tools if provided
 	if len(req.Tools) > 0 {
 		chatReq.Tools = p.convertTools(req.Tools)
+	}
+
+	// Append provider-native web search tool if enabled.
+	if req.WebSearch != nil && req.WebSearch.Enabled {
+		wsEntry := map[string]any{
+			"type": "web_search_20250305",
+			"name": "web_search",
+		}
+		if req.WebSearch.MaxUses != nil {
+			wsEntry["max_uses"] = *req.WebSearch.MaxUses
+		}
+		if len(req.WebSearch.AllowedDomains) > 0 {
+			wsEntry["allowed_domains"] = req.WebSearch.AllowedDomains
+		}
+		if len(req.WebSearch.BlockedDomains) > 0 {
+			wsEntry["blocked_domains"] = req.WebSearch.BlockedDomains
+		}
+		if req.WebSearch.UserLocation != nil {
+			wsEntry["user_location"] = map[string]any{
+				"type":     "approximate",
+				"city":     req.WebSearch.UserLocation.City,
+				"region":   req.WebSearch.UserLocation.Region,
+				"country":  req.WebSearch.UserLocation.Country,
+				"timezone": req.WebSearch.UserLocation.Timezone,
+			}
+		}
+		chatReq.Tools = append(chatReq.Tools, wsEntry)
 	}
 
 	// Add tool choice if specified
@@ -279,12 +308,12 @@ func (p *Provider) processMessages(reqMessages []llm.Message) (string, []message
 	return systemContent, messages
 }
 
-func (p *Provider) convertTools(tools []llm.Tool) []tool {
+func (p *Provider) convertTools(tools []llm.Tool) []any {
 	if len(tools) == 0 {
 		return nil
 	}
 
-	result := make([]tool, len(tools))
+	result := make([]any, len(tools))
 	for i, t := range tools {
 		// Extract properties and required from the Parameters schema
 		var props map[string]any
@@ -461,7 +490,7 @@ type messagesRequest struct {
 	StopSequences []string         `json:"stop_sequences,omitempty"`
 	Stream        bool             `json:"stream,omitempty"`
 	Thinking      *thinkingRequest `json:"thinking,omitempty"`
-	Tools         []tool           `json:"tools,omitempty"`
+	Tools         []any            `json:"tools,omitempty"`
 	ToolChoice    any              `json:"tool_choice,omitempty"` // "auto", "any", or {"type": "tool", "name": "..."}
 }
 

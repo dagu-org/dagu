@@ -21,7 +21,6 @@ func TestResolveToolPolicy_Defaults(t *testing.T) {
 	assert.True(t, resolved.Tools["navigate"])
 	assert.True(t, resolved.Tools["read_schema"])
 	assert.True(t, resolved.Tools["ask_user"])
-	assert.True(t, resolved.Tools["web_search"])
 	assert.True(t, resolved.Tools["delegate"])
 	assert.Equal(t, BashDefaultBehaviorAllow, resolved.Bash.DefaultBehavior)
 	assert.Equal(t, BashDenyBehaviorAskUser, resolved.Bash.DenyBehavior)

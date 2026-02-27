@@ -2984,9 +2984,51 @@
         "thinking": {
           "$ref": "#/definitions/thinkingConfig",
           "description": "Extended thinking/reasoning configuration. Enables deeper reasoning for complex tasks."
+        },
+        "web_search": {
+          "$ref": "#/definitions/webSearchConfig",
+          "description": "Provider-native web search configuration. Supported by Anthropic, Gemini, and OpenRouter."
         }
       },
       "description": "LLM configuration. Supports OpenAI, Anthropic, Google Gemini, OpenRouter, and local models (Ollama/vLLM)."
+    },
+    "webSearchConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable provider-native web search. When true, the LLM can search the web for real-time information."
+        },
+        "max_uses": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of search invocations per request."
+        },
+        "allowed_domains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Restrict search results to these domains (Anthropic only)."
+        },
+        "blocked_domains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Exclude search results from these domains (Anthropic only)."
+        },
+        "user_location": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "city": { "type": "string", "description": "City name for search localization." },
+            "region": { "type": "string", "description": "Region or state." },
+            "country": { "type": "string", "description": "ISO country code (e.g., 'US')." },
+            "timezone": { "type": "string", "description": "IANA timezone (e.g., 'America/New_York')." }
+          },
+          "description": "Approximate location for search result localization."
+        }
+      },
+      "description": "Configuration for provider-native web search. Anthropic uses web_search_20250305 tool, Gemini uses google_search grounding, OpenRouter uses web plugin."
     },
     "thinkingConfig": {
       "type": "object",
@@ -3079,6 +3121,10 @@
         "soul": {
           "type": "string",
           "description": "Soul ID for this step's agent identity. When omitted, inherits from defaults.agent.soul or uses the built-in default."
+        },
+        "web_search": {
+          "$ref": "#/definitions/webSearchConfig",
+          "description": "Provider-native web search configuration for this agent step. Overrides the global agent web search setting."
         }
       },
       "description": "Configuration for agent-type steps. Controls model selection, available tools, safety policies, and iteration limits."
@@ -3091,7 +3137,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["bash", "read", "patch", "think", "read_schema", "web_search", "output", "use_skill", "search_skills"]
+            "enum": ["bash", "read", "patch", "think", "read_schema", "output", "use_skill", "search_skills"]
           },
           "description": "List of tools to enable. When omitted, all tools are available."
         },
