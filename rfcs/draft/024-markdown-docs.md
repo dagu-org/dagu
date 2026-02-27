@@ -413,7 +413,7 @@ When the agent edits a document via `patch` while a user has the same document o
 
 #### Backend
 
-**New topic type** — A new `TopicTypeDoc TopicType = "doc"` is added to `sse/types.go` alongside the existing 9 topic types:
+**New topic types** — Two new topic types are added to `sse/types.go`:
 
 ```go
 const (
@@ -421,37 +421,55 @@ const (
     TopicTypeDAG        TopicType = "dag"
     // ... existing types ...
     TopicTypeDoc        TopicType = "doc"
+    TopicTypeDocTree    TopicType = "doctree"
 )
 ```
 
-Topic identifier format: `doc:runbooks/deployment` (using the doc ID as the topic identifier).
+- `TopicTypeDoc` — Individual document content. Topic identifier format: `doc:runbooks/deployment`.
+- `TopicTypeDocTree` — Document tree structure. Topic identifier format: `doctree:<querystring>` (e.g., `doctree:page=1&perPage=200`). Used by the tree sidebar for real-time updates when documents are created, deleted, or renamed by any actor (agent, git sync, CLI).
 
-**FetchFunc** — `GetDocContentData` reads the document from disk via the doc store's `Get(id)` method and returns the same structure as `GET /docs/doc?path={docPath}` (id, title, content, createdAt, updatedAt). Registered in `registerSSEFetchers()`:
+**FetchFuncs:**
+
+- `GetDocContentData` reads a single document via `docStore.Get(id)` and returns the same structure as `GET /docs/doc?path={docPath}` (id, title, content, createdAt, updatedAt).
+- `GetDocTreeData` reads the tree via `docStore.List(page, perPage)` with parameters parsed from the identifier query string and returns the same structure as `GET /docs` (tree mode).
+
+Registered in `registerSSEFetchers()`:
 
 ```go
 srv.sseHub.RegisterFetcher(sse.TopicTypeDoc, srv.apiV1.GetDocContentData)
+srv.sseHub.RegisterFetcher(sse.TopicTypeDocTree, srv.apiV1.GetDocTreeData)
 ```
 
-**SSE endpoint** — `GET /events/docs/{docPath}` where `{docPath}` is a Chi wildcard (`events/docs/*`) since doc paths contain slashes (e.g., `events/docs/runbooks/deployment`). Route registration:
+**SSE endpoints:**
+
+- `GET /events/docs/{docPath}` — Individual document content stream. `{docPath}` is a Chi wildcard (`events/docs/*`) since doc paths contain slashes.
+- `GET /events/docs-tree` — Document tree structure stream. Used by the tree sidebar.
+
+Route registration:
 
 ```go
 r.Get(path.Join(apiV1BasePath, "events/docs/*"), handler.HandleDocEvents)
+r.Get(path.Join(apiV1BasePath, "events/docs-tree"), handler.HandleDocTreeEvents)
 ```
 
-**Handler** — `HandleDocEvents` extracts the path after `events/docs/` and calls `handleSSE`:
+**Handlers:**
 
 ```go
 func (h *Handler) HandleDocEvents(w http.ResponseWriter, r *http.Request) {
     docPath := chi.URLParam(r, "*")
     h.handleSSE(w, r, buildTopic(TopicTypeDoc, docPath))
 }
+
+func (h *Handler) HandleDocTreeEvents(w http.ResponseWriter, r *http.Request) {
+    h.handleSSE(w, r, buildTopic(TopicTypeDocTree, r.URL.RawQuery))
+}
 ```
 
-**Watcher** — The SSE hub's existing polling watcher detects changes by comparing the document's content hash (SHA256). The watcher polls at 1–10s adaptive intervals (same adaptive logic as other topic types). A hash change triggers a broadcast to all clients subscribed to that document's topic.
+**Watcher** — The SSE hub's existing polling watcher detects changes by comparing the response data's SHA256 hash. The watcher polls at 1–10s adaptive intervals (same adaptive logic as other topic types). A hash change triggers a broadcast to all clients subscribed to that topic. This applies to both `TopicTypeDoc` (content changes) and `TopicTypeDocTree` (tree structure changes — file created, deleted, renamed).
 
 #### Frontend
 
-**`useDocSSE` hook** — Wraps the generic `useSSE` hook, following the `useDAGSSE` pattern (`ui/src/hooks/useDAGSSE.ts`):
+**`useDocSSE` hook** — Wraps the generic `useSSE` hook for individual document content, following the `useDAGSSE` pattern (`ui/src/hooks/useDAGSSE.ts`):
 
 ```typescript
 interface DocSSEResponse {
@@ -468,6 +486,18 @@ export function useDocSSE(
 ): SSEState<DocSSEResponse> {
   const endpoint = `/events/docs/${docPath}`;
   return useSSE<DocSSEResponse>(endpoint, enabled);
+}
+```
+
+**`useDocTreeSSE` hook** — Wraps `useSSE` for the document tree, following the `useDAGsListSSE` pattern (`ui/src/hooks/useDAGsListSSE.ts`):
+
+```typescript
+export function useDocTreeSSE(
+  queryParams: Record<string, string | number>,
+  enabled: boolean = true
+): SSEState<DocListResponse> {
+  const endpoint = buildSSEEndpoint('/events/docs-tree', queryParams);
+  return useSSE<DocListResponse>(endpoint, enabled);
 }
 ```
 
@@ -606,13 +636,24 @@ The page sets `appBarContext.setTitle('Documents')` on mount.
 
 #### Tree Sidebar
 
-The tree sidebar fetches data from `GET /docs` (tree mode) via `useQuery`. It renders a recursive tree of directories and files.
+The tree sidebar renders a recursive tree of directories and files with real-time updates.
+
+**Real-time updates** — The tree uses the dual data source pattern from the DAG list page (`ui/src/pages/dags/index.tsx:206-229`):
+
+```
+SSE primary (useDocTreeSSE) → polling fallback (2s interval via useQuery) → keepPreviousData
+const data = sseResult.data ?? pollingData;
+```
+
+The tree fetches with `perPage=200` to accommodate most documentation sets. The SSE watcher detects tree changes (file created, deleted, renamed by any actor) via SHA256 hash comparison and broadcasts updates automatically. After local mutations (create/delete/rename via UI), `mutate()` is called for immediate local refresh in addition to SSE.
+
+**Pagination** — If `pagination.hasNextPage` is true, a "Load more" link appears at the bottom of the tree, fetching the next page and appending results.
 
 **Header bar** — Compact top bar with section label and action buttons:
 - "Documents" label (`text-xs font-medium uppercase tracking-wide`)
 - `FilePlus` button (new document), gated by `canWrite`
 
-**Tree nodes** — Recursive rendering with depth-based indentation (`pl-3` per level):
+**Tree nodes** — Recursive rendering with depth-based indentation (`pl-3` per level). Tree nodes are rendered in the order returned by `GET /docs`, which sorts directories first, then files, alphabetically within each group. No client-side sorting is needed.
 
 | Type | Icon (collapsed/expanded) | Click action |
 |------|---------------------------|--------------|
@@ -621,12 +662,16 @@ The tree sidebar fetches data from `GET /docs` (tree mode) via `useQuery`. It re
 
 Active file is highlighted with `bg-accent text-accent-foreground`. Expand state is stored in local `Set<string>` — directories containing the active document auto-expand on initial load.
 
+**Empty directory pruning** — The backend's `buildTree` prunes directory nodes that have no `.md` file descendants after sorting. Directories containing only non-`.md` files (e.g., `.txt`, `.png`) are not shown in the tree. This prevents phantom empty directories from appearing in the UI.
+
 **Context menu** — A `DropdownMenu` triggered by a `MoreHorizontal` icon button that appears on hover:
 
 | Node type | Menu items |
 |-----------|------------|
 | File | Rename, Delete |
-| Directory | New Document, Delete (only if empty) |
+| Directory | New Document, Delete |
+
+Delete is disabled for directories that have children in the tree. If the server returns an error when deleting a directory (e.g., it contains non-`.md` files not visible in the tree), an error toast is shown: "Cannot delete directory: contains non-document files."
 
 **Empty state** — When tree is empty: centered `FileText` icon + "No documents yet." + Create Document button (gated by `canWrite`).
 
@@ -666,6 +711,18 @@ The `DocTabContext` provides:
 - If a tab for that `docPath` already exists, it becomes active
 - Otherwise a new tab is created and becomes active
 - The URL updates to `/docs/${docPath}` to reflect the active tab
+
+**URL synchronization** — On page load, URL takes priority over `localStorage`:
+
+1. Read `docPath` from URL (`location.pathname.replace(/^\/docs\/?/, '')`)
+2. If `docPath` is non-empty:
+   - If a tab for that `docPath` exists in `localStorage` → activate it
+   - Otherwise → create a new tab for it (title fetched from `GET /docs/doc?path={docPath}`)
+   - If the doc doesn't exist (404) → show "not found" state in the editor, no tab created
+3. If `docPath` is empty (`/docs`) → restore `activeTabId` from `localStorage`, or show empty state
+4. Tab changes update the URL via `navigate(`/docs/${docPath}`)`
+
+**Stale tab recovery** — When a document is deleted or renamed externally (by the agent, git sync, or another user), the editor detects the 404 from SSE fallback or REST fetch and shows a centered message: "Document not found or has been deleted." with a "Close Tab" button. The tab title is dimmed with `text-muted-foreground`. This follows the DAG details panel pattern (`DAGDetailsPanel.tsx:170-179`). For renames, the tree refreshes via SSE and shows the new path — the user closes the stale tab and opens the renamed doc from the tree.
 
 **Editor per tab** — Each active tab loads document content from `GET /docs/doc?path={docPath}`.
 
@@ -744,6 +801,7 @@ ui/src/pages/docs/
     DocTabContext.tsx            -- Tab state management (following TabContext.tsx pattern)
 ui/src/hooks/
     useDocSSE.ts                    -- SSE hook for doc content (follows useDAGSSE pattern)
+    useDocTreeSSE.ts                -- SSE hook for doc tree (follows useDAGsListSSE pattern)
     useDocContentWithConflictDetection.ts -- Conflict detection for SSE-driven doc editing
 ui/src/features/agent/components/
     DocPicker.tsx               -- @ trigger doc picker for agent chat
@@ -885,12 +943,23 @@ A document's ID is derived from its filesystem path, so renaming a file changes 
 - Stat-before-hash optimization applies to docs — `scanDocFiles()` populates stat cache.
 - Renamed docs are handled via API rename (`os.Rename`) and via reconciliation for git-side renames (old → `missing`, new → `untracked`); `sync mv` available for explicit atomic remote rename.
 - During pull, content-hash duplicate prevention prevents ghost entries when docs are renamed.
-- SSE topic `doc` registered with `GetDocContentData` FetchFunc.
+- SSE topic `doc` registered with `GetDocContentData` FetchFunc for individual document content.
+- SSE topic `doctree` registered with `GetDocTreeData` FetchFunc for tree structure updates.
 - SSE endpoint `GET /events/docs/{docPath}` streams document content changes.
-- `useDocSSE` and `useDocContentWithConflictDetection` hooks implemented following existing DAG SSE patterns.
+- SSE endpoint `GET /events/docs-tree` streams document tree structure changes.
+- Tree sidebar uses dual data source pattern: SSE primary → polling fallback (2s) → `keepPreviousData`.
+- Tree auto-refreshes when docs are created, deleted, or renamed by any actor (agent, git sync, CLI) within SSE polling interval.
+- `useDocSSE`, `useDocTreeSSE`, and `useDocContentWithConflictDetection` hooks implemented following existing DAG SSE patterns.
 - Agent `patch` changes reflected in the editor within the SSE polling interval (1–10s adaptive).
 - `DocExternalChangeDialog` shown when external changes are detected during editing with unsaved changes.
-- SSE failure triggers graceful fallback to REST fetch.
+- SSE failure triggers graceful fallback to REST polling.
+- Empty directory nodes (those with no `.md` file descendants) are pruned from the tree by `buildTree`.
+- Tree sidebar fetches with `perPage=200`; "Load more" link shown when additional pages exist.
+- Tree nodes rendered in server-provided order (directories first, then files, alphabetically).
+- Delete is disabled for directories with children in the tree; server errors for non-empty directories show error toast.
+- URL takes priority over `localStorage` on page load: `/docs/{docPath}` opens or activates the tab for that document.
+- Externally deleted/renamed docs show "Document not found or has been deleted." with "Close Tab" button (following DAG details 404 pattern).
+- Tab title dimmed with `text-muted-foreground` for stale tabs.
 - Agent `navigate` tool supports `/docs` and `/docs/{docPath}` paths.
 - Agent system prompt includes docs directory in `<environment>`, navigate paths in `<tools>`, and document workflows in `<workflows>`.
 - `GET /docs?flat=true` returns a paginated, alphabetically sorted response.
