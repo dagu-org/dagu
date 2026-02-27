@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/google/uuid"
 )
@@ -51,12 +52,15 @@ const (
 
 	// remoteAgentPromptSummaryLen is the max length of a prompt summary in rejection reports.
 	remoteAgentPromptSummaryLen = 200
-
-	// Backoff parameters for polling.
-	remoteAgentPollInitial = 500 * time.Millisecond
-	remoteAgentPollFactor  = 1.5
-	remoteAgentPollMaxWait = 5 * time.Second
 )
+
+// remotePollBackoff defines the exponential backoff policy for polling remote sessions.
+var remotePollBackoff = &backoff.ExponentialBackoffPolicy{
+	InitialInterval: 500 * time.Millisecond,
+	BackoffFactor:   1.5,
+	MaxInterval:     5 * time.Second,
+	MaxRetries:      0, // Unlimited — exit is controlled by context timeout.
+}
 
 type remoteAgentInput struct {
 	Node    string `json:"node"`
@@ -232,6 +236,41 @@ func newRemoteHTTPClient(skipTLSVerify bool) *http.Client {
 	}
 }
 
+// remoteURL constructs a full API URL for the given node and path suffix.
+func remoteURL(node *RemoteNodeInfo, path string) string {
+	return strings.TrimRight(node.APIBaseURL, "/") + path
+}
+
+// remoteDoRequest executes an authenticated HTTP request and checks the response status.
+// On success (2xx), returns the response (caller must close Body). On failure, returns
+// an error containing the status code and up to 1KB of the response body.
+func remoteDoRequest(
+	ctx context.Context, client *http.Client, node *RemoteNodeInfo,
+	method, path string, body io.Reader,
+) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, method, remoteURL(node, path), body)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	node.ApplyAuth(req)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("send request: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	return resp, nil
+}
+
 // remoteSessionRequest is the POST body for creating a remote agent session.
 type remoteSessionRequest struct {
 	SessionID string `json:"sessionId"`
@@ -250,54 +289,41 @@ func remoteCreateSession(ctx context.Context, client *http.Client, node *RemoteN
 		return fmt.Errorf("marshal request: %w", err)
 	}
 
-	url := strings.TrimRight(node.APIBaseURL, "/") + "/api/v1/agent/sessions"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	resp, err := remoteDoRequest(ctx, client, node, http.MethodPost, "/api/v1/agent/sessions", bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
+		return err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	node.ApplyAuth(req)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
-	}
-
+	resp.Body.Close()
 	return nil
 }
 
 // remoteSessionState represents the session state returned by the remote API.
+// JSON tags use camelCase to match the Dagu REST API (generated from OpenAPI spec).
 type remoteSessionState struct {
 	Working          bool   `json:"working"`
-	HasPendingPrompt bool   `json:"has_pending_prompt"`
-	SessionID        string `json:"session_id"`
+	HasPendingPrompt bool   `json:"hasPendingPrompt"`
+	SessionID        string `json:"sessionId"`
 }
 
 // remoteSessionDetail represents the session detail response.
 type remoteSessionDetail struct {
-	Session  json.RawMessage    `json:"session"`
-	State    remoteSessionState `json:"state"`
-	Messages []remoteMessage    `json:"messages"`
+	Session      json.RawMessage    `json:"session"`
+	SessionState remoteSessionState `json:"sessionState"`
+	Messages     []remoteMessage    `json:"messages"`
 }
 
 // remoteMessage represents a message from the remote session.
 type remoteMessage struct {
 	Type       string           `json:"type"`
 	Content    string           `json:"content,omitempty"`
-	UserPrompt *remotePromptRef `json:"user_prompt,omitempty"`
+	UserPrompt *remotePromptRef `json:"userPrompt,omitempty"`
 }
 
 // remotePromptRef is a reference to a pending prompt on the remote session.
 type remotePromptRef struct {
-	PromptID   string `json:"prompt_id"`
+	PromptID   string `json:"promptId"`
 	Question   string `json:"question"`
-	PromptType string `json:"prompt_type,omitempty"`
+	PromptType string `json:"promptType,omitempty"`
 }
 
 // remotePollSession polls the remote session until completion or timeout.
@@ -312,8 +338,8 @@ func remotePollSession(
 	)
 
 	for {
-		// Compute backoff interval.
-		waitDur := computePollBackoff(retryCount)
+		// Compute backoff interval using the shared policy.
+		waitDur, _ := remotePollBackoff.ComputeNextInterval(retryCount, 0, nil)
 
 		select {
 		case <-ctx.Done():
@@ -334,7 +360,7 @@ func remotePollSession(
 		consecutiveFailures = 0
 
 		// Handle pending prompt — auto-reject it.
-		if detail.State.HasPendingPrompt {
+		if detail.SessionState.HasPendingPrompt {
 			promptType, summary := extractPromptInfo(detail)
 			rejectErr := remoteRespondToPrompt(ctx, client, node, sessionID, detail)
 			if rejectErr != nil {
@@ -350,7 +376,7 @@ func remotePollSession(
 		}
 
 		// Check if done.
-		if !detail.State.Working {
+		if !detail.SessionState.Working {
 			content := extractLastAssistantContent(detail)
 			return content, rejected, nil
 		}
@@ -359,48 +385,21 @@ func remotePollSession(
 	}
 }
 
-// computePollBackoff computes the poll wait duration using exponential backoff.
-func computePollBackoff(retryCount int) time.Duration {
-	interval := float64(remoteAgentPollInitial)
-	for range retryCount {
-		interval *= remoteAgentPollFactor
-	}
-	maxWait := float64(remoteAgentPollMaxWait)
-	if interval > maxWait {
-		interval = maxWait
-	}
-	return time.Duration(interval)
-}
-
 // remoteGetSession fetches the session detail from the remote node.
 func remoteGetSession(
 	ctx context.Context, client *http.Client, node *RemoteNodeInfo, sessionID string,
 ) (*remoteSessionDetail, error) {
-	url := fmt.Sprintf("%s/api/v1/agent/sessions/%s",
-		strings.TrimRight(node.APIBaseURL, "/"), sessionID)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	path := fmt.Sprintf("/api/v1/agent/sessions/%s", sessionID)
+	resp, err := remoteDoRequest(ctx, client, node, http.MethodGet, path, nil)
 	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-	node.ApplyAuth(req)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("send request: %w", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
-	}
 
 	var detail remoteSessionDetail
 	if err := json.NewDecoder(resp.Body).Decode(&detail); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
-
 	return &detail, nil
 }
 
@@ -411,53 +410,30 @@ func remoteRespondToPrompt(
 ) error {
 	promptID := extractPromptID(detail)
 	if promptID == "" {
-		return fmt.Errorf("no prompt_id found in session detail")
+		return fmt.Errorf("no promptId found in session detail")
 	}
 
 	body, err := json.Marshal(map[string]any{
-		"prompt_id": promptID,
+		"promptId":  promptID,
 		"cancelled": true,
 	})
 	if err != nil {
 		return fmt.Errorf("marshal response: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/api/v1/agent/sessions/%s/respond",
-		strings.TrimRight(node.APIBaseURL, "/"), sessionID)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	path := fmt.Sprintf("/api/v1/agent/sessions/%s/respond", sessionID)
+	resp, err := remoteDoRequest(ctx, client, node, http.MethodPost, path, bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
+		return err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	node.ApplyAuth(req)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
-	}
-
+	resp.Body.Close()
 	return nil
 }
 
 // remoteCancelSession sends a best-effort cancel to the remote session.
 func remoteCancelSession(ctx context.Context, client *http.Client, node *RemoteNodeInfo, sessionID string) {
-	url := fmt.Sprintf("%s/api/v1/agent/sessions/%s/cancel",
-		strings.TrimRight(node.APIBaseURL, "/"), sessionID)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
-	if err != nil {
-		return
-	}
-	node.ApplyAuth(req)
-
-	resp, err := client.Do(req)
+	path := fmt.Sprintf("/api/v1/agent/sessions/%s/cancel", sessionID)
+	resp, err := remoteDoRequest(ctx, client, node, http.MethodPost, path, nil)
 	if err != nil {
 		return
 	}

@@ -49,6 +49,7 @@ func getUserIDFromContext(ctx context.Context) string {
 // API handles HTTP requests for the agent.
 type API struct {
 	sessions           sync.Map // id -> *SessionManager (active sessions)
+	creatingIDs        sync.Map // id -> struct{} (session IDs currently being created)
 	store              SessionStore
 	configStore        ConfigStore
 	modelStore         ModelStore
@@ -669,6 +670,12 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 				return id, "already_exists", nil
 			}
 		}
+
+		// Atomically claim this ID to prevent concurrent creation of the same session.
+		if _, alreadyCreating := a.creatingIDs.LoadOrStore(id, struct{}{}); alreadyCreating {
+			return "", "", fmt.Errorf("bad request: session creation already in progress")
+		}
+		defer a.creatingIDs.Delete(id)
 	} else {
 		id = uuid.New().String()
 	}
@@ -726,7 +733,7 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 	return id, "accepted", nil
 }
 
-// isValidUUID checks if a string is a valid UUID v4 format.
+// isValidUUID checks if a string is a valid UUID.
 func isValidUUID(s string) bool {
 	_, err := uuid.Parse(s)
 	return err == nil

@@ -522,49 +522,7 @@ func (c *Context) buildRemoteNodeResolver() agent.RemoteNodeResolver {
 	}
 
 	resolver := remotenode.NewResolver(c.Config.Server.RemoteNodes, rnStore)
-	return &cliRemoteNodeAdapter{resolver: resolver}
-}
-
-// cliRemoteNodeAdapter adapts *remotenode.Resolver to agent.RemoteNodeResolver
-// for CLI commands (start, retry, restart, dry).
-type cliRemoteNodeAdapter struct {
-	resolver *remotenode.Resolver
-}
-
-func (a *cliRemoteNodeAdapter) GetByName(ctx context.Context, name string) (agent.RemoteNodeInfo, error) {
-	node, err := a.resolver.GetByName(ctx, name)
-	if err != nil {
-		return agent.RemoteNodeInfo{}, err
-	}
-	if node.AuthType != remotenode.AuthTypeToken {
-		return agent.RemoteNodeInfo{}, fmt.Errorf("node %q uses %s auth (only token auth is supported)", name, node.AuthType)
-	}
-	return cliToRemoteNodeInfo(node), nil
-}
-
-func (a *cliRemoteNodeAdapter) ListTokenAuthNodes(ctx context.Context) ([]agent.RemoteNodeInfo, error) {
-	all, err := a.resolver.ListAll(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var result []agent.RemoteNodeInfo
-	for _, rn := range all {
-		if rn.AuthType == remotenode.AuthTypeToken {
-			result = append(result, cliToRemoteNodeInfo(rn.RemoteNode))
-		}
-	}
-	return result, nil
-}
-
-func cliToRemoteNodeInfo(n *remotenode.RemoteNode) agent.RemoteNodeInfo {
-	return agent.RemoteNodeInfo{
-		Name:          n.Name,
-		Description:   n.Description,
-		APIBaseURL:    n.APIBaseURL,
-		AuthToken:     n.AuthToken,
-		SkipTLSVerify: n.SkipTLSVerify,
-		Timeout:       n.Timeout,
-	}
+	return &agent.RemoteNodeResolverAdapter{Resolver: resolver}
 }
 
 // OpenLogFile creates and opens a log file for a given dag-run.

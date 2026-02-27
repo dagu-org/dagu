@@ -1403,3 +1403,145 @@ func TestAPI_CleanupIdleSessions_DoesNotCancelZeroHeartbeat(t *testing.T) {
 	_, exists := api.sessions.Load("no-hb-sess")
 	require.True(t, exists, "session with zero heartbeat should not be cancelled")
 }
+
+func TestAPI_CreateSession_IdempotentWithSessionID(t *testing.T) {
+	t.Parallel()
+
+	t.Run("duplicate ID returns already_exists", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAPITestSetup(t, true, true, "")
+		user := UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}
+		clientID := "550e8400-e29b-41d4-a716-446655440000"
+
+		sessID, status, err := setup.api.CreateSession(context.Background(), user, ChatRequest{
+			Message:   "hello",
+			SessionID: clientID,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, clientID, sessID)
+		assert.Equal(t, "accepted", status)
+
+		// Second call with same ID should return already_exists.
+		sessID2, status2, err2 := setup.api.CreateSession(context.Background(), user, ChatRequest{
+			Message:   "world",
+			SessionID: clientID,
+		})
+		require.NoError(t, err2)
+		assert.Equal(t, clientID, sessID2)
+		assert.Equal(t, "already_exists", status2)
+	})
+
+	t.Run("duplicate ID from different user returns error", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAPITestSetup(t, true, true, "")
+		user1 := UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}
+		user2 := UserIdentity{UserID: "other", Username: "other", Role: auth.RoleAdmin}
+		clientID := "660e8400-e29b-41d4-a716-446655440000"
+
+		_, _, err := setup.api.CreateSession(context.Background(), user1, ChatRequest{
+			Message:   "hello",
+			SessionID: clientID,
+		})
+		require.NoError(t, err)
+
+		// Different user with same ID should fail.
+		_, _, err2 := setup.api.CreateSession(context.Background(), user2, ChatRequest{
+			Message:   "world",
+			SessionID: clientID,
+		})
+		assert.Error(t, err2)
+		assert.Contains(t, err2.Error(), "bad request")
+	})
+
+	t.Run("invalid UUID returns error", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAPITestSetup(t, true, true, "")
+		user := UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}
+
+		_, _, err := setup.api.CreateSession(context.Background(), user, ChatRequest{
+			Message:   "hello",
+			SessionID: "not-a-uuid",
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "valid UUID")
+	})
+
+	t.Run("duplicate ID in persisted store returns already_exists", func(t *testing.T) {
+		t.Parallel()
+
+		model := testModelConfig("test-model")
+		configStore := newMockConfigStore(true)
+		configStore.config.DefaultModelID = model.ID
+		sessStore := newMockSessionStore()
+
+		api := NewAPI(APIConfig{
+			ConfigStore:  configStore,
+			ModelStore:   newMockModelStore().addModel(model),
+			WorkingDir:   t.TempDir(),
+			SessionStore: sessStore,
+		})
+		api.providers.Set(model.ToLLMConfig(), &mockLLMProvider{})
+
+		clientID := "770e8400-e29b-41d4-a716-446655440000"
+		user := UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}
+
+		// First create succeeds and persists.
+		sessID, status, err := api.CreateSession(context.Background(), user, ChatRequest{
+			Message:   "hello",
+			SessionID: clientID,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, clientID, sessID)
+		assert.Equal(t, "accepted", status)
+
+		// Remove from active map to simulate session eviction.
+		api.sessions.Delete(clientID)
+
+		// Second call should find it in the store.
+		sessID2, status2, err2 := api.CreateSession(context.Background(), user, ChatRequest{
+			Message:   "world",
+			SessionID: clientID,
+		})
+		require.NoError(t, err2)
+		assert.Equal(t, clientID, sessID2)
+		assert.Equal(t, "already_exists", status2)
+	})
+
+	t.Run("concurrent creation with same ID is safe", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAPITestSetup(t, true, true, "")
+		user := UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}
+		clientID := "880e8400-e29b-41d4-a716-446655440000"
+
+		var wg sync.WaitGroup
+		results := make([]string, 10)
+		errs := make([]error, 10)
+
+		for i := range 10 {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				_, status, err := setup.api.CreateSession(context.Background(), user, ChatRequest{
+					Message:   fmt.Sprintf("msg-%d", idx),
+					SessionID: clientID,
+				})
+				results[idx] = status
+				errs[idx] = err
+			}(i)
+		}
+		wg.Wait()
+
+		// Exactly one should be "accepted", rest should be "already_exists" or errors.
+		acceptedCount := 0
+		for i := range 10 {
+			if errs[i] == nil && results[i] == "accepted" {
+				acceptedCount++
+			}
+		}
+		assert.Equal(t, 1, acceptedCount, "exactly one goroutine should win the creation race")
+	})
+}
