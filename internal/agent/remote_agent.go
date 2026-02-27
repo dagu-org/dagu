@@ -289,7 +289,7 @@ func remoteCreateSession(ctx context.Context, client *http.Client, node *RemoteN
 		return fmt.Errorf("marshal request: %w", err)
 	}
 
-	resp, err := remoteDoRequest(ctx, client, node, http.MethodPost, "/api/v1/agent/sessions", bytes.NewReader(body))
+	resp, err := remoteDoRequest(ctx, client, node, http.MethodPost, "/agent/sessions", bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -389,7 +389,7 @@ func remotePollSession(
 func remoteGetSession(
 	ctx context.Context, client *http.Client, node *RemoteNodeInfo, sessionID string,
 ) (*remoteSessionDetail, error) {
-	path := fmt.Sprintf("/api/v1/agent/sessions/%s", sessionID)
+	path := fmt.Sprintf("/agent/sessions/%s", sessionID)
 	resp, err := remoteDoRequest(ctx, client, node, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -421,7 +421,7 @@ func remoteRespondToPrompt(
 		return fmt.Errorf("marshal response: %w", err)
 	}
 
-	path := fmt.Sprintf("/api/v1/agent/sessions/%s/respond", sessionID)
+	path := fmt.Sprintf("/agent/sessions/%s/respond", sessionID)
 	resp, err := remoteDoRequest(ctx, client, node, http.MethodPost, path, bytes.NewReader(body))
 	if err != nil {
 		return err
@@ -432,7 +432,7 @@ func remoteRespondToPrompt(
 
 // remoteCancelSession sends a best-effort cancel to the remote session.
 func remoteCancelSession(ctx context.Context, client *http.Client, node *RemoteNodeInfo, sessionID string) {
-	path := fmt.Sprintf("/api/v1/agent/sessions/%s/cancel", sessionID)
+	path := fmt.Sprintf("/agent/sessions/%s/cancel", sessionID)
 	resp, err := remoteDoRequest(ctx, client, node, http.MethodPost, path, nil)
 	if err != nil {
 		return
