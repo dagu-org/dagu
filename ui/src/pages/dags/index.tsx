@@ -204,7 +204,7 @@ function DAGsContent() {
   );
 
   const sseResult = useDAGsListSSE(queryParams, true);
-  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
+  const usePolling = sseResult.shouldUseFallback;
 
   const { data: pollingData, mutate, isLoading } = useQuery(
     '/dags',
@@ -221,8 +221,10 @@ function DAGsContent() {
     {
       refreshInterval: usePolling ? 2000 : 0,
       revalidateIfStale: false,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
       keepPreviousData: true,
-      isPaused: () => !usePolling,
+      isPaused: () => sseResult.isConnected,
     }
   );
 

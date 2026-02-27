@@ -59,9 +59,9 @@ function DocsContent() {
   const [deleteDocPath, setDeleteDocPath] = useState('');
   const [deleteDocTitle, setDeleteDocTitle] = useState('');
 
-  // Dual data source for tree
+  // Dual data source for tree: SSE primary, SWR polling only when SSE gives up
   const sseResult = useDocTreeSSE(true);
-  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
+  const usePolling = sseResult.shouldUseFallback;
 
   const { data: pollingData, mutate } = useQuery(
     '/docs',
@@ -72,8 +72,11 @@ function DocsContent() {
     },
     {
       refreshInterval: usePolling ? 2000 : 0,
+      revalidateIfStale: false,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
       keepPreviousData: true,
-      isPaused: () => !usePolling,
+      isPaused: () => sseResult.isConnected,
     }
   );
 
