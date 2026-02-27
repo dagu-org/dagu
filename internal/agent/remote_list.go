@@ -13,7 +13,7 @@ func init() {
 		Name:           "list_remote_nodes",
 		Label:          "List Remote Nodes",
 		Description:    "List available remote Dagu nodes for remote_agent",
-		DefaultEnabled: false,
+		DefaultEnabled: true,
 		Factory: func(cfg ToolConfig) *AgentTool {
 			if cfg.RemoteNodeResolver == nil {
 				return nil

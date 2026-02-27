@@ -21,7 +21,7 @@ func init() {
 		Name:           "remote_agent",
 		Label:          "Remote Agent",
 		Description:    "Send tasks to AI agents on remote Dagu nodes",
-		DefaultEnabled: false,
+		DefaultEnabled: true,
 		Factory: func(cfg ToolConfig) *AgentTool {
 			if cfg.RemoteNodeResolver == nil {
 				return nil
