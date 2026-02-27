@@ -124,27 +124,22 @@ func (s *Store) loadNodeFromFile(filePath string) (*remotenode.RemoteNode, error
 
 	node := stored.ToRemoteNode()
 
-	// Decrypt credentials
+	// Decrypt credentials — return errors rather than silently serving
+	// nodes with missing credentials.
 	if stored.BasicAuthPasswordEnc != "" {
 		pwd, err := s.encryptor.Decrypt(stored.BasicAuthPasswordEnc)
 		if err != nil {
-			slog.Warn("Failed to decrypt basic auth password for remote node",
-				slog.String("id", stored.ID),
-				slog.String("error", err.Error()))
-		} else {
-			node.BasicAuthPassword = pwd
+			return nil, fmt.Errorf("fileremotenode: failed to decrypt basic auth password for node %s: %w", stored.ID, err)
 		}
+		node.BasicAuthPassword = pwd
 	}
 
 	if stored.AuthTokenEnc != "" {
 		token, err := s.encryptor.Decrypt(stored.AuthTokenEnc)
 		if err != nil {
-			slog.Warn("Failed to decrypt auth token for remote node",
-				slog.String("id", stored.ID),
-				slog.String("error", err.Error()))
-		} else {
-			node.AuthToken = token
+			return nil, fmt.Errorf("fileremotenode: failed to decrypt auth token for node %s: %w", stored.ID, err)
 		}
+		node.AuthToken = token
 	}
 
 	return node, nil
@@ -342,10 +337,16 @@ func (s *Store) Delete(_ context.Context, id string) error {
 		return remotenode.ErrRemoteNodeNotFound
 	}
 
-	// Load node to get name for index cleanup
+	// Load node to get name for index cleanup.
+	// Tolerate corrupt/missing files so deletion can still proceed.
 	stored, err := s.loadStoredFromFile(filePath)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("fileremotenode: failed to load node for deletion: %w", err)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			slog.Warn("Failed to load node metadata for deletion, proceeding anyway",
+				slog.String("id", id),
+				slog.String("error", err.Error()))
+		}
+		stored = nil
 	}
 
 	if err := os.Remove(filePath); err != nil && !errors.Is(err, os.ErrNotExist) {

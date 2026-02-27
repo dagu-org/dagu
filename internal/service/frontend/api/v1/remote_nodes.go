@@ -279,7 +279,9 @@ func (a *API) resolveRemoteNode(ctx context.Context, id string) (*remotenode.Rem
 		if a.remoteNodeResolver == nil {
 			return nil, remotenode.ErrRemoteNodeNotFound
 		}
-		return a.remoteNodeResolver.GetByName(ctx, name)
+		// Use GetConfigByName to resolve only from config source,
+		// avoiding store-first precedence of GetByName.
+		return a.remoteNodeResolver.GetConfigByName(name)
 	}
 
 	// Store-managed node — look up by UUID

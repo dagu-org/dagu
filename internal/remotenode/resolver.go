@@ -3,7 +3,7 @@ package remotenode
 import (
 	"context"
 	"errors"
-	"log/slog"
+	"fmt"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 )
@@ -83,15 +83,14 @@ func (r *Resolver) ListAll(ctx context.Context) ([]ResolvedNode, error) {
 	if r.store != nil {
 		storeNodes, err := r.store.List(ctx)
 		if err != nil {
-			slog.Warn("Failed to list store remote nodes", slog.String("error", err.Error()))
-		} else {
-			for _, n := range storeNodes {
-				seen[n.Name] = struct{}{}
-				result = append(result, ResolvedNode{
-					RemoteNode: n,
-					Source:     SourceStore,
-				})
-			}
+			return nil, fmt.Errorf("failed to list store remote nodes: %w", err)
+		}
+		for _, n := range storeNodes {
+			seen[n.Name] = struct{}{}
+			result = append(result, ResolvedNode{
+				RemoteNode: n,
+				Source:     SourceStore,
+			})
 		}
 	}
 
@@ -107,6 +106,16 @@ func (r *Resolver) ListAll(ctx context.Context) ([]ResolvedNode, error) {
 	}
 
 	return result, nil
+}
+
+// GetConfigByName looks up a config-sourced remote node by name.
+// Unlike GetByName, this only checks config nodes and never the store.
+func (r *Resolver) GetConfigByName(name string) (*RemoteNode, error) {
+	n, ok := r.nodes[name]
+	if !ok {
+		return nil, ErrRemoteNodeNotFound
+	}
+	return n, nil
 }
 
 // ListNames returns deduplicated node names from both sources.

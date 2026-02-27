@@ -1,8 +1,11 @@
 import { useState, useEffect, useContext } from 'react';
-import { useConfig } from '@/contexts/ConfigContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { TOKEN_KEY } from '@/contexts/AuthContext';
-import { components, CreateRemoteNodeRequestAuthType } from '@/api/v1/schema';
+import { useClient } from '@/hooks/api';
+import {
+  components,
+  CreateRemoteNodeRequestAuthType,
+  UpdateRemoteNodeRequestAuthType,
+} from '@/api/v1/schema';
 import {
   Dialog,
   DialogContent,
@@ -37,7 +40,7 @@ export function RemoteNodeFormModal({
   onClose,
   onSuccess,
 }: RemoteNodeFormModalProps) {
-  const config = useConfig();
+  const client = useClient();
   const appBarContext = useContext(AppBarContext);
   const isEditing = !!node;
 
@@ -97,20 +100,23 @@ export function RemoteNodeFormModal({
     setIsLoading(true);
 
     try {
-      const token = localStorage.getItem(TOKEN_KEY);
-      if (!token) {
-        throw new Error('Not authenticated');
-      }
-      const remoteNode = encodeURIComponent(
-        appBarContext.selectedRemoteNode || 'local'
-      );
+      const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
       if (isEditing) {
-        const body: Record<string, unknown> = {
+        const body: {
+          name?: string;
+          description?: string;
+          apiBaseUrl?: string;
+          authType?: UpdateRemoteNodeRequestAuthType;
+          basicAuthUsername?: string;
+          basicAuthPassword?: string;
+          authToken?: string;
+          skipTlsVerify?: boolean;
+        } = {
           name,
           description,
           apiBaseUrl,
-          authType,
+          authType: authType as UpdateRemoteNodeRequestAuthType,
           skipTlsVerify,
         };
         if (authType === 'basic') {
@@ -120,24 +126,30 @@ export function RemoteNodeFormModal({
           if (authToken) body.authToken = authToken;
         }
 
-        const response = await fetch(
-          `${config.apiURL}/remote-nodes/${node.id}?remoteNode=${remoteNode}`,
+        const { error: patchError } = await client.PATCH(
+          '/remote-nodes/{remoteNodeId}',
           {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
+            params: {
+              path: { remoteNodeId: node.id },
+              query: { remoteNode },
             },
-            body: JSON.stringify(body),
+            body,
           }
         );
-
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.message || 'Failed to update remote node');
+        if (patchError) {
+          throw new Error(patchError.message || 'Failed to update remote node');
         }
       } else {
-        const body: Record<string, unknown> = {
+        const body: {
+          name: string;
+          description?: string;
+          apiBaseUrl: string;
+          authType: CreateRemoteNodeRequestAuthType;
+          basicAuthUsername?: string;
+          basicAuthPassword?: string;
+          authToken?: string;
+          skipTlsVerify: boolean;
+        } = {
           name,
           description,
           apiBaseUrl,
@@ -151,21 +163,12 @@ export function RemoteNodeFormModal({
           body.authToken = authToken;
         }
 
-        const response = await fetch(
-          `${config.apiURL}/remote-nodes?remoteNode=${remoteNode}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(body),
-          }
-        );
-
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.message || 'Failed to create remote node');
+        const { error: postError } = await client.POST('/remote-nodes', {
+          params: { query: { remoteNode } },
+          body,
+        });
+        if (postError) {
+          throw new Error(postError.message || 'Failed to create remote node');
         }
       }
 

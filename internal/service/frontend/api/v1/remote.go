@@ -30,6 +30,15 @@ func WithRemoteNode(resolver *remotenode.Resolver, apiBasePath string) func(next
 				return
 			}
 
+			if resolver == nil {
+				WriteErrorResponse(w, &Error{
+					HTTPStatus: http.StatusServiceUnavailable,
+					Code:       api.ErrorCodeInternalError,
+					Message:    "remote node resolution is not available",
+				})
+				return
+			}
+
 			node, err := resolver.GetByName(r.Context(), remoteNodeName)
 			if err != nil {
 				if errors.Is(err, remotenode.ErrRemoteNodeNotFound) {
@@ -125,8 +134,9 @@ func WithRemoteNode(resolver *remotenode.Resolver, apiBasePath string) func(next
 				return
 			}
 
-			// Write the successful response
+			// Write the successful response, preserving the upstream status code
 			w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+			w.WriteHeader(resp.StatusCode)
 			if _, err = w.Write(respData); err != nil {
 				logger.Error(r.Context(), "Failed to write response", tag.Error(err))
 			}

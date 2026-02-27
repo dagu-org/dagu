@@ -73,7 +73,7 @@ On name conflicts, store nodes take precedence over config nodes. Config-sourced
 
 ### Store Interface
 
-```
+```text
 RemoteNodeStore
 ├── Create(ctx, RemoteNode) → error
 ├── GetByID(ctx, id) → (RemoteNode, error)
@@ -89,7 +89,7 @@ The interface lives in `internal/core/exec/` alongside the other store interface
 
 Each remote node is stored as an individual JSON file in `<data_dir>/remote-nodes/`:
 
-```
+```text
 <data_dir>/
   remote-nodes/
     <uuid>.json
@@ -137,7 +137,7 @@ A new "Remote Nodes" section in the settings area:
 
 ### Example: Adding a Remote Node via API
 
-```
+```http
 POST /api/v1/remote-nodes
 {
   "name": "production",
@@ -154,7 +154,7 @@ Response: `201 Created`
 
 ### Example: Listing Remote Nodes
 
-```
+```http
 GET /api/v1/remote-nodes
 
 {

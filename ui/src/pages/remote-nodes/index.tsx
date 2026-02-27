@@ -265,17 +265,17 @@ export default function RemoteNodesPage() {
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <Globe className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                        <div>
-                          <div>{node.name}</div>
+                        <div className="min-w-0">
+                          <div className="truncate">{node.name}</div>
                           {node.description && (
-                            <div className="text-muted-foreground font-normal text-[11px]">
+                            <div className="text-muted-foreground font-normal text-[11px] whitespace-normal break-words">
                               {node.description}
                             </div>
                           )}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground font-mono text-xs">
+                    <TableCell className="text-muted-foreground font-mono text-xs max-w-[280px] truncate">
                       {node.apiBaseUrl}
                     </TableCell>
                     <TableCell>
@@ -327,7 +327,7 @@ export default function RemoteNodesPage() {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" aria-label="Actions">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>

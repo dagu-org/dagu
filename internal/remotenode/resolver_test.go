@@ -370,3 +370,51 @@ func TestResolver_ListNames(t *testing.T) {
 	assert.Contains(t, names, "store-node")
 	assert.Contains(t, names, "config-node")
 }
+
+func TestResolver_ListAll_StoreError(t *testing.T) {
+	t.Parallel()
+
+	store := &mockStore{
+		listErr: errors.New("disk failure"),
+	}
+	resolver := NewResolver([]config.RemoteNode{
+		{Name: "config-node", APIBaseURL: "http://config.example.com"},
+	}, store)
+
+	result, err := resolver.ListAll(context.Background())
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "disk failure")
+}
+
+func TestResolver_GetConfigByName(t *testing.T) {
+	t.Parallel()
+
+	store := &mockStore{nodes: []*RemoteNode{
+		{ID: "uuid-1", Name: "shared", APIBaseURL: "http://store.example.com"},
+	}}
+	resolver := NewResolver([]config.RemoteNode{
+		{Name: "shared", APIBaseURL: "http://config.example.com"},
+		{Name: "config-only", APIBaseURL: "http://config-only.example.com"},
+	}, store)
+
+	t.Run("ReturnsConfigNodeEvenWhenStoreHasSameName", func(t *testing.T) {
+		t.Parallel()
+		node, err := resolver.GetConfigByName("shared")
+		require.NoError(t, err)
+		assert.Equal(t, "http://config.example.com", node.APIBaseURL)
+	})
+
+	t.Run("ReturnsConfigOnlyNode", func(t *testing.T) {
+		t.Parallel()
+		node, err := resolver.GetConfigByName("config-only")
+		require.NoError(t, err)
+		assert.Equal(t, "http://config-only.example.com", node.APIBaseURL)
+	})
+
+	t.Run("NotFoundReturnsError", func(t *testing.T) {
+		t.Parallel()
+		_, err := resolver.GetConfigByName("nonexistent")
+		assert.ErrorIs(t, err, ErrRemoteNodeNotFound)
+	})
+}
