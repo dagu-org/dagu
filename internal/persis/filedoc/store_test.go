@@ -877,7 +877,7 @@ func TestGetReadPermissionError(t *testing.T) {
 	// Make file unreadable.
 	filePath := filepath.Join(store.baseDir, "perm-doc.md")
 	require.NoError(t, os.Chmod(filePath, 0000))
-	t.Cleanup(func() { os.Chmod(filePath, 0600) })
+	t.Cleanup(func() { _ = os.Chmod(filePath, 0600) })
 
 	_, err := store.Get(ctx, "perm-doc")
 	assert.Error(t, err)
@@ -894,7 +894,7 @@ func TestCreateMkdirPermissionError(t *testing.T) {
 
 	// Make base dir read-only so MkdirAll for nested path fails.
 	require.NoError(t, os.Chmod(store.baseDir, 0500))
-	t.Cleanup(func() { os.Chmod(store.baseDir, 0750) })
+	t.Cleanup(func() { _ = os.Chmod(store.baseDir, 0750) })
 
 	err := store.Create(ctx, "sub/doc", "content")
 	assert.Error(t, err)
@@ -912,7 +912,7 @@ func TestDeleteRemovePermissionError(t *testing.T) {
 
 	// Make directory read-only so os.Remove of file fails.
 	require.NoError(t, os.Chmod(store.baseDir, 0500))
-	t.Cleanup(func() { os.Chmod(store.baseDir, 0750) })
+	t.Cleanup(func() { _ = os.Chmod(store.baseDir, 0750) })
 
 	err := store.Delete(ctx, "perm-del")
 	assert.Error(t, err)
@@ -931,7 +931,7 @@ func TestUpdateWritePermissionError(t *testing.T) {
 
 	// Make directory read-only so atomic write (create temp file) fails.
 	require.NoError(t, os.Chmod(store.baseDir, 0500))
-	t.Cleanup(func() { os.Chmod(store.baseDir, 0750) })
+	t.Cleanup(func() { _ = os.Chmod(store.baseDir, 0750) })
 
 	err := store.Update(ctx, "perm-upd", "updated")
 	assert.Error(t, err)
@@ -949,7 +949,7 @@ func TestRenameMkdirPermissionError(t *testing.T) {
 
 	// Make base dir read-only so MkdirAll for target path fails.
 	require.NoError(t, os.Chmod(store.baseDir, 0500))
-	t.Cleanup(func() { os.Chmod(store.baseDir, 0750) })
+	t.Cleanup(func() { _ = os.Chmod(store.baseDir, 0750) })
 
 	err := store.Rename(ctx, "src-doc", "new-dir/target")
 	assert.Error(t, err)
@@ -976,7 +976,7 @@ func TestListFlatWithUnreadableFile(t *testing.T) {
 	// Make one file unreadable.
 	filePath := filepath.Join(store.baseDir, "unreadable.md")
 	require.NoError(t, os.Chmod(filePath, 0000))
-	t.Cleanup(func() { os.Chmod(filePath, 0600) })
+	t.Cleanup(func() { _ = os.Chmod(filePath, 0600) })
 
 	result, err := store.ListFlat(ctx, 1, 50)
 	require.NoError(t, err)
@@ -999,7 +999,7 @@ func TestSearchWithUnreadableFile(t *testing.T) {
 	// Make one file unreadable.
 	filePath := filepath.Join(store.baseDir, "hidden.md")
 	require.NoError(t, os.Chmod(filePath, 0000))
-	t.Cleanup(func() { os.Chmod(filePath, 0600) })
+	t.Cleanup(func() { _ = os.Chmod(filePath, 0600) })
 
 	results, err := store.Search(ctx, "searchterm")
 	require.NoError(t, err)
@@ -1021,7 +1021,7 @@ func TestBuildTreeWithUnreadableFile(t *testing.T) {
 	// Make one file unreadable to trigger readErr in buildTree.
 	filePath := filepath.Join(store.baseDir, "noperm.md")
 	require.NoError(t, os.Chmod(filePath, 0000))
-	t.Cleanup(func() { os.Chmod(filePath, 0600) })
+	t.Cleanup(func() { _ = os.Chmod(filePath, 0600) })
 
 	result, err := store.List(ctx, 1, 50)
 	require.NoError(t, err)
@@ -1039,7 +1039,7 @@ func TestCreateWritePermissionError(t *testing.T) {
 
 	// Make base dir read-only so atomic write fails.
 	require.NoError(t, os.Chmod(store.baseDir, 0500))
-	t.Cleanup(func() { os.Chmod(store.baseDir, 0750) })
+	t.Cleanup(func() { _ = os.Chmod(store.baseDir, 0750) })
 
 	err := store.Create(ctx, "fail-write", "content")
 	assert.Error(t, err)
@@ -1059,7 +1059,7 @@ func TestListFlatEmptyStore(t *testing.T) {
 func TestListFlatMissingBaseDir(t *testing.T) {
 	// When base dir doesn't exist, ListFlat returns empty results (WalkDir error is swallowed).
 	store := New(filepath.Join(t.TempDir(), "nonexistent"))
-	os.RemoveAll(store.baseDir)
+	_ = os.RemoveAll(store.baseDir)
 	ctx := context.Background()
 
 	result, err := store.ListFlat(ctx, 1, 10)
@@ -1070,7 +1070,7 @@ func TestListFlatMissingBaseDir(t *testing.T) {
 func TestListTreeMissingBaseDir(t *testing.T) {
 	// When base dir doesn't exist, List returns empty results.
 	store := New(filepath.Join(t.TempDir(), "nonexistent"))
-	os.RemoveAll(store.baseDir)
+	_ = os.RemoveAll(store.baseDir)
 	ctx := context.Background()
 
 	result, err := store.List(ctx, 1, 10)
@@ -1081,7 +1081,7 @@ func TestListTreeMissingBaseDir(t *testing.T) {
 func TestSearchMissingBaseDir(t *testing.T) {
 	// When base dir doesn't exist, Search returns empty results.
 	store := New(filepath.Join(t.TempDir(), "nonexistent"))
-	os.RemoveAll(store.baseDir)
+	_ = os.RemoveAll(store.baseDir)
 	ctx := context.Background()
 
 	results, err := store.Search(ctx, "anything")
@@ -1103,7 +1103,7 @@ func TestCleanEmptyParentsNonRemovable(t *testing.T) {
 	// Make level1 non-writable so level2 cannot be removed.
 	level1Dir := filepath.Join(store.baseDir, "level1")
 	require.NoError(t, os.Chmod(level1Dir, 0500))
-	t.Cleanup(func() { os.Chmod(level1Dir, 0750) })
+	t.Cleanup(func() { _ = os.Chmod(level1Dir, 0750) })
 
 	// Delete the doc -- os.Remove succeeds for the file (in level2),
 	// but cleanEmptyParents cannot remove level2 (because level1 is read-only).
@@ -1137,7 +1137,7 @@ func TestRenameOsRenameError(t *testing.T) {
 	targetDir := filepath.Join(store.baseDir, "target-dir")
 	require.NoError(t, os.MkdirAll(targetDir, 0750))
 	require.NoError(t, os.Chmod(targetDir, 0500))
-	t.Cleanup(func() { os.Chmod(targetDir, 0750) })
+	t.Cleanup(func() { _ = os.Chmod(targetDir, 0750) })
 
 	err := store.Rename(ctx, "rename-src", "target-dir/dest")
 	assert.Error(t, err)

@@ -42,9 +42,7 @@ type Store struct {
 
 // New creates a new file-based doc store.
 func New(baseDir string) *Store {
-	if err := os.MkdirAll(baseDir, docDirPermissions); err != nil {
-		// Best effort — the directory may be created later.
-	}
+	_ = os.MkdirAll(baseDir, docDirPermissions) // best effort
 	return &Store{baseDir: baseDir}
 }
 
@@ -115,10 +113,7 @@ func (s *Store) List(ctx context.Context, page, perPage int) (*exec.PaginatedRes
 
 	pg := exec.NewPaginator(page, perPage)
 	total := len(tree)
-	offset := pg.Offset()
-	if offset > total {
-		offset = total
-	}
+	offset := min(pg.Offset(), total)
 	end := min(offset+pg.Limit(), total)
 	pageItems := tree[offset:end]
 
@@ -175,10 +170,7 @@ func (s *Store) ListFlat(ctx context.Context, page, perPage int) (*exec.Paginate
 
 	pg := exec.NewPaginator(page, perPage)
 	total := len(items)
-	offset := pg.Offset()
-	if offset > total {
-		offset = total
-	}
+	offset := min(pg.Offset(), total)
 	end := min(offset+pg.Limit(), total)
 	pageItems := items[offset:end]
 

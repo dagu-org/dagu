@@ -19,8 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func ptrOf[T any](v T) *T { return &v }
-
 // errForced is a generic error used to trigger internal error paths in the mock.
 var errForced = errors.New("forced error")
 
@@ -163,14 +161,8 @@ func (m *mockDocStore) List(_ context.Context, page, perPage int) (*exec.Paginat
 	sort.Slice(nodes, func(i, j int) bool { return nodes[i].ID < nodes[j].ID })
 
 	pg := exec.NewPaginator(page, perPage)
-	start := pg.Offset()
-	if start > len(nodes) {
-		start = len(nodes)
-	}
-	end := start + pg.Limit()
-	if end > len(nodes) {
-		end = len(nodes)
-	}
+	start := min(pg.Offset(), len(nodes))
+	end := min(start+pg.Limit(), len(nodes))
 	result := exec.NewPaginatedResult(nodes[start:end], len(nodes), pg)
 	return &result, nil
 }
@@ -189,14 +181,8 @@ func (m *mockDocStore) ListFlat(_ context.Context, page, perPage int) (*exec.Pag
 	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
 
 	pg := exec.NewPaginator(page, perPage)
-	start := pg.Offset()
-	if start > len(items) {
-		start = len(items)
-	}
-	end := start + pg.Limit()
-	if end > len(items) {
-		end = len(items)
-	}
+	start := min(pg.Offset(), len(items))
+	end := min(start+pg.Limit(), len(items))
 	result := exec.NewPaginatedResult(items[start:end], len(items), pg)
 	return &result, nil
 }
@@ -236,9 +222,9 @@ func TestListDocs(t *testing.T) {
 
 		resp, err := setup.api.ListDocs(adminCtx(), apigen.ListDocsRequestObject{
 			Params: apigen.ListDocsParams{
-				Flat:    ptrOf(true),
-				Page:    ptrOf(1),
-				PerPage: ptrOf(10),
+				Flat:    new(true),
+				Page:    new(1),
+				PerPage: new(10),
 			},
 		})
 		require.NoError(t, err)
@@ -258,8 +244,8 @@ func TestListDocs(t *testing.T) {
 
 		resp, err := setup.api.ListDocs(adminCtx(), apigen.ListDocsRequestObject{
 			Params: apigen.ListDocsParams{
-				Page:    ptrOf(1),
-				PerPage: ptrOf(10),
+				Page:    new(1),
+				PerPage: new(10),
 			},
 		})
 		require.NoError(t, err)
@@ -771,8 +757,8 @@ func TestListDocsTreeWithChildren(t *testing.T) {
 
 		resp, err := a.ListDocs(adminCtx(), apigen.ListDocsRequestObject{
 			Params: apigen.ListDocsParams{
-				Page:    ptrOf(1),
-				PerPage: ptrOf(10),
+				Page:    new(1),
+				PerPage: new(10),
 			},
 		})
 		require.NoError(t, err)
@@ -865,7 +851,7 @@ func TestDocStoreInternalErrors(t *testing.T) {
 		t.Parallel()
 		setup := newFailSetup(t)
 		_, err := setup.api.ListDocs(adminCtx(), apigen.ListDocsRequestObject{
-			Params: apigen.ListDocsParams{Flat: ptrOf(true), Page: ptrOf(1), PerPage: ptrOf(10)},
+			Params: apigen.ListDocsParams{Flat: new(true), Page: new(1), PerPage: new(10)},
 		})
 		require.Error(t, err)
 	})
@@ -874,7 +860,7 @@ func TestDocStoreInternalErrors(t *testing.T) {
 		t.Parallel()
 		setup := newFailSetup(t)
 		_, err := setup.api.ListDocs(adminCtx(), apigen.ListDocsRequestObject{
-			Params: apigen.ListDocsParams{Page: ptrOf(1), PerPage: ptrOf(10)},
+			Params: apigen.ListDocsParams{Page: new(1), PerPage: new(10)},
 		})
 		require.Error(t, err)
 	})

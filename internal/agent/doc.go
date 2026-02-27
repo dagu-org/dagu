@@ -42,8 +42,8 @@ type DocTreeNode struct {
 
 // DocSearchResult holds a doc ID/title and its grep matches.
 type DocSearchResult struct {
-	ID      string       `json:"id"`
-	Title   string       `json:"title"`
+	ID      string        `json:"id"`
+	Title   string        `json:"title"`
 	Matches []*exec.Match `json:"matches"`
 }
 
