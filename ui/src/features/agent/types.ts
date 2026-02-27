@@ -189,7 +189,7 @@ export interface ReadSchemaToolInput {
 
 export interface AskUserToolInput {
   question: string;
-  options?: UserPromptOption[];
+  options?: string[];
   allow_free_text?: boolean;
   free_text_placeholder?: string;
   multi_select?: boolean;

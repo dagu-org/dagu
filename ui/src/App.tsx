@@ -37,6 +37,7 @@ import DAGRuns from './pages/dag-runs';
 import DAGRunDetails from './pages/dag-runs/dag-run';
 import DAGs from './pages/dags';
 import DAGDetails from './pages/dags/dag';
+import DocsPage from './pages/docs';
 import GitSyncPage from './pages/git-sync';
 import LicensePage from './pages/license';
 import LoginPage from './pages/login';
@@ -232,6 +233,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                         <Route path="/dags/:fileName/:tab" element={<DAGDetails />} />
                                         <Route path="/dags/:fileName/" element={<DAGDetails />} />
                                         <Route path="/search/" element={<Search />} />
+                                        <Route path="/docs/*" element={<DocsPage />} />
                                         <Route path="/queues" element={<Queues />} />
                                         <Route path="/dag-runs" element={<DAGRuns />} />
                                         <Route path="/dag-runs/:name/:dagRunId" element={<DAGRunDetails />} />

@@ -632,6 +632,8 @@ func toAPISyncItemKind(itemID string, kind gitsync.DAGKind) api.SyncItemKind {
 		return api.SyncItemKindSkill
 	case gitsync.DAGKindSoul:
 		return api.SyncItemKindSoul
+	case gitsync.DAGKindDoc:
+		return api.SyncItemKindDoc
 	case gitsync.DAGKindDAG:
 		return api.SyncItemKindDag
 	default:
@@ -643,7 +645,7 @@ func syncItemFilePath(itemID string, kind gitsync.DAGKind) string {
 	kind = resolveKind(itemID, kind)
 	ext := ".yaml"
 	switch kind {
-	case gitsync.DAGKindMemory, gitsync.DAGKindSkill, gitsync.DAGKindSoul:
+	case gitsync.DAGKindMemory, gitsync.DAGKindSkill, gitsync.DAGKindSoul, gitsync.DAGKindDoc:
 		ext = ".md"
 	case gitsync.DAGKindDAG:
 		// default .yaml extension

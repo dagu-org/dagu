@@ -61,7 +61,7 @@ export default function AgentSoulsPage(): React.ReactNode {
     (async () => {
       try {
         const { data } = await client.GET('/settings/agent', { params: { query: { remoteNode } } });
-        if (data) setDefaultSoulId(data.selectedSoulId);
+        if (data) setDefaultSoulId(data.selectedSoulId ?? undefined);
       } catch {
         // Best-effort fetch
       }
@@ -93,7 +93,7 @@ export default function AgentSoulsPage(): React.ReactNode {
         body: { selectedSoulId: soul.id },
       });
       if (apiError) throw new Error(apiError.message || 'Failed to set default soul');
-      setDefaultSoulId(data.selectedSoulId);
+      setDefaultSoulId(data.selectedSoulId ?? undefined);
       setSuccess(`"${soul.name}" is now the default soul`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to set default soul');

@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { ArrowRightLeft, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-type ItemKind = 'dag' | 'memory' | 'skill' | 'soul';
+type ItemKind = 'dag' | 'memory' | 'skill' | 'soul' | 'doc';
 
 interface MoveDialogProps {
   open: boolean;
@@ -30,6 +30,7 @@ function deriveKind(id: string): ItemKind {
   if (id.startsWith('memory/')) return 'memory';
   if (id.startsWith('skills/')) return 'skill';
   if (id.startsWith('souls/')) return 'soul';
+  if (id.startsWith('docs/')) return 'doc';
   return 'dag';
 }
 

@@ -174,12 +174,12 @@ export default function AgentSettingsPage(): ReactNode {
       const normalizedPolicy = normalizeToolPolicy(data.toolPolicy, tools);
       setEnabled(data.enabled ?? false);
       setDefaultModelId(data.defaultModelId);
-      setSelectedSoulId(data.selectedSoulId);
+      setSelectedSoulId(data.selectedSoulId ?? undefined);
       setToolPolicy(normalizedPolicy);
       setSavedConfig({
         enabled: data.enabled ?? false,
         defaultModelId: data.defaultModelId,
-        selectedSoulId: data.selectedSoulId,
+        selectedSoulId: data.selectedSoulId ?? undefined,
         toolPolicy: normalizedPolicy,
       });
       setBashRuleIds(buildBashRuleIDs(normalizedPolicy.bash?.rules?.length || 0));
@@ -276,12 +276,12 @@ export default function AgentSettingsPage(): ReactNode {
       const normalizedPolicy = normalizeToolPolicy(data.toolPolicy, toolMetas);
       setEnabled(data.enabled ?? false);
       setDefaultModelId(data.defaultModelId);
-      setSelectedSoulId(data.selectedSoulId);
+      setSelectedSoulId(data.selectedSoulId ?? undefined);
       setToolPolicy(normalizedPolicy);
       setSavedConfig({
         enabled: data.enabled ?? false,
         defaultModelId: data.defaultModelId,
-        selectedSoulId: data.selectedSoulId,
+        selectedSoulId: data.selectedSoulId ?? undefined,
         toolPolicy: normalizedPolicy,
       });
       setSuccess('Configuration saved successfully');

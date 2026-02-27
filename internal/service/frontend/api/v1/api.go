@@ -67,6 +67,7 @@ type API struct {
 	agentSkillStore    agent.SkillStore
 	agentSoulStore     agent.SoulStore
 	agentAPI           *agent.API
+	docStore           agent.DocStore
 	baseConfigStore    baseconfig.Store
 	licenseManager     *license.Manager
 }
@@ -183,6 +184,13 @@ func WithAgentSoulStore(store agent.SoulStore) APIOption {
 func WithLicenseManager(m *license.Manager) APIOption {
 	return func(a *API) {
 		a.licenseManager = m
+	}
+}
+
+// WithDocStore returns an APIOption that sets the API's doc store.
+func WithDocStore(store agent.DocStore) APIOption {
+	return func(a *API) {
+		a.docStore = store
 	}
 }
 
