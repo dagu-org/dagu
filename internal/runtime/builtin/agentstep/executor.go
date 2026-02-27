@@ -216,6 +216,9 @@ func (e *Executor) Run(ctx context.Context) error {
 
 	iteration := 0
 
+	// Resolve web search config: step-level overrides global agent config.
+	webSearch := resolveWebSearch(stepCfg, agentCfg)
+
 	loop := agent.NewLoop(agent.LoopConfig{
 		Provider:      provider,
 		Model:         modelCfg.Model,
@@ -227,6 +230,7 @@ func (e *Executor) Run(ctx context.Context) error {
 		Logger:        slog.Default(),
 		SkillStore:    skillStore,
 		AllowedSkills: allowedSkills,
+		WebSearch:     webSearch,
 		RecordMessage: func(_ context.Context, msg agent.Message) {
 			logMessage(stderr, msg)
 			converted := convertMessage(msg, modelCfg)
@@ -274,7 +278,6 @@ func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy
 		"patch":       agent.NewPatchTool(dagsDir),
 		"think":       agent.NewThinkTool(),
 		"read_schema": agent.NewReadSchemaTool(),
-		"web_search":  agent.NewWebSearchTool(),
 		"output":      agent.NewOutputTool(stdout),
 	}
 	if skillStore != nil {
@@ -400,6 +403,43 @@ func mergeStepBashPolicy(global agent.ToolPolicyConfig, stepCfg *core.AgentStepC
 		merged.Bash.Rules = rules
 	}
 	return merged
+}
+
+// resolveWebSearch resolves the web search config for the agent step.
+// Step-level config overrides global agent config.
+func resolveWebSearch(stepCfg *core.AgentStepConfig, agentCfg *agent.Config) *llm.WebSearchRequest {
+	// Step-level override takes precedence.
+	if stepCfg != nil && stepCfg.WebSearch != nil {
+		ws := stepCfg.WebSearch
+		if !ws.Enabled {
+			return nil
+		}
+		result := &llm.WebSearchRequest{
+			Enabled:        true,
+			MaxUses:        ws.MaxUses,
+			AllowedDomains: ws.AllowedDomains,
+			BlockedDomains: ws.BlockedDomains,
+		}
+		if ws.UserLocation != nil {
+			result.UserLocation = &llm.UserLocation{
+				City:     ws.UserLocation.City,
+				Region:   ws.UserLocation.Region,
+				Country:  ws.UserLocation.Country,
+				Timezone: ws.UserLocation.Timezone,
+			}
+		}
+		return result
+	}
+
+	// Fall back to global agent config.
+	if agentCfg != nil && agentCfg.WebSearch != nil && agentCfg.WebSearch.Enabled {
+		return &llm.WebSearchRequest{
+			Enabled: true,
+			MaxUses: agentCfg.WebSearch.MaxUses,
+		}
+	}
+
+	return nil
 }
 
 // buildPolicyHook returns a before-tool hook that enforces bash command policy.

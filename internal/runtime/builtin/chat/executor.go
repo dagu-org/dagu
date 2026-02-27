@@ -225,6 +225,28 @@ func toThinkingRequest(cfg *core.ThinkingConfig) *llmpkg.ThinkingRequest {
 	}
 }
 
+// toWebSearchRequest converts core.WebSearchConfig to llmpkg.WebSearchRequest.
+func toWebSearchRequest(cfg *core.WebSearchConfig) *llmpkg.WebSearchRequest {
+	if cfg == nil || !cfg.Enabled {
+		return nil
+	}
+	result := &llmpkg.WebSearchRequest{
+		Enabled:        true,
+		MaxUses:        cfg.MaxUses,
+		AllowedDomains: cfg.AllowedDomains,
+		BlockedDomains: cfg.BlockedDomains,
+	}
+	if cfg.UserLocation != nil {
+		result.UserLocation = &llmpkg.UserLocation{
+			City:     cfg.UserLocation.City,
+			Region:   cfg.UserLocation.Region,
+			Country:  cfg.UserLocation.Country,
+			Timezone: cfg.UserLocation.Timezone,
+		}
+	}
+	return result
+}
+
 // normalizeEnvVarExpr converts an environment variable reference to ${VAR} format.
 // Handles: VAR → ${VAR}, $VAR → ${VAR}, ${VAR} → ${VAR}, "" → ""
 func normalizeEnvVarExpr(expr string) string {
@@ -380,6 +402,7 @@ func (e *Executor) buildEffectiveConfig(model core.ModelEntry) *core.LLMConfig {
 		Thinking:          cfg.Thinking,
 		Tools:             cfg.Tools,
 		MaxToolIterations: cfg.MaxToolIterations,
+		WebSearch:         cfg.WebSearch,
 		Temperature:       coalescePtr(model.Temperature, cfg.Temperature),
 		MaxTokens:         coalescePtr(model.MaxTokens, cfg.MaxTokens),
 		TopP:              coalescePtr(model.TopP, cfg.TopP),
@@ -473,6 +496,7 @@ func (e *Executor) runSimpleForModel(ctx context.Context, provider llmpkg.Provid
 		MaxTokens:   cfg.MaxTokens,
 		TopP:        cfg.TopP,
 		Thinking:    toThinkingRequest(cfg.Thinking),
+		WebSearch:   toWebSearchRequest(cfg.WebSearch),
 	}
 
 	var responseContent string
@@ -617,6 +641,7 @@ func (e *Executor) executeToolStep(
 		Thinking:    toThinkingRequest(cfg.Thinking),
 		Tools:       tools,
 		ToolChoice:  "auto",
+		WebSearch:   toWebSearchRequest(cfg.WebSearch),
 	}
 
 	// Execute request

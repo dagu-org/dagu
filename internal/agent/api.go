@@ -256,6 +256,17 @@ func (a *API) loadEnabledSkills(ctx context.Context) []string {
 	return cfg.EnabledSkills
 }
 
+func (a *API) loadWebSearch(ctx context.Context) *llm.WebSearchRequest {
+	cfg, err := a.configStore.Load(ctx)
+	if err != nil || cfg == nil || cfg.WebSearch == nil || !cfg.WebSearch.Enabled {
+		return nil
+	}
+	return &llm.WebSearchRequest{
+		Enabled: true,
+		MaxUses: cfg.WebSearch.MaxUses,
+	}
+}
+
 // loadSoulWithOverride loads a soul by explicit ID override, falling back to the
 // global default from config. Use this for session creation where the client may
 // specify a soul.
@@ -501,6 +512,7 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		DAGName:       sess.DAGName,
 		SessionStore:  a.store,
 		Soul:          a.loadSelectedSoul(ctx),
+		WebSearch:     a.loadWebSearch(ctx),
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 	a.sessions.Store(id, mgr)
@@ -661,6 +673,7 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 		DAGName:         dagName,
 		SessionStore:    a.store,
 		Soul:            a.loadSoulWithOverride(ctx, req.SoulID),
+		WebSearch:       a.loadWebSearch(ctx),
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 

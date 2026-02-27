@@ -13,8 +13,7 @@ func TestRegisteredTools_ContainsAllExpected(t *testing.T) {
 	expected := []string{
 		"bash", "read", "patch", "think",
 		"navigate", "read_schema", "ask_user",
-		"web_search", "delegate", "use_skill",
-		"search_skills",
+		"delegate", "use_skill", "search_skills",
 	}
 
 	regs := RegisteredTools()

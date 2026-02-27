@@ -52,6 +52,7 @@ type SessionManager struct {
 	registry        SubSessionRegistry
 	delegates       map[string]DelegateSnapshot // guarded by mu
 	soul            *Soul
+	webSearch       *llm.WebSearchRequest
 }
 
 // SessionManagerConfig contains configuration for creating a SessionManager.
@@ -82,6 +83,8 @@ type SessionManagerConfig struct {
 	Registry SubSessionRegistry
 	// Soul is the active soul for this session (nil means use default prompt).
 	Soul *Soul
+	// WebSearch configures provider-native web search for this session.
+	WebSearch *llm.WebSearchRequest
 }
 
 // NewSessionManager creates a new SessionManager.
@@ -127,6 +130,7 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		delegateTask:    cfg.DelegateTask,
 		registry:        cfg.Registry,
 		soul:            cfg.Soul,
+		webSearch:       cfg.WebSearch,
 	}
 }
 
@@ -518,6 +522,7 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		Registry:         sm.registry,
 		SkillStore:       sm.skillStore,
 		AllowedSkills:    allowedSkills,
+		WebSearch:        sm.webSearch,
 	})
 }
 
