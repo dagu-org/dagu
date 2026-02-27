@@ -17,13 +17,13 @@ interface DocTabContextType {
   updateTab: (tabId: string, updates: Partial<Pick<DocTab, 'docPath' | 'title'>>) => void;
 
   // Draft content persistence
-  drafts: Map<string, string>;
+  drafts: ReadonlyMap<string, string>;
   setDraft: (tabId: string, content: string) => void;
   clearDraft: (tabId: string) => void;
   getDraft: (tabId: string) => string | undefined;
 
   // Per-tab unsaved tracking
-  unsavedTabIds: Set<string>;
+  unsavedTabIds: ReadonlySet<string>;
   markTabUnsaved: (tabId: string) => void;
   markTabSaved: (tabId: string) => void;
   isTabUnsaved: (tabId: string) => boolean;
@@ -92,13 +92,20 @@ export function DocTabProvider({ children }: { children: React.ReactNode }) {
 
   // Persist to localStorage
   useEffect(() => {
-    const state: StoredTabState = { tabs, activeTabId };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    try {
+      const state: StoredTabState = { tabs, activeTabId };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch {
+      // Ignore persistence errors (quota/private mode)
+    }
   }, [tabs, activeTabId]);
 
   // Sync unsavedTabIds to UnsavedChangesContext
   useEffect(() => {
     setHasUnsavedChanges(unsavedTabIds.size > 0);
+    return () => {
+      setHasUnsavedChanges(false);
+    };
   }, [unsavedTabIds, setHasUnsavedChanges]);
 
   const openDoc = useCallback((docPath: string, title: string) => {

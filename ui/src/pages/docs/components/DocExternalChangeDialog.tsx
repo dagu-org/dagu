@@ -38,12 +38,7 @@ function DocExternalChangeDialog({ visible, onDiscard, onIgnore }: Props) {
           return;
         }
 
-        if (activeElement instanceof HTMLButtonElement) {
-          return;
-        }
-
-        e.preventDefault();
-        onDiscard();
+        // No default action — Enter only triggers when a specific button is focused
       }
     };
 

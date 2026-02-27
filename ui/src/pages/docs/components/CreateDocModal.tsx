@@ -76,8 +76,8 @@ export function CreateDocModal({
               Enter a path for your new document. Use / for directories.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
+          <div className="grid gap-3 py-3">
+            <div className="grid grid-cols-4 items-center gap-3">
               <Label htmlFor="doc-path" className="text-right">
                 Path
               </Label>

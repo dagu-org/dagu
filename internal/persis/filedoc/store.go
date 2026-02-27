@@ -47,11 +47,26 @@ func New(baseDir string) *Store {
 }
 
 // docFilePath returns the file path for a doc ID and validates the path
-// stays within baseDir to prevent path traversal.
+// stays within baseDir to prevent path traversal (including via symlinks).
 func (s *Store) docFilePath(id string) (string, error) {
 	p := filepath.Join(s.baseDir, id+".md")
 	cleaned := filepath.Clean(p)
-	if !strings.HasPrefix(cleaned, filepath.Clean(s.baseDir)+string(filepath.Separator)) {
+
+	// Resolve symlinks for stronger path traversal protection.
+	resolvedBase, err := filepath.EvalSymlinks(s.baseDir)
+	if err != nil {
+		return "", fmt.Errorf("filedoc: cannot resolve base dir: %w", err)
+	}
+	resolvedDir, err := filepath.EvalSymlinks(filepath.Dir(cleaned))
+	if err != nil {
+		// Parent dir may not exist yet (e.g. during Create); fall back to lexical check.
+		if !strings.HasPrefix(cleaned, filepath.Clean(s.baseDir)+string(filepath.Separator)) {
+			return "", fmt.Errorf("filedoc: path traversal detected for id %q", id)
+		}
+		return cleaned, nil
+	}
+	fullResolved := filepath.Join(resolvedDir, filepath.Base(cleaned))
+	if !strings.HasPrefix(fullResolved, resolvedBase+string(filepath.Separator)) {
 		return "", fmt.Errorf("filedoc: path traversal detected for id %q", id)
 	}
 	return cleaned, nil
@@ -137,7 +152,7 @@ func (s *Store) ListFlat(ctx context.Context, page, perPage int) (*exec.Paginate
 		if err != nil {
 			return nil
 		}
-		id := strings.TrimSuffix(relPath, ".md")
+		id := strings.TrimSuffix(filepath.ToSlash(relPath), ".md")
 
 		if err := agent.ValidateDocID(id); err != nil {
 			logger.Debug(ctx, "Skipping non-conforming doc file", tag.File(relPath), tag.Reason(err.Error()))
@@ -224,10 +239,6 @@ func (s *Store) Create(_ context.Context, id, content string) error {
 		return err
 	}
 
-	if _, err := os.Stat(filePath); err == nil {
-		return agent.ErrDocAlreadyExists
-	}
-
 	// Ensure parent directories exist.
 	if err := os.MkdirAll(filepath.Dir(filePath), docDirPermissions); err != nil {
 		return fmt.Errorf("filedoc: failed to create parent directories: %w", err)
@@ -237,7 +248,17 @@ func (s *Store) Create(_ context.Context, id, content string) error {
 	if len(data) > 0 && data[len(data)-1] != '\n' {
 		data = append(data, '\n')
 	}
-	if err := fileutil.WriteFileAtomic(filePath, data, filePermissions); err != nil {
+
+	// Use O_EXCL for atomic create — prevents race between concurrent creates.
+	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, filePermissions)
+	if err != nil {
+		if os.IsExist(err) {
+			return agent.ErrDocAlreadyExists
+		}
+		return fmt.Errorf("filedoc: failed to create file: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+	if _, err := f.Write(data); err != nil {
 		return fmt.Errorf("filedoc: failed to write file: %w", err)
 	}
 
@@ -349,7 +370,7 @@ func (s *Store) Search(ctx context.Context, query string) ([]*agent.DocSearchRes
 		if err != nil {
 			return nil
 		}
-		id := strings.TrimSuffix(relPath, ".md")
+		id := strings.TrimSuffix(filepath.ToSlash(relPath), ".md")
 
 		if err := agent.ValidateDocID(id); err != nil {
 			logger.Debug(ctx, "Skipping non-conforming doc file", tag.File(relPath), tag.Reason(err.Error()))
@@ -407,6 +428,7 @@ func (s *Store) buildTree(ctx context.Context) ([]*agent.DocTreeNode, error) {
 		if err != nil {
 			return nil
 		}
+		relPath = filepath.ToSlash(relPath)
 
 		if d.IsDir() {
 			node := &agent.DocTreeNode{

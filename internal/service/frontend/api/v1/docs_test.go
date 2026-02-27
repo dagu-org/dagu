@@ -421,8 +421,7 @@ func TestSearchDocs(t *testing.T) {
 
 		searchResp, ok := resp.(apigen.SearchDocs200JSONResponse)
 		require.True(t, ok)
-		require.NotNil(t, searchResp.Results)
-		assert.Len(t, *searchResp.Results, 2)
+		assert.Len(t, searchResp.Results, 2)
 	})
 
 	t.Run("empty query", func(t *testing.T) {
@@ -449,8 +448,7 @@ func TestSearchDocs(t *testing.T) {
 
 		searchResp, ok := resp.(apigen.SearchDocs200JSONResponse)
 		require.True(t, ok)
-		require.NotNil(t, searchResp.Results)
-		assert.Empty(t, *searchResp.Results)
+		assert.Empty(t, searchResp.Results)
 	})
 
 	t.Run("no doc store", func(t *testing.T) {
@@ -716,9 +714,8 @@ func TestSearchDocsWithMatches(t *testing.T) {
 
 		searchResp, ok := resp.(apigen.SearchDocs200JSONResponse)
 		require.True(t, ok)
-		require.NotNil(t, searchResp.Results)
-		require.Len(t, *searchResp.Results, 1)
-		item := (*searchResp.Results)[0]
+		require.Len(t, searchResp.Results, 1)
+		item := searchResp.Results[0]
 		assert.Equal(t, "doc1", item.Id)
 		require.NotNil(t, item.Matches)
 		assert.Len(t, *item.Matches, 1)

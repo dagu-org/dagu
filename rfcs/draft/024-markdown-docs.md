@@ -279,23 +279,23 @@ The agent uses `read` to view documents and `patch` (with `create` or `replace` 
 The agent system prompt template is updated with the following additions:
 
 **`<environment>` block** — Add the docs directory path:
-```
+```text
 Docs Directory: {{.DAGsDir}}/docs/
 ```
 
 **`<tools>` block** — Update the `navigate` tool description to include doc paths:
-```
+```text
 navigate: Navigate the user to a specific page in the Dagu UI. Available paths include
 '/docs' for the documents page, '/docs/<doc-id>' for a specific document, ...
 ```
 
 **`<ui_flow>` rule** — Add a rule for post-edit navigation:
-```
+```text
 After creating or modifying documents, navigate to `/docs/<doc-id>` so the user can review the changes.
 ```
 
 **`<workflows>` section** — Add a "Working with Documents" workflow:
-```
+```text
 <workflow name="Working with Documents">
 1. Check if the document exists: read({DAGsDir}/docs/<id>.md)
 2. Create or update: patch(path, operation: create|replace, ...)
@@ -640,7 +640,7 @@ The tree sidebar renders a recursive tree of directories and files with real-tim
 
 **Real-time updates** — The tree uses the dual data source pattern from the DAG list page (`ui/src/pages/dags/index.tsx:206-229`):
 
-```
+```typescript
 SSE primary (useDocTreeSSE) → polling fallback (2s interval via useQuery) → keepPreviousData
 const data = sseResult.data ?? pollingData;
 ```
@@ -785,7 +785,7 @@ On mobile (< 768px), tree and editor are displayed one at a time:
 
 #### Frontend File Structure
 
-```
+```text
 ui/src/pages/docs/
   index.tsx                     -- DocsPage (split layout, tab provider, URL routing)
   components/

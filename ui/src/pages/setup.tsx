@@ -185,6 +185,16 @@ export default function SetupPage() {
       }
 
       // 3. Create model config
+      const supportedProviders = [
+        CreateModelConfigRequestProvider.anthropic,
+        CreateModelConfigRequestProvider.openai,
+        CreateModelConfigRequestProvider.gemini,
+      ] as const;
+      const isValidProvider = (v: string): v is CreateModelConfigRequestProvider =>
+        (supportedProviders as readonly string[]).includes(v);
+      if (!isValidProvider(preset.provider)) {
+        throw new Error(`Unsupported provider: ${preset.provider}`);
+      }
       const { data: createdModel, error: createError } = await client.POST(
         '/settings/agent/models',
         {
@@ -192,7 +202,7 @@ export default function SetupPage() {
           body: {
             id: generateSlugId(preset.name),
             name: preset.name,
-            provider: preset.provider as unknown as CreateModelConfigRequestProvider,
+            provider: preset.provider,
             model: preset.model,
             apiKey: apiKey.trim(),
             description: preset.description || undefined,

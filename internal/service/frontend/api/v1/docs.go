@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/agent"
@@ -83,7 +84,7 @@ func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (
 
 		return api.ListDocs200JSONResponse{
 			Items:      &items,
-			Pagination: ptrOf(toPagination(*result)),
+			Pagination: toPagination(*result),
 		}, nil
 	}
 
@@ -100,7 +101,7 @@ func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (
 
 	return api.ListDocs200JSONResponse{
 		Tree:       &tree,
-		Pagination: ptrOf(toPagination(*result)),
+		Pagination: toPagination(*result),
 	}, nil
 }
 
@@ -198,7 +199,7 @@ func (a *API) SearchDocs(ctx context.Context, request api.SearchDocsRequestObjec
 	}
 
 	return api.SearchDocs200JSONResponse{
-		Results: &items,
+		Results: items,
 	}, nil
 }
 
@@ -311,7 +312,7 @@ func (a *API) GetDocTreeData(ctx context.Context, queryString string) (any, erro
 	}
 
 	page := parseIntParam(params.Get("page"), 1)
-	perPage := parseIntParam(params.Get("perPage"), 200)
+	perPage := min(parseIntParam(params.Get("perPage"), 200), 200)
 
 	result, err := a.docStore.List(ctx, page, perPage)
 	if err != nil {
@@ -325,7 +326,7 @@ func (a *API) GetDocTreeData(ctx context.Context, queryString string) (any, erro
 
 	return api.ListDocs200JSONResponse{
 		Tree:       &tree,
-		Pagination: ptrOf(toPagination(*result)),
+		Pagination: toPagination(*result),
 	}, nil
 }
 
@@ -333,6 +334,9 @@ func (a *API) GetDocTreeData(ctx context.Context, queryString string) (any, erro
 func (a *API) GetDocContentData(ctx context.Context, docID string) (any, error) {
 	if a.docStore == nil {
 		return nil, errDocStoreNotAvailable
+	}
+	if err := validateDocPath(docID); err != nil {
+		return nil, err
 	}
 	doc, err := a.docStore.Get(ctx, docID)
 	if err != nil {
@@ -342,13 +346,18 @@ func (a *API) GetDocContentData(ctx context.Context, docID string) (any, error) 
 }
 
 func toDocResponse(doc *agent.Doc) api.DocResponse {
-	return api.DocResponse{
-		Id:        doc.ID,
-		Title:     doc.Title,
-		Content:   doc.Content,
-		CreatedAt: ptrOf(doc.CreatedAt),
-		UpdatedAt: ptrOf(doc.UpdatedAt),
+	resp := api.DocResponse{
+		Id:      doc.ID,
+		Title:   doc.Title,
+		Content: doc.Content,
 	}
+	if t, err := time.Parse(time.RFC3339, doc.CreatedAt); err == nil {
+		resp.CreatedAt = &t
+	}
+	if t, err := time.Parse(time.RFC3339, doc.UpdatedAt); err == nil {
+		resp.UpdatedAt = &t
+	}
+	return resp
 }
 
 func toDocMetadataResponse(m agent.DocMetadata) api.DocMetadataResponse {

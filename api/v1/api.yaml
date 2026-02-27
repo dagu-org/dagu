@@ -5591,7 +5591,7 @@ paths:
           description: "Document path (may include slashes for nested docs)"
           required: true
           schema:
-            type: string
+            $ref: "#/components/schemas/DocPath"
       responses:
         "200":
           description: "Document details"
@@ -5625,7 +5625,7 @@ paths:
           description: "Document path (may include slashes for nested docs)"
           required: true
           schema:
-            type: string
+            $ref: "#/components/schemas/DocPath"
       requestBody:
         required: true
         content:
@@ -5668,7 +5668,7 @@ paths:
           description: "Document path (may include slashes for nested docs)"
           required: true
           schema:
-            type: string
+            $ref: "#/components/schemas/DocPath"
       responses:
         "204":
           description: "Document deleted"
@@ -5699,7 +5699,7 @@ paths:
           description: "Current document path (may include slashes for nested docs)"
           required: true
           schema:
-            type: string
+            $ref: "#/components/schemas/DocPath"
       requestBody:
         required: true
         content:
@@ -8814,8 +8814,12 @@ components:
           description: "Full file content including YAML frontmatter"
         createdAt:
           type: string
+          format: date-time
+          description: "RFC3339 timestamp when the document was created"
         updatedAt:
           type: string
+          format: date-time
+          description: "RFC3339 timestamp when the document was last updated"
 
     DocMetadataResponse:
       type: object
@@ -8856,6 +8860,8 @@ components:
     DocListResponse:
       type: object
       description: "Paginated document list (tree or flat)"
+      required:
+        - pagination
       properties:
         tree:
           type: array
@@ -8887,11 +8893,20 @@ components:
     DocSearchResponse:
       type: object
       description: "Search results"
+      required:
+        - results
       properties:
         results:
           type: array
           items:
             $ref: "#/components/schemas/DocSearchResultItem"
+
+    DocPath:
+      type: string
+      minLength: 1
+      maxLength: 500
+      description: "Relative document path (without extension), e.g. runbooks/deploy-guide. Must not start with / or contain .."
+      pattern: '^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$'
 
     CreateDocRequest:
       type: object
@@ -8901,8 +8916,7 @@ components:
       description: "Request to create a new document"
       properties:
         id:
-          type: string
-          description: "Document path (e.g., runbooks/deploy-guide)"
+          $ref: "#/components/schemas/DocPath"
         content:
           type: string
           description: "Full file content including optional YAML frontmatter"
@@ -8924,8 +8938,7 @@ components:
       description: "Request to rename/move a document"
       properties:
         newPath:
-          type: string
-          description: "New document path"
+          $ref: "#/components/schemas/DocPath"
 
     ModelPreset:
       type: object

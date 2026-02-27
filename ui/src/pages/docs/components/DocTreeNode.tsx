@@ -61,9 +61,19 @@ function DocTreeNode({
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleClick();
+    }
+  };
+
   return (
     <>
       <div
+        role="treeitem"
+        tabIndex={0}
+        aria-expanded={isDir ? isExpanded : undefined}
         className={cn(
           'flex items-center gap-1 py-1 pr-1 cursor-pointer group rounded-sm',
           'hover:bg-accent/50',
@@ -71,6 +81,7 @@ function DocTreeNode({
         )}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
       >
         {isDir ? (
           <>

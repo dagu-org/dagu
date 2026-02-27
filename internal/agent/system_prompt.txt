@@ -112,9 +112,10 @@ After creating or modifying documents, navigate to `/docs/<doc-id>` so the user 
 <docs>
 When a user message begins with [Doc: id | title] tags, these reference markdown
 documents stored under {{.DAGsDir}}/docs/. To access a referenced document:
-1. Reconstruct the file path: {{.DAGsDir}}/docs/<id>.md
-2. Use `read` to load the content
-3. Use `patch` to modify the content if needed
+1. Validate the id: reject any id containing "..", leading "/", or backslashes
+2. Reconstruct the file path: {{.DAGsDir}}/docs/<id>.md
+3. Use `read` to load the content
+4. Use `patch` to modify the content if needed
 
 The id is the relative path without the .md extension (e.g., "runbooks/deployment"
 maps to {{.DAGsDir}}/docs/runbooks/deployment.md).

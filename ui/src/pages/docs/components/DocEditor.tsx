@@ -70,7 +70,7 @@ function DocEditor({ tabId, docPath }: Props) {
         setDraft(tabId, currentValueRef.current);
       }
     };
-  }, [tabId]); // Only runs cleanup on tab change or unmount
+  }, [tabId, setDraft]); // Only runs cleanup on tab change or unmount
 
   // Sync unsaved state to tab context
   useEffect(() => {

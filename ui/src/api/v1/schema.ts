@@ -3754,7 +3754,15 @@ export interface components {
             title: string;
             /** @description Full file content including YAML frontmatter */
             content: string;
+            /**
+             * Format: date-time
+             * @description RFC3339 timestamp when the document was created
+             */
             createdAt?: string;
+            /**
+             * Format: date-time
+             * @description RFC3339 timestamp when the document was last updated
+             */
             updatedAt?: string;
         };
         /** @description Lightweight document metadata */
@@ -3775,7 +3783,7 @@ export interface components {
         DocListResponse: {
             tree?: components["schemas"]["DocTreeNodeResponse"][];
             items?: components["schemas"]["DocMetadataResponse"][];
-            pagination?: components["schemas"]["Pagination"];
+            pagination: components["schemas"]["Pagination"];
         };
         /** @description A search result for a single document */
         DocSearchResultItem: {
@@ -3785,12 +3793,13 @@ export interface components {
         };
         /** @description Search results */
         DocSearchResponse: {
-            results?: components["schemas"]["DocSearchResultItem"][];
+            results: components["schemas"]["DocSearchResultItem"][];
         };
+        /** @description Relative document path (without extension), e.g. runbooks/deploy-guide. Must not start with / or contain .. */
+        DocPath: string;
         /** @description Request to create a new document */
         CreateDocRequest: {
-            /** @description Document path (e.g., runbooks/deploy-guide) */
-            id: string;
+            id: components["schemas"]["DocPath"];
             /** @description Full file content including optional YAML frontmatter */
             content: string;
         };
@@ -3801,8 +3810,7 @@ export interface components {
         };
         /** @description Request to rename/move a document */
         RenameDocRequest: {
-            /** @description New document path */
-            newPath: string;
+            newPath: components["schemas"]["DocPath"];
         };
         /** @description Hardcoded model preset with metadata */
         ModelPreset: {
@@ -11150,7 +11158,7 @@ export interface operations {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Document path (may include slashes for nested docs) */
-                path: string;
+                path: components["schemas"]["DocPath"];
             };
             header?: never;
             path?: never;
@@ -11193,7 +11201,7 @@ export interface operations {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Document path (may include slashes for nested docs) */
-                path: string;
+                path: components["schemas"]["DocPath"];
             };
             header?: never;
             path?: never;
@@ -11234,7 +11242,7 @@ export interface operations {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Document path (may include slashes for nested docs) */
-                path: string;
+                path: components["schemas"]["DocPath"];
             };
             header?: never;
             path?: never;
@@ -11283,7 +11291,7 @@ export interface operations {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Current document path (may include slashes for nested docs) */
-                path: string;
+                path: components["schemas"]["DocPath"];
             };
             header?: never;
             path?: never;
