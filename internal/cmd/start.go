@@ -413,8 +413,9 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 			AgentConfigStore: as.ConfigStore,
 			AgentModelStore:  as.ModelStore,
 			AgentMemoryStore: as.MemoryStore,
-			AgentSkillStore:  as.SkillStore,
-			AgentSoulStore:   as.SoulStore,
+			AgentSkillStore:         as.SkillStore,
+			AgentSoulStore:          as.SoulStore,
+			AgentRemoteNodeResolver: as.RemoteNodeResolver,
 		},
 	)
 

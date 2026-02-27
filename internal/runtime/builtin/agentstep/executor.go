@@ -138,7 +138,7 @@ func (e *Executor) Run(ctx context.Context) error {
 	}
 
 	// Build tools filtered by global policy (exclude navigate and ask_user; add output tool).
-	tools := buildTools(dagCtx, stepCfg, globalPolicy, skillStore, allowedSkills, stdout)
+	tools := buildTools(ctx, dagCtx, stepCfg, globalPolicy, skillStore, allowedSkills, stdout)
 
 	// Load memory content if enabled.
 	var memoryContent agent.MemoryContent
@@ -265,7 +265,7 @@ func (e *Executor) Run(ctx context.Context) error {
 
 // buildTools creates the tool list for the agent step.
 // Tools are filtered first by global policy, then by step-level config.
-func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy agent.ToolPolicyConfig, skillStore agent.SkillStore, allowedSkills map[string]struct{}, stdout io.Writer) []*agent.AgentTool {
+func buildTools(ctx context.Context, dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy agent.ToolPolicyConfig, skillStore agent.SkillStore, allowedSkills map[string]struct{}, stdout io.Writer) []*agent.AgentTool {
 	dagsDir := ""
 	if dagCtx.DAG != nil {
 		dagsDir = dagCtx.DAG.Location
@@ -283,6 +283,16 @@ func buildTools(dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy
 	if skillStore != nil {
 		allTools["use_skill"] = agent.NewUseSkillTool(skillStore, allowedSkills)
 		allTools["search_skills"] = agent.NewSearchSkillsTool(skillStore, allowedSkills)
+	}
+
+	remoteResolver := agent.GetRemoteNodeResolver(ctx)
+	if remoteResolver != nil {
+		if t := agent.NewRemoteAgentTool(remoteResolver); t != nil {
+			allTools["remote_agent"] = t
+		}
+		if t := agent.NewListRemoteNodesTool(remoteResolver); t != nil {
+			allTools["list_remote_nodes"] = t
+		}
 	}
 
 	// Remove tools disabled by global policy (output is step-only, always kept).

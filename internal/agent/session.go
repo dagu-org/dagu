@@ -51,8 +51,9 @@ type SessionManager struct {
 	delegateTask    string
 	registry        SubSessionRegistry
 	delegates       map[string]DelegateSnapshot // guarded by mu
-	soul            *Soul
-	webSearch       *llm.WebSearchRequest
+	soul               *Soul
+	webSearch          *llm.WebSearchRequest
+	remoteNodeResolver RemoteNodeResolver
 }
 
 // SessionManagerConfig contains configuration for creating a SessionManager.
@@ -85,6 +86,8 @@ type SessionManagerConfig struct {
 	Soul *Soul
 	// WebSearch configures provider-native web search for this session.
 	WebSearch *llm.WebSearchRequest
+	// RemoteNodeResolver provides access to remote nodes for remote_agent tools.
+	RemoteNodeResolver RemoteNodeResolver
 }
 
 // NewSessionManager creates a new SessionManager.
@@ -129,8 +132,9 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		parentSessionID: cfg.ParentSessionID,
 		delegateTask:    cfg.DelegateTask,
 		registry:        cfg.Registry,
-		soul:            cfg.Soul,
-		webSearch:       cfg.WebSearch,
+		soul:               cfg.Soul,
+		webSearch:          cfg.WebSearch,
+		remoteNodeResolver: cfg.RemoteNodeResolver,
 	}
 }
 
@@ -494,9 +498,10 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		Model:    model,
 		History:  history,
 		Tools: CreateTools(ToolConfig{
-			DAGsDir:       sm.environment.DAGsDir,
-			SkillStore:    sm.skillStore,
-			AllowedSkills: allowedSkills,
+			DAGsDir:            sm.environment.DAGsDir,
+			SkillStore:         sm.skillStore,
+			AllowedSkills:      allowedSkills,
+			RemoteNodeResolver: sm.remoteNodeResolver,
 		}),
 		RecordMessage: sm.createRecordMessageFunc(),
 		Logger:        sm.logger,

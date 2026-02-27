@@ -295,6 +295,7 @@ type RemoteNode struct {
 	BasicAuthPassword string
 	AuthToken         string
 	SkipTLSVerify     bool
+	Timeout           int // seconds; 0 = use default
 }
 
 // TLSConfig represents TLS configuration.

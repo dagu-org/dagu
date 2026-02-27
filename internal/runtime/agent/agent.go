@@ -171,6 +171,8 @@ type Agent struct {
 	agentSkillStore agentpkg.SkillStore
 	// agentSoulStore is the agent soul store for agent step execution.
 	agentSoulStore agentpkg.SoulStore
+	// agentRemoteNodeResolver is the remote node resolver for agent step execution.
+	agentRemoteNodeResolver agentpkg.RemoteNodeResolver
 
 	// Evaluated configs - these are expanded at runtime and stored separately
 	// to avoid mutating the original DAG struct.
@@ -245,6 +247,8 @@ type Options struct {
 	AgentSkillStore agentpkg.SkillStore
 	// AgentSoulStore is the agent soul store for agent step execution.
 	AgentSoulStore agentpkg.SoulStore
+	// AgentRemoteNodeResolver is the remote node resolver for agent step execution.
+	AgentRemoteNodeResolver agentpkg.RemoteNodeResolver
 }
 
 // New creates a new Agent.
@@ -282,8 +286,9 @@ func New(
 		agentConfigStore: opts.AgentConfigStore,
 		agentModelStore:  opts.AgentModelStore,
 		agentMemoryStore: opts.AgentMemoryStore,
-		agentSkillStore:  opts.AgentSkillStore,
-		agentSoulStore:   opts.AgentSoulStore,
+		agentSkillStore:         opts.AgentSkillStore,
+		agentSoulStore:          opts.AgentSoulStore,
+		agentRemoteNodeResolver: opts.AgentRemoteNodeResolver,
 	}
 
 	// Initialize progress display if enabled
@@ -443,6 +448,9 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	if a.agentSoulStore != nil {
 		ctx = agentpkg.WithSoulStore(ctx, a.agentSoulStore)
+	}
+	if a.agentRemoteNodeResolver != nil {
+		ctx = agentpkg.WithRemoteNodeResolver(ctx, a.agentRemoteNodeResolver)
 	}
 
 	// Add structured logging context

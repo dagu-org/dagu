@@ -18,6 +18,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
+	"github.com/dagu-org/dagu/internal/cmn/crypto"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
@@ -36,8 +37,10 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
 	"github.com/dagu-org/dagu/internal/persis/filequeue"
+	"github.com/dagu-org/dagu/internal/persis/fileremotenode"
 	"github.com/dagu-org/dagu/internal/persis/fileserviceregistry"
 	"github.com/dagu-org/dagu/internal/persis/filewatermark"
+	"github.com/dagu-org/dagu/internal/remotenode"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
@@ -445,11 +448,12 @@ func (c *Context) dagStore(cfg dagStoreConfig) (exec.DAGStore, error) {
 
 // agentStoresResult holds the agent stores created by agentStores().
 type agentStoresResult struct {
-	ConfigStore agent.ConfigStore
-	ModelStore  agent.ModelStore
-	MemoryStore agent.MemoryStore
-	SkillStore  agent.SkillStore
-	SoulStore   agent.SoulStore
+	ConfigStore        agent.ConfigStore
+	ModelStore         agent.ModelStore
+	MemoryStore        agent.MemoryStore
+	SkillStore         agent.SkillStore
+	SoulStore          agent.SoulStore
+	RemoteNodeResolver agent.RemoteNodeResolver
 }
 
 // agentStores creates the agent config, model, memory, and skill stores from the config paths.
@@ -497,7 +501,70 @@ func (c *Context) agentStores() agentStoresResult {
 	}
 	result.SoulStore = soulStore
 
+	// Build remote node resolver for agent step remote tools.
+	result.RemoteNodeResolver = c.buildRemoteNodeResolver()
+
 	return result
+}
+
+// buildRemoteNodeResolver creates a RemoteNodeResolver from config and store.
+func (c *Context) buildRemoteNodeResolver() agent.RemoteNodeResolver {
+	var rnStore remotenode.Store
+	encKey, err := crypto.ResolveKey(c.Config.Paths.DataDir)
+	if err == nil {
+		enc, err := crypto.NewEncryptor(encKey)
+		if err == nil {
+			s, err := fileremotenode.New(c.Config.Paths.RemoteNodesDir, enc)
+			if err == nil {
+				rnStore = s
+			}
+		}
+	}
+
+	resolver := remotenode.NewResolver(c.Config.Server.RemoteNodes, rnStore)
+	return &cliRemoteNodeAdapter{resolver: resolver}
+}
+
+// cliRemoteNodeAdapter adapts *remotenode.Resolver to agent.RemoteNodeResolver
+// for CLI commands (start, retry, restart, dry).
+type cliRemoteNodeAdapter struct {
+	resolver *remotenode.Resolver
+}
+
+func (a *cliRemoteNodeAdapter) GetByName(ctx context.Context, name string) (agent.RemoteNodeInfo, error) {
+	node, err := a.resolver.GetByName(ctx, name)
+	if err != nil {
+		return agent.RemoteNodeInfo{}, err
+	}
+	if node.AuthType != remotenode.AuthTypeToken {
+		return agent.RemoteNodeInfo{}, fmt.Errorf("node %q uses %s auth (only token auth is supported)", name, node.AuthType)
+	}
+	return cliToRemoteNodeInfo(node), nil
+}
+
+func (a *cliRemoteNodeAdapter) ListTokenAuthNodes(ctx context.Context) ([]agent.RemoteNodeInfo, error) {
+	all, err := a.resolver.ListAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var result []agent.RemoteNodeInfo
+	for _, rn := range all {
+		if rn.AuthType == remotenode.AuthTypeToken {
+			result = append(result, cliToRemoteNodeInfo(rn.RemoteNode))
+		}
+	}
+	return result, nil
+}
+
+func cliToRemoteNodeInfo(n *remotenode.RemoteNode) agent.RemoteNodeInfo {
+	return agent.RemoteNodeInfo{
+		Name:          n.Name,
+		Description:   n.Description,
+		APIBaseURL:    n.APIBaseURL,
+		AuthToken:     n.AuthToken,
+		SkipTLSVerify: n.SkipTLSVerify,
+		Timeout:       n.Timeout,
+	}
 }
 
 // OpenLogFile creates and opens a log file for a given dag-run.

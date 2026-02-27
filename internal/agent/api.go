@@ -48,34 +48,36 @@ func getUserIDFromContext(ctx context.Context) string {
 
 // API handles HTTP requests for the agent.
 type API struct {
-	sessions    sync.Map // id -> *SessionManager (active sessions)
-	store       SessionStore
-	configStore ConfigStore
-	modelStore  ModelStore
-	skillStore  SkillStore
-	providers   *ProviderCache
-	workingDir  string
-	logger      *slog.Logger
-	dagStore    DAGMetadataStore // For resolving DAG file paths
-	environment EnvironmentInfo
-	hooks       *Hooks
-	memoryStore MemoryStore
-	soulStore   SoulStore
+	sessions           sync.Map // id -> *SessionManager (active sessions)
+	store              SessionStore
+	configStore        ConfigStore
+	modelStore         ModelStore
+	skillStore         SkillStore
+	providers          *ProviderCache
+	workingDir         string
+	logger             *slog.Logger
+	dagStore           DAGMetadataStore // For resolving DAG file paths
+	environment        EnvironmentInfo
+	hooks              *Hooks
+	memoryStore        MemoryStore
+	soulStore          SoulStore
+	remoteNodeResolver RemoteNodeResolver
 }
 
 // APIConfig contains configuration for the API.
 type APIConfig struct {
-	ConfigStore  ConfigStore
-	ModelStore   ModelStore
-	SkillStore   SkillStore
-	SoulStore    SoulStore
-	WorkingDir   string
-	Logger       *slog.Logger
-	SessionStore SessionStore
-	DAGStore     DAGMetadataStore // For resolving DAG file paths
-	Environment  EnvironmentInfo
-	Hooks        *Hooks
-	MemoryStore  MemoryStore
+	ConfigStore        ConfigStore
+	ModelStore         ModelStore
+	SkillStore         SkillStore
+	SoulStore          SoulStore
+	WorkingDir         string
+	Logger             *slog.Logger
+	SessionStore       SessionStore
+	DAGStore           DAGMetadataStore // For resolving DAG file paths
+	Environment        EnvironmentInfo
+	Hooks              *Hooks
+	MemoryStore        MemoryStore
+	RemoteNodeResolver RemoteNodeResolver
 }
 
 // SessionWithState is a session with its current state.
@@ -95,18 +97,19 @@ func NewAPI(cfg APIConfig) *API {
 	}
 
 	return &API{
-		configStore: cfg.ConfigStore,
-		modelStore:  cfg.ModelStore,
-		skillStore:  cfg.SkillStore,
-		soulStore:   cfg.SoulStore,
-		providers:   NewProviderCache(),
-		workingDir:  cfg.WorkingDir,
-		logger:      logger,
-		store:       cfg.SessionStore,
-		dagStore:    cfg.DAGStore,
-		environment: cfg.Environment,
-		hooks:       cfg.Hooks,
-		memoryStore: cfg.MemoryStore,
+		configStore:        cfg.ConfigStore,
+		modelStore:         cfg.ModelStore,
+		skillStore:         cfg.SkillStore,
+		soulStore:          cfg.SoulStore,
+		providers:          NewProviderCache(),
+		workingDir:         cfg.WorkingDir,
+		logger:             logger,
+		store:              cfg.SessionStore,
+		dagStore:           cfg.DAGStore,
+		environment:        cfg.Environment,
+		hooks:              cfg.Hooks,
+		memoryStore:        cfg.MemoryStore,
+		remoteNodeResolver: cfg.RemoteNodeResolver,
 	}
 }
 
@@ -511,8 +514,9 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		EnabledSkills: a.loadEnabledSkills(ctx),
 		DAGName:       sess.DAGName,
 		SessionStore:  a.store,
-		Soul:          a.loadSelectedSoul(ctx),
-		WebSearch:     a.loadWebSearch(ctx),
+		Soul:               a.loadSelectedSoul(ctx),
+		WebSearch:          a.loadWebSearch(ctx),
+		RemoteNodeResolver: a.remoteNodeResolver,
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 	a.sessions.Store(id, mgr)
@@ -633,10 +637,40 @@ func (a *API) ListTools() []ToolInfo {
 }
 
 // CreateSession creates a new session with the first message.
-// Returns the session ID on success.
-func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequest) (string, error) {
+// Returns the session ID, creation status ("accepted" or "already_exists"), and any error.
+// If req.SessionID is provided, the session is created idempotently.
+func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequest) (string, string, error) {
 	if req.Message == "" {
-		return "", ErrMessageRequired
+		return "", "", ErrMessageRequired
+	}
+
+	// Handle idempotent session creation.
+	id := req.SessionID
+	if id != "" {
+		if !isValidUUID(id) {
+			return "", "", fmt.Errorf("bad request: sessionId must be a valid UUID")
+		}
+
+		// Check active sessions.
+		if existing, loaded := a.sessions.Load(id); loaded {
+			mgr := existing.(*SessionManager)
+			if mgr.user.UserID != user.UserID {
+				return "", "", fmt.Errorf("bad request")
+			}
+			return id, "already_exists", nil
+		}
+
+		// Check persisted sessions.
+		if a.store != nil {
+			if sess, err := a.store.GetSession(ctx, id); err == nil && sess != nil {
+				if sess.UserID != user.UserID {
+					return "", "", fmt.Errorf("bad request")
+				}
+				return id, "already_exists", nil
+			}
+		}
+	} else {
+		id = uuid.New().String()
 	}
 
 	model := selectModel(req.Model, "", a.getDefaultModelID(ctx))
@@ -644,10 +678,9 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 	provider, modelCfg, err := a.resolveProvider(ctx, model)
 	if err != nil {
 		a.logger.Error("Failed to get LLM provider", "error", err)
-		return "", ErrAgentNotConfigured
+		return "", "", ErrAgentNotConfigured
 	}
 
-	id := uuid.New().String()
 	now := time.Now()
 
 	resolved := a.resolveContexts(ctx, req.DAGContexts)
@@ -657,23 +690,24 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 	}
 
 	mgr := NewSessionManager(SessionManagerConfig{
-		ID:              id,
-		User:            user,
-		Logger:          a.logger,
-		WorkingDir:      a.workingDir,
-		OnMessage:       a.createMessageCallback(id),
-		Environment:     a.environment,
-		SafeMode:        req.SafeMode,
-		Hooks:           a.hooks,
-		InputCostPer1M:  modelCfg.InputCostPer1M,
-		OutputCostPer1M: modelCfg.OutputCostPer1M,
-		MemoryStore:     a.memoryStore,
-		SkillStore:      a.skillStore,
-		EnabledSkills:   a.loadEnabledSkills(ctx),
-		DAGName:         dagName,
-		SessionStore:    a.store,
-		Soul:            a.loadSoulWithOverride(ctx, req.SoulID),
-		WebSearch:       a.loadWebSearch(ctx),
+		ID:                 id,
+		User:               user,
+		Logger:             a.logger,
+		WorkingDir:         a.workingDir,
+		OnMessage:          a.createMessageCallback(id),
+		Environment:        a.environment,
+		SafeMode:           req.SafeMode,
+		Hooks:              a.hooks,
+		InputCostPer1M:     modelCfg.InputCostPer1M,
+		OutputCostPer1M:    modelCfg.OutputCostPer1M,
+		MemoryStore:        a.memoryStore,
+		SkillStore:         a.skillStore,
+		EnabledSkills:      a.loadEnabledSkills(ctx),
+		DAGName:            dagName,
+		SessionStore:       a.store,
+		Soul:               a.loadSoulWithOverride(ctx, req.SoulID),
+		WebSearch:          a.loadWebSearch(ctx),
+		RemoteNodeResolver: a.remoteNodeResolver,
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 
@@ -686,10 +720,16 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 	if err := mgr.AcceptUserMessage(ctx, provider, model, modelCfg.Model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		a.sessions.Delete(id)
-		return "", ErrFailedToProcessMessage
+		return "", "", ErrFailedToProcessMessage
 	}
 
-	return id, nil
+	return id, "accepted", nil
+}
+
+// isValidUUID checks if a string is a valid UUID v4 format.
+func isValidUUID(s string) bool {
+	_, err := uuid.Parse(s)
+	return err == nil
 }
 
 // ListSessions returns all sessions for the given user.

@@ -167,8 +167,9 @@ func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRu
 			AgentConfigStore: as.ConfigStore,
 			AgentModelStore:  as.ModelStore,
 			AgentMemoryStore: as.MemoryStore,
-			AgentSkillStore:  as.SkillStore,
-			AgentSoulStore:   as.SoulStore,
+			AgentSkillStore:         as.SkillStore,
+			AgentSoulStore:          as.SoulStore,
+			AgentRemoteNodeResolver: as.RemoteNodeResolver,
 		})
 
 	listenSignals(ctx, agentInstance)

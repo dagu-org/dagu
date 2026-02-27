@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 )
@@ -137,6 +138,10 @@ const ConfigNodeIDPrefix = "cfg:"
 // ToConfigNode converts a domain RemoteNode to config.RemoteNode
 // for backward compatibility with proxy/SSE middleware.
 func ToConfigNode(n *RemoteNode) config.RemoteNode {
+	var timeoutSec int
+	if n.Timeout > 0 {
+		timeoutSec = int(n.Timeout.Seconds())
+	}
 	return config.RemoteNode{
 		Name:              n.Name,
 		Description:       n.Description,
@@ -146,6 +151,7 @@ func ToConfigNode(n *RemoteNode) config.RemoteNode {
 		BasicAuthPassword: n.BasicAuthPassword,
 		AuthToken:         n.AuthToken,
 		SkipTLSVerify:     n.SkipTLSVerify,
+		Timeout:           timeoutSec,
 	}
 }
 
@@ -166,5 +172,6 @@ func FromConfigNode(cn config.RemoteNode) *RemoteNode {
 		BasicAuthPassword: cn.BasicAuthPassword,
 		AuthToken:         cn.AuthToken,
 		SkipTLSVerify:     cn.SkipTLSVerify,
+		Timeout:           time.Duration(cn.Timeout) * time.Second,
 	}
 }
