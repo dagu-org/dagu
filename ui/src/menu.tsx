@@ -96,9 +96,10 @@ type RemoteNodeSelectContentProps = {
 };
 
 function RemoteNodeSelectContent({ nodes }: RemoteNodeSelectContentProps): React.ReactElement {
+  const uniqueNodes = [...new Set(nodes)];
   return (
     <SelectContent>
-      {nodes.map((node) => (
+      {uniqueNodes.map((node) => (
         <SelectItem key={node} value={node}>
           {node}
         </SelectItem>
@@ -506,6 +507,14 @@ export const mainListItems = React.forwardRef<
                   customColor={customColor}
                 />
               )}
+              <NavItem
+                to="/remote-nodes"
+                text="Remote Nodes"
+                icon={<Globe size={18} />}
+                isOpen={isOpen}
+                onClick={onNavItemClick}
+                customColor={customColor}
+              />
               <NavItem
                 to="/license"
                 text="License"

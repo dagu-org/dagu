@@ -11,7 +11,7 @@ import { useContext, useEffect, useState } from 'react';
 
 export default function LicensePage() {
   const config = useConfig();
-  const { license } = config;
+  const license = config?.license;
   const updateConfig = useUpdateConfig();
   const appBarContext = useContext(AppBarContext);
   const client = useClient();
@@ -93,6 +93,8 @@ export default function LicensePage() {
       setDeactivating(false);
     }
   }
+
+  if (!license) return null;
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">

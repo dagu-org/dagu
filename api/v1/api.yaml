@@ -49,6 +49,8 @@ tags:
     description: "AI Agent configuration operations (admin only)"
   - name: "docs"
     description: "Document management operations"
+  - name: "remote-nodes"
+    description: "Remote node management operations (admin only)"
 
 paths:
   /health:
@@ -5733,6 +5735,176 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+
+  /remote-nodes:
+    get:
+      summary: "List all remote nodes"
+      description: "Returns remote nodes from both config file and store"
+      operationId: "listRemoteNodes"
+      tags:
+        - "remote-nodes"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "List of remote nodes"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemoteNodeListResponse"
+        "403":
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: "Create a new remote node"
+      description: "Creates a store-managed remote node"
+      operationId: "createRemoteNode"
+      tags:
+        - "remote-nodes"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRemoteNodeRequest"
+      responses:
+        "201":
+          description: "Remote node created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemoteNodeResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Name already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /remote-nodes/{remoteNodeId}:
+    get:
+      summary: "Get a remote node"
+      description: "Returns a single remote node by ID"
+      operationId: "getRemoteNode"
+      tags:
+        - "remote-nodes"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNodeId"
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Remote node details"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemoteNodeResponse"
+        "404":
+          description: "Not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: "Update a remote node"
+      description: "Updates a store-managed remote node"
+      operationId: "updateRemoteNode"
+      tags:
+        - "remote-nodes"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNodeId"
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRemoteNodeRequest"
+      responses:
+        "200":
+          description: "Remote node updated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemoteNodeResponse"
+        "403":
+          description: "Cannot modify config-sourced node"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Name already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Delete a remote node"
+      description: "Deletes a store-managed remote node"
+      operationId: "deleteRemoteNode"
+      tags:
+        - "remote-nodes"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNodeId"
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "204":
+          description: "Remote node deleted"
+        "403":
+          description: "Cannot delete config-sourced node"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /remote-nodes/{remoteNodeId}/test-connection:
+    post:
+      summary: "Test remote node connection"
+      description: "Tests connectivity to a remote node by making a health check request"
+      operationId: "testRemoteNodeConnection"
+      tags:
+        - "remote-nodes"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNodeId"
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Connection test result"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestRemoteNodeConnectionResponse"
+        "404":
+          description: "Not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+
 components:
   securitySchemes:
     basicAuth:
@@ -5926,6 +6098,14 @@ components:
         type: string
         minLength: 1
       description: The soul ID
+
+    RemoteNodeId:
+      name: remoteNodeId
+      in: path
+      required: true
+      description: "The unique identifier of the remote node"
+      schema:
+        type: string
 
   schemas:
     AuditEntry:
@@ -9212,6 +9392,119 @@ components:
         - status
       properties:
         status:
+          type: string
+
+    CreateRemoteNodeRequest:
+      type: object
+      required:
+        - name
+        - apiBaseUrl
+      properties:
+        name:
+          type: string
+          description: "Display name for the remote node"
+        description:
+          type: string
+          description: "Optional description"
+        apiBaseUrl:
+          type: string
+          description: "Base URL of the remote Dagu instance API"
+        authType:
+          type: string
+          enum: ["none", "basic", "token"]
+          default: "none"
+          description: "Authentication mode"
+        basicAuthUsername:
+          type: string
+          description: "Username for basic auth"
+        basicAuthPassword:
+          type: string
+          description: "Password for basic auth"
+        authToken:
+          type: string
+          description: "Bearer token for token auth"
+        skipTlsVerify:
+          type: boolean
+          default: false
+          description: "Skip TLS certificate verification"
+
+    UpdateRemoteNodeRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        apiBaseUrl:
+          type: string
+        authType:
+          type: string
+          enum: ["none", "basic", "token"]
+        basicAuthUsername:
+          type: string
+        basicAuthPassword:
+          type: string
+        authToken:
+          type: string
+        skipTlsVerify:
+          type: boolean
+
+    RemoteNodeResponse:
+      type: object
+      required:
+        - id
+        - name
+        - apiBaseUrl
+        - authType
+        - source
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        apiBaseUrl:
+          type: string
+        authType:
+          type: string
+          enum: ["none", "basic", "token"]
+        hasCredentials:
+          type: boolean
+          description: "Whether credentials are configured (values are never returned)"
+        skipTlsVerify:
+          type: boolean
+        source:
+          type: string
+          enum: ["config", "store"]
+          description: "Where this node is defined"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    RemoteNodeListResponse:
+      type: object
+      required:
+        - remoteNodes
+      properties:
+        remoteNodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/RemoteNodeResponse"
+
+    TestRemoteNodeConnectionResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        error:
           type: string
 
 # Apply security requirements globally

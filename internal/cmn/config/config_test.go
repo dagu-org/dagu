@@ -410,6 +410,143 @@ func TestConfig_Validate(t *testing.T) {
 	})
 }
 
+func TestConfig_ValidateRemoteNodes(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ValidBasicAuth", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.RemoteNodes = []RemoteNode{{
+			Name:              "node1",
+			APIBaseURL:        "http://example.com/api/v1",
+			AuthType:          "basic",
+			BasicAuthUsername: "user",
+			BasicAuthPassword: "pass",
+		}}
+		require.NoError(t, cfg.Validate())
+	})
+
+	t.Run("ValidTokenAuth", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.RemoteNodes = []RemoteNode{{
+			Name:       "node1",
+			APIBaseURL: "http://example.com/api/v1",
+			AuthType:   "token",
+			AuthToken:  "tok-123",
+		}}
+		require.NoError(t, cfg.Validate())
+	})
+
+	t.Run("ValidNoAuth", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.RemoteNodes = []RemoteNode{{
+			Name:       "node1",
+			APIBaseURL: "http://example.com/api/v1",
+			AuthType:   "none",
+		}}
+		require.NoError(t, cfg.Validate())
+	})
+
+	t.Run("EmptyAuthTypeDefaultsToNone", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.RemoteNodes = []RemoteNode{{
+			Name:       "node1",
+			APIBaseURL: "http://example.com/api/v1",
+		}}
+		require.NoError(t, cfg.Validate())
+	})
+
+	t.Run("MissingAPIBaseURL", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.RemoteNodes = []RemoteNode{{
+			Name: "node1",
+		}}
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "api_base_url is required")
+		assert.Contains(t, err.Error(), "node1")
+	})
+
+	t.Run("InvalidAuthType", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.RemoteNodes = []RemoteNode{{
+			Name:       "node1",
+			APIBaseURL: "http://example.com/api/v1",
+			AuthType:   "invalid",
+		}}
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid auth_type")
+	})
+
+	t.Run("BasicAuthMissingUsername", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.RemoteNodes = []RemoteNode{{
+			Name:              "node1",
+			APIBaseURL:        "http://example.com/api/v1",
+			AuthType:          "basic",
+			BasicAuthPassword: "pass",
+		}}
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "basic auth requires")
+	})
+
+	t.Run("BasicAuthMissingPassword", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.RemoteNodes = []RemoteNode{{
+			Name:              "node1",
+			APIBaseURL:        "http://example.com/api/v1",
+			AuthType:          "basic",
+			BasicAuthUsername: "user",
+		}}
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "basic auth requires")
+	})
+
+	t.Run("TokenAuthMissingToken", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.RemoteNodes = []RemoteNode{{
+			Name:       "node1",
+			APIBaseURL: "http://example.com/api/v1",
+			AuthType:   "token",
+		}}
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "token auth requires auth_token")
+	})
+
+	t.Run("MultipleNodes_OneInvalid", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.RemoteNodes = []RemoteNode{
+			{Name: "good", APIBaseURL: "http://example.com/api/v1"},
+			{Name: "bad", AuthType: "token"}, // missing api_base_url
+		}
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "bad")
+	})
+
+	t.Run("EmptyNameSkipped", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.RemoteNodes = []RemoteNode{{
+			Name: "", // empty name -> skipped
+		}}
+		require.NoError(t, cfg.Validate())
+	})
+}
+
 func TestFindQueueConfig(t *testing.T) {
 	t.Parallel()
 

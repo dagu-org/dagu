@@ -174,6 +174,7 @@ type PathsDef struct {
 	APIKeysDir         string `mapstructure:"api_keys_dir"`
 	WebhooksDir        string `mapstructure:"webhooks_dir"`
 	SessionsDir        string `mapstructure:"sessions_dir"`
+	RemoteNodesDir     string `mapstructure:"remote_nodes_dir"`
 }
 
 // -----------------------------------------------------------------------------
@@ -213,11 +214,11 @@ type PeerDef struct {
 // RemoteNodeDef configures a remote node connection.
 type RemoteNodeDef struct {
 	Name              string `mapstructure:"name"`
+	Description       string `mapstructure:"description"`
 	APIBaseURL        string `mapstructure:"api_base_url"`
-	IsBasicAuth       bool   `mapstructure:"is_basic_auth"`
+	AuthType          string `mapstructure:"auth_type"`
 	BasicAuthUsername string `mapstructure:"basic_auth_username"`
 	BasicAuthPassword string `mapstructure:"basic_auth_password"`
-	IsAuthToken       bool   `mapstructure:"is_auth_token"`
 	AuthToken         string `mapstructure:"auth_token"`
 	SkipTLSVerify     bool   `mapstructure:"skip_tls_verify"`
 }

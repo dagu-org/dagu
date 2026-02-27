@@ -185,6 +185,7 @@ func TestLoad_Env(t *testing.T) {
 			APIKeysDir:         filepath.Join(testPaths, "data", "apikeys"),           // Derived from DataDir
 			WebhooksDir:        filepath.Join(testPaths, "data", "webhooks"),          // Derived from DataDir
 			SessionsDir:        filepath.Join(testPaths, "data", "agent", "sessions"), // Derived from DataDir
+			RemoteNodesDir:     filepath.Join(testPaths, "data", "remote-nodes"),      // Derived from DataDir
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
@@ -309,14 +310,15 @@ auth:
       - "user@example.com"
 remote_nodes:
   - name: "node1"
+    description: "Primary processing node"
     api_base_url: "http://node1.example.com/api"
-    is_basic_auth: true
+    auth_type: basic
     basic_auth_username: "nodeuser"
     basic_auth_password: "nodepass"
     skip_tls_verify: true
   - name: "node2"
     api_base_url: "http://node2.example.com/api"
-    is_auth_token: true
+    auth_type: token
     auth_token: "node-token-123"
 tls:
   cert_file: "/path/to/cert.pem"
@@ -405,17 +407,18 @@ scheduler:
 			RemoteNodes: []RemoteNode{
 				{
 					Name:              "node1",
+					Description:       "Primary processing node",
 					APIBaseURL:        "http://node1.example.com/api",
-					IsBasicAuth:       true,
+					AuthType:          "basic",
 					BasicAuthUsername: "nodeuser",
 					BasicAuthPassword: "nodepass",
 					SkipTLSVerify:     true,
 				},
 				{
-					Name:        "node2",
-					APIBaseURL:  "http://node2.example.com/api",
-					IsAuthToken: true,
-					AuthToken:   "node-token-123",
+					Name:       "node2",
+					APIBaseURL: "http://node2.example.com/api",
+					AuthType:   "token",
+					AuthToken:  "node-token-123",
 				},
 			},
 			Permissions: map[Permission]bool{
@@ -443,6 +446,7 @@ scheduler:
 			APIKeysDir:         "/var/dagu/data/apikeys",
 			WebhooksDir:        "/var/dagu/data/webhooks",
 			SessionsDir:        "/var/dagu/data/agent/sessions",
+			RemoteNodesDir:     "/var/dagu/data/remote-nodes",
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",

@@ -46,6 +46,7 @@ import Search from './pages/search';
 import SetupPage from './pages/setup';
 import SystemStatus from './pages/system-status';
 import TerminalPage from './pages/terminal';
+import RemoteNodesPage from './pages/remote-nodes';
 import UsersPage from './pages/users';
 import WebhooksPage from './pages/webhooks';
 
@@ -133,9 +134,8 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
   const { preferences } = useUserPreferences();
   const theme = preferences.theme || 'dark';
 
-  const remoteNodes = React.useMemo(
-    () => parseRemoteNodes(config.remoteNodes),
-    [config.remoteNodes]
+  const [remoteNodes, setRemoteNodes] = React.useState<string[]>(() =>
+    parseRemoteNodes(config.remoteNodes)
   );
 
   const [selectedRemoteNode, setSelectedRemoteNode] = React.useState<string>(
@@ -150,6 +150,34 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
     },
     [remoteNodes]
   );
+
+  // Fetch remote node names from the API on mount so the dropdown
+  // includes store-sourced nodes (not just config-sourced ones from the template).
+  React.useEffect(() => {
+    const fetchRemoteNodeNames = async () => {
+      try {
+        const token = localStorage.getItem('dagu_auth_token');
+        const headers: Record<string, string> = { Accept: 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        const response = await fetch(
+          `${config.apiURL}/remote-nodes?remoteNode=local`,
+          { headers }
+        );
+        if (!response.ok) return;
+        const data = await response.json();
+        const nodes: { name: string }[] = data.remoteNodes || [];
+        if (nodes.length > 0) {
+          const names = ['local', ...nodes.map((n: { name: string }) => n.name)];
+          setRemoteNodes([...new Set(names)]);
+        }
+      } catch {
+        // Silently fall back to template-provided nodes
+      }
+    };
+    fetchRemoteNodeNames();
+  }, [config.apiURL]);
 
   React.useEffect(() => {
     if (!remoteNodes.includes(selectedRemoteNode)) {
@@ -175,6 +203,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
             title,
             setTitle,
             remoteNodes,
+            setRemoteNodes,
             selectedRemoteNode,
             selectRemoteNode: handleSelectRemoteNode,
           }}
@@ -211,6 +240,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                         <Route path="/system-status" element={<DeveloperElement><SystemStatus /></DeveloperElement>} />
                                         <Route path="/base-config" element={<DeveloperElement><BaseConfigPage /></DeveloperElement>} />
                                         <Route path="/users" element={<AdminElement><UsersPage /></AdminElement>} />
+                                        <Route path="/remote-nodes" element={<AdminElement><RemoteNodesPage /></AdminElement>} />
                                         <Route path="/api-keys" element={<AdminElement><APIKeysPage /></AdminElement>} />
                                         <Route path="/webhooks" element={<DeveloperElement><WebhooksPage /></DeveloperElement>} />
                                         <Route path="/terminal" element={<AdminElement><TerminalPage /></AdminElement>} />

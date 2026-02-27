@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/remotenode"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -222,18 +223,18 @@ func TestPathWithOptionalQuery(t *testing.T) {
 	}
 }
 
-func TestApplyNodeAuth(t *testing.T) {
+func TestApplyAuth(t *testing.T) {
 	t.Parallel()
 	t.Run("basic auth", func(t *testing.T) {
 		t.Parallel()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		node := config.RemoteNode{
-			IsBasicAuth:       true,
+		node := &remotenode.RemoteNode{
+			AuthType:          remotenode.AuthTypeBasic,
 			BasicAuthUsername: "user",
 			BasicAuthPassword: "pass",
 		}
 
-		applyNodeAuth(req, node)
+		node.ApplyAuth(req)
 
 		user, pass, ok := req.BasicAuth()
 		assert.True(t, ok)
@@ -244,12 +245,12 @@ func TestApplyNodeAuth(t *testing.T) {
 	t.Run("bearer token", func(t *testing.T) {
 		t.Parallel()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		node := config.RemoteNode{
-			IsAuthToken: true,
-			AuthToken:   "my-token-123",
+		node := &remotenode.RemoteNode{
+			AuthType:  remotenode.AuthTypeToken,
+			AuthToken: "my-token-123",
 		}
 
-		applyNodeAuth(req, node)
+		node.ApplyAuth(req)
 
 		assert.Equal(t, "Bearer my-token-123", req.Header.Get("Authorization"))
 	})
@@ -257,9 +258,9 @@ func TestApplyNodeAuth(t *testing.T) {
 	t.Run("no auth", func(t *testing.T) {
 		t.Parallel()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		node := config.RemoteNode{}
+		node := &remotenode.RemoteNode{}
 
-		applyNodeAuth(req, node)
+		node.ApplyAuth(req)
 
 		assert.Empty(t, req.Header.Get("Authorization"))
 	})
@@ -309,7 +310,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 	t.Run("unknown remote node", func(t *testing.T) {
 		t.Parallel()
 		hub := NewHub()
-		handler := NewHandler(hub, map[string]config.RemoteNode{}, nil)
+		handler := NewHandler(hub, remotenode.NewResolver(nil, nil), nil)
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/events/dag-runs/test", nil)
@@ -334,13 +335,10 @@ func TestProxyToRemoteNode(t *testing.T) {
 		defer remoteServer.Close()
 
 		hub := NewHub()
-		remoteNodes := map[string]config.RemoteNode{
-			"remote1": {
-				Name:       "remote1",
-				APIBaseURL: remoteServer.URL,
-			},
-		}
-		handler := NewHandler(hub, remoteNodes, nil)
+		resolver := remotenode.NewResolver([]config.RemoteNode{
+			{Name: "remote1", APIBaseURL: remoteServer.URL},
+		}, nil)
+		handler := NewHandler(hub, resolver, nil)
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/events/dag-runs/mydag/run123?token=abc", nil)
@@ -359,13 +357,10 @@ func TestProxyToRemoteNode(t *testing.T) {
 		defer remoteServer.Close()
 
 		hub := NewHub()
-		remoteNodes := map[string]config.RemoteNode{
-			"remote1": {
-				Name:       "remote1",
-				APIBaseURL: remoteServer.URL,
-			},
-		}
-		handler := NewHandler(hub, remoteNodes, nil)
+		resolver := remotenode.NewResolver([]config.RemoteNode{
+			{Name: "remote1", APIBaseURL: remoteServer.URL},
+		}, nil)
+		handler := NewHandler(hub, resolver, nil)
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/events/dag-runs/test", nil)
@@ -378,13 +373,10 @@ func TestProxyToRemoteNode(t *testing.T) {
 	t.Run("connection failure", func(t *testing.T) {
 		t.Parallel()
 		hub := NewHub()
-		remoteNodes := map[string]config.RemoteNode{
-			"remote1": {
-				Name:       "remote1",
-				APIBaseURL: "http://invalid-host:99999",
-			},
-		}
-		handler := NewHandler(hub, remoteNodes, nil)
+		resolver := remotenode.NewResolver([]config.RemoteNode{
+			{Name: "remote1", APIBaseURL: "http://invalid-host:99999"},
+		}, nil)
+		handler := NewHandler(hub, resolver, nil)
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/events/dag-runs/test", nil)
@@ -406,16 +398,16 @@ func TestProxyToRemoteNode(t *testing.T) {
 		defer remoteServer.Close()
 
 		hub := NewHub()
-		remoteNodes := map[string]config.RemoteNode{
-			"remote1": {
+		resolver := remotenode.NewResolver([]config.RemoteNode{
+			{
 				Name:              "remote1",
 				APIBaseURL:        remoteServer.URL,
-				IsBasicAuth:       true,
+				AuthType:          "basic",
 				BasicAuthUsername: "testuser",
 				BasicAuthPassword: "testpass",
 			},
-		}
-		handler := NewHandler(hub, remoteNodes, nil)
+		}, nil)
+		handler := NewHandler(hub, resolver, nil)
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/events/dag-runs/test", nil)
@@ -472,13 +464,10 @@ func TestProxyToRemoteNodeNonFlusher(t *testing.T) {
 	defer remoteServer.Close()
 
 	hub := NewHub()
-	remoteNodes := map[string]config.RemoteNode{
-		"remote1": {
-			Name:       "remote1",
-			APIBaseURL: remoteServer.URL,
-		},
-	}
-	handler := NewHandler(hub, remoteNodes, nil)
+	resolver := remotenode.NewResolver([]config.RemoteNode{
+		{Name: "remote1", APIBaseURL: remoteServer.URL},
+	}, nil)
+	handler := NewHandler(hub, resolver, nil)
 
 	// Use nonFlusher which doesn't implement http.Flusher
 	w := &nonFlusher{}
