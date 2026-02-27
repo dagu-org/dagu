@@ -159,7 +159,7 @@ function DocsContent() {
           body: { id: path, content: '' },
         });
         if (error) {
-          setCreateError((error as { message?: string }).message || 'Failed to create document');
+          setCreateError(error?.message || 'Failed to create document');
           return;
         }
         mutate();
@@ -186,7 +186,7 @@ function DocsContent() {
           body: { newPath },
         });
         if (error) {
-          setRenameError((error as { message?: string }).message || 'Failed to rename document');
+          setRenameError(error?.message || 'Failed to rename document');
           return;
         }
         mutate();

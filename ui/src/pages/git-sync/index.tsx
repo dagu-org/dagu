@@ -58,8 +58,8 @@ type SyncConfigResponse = components['schemas']['SyncConfigResponse'];
 type SyncItemDiffResponse = components['schemas']['SyncItemDiffResponse'];
 type SyncItem = components['schemas']['SyncItem'];
 type StatusFilter = 'all' | 'modified' | 'untracked' | 'conflict' | 'missing';
-type TypeFilter = 'all' | 'dag' | 'memory' | 'skill' | 'soul';
-type UISyncKind = 'dag' | 'memory' | 'skill' | 'soul';
+type TypeFilter = 'all' | 'dag' | 'memory' | 'skill' | 'soul' | 'doc';
+type UISyncKind = 'dag' | 'memory' | 'skill' | 'soul' | 'doc';
 type SyncRow = { itemId: string; item: SyncItem; kind: UISyncKind };
 
 const statusFilters: StatusFilter[] = [
@@ -69,7 +69,7 @@ const statusFilters: StatusFilter[] = [
   'conflict',
   'missing',
 ];
-const typeFilters: TypeFilter[] = ['all', 'dag', 'memory', 'skill', 'soul'];
+const typeFilters: TypeFilter[] = ['all', 'dag', 'memory', 'skill', 'soul', 'doc'];
 
 function parseStatusFilter(value: string | null): StatusFilter {
   if (
@@ -85,7 +85,7 @@ function parseStatusFilter(value: string | null): StatusFilter {
 }
 
 function parseTypeFilter(value: string | null): TypeFilter {
-  if (value === 'all' || value === 'dag' || value === 'memory' || value === 'skill' || value === 'soul') {
+  if (value === 'all' || value === 'dag' || value === 'memory' || value === 'skill' || value === 'soul' || value === 'doc') {
     return value;
   }
   return 'all';
@@ -95,6 +95,7 @@ function normalizeSyncItemKind(kind: SyncItemKind): UISyncKind {
   if (kind === SyncItemKind.memory) return 'memory';
   if (kind === SyncItemKind.skill) return 'skill';
   if (kind === SyncItemKind.soul) return 'soul';
+  if (kind === SyncItemKind.doc) return 'doc';
   return 'dag';
 }
 
@@ -467,6 +468,7 @@ export default function GitSyncPage() {
       memory: 0,
       skill: 0,
       soul: 0,
+      doc: 0,
     };
     for (const { kind } of syncRows) {
       counts[kind] += 1;
@@ -507,15 +509,17 @@ export default function GitSyncPage() {
     let memory = 0;
     let skill = 0;
     let soul = 0;
+    let doc = 0;
     for (const dagID of selectedDags) {
       const row = rowByID.get(dagID);
       if (!row) continue;
       if (row.kind === 'memory') memory += 1;
       else if (row.kind === 'skill') skill += 1;
       else if (row.kind === 'soul') soul += 1;
+      else if (row.kind === 'doc') doc += 1;
       else dag += 1;
     }
-    return { dag, memory, skill, soul, total: dag + memory + skill + soul };
+    return { dag, memory, skill, soul, doc, total: dag + memory + skill + soul + doc };
   }, [selectedDags, rowByID]);
 
   const emptyStateMessage = useMemo(() => {
@@ -530,6 +534,7 @@ export default function GitSyncPage() {
       memory: 'memory',
       skill: 'skill',
       soul: 'soul',
+      doc: 'doc',
     };
     const typeLabel = typeLabelMap[typeFilter] || typeFilter;
     if (statusFilter === 'all') {
@@ -668,13 +673,13 @@ export default function GitSyncPage() {
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              {({ all: 'All', dag: 'DAGs', memory: 'Memory', skill: 'Skills', soul: 'Souls' } as Record<string, string>)[f]} ({typeCounts[f]})
+              {({ all: 'All', dag: 'DAGs', memory: 'Memory', skill: 'Skills', soul: 'Souls', doc: 'Docs' } as Record<string, string>)[f]} ({typeCounts[f]})
             </button>
           ))}
         </div>
         {selectedCounts.total > 0 && (
           <span className="text-xs text-muted-foreground">
-            Selected: {selectedCounts.dag} DAGs{selectedCounts.memory > 0 ? `, ${selectedCounts.memory} memory` : ''}{selectedCounts.skill > 0 ? `, ${selectedCounts.skill} skills` : ''}{selectedCounts.soul > 0 ? `, ${selectedCounts.soul} souls` : ''}
+            Selected: {selectedCounts.dag} DAGs{selectedCounts.memory > 0 ? `, ${selectedCounts.memory} memory` : ''}{selectedCounts.skill > 0 ? `, ${selectedCounts.skill} skills` : ''}{selectedCounts.soul > 0 ? `, ${selectedCounts.soul} souls` : ''}{selectedCounts.doc > 0 ? `, ${selectedCounts.doc} docs` : ''}
           </span>
         )}
       </div>
@@ -782,6 +787,11 @@ export default function GitSyncPage() {
                       {kind === 'soul' && (
                         <span className="text-[10px] px-1 py-0 rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
                           soul
+                        </span>
+                      )}
+                      {kind === 'doc' && (
+                        <span className="text-[10px] px-1 py-0 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                          doc
                         </span>
                       )}
                     </div>
