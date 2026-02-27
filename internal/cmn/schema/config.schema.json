@@ -436,6 +436,10 @@
         "sessions_dir": {
           "type": "string",
           "description": "Directory for session data storage."
+        },
+        "remote_nodes_dir": {
+          "type": "string",
+          "description": "Directory for remote node data storage."
         }
       }
     },
@@ -527,13 +531,18 @@
           "type": "string",
           "description": "Display name for the remote node."
         },
+        "description": {
+          "type": "string",
+          "description": "Optional description for the remote node."
+        },
         "api_base_url": {
           "type": "string",
           "description": "Base URL of the remote node's API."
         },
-        "is_basic_auth": {
-          "type": "boolean",
-          "description": "Enable basic auth for this remote node."
+        "auth_type": {
+          "type": "string",
+          "enum": ["none", "basic", "token"],
+          "description": "Authentication type for this remote node."
         },
         "basic_auth_username": {
           "type": "string",
@@ -542,10 +551,6 @@
         "basic_auth_password": {
           "type": "string",
           "description": "Basic auth password for this remote node."
-        },
-        "is_auth_token": {
-          "type": "boolean",
-          "description": "Enable token auth for this remote node."
         },
         "auth_token": {
           "type": "string",

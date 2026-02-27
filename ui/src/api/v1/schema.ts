@@ -2166,6 +2166,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/remote-nodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all remote nodes
+         * @description Returns remote nodes from both config file and store
+         */
+        get: operations["listRemoteNodes"];
+        put?: never;
+        /**
+         * Create a new remote node
+         * @description Creates a store-managed remote node
+         */
+        post: operations["createRemoteNode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/remote-nodes/{remoteNodeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a remote node
+         * @description Returns a single remote node by ID
+         */
+        get: operations["getRemoteNode"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a remote node
+         * @description Deletes a store-managed remote node
+         */
+        delete: operations["deleteRemoteNode"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a remote node
+         * @description Updates a store-managed remote node
+         */
+        patch: operations["updateRemoteNode"];
+        trace?: never;
+    };
+    "/remote-nodes/{remoteNodeId}/test-connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test remote node connection
+         * @description Tests connectivity to a remote node by making a health check request
+         */
+        post: operations["testRemoteNodeConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3786,6 +3858,70 @@ export interface components {
         AgentStatusResponse: {
             status: string;
         };
+        CreateRemoteNodeRequest: {
+            /** @description Display name for the remote node */
+            name: string;
+            /** @description Optional description */
+            description?: string;
+            /** @description Base URL of the remote Dagu instance API */
+            apiBaseUrl: string;
+            /**
+             * @description Authentication mode
+             * @default none
+             * @enum {string}
+             */
+            authType: CreateRemoteNodeRequestAuthType;
+            /** @description Username for basic auth */
+            basicAuthUsername?: string;
+            /** @description Password for basic auth */
+            basicAuthPassword?: string;
+            /** @description Bearer token for token auth */
+            authToken?: string;
+            /**
+             * @description Skip TLS certificate verification
+             * @default false
+             */
+            skipTlsVerify: boolean;
+        };
+        UpdateRemoteNodeRequest: {
+            name?: string;
+            description?: string;
+            apiBaseUrl?: string;
+            /** @enum {string} */
+            authType?: UpdateRemoteNodeRequestAuthType;
+            basicAuthUsername?: string;
+            basicAuthPassword?: string;
+            authToken?: string;
+            skipTlsVerify?: boolean;
+        };
+        RemoteNodeResponse: {
+            id: string;
+            name: string;
+            description?: string;
+            apiBaseUrl: string;
+            /** @enum {string} */
+            authType: RemoteNodeResponseAuthType;
+            /** @description Whether credentials are configured (values are never returned) */
+            hasCredentials?: boolean;
+            skipTlsVerify?: boolean;
+            /**
+             * @description Where this node is defined
+             * @enum {string}
+             */
+            source: RemoteNodeResponseSource;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        RemoteNodeListResponse: {
+            remoteNodes: components["schemas"]["RemoteNodeResponse"][];
+        };
+        TestRemoteNodeConnectionResponse: {
+            success: boolean;
+            message?: string;
+            error?: string;
+        };
     };
     responses: never;
     parameters: {
@@ -3831,6 +3967,8 @@ export interface components {
         AgentSessionId: string;
         /** @description The soul ID */
         SoulId: string;
+        /** @description The unique identifier of the remote node */
+        RemoteNodeId: string;
     };
     requestBodies: never;
     headers: never;
@@ -10721,6 +10859,252 @@ export interface operations {
             };
         };
     };
+    listRemoteNodes: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of remote nodes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteNodeListResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createRemoteNode: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRemoteNodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Remote node created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteNodeResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Name already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getRemoteNode: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description The unique identifier of the remote node */
+                remoteNodeId: components["parameters"]["RemoteNodeId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Remote node details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteNodeResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteRemoteNode: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description The unique identifier of the remote node */
+                remoteNodeId: components["parameters"]["RemoteNodeId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Remote node deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cannot delete config-sourced node */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateRemoteNode: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description The unique identifier of the remote node */
+                remoteNodeId: components["parameters"]["RemoteNodeId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRemoteNodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Remote node updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteNodeResponse"];
+                };
+            };
+            /** @description Cannot modify config-sourced node */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Name already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    testRemoteNodeConnection: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description The unique identifier of the remote node */
+                remoteNodeId: components["parameters"]["RemoteNodeId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Connection test result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestRemoteNodeConnectionResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
 }
 export enum PathsDagsGetParametersQuerySort {
     name = "name",
@@ -10943,4 +11327,23 @@ export enum AgentMessageType {
 export enum AgentDelegateSnapshotStatus {
     running = "running",
     completed = "completed"
+}
+export enum CreateRemoteNodeRequestAuthType {
+    none = "none",
+    basic = "basic",
+    token = "token"
+}
+export enum UpdateRemoteNodeRequestAuthType {
+    none = "none",
+    basic = "basic",
+    token = "token"
+}
+export enum RemoteNodeResponseAuthType {
+    none = "none",
+    basic = "basic",
+    token = "token"
+}
+export enum RemoteNodeResponseSource {
+    config = "config",
+    store = "store"
 }
