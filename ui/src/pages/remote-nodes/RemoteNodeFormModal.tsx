@@ -237,7 +237,7 @@ export function RemoteNodeFormModal({
               required
               autoComplete="off"
               className="h-9"
-              placeholder="https://dagu.example.com:8080"
+              placeholder="https://dagu.example.com:8080/api/v1"
             />
           </div>
 
