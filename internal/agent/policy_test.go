@@ -29,13 +29,15 @@ func TestResolveToolPolicy_Defaults(t *testing.T) {
 func TestValidateToolPolicy(t *testing.T) {
 	t.Parallel()
 
-	t.Run("rejects unknown tools", func(t *testing.T) {
+	t.Run("silently strips unknown tools", func(t *testing.T) {
 		t.Parallel()
-		err := ValidateToolPolicy(ToolPolicyConfig{
-			Tools: map[string]bool{"unknown_tool": true},
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unknown tool")
+		policy := ToolPolicyConfig{
+			Tools: map[string]bool{"unknown_tool": true, "bash": true},
+		}
+		err := ValidateToolPolicy(policy)
+		require.NoError(t, err)
+		assert.NotContains(t, policy.Tools, "unknown_tool")
+		assert.Contains(t, policy.Tools, "bash")
 	})
 
 	t.Run("rejects invalid regex", func(t *testing.T) {
