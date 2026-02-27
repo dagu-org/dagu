@@ -21,8 +21,6 @@
   margin-top: 1.75rem;
   margin-bottom: 0.75rem;
   line-height: 1.35;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0.375rem;
 }
 
 .doc-preview h3 {
