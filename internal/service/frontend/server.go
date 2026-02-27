@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"mime"
 	"net"
 	"net/http"
@@ -685,9 +686,7 @@ func newAgentAuditHook(auditSvc *audit.Service) agent.AfterToolExecHookFunc {
 		if info.Audit.DetailExtractor != nil {
 			details = info.Audit.DetailExtractor(info.Input)
 		}
-		for k, v := range result.AuditDetails {
-			details[k] = v
-		}
+		maps.Copy(details, result.AuditDetails)
 		if result.IsError {
 			details["failed"] = true
 		}

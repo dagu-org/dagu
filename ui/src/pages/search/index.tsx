@@ -124,13 +124,13 @@ function Search() {
 
   useEffect(() => {
     ref.current?.focus();
-  }, [ref.current]);
+  }, []);
 
   const onSubmit = React.useCallback((value: string) => {
     setSearchParams({
       q: value,
     });
-  }, []);
+  }, [setSearchParams]);
 
   return (
     <div className="max-w-7xl">

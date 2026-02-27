@@ -294,7 +294,8 @@ type ToolOut struct {
 	// DelegateIDs references the sub-sessions created by the delegate tool.
 	DelegateIDs []string
 	// AuditDetails contains extra audit details set by the tool at runtime.
-	// These are merged with DetailExtractor output in the audit hook.
+	// These are merged with DetailExtractor output in the audit hook;
+	// AuditDetails takes precedence on key collisions.
 	AuditDetails map[string]any
 }
 

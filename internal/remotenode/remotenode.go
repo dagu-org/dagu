@@ -102,6 +102,7 @@ func (n *RemoteNode) ToStorage() *RemoteNodeForStorage {
 // Note: Credential decryption must be handled by the caller to populate
 // BasicAuthPassword and AuthToken.
 func (s *RemoteNodeForStorage) ToRemoteNode() *RemoteNode {
+	timeout := max(time.Duration(s.TimeoutSeconds)*time.Second, 0)
 	return &RemoteNode{
 		ID:                s.ID,
 		Name:              s.Name,
@@ -110,7 +111,7 @@ func (s *RemoteNodeForStorage) ToRemoteNode() *RemoteNode {
 		AuthType:          s.AuthType,
 		BasicAuthUsername: s.BasicAuthUsername,
 		SkipTLSVerify:     s.SkipTLSVerify,
-		Timeout:           time.Duration(s.TimeoutSeconds) * time.Second,
+		Timeout:           timeout,
 		CreatedAt:         s.CreatedAt,
 		UpdatedAt:         s.UpdatedAt,
 	}

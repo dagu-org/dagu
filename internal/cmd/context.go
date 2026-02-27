@@ -511,11 +511,17 @@ func (c *Context) agentStores() agentStoresResult {
 func (c *Context) buildRemoteNodeResolver() agent.RemoteNodeResolver {
 	var rnStore remotenode.Store
 	encKey, err := crypto.ResolveKey(c.Config.Paths.DataDir)
-	if err == nil {
+	if err != nil {
+		logger.Warn(c, "Failed to resolve encryption key for remote nodes", tag.Error(err))
+	} else {
 		enc, err := crypto.NewEncryptor(encKey)
-		if err == nil {
+		if err != nil {
+			logger.Warn(c, "Failed to create encryptor for remote nodes", tag.Error(err))
+		} else {
 			s, err := fileremotenode.New(c.Config.Paths.RemoteNodesDir, enc)
-			if err == nil {
+			if err != nil {
+				logger.Warn(c, "Failed to create remote node store", tag.Error(err))
+			} else {
 				rnStore = s
 			}
 		}

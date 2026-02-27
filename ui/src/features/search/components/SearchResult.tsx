@@ -17,18 +17,18 @@ function SearchResult(props: Props) {
   const elements = React.useMemo(
     () =>
       results.map((result, i) => {
-        const name =
+        const { name, link, matches } =
           type === 'dag'
-            ? (result as DagResult).name
-            : (result as DocResult).title;
-        const link =
-          type === 'dag'
-            ? `/dags/${encodeURI((result as DagResult).name)}/spec`
-            : `/docs/${(result as DocResult).id}`;
-        const matches =
-          type === 'dag'
-            ? (result as DagResult).matches
-            : ((result as DocResult).matches ?? []);
+            ? {
+                name: (result as DagResult).name,
+                link: `/dags/${encodeURI((result as DagResult).name)}/spec`,
+                matches: (result as DagResult).matches,
+              }
+            : {
+                name: (result as DocResult).title,
+                link: `/docs/${(result as DocResult).id}`,
+                matches: (result as DocResult).matches ?? [],
+              };
 
         const ret = [] as ReactElement[];
         matches.forEach((m, j) => {

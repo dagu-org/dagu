@@ -652,9 +652,18 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 			return "", "", fmt.Errorf("bad request: sessionId must be a valid UUID")
 		}
 
+		// Atomically claim this ID first to prevent TOCTOU races.
+		if _, alreadyCreating := a.creatingIDs.LoadOrStore(id, struct{}{}); alreadyCreating {
+			return "", "", fmt.Errorf("bad request: session creation already in progress")
+		}
+		defer a.creatingIDs.Delete(id)
+
 		// Check active sessions.
 		if existing, loaded := a.sessions.Load(id); loaded {
-			mgr := existing.(*SessionManager)
+			mgr, ok := existing.(*SessionManager)
+			if !ok {
+				return "", "", fmt.Errorf("internal error: unexpected session type")
+			}
 			if mgr.user.UserID != user.UserID {
 				return "", "", fmt.Errorf("bad request")
 			}
@@ -670,12 +679,6 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 				return id, "already_exists", nil
 			}
 		}
-
-		// Atomically claim this ID to prevent concurrent creation of the same session.
-		if _, alreadyCreating := a.creatingIDs.LoadOrStore(id, struct{}{}); alreadyCreating {
-			return "", "", fmt.Errorf("bad request: session creation already in progress")
-		}
-		defer a.creatingIDs.Delete(id)
 	} else {
 		id = uuid.New().String()
 	}

@@ -596,6 +596,9 @@ func (c *Config) validateRemoteNodes() error {
 				return fmt.Errorf("remote_nodes[%d] (%q): token auth requires auth_token", i, n.Name)
 			}
 		}
+		if n.Timeout < 0 {
+			return fmt.Errorf("remote_nodes[%d] (%q): timeout must not be negative", i, n.Name)
+		}
 	}
 	return nil
 }

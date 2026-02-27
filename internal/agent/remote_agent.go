@@ -124,8 +124,21 @@ func NewRemoteAgentTool(resolver RemoteNodeResolver) *AgentTool {
 		},
 		Run: makeRemoteAgentRun(resolver),
 		Audit: &AuditInfo{
-			Action:          "remote_agent_exec",
-			DetailExtractor: ExtractFields("node", "message"),
+			Action: "remote_agent_exec",
+			DetailExtractor: func(input json.RawMessage) map[string]any {
+				var raw map[string]any
+				_ = json.Unmarshal(input, &raw)
+				details := make(map[string]any)
+				if v, ok := raw["node"]; ok {
+					details["node"] = v
+				}
+				if v, ok := raw["message"]; ok {
+					if s, ok := v.(string); ok {
+						details["message_length"] = len(s)
+					}
+				}
+				return details
+			},
 		},
 	}
 }
@@ -487,10 +500,10 @@ func truncateResult(s string) string {
 	if len(s) <= remoteAgentMaxResultLen {
 		return s
 	}
-	tailLen := remoteAgentMaxResultLen - remoteAgentHeadLen
 	removed := len(s) - remoteAgentMaxResultLen
-	return fmt.Sprintf("%s\n\n... [truncated %d chars] ...\n\n%s",
-		s[:remoteAgentHeadLen], removed, s[len(s)-tailLen:])
+	marker := fmt.Sprintf("\n\n... [truncated %d chars] ...\n\n", removed)
+	tailLen := max(remoteAgentMaxResultLen-remoteAgentHeadLen-len(marker), 0)
+	return s[:remoteAgentHeadLen] + marker + s[len(s)-tailLen:]
 }
 
 // appendRejectionSummary appends auto-rejected prompt information to the result.

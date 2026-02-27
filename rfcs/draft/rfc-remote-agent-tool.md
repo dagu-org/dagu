@@ -170,7 +170,7 @@ The `POST /agent/sessions` request is made idempotent via an optional client-pro
 2. **Safe mode** — Remote sessions always run with `safeMode: true`; command approval prompts are auto-rejected. Rejection reports include prompt type and a truncated summary (first 200 chars) — full prompt content is not forwarded to prevent leaking remote node context.
 3. **Tool policy** — `DefaultEnabled: false`; operators must explicitly enable the tool.
 4. **RBAC** — Requires execute permission (operator and above).
-5. **Audit** — Both tools are audit-logged via the existing `OnAfterToolExec` hook. `remote_agent` uses action `remote_agent_exec` with details: `node`, `message`, `remote_session_id`. `list_remote_nodes` uses action `remote_nodes_list` with details: `name_filter`.
+5. **Audit** — Both tools are audit-logged via the existing `OnAfterToolExec` hook. `remote_agent` uses action `remote_agent_exec` with details: `node`, `message_length`, `remote_session_id`. `list_remote_nodes` uses action `remote_nodes_list` with details: `name_filter`.
 6. **Credential isolation** — Remote node credentials resolved via the `Resolver` at tool creation time, not accessible to the LLM. Store-managed credentials are encrypted at rest (AES-256-GCM) and decrypted only in memory.
 7. **Delegate isolation** — `remote_agent` and `list_remote_nodes` are filtered from delegate sub-agent tool sets via the delegate tool's factory deny list, preventing cascading cross-node calls.
 8. **Remote trust boundary** — Safe mode behavior is defined by the remote node's agent configuration. Operators should audit remote node agent configs to ensure safe mode policies meet expectations.
@@ -270,7 +270,7 @@ The `POST /agent/sessions` request body accepts an optional `sessionId` field fo
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `sessionId` | string (UUID v4) | server-generated | Optional client-provided session ID. When provided and a session with this ID already exists for the authenticated user, the endpoint returns 201 with `status: "already_exists"`. Must match UUID format (`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`). |
+| `sessionId` | string (UUID) | server-generated | Optional client-provided session ID. When provided and a session with this ID already exists for the authenticated user, the endpoint returns 201 with `status: "already_exists"`. Must match UUID format (`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`). |
 
 ### Remote Node Fields (used by tool)
 
@@ -284,7 +284,7 @@ These fields are sourced from the `remotenode.RemoteNode` domain model (resolved
 | `AuthType` | `AuthType` enum | `"none"` | Authentication method: `none`, `basic`, or `token`. Only `token` nodes are eligible. |
 | `AuthToken` | string | — | Bearer token carrying its own RBAC role (used when `AuthType == "token"`) |
 | `SkipTLSVerify` | bool | `false` | Skip TLS certificate verification |
-| `Timeout` | duration | `5m` | Per-node session timeout, overrides the default 5-minute timeout (**to be added** to `RemoteNode` struct) |
+| `Timeout` | duration | `5m` | Per-node session timeout, overrides the default 5-minute timeout. Stored as `Timeout` on `RemoteNode`. |
 
 ---
 

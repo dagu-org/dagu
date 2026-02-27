@@ -9105,7 +9105,7 @@ components:
           description: "Soul ID to use for this session (overrides default)"
         sessionId:
           type: string
-          description: "Optional client-provided session ID (UUID v4) for idempotent creation"
+          description: "Optional client-provided session ID (UUID v4) for idempotent creation. Only used by the create-session endpoint; ignored by the chat endpoint."
 
     CreateAgentSessionResponse:
       type: object
