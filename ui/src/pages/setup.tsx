@@ -192,7 +192,7 @@ export default function SetupPage() {
           body: {
             id: generateSlugId(preset.name),
             name: preset.name,
-            provider: preset.provider as CreateModelConfigRequestProvider,
+            provider: preset.provider as unknown as CreateModelConfigRequestProvider,
             model: preset.model,
             apiKey: apiKey.trim(),
             description: preset.description || undefined,

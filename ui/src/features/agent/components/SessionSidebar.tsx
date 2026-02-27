@@ -33,7 +33,7 @@ export function SessionSidebar({
     const el = sentinelRef.current;
     if (!el || !hasMore) return;
     const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) onLoadMore(); },
+      ([entry]) => { if (entry?.isIntersecting) onLoadMore(); },
       { threshold: 0.1 }
     );
     observer.observe(el);

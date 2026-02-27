@@ -52,6 +52,7 @@ export default function LicensePage() {
           gracePeriod: false,
           community: false,
           source: 'file',
+          warningCode: '',
         },
       });
       setKey('');
@@ -84,6 +85,7 @@ export default function LicensePage() {
           gracePeriod: false,
           community: true,
           source: '',
+          warningCode: '',
         },
       });
       setSuccessMessage('License deactivated. Running in community mode.');
