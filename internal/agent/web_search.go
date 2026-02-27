@@ -175,7 +175,7 @@ func performSearch(ctx context.Context, query string, maxResults int, httpClient
 		body, _ := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 
-		if resp.StatusCode == http.StatusOK {
+		if resp.StatusCode >= http.StatusOK && resp.StatusCode < 300 {
 			return parseSearchResults(string(body), maxResults)
 		}
 

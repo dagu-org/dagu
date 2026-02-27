@@ -8,6 +8,8 @@ export interface PageContextData {
   dagFile?: string;
   dagRunId?: string;
   dagRunName?: string;
+  docPath?: string;
+  docTitle?: string;
   source: string;
 }
 

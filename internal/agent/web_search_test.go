@@ -40,6 +40,22 @@ func TestWebSearchTool_Run(t *testing.T) {
 		assert.Contains(t, result.Content, "parse")
 	})
 
+	t.Run("accepts 202 status code", func(t *testing.T) {
+		t.Parallel()
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusAccepted) // 202
+			_, _ = w.Write([]byte(`<html><body><div class="result link"><a class="result__a" href="https://example.com">Result</a></div></body></html>`))
+		}))
+		defer server.Close()
+
+		tool := NewWebSearchToolWithClient(server.Client(), server.URL)
+		result := tool.Run(backgroundCtx(), json.RawMessage(`{"query": "test"}`))
+
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, "example.com")
+	})
+
 	t.Run("works with nil context using mock server", func(t *testing.T) {
 		t.Parallel()
 

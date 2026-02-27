@@ -27,6 +27,8 @@ type TopicType string
 //   - TopicTypeQueueItems: "queueName"
 //   - TopicTypeQueues: URL query string
 //   - TopicTypeDAGsList: URL query string (e.g., "page=1&perPage=100&name=mydag")
+//   - TopicTypeDoc: document path (e.g., "runbooks/deployment")
+//   - TopicTypeDocTree: URL query string (e.g., "page=1&perPage=200")
 const (
 	TopicTypeDAGRun     TopicType = "dagrun"
 	TopicTypeDAG        TopicType = "dag"
@@ -37,6 +39,8 @@ const (
 	TopicTypeQueueItems TopicType = "queueitems"
 	TopicTypeQueues     TopicType = "queues"
 	TopicTypeDAGsList   TopicType = "dagslist"
+	TopicTypeDoc        TopicType = "doc"
+	TopicTypeDocTree    TopicType = "doctree"
 )
 
 // FetchFunc fetches data for a given identifier. The returned data is JSON
