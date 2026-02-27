@@ -86,8 +86,9 @@ function DocsContent() {
 
   // URL ↔ Tab sync with loop prevention
   const isNavigatingRef = useRef(false);
+  const isInitialMountRef = useRef(true);
 
-  // URL → Tab
+  // URL → Tab (source of truth on mount)
   useEffect(() => {
     if (isNavigatingRef.current) return;
     const docPath = location.pathname.replace(/^\/docs\/?/, '');
@@ -96,8 +97,12 @@ function DocsContent() {
     }
   }, [location.pathname, openDoc]);
 
-  // Tab → URL
+  // Tab → URL (skip on initial mount — URL takes precedence)
   useEffect(() => {
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      return;
+    }
     const docPath = getActiveDocPath();
     const currentPath = location.pathname.replace(/^\/docs\/?/, '');
     if (docPath && docPath !== decodeURIComponent(currentPath)) {
