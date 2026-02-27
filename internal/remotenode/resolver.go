@@ -2,6 +2,7 @@ package remotenode
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
@@ -24,45 +25,43 @@ type ResolvedNode struct {
 // Resolver merges remote nodes from config file and store.
 // Store nodes take precedence over config nodes on name collision.
 type Resolver struct {
-	configNodes map[string]config.RemoteNode
-	store       Store
+	nodes map[string]*RemoteNode
+	store Store
 }
 
 // NewResolver creates a Resolver from config-file nodes and an optional store.
 func NewResolver(configNodes []config.RemoteNode, store Store) *Resolver {
-	nodeMap := make(map[string]config.RemoteNode, len(configNodes))
-	for _, n := range configNodes {
-		nodeMap[n.Name] = n
+	nodeMap := make(map[string]*RemoteNode, len(configNodes))
+	for _, cn := range configNodes {
+		nodeMap[cn.Name] = FromConfigNode(cn)
 	}
 	return &Resolver{
-		configNodes: nodeMap,
-		store:       store,
+		nodes: nodeMap,
+		store: store,
 	}
 }
 
 // GetByName looks up a remote node by name, trying the store first (if available),
-// then falling back to config. Returns a config.RemoteNode so existing proxy/SSE
-// code requires minimal changes.
-func (r *Resolver) GetByName(ctx context.Context, name string) (*config.RemoteNode, error) {
+// then falling back to config.
+func (r *Resolver) GetByName(ctx context.Context, name string) (*RemoteNode, error) {
 	// Try store first (higher precedence)
 	if r.store != nil {
 		node, err := r.store.GetByName(ctx, name)
 		if err == nil {
-			cn := ToConfigNode(node)
-			return &cn, nil
+			return node, nil
 		}
 		// Only fall through if not found; other errors are real failures
-		if err != ErrRemoteNodeNotFound {
+		if !errors.Is(err, ErrRemoteNodeNotFound) {
 			return nil, err
 		}
 	}
 
 	// Fall back to config
-	cn, ok := r.configNodes[name]
+	n, ok := r.nodes[name]
 	if !ok {
 		return nil, ErrRemoteNodeNotFound
 	}
-	return &cn, nil
+	return n, nil
 }
 
 // GetByID retrieves a store-managed remote node by ID.
@@ -97,12 +96,12 @@ func (r *Resolver) ListAll(ctx context.Context) ([]ResolvedNode, error) {
 	}
 
 	// Config nodes (skip if overridden by store)
-	for _, cn := range r.configNodes {
-		if _, ok := seen[cn.Name]; ok {
+	for _, n := range r.nodes {
+		if _, ok := seen[n.Name]; ok {
 			continue
 		}
 		result = append(result, ResolvedNode{
-			RemoteNode: FromConfigNode(cn),
+			RemoteNode: n,
 			Source:     SourceConfig,
 		})
 	}

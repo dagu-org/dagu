@@ -1,11 +1,67 @@
 package remotenode
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+// mockStore is a test double for the Store interface.
+type mockStore struct {
+	nodes   []*RemoteNode
+	listErr error
+}
+
+func (m *mockStore) Create(_ context.Context, _ *RemoteNode) error {
+	return nil
+}
+
+func (m *mockStore) GetByID(_ context.Context, id string) (*RemoteNode, error) {
+	for _, n := range m.nodes {
+		if n.ID == id {
+			return n, nil
+		}
+	}
+	return nil, ErrRemoteNodeNotFound
+}
+
+func (m *mockStore) GetByName(_ context.Context, name string) (*RemoteNode, error) {
+	for _, n := range m.nodes {
+		if n.Name == name {
+			return n, nil
+		}
+	}
+	return nil, ErrRemoteNodeNotFound
+}
+
+func (m *mockStore) List(_ context.Context) ([]*RemoteNode, error) {
+	if m.listErr != nil {
+		return nil, m.listErr
+	}
+	return m.nodes, nil
+}
+
+func (m *mockStore) Update(_ context.Context, _ *RemoteNode) error {
+	return nil
+}
+
+func (m *mockStore) Delete(_ context.Context, _ string) error {
+	return nil
+}
+
+// errMockStore always returns an error for GetByName.
+type errMockStore struct {
+	mockStore
+	getByNameErr error
+}
+
+func (m *errMockStore) GetByName(_ context.Context, _ string) (*RemoteNode, error) {
+	return nil, m.getByNameErr
+}
 
 func TestToConfigNode(t *testing.T) {
 	t.Parallel()
@@ -168,4 +224,149 @@ func TestRoundTripConfigNode(t *testing.T) {
 	assert.Equal(t, original.BasicAuthUsername, result.BasicAuthUsername)
 	assert.Equal(t, original.BasicAuthPassword, result.BasicAuthPassword)
 	assert.Equal(t, original.SkipTLSVerify, result.SkipTLSVerify)
+}
+
+func TestResolver_GetByName(t *testing.T) {
+	t.Parallel()
+
+	t.Run("StoreNodeFound", func(t *testing.T) {
+		t.Parallel()
+		storeNode := &RemoteNode{ID: "uuid-1", Name: "node1", APIBaseURL: "http://store.example.com"}
+		store := &mockStore{nodes: []*RemoteNode{storeNode}}
+		resolver := NewResolver([]config.RemoteNode{
+			{Name: "node1", APIBaseURL: "http://config.example.com"},
+		}, store)
+
+		result, err := resolver.GetByName(context.Background(), "node1")
+		require.NoError(t, err)
+		assert.Equal(t, "uuid-1", result.ID)
+		assert.Equal(t, "http://store.example.com", result.APIBaseURL)
+	})
+
+	t.Run("StoreMissConfigFallback", func(t *testing.T) {
+		t.Parallel()
+		store := &mockStore{nodes: nil}
+		resolver := NewResolver([]config.RemoteNode{
+			{Name: "node1", APIBaseURL: "http://config.example.com"},
+		}, store)
+
+		result, err := resolver.GetByName(context.Background(), "node1")
+		require.NoError(t, err)
+		assert.Equal(t, "cfg:node1", result.ID)
+		assert.Equal(t, "http://config.example.com", result.APIBaseURL)
+	})
+
+	t.Run("BothMissNotFound", func(t *testing.T) {
+		t.Parallel()
+		store := &mockStore{nodes: nil}
+		resolver := NewResolver(nil, store)
+
+		_, err := resolver.GetByName(context.Background(), "missing")
+		require.ErrorIs(t, err, ErrRemoteNodeNotFound)
+	})
+
+	t.Run("StoreErrorPropagated", func(t *testing.T) {
+		t.Parallel()
+		storeErr := errors.New("database connection failed")
+		store := &errMockStore{getByNameErr: storeErr}
+		resolver := NewResolver([]config.RemoteNode{
+			{Name: "node1", APIBaseURL: "http://config.example.com"},
+		}, store)
+
+		_, err := resolver.GetByName(context.Background(), "node1")
+		require.Error(t, err)
+		assert.Equal(t, storeErr, err)
+	})
+
+	t.Run("NilStoreConfigHit", func(t *testing.T) {
+		t.Parallel()
+		resolver := NewResolver([]config.RemoteNode{
+			{Name: "node1", APIBaseURL: "http://config.example.com"},
+		}, nil)
+
+		result, err := resolver.GetByName(context.Background(), "node1")
+		require.NoError(t, err)
+		assert.Equal(t, "cfg:node1", result.ID)
+	})
+
+	t.Run("NilStoreMissNotFound", func(t *testing.T) {
+		t.Parallel()
+		resolver := NewResolver(nil, nil)
+
+		_, err := resolver.GetByName(context.Background(), "missing")
+		require.ErrorIs(t, err, ErrRemoteNodeNotFound)
+	})
+}
+
+func TestResolver_ListAll(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ConfigOnly", func(t *testing.T) {
+		t.Parallel()
+		resolver := NewResolver([]config.RemoteNode{
+			{Name: "node1", APIBaseURL: "http://a.example.com"},
+			{Name: "node2", APIBaseURL: "http://b.example.com"},
+		}, nil)
+
+		result, err := resolver.ListAll(context.Background())
+		require.NoError(t, err)
+		assert.Len(t, result, 2)
+		for _, n := range result {
+			assert.Equal(t, SourceConfig, n.Source)
+		}
+	})
+
+	t.Run("StoreAndConfigNoOverlap", func(t *testing.T) {
+		t.Parallel()
+		store := &mockStore{nodes: []*RemoteNode{
+			{ID: "uuid-1", Name: "store-node", APIBaseURL: "http://store.example.com"},
+		}}
+		resolver := NewResolver([]config.RemoteNode{
+			{Name: "config-node", APIBaseURL: "http://config.example.com"},
+		}, store)
+
+		result, err := resolver.ListAll(context.Background())
+		require.NoError(t, err)
+		assert.Len(t, result, 2)
+
+		names := make(map[string]Source)
+		for _, n := range result {
+			names[n.Name] = n.Source
+		}
+		assert.Equal(t, SourceStore, names["store-node"])
+		assert.Equal(t, SourceConfig, names["config-node"])
+	})
+
+	t.Run("StoreOverridesConfigOnCollision", func(t *testing.T) {
+		t.Parallel()
+		store := &mockStore{nodes: []*RemoteNode{
+			{ID: "uuid-1", Name: "shared", APIBaseURL: "http://store.example.com"},
+		}}
+		resolver := NewResolver([]config.RemoteNode{
+			{Name: "shared", APIBaseURL: "http://config.example.com"},
+		}, store)
+
+		result, err := resolver.ListAll(context.Background())
+		require.NoError(t, err)
+		assert.Len(t, result, 1)
+		assert.Equal(t, "http://store.example.com", result[0].APIBaseURL)
+		assert.Equal(t, SourceStore, result[0].Source)
+	})
+}
+
+func TestResolver_ListNames(t *testing.T) {
+	t.Parallel()
+
+	store := &mockStore{nodes: []*RemoteNode{
+		{ID: "uuid-1", Name: "store-node"},
+	}}
+	resolver := NewResolver([]config.RemoteNode{
+		{Name: "config-node"},
+	}, store)
+
+	names, err := resolver.ListNames(context.Background())
+	require.NoError(t, err)
+	assert.Len(t, names, 2)
+	assert.Contains(t, names, "store-node")
+	assert.Contains(t, names, "config-node")
 }

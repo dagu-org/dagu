@@ -223,18 +223,18 @@ func TestPathWithOptionalQuery(t *testing.T) {
 	}
 }
 
-func TestApplyNodeAuth(t *testing.T) {
+func TestApplyAuth(t *testing.T) {
 	t.Parallel()
 	t.Run("basic auth", func(t *testing.T) {
 		t.Parallel()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		node := config.RemoteNode{
-			AuthType:          "basic",
+		node := &remotenode.RemoteNode{
+			AuthType:          remotenode.AuthTypeBasic,
 			BasicAuthUsername: "user",
 			BasicAuthPassword: "pass",
 		}
 
-		applyNodeAuth(req, node)
+		node.ApplyAuth(req)
 
 		user, pass, ok := req.BasicAuth()
 		assert.True(t, ok)
@@ -245,12 +245,12 @@ func TestApplyNodeAuth(t *testing.T) {
 	t.Run("bearer token", func(t *testing.T) {
 		t.Parallel()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		node := config.RemoteNode{
-			AuthType:  "token",
+		node := &remotenode.RemoteNode{
+			AuthType:  remotenode.AuthTypeToken,
 			AuthToken: "my-token-123",
 		}
 
-		applyNodeAuth(req, node)
+		node.ApplyAuth(req)
 
 		assert.Equal(t, "Bearer my-token-123", req.Header.Get("Authorization"))
 	})
@@ -258,9 +258,9 @@ func TestApplyNodeAuth(t *testing.T) {
 	t.Run("no auth", func(t *testing.T) {
 		t.Parallel()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		node := config.RemoteNode{}
+		node := &remotenode.RemoteNode{}
 
-		applyNodeAuth(req, node)
+		node.ApplyAuth(req)
 
 		assert.Empty(t, req.Header.Get("Authorization"))
 	})

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/remotenode"
@@ -31,7 +30,7 @@ func WithRemoteNode(resolver *remotenode.Resolver, apiBasePath string) func(next
 				return
 			}
 
-			cn, err := resolver.GetByName(r.Context(), remoteNodeName)
+			node, err := resolver.GetByName(r.Context(), remoteNodeName)
 			if err != nil {
 				if errors.Is(err, remotenode.ErrRemoteNodeNotFound) {
 					WriteErrorResponse(w, &Error{
@@ -48,11 +47,10 @@ func WithRemoteNode(resolver *remotenode.Resolver, apiBasePath string) func(next
 				}
 				return
 			}
-			remoteNode := *cn
 			// If the parameter is present, we need to handle the request differently
 			// Call the handleRemoteNodeProxy function to proxy the request
 			remoteNodeHandler := &remoteNodeProxy{
-				remoteNode:  remoteNode,
+				remoteNode:  node,
 				apiBasePath: apiBasePath,
 			}
 			resp, err := remoteNodeHandler.proxy(r)
@@ -139,7 +137,7 @@ func WithRemoteNode(resolver *remotenode.Resolver, apiBasePath string) func(next
 }
 
 type remoteNodeProxy struct {
-	remoteNode  config.RemoteNode
+	remoteNode  *remotenode.RemoteNode
 	apiBasePath string
 }
 
@@ -165,11 +163,11 @@ func (h *remoteNodeProxy) proxy(r *http.Request) (*http.Response, error) {
 		}
 	}
 	// forward the request to the remote node
-	return h.doRequest(body, r, h.remoteNode)
+	return h.doRequest(body, r)
 }
 
-// doRemoteProxy performs the actual proxying of the request to the remote node.
-func (h *remoteNodeProxy) doRequest(body any, r *http.Request, node config.RemoteNode) (*http.Response, error) {
+// doRequest performs the actual proxying of the request to the remote node.
+func (h *remoteNodeProxy) doRequest(body any, r *http.Request) (*http.Response, error) {
 	// Copy original query parameters except remoteNode
 	q := r.URL.Query()
 	q.Del("remoteNode")
@@ -183,7 +181,7 @@ func (h *remoteNodeProxy) doRequest(body any, r *http.Request, node config.Remot
 			Message:    fmt.Sprintf("invalid URL path: %s", r.URL.Path),
 		}
 	}
-	remoteURL := fmt.Sprintf("%s%s", strings.TrimSuffix(node.APIBaseURL, "/"), urlComponents[1])
+	remoteURL := fmt.Sprintf("%s%s", strings.TrimSuffix(h.remoteNode.APIBaseURL, "/"), urlComponents[1])
 	if params := q.Encode(); params != "" {
 		remoteURL += "?" + params
 	}
@@ -198,19 +196,15 @@ func (h *remoteNodeProxy) doRequest(body any, r *http.Request, node config.Remot
 		bodyJSON = strings.NewReader(string(data))
 	}
 
-	req, err := http.NewRequest(method, remoteURL, bodyJSON)
+	req, err := http.NewRequestWithContext(r.Context(), method, remoteURL, bodyJSON)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new request: %w", err)
 	}
 
-	// Copy headers from the original request if needed
-	// But we need to override authorization headers
-	switch node.AuthType {
-	case "basic":
-		req.SetBasicAuth(node.BasicAuthUsername, node.BasicAuthPassword)
-	case "token":
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", node.AuthToken))
-	}
+	// Apply authentication from node configuration
+	h.remoteNode.ApplyAuth(req)
+
+	// Copy headers from the original request (skip Authorization since we set it above)
 	for k, v := range r.Header {
 		if k == "Authorization" {
 			continue
@@ -233,7 +227,8 @@ func (h *remoteNodeProxy) doRequest(body any, r *http.Request, node config.Remot
 		TLSClientConfig: &tls.Config{
 			// Allow insecure TLS connections if the remote node is configured to skip verification
 			// This may be necessary for some enterprise setups
-			InsecureSkipVerify: node.SkipTLSVerify, // nolint:gosec
+			InsecureSkipVerify: h.remoteNode.SkipTLSVerify, // nolint:gosec
+			MinVersion:         tls.VersionTLS12,
 		},
 	}
 

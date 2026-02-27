@@ -73,6 +73,8 @@ func (a *API) CreateRemoteNode(ctx context.Context, request api.CreateRemoteNode
 				Code:    api.ErrorCodeAlreadyExists,
 				Message: fmt.Sprintf("Remote node with name %q already exists", body.Name),
 			}, nil
+		} else if !errors.Is(err, remotenode.ErrRemoteNodeNotFound) {
+			return nil, fmt.Errorf("failed to check remote node name: %w", err)
 		}
 	}
 
@@ -265,7 +267,7 @@ func (a *API) TestRemoteNodeConnection(ctx context.Context, request api.TestRemo
 		return nil, fmt.Errorf("failed to get remote node: %w", err)
 	}
 
-	result := testNodeConnection(node)
+	result := testNodeConnection(ctx, node)
 	return api.TestRemoteNodeConnection200JSONResponse(result), nil
 }
 
@@ -277,11 +279,7 @@ func (a *API) resolveRemoteNode(ctx context.Context, id string) (*remotenode.Rem
 		if a.remoteNodeResolver == nil {
 			return nil, remotenode.ErrRemoteNodeNotFound
 		}
-		cn, err := a.remoteNodeResolver.GetByName(ctx, name)
-		if err != nil {
-			return nil, err
-		}
-		return remotenode.FromConfigNode(*cn), nil
+		return a.remoteNodeResolver.GetByName(ctx, name)
 	}
 
 	// Store-managed node — look up by UUID
@@ -292,10 +290,10 @@ func (a *API) resolveRemoteNode(ctx context.Context, id string) (*remotenode.Rem
 }
 
 // testNodeConnection performs a health check against a remote node.
-func testNodeConnection(node *remotenode.RemoteNode) api.TestRemoteNodeConnectionResponse {
+func testNodeConnection(ctx context.Context, node *remotenode.RemoteNode) api.TestRemoteNodeConnectionResponse {
 	healthURL := fmt.Sprintf("%s/health", node.APIBaseURL)
 
-	req, err := http.NewRequest(http.MethodGet, healthURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL, nil)
 	if err != nil {
 		return api.TestRemoteNodeConnectionResponse{
 			Success: false,
@@ -303,21 +301,14 @@ func testNodeConnection(node *remotenode.RemoteNode) api.TestRemoteNodeConnectio
 		}
 	}
 
-	// Apply auth
-	switch node.AuthType {
-	case remotenode.AuthTypeBasic:
-		req.SetBasicAuth(node.BasicAuthUsername, node.BasicAuthPassword)
-	case remotenode.AuthTypeToken:
-		req.Header.Set("Authorization", "Bearer "+node.AuthToken)
-	case remotenode.AuthTypeNone:
-		// No auth needed
-	}
+	node.ApplyAuth(req)
 
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: node.SkipTLSVerify, //nolint:gosec
+				MinVersion:         tls.VersionTLS12,
 			},
 		},
 	}

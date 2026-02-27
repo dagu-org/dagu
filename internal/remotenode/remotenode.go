@@ -1,6 +1,8 @@
 package remotenode
 
 import (
+	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,6 +43,18 @@ func NewRemoteNode(name, description, apiBaseURL string, authType AuthType) *Rem
 		AuthType:    authType,
 		CreatedAt:   now,
 		UpdatedAt:   now,
+	}
+}
+
+// ApplyAuth adds authentication headers to the request based on the node's auth configuration.
+func (n *RemoteNode) ApplyAuth(req *http.Request) {
+	switch n.AuthType {
+	case AuthTypeBasic:
+		req.SetBasicAuth(n.BasicAuthUsername, n.BasicAuthPassword)
+	case AuthTypeToken:
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", n.AuthToken))
+	case AuthTypeNone:
+		// No authentication needed.
 	}
 }
 

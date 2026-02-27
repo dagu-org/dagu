@@ -8,19 +8,16 @@ import (
 	"net/url"
 	"strings"
 	"time"
-
-	"github.com/dagu-org/dagu/internal/cmn/config"
 )
 
 // proxyToRemoteNode proxies the SSE request to a remote node.
 // The topic parameter contains the full topic string (e.g., "dagrun:mydag/run123").
 func (h *Handler) proxyToRemoteNode(w http.ResponseWriter, r *http.Request, nodeName, topic string) {
-	cn, err := h.nodeResolver.GetByName(r.Context(), nodeName)
+	node, err := h.nodeResolver.GetByName(r.Context(), nodeName)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unknown remote node: %s", nodeName), http.StatusBadRequest)
 		return
 	}
-	node := *cn
 
 	remoteURL := buildRemoteURL(node.APIBaseURL, topic, r.URL.Query().Get("token"))
 
@@ -30,7 +27,7 @@ func (h *Handler) proxyToRemoteNode(w http.ResponseWriter, r *http.Request, node
 		return
 	}
 	req.Header.Set("Accept", "text/event-stream")
-	applyNodeAuth(req, node)
+	node.ApplyAuth(req)
 
 	client := &http.Client{
 		// Timeout: 0 is safe for SSE because:
@@ -152,16 +149,6 @@ func pathWithOptionalQuery(basePath, query string) string {
 		return basePath + "?" + query
 	}
 	return basePath
-}
-
-// applyNodeAuth adds authentication headers based on node configuration.
-func applyNodeAuth(req *http.Request, node config.RemoteNode) {
-	switch node.AuthType {
-	case "basic":
-		req.SetBasicAuth(node.BasicAuthUsername, node.BasicAuthPassword)
-	case "token":
-		req.Header.Set("Authorization", "Bearer "+node.AuthToken)
-	}
 }
 
 // streamResponse copies data from the response body to the client.
