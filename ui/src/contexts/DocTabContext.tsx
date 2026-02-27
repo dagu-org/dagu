@@ -47,7 +47,7 @@ interface StoredTabState {
 }
 
 function generateTabId(): string {
-  return `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return `doc-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
 export function DocTabProvider({ children }: { children: React.ReactNode }) {
