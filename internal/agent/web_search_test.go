@@ -13,6 +13,28 @@ import (
 	"golang.org/x/net/html"
 )
 
+// liteHTML returns HTML in DuckDuckGo Lite's table-based format.
+func liteHTML(results ...struct{ title, href, snippet string }) string {
+	var sb strings.Builder
+	sb.WriteString(`<html><body><table>`)
+	for i, r := range results {
+		sb.WriteString(`<tr><td>`)
+		sb.WriteString(strings.Repeat(" ", i)) // number column
+		sb.WriteString(`</td><td><a rel="nofollow" href="`)
+		sb.WriteString(r.href)
+		sb.WriteString(`" class="result-link">`)
+		sb.WriteString(r.title)
+		sb.WriteString(`</a></td></tr>`)
+		if r.snippet != "" {
+			sb.WriteString(`<tr><td></td><td class="result-snippet">`)
+			sb.WriteString(r.snippet)
+			sb.WriteString(`</td></tr>`)
+		}
+	}
+	sb.WriteString(`</table></body></html>`)
+	return sb.String()
+}
+
 func TestWebSearchTool_Run(t *testing.T) {
 	t.Parallel()
 
@@ -43,9 +65,13 @@ func TestWebSearchTool_Run(t *testing.T) {
 	t.Run("accepts 202 status code", func(t *testing.T) {
 		t.Parallel()
 
+		body := liteHTML(struct{ title, href, snippet string }{
+			"Result", "https://example.com", "",
+		})
+
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusAccepted) // 202
-			_, _ = w.Write([]byte(`<html><body><div class="result link"><a class="result__a" href="https://example.com">Result</a></div></body></html>`))
+			_, _ = w.Write([]byte(body))
 		}))
 		defer server.Close()
 
@@ -59,16 +85,18 @@ func TestWebSearchTool_Run(t *testing.T) {
 	t.Run("works with nil context using mock server", func(t *testing.T) {
 		t.Parallel()
 
-		input := json.RawMessage(`{"query": "golang"}`)
+		body := liteHTML(struct{ title, href, snippet string }{
+			"Go", "https://golang.org", "",
+		})
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`<html><body><div class="result link"><a class="result__a" href="https://golang.org">Go</a></div></body></html>`))
+			_, _ = w.Write([]byte(body))
 		}))
 		defer server.Close()
 
 		toolWithClient := NewWebSearchToolWithClient(server.Client(), server.URL)
-		result := toolWithClient.Run(ToolContext{}, input)
+		result := toolWithClient.Run(ToolContext{}, json.RawMessage(`{"query": "golang"}`))
 		assert.False(t, result.IsError)
 		assert.Contains(t, result.Content, "golang.org")
 	})
@@ -121,23 +149,17 @@ func TestResolveMaxResults(t *testing.T) {
 func TestParseSearchResults(t *testing.T) {
 	t.Parallel()
 
-	t.Run("parses valid HTML with results", func(t *testing.T) {
+	t.Run("parses valid Lite HTML with results", func(t *testing.T) {
 		t.Parallel()
 
-		htmlContent := `
-		<html>
-		<body>
-			<div class="result link">
-				<a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fpage1">Example Page 1</a>
-				<span class="result__snippet">This is the first result description.</span>
-			</div>
-			<div class="result link">
-				<a class="result__a" href="https://example.com/page2">Example Page 2</a>
-				<span class="result__snippet">Second result description.</span>
-			</div>
-		</body>
-		</html>
-		`
+		htmlContent := liteHTML(
+			struct{ title, href, snippet string }{
+				"Example Page 1", "https://example.com/page1", "This is the first result description.",
+			},
+			struct{ title, href, snippet string }{
+				"Example Page 2", "https://example.com/page2", "Second result description.",
+			},
+		)
 
 		results, err := parseSearchResults(htmlContent, 5)
 
@@ -150,26 +172,17 @@ func TestParseSearchResults(t *testing.T) {
 
 		assert.Equal(t, "Example Page 2", results[1].Title)
 		assert.Equal(t, "https://example.com/page2", results[1].URL)
+		assert.Equal(t, "Second result description.", results[1].Description)
 	})
 
 	t.Run("respects max results limit", func(t *testing.T) {
 		t.Parallel()
 
-		htmlContent := `
-		<html>
-		<body>
-			<div class="result link">
-				<a class="result__a" href="https://example.com/1">Page 1</a>
-			</div>
-			<div class="result link">
-				<a class="result__a" href="https://example.com/2">Page 2</a>
-			</div>
-			<div class="result link">
-				<a class="result__a" href="https://example.com/3">Page 3</a>
-			</div>
-		</body>
-		</html>
-		`
+		htmlContent := liteHTML(
+			struct{ title, href, snippet string }{"Page 1", "https://example.com/1", "desc"},
+			struct{ title, href, snippet string }{"Page 2", "https://example.com/2", "desc"},
+			struct{ title, href, snippet string }{"Page 3", "https://example.com/3", "desc"},
+		)
 
 		results, err := parseSearchResults(htmlContent, 2)
 
@@ -186,72 +199,37 @@ func TestParseSearchResults(t *testing.T) {
 		assert.Empty(t, results)
 	})
 
-	t.Run("skips results without title or URL", func(t *testing.T) {
+	t.Run("handles result without snippet", func(t *testing.T) {
 		t.Parallel()
 
-		htmlContent := `
-		<html>
-		<body>
-			<div class="result link">
-				<span class="result__snippet">Just a description, no title or URL</span>
-			</div>
-			<div class="result link">
-				<a class="result__a" href="https://valid.com">Valid Result</a>
-			</div>
-		</body>
-		</html>
-		`
+		htmlContent := liteHTML(
+			struct{ title, href, snippet string }{"No Snippet", "https://example.com", ""},
+		)
 
 		results, err := parseSearchResults(htmlContent, 5)
 
 		require.NoError(t, err)
-		assert.Len(t, results, 1)
-		assert.Equal(t, "Valid Result", results[0].Title)
+		require.Len(t, results, 1)
+		assert.Equal(t, "No Snippet", results[0].Title)
+		assert.Equal(t, "https://example.com", results[0].URL)
+		assert.Empty(t, results[0].Description)
 	})
-}
 
-func TestDecodeRedirectURL(t *testing.T) {
-	t.Parallel()
+	t.Run("skips links without href", func(t *testing.T) {
+		t.Parallel()
 
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "DuckDuckGo redirect URL",
-			input:    "//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fpath",
-			expected: "https://example.com/path",
-		},
-		{
-			name:     "direct URL unchanged",
-			input:    "https://example.com/page",
-			expected: "https://example.com/page",
-		},
-		{
-			name:     "protocol-relative URL without uddg",
-			input:    "//example.com/page",
-			expected: "https://example.com/page",
-		},
-		{
-			name:     "complex uddg parameter",
-			input:    "//duckduckgo.com/l/?kh=-1&uddg=https%3A%2F%2Fgolang.org%2Fdoc%2F",
-			expected: "https://golang.org/doc/",
-		},
-		{
-			name:     "empty string",
-			input:    "",
-			expected: "",
-		},
-	}
+		htmlContent := `<html><body><table>
+			<tr><td><a class="result-link">No href</a></td></tr>
+			<tr><td><a class="result-link" href="https://valid.com">Valid</a></td></tr>
+			<tr><td class="result-snippet">desc</td></tr>
+		</table></body></html>`
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			result := decodeRedirectURL(tc.input)
-			assert.Equal(t, tc.expected, result)
-		})
-	}
+		results, err := parseSearchResults(htmlContent, 5)
+
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Equal(t, "Valid", results[0].Title)
+	})
 }
 
 func TestFormatSearchResults(t *testing.T) {
@@ -315,47 +293,6 @@ func TestWebSearchTool_ContextCancellation(t *testing.T) {
 
 		result := tool.Run(ToolContext{Context: ctx}, input)
 		assert.True(t, result.IsError)
-	})
-}
-
-func TestIsResultDiv(t *testing.T) {
-	t.Parallel()
-
-	t.Run("matches result class", func(t *testing.T) {
-		t.Parallel()
-
-		// Use "result link" instead of "result results_links" - our logic rejects strings containing "results"
-		htmlContent := `<div class="result link">content</div>`
-		doc, err := parseHTMLFragment(htmlContent)
-		require.NoError(t, err)
-
-		div := findFirstElement(doc, "div")
-		require.NotNil(t, div)
-		assert.True(t, isResultDiv(div))
-	})
-
-	t.Run("does not match results container", func(t *testing.T) {
-		t.Parallel()
-
-		htmlContent := `<div class="results">content</div>`
-		doc, err := parseHTMLFragment(htmlContent)
-		require.NoError(t, err)
-
-		div := findFirstElement(doc, "div")
-		require.NotNil(t, div)
-		assert.False(t, isResultDiv(div))
-	})
-
-	t.Run("does not match non-div elements", func(t *testing.T) {
-		t.Parallel()
-
-		htmlContent := `<span class="result">content</span>`
-		doc, err := parseHTMLFragment(htmlContent)
-		require.NoError(t, err)
-
-		span := findFirstElement(doc, "span")
-		require.NotNil(t, span)
-		assert.False(t, isResultDiv(span))
 	})
 }
 
