@@ -1,6 +1,8 @@
 import MarkdownEditor from '@/components/editors/MarkdownEditor';
-import { Markdown } from '@/components/ui/markdown';
 import { useSimpleToast } from '@/components/ui/simple-toast';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import './DocPreview.css';
 import { useCanWrite } from '@/contexts/AuthContext';
 import { useDocTabContext } from '@/contexts/DocTabContext';
 import { useClient } from '@/hooks/api';
@@ -193,11 +195,12 @@ function DocEditor({ tabId, docPath }: Props) {
             readOnly={!canWrite}
           />
         ) : (
-          <div className="h-full overflow-y-auto p-4">
-            <Markdown
-              content={currentValue}
-              className="text-sm prose-base prose-p:my-2 prose-headings:my-3 prose-h1:text-lg prose-h2:text-base prose-h3:text-sm"
-            />
+          <div className="h-full overflow-y-auto p-6">
+            <div className="doc-preview max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {currentValue}
+              </ReactMarkdown>
+            </div>
           </div>
         )}
       </div>
