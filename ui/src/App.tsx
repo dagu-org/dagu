@@ -150,6 +150,34 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
     [remoteNodes]
   );
 
+  // Fetch remote node names from the API on mount so the dropdown
+  // includes store-sourced nodes (not just config-sourced ones from the template).
+  React.useEffect(() => {
+    const fetchRemoteNodeNames = async () => {
+      try {
+        const token = localStorage.getItem('dagu_auth_token');
+        const headers: Record<string, string> = { Accept: 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        const response = await fetch(
+          `${config.apiURL}/remote-nodes?remoteNode=local`,
+          { headers }
+        );
+        if (!response.ok) return;
+        const data = await response.json();
+        const nodes: { name: string }[] = data.remoteNodes || [];
+        if (nodes.length > 0) {
+          const names = ['local', ...nodes.map((n: { name: string }) => n.name)];
+          setRemoteNodes([...new Set(names)]);
+        }
+      } catch {
+        // Silently fall back to template-provided nodes
+      }
+    };
+    fetchRemoteNodeNames();
+  }, [config.apiURL]);
+
   React.useEffect(() => {
     if (!remoteNodes.includes(selectedRemoteNode)) {
       handleSelectRemoteNode('local');
