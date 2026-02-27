@@ -51,7 +51,7 @@ func TestBuildRequestBody_WebSearch(t *testing.T) {
 		require.Len(t, tools, 1)
 
 		wsTool := tools[0].(map[string]any)
-		assert.Equal(t, "web_search_20250305", wsTool["type"])
+		assert.Equal(t, "web_search_20260209", wsTool["type"])
 		assert.Equal(t, "web_search", wsTool["name"])
 	})
 
@@ -121,7 +121,7 @@ func TestBuildRequestBody_WebSearch(t *testing.T) {
 
 		// Second tool is web search
 		wsTool := tools[1].(map[string]any)
-		assert.Equal(t, "web_search_20250305", wsTool["type"])
+		assert.Equal(t, "web_search_20260209", wsTool["type"])
 	})
 }
 

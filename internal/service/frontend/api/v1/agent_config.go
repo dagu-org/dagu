@@ -206,6 +206,9 @@ func buildAgentConfigChanges(update *api.UpdateAgentConfigRequest) map[string]an
 	if update.SelectedSoulId != nil {
 		changes["selected_soul_id"] = *update.SelectedSoulId
 	}
+	if update.WebSearch != nil {
+		changes["web_search"] = update.WebSearch
+	}
 	return changes
 }
 

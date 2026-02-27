@@ -8490,6 +8490,7 @@ components:
           description: "Whether provider-native web search is enabled"
         maxUses:
           type: integer
+          minimum: 1
           description: "Maximum number of search invocations per request"
 
     ModelConfigResponse:

@@ -157,7 +157,7 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 	// Append provider-native web search tool if enabled.
 	if req.WebSearch != nil && req.WebSearch.Enabled {
 		wsEntry := map[string]any{
-			"type": "web_search_20250305",
+			"type": "web_search_20260209",
 			"name": "web_search",
 		}
 		if req.WebSearch.MaxUses != nil {

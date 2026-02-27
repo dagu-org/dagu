@@ -605,7 +605,12 @@ export default function AgentSettingsPage(): ReactNode {
               value={webSearchMaxUses ?? ''}
               onChange={(e) => {
                 const val = e.target.value;
-                setWebSearchMaxUses(val === '' ? undefined : parseInt(val, 10));
+                if (val === '') {
+                  setWebSearchMaxUses(undefined);
+                  return;
+                }
+                const parsed = parseInt(val, 10);
+                setWebSearchMaxUses(Number.isNaN(parsed) || parsed < 1 ? undefined : parsed);
               }}
             />
           </div>
