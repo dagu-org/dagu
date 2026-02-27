@@ -122,7 +122,7 @@ func buildPathForTopic(topicType TopicType, identifier string) string {
 	case TopicTypeDoc:
 		return "/events/docs/" + identifier
 	case TopicTypeDocTree:
-		return pathWithOptionalQuery("/events/docs", identifier)
+		return pathWithOptionalQuery("/events/docs-tree", identifier)
 	default:
 		return fmt.Sprintf("/events/%s/%s", topicType, identifier)
 	}
