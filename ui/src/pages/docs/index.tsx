@@ -2,6 +2,7 @@ import SplitLayout from '@/components/SplitLayout';
 import { useSimpleToast } from '@/components/ui/simple-toast';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { DocTabProvider, useDocTabContext } from '@/contexts/DocTabContext';
+import { usePageContext } from '@/contexts/PageContext';
 import { UnsavedChangesProvider } from '@/contexts/UnsavedChangesContext';
 import { useClient, useQuery } from '@/hooks/api';
 import { useDocTreeSSE } from '@/hooks/useDocTreeSSE';
@@ -30,6 +31,7 @@ function DocsContent() {
   const { showToast } = useSimpleToast();
   const isMobile = useIsMobile();
 
+  const { setContext } = usePageContext();
   const {
     tabs,
     activeTabId,
@@ -86,6 +88,23 @@ function DocsContent() {
   useEffect(() => {
     appBarContext.setTitle('Documents');
   }, [appBarContext]);
+
+  // Set page context for agent chat (mirrors DAG detail page pattern)
+  useEffect(() => {
+    const activeTab = tabs.find((t) => t.id === activeTabId);
+    if (activeTab) {
+      setContext({
+        docPath: activeTab.docPath,
+        docTitle: activeTab.title,
+        source: 'docs-page',
+      });
+    } else {
+      setContext(null);
+    }
+    return () => {
+      setContext(null);
+    };
+  }, [activeTabId, tabs, setContext]);
 
   // URL ↔ Tab sync with loop prevention
   const isNavigatingRef = useRef(false);

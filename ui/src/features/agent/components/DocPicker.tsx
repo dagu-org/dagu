@@ -36,12 +36,13 @@ interface DocPickerProps {
   isOpen: boolean;
   onClose: () => void;
   filterQuery: string;
+  currentPageDoc?: DocRef | null;
   disabled?: boolean;
 }
 
 export const DocPicker = forwardRef<DocPickerHandle, DocPickerProps>(
   function DocPicker(
-    { selectedDocs, onSelect, onRemove, isOpen, onClose, filterQuery, disabled },
+    { selectedDocs, onSelect, onRemove, isOpen, onClose, filterQuery, currentPageDoc, disabled },
     ref
   ) {
     const client = useClient();
@@ -98,7 +99,9 @@ export const DocPicker = forwardRef<DocPickerHandle, DocPickerProps>(
     );
 
     const filtered = useMemo(() => {
-      const available = docs.filter((d) => !selectedIds.has(d.id));
+      const available = docs.filter(
+        (d) => !selectedIds.has(d.id) && d.id !== currentPageDoc?.id
+      );
       const q = filterQuery.trim().toLowerCase();
       if (!q) return available;
       return available.filter(
@@ -106,7 +109,7 @@ export const DocPicker = forwardRef<DocPickerHandle, DocPickerProps>(
           d.id.toLowerCase().includes(q) ||
           d.title.toLowerCase().includes(q)
       );
-    }, [docs, filterQuery, selectedIds]);
+    }, [docs, filterQuery, selectedIds, currentPageDoc]);
 
     // Reset highlight when filter changes
     useEffect(() => {
@@ -146,8 +149,20 @@ export const DocPicker = forwardRef<DocPickerHandle, DocPickerProps>(
     return (
       <>
         {/* Doc chips */}
-        {selectedDocs.length > 0 && (
+        {(currentPageDoc || selectedDocs.length > 0) && (
           <div className="flex flex-wrap gap-1 mb-1">
+            {currentPageDoc && (
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs',
+                  'bg-primary/15 text-primary'
+                )}
+              >
+                <FileText className="h-3 w-3" />
+                <span className="max-w-[120px] truncate">{currentPageDoc.title || currentPageDoc.id}</span>
+                <span className="opacity-60 text-[10px]">(current)</span>
+              </span>
+            )}
             {selectedDocs.map((doc) => (
               <span
                 key={doc.id}

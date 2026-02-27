@@ -14,6 +14,7 @@ import { DAGPicker } from './DAGPicker';
 import { DocPicker, type DocRef, type DocPickerHandle } from './DocPicker';
 import { SkillPicker, type SkillRef, type SkillPickerHandle } from './SkillPicker';
 import { useDagPageContext } from '../hooks/useDagPageContext';
+import { useDocPageContext } from '../hooks/useDocPageContext';
 import { useAvailableModels } from '../hooks/useAvailableModels';
 import { useAvailableSouls } from '../hooks/useAvailableSouls';
 
@@ -42,6 +43,7 @@ export function ChatInput({
   const { models, selectedModel, setSelectedModel } = useAvailableModels();
   const { souls, selectedSoul, setSelectedSoul } = useAvailableSouls();
   const currentPageDag = useDagPageContext();
+  const currentPageDoc = useDocPageContext();
   // Track IME composition state manually for reliable Japanese/Chinese input handling
   const isComposingRef = useRef(false);
 
@@ -110,8 +112,14 @@ export function ChatInput({
 
     // Prepend doc and skill instructions if selected.
     let finalMessage = trimmed;
-    if (selectedDocs.length > 0) {
-      const docPrefix = selectedDocs.map((d) => `[Doc: ${d.id} | ${d.title}]`).join(' ');
+    const additionalDocs = selectedDocs.filter(
+      (doc) => doc.id !== currentPageDoc?.id
+    );
+    const allDocs = currentPageDoc
+      ? [currentPageDoc, ...additionalDocs]
+      : additionalDocs;
+    if (allDocs.length > 0) {
+      const docPrefix = allDocs.map((d) => `[Doc: ${d.id} | ${d.title}]`).join(' ');
       finalMessage = `${docPrefix}\n${finalMessage}`;
     }
     if (selectedSkills.length > 0) {
@@ -129,7 +137,7 @@ export function ChatInput({
     setMessage('');
     setSelectedSkills([]);
     setSelectedDocs([]);
-  }, [message, isPending, disabled, onSend, selectedDags, currentPageDag, selectedModel, selectedSkills, selectedDocs, selectedSoul]);
+  }, [message, isPending, disabled, onSend, selectedDags, currentPageDag, selectedModel, selectedSkills, selectedDocs, currentPageDoc, selectedSoul]);
 
   const handleChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -300,6 +308,7 @@ export function ChatInput({
           setAtQuery('');
         }}
         filterQuery={atQuery}
+        currentPageDoc={currentPageDoc}
         disabled={disabled || showPauseButton}
       />
 
