@@ -23,6 +23,7 @@ import {
   Bot,
   Brain,
   FileCog,
+  FileText,
   Ghost,
   Shield,
   Sparkles,
@@ -412,6 +413,14 @@ export const mainListItems = React.forwardRef<
               to="/dags"
               text="Definitions"
               icon={<Network size={18} />}
+              isOpen={isOpen}
+              onClick={onNavItemClick}
+              customColor={customColor}
+            />
+            <NavItem
+              to="/docs"
+              text="Docs"
+              icon={<FileText size={18} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
               customColor={customColor}

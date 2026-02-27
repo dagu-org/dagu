@@ -11,6 +11,7 @@ import {
 import { cn } from '@/lib/utils';
 import { DAGContext } from '../types';
 import { DAGPicker } from './DAGPicker';
+import { DocPicker, type DocRef, type DocPickerHandle } from './DocPicker';
 import { SkillPicker, type SkillRef, type SkillPickerHandle } from './SkillPicker';
 import { useDagPageContext } from '../hooks/useDagPageContext';
 import { useAvailableModels } from '../hooks/useAvailableModels';
@@ -50,6 +51,14 @@ export function ChatInput({
   const [slashQuery, setSlashQuery] = useState('');
   const [slashStart, setSlashStart] = useState(-1);
   const skillPickerRef = useRef<SkillPickerHandle>(null);
+
+  // Doc picker state
+  const [selectedDocs, setSelectedDocs] = useState<DocRef[]>([]);
+  const [atMenuOpen, setAtMenuOpen] = useState(false);
+  const [atQuery, setAtQuery] = useState('');
+  const [atStart, setAtStart] = useState(-1);
+  const docPickerRef = useRef<DocPickerHandle>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const showPauseButton = isPending || isWorking;
@@ -99,8 +108,12 @@ export function ChatInput({
       ? [currentPageDag, ...additionalDags]
       : additionalDags;
 
-    // Prepend skill instructions if selected.
+    // Prepend doc and skill instructions if selected.
     let finalMessage = trimmed;
+    if (selectedDocs.length > 0) {
+      const docPrefix = selectedDocs.map((d) => `[Doc: ${d.id} | ${d.title}]`).join(' ');
+      finalMessage = `${docPrefix}\n${finalMessage}`;
+    }
     if (selectedSkills.length > 0) {
       const prefix = selectedSkills.map((s) => `[Skill: ${s.id}]`).join(' ');
       finalMessage = `${prefix}\n${finalMessage}`;
@@ -115,13 +128,28 @@ export function ChatInput({
     );
     setMessage('');
     setSelectedSkills([]);
-  }, [message, isPending, disabled, onSend, selectedDags, currentPageDag, selectedModel, selectedSkills, selectedSoul]);
+    setSelectedDocs([]);
+  }, [message, isPending, disabled, onSend, selectedDags, currentPageDag, selectedModel, selectedSkills, selectedDocs, selectedSoul]);
 
   const handleChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
       const val = e.target.value;
       const pos = e.target.selectionStart ?? val.length;
       setMessage(val);
+
+      // Detect '@' at start or after whitespace to open doc menu.
+      if (pos > 0 && val[pos - 1] === '@') {
+        const charBefore = pos > 1 ? val[pos - 2] : undefined;
+        if (charBefore === undefined || charBefore === ' ' || charBefore === '\n') {
+          setAtStart(pos - 1);
+          setAtMenuOpen(true);
+          setAtQuery('');
+          // Close skill menu if open (mutual exclusivity)
+          setSlashMenuOpen(false);
+          setSlashStart(-1);
+          return;
+        }
+      }
 
       // Detect '/' at start or after whitespace to open skill menu.
       if (pos > 0 && val[pos - 1] === '/') {
@@ -130,6 +158,9 @@ export function ChatInput({
           setSlashStart(pos - 1);
           setSlashMenuOpen(true);
           setSlashQuery('');
+          // Close doc menu if open (mutual exclusivity)
+          setAtMenuOpen(false);
+          setAtStart(-1);
           return;
         }
       }
@@ -137,7 +168,6 @@ export function ChatInput({
       // Update filter query while slash menu is open.
       if (slashMenuOpen && slashStart >= 0) {
         const query = val.substring(slashStart + 1, pos);
-        // Close menu if user typed a space (done filtering).
         if (query.includes(' ')) {
           setSlashMenuOpen(false);
           setSlashStart(-1);
@@ -146,8 +176,19 @@ export function ChatInput({
         }
       }
 
+      // Update filter query while at menu is open.
+      if (atMenuOpen && atStart >= 0) {
+        const query = val.substring(atStart + 1, pos);
+        if (query.includes(' ')) {
+          setAtMenuOpen(false);
+          setAtStart(-1);
+        } else {
+          setAtQuery(query);
+        }
+      }
+
     },
-    [slashMenuOpen, slashStart]
+    [slashMenuOpen, slashStart, atMenuOpen, atStart]
   );
 
   const handleSkillSelect = useCallback(
@@ -174,8 +215,39 @@ export function ChatInput({
     setSelectedSkills((prev) => prev.filter((s) => s.id !== id));
   }, []);
 
+  const handleDocSelect = useCallback(
+    (doc: DocRef) => {
+      if (!selectedDocs.find((d) => d.id === doc.id)) {
+        setSelectedDocs((prev) => [...prev, doc]);
+      }
+      const before = message.substring(0, atStart);
+      const after = message.substring(atStart + 1 + atQuery.length);
+      setMessage(before + after);
+      setAtMenuOpen(false);
+      setAtStart(-1);
+      setAtQuery('');
+      textareaRef.current?.focus();
+    },
+    [selectedDocs, message, atStart, atQuery]
+  );
+
+  const handleDocRemove = useCallback((id: string) => {
+    setSelectedDocs((prev) => prev.filter((d) => d.id !== id));
+  }, []);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      // Let doc picker handle keys when open.
+      if (atMenuOpen && docPickerRef.current) {
+        if (e.key === 'Backspace' && atQuery === '') {
+          setAtMenuOpen(false);
+          setAtStart(-1);
+          return;
+        }
+        const consumed = docPickerRef.current.handleKeyDown(e);
+        if (consumed) return;
+      }
+
       // Let skill picker handle keys when open.
       if (slashMenuOpen && skillPickerRef.current) {
         if (e.key === 'Backspace' && slashQuery === '') {
@@ -194,7 +266,7 @@ export function ChatInput({
         handleSend();
       }
     },
-    [handleSend, slashMenuOpen, slashQuery]
+    [handleSend, slashMenuOpen, slashQuery, atMenuOpen, atQuery]
   );
 
   const handleCompositionStart = useCallback(() => {
@@ -212,6 +284,22 @@ export function ChatInput({
         selectedDags={selectedDags}
         onChange={setSelectedDags}
         currentPageDag={currentPageDag}
+        disabled={disabled || showPauseButton}
+      />
+
+      {/* Doc chips and dropdown */}
+      <DocPicker
+        ref={docPickerRef}
+        selectedDocs={selectedDocs}
+        onSelect={handleDocSelect}
+        onRemove={handleDocRemove}
+        isOpen={atMenuOpen}
+        onClose={() => {
+          setAtMenuOpen(false);
+          setAtStart(-1);
+          setAtQuery('');
+        }}
+        filterQuery={atQuery}
         disabled={disabled || showPauseButton}
       />
 
