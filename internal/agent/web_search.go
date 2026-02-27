@@ -30,7 +30,7 @@ const (
 	defaultWebSearchTimeout = 30 * time.Second
 	defaultMaxResults       = 5
 	maxAllowedResults       = 10
-	duckDuckGoURL           = "https://lite.duckduckgo.com/lite/"
+	duckDuckGoURL           = "https://html.duckduckgo.com/html/"
 	maxRetries              = 3
 	retryWaitTime           = time.Second
 )
@@ -189,9 +189,6 @@ func performSearch(ctx context.Context, query string, maxResults int, httpClient
 	return nil, lastErr
 }
 
-// parseSearchResults parses DuckDuckGo Lite's table-based HTML response.
-// The Lite endpoint returns results as <a class="result-link"> for titles/URLs
-// and <td class="result-snippet"> for descriptions.
 func parseSearchResults(htmlContent string, maxResults int) ([]SearchResult, error) {
 	doc, err := html.Parse(strings.NewReader(htmlContent))
 	if err != nil {
@@ -199,50 +196,64 @@ func parseSearchResults(htmlContent string, maxResults int) ([]SearchResult, err
 	}
 
 	var results []SearchResult
-	var currentResult *SearchResult
-
-	var walk func(*html.Node)
-	walk = func(n *html.Node) {
+	var f func(*html.Node)
+	f = func(n *html.Node) {
 		if len(results) >= maxResults {
 			return
 		}
 
-		if n.Type == html.ElementNode {
-			if n.Data == "a" && hasClass(n, "result-link") {
-				title := getTextContent(n)
-				href := getAttr(n, "href")
-				if title != "" && href != "" {
-					// Flush any previous result before starting a new one.
-					if currentResult != nil && currentResult.Title != "" && currentResult.URL != "" {
-						results = append(results, *currentResult)
-					}
-					currentResult = &SearchResult{
-						Title: title,
-						URL:   href,
-					}
-				}
-			} else if n.Data == "td" && hasClass(n, "result-snippet") && currentResult != nil {
-				currentResult.Description = getTextContent(n)
-				// Snippet completes the result — flush it.
-				if currentResult.Title != "" && currentResult.URL != "" {
-					results = append(results, *currentResult)
-				}
-				currentResult = nil
+		if isResultDiv(n) {
+			if result := extractResult(n); result != nil {
+				results = append(results, *result)
 			}
 		}
 
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
+			f(c)
 		}
 	}
-	walk(doc)
-
-	// Flush any trailing result without a snippet.
-	if currentResult != nil && currentResult.Title != "" && currentResult.URL != "" && len(results) < maxResults {
-		results = append(results, *currentResult)
-	}
+	f(doc)
 
 	return results, nil
+}
+
+func isResultDiv(n *html.Node) bool {
+	if n.Type != html.ElementNode || n.Data != "div" {
+		return false
+	}
+	for _, attr := range n.Attr {
+		if attr.Key == "class" && strings.Contains(attr.Val, "result") && !strings.Contains(attr.Val, "results") {
+			return true
+		}
+	}
+	return false
+}
+
+func extractResult(n *html.Node) *SearchResult {
+	result := &SearchResult{}
+
+	var extract func(*html.Node)
+	extract = func(node *html.Node) {
+		if node.Type == html.ElementNode {
+			if node.Data == "a" && hasClass(node, "result__a") {
+				result.Title = getTextContent(node)
+				result.URL = extractURL(node)
+			}
+			if hasClass(node, "result__snippet") {
+				result.Description = getTextContent(node)
+			}
+		}
+		for c := node.FirstChild; c != nil; c = c.NextSibling {
+			extract(c)
+		}
+	}
+	extract(n)
+
+	if result.Title == "" || result.URL == "" {
+		return nil
+	}
+
+	return result
 }
 
 func hasClass(n *html.Node, class string) bool {
@@ -252,15 +263,6 @@ func hasClass(n *html.Node, class string) bool {
 		}
 	}
 	return false
-}
-
-func getAttr(n *html.Node, key string) string {
-	for _, attr := range n.Attr {
-		if attr.Key == key {
-			return attr.Val
-		}
-	}
-	return ""
 }
 
 func getTextContent(n *html.Node) string {
@@ -276,6 +278,36 @@ func getTextContent(n *html.Node) string {
 	}
 	extract(n)
 	return strings.TrimSpace(text.String())
+}
+
+func extractURL(n *html.Node) string {
+	for _, attr := range n.Attr {
+		if attr.Key == "href" {
+			return decodeRedirectURL(attr.Val)
+		}
+	}
+	return ""
+}
+
+// decodeRedirectURL extracts the actual URL from DuckDuckGo's redirect URL.
+// DuckDuckGo wraps URLs like: //duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com
+func decodeRedirectURL(rawURL string) string {
+	// Handle protocol-relative URLs
+	if strings.HasPrefix(rawURL, "//") {
+		rawURL = "https:" + rawURL
+	}
+
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+
+	// Check for DuckDuckGo redirect
+	if uddg := parsed.Query().Get("uddg"); uddg != "" {
+		return uddg
+	}
+
+	return rawURL
 }
 
 func formatSearchResults(query string, results []SearchResult) string {
