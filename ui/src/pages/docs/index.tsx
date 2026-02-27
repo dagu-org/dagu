@@ -37,7 +37,6 @@ function DocsContent() {
     activeTabId,
     openDoc,
     closeTab,
-    getActiveDocPath,
     updateTab,
     clearDraft,
     markTabSaved,
@@ -125,7 +124,11 @@ function DocsContent() {
       isInitialMountRef.current = false;
       return;
     }
-    const docPath = getActiveDocPath();
+    if (isNavigatingRef.current) return;
+    const activeTab = activeTabId
+      ? tabs.find((t) => t.id === activeTabId)
+      : null;
+    const docPath = activeTab?.docPath;
     const currentPath = location.pathname.replace(/^\/docs\/?/, '');
     if (docPath && docPath !== decodeURIComponent(currentPath)) {
       isNavigatingRef.current = true;
@@ -140,7 +143,7 @@ function DocsContent() {
         isNavigatingRef.current = false;
       });
     }
-  }, [activeTabId, getActiveDocPath, navigate, location.pathname]);
+  }, [activeTabId, tabs, navigate, location.pathname]);
 
   // File selection handler
   const handleSelectFile = useCallback(

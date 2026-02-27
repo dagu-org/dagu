@@ -250,7 +250,7 @@ func (s *Store) Create(_ context.Context, id, content string) error {
 	}
 
 	// Use O_EXCL for atomic create — prevents race between concurrent creates.
-	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, filePermissions)
+	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, filePermissions) //nolint:gosec // filePath is validated by docFilePath
 	if err != nil {
 		if os.IsExist(err) {
 			return agent.ErrDocAlreadyExists
