@@ -2166,6 +2166,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/docs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List documents
+         * @description Returns documents as a tree structure or flat list. All authenticated users can browse.
+         */
+        get: operations["listDocs"];
+        put?: never;
+        /**
+         * Create document
+         * @description Creates a new document. Requires DAG write permission.
+         */
+        post: operations["createDoc"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/docs/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search documents
+         * @description Searches document content for the given query.
+         */
+        get: operations["searchDocs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/docs/doc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get document
+         * @description Returns a single document by path.
+         */
+        get: operations["getDoc"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete document
+         * @description Deletes a document. Requires DAG write permission.
+         */
+        delete: operations["deleteDoc"];
+        options?: never;
+        head?: never;
+        /**
+         * Update document
+         * @description Updates an existing document's content. Requires DAG write permission.
+         */
+        patch: operations["updateDoc"];
+        trace?: never;
+    };
+    "/docs/doc/rename": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rename document
+         * @description Renames/moves a document to a new path. Requires DAG write permission.
+         */
+        post: operations["renameDoc"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/remote-nodes": {
         parameters: {
             query?: never;
@@ -3664,6 +3756,70 @@ export interface components {
             description?: string;
             /** @description Markdown body content (identity definition) */
             content?: string;
+        };
+        /** @description Full document with content */
+        DocResponse: {
+            id: string;
+            title: string;
+            /** @description Full file content including YAML frontmatter */
+            content: string;
+            /**
+             * Format: date-time
+             * @description RFC3339 timestamp when the document was created
+             */
+            createdAt?: string;
+            /**
+             * Format: date-time
+             * @description RFC3339 timestamp when the document was last updated
+             */
+            updatedAt?: string;
+        };
+        /** @description Lightweight document metadata */
+        DocMetadataResponse: {
+            id: string;
+            title: string;
+        };
+        /** @description A file or directory node in the doc tree */
+        DocTreeNodeResponse: {
+            id: string;
+            name: string;
+            title?: string;
+            /** @enum {string} */
+            type: DocTreeNodeResponseType;
+            children?: components["schemas"]["DocTreeNodeResponse"][];
+        };
+        /** @description Paginated document list (tree or flat) */
+        DocListResponse: {
+            tree?: components["schemas"]["DocTreeNodeResponse"][];
+            items?: components["schemas"]["DocMetadataResponse"][];
+            pagination: components["schemas"]["Pagination"];
+        };
+        /** @description A search result for a single document */
+        DocSearchResultItem: {
+            id: string;
+            title: string;
+            matches?: components["schemas"]["SearchDAGsMatchItem"][];
+        };
+        /** @description Search results */
+        DocSearchResponse: {
+            results: components["schemas"]["DocSearchResultItem"][];
+        };
+        /** @description Relative document path (without extension), e.g. runbooks/deploy-guide. Must not start with / or contain .. */
+        DocPath: string;
+        /** @description Request to create a new document */
+        CreateDocRequest: {
+            id: components["schemas"]["DocPath"];
+            /** @description Full file content including optional YAML frontmatter */
+            content: string;
+        };
+        /** @description Request to update document content */
+        UpdateDocRequest: {
+            /** @description Full file content including optional YAML frontmatter */
+            content: string;
+        };
+        /** @description Request to rename/move a document */
+        RenameDocRequest: {
+            newPath: components["schemas"]["DocPath"];
         };
         /** @description Hardcoded model preset with metadata */
         ModelPreset: {
@@ -10868,6 +11024,334 @@ export interface operations {
             };
         };
     };
+    listDocs: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description page number of items to fetch (default is 1) */
+                page?: components["parameters"]["Page"];
+                /** @description number of items per page (default is 30, max is 100) */
+                perPage?: components["parameters"]["PerPage"];
+                /** @description If true, returns flat list instead of tree */
+                flat?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of documents */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocListResponse"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createDoc: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDocRequest"];
+            };
+        };
+        responses: {
+            /** @description Document created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    searchDocs: {
+        parameters: {
+            query: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Search query */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Search results */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocSearchResponse"];
+                };
+            };
+            /** @description Missing query parameter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDoc: {
+        parameters: {
+            query: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Document path (may include slashes for nested docs) */
+                path: components["schemas"]["DocPath"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Document details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocResponse"];
+                };
+            };
+            /** @description Document not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteDoc: {
+        parameters: {
+            query: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Document path (may include slashes for nested docs) */
+                path: components["schemas"]["DocPath"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Document deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Document not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateDoc: {
+        parameters: {
+            query: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Document path (may include slashes for nested docs) */
+                path: components["schemas"]["DocPath"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDocRequest"];
+            };
+        };
+        responses: {
+            /** @description Document updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Document not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    renameDoc: {
+        parameters: {
+            query: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Current document path (may include slashes for nested docs) */
+                path: components["schemas"]["DocPath"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameDocRequest"];
+            };
+        };
+        responses: {
+            /** @description Document renamed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Document not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Target path already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listRemoteNodes: {
         parameters: {
             query?: {
@@ -11272,7 +11756,8 @@ export enum SyncItemKind {
     dag = "dag",
     memory = "memory",
     skill = "skill",
-    soul = "soul"
+    soul = "soul",
+    doc = "doc"
 }
 export enum SyncAuthConfigType {
     token = "token",
@@ -11314,6 +11799,10 @@ export enum UpdateModelConfigRequestProvider {
 export enum SkillResponseType {
     builtin = "builtin",
     custom = "custom"
+}
+export enum DocTreeNodeResponseType {
+    file = "file",
+    directory = "directory"
 }
 export enum ModelPresetProvider {
     anthropic = "anthropic",

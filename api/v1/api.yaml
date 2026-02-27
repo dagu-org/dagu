@@ -47,6 +47,8 @@ tags:
     description: "Git synchronization operations for DAGs"
   - name: "agent"
     description: "AI Agent configuration operations (admin only)"
+  - name: "docs"
+    description: "Document management operations"
   - name: "remote-nodes"
     description: "Remote node management operations (admin only)"
 
@@ -5466,6 +5468,274 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /docs:
+    get:
+      summary: "List documents"
+      description: "Returns documents as a tree structure or flat list. All authenticated users can browse."
+      operationId: "listDocs"
+      tags:
+        - "docs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - name: flat
+          in: query
+          description: "If true, returns flat list instead of tree"
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: "List of documents"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocListResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create document"
+      description: "Creates a new document. Requires DAG write permission."
+      operationId: "createDoc"
+      tags:
+        - "docs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocRequest"
+      responses:
+        "201":
+          description: "Document created"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Document already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /docs/search:
+    get:
+      summary: "Search documents"
+      description: "Searches document content for the given query."
+      operationId: "searchDocs"
+      tags:
+        - "docs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: q
+          in: query
+          description: "Search query"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Search results"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocSearchResponse"
+        "400":
+          description: "Missing query parameter"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /docs/doc:
+    get:
+      summary: "Get document"
+      description: "Returns a single document by path."
+      operationId: "getDoc"
+      tags:
+        - "docs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: path
+          in: query
+          description: "Document path (may include slashes for nested docs)"
+          required: true
+          schema:
+            $ref: "#/components/schemas/DocPath"
+      responses:
+        "200":
+          description: "Document details"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocResponse"
+        "404":
+          description: "Document not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    patch:
+      summary: "Update document"
+      description: "Updates an existing document's content. Requires DAG write permission."
+      operationId: "updateDoc"
+      tags:
+        - "docs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: path
+          in: query
+          description: "Document path (may include slashes for nested docs)"
+          required: true
+          schema:
+            $ref: "#/components/schemas/DocPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDocRequest"
+      responses:
+        "200":
+          description: "Document updated"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "404":
+          description: "Document not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Delete document"
+      description: "Deletes a document. Requires DAG write permission."
+      operationId: "deleteDoc"
+      tags:
+        - "docs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: path
+          in: query
+          description: "Document path (may include slashes for nested docs)"
+          required: true
+          schema:
+            $ref: "#/components/schemas/DocPath"
+      responses:
+        "204":
+          description: "Document deleted"
+        "404":
+          description: "Document not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /docs/doc/rename:
+    post:
+      summary: "Rename document"
+      description: "Renames/moves a document to a new path. Requires DAG write permission."
+      operationId: "renameDoc"
+      tags:
+        - "docs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: path
+          in: query
+          description: "Current document path (may include slashes for nested docs)"
+          required: true
+          schema:
+            $ref: "#/components/schemas/DocPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenameDocRequest"
+      responses:
+        "200":
+          description: "Document renamed"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "404":
+          description: "Document not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Target path already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+
   /remote-nodes:
     get:
       summary: "List all remote nodes"
@@ -5633,6 +5903,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+
 
 components:
   securitySchemes:
@@ -7778,6 +8049,7 @@ components:
         - memory
         - skill
         - soul
+        - doc
 
     SyncItem:
       type: object
@@ -8539,6 +8811,149 @@ components:
         content:
           type: string
           description: "Markdown body content (identity definition)"
+
+    DocResponse:
+      type: object
+      description: "Full document with content"
+      required:
+        - id
+        - title
+        - content
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+          description: "Full file content including YAML frontmatter"
+        createdAt:
+          type: string
+          format: date-time
+          description: "RFC3339 timestamp when the document was created"
+        updatedAt:
+          type: string
+          format: date-time
+          description: "RFC3339 timestamp when the document was last updated"
+
+    DocMetadataResponse:
+      type: object
+      description: "Lightweight document metadata"
+      required:
+        - id
+        - title
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+
+    DocTreeNodeResponse:
+      type: object
+      description: "A file or directory node in the doc tree"
+      required:
+        - id
+        - name
+        - type
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+          enum:
+            - file
+            - directory
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocTreeNodeResponse"
+
+    DocListResponse:
+      type: object
+      description: "Paginated document list (tree or flat)"
+      required:
+        - pagination
+      properties:
+        tree:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocTreeNodeResponse"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocMetadataResponse"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    DocSearchResultItem:
+      type: object
+      description: "A search result for a single document"
+      required:
+        - id
+        - title
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        matches:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchDAGsMatchItem"
+
+    DocSearchResponse:
+      type: object
+      description: "Search results"
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocSearchResultItem"
+
+    DocPath:
+      type: string
+      minLength: 1
+      maxLength: 500
+      description: "Relative document path (without extension), e.g. runbooks/deploy-guide. Must not start with / or contain .."
+      pattern: '^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$'
+
+    CreateDocRequest:
+      type: object
+      required:
+        - id
+        - content
+      description: "Request to create a new document"
+      properties:
+        id:
+          $ref: "#/components/schemas/DocPath"
+        content:
+          type: string
+          description: "Full file content including optional YAML frontmatter"
+
+    UpdateDocRequest:
+      type: object
+      required:
+        - content
+      description: "Request to update document content"
+      properties:
+        content:
+          type: string
+          description: "Full file content including optional YAML frontmatter"
+
+    RenameDocRequest:
+      type: object
+      required:
+        - newPath
+      description: "Request to rename/move a document"
+      properties:
+        newPath:
+          $ref: "#/components/schemas/DocPath"
 
     ModelPreset:
       type: object

@@ -46,6 +46,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
 	"github.com/dagu-org/dagu/internal/persis/filebaseconfig"
+	"github.com/dagu-org/dagu/internal/persis/filedoc"
 	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/persis/fileremotenode"
 	"github.com/dagu-org/dagu/internal/persis/filesession"
@@ -192,6 +193,9 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	} else {
 		agentSoulStore = soulStore
 	}
+
+	docsDir := filepath.Join(cfg.Paths.DAGsDir, "docs")
+	docStore := filedoc.New(docsDir)
 
 	var memoryStore agent.MemoryStore
 	cacheLimits := cfg.Cache.Limits()
@@ -401,6 +405,9 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 	if agentSoulStore != nil {
 		allAPIOptions = append(allAPIOptions, apiv1.WithAgentSoulStore(agentSoulStore))
+	}
+	if docStore != nil {
+		allAPIOptions = append(allAPIOptions, apiv1.WithDocStore(docStore))
 	}
 	if srv.agentAPI != nil {
 		allAPIOptions = append(allAPIOptions, apiv1.WithAgentAPI(srv.agentAPI))
@@ -966,6 +973,8 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 	r.Get(path.Join(apiV1BasePath, "events/dag-runs/{name}/{dagRunId}/logs/steps/{stepName}"), handler.HandleStepLogEvents)
 	r.Get(path.Join(apiV1BasePath, "events/queues"), handler.HandleQueuesListEvents)
 	r.Get(path.Join(apiV1BasePath, "events/queues/{name}/items"), handler.HandleQueueItemsEvents)
+	r.Get(path.Join(apiV1BasePath, "events/docs-tree"), handler.HandleDocTreeEvents)
+	r.Get(path.Join(apiV1BasePath, "events/docs/*"), handler.HandleDocEvents)
 
 	logger.Info(ctx, "SSE routes configured", slog.String("basePath", apiV1BasePath))
 }
@@ -980,6 +989,8 @@ func (srv *Server) registerSSEFetchers() {
 	srv.sseHub.RegisterFetcher(sse.TopicTypeStepLog, srv.apiV1.GetStepLogData)
 	srv.sseHub.RegisterFetcher(sse.TopicTypeQueues, srv.apiV1.GetQueuesListData)
 	srv.sseHub.RegisterFetcher(sse.TopicTypeQueueItems, srv.apiV1.GetQueueItemsData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDoc, srv.apiV1.GetDocContentData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDocTree, srv.apiV1.GetDocTreeData)
 }
 
 func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath string) {

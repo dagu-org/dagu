@@ -178,14 +178,14 @@ export default function AgentSettingsPage(): ReactNode {
       const normalizedPolicy = normalizeToolPolicy(data.toolPolicy, tools);
       setEnabled(data.enabled ?? false);
       setDefaultModelId(data.defaultModelId);
-      setSelectedSoulId(data.selectedSoulId);
+      setSelectedSoulId(data.selectedSoulId ?? undefined);
       setToolPolicy(normalizedPolicy);
       setWebSearchEnabled(data.webSearch?.enabled ?? false);
       setWebSearchMaxUses(data.webSearch?.maxUses ?? undefined);
       setSavedConfig({
         enabled: data.enabled ?? false,
         defaultModelId: data.defaultModelId,
-        selectedSoulId: data.selectedSoulId,
+        selectedSoulId: data.selectedSoulId ?? undefined,
         toolPolicy: normalizedPolicy,
         webSearchEnabled: data.webSearch?.enabled ?? false,
         webSearchMaxUses: data.webSearch?.maxUses ?? undefined,
@@ -290,14 +290,14 @@ export default function AgentSettingsPage(): ReactNode {
       const normalizedPolicy = normalizeToolPolicy(data.toolPolicy, toolMetas);
       setEnabled(data.enabled ?? false);
       setDefaultModelId(data.defaultModelId);
-      setSelectedSoulId(data.selectedSoulId);
+      setSelectedSoulId(data.selectedSoulId ?? undefined);
       setToolPolicy(normalizedPolicy);
       setWebSearchEnabled(data.webSearch?.enabled ?? false);
       setWebSearchMaxUses(data.webSearch?.maxUses ?? undefined);
       setSavedConfig({
         enabled: data.enabled ?? false,
         defaultModelId: data.defaultModelId,
-        selectedSoulId: data.selectedSoulId,
+        selectedSoulId: data.selectedSoulId ?? undefined,
         toolPolicy: normalizedPolicy,
         webSearchEnabled: data.webSearch?.enabled ?? false,
         webSearchMaxUses: data.webSearch?.maxUses ?? undefined,

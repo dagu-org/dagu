@@ -1,6 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
+import { MermaidBlock } from '@/components/ui/mermaid-block';
 
 interface MarkdownProps {
   content: string;
@@ -44,6 +45,10 @@ export function Markdown({ content, className }: MarkdownProps) {
                 </code>
               );
             }
+            // Mermaid code blocks
+            if (codeClassName === 'language-mermaid') {
+              return <MermaidBlock code={String(children)} />;
+            }
             // Block code
             return (
               <code className={cn('block text-xs font-mono', codeClassName)} {...props}>
@@ -53,6 +58,11 @@ export function Markdown({ content, className }: MarkdownProps) {
           },
           // Ensure pre blocks have proper styling
           pre({ children, ...props }) {
+            // Pass through mermaid blocks without wrapping in pre
+            const child = children as React.ReactElement;
+            if (child?.type === MermaidBlock) {
+              return <>{children}</>;
+            }
             return (
               <pre
                 className="text-xs p-2 rounded bg-muted overflow-x-auto font-mono"

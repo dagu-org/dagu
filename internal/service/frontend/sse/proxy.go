@@ -117,6 +117,10 @@ func buildPathForTopic(topicType TopicType, identifier string) string {
 		return pathWithOptionalQuery("/events/dags", identifier)
 	case TopicTypeDAGHistory:
 		return "/events/dags/" + identifier + "/dag-runs"
+	case TopicTypeDoc:
+		return "/events/docs/" + identifier
+	case TopicTypeDocTree:
+		return pathWithOptionalQuery("/events/docs-tree", identifier)
 	default:
 		return fmt.Sprintf("/events/%s/%s", topicType, identifier)
 	}
