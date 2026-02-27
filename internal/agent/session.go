@@ -17,40 +17,40 @@ import (
 // It links the Loop with SSE streaming and handles state management.
 // Lock ordering: mu must be acquired before promptsMu when both are needed.
 type SessionManager struct {
-	id              string
-	user            UserIdentity
-	loop            *Loop
-	loopCancel      context.CancelFunc
-	mu              sync.Mutex
-	createdAt       time.Time
-	lastActivity    time.Time
-	lastHeartbeat   time.Time
-	model           string
-	messages        []Message
-	subpub          *SubPub[StreamResponse]
-	working         bool
-	logger          *slog.Logger
-	workingDir      string
-	sequenceID      int64
-	environment     EnvironmentInfo
-	safeMode        bool
-	hooks           *Hooks
-	onWorkingChange func(id string, working bool)
-	onMessage       func(ctx context.Context, msg Message) error
-	pendingPrompts  map[string]chan UserPromptResponse
-	promptsMu       sync.Mutex
-	inputCostPer1M  float64
-	outputCostPer1M float64
-	totalCost       float64
-	memoryStore     MemoryStore
-	skillStore      SkillStore
-	enabledSkills   []string
-	dagName         string
-	sessionStore    SessionStore
-	parentSessionID string
-	delegateTask    string
-	registry        SubSessionRegistry
-	delegates       map[string]DelegateSnapshot // guarded by mu
+	id                 string
+	user               UserIdentity
+	loop               *Loop
+	loopCancel         context.CancelFunc
+	mu                 sync.Mutex
+	createdAt          time.Time
+	lastActivity       time.Time
+	lastHeartbeat      time.Time
+	model              string
+	messages           []Message
+	subpub             *SubPub[StreamResponse]
+	working            bool
+	logger             *slog.Logger
+	workingDir         string
+	sequenceID         int64
+	environment        EnvironmentInfo
+	safeMode           bool
+	hooks              *Hooks
+	onWorkingChange    func(id string, working bool)
+	onMessage          func(ctx context.Context, msg Message) error
+	pendingPrompts     map[string]chan UserPromptResponse
+	promptsMu          sync.Mutex
+	inputCostPer1M     float64
+	outputCostPer1M    float64
+	totalCost          float64
+	memoryStore        MemoryStore
+	skillStore         SkillStore
+	enabledSkills      []string
+	dagName            string
+	sessionStore       SessionStore
+	parentSessionID    string
+	delegateTask       string
+	registry           SubSessionRegistry
+	delegates          map[string]DelegateSnapshot // guarded by mu
 	soul               *Soul
 	webSearch          *llm.WebSearchRequest
 	remoteNodeResolver RemoteNodeResolver
@@ -106,32 +106,32 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 
 	now := time.Now()
 	return &SessionManager{
-		id:              id,
-		user:            cfg.User,
-		createdAt:       now,
-		lastActivity:    now,
-		logger:          logger.With("session_id", id),
-		subpub:          NewSubPub[StreamResponse](),
-		messages:        messages,
-		workingDir:      cfg.WorkingDir,
-		onWorkingChange: cfg.OnWorkingChange,
-		onMessage:       cfg.OnMessage,
-		sequenceID:      cfg.SequenceID,
-		environment:     cfg.Environment,
-		safeMode:        cfg.SafeMode,
-		hooks:           cfg.Hooks,
-		pendingPrompts:  make(map[string]chan UserPromptResponse),
-		delegates:       make(map[string]DelegateSnapshot),
-		inputCostPer1M:  cfg.InputCostPer1M,
-		outputCostPer1M: cfg.OutputCostPer1M,
-		memoryStore:     cfg.MemoryStore,
-		skillStore:      cfg.SkillStore,
-		enabledSkills:   cfg.EnabledSkills,
-		dagName:         cfg.DAGName,
-		sessionStore:    cfg.SessionStore,
-		parentSessionID: cfg.ParentSessionID,
-		delegateTask:    cfg.DelegateTask,
-		registry:        cfg.Registry,
+		id:                 id,
+		user:               cfg.User,
+		createdAt:          now,
+		lastActivity:       now,
+		logger:             logger.With("session_id", id),
+		subpub:             NewSubPub[StreamResponse](),
+		messages:           messages,
+		workingDir:         cfg.WorkingDir,
+		onWorkingChange:    cfg.OnWorkingChange,
+		onMessage:          cfg.OnMessage,
+		sequenceID:         cfg.SequenceID,
+		environment:        cfg.Environment,
+		safeMode:           cfg.SafeMode,
+		hooks:              cfg.Hooks,
+		pendingPrompts:     make(map[string]chan UserPromptResponse),
+		delegates:          make(map[string]DelegateSnapshot),
+		inputCostPer1M:     cfg.InputCostPer1M,
+		outputCostPer1M:    cfg.OutputCostPer1M,
+		memoryStore:        cfg.MemoryStore,
+		skillStore:         cfg.SkillStore,
+		enabledSkills:      cfg.EnabledSkills,
+		dagName:            cfg.DAGName,
+		sessionStore:       cfg.SessionStore,
+		parentSessionID:    cfg.ParentSessionID,
+		delegateTask:       cfg.DelegateTask,
+		registry:           cfg.Registry,
 		soul:               cfg.Soul,
 		webSearch:          cfg.WebSearch,
 		remoteNodeResolver: cfg.RemoteNodeResolver,

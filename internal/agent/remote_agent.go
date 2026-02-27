@@ -112,7 +112,7 @@ func NewRemoteAgentTool(resolver RemoteNodeResolver) *AgentTool {
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
-						"node":    nodeProp,
+						"node": nodeProp,
 						"message": map[string]any{
 							"type":        "string",
 							"description": "The task or message to send to the remote agent",
