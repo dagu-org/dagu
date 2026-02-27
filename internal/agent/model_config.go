@@ -90,6 +90,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		Enabled:    true,
 		ToolPolicy: DefaultToolPolicy(),
+		WebSearch:  &WebSearchConfig{Enabled: true},
 	}
 }
 
