@@ -2,6 +2,7 @@ package anthropic
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/llm"
@@ -137,16 +138,16 @@ func TestChat_WebSearchResponseBlocks(t *testing.T) {
 		StopReason: "end_turn",
 	}
 
-	var content string
+	var content strings.Builder
 	for _, block := range resp.Content {
 		switch block.Type {
 		case "text":
-			content += block.Text
+			content.WriteString(block.Text)
 		case "server_tool_use", "web_search_tool_result":
 			// Should be silently skipped
 		}
 	}
-	assert.Equal(t, "The answer is 42.", content)
+	assert.Equal(t, "The answer is 42.", content.String())
 }
 
 func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
