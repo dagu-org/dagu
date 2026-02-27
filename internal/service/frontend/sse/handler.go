@@ -100,6 +100,12 @@ func (h *Handler) HandleDocEvents(w http.ResponseWriter, r *http.Request) {
 	h.handleSSE(w, r, buildTopic(TopicTypeDoc, docPath))
 }
 
+// HandleDocTreeEvents handles SSE connections for document tree updates.
+// Endpoint: GET /events/docs-tree
+func (h *Handler) HandleDocTreeEvents(w http.ResponseWriter, r *http.Request) {
+	h.handleSSE(w, r, buildTopic(TopicTypeDocTree, sanitizeQueryForTopic(r.URL.RawQuery)))
+}
+
 // HandleDAGsListEvents handles SSE connections for the DAGs list.
 // Endpoint: GET /events/dags
 func (h *Handler) HandleDAGsListEvents(w http.ResponseWriter, r *http.Request) {

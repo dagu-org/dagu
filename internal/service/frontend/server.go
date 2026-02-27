@@ -939,6 +939,7 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 	r.Get(path.Join(apiV1BasePath, "events/dag-runs/{name}/{dagRunId}/logs/steps/{stepName}"), handler.HandleStepLogEvents)
 	r.Get(path.Join(apiV1BasePath, "events/queues"), handler.HandleQueuesListEvents)
 	r.Get(path.Join(apiV1BasePath, "events/queues/{name}/items"), handler.HandleQueueItemsEvents)
+	r.Get(path.Join(apiV1BasePath, "events/docs-tree"), handler.HandleDocTreeEvents)
 	r.Get(path.Join(apiV1BasePath, "events/docs/*"), handler.HandleDocEvents)
 
 	logger.Info(ctx, "SSE routes configured", slog.String("basePath", apiV1BasePath))
@@ -955,6 +956,7 @@ func (srv *Server) registerSSEFetchers() {
 	srv.sseHub.RegisterFetcher(sse.TopicTypeQueues, srv.apiV1.GetQueuesListData)
 	srv.sseHub.RegisterFetcher(sse.TopicTypeQueueItems, srv.apiV1.GetQueueItemsData)
 	srv.sseHub.RegisterFetcher(sse.TopicTypeDoc, srv.apiV1.GetDocContentData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDocTree, srv.apiV1.GetDocTreeData)
 }
 
 func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath string) {

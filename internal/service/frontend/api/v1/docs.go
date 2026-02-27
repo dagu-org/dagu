@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/agent"
@@ -295,6 +296,37 @@ func (a *API) RenameDoc(ctx context.Context, request api.RenameDocRequestObject)
 
 	msg := fmt.Sprintf("Document renamed to %s", request.Body.NewPath)
 	return api.RenameDoc200JSONResponse{Message: &msg}, nil
+}
+
+// GetDocTreeData is the SSE data method for the doc tree.
+// Identifier format: URL query string (e.g., "page=1&perPage=200")
+func (a *API) GetDocTreeData(ctx context.Context, queryString string) (any, error) {
+	if a.docStore == nil {
+		return nil, errDocStoreNotAvailable
+	}
+
+	params, err := url.ParseQuery(queryString)
+	if err != nil {
+		params = url.Values{}
+	}
+
+	page := parseIntParam(params.Get("page"), 1)
+	perPage := parseIntParam(params.Get("perPage"), 200)
+
+	result, err := a.docStore.List(ctx, page, perPage)
+	if err != nil {
+		return nil, err
+	}
+
+	tree := make([]api.DocTreeNodeResponse, 0, len(result.Items))
+	for _, node := range result.Items {
+		tree = append(tree, toDocTreeResponse(node))
+	}
+
+	return api.ListDocs200JSONResponse{
+		Tree:       &tree,
+		Pagination: ptrOf(toPagination(*result)),
+	}, nil
 }
 
 // GetDocContentData is the SSE data method for doc content.
