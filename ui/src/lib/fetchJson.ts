@@ -28,7 +28,7 @@ export default async function fetchJson<JSON = unknown>(
   }
 
   throw new FetchError({
-    message: response.statusText,
+    message: data?.message || response.statusText,
     response,
     data,
   });
