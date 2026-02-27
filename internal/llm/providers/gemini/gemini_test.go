@@ -9,6 +9,77 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBuildRequestBody_WebSearch(t *testing.T) {
+	t.Parallel()
+
+	provider := &Provider{
+		config: llm.Config{APIKey: "test-key"},
+	}
+
+	t.Run("web search disabled - no google_search tool", func(t *testing.T) {
+		t.Parallel()
+		req := &llm.ChatRequest{
+			Model:    "gemini-2.5-flash",
+			Messages: []llm.Message{{Role: llm.RoleUser, Content: "Hello"}},
+		}
+		body, err := provider.buildRequestBody(req)
+		require.NoError(t, err)
+
+		var parsed generateContentRequest
+		require.NoError(t, json.Unmarshal(body, &parsed))
+		assert.Empty(t, parsed.Tools)
+	})
+
+	t.Run("web search enabled - google_search tool appended", func(t *testing.T) {
+		t.Parallel()
+		req := &llm.ChatRequest{
+			Model:    "gemini-2.5-flash",
+			Messages: []llm.Message{{Role: llm.RoleUser, Content: "Hello"}},
+			WebSearch: &llm.WebSearchRequest{
+				Enabled: true,
+			},
+		}
+		body, err := provider.buildRequestBody(req)
+		require.NoError(t, err)
+
+		var parsed generateContentRequest
+		require.NoError(t, json.Unmarshal(body, &parsed))
+		require.Len(t, parsed.Tools, 1)
+		assert.NotNil(t, parsed.Tools[0].GoogleSearch, "should have google_search tool")
+		assert.Empty(t, parsed.Tools[0].FunctionDeclarations, "google_search tool should have no function declarations")
+	})
+
+	t.Run("web search alongside function tools", func(t *testing.T) {
+		t.Parallel()
+		req := &llm.ChatRequest{
+			Model:    "gemini-2.5-flash",
+			Messages: []llm.Message{{Role: llm.RoleUser, Content: "Hello"}},
+			Tools: []llm.Tool{{
+				Type: "function",
+				Function: llm.ToolFunction{
+					Name:        "test_tool",
+					Description: "A test tool",
+					Parameters:  map[string]any{"type": "object"},
+				},
+			}},
+			WebSearch: &llm.WebSearchRequest{Enabled: true},
+		}
+		body, err := provider.buildRequestBody(req)
+		require.NoError(t, err)
+
+		var parsed generateContentRequest
+		require.NoError(t, json.Unmarshal(body, &parsed))
+		require.Len(t, parsed.Tools, 2, "should have function tool group + google_search tool")
+
+		// First entry has function declarations
+		assert.NotEmpty(t, parsed.Tools[0].FunctionDeclarations)
+		assert.Equal(t, "test_tool", parsed.Tools[0].FunctionDeclarations[0].Name)
+
+		// Second entry is google_search
+		assert.NotNil(t, parsed.Tools[1].GoogleSearch)
+	})
+}
+
 func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 	t.Parallel()
 

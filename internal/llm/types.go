@@ -161,6 +161,34 @@ type ThinkingRequest struct {
 	IncludeInOutput bool
 }
 
+// WebSearchRequest contains configuration for provider-native web search.
+// Each provider maps this to its native format during request building.
+type WebSearchRequest struct {
+	// Enabled activates provider-native web search.
+	Enabled bool
+	// MaxUses limits search invocations per request.
+	// Anthropic: maps to max_uses. OpenRouter: maps to max_results.
+	MaxUses *int
+	// AllowedDomains restricts results to these domains (Anthropic only).
+	AllowedDomains []string
+	// BlockedDomains excludes results from these domains (Anthropic only).
+	BlockedDomains []string
+	// UserLocation localizes search results.
+	UserLocation *UserLocation
+}
+
+// UserLocation provides approximate location for search result localization.
+type UserLocation struct {
+	// City is the city name.
+	City string
+	// Region is the region or state.
+	Region string
+	// Country is the ISO country code (e.g., "US").
+	Country string
+	// Timezone is the IANA timezone (e.g., "America/New_York").
+	Timezone string
+}
+
 // ChatRequest contains the input for a chat completion request.
 type ChatRequest struct {
 	// Model is the identifier of the model to use.
@@ -184,6 +212,9 @@ type ChatRequest struct {
 	// ToolChoice controls how the model uses tools.
 	// Values: "auto" (default), "required", "none", or a specific tool name.
 	ToolChoice string
+	// WebSearch enables provider-native web search when non-nil and Enabled.
+	// Provider-specific handling in each provider implementation.
+	WebSearch *WebSearchRequest
 }
 
 // ChatResponse contains the output from a chat completion request.

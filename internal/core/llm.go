@@ -124,6 +124,8 @@ type LLMConfig struct {
 	// MaxToolIterations limits the number of tool calling rounds.
 	// Default is 10 if not specified.
 	MaxToolIterations *int `json:"maxToolIterations,omitempty"`
+	// WebSearch configures provider-native web search.
+	WebSearch *WebSearchConfig `json:"webSearch,omitempty"`
 }
 
 // LLMMessage represents a message in the LLM session.
@@ -195,6 +197,28 @@ func (c *LLMConfig) GetModels() []ModelEntry {
 // HasFallback returns true if there are multiple models configured.
 func (c *LLMConfig) HasFallback() bool {
 	return len(c.Models) > 1
+}
+
+// WebSearchConfig contains configuration for provider-native web search.
+type WebSearchConfig struct {
+	// Enabled activates provider-native web search.
+	Enabled bool `json:"enabled,omitempty"`
+	// MaxUses limits search invocations per request.
+	MaxUses *int `json:"maxUses,omitempty"`
+	// AllowedDomains restricts results to these domains (Anthropic only).
+	AllowedDomains []string `json:"allowedDomains,omitempty"`
+	// BlockedDomains excludes results from these domains (Anthropic only).
+	BlockedDomains []string `json:"blockedDomains,omitempty"`
+	// UserLocation localizes search results.
+	UserLocation *WebSearchUserLocation `json:"userLocation,omitempty"`
+}
+
+// WebSearchUserLocation provides approximate location for search localization.
+type WebSearchUserLocation struct {
+	City     string `json:"city,omitempty"`
+	Region   string `json:"region,omitempty"`
+	Country  string `json:"country,omitempty"`
+	Timezone string `json:"timezone,omitempty"`
 }
 
 // ExecutorTypeChat is the executor type for chat steps.

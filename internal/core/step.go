@@ -361,6 +361,9 @@ type AgentStepConfig struct {
 	MaxIterations int `json:"maxIterations,omitempty"`
 	// SafeMode enables command approval via HITL (default: true).
 	SafeMode bool `json:"safeMode"`
+	// WebSearch configures provider-native web search for this step.
+	// Overrides the global agent web search setting.
+	WebSearch *WebSearchConfig `json:"webSearch,omitempty"`
 }
 
 // AgentToolsConfig configures available tools and policies.

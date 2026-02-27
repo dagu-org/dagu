@@ -99,9 +99,11 @@ func IsToolEnabledResolved(resolved ToolPolicyConfig, toolName string) bool {
 func ValidateToolPolicy(policy ToolPolicyConfig) error {
 	var errs []string
 
+	// Skip unknown tools silently — saved configs may reference tools
+	// that were removed between versions (e.g., web_search).
 	for toolName := range policy.Tools {
 		if !IsKnownToolName(toolName) {
-			errs = append(errs, fmt.Sprintf("unknown tool: %s", toolName))
+			delete(policy.Tools, toolName)
 		}
 	}
 

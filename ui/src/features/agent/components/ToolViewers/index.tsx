@@ -5,7 +5,6 @@ import { ThinkToolViewer } from './ThinkToolViewer';
 import { NavigateToolViewer } from './NavigateToolViewer';
 import { ReadSchemaToolViewer } from './ReadSchemaToolViewer';
 import { AskUserToolViewer } from './AskUserToolViewer';
-import { WebSearchToolViewer } from './WebSearchToolViewer';
 import { DefaultToolViewer } from './DefaultToolViewer';
 
 export interface ToolViewerProps {
@@ -21,7 +20,6 @@ const toolViewerRegistry: Record<string, React.FC<ToolViewerProps>> = {
   navigate: NavigateToolViewer,
   read_schema: ReadSchemaToolViewer,
   ask_user: AskUserToolViewer,
-  web_search: WebSearchToolViewer,
 };
 
 export function ToolContentViewer({ toolName, args }: ToolViewerProps): React.ReactNode {
@@ -36,5 +34,4 @@ export { ThinkToolViewer } from './ThinkToolViewer';
 export { NavigateToolViewer } from './NavigateToolViewer';
 export { ReadSchemaToolViewer } from './ReadSchemaToolViewer';
 export { AskUserToolViewer } from './AskUserToolViewer';
-export { WebSearchToolViewer } from './WebSearchToolViewer';
 export { DefaultToolViewer } from './DefaultToolViewer';

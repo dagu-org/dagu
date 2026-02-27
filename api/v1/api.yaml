@@ -8412,6 +8412,8 @@ components:
           type: string
           nullable: true
           description: "ID of the currently selected soul"
+        webSearch:
+          $ref: "#/components/schemas/AgentWebSearchConfig"
 
     UpdateAgentConfigRequest:
       type: object
@@ -8429,6 +8431,8 @@ components:
           type: string
           nullable: true
           description: "ID of the soul to select"
+        webSearch:
+          $ref: "#/components/schemas/AgentWebSearchConfig"
 
     AgentToolPolicy:
       type: object
@@ -8476,6 +8480,18 @@ components:
         enabled:
           type: boolean
           description: "Rule enabled state (default: true when omitted)"
+
+    AgentWebSearchConfig:
+      type: object
+      description: "Provider-native web search configuration for agent sessions"
+      properties:
+        enabled:
+          type: boolean
+          description: "Whether provider-native web search is enabled"
+        maxUses:
+          type: integer
+          minimum: 1
+          description: "Maximum number of search invocations per request"
 
     ModelConfigResponse:
       type: object

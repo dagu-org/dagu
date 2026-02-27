@@ -171,6 +171,18 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 		}
 	}
 
+	// Append web search plugin if enabled.
+	if req.WebSearch != nil && req.WebSearch.Enabled {
+		p := plugin{ID: "web"}
+		if req.WebSearch.MaxUses != nil {
+			p.MaxResults = req.WebSearch.MaxUses
+		}
+		chatReq.Plugins = []plugin{p}
+		chatReq.WebSearchOptions = &webSearchOptions{
+			SearchContextSize: "medium",
+		}
+	}
+
 	return json.Marshal(chatReq)
 }
 
@@ -260,14 +272,27 @@ type message struct {
 }
 
 type chatCompletionRequest struct {
-	Model       string            `json:"model"`
-	Messages    []message         `json:"messages"`
-	Temperature *float64          `json:"temperature,omitempty"`
-	MaxTokens   *int              `json:"max_tokens,omitempty"`
-	TopP        *float64          `json:"top_p,omitempty"`
-	Stop        []string          `json:"stop,omitempty"`
-	Stream      bool              `json:"stream,omitempty"`
-	Reasoning   *reasoningRequest `json:"reasoning,omitempty"`
+	Model            string            `json:"model"`
+	Messages         []message         `json:"messages"`
+	Temperature      *float64          `json:"temperature,omitempty"`
+	MaxTokens        *int              `json:"max_tokens,omitempty"`
+	TopP             *float64          `json:"top_p,omitempty"`
+	Stop             []string          `json:"stop,omitempty"`
+	Stream           bool              `json:"stream,omitempty"`
+	Reasoning        *reasoningRequest `json:"reasoning,omitempty"`
+	Plugins          []plugin          `json:"plugins,omitempty"`
+	WebSearchOptions *webSearchOptions `json:"web_search_options,omitempty"`
+}
+
+// plugin represents an OpenRouter plugin configuration.
+type plugin struct {
+	ID         string `json:"id"`
+	MaxResults *int   `json:"max_results,omitempty"`
+}
+
+// webSearchOptions configures web search behavior for OpenRouter.
+type webSearchOptions struct {
+	SearchContextSize string `json:"search_context_size,omitempty"`
 }
 
 // reasoningRequest represents OpenRouter's unified reasoning configuration.

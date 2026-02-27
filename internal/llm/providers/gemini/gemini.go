@@ -152,6 +152,13 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest) ([]byte, error) {
 		geminiReq.Tools = p.convertTools(req.Tools)
 	}
 
+	// Append Google Search grounding tool if web search is enabled.
+	if req.WebSearch != nil && req.WebSearch.Enabled {
+		geminiReq.Tools = append(geminiReq.Tools, geminiTool{
+			GoogleSearch: &struct{}{},
+		})
+	}
+
 	// Add tool choice config if specified
 	if req.ToolChoice != "" {
 		switch req.ToolChoice {
@@ -499,6 +506,7 @@ type generateContentRequest struct {
 
 type geminiTool struct {
 	FunctionDeclarations []functionDeclaration `json:"functionDeclarations,omitempty"`
+	GoogleSearch         *struct{}             `json:"google_search,omitempty"`
 }
 
 type responsePart struct {

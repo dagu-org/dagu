@@ -9,6 +9,72 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBuildRequestBody_WebSearch(t *testing.T) {
+	t.Parallel()
+
+	provider := &Provider{
+		config: llm.Config{APIKey: "test-key"},
+	}
+
+	t.Run("web search disabled - no plugins", func(t *testing.T) {
+		t.Parallel()
+		req := &llm.ChatRequest{
+			Model:    "anthropic/claude-sonnet-4",
+			Messages: []llm.Message{{Role: llm.RoleUser, Content: "Hello"}},
+		}
+		body, err := provider.buildRequestBody(req, false)
+		require.NoError(t, err)
+
+		var parsed chatCompletionRequest
+		require.NoError(t, json.Unmarshal(body, &parsed))
+		assert.Empty(t, parsed.Plugins)
+		assert.Nil(t, parsed.WebSearchOptions)
+	})
+
+	t.Run("web search enabled - plugin appended", func(t *testing.T) {
+		t.Parallel()
+		req := &llm.ChatRequest{
+			Model:    "anthropic/claude-sonnet-4",
+			Messages: []llm.Message{{Role: llm.RoleUser, Content: "Hello"}},
+			WebSearch: &llm.WebSearchRequest{
+				Enabled: true,
+			},
+		}
+		body, err := provider.buildRequestBody(req, false)
+		require.NoError(t, err)
+
+		var parsed chatCompletionRequest
+		require.NoError(t, json.Unmarshal(body, &parsed))
+		require.Len(t, parsed.Plugins, 1)
+		assert.Equal(t, "web", parsed.Plugins[0].ID)
+		assert.Nil(t, parsed.Plugins[0].MaxResults)
+		require.NotNil(t, parsed.WebSearchOptions)
+		assert.Equal(t, "medium", parsed.WebSearchOptions.SearchContextSize)
+	})
+
+	t.Run("web search with max_uses", func(t *testing.T) {
+		t.Parallel()
+		maxUses := 3
+		req := &llm.ChatRequest{
+			Model:    "anthropic/claude-sonnet-4",
+			Messages: []llm.Message{{Role: llm.RoleUser, Content: "Hello"}},
+			WebSearch: &llm.WebSearchRequest{
+				Enabled: true,
+				MaxUses: &maxUses,
+			},
+		}
+		body, err := provider.buildRequestBody(req, false)
+		require.NoError(t, err)
+
+		var parsed chatCompletionRequest
+		require.NoError(t, json.Unmarshal(body, &parsed))
+		require.Len(t, parsed.Plugins, 1)
+		assert.Equal(t, "web", parsed.Plugins[0].ID)
+		require.NotNil(t, parsed.Plugins[0].MaxResults)
+		assert.Equal(t, 3, *parsed.Plugins[0].MaxResults)
+	})
+}
+
 func TestBuildRequestBody_ReasoningTokens(t *testing.T) {
 	t.Parallel()
 
