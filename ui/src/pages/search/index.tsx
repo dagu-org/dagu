@@ -96,39 +96,46 @@ function Search() {
   const q = searchParams.get('q') || '';
   // Use a conditional key pattern - this is a standard SWR pattern for conditional fetching
   // When q is empty, we pass undefined for the first parameter, which tells SWR not to fetch
-  const { data } = useQuery(
-    q ? '/dags/search' : (undefined as any), // eslint-disable-line @typescript-eslint/no-explicit-any
-    q
-      ? {
-          params: {
-            query: {
-              remoteNode: appBarContext.selectedRemoteNode || 'local',
-              q,
-            },
+  const searchParams_ = q
+    ? {
+        params: {
+          query: {
+            remoteNode: appBarContext.selectedRemoteNode || 'local',
+            q,
           },
-        }
-      : {},
-    {
-      refreshInterval: q ? 2000 : 0,
-    }
+        },
+      }
+    : {};
+  const searchOpts = { refreshInterval: q ? 2000 : 0 };
+
+  const { data: dagData } = useQuery(
+    q ? '/dags/search' : (undefined as any), // eslint-disable-line @typescript-eslint/no-explicit-any
+    searchParams_,
+    searchOpts
+  );
+
+  const { data: docData } = useQuery(
+    q ? '/docs/search' : (undefined as any), // eslint-disable-line @typescript-eslint/no-explicit-any
+    searchParams_,
+    searchOpts
   );
 
   const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     ref.current?.focus();
-  }, [ref.current]);
+  }, []);
 
   const onSubmit = React.useCallback((value: string) => {
     setSearchParams({
       q: value,
     });
-  }, []);
+  }, [setSearchParams]);
 
   return (
     <div className="max-w-7xl">
       <div className="w-full">
-        <Title>Search DAG Definitions</Title>
+        <Title>Search</Title>
         <div className="flex items-center gap-2 pt-2">
           <Input
             placeholder="Search text..."
@@ -168,21 +175,11 @@ function Search() {
               );
             }
 
-            if (data && data.results && data.results.length > 0) {
-              return (
-                <div>
-                  <h2 className="text-lg font-semibold mb-2">
-                    {data.results.length} results found
-                  </h2>
-                  <SearchResult results={data.results} />
-                </div>
-              );
-            }
+            const dagResults = dagData?.results ?? [];
+            const docResults = docData?.results ?? [];
+            const totalCount = dagResults.length + docResults.length;
 
-            if (
-              (data && !data.results) ||
-              (data && data.results && data.results.length === 0)
-            ) {
+            if (totalCount === 0 && dagData && docData) {
               return (
                 <div className="text-sm text-muted-foreground italic">
                   No results found
@@ -190,7 +187,28 @@ function Search() {
               );
             }
 
-            return null;
+            return (
+              <div className="space-y-4">
+                {dagResults.length > 0 && (
+                  <div>
+                    <h2 className="text-lg font-semibold mb-2">
+                      {dagResults.length} DAG{' '}
+                      {dagResults.length === 1 ? 'result' : 'results'}
+                    </h2>
+                    <SearchResult type="dag" results={dagResults} />
+                  </div>
+                )}
+                {docResults.length > 0 && (
+                  <div>
+                    <h2 className="text-lg font-semibold mb-2">
+                      {docResults.length} Doc{' '}
+                      {docResults.length === 1 ? 'result' : 'results'}
+                    </h2>
+                    <SearchResult type="doc" results={docResults} />
+                  </div>
+                )}
+              </div>
+            );
           })()}
         </div>
       </div>

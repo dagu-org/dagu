@@ -1,11 +1,23 @@
 package agent
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// testRemoteNodeResolver is a minimal resolver for tests.
+type testRemoteNodeResolver struct{}
+
+func (r *testRemoteNodeResolver) GetByName(_ context.Context, _ string) (RemoteNodeInfo, error) {
+	return RemoteNodeInfo{}, nil
+}
+
+func (r *testRemoteNodeResolver) ListTokenAuthNodes(_ context.Context) ([]RemoteNodeInfo, error) {
+	return nil, nil
+}
 
 func TestRegisteredTools_ContainsAllExpected(t *testing.T) {
 	t.Parallel()
@@ -14,6 +26,7 @@ func TestRegisteredTools_ContainsAllExpected(t *testing.T) {
 		"bash", "read", "patch", "think",
 		"navigate", "read_schema", "ask_user",
 		"delegate", "use_skill", "search_skills",
+		"remote_agent", "list_remote_nodes",
 	}
 
 	regs := RegisteredTools()
@@ -67,7 +80,7 @@ func TestRegisteredTools_HaveMetadata(t *testing.T) {
 func TestRegisteredTools_FactoriesProduceValidTools(t *testing.T) {
 	t.Parallel()
 
-	cfg := ToolConfig{DAGsDir: "/tmp/test-dags", SkillStore: &testSkillStore{}}
+	cfg := ToolConfig{DAGsDir: "/tmp/test-dags", SkillStore: &testSkillStore{}, RemoteNodeResolver: &testRemoteNodeResolver{}}
 	for _, reg := range RegisteredTools() {
 		t.Run(reg.Name, func(t *testing.T) {
 			t.Parallel()
@@ -85,7 +98,7 @@ func TestRegisteredTools_FactoriesProduceValidTools(t *testing.T) {
 func TestCreateTools_UsesRegistry(t *testing.T) {
 	t.Parallel()
 
-	tools := CreateTools(ToolConfig{DAGsDir: "/tmp/dags", SkillStore: &testSkillStore{}})
+	tools := CreateTools(ToolConfig{DAGsDir: "/tmp/dags", SkillStore: &testSkillStore{}, RemoteNodeResolver: &testRemoteNodeResolver{}})
 	regs := RegisteredTools()
 
 	assert.Len(t, tools, len(regs), "CreateTools should produce one tool per registration")

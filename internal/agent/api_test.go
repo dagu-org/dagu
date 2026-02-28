@@ -66,7 +66,7 @@ func newAPITestSetup(t *testing.T, enabled bool, withProvider bool, workingDir s
 // createSession creates a new session using the exported CreateSession method.
 func (s *apiTestSetup) createSession(t *testing.T, message string) string {
 	t.Helper()
-	sessID, err := s.api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: message})
+	sessID, _, err := s.api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: message})
 	require.NoError(t, err)
 	require.NotEmpty(t, sessID)
 	return sessID
@@ -153,7 +153,7 @@ func TestAPI_CreateSession(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		sessID, err := setup.api.CreateSession(context.Background(), UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}, ChatRequest{Message: "hello"})
+		sessID, _, err := setup.api.CreateSession(context.Background(), UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}, ChatRequest{Message: "hello"})
 
 		require.NoError(t, err)
 		assert.NotEmpty(t, sessID)
@@ -163,7 +163,7 @@ func TestAPI_CreateSession(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		_, err := setup.api.CreateSession(context.Background(), UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}, ChatRequest{Message: ""})
+		_, _, err := setup.api.CreateSession(context.Background(), UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}, ChatRequest{Message: ""})
 
 		assert.ErrorIs(t, err, ErrMessageRequired)
 	})
@@ -172,7 +172,7 @@ func TestAPI_CreateSession(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, false, "")
-		_, err := setup.api.CreateSession(context.Background(), UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}, ChatRequest{Message: "hello"})
+		_, _, err := setup.api.CreateSession(context.Background(), UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}, ChatRequest{Message: "hello"})
 
 		assert.ErrorIs(t, err, ErrAgentNotConfigured)
 	})
@@ -181,7 +181,7 @@ func TestAPI_CreateSession(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		sessID, err := setup.api.CreateSession(context.Background(), UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}, ChatRequest{
+		sessID, _, err := setup.api.CreateSession(context.Background(), UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}, ChatRequest{
 			Message: "hello",
 			Model:   "test-model",
 		})
@@ -206,7 +206,7 @@ func TestAPI_CreateSession(t *testing.T) {
 		})
 		api.providers.Set(model.ToLLMConfig(), &mockLLMProvider{})
 
-		sessID, err := api.CreateSession(context.Background(), UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}, ChatRequest{Message: "hello"})
+		sessID, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}, ChatRequest{Message: "hello"})
 
 		require.NoError(t, err)
 		assert.True(t, sessStore.HasSession(sessID), "session should be persisted")
@@ -289,7 +289,7 @@ func TestAPI_ListSessionsPaginated(t *testing.T) {
 		api.providers.Set(model.ToLLMConfig(), &mockLLMProvider{})
 
 		// Create an active session via API
-		sessID, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "active"})
+		sessID, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "active"})
 		require.NoError(t, err)
 
 		// Add a persisted-only session directly to the store
@@ -330,7 +330,7 @@ func TestAPI_ListSessionsPaginated(t *testing.T) {
 		api.providers.Set(model.ToLLMConfig(), &mockLLMProvider{})
 
 		// Create a parent session
-		_, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "parent"})
+		_, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "parent"})
 		require.NoError(t, err)
 
 		// Add a sub-session directly to the store
@@ -771,7 +771,7 @@ func TestAPI_CreateSession_PassesPricing(t *testing.T) {
 		api, _ := testAPIWithModels(t, model)
 		api.providers.Set(model.ToLLMConfig(), newStopProvider("hello"))
 
-		sessID, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "hello"})
+		sessID, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "hello"})
 		require.NoError(t, err)
 
 		mgrVal, ok := api.sessions.Load(sessID)
@@ -804,7 +804,7 @@ func TestAPI_SendMessage_UpdatesPricing(t *testing.T) {
 		api.providers.Set(modelB.ToLLMConfig(), newStopProvider("b"))
 
 		// Create session with model-a
-		sessID, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "hello", Model: "model-a"})
+		sessID, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "hello", Model: "model-a"})
 		require.NoError(t, err)
 
 		// Send message with model-b
@@ -1062,7 +1062,7 @@ func TestAPI_CreateSession_DelegateFlow(t *testing.T) {
 	provider := newDelegateProvider("analyze data")
 	api, store := createAPIWithSessionStore(t, provider)
 
-	sessID, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "delegate test"})
+	sessID, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "delegate test"})
 	require.NoError(t, err)
 	require.NotEmpty(t, sessID)
 
@@ -1099,7 +1099,7 @@ func TestAPI_CreateSession_ParentMessagesIntact(t *testing.T) {
 	provider := newDelegateProvider("sub task")
 	api, _ := createAPIWithSessionStore(t, provider)
 
-	sessID, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "parent msg"})
+	sessID, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "parent msg"})
 	require.NoError(t, err)
 
 	// Wait for processing to complete
@@ -1171,7 +1171,7 @@ func TestAPI_CreateSession_MultipleDelegates(t *testing.T) {
 
 	api, store := createAPIWithSessionStore(t, provider)
 
-	sessID, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "multi delegate"})
+	sessID, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "multi delegate"})
 	require.NoError(t, err)
 
 	// Wait for processing to complete
@@ -1210,7 +1210,7 @@ func TestAPI_CreateSession_PersistsToStore(t *testing.T) {
 
 	api, store := createAPIWithSessionStore(t, newStopProvider("persisted response"))
 
-	sessID, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "persist test"})
+	sessID, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "persist test"})
 	require.NoError(t, err)
 
 	// Verify session exists in store
@@ -1248,7 +1248,7 @@ func TestAPI_SendMessage_ReactivatesFromStore(t *testing.T) {
 	api, store := createAPIWithSessionStore(t, newStopProvider("reactivated response"))
 
 	// Create a session
-	sessID, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "initial"})
+	sessID, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "initial"})
 	require.NoError(t, err)
 
 	// Wait for initial processing
@@ -1283,7 +1283,7 @@ func TestAPI_GetSessionDetail_IncludesDelegates(t *testing.T) {
 
 	api, _ := createAPIWithSessionStore(t, newDelegateProvider("detail delegate"))
 
-	sessID, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "delegate detail"})
+	sessID, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "delegate detail"})
 	require.NoError(t, err)
 
 	// Wait for delegate flow to complete
@@ -1402,4 +1402,146 @@ func TestAPI_CleanupIdleSessions_DoesNotCancelZeroHeartbeat(t *testing.T) {
 	// Should not be cancelled because lastHeartbeat is zero
 	_, exists := api.sessions.Load("no-hb-sess")
 	require.True(t, exists, "session with zero heartbeat should not be cancelled")
+}
+
+func TestAPI_CreateSession_IdempotentWithSessionID(t *testing.T) {
+	t.Parallel()
+
+	t.Run("duplicate ID returns already_exists", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAPITestSetup(t, true, true, "")
+		user := UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}
+		clientID := "550e8400-e29b-41d4-a716-446655440000"
+
+		sessID, status, err := setup.api.CreateSession(context.Background(), user, ChatRequest{
+			Message:   "hello",
+			SessionID: clientID,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, clientID, sessID)
+		assert.Equal(t, "accepted", status)
+
+		// Second call with same ID should return already_exists.
+		sessID2, status2, err2 := setup.api.CreateSession(context.Background(), user, ChatRequest{
+			Message:   "world",
+			SessionID: clientID,
+		})
+		require.NoError(t, err2)
+		assert.Equal(t, clientID, sessID2)
+		assert.Equal(t, "already_exists", status2)
+	})
+
+	t.Run("duplicate ID from different user returns error", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAPITestSetup(t, true, true, "")
+		user1 := UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}
+		user2 := UserIdentity{UserID: "other", Username: "other", Role: auth.RoleAdmin}
+		clientID := "660e8400-e29b-41d4-a716-446655440000"
+
+		_, _, err := setup.api.CreateSession(context.Background(), user1, ChatRequest{
+			Message:   "hello",
+			SessionID: clientID,
+		})
+		require.NoError(t, err)
+
+		// Different user with same ID should fail.
+		_, _, err2 := setup.api.CreateSession(context.Background(), user2, ChatRequest{
+			Message:   "world",
+			SessionID: clientID,
+		})
+		assert.Error(t, err2)
+		assert.Contains(t, err2.Error(), "bad request")
+	})
+
+	t.Run("invalid UUID returns error", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAPITestSetup(t, true, true, "")
+		user := UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}
+
+		_, _, err := setup.api.CreateSession(context.Background(), user, ChatRequest{
+			Message:   "hello",
+			SessionID: "not-a-uuid",
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "valid UUID")
+	})
+
+	t.Run("duplicate ID in persisted store returns already_exists", func(t *testing.T) {
+		t.Parallel()
+
+		model := testModelConfig("test-model")
+		configStore := newMockConfigStore(true)
+		configStore.config.DefaultModelID = model.ID
+		sessStore := newMockSessionStore()
+
+		api := NewAPI(APIConfig{
+			ConfigStore:  configStore,
+			ModelStore:   newMockModelStore().addModel(model),
+			WorkingDir:   t.TempDir(),
+			SessionStore: sessStore,
+		})
+		api.providers.Set(model.ToLLMConfig(), &mockLLMProvider{})
+
+		clientID := "770e8400-e29b-41d4-a716-446655440000"
+		user := UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}
+
+		// First create succeeds and persists.
+		sessID, status, err := api.CreateSession(context.Background(), user, ChatRequest{
+			Message:   "hello",
+			SessionID: clientID,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, clientID, sessID)
+		assert.Equal(t, "accepted", status)
+
+		// Remove from active map to simulate session eviction.
+		api.sessions.Delete(clientID)
+
+		// Second call should find it in the store.
+		sessID2, status2, err2 := api.CreateSession(context.Background(), user, ChatRequest{
+			Message:   "world",
+			SessionID: clientID,
+		})
+		require.NoError(t, err2)
+		assert.Equal(t, clientID, sessID2)
+		assert.Equal(t, "already_exists", status2)
+	})
+
+	t.Run("concurrent creation with same ID is safe", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAPITestSetup(t, true, true, "")
+		user := UserIdentity{UserID: "admin", Username: "admin", Role: auth.RoleAdmin}
+		clientID := "880e8400-e29b-41d4-a716-446655440000"
+
+		var wg sync.WaitGroup
+		results := make([]string, 10)
+		errs := make([]error, 10)
+
+		for i := range 10 {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				_, status, err := setup.api.CreateSession(context.Background(), user, ChatRequest{
+					Message:   fmt.Sprintf("msg-%d", idx),
+					SessionID: clientID,
+				})
+				results[idx] = status
+				errs[idx] = err
+			}(i)
+		}
+		wg.Wait()
+
+		// Exactly one should be "accepted", rest should be "already_exists" or errors.
+		acceptedCount := 0
+		for i := range 10 {
+			if errs[i] == nil && results[i] == "accepted" {
+				acceptedCount++
+			}
+		}
+		assert.Equal(t, 1, acceptedCount, "exactly one goroutine should win the creation race")
+	})
 }

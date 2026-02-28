@@ -261,6 +261,8 @@ type ChatRequest struct {
 	SafeMode bool `json:"safe_mode,omitempty"`
 	// SoulID overrides the default soul for this session.
 	SoulID string `json:"soul_id,omitempty"`
+	// SessionID is an optional client-provided session ID (UUID v4) for idempotent creation.
+	SessionID string `json:"session_id,omitempty"`
 }
 
 // ResolvedDAGContext contains server-resolved information for a DAG.
@@ -291,6 +293,10 @@ type ToolOut struct {
 	IsError bool
 	// DelegateIDs references the sub-sessions created by the delegate tool.
 	DelegateIDs []string
+	// AuditDetails contains extra audit details set by the tool at runtime.
+	// These are merged with DetailExtractor output in the audit hook;
+	// AuditDetails takes precedence on key collisions.
+	AuditDetails map[string]any
 }
 
 // ToolFunc is the function signature for tool execution.

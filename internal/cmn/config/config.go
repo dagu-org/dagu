@@ -295,6 +295,7 @@ type RemoteNode struct {
 	BasicAuthPassword string
 	AuthToken         string
 	SkipTLSVerify     bool
+	Timeout           int // seconds; 0 = use default
 }
 
 // TLSConfig represents TLS configuration.
@@ -594,6 +595,9 @@ func (c *Config) validateRemoteNodes() error {
 			if n.AuthToken == "" {
 				return fmt.Errorf("remote_nodes[%d] (%q): token auth requires auth_token", i, n.Name)
 			}
+		}
+		if n.Timeout < 0 {
+			return fmt.Errorf("remote_nodes[%d] (%q): timeout must not be negative", i, n.Name)
 		}
 	}
 	return nil

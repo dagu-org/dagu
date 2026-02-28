@@ -119,14 +119,14 @@ func (a *API) CreateAgentSession(ctx context.Context, request api.CreateAgentSes
 	user := extractUserContext(ctx)
 	chatReq := toAgentChatRequest(request.Body)
 
-	sessionID, err := a.agentAPI.CreateSession(ctx, user, chatReq)
+	sessionID, status, err := a.agentAPI.CreateSession(ctx, user, chatReq)
 	if err != nil {
 		return nil, mapAgentError(err)
 	}
 
 	return api.CreateAgentSession201JSONResponse{
 		SessionId: sessionID,
-		Status:    "accepted",
+		Status:    status,
 	}, nil
 }
 
@@ -228,6 +228,9 @@ func toAgentChatRequest(req *api.AgentChatRequest) agent.ChatRequest {
 	}
 	if req.SoulId != nil {
 		out.SoulID = *req.SoulId
+	}
+	if req.SessionId != nil {
+		out.SessionID = *req.SessionId
 	}
 	if req.DagContexts != nil {
 		for _, dc := range *req.DagContexts {

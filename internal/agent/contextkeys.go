@@ -11,6 +11,7 @@ type modelStoreKey struct{}
 type memoryStoreKey struct{}
 type skillStoreKey struct{}
 type soulStoreKey struct{}
+type remoteNodeResolverKey struct{}
 
 // WithConfigStore injects a ConfigStore into the context.
 func WithConfigStore(ctx context.Context, s ConfigStore) context.Context {
@@ -70,4 +71,16 @@ func WithSoulStore(ctx context.Context, s SoulStore) context.Context {
 func GetSoulStore(ctx context.Context) SoulStore {
 	s, _ := ctx.Value(soulStoreKey{}).(SoulStore)
 	return s
+}
+
+// WithRemoteNodeResolver injects a RemoteNodeResolver into the context.
+func WithRemoteNodeResolver(ctx context.Context, r RemoteNodeResolver) context.Context {
+	return context.WithValue(ctx, remoteNodeResolverKey{}, r)
+}
+
+// GetRemoteNodeResolver retrieves a RemoteNodeResolver from the context.
+// Returns nil if no RemoteNodeResolver is set.
+func GetRemoteNodeResolver(ctx context.Context) RemoteNodeResolver {
+	r, _ := ctx.Value(remoteNodeResolverKey{}).(RemoteNodeResolver)
+	return r
 }

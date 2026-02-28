@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"mime"
 	"net"
 	"net/http"
@@ -210,14 +211,6 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		memoryStore = ms
 	}
 
-	var agentAPI *agent.API
-	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSkillStore, agentSoulStore, &cfg.Paths, cfg.Server.Session.MaxPerUser, dr, auditSvc, memoryStore)
-		if err != nil {
-			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
-		}
-	}
-
 	var authSvc *authservice.Service
 	if cfg.Server.Auth.Mode == config.AuthModeBuiltin {
 		result, isSetupRequired, err := initBuiltinAuthService(ctx, cfg, collector)
@@ -303,6 +296,14 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	// Update template remote nodes list to include store-managed nodes
 	if names, err := remoteNodeResolver.ListNames(ctx); err == nil && len(names) > 0 {
 		remoteNodes = names
+	}
+
+	var agentAPI *agent.API
+	if agentConfigStore != nil {
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSkillStore, agentSoulStore, &cfg.Paths, cfg.Server.Session.MaxPerUser, dr, auditSvc, memoryStore, newRemoteNodeAdapter(remoteNodeResolver))
+		if err != nil {
+			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
+		}
 	}
 
 	upgradeStore, err := fileupgradecheck.New(cfg.Paths.DataDir)
@@ -633,7 +634,7 @@ func autoEnableExampleSkills(ctx context.Context, configStore agent.ConfigStore)
 
 // initAgentAPI creates and returns an agent API.
 // The API uses the config store to check enabled status and resolve providers via the model store.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, soulStore agent.SoulStore, paths *config.PathsConfig, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, memoryStore agent.MemoryStore) (*agent.API, error) {
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, soulStore agent.SoulStore, paths *config.PathsConfig, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteNodeResolver) (*agent.API, error) {
 	sessStore, err := filesession.New(paths.SessionsDir, filesession.WithMaxPerUser(sessionMaxPerUser))
 	if err != nil {
 		logger.Warn(ctx, "Failed to create session store, persistence disabled", tag.Error(err))
@@ -646,16 +647,17 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 	}
 
 	api := agent.NewAPI(agent.APIConfig{
-		ConfigStore:  store,
-		ModelStore:   modelStore,
-		SkillStore:   skillStore,
-		SoulStore:    soulStore,
-		WorkingDir:   paths.DAGsDir,
-		Logger:       slog.Default(),
-		SessionStore: sessStore,
-		DAGStore:     dagStore,
-		Hooks:        hooks,
-		MemoryStore:  memoryStore,
+		ConfigStore:        store,
+		ModelStore:         modelStore,
+		SkillStore:         skillStore,
+		SoulStore:          soulStore,
+		WorkingDir:         paths.DAGsDir,
+		Logger:             slog.Default(),
+		SessionStore:       sessStore,
+		DAGStore:           dagStore,
+		Hooks:              hooks,
+		MemoryStore:        memoryStore,
+		RemoteNodeResolver: remoteResolver,
 		Environment: agent.EnvironmentInfo{
 			DAGsDir:        paths.DAGsDir,
 			LogDir:         paths.LogDir,
@@ -684,6 +686,7 @@ func newAgentAuditHook(auditSvc *audit.Service) agent.AfterToolExecHookFunc {
 		if info.Audit.DetailExtractor != nil {
 			details = info.Audit.DetailExtractor(info.Input)
 		}
+		maps.Copy(details, result.AuditDetails)
 		if result.IsError {
 			details["failed"] = true
 		}

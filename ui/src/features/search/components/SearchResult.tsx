@@ -4,23 +4,44 @@ import { components } from '../../../api/v1/schema';
 import Prism from '../../../assets/js/prism';
 import { DAGDefinition } from '../../dags/components/dag-editor';
 
-type Props = {
-  results: components['schemas']['SearchResultItem'][];
-};
+type DagResult = components['schemas']['SearchResultItem'];
+type DocResult = components['schemas']['DocSearchResultItem'];
 
-function SearchResult({ results }: Props) {
+type Props =
+  | { type: 'dag'; results: DagResult[] }
+  | { type: 'doc'; results: DocResult[] };
+
+function SearchResult(props: Props) {
+  const { type, results } = props;
+
   const elements = React.useMemo(
     () =>
       results.map((result, i) => {
+        const { name, link, matches } =
+          type === 'dag'
+            ? {
+                name: (result as DagResult).name,
+                link: `/dags/${encodeURI((result as DagResult).name)}/spec`,
+                matches: (result as DagResult).matches,
+              }
+            : {
+                name: (result as DocResult).title,
+                link: `/docs/${(result as DocResult).id}`,
+                matches: (result as DocResult).matches ?? [],
+              };
+
         const ret = [] as ReactElement[];
-        result.matches.forEach((m, j) => {
+        matches.forEach((m, j) => {
           ret.push(
-            <li key={`${result.name}-${m.lineNumber}`} className="px-4">
+            <li key={`${name}-${m.lineNumber}`} className="px-4">
               <div className="flex flex-col space-y-2 w-full">
                 {j == 0 ? (
-                  <Link to={`/dags/${encodeURI(result.name)}/spec`}>
+                  <Link to={link}>
                     <h3 className="text-lg font-semibold text-foreground">
-                      {result.name}
+                      {name}
+                      <span className="ml-2 text-xs font-normal text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        {type === 'dag' ? 'DAG' : 'Doc'}
+                      </span>
                     </h3>
                   </Link>
                 ) : null}
@@ -38,14 +59,14 @@ function SearchResult({ results }: Props) {
         if (i < results.length - 1) {
           ret.push(
             <div
-              key={`${result.name}-divider`}
+              key={`${name}-divider`}
               className="h-px bg-accent my-2"
             />
           );
         }
         return ret;
       }),
-    [results]
+    [results, type]
   );
 
   useEffect(() => Prism.highlightAll(), [elements]);

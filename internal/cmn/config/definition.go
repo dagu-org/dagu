@@ -221,6 +221,7 @@ type RemoteNodeDef struct {
 	BasicAuthPassword string `mapstructure:"basic_auth_password"`
 	AuthToken         string `mapstructure:"auth_token"`
 	SkipTLSVerify     bool   `mapstructure:"skip_tls_verify"`
+	Timeout           int    `mapstructure:"timeout"` // seconds; 0 = use default
 }
 
 // -----------------------------------------------------------------------------

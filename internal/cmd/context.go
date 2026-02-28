@@ -17,6 +17,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/crypto"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -36,8 +37,10 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
 	"github.com/dagu-org/dagu/internal/persis/filequeue"
+	"github.com/dagu-org/dagu/internal/persis/fileremotenode"
 	"github.com/dagu-org/dagu/internal/persis/fileserviceregistry"
 	"github.com/dagu-org/dagu/internal/persis/filewatermark"
+	"github.com/dagu-org/dagu/internal/remotenode"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
@@ -445,11 +448,12 @@ func (c *Context) dagStore(cfg dagStoreConfig) (exec.DAGStore, error) {
 
 // agentStoresResult holds the agent stores created by agentStores().
 type agentStoresResult struct {
-	ConfigStore agent.ConfigStore
-	ModelStore  agent.ModelStore
-	MemoryStore agent.MemoryStore
-	SkillStore  agent.SkillStore
-	SoulStore   agent.SoulStore
+	ConfigStore        agent.ConfigStore
+	ModelStore         agent.ModelStore
+	MemoryStore        agent.MemoryStore
+	SkillStore         agent.SkillStore
+	SoulStore          agent.SoulStore
+	RemoteNodeResolver agent.RemoteNodeResolver
 }
 
 // agentStores creates the agent config, model, memory, and skill stores from the config paths.
@@ -497,7 +501,34 @@ func (c *Context) agentStores() agentStoresResult {
 	}
 	result.SoulStore = soulStore
 
+	// Build remote node resolver for agent step remote tools.
+	result.RemoteNodeResolver = c.buildRemoteNodeResolver()
+
 	return result
+}
+
+// buildRemoteNodeResolver creates a RemoteNodeResolver from config and store.
+func (c *Context) buildRemoteNodeResolver() agent.RemoteNodeResolver {
+	var rnStore remotenode.Store
+	encKey, err := crypto.ResolveKey(c.Config.Paths.DataDir)
+	if err != nil {
+		logger.Warn(c, "Failed to resolve encryption key for remote nodes", tag.Error(err))
+	} else {
+		enc, err := crypto.NewEncryptor(encKey)
+		if err != nil {
+			logger.Warn(c, "Failed to create encryptor for remote nodes", tag.Error(err))
+		} else {
+			s, err := fileremotenode.New(c.Config.Paths.RemoteNodesDir, enc)
+			if err != nil {
+				logger.Warn(c, "Failed to create remote node store", tag.Error(err))
+			} else {
+				rnStore = s
+			}
+		}
+	}
+
+	resolver := remotenode.NewResolver(c.Config.Server.RemoteNodes, rnStore)
+	return &agent.RemoteNodeResolverAdapter{Resolver: resolver}
 }
 
 // OpenLogFile creates and opens a log file for a given dag-run.

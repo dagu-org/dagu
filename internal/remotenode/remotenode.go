@@ -28,6 +28,7 @@ type RemoteNode struct {
 	BasicAuthPassword string // plaintext in memory, encrypted at rest
 	AuthToken         string // plaintext in memory, encrypted at rest
 	SkipTLSVerify     bool
+	Timeout           time.Duration // per-node timeout; 0 = use default
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }
@@ -70,6 +71,7 @@ type RemoteNodeForStorage struct {
 	BasicAuthPasswordEnc string    `json:"basic_auth_password_enc,omitempty"`
 	AuthTokenEnc         string    `json:"auth_token_enc,omitempty"`
 	SkipTLSVerify        bool      `json:"skip_tls_verify,omitempty"`
+	TimeoutSeconds       int       `json:"timeout_seconds,omitempty"`
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
 }
@@ -78,6 +80,10 @@ type RemoteNodeForStorage struct {
 // Note: Credential encryption must be handled by the caller before setting
 // BasicAuthPasswordEnc and AuthTokenEnc.
 func (n *RemoteNode) ToStorage() *RemoteNodeForStorage {
+	var timeoutSec int
+	if n.Timeout > 0 {
+		timeoutSec = int(n.Timeout.Seconds())
+	}
 	return &RemoteNodeForStorage{
 		ID:                n.ID,
 		Name:              n.Name,
@@ -86,6 +92,7 @@ func (n *RemoteNode) ToStorage() *RemoteNodeForStorage {
 		AuthType:          n.AuthType,
 		BasicAuthUsername: n.BasicAuthUsername,
 		SkipTLSVerify:     n.SkipTLSVerify,
+		TimeoutSeconds:    timeoutSec,
 		CreatedAt:         n.CreatedAt,
 		UpdatedAt:         n.UpdatedAt,
 	}
@@ -95,6 +102,7 @@ func (n *RemoteNode) ToStorage() *RemoteNodeForStorage {
 // Note: Credential decryption must be handled by the caller to populate
 // BasicAuthPassword and AuthToken.
 func (s *RemoteNodeForStorage) ToRemoteNode() *RemoteNode {
+	timeout := max(time.Duration(s.TimeoutSeconds)*time.Second, 0)
 	return &RemoteNode{
 		ID:                s.ID,
 		Name:              s.Name,
@@ -103,6 +111,7 @@ func (s *RemoteNodeForStorage) ToRemoteNode() *RemoteNode {
 		AuthType:          s.AuthType,
 		BasicAuthUsername: s.BasicAuthUsername,
 		SkipTLSVerify:     s.SkipTLSVerify,
+		Timeout:           timeout,
 		CreatedAt:         s.CreatedAt,
 		UpdatedAt:         s.UpdatedAt,
 	}
