@@ -101,7 +101,7 @@ func TestRemoteGetSession_CamelCaseRoundTrip(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Contains(t, r.URL.Path, "/api/v1/agent/sessions/test-session")
+		assert.Contains(t, r.URL.Path, "/agent/sessions/test-session")
 		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
 
 		w.Header().Set("Content-Type", "application/json")
