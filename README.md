@@ -1,127 +1,86 @@
 <div align="center">
-  <img src="./assets/images/dagu-logo.webp" width="480" alt="Dagu Logo">
-  <br/>
-
+  <img src="./assets/images/hero-logo.webp" width="480" alt="Dagu Logo">
   <p>
-    <a href="https://docs.daguit.dev/reference/changelog"><img src="https://img.shields.io/github/release/dagu-org/dagu.svg?style=flat-square" alt="Latest Release"></a>
+    <a href="https://docs.dagu.sh/reference/changelog"><img src="https://img.shields.io/github/release/dagu-org/dagu.svg?style=flat-square" alt="Latest Release"></a>
     <a href="https://github.com/dagu-org/dagu/actions/workflows/ci.yaml"><img src="https://img.shields.io/github/actions/workflow/status/dagu-org/dagu/ci.yaml?style=flat-square" alt="Build Status"></a>
     <a href="https://discord.gg/gpahPUjGRk"><img src="https://img.shields.io/discord/1095289480774172772?style=flat-square&logo=discord" alt="Discord"></a>
     <a href="https://bsky.app/profile/dagu-org.bsky.social"><img src="https://img.shields.io/badge/Bluesky-0285FF?style=flat-square&logo=bluesky&logoColor=white" alt="Bluesky"></a>
   </p>
-  
+
   <p>
-    <a href="https://docs.daguit.dev/writing-workflows/examples">Examples</a> |
-    <a href="https://docs.daguit.dev/overview/api">API Reference</a> |
-    <a href="https://docs.daguit.dev/configurations/server">Configuration</a> |
-    <a href="https://discord.gg/gpahPUjGRk">Discord</a>
+    <a href="https://docs.dagu.sh">Docs</a> |
+    <a href="https://docs.dagu.sh/writing-workflows/examples">Examples</a> |
+    <a href="https://discord.gg/gpahPUjGRk">Discord</a> |
+    <a href="https://github.com/dagu-org/dagu">GitHub</a>
   </p>
 </div>
 
-## What is Dagu?
+## What is Dagu Workflow Engine?
 
-**Dagu is a self-contained, lightweight workflow engine for enterprise and small teams.** Define workflows in simple YAML, execute them anywhere with a single binary, compose complex pipelines from reusable sub-workflows, and distribute tasks across workers. All without requiring databases, message brokers, or code changes to your existing scripts.
+**Dagu is a self-contained, lightweight workflow engine for small teams.** Define workflows in simple YAML, execute them anywhere with a single binary, compose complex pipelines from reusable sub-workflows, and distribute tasks across workers. All without requiring databases, message brokers, or code changes to your existing scripts.
 
-Built for developers who want powerful workflow orchestration without the operational overhead. For a quick feel of how it works, take a look at the [examples](https://docs.daguit.dev/writing-workflows/examples).
+Built for developers who want powerful workflow orchestration without the operational overhead. For a quick feel of how it works, take a look at the [examples](https://docs.dagu.sh/writing-workflows/examples).
 
-### Web UI Preview
-![Demo Web UI](./assets/images/demo-web-ui.webp)
+- Zero-Ops: Single binary, file-based storage, under 128MB memory footprint
+- Full-Power: Docker steps, SSH execution, DAG composition, distributed mode, Git-based version management for DAGs & docs, [19+ executors](https://docs.dagu.sh/reference/executors)
+- AI-Native: Built-in LLM agent creates, edits, and debugs workflows from natural language
+- Legacy Script Friendly: Orchestrate existing shell commands, Python scripts, Docker containers, or HTTP calls without modification.
+- Air-gapped Ready: Runs in isolated environments without external dependencies or network access
 
-### CLI Preview
-![Demo CLI](./assets/images/demo-cli.webp)
+![Web UI](./assets/images/demo-web-ui.webp)
 
-### Try It Live
-Explore Dagu without installing: [Live Demo](http://23.251.149.55:8525/) (credentials: `demouser` / `demouser`)
+**Try it live:** [Live Demo](http://23.251.149.55:8525/) (credentials: `demouser` / `demouser`)
 
 ## Why Dagu?
 
-Many workflow orchestrators already exist, and Apache Airflow is a well known example. In Airflow, DAGs are loaded from Python source files, so defining workflows typically means writing and maintaining Python code. In real deployments, Airflow commonly involves multiple running components (for example, scheduler, webserver, metadata database, and workers) and DAG files often need to be synchronized across them, which can increase operational complexity. 
+```
+  Traditional Orchestrator           Dagu
+  ┌────────────────────────┐        ┌──────────────────┐
+  │  Web Server            │        │                  │
+  │  Scheduler             │        │  dagu start-all  │
+  │  Worker(s)             │        │                  │
+  │  PostgreSQL            │        └──────────────────┘
+  │  Redis / RabbitMQ      │         Single binary.
+  │  Python runtime        │         Zero dependencies.
+  └────────────────────────┘         Just run it.
+    6+ services to manage
+```
 
-Dagu is a self-contained workflow engine where workflows are defined in simple YAML and executed with a single binary. It is designed to run without requiring external databases or message brokers, using local files for definitions, logs, and metadata. Because it orchestrates commands rather than forcing you into a specific programming model, it is easy to integrate existing shell scripts and operational commands as they are. Our goal is to make Dagu an ideal workflow engine for small teams that want orchestration power with minimal setup and operational overhead.
-
-## Highlights
- 
-- Single binary file installation
-- Declarative YAML format for defining DAGs
-- Web UI for visually managing, rerunning, and monitoring pipelines
-- Use existing programs without any modification
-- Self-contained, with no need for a DBMS
+One binary. No Postgres. No Redis. No Python. Just `dagu start-all`.
 
 ## Quick Start
 
-### 1. Install dagu
+### 1. Install
 
-**macOS/Linux**:
+**macOS/Linux:**
 
 ```bash
-# Install to ~/.local/bin (default, no sudo required)
 curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
-
-# Install specific version
-curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash -s -- --version v1.17.0
-
-# Install to custom directory
-curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash -s -- --install-dir /usr/local/bin
-
-# Install to custom directory with custom working directory
-curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash -s -- --install-dir /usr/local/bin --working-dir /var/tmp
 ```
 
-**Windows (PowerShell)**:
+**Homebrew:**
+
+```bash
+brew install dagu
+```
+
+**Windows (PowerShell):**
 
 ```powershell
-# Install latest version to default location (%LOCALAPPDATA%\Programs\dagu)
 irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1 | iex
-
-# Install specific version
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1))) v1.24.0
-
-# Install to custom directory
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1))) latest "C:\tools\dagu"
 ```
 
-**Windows (CMD/PowerShell)**:
-
-```cmd
-REM Install latest version to default location (%LOCALAPPDATA%\Programs\dagu)
-curl -fsSL https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.cmd -o installer.cmd && .\installer.cmd && del installer.cmd
-
-REM Install specific version
-curl -fsSL https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.cmd -o installer.cmd && .\installer.cmd v1.24.0 && del installer.cmd
-
-REM Install to custom directory
-curl -fsSL https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.cmd -o installer.cmd && .\installer.cmd latest "C:\tools\dagu" && del installer.cmd
-```
-
-**Docker**:
+**Docker:**
 
 ```bash
-docker run --rm \
-  -v ~/.dagu:/var/lib/dagu \
-  -p 8080:8080 \
-  ghcr.io/dagu-org/dagu:latest \
-  dagu start-all
+docker run --rm -v ~/.dagu:/var/lib/dagu -p 8080:8080 ghcr.io/dagu-org/dagu:latest dagu start-all
 ```
 
-Note: see [documentation](https://docs.daguit.dev/getting-started/installation) for other methods.
-
-**Homebrew**:
-
-```bash
-brew update && brew install dagu
-
-# Upgrade to latest version
-brew update && brew upgrade dagu
-```
-
-**npm**:
-```bash
-# Install via npm
-npm install -g --ignore-scripts=false @dagu-org/dagu
-```
+> More options (npm, custom paths, specific versions): [Installation docs](https://docs.dagu.sh/getting-started/installation)
 
 ### 2. Create your first workflow
 
-> **Note**: When you first start Dagu with an empty DAGs directory, it automatically creates example workflows to help you get started. To skip this, set `DAGU_SKIP_EXAMPLES=true`.
+> When you first start Dagu with an empty DAGs directory, it automatically creates example workflows. Set `DAGU_SKIP_EXAMPLES=true` to skip this.
 
 ```bash
 cat > ./hello.yaml << 'EOF'
@@ -137,7 +96,7 @@ EOF
 dagu start hello.yaml
 ```
 
-### 4. Check the status and view logs
+### 4. Check the status
 
 ```bash
 dagu status hello
@@ -151,7 +110,9 @@ dagu start-all
 
 Visit http://localhost:8080
 
-## Quick Look for Workflow Definitions
+**Docker Compose:** Clone the repo and run `docker compose -f deploy/docker/compose.minimal.yaml up -d`. See [deployment docs](https://docs.dagu.sh/getting-started/installation) for production setups.
+
+## Workflow Examples
 
 ### Sequential Steps
 
@@ -165,11 +126,11 @@ steps:
 ```
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#3A322C', 'primaryTextColor': '#fff', 'lineColor': '#888'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#18181B', 'primaryTextColor': '#fff', 'lineColor': '#888'}}}%%
 graph LR
     A["Step 1"] --> B["Step 2"]
-    style A fill:#3A322C,stroke:green,stroke-width:1.6px,color:#fff
-    style B fill:#3A322C,stroke:lime,stroke-width:1.6px,color:#fff
+    style A fill:#18181B,stroke:#22C55E,stroke-width:1.6px,color:#fff
+    style B fill:#18181B,stroke:#22C55E,stroke-width:1.6px,color:#fff
 ```
 
 ### Parallel Steps
@@ -193,74 +154,96 @@ steps:
 ```
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#3A322C', 'primaryTextColor': '#fff', 'lineColor': '#888'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#18181B', 'primaryTextColor': '#fff', 'lineColor': '#888'}}}%%
 graph LR
     A[step_1] --> B[step_2a]
     A --> C[step_2b]
     B --> D[step_3]
     C --> D
-    style A fill:#3A322C,stroke:green,stroke-width:1.6px,color:#fff
-    style B fill:#3A322C,stroke:lime,stroke-width:1.6px,color:#fff
-    style C fill:#3A322C,stroke:lime,stroke-width:1.6px,color:#fff
-    style D fill:#3A322C,stroke:lightblue,stroke-width:1.6px,color:#fff
+    style A fill:#18181B,stroke:#22C55E,stroke-width:1.6px,color:#fff
+    style B fill:#18181B,stroke:#22C55E,stroke-width:1.6px,color:#fff
+    style C fill:#18181B,stroke:#22C55E,stroke-width:1.6px,color:#fff
+    style D fill:#18181B,stroke:#3B82F6,stroke-width:1.6px,color:#fff
 ```
 
-For more examples, see the [Examples](https://docs.daguit.dev/writing-workflows/examples) documentation.
+### Docker Step
 
-## Docker-Compose
+Run containers as workflow steps:
 
-Clone the repository and run with Docker Compose:
-
-```bash
-git clone https://github.com/dagu-org/dagu.git
-cd dagu
+```yaml
+steps:
+  - name: build-app
+    container:
+      image: node:20-alpine
+    command: npm run build
 ```
 
-Run with minimal setup:
+### SSH Execution
 
-```bash
-docker compose -f deploy/docker/compose.minimal.yaml up -d
-# Visit http://localhost:8080
+Run commands on remote machines:
+
+```yaml
+steps:
+  - name: deploy
+    type: ssh
+    config:
+      host: prod-server.example.com
+      user: deploy
+      key: ~/.ssh/id_rsa
+    command: cd /var/www && git pull && npm run build
 ```
 
-Stop containers:
+### Sub-DAG Composition
 
-```bash
-docker compose -f deploy/docker/compose.minimal.yaml down
+Invoke other DAGs as steps for hierarchical workflows:
+
+```yaml
+steps:
+  - name: extract
+    call: etl/extract
+    params: "SOURCE=s3://bucket/data.csv"
+  - name: transform
+    call: etl/transform
+    params: "INPUT=${extract.outputs.result}"
+    depends: [extract]
+  - name: load
+    call: etl/load
+    params: "DATA=${transform.outputs.result}"
+    depends: [transform]
 ```
 
-You can also use the production-like configuration `deploy/docker/compose.prod.yaml` with OpenTelemetry, Prometheus, and Grafana:
+For more examples, see the [Examples](https://docs.dagu.sh/writing-workflows/examples) documentation.
 
-```bash
-docker compose -f deploy/docker/compose.prod.yaml up -d
-# Visit UI at http://localhost:8080
-# Jaeger at http://localhost:16686, Prometheus at http://localhost:9090, Grafana at http://localhost:3000
-```
+## Features
 
-Note: It's just for demonstration purposes. For production, please customize the configuration as needed.
+### Zero-Ops
 
-For Kubernetes deployment, see the example manifests in `deploy/k8s/README.md`.
+- Single binary installation, under 128MB memory
+- File-based storage — no PostgreSQL, no Redis, no message brokers
+- Air-gapped / offline capable
+- [Cron scheduling](https://docs.dagu.sh/features/scheduling) with timezone support and zombie detection
+- [High availability](https://docs.dagu.sh/features/scheduling#high-availability) with scheduler failover
 
-## Join our Developer Community
+### Full-Power
 
-- Chat with us by joining our [Discord server](https://discord.gg/gpahPUjGRk)
-- File bug reports and feature requests on our [GitHub Issues](https://github.com/dagu-org/dagu/issues)
-- Follow us on [Bluesky](https://bsky.app/profile/dagu-org.bsky.social) for updates
+- [Docker executor](https://docs.dagu.sh/features/executors/docker) — run containers as workflow steps
+- [SSH executor](https://docs.dagu.sh/features/executors/ssh) — execute commands on remote machines
+- [Git sync](https://docs.dagu.sh/features/git-sync) — version management for DAG definitions and documents
+- [Hierarchical DAG composition](https://docs.dagu.sh/features/execution-control#parallel-execution) — nest workflows inside workflows
+- [Distributed execution](https://docs.dagu.sh/features/distributed-execution) — coordinator/worker mode across machines
+- [19+ built-in executors](https://docs.dagu.sh/reference/executors) — HTTP, SQL, Redis, S3, jq, mail, archive, and more
+- [RBAC](https://docs.dagu.sh/configurations/authentication) with 5 roles, OIDC, API keys, and audit logging
+- [Human-in-the-loop](https://docs.dagu.sh/writing-workflows/examples) approval gates
 
-For a detailed list of changes, bug fixes, and new features, please refer to the [Changelog](https://docs.daguit.dev/reference/changelog).
+### AI-Native
 
-## Documentation
+- Built-in [AI agent](https://docs.dagu.sh/features/agent/) — creates, edits, runs, and debugs workflows from natural language
+- [Agent and chat step types](https://docs.dagu.sh/reference/executors) in DAGs with tool calling
+- Multi-provider LLM support (Anthropic, OpenAI, Google Gemini, OpenRouter)
+- Persistent memory, sub-agent delegation, and domain-specific skills
+- Built-in [document management](https://docs.dagu.sh/features/documents) with AI agent integration
 
-Full documentation is available at [docs.daguit.dev](https://docs.daguit.dev/).
-
-**Helpful Links**:
-
-- [Feature by Examples](https://docs.daguit.dev/writing-workflows/examples) - Explore useful features with examples
-- [Remote Execution via SSH](https://docs.daguit.dev/features/executors/ssh#ssh-executor) - Run commands on remote machines using SSH
-- [Distributed Execution](https://docs.daguit.dev/features/distributed-execution) - How to run workflows across multiple machines
-- [Scheduling](https://docs.daguit.dev/features/scheduling) - Learn about flexible scheduling options (start, stop, restart) with cron syntax
-- [Authentication](https://docs.daguit.dev/configurations/authentication) - Configure authentication for the Web UI
-- [Configuration](https://docs.daguit.dev/configurations/reference) - Detailed configuration options for customizing Dagu
+> See the [full feature list](https://docs.dagu.sh) for all capabilities.
 
 ## Environment Variables
 
@@ -349,7 +332,7 @@ When `DAGU_AUTH_MODE=builtin`, a file-based user management system with role-bas
 
 ### Git Sync Configuration
 
-Synchronize DAG definitions with a Git repository. See [Git Sync](https://docs.daguit.dev/features/git-sync) for details.
+Synchronize DAG definitions with a Git repository. See [Git Sync](https://docs.dagu.sh/features/git-sync) for details.
 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
@@ -376,7 +359,7 @@ Synchronize DAG definitions with a Git repository. See [Git Sync](https://docs.d
 
 ### Worker Configuration
 
-This configuration is used for worker instances that execute DAGs. See the [Distributed Execution](https://docs.daguit.dev/features/distributed-execution) documentation for more details.
+This configuration is used for worker instances that execute DAGs. See the [Distributed Execution](https://docs.dagu.sh/features/distributed-execution) documentation for more details.
 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
@@ -393,7 +376,7 @@ This configuration is used for worker instances that execute DAGs. See the [Dist
 
 ### Peer Configuration
 
-This configuration is used for communication between coordinator services and other services (e.g., scheduler, worker, web UI). See the [Distributed Execution](https://docs.daguit.dev/features/distributed-execution) documentation for more details.
+This configuration is used for communication between coordinator services and other services (e.g., scheduler, worker, web UI). See the [Distributed Execution](https://docs.dagu.sh/features/distributed-execution) documentation for more details.
 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
@@ -403,144 +386,43 @@ This configuration is used for communication between coordinator services and ot
 | `DAGU_PEER_SKIP_TLS_VERIFY` | `false` | Skip TLS certificate verification for peer connections |
 | `DAGU_PEER_INSECURE` | `true` | Use insecure connection (h2c) instead of TLS |
 
+## Documentation
+
+Full documentation at [docs.dagu.sh](https://docs.dagu.sh/).
+
+- [Getting Started](https://docs.dagu.sh/getting-started/installation) — Installation and first workflow
+- [Examples](https://docs.dagu.sh/writing-workflows/examples) — Feature walkthroughs with YAML samples
+- [AI Agent](https://docs.dagu.sh/features/agent/) — Built-in AI assistant for workflow management
+- [Distributed Execution](https://docs.dagu.sh/features/distributed-execution) — Coordinator/worker setup
+- [Configuration](https://docs.dagu.sh/configurations/reference) — Environment variables and settings
+- [Changelog](https://docs.dagu.sh/reference/changelog) — Recent updates and releases
+
+## Community
+
+- Chat with us on [Discord](https://discord.gg/gpahPUjGRk)
+- File bugs and feature requests on [GitHub Issues](https://github.com/dagu-org/dagu/issues)
+- Follow us on [Bluesky](https://bsky.app/profile/dagu-org.bsky.social)
+
 ## Development
 
-### Building from Source
-
-#### Prerequisites
-- [Go 1.25+](https://go.dev/doc/install)
-- [Node.js](https://nodejs.org/en/download/)
-- [pnpm](https://pnpm.io/installation)
-
-#### 1. Clone the repository and build server
+**Prerequisites:** [Go 1.26+](https://go.dev/doc/install), [Node.js](https://nodejs.org/en/download/), [pnpm](https://pnpm.io/installation)
 
 ```bash
 git clone https://github.com/dagu-org/dagu.git && cd dagu
-make
+make build
 ```
 
-This will start the dagu server at http://localhost:8080.
-
-#### 2. Run the frontend development server
-
-```bash
-cd ui
-pnpm install
-pnpm dev
-```
-
-Navigate to http://localhost:8081 to view the frontend.
-
-### Running Tests
-
-To ensure the integrity of the go code, you can run all Go unit and integration tests.
-
-Run all tests from the project root directory:
-
-```bash
-make test
-```
-
-To run tests with code coverage analysis:
-
-```bash
-make make-coverage
-```
-
-
-## Features
-
-This section outlines the current capabilities of Dagu.
-
-| Category                    | Capability                      | Description                                                              | Link |
-| --------------------------- | ------------------------------- | ------------------------------------------------------------------------ | ---- |
-| Core Execution & Lifecycle  | Local execution                 | Run workflows locally with CLI / Web UI / API                           | <a href="https://docs.daguit.dev/overview/cli">CLI</a>, <a href="https://docs.daguit.dev/overview/web-ui">Web UI</a>, <a href="https://docs.daguit.dev/overview/api">API</a> |
-|                             | Queue based execution           | Dispatch DAG execution to workers with labels and priorities            | <a href="https://docs.daguit.dev/features/queues">Queues</a> |
-|                             | Immediate execution             | Disable queue for immediate execution                                    | <a href="https://docs.daguit.dev/overview/cli">CLI</a> |
-|                             | Idempotency                     | Prevent duplicate DAG execution with same DAG-run ID                |  <a href="https://docs.daguit.dev/reference/cli#status">`start` command</a> |
-|                             | Status management               | queued → running → succeeded/partially_succeeded/failed/aborted              | <a href="http://localhost:5173/getting-started/concepts#status-management">Status Management</a> |
-|                             | Cancel propagation              | Cancel signals to sub-DAG                      | |
-|                             | Cleanup hooks                   | Define cleanup processing with onExit handlers                           | <a href="https://docs.daguit.dev/getting-started/concepts#lifecycle-handlers">Lifecycle Handlers</a> |
-|                             | Status hooks                    | Define hooks on success / failure / cancel                         |  <a href="https://docs.daguit.dev/getting-started/concepts#lifecycle-handlers">Lifecycle Handlers</a> |
-| Definition & Templates      | Declarative YAML DSL            | Validation with JSON Schema, display error locations                     | <a href="https://docs.daguit.dev/reference/yaml">YAML Specification</a> |
-|                             | Environment variables           | Environment variables at DAG and step level, support dotenv      | <a href="https://docs.daguit.dev/writing-workflows/data-variables#environment-variables">Environment Variables</a> |
-|                             | Command substitution            | Use command output as value for variables or parameters                  | <a href="https://docs.daguit.dev/reference/variables#command-substitution">Command Substitution</a> |
-|                             | Shell support                   | Use shell features like pipes, redirects, globbing, etc. | <a href="https://docs.daguit.dev/features/executors/shell">Shell Executor</a> |
-|                             | Script support                  | Use scripts in Python, Bash, etc. as steps                                 | <a href="https://docs.daguit.dev/writing-workflows/examples#scripts-code">Script Execution</a> |
-|                             | Modular DAGs                   | Reusable DAGs with params                                            | <a href="https://docs.daguit.dev/writing-workflows/#base-configuration">Base Configuration</a>, <a href="https://docs.daguit.dev/features/execution-control#parallel-execution">Parallel Execution</a> |
-|                             | Secrets management              | Reference-only secrets via KMS/Vault/OIDC                                | <a href="https://docs.daguit.dev/writing-workflows/secrets">Secrets</a> |
-| Control Structures          | Fan-out/Fan-in                  | Native parallel branches + join                                          | <a href="https://docs.daguit.dev/writing-workflows/control-flow#parallel-execution">Parallel Execution</a> |
-|                             | Iteration (loop)                | Iteration over list values                                               | <a href="https://docs.daguit.dev/writing-workflows/control-flow#parallel-execution">Parallel Execution</a> |
-|                             | Conditional routes              | Data/expression based routing                                            | <a href="https://docs.daguit.dev/writing-workflows/control-flow#conditional-execution">Conditional Execution</a> |
-|                             | Sub-DAG call                    | Reusable sub-DAG                                                        | <a href="https://docs.daguit.dev/features/execution-control#parallel-execution">Parallel Execution</a> |
-|                             | Worker & Dispatch               | Runs DAG on different nodes with selector conditions                     | <a href="https://docs.daguit.dev/features/distributed-execution">Distributed Execution</a> |
-|                             | Retry policies                  | Retry with backoff/interval                                              | <a href="https://docs.daguit.dev/writing-workflows/error-handling#retry-policies">Retry Policies</a> |
-|                             | Repeat Policies                 | Repeat step until condition is met                                       | <a href="https://docs.daguit.dev/writing-workflows/control-flow#repetition">Repeat Policies</a> |
-|                             | Timeout management              | DAG Execution Timeouts                                                   | <a href="https://docs.daguit.dev/features/execution-control#workflow-timeout">Workflow Timeout</a> |
-| Triggers & Scheduling       | Cron expression                 | Schedule to start / stop / restart                                       | <a href="https://docs.daguit.dev/features/scheduling">Scheduling</a> |
-|                             | Multiple schedules              | Multiple schedules per DAG                                              | <a href="https://docs.daguit.dev/features/scheduling#multiple-schedules">Multiple Schedules</a> |
-|                             | Timezone support                | Per-DAG timezone for cron schedules                                 | <a href="https://docs.daguit.dev/features/scheduling#timezone-support">Timezone Support</a> |
-|                             | Skip                            | Skip an execution when a previous manual run was successful                 | <a href="https://docs.daguit.dev/features/scheduling#skip-redundant-runs">Skip Redundant Runs</a> |
-|                             | Zombie detection                | Automatic detection for processes terminated unexpectedly                | <a href="https://docs.daguit.dev/features/scheduling">Scheduling</a> |
-|                             | Trigger via Web API             | Web API to start DAG executions                                               | <a href="https://docs.daguit.dev/overview/api">Web API</a> |
-| Container Native Execution  | Step-level container config     | Run steps in Docker containers with granular control                     | <a href="https://docs.daguit.dev/features/executors/docker">Docker Executor</a> |
-|                             | DAG level container config      | Run all steps in a container with shared volumes and env vars            | <a href="https://docs.daguit.dev/features/executors/docker#container-field">Container Field</a> |
-|                             | Authorized registry access      | Access private registries with credentials                                | <a href="https://docs.daguit.dev/features/executors/docker#registry-authentication">Registry Auth</a> |
-| Data & Artifacts            | Passing data between steps      | Passing ephemeral data between steps in a DAG                           | <a href="https://docs.daguit.dev/features/data-flow">Data Flow</a> |
-|                             | Secret redaction                | Auto-mask secrets in logs/events                                         | |
-|                             | Automatic log cleanup           | Automatic log cleanup based on retention policies                        | <a href="https://docs.daguit.dev/configurations/operations#log-cleanup">Log Retention</a> |
-| Observability               | Logging with live streaming     | Structured JSON logs with live tail streaming                            | <a href="https://docs.daguit.dev/overview/web-ui#log-viewer">Log Viewer</a> |
-|                             | Metrics                         | Prometheus metrics                                                       | <a href="https://docs.daguit.dev/configurations/reference#metrics">Metrics</a> |
-|                             | OpenTelemetry                   | Distributed tracing with OpenTelemetry                                    | <a href="https://docs.daguit.dev/features/opentelemetry">OpenTelemetry</a> |
-|                             | DAG Visualization               | DAG / Gantt charts for critical path analysis                            | <a href="https://docs.daguit.dev/overview/web-ui#dag-visualization">DAG Visualization</a> |
-|                             | Email notification              | Email notification on success / failure with the log file attachment      | <a href="https://docs.daguit.dev/features/email-notifications">Email Notifications</a> |
-|                             | Health monitoring               | Health check for scheduler & failover                                   | <a href="https://docs.daguit.dev/configurations/reference#health-check">Health Check</a> |
-|                             | Nested-DAG visualization        | Nested DAG visualization with drill down functionality                  | <a href="https://docs.daguit.dev/overview/web-ui#nested-dag-visualization">Nested DAG Visualization</a> |
-| Security & Governance       | Secret injection                | Vault/KMS/OIDC ref-only; short-lived tokens                              | <a href="https://docs.daguit.dev/writing-workflows/secrets">Secrets</a> |
-|                             | Authentication                  | Basic auth / OIDC / Builtin (JWT) support for Web UI and API             | <a href="https://docs.daguit.dev/configurations/authentication">Authentication</a> |
-|                             | Role-based access control       | Builtin RBAC with admin, manager, operator, viewer roles                 | |
-|                             | User management                 | Create, update, delete users with role assignment                        | |
-|                             | Audit logging                   | Security event logging for authentication, user, and API key operations  | <a href="https://docs.daguit.dev/configurations/server#audit-logging">Audit Logging</a> |
-|                             | Git Sync                        | Sync DAG definitions with Git repository (pull/publish/conflict detection) | <a href="https://docs.daguit.dev/features/git-sync">Git Sync</a> |
-|                             | Web terminal                    | Web-based terminal for shell access (disabled by default)                | <a href="https://docs.daguit.dev/configurations/server#terminal">Terminal</a> |
-|                             | HA (High availability) mode     | Control-plane with failover for scheduler / Web UI / Coordinator         | <a href="https://docs.daguit.dev/features/scheduling#high-availability">High Availability</a> |
-| Executor types              | `jq`                            | JSON processing with jq queries                                          | <a href="https://docs.daguit.dev/features/executors/jq">JQ Executor</a> |
-|                             | `ssh`                           | Remote command execution via SSH                                         | <a href="https://docs.daguit.dev/features/executors/ssh">SSH Executor</a> |
-|                             | `docker`                        | Container-based task execution                                           | <a href="https://docs.daguit.dev/features/executors/docker">Docker Executor</a> |
-|                             | `http`                          | HTTP/REST API calls with retry                                           | <a href="https://docs.daguit.dev/features/executors/http">HTTP Executor</a> |
-|                             | `mail`                          | Send emails with template                                                | <a href="https://docs.daguit.dev/features/executors/mail">Mail Executor</a> |
-|                             | `archive`                       | Archive/unarchive operations (zip, tar, etc.)                            | <a href="https://docs.daguit.dev/features/executors/archive">Archive Executor</a> |
-| DevX & Testing              | Local development               | offline runs                                                       | <a href="https://docs.daguit.dev/overview/cli">CLI Usage</a> |
-|                             | Dry-run                         | DAG level Dry-run                                                        | <a href="https://docs.daguit.dev/reference/cli#dry">`dry` command</a> |
-| UI & Operations             | Run / retry / cancel operations | Start / enqueue / retry / stop                                                         | <a href="https://docs.daguit.dev/overview/web-ui#dag-operations">DAG Operations</a> |
-|                             | Automatic parameter forms       | Auto-generate parameter forms for DAGs                             | <a href="https://docs.daguit.dev/overview/web-ui">Web UI</a> |
-|                             | DAG definition search           | Filter by tag / name                                                     | <a href="https://docs.daguit.dev/overview/web-ui#search">DAG Search</a> |
-|                             | Execution history search        | Filter by status / date-range / name                                     | <a href="https://docs.daguit.dev/overview/web-ui#history">History Search</a> |
-|                             | Step-level operations           | Rerun, resume from step                                             | <a href="https://docs.daguit.dev/overview/web-ui">Web UI</a> |
-|                             | Parameter override              | Override parameters for a DAG run                                 | |
-|                             | Scheduled DAG management        | Enable/disable schedule for a DAG                                   | <a href="https://docs.daguit.dev/overview/web-ui">Web UI</a> |
-|                             | UI organization                 | Logical DAG grouping                                               | <a href="https://docs.daguit.dev/overview/web-ui#dag-organization">DAG Organization</a> |
-| Others                      | Windows support                 | Windows support                                                     | |
-
-## Discussion
-
-For discussions, support, and sharing ideas, join our community on [Discord](https://discord.gg/gpahPUjGRk).
-
-## Recent Updates
-
-Changelog of recent updates can be found in the [Changelog](https://docs.daguit.dev/reference/changelog) section of the documentation.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for development workflow, testing, and code standards.
 
 ## Acknowledgements
 
-### Sponsors & Supporters
-
 <div align="center">
-  <h3>💜 Premium Sponsors</h3>
+  <h3>Premium Sponsors</h3>
   <a href="https://github.com/slashbinlabs">
     <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fslashbinlabs.png&w=150&h=150&fit=cover&mask=circle" width="100" height="100" alt="@slashbinlabs">
   </a>
 
-  <h3>✨ Supporters</h3>
+  <h3>Supporters</h3>
   <a href="https://github.com/disizmj">
     <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fdisizmj.png&w=128&h=128&fit=cover&mask=circle" width="50" height="50" alt="@disizmj" style="margin: 5px;">
   </a>
@@ -558,7 +440,7 @@ Changelog of recent updates can be found in the [Changelog](https://docs.daguit.
   </a>
 
   <br/><br/>
-  
+
   <a href="https://github.com/sponsors/dagu-org">
     <img src="https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23fe8e86" width="150" alt="Sponsor">
   </a>
@@ -566,22 +448,11 @@ Changelog of recent updates can be found in the [Changelog](https://docs.daguit.
 
 ## Contributing
 
-We welcome contributions of all kinds! Whether you're a developer, a designer, or a user, your help is valued. Here are a few ways to get involved:
-
-- Star the project on GitHub.
-- Suggest new features by opening an issue.
-- Join the discussion on our Discord server.
-- Contribute code: Check out our issues you can help with.
-
-For more details, see our [Contribution Guide](./CONTRIBUTING.md).
-
-### Contributors
+We welcome contributions of all kinds. See our [Contribution Guide](./CONTRIBUTING.md) for details.
 
 <a href="https://github.com/dagu-org/dagu/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=dagu-org/dagu" />
 </a>
-
-Thanks to all the contributors who have helped make Dagu better! Your contributions, whether through code, documentation, or feedback, are invaluable to the project.
 
 ## License
 
