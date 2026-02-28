@@ -64,9 +64,9 @@ func (p Platform) IsSupported() bool {
 	supportedPlatforms := map[string][]string{
 		"darwin":  {"amd64", "arm64"},
 		"linux":   {"386", "amd64", "arm64", "armv6", "armv7", "ppc64le", "s390x"},
-		"freebsd": {"386", "amd64", "arm64", "armv6", "armv7"},
-		"openbsd": {"386", "amd64", "arm64", "armv6", "armv7"},
-		"windows": {"386", "amd64", "arm64", "armv6", "armv7"},
+		"freebsd": {"amd64", "arm64"},
+		"openbsd": {"amd64", "arm64"},
+		"windows": {"386", "amd64", "arm64"},
 	}
 
 	arches, ok := supportedPlatforms[p.OS]
@@ -82,7 +82,7 @@ func SupportedPlatformsMessage() string {
 	return `Supported platforms:
   darwin:  amd64, arm64
   linux:   386, amd64, arm64, armv6, armv7, ppc64le, s390x
-  freebsd: 386, amd64, arm64, armv6, armv7
-  openbsd: 386, amd64, arm64, armv6, armv7
-  windows: 386, amd64, arm64, armv6, armv7`
+  freebsd: amd64, arm64
+  openbsd: amd64, arm64
+  windows: 386, amd64, arm64`
 }
