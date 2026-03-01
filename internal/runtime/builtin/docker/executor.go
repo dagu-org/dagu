@@ -245,7 +245,8 @@ func (e *docker) runInNewContainer(ctx context.Context, tw *executor.TailWriter)
 
 	// For single command, use the simple Run approach
 	if len(e.step.Commands) == 1 {
-		cmd := e.buildCommandRaw(e.step.Commands[0])
+		cmd := e.buildCommand(e.step.Commands[0])
+		cmd = wrapCommandWithShell(e.cfg.Shell, cmd)
 
 		logger.Debug(ctx, "Docker executor: calling container.Run for single command",
 			slog.Any("cmd", cmd),
