@@ -102,6 +102,7 @@ func runRetry(ctx *Context, args []string) error {
 	defer func() {
 		_ = proc.Stop(ctx)
 	}()
+	ctx.Proc = proc
 
 	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 

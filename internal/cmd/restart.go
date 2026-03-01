@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -119,6 +118,7 @@ func handleRestartProcess(ctx *Context, d *core.DAG, oldDagRunID string) error {
 	defer func() {
 		_ = proc.Stop(ctx)
 	}()
+	ctx.Proc = proc
 
 	ctx.ProcStore.Unlock(ctx, d.ProcGroup())
 
@@ -174,12 +174,10 @@ func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRu
 
 	listenSignals(ctx, agentInstance)
 	if err := agentInstance.Run(ctx); err != nil {
-		if ctx.Quiet {
-			os.Exit(1)
-		} else {
+		if !ctx.Quiet {
 			agentInstance.PrintSummary(ctx)
-			return fmt.Errorf("dag-run failed: %w", err)
 		}
+		return fmt.Errorf("dag-run failed: %w", err)
 	}
 
 	return nil
