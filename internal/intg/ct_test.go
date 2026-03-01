@@ -868,6 +868,90 @@ steps:
 				"CONTAINER_CMD_OUT": `{"name": "Alice", "age": 30}`,
 			},
 		},
+		{
+			// Regression test for: https://github.com/dagu-org/dagu/issues/1709
+			// Step-level container with shell field should execute commands
+			// through the shell, just like DAG-level container does.
+			// Uses arithmetic expansion which requires shell interpretation.
+			name: "StepContainerShellBasic",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+steps:
+  - name: shell-basic
+    container:
+      image: %s
+      shell: ["/bin/sh", "-c"]
+    command: echo $((1 + 2))
+    output: STEP_SHELL_BASIC_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"STEP_SHELL_BASIC_OUT": "3",
+			},
+		},
+		{
+			// Regression test for: https://github.com/dagu-org/dagu/issues/1709
+			// Step-level container with shell field should support pipe operators.
+			// Without shell wrapping, the pipe character is passed as a literal
+			// argument to echo instead of being interpreted as a pipe.
+			name: "StepContainerShellWithPipe",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+steps:
+  - name: shell-pipe
+    container:
+      image: %s
+      shell: ["/bin/sh", "-c"]
+    command: echo hello | tr a-z A-Z
+    output: STEP_SHELL_PIPE_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"STEP_SHELL_PIPE_OUT": "HELLO",
+			},
+		},
+		{
+			// Regression test for: https://github.com/dagu-org/dagu/issues/1709
+			// Step-level container with shell field should support && operators.
+			// Without shell wrapping, && is passed as a literal argument.
+			name: "StepContainerShellWithOperators",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+steps:
+  - name: shell-operators
+    container:
+      image: %s
+      shell: ["/bin/sh", "-c"]
+    command: echo line1 && echo line2
+    output: STEP_SHELL_OPERATOR_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"STEP_SHELL_OPERATOR_OUT": "line1\nline2",
+			},
+		},
+		{
+			// Regression test for: https://github.com/dagu-org/dagu/issues/1709
+			// Step-level container with shell field should support environment
+			// variable expansion via the shell.
+			name: "StepContainerShellVariableExpansion",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+steps:
+  - name: shell-env-var
+    container:
+      image: %s
+      shell: ["/bin/sh", "-c"]
+      env:
+        - TEST_SHELL_VAR=expanded_value
+    command: echo $TEST_SHELL_VAR
+    output: STEP_SHELL_ENVVAR_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"STEP_SHELL_ENVVAR_OUT": "expanded_value",
+			},
+		},
 	}
 
 	for _, tt := range tests {
