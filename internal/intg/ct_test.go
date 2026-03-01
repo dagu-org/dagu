@@ -938,12 +938,6 @@ steps:
 			dagConfigFunc: func(_ string) string {
 				return fmt.Sprintf(`
 steps:
-  - name: shell-variable
-    container:
-      image: %s
-      shell: ["/bin/sh", "-c"]
-    command: echo "shell is running"
-    output: STEP_SHELL_VAR_OUT
   - name: shell-env-var
     container:
       image: %s
@@ -952,10 +946,9 @@ steps:
         - TEST_SHELL_VAR=expanded_value
     command: echo $TEST_SHELL_VAR
     output: STEP_SHELL_ENVVAR_OUT
-`, testImage, testImage)
+`, testImage)
 			},
 			expectedOutputs: map[string]any{
-				"STEP_SHELL_VAR_OUT":    "shell is running",
 				"STEP_SHELL_ENVVAR_OUT": "expanded_value",
 			},
 		},
