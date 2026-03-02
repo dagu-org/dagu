@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/remotenode"
-	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -16,18 +15,17 @@ const maxQueryLength = 4096
 
 // Handler handles SSE connections for various data types.
 // Each handler method builds a topic string and delegates to handleSSE.
+// Authentication is handled by middleware before requests reach the handler.
 type Handler struct {
 	hub          *Hub
 	nodeResolver *remotenode.Resolver
-	authService  *authservice.Service
 }
 
-// NewHandler creates a new SSE handler
-func NewHandler(hub *Hub, nodeResolver *remotenode.Resolver, authService *authservice.Service) *Handler {
+// NewHandler creates a new SSE handler.
+func NewHandler(hub *Hub, nodeResolver *remotenode.Resolver) *Handler {
 	return &Handler{
 		hub:          hub,
 		nodeResolver: nodeResolver,
-		authService:  authService,
 	}
 }
 
@@ -151,10 +149,6 @@ func (h *Handler) handleSSE(w http.ResponseWriter, r *http.Request, topic string
 		return
 	}
 
-	if !h.validateAuth(w, r) {
-		return
-	}
-
 	SetSSEHeaders(w)
 
 	client, err := NewClient(w)
@@ -179,23 +173,3 @@ func (h *Handler) handleSSE(w http.ResponseWriter, r *http.Request, topic string
 	client.WritePump(ctx)
 }
 
-// validateAuth validates the auth token if auth service is configured.
-// Returns true if authentication passed (or not required), false otherwise.
-func (h *Handler) validateAuth(w http.ResponseWriter, r *http.Request) bool {
-	if h.authService == nil {
-		return true
-	}
-
-	token := r.URL.Query().Get("token")
-	if token == "" {
-		http.Error(w, "missing token", http.StatusUnauthorized)
-		return false
-	}
-
-	if _, err := h.authService.GetUserFromToken(r.Context(), token); err != nil {
-		http.Error(w, "invalid or expired token", http.StatusUnauthorized)
-		return false
-	}
-
-	return true
-}

@@ -19,12 +19,11 @@ func TestNewHandler(t *testing.T) {
 	hub := NewHub()
 	resolver := remotenode.NewResolver([]config.RemoteNode{{Name: "node1"}}, nil)
 
-	handler := NewHandler(hub, resolver, nil)
+	handler := NewHandler(hub, resolver)
 
 	require.NotNil(t, handler)
 	assert.Same(t, hub, handler.hub)
 	assert.NotNil(t, handler.nodeResolver)
-	assert.Nil(t, handler.authService)
 }
 
 func TestBuildTopic(t *testing.T) {
@@ -95,7 +94,7 @@ func setupHandler(t *testing.T) (*Handler, *Hub) {
 	hub.Start()
 	t.Cleanup(hub.Shutdown)
 
-	handler := NewHandler(hub, nil, nil)
+	handler := NewHandler(hub, nil)
 	return handler, hub
 }
 
@@ -278,7 +277,7 @@ func TestHandleSSERemoteProxy(t *testing.T) {
 	resolver := remotenode.NewResolver([]config.RemoteNode{
 		{Name: "remote1", APIBaseURL: remoteServer.URL},
 	}, nil)
-	handler := NewHandler(hub, resolver, nil)
+	handler := NewHandler(hub, resolver)
 
 	w := newMockFlusher()
 	params := map[string]string{"fileName": "mydag.yaml"}
@@ -309,19 +308,6 @@ func TestHandleSSELocalNode(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "dag:mydag.yaml")
 }
 
-func TestValidateAuthNoService(t *testing.T) {
-	t.Parallel()
-	hub := NewHub()
-	handler := NewHandler(hub, nil, nil)
-
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/test", nil)
-
-	result := handler.validateAuth(w, r)
-
-	assert.True(t, result, "should pass when no auth service is configured")
-}
-
 func TestHandleSSEMaxClients(t *testing.T) {
 	t.Parallel()
 	hub := NewHub(WithMaxClients(1))
@@ -330,7 +316,7 @@ func TestHandleSSEMaxClients(t *testing.T) {
 	hub.Start()
 	defer hub.Shutdown()
 
-	handler := NewHandler(hub, nil, nil)
+	handler := NewHandler(hub, nil)
 
 	// First client - use longer timeout
 	w1 := newMockFlusher()

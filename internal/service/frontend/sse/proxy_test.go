@@ -19,98 +19,72 @@ func TestBuildRemoteURL(t *testing.T) {
 		name     string
 		baseURL  string
 		topic    string
-		token    string
 		expected string
 	}{
 		{
 			name:     "dagrun topic",
 			baseURL:  "http://remote:8080/api/v1",
 			topic:    "dagrun:mydag/run123",
-			token:    "",
 			expected: "http://remote:8080/api/v1/events/dag-runs/mydag/run123",
 		},
 		{
 			name:     "dag topic",
 			baseURL:  "http://remote:8080/api/v1",
 			topic:    "dag:mydag.yaml",
-			token:    "",
 			expected: "http://remote:8080/api/v1/events/dags/mydag.yaml",
 		},
 		{
 			name:     "dagrunlogs topic",
 			baseURL:  "http://remote:8080/api/v1",
 			topic:    "dagrunlogs:mydag/run123",
-			token:    "",
 			expected: "http://remote:8080/api/v1/events/dag-runs/mydag/run123/logs",
 		},
 		{
 			name:     "steplog topic",
 			baseURL:  "http://remote:8080/api/v1",
 			topic:    "steplog:mydag/run123/step1",
-			token:    "",
 			expected: "http://remote:8080/api/v1/events/dag-runs/mydag/run123/logs/steps/step1",
 		},
 		{
 			name:     "dagruns topic with query",
 			baseURL:  "http://remote:8080/api/v1",
 			topic:    "dagruns:limit=50&offset=0",
-			token:    "",
 			expected: "http://remote:8080/api/v1/events/dag-runs?limit=50&offset=0",
 		},
 		{
 			name:     "dagruns topic without query",
 			baseURL:  "http://remote:8080/api/v1",
 			topic:    "dagruns:",
-			token:    "",
 			expected: "http://remote:8080/api/v1/events/dag-runs",
 		},
 		{
 			name:     "queueitems topic",
 			baseURL:  "http://remote:8080/api/v1",
 			topic:    "queueitems:myqueue",
-			token:    "",
 			expected: "http://remote:8080/api/v1/events/queues/myqueue/items",
 		},
 		{
 			name:     "queues topic",
 			baseURL:  "http://remote:8080/api/v1",
 			topic:    "queues:limit=10",
-			token:    "",
 			expected: "http://remote:8080/api/v1/events/queues?limit=10",
 		},
 		{
 			name:     "dagslist topic",
 			baseURL:  "http://remote:8080/api/v1",
 			topic:    "dagslist:page=1&perPage=100",
-			token:    "",
 			expected: "http://remote:8080/api/v1/events/dags?page=1&perPage=100",
-		},
-		{
-			name:     "with token",
-			baseURL:  "http://remote:8080/api/v1",
-			topic:    "dagrun:mydag/run123",
-			token:    "abc123",
-			expected: "http://remote:8080/api/v1/events/dag-runs/mydag/run123?token=abc123",
-		},
-		{
-			name:     "with token and existing query",
-			baseURL:  "http://remote:8080/api/v1",
-			topic:    "dagruns:limit=50",
-			token:    "abc123",
-			expected: "http://remote:8080/api/v1/events/dag-runs?limit=50&token=abc123",
 		},
 		{
 			name:     "trailing slash in baseURL",
 			baseURL:  "http://remote:8080/api/v1/",
 			topic:    "dagrun:mydag/run123",
-			token:    "",
 			expected: "http://remote:8080/api/v1/events/dag-runs/mydag/run123",
 		},
 		{
 			name:     "topic without colon (fallback)",
 			baseURL:  "http://remote:8080/api/v1",
 			topic:    "invalidtopic",
-			token:    "",
 			expected: "http://remote:8080/api/v1/events/dag-runs/invalidtopic",
 		},
 	}
@@ -118,7 +92,7 @@ func TestBuildRemoteURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := buildRemoteURL(tt.baseURL, tt.topic, tt.token)
+			result := buildRemoteURL(tt.baseURL, tt.topic)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -310,7 +284,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 	t.Run("unknown remote node", func(t *testing.T) {
 		t.Parallel()
 		hub := NewHub()
-		handler := NewHandler(hub, remotenode.NewResolver(nil, nil), nil)
+		handler := NewHandler(hub, remotenode.NewResolver(nil, nil))
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/events/dag-runs/test", nil)
@@ -338,7 +312,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 		resolver := remotenode.NewResolver([]config.RemoteNode{
 			{Name: "remote1", APIBaseURL: remoteServer.URL},
 		}, nil)
-		handler := NewHandler(hub, resolver, nil)
+		handler := NewHandler(hub, resolver)
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/events/dag-runs/mydag/run123?token=abc", nil)
@@ -360,7 +334,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 		resolver := remotenode.NewResolver([]config.RemoteNode{
 			{Name: "remote1", APIBaseURL: remoteServer.URL},
 		}, nil)
-		handler := NewHandler(hub, resolver, nil)
+		handler := NewHandler(hub, resolver)
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/events/dag-runs/test", nil)
@@ -376,7 +350,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 		resolver := remotenode.NewResolver([]config.RemoteNode{
 			{Name: "remote1", APIBaseURL: "http://invalid-host:99999"},
 		}, nil)
-		handler := NewHandler(hub, resolver, nil)
+		handler := NewHandler(hub, resolver)
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/events/dag-runs/test", nil)
@@ -407,7 +381,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 				BasicAuthPassword: "testpass",
 			},
 		}, nil)
-		handler := NewHandler(hub, resolver, nil)
+		handler := NewHandler(hub, resolver)
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/events/dag-runs/test", nil)
@@ -467,7 +441,7 @@ func TestProxyToRemoteNodeNonFlusher(t *testing.T) {
 	resolver := remotenode.NewResolver([]config.RemoteNode{
 		{Name: "remote1", APIBaseURL: remoteServer.URL},
 	}, nil)
-	handler := NewHandler(hub, resolver, nil)
+	handler := NewHandler(hub, resolver)
 
 	// Use nonFlusher which doesn't implement http.Flusher
 	w := &nonFlusher{}

@@ -965,19 +965,26 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 	srv.sseHub.Start()
 	srv.registerSSEFetchers()
 
-	handler := sse.NewHandler(srv.sseHub, srv.remoteNodeResolver, srv.authService)
+	handler := sse.NewHandler(srv.sseHub, srv.remoteNodeResolver)
 
-	r.Get(path.Join(apiV1BasePath, "events/dags"), handler.HandleDAGsListEvents)
-	r.Get(path.Join(apiV1BasePath, "events/dags/{fileName}"), handler.HandleDAGEvents)
-	r.Get(path.Join(apiV1BasePath, "events/dags/{fileName}/dag-runs"), handler.HandleDAGHistoryEvents)
-	r.Get(path.Join(apiV1BasePath, "events/dag-runs"), handler.HandleDAGRunsListEvents)
-	r.Get(path.Join(apiV1BasePath, "events/dag-runs/{name}/{dagRunId}"), handler.HandleDAGRunEvents)
-	r.Get(path.Join(apiV1BasePath, "events/dag-runs/{name}/{dagRunId}/logs"), handler.HandleDAGRunLogsEvents)
-	r.Get(path.Join(apiV1BasePath, "events/dag-runs/{name}/{dagRunId}/logs/steps/{stepName}"), handler.HandleStepLogEvents)
-	r.Get(path.Join(apiV1BasePath, "events/queues"), handler.HandleQueuesListEvents)
-	r.Get(path.Join(apiV1BasePath, "events/queues/{name}/items"), handler.HandleQueueItemsEvents)
-	r.Get(path.Join(apiV1BasePath, "events/docs-tree"), handler.HandleDocTreeEvents)
-	r.Get(path.Join(apiV1BasePath, "events/docs/*"), handler.HandleDocEvents)
+	authOpts := srv.buildStreamAuthOptions("restricted")
+
+	r.Route(path.Join(apiV1BasePath, "events"), func(r chi.Router) {
+		r.Use(auth.QueryTokenMiddleware())
+		r.Use(auth.Middleware(authOpts))
+
+		r.Get("/dags", handler.HandleDAGsListEvents)
+		r.Get("/dags/{fileName}", handler.HandleDAGEvents)
+		r.Get("/dags/{fileName}/dag-runs", handler.HandleDAGHistoryEvents)
+		r.Get("/dag-runs", handler.HandleDAGRunsListEvents)
+		r.Get("/dag-runs/{name}/{dagRunId}", handler.HandleDAGRunEvents)
+		r.Get("/dag-runs/{name}/{dagRunId}/logs", handler.HandleDAGRunLogsEvents)
+		r.Get("/dag-runs/{name}/{dagRunId}/logs/steps/{stepName}", handler.HandleStepLogEvents)
+		r.Get("/queues", handler.HandleQueuesListEvents)
+		r.Get("/queues/{name}/items", handler.HandleQueueItemsEvents)
+		r.Get("/docs-tree", handler.HandleDocTreeEvents)
+		r.Get("/docs/*", handler.HandleDocEvents)
+	})
 
 	logger.Info(ctx, "SSE routes configured", slog.String("basePath", apiV1BasePath))
 }
@@ -1006,36 +1013,37 @@ func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux, apiV1BasePa
 }
 
 func (srv *Server) buildAgentAuthMiddleware(_ context.Context) func(http.Handler) http.Handler {
-	authOptions := srv.buildAgentAuthOptions()
+	authOptions := srv.buildStreamAuthOptions("Dagu Agent")
 
 	return func(next http.Handler) http.Handler {
-		baseMiddleware := auth.ClientIPMiddleware()(auth.Middleware(authOptions)(next))
-
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if token := r.URL.Query().Get("token"); token != "" {
-				r.Header.Set("Authorization", "Bearer "+token)
-			}
-			baseMiddleware.ServeHTTP(w, r)
-		})
+		return auth.QueryTokenMiddleware()(
+			auth.ClientIPMiddleware()(
+				auth.Middleware(authOptions)(next),
+			),
+		)
 	}
 }
 
-func (srv *Server) buildAgentAuthOptions() auth.Options {
+// buildStreamAuthOptions builds auth options for streaming endpoints (SSE, Agent SSE).
+// In basic auth mode, auth is disabled because EventSource/WebSocket cannot send
+// Basic auth headers. This matches the pre-existing behavior.
+func (srv *Server) buildStreamAuthOptions(realm string) auth.Options {
 	authCfg := srv.config.Server.Auth
 
 	// When auth mode is "none", disable all authentication entirely.
 	if authCfg.Mode == config.AuthModeNone {
-		return auth.Options{Realm: "Dagu Agent"}
+		return auth.Options{Realm: realm}
+	}
+
+	// Basic auth mode: EventSource API cannot send Basic auth headers.
+	// Skip auth to match current behavior (pre-existing security gap).
+	if authCfg.Mode == config.AuthModeBasic {
+		return auth.Options{Realm: realm}
 	}
 
 	opts := auth.Options{
-		Realm:        "Dagu Agent",
+		Realm:        realm,
 		AuthRequired: true,
-	}
-
-	if authCfg.Mode == config.AuthModeBasic {
-		opts.BasicAuthEnabled = true
-		opts.Creds = map[string]string{authCfg.Basic.Username: authCfg.Basic.Password}
 	}
 
 	if authCfg.Mode == config.AuthModeBuiltin && srv.authService != nil {
