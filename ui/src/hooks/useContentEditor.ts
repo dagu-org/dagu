@@ -122,7 +122,7 @@ export function useContentEditor({
     (action: 'discard' | 'ignore') => {
       if (action === 'discard') {
         // Discard local changes, accept external
-        if (conflict.externalContent) {
+        if (conflict.externalContent !== null) {
           lastServerContentRef.current = conflict.externalContent;
           currentValueRef.current = conflict.externalContent;
           setCurrentValueState(conflict.externalContent);
@@ -131,7 +131,7 @@ export function useContentEditor({
       } else {
         // Ignore external changes, keep local
         // Just update the server ref to prevent repeated dialogs
-        if (conflict.externalContent) {
+        if (conflict.externalContent !== null) {
           lastServerContentRef.current = conflict.externalContent;
         }
       }
