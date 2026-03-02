@@ -172,4 +172,3 @@ func (h *Handler) handleSSE(w http.ResponseWriter, r *http.Request, topic string
 
 	client.WritePump(ctx)
 }
-
