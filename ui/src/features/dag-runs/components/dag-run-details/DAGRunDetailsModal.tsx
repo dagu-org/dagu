@@ -37,6 +37,7 @@ function DAGRunDetailsModal({
 
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [isVisible, setIsVisible] = useState(false);
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const previousDataRef = useRef<PreviousData | null>(null);
   const prevRemoteNodeRef = useRef(remoteNode);
   if (prevRemoteNodeRef.current !== remoteNode) {
@@ -68,7 +69,6 @@ function DAGRunDetailsModal({
   const parentDAGRunId = searchParams.get('dagRunId');
   const parentName = searchParams.get('dagRunName') || name;
   const canQuerySubDag = Boolean(subDAGRunId && parentDAGRunId && parentName);
-  const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',

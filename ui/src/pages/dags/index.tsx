@@ -260,14 +260,6 @@ function DAGsContent() {
     appBarContext.setTitle('DAG Definitions');
   }, [appBarContext]);
 
-  const { dagFiles, errorCount } = React.useMemo(() => {
-    const dags = data?.dags ?? [];
-    return {
-      dagFiles: dags,
-      errorCount: dags.filter((dag) => dag.errors?.length).length,
-    };
-  }, [data]);
-
   const pageChange = (page: number) => {
     addSearchParam('page', page.toString());
     setPage(page);
@@ -313,6 +305,14 @@ function DAGsContent() {
 
   const displayData = useLastValidData(data ?? null, remoteNode);
 
+  const { dagFiles, errorCount } = React.useMemo(() => {
+    const dags = displayData?.dags ?? [];
+    return {
+      dagFiles: dags,
+      errorCount: dags.filter((dag) => dag.errors?.length).length,
+    };
+  }, [displayData]);
+
   const leftPanel = (
     <div className="pl-4 md:pl-6 pr-2 pt-4 md:pt-6 pb-6">
       <DAGListHeader onRefresh={refreshFn} />
@@ -326,7 +326,7 @@ function DAGsContent() {
             }
           />
           <DAGTable
-            dags={isLoading && !displayData ? [] : dagFiles}
+            dags={dagFiles}
             group={group}
             refreshFn={refreshFn}
             searchText={searchText}
