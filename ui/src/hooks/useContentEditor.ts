@@ -43,6 +43,9 @@ export function useContentEditor({
   // Track pending save content (to ignore our own saves coming back)
   const pendingSaveContentRef = useRef<string | null>(null);
 
+  // Ref for currentValue to avoid effect re-runs on every keystroke
+  const currentValueRef = useRef<string | null>(null);
+
   // Conflict state
   const [conflict, setConflict] = useState<ConflictState>({
     hasConflict: false,
@@ -54,6 +57,7 @@ export function useContentEditor({
     lastServerContentRef.current = null;
     hasUserEditedRef.current = false;
     pendingSaveContentRef.current = null;
+    currentValueRef.current = null;
     setCurrentValueState(null);
     setConflict({ hasConflict: false, externalContent: null });
   }, [key]);
@@ -68,6 +72,7 @@ export function useContentEditor({
     if (lastServerContentRef.current === null) {
       lastServerContentRef.current = serverContent;
       if (!hasUserEditedRef.current) {
+        currentValueRef.current = serverContent;
         setCurrentValueState(serverContent);
       }
       return;
@@ -88,7 +93,7 @@ export function useContentEditor({
     // Server content changed externally
     const hasLocalChanges =
       hasUserEditedRef.current &&
-      currentValue !== lastServerContentRef.current;
+      currentValueRef.current !== lastServerContentRef.current;
 
     if (hasLocalChanges) {
       // Conflict: user has unsaved edits AND external change occurred
@@ -99,14 +104,16 @@ export function useContentEditor({
     } else {
       // No local edits - update silently
       lastServerContentRef.current = serverContent;
+      currentValueRef.current = serverContent;
       setCurrentValueState(serverContent);
       hasUserEditedRef.current = false;
     }
-  }, [serverContent, currentValue]);
+  }, [serverContent]);
 
   // Handle user edits
   const setCurrentValue = useCallback((value: string) => {
     hasUserEditedRef.current = true;
+    currentValueRef.current = value;
     setCurrentValueState(value);
   }, []);
 
@@ -117,6 +124,7 @@ export function useContentEditor({
         // Discard local changes, accept external
         if (conflict.externalContent) {
           lastServerContentRef.current = conflict.externalContent;
+          currentValueRef.current = conflict.externalContent;
           setCurrentValueState(conflict.externalContent);
           hasUserEditedRef.current = false;
         }

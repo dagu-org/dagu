@@ -76,7 +76,7 @@ function DAGSpec({ fileName, localDags }: Props) {
       setCookie('flowchart', value, { path: '/' });
       setFlowchart(value);
     },
-    [setCookie, flowchart, setFlowchart]
+    [setCookie, setFlowchart]
   );
 
   // SSE connection for real-time data
@@ -202,6 +202,7 @@ function DAGSpec({ fileName, localDags }: Props) {
     remoteNode,
     client,
     saveScrollPosition,
+    showError,
     showToast,
     markAsSaved,
     mutateSpec,
