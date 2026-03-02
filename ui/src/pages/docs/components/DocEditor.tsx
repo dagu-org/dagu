@@ -7,8 +7,9 @@ import remarkGfm from 'remark-gfm';
 import './DocPreview.css';
 import { useCanWrite } from '@/contexts/AuthContext';
 import { useDocTabContext } from '@/contexts/DocTabContext';
-import { useClient } from '@/hooks/api';
-import { useDocContentWithConflictDetection } from '@/hooks/useDocContentWithConflictDetection';
+import { useClient, useQuery } from '@/hooks/api';
+import { useContentEditor } from '@/hooks/useContentEditor';
+import { useDocSSE } from '@/hooks/useDocSSE';
 import { cn } from '@/lib/utils';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { FileText, Save } from 'lucide-react';
@@ -34,6 +35,34 @@ function DocEditor({ tabId, docPath }: Props) {
     markTabSaved,
   } = useDocTabContext();
 
+  // SSE connection for real-time doc data
+  const sseResult = useDocSSE(docPath);
+
+  // Polling fallback when SSE fails
+  const { data: pollingData } = useQuery(
+    '/docs/doc',
+    {
+      params: {
+        query: {
+          remoteNode,
+          path: docPath,
+        },
+      },
+    },
+    {
+      revalidateIfStale: sseResult.shouldUseFallback,
+      revalidateOnFocus: sseResult.shouldUseFallback,
+      revalidateOnMount: true,
+      refreshInterval: sseResult.shouldUseFallback ? 5000 : 0,
+      isPaused: () => !sseResult.shouldUseFallback && sseResult.isConnected,
+    }
+  );
+
+  // Best available doc data — prefer SSE when connected, polling when not
+  const doc = sseResult.isConnected && sseResult.data ? sseResult.data : pollingData;
+  const serverContent = doc?.content ?? null;
+
+  // Change tracking (source-agnostic)
   const {
     currentValue,
     setCurrentValue,
@@ -41,8 +70,10 @@ function DocEditor({ tabId, docPath }: Props) {
     conflict,
     resolveConflict,
     markAsSaved,
-    doc,
-  } = useDocContentWithConflictDetection({ docPath });
+  } = useContentEditor({
+    key: docPath,
+    serverContent,
+  });
 
   const [mode, setMode] = useState<'edit' | 'preview'>(() => {
     const stored = localStorage.getItem('doc-editor-mode');
@@ -193,7 +224,7 @@ function DocEditor({ tabId, docPath }: Props) {
         {mode === 'edit' ? (
           <MarkdownEditor
             value={currentValue}
-            onChange={(val) => setCurrentValue(val || '')}
+            onChange={(val) => setCurrentValue(val ?? '')}
             readOnly={!canWrite}
           />
         ) : (
