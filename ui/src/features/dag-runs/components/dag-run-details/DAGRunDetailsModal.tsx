@@ -38,6 +38,11 @@ function DAGRunDetailsModal({
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [isVisible, setIsVisible] = useState(false);
   const previousDataRef = useRef<PreviousData | null>(null);
+  const prevRemoteNodeRef = useRef(remoteNode);
+  if (prevRemoteNodeRef.current !== remoteNode) {
+    prevRemoteNodeRef.current = remoteNode;
+    previousDataRef.current = null;
+  }
 
   useEffect(() => {
     if (isOpen) {
@@ -79,7 +84,6 @@ function DAGRunDetailsModal({
     },
     {
       refreshInterval: 2000,
-      keepPreviousData: true,
       isPaused: () => !canQuerySubDag,
     }
   );
@@ -97,7 +101,6 @@ function DAGRunDetailsModal({
     },
     {
       refreshInterval: 2000,
-      keepPreviousData: true,
       isPaused: () => canQuerySubDag,
     }
   );
@@ -116,10 +119,8 @@ function DAGRunDetailsModal({
     }
   }, [freshDetails, name, dagRunId]);
 
-  // Clear stale cross-node data when remote node changes
-  useEffect(() => {
-    previousDataRef.current = null;
-  }, [remoteNode]);
+  // Note: previousDataRef is cleared synchronously during render (above)
+  // when remoteNode changes, preventing stale cross-node data.
 
   const isInitialLoading = isLoading && !displayData;
   const previousData = previousDataRef.current;

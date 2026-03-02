@@ -17,6 +17,7 @@ import { DAGTable } from '../../features/dags/components/dag-list';
 import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
 import { useQuery } from '../../hooks/api';
 import { useDAGsListSSE } from '../../hooks/useDAGsListSSE';
+import { useLastValidData } from '../../hooks/useLastValidData';
 import LoadingIndicator from '../../ui/LoadingIndicator';
 
 type DAGDefinitionsFilters = {
@@ -223,8 +224,7 @@ function DAGsContent() {
       revalidateIfStale: false,
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
-      keepPreviousData: true,
-      isPaused: () => sseResult.isConnected,
+      isPaused: () => sseResult.isConnected && sseResult.data != null,
     }
   );
 
@@ -311,21 +311,7 @@ function DAGsContent() {
     setPage(1);
   };
 
-  const [lastValidData, setLastValidData] = React.useState<typeof data | null>(
-    null
-  );
-
-  React.useEffect(() => {
-    if (data) {
-      setLastValidData(data);
-    }
-  }, [data]);
-
-  React.useEffect(() => {
-    setLastValidData(null);
-  }, [remoteNode]);
-
-  const displayData = data ?? lastValidData;
+  const displayData = useLastValidData(data ?? null, remoteNode);
 
   const leftPanel = (
     <div className="pl-4 md:pl-6 pr-2 pt-4 md:pt-6 pb-6">
@@ -340,7 +326,7 @@ function DAGsContent() {
             }
           />
           <DAGTable
-            dags={isLoading && !lastValidData ? [] : dagFiles}
+            dags={isLoading && !displayData ? [] : dagFiles}
             group={group}
             refreshFn={refreshFn}
             searchText={searchText}

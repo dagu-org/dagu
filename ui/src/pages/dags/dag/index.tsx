@@ -52,7 +52,7 @@ function DAGDetails() {
 
   // SSE for real-time updates with polling fallback
   const sseResult = useDAGSSE(fileName || '', !!fileName);
-  const shouldPoll = sseResult.shouldUseFallback || !sseResult.isConnected;
+  const shouldPoll = sseResult.shouldUseFallback || !sseResult.isConnected || !sseResult.data;
 
   // Determine active tab
   const tab = params.tab || 'status';
@@ -113,8 +113,7 @@ function DAGDetails() {
     },
     {
       refreshInterval: shouldPoll ? 2000 : 0,
-      keepPreviousData: true,
-      isPaused: () => !shouldPoll && sseResult.isConnected,
+      isPaused: () => !shouldPoll && sseResult.isConnected && sseResult.data != null,
     }
   );
 

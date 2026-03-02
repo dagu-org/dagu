@@ -148,8 +148,8 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
       setSelectedRemoteNode(validNode);
       localStorage.setItem(REMOTE_NODE_STORAGE_KEY, validNode);
 
-      // Clear all SWR cache so keepPreviousData doesn't show stale cross-node data.
-      // Active hooks will refetch automatically since their keys change (remoteNode is in params).
+      // Clear SWR cache on node switch. Active hooks refetch automatically
+      // since their keys include remoteNode.
       globalMutate(() => true, undefined, { revalidate: false });
     },
     [remoteNodes]

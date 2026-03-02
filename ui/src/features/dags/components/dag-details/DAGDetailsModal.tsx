@@ -39,7 +39,7 @@ function DAGDetailsModal({ fileName, isOpen, onClose }: Props): React.ReactEleme
 
   // Polling fallback (only when SSE fails or not connected)
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
+  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected || !sseResult.data;
 
   const { data: pollingData, mutate } = useQuery(
     '/dags/{fileName}',
@@ -51,8 +51,7 @@ function DAGDetailsModal({ fileName, isOpen, onClose }: Props): React.ReactEleme
     },
     {
       refreshInterval: usePolling ? 2000 : 0,
-      keepPreviousData: true,
-      isPaused: () => !isOpen || (!usePolling && sseResult.isConnected),
+      isPaused: () => !isOpen || (!usePolling && sseResult.isConnected && sseResult.data != null),
     }
   );
 

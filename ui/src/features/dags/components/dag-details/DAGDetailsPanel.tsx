@@ -9,6 +9,7 @@ import { usePageContext } from '../../../../contexts/PageContext';
 import { UnsavedChangesProvider } from '../../../../contexts/UnsavedChangesContext';
 import { useQuery } from '../../../../hooks/api';
 import { useDAGSSE } from '../../../../hooks/useDAGSSE';
+import { useLastValidData } from '../../../../hooks/useLastValidData';
 import dayjs from '../../../../lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -58,7 +59,6 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
   const [currentDAGRun, setCurrentDAGRun] = useState<DAGRunDetails | undefined>();
   const [activeTab, setActiveTab] = useState('status');
   const [notFound, setNotFound] = useState(false);
-  const [lastValidData, setLastValidData] = useState<DAGDetailsData>(null);
 
   // Set page context for agent chat
   useEffect(() => {
@@ -76,7 +76,7 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
   // SSE for real-time updates with polling fallback
   const sseResult = useDAGSSE(fileName || '', !!fileName);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const shouldPoll = sseResult.shouldUseFallback || !sseResult.isConnected;
+  const shouldPoll = sseResult.shouldUseFallback || !sseResult.isConnected || !sseResult.data;
 
   const { data: pollingData, error, mutate } = useQuery(
     '/dags/{fileName}',
@@ -88,7 +88,6 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
     },
     {
       refreshInterval: getPollingInterval(notFound, shouldPoll),
-      keepPreviousData: true,
       isPaused: () => !shouldPoll && !notFound,
     }
   );
@@ -98,25 +97,22 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
   // Track data loading state and handle 404 errors
   useEffect(() => {
     if (error) {
-      // Only set notFound for 404 errors when no cached data exists
       const is404 = (error as { status?: number })?.status === 404;
-      if (is404 && !lastValidData) {
+      if (is404 && !data) {
         setNotFound(true);
       }
     } else if (data) {
       setNotFound(false);
-      setLastValidData(data as DAGDetailsData);
     }
-  }, [error, data, lastValidData]);
+  }, [error, data]);
 
-  // Reset state when fileName changes
+  // Reset UI state when switching DAGs or nodes
   useEffect(() => {
     setNotFound(false);
-    setLastValidData(null); // Clear cached data when switching DAGs
     setActiveTab('status');
   }, [fileName, remoteNode]);
 
-  const displayData = data || lastValidData;
+  const displayData = useLastValidData(data ?? null, `${fileName}|${remoteNode}`);
 
   function refreshFn(): void {
     setTimeout(() => mutate(), 500);
