@@ -1,22 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useDocSSE } from './useDocSSE';
 
 interface ConflictState {
   hasConflict: boolean;
   externalContent: string | null;
 }
 
-interface UseDocContentWithConflictDetectionOptions {
-  docPath: string;
-  enabled?: boolean;
+interface UseContentEditorOptions {
+  /** Key for resetting state on navigation (e.g., fileName) */
+  key: string;
+  /** Server content from any source (SSE or polling) */
+  serverContent: string | null;
 }
 
-interface UseDocContentWithConflictDetectionResult {
-  isConnected: boolean;
-  shouldUseFallback: boolean;
-  error: Error | null;
-  doc: ReturnType<typeof useDocSSE>['data'];
-  currentValue: string;
+interface UseContentEditorResult {
+  /** Current editor value. null = not yet initialized. */
+  currentValue: string | null;
   setCurrentValue: (value: string) => void;
   hasUnsavedChanges: boolean;
   conflict: ConflictState;
@@ -24,87 +22,107 @@ interface UseDocContentWithConflictDetectionResult {
   markAsSaved: (savedContent: string) => void;
 }
 
-export function useDocContentWithConflictDetection({
-  docPath,
-  enabled = true,
-}: UseDocContentWithConflictDetectionOptions): UseDocContentWithConflictDetectionResult {
-  const sseResult = useDocSSE(docPath, enabled);
+/**
+ * Generic content editor hook with conflict detection.
+ * Decoupled from data transport — receives serverContent from any source.
+ * Detects when content changes externally while the user is editing.
+ */
+export function useContentEditor({
+  key,
+  serverContent,
+}: UseContentEditorOptions): UseContentEditorResult {
+  // Track local edits (null = not yet initialized)
+  const [currentValue, setCurrentValueState] = useState<string | null>(null);
 
-  const [currentValue, setCurrentValueState] = useState<string>('');
+  // Track the last known server content (for change detection)
   const lastServerContentRef = useRef<string | null>(null);
+
+  // Track if user has started editing
   const hasUserEditedRef = useRef<boolean>(false);
+
+  // Track pending save content (to ignore our own saves coming back)
   const pendingSaveContentRef = useRef<string | null>(null);
 
+  // Conflict state
   const [conflict, setConflict] = useState<ConflictState>({
     hasConflict: false,
     externalContent: null,
   });
 
-  // Reset all state when docPath changes
+  // Reset all state when key changes (navigating to different item)
   useEffect(() => {
     lastServerContentRef.current = null;
     hasUserEditedRef.current = false;
     pendingSaveContentRef.current = null;
-    setCurrentValueState('');
+    setCurrentValueState(null);
     setConflict({ hasConflict: false, externalContent: null });
-  }, [docPath]);
+  }, [key]);
 
-  // Process incoming SSE data
+  // Process incoming server content changes
   useEffect(() => {
-    const incomingContent = sseResult.data?.content;
-    if (typeof incomingContent === 'undefined' || incomingContent === null) {
+    if (serverContent == null) {
       return;
     }
 
-    // First load
+    // First load - initialize everything
     if (lastServerContentRef.current === null) {
-      lastServerContentRef.current = incomingContent;
-      setCurrentValueState(incomingContent);
+      lastServerContentRef.current = serverContent;
+      if (!hasUserEditedRef.current) {
+        setCurrentValueState(serverContent);
+      }
       return;
     }
 
     // Check if this is our own save coming back
-    if (pendingSaveContentRef.current === incomingContent) {
-      lastServerContentRef.current = incomingContent;
+    if (pendingSaveContentRef.current === serverContent) {
+      lastServerContentRef.current = serverContent;
       pendingSaveContentRef.current = null;
       return;
     }
 
-    // No change
-    if (incomingContent === lastServerContentRef.current) {
+    // Check if server content actually changed
+    if (serverContent === lastServerContentRef.current) {
       return;
     }
 
     // Server content changed externally
     const hasLocalChanges =
-      hasUserEditedRef.current && currentValue !== lastServerContentRef.current;
+      hasUserEditedRef.current &&
+      currentValue !== lastServerContentRef.current;
 
     if (hasLocalChanges) {
+      // Conflict: user has unsaved edits AND external change occurred
       setConflict({
         hasConflict: true,
-        externalContent: incomingContent,
+        externalContent: serverContent,
       });
     } else {
-      lastServerContentRef.current = incomingContent;
-      setCurrentValueState(incomingContent);
+      // No local edits - update silently
+      lastServerContentRef.current = serverContent;
+      setCurrentValueState(serverContent);
       hasUserEditedRef.current = false;
     }
-  }, [sseResult.data?.content, currentValue]);
+  }, [serverContent, currentValue]);
 
+  // Handle user edits
   const setCurrentValue = useCallback((value: string) => {
     hasUserEditedRef.current = true;
     setCurrentValueState(value);
   }, []);
 
+  // Resolve conflict
   const resolveConflict = useCallback(
     (action: 'discard' | 'ignore') => {
       if (action === 'discard') {
+        // Discard local changes, accept external
         if (conflict.externalContent) {
           lastServerContentRef.current = conflict.externalContent;
           setCurrentValueState(conflict.externalContent);
           hasUserEditedRef.current = false;
         }
       } else {
+        // Ignore external changes, keep local
+        // Just update the server ref to prevent repeated dialogs
         if (conflict.externalContent) {
           lastServerContentRef.current = conflict.externalContent;
         }
@@ -114,21 +132,20 @@ export function useDocContentWithConflictDetection({
     [conflict.externalContent]
   );
 
+  // Called after successful save
   const markAsSaved = useCallback((savedContent: string) => {
     pendingSaveContentRef.current = savedContent;
     lastServerContentRef.current = savedContent;
     hasUserEditedRef.current = false;
   }, []);
 
+  // Calculate unsaved changes
   const hasUnsavedChanges =
     lastServerContentRef.current !== null &&
+    currentValue !== null &&
     currentValue !== lastServerContentRef.current;
 
   return {
-    isConnected: sseResult.isConnected,
-    shouldUseFallback: sseResult.shouldUseFallback,
-    error: sseResult.error,
-    doc: sseResult.data,
     currentValue,
     setCurrentValue,
     hasUnsavedChanges,

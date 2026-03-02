@@ -8,7 +8,8 @@ import './DocPreview.css';
 import { useCanWrite } from '@/contexts/AuthContext';
 import { useDocTabContext } from '@/contexts/DocTabContext';
 import { useClient } from '@/hooks/api';
-import { useDocContentWithConflictDetection } from '@/hooks/useDocContentWithConflictDetection';
+import { useContentEditor } from '@/hooks/useContentEditor';
+import { useDocSSE } from '@/hooks/useDocSSE';
 import { cn } from '@/lib/utils';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { FileText, Save } from 'lucide-react';
@@ -34,6 +35,11 @@ function DocEditor({ tabId, docPath }: Props) {
     markTabSaved,
   } = useDocTabContext();
 
+  // SSE connection for real-time doc data
+  const sseResult = useDocSSE(docPath);
+  const doc = sseResult.data;
+
+  // Change tracking (source-agnostic)
   const {
     currentValue,
     setCurrentValue,
@@ -41,8 +47,10 @@ function DocEditor({ tabId, docPath }: Props) {
     conflict,
     resolveConflict,
     markAsSaved,
-    doc,
-  } = useDocContentWithConflictDetection({ docPath });
+  } = useContentEditor({
+    key: docPath,
+    serverContent: doc?.content ?? null,
+  });
 
   const [mode, setMode] = useState<'edit' | 'preview'>(() => {
     const stored = localStorage.getItem('doc-editor-mode');
@@ -193,7 +201,7 @@ function DocEditor({ tabId, docPath }: Props) {
         {mode === 'edit' ? (
           <MarkdownEditor
             value={currentValue}
-            onChange={(val) => setCurrentValue(val || '')}
+            onChange={(val) => setCurrentValue(val ?? '')}
             readOnly={!canWrite}
           />
         ) : (

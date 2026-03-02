@@ -16,7 +16,8 @@ import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
 import { useClient, useQuery } from '../../../../hooks/api';
-import { useDAGSpecWithConflictDetection } from '../../../../hooks/useDAGSpecWithConflictDetection';
+import { useContentEditor } from '../../../../hooks/useContentEditor';
+import { useDAGSSE } from '../../../../hooks/useDAGSSE';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { DAGStepTable } from '../dag-details';
@@ -78,23 +79,10 @@ function DAGSpec({ fileName, localDags }: Props) {
     [setCookie, flowchart, setFlowchart]
   );
 
-  // SSE-based spec watching with conflict detection
-  const {
-    dag: sseData,
-    isConnected,
-    shouldUseFallback,
-    currentValue,
-    setCurrentValue,
-    hasUnsavedChanges: localHasUnsavedChanges,
-    conflict,
-    resolveConflict,
-    markAsSaved,
-  } = useDAGSpecWithConflictDetection({
-    fileName,
-    enabled: true,
-  });
+  // SSE connection for real-time data
+  const sseResult = useDAGSSE(fileName, true);
 
-  // Fallback to REST polling when SSE fails
+  // Polling fallback (uses SSE state for config)
   const { data: pollingData, isLoading, mutate: mutateSpec } = useQuery(
     '/dags/{fileName}/spec',
     {
@@ -108,16 +96,38 @@ function DAGSpec({ fileName, localDags }: Props) {
       },
     },
     {
-      revalidateIfStale: shouldUseFallback,
-      revalidateOnFocus: shouldUseFallback,
+      revalidateIfStale: sseResult.shouldUseFallback,
+      revalidateOnFocus: sseResult.shouldUseFallback,
       revalidateOnMount: true,
-      refreshInterval: shouldUseFallback ? 5000 : 0,
-      isPaused: () => !shouldUseFallback && isConnected,
+      refreshInterval: sseResult.shouldUseFallback ? 5000 : 0,
+      isPaused: () => !sseResult.shouldUseFallback && sseResult.isConnected,
     }
   );
 
-  // Use SSE data when connected, fallback to polling data
-  const data = isConnected && sseData ? sseData : pollingData;
+  // Best available server spec — prefer SSE when connected, polling when not.
+  // When SSE disconnects, sseResult.data retains stale values,
+  // so only use SSE spec when actively connected.
+  const serverSpec =
+    sseResult.isConnected && sseResult.data?.spec != null
+      ? sseResult.data.spec
+      : pollingData?.spec ?? null;
+
+  // Change tracking (source-agnostic)
+  const {
+    currentValue,
+    setCurrentValue,
+    hasUnsavedChanges: localHasUnsavedChanges,
+    conflict,
+    resolveConflict,
+    markAsSaved,
+  } = useContentEditor({
+    key: fileName,
+    serverContent: serverSpec,
+  });
+
+  // Display data (SSE when connected, polling when not)
+  const data =
+    sseResult.isConnected && sseResult.data ? sseResult.data : pollingData;
 
   // Sync unsaved changes context
   useEffect(() => {
@@ -140,7 +150,7 @@ function DAGSpec({ fileName, localDags }: Props) {
 
   // Save handler function
   const handleSave = React.useCallback(async () => {
-    if (!currentValue) {
+    if (currentValue == null) {
       showError('No changes to save', 'Make some edits before saving.');
       return;
     }
@@ -395,14 +405,14 @@ function DAGSpec({ fileName, localDags }: Props) {
                 <DAGEditorWithDocs
                   value={
                     editable
-                      ? currentValue || data.spec || ''
-                      : data.spec || ''
+                      ? (currentValue ?? serverSpec ?? '')
+                      : (serverSpec ?? '')
                   }
                   readOnly={!editable}
                   onChange={
                     editable
                       ? (newValue) => {
-                          setCurrentValue(newValue || '');
+                          setCurrentValue(newValue ?? '');
                         }
                       : undefined
                   }
