@@ -183,7 +183,7 @@ function Dashboard(): React.ReactElement | null {
     true
   );
 
-  const shouldPoll = sseResult.shouldUseFallback || !sseResult.isConnected;
+  const shouldPoll = sseResult.shouldUseFallback || !sseResult.isConnected || !sseResult.data;
 
   const { data: pollingData, error, isLoading, mutate } = useQuery(
     '/dag-runs',

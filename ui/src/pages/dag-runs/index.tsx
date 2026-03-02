@@ -421,7 +421,7 @@ function DAGRuns() {
     toDate: formatDateForApi(apiToDate),
   };
   const sseResult = useDAGRunsListSSE(sseParams, true);
-  const shouldUsePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
+  const shouldUsePolling = sseResult.shouldUseFallback || !sseResult.isConnected || !sseResult.data;
 
   const { data: pollingData, mutate } = useQuery(
     '/dag-runs',

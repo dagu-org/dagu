@@ -32,6 +32,31 @@ type Options struct {
 	AuthRequired bool
 }
 
+// QueryTokenMiddleware converts a "token" query parameter into an Authorization
+// Bearer header. This bridges browser APIs that cannot set custom headers
+// (EventSource, WebSocket) with the standard auth middleware.
+// If an Authorization header is already present, the query parameter is ignored.
+func QueryTokenMiddleware() func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("Authorization") != "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			token := r.URL.Query().Get("token")
+			if token != "" {
+				r2 := r.Clone(r.Context())
+				r2.Header.Set("Authorization", "Bearer "+token)
+				next.ServeHTTP(w, r2)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // ClientIPMiddleware creates an HTTP middleware that adds the client IP to the request context.
 // This should be applied before authentication middleware to ensure IP is available for audit logging.
 func ClientIPMiddleware() func(next http.Handler) http.Handler {

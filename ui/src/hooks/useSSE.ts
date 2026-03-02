@@ -63,6 +63,17 @@ export function useSSE<T>(endpoint: string, enabled: boolean = true): SSEState<T
 
   const [state, setState] = useState<SSEState<T>>(INITIAL_STATE as SSEState<T>);
 
+  // Reset state synchronously during render when connection parameters change.
+  // This prevents stale data from the old connection being returned in the first
+  // render after a change — critical because consumers use isConnected to gate
+  // SWR polling (isPaused), and stale isConnected=true blocks SWR fetches.
+  const connectionKey = `${endpoint}|${remoteNode}|${config.apiURL}|${enabled}`;
+  const prevConnectionKeyRef = useRef(connectionKey);
+  if (prevConnectionKeyRef.current !== connectionKey) {
+    prevConnectionKeyRef.current = connectionKey;
+    setState(INITIAL_STATE as SSEState<T>);
+  }
+
   const eventSourceRef = useRef<EventSource | null>(null);
   const retryCountRef = useRef(0);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -133,8 +144,6 @@ export function useSSE<T>(endpoint: string, enabled: boolean = true): SSEState<T
   }, [endpoint, enabled, remoteNode, config.apiURL]);
 
   useEffect(() => {
-    // Reset state and retry counter when dependencies change
-    setState(INITIAL_STATE as SSEState<T>);
     retryCountRef.current = 0;
 
     connect();

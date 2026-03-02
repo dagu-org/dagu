@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import { useDAGRunSSE } from '../../../../hooks/useDAGRunSSE';
+import { useLastValidData } from '../../../../hooks/useLastValidData';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGRunContext } from '../../contexts/DAGRunContext';
@@ -55,11 +56,11 @@ function DAGRunDetailsPanel({
         },
       },
     },
-    { refreshInterval: 2000, keepPreviousData: true, isPaused: () => !isSubDAGRun }
+    { refreshInterval: 2000, isPaused: () => !isSubDAGRun }
   );
 
   // Regular DAG query (fallback when SSE is unavailable)
-  const sseIsActive = sseResult.isConnected && !sseResult.shouldUseFallback;
+  const sseIsActive = sseResult.isConnected && !sseResult.shouldUseFallback && sseResult.data != null;
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}',
     {
@@ -73,7 +74,6 @@ function DAGRunDetailsPanel({
     },
     {
       refreshInterval: sseIsActive ? 0 : 2000,
-      keepPreviousData: true,
       isPaused: () => isSubDAGRun || sseIsActive,
     }
   );
@@ -84,14 +84,7 @@ function DAGRunDetailsPanel({
     ? subDAGQuery.data
     : sseResult.data || dagRunQuery.data;
 
-  // Keep track of last valid data to prevent flickering
-  const [lastValidData, setLastValidData] = React.useState(data);
-  React.useEffect(() => {
-    if (data) {
-      setLastValidData(data);
-    }
-  }, [data]);
-  const displayData = data || lastValidData;
+  const displayData = useLastValidData(data ?? null, remoteNode);
 
   const refreshFn = React.useCallback(() => {
     setTimeout(() => mutate(), 500);

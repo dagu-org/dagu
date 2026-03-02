@@ -380,3 +380,69 @@ func TestMiddleware_NoAuthEnabled(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
+
+func TestQueryTokenMiddleware(t *testing.T) {
+	t.Parallel()
+
+	// headerCapture is a handler that records the Authorization header it receives.
+	type headerCapture struct {
+		authHeader string
+	}
+
+	t.Run("promotes query token to Authorization header", func(t *testing.T) {
+		t.Parallel()
+		capture := &headerCapture{}
+		handler := QueryTokenMiddleware()(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			capture.authHeader = r.Header.Get("Authorization")
+		}))
+
+		req := httptest.NewRequest(http.MethodGet, "/test?token=mytoken123", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		assert.Equal(t, "Bearer mytoken123", capture.authHeader)
+	})
+
+	t.Run("existing Authorization header takes precedence", func(t *testing.T) {
+		t.Parallel()
+		capture := &headerCapture{}
+		handler := QueryTokenMiddleware()(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			capture.authHeader = r.Header.Get("Authorization")
+		}))
+
+		req := httptest.NewRequest(http.MethodGet, "/test?token=querytoken", nil)
+		req.Header.Set("Authorization", "Bearer headertoken")
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		assert.Equal(t, "Bearer headertoken", capture.authHeader)
+	})
+
+	t.Run("no token no header passes through", func(t *testing.T) {
+		t.Parallel()
+		capture := &headerCapture{}
+		handler := QueryTokenMiddleware()(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			capture.authHeader = r.Header.Get("Authorization")
+		}))
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		assert.Empty(t, capture.authHeader)
+	})
+
+	t.Run("empty token value passes through", func(t *testing.T) {
+		t.Parallel()
+		capture := &headerCapture{}
+		handler := QueryTokenMiddleware()(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			capture.authHeader = r.Header.Get("Authorization")
+		}))
+
+		req := httptest.NewRequest(http.MethodGet, "/test?token=", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		assert.Empty(t, capture.authHeader)
+	})
+}

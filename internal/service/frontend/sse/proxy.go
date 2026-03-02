@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 )
@@ -19,7 +18,7 @@ func (h *Handler) proxyToRemoteNode(w http.ResponseWriter, r *http.Request, node
 		return
 	}
 
-	remoteURL := buildRemoteURL(node.APIBaseURL, topic, r.URL.Query().Get("token"))
+	remoteURL := buildRemoteURL(node.APIBaseURL, topic)
 
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, remoteURL, nil)
 	if err != nil {
@@ -73,7 +72,9 @@ func (h *Handler) proxyToRemoteNode(w http.ResponseWriter, r *http.Request, node
 
 // buildRemoteURL constructs the SSE URL for a remote node based on the topic.
 // Topic format: "type:identifier"
-func buildRemoteURL(baseURL, topic, token string) string {
+// Authentication is handled via the Authorization header (set by node.ApplyAuth),
+// not via query parameters.
+func buildRemoteURL(baseURL, topic string) string {
 	baseURL = strings.TrimSuffix(baseURL, "/")
 
 	topicType, identifier, ok := strings.Cut(topic, ":")
@@ -82,18 +83,7 @@ func buildRemoteURL(baseURL, topic, token string) string {
 	}
 
 	path := buildPathForTopic(TopicType(topicType), identifier)
-	result := baseURL + path
-
-	if token == "" {
-		return result
-	}
-
-	// URL-encode the token to handle special characters
-	encodedToken := url.QueryEscape(token)
-	if strings.Contains(result, "?") {
-		return result + "&token=" + encodedToken
-	}
-	return result + "?token=" + encodedToken
+	return baseURL + path
 }
 
 // buildPathForTopic returns the URL path for the given topic type and identifier.

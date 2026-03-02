@@ -121,7 +121,7 @@ function DAGSpec({ fileName, localDags }: Props) {
     resolveConflict,
     markAsSaved,
   } = useContentEditor({
-    key: fileName,
+    key: `${fileName}:${remoteNode}`,
     serverContent: serverSpec,
   });
 

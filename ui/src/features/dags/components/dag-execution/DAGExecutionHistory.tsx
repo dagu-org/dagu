@@ -41,7 +41,7 @@ function DAGExecutionHistory({
 
   // SSE for real-time updates with polling fallback
   const sseResult = useDAGHistorySSE(fileName, !!fileName);
-  const shouldPoll = sseResult.shouldUseFallback || !sseResult.isConnected;
+  const shouldPoll = sseResult.shouldUseFallback || !sseResult.isConnected || !sseResult.data;
 
   // Fetch execution history data - use polling only as fallback
   const { data: pollingData } = useQuery(
@@ -58,8 +58,7 @@ function DAGExecutionHistory({
     },
     {
       refreshInterval: shouldPoll ? 2000 : 0,
-      keepPreviousData: true,
-      isPaused: () => !shouldPoll && sseResult.isConnected,
+      isPaused: () => !shouldPoll && sseResult.isConnected && sseResult.data != null,
     }
   );
 

@@ -17,6 +17,7 @@ import { DAGTable } from '../../features/dags/components/dag-list';
 import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
 import { useQuery } from '../../hooks/api';
 import { useDAGsListSSE } from '../../hooks/useDAGsListSSE';
+import { useLastValidData } from '../../hooks/useLastValidData';
 import LoadingIndicator from '../../ui/LoadingIndicator';
 
 type DAGDefinitionsFilters = {
@@ -223,8 +224,7 @@ function DAGsContent() {
       revalidateIfStale: false,
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
-      keepPreviousData: true,
-      isPaused: () => sseResult.isConnected,
+      isPaused: () => sseResult.isConnected && sseResult.data != null,
     }
   );
 
@@ -259,14 +259,6 @@ function DAGsContent() {
   React.useEffect(() => {
     appBarContext.setTitle('DAG Definitions');
   }, [appBarContext]);
-
-  const { dagFiles, errorCount } = React.useMemo(() => {
-    const dags = data?.dags ?? [];
-    return {
-      dagFiles: dags,
-      errorCount: dags.filter((dag) => dag.errors?.length).length,
-    };
-  }, [data]);
 
   const pageChange = (page: number) => {
     addSearchParam('page', page.toString());
@@ -311,17 +303,15 @@ function DAGsContent() {
     setPage(1);
   };
 
-  const [lastValidData, setLastValidData] = React.useState<typeof data | null>(
-    null
-  );
+  const displayData = useLastValidData(data ?? null, remoteNode);
 
-  React.useEffect(() => {
-    if (data) {
-      setLastValidData(data);
-    }
-  }, [data]);
-
-  const displayData = data ?? lastValidData;
+  const { dagFiles, errorCount } = React.useMemo(() => {
+    const dags = displayData?.dags ?? [];
+    return {
+      dagFiles: dags,
+      errorCount: dags.filter((dag) => dag.errors?.length).length,
+    };
+  }, [displayData]);
 
   const leftPanel = (
     <div className="pl-4 md:pl-6 pr-2 pt-4 md:pt-6 pb-6">
@@ -336,7 +326,7 @@ function DAGsContent() {
             }
           />
           <DAGTable
-            dags={isLoading && !lastValidData ? [] : dagFiles}
+            dags={dagFiles}
             group={group}
             refreshFn={refreshFn}
             searchText={searchText}
