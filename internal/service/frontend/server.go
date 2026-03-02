@@ -971,6 +971,7 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 
 	r.Route(path.Join(apiV1BasePath, "events"), func(r chi.Router) {
 		r.Use(auth.QueryTokenMiddleware())
+		r.Use(auth.ClientIPMiddleware())
 		r.Use(auth.Middleware(authOpts))
 
 		r.Get("/dags", handler.HandleDAGsListEvents)
