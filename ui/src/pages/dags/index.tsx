@@ -321,6 +321,10 @@ function DAGsContent() {
     }
   }, [data]);
 
+  React.useEffect(() => {
+    setLastValidData(null);
+  }, [remoteNode]);
+
   const displayData = data ?? lastValidData;
 
   const leftPanel = (

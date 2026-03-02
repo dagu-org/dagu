@@ -2,7 +2,7 @@ import { Theme } from '@radix-ui/themes';
 import '@radix-ui/themes/styles.css';
 import React from 'react';
 import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
-import { SWRConfig } from 'swr';
+import { SWRConfig, mutate as globalMutate } from 'swr';
 
 import { Shield } from 'lucide-react';
 
@@ -147,6 +147,10 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
       const validNode = remoteNodes.includes(node) ? node : 'local';
       setSelectedRemoteNode(validNode);
       localStorage.setItem(REMOTE_NODE_STORAGE_KEY, validNode);
+
+      // Clear all SWR cache so keepPreviousData doesn't show stale cross-node data.
+      // Active hooks will refetch automatically since their keys change (remoteNode is in params).
+      globalMutate(() => true, undefined, { revalidate: false });
     },
     [remoteNodes]
   );

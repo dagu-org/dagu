@@ -114,7 +114,7 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
     setNotFound(false);
     setLastValidData(null); // Clear cached data when switching DAGs
     setActiveTab('status');
-  }, [fileName]);
+  }, [fileName, remoteNode]);
 
   const displayData = data || lastValidData;
 

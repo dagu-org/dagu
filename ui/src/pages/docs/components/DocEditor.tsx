@@ -71,7 +71,7 @@ function DocEditor({ tabId, docPath }: Props) {
     resolveConflict,
     markAsSaved,
   } = useContentEditor({
-    key: docPath,
+    key: `${docPath}:${remoteNode}`,
     serverContent,
   });
 

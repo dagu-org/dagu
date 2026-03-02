@@ -116,6 +116,11 @@ function DAGRunDetailsModal({
     }
   }, [freshDetails, name, dagRunId]);
 
+  // Clear stale cross-node data when remote node changes
+  useEffect(() => {
+    previousDataRef.current = null;
+  }, [remoteNode]);
+
   const isInitialLoading = isLoading && !displayData;
   const previousData = previousDataRef.current;
   const isTransitioning =

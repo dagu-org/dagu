@@ -91,6 +91,11 @@ function DAGRunDetailsPanel({
       setLastValidData(data);
     }
   }, [data]);
+
+  React.useEffect(() => {
+    setLastValidData(null);
+  }, [remoteNode]);
+
   const displayData = data || lastValidData;
 
   const refreshFn = React.useCallback(() => {
