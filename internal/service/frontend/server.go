@@ -2,8 +2,10 @@ package frontend
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"maps"
 	"mime"
@@ -1009,8 +1011,126 @@ func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux, apiV1BasePa
 	// Only the SSE stream endpoint is registered as a manual route.
 	// All other agent endpoints are served through the OpenAPI handler.
 	streamPath := path.Join(apiV1BasePath, "agent/sessions/{id}/stream")
-	r.With(srv.agentAPI.EnabledMiddleware(), authMiddleware).Get(streamPath, srv.agentAPI.HandleStream)
+	r.With(srv.agentAPI.EnabledMiddleware(), authMiddleware).Get(
+		streamPath, srv.handleAgentStream(apiV1BasePath),
+	)
 	logger.Info(ctx, "Agent SSE stream route configured")
+}
+
+// handleAgentStream returns a handler that checks for remoteNode and either
+// proxies the SSE stream to the remote node or delegates to the local handler.
+func (srv *Server) handleAgentStream(apiV1BasePath string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		remoteNodeName := r.URL.Query().Get("remoteNode")
+		if remoteNodeName == "" || remoteNodeName == "local" {
+			srv.agentAPI.HandleStream(w, r)
+			return
+		}
+		srv.proxyAgentStream(w, r, remoteNodeName, apiV1BasePath)
+	}
+}
+
+// proxyAgentStream proxies the agent SSE stream to a remote node.
+// It follows the same streaming pattern as sse/proxy.go:proxyToRemoteNode.
+func (srv *Server) proxyAgentStream(w http.ResponseWriter, r *http.Request, nodeName, apiV1BasePath string) {
+	if srv.remoteNodeResolver == nil {
+		http.Error(w, "remote node resolution not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	node, err := srv.remoteNodeResolver.GetByName(r.Context(), nodeName)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("unknown remote node: %s", nodeName), http.StatusBadRequest)
+		return
+	}
+
+	// Build remote URL: strip apiBasePath prefix, append to node's APIBaseURL.
+	remoteURL := buildAgentStreamRemoteURL(node.APIBaseURL, r.URL.Path, apiV1BasePath)
+
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, remoteURL, nil)
+	if err != nil {
+		http.Error(w, "failed to create proxy request", http.StatusInternalServerError)
+		return
+	}
+	req.Header.Set("Accept", "text/event-stream")
+	node.ApplyAuth(req)
+
+	// Forward the token query param for auth on the remote node.
+	if token := r.URL.Query().Get("token"); token != "" {
+		q := req.URL.Query()
+		q.Set("token", token)
+		req.URL.RawQuery = q.Encode()
+	}
+
+	client := &http.Client{
+		// Timeout: 0 is safe for SSE because the request is created with
+		// r.Context() which is cancelled when the client disconnects.
+		Timeout: 0,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: node.SkipTLSVerify, //nolint:gosec
+				MinVersion:         tls.VersionTLS12,
+			},
+			MaxIdleConns:       10,
+			IdleConnTimeout:    90 * time.Second,
+			DisableCompression: true,
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		if r.Context().Err() != nil {
+			return // Client disconnected
+		}
+		http.Error(w, "failed to connect to remote node", http.StatusBadGateway)
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		http.Error(w, fmt.Sprintf("remote node returned status: %d", resp.StatusCode), resp.StatusCode)
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	// Set SSE headers and clear the write deadline to prevent the server's
+	// WriteTimeout (60s) from killing this long-lived SSE connection.
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+	rc := http.NewResponseController(w)
+	_ = rc.SetWriteDeadline(time.Time{})
+
+	// Stream chunks from remote to client.
+	buf := make([]byte, 4096)
+	for {
+		n, readErr := resp.Body.Read(buf)
+		if n > 0 {
+			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+				_, _ = io.Copy(io.Discard, resp.Body)
+				return
+			}
+			flusher.Flush()
+		}
+		if readErr != nil {
+			return
+		}
+	}
+}
+
+// buildAgentStreamRemoteURL constructs the SSE stream URL for a remote node.
+func buildAgentStreamRemoteURL(baseURL, requestPath, apiV1BasePath string) string {
+	parts := strings.SplitN(requestPath, apiV1BasePath, 2)
+	if len(parts) < 2 {
+		return strings.TrimSuffix(baseURL, "/") + requestPath
+	}
+	return strings.TrimSuffix(baseURL, "/") + parts[1]
 }
 
 func (srv *Server) buildAgentAuthMiddleware(_ context.Context) func(http.Handler) http.Handler {
