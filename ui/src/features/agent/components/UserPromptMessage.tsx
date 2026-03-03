@@ -92,8 +92,11 @@ export function UserPromptMessage({
 
   const canSubmit = selectedOptions.size > 0 || freeText.trim().length > 0;
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (isAnswered) return;
+
+    // Let focused buttons (Submit, Skip, option buttons) handle Enter/Space natively.
+    if (e.target instanceof HTMLButtonElement) return;
 
     // Don't intercept any keys when free-text input is focused, except Enter to submit.
     if (e.target === inputRef.current) {
@@ -119,8 +122,8 @@ export function UserPromptMessage({
       }
       if ((e.key === 'Enter' || e.key === ' ') && focusedIndex >= 0) {
         e.preventDefault();
-        const option = prompt.options![focusedIndex];
-        handleOptionClick(option.id);
+        const option = prompt.options?.[focusedIndex];
+        if (option) handleOptionClick(option.id);
         return;
       }
     }
@@ -161,7 +164,10 @@ export function UserPromptMessage({
         ref={containerRef}
         tabIndex={0}
         onKeyDown={handleKeyDown}
+        role={prompt.options && prompt.options.length > 0 ? 'listbox' : undefined}
         aria-label={prompt.question}
+        aria-multiselectable={prompt.multi_select || undefined}
+        aria-activedescendant={focusedIndex >= 0 && prompt.options?.[focusedIndex] ? prompt.options[focusedIndex].id : undefined}
         className="rounded-lg border border-orange-300 dark:border-amber-500/40 bg-orange-50 dark:bg-amber-500/10 p-2 outline-none"
       >
         <div className="flex items-start gap-1.5 mb-2">
@@ -170,12 +176,7 @@ export function UserPromptMessage({
         </div>
 
         {prompt.options && prompt.options.length > 0 && (
-          <div
-            role="listbox"
-            aria-multiselectable={prompt.multi_select || undefined}
-            aria-activedescendant={focusedIndex >= 0 ? prompt.options[focusedIndex].id : undefined}
-            className="flex flex-wrap gap-1 mb-2"
-          >
+          <div className="flex flex-wrap gap-1 mb-2">
             {prompt.options.map((option, index) => (
               <button
                 key={option.id}

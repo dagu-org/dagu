@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"maps"
 	"mime"
@@ -1113,8 +1112,7 @@ func (srv *Server) proxyAgentStream(w http.ResponseWriter, r *http.Request, node
 		n, readErr := resp.Body.Read(buf)
 		if n > 0 {
 			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
-				_, _ = io.Copy(io.Discard, resp.Body)
-				return
+				return // defer resp.Body.Close() handles cleanup
 			}
 			flusher.Flush()
 		}
