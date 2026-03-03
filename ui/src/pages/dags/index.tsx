@@ -17,7 +17,7 @@ import { DAGTable } from '../../features/dags/components/dag-list';
 import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
 import { useQuery } from '../../hooks/api';
 import { useDAGsListSSE } from '../../hooks/useDAGsListSSE';
-import { useLastValidData } from '../../hooks/useLastValidData';
+import { sseFallbackOptions, useSSECacheSync } from '../../hooks/useSSECacheSync';
 import LoadingIndicator from '../../ui/LoadingIndicator';
 
 type DAGDefinitionsFilters = {
@@ -205,9 +205,8 @@ function DAGsContent() {
   );
 
   const sseResult = useDAGsListSSE(queryParams, true);
-  const usePolling = sseResult.shouldUseFallback;
 
-  const { data: pollingData, mutate, isLoading } = useQuery(
+  const { data, mutate, isLoading } = useQuery(
     '/dags',
     {
       params: {
@@ -220,15 +219,13 @@ function DAGsContent() {
       },
     },
     {
-      refreshInterval: usePolling ? 2000 : 0,
+      ...sseFallbackOptions(sseResult),
       revalidateIfStale: false,
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
-      isPaused: () => sseResult.isConnected && sseResult.data != null,
     }
   );
-
-  const data = sseResult.data ?? pollingData;
+  useSSECacheSync(sseResult, mutate);
 
   const addSearchParam = (key: string, value: string | string[]) => {
     const locationQuery = new URLSearchParams(window.location.search);
@@ -303,26 +300,24 @@ function DAGsContent() {
     setPage(1);
   };
 
-  const displayData = useLastValidData(data ?? null, remoteNode);
-
   const { dagFiles, errorCount } = React.useMemo(() => {
-    const dags = displayData?.dags ?? [];
+    const dags = data?.dags ?? [];
     return {
       dagFiles: dags,
       errorCount: dags.filter((dag) => dag.errors?.length).length,
     };
-  }, [displayData]);
+  }, [data]);
 
   const leftPanel = (
     <div className="pl-4 md:pl-6 pr-2 pt-4 md:pt-6 pb-6">
       <DAGListHeader onRefresh={refreshFn} />
-      {displayData ? (
+      {data ? (
         <>
           <DAGErrors
-            dags={displayData.dags || []}
-            errors={displayData.errors || []}
+            dags={data.dags || []}
+            errors={data.errors || []}
             hasError={
-              (errorCount > 0 || displayData.errors?.length > 0) && !isLoading
+              (errorCount > 0 || data.errors?.length > 0) && !isLoading
             }
           />
           <DAGTable
@@ -334,7 +329,7 @@ function DAGsContent() {
             searchTags={searchTags}
             handleSearchTagsChange={searchTagsChange}
             pagination={{
-              totalPages: displayData.pagination.totalPages,
+              totalPages: data.pagination.totalPages,
               page: page,
               pageChange: pageChange,
               onPageLimitChange: handlePageLimitChange,

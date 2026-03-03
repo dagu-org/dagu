@@ -6,6 +6,7 @@ import { usePageContext } from '@/contexts/PageContext';
 import { UnsavedChangesProvider } from '@/contexts/UnsavedChangesContext';
 import { useClient, useQuery } from '@/hooks/api';
 import { useDocTreeSSE } from '@/hooks/useDocTreeSSE';
+import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { ChevronLeft } from 'lucide-react';
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
@@ -60,11 +61,10 @@ function DocsContent() {
   const [deleteDocPath, setDeleteDocPath] = useState('');
   const [deleteDocTitle, setDeleteDocTitle] = useState('');
 
-  // Dual data source for tree: SSE primary, SWR polling only when SSE gives up
+  // SSE for real-time updates with polling fallback
   const sseResult = useDocTreeSSE(true);
-  const usePolling = sseResult.shouldUseFallback;
 
-  const { data: pollingData, mutate } = useQuery(
+  const { data: treeData, mutate } = useQuery(
     '/docs',
     {
       params: {
@@ -72,16 +72,14 @@ function DocsContent() {
       },
     },
     {
-      refreshInterval: usePolling ? 2000 : 0,
+      ...sseFallbackOptions(sseResult),
       revalidateIfStale: false,
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
       keepPreviousData: true,
-      isPaused: () => sseResult.isConnected,
     }
   );
-
-  const treeData = sseResult.data ?? pollingData;
+  useSSECacheSync(sseResult, mutate);
 
   // Set page title
   useEffect(() => {

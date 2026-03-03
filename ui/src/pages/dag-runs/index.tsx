@@ -24,6 +24,7 @@ import DAGRunGroupedView from '../../features/dag-runs/components/dag-run-list/D
 import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
 import { useQuery } from '../../hooks/api';
 import { useDAGRunsListSSE } from '../../hooks/useDAGRunsListSSE';
+import { sseFallbackOptions, useSSECacheSync } from '../../hooks/useSSECacheSync';
 import StatusChip from '../../ui/StatusChip';
 import Title from '../../ui/Title';
 
@@ -421,9 +422,7 @@ function DAGRuns() {
     toDate: formatDateForApi(apiToDate),
   };
   const sseResult = useDAGRunsListSSE(sseParams, true);
-  const shouldUsePolling = sseResult.shouldUseFallback || !sseResult.isConnected || !sseResult.data;
-
-  const { data: pollingData, mutate } = useQuery(
+  const { data, mutate } = useQuery(
     '/dag-runs',
     {
       params: {
@@ -438,17 +437,9 @@ function DAGRuns() {
         },
       },
     },
-    {
-      revalidateIfStale: shouldUsePolling,
-      revalidateOnFocus: shouldUsePolling,
-      revalidateOnReconnect: shouldUsePolling,
-      refreshInterval: shouldUsePolling ? 2000 : 0,
-      isPaused: () => !shouldUsePolling,
-    }
+    sseFallbackOptions(sseResult)
   );
-
-  // Prefer SSE data when connected, fall back to polling data
-  const data = sseResult.data ?? pollingData;
+  useSSECacheSync(sseResult, mutate);
 
   const addSearchParam = (key: string, value: string | undefined) => {
     const locationQuery = new URLSearchParams(window.location.search);

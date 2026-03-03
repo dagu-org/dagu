@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import { useDAGRunSSE } from '../../../../hooks/useDAGRunSSE';
-import { useLastValidData } from '../../../../hooks/useLastValidData';
+import { sseFallbackOptions, useSSECacheSync } from '../../../../hooks/useSSECacheSync';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGRunContext } from '../../contexts/DAGRunContext';
@@ -59,8 +59,7 @@ function DAGRunDetailsPanel({
     { refreshInterval: 2000, isPaused: () => !isSubDAGRun }
   );
 
-  // Regular DAG query (fallback when SSE is unavailable)
-  const sseIsActive = sseResult.isConnected && !sseResult.shouldUseFallback && sseResult.data != null;
+  // Regular DAG query — SWR is the single source of truth, kept fresh by SSE sync
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}',
     {
@@ -73,18 +72,15 @@ function DAGRunDetailsPanel({
       },
     },
     {
-      refreshInterval: sseIsActive ? 0 : 2000,
-      isPaused: () => isSubDAGRun || sseIsActive,
+      ...sseFallbackOptions(sseResult),
+      isPaused: () => isSubDAGRun,
     }
   );
+  useSSECacheSync(sseResult, dagRunQuery.mutate);
 
-  // Select data source: sub-DAG query, SSE data, or polling query
+  // Select data source: sub-DAG query or regular query
   const { mutate } = isSubDAGRun ? subDAGQuery : dagRunQuery;
-  const data = isSubDAGRun
-    ? subDAGQuery.data
-    : sseResult.data || dagRunQuery.data;
-
-  const displayData = useLastValidData(data ?? null, remoteNode);
+  const data = isSubDAGRun ? subDAGQuery.data : dagRunQuery.data;
 
   const refreshFn = React.useCallback(() => {
     setTimeout(() => mutate(), 500);
@@ -140,7 +136,7 @@ function DAGRunDetailsPanel({
   }, [onClose, onNavigate, handleFullscreenClick]);
 
   // Only show loading on initial load, not when switching DAG runs
-  if (!displayData) {
+  if (!data) {
     return (
       <div className="flex items-center justify-center h-full">
         <LoadingIndicator />
@@ -189,7 +185,7 @@ function DAGRunDetailsPanel({
         <div className="flex-1 overflow-y-auto min-h-0">
           <DAGRunDetailsContent
             name={name}
-            dagRun={displayData.dagRunDetails}
+            dagRun={data.dagRunDetails}
             refreshFn={refreshFn}
             dagRunId={dagRunId}
           />

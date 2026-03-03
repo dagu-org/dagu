@@ -9,15 +9,13 @@ import { usePageContext } from '../../../../contexts/PageContext';
 import { UnsavedChangesProvider } from '../../../../contexts/UnsavedChangesContext';
 import { useQuery } from '../../../../hooks/api';
 import { useDAGSSE } from '../../../../hooks/useDAGSSE';
-import { useLastValidData } from '../../../../hooks/useLastValidData';
+import { sseFallbackOptions, useSSECacheSync } from '../../../../hooks/useSSECacheSync';
 import dayjs from '../../../../lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';
 import DAGDetailsContent from './DAGDetailsContent';
-
-const POLLING_INTERVAL_MS = 2000;
 
 function formatDuration(startDate: string, endDate: string): string {
   if (!startDate || !endDate) {
@@ -38,10 +36,6 @@ function formatDuration(startDate: string, endDate: string): string {
   return `${seconds}s`;
 }
 
-function getPollingInterval(notFound: boolean, shouldPoll: boolean): number {
-  return notFound || !shouldPoll ? 0 : POLLING_INTERVAL_MS;
-}
-
 type Props = {
   fileName: string;
   onClose: () => void;
@@ -49,7 +43,6 @@ type Props = {
 };
 
 type DAGRunDetails = components['schemas']['DAGRunDetails'];
-type DAGDetailsData = ReturnType<typeof useDAGSSE>['data'];
 
 function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactElement | null {
   const navigate = useNavigate();
@@ -76,9 +69,9 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
   // SSE for real-time updates with polling fallback
   const sseResult = useDAGSSE(fileName || '', !!fileName);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const shouldPoll = sseResult.shouldUseFallback || !sseResult.isConnected || !sseResult.data;
-
-  const { data: pollingData, error, mutate } = useQuery(
+  // Fetch DAG details — SWR is the single source of truth, kept fresh by SSE sync
+  const sseOpts = sseFallbackOptions(sseResult);
+  const { data, error, mutate } = useQuery(
     '/dags/{fileName}',
     {
       params: {
@@ -86,13 +79,9 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
         path: { fileName: fileName || '' },
       },
     },
-    {
-      refreshInterval: getPollingInterval(notFound, shouldPoll),
-      isPaused: () => !shouldPoll && !notFound,
-    }
+    { ...sseOpts, refreshInterval: notFound ? 0 : sseOpts.refreshInterval }
   );
-
-  const data = sseResult.data || pollingData;
+  useSSECacheSync(sseResult, mutate);
 
   // Track data loading state and handle 404 errors
   useEffect(() => {
@@ -112,8 +101,6 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
     setActiveTab('status');
   }, [fileName, remoteNode]);
 
-  const displayData = useLastValidData(data ?? null, `${fileName}|${remoteNode}`);
-
   function refreshFn(): void {
     setTimeout(() => mutate(), 500);
   }
@@ -130,10 +117,10 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
   }
 
   useEffect(() => {
-    if (displayData) {
-      setCurrentDAGRun(displayData.latestDAGRun);
+    if (data) {
+      setCurrentDAGRun(data.latestDAGRun);
     }
-  }, [displayData]);
+  }, [data]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -176,7 +163,7 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
 
   // Only show loading on initial load, not when switching DAGs
   // Gate on dag existence, not latestDAGRun, so DAGs with no runs can still be displayed
-  if (!displayData?.dag) {
+  if (!data?.dag) {
     return (
       <div className="flex items-center justify-center h-full">
         <LoadingIndicator />
@@ -190,7 +177,7 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
         value={{
           refresh: refreshFn,
           fileName: fileName || '',
-          name: displayData.dag.name || '',
+          name: data.dag.name || '',
         }}
       >
         <RootDAGRunContext.Provider
@@ -228,8 +215,8 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
             <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 pr-4">
               <DAGDetailsContent
                 fileName={fileName}
-                dag={displayData.dag}
-                currentDAGRun={displayData.latestDAGRun}
+                dag={data.dag}
+                currentDAGRun={data.latestDAGRun}
                 refreshFn={refreshFn}
                 formatDuration={formatDuration}
                 activeTab={activeTab}
@@ -238,7 +225,7 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
                 stepName={null}
                 isModal={true}
                 navigateToStatusTab={() => setActiveTab('status')}
-                localDags={displayData.localDags}
+                localDags={data.localDags}
               />
             </div>
           </div>
