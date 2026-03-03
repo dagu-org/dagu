@@ -1005,32 +1005,66 @@ func TestSessionManager_CancelPendingPrompts(t *testing.T) {
 	})
 }
 
-func TestSessionManager_CreateRecordMessageFunc_DetachedContext(t *testing.T) {
+func TestRepairOrphanedToolCalls(t *testing.T) {
 	t.Parallel()
 
-	t.Run("persists message even with cancelled context", func(t *testing.T) {
+	t.Run("no-op on empty history", func(t *testing.T) {
 		t.Parallel()
+		result := repairOrphanedToolCalls(nil)
+		assert.Nil(t, result)
+	})
 
-		var persisted bool
-		sm := NewSessionManager(SessionManagerConfig{
-			ID: "detached-ctx",
-			OnMessage: func(_ context.Context, _ Message) error {
-				persisted = true
-				return nil
-			},
-		})
+	t.Run("no-op when all tool calls have results", func(t *testing.T) {
+		t.Parallel()
+		history := []llm.Message{
+			{Role: llm.RoleUser, Content: "hi"},
+			{Role: llm.RoleAssistant, ToolCalls: []llm.ToolCall{{ID: "tc1"}}},
+			{Role: llm.RoleTool, ToolCallID: "tc1", Content: "done"},
+		}
+		result := repairOrphanedToolCalls(history)
+		assert.Len(t, result, 3)
+	})
 
-		recordMsg := sm.createRecordMessageFunc()
+	t.Run("adds synthetic result for orphaned tool call", func(t *testing.T) {
+		t.Parallel()
+		history := []llm.Message{
+			{Role: llm.RoleUser, Content: "hi"},
+			{Role: llm.RoleAssistant, ToolCalls: []llm.ToolCall{{ID: "tc1"}, {ID: "tc2"}}},
+			{Role: llm.RoleTool, ToolCallID: "tc1", Content: "done"},
+			// tc2 is missing — orphaned
+		}
+		result := repairOrphanedToolCalls(history)
+		require.Len(t, result, 4)
+		assert.Equal(t, llm.RoleTool, result[3].Role)
+		assert.Equal(t, "tc2", result[3].ToolCallID)
+		assert.Contains(t, result[3].Content, "cancelled")
+	})
 
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel() // Cancel immediately.
+	t.Run("adds results for all missing tool calls", func(t *testing.T) {
+		t.Parallel()
+		history := []llm.Message{
+			{Role: llm.RoleAssistant, ToolCalls: []llm.ToolCall{{ID: "a"}, {ID: "b"}, {ID: "c"}}},
+			// All missing
+		}
+		result := repairOrphanedToolCalls(history)
+		require.Len(t, result, 4) // 1 assistant + 3 synthetic
+		for _, msg := range result[1:] {
+			assert.Equal(t, llm.RoleTool, msg.Role)
+			assert.Contains(t, msg.Content, "cancelled")
+		}
+	})
 
-		recordMsg(ctx, Message{
-			Type:    MessageTypeUser,
-			Content: "test",
-		})
-
-		assert.True(t, persisted, "message should be persisted even with cancelled context")
+	t.Run("ignores earlier paired tool calls", func(t *testing.T) {
+		t.Parallel()
+		history := []llm.Message{
+			{Role: llm.RoleUser, Content: "first"},
+			{Role: llm.RoleAssistant, ToolCalls: []llm.ToolCall{{ID: "old"}}},
+			{Role: llm.RoleTool, ToolCallID: "old", Content: "result"},
+			{Role: llm.RoleUser, Content: "second"},
+			// No orphaned calls — last non-tool message is a user message
+		}
+		result := repairOrphanedToolCalls(history)
+		assert.Len(t, result, 4) // unchanged
 	})
 }
 

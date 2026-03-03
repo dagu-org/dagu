@@ -641,6 +641,10 @@ func (sm *SessionManager) runLoop(ctx context.Context, loop *Loop) {
 }
 
 // extractLLMHistoryLocked converts stored messages to LLM format.
+// If the history ends with an assistant message containing tool calls
+// that have no matching tool results (e.g. due to cancellation or crash),
+// synthetic "cancelled" results are appended so the LLM API accepts
+// the history without errors.
 // Must be called with sm.mu held.
 func (sm *SessionManager) extractLLMHistoryLocked() []llm.Message {
 	history := make([]llm.Message, 0, len(sm.messages))
@@ -649,6 +653,53 @@ func (sm *SessionManager) extractLLMHistoryLocked() []llm.Message {
 			history = append(history, *msg.LLMData)
 		}
 	}
+	return repairOrphanedToolCalls(history)
+}
+
+// repairOrphanedToolCalls checks whether the last assistant message has
+// tool calls without matching tool-role results and adds synthetic
+// cancelled results for any that are missing.
+func repairOrphanedToolCalls(history []llm.Message) []llm.Message {
+	if len(history) == 0 {
+		return history
+	}
+
+	// Find the last assistant message with tool calls.
+	var lastAssistantIdx int = -1
+	for i := len(history) - 1; i >= 0; i-- {
+		if history[i].Role == llm.RoleAssistant && len(history[i].ToolCalls) > 0 {
+			lastAssistantIdx = i
+			break
+		}
+		// Stop scanning once we hit a non-tool, non-assistant message — earlier
+		// tool calls are already paired from previous loop iterations.
+		if history[i].Role != llm.RoleTool {
+			break
+		}
+	}
+	if lastAssistantIdx < 0 {
+		return history
+	}
+
+	// Collect IDs of tool results that follow the assistant message.
+	answered := make(map[string]struct{})
+	for i := lastAssistantIdx + 1; i < len(history); i++ {
+		if history[i].Role == llm.RoleTool && history[i].ToolCallID != "" {
+			answered[history[i].ToolCallID] = struct{}{}
+		}
+	}
+
+	// Synthesize results for any orphaned tool calls.
+	for _, tc := range history[lastAssistantIdx].ToolCalls {
+		if _, ok := answered[tc.ID]; !ok {
+			history = append(history, llm.Message{
+				Role:       llm.RoleTool,
+				ToolCallID: tc.ID,
+				Content:    "Tool execution was cancelled.",
+			})
+		}
+	}
+
 	return history
 }
 
@@ -678,15 +729,7 @@ func (sm *SessionManager) createRecordMessageFunc() MessageRecordFunc {
 		})
 
 		if sm.onMessage != nil {
-			// Use a detached context for persistence when the loop context is
-			// cancelled. This ensures tool results and assistant messages are
-			// always persisted, preventing broken tool_use/tool_result pairings
-			// in session history on reload.
-			persistCtx := ctx
-			if persistCtx.Err() != nil {
-				persistCtx = context.Background()
-			}
-			if err := sm.onMessage(persistCtx, msg); err != nil {
+			if err := sm.onMessage(ctx, msg); err != nil {
 				sm.logger.Warn("failed to persist message", "error", err)
 			}
 		}
