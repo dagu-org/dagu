@@ -29,5 +29,5 @@ export function parseTagParts(tag: string): { key: string; value: string | null 
  * that already contain underscores.
  */
 export function toMermaidNodeId(stepName: string): string {
-  return stepName.replace(/[^a-zA-Z0-9_]/g, 'dagutmp');
+  return stepName.replace(/[^a-zA-Z0-9_]/gu, 'dagutmp');
 }
