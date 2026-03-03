@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Check, MessageCircleQuestion, SkipForward } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserPrompt, UserPromptResponse } from '../types';
@@ -18,6 +18,16 @@ export function UserPromptMessage({
 }: UserPromptMessageProps): React.ReactNode {
   const [selectedOptions, setSelectedOptions] = useState<Set<string>>(new Set());
   const [freeText, setFreeText] = useState('');
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus the container when the prompt appears so keyboard navigation works immediately.
+  useEffect(() => {
+    if (!isAnswered) {
+      containerRef.current?.focus();
+    }
+  }, [isAnswered]);
 
   const handleOptionClick = (optionId: string) => {
     if (isAnswered) return;
@@ -38,6 +48,7 @@ export function UserPromptMessage({
       }
     }
     setSelectedOptions(newSelected);
+    setFocusedIndex(-1);
     if (newSelected.size > 0) {
       setFreeText('');
     }
@@ -45,6 +56,7 @@ export function UserPromptMessage({
 
   const handleFreeTextChange = (value: string) => {
     setFreeText(value);
+    setFocusedIndex(-1);
     if (value) {
       setSelectedOptions(new Set());
     }
@@ -80,6 +92,54 @@ export function UserPromptMessage({
 
   const canSubmit = selectedOptions.size > 0 || freeText.trim().length > 0;
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (isAnswered) return;
+
+    // Let focused buttons (Submit, Skip, option buttons) handle Enter/Space natively.
+    if (e.target instanceof HTMLButtonElement) return;
+
+    // Don't intercept any keys when free-text input is focused, except Enter to submit.
+    if (e.target === inputRef.current) {
+      if (e.key === 'Enter' && canSubmit) {
+        e.preventDefault();
+        handleSubmit();
+      }
+      return;
+    }
+
+    const optionCount = prompt.options?.length ?? 0;
+
+    if (optionCount > 0) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        setFocusedIndex(prev => Math.min(prev + 1, optionCount - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setFocusedIndex(prev => Math.max(prev - 1, 0));
+        return;
+      }
+      if ((e.key === 'Enter' || e.key === ' ') && focusedIndex >= 0) {
+        e.preventDefault();
+        const option = prompt.options?.[focusedIndex];
+        if (option) handleOptionClick(option.id);
+        return;
+      }
+    }
+
+    if (e.key === 'Enter' && canSubmit) {
+      e.preventDefault();
+      handleSubmit();
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      containerRef.current?.blur();
+    }
+  };
+
   if (isAnswered) {
     return (
       <div className="pl-1">
@@ -100,7 +160,16 @@ export function UserPromptMessage({
 
   return (
     <div className="pl-1">
-      <div className="rounded-lg border border-orange-300 dark:border-amber-500/40 bg-orange-50 dark:bg-amber-500/10 p-2">
+      <div
+        ref={containerRef}
+        tabIndex={0}
+        onKeyDown={handleKeyDown}
+        role={prompt.options && prompt.options.length > 0 ? 'listbox' : undefined}
+        aria-label={prompt.question}
+        aria-multiselectable={prompt.multi_select || undefined}
+        aria-activedescendant={focusedIndex >= 0 && prompt.options?.[focusedIndex] ? prompt.options[focusedIndex].id : undefined}
+        className="rounded-lg border border-orange-300 dark:border-amber-500/40 bg-orange-50 dark:bg-amber-500/10 p-2 outline-none"
+      >
         <div className="flex items-start gap-1.5 mb-2">
           <MessageCircleQuestion className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-orange-600 dark:text-orange-400" />
           <p className="text-xs font-medium text-foreground">{prompt.question}</p>
@@ -108,15 +177,19 @@ export function UserPromptMessage({
 
         {prompt.options && prompt.options.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-2">
-            {prompt.options.map((option) => (
+            {prompt.options.map((option, index) => (
               <button
                 key={option.id}
+                id={option.id}
+                role="option"
+                aria-selected={selectedOptions.has(option.id)}
                 onClick={() => handleOptionClick(option.id)}
                 className={cn(
                   'px-2 py-1 text-xs rounded border transition-colors',
                   selectedOptions.has(option.id)
                     ? 'bg-amber-500 text-white border-amber-500'
-                    : 'bg-background border-border hover:border-amber-500/50'
+                    : 'bg-background border-border hover:border-amber-500/50',
+                  index === focusedIndex && 'ring-1 ring-amber-500/70'
                 )}
                 title={option.description}
               >
@@ -128,6 +201,7 @@ export function UserPromptMessage({
 
         {prompt.allow_free_text && (
           <input
+            ref={inputRef}
             type="text"
             value={freeText}
             onChange={(e) => handleFreeTextChange(e.target.value)}
