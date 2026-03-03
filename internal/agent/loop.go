@@ -81,6 +81,10 @@ type LoopConfig struct {
 	AllowedSkills map[string]struct{}
 	// WebSearch configures provider-native web search for requests.
 	WebSearch *llm.WebSearchRequest
+	// OnTurnComplete is called after a queued message batch is successfully
+	// processed (processLLMRequest returned nil). For single-shot callers
+	// like the agent-step executor this is the signal to cancel the loop.
+	OnTurnComplete func()
 }
 
 // Loop manages a session turn with an LLM including tool execution.
@@ -111,6 +115,7 @@ type Loop struct {
 	skillStore       SkillStore
 	allowedSkills    map[string]struct{}
 	webSearch        *llm.WebSearchRequest
+	onTurnComplete   func()
 }
 
 // NewLoop creates a new Loop instance.
@@ -143,6 +148,7 @@ func NewLoop(config LoopConfig) *Loop {
 		skillStore:       config.SkillStore,
 		allowedSkills:    config.AllowedSkills,
 		webSearch:        config.WebSearch,
+		onTurnComplete:   config.OnTurnComplete,
 	}
 }
 
@@ -213,6 +219,9 @@ func (l *Loop) Go(ctx context.Context) error {
 			}
 			retrier.Reset()
 			l.logger.Info("finished processing queued messages")
+			if l.onTurnComplete != nil {
+				l.onTurnComplete()
+			}
 		} else {
 			if !idleTimer.Stop() {
 				select {
