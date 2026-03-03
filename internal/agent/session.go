@@ -665,7 +665,7 @@ func repairOrphanedToolCalls(history []llm.Message) []llm.Message {
 	}
 
 	// Find the last assistant message with tool calls.
-	var lastAssistantIdx int = -1
+	lastAssistantIdx := -1
 	for i := len(history) - 1; i >= 0; i-- {
 		if history[i].Role == llm.RoleAssistant && len(history[i].ToolCalls) > 0 {
 			lastAssistantIdx = i
