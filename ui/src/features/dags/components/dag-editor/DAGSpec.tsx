@@ -98,11 +98,16 @@ function DAGSpec({ fileName, localDags }: Props) {
     },
     sseFallbackOptions(sseResult)
   );
-  useSSECacheSync(sseResult, mutateSpec, (sseData) => ({
-    dag: sseData.dag,
-    spec: sseData.spec ?? '',
-    errors: sseData.errors,
-  }));
+  useSSECacheSync(sseResult, mutateSpec, (sseData) => {
+    // Skip cache update when spec is missing to avoid overwriting valid
+    // cached spec with empty string, which would trigger false conflicts.
+    if (sseData.spec === undefined) return undefined;
+    return {
+      dag: sseData.dag,
+      spec: sseData.spec,
+      errors: sseData.errors,
+    };
+  });
 
   // Server spec — SWR cache is always fresh (updated by SSE sync or polling)
   const serverSpec = data?.spec ?? null;

@@ -30,13 +30,22 @@ export function sseFallbackOptions(
  *
  * An optional `transform` function maps SSE data to the SWR cache shape when
  * the SSE type differs from the SWR endpoint type (e.g., DAGSpec).
+ * Return `undefined` from `transform` to skip the cache update (e.g., when
+ * the SSE payload is missing fields that would overwrite valid cached data).
+ *
+ * `transform` is stored in a ref so inline arrow functions don't cause
+ * unnecessary effect re-runs — the latest transform is always used when
+ * new SSE data arrives.
  */
 export function useSSECacheSync<S, T = S>(
   sseResult: SSEState<S>,
   mutate: KeyedMutator<T>,
-  transform?: (data: S) => T
+  transform?: (data: S) => T | undefined
 ) {
   const prevDataRef = useRef<S | null>(null);
+  const transformRef = useRef(transform);
+  transformRef.current = transform;
+
   useEffect(() => {
     if (
       sseResult.isConnected &&
@@ -44,10 +53,12 @@ export function useSSECacheSync<S, T = S>(
       sseResult.data !== prevDataRef.current
     ) {
       prevDataRef.current = sseResult.data;
-      const cacheData = transform
-        ? transform(sseResult.data)
+      const cacheData = transformRef.current
+        ? transformRef.current(sseResult.data)
         : (sseResult.data as unknown as T);
-      mutate(cacheData, { revalidate: false });
+      if (cacheData !== undefined) {
+        mutate(cacheData, { revalidate: false });
+      }
     }
-  }, [sseResult.data, sseResult.isConnected, mutate, transform]);
+  }, [sseResult.data, sseResult.isConnected, mutate]);
 }
