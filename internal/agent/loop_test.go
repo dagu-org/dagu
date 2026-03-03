@@ -682,6 +682,7 @@ func TestLoop_ToolCallFlow(t *testing.T) {
 			recorded = append(recorded, msg)
 			mu.Unlock()
 		},
+		OnTurnComplete: func() { cancel() },
 	})
 
 	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "run tool"})
@@ -746,6 +747,7 @@ func TestLoop_DelegateToolIsolation(t *testing.T) {
 			parentMessages = append(parentMessages, msg)
 			mu.Unlock()
 		},
+		OnTurnComplete: func() { cancel() },
 	})
 
 	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "delegate this"})
@@ -786,9 +788,10 @@ func TestLoop_RecordMessageError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	loop := NewLoop(LoopConfig{
-		Provider:      provider,
-		Model:         "test",
-		RecordMessage: func(_ context.Context, _ Message) {},
+		Provider:       provider,
+		Model:          "test",
+		RecordMessage:  func(_ context.Context, _ Message) {},
+		OnTurnComplete: func() { cancel() },
 	})
 
 	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
@@ -826,13 +829,14 @@ func TestLoop_BatchedDelegates(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	loop := NewLoop(LoopConfig{
-		Provider:     provider,
-		Model:        "test",
-		Tools:        []*AgentTool{NewDelegateTool()},
-		SessionID:    parentID,
-		SessionStore: store,
-		User:         UserIdentity{UserID: "user1"},
-		Registry:     newMockSubSessionRegistry(),
+		Provider:       provider,
+		Model:          "test",
+		Tools:          []*AgentTool{NewDelegateTool()},
+		SessionID:      parentID,
+		SessionStore:   store,
+		User:           UserIdentity{UserID: "user1"},
+		Registry:       newMockSubSessionRegistry(),
+		OnTurnComplete: func() { cancel() },
 	})
 
 	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "do 3 things"})
@@ -888,13 +892,14 @@ func TestLoop_BatchedDelegateExceedsMax(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	loop := NewLoop(LoopConfig{
-		Provider:     provider,
-		Model:        "test",
-		Tools:        []*AgentTool{NewDelegateTool()},
-		SessionID:    parentID,
-		SessionStore: store,
-		User:         UserIdentity{UserID: "user1"},
-		Registry:     newMockSubSessionRegistry(),
+		Provider:       provider,
+		Model:          "test",
+		Tools:          []*AgentTool{NewDelegateTool()},
+		SessionID:      parentID,
+		SessionStore:   store,
+		User:           UserIdentity{UserID: "user1"},
+		Registry:       newMockSubSessionRegistry(),
+		OnTurnComplete: func() { cancel() },
 	})
 
 	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "do 12 things"})
@@ -1092,4 +1097,133 @@ func TestLoop_DelegateContextOnlyForDelegateTool(t *testing.T) {
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
 	assert.Empty(t, registry.registered, "no sub-sessions should be registered for non-delegate tools")
+}
+
+func TestLoop_OnTurnComplete(t *testing.T) {
+	t.Parallel()
+
+	t.Run("fires after successful turn and loop exits", func(t *testing.T) {
+		t.Parallel()
+
+		provider := newStopProvider("hello from LLM")
+
+		var turnCompleted atomic.Int32
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		loop := NewLoop(LoopConfig{
+			Provider: provider,
+			Model:    "test",
+			OnTurnComplete: func() {
+				turnCompleted.Add(1)
+				cancel()
+			},
+		})
+		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
+
+		err := loop.Go(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.Equal(t, int32(1), turnCompleted.Load(),
+			"OnTurnComplete should fire exactly once after the LLM responds")
+	})
+
+	t.Run("fires after tool calls complete", func(t *testing.T) {
+		t.Parallel()
+
+		provider := newSequenceProvider(
+			&llm.ChatResponse{
+				FinishReason: "tool_calls",
+				ToolCalls: []llm.ToolCall{{
+					ID:   "tc-1",
+					Type: "function",
+					Function: llm.ToolCallFunction{
+						Name:      "think",
+						Arguments: `{"thought": "thinking"}`,
+					},
+				}},
+			},
+			&llm.ChatResponse{Content: "done", FinishReason: "stop"},
+		)
+
+		var turnCompleted atomic.Int32
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		loop := NewLoop(LoopConfig{
+			Provider: provider,
+			Model:    "test",
+			Tools:    CreateTools(ToolConfig{}),
+			OnTurnComplete: func() {
+				turnCompleted.Add(1)
+				cancel()
+			},
+		})
+		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "use a tool"})
+
+		err := loop.Go(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.Equal(t, int32(1), turnCompleted.Load(),
+			"OnTurnComplete should fire once after tool calls + final response")
+	})
+
+	t.Run("does not fire on LLM error", func(t *testing.T) {
+		t.Parallel()
+
+		callCount := atomic.Int32{}
+		provider := &mockLLMProvider{
+			chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+				callCount.Add(1)
+				return nil, fmt.Errorf("API error")
+			},
+		}
+
+		var turnCompleted atomic.Int32
+
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+
+		loop := NewLoop(LoopConfig{
+			Provider: provider,
+			Model:    "test",
+			OnTurnComplete: func() {
+				turnCompleted.Add(1)
+			},
+		})
+		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "fail"})
+
+		_ = loop.Go(ctx)
+
+		assert.Equal(t, int32(0), turnCompleted.Load(),
+			"OnTurnComplete should not fire when LLM request fails")
+		assert.GreaterOrEqual(t, callCount.Load(), int32(1),
+			"provider should have been called at least once")
+	})
+
+	t.Run("loop exits promptly without idle polling", func(t *testing.T) {
+		t.Parallel()
+
+		provider := newStopProvider("quick response")
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		loop := NewLoop(LoopConfig{
+			Provider: provider,
+			Model:    "test",
+			OnTurnComplete: func() {
+				cancel()
+			},
+		})
+		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
+
+		start := time.Now()
+		err := loop.Go(ctx)
+		elapsed := time.Since(start)
+
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.Less(t, elapsed, 2*time.Second,
+			"loop should exit promptly via OnTurnComplete, not wait for idle timeout")
+	})
 }

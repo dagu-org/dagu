@@ -245,6 +245,11 @@ func (e *Executor) Run(ctx context.Context) error {
 				}
 			}
 		},
+		OnTurnComplete: func() {
+			// In a workflow step, cancel the loop after the first successful
+			// turn since no new messages will be queued externally.
+			cancelLoop()
+		},
 	})
 
 	// Queue user messages.
