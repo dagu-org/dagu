@@ -1834,6 +1834,12 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 
 			steps = append(steps, *builtStep)
 		}
+		// Sort steps by name for deterministic output when built from a map.
+		// Go map iteration is non-deterministic, which causes the SSE watcher's
+		// JSON hash to change on every poll, triggering unnecessary broadcasts.
+		slices.SortFunc(steps, func(a, b core.Step) int {
+			return strings.Compare(a.Name, b.Name)
+		})
 		// Transform router steps: inject preconditions into targets
 		if err := transformRouterSteps(steps); err != nil {
 			return nil, err

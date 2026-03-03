@@ -39,7 +39,7 @@ function DocEditor({ tabId, docPath }: Props) {
   const sseResult = useDocSSE(docPath);
 
   // Polling fallback when SSE fails
-  const { data: pollingData } = useQuery(
+  const { data: pollingData, mutate: mutateDoc } = useQuery(
     '/docs/doc',
     {
       params: {
@@ -81,11 +81,15 @@ function DocEditor({ tabId, docPath }: Props) {
   });
   const [isSaving, setIsSaving] = useState(false);
 
-  // Use refs for cleanup to avoid stale closures
+  // Use refs for cleanup and to avoid stale closures / unnecessary callback recreation
   const currentValueRef = useRef(currentValue);
   currentValueRef.current = currentValue;
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
   hasUnsavedChangesRef.current = hasUnsavedChanges;
+  const pollingDataRef = useRef(pollingData);
+  pollingDataRef.current = pollingData;
+  const mutateDocRef = useRef(mutateDoc);
+  mutateDocRef.current = mutateDoc;
 
   // Restore draft on mount
   useEffect(() => {
@@ -131,6 +135,16 @@ function DocEditor({ tabId, docPath }: Props) {
         showToast('Failed to save document');
       } else {
         markAsSaved(currentValueRef.current);
+        // Update the SWR polling cache directly with the saved content.
+        // mutateDoc() alone is blocked by isPaused() when SSE is connected,
+        // leaving pollingData stale. When SSE later disconnects, serverContent
+        // falls back to the stale pollingData, triggering a false conflict.
+        if (pollingDataRef.current && currentValueRef.current != null) {
+          mutateDocRef.current(
+            { ...pollingDataRef.current, content: currentValueRef.current },
+            { revalidate: false }
+          );
+        }
         markTabSaved(tabId);
         clearDraft(tabId);
         showToast('Document saved');
