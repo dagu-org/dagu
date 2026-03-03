@@ -390,8 +390,8 @@ func (sm *SessionManager) AcceptUserMessage(ctx context.Context, provider llm.Pr
 	if loop == nil {
 		return errors.New("session loop not initialized")
 	}
-	loop.QueueUserMessage(llmMsg)
 	sm.SetWorking(true)
+	loop.QueueUserMessage(llmMsg)
 
 	return nil
 }

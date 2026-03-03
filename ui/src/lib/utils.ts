@@ -22,11 +22,15 @@ export function parseTagParts(tag: string): { key: string; value: string | null 
 }
 
 /**
- * Converts a step name to a valid Mermaid node ID by replacing
- * characters that could break Mermaid syntax (spaces, dashes, parentheses).
- * Uses 'dagutmp' as the replacement to avoid collisions with step names
- * that already contain underscores.
+ * Converts a step name to a valid Mermaid node ID by encoding
+ * all non-ASCII-alphanumeric characters (including emojis, CJK characters,
+ * and other Unicode) that could break Mermaid syntax.
+ * Each character is encoded as its hex code point delimited by underscores
+ * (e.g., 'ス' → 'u30b9_') to produce deterministic, collision-free IDs.
  */
 export function toMermaidNodeId(stepName: string): string {
-  return stepName.replace(/[\s-()]/g, 'dagutmp');
+  return stepName.replace(
+    /[^a-zA-Z0-9_]/gu,
+    (ch) => `u${ch.codePointAt(0)!.toString(16)}_`,
+  );
 }
