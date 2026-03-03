@@ -104,6 +104,12 @@ function DAGSpec({ fileName, localDags }: Props) {
     }
   );
 
+  // Refs to avoid recreating handleSave when polling data or mutate changes
+  const pollingDataRef = React.useRef(pollingData);
+  pollingDataRef.current = pollingData;
+  const mutateSpecRef = React.useRef(mutateSpec);
+  mutateSpecRef.current = mutateSpec;
+
   // Best available server spec — prefer SSE when connected, polling when not.
   // When SSE disconnects, sseResult.data retains stale values,
   // so only use SSE spec when actively connected.
@@ -195,9 +201,9 @@ function DAGSpec({ fileName, localDags }: Props) {
     // mutateSpec() alone is blocked by isPaused() when SSE is connected,
     // leaving pollingData stale. When SSE later disconnects, serverSpec
     // falls back to the stale pollingData, triggering a false conflict.
-    if (pollingData) {
-      mutateSpec(
-        { ...pollingData, spec: currentValue },
+    if (pollingDataRef.current) {
+      mutateSpecRef.current(
+        { ...pollingDataRef.current, spec: currentValue },
         { revalidate: false }
       );
     }
@@ -213,8 +219,6 @@ function DAGSpec({ fileName, localDags }: Props) {
     showError,
     showToast,
     markAsSaved,
-    mutateSpec,
-    pollingData,
   ]);
 
   // Restore scroll position after render

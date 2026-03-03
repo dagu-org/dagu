@@ -81,11 +81,15 @@ function DocEditor({ tabId, docPath }: Props) {
   });
   const [isSaving, setIsSaving] = useState(false);
 
-  // Use refs for cleanup to avoid stale closures
+  // Use refs for cleanup and to avoid stale closures / unnecessary callback recreation
   const currentValueRef = useRef(currentValue);
   currentValueRef.current = currentValue;
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
   hasUnsavedChangesRef.current = hasUnsavedChanges;
+  const pollingDataRef = useRef(pollingData);
+  pollingDataRef.current = pollingData;
+  const mutateDocRef = useRef(mutateDoc);
+  mutateDocRef.current = mutateDoc;
 
   // Restore draft on mount
   useEffect(() => {
@@ -135,9 +139,9 @@ function DocEditor({ tabId, docPath }: Props) {
         // mutateDoc() alone is blocked by isPaused() when SSE is connected,
         // leaving pollingData stale. When SSE later disconnects, serverContent
         // falls back to the stale pollingData, triggering a false conflict.
-        if (pollingData && currentValueRef.current != null) {
-          mutateDoc(
-            { ...pollingData, content: currentValueRef.current },
+        if (pollingDataRef.current && currentValueRef.current != null) {
+          mutateDocRef.current(
+            { ...pollingDataRef.current, content: currentValueRef.current },
             { revalidate: false }
           );
         }
@@ -150,7 +154,7 @@ function DocEditor({ tabId, docPath }: Props) {
     } finally {
       setIsSaving(false);
     }
-  }, [isSaving, client, remoteNode, docPath, markAsSaved, markTabSaved, clearDraft, tabId, showToast, pollingData, mutateDoc]);
+  }, [isSaving, client, remoteNode, docPath, markAsSaved, markTabSaved, clearDraft, tabId, showToast]);
 
   // Keep save handler in ref for keyboard shortcut
   const handleSaveRef = useRef(handleSave);
