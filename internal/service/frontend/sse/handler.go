@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/remotenode"
 	"github.com/go-chi/chi/v5"
@@ -150,6 +151,12 @@ func (h *Handler) handleSSE(w http.ResponseWriter, r *http.Request, topic string
 	}
 
 	SetSSEHeaders(w)
+
+	// Clear the write deadline for long-lived SSE connections.
+	// The server's WriteTimeout (60s) would otherwise kill SSE streams,
+	// causing the frontend to reconnect and potentially show stale data.
+	rc := http.NewResponseController(w)
+	_ = rc.SetWriteDeadline(time.Time{})
 
 	client, err := NewClient(w)
 	if err != nil {

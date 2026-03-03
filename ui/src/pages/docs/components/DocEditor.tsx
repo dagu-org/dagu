@@ -39,7 +39,7 @@ function DocEditor({ tabId, docPath }: Props) {
   const sseResult = useDocSSE(docPath);
 
   // Polling fallback when SSE fails
-  const { data: pollingData } = useQuery(
+  const { data: pollingData, mutate: mutateDoc } = useQuery(
     '/docs/doc',
     {
       params: {
@@ -131,6 +131,16 @@ function DocEditor({ tabId, docPath }: Props) {
         showToast('Failed to save document');
       } else {
         markAsSaved(currentValueRef.current);
+        // Update the SWR polling cache directly with the saved content.
+        // mutateDoc() alone is blocked by isPaused() when SSE is connected,
+        // leaving pollingData stale. When SSE later disconnects, serverContent
+        // falls back to the stale pollingData, triggering a false conflict.
+        if (pollingData && currentValueRef.current != null) {
+          mutateDoc(
+            { ...pollingData, content: currentValueRef.current },
+            { revalidate: false }
+          );
+        }
         markTabSaved(tabId);
         clearDraft(tabId);
         showToast('Document saved');
@@ -140,7 +150,7 @@ function DocEditor({ tabId, docPath }: Props) {
     } finally {
       setIsSaving(false);
     }
-  }, [isSaving, client, remoteNode, docPath, markAsSaved, markTabSaved, clearDraft, tabId, showToast]);
+  }, [isSaving, client, remoteNode, docPath, markAsSaved, markTabSaved, clearDraft, tabId, showToast, pollingData, mutateDoc]);
 
   // Keep save handler in ref for keyboard shortcut
   const handleSaveRef = useRef(handleSave);

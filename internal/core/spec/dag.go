@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -1834,6 +1835,12 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 
 			steps = append(steps, *builtStep)
 		}
+		// Sort steps by name for deterministic output when built from a map.
+		// Go map iteration is non-deterministic, which causes the SSE watcher's
+		// JSON hash to change on every poll, triggering unnecessary broadcasts.
+		sort.Slice(steps, func(i, j int) bool {
+			return steps[i].Name < steps[j].Name
+		})
 		// Transform router steps: inject preconditions into targets
 		if err := transformRouterSteps(steps); err != nil {
 			return nil, err

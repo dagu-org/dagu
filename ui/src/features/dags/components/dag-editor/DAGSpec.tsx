@@ -191,8 +191,16 @@ function DAGSpec({ fileName, localDags }: Props) {
     // Mark as saved to prevent false conflict detection on our own save
     markAsSaved(currentValue);
 
-    // Invalidate the spec cache to ensure fresh data on remount
-    mutateSpec();
+    // Update the SWR polling cache directly with the saved spec value.
+    // mutateSpec() alone is blocked by isPaused() when SSE is connected,
+    // leaving pollingData stale. When SSE later disconnects, serverSpec
+    // falls back to the stale pollingData, triggering a false conflict.
+    if (pollingData) {
+      mutateSpec(
+        { ...pollingData, spec: currentValue },
+        { revalidate: false }
+      );
+    }
 
     // Show success toast notification
     showToast('Changes saved successfully');
@@ -206,6 +214,7 @@ function DAGSpec({ fileName, localDags }: Props) {
     showToast,
     markAsSaved,
     mutateSpec,
+    pollingData,
   ]);
 
   // Restore scroll position after render
