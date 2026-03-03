@@ -890,3 +890,383 @@ func TestSessionManager_RecordHeartbeat(t *testing.T) {
 		assert.False(t, sm.LastHeartbeat().IsZero())
 	})
 }
+
+func TestSessionManager_CancelPendingPrompts(t *testing.T) {
+	t.Parallel()
+
+	t.Run("cancels multiple pending general prompts", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "cancel-test"})
+
+		ch1 := make(chan UserPromptResponse, 1)
+		ch2 := make(chan UserPromptResponse, 1)
+
+		sm.promptsMu.Lock()
+		sm.pendingPrompts["p1"] = ch1
+		sm.pendingPrompts["p2"] = ch2
+		sm.promptTypes["p1"] = PromptTypeGeneral
+		sm.promptTypes["p2"] = PromptTypeGeneral
+		sm.promptsMu.Unlock()
+
+		sm.CancelPendingPrompts()
+
+		select {
+		case resp := <-ch1:
+			assert.True(t, resp.Cancelled)
+			assert.Equal(t, "p1", resp.PromptID)
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("ch1 did not receive cancellation")
+		}
+
+		select {
+		case resp := <-ch2:
+			assert.True(t, resp.Cancelled)
+			assert.Equal(t, "p2", resp.PromptID)
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("ch2 did not receive cancellation")
+		}
+	})
+
+	t.Run("skips command approval prompts", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "skip-approval"})
+
+		generalCh := make(chan UserPromptResponse, 1)
+		approvalCh := make(chan UserPromptResponse, 1)
+
+		sm.promptsMu.Lock()
+		sm.pendingPrompts["general"] = generalCh
+		sm.pendingPrompts["approval"] = approvalCh
+		sm.promptTypes["general"] = PromptTypeGeneral
+		sm.promptTypes["approval"] = PromptTypeCommandApproval
+		sm.promptsMu.Unlock()
+
+		sm.CancelPendingPrompts()
+
+		// General prompt should be cancelled.
+		select {
+		case resp := <-generalCh:
+			assert.True(t, resp.Cancelled)
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("general prompt not cancelled")
+		}
+
+		// Approval prompt should NOT be cancelled.
+		select {
+		case <-approvalCh:
+			t.Fatal("approval prompt should not be cancelled")
+		case <-time.After(50 * time.Millisecond):
+			// Expected: no cancellation.
+		}
+	})
+
+	t.Run("no panic on empty map", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "empty-cancel"})
+		assert.NotPanics(t, func() {
+			sm.CancelPendingPrompts()
+		})
+	})
+
+	t.Run("does not block on already responded channel", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "full-chan"})
+
+		ch := make(chan UserPromptResponse, 1)
+		// Pre-fill the channel.
+		ch <- UserPromptResponse{PromptID: "p1", FreeTextResponse: "answer"}
+
+		sm.promptsMu.Lock()
+		sm.pendingPrompts["p1"] = ch
+		sm.promptTypes["p1"] = PromptTypeGeneral
+		sm.promptsMu.Unlock()
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			sm.CancelPendingPrompts()
+		}()
+
+		select {
+		case <-done:
+			// Expected: did not block.
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("CancelPendingPrompts blocked on full channel")
+		}
+
+		// The original response should still be in the channel (not the cancellation).
+		resp := <-ch
+		assert.Equal(t, "answer", resp.FreeTextResponse)
+		assert.False(t, resp.Cancelled)
+	})
+}
+
+func TestSessionManager_CreateRecordMessageFunc_DetachedContext(t *testing.T) {
+	t.Parallel()
+
+	t.Run("persists message even with cancelled context", func(t *testing.T) {
+		t.Parallel()
+
+		var persisted bool
+		sm := NewSessionManager(SessionManagerConfig{
+			ID: "detached-ctx",
+			OnMessage: func(_ context.Context, _ Message) error {
+				persisted = true
+				return nil
+			},
+		})
+
+		recordMsg := sm.createRecordMessageFunc()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // Cancel immediately.
+
+		recordMsg(ctx, Message{
+			Type:    MessageTypeUser,
+			Content: "test",
+		})
+
+		assert.True(t, persisted, "message should be persisted even with cancelled context")
+	})
+}
+
+func TestSessionManager_TryRouteToGeneralPrompt(t *testing.T) {
+	t.Parallel()
+
+	t.Run("routes text to pending general prompt", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "route-test"})
+
+		ch := make(chan UserPromptResponse, 1)
+		sm.promptsMu.Lock()
+		sm.pendingPrompts["p1"] = ch
+		sm.promptTypes["p1"] = PromptTypeGeneral
+		sm.promptsMu.Unlock()
+
+		id, routed := sm.tryRouteToGeneralPrompt("main.go")
+		require.True(t, routed)
+		assert.Equal(t, "p1", id)
+
+		resp := <-ch
+		assert.Equal(t, "p1", resp.PromptID)
+		assert.Equal(t, "main.go", resp.FreeTextResponse)
+		assert.False(t, resp.Cancelled)
+	})
+
+	t.Run("skips command approval prompts", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "route-skip-approval"})
+
+		ch := make(chan UserPromptResponse, 1)
+		sm.promptsMu.Lock()
+		sm.pendingPrompts["approval-1"] = ch
+		sm.promptTypes["approval-1"] = PromptTypeCommandApproval
+		sm.promptsMu.Unlock()
+
+		id, routed := sm.tryRouteToGeneralPrompt("yes")
+		assert.False(t, routed)
+		assert.Empty(t, id)
+
+		// Channel should be empty — nothing was sent.
+		select {
+		case <-ch:
+			t.Fatal("should not have sent to approval channel")
+		default:
+			// Expected.
+		}
+	})
+
+	t.Run("returns false when channel is full", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "route-full"})
+
+		ch := make(chan UserPromptResponse, 1)
+		// Pre-fill the channel.
+		ch <- UserPromptResponse{PromptID: "p1", FreeTextResponse: "previous"}
+
+		sm.promptsMu.Lock()
+		sm.pendingPrompts["p1"] = ch
+		sm.promptTypes["p1"] = PromptTypeGeneral
+		sm.promptsMu.Unlock()
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			id, routed := sm.tryRouteToGeneralPrompt("new text")
+			assert.False(t, routed)
+			assert.Empty(t, id)
+		}()
+
+		select {
+		case <-done:
+			// Expected: did not block.
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("tryRouteToGeneralPrompt blocked on full channel")
+		}
+
+		// Original response is still there.
+		resp := <-ch
+		assert.Equal(t, "previous", resp.FreeTextResponse)
+	})
+
+	t.Run("returns false when no prompts pending", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "route-empty"})
+		id, routed := sm.tryRouteToGeneralPrompt("hello")
+		assert.False(t, routed)
+		assert.Empty(t, id)
+	})
+}
+
+func TestSessionManager_AcceptUserMessage_RoutesToPendingPrompt(t *testing.T) {
+	t.Parallel()
+
+	t.Run("routes to pending prompt and records with nil LLMData", func(t *testing.T) {
+		t.Parallel()
+
+		provider := newStopProvider("hi")
+
+		var persisted []Message
+		var mu sync.Mutex
+
+		sm := NewSessionManager(SessionManagerConfig{
+			ID: "route-accept",
+			OnMessage: func(_ context.Context, msg Message) error {
+				mu.Lock()
+				persisted = append(persisted, msg)
+				mu.Unlock()
+				return nil
+			},
+		})
+
+		// Start the loop first so ensureLoop is a no-op.
+		err := sm.AcceptUserMessage(context.Background(), provider, "m", "m", "setup")
+		require.NoError(t, err)
+		time.Sleep(50 * time.Millisecond)
+
+		// Register a pending prompt.
+		ch := make(chan UserPromptResponse, 1)
+		sm.promptsMu.Lock()
+		sm.pendingPrompts["ask-1"] = ch
+		sm.promptTypes["ask-1"] = PromptTypeGeneral
+		sm.promptsMu.Unlock()
+
+		// Send message while prompt is pending.
+		err = sm.AcceptUserMessage(context.Background(), provider, "m", "m", "main.go")
+		require.NoError(t, err)
+
+		// Prompt should have received the response.
+		select {
+		case resp := <-ch:
+			assert.Equal(t, "ask-1", resp.PromptID)
+			assert.Equal(t, "main.go", resp.FreeTextResponse)
+			assert.False(t, resp.Cancelled)
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("prompt did not receive response")
+		}
+
+		// Check that the message was recorded with nil LLMData.
+		msgs := sm.GetMessages()
+		var routedMsg *Message
+		for i := range msgs {
+			if msgs[i].Content == "main.go" {
+				routedMsg = &msgs[i]
+				break
+			}
+		}
+		require.NotNil(t, routedMsg, "routed message should be recorded")
+		assert.Nil(t, routedMsg.LLMData, "routed message should have nil LLMData")
+
+		_ = sm.Cancel(context.Background())
+	})
+
+	t.Run("falls back to cancel+queue when channel full", func(t *testing.T) {
+		t.Parallel()
+
+		provider := newStopProvider("hi")
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "route-fallback"})
+
+		// Start the loop.
+		err := sm.AcceptUserMessage(context.Background(), provider, "m", "m", "setup")
+		require.NoError(t, err)
+		time.Sleep(50 * time.Millisecond)
+
+		// Register a pending prompt with a full channel.
+		ch := make(chan UserPromptResponse, 1)
+		ch <- UserPromptResponse{PromptID: "ask-1", FreeTextResponse: "previous"}
+
+		sm.promptsMu.Lock()
+		sm.pendingPrompts["ask-1"] = ch
+		sm.promptTypes["ask-1"] = PromptTypeGeneral
+		sm.promptsMu.Unlock()
+
+		// Send message — routing should fail, fall back to normal flow.
+		err = sm.AcceptUserMessage(context.Background(), provider, "m", "m", "fallback text")
+		require.NoError(t, err)
+
+		// Check that the message was recorded with non-nil LLMData (normal path).
+		msgs := sm.GetMessages()
+		var fallbackMsg *Message
+		for i := range msgs {
+			if msgs[i].Content == "fallback text" {
+				fallbackMsg = &msgs[i]
+				break
+			}
+		}
+		require.NotNil(t, fallbackMsg, "fallback message should be recorded")
+		assert.NotNil(t, fallbackMsg.LLMData, "fallback message should have LLMData")
+
+		_ = sm.Cancel(context.Background())
+	})
+}
+
+func TestSessionManager_EmitUserPrompt_ForcesFreeText(t *testing.T) {
+	t.Parallel()
+
+	t.Run("forces AllowFreeText for general prompts", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "freetext-test"})
+		emitFn := sm.createEmitUserPromptFunc()
+
+		emitFn(UserPrompt{
+			PromptID:      "test-prompt",
+			Question:      "Pick one",
+			AllowFreeText: false, // LLM says no free text.
+		})
+
+		msgs := sm.GetMessages()
+		require.NotEmpty(t, msgs)
+		require.NotNil(t, msgs[0].UserPrompt)
+		assert.True(t, msgs[0].UserPrompt.AllowFreeText, "free text should be forced to true")
+		assert.NotEmpty(t, msgs[0].UserPrompt.FreeTextPlaceholder)
+	})
+
+	t.Run("does not force AllowFreeText for command approval", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "approval-freetext"})
+		emitFn := sm.createEmitUserPromptFunc()
+
+		emitFn(UserPrompt{
+			PromptID:      "approval-prompt",
+			PromptType:    PromptTypeCommandApproval,
+			Question:      "Approve?",
+			AllowFreeText: false,
+		})
+
+		msgs := sm.GetMessages()
+		require.NotEmpty(t, msgs)
+		require.NotNil(t, msgs[0].UserPrompt)
+		assert.False(t, msgs[0].UserPrompt.AllowFreeText, "approval prompts should not force free text")
+	})
+}

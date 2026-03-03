@@ -38,6 +38,7 @@ type SessionManager struct {
 	onWorkingChange    func(id string, working bool)
 	onMessage          func(ctx context.Context, msg Message) error
 	pendingPrompts     map[string]chan UserPromptResponse
+	promptTypes        map[string]PromptType // tracks each prompt's type for selective cancellation
 	promptsMu          sync.Mutex
 	inputCostPer1M     float64
 	outputCostPer1M    float64
@@ -121,6 +122,7 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		safeMode:           cfg.SafeMode,
 		hooks:              cfg.Hooks,
 		pendingPrompts:     make(map[string]chan UserPromptResponse),
+		promptTypes:        make(map[string]PromptType),
 		delegates:          make(map[string]DelegateSnapshot),
 		inputCostPer1M:     cfg.InputCostPer1M,
 		outputCostPer1M:    cfg.OutputCostPer1M,
@@ -240,6 +242,45 @@ func (sm *SessionManager) HasPendingPrompt() bool {
 	return len(sm.pendingPrompts) > 0
 }
 
+// CancelPendingPrompts sends a cancellation response to all pending general prompts,
+// unblocking any goroutines waiting in WaitUserResponse. Command approval prompts
+// are left pending because the user may intend to approve/reject them.
+func (sm *SessionManager) CancelPendingPrompts() {
+	sm.promptsMu.Lock()
+	for promptID, ch := range sm.pendingPrompts {
+		if sm.promptTypes[promptID] == PromptTypeCommandApproval {
+			continue
+		}
+		select {
+		case ch <- UserPromptResponse{PromptID: promptID, Cancelled: true}:
+		default:
+			slog.Debug("pending prompt already responded", "promptID", promptID)
+		}
+	}
+	sm.promptsMu.Unlock()
+}
+
+// tryRouteToGeneralPrompt attempts to deliver text as a free-text response to
+// a pending non-approval prompt. Returns the prompt ID and true on success.
+// The lookup and send happen in a single critical section to prevent TOCTOU
+// races with concurrent SubmitUserResponse calls.
+func (sm *SessionManager) tryRouteToGeneralPrompt(text string) (string, bool) {
+	sm.promptsMu.Lock()
+	defer sm.promptsMu.Unlock()
+	for id, ch := range sm.pendingPrompts {
+		if sm.promptTypes[id] == PromptTypeCommandApproval {
+			continue
+		}
+		select {
+		case ch <- UserPromptResponse{PromptID: id, FreeTextResponse: text}:
+			return id, true
+		default:
+			continue // channel full, prompt already answered
+		}
+	}
+	return "", false
+}
+
 // RecordHeartbeat updates the heartbeat and activity timestamps.
 func (sm *SessionManager) RecordHeartbeat() {
 	sm.mu.Lock()
@@ -316,6 +357,9 @@ func (sm *SessionManager) RecordExternalMessage(ctx context.Context, msg Message
 }
 
 // AcceptUserMessage enqueues a user message, ensuring the loop is ready first.
+// If a general (non-approval) prompt is pending, the text is routed as the
+// prompt response instead of starting a new LLM turn. This lets users answer
+// ask_user prompts by typing in the main chat input.
 func (sm *SessionManager) AcceptUserMessage(ctx context.Context, provider llm.Provider, modelID string, resolvedModel string, content string) error {
 	if provider == nil {
 		return errors.New("LLM provider is required")
@@ -325,35 +369,47 @@ func (sm *SessionManager) AcceptUserMessage(ctx context.Context, provider llm.Pr
 		return err
 	}
 
-	llmMsg := llm.Message{
-		Role:    llm.RoleUser,
-		Content: content,
+	// If a general prompt is pending, route text as the prompt response.
+	if _, routed := sm.tryRouteToGeneralPrompt(content); routed {
+		// Record for UI display only (LLMData=nil excludes from LLM history
+		// on session restore — the tool_result carries the response content).
+		sm.recordAndPublishUserMessage(ctx, content, nil)
+		return nil
 	}
 
-	userMessage, loopInstance := sm.recordUserMessage(content, &llmMsg)
-	if loopInstance == nil {
+	// No pending prompt (or routing failed) — normal flow.
+	llmMsg := llm.Message{Role: llm.RoleUser, Content: content}
+	sm.recordAndPublishUserMessage(ctx, content, &llmMsg)
+
+	// Cancel any pending general prompts so the loop unblocks from WaitUserResponse.
+	sm.CancelPendingPrompts()
+
+	sm.mu.Lock()
+	loop := sm.loop
+	sm.mu.Unlock()
+	if loop == nil {
 		return errors.New("session loop not initialized")
 	}
-
-	sm.subpub.Publish(userMessage.SequenceID, StreamResponse{
-		Messages: []Message{userMessage},
-	})
-
-	// Persist user message to store.
-	if sm.onMessage != nil {
-		if err := sm.onMessage(ctx, userMessage); err != nil {
-			sm.logger.Warn("failed to persist user message", "error", err)
-		}
-	}
-
-	loopInstance.QueueUserMessage(llmMsg)
+	loop.QueueUserMessage(llmMsg)
 	sm.SetWorking(true)
 
 	return nil
 }
 
-// recordUserMessage adds a user message to the session and returns it with the loop instance.
-func (sm *SessionManager) recordUserMessage(content string, llmMsg *llm.Message) (Message, *Loop) {
+// recordAndPublishUserMessage builds a user message, publishes it to SSE
+// subscribers, and persists it via the onMessage callback.
+func (sm *SessionManager) recordAndPublishUserMessage(ctx context.Context, content string, llmMsg *llm.Message) {
+	msg := sm.buildUserMessage(content, llmMsg)
+	sm.subpub.Publish(msg.SequenceID, StreamResponse{Messages: []Message{msg}})
+	if sm.onMessage != nil {
+		if err := sm.onMessage(ctx, msg); err != nil {
+			sm.logger.Warn("failed to persist user message", "error", err)
+		}
+	}
+}
+
+// buildUserMessage adds a user message to the session and returns it.
+func (sm *SessionManager) buildUserMessage(content string, llmMsg *llm.Message) Message {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -372,7 +428,7 @@ func (sm *SessionManager) recordUserMessage(content string, llmMsg *llm.Message)
 	}
 
 	sm.messages = append(sm.messages, msg)
-	return msg, sm.loop
+	return msg
 }
 
 // Subscribe returns a function that blocks until the next message is available.
@@ -434,6 +490,12 @@ func (sm *SessionManager) SubscribeWithSnapshot(ctx context.Context) (StreamResp
 // Cancel stops the session loop. The context parameter is unused
 // because cancellation is performed synchronously via the internal cancel function.
 func (sm *SessionManager) Cancel(_ context.Context) error {
+	// Cancel pending prompts first, before cancelling the loop context.
+	// This sends Cancelled responses through channels, allowing WaitUserResponse
+	// to return cleanly and record proper tool results ("User skipped")
+	// instead of noisy "Failed to get user response: context canceled" errors.
+	sm.CancelPendingPrompts()
+
 	if cancel := sm.clearLoop(); cancel != nil {
 		cancel()
 	}
@@ -616,7 +678,15 @@ func (sm *SessionManager) createRecordMessageFunc() MessageRecordFunc {
 		})
 
 		if sm.onMessage != nil {
-			if err := sm.onMessage(ctx, msg); err != nil {
+			// Use a detached context for persistence when the loop context is
+			// cancelled. This ensures tool results and assistant messages are
+			// always persisted, preventing broken tool_use/tool_result pairings
+			// in session history on reload.
+			persistCtx := ctx
+			if persistCtx.Err() != nil {
+				persistCtx = context.Background()
+			}
+			if err := sm.onMessage(persistCtx, msg); err != nil {
 				sm.logger.Warn("failed to persist message", "error", err)
 			}
 		}
@@ -654,6 +724,20 @@ func (sm *SessionManager) createEmitUIActionFunc() UIActionFunc {
 // createEmitUserPromptFunc returns a function for emitting user prompts.
 func (sm *SessionManager) createEmitUserPromptFunc() EmitUserPromptFunc {
 	return func(prompt UserPrompt) {
+		// Always allow free-text responses for general prompts so users
+		// have an escape hatch regardless of what the LLM specified.
+		if prompt.PromptType != PromptTypeCommandApproval {
+			prompt.AllowFreeText = true
+			if prompt.FreeTextPlaceholder == "" {
+				prompt.FreeTextPlaceholder = "Or type your answer..."
+			}
+		}
+
+		// Track prompt type for selective cancellation in CancelPendingPrompts.
+		sm.promptsMu.Lock()
+		sm.promptTypes[prompt.PromptID] = prompt.PromptType
+		sm.promptsMu.Unlock()
+
 		msg := Message{
 			ID:         fmt.Sprintf("prompt-%s", prompt.PromptID),
 			SessionID:  sm.id,
@@ -688,6 +772,7 @@ func (sm *SessionManager) createWaitUserResponseFunc() WaitUserResponseFunc {
 		defer func() {
 			sm.promptsMu.Lock()
 			delete(sm.pendingPrompts, promptID)
+			delete(sm.promptTypes, promptID)
 			sm.promptsMu.Unlock()
 		}()
 
