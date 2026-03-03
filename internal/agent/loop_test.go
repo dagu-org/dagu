@@ -682,6 +682,7 @@ func TestLoop_ToolCallFlow(t *testing.T) {
 			recorded = append(recorded, msg)
 			mu.Unlock()
 		},
+		OnTurnComplete: func() { cancel() },
 	})
 
 	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "run tool"})
@@ -746,6 +747,7 @@ func TestLoop_DelegateToolIsolation(t *testing.T) {
 			parentMessages = append(parentMessages, msg)
 			mu.Unlock()
 		},
+		OnTurnComplete: func() { cancel() },
 	})
 
 	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "delegate this"})
@@ -786,9 +788,10 @@ func TestLoop_RecordMessageError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	loop := NewLoop(LoopConfig{
-		Provider:      provider,
-		Model:         "test",
-		RecordMessage: func(_ context.Context, _ Message) {},
+		Provider:       provider,
+		Model:          "test",
+		RecordMessage:  func(_ context.Context, _ Message) {},
+		OnTurnComplete: func() { cancel() },
 	})
 
 	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
@@ -826,13 +829,14 @@ func TestLoop_BatchedDelegates(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	loop := NewLoop(LoopConfig{
-		Provider:     provider,
-		Model:        "test",
-		Tools:        []*AgentTool{NewDelegateTool()},
-		SessionID:    parentID,
-		SessionStore: store,
-		User:         UserIdentity{UserID: "user1"},
-		Registry:     newMockSubSessionRegistry(),
+		Provider:       provider,
+		Model:          "test",
+		Tools:          []*AgentTool{NewDelegateTool()},
+		SessionID:      parentID,
+		SessionStore:   store,
+		User:           UserIdentity{UserID: "user1"},
+		Registry:       newMockSubSessionRegistry(),
+		OnTurnComplete: func() { cancel() },
 	})
 
 	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "do 3 things"})
@@ -888,13 +892,14 @@ func TestLoop_BatchedDelegateExceedsMax(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	loop := NewLoop(LoopConfig{
-		Provider:     provider,
-		Model:        "test",
-		Tools:        []*AgentTool{NewDelegateTool()},
-		SessionID:    parentID,
-		SessionStore: store,
-		User:         UserIdentity{UserID: "user1"},
-		Registry:     newMockSubSessionRegistry(),
+		Provider:       provider,
+		Model:          "test",
+		Tools:          []*AgentTool{NewDelegateTool()},
+		SessionID:      parentID,
+		SessionStore:   store,
+		User:           UserIdentity{UserID: "user1"},
+		Registry:       newMockSubSessionRegistry(),
+		OnTurnComplete: func() { cancel() },
 	})
 
 	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "do 12 things"})
