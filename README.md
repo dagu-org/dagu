@@ -29,7 +29,7 @@ Built for developers who want powerful workflow orchestration without the operat
 
 ![Web UI](./assets/images/demo-web-ui.webp)
 
-**Try it live:** [Live Demo](http://23.251.149.55:8525/) (credentials: `demouser` / `demouser`)
+**Try it live:** [Live Demo](https://demo-instance.dagu.sh/) (credentials: `demouser` / `demouser`)
 
 ## Why Dagu?
 
