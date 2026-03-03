@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Check, MessageCircleQuestion, SkipForward } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserPrompt, UserPromptResponse } from '../types';
@@ -20,6 +20,14 @@ export function UserPromptMessage({
   const [freeText, setFreeText] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus the container when the prompt appears so keyboard navigation works immediately.
+  useEffect(() => {
+    if (!isAnswered) {
+      containerRef.current?.focus();
+    }
+  }, [isAnswered]);
 
   const handleOptionClick = (optionId: string) => {
     if (isAnswered) return;
@@ -87,8 +95,14 @@ export function UserPromptMessage({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (isAnswered) return;
 
-    // Don't intercept non-Enter keys when free-text input is focused
-    if (e.target instanceof HTMLInputElement && e.key !== 'Enter') return;
+    // Don't intercept any keys when free-text input is focused, except Enter to submit.
+    if (e.target === inputRef.current) {
+      if (e.key === 'Enter' && canSubmit) {
+        e.preventDefault();
+        handleSubmit();
+      }
+      return;
+    }
 
     const optionCount = prompt.options?.length ?? 0;
 
@@ -186,6 +200,7 @@ export function UserPromptMessage({
 
         {prompt.allow_free_text && (
           <input
+            ref={inputRef}
             type="text"
             value={freeText}
             onChange={(e) => handleFreeTextChange(e.target.value)}
