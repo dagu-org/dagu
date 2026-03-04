@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { components } from '../../../../api/v1/schema';
+import type { SSEState } from '../../../../hooks/useSSE';
 import { DAGStatus } from '../../components';
 import { DAGContext } from '../../contexts/DAGContext';
 import { LinkTab } from '../common';
@@ -36,6 +37,8 @@ type DAGDetailsContentProps = {
   navigateToStatusTab?: () => void;
   skipHeader?: boolean;
   localDags?: components['schemas']['LocalDag'][];
+  /** SSE result from parent — shared with DAGSpec to avoid duplicate connections */
+  sseResult?: SSEState<unknown>;
 };
 
 type LogViewerState = {
@@ -58,6 +61,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   navigateToStatusTab,
   skipHeader = false,
   localDags,
+  sseResult,
 }) => {
   const baseUrl = isModal ? '#' : `/dags/${fileName}`;
   const [logViewer, setLogViewer] = useState<LogViewerState>({
@@ -325,7 +329,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             </>
           ) : null}
           {activeTab === 'spec' ? (
-            <DAGSpec key={fileName} fileName={fileName} localDags={localDags} />
+            <DAGSpec key={fileName} fileName={fileName} localDags={localDags} sseResult={sseResult} />
           ) : null}
           {activeTab === 'history' ? (
             <>

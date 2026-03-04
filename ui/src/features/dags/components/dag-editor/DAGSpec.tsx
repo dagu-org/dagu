@@ -18,6 +18,7 @@ import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
 import { useClient, useQuery } from '../../../../hooks/api';
 import { useContentEditor } from '../../../../hooks/useContentEditor';
 import { useDAGSSE } from '../../../../hooks/useDAGSSE';
+import type { SSEState } from '../../../../hooks/useSSE';
 import { sseFallbackOptions, useSSECacheSync } from '../../../../hooks/useSSECacheSync';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
@@ -35,13 +36,15 @@ type Props = {
   fileName: string;
   /** Local DAGs from parent (optional, avoids redundant fetch) */
   localDags?: components['schemas']['LocalDag'][];
+  /** SSE result from parent — avoids duplicate SSE connection for the same DAG */
+  sseResult?: SSEState<unknown>;
 };
 
 /**
  * DAGSpec displays and allows editing of a DAG specification
  * including visualization, attributes, steps, and YAML definition
  */
-function DAGSpec({ fileName, localDags }: Props) {
+function DAGSpec({ fileName, localDags, sseResult: parentSSEResult }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const client = useClient();
@@ -80,8 +83,10 @@ function DAGSpec({ fileName, localDags }: Props) {
     [setCookie, setFlowchart]
   );
 
-  // SSE connection for real-time data
-  const sseResult = useDAGSSE(fileName, true);
+  // Reuse parent's SSE connection when available to avoid duplicate connections
+  // that exhaust the browser's HTTP/1.1 connection pool.
+  const ownSSEResult = useDAGSSE(fileName, !parentSSEResult);
+  const sseResult = parentSSEResult ?? ownSSEResult;
 
   // Fetch spec — SWR is the single source of truth, kept fresh by SSE sync
   const { data, isLoading, mutate: mutateSpec } = useQuery(
@@ -99,13 +104,15 @@ function DAGSpec({ fileName, localDags }: Props) {
     sseFallbackOptions(sseResult)
   );
   useSSECacheSync(sseResult, mutateSpec, (sseData) => {
+    // Cast to access DAG SSE fields (sseResult may be typed as unknown from parent)
+    const d = sseData as { dag?: components['schemas']['DAGDetails']; spec?: string; errors?: string[] };
     // Skip cache update when spec is missing to avoid overwriting valid
     // cached spec with empty string, which would trigger false conflicts.
-    if (sseData.spec === undefined) return undefined;
+    if (d.spec === undefined) return undefined;
     return {
-      dag: sseData.dag,
-      spec: sseData.spec,
-      errors: sseData.errors,
+      dag: d.dag,
+      spec: d.spec,
+      errors: d.errors ?? [],
     };
   });
 

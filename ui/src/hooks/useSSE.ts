@@ -1,6 +1,7 @@
-import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
+import { sseManager } from './SSEManager';
 
 export interface SSEState<T> {
   data: T | null;
@@ -30,8 +31,6 @@ export function buildSSEEndpoint(
   return queryString ? `${basePath}?${queryString}` : basePath;
 }
 
-const MAX_RETRIES = 5;
-const MAX_RETRY_DELAY_MS = 16000;
 const INITIAL_STATE: SSEState<unknown> = {
   data: null,
   error: null,
@@ -39,22 +38,6 @@ const INITIAL_STATE: SSEState<unknown> = {
   isConnecting: false,
   shouldUseFallback: false,
 };
-
-function calculateRetryDelay(retryCount: number): number {
-  return Math.min(1000 * 2 ** retryCount, MAX_RETRY_DELAY_MS);
-}
-
-function buildSSEUrl(apiURL: string, endpoint: string, remoteNode: string): URL {
-  const url = new URL(`${apiURL}${endpoint}`, window.location.origin);
-  url.searchParams.set('remoteNode', remoteNode);
-
-  const token = localStorage.getItem('dagu_auth_token');
-  if (token) {
-    url.searchParams.set('token', token);
-  }
-
-  return url;
-}
 
 export function useSSE<T>(endpoint: string, enabled: boolean = true): SSEState<T> {
   const appBarContext = useContext(AppBarContext);
@@ -66,7 +49,7 @@ export function useSSE<T>(endpoint: string, enabled: boolean = true): SSEState<T
   // Reset state synchronously during render when connection parameters change.
   // This prevents stale data from the old connection being returned in the first
   // render after a change — critical because consumers use isConnected to gate
-  // SWR polling (isPaused), and stale isConnected=true blocks SWR fetches.
+  // SWR polling, and stale isConnected=true blocks SWR fetches.
   const connectionKey = `${endpoint}|${remoteNode}|${config.apiURL}|${enabled}`;
   const prevConnectionKeyRef = useRef(connectionKey);
   if (prevConnectionKeyRef.current !== connectionKey) {
@@ -74,86 +57,36 @@ export function useSSE<T>(endpoint: string, enabled: boolean = true): SSEState<T
     setState(INITIAL_STATE as SSEState<T>);
   }
 
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const retryCountRef = useRef(0);
-  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const connect = useCallback(() => {
-    if (!enabled) return;
-
-    const url = buildSSEUrl(config.apiURL, endpoint, remoteNode);
-
-    setState((prev) => ({ ...prev, isConnecting: true }));
-
-    const eventSource = new EventSource(url.toString());
-    eventSourceRef.current = eventSource;
-
-    eventSource.addEventListener('connected', () => {
-      setState((prev) => ({
-        ...prev,
-        isConnected: true,
-        isConnecting: false,
-        error: null,
-      }));
-      retryCountRef.current = 0;
-    });
-
-    eventSource.addEventListener('data', (event) => {
-      const messageEvent = event as MessageEvent;
-      try {
-        const parsed = JSON.parse(messageEvent.data) as T;
-        setState((prev) => ({ ...prev, data: parsed }));
-      } catch (err) {
-        console.error('SSE JSON parse error:', err);
-        setState((prev) => ({ ...prev, error: new Error('Invalid JSON response from SSE') }));
-      }
-    });
-
-    eventSource.addEventListener('heartbeat', () => {});
-
-    eventSource.addEventListener('error', (event) => {
-      const messageEvent = event as MessageEvent;
-      if (messageEvent.data) {
-        console.error('SSE error event:', messageEvent.data);
-      }
-    });
-
-    eventSource.onerror = () => {
-      eventSource.close();
-      setState((prev) => ({
-        ...prev,
-        isConnected: false,
-        isConnecting: false,
-      }));
-
-      if (retryCountRef.current < MAX_RETRIES) {
-        // Calculate delay before incrementing for correct exponential backoff
-        const delay = calculateRetryDelay(retryCountRef.current);
-        retryCountRef.current++;
-        retryTimeoutRef.current = setTimeout(() => {
-          connect();
-        }, delay);
-      } else {
-        setState((prev) => ({
-          ...prev,
-          shouldUseFallback: true,
-          error: new Error('SSE connection failed, falling back to polling'),
-        }));
-      }
-    };
-  }, [endpoint, enabled, remoteNode, config.apiURL]);
-
   useEffect(() => {
-    retryCountRef.current = 0;
+    if (!enabled) {
+      setState((prev) => ({ ...prev, isConnected: false, shouldUseFallback: true }));
+      return;
+    }
 
-    connect();
-    return () => {
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
+    const unsubscribe = sseManager.subscribe(
+      endpoint,
+      remoteNode,
+      config.apiURL,
+      {
+        onData: (data) =>
+          setState((prev) => ({
+            ...prev,
+            data: data as T,
+            isConnected: true,
+            isConnecting: false,
+            shouldUseFallback: false,
+            error: null,
+          })),
+        onStateChange: (connState) =>
+          setState((prev) => ({
+            ...prev,
+            ...connState,
+          })),
       }
-      eventSourceRef.current?.close();
-    };
-  }, [connect]);
+    );
+
+    return unsubscribe;
+  }, [endpoint, remoteNode, config.apiURL, enabled]);
 
   return state;
 }

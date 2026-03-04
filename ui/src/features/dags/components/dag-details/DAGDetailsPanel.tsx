@@ -226,6 +226,7 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
                 isModal={true}
                 navigateToStatusTab={() => setActiveTab('status')}
                 localDags={data.localDags}
+                sseResult={sseResult}
               />
             </div>
           </div>
