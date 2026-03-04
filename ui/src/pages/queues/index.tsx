@@ -10,6 +10,7 @@ import QueueList from '../../features/queues/components/QueueList';
 import QueueMetrics from '../../features/queues/components/QueueMetrics';
 import { useQuery } from '../../hooks/api';
 import { useQueuesListSSE } from '../../hooks/useQueuesListSSE';
+import { sseFallbackOptions, useSSECacheSync } from '../../hooks/useSSECacheSync';
 import Title from '../../ui/Title';
 
 function Queues() {
@@ -97,9 +98,8 @@ function Queues() {
   }, [appBarContext]);
 
   const sseResult = useQueuesListSSE(true);
-  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
 
-  const { data: pollingData, error, isLoading, mutate } = useQuery(
+  const { data, error, isLoading, mutate } = useQuery(
     '/queues',
     {
       params: {
@@ -108,15 +108,9 @@ function Queues() {
         },
       },
     },
-    {
-      refreshInterval: usePolling ? 3000 : 0,
-      revalidateOnFocus: usePolling,
-      revalidateOnReconnect: usePolling,
-      isPaused: () => !usePolling,
-    }
+    sseFallbackOptions(sseResult, 3000)
   );
-
-  const data = sseResult.data || pollingData;
+  useSSECacheSync(sseResult, mutate);
 
   async function handleRefresh(): Promise<void> {
     await mutate();

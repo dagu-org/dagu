@@ -66,7 +66,7 @@ func (h *Handler) proxyToRemoteNode(w http.ResponseWriter, r *http.Request, node
 		return
 	}
 
-	SetSSEHeaders(w)
+	// SSE headers already set by handleSSE before proxying
 	streamResponse(w, flusher, resp.Body)
 }
 

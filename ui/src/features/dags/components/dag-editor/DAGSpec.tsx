@@ -18,6 +18,8 @@ import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
 import { useClient, useQuery } from '../../../../hooks/api';
 import { useContentEditor } from '../../../../hooks/useContentEditor';
 import { useDAGSSE } from '../../../../hooks/useDAGSSE';
+import type { SSEState } from '../../../../hooks/useSSE';
+import { sseFallbackOptions, useSSECacheSync } from '../../../../hooks/useSSECacheSync';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { DAGStepTable } from '../dag-details';
@@ -34,13 +36,15 @@ type Props = {
   fileName: string;
   /** Local DAGs from parent (optional, avoids redundant fetch) */
   localDags?: components['schemas']['LocalDag'][];
+  /** SSE result from parent — avoids duplicate SSE connection for the same DAG */
+  sseResult?: SSEState<unknown>;
 };
 
 /**
  * DAGSpec displays and allows editing of a DAG specification
  * including visualization, attributes, steps, and YAML definition
  */
-function DAGSpec({ fileName, localDags }: Props) {
+function DAGSpec({ fileName, localDags, sseResult: parentSSEResult }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const client = useClient();
@@ -79,11 +83,13 @@ function DAGSpec({ fileName, localDags }: Props) {
     [setCookie, setFlowchart]
   );
 
-  // SSE connection for real-time data
-  const sseResult = useDAGSSE(fileName, true);
+  // Reuse parent's SSE connection when available to avoid duplicate connections
+  // that exhaust the browser's HTTP/1.1 connection pool.
+  const ownSSEResult = useDAGSSE(fileName, !parentSSEResult);
+  const sseResult = parentSSEResult ?? ownSSEResult;
 
-  // Polling fallback (uses SSE state for config)
-  const { data: pollingData, isLoading, mutate: mutateSpec } = useQuery(
+  // Fetch spec — SWR is the single source of truth, kept fresh by SSE sync
+  const { data, isLoading, mutate: mutateSpec } = useQuery(
     '/dags/{fileName}/spec',
     {
       params: {
@@ -95,28 +101,23 @@ function DAGSpec({ fileName, localDags }: Props) {
         },
       },
     },
-    {
-      revalidateIfStale: sseResult.shouldUseFallback,
-      revalidateOnFocus: sseResult.shouldUseFallback,
-      revalidateOnMount: true,
-      refreshInterval: sseResult.shouldUseFallback ? 5000 : 0,
-      isPaused: () => !sseResult.shouldUseFallback && sseResult.isConnected,
-    }
+    sseFallbackOptions(sseResult)
   );
+  useSSECacheSync(sseResult, mutateSpec, (sseData) => {
+    // Cast to access DAG SSE fields (sseResult may be typed as unknown from parent)
+    const d = sseData as { dag?: components['schemas']['DAGDetails']; spec?: string; errors?: string[] };
+    // Skip cache update when spec is missing to avoid overwriting valid
+    // cached spec with empty string, which would trigger false conflicts.
+    if (d.spec === undefined) return undefined;
+    return {
+      dag: d.dag,
+      spec: d.spec,
+      errors: d.errors ?? [],
+    };
+  });
 
-  // Refs to avoid recreating handleSave when polling data or mutate changes
-  const pollingDataRef = React.useRef(pollingData);
-  pollingDataRef.current = pollingData;
-  const mutateSpecRef = React.useRef(mutateSpec);
-  mutateSpecRef.current = mutateSpec;
-
-  // Best available server spec — prefer SSE when connected, polling when not.
-  // When SSE disconnects, sseResult.data retains stale values,
-  // so only use SSE spec when actively connected.
-  const serverSpec =
-    sseResult.isConnected && sseResult.data?.spec != null
-      ? sseResult.data.spec
-      : pollingData?.spec ?? null;
+  // Server spec — SWR cache is always fresh (updated by SSE sync or polling)
+  const serverSpec = data?.spec ?? null;
 
   // Change tracking (source-agnostic)
   const {
@@ -130,10 +131,6 @@ function DAGSpec({ fileName, localDags }: Props) {
     key: `${fileName}:${remoteNode}`,
     serverContent: serverSpec,
   });
-
-  // Display data (SSE when connected, polling when not)
-  const data =
-    sseResult.isConnected && sseResult.data ? sseResult.data : pollingData;
 
   // Sync unsaved changes context
   useEffect(() => {
@@ -197,16 +194,8 @@ function DAGSpec({ fileName, localDags }: Props) {
     // Mark as saved to prevent false conflict detection on our own save
     markAsSaved(currentValue);
 
-    // Update the SWR polling cache directly with the saved spec value.
-    // mutateSpec() alone is blocked by isPaused() when SSE is connected,
-    // leaving pollingData stale. When SSE later disconnects, serverSpec
-    // falls back to the stale pollingData, triggering a false conflict.
-    if (pollingDataRef.current) {
-      mutateSpecRef.current(
-        { ...pollingDataRef.current, spec: currentValue },
-        { revalidate: false }
-      );
-    }
+    // Revalidate SWR cache from server as safety net
+    mutateSpec();
 
     // Show success toast notification
     showToast('Changes saved successfully');
@@ -219,6 +208,7 @@ function DAGSpec({ fileName, localDags }: Props) {
     showError,
     showToast,
     markAsSaved,
+    mutateSpec,
   ]);
 
   // Restore scroll position after render

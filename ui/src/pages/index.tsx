@@ -20,6 +20,7 @@ import DashboardTimeChart from '../features/dashboard/components/DashboardTimech
 import PathsCard from '../features/system-status/components/PathsCard';
 import { useQuery } from '../hooks/api';
 import { useDAGRunsListSSE } from '../hooks/useDAGRunsListSSE';
+import { sseFallbackOptions, useSSECacheSync } from '../hooks/useSSECacheSync';
 import dayjs from '../lib/dayjs';
 import Title from '../ui/Title';
 
@@ -183,9 +184,7 @@ function Dashboard(): React.ReactElement | null {
     true
   );
 
-  const shouldPoll = sseResult.shouldUseFallback || !sseResult.isConnected || !sseResult.data;
-
-  const { data: pollingData, error, isLoading, mutate } = useQuery(
+  const { data, error, isLoading, mutate } = useQuery(
     '/dag-runs',
     {
       params: {
@@ -197,13 +196,9 @@ function Dashboard(): React.ReactElement | null {
         },
       },
     },
-    {
-      refreshInterval: shouldPoll ? 5000 : 0,
-      isPaused: () => !shouldPoll,
-    }
+    sseFallbackOptions(sseResult, 5000)
   );
-
-  const data = sseResult.data ?? pollingData;
+  useSSECacheSync(sseResult, mutate);
 
   const handleRefreshAll = async () => {
     await mutate();

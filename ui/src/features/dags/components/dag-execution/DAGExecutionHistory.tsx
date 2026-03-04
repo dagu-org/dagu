@@ -10,6 +10,7 @@ import { components, NodeStatus, Status, Stream } from '../../../../api/v1/schem
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient, useQuery } from '../../../../hooks/api';
 import { useDAGHistorySSE } from '../../../../hooks/useDAGHistorySSE';
+import { sseFallbackOptions, useSSECacheSync } from '../../../../hooks/useSSECacheSync';
 import { toMermaidNodeId } from '../../../../lib/utils';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
@@ -41,10 +42,8 @@ function DAGExecutionHistory({
 
   // SSE for real-time updates with polling fallback
   const sseResult = useDAGHistorySSE(fileName, !!fileName);
-  const shouldPoll = sseResult.shouldUseFallback || !sseResult.isConnected || !sseResult.data;
-
-  // Fetch execution history data - use polling only as fallback
-  const { data: pollingData } = useQuery(
+  // Fetch execution history data — SWR is the single source of truth, kept fresh by SSE sync
+  const { data, mutate } = useQuery(
     '/dags/{fileName}/dag-runs',
     {
       params: {
@@ -56,14 +55,9 @@ function DAGExecutionHistory({
         },
       },
     },
-    {
-      refreshInterval: shouldPoll ? 2000 : 0,
-      isPaused: () => !shouldPoll && sseResult.isConnected && sseResult.data != null,
-    }
+    sseFallbackOptions(sseResult)
   );
-
-  // Use SSE data when available, otherwise fall back to polling
-  const data = sseResult.data || pollingData;
+  useSSECacheSync(sseResult, mutate);
 
   // Show loading indicator while fetching data
   if (!data) {

@@ -145,18 +145,17 @@ func (h *Handler) handleSSE(w http.ResponseWriter, r *http.Request, topic string
 	ctx := r.Context()
 	query := r.URL.Query()
 
+	// Set SSE headers and clear the write deadline for all SSE connections
+	// (both local and proxied to remote nodes). The server's WriteTimeout (60s)
+	// would otherwise kill long-lived SSE streams.
+	SetSSEHeaders(w)
+	rc := http.NewResponseController(w)
+	_ = rc.SetWriteDeadline(time.Time{})
+
 	if remoteNode := query.Get("remoteNode"); remoteNode != "" && remoteNode != "local" {
 		h.proxyToRemoteNode(w, r, remoteNode, topic)
 		return
 	}
-
-	SetSSEHeaders(w)
-
-	// Clear the write deadline for long-lived SSE connections.
-	// The server's WriteTimeout (60s) would otherwise kill SSE streams,
-	// causing the frontend to reconnect and potentially show stale data.
-	rc := http.NewResponseController(w)
-	_ = rc.SetWriteDeadline(time.Time{})
 
 	client, err := NewClient(w)
 	if err != nil {

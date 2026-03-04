@@ -6,6 +6,7 @@ import { components } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import { useDAGSSE } from '../../../../hooks/useDAGSSE';
+import { sseFallbackOptions, useSSECacheSync } from '../../../../hooks/useSSECacheSync';
 import dayjs from '../../../../lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -37,11 +38,10 @@ function DAGDetailsModal({ fileName, isOpen, onClose }: Props): React.ReactEleme
   // SSE for real-time updates (only when modal is open)
   const sseResult = useDAGSSE(fileName || '', isOpen && !!fileName);
 
-  // Polling fallback (only when SSE fails or not connected)
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected || !sseResult.data;
 
-  const { data: pollingData, mutate } = useQuery(
+  // Fetch DAG details — SWR is the single source of truth, kept fresh by SSE sync
+  const { data, mutate } = useQuery(
     '/dags/{fileName}',
     {
       params: {
@@ -50,13 +50,11 @@ function DAGDetailsModal({ fileName, isOpen, onClose }: Props): React.ReactEleme
       },
     },
     {
-      refreshInterval: usePolling ? 2000 : 0,
-      isPaused: () => !isOpen || (!usePolling && sseResult.isConnected && sseResult.data != null),
+      ...sseFallbackOptions(sseResult),
+      isPaused: () => !isOpen,
     }
   );
-
-  // Use SSE data when available, otherwise polling
-  const data = sseResult.data || pollingData;
+  useSSECacheSync(sseResult, mutate);
 
   const refreshFn = React.useCallback(() => {
     setTimeout(() => mutate(), 500);
@@ -221,6 +219,7 @@ function DAGDetailsModal({ fileName, isOpen, onClose }: Props): React.ReactEleme
                     isModal={true}
                     navigateToStatusTab={navigateToStatusTab}
                     localDags={data?.localDags}
+                    sseResult={sseResult}
                   />
                 )}
               </div>

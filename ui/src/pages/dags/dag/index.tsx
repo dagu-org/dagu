@@ -12,6 +12,7 @@ import { DAGContext } from '../../../features/dags/contexts/DAGContext';
 import { RootDAGRunContext } from '../../../features/dags/contexts/RootDAGRunContext';
 import { useQuery } from '../../../hooks/api';
 import { useDAGSSE } from '../../../hooks/useDAGSSE';
+import { sseFallbackOptions, useSSECacheSync } from '../../../hooks/useSSECacheSync';
 import dayjs from '../../../lib/dayjs';
 
 type Params = {
@@ -52,7 +53,6 @@ function DAGDetails() {
 
   // SSE for real-time updates with polling fallback
   const sseResult = useDAGSSE(fileName || '', !!fileName);
-  const shouldPoll = sseResult.shouldUseFallback || !sseResult.isConnected || !sseResult.data;
 
   // Determine active tab
   const tab = params.tab || 'status';
@@ -102,8 +102,8 @@ function DAGDetails() {
     }
   }, [tab, handleTabChange]);
 
-  // Fetch DAG details - use polling only as fallback when SSE is not connected
-  const { data: pollingDagData, mutate: mutateDag } = useQuery(
+  // Fetch DAG details — SWR is the single source of truth, kept fresh by SSE sync
+  const { data: dagData, mutate: mutateDag } = useQuery(
     '/dags/{fileName}',
     {
       params: {
@@ -111,14 +111,9 @@ function DAGDetails() {
         path: { fileName },
       },
     },
-    {
-      refreshInterval: shouldPoll ? 2000 : 0,
-      isPaused: () => !shouldPoll && sseResult.isConnected && sseResult.data != null,
-    }
+    sseFallbackOptions(sseResult)
   );
-
-  // Use SSE data when available, otherwise fall back to polling
-  const dagData = sseResult.data || pollingDagData;
+  useSSECacheSync(sseResult, mutateDag);
 
   // Use dagRunName from URL if available, otherwise use the name from dagData
   const dagRunName = queriedDAGRunName || dagData?.dag?.name || '';
@@ -237,6 +232,7 @@ function DAGDetails() {
                   navigateToStatusTab={navigateToStatusTab}
                   skipHeader={true}
                   localDags={dagData?.localDags}
+                  sseResult={sseResult}
                 />
               </>
             )}

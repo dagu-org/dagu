@@ -10,6 +10,7 @@ import { useDocTabContext } from '@/contexts/DocTabContext';
 import { useClient, useQuery } from '@/hooks/api';
 import { useContentEditor } from '@/hooks/useContentEditor';
 import { useDocSSE } from '@/hooks/useDocSSE';
+import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import { cn } from '@/lib/utils';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { FileText, Save } from 'lucide-react';
@@ -38,8 +39,8 @@ function DocEditor({ tabId, docPath }: Props) {
   // SSE connection for real-time doc data
   const sseResult = useDocSSE(docPath);
 
-  // Polling fallback when SSE fails
-  const { data: pollingData, mutate: mutateDoc } = useQuery(
+  // Fetch doc — SWR is the single source of truth, kept fresh by SSE sync
+  const { data: doc, mutate: mutateDoc } = useQuery(
     '/docs/doc',
     {
       params: {
@@ -49,17 +50,9 @@ function DocEditor({ tabId, docPath }: Props) {
         },
       },
     },
-    {
-      revalidateIfStale: sseResult.shouldUseFallback,
-      revalidateOnFocus: sseResult.shouldUseFallback,
-      revalidateOnMount: true,
-      refreshInterval: sseResult.shouldUseFallback ? 5000 : 0,
-      isPaused: () => !sseResult.shouldUseFallback && sseResult.isConnected,
-    }
+    sseFallbackOptions(sseResult)
   );
-
-  // Best available doc data — prefer SSE when connected, polling when not
-  const doc = sseResult.isConnected && sseResult.data ? sseResult.data : pollingData;
+  useSSECacheSync(sseResult, mutateDoc);
   const serverContent = doc?.content ?? null;
 
   // Change tracking (source-agnostic)
@@ -86,11 +79,6 @@ function DocEditor({ tabId, docPath }: Props) {
   currentValueRef.current = currentValue;
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
   hasUnsavedChangesRef.current = hasUnsavedChanges;
-  const pollingDataRef = useRef(pollingData);
-  pollingDataRef.current = pollingData;
-  const mutateDocRef = useRef(mutateDoc);
-  mutateDocRef.current = mutateDoc;
-
   // Restore draft on mount
   useEffect(() => {
     const draft = getDraft(tabId);
@@ -104,7 +92,7 @@ function DocEditor({ tabId, docPath }: Props) {
   useEffect(() => {
     return () => {
       if (hasUnsavedChangesRef.current) {
-        setDraft(tabId, currentValueRef.current);
+        setDraft(tabId, currentValueRef.current ?? '');
       }
     };
   }, [tabId, setDraft]); // Only runs cleanup on tab change or unmount
@@ -129,22 +117,14 @@ function DocEditor({ tabId, docPath }: Props) {
     try {
       const { error } = await client.PATCH('/docs/doc', {
         params: { query: { remoteNode, path: docPath } },
-        body: { content: currentValueRef.current },
+        body: { content: currentValueRef.current ?? '' },
       });
       if (error) {
         showToast('Failed to save document');
       } else {
-        markAsSaved(currentValueRef.current);
-        // Update the SWR polling cache directly with the saved content.
-        // mutateDoc() alone is blocked by isPaused() when SSE is connected,
-        // leaving pollingData stale. When SSE later disconnects, serverContent
-        // falls back to the stale pollingData, triggering a false conflict.
-        if (pollingDataRef.current && currentValueRef.current != null) {
-          mutateDocRef.current(
-            { ...pollingDataRef.current, content: currentValueRef.current },
-            { revalidate: false }
-          );
-        }
+        markAsSaved(currentValueRef.current ?? '');
+        // Revalidate SWR cache from server as safety net
+        mutateDoc();
         markTabSaved(tabId);
         clearDraft(tabId);
         showToast('Document saved');
@@ -154,7 +134,7 @@ function DocEditor({ tabId, docPath }: Props) {
     } finally {
       setIsSaving(false);
     }
-  }, [isSaving, client, remoteNode, docPath, markAsSaved, markTabSaved, clearDraft, tabId, showToast]);
+  }, [isSaving, client, remoteNode, docPath, markAsSaved, mutateDoc, markTabSaved, clearDraft, tabId, showToast]);
 
   // Keep save handler in ref for keyboard shortcut
   const handleSaveRef = useRef(handleSave);
@@ -237,7 +217,7 @@ function DocEditor({ tabId, docPath }: Props) {
       <div className="flex-1 overflow-hidden min-h-0">
         {mode === 'edit' ? (
           <MarkdownEditor
-            value={currentValue}
+            value={currentValue ?? ''}
             onChange={(val) => setCurrentValue(val ?? '')}
             readOnly={!canWrite}
           />
