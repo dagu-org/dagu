@@ -60,13 +60,20 @@ func newHTTP(ctx context.Context, step core.Step) (executor.Executor, error) {
 		}
 	}
 
-	// Extract method and url from Commands field
+	// Extract method and url from Commands field.
+	// Prefer CmdWithArgs (fully expanded) over Command/Args (not expanded)
+	// so that parameter variables in the method position are resolved.
 	var method string
 	var url string
 	if len(step.Commands) > 0 {
-		method = step.Commands[0].Command
-		if len(step.Commands[0].Args) > 0 {
-			url = step.Commands[0].Args[0]
+		cmd := step.Commands[0]
+		if cmd.CmdWithArgs != "" {
+			method, url = splitMethodURL(cmd.CmdWithArgs)
+		} else {
+			method = cmd.Command
+			if len(cmd.Args) > 0 {
+				url = cmd.Args[0]
+			}
 		}
 	}
 
@@ -203,6 +210,15 @@ func decodeHTTPConfigFromString(_ context.Context, source string, target *httpCo
 		}
 	}
 	return nil
+}
+
+// splitMethodURL splits "METHOD URL" into method and URL parts.
+func splitMethodURL(cmdWithArgs string) (string, string) {
+	parts := strings.SplitN(strings.TrimSpace(cmdWithArgs), " ", 2)
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
+	return parts[0], strings.TrimSpace(parts[1])
 }
 
 func init() {

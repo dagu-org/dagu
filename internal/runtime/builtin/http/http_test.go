@@ -333,6 +333,80 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 	})
 }
 
+func TestHTTPExecutor_CmdWithArgsExpansion(t *testing.T) {
+	t.Run("MethodFromCmdWithArgs", func(t *testing.T) {
+		// Simulates the post-expansion state where CmdWithArgs is expanded
+		// but Command still contains the unexpanded variable (issue #1722).
+		server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
+			assert.Equal(t, "GET", r.Method)
+			w.WriteHeader(nethttp.StatusOK)
+			_, _ = w.Write([]byte("ok"))
+		}))
+		defer server.Close()
+
+		step := core.Step{
+			Commands: []core.CommandEntry{{
+				Command:     "${METHOD}",                   // unexpanded
+				Args:        []string{server.URL},          // expanded
+				CmdWithArgs: "GET " + server.URL,           // expanded (as evaluateCommandArgs does)
+			}},
+			ExecutorConfig: core.ExecutorConfig{
+				Type:   "http",
+				Config: map[string]any{"silent": true},
+			},
+		}
+
+		exec, err := newHTTP(context.Background(), step)
+		require.NoError(t, err)
+
+		httpExec, ok := exec.(*http)
+		require.True(t, ok)
+		assert.Equal(t, "GET", httpExec.method)
+		assert.Equal(t, server.URL, httpExec.url)
+
+		httpExec.SetStdout(&testWriter{})
+		httpExec.SetStderr(&testWriter{})
+
+		err = httpExec.Run(context.Background())
+		assert.NoError(t, err)
+	})
+
+	t.Run("FallbackToCommandWhenCmdWithArgsEmpty", func(t *testing.T) {
+		// When CmdWithArgs is empty, fall back to Command/Args fields.
+		server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
+			assert.Equal(t, "POST", r.Method)
+			w.WriteHeader(nethttp.StatusOK)
+			_, _ = w.Write([]byte("ok"))
+		}))
+		defer server.Close()
+
+		step := core.Step{
+			Commands: []core.CommandEntry{{
+				Command: "POST",
+				Args:    []string{server.URL},
+			}},
+			ExecutorConfig: core.ExecutorConfig{
+				Type:   "http",
+				Config: map[string]any{"silent": true},
+			},
+		}
+
+		exec, err := newHTTP(context.Background(), step)
+		require.NoError(t, err)
+
+		httpExec, ok := exec.(*http)
+		require.True(t, ok)
+		assert.Equal(t, "POST", httpExec.method)
+		assert.Equal(t, server.URL, httpExec.url)
+
+		httpExec.SetStdout(&testWriter{})
+		httpExec.SetStderr(&testWriter{})
+
+		err = httpExec.Run(context.Background())
+		assert.NoError(t, err)
+	})
+}
+
 type testWriter struct {
 	data []byte
 }
