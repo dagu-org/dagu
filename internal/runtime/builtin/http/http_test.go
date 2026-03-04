@@ -346,9 +346,9 @@ func TestHTTPExecutor_CmdWithArgsExpansion(t *testing.T) {
 
 		step := core.Step{
 			Commands: []core.CommandEntry{{
-				Command:     "${METHOD}",                   // unexpanded
-				Args:        []string{server.URL},          // expanded
-				CmdWithArgs: "GET " + server.URL,           // expanded (as evaluateCommandArgs does)
+				Command:     "${METHOD}",          // unexpanded
+				Args:        []string{server.URL}, // expanded
+				CmdWithArgs: "GET " + server.URL,  // expanded (as evaluateCommandArgs does)
 			}},
 			ExecutorConfig: core.ExecutorConfig{
 				Type:   "http",
