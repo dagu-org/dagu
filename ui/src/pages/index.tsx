@@ -318,7 +318,7 @@ function Dashboard(): React.ReactElement | null {
             <span className="text-xs">failed</span>
           </div>
           <div className="flex items-baseline gap-1">
-            <span className={`text-lg sm:text-xl font-light tabular-nums ${hasFailures ? 'text-foreground' : 'text-muted-foreground/50'}`}>{metrics[Status.Aborted]}</span>
+            <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{metrics[Status.Aborted]}</span>
             <span className="text-xs">aborted</span>
           </div>
           {hasRunning && (
