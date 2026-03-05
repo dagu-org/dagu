@@ -761,11 +761,11 @@ function DAGRuns() {
               onTagsChange={updateTags}
               availableTags={availableTags}
               placeholder="Filter by tags..."
-              className="min-w-[180px] max-w-[300px] h-8"
+              className="min-w-[180px] max-w-[300px] h-7"
             />
             <Button
               onClick={() => handleSearch()}
-              size="default"
+              size="xs"
               className="px-6 font-medium"
             >
               <Search size={18} className="mr-2" />

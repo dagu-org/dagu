@@ -203,7 +203,7 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
         type="button"
         onClick={handleOpen}
         className={cn(
-          'flex items-center justify-between gap-2 h-9 px-3 text-xs rounded-md border border-border bg-background whitespace-nowrap transition-colors outline-none',
+          'flex items-center justify-between gap-2 h-7 px-3 text-xs rounded-md border border-border bg-background whitespace-nowrap transition-colors outline-none',
           'hover:border-border-strong cursor-pointer w-48',
           isOpen && 'border-ring'
         )}

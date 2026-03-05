@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
+import { Input } from '@/components/ui/input';
 import { Plus, Trash2 } from 'lucide-react';
 import {
   Select,
@@ -52,10 +53,10 @@ export function WorkspaceSelector({
   if (isCreating) {
     return (
       <div className="flex items-center gap-1">
-        <input
+        <Input
           ref={inputRef}
           autoFocus
-          className="h-7 px-2 text-xs rounded-md border border-border bg-background w-36"
+          className="px-2 text-xs w-40"
           placeholder="Workspace name..."
           onKeyDown={handleKeyDown}
           onBlur={handleCreate}
@@ -75,7 +76,7 @@ export function WorkspaceSelector({
           onSelect(v);
         }
       }}>
-        <SelectTrigger className="h-7 text-xs w-40">
+        <SelectTrigger className="text-xs w-40">
           <SelectValue placeholder="Select workspace" />
         </SelectTrigger>
         <SelectContent>
