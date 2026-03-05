@@ -29,6 +29,9 @@ export function UpdateBanner() {
         >
           View release
         </a>
+        <span className="ml-2">
+          · Run <code className="font-mono bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs">dagu upgrade</code> to update
+        </span>
       </span>
       <button
         onClick={handleDismiss}
