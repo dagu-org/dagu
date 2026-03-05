@@ -26,18 +26,23 @@ func runSchemaCmd(args ...string) (string, error) {
 
 func TestSchemaCommand(t *testing.T) {
 	t.Run("DAGRoot", func(t *testing.T) {
-		_, err := runSchemaCmd("schema", "dag")
+		out, err := runSchemaCmd("schema", "dag")
 		require.NoError(t, err)
+		assert.Contains(t, out, "steps")
+		assert.Contains(t, out, "schedule")
 	})
 
 	t.Run("ConfigRoot", func(t *testing.T) {
-		_, err := runSchemaCmd("schema", "config")
+		out, err := runSchemaCmd("schema", "config")
 		require.NoError(t, err)
+		assert.Contains(t, out, "server")
 	})
 
 	t.Run("DAGSteps", func(t *testing.T) {
-		_, err := runSchemaCmd("schema", "dag", "steps")
+		out, err := runSchemaCmd("schema", "dag", "steps")
 		require.NoError(t, err)
+		assert.Contains(t, out, "name")
+		assert.Contains(t, out, "command")
 	})
 
 	t.Run("InvalidSchema", func(t *testing.T) {

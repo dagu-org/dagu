@@ -45,6 +45,6 @@ func runSchema(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("schema navigation failed: %w", err)
 	}
 
-	fmt.Print(result)
+	_, _ = fmt.Fprint(cmd.OutOrStdout(), result)
 	return nil
 }
