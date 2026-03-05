@@ -34,7 +34,17 @@ func (r *Registry) Register(name string, data []byte) error {
 }
 
 // Navigate returns formatted schema information for the given path.
+// Descriptions are truncated to keep output compact (suitable for LLM context).
 func (r *Registry) Navigate(schemaName, path string) (string, error) {
+	return r.navigateInternal(schemaName, path, true)
+}
+
+// NavigateFull returns formatted schema information with full descriptions (no truncation).
+func (r *Registry) NavigateFull(schemaName, path string) (string, error) {
+	return r.navigateInternal(schemaName, path, false)
+}
+
+func (r *Registry) navigateInternal(schemaName, path string, truncate bool) (string, error) {
 	r.mu.RLock()
 	schema, ok := r.schemas[schemaName]
 	r.mu.RUnlock()
@@ -50,6 +60,7 @@ func (r *Registry) Navigate(schemaName, path string) (string, error) {
 		path:       path,
 		schemaName: schemaName,
 		output:     &strings.Builder{},
+		truncate:   truncate,
 	}
 
 	return nav.navigate()
@@ -69,6 +80,7 @@ type navigator struct {
 	path       string
 	schemaName string
 	output     *strings.Builder
+	truncate   bool
 }
 
 func (n *navigator) navigate() (string, error) {
@@ -396,7 +408,7 @@ func (n *navigator) formatProperties(props map[string]any, parent map[string]any
 		if requiredSet[name] {
 			reqStr = ", required"
 		}
-		desc := truncateDescription(resolved["description"])
+		desc := formatDescription(resolved["description"], n.truncate)
 		n.output.WriteString(fmt.Sprintf("- %s (%s%s): %s\n", name, typ, reqStr, desc))
 	}
 }
@@ -461,14 +473,16 @@ func capitalizeFirst(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
-func truncateDescription(v any) string {
+func formatDescription(v any, truncate bool) string {
 	desc, ok := v.(string)
 	if !ok {
 		return ""
 	}
-	const maxLen = 100
-	if len(desc) > maxLen {
-		return desc[:maxLen-3] + "..."
+	if truncate {
+		const maxLen = 100
+		if len(desc) > maxLen {
+			return desc[:maxLen-3] + "..."
+		}
 	}
 	return desc
 }
