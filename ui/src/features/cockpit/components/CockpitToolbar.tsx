@@ -42,14 +42,12 @@ export function CockpitToolbar({
         selectedWorkspace={selectedWorkspace}
         onSelect={onSelectTemplate}
       />
-      {selectedTemplate && (
-        <DAGPreviewModal
-          key={selectedTemplate}
-          fileName={selectedTemplate}
-          selectedWorkspace={selectedWorkspace}
-          onClose={() => onSelectTemplate('')}
-        />
-      )}
+      <DAGPreviewModal
+        fileName={selectedTemplate}
+        isOpen={!!selectedTemplate}
+        selectedWorkspace={selectedWorkspace}
+        onClose={() => onSelectTemplate('')}
+      />
     </div>
   );
 }

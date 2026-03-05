@@ -32,15 +32,37 @@ function injectTagIntoSpec(yamlSpec: string, tag: string): string {
 
 interface DAGPreviewModalProps {
   fileName: string;
+  isOpen: boolean;
   selectedWorkspace: string;
   onClose: () => void;
 }
 
-export function DAGPreviewModal({ fileName, selectedWorkspace, onClose }: DAGPreviewModalProps): React.ReactElement {
+export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }: DAGPreviewModalProps): React.ReactElement | null {
   const navigate = useNavigate();
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const client = useClient();
+
+  const [shouldRender, setShouldRender] = useState(isOpen);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setShouldRender(true);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setIsVisible(true);
+        });
+      });
+      return;
+    }
+
+    setIsVisible(false);
+    const timer = setTimeout(() => {
+      setShouldRender(false);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [isOpen]);
 
   const [currentDAGRun, setCurrentDAGRun] = useState<
     components['schemas']['DAGRunDetails'] | undefined
@@ -148,16 +170,24 @@ export function DAGPreviewModal({ fileName, selectedWorkspace, onClose }: DAGPre
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, handleFullscreenClick]);
 
+  if (!shouldRender) {
+    return null;
+  }
+
+  const modalVisibilityClass = isVisible
+    ? 'translate-x-0 opacity-100'
+    : 'translate-x-full opacity-0';
+
   return (
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 h-screen w-screen bg-black/20 z-40"
+        className="fixed inset-0 h-screen w-screen z-40"
         onClick={onClose}
       />
 
       {/* Side Panel */}
-      <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 overflow-y-auto">
+      <div className={`fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 overflow-y-auto transition-all duration-150 ease-out ${modalVisibilityClass}`}>
         <RootDAGRunContext.Provider
           value={{
             data: currentDAGRun,
