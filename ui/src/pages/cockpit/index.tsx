@@ -1,8 +1,7 @@
 import React, { useEffect } from 'react';
 import { useCockpitState } from '@/features/cockpit/hooks/useCockpitState';
-import { useKanbanData } from '@/features/cockpit/hooks/useKanbanData';
 import { CockpitToolbar } from '@/features/cockpit/components/CockpitToolbar';
-import { KanbanBoard } from '@/features/cockpit/components/KanbanBoard';
+import { DateKanbanList } from '@/features/cockpit/components/DateKanbanList';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { Kanban } from 'lucide-react';
 
@@ -17,8 +16,6 @@ export default function CockpitPage(): React.ReactElement {
     selectWorkspace,
     selectTemplate,
   } = useCockpitState();
-
-  const { columns } = useKanbanData(selectedWorkspace);
 
   useEffect(() => {
     setTitle('Cockpit');
@@ -36,7 +33,7 @@ export default function CockpitPage(): React.ReactElement {
         onSelectTemplate={selectTemplate}
       />
       {selectedWorkspace ? (
-        <KanbanBoard columns={columns} />
+        <DateKanbanList selectedWorkspace={selectedWorkspace} />
       ) : (
         <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center text-muted-foreground">
           <Kanban size={40} className="opacity-40" />

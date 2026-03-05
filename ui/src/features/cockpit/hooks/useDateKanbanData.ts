@@ -14,8 +14,13 @@ export interface KanbanColumns {
   failed: DAGRunSummary[];
 }
 
-function sevenDaysAgoUnix(): number {
-  return Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
+function dayBounds(dateStr: string): { fromDate: number; toDate: number } {
+  const d = new Date(dateStr + 'T00:00:00');
+  const fromDate = Math.floor(d.getTime() / 1000);
+  const next = new Date(d);
+  next.setDate(next.getDate() + 1);
+  const toDate = Math.floor(next.getTime() / 1000);
+  return { fromDate, toDate };
 }
 
 function groupByStatus(runs: DAGRunSummary[]): KanbanColumns {
@@ -43,18 +48,23 @@ function groupByStatus(runs: DAGRunSummary[]): KanbanColumns {
   return columns;
 }
 
-export function useKanbanData(selectedWorkspace: string) {
+export function useDateKanbanData(
+  date: string,
+  selectedWorkspace: string,
+  isToday: boolean
+) {
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const tag = selectedWorkspace ? `workspace=${selectedWorkspace}` : undefined;
-  const fromDate = useMemo(() => sevenDaysAgoUnix(), []);
 
+  const { fromDate, toDate } = useMemo(() => dayBounds(date), [date]);
+
+  // SSE only for today
   const sseParams = useMemo(
-    () => ({ tags: tag, fromDate }),
-    [tag, fromDate]
+    () => ({ tags: tag, fromDate, toDate }),
+    [tag, fromDate, toDate]
   );
-
-  const sseResult = useDAGRunsListSSE(sseParams, !!selectedWorkspace);
+  const sseResult = useDAGRunsListSSE(sseParams, isToday && !!selectedWorkspace);
 
   const { data, mutate } = useQuery(
     '/dag-runs',
@@ -64,15 +74,17 @@ export function useKanbanData(selectedWorkspace: string) {
           remoteNode,
           tags: tag,
           fromDate,
+          toDate,
         },
       },
     },
     {
-      ...sseFallbackOptions(sseResult),
+      ...(isToday ? sseFallbackOptions(sseResult) : { refreshInterval: 0 }),
       isPaused: () => !selectedWorkspace,
     }
   );
 
+  // Always call the hook (rules of hooks), but SSE data is only present when isToday
   useSSECacheSync(sseResult, mutate);
 
   const columns = useMemo(
@@ -80,5 +92,11 @@ export function useKanbanData(selectedWorkspace: string) {
     [data?.dagRuns]
   );
 
-  return { columns, isConnected: sseResult.isConnected };
+  const isEmpty =
+    columns.queued.length === 0 &&
+    columns.running.length === 0 &&
+    columns.done.length === 0 &&
+    columns.failed.length === 0;
+
+  return { columns, isLoading: !data, isEmpty };
 }
