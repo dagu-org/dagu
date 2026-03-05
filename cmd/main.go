@@ -52,6 +52,7 @@ func init() {
 	rootCmd.AddCommand(cmd.License())
 	rootCmd.AddCommand(cmd.Schema())
 	rootCmd.AddCommand(cmd.Example())
+	rootCmd.AddCommand(cmd.Config())
 
 	config.Version = version
 }
