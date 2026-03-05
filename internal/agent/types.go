@@ -427,6 +427,8 @@ type AgentTool struct {
 type EnvironmentInfo struct {
 	// DAGsDir is the directory containing DAG definition files.
 	DAGsDir string
+	// DocsDir is the directory for documents.
+	DocsDir string
 	// LogDir is the directory for log files.
 	LogDir string
 	// DataDir is the directory for data storage.

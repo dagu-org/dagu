@@ -14,6 +14,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{
 			DAGsDir:        "/dags",
+			DocsDir:        "/dags/docs",
 			LogDir:         "/logs",
 			WorkingDir:     "/work",
 			BaseConfigFile: "/config/base.yaml",
@@ -23,6 +24,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "/dags")
+		assert.Contains(t, result, "/dags/docs")
 		assert.Contains(t, result, "/config/base.yaml")
 		assert.Contains(t, result, "Authenticated role: developer")
 	})

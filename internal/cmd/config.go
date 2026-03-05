@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -38,7 +37,7 @@ func runConfig(ctx *Context, _ []string) error {
 		{"Config file", paths.ConfigFileUsed},
 		{"Base config", paths.BaseConfig},
 		{"DAGs directory", paths.DAGsDir},
-		{"Docs directory", filepath.Join(paths.DAGsDir, "docs")},
+		{"Docs directory", paths.DocsDir},
 		{"DAG runs", paths.DAGRunsDir},
 		{"Data directory", paths.DataDir},
 		{"Log directory", paths.LogDir},

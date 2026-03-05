@@ -197,8 +197,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		agentSoulStore = soulStore
 	}
 
-	docsDir := filepath.Join(cfg.Paths.DAGsDir, "docs")
-	docStore := filedoc.New(docsDir)
+	docStore := filedoc.New(cfg.Paths.DocsDir)
 
 	var memoryStore agent.MemoryStore
 	cacheLimits := cfg.Cache.Limits()
@@ -659,6 +658,7 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 		RemoteNodeResolver: remoteResolver,
 		Environment: agent.EnvironmentInfo{
 			DAGsDir:        paths.DAGsDir,
+			DocsDir:        paths.DocsDir,
 			LogDir:         paths.LogDir,
 			DataDir:        paths.DataDir,
 			ConfigFile:     paths.ConfigFileUsed,
