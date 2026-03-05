@@ -22,6 +22,7 @@ import {
   BarChart2,
   Bot,
   Brain,
+  ChevronDown,
   FileCog,
   FileText,
   Ghost,
@@ -229,6 +230,116 @@ function NavItem({ to, icon, text, isOpen, onClick, customColor = false }: NavIt
           {text}
         </span>
       </Link>
+    </div>
+  );
+}
+
+type NavGroupProps = {
+  groupKey: string;
+  icon: React.ReactNode;
+  label: string;
+  isOpen: boolean;
+  basePath: string;
+  customColor?: boolean;
+  children: React.ReactNode;
+};
+
+function NavGroup({ groupKey, icon, label, isOpen, basePath, customColor = false, children }: NavGroupProps): React.ReactElement {
+  const location = useLocation();
+  const isChildActive = location.pathname.startsWith(basePath);
+
+  const [isExpanded, setIsExpanded] = React.useState(() => {
+    try {
+      return localStorage.getItem(`navgroup_expanded_${groupKey}`) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(`navgroup_expanded_${groupKey}`, isExpanded.toString());
+    } catch { /* ignore */ }
+  }, [isExpanded, groupKey]);
+
+  React.useEffect(() => {
+    if (isChildActive && !isExpanded) {
+      setIsExpanded(true);
+    }
+  }, [isChildActive]);
+
+  const effectivelyExpanded = isExpanded || isChildActive;
+
+  const headerClassName = cn(
+    'flex items-center rounded-md px-2 group relative w-full',
+    'h-9 gap-3',
+    isChildActive && !effectivelyExpanded
+      ? getActiveLinkStyle(customColor)
+      : 'text-sidebar-foreground hover:text-foreground hover:bg-sidebar-hover'
+  );
+
+  const iconClassName = cn(
+    'flex items-center justify-center flex-shrink-0',
+    isChildActive
+      ? getActiveIconStyle(customColor)
+      : 'text-sidebar-foreground group-hover:text-foreground'
+  );
+
+  return (
+    <div>
+      <div className="px-1">
+        <button
+          onClick={() => setIsExpanded((prev) => !prev)}
+          className={headerClassName}
+          title={isOpen ? '' : label}
+          aria-expanded={effectivelyExpanded}
+          style={{ transition: 'background-color 150ms ease, color 150ms ease' }}
+        >
+          {isChildActive && (
+            <div
+              className={cn('absolute left-0 w-[3px] h-6 rounded-r-sm', getActiveIndicatorStyle(customColor))}
+              style={{ transition: 'opacity 200ms ease' }}
+            />
+          )}
+          <div className={iconClassName}>{icon}</div>
+          <span
+            className={cn(
+              'text-sm font-medium whitespace-nowrap overflow-hidden',
+              isChildActive ? 'text-foreground' : 'text-sidebar-foreground group-hover:text-foreground'
+            )}
+            style={{
+              transition: 'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1), max-width 280ms cubic-bezier(0.4, 0, 0.2, 1)',
+              opacity: isOpen ? 1 : 0,
+              maxWidth: isOpen ? '180px' : '0px',
+              transform: isOpen ? 'translateX(0)' : 'translateX(-8px)',
+            }}
+          >
+            {label}
+          </span>
+          <div
+            className="ml-auto flex-shrink-0"
+            style={{
+              transition: 'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+              opacity: isOpen ? 0.6 : 0,
+              transform: effectivelyExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+            }}
+          >
+            <ChevronDown size={14} />
+          </div>
+        </button>
+      </div>
+      <div
+        style={{
+          transition: 'max-height 250ms cubic-bezier(0.4, 0, 0.2, 1), opacity 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+          maxHeight: effectivelyExpanded ? '200px' : '0px',
+          opacity: effectivelyExpanded ? 1 : 0,
+          overflow: 'hidden',
+        }}
+      >
+        <div className={cn(isOpen && 'pl-4')}>
+          {children}
+        </div>
+      </div>
     </div>
   );
 }
@@ -469,44 +580,53 @@ export const mainListItems = React.forwardRef<
                   customColor={customColor}
                 />
               )}
-              <NavItem
-                to="/agent-settings"
-                text="Agent Settings"
+              <NavGroup
+                groupKey="agent"
                 icon={<Bot size={18} />}
+                label="Agent"
                 isOpen={isOpen}
-                onClick={onNavItemClick}
+                basePath="/agent-"
                 customColor={customColor}
-              />
-              {config.agentEnabled && (
+              >
                 <NavItem
-                  to="/agent-memory"
-                  text="Agent Memory"
-                  icon={<Brain size={18} />}
+                  to="/agent-settings"
+                  text="Settings"
+                  icon={<Bot size={18} />}
                   isOpen={isOpen}
                   onClick={onNavItemClick}
                   customColor={customColor}
                 />
-              )}
-              {config.agentEnabled && (
-                <NavItem
-                  to="/agent-skills"
-                  text="Agent Skills"
-                  icon={<Sparkles size={18} />}
-                  isOpen={isOpen}
-                  onClick={onNavItemClick}
-                  customColor={customColor}
-                />
-              )}
-              {config.agentEnabled && (
-                <NavItem
-                  to="/agent-souls"
-                  text="Agent Souls"
-                  icon={<Ghost size={18} />}
-                  isOpen={isOpen}
-                  onClick={onNavItemClick}
-                  customColor={customColor}
-                />
-              )}
+                {config.agentEnabled && (
+                  <NavItem
+                    to="/agent-memory"
+                    text="Memory"
+                    icon={<Brain size={18} />}
+                    isOpen={isOpen}
+                    onClick={onNavItemClick}
+                    customColor={customColor}
+                  />
+                )}
+                {config.agentEnabled && (
+                  <NavItem
+                    to="/agent-skills"
+                    text="Skills"
+                    icon={<Sparkles size={18} />}
+                    isOpen={isOpen}
+                    onClick={onNavItemClick}
+                    customColor={customColor}
+                  />
+                )}
+                {config.agentEnabled && (
+                  <NavItem
+                    to="/agent-souls"
+                    text="Souls"
+                    icon={<Ghost size={18} />}
+                    isOpen={isOpen}
+                    onClick={onNavItemClick}
+                    customColor={customColor}
+                  />
+                )}
+              </NavGroup>
               <NavItem
                 to="/remote-nodes"
                 text="Remote Nodes"
