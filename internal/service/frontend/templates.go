@@ -62,6 +62,12 @@ type SetupRequiredChecker interface {
 	IsSetupRequired(ctx context.Context) bool
 }
 
+// UpdateChecker provides dynamic update availability for template rendering.
+// Called on every HTML page render so the banner reflects the latest cached check.
+type UpdateChecker interface {
+	GetUpdateInfo() (updateAvailable bool, latestVersion string)
+}
+
 // AgentEnabledChecker provides the agent enabled status for template rendering.
 type AgentEnabledChecker interface {
 	IsEnabled(ctx context.Context) bool
@@ -85,8 +91,7 @@ type funcsConfig struct {
 	GitSyncEnabled        bool
 
 	SetupRequiredChecker SetupRequiredChecker
-	UpdateAvailable      bool
-	LatestVersion        string
+	UpdateChecker        UpdateChecker
 	AgentEnabledChecker  AgentEnabledChecker
 	LicenseChecker       license.Checker
 	LicenseManager       *license.Manager
@@ -130,8 +135,20 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 			}
 			return boolStr(cfg.SetupRequiredChecker.IsSetupRequired(context.Background()))
 		},
-		"updateAvailable": func() string { return boolStr(cfg.UpdateAvailable) },
-		"latestVersion":   func() string { return cfg.LatestVersion },
+		"updateAvailable": func() string {
+			if cfg.UpdateChecker == nil {
+				return "false"
+			}
+			available, _ := cfg.UpdateChecker.GetUpdateInfo()
+			return boolStr(available)
+		},
+		"latestVersion": func() string {
+			if cfg.UpdateChecker == nil {
+				return ""
+			}
+			_, version := cfg.UpdateChecker.GetUpdateInfo()
+			return version
+		},
 
 		// License functions
 		"licenseValid": func() string {
