@@ -74,6 +74,14 @@ Confirm before actions with side effects (editing production DAGs, deleting file
 Do not read environment variables via bash (echo $VAR, env, printenv)—they may contain secrets that would be exposed in logs or outputs.
 
 Treat anything that looks like a secret as sensitive (API keys, tokens, passwords).
+
+When passing user-generated content (emails, file contents, API responses, etc.) to external CLI tools, never embed the variable directly in shell arguments. The content may contain quotes or special characters that break shell parsing. Always write the content to a temp file and use stdin redirection:
+```sh
+TMPFILE=$(mktemp)
+trap 'rm -f "$TMPFILE"' EXIT
+printf '%s' "${CONTENT}" > "$TMPFILE"
+some-cli-tool < "$TMPFILE"
+```
 </security>
 
 <correctness>
@@ -86,7 +94,30 @@ Use `read_schema` when unsure about YAML fields.
 Use the appropriate executor type (http, s3, postgres) instead of shelling out.
 
 Omit the root `name:` field—Dagu uses the filename as the DAG name by default.
+
+Always use `type: graph` with explicit `depends` on every step. This makes execution order clear and deterministic. Steps with no dependencies use `depends: []`. Never use `type: chain` or omit `type`—implicit sequential ordering hides the real dependency structure.
+
+Example:
+```yaml
+type: graph
+steps:
+  - name: fetch-data
+    command: curl -o data.json https://api.example.com/data
+    depends: []
+  - name: process
+    command: python process.py
+    depends:
+      - fetch-data
+  - name: notify
+    command: echo "Done"
+    depends:
+      - process
+```
 </correctness>
+
+<output_documents>
+When a DAG produces output documents (reports, summaries, briefings, etc.), always save them to the Dagu docs directory: ${DAGU_DAGS_DIR}/docs/<subdirectory>/<filename>.md
+</output_documents>
 
 <data_hygiene>
 Do not use placeholder values (example.com, your-api-key) in user DAGs unless explicitly requested for testing. If real values are missing, guide the user to configure them.
