@@ -55,7 +55,7 @@ func TestExampleCommand(t *testing.T) {
 	t.Run("InvalidID", func(t *testing.T) {
 		_, err := runExampleCmd("example", "99")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "between 1 and 11")
+		assert.Contains(t, err.Error(), fmt.Sprintf("between 1 and %d", cmd.ExampleCount()))
 	})
 
 	t.Run("NonNumericID", func(t *testing.T) {
@@ -67,7 +67,7 @@ func TestExampleCommand(t *testing.T) {
 	t.Run("ZeroID", func(t *testing.T) {
 		_, err := runExampleCmd("example", "0")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "between 1 and 11")
+		assert.Contains(t, err.Error(), fmt.Sprintf("between 1 and %d", cmd.ExampleCount()))
 	})
 
 	t.Run("Help", func(t *testing.T) {
@@ -76,7 +76,7 @@ func TestExampleCommand(t *testing.T) {
 	})
 
 	t.Run("AllExamplesUseGraph", func(t *testing.T) {
-		for i := 1; i <= 11; i++ {
+		for i := 1; i <= cmd.ExampleCount(); i++ {
 			out, err := runExampleCmd("example", fmt.Sprintf("%d", i))
 			require.NoError(t, err, "example %d failed", i)
 			assert.Contains(t, out, "type: graph", "example %d missing type: graph", i)

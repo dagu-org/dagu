@@ -304,6 +304,9 @@ steps:
 	},
 }
 
+// ExampleCount returns the number of available examples.
+func ExampleCount() int { return len(examples) }
+
 // Example creates the 'example' CLI command that displays example DAG definitions.
 func Example() *cobra.Command {
 	return &cobra.Command{
