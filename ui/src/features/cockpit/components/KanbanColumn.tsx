@@ -1,4 +1,5 @@
 import React from 'react';
+import { AnimatePresence, LayoutGroup } from 'framer-motion';
 import { components } from '@/api/v1/schema';
 import { KanbanCard } from './KanbanCard';
 
@@ -18,13 +19,17 @@ export function KanbanColumn({ title, runs, onCardClick }: Props): React.ReactEl
         <span className="text-[11px] text-muted-foreground/60">{runs.length}</span>
       </div>
       <div className="flex flex-col gap-1.5 overflow-y-auto min-h-0 flex-1 px-0.5">
-        {runs.map((run) => (
-          <KanbanCard
-            key={`${run.name}-${run.dagRunId}`}
-            run={run}
-            onClick={() => onCardClick(run)}
-          />
-        ))}
+        <LayoutGroup>
+          <AnimatePresence mode="popLayout">
+            {runs.map((run) => (
+              <KanbanCard
+                key={run.dagRunId}
+                run={run}
+                onClick={() => onCardClick(run)}
+              />
+            ))}
+          </AnimatePresence>
+        </LayoutGroup>
       </div>
     </div>
   );

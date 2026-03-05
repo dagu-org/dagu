@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { components, Status } from '@/api/v1/schema';
 import StatusChip from '@/ui/StatusChip';
 
@@ -35,20 +36,29 @@ export function KanbanCard({ run, onClick }: Props): React.ReactElement {
   const params = useMemo(() => truncateParams(run.params), [run.params]);
 
   return (
-    <button
-      onClick={onClick}
-      className="w-full text-left p-2 rounded-md border border-border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+    <motion.div
+      layoutId={run.dagRunId}
+      layout
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
     >
-      <div className="flex items-center justify-between gap-2 mb-1">
-        <span className="text-xs font-medium truncate">{run.name}</span>
-        <StatusChip status={run.status} size="xs">{run.statusLabel}</StatusChip>
-      </div>
-      {elapsed && (
-        <div className="text-[11px] text-muted-foreground">{elapsed}</div>
-      )}
-      {params && (
-        <div className="text-[11px] text-muted-foreground mt-0.5 truncate font-mono">{params}</div>
-      )}
-    </button>
+      <button
+        onClick={onClick}
+        className="w-full text-left p-2 rounded-md border border-border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+      >
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <span className="text-xs font-medium truncate">{run.name}</span>
+          <StatusChip status={run.status} size="xs">{run.statusLabel}</StatusChip>
+        </div>
+        {elapsed && (
+          <div className="text-[11px] text-muted-foreground">{elapsed}</div>
+        )}
+        {params && (
+          <div className="text-[11px] text-muted-foreground mt-0.5 truncate font-mono">{params}</div>
+        )}
+      </button>
+    </motion.div>
   );
 }

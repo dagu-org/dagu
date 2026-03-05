@@ -473,7 +473,7 @@ export const mainListItems = React.forwardRef<
 
         <div className="space-y-4">
           <div className="space-y-0.5">
-            <SectionLabel label="System" isOpen={isOpen} customColor={customColor} />
+            <SectionLabel label="Overview" isOpen={isOpen} customColor={customColor} />
             <NavItem
               to="/dashboard"
               text="Dashboard"
@@ -492,34 +492,14 @@ export const mainListItems = React.forwardRef<
                 customColor={customColor}
               />
             )}
-            {canAccessSystemStatus && (
-              <NavItem
-                to="/system-status"
-                text="System Status"
-                icon={<Activity size={18} />}
-                isOpen={isOpen}
-                onClick={onNavItemClick}
-                customColor={customColor}
-              />
-            )}
-            {canWrite && (
-              <NavItem
-                to="/base-config"
-                text="Base Config"
-                icon={<FileCog size={18} />}
-                isOpen={isOpen}
-                onClick={onNavItemClick}
-                customColor={customColor}
-              />
-            )}
           </div>
 
           <div className="space-y-0.5">
             <SectionLabel label="Workflows" isOpen={isOpen} customColor={customColor} />
             <NavItem
-              to="/queues"
-              text="Queues"
-              icon={<Inbox size={18} />}
+              to="/dags"
+              text="Definitions"
+              icon={<Network size={18} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
               customColor={customColor}
@@ -533,17 +513,9 @@ export const mainListItems = React.forwardRef<
               customColor={customColor}
             />
             <NavItem
-              to="/dags"
-              text="Definitions"
-              icon={<Network size={18} />}
-              isOpen={isOpen}
-              onClick={onNavItemClick}
-              customColor={customColor}
-            />
-            <NavItem
-              to="/docs"
-              text="Docs"
-              icon={<FileText size={18} />}
+              to="/queues"
+              text="Queues"
+              icon={<Inbox size={18} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
               customColor={customColor}
@@ -556,7 +528,122 @@ export const mainListItems = React.forwardRef<
               onClick={onNavItemClick}
               customColor={customColor}
             />
+            <NavItem
+              to="/docs"
+              text="Docs"
+              icon={<FileText size={18} />}
+              isOpen={isOpen}
+              onClick={onNavItemClick}
+              customColor={customColor}
+            />
           </div>
+
+          {(canWrite || canAccessSystemStatus || canManageWebhooks || canViewAuditLogs) && (
+            <div className="space-y-0.5">
+              <SectionLabel label="Settings" isOpen={isOpen} customColor={customColor} />
+              {canAccessSystemStatus && (
+                <NavItem
+                  to="/system-status"
+                  text="System Status"
+                  icon={<Activity size={18} />}
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+              )}
+              {canWrite && (
+                <NavItem
+                  to="/base-config"
+                  text="Base Config"
+                  icon={<FileCog size={18} />}
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+              )}
+              {canWrite && config.gitSyncEnabled && (
+                <NavItem
+                  to="/git-sync"
+                  text="Git Sync"
+                  icon={<GitBranch size={18} />}
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+              )}
+              <NavItem
+                to="/remote-nodes"
+                text="Remote Nodes"
+                icon={<Globe size={18} />}
+                isOpen={isOpen}
+                onClick={onNavItemClick}
+                customColor={customColor}
+              />
+              {canManageWebhooks && (
+                <NavItem
+                  to="/webhooks"
+                  text="Webhooks"
+                  icon={<Webhook size={18} />}
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+              )}
+              {canViewAuditLogs && (
+                <NavItem
+                  to="/audit-logs"
+                  text={hasAudit ? 'Audit Logs' : 'Audit Logs (Pro)'}
+                  icon={<ScrollText size={18} />}
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+              )}
+              {config.agentEnabled && (
+                <NavGroup
+                  groupKey="agent"
+                  icon={<Bot size={18} />}
+                  label="Agent"
+                  isOpen={isOpen}
+                  basePath="/agent-"
+                  customColor={customColor}
+                >
+                  <NavItem
+                    to="/agent-settings"
+                    text="Settings"
+                    icon={<Bot size={18} />}
+                    isOpen={isOpen}
+                    onClick={onNavItemClick}
+                    customColor={customColor}
+                  />
+                  <NavItem
+                    to="/agent-memory"
+                    text="Memory"
+                    icon={<Brain size={18} />}
+                    isOpen={isOpen}
+                    onClick={onNavItemClick}
+                    customColor={customColor}
+                  />
+                  <NavItem
+                    to="/agent-skills"
+                    text="Skills"
+                    icon={<Sparkles size={18} />}
+                    isOpen={isOpen}
+                    onClick={onNavItemClick}
+                    customColor={customColor}
+                  />
+                  <NavItem
+                    to="/agent-souls"
+                    text="Souls"
+                    icon={<Ghost size={18} />}
+                    isOpen={isOpen}
+                    onClick={onNavItemClick}
+                    customColor={customColor}
+                  />
+                </NavGroup>
+              )}
+            </div>
+          )}
 
           {isAdmin && (
             <div className="space-y-0.5">
@@ -591,105 +678,10 @@ export const mainListItems = React.forwardRef<
                   customColor={customColor}
                 />
               )}
-              <NavGroup
-                groupKey="agent"
-                icon={<Bot size={18} />}
-                label="Agent"
-                isOpen={isOpen}
-                basePath="/agent-"
-                customColor={customColor}
-              >
-                <NavItem
-                  to="/agent-settings"
-                  text="Settings"
-                  icon={<Bot size={18} />}
-                  isOpen={isOpen}
-                  onClick={onNavItemClick}
-                  customColor={customColor}
-                />
-                {config.agentEnabled && (
-                  <NavItem
-                    to="/agent-memory"
-                    text="Memory"
-                    icon={<Brain size={18} />}
-                    isOpen={isOpen}
-                    onClick={onNavItemClick}
-                    customColor={customColor}
-                  />
-                )}
-                {config.agentEnabled && (
-                  <NavItem
-                    to="/agent-skills"
-                    text="Skills"
-                    icon={<Sparkles size={18} />}
-                    isOpen={isOpen}
-                    onClick={onNavItemClick}
-                    customColor={customColor}
-                  />
-                )}
-                {config.agentEnabled && (
-                  <NavItem
-                    to="/agent-souls"
-                    text="Souls"
-                    icon={<Ghost size={18} />}
-                    isOpen={isOpen}
-                    onClick={onNavItemClick}
-                    customColor={customColor}
-                  />
-                )}
-              </NavGroup>
-              <NavItem
-                to="/remote-nodes"
-                text="Remote Nodes"
-                icon={<Globe size={18} />}
-                isOpen={isOpen}
-                onClick={onNavItemClick}
-                customColor={customColor}
-              />
               <NavItem
                 to="/license"
                 text="License"
                 icon={<Shield size={18} />}
-                isOpen={isOpen}
-                onClick={onNavItemClick}
-                customColor={customColor}
-              />
-            </div>
-          )}
-
-          {(canManageWebhooks || canViewAuditLogs) && (
-              <div className="space-y-0.5">
-                <SectionLabel label="Operations" isOpen={isOpen} customColor={customColor} />
-                {canManageWebhooks && (
-                  <NavItem
-                    to="/webhooks"
-                    text="Webhooks"
-                    icon={<Webhook size={18} />}
-                    isOpen={isOpen}
-                    onClick={onNavItemClick}
-                    customColor={customColor}
-                  />
-                )}
-                {canViewAuditLogs && (
-                  <NavItem
-                    to="/audit-logs"
-                    text={hasAudit ? 'Audit Logs' : 'Audit Logs (Pro)'}
-                    icon={<ScrollText size={18} />}
-                    isOpen={isOpen}
-                    onClick={onNavItemClick}
-                    customColor={customColor}
-                  />
-                )}
-              </div>
-            )}
-
-          {canWrite && config.gitSyncEnabled && (
-            <div className="space-y-0.5">
-              <SectionLabel label="Sync" isOpen={isOpen} customColor={customColor} />
-              <NavItem
-                to="/git-sync"
-                text="Git Sync"
-                icon={<GitBranch size={18} />}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
                 customColor={customColor}
