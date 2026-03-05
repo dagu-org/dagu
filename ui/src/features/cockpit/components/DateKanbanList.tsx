@@ -23,6 +23,7 @@ export function DateKanbanList({ selectedWorkspace }: Props): React.ReactElement
     setSelectedRun(null);
   }, []);
 
+  const dateCount = loadedDates.length;
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el || !hasMore) return;
@@ -34,7 +35,7 @@ export function DateKanbanList({ selectedWorkspace }: Props): React.ReactElement
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasMore, loadNextDate]);
+  }, [hasMore, loadNextDate, dateCount]);
 
   return (
     <>
