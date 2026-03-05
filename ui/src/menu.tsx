@@ -25,6 +25,7 @@ import {
   ChevronDown,
   FileCog,
   FileText,
+  Gauge,
   Ghost,
   Shield,
   Sparkles,
@@ -481,6 +482,16 @@ export const mainListItems = React.forwardRef<
               onClick={onNavItemClick}
               customColor={customColor}
             />
+            {config.agentEnabled && (
+              <NavItem
+                to="/cockpit"
+                text="Cockpit"
+                icon={<Gauge size={18} />}
+                isOpen={isOpen}
+                onClick={onNavItemClick}
+                customColor={customColor}
+              />
+            )}
             {canAccessSystemStatus && (
               <NavItem
                 to="/system-status"
