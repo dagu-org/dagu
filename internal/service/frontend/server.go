@@ -51,6 +51,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/filedoc"
 	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/persis/fileremotenode"
+	"github.com/dagu-org/dagu/internal/persis/fileworkspace"
 	"github.com/dagu-org/dagu/internal/persis/filesession"
 	"github.com/dagu-org/dagu/internal/persis/filetokensecret"
 	"github.com/dagu-org/dagu/internal/persis/fileupgradecheck"
@@ -298,6 +299,14 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	// Update template remote nodes list to include store-managed nodes
 	if names, err := remoteNodeResolver.ListNames(ctx); err == nil && len(names) > 0 {
 		remoteNodes = names
+	}
+
+	// Initialize workspace store
+	wsStore, wsErr := fileworkspace.New(cfg.Paths.WorkspacesDir)
+	if wsErr != nil {
+		logger.Warn(ctx, "Failed to create workspace store", tag.Error(wsErr))
+	} else {
+		apiOpts = append(apiOpts, apiv1.WithWorkspaceStore(wsStore))
 	}
 
 	var agentAPI *agent.API

@@ -7,13 +7,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import type { components } from '@/api/v1/schema';
+
+type WorkspaceResponse = components['schemas']['WorkspaceResponse'];
 
 interface Props {
-  workspaces: string[];
+  workspaces: WorkspaceResponse[];
   selectedWorkspace: string;
   onSelect: (name: string) => void;
   onCreate: (name: string) => void;
-  onDelete: (name: string) => void;
+  onDelete: (id: string) => void;
 }
 
 export function WorkspaceSelector({
@@ -41,6 +44,8 @@ export function WorkspaceSelector({
     },
     [handleCreate]
   );
+
+  const selectedWs = workspaces.find((ws) => ws.name === selectedWorkspace);
 
   if (isCreating) {
     return (
@@ -76,7 +81,7 @@ export function WorkspaceSelector({
             <span className="text-muted-foreground">All workspaces</span>
           </SelectItem>
           {workspaces.map((ws) => (
-            <SelectItem key={ws} value={ws}>{ws}</SelectItem>
+            <SelectItem key={ws.id} value={ws.name}>{ws.name}</SelectItem>
           ))}
           <SelectItem value="__new__">
             <span className="flex items-center gap-1 text-primary">
@@ -85,9 +90,9 @@ export function WorkspaceSelector({
           </SelectItem>
         </SelectContent>
       </Select>
-      {selectedWorkspace && (
+      {selectedWs && (
         <button
-          onClick={() => onDelete(selectedWorkspace)}
+          onClick={() => onDelete(selectedWs.id)}
           className="p-1 text-muted-foreground hover:text-destructive rounded"
           title="Delete workspace"
         >

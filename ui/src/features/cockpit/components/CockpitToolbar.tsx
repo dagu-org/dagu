@@ -2,14 +2,17 @@ import React from 'react';
 import { WorkspaceSelector } from './WorkspaceSelector';
 import { TemplateSelector } from './TemplateSelector';
 import { QuickAddBar } from './QuickAddBar';
+import type { components } from '@/api/v1/schema';
+
+type WorkspaceResponse = components['schemas']['WorkspaceResponse'];
 
 interface Props {
-  workspaces: string[];
+  workspaces: WorkspaceResponse[];
   selectedWorkspace: string;
   selectedTemplate: string;
   onSelectWorkspace: (name: string) => void;
   onCreateWorkspace: (name: string) => void;
-  onDeleteWorkspace: (name: string) => void;
+  onDeleteWorkspace: (id: string) => void;
   onSelectTemplate: (fileName: string) => void;
 }
 

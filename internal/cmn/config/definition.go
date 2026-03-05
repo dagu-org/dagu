@@ -175,6 +175,7 @@ type PathsDef struct {
 	WebhooksDir        string `mapstructure:"webhooks_dir"`
 	SessionsDir        string `mapstructure:"sessions_dir"`
 	RemoteNodesDir     string `mapstructure:"remote_nodes_dir"`
+	WorkspacesDir      string `mapstructure:"workspaces_dir"`
 }
 
 // -----------------------------------------------------------------------------

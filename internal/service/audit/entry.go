@@ -21,6 +21,7 @@ const (
 	CategoryAgent      Category = "agent"
 	CategorySystem     Category = "system"
 	CategoryRemoteNode Category = "remote_node"
+	CategoryWorkspace  Category = "workspace"
 )
 
 // Entry represents a single audit log entry.

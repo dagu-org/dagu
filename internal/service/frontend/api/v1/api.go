@@ -23,6 +23,7 @@ import (
 	"github.com/dagu-org/dagu/internal/license"
 	"github.com/dagu-org/dagu/internal/remotenode"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/workspace"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
@@ -70,6 +71,7 @@ type API struct {
 	docStore           agent.DocStore
 	baseConfigStore    baseconfig.Store
 	licenseManager     *license.Manager
+	workspaceStore     workspace.Store
 }
 
 // AuthService defines the interface for authentication operations.
@@ -205,6 +207,13 @@ func WithRemoteNodeResolver(r *remotenode.Resolver) APIOption {
 func WithRemoteNodeStore(s remotenode.Store) APIOption {
 	return func(a *API) {
 		a.remoteNodeStore = s
+	}
+}
+
+// WithWorkspaceStore returns an APIOption that sets the workspace store.
+func WithWorkspaceStore(s workspace.Store) APIOption {
+	return func(a *API) {
+		a.workspaceStore = s
 	}
 }
 
