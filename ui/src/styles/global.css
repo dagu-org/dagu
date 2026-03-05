@@ -115,7 +115,7 @@
     /* Unified Status Colors */
     --status-success: #1e8e3e;
     --status-error: #d93025;
-    --status-running: #34a853;
+    --status-running: #81c784;
     --status-neutral: #5f6368;
     --status-warning: #e37400;
     --status-aborted: #d946ef;
@@ -196,7 +196,7 @@
     /* Unified Status Colors - Dark Mode */
     --status-success: #81c995;
     --status-error: #f28b82;
-    --status-running: #81c995;
+    --status-running: #b9f6ca;
     --status-neutral: #9aa0a6;
     --status-warning: #fdd663;
     --status-aborted: #e879f9;

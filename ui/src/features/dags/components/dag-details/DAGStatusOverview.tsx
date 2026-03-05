@@ -32,7 +32,7 @@ type NodeStatusConfig = {
 // Unified status colors matching Graph.tsx and global.css
 const NODE_STATUS_CONFIG: NodeStatusConfig[] = [
   { key: 'succeeded', label: 'success', colorClass: 'bg-[#1e8e3e]' },
-  { key: 'running', label: 'running', colorClass: 'bg-[#34a853]' },
+  { key: 'running', label: 'running', colorClass: 'bg-[#81c784]' },
   { key: 'failed', label: 'failed', colorClass: 'bg-[#d93025]' },
   { key: 'queued', label: 'queued', colorClass: 'bg-[#5f6368]' },
   { key: 'not_started', label: 'not started', colorClass: 'bg-[#5f6368]' },
@@ -50,7 +50,7 @@ type ExecutionStatusConfig = {
 };
 
 const EXECUTION_STATUS_CONFIG: ExecutionStatusConfig[] = [
-  { status: Status.Running, icon: PlayCircle, iconClass: 'text-[#34a853]', message: 'Execution in progress' },
+  { status: Status.Running, icon: PlayCircle, iconClass: 'text-[#81c784]', message: 'Execution in progress' },
   { status: Status.Queued, icon: Clock, iconClass: 'text-[#5f6368]', message: 'DAGRun is queued for execution' },
   { status: Status.Aborted, icon: StopCircle, iconClass: 'text-[#d946ef]', message: 'Execution was aborted' },
   { status: Status.Waiting, icon: Clock, iconClass: 'text-[#e37400]', message: 'Waiting for approval' },

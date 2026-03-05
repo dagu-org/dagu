@@ -301,7 +301,7 @@ function Graph({
     // Unified status colors
     const statusColors = {
       none: '#5f6368',      // neutral gray
-      running: '#34a853',   // subdued green
+      running: '#81c784',   // light green (distinct from success)
       done: '#1e8e3e',      // success green
       error: '#d93025',     // error red
       cancel: '#d946ef',    // pink/magenta for aborted

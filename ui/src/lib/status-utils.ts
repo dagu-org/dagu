@@ -81,9 +81,9 @@ export function getStatusColors(
 
     case 'status-running':
       return {
-        bgClass: 'bg-[#34a853] dark:bg-[#81c995]',
-        textClass: 'text-[#34a853] dark:text-[#81c995]',
-        borderClass: 'border-[#34a853] dark:border-[#81c995]',
+        bgClass: 'bg-[#81c784] dark:bg-[#b9f6ca]',
+        textClass: 'text-[#81c784] dark:text-[#b9f6ca]',
+        borderClass: 'border-[#81c784] dark:border-[#b9f6ca]',
         animation: '',
       };
 
