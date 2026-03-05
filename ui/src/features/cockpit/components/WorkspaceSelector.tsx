@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
+import ConfirmModal from '@/ui/ConfirmModal';
 import { Plus, Trash2 } from 'lucide-react';
 import {
   Select,
@@ -30,10 +31,11 @@ export function WorkspaceSelector({
   canWrite = true,
 }: Props): React.ReactElement {
   const [isCreating, setIsCreating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleCreate = useCallback(() => {
-    const name = inputRef.current?.value.trim();
+    const name = inputRef.current?.value.trim().replace(/[^a-zA-Z0-9_-]/g, '');
     if (name) {
       onCreate(name);
       setIsCreating(false);
@@ -66,6 +68,7 @@ export function WorkspaceSelector({
   }
 
   return (
+    <>
     <div className="flex items-center gap-1">
       <Select value={selectedWorkspace || '__none__'} onValueChange={(v) => {
         if (v === '__new__') {
@@ -97,7 +100,7 @@ export function WorkspaceSelector({
       </Select>
       {canWrite && selectedWs && (
         <button
-          onClick={() => onDelete(selectedWs.id)}
+          onClick={() => setDeleteTarget(selectedWs.id)}
           className="p-1 text-muted-foreground hover:text-destructive rounded"
           title="Delete workspace"
         >
@@ -105,5 +108,18 @@ export function WorkspaceSelector({
         </button>
       )}
     </div>
+    <ConfirmModal
+      title="Delete Workspace"
+      buttonText="Delete"
+      visible={!!deleteTarget}
+      dismissModal={() => setDeleteTarget(null)}
+      onSubmit={() => {
+        if (deleteTarget) onDelete(deleteTarget);
+        setDeleteTarget(null);
+      }}
+    >
+      <p className="text-sm">Are you sure you want to delete this workspace? This action cannot be undone.</p>
+    </ConfirmModal>
+    </>
   );
 }

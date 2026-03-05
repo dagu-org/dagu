@@ -106,11 +106,6 @@ export function EmbeddedAgentChat(): React.ReactElement {
     [selectSession, clearSession, setError]
   );
 
-  const handleOpenDelegate = useCallback((id: string) => {
-    // In embedded mode, we don't open delegate panels
-    void id;
-  }, []);
-
   return (
     <div className="flex flex-col h-full bg-card">
       {/* Header */}
@@ -157,7 +152,7 @@ export function EmbeddedAgentChat(): React.ReactElement {
             onPromptRespond={respondToPrompt}
             answeredPrompts={answeredPrompts}
             delegateStatuses={delegateStatuses}
-            onOpenDelegate={handleOpenDelegate}
+            onOpenDelegate={undefined}
           />
           <ChatInput
             onSend={handleSend}

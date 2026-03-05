@@ -191,8 +191,10 @@ func TestBuildDAGYAML(t *testing.T) {
 		Tags: []string{"workspace:test", "env:dev"},
 	}
 
-	yaml := buildDAGYAML(input)
+	yamlContent, err := buildDAGYAML(input)
+	require.NoError(t, err)
 
+	yaml := yamlContent
 	assert.Contains(t, yaml, "name: my-dag")
 	assert.Contains(t, yaml, "type: graph")
 	assert.Contains(t, yaml, "- workspace:test")

@@ -12,6 +12,10 @@ import { Button } from '@/components/ui/button';
 import { Maximize2, X } from 'lucide-react';
 import type { components } from '@/api/v1/schema';
 
+function sanitizeForTag(s: string): string {
+  return s.replace(/[^a-zA-Z0-9_-]/g, '');
+}
+
 function injectTagIntoSpec(yamlSpec: string, tag: string): string {
   const tagsRegex = /^tags:\s*(.*)$/m;
   const match = yamlSpec.match(tagsRegex);
@@ -68,7 +72,7 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
     components['schemas']['DAGRunDetails'] | undefined
   >();
   // SSE for real-time updates
-  const sseResult = useDAGSSE(fileName, true);
+  const sseResult = useDAGSSE(fileName, !!fileName);
 
   // Fetch DAG details
   const { data, mutate } = useQuery(
@@ -79,7 +83,10 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
         path: { fileName },
       },
     },
-    sseFallbackOptions(sseResult),
+    {
+      ...sseFallbackOptions(sseResult),
+      isPaused: () => !fileName,
+    },
   );
   useSSECacheSync(sseResult, mutate);
 
@@ -89,6 +96,8 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
       path: { fileName },
       query: { remoteNode },
     },
+  }, {
+    isPaused: () => !fileName,
   });
 
   const refreshFn = useCallback(() => {
@@ -117,7 +126,9 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
   const handleEnqueue = useCallback(async (params: string, dagRunId?: string) => {
     if (!specData?.spec || !selectedWorkspace) return;
 
-    const spec = injectTagIntoSpec(specData.spec, `workspace=${selectedWorkspace}`);
+    const safeName = sanitizeForTag(selectedWorkspace);
+    if (!safeName) return;
+    const spec = injectTagIntoSpec(specData.spec, `workspace=${safeName}`);
     const { error } = await client.POST('/dag-runs/enqueue', {
       params: { query: { remoteNode } },
       body: {

@@ -193,9 +193,6 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
   const selectedDagName = selectedDag?.dag.name;
   const hasGroups = groupedDags.some(([group]) => group !== '');
 
-  // Track flat index for highlighting across groups
-  let flatIndex = -1;
-
   return (
     <div ref={containerRef} className="relative">
       {/* Trigger button */}
@@ -299,8 +296,7 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
                   )}
                   {/* DAG items */}
                   {dagList.map((dag) => {
-                    flatIndex++;
-                    const idx = flatIndex;
+                    const idx = flatList.indexOf(dag);
                     const params = dag.dag.params;
                     const tags = dag.dag.tags;
                     const description = dag.dag.description;

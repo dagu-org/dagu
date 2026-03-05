@@ -25,7 +25,7 @@ export function useCockpitState() {
       autoCreatedRef.current = true;
       createWorkspace('default');
     }
-  }, [data?.workspaces]);
+  }, [data?.workspaces, createWorkspace]);
 
   const createWorkspace = useCallback(
     async (name: string) => {

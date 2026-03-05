@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { components, Status } from '@/api/v1/schema';
 import StatusChip from '@/ui/StatusChip';
+import Ticker from '@/ui/Ticker';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
 
@@ -32,7 +33,6 @@ function truncateParams(params: string | undefined, maxLen = 60): string {
 }
 
 export function KanbanCard({ run, onClick }: Props): React.ReactElement {
-  const elapsed = useMemo(() => formatElapsed(run), [run]);
   const params = useMemo(() => truncateParams(run.params), [run.params]);
 
   return (
@@ -52,8 +52,14 @@ export function KanbanCard({ run, onClick }: Props): React.ReactElement {
           <span className="text-xs font-medium truncate">{run.name}</span>
           <StatusChip status={run.status} size="xs">{run.statusLabel}</StatusChip>
         </div>
-        {elapsed && (
-          <div className="text-[11px] text-muted-foreground">{elapsed}</div>
+        {run.startedAt && (
+          run.status === Status.Running ? (
+            <Ticker intervalMs={1000}>
+              {() => <div className="text-[11px] text-muted-foreground">{formatElapsed(run)}</div>}
+            </Ticker>
+          ) : (
+            <div className="text-[11px] text-muted-foreground">{formatElapsed(run)}</div>
+          )
         )}
         {params && (
           <div className="text-[11px] text-muted-foreground mt-0.5 truncate font-mono">{params}</div>

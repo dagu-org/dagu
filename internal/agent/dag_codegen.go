@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	yaml "github.com/goccy/go-yaml"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec"
@@ -129,7 +130,10 @@ func dagCodegenRun(ctx ToolContext, input json.RawMessage, dagsDir string) ToolO
 		return toolError("%v", err)
 	}
 
-	yaml := buildDAGYAML(args)
+	yamlContent, err := buildDAGYAML(args)
+	if err != nil {
+		return toolError("Failed to generate YAML: %v", err)
+	}
 
 	generatedDir := filepath.Join(dagsDir, ".generated")
 	if err := os.MkdirAll(generatedDir, dirPermission); err != nil {
@@ -137,7 +141,7 @@ func dagCodegenRun(ctx ToolContext, input json.RawMessage, dagsDir string) ToolO
 	}
 
 	filePath := filepath.Join(generatedDir, args.Name+".yaml")
-	if err := os.WriteFile(filePath, []byte(yaml), filePermission); err != nil {
+	if err := os.WriteFile(filePath, []byte(yamlContent), filePermission); err != nil {
 		return toolError("Failed to write DAG file: %v", err)
 	}
 
@@ -214,41 +218,43 @@ func detectCycle(steps []DAGCodegenStep) error {
 	return nil
 }
 
-func buildDAGYAML(input DAGCodegenInput) string {
-	var buf bytes.Buffer
+// dagYAMLDoc is the top-level structure for marshaling a DAG to YAML.
+type dagYAMLDoc struct {
+	Name  string        `yaml:"name"`
+	Type  string        `yaml:"type"`
+	Tags  []string      `yaml:"tags,omitempty"`
+	Steps []dagYAMLStep `yaml:"steps"`
+}
 
-	fmt.Fprintf(&buf, "name: %s\n", input.Name)
-	buf.WriteString("type: graph\n")
+// dagYAMLStep is a single step in the YAML output.
+type dagYAMLStep struct {
+	Name    string   `yaml:"name"`
+	Command string   `yaml:"command"`
+	Args    []string `yaml:"args,omitempty"`
+	Dir     string   `yaml:"dir,omitempty"`
+	Depends []string `yaml:"depends,omitempty"`
+}
 
-	if len(input.Tags) > 0 {
-		buf.WriteString("tags:\n")
-		for _, tag := range input.Tags {
-			fmt.Fprintf(&buf, "  - %s\n", tag)
-		}
+func buildDAGYAML(input DAGCodegenInput) (string, error) {
+	doc := dagYAMLDoc{
+		Name: input.Name,
+		Type: "graph",
+		Tags: input.Tags,
 	}
-
-	buf.WriteString("steps:\n")
 	for _, s := range input.Steps {
-		fmt.Fprintf(&buf, "  - name: %s\n", s.Name)
-		fmt.Fprintf(&buf, "    command: %s\n", s.Command)
-		if len(s.Args) > 0 {
-			buf.WriteString("    args:\n")
-			for _, arg := range s.Args {
-				fmt.Fprintf(&buf, "      - %q\n", arg)
-			}
-		}
-		if s.Dir != "" {
-			fmt.Fprintf(&buf, "    dir: %s\n", s.Dir)
-		}
-		if len(s.Depends) > 0 {
-			buf.WriteString("    depends:\n")
-			for _, dep := range s.Depends {
-				fmt.Fprintf(&buf, "      - %s\n", dep)
-			}
-		}
+		doc.Steps = append(doc.Steps, dagYAMLStep{
+			Name:    s.Name,
+			Command: s.Command,
+			Args:    s.Args,
+			Dir:     s.Dir,
+			Depends: s.Depends,
+		})
 	}
-
-	return buf.String()
+	data, err := yaml.Marshal(doc)
+	if err != nil {
+		return "", fmt.Errorf("yaml marshal: %w", err)
+	}
+	return string(data), nil
 }
 
 func validateGeneratedDAG(ctx context.Context, path string) []string {

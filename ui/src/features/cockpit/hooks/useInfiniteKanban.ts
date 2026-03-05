@@ -28,7 +28,7 @@ export function useInfiniteKanban(selectedWorkspace: string) {
     }
   }, [selectedWorkspace]);
 
-  const todayStr = useMemo(() => toDateStr(new Date()), []);
+  const todayStr = useMemo(() => toDateStr(new Date()), [loadedDates]);
 
   const hasMore = useMemo(() => {
     if (loadedDates.length === 0) return true;
