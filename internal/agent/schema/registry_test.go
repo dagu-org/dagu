@@ -710,7 +710,7 @@ func TestTruncateDescription(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := truncateDescription(tt.input)
+			got := formatDescription(tt.input, true)
 			assert.Equal(t, tt.want, got)
 		})
 	}
