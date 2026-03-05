@@ -93,6 +93,7 @@ type Server struct {
 	dagStore           exec.DAGStore
 	licenseManager     *license.Manager
 	remoteNodeResolver *remotenode.Resolver
+	upgradeStore       upgrade.CacheStore
 }
 
 // ServerOption is a functional option for configuring the Server.
@@ -312,13 +313,6 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		logger.Warn(ctx, "Failed to create upgrade check store", tag.Error(err))
 	}
 
-	// Check for updates asynchronously (populates cache for next startup)
-	if upgradeStore != nil {
-		go func() { _, _ = upgrade.CheckAndUpdateCache(upgradeStore, config.Version) }()
-	}
-
-	updateAvailable, latestVersion := getUpdateInfo(upgradeStore)
-
 	// Note: SSO/OIDC gating is applied after opts are processed (see below)
 
 	srv := &Server{
@@ -333,6 +327,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		metricsRegistry:    mr,
 		dagStore:           dr,
 		remoteNodeResolver: remoteNodeResolver,
+		upgradeStore:       upgradeStore,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
 			NavbarTitle:           cfg.UI.NavbarTitle,
@@ -350,8 +345,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			TerminalEnabled:       cfg.Server.Terminal.Enabled && authSvc != nil,
 			GitSyncEnabled:        cfg.GitSync.Enabled,
 			SetupRequiredChecker:  &setupChecker{authSvc: authSvc, fallback: setupRequired},
-			UpdateAvailable:       updateAvailable,
-			LatestVersion:         latestVersion,
+			UpdateChecker:         &updateChecker{store: upgradeStore},
 			AgentEnabledChecker:   agentConfigStore,
 		},
 	}
@@ -420,12 +414,16 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	return srv, nil
 }
 
-// getUpdateInfo returns update availability and latest version from cache.
-func getUpdateInfo(store upgrade.CacheStore) (updateAvailable bool, latestVersion string) {
-	if store == nil {
+// updateChecker implements UpdateChecker by reading from the upgrade cache store.
+type updateChecker struct {
+	store upgrade.CacheStore
+}
+
+func (u *updateChecker) GetUpdateInfo() (bool, string) {
+	if u.store == nil {
 		return false, ""
 	}
-	cache := upgrade.GetCachedUpdateInfo(store)
+	cache := upgrade.GetCachedUpdateInfo(u.store)
 	if cache == nil {
 		return false, ""
 	}
@@ -842,10 +840,34 @@ func (srv *Server) Serve(ctx context.Context) error {
 	metrics.StartUptime(ctx)
 	logger.Info(ctx, "Server is starting", tag.Addr(addr))
 
+	srv.startPeriodicUpdateCheck(ctx)
+
 	go srv.startServer(ctx)
 	srv.setupGracefulShutdown(ctx)
 
 	return nil
+}
+
+// startPeriodicUpdateCheck runs an initial update check and then repeats
+// every CacheTTL interval so that long-running servers pick up new releases.
+func (srv *Server) startPeriodicUpdateCheck(ctx context.Context) {
+	if srv.upgradeStore == nil {
+		return
+	}
+	go func() {
+		_, _ = upgrade.CheckAndUpdateCache(srv.upgradeStore, config.Version)
+
+		ticker := time.NewTicker(upgrade.CacheTTL)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				_, _ = upgrade.CheckAndUpdateCache(srv.upgradeStore, config.Version)
+			}
+		}
+	}()
 }
 
 func (srv *Server) configureAPIPath() string {
