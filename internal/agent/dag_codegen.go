@@ -27,9 +27,9 @@ func init() {
 
 // DAGCodegenInput is the input schema for the dag_codegen tool.
 type DAGCodegenInput struct {
-	Name  string            `json:"name"`
-	Steps []DAGCodegenStep  `json:"steps"`
-	Tags  []string          `json:"tags"`
+	Name  string           `json:"name"`
+	Steps []DAGCodegenStep `json:"steps"`
+	Tags  []string         `json:"tags"`
 }
 
 // DAGCodegenStep defines a single step in the generated DAG.

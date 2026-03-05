@@ -1,4 +1,4 @@
-import { useCallback, useContext, useState } from 'react';
+import { useCallback, useContext, useEffect, useState } from 'react';
 import { useQuery, useClient } from '@/hooks/api';
 import { AppBarContext } from '@/contexts/AppBarContext';
 
@@ -13,6 +13,13 @@ export function useCockpitState() {
 
   const [selectedWorkspace, setSelectedWorkspace] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('');
+
+  // Auto-select first workspace on initial load
+  useEffect(() => {
+    if (!selectedWorkspace && data?.workspaces?.length) {
+      setSelectedWorkspace(data.workspaces[0]!.name);
+    }
+  }, [data?.workspaces]);
 
   const createWorkspace = useCallback(
     async (name: string) => {

@@ -33,6 +33,9 @@ func (a *API) ListWorkspaces(ctx context.Context, _ api.ListWorkspacesRequestObj
 
 // CreateWorkspace creates a new workspace.
 func (a *API) CreateWorkspace(ctx context.Context, request api.CreateWorkspaceRequestObject) (api.CreateWorkspaceResponseObject, error) {
+	if err := a.requireDeveloperOrAbove(ctx); err != nil {
+		return nil, err
+	}
 	if a.workspaceStore == nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusServiceUnavailable,
@@ -93,6 +96,9 @@ func (a *API) GetWorkspace(ctx context.Context, request api.GetWorkspaceRequestO
 
 // UpdateWorkspace updates a workspace with PATCH semantics.
 func (a *API) UpdateWorkspace(ctx context.Context, request api.UpdateWorkspaceRequestObject) (api.UpdateWorkspaceResponseObject, error) {
+	if err := a.requireDeveloperOrAbove(ctx); err != nil {
+		return nil, err
+	}
 	if a.workspaceStore == nil {
 		return api.UpdateWorkspace404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -141,6 +147,9 @@ func (a *API) UpdateWorkspace(ctx context.Context, request api.UpdateWorkspaceRe
 
 // DeleteWorkspace deletes a workspace by ID.
 func (a *API) DeleteWorkspace(ctx context.Context, request api.DeleteWorkspaceRequestObject) (api.DeleteWorkspaceResponseObject, error) {
+	if err := a.requireDeveloperOrAbove(ctx); err != nil {
+		return nil, err
+	}
 	if a.workspaceStore == nil {
 		return api.DeleteWorkspace404JSONResponse{
 			Code:    api.ErrorCodeNotFound,

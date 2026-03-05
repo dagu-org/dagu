@@ -17,6 +17,7 @@ interface Props {
   onSelect: (name: string) => void;
   onCreate: (name: string) => void;
   onDelete: (id: string) => void;
+  canWrite?: boolean;
 }
 
 export function WorkspaceSelector({
@@ -25,6 +26,7 @@ export function WorkspaceSelector({
   onSelect,
   onCreate,
   onDelete,
+  canWrite = true,
 }: Props): React.ReactElement {
   const [isCreating, setIsCreating] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -83,14 +85,16 @@ export function WorkspaceSelector({
           {workspaces.map((ws) => (
             <SelectItem key={ws.id} value={ws.name}>{ws.name}</SelectItem>
           ))}
-          <SelectItem value="__new__">
-            <span className="flex items-center gap-1 text-primary">
-              <Plus size={12} /> New workspace
-            </span>
-          </SelectItem>
+          {canWrite && (
+            <SelectItem value="__new__">
+              <span className="flex items-center gap-1 text-primary">
+                <Plus size={12} /> New workspace
+              </span>
+            </SelectItem>
+          )}
         </SelectContent>
       </Select>
-      {selectedWs && (
+      {canWrite && selectedWs && (
         <button
           onClick={() => onDelete(selectedWs.id)}
           className="p-1 text-muted-foreground hover:text-destructive rounded"

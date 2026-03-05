@@ -39,6 +39,8 @@ type DAGDetailsContentProps = {
   localDags?: components['schemas']['LocalDag'][];
   /** SSE result from parent — shared with DAGSpec to avoid duplicate connections */
   sseResult?: SSEState<unknown>;
+  /** Custom enqueue handler, threaded to DAGHeader → DAGActions */
+  onEnqueue?: (params: string, dagRunId?: string, immediate?: boolean) => void | Promise<void>;
 };
 
 type LogViewerState = {
@@ -62,6 +64,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   skipHeader = false,
   localDags,
   sseResult,
+  onEnqueue,
 }) => {
   const baseUrl = isModal ? '#' : `/dags/${fileName}`;
   const [logViewer, setLogViewer] = useState<LogViewerState>({
@@ -112,6 +115,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             refreshFn={refreshFn}
             formatDuration={formatDuration}
             navigateToStatusTab={navigateToStatusTab}
+            onEnqueue={onEnqueue}
           />
         )}
         <div className="flex flex-col lg:flex-row justify-between items-center gap-3 lg:gap-0 mb-4 mt-3">
