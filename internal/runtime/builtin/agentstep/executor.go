@@ -278,12 +278,11 @@ func buildTools(ctx context.Context, dagCtx exec.Context, stepCfg *core.AgentSte
 
 	// All available tools (excluding navigate and ask_user).
 	allTools := map[string]*agent.AgentTool{
-		"bash":        agent.NewBashTool(),
-		"read":        agent.NewReadTool(),
-		"patch":       agent.NewPatchTool(dagsDir),
-		"think":       agent.NewThinkTool(),
-		"read_schema": agent.NewReadSchemaTool(),
-		"output":      agent.NewOutputTool(stdout),
+		"bash":   agent.NewBashTool(),
+		"read":   agent.NewReadTool(),
+		"patch":  agent.NewPatchTool(dagsDir),
+		"think":  agent.NewThinkTool(),
+		"output": agent.NewOutputTool(stdout),
 	}
 	if skillStore != nil {
 		allTools["use_skill"] = agent.NewUseSkillTool(skillStore, allowedSkills)

@@ -24,7 +24,7 @@ func TestRegisteredTools_ContainsAllExpected(t *testing.T) {
 
 	expected := []string{
 		"bash", "read", "patch", "think",
-		"navigate", "read_schema", "ask_user",
+		"navigate", "ask_user",
 		"delegate", "use_skill", "search_skills",
 		"remote_agent", "list_remote_nodes",
 	}
