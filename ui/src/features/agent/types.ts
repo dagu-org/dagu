@@ -182,11 +182,6 @@ export interface NavigateToolInput {
   path: string;
 }
 
-export interface ReadSchemaToolInput {
-  schema: string;
-  path?: string;
-}
-
 export interface AskUserToolInput {
   question: string;
   options?: string[];

@@ -89,7 +89,7 @@ Read files before editing them—this prevents overwriting content you haven't s
 
 Validate with `dagu validate` before claiming a DAG is correct.
 
-Use `read_schema` when unsure about YAML fields.
+Use `dagu schema` via bash when unsure about YAML fields.
 
 Use the appropriate executor type (http, s3, postgres) instead of shelling out.
 
@@ -135,7 +135,6 @@ After creating or modifying documents, navigate to `/docs/<doc-id>` so the user 
 - `patch`: Create or edit files using unified diff format.
 - `think`: Reason through complex multi-step tasks before acting.
 - `navigate`: Open a UI page (/dags/<name>, /dag-runs/<name>/<id>, /docs, /docs/<doc-id>).
-- `read_schema`: Look up DAG YAML structure. Use before creating/editing DAGs.
 - `delegate`: Spawn a sub-agent for a focused sub-task. The sub-agent works independently with the same tools and returns a summary. Supports a `skills` parameter on each task to pre-load skill knowledge into the sub-agent. You can delegate multiple tasks simultaneously.
 - `search_skills`: Discover available skills by keyword or tag. Returns summaries without loading full knowledge.
 </tools>
@@ -170,7 +169,7 @@ This keeps the main conversation context lean and avoids token waste.
 
 <workflows>
 ### Creating a New DAG
-1. Use `read_schema` to confirm available fields.
+1. Use `dagu schema dag` to confirm available fields.
 2. Verify configuration requirements (secrets/env/services) are available.
    - If anything required is missing: stop and guide user to configure it.
 3. Create the DAG YAML with `patch` in: {{.DAGsDir}}
@@ -256,14 +255,19 @@ Rules:
 </memory_management>
 {{end}}
 
-<schema_reference>
-Use `read_schema` to look up DAG YAML structure:
-- Root fields: `path: ""`
-- Steps: `path: "steps"`
-- Executors: `path: "steps.type"` (http, docker, ssh, s3, mail, postgres, etc.)
-- Container: `path: "container"`
-- Handlers: `path: "handlerOn"`
-- Output/parallel: `path: "steps.output"`, `path: "steps.parallel"`
+<reference>
+Use `dagu schema` and `dagu example` via bash to look up DAG YAML structure and see examples:
+
+Schema navigation:
+- `dagu schema dag` — show all root-level DAG fields
+- `dagu schema dag steps` — show step properties
+- `dagu schema dag steps.container` — show container configuration
+- `dagu schema dag steps.type` — show executor/step types (http, docker, ssh, s3, mail, postgres, etc.)
+- `dagu schema config` — show all config root-level fields
+
+Examples:
+- `dagu example` — list all available DAG examples
+- `dagu example <id>` — show a specific DAG example
 
 Params are defined as a list of key-value pairs:
 ```yaml
@@ -272,5 +276,5 @@ params:
 - BAZ: QUX
 ```
 
-Check schema before creating or editing DAGs.
-</schema_reference>
+Check schema and examples before creating or editing DAGs.
+</reference>

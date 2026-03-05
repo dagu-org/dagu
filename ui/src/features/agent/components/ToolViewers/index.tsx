@@ -3,7 +3,6 @@ import { ReadToolViewer } from './ReadToolViewer';
 import { PatchToolViewer } from './PatchToolViewer';
 import { ThinkToolViewer } from './ThinkToolViewer';
 import { NavigateToolViewer } from './NavigateToolViewer';
-import { ReadSchemaToolViewer } from './ReadSchemaToolViewer';
 import { AskUserToolViewer } from './AskUserToolViewer';
 import { DefaultToolViewer } from './DefaultToolViewer';
 
@@ -18,7 +17,6 @@ const toolViewerRegistry: Record<string, React.FC<ToolViewerProps>> = {
   patch: PatchToolViewer,
   think: ThinkToolViewer,
   navigate: NavigateToolViewer,
-  read_schema: ReadSchemaToolViewer,
   ask_user: AskUserToolViewer,
 };
 
@@ -32,6 +30,5 @@ export { ReadToolViewer } from './ReadToolViewer';
 export { PatchToolViewer } from './PatchToolViewer';
 export { ThinkToolViewer } from './ThinkToolViewer';
 export { NavigateToolViewer } from './NavigateToolViewer';
-export { ReadSchemaToolViewer } from './ReadSchemaToolViewer';
 export { AskUserToolViewer } from './AskUserToolViewer';
 export { DefaultToolViewer } from './DefaultToolViewer';

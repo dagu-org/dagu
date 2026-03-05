@@ -323,7 +323,7 @@ The self-healing index approach eliminates all locking:
 
 #### Rebuild Strategy
 
-Both indexes rebuild from scratch when the index file is missing, unparseable, has an incompatible version, or fails per-entry validation. Rebuild means: scan the directory, extract metadata, write a fresh index via `fileutil.WriteFileAtomic` with protobuf serialization. To force a rebuild, delete the index file (`rm .dag.index` or `rm .dagrun.index`).
+Both indexes rebuild from scratch when the index file is missing, unparsable, has an incompatible version, or fails per-entry validation. Rebuild means: scan the directory, extract metadata, write a fresh index via `fileutil.WriteFileAtomic` with protobuf serialization. To force a rebuild, delete the index file (`rm .dag.index` or `rm .dagrun.index`).
 
 #### Error Handling
 
