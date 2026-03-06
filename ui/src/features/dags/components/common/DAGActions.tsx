@@ -521,7 +521,14 @@ function DAGActions({
             setIsEnqueueModal(false);
 
             if (onEnqueue) {
-              await onEnqueue(params, dagRunId, immediate);
+              try {
+                await onEnqueue(params, dagRunId, immediate);
+              } catch (err) {
+                showError(
+                  err instanceof Error ? err.message : 'Failed to enqueue DAG',
+                  'Enqueue failed. Please try again.'
+                );
+              }
               return;
             }
 

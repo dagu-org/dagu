@@ -152,7 +152,7 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
     (e?: React.MouseEvent) => {
       const url = `/dags/${fileName}/spec`;
       if (e?.metaKey || e?.ctrlKey) {
-        window.open(url, '_blank');
+        window.open(url, '_blank', 'noopener,noreferrer');
       } else {
         navigate(url);
       }
@@ -162,6 +162,8 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
 
   // Keyboard shortcuts
   useEffect(() => {
+    if (!isOpen) return;
+
     function handleKeyDown(event: KeyboardEvent): void {
       if (shouldIgnoreKeyboardShortcuts()) return;
       if (event.metaKey || event.ctrlKey) return;
@@ -179,7 +181,7 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, handleFullscreenClick]);
+  }, [isOpen, onClose, handleFullscreenClick]);
 
   if (!shouldRender) {
     return null;

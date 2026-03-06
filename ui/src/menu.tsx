@@ -571,14 +571,16 @@ export const mainListItems = React.forwardRef<
                   customColor={customColor}
                 />
               )}
-              <NavItem
-                to="/remote-nodes"
-                text="Remote Nodes"
-                icon={<Globe size={18} />}
-                isOpen={isOpen}
-                onClick={onNavItemClick}
-                customColor={customColor}
-              />
+              {isAdmin && (
+                <NavItem
+                  to="/remote-nodes"
+                  text="Remote Nodes"
+                  icon={<Globe size={18} />}
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+              )}
               {canManageWebhooks && (
                 <NavItem
                   to="/webhooks"

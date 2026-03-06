@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState, type MutableRefObject } from 'react';
 import { Input } from '@/components/ui/input';
 import ConfirmModal from '@/ui/ConfirmModal';
 import { Plus, Trash2 } from 'lucide-react';
@@ -33,19 +33,29 @@ export function WorkspaceSelector({
   const [isCreating, setIsCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const createStateRef = useRef<'idle' | 'submitted' | 'cancelled'>('idle') as MutableRefObject<'idle' | 'submitted' | 'cancelled'>;
 
   const handleCreate = useCallback(() => {
+    if (createStateRef.current !== 'idle') return;
+    createStateRef.current = 'submitted';
     const name = inputRef.current?.value.trim().replace(/[^a-zA-Z0-9_-]/g, '');
     if (name) {
       onCreate(name);
-      setIsCreating(false);
     }
+    setIsCreating(false);
   }, [onCreate]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') handleCreate();
-      if (e.key === 'Escape') setIsCreating(false);
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleCreate();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        createStateRef.current = 'cancelled';
+        setIsCreating(false);
+      }
     },
     [handleCreate]
   );
@@ -72,6 +82,7 @@ export function WorkspaceSelector({
     <div className="flex items-center gap-1">
       <Select value={selectedWorkspace || '__none__'} onValueChange={(v) => {
         if (v === '__new__') {
+          createStateRef.current = 'idle';
           setIsCreating(true);
         } else if (v === '__none__') {
           onSelect('');
@@ -79,7 +90,7 @@ export function WorkspaceSelector({
           onSelect(v);
         }
       }}>
-        <SelectTrigger className="text-xs w-40">
+        <SelectTrigger className="text-xs w-40 py-1">
           <SelectValue placeholder="Select workspace" />
         </SelectTrigger>
         <SelectContent>

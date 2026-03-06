@@ -208,17 +208,27 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
         {selectedTemplate && selectedDagName ? (
           <>
             <span className="truncate flex-1 text-left">{selectedDagName}</span>
-            <button
-              type="button"
+            <span
+              role="button"
+              tabIndex={0}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelect('');
                 setSelectedDag(null);
               }}
-              className="p-0.5 rounded hover:bg-muted-foreground/20 hover:text-destructive"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onSelect('');
+                  setSelectedDag(null);
+                }
+              }}
+              aria-label="Clear selection"
+              className="p-0.5 rounded hover:bg-muted-foreground/20 hover:text-destructive cursor-pointer"
             >
               <X className="h-3 w-3" />
-            </button>
+            </span>
           </>
         ) : (
           <>

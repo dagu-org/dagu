@@ -15,18 +15,6 @@ export function useCockpitState() {
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const autoCreatedRef = useRef(false);
 
-  // Auto-select first workspace on initial load, or create "default" if none exist
-  useEffect(() => {
-    if (!data) return;
-    if (selectedWorkspace) return;
-    if (data.workspaces?.length) {
-      setSelectedWorkspace(data.workspaces[0]!.name);
-    } else if (!autoCreatedRef.current) {
-      autoCreatedRef.current = true;
-      createWorkspace('default');
-    }
-  }, [data?.workspaces, createWorkspace]);
-
   const createWorkspace = useCallback(
     async (name: string) => {
       if (!name) return;
@@ -44,14 +32,28 @@ export function useCockpitState() {
 
   const deleteWorkspace = useCallback(
     async (id: string) => {
-      await client.DELETE('/workspaces/{workspaceId}', {
+      const { error } = await client.DELETE('/workspaces/{workspaceId}', {
         params: { path: { workspaceId: id }, query: { remoteNode } },
       });
-      mutate();
-      setSelectedWorkspace('');
+      if (!error) {
+        mutate();
+        setSelectedWorkspace('');
+      }
     },
     [client, remoteNode, mutate]
   );
+
+  // Auto-select first workspace on initial load, or create "default" if none exist
+  useEffect(() => {
+    if (!data) return;
+    if (selectedWorkspace) return;
+    if (data.workspaces?.length) {
+      setSelectedWorkspace(data.workspaces[0]!.name);
+    } else if (!autoCreatedRef.current) {
+      autoCreatedRef.current = true;
+      createWorkspace('default');
+    }
+  }, [data?.workspaces, selectedWorkspace, createWorkspace]);
 
   return {
     workspaces: data?.workspaces ?? [],

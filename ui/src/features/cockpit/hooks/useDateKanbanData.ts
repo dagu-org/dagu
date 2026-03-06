@@ -61,8 +61,8 @@ export function useDateKanbanData(
 
   // SSE only for today
   const sseParams = useMemo(
-    () => ({ tags: tag, fromDate, toDate }),
-    [tag, fromDate, toDate]
+    () => ({ remoteNode, tags: tag, fromDate, toDate }),
+    [remoteNode, tag, fromDate, toDate]
   );
   const sseResult = useDAGRunsListSSE(sseParams, isToday && !!selectedWorkspace);
 

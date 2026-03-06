@@ -110,7 +110,12 @@ export function EmbeddedAgentChat(): React.ReactElement {
     <div className="flex flex-col h-full bg-card">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
-        <button onClick={toggleSidebar} className="text-muted-foreground hover:text-foreground p-0.5">
+        <button
+          type="button"
+          aria-label={sidebarOpen ? 'Collapse session sidebar' : 'Expand session sidebar'}
+          onClick={toggleSidebar}
+          className="text-muted-foreground hover:text-foreground p-0.5"
+        >
           {sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
         </button>
         <MessageSquare size={14} className="text-muted-foreground" />
@@ -140,7 +145,12 @@ export function EmbeddedAgentChat(): React.ReactElement {
             <div className="mx-3 mt-2 p-2 bg-destructive/10 border border-destructive/20 rounded-md flex items-start gap-2">
               <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
               <p className="flex-1 text-xs text-destructive">{error}</p>
-              <button onClick={clearError} className="text-destructive/60 hover:text-destructive flex-shrink-0">
+              <button
+                type="button"
+                aria-label="Dismiss error"
+                onClick={clearError}
+                className="text-destructive/60 hover:text-destructive flex-shrink-0"
+              >
                 <X className="h-3 w-3" />
               </button>
             </div>

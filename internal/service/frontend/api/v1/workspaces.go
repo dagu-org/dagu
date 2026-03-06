@@ -12,10 +12,18 @@ import (
 	"github.com/dagu-org/dagu/internal/workspace"
 )
 
+func workspaceStoreUnavailable() *Error {
+	return &Error{
+		HTTPStatus: http.StatusServiceUnavailable,
+		Code:       api.ErrorCodeInternalError,
+		Message:    "Workspace store not configured",
+	}
+}
+
 // ListWorkspaces returns all workspaces.
 func (a *API) ListWorkspaces(ctx context.Context, _ api.ListWorkspacesRequestObject) (api.ListWorkspacesResponseObject, error) {
 	if a.workspaceStore == nil {
-		return api.ListWorkspaces200JSONResponse{Workspaces: []api.WorkspaceResponse{}}, nil
+		return nil, workspaceStoreUnavailable()
 	}
 
 	wsList, err := a.workspaceStore.List(ctx)
@@ -37,11 +45,7 @@ func (a *API) CreateWorkspace(ctx context.Context, request api.CreateWorkspaceRe
 		return nil, err
 	}
 	if a.workspaceStore == nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusServiceUnavailable,
-			Code:       api.ErrorCodeInternalError,
-			Message:    "Workspace store not configured",
-		}
+		return nil, workspaceStoreUnavailable()
 	}
 
 	body := request.Body
@@ -74,10 +78,7 @@ func (a *API) CreateWorkspace(ctx context.Context, request api.CreateWorkspaceRe
 // GetWorkspace returns a single workspace by ID.
 func (a *API) GetWorkspace(ctx context.Context, request api.GetWorkspaceRequestObject) (api.GetWorkspaceResponseObject, error) {
 	if a.workspaceStore == nil {
-		return api.GetWorkspace404JSONResponse{
-			Code:    api.ErrorCodeNotFound,
-			Message: "Workspace not found",
-		}, nil
+		return nil, workspaceStoreUnavailable()
 	}
 
 	ws, err := a.workspaceStore.GetByID(ctx, request.WorkspaceId)
@@ -100,10 +101,7 @@ func (a *API) UpdateWorkspace(ctx context.Context, request api.UpdateWorkspaceRe
 		return nil, err
 	}
 	if a.workspaceStore == nil {
-		return api.UpdateWorkspace404JSONResponse{
-			Code:    api.ErrorCodeNotFound,
-			Message: "Workspace not found",
-		}, nil
+		return nil, workspaceStoreUnavailable()
 	}
 
 	existing, err := a.workspaceStore.GetByID(ctx, request.WorkspaceId)
@@ -151,10 +149,7 @@ func (a *API) DeleteWorkspace(ctx context.Context, request api.DeleteWorkspaceRe
 		return nil, err
 	}
 	if a.workspaceStore == nil {
-		return api.DeleteWorkspace404JSONResponse{
-			Code:    api.ErrorCodeNotFound,
-			Message: "Workspace not found",
-		}, nil
+		return nil, workspaceStoreUnavailable()
 	}
 
 	ws, err := a.workspaceStore.GetByID(ctx, request.WorkspaceId)
