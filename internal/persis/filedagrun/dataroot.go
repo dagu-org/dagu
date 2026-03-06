@@ -438,7 +438,12 @@ SCAN:
 					continue
 				}
 
-				indexEntries, fromIndex, _ := dagrunindex.TryLoadForDay(dayPath, dayEntries)
+				indexEntries, fromIndex, indexErr := dagrunindex.TryLoadForDay(dayPath, dayEntries)
+				if indexErr != nil {
+					logger.Debug(ctx, "Failed to load day index, falling back to filesystem scan",
+						tag.Dir(dayPath),
+						tag.Error(indexErr))
+				}
 				if fromIndex && indexEntries != nil {
 					for _, ie := range indexEntries {
 						runPath := filepath.Join(dayPath, ie.DagRunDir)
@@ -447,8 +452,7 @@ SCAN:
 							continue
 						}
 						run.summary = summaryFromIndexEntry(ie)
-						if (start.IsZero() || !run.timestamp.Before(startDate)) &&
-							(end.IsZero() || run.timestamp.Before(endDate)) {
+						if inTimeRange(run.timestamp, startDate, endDate, start.IsZero(), end.IsZero()) {
 							result = append(result, run)
 						}
 					}
@@ -481,8 +485,7 @@ SCAN:
 								run.summary = summaryFromIndexEntry(*ie)
 							}
 						}
-						if (start.IsZero() || !run.timestamp.Before(startDate)) &&
-							(end.IsZero() || run.timestamp.Before(endDate)) {
+						if inTimeRange(run.timestamp, startDate, endDate, start.IsZero(), end.IsZero()) {
 							lock.Lock()
 							result = append(result, run)
 							lock.Unlock()
@@ -649,6 +652,11 @@ func processFilesParallel(files []string, processor func(string) error) []error 
 	}
 
 	return errs
+}
+
+// inTimeRange checks if a timestamp falls within the specified range.
+func inTimeRange(ts, start, end time.Time, startZero, endZero bool) bool {
+	return (startZero || !ts.Before(start)) && (endZero || ts.Before(end))
 }
 
 // summaryFromIndexEntry converts a dagrunindex.Entry into a DAGRunSummary.

@@ -185,6 +185,8 @@ func tagsToStrings(tags core.Tags) []string {
 	return strs
 }
 
+// scheduleToString joins schedule expressions with "; " as a delimiter.
+// This is safe because cron expressions never contain semicolons.
 func scheduleToString(schedules []core.Schedule) string {
 	if len(schedules) == 0 {
 		return ""

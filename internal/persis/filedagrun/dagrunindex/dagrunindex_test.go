@@ -166,6 +166,16 @@ func TestTryLoadForDay_StaleIndex_NewAttempt(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, entries, 10)
 	assert.True(t, fromIndex)
+
+	// Verify the rebuilt index reflects the new attempt.
+	found := false
+	for _, e := range entries {
+		if e.LatestAttemptDir == "attempt_20240115_130000_002Z_retry1" {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "Expected rebuilt index to contain the new attempt directory")
 }
 
 func TestTryLoadForDay_CorruptIndex(t *testing.T) {

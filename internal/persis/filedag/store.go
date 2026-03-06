@@ -296,7 +296,10 @@ func (store *Storage) loadOrRebuildIndex(ctx context.Context) []*indexv1.DAGInde
 	// Build suspend flags set.
 	flags := make(dagindex.SuspendFlags)
 	flagEntries, err := os.ReadDir(store.flagsBaseDir)
-	if err == nil {
+	if err != nil {
+		// Flags directory may not exist yet (e.g., new installations).
+		logger.Debug(ctx, "Could not read flags directory", tag.Dir(store.flagsBaseDir))
+	} else {
 		for _, fe := range flagEntries {
 			if !fe.IsDir() {
 				flags[fe.Name()] = struct{}{}
@@ -375,10 +378,8 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 
 			baseName := path.Base(entry.Name())
 			dagName := strings.TrimSuffix(baseName, path.Ext(baseName))
-			if opts.Name != "" && len(opts.Tags) == 0 {
-				if !containsSearchText(dagName, opts.Name) {
-					continue
-				}
+			if opts.Name != "" && !containsSearchText(dagName, opts.Name) {
+				continue
 			}
 
 			filePath := filepath.Join(store.baseDir, entry.Name())

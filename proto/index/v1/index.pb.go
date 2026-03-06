@@ -269,15 +269,15 @@ type DAGRunIndexEntry struct {
 	LatestStatusSize    int64                  `protobuf:"varint,4,opt,name=latest_status_size,json=latestStatusSize,proto3" json:"latest_status_size,omitempty"`
 	LatestStatusModTime int64                  `protobuf:"varint,5,opt,name=latest_status_mod_time,json=latestStatusModTime,proto3" json:"latest_status_mod_time,omitempty"`
 	Status              int32                  `protobuf:"varint,6,opt,name=status,proto3" json:"status,omitempty"`
-	StartedAt           int64                  `protobuf:"varint,7,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
-	FinishedAt          int64                  `protobuf:"varint,8,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	StartedAt           int64                  `protobuf:"varint,7,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`    // Unix epoch seconds
+	FinishedAt          int64                  `protobuf:"varint,8,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"` // Unix epoch seconds
 	Tags                []string               `protobuf:"bytes,9,rep,name=tags,proto3" json:"tags,omitempty"`
 	RunDirModTime       int64                  `protobuf:"varint,10,opt,name=run_dir_mod_time,json=runDirModTime,proto3" json:"run_dir_mod_time,omitempty"`
 	WorkerId            string                 `protobuf:"bytes,11,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
 	Params              string                 `protobuf:"bytes,12,opt,name=params,proto3" json:"params,omitempty"`
-	QueuedAt            string                 `protobuf:"bytes,13,opt,name=queued_at,json=queuedAt,proto3" json:"queued_at,omitempty"`
+	QueuedAt            string                 `protobuf:"bytes,13,opt,name=queued_at,json=queuedAt,proto3" json:"queued_at,omitempty"` // RFC 3339 string (matches DAGRunStatus.QueuedAt)
 	TriggerType         int32                  `protobuf:"varint,14,opt,name=trigger_type,json=triggerType,proto3" json:"trigger_type,omitempty"`
-	CreatedAt           int64                  `protobuf:"varint,15,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	CreatedAt           int64                  `protobuf:"varint,15,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"` // Unix epoch milliseconds (matches DAGRunStatus.CreatedAt)
 	Name                string                 `protobuf:"bytes,16,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache

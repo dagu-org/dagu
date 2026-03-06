@@ -102,7 +102,8 @@ func RebuildForDay(dayDir string, dagRunDirs []os.DirEntry) ([]Entry, bool, erro
 		statusPath := filepath.Join(runDir, latestAttemptDir, statusFile)
 		status, err := parseStatusFile(statusPath)
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to parse status file %s: %w", statusPath, err)
+			// Skip runs with unreadable status files; they'll be served from filesystem.
+			continue
 		}
 
 		if status.Status.IsActive() {

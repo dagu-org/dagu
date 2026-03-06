@@ -41,14 +41,14 @@ message DAGRunIndexEntry {
   int64 latest_status_size = 4;
   int64 latest_status_mod_time = 5;
   int32 status = 6;
-  int64 started_at = 7;
-  int64 finished_at = 8;
+  int64 started_at = 7;     // Unix epoch seconds
+  int64 finished_at = 8;    // Unix epoch seconds
   repeated string tags = 9;
   int64 run_dir_mod_time = 10;
   string worker_id = 11;
   string params = 12;
-  string queued_at = 13;
+  string queued_at = 13;    // RFC 3339 string (matches DAGRunStatus.QueuedAt)
   int32 trigger_type = 14;
-  int64 created_at = 15;
+  int64 created_at = 15;    // Unix epoch milliseconds (matches DAGRunStatus.CreatedAt)
   string name = 16;
 }

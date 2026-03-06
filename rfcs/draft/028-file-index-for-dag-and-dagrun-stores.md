@@ -48,7 +48,7 @@ That is expensive for historical queries because most old runs are already termi
 
 ### Index Location
 
-```
+```text
 {dagDir}/.dag.index
 ```
 
@@ -148,7 +148,7 @@ This matters because old run directories are still mutable:
 
 ### Index Location
 
-```
+```text
 {dagPrefix}/dag-runs/{year}/{month}/{day}/.dagrun.index
 ```
 

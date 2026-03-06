@@ -169,6 +169,15 @@ func (store *Store) collectStatusesFromRoots(
 	jobs := make(chan DataRoot)
 	var wg sync.WaitGroup
 
+	// Pre-parse tag filters once before starting workers.
+	var tagFilters []core.TagFilter
+	if len(opts.Tags) > 0 {
+		tagFilters = make([]core.TagFilter, 0, len(opts.Tags))
+		for _, t := range opts.Tags {
+			tagFilters = append(tagFilters, core.ParseTagFilter(t))
+		}
+	}
+
 	worker := func() {
 		defer wg.Done()
 		for root := range jobs {
@@ -179,15 +188,6 @@ func (store *Store) collectStatusesFromRoots(
 			dagRuns := root.listDAGRunsInRange(ctx, opts.From, opts.To, &listDAGRunsInRangeOpts{
 				limit: int(remaining.Load()),
 			})
-
-			// Pre-parse tag filters once for this worker.
-			var tagFilters []core.TagFilter
-			if len(opts.Tags) > 0 {
-				tagFilters = make([]core.TagFilter, 0, len(opts.Tags))
-				for _, t := range opts.Tags {
-					tagFilters = append(tagFilters, core.ParseTagFilter(t))
-				}
-			}
 
 			statuses := make([]*exec.DAGRunStatus, 0, len(dagRuns))
 			for _, dagRun := range dagRuns {
