@@ -656,51 +656,52 @@ func (sm *SessionManager) extractLLMHistoryLocked() []llm.Message {
 	return repairOrphanedToolCalls(history)
 }
 
-// repairOrphanedToolCalls checks whether the last assistant message has
-// tool calls without matching tool-role results and adds synthetic
-// cancelled results for any that are missing.
+// repairOrphanedToolCalls scans the entire history for assistant messages
+// with tool calls that lack matching tool-role results, and inserts
+// synthetic cancelled results immediately after the tool result block.
+// This handles orphaned tool calls anywhere in the history (not just the
+// last assistant message), which can occur from mid-conversation crashes
+// or cancellations.
 func repairOrphanedToolCalls(history []llm.Message) []llm.Message {
 	if len(history) == 0 {
 		return history
 	}
 
-	// Find the last assistant message with tool calls.
-	lastAssistantIdx := -1
-	for i := len(history) - 1; i >= 0; i-- {
-		if history[i].Role == llm.RoleAssistant && len(history[i].ToolCalls) > 0 {
-			lastAssistantIdx = i
-			break
+	var result []llm.Message
+	for i := 0; i < len(history); i++ {
+		result = append(result, history[i])
+
+		msg := history[i]
+		if msg.Role != llm.RoleAssistant || len(msg.ToolCalls) == 0 {
+			continue
 		}
-		// Stop scanning once we hit a non-tool, non-assistant message — earlier
-		// tool calls are already paired from previous loop iterations.
-		if history[i].Role != llm.RoleTool {
-			break
+
+		// Collect IDs of tool results that immediately follow this assistant message.
+		answered := make(map[string]struct{})
+		j := i + 1
+		for j < len(history) && history[j].Role == llm.RoleTool {
+			if history[j].ToolCallID != "" {
+				answered[history[j].ToolCallID] = struct{}{}
+			}
+			result = append(result, history[j])
+			j++
 		}
-	}
-	if lastAssistantIdx < 0 {
-		return history
+
+		// Synthesize results for any orphaned tool calls.
+		for _, tc := range msg.ToolCalls {
+			if _, ok := answered[tc.ID]; !ok {
+				result = append(result, llm.Message{
+					Role:       llm.RoleTool,
+					ToolCallID: tc.ID,
+					Content:    "Tool execution was cancelled.",
+				})
+			}
+		}
+
+		i = j - 1 // skip already-processed tool results
 	}
 
-	// Collect IDs of tool results that follow the assistant message.
-	answered := make(map[string]struct{})
-	for i := lastAssistantIdx + 1; i < len(history); i++ {
-		if history[i].Role == llm.RoleTool && history[i].ToolCallID != "" {
-			answered[history[i].ToolCallID] = struct{}{}
-		}
-	}
-
-	// Synthesize results for any orphaned tool calls.
-	for _, tc := range history[lastAssistantIdx].ToolCalls {
-		if _, ok := answered[tc.ID]; !ok {
-			history = append(history, llm.Message{
-				Role:       llm.RoleTool,
-				ToolCallID: tc.ID,
-				Content:    "Tool execution was cancelled.",
-			})
-		}
-	}
-
-	return history
+	return result
 }
 
 // createRecordMessageFunc returns a function for recording messages to the session.
