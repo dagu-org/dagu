@@ -49,6 +49,7 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
 
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [isVisible, setIsVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState('spec');
 
   useEffect(() => {
     if (isOpen) {
@@ -145,7 +146,10 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
 
     if (error) {
       console.error('Failed to enqueue:', error);
+      return;
     }
+
+    setActiveTab('status');
   }, [specData, selectedWorkspace, client, remoteNode, data?.dag?.name]);
 
   // Fullscreen navigation
@@ -251,7 +255,8 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
                   currentDAGRun={data.latestDAGRun}
                   refreshFn={refreshFn}
                   formatDuration={formatDuration}
-                  activeTab="spec"
+                  activeTab={activeTab}
+                  onTabChange={setActiveTab}
                   isModal={true}
                   localDags={data?.localDags}
                   sseResult={sseResult}
