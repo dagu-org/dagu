@@ -1,5 +1,6 @@
 import React from 'react';
 import { components } from '@/api/v1/schema';
+import dayjs from '@/lib/dayjs';
 import { useDateKanbanData } from '../hooks/useDateKanbanData';
 import { KanbanBoard } from './KanbanBoard';
 
@@ -13,13 +14,7 @@ interface Props {
 }
 
 function formatDateHeader(date: string): string {
-  const d = new Date(date + 'T00:00:00');
-  return d.toLocaleDateString(undefined, {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  return `${date} ${dayjs(date).format('ddd')}`;
 }
 
 export function DateKanbanSection({

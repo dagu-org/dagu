@@ -3,6 +3,8 @@ import { useQuery } from '@/hooks/api';
 import { useDAGRunsListSSE } from '@/hooks/useDAGRunsListSSE';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import { useConfig } from '@/contexts/ConfigContext';
+import dayjs from '@/lib/dayjs';
 import { components, Status } from '@/api/v1/schema';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
@@ -14,13 +16,18 @@ export interface KanbanColumns {
   failed: DAGRunSummary[];
 }
 
-function dayBounds(dateStr: string): { fromDate: number; toDate: number } {
-  const d = new Date(dateStr + 'T00:00:00');
-  const fromDate = Math.floor(d.getTime() / 1000);
-  const next = new Date(d);
-  next.setDate(next.getDate() + 1);
-  const toDate = Math.floor(next.getTime() / 1000);
-  return { fromDate, toDate };
+function dayBounds(
+  dateStr: string,
+  tzOffsetInSec: number | undefined
+): { fromDate: number; toDate: number } {
+  const d =
+    tzOffsetInSec !== undefined
+      ? dayjs(dateStr).utcOffset(tzOffsetInSec / 60, true)
+      : dayjs(dateStr);
+  return {
+    fromDate: d.startOf('day').unix(),
+    toDate: d.add(1, 'day').startOf('day').unix(),
+  };
 }
 
 function groupByStatus(runs: DAGRunSummary[]): KanbanColumns {
@@ -54,10 +61,14 @@ export function useDateKanbanData(
   isToday: boolean
 ) {
   const appBarContext = useContext(AppBarContext);
+  const { tzOffsetInSec } = useConfig();
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const tag = selectedWorkspace ? `workspace=${selectedWorkspace}` : undefined;
 
-  const { fromDate, toDate } = useMemo(() => dayBounds(date), [date]);
+  const { fromDate, toDate } = useMemo(
+    () => dayBounds(date, tzOffsetInSec),
+    [date, tzOffsetInSec]
+  );
 
   // SSE only for today
   const sseParams = useMemo(
