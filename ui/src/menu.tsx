@@ -599,49 +599,47 @@ export const mainListItems = React.forwardRef<
                   customColor={customColor}
                 />
               )}
-              {config.agentEnabled && (
-                <NavGroup
-                  groupKey="agent"
+              <NavGroup
+                groupKey="agent"
+                icon={<Bot size={18} />}
+                label="Agent"
+                isOpen={isOpen}
+                basePath="/agent-"
+                customColor={customColor}
+              >
+                <NavItem
+                  to="/agent-settings"
+                  text="Settings"
                   icon={<Bot size={18} />}
-                  label="Agent"
                   isOpen={isOpen}
-                  basePath="/agent-"
+                  onClick={onNavItemClick}
                   customColor={customColor}
-                >
-                  <NavItem
-                    to="/agent-settings"
-                    text="Settings"
-                    icon={<Bot size={18} />}
-                    isOpen={isOpen}
-                    onClick={onNavItemClick}
-                    customColor={customColor}
-                  />
-                  <NavItem
-                    to="/agent-memory"
-                    text="Memory"
-                    icon={<Brain size={18} />}
-                    isOpen={isOpen}
-                    onClick={onNavItemClick}
-                    customColor={customColor}
-                  />
-                  <NavItem
-                    to="/agent-skills"
-                    text="Skills"
-                    icon={<Sparkles size={18} />}
-                    isOpen={isOpen}
-                    onClick={onNavItemClick}
-                    customColor={customColor}
-                  />
-                  <NavItem
-                    to="/agent-souls"
-                    text="Souls"
-                    icon={<Ghost size={18} />}
-                    isOpen={isOpen}
-                    onClick={onNavItemClick}
-                    customColor={customColor}
-                  />
-                </NavGroup>
-              )}
+                />
+                <NavItem
+                  to="/agent-memory"
+                  text="Memory"
+                  icon={<Brain size={18} />}
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+                <NavItem
+                  to="/agent-skills"
+                  text="Skills"
+                  icon={<Sparkles size={18} />}
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+                <NavItem
+                  to="/agent-souls"
+                  text="Souls"
+                  icon={<Ghost size={18} />}
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+              </NavGroup>
             </div>
           )}
 

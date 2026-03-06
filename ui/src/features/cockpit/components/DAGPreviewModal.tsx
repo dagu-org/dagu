@@ -124,11 +124,15 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
 
   // Custom enqueue handler — injects workspace tag and uses /dag-runs/enqueue
   const handleEnqueue = useCallback(async (params: string, dagRunId?: string) => {
-    if (!specData?.spec || !selectedWorkspace) return;
+    if (!specData?.spec) return;
 
-    const safeName = sanitizeForTag(selectedWorkspace);
-    if (!safeName) return;
-    const spec = injectTagIntoSpec(specData.spec, `workspace=${safeName}`);
+    let spec = specData.spec;
+    if (selectedWorkspace) {
+      const safeName = sanitizeForTag(selectedWorkspace);
+      if (safeName) {
+        spec = injectTagIntoSpec(spec, `workspace=${safeName}`);
+      }
+    }
     const { error } = await client.POST('/dag-runs/enqueue', {
       params: { query: { remoteNode } },
       body: {
