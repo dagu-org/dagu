@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/table';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useIsAdmin } from '@/contexts/AuthContext';
+import { useUpdateConfig } from '@/contexts/ConfigContext';
 import { useClient } from '@/hooks/api';
 import ConfirmModal from '@/ui/ConfirmModal';
 import { ModelFormModal } from './ModelFormModal';
@@ -114,6 +115,7 @@ function canonicalizeToolPolicy(policy: AgentToolPolicy | undefined, tools: Tool
 export default function AgentSettingsPage(): ReactNode {
   const client = useClient();
   const isAdmin = useIsAdmin();
+  const updateConfig = useUpdateConfig();
   const appBarContext = useContext(AppBarContext);
   const [toolMetas, setToolMetas] = useState<ToolMeta[]>([]);
 
@@ -302,6 +304,7 @@ export default function AgentSettingsPage(): ReactNode {
         webSearchEnabled: data.webSearch?.enabled ?? false,
         webSearchMaxUses: data.webSearch?.maxUses ?? undefined,
       });
+      updateConfig({ agentEnabled: data.enabled ?? false });
       setSuccess('Configuration saved successfully');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save configuration');

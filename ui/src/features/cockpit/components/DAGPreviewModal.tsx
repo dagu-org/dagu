@@ -145,11 +145,8 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
 
     if (error) {
       console.error('Failed to enqueue:', error);
-      return;
     }
-
-    onClose();
-  }, [specData, selectedWorkspace, client, remoteNode, data?.dag?.name, onClose]);
+  }, [specData, selectedWorkspace, client, remoteNode, data?.dag?.name]);
 
   // Fullscreen navigation
   const handleFullscreenClick = useCallback(
