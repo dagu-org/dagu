@@ -67,6 +67,31 @@ func (dr DAGRunTest) WriteStatus(t *testing.T, ts exec.TimeInUTC, s core.Status)
 	return run
 }
 
+func TestAttemptByDir(t *testing.T) {
+	root := setupTestDataRoot(t)
+	run := root.CreateTestDAGRun(t, "attempt-test", exec.NewUTC(time.Now()))
+
+	// Write a status to create an attempt.
+	ts := exec.NewUTC(time.Now())
+	att := run.WriteStatus(t, ts, core.Succeeded)
+
+	// Get the attempt dir name.
+	attemptDir := filepath.Base(filepath.Dir(att.file))
+
+	// AttemptByDir with correct dir should succeed.
+	result, err := run.AttemptByDir(attemptDir, nil)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	status, err := result.ReadStatus(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, core.Succeeded, status.Status)
+
+	// AttemptByDir with non-existent dir should fail.
+	_, err = run.AttemptByDir("nonexistent_attempt_dir", nil)
+	assert.Error(t, err)
+}
+
 func TestListSubDAGRuns(t *testing.T) {
 	t.Run("NoSubDAGRuns", func(t *testing.T) {
 		root := setupTestDataRoot(t)

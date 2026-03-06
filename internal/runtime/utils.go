@@ -25,20 +25,20 @@ func parseExitCodeFromError(errStr string) (int, bool) {
 	lastPart := parts[len(parts)-1]
 
 	// Extract the number from the beginning of the string
-	numStr := ""
+	var numStr strings.Builder
 	for _, ch := range lastPart {
 		if ch >= '0' && ch <= '9' {
-			numStr += string(ch)
+			numStr.WriteRune(ch)
 		} else {
 			break
 		}
 	}
 
-	if numStr == "" {
+	if numStr.Len() == 0 {
 		return 0, false
 	}
 
-	code, err := strconv.Atoi(numStr)
+	code, err := strconv.Atoi(numStr.String())
 	if err != nil {
 		return 0, false
 	}

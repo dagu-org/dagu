@@ -2845,12 +2845,6 @@ export interface components {
         };
         /** @description Current status of a DAG-run */
         DAGRunSummary: {
-            /** @description Name of the root DAG-run */
-            rootDAGRunName: string;
-            rootDAGRunId: components["schemas"]["DAGRunId"] & unknown;
-            /** @description Name of the parent DAG-run */
-            parentDAGRunName?: string;
-            parentDAGRunId?: components["schemas"]["DAGRunId"] & unknown;
             dagRunId: components["schemas"]["DAGRunId"];
             name: components["schemas"]["DAGName"];
             status: components["schemas"]["Status"];
@@ -2861,8 +2855,6 @@ export interface components {
             startedAt: string;
             /** @description RFC 3339 timestamp when the DAG-run finished */
             finishedAt: string;
-            /** @description Path to the log file */
-            log: string;
             /** @description Runtime parameters passed to the DAG-run in JSON format */
             params?: string;
             /** @description ID of the worker that executed this DAG-run ('local' for local execution) */
@@ -2873,6 +2865,14 @@ export interface components {
         };
         /** @description Detailed status of a DAG-run including sub DAG-run nodes */
         DAGRunDetails: components["schemas"]["DAGRunSummary"] & {
+            /** @description Name of the root DAG-run */
+            rootDAGRunName: string;
+            rootDAGRunId: components["schemas"]["DAGRunId"] & unknown;
+            /** @description Name of the parent DAG-run */
+            parentDAGRunName?: string;
+            parentDAGRunId?: components["schemas"]["DAGRunId"] & unknown;
+            /** @description Path to the log file */
+            log: string;
             /** @description Status of individual steps within the DAG-run */
             nodes: components["schemas"]["Node"][];
             onExit?: components["schemas"]["Node"];

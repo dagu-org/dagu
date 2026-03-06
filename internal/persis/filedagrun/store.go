@@ -22,13 +22,12 @@ import (
 
 // Error definitions for common issues
 var (
-	ErrDAGRunIDEmpty  = errors.New("dag-run ID is empty")
-	ErrTooManyResults = errors.New("too many results found")
+	ErrDAGRunIDEmpty = errors.New("dag-run ID is empty")
 )
 
 var _ exec.DAGRunStore = (*Store)(nil)
 
-// Store manages DAGs status files in local Store with high performance and reliability.
+// Store manages DAG run status files on the local filesystem.
 type Store struct {
 	baseDir           string                              // Base directory for all status files
 	latestStatusToday bool                                // Whether to only return today's status
@@ -37,19 +36,18 @@ type Store struct {
 	location          *time.Location                      // Timezone location for date calculations
 }
 
-// DAGRunStoreOption defines functional options for configuring local.
+// DAGRunStoreOption defines functional options for configuring Store.
 type DAGRunStoreOption func(*DAGRunStoreOptions)
 
-// DAGRunStoreOptions holds configuration options for local.
+// DAGRunStoreOptions holds configuration options for Store.
 type DAGRunStoreOptions struct {
 	FileCache         *fileutil.Cache[*exec.DAGRunStatus] // Optional cache for status files
 	LatestStatusToday bool                                // Whether to only return today's status
 	MaxWorkers        int                                 // Maximum number of parallel workers
-	OperationTimeout  time.Duration                       // Timeout for operations
 	Location          *time.Location                      // Timezone location for date calculations
 }
 
-// WithHistoryFileCache sets the file cache for local.
+// WithHistoryFileCache sets the file cache for Store.
 func WithHistoryFileCache(cache *fileutil.Cache[*exec.DAGRunStatus]) DAGRunStoreOption {
 	return func(o *DAGRunStoreOptions) {
 		o.FileCache = cache
@@ -70,7 +68,7 @@ func WithLocation(location *time.Location) DAGRunStoreOption {
 	}
 }
 
-// New creates a new JSONDB instance with the specified options.
+// New creates a new Store instance with the specified options.
 func New(baseDir string, opts ...DAGRunStoreOption) exec.DAGRunStore {
 	options := &DAGRunStoreOptions{
 		LatestStatusToday: true,
@@ -149,7 +147,7 @@ func (store *Store) collectStatusesFromRoots(
 	if len(roots) == 0 {
 		return nil, nil
 	}
-	maxWorkers := min(runtime.NumCPU(), len(roots))
+	maxWorkers := min(store.maxWorkers, len(roots))
 
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
@@ -171,6 +169,15 @@ func (store *Store) collectStatusesFromRoots(
 	jobs := make(chan DataRoot)
 	var wg sync.WaitGroup
 
+	// Pre-parse tag filters once before starting workers.
+	var tagFilters []core.TagFilter
+	if len(opts.Tags) > 0 {
+		tagFilters = make([]core.TagFilter, 0, len(opts.Tags))
+		for _, t := range opts.Tags {
+			tagFilters = append(tagFilters, core.ParseTagFilter(t))
+		}
+	}
+
 	worker := func() {
 		defer wg.Done()
 		for root := range jobs {
@@ -188,45 +195,13 @@ func (store *Store) collectStatusesFromRoots(
 					continue
 				}
 
-				run, err := dagRun.LatestAttempt(ctx, store.cache)
-				if err != nil {
-					if !errors.Is(err, exec.ErrNoStatusData) {
-						logger.Error(ctx, "Failed to get latest run",
-							tag.Error(err))
-					}
-					continue
-				}
-
-				status, err := run.ReadStatus(ctx)
-				if err != nil {
-					logger.Error(ctx, "Failed to read status",
-						tag.Error(err))
-					continue
-				}
-
-				// Filter by tags (AND logic) using TagFilter for key-only, exact, and negation matching
-				if len(opts.Tags) > 0 {
-					statusTags := core.NewTags(status.Tags)
-					filters := make([]core.TagFilter, 0, len(opts.Tags))
-					for _, t := range opts.Tags {
-						filters = append(filters, core.ParseTagFilter(t))
-					}
-					if !statusTags.MatchesFilters(filters) {
-						continue
-					}
-				}
-
-				if !hasStatusFilter {
+				status := store.resolveStatus(ctx, dagRun, tagFilters, statusesFilter, hasStatusFilter)
+				if status != nil {
 					statuses = append(statuses, status)
-					continue
 				}
-				if _, ok := statusesFilter[status.Status]; !ok {
-					continue
-				}
-				statuses = append(statuses, status)
 			}
 
-			taken := int64(len(dagRuns))
+			taken := int64(len(statuses))
 			if d := remaining.Add(-taken); d < 0 {
 				cancel()
 			}
@@ -264,6 +239,85 @@ func (store *Store) collectStatusesFromRoots(
 		results = results[:opts.Limit]
 	}
 	return results, nil
+}
+
+// resolveStatus resolves and filters a DAGRunStatus for a single dagRun.
+// Uses the index summary for fast filtering when available, falling back to
+// reading status.jsonl directly.
+func (store *Store) resolveStatus(
+	ctx context.Context,
+	dagRun *DAGRun,
+	tagFilters []core.TagFilter,
+	statusesFilter map[core.Status]struct{},
+	hasStatusFilter bool,
+) *exec.DAGRunStatus {
+	// Fast path: use pre-loaded summary for filtering.
+	if dagRun.summary != nil {
+		if hasStatusFilter {
+			if _, ok := statusesFilter[dagRun.summary.Status]; !ok {
+				return nil
+			}
+		}
+		if len(tagFilters) > 0 {
+			summaryTags := core.NewTags(dagRun.summary.Tags)
+			if !summaryTags.MatchesFilters(tagFilters) {
+				return nil
+			}
+		}
+
+		// Passed filters — construct status directly from index.
+		s := dagRun.summary
+		return &exec.DAGRunStatus{
+			Name:        s.Name,
+			DAGRunID:    s.DagRunID,
+			Status:      s.Status,
+			Tags:        s.Tags,
+			StartedAt:   formatUnixToRFC3339(s.StartedAtUnix),
+			FinishedAt:  formatUnixToRFC3339(s.FinishedAtUnix),
+			WorkerID:    s.WorkerID,
+			Params:      s.Params,
+			QueuedAt:    s.QueuedAt,
+			TriggerType: s.TriggerType,
+			CreatedAt:   s.CreatedAt,
+		}
+	}
+
+	// Standard path: discover latest attempt and read status.
+	run, err := dagRun.LatestAttempt(ctx, store.cache)
+	if err != nil {
+		if !errors.Is(err, exec.ErrNoStatusData) {
+			logger.Error(ctx, "Failed to get latest run", tag.Error(err))
+		}
+		return nil
+	}
+
+	status, err := run.ReadStatus(ctx)
+	if err != nil {
+		logger.Error(ctx, "Failed to read status", tag.Error(err))
+		return nil
+	}
+
+	if len(tagFilters) > 0 {
+		statusTags := core.NewTags(status.Tags)
+		if !statusTags.MatchesFilters(tagFilters) {
+			return nil
+		}
+	}
+
+	if hasStatusFilter {
+		if _, ok := statusesFilter[status.Status]; !ok {
+			return nil
+		}
+	}
+
+	return status
+}
+
+func formatUnixToRFC3339(unix int64) string {
+	if unix == 0 {
+		return ""
+	}
+	return time.Unix(unix, 0).UTC().Format(time.RFC3339)
 }
 
 // CreateAttempt creates a new history record for the specified dag-run ID.

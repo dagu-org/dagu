@@ -16,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
@@ -44,11 +45,30 @@ const (
 // After finishing the run, this file will be compacted into a single JSON line file.
 const JSONLStatusFile = "status.jsonl"
 
+// DAGRunSummary holds pre-loaded summary data from a day index.
+// When non-nil, it allows filtering and constructing list responses
+// without reading status.jsonl.
+type DAGRunSummary struct {
+	LatestAttemptDir string
+	Status           core.Status
+	StartedAtUnix    int64
+	FinishedAtUnix   int64
+	Tags             []string
+	Name             string
+	DagRunID         string
+	WorkerID         string
+	Params           string
+	QueuedAt         string
+	TriggerType      core.TriggerType
+	CreatedAt        int64
+}
+
 // DAGRun represents a dag-run with its associated timestamp and run ID.
 type DAGRun struct {
-	baseDir   string    // Base directory path for this run
-	timestamp time.Time // Timestamp when the run was created
-	dagRunID  string    // Unique identifier for the dag-run
+	baseDir   string         // Base directory path for this run
+	timestamp time.Time      // Timestamp when the run was created
+	dagRunID  string         // Unique identifier for the dag-run
+	summary   *DAGRunSummary // Optional pre-loaded summary from index
 }
 
 // NewDAGRun creates a new Run instance from a directory path.
@@ -189,6 +209,12 @@ func (dr DAGRun) LatestAttempt(ctx context.Context, cache *fileutil.Cache[*exec.
 		}
 	}
 	return nil, exec.ErrNoStatusData
+}
+
+// AttemptByDir constructs an Attempt directly from a known attempt directory name,
+// skipping the directory listing and sorting done by LatestAttempt.
+func (dr DAGRun) AttemptByDir(attemptDir string, cache *fileutil.Cache[*exec.DAGRunStatus]) (*Attempt, error) {
+	return NewAttempt(filepath.Join(dr.baseDir, attemptDir, JSONLStatusFile), cache)
 }
 
 // Remove deletes the entire dag-run directory and all its contents.

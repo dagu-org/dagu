@@ -3,6 +3,8 @@ package fileutil
 import (
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestSafeName(t *testing.T) {
@@ -107,5 +109,42 @@ func TestEdgeCases(t *testing.T) {
 	if len(result) != MaxSafeNameLength {
 		t.Errorf("SafeName with over max length returned incorrect length: got %d, want %d",
 			len(result), MaxSafeNameLength)
+	}
+}
+
+func TestNormalizeFilename(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		replacement string
+		expected    string
+	}{
+		{"EmptyString", "", "-", ""},
+		{"NormalName", "normal-name", "-", "normal-name"},
+		{"Spaces", "hello world", "-", "hello-world"},
+		{"ReservedChars", "<>:\"|?*", "-", "-------"},
+		{"BackslashForwardSlash", "a/b\\c", "-", "a-b-c"},
+		{"ControlChars", "a\x00b\x1Fc", "-", "a-b-c"},
+		{"WindowsReservedCON", "CON", "-", "-"},
+		{"WindowsReservedPRN", "PRN", "_", "_"},
+		{"WindowsReservedAUX", "AUX", "-", "-"},
+		{"WindowsReservedNUL", "NUL", "-", "-"},
+		{"WindowsReservedCOM1", "COM1", "-", "-"},
+		{"WindowsReservedLPT1", "LPT1", "-", "-"},
+		{"WindowsReservedCaseInsensitive", "con", "-", "-"},
+		{"WindowsReservedWithExtension", "CON.txt", "-", "-.txt"},
+		{"WindowsReservedCOM1WithExt", "COM1.txt", "-", "-.txt"},
+		{"COM0NotReserved", "COM0", "-", "COM0"},
+		{"LPT0NotReserved", "LPT0", "-", "LPT0"},
+		{"MixedReservedAndNormal", "mix<ed>name", "-", "mix-ed-name"},
+		{"MultipleSpaces", "a  b  c", "-", "a--b--c"},
+		{"UnderscoreReplacement", "hello world", "_", "hello_world"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := NormalizeFilename(tt.input, tt.replacement)
+			require.Equal(t, tt.expected, result, "NormalizeFilename(%q, %q)", tt.input, tt.replacement)
+		})
 	}
 }
