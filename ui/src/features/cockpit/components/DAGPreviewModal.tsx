@@ -50,6 +50,7 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [isVisible, setIsVisible] = useState(false);
   const [activeTab, setActiveTab] = useState('spec');
+  const [enqueuedRunId, setEnqueuedRunId] = useState<string | undefined>();
 
   useEffect(() => {
     if (isOpen) {
@@ -101,16 +102,34 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
     isPaused: () => !fileName,
   });
 
+  // Fetch specific DAG run when enqueued
+  const dagName = data?.dag?.name || '';
+  const { data: enqueuedRunData } = useQuery(
+    '/dag-runs/{name}/{dagRunId}',
+    {
+      params: {
+        path: { name: dagName, dagRunId: enqueuedRunId || '' },
+        query: { remoteNode },
+      },
+    },
+    {
+      isPaused: () => !dagName || !enqueuedRunId,
+      refreshInterval: 2000,
+    },
+  );
+
   const refreshFn = useCallback(() => {
     setTimeout(() => mutate(), 500);
   }, [mutate]);
 
   // Sync latest DAG run
   useEffect(() => {
-    if (data) {
+    if (enqueuedRunData?.dagRunDetails) {
+      setCurrentDAGRun(enqueuedRunData.dagRunDetails);
+    } else if (data) {
       setCurrentDAGRun(data.latestDAGRun);
     }
-  }, [data]);
+  }, [data, enqueuedRunData]);
 
   const formatDuration = (startDate: string, endDate: string): string => {
     if (!startDate || !endDate) return '--';
@@ -134,7 +153,7 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
         spec = injectTagIntoSpec(spec, `workspace=${safeName}`);
       }
     }
-    const { error } = await client.POST('/dag-runs/enqueue', {
+    const { data: enqueueData, error } = await client.POST('/dag-runs/enqueue', {
       params: { query: { remoteNode } },
       body: {
         spec,
@@ -149,6 +168,9 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
       return;
     }
 
+    if (enqueueData?.dagRunId) {
+      setEnqueuedRunId(enqueueData.dagRunId);
+    }
     setActiveTab('status');
   }, [specData, selectedWorkspace, client, remoteNode, data?.dag?.name]);
 
@@ -252,7 +274,8 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
                 <DAGDetailsContent
                   fileName={fileName}
                   dag={data.dag}
-                  currentDAGRun={data.latestDAGRun}
+                  currentDAGRun={currentDAGRun}
+                  dagRunId={enqueuedRunId}
                   refreshFn={refreshFn}
                   formatDuration={formatDuration}
                   activeTab={activeTab}
