@@ -269,7 +269,7 @@ function NavGroup({ groupKey, icon, label, isOpen, basePath, customColor = false
     }
   }, [isChildActive]);
 
-  const effectivelyExpanded = isExpanded || isChildActive;
+  const effectivelyExpanded = isExpanded;
 
   const headerClassName = cn(
     'flex items-center rounded-md px-2 group relative w-full',
