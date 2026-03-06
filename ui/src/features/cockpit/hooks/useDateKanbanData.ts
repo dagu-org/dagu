@@ -12,6 +12,7 @@ type DAGRunSummary = components['schemas']['DAGRunSummary'];
 export interface KanbanColumns {
   queued: DAGRunSummary[];
   running: DAGRunSummary[];
+  review: DAGRunSummary[];
   done: DAGRunSummary[];
   failed: DAGRunSummary[];
 }
@@ -31,7 +32,7 @@ function dayBounds(
 }
 
 function groupByStatus(runs: DAGRunSummary[]): KanbanColumns {
-  const columns: KanbanColumns = { queued: [], running: [], done: [], failed: [] };
+  const columns: KanbanColumns = { queued: [], running: [], review: [], done: [], failed: [] };
   for (const run of runs) {
     switch (run.status) {
       case Status.Queued:
@@ -39,8 +40,10 @@ function groupByStatus(runs: DAGRunSummary[]): KanbanColumns {
         columns.queued.push(run);
         break;
       case Status.Running:
-      case Status.Waiting:
         columns.running.push(run);
+        break;
+      case Status.Waiting:
+        columns.review.push(run);
         break;
       case Status.Success:
       case Status.PartialSuccess:
@@ -106,6 +109,7 @@ export function useDateKanbanData(
   const isEmpty =
     columns.queued.length === 0 &&
     columns.running.length === 0 &&
+    columns.review.length === 0 &&
     columns.done.length === 0 &&
     columns.failed.length === 0;
 

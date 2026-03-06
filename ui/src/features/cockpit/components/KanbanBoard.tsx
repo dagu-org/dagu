@@ -15,6 +15,7 @@ export function KanbanBoard({ columns, onCardClick }: Props): React.ReactElement
     <div className="flex gap-3 min-h-0 overflow-x-auto p-1 max-h-[50vh]">
       <KanbanColumn title="Queued" runs={columns.queued} onCardClick={onCardClick} />
       <KanbanColumn title="Running" runs={columns.running} onCardClick={onCardClick} />
+      <KanbanColumn title="Review" runs={columns.review} onCardClick={onCardClick} />
       <KanbanColumn title="Done" runs={columns.done} onCardClick={onCardClick} />
       <KanbanColumn title="Failed" runs={columns.failed} onCardClick={onCardClick} />
     </div>
