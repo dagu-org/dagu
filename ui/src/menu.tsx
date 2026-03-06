@@ -474,14 +474,6 @@ export const mainListItems = React.forwardRef<
         <div className="space-y-4">
           <div className="space-y-0.5">
             <SectionLabel label="Overview" isOpen={isOpen} customColor={customColor} />
-            <NavItem
-              to="/dashboard"
-              text="Dashboard"
-              icon={<BarChart2 size={18} />}
-              isOpen={isOpen}
-              onClick={onNavItemClick}
-              customColor={customColor}
-            />
             {config.agentEnabled && (
               <NavItem
                 to="/cockpit"
@@ -492,6 +484,14 @@ export const mainListItems = React.forwardRef<
                 customColor={customColor}
               />
             )}
+            <NavItem
+              to="/dashboard"
+              text="Dashboard"
+              icon={<BarChart2 size={18} />}
+              isOpen={isOpen}
+              onClick={onNavItemClick}
+              customColor={customColor}
+            />
           </div>
 
           <div className="space-y-0.5">
