@@ -94,9 +94,7 @@ export function WorkspaceSelector({
           <SelectValue placeholder="Select workspace" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="__none__">
-            <span className="text-muted-foreground">All workspaces</span>
-          </SelectItem>
+          <SelectItem value="__none__">All workspaces</SelectItem>
           {workspaces.map((ws) => (
             <SelectItem key={ws.id} value={ws.name}>{ws.name}</SelectItem>
           ))}

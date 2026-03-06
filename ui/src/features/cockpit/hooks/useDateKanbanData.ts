@@ -76,7 +76,7 @@ export function useDateKanbanData(
     () => ({ remoteNode, tags: tag, fromDate, toDate }),
     [remoteNode, tag, fromDate, toDate]
   );
-  const sseResult = useDAGRunsListSSE(sseParams, isToday && !!selectedWorkspace);
+  const sseResult = useDAGRunsListSSE(sseParams, isToday);
 
   const { data, mutate } = useQuery(
     '/dag-runs',
@@ -92,7 +92,6 @@ export function useDateKanbanData(
     },
     {
       ...(isToday ? sseFallbackOptions(sseResult) : { refreshInterval: 0 }),
-      isPaused: () => !selectedWorkspace,
     }
   );
 
