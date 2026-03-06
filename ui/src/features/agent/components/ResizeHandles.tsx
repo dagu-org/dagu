@@ -10,35 +10,35 @@ export function ResizeHandles({ resizeHandlers }: Props): ReactElement {
   return (
     <>
       <div
-        className="absolute top-0 left-2 right-2 h-1.5 cursor-n-resize"
+        className="absolute top-0 left-3 right-3 h-3 cursor-n-resize"
         {...resizeHandlers.top}
       />
       <div
-        className="absolute bottom-0 left-2 right-2 h-1.5 cursor-s-resize"
+        className="absolute bottom-0 left-3 right-3 h-3 cursor-s-resize"
         {...resizeHandlers.bottom}
       />
       <div
-        className="absolute left-0 top-2 bottom-2 w-1.5 cursor-w-resize"
+        className="absolute left-0 top-3 bottom-3 w-3 cursor-w-resize"
         {...resizeHandlers.left}
       />
       <div
-        className="absolute right-0 top-2 bottom-2 w-1.5 cursor-e-resize"
+        className="absolute right-0 top-3 bottom-3 w-3 cursor-e-resize"
         {...resizeHandlers.right}
       />
       <div
-        className="absolute top-0 left-0 w-3 h-3 cursor-nw-resize"
+        className="absolute top-0 left-0 w-4 h-4 cursor-nw-resize"
         {...resizeHandlers.topLeft}
       />
       <div
-        className="absolute top-0 right-0 w-3 h-3 cursor-ne-resize"
+        className="absolute top-0 right-0 w-4 h-4 cursor-ne-resize"
         {...resizeHandlers.topRight}
       />
       <div
-        className="absolute bottom-0 left-0 w-3 h-3 cursor-sw-resize"
+        className="absolute bottom-0 left-0 w-4 h-4 cursor-sw-resize"
         {...resizeHandlers.bottomLeft}
       />
       <div
-        className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize"
+        className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize"
         {...resizeHandlers.bottomRight}
       />
     </>
