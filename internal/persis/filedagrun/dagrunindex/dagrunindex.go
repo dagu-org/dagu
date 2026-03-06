@@ -21,7 +21,7 @@ const (
 	// IndexFileName is the name of the DAG run index file.
 	IndexFileName = ".dagrun.index"
 	// IndexVersion is the current index format version.
-	IndexVersion = 2
+	IndexVersion = 3
 	// MinRunsForIndex is the minimum number of runs needed to create an index.
 	MinRunsForIndex = 10
 
@@ -44,6 +44,12 @@ type Entry struct {
 	StartedAtUnix    int64
 	FinishedAtUnix   int64
 	Tags             []string
+	Name             string
+	WorkerID         string
+	Params           string
+	QueuedAt         string
+	TriggerType      core.TriggerType
+	CreatedAt        int64
 }
 
 // TryLoadForDay attempts to load and validate the index for a day directory.
@@ -118,6 +124,12 @@ func RebuildForDay(dayDir string, dagRunDirs []os.DirEntry) ([]Entry, bool, erro
 			StartedAtUnix:    startedAt,
 			FinishedAtUnix:   finishedAt,
 			Tags:             status.Tags,
+			Name:             status.Name,
+			WorkerID:         status.WorkerID,
+			Params:           status.Params,
+			QueuedAt:         status.QueuedAt,
+			TriggerType:      status.TriggerType,
+			CreatedAt:        status.CreatedAt,
 		})
 	}
 
@@ -220,6 +232,12 @@ func writeIndex(dayDir string, entries []Entry) error {
 			StartedAt:           e.StartedAtUnix,
 			FinishedAt:          e.FinishedAtUnix,
 			Tags:                e.Tags,
+			Name:                e.Name,
+			WorkerId:            e.WorkerID,
+			Params:              e.Params,
+			QueuedAt:            e.QueuedAt,
+			TriggerType:         int32(e.TriggerType), //nolint:gosec
+			CreatedAt:           e.CreatedAt,
 		})
 	}
 
@@ -248,6 +266,12 @@ func protoToEntries(protoEntries []*indexv1.DAGRunIndexEntry) []Entry {
 			StartedAtUnix:    pe.StartedAt,
 			FinishedAtUnix:   pe.FinishedAt,
 			Tags:             pe.Tags,
+			Name:             pe.Name,
+			WorkerID:         pe.WorkerId,
+			Params:           pe.Params,
+			QueuedAt:         pe.QueuedAt,
+			TriggerType:      core.TriggerType(pe.TriggerType),
+			CreatedAt:        pe.CreatedAt,
 		}
 	}
 	return entries

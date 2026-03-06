@@ -265,18 +265,21 @@ func (store *Store) resolveStatus(
 			}
 		}
 
-		// Passed filters — read full status for results.
-		run, err := dagRun.AttemptByDir(dagRun.summary.LatestAttemptDir, store.cache)
-		if err == nil {
-			status, err := run.ReadStatus(ctx)
-			if err == nil {
-				return status
-			}
-			logger.Warn(ctx, "Failed to read indexed status", tag.Error(err))
-		} else {
-			logger.Warn(ctx, "Failed to get indexed attempt", tag.Error(err))
+		// Passed filters — construct status directly from index.
+		s := dagRun.summary
+		return &exec.DAGRunStatus{
+			Name:        s.Name,
+			DAGRunID:    s.DagRunID,
+			Status:      s.Status,
+			Tags:        s.Tags,
+			StartedAt:   formatUnixToRFC3339(s.StartedAtUnix),
+			FinishedAt:  formatUnixToRFC3339(s.FinishedAtUnix),
+			WorkerID:    s.WorkerID,
+			Params:      s.Params,
+			QueuedAt:    s.QueuedAt,
+			TriggerType: s.TriggerType,
+			CreatedAt:   s.CreatedAt,
 		}
-		// Fall through to standard path on error.
 	}
 
 	// Standard path: discover latest attempt and read status.
@@ -308,6 +311,13 @@ func (store *Store) resolveStatus(
 	}
 
 	return status
+}
+
+func formatUnixToRFC3339(unix int64) string {
+	if unix == 0 {
+		return ""
+	}
+	return time.Unix(unix, 0).UTC().Format(time.RFC3339)
 }
 
 // CreateAttempt creates a new history record for the specified dag-run ID.

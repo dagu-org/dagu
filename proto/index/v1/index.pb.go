@@ -273,6 +273,12 @@ type DAGRunIndexEntry struct {
 	FinishedAt          int64                  `protobuf:"varint,8,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
 	Tags                []string               `protobuf:"bytes,9,rep,name=tags,proto3" json:"tags,omitempty"`
 	RunDirModTime       int64                  `protobuf:"varint,10,opt,name=run_dir_mod_time,json=runDirModTime,proto3" json:"run_dir_mod_time,omitempty"`
+	WorkerId            string                 `protobuf:"bytes,11,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
+	Params              string                 `protobuf:"bytes,12,opt,name=params,proto3" json:"params,omitempty"`
+	QueuedAt            string                 `protobuf:"bytes,13,opt,name=queued_at,json=queuedAt,proto3" json:"queued_at,omitempty"`
+	TriggerType         int32                  `protobuf:"varint,14,opt,name=trigger_type,json=triggerType,proto3" json:"trigger_type,omitempty"`
+	CreatedAt           int64                  `protobuf:"varint,15,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	Name                string                 `protobuf:"bytes,16,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -377,6 +383,48 @@ func (x *DAGRunIndexEntry) GetRunDirModTime() int64 {
 	return 0
 }
 
+func (x *DAGRunIndexEntry) GetWorkerId() string {
+	if x != nil {
+		return x.WorkerId
+	}
+	return ""
+}
+
+func (x *DAGRunIndexEntry) GetParams() string {
+	if x != nil {
+		return x.Params
+	}
+	return ""
+}
+
+func (x *DAGRunIndexEntry) GetQueuedAt() string {
+	if x != nil {
+		return x.QueuedAt
+	}
+	return ""
+}
+
+func (x *DAGRunIndexEntry) GetTriggerType() int32 {
+	if x != nil {
+		return x.TriggerType
+	}
+	return 0
+}
+
+func (x *DAGRunIndexEntry) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *DAGRunIndexEntry) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 var File_proto_index_v1_index_proto protoreflect.FileDescriptor
 
 const file_proto_index_v1_index_proto_rawDesc = "" +
@@ -402,7 +450,7 @@ const file_proto_index_v1_index_proto_rawDesc = "" +
 	"\vDAGRunIndex\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\rR\aversion\x12\"\n" +
 	"\rbuilt_at_unix\x18\x02 \x01(\x03R\vbuiltAtUnix\x124\n" +
-	"\aentries\x18\x03 \x03(\v2\x1a.index.v1.DAGRunIndexEntryR\aentries\"\xf6\x02\n" +
+	"\aentries\x18\x03 \x03(\v2\x1a.index.v1.DAGRunIndexEntryR\aentries\"\x9e\x04\n" +
 	"\x10DAGRunIndexEntry\x12\x1e\n" +
 	"\vdag_run_dir\x18\x01 \x01(\tR\tdagRunDir\x12\x1c\n" +
 	"\n" +
@@ -417,7 +465,14 @@ const file_proto_index_v1_index_proto_rawDesc = "" +
 	"finishedAt\x12\x12\n" +
 	"\x04tags\x18\t \x03(\tR\x04tags\x12'\n" +
 	"\x10run_dir_mod_time\x18\n" +
-	" \x01(\x03R\rrunDirModTimeB1Z/github.com/dagu-org/dagu/proto/index/v1;indexv1b\x06proto3"
+	" \x01(\x03R\rrunDirModTime\x12\x1b\n" +
+	"\tworker_id\x18\v \x01(\tR\bworkerId\x12\x16\n" +
+	"\x06params\x18\f \x01(\tR\x06params\x12\x1b\n" +
+	"\tqueued_at\x18\r \x01(\tR\bqueuedAt\x12!\n" +
+	"\ftrigger_type\x18\x0e \x01(\x05R\vtriggerType\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x0f \x01(\x03R\tcreatedAt\x12\x12\n" +
+	"\x04name\x18\x10 \x01(\tR\x04nameB1Z/github.com/dagu-org/dagu/proto/index/v1;indexv1b\x06proto3"
 
 var (
 	file_proto_index_v1_index_proto_rawDescOnce sync.Once

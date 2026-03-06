@@ -659,6 +659,13 @@ func summaryFromIndexEntry(ie dagrunindex.Entry) *DAGRunSummary {
 		StartedAtUnix:    ie.StartedAtUnix,
 		FinishedAtUnix:   ie.FinishedAtUnix,
 		Tags:             ie.Tags,
+		Name:             ie.Name,
+		DagRunID:         ie.DagRunID,
+		WorkerID:         ie.WorkerID,
+		Params:           ie.Params,
+		QueuedAt:         ie.QueuedAt,
+		TriggerType:      ie.TriggerType,
+		CreatedAt:        ie.CreatedAt,
 	}
 }
 

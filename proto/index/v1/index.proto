@@ -45,4 +45,10 @@ message DAGRunIndexEntry {
   int64 finished_at = 8;
   repeated string tags = 9;
   int64 run_dir_mod_time = 10;
+  string worker_id = 11;
+  string params = 12;
+  string queued_at = 13;
+  int32 trigger_type = 14;
+  int64 created_at = 15;
+  string name = 16;
 }

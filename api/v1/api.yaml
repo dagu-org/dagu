@@ -7093,20 +7093,6 @@ components:
       type: object
       description: "Current status of a DAG-run"
       properties:
-        rootDAGRunName:
-          type: string
-          description: "Name of the root DAG-run"
-        rootDAGRunId:
-          allOf:
-            - $ref: "#/components/schemas/DAGRunId"
-            - description: "ID of the root DAG-run"
-        parentDAGRunName:
-          type: string
-          description: "Name of the parent DAG-run"
-        parentDAGRunId:
-          allOf:
-            - $ref: "#/components/schemas/DAGRunId"
-            - description: "ID of the parent DAG-run"
         dagRunId:
           $ref: "#/components/schemas/DAGRunId"
         name:
@@ -7124,9 +7110,6 @@ components:
         finishedAt:
           type: string
           description: "RFC 3339 timestamp when the DAG-run finished"
-        log:
-          type: string
-          description: "Path to the log file"
         params:
           type: string
           description: "Runtime parameters passed to the DAG-run in JSON format"
@@ -7141,15 +7124,12 @@ components:
             type: string
           description: "List of tags for categorizing and filtering DAG runs"
       required:
-        - rootDAGRunName
-        - rootDAGRunId
         - dagRunId
         - name
         - status
         - statusLabel
         - startedAt
         - finishedAt
-        - log
 
     DAGRunDetails:
       type: object
@@ -7159,6 +7139,23 @@ components:
         - type: object
           description: "Detailed status information for the steps within a DAG-run."
           properties:
+            rootDAGRunName:
+              type: string
+              description: "Name of the root DAG-run"
+            rootDAGRunId:
+              allOf:
+                - $ref: "#/components/schemas/DAGRunId"
+                - description: "ID of the root DAG-run"
+            parentDAGRunName:
+              type: string
+              description: "Name of the parent DAG-run"
+            parentDAGRunId:
+              allOf:
+                - $ref: "#/components/schemas/DAGRunId"
+                - description: "ID of the parent DAG-run"
+            log:
+              type: string
+              description: "Path to the log file"
             nodes:
               type: array
               description: "Status of individual steps within the DAG-run"
@@ -7178,6 +7175,9 @@ components:
               items:
                 $ref: "#/components/schemas/Condition"
           required:
+            - rootDAGRunName
+            - rootDAGRunId
+            - log
             - nodes
 
     DAGRunOutputs:
