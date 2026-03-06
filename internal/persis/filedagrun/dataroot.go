@@ -24,6 +24,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis/filedagrun/dagrunindex"
 )
 
 // DataRoot manages the directory structure for run history data.
@@ -328,7 +329,9 @@ func (dr DataRoot) RemoveOld(ctx context.Context, retentionDays int, dryRun bool
 			logger.Error(runCtx, "Failed to remove run",
 				tag.Error(err))
 		}
-		dr.removeEmptyDir(ctx, filepath.Dir(r.baseDir))
+		dayDir := filepath.Dir(r.baseDir)
+		dagrunindex.DeleteIndex(dayDir)
+		dr.removeEmptyDir(ctx, dayDir)
 	}
 	return removedRunIDs, nil
 }
@@ -428,29 +431,66 @@ func (dr DataRoot) listDAGRunsInRange(ctx context.Context, start, end exec.TimeI
 					continue
 				}
 
-				// Find all status files for this day
-				files, err := filepath.Glob(filepath.Join(dayPath, DAGRunDirPrefix+"*"))
-				if err != nil {
+				// Try index-accelerated path for this day.
+				dayEntries, readErr := os.ReadDir(dayPath)
+				if readErr != nil {
 					continue
 				}
 
-				_ = processFilesParallel(files, func(filePath string) error {
-					run, err := NewDAGRun(filePath)
+				indexEntries, fromIndex, _ := dagrunindex.TryLoadForDay(dayPath, dayEntries)
+				if fromIndex && indexEntries != nil {
+					for _, ie := range indexEntries {
+						runPath := filepath.Join(dayPath, ie.DagRunDir)
+						run, err := NewDAGRun(runPath)
+						if err != nil {
+							continue
+						}
+						run.summary = summaryFromIndexEntry(ie)
+						if (start.IsZero() || !run.timestamp.Before(startDate)) &&
+							(end.IsZero() || run.timestamp.Before(endDate)) {
+							lock.Lock()
+							result = append(result, run)
+							lock.Unlock()
+						}
+					}
+				} else {
+					// Fallback: direct filesystem scan.
+					files, err := filepath.Glob(filepath.Join(dayPath, DAGRunDirPrefix+"*"))
 					if err != nil {
-						logger.Debug(ctx, "Failed to create run from file",
-							tag.File(filePath),
-							tag.Error(err))
-						return err
+						continue
 					}
-					// Check if the timestamp is within the range
-					if (start.IsZero() || !run.timestamp.Before(startDate)) &&
-						(end.IsZero() || run.timestamp.Before(endDate)) {
-						lock.Lock()
-						result = append(result, run)
-						lock.Unlock()
+
+					// Build optional summary map from rebuild entries.
+					var summaryMap map[string]*dagrunindex.Entry
+					if indexEntries != nil {
+						summaryMap = make(map[string]*dagrunindex.Entry, len(indexEntries))
+						for i := range indexEntries {
+							summaryMap[indexEntries[i].DagRunDir] = &indexEntries[i]
+						}
 					}
-					return nil
-				})
+
+					_ = processFilesParallel(files, func(filePath string) error {
+						run, err := NewDAGRun(filePath)
+						if err != nil {
+							logger.Debug(ctx, "Failed to create run from file",
+								tag.File(filePath),
+								tag.Error(err))
+							return err
+						}
+						if summaryMap != nil {
+							if ie, ok := summaryMap[filepath.Base(filePath)]; ok {
+								run.summary = summaryFromIndexEntry(*ie)
+							}
+						}
+						if (start.IsZero() || !run.timestamp.Before(startDate)) &&
+							(end.IsZero() || run.timestamp.Before(endDate)) {
+							lock.Lock()
+							result = append(result, run)
+							lock.Unlock()
+						}
+						return nil
+					})
+				}
 
 				if opts != nil && opts.limit > 0 && len(result) >= opts.limit {
 					// Limit reached, break out of the loop
@@ -611,6 +651,17 @@ func processFilesParallel(files []string, processor func(string) error) []error 
 	}
 
 	return errs
+}
+
+// summaryFromIndexEntry converts a dagrunindex.Entry into a DAGRunSummary.
+func summaryFromIndexEntry(ie dagrunindex.Entry) *DAGRunSummary {
+	return &DAGRunSummary{
+		LatestAttemptDir: ie.LatestAttemptDir,
+		Status:           ie.Status,
+		StartedAtUnix:    ie.StartedAtUnix,
+		FinishedAtUnix:   ie.FinishedAtUnix,
+		Tags:             ie.Tags,
+	}
 }
 
 // isDirEmpty checks if a directory is empty.

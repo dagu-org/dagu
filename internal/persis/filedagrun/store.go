@@ -182,48 +182,25 @@ func (store *Store) collectStatusesFromRoots(
 				limit: int(remaining.Load()),
 			})
 
+			// Pre-parse tag filters once for this worker.
+			var tagFilters []core.TagFilter
+			if len(opts.Tags) > 0 {
+				tagFilters = make([]core.TagFilter, 0, len(opts.Tags))
+				for _, t := range opts.Tags {
+					tagFilters = append(tagFilters, core.ParseTagFilter(t))
+				}
+			}
+
 			statuses := make([]*exec.DAGRunStatus, 0, len(dagRuns))
 			for _, dagRun := range dagRuns {
 				if opts.DAGRunID != "" && !strings.Contains(dagRun.dagRunID, opts.DAGRunID) {
 					continue
 				}
 
-				run, err := dagRun.LatestAttempt(ctx, store.cache)
-				if err != nil {
-					if !errors.Is(err, exec.ErrNoStatusData) {
-						logger.Error(ctx, "Failed to get latest run",
-							tag.Error(err))
-					}
-					continue
-				}
-
-				status, err := run.ReadStatus(ctx)
-				if err != nil {
-					logger.Error(ctx, "Failed to read status",
-						tag.Error(err))
-					continue
-				}
-
-				// Filter by tags (AND logic) using TagFilter for key-only, exact, and negation matching
-				if len(opts.Tags) > 0 {
-					statusTags := core.NewTags(status.Tags)
-					filters := make([]core.TagFilter, 0, len(opts.Tags))
-					for _, t := range opts.Tags {
-						filters = append(filters, core.ParseTagFilter(t))
-					}
-					if !statusTags.MatchesFilters(filters) {
-						continue
-					}
-				}
-
-				if !hasStatusFilter {
+				status := store.resolveStatus(ctx, dagRun, tagFilters, statusesFilter, hasStatusFilter)
+				if status != nil {
 					statuses = append(statuses, status)
-					continue
 				}
-				if _, ok := statusesFilter[status.Status]; !ok {
-					continue
-				}
-				statuses = append(statuses, status)
 			}
 
 			taken := int64(len(dagRuns))
@@ -264,6 +241,75 @@ func (store *Store) collectStatusesFromRoots(
 		results = results[:opts.Limit]
 	}
 	return results, nil
+}
+
+// resolveStatus resolves and filters a DAGRunStatus for a single dagRun.
+// Uses the index summary for fast filtering when available, falling back to
+// reading status.jsonl directly.
+func (store *Store) resolveStatus(
+	ctx context.Context,
+	dagRun *DAGRun,
+	tagFilters []core.TagFilter,
+	statusesFilter map[core.Status]struct{},
+	hasStatusFilter bool,
+) *exec.DAGRunStatus {
+	// Fast path: use pre-loaded summary for filtering.
+	if dagRun.summary != nil {
+		if hasStatusFilter {
+			if _, ok := statusesFilter[dagRun.summary.Status]; !ok {
+				return nil
+			}
+		}
+		if len(tagFilters) > 0 {
+			summaryTags := core.NewTags(dagRun.summary.Tags)
+			if !summaryTags.MatchesFilters(tagFilters) {
+				return nil
+			}
+		}
+
+		// Passed filters — read full status for results.
+		run, err := dagRun.AttemptByDir(dagRun.summary.LatestAttemptDir, store.cache)
+		if err == nil {
+			status, err := run.ReadStatus(ctx)
+			if err == nil {
+				return status
+			}
+			logger.Warn(ctx, "Failed to read indexed status", tag.Error(err))
+		} else {
+			logger.Warn(ctx, "Failed to get indexed attempt", tag.Error(err))
+		}
+		// Fall through to standard path on error.
+	}
+
+	// Standard path: discover latest attempt and read status.
+	run, err := dagRun.LatestAttempt(ctx, store.cache)
+	if err != nil {
+		if !errors.Is(err, exec.ErrNoStatusData) {
+			logger.Error(ctx, "Failed to get latest run", tag.Error(err))
+		}
+		return nil
+	}
+
+	status, err := run.ReadStatus(ctx)
+	if err != nil {
+		logger.Error(ctx, "Failed to read status", tag.Error(err))
+		return nil
+	}
+
+	if len(tagFilters) > 0 {
+		statusTags := core.NewTags(status.Tags)
+		if !statusTags.MatchesFilters(tagFilters) {
+			return nil
+		}
+	}
+
+	if hasStatusFilter {
+		if _, ok := statusesFilter[status.Status]; !ok {
+			return nil
+		}
+	}
+
+	return status
 }
 
 // CreateAttempt creates a new history record for the specified dag-run ID.

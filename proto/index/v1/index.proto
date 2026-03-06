@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package index.v1;
+
+// protolint:disable:next MAX_LINE_LENGTH
+option go_package = "github.com/dagu-org/dagu/proto/index/v1;indexv1";
+
+// DAGIndex stores cached metadata for DAG definition files.
+message DAGIndex {
+  uint32 version = 1;
+  int64 built_at_unix = 2;
+  repeated DAGIndexEntry entries = 3;
+}
+
+// DAGIndexEntry holds cached metadata for a single DAG definition file.
+message DAGIndexEntry {
+  string file_path = 1;
+  int64 file_size = 2;
+  int64 mod_time = 3;
+  string name = 4;
+  repeated string tags = 5;
+  string group = 6;
+  string schedule = 7;
+  bool suspended = 8;
+  string description = 9;
+  string load_error = 10;
+}
+
+// DAGRunIndex stores cached summaries for a single day's DAG runs.
+message DAGRunIndex {
+  uint32 version = 1;
+  int64 built_at_unix = 2;
+  repeated DAGRunIndexEntry entries = 3;
+}
+
+// DAGRunIndexEntry holds a cached summary for a single DAG run.
+message DAGRunIndexEntry {
+  string dag_run_dir = 1;
+  string dag_run_id = 2;
+  string latest_attempt_dir = 3;
+  int64 latest_status_size = 4;
+  int64 latest_status_mod_time = 5;
+  int32 status = 6;
+  int64 started_at = 7;
+  int64 finished_at = 8;
+  repeated string tags = 9;
+}
