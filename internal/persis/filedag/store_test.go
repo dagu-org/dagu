@@ -1017,7 +1017,7 @@ func TestConcurrentList(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a few DAGs.
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		content := fmt.Sprintf("name: concurrent-dag-%d\nsteps:\n  - name: s1\n    command: echo ok\n", i)
 		err := store.Create(ctx, fmt.Sprintf("concurrent-dag-%d", i), []byte(content))
 		require.NoError(t, err)
@@ -1026,13 +1026,11 @@ func TestConcurrentList(t *testing.T) {
 	// Run 10 concurrent List calls.
 	var wg sync.WaitGroup
 	for range 10 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			result, _, err := store.List(ctx, exec.ListDAGsOptions{})
 			assert.NoError(t, err)
 			assert.Equal(t, 5, result.TotalCount)
-		}()
+		})
 	}
 	wg.Wait()
 }
@@ -1107,7 +1105,7 @@ func TestListUsesIndex(t *testing.T) {
 	ctx := context.Background()
 
 	// Create DAGs.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		content := fmt.Sprintf("name: idx-dag-%d\ntags:\n  - env=prod\nsteps:\n  - name: s1\n    command: echo ok\n", i)
 		require.NoError(t, store.Create(ctx, fmt.Sprintf("idx-dag-%d", i), []byte(content)))
 	}

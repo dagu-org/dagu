@@ -263,7 +263,7 @@ func TestRebuildForDay_MixedStatuses(t *testing.T) {
 	createDayDir(t, dayDir, 10, core.Succeeded)
 
 	// Add 2 more active runs with different names.
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		runName := fmt.Sprintf("dag-run_20240115_130000Z_active%d", i)
 		runDir := filepath.Join(dayDir, runName)
 		attemptDir := filepath.Join(runDir, "attempt_20240115_130000_001Z_abc123")

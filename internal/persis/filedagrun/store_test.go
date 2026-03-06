@@ -689,10 +689,10 @@ func TestListStatuses_RemainingCountWithFilters(t *testing.T) {
 	ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Create 10 runs: 5 succeeded, 5 failed.
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		th.CreateAttempt(t, ts.Add(time.Duration(i)*time.Second), fmt.Sprintf("success-%d", i), core.Succeeded)
 	}
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		th.CreateAttempt(t, ts.Add(time.Duration(i+5)*time.Second), fmt.Sprintf("failed-%d", i), core.Failed)
 	}
 

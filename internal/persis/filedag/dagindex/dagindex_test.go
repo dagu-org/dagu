@@ -322,9 +322,9 @@ func TestBuild_ContextCancellation(t *testing.T) {
 
 	// Create multiple DAG YAML files.
 	var files []YAMLFileMeta
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		name := fmt.Sprintf("dag-%d.yaml", i)
-		content := []byte(fmt.Sprintf("name: dag-%d\nsteps:\n  - name: s1\n    command: echo ok\n", i))
+		content := fmt.Appendf(nil, "name: dag-%d\nsteps:\n  - name: s1\n    command: echo ok\n", i)
 		require.NoError(t, os.WriteFile(filepath.Join(dir, name), content, 0600))
 		info, err := os.Stat(filepath.Join(dir, name))
 		require.NoError(t, err)

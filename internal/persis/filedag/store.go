@@ -729,7 +729,6 @@ func fileExists(file string) bool {
 	return !os.IsNotExist(err)
 }
 
-
 // shouldCreateExamples checks if we should create example DAGs
 func shouldCreateExamples(dir string) bool {
 	// Check for marker file that indicates examples were already created

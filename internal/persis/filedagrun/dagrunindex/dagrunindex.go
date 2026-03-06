@@ -242,9 +242,9 @@ func writeIndex(dayDir string, entries []Entry) error {
 	}
 
 	idx := &indexv1.DAGRunIndex{
-		Version:    IndexVersion,
+		Version:     IndexVersion,
 		BuiltAtUnix: time.Now().Unix(),
-		Entries:    protoEntries,
+		Entries:     protoEntries,
 	}
 
 	data, err := proto.Marshal(idx)

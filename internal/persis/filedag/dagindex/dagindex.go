@@ -89,9 +89,9 @@ func Load(indexPath string, yamlFiles []YAMLFileMeta, flags SuspendFlags) []*ind
 // Build constructs a fresh index by loading every YAML file with metadata-only semantics.
 func Build(ctx context.Context, dagDir string, yamlFiles []YAMLFileMeta, flags SuspendFlags) *indexv1.DAGIndex {
 	idx := &indexv1.DAGIndex{
-		Version:    IndexVersion,
+		Version:     IndexVersion,
 		BuiltAtUnix: time.Now().Unix(),
-		Entries:    make([]*indexv1.DAGIndexEntry, 0, len(yamlFiles)),
+		Entries:     make([]*indexv1.DAGIndexEntry, 0, len(yamlFiles)),
 	}
 
 	for _, f := range yamlFiles {

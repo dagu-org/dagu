@@ -65,9 +65,9 @@ type DAGRunSummary struct {
 
 // DAGRun represents a dag-run with its associated timestamp and run ID.
 type DAGRun struct {
-	baseDir   string    // Base directory path for this run
-	timestamp time.Time // Timestamp when the run was created
-	dagRunID  string    // Unique identifier for the dag-run
+	baseDir   string         // Base directory path for this run
+	timestamp time.Time      // Timestamp when the run was created
+	dagRunID  string         // Unique identifier for the dag-run
 	summary   *DAGRunSummary // Optional pre-loaded summary from index
 }
 

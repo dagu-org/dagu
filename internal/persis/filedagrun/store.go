@@ -43,8 +43,8 @@ type DAGRunStoreOption func(*DAGRunStoreOptions)
 type DAGRunStoreOptions struct {
 	FileCache         *fileutil.Cache[*exec.DAGRunStatus] // Optional cache for status files
 	LatestStatusToday bool                                // Whether to only return today's status
-	MaxWorkers int                 // Maximum number of parallel workers
-	Location   *time.Location     // Timezone location for date calculations
+	MaxWorkers        int                                 // Maximum number of parallel workers
+	Location          *time.Location                      // Timezone location for date calculations
 }
 
 // WithHistoryFileCache sets the file cache for Store.
