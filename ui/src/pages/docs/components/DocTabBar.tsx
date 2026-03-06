@@ -1,14 +1,24 @@
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useDocTabContext } from '@/contexts/DocTabContext';
 import { cn } from '@/lib/utils';
-import { X } from 'lucide-react';
+import { MoreHorizontal, Trash2, X, XCircle } from 'lucide-react';
 import React, { useCallback } from 'react';
 
 type Props = {
   className?: string;
   onCloseTabWithUnsaved?: (tabId: string) => void;
+  onDeleteDoc?: (docPath: string, title: string) => void;
+  onCloseAllTabs?: () => void;
+  onCloseOtherTabs?: (keepTabId: string) => void;
 };
 
-function DocTabBar({ className, onCloseTabWithUnsaved }: Props) {
+function DocTabBar({ className, onCloseTabWithUnsaved, onDeleteDoc, onCloseAllTabs, onCloseOtherTabs }: Props) {
   const { tabs, activeTabId, closeTab, setActiveTab, isTabUnsaved } =
     useDocTabContext();
 
@@ -98,24 +108,89 @@ function DocTabBar({ className, onCloseTabWithUnsaved }: Props) {
               {tab.title || tab.docPath || 'Untitled'}
             </span>
 
-            {/* Close Button */}
-            <button
-              type="button"
-              onClick={(e) => handleCloseTab(e, tab.id)}
-              className={cn(
-                'flex items-center justify-center shrink-0 w-4 h-4 rounded-sm',
-                'transition-all duration-150',
-                'hover:bg-muted-foreground/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                'opacity-0 group-hover:opacity-100',
-                isActive && 'opacity-100'
-              )}
-              aria-label={`Close ${tab.title || tab.docPath}`}
-            >
-              <X className="w-3 h-3" />
-            </button>
+            {/* Tab Actions */}
+            <div className={cn(
+              'flex items-center gap-0.5 shrink-0',
+              'opacity-0 group-hover:opacity-100',
+              isActive && 'opacity-100'
+            )}>
+              {/* More Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center justify-center w-4 h-4 rounded-sm hover:bg-muted-foreground/20"
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={`Actions for ${tab.title || tab.docPath}`}
+                  >
+                    <MoreHorizontal className="w-3 h-3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-44">
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isTabUnsaved(tab.id) && onCloseTabWithUnsaved) {
+                        onCloseTabWithUnsaved(tab.id);
+                      } else {
+                        closeTab(tab.id);
+                      }
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5 mr-2" />
+                    Close
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={tabs.length <= 1}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCloseOtherTabs?.(tab.id);
+                    }}
+                  >
+                    <XCircle className="h-3.5 w-3.5 mr-2" />
+                    Close Others
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCloseAllTabs?.();
+                    }}
+                  >
+                    <XCircle className="h-3.5 w-3.5 mr-2" />
+                    Close All
+                  </DropdownMenuItem>
+                  {onDeleteDoc && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteDoc(tab.docPath, tab.title);
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 mr-2" />
+                        Delete Document
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={(e) => handleCloseTab(e, tab.id)}
+                className="flex items-center justify-center w-4 h-4 rounded-sm hover:bg-muted-foreground/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                aria-label={`Close ${tab.title || tab.docPath}`}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
           </div>
         );
       })}
+
     </div>
   );
 }

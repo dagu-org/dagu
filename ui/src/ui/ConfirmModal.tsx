@@ -30,6 +30,16 @@ function ConfirmModal({
   const cancelButtonRef = React.useRef<HTMLButtonElement>(null);
   const submitButtonRef = React.useRef<HTMLButtonElement>(null);
 
+  // Auto-focus the submit button when modal opens so Enter triggers submit
+  React.useEffect(() => {
+    if (visible && submitButtonRef.current) {
+      // Delay to allow Radix Dialog to finish mounting and focus-trapping
+      requestAnimationFrame(() => {
+        submitButtonRef.current?.focus();
+      });
+    }
+  }, [visible]);
+
   // Handle keyboard events
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

@@ -5,8 +5,12 @@ import ConfirmModal from '@/ui/ConfirmModal';
 import DocEditor from './DocEditor';
 import DocTabBar from './DocTabBar';
 
-function DocTabEditorPanel() {
-  const { tabs, activeTabId, closeTab, clearDraft, markTabSaved } =
+type Props = {
+  onDeleteDoc?: (docPath: string, title: string) => void;
+};
+
+function DocTabEditorPanel({ onDeleteDoc }: Props) {
+  const { tabs, activeTabId, closeTab, closeAllTabs, closeOtherTabs, clearDraft, markTabSaved, isTabUnsaved } =
     useDocTabContext();
 
   const [confirmCloseTabId, setConfirmCloseTabId] = useState<string | null>(null);
@@ -28,6 +32,50 @@ function DocTabEditorPanel() {
     }
   }, [confirmCloseTabId, closeTab, clearDraft, markTabSaved]);
 
+  // Close All Tabs
+  const [confirmCloseAll, setConfirmCloseAll] = useState(false);
+
+  const handleCloseAllTabs = useCallback(() => {
+    if (tabs.some(t => isTabUnsaved(t.id))) {
+      setConfirmCloseAll(true);
+    } else {
+      closeAllTabs();
+    }
+  }, [tabs, isTabUnsaved, closeAllTabs]);
+
+  const handleConfirmCloseAll = useCallback(() => {
+    tabs.forEach(t => {
+      clearDraft(t.id);
+      markTabSaved(t.id);
+    });
+    closeAllTabs();
+    setConfirmCloseAll(false);
+  }, [tabs, closeAllTabs, clearDraft, markTabSaved]);
+
+  // Close Other Tabs
+  const [confirmCloseOthersKeepId, setConfirmCloseOthersKeepId] = useState<string | null>(null);
+
+  const handleCloseOtherTabs = useCallback((keepTabId: string) => {
+    if (tabs.some(t => t.id !== keepTabId && isTabUnsaved(t.id))) {
+      setConfirmCloseOthersKeepId(keepTabId);
+    } else {
+      closeOtherTabs(keepTabId);
+    }
+  }, [tabs, isTabUnsaved, closeOtherTabs]);
+
+  const handleConfirmCloseOthers = useCallback(() => {
+    if (confirmCloseOthersKeepId) {
+      tabs.forEach(t => {
+        if (t.id !== confirmCloseOthersKeepId) {
+          clearDraft(t.id);
+          markTabSaved(t.id);
+        }
+      });
+      closeOtherTabs(confirmCloseOthersKeepId);
+      setConfirmCloseOthersKeepId(null);
+    }
+  }, [confirmCloseOthersKeepId, tabs, closeOtherTabs, clearDraft, markTabSaved]);
+
   const confirmTab = confirmCloseTabId
     ? tabs.find((t) => t.id === confirmCloseTabId)
     : null;
@@ -45,13 +93,19 @@ function DocTabEditorPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      <DocTabBar onCloseTabWithUnsaved={handleCloseTabWithUnsaved} />
+      <DocTabBar
+        onCloseTabWithUnsaved={handleCloseTabWithUnsaved}
+        onDeleteDoc={onDeleteDoc}
+        onCloseAllTabs={handleCloseAllTabs}
+        onCloseOtherTabs={handleCloseOtherTabs}
+      />
       <div className="flex-1 overflow-hidden min-h-0">
         {activeTab ? (
           <DocEditor
             key={activeTab.id}
             tabId={activeTab.id}
             docPath={activeTab.docPath}
+            onDeleteDoc={onDeleteDoc ? () => onDeleteDoc(activeTab.docPath, activeTab.title) : undefined}
           />
         ) : (
           <div className="flex items-center justify-center h-full">
@@ -74,6 +128,32 @@ function DocTabEditorPanel() {
           You have unsaved changes in{' '}
           <strong>{confirmTab?.title || confirmTab?.docPath || 'this document'}</strong>.
           Discard changes?
+        </p>
+      </ConfirmModal>
+
+      {/* Confirm close all tabs */}
+      <ConfirmModal
+        title="Close All Tabs"
+        buttonText="Discard & Close All"
+        visible={confirmCloseAll}
+        dismissModal={() => setConfirmCloseAll(false)}
+        onSubmit={handleConfirmCloseAll}
+      >
+        <p className="text-sm text-muted-foreground">
+          Some tabs have unsaved changes. Discard all changes and close all tabs?
+        </p>
+      </ConfirmModal>
+
+      {/* Confirm close other tabs */}
+      <ConfirmModal
+        title="Close Other Tabs"
+        buttonText="Discard & Close Others"
+        visible={!!confirmCloseOthersKeepId}
+        dismissModal={() => setConfirmCloseOthersKeepId(null)}
+        onSubmit={handleConfirmCloseOthers}
+      >
+        <p className="text-sm text-muted-foreground">
+          Some other tabs have unsaved changes. Discard their changes and close them?
         </p>
       </ConfirmModal>
     </div>

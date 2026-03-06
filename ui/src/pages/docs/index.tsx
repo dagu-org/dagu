@@ -260,6 +260,13 @@ function DocsContent() {
     }
   }, [client, remoteNode, deleteDocPath, mutate, tabs, closeTab, clearDraft, markTabSaved, showToast]);
 
+  // Delete triggered from tab menu or editor header
+  const handleDeleteFromTab = useCallback((docPath: string, title: string) => {
+    setDeleteDocPath(docPath);
+    setDeleteDocTitle(title);
+    setDeleteConfirmOpen(true);
+  }, []);
+
   const leftPanel = (
     <DocTreeSidebar
       tree={treeData?.tree}
@@ -274,7 +281,7 @@ function DocsContent() {
   );
 
   const rightPanel =
-    tabs.length > 0 ? <DocTabEditorPanel /> : null;
+    tabs.length > 0 ? <DocTabEditorPanel onDeleteDoc={handleDeleteFromTab} /> : null;
 
   // Mobile layout
   if (isMobile) {

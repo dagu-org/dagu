@@ -12,6 +12,8 @@ interface DocTabContextType {
   activeTabId: string | null;
   openDoc: (docPath: string, title: string) => void;
   closeTab: (tabId: string) => void;
+  closeAllTabs: () => void;
+  closeOtherTabs: (keepTabId: string) => void;
   setActiveTab: (tabId: string) => void;
   getActiveDocPath: () => string | null;
   updateTab: (tabId: string, updates: Partial<Pick<DocTab, 'docPath' | 'title'>>) => void;
@@ -154,6 +156,29 @@ export function DocTabProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const closeAllTabs = useCallback(() => {
+    setTabs([]);
+    setActiveTabId(null);
+    setDrafts(new Map());
+    setUnsavedTabIds(new Set());
+  }, []);
+
+  const closeOtherTabs = useCallback((keepTabId: string) => {
+    setTabs(prev => prev.filter(t => t.id === keepTabId));
+    setActiveTabId(keepTabId);
+    setDrafts(prev => {
+      const draft = prev.get(keepTabId);
+      const next = new Map<string, string>();
+      if (draft !== undefined) next.set(keepTabId, draft);
+      return next;
+    });
+    setUnsavedTabIds(prev => {
+      const next = new Set<string>();
+      if (prev.has(keepTabId)) next.add(keepTabId);
+      return next;
+    });
+  }, []);
+
   const setActiveTab = useCallback((tabId: string) => {
     setActiveTabId(tabId);
   }, []);
@@ -217,6 +242,8 @@ export function DocTabProvider({ children }: { children: React.ReactNode }) {
     activeTabId,
     openDoc,
     closeTab,
+    closeAllTabs,
+    closeOtherTabs,
     setActiveTab,
     getActiveDocPath,
     updateTab,

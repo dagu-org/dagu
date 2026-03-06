@@ -13,16 +13,17 @@ import { useDocSSE } from '@/hooks/useDocSSE';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import { cn } from '@/lib/utils';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { FileText, Save } from 'lucide-react';
+import { FileText, Save, Trash2 } from 'lucide-react';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import DocExternalChangeDialog from './DocExternalChangeDialog';
 
 type Props = {
   tabId: string;
   docPath: string;
+  onDeleteDoc?: () => void;
 };
 
-function DocEditor({ tabId, docPath }: Props) {
+function DocEditor({ tabId, docPath, onDeleteDoc }: Props) {
   const client = useClient();
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
@@ -209,6 +210,17 @@ function DocEditor({ tabId, docPath }: Props) {
           >
             <Save className="h-3 w-3" />
             {isSaving ? 'Saving...' : 'Save'}
+          </button>
+        )}
+        {canWrite && onDeleteDoc && (
+          <button
+            type="button"
+            onClick={onDeleteDoc}
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+            title="Delete document"
+            aria-label="Delete document"
+          >
+            <Trash2 className="h-3 w-3" />
           </button>
         )}
       </div>
