@@ -358,6 +358,116 @@ func TestParseDagRunID_MoreEdgeCases(t *testing.T) {
 	assert.Equal(t, "run-with-dashes", parseDagRunID("dag-run_20240115_120000Z_run-with-dashes"))
 }
 
+func TestRebuildForDay_WriteFailure(t *testing.T) {
+	dayDir := t.TempDir()
+	createDayDir(t, dayDir, 12, core.Succeeded)
+
+	// Make dayDir read-only so writeIndex fails.
+	require.NoError(t, os.Chmod(dayDir, 0555))
+	t.Cleanup(func() {
+		_ = os.Chmod(dayDir, 0755)
+	})
+
+	entries, fromIndex, err := RebuildForDay(dayDir, readDayDir(t, dayDir))
+	require.NoError(t, err)
+	assert.Len(t, entries, 12)
+	assert.False(t, fromIndex, "should return false when index write fails")
+}
+
+func TestRebuildForDay_UnreadableStatus(t *testing.T) {
+	dayDir := t.TempDir()
+
+	// Create a run with an unreadable status file.
+	runName := "dag-run_20240115_120000Z_badstatus"
+	runDir := filepath.Join(dayDir, runName)
+	attemptDir := filepath.Join(runDir, "attempt_20240115_120000_001Z_abc123")
+	require.NoError(t, os.MkdirAll(attemptDir, 0750))
+
+	statusPath := filepath.Join(attemptDir, "status.jsonl")
+	require.NoError(t, os.WriteFile(statusPath, []byte(`{"status":4}`+"\n"), 0600))
+	require.NoError(t, os.Chmod(statusPath, 0000))
+	t.Cleanup(func() {
+		_ = os.Chmod(statusPath, 0644)
+	})
+
+	entries, fromIndex, err := RebuildForDay(dayDir, readDayDir(t, dayDir))
+	require.NoError(t, err)
+	assert.Empty(t, entries, "unreadable status should be skipped")
+	assert.False(t, fromIndex)
+}
+
+func TestRebuildForDay_AttemptReadError(t *testing.T) {
+	dayDir := t.TempDir()
+
+	// Create a run dir that can't be listed.
+	runName := "dag-run_20240115_120000Z_noperm"
+	runDir := filepath.Join(dayDir, runName)
+	require.NoError(t, os.MkdirAll(runDir, 0750))
+	require.NoError(t, os.Chmod(runDir, 0000))
+	t.Cleanup(func() {
+		_ = os.Chmod(runDir, 0755)
+	})
+
+	_, _, err := RebuildForDay(dayDir, readDayDir(t, dayDir))
+	require.Error(t, err, "should return error when findLatestAttempt fails")
+}
+
+func TestValidateIndex_RunDirDeleted(t *testing.T) {
+	dayDir := t.TempDir()
+	createDayDir(t, dayDir, 12, core.Succeeded) // 12 so after deleting 1 we still have 11 >= MinRunsForIndex
+
+	// Build index.
+	_, fromIndex, err := TryLoadForDay(dayDir, readDayDir(t, dayDir))
+	require.NoError(t, err)
+	require.True(t, fromIndex)
+
+	// Delete one run dir.
+	dirEntries := readDayDir(t, dayDir)
+	for _, de := range dirEntries {
+		if de.IsDir() {
+			require.NoError(t, os.RemoveAll(filepath.Join(dayDir, de.Name())))
+			break
+		}
+	}
+
+	// Should detect missing dir and rebuild.
+	entries, fromIndex, err := TryLoadForDay(dayDir, readDayDir(t, dayDir))
+	require.NoError(t, err)
+	assert.Len(t, entries, 11)
+	assert.True(t, fromIndex, "should rebuild and write new index")
+}
+
+func TestValidateIndex_StatusFileModified(t *testing.T) {
+	dayDir := t.TempDir()
+	createDayDir(t, dayDir, 10, core.Succeeded)
+
+	// Build index.
+	_, fromIndex, err := TryLoadForDay(dayDir, readDayDir(t, dayDir))
+	require.NoError(t, err)
+	require.True(t, fromIndex)
+
+	// Modify a status file (append data to change size).
+	dirEntries := readDayDir(t, dayDir)
+	for _, de := range dirEntries {
+		if de.IsDir() {
+			attemptDir := filepath.Join(dayDir, de.Name(), "attempt_20240115_120000_001Z_abc123")
+			statusPath := filepath.Join(attemptDir, "status.jsonl")
+			f, err := os.OpenFile(statusPath, os.O_APPEND|os.O_WRONLY, 0600)
+			require.NoError(t, err)
+			_, err = f.WriteString(`{"status":4}` + "\n")
+			require.NoError(t, err)
+			require.NoError(t, f.Close())
+			break
+		}
+	}
+
+	// Should detect modified status and rebuild.
+	entries, fromIndex, err := TryLoadForDay(dayDir, readDayDir(t, dayDir))
+	require.NoError(t, err)
+	assert.Len(t, entries, 10)
+	assert.True(t, fromIndex, "should rebuild and write new index")
+}
+
 func TestRebuildForDay_EmptyAttempts(t *testing.T) {
 	dayDir := t.TempDir()
 

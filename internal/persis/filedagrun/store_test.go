@@ -712,3 +712,129 @@ func TestListStatuses_RemainingCountWithFilters(t *testing.T) {
 		assert.Equal(t, core.Succeeded, s.Status)
 	}
 }
+
+func TestFormatUnixToRFC3339(t *testing.T) {
+	assert.Equal(t, "", formatUnixToRFC3339(0))
+	assert.Equal(t, "2024-01-15T12:00:00Z", formatUnixToRFC3339(1705320000))
+}
+
+func TestResolveStatus_FastPath(t *testing.T) {
+	store := &Store{}
+	ctx := context.Background()
+
+	dagRun := &DAGRun{
+		dagRunID: "test-run",
+		summary: &DAGRunSummary{
+			Name:           "test-dag",
+			DagRunID:       "test-run",
+			Status:         core.Succeeded,
+			StartedAtUnix:  1705320000,
+			FinishedAtUnix: 1705320060,
+			Tags:           []string{"env=prod"},
+			WorkerID:       "worker-1",
+			Params:         "key=val",
+			QueuedAt:       "2024-01-15T12:00:00Z",
+			TriggerType:    core.TriggerType(1),
+			CreatedAt:      1705320000000,
+		},
+	}
+
+	status := store.resolveStatus(ctx, dagRun, nil, nil, false)
+	require.NotNil(t, status)
+	assert.Equal(t, "test-dag", status.Name)
+	assert.Equal(t, "test-run", status.DAGRunID)
+	assert.Equal(t, core.Succeeded, status.Status)
+	assert.Equal(t, []string{"env=prod"}, status.Tags)
+	assert.Equal(t, "2024-01-15T12:00:00Z", status.StartedAt)
+	assert.Equal(t, "2024-01-15T12:01:00Z", status.FinishedAt)
+	assert.Equal(t, "worker-1", status.WorkerID)
+	assert.Equal(t, "key=val", status.Params)
+	assert.Equal(t, "2024-01-15T12:00:00Z", status.QueuedAt)
+	assert.Equal(t, int64(1705320000000), status.CreatedAt)
+}
+
+func TestResolveStatus_FastPath_StatusFilterReject(t *testing.T) {
+	store := &Store{}
+	ctx := context.Background()
+
+	dagRun := &DAGRun{
+		summary: &DAGRunSummary{
+			Status: core.Succeeded,
+		},
+	}
+
+	// Filter only for Failed — should reject Succeeded.
+	statusesFilter := map[core.Status]struct{}{core.Failed: {}}
+	status := store.resolveStatus(ctx, dagRun, nil, statusesFilter, true)
+	assert.Nil(t, status)
+}
+
+func TestResolveStatus_FastPath_TagFilterReject(t *testing.T) {
+	store := &Store{}
+	ctx := context.Background()
+
+	dagRun := &DAGRun{
+		summary: &DAGRunSummary{
+			Status: core.Succeeded,
+			Tags:   []string{"env=dev"},
+		},
+	}
+
+	tagFilters := []core.TagFilter{core.ParseTagFilter("env=prod")}
+	status := store.resolveStatus(ctx, dagRun, tagFilters, nil, false)
+	assert.Nil(t, status)
+}
+
+func TestResolveStatus_StandardPath(t *testing.T) {
+	th := setupTestStore(t)
+
+	ts := time.Date(2021, 6, 1, 0, 0, 0, 0, time.UTC)
+	dag := th.DAG("std-path-dag")
+	dag.Tags = core.NewTags([]string{"env=prod"})
+	th.CreateAttemptWithDAG(t, ts, "std-run-1", core.Succeeded, dag.DAG)
+
+	store := th.Store.(*Store)
+	ctx := context.Background()
+
+	root := NewDataRoot(th.TmpDir, "std-path-dag")
+	start := exec.NewUTC(ts)
+	end := exec.NewUTC(ts.Add(24 * time.Hour))
+	dagRuns := root.listDAGRunsInRange(ctx, start, end, nil)
+	require.NotEmpty(t, dagRuns)
+
+	// Standard path (no summary) with matching tag filter.
+	tagFilters := []core.TagFilter{core.ParseTagFilter("env=prod")}
+	status := store.resolveStatus(ctx, dagRuns[0], tagFilters, nil, false)
+	require.NotNil(t, status, "should resolve status via standard path with matching tag")
+
+	// Standard path with non-matching tag filter.
+	tagFilters = []core.TagFilter{core.ParseTagFilter("env=staging")}
+	status = store.resolveStatus(ctx, dagRuns[0], tagFilters, nil, false)
+	assert.Nil(t, status, "should reject via standard path when tag doesn't match")
+
+	// Standard path with matching status filter.
+	statusFilter := map[core.Status]struct{}{core.Succeeded: {}}
+	status = store.resolveStatus(ctx, dagRuns[0], nil, statusFilter, true)
+	require.NotNil(t, status, "should resolve via standard path with matching status")
+
+	// Standard path with non-matching status filter.
+	statusFilter = map[core.Status]struct{}{core.Failed: {}}
+	status = store.resolveStatus(ctx, dagRuns[0], nil, statusFilter, true)
+	assert.Nil(t, status, "should reject via standard path when status doesn't match")
+}
+
+func TestResolveStatus_StandardPath_NoAttempt(t *testing.T) {
+	store := &Store{}
+	ctx := context.Background()
+
+	// Create a DAGRun directory with correct naming but no attempt files.
+	dir := t.TempDir()
+	dagRunDir := filepath.Join(dir, "dag-run_20240115_120000Z_no-attempt")
+	require.NoError(t, os.MkdirAll(dagRunDir, 0750))
+
+	dagRun, err := NewDAGRun(dagRunDir)
+	require.NoError(t, err)
+
+	status := store.resolveStatus(ctx, dagRun, nil, nil, false)
+	assert.Nil(t, status, "should return nil when no attempts exist")
+}

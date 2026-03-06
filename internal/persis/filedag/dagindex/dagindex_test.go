@@ -380,6 +380,72 @@ func TestDAGFromEntry_NoSchedule(t *testing.T) {
 	assert.Nil(t, dag.Schedule)
 }
 
+func TestWrite_InvalidPath(t *testing.T) {
+	idx := &indexv1.DAGIndex{
+		Version: IndexVersion,
+		Entries: []*indexv1.DAGIndexEntry{{FilePath: "a.yaml", Name: "a"}},
+	}
+	err := Write("/nonexistent/dir/.dag.index", idx)
+	require.Error(t, err)
+}
+
+func TestJoinErrors(t *testing.T) {
+	errs := []error{
+		fmt.Errorf("first error"),
+		fmt.Errorf("second error"),
+	}
+	result := joinErrors(errs)
+	assert.Equal(t, "first error; second error", result)
+}
+
+func TestBuild_SpecLoadFailure(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create a YAML file that is unreadable (permission denied).
+	filePath := filepath.Join(dir, "noperm.yaml")
+	require.NoError(t, os.WriteFile(filePath, []byte("name: noperm\nsteps:\n  - name: s\n    command: echo ok\n"), 0600))
+	info, err := os.Stat(filePath)
+	require.NoError(t, err)
+
+	files := []YAMLFileMeta{
+		{Name: "noperm.yaml", Size: info.Size(), ModTime: info.ModTime().UnixNano()},
+	}
+
+	// Remove read permission so spec.Load fails with a file-open error.
+	require.NoError(t, os.Chmod(filePath, 0000))
+	t.Cleanup(func() { _ = os.Chmod(filePath, 0600) })
+
+	idx := Build(context.Background(), dir, files, nil)
+	require.Len(t, idx.Entries, 1)
+	assert.Equal(t, "noperm", idx.Entries[0].Name)
+	assert.NotEmpty(t, idx.Entries[0].LoadError, "should record error when file is unreadable")
+}
+
+func TestLoad_FilePathMismatch(t *testing.T) {
+	dir := t.TempDir()
+	indexPath := filepath.Join(dir, IndexFileName)
+
+	idx := &indexv1.DAGIndex{
+		Version: IndexVersion,
+		Entries: []*indexv1.DAGIndexEntry{
+			{FilePath: "a.yaml", FileSize: 10, ModTime: 100, Name: "a"},
+		},
+	}
+	data, err := proto.Marshal(idx)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(indexPath, data, 0600))
+
+	// YAML file name doesn't match index entry → returns nil.
+	files := []YAMLFileMeta{{Name: "b.yaml", Size: 10, ModTime: 100}}
+	entries := Load(indexPath, files, nil)
+	assert.Nil(t, entries, "should return nil when file path doesn't match index")
+}
+
+func TestParseScheduleExpressions_EmptyString(t *testing.T) {
+	schedules := parseScheduleExpressions("")
+	assert.Nil(t, schedules, "empty string should return nil schedules")
+}
+
 func TestSuspendFlagName(t *testing.T) {
 	tests := []struct {
 		name     string

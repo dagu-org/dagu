@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis/filedagrun/dagrunindex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -394,6 +395,114 @@ func TestDataRootUtils(t *testing.T) {
 
 	// Directory does not exist
 	assert.False(t, root.Exists(), "Exists should return false when directory does not exist")
+}
+
+func TestInTimeRange(t *testing.T) {
+	base := time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
+	start := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	end := time.Date(2024, 1, 15, 14, 0, 0, 0, time.UTC)
+
+	// Within range.
+	assert.True(t, inTimeRange(base, start, end, false, false))
+
+	// Before range.
+	assert.False(t, inTimeRange(start.Add(-time.Hour), start, end, false, false))
+
+	// At end boundary (exclusive).
+	assert.False(t, inTimeRange(end, start, end, false, false))
+
+	// Start zero means no lower bound.
+	assert.True(t, inTimeRange(start.Add(-time.Hour), start, end, true, false))
+
+	// End zero means no upper bound.
+	assert.True(t, inTimeRange(end.Add(time.Hour), start, end, false, true))
+
+	// Both zero.
+	assert.True(t, inTimeRange(base, start, end, true, true))
+}
+
+func TestSummaryFromIndexEntry(t *testing.T) {
+	entry := dagrunindex.Entry{
+		DagRunDir:        "dag-run_20240115_120000Z_test",
+		DagRunID:         "test-id",
+		LatestAttemptDir: "attempt_20240115_120000_001Z_abc",
+		Status:           core.Succeeded,
+		StartedAtUnix:    1705320000,
+		FinishedAtUnix:   1705320060,
+		Tags:             []string{"env=prod"},
+		Name:             "test-dag",
+		WorkerID:         "worker-1",
+		Params:           "key=val",
+		QueuedAt:         "2024-01-15T12:00:00Z",
+		TriggerType:      core.TriggerType(1),
+		CreatedAt:        1705320000000,
+	}
+
+	summary := summaryFromIndexEntry(entry)
+	require.NotNil(t, summary)
+	assert.Equal(t, entry.LatestAttemptDir, summary.LatestAttemptDir)
+	assert.Equal(t, entry.Status, summary.Status)
+	assert.Equal(t, entry.StartedAtUnix, summary.StartedAtUnix)
+	assert.Equal(t, entry.FinishedAtUnix, summary.FinishedAtUnix)
+	assert.Equal(t, entry.Tags, summary.Tags)
+	assert.Equal(t, entry.Name, summary.Name)
+	assert.Equal(t, entry.DagRunID, summary.DagRunID)
+	assert.Equal(t, entry.WorkerID, summary.WorkerID)
+	assert.Equal(t, entry.Params, summary.Params)
+	assert.Equal(t, entry.QueuedAt, summary.QueuedAt)
+	assert.Equal(t, entry.TriggerType, summary.TriggerType)
+	assert.Equal(t, entry.CreatedAt, summary.CreatedAt)
+}
+
+func TestListDAGRunsInRange_IndexPath(t *testing.T) {
+	root := setupTestDataRoot(t)
+
+	// Create 12 runs on the same day with actual status files to trigger index.
+	baseTime := time.Date(2024, 6, 15, 0, 0, 0, 0, time.UTC)
+	for i := range 12 {
+		ts := exec.NewUTC(baseTime.Add(time.Duration(i) * time.Hour))
+		run := root.CreateTestDAGRun(t, fmt.Sprintf("idx-run-%d", i), ts)
+		run.WriteStatus(t, ts, core.Succeeded)
+	}
+
+	start := exec.NewUTC(baseTime)
+	end := exec.NewUTC(baseTime.Add(12 * time.Hour))
+
+	result := root.listDAGRunsInRange(context.Background(), start, end, nil)
+	assert.Len(t, result, 12, "should find all 12 runs via index-accelerated path")
+
+	// Verify summaries are populated from the index.
+	for _, r := range result {
+		assert.NotNil(t, r.summary, "run should have summary from index")
+	}
+}
+
+func TestListDAGRunsInRange_FallbackPath(t *testing.T) {
+	root := setupTestDataRoot(t)
+
+	// Create fewer than MinRunsForIndex (10) runs to stay on fallback path.
+	baseTime := time.Date(2024, 6, 15, 0, 0, 0, 0, time.UTC)
+	for i := range 5 {
+		ts := exec.NewUTC(baseTime.Add(time.Duration(i) * time.Hour))
+		run := root.CreateTestDAGRun(t, fmt.Sprintf("fb-run-%d", i), ts)
+		run.WriteStatus(t, ts, core.Succeeded)
+	}
+
+	start := exec.NewUTC(baseTime)
+	end := exec.NewUTC(baseTime.Add(5 * time.Hour))
+
+	result := root.listDAGRunsInRange(context.Background(), start, end, nil)
+	assert.Len(t, result, 5, "should find all 5 runs via fallback path")
+}
+
+func TestListDAGRunsInRange_StartAfterEnd(t *testing.T) {
+	root := setupTestDataRoot(t)
+
+	start := exec.NewUTC(time.Date(2024, 6, 16, 0, 0, 0, 0, time.UTC))
+	end := exec.NewUTC(time.Date(2024, 6, 15, 0, 0, 0, 0, time.UTC))
+
+	result := root.listDAGRunsInRange(context.Background(), start, end, nil)
+	assert.Nil(t, result, "should return nil when start is after end")
 }
 
 // setupTestDataRoot creates a DataRootTest instance for testing purposes.
