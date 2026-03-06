@@ -39,6 +39,7 @@ function groupByStatus(runs: DAGRunSummary[]): KanbanColumns {
         columns.queued.push(run);
         break;
       case Status.Running:
+      case Status.Waiting:
         columns.running.push(run);
         break;
       case Status.Success:
