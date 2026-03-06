@@ -232,7 +232,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                   <PageContextProvider>
                                     <Layout navbarColor={config.navbarColor}>
                                       <Routes>
-                                        <Route path="/" element={<Dashboard />} />
+                                        <Route path="/" element={<CockpitPage />} />
                                         <Route path="/dashboard" element={<Dashboard />} />
                                         <Route path="/cockpit" element={<CockpitPage />} />
                                         <Route path="/dags/" element={<DAGs />} />
