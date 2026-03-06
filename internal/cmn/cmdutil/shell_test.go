@@ -2,6 +2,7 @@ package cmdutil
 
 import (
 	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -251,16 +252,16 @@ func TestShellQuoteArgs(t *testing.T) {
 
 func TestShellQuote_RoundTrip(t *testing.T) {
 	// Exhaustive list of characters to test
-	chars := ""
+	var chars strings.Builder
 	for i := range 256 {
-		chars += string(rune(i))
+		chars.WriteString(string(rune(i)))
 	}
 
-	quoted := ShellQuote(chars)
+	quoted := ShellQuote(chars.String())
 	// We don't have a parser here to verify, but we can at least ensure it's not empty and wrapped if needed.
 	assert.NotEmpty(t, quoted)
-	if len(chars) > 0 {
-		assert.True(t, len(quoted) >= len(chars))
+	if len(chars.String()) > 0 {
+		assert.True(t, len(quoted) >= len(chars.String()))
 	}
 }
 
