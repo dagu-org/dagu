@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -522,7 +523,8 @@ steps:
 	}
 
 	// Test pagination
-	opts := exec.ListDAGsOptions{Paginator: new(exec.NewPaginator(2, 2))}
+	paginator := exec.NewPaginator(2, 2)
+	opts := exec.ListDAGsOptions{Paginator: &paginator}
 	result, errList, err := store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
@@ -1007,4 +1009,155 @@ func TestListWithNextRunSorting(t *testing.T) {
 	assert.Equal(t, "daily-dag", result.Items[0].Name)
 	assert.Equal(t, "hourly-dag", result.Items[1].Name)
 	assert.Equal(t, "no-schedule", result.Items[2].Name)
+}
+
+func TestConcurrentList(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := New(tmpDir, WithSkipExamples(true))
+	ctx := context.Background()
+
+	// Create a few DAGs.
+	for i := 0; i < 5; i++ {
+		content := fmt.Sprintf("name: concurrent-dag-%d\nsteps:\n  - name: s1\n    command: echo ok\n", i)
+		err := store.Create(ctx, fmt.Sprintf("concurrent-dag-%d", i), []byte(content))
+		require.NoError(t, err)
+	}
+
+	// Run 10 concurrent List calls.
+	var wg sync.WaitGroup
+	for range 10 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			result, _, err := store.List(ctx, exec.ListDAGsOptions{})
+			assert.NoError(t, err)
+			assert.Equal(t, 5, result.TotalCount)
+		}()
+	}
+	wg.Wait()
+}
+
+func TestIndexInvalidationOnMutations(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := New(tmpDir, WithSkipExamples(true))
+	ctx := context.Background()
+
+	indexPath := filepath.Join(tmpDir, ".dag.index")
+
+	// Create a DAG and build index via List.
+	content := `name: mutation-dag
+steps:
+  - name: step1
+    command: echo hello`
+	require.NoError(t, store.Create(ctx, "mutation-dag", []byte(content)))
+
+	// List to build index.
+	_, _, err := store.List(ctx, exec.ListDAGsOptions{})
+	require.NoError(t, err)
+	assert.True(t, fileExists(indexPath), "index should exist after List")
+
+	// Create invalidates index.
+	require.NoError(t, store.Create(ctx, "another-dag", []byte(content)))
+	assert.False(t, fileExists(indexPath), "index should be invalidated after Create")
+
+	// Rebuild index.
+	_, _, err = store.List(ctx, exec.ListDAGsOptions{})
+	require.NoError(t, err)
+	assert.True(t, fileExists(indexPath))
+
+	// Delete invalidates index.
+	require.NoError(t, store.Delete(ctx, "another-dag"))
+	assert.False(t, fileExists(indexPath), "index should be invalidated after Delete")
+
+	// Rebuild index.
+	_, _, err = store.List(ctx, exec.ListDAGsOptions{})
+	require.NoError(t, err)
+	assert.True(t, fileExists(indexPath))
+
+	// ToggleSuspend invalidates index.
+	require.NoError(t, store.ToggleSuspend(ctx, "mutation-dag", true))
+	assert.False(t, fileExists(indexPath), "index should be invalidated after ToggleSuspend")
+
+	// Rebuild index.
+	_, _, err = store.List(ctx, exec.ListDAGsOptions{})
+	require.NoError(t, err)
+	assert.True(t, fileExists(indexPath))
+
+	// UpdateSpec invalidates index.
+	updatedContent := `name: mutation-dag
+steps:
+  - name: step1
+    command: echo updated`
+	require.NoError(t, store.UpdateSpec(ctx, "mutation-dag", []byte(updatedContent)))
+	assert.False(t, fileExists(indexPath), "index should be invalidated after UpdateSpec")
+
+	// Rebuild index.
+	_, _, err = store.List(ctx, exec.ListDAGsOptions{})
+	require.NoError(t, err)
+	assert.True(t, fileExists(indexPath))
+
+	// Rename invalidates index.
+	require.NoError(t, store.Rename(ctx, "mutation-dag", "renamed-dag"))
+	assert.False(t, fileExists(indexPath), "index should be invalidated after Rename")
+}
+
+func TestListUsesIndex(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := New(tmpDir, WithSkipExamples(true))
+	ctx := context.Background()
+
+	// Create DAGs.
+	for i := 0; i < 3; i++ {
+		content := fmt.Sprintf("name: idx-dag-%d\ntags:\n  - env=prod\nsteps:\n  - name: s1\n    command: echo ok\n", i)
+		require.NoError(t, store.Create(ctx, fmt.Sprintf("idx-dag-%d", i), []byte(content)))
+	}
+
+	// First List builds index.
+	result1, errList1, err := store.List(ctx, exec.ListDAGsOptions{})
+	require.NoError(t, err)
+	require.Empty(t, errList1)
+	assert.Equal(t, 3, result1.TotalCount)
+
+	// Verify index file exists.
+	indexPath := filepath.Join(tmpDir, ".dag.index")
+	assert.True(t, fileExists(indexPath))
+
+	// Second List should use index and return same results.
+	result2, errList2, err := store.List(ctx, exec.ListDAGsOptions{})
+	require.NoError(t, err)
+	require.Empty(t, errList2)
+	assert.Equal(t, 3, result2.TotalCount)
+
+	// Verify filtering works with index.
+	result3, _, err := store.List(ctx, exec.ListDAGsOptions{Tags: []string{"env=prod"}})
+	require.NoError(t, err)
+	assert.Equal(t, 3, result3.TotalCount)
+}
+
+func TestTagListUsesIndex(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := New(tmpDir, WithSkipExamples(true))
+	ctx := context.Background()
+
+	// Create DAGs with tags.
+	dag1 := "name: tag-idx-1\ntags:\n  - env=prod\n  - team=backend\nsteps:\n  - name: s1\n    command: echo ok\n"
+	dag2 := "name: tag-idx-2\ntags:\n  - env=staging\nsteps:\n  - name: s1\n    command: echo ok\n"
+	require.NoError(t, store.Create(ctx, "tag-idx-1", []byte(dag1)))
+	require.NoError(t, store.Create(ctx, "tag-idx-2", []byte(dag2)))
+
+	// First call builds index.
+	tags1, errList1, err := store.TagList(ctx)
+	require.NoError(t, err)
+	require.Empty(t, errList1)
+	assert.GreaterOrEqual(t, len(tags1), 3) // env=prod, env=staging, team=backend, env, team
+
+	// Verify index exists.
+	indexPath := filepath.Join(tmpDir, ".dag.index")
+	assert.True(t, fileExists(indexPath))
+
+	// Second call uses index.
+	tags2, errList2, err := store.TagList(ctx)
+	require.NoError(t, err)
+	require.Empty(t, errList2)
+	assert.Equal(t, len(tags1), len(tags2))
 }

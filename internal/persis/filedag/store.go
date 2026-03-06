@@ -7,10 +7,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
@@ -112,6 +112,7 @@ type Storage struct {
 	searchPaths           []string                   // Additional search paths for DAG files
 	skipExamples          bool                       // Skip creating example DAGs
 	skipDirectoryCreation bool                       // Skip creating base directory (for worker mode)
+	indexMu               sync.Mutex                 // Protects index load/rebuild/invalidate
 }
 
 // Initialize ensures the storage is ready and creates example DAGs if needed
@@ -267,6 +268,9 @@ func (store *Storage) ensureDirExist() error {
 // loadOrRebuildIndex returns validated index entries, rebuilding if necessary.
 // Returns nil on any failure (caller falls back to direct scan).
 func (store *Storage) loadOrRebuildIndex(ctx context.Context) []*indexv1.DAGIndexEntry {
+	store.indexMu.Lock()
+	defer store.indexMu.Unlock()
+
 	entries, err := os.ReadDir(store.baseDir)
 	if err != nil {
 		return nil
@@ -318,6 +322,8 @@ func (store *Storage) loadOrRebuildIndex(ctx context.Context) []*indexv1.DAGInde
 
 // invalidateIndex removes the index file so the next read triggers a rebuild.
 func (store *Storage) invalidateIndex() {
+	store.indexMu.Lock()
+	defer store.indexMu.Unlock()
 	_ = os.Remove(filepath.Join(store.baseDir, dagindex.IndexFileName))
 }
 
@@ -327,7 +333,8 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 	var errList []string
 
 	if opts.Paginator == nil {
-		opts.Paginator = new(exec.DefaultPaginator())
+		p := exec.DefaultPaginator()
+		opts.Paginator = &p
 	}
 
 	// Try index-accelerated path.
@@ -553,7 +560,7 @@ func (store *Storage) IsSuspended(_ context.Context, id string) bool {
 }
 
 func fileName(id string) string {
-	return fmt.Sprintf("%s.suspend", normalizeFilename(id, "-"))
+	return dagindex.SuspendFlagName(id)
 }
 
 // Rename renames a DAG from oldID to newID.
@@ -722,22 +729,6 @@ func fileExists(file string) bool {
 	return !os.IsNotExist(err)
 }
 
-// normalizeFilename normalizes a filename by replacing reserved characters with a replacement string.
-func normalizeFilename(str, replacement string) string {
-	s := filenameReservedRegex.ReplaceAllString(str, replacement)
-	s = filenameReservedWindowsNamesRegex.ReplaceAllString(s, replacement)
-	return strings.ReplaceAll(s, " ", replacement)
-}
-
-// https://github.com/sindresorhus/filename-reserved-regex/blob/master/index.js
-var (
-	filenameReservedRegex = regexp.MustCompile(
-		`[<>:"/\\|?*\x00-\x1F]`,
-	)
-	filenameReservedWindowsNamesRegex = regexp.MustCompile(
-		`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])$`,
-	)
-)
 
 // shouldCreateExamples checks if we should create example DAGs
 func shouldCreateExamples(dir string) bool {

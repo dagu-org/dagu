@@ -2,6 +2,7 @@ package fileutil
 
 import (
 	"regexp"
+	"strings"
 )
 
 const (
@@ -12,6 +13,10 @@ const (
 var (
 	// Only allow alphanumeric characters, underscores, and hyphens
 	allowedCharRegex = regexp.MustCompile(`[^a-zA-Z0-9_\-]`)
+
+	// https://github.com/sindresorhus/filename-reserved-regex/blob/master/index.js
+	filenameReservedRegex             = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1F]`)
+	filenameReservedWindowsNamesRegex = regexp.MustCompile(`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])$`)
 )
 
 // SafeName converts a string to a safe filename containing only alphanumeric characters,
@@ -27,4 +32,12 @@ func SafeName(str string) string {
 	}
 
 	return safe
+}
+
+// NormalizeFilename replaces OS-reserved characters and Windows reserved
+// names in a filename with the given replacement string.
+func NormalizeFilename(name, replacement string) string {
+	s := filenameReservedRegex.ReplaceAllString(name, replacement)
+	s = filenameReservedWindowsNamesRegex.ReplaceAllString(s, replacement)
+	return strings.ReplaceAll(s, " ", replacement)
 }

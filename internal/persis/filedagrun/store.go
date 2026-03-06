@@ -22,13 +22,12 @@ import (
 
 // Error definitions for common issues
 var (
-	ErrDAGRunIDEmpty  = errors.New("dag-run ID is empty")
-	ErrTooManyResults = errors.New("too many results found")
+	ErrDAGRunIDEmpty = errors.New("dag-run ID is empty")
 )
 
 var _ exec.DAGRunStore = (*Store)(nil)
 
-// Store manages DAGs status files in local Store with high performance and reliability.
+// Store manages DAG run status files on the local filesystem.
 type Store struct {
 	baseDir           string                              // Base directory for all status files
 	latestStatusToday bool                                // Whether to only return today's status
@@ -37,19 +36,18 @@ type Store struct {
 	location          *time.Location                      // Timezone location for date calculations
 }
 
-// DAGRunStoreOption defines functional options for configuring local.
+// DAGRunStoreOption defines functional options for configuring Store.
 type DAGRunStoreOption func(*DAGRunStoreOptions)
 
-// DAGRunStoreOptions holds configuration options for local.
+// DAGRunStoreOptions holds configuration options for Store.
 type DAGRunStoreOptions struct {
 	FileCache         *fileutil.Cache[*exec.DAGRunStatus] // Optional cache for status files
 	LatestStatusToday bool                                // Whether to only return today's status
-	MaxWorkers        int                                 // Maximum number of parallel workers
-	OperationTimeout  time.Duration                       // Timeout for operations
-	Location          *time.Location                      // Timezone location for date calculations
+	MaxWorkers int                 // Maximum number of parallel workers
+	Location   *time.Location     // Timezone location for date calculations
 }
 
-// WithHistoryFileCache sets the file cache for local.
+// WithHistoryFileCache sets the file cache for Store.
 func WithHistoryFileCache(cache *fileutil.Cache[*exec.DAGRunStatus]) DAGRunStoreOption {
 	return func(o *DAGRunStoreOptions) {
 		o.FileCache = cache
@@ -70,7 +68,7 @@ func WithLocation(location *time.Location) DAGRunStoreOption {
 	}
 }
 
-// New creates a new JSONDB instance with the specified options.
+// New creates a new Store instance with the specified options.
 func New(baseDir string, opts ...DAGRunStoreOption) exec.DAGRunStore {
 	options := &DAGRunStoreOptions{
 		LatestStatusToday: true,
@@ -149,7 +147,7 @@ func (store *Store) collectStatusesFromRoots(
 	if len(roots) == 0 {
 		return nil, nil
 	}
-	maxWorkers := min(runtime.NumCPU(), len(roots))
+	maxWorkers := min(store.maxWorkers, len(roots))
 
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
@@ -203,7 +201,7 @@ func (store *Store) collectStatusesFromRoots(
 				}
 			}
 
-			taken := int64(len(dagRuns))
+			taken := int64(len(statuses))
 			if d := remaining.Add(-taken); d < 0 {
 				cancel()
 			}

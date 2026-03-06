@@ -2,6 +2,7 @@ package dagrunindex
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -253,4 +254,111 @@ func TestFindLatestAttempt_Empty(t *testing.T) {
 func TestParseDagRunID(t *testing.T) {
 	assert.Equal(t, "myrun123", parseDagRunID("dag-run_20240115_120000Z_myrun123"))
 	assert.Equal(t, "", parseDagRunID("invalid"))
+}
+
+func TestRebuildForDay_MixedStatuses(t *testing.T) {
+	dayDir := t.TempDir()
+
+	// Create 10 terminal + 2 active = 12 total
+	createDayDir(t, dayDir, 10, core.Succeeded)
+
+	// Add 2 more active runs with different names.
+	for i := 0; i < 2; i++ {
+		runName := fmt.Sprintf("dag-run_20240115_130000Z_active%d", i)
+		runDir := filepath.Join(dayDir, runName)
+		attemptDir := filepath.Join(runDir, "attempt_20240115_130000_001Z_abc123")
+		require.NoError(t, os.MkdirAll(attemptDir, 0750))
+
+		st := exec.DAGRunStatus{
+			Name:      "test",
+			DAGRunID:  fmt.Sprintf("active%d", i),
+			AttemptID: "abc123",
+			Status:    core.Running,
+			StartedAt: "2024-01-15T13:00:00Z",
+		}
+		data, err := json.Marshal(st)
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(attemptDir, "status.jsonl"), append(data, '\n'), 0600))
+	}
+
+	entries, fromIndex, err := TryLoadForDay(dayDir, readDayDir(t, dayDir))
+	require.NoError(t, err)
+	assert.Len(t, entries, 12)
+	assert.False(t, fromIndex) // Not all terminal, so no index written.
+
+	// Verify no index file was created.
+	_, statErr := os.Stat(filepath.Join(dayDir, IndexFileName))
+	assert.True(t, os.IsNotExist(statErr))
+}
+
+func TestParseStatusFile_MultiLine(t *testing.T) {
+	dir := t.TempDir()
+	statusPath := filepath.Join(dir, "status.jsonl")
+
+	// Write multiple status lines (simulating updates during a run).
+	line1 := `{"status":1,"startedAt":"2024-01-15T12:00:00Z"}`
+	line2 := `{"status":4,"startedAt":"2024-01-15T12:00:00Z","finishedAt":"2024-01-15T12:01:00Z"}`
+	content := line1 + "\n" + line2 + "\n"
+	require.NoError(t, os.WriteFile(statusPath, []byte(content), 0600))
+
+	status, err := parseStatusFile(statusPath)
+	require.NoError(t, err)
+	// Should return the last valid line (succeeded status).
+	assert.Equal(t, core.Succeeded, status.Status)
+}
+
+func TestParseStatusFile_EmptyFile(t *testing.T) {
+	dir := t.TempDir()
+	statusPath := filepath.Join(dir, "status.jsonl")
+	require.NoError(t, os.WriteFile(statusPath, []byte(""), 0600))
+
+	_, err := parseStatusFile(statusPath)
+	assert.Error(t, err)
+}
+
+func TestParseStatusFile_AllInvalid(t *testing.T) {
+	dir := t.TempDir()
+	statusPath := filepath.Join(dir, "status.jsonl")
+	require.NoError(t, os.WriteFile(statusPath, []byte("not json\nalso not json\n"), 0600))
+
+	_, err := parseStatusFile(statusPath)
+	assert.Error(t, err)
+}
+
+func TestParseTimeToUnix_EdgeCases(t *testing.T) {
+	// Empty string returns 0.
+	assert.Equal(t, int64(0), parseTimeToUnix(""))
+
+	// Invalid string returns 0.
+	assert.Equal(t, int64(0), parseTimeToUnix("not-a-time"))
+
+	// Valid RFC3339 returns correct unix timestamp.
+	ts := parseTimeToUnix("2024-01-15T12:00:00Z")
+	assert.Greater(t, ts, int64(0))
+}
+
+func TestParseDagRunID_MoreEdgeCases(t *testing.T) {
+	// Empty string
+	assert.Equal(t, "", parseDagRunID(""))
+
+	// Prefix only
+	assert.Equal(t, "", parseDagRunID("dag-run_"))
+
+	// Valid with special characters in ID
+	assert.Equal(t, "run-with-dashes", parseDagRunID("dag-run_20240115_120000Z_run-with-dashes"))
+}
+
+func TestRebuildForDay_EmptyAttempts(t *testing.T) {
+	dayDir := t.TempDir()
+
+	// Create a run directory with no attempt subdirectories.
+	runDir := filepath.Join(dayDir, "dag-run_20240115_120000Z_noattempts")
+	require.NoError(t, os.MkdirAll(runDir, 0750))
+
+	// Need at least MinRunsForIndex entries for TryLoadForDay to consider indexing.
+	// But RebuildForDay doesn't have that restriction.
+	entries, fromIndex, err := RebuildForDay(dayDir, readDayDir(t, dayDir))
+	require.NoError(t, err)
+	assert.Empty(t, entries) // No valid attempts found.
+	assert.False(t, fromIndex)
 }

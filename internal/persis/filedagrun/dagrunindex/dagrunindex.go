@@ -21,7 +21,7 @@ const (
 	// IndexFileName is the name of the DAG run index file.
 	IndexFileName = ".dagrun.index"
 	// IndexVersion is the current index format version.
-	IndexVersion = 1
+	IndexVersion = 2
 	// MinRunsForIndex is the minimum number of runs needed to create an index.
 	MinRunsForIndex = 10
 
@@ -169,10 +169,13 @@ func validateIndex(dayDir string, idx *indexv1.DAGRunIndex, runDirs []os.DirEntr
 			return false
 		}
 
-		// Validate latest attempt identity.
+		// Validate run directory mtime (changes when new attempts are created).
 		runDir := filepath.Join(dayDir, e.DagRunDir)
-		latestAttempt, err := findLatestAttempt(runDir)
-		if err != nil || latestAttempt != e.LatestAttemptDir {
+		runDirInfo, err := os.Stat(runDir)
+		if err != nil {
+			return false
+		}
+		if runDirInfo.ModTime().UnixNano() != e.RunDirModTime {
 			return false
 		}
 
@@ -191,25 +194,32 @@ func validateIndex(dayDir string, idx *indexv1.DAGRunIndex, runDirs []os.DirEntr
 }
 
 func writeIndex(dayDir string, entries []Entry) error {
-	// We need stat info for each entry, so re-stat the status files.
+	// Stat the run dirs and status files to capture metadata for index validation.
 	protoEntries := make([]*indexv1.DAGRunIndexEntry, 0, len(entries))
 	for _, e := range entries {
-		statusPath := filepath.Join(dayDir, e.DagRunDir, e.LatestAttemptDir, statusFile)
+		runDir := filepath.Join(dayDir, e.DagRunDir)
+		runDirInfo, err := os.Stat(runDir)
+		if err != nil {
+			return err
+		}
+
+		statusPath := filepath.Join(runDir, e.LatestAttemptDir, statusFile)
 		info, err := os.Stat(statusPath)
 		if err != nil {
 			return err
 		}
 
 		protoEntries = append(protoEntries, &indexv1.DAGRunIndexEntry{
-			DagRunDir:          e.DagRunDir,
-			DagRunId:           e.DagRunID,
-			LatestAttemptDir:   e.LatestAttemptDir,
-			LatestStatusSize:   info.Size(),
+			DagRunDir:           e.DagRunDir,
+			DagRunId:            e.DagRunID,
+			LatestAttemptDir:    e.LatestAttemptDir,
+			LatestStatusSize:    info.Size(),
 			LatestStatusModTime: info.ModTime().UnixNano(),
-			Status:             int32(e.Status), //nolint:gosec
-			StartedAt:          e.StartedAtUnix,
-			FinishedAt:         e.FinishedAtUnix,
-			Tags:               e.Tags,
+			RunDirModTime:       runDirInfo.ModTime().UnixNano(),
+			Status:              int32(e.Status), //nolint:gosec
+			StartedAt:           e.StartedAtUnix,
+			FinishedAt:          e.FinishedAtUnix,
+			Tags:                e.Tags,
 		})
 	}
 
@@ -299,6 +309,7 @@ func parseTimeToUnix(s string) int64 {
 // parseStatusFile reads the status file. This is a local wrapper to avoid
 // importing the filedagrun package (which would create a circular dependency).
 // It reads the file and finds the last valid JSON line.
+// Keep in sync with internal/core/exec/runstatus.go:StatusFromJSON if the format changes.
 func parseStatusFile(filePath string) (*exec.DAGRunStatus, error) {
 	data, err := os.ReadFile(filePath) //nolint:gosec
 	if err != nil {

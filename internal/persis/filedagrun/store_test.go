@@ -682,3 +682,33 @@ func TestLatestStatusTimezone(t *testing.T) {
 		assert.Equal(t, "tokyo-today-run", dagRunStatus.DAGRunID)
 	})
 }
+
+func TestListStatuses_RemainingCountWithFilters(t *testing.T) {
+	th := setupTestStore(t)
+
+	ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	// Create 10 runs: 5 succeeded, 5 failed.
+	for i := 0; i < 5; i++ {
+		th.CreateAttempt(t, ts.Add(time.Duration(i)*time.Second), fmt.Sprintf("success-%d", i), core.Succeeded)
+	}
+	for i := 0; i < 5; i++ {
+		th.CreateAttempt(t, ts.Add(time.Duration(i+5)*time.Second), fmt.Sprintf("failed-%d", i), core.Failed)
+	}
+
+	// Filter by Succeeded status with limit 10.
+	// Before the fix, len(dagRuns) would consume the budget even for filtered-out runs,
+	// potentially returning fewer results than expected.
+	statuses, err := th.Store.ListStatuses(th.Context,
+		exec.WithStatuses([]core.Status{core.Succeeded}),
+		exec.WithFrom(exec.NewUTC(ts)),
+		func(o *exec.ListDAGRunStatusesOptions) { o.Limit = 10 },
+	)
+	require.NoError(t, err)
+	// Should return all 5 succeeded runs, not fewer.
+	assert.Len(t, statuses, 5)
+
+	for _, s := range statuses {
+		assert.Equal(t, core.Succeeded, s.Status)
+	}
+}

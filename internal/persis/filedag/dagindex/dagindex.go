@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -78,7 +77,7 @@ func Load(indexPath string, yamlFiles []YAMLFileMeta, flags SuspendFlags) []*ind
 
 	// Validate suspend flags.
 	for _, e := range idx.Entries {
-		_, flagged := flags[suspendFlagName(e.Name)]
+		_, flagged := flags[SuspendFlagName(e.Name)]
 		if e.Suspended != flagged {
 			return nil
 		}
@@ -130,7 +129,7 @@ func Build(ctx context.Context, dagDir string, yamlFiles []YAMLFileMeta, flags S
 			entry.LoadError = joinErrors(dag.BuildErrors)
 		}
 
-		_, flagged := flags[suspendFlagName(dag.Name)]
+		_, flagged := flags[SuspendFlagName(dag.Name)]
 		entry.Suspended = flagged
 
 		idx.Entries = append(idx.Entries, entry)
@@ -170,27 +169,10 @@ func DAGFromEntry(entry *indexv1.DAGIndexEntry, baseDir string) *core.DAG {
 	return dag
 }
 
-// suspendFlagName returns the flag filename for a DAG name.
-// Must match the normalization logic in filedag/store.go.
-func suspendFlagName(dagName string) string {
-	return normalizeFilename(dagName) + ".suspend"
+// SuspendFlagName returns the flag filename for a DAG name.
+func SuspendFlagName(dagName string) string {
+	return fileutil.NormalizeFilename(dagName, "-") + ".suspend"
 }
-
-// normalizeFilename matches the normalization logic in filedag/store.go.
-func normalizeFilename(name string) string {
-	s := filenameReservedRegex.ReplaceAllString(name, "-")
-	s = filenameReservedWindowsNamesRegex.ReplaceAllString(s, "-")
-	return strings.ReplaceAll(s, " ", "-")
-}
-
-var (
-	filenameReservedRegex = regexp.MustCompile(
-		`[<>:"/\\|?*\x00-\x1F]`,
-	)
-	filenameReservedWindowsNamesRegex = regexp.MustCompile(
-		`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])$`,
-	)
-)
 
 func tagsToStrings(tags core.Tags) []string {
 	if len(tags) == 0 {

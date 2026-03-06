@@ -272,6 +272,7 @@ type DAGRunIndexEntry struct {
 	StartedAt           int64                  `protobuf:"varint,7,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
 	FinishedAt          int64                  `protobuf:"varint,8,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
 	Tags                []string               `protobuf:"bytes,9,rep,name=tags,proto3" json:"tags,omitempty"`
+	RunDirModTime       int64                  `protobuf:"varint,10,opt,name=run_dir_mod_time,json=runDirModTime,proto3" json:"run_dir_mod_time,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -369,6 +370,13 @@ func (x *DAGRunIndexEntry) GetTags() []string {
 	return nil
 }
 
+func (x *DAGRunIndexEntry) GetRunDirModTime() int64 {
+	if x != nil {
+		return x.RunDirModTime
+	}
+	return 0
+}
+
 var File_proto_index_v1_index_proto protoreflect.FileDescriptor
 
 const file_proto_index_v1_index_proto_rawDesc = "" +
@@ -394,7 +402,7 @@ const file_proto_index_v1_index_proto_rawDesc = "" +
 	"\vDAGRunIndex\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\rR\aversion\x12\"\n" +
 	"\rbuilt_at_unix\x18\x02 \x01(\x03R\vbuiltAtUnix\x124\n" +
-	"\aentries\x18\x03 \x03(\v2\x1a.index.v1.DAGRunIndexEntryR\aentries\"\xcd\x02\n" +
+	"\aentries\x18\x03 \x03(\v2\x1a.index.v1.DAGRunIndexEntryR\aentries\"\xf6\x02\n" +
 	"\x10DAGRunIndexEntry\x12\x1e\n" +
 	"\vdag_run_dir\x18\x01 \x01(\tR\tdagRunDir\x12\x1c\n" +
 	"\n" +
@@ -407,7 +415,9 @@ const file_proto_index_v1_index_proto_rawDesc = "" +
 	"started_at\x18\a \x01(\x03R\tstartedAt\x12\x1f\n" +
 	"\vfinished_at\x18\b \x01(\x03R\n" +
 	"finishedAt\x12\x12\n" +
-	"\x04tags\x18\t \x03(\tR\x04tagsB1Z/github.com/dagu-org/dagu/proto/index/v1;indexv1b\x06proto3"
+	"\x04tags\x18\t \x03(\tR\x04tags\x12'\n" +
+	"\x10run_dir_mod_time\x18\n" +
+	" \x01(\x03R\rrunDirModTimeB1Z/github.com/dagu-org/dagu/proto/index/v1;indexv1b\x06proto3"
 
 var (
 	file_proto_index_v1_index_proto_rawDescOnce sync.Once

@@ -390,6 +390,7 @@ func (dr DataRoot) listDAGRunsInRange(ctx context.Context, start, end exec.TimeI
 		return nil
 	}
 
+SCAN:
 	for _, year := range years {
 		yearInt, _ := strconv.Atoi(year)
 		yearPath := filepath.Join(dr.dagRunsDir, year)
@@ -448,9 +449,7 @@ func (dr DataRoot) listDAGRunsInRange(ctx context.Context, start, end exec.TimeI
 						run.summary = summaryFromIndexEntry(ie)
 						if (start.IsZero() || !run.timestamp.Before(startDate)) &&
 							(end.IsZero() || run.timestamp.Before(endDate)) {
-							lock.Lock()
 							result = append(result, run)
-							lock.Unlock()
 						}
 					}
 				} else {
@@ -469,7 +468,7 @@ func (dr DataRoot) listDAGRunsInRange(ctx context.Context, start, end exec.TimeI
 						}
 					}
 
-					_ = processFilesParallel(files, func(filePath string) error {
+					if errs := processFilesParallel(files, func(filePath string) error {
 						run, err := NewDAGRun(filePath)
 						if err != nil {
 							logger.Debug(ctx, "Failed to create run from file",
@@ -489,18 +488,19 @@ func (dr DataRoot) listDAGRunsInRange(ctx context.Context, start, end exec.TimeI
 							lock.Unlock()
 						}
 						return nil
-					})
+					}); len(errs) > 0 {
+						logger.Warn(ctx, "Some dag-run files failed to load",
+							tag.Dir(dayPath),
+							slog.Int("errors", len(errs)))
+					}
 				}
 
 				if opts != nil && opts.limit > 0 && len(result) >= opts.limit {
-					// Limit reached, break out of the loop
-					goto BREAK
+					break SCAN
 				}
 			}
 		}
 	}
-
-BREAK:
 
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].timestamp.After(result[j].timestamp)
@@ -611,11 +611,9 @@ func listDirsSorted(path string, reverse bool, pattern *regexp.Regexp) ([]string
 }
 
 // processFilesParallel processes files in parallel using a worker pool.
-// It limits concurrency to the number of available CPU cores and handles
-// context cancellation gracefully.
+// It limits concurrency to the number of available CPU cores.
 //
 // Parameters:
-//   - ctx: Context for the operation, which can be used to cancel processing
 //   - files: Slice of file paths to process
 //   - processor: Function to apply to each file path
 //

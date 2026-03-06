@@ -2,6 +2,7 @@ package dagindex
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -287,4 +288,113 @@ func TestDAGFromEntry_WithError(t *testing.T) {
 	assert.Equal(t, "bad", dag.Name)
 	require.Len(t, dag.BuildErrors, 1)
 	assert.Equal(t, "parse failed", dag.BuildErrors[0].Error())
+}
+
+func TestBuild_WithSuspendFlags(t *testing.T) {
+	dir := t.TempDir()
+
+	dagContent := []byte("name: flagged-dag\nsteps:\n  - name: step1\n    command: echo hello\n")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "flagged.yaml"), dagContent, 0600))
+
+	core.RegisterExecutorCapabilities("", core.ExecutorCapabilities{
+		Command: true, MultipleCommands: true, Script: true, Shell: true,
+	})
+
+	info, err := os.Stat(filepath.Join(dir, "flagged.yaml"))
+	require.NoError(t, err)
+
+	files := []YAMLFileMeta{
+		{Name: "flagged.yaml", Size: info.Size(), ModTime: info.ModTime().UnixNano()},
+	}
+
+	flags := SuspendFlags{"flagged-dag.suspend": {}}
+	idx := Build(context.Background(), dir, files, flags)
+	require.Len(t, idx.Entries, 1)
+	assert.True(t, idx.Entries[0].Suspended)
+}
+
+func TestBuild_ContextCancellation(t *testing.T) {
+	dir := t.TempDir()
+
+	core.RegisterExecutorCapabilities("", core.ExecutorCapabilities{
+		Command: true, MultipleCommands: true, Script: true, Shell: true,
+	})
+
+	// Create multiple DAG YAML files.
+	var files []YAMLFileMeta
+	for i := 0; i < 5; i++ {
+		name := fmt.Sprintf("dag-%d.yaml", i)
+		content := []byte(fmt.Sprintf("name: dag-%d\nsteps:\n  - name: s1\n    command: echo ok\n", i))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), content, 0600))
+		info, err := os.Stat(filepath.Join(dir, name))
+		require.NoError(t, err)
+		files = append(files, YAMLFileMeta{Name: name, Size: info.Size(), ModTime: info.ModTime().UnixNano()})
+	}
+
+	// Cancel context immediately.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	idx := Build(ctx, dir, files, nil)
+	// With cancelled context, should have fewer entries than files.
+	assert.Less(t, len(idx.Entries), len(files))
+}
+
+func TestDAGFromEntry_MultipleSchedules(t *testing.T) {
+	entry := &indexv1.DAGIndexEntry{
+		FilePath: "multi.yaml",
+		Name:     "multi",
+		Schedule: "0 * * * *; 30 * * * *",
+	}
+
+	dag := DAGFromEntry(entry, "/dags")
+	require.Len(t, dag.Schedule, 2)
+	assert.Equal(t, "0 * * * *", dag.Schedule[0].Expression)
+	assert.NotNil(t, dag.Schedule[0].Parsed)
+	assert.Equal(t, "30 * * * *", dag.Schedule[1].Expression)
+	assert.NotNil(t, dag.Schedule[1].Parsed)
+}
+
+func TestDAGFromEntry_InvalidCron(t *testing.T) {
+	entry := &indexv1.DAGIndexEntry{
+		FilePath: "invalid-cron.yaml",
+		Name:     "invalid-cron",
+		Schedule: "not-a-cron",
+	}
+
+	dag := DAGFromEntry(entry, "/dags")
+	require.Len(t, dag.Schedule, 1)
+	assert.Equal(t, "not-a-cron", dag.Schedule[0].Expression)
+	assert.Nil(t, dag.Schedule[0].Parsed) // Non-fatal: no parsed cron
+}
+
+func TestDAGFromEntry_NoSchedule(t *testing.T) {
+	entry := &indexv1.DAGIndexEntry{
+		FilePath: "no-sched.yaml",
+		Name:     "no-sched",
+		Schedule: "",
+	}
+
+	dag := DAGFromEntry(entry, "/dags")
+	assert.Nil(t, dag.Schedule)
+}
+
+func TestSuspendFlagName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"NormalName", "my-dag", "my-dag.suspend"},
+		{"NameWithSpaces", "my dag", "my-dag.suspend"},
+		{"NameWithSpecialChars", "my<dag>", "my-dag-.suspend"},
+		{"EmptyName", "", ".suspend"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := SuspendFlagName(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
