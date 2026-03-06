@@ -9,8 +9,8 @@
   align-items: center;
   border-radius: 9999px;
   transition: background-color 0.2s ease;
-  /* Light mode unchecked - visible gray */
-  background-color: #cbd5e1;
+  /* Light mode unchecked - warm gray */
+  background-color: #d4cdc0;
 }
 
 .switch-root:focus-visible {
