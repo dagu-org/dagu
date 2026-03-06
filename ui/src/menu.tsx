@@ -492,6 +492,14 @@ export const mainListItems = React.forwardRef<
               onClick={onNavItemClick}
               customColor={customColor}
             />
+            <NavItem
+              to="/docs"
+              text="Docs"
+              icon={<FileText size={18} />}
+              isOpen={isOpen}
+              onClick={onNavItemClick}
+              customColor={customColor}
+            />
           </div>
 
           <div className="space-y-0.5">
@@ -524,14 +532,6 @@ export const mainListItems = React.forwardRef<
               to="/search"
               text="Search"
               icon={<Search size={18} />}
-              isOpen={isOpen}
-              onClick={onNavItemClick}
-              customColor={customColor}
-            />
-            <NavItem
-              to="/docs"
-              text="Docs"
-              icon={<FileText size={18} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
               customColor={customColor}
