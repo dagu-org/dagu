@@ -116,11 +116,11 @@ export function useResizableDraggable(options: UseResizableDraggableOptions = {}
         let newBottom = state.startBounds.bottom;
 
         // Handle horizontal resize
-        if (dir.includes('left') || dir === 'left') {
+        if (dir.includes('Left') || dir === 'left') {
           // Left edge: increase width, keep right anchor
           newWidth = Math.max(minWidth, Math.min(state.startBounds.width - deltaX, maxWidth));
         }
-        if (dir.includes('right') || dir === 'right') {
+        if (dir.includes('Right') || dir === 'right') {
           // Right edge: increase width by moving right anchor
           newWidth = Math.max(minWidth, Math.min(state.startBounds.width + deltaX, maxWidth));
           newRight = Math.max(0, state.startBounds.right - deltaX);
