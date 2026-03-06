@@ -160,6 +160,11 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 			"type": "web_search_20260209",
 			"name": "web_search",
 		}
+		// Haiku 4.5 only supports allowed_callers=["direct"] for web_search.
+		// Other models accept any value, so "direct" is safe as a universal default.
+		if strings.Contains(req.Model, "haiku") {
+			wsEntry["allowed_callers"] = []string{"direct"}
+		}
 		if req.WebSearch.MaxUses != nil {
 			wsEntry["max_uses"] = *req.WebSearch.MaxUses
 		}
