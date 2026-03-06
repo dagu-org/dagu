@@ -30,6 +30,7 @@ import (
 	frontendauth "github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/dagu-org/dagu/internal/service/resource"
 	"github.com/dagu-org/dagu/internal/tunnel"
+	"github.com/dagu-org/dagu/internal/workspace"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
@@ -70,6 +71,7 @@ type API struct {
 	docStore           agent.DocStore
 	baseConfigStore    baseconfig.Store
 	licenseManager     *license.Manager
+	workspaceStore     workspace.Store
 }
 
 // AuthService defines the interface for authentication operations.
@@ -205,6 +207,13 @@ func WithRemoteNodeResolver(r *remotenode.Resolver) APIOption {
 func WithRemoteNodeStore(s remotenode.Store) APIOption {
 	return func(a *API) {
 		a.remoteNodeStore = s
+	}
+}
+
+// WithWorkspaceStore returns an APIOption that sets the workspace store.
+func WithWorkspaceStore(s workspace.Store) APIOption {
+	return func(a *API) {
+		a.workspaceStore = s
 	}
 }
 

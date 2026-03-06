@@ -187,6 +187,7 @@ func TestLoad_Env(t *testing.T) {
 			WebhooksDir:        filepath.Join(testPaths, "data", "webhooks"),          // Derived from DataDir
 			SessionsDir:        filepath.Join(testPaths, "data", "agent", "sessions"), // Derived from DataDir
 			RemoteNodesDir:     filepath.Join(testPaths, "data", "remote-nodes"),      // Derived from DataDir
+			WorkspacesDir:      filepath.Join(testPaths, "data", "workspaces"),        // Derived from DataDir
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
@@ -449,6 +450,7 @@ scheduler:
 			WebhooksDir:        "/var/dagu/data/webhooks",
 			SessionsDir:        "/var/dagu/data/agent/sessions",
 			RemoteNodesDir:     "/var/dagu/data/remote-nodes",
+			WorkspacesDir:      "/var/dagu/data/workspaces",
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",

@@ -14,6 +14,7 @@ interface DAGHeaderProps {
   refreshFn: () => void;
   formatDuration: (startDate: string, endDate: string) => string;
   navigateToStatusTab?: () => void;
+  onEnqueue?: (params: string, dagRunId?: string, immediate?: boolean) => void | Promise<void>;
 }
 
 const DAGHeader: React.FC<DAGHeaderProps> = ({
@@ -23,6 +24,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   refreshFn,
   formatDuration,
   navigateToStatusTab,
+  onEnqueue,
 }) => {
   const navigate = useNavigate();
   const params = useParams<{ tab?: string }>();
@@ -190,6 +192,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
               refresh={refreshFn}
               displayMode="compact"
               navigateToStatusTab={navigateToStatusTab}
+              onEnqueue={onEnqueue}
             />
           </div>
         )}

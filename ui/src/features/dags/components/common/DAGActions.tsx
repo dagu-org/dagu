@@ -48,6 +48,8 @@ type Props = {
   displayMode?: 'compact' | 'full';
   /** Function to navigate to status tab after execution */
   navigateToStatusTab?: () => void;
+  /** Custom enqueue handler. When provided, overrides the default enqueue API call. */
+  onEnqueue?: (params: string, dagRunId?: string, immediate?: boolean) => void | Promise<void>;
 };
 
 /**
@@ -60,6 +62,7 @@ function DAGActions({
   refresh,
   displayMode = 'compact',
   navigateToStatusTab,
+  onEnqueue,
 }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
@@ -516,6 +519,19 @@ function DAGActions({
           action="enqueue"
           onSubmit={async (params, dagRunId, immediate) => {
             setIsEnqueueModal(false);
+
+            if (onEnqueue) {
+              try {
+                await onEnqueue(params, dagRunId, immediate);
+              } catch (err) {
+                showError(
+                  err instanceof Error ? err.message : 'Failed to enqueue DAG',
+                  'Enqueue failed. Please try again.'
+                );
+              }
+              return;
+            }
+
             const body: { params: string; dagRunId?: string } = { params };
             if (dagRunId) {
               body.dagRunId = dagRunId;

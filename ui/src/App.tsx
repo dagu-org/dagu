@@ -24,6 +24,7 @@ import { AgentChatModal, AgentChatProvider } from './features/agent';
 import Layout from './layouts/Layout';
 import fetchJson from './lib/fetchJson';
 import Dashboard from './pages';
+import CockpitPage from './pages/cockpit';
 import AgentMemoryPage from './pages/agent-memory';
 import AgentSettingsPage from './pages/agent-settings';
 import AgentSkillsPage from './pages/agent-skills';
@@ -233,6 +234,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                       <Routes>
                                         <Route path="/" element={<Dashboard />} />
                                         <Route path="/dashboard" element={<Dashboard />} />
+                                        <Route path="/cockpit" element={<CockpitPage />} />
                                         <Route path="/dags/" element={<DAGs />} />
                                         <Route path="/dags/:fileName/:tab" element={<DAGDetails />} />
                                         <Route path="/dags/:fileName/" element={<DAGDetails />} />

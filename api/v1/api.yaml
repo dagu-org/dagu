@@ -5904,6 +5904,139 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /workspaces:
+    get:
+      summary: "List all workspaces"
+      operationId: "listWorkspaces"
+      tags:
+        - "workspaces"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "List of workspaces"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceListResponse"
+    post:
+      summary: "Create a workspace"
+      operationId: "createWorkspace"
+      tags:
+        - "workspaces"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkspaceRequest"
+      responses:
+        "201":
+          description: "Workspace created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Name already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workspaces/{workspaceId}:
+    get:
+      summary: "Get workspace by ID"
+      operationId: "getWorkspace"
+      tags:
+        - "workspaces"
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Workspace details"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceResponse"
+        "404":
+          description: "Not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: "Update a workspace"
+      operationId: "updateWorkspace"
+      tags:
+        - "workspaces"
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceRequest"
+      responses:
+        "200":
+          description: "Workspace updated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceResponse"
+        "404":
+          description: "Not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Name already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Delete a workspace"
+      operationId: "deleteWorkspace"
+      tags:
+        - "workspaces"
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "204":
+          description: "Workspace deleted"
+        "404":
+          description: "Not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 
 components:
   securitySchemes:
@@ -9538,6 +9671,53 @@ components:
           type: string
         error:
           type: string
+
+    CreateWorkspaceRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+
+    UpdateWorkspaceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+
+    WorkspaceResponse:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    WorkspaceListResponse:
+      type: object
+      required:
+        - workspaces
+      properties:
+        workspaces:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkspaceResponse"
 
 # Apply security requirements globally
 security:
