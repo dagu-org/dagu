@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -62,7 +63,7 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, defaultWorkingDirFlag, startWorkerIDFlag, triggerTypeFlag}
+var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, tagsFlag, defaultWorkingDirFlag, startWorkerIDFlag, triggerTypeFlag}
 
 var fromRunIDFlag = commandLineFlag{
 	name:  "from-run-id",
@@ -167,6 +168,18 @@ func runStart(ctx *Context, args []string) error {
 		if err := validateStartPositionalParamCount(ctx, args, dag); err != nil {
 			return err
 		}
+	}
+
+	tagsStr, err := ctx.StringParam("tags")
+	if err != nil {
+		return fmt.Errorf("failed to get tags: %w", err)
+	}
+	if tagsStr != "" {
+		extraTags := core.NewTags(strings.Split(tagsStr, ","))
+		if err := core.ValidateTags(extraTags); err != nil {
+			return fmt.Errorf("invalid tags: %w", err)
+		}
+		dag.Tags = append(dag.Tags, extraTags...)
 	}
 
 	root, err := determineRootDAGRun(isSubDAGRun, rootRef, dag, dagRunID)

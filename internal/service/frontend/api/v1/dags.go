@@ -645,7 +645,12 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		return nil, err
 	}
 
-	if err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, singleton); err != nil {
+	tags, err := extractTagsParam(request.Body.Tags)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, singleton, tags); err != nil {
 		return nil, fmt.Errorf("error starting dag-run: %w", err)
 	}
 
@@ -729,7 +734,12 @@ func (a *API) ExecuteDAGSync(ctx context.Context, request api.ExecuteDAGSyncRequ
 		return nil, err
 	}
 
-	if err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, singleton); err != nil {
+	tags, err := extractTagsParam(request.Body.Tags)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, singleton, tags); err != nil {
 		return nil, fmt.Errorf("error starting dag-run: %w", err)
 	}
 
@@ -819,14 +829,31 @@ func (a *API) waitForDAGCompletion(
 	}
 }
 
-func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string, singleton bool) error {
+func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string, singleton bool, tags string) error {
 	return a.startDAGRunWithOptions(ctx, dag, startDAGRunOptions{
 		params:       params,
 		dagRunID:     dagRunID,
 		nameOverride: nameOverride,
 		singleton:    singleton,
 		triggerType:  core.TriggerTypeManual,
+		tags:         tags,
 	})
+}
+
+// extractTagsParam validates and serializes an optional tags array into a comma-separated string.
+func extractTagsParam(tags *[]string) (string, error) {
+	if tags == nil || len(*tags) == 0 {
+		return "", nil
+	}
+	parsed := core.NewTags(*tags)
+	if err := core.ValidateTags(parsed); err != nil {
+		return "", &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    fmt.Sprintf("invalid tags: %s", err.Error()),
+		}
+	}
+	return strings.Join(*tags, ","), nil
 }
 
 // buildErrorsToAPIError returns an API error if the DAG has build errors, nil otherwise.
@@ -866,6 +893,7 @@ type startDAGRunOptions struct {
 	fromRunID    string
 	target       string
 	triggerType  core.TriggerType
+	tags         string
 }
 
 // waitForDAGStatusChange waits until the DAG status transitions from NotStarted.
@@ -953,6 +981,7 @@ func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts st
 		FromRunID:    opts.fromRunID,
 		Target:       opts.target,
 		TriggerType:  triggerTypeStr,
+		Tags:         opts.tags,
 	})
 
 	if err := runtime.Start(ctx, spec); err != nil {
@@ -1034,7 +1063,12 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		}
 	}
 
-	if err := a.enqueueDAGRun(ctx, dag, valueOf(request.Body.Params), dagRunId, nameOverride, core.TriggerTypeManual); err != nil {
+	tags, err := extractTagsParam(request.Body.Tags)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := a.enqueueDAGRun(ctx, dag, valueOf(request.Body.Params), dagRunId, nameOverride, core.TriggerTypeManual, tags); err != nil {
 		return nil, fmt.Errorf("error enqueuing dag-run: %w", err)
 	}
 
@@ -1052,7 +1086,7 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 	}, nil
 }
 
-func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string, triggerType core.TriggerType) error {
+func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string, triggerType core.TriggerType, tags string) error {
 	// Only pass trigger type if it's a known value (not TriggerTypeUnknown)
 	triggerTypeStr := ""
 	if triggerType != core.TriggerTypeUnknown {
@@ -1063,6 +1097,7 @@ func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID
 		DAGRunID:     dagRunID,
 		NameOverride: nameOverride,
 		TriggerType:  triggerTypeStr,
+		Tags:         tags,
 	}
 	if dag.Queue != "" {
 		opts.Queue = dag.Queue

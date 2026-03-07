@@ -5417,6 +5417,8 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    /** @description Additional tags to apply to the DAG-run (format: key=value or key-only). Merged with tags defined in the DAG spec. */
+                    tags?: string[];
                 };
             };
         };
@@ -5478,6 +5480,8 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    /** @description Additional tags to apply to the DAG-run (format: key=value or key-only). Merged with tags defined in the DAG spec. */
+                    tags?: string[];
                     /** @description Maximum seconds to wait for DAG execution to complete (required) */
                     timeout: number;
                 };
@@ -5552,6 +5556,8 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    /** @description Additional tags to apply to the DAG-run (format: key=value or key-only). Merged with tags defined in the DAG spec. */
+                    tags?: string[];
                 };
             };
         };
@@ -6049,6 +6055,8 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    /** @description Additional tags to apply to the DAG-run (format: key=value or key-only). Merged with tags defined in the DAG spec. */
+                    tags?: string[];
                 };
             };
         };
@@ -6120,6 +6128,8 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    /** @description Additional tags to apply to the DAG-run (format: key=value or key-only). Merged with tags defined in the DAG spec. */
+                    tags?: string[];
                 };
             };
         };

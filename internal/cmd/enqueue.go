@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -29,7 +30,7 @@ Examples:
 	)
 }
 
-var enqueueFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, queueFlag, defaultWorkingDirFlag, triggerTypeFlag}
+var enqueueFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, queueFlag, tagsFlag, defaultWorkingDirFlag, triggerTypeFlag}
 
 func runEnqueue(ctx *Context, args []string) error {
 	runID, err := ctx.StringParam("run-id")
@@ -58,6 +59,18 @@ func runEnqueue(ctx *Context, args []string) error {
 
 	if queueOverride != "" {
 		dag.Queue = queueOverride
+	}
+
+	tagsStr, err := ctx.StringParam("tags")
+	if err != nil {
+		return fmt.Errorf("failed to get tags: %w", err)
+	}
+	if tagsStr != "" {
+		extraTags := core.NewTags(strings.Split(tagsStr, ","))
+		if err := core.ValidateTags(extraTags); err != nil {
+			return fmt.Errorf("invalid tags: %w", err)
+		}
+		dag.Tags = append(dag.Tags, extraTags...)
 	}
 
 	triggerType, err := parseTriggerTypeParam(ctx)

@@ -95,7 +95,12 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 		return nil, err
 	}
 
-	if err := a.startDAGRun(ctx, dag, params, dagRunId, valueOf(request.Body.Name), singleton); err != nil {
+	tags, err := extractTagsParam(request.Body.Tags)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := a.startDAGRun(ctx, dag, params, dagRunId, valueOf(request.Body.Name), singleton, tags); err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusInternalServerError,
 			Code:       api.ErrorCodeInternalError,
@@ -180,7 +185,12 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 		}
 	}
 
-	if err := a.enqueueDAGRun(ctx, dag, params, dagRunId, valueOf(request.Body.Name), core.TriggerTypeManual); err != nil {
+	tags, err := extractTagsParam(request.Body.Tags)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := a.enqueueDAGRun(ctx, dag, params, dagRunId, valueOf(request.Body.Name), core.TriggerTypeManual, tags); err != nil {
 		return nil, fmt.Errorf("error enqueuing dag-run: %w", err)
 	}
 

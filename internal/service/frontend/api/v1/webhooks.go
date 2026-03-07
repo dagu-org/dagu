@@ -368,7 +368,7 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 	}
 
 	// Enqueue the DAG run with webhook trigger type
-	if err := a.enqueueDAGRun(ctx, dag, params, dagRunID, "", core.TriggerTypeWebhook); err != nil {
+	if err := a.enqueueDAGRun(ctx, dag, params, dagRunID, "", core.TriggerTypeWebhook, ""); err != nil {
 		logger.Error(ctx, "Webhook: failed to enqueue DAG run",
 			tag.Name(dag.Name),
 			tag.Error(err),
