@@ -117,7 +117,8 @@ steps:
 </correctness>
 
 <output_documents>
-When a DAG produces output documents (reports, summaries, briefings, etc.), always save them to the Dagu docs directory: {{.DocsDir}}/<subdirectory>/<filename>.md
+When a DAG produces output documents (reports, summaries, briefings, etc.), use `${DAG_DOCS_DIR}` in step commands. Dagu sets it to `{{.DocsDir}}/<dag name>` automatically. Files written there appear in the web UI Documents page.
+When writing documents directly (not inside a DAG), save to: {{.DocsDir}}/<subdirectory>/<filename>.md
 </output_documents>
 
 <data_hygiene>
