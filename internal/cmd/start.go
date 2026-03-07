@@ -470,7 +470,9 @@ func dispatchToCoordinatorAndWait(ctx *Context, d *core.DAG, dagRunID string, co
 	)
 
 	var taskOpts []executor.TaskOption
-	taskOpts = append(taskOpts, executor.WithWorkerSelector(d.WorkerSelector))
+	if len(d.WorkerSelector) > 0 {
+		taskOpts = append(taskOpts, executor.WithWorkerSelector(d.WorkerSelector))
+	}
 	if len(d.Tags) > 0 {
 		taskOpts = append(taskOpts, executor.WithTags(strings.Join(d.Tags.Strings(), ",")))
 	}

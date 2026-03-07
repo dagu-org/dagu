@@ -855,7 +855,7 @@ func extractTagsParam(tags *[]string) (string, error) {
 			Message:    fmt.Sprintf("invalid tags: %s", err.Error()),
 		}
 	}
-	return strings.Join(*tags, ","), nil
+	return strings.Join(parsed.Strings(), ","), nil
 }
 
 // buildErrorsToAPIError returns an API error if the DAG has build errors, nil otherwise.
