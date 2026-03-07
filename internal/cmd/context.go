@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"regexp"
 	"runtime/pprof"
 	"syscall"
 	"time"
@@ -626,24 +625,8 @@ func genRunID() (string, error) {
 
 // validateRunID checks if the dag-run ID is valid and not empty.
 func validateRunID(dagRunID string) error {
-	if dagRunID == "" {
-		return ErrDAGRunIDRequired
-	}
-	if !reDAGRunID.MatchString(dagRunID) {
-		return ErrDAGRunIDFormat
-	}
-	if len(dagRunID) > maxDAGRunIDLen {
-		return ErrDAGRunIDTooLong
-	}
-	return nil
+	return exec.ValidateDAGRunID(dagRunID)
 }
-
-// reDAGRunID is a regular expression to validate dag-run IDs.
-// It allows alphanumeric characters, hyphens, and underscores.
-var reDAGRunID = regexp.MustCompile(`^[-a-zA-Z0-9_]+$`)
-
-// maxDAGRunIDLen is the max length of the dag-run ID
-const maxDAGRunIDLen = 64
 
 // signalListener is an interface for types that can receive OS signals.
 type signalListener interface {

@@ -71,6 +71,9 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 	if request.Body.DagRunId != nil {
 		dagRunId = *request.Body.DagRunId
 	}
+	if err := validateDAGRunID(dagRunId); err != nil {
+		return nil, err
+	}
 	if dagRunId == "" {
 		var genErr error
 		dagRunId, genErr = a.dagRunMgr.GenDAGRunID(ctx)
@@ -144,6 +147,9 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 	var singleton bool
 	if request.Body.DagRunId != nil {
 		dagRunId = *request.Body.DagRunId
+	}
+	if err := validateDAGRunID(dagRunId); err != nil {
+		return nil, err
 	}
 	if dagRunId == "" {
 		var genErr error

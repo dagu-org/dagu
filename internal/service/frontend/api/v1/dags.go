@@ -618,6 +618,10 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	singleton := valueOf(request.Body.Singleton)
 	nameOverride := strings.TrimSpace(valueOf(request.Body.DagName))
 
+	if err := validateDAGRunID(dagRunId); err != nil {
+		return nil, err
+	}
+
 	if nameOverride != "" {
 		if err := core.ValidateDAGName(nameOverride); err != nil {
 			return nil, &Error{
@@ -706,6 +710,10 @@ func (a *API) ExecuteDAGSync(ctx context.Context, request api.ExecuteDAGSyncRequ
 	singleton := valueOf(request.Body.Singleton)
 	nameOverride := strings.TrimSpace(valueOf(request.Body.DagName))
 	timeout := request.Body.Timeout
+
+	if err := validateDAGRunID(dagRunId); err != nil {
+		return nil, err
+	}
 
 	if nameOverride != "" {
 		if err := core.ValidateDAGName(nameOverride); err != nil {
@@ -868,6 +876,22 @@ func buildErrorsToAPIError(buildErrors []error) *Error {
 		Code:       api.ErrorCodeBadRequest,
 		Message:    strings.Join(extractBuildErrors(buildErrors), "; "),
 	}
+}
+
+// validateDAGRunID checks that a user-provided dagRunID contains only safe characters.
+// Skips validation if the ID is empty (will be auto-generated).
+func validateDAGRunID(dagRunID string) error {
+	if dagRunID == "" {
+		return nil
+	}
+	if err := exec.ValidateDAGRunID(dagRunID); err != nil {
+		return &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    err.Error(),
+		}
+	}
+	return nil
 }
 
 // ensureDAGRunIDUnique validates that the given dagRunID is not already in use for this DAG.
@@ -1055,6 +1079,9 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 	}
 
 	dagRunId := valueOf(request.Body.DagRunId)
+	if err := validateDAGRunID(dagRunId); err != nil {
+		return nil, err
+	}
 	if dagRunId == "" {
 		var err error
 		dagRunId, err = a.dagRunMgr.GenDAGRunID(ctx)
