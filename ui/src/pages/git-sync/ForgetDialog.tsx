@@ -25,7 +25,7 @@ export function ForgetDialog({
     >
       <p className="text-sm text-muted-foreground">
         Remove{' '}
-        <span className="font-mono font-medium text-foreground">{itemId}</span>{' '}
+        <span className="font-mono font-medium text-foreground break-all">{itemId}</span>{' '}
         from sync tracking? This does not delete the file from the remote
         repository.
       </p>
