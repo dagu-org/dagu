@@ -945,6 +945,107 @@ func TestCommandExecutor_StderrInError(t *testing.T) {
 	assert.Contains(t, err.Error(), "error details")
 }
 
+// TestCommandExecutor_ScriptErrorAnnotation tests that failing script line content
+// is included in error messages.
+func TestCommandExecutor_ScriptErrorAnnotation(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping Unix-specific test on Windows")
+	}
+
+	script := "echo line1\necho line2\nnonexistent_command_xyz_12345\necho line4\n"
+	step := core.Step{
+		Name:   "test",
+		Script: script,
+	}
+
+	ctx := setupTestContext(t, nil, step)
+
+	exec, err := NewCommand(ctx, step)
+	require.NoError(t, err)
+
+	var stdout, stderr strings.Builder
+	exec.SetStdout(&stdout)
+	exec.SetStderr(&stderr)
+
+	err = exec.Run(ctx)
+	require.Error(t, err)
+
+	// Error field should be clean: no temp script path, no script dump
+	errMsg := err.Error()
+	assert.Contains(t, errMsg, "nonexistent_command_xyz_12345")
+	assert.NotContains(t, errMsg, "--- script content ---")
+	assert.NotContains(t, errMsg, "dagu_script-")
+
+	// Full script with error marker should appear in stderr log output
+	stderrOutput := stderr.String()
+	assert.Contains(t, stderrOutput, "--- script content ---")
+	assert.Contains(t, stderrOutput, "nonexistent_command_xyz_12345")
+	assert.Contains(t, stderrOutput, "echo line1")
+	assert.Contains(t, stderrOutput, "echo line4")
+	// Failing line should be marked with >>
+	assert.Contains(t, stderrOutput, " >>    3: nonexistent_command_xyz_12345")
+}
+
+// TestCommandExecutor_ScriptPreservedOnFailure tests that temp script files
+// are preserved when execution fails.
+func TestCommandExecutor_ScriptPreservedOnFailure(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping Unix-specific test on Windows")
+	}
+
+	step := core.Step{
+		Name:   "test",
+		Script: "exit 1",
+	}
+
+	ctx := setupTestContext(t, nil, step)
+
+	exec, err := NewCommand(ctx, step)
+	require.NoError(t, err)
+
+	var stdout, stderr strings.Builder
+	exec.SetStdout(&stdout)
+	exec.SetStderr(&stderr)
+
+	err = exec.Run(ctx)
+	require.Error(t, err)
+
+	ce := exec.(*commandExecutor)
+	assert.NotEmpty(t, ce.scriptFile)
+	_, statErr := os.Stat(ce.scriptFile)
+	assert.NoError(t, statErr, "script file should be preserved on failure")
+
+	t.Cleanup(func() { _ = os.Remove(ce.scriptFile) })
+}
+
+// TestCommandExecutor_ScriptCleanedOnSuccess tests that temp script files
+// are cleaned up after successful execution.
+func TestCommandExecutor_ScriptCleanedOnSuccess(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping Unix-specific test on Windows")
+	}
+
+	step := core.Step{
+		Name:   "test",
+		Script: "echo hello",
+	}
+
+	ctx := setupTestContext(t, nil, step)
+
+	exec, err := NewCommand(ctx, step)
+	require.NoError(t, err)
+
+	var stdout strings.Builder
+	exec.SetStdout(&stdout)
+
+	err = exec.Run(ctx)
+	require.NoError(t, err)
+
+	ce := exec.(*commandExecutor)
+	_, statErr := os.Stat(ce.scriptFile)
+	assert.True(t, os.IsNotExist(statErr), "script file should be deleted on success")
+}
+
 // TestCommandExecutor_WorkingDirectory tests working directory is set correctly
 func TestCommandExecutor_WorkingDirectory(t *testing.T) {
 	if goruntime.GOOS == "windows" {

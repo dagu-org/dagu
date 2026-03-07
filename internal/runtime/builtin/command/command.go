@@ -9,6 +9,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
@@ -24,11 +27,12 @@ var _ executor.Executor = (*commandExecutor)(nil)
 var _ executor.ExitCoder = (*commandExecutor)(nil)
 
 type commandExecutor struct {
-	mu         sync.Mutex
-	config     *commandConfig
-	cmd        *exec.Cmd
-	scriptFile string
-	exitCode   int
+	mu           sync.Mutex
+	config       *commandConfig
+	cmd          *exec.Cmd
+	scriptFile   string
+	exitCode     int
+	scriptFailed bool // set on failure to prevent temp script cleanup
 	// stderrTail stores a rolling tail of recent stderr lines
 	stderrTail *executor.TailWriter
 }
@@ -49,8 +53,9 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 		}
 		e.scriptFile = scriptFile
 		defer func() {
-			// Remove the temporary script file after the command has finished
-			_ = os.Remove(scriptFile)
+			if !e.scriptFailed {
+				_ = os.Remove(scriptFile)
+			}
 		}()
 	}
 	// Wrap stderr with a tailing writer so we can include recent
@@ -80,7 +85,11 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	if err := e.cmd.Start(); err != nil {
 		e.exitCode = exitCodeFromError(err)
 		e.mu.Unlock()
+		if e.config.Script != "" && e.scriptFile != "" {
+			e.scriptFailed = true
+		}
 		if tail := e.stderrTail.Tail(); tail != "" {
+			tail = e.annotateStderrTail(tail)
 			return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
 		}
 		return err
@@ -107,7 +116,11 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	case err := <-waitDone:
 		if err != nil {
 			e.exitCode = exitCodeFromError(err)
+			if e.config.Script != "" && e.scriptFile != "" {
+				e.scriptFailed = true
+			}
 			if tail := e.stderrTail.Tail(); tail != "" {
+				tail = e.annotateStderrTail(tail)
 				return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
 			}
 			return err
@@ -129,6 +142,68 @@ func (e *commandExecutor) Kill(sig os.Signal) error {
 	defer e.mu.Unlock()
 
 	return cmdutil.KillProcessGroup(e.cmd, sig)
+}
+
+// annotateStderrTail writes the full script to the stderr log with the
+// failing line(s) marked, and returns a cleaned version of the tail with
+// the temp script path stripped for use in the error field.
+func (e *commandExecutor) annotateStderrTail(tail string) string {
+	if e.config.Script == "" || e.scriptFile == "" {
+		return tail
+	}
+	offset := scriptLineOffset(e.config.Shell)
+	errorLines := extractErrorLines(tail, e.scriptFile)
+
+	// Strip temp script path from stderr for clean display.
+	// e.g. "/tmp/dagu_script-123.sh:3: not found" → "line 3: not found"
+	baseName := filepath.Base(e.scriptFile)
+	cleaned := strings.ReplaceAll(tail, e.scriptFile+":", "line ")
+	cleaned = strings.ReplaceAll(cleaned, baseName+":", "line ")
+	cleaned = strings.ReplaceAll(cleaned, e.scriptFile+": ", "")
+	cleaned = strings.ReplaceAll(cleaned, baseName+": ", "")
+
+	// Write cleaned error + full script dump to stderr log
+	_, _ = fmt.Fprintf(e.config.Stderr, "\n--- error ---\n%s\n", strings.TrimRight(cleaned, "\n"))
+	writeScriptToStderr(e.config.Stderr, e.config.Script, offset, errorLines)
+
+	return cleaned
+}
+
+// extractErrorLines parses stderr for line-number references to the script
+// file and returns a set of those line numbers.
+func extractErrorLines(stderr, scriptFile string) map[int]bool {
+	baseName := filepath.Base(scriptFile)
+	escaped := regexp.QuoteMeta(baseName)
+	// Match patterns like "filename:3:" or "filename: line 3:"
+	re := regexp.MustCompile(escaped + `(?::|\: line )(\d+)`)
+
+	lines := make(map[int]bool)
+	for _, match := range re.FindAllStringSubmatch(stderr, -1) {
+		if n, err := strconv.Atoi(match[1]); err == nil {
+			lines[n] = true
+		}
+	}
+	return lines
+}
+
+// writeScriptToStderr writes the full script content with line numbers to
+// the stderr writer. Lines in errorLines are marked with ">>" for visibility.
+func writeScriptToStderr(w io.Writer, script string, lineOffset int, errorLines map[int]bool) {
+	_, _ = fmt.Fprintln(w, "\n--- script content ---")
+	for i, line := range strings.Split(script, "\n") {
+		num := i + 1
+		scriptLineNum := num + lineOffset
+		prefix := "    "
+		if errorLines[scriptLineNum] {
+			prefix = " >> "
+		}
+		if lineOffset > 0 {
+			_, _ = fmt.Fprintf(w, "%s%4d (orig %d): %s\n", prefix, scriptLineNum, num, line)
+		} else {
+			_, _ = fmt.Fprintf(w, "%s%4d: %s\n", prefix, num, line)
+		}
+	}
+	_, _ = fmt.Fprintln(w, "---")
 }
 
 type commandConfig struct {
