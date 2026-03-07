@@ -1,6 +1,3 @@
-// Copyright (C) 2026 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package filebaseconfig
 
 // defaultBaseConfig is the content written to base.yaml on first run.
