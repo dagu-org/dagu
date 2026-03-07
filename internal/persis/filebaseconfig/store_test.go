@@ -110,6 +110,70 @@ func TestUpdateSpec(t *testing.T) {
 	})
 }
 
+func TestInitialize(t *testing.T) {
+	t.Run("creates default when file and marker missing", func(t *testing.T) {
+		filePath := filepath.Join(t.TempDir(), "base.yaml")
+		store, err := New(filePath)
+		require.NoError(t, err)
+
+		require.NoError(t, store.Initialize())
+
+		data, err := os.ReadFile(filePath)
+		require.NoError(t, err)
+		assert.Contains(t, string(data), "Base DAG Configuration")
+		assert.Contains(t, string(data), "catchup_window")
+		assert.Contains(t, string(data), "hist_retention_days")
+	})
+
+	t.Run("skips when file already exists", func(t *testing.T) {
+		filePath := filepath.Join(t.TempDir(), "base.yaml")
+		existing := []byte("env:\n  - MY_VAR: custom\n")
+		require.NoError(t, os.WriteFile(filePath, existing, 0600))
+
+		store, err := New(filePath)
+		require.NoError(t, err)
+		require.NoError(t, store.Initialize())
+
+		data, err := os.ReadFile(filePath)
+		require.NoError(t, err)
+		assert.Equal(t, existing, data)
+	})
+
+	t.Run("skips when marker exists", func(t *testing.T) {
+		dir := t.TempDir()
+		filePath := filepath.Join(dir, "base.yaml")
+		markerPath := filepath.Join(dir, ".base-config-created")
+		require.NoError(t, os.WriteFile(markerPath, []byte("marker"), 0600))
+
+		store, err := New(filePath)
+		require.NoError(t, err)
+		require.NoError(t, store.Initialize())
+
+		assert.NoFileExists(t, filePath)
+	})
+
+	t.Run("skips when skipDefault is true", func(t *testing.T) {
+		filePath := filepath.Join(t.TempDir(), "base.yaml")
+		store, err := New(filePath, WithSkipDefault(true))
+		require.NoError(t, err)
+
+		require.NoError(t, store.Initialize())
+		assert.NoFileExists(t, filePath)
+	})
+
+	t.Run("creates marker file", func(t *testing.T) {
+		dir := t.TempDir()
+		filePath := filepath.Join(dir, "base.yaml")
+		store, err := New(filePath)
+		require.NoError(t, err)
+
+		require.NoError(t, store.Initialize())
+
+		markerPath := filepath.Join(dir, ".base-config-created")
+		assert.FileExists(t, markerPath)
+	})
+}
+
 func TestConcurrentAccess(t *testing.T) {
 	filePath := filepath.Join(t.TempDir(), "base.yaml")
 	store, err := New(filePath)
