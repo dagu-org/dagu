@@ -544,6 +544,16 @@ export const mainListItems = React.forwardRef<
                 customColor={customColor}
               />
             )}
+            {canWrite && config.gitSyncEnabled && (
+              <NavItem
+                to="/git-sync"
+                text="Git Sync"
+                icon={<GitBranch size={18} />}
+                isOpen={isOpen}
+                onClick={onNavItemClick}
+                customColor={customColor}
+              />
+            )}
           </div>
 
           {(canWrite || canAccessSystemStatus || canManageWebhooks || canViewAuditLogs) && (
@@ -554,16 +564,6 @@ export const mainListItems = React.forwardRef<
                   to="/system-status"
                   text="System Status"
                   icon={<Activity size={18} />}
-                  isOpen={isOpen}
-                  onClick={onNavItemClick}
-                  customColor={customColor}
-                />
-              )}
-              {canWrite && config.gitSyncEnabled && (
-                <NavItem
-                  to="/git-sync"
-                  text="Git Sync"
-                  icon={<GitBranch size={18} />}
                   isOpen={isOpen}
                   onClick={onNavItemClick}
                   customColor={customColor}
