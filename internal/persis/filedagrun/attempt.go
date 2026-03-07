@@ -166,6 +166,11 @@ func (att *Attempt) Open(ctx context.Context) error {
 		}
 	}
 
+	// Create the per-run work directory so steps can use DAG_RUN_WORK_DIR immediately
+	if err := os.MkdirAll(att.WorkDir(), 0750); err != nil {
+		return fmt.Errorf("failed to create work directory %s: %w", att.WorkDir(), err)
+	}
+
 	logger.Debug(ctx, "Initializing status file",
 		tag.File(att.file))
 

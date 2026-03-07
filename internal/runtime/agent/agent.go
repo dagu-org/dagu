@@ -414,6 +414,9 @@ func (a *Agent) Run(ctx context.Context) error {
 		if a.workDir == "" {
 			// Shared-nothing mode: create a temp directory as fallback
 			a.workDir = filepath.Join(os.TempDir(), fmt.Sprintf("dagu_%s_%s", fileutil.SafeName(a.dag.Name), a.dagRunID))
+			if err := os.MkdirAll(a.workDir, 0o750); err != nil {
+				return fmt.Errorf("failed to create work directory: %w", err)
+			}
 		}
 	}
 
