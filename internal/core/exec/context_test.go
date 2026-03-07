@@ -2,6 +2,7 @@ package exec_test
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
@@ -97,7 +98,7 @@ func TestNewContext_DAGDocsDir(t *testing.T) {
 			name:      "ConfigHasDocsDir",
 			docsDir:   "/var/dagu/docs",
 			dagName:   "my-workflow",
-			expected:  "/var/dagu/docs/my-workflow",
+			expected:  filepath.Join("/var/dagu/docs", "my-workflow"),
 			expectSet: true,
 		},
 		{

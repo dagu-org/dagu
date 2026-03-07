@@ -674,7 +674,7 @@ func TestEnv_SpecialEnvVars_DAGDocsDirAndParamsJSON(t *testing.T) {
 	ctx = runtime.WithEnv(ctx, env)
 	result := runtime.AllEnvsMap(ctx)
 
-	assert.Equal(t, "/docs/test-dag", result[exec.EnvKeyDAGDocsDir])
+	assert.Equal(t, filepath.Join(cfg.Paths.DocsDir, dag.Name), result[exec.EnvKeyDAGDocsDir])
 	assert.Equal(t, `{"a":"b"}`, result[exec.EnvKeyDAGParamsJSONCompat])
 	assert.Equal(t, `{"a":"b"}`, result[exec.EnvKeyDAGParamsJSON])
 }
