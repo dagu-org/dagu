@@ -344,6 +344,106 @@ steps:
 		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
 	})
 
+	t.Run("ExecuteDAGWithTags", func(t *testing.T) {
+		spec := `
+steps:
+  - name: echo_tags
+    command: echo "tagged"
+`
+		dagName := "test_tags_dag"
+
+		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		tags := []string{"env=prod", "team=backend"}
+		resp := server.Client().Post("/api/v1/dags/"+dagName+"/start", api.ExecuteDAGJSONRequestBody{
+			Tags: &tags,
+		}).ExpectStatus(http.StatusOK).Send(t)
+
+		var execResp api.ExecuteDAG200JSONResponse
+		resp.Unmarshal(t, &execResp)
+		require.NotEmpty(t, execResp.DagRunId)
+
+		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
+	})
+
+	t.Run("ExecuteDAGWithInvalidTags", func(t *testing.T) {
+		spec := `
+steps:
+  - name: echo
+    command: echo "test"
+`
+		dagName := "test_invalid_tags_dag"
+
+		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		tags := []string{"!!!invalid"}
+		resp := server.Client().Post("/api/v1/dags/"+dagName+"/start", api.ExecuteDAGJSONRequestBody{
+			Tags: &tags,
+		}).ExpectStatus(http.StatusBadRequest).Send(t)
+
+		var errResp api.Error
+		resp.Unmarshal(t, &errResp)
+		require.Equal(t, api.ErrorCodeBadRequest, errResp.Code)
+
+		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
+	})
+
+	t.Run("EnqueueDAGWithTags", func(t *testing.T) {
+		spec := `
+steps:
+  - name: echo_tags
+    command: echo "enqueued"
+`
+		dagName := "test_enqueue_tags_dag"
+
+		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		tags := []string{"env=staging", "priority=low"}
+		resp := server.Client().Post("/api/v1/dags/"+dagName+"/enqueue", api.EnqueueDAGDAGRunJSONRequestBody{
+			Tags: &tags,
+		}).ExpectStatus(http.StatusOK).Send(t)
+
+		var enqResp api.EnqueueDAGDAGRun200JSONResponse
+		resp.Unmarshal(t, &enqResp)
+		require.NotEmpty(t, enqResp.DagRunId)
+
+		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
+	})
+
+	t.Run("EnqueueDAGWithInvalidTags", func(t *testing.T) {
+		spec := `
+steps:
+  - name: echo
+    command: echo "test"
+`
+		dagName := "test_enqueue_invalid_tags_dag"
+
+		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		tags := []string{"@@@bad-tag"}
+		resp := server.Client().Post("/api/v1/dags/"+dagName+"/enqueue", api.EnqueueDAGDAGRunJSONRequestBody{
+			Tags: &tags,
+		}).ExpectStatus(http.StatusBadRequest).Send(t)
+
+		var errResp api.Error
+		resp.Unmarshal(t, &errResp)
+		require.Equal(t, api.ErrorCodeBadRequest, errResp.Code)
+
+		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
+	})
+
 	t.Run("EnqueueDAGRunFromSpec", func(t *testing.T) {
 		spec := `
 steps:
