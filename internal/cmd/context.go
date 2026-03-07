@@ -30,6 +30,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
 	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
 	"github.com/dagu-org/dagu/internal/persis/fileagentsoul"
+	"github.com/dagu-org/dagu/internal/persis/filebaseconfig"
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
 	"github.com/dagu-org/dagu/internal/persis/filelicense"
@@ -246,6 +247,20 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		slog.String("data-dir", cfg.Paths.DataDir),
 		slog.String("dag-runs-dir", cfg.Paths.DAGRunsDir),
 	)
+
+	// Initialize default base config if it doesn't exist
+	if cfg.Paths.BaseConfig != "" {
+		bcStore, bcErr := filebaseconfig.New(cfg.Paths.BaseConfig,
+			filebaseconfig.WithSkipDefault(cfg.Core.SkipExamples),
+		)
+		if bcErr != nil {
+			logger.Warn(ctx, "Failed to create base config store", tag.Error(bcErr))
+		} else {
+			if initErr := bcStore.Initialize(); initErr != nil {
+				logger.Warn(ctx, "Failed to initialize default base config", tag.Error(initErr))
+			}
+		}
+	}
 
 	return &Context{
 		Context:         ctx,

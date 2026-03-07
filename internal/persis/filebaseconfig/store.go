@@ -20,9 +20,10 @@ const filePermissions = 0600
 // Store implements a file-based store for the base DAG configuration.
 // Thread-safe through internal locking.
 type Store struct {
-	filePath  string
-	mu        sync.RWMutex
-	fileCache *fileutil.Cache[string]
+	filePath    string
+	mu          sync.RWMutex
+	fileCache   *fileutil.Cache[string]
+	skipDefault bool
 }
 
 // Option is a functional option for configuring the Store.
@@ -32,6 +33,13 @@ type Option func(*Store)
 func WithFileCache(cache *fileutil.Cache[string]) Option {
 	return func(s *Store) {
 		s.fileCache = cache
+	}
+}
+
+// WithSkipDefault disables auto-creation of the default base config file.
+func WithSkipDefault(skip bool) Option {
+	return func(s *Store) {
+		s.skipDefault = skip
 	}
 }
 
@@ -53,6 +61,28 @@ func New(filePath string, opts ...Option) (*Store, error) {
 	}
 
 	return s, nil
+}
+
+// Initialize ensures a default base config exists for first-time users.
+// Skipped if the file already exists, a marker file is present, or skipDefault is set.
+func (s *Store) Initialize() error {
+	if s.skipDefault {
+		return nil
+	}
+	if fileutil.FileExists(s.filePath) {
+		return nil
+	}
+	dir := filepath.Dir(s.filePath)
+	markerFile := filepath.Join(dir, ".base-config-created")
+	if fileutil.FileExists(markerFile) {
+		return nil
+	}
+	if err := fileutil.WriteFileAtomic(s.filePath, []byte(defaultBaseConfig), filePermissions); err != nil {
+		return fmt.Errorf("filebaseconfig: failed to create default base config: %w", err)
+	}
+	markerContent := []byte("# Marker: default base.yaml was auto-created.\n# Delete this file and base.yaml to re-create defaults on next startup.\n")
+	_ = os.WriteFile(markerFile, markerContent, filePermissions)
+	return nil
 }
 
 // GetSpec returns the raw YAML content of the base configuration.

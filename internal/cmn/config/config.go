@@ -116,7 +116,7 @@ type Core struct {
 	TzOffsetInSec int
 	Location      *time.Location
 	DefaultShell  string // Platform default if empty
-	SkipExamples  bool   // Skip auto-creation of example DAGs
+	SkipExamples  bool   // Skip auto-creation of example DAGs and default base config
 	Peer          Peer
 	BaseEnv       BaseEnv
 }
