@@ -1490,6 +1490,19 @@ func (a *Agent) setupRetryPlan(ctx context.Context) error {
 	for _, n := range a.retryTarget.Nodes {
 		nodes = append(nodes, transform.ToNode(n))
 	}
+	// If the previous run was killed before writing node data to the status
+	// (e.g., SIGKILL before the initial 100ms status write), retryTarget.Nodes
+	// will be empty. Fall back to a fresh plan from the DAG definition so that
+	// the retry actually runs all steps instead of producing a 0-node run.
+	if len(nodes) == 0 {
+		logger.Warn(ctx, "Retry target has no nodes; falling back to fresh plan from DAG definition")
+		plan, err := runtime.NewPlan(a.dag.Steps...)
+		if err != nil {
+			return err
+		}
+		a.plan = plan
+		return nil
+	}
 	if a.stepRetry != "" {
 		return a.setupStepRetryPlan(nodes)
 	}

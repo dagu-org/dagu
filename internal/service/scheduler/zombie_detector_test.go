@@ -125,10 +125,68 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 		}
 		procStore.On("IsRunAlive", mock.Anything, dag.ProcGroup(), procRef).Return(false, nil)
 
+		// ReadStatus returns the full status from the attempt
+		attempt.On("ReadStatus", mock.Anything).Return(runningStatus, nil)
+
 		// Expect status update
 		attempt.On("Open", mock.Anything).Return(nil)
 		attempt.On("Write", mock.Anything, mock.MatchedBy(func(s exec.DAGRunStatus) bool {
 			return s.Status == core.Failed && s.FinishedAt != ""
+		})).Return(nil)
+		attempt.On("Close", mock.Anything).Return(nil)
+
+		detector.detectAndCleanZombies(ctx)
+
+		dagRunStore.AssertExpectations(t)
+		procStore.AssertExpectations(t)
+		attempt.AssertExpectations(t)
+	})
+
+	t.Run("ZombieWithNoNodesPopulatesFromDAG", func(t *testing.T) {
+		t.Parallel()
+
+		dagRunStore := &mockDAGRunStore{}
+		procStore := &mockProcStore{}
+		detector := NewZombieDetector(dagRunStore, procStore, time.Second)
+
+		// Status has NO nodes (process killed before initial status write)
+		runningStatus := &exec.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-456",
+			Status:   core.Running,
+			Nodes:    nil, // empty — the bug scenario
+		}
+		dagRunStore.On("ListStatuses", ctx, mock.Anything).Return([]*exec.DAGRunStatus{runningStatus}, nil)
+
+		attempt := &exec.MockDAGRunAttempt{}
+		dagRunRef := exec.NewDAGRunRef("test-dag", "run-456")
+		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return(attempt, nil)
+
+		// DAG has steps defined
+		dag := &core.DAG{
+			Name: "test-dag",
+			Steps: []core.Step{
+				{Name: "step1"},
+				{Name: "step2"},
+			},
+		}
+		attempt.On("ReadDAG", mock.Anything).Return(dag, nil)
+
+		procRef := exec.DAGRunRef{Name: dag.Name, ID: "run-456"}
+		procStore.On("IsRunAlive", mock.Anything, dag.ProcGroup(), procRef).Return(false, nil)
+
+		// ReadStatus returns status with no nodes (process killed before writing)
+		attempt.On("ReadStatus", mock.Anything).Return(runningStatus, nil)
+
+		// Expect status write with nodes populated from DAG steps
+		attempt.On("Open", mock.Anything).Return(nil)
+		attempt.On("Write", mock.Anything, mock.MatchedBy(func(s exec.DAGRunStatus) bool {
+			return s.Status == core.Failed &&
+				len(s.Nodes) == 2 &&
+				s.Nodes[0].Step.Name == "step1" &&
+				s.Nodes[1].Step.Name == "step2" &&
+				s.Nodes[0].Status == core.NodeFailed &&
+				s.Nodes[1].Status == core.NodeFailed
 		})).Return(nil)
 		attempt.On("Close", mock.Anything).Return(nil)
 
@@ -302,6 +360,9 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 			ID:   "run-123",
 		}
 		procStore.On("IsRunAlive", mock.Anything, dag.ProcGroup(), procRef).Return(false, nil)
+
+		// ReadStatus returns the full status from the attempt
+		attempt.On("ReadStatus", mock.Anything).Return(status, nil)
 
 		// Fail to open attempt
 		attempt.On("Open", mock.Anything).Return(errors.New("open error"))
