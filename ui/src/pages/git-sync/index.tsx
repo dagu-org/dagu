@@ -270,6 +270,11 @@ export default function GitSyncPage() {
     setSelectedDags(new Set());
   }, [remoteNode]);
 
+  const allKnownItemIds = useMemo(
+    () => new Set(syncRows.map(({ itemId }) => itemId)),
+    [syncRows]
+  );
+
   // Auto-select publishable items without overriding user manual choices on polling.
   useEffect(() => {
     const next = publishableKey ? publishableKey.split(',') : [];
@@ -277,19 +282,20 @@ export default function GitSyncPage() {
       ? prevPublishableRef.current.split(',')
       : [];
     const prevSet = new Set(prev);
-    const nextSet = new Set(next);
 
     setSelectedDags((current) => {
       if (!userTouchedSelectionRef.current) {
         return new Set(next);
       }
 
+      // Keep any currently selected item that still exists (not just publishable).
       const updated = new Set<string>();
       for (const id of current) {
-        if (nextSet.has(id)) {
+        if (allKnownItemIds.has(id)) {
           updated.add(id);
         }
       }
+      // Auto-add newly publishable items.
       for (const id of next) {
         if (!prevSet.has(id)) {
           updated.add(id)
@@ -299,7 +305,7 @@ export default function GitSyncPage() {
     });
 
     prevPublishableRef.current = publishableKey;
-  }, [publishableKey]);
+  }, [publishableKey, allKnownItemIds]);
 
   // Handlers
   const handlePull = async () => {
@@ -336,7 +342,7 @@ export default function GitSyncPage() {
             params: { query: { remoteNode } },
             body: {
               message: commitMessage || 'Batch update',
-              itemIds: Array.from(selectedDags),
+              itemIds: publishableSelectedIds,
             },
           });
 
@@ -522,7 +528,7 @@ export default function GitSyncPage() {
   );
 
   // Publishable items from current selection
-  const publishableSelectedCount = useMemo(
+  const publishableSelectedIds = useMemo(
     () =>
       Array.from(selectedDags).filter((id) => {
         const row = rowByID.get(id);
@@ -531,9 +537,11 @@ export default function GitSyncPage() {
           (row.item.status === SyncStatus.modified ||
             row.item.status === SyncStatus.untracked)
         );
-      }).length,
+      }),
     [selectedDags, rowByID]
   );
+
+  const publishableSelectedCount = publishableSelectedIds.length;
 
   const selectedCounts = useMemo(() => {
     let dag = 0;
@@ -976,7 +984,7 @@ export default function GitSyncPage() {
             <DialogTitle className="text-base">
               {publishModal.itemId
                 ? `Publish ${publishModal.itemId}`
-                : `Publish ${selectedDags.size} Selected`}
+                : `Publish ${publishableSelectedCount} Selected`}
             </DialogTitle>
             <DialogDescription className="text-xs">
               Enter a commit message for this change.

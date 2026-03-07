@@ -1211,7 +1211,7 @@ func (s *serviceImpl) DeleteBatch(ctx context.Context, itemIDs []string, message
 		return nil, err
 	}
 
-	// Phase 1: validate all items before any mutation.
+	// Phase 1: validate and de-duplicate all items before any mutation.
 	type deleteTarget struct {
 		itemID    string
 		status    SyncStatus
@@ -1219,8 +1219,14 @@ func (s *serviceImpl) DeleteBatch(ctx context.Context, itemIDs []string, message
 		repoPath  string
 	}
 	var targets []deleteTarget
+	seen := make(map[string]struct{}, len(itemIDs))
 
 	for _, itemID := range itemIDs {
+		if _, dup := seen[itemID]; dup {
+			continue
+		}
+		seen[itemID] = struct{}{}
+
 		dagState, exists := state.DAGs[itemID]
 		if !exists {
 			return nil, &DAGNotFoundError{DAGID: itemID}
@@ -1263,18 +1269,17 @@ func (s *serviceImpl) DeleteBatch(ctx context.Context, itemIDs []string, message
 		return nil, err
 	}
 
-	// Delete local files.
-	for _, t := range targets {
-		if err := os.Remove(t.localPath); err != nil && !os.IsNotExist(err) {
-			return nil, fmt.Errorf("failed to remove local file %q: %w", t.itemID, err)
-		}
-	}
-
-	// Stage removals individually — ignore errors for missing items whose
-	// files may not exist in the repo (consistent with single Delete).
+	// Stage removals first so a staging failure does not already delete from disk.
 	for _, t := range targets {
 		if err := s.gitClient.RemoveFile(t.repoPath); err != nil && t.status != StatusMissing {
 			return nil, fmt.Errorf("failed to stage removal of %q: %w", t.itemID, err)
+		}
+	}
+
+	// Delete local files after staging succeeds.
+	for _, t := range targets {
+		if err := os.Remove(t.localPath); err != nil && !os.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to remove local file %q: %w", t.itemID, err)
 		}
 	}
 

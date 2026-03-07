@@ -541,6 +541,12 @@ func (a *API) SyncDeleteBatch(ctx context.Context, req api.SyncDeleteBatchReques
 				Message: err.Error(),
 			}, nil
 		}
+		if gitsync.IsInvalidDAGID(err) {
+			return api.SyncDeleteBatch400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: err.Error(),
+			}, nil
+		}
 		if errors.Is(err, gitsync.ErrCannotDeleteUntracked) || errors.Is(err, gitsync.ErrPushDisabled) {
 			return api.SyncDeleteBatch400JSONResponse{
 				Code:    api.ErrorCodeBadRequest,
