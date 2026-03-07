@@ -174,6 +174,9 @@ type Agent struct {
 	// agentRemoteNodeResolver is the remote node resolver for agent step execution.
 	agentRemoteNodeResolver agentpkg.RemoteNodeResolver
 
+	// workDir is the per-run work directory (for DAG_RUN_WORK_DIR).
+	workDir string
+
 	// Evaluated configs - these are expanded at runtime and stored separately
 	// to avoid mutating the original DAG struct.
 	evaluatedSMTP          *core.SMTPConfig
@@ -404,6 +407,15 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 	}
 
+	// Resolve per-run work directory
+	if attempt != nil {
+		a.workDir = attempt.WorkDir()
+		if a.workDir == "" {
+			// Shared-nothing mode: create a temp directory as fallback
+			a.workDir = filepath.Join(os.TempDir(), fmt.Sprintf("dagu_%s_%s", a.dag.Name, a.dagRunID))
+		}
+	}
+
 	// Initialize the runner
 	a.runner = a.newRunner(attempt)
 
@@ -427,6 +439,9 @@ func (a *Agent) Run(ctx context.Context) error {
 		runtime.WithDefaultExecMode(a.defaultExecMode),
 	}
 
+	if a.workDir != "" {
+		contextOpts = append(contextOpts, runtime.WithWorkDir(a.workDir))
+	}
 	if a.logWriterFactory != nil {
 		contextOpts = append(contextOpts, runtime.WithLogWriterFactory(a.logWriterFactory))
 	}
@@ -521,6 +536,13 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 		if err := attempt.Close(ctx); err != nil {
 			logger.Error(ctx, "Failed to close runstore store", tag.Error(err))
+		}
+		// Clean up temp work dir in shared-nothing mode.
+		// In local mode, cleanup happens via DAGRun.Remove().
+		if a.dagRunStore == nil && a.workDir != "" {
+			if err := os.RemoveAll(a.workDir); err != nil {
+				logger.Warn(ctx, "Failed to remove temp work dir", tag.Error(err))
+			}
 		}
 	}()
 
@@ -1339,6 +1361,13 @@ func (a *Agent) evaluateRegistryAuths(ctx context.Context) error {
 // evaluateWorkingDir evaluates the working directory with environment variables.
 // The result is stored in evaluatedWorkingDir to avoid mutating the original DAG.
 func (a *Agent) evaluateWorkingDir(ctx context.Context) error {
+	// If working_dir was not explicitly set and we have a per-run work dir,
+	// use the work dir as the process working directory.
+	if !a.dag.WorkingDirExplicit && a.workDir != "" {
+		a.evaluatedWorkingDir = a.workDir
+		return nil
+	}
+
 	if a.dag.WorkingDir == "" {
 		return nil
 	}

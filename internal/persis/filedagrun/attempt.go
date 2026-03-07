@@ -507,6 +507,14 @@ func (att *Attempt) Hide(ctx context.Context) error {
 	return nil
 }
 
+// WorkDir returns the path to the per-DAG-run working directory.
+// The work directory lives at the dag-run level (not attempt level)
+// so it persists across retries.
+func (att *Attempt) WorkDir() string {
+	dagRunDir := filepath.Dir(filepath.Dir(att.file))
+	return filepath.Join(dagRunDir, "work")
+}
+
 // readLineFrom reads a line from the file starting at the specified offset.
 // It returns the line, the new offset, and any error encountered.
 // The buffer is used to reduce allocations.

@@ -190,3 +190,36 @@ func TestNewContext_DAGParamsJSON(t *testing.T) {
 		})
 	}
 }
+
+func TestNewContext_DAGRunWorkDir(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		workDir   string
+		expectSet bool
+	}{
+		{name: "WorkDirSet", workDir: "/data/dag-runs/my-dag/work", expectSet: true},
+		{name: "WorkDirEmpty", workDir: "", expectSet: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			dag := &core.DAG{Name: "test-dag"}
+			var opts []exec.ContextOption
+			if tt.workDir != "" {
+				opts = append(opts, exec.WithWorkDir(tt.workDir))
+			}
+			ctx = exec.NewContext(ctx, dag, "run-1", "test.log", opts...)
+			rCtx := exec.GetContext(ctx)
+			result := rCtx.UserEnvsMap()
+			if tt.expectSet {
+				assert.Equal(t, tt.workDir, result[exec.EnvKeyDAGRunWorkDir])
+			} else {
+				_, ok := result[exec.EnvKeyDAGRunWorkDir]
+				assert.False(t, ok, "DAG_RUN_WORK_DIR should not be set")
+			}
+		})
+	}
+}

@@ -64,6 +64,11 @@ type DAG struct {
 	// Relative paths are resolved at build time; variables are expanded at runtime.
 	// Supports environment variable templates (e.g., ${MY_DIR}).
 	WorkingDir string `json:"workingDir,omitempty"`
+	// WorkingDirExplicit is true when WorkingDir was explicitly set in YAML,
+	// base config, or via DefaultWorkingDir option. When false, WorkingDir
+	// was auto-defaulted by the loader to the DAG file's parent directory.
+	// Not serialized — runtime-only flag.
+	WorkingDirExplicit bool `json:"-"`
 	// Location is the absolute path to the DAG file.
 	// It is used to generate unix socket name and can be blank
 	Location string `json:"location,omitempty"`

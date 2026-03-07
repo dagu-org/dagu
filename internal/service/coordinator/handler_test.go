@@ -193,6 +193,8 @@ func (m *mockDAGRunAttempt) ReadStepMessages(_ context.Context, stepName string)
 	return m.stepMessages[stepName], nil
 }
 
+func (m *mockDAGRunAttempt) WorkDir() string { return "" }
+
 // GetStepMessages returns the messages written for a step (for test assertions)
 func (m *mockDAGRunAttempt) GetStepMessages(stepName string) []exec.LLMMessage {
 	m.mu.Lock()

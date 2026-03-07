@@ -84,3 +84,7 @@ func (n *noopDAGRunAttempt) WriteStepMessages(_ context.Context, _ string, _ []L
 func (n *noopDAGRunAttempt) ReadStepMessages(_ context.Context, _ string) ([]LLMMessage, error) {
 	return nil, nil
 }
+
+func (n *noopDAGRunAttempt) WorkDir() string {
+	return ""
+}

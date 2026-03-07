@@ -55,6 +55,9 @@ type DAGRunAttempt interface {
 	// ReadStepMessages reads LLM messages for a single step.
 	// Returns nil if no messages exist for the step.
 	ReadStepMessages(ctx context.Context, stepName string) ([]LLMMessage, error)
+	// WorkDir returns the path to the per-DAG-run working directory.
+	// Returns "" if the attempt does not support local storage (e.g., shared-nothing mode).
+	WorkDir() string
 }
 
 var _ DAGRunAttempt = (*MockDAGRunAttempt)(nil)
@@ -153,4 +156,9 @@ func (m *MockDAGRunAttempt) ReadStepMessages(ctx context.Context, stepName strin
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]LLMMessage), args.Error(1)
+}
+
+func (m *MockDAGRunAttempt) WorkDir() string {
+	args := m.Called()
+	return args.String(0)
 }

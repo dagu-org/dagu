@@ -306,6 +306,10 @@ func (m *mockRemoteDAGRunAttempt) ReadStepMessages(_ context.Context, _ string) 
 	return nil, nil
 }
 
+func (m *mockRemoteDAGRunAttempt) WorkDir() string {
+	return ""
+}
+
 // mockRemoteDAGRunStore implements execution.DAGRunStore for testing
 type mockRemoteDAGRunStore struct {
 	attempts    map[string]exec.DAGRunAttempt

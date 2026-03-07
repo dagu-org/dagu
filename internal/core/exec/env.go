@@ -33,4 +33,7 @@ const (
 	// EnvKeyDAGParamsJSONCompat is the DAG_-prefixed key for resolved parameters JSON.
 	// Both DAG_PARAMS_JSON and DAGU_PARAMS_JSON are set for backward compatibility.
 	EnvKeyDAGParamsJSONCompat = "DAG_PARAMS_JSON"
+
+	// EnvKeyDAGRunWorkDir holds the path to the per-DAG-run working directory.
+	EnvKeyDAGRunWorkDir = "DAG_RUN_WORK_DIR"
 )
