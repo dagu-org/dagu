@@ -100,7 +100,7 @@ func collectNamesAndIDs(dag *DAG, errs *ErrorList) (stepNames, stepIDs map[strin
 		}
 
 		if !isValidStepID(step.ID) {
-			*errs = append(*errs, NewValidationError("steps", step.ID, fmt.Errorf("invalid step ID format: must match pattern ^[a-zA-Z][a-zA-Z0-9_]*$ (hyphens are not allowed)")))
+			*errs = append(*errs, NewValidationError("steps", step.ID, fmt.Errorf("invalid step ID format: must match %s (use '_' instead of '-')", stepIDPattern.String())))
 		}
 
 		if _, exists := stepIDs[step.ID]; exists {

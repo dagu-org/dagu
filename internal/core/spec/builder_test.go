@@ -1734,6 +1734,16 @@ steps:
 			errContains: "invalid step ID format",
 		},
 		{
+			name: "HyphenInID",
+			yaml: `
+steps:
+  - name: step1
+    id: my-step
+    command: echo test
+`,
+			errContains: "invalid step ID format",
+		},
+		{
 			name: "DuplicateIDs",
 			yaml: `
 steps:
