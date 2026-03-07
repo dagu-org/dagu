@@ -1014,10 +1014,7 @@ paths:
                   description: "If true, prevent starting if DAG is already running (returns 409 conflict)"
                   default: false
                 tags:
-                  type: array
-                  items:
-                    type: string
-                  description: "Additional tags to apply to the DAG-run (format: key=value or key-only). Merged with tags defined in the DAG spec."
+                  $ref: "#/components/schemas/Tags"
       responses:
         "200":
           description: "A successful response"
@@ -1030,6 +1027,12 @@ paths:
                     $ref: "#/components/schemas/DAGRunId"
                 required:
                   - dagRunId
+        "400":
+          description: "Invalid request parameters or tags"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "409":
           description: "DAG is already running (singleton mode) or dagRunId already exists"
           content:
@@ -1082,10 +1085,7 @@ paths:
                   description: "If true, prevent starting if DAG is already running (returns 409 conflict)"
                   default: false
                 tags:
-                  type: array
-                  items:
-                    type: string
-                  description: "Additional tags to apply to the DAG-run (format: key=value or key-only). Merged with tags defined in the DAG spec."
+                  $ref: "#/components/schemas/Tags"
                 timeout:
                   type: integer
                   minimum: 1
@@ -1103,6 +1103,12 @@ paths:
                 properties:
                   dagRun:
                     $ref: "#/components/schemas/DAGRunDetails"
+        "400":
+          description: "Invalid request parameters or tags"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "408":
           description: "Timeout waiting for DAG execution to complete. The DAG run continues executing in the background."
           content:
@@ -1157,10 +1163,7 @@ paths:
                   description: "If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)"
                   default: false
                 tags:
-                  type: array
-                  items:
-                    type: string
-                  description: "Additional tags to apply to the DAG-run (format: key=value or key-only). Merged with tags defined in the DAG spec."
+                  $ref: "#/components/schemas/Tags"
       responses:
         "200":
           description: "A successful response"
@@ -1173,6 +1176,12 @@ paths:
                     $ref: "#/components/schemas/DAGRunId"
                 required:
                   - dagRunId
+        "400":
+          description: "Invalid request parameters or tags"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "409":
           description: "DAG is already running or queued (singleton mode)"
           content:
@@ -1606,10 +1615,7 @@ paths:
                   description: "If true, prevent starting if a DAG with the same name is already running (returns 409)"
                   default: false
                 tags:
-                  type: array
-                  items:
-                    type: string
-                  description: "Additional tags to apply to the DAG-run (format: key=value or key-only). Merged with tags defined in the DAG spec."
+                  $ref: "#/components/schemas/Tags"
               required:
                 - spec
       responses:
@@ -1684,10 +1690,7 @@ paths:
                   description: "If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)"
                   default: false
                 tags:
-                  type: array
-                  items:
-                    type: string
-                  description: "Additional tags to apply to the DAG-run (format: key=value or key-only). Merged with tags defined in the DAG spec."
+                  $ref: "#/components/schemas/Tags"
               required:
                 - spec
       responses:
@@ -6266,6 +6269,12 @@ components:
         type: string
 
   schemas:
+    Tags:
+      type: array
+      items:
+        type: string
+      description: "Additional tags to apply to the DAG-run (format: key=value or key-only). Merged with tags defined in the DAG spec."
+
     AuditEntry:
       type: object
       description: "A single audit log entry"

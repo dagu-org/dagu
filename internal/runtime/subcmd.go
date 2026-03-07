@@ -254,6 +254,10 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 		args = append(args, fmt.Sprintf("--worker-id=%s", task.WorkerId))
 	}
 
+	if task.Tags != "" {
+		args = append(args, fmt.Sprintf("--tags=%s", task.Tags))
+	}
+
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
 	}

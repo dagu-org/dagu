@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -61,16 +60,8 @@ func runEnqueue(ctx *Context, args []string) error {
 		dag.Queue = queueOverride
 	}
 
-	tagsStr, err := ctx.StringParam("tags")
-	if err != nil {
-		return fmt.Errorf("failed to get tags: %w", err)
-	}
-	if tagsStr != "" {
-		extraTags := core.NewTags(strings.Split(tagsStr, ","))
-		if err := core.ValidateTags(extraTags); err != nil {
-			return fmt.Errorf("invalid tags: %w", err)
-		}
-		dag.Tags = append(dag.Tags, extraTags...)
+	if err := parseAndAppendTags(ctx, dag); err != nil {
+		return err
 	}
 
 	triggerType, err := parseTriggerTypeParam(ctx)

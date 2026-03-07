@@ -170,16 +170,8 @@ func runStart(ctx *Context, args []string) error {
 		}
 	}
 
-	tagsStr, err := ctx.StringParam("tags")
-	if err != nil {
-		return fmt.Errorf("failed to get tags: %w", err)
-	}
-	if tagsStr != "" {
-		extraTags := core.NewTags(strings.Split(tagsStr, ","))
-		if err := core.ValidateTags(extraTags); err != nil {
-			return fmt.Errorf("invalid tags: %w", err)
-		}
-		dag.Tags = append(dag.Tags, extraTags...)
+	if err := parseAndAppendTags(ctx, dag); err != nil {
+		return err
 	}
 
 	root, err := determineRootDAGRun(isSubDAGRun, rootRef, dag, dagRunID)
@@ -332,6 +324,22 @@ func loadDAGWithParams(ctx *Context, args []string, isSubDAGRun bool) (*core.DAG
 	return dag, params, nil
 }
 
+// parseAndAppendTags parses the --tags flag and appends validated tags to the DAG.
+func parseAndAppendTags(ctx *Context, dag *core.DAG) error {
+	tagsStr, err := ctx.StringParam("tags")
+	if err != nil {
+		return fmt.Errorf("failed to get tags: %w", err)
+	}
+	if tagsStr != "" {
+		extraTags := core.NewTags(strings.Split(tagsStr, ","))
+		if err := core.ValidateTags(extraTags); err != nil {
+			return fmt.Errorf("invalid tags: %w", err)
+		}
+		dag.Tags = append(dag.Tags, extraTags...)
+	}
+	return nil
+}
+
 // determineRootDAGRun creates or parses the root execution reference.
 func determineRootDAGRun(isSubDAGRun bool, rootDAGRun string, dag *core.DAG, dagRunID string) (exec.DAGRunRef, error) {
 	if isSubDAGRun {
@@ -461,12 +469,18 @@ func dispatchToCoordinatorAndWait(ctx *Context, d *core.DAG, dagRunID string, co
 		slog.Any("worker-selector", d.WorkerSelector),
 	)
 
+	var taskOpts []executor.TaskOption
+	taskOpts = append(taskOpts, executor.WithWorkerSelector(d.WorkerSelector))
+	if len(d.Tags) > 0 {
+		taskOpts = append(taskOpts, executor.WithTags(strings.Join(d.Tags.Strings(), ",")))
+	}
+
 	task := executor.CreateTask(
 		d.Name,
 		string(d.YamlData),
 		coordinatorv1.Operation_OPERATION_START,
 		dagRunID,
-		executor.WithWorkerSelector(d.WorkerSelector),
+		taskOpts...,
 	)
 
 	if err := coordinatorCli.Dispatch(signalAwareCtx, task); err != nil {
