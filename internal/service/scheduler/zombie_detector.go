@@ -174,17 +174,32 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *exec.DAGRu
 		tag.Queue(dag.ProcGroup()),
 	)
 
-	// Update the status to error
-	st.Status = core.Failed
-	st.FinishedAt = time.Now().Format(time.RFC3339)
-	for _, n := range st.Nodes {
-		if n.Status == core.NodeRunning {
+	// Read the full status from the attempt rather than using the summary
+	// from ListStatuses, which lacks node data. This ensures we preserve
+	// the complete status (nodes, logs, params, etc.) when updating.
+	fullStatus, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return fmt.Errorf("read full status: %w", err)
+	}
+
+	fullStatus.Status = core.Failed
+	fullStatus.FinishedAt = time.Now().Format(time.RFC3339)
+
+	// If the process was killed before writing node data (e.g., SIGKILL before
+	// the initial 100ms status write), populate nodes from the DAG definition
+	// so the UI shows step names instead of "0/0 Log".
+	if len(fullStatus.Nodes) == 0 {
+		fullStatus.Nodes = exec.NewNodesFromSteps(dag.Steps)
+	}
+
+	for _, n := range fullStatus.Nodes {
+		if n.Status == core.NodeRunning || n.Status == core.NodeNotStarted {
 			n.Status = core.NodeFailed
 			n.Error = "process terminated unexpectedly - zombie process detected"
 		}
 	}
 
-	if err := z.updateStatus(ctx, attempt, *st); err != nil {
+	if err := z.updateStatus(ctx, attempt, *fullStatus); err != nil {
 		return fmt.Errorf("update status: %w", err)
 	}
 
