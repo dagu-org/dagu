@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package cmd
 
 import (
@@ -254,7 +257,9 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		bcStore, bcErr := filebaseconfig.New(cfg.Paths.BaseConfig,
 			filebaseconfig.WithSkipDefault(cfg.Core.SkipExamples),
 		)
-		if bcErr == nil {
+		if bcErr != nil {
+			logger.Warn(ctx, "Failed to create base config store", tag.Error(bcErr))
+		} else {
 			if initErr := bcStore.Initialize(); initErr != nil {
 				logger.Warn(ctx, "Failed to initialize default base config", tag.Error(initErr))
 			}

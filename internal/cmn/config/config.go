@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package config
 
 import (
@@ -116,7 +119,7 @@ type Core struct {
 	TzOffsetInSec int
 	Location      *time.Location
 	DefaultShell  string // Platform default if empty
-	SkipExamples  bool   // Skip auto-creation of example DAGs
+	SkipExamples  bool   // Skip auto-creation of example DAGs and default base config
 	Peer          Peer
 	BaseEnv       BaseEnv
 }
