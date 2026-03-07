@@ -18,6 +18,7 @@ export function useSyncReconcile({ remoteNode, onSuccess }: UseSyncReconcileOpti
   const [isMoving, setIsMoving] = useState(false);
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [isDeletingMissing, setIsDeletingMissing] = useState(false);
+  const [isDeletingBatch, setIsDeletingBatch] = useState(false);
 
   const handleForget = async (itemId: string) => {
     setIsForgetting(true);
@@ -129,14 +130,39 @@ export function useSyncReconcile({ remoteNode, onSuccess }: UseSyncReconcileOpti
     }
   };
 
+  const handleDeleteBatch = async (itemIds: string[], message: string, force: boolean) => {
+    setIsDeletingBatch(true);
+    try {
+      const response = await client.POST('/sync/delete-batch', {
+        params: { query: { remoteNode } },
+        body: { itemIds, message, force },
+      });
+      if (response.error) {
+        showError(response.error.message || 'Batch delete failed');
+        return false;
+      }
+      const count = response.data?.deleted?.length || 0;
+      showToast(`Deleted ${count} item${count !== 1 ? 's' : ''}`);
+      onSuccess();
+      return true;
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Batch delete failed');
+      return false;
+    } finally {
+      setIsDeletingBatch(false);
+    }
+  };
+
   return {
     isForgetting,
     isDeleting,
+    isDeletingBatch,
     isMoving,
     isCleaningUp,
     isDeletingMissing,
     handleForget,
     handleDelete,
+    handleDeleteBatch,
     handleMove,
     handleCleanup,
     handleDeleteMissing,

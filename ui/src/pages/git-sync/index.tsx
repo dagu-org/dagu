@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { BatchDeleteDialog } from './BatchDeleteDialog';
 import { CleanupDialog } from './CleanupDialog';
 import { DeleteDialog } from './DeleteDialog';
 import { DeleteMissingDialog } from './DeleteMissingDialog';
@@ -175,6 +176,7 @@ export default function GitSyncPage() {
   const [moveModal, setMoveModal] = useState<{ open: boolean; itemId?: string }>({ open: false });
   const [cleanupModal, setCleanupModal] = useState(false);
   const [deleteMissingModal, setDeleteMissingModal] = useState(false);
+  const [batchDeleteModal, setBatchDeleteModal] = useState(false);
   const [selectedDags, setSelectedDags] = useState<Set<string>>(new Set());
   const userTouchedSelectionRef = useRef(false);
   const prevPublishableRef = useRef<string>('');
@@ -268,6 +270,11 @@ export default function GitSyncPage() {
     setSelectedDags(new Set());
   }, [remoteNode]);
 
+  const allKnownItemIds = useMemo(
+    () => new Set(syncRows.map(({ itemId }) => itemId)),
+    [syncRows]
+  );
+
   // Auto-select publishable items without overriding user manual choices on polling.
   useEffect(() => {
     const next = publishableKey ? publishableKey.split(',') : [];
@@ -275,19 +282,20 @@ export default function GitSyncPage() {
       ? prevPublishableRef.current.split(',')
       : [];
     const prevSet = new Set(prev);
-    const nextSet = new Set(next);
 
     setSelectedDags((current) => {
       if (!userTouchedSelectionRef.current) {
         return new Set(next);
       }
 
+      // Keep any currently selected item that still exists (not just publishable).
       const updated = new Set<string>();
       for (const id of current) {
-        if (nextSet.has(id)) {
+        if (allKnownItemIds.has(id)) {
           updated.add(id);
         }
       }
+      // Auto-add newly publishable items.
       for (const id of next) {
         if (!prevSet.has(id)) {
           updated.add(id)
@@ -297,7 +305,7 @@ export default function GitSyncPage() {
     });
 
     prevPublishableRef.current = publishableKey;
-  }, [publishableKey]);
+  }, [publishableKey, allKnownItemIds]);
 
   // Handlers
   const handlePull = async () => {
@@ -334,7 +342,7 @@ export default function GitSyncPage() {
             params: { query: { remoteNode } },
             body: {
               message: commitMessage || 'Batch update',
-              itemIds: Array.from(selectedDags),
+              itemIds: publishableSelectedIds,
             },
           });
 
@@ -418,38 +426,30 @@ export default function GitSyncPage() {
     [syncRows, typeFilter, statusFilter]
   );
 
-  // Publishable DAG IDs among currently visible (filtered) rows
-  const publishableItemIDs = useMemo(
-    () =>
-      filteredRows
-        .filter(
-          ({ item }) =>
-            item.status === SyncStatus.modified ||
-            item.status === SyncStatus.untracked
-        )
-        .map(({ itemId }) => itemId),
+  const allVisibleItemIDs = useMemo(
+    () => filteredRows.map(({ itemId }) => itemId),
     [filteredRows]
   );
 
-  const allPublishableSelected = useMemo(
+  const allVisibleSelected = useMemo(
     () =>
-      publishableItemIDs.length > 0 &&
-      publishableItemIDs.every((id) => selectedDags.has(id)),
-    [publishableItemIDs, selectedDags]
+      allVisibleItemIDs.length > 0 &&
+      allVisibleItemIDs.every((id) => selectedDags.has(id)),
+    [allVisibleItemIDs, selectedDags]
   );
 
   const handleToggleSelectAll = useCallback(() => {
     userTouchedSelectionRef.current = true;
     setSelectedDags((prev) => {
       const next = new Set(prev);
-      if (allPublishableSelected) {
-        for (const id of publishableItemIDs) next.delete(id);
+      if (allVisibleSelected) {
+        for (const id of allVisibleItemIDs) next.delete(id);
       } else {
-        for (const id of publishableItemIDs) next.add(id);
+        for (const id of allVisibleItemIDs) next.add(id);
       }
       return next;
     });
-  }, [allPublishableSelected, publishableItemIDs]);
+  }, [allVisibleSelected, allVisibleItemIDs]);
 
   const handleToggleItem = useCallback((itemId: string) => {
     userTouchedSelectionRef.current = true;
@@ -503,6 +503,45 @@ export default function GitSyncPage() {
     () => new Map(syncRows.map((row) => [row.itemId, row] as const)),
     [syncRows]
   );
+
+  // Deletable items from current selection (synced, modified, conflict, missing — not untracked)
+  const deletableSelectedIds = useMemo(
+    () =>
+      Array.from(selectedDags).filter((id) => {
+        const row = rowByID.get(id);
+        return row && row.item.status !== SyncStatus.untracked;
+      }),
+    [selectedDags, rowByID]
+  );
+
+  const hasModifiedOrConflictInSelection = useMemo(
+    () =>
+      deletableSelectedIds.some((id) => {
+        const row = rowByID.get(id);
+        return (
+          row &&
+          (row.item.status === SyncStatus.modified ||
+            row.item.status === SyncStatus.conflict)
+        );
+      }),
+    [deletableSelectedIds, rowByID]
+  );
+
+  // Publishable items from current selection
+  const publishableSelectedIds = useMemo(
+    () =>
+      Array.from(selectedDags).filter((id) => {
+        const row = rowByID.get(id);
+        return (
+          row &&
+          (row.item.status === SyncStatus.modified ||
+            row.item.status === SyncStatus.untracked)
+        );
+      }),
+    [selectedDags, rowByID]
+  );
+
+  const publishableSelectedCount = publishableSelectedIds.length;
 
   const selectedCounts = useMemo(() => {
     let dag = 0;
@@ -599,17 +638,29 @@ export default function GitSyncPage() {
             size="sm"
             className="h-8 w-8 p-0"
             onClick={() => setPublishModal({ open: true })}
-            disabled={selectedDags.size === 0 || !config?.pushEnabled || !canWrite}
+            disabled={publishableSelectedCount === 0 || !config?.pushEnabled || !canWrite}
             title={
               !canWrite
                 ? 'Write permission required'
                 : !config?.pushEnabled
                   ? 'Push disabled in read-only mode'
-                  : `Publish ${selectedDags.size} selected`
+                  : `Publish ${publishableSelectedCount} selected`
             }
           >
             <Upload className="h-4 w-4" />
           </Button>
+          {deletableSelectedIds.length > 0 && config?.pushEnabled && canWrite && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-xs text-destructive hover:text-destructive"
+              onClick={() => setBatchDeleteModal(true)}
+              title={`Delete ${deletableSelectedIds.length} selected`}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete ({deletableSelectedIds.length})
+            </Button>
+          )}
           {missingCount > 0 && canWrite && (
             <Button
               variant="ghost"
@@ -728,11 +779,11 @@ export default function GitSyncPage() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-8">
-                {publishableItemIDs.length > 0 && (
+                {allVisibleItemIDs.length > 0 && (
                   <Checkbox
-                    checked={allPublishableSelected}
+                    checked={allVisibleSelected}
                     onCheckedChange={handleToggleSelectAll}
-                    aria-label="Select all publishable items"
+                    aria-label="Select all items"
                   />
                 )}
               </TableHead>
@@ -760,14 +811,11 @@ export default function GitSyncPage() {
                   onClick={() => handleViewDiff(itemId)}
                 >
                   <TableCell onClick={(e) => e.stopPropagation()}>
-                    {(item.status === SyncStatus.modified ||
-                      item.status === SyncStatus.untracked) && (
-                      <Checkbox
-                        checked={selectedDags.has(itemId)}
-                        onCheckedChange={() => handleToggleItem(itemId)}
-                        aria-label={`Select ${itemId}`}
-                      />
-                    )}
+                    <Checkbox
+                      checked={selectedDags.has(itemId)}
+                      onCheckedChange={() => handleToggleItem(itemId)}
+                      aria-label={`Select ${itemId}`}
+                    />
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
@@ -936,7 +984,7 @@ export default function GitSyncPage() {
             <DialogTitle className="text-base">
               {publishModal.itemId
                 ? `Publish ${publishModal.itemId}`
-                : `Publish ${selectedDags.size} Selected`}
+                : `Publish ${publishableSelectedCount} Selected`}
             </DialogTitle>
             <DialogDescription className="text-xs">
               Enter a commit message for this change.
@@ -1142,6 +1190,22 @@ export default function GitSyncPage() {
           }
         }}
         onCancel={() => setDeleteMissingModal(false)}
+      />
+
+      {/* Batch Delete Dialog */}
+      <BatchDeleteDialog
+        open={batchDeleteModal}
+        itemIds={deletableSelectedIds}
+        hasModifiedOrConflict={hasModifiedOrConflictInSelection}
+        isDeletingBatch={reconcile.isDeletingBatch}
+        onConfirm={async (message, force) => {
+          if (await reconcile.handleDeleteBatch(deletableSelectedIds, message, force)) {
+            setBatchDeleteModal(false);
+            setSelectedDags(new Set());
+            userTouchedSelectionRef.current = false;
+          }
+        }}
+        onCancel={() => setBatchDeleteModal(false)}
       />
     </div>
   );
