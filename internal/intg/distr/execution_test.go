@@ -335,6 +335,59 @@ steps:
 	})
 }
 
+func TestExecution_WorkDir(t *testing.T) {
+	t.Run("sharedNothingWorkDir", func(t *testing.T) {
+		f := newTestFixture(t, `
+type: graph
+name: workdir-shared-nothing-test
+worker_selector:
+  test: "true"
+steps:
+  - name: write-to-workdir
+    command: echo "hello" > "${DAG_RUN_WORK_DIR}/test.txt"
+  - name: read-from-workdir
+    command: cat "${DAG_RUN_WORK_DIR}/test.txt"
+    depends: [write-to-workdir]
+`, withLogPersistence())
+		defer f.cleanup()
+
+		require.NoError(t, f.enqueue())
+		f.waitForQueued()
+		f.startScheduler(30 * time.Second)
+
+		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+
+		require.Equal(t, core.Succeeded, status.Status)
+		f.assertAllNodesSucceeded(status)
+		assertLogContains(t, f.logDir(), f.dagWrapper.Name, status.DAGRunID, "read-from-workdir", "hello")
+	})
+
+	t.Run("sharedFSWorkDir", func(t *testing.T) {
+		f := newTestFixture(t, `
+type: graph
+name: workdir-sharedfs-test
+worker_selector:
+  test: "true"
+steps:
+  - name: write-to-workdir
+    command: echo "world" > "${DAG_RUN_WORK_DIR}/data.txt"
+  - name: read-from-workdir
+    command: cat "${DAG_RUN_WORK_DIR}/data.txt"
+    depends: [write-to-workdir]
+`, withWorkerMode(sharedFSMode), withLogPersistence())
+		defer f.cleanup()
+
+		require.NoError(t, f.enqueue())
+		f.waitForQueued()
+		f.startScheduler(30 * time.Second)
+
+		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+
+		require.Equal(t, core.Succeeded, status.Status)
+		f.assertAllNodesSucceeded(status)
+	})
+}
+
 func TestExecution_QueueLifecycle(t *testing.T) {
 	t.Run("queueItemRemovedAfterSuccess", func(t *testing.T) {
 		f := newTestFixture(t, `
