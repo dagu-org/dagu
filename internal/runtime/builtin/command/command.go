@@ -145,7 +145,8 @@ func (e *commandExecutor) Kill(sig os.Signal) error {
 }
 
 // annotateStderrTail writes the full script to the stderr log with the
-// failing line(s) marked. Returns the tail unchanged for the error field.
+// failing line(s) marked, and returns a cleaned version of the tail with
+// the temp script path stripped for use in the error field.
 func (e *commandExecutor) annotateStderrTail(tail string) string {
 	if e.config.Script == "" || e.scriptFile == "" {
 		return tail
