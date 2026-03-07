@@ -507,12 +507,17 @@ func (att *Attempt) Hide(ctx context.Context) error {
 	return nil
 }
 
+// dagRunDir returns the dag-run directory (parent of the attempt directory).
+// The dag-run dir contains attempt dirs, messages, work dir, etc.
+func (att *Attempt) dagRunDir() string {
+	return filepath.Dir(filepath.Dir(att.file))
+}
+
 // WorkDir returns the path to the per-DAG-run working directory.
 // The work directory lives at the dag-run level (not attempt level)
 // so it persists across retries.
 func (att *Attempt) WorkDir() string {
-	dagRunDir := filepath.Dir(filepath.Dir(att.file))
-	return filepath.Join(dagRunDir, "work")
+	return filepath.Join(att.dagRunDir(), "work")
 }
 
 // readLineFrom reads a line from the file starting at the specified offset.
@@ -601,8 +606,7 @@ func (att *Attempt) WriteStepMessages(_ context.Context, stepName string, messag
 	}
 
 	// Store at dag-run level (parent of attempt directory) for retry persistence
-	dagRunDir := filepath.Dir(filepath.Dir(att.file))
-	messagesDir := filepath.Join(dagRunDir, MessagesDir)
+	messagesDir := filepath.Join(att.dagRunDir(), MessagesDir)
 
 	if err := os.MkdirAll(messagesDir, 0750); err != nil {
 		return fmt.Errorf("failed to create messages directory: %w", err)
@@ -626,8 +630,7 @@ func (att *Attempt) WriteStepMessages(_ context.Context, stepName string, messag
 // Returns nil if no messages exist for the step.
 func (att *Attempt) ReadStepMessages(_ context.Context, stepName string) ([]exec.LLMMessage, error) {
 	// Read from dag-run level (parent of attempt directory) for retry persistence
-	dagRunDir := filepath.Dir(filepath.Dir(att.file))
-	file := filepath.Join(dagRunDir, MessagesDir, stepName+".json")
+	file := filepath.Join(att.dagRunDir(), MessagesDir, stepName+".json")
 
 	data, err := os.ReadFile(file) //nolint:gosec
 	if err != nil {
