@@ -24,6 +24,7 @@ import (
 	agentpkg "github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/cmn/mailer"
@@ -412,7 +413,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		a.workDir = attempt.WorkDir()
 		if a.workDir == "" {
 			// Shared-nothing mode: create a temp directory as fallback
-			a.workDir = filepath.Join(os.TempDir(), fmt.Sprintf("dagu_%s_%s", a.dag.Name, a.dagRunID))
+			a.workDir = filepath.Join(os.TempDir(), fmt.Sprintf("dagu_%s_%s", fileutil.SafeName(a.dag.Name), a.dagRunID))
 		}
 	}
 
