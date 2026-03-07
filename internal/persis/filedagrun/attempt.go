@@ -166,6 +166,11 @@ func (att *Attempt) Open(ctx context.Context) error {
 		}
 	}
 
+	// Create the per-run work directory so steps can use DAG_RUN_WORK_DIR immediately
+	if err := os.MkdirAll(att.WorkDir(), 0750); err != nil {
+		return fmt.Errorf("failed to create work directory %s: %w", att.WorkDir(), err)
+	}
+
 	logger.Debug(ctx, "Initializing status file",
 		tag.File(att.file))
 
@@ -507,6 +512,19 @@ func (att *Attempt) Hide(ctx context.Context) error {
 	return nil
 }
 
+// dagRunDir returns the dag-run directory (parent of the attempt directory).
+// The dag-run dir contains attempt dirs, messages, work dir, etc.
+func (att *Attempt) dagRunDir() string {
+	return filepath.Dir(filepath.Dir(att.file))
+}
+
+// WorkDir returns the path to the per-DAG-run working directory.
+// The work directory lives at the dag-run level (not attempt level)
+// so it persists across retries.
+func (att *Attempt) WorkDir() string {
+	return filepath.Join(att.dagRunDir(), "work")
+}
+
 // readLineFrom reads a line from the file starting at the specified offset.
 // It returns the line, the new offset, and any error encountered.
 // The buffer is used to reduce allocations.
@@ -593,8 +611,7 @@ func (att *Attempt) WriteStepMessages(_ context.Context, stepName string, messag
 	}
 
 	// Store at dag-run level (parent of attempt directory) for retry persistence
-	dagRunDir := filepath.Dir(filepath.Dir(att.file))
-	messagesDir := filepath.Join(dagRunDir, MessagesDir)
+	messagesDir := filepath.Join(att.dagRunDir(), MessagesDir)
 
 	if err := os.MkdirAll(messagesDir, 0750); err != nil {
 		return fmt.Errorf("failed to create messages directory: %w", err)
@@ -618,8 +635,7 @@ func (att *Attempt) WriteStepMessages(_ context.Context, stepName string, messag
 // Returns nil if no messages exist for the step.
 func (att *Attempt) ReadStepMessages(_ context.Context, stepName string) ([]exec.LLMMessage, error) {
 	// Read from dag-run level (parent of attempt directory) for retry persistence
-	dagRunDir := filepath.Dir(filepath.Dir(att.file))
-	file := filepath.Join(dagRunDir, MessagesDir, stepName+".json")
+	file := filepath.Join(att.dagRunDir(), MessagesDir, stepName+".json")
 
 	data, err := os.ReadFile(file) //nolint:gosec
 	if err != nil {

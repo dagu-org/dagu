@@ -145,6 +145,7 @@ type contextOptions struct {
 	logEncodingCharset string
 	logWriterFactory   LogWriterFactory
 	defaultExecMode    config.ExecutionMode
+	workDir            string
 }
 
 // ContextOption configures optional parameters for NewContext.
@@ -207,6 +208,13 @@ func WithDefaultExecMode(mode config.ExecutionMode) ContextOption {
 	}
 }
 
+// WithWorkDir sets the per-DAG-run working directory path.
+func WithWorkDir(dir string) ContextOption {
+	return func(o *contextOptions) {
+		o.workDir = dir
+	}
+}
+
 // NewContext creates a new context with DAG execution metadata.
 // Required: ctx, dag, dagRunID, logFile
 // Optional: use ContextOption functions (WithDatabase, WithParams, etc.)
@@ -239,8 +247,10 @@ func NewContext(
 	maps.Copy(envs, stringutil.KeyValuesToMap(options.params))
 	maps.Copy(envs, stringutil.KeyValuesToMap(dag.Env))
 
-	// DAG_PARAMS_JSON + DAGU_PARAMS_JSON (backward compat)
-	// Set after merges so user-defined params/env cannot cause the two keys to diverge.
+	// Set runtime-managed env vars after merges so user-defined params/env cannot override them.
+	if options.workDir != "" {
+		envs[EnvKeyDAGRunWorkDir] = options.workDir
+	}
 	if dag.ParamsJSON != "" {
 		envs[EnvKeyDAGParamsJSONCompat] = dag.ParamsJSON
 		envs[EnvKeyDAGParamsJSON] = dag.ParamsJSON

@@ -42,6 +42,8 @@ var (
 	WithLogWriterFactory = exec.WithLogWriterFactory
 	// WithDefaultExecMode sets the server-level default execution mode.
 	WithDefaultExecMode = exec.WithDefaultExecMode
+	// WithWorkDir sets the per-DAG-run working directory path.
+	WithWorkDir = exec.WithWorkDir
 )
 
 // LogWriterFactory is re-exported from execution package

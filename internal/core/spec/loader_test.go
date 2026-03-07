@@ -488,6 +488,61 @@ steps:
 	})
 }
 
+func TestWorkingDirExplicit(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ExplicitlySet", func(t *testing.T) {
+		t.Parallel()
+
+		dagFile := createTempYAMLFile(t, `
+working_dir: /custom
+steps:
+  - name: a
+    command: echo hi
+`)
+		dag, err := spec.Load(context.Background(), dagFile)
+		require.NoError(t, err)
+		assert.True(t, dag.WorkingDirExplicit)
+	})
+
+	t.Run("DefaultedToFileDir", func(t *testing.T) {
+		t.Parallel()
+
+		dagFile := createTempYAMLFile(t, `steps:
+  - name: a
+    command: echo hi
+`)
+		dag, err := spec.Load(context.Background(), dagFile)
+		require.NoError(t, err)
+		assert.False(t, dag.WorkingDirExplicit)
+	})
+
+	t.Run("FromBaseConfig", func(t *testing.T) {
+		t.Parallel()
+
+		baseDAG := createTempYAMLFile(t, `working_dir: /shared/workspace`)
+		childDAG := createTempYAMLFile(t, `steps:
+  - name: a
+    command: echo hi
+`)
+		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseDAG))
+		require.NoError(t, err)
+		assert.True(t, dag.WorkingDirExplicit)
+	})
+
+	t.Run("FromDefaultWorkingDir", func(t *testing.T) {
+		t.Parallel()
+
+		dagFile := createTempYAMLFile(t, `steps:
+  - name: a
+    command: echo hi
+`)
+		dag, err := spec.Load(context.Background(), dagFile, spec.WithDefaultWorkingDir("/default"))
+		require.NoError(t, err)
+		assert.True(t, dag.WorkingDirExplicit)
+	})
+}
+
 func TestLoadYAML(t *testing.T) {
 	t.Parallel()
 

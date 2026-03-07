@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"hash/fnv"
+	"regexp"
 	"strings"
 	"time"
 
@@ -17,6 +19,29 @@ var (
 	ErrNoStatusData        = errors.New("no status data")
 	ErrCorruptedStatusFile = errors.New("corrupted status file") // Status file exists but contains no valid data or is corrupted
 )
+
+// reDAGRunID validates dag-run IDs: alphanumeric, hyphens, and underscores only.
+var reDAGRunID = regexp.MustCompile(`^[-a-zA-Z0-9_]+$`)
+
+// maxDAGRunIDLen is the maximum allowed length of a dag-run ID.
+const maxDAGRunIDLen = 64
+
+// ValidateDAGRunID checks that the dag-run ID contains only safe characters
+// (alphanumeric, hyphens, underscores) and does not exceed the max length.
+// Returns nil if the ID is valid. Returns an error if the ID is empty, contains
+// invalid characters, or is too long.
+func ValidateDAGRunID(dagRunID string) error {
+	if dagRunID == "" {
+		return fmt.Errorf("dag-run ID must not be empty")
+	}
+	if !reDAGRunID.MatchString(dagRunID) {
+		return fmt.Errorf("dag-run ID must only contain alphanumeric characters, dashes, and underscores")
+	}
+	if len(dagRunID) > maxDAGRunIDLen {
+		return fmt.Errorf("dag-run ID length must be less than %d characters", maxDAGRunIDLen)
+	}
+	return nil
+}
 
 // DAGRunStore provides an interface for interacting with the underlying database
 // for storing and retrieving dag-run data.

@@ -325,6 +325,8 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 			}
 			mainDAG.WorkingDir = wd
 		}
+	} else {
+		mainDAG.WorkingDirExplicit = true
 	}
 
 	return mainDAG, nil
