@@ -15,7 +15,7 @@ const (
 // Regex patterns for validation.
 var (
 	dagNameRegex  = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
-	stepIDPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]*$`)
+	stepIDPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
 )
 
 // reservedWords contains IDs that cannot be used as step IDs.
@@ -100,7 +100,7 @@ func collectNamesAndIDs(dag *DAG, errs *ErrorList) (stepNames, stepIDs map[strin
 		}
 
 		if !isValidStepID(step.ID) {
-			*errs = append(*errs, NewValidationError("steps", step.ID, fmt.Errorf("invalid step ID format: must match pattern ^[a-zA-Z][a-zA-Z0-9_-]*$")))
+			*errs = append(*errs, NewValidationError("steps", step.ID, fmt.Errorf("invalid step ID format: must match pattern ^[a-zA-Z][a-zA-Z0-9_]*$ (hyphens are not allowed)")))
 		}
 
 		if _, exists := stepIDs[step.ID]; exists {

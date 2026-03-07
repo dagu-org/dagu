@@ -1113,12 +1113,12 @@ steps:
 		data := []byte(`
 steps:
   - name: step1
-    id: unique-step-1
+    id: unique_step_1
     command: echo "Step with ID"
   - name: step2
     command: echo "Step without ID"
   - name: step3
-    id: custom-id-123
+    id: custom_id_123
     command: echo "Another step with ID"
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
@@ -1128,7 +1128,7 @@ steps:
 
 		// First step has ID
 		assert.Equal(t, "step1", th.Steps[0].Name)
-		assert.Equal(t, "unique-step-1", th.Steps[0].ID)
+		assert.Equal(t, "unique_step_1", th.Steps[0].ID)
 
 		// Second step has no ID
 		assert.Equal(t, "step2", th.Steps[1].Name)
@@ -1136,7 +1136,7 @@ steps:
 
 		// Third step has ID
 		assert.Equal(t, "step3", th.Steps[2].Name)
-		assert.Equal(t, "custom-id-123", th.Steps[2].ID)
+		assert.Equal(t, "custom_id_123", th.Steps[2].ID)
 	})
 	t.Run("Preconditions", func(t *testing.T) {
 		t.Parallel()
@@ -1995,15 +1995,15 @@ steps:
 			yaml: `
 type: graph
 steps:
-  - name: step-one
-    id: step-one
+  - name: step_one
+    id: step_one
     command: echo "1"
-  - name: step-two
-    depends: step-one
+  - name: step_two
+    depends: step_one
     command: echo "2"
 `,
 			expected: map[string][]string{
-				"step-two": {"step-one"},
+				"step_two": {"step_one"},
 			},
 		},
 	}
