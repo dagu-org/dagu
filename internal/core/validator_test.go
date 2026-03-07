@@ -26,15 +26,15 @@ func TestIsValidStepID(t *testing.T) {
 		{name: "single letter", id: "a", expected: true},
 		{name: "simple word", id: "step", expected: true},
 		{name: "word with number", id: "step1", expected: true},
-		{name: "word with dash", id: "my-step", expected: true},
 		{name: "word with underscore", id: "my_step", expected: true},
 		{name: "mixed case", id: "MyStep", expected: true},
 		{name: "uppercase", id: "STEP", expected: true},
-		{name: "complex valid id", id: "Step123-test_id", expected: true},
+		{name: "complex valid id", id: "Step123_test_id", expected: true},
 		{name: "letters and numbers", id: "step123abc", expected: true},
 		{name: "uppercase with numbers", id: "STEP123", expected: true},
 
 		// Invalid cases
+		{name: "contains hyphen", id: "my-step", expected: false},
 		{name: "starts with number", id: "1step", expected: false},
 		{name: "starts with dash", id: "-step", expected: false},
 		{name: "starts with underscore", id: "_step", expected: false},
