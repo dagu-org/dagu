@@ -77,6 +77,53 @@ steps:
 		})
 	})
 
+	t.Run("DAGRunWorkDir", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `
+steps:
+  - name: write-to-workdir
+    command: echo "hello" > "${DAG_RUN_WORK_DIR}/test.txt"
+  - name: read-from-workdir
+    command: cat "${DAG_RUN_WORK_DIR}/test.txt"
+    output: WORKDIR_OUTPUT
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+		dag.AssertOutputs(t, map[string]any{
+			"WORKDIR_OUTPUT": "hello",
+		})
+	})
+
+	t.Run("DAGRunWorkDirWithExplicitWorkingDir", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		explicitDir := t.TempDir()
+		dag := th.DAG(t, `
+working_dir: `+explicitDir+`
+steps:
+  - name: check-pwd
+    command: pwd
+    output: PWD_OUTPUT
+  - name: write-to-workdir
+    command: echo "from-workdir" > "${DAG_RUN_WORK_DIR}/data.txt"
+  - name: read-from-workdir
+    command: cat "${DAG_RUN_WORK_DIR}/data.txt"
+    output: WORKDIR_OUTPUT
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		// PWD should be the explicit working_dir, not the work dir
+		// DAG_RUN_WORK_DIR should still be usable
+		dag.AssertOutputs(t, map[string]any{
+			"PWD_OUTPUT":     explicitDir,
+			"WORKDIR_OUTPUT": "from-workdir",
+		})
+	})
+
 	t.Run("StepOutputSubstrings", func(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `
