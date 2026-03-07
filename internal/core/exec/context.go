@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"maps"
+	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
@@ -228,6 +229,19 @@ func NewContext(
 		EnvKeyDAGRunID:      dagRunID,
 		EnvKeyDAGName:       dag.Name,
 	}
+
+	// DAG_DOCS_DIR: per-DAG docs directory from global config
+	cfg := config.GetConfig(ctx)
+	if cfg.Paths.DocsDir != "" {
+		envs[EnvKeyDAGDocsDir] = filepath.Join(cfg.Paths.DocsDir, dag.Name)
+	}
+
+	// DAG_PARAMS_JSON + DAGU_PARAMS_JSON (backward compat)
+	if dag.ParamsJSON != "" {
+		envs[EnvKeyDAGParamsJSONCompat] = dag.ParamsJSON
+		envs[EnvKeyDAGParamsJSON] = dag.ParamsJSON
+	}
+
 	maps.Copy(envs, stringutil.KeyValuesToMap(options.params))
 	maps.Copy(envs, stringutil.KeyValuesToMap(dag.Env))
 
