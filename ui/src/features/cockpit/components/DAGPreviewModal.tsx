@@ -284,6 +284,7 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
                   localDags={data?.localDags}
                   sseResult={sseResult}
                   onEnqueue={handleEnqueue}
+                  forceEnqueue={true}
                 />
               )}
             </div>

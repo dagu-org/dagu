@@ -41,6 +41,8 @@ type DAGDetailsContentProps = {
   sseResult?: SSEState<unknown>;
   /** Custom enqueue handler, threaded to DAGHeader → DAGActions */
   onEnqueue?: (params: string, dagRunId?: string, immediate?: boolean) => void | Promise<void>;
+  /** When true, forces enqueue mode in DAGContext (used by cockpit) */
+  forceEnqueue?: boolean;
 };
 
 type LogViewerState = {
@@ -65,6 +67,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   localDags,
   sseResult,
   onEnqueue,
+  forceEnqueue = false,
 }) => {
   const baseUrl = isModal ? '#' : `/dags/${fileName}`;
   const [logViewer, setLogViewer] = useState<LogViewerState>({
@@ -103,6 +106,8 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
         refresh: refreshFn,
         fileName: fileName || '',
         name: dag?.name || '',
+        forceEnqueue,
+        onEnqueue,
       }}
     >
       <div className="w-full flex flex-col">
@@ -115,7 +120,6 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             refreshFn={refreshFn}
             formatDuration={formatDuration}
             navigateToStatusTab={navigateToStatusTab}
-            onEnqueue={onEnqueue}
           />
         )}
         <div className="flex flex-col lg:flex-row justify-between items-center gap-3 lg:gap-0 mb-4 mt-3">

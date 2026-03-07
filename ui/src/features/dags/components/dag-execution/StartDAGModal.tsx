@@ -42,7 +42,7 @@ type Props = {
 /**
  * Modal dialog for starting or enqueuing a DAG with parameters
  */
-function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
+function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) {
   const ref = React.useRef<HTMLInputElement>(null);
 
   // Parse default parameters from the DAG definition
@@ -55,7 +55,8 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
 
   const [params, setParams] = React.useState<Parameter[]>([]);
   const [dagRunId, setDAGRunId] = React.useState<string>('');
-  const [enqueue, setEnqueue] = React.useState<boolean>(false);
+  const forceEnqueue = action === 'enqueue';
+  const [enqueue, setEnqueue] = React.useState<boolean>(forceEnqueue);
 
   // Get runConfig with default values if not specified
   const dagWithRunConfig = dag as typeof dag & {
@@ -142,17 +143,19 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
         )}
 
         <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
-          {/* Enqueue checkbox */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="enqueue"
-              checked={enqueue}
-              onCheckedChange={(checked) => setEnqueue(checked as boolean)}
-            />
-            <Label htmlFor="enqueue" className="cursor-pointer">
-              Enqueue
-            </Label>
-          </div>
+          {/* Enqueue checkbox (hidden when forced) */}
+          {!forceEnqueue && (
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="enqueue"
+                checked={enqueue}
+                onCheckedChange={(checked) => setEnqueue(checked as boolean)}
+              />
+              <Label htmlFor="enqueue" className="cursor-pointer">
+                Enqueue
+              </Label>
+            </div>
+          )}
           {/* Optional DAGRun ID field */}
           <div className="space-y-2">
             <Label htmlFor="dagRun-id">DAG-Run ID (optional)</Label>

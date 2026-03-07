@@ -26,6 +26,7 @@ import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
 import { useClient } from '../../../../hooks/api';
 import ConfirmModal from '../../../../ui/ConfirmModal';
 import LabeledItem from '../../../../ui/LabeledItem';
+import { DAGContext } from '../../contexts/DAGContext';
 import { StartDAGModal } from '../dag-execution';
 
 /**
@@ -48,8 +49,6 @@ type Props = {
   displayMode?: 'compact' | 'full';
   /** Function to navigate to status tab after execution */
   navigateToStatusTab?: () => void;
-  /** Custom enqueue handler. When provided, overrides the default enqueue API call. */
-  onEnqueue?: (params: string, dagRunId?: string, immediate?: boolean) => void | Promise<void>;
 };
 
 /**
@@ -62,9 +61,9 @@ function DAGActions({
   refresh,
   displayMode = 'compact',
   navigateToStatusTab,
-  onEnqueue,
 }: Props) {
   const appBarContext = React.useContext(AppBarContext);
+  const dagContext = React.useContext(DAGContext);
   const config = useConfig();
   const { hasUnsavedChanges } = useUnsavedChanges();
   const { showError } = useErrorModal();
@@ -516,13 +515,13 @@ function DAGActions({
         <StartDAGModal
           dag={dag}
           visible={isEnqueueModal}
-          action="enqueue"
+          action={dagContext.forceEnqueue ? 'enqueue' : undefined}
           onSubmit={async (params, dagRunId, immediate) => {
             setIsEnqueueModal(false);
 
-            if (onEnqueue) {
+            if (dagContext.onEnqueue) {
               try {
-                await onEnqueue(params, dagRunId, immediate);
+                await dagContext.onEnqueue(params, dagRunId, immediate);
               } catch (err) {
                 showError(
                   err instanceof Error ? err.message : 'Failed to enqueue DAG',
