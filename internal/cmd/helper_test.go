@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -55,6 +57,80 @@ func TestRebuildDAGFromYAML_EmptyYAML(t *testing.T) {
 
 	assert.Same(t, dag, result)
 	assert.Equal(t, "Default", result.Queue)
+}
+
+func TestQuoteParamValues(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		input  []string
+		expect []string
+	}{
+		{
+			name:   "named param with spaces",
+			input:  []string{"topic=hello world"},
+			expect: []string{`topic="hello world"`},
+		},
+		{
+			name:   "named param without spaces",
+			input:  []string{"topic=hello"},
+			expect: []string{`topic="hello"`},
+		},
+		{
+			name:   "positional param with spaces",
+			input:  []string{"hello world"},
+			expect: []string{`"hello world"`},
+		},
+		{
+			name:   "positional param without spaces",
+			input:  []string{"hello"},
+			expect: []string{`"hello"`},
+		},
+		{
+			name:   "multiple params",
+			input:  []string{"topic=hello world", "count=42", "greeting"},
+			expect: []string{`topic="hello world"`, `count="42"`, `"greeting"`},
+		},
+		{
+			name:   "empty slice",
+			input:  []string{},
+			expect: []string{},
+		},
+		{
+			name:   "param with quotes in value",
+			input:  []string{`msg=say "hi"`},
+			expect: []string{`msg="say \"hi\""`},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := quoteParamValues(tt.input)
+			assert.Equal(t, tt.expect, result)
+		})
+	}
+}
+
+func TestRestoreDAGFromStatus_ParamsWithSpaces(t *testing.T) {
+	t.Parallel()
+
+	dag := &core.DAG{
+		Name:     "test-dag",
+		YamlData: []byte("params:\n  - topic: \"\"\nsteps:\n  - name: test\n    command: echo $topic"),
+	}
+
+	status := &exec.DAGRunStatus{
+		ParamsList: []string{"topic=hello world"},
+	}
+
+	result, err := restoreDAGFromStatus(context.Background(), dag, status)
+	require.NoError(t, err)
+
+	// The restored params should preserve "hello world" as a single value
+	found := slices.Contains(result.Params, "topic=hello world")
+	assert.True(t, found, "expected 'topic=hello world' in params, got: %v", result.Params)
 }
 
 func TestRebuildDAGFromYAML_RebuildEnvFromYAML(t *testing.T) {

@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -39,9 +40,27 @@ func parseTriggerTypeParam(ctx *Context) (core.TriggerType, error) {
 // It restores params from the status, loads dotenv, and rebuilds fields excluded
 // from JSON serialization (env, shell, workingDir, registryAuths, etc.).
 func restoreDAGFromStatus(ctx context.Context, dag *core.DAG, status *exec.DAGRunStatus) (*core.DAG, error) {
-	dag.Params = status.ParamsList
+	dag.Params = quoteParamValues(status.ParamsList)
 	dag.LoadDotEnv(ctx)
 	return rebuildDAGFromYAML(ctx, dag)
+}
+
+// quoteParamValues quotes the value portion of each parameter so that
+// values containing spaces survive re-parsing by parseStringParams.
+//
+// ParamsList stores unquoted "key=value" strings (produced by paramPair.String()),
+// but the rebuild path feeds them back through parseStringParams which splits
+// on whitespace. Quoting each value prevents that re-split.
+func quoteParamValues(params []string) []string {
+	quoted := make([]string, len(params))
+	for i, p := range params {
+		if k, v, ok := strings.Cut(p, "="); ok {
+			quoted[i] = k + "=" + strconv.Quote(v)
+		} else {
+			quoted[i] = strconv.Quote(p)
+		}
+	}
+	return quoted
 }
 
 // rebuildDAGFromYAML rebuilds a DAG from its YamlData using the spec loader.
