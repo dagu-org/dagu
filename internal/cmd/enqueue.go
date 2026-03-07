@@ -29,7 +29,7 @@ Examples:
 	)
 }
 
-var enqueueFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, queueFlag, defaultWorkingDirFlag, triggerTypeFlag}
+var enqueueFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, queueFlag, tagsFlag, defaultWorkingDirFlag, triggerTypeFlag}
 
 func runEnqueue(ctx *Context, args []string) error {
 	runID, err := ctx.StringParam("run-id")
@@ -58,6 +58,10 @@ func runEnqueue(ctx *Context, args []string) error {
 
 	if queueOverride != "" {
 		dag.Queue = queueOverride
+	}
+
+	if err := parseAndAppendTags(ctx, dag); err != nil {
+		return err
 	}
 
 	triggerType, err := parseTriggerTypeParam(ctx)

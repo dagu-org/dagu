@@ -92,6 +92,11 @@ var (
 		usage:     "Override the DAG-level queue definition",
 	}
 
+	tagsFlag = commandLineFlag{
+		name:  "tags",
+		usage: "Additional tags (comma-separated key=value or key-only, e.g., workspace=foo,env=prod)",
+	}
+
 	defaultWorkingDirFlag = commandLineFlag{
 		name:  "default-working-dir",
 		usage: "Default working directory for DAGs without explicit workingDir",

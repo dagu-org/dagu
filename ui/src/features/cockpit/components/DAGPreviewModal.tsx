@@ -12,28 +12,6 @@ import { Button } from '@/components/ui/button';
 import { Maximize2, X } from 'lucide-react';
 import type { components } from '@/api/v1/schema';
 
-function sanitizeForTag(s: string): string {
-  return s.replace(/[^a-zA-Z0-9_-]/g, '');
-}
-
-function injectTagIntoSpec(yamlSpec: string, tag: string): string {
-  const tagsRegex = /^tags:\s*(.*)$/m;
-  const match = yamlSpec.match(tagsRegex);
-
-  if (match) {
-    const existingValue = (match[1] ?? '').trim();
-    if (existingValue === '' || existingValue.startsWith('-')) {
-      const idx = yamlSpec.indexOf(match[0]) + match[0].length;
-      return yamlSpec.slice(0, idx) + `\n  - ${tag}` + yamlSpec.slice(idx);
-    }
-    const stripped = existingValue.replace(/^["']|["']$/g, '');
-    const newValue = stripped ? `${stripped},${tag}` : tag;
-    return yamlSpec.replace(tagsRegex, `tags: "${newValue}"`);
-  }
-
-  return yamlSpec.trimEnd() + `\ntags:\n  - ${tag}\n`;
-}
-
 interface DAGPreviewModalProps {
   fileName: string;
   isOpen: boolean;
@@ -92,16 +70,6 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
   );
   useSSECacheSync(sseResult, mutate);
 
-  // Separate spec fetch for enqueue (need raw YAML)
-  const { data: specData } = useQuery('/dags/{fileName}/spec', {
-    params: {
-      path: { fileName },
-      query: { remoteNode },
-    },
-  }, {
-    isPaused: () => !fileName,
-  });
-
   // Fetch specific DAG run when enqueued
   const dagName = data?.dag?.name || '';
   const { data: enqueuedRunData } = useQuery(
@@ -142,24 +110,25 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
     return `${seconds}s`;
   };
 
-  // Custom enqueue handler — injects workspace tag and uses /dag-runs/enqueue
+  // Custom enqueue handler — uses file-based enqueue with tags parameter
   const handleEnqueue = useCallback(async (params: string, dagRunId?: string) => {
-    if (!specData?.spec) return;
-
-    let spec = specData.spec;
+    const tags: string[] = [];
     if (selectedWorkspace) {
-      const safeName = sanitizeForTag(selectedWorkspace);
+      const safeName = selectedWorkspace.replace(/[^a-zA-Z0-9_-]/g, '');
       if (safeName) {
-        spec = injectTagIntoSpec(spec, `workspace=${safeName}`);
+        tags.push(`workspace=${safeName}`);
       }
     }
-    const { data: enqueueData, error } = await client.POST('/dag-runs/enqueue', {
-      params: { query: { remoteNode } },
+
+    const { data: enqueueData, error } = await client.POST('/dags/{fileName}/enqueue', {
+      params: {
+        path: { fileName },
+        query: { remoteNode },
+      },
       body: {
-        spec,
         params: params || undefined,
-        name: data?.dag?.name,
         dagRunId: dagRunId || undefined,
+        tags: tags.length > 0 ? tags : undefined,
       },
     });
 
@@ -172,7 +141,7 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
       setEnqueuedRunId(enqueueData.dagRunId);
     }
     setActiveTab('status');
-  }, [specData, selectedWorkspace, client, remoteNode, data?.dag?.name]);
+  }, [selectedWorkspace, client, remoteNode, fileName]);
 
   // Fullscreen navigation
   const handleFullscreenClick = useCallback(

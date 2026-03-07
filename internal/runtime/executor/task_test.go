@@ -218,6 +218,20 @@ steps:
 		assert.Equal(t, coordinatorv1.Operation_OPERATION_RETRY, task.Operation)
 	})
 
+	t.Run("WithTagsOption", func(t *testing.T) {
+		t.Parallel()
+
+		task := executor.CreateTask(
+			"test-dag",
+			`name: test-dag`,
+			coordinatorv1.Operation_OPERATION_START,
+			"run-123",
+			executor.WithTags("env=prod,region=us-east-1"),
+		)
+
+		assert.Equal(t, "env=prod,region=us-east-1", task.Tags)
+	})
+
 	t.Run("AllOperationTypes", func(t *testing.T) {
 		t.Parallel()
 
@@ -298,6 +312,26 @@ func TestTaskOption_Functions(t *testing.T) {
 		executor.WithStep("step-name")(task)
 
 		assert.Equal(t, "step-name", task.Step)
+	})
+
+	t.Run("WithTags", func(t *testing.T) {
+		t.Parallel()
+
+		task := &coordinatorv1.Task{}
+
+		executor.WithTags("env=prod,team=backend")(task)
+
+		assert.Equal(t, "env=prod,team=backend", task.Tags)
+	})
+
+	t.Run("WithTagsEmpty", func(t *testing.T) {
+		t.Parallel()
+
+		task := &coordinatorv1.Task{}
+
+		executor.WithTags("")(task)
+
+		assert.Empty(t, task.Tags)
 	})
 
 	t.Run("WithPreviousStatus", func(t *testing.T) {

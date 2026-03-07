@@ -80,6 +80,13 @@ func WithStep(step string) TaskOption {
 	}
 }
 
+// WithTags sets additional tags (comma-separated) for the task.
+func WithTags(tags string) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		task.Tags = tags
+	}
+}
+
 // WithPreviousStatus sets the previous status for retry operations in shared-nothing mode.
 // When set, workers can retry without needing local DAGRunStore access.
 func WithPreviousStatus(status *exec.DAGRunStatus) TaskOption {

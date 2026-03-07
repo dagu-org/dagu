@@ -2371,6 +2371,8 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description Additional tags to apply to the DAG-run (format: key=value or key-only). Merged with tags defined in the DAG spec. */
+        Tags: string[];
         /** @description A single audit log entry */
         AuditEntry: {
             /** @description Unique identifier for this entry */
@@ -5417,6 +5419,7 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    tags?: components["schemas"]["Tags"];
                 };
             };
         };
@@ -5430,6 +5433,15 @@ export interface operations {
                     "application/json": {
                         dagRunId: components["schemas"]["DAGRunId"];
                     };
+                };
+            };
+            /** @description Invalid request parameters or tags */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description DAG is already running (singleton mode) or dagRunId already exists */
@@ -5478,6 +5490,7 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    tags?: components["schemas"]["Tags"];
                     /** @description Maximum seconds to wait for DAG execution to complete (required) */
                     timeout: number;
                 };
@@ -5493,6 +5506,15 @@ export interface operations {
                     "application/json": {
                         dagRun: components["schemas"]["DAGRunDetails"];
                     };
+                };
+            };
+            /** @description Invalid request parameters or tags */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Timeout waiting for DAG execution to complete. The DAG run continues executing in the background. */
@@ -5552,6 +5574,7 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    tags?: components["schemas"]["Tags"];
                 };
             };
         };
@@ -5565,6 +5588,15 @@ export interface operations {
                     "application/json": {
                         dagRunId: components["schemas"]["DAGRunId"];
                     };
+                };
+            };
+            /** @description Invalid request parameters or tags */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description DAG is already running or queued (singleton mode) */
@@ -6049,6 +6081,7 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    tags?: components["schemas"]["Tags"];
                 };
             };
         };
@@ -6120,6 +6153,7 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    tags?: components["schemas"]["Tags"];
                 };
             };
         };

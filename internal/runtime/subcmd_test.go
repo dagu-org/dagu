@@ -487,6 +487,31 @@ func TestTaskStart(t *testing.T) {
 		}
 	})
 
+	t.Run("TaskStartWithTags", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			DagRunId: "task-run-id",
+			Target:   "/path/to/task.yaml",
+			Tags:     "env=prod,team=backend",
+		}
+		spec := builder.TaskStart(task)
+
+		assert.Contains(t, spec.Args, "--tags=env=prod,team=backend")
+	})
+
+	t.Run("TaskStartWithoutTags", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			DagRunId: "task-run-id",
+			Target:   "/path/to/task.yaml",
+		}
+		spec := builder.TaskStart(task)
+
+		for _, arg := range spec.Args {
+			assert.NotContains(t, arg, "--tags=")
+		}
+	})
+
 	t.Run("TaskStartWithoutConfig", func(t *testing.T) {
 		t.Parallel()
 		cfgNoFile := &config.Config{
