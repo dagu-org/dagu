@@ -7,6 +7,7 @@ import (
 	goruntime "runtime"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
@@ -653,4 +654,27 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestEnv_SpecialEnvVars_DAGDocsDirAndParamsJSON(t *testing.T) {
+	t.Parallel()
+
+	cfg := &config.Config{}
+	cfg.Paths.DocsDir = "/docs"
+	ctx := config.WithConfig(context.Background(), cfg)
+
+	dag := &core.DAG{
+		Name:       "test-dag",
+		WorkingDir: t.TempDir(),
+		ParamsJSON: `{"a":"b"}`,
+	}
+	ctx = runtime.NewContext(ctx, dag, "run-1", "test.log")
+
+	env := runtime.NewEnv(ctx, core.Step{Name: "step1"})
+	ctx = runtime.WithEnv(ctx, env)
+	result := runtime.AllEnvsMap(ctx)
+
+	assert.Equal(t, filepath.Join(cfg.Paths.DocsDir, dag.Name), result[exec.EnvKeyDAGDocsDir])
+	assert.Equal(t, `{"a":"b"}`, result[exec.EnvKeyDAGParamsJSONCompat])
+	assert.Equal(t, `{"a":"b"}`, result[exec.EnvKeyDAGParamsJSON])
 }
