@@ -155,6 +155,53 @@ steps:
 	})
 }
 
+func TestExecution_TagsPropagation(t *testing.T) {
+	t.Run("tagsPreservedThroughCoordinator", func(t *testing.T) {
+		f := newTestFixture(t, `
+type: graph
+name: tags-propagation-test
+worker_selector:
+  test: "true"
+steps:
+  - name: step1
+    command: echo "tagged run"
+`)
+		defer f.cleanup()
+
+		f.startScheduler(30 * time.Second)
+
+		require.NoError(t, f.startWithTags("env=prod,team=backend"))
+
+		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+
+		require.Equal(t, core.Succeeded, status.Status)
+		require.Contains(t, status.Tags, "env=prod")
+		require.Contains(t, status.Tags, "team=backend")
+	})
+
+	t.Run("tagsPreservedThroughCoordinator_SharedFS", func(t *testing.T) {
+		f := newTestFixture(t, `
+type: graph
+name: tags-sharedfs-test
+worker_selector:
+  test: "true"
+steps:
+  - name: step1
+    command: echo "tagged sharedfs run"
+`, withWorkerMode(sharedFSMode))
+		defer f.cleanup()
+
+		f.startScheduler(30 * time.Second)
+
+		require.NoError(t, f.startWithTags("region=us-east-1"))
+
+		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+
+		require.Equal(t, core.Succeeded, status.Status)
+		require.Contains(t, status.Tags, "region=us-east-1")
+	})
+}
+
 func TestExecution_SharedFSMode(t *testing.T) {
 	t.Run("statusWrittenToSharedFilesystem", func(t *testing.T) {
 		f := newTestFixture(t, `

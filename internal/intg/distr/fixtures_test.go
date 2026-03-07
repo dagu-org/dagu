@@ -216,8 +216,13 @@ func (f *testFixture) enqueue() error {
 
 func (f *testFixture) start() error {
 	f.t.Helper()
+	return f.startWithTags("")
+}
+
+func (f *testFixture) startWithTags(tags string) error {
+	f.t.Helper()
 	subCmdBuilder := runtime.NewSubCmdBuilder(f.coord.Config)
-	startSpec := subCmdBuilder.Start(f.dagWrapper.DAG, runtime.StartOptions{Quiet: true})
+	startSpec := subCmdBuilder.Start(f.dagWrapper.DAG, runtime.StartOptions{Quiet: true, Tags: tags})
 	return runtime.Start(f.coord.Context, startSpec)
 }
 
