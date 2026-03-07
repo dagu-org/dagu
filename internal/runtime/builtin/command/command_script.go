@@ -59,6 +59,20 @@ func setupScript(workDir, script string, shell []string) (string, error) {
 	return file.Name(), nil
 }
 
+// scriptLineOffset returns the number of lines prepended by preprocessScript
+// for the given shell. This is needed to map error line numbers back to the
+// user's original script content.
+func scriptLineOffset(shell []string) int {
+	if len(shell) == 0 {
+		return 0
+	}
+	ext := cmdutil.GetScriptExtension(shell[0])
+	if ext == ".ps1" {
+		return 2 // preprocessScript prepends 2 lines for PowerShell
+	}
+	return 0
+}
+
 // preprocessScript returns the script content adjusted for the shell indicated by ext.
 // For ".ps1" it prepends PowerShell directives that make cmdlet errors and non-zero exit codes stop execution; for other extensions it returns the original script.
 func preprocessScript(script, ext string) string {
