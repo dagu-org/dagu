@@ -238,10 +238,6 @@ func NewContext(
 		EnvKeyDAGName:       dag.Name,
 	}
 
-	if options.workDir != "" {
-		envs[EnvKeyDAGRunWorkDir] = options.workDir
-	}
-
 	// DAG_DOCS_DIR: per-DAG docs directory from global config
 	cfg := config.GetConfig(ctx)
 	if cfg.Paths.DocsDir != "" {
@@ -251,8 +247,10 @@ func NewContext(
 	maps.Copy(envs, stringutil.KeyValuesToMap(options.params))
 	maps.Copy(envs, stringutil.KeyValuesToMap(dag.Env))
 
-	// DAG_PARAMS_JSON + DAGU_PARAMS_JSON (backward compat)
-	// Set after merges so user-defined params/env cannot cause the two keys to diverge.
+	// Set runtime-managed env vars after merges so user-defined params/env cannot override them.
+	if options.workDir != "" {
+		envs[EnvKeyDAGRunWorkDir] = options.workDir
+	}
 	if dag.ParamsJSON != "" {
 		envs[EnvKeyDAGParamsJSONCompat] = dag.ParamsJSON
 		envs[EnvKeyDAGParamsJSON] = dag.ParamsJSON

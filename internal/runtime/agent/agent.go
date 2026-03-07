@@ -417,6 +417,15 @@ func (a *Agent) Run(ctx context.Context) error {
 			if err := os.MkdirAll(a.workDir, 0o750); err != nil {
 				return fmt.Errorf("failed to create work directory: %w", err)
 			}
+			// Register cleanup immediately so the temp dir is removed even if
+			// later initialization (attempt.Open, config evaluation, etc.) fails.
+			defer func() {
+				if a.dagRunStore == nil && a.workDir != "" {
+					if err := os.RemoveAll(a.workDir); err != nil {
+						logger.Warn(ctx, "Failed to remove temp work dir", tag.Error(err))
+					}
+				}
+			}()
 		}
 	}
 
@@ -540,13 +549,6 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 		if err := attempt.Close(ctx); err != nil {
 			logger.Error(ctx, "Failed to close runstore store", tag.Error(err))
-		}
-		// Clean up temp work dir in shared-nothing mode.
-		// In local mode, cleanup happens via DAGRun.Remove().
-		if a.dagRunStore == nil && a.workDir != "" {
-			if err := os.RemoveAll(a.workDir); err != nil {
-				logger.Warn(ctx, "Failed to remove temp work dir", tag.Error(err))
-			}
 		}
 	}()
 
