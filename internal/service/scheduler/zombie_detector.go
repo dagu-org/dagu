@@ -179,10 +179,7 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *exec.DAGRu
 	// the complete status (nodes, logs, params, etc.) when updating.
 	fullStatus, err := attempt.ReadStatus(ctx)
 	if err != nil {
-		logger.Warn(ctx, "Failed to read full status from attempt, using summary",
-			tag.Error(err),
-		)
-		fullStatus = st
+		return fmt.Errorf("read full status: %w", err)
 	}
 
 	fullStatus.Status = core.Failed

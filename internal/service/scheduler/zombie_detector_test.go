@@ -375,6 +375,48 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 		procStore.AssertExpectations(t)
 		attempt.AssertExpectations(t)
 	})
+
+	t.Run("ErrorReadingFullStatus", func(t *testing.T) {
+		t.Parallel()
+
+		dagRunStore := &mockDAGRunStore{}
+		procStore := &mockProcStore{}
+		detector := NewZombieDetector(dagRunStore, procStore, time.Second)
+
+		status := &exec.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-123",
+			Status:   core.Running,
+		}
+
+		attempt := &exec.MockDAGRunAttempt{}
+		dagRunRef := exec.NewDAGRunRef("test-dag", "run-123")
+		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return(attempt, nil)
+
+		dag := &core.DAG{Name: "test-dag"}
+		attempt.On("ReadDAG", mock.Anything).Return(dag, nil)
+
+		procRef := exec.DAGRunRef{
+			Name: dag.Name,
+			ID:   "run-123",
+		}
+		procStore.On("IsRunAlive", mock.Anything, dag.ProcGroup(), procRef).Return(false, nil)
+
+		// ReadStatus fails — should return error, not fall back to summary
+		attempt.On("ReadStatus", mock.Anything).Return((*exec.DAGRunStatus)(nil), errors.New("corrupted file"))
+
+		err := detector.checkAndCleanZombie(ctx, status)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "read full status")
+
+		// Should NOT have tried to write the truncated summary
+		attempt.AssertNotCalled(t, "Open", mock.Anything)
+		attempt.AssertNotCalled(t, "Write", mock.Anything, mock.Anything)
+
+		dagRunStore.AssertExpectations(t)
+		procStore.AssertExpectations(t)
+		attempt.AssertExpectations(t)
+	})
 }
 
 func TestZombieDetector_concurrency(t *testing.T) {

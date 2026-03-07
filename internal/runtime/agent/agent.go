@@ -1496,6 +1496,9 @@ func (a *Agent) setupRetryPlan(ctx context.Context) error {
 	// the retry actually runs all steps instead of producing a 0-node run.
 	if len(nodes) == 0 {
 		logger.Warn(ctx, "Retry target has no nodes; falling back to fresh plan from DAG definition")
+		if a.stepRetry != "" {
+			return fmt.Errorf("cannot retry step %q: previous attempt has no node state", a.stepRetry)
+		}
 		plan, err := runtime.NewPlan(a.dag.Steps...)
 		if err != nil {
 			return err
