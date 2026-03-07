@@ -1077,6 +1077,65 @@ func TestDeleteAllMissing_NoMissingItems(t *testing.T) {
 	assert.Nil(t, deleted)
 }
 
+// --- Phase 5b: DeleteBatch tests ---
+
+func TestDeleteBatch_PushDisabled_Rejected(t *testing.T) {
+	t.Parallel()
+	impl, _ := newTestService(t, testCfgPushOff)
+
+	_, err := impl.DeleteBatch(context.Background(), []string{"dag-a"}, "", false)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrPushDisabled)
+}
+
+func TestDeleteBatch_NotFound(t *testing.T) {
+	t.Parallel()
+	impl, _ := newTestService(t, testCfgReadWrite)
+	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{}}))
+
+	_, err := impl.DeleteBatch(context.Background(), []string{"nonexistent"}, "", false)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrDAGNotFound)
+}
+
+func TestDeleteBatch_UntrackedItem_Rejected(t *testing.T) {
+	t.Parallel()
+	impl, _ := newTestService(t, testCfgReadWrite)
+	now := time.Now()
+	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{
+		"dag-a": {Status: StatusSynced},
+		"dag-b": {Status: StatusUntracked, ModifiedAt: &now},
+	}}))
+
+	_, err := impl.DeleteBatch(context.Background(), []string{"dag-a", "dag-b"}, "", false)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrCannotDeleteUntracked)
+}
+
+func TestDeleteBatch_ModifiedWithoutForce_Rejected(t *testing.T) {
+	t.Parallel()
+	impl, _ := newTestService(t, testCfgReadWrite)
+	now := time.Now()
+	require.NoError(t, impl.stateManager.Save(&State{Version: 1, DAGs: map[string]*DAGState{
+		"dag-a": {Status: StatusSynced},
+		"dag-b": {Status: StatusModified, ModifiedAt: &now},
+	}}))
+
+	_, err := impl.DeleteBatch(context.Background(), []string{"dag-a", "dag-b"}, "", false)
+	require.Error(t, err)
+	var validationErr *ValidationError
+	assert.ErrorAs(t, err, &validationErr)
+}
+
+func TestDeleteBatch_EmptyList(t *testing.T) {
+	t.Parallel()
+	impl, _ := newTestService(t, testCfgReadWrite)
+
+	deleted, err := impl.DeleteBatch(context.Background(), []string{}, "", false)
+	require.NoError(t, err)
+	assert.Nil(t, deleted)
+}
+
 // --- Phase 6: Move tests ---
 
 func TestMove_PushDisabled_Rejected(t *testing.T) {

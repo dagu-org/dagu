@@ -1666,6 +1666,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sync/delete-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete selected sync items
+         * @description Removes the specified items from remote repository, local disk, and sync state in a single commit.
+         */
+        post: operations["syncDeleteBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sync/cleanup": {
         parameters: {
             query?: never;
@@ -3535,6 +3555,15 @@ export interface components {
             message?: string;
             /** @description Item IDs to publish. If omitted, all modified or untracked items are published. */
             itemIds?: string[];
+        };
+        /** @description Request to delete selected items */
+        SyncDeleteBatchRequest: {
+            /** @description Item IDs to delete */
+            itemIds: string[];
+            /** @description Commit message for the deletion */
+            message?: string;
+            /** @description Force delete items with local modifications or conflicts */
+            force?: boolean;
         };
         /** @description Response when a conflict is detected */
         SyncConflictResponse: {
@@ -8850,6 +8879,65 @@ export interface operations {
             };
             /** @description Cannot delete */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    syncDeleteBatch: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncDeleteBatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Items deleted successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description List of deleted item IDs */
+                        deleted: string[];
+                        /** @description Summary message */
+                        message: string;
+                    };
+                };
+            };
+            /** @description Cannot delete (push disabled, untracked items, validation error) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Item not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

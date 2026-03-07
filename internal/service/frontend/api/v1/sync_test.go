@@ -19,6 +19,7 @@ type mockSyncService struct {
 	forgetFn         func(ctx context.Context, itemIDs []string) ([]string, error)
 	cleanupFn        func(ctx context.Context) ([]string, error)
 	deleteFn         func(ctx context.Context, itemID, message string, force bool) error
+	deleteBatchFn    func(ctx context.Context, itemIDs []string, message string, force bool) ([]string, error)
 	deleteAllMissing func(ctx context.Context, message string) ([]string, error)
 	moveFn           func(ctx context.Context, oldID, newID, message string, force bool) error
 }
@@ -57,6 +58,13 @@ func (m *mockSyncService) Delete(ctx context.Context, itemID, message string, fo
 		return m.deleteFn(ctx, itemID, message, force)
 	}
 	return nil
+}
+
+func (m *mockSyncService) DeleteBatch(ctx context.Context, itemIDs []string, message string, force bool) ([]string, error) {
+	if m.deleteBatchFn != nil {
+		return m.deleteBatchFn(ctx, itemIDs, message, force)
+	}
+	return nil, nil
 }
 
 func (m *mockSyncService) DeleteAllMissing(ctx context.Context, message string) ([]string, error) {
@@ -455,6 +463,150 @@ func TestSyncDeleteMissing(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, []string{"dag-x", "dag-y"}, r.Deleted)
 		assert.Contains(t, r.Message, "2")
+	})
+}
+
+func TestSyncDeleteBatch(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns 400 for nil body", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{})
+		resp, err := a.SyncDeleteBatch(context.Background(), apigen.SyncDeleteBatchRequestObject{})
+		require.NoError(t, err)
+		errResp, ok := resp.(apigen.SyncDeleteBatch400JSONResponse)
+		assert.True(t, ok)
+		assert.Contains(t, errResp.Message, "itemIds")
+	})
+
+	t.Run("returns 400 for empty itemIds", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{})
+		resp, err := a.SyncDeleteBatch(context.Background(), apigen.SyncDeleteBatchRequestObject{
+			Body: &apigen.SyncDeleteBatchJSONRequestBody{
+				ItemIds: []string{},
+			},
+		})
+		require.NoError(t, err)
+		errResp, ok := resp.(apigen.SyncDeleteBatch400JSONResponse)
+		assert.True(t, ok)
+		assert.Contains(t, errResp.Message, "itemIds")
+	})
+
+	t.Run("returns 400 when push disabled", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			deleteBatchFn: func(_ context.Context, _ []string, _ string, _ bool) ([]string, error) {
+				return nil, gitsync.ErrPushDisabled
+			},
+		})
+
+		resp, err := a.SyncDeleteBatch(context.Background(), apigen.SyncDeleteBatchRequestObject{
+			Body: &apigen.SyncDeleteBatchJSONRequestBody{
+				ItemIds: []string{"dag-a"},
+			},
+		})
+		require.NoError(t, err)
+		errResp, ok := resp.(apigen.SyncDeleteBatch400JSONResponse)
+		assert.True(t, ok)
+		assert.Contains(t, errResp.Message, "push")
+	})
+
+	t.Run("returns 400 when item is untracked", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			deleteBatchFn: func(_ context.Context, _ []string, _ string, _ bool) ([]string, error) {
+				return nil, gitsync.ErrCannotDeleteUntracked
+			},
+		})
+
+		resp, err := a.SyncDeleteBatch(context.Background(), apigen.SyncDeleteBatchRequestObject{
+			Body: &apigen.SyncDeleteBatchJSONRequestBody{
+				ItemIds: []string{"untracked-dag"},
+			},
+		})
+		require.NoError(t, err)
+		errResp, ok := resp.(apigen.SyncDeleteBatch400JSONResponse)
+		assert.True(t, ok)
+		assert.Contains(t, errResp.Message, "untracked")
+	})
+
+	t.Run("returns 404 when item not found", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			deleteBatchFn: func(_ context.Context, _ []string, _ string, _ bool) ([]string, error) {
+				return nil, &gitsync.DAGNotFoundError{DAGID: "missing"}
+			},
+		})
+
+		resp, err := a.SyncDeleteBatch(context.Background(), apigen.SyncDeleteBatchRequestObject{
+			Body: &apigen.SyncDeleteBatchJSONRequestBody{
+				ItemIds: []string{"missing"},
+			},
+		})
+		require.NoError(t, err)
+		_, ok := resp.(apigen.SyncDeleteBatch404JSONResponse)
+		assert.True(t, ok)
+	})
+
+	t.Run("returns 400 for validation error", func(t *testing.T) {
+		t.Parallel()
+
+		a := newSyncAPIForTest(&mockSyncService{
+			deleteBatchFn: func(_ context.Context, _ []string, _ string, _ bool) ([]string, error) {
+				return nil, &gitsync.ValidationError{
+					Field:   "modified-dag",
+					Message: "item has local modifications — use force to delete anyway",
+				}
+			},
+		})
+
+		resp, err := a.SyncDeleteBatch(context.Background(), apigen.SyncDeleteBatchRequestObject{
+			Body: &apigen.SyncDeleteBatchJSONRequestBody{
+				ItemIds: []string{"modified-dag"},
+			},
+		})
+		require.NoError(t, err)
+		errResp, ok := resp.(apigen.SyncDeleteBatch400JSONResponse)
+		assert.True(t, ok)
+		assert.Contains(t, errResp.Message, "local modifications")
+	})
+
+	t.Run("returns 200 on success", func(t *testing.T) {
+		t.Parallel()
+
+		var gotIDs []string
+		var gotMsg string
+		var gotForce bool
+		a := newSyncAPIForTest(&mockSyncService{
+			deleteBatchFn: func(_ context.Context, itemIDs []string, message string, force bool) ([]string, error) {
+				gotIDs = itemIDs
+				gotMsg = message
+				gotForce = force
+				return []string{"dag-a", "dag-b"}, nil
+			},
+		})
+
+		resp, err := a.SyncDeleteBatch(context.Background(), apigen.SyncDeleteBatchRequestObject{
+			Body: &apigen.SyncDeleteBatchJSONRequestBody{
+				ItemIds: []string{"dag-b", "dag-a"},
+				Message: ptrOf("bulk delete"),
+				Force:   ptrOf(true),
+			},
+		})
+		require.NoError(t, err)
+		r, ok := resp.(apigen.SyncDeleteBatch200JSONResponse)
+		require.True(t, ok)
+		assert.Equal(t, []string{"dag-a", "dag-b"}, r.Deleted)
+		assert.Contains(t, r.Message, "2")
+		assert.Equal(t, []string{"dag-b", "dag-a"}, gotIDs)
+		assert.Equal(t, "bulk delete", gotMsg)
+		assert.True(t, gotForce)
 	})
 }
 

@@ -3840,6 +3840,59 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /sync/delete-batch:
+    post:
+      summary: "Delete selected sync items"
+      description: "Removes the specified items from remote repository, local disk, and sync state in a single commit."
+      operationId: "syncDeleteBatch"
+      tags:
+        - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncDeleteBatchRequest"
+      responses:
+        "200":
+          description: "Items deleted successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: array
+                    items:
+                      type: string
+                    description: "List of deleted item IDs"
+                  message:
+                    type: string
+                    description: "Summary message"
+                required:
+                  - deleted
+                  - message
+        "400":
+          description: "Cannot delete (push disabled, untracked items, validation error)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Item not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /sync/cleanup:
     post:
       summary: "Cleanup missing sync items"
@@ -8443,6 +8496,24 @@ components:
           items:
             type: string
           description: "Item IDs to publish. If omitted, all modified or untracked items are published."
+
+    SyncDeleteBatchRequest:
+      type: object
+      description: "Request to delete selected items"
+      properties:
+        itemIds:
+          type: array
+          items:
+            type: string
+          description: "Item IDs to delete"
+        message:
+          type: string
+          description: "Commit message for the deletion"
+        force:
+          type: boolean
+          description: "Force delete items with local modifications or conflicts"
+      required:
+        - itemIds
 
     SyncConflictResponse:
       type: object

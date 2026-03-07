@@ -44,6 +44,9 @@ type Service interface {
 	// Delete removes an item from remote (git rm + commit + push), local disk, and state.
 	Delete(ctx context.Context, itemID, message string, force bool) error
 
+	// DeleteBatch removes multiple items from remote, local disk, and state in a single commit.
+	DeleteBatch(ctx context.Context, itemIDs []string, message string, force bool) ([]string, error)
+
 	// DeleteAllMissing removes all missing items from remote, local, and state.
 	DeleteAllMissing(ctx context.Context, message string) ([]string, error)
 
@@ -1192,6 +1195,111 @@ func (s *serviceImpl) Delete(ctx context.Context, itemID, message string, force 
 	s.updateSuccessStateWithCommit(state, commitHash)
 
 	return nil
+}
+
+// DeleteBatch removes multiple items from remote, local disk, and state in a single commit.
+func (s *serviceImpl) DeleteBatch(ctx context.Context, itemIDs []string, message string, force bool) ([]string, error) {
+	if err := s.validatePushEnabled(); err != nil {
+		return nil, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	state, err := s.stateManager.GetState()
+	if err != nil {
+		return nil, err
+	}
+
+	// Phase 1: validate all items before any mutation.
+	type deleteTarget struct {
+		itemID    string
+		status    SyncStatus
+		localPath string
+		repoPath  string
+	}
+	var targets []deleteTarget
+
+	for _, itemID := range itemIDs {
+		dagState, exists := state.DAGs[itemID]
+		if !exists {
+			return nil, &DAGNotFoundError{DAGID: itemID}
+		}
+
+		if dagState.Status == StatusUntracked {
+			return nil, ErrCannotDeleteUntracked
+		}
+
+		if (dagState.Status == StatusModified || dagState.Status == StatusConflict) && !force {
+			return nil, &ValidationError{
+				Field:   itemID,
+				Message: "item has local modifications — use force to delete anyway",
+			}
+		}
+
+		localPath, err := s.safeDAGIDToFilePath(itemID)
+		if err != nil {
+			return nil, err
+		}
+		repoPath, err := s.safeDAGIDToRepoPath(itemID)
+		if err != nil {
+			return nil, err
+		}
+
+		targets = append(targets, deleteTarget{
+			itemID:    itemID,
+			status:    dagState.Status,
+			localPath: localPath,
+			repoPath:  repoPath,
+		})
+	}
+
+	if len(targets) == 0 {
+		return nil, nil
+	}
+
+	// Phase 2: execute deletion.
+	if err := s.gitClient.Open(); err != nil {
+		return nil, err
+	}
+
+	// Delete local files.
+	for _, t := range targets {
+		if err := os.Remove(t.localPath); err != nil && !os.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to remove local file %q: %w", t.itemID, err)
+		}
+	}
+
+	// Stage removals individually — ignore errors for missing items whose
+	// files may not exist in the repo (consistent with single Delete).
+	for _, t := range targets {
+		if err := s.gitClient.RemoveFile(t.repoPath); err != nil && t.status != StatusMissing {
+			return nil, fmt.Errorf("failed to stage removal of %q: %w", t.itemID, err)
+		}
+	}
+
+	if message == "" {
+		message = fmt.Sprintf("Delete %d item(s)", len(targets))
+	}
+	commitHash, err := s.gitClient.CommitStaged(message)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.gitClient.Push(ctx); err != nil {
+		return nil, err
+	}
+
+	// On success: delete all state entries.
+	var deleted []string
+	for _, t := range targets {
+		delete(state.DAGs, t.itemID)
+		deleted = append(deleted, t.itemID)
+	}
+	sort.Strings(deleted)
+	s.updateSuccessStateWithCommit(state, commitHash)
+
+	return deleted, nil
 }
 
 // DeleteAllMissing removes all missing items from remote, local, and state.

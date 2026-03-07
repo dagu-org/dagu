@@ -21,6 +21,7 @@ type SyncService interface {
 	Forget(ctx context.Context, itemIDs []string) ([]string, error)
 	Cleanup(ctx context.Context) ([]string, error)
 	Delete(ctx context.Context, itemID, message string, force bool) error
+	DeleteBatch(ctx context.Context, itemIDs []string, message string, force bool) ([]string, error)
 	DeleteAllMissing(ctx context.Context, message string) ([]string, error)
 	Move(ctx context.Context, oldID, newID, message string, force bool) error
 	GetStatus(ctx context.Context) (*gitsync.OverallStatus, error)
@@ -504,6 +505,72 @@ func (a *API) SyncDeleteMissing(ctx context.Context, req api.SyncDeleteMissingRe
 	return api.SyncDeleteMissing200JSONResponse{
 		Deleted: deleted,
 		Message: fmt.Sprintf("Deleted %d missing item(s)", len(deleted)),
+	}, nil
+}
+
+// SyncDeleteBatch deletes multiple items from remote, local, and state in a single commit.
+func (a *API) SyncDeleteBatch(ctx context.Context, req api.SyncDeleteBatchRequestObject) (api.SyncDeleteBatchResponseObject, error) {
+	if err := a.requireSyncService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireDAGWrite(ctx); err != nil {
+		return nil, err
+	}
+
+	if req.Body == nil || len(req.Body.ItemIds) == 0 {
+		return api.SyncDeleteBatch400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: "itemIds is required and must not be empty",
+		}, nil
+	}
+
+	var message string
+	var force bool
+	if req.Body.Message != nil {
+		message = *req.Body.Message
+	}
+	if req.Body.Force != nil {
+		force = *req.Body.Force
+	}
+
+	deleted, err := a.syncService.DeleteBatch(ctx, req.Body.ItemIds, message, force)
+	if err != nil {
+		if gitsync.IsDAGNotFound(err) {
+			return api.SyncDeleteBatch404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: err.Error(),
+			}, nil
+		}
+		if errors.Is(err, gitsync.ErrCannotDeleteUntracked) || errors.Is(err, gitsync.ErrPushDisabled) {
+			return api.SyncDeleteBatch400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: err.Error(),
+			}, nil
+		}
+		var validationErr *gitsync.ValidationError
+		if errors.As(err, &validationErr) {
+			return api.SyncDeleteBatch400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: err.Error(),
+			}, nil
+		}
+		return nil, internalError(err)
+	}
+
+	a.logAudit(ctx, audit.CategoryGitSync, "sync_delete_batch", map[string]any{
+		"item_ids": req.Body.ItemIds,
+		"deleted":  deleted,
+		"force":    force,
+		"message":  message,
+	})
+
+	if deleted == nil {
+		deleted = []string{}
+	}
+
+	return api.SyncDeleteBatch200JSONResponse{
+		Deleted: deleted,
+		Message: fmt.Sprintf("Deleted %d item(s)", len(deleted)),
 	}, nil
 }
 
