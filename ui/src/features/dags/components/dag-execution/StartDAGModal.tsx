@@ -183,6 +183,14 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) 
             />
           </div>
           {parsedParams.map((p, i) => {
+            const maxHeight = 150;
+            const autoGrow = (el: HTMLTextAreaElement) => {
+              el.style.height = 'auto';
+              const clamped = Math.min(el.scrollHeight, maxHeight);
+              el.style.height = clamped + 'px';
+              el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
+            };
+
             if (p.Name != undefined) {
               return (
                 <div key={i} className="space-y-2">
@@ -190,7 +198,12 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) 
                   <Textarea
                     id={`param-${i}`}
                     placeholder={p.Value}
-                    ref={i === 0 ? ref : undefined}
+                    ref={(el) => {
+                      if (i === 0) {
+                        (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
+                      }
+                      if (el) autoGrow(el);
+                    }}
                     rows={1}
                     value={params.find((pp) => pp.Name == p.Name)?.Value || ''}
                     readOnly={paramsReadOnly}
@@ -198,11 +211,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) 
                     className={
                       paramsReadOnly ? 'bg-muted cursor-not-allowed' : ''
                     }
-                    onInput={(e) => {
-                      const target = e.currentTarget;
-                      target.style.height = 'auto';
-                      target.style.height = target.scrollHeight + 'px';
-                    }}
+                    onInput={(e) => autoGrow(e.currentTarget)}
                     onChange={(e) => {
                       if (p.Name && !paramsReadOnly) {
                         setParams(
@@ -229,7 +238,12 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) 
                   <Textarea
                     id={`param-${i}`}
                     placeholder={p.Value}
-                    ref={i === 0 ? ref : undefined}
+                    ref={(el) => {
+                      if (i === 0) {
+                        (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
+                      }
+                      if (el) autoGrow(el);
+                    }}
                     rows={1}
                     value={params.find((_, j) => i == j)?.Value || ''}
                     readOnly={paramsReadOnly}
@@ -237,11 +251,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) 
                     className={
                       paramsReadOnly ? 'bg-muted cursor-not-allowed' : ''
                     }
-                    onInput={(e) => {
-                      const target = e.currentTarget;
-                      target.style.height = 'auto';
-                      target.style.height = target.scrollHeight + 'px';
-                    }}
+                    onInput={(e) => autoGrow(e.currentTarget)}
                     onChange={(e) => {
                       if (paramsReadOnly) return;
                       setParams(
