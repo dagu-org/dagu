@@ -92,6 +92,13 @@ function DAGActions({
 
   const client = useClient();
 
+  // Auto-open start modal when requested (e.g., from cockpit preview)
+  React.useEffect(() => {
+    if (dagContext.autoOpenStartModal) {
+      setIsEnqueueModal(true);
+    }
+  }, [dagContext.autoOpenStartModal]);
+
   /**
    * Reload DAG data after an action is performed
    */

@@ -44,6 +44,8 @@ type DAGDetailsContentProps = {
   onEnqueue?: (params: string, dagRunId?: string, immediate?: boolean) => void | Promise<void>;
   /** When true, forces enqueue mode in DAGContext (used by cockpit) */
   forceEnqueue?: boolean;
+  /** When true, automatically opens the start/enqueue modal on mount */
+  autoOpenStartModal?: boolean;
 };
 
 type LogViewerState = {
@@ -70,6 +72,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   sseResult,
   onEnqueue,
   forceEnqueue = false,
+  autoOpenStartModal = false,
 }) => {
   const baseUrl = isModal ? '#' : `/dags/${fileName}`;
   const [logViewer, setLogViewer] = useState<LogViewerState>({
@@ -109,6 +112,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
         fileName: fileName || '',
         name: dag?.name || '',
         forceEnqueue,
+        autoOpenStartModal,
         onEnqueue,
       }}
     >

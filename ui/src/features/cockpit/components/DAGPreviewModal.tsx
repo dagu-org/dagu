@@ -255,6 +255,7 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
                   sseResult={sseResult}
                   onEnqueue={handleEnqueue}
                   forceEnqueue={true}
+                  autoOpenStartModal={true}
                 />
               )}
             </div>
