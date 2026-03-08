@@ -1,4 +1,5 @@
-import React, { useCallback, useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useClient } from '@/hooks/api';
 import { useDAGSSE } from '@/hooks/useDAGSSE';
@@ -30,6 +31,13 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
   const [activeTab, setActiveTab] = useState('spec');
   const [enqueuedRunId, setEnqueuedRunId] = useState<string | undefined>();
 
+  // Preserve the last valid fileName so SWR data stays stable during close animation
+  const stableFileNameRef = useRef(fileName);
+  if (fileName) {
+    stableFileNameRef.current = fileName;
+  }
+  const stableFileName = shouldRender ? stableFileNameRef.current : '';
+
   useEffect(() => {
     if (isOpen) {
       setShouldRender(true);
@@ -44,7 +52,7 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
     setIsVisible(false);
     const timer = setTimeout(() => {
       setShouldRender(false);
-    }, 150);
+    }, 200);
     return () => clearTimeout(timer);
   }, [isOpen]);
 
@@ -52,7 +60,7 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
     components['schemas']['DAGRunDetails'] | undefined
   >();
   // SSE for real-time updates
-  const sseResult = useDAGSSE(fileName, !!fileName);
+  const sseResult = useDAGSSE(stableFileName, !!stableFileName);
 
   // Fetch DAG details
   const { data, mutate } = useQuery(
@@ -60,12 +68,12 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
     {
       params: {
         query: { remoteNode },
-        path: { fileName },
+        path: { fileName: stableFileName },
       },
     },
     {
       ...sseFallbackOptions(sseResult),
-      isPaused: () => !fileName,
+      isPaused: () => !stableFileName,
     },
   );
   useSSECacheSync(sseResult, mutate);
@@ -183,20 +191,24 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
     return null;
   }
 
-  const modalVisibilityClass = isVisible
+  const backdropClass = isVisible
+    ? 'bg-black/5'
+    : 'bg-transparent';
+
+  const panelClass = isVisible
     ? 'translate-x-0 opacity-100'
     : 'translate-x-full opacity-0';
 
-  return (
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 h-screen w-screen z-40"
+        className={`fixed inset-0 h-screen w-screen z-40 transition-colors duration-200 ${backdropClass}`}
         onClick={onClose}
       />
 
       {/* Side Panel */}
-      <div className={`fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 overflow-y-auto transition-all duration-150 ease-out ${modalVisibilityClass}`}>
+      <div className={`fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 overflow-y-auto transition-all duration-200 ease-out ${panelClass}`}>
         <RootDAGRunContext.Provider
           value={{
             data: currentDAGRun,
@@ -255,13 +267,14 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
                   sseResult={sseResult}
                   onEnqueue={handleEnqueue}
                   forceEnqueue={true}
-                  autoOpenStartModal={true}
+                  autoOpenStartModal={false}
                 />
               )}
             </div>
           </div>
         </RootDAGRunContext.Provider>
       </div>
-    </>
+    </>,
+    document.body
   );
 }

@@ -9,7 +9,7 @@ export function useCockpitState() {
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const client = useClient();
 
-  const { data, mutate } = useQuery('/workspaces', {
+  const { data, error: workspaceError, mutate } = useQuery('/workspaces', {
     params: { query: { remoteNode } },
   });
 
@@ -57,6 +57,7 @@ export function useCockpitState() {
 
   return {
     workspaces: data?.workspaces ?? [],
+    workspaceError,
     selectedWorkspace,
     selectedTemplate,
     selectWorkspace,

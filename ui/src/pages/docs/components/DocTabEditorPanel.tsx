@@ -7,9 +7,10 @@ import DocTabBar from './DocTabBar';
 
 type Props = {
   onDeleteDoc?: (docPath: string, title: string) => void;
+  toolbar?: React.ReactNode;
 };
 
-function DocTabEditorPanel({ onDeleteDoc }: Props) {
+function DocTabEditorPanel({ onDeleteDoc, toolbar }: Props) {
   const { tabs, activeTabId, closeTab, closeAllTabs, closeOtherTabs, clearDraft, markTabSaved, isTabUnsaved } =
     useDocTabContext();
 
@@ -93,12 +94,20 @@ function DocTabEditorPanel({ onDeleteDoc }: Props) {
 
   return (
     <div className="flex flex-col h-full">
-      <DocTabBar
-        onCloseTabWithUnsaved={handleCloseTabWithUnsaved}
-        onDeleteDoc={onDeleteDoc}
-        onCloseAllTabs={handleCloseAllTabs}
-        onCloseOtherTabs={handleCloseOtherTabs}
-      />
+      <div className="flex items-stretch border-b border-border">
+        {toolbar && (
+          <div className="flex items-center shrink-0 px-2 gap-2">
+            {toolbar}
+          </div>
+        )}
+        <DocTabBar
+          className="flex-1 min-w-0 border-b-0"
+          onCloseTabWithUnsaved={handleCloseTabWithUnsaved}
+          onDeleteDoc={onDeleteDoc}
+          onCloseAllTabs={handleCloseAllTabs}
+          onCloseOtherTabs={handleCloseOtherTabs}
+        />
+      </div>
       <div className="flex-1 overflow-hidden min-h-0">
         {activeTab ? (
           <DocEditor

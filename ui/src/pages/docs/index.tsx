@@ -17,6 +17,8 @@ import DocTabEditorPanel from './components/DocTabEditorPanel';
 import DocTreeSidebar from './components/DocTreeSidebar';
 import { RenameDocModal } from './components/RenameDocModal';
 import type { ContextAction } from './components/DocTreeNode';
+import { useCockpitState } from '@/features/cockpit/hooks/useCockpitState';
+import { CockpitToolbar } from '@/features/cockpit/components/CockpitToolbar';
 
 function titleFromPath(docPath: string): string {
   const segments = docPath.split('/');
@@ -31,6 +33,16 @@ function DocsContent() {
   const client = useClient();
   const { showToast } = useSimpleToast();
   const isMobile = useIsMobile();
+
+  const {
+    workspaces,
+    selectedWorkspace,
+    selectedTemplate,
+    selectWorkspace,
+    selectTemplate,
+    createWorkspace,
+    deleteWorkspace,
+  } = useCockpitState();
 
   const { setContext } = usePageContext();
   const {
@@ -280,8 +292,24 @@ function DocsContent() {
     />
   );
 
+  const cockpitToolbar = (
+    <div className="[&>div]:mb-0">
+      <CockpitToolbar
+        workspaces={workspaces}
+        selectedWorkspace={selectedWorkspace}
+        selectedTemplate={selectedTemplate}
+        onSelectWorkspace={selectWorkspace}
+        onCreateWorkspace={createWorkspace}
+        onDeleteWorkspace={deleteWorkspace}
+        onSelectTemplate={selectTemplate}
+      />
+    </div>
+  );
+
   const rightPanel =
-    tabs.length > 0 ? <DocTabEditorPanel onDeleteDoc={handleDeleteFromTab} /> : null;
+    tabs.length > 0 ? (
+      <DocTabEditorPanel onDeleteDoc={handleDeleteFromTab} toolbar={cockpitToolbar} />
+    ) : null;
 
   // Mobile layout
   if (isMobile) {
