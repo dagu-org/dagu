@@ -258,11 +258,6 @@ func (d *DAG) HasApprovalSteps() bool {
 	return false
 }
 
-// HasHITLSteps is deprecated. Use HasApprovalSteps.
-func (d *DAG) HasHITLSteps() bool {
-	return d.HasApprovalSteps()
-}
-
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
 func (d *DAG) SockAddr(dagRunID string) string {

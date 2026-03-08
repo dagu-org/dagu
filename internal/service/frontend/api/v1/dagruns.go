@@ -1014,7 +1014,7 @@ func (a *API) PushBackDAGRunStep(ctx context.Context, request api.PushBackDAGRun
 		}, nil
 	}
 
-	applyPushBack(node, dagStatus, request.Body)
+	applyPushBack(ctx, node, dagStatus, request.Body)
 
 	if err := a.dagRunMgr.UpdateStatus(ctx, ref, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
@@ -1092,7 +1092,7 @@ func (a *API) PushBackSubDAGRunStep(ctx context.Context, request api.PushBackSub
 		}, nil
 	}
 
-	applyPushBack(node, dagStatus, request.Body)
+	applyPushBack(ctx, node, dagStatus, request.Body)
 
 	if err := a.dagRunMgr.UpdateStatus(ctx, rootRef, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating sub DAG-run status: %w", err)
@@ -2005,66 +2005,71 @@ func hasWaitingSteps(nodes []*exec.Node) bool {
 	return false
 }
 
-func validateRequiredInputs(step core.Step, body *api.ApproveStepRequest) error {
-	// Check approval config first (new approval field)
-	if step.Approval != nil && len(step.Approval.Required) > 0 {
-		var providedInputs map[string]string
-		if body != nil && body.Inputs != nil {
-			providedInputs = *body.Inputs
+// checkMissingInputs validates that all required fields are present in the provided inputs.
+func checkMissingInputs(required []string, provided map[string]string) error {
+	var missing []string
+	for _, fieldName := range required {
+		if provided == nil || provided[fieldName] == "" {
+			missing = append(missing, fieldName)
 		}
-
-		var missing []string
-		for _, fieldName := range step.Approval.Required {
-			if providedInputs == nil || providedInputs[fieldName] == "" {
-				missing = append(missing, fieldName)
-			}
-		}
-
-		if len(missing) > 0 {
-			return fmt.Errorf("missing required inputs: %v", missing)
-		}
-		return nil
 	}
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required inputs: %v", missing)
+	}
+	return nil
+}
 
+// requiredFieldsForStep returns the list of required input field names for a step,
+// checking the approval config first then falling back to legacy hitl executor config.
+func requiredFieldsForStep(step core.Step) []string {
+	if step.Approval != nil {
+		return step.Approval.Required
+	}
 	// Fall back to legacy hitl executor config
 	if step.ExecutorConfig.Config == nil {
 		return nil
 	}
-
 	requiredFields, ok := step.ExecutorConfig.Config["required"]
 	if !ok {
 		return nil
 	}
-
 	required, ok := requiredFields.([]any)
-	if !ok || len(required) == 0 {
+	if !ok {
 		return nil
 	}
-
-	var providedInputs map[string]string
-	if body != nil && body.Inputs != nil {
-		providedInputs = *body.Inputs
-	}
-
-	var missing []string
+	result := make([]string, 0, len(required))
 	for _, r := range required {
-		fieldName, ok := r.(string)
-		if !ok {
-			continue
-		}
-		if providedInputs == nil || providedInputs[fieldName] == "" {
-			missing = append(missing, fieldName)
+		if fieldName, ok := r.(string); ok {
+			result = append(result, fieldName)
 		}
 	}
-
-	if len(missing) > 0 {
-		return fmt.Errorf("missing required inputs: %v", missing)
-	}
-
-	return nil
+	return result
 }
 
-func applyPushBack(node *exec.Node, status *exec.DAGRunStatus, body *api.PushBackStepRequest) {
+func validateRequiredInputs(step core.Step, body *api.ApproveStepRequest) error {
+	required := requiredFieldsForStep(step)
+	if len(required) == 0 {
+		return nil
+	}
+	var provided map[string]string
+	if body != nil && body.Inputs != nil {
+		provided = *body.Inputs
+	}
+	return checkMissingInputs(required, provided)
+}
+
+func validatePushBackInputs(step core.Step, body *api.PushBackStepRequest) error {
+	if step.Approval == nil || len(step.Approval.Required) == 0 {
+		return nil
+	}
+	var provided map[string]string
+	if body != nil && body.Inputs != nil {
+		provided = *body.Inputs
+	}
+	return checkMissingInputs(step.Approval.Required, provided)
+}
+
+func applyPushBack(ctx context.Context, node *exec.Node, status *exec.DAGRunStatus, body *api.PushBackStepRequest) {
 	node.ApprovalIteration++
 	node.Status = core.NodeNotStarted
 	node.StartedAt = "-"
@@ -2119,30 +2124,6 @@ func findDependentNodes(nodes []*exec.Node, stepName string) []*exec.Node {
 		}
 	}
 	return result
-}
-
-func validatePushBackInputs(step core.Step, body *api.PushBackStepRequest) error {
-	if step.Approval == nil || len(step.Approval.Required) == 0 {
-		return nil
-	}
-
-	var providedInputs map[string]string
-	if body != nil && body.Inputs != nil {
-		providedInputs = *body.Inputs
-	}
-
-	var missing []string
-	for _, fieldName := range step.Approval.Required {
-		if providedInputs == nil || providedInputs[fieldName] == "" {
-			missing = append(missing, fieldName)
-		}
-	}
-
-	if len(missing) > 0 {
-		return fmt.Errorf("missing required inputs: %v", missing)
-	}
-
-	return nil
 }
 
 func (a *API) logStepPushBack(ctx context.Context, dagName, dagRunID, subDAGRunID, stepName string, iteration int, resumed bool) {

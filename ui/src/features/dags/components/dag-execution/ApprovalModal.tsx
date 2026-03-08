@@ -60,7 +60,7 @@ export function ApprovalModal({ visible, dismissModal, step, node, onApprove, on
     (field) => inputs[field] && inputs[field].trim() !== ''
   );
 
-  const handleApprove = async () => {
+  const handleAction = async (action: (inputs: Record<string, string>) => Promise<void>, errorLabel: string) => {
     if (!isValid) {
       setError('Please fill in all required fields');
       return;
@@ -70,36 +70,18 @@ export function ApprovalModal({ visible, dismissModal, step, node, onApprove, on
     setError(null);
 
     try {
-      await onApprove(inputs);
+      await action(inputs);
       dismissModal();
     } catch (e) {
       const err = e as { message?: string };
-      setError(err.message || 'Failed to approve step');
+      setError(err.message || `Failed to ${errorLabel} step`);
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePushBack = async () => {
-    if (!onPushBack) return;
-    if (!isValid) {
-      setError('Please fill in all required fields');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      await onPushBack(inputs);
-      dismissModal();
-    } catch (e) {
-      const err = e as { message?: string };
-      setError(err.message || 'Failed to push back step');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleApprove = () => handleAction(onApprove, 'approve');
+  const handlePushBack = () => onPushBack && handleAction(onPushBack, 'push back');
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey && isValid && !loading) {

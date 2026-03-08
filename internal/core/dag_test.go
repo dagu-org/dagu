@@ -834,7 +834,7 @@ func TestDAG_GetName(t *testing.T) {
 	}
 }
 
-func TestDAGHasHITLSteps(t *testing.T) {
+func TestDAGHasApprovalSteps(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -848,7 +848,7 @@ func TestDAGHasHITLSteps(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "NoHITL",
+			name: "NoApproval",
 			steps: []core.Step{
 				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: "command"}},
 				{Name: "step2", ExecutorConfig: core.ExecutorConfig{Type: "dag"}},
@@ -856,10 +856,18 @@ func TestDAGHasHITLSteps(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "HasHITL",
+			name: "LegacyHITL",
 			steps: []core.Step{
 				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: "command"}},
 				{Name: "step2", ExecutorConfig: core.ExecutorConfig{Type: "hitl"}},
+			},
+			expected: true,
+		},
+		{
+			name: "ApprovalField",
+			steps: []core.Step{
+				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: "command"}},
+				{Name: "step2", Approval: &core.ApprovalConfig{Prompt: "review"}},
 			},
 			expected: true,
 		},
@@ -883,7 +891,7 @@ func TestDAGHasHITLSteps(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dag := &core.DAG{Steps: tt.steps}
-			result := dag.HasHITLSteps()
+			result := dag.HasApprovalSteps()
 			assert.Equal(t, tt.expected, result)
 		})
 	}
