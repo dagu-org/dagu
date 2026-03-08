@@ -29,8 +29,8 @@ type dag struct {
 	// Description is the description of the DAG.
 	Description string `yaml:"description,omitempty"`
 	// Type is the execution type for steps (graph, chain, or agent).
-	// Default is "graph" which uses dependency-based execution.
-	// "chain" executes steps in the order they are defined.
+	// Default is "chain" which executes steps in the order they are defined.
+	// "graph" uses dependency-based parallel execution.
 	// "agent" is reserved for future agent-based execution.
 	Type string `yaml:"type,omitempty"`
 	// Shell is the default shell to use for all steps in this DAG.
