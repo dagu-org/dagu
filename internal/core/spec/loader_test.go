@@ -385,6 +385,107 @@ steps:
 		assert.Equal(t, "Base system prompt", dag.LLM.System)
 	})
 
+	t.Run("WithBaseConfigContent_MergesEnvVars", func(t *testing.T) {
+		t.Parallel()
+
+		// Simulate embedded base config content (as used in distributed mode)
+		baseContent := []byte(`
+env:
+  BASE_ENV: "base_value"
+  OVERWRITE_ENV: "base_overwrite_value"
+
+log_dir: "/base/logs"
+hist_retention_days: 90
+`)
+
+		childDAG := createTempYAMLFile(t, `
+env:
+  SUB_ENV: "sub_value"
+  OVERWRITE_ENV: "sub_overwrite_value"
+
+steps:
+  - name: "step1"
+    command: echo "step1"
+`)
+		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfigContent(baseContent))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+
+		// Env vars from embedded base config should be merged
+		assert.Contains(t, dag.Env, "BASE_ENV=base_value")
+		assert.Contains(t, dag.Env, "SUB_ENV=sub_value")
+		assert.Contains(t, dag.Env, "OVERWRITE_ENV=sub_overwrite_value")
+
+		// Other fields should be inherited
+		assert.Equal(t, "/base/logs", dag.LogDir)
+		assert.Equal(t, 90, dag.HistRetentionDays)
+
+		// BaseConfigData should be populated for propagation
+		assert.NotEmpty(t, dag.BaseConfigData)
+	})
+
+	t.Run("WithBaseConfigContent_MatchesWithBaseConfig", func(t *testing.T) {
+		t.Parallel()
+
+		// Both WithBaseConfig (file) and WithBaseConfigContent (bytes) should
+		// produce identical DAGs when given the same base config content.
+		baseYAML := `
+env:
+  MY_VAR: "hello"
+
+log_dir: "/shared/logs"
+hist_retention_days: 30
+`
+		baseFile := createTempYAMLFile(t, baseYAML)
+		childDAG := createTempYAMLFile(t, `
+steps:
+  - name: "step1"
+    command: echo "${MY_VAR}"
+`)
+
+		dagFromFile, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseFile))
+		require.NoError(t, err)
+
+		dagFromContent, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfigContent([]byte(baseYAML)))
+		require.NoError(t, err)
+
+		// Env, LogDir, HistRetentionDays should match
+		assert.Equal(t, dagFromFile.Env, dagFromContent.Env)
+		assert.Equal(t, dagFromFile.LogDir, dagFromContent.LogDir)
+		assert.Equal(t, dagFromFile.HistRetentionDays, dagFromContent.HistRetentionDays)
+
+		// Both should have BaseConfigData populated
+		assert.NotEmpty(t, dagFromFile.BaseConfigData)
+		assert.NotEmpty(t, dagFromContent.BaseConfigData)
+	})
+
+	t.Run("WithBaseConfigContent_PrecedenceOverFile", func(t *testing.T) {
+		t.Parallel()
+
+		// When both WithBaseConfig and WithBaseConfigContent are set,
+		// embedded content should take precedence.
+		fileBase := createTempYAMLFile(t, `
+env:
+  SOURCE: "file"
+`)
+		embeddedContent := []byte(`
+env:
+  SOURCE: "embedded"
+`)
+
+		childDAG := createTempYAMLFile(t, `
+steps:
+  - name: "step1"
+    command: echo "test"
+`)
+		dag, err := spec.Load(context.Background(), childDAG,
+			spec.WithBaseConfig(fileBase),
+			spec.WithBaseConfigContent(embeddedContent),
+		)
+		require.NoError(t, err)
+		assert.Contains(t, dag.Env, "SOURCE=embedded")
+	})
+
 	t.Run("OverrideBaseConfig", func(t *testing.T) {
 		t.Parallel()
 
