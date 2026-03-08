@@ -22,7 +22,7 @@ import (
 
 // Execution type constants
 const (
-	// TypeGraph is the default execution type using dependency-based execution
+	// TypeGraph is the execution type using dependency-based parallel execution
 	TypeGraph = "graph"
 	// TypeChain executes steps sequentially in the order they are defined
 	TypeChain = "chain"
