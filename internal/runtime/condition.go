@@ -101,7 +101,11 @@ func matchCondition(ctx context.Context, c *core.Condition) error {
 }
 
 func evalCommand(ctx context.Context, shell []string, c *core.Condition) error {
-	commandToRun, err := EvalString(ctx, c.Condition, eval.OnlyReplaceVars())
+	var opts []eval.Option
+	if len(shell) > 0 {
+		opts = append(opts, eval.OnlyReplaceVars())
+	}
+	commandToRun, err := EvalString(ctx, c.Condition, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate command: %w", err)
 	}

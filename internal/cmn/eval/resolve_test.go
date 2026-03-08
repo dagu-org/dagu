@@ -174,6 +174,192 @@ func TestResolveJSONSource_WithoutExpandOS(t *testing.T) {
 	require.Equal(t, `{"c":3}`, val)
 }
 
+// --- resolveForReplace coverage ---
+
+func TestResolveForReplace_ExplicitVarsAlwaysExpanded(t *testing.T) {
+	r := &resolver{
+		variables:      []map[string]string{{"FOO": "bar"}},
+		deferShellVars: true,
+	}
+	val, ok := r.resolveForReplace("FOO")
+	require.True(t, ok)
+	require.Equal(t, "bar", val)
+}
+
+func TestResolveForReplace_ExplicitVarsWithoutDefer(t *testing.T) {
+	r := &resolver{
+		variables:      []map[string]string{{"FOO": "bar"}},
+		deferShellVars: false,
+	}
+	val, ok := r.resolveForReplace("FOO")
+	require.True(t, ok)
+	require.Equal(t, "bar", val)
+}
+
+func TestResolveForReplace_ScopeVarDeferredWhenDeferTrue(t *testing.T) {
+	scope := NewEnvScope(nil, false).WithEntry("PARAM", "value", EnvSourceDAGEnv)
+	r := &resolver{
+		scope:          scope,
+		deferShellVars: true,
+	}
+	_, ok := r.resolveForReplace("PARAM")
+	assert.False(t, ok, "scope var should be deferred when deferShellVars=true")
+}
+
+func TestResolveForReplace_ScopeVarExpandedWhenDeferFalse(t *testing.T) {
+	scope := NewEnvScope(nil, false).WithEntry("PARAM", "value", EnvSourceDAGEnv)
+	r := &resolver{
+		scope:          scope,
+		deferShellVars: false,
+	}
+	val, ok := r.resolveForReplace("PARAM")
+	require.True(t, ok)
+	require.Equal(t, "value", val)
+}
+
+func TestResolveForReplace_OSSourcedScopeSkippedEvenWithoutDefer(t *testing.T) {
+	scope := NewEnvScope(nil, false).WithEntry("HOME", "/home/user", EnvSourceOS)
+	r := &resolver{
+		scope:          scope,
+		deferShellVars: false,
+	}
+	_, ok := r.resolveForReplace("HOME")
+	assert.False(t, ok, "OS-sourced scope should be skipped by lookupScopeNonOS")
+}
+
+func TestResolveForReplace_NotFoundReturnsEmpty(t *testing.T) {
+	r := &resolver{deferShellVars: true}
+	_, ok := r.resolveForReplace("NONEXISTENT")
+	assert.False(t, ok)
+}
+
+func TestResolveForReplace_ExplicitVarTakesPrecedenceOverScope(t *testing.T) {
+	scope := NewEnvScope(nil, false).WithEntry("VAR", "scope_val", EnvSourceDAGEnv)
+	r := &resolver{
+		variables:      []map[string]string{{"VAR": "explicit_val"}},
+		scope:          scope,
+		deferShellVars: false,
+	}
+	val, ok := r.resolveForReplace("VAR")
+	require.True(t, ok)
+	require.Equal(t, "explicit_val", val)
+}
+
+// --- replaceVars with deferShellVars ---
+
+func TestReplaceVars_DeferShellVars_ExplicitVarExpanded(t *testing.T) {
+	r := &resolver{
+		variables:      []map[string]string{{"FOO": "bar"}},
+		deferShellVars: true,
+	}
+	got := r.replaceVars("echo $FOO")
+	require.Equal(t, "echo bar", got)
+}
+
+func TestReplaceVars_DeferShellVars_ScopeVarPreserved(t *testing.T) {
+	scope := NewEnvScope(nil, false).WithEntry("TOPIC", "my-topic", EnvSourceDAGEnv)
+	r := &resolver{
+		scope:          scope,
+		deferShellVars: true,
+	}
+	got := r.replaceVars("echo $TOPIC")
+	require.Equal(t, "echo $TOPIC", got)
+}
+
+func TestReplaceVars_DeferShellVars_MixedExplicitAndScope(t *testing.T) {
+	scope := NewEnvScope(nil, false).WithEntry("PARAM", "param_val", EnvSourceDAGEnv)
+	r := &resolver{
+		variables:      []map[string]string{{"EXPLICIT": "explicit_val"}},
+		scope:          scope,
+		deferShellVars: true,
+	}
+	got := r.replaceVars("$EXPLICIT and $PARAM")
+	require.Equal(t, "explicit_val and $PARAM", got)
+}
+
+func TestReplaceVars_DeferShellVars_BracedSyntaxScopePreserved(t *testing.T) {
+	scope := NewEnvScope(nil, false).WithEntry("TOPIC", "my-topic", EnvSourceDAGEnv)
+	r := &resolver{
+		scope:          scope,
+		deferShellVars: true,
+	}
+	got := r.replaceVars("echo ${TOPIC}")
+	require.Equal(t, "echo ${TOPIC}", got)
+}
+
+func TestReplaceVars_DeferShellVars_BackticksInValuePreserved(t *testing.T) {
+	// Simulates the scenario where a scope var has backticks in its value.
+	// With deferShellVars=true, the var is NOT expanded, so the backticks
+	// never appear in the template output.
+	scope := NewEnvScope(nil, false).WithEntry("MSG", "say `hello`", EnvSourceDAGEnv)
+	r := &resolver{
+		scope:          scope,
+		deferShellVars: true,
+	}
+	got := r.replaceVars("echo $MSG")
+	require.Equal(t, "echo $MSG", got, "scope var with backticks should be deferred")
+}
+
+// --- deferShellVars with numeric (positional) vars ---
+
+func TestResolveForReplace_NumericVarNotDeferredEvenWithDefer(t *testing.T) {
+	scope := NewEnvScope(nil, false).WithEntry("1", "A", EnvSourceDAGEnv)
+	r := &resolver{
+		scope:          scope,
+		deferShellVars: true,
+	}
+	val, ok := r.resolveForReplace("1")
+	require.True(t, ok, "$1 should be expanded even with deferShellVars")
+	require.Equal(t, "A", val)
+}
+
+func TestReplaceVars_DeferShellVars_PositionalParamsExpanded(t *testing.T) {
+	scope := NewEnvScope(nil, false).
+		WithEntry("1", "A", EnvSourceDAGEnv).
+		WithEntry("2", "B", EnvSourceDAGEnv).
+		WithEntry("NAMED", "deferred", EnvSourceDAGEnv)
+	r := &resolver{
+		scope:          scope,
+		deferShellVars: true,
+	}
+	got := r.replaceVars("echo $1 $2 $NAMED")
+	require.Equal(t, "echo A B $NAMED", got)
+}
+
+func TestIsNumericVar(t *testing.T) {
+	assert.True(t, isNumericVar("1"))
+	assert.True(t, isNumericVar("42"))
+	assert.True(t, isNumericVar("0"))
+	assert.False(t, isNumericVar(""))
+	assert.False(t, isNumericVar("a"))
+	assert.False(t, isNumericVar("1a"))
+	assert.False(t, isNumericVar("FOO"))
+}
+
+// --- expandReferences unaffected by deferShellVars ---
+
+func TestExpandReferences_StillWorksWithDeferShellVars(t *testing.T) {
+	ctx := context.Background()
+	r := &resolver{
+		stepMap: map[string]StepInfo{
+			"step1": {Stdout: "/tmp/out.txt"},
+		},
+		deferShellVars: true,
+	}
+	got := r.expandReferences(ctx, "cat ${step1.stdout}")
+	require.Equal(t, "cat /tmp/out.txt", got)
+}
+
+func TestExpandReferences_JSONPathWithDeferShellVars(t *testing.T) {
+	ctx := context.Background()
+	r := &resolver{
+		variables:      []map[string]string{{"DATA": `{"key":"val"}`}},
+		deferShellVars: true,
+	}
+	got := r.expandReferences(ctx, "result: ${DATA.key}")
+	require.Equal(t, "result: val", got)
+}
+
 // --- expandReferences short submatch ---
 
 func TestExpandReferences_ShortSubmatch(t *testing.T) {

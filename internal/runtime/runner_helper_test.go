@@ -217,18 +217,20 @@ func (th testHelper) newPlan(t *testing.T, steps ...core.Step) planHelper {
 	return planHelper{
 		testHelper: th,
 		Plan:       plan,
+		workDir:    t.TempDir(),
 	}
 }
 
 type planHelper struct {
 	testHelper
 	*runtime.Plan
+	workDir string
 }
 
 func (ph planHelper) assertRun(t *testing.T, expectedStatus core.Status) runResult {
 	t.Helper()
 
-	dag := &core.DAG{Name: "test_dag"}
+	dag := &core.DAG{Name: "test_dag", WorkingDir: ph.workDir}
 	logFilename := fmt.Sprintf("%s_%s.log", dag.Name, ph.cfg.DAGRunID)
 	logFilePath := path.Join(ph.cfg.LogDir, logFilename)
 

@@ -20,19 +20,21 @@ var reJSONPathRef = regexp.MustCompile(`\$\{([A-Za-z0-9_]\w*)(\.[^}]+)\}|\$([A-Z
 // resolver provides unified variable resolution across explicit variable maps,
 // EnvScope, and OS environment.
 type resolver struct {
-	variables []map[string]string
-	stepMap   map[string]StepInfo
-	scope     *EnvScope
-	expandOS  bool
+	variables      []map[string]string
+	stepMap        map[string]StepInfo
+	scope          *EnvScope
+	expandOS       bool
+	deferShellVars bool
 }
 
 // newResolver creates a resolver from the given context and options.
 func newResolver(ctx context.Context, opts *Options) *resolver {
 	return &resolver{
-		variables: opts.Variables,
-		stepMap:   opts.StepMap,
-		scope:     GetEnvScope(ctx),
-		expandOS:  opts.ExpandOS,
+		variables:      opts.Variables,
+		stepMap:        opts.StepMap,
+		scope:          GetEnvScope(ctx),
+		expandOS:       opts.ExpandOS,
+		deferShellVars: opts.DeferShellVars,
 	}
 }
 
@@ -65,6 +67,35 @@ func (r *resolver) resolve(name string) (string, bool) {
 		return val, true
 	}
 	return r.lookupScopeNonOS(name)
+}
+
+// resolveForReplace resolves a variable for simple $VAR replacement.
+// When deferShellVars is true, most scope variables are deferred to the
+// shell at runtime. Numeric variables ($1, $2, ...) are always expanded
+// because shells treat $N as positional arguments, not environment variables.
+func (r *resolver) resolveForReplace(name string) (string, bool) {
+	if val, ok := r.lookupVariable(name); ok {
+		return val, true
+	}
+	if r.deferShellVars && !isNumericVar(name) {
+		return "", false
+	}
+	return r.lookupScopeNonOS(name)
+}
+
+// isNumericVar reports whether name consists entirely of digits (e.g., "1", "2").
+// These correspond to shell positional parameters ($1, $2, ...) which cannot
+// be set via environment variables, so they must always be expanded by Dagu.
+func isNumericVar(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, c := range name {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // resolveForShell looks up a variable for shell expansion.
@@ -156,7 +187,7 @@ func (r *resolver) replaceVars(template string) string {
 			b.WriteString(match)
 			continue
 		}
-		if val, found := r.resolve(key); found {
+		if val, found := r.resolveForReplace(key); found {
 			b.WriteString(val)
 			continue
 		}

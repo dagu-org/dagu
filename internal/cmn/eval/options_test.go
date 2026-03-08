@@ -15,8 +15,22 @@ func TestOptions_Defaults(t *testing.T) {
 	assert.True(t, opts.Substitute, "Substitute should default to true")
 	assert.True(t, opts.EscapeDollar, "EscapeDollar should default to true")
 	assert.False(t, opts.ExpandOS, "ExpandOS should default to false")
+	assert.False(t, opts.DeferShellVars, "DeferShellVars should default to false")
 	assert.Nil(t, opts.Variables, "Variables should default to nil")
 	assert.Nil(t, opts.StepMap, "StepMap should default to nil")
+}
+
+func TestOptions_OnlyReplaceVars(t *testing.T) {
+	opts := NewOptions()
+	OnlyReplaceVars()(opts)
+
+	assert.False(t, opts.ExpandEnv, "OnlyReplaceVars should disable ExpandEnv")
+	assert.False(t, opts.Substitute, "OnlyReplaceVars should disable Substitute")
+	assert.True(t, opts.DeferShellVars, "OnlyReplaceVars should enable DeferShellVars")
+	// These should remain at their default values
+	assert.True(t, opts.ExpandShell, "OnlyReplaceVars should not change ExpandShell")
+	assert.True(t, opts.EscapeDollar, "OnlyReplaceVars should not change EscapeDollar")
+	assert.False(t, opts.ExpandOS, "OnlyReplaceVars should not change ExpandOS")
 }
 
 func TestOptions_WithOSExpansion(t *testing.T) {

@@ -159,6 +159,20 @@ func TestParseParamTokens_Matrix(t *testing.T) {
 			},
 		},
 		{
+			name:  "MultilineQuotedValue",
+			input: `msg="line1\nline2"`,
+			expected: []paramToken{
+				{Name: "msg", Value: "line1\nline2"},
+			},
+		},
+		{
+			name:  "EscapedBackslash",
+			input: `path="C:\\Users"`,
+			expected: []paramToken{
+				{Name: "path", Value: `C:\Users`},
+			},
+		},
+		{
 			name:     "EmptyInput",
 			input:    "",
 			expected: []paramToken{},
