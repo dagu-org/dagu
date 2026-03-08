@@ -1115,6 +1115,7 @@ func (a *API) PushBackSubDAGRunStep(ctx context.Context, request api.PushBackSub
 
 	return &api.PushBackSubDAGRunStep200JSONResponse{
 		DagRunId:          request.SubDAGRunId,
+		SubDAGRunId:       &request.SubDAGRunId,
 		StepName:          request.StepName,
 		ApprovalIteration: node.ApprovalIteration,
 		Resumed:           resumed,

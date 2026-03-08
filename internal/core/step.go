@@ -390,7 +390,7 @@ type AgentToolsConfig struct {
 type AgentBashPolicy struct {
 	// DefaultBehavior is the default action when no rule matches ("allow" or "deny").
 	DefaultBehavior string `json:"defaultBehavior,omitempty"`
-	// DenyBehavior determines what happens when a command is denied ("block" or "hitl").
+	// DenyBehavior determines what happens when a command is denied ("block" or "ask_user").
 	DenyBehavior string `json:"denyBehavior,omitempty"`
 	// Rules is an ordered list of pattern-matching rules.
 	Rules []AgentBashRule `json:"rules,omitempty"`

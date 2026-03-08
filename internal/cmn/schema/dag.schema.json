@@ -3129,8 +3129,8 @@
         },
         "deny_behavior": {
           "type": "string",
-          "enum": ["block", "hitl"],
-          "description": "What happens when a command is denied: 'block' rejects it, 'hitl' asks for approval."
+          "enum": ["block", "ask_user"],
+          "description": "What happens when a command is denied: 'block' rejects it, 'ask_user' asks for approval."
         },
         "rules": {
           "type": "array",
