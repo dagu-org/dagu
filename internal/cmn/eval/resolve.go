@@ -20,19 +20,21 @@ var reJSONPathRef = regexp.MustCompile(`\$\{([A-Za-z0-9_]\w*)(\.[^}]+)\}|\$([A-Z
 // resolver provides unified variable resolution across explicit variable maps,
 // EnvScope, and OS environment.
 type resolver struct {
-	variables []map[string]string
-	stepMap   map[string]StepInfo
-	scope     *EnvScope
-	expandOS  bool
+	variables      []map[string]string
+	stepMap        map[string]StepInfo
+	scope          *EnvScope
+	expandOS       bool
+	deferShellVars bool
 }
 
 // newResolver creates a resolver from the given context and options.
 func newResolver(ctx context.Context, opts *Options) *resolver {
 	return &resolver{
-		variables: opts.Variables,
-		stepMap:   opts.StepMap,
-		scope:     GetEnvScope(ctx),
-		expandOS:  opts.ExpandOS,
+		variables:      opts.Variables,
+		stepMap:        opts.StepMap,
+		scope:          GetEnvScope(ctx),
+		expandOS:       opts.ExpandOS,
+		deferShellVars: opts.DeferShellVars,
 	}
 }
 
@@ -63,6 +65,19 @@ func (r *resolver) lookupScopeNonOS(name string) (string, bool) {
 func (r *resolver) resolve(name string) (string, bool) {
 	if val, ok := r.lookupVariable(name); ok {
 		return val, true
+	}
+	return r.lookupScopeNonOS(name)
+}
+
+// resolveForReplace resolves a variable for simple $VAR replacement.
+// When deferShellVars is true, only explicit variable maps are checked;
+// scope variables (params, env) are deferred to the shell at runtime.
+func (r *resolver) resolveForReplace(name string) (string, bool) {
+	if val, ok := r.lookupVariable(name); ok {
+		return val, true
+	}
+	if r.deferShellVars {
+		return "", false
 	}
 	return r.lookupScopeNonOS(name)
 }
@@ -156,7 +171,7 @@ func (r *resolver) replaceVars(template string) string {
 			b.WriteString(match)
 			continue
 		}
-		if val, found := r.resolve(key); found {
+		if val, found := r.resolveForReplace(key); found {
 			b.WriteString(val)
 			continue
 		}

@@ -854,7 +854,16 @@ func parseParamsInternal(ctx BuildContext, d *dag) (*paramsResult, error) {
 			overridePairs []paramPair
 			overrideEnvs  []string
 		)
-		if err := parseParams(ctx, ctx.opts.Parameters, &overridePairs, &overrideEnvs); err != nil {
+		// Skip eval (backtick substitution, variable expansion) for
+		// JSON-formatted params from the UI. JSON values are literal
+		// and must not be interpreted as shell commands.
+		overrideCtx := ctx
+		trimmed := strings.TrimSpace(ctx.opts.Parameters)
+		if (strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]")) ||
+			(strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}")) {
+			overrideCtx.opts.Flags |= BuildFlagNoEval
+		}
+		if err := parseParams(overrideCtx, ctx.opts.Parameters, &overridePairs, &overrideEnvs); err != nil {
 			return nil, err
 		}
 		overrideParams(&paramPairs, overridePairs)

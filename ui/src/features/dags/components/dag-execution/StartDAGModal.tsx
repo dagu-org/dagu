@@ -99,13 +99,14 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) 
           return;
         }
 
-        // Textarea: bare Enter inserts newline, Shift+Enter submits
+        // Textarea: Shift+Enter inserts newline, bare Enter submits
         if (activeElement instanceof HTMLTextAreaElement) {
           if (e.shiftKey) {
-            e.preventDefault();
-            onSubmit(stringifyParams(params), dagRunId || undefined, !enqueue);
+            return; // Shift+Enter: let browser insert newline
           }
-          return; // bare Enter: let browser insert newline
+          e.preventDefault();
+          onSubmit(stringifyParams(params), dagRunId || undefined, !enqueue);
+          return;
         }
 
         // Input/Select/nothing focused: Enter submits (existing behavior)

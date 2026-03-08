@@ -8,6 +8,13 @@ type Options struct {
 	Substitute   bool // Enable backtick command substitution
 	EscapeDollar bool // Enable \$ → $ escape before variable expansion
 
+	// DeferShellVars skips simple $VAR/${VAR} expansion in the variables
+	// phase, deferring to the shell at runtime. JSON path references like
+	// ${step.stdout} are still expanded by Dagu since shells cannot handle
+	// them. This prevents shell-special characters (backticks, $(), etc.)
+	// in variable values from being interpreted when the script executes.
+	DeferShellVars bool
+
 	Variables []map[string]string // Ordered variable maps for expansion
 	StepMap   map[string]StepInfo // Step info map for step reference expansion
 }
@@ -77,11 +84,15 @@ func WithOSExpansion() Option {
 	}
 }
 
-// OnlyReplaceVars disables both env expansion and command substitution,
-// leaving only explicit variable replacement.
+// OnlyReplaceVars disables env expansion, command substitution, and simple
+// $VAR text substitution. JSON path references like ${step.stdout} are still
+// expanded since shells cannot handle them. Simple $VAR references are
+// deferred to the shell at runtime via env vars, preventing shell-special
+// characters (backticks, $(), etc.) in values from being interpreted.
 func OnlyReplaceVars() Option {
 	return func(opts *Options) {
 		opts.ExpandEnv = false
 		opts.Substitute = false
+		opts.DeferShellVars = true
 	}
 }

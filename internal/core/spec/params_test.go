@@ -845,6 +845,26 @@ func TestMultilineParamRoundTrip(t *testing.T) {
 	assert.Equal(t, "line1\nline2", result[0].Value)
 }
 
+func TestJSONParamsSkipBacktickSubstitution(t *testing.T) {
+	t.Parallel()
+
+	// JSON params from the UI should not execute backtick commands.
+	ctx := BuildContext{
+		ctx:  context.Background(),
+		opts: BuildOpts{},
+	}
+
+	// Value containing backticks — should be treated as literal, not executed.
+	input := "[{\"topic\":\"`echo pwned`\"}]"
+	result, err := parseStringParams(ctx, input)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	assert.Equal(t, "topic", result[0].Name)
+	// tryParseJSONParams does not execute backtick commands;
+	// the value is returned as-is from JSON parsing.
+	assert.Equal(t, "`echo pwned`", result[0].Value)
+}
+
 func TestEvalParamValue(t *testing.T) {
 	t.Run("SimpleValue", func(t *testing.T) {
 		ctx := BuildContext{
