@@ -16,9 +16,17 @@ import {
 } from '@/components/ui/tooltip';
 import dayjs from '@/lib/dayjs';
 import ActionButton from '@/ui/ActionButton';
-import { RefreshCw, Square, X } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/ui/CustomDialog';
+import { Ban, RefreshCw, Square, X } from 'lucide-react';
 import React from 'react';
-import { components, Status } from '../../../../api/v1/schema';
+import { Button } from '@/components/ui/button';
+import { components, NodeStatus, Status } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
@@ -63,6 +71,8 @@ function DAGRunActions({
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
   const [isDequeueModal, setIsDequeueModal] = React.useState(false);
+  const [isRejectModal, setIsRejectModal] = React.useState(false);
+  const [rejectReason, setRejectReason] = React.useState('');
 
   // Retry-as-new modal state
   const [retryAsNew, setRetryAsNew] = React.useState(false);
@@ -80,15 +90,19 @@ function DAGRunActions({
     }
   };
 
+  const isWaiting = dagRun?.status === Status.Waiting;
+  const hasNodes = dagRun && 'nodes' in dagRun && Array.isArray((dagRun as components['schemas']['DAGRunDetails']).nodes);
+
   // Determine which buttons should be enabled based on current status and root level
   const buttonState = {
-    stop: isRootLevel && dagRun?.status === Status.Running, // Running and at root level
+    stop: isRootLevel && dagRun?.status === Status.Running,
+    reject: isRootLevel && isWaiting && hasNodes,
     retry:
       isRootLevel &&
       dagRun?.status !== Status.Running &&
       dagRun?.status !== Status.Queued &&
-      dagRun?.dagRunId !== '', // Not running, not queued, has dagRunId, and at root level
-    dequeue: isRootLevel && dagRun?.status === Status.Queued, // Queued and at root level
+      dagRun?.dagRunId !== '',
+    dequeue: isRootLevel && dagRun?.status === Status.Queued,
   };
 
   if (!dagRun || !config.permissions.runDags) {
@@ -100,29 +114,50 @@ function DAGRunActions({
       <div
         className={`flex items-center ${displayMode === 'compact' ? 'space-x-1' : 'space-x-2'}`}
       >
-        {/* Stop Button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span>
-              <ActionButton
-                label={displayMode !== 'compact'}
-                icon={<Square className="h-4 w-4" />}
-                disabled={!buttonState['stop']}
-                onClick={() => setIsStopModal(true)}
-                className="cursor-pointer"
-              >
-                Stop
-              </ActionButton>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>
-              {isRootLevel
-                ? 'Stop DAGRun execution'
-                : 'Stop action only available at root dagRun level'}
-            </p>
-          </TooltipContent>
-        </Tooltip>
+        {/* Stop / Reject Button */}
+        {isWaiting && hasNodes ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <ActionButton
+                  label={displayMode !== 'compact'}
+                  icon={<Ban className="h-4 w-4" />}
+                  disabled={!buttonState['reject']}
+                  onClick={() => setIsRejectModal(true)}
+                  className="cursor-pointer"
+                >
+                  Reject
+                </ActionButton>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Reject all waiting steps</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <ActionButton
+                  label={displayMode !== 'compact'}
+                  icon={<Square className="h-4 w-4" />}
+                  disabled={!buttonState['stop']}
+                  onClick={() => setIsStopModal(true)}
+                  className="cursor-pointer"
+                >
+                  Stop
+                </ActionButton>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>
+                {isRootLevel
+                  ? 'Stop DAGRun execution'
+                  : 'Stop action only available at root dagRun level'}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        )}
 
         {/* Retry Button */}
         <Tooltip>
@@ -364,6 +399,62 @@ function DAGRunActions({
             )}
           </div>
         </ConfirmModal>
+
+        {/* Reject Modal */}
+        <Dialog open={isRejectModal} onOpenChange={(open) => { if (!open) { setIsRejectModal(false); setRejectReason(''); } }}>
+          <DialogContent className="sm:max-w-[450px]">
+            <DialogHeader>
+              <DialogTitle>Reject DAG Run</DialogTitle>
+            </DialogHeader>
+            <div className="py-2">
+              <textarea
+                className="w-full px-3 py-2 text-sm border border-border rounded bg-background focus:outline-none focus:border-ring resize-none"
+                placeholder="Reason (optional)..."
+                rows={2}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" size="sm" onClick={() => { setIsRejectModal(false); setRejectReason(''); }}>
+                <X className="h-4 w-4" /> Cancel
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={async () => {
+                  setIsRejectModal(false);
+                  const details = dagRun as components['schemas']['DAGRunDetails'];
+                  const waitingNodes = details.nodes.filter(n => n.status === NodeStatus.Waiting);
+                  for (const node of waitingNodes) {
+                    const { error } = await client.POST(
+                      '/dag-runs/{name}/{dagRunId}/steps/{stepName}/reject',
+                      {
+                        params: {
+                          path: { name, dagRunId: dagRun!.dagRunId, stepName: node.step.name },
+                          query: { remoteNode: appBarContext.selectedRemoteNode || 'local' },
+                        },
+                        body: { reason: rejectReason || undefined },
+                      }
+                    );
+                    if (error) {
+                      showError(
+                        error.message || 'Failed to reject step',
+                        `Failed to reject step "${node.step.name}".`
+                      );
+                      setRejectReason('');
+                      return;
+                    }
+                  }
+                  setRejectReason('');
+                  reloadData();
+                }}
+              >
+                <Ban className="h-4 w-4" /> Reject
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Dequeue Confirmation Modal */}
         <ConfirmModal

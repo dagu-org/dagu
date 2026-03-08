@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient } from '@/hooks/api';
-import { Ban, Check, RotateCcw } from 'lucide-react';
+import { Check, RotateCcw } from 'lucide-react';
 import React, { useState } from 'react';
 import { components, NodeStatus, Stream } from '../../../../api/v1/schema';
 import { InlineLogViewer } from '../common/InlineLogViewer';
@@ -30,7 +30,7 @@ function ApprovalCard({
   node: NodeData;
   dagRun: DAGRunDetails;
   dagName: string;
-  onAction: (node: NodeData, action: 'approve' | 'retry' | 'reject') => void;
+  onAction: (node: NodeData, action: 'approve' | 'retry') => void;
 }) {
   const step = node.step;
   const approvalConfig = step.approval;
@@ -63,21 +63,13 @@ function ApprovalCard({
           {step.approval && (
             <Button
               size="sm"
-              variant="secondary"
+              variant="default"
               onClick={() => onAction(node, 'retry')}
             >
               <RotateCcw className="h-4 w-4" />
               Retry
             </Button>
           )}
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-            onClick={() => onAction(node, 'reject')}
-          >
-            <Ban className="h-4 w-4" />
-          </Button>
           <Button
             size="sm"
             variant="primary"
@@ -113,7 +105,7 @@ export function ApprovalTab({ dagRun, dagName }: ApprovalTabProps) {
 
   const [reviewState, setReviewState] = useState<{
     node: NodeData;
-    action: 'approve' | 'retry' | 'reject';
+    action: 'approve' | 'retry';
   } | null>(null);
 
   const waitingNodes = dagRun.nodes?.filter(
@@ -157,18 +149,6 @@ export function ApprovalTab({ dagRun, dagName }: ApprovalTabProps) {
     if (error) throw new Error(error.message || 'Failed to retry step');
   };
 
-  const handleReject = async (reason: string) => {
-    if (!reviewState) return;
-    const endpoint = isSubRun
-      ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/reject'
-      : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/reject';
-    const { error } = await client.POST(endpoint, {
-      params: { path: getPathParams(reviewState.node.step.name), query: { remoteNode } },
-      body: { reason: reason || undefined },
-    });
-    if (error) throw new Error(error.message || 'Failed to reject step');
-  };
-
   if (waitingNodes.length === 0) {
     return (
       <div className="text-center text-muted-foreground py-8 text-sm">
@@ -200,7 +180,6 @@ export function ApprovalTab({ dagRun, dagName }: ApprovalTabProps) {
           dagRun={dagRun}
           onApprove={reviewState.action === 'approve' ? handleApprove : undefined}
           onPushBack={reviewState.action === 'retry' ? handlePushBack : undefined}
-          onReject={reviewState.action === 'reject' ? handleReject : undefined}
           compact
         />
       )}
