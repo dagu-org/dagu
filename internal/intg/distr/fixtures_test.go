@@ -29,12 +29,12 @@ const (
 )
 
 type fixtureConfig struct {
-	workerMode          workerMode
-	workerCount         int
-	workerLabels        map[string]string
-	logPersistence      bool
-	dagsDir             string
-	baseConfigPath      string
+	workerMode           workerMode
+	workerCount          int
+	workerLabels         map[string]string
+	logPersistence       bool
+	dagsDir              string
+	baseConfigPath       string
 	workerBaseConfigPath string // Override worker's base config path (for testing embedded base config)
 }
 
