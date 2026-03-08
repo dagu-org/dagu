@@ -567,6 +567,41 @@ function NodeStatusTableRow({
     }
   };
 
+  // Handle push-back for approval steps
+  const handlePushBack = async (inputs: Record<string, string>) => {
+    const isSubDAGRun =
+      dagRun.rootDAGRunId &&
+      dagRun.rootDAGRunName &&
+      dagRun.rootDAGRunId !== dagRun.dagRunId;
+
+    const pathParams = {
+      name: isSubDAGRun ? dagRun.rootDAGRunName : dagName,
+      dagRunId: isSubDAGRun ? dagRun.rootDAGRunId : dagRunId || '',
+      stepName: node.step.name,
+      ...(isSubDAGRun ? { subDAGRunId: dagRun.dagRunId } : {}),
+    };
+
+    const endpoint = isSubDAGRun
+      ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/push-back'
+      : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/push-back';
+
+    const { error } = await client.POST(endpoint, {
+      params: {
+        path: pathParams,
+        query: {
+          remoteNode,
+        },
+      },
+      body: {
+        inputs: Object.keys(inputs).length > 0 ? inputs : undefined,
+      },
+    });
+
+    if (error) {
+      throw new Error(error.message || 'Failed to push back step');
+    }
+  };
+
   // Determine if logs are available
   const hasStdout = !!node.stdout;
   const hasStderr = !!node.stderr;
@@ -1077,7 +1112,9 @@ function NodeStatusTableRow({
           visible={showApprovalModal}
           dismissModal={() => setShowApprovalModal(false)}
           step={node.step}
+          node={node}
           onApprove={handleApprove}
+          onPushBack={node.step.approval ? handlePushBack : undefined}
         />
 
         {/* Rejection Modal for wait steps */}

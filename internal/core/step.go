@@ -106,6 +106,9 @@ type Step struct {
 	// Agent contains the configuration for agent-type steps.
 	// Only used when type is "agent".
 	Agent *AgentStepConfig `json:"agent,omitempty"`
+	// Approval configures a human approval gate after step execution.
+	// When set, the step pauses in Waiting state after execution completes.
+	Approval *ApprovalConfig `json:"approval,omitempty"`
 }
 
 // String returns a formatted string representation of the step
@@ -323,6 +326,18 @@ type ContinueOn struct {
 	ExitCode    []int    `json:"exitCode,omitempty"`    // ExitCode is the list of exit codes to continue to the next step.
 	Output      []string `json:"output,omitempty"`      // Output is the list of output (stdout/stderr) to continue to the next step.
 	MarkSuccess bool     `json:"markSuccess,omitempty"` // MarkSuccess is the flag to mark the step as success when the condition is met.
+}
+
+// ApprovalConfig configures the approval gate for a step.
+// When a step has an ApprovalConfig, it pauses in Waiting state after execution
+// completes, allowing a human to approve, push back (re-run with feedback), or reject.
+type ApprovalConfig struct {
+	// Prompt is the message displayed to the approver.
+	Prompt string `json:"prompt,omitempty"`
+	// Input is the list of expected input field names from the approver.
+	Input []string `json:"input,omitempty"`
+	// Required is the subset of Input fields that must be provided.
+	Required []string `json:"required,omitempty"`
 }
 
 const (

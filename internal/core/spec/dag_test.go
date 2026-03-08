@@ -2158,7 +2158,7 @@ func TestBuildHITLStepsValidation(t *testing.T) {
 				},
 			},
 			expectErr:   true,
-			errContains: "DAG with HITL steps cannot be dispatched to workers",
+			errContains: "DAG with approval steps cannot be dispatched to workers",
 		},
 		{
 			name: "ConflictMultipleSteps",
@@ -2172,7 +2172,7 @@ func TestBuildHITLStepsValidation(t *testing.T) {
 				},
 			},
 			expectErr:   true,
-			errContains: "DAG with HITL steps cannot be dispatched to workers",
+			errContains: "DAG with approval steps cannot be dispatched to workers",
 		},
 	}
 

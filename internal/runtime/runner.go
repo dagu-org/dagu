@@ -429,6 +429,17 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 
 	ctx = node.SetupEnv(ctx)
 
+	// Inject push-back inputs as environment variables for re-execution.
+	// When a step is pushed back, the human's feedback inputs are stored
+	// in PushBackInputs and need to be available as env vars during re-run.
+	if pushBackInputs := node.State().PushBackInputs; len(pushBackInputs) > 0 {
+		env := GetEnv(ctx)
+		for k, v := range pushBackInputs {
+			env = env.WithEnvVars(k, v)
+		}
+		ctx = WithEnv(ctx, env)
+	}
+
 	// Setup chat messages from dependencies before execution
 	r.setupChatMessages(ctx, node)
 
@@ -466,9 +477,20 @@ ExecRepeat: // repeat execution
 		isRepetitive := node.Step().RepeatPolicy.RepeatMode != ""
 		if !isRepetitive && r.isCanceled() {
 			node.SetStatus(core.NodeAborted)
+		} else if node.Step().Approval != nil {
+			// Step has approval config — enter waiting state for human review.
+			// Push-back is human-controlled, no iteration limit.
+			node.SetStatus(core.NodeWaiting)
 		} else {
 			node.SetStatus(core.NodeSucceeded)
 		}
+	}
+
+	// For executors that implement NodeStatusDeterminer (e.g. call/dag, parallel),
+	// the status may have been set to NodeSucceeded by the executor.
+	// If the step has an approval config, override to NodeWaiting.
+	if node.State().Status == core.NodeSucceeded && node.Step().Approval != nil {
+		node.SetStatus(core.NodeWaiting)
 	}
 
 	// Save chat messages after successful execution

@@ -245,16 +245,22 @@ func (d *DAG) Clone() *DAG {
 	return &clone
 }
 
-// HasHITLSteps returns true if the DAG contains any HITL executor steps.
-// DAGs with HITL steps cannot be dispatched to workers because
-// HITL steps require local storage access for approval.
-func (d *DAG) HasHITLSteps() bool {
+// HasApprovalSteps returns true if the DAG contains any steps that require
+// human approval (either via the approval field or the legacy hitl executor).
+// DAGs with approval steps cannot be dispatched to workers because
+// approval steps require local storage access.
+func (d *DAG) HasApprovalSteps() bool {
 	for _, step := range d.Steps {
-		if step.ExecutorConfig.Type == ExecutorTypeHITL {
+		if step.Approval != nil || step.ExecutorConfig.Type == ExecutorTypeHITL {
 			return true
 		}
 	}
 	return false
+}
+
+// HasHITLSteps is deprecated. Use HasApprovalSteps.
+func (d *DAG) HasHITLSteps() bool {
+	return d.HasApprovalSteps()
 }
 
 // SockAddr returns the unix socket address for the DAG.

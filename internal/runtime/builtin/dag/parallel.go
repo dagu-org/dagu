@@ -58,8 +58,8 @@ func newParallelExecutor(
 		return nil, err
 	}
 
-	// Validate: sub-DAGs with HITL steps cannot be dispatched to workers
-	if len(step.WorkerSelector) > 0 && child.DAG.HasHITLSteps() {
+	// Validate: sub-DAGs with approval steps cannot be dispatched to workers
+	if len(step.WorkerSelector) > 0 && child.DAG.HasApprovalSteps() {
 		return nil, fmt.Errorf("%w: %s", ErrHITLStepsWithWorker, step.SubDAG.Name)
 	}
 

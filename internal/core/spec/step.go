@@ -6,6 +6,7 @@ import (
 	"math"
 	"reflect"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -106,11 +107,24 @@ type step struct {
 	// Only valid when type is "agent".
 	Agent *agentConfig `yaml:"agent,omitempty"`
 
+	// Approval configures a human approval gate after step execution.
+	Approval *approvalConfig `yaml:"approval,omitempty"`
+
 	// Router configuration (type: router)
 	// Value is the expression to evaluate for routing
 	Value string `yaml:"value,omitempty"`
 	// Routes maps patterns to target step names
 	Routes map[string][]string `yaml:"routes,omitempty"`
+}
+
+// approvalConfig defines the approval configuration for a step.
+type approvalConfig struct {
+	// Prompt is the message displayed to the approver.
+	Prompt string `yaml:"prompt,omitempty"`
+	// Input is the list of expected input field names from the approver.
+	Input []string `yaml:"input,omitempty"`
+	// Required is the subset of Input fields that must be provided.
+	Required []string `yaml:"required,omitempty"`
 }
 
 // repeatPolicy defines the repeat policy for a step.
@@ -378,6 +392,9 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	}
 	if err := buildStepRouter(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("router", err))
+	}
+	if err := buildStepApproval(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("approval", err))
 	}
 	if err := buildStepCommand(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("command", err))
@@ -1202,6 +1219,22 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 	}
 	maps.Copy(result.ExecutorConfig.Config, s.Config)
 
+	// Translate type: hitl to approval config for backward compatibility.
+	// The hitl executor is kept for DetermineNodeStatus, but the approval
+	// config enables push-back and the new approval UI.
+	if result.ExecutorConfig.Type == "hitl" && result.Approval == nil {
+		result.Approval = &core.ApprovalConfig{}
+		if prompt, ok := s.Config["prompt"].(string); ok {
+			result.Approval.Prompt = prompt
+		}
+		if input, ok := s.Config["input"]; ok {
+			result.Approval.Input = toStringSlice(input)
+		}
+		if required, ok := s.Config["required"]; ok {
+			result.Approval.Required = toStringSlice(required)
+		}
+	}
+
 	// Infer type from container field
 	if result.ExecutorConfig.Type == "" && result.Container != nil {
 		result.ExecutorConfig.Type = "docker"
@@ -1225,6 +1258,25 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 	}
 
 	return nil
+}
+
+// toStringSlice converts an any value to []string.
+// Handles []any (from YAML parsing) by converting each element to string.
+func toStringSlice(v any) []string {
+	switch val := v.(type) {
+	case []string:
+		return val
+	case []any:
+		result := make([]string, 0, len(val))
+		for _, item := range val {
+			if s, ok := item.(string); ok {
+				result = append(result, s)
+			}
+		}
+		return result
+	default:
+		return nil
+	}
 }
 
 // mergeRedisConfig merges DAG-level Redis defaults into step config.
@@ -1717,6 +1769,25 @@ func validateAgent(result *core.Step) error {
 		if len(result.Agent.Soul) > maxSlugIDLength || !validSlugIDRegexp.MatchString(result.Agent.Soul) {
 			return core.NewValidationError("agent.soul", result.Agent.Soul,
 				fmt.Errorf("invalid soul ID %q: must be lowercase alphanumeric with hyphens, max %d chars", result.Agent.Soul, maxSlugIDLength))
+		}
+	}
+	return nil
+}
+
+// buildStepApproval parses the approval configuration for a step.
+func buildStepApproval(_ StepBuildContext, s *step, result *core.Step) error {
+	if s.Approval == nil {
+		return nil
+	}
+	result.Approval = &core.ApprovalConfig{
+		Prompt:   s.Approval.Prompt,
+		Input:    s.Approval.Input,
+		Required: s.Approval.Required,
+	}
+	// Validate required fields are subset of input
+	for _, req := range result.Approval.Required {
+		if !slices.Contains(result.Approval.Input, req) {
+			return fmt.Errorf("required field %q is not in input list", req)
 		}
 	}
 	return nil

@@ -6,11 +6,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/ui/CustomDialog';
-import { Check, X } from 'lucide-react';
+import { Check, RotateCcw, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { components } from '../../../../api/v1/schema';
 
 type Step = components['schemas']['Step'];
+type NodeData = components['schemas']['Node'];
 
 type WaitConfig = {
   prompt?: string;
@@ -22,22 +23,28 @@ type Props = {
   visible: boolean;
   dismissModal: () => void;
   step: Step;
+  node?: NodeData;
   onApprove: (inputs: Record<string, string>) => Promise<void>;
+  onPushBack?: (inputs: Record<string, string>) => Promise<void>;
 };
 
 /**
- * ApprovalModal displays a form for approving a wait step with optional input fields.
+ * ApprovalModal displays a form for approving or pushing back a step with optional input fields.
  */
-export function ApprovalModal({ visible, dismissModal, step, onApprove }: Props) {
+export function ApprovalModal({ visible, dismissModal, step, node, onApprove, onPushBack }: Props) {
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Extract wait config from step's executorConfig
-  const waitConfig: WaitConfig = (step.executorConfig?.config as WaitConfig) || {};
+  // Extract config from step.approval first, fall back to executorConfig for legacy hitl
+  const approvalConfig = step.approval;
+  const waitConfig: WaitConfig = approvalConfig
+    ? { prompt: approvalConfig.prompt, input: approvalConfig.input, required: approvalConfig.required }
+    : (step.executorConfig?.config as WaitConfig) || {};
   const inputFields = waitConfig.input || [];
   const requiredFields = waitConfig.required || [];
   const prompt = waitConfig.prompt || step.description;
+  const iteration = node?.approvalIteration || 0;
 
   // Reset state when modal opens
   useEffect(() => {
@@ -73,6 +80,27 @@ export function ApprovalModal({ visible, dismissModal, step, onApprove }: Props)
     }
   };
 
+  const handlePushBack = async () => {
+    if (!onPushBack) return;
+    if (!isValid) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      await onPushBack(inputs);
+      dismissModal();
+    } catch (e) {
+      const err = e as { message?: string };
+      setError(err.message || 'Failed to push back step');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey && isValid && !loading) {
       e.preventDefault();
@@ -84,8 +112,13 @@ export function ApprovalModal({ visible, dismissModal, step, onApprove }: Props)
     <Dialog open={visible} onOpenChange={dismissModal}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle className="text-base">
-            Approve: {step.name}
+          <DialogTitle className="text-base flex items-center gap-2">
+            <span>Approve: {step.name}</span>
+            {iteration > 0 && (
+              <span className="text-xs font-normal text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                Iteration {iteration}
+              </span>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -156,11 +189,22 @@ export function ApprovalModal({ visible, dismissModal, step, onApprove }: Props)
             <X className="h-4 w-4" />
             Cancel
           </Button>
+          {onPushBack && (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={handlePushBack}
+              disabled={loading || (!isValid && requiredFields.length > 0)}
+            >
+              <RotateCcw className="h-4 w-4" />
+              {loading ? 'Pushing Back...' : 'Push Back'}
+            </Button>
+          )}
           <Button
             size="sm"
+            variant="primary"
             onClick={handleApprove}
             disabled={loading || (!isValid && requiredFields.length > 0)}
-            className="bg-success hover:bg-success/90"
           >
             <Check className="h-4 w-4" />
             {loading ? 'Approving...' : 'Approve'}

@@ -83,6 +83,10 @@ type NodeState struct {
 	RejectedBy string
 	// RejectionReason stores the optional reason for rejection.
 	RejectionReason string
+	// ApprovalIteration tracks how many times this step has been pushed back.
+	ApprovalIteration int
+	// PushBackInputs stores inputs from the last push-back for env var injection.
+	PushBackInputs map[string]string
 }
 
 // Parallel represents the evaluated parallel execution configuration for a node.

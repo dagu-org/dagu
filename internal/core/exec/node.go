@@ -33,6 +33,11 @@ type Node struct {
 	RejectedBy string `json:"rejectedBy,omitempty"`
 	// RejectionReason stores the optional reason for rejection
 	RejectionReason string `json:"rejectionReason,omitempty"`
+	// ApprovalIteration tracks how many times this step has been pushed back.
+	ApprovalIteration int `json:"approvalIteration,omitempty"`
+	// PushBackInputs stores the inputs from the last push-back.
+	// These are injected as environment variables when the step re-executes.
+	PushBackInputs map[string]string `json:"pushBackInputs,omitempty"`
 	// ChatMessages stores the session messages for chat/LLM steps.
 	// This field is populated during execution and synced via status updates
 	// in shared-nothing mode where workers don't have filesystem access.
