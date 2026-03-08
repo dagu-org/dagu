@@ -274,6 +274,27 @@ steps:
 	},
 	{
 		ID:          11,
+		Name:        "approval-gate",
+		Description: "Add human approval gates to a workflow",
+		Content: `type: graph
+steps:
+  - name: build
+    command: echo "build artifact v1.2.3"
+    output: VERSION
+  - name: review
+    command: echo "ready to deploy v${VERSION}"
+    approval:
+      prompt: "Approve deployment to production?"
+      input: [APPROVER, NOTES]
+      required: [APPROVER]
+    depends: [build]
+  - name: deploy
+    command: echo "deploying v${VERSION} approved by ${APPROVER}"
+    depends: [review]
+`,
+	},
+	{
+		ID:          12,
 		Name:        "agent-step",
 		Description: "Run an AI agent as a workflow step",
 		Content: `type: graph
