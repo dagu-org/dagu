@@ -6,9 +6,11 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDAGContext_UserEnvsMap(t *testing.T) {
@@ -222,4 +224,23 @@ func TestNewContext_DAGRunWorkDir(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewContext_BaseEnvUsedForExpansion(t *testing.T) {
+	t.Parallel()
+
+	cfg := &config.Config{}
+	cfg.Core.BaseEnv = config.NewBaseEnv([]string{"GITHUB_URL=github.com"})
+
+	ctx := config.WithConfig(context.Background(), cfg)
+	dag := &core.DAG{Name: "test-dag"}
+	ctx = exec.NewContext(ctx, dag, "run-1", "test.log")
+
+	rCtx := exec.GetContext(ctx)
+	require.NotNil(t, rCtx.EnvScope)
+
+	evalCtx := eval.WithEnvScope(context.Background(), rCtx.EnvScope)
+	out, err := eval.String(evalCtx, "https://${GITHUB_URL}/dagu-org/dagu")
+	require.NoError(t, err)
+	assert.Equal(t, "https://github.com/dagu-org/dagu", out)
 }
