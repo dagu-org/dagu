@@ -170,7 +170,7 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 	return false
 }
 
-func (n *Node) Execute(ctx context.Context) error {
+func (n *Node) Execute(ctx context.Context, onSetup ...func()) error {
 	ctx, cancel, stepTimeout := n.setupContextWithTimeout(ctx)
 	defer cancel()
 
@@ -178,6 +178,14 @@ func (n *Node) Execute(ctx context.Context) error {
 	if err != nil {
 		n.SetError(fmt.Errorf("failed to setup executor: %w", err))
 		return err
+	}
+
+	// Notify after executor setup so SubRuns (set for subDAG steps) are
+	// persisted to storage before the executor starts running.
+	for _, fn := range onSetup {
+		if fn != nil {
+			fn()
+		}
 	}
 
 	// Ensure executor cleanup happens (releases connections, etc.)

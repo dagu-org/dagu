@@ -435,7 +435,7 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 ExecRepeat: // repeat execution
 	for !r.isCanceled() {
 		logger.Debug(ctx, "Executing node loop")
-		execErr := r.execNode(ctx, node)
+		execErr := r.execNode(ctx, node, progressCh)
 		isRetriable := r.handleNodeExecutionError(ctx, plan, node, execErr)
 		if isRetriable {
 			continue ExecRepeat
@@ -678,9 +678,14 @@ func (r *Runner) setupEnvironEventHandler(ctx context.Context, plan *Plan, node 
 	return WithEnv(ctx, env)
 }
 
-func (r *Runner) execNode(ctx context.Context, node *Node) error {
+func (r *Runner) execNode(ctx context.Context, node *Node, progressCh chan *Node) error {
 	if r.dry {
 		return nil
+	}
+	if progressCh != nil && node.Step().SubDAG != nil {
+		// Send an additional progress notification after the executor is set up
+		// so that SubRuns are persisted to storage before the subDAG starts running.
+		return node.Execute(ctx, func() { progressCh <- node })
 	}
 	return node.Execute(ctx)
 }

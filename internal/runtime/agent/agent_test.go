@@ -677,3 +677,58 @@ steps:
 	require.NotContains(t, outputs["response"], secretValue, "secret should be masked")
 	require.Contains(t, outputs["response"], "*******", "masked placeholder expected")
 }
+
+func TestAgent_SubDAGRunVisibleWhileRunning(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	// Create a child DAG that sleeps long enough for the parent to be observed mid-run
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-slow", []byte(`
+steps:
+  - name: slow-step
+    command: "sleep 3"
+`))
+
+	// The preceding step must run long enough for the one-shot 100ms status timer
+	// to fire (and exhaust itself) BEFORE run-child starts. This replicates the
+	// production scenario where the bug manifests.
+	parent := th.DAG(t, `
+type: graph
+steps:
+  - name: pre-step
+    command: "sleep 0.3"
+  - name: run-child
+    call: child-slow
+    depends:
+      - pre-step
+`)
+
+	a := parent.Agent()
+	runErr := make(chan error, 1)
+	go func() {
+		runErr <- a.Run(parent.Context)
+	}()
+
+	// SubRuns must be visible in the *stored* status BEFORE the child DAG completes.
+	// We use ListRecentStatus which reads from the status.jsonl file on disk, not from
+	// the live socket, so it accurately reflects what the API handler would return.
+	// Before the fix, this would never become true because SetSubRuns() was called
+	// after the progressCh notification, so the children field was never written
+	// to status.jsonl while the subdag was running.
+	require.Eventually(t, func() bool {
+		statuses := th.DAGRunMgr.ListRecentStatus(th.Context, parent.Name, 1)
+		if len(statuses) == 0 || statuses[0].Status != core.Running {
+			return false
+		}
+		for _, node := range statuses[0].Nodes {
+			if node.Step.Name == "run-child" && node.Status == core.NodeRunning {
+				return len(node.SubRuns) > 0
+			}
+		}
+		return false
+	}, 10*time.Second, 100*time.Millisecond,
+		"SubRuns must be present in stored status while subDAG step is running")
+
+	require.NoError(t, <-runErr)
+}
