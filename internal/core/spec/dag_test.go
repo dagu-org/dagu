@@ -107,6 +107,23 @@ func TestBuildParamsJSON(t *testing.T) {
 	}
 }
 
+func TestBuildParamsJSON_JSONOverrideSkipsEval(t *testing.T) {
+	t.Parallel()
+
+	// JSON-formatted override params should skip eval (BuildFlagNoEval).
+	// Values containing backticks should NOT be executed.
+	ctx := testBuildContextWithOpts(BuildOpts{
+		Parameters: `[{"topic":"` + "`echo pwned`" + `"}]`,
+	})
+	d := &dag{Params: `topic="default"`}
+
+	result, err := buildParamsJSON(ctx, d)
+	require.NoError(t, err)
+
+	// The backtick value should be preserved as-is, not executed.
+	assert.Contains(t, result, "`echo pwned`")
+}
+
 func TestBuildType(t *testing.T) {
 	t.Parallel()
 

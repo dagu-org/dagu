@@ -847,6 +847,106 @@ func TestString_CommandLikeStringWithSingleQuoteAfterVar(t *testing.T) {
 	}
 }
 
+// --- DeferShellVars integration tests (full pipeline via String) ---
+
+func TestString_OnlyReplaceVars_DefersScopeVars(t *testing.T) {
+	// Scope vars (params, env) should be deferred to the shell.
+	scope := NewEnvScope(nil, false).
+		WithEntry("TOPIC", "my-topic", EnvSourceDAGEnv)
+	ctx := WithEnvScope(context.Background(), scope)
+
+	result, err := String(ctx, "echo $TOPIC", OnlyReplaceVars())
+	require.NoError(t, err)
+	assert.Equal(t, "echo $TOPIC", result, "scope var should be deferred")
+}
+
+func TestString_OnlyReplaceVars_ExpandsExplicitVars(t *testing.T) {
+	result, err := String(context.Background(), "echo ${FOO}",
+		OnlyReplaceVars(),
+		WithVariables(map[string]string{"FOO": "bar"}),
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "echo bar", result, "explicit WithVariables should be expanded")
+}
+
+func TestString_OnlyReplaceVars_BackticksNotExecuted(t *testing.T) {
+	result, err := String(context.Background(), "`echo injected`",
+		OnlyReplaceVars(),
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "`echo injected`", result, "backtick substitution should be disabled")
+}
+
+func TestString_OnlyReplaceVars_ScopeVarWithBackticksDeferred(t *testing.T) {
+	// Value containing backticks in scope: should be deferred, not expanded.
+	scope := NewEnvScope(nil, false).
+		WithEntry("MSG", "say `hello`", EnvSourceDAGEnv)
+	ctx := WithEnvScope(context.Background(), scope)
+
+	result, err := String(ctx, "echo $MSG", OnlyReplaceVars())
+	require.NoError(t, err)
+	assert.Equal(t, "echo $MSG", result, "scope var with backticks should be deferred")
+}
+
+func TestString_OnlyReplaceVars_StepRefsStillExpanded(t *testing.T) {
+	result, err := String(context.Background(), "cat ${step1.stdout}",
+		OnlyReplaceVars(),
+		WithStepMap(map[string]StepInfo{
+			"step1": {Stdout: "/tmp/out.txt"},
+		}),
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "cat /tmp/out.txt", result, "step references should still be expanded")
+}
+
+func TestString_OnlyReplaceVars_JSONPathStillExpanded(t *testing.T) {
+	result, err := String(context.Background(), "val: ${DATA.key}",
+		OnlyReplaceVars(),
+		WithVariables(map[string]string{"DATA": `{"key":"resolved"}`}),
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "val: resolved", result, "JSON path refs should still be expanded")
+}
+
+func TestString_OnlyReplaceVars_MixedDeferredAndExpanded(t *testing.T) {
+	scope := NewEnvScope(nil, false).
+		WithEntry("PARAM", "param_val", EnvSourceDAGEnv)
+	ctx := WithEnvScope(context.Background(), scope)
+
+	result, err := String(ctx, "${EXPLICIT} and $PARAM and ${step1.stdout}",
+		OnlyReplaceVars(),
+		WithVariables(map[string]string{"EXPLICIT": "explicit_val"}),
+		WithStepMap(map[string]StepInfo{
+			"step1": {Stdout: "/tmp/out"},
+		}),
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "explicit_val and $PARAM and /tmp/out", result)
+}
+
+func TestString_OnlyReplaceVars_OSEnvNotExpanded(t *testing.T) {
+	t.Setenv("HOME", "/home/user")
+	result, err := String(context.Background(), "echo $HOME", OnlyReplaceVars())
+	require.NoError(t, err)
+	assert.Equal(t, "echo $HOME", result, "OS env should not be expanded")
+}
+
+func TestString_OnlyReplaceVars_MultipleStepSources(t *testing.T) {
+	scope := NewEnvScope(nil, false).
+		WithEntry("DEFERRED", "should-defer", EnvSourceStepEnv)
+	ctx := WithEnvScope(context.Background(), scope)
+
+	result, err := String(ctx, "${step1.exit_code} $DEFERRED ${EXPLICIT}",
+		OnlyReplaceVars(),
+		WithVariables(map[string]string{"EXPLICIT": "yes"}),
+		WithStepMap(map[string]StepInfo{
+			"step1": {ExitCode: "0"},
+		}),
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "0 $DEFERRED yes", result)
+}
+
 func TestString_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 	ctx := context.Background()
 
