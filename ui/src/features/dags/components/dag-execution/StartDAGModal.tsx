@@ -44,8 +44,6 @@ type Props = {
  * Modal dialog for starting or enqueuing a DAG with parameters
  */
 function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) {
-  const ref = React.useRef<HTMLTextAreaElement>(null);
-
   // Parse default parameters from the DAG definition
   const parsedParams = React.useMemo(() => {
     if (!dag.defaultParams) {
@@ -199,9 +197,6 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) 
                     id={`param-${i}`}
                     placeholder={p.Value}
                     ref={(el) => {
-                      if (i === 0) {
-                        (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
-                      }
                       if (el) autoGrow(el);
                     }}
                     rows={1}
@@ -239,9 +234,6 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) 
                     id={`param-${i}`}
                     placeholder={p.Value}
                     ref={(el) => {
-                      if (i === 0) {
-                        (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
-                      }
                       if (el) autoGrow(el);
                     }}
                     rows={1}
