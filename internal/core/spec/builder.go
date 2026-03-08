@@ -272,8 +272,16 @@ func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names m
 		return nil, err
 	}
 	if builtStep.Name == "" {
-		builtStep.Name = generateTypedStepName(names, builtStep, idx)
+		if builtStep.ID != "" {
+			builtStep.Name = builtStep.ID
+		} else {
+			builtStep.Name = generateTypedStepName(names, builtStep, idx)
+		}
 	}
+	// Register every resolved name (explicit, promoted, or generated) so that
+	// subsequent auto-generated names skip it. generateTypedStepName already
+	// registers internally, but map[string]struct{} insertion is idempotent.
+	names[builtStep.Name] = struct{}{}
 	return builtStep, nil
 }
 
