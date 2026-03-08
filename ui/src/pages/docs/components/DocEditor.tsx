@@ -13,7 +13,7 @@ import { useDocSSE } from '@/hooks/useDocSSE';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import { cn } from '@/lib/utils';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { Check, Copy, FileText, Save, Trash2 } from 'lucide-react';
+import { Check, ClipboardCopy, Copy, FileText, Save, Trash2 } from 'lucide-react';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import DocExternalChangeDialog from './DocExternalChangeDialog';
 
@@ -154,6 +154,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc }: Props) {
   }, []);
 
   const [copiedPath, setCopiedPath] = useState(false);
+  const [copiedContent, setCopiedContent] = useState(false);
 
   const copyFilePath = useCallback(async () => {
     const fp = doc?.filePath;
@@ -173,6 +174,25 @@ function DocEditor({ tabId, docPath, onDeleteDoc }: Props) {
       setTimeout(() => setCopiedPath(false), 2000);
     }
   }, [doc?.filePath]);
+
+  const copyContent = useCallback(async () => {
+    const text = currentValue ?? '';
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedContent(true);
+      setTimeout(() => setCopiedContent(false), 2000);
+    } catch {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopiedContent(true);
+      setTimeout(() => setCopiedContent(false), 2000);
+    }
+  }, [currentValue]);
 
   const title = doc?.title || docPath.split('/').pop() || docPath;
 
@@ -202,6 +222,22 @@ function DocEditor({ tabId, docPath, onDeleteDoc }: Props) {
         )}
 
         <div className="flex-1" />
+
+        {/* Copy content */}
+        <button
+          type="button"
+          onClick={copyContent}
+          disabled={!currentValue}
+          className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          title="Copy content"
+        >
+          {copiedContent ? (
+            <Check className="h-3 w-3 text-green-500" />
+          ) : (
+            <ClipboardCopy className="h-3 w-3" />
+          )}
+          <span>Copy</span>
+        </button>
 
         {/* Mode toggle */}
         <div className="flex rounded-md border border-border overflow-hidden">
