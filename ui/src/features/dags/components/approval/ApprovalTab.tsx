@@ -10,12 +10,6 @@ import { StepReviewModal } from '../dag-execution/StepReviewModal';
 type DAGRunDetails = components['schemas']['DAGRunDetails'];
 type NodeData = components['schemas']['Node'];
 
-type WaitConfig = {
-  prompt?: string;
-  input?: string[];
-  required?: string[];
-};
-
 interface ApprovalTabProps {
   dagRun: DAGRunDetails;
   dagName: string;
@@ -33,11 +27,7 @@ function ApprovalCard({
   onAction: (node: NodeData, action: 'approve' | 'retry') => void;
 }) {
   const step = node.step;
-  const approvalConfig = step.approval;
-  const waitConfig: WaitConfig = approvalConfig
-    ? { prompt: approvalConfig.prompt, input: approvalConfig.input, required: approvalConfig.required }
-    : (step.executorConfig?.config as WaitConfig) || {};
-  const prompt = waitConfig.prompt || step.description;
+  const prompt = step.approval?.prompt || step.description;
   const iteration = node?.approvalIteration || 0;
 
   return (

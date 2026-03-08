@@ -19,7 +19,7 @@ func TestValidateRequiredInputs(t *testing.T) {
 		errMsg    string
 	}{
 		{
-			name: "no config - always valid",
+			name: "no approval config - always valid",
 			step: core.Step{
 				Name: "test",
 			},
@@ -27,26 +27,11 @@ func TestValidateRequiredInputs(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name: "empty config - always valid",
+			name: "approval with no required fields - always valid",
 			step: core.Step{
 				Name: "test",
-				ExecutorConfig: core.ExecutorConfig{
-					Type:   "hitl",
-					Config: map[string]any{},
-				},
-			},
-			body:      nil,
-			expectErr: false,
-		},
-		{
-			name: "no required fields - always valid",
-			step: core.Step{
-				Name: "test",
-				ExecutorConfig: core.ExecutorConfig{
-					Type: "hitl",
-					Config: map[string]any{
-						"input": []any{"reason", "approver"},
-					},
+				Approval: &core.ApprovalConfig{
+					Input: []string{"reason", "approver"},
 				},
 			},
 			body:      nil,
@@ -56,12 +41,9 @@ func TestValidateRequiredInputs(t *testing.T) {
 			name: "required fields provided",
 			step: core.Step{
 				Name: "test",
-				ExecutorConfig: core.ExecutorConfig{
-					Type: "hitl",
-					Config: map[string]any{
-						"input":    []any{"reason", "approver"},
-						"required": []any{"reason"},
-					},
+				Approval: &core.ApprovalConfig{
+					Input:    []string{"reason", "approver"},
+					Required: []string{"reason"},
 				},
 			},
 			body: &api.ApproveStepRequest{
@@ -75,11 +57,8 @@ func TestValidateRequiredInputs(t *testing.T) {
 			name: "required fields missing - no body",
 			step: core.Step{
 				Name: "test",
-				ExecutorConfig: core.ExecutorConfig{
-					Type: "hitl",
-					Config: map[string]any{
-						"required": []any{"reason"},
-					},
+				Approval: &core.ApprovalConfig{
+					Required: []string{"reason"},
 				},
 			},
 			body:      nil,
@@ -90,11 +69,8 @@ func TestValidateRequiredInputs(t *testing.T) {
 			name: "required fields missing - empty inputs",
 			step: core.Step{
 				Name: "test",
-				ExecutorConfig: core.ExecutorConfig{
-					Type: "hitl",
-					Config: map[string]any{
-						"required": []any{"reason", "approver"},
-					},
+				Approval: &core.ApprovalConfig{
+					Required: []string{"reason", "approver"},
 				},
 			},
 			body: &api.ApproveStepRequest{
@@ -107,11 +83,8 @@ func TestValidateRequiredInputs(t *testing.T) {
 			name: "partial required fields provided",
 			step: core.Step{
 				Name: "test",
-				ExecutorConfig: core.ExecutorConfig{
-					Type: "hitl",
-					Config: map[string]any{
-						"required": []any{"reason", "approver"},
-					},
+				Approval: &core.ApprovalConfig{
+					Required: []string{"reason", "approver"},
 				},
 			},
 			body: &api.ApproveStepRequest{
@@ -126,11 +99,8 @@ func TestValidateRequiredInputs(t *testing.T) {
 			name: "all required fields provided with extras",
 			step: core.Step{
 				Name: "test",
-				ExecutorConfig: core.ExecutorConfig{
-					Type: "hitl",
-					Config: map[string]any{
-						"required": []any{"reason"},
-					},
+				Approval: &core.ApprovalConfig{
+					Required: []string{"reason"},
 				},
 			},
 			body: &api.ApproveStepRequest{

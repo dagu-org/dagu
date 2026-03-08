@@ -12,12 +12,6 @@ import { components } from '../../../../api/v1/schema';
 
 type Step = components['schemas']['Step'];
 
-type WaitConfig = {
-  prompt?: string;
-  input?: string[];
-  required?: string[];
-};
-
 type Props = {
   visible: boolean;
   dismissModal: () => void;
@@ -37,12 +31,8 @@ export function StepReviewModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const approvalConfig = step.approval;
-  const waitConfig: WaitConfig = approvalConfig
-    ? { prompt: approvalConfig.prompt, input: approvalConfig.input, required: approvalConfig.required }
-    : (step.executorConfig?.config as WaitConfig) || {};
-  const inputFields = waitConfig.input || [];
-  const requiredFields = waitConfig.required || [];
+  const inputFields = step.approval?.input || [];
+  const requiredFields = step.approval?.required || [];
 
   const isValid = requiredFields.every(
     (field) => inputs[field] && inputs[field].trim() !== ''

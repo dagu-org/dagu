@@ -138,7 +138,7 @@ type handlerOn struct {
 	Success *step `yaml:"success,omitempty"` // Step to execute on success
 	Abort   *step `yaml:"abort,omitempty"`   // Step to execute on abort
 	Exit    *step `yaml:"exit,omitempty"`    // Step to execute on exit
-	Wait    *step `yaml:"wait,omitempty"`    // Step to execute when DAG enters wait status (HITL)
+	Wait    *step `yaml:"wait,omitempty"`    // Step to execute when DAG enters wait status (approval)
 }
 
 // smtpConfig defines the SMTP configuration.

@@ -347,9 +347,6 @@ const (
 	// ExecutorTypeParallel is the executor type for parallel steps.
 	ExecutorTypeParallel = "parallel"
 
-	// ExecutorTypeHITL is the executor type for HITL (Human In The Loop) steps.
-	ExecutorTypeHITL = "hitl"
-
 	// ExecutorTypeRouter is the executor type for router steps.
 	ExecutorTypeRouter = "router"
 
@@ -374,7 +371,7 @@ type AgentStepConfig struct {
 	Prompt string `json:"prompt,omitempty"`
 	// MaxIterations is the maximum number of tool call rounds (default: 50).
 	MaxIterations int `json:"maxIterations,omitempty"`
-	// SafeMode enables command approval via HITL (default: true).
+	// SafeMode enables command approval via human review (default: true).
 	SafeMode bool `json:"safeMode"`
 	// WebSearch configures provider-native web search for this step.
 	// Overrides the global agent web search setting.

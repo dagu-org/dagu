@@ -825,7 +825,7 @@ func (a *API) waitForDAGCompletion(
 			lastStatus = status
 
 			// Check if execution is complete (not active) or waiting for human approval.
-			// We return on "waiting" status because HITL (Human-In-The-Loop) workflows
+			// We return on "waiting" status because approval workflows
 			// require external intervention that would cause indefinite blocking otherwise.
 			// The client can poll the status endpoint or use callbacks to resume monitoring.
 			if !status.Status.IsActive() || status.Status.IsWaiting() {

@@ -246,12 +246,11 @@ func (d *DAG) Clone() *DAG {
 }
 
 // HasApprovalSteps returns true if the DAG contains any steps that require
-// human approval (either via the approval field or the legacy hitl executor).
-// DAGs with approval steps cannot be dispatched to workers because
-// approval steps require local storage access.
+// human approval. DAGs with approval steps cannot be dispatched to workers
+// because approval steps require local storage access.
 func (d *DAG) HasApprovalSteps() bool {
 	for _, step := range d.Steps {
-		if step.Approval != nil || step.ExecutorConfig.Type == ExecutorTypeHITL {
+		if step.Approval != nil {
 			return true
 		}
 	}

@@ -635,7 +635,7 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 	return &api.UpdateDAGRunStepStatus200Response{}, nil
 }
 
-// ApproveDAGRunStep approves a waiting step for HITL (Human-in-the-Loop).
+// ApproveDAGRunStep approves a waiting step.
 func (a *API) ApproveDAGRunStep(ctx context.Context, request api.ApproveDAGRunStepRequestObject) (api.ApproveDAGRunStepResponseObject, error) {
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
@@ -853,7 +853,7 @@ func (a *API) GetSubDAGRunStepMessages(ctx context.Context, request api.GetSubDA
 	}, nil
 }
 
-// RejectDAGRunStep rejects a waiting step for HITL (Human-in-the-Loop).
+// RejectDAGRunStep rejects a waiting step.
 func (a *API) RejectDAGRunStep(ctx context.Context, request api.RejectDAGRunStepRequestObject) (api.RejectDAGRunStepResponseObject, error) {
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
@@ -2019,31 +2019,12 @@ func checkMissingInputs(required []string, provided map[string]string) error {
 	return nil
 }
 
-// requiredFieldsForStep returns the list of required input field names for a step,
-// checking the approval config first then falling back to legacy hitl executor config.
+// requiredFieldsForStep returns the list of required input field names for a step.
 func requiredFieldsForStep(step core.Step) []string {
 	if step.Approval != nil {
 		return step.Approval.Required
 	}
-	// Fall back to legacy hitl executor config
-	if step.ExecutorConfig.Config == nil {
-		return nil
-	}
-	requiredFields, ok := step.ExecutorConfig.Config["required"]
-	if !ok {
-		return nil
-	}
-	required, ok := requiredFields.([]any)
-	if !ok {
-		return nil
-	}
-	result := make([]string, 0, len(required))
-	for _, r := range required {
-		if fieldName, ok := r.(string); ok {
-			result = append(result, fieldName)
-		}
-	}
-	return result
+	return nil
 }
 
 func validateRequiredInputs(step core.Step, body *api.ApproveStepRequest) error {

@@ -3167,10 +3167,11 @@ func TestWaitStep(t *testing.T) {
 
 		// Wait step with input configuration
 		waitWithInputs := newStep("wait-inputs",
-			withExecutor("hitl", map[string]any{
-				"prompt":   "Please provide approval",
-				"input":    []string{"reason", "approver"},
-				"required": []string{"reason"},
+			withCommand("true"),
+			withApproval(&core.ApprovalConfig{
+				Prompt:   "Please provide approval",
+				Input:    []string{"reason", "approver"},
+				Required: []string{"reason"},
 			}),
 		)
 

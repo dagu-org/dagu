@@ -16,8 +16,8 @@ func TestWaitStepApproval(t *testing.T) {
 type: graph
 steps:
   - name: wait-step
-    type: hitl
-    config:
+    command: "true"
+    approval:
       prompt: "Please approve"
   - name: after-wait
     depends: [wait-step]
@@ -50,7 +50,8 @@ steps:
     command: echo "before"
   - name: wait-step
     depends: [before-wait]
-    type: hitl
+    command: "true"
+    approval: {}
   - name: after-wait-1
     depends: [wait-step]
     command: echo "after1"
@@ -75,39 +76,6 @@ steps:
 		require.Equal(t, core.NodeNotStarted, dagRunStatus.Nodes[3].Status, "after-wait-2 should not start")
 	})
 
-	t.Run("LegacyHITLWithApprovalTranslation", func(t *testing.T) {
-		th := test.Setup(t)
-
-		testDAG := th.DAG(t, `
-type: graph
-steps:
-  - name: wait-step
-    type: hitl
-    config:
-      prompt: "Please approve"
-      input: [FEEDBACK]
-      required: [FEEDBACK]
-  - name: after-wait
-    depends: [wait-step]
-    command: echo "approved"
-`)
-
-		agent := testDAG.Agent()
-		err := agent.Run(agent.Context)
-		require.NoError(t, err)
-
-		testDAG.AssertLatestStatus(t, core.Waiting)
-
-		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
-		require.NoError(t, err)
-
-		// Verify that the HITL config was translated to approval config
-		require.NotNil(t, dagRunStatus.Nodes[0].Step.Approval, "HITL step should have approval config from translation")
-		require.Equal(t, "Please approve", dagRunStatus.Nodes[0].Step.Approval.Prompt)
-		require.Equal(t, []string{"FEEDBACK"}, dagRunStatus.Nodes[0].Step.Approval.Input)
-		require.Equal(t, []string{"FEEDBACK"}, dagRunStatus.Nodes[0].Step.Approval.Required)
-	})
-
 	t.Run("ParallelBranchWithWaitStep", func(t *testing.T) {
 		th := test.Setup(t)
 
@@ -120,7 +88,8 @@ steps:
     depends: [branch-a-1]
     command: echo "a2"
   - name: wait-branch
-    type: hitl
+    command: "true"
+    approval: {}
   - name: after-wait
     depends: [wait-branch]
     command: echo "after wait"

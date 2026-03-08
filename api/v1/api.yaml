@@ -2287,7 +2287,7 @@ paths:
 
   /dag-runs/{name}/{dagRunId}/steps/{stepName}/approve:
     post:
-      summary: "Approve a waiting step for HITL"
+      summary: "Approve a waiting step"
       description: "Approves a step that is in Waiting status, optionally providing input parameters that will be available as environment variables in subsequent steps"
       operationId: "approveDAGRunStep"
       tags:
@@ -2331,7 +2331,7 @@ paths:
 
   /dag-runs/{name}/{dagRunId}/steps/{stepName}/reject:
     post:
-      summary: "Reject a waiting step for HITL"
+      summary: "Reject a waiting step"
       description: "Rejects a step that is in Waiting status, optionally providing a reason for rejection"
       operationId: "rejectDAGRunStep"
       tags:
@@ -2763,7 +2763,7 @@ paths:
 
   /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/approve:
     post:
-      summary: "Approve a waiting step in a sub DAG-run for HITL"
+      summary: "Approve a waiting step in a sub DAG-run"
       description: "Approves a step that is in Waiting status within a sub DAG-run, optionally providing input parameters that will be available as environment variables in subsequent steps"
       operationId: "approveSubDAGRunStep"
       tags:
@@ -2813,7 +2813,7 @@ paths:
 
   /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/reject:
     post:
-      summary: "Reject a waiting step in a sub DAG-run for HITL"
+      summary: "Reject a waiting step in a sub DAG-run"
       description: "Rejects a step that is in Waiting status within a sub DAG-run, optionally providing a reason for rejection"
       operationId: "rejectSubDAGRunStep"
       tags:
@@ -7506,21 +7506,21 @@ components:
           description: "Error message if the step failed"
         approvedAt:
           type: string
-          description: "RFC3339 timestamp when the HITL step was approved"
+          description: "RFC3339 timestamp when the step was approved"
         approvedBy:
           type: string
-          description: "Username of who approved the HITL step"
+          description: "Username of who approved the step"
         approvalInputs:
           type: object
           additionalProperties:
             type: string
-          description: "Key-value inputs provided during HITL approval"
+          description: "Key-value inputs provided during approval"
         rejectedAt:
           type: string
-          description: "RFC3339 timestamp when the HITL step was rejected"
+          description: "RFC3339 timestamp when the step was rejected"
         rejectedBy:
           type: string
-          description: "Username of who rejected the HITL step"
+          description: "Username of who rejected the step"
         rejectionReason:
           type: string
           description: "Optional reason for rejection"

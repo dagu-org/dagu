@@ -911,7 +911,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Approve a waiting step for HITL
+         * Approve a waiting step
          * @description Approves a step that is in Waiting status, optionally providing input parameters that will be available as environment variables in subsequent steps
          */
         post: operations["approveDAGRunStep"];
@@ -931,7 +931,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Reject a waiting step for HITL
+         * Reject a waiting step
          * @description Rejects a step that is in Waiting status, optionally providing a reason for rejection
          */
         post: operations["rejectDAGRunStep"];
@@ -1131,7 +1131,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Approve a waiting step in a sub DAG-run for HITL
+         * Approve a waiting step in a sub DAG-run
          * @description Approves a step that is in Waiting status within a sub DAG-run, optionally providing input parameters that will be available as environment variables in subsequent steps
          */
         post: operations["approveSubDAGRunStep"];
@@ -1151,7 +1151,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Reject a waiting step in a sub DAG-run for HITL
+         * Reject a waiting step in a sub DAG-run
          * @description Rejects a step that is in Waiting status within a sub DAG-run, optionally providing a reason for rejection
          */
         post: operations["rejectSubDAGRunStep"];
@@ -3026,17 +3026,17 @@ export interface components {
             subRunsRepeated?: components["schemas"]["SubDAGRun"][];
             /** @description Error message if the step failed */
             error?: string;
-            /** @description RFC3339 timestamp when the HITL step was approved */
+            /** @description RFC3339 timestamp when the step was approved */
             approvedAt?: string;
-            /** @description Username of who approved the HITL step */
+            /** @description Username of who approved the step */
             approvedBy?: string;
-            /** @description Key-value inputs provided during HITL approval */
+            /** @description Key-value inputs provided during approval */
             approvalInputs?: {
                 [key: string]: string;
             };
-            /** @description RFC3339 timestamp when the HITL step was rejected */
+            /** @description RFC3339 timestamp when the step was rejected */
             rejectedAt?: string;
-            /** @description Username of who rejected the HITL step */
+            /** @description Username of who rejected the step */
             rejectedBy?: string;
             /** @description Optional reason for rejection */
             rejectionReason?: string;

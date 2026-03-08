@@ -563,7 +563,7 @@ function NodeStatusTableRow({
                   {currentDuration}
                 </div>
               )}
-              {/* Approval info for HITL steps */}
+              {/* Approval info */}
               {node.approvedBy && (
                 <div className="text-xs text-muted-foreground leading-tight">
                   <span className="font-medium">Approved by:</span>{' '}
@@ -584,7 +584,7 @@ function NodeStatusTableRow({
                     </span>
                   </div>
                 )}
-              {/* Rejection info for rejected HITL steps */}
+              {/* Rejection info */}
               {node.rejectedBy && (
                 <div className="text-xs text-muted-foreground leading-tight">
                   <span className="font-medium">Rejected by:</span>{' '}
@@ -992,7 +992,7 @@ function NodeStatusTableRow({
               {currentDuration}
             </div>
           )}
-          {/* Approval info for HITL steps */}
+          {/* Approval info */}
           {node.approvedBy && (
             <div className="text-xs text-muted-foreground">
               <span className="font-medium">Approved by:</span>{' '}
@@ -1013,7 +1013,7 @@ function NodeStatusTableRow({
                 </span>
               </div>
             )}
-          {/* Rejection info for rejected HITL steps */}
+          {/* Rejection info */}
           {node.rejectedBy && (
             <div className="text-xs text-muted-foreground">
               <span className="font-medium">Rejected by:</span>{' '}

@@ -242,7 +242,7 @@ type agentConfig struct {
 	Prompt string `yaml:"prompt,omitempty"`
 	// MaxIterations is the maximum number of tool call rounds.
 	MaxIterations *int `yaml:"max_iterations,omitempty"`
-	// SafeMode enables command approval via HITL.
+	// SafeMode enables command approval via human review.
 	SafeMode *bool `yaml:"safe_mode,omitempty"`
 	// WebSearch configures provider-native web search for this agent step.
 	// Overrides the global agent web search setting.
@@ -1219,22 +1219,6 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 	}
 	maps.Copy(result.ExecutorConfig.Config, s.Config)
 
-	// Translate type: hitl to approval config for backward compatibility.
-	// The hitl executor is kept for DetermineNodeStatus, but the approval
-	// config enables push-back and the new approval UI.
-	if result.ExecutorConfig.Type == "hitl" && result.Approval == nil {
-		result.Approval = &core.ApprovalConfig{}
-		if prompt, ok := s.Config["prompt"].(string); ok {
-			result.Approval.Prompt = prompt
-		}
-		if input, ok := s.Config["input"]; ok {
-			result.Approval.Input = toStringSlice(input)
-		}
-		if required, ok := s.Config["required"]; ok {
-			result.Approval.Required = toStringSlice(required)
-		}
-	}
-
 	// Infer type from container field
 	if result.ExecutorConfig.Type == "" && result.Container != nil {
 		result.ExecutorConfig.Type = "docker"
@@ -1258,25 +1242,6 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 	}
 
 	return nil
-}
-
-// toStringSlice converts an any value to []string.
-// Handles []any (from YAML parsing) by converting each element to string.
-func toStringSlice(v any) []string {
-	switch val := v.(type) {
-	case []string:
-		return val
-	case []any:
-		result := make([]string, 0, len(val))
-		for _, item := range val {
-			if s, ok := item.(string); ok {
-				result = append(result, s)
-			}
-		}
-		return result
-	default:
-		return nil
-	}
 }
 
 // mergeRedisConfig merges DAG-level Redis defaults into step config.

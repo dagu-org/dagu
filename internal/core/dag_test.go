@@ -856,14 +856,6 @@ func TestDAGHasApprovalSteps(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "LegacyHITL",
-			steps: []core.Step{
-				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: "command"}},
-				{Name: "step2", ExecutorConfig: core.ExecutorConfig{Type: "hitl"}},
-			},
-			expected: true,
-		},
-		{
 			name: "ApprovalField",
 			steps: []core.Step{
 				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: "command"}},
@@ -872,9 +864,9 @@ func TestDAGHasApprovalSteps(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "OnlyHITL",
+			name: "OnlyApproval",
 			steps: []core.Step{
-				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: "hitl"}},
+				{Name: "step1", Approval: &core.ApprovalConfig{}},
 			},
 			expected: true,
 		},

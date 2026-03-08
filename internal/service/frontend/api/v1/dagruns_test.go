@@ -213,8 +213,8 @@ func TestApproveDAGRunStep(t *testing.T) {
 	dagSpec := `type: graph
 steps:
   - name: wait-step
-    type: hitl
-    config:
+    command: "true"
+    approval:
       prompt: "Please approve"
   - name: after-wait
     depends: [wait-step]
@@ -278,8 +278,8 @@ func TestApproveDAGRunStepWithInputs(t *testing.T) {
 	dagSpec := `type: graph
 steps:
   - name: wait-step
-    type: hitl
-    config:
+    command: "true"
+    approval:
       prompt: "Please provide reason"
       input:
         - reason
@@ -350,8 +350,8 @@ func TestApproveDAGRunStepMissingRequired(t *testing.T) {
 	dagSpec := `type: graph
 steps:
   - name: wait-step
-    type: hitl
-    config:
+    command: "true"
+    approval:
       prompt: "Please provide reason"
       input:
         - reason
@@ -437,8 +437,8 @@ func TestRejectDAGRunStep(t *testing.T) {
 	dagSpec := `type: graph
 steps:
   - name: wait-step
-    type: hitl
-    config:
+    command: "true"
+    approval:
       prompt: "Please approve"
   - name: after-wait
     depends: [wait-step]
@@ -647,11 +647,11 @@ func TestExecuteDAGSyncTimeout(t *testing.T) {
 func TestExecuteDAGSyncWithWaitingStatus(t *testing.T) {
 	server := test.SetupServer(t)
 
-	// Create a DAG with HITL step that will wait for approval
+	// Create a DAG with approval step that will wait for approval
 	dagSpec := `steps:
   - name: wait-step
-    type: hitl
-    config:
+    command: "true"
+    approval:
       prompt: "Approve this"`
 
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{

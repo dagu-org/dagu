@@ -2118,7 +2118,7 @@ func TestBuildLogOutput(t *testing.T) {
 	}
 }
 
-func TestBuildHITLStepsValidation(t *testing.T) {
+func TestBuildApprovalStepsValidation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -2128,7 +2128,7 @@ func TestBuildHITLStepsValidation(t *testing.T) {
 		errContains string
 	}{
 		{
-			name: "NoHITLSteps",
+			name: "NoApprovalSteps",
 			dag: &dag{
 				Name:           "test-dag",
 				WorkerSelector: map[string]string{"region": "us-west"},
@@ -2143,7 +2143,7 @@ func TestBuildHITLStepsValidation(t *testing.T) {
 			dag: &dag{
 				Name: "test-dag",
 				Steps: []any{
-					map[string]any{"name": "step1", "type": "hitl"},
+					map[string]any{"name": "step1", "command": "true", "approval": map[string]any{}},
 				},
 			},
 			expectErr: false,
@@ -2154,7 +2154,7 @@ func TestBuildHITLStepsValidation(t *testing.T) {
 				Name:           "test-dag",
 				WorkerSelector: map[string]string{"region": "us-west"},
 				Steps: []any{
-					map[string]any{"name": "step1", "type": "hitl"},
+					map[string]any{"name": "step1", "command": "true", "approval": map[string]any{}},
 				},
 			},
 			expectErr:   true,
@@ -2167,7 +2167,7 @@ func TestBuildHITLStepsValidation(t *testing.T) {
 				WorkerSelector: map[string]string{"region": "us-west"},
 				Steps: []any{
 					map[string]any{"name": "step1", "script": "echo hello"},
-					map[string]any{"name": "step2", "type": "hitl"},
+					map[string]any{"name": "step2", "command": "true", "approval": map[string]any{}},
 					map[string]any{"name": "step3", "script": "echo done"},
 				},
 			},
