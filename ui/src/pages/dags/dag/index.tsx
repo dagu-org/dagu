@@ -214,12 +214,14 @@ function DAGDetails() {
                   dag={dagData.dag}
                   currentDAGRun={displayDAGRun}
                   fileName={fileName}
+                  filePath={dagData.filePath}
                   refreshFn={refreshData}
                   formatDuration={formatDuration}
                   navigateToStatusTab={navigateToStatusTab}
                 />
                 <DAGDetailsContent
                   fileName={fileName}
+                  filePath={dagData.filePath}
                   dag={dagData.dag}
                   currentDAGRun={displayDAGRun}
                   refreshFn={refreshData}

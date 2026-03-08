@@ -242,6 +242,7 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
               {data?.dag && (
                 <DAGDetailsContent
                   fileName={fileName}
+                  filePath={data?.filePath}
                   dag={data.dag}
                   currentDAGRun={currentDAGRun}
                   dagRunId={enqueuedRunId}

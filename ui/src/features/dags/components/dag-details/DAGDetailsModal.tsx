@@ -208,6 +208,7 @@ function DAGDetailsModal({ fileName, isOpen, onClose }: Props): React.ReactEleme
                 {data.dag && (
                   <DAGDetailsContent
                     fileName={fileName}
+                    filePath={data.filePath}
                     dag={data.dag}
                     currentDAGRun={data.latestDAGRun}
                     refreshFn={refreshFn}

@@ -2640,6 +2640,8 @@ export interface components {
         DAGFile: {
             /** @description File ID of the DAG file */
             fileName: string;
+            /** @description Absolute file path of the DAG file on disk */
+            filePath?: string;
             dag: components["schemas"]["DAG"];
             latestDAGRun: components["schemas"]["DAGRunSummary"];
             /** @description Whether the DAG is suspended */
@@ -5356,6 +5358,8 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @description Absolute file path of the DAG file on disk */
+                        filePath?: string;
                         dag?: components["schemas"]["DAGDetails"];
                         /** @description List of local DAGs that are part of this DAG */
                         localDags: components["schemas"]["LocalDag"][];

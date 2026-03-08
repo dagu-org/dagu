@@ -925,6 +925,9 @@ paths:
                 type: object
                 description: "Response object for getting details of a DAG"
                 properties:
+                  filePath:
+                    type: string
+                    description: "Absolute file path of the DAG file on disk"
                   dag:
                     $ref: "#/components/schemas/DAGDetails"
                   localDags:
@@ -6776,6 +6779,9 @@ components:
         fileName:
           type: string
           description: "File ID of the DAG file"
+        filePath:
+          type: string
+          description: "Absolute file path of the DAG file on disk"
         dag:
           $ref: "#/components/schemas/DAG"
         latestDAGRun:
