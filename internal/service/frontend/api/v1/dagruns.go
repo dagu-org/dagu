@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -1014,32 +1015,42 @@ func (a *API) PushBackDAGRunStep(ctx context.Context, request api.PushBackDAGRun
 		}, nil
 	}
 
+	// Snapshot current state for rollback if resume fails.
+	snapshot, err := json.Marshal(dagStatus)
+	if err != nil {
+		return nil, fmt.Errorf("error serializing status for rollback: %w", err)
+	}
+
 	applyPushBack(ctx, node, dagStatus, request.Body)
 
 	if err := a.dagRunMgr.UpdateStatus(ctx, ref, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
 
-	// Always resume after push-back since the step needs to re-execute
-	resumed := true
 	if err := a.resumeDAGRun(ctx, ref, request.DagRunId); err != nil {
-		logger.Error(ctx, "Failed to resume DAG after push-back", tag.Error(err))
-		resumed = false
-	} else {
-		logger.Info(ctx, "DAG resumed after push-back",
-			slog.String("dagRunId", request.DagRunId),
-			slog.String("step", request.StepName),
-			slog.Int("iteration", node.ApprovalIteration),
-		)
+		logger.Error(ctx, "Failed to resume DAG after push-back, rolling back", tag.Error(err))
+		var original exec.DAGRunStatus
+		if unmarshalErr := json.Unmarshal(snapshot, &original); unmarshalErr == nil {
+			if rollbackErr := a.dagRunMgr.UpdateStatus(ctx, ref, original); rollbackErr != nil {
+				logger.Error(ctx, "Failed to rollback push-back state", tag.Error(rollbackErr))
+			}
+		}
+		return nil, fmt.Errorf("failed to resume DAG after push-back: %w", err)
 	}
 
-	a.logStepPushBack(ctx, request.Name, request.DagRunId, "", request.StepName, node.ApprovalIteration, resumed)
+	logger.Info(ctx, "DAG resumed after push-back",
+		slog.String("dagRunId", request.DagRunId),
+		slog.String("step", request.StepName),
+		slog.Int("iteration", node.ApprovalIteration),
+	)
+
+	a.logStepPushBack(ctx, request.Name, request.DagRunId, "", request.StepName, node.ApprovalIteration, true)
 
 	return &api.PushBackDAGRunStep200JSONResponse{
 		DagRunId:          request.DagRunId,
 		StepName:          request.StepName,
 		ApprovalIteration: node.ApprovalIteration,
-		Resumed:           resumed,
+		Resumed:           true,
 	}, nil
 }
 
@@ -1092,33 +1103,43 @@ func (a *API) PushBackSubDAGRunStep(ctx context.Context, request api.PushBackSub
 		}, nil
 	}
 
+	// Snapshot current state for rollback if resume fails.
+	snapshot, err := json.Marshal(dagStatus)
+	if err != nil {
+		return nil, fmt.Errorf("error serializing status for rollback: %w", err)
+	}
+
 	applyPushBack(ctx, node, dagStatus, request.Body)
 
 	if err := a.dagRunMgr.UpdateStatus(ctx, rootRef, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating sub DAG-run status: %w", err)
 	}
 
-	// Always resume after push-back since the step needs to re-execute
-	resumed := true
 	if err := a.resumeSubDAGRun(ctx, rootRef, request.SubDAGRunId); err != nil {
-		logger.Error(ctx, "Failed to resume sub DAG after push-back", tag.Error(err))
-		resumed = false
-	} else {
-		logger.Info(ctx, "Sub DAG resumed after push-back",
-			slog.String("subDagRunId", request.SubDAGRunId),
-			slog.String("step", request.StepName),
-			slog.Int("iteration", node.ApprovalIteration),
-		)
+		logger.Error(ctx, "Failed to resume sub DAG after push-back, rolling back", tag.Error(err))
+		var original exec.DAGRunStatus
+		if unmarshalErr := json.Unmarshal(snapshot, &original); unmarshalErr == nil {
+			if rollbackErr := a.dagRunMgr.UpdateStatus(ctx, rootRef, original); rollbackErr != nil {
+				logger.Error(ctx, "Failed to rollback push-back state", tag.Error(rollbackErr))
+			}
+		}
+		return nil, fmt.Errorf("failed to resume sub DAG after push-back: %w", err)
 	}
 
-	a.logStepPushBack(ctx, request.Name, request.DagRunId, request.SubDAGRunId, request.StepName, node.ApprovalIteration, resumed)
+	logger.Info(ctx, "Sub DAG resumed after push-back",
+		slog.String("subDagRunId", request.SubDAGRunId),
+		slog.String("step", request.StepName),
+		slog.Int("iteration", node.ApprovalIteration),
+	)
+
+	a.logStepPushBack(ctx, request.Name, request.DagRunId, request.SubDAGRunId, request.StepName, node.ApprovalIteration, true)
 
 	return &api.PushBackSubDAGRunStep200JSONResponse{
 		DagRunId:          request.SubDAGRunId,
 		SubDAGRunId:       &request.SubDAGRunId,
 		StepName:          request.StepName,
 		ApprovalIteration: node.ApprovalIteration,
-		Resumed:           resumed,
+		Resumed:           true,
 	}, nil
 }
 
