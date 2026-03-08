@@ -300,6 +300,42 @@ func TestReplaceVars_DeferShellVars_BackticksInValuePreserved(t *testing.T) {
 	require.Equal(t, "echo $MSG", got, "scope var with backticks should be deferred")
 }
 
+// --- deferShellVars with numeric (positional) vars ---
+
+func TestResolveForReplace_NumericVarNotDeferredEvenWithDefer(t *testing.T) {
+	scope := NewEnvScope(nil, false).WithEntry("1", "A", EnvSourceDAGEnv)
+	r := &resolver{
+		scope:          scope,
+		deferShellVars: true,
+	}
+	val, ok := r.resolveForReplace("1")
+	require.True(t, ok, "$1 should be expanded even with deferShellVars")
+	require.Equal(t, "A", val)
+}
+
+func TestReplaceVars_DeferShellVars_PositionalParamsExpanded(t *testing.T) {
+	scope := NewEnvScope(nil, false).
+		WithEntry("1", "A", EnvSourceDAGEnv).
+		WithEntry("2", "B", EnvSourceDAGEnv).
+		WithEntry("NAMED", "deferred", EnvSourceDAGEnv)
+	r := &resolver{
+		scope:          scope,
+		deferShellVars: true,
+	}
+	got := r.replaceVars("echo $1 $2 $NAMED")
+	require.Equal(t, "echo A B $NAMED", got)
+}
+
+func TestIsNumericVar(t *testing.T) {
+	assert.True(t, isNumericVar("1"))
+	assert.True(t, isNumericVar("42"))
+	assert.True(t, isNumericVar("0"))
+	assert.False(t, isNumericVar(""))
+	assert.False(t, isNumericVar("a"))
+	assert.False(t, isNumericVar("1a"))
+	assert.False(t, isNumericVar("FOO"))
+}
+
 // --- expandReferences unaffected by deferShellVars ---
 
 func TestExpandReferences_StillWorksWithDeferShellVars(t *testing.T) {

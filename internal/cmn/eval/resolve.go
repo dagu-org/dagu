@@ -70,16 +70,32 @@ func (r *resolver) resolve(name string) (string, bool) {
 }
 
 // resolveForReplace resolves a variable for simple $VAR replacement.
-// When deferShellVars is true, only explicit variable maps are checked;
-// scope variables (params, env) are deferred to the shell at runtime.
+// When deferShellVars is true, most scope variables are deferred to the
+// shell at runtime. Numeric variables ($1, $2, ...) are always expanded
+// because shells treat $N as positional arguments, not environment variables.
 func (r *resolver) resolveForReplace(name string) (string, bool) {
 	if val, ok := r.lookupVariable(name); ok {
 		return val, true
 	}
-	if r.deferShellVars {
+	if r.deferShellVars && !isNumericVar(name) {
 		return "", false
 	}
 	return r.lookupScopeNonOS(name)
+}
+
+// isNumericVar reports whether name consists entirely of digits (e.g., "1", "2").
+// These correspond to shell positional parameters ($1, $2, ...) which cannot
+// be set via environment variables, so they must always be expanded by Dagu.
+func isNumericVar(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, c := range name {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // resolveForShell looks up a variable for shell expansion.
