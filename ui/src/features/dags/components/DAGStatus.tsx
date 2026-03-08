@@ -13,6 +13,7 @@ import {
   MessageSquare,
   MousePointerClick,
   Package,
+  ShieldCheck,
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { useCookies } from 'react-cookie';
@@ -26,6 +27,7 @@ import BorderedBox from '../../../ui/BorderedBox';
 import { DAGRunOutputs } from '../../dag-runs/components/dag-run-details';
 import { DAGContext } from '../contexts/DAGContext';
 import { getEventHandlers } from '../lib/getEventHandlers';
+import { ApprovalTab } from './approval';
 import { ChatHistoryTab } from './chat-history';
 import { DAGStatusOverview, NodeStatusTable } from './dag-details';
 import { DAGSpecReadOnly } from './dag-editor';
@@ -41,7 +43,7 @@ type Props = {
   fileName: string;
 };
 
-type StatusTab = 'status' | 'timeline' | 'outputs' | 'chat' | 'spec';
+type StatusTab = 'status' | 'timeline' | 'outputs' | 'chat' | 'spec' | 'approval';
 
 /** Check if the current DAG run is a sub DAG-run (has a different root) */
 function isSubDAGRun(dagRun: components['schemas']['DAGRunDetails']): boolean {
@@ -308,6 +310,12 @@ function DAGStatus({ dagRun, fileName }: Props) {
     (node) => node.step.executorConfig?.type === 'chat'
   );
 
+  // Check if there are any steps awaiting approval
+  const waitingStepCount = dagRun.nodes?.filter(
+    (node) => node.status === NodeStatus.Waiting
+  ).length || 0;
+  const hasWaitingSteps = waitingStepCount > 0;
+
   // Reset to status tab if selected tab is not available
   useEffect(() => {
     if (activeTab === 'timeline' && !showTimeline) {
@@ -316,7 +324,17 @@ function DAGStatus({ dagRun, fileName }: Props) {
     if (activeTab === 'chat' && !hasChatSteps) {
       setActiveTab('status');
     }
-  }, [showTimeline, hasChatSteps, activeTab]);
+    if (activeTab === 'approval' && !hasWaitingSteps) {
+      setActiveTab('status');
+    }
+  }, [showTimeline, hasChatSteps, hasWaitingSteps, activeTab]);
+
+  // Auto-switch to approval tab when steps enter waiting state
+  useEffect(() => {
+    if (hasWaitingSteps) {
+      setActiveTab('approval');
+    }
+  }, [hasWaitingSteps]);
 
   return (
     <div className="space-y-4">
@@ -330,6 +348,19 @@ function DAGStatus({ dagRun, fileName }: Props) {
           <ActivitySquare className="h-4 w-4" />
           Status
         </Tab>
+        {hasWaitingSteps && (
+          <Tab
+            isActive={activeTab === 'approval'}
+            onClick={() => setActiveTab('approval')}
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            <ShieldCheck className="h-4 w-4" />
+            Approval
+            <span className="bg-warning/15 text-warning text-xs font-medium px-1.5 py-0.5 rounded-full">
+              {waitingStepCount}
+            </span>
+          </Tab>
+        )}
         {showTimeline && (
           <Tab
             isActive={activeTab === 'timeline'}
@@ -464,6 +495,11 @@ function DAGStatus({ dagRun, fileName }: Props) {
             )}
           </DAGContext.Consumer>
         </div>
+      )}
+
+      {/* Approval Tab Content */}
+      {activeTab === 'approval' && hasWaitingSteps && (
+        <ApprovalTab dagRun={dagRun} dagName={fileName} />
       )}
 
       {/* Timeline Tab Content */}

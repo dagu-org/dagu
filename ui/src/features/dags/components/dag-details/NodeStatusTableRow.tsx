@@ -27,7 +27,6 @@ import {
 } from '@/ui/CustomDialog';
 import {
   AlertCircle,
-  Check,
   ChevronDown,
   ChevronRight,
   Code,
@@ -47,7 +46,6 @@ import {
 import StyledTableRow from '../../../../ui/StyledTableRow';
 import { NodeStatusChip } from '../common';
 import { InlineLogViewer } from '../common/InlineLogViewer';
-import { StepReviewModal } from '../dag-execution/StepReviewModal';
 import StatusUpdateModal from '../dag-execution/StatusUpdateModal';
 import { SubDAGRunsList } from './SubDAGRunsList';
 
@@ -154,8 +152,6 @@ function NodeStatusTableRow({
   );
   // State for status update modal
   const [showStatusModal, setShowStatusModal] = useState(false);
-  // State for review modal
-  const [showReviewModal, setShowReviewModal] = useState(false);
   // Check if this is a sub dagRun node
   // Include both regular and repeated sub runs
   const allSubRuns = [...(node.subRuns || []), ...(node.subRunsRepeated || [])];
@@ -364,117 +360,6 @@ function NodeStatusTableRow({
     }
 
     setShowStatusModal(false);
-  };
-
-  // Handle approval for wait steps
-  const handleApprove = async (inputs: Record<string, string>) => {
-    // Check if this is a sub DAG-run
-    const isSubDAGRun =
-      dagRun.rootDAGRunId &&
-      dagRun.rootDAGRunName &&
-      dagRun.rootDAGRunId !== dagRun.dagRunId;
-
-    // Define path parameters
-    const pathParams = {
-      name: isSubDAGRun ? dagRun.rootDAGRunName : dagName,
-      dagRunId: isSubDAGRun ? dagRun.rootDAGRunId : dagRunId || '',
-      stepName: node.step.name,
-      ...(isSubDAGRun ? { subDAGRunId: dagRun.dagRunId } : {}),
-    };
-
-    // Use the appropriate endpoint
-    const endpoint = isSubDAGRun
-      ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/approve'
-      : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/approve';
-
-    const { error } = await client.POST(endpoint, {
-      params: {
-        path: pathParams,
-        query: {
-          remoteNode,
-        },
-      },
-      body: {
-        inputs: Object.keys(inputs).length > 0 ? inputs : undefined,
-      },
-    });
-
-    if (error) {
-      throw new Error(error.message || 'Failed to approve step');
-    }
-  };
-
-  // Handle rejection for wait steps
-  const handleReject = async (reason: string) => {
-    // Check if this is a sub DAG-run
-    const isSubDAGRun =
-      dagRun.rootDAGRunId &&
-      dagRun.rootDAGRunName &&
-      dagRun.rootDAGRunId !== dagRun.dagRunId;
-
-    // Define path parameters
-    const pathParams = {
-      name: isSubDAGRun ? dagRun.rootDAGRunName : dagName,
-      dagRunId: isSubDAGRun ? dagRun.rootDAGRunId : dagRunId || '',
-      stepName: node.step.name,
-      ...(isSubDAGRun ? { subDAGRunId: dagRun.dagRunId } : {}),
-    };
-
-    // Use the appropriate endpoint
-    const endpoint = isSubDAGRun
-      ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/reject'
-      : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/reject';
-
-    const { error } = await client.POST(endpoint, {
-      params: {
-        path: pathParams,
-        query: {
-          remoteNode,
-        },
-      },
-      body: {
-        reason: reason || undefined,
-      },
-    });
-
-    if (error) {
-      throw new Error(error.message || 'Failed to reject step');
-    }
-  };
-
-  // Handle push-back for approval steps
-  const handlePushBack = async (inputs: Record<string, string>) => {
-    const isSubDAGRun =
-      dagRun.rootDAGRunId &&
-      dagRun.rootDAGRunName &&
-      dagRun.rootDAGRunId !== dagRun.dagRunId;
-
-    const pathParams = {
-      name: isSubDAGRun ? dagRun.rootDAGRunName : dagName,
-      dagRunId: isSubDAGRun ? dagRun.rootDAGRunId : dagRunId || '',
-      stepName: node.step.name,
-      ...(isSubDAGRun ? { subDAGRunId: dagRun.dagRunId } : {}),
-    };
-
-    const endpoint = isSubDAGRun
-      ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/push-back'
-      : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/push-back';
-
-    const { error } = await client.POST(endpoint, {
-      params: {
-        path: pathParams,
-        query: {
-          remoteNode,
-        },
-      },
-      body: {
-        inputs: Object.keys(inputs).length > 0 ? inputs : undefined,
-      },
-    });
-
-    if (error) {
-      throw new Error(error.message || 'Failed to push back step');
-    }
   };
 
   // Determine if logs are available
@@ -817,20 +702,6 @@ function NodeStatusTableRow({
           {dagRunId && (
             <TableCell className="text-center">
               <div className="flex items-center justify-center gap-1">
-                {/* Review button for waiting steps */}
-                {node.status === NodeStatus.Waiting && (
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowReviewModal(true);
-                    }}
-                  >
-                    <Check className="h-3.5 w-3.5" />
-                    Review
-                  </Button>
-                )}
                 {/* Retry button - hidden for Waiting and Rejected steps */}
                 {node.status !== NodeStatus.Waiting &&
                   node.status !== NodeStatus.Rejected && (
@@ -969,19 +840,6 @@ function NodeStatusTableRow({
           onSubmit={handleStatusUpdate}
         />
 
-        {/* Step Review Modal */}
-        <StepReviewModal
-          visible={showReviewModal}
-          dismissModal={() => setShowReviewModal(false)}
-          step={node.step}
-          node={node}
-          dagName={dagRun?.name || name}
-          dagRunId={dagRunId || ''}
-          dagRun={dagRun}
-          onApprove={handleApprove}
-          onPushBack={node.step.approval ? handlePushBack : undefined}
-          onReject={handleReject}
-        />
       </>
     );
   }
@@ -1256,16 +1114,6 @@ function NodeStatusTableRow({
 
       {dagRunId && (
         <div className="flex justify-end mt-4 gap-2">
-          {/* Review button for waiting steps */}
-          {node.status === NodeStatus.Waiting && (
-            <button
-              className="w-full py-2 px-4 rounded-lg bg-primary text-primary-foreground font-medium text-sm flex items-center justify-center gap-2"
-              onClick={() => setShowReviewModal(true)}
-            >
-              <Check className="h-5 w-5" />
-              Review Required
-            </button>
-          )}
           {/* Retry button - hidden for Waiting and Rejected steps */}
           {node.status !== NodeStatus.Waiting &&
             node.status !== NodeStatus.Rejected && (
@@ -1308,19 +1156,6 @@ function NodeStatusTableRow({
             </DialogContent>
           </Dialog>
 
-          {/* Step Review Modal */}
-          <StepReviewModal
-            visible={showReviewModal}
-            dismissModal={() => setShowReviewModal(false)}
-            step={node.step}
-            node={node}
-            dagName={dagRun?.name || name}
-            dagRunId={dagRunId || ''}
-            dagRun={dagRun}
-            onApprove={handleApprove}
-            onPushBack={node.step.approval ? handlePushBack : undefined}
-            onReject={handleReject}
-          />
         </div>
       )}
     </div>

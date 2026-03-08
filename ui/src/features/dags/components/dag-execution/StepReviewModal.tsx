@@ -29,9 +29,11 @@ type Props = {
   dagName: string;
   dagRunId: string;
   dagRun: DAGRunDetails;
-  onApprove: (inputs: Record<string, string>) => Promise<void>;
+  onApprove?: (inputs: Record<string, string>) => Promise<void>;
   onPushBack?: (inputs: Record<string, string>) => Promise<void>;
-  onReject: (reason: string) => Promise<void>;
+  onReject?: (reason: string) => Promise<void>;
+  /** Hide step output and prompt (when already shown in parent context) */
+  compact?: boolean;
 };
 
 export function StepReviewModal({
@@ -45,6 +47,7 @@ export function StepReviewModal({
   onApprove,
   onPushBack,
   onReject,
+  compact,
 }: Props) {
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -131,9 +134,6 @@ export function StepReviewModal({
         <DialogHeader>
           <DialogTitle className="text-base flex items-center gap-2">
             <span>{step.name}</span>
-            <span className="text-xs font-medium text-warning bg-warning/15 px-1.5 py-0.5 rounded">
-              AWAITING REVIEW
-            </span>
             {iteration > 0 && (
               <span className="text-xs font-normal text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                 Iteration {iteration}
@@ -144,22 +144,24 @@ export function StepReviewModal({
 
         <div className="py-2 space-y-4" onKeyDown={handleKeyDown}>
           {/* Step Output Panel */}
-          <div>
-            <div className="text-xs font-medium text-muted-foreground mb-1">Step Output</div>
-            <div className="max-h-[250px] overflow-y-auto rounded border border-border">
-              <InlineLogViewer
-                dagName={dagName}
-                dagRunId={dagRunId}
-                stepName={step.name}
-                stream={Stream.stdout}
-                dagRun={dagRun}
-              />
+          {!compact && (
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-1">Step Output</div>
+              <div className="max-h-[250px] overflow-y-auto rounded border border-border">
+                <InlineLogViewer
+                  dagName={dagName}
+                  dagRunId={dagRunId}
+                  stepName={step.name}
+                  stream={Stream.stdout}
+                  dagRun={dagRun}
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Prompt message */}
           {prompt && (
-            <div className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted p-3 rounded">
+            <div className="text-base whitespace-pre-wrap">
               {prompt}
             </div>
           )}
@@ -241,27 +243,31 @@ export function StepReviewModal({
                   disabled={loading || (!isValid && requiredFields.length > 0)}
                 >
                   <RotateCcw className="h-4 w-4" />
-                  {loading ? 'Pushing Back...' : 'Push Back'}
+                  {loading ? 'Retrying...' : 'Retry'}
                 </Button>
               )}
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={() => setRejecting(true)}
-                disabled={loading}
-              >
-                <Ban className="h-4 w-4" />
-                Reject
-              </Button>
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={handleApprove}
-                disabled={loading || (!isValid && requiredFields.length > 0)}
-              >
-                <Check className="h-4 w-4" />
-                {loading ? 'Approving...' : 'Approve'}
-              </Button>
+              {onReject && (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => setRejecting(true)}
+                  disabled={loading}
+                >
+                  <Ban className="h-4 w-4" />
+                  Reject
+                </Button>
+              )}
+              {onApprove && (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={handleApprove}
+                  disabled={loading || (!isValid && requiredFields.length > 0)}
+                >
+                  <Check className="h-4 w-4" />
+                  {loading ? 'Approving...' : 'Approve'}
+                </Button>
+              )}
             </>
           ) : (
             <>

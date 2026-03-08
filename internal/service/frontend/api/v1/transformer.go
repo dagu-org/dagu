@@ -112,6 +112,14 @@ func toStep(obj core.Step) api.Step {
 		}
 	}
 
+	if obj.Approval != nil {
+		step.Approval = &api.ApprovalConfig{
+			Prompt:   ptrOf(obj.Approval.Prompt),
+			Input:    ptrOf(obj.Approval.Input),
+			Required: ptrOf(obj.Approval.Required),
+		}
+	}
+
 	if obj.Router != nil {
 		routes := make([]struct {
 			Pattern string   `json:"pattern"`
@@ -230,9 +238,10 @@ func toNode(node *exec.Node) api.Node {
 		ApprovedAt:      ptrOf(node.ApprovedAt),
 		ApprovedBy:      ptrOf(node.ApprovedBy),
 		ApprovalInputs:  ptrOf(node.ApprovalInputs),
-		RejectedAt:      ptrOf(node.RejectedAt),
-		RejectedBy:      ptrOf(node.RejectedBy),
-		RejectionReason: ptrOf(node.RejectionReason),
+		RejectedAt:        ptrOf(node.RejectedAt),
+		RejectedBy:        ptrOf(node.RejectedBy),
+		RejectionReason:   ptrOf(node.RejectionReason),
+		ApprovalIteration: ptrOf(node.ApprovalIteration),
 	}
 }
 
