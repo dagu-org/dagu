@@ -5,6 +5,7 @@
  */
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -43,7 +44,7 @@ type Props = {
  * Modal dialog for starting or enqueuing a DAG with parameters
  */
 function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) {
-  const ref = React.useRef<HTMLInputElement>(null);
+  const ref = React.useRef<HTMLTextAreaElement>(null);
 
   // Parse default parameters from the DAG definition
   const parsedParams = React.useMemo(() => {
@@ -84,7 +85,6 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) 
 
       // Handle Enter key (skip during IME composition)
       if (e.key === 'Enter' && !e.isComposing) {
-        // Get the active element
         const activeElement = document.activeElement;
 
         // If Cancel button is focused, trigger cancel
@@ -99,10 +99,18 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) 
           return;
         }
 
-        // If an input field is focused, submit the form
+        // Textarea: bare Enter inserts newline, Shift+Enter submits
+        if (activeElement instanceof HTMLTextAreaElement) {
+          if (e.shiftKey) {
+            e.preventDefault();
+            onSubmit(stringifyParams(params), dagRunId || undefined, !enqueue);
+          }
+          return; // bare Enter: let browser insert newline
+        }
+
+        // Input/Select/nothing focused: Enter submits (existing behavior)
         const isInputFocused =
           activeElement instanceof HTMLInputElement ||
-          activeElement instanceof HTMLTextAreaElement ||
           activeElement instanceof HTMLSelectElement;
 
         if (isInputFocused || !activeElement) {
@@ -178,16 +186,22 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) 
               return (
                 <div key={i} className="space-y-2">
                   <Label htmlFor={`param-${i}`}>{p.Name}</Label>
-                  <Input
+                  <Textarea
                     id={`param-${i}`}
                     placeholder={p.Value}
                     ref={i === 0 ? ref : undefined}
+                    rows={1}
                     value={params.find((pp) => pp.Name == p.Name)?.Value || ''}
                     readOnly={paramsReadOnly}
                     disabled={paramsReadOnly}
                     className={
                       paramsReadOnly ? 'bg-muted cursor-not-allowed' : ''
                     }
+                    onInput={(e) => {
+                      const target = e.currentTarget;
+                      target.style.height = 'auto';
+                      target.style.height = target.scrollHeight + 'px';
+                    }}
                     onChange={(e) => {
                       if (p.Name && !paramsReadOnly) {
                         setParams(
@@ -211,16 +225,22 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) 
               return (
                 <div key={i} className="space-y-2">
                   <Label htmlFor={`param-${i}`}>{`Parameter ${i + 1}`}</Label>
-                  <Input
+                  <Textarea
                     id={`param-${i}`}
                     placeholder={p.Value}
                     ref={i === 0 ? ref : undefined}
+                    rows={1}
                     value={params.find((_, j) => i == j)?.Value || ''}
                     readOnly={paramsReadOnly}
                     disabled={paramsReadOnly}
                     className={
                       paramsReadOnly ? 'bg-muted cursor-not-allowed' : ''
                     }
+                    onInput={(e) => {
+                      const target = e.currentTarget;
+                      target.style.height = 'auto';
+                      target.style.height = target.scrollHeight + 'px';
+                    }}
                     onChange={(e) => {
                       if (paramsReadOnly) return;
                       setParams(

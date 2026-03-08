@@ -184,7 +184,7 @@ func TestParseStringParams(t *testing.T) {
 		{
 			name:     "QuotedValueWithEscapedQuotes",
 			input:    `msg="say \"hello\""`,
-			expected: []paramPair{{Name: "msg", Value: `say "hello\`}},
+			expected: []paramPair{{Name: "msg", Value: `say "hello"`}},
 		},
 		{
 			name:     "EmptyString",
@@ -199,6 +199,31 @@ func TestParseStringParams(t *testing.T) {
 				{Name: "", Value: "two"},
 				{Name: "", Value: "three"},
 			},
+		},
+		{
+			name:     "MultilineEscapeSequence",
+			input:    `msg="line1\nline2"`,
+			expected: []paramPair{{Name: "msg", Value: "line1\nline2"}},
+		},
+		{
+			name:     "EscapedBackslash",
+			input:    `path="C:\\Users"`,
+			expected: []paramPair{{Name: "path", Value: `C:\Users`}},
+		},
+		{
+			name:     "LiteralBackslashN",
+			input:    `val="a\\nb"`,
+			expected: []paramPair{{Name: "val", Value: `a\nb`}},
+		},
+		{
+			name:     "TabEscape",
+			input:    `data="col1\tcol2"`,
+			expected: []paramPair{{Name: "data", Value: "col1\tcol2"}},
+		},
+		{
+			name:     "MixedEscapes",
+			input:    `msg="line1\nline2\\end"`,
+			expected: []paramPair{{Name: "msg", Value: "line1\nline2\\end"}},
 		},
 		{
 			name:     "BacktickValue",
@@ -263,7 +288,7 @@ func TestParseStringParams_NoEval_Matrix(t *testing.T) {
 			name:  "EscapedQuotesInDoubleQuotedToken",
 			input: `X="a \"b\"" Y=2`,
 			expected: []paramPair{
-				{Name: "X", Value: `a "b\`},
+				{Name: "X", Value: `a "b"`},
 				{Name: "Y", Value: "2"},
 			},
 		},
@@ -806,6 +831,18 @@ func TestParseParams(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid parameter value")
 	})
+}
+
+func TestMultilineParamRoundTrip(t *testing.T) {
+	t.Parallel()
+	pair := paramPair{Name: "MSG", Value: "line1\nline2"}
+	escaped := pair.Escaped() // MSG="line1\nline2" with \n escape
+	ctx := BuildContext{ctx: context.Background(), opts: BuildOpts{Flags: BuildFlagNoEval}}
+	result, err := parseStringParams(ctx, escaped)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	assert.Equal(t, "MSG", result[0].Name)
+	assert.Equal(t, "line1\nline2", result[0].Value)
 }
 
 func TestEvalParamValue(t *testing.T) {
