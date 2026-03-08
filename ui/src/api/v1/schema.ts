@@ -3833,6 +3833,8 @@ export interface components {
             title: string;
             /** @description Full file content including YAML frontmatter */
             content: string;
+            /** @description Absolute file path of the document on disk */
+            filePath?: string;
             /**
              * Format: date-time
              * @description RFC3339 timestamp when the document was created

@@ -13,7 +13,7 @@ import { useDocSSE } from '@/hooks/useDocSSE';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import { cn } from '@/lib/utils';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { FileText, Save, Trash2 } from 'lucide-react';
+import { Check, Copy, FileText, Save, Trash2 } from 'lucide-react';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import DocExternalChangeDialog from './DocExternalChangeDialog';
 
@@ -153,6 +153,27 @@ function DocEditor({ tabId, docPath, onDeleteDoc }: Props) {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const [copiedPath, setCopiedPath] = useState(false);
+
+  const copyFilePath = useCallback(async () => {
+    const fp = doc?.filePath;
+    if (!fp) return;
+    try {
+      await navigator.clipboard.writeText(fp);
+      setCopiedPath(true);
+      setTimeout(() => setCopiedPath(false), 2000);
+    } catch {
+      const textArea = document.createElement('textarea');
+      textArea.value = fp;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopiedPath(true);
+      setTimeout(() => setCopiedPath(false), 2000);
+    }
+  }, [doc?.filePath]);
+
   const title = doc?.title || docPath.split('/').pop() || docPath;
 
   return (
@@ -163,6 +184,21 @@ function DocEditor({ tabId, docPath, onDeleteDoc }: Props) {
         <span className="text-sm font-medium truncate">{title}</span>
         {hasUnsavedChanges && (
           <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+        )}
+
+        {doc?.filePath && (
+          <button
+            type="button"
+            onClick={copyFilePath}
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-all shrink-0"
+            title={`Copy file path: ${doc.filePath}`}
+          >
+            {copiedPath ? (
+              <Check className="h-3.5 w-3.5 text-green-500" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+          </button>
         )}
 
         <div className="flex-1" />

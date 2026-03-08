@@ -9075,6 +9075,9 @@ components:
         content:
           type: string
           description: "Full file content including YAML frontmatter"
+        filePath:
+          type: string
+          description: "Absolute file path of the document on disk"
         createdAt:
           type: string
           format: date-time

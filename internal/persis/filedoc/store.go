@@ -222,6 +222,7 @@ func (s *Store) Get(_ context.Context, id string) (*agent.Doc, error) {
 		return nil, fmt.Errorf("filedoc: failed to parse doc %s: %w", id, err)
 	}
 
+	doc.FilePath = filePath
 	doc.CreatedAt = fileCreationTime(info).UTC().Format(time.RFC3339)
 	doc.UpdatedAt = info.ModTime().UTC().Format(time.RFC3339)
 
