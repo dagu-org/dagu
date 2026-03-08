@@ -5,6 +5,7 @@
  */
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -43,7 +44,7 @@ type Props = {
  * Modal dialog for starting or enqueuing a DAG with parameters
  */
 function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) {
-  const ref = React.useRef<HTMLInputElement>(null);
+  const ref = React.useRef<HTMLTextAreaElement>(null);
 
   // Parse default parameters from the DAG definition
   const parsedParams = React.useMemo(() => {
@@ -84,7 +85,6 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) 
 
       // Handle Enter key (skip during IME composition)
       if (e.key === 'Enter' && !e.isComposing) {
-        // Get the active element
         const activeElement = document.activeElement;
 
         // If Cancel button is focused, trigger cancel
@@ -99,10 +99,19 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) 
           return;
         }
 
-        // If an input field is focused, submit the form
+        // Textarea: Shift+Enter inserts newline, bare Enter submits
+        if (activeElement instanceof HTMLTextAreaElement) {
+          if (e.shiftKey) {
+            return; // Shift+Enter: let browser insert newline
+          }
+          e.preventDefault();
+          onSubmit(stringifyParams(params), dagRunId || undefined, !enqueue);
+          return;
+        }
+
+        // Input/Select/nothing focused: Enter submits (existing behavior)
         const isInputFocused =
           activeElement instanceof HTMLInputElement ||
-          activeElement instanceof HTMLTextAreaElement ||
           activeElement instanceof HTMLSelectElement;
 
         if (isInputFocused || !activeElement) {
@@ -174,20 +183,35 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) 
             />
           </div>
           {parsedParams.map((p, i) => {
+            const maxHeight = 150;
+            const autoGrow = (el: HTMLTextAreaElement) => {
+              el.style.height = 'auto';
+              const clamped = Math.min(el.scrollHeight, maxHeight);
+              el.style.height = clamped + 'px';
+              el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
+            };
+
             if (p.Name != undefined) {
               return (
                 <div key={i} className="space-y-2">
                   <Label htmlFor={`param-${i}`}>{p.Name}</Label>
-                  <Input
+                  <Textarea
                     id={`param-${i}`}
                     placeholder={p.Value}
-                    ref={i === 0 ? ref : undefined}
+                    ref={(el) => {
+                      if (i === 0) {
+                        (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
+                      }
+                      if (el) autoGrow(el);
+                    }}
+                    rows={1}
                     value={params.find((pp) => pp.Name == p.Name)?.Value || ''}
                     readOnly={paramsReadOnly}
                     disabled={paramsReadOnly}
                     className={
                       paramsReadOnly ? 'bg-muted cursor-not-allowed' : ''
                     }
+                    onInput={(e) => autoGrow(e.currentTarget)}
                     onChange={(e) => {
                       if (p.Name && !paramsReadOnly) {
                         setParams(
@@ -211,16 +235,23 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit, action }: Props) 
               return (
                 <div key={i} className="space-y-2">
                   <Label htmlFor={`param-${i}`}>{`Parameter ${i + 1}`}</Label>
-                  <Input
+                  <Textarea
                     id={`param-${i}`}
                     placeholder={p.Value}
-                    ref={i === 0 ? ref : undefined}
+                    ref={(el) => {
+                      if (i === 0) {
+                        (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
+                      }
+                      if (el) autoGrow(el);
+                    }}
+                    rows={1}
                     value={params.find((_, j) => i == j)?.Value || ''}
                     readOnly={paramsReadOnly}
                     disabled={paramsReadOnly}
                     className={
                       paramsReadOnly ? 'bg-muted cursor-not-allowed' : ''
                     }
+                    onInput={(e) => autoGrow(e.currentTarget)}
                     onChange={(e) => {
                       if (paramsReadOnly) return;
                       setParams(

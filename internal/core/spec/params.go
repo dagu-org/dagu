@@ -315,8 +315,13 @@ func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
 
 		if strings.HasPrefix(value, `"`) || strings.HasPrefix(value, "`") {
 			if strings.HasPrefix(value, `"`) {
-				value = strings.Trim(value, `"`)
-				value = strings.ReplaceAll(value, `\"`, `"`)
+				if unquoted, err := strconv.Unquote(value); err == nil {
+					value = unquoted
+				} else {
+					// Fallback for malformed strings (e.g., unterminated quotes)
+					value = strings.Trim(value, `"`)
+					value = strings.ReplaceAll(value, `\"`, `"`)
+				}
 			}
 
 			if !ctx.opts.Has(BuildFlagNoEval) {
