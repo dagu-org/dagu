@@ -96,13 +96,16 @@ func WithBaseConfig(content string) TaskOption {
 	}
 }
 
-// ReadBaseConfigContent reads the base config file and returns its content as a string.
-// Returns empty string if the path is empty or the file cannot be read.
-func ReadBaseConfigContent(path string) string {
-	if path == "" {
+// ResolveBaseConfig returns the base config content for a DAG task.
+// It prefers embedded BaseConfigData from the DAG, falling back to reading the file at fallbackPath.
+func ResolveBaseConfig(baseConfigData []byte, fallbackPath string) string {
+	if len(baseConfigData) > 0 {
+		return string(baseConfigData)
+	}
+	if fallbackPath == "" {
 		return ""
 	}
-	data, err := os.ReadFile(path) //nolint:gosec
+	data, err := os.ReadFile(fallbackPath) //nolint:gosec
 	if err != nil {
 		return ""
 	}

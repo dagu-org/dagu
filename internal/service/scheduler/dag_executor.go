@@ -132,10 +132,6 @@ func (e *DAGExecutor) ExecuteDAG(
 ) error {
 	if e.shouldUseDistributedExecution(dag) {
 		// Distributed execution: dispatch to coordinator
-		baseConfig := string(dag.BaseConfigData)
-		if baseConfig == "" {
-			baseConfig = executor.ReadBaseConfigContent(e.baseConfigPath)
-		}
 		task := executor.CreateTask(
 			dag.Name,
 			string(dag.YamlData),
@@ -143,7 +139,7 @@ func (e *DAGExecutor) ExecuteDAG(
 			runID,
 			executor.WithWorkerSelector(dag.WorkerSelector),
 			executor.WithPreviousStatus(previousStatus),
-			executor.WithBaseConfig(baseConfig),
+			executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, e.baseConfigPath)),
 		)
 		return e.dispatchToCoordinator(ctx, task)
 	}

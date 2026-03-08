@@ -237,11 +237,6 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 		return nil, nil, fmt.Errorf("failed to load DAG from %s: %w", tempFile, err)
 	}
 
-	// Preserve base config data for sub-DAG propagation
-	if task.BaseConfig != "" {
-		dag.BaseConfigData = []byte(task.BaseConfig)
-	}
-
 	return dag, cleanupFunc, nil
 }
 

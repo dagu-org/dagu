@@ -294,14 +294,16 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 				return nil, fmt.Errorf("failed to decode embedded base config: %w", err)
 			}
 		} else if ctx.opts.Base != "" {
-			if fileutil.FileExists(ctx.opts.Base) {
-				baseRaw, err = os.ReadFile(ctx.opts.Base) //nolint:gosec
-				if err != nil {
+			baseRaw, err = os.ReadFile(ctx.opts.Base) //nolint:gosec
+			if err != nil {
+				if !os.IsNotExist(err) {
 					return nil, fmt.Errorf("failed to read base config: %w", err)
 				}
+				// File doesn't exist — skip base config gracefully
+			} else {
 				raw, err := unmarshalData(baseRaw)
 				if err != nil {
-					return nil, fmt.Errorf("failed to read base config: %w", err)
+					return nil, fmt.Errorf("failed to unmarshal base config: %w", err)
 				}
 				baseDef, err = decode(raw)
 				if err != nil {
