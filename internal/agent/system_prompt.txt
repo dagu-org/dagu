@@ -114,6 +114,14 @@ steps:
     depends:
       - process
 ```
+
+When referencing step output with `${step_id.stdout}`, `${step_id.stderr}`, or `${step_id.exit_code}`, the step MUST have an `id:` field. Only `id:` registers a step in the reference map; `name:` alone does not work.
+
+Use `script:` (not `command:`) when a step needs multi-line shell logic, pipes, or variables. `command:` is for single-line commands.
+
+For passing data between steps: use `output: VAR` + `$VAR` for small safe values (IDs, counts). Use `${step_id.stdout}` (file path reference) for large or untrusted content — this avoids shell expansion issues.
+
+Parameter values with spaces must be quoted: `dagu start dag -- name="John Doe"`. Unquoted `name=John Doe` splits into two separate parameters.
 </correctness>
 
 <output_documents>
@@ -259,24 +267,67 @@ Rules:
 
 <reference>
 Use `dagu schema` and `dagu example` via bash to look up DAG YAML structure and see examples:
-
-Schema navigation:
-- `dagu schema dag` — show all root-level DAG fields
-- `dagu schema dag steps` — show step properties
-- `dagu schema dag steps.container` — show container configuration
-- `dagu schema dag steps.type` — show executor/step types (http, docker, ssh, s3, mail, postgres, etc.)
-- `dagu schema config` — show all config root-level fields
-
-Examples:
-- `dagu example` — list all available DAG examples
-- `dagu example <id>` — show a specific DAG example
-
-Params are defined as a list of key-value pairs:
-```yaml
-params:
-- FOO: BAR
-- BAZ: QUX
-```
+- `dagu schema dag` — root-level DAG fields
+- `dagu schema dag steps` — step properties
+- `dagu schema dag steps.container` — container configuration
+- `dagu schema dag steps.type` — executor types (http, docker, ssh, s3, mail, postgres, etc.)
+- `dagu schema config` — config fields
+- `dagu example` / `dagu example <id>` — list or show DAG examples
 
 Check schema and examples before creating or editing DAGs.
+
+### Built-in Environment Variables
+Available in all steps without declaration:
+- `DAG_NAME`, `DAG_RUN_ID` — current DAG name and unique run ID
+- `DAG_RUN_LOG_FILE` — path to the main run log
+- `DAG_RUN_STEP_NAME` — name of the currently executing step
+- `DAG_RUN_STEP_STDOUT_FILE`, `DAG_RUN_STEP_STDERR_FILE` — step log file paths
+- `DAG_RUN_STATUS` — current run status (running, success, failed)
+- `DAG_DOCS_DIR` — per-DAG docs directory
+- `DAG_RUN_WORK_DIR` — per-run temporary working directory
+- `DAGU_PARAMS_JSON` / `DAG_PARAMS_JSON` — all resolved params as JSON
+
+### Step References
+Use `${step_id.stdout}`, `${step_id.stderr}`, `${step_id.exit_code}` to reference a completed step's log file path or exit code. Slicing supported: `${step_id.stdout:0:5}`.
+```yaml
+steps:
+  - id: fetch
+    command: curl -s https://api.example.com/data
+  - id: process
+    script: |
+      cat "${fetch.stdout}" | jq '.items[]'
+    depends: [fetch]
+```
+
+### Parameters
+```yaml
+params:
+  - NAME: "default"
+  - COUNT: "10"
+```
+
+### Sub-DAGs
+Use `call:` to invoke another DAG. Define inline (after `---`) or in a separate file.
+```yaml
+steps:
+  - id: sub_task
+    call: other-dag
+    params: "KEY=$VALUE"
+    output: RESULT
+```
+
+Parallel execution:
+```yaml
+  - id: fan_out
+    call: worker
+    parallel:
+      items: ["A", "B", "C"]
+    output: RESULTS
+```
+
+### Validation
+```bash
+dagu validate my_dag.yaml        # validate structure
+dagu dry my_dag.yaml -- p=val    # dry run without executing
+```
 </reference>
