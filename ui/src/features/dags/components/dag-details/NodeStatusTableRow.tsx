@@ -14,7 +14,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { useClient, useQuery } from '@/hooks/api';
+import { useClient } from '@/hooks/api';
 import { getExecutorCommand } from '@/lib/executor-utils';
 import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
@@ -27,7 +27,6 @@ import {
 } from '@/ui/CustomDialog';
 import {
   AlertCircle,
-  Ban,
   Check,
   ChevronDown,
   ChevronRight,
@@ -47,8 +46,8 @@ import {
 } from '../../../../api/v1/schema';
 import StyledTableRow from '../../../../ui/StyledTableRow';
 import { NodeStatusChip } from '../common';
-import { ApprovalModal } from '../dag-execution/ApprovalModal';
-import { RejectionModal } from '../dag-execution/RejectionModal';
+import { InlineLogViewer } from '../common/InlineLogViewer';
+import { StepReviewModal } from '../dag-execution/StepReviewModal';
 import StatusUpdateModal from '../dag-execution/StatusUpdateModal';
 import { SubDAGRunsList } from './SubDAGRunsList';
 
@@ -85,130 +84,6 @@ const formatTimestamp = (timestamp: string | undefined) => {
     return timestamp;
   }
 };
-
-/**
- * ANSI color codes regex for stripping
- */
-const ANSI_CODES_REGEX = [
-  '[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|[a-zA-Z\\d]+(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)',
-  '(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-nq-uy=><~]))',
-].join('|');
-
-/**
- * Simple inline log viewer - no controls, just logs
- */
-function InlineLogViewer({
-  dagName,
-  dagRunId,
-  stepName,
-  stream,
-  dagRun,
-}: {
-  dagName: string;
-  dagRunId: string;
-  stepName: string;
-  stream: components['schemas']['Stream'];
-  dagRun?: components['schemas']['DAGRunDetails'];
-}) {
-  const appBarContext = useContext(AppBarContext);
-  const remoteNode = appBarContext.selectedRemoteNode || 'local';
-
-  // Determine if this is a sub DAG run - check both rootDAGRunId AND rootDAGRunName
-  const isSubDAGRun =
-    dagRun &&
-    dagRun.rootDAGRunId &&
-    dagRun.rootDAGRunName &&
-    dagRun.rootDAGRunId !== dagRun.dagRunId;
-
-  // Fetch sub-DAG-run step log (only when isSubDAGRun is true)
-  const subDAGQuery = useQuery(
-    '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log',
-    {
-      params: {
-        query: {
-          remoteNode,
-          stream,
-          tail: 100,
-        },
-        path: {
-          name: dagRun?.rootDAGRunName as string,
-          dagRunId: dagRun?.rootDAGRunId as string,
-          subDAGRunId: dagRun?.dagRunId as string,
-          stepName,
-        },
-      },
-    },
-    {
-      refreshInterval: 2000,
-      revalidateOnFocus: false,
-      isPaused: () => !isSubDAGRun,
-    }
-  );
-
-  // Fetch regular DAG-run step log (only when isSubDAGRun is false)
-  const dagRunQuery = useQuery(
-    '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log',
-    {
-      params: {
-        query: {
-          remoteNode,
-          stream,
-          tail: 100,
-        },
-        path: {
-          name: dagName,
-          dagRunId,
-          stepName,
-        },
-      },
-    },
-    {
-      refreshInterval: 2000,
-      revalidateOnFocus: false,
-      isPaused: () => !!isSubDAGRun,
-    }
-  );
-
-  // Use the appropriate query based on whether this is a sub-DAG-run
-  const { data, isLoading } = isSubDAGRun ? subDAGQuery : dagRunQuery;
-
-  // Process log content
-  const content =
-    data?.content?.replace(new RegExp(ANSI_CODES_REGEX, 'g'), '') || '';
-  const lines = content ? content.split('\n') : [];
-  const totalLines = data?.totalLines || 0;
-  const lineCount = data?.lineCount || 0;
-
-  return (
-    <div className="bg-muted rounded overflow-hidden border border-border">
-      {isLoading && !data ? (
-        <div className="text-muted-foreground text-xs py-4 px-3">Loading logs...</div>
-      ) : lines.length === 0 ? (
-        <div className="text-muted-foreground text-xs py-4 px-3">
-          &lt;No log output&gt;
-        </div>
-      ) : (
-        <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-          <pre className="font-mono text-xs text-foreground p-2">
-            {lines.map((line, index) => {
-              const lineNumber = totalLines - lineCount + index + 1;
-              return (
-                <div key={index} className="flex px-1 py-0.5">
-                  <span className="text-muted-foreground mr-3 select-none w-12 text-right flex-shrink-0">
-                    {lineNumber}
-                  </span>
-                  <span className="whitespace-pre-wrap break-all flex-grow">
-                    {line || ' '}
-                  </span>
-                </div>
-              );
-            })}
-          </pre>
-        </div>
-      )}
-    </div>
-  );
-}
 
 /**
  * Calculate duration between two timestamps
@@ -279,10 +154,8 @@ function NodeStatusTableRow({
   );
   // State for status update modal
   const [showStatusModal, setShowStatusModal] = useState(false);
-  // State for approval modal
-  const [showApprovalModal, setShowApprovalModal] = useState(false);
-  // State for rejection modal
-  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  // State for review modal
+  const [showReviewModal, setShowReviewModal] = useState(false);
   // Check if this is a sub dagRun node
   // Include both regular and repeated sub runs
   const allSubRuns = [...(node.subRuns || []), ...(node.subRunsRepeated || [])];
@@ -328,6 +201,8 @@ function NodeStatusTableRow({
         return 'bg-success-muted';
       case NodeStatus.Failed:
         return 'bg-error-muted';
+      case NodeStatus.Waiting:
+        return 'bg-warning/5';
       default:
         return '';
     }
@@ -942,32 +817,19 @@ function NodeStatusTableRow({
           {dagRunId && (
             <TableCell className="text-center">
               <div className="flex items-center justify-center gap-1">
-                {/* Approve button for waiting steps */}
+                {/* Review button for waiting steps */}
                 {node.status === NodeStatus.Waiting && (
-                  <>
-                    <Button
-                      size="icon-sm"
-                      className="btn-3d-secondary bg-warning/10 hover:bg-warning/20"
-                      title="Approve this step"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowApprovalModal(true);
-                      }}
-                    >
-                      <Check className="h-4 w-4 text-warning" />
-                    </Button>
-                    <Button
-                      size="icon-sm"
-                      className="btn-3d-secondary bg-error/10 hover:bg-error/20"
-                      title="Reject this step"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowRejectionModal(true);
-                      }}
-                    >
-                      <Ban className="h-4 w-4 text-error" />
-                    </Button>
-                  </>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowReviewModal(true);
+                    }}
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    Review
+                  </Button>
                 )}
                 {/* Retry button - hidden for Waiting and Rejected steps */}
                 {node.status !== NodeStatus.Waiting &&
@@ -1107,21 +969,17 @@ function NodeStatusTableRow({
           onSubmit={handleStatusUpdate}
         />
 
-        {/* Approval Modal for wait steps */}
-        <ApprovalModal
-          visible={showApprovalModal}
-          dismissModal={() => setShowApprovalModal(false)}
+        {/* Step Review Modal */}
+        <StepReviewModal
+          visible={showReviewModal}
+          dismissModal={() => setShowReviewModal(false)}
           step={node.step}
           node={node}
+          dagName={dagRun?.name || name}
+          dagRunId={dagRunId || ''}
+          dagRun={dagRun}
           onApprove={handleApprove}
           onPushBack={node.step.approval ? handlePushBack : undefined}
-        />
-
-        {/* Rejection Modal for wait steps */}
-        <RejectionModal
-          visible={showRejectionModal}
-          dismissModal={() => setShowRejectionModal(false)}
-          step={node.step}
           onReject={handleReject}
         />
       </>
@@ -1398,24 +1256,15 @@ function NodeStatusTableRow({
 
       {dagRunId && (
         <div className="flex justify-end mt-4 gap-2">
-          {/* Approve and Reject buttons for waiting steps */}
+          {/* Review button for waiting steps */}
           {node.status === NodeStatus.Waiting && (
-            <>
-              <button
-                className="p-2 rounded-full hover:bg-warning/20 bg-warning/10"
-                title="Approve this step"
-                onClick={() => setShowApprovalModal(true)}
-              >
-                <Check className="h-6 w-6 text-warning" />
-              </button>
-              <button
-                className="p-2 rounded-full hover:bg-error/20 bg-error/10"
-                title="Reject this step"
-                onClick={() => setShowRejectionModal(true)}
-              >
-                <Ban className="h-6 w-6 text-error" />
-              </button>
-            </>
+            <button
+              className="w-full py-2 px-4 rounded-lg bg-primary text-primary-foreground font-medium text-sm flex items-center justify-center gap-2"
+              onClick={() => setShowReviewModal(true)}
+            >
+              <Check className="h-5 w-5" />
+              Review Required
+            </button>
           )}
           {/* Retry button - hidden for Waiting and Rejected steps */}
           {node.status !== NodeStatus.Waiting &&
@@ -1459,19 +1308,17 @@ function NodeStatusTableRow({
             </DialogContent>
           </Dialog>
 
-          {/* Approval Modal for wait steps */}
-          <ApprovalModal
-            visible={showApprovalModal}
-            dismissModal={() => setShowApprovalModal(false)}
+          {/* Step Review Modal */}
+          <StepReviewModal
+            visible={showReviewModal}
+            dismissModal={() => setShowReviewModal(false)}
             step={node.step}
+            node={node}
+            dagName={dagRun?.name || name}
+            dagRunId={dagRunId || ''}
+            dagRun={dagRun}
             onApprove={handleApprove}
-          />
-
-          {/* Rejection Modal for wait steps */}
-          <RejectionModal
-            visible={showRejectionModal}
-            dismissModal={() => setShowRejectionModal(false)}
-            step={node.step}
+            onPushBack={node.step.approval ? handlePushBack : undefined}
             onReject={handleReject}
           />
         </div>
