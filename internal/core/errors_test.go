@@ -353,6 +353,7 @@ func TestErrorConstants(t *testing.T) {
 		{"ErrStepNameRequired", ErrStepNameRequired},
 		{"ErrStepNameDuplicate", ErrStepNameDuplicate},
 		{"ErrStepNameTooLong", ErrStepNameTooLong},
+		{"ErrStepIDTooLong", ErrStepIDTooLong},
 		{"ErrStepCommandIsRequired", ErrStepCommandIsRequired},
 		{"ErrStepCommandIsEmpty", ErrStepCommandIsEmpty},
 		{"ErrStepCommandMustBeArrayOrString", ErrStepCommandMustBeArrayOrString},
