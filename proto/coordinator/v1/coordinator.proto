@@ -80,6 +80,8 @@ message Task {
   string attempt_key = 15;
   // Additional tags (comma-separated key=value or key-only) to apply to the DAG run.
   string tags = 16;
+  // Base config YAML content for workers (avoids relying on local base config files).
+  string base_config = 17;
 }
 
 enum Operation {

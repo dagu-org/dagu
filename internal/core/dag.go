@@ -185,6 +185,10 @@ type DAG struct {
 	LocalDAGs map[string]*DAG `json:"localDAGs,omitempty"`
 	// YamlData contains the raw YAML data of the DAG.
 	YamlData []byte `json:"yamlData,omitempty"`
+	// BaseConfigData contains the raw base config YAML content.
+	// This is used to propagate base config through distributed execution
+	// and sub-DAG chains, so workers don't need local base config files.
+	BaseConfigData []byte `json:"baseConfigData,omitempty"`
 	// Container contains the container definition for the DAG.
 	Container *Container `json:"container,omitempty"`
 	// RunConfig contains configuration for controlling user interactions during DAG runs.

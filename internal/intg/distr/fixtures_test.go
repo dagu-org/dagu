@@ -29,11 +29,13 @@ const (
 )
 
 type fixtureConfig struct {
-	workerMode     workerMode
-	workerCount    int
-	workerLabels   map[string]string
-	logPersistence bool
-	dagsDir        string
+	workerMode          workerMode
+	workerCount         int
+	workerLabels        map[string]string
+	logPersistence      bool
+	dagsDir             string
+	baseConfigPath      string
+	workerBaseConfigPath string // Override worker's base config path (for testing embedded base config)
 }
 
 type fixtureOption func(*fixtureConfig)
@@ -56,6 +58,14 @@ func withLogPersistence() fixtureOption {
 
 func withDAGsDir(dir string) fixtureOption {
 	return func(c *fixtureConfig) { c.dagsDir = dir }
+}
+
+func withBaseConfigPath(path string) fixtureOption {
+	return func(c *fixtureConfig) { c.baseConfigPath = path }
+}
+
+func withWorkerBaseConfigPath(path string) fixtureOption {
+	return func(c *fixtureConfig) { c.workerBaseConfigPath = path }
 }
 
 type testFixture struct {
@@ -92,6 +102,11 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 	if cfg.dagsDir != "" {
 		coordOpts = append(coordOpts, test.WithDAGsDir(cfg.dagsDir))
 	}
+	if cfg.baseConfigPath != "" {
+		coordOpts = append(coordOpts, test.WithConfigMutator(func(c *config.Config) {
+			c.Paths.BaseConfig = cfg.baseConfigPath
+		}))
+	}
 
 	coord := test.SetupCoordinator(t, coordOpts...)
 	coord.Config.Queues.Enabled = true
@@ -107,7 +122,7 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 		var w *worker.Worker
 		switch cfg.workerMode {
 		case sharedNothingMode:
-			w = f.setupSharedNothingWorker(workerID, cfg.workerLabels)
+			w = f.setupSharedNothingWorker(workerID, cfg.workerLabels, cfg.workerBaseConfigPath)
 		case sharedFSMode:
 			w = f.setupSharedFSWorker(workerID, cfg.workerLabels)
 		}
@@ -119,8 +134,19 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 	return f
 }
 
-func (f *testFixture) setupSharedNothingWorker(workerID string, labels map[string]string) *worker.Worker {
+func (f *testFixture) setupSharedNothingWorker(workerID string, labels map[string]string, workerBaseConfigPath string) *worker.Worker {
 	f.t.Helper()
+
+	workerConfig := f.coord.Config
+	if workerBaseConfigPath != "" {
+		// Create a copy of the config with a different base config path for the worker.
+		// This simulates workers that don't have local access to the base config file.
+		cfgCopy := *workerConfig
+		pathsCopy := cfgCopy.Paths
+		pathsCopy.BaseConfig = workerBaseConfigPath
+		cfgCopy.Paths = pathsCopy
+		workerConfig = &cfgCopy
+	}
 
 	handlerCfg := worker.RemoteTaskHandlerConfig{
 		WorkerID:          workerID,
@@ -130,7 +156,7 @@ func (f *testFixture) setupSharedNothingWorker(workerID string, labels map[strin
 		DAGRunMgr:         f.coord.DAGRunMgr,
 		ServiceRegistry:   f.coord.ServiceRegistry,
 		PeerConfig:        f.coord.Config.Core.Peer,
-		Config:            f.coord.Config,
+		Config:            workerConfig,
 	}
 
 	w := worker.NewWorker(workerID, 10, f.coordinatorClient, labels, f.coord.Config)

@@ -178,6 +178,12 @@ func (e *SubDAGExecutor) BuildCoordinatorTask(ctx context.Context, runParams Run
 		return nil, errRootDAGRunNotSet
 	}
 
+	// Determine base config to propagate: prefer sub-DAG's own, fall back to parent's
+	baseConfig := string(e.DAG.BaseConfigData)
+	if baseConfig == "" && rCtx.DAG != nil {
+		baseConfig = string(rCtx.DAG.BaseConfigData)
+	}
+
 	// Build task for coordinator dispatch using DAG.CreateTask
 	task := CreateTask(
 		e.DAG.Name,
@@ -191,6 +197,7 @@ func (e *SubDAGExecutor) BuildCoordinatorTask(ctx context.Context, runParams Run
 		}),
 		WithTaskParams(runParams.Params),
 		WithWorkerSelector(e.DAG.WorkerSelector),
+		WithBaseConfig(baseConfig),
 	)
 
 	taskCtx := logger.WithValues(ctx,

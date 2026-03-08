@@ -51,6 +51,7 @@ type DAGExecutor struct {
 	coordinatorCli  exec.Dispatcher
 	subCmdBuilder   *runtime.SubCmdBuilder
 	defaultExecMode config.ExecutionMode
+	baseConfigPath  string
 }
 
 // NewDAGExecutor creates a new DAGExecutor instance.
@@ -58,11 +59,13 @@ func NewDAGExecutor(
 	coordinatorCli exec.Dispatcher,
 	subCmdBuilder *runtime.SubCmdBuilder,
 	defaultExecMode config.ExecutionMode,
+	baseConfigPath string,
 ) *DAGExecutor {
 	return &DAGExecutor{
 		coordinatorCli:  coordinatorCli,
 		subCmdBuilder:   subCmdBuilder,
 		defaultExecMode: defaultExecMode,
+		baseConfigPath:  baseConfigPath,
 	}
 }
 
@@ -129,6 +132,10 @@ func (e *DAGExecutor) ExecuteDAG(
 ) error {
 	if e.shouldUseDistributedExecution(dag) {
 		// Distributed execution: dispatch to coordinator
+		baseConfig := string(dag.BaseConfigData)
+		if baseConfig == "" {
+			baseConfig = executor.ReadBaseConfigContent(e.baseConfigPath)
+		}
 		task := executor.CreateTask(
 			dag.Name,
 			string(dag.YamlData),
@@ -136,6 +143,7 @@ func (e *DAGExecutor) ExecuteDAG(
 			runID,
 			executor.WithWorkerSelector(dag.WorkerSelector),
 			executor.WithPreviousStatus(previousStatus),
+			executor.WithBaseConfig(baseConfig),
 		)
 		return e.dispatchToCoordinator(ctx, task)
 	}

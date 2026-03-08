@@ -215,8 +215,15 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 	// 1. Remote handlers always receive DAG definitions from the coordinator
 	// 2. Shared-nothing workers should not access local DAG directories
 	loadOpts := []spec.LoadOption{
-		spec.WithBaseConfig(h.config.Paths.BaseConfig),
 		spec.WithName(task.Target), // Use original DAG name, not temp file path
+	}
+
+	// Use embedded base config from the task if available (distributed mode).
+	// Fall back to local base config path if the task doesn't include one.
+	if task.BaseConfig != "" {
+		loadOpts = append(loadOpts, spec.WithBaseConfigContent([]byte(task.BaseConfig)))
+	} else {
+		loadOpts = append(loadOpts, spec.WithBaseConfig(h.config.Paths.BaseConfig))
 	}
 
 	// Pass task params to the DAG (e.g., from parallel execution items)
@@ -228,6 +235,11 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 	if err != nil {
 		cleanupFunc()
 		return nil, nil, fmt.Errorf("failed to load DAG from %s: %w", tempFile, err)
+	}
+
+	// Preserve base config data for sub-DAG propagation
+	if task.BaseConfig != "" {
+		dag.BaseConfigData = []byte(task.BaseConfig)
 	}
 
 	return dag, cleanupFunc, nil

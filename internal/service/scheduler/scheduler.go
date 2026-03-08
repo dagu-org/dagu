@@ -71,7 +71,7 @@ func New(
 	lockDir := filepath.Join(cfg.Paths.DataDir, "scheduler", "locks")
 	dirLock := dirlock.New(lockDir, lockOpts)
 	subCmdBuilder := runtime.NewSubCmdBuilder(cfg)
-	dagExecutor := NewDAGExecutor(coordinatorCli, subCmdBuilder, cfg.DefaultExecMode)
+	dagExecutor := NewDAGExecutor(coordinatorCli, subCmdBuilder, cfg.DefaultExecMode, cfg.Paths.BaseConfig)
 	healthServer := NewHealthServer(cfg.Scheduler.Port)
 	processor := NewQueueProcessor(
 		queueStore,
