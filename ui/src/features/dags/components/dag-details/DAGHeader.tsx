@@ -1,5 +1,5 @@
-import { Calendar, RefreshCw, Server, Timer } from 'lucide-react';
-import React, { useEffect } from 'react';
+import { Calendar, Check, Copy, RefreshCw, Server, Timer } from 'lucide-react';
+import React, { useCallback, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { components, Status } from '../../../../api/v1/schema';
 import dayjs from '../../../../lib/dayjs';
@@ -11,6 +11,7 @@ interface DAGHeaderProps {
   dag: components['schemas']['DAG'] | components['schemas']['DAGDetails'];
   currentDAGRun?: components['schemas']['DAGRunDetails'];
   fileName: string;
+  filePath?: string;
   refreshFn: () => void;
   formatDuration: (startDate: string, endDate: string) => string;
   navigateToStatusTab?: () => void;
@@ -20,6 +21,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   dag,
   currentDAGRun,
   fileName,
+  filePath,
   refreshFn,
   formatDuration,
   navigateToStatusTab,
@@ -29,6 +31,25 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   const rootDAGRunContext = React.useContext(RootDAGRunContext);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [currentDuration, setCurrentDuration] = React.useState<string>('--');
+  const [copiedPath, setCopiedPath] = React.useState(false);
+
+  const copyFilePath = useCallback(async () => {
+    if (!filePath) return;
+    try {
+      await navigator.clipboard.writeText(filePath);
+      setCopiedPath(true);
+      setTimeout(() => setCopiedPath(false), 2000);
+    } catch {
+      const textArea = document.createElement('textarea');
+      textArea.value = filePath;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopiedPath(true);
+      setTimeout(() => setCopiedPath(false), 2000);
+    }
+  }, [filePath]);
 
   // Use the DAG-run from context if available, otherwise use the prop
   const dagRunToDisplay = rootDAGRunContext.data || currentDAGRun;
@@ -175,9 +196,24 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
             </nav>
           )}
 
-          <h1 className="text-2xl font-bold text-foreground truncate">
-            {dagRunToDisplay?.name || dag.name}
-          </h1>
+          <div className="flex items-center gap-2 min-w-0">
+            <h1 className="text-2xl font-bold text-foreground truncate">
+              {dagRunToDisplay?.name || dag.name}
+            </h1>
+            {filePath && (
+              <button
+                onClick={copyFilePath}
+                className="flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                title={`Copy file path: ${filePath}`}
+              >
+                {copiedPath ? (
+                  <Check className="h-3.5 w-3.5 text-green-500" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Actions - always show for root runs or when no run data */}

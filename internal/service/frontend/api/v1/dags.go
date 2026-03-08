@@ -392,6 +392,7 @@ func (a *API) getDAGDetailsData(ctx context.Context, fileName string) (api.GetDA
 	})
 
 	return api.GetDAGDetails200JSONResponse{
+		FilePath:     ptrOf(dag.Location),
 		Dag:          details,
 		LatestDAGRun: ToDAGRunDetails(dagStatus),
 		Suspended:    a.dagStore.IsSuspended(ctx, fileName),
@@ -512,6 +513,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 
 		dagFiles = append(dagFiles, api.DAGFile{
 			FileName:     item.FileName(),
+			FilePath:     ptrOf(item.Location),
 			LatestDAGRun: toDAGRunSummary(dagStatus),
 			Suspended:    a.dagStore.IsSuspended(ctx, item.FileName()),
 			Dag:          toDAG(item),
@@ -1349,6 +1351,7 @@ func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, err
 		dagStatus, statusErr := a.dagRunMgr.GetLatestStatus(ctx, item)
 		dagFile := api.DAGFile{
 			FileName:     item.FileName(),
+			FilePath:     ptrOf(item.Location),
 			LatestDAGRun: toDAGRunSummary(dagStatus),
 			Suspended:    a.dagStore.IsSuspended(ctx, item.FileName()),
 			Dag:          toDAG(item),

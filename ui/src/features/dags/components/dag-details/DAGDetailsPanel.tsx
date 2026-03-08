@@ -215,6 +215,7 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
             <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 pr-4">
               <DAGDetailsContent
                 fileName={fileName}
+                filePath={data.filePath}
                 dag={data.dag}
                 currentDAGRun={data.latestDAGRun}
                 refreshFn={refreshFn}

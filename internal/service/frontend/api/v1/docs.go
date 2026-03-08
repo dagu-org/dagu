@@ -351,6 +351,9 @@ func toDocResponse(doc *agent.Doc) api.DocResponse {
 		Title:   doc.Title,
 		Content: doc.Content,
 	}
+	if doc.FilePath != "" {
+		resp.FilePath = &doc.FilePath
+	}
 	if t, err := time.Parse(time.RFC3339, doc.CreatedAt); err == nil {
 		resp.CreatedAt = &t
 	}
