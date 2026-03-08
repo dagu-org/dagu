@@ -2287,7 +2287,7 @@ paths:
 
   /dag-runs/{name}/{dagRunId}/steps/{stepName}/approve:
     post:
-      summary: "Approve a waiting step for HITL"
+      summary: "Approve a waiting step"
       description: "Approves a step that is in Waiting status, optionally providing input parameters that will be available as environment variables in subsequent steps"
       operationId: "approveDAGRunStep"
       tags:
@@ -2331,7 +2331,7 @@ paths:
 
   /dag-runs/{name}/{dagRunId}/steps/{stepName}/reject:
     post:
-      summary: "Reject a waiting step for HITL"
+      summary: "Reject a waiting step"
       description: "Rejects a step that is in Waiting status, optionally providing a reason for rejection"
       operationId: "rejectDAGRunStep"
       tags:
@@ -2356,6 +2356,50 @@ paths:
                 $ref: "#/components/schemas/RejectStepResponse"
         "400":
           description: "Step is not in Waiting status"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "DAG-run or step not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/steps/{stepName}/push-back:
+    post:
+      summary: "Push back a waiting step for re-execution with feedback"
+      description: "Pushes back a step that is in Waiting status, providing input parameters that will be injected as environment variables when the step re-executes. The step must have an approval configuration."
+      operationId: "pushBackDAGRunStep"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/StepName"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushBackStepRequest"
+      responses:
+        "200":
+          description: "Step pushed back successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushBackStepResponse"
+        "400":
+          description: "Step is not in Waiting status, missing required inputs, or step does not have approval config"
           content:
             application/json:
               schema:
@@ -2719,7 +2763,7 @@ paths:
 
   /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/approve:
     post:
-      summary: "Approve a waiting step in a sub DAG-run for HITL"
+      summary: "Approve a waiting step in a sub DAG-run"
       description: "Approves a step that is in Waiting status within a sub DAG-run, optionally providing input parameters that will be available as environment variables in subsequent steps"
       operationId: "approveSubDAGRunStep"
       tags:
@@ -2769,7 +2813,7 @@ paths:
 
   /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/reject:
     post:
-      summary: "Reject a waiting step in a sub DAG-run for HITL"
+      summary: "Reject a waiting step in a sub DAG-run"
       description: "Rejects a step that is in Waiting status within a sub DAG-run, optionally providing a reason for rejection"
       operationId: "rejectSubDAGRunStep"
       tags:
@@ -2800,6 +2844,56 @@ paths:
                 $ref: "#/components/schemas/RejectStepResponse"
         "400":
           description: "Step is not in Waiting status"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Sub DAG-run or step not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/push-back:
+    post:
+      summary: "Push back a waiting step in a sub DAG-run for re-execution with feedback"
+      description: "Pushes back a step that is in Waiting status within a sub DAG-run, providing input parameters that will be injected as environment variables when the step re-executes. The step must have an approval configuration."
+      operationId: "pushBackSubDAGRunStep"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run containing the step to push back"
+        - $ref: "#/components/parameters/StepName"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushBackStepRequest"
+      responses:
+        "200":
+          description: "Step pushed back successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushBackStepResponse"
+        "400":
+          description: "Step is not in Waiting status, missing required inputs, or step does not have approval config"
           content:
             application/json:
               schema:
@@ -6540,6 +6634,59 @@ components:
         - dagRunId
         - stepName
 
+    PushBackStepRequest:
+      type: object
+      description: "Request body for pushing back a waiting step for re-execution with feedback"
+      properties:
+        inputs:
+          type: object
+          additionalProperties:
+            type: string
+          description: "Key-value parameters to provide as feedback. These will be injected as environment variables when the step re-executes."
+
+    PushBackStepResponse:
+      type: object
+      description: "Response after pushing back a waiting step"
+      properties:
+        dagRunId:
+          type: string
+          description: "The DAG run ID"
+        stepName:
+          type: string
+          description: "The pushed-back step name"
+        approvalIteration:
+          type: integer
+          description: "The current approval iteration count after push-back"
+        resumed:
+          type: boolean
+          description: "Whether the DAG run was re-enqueued for execution"
+        subDAGRunId:
+          type: string
+          description: "The sub-DAG run ID, present only for sub-DAG push-back operations"
+      required:
+        - dagRunId
+        - stepName
+        - approvalIteration
+        - resumed
+
+    ApprovalConfig:
+      type: object
+      description: "Configuration for a human approval gate on a step"
+      properties:
+        prompt:
+          type: string
+          description: "Message displayed to the approver"
+        input:
+          type: array
+          items:
+            type: string
+          description: "List of expected input field names from the approver"
+        required:
+          type: array
+          items:
+            type: string
+          description: "Subset of input fields that must be provided"
+
     Error:
       type: object
       description: "Generic error response object"
@@ -7362,24 +7509,32 @@ components:
           description: "Error message if the step failed"
         approvedAt:
           type: string
-          description: "RFC3339 timestamp when the HITL step was approved"
+          description: "RFC3339 timestamp when the step was approved"
         approvedBy:
           type: string
-          description: "Username of who approved the HITL step"
+          description: "Username of who approved the step"
         approvalInputs:
           type: object
           additionalProperties:
             type: string
-          description: "Key-value inputs provided during HITL approval"
+          description: "Key-value inputs provided during approval"
         rejectedAt:
           type: string
-          description: "RFC3339 timestamp when the HITL step was rejected"
+          description: "RFC3339 timestamp when the step was rejected"
         rejectedBy:
           type: string
-          description: "Username of who rejected the HITL step"
+          description: "Username of who rejected the step"
         rejectionReason:
           type: string
           description: "Optional reason for rejection"
+        approvalIteration:
+          type: integer
+          description: "Number of times this step has been pushed back for re-execution"
+        pushBackInputs:
+          type: object
+          additionalProperties:
+            type: string
+          description: "Key-value inputs from the last push-back, injected as environment variables during re-execution"
       required:
         - step
         - stdout
@@ -7549,6 +7704,8 @@ components:
                       type: string
                       minLength: 1
                     description: "Step names to route to"
+        approval:
+          $ref: "#/components/schemas/ApprovalConfig"
       required:
         - name
 

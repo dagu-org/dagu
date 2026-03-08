@@ -106,6 +106,9 @@ type Step struct {
 	// Agent contains the configuration for agent-type steps.
 	// Only used when type is "agent".
 	Agent *AgentStepConfig `json:"agent,omitempty"`
+	// Approval configures a human approval gate after step execution.
+	// When set, the step pauses in Waiting state after execution completes.
+	Approval *ApprovalConfig `json:"approval,omitempty"`
 }
 
 // String returns a formatted string representation of the step
@@ -325,15 +328,24 @@ type ContinueOn struct {
 	MarkSuccess bool     `json:"markSuccess,omitempty"` // MarkSuccess is the flag to mark the step as success when the condition is met.
 }
 
+// ApprovalConfig configures the approval gate for a step.
+// When a step has an ApprovalConfig, it pauses in Waiting state after execution
+// completes, allowing a human to approve, push back (re-run with feedback), or reject.
+type ApprovalConfig struct {
+	// Prompt is the message displayed to the approver.
+	Prompt string `json:"prompt,omitempty"`
+	// Input is the list of expected input field names from the approver.
+	Input []string `json:"input,omitempty"`
+	// Required is the subset of Input fields that must be provided.
+	Required []string `json:"required,omitempty"`
+}
+
 const (
 	// ExecutorTypeDAG is the executor type for a sub DAG.
 	ExecutorTypeDAG = "dag"
 
 	// ExecutorTypeParallel is the executor type for parallel steps.
 	ExecutorTypeParallel = "parallel"
-
-	// ExecutorTypeHITL is the executor type for HITL (Human In The Loop) steps.
-	ExecutorTypeHITL = "hitl"
 
 	// ExecutorTypeRouter is the executor type for router steps.
 	ExecutorTypeRouter = "router"
@@ -359,7 +371,7 @@ type AgentStepConfig struct {
 	Prompt string `json:"prompt,omitempty"`
 	// MaxIterations is the maximum number of tool call rounds (default: 50).
 	MaxIterations int `json:"maxIterations,omitempty"`
-	// SafeMode enables command approval via HITL (default: true).
+	// SafeMode enables command approval via human review (default: true).
 	SafeMode bool `json:"safeMode"`
 	// WebSearch configures provider-native web search for this step.
 	// Overrides the global agent web search setting.
@@ -378,7 +390,7 @@ type AgentToolsConfig struct {
 type AgentBashPolicy struct {
 	// DefaultBehavior is the default action when no rule matches ("allow" or "deny").
 	DefaultBehavior string `json:"defaultBehavior,omitempty"`
-	// DenyBehavior determines what happens when a command is denied ("block" or "hitl").
+	// DenyBehavior determines what happens when a command is denied ("block" or "ask_user").
 	DenyBehavior string `json:"denyBehavior,omitempty"`
 	// Rules is an ordered list of pattern-matching rules.
 	Rules []AgentBashRule `json:"rules,omitempty"`

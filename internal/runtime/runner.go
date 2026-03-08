@@ -429,8 +429,27 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 
 	ctx = node.SetupEnv(ctx)
 
+	// Inject push-back inputs as environment variables for re-execution.
+	// Only declared input fields are allowed to prevent arbitrary env overwrite.
+	if approval := node.Step().Approval; approval != nil && len(node.State().PushBackInputs) > 0 {
+		env := GetEnv(ctx)
+		allowed := make(map[string]struct{}, len(approval.Input))
+		for _, key := range approval.Input {
+			allowed[key] = struct{}{}
+		}
+		for k, v := range node.State().PushBackInputs {
+			if _, ok := allowed[k]; !ok {
+				logger.Warn(ctx, "Ignoring unexpected push-back input", slog.String("input", k))
+				continue
+			}
+			env = env.WithEnvVars(k, v)
+		}
+		ctx = WithEnv(ctx, env)
+	}
+
 	// Setup chat messages from dependencies before execution
 	r.setupChatMessages(ctx, node)
+	r.setupPushBackConversation(ctx, node)
 
 ExecRepeat: // repeat execution
 	for !r.isCanceled() {
@@ -466,13 +485,24 @@ ExecRepeat: // repeat execution
 		isRepetitive := node.Step().RepeatPolicy.RepeatMode != ""
 		if !isRepetitive && r.isCanceled() {
 			node.SetStatus(core.NodeAborted)
+		} else if node.Step().Approval != nil {
+			// Step has approval config — enter waiting state for human review.
+			// Push-back is human-controlled, no iteration limit.
+			node.SetStatus(core.NodeWaiting)
 		} else {
 			node.SetStatus(core.NodeSucceeded)
 		}
 	}
 
-	// Save chat messages after successful execution
-	if node.State().Status == core.NodeSucceeded {
+	// For executors that implement NodeStatusDeterminer (e.g. call/dag, parallel),
+	// the status may have been set to NodeSucceeded by the executor.
+	// If the step has an approval config, override to NodeWaiting.
+	if node.State().Status == core.NodeSucceeded && node.Step().Approval != nil {
+		node.SetStatus(core.NodeWaiting)
+	}
+
+	// Save chat messages after execution (including waiting steps for push-back continuity).
+	if node.State().Status == core.NodeSucceeded || node.State().Status == core.NodeWaiting {
 		r.saveChatMessages(ctx, node)
 	}
 
@@ -558,6 +588,43 @@ func (r *Runner) saveChatMessages(ctx context.Context, node *Node) {
 	if err := r.messagesHandler.WriteStepMessages(ctx, node.Step().Name, savedMsgs); err != nil {
 		logger.Warn(ctx, "Failed to write chat messages", tag.Error(err))
 	}
+}
+
+// setupPushBackConversation loads the step's own previous conversation for
+// agent steps being re-executed after push-back. This REPLACES any dependency
+// messages (which are already embedded in the previous conversation from
+// iteration 0). Non-agent steps are unaffected.
+func (r *Runner) setupPushBackConversation(ctx context.Context, node *Node) {
+	if r.messagesHandler == nil {
+		return
+	}
+	step := node.Step()
+	if step.Approval == nil || !core.SupportsAgent(step.ExecutorConfig.Type) {
+		return
+	}
+	if node.State().ApprovalIteration == 0 {
+		return
+	}
+
+	ownMessages, err := r.messagesHandler.ReadStepMessages(ctx, step.Name)
+	if err != nil {
+		logger.Warn(ctx, "Failed to read own messages for push-back",
+			tag.Step(step.Name), tag.Error(err))
+		return
+	}
+	if len(ownMessages) == 0 {
+		return
+	}
+
+	if len(ownMessages) > 200 {
+		logger.Warn(ctx, "Large conversation history after push-back iterations",
+			tag.Step(step.Name), slog.Int("messageCount", len(ownMessages)),
+			slog.Int("iteration", node.State().ApprovalIteration))
+	}
+
+	// REPLACE (not merge) — dependencies are already embedded in the
+	// previous conversation from iteration 0.
+	node.SetChatMessages(ownMessages)
 }
 
 func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) context.Context {

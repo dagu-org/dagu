@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/stretchr/testify/assert"
@@ -177,4 +178,80 @@ func TestConvertMessage_UnknownType(t *testing.T) {
 
 	result := convertMessage(msg, testModelConfig())
 	assert.Nil(t, result)
+}
+
+func TestFormatPushBackFeedback_WithInputs(t *testing.T) {
+	t.Parallel()
+
+	inputs := map[string]string{
+		"REASON": "needs more error handling",
+		"NOTES":  "also add logging",
+	}
+	approval := &core.ApprovalConfig{
+		Input: []string{"REASON", "NOTES"},
+	}
+
+	result := formatPushBackFeedback(inputs, approval)
+
+	assert.Contains(t, result, "requested changes")
+	assert.Contains(t, result, "- NOTES: also add logging")
+	assert.Contains(t, result, "- REASON: needs more error handling")
+	assert.Contains(t, result, "revise your response")
+}
+
+func TestFormatPushBackFeedback_EmptyInputs(t *testing.T) {
+	t.Parallel()
+
+	result := formatPushBackFeedback(nil, &core.ApprovalConfig{})
+
+	assert.Contains(t, result, "requested changes")
+	assert.Contains(t, result, "revise your response")
+	assert.NotContains(t, result, "Reviewer feedback")
+}
+
+func TestFormatPushBackFeedback_FiltersUndeclaredKeys(t *testing.T) {
+	t.Parallel()
+
+	inputs := map[string]string{
+		"REASON":    "fix it",
+		"MALICIOUS": "should not appear",
+	}
+	approval := &core.ApprovalConfig{
+		Input: []string{"REASON"},
+	}
+
+	result := formatPushBackFeedback(inputs, approval)
+
+	assert.Contains(t, result, "- REASON: fix it")
+	assert.NotContains(t, result, "MALICIOUS")
+}
+
+func TestFormatPushBackFeedback_NilApproval(t *testing.T) {
+	t.Parallel()
+
+	inputs := map[string]string{"KEY": "value"}
+
+	result := formatPushBackFeedback(inputs, nil)
+
+	assert.Contains(t, result, "requested changes")
+	assert.NotContains(t, result, "KEY")
+}
+
+func TestFormatPushBackFeedback_DeterministicOrder(t *testing.T) {
+	t.Parallel()
+
+	inputs := map[string]string{
+		"ZZZ": "last",
+		"AAA": "first",
+		"MMM": "middle",
+	}
+	approval := &core.ApprovalConfig{
+		Input: []string{"ZZZ", "AAA", "MMM"},
+	}
+
+	// Run multiple times to verify deterministic ordering.
+	for range 10 {
+		result := formatPushBackFeedback(inputs, approval)
+		assert.Contains(t, result, "- AAA: first\n- MMM: middle\n- ZZZ: last")
+	}
 }

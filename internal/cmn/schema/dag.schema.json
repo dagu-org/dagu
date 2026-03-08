@@ -1335,14 +1335,6 @@
           }
         },
         {
-          "if": { "properties": { "type": { "const": "hitl" } } },
-          "then": {
-            "properties": {
-              "config": { "$ref": "#/definitions/hitlExecutorConfig" }
-            }
-          }
-        },
-        {
           "if": { "properties": { "type": { "const": "redis" } } },
           "then": {
             "properties": {
@@ -2882,27 +2874,6 @@
       ],
       "description": "Redis executor configuration for executing Redis commands, managing cache, pub/sub, streams, and distributed locks."
     },
-    "hitlExecutorConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "prompt": {
-          "type": "string",
-          "description": "Message displayed to the approver explaining what approval is needed."
-        },
-        "input": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "List of input field names expected from the approver."
-        },
-        "required": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Subset of input fields that must be provided. All values must exist in 'input' array."
-        }
-      },
-      "description": "Human-in-the-loop executor configuration. Pauses workflow execution until human approval is received."
-    },
     "llmProvider": {
       "type": "string",
       "enum": [
@@ -3109,7 +3080,7 @@
         "safe_mode": {
           "type": "boolean",
           "default": true,
-          "description": "Enable command approval via HITL for bash commands. Default: true."
+          "description": "Enable command approval via human review for bash commands. Default: true."
         },
         "skills": {
           "type": "array",
@@ -3158,8 +3129,8 @@
         },
         "deny_behavior": {
           "type": "string",
-          "enum": ["block", "hitl"],
-          "description": "What happens when a command is denied: 'block' rejects it, 'hitl' asks for approval."
+          "enum": ["block", "ask_user"],
+          "description": "What happens when a command is denied: 'block' rejects it, 'ask_user' asks for approval."
         },
         "rules": {
           "type": "array",
@@ -3212,7 +3183,6 @@
         "parallel",
         "archive",
         "chat",
-        "hitl",
         "postgres",
         "sqlite",
         "redis",
@@ -3313,14 +3283,6 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/sqliteExecutorConfig" }
-            }
-          }
-        },
-        {
-          "if": { "properties": { "type": { "const": "hitl" } } },
-          "then": {
-            "properties": {
-              "config": { "$ref": "#/definitions/hitlExecutorConfig" }
             }
           }
         },

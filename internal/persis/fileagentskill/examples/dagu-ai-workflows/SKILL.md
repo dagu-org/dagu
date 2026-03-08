@@ -206,7 +206,7 @@ steps:
           # bash, patch excluded = read-only agent
         bash_policy:
           default_behavior: deny
-          deny_behavior: block      # or "hitl" for human approval
+          deny_behavior: block      # or "ask_user" for human approval
           rules:
             - name: allow-ls
               pattern: "^ls "

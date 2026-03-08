@@ -14,7 +14,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { useClient, useQuery } from '@/hooks/api';
+import { useClient } from '@/hooks/api';
 import { getExecutorCommand } from '@/lib/executor-utils';
 import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
@@ -27,8 +27,6 @@ import {
 } from '@/ui/CustomDialog';
 import {
   AlertCircle,
-  Ban,
-  Check,
   ChevronDown,
   ChevronRight,
   Code,
@@ -47,8 +45,7 @@ import {
 } from '../../../../api/v1/schema';
 import StyledTableRow from '../../../../ui/StyledTableRow';
 import { NodeStatusChip } from '../common';
-import { ApprovalModal } from '../dag-execution/ApprovalModal';
-import { RejectionModal } from '../dag-execution/RejectionModal';
+import { InlineLogViewer } from '../common/InlineLogViewer';
 import StatusUpdateModal from '../dag-execution/StatusUpdateModal';
 import { SubDAGRunsList } from './SubDAGRunsList';
 
@@ -85,130 +82,6 @@ const formatTimestamp = (timestamp: string | undefined) => {
     return timestamp;
   }
 };
-
-/**
- * ANSI color codes regex for stripping
- */
-const ANSI_CODES_REGEX = [
-  '[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|[a-zA-Z\\d]+(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)',
-  '(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-nq-uy=><~]))',
-].join('|');
-
-/**
- * Simple inline log viewer - no controls, just logs
- */
-function InlineLogViewer({
-  dagName,
-  dagRunId,
-  stepName,
-  stream,
-  dagRun,
-}: {
-  dagName: string;
-  dagRunId: string;
-  stepName: string;
-  stream: components['schemas']['Stream'];
-  dagRun?: components['schemas']['DAGRunDetails'];
-}) {
-  const appBarContext = useContext(AppBarContext);
-  const remoteNode = appBarContext.selectedRemoteNode || 'local';
-
-  // Determine if this is a sub DAG run - check both rootDAGRunId AND rootDAGRunName
-  const isSubDAGRun =
-    dagRun &&
-    dagRun.rootDAGRunId &&
-    dagRun.rootDAGRunName &&
-    dagRun.rootDAGRunId !== dagRun.dagRunId;
-
-  // Fetch sub-DAG-run step log (only when isSubDAGRun is true)
-  const subDAGQuery = useQuery(
-    '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log',
-    {
-      params: {
-        query: {
-          remoteNode,
-          stream,
-          tail: 100,
-        },
-        path: {
-          name: dagRun?.rootDAGRunName as string,
-          dagRunId: dagRun?.rootDAGRunId as string,
-          subDAGRunId: dagRun?.dagRunId as string,
-          stepName,
-        },
-      },
-    },
-    {
-      refreshInterval: 2000,
-      revalidateOnFocus: false,
-      isPaused: () => !isSubDAGRun,
-    }
-  );
-
-  // Fetch regular DAG-run step log (only when isSubDAGRun is false)
-  const dagRunQuery = useQuery(
-    '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log',
-    {
-      params: {
-        query: {
-          remoteNode,
-          stream,
-          tail: 100,
-        },
-        path: {
-          name: dagName,
-          dagRunId,
-          stepName,
-        },
-      },
-    },
-    {
-      refreshInterval: 2000,
-      revalidateOnFocus: false,
-      isPaused: () => !!isSubDAGRun,
-    }
-  );
-
-  // Use the appropriate query based on whether this is a sub-DAG-run
-  const { data, isLoading } = isSubDAGRun ? subDAGQuery : dagRunQuery;
-
-  // Process log content
-  const content =
-    data?.content?.replace(new RegExp(ANSI_CODES_REGEX, 'g'), '') || '';
-  const lines = content ? content.split('\n') : [];
-  const totalLines = data?.totalLines || 0;
-  const lineCount = data?.lineCount || 0;
-
-  return (
-    <div className="bg-muted rounded overflow-hidden border border-border">
-      {isLoading && !data ? (
-        <div className="text-muted-foreground text-xs py-4 px-3">Loading logs...</div>
-      ) : lines.length === 0 ? (
-        <div className="text-muted-foreground text-xs py-4 px-3">
-          &lt;No log output&gt;
-        </div>
-      ) : (
-        <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-          <pre className="font-mono text-xs text-foreground p-2">
-            {lines.map((line, index) => {
-              const lineNumber = totalLines - lineCount + index + 1;
-              return (
-                <div key={index} className="flex px-1 py-0.5">
-                  <span className="text-muted-foreground mr-3 select-none w-12 text-right flex-shrink-0">
-                    {lineNumber}
-                  </span>
-                  <span className="whitespace-pre-wrap break-all flex-grow">
-                    {line || ' '}
-                  </span>
-                </div>
-              );
-            })}
-          </pre>
-        </div>
-      )}
-    </div>
-  );
-}
 
 /**
  * Calculate duration between two timestamps
@@ -279,10 +152,6 @@ function NodeStatusTableRow({
   );
   // State for status update modal
   const [showStatusModal, setShowStatusModal] = useState(false);
-  // State for approval modal
-  const [showApprovalModal, setShowApprovalModal] = useState(false);
-  // State for rejection modal
-  const [showRejectionModal, setShowRejectionModal] = useState(false);
   // Check if this is a sub dagRun node
   // Include both regular and repeated sub runs
   const allSubRuns = [...(node.subRuns || []), ...(node.subRunsRepeated || [])];
@@ -328,6 +197,8 @@ function NodeStatusTableRow({
         return 'bg-success-muted';
       case NodeStatus.Failed:
         return 'bg-error-muted';
+      case NodeStatus.Waiting:
+        return 'bg-warning/5';
       default:
         return '';
     }
@@ -489,82 +360,6 @@ function NodeStatusTableRow({
     }
 
     setShowStatusModal(false);
-  };
-
-  // Handle approval for wait steps
-  const handleApprove = async (inputs: Record<string, string>) => {
-    // Check if this is a sub DAG-run
-    const isSubDAGRun =
-      dagRun.rootDAGRunId &&
-      dagRun.rootDAGRunName &&
-      dagRun.rootDAGRunId !== dagRun.dagRunId;
-
-    // Define path parameters
-    const pathParams = {
-      name: isSubDAGRun ? dagRun.rootDAGRunName : dagName,
-      dagRunId: isSubDAGRun ? dagRun.rootDAGRunId : dagRunId || '',
-      stepName: node.step.name,
-      ...(isSubDAGRun ? { subDAGRunId: dagRun.dagRunId } : {}),
-    };
-
-    // Use the appropriate endpoint
-    const endpoint = isSubDAGRun
-      ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/approve'
-      : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/approve';
-
-    const { error } = await client.POST(endpoint, {
-      params: {
-        path: pathParams,
-        query: {
-          remoteNode,
-        },
-      },
-      body: {
-        inputs: Object.keys(inputs).length > 0 ? inputs : undefined,
-      },
-    });
-
-    if (error) {
-      throw new Error(error.message || 'Failed to approve step');
-    }
-  };
-
-  // Handle rejection for wait steps
-  const handleReject = async (reason: string) => {
-    // Check if this is a sub DAG-run
-    const isSubDAGRun =
-      dagRun.rootDAGRunId &&
-      dagRun.rootDAGRunName &&
-      dagRun.rootDAGRunId !== dagRun.dagRunId;
-
-    // Define path parameters
-    const pathParams = {
-      name: isSubDAGRun ? dagRun.rootDAGRunName : dagName,
-      dagRunId: isSubDAGRun ? dagRun.rootDAGRunId : dagRunId || '',
-      stepName: node.step.name,
-      ...(isSubDAGRun ? { subDAGRunId: dagRun.dagRunId } : {}),
-    };
-
-    // Use the appropriate endpoint
-    const endpoint = isSubDAGRun
-      ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/reject'
-      : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/reject';
-
-    const { error } = await client.POST(endpoint, {
-      params: {
-        path: pathParams,
-        query: {
-          remoteNode,
-        },
-      },
-      body: {
-        reason: reason || undefined,
-      },
-    });
-
-    if (error) {
-      throw new Error(error.message || 'Failed to reject step');
-    }
   };
 
   // Determine if logs are available
@@ -768,7 +563,7 @@ function NodeStatusTableRow({
                   {currentDuration}
                 </div>
               )}
-              {/* Approval info for HITL steps */}
+              {/* Approval info */}
               {node.approvedBy && (
                 <div className="text-xs text-muted-foreground leading-tight">
                   <span className="font-medium">Approved by:</span>{' '}
@@ -789,7 +584,7 @@ function NodeStatusTableRow({
                     </span>
                   </div>
                 )}
-              {/* Rejection info for rejected HITL steps */}
+              {/* Rejection info */}
               {node.rejectedBy && (
                 <div className="text-xs text-muted-foreground leading-tight">
                   <span className="font-medium">Rejected by:</span>{' '}
@@ -907,33 +702,6 @@ function NodeStatusTableRow({
           {dagRunId && (
             <TableCell className="text-center">
               <div className="flex items-center justify-center gap-1">
-                {/* Approve button for waiting steps */}
-                {node.status === NodeStatus.Waiting && (
-                  <>
-                    <Button
-                      size="icon-sm"
-                      className="btn-3d-secondary bg-warning/10 hover:bg-warning/20"
-                      title="Approve this step"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowApprovalModal(true);
-                      }}
-                    >
-                      <Check className="h-4 w-4 text-warning" />
-                    </Button>
-                    <Button
-                      size="icon-sm"
-                      className="btn-3d-secondary bg-error/10 hover:bg-error/20"
-                      title="Reject this step"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowRejectionModal(true);
-                      }}
-                    >
-                      <Ban className="h-4 w-4 text-error" />
-                    </Button>
-                  </>
-                )}
                 {/* Retry button - hidden for Waiting and Rejected steps */}
                 {node.status !== NodeStatus.Waiting &&
                   node.status !== NodeStatus.Rejected && (
@@ -1072,21 +840,6 @@ function NodeStatusTableRow({
           onSubmit={handleStatusUpdate}
         />
 
-        {/* Approval Modal for wait steps */}
-        <ApprovalModal
-          visible={showApprovalModal}
-          dismissModal={() => setShowApprovalModal(false)}
-          step={node.step}
-          onApprove={handleApprove}
-        />
-
-        {/* Rejection Modal for wait steps */}
-        <RejectionModal
-          visible={showRejectionModal}
-          dismissModal={() => setShowRejectionModal(false)}
-          step={node.step}
-          onReject={handleReject}
-        />
       </>
     );
   }
@@ -1239,7 +992,7 @@ function NodeStatusTableRow({
               {currentDuration}
             </div>
           )}
-          {/* Approval info for HITL steps */}
+          {/* Approval info */}
           {node.approvedBy && (
             <div className="text-xs text-muted-foreground">
               <span className="font-medium">Approved by:</span>{' '}
@@ -1260,7 +1013,7 @@ function NodeStatusTableRow({
                 </span>
               </div>
             )}
-          {/* Rejection info for rejected HITL steps */}
+          {/* Rejection info */}
           {node.rejectedBy && (
             <div className="text-xs text-muted-foreground">
               <span className="font-medium">Rejected by:</span>{' '}
@@ -1361,25 +1114,6 @@ function NodeStatusTableRow({
 
       {dagRunId && (
         <div className="flex justify-end mt-4 gap-2">
-          {/* Approve and Reject buttons for waiting steps */}
-          {node.status === NodeStatus.Waiting && (
-            <>
-              <button
-                className="p-2 rounded-full hover:bg-warning/20 bg-warning/10"
-                title="Approve this step"
-                onClick={() => setShowApprovalModal(true)}
-              >
-                <Check className="h-6 w-6 text-warning" />
-              </button>
-              <button
-                className="p-2 rounded-full hover:bg-error/20 bg-error/10"
-                title="Reject this step"
-                onClick={() => setShowRejectionModal(true)}
-              >
-                <Ban className="h-6 w-6 text-error" />
-              </button>
-            </>
-          )}
           {/* Retry button - hidden for Waiting and Rejected steps */}
           {node.status !== NodeStatus.Waiting &&
             node.status !== NodeStatus.Rejected && (
@@ -1422,21 +1156,6 @@ function NodeStatusTableRow({
             </DialogContent>
           </Dialog>
 
-          {/* Approval Modal for wait steps */}
-          <ApprovalModal
-            visible={showApprovalModal}
-            dismissModal={() => setShowApprovalModal(false)}
-            step={node.step}
-            onApprove={handleApprove}
-          />
-
-          {/* Rejection Modal for wait steps */}
-          <RejectionModal
-            visible={showRejectionModal}
-            dismissModal={() => setShowRejectionModal(false)}
-            step={node.step}
-            onReject={handleReject}
-          />
         </div>
       )}
     </div>

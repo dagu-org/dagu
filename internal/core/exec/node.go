@@ -21,18 +21,23 @@ type Node struct {
 	SubRuns         []SubDAGRun          `json:"children,omitempty"`
 	SubRunsRepeated []SubDAGRun          `json:"childrenRepeated,omitempty"` // repeated sub DAG runs
 	OutputVariables *collections.SyncMap `json:"outputVariables,omitempty"`
-	// ApprovedAt records when this wait step was approved (HITL)
+	// ApprovedAt records when this wait step was approved
 	ApprovedAt string `json:"approvedAt,omitempty"`
 	// ApprovalInputs stores key-value parameters provided during approval
 	ApprovalInputs map[string]string `json:"approvalInputs,omitempty"`
 	// ApprovedBy records who approved this wait step (username)
 	ApprovedBy string `json:"approvedBy,omitempty"`
-	// RejectedAt records when this wait step was rejected (HITL)
+	// RejectedAt records when this wait step was rejected
 	RejectedAt string `json:"rejectedAt,omitempty"`
 	// RejectedBy records who rejected this wait step (username)
 	RejectedBy string `json:"rejectedBy,omitempty"`
 	// RejectionReason stores the optional reason for rejection
 	RejectionReason string `json:"rejectionReason,omitempty"`
+	// ApprovalIteration tracks how many times this step has been pushed back.
+	ApprovalIteration int `json:"approvalIteration,omitempty"`
+	// PushBackInputs stores the inputs from the last push-back.
+	// These are injected as environment variables when the step re-executes.
+	PushBackInputs map[string]string `json:"pushBackInputs,omitempty"`
 	// ChatMessages stores the session messages for chat/LLM steps.
 	// This field is populated during execution and synced via status updates
 	// in shared-nothing mode where workers don't have filesystem access.

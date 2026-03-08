@@ -34,7 +34,7 @@ Dagu is a self-contained, single-binary workflow orchestration engine. Workflows
 - **`core/`** — DAG and step definitions, validation, status types. The DAG spec is rich (~100 fields) supporting schedules, lifecycle hooks, container specs, parameters, and three execution types: `graph`, `chain`, `agent`.
 - **`core/exec/`** — Interfaces for DAG run tracking, queue, and process stores (`DAGRunStore`, `QueueStore`, `ProcStore`, `Dispatcher`).
 - **`runtime/`** — Execution engine. `runner.go` orchestrates parallel execution with dependency resolution. `node.go` manages individual step execution with retry logic. `manager.go` coordinates the overall lifecycle.
-- **`runtime/builtin/`** — 19+ built-in executor implementations: `command`, `docker`, `http`, `ssh`, `jq`, `mail`, `sql`, `redis`, `s3`, `dag` (sub-DAG), `chat` (LLM), `router`, `hitl` (human-in-the-loop), `agentstep`, etc.
+- **`runtime/builtin/`** — 18+ built-in executor implementations: `command`, `docker`, `http`, `ssh`, `jq`, `mail`, `sql`, `redis`, `s3`, `dag` (sub-DAG), `chat` (LLM), `router`, `agentstep`, etc.
 - **`runtime/executor/`** — Executor factory pattern with global registry. Executors implement `Run(ctx) error` with stdout/stderr/kill support.
 - **`persis/`** — File-based persistence layer. Each store type (`filedag`, `filedagrun`, `filequeue`, `fileproc`, `fileuser`, `filesession`, `fileaudit`, etc.) follows the same pattern: file I/O with structured data marshaling.
 - **`service/frontend/`** — HTTP server using Chi router. REST API v1 with 43+ endpoint handlers, SSE for real-time updates, static asset serving. API handlers are in `api/v1/`.

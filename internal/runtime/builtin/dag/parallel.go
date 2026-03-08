@@ -58,9 +58,9 @@ func newParallelExecutor(
 		return nil, err
 	}
 
-	// Validate: sub-DAGs with HITL steps cannot be dispatched to workers
-	if len(step.WorkerSelector) > 0 && child.DAG.HasHITLSteps() {
-		return nil, fmt.Errorf("%w: %s", ErrHITLStepsWithWorker, step.SubDAG.Name)
+	// Validate: sub-DAGs with approval steps cannot be dispatched to workers
+	if len(step.WorkerSelector) > 0 && child.DAG.HasApprovalSteps() {
+		return nil, fmt.Errorf("%w: %s", ErrApprovalStepsWithWorker, step.SubDAG.Name)
 	}
 
 	dir := runtime.GetEnv(ctx).WorkingDir
@@ -224,7 +224,7 @@ func (e *parallelExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 		case core.PartiallySucceeded:
 			partialSuccess = true
 		case core.Waiting:
-			// Sub-DAG is waiting for human approval (HITL)
+			// Sub-DAG is waiting for human approval
 			hasWaiting = true
 		default:
 			return core.NodeFailed, fmt.Errorf("sub DAG run %s is still in progress with status: %s", result.DAGRunID, result.Status)

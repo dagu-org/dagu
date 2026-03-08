@@ -17,9 +17,17 @@ import {
 import dayjs from '@/lib/dayjs';
 import ActionButton from '@/ui/ActionButton';
 import StatusChip from '@/ui/StatusChip';
-import { AlertTriangle, Play, RefreshCw, Square } from 'lucide-react'; // Import lucide icons
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/ui/CustomDialog';
+import { AlertTriangle, Ban, Play, RefreshCw, Square, X } from 'lucide-react';
 import React from 'react';
-import { components } from '../../../../api/v1/schema';
+import { Button } from '@/components/ui/button';
+import { components, NodeStatus } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
@@ -74,6 +82,8 @@ function DAGActions({
   const [isUnsavedChangesModal, setIsUnsavedChangesModal] = React.useState(false);
   const [retryDagRunId, setRetryDagRunId] = React.useState<string>('');
   const [stopAllRunning, setStopAllRunning] = React.useState(false);
+  const [isRejectModal, setIsRejectModal] = React.useState(false);
+  const [rejectReason, setRejectReason] = React.useState('');
 
   // Retry-as-new modal state
   const [retryAsNew, setRetryAsNew] = React.useState(false);
@@ -91,11 +101,15 @@ function DAGActions({
     }
   };
 
+  const isWaiting = status?.status == 7;
+  const hasNodes = status && 'nodes' in status && Array.isArray((status as components['schemas']['DAGRunDetails']).nodes);
+
   // Determine which buttons should be enabled based on current status
   const buttonState = {
-    enqueue: true, // Always allow enqueuing
+    enqueue: true,
     stop: status?.status == 1,
-    retry: status?.status != 1 && status?.status != 5 && status?.dagRunId != '', // Disable when running (1) or queued (5)
+    reject: isWaiting && hasNodes,
+    retry: status?.status != 1 && status?.status != 5 && status?.dagRunId != '',
   };
 
   if (!dag || !config.permissions.runDags) {
@@ -131,23 +145,42 @@ function DAGActions({
           </TooltipContent>
         </Tooltip>
 
-        {/* Stop Button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <ActionButton
-              label={displayMode !== 'compact'}
-              icon={<Square className="h-4 w-4" />}
-              disabled={!buttonState['stop']}
-              onClick={() => setIsStopModal(true)}
-              className="cursor-pointer"
-            >
-              Stop
-            </ActionButton>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Stop DAG execution</p>
-          </TooltipContent>
-        </Tooltip>
+        {/* Stop / Reject Button */}
+        {isWaiting && hasNodes ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <ActionButton
+                label={displayMode !== 'compact'}
+                icon={<Ban className="h-4 w-4" />}
+                disabled={!buttonState['reject']}
+                onClick={() => setIsRejectModal(true)}
+                className="cursor-pointer"
+              >
+                Reject
+              </ActionButton>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Reject all waiting steps</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <ActionButton
+                label={displayMode !== 'compact'}
+                icon={<Square className="h-4 w-4" />}
+                disabled={!buttonState['stop']}
+                onClick={() => setIsStopModal(true)}
+                className="cursor-pointer"
+              >
+                Stop
+              </ActionButton>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Stop DAG execution</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
 
         {/* Retry Button */}
         <Tooltip>
@@ -226,6 +259,64 @@ function DAGActions({
             <p>Retry DAG execution</p>
           </TooltipContent>
         </Tooltip>
+        {/* Reject Modal */}
+        <Dialog open={isRejectModal} onOpenChange={(open) => { if (!open) { setIsRejectModal(false); setRejectReason(''); } }}>
+          <DialogContent className="sm:max-w-[450px]">
+            <DialogHeader>
+              <DialogTitle>Reject DAG Run</DialogTitle>
+            </DialogHeader>
+            <div className="py-2">
+              <textarea
+                className="w-full px-3 py-2 text-sm border border-border rounded bg-background focus:outline-none focus:border-ring resize-none"
+                placeholder="Reason (optional)..."
+                rows={2}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" size="sm" onClick={() => { setIsRejectModal(false); setRejectReason(''); }}>
+                <X className="h-4 w-4" /> Cancel
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={async () => {
+                  setIsRejectModal(false);
+                  const details = status as components['schemas']['DAGRunDetails'];
+                  const waitingNodes = details.nodes.filter(n => n.status === NodeStatus.Waiting);
+                  const errors: string[] = [];
+                  for (const node of waitingNodes) {
+                    const { error } = await client.POST(
+                      '/dag-runs/{name}/{dagRunId}/steps/{stepName}/reject',
+                      {
+                        params: {
+                          path: { name: status!.name, dagRunId: status!.dagRunId, stepName: node.step.name },
+                          query: { remoteNode: appBarContext.selectedRemoteNode || 'local' },
+                        },
+                        body: { reason: rejectReason || undefined },
+                      }
+                    );
+                    if (error) {
+                      errors.push(node.step.name);
+                    }
+                  }
+                  if (errors.length > 0) {
+                    showError(
+                      `Failed to reject ${errors.length} step(s)`,
+                      `Failed to reject: ${errors.join(', ')}`
+                    );
+                  }
+                  setRejectReason('');
+                  reloadData();
+                }}
+              >
+                <Ban className="h-4 w-4" /> Reject
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <ConfirmModal
           title="Confirmation"
           buttonText="Stop"

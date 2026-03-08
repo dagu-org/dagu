@@ -26,6 +26,7 @@ import (
 
 var _ executor.Executor = (*Executor)(nil)
 var _ executor.ChatMessageHandler = (*Executor)(nil)
+var _ executor.PushBackAware = (*Executor)(nil)
 
 func init() {
 	executor.RegisterExecutor(
@@ -38,13 +39,15 @@ func init() {
 
 // Executor runs the agent loop as a workflow step.
 type Executor struct {
-	step            core.Step
-	stdout          io.Writer
-	stderr          io.Writer
-	mu              sync.Mutex
-	cancelLoop      context.CancelFunc
-	contextMessages []exec.LLMMessage
-	savedMessages   []exec.LLMMessage
+	step              core.Step
+	stdout            io.Writer
+	stderr            io.Writer
+	mu                sync.Mutex
+	cancelLoop        context.CancelFunc
+	contextMessages   []exec.LLMMessage
+	savedMessages     []exec.LLMMessage
+	pushBackInputs    map[string]string
+	pushBackIteration int
 }
 
 func newAgentExecutor(_ context.Context, step core.Step) (executor.Executor, error) {
@@ -59,6 +62,12 @@ func (e *Executor) SetContext(msgs []exec.LLMMessage) { e.contextMessages = msgs
 
 // GetMessages returns the collected messages after execution.
 func (e *Executor) GetMessages() []exec.LLMMessage { return e.savedMessages }
+
+// SetPushBackContext provides push-back feedback for iterative re-execution.
+func (e *Executor) SetPushBackContext(inputs map[string]string, iteration int) {
+	e.pushBackInputs = inputs
+	e.pushBackIteration = iteration
+}
 
 func (e *Executor) Kill(_ os.Signal) error {
 	e.mu.Lock()
@@ -170,6 +179,17 @@ func (e *Executor) Run(ctx context.Context) error {
 	// Generate system prompt.
 	systemPrompt := buildSystemPrompt(dagCtx, stepCfg, memoryContent, skillSummaries, skillCount, soul)
 
+	// Enhance system prompt for push-back re-execution.
+	if e.pushBackIteration > 0 {
+		systemPrompt += fmt.Sprintf(
+			"\n\n## Revision Context\n\nThis is a revision (iteration %d). "+
+				"Your previous conversation is included in the history. "+
+				"The reviewer's feedback follows as the next user message. "+
+				"Revise your work accordingly.\n",
+			e.pushBackIteration,
+		)
+	}
+
 	// Resolve safe mode and max iterations.
 	safeMode := true
 	maxIterations := 50
@@ -253,9 +273,19 @@ func (e *Executor) Run(ctx context.Context) error {
 		},
 	})
 
-	// Queue user messages.
-	for _, msg := range userMessages {
-		loop.QueueUserMessage(msg)
+	// Queue messages: either push-back feedback or original YAML messages.
+	if e.pushBackIteration > 0 {
+		// Push-back re-execution: previous conversation is already in history
+		// via contextMessages. Queue only the feedback message.
+		feedback := formatPushBackFeedback(e.pushBackInputs, e.step.Approval)
+		loop.QueueUserMessage(llm.Message{
+			Role:    llm.RoleUser,
+			Content: feedback,
+		})
+	} else {
+		for _, msg := range userMessages {
+			loop.QueueUserMessage(msg)
+		}
 	}
 
 	// Run the loop. It returns context.Canceled when we cancel it (expected).

@@ -70,19 +70,23 @@ type NodeState struct {
 	// ToolDefinitions stores the tool definitions that were available to the LLM during execution.
 	// This provides visibility into what tools/functions the LLM could call.
 	ToolDefinitions []exec.ToolDefinition
-	// ApprovalInputs stores key-value parameters provided during HITL approval.
+	// ApprovalInputs stores key-value parameters provided during approval.
 	// These are available as environment variables in subsequent steps.
 	ApprovalInputs map[string]string
-	// ApprovedAt is the time when the HITL step was approved.
+	// ApprovedAt is the time when the step was approved.
 	ApprovedAt string
-	// ApprovedBy is the username of the user who approved the HITL step.
+	// ApprovedBy is the username of the user who approved the step.
 	ApprovedBy string
-	// RejectedAt is the time when the HITL step was rejected.
+	// RejectedAt is the time when the step was rejected.
 	RejectedAt string
-	// RejectedBy is the username of the user who rejected the HITL step.
+	// RejectedBy is the username of the user who rejected the step.
 	RejectedBy string
 	// RejectionReason stores the optional reason for rejection.
 	RejectionReason string
+	// ApprovalIteration tracks how many times this step has been pushed back.
+	ApprovalIteration int
+	// PushBackInputs stores inputs from the last push-back for env var injection.
+	PushBackInputs map[string]string
 }
 
 // Parallel represents the evaluated parallel execution configuration for a node.

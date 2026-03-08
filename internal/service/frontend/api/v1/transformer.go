@@ -112,6 +112,14 @@ func toStep(obj core.Step) api.Step {
 		}
 	}
 
+	if obj.Approval != nil {
+		step.Approval = &api.ApprovalConfig{
+			Prompt:   ptrOf(obj.Approval.Prompt),
+			Input:    ptrOf(obj.Approval.Input),
+			Required: ptrOf(obj.Approval.Required),
+		}
+	}
+
 	if obj.Router != nil {
 		routes := make([]struct {
 			Pattern string   `json:"pattern"`
@@ -215,24 +223,26 @@ func toNode(node *exec.Node) api.Node {
 		return api.Node{}
 	}
 	return api.Node{
-		DoneCount:       node.DoneCount,
-		FinishedAt:      node.FinishedAt,
-		Stdout:          node.Stdout,
-		Stderr:          node.Stderr,
-		RetryCount:      node.RetryCount,
-		StartedAt:       node.StartedAt,
-		Status:          api.NodeStatus(node.Status),
-		StatusLabel:     api.NodeStatusLabel(node.Status.String()),
-		Step:            toStep(node.Step),
-		Error:           ptrOf(node.Error),
-		SubRuns:         ptrOf(toSubDAGRuns(node.SubRuns)),
-		SubRunsRepeated: ptrOf(toSubDAGRuns(node.SubRunsRepeated)),
-		ApprovedAt:      ptrOf(node.ApprovedAt),
-		ApprovedBy:      ptrOf(node.ApprovedBy),
-		ApprovalInputs:  ptrOf(node.ApprovalInputs),
-		RejectedAt:      ptrOf(node.RejectedAt),
-		RejectedBy:      ptrOf(node.RejectedBy),
-		RejectionReason: ptrOf(node.RejectionReason),
+		DoneCount:         node.DoneCount,
+		FinishedAt:        node.FinishedAt,
+		Stdout:            node.Stdout,
+		Stderr:            node.Stderr,
+		RetryCount:        node.RetryCount,
+		StartedAt:         node.StartedAt,
+		Status:            api.NodeStatus(node.Status),
+		StatusLabel:       api.NodeStatusLabel(node.Status.String()),
+		Step:              toStep(node.Step),
+		Error:             ptrOf(node.Error),
+		SubRuns:           ptrOf(toSubDAGRuns(node.SubRuns)),
+		SubRunsRepeated:   ptrOf(toSubDAGRuns(node.SubRunsRepeated)),
+		ApprovedAt:        ptrOf(node.ApprovedAt),
+		ApprovedBy:        ptrOf(node.ApprovedBy),
+		ApprovalInputs:    ptrOf(node.ApprovalInputs),
+		PushBackInputs:    ptrOf(node.PushBackInputs),
+		RejectedAt:        ptrOf(node.RejectedAt),
+		RejectedBy:        ptrOf(node.RejectedBy),
+		RejectionReason:   ptrOf(node.RejectionReason),
+		ApprovalIteration: ptrOf(node.ApprovalIteration),
 	}
 }
 

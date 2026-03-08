@@ -911,7 +911,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Approve a waiting step for HITL
+         * Approve a waiting step
          * @description Approves a step that is in Waiting status, optionally providing input parameters that will be available as environment variables in subsequent steps
          */
         post: operations["approveDAGRunStep"];
@@ -931,10 +931,30 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Reject a waiting step for HITL
+         * Reject a waiting step
          * @description Rejects a step that is in Waiting status, optionally providing a reason for rejection
          */
         post: operations["rejectDAGRunStep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/{name}/{dagRunId}/steps/{stepName}/push-back": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Push back a waiting step for re-execution with feedback
+         * @description Pushes back a step that is in Waiting status, providing input parameters that will be injected as environment variables when the step re-executes. The step must have an approval configuration.
+         */
+        post: operations["pushBackDAGRunStep"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1111,7 +1131,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Approve a waiting step in a sub DAG-run for HITL
+         * Approve a waiting step in a sub DAG-run
          * @description Approves a step that is in Waiting status within a sub DAG-run, optionally providing input parameters that will be available as environment variables in subsequent steps
          */
         post: operations["approveSubDAGRunStep"];
@@ -1131,10 +1151,30 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Reject a waiting step in a sub DAG-run for HITL
+         * Reject a waiting step in a sub DAG-run
          * @description Rejects a step that is in Waiting status within a sub DAG-run, optionally providing a reason for rejection
          */
         post: operations["rejectSubDAGRunStep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/push-back": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Push back a waiting step in a sub DAG-run for re-execution with feedback
+         * @description Pushes back a step that is in Waiting status within a sub DAG-run, providing input parameters that will be injected as environment variables when the step re-executes. The step must have an approval configuration.
+         */
+        post: operations["pushBackSubDAGRunStep"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2507,6 +2547,35 @@ export interface components {
             /** @description The rejected step name */
             stepName: string;
         };
+        /** @description Request body for pushing back a waiting step for re-execution with feedback */
+        PushBackStepRequest: {
+            /** @description Key-value parameters to provide as feedback. These will be injected as environment variables when the step re-executes. */
+            inputs?: {
+                [key: string]: string;
+            };
+        };
+        /** @description Response after pushing back a waiting step */
+        PushBackStepResponse: {
+            /** @description The DAG run ID */
+            dagRunId: string;
+            /** @description The pushed-back step name */
+            stepName: string;
+            /** @description The current approval iteration count after push-back */
+            approvalIteration: number;
+            /** @description Whether the DAG run was re-enqueued for execution */
+            resumed: boolean;
+            /** @description The sub-DAG run ID, present only for sub-DAG push-back operations */
+            subDAGRunId?: string;
+        };
+        /** @description Configuration for a human approval gate on a step */
+        ApprovalConfig: {
+            /** @description Message displayed to the approver */
+            prompt?: string;
+            /** @description List of expected input field names from the approver */
+            input?: string[];
+            /** @description Subset of input fields that must be provided */
+            required?: string[];
+        };
         /** @description Generic error response object */
         Error: {
             code: components["schemas"]["ErrorCode"];
@@ -2959,20 +3028,26 @@ export interface components {
             subRunsRepeated?: components["schemas"]["SubDAGRun"][];
             /** @description Error message if the step failed */
             error?: string;
-            /** @description RFC3339 timestamp when the HITL step was approved */
+            /** @description RFC3339 timestamp when the step was approved */
             approvedAt?: string;
-            /** @description Username of who approved the HITL step */
+            /** @description Username of who approved the step */
             approvedBy?: string;
-            /** @description Key-value inputs provided during HITL approval */
+            /** @description Key-value inputs provided during approval */
             approvalInputs?: {
                 [key: string]: string;
             };
-            /** @description RFC3339 timestamp when the HITL step was rejected */
+            /** @description RFC3339 timestamp when the step was rejected */
             rejectedAt?: string;
-            /** @description Username of who rejected the HITL step */
+            /** @description Username of who rejected the step */
             rejectedBy?: string;
             /** @description Optional reason for rejection */
             rejectionReason?: string;
+            /** @description Number of times this step has been pushed back for re-execution */
+            approvalIteration?: number;
+            /** @description Key-value inputs from the last push-back, injected as environment variables during re-execution */
+            pushBackInputs?: {
+                [key: string]: string;
+            };
         };
         /** @description Metadata for a sub DAG-run */
         SubDAGRun: {
@@ -3056,6 +3131,7 @@ export interface components {
                     targets: string[];
                 }[];
             };
+            approval?: components["schemas"]["ApprovalConfig"];
         };
         /** @description Individual search result item for a DAG */
         SearchResultItem: {
@@ -7113,6 +7189,67 @@ export interface operations {
             };
         };
     };
+    pushBackDAGRunStep: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PushBackStepRequest"];
+            };
+        };
+        responses: {
+            /** @description Step pushed back successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushBackStepResponse"];
+                };
+            };
+            /** @description Step is not in Waiting status, missing required inputs, or step does not have approval config */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description DAG-run or step not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getSubDAGRunDetails: {
         parameters: {
             query?: {
@@ -7645,6 +7782,69 @@ export interface operations {
                 };
             };
             /** @description Step is not in Waiting status */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Sub DAG-run or step not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    pushBackSubDAGRunStep: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+                /** @description ID of the sub DAG-run containing the step to push back */
+                subDAGRunId: string;
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PushBackStepRequest"];
+            };
+        };
+        responses: {
+            /** @description Step pushed back successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushBackStepResponse"];
+                };
+            };
+            /** @description Step is not in Waiting status, missing required inputs, or step does not have approval config */
             400: {
                 headers: {
                     [name: string]: unknown;

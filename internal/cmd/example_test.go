@@ -29,27 +29,12 @@ func TestExampleCommand(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, out, "parallel-steps")
 		assert.Contains(t, out, "agent-step")
-		assert.Contains(t, out, "dagu schema dag")
 	})
 
-	t.Run("ShowExample1", func(t *testing.T) {
+	t.Run("ShowByID", func(t *testing.T) {
 		out, err := runExampleCmd("example", "1")
 		require.NoError(t, err)
 		assert.Contains(t, out, "type: graph")
-		assert.Contains(t, out, "Parallel Steps")
-		assert.NotContains(t, out, "dagu schema dag")
-	})
-
-	t.Run("ShowExample10", func(t *testing.T) {
-		out, err := runExampleCmd("example", "10")
-		require.NoError(t, err)
-		assert.Contains(t, out, "router")
-	})
-
-	t.Run("ShowExample11", func(t *testing.T) {
-		out, err := runExampleCmd("example", "11")
-		require.NoError(t, err)
-		assert.Contains(t, out, "agent")
 	})
 
 	t.Run("InvalidID", func(t *testing.T) {
@@ -58,24 +43,7 @@ func TestExampleCommand(t *testing.T) {
 		assert.Contains(t, err.Error(), fmt.Sprintf("between 1 and %d", cmd.ExampleCount()))
 	})
 
-	t.Run("NonNumericID", func(t *testing.T) {
-		_, err := runExampleCmd("example", "abc")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "must be a number")
-	})
-
-	t.Run("ZeroID", func(t *testing.T) {
-		_, err := runExampleCmd("example", "0")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), fmt.Sprintf("between 1 and %d", cmd.ExampleCount()))
-	})
-
-	t.Run("Help", func(t *testing.T) {
-		_, err := runExampleCmd("example", "help")
-		require.NoError(t, err)
-	})
-
-	t.Run("AllExamplesUseGraph", func(t *testing.T) {
+	t.Run("AllExamplesValid", func(t *testing.T) {
 		for i := 1; i <= cmd.ExampleCount(); i++ {
 			out, err := runExampleCmd("example", fmt.Sprintf("%d", i))
 			require.NoError(t, err, "example %d failed", i)

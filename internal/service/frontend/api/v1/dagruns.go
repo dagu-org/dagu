@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -635,7 +636,7 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 	return &api.UpdateDAGRunStepStatus200Response{}, nil
 }
 
-// ApproveDAGRunStep approves a waiting step for HITL (Human-in-the-Loop).
+// ApproveDAGRunStep approves a waiting step.
 func (a *API) ApproveDAGRunStep(ctx context.Context, request api.ApproveDAGRunStepRequestObject) (api.ApproveDAGRunStepResponseObject, error) {
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
@@ -853,7 +854,7 @@ func (a *API) GetSubDAGRunStepMessages(ctx context.Context, request api.GetSubDA
 	}, nil
 }
 
-// RejectDAGRunStep rejects a waiting step for HITL (Human-in-the-Loop).
+// RejectDAGRunStep rejects a waiting step.
 func (a *API) RejectDAGRunStep(ctx context.Context, request api.RejectDAGRunStepRequestObject) (api.RejectDAGRunStepResponseObject, error) {
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
@@ -962,6 +963,183 @@ func (a *API) RejectSubDAGRunStep(ctx context.Context, request api.RejectSubDAGR
 	return &api.RejectSubDAGRunStep200JSONResponse{
 		DagRunId: request.SubDAGRunId,
 		StepName: request.StepName,
+	}, nil
+}
+
+// PushBackDAGRunStep pushes back a waiting step for re-execution with feedback.
+func (a *API) PushBackDAGRunStep(ctx context.Context, request api.PushBackDAGRunStepRequestObject) (api.PushBackDAGRunStepResponseObject, error) {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+
+	ref := exec.NewDAGRunRef(request.Name, request.DagRunId)
+	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
+	if err != nil {
+		return &api.PushBackDAGRunStep404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
+		}, nil
+	}
+
+	stepIdx := findStepByName(dagStatus.Nodes, request.StepName)
+	if stepIdx < 0 {
+		return &api.PushBackDAGRunStep404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, request.Name),
+		}, nil
+	}
+
+	node := dagStatus.Nodes[stepIdx]
+
+	if node.Status != core.NodeWaiting {
+		return &api.PushBackDAGRunStep400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: fmt.Sprintf("step %s is not waiting for approval (status: %s)", request.StepName, node.Status),
+		}, nil
+	}
+
+	if node.Step.Approval == nil {
+		return &api.PushBackDAGRunStep400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: fmt.Sprintf("step %s does not have approval configuration; push-back requires the approval field", request.StepName),
+		}, nil
+	}
+
+	if err := validatePushBackInputs(node.Step, request.Body); err != nil {
+		return &api.PushBackDAGRunStep400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: err.Error(),
+		}, nil
+	}
+
+	// Snapshot current state for rollback if resume fails.
+	snapshot, err := json.Marshal(dagStatus)
+	if err != nil {
+		return nil, fmt.Errorf("error serializing status for rollback: %w", err)
+	}
+
+	applyPushBack(ctx, node, dagStatus, request.Body)
+
+	if err := a.dagRunMgr.UpdateStatus(ctx, ref, *dagStatus); err != nil {
+		return nil, fmt.Errorf("error updating status: %w", err)
+	}
+
+	if err := a.resumeDAGRun(ctx, ref, request.DagRunId); err != nil {
+		logger.Error(ctx, "Failed to resume DAG after push-back, rolling back", tag.Error(err))
+		var original exec.DAGRunStatus
+		if unmarshalErr := json.Unmarshal(snapshot, &original); unmarshalErr == nil {
+			if rollbackErr := a.dagRunMgr.UpdateStatus(ctx, ref, original); rollbackErr != nil {
+				logger.Error(ctx, "Failed to rollback push-back state", tag.Error(rollbackErr))
+			}
+		}
+		return nil, fmt.Errorf("failed to resume DAG after push-back: %w", err)
+	}
+
+	logger.Info(ctx, "DAG resumed after push-back",
+		slog.String("dagRunId", request.DagRunId),
+		slog.String("step", request.StepName),
+		slog.Int("iteration", node.ApprovalIteration),
+	)
+
+	a.logStepPushBack(ctx, request.Name, request.DagRunId, "", request.StepName, node.ApprovalIteration, true)
+
+	return &api.PushBackDAGRunStep200JSONResponse{
+		DagRunId:          request.DagRunId,
+		StepName:          request.StepName,
+		ApprovalIteration: node.ApprovalIteration,
+		Resumed:           true,
+	}, nil
+}
+
+// PushBackSubDAGRunStep pushes back a waiting step in a sub DAG-run for re-execution with feedback.
+func (a *API) PushBackSubDAGRunStep(ctx context.Context, request api.PushBackSubDAGRunStepRequestObject) (api.PushBackSubDAGRunStepResponseObject, error) {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+
+	rootRef := exec.NewDAGRunRef(request.Name, request.DagRunId)
+	dagStatus, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, rootRef, request.SubDAGRunId)
+	if err != nil {
+		return &api.PushBackSubDAGRunStep404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("sub DAG-run ID %s not found", request.SubDAGRunId),
+		}, nil
+	}
+
+	stepIdx := findStepByName(dagStatus.Nodes, request.StepName)
+	if stepIdx < 0 {
+		return &api.PushBackSubDAGRunStep404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("step %s not found in sub DAG-run %s", request.StepName, request.SubDAGRunId),
+		}, nil
+	}
+
+	node := dagStatus.Nodes[stepIdx]
+
+	if node.Status != core.NodeWaiting {
+		return &api.PushBackSubDAGRunStep400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: fmt.Sprintf("step %s is not waiting for approval (status: %s)", request.StepName, node.Status),
+		}, nil
+	}
+
+	if node.Step.Approval == nil {
+		return &api.PushBackSubDAGRunStep400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: fmt.Sprintf("step %s does not have approval configuration; push-back requires the approval field", request.StepName),
+		}, nil
+	}
+
+	if err := validatePushBackInputs(node.Step, request.Body); err != nil {
+		return &api.PushBackSubDAGRunStep400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: err.Error(),
+		}, nil
+	}
+
+	// Snapshot current state for rollback if resume fails.
+	snapshot, err := json.Marshal(dagStatus)
+	if err != nil {
+		return nil, fmt.Errorf("error serializing status for rollback: %w", err)
+	}
+
+	applyPushBack(ctx, node, dagStatus, request.Body)
+
+	if err := a.dagRunMgr.UpdateStatus(ctx, rootRef, *dagStatus); err != nil {
+		return nil, fmt.Errorf("error updating sub DAG-run status: %w", err)
+	}
+
+	if err := a.resumeSubDAGRun(ctx, rootRef, request.SubDAGRunId); err != nil {
+		logger.Error(ctx, "Failed to resume sub DAG after push-back, rolling back", tag.Error(err))
+		var original exec.DAGRunStatus
+		if unmarshalErr := json.Unmarshal(snapshot, &original); unmarshalErr == nil {
+			if rollbackErr := a.dagRunMgr.UpdateStatus(ctx, rootRef, original); rollbackErr != nil {
+				logger.Error(ctx, "Failed to rollback push-back state", tag.Error(rollbackErr))
+			}
+		}
+		return nil, fmt.Errorf("failed to resume sub DAG after push-back: %w", err)
+	}
+
+	logger.Info(ctx, "Sub DAG resumed after push-back",
+		slog.String("subDagRunId", request.SubDAGRunId),
+		slog.String("step", request.StepName),
+		slog.Int("iteration", node.ApprovalIteration),
+	)
+
+	a.logStepPushBack(ctx, request.Name, request.DagRunId, request.SubDAGRunId, request.StepName, node.ApprovalIteration, true)
+
+	return &api.PushBackSubDAGRunStep200JSONResponse{
+		DagRunId:          request.SubDAGRunId,
+		SubDAGRunId:       &request.SubDAGRunId,
+		StepName:          request.StepName,
+		ApprovalIteration: node.ApprovalIteration,
+		Resumed:           true,
 	}, nil
 }
 
@@ -1850,42 +2028,126 @@ func hasWaitingSteps(nodes []*exec.Node) bool {
 	return false
 }
 
-func validateRequiredInputs(step core.Step, body *api.ApproveStepRequest) error {
-	if step.ExecutorConfig.Config == nil {
-		return nil
-	}
-
-	requiredFields, ok := step.ExecutorConfig.Config["required"]
-	if !ok {
-		return nil
-	}
-
-	required, ok := requiredFields.([]any)
-	if !ok || len(required) == 0 {
-		return nil
-	}
-
-	var providedInputs map[string]string
-	if body != nil && body.Inputs != nil {
-		providedInputs = *body.Inputs
-	}
-
+// checkMissingInputs validates that all required fields are present in the provided inputs.
+func checkMissingInputs(required []string, provided map[string]string) error {
 	var missing []string
-	for _, r := range required {
-		fieldName, ok := r.(string)
-		if !ok {
-			continue
-		}
-		if providedInputs == nil || providedInputs[fieldName] == "" {
+	for _, fieldName := range required {
+		if provided == nil || strings.TrimSpace(provided[fieldName]) == "" {
 			missing = append(missing, fieldName)
 		}
 	}
-
 	if len(missing) > 0 {
 		return fmt.Errorf("missing required inputs: %v", missing)
 	}
-
 	return nil
+}
+
+// requiredFieldsForStep returns the list of required input field names for a step.
+func requiredFieldsForStep(step core.Step) []string {
+	if step.Approval != nil {
+		return step.Approval.Required
+	}
+	return nil
+}
+
+func validateRequiredInputs(step core.Step, body *api.ApproveStepRequest) error {
+	required := requiredFieldsForStep(step)
+	if len(required) == 0 {
+		return nil
+	}
+	var provided map[string]string
+	if body != nil && body.Inputs != nil {
+		provided = *body.Inputs
+	}
+	return checkMissingInputs(required, provided)
+}
+
+func validatePushBackInputs(step core.Step, body *api.PushBackStepRequest) error {
+	if step.Approval == nil || len(step.Approval.Required) == 0 {
+		return nil
+	}
+	var provided map[string]string
+	if body != nil && body.Inputs != nil {
+		provided = *body.Inputs
+	}
+	return checkMissingInputs(step.Approval.Required, provided)
+}
+
+func applyPushBack(_ context.Context, node *exec.Node, status *exec.DAGRunStatus, body *api.PushBackStepRequest) {
+	node.ApprovalIteration++
+	node.Status = core.NodeNotStarted
+	node.StartedAt = "-"
+	node.FinishedAt = "-"
+	node.Error = ""
+
+	if body != nil && body.Inputs != nil {
+		node.PushBackInputs = *body.Inputs
+	} else {
+		node.PushBackInputs = nil
+	}
+
+	// Clear downstream nodes so they re-execute after the push-back step
+	dependents := findDependentNodes(status.Nodes, node.Step.Name)
+	for _, dep := range dependents {
+		dep.Status = core.NodeNotStarted
+		dep.StartedAt = "-"
+		dep.FinishedAt = "-"
+		dep.Error = ""
+	}
+}
+
+// findDependentNodes returns all nodes that directly or transitively depend on the given step.
+func findDependentNodes(nodes []*exec.Node, stepName string) []*exec.Node {
+	// Build a set of step names that depend on the given step
+	dependentNames := make(map[string]bool)
+	dependentNames[stepName] = true
+
+	// Iterate until no new dependents are found (transitive closure)
+	changed := true
+	for changed {
+		changed = false
+		for _, n := range nodes {
+			if dependentNames[n.Step.Name] {
+				continue
+			}
+			for _, dep := range n.Step.Depends {
+				if dependentNames[dep] {
+					dependentNames[n.Step.Name] = true
+					changed = true
+					break
+				}
+			}
+		}
+	}
+
+	// Collect dependent nodes (excluding the source step itself)
+	var result []*exec.Node
+	for _, n := range nodes {
+		if dependentNames[n.Step.Name] && n.Step.Name != stepName {
+			result = append(result, n)
+		}
+	}
+	return result
+}
+
+func (a *API) logStepPushBack(ctx context.Context, dagName, dagRunID, subDAGRunID, stepName string, iteration int, resumed bool) {
+	detailsMap := map[string]any{
+		"dag_name":           dagName,
+		"dag_run_id":         dagRunID,
+		"step_name":          stepName,
+		"approval_iteration": iteration,
+		"resumed":            resumed,
+	}
+	if subDAGRunID != "" {
+		detailsMap["sub_dag_run_id"] = subDAGRunID
+	}
+
+	action := "dag_step_push_back"
+	if subDAGRunID != "" {
+		action = "sub_dag_step_push_back"
+	}
+
+	a.logAudit(ctx, audit.CategoryDAG, action, detailsMap)
 }
 
 // SSE Data Methods for DAG Runs

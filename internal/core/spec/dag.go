@@ -138,7 +138,7 @@ type handlerOn struct {
 	Success *step `yaml:"success,omitempty"` // Step to execute on success
 	Abort   *step `yaml:"abort,omitempty"`   // Step to execute on abort
 	Exit    *step `yaml:"exit,omitempty"`    // Step to execute on exit
-	Wait    *step `yaml:"wait,omitempty"`    // Step to execute when DAG enters wait status (HITL)
+	Wait    *step `yaml:"wait,omitempty"`    // Step to execute when DAG enters wait status (approval)
 }
 
 // smtpConfig defines the SMTP configuration.
@@ -531,12 +531,12 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 		errs = append(errs, err)
 	}
 
-	// Validate workerSelector compatibility with HITL steps
-	if len(result.WorkerSelector) > 0 && result.HasHITLSteps() {
+	// Validate workerSelector compatibility with approval steps
+	if len(result.WorkerSelector) > 0 && result.HasApprovalSteps() {
 		errs = append(errs, core.NewValidationError(
 			"worker_selector",
 			result.WorkerSelector,
-			fmt.Errorf("DAG with HITL steps cannot be dispatched to workers"),
+			fmt.Errorf("DAG with approval steps cannot be dispatched to workers"),
 		))
 	}
 

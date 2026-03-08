@@ -28,7 +28,7 @@ func failStep(name string, depends ...string) core.Step {
 }
 
 func waitStep(name string, depends ...string) core.Step {
-	return newStep(name, withDepends(depends...), withExecutor("hitl", nil))
+	return newStep(name, withDepends(depends...), withCommand("true"), withApproval(&core.ApprovalConfig{}))
 }
 
 type stepOption func(*core.Step)
@@ -110,12 +110,9 @@ func withID(id string) stepOption {
 	}
 }
 
-func withExecutor(executorType string, config map[string]any) stepOption {
+func withApproval(approval *core.ApprovalConfig) stepOption {
 	return func(step *core.Step) {
-		step.ExecutorConfig = core.ExecutorConfig{
-			Type:   executorType,
-			Config: config,
-		}
+		step.Approval = approval
 	}
 }
 
