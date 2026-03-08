@@ -1338,6 +1338,7 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		opts := []executor.TaskOption{
 			executor.WithWorkerSelector(dag.WorkerSelector),
 			executor.WithPreviousStatus(prevStatus),
+			executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, a.config.Paths.BaseConfig)),
 		}
 		if stepName != "" {
 			opts = append(opts, executor.WithStep(stepName))

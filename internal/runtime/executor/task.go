@@ -2,6 +2,7 @@ package executor
 
 import (
 	"log/slog"
+	"os"
 
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/proto/convert"
@@ -85,6 +86,33 @@ func WithTags(tags string) TaskOption {
 	return func(task *coordinatorv1.Task) {
 		task.Tags = tags
 	}
+}
+
+// WithBaseConfig sets the base config YAML content on the task.
+// This allows workers to apply base config without needing local base config files.
+func WithBaseConfig(content string) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		task.BaseConfig = content
+	}
+}
+
+// ResolveBaseConfig returns the base config content for a DAG task.
+// It prefers embedded BaseConfigData from the DAG, falling back to reading the file at fallbackPath.
+func ResolveBaseConfig(baseConfigData []byte, fallbackPath string) string {
+	if len(baseConfigData) > 0 {
+		return string(baseConfigData)
+	}
+	if fallbackPath == "" {
+		return ""
+	}
+	data, err := os.ReadFile(fallbackPath) //nolint:gosec
+	if err != nil {
+		if !os.IsNotExist(err) {
+			slog.Debug("failed to read base config file", "path", fallbackPath, "error", err)
+		}
+		return ""
+	}
+	return string(data)
 }
 
 // WithPreviousStatus sets the previous status for retry operations in shared-nothing mode.

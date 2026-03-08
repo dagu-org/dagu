@@ -70,6 +70,9 @@ const (
 type BuildOpts struct {
 	// Base specifies the Base configuration file for the DAG.
 	Base string
+	// BaseConfigContent is the raw base config YAML content.
+	// When set, this takes precedence over Base file path.
+	BaseConfigContent []byte
 	// Parameters specifies the Parameters to the DAG.
 	// Parameters are used to override the default Parameters in the DAG.
 	Parameters string

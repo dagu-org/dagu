@@ -30,6 +30,7 @@ var (
 type LoadOptions struct {
 	name              string   // Name of the DAG.
 	baseConfig        string   // Path to the base core.DAG configuration file.
+	baseConfigContent []byte   // Raw base config YAML content (used when file is unavailable, e.g., distributed mode).
 	params            string   // Parameters to override default parameters in the DAG.
 	paramsList        []string // List of parameters to override default parameters in the DAG.
 	flags             BuildFlag
@@ -45,6 +46,15 @@ type LoadOption func(*LoadOptions)
 func WithBaseConfig(baseDAG string) LoadOption {
 	return func(o *LoadOptions) {
 		o.baseConfig = baseDAG
+	}
+}
+
+// WithBaseConfigContent sets the raw base config YAML content directly.
+// This is used in distributed mode where workers may not have local base config files.
+// When set, this takes precedence over the base config file path.
+func WithBaseConfigContent(content []byte) LoadOption {
+	return func(o *LoadOptions) {
+		o.baseConfigContent = content
 	}
 }
 
@@ -170,6 +180,7 @@ func Load(ctx context.Context, nameOrPath string, opts ...LoadOption) (*core.DAG
 		ctx: ctx,
 		opts: BuildOpts{
 			Base:              options.baseConfig,
+			BaseConfigContent: options.baseConfigContent,
 			Parameters:        options.params,
 			ParametersList:    options.paramsList,
 			Name:              options.name,
@@ -190,6 +201,7 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*core.DAG, 
 	}
 	return LoadYAMLWithOpts(ctx, data, BuildOpts{
 		Base:              options.baseConfig,
+		BaseConfigContent: options.baseConfigContent,
 		Parameters:        options.params,
 		ParametersList:    options.paramsList,
 		Name:              options.name,
@@ -265,16 +277,39 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 
 	ctx = ctx.WithFile(filePath)
 
-	// Load base manifest if specified
+	// Load base manifest if specified.
+	// Priority: embedded content (BaseConfigContent) > file path (Base).
 	var baseDef *dag
-	if !ctx.opts.Has(BuildFlagOnlyMetadata) && ctx.opts.Base != "" && fileutil.FileExists(ctx.opts.Base) {
-		raw, err := readYAMLFile(ctx.opts.Base)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read base config: %w", err)
-		}
-		baseDef, err = decode(raw)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode base config: %w", err)
+	var baseRaw []byte
+	if !ctx.opts.Has(BuildFlagOnlyMetadata) {
+		if len(ctx.opts.BaseConfigContent) > 0 {
+			// Use embedded base config content (distributed mode / sub-DAG propagation)
+			baseRaw = ctx.opts.BaseConfigContent
+			raw, err := unmarshalData(baseRaw)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal embedded base config: %w", err)
+			}
+			baseDef, err = decode(raw)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode embedded base config: %w", err)
+			}
+		} else if ctx.opts.Base != "" {
+			baseRaw, err = os.ReadFile(ctx.opts.Base) //nolint:gosec
+			if err != nil {
+				if !os.IsNotExist(err) {
+					return nil, fmt.Errorf("failed to read base config: %w", err)
+				}
+				// File doesn't exist — skip base config gracefully
+			} else {
+				raw, err := unmarshalData(baseRaw)
+				if err != nil {
+					return nil, fmt.Errorf("failed to unmarshal base config: %w", err)
+				}
+				baseDef, err = decode(raw)
+				if err != nil {
+					return nil, fmt.Errorf("failed to decode base config: %w", err)
+				}
+			}
 		}
 	}
 
@@ -310,6 +345,11 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 			}
 			mainDAG.LocalDAGs[subDAG.Name] = subDAG
 		}
+	}
+
+	// Store base config data for propagation through distributed execution
+	if len(baseRaw) > 0 {
+		mainDAG.BaseConfigData = baseRaw
 	}
 
 	core.InitializeDefaults(mainDAG)

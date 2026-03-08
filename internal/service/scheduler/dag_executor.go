@@ -51,6 +51,7 @@ type DAGExecutor struct {
 	coordinatorCli  exec.Dispatcher
 	subCmdBuilder   *runtime.SubCmdBuilder
 	defaultExecMode config.ExecutionMode
+	baseConfigPath  string
 }
 
 // NewDAGExecutor creates a new DAGExecutor instance.
@@ -58,11 +59,13 @@ func NewDAGExecutor(
 	coordinatorCli exec.Dispatcher,
 	subCmdBuilder *runtime.SubCmdBuilder,
 	defaultExecMode config.ExecutionMode,
+	baseConfigPath string,
 ) *DAGExecutor {
 	return &DAGExecutor{
 		coordinatorCli:  coordinatorCli,
 		subCmdBuilder:   subCmdBuilder,
 		defaultExecMode: defaultExecMode,
+		baseConfigPath:  baseConfigPath,
 	}
 }
 
@@ -136,6 +139,7 @@ func (e *DAGExecutor) ExecuteDAG(
 			runID,
 			executor.WithWorkerSelector(dag.WorkerSelector),
 			executor.WithPreviousStatus(previousStatus),
+			executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, e.baseConfigPath)),
 		)
 		return e.dispatchToCoordinator(ctx, task)
 	}

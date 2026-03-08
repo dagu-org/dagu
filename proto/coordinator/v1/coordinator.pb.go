@@ -387,7 +387,9 @@ type Task struct {
 	// Globally unique attempt identifier for cancellation tracking.
 	AttemptKey string `protobuf:"bytes,15,opt,name=attempt_key,json=attemptKey,proto3" json:"attempt_key,omitempty"`
 	// Additional tags (comma-separated key=value or key-only) to apply to the DAG run.
-	Tags          string `protobuf:"bytes,16,opt,name=tags,proto3" json:"tags,omitempty"`
+	Tags string `protobuf:"bytes,16,opt,name=tags,proto3" json:"tags,omitempty"`
+	// Base config YAML content for workers (avoids relying on local base config files).
+	BaseConfig    string `protobuf:"bytes,17,opt,name=base_config,json=baseConfig,proto3" json:"base_config,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -530,6 +532,13 @@ func (x *Task) GetAttemptKey() string {
 func (x *Task) GetTags() string {
 	if x != nil {
 		return x.Tags
+	}
+	return ""
+}
+
+func (x *Task) GetBaseConfig() string {
+	if x != nil {
+		return x.BaseConfig
 	}
 	return ""
 }
@@ -1651,7 +1660,7 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\";\n" +
 	"\x0fDispatchRequest\x12(\n" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\"\x12\n" +
-	"\x10DispatchResponse\"\xc0\x05\n" +
+	"\x10DispatchResponse\"\xe1\x05\n" +
 	"\x04Task\x127\n" +
 	"\toperation\x18\x06 \x01(\x0e2\x19.coordinator.v1.OperationR\toperation\x12)\n" +
 	"\x11root_dag_run_name\x18\x01 \x01(\tR\x0erootDagRunName\x12%\n" +
@@ -1674,7 +1683,9 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"attempt_id\x18\x0e \x01(\tR\tattemptId\x12\x1f\n" +
 	"\vattempt_key\x18\x0f \x01(\tR\n" +
 	"attemptKey\x12\x12\n" +
-	"\x04tags\x18\x10 \x01(\tR\x04tags\x1aA\n" +
+	"\x04tags\x18\x10 \x01(\tR\x04tags\x12\x1f\n" +
+	"\vbase_config\x18\x11 \x01(\tR\n" +
+	"baseConfig\x1aA\n" +
 	"\x13WorkerSelectorEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x13\n" +

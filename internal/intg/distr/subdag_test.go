@@ -121,7 +121,7 @@ steps:
 
 		f.coord.CreateDAGFile(t, f.coord.Config.Paths.DAGsDir, "child-remote", []byte(childYAML))
 
-		childWorker := f.setupSharedNothingWorker("child-worker", map[string]string{"type": "child"})
+		childWorker := f.setupSharedNothingWorker("child-worker", map[string]string{"type": "child"}, "")
 		_ = childWorker
 
 		require.NoError(t, f.enqueue())

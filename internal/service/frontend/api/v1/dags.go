@@ -955,6 +955,7 @@ func (a *API) dispatchStartToCoordinator(ctx context.Context, dag *core.DAG, dag
 	if tags != "" {
 		taskOpts = append(taskOpts, executor.WithTags(tags))
 	}
+	taskOpts = append(taskOpts, executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, a.config.Paths.BaseConfig)))
 
 	task := executor.CreateTask(
 		dag.Name,
