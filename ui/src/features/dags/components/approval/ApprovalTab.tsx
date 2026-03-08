@@ -174,13 +174,8 @@ export function ApprovalTab({ dagRun, dagName }: ApprovalTabProps) {
           visible={!!reviewState}
           dismissModal={() => setReviewState(null)}
           step={reviewState.node.step}
-          node={reviewState.node}
-          dagName={dagName}
-          dagRunId={dagRun.dagRunId}
-          dagRun={dagRun}
           onApprove={reviewState.action === 'approve' ? handleApprove : undefined}
           onPushBack={reviewState.action === 'retry' ? handlePushBack : undefined}
-          compact
         />
       )}
     </div>

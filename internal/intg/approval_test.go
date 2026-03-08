@@ -312,7 +312,7 @@ steps:
 type: graph
 steps:
   - name: call-step
-    call: "`+subDAG.DAG.Name+`"
+    call: "`+subDAG.Name+`"
     approval:
       prompt: "Review sub-DAG results"
   - name: after-call

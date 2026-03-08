@@ -2069,7 +2069,7 @@ func validatePushBackInputs(step core.Step, body *api.PushBackStepRequest) error
 	return checkMissingInputs(step.Approval.Required, provided)
 }
 
-func applyPushBack(ctx context.Context, node *exec.Node, status *exec.DAGRunStatus, body *api.PushBackStepRequest) {
+func applyPushBack(_ context.Context, node *exec.Node, status *exec.DAGRunStatus, body *api.PushBackStepRequest) {
 	node.ApprovalIteration++
 	node.Status = core.NodeNotStarted
 	node.StartedAt = "-"

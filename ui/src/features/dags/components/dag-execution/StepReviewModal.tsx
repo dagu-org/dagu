@@ -6,13 +6,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/ui/CustomDialog';
-import { Ban, Check, RotateCcw, X } from 'lucide-react';
+import { Check, RotateCcw, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { components } from '../../../../api/v1/schema';
 
 type Step = components['schemas']['Step'];
-type NodeData = components['schemas']['Node'];
-type DAGRunDetails = components['schemas']['DAGRunDetails'];
 
 type WaitConfig = {
   prompt?: string;
@@ -24,29 +22,20 @@ type Props = {
   visible: boolean;
   dismissModal: () => void;
   step: Step;
-  node: NodeData;
-  dagName: string;
-  dagRunId: string;
-  dagRun: DAGRunDetails;
   onApprove?: (inputs: Record<string, string>) => Promise<void>;
   onPushBack?: (inputs: Record<string, string>) => Promise<void>;
-  onReject?: (reason: string) => Promise<void>;
-  compact?: boolean;
 };
 
 export function StepReviewModal({
   visible,
   dismissModal,
   step,
-  node,
   onApprove,
   onPushBack,
-  onReject,
 }: Props) {
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [rejectionReason, setRejectionReason] = useState('');
 
   const approvalConfig = step.approval;
   const waitConfig: WaitConfig = approvalConfig
@@ -64,19 +53,21 @@ export function StepReviewModal({
       setInputs({});
       setError(null);
       setLoading(false);
-      setRejectionReason('');
     }
   }, [visible]);
 
   const handleAction = async (
-    action: (arg: Record<string, string> | string) => Promise<void>,
-    arg: Record<string, string> | string,
+    action: (inputs: Record<string, string>) => Promise<void>,
     errorLabel: string
   ) => {
+    if (!isValid) {
+      setError('Please fill in all required fields');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      await action(arg);
+      await action(inputs);
       dismissModal();
     } catch (e) {
       const err = e as { message?: string };
@@ -87,20 +78,10 @@ export function StepReviewModal({
   };
 
   const handleSubmit = () => {
-    if (onReject) {
-      handleAction(onReject as (arg: Record<string, string> | string) => Promise<void>, rejectionReason, 'reject');
-    } else if (onApprove) {
-      if (!isValid) {
-        setError('Please fill in all required fields');
-        return;
-      }
-      handleAction(onApprove as (arg: Record<string, string> | string) => Promise<void>, inputs, 'approve');
+    if (onApprove) {
+      handleAction(onApprove, 'approve');
     } else if (onPushBack) {
-      if (!isValid) {
-        setError('Please fill in all required fields');
-        return;
-      }
-      handleAction(onPushBack as (arg: Record<string, string> | string) => Promise<void>, inputs, 'retry');
+      handleAction(onPushBack, 'retry');
     }
   };
 
@@ -111,14 +92,11 @@ export function StepReviewModal({
     }
   };
 
-  // Determine action label and styling
-  const actionLabel = onReject ? 'Reject' : onApprove ? 'Approve' : 'Retry';
-  const actionIcon = onReject
-    ? <Ban className="h-4 w-4" />
-    : onApprove
-      ? <Check className="h-4 w-4" />
-      : <RotateCcw className="h-4 w-4" />;
-  const actionVariant = onReject ? 'destructive' as const : onApprove ? 'primary' as const : 'outline' as const;
+  const actionLabel = onApprove ? 'Approve' : 'Retry';
+  const actionIcon = onApprove
+    ? <Check className="h-4 w-4" />
+    : <RotateCcw className="h-4 w-4" />;
+  const actionVariant = onApprove ? 'primary' as const : 'outline' as const;
 
   return (
     <Dialog open={visible} onOpenChange={dismissModal}>
@@ -130,8 +108,7 @@ export function StepReviewModal({
         </DialogHeader>
 
         <div className="py-2 space-y-3" onKeyDown={handleKeyDown}>
-          {/* Input fields for approve/retry */}
-          {!onReject && inputFields.length > 0 && (
+          {inputFields.length > 0 && (
             <div className="space-y-3">
               {inputFields.map((field) => {
                 const isRequired = requiredFields.includes(field);
@@ -158,17 +135,6 @@ export function StepReviewModal({
             </div>
           )}
 
-          {/* Rejection reason */}
-          {onReject && (
-            <textarea
-              className="w-full px-3 py-2 text-sm border border-border rounded bg-background focus:outline-none focus:border-ring resize-none"
-              placeholder="Reason (optional)..."
-              rows={2}
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-            />
-          )}
-
           {error && (
             <div className="text-sm text-error bg-error-muted p-2 rounded">
               {error}
@@ -188,9 +154,9 @@ export function StepReviewModal({
           </Button>
           <Button
             size="sm"
-            variant={onReject ? 'default' : actionVariant}
+            variant={actionVariant}
             onClick={handleSubmit}
-            disabled={loading || (!onReject && !isValid && requiredFields.length > 0)}
+            disabled={loading || (!isValid && requiredFields.length > 0)}
           >
             {actionIcon}
             {loading ? `${actionLabel}...` : actionLabel}
