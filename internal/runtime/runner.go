@@ -449,6 +449,7 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 
 	// Setup chat messages from dependencies before execution
 	r.setupChatMessages(ctx, node)
+	r.setupPushBackConversation(ctx, node)
 
 ExecRepeat: // repeat execution
 	for !r.isCanceled() {
@@ -587,6 +588,43 @@ func (r *Runner) saveChatMessages(ctx context.Context, node *Node) {
 	if err := r.messagesHandler.WriteStepMessages(ctx, node.Step().Name, savedMsgs); err != nil {
 		logger.Warn(ctx, "Failed to write chat messages", tag.Error(err))
 	}
+}
+
+// setupPushBackConversation loads the step's own previous conversation for
+// agent steps being re-executed after push-back. This REPLACES any dependency
+// messages (which are already embedded in the previous conversation from
+// iteration 0). Non-agent steps are unaffected.
+func (r *Runner) setupPushBackConversation(ctx context.Context, node *Node) {
+	if r.messagesHandler == nil {
+		return
+	}
+	step := node.Step()
+	if step.Approval == nil || !core.SupportsAgent(step.ExecutorConfig.Type) {
+		return
+	}
+	if node.State().ApprovalIteration == 0 {
+		return
+	}
+
+	ownMessages, err := r.messagesHandler.ReadStepMessages(ctx, step.Name)
+	if err != nil {
+		logger.Warn(ctx, "Failed to read own messages for push-back",
+			tag.Step(step.Name), tag.Error(err))
+		return
+	}
+	if len(ownMessages) == 0 {
+		return
+	}
+
+	if len(ownMessages) > 200 {
+		logger.Warn(ctx, "Large conversation history after push-back iterations",
+			tag.Step(step.Name), slog.Int("messageCount", len(ownMessages)),
+			slog.Int("iteration", node.State().ApprovalIteration))
+	}
+
+	// REPLACE (not merge) — dependencies are already embedded in the
+	// previous conversation from iteration 0.
+	node.SetChatMessages(ownMessages)
 }
 
 func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) context.Context {

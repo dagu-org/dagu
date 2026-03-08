@@ -99,6 +99,12 @@ type ChatMessageHandler interface {
 	GetMessages() []exec.LLMMessage
 }
 
+// PushBackAware is implemented by executors that can incorporate
+// push-back feedback into their conversation flow.
+type PushBackAware interface {
+	SetPushBackContext(inputs map[string]string, iteration int)
+}
+
 // SubRunProvider is an interface for executors that spawn sub-DAG runs.
 // This is used by executors like chat (with tools) to report sub-runs
 // for UI drill-down functionality.

@@ -3081,6 +3081,161 @@ func TestRunner_ChatMessagesHandler(t *testing.T) {
 	})
 }
 
+func TestSetupPushBackConversation(t *testing.T) {
+	t.Run("LoadsOwnMessagesForPushedBackAgentStep", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		// Pre-populate the step's own previous messages.
+		handler.messages["agent1"] = []exec.LLMMessage{
+			{Role: exec.RoleSystem, Content: "be helpful"},
+			{Role: exec.RoleUser, Content: "original prompt"},
+			{Role: exec.RoleAssistant, Content: "previous response"},
+		}
+		// Also set dependency messages to verify they get replaced.
+		handler.messages["dep1"] = []exec.LLMMessage{
+			{Role: exec.RoleUser, Content: "dep message"},
+		}
+
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		step := newStep("agent1",
+			withExecutorType(core.ExecutorTypeAgent),
+			withDepends("dep1"),
+			withApproval(&core.ApprovalConfig{
+				Prompt: "review this",
+				Input:  []string{"FEEDBACK"},
+			}),
+		)
+
+		plan := r.newPlan(t, successStep("dep1"), step)
+		node := plan.GetNodeByName("agent1")
+		require.NotNil(t, node)
+
+		// Simulate push-back: set ApprovalIteration > 0
+		node.SetApprovalIteration(1)
+
+		ctx := context.Background()
+
+		// First, setupChatMessages sets dependency messages.
+		r.runner.SetupChatMessages(ctx, node)
+		msgs := node.GetChatMessages()
+		require.Len(t, msgs, 1)
+		assert.Equal(t, "dep message", msgs[0].Content)
+
+		// Then, setupPushBackConversation replaces with own messages.
+		r.runner.SetupPushBackConversation(ctx, node)
+		msgs = node.GetChatMessages()
+		require.Len(t, msgs, 3)
+		assert.Equal(t, "be helpful", msgs[0].Content)
+		assert.Equal(t, "original prompt", msgs[1].Content)
+		assert.Equal(t, "previous response", msgs[2].Content)
+	})
+
+	t.Run("NoOpForFirstExecution", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		handler.messages["agent1"] = []exec.LLMMessage{
+			{Role: exec.RoleUser, Content: "should not load"},
+		}
+
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		step := newStep("agent1",
+			withExecutorType(core.ExecutorTypeAgent),
+			withApproval(&core.ApprovalConfig{}),
+		)
+
+		plan := r.newPlan(t, step)
+		node := plan.GetNodeByName("agent1")
+		// ApprovalIteration is 0 (default) — no push-back
+
+		ctx := context.Background()
+		r.runner.SetupPushBackConversation(ctx, node)
+
+		// Should not load any messages.
+		msgs := node.GetChatMessages()
+		assert.Empty(t, msgs)
+	})
+
+	t.Run("NoOpForNonAgentStep", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		handler.messages["cmd1"] = []exec.LLMMessage{
+			{Role: exec.RoleUser, Content: "should not load"},
+		}
+
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		step := newStep("cmd1",
+			withCommand("echo hello"),
+			withApproval(&core.ApprovalConfig{}),
+		)
+
+		plan := r.newPlan(t, step)
+		node := plan.GetNodeByName("cmd1")
+		node.SetApprovalIteration(1)
+
+		ctx := context.Background()
+		r.runner.SetupPushBackConversation(ctx, node)
+
+		msgs := node.GetChatMessages()
+		assert.Empty(t, msgs)
+	})
+
+	t.Run("NoOpWithoutApproval", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		handler.messages["agent1"] = []exec.LLMMessage{
+			{Role: exec.RoleUser, Content: "should not load"},
+		}
+
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		step := newStep("agent1",
+			withExecutorType(core.ExecutorTypeAgent),
+		)
+
+		plan := r.newPlan(t, step)
+		node := plan.GetNodeByName("agent1")
+		node.SetApprovalIteration(1)
+
+		ctx := context.Background()
+		r.runner.SetupPushBackConversation(ctx, node)
+
+		msgs := node.GetChatMessages()
+		assert.Empty(t, msgs)
+	})
+
+	t.Run("GracefulOnReadError", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		handler.readErr = fmt.Errorf("storage error")
+
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		step := newStep("agent1",
+			withExecutorType(core.ExecutorTypeAgent),
+			withApproval(&core.ApprovalConfig{}),
+		)
+
+		plan := r.newPlan(t, step)
+		node := plan.GetNodeByName("agent1")
+		node.SetApprovalIteration(1)
+
+		ctx := context.Background()
+		// Should not panic on read error.
+		r.runner.SetupPushBackConversation(ctx, node)
+
+		msgs := node.GetChatMessages()
+		assert.Empty(t, msgs)
+	})
+}
+
 func TestWaitStep(t *testing.T) {
 	t.Run("WaitStepResultsInWaitStatus", func(t *testing.T) {
 		t.Parallel()

@@ -199,6 +199,14 @@ func (n *Node) Execute(ctx context.Context) error {
 		}
 	}
 
+	// Pass push-back context to executors that support iterative feedback.
+	if pbHandler, ok := cmd.(executor.PushBackAware); ok {
+		state := n.State()
+		if state.ApprovalIteration > 0 {
+			pbHandler.SetPushBackContext(state.PushBackInputs, state.ApprovalIteration)
+		}
+	}
+
 	flusher := n.startOutputFlusher()
 	defer func() {
 		n.stopOutputFlusher(flusher)
