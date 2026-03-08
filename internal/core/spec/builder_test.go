@@ -1697,6 +1697,176 @@ steps:
 		assert.Equal(t, []string{"cmd_1"}, th.Steps[1].Depends)
 		assert.Equal(t, []string{"cmd_2"}, th.Steps[2].Depends)
 	})
+
+	t.Run("IDPromotedToName", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - id: fetch_data
+    command: echo hi
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+
+		require.Len(t, th.Steps, 1)
+		assert.Equal(t, "fetch_data", th.Steps[0].Name)
+		assert.Equal(t, "fetch_data", th.Steps[0].ID)
+	})
+
+	t.Run("ExplicitNameWinsOverID", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - id: build
+    name: compile
+    command: make build
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+
+		require.Len(t, th.Steps, 1)
+		assert.Equal(t, "compile", th.Steps[0].Name)
+		assert.Equal(t, "build", th.Steps[0].ID)
+	})
+
+	t.Run("NoIDNoNameAutoGenerates", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: echo hi
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+
+		require.Len(t, th.Steps, 1)
+		assert.Equal(t, "cmd_1", th.Steps[0].Name)
+	})
+
+	t.Run("DependsOnPromotedID", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+type: graph
+steps:
+  - id: extract
+    command: echo extract
+  - id: transform
+    command: echo transform
+    depends: [extract]
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+
+		require.Len(t, th.Steps, 2)
+		assert.Equal(t, "extract", th.Steps[0].Name)
+		assert.Equal(t, "transform", th.Steps[1].Name)
+		assert.Equal(t, []string{"extract"}, th.Steps[1].Depends)
+	})
+
+	t.Run("ChainTypeWithPromotedIDs", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - id: step_a
+    command: echo a
+  - id: step_b
+    command: echo b
+  - id: step_c
+    command: echo c
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+
+		require.Len(t, th.Steps, 3)
+		assert.Equal(t, "step_a", th.Steps[0].Name)
+		assert.Equal(t, "step_b", th.Steps[1].Name)
+		assert.Equal(t, "step_c", th.Steps[2].Name)
+		assert.Equal(t, []string{"step_a"}, th.Steps[1].Depends)
+		assert.Equal(t, []string{"step_b"}, th.Steps[2].Depends)
+	})
+
+	t.Run("PromotedIDDoesNotCollideWithAutoName", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - id: cmd_2
+    command: echo first
+  - command: echo second
+  - command: echo third
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+
+		require.Len(t, th.Steps, 3)
+		assert.Equal(t, "cmd_2", th.Steps[0].Name)
+		assert.Equal(t, "cmd_3", th.Steps[1].Name)
+		assert.Equal(t, "cmd_4", th.Steps[2].Name)
+	})
+
+	t.Run("MixedIDExplicitAndAutoSteps", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+type: graph
+steps:
+  - id: a
+    command: echo a
+  - name: B
+    command: echo b
+  - command: echo c
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+
+		require.Len(t, th.Steps, 3)
+		assert.Equal(t, "a", th.Steps[0].Name)
+		assert.Equal(t, "B", th.Steps[1].Name)
+		assert.Equal(t, "cmd_3", th.Steps[2].Name)
+	})
+
+	t.Run("DuplicatePromotedIDsBuildError", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+type: graph
+steps:
+  - id: same_id
+    command: echo a
+  - id: same_id
+    command: echo b
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "duplicate")
+	})
+
+	t.Run("PromotedIDConflictsWithExplicitName", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+type: graph
+steps:
+  - name: deploy
+    command: echo a
+  - id: deploy
+    command: echo b
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "step name must be unique")
+	})
 }
 
 func TestStepIDValidation(t *testing.T) {
@@ -1869,6 +2039,8 @@ steps:
 	})
 
 	t.Run("MixOfIDAndNameDependencies", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 type: graph
 steps:

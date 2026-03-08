@@ -631,6 +631,42 @@ func TestValidateStep(t *testing.T) {
 		step := Step{Name: strings.Repeat("x", 40), ExecutorConfig: testExecConfig}
 		assert.Empty(t, validateStep(step))
 	})
+
+	t.Run("promoted ID too long gives clear error", func(t *testing.T) {
+		t.Parallel()
+		longID := strings.Repeat("a", 41)
+		step := Step{Name: longID, ID: longID, ExecutorConfig: testExecConfig}
+		errs := validateStep(step)
+		require.NotEmpty(t, errs)
+		assert.Contains(t, errs.Error(), "step ID")
+		assert.Contains(t, errs.Error(), "add an explicit shorter 'name' field")
+	})
+}
+
+func TestValidateStepIDLength(t *testing.T) {
+	t.Parallel()
+
+	t.Run("step ID too long fails", func(t *testing.T) {
+		t.Parallel()
+		dag := &DAG{
+			Steps: []Step{
+				{Name: "short", ID: strings.Repeat("a", 41), ExecutorConfig: testExecConfig},
+			},
+		}
+		err := ValidateSteps(dag)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrStepIDTooLong)
+	})
+
+	t.Run("step ID at max length passes", func(t *testing.T) {
+		t.Parallel()
+		dag := &DAG{
+			Steps: []Step{
+				{Name: "ok", ID: strings.Repeat("a", 40), ExecutorConfig: testExecConfig},
+			},
+		}
+		assert.NoError(t, ValidateSteps(dag))
+	})
 }
 
 func TestValidateStepWithValidator(t *testing.T) {

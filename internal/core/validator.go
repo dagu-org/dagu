@@ -103,6 +103,10 @@ func collectNamesAndIDs(dag *DAG, errs *ErrorList) (stepNames, stepIDs map[strin
 			*errs = append(*errs, NewValidationError("steps", step.ID, fmt.Errorf("invalid step ID format: must match %s (use '_' instead of '-')", stepIDPattern.String())))
 		}
 
+		if len(step.ID) > maxStepNameLen {
+			*errs = append(*errs, NewValidationError("steps", step.ID, ErrStepIDTooLong))
+		}
+
 		if _, exists := stepIDs[step.ID]; exists {
 			*errs = append(*errs, NewValidationError("steps", step.ID, fmt.Errorf("duplicate step ID: %s", step.ID)))
 		} else {
@@ -165,7 +169,12 @@ func validateStep(step Step) ErrorList {
 	}
 
 	if len(step.Name) > maxStepNameLen {
-		errs = append(errs, NewValidationError("name", step.Name, ErrStepNameTooLong))
+		if step.ID != "" && step.Name == step.ID {
+			errs = append(errs, NewValidationError("name", step.Name,
+				fmt.Errorf("step ID '%s' is used as display name but exceeds %d characters; add an explicit shorter 'name' field", step.ID, maxStepNameLen)))
+		} else {
+			errs = append(errs, NewValidationError("name", step.Name, ErrStepNameTooLong))
+		}
 	}
 
 	errs = append(errs, validateParallelConfig(step)...)
