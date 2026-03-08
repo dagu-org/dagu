@@ -430,11 +430,18 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 	ctx = node.SetupEnv(ctx)
 
 	// Inject push-back inputs as environment variables for re-execution.
-	// When a step is pushed back, the human's feedback inputs are stored
-	// in PushBackInputs and need to be available as env vars during re-run.
-	if pushBackInputs := node.State().PushBackInputs; len(pushBackInputs) > 0 {
+	// Only declared input fields are allowed to prevent arbitrary env overwrite.
+	if approval := node.Step().Approval; approval != nil && len(node.State().PushBackInputs) > 0 {
 		env := GetEnv(ctx)
-		for k, v := range pushBackInputs {
+		allowed := make(map[string]struct{}, len(approval.Input))
+		for _, key := range approval.Input {
+			allowed[key] = struct{}{}
+		}
+		for k, v := range node.State().PushBackInputs {
+			if _, ok := allowed[k]; !ok {
+				logger.Warn(ctx, "Ignoring unexpected push-back input", slog.String("input", k))
+				continue
+			}
 			env = env.WithEnvVars(k, v)
 		}
 		ctx = WithEnv(ctx, env)
@@ -493,8 +500,8 @@ ExecRepeat: // repeat execution
 		node.SetStatus(core.NodeWaiting)
 	}
 
-	// Save chat messages after successful execution
-	if node.State().Status == core.NodeSucceeded {
+	// Save chat messages after execution (including waiting steps for push-back continuity).
+	if node.State().Status == core.NodeSucceeded || node.State().Status == core.NodeWaiting {
 		r.saveChatMessages(ctx, node)
 	}
 

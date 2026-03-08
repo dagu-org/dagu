@@ -238,6 +238,7 @@ func toNode(node *exec.Node) api.Node {
 		ApprovedAt:        ptrOf(node.ApprovedAt),
 		ApprovedBy:        ptrOf(node.ApprovedBy),
 		ApprovalInputs:    ptrOf(node.ApprovalInputs),
+		PushBackInputs:    ptrOf(node.PushBackInputs),
 		RejectedAt:        ptrOf(node.RejectedAt),
 		RejectedBy:        ptrOf(node.RejectedBy),
 		RejectionReason:   ptrOf(node.RejectionReason),

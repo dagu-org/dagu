@@ -2009,7 +2009,7 @@ func hasWaitingSteps(nodes []*exec.Node) bool {
 func checkMissingInputs(required []string, provided map[string]string) error {
 	var missing []string
 	for _, fieldName := range required {
-		if provided == nil || provided[fieldName] == "" {
+		if provided == nil || strings.TrimSpace(provided[fieldName]) == "" {
 			missing = append(missing, fieldName)
 		}
 	}

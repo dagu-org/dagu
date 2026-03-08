@@ -6660,6 +6660,9 @@ components:
         resumed:
           type: boolean
           description: "Whether the DAG run was re-enqueued for execution"
+        subDAGRunId:
+          type: string
+          description: "The sub-DAG run ID, present only for sub-DAG push-back operations"
       required:
         - dagRunId
         - stepName

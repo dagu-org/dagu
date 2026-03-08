@@ -2564,6 +2564,8 @@ export interface components {
             approvalIteration: number;
             /** @description Whether the DAG run was re-enqueued for execution */
             resumed: boolean;
+            /** @description The sub-DAG run ID, present only for sub-DAG push-back operations */
+            subDAGRunId?: string;
         };
         /** @description Configuration for a human approval gate on a step */
         ApprovalConfig: {

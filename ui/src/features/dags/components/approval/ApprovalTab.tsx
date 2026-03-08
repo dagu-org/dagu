@@ -79,7 +79,7 @@ function ApprovalCard({
             dagName={dagName}
             dagRunId={dagRun.dagRunId}
             stepName={step.name}
-            stream={Stream.stdout}
+            stream={node.stdout ? Stream.stdout : Stream.stderr}
             dagRun={dagRun}
           />
         </div>

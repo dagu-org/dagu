@@ -233,7 +233,7 @@ For more examples, see the [Examples](https://docs.dagu.sh/writing-workflows/exa
 - [Distributed execution](https://docs.dagu.sh/features/distributed-execution) — coordinator/worker mode across machines
 - [19+ built-in executors](https://docs.dagu.sh/reference/executors) — HTTP, SQL, Redis, S3, jq, mail, archive, and more
 - [RBAC](https://docs.dagu.sh/configurations/authentication) with 5 roles, OIDC, API keys, and audit logging
-- [Human-in-the-loop](https://docs.dagu.sh/writing-workflows/examples) approval gates
+- [Approval gates](https://docs.dagu.sh/features/approval) on any step type
 
 ### AI-Native
 

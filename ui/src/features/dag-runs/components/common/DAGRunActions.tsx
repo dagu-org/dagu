@@ -426,6 +426,7 @@ function DAGRunActions({
                   setIsRejectModal(false);
                   const details = dagRun as components['schemas']['DAGRunDetails'];
                   const waitingNodes = details.nodes.filter(n => n.status === NodeStatus.Waiting);
+                  const errors: string[] = [];
                   for (const node of waitingNodes) {
                     const { error } = await client.POST(
                       '/dag-runs/{name}/{dagRunId}/steps/{stepName}/reject',
@@ -438,13 +439,14 @@ function DAGRunActions({
                       }
                     );
                     if (error) {
-                      showError(
-                        error.message || 'Failed to reject step',
-                        `Failed to reject step "${node.step.name}".`
-                      );
-                      setRejectReason('');
-                      return;
+                      errors.push(node.step.name);
                     }
+                  }
+                  if (errors.length > 0) {
+                    showError(
+                      `Failed to reject ${errors.length} step(s)`,
+                      `Failed to reject: ${errors.join(', ')}`
+                    );
                   }
                   setRejectReason('');
                   reloadData();
