@@ -129,6 +129,8 @@ steps:
 `, withLogPersistence(), withBaseConfigPath(baseConfigPath), withLabels(map[string]string{"type": "test-worker"}))
 		defer f.cleanup()
 
+		// Use agent.RunSuccess() (direct execution) instead of the scheduler path
+		// to test base config propagation through the sub-DAG dispatch specifically.
 		agent := f.dagWrapper.Agent()
 		agent.RunSuccess(t)
 		f.dagWrapper.AssertLatestStatus(t, core.Succeeded)

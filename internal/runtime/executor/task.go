@@ -107,6 +107,9 @@ func ResolveBaseConfig(baseConfigData []byte, fallbackPath string) string {
 	}
 	data, err := os.ReadFile(fallbackPath) //nolint:gosec
 	if err != nil {
+		if !os.IsNotExist(err) {
+			slog.Debug("failed to read base config file", "path", fallbackPath, "error", err)
+		}
 		return ""
 	}
 	return string(data)
