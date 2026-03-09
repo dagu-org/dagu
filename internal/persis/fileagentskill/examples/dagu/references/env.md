@@ -22,7 +22,6 @@ Set automatically during DAG execution. Defined in `internal/core/exec/env.go`.
 | `DAG_RUN_WORK_DIR` | Only if a per-run working directory is configured | Path to the per-DAG-run working directory |
 | `DAG_DOCS_DIR` | Only if `paths.docs_dir` is configured | Per-DAG docs directory (`{docs_dir}/{dag_name}`) |
 | `DAGU_PARAMS_JSON` | Only if the DAG has parameters | Resolved parameters encoded as JSON |
-| `DAG_PARAMS_JSON` | Only if the DAG has parameters | Same as `DAGU_PARAMS_JSON` (backward compatibility alias) |
 
 ### Handler-Only Variables
 
@@ -41,9 +40,8 @@ All configuration environment variables use the `DAGU_` prefix. They map to conf
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DAGU_HOME` | `~/.dagu` (legacy) or XDG dirs | Base directory for all Dagu data. When set, all paths use unified structure under this directory |
+| `DAGU_HOME` | XDG dirs | Base directory for all Dagu data. When set, all paths use unified structure under this directory |
 | `DAGU_DAGS_DIR` | `$DAGU_HOME/dags` | DAG YAML files directory |
-| `DAGU_DAGS` | — | Legacy alias for `DAGU_DAGS_DIR` |
 | `DAGU_LOG_DIR` | `$DAGU_HOME/logs` | Log files directory |
 | `DAGU_DATA_DIR` | `$DAGU_HOME/data` | Data storage directory |
 | `DAGU_ADMIN_LOG_DIR` | `$DAGU_HOME/logs/admin` | Admin logs directory |
@@ -66,7 +64,6 @@ All configuration environment variables use the `DAGU_` prefix. They map to conf
 | `DAGU_HOST` | `127.0.0.1` | Server bind address |
 | `DAGU_PORT` | `8080` | Server port |
 | `DAGU_BASE_PATH` | `""` (empty) | URL base path for reverse proxy setups |
-| `DAGU_API_BASE_URL` | — | API base URL override |
 | `DAGU_TZ` | system | Timezone for schedules |
 | `DAGU_LOG_FORMAT` | `text` | Log format: `text` or `json` |
 | `DAGU_ACCESS_LOG_MODE` | `all` | Access log mode: `all`, `non-public`, `none` |
@@ -252,8 +249,6 @@ $DAGU_HOME/
 └── base.yaml      # Base configuration
 ```
 
-When `DAGU_HOME` is not set:
-1. If `~/.dagu` exists (legacy), it is used as the unified root (with a deprecation warning).
-2. Otherwise, XDG-compliant paths are used (`$XDG_CONFIG_HOME/dagu/`, `$XDG_DATA_HOME/dagu/`).
+When `DAGU_HOME` is not set, XDG-compliant paths are used (`$XDG_CONFIG_HOME/dagu/`, `$XDG_DATA_HOME/dagu/`).
 
 Individual path variables (e.g., `DAGU_DAGS_DIR`) override the defaults regardless of which resolution mode is active.

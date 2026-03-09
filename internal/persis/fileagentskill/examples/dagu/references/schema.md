@@ -25,14 +25,13 @@
 | `timeout_sec` | int | — | Max execution time (seconds) |
 | `delay_sec` | int | — | Delay before first step |
 | `restart_wait_sec` | int | — | Wait time before restart |
-| `max_active_runs` | int | 1 | Max concurrent DAG runs |
 | `max_active_steps` | int | — | Max concurrent steps per run |
 | `max_clean_up_time_sec` | int | 5 | Max cleanup time |
 | `max_output_size` | int | 1048576 (1MB) | Max step output capture (bytes) |
 | `log_dir` | string | — | Log directory |
 | `log_output` | string | `separate` | `separate` (.out/.err) or `merged` (.log) |
 | `hist_retention_days` | int | 30 | History retention |
-| `queue` | string | — | Queue name for this DAG |
+| `queue` | string | — | Queue name for concurrency control. Define queues in global config with `max_concurrency`. |
 | `preconditions` | array | — | DAG-level preconditions (`condition`, `expected`, `negate`) |
 | `handler_on` | object | — | Event handlers: `init`, `success`, `failure`, `abort`, `exit`, `wait` (each is a step definition) |
 | `smtp` | object | — | SMTP config: `host`, `port`, `username`, `password` |
