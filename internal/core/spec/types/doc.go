@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package types provides typed union types for YAML fields that accept multiple formats.
 //
 // These types provide type-safe unmarshaling with early validation while maintaining

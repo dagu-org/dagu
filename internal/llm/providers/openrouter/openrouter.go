@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package openrouter provides an LLM provider implementation for OpenRouter's API.
 // OpenRouter is a unified API that routes requests to various LLM providers.
 package openrouter

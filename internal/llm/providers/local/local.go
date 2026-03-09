@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package local provides an LLM provider implementation for local OpenAI-compatible servers.
 // This includes Ollama, vLLM, llama.cpp server, LocalAI, and other compatible implementations.
 package local

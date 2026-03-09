@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package core
 
 // Status represents the canonical lifecycle phases for a DAG execution.

@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package dirlock provides a directory-based locking mechanism for coordinating
 // access to shared resources across multiple processes.
 package dirlock

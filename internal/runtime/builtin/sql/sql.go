@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package sql provides SQL executor capabilities for PostgreSQL and SQLite databases.
 package sql
 

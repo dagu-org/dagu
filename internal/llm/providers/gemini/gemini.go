@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package gemini provides an LLM provider implementation for Google's Gemini API.
 package gemini
 

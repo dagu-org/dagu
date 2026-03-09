@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package agentstep provides an executor for agent-type workflow steps.
 // It wraps the agent.Loop to run the AI agent as a single-shot
 // step within a DAG workflow.

@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package oidcprovision provides OIDC user provisioning functionality for builtin auth mode.
 package oidcprovision
 

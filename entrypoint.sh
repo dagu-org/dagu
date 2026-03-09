@@ -1,4 +1,7 @@
 #!/usr/bin/env /bin/sh
+# Copyright (C) 2026 Yota Hamada
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 
 # Check if both DOCKER_GID is not -1. This indicates the desire for a docker group
 if [ "$DOCKER_GID" != "-1" ]; then

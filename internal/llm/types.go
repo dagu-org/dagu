@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package llm provides a generic abstraction layer for interacting with
 // Large Language Model providers.
 package llm

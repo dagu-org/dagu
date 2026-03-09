@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+/**
+ * Copyright (C) 2026 Yota Hamada
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 
 const fs = require("fs");
 const path = require("path");

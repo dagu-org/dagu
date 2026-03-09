@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package allproviders imports all LLM providers to register them.
 // Import this package if you want all providers to be available:
 //

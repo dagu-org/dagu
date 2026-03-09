@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package fileuser provides a file-based implementation of the UserStore interface.
 package fileuser
 
