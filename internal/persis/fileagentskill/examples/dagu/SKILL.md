@@ -13,19 +13,23 @@ Dagu runs workflows defined as DAGs in YAML. Each YAML file defines steps with c
 | `chain` (default) | Steps run sequentially in definition order. `depends:` is not allowed. |
 | `graph` | Steps run based on `depends:` declarations. Steps without `depends:` run immediately in parallel. |
 
+**Always use `type: graph`** in DAG definitions. It supports both sequential (via `depends:`) and parallel execution, making it strictly more capable than `chain`. Every DAG you write should include `type: graph` at the top level.
+
 ## Step Execution
 
 Steps can run commands via different executor types. The default executor runs shell commands.
 
 ```yaml
+type: graph
+
 # Minimal step
 steps:
   - name: hello
     command: echo "hello world"
 
-# Script block
-steps:
+# Script block — depends on hello, so runs after it
   - name: process
+    depends: [hello]
     script: |
       set -e
       echo "line 1"
@@ -37,6 +41,7 @@ steps:
 Capture stdout to a variable with `output:`, reference in later steps with `${VAR}`:
 
 ```yaml
+type: graph
 steps:
   - name: get-date
     command: date +%Y-%m-%d
@@ -49,6 +54,7 @@ steps:
 For JSON output, extract fields with `${VAR.key}`:
 
 ```yaml
+type: graph
 steps:
   - name: get-data
     command: echo '{"host":"db.example.com","port":5432}'
@@ -61,6 +67,7 @@ steps:
 ## Parameters
 
 ```yaml
+type: graph
 params:
   env: production
   region: us-east-1
@@ -75,6 +82,7 @@ Override at runtime: `dagu start my-dag -- env=staging region=eu-west-1`
 ## Environment Variables
 
 ```yaml
+type: graph
 # Use list-of-maps to preserve ordering (maps iterate randomly in Go):
 env:
   - BASE_DIR: /data
@@ -84,6 +92,7 @@ env:
 ## Lifecycle Hooks
 
 ```yaml
+type: graph
 handler_on:
   init:
     command: echo "starting"
@@ -98,6 +107,7 @@ handler_on:
 ## Retry and Continue
 
 ```yaml
+type: graph
 steps:
   - name: flaky-step
     command: curl http://api.example.com/data
@@ -111,6 +121,7 @@ steps:
 ## Sub-DAGs
 
 ```yaml
+type: graph
 steps:
   - name: run-child
     type: dag
@@ -121,22 +132,30 @@ steps:
 
 ## Conditional Routing
 
+Routes map patterns to lists of existing step names (not inline step definitions).
+
 ```yaml
+type: graph
 steps:
   - name: check
     command: echo "error"
     output: RESULT
+
   - name: route
     type: router
     value: ${RESULT}
     routes:
       "ok":
-        - name: success-path
-          command: echo "success"
+        - success-path
       "re:err.*":
-        - name: error-path
-          command: echo "handling error"
+        - error-path
     depends: [check]
+
+  - name: success-path
+    command: echo "success"
+
+  - name: error-path
+    command: echo "handling error"
 ```
 
 ## Quick Reference Tables
