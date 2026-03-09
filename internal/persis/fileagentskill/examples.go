@@ -12,14 +12,19 @@ import (
 	"strings"
 )
 
-//go:embed examples/*/SKILL.md
+//go:embed all:examples
 var exampleSkillsFS embed.FS
 
 const examplesMarkerFile = ".examples-created"
 
 // ExampleSkillIDs returns the IDs of bundled example skills.
 func ExampleSkillIDs() []string {
-	return []string{"dagu-ai-workflows", "dagu-containers", "dagu-server-worker"}
+	return []string{"dagu", "dagu-ai-workflows", "dagu-containers", "dagu-server-worker"}
+}
+
+// SkillFS returns the embedded example skills filesystem.
+func SkillFS() embed.FS {
+	return exampleSkillsFS
 }
 
 // SeedExampleSkills writes bundled example skills to baseDir if not already seeded.
