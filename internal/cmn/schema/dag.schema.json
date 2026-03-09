@@ -1223,6 +1223,31 @@
           "$ref": "#/definitions/agentStepConfig",
           "description": "Agent configuration for AI agent steps. Only valid when type is 'agent'. Controls model, tools, safety, and iteration limits."
         },
+        "approval": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "prompt": {
+              "type": "string",
+              "description": "Message displayed to the approver explaining what approval is needed."
+            },
+            "input": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of expected input field names from the approver."
+            },
+            "required": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Subset of input fields that must be provided by the approver."
+            }
+          },
+          "description": "Human approval gate for this step. When configured, the step executes its command first, then pauses the DAG and waits for human approval before proceeding to dependent steps. The approver can provide input values that become available as environment variables in subsequent steps."
+        },
         "messages": {
           "type": "array",
           "items": {
