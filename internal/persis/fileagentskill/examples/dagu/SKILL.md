@@ -15,20 +15,32 @@ Dagu runs workflows defined as DAGs in YAML. Each YAML file defines steps with c
 
 **Always use `type: graph`** in DAG definitions. It supports both sequential (via `depends:`) and parallel execution, making it strictly more capable than `chain`. Every DAG you write should include `type: graph` at the top level.
 
+## Step Identity: `id` vs `name`
+
+**Always set `id` on every step. Omit `name` — it is redundant.** When `name` is omitted, it is automatically set to the `id` value. When both are omitted, a name is auto-generated (e.g., `cmd_1`, `docker_1`), but the step cannot be referenced by other steps.
+
+The `id` field is required for:
+- Referencing step outputs via `${step_id.stdout}`, `${step_id.stderr}`, `${step_id.exit_code}`
+- Dependencies via `depends: [step_id]`
+
+**Step ID rules:**
+- Regex: `^[a-zA-Z][a-zA-Z0-9_]*$`
+- Must start with a letter, followed by letters, digits, or underscores
+- Max length: 40 characters
+- **No hyphens** — use underscores instead
+- Reserved words (cannot be used as IDs): `env`, `params`, `args`, `stdout`, `stderr`, `output`, `outputs`
+
 ## Step Execution
 
 Steps can run commands via different executor types. The default executor runs shell commands.
 
 ```yaml
 type: graph
-
-# Minimal step
 steps:
-  - name: hello
+  - id: hello
     command: echo "hello world"
 
-# Script block — depends on hello, so runs after it
-  - name: process
+  - id: process
     depends: [hello]
     script: |
       set -e
@@ -38,17 +50,20 @@ steps:
 
 ## Output Passing
 
-Capture stdout to a variable with `output:`, reference in later steps with `${VAR}`:
+### Captured output variables (`output:`)
+
+Capture stdout **content** to a named variable with `output:`, reference with `${VAR}`:
 
 ```yaml
 type: graph
 steps:
-  - name: get-date
+  - id: get_date
     command: date +%Y-%m-%d
     output: TODAY
-  - name: use-date
+
+  - id: use_date
     command: echo "Today is ${TODAY}"
-    depends: [get-date]
+    depends: [get_date]
 ```
 
 For JSON output, extract fields with `${VAR.key}`:
@@ -56,13 +71,54 @@ For JSON output, extract fields with `${VAR.key}`:
 ```yaml
 type: graph
 steps:
-  - name: get-data
+  - id: get_config
     command: echo '{"host":"db.example.com","port":5432}'
     output: CONFIG
-  - name: use-data
+
+  - id: use_config
     command: echo "Host is ${CONFIG.host}"
-    depends: [get-data]
+    depends: [get_config]
 ```
+
+### Step reference properties (`${step_id.XXX}`)
+
+Steps with an `id` expose three properties to downstream steps:
+
+| Reference | Value |
+|-----------|-------|
+| `${step_id.stdout}` | **File path** to the step's stdout log |
+| `${step_id.stderr}` | **File path** to the step's stderr log |
+| `${step_id.exit_code}` | Exit code as a string |
+
+**Important:** `${step_id.stdout}` returns the **file path**, not the content. Use `output:` to capture **content** into a variable.
+
+Slicing syntax is supported: `${step_id.stdout:start:length}`
+
+```yaml
+type: graph
+steps:
+  - id: producer
+    command: echo "hello world"
+    output: CONTENT
+
+  - id: consumer
+    depends: [producer]
+    script: |
+      # Content captured by output: field
+      echo "Content: ${CONTENT}"
+
+      # File paths to log files
+      echo "Stdout file: ${producer.stdout}"
+      echo "Stderr file: ${producer.stderr}"
+
+      # Exit code
+      echo "Exit code: ${producer.exit_code}"
+
+      # Slicing: first 5 chars of stdout path
+      echo "Prefix: ${producer.stdout:0:5}"
+```
+
+Resolution priority: when `${foo.bar}` is evaluated, step references are checked first, then JSON path on variables.
 
 ## Parameters
 
@@ -73,7 +129,7 @@ params:
   region: us-east-1
 
 steps:
-  - name: deploy
+  - id: deploy
     command: deploy --env ${env} --region ${region}
 ```
 
@@ -109,7 +165,7 @@ handler_on:
 ```yaml
 type: graph
 steps:
-  - name: flaky-step
+  - id: flaky_step
     command: curl http://api.example.com/data
     retry_policy:
       limit: 3
@@ -123,7 +179,7 @@ steps:
 ```yaml
 type: graph
 steps:
-  - name: run-child
+  - id: run_child
     type: dag
     call: child-workflow
     params:
@@ -137,24 +193,24 @@ Routes map patterns to lists of existing step names (not inline step definitions
 ```yaml
 type: graph
 steps:
-  - name: check
+  - id: check
     command: echo "error"
     output: RESULT
 
-  - name: route
+  - id: route
     type: router
     value: ${RESULT}
     routes:
       "ok":
-        - success-path
+        - success_path
       "re:err.*":
-        - error-path
+        - error_path
     depends: [check]
 
-  - name: success-path
+  - id: success_path
     command: echo "success"
 
-  - name: error-path
+  - id: error_path
     command: echo "handling error"
 ```
 

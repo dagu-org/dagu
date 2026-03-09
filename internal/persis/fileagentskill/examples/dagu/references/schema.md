@@ -55,8 +55,8 @@
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `name` | string | required | Step name |
-| `id` | string | — | Unique step ID |
+| `id` | string | — | Unique step identifier. **Always set this.** Required for `${id.stdout}`, `${id.stderr}`, `${id.exit_code}` references and `depends:`. Regex: `^[a-zA-Z][a-zA-Z0-9_]*$`, max 40 chars. Reserved: `env`, `params`, `args`, `stdout`, `stderr`, `output`, `outputs`. |
+| `name` | string | — | Display name. **Omit this** — auto-set from `id` when absent. Only use if you need a different display name than the ID. |
 | `command` | string | — | Shell command |
 | `script` | string | — | Script content |
 | `shell` | string or array | — | Override shell |
@@ -86,3 +86,19 @@
 | `value` | string | — | Router expression |
 | `routes` | map | — | Router pattern→steps mappings |
 | `worker_selector` | map | — | Labels for distributed execution |
+
+## Step Reference Properties
+
+Steps with an `id` expose properties accessible via `${step_id.property}` in downstream steps:
+
+| Reference | Type | Description |
+|-----------|------|-------------|
+| `${step_id.stdout}` | string | **File path** to the step's stdout log file |
+| `${step_id.stderr}` | string | **File path** to the step's stderr log file |
+| `${step_id.exit_code}` | string | Exit code as a string (e.g., `"0"`) |
+
+Slicing: `${step_id.stdout:start:length}` — substring from `start` for `length` characters.
+
+**Note:** `${step_id.stdout}` is the **file path**, not the content. To capture stdout **content** into a variable, use the `output:` field and reference it as `${VAR_NAME}`.
+
+Resolution priority for `${foo.bar}`: step property lookup first, then JSON path on variable `foo`.
