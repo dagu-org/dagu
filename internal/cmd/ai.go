@@ -42,7 +42,7 @@ func AI() *cobra.Command {
 }
 
 func aiInstallCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "install",
 		Short: "Install Dagu skill into AI coding tools",
 		Long: `Install the Dagu DAG authoring skill into detected AI coding tools.
@@ -55,6 +55,8 @@ Supported tools: Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI`,
 		Args: cobra.NoArgs,
 		RunE: runAIInstall,
 	}
+	cmd.Flags().BoolP("yes", "y", false, "Install to all detected tools without prompting")
+	return cmd
 }
 
 func aiTools() []aiTool {
@@ -63,9 +65,9 @@ func aiTools() []aiTool {
 			Name:   "Claude Code",
 			Format: "skill",
 			detect: func(homeDir string) string {
-				dir := filepath.Join(homeDir, ".claude")
-				if dirExists(dir) {
-					return filepath.Join(dir, "skills")
+				// Verify Claude Code is installed by checking for its config file
+				if fileExists(filepath.Join(homeDir, ".claude", ".claude.json")) {
+					return filepath.Join(homeDir, ".claude", "skills")
 				}
 				return ""
 			},
@@ -109,9 +111,9 @@ func aiTools() []aiTool {
 			Name:   "Gemini CLI",
 			Format: "skill",
 			detect: func(homeDir string) string {
-				dir := filepath.Join(homeDir, ".gemini")
-				if dirExists(dir) {
-					return filepath.Join(dir, "skills")
+				// Verify Gemini CLI is installed by checking for GEMINI.md
+				if fileExists(filepath.Join(homeDir, ".gemini", "GEMINI.md")) {
+					return filepath.Join(homeDir, ".gemini", "skills")
 				}
 				return ""
 			},
@@ -120,14 +122,15 @@ func aiTools() []aiTool {
 			Name:   "Copilot CLI",
 			Format: "copilot",
 			detect: func(homeDir string) string {
+				// Verify Copilot CLI by checking for config.json
 				if v := os.Getenv("XDG_CONFIG_HOME"); v != "" {
 					dir := filepath.Join(v, ".copilot")
-					if dirExists(dir) {
+					if fileExists(filepath.Join(dir, "config.json")) {
 						return dir
 					}
 				}
 				dir := filepath.Join(homeDir, ".copilot")
-				if dirExists(dir) {
+				if fileExists(filepath.Join(dir, "config.json")) {
 					return dir
 				}
 				return ""
@@ -141,10 +144,15 @@ type detectedTool struct {
 	targetPath string // full path to the skill file or directory
 }
 
-func runAIInstall(_ *cobra.Command, _ []string) error {
+func runAIInstall(cmd *cobra.Command, _ []string) error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("failed to determine home directory: %w", err)
+	}
+
+	skipPrompt, err := cmd.Flags().GetBool("yes")
+	if err != nil {
+		return fmt.Errorf("failed to get yes flag: %w", err)
 	}
 
 	reader := bufio.NewReader(os.Stdin)
@@ -187,15 +195,8 @@ func runAIInstall(_ *cobra.Command, _ []string) error {
 	skillFS := fileagentskill.SkillFS()
 
 	for _, d := range detected {
-		exists := skillExists(d)
-		if !promptDefault(reader, fmt.Sprintf("Install to %s?", d.tool.Name), true) {
-			fmt.Println("  — Skipped")
-			fmt.Println()
-			continue
-		}
-
-		if exists {
-			if !promptDefault(reader, "  Skill already exists. Overwrite?", false) {
+		if !skipPrompt {
+			if !promptDefault(reader, fmt.Sprintf("Install to %s?", d.tool.Name), true) {
 				fmt.Println("  — Skipped")
 				fmt.Println()
 				continue
@@ -215,11 +216,7 @@ func runAIInstall(_ *cobra.Command, _ []string) error {
 			continue
 		}
 
-		action := "Installed"
-		if exists {
-			action = "Updated"
-		}
-		fmt.Printf("  ✓ %s %s\n", action, tildefy(d.targetPath, homeDir))
+		fmt.Printf("  ✓ Installed %s\n", tildefy(d.targetPath, homeDir))
 		fmt.Println()
 	}
 
@@ -356,19 +353,6 @@ func stripFrontmatter(content string) string {
 	return strings.TrimLeft(after, "\n")
 }
 
-// skillExists checks if the skill is already installed at the target.
-func skillExists(d detectedTool) bool {
-	if d.tool.Format == "copilot" {
-		data, err := os.ReadFile(d.targetPath)
-		if err != nil {
-			return false
-		}
-		return strings.Contains(string(data), copilotBeginMark)
-	}
-	_, err := os.Stat(d.targetPath)
-	return err == nil
-}
-
 // promptDefault asks the user a yes/no question with a default answer.
 func promptDefault(reader *bufio.Reader, prompt string, defaultYes bool) bool {
 	hint := "[Y/n]"
@@ -393,6 +377,12 @@ func promptDefault(reader *bufio.Reader, prompt string, defaultYes bool) bool {
 func dirExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
+}
+
+// fileExists checks if a regular file exists.
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
 
 // tildefy replaces the home directory prefix with ~ for display.

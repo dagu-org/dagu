@@ -19,55 +19,32 @@ func TestAIToolDetection(t *testing.T) {
 
 	homeDir := t.TempDir()
 
-	// Create tool directories for detection tests
+	// Create tool directories with their indicator files
 	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".claude"), 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(homeDir, ".claude", ".claude.json"), []byte("{}"), 0o600))
+
 	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".agents"), 0o750))
+
 	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".config", "opencode"), 0o750))
+
 	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".gemini"), 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(homeDir, ".gemini", "GEMINI.md"), []byte(""), 0o600))
+
 	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".copilot"), 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(homeDir, ".copilot", "config.json"), []byte("{}"), 0o600))
 
 	tests := []struct {
 		name     string
-		useHome  string // which home dir to use for detection
+		useHome  string
 		toolIdx  int
 		expected bool
 	}{
-		{
-			name:     "claude code detected",
-			useHome:  homeDir,
-			toolIdx:  0,
-			expected: true,
-		},
-		{
-			name:     "claude code not detected",
-			useHome:  "", // will use empty temp dir
-			toolIdx:  0,
-			expected: false,
-		},
-		{
-			name:     "codex detected via .agents",
-			useHome:  homeDir,
-			toolIdx:  1,
-			expected: true,
-		},
-		{
-			name:     "opencode detected",
-			useHome:  homeDir,
-			toolIdx:  2,
-			expected: true,
-		},
-		{
-			name:     "gemini detected",
-			useHome:  homeDir,
-			toolIdx:  3,
-			expected: true,
-		},
-		{
-			name:     "copilot detected",
-			useHome:  homeDir,
-			toolIdx:  4,
-			expected: true,
-		},
+		{name: "claude code detected", useHome: homeDir, toolIdx: 0, expected: true},
+		{name: "claude code not detected", useHome: "", toolIdx: 0, expected: false},
+		{name: "codex detected via .agents", useHome: homeDir, toolIdx: 1, expected: true},
+		{name: "opencode detected", useHome: homeDir, toolIdx: 2, expected: true},
+		{name: "gemini detected", useHome: homeDir, toolIdx: 3, expected: true},
+		{name: "copilot detected", useHome: homeDir, toolIdx: 4, expected: true},
 	}
 
 	for _, tt := range tests {
@@ -85,6 +62,26 @@ func TestAIToolDetection(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAIToolDetectionRequiresIndicatorFile(t *testing.T) {
+	t.Parallel()
+
+	homeDir := t.TempDir()
+
+	// Create .claude directory without .claude.json — should NOT be detected
+	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".claude"), 0o750))
+
+	// Create .gemini directory without GEMINI.md — should NOT be detected
+	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".gemini"), 0o750))
+
+	// Create .copilot directory without config.json — should NOT be detected
+	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".copilot"), 0o750))
+
+	tools := aiTools()
+	assert.Empty(t, tools[0].detect(homeDir), "Claude Code should not be detected without .claude.json")
+	assert.Empty(t, tools[3].detect(homeDir), "Gemini CLI should not be detected without GEMINI.md")
+	assert.Empty(t, tools[4].detect(homeDir), "Copilot CLI should not be detected without config.json")
 }
 
 func TestInstallSkill(t *testing.T) {
@@ -109,6 +106,24 @@ func TestInstallSkill(t *testing.T) {
 		_, err := os.Stat(filepath.Join(refDir, name))
 		assert.NoError(t, err, "reference file %s should exist", name)
 	}
+}
+
+func TestInstallSkillOverwrites(t *testing.T) {
+	t.Parallel()
+
+	targetDir := t.TempDir()
+	targetSKILLMD := filepath.Join(targetDir, "dagu", "SKILL.md")
+
+	// Install once
+	skillFS := fileagentskill.SkillFS()
+	require.NoError(t, installSkill(targetSKILLMD, skillFS))
+
+	// Install again — should overwrite without error
+	require.NoError(t, installSkill(targetSKILLMD, skillFS))
+
+	data, err := os.ReadFile(targetSKILLMD)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "name: dagu")
 }
 
 func TestInstallCopilotFresh(t *testing.T) {
@@ -141,7 +156,7 @@ func TestInstallCopilotReplace(t *testing.T) {
 	// Write existing file with markers
 	existing := "# My Instructions\n\nSome content.\n\n" +
 		copilotBeginMark + "\nold content\n" + copilotEndMark + "\n\n# More stuff\n"
-	require.NoError(t, os.WriteFile(targetPath, []byte(existing), 0o644))
+	require.NoError(t, os.WriteFile(targetPath, []byte(existing), 0o600))
 
 	skillFS := fileagentskill.SkillFS()
 	err := installCopilot(targetPath, skillFS)
@@ -168,7 +183,7 @@ func TestInstallCopilotAppend(t *testing.T) {
 
 	// Write existing file without markers
 	existing := "# My Instructions\n\nSome existing content."
-	require.NoError(t, os.WriteFile(targetPath, []byte(existing), 0o644))
+	require.NoError(t, os.WriteFile(targetPath, []byte(existing), 0o600))
 
 	skillFS := fileagentskill.SkillFS()
 	err := installCopilot(targetPath, skillFS)
@@ -183,51 +198,6 @@ func TestInstallCopilotAppend(t *testing.T) {
 	assert.Contains(t, content, copilotBeginMark)
 	assert.Contains(t, content, copilotEndMark)
 	assert.Contains(t, content, "Dagu DAG Authoring Reference")
-}
-
-func TestSkillExistsSkillFormat(t *testing.T) {
-	t.Parallel()
-
-	targetDir := t.TempDir()
-	targetPath := filepath.Join(targetDir, "dagu", "SKILL.md")
-
-	d := detectedTool{
-		tool:       aiTool{Format: "skill"},
-		targetPath: targetPath,
-	}
-
-	// Not exists
-	assert.False(t, skillExists(d))
-
-	// Create the file
-	require.NoError(t, os.MkdirAll(filepath.Dir(targetPath), 0o750))
-	require.NoError(t, os.WriteFile(targetPath, []byte("test"), 0o644))
-
-	// Now exists
-	assert.True(t, skillExists(d))
-}
-
-func TestSkillExistsCopilotFormat(t *testing.T) {
-	t.Parallel()
-
-	targetDir := t.TempDir()
-	targetPath := filepath.Join(targetDir, copilotFileName)
-
-	d := detectedTool{
-		tool:       aiTool{Format: "copilot"},
-		targetPath: targetPath,
-	}
-
-	// File doesn't exist
-	assert.False(t, skillExists(d))
-
-	// File exists but no markers
-	require.NoError(t, os.WriteFile(targetPath, []byte("some content"), 0o644))
-	assert.False(t, skillExists(d))
-
-	// File with markers
-	require.NoError(t, os.WriteFile(targetPath, []byte("before\n"+copilotBeginMark+"\ncontent\n"+copilotEndMark), 0o644))
-	assert.True(t, skillExists(d))
 }
 
 func TestStripFrontmatter(t *testing.T) {
