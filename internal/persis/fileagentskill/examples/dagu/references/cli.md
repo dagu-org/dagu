@@ -284,10 +284,20 @@ Show JSON schema documentation.
 dagu schema <dag|config> [path]
 ```
 
+Use a dot-separated path to drill into nested sections.
+
 Examples:
 - `dagu schema dag` — Show all DAG root-level fields
-- `dagu schema dag steps` — Show step properties
-- `dagu schema config server` — Show server config
+- `dagu schema dag steps` — Show step definition structure
+- `dagu schema dag steps.container` — Show container configuration
+- `dagu schema dag steps.retry_policy` — Show retry policy fields
+- `dagu schema dag steps.agent` — Show agent step configuration
+- `dagu schema dag handler_on` — Show lifecycle event hooks
+- `dagu schema dag defaults` — Show default step configuration
+- `dagu schema dag overlap_policy` — Show overlap policy options
+- `dagu schema config` — Show all config root-level fields
+- `dagu schema config auth` — Show authentication configuration
+- `dagu schema config queues` — Show global queue configuration
 
 ### dagu example
 

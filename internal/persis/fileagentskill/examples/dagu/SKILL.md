@@ -214,6 +214,30 @@ steps:
     command: echo "handling error"
 ```
 
+## Finding DAG Files
+
+Run `dagu config` to discover where DAGs and other files are stored on the local system. The `DAGs directory` line shows where DAG YAML files should be created and read from.
+
+```bash
+dagu config    # Shows all resolved paths (DAGs dir, logs, data, etc.)
+```
+
+## Schema Lookup via CLI
+
+Run `dagu schema <dag|config> [path]` to look up field definitions, types, defaults, and allowed values. Use dot-separated paths to drill into nested fields (e.g. `dagu schema dag steps.container`).
+
+```bash
+dagu schema dag                    # All DAG root-level fields
+dagu schema dag steps              # Step fields
+dagu schema dag steps.container    # Container config
+dagu schema dag steps.retry_policy # Retry policy fields
+dagu schema dag steps.agent        # Agent step config
+dagu schema dag handler_on         # Lifecycle hooks
+dagu schema dag defaults           # Default step config
+dagu schema config                 # All config fields
+dagu schema config auth            # Auth config
+```
+
 ## Quick Reference Tables
 
 See the `references/` directory for complete details:
