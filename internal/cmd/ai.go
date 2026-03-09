@@ -176,29 +176,19 @@ func runAIInstall(cmd *cobra.Command, _ []string) error {
 		detected = append(detected, detectedTool{tool: t, targetPath: target})
 	}
 
-	fmt.Println("Dagu AI skill installer")
-	fmt.Println()
-
 	if len(detected) == 0 {
 		fmt.Println("No AI coding tools detected.")
-		fmt.Println()
 		fmt.Println("Supported tools: Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI")
 		return nil
 	}
 
-	fmt.Println("Detected AI coding tools:")
-	for i, d := range detected {
-		fmt.Printf("  [%d] %-14s %s\n", i+1, d.tool.Name, tildefy(d.targetPath, homeDir))
-	}
-	fmt.Println()
-
 	skillFS := fileagentskill.SkillFS()
 
 	for _, d := range detected {
+		displayPath := tildefy(d.targetPath, homeDir)
+
 		if !skipPrompt {
 			if !promptDefault(reader, fmt.Sprintf("Install to %s?", d.tool.Name), true) {
-				fmt.Println("  — Skipped")
-				fmt.Println()
 				continue
 			}
 		}
@@ -211,13 +201,11 @@ func runAIInstall(cmd *cobra.Command, _ []string) error {
 		}
 
 		if installErr != nil {
-			fmt.Printf("  ✗ Error: %v\n", installErr)
-			fmt.Println()
+			fmt.Printf("  ✗ %s: %v\n", d.tool.Name, installErr)
 			continue
 		}
 
-		fmt.Printf("  ✓ Installed %s\n", tildefy(d.targetPath, homeDir))
-		fmt.Println()
+		fmt.Printf("  ✓ %s\n", displayPath)
 	}
 
 	if len(notDetected) > 0 {
