@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/fatih/color"
+
 	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
 	"github.com/spf13/cobra"
 )
@@ -22,6 +24,13 @@ const (
 	copilotBeginMark = "<!-- BEGIN DAGU -->"
 	copilotEndMark   = "<!-- END DAGU -->"
 	copilotFileName  = "copilot-instructions.md"
+)
+
+var (
+	green = color.New(color.FgGreen).SprintFunc()
+	red   = color.New(color.FgRed).SprintFunc()
+	dim   = color.New(color.Faint).SprintFunc()
+	bold  = color.New(color.Bold).SprintFunc()
 )
 
 // aiTool describes an external AI coding tool and how to detect/install skills.
@@ -47,9 +56,8 @@ func aiInstallCmd() *cobra.Command {
 		Short: "Install Dagu skill into AI coding tools",
 		Long: `Install the Dagu DAG authoring skill into detected AI coding tools.
 
-This interactive wizard detects installed AI coding tools and installs the
-Dagu skill (SKILL.md) into each tool's skill directory, enabling the tool
-to write correct Dagu DAG YAML files.
+Detects installed tools and installs the Dagu skill (SKILL.md) into each
+tool's skill directory, enabling it to write correct Dagu DAG YAML files.
 
 Supported tools: Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI`,
 		Args: cobra.NoArgs,
@@ -65,7 +73,6 @@ func aiTools() []aiTool {
 			Name:   "Claude Code",
 			Format: "skill",
 			detect: func(homeDir string) string {
-				// Verify Claude Code is installed by checking for its config file
 				if fileExists(filepath.Join(homeDir, ".claude", ".claude.json")) {
 					return filepath.Join(homeDir, ".claude", "skills")
 				}
@@ -76,7 +83,6 @@ func aiTools() []aiTool {
 			Name:   "Codex",
 			Format: "skill",
 			detect: func(homeDir string) string {
-				// Check $AGENTS_HOME first (new), then ~/.agents/, then $CODEX_HOME (legacy), then ~/.codex/
 				if v := os.Getenv("AGENTS_HOME"); v != "" {
 					if dirExists(v) {
 						return filepath.Join(v, "skills")
@@ -111,7 +117,6 @@ func aiTools() []aiTool {
 			Name:   "Gemini CLI",
 			Format: "skill",
 			detect: func(homeDir string) string {
-				// Verify Gemini CLI is installed by checking for GEMINI.md
 				if fileExists(filepath.Join(homeDir, ".gemini", "GEMINI.md")) {
 					return filepath.Join(homeDir, ".gemini", "skills")
 				}
@@ -122,7 +127,6 @@ func aiTools() []aiTool {
 			Name:   "Copilot CLI",
 			Format: "copilot",
 			detect: func(homeDir string) string {
-				// Verify Copilot CLI by checking for config.json
 				if v := os.Getenv("XDG_CONFIG_HOME"); v != "" {
 					dir := filepath.Join(v, ".copilot")
 					if fileExists(filepath.Join(dir, "config.json")) {
@@ -141,7 +145,7 @@ func aiTools() []aiTool {
 
 type detectedTool struct {
 	tool       aiTool
-	targetPath string // full path to the skill file or directory
+	targetPath string
 }
 
 func runAIInstall(cmd *cobra.Command, _ []string) error {
@@ -159,12 +163,10 @@ func runAIInstall(cmd *cobra.Command, _ []string) error {
 	tools := aiTools()
 
 	var detected []detectedTool
-	var notDetected []string
 
 	for _, t := range tools {
 		baseDir := t.detect(homeDir)
 		if baseDir == "" {
-			notDetected = append(notDetected, t.Name)
 			continue
 		}
 		var target string
@@ -178,9 +180,10 @@ func runAIInstall(cmd *cobra.Command, _ []string) error {
 
 	if len(detected) == 0 {
 		fmt.Println("No AI coding tools detected.")
-		fmt.Println("Supported tools: Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI")
 		return nil
 	}
+
+	fmt.Printf("Found %s tool(s)\n\n", bold(len(detected)))
 
 	skillFS := fileagentskill.SkillFS()
 
@@ -188,9 +191,12 @@ func runAIInstall(cmd *cobra.Command, _ []string) error {
 		displayPath := tildefy(d.targetPath, homeDir)
 
 		if !skipPrompt {
-			if !promptDefault(reader, fmt.Sprintf("Install to %s?", d.tool.Name), true) {
+			if !promptDefault(reader, fmt.Sprintf("  %s?", bold(d.tool.Name)), true) {
+				clearLine()
+				fmt.Printf("  %-14s %s\n", d.tool.Name, dim("skipped"))
 				continue
 			}
+			clearLine()
 		}
 
 		var installErr error
@@ -201,15 +207,11 @@ func runAIInstall(cmd *cobra.Command, _ []string) error {
 		}
 
 		if installErr != nil {
-			fmt.Printf("  ✗ %s: %v\n", d.tool.Name, installErr)
+			fmt.Fprintf(os.Stderr, "  %-14s %s %v\n", d.tool.Name, red("✗"), installErr)
 			continue
 		}
 
-		fmt.Printf("  ✓ %s\n", displayPath)
-	}
-
-	if len(notDetected) > 0 {
-		fmt.Printf("Not detected: %s\n", strings.Join(notDetected, ", "))
+		fmt.Printf("  %-14s %s %s\n", d.tool.Name, green("✓"), dim(displayPath))
 	}
 
 	return nil
@@ -217,9 +219,9 @@ func runAIInstall(cmd *cobra.Command, _ []string) error {
 
 // installSkill copies the embedded dagu skill directory to the target path.
 func installSkill(targetSKILLMD string, skillFS embed.FS) error {
-	targetDir := filepath.Dir(targetSKILLMD) // .../skills/dagu
+	targetDir := filepath.Dir(targetSKILLMD)
 
-	err := fs.WalkDir(skillFS, skillEmbedPrefix, func(path string, d fs.DirEntry, err error) error {
+	return fs.WalkDir(skillFS, skillEmbedPrefix, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -245,13 +247,10 @@ func installSkill(targetSKILLMD string, skillFS embed.FS) error {
 
 		return nil
 	})
-
-	return err
 }
 
 // installCopilot appends or replaces skill content in copilot-instructions.md.
 func installCopilot(targetPath string, skillFS embed.FS) error {
-	// Build content from SKILL.md body + reference files
 	content, err := buildCopilotContent(skillFS)
 	if err != nil {
 		return err
@@ -259,7 +258,7 @@ func installCopilot(targetPath string, skillFS embed.FS) error {
 
 	wrappedContent := copilotBeginMark + "\n" + content + "\n" + copilotEndMark
 
-	existing, readErr := os.ReadFile(targetPath) //nolint:gosec // path is constructed internally, not from user input
+	existing, readErr := os.ReadFile(targetPath) //nolint:gosec // path is constructed internally
 	if readErr != nil && !os.IsNotExist(readErr) {
 		return fmt.Errorf("read %s: %w", targetPath, readErr)
 	}
@@ -271,10 +270,8 @@ func installCopilot(targetPath string, skillFS embed.FS) error {
 		endIdx := strings.Index(existingStr, copilotEndMark)
 
 		if beginIdx >= 0 && endIdx >= 0 && endIdx > beginIdx {
-			// Replace between markers
 			result = existingStr[:beginIdx] + wrappedContent + existingStr[endIdx+len(copilotEndMark):]
 		} else {
-			// Append
 			result = existingStr
 			if !strings.HasSuffix(result, "\n") && len(result) > 0 {
 				result += "\n"
@@ -282,7 +279,6 @@ func installCopilot(targetPath string, skillFS embed.FS) error {
 			result += "\n" + wrappedContent + "\n"
 		}
 	} else {
-		// New file
 		result = wrappedContent + "\n"
 	}
 
@@ -295,7 +291,6 @@ func installCopilot(targetPath string, skillFS embed.FS) error {
 
 // buildCopilotContent extracts SKILL.md body (without frontmatter) and appends reference files.
 func buildCopilotContent(skillFS embed.FS) (string, error) {
-	// Read SKILL.md and strip frontmatter
 	skillData, err := skillFS.ReadFile(skillEmbedPrefix + "/SKILL.md")
 	if err != nil {
 		return "", fmt.Errorf("read SKILL.md: %w", err)
@@ -303,7 +298,6 @@ func buildCopilotContent(skillFS embed.FS) (string, error) {
 
 	body := stripFrontmatter(string(skillData))
 
-	// Append reference files
 	refPrefix := skillEmbedPrefix + "/references"
 	entries, err := fs.ReadDir(skillFS, refPrefix)
 	if err != nil {
@@ -332,7 +326,6 @@ func stripFrontmatter(content string) string {
 	if !strings.HasPrefix(content, "---") {
 		return content
 	}
-	// Find closing ---
 	rest := content[3:]
 	_, after, found := strings.Cut(rest, "\n---")
 	if !found {
@@ -347,7 +340,7 @@ func promptDefault(reader *bufio.Reader, prompt string, defaultYes bool) bool {
 	if !defaultYes {
 		hint = "[y/N]"
 	}
-	fmt.Printf("%s %s ", prompt, hint)
+	fmt.Printf("%s %s ", prompt, dim(hint))
 
 	response, err := reader.ReadString('\n')
 	if err != nil {
@@ -359,6 +352,11 @@ func promptDefault(reader *bufio.Reader, prompt string, defaultYes bool) bool {
 		return defaultYes
 	}
 	return response == "y" || response == "yes"
+}
+
+// clearLine moves cursor to start of previous line and clears it.
+func clearLine() {
+	fmt.Print("\033[A\033[2K\r")
 }
 
 // dirExists checks if a directory exists.
