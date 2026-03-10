@@ -284,3 +284,4 @@ See the `references/` directory for complete details:
 - `executors.md` — All 18 executor types with configuration
 - `env.md` — Execution and configuration environment variables
 - `pitfalls.md` — Critical pitfalls with examples
+- `codingagent.md` — Integrating AI coding agents (Claude Code, Codex, Gemini, etc.) into DAG workflows
