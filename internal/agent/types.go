@@ -442,4 +442,6 @@ type EnvironmentInfo struct {
 	WorkingDir string
 	// BaseConfigFile is the path to the base configuration file.
 	BaseConfigFile string
+	// ReferencesDir is the directory containing built-in reference documents.
+	ReferencesDir string
 }

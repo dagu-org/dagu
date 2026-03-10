@@ -179,6 +179,11 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		}
 	}
 
+	// Seed built-in knowledge references to data dir (not git-synced).
+	fileagentskill.SeedReferences(
+		filepath.Join(cfg.Paths.DataDir, "agent", "references"),
+	)
+
 	var agentSkillStore agent.SkillStore
 	skillsDir := filepath.Join(cfg.Paths.DAGsDir, "skills")
 	if fileagentskill.SeedExampleSkills(skillsDir) && agentConfigStore != nil {
@@ -669,13 +674,14 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 		MemoryStore:        memoryStore,
 		RemoteNodeResolver: remoteResolver,
 		Environment: agent.EnvironmentInfo{
-			DAGsDir:        paths.DAGsDir,
-			DocsDir:        paths.DocsDir,
-			LogDir:         paths.LogDir,
-			DataDir:        paths.DataDir,
-			ConfigFile:     paths.ConfigFileUsed,
-			WorkingDir:     paths.DAGsDir,
-			BaseConfigFile: paths.BaseConfig,
+			DAGsDir:             paths.DAGsDir,
+			DocsDir:             paths.DocsDir,
+			LogDir:              paths.LogDir,
+			DataDir:             paths.DataDir,
+			ConfigFile:          paths.ConfigFileUsed,
+			WorkingDir:          paths.DAGsDir,
+			BaseConfigFile:      paths.BaseConfig,
+			ReferencesDir: filepath.Join(paths.DataDir, "agent", "references"),
 		},
 	})
 
