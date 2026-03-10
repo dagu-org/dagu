@@ -238,6 +238,44 @@ dagu schema config                 # All config fields
 dagu schema config auth            # Auth config
 ```
 
+## Checking Run Status
+
+After running a DAG with `dagu start`, use `dagu status` to inspect the result. The output is a tree showing each step's status, command, stdout/stderr content, and errors.
+
+```bash
+dagu status my-dag                          # Latest run
+dagu status --run-id=<id> my-dag            # Specific run
+dagu status --run-id=<id> --sub-run-id=<id> my-dag  # Sub-DAG run
+```
+
+Example output for a failed run:
+
+```
+Failed ✗ - 2026-03-10 14:22:15
+dag: my-dag (45s)
+│
+├─fetch_data (12s) [succeeded]
+│ ├─curl -f https://api.example.com/data -o data.json
+│ └─stdout: /path/to/stdout.log
+│   {"status": "ok", "records": 142}
+│
+└─process_data (33s) [failed]
+  ├─python transform.py --input data.json
+  ├─stderr: /path/to/stderr.log
+  │   Traceback (most recent call last):
+  │     File "transform.py", line 42
+  │   KeyError: 'missing_field'
+  └─error: command exited with code 1
+
+Result: Failed ✗
+```
+
+Use `dagu history` to find run IDs of past executions:
+
+```bash
+dagu history my-dag --last 7d --status failed
+```
+
 ## Quick Reference Tables
 
 See the `references/` directory for complete details:
