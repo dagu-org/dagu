@@ -10,19 +10,25 @@ function getCSSVariable(name: string, fallback: string): string {
   return value || fallback;
 }
 
+function isDarkMode(): boolean {
+  if (typeof document === 'undefined') return false;
+  return document.documentElement.classList.contains('dark');
+}
+
 function initializeMermaid(): void {
+  const dark = isDarkMode();
   mermaid.initialize({
-    securityLevel: 'strict',
+    securityLevel: 'loose',
     startOnLoad: false,
-    theme: 'default',
+    theme: dark ? 'dark' : 'default',
     themeVariables: {
       background: 'transparent',
-      primaryColor: getCSSVariable('--card', '#faf8f5'),
-      primaryTextColor: getCSSVariable('--foreground', '#3d3833'),
-      primaryBorderColor: getCSSVariable('--border', '#c8bfb0'),
-      lineColor: getCSSVariable('--muted-foreground', '#6b635a'),
-      secondaryColor: getCSSVariable('--secondary', '#f0ebe3'),
-      tertiaryColor: getCSSVariable('--background', '#f5f0e8'),
+      primaryColor: getCSSVariable('--card', dark ? '#292a2d' : '#faf8f5'),
+      primaryTextColor: getCSSVariable('--foreground', dark ? '#e8eaed' : '#3d3833'),
+      primaryBorderColor: getCSSVariable('--border', dark ? '#5f6368' : '#d4cdc0'),
+      lineColor: getCSSVariable('--muted-foreground', dark ? '#9aa0a6' : '#7a7268'),
+      secondaryColor: getCSSVariable('--secondary', dark ? '#35363a' : '#f5f0e8'),
+      tertiaryColor: getCSSVariable('--background', dark ? '#202124' : '#f5f0e8'),
     },
     fontFamily: 'Arial',
     logLevel: 4,
@@ -39,7 +45,6 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const idPrefix = useId().replace(/:/g, '');
-  const renderIdRef = useRef(`mermaid-block-${idPrefix}-${mermaidIdCounter++}`);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,7 +54,10 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
 
       try {
         initializeMermaid();
-        const { svg } = await mermaid.render(renderIdRef.current, code.trim());
+        // Generate a unique ID per render call to avoid mermaid's internal
+        // diagram cache conflicts when the code or diagram type changes.
+        const renderId = `mermaid-block-${idPrefix}-${mermaidIdCounter++}`;
+        const { svg } = await mermaid.render(renderId, code.trim());
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg;
           setError(null);
@@ -63,7 +71,7 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
 
     render();
     return () => { cancelled = true; };
-  }, [code]);
+  }, [code, idPrefix]);
 
   if (error) {
     return (
