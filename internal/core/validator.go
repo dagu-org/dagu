@@ -12,7 +12,7 @@ import (
 // Constants for validation limits.
 const (
 	DAGNameMaxLen  = 40
-	maxStepNameLen = 40
+	maxStepNameLen = 255
 )
 
 // Regex patterns for validation.

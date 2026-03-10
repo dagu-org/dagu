@@ -298,7 +298,7 @@ func TestValidateSteps(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{
 			Steps: []Step{
-				{Name: strings.Repeat("a", 41)},
+				{Name: strings.Repeat("a", 256)},
 			},
 		}
 		err := ValidateSteps(dag)
@@ -310,7 +310,7 @@ func TestValidateSteps(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{
 			Steps: []Step{
-				{Name: strings.Repeat("a", 40), ExecutorConfig: testExecConfig},
+				{Name: strings.Repeat("a", 255), ExecutorConfig: testExecConfig},
 			},
 		}
 		assert.NoError(t, ValidateSteps(dag))
