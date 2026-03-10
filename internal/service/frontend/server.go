@@ -1194,17 +1194,15 @@ func (srv *Server) buildStreamAuthOptions(realm string) auth.Options {
 		return auth.Options{Realm: realm}
 	}
 
-	// Basic auth mode: The browser EventSource API cannot send custom headers,
-	// so it cannot provide Basic credentials. We enable Basic auth validation
-	// (so programmatic clients like curl are authenticated) but set
-	// AuthRequired=false so browser SSE connections without credentials are
-	// not blocked with 401.
-	// FIXME: add a session-token mechanism for basic-auth users so browser
-	// EventSource requests can authenticate via the ?token= query parameter.
+	// Basic auth mode: require credentials for SSE endpoints just like REST.
+	// Browsers handle 401 + WWW-Authenticate: Basic challenges natively,
+	// caching credentials per origin/realm, so EventSource requests will
+	// include Basic auth automatically after the user authenticates once.
 	if authCfg.Mode == config.AuthModeBasic {
 		return auth.Options{
 			Realm:            realm,
 			BasicAuthEnabled: true,
+			AuthRequired:     true,
 			Creds:            map[string]string{authCfg.Basic.Username: authCfg.Basic.Password},
 		}
 	}
