@@ -27,7 +27,13 @@ Built for developers who want powerful workflow orchestration without the operat
 - Legacy Script Friendly: Orchestrate existing shell commands, Python scripts, Docker containers, or HTTP calls without modification.
 - Air-gapped Ready: Runs in isolated environments without external dependencies or network access
 
-![Web UI](./assets/images/demo-web-ui.webp)
+<div align="center">
+  <img src="./assets/images/dagu-demo.gif" alt="Demo" width="720">
+</div>
+
+| Cockpit (Kanban) | DAG Run Details |
+|---|---|
+| ![Cockpit](./assets/images/ui-cockpit.png) | ![DAG Run Details](./assets/images/ui-dag-run-details.png) |
 
 **Try it live:** [Live Demo](https://demo-instance.dagu.sh/) (credentials: `demouser` / `demouser`)
 
