@@ -180,7 +180,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 
 	// Seed built-in knowledge references to data dir (not git-synced).
-	fileagentskill.SeedReferences(
+	referencesDir := fileagentskill.SeedReferences(
 		filepath.Join(cfg.Paths.DataDir, "agent", "references"),
 	)
 
@@ -318,7 +318,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	var agentAPI *agent.API
 	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSkillStore, agentSoulStore, &cfg.Paths, cfg.Server.Session.MaxPerUser, dr, auditSvc, memoryStore, newRemoteNodeAdapter(remoteNodeResolver))
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSkillStore, agentSoulStore, &cfg.Paths, referencesDir, cfg.Server.Session.MaxPerUser, dr, auditSvc, memoryStore, newRemoteNodeAdapter(remoteNodeResolver))
 		if err != nil {
 			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
 		}
@@ -649,7 +649,7 @@ func autoEnableExampleSkills(ctx context.Context, configStore agent.ConfigStore)
 
 // initAgentAPI creates and returns an agent API.
 // The API uses the config store to check enabled status and resolve providers via the model store.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, soulStore agent.SoulStore, paths *config.PathsConfig, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteNodeResolver) (*agent.API, error) {
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, soulStore agent.SoulStore, paths *config.PathsConfig, referencesDir string, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteNodeResolver) (*agent.API, error) {
 	sessStore, err := filesession.New(paths.SessionsDir, filesession.WithMaxPerUser(sessionMaxPerUser))
 	if err != nil {
 		logger.Warn(ctx, "Failed to create session store, persistence disabled", tag.Error(err))
@@ -681,7 +681,7 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 			ConfigFile:     paths.ConfigFileUsed,
 			WorkingDir:     paths.DAGsDir,
 			BaseConfigFile: paths.BaseConfig,
-			ReferencesDir:  filepath.Join(paths.DataDir, "agent", "references"),
+			ReferencesDir:  referencesDir,
 		},
 	})
 

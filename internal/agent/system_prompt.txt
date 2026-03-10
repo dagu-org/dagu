@@ -276,9 +276,9 @@ Rules:
 </memory_management>
 {{end}}
 
+<reference>
 {{if .ReferencesDir}}
-<builtin_knowledge>
-Built-in reference documents are available at {{.ReferencesDir}}/. Use `read` to load them when you need detailed information beyond what `dagu schema` provides.
+Reference documents are available at {{.ReferencesDir}}/. Use `read` to load them when you need details beyond what `dagu schema` provides.
 
 Available references:
 - `schema.md` — Complete DAG YAML schema (top-level and step-level fields)
@@ -292,10 +292,7 @@ Load a reference when:
 - A user asks about a specific executor, CLI command, or env var and `dagu schema` doesn't cover the detail
 - You need to write a DAG that uses coding agents (claude -p, codex exec, gemini -p, etc.)
 - You want to double-check a pitfall before authoring a DAG
-</builtin_knowledge>
 {{end}}
-
-<reference>
 Use `dagu schema` and `dagu example` via bash to look up DAG YAML structure and see examples:
 - `dagu schema dag` — root-level DAG fields
 - `dagu schema dag steps` — step properties
