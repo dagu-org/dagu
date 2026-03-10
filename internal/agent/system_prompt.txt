@@ -102,24 +102,35 @@ Example:
 ```yaml
 type: graph
 steps:
-  - name: fetch-data
+  - id: fetch_data
     command: curl -o data.json https://api.example.com/data
     depends: []
-  - name: process
+  - id: process
     command: python process.py
     depends:
-      - fetch-data
-  - name: notify
+      - fetch_data
+  - id: notify
     command: echo "Done"
     depends:
       - process
 ```
 
-When referencing step output with `${step_id.stdout}`, `${step_id.stderr}`, or `${step_id.exit_code}`, the step MUST have an `id:` field. Only `id:` registers a step in the reference map; `name:` alone does not work.
+**Step ID rules:** Always set `id:` on every step. Omit `name:` — it auto-fills from `id`. Regex: `^[a-zA-Z][a-zA-Z0-9_]*$` (no hyphens — use underscores). Max 40 chars. Reserved words: `env`, `params`, `args`, `stdout`, `stderr`, `output`, `outputs`.
 
 Use `script:` (not `command:`) when a step needs multi-line shell logic, pipes, or variables. `command:` is for single-line commands.
 
-For passing data between steps: use `output: VAR` + `$VAR` for small safe values (IDs, counts). Use `${step_id.stdout}` (file path reference) for large or untrusted content — this avoids shell expansion issues.
+**Passing data between steps:**
+- `output: VAR` captures stdout **content** into `${VAR}`. For JSON output, extract fields with `${VAR.key}`.
+- `${step_id.stdout}` is a **file path** to the step's stdout log, not the content. Use `cat "${step_id.stdout}"` to read it.
+- Use `output:` + `${VAR}` for small safe values (IDs, counts). Use `${step_id.stdout}` (file path) for large or untrusted content.
+- Resolution priority: `${foo.bar}` checks step references first, then JSON path on variables.
+
+**env ordering:** Use list-of-maps to preserve evaluation order. `env: {A: foo, B: ${A}/bar}` may fail because Go maps iterate randomly. Use:
+```yaml
+env:
+  - A: foo
+  - B: ${A}/bar
+```
 
 Parameter values with spaces must be quoted: `dagu start dag -- name="John Doe"`. Unquoted `name=John Doe` splits into two separate parameters.
 </correctness>
@@ -265,6 +276,25 @@ Rules:
 </memory_management>
 {{end}}
 
+{{if .ReferencesDir}}
+<builtin_knowledge>
+Built-in reference documents are available at {{.ReferencesDir}}/. Use `read` to load them when you need detailed information beyond what `dagu schema` provides.
+
+Available references:
+- `schema.md` — Complete DAG YAML schema (top-level and step-level fields)
+- `executors.md` — All executor types with full configuration details
+- `cli.md` — All CLI subcommands with flags
+- `env.md` — Execution and configuration environment variables
+- `pitfalls.md` — Critical pitfalls and how to avoid them
+- `codingagent.md` — Integrating AI coding agents (Claude Code, Codex, Gemini, etc.) into DAG workflows
+
+Load a reference when:
+- A user asks about a specific executor, CLI command, or env var and `dagu schema` doesn't cover the detail
+- You need to write a DAG that uses coding agents (claude -p, codex exec, gemini -p, etc.)
+- You want to double-check a pitfall before authoring a DAG
+</builtin_knowledge>
+{{end}}
+
 <reference>
 Use `dagu schema` and `dagu example` via bash to look up DAG YAML structure and see examples:
 - `dagu schema dag` — root-level DAG fields
@@ -287,47 +317,72 @@ Available in all steps without declaration:
 - `DAG_RUN_WORK_DIR` — per-run temporary working directory
 - `DAGU_PARAMS_JSON` / `DAG_PARAMS_JSON` — all resolved params as JSON
 
-### Step References
-Use `${step_id.stdout}`, `${step_id.stderr}`, `${step_id.exit_code}` to reference a completed step's log file path or exit code. Slicing supported: `${step_id.stdout:0:5}`.
+### Lifecycle Hooks
 ```yaml
-steps:
-  - id: fetch
-    command: curl -s https://api.example.com/data
-  - id: process
-    script: |
-      cat "${fetch.stdout}" | jq '.items[]'
-    depends: [fetch]
+handler_on:
+  init:
+    command: echo "starting"
+  success:
+    command: echo "succeeded"
+  failure:
+    command: echo "failed with status ${DAG_RUN_STATUS}"
+  exit:
+    command: echo "always runs"
 ```
 
-### Parameters
+### Retry and Continue
 ```yaml
-params:
-  - NAME: "default"
-  - COUNT: "10"
+steps:
+  - id: flaky_step
+    command: curl http://api.example.com/data
+    retry_policy:
+      limit: 3
+      interval_sec: 10
+    continue_on:
+      failed: true
 ```
 
 ### Sub-DAGs
-Use `call:` to invoke another DAG. Define inline (after `---`) or in a separate file.
 ```yaml
 steps:
   - id: sub_task
-    call: other-dag
-    params: "KEY=$VALUE"
-    output: RESULT
-```
+    type: dag
+    call: child-workflow
+    params:
+      input_file: /data/input.csv
 
-Parallel execution:
-```yaml
   - id: fan_out
     call: worker
     parallel:
       items: ["A", "B", "C"]
-    output: RESULTS
 ```
 
-### Validation
+### Conditional Routing
+Routes map patterns to lists of existing step names.
+```yaml
+steps:
+  - id: check
+    command: echo "error"
+    output: RESULT
+  - id: route
+    type: router
+    value: ${RESULT}
+    routes:
+      "ok": [success_path]
+      "re:err.*": [error_path]
+    depends: [check]
+  - id: success_path
+    command: echo "success"
+  - id: error_path
+    command: echo "handling error"
+```
+
+### Validation and Inspection
 ```bash
+dagu config                      # show resolved paths (DAGs dir, logs, data)
 dagu validate my_dag.yaml        # validate structure
 dagu dry my_dag.yaml -- p=val    # dry run without executing
+dagu status my-dag               # latest run status (tree view)
+dagu status --run-id=<id> my-dag # specific run
 ```
 </reference>
