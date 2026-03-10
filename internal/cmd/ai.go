@@ -187,6 +187,8 @@ func runAIInstall(cmd *cobra.Command, _ []string) error {
 
 	skillFS := fileagentskill.SkillFS()
 
+	var hadFailure bool
+
 	for _, d := range detected {
 		displayPath := tildefy(d.targetPath, homeDir)
 
@@ -207,11 +209,16 @@ func runAIInstall(cmd *cobra.Command, _ []string) error {
 		}
 
 		if installErr != nil {
+			hadFailure = true
 			fmt.Fprintf(os.Stderr, "  %-14s %s %v\n", d.tool.Name, red("✗"), installErr)
 			continue
 		}
 
 		fmt.Printf("  %-14s %s %s\n", d.tool.Name, green("✓"), dim(displayPath))
+	}
+
+	if hadFailure {
+		return fmt.Errorf("failed to install into one or more AI tools")
 	}
 
 	return nil
@@ -344,7 +351,7 @@ func promptDefault(reader *bufio.Reader, prompt string, defaultYes bool) bool {
 
 	response, err := reader.ReadString('\n')
 	if err != nil {
-		return defaultYes
+		return false
 	}
 
 	response = strings.ToLower(strings.TrimSpace(response))
@@ -373,7 +380,10 @@ func fileExists(path string) bool {
 
 // tildefy replaces the home directory prefix with ~ for display.
 func tildefy(path, homeDir string) string {
-	if strings.HasPrefix(path, homeDir) {
+	if path == homeDir {
+		return "~"
+	}
+	if strings.HasPrefix(path, homeDir+string(os.PathSeparator)) {
 		return "~" + path[len(homeDir):]
 	}
 	return path

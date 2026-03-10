@@ -19,7 +19,7 @@ const examplesMarkerFile = ".examples-created"
 
 // ExampleSkillIDs returns the IDs of bundled example skills.
 func ExampleSkillIDs() []string {
-	return []string{"dagu", "dagu-ai-workflows", "dagu-containers", "dagu-server-worker"}
+	return []string{"dagu-ai-workflows", "dagu-containers", "dagu-server-worker"}
 }
 
 // SkillFS returns the embedded example skills filesystem.

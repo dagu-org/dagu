@@ -15,7 +15,9 @@ import (
 )
 
 func TestAIToolDetection(t *testing.T) {
-	t.Parallel()
+	t.Setenv("AGENTS_HOME", "")
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
 
 	homeDir := t.TempDir()
 
@@ -65,7 +67,9 @@ func TestAIToolDetection(t *testing.T) {
 }
 
 func TestAIToolDetectionRequiresIndicatorFile(t *testing.T) {
-	t.Parallel()
+	t.Setenv("AGENTS_HOME", "")
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
 
 	homeDir := t.TempDir()
 

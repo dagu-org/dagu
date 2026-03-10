@@ -36,7 +36,7 @@ Neither has a default. Omitting either is a validation error.
 
 ## 8. continue_on runs after retries exhaust
 
-They are independent — step retries first, then `continue_on: failure` applies.
+They are independent — step retries first, then `continue_on: failed` applies.
 
 ## 9. Preconditions use exact string match
 

@@ -65,7 +65,7 @@
 | `output` | string or object | — | Capture stdout to variable. String: `MY_VAR`. Object: `{name, key, omit}` |
 | `stdout` | string | — | File to write stdout |
 | `stderr` | string | — | File to write stderr |
-| `depends` | string or array | — | Dependency step names. In `graph` mode only. |
+| `depends` | string or array | — | Dependency step IDs. In `graph` mode only. |
 | `continue_on` | string or object | — | Continue on: `"skipped"`, `"failed"`, or `{skipped, failed, exit_code: [codes], mark_success}` |
 | `preconditions` | array | — | Step conditions: `{condition, expected, negate}` |
 | `retry_policy` | object | — | `{limit, interval_sec, exit_code: [codes], backoff, max_interval_sec}` |
@@ -83,7 +83,7 @@
 | `messages` | array | — | Chat messages: `[{role, content}]` |
 | `agent` | object | — | Agent config: `{model, tools, skills, soul, memory, prompt, max_iterations, safe_mode}` |
 | `value` | string | — | Router expression |
-| `routes` | map | — | Router pattern→steps mappings |
+| `routes` | map | — | Router pattern→target step ID mappings |
 | `worker_selector` | map | — | Labels for distributed execution |
 
 ## Step Reference Properties
