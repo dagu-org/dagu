@@ -674,14 +674,14 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 		MemoryStore:        memoryStore,
 		RemoteNodeResolver: remoteResolver,
 		Environment: agent.EnvironmentInfo{
-			DAGsDir:             paths.DAGsDir,
-			DocsDir:             paths.DocsDir,
-			LogDir:              paths.LogDir,
-			DataDir:             paths.DataDir,
-			ConfigFile:          paths.ConfigFileUsed,
-			WorkingDir:          paths.DAGsDir,
-			BaseConfigFile:      paths.BaseConfig,
-			ReferencesDir: filepath.Join(paths.DataDir, "agent", "references"),
+			DAGsDir:        paths.DAGsDir,
+			DocsDir:        paths.DocsDir,
+			LogDir:         paths.LogDir,
+			DataDir:        paths.DataDir,
+			ConfigFile:     paths.ConfigFileUsed,
+			WorkingDir:     paths.DAGsDir,
+			BaseConfigFile: paths.BaseConfig,
+			ReferencesDir:  filepath.Join(paths.DataDir, "agent", "references"),
 		},
 	})
 
