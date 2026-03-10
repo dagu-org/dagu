@@ -65,7 +65,7 @@ func TestVaultResolver_Resolve(t *testing.T) {
 
 	t.Run("SuccessfulResolutionWithConvention", func(t *testing.T) {
 		mockClient := &MockVaultClient{
-			ReadFunc: func(ctx context.Context, path string) (map[string]any, error) {
+			ReadFunc: func(_ context.Context, path string) (map[string]any, error) {
 				if path == "kv/data/dummy" {
 					return map[string]any{
 						"data": map[string]any{
@@ -91,7 +91,7 @@ func TestVaultResolver_Resolve(t *testing.T) {
 
 	t.Run("TrailingSlashHandling", func(t *testing.T) {
 		mockClient := &MockVaultClient{
-			ReadFunc: func(ctx context.Context, path string) (map[string]any, error) {
+			ReadFunc: func(_ context.Context, path string) (map[string]any, error) {
 				if path == "kv/data/dummy" {
 					return map[string]any{
 						"my-secret": "value-with-slash",
@@ -115,7 +115,7 @@ func TestVaultResolver_Resolve(t *testing.T) {
 
 	t.Run("ExplicitFieldOption", func(t *testing.T) {
 		mockClient := &MockVaultClient{
-			ReadFunc: func(ctx context.Context, path string) (map[string]any, error) {
+			ReadFunc: func(_ context.Context, path string) (map[string]any, error) {
 				if path == "kv/data/dummy" {
 					return map[string]any{
 						"api_key": "v2-secret",
@@ -140,7 +140,7 @@ func TestVaultResolver_Resolve(t *testing.T) {
 
 	t.Run("NotFound", func(t *testing.T) {
 		mockClient := &MockVaultClient{
-			ReadFunc: func(ctx context.Context, path string) (map[string]any, error) {
+			ReadFunc: func(_ context.Context, _ string) (map[string]any, error) {
 				return nil, nil
 			},
 		}
@@ -161,7 +161,7 @@ func TestVaultResolver_Resolve(t *testing.T) {
 		// Verify that if a KV v1 secret has a field named "data" that is NOT a map,
 		// we don't try to unwrap it and instead treat it as a regular field.
 		mockClient := &MockVaultClient{
-			ReadFunc: func(ctx context.Context, path string) (map[string]any, error) {
+			ReadFunc: func(_ context.Context, _ string) (map[string]any, error) {
 				return map[string]any{
 					"data": "actual-value",
 				}, nil
@@ -182,7 +182,7 @@ func TestVaultResolver_Resolve(t *testing.T) {
 
 	t.Run("DeepPathConvention", func(t *testing.T) {
 		mockClient := &MockVaultClient{
-			ReadFunc: func(ctx context.Context, path string) (map[string]any, error) {
+			ReadFunc: func(_ context.Context, path string) (map[string]any, error) {
 				if path == "projects/team-a/production/db" {
 					return map[string]any{"password": "deep-secret"}, nil
 				}
@@ -206,7 +206,7 @@ func TestVaultResolver_Resolve(t *testing.T) {
 func TestVaultResolver_Concurrency(t *testing.T) {
 	ctx := context.Background()
 	mockClient := &MockVaultClient{
-		ReadFunc: func(ctx context.Context, path string) (map[string]any, error) {
+		ReadFunc: func(_ context.Context, _ string) (map[string]any, error) {
 			return map[string]any{"value": "ok"}, nil
 		},
 	}
@@ -239,10 +239,10 @@ func TestVaultResolver_CheckAccessibility(t *testing.T) {
 
 	t.Run("Accessible", func(t *testing.T) {
 		mockClient := &MockVaultClient{
-			LookupSelfFunc: func(ctx context.Context) (map[string]any, error) {
+			LookupSelfFunc: func(_ context.Context) (map[string]any, error) {
 				return map[string]any{"id": "token"}, nil
 			},
-			ReadFunc: func(ctx context.Context, path string) (map[string]any, error) {
+			ReadFunc: func(_ context.Context, _ string) (map[string]any, error) {
 				return map[string]any{"field": "exists"}, nil
 			},
 		}
@@ -260,7 +260,7 @@ func TestVaultResolver_CheckAccessibility(t *testing.T) {
 
 	t.Run("TokenInvalid", func(t *testing.T) {
 		mockClient := &MockVaultClient{
-			LookupSelfFunc: func(ctx context.Context) (map[string]any, error) {
+			LookupSelfFunc: func(_ context.Context) (map[string]any, error) {
 				return nil, fmt.Errorf("permission denied")
 			},
 		}
