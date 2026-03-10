@@ -117,6 +117,37 @@ func TestAuth_Combinations(t *testing.T) {
 	}
 }
 
+// TestAuth_BasicAuth_SSE_Requires_Credentials verifies that SSE endpoints
+// require basic auth when auth.mode is "basic" (regression test for auth bypass).
+func TestAuth_BasicAuth_SSE_Requires_Credentials(t *testing.T) {
+	t.Parallel()
+
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Mode = config.AuthModeBasic
+		cfg.Server.Auth.Basic.Username = "admin"
+		cfg.Server.Auth.Basic.Password = "secret"
+	}))
+
+	sseEndpoints := []string{
+		"/api/v1/events/dags",
+		"/api/v1/events/dag-runs",
+		"/api/v1/events/queues",
+	}
+
+	for _, endpoint := range sseEndpoints {
+		t.Run(endpoint, func(t *testing.T) {
+			// No credentials — must be rejected (not bypassed)
+			server.Client().Get(endpoint).
+				ExpectStatus(http.StatusUnauthorized).Send(t)
+
+			// Wrong credentials — must be rejected
+			server.Client().Get(endpoint).
+				WithBasicAuth("wrong", "wrong").
+				ExpectStatus(http.StatusUnauthorized).Send(t)
+		})
+	}
+}
+
 func TestAuth_BuiltinMode(t *testing.T) {
 	t.Parallel()
 
