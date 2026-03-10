@@ -102,14 +102,14 @@ Example:
 ```yaml
 type: graph
 steps:
-  - name: fetch-data
+  - id: fetch_data
     command: curl -o data.json https://api.example.com/data
     depends: []
-  - name: process
+  - id: process
     command: python process.py
     depends:
-      - fetch-data
-  - name: notify
+      - fetch_data
+  - id: notify
     command: echo "Done"
     depends:
       - process
