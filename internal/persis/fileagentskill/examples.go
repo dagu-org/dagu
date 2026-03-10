@@ -45,12 +45,21 @@ func SeedExampleSkills(baseDir string) bool {
 
 	slog.Info("Creating example skills for first-time users", "dir", baseDir)
 
+	seedableIDs := make(map[string]struct{}, len(ExampleSkillIDs()))
+	for _, id := range ExampleSkillIDs() {
+		seedableIDs[id] = struct{}{}
+	}
+
 	err := fs.WalkDir(exampleSkillsFS, "examples", func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
 		}
 		// path is "examples/{skill-id}/SKILL.md"
 		relPath := strings.TrimPrefix(path, "examples/")
+		topDir := strings.SplitN(relPath, "/", 2)[0]
+		if _, ok := seedableIDs[topDir]; !ok {
+			return nil // skip non-example skills (e.g. dagu/ used by ai install)
+		}
 		destPath := filepath.Join(baseDir, relPath)
 
 		data, readErr := exampleSkillsFS.ReadFile(path)

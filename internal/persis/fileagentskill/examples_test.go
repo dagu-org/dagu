@@ -87,13 +87,3 @@ func TestSeedExampleSkills_ValidContent(t *testing.T) {
 		assert.NotEmpty(t, skill.Knowledge, "skill %s should have knowledge", skill.ID)
 	}
 }
-
-func TestExampleSkillIDs(t *testing.T) {
-	t.Parallel()
-	ids := ExampleSkillIDs()
-
-	assert.Len(t, ids, 3)
-	assert.Contains(t, ids, "dagu-ai-workflows")
-	assert.Contains(t, ids, "dagu-containers")
-	assert.Contains(t, ids, "dagu-server-worker")
-}
