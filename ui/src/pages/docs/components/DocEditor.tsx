@@ -12,18 +12,29 @@ import { useContentEditor } from '@/hooks/useContentEditor';
 import { useDocSSE } from '@/hooks/useDocSSE';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import { cn } from '@/lib/utils';
+import { slugifyHeading } from '@/lib/text-utils';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { Check, ClipboardCopy, Copy, FileText, Save, Trash2 } from 'lucide-react';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import DocExternalChangeDialog from './DocExternalChangeDialog';
 
+function headingId(children: React.ReactNode): string {
+  const text = typeof children === 'string'
+    ? children
+    : Array.isArray(children)
+      ? children.map((c) => (typeof c === 'string' ? c : '')).join('')
+      : String(children ?? '');
+  return slugifyHeading(text);
+}
+
 type Props = {
   tabId: string;
   docPath: string;
   onDeleteDoc?: () => void;
+  onContentChange?: (content: string | null) => void;
 };
 
-function DocEditor({ tabId, docPath, onDeleteDoc }: Props) {
+function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
   const client = useClient();
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
@@ -111,6 +122,20 @@ function DocEditor({ tabId, docPath, onDeleteDoc }: Props) {
   useEffect(() => {
     localStorage.setItem('doc-editor-mode', mode);
   }, [mode]);
+
+  // Report content changes to parent for outline panel (debounced)
+  const contentChangeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (contentChangeTimerRef.current) {
+      clearTimeout(contentChangeTimerRef.current);
+    }
+    contentChangeTimerRef.current = setTimeout(() => {
+      onContentChange?.(currentValue);
+    }, 300);
+    return () => {
+      if (contentChangeTimerRef.current) clearTimeout(contentChangeTimerRef.current);
+    };
+  }, [currentValue, onContentChange]);
 
   const handleSave = useCallback(async () => {
     if (isSaving || !hasUnsavedChangesRef.current) return;
@@ -311,6 +336,12 @@ function DocEditor({ tabId, docPath, onDeleteDoc }: Props) {
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
+                  h1: ({ children }) => <h1 id={headingId(children)}>{children}</h1>,
+                  h2: ({ children }) => <h2 id={headingId(children)}>{children}</h2>,
+                  h3: ({ children }) => <h3 id={headingId(children)}>{children}</h3>,
+                  h4: ({ children }) => <h4 id={headingId(children)}>{children}</h4>,
+                  h5: ({ children }) => <h5 id={headingId(children)}>{children}</h5>,
+                  h6: ({ children }) => <h6 id={headingId(children)}>{children}</h6>,
                   code({ className: codeClassName, children }) {
                     if (codeClassName === 'language-mermaid') {
                       return <MermaidBlock code={String(children)} />;

@@ -109,6 +109,7 @@
     "openapi-fetch": "^0.15.0",
     "prism-react-renderer": "^2.4.1",
     "react": "^19.1.0",
+    "react-arborist": "^3.4.3",
     "react-cookie": "^8.0.1",
     "react-diff-viewer-continued": "^3.4.0",
     "react-dom": "^19.1.0",

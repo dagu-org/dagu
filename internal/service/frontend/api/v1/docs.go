@@ -302,6 +302,62 @@ func (a *API) RenameDoc(ctx context.Context, request api.RenameDocRequestObject)
 	return api.RenameDoc200JSONResponse{Message: &msg}, nil
 }
 
+// DeleteDocBatch deletes multiple documents or directories.
+func (a *API) DeleteDocBatch(ctx context.Context, request api.DeleteDocBatchRequestObject) (api.DeleteDocBatchResponseObject, error) {
+	if err := a.requireDocManagement(); err != nil {
+		return nil, err
+	}
+	if err := a.requireDAGWrite(ctx); err != nil {
+		return nil, err
+	}
+	if request.Body == nil || len(request.Body.Paths) == 0 {
+		return nil, &Error{
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "paths required",
+			HTTPStatus: http.StatusBadRequest,
+		}
+	}
+	if len(request.Body.Paths) > 100 {
+		return nil, &Error{
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "max 100 paths per batch",
+			HTTPStatus: http.StatusBadRequest,
+		}
+	}
+	for _, p := range request.Body.Paths {
+		if err := validateDocPath(p); err != nil {
+			return nil, err
+		}
+	}
+
+	deleted, failed, err := a.docStore.DeleteBatch(ctx, request.Body.Paths)
+	if err != nil {
+		logger.Error(ctx, "Failed to batch delete docs", tag.Error(err))
+		return nil, internalError(err)
+	}
+
+	for _, id := range deleted {
+		a.logAudit(ctx, audit.CategoryAgent, auditActionDocDelete, map[string]any{
+			"doc_id": id,
+		})
+	}
+
+	failedItems := make([]api.DocDeleteBatchFailedItem, 0, len(failed))
+	for _, f := range failed {
+		failedItems = append(failedItems, api.DocDeleteBatchFailedItem{
+			Path:  f.ID,
+			Error: f.Error,
+		})
+	}
+
+	msg := fmt.Sprintf("Deleted %d, failed %d", len(deleted), len(failed))
+	return api.DeleteDocBatch200JSONResponse{
+		Deleted: deleted,
+		Failed:  failedItems,
+		Message: msg,
+	}, nil
+}
+
 // GetDocTreeData is the SSE data method for the doc tree.
 // Identifier format: URL query string (e.g., "page=1&perPage=200")
 func (a *API) GetDocTreeData(ctx context.Context, queryString string) (any, error) {

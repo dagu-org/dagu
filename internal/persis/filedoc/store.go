@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -49,13 +50,11 @@ func New(baseDir string) *Store {
 	return &Store{baseDir: baseDir}
 }
 
-// docFilePath returns the file path for a doc ID and validates the path
-// stays within baseDir to prevent path traversal (including via symlinks).
-func (s *Store) docFilePath(id string) (string, error) {
-	p := filepath.Join(s.baseDir, id+".md")
+// safePath validates that the given path stays within baseDir (preventing
+// path traversal, including via symlinks) and returns the cleaned absolute path.
+func (s *Store) safePath(p string, id string) (string, error) {
 	cleaned := filepath.Clean(p)
 
-	// Resolve symlinks for stronger path traversal protection.
 	resolvedBase, err := filepath.EvalSymlinks(s.baseDir)
 	if err != nil {
 		return "", fmt.Errorf("filedoc: cannot resolve base dir: %w", err)
@@ -73,6 +72,11 @@ func (s *Store) docFilePath(id string) (string, error) {
 		return "", fmt.Errorf("filedoc: path traversal detected for id %q", id)
 	}
 	return cleaned, nil
+}
+
+// docFilePath returns the .md file path for a doc ID with path-traversal validation.
+func (s *Store) docFilePath(id string) (string, error) {
+	return s.safePath(filepath.Join(s.baseDir, id+".md"), id)
 }
 
 // parseDocFile parses a doc .md file into an agent.Doc.
@@ -295,32 +299,156 @@ func (s *Store) Update(_ context.Context, id, content string) error {
 	return nil
 }
 
-// Delete removes a doc file and cleans up empty parent directories.
+// Delete removes a doc file or directory and cleans up empty parent directories.
+// File takes precedence: if both foo.md and foo/ exist, Delete("foo") deletes the file.
 func (s *Store) Delete(_ context.Context, id string) error {
 	if err := agent.ValidateDocID(id); err != nil {
 		return err
 	}
 
+	// Try as file first (existing behavior).
 	filePath, err := s.docFilePath(id)
 	if err != nil {
 		return err
 	}
+	if _, err := os.Stat(filePath); err == nil {
+		if err := os.Remove(filePath); err != nil {
+			return fmt.Errorf("filedoc: failed to delete file: %w", err)
+		}
+		s.cleanEmptyParents(filepath.Dir(filePath))
+		return nil
+	}
 
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	// Try as directory.
+	dirPath, err := s.dirPath(id)
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(dirPath)
+	if err != nil || !info.IsDir() {
 		return agent.ErrDocNotFound
 	}
-
-	if err := os.Remove(filePath); err != nil {
-		return fmt.Errorf("filedoc: failed to delete file: %w", err)
+	if err := s.safeDeleteDir(dirPath); err != nil {
+		return fmt.Errorf("filedoc: failed to delete directory: %w", err)
 	}
-
-	// Clean up empty parent directories up to baseDir.
-	s.cleanEmptyParents(filepath.Dir(filePath))
-
+	s.cleanEmptyParents(filepath.Dir(dirPath))
 	return nil
 }
 
-// Rename moves a doc from oldID to newID.
+// safeDeleteDir removes a directory tree safely without using os.RemoveAll.
+// It walks depth-first and uses os.Remove for each entry, which never follows
+// symlinks and only removes empty directories.
+func (s *Store) safeDeleteDir(dirPath string) error {
+	var paths []string
+	err := filepath.WalkDir(dirPath, func(path string, _ os.DirEntry, err error) error {
+		if err != nil {
+			return nil // skip unreadable entries
+		}
+		paths = append(paths, path)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Reverse to delete deepest entries first (children before parents).
+	slices.Reverse(paths)
+
+	var lastErr error
+	for _, p := range paths {
+		// os.Remove: deletes file/symlink/empty-dir. Never follows symlinks.
+		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+			lastErr = err
+		}
+	}
+	return lastErr
+}
+
+// DeleteBatch deletes multiple docs/directories in one operation.
+// Not-found items are treated as success (idempotency for safe retries).
+func (s *Store) DeleteBatch(_ context.Context, ids []string) ([]string, []agent.DeleteError, error) {
+	var deleted []string
+	var failed []agent.DeleteError
+
+	// Validate all IDs upfront, separate valid from invalid.
+	validIDs := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if err := agent.ValidateDocID(id); err != nil {
+			failed = append(failed, agent.DeleteError{ID: id, Error: err.Error()})
+		} else {
+			validIDs = append(validIDs, id)
+		}
+	}
+
+	// Sort shortest-first for parent-before-child deduplication.
+	sort.Slice(validIDs, func(i, j int) bool { return len(validIDs[i]) < len(validIDs[j]) })
+
+	// Track deleted directory prefixes to skip subsumed children.
+	deletedPrefixes := map[string]bool{}
+
+	for _, id := range validIDs {
+		// Skip if already covered by a deleted parent directory.
+		if isSubsumedByPrefix(id, deletedPrefixes) {
+			deleted = append(deleted, id)
+			continue
+		}
+
+		// Try as file first.
+		filePath, err := s.docFilePath(id)
+		if err != nil {
+			failed = append(failed, agent.DeleteError{ID: id, Error: err.Error()})
+			continue
+		}
+		if _, err := os.Stat(filePath); err == nil {
+			if err := os.Remove(filePath); err != nil {
+				failed = append(failed, agent.DeleteError{ID: id, Error: err.Error()})
+				continue
+			}
+			s.cleanEmptyParents(filepath.Dir(filePath))
+			deleted = append(deleted, id)
+			continue
+		}
+
+		// Try as directory.
+		dirPath, err := s.dirPath(id)
+		if err != nil {
+			failed = append(failed, agent.DeleteError{ID: id, Error: err.Error()})
+			continue
+		}
+		info, err := os.Stat(dirPath)
+		if err != nil || !info.IsDir() {
+			// Not found → treat as success (idempotency).
+			deleted = append(deleted, id)
+			continue
+		}
+		if err := s.safeDeleteDir(dirPath); err != nil {
+			failed = append(failed, agent.DeleteError{ID: id, Error: err.Error()})
+			continue
+		}
+		s.cleanEmptyParents(filepath.Dir(dirPath))
+		deletedPrefixes[id+"/"] = true
+		deleted = append(deleted, id)
+	}
+
+	return deleted, failed, nil
+}
+
+// isSubsumedByPrefix checks if id is a child of any deleted directory prefix.
+func isSubsumedByPrefix(id string, prefixes map[string]bool) bool {
+	for prefix := range prefixes {
+		if strings.HasPrefix(id, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// dirPath returns the directory path for a doc ID with path-traversal validation.
+func (s *Store) dirPath(id string) (string, error) {
+	return s.safePath(filepath.Join(s.baseDir, id), id)
+}
+
+// Rename moves a doc (file or directory) from oldID to newID.
 func (s *Store) Rename(_ context.Context, oldID, newID string) error {
 	if err := agent.ValidateDocID(oldID); err != nil {
 		return err
@@ -329,32 +457,60 @@ func (s *Store) Rename(_ context.Context, oldID, newID string) error {
 		return err
 	}
 
-	oldPath, err := s.docFilePath(oldID)
+	// Try as file first (existing behavior).
+	oldFilePath, err := s.docFilePath(oldID)
 	if err != nil {
 		return err
 	}
-	newPath, err := s.docFilePath(newID)
+	newFilePath, err := s.docFilePath(newID)
 	if err != nil {
 		return err
 	}
 
-	if _, err := os.Stat(oldPath); os.IsNotExist(err) {
+	if _, err := os.Stat(oldFilePath); err == nil {
+		// Old file exists — rename as file.
+		if _, err := os.Stat(newFilePath); err == nil {
+			return agent.ErrDocAlreadyExists
+		}
+		if err := os.MkdirAll(filepath.Dir(newFilePath), docDirPermissions); err != nil {
+			return fmt.Errorf("filedoc: failed to create target directories: %w", err)
+		}
+		if err := os.Rename(oldFilePath, newFilePath); err != nil {
+			return fmt.Errorf("filedoc: failed to rename file: %w", err)
+		}
+		s.cleanEmptyParents(filepath.Dir(oldFilePath))
+		return nil
+	}
+
+	// Try as directory.
+	oldDirPath, err := s.dirPath(oldID)
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(oldDirPath)
+	if err != nil || !info.IsDir() {
 		return agent.ErrDocNotFound
 	}
-	if _, err := os.Stat(newPath); err == nil {
+
+	newDirPath, err := s.dirPath(newID)
+	if err != nil {
+		return err
+	}
+	// Check that neither a directory nor a file with the target name exists.
+	if _, err := os.Stat(newDirPath); err == nil {
+		return agent.ErrDocAlreadyExists
+	}
+	if _, err := os.Stat(newFilePath); err == nil {
 		return agent.ErrDocAlreadyExists
 	}
 
-	if err := os.MkdirAll(filepath.Dir(newPath), docDirPermissions); err != nil {
+	if err := os.MkdirAll(filepath.Dir(newDirPath), docDirPermissions); err != nil {
 		return fmt.Errorf("filedoc: failed to create target directories: %w", err)
 	}
-
-	if err := os.Rename(oldPath, newPath); err != nil {
-		return fmt.Errorf("filedoc: failed to rename file: %w", err)
+	if err := os.Rename(oldDirPath, newDirPath); err != nil {
+		return fmt.Errorf("filedoc: failed to rename directory: %w", err)
 	}
-
-	s.cleanEmptyParents(filepath.Dir(oldPath))
-
+	s.cleanEmptyParents(filepath.Dir(oldDirPath))
 	return nil
 }
 
