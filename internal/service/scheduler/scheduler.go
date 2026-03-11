@@ -123,6 +123,15 @@ func New(
 			)
 		},
 		Enqueue: func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error {
+			// When queues are disabled, fall back to direct dispatch so
+			// catchup runs are not stuck forever retrying enqueue.
+			if !cfg.Queues.Enabled {
+				return dagExecutor.HandleJob(
+					ctx, dag,
+					coordinatorv1.Operation_OPERATION_START,
+					runID, triggerType,
+				)
+			}
 			return dagExecutor.EnqueueRun(ctx, dag, runID, triggerType)
 		},
 		Stop: func(ctx context.Context, dag *core.DAG) error {

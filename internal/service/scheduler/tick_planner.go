@@ -327,13 +327,17 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 			continue
 		}
 
-		// Check catchup buffer first (catchup has priority over live)
-		catchupProduced := false
+		// Check catchup buffer first (catchup has priority over live).
+		// Any pending catchup item — whether successfully enqueued or
+		// retained due to failure — blocks live scheduling for this DAG.
+		catchupPending := false
 		if buf, ok := tp.buffers[dagName]; ok {
 			item, hasItem := buf.Peek()
 			if !hasItem {
 				delete(tp.buffers, dagName)
 			} else {
+				catchupPending = true
+
 				running, err := tp.cfg.IsRunning(ctx, item.DAG)
 				if err != nil {
 					logger.Error(ctx, "Failed to check if DAG is running, assuming not running",
@@ -363,7 +367,6 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 						} else {
 							buf.Pop()
 							tp.advanceDAGWatermark(dagName, item.ScheduledTime)
-							catchupProduced = true
 						}
 					}
 				} else {
@@ -400,8 +403,8 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 			}
 		}
 
-		// If catchup produced a run, skip live eval (catchup has priority)
-		if catchupProduced {
+		// If a catchup item was handled or is still pending, skip live eval.
+		if catchupPending {
 			continue
 		}
 

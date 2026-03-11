@@ -1785,10 +1785,11 @@ func TestTickPlanner_CatchupEnqueueFailureRetainsBuffer(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, 2, buf.Len(), "expected 2 missed intervals (11:00 and 12:00)")
 
-	// Plan with Dispatch failing — buffer should be retained.
-	// The live schedule may still fire (catchup failure doesn't block live runs).
+	// Plan with Enqueue failing — buffer should be retained and live
+	// scheduling should be blocked (pending catchup has priority).
 	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
-	_ = tp.Plan(context.Background(), now)
+	runs := tp.Plan(context.Background(), now)
+	assert.Empty(t, runs, "failed catchup should block live scheduling")
 
 	// Item must still be in buffer (not popped)
 	buf, ok = tp.buffers["enq-fail-dag"]
@@ -1898,4 +1899,61 @@ func TestTickPlanner_CatchupEnqueueSuccessAdvancesWatermark(t *testing.T) {
 	hour11 := time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)
 	assert.Equal(t, hour11, wm.LastScheduledTime,
 		"watermark should advance after successful enqueue")
+}
+
+// TestTickPlanner_CatchupFailureBlocksLiveScheduling verifies that when a
+// catchup enqueue fails, live scheduling for the same DAG is blocked on the
+// same tick. This prevents dispatching a live run while a catchup item is
+// still pending retry.
+func TestTickPlanner_CatchupFailureBlocksLiveScheduling(t *testing.T) {
+	t.Parallel()
+
+	// Watermark at 11:00, clock at 12:00 → one missed interval at 12:00.
+	// The live schedule also fires at 12:00.
+	lastTick := time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)
+	state := newMockWatermarkState(lastTick)
+	state.DAGs["block-dag"] = DAGWatermark{
+		LastScheduledTime: lastTick,
+	}
+	store := &mockWatermarkStore{state: state}
+
+	var dispatchedRuns []PlannedRun
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore: store,
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{}, nil
+		},
+		Dispatch: func(_ context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error {
+			dispatchedRuns = append(dispatchedRuns, PlannedRun{DAG: dag, RunID: runID, TriggerType: triggerType})
+			return nil
+		},
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			return errors.New("enqueue temporarily unavailable")
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "run-1", nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+		Events: eventCh,
+	})
+
+	dag := newHourlyCatchupDAG(t, "block-dag")
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	// Plan at 12:00 — both catchup (12:00) and live (12:00) could fire.
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+
+	// Live scheduling must be blocked because catchup is pending.
+	assert.Empty(t, runs, "pending catchup must block live scheduling")
+	assert.Empty(t, dispatchedRuns, "Dispatch should not be called when catchup is pending")
 }
