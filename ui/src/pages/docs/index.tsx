@@ -16,7 +16,7 @@ import { CreateDocModal } from './components/CreateDocModal';
 import DocTabEditorPanel from './components/DocTabEditorPanel';
 import DocTreeSidebar from './components/DocTreeSidebar';
 import { RenameDocModal } from './components/RenameDocModal';
-import type { ContextAction } from './components/DocTreeNode';
+import type { ContextAction } from './components/DocArboristNode';
 import { useCockpitState } from '@/features/cockpit/hooks/useCockpitState';
 import { CockpitToolbar } from '@/features/cockpit/components/CockpitToolbar';
 
@@ -58,6 +58,9 @@ function DocsContent() {
   // Mobile view state
   const [mobileView, setMobileView] = useState<'tree' | 'editor'>('tree');
 
+  // Active doc content for outline panel
+  const [activeDocContent, setActiveDocContent] = useState<string | null>(null);
+
   // Modal state
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createParentDir, setCreateParentDir] = useState('');
@@ -76,7 +79,7 @@ function DocsContent() {
   // SSE for real-time updates with polling fallback
   const sseResult = useDocTreeSSE(true);
 
-  const { data: treeData, mutate } = useQuery(
+  const { data: treeData, mutate, error: treeError, isLoading: treeIsLoading } = useQuery(
     '/docs',
     {
       params: {
@@ -215,8 +218,8 @@ function DocsContent() {
     [client, remoteNode, mutate, openDoc, showToast]
   );
 
-  // Rename handler
-  const handleRename = useCallback(
+  // Rename handler (from modal)
+  const handleRenameModal = useCallback(
     async (newPath: string) => {
       setRenameLoading(true);
       setRenameError(null);
@@ -245,6 +248,69 @@ function DocsContent() {
     },
     [client, remoteNode, renameDocPath, mutate, tabs, updateTab, showToast]
   );
+
+  // Inline rename handler (from tree F2/double-click)
+  const handleInlineRename = useCallback(
+    async (oldPath: string, newPath: string) => {
+      try {
+        const { error } = await client.POST('/docs/doc/rename', {
+          params: { query: { remoteNode, path: oldPath } },
+          body: { newPath },
+        });
+        if (error) {
+          showToast(error?.message || 'Failed to rename document');
+          mutate(); // Rollback optimistic state
+          return;
+        }
+        mutate();
+        const openTab = tabs.find((t) => t.docPath === oldPath);
+        if (openTab) {
+          updateTab(openTab.id, { docPath: newPath, title: titleFromPath(newPath) });
+        }
+        showToast('Document renamed');
+      } catch {
+        showToast('Failed to rename document');
+        mutate(); // Rollback
+      }
+    },
+    [client, remoteNode, mutate, tabs, updateTab, showToast]
+  );
+
+  // Move handler (drag-and-drop)
+  const handleMove = useCallback(
+    async (oldPath: string, newPath: string) => {
+      try {
+        const { error } = await client.POST('/docs/doc/rename', {
+          params: { query: { remoteNode, path: oldPath } },
+          body: { newPath },
+        });
+        if (error) {
+          showToast(error?.message || 'A document at that path already exists');
+          mutate(); // Rollback optimistic state
+          return;
+        }
+        mutate();
+        const openTab = tabs.find((t) => t.docPath === oldPath);
+        if (openTab) {
+          updateTab(openTab.id, { docPath: newPath, title: titleFromPath(newPath) });
+        }
+        showToast('Document moved');
+      } catch {
+        showToast('Failed to move document');
+        mutate(); // Rollback
+      }
+    },
+    [client, remoteNode, mutate, tabs, updateTab, showToast]
+  );
+
+  // Heading click for outline panel
+  const handleHeadingClick = useCallback((anchor: string) => {
+    // Find the heading in the preview panel and scroll to it
+    const el = document.getElementById(anchor);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
 
   // Delete handler
   const handleDelete = useCallback(async () => {
@@ -282,6 +348,9 @@ function DocsContent() {
   const leftPanel = (
     <DocTreeSidebar
       tree={treeData?.tree}
+      isLoading={treeIsLoading}
+      error={treeError}
+      onRetry={() => mutate()}
       onContextAction={handleContextAction}
       onCreateNew={() => {
         setCreateParentDir('');
@@ -289,6 +358,10 @@ function DocsContent() {
         setCreateModalOpen(true);
       }}
       onSelectFile={handleSelectFile}
+      onRename={handleInlineRename}
+      onMove={handleMove}
+      activeDocContent={activeDocContent}
+      onHeadingClick={handleHeadingClick}
     />
   );
 
@@ -308,7 +381,11 @@ function DocsContent() {
 
   const rightPanel =
     tabs.length > 0 ? (
-      <DocTabEditorPanel onDeleteDoc={handleDeleteFromTab} toolbar={cockpitToolbar} />
+      <DocTabEditorPanel
+        onDeleteDoc={handleDeleteFromTab}
+        toolbar={cockpitToolbar}
+        onContentChange={setActiveDocContent}
+      />
     ) : null;
 
   // Mobile layout
@@ -351,7 +428,7 @@ function DocsContent() {
         <RenameDocModal
           isOpen={renameModalOpen}
           onClose={() => setRenameModalOpen(false)}
-          onSubmit={handleRename}
+          onSubmit={handleRenameModal}
           currentPath={renameDocPath}
           isLoading={renameLoading}
           externalError={renameError}
@@ -397,7 +474,7 @@ function DocsContent() {
       <RenameDocModal
         isOpen={renameModalOpen}
         onClose={() => setRenameModalOpen(false)}
-        onSubmit={handleRename}
+        onSubmit={handleRenameModal}
         currentPath={renameDocPath}
         isLoading={renameLoading}
         externalError={renameError}

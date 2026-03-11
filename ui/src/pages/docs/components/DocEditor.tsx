@@ -17,13 +17,28 @@ import { Check, ClipboardCopy, Copy, FileText, Save, Trash2 } from 'lucide-react
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import DocExternalChangeDialog from './DocExternalChangeDialog';
 
+function slugifyHeading(children: React.ReactNode): string {
+  const text = typeof children === 'string'
+    ? children
+    : Array.isArray(children)
+      ? children.map((c) => (typeof c === 'string' ? c : '')).join('')
+      : String(children ?? '');
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
+
 type Props = {
   tabId: string;
   docPath: string;
   onDeleteDoc?: () => void;
+  onContentChange?: (content: string | null) => void;
 };
 
-function DocEditor({ tabId, docPath, onDeleteDoc }: Props) {
+function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
   const client = useClient();
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
@@ -111,6 +126,11 @@ function DocEditor({ tabId, docPath, onDeleteDoc }: Props) {
   useEffect(() => {
     localStorage.setItem('doc-editor-mode', mode);
   }, [mode]);
+
+  // Report content changes to parent for outline panel
+  useEffect(() => {
+    onContentChange?.(currentValue);
+  }, [currentValue, onContentChange]);
 
   const handleSave = useCallback(async () => {
     if (isSaving || !hasUnsavedChangesRef.current) return;
@@ -311,6 +331,12 @@ function DocEditor({ tabId, docPath, onDeleteDoc }: Props) {
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
+                  h1: ({ children }) => <h1 id={slugifyHeading(children)}>{children}</h1>,
+                  h2: ({ children }) => <h2 id={slugifyHeading(children)}>{children}</h2>,
+                  h3: ({ children }) => <h3 id={slugifyHeading(children)}>{children}</h3>,
+                  h4: ({ children }) => <h4 id={slugifyHeading(children)}>{children}</h4>,
+                  h5: ({ children }) => <h5 id={slugifyHeading(children)}>{children}</h5>,
+                  h6: ({ children }) => <h6 id={slugifyHeading(children)}>{children}</h6>,
                   code({ className: codeClassName, children }) {
                     if (codeClassName === 'language-mermaid') {
                       return <MermaidBlock code={String(children)} />;
