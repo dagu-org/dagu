@@ -1508,3 +1508,183 @@ func TestComputePrevExecTime(t *testing.T) {
 		})
 	}
 }
+
+// TestTickPlanner_RecomputeBufferAfterPlanNoDuplicate verifies that a DAG
+// update event arriving between Plan() and Advance() does not re-create
+// an already-dispatched catchup item. This is the exact interleave that
+// caused duplicate DAG runs:
+//
+//	Plan() pops item T → releases entryMu
+//	handleEvent(Updated) → recomputeBuffer reads stale watermark → re-adds T
+//	Advance() updates watermark → too late
+//
+// The fix: Plan() must advance the per-DAG watermark when popping a
+// catchup item, while entryMu is held, so recomputeBuffer never sees
+// the stale value.
+func TestTickPlanner_RecomputeBufferAfterPlanNoDuplicate(t *testing.T) {
+	t.Parallel()
+
+	// Watermark: last tick and last scheduled time at 10:00.
+	// Clock: 12:00. This gives missed intervals at 11:00 and 12:00.
+	lastTick := time.Date(2026, 2, 7, 10, 0, 0, 0, time.UTC)
+	state := newMockWatermarkState(lastTick)
+	state.DAGs["dup-dag"] = DAGWatermark{
+		LastScheduledTime: lastTick,
+	}
+	store := &mockWatermarkStore{state: state}
+
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore: store,
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{}, nil
+		},
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			return nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "run-1", nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+		Events: eventCh,
+	})
+
+	dag := newHourlyCatchupDAG(t, "dup-dag")
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	// Verify initial buffer: should have 2 items (11:00, 12:00)
+	buf, ok := tp.buffers["dup-dag"]
+	require.True(t, ok)
+	require.Equal(t, 2, buf.Len(), "expected 2 missed intervals (11:00 and 12:00)")
+
+	// Step 1: Plan() pops the first catchup item (11:00)
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+	require.Len(t, runs, 1)
+	assert.Equal(t, core.TriggerTypeCatchUp, runs[0].TriggerType)
+	hour11 := time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)
+	assert.Equal(t, hour11, runs[0].ScheduledTime)
+
+	// Step 2: BEFORE Advance(), simulate a DAG update event.
+	// This is the exact race: Plan() released entryMu, Advance() hasn't
+	// run yet, so the watermark may be stale when recomputeBuffer reads it.
+	tp.entryMu.Lock()
+	tp.handleEvent(context.Background(), DAGChangeEvent{
+		Type:    DAGChangeUpdated,
+		DAG:     dag,
+		DAGName: "dup-dag",
+	})
+	tp.entryMu.Unlock()
+
+	// Step 3: Now call Advance() (as cronLoop would).
+	tp.Advance(now)
+
+	// Verify: the recomputed buffer must NOT contain the 11:00 item
+	// that was already dispatched. It should only contain 12:00.
+	buf, ok = tp.buffers["dup-dag"]
+	require.True(t, ok, "buffer should exist with remaining item(s)")
+
+	var scheduledTimes []time.Time
+	for buf.Len() > 0 {
+		item, _ := buf.Pop()
+		scheduledTimes = append(scheduledTimes, item.ScheduledTime)
+	}
+
+	hour12 := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	assert.Equal(t, []time.Time{hour12}, scheduledTimes,
+		"recomputed buffer should only contain 12:00; 11:00 was already dispatched")
+
+	// Double-check: no 11:00 in the buffer (the duplicate scenario)
+	for _, st := range scheduledTimes {
+		assert.NotEqual(t, hour11, st,
+			"11:00 must not reappear — it was already dispatched by Plan()")
+	}
+}
+
+// TestTickPlanner_CatchupRetainedOnCreatePlannedRunFailure verifies that when
+// createPlannedRun fails (e.g., GenRunID error), the catchup item stays in the
+// buffer and the watermark is NOT advanced, allowing retry on the next tick or
+// restoration via recomputeBuffer.
+func TestTickPlanner_CatchupRetainedOnCreatePlannedRunFailure(t *testing.T) {
+	t.Parallel()
+
+	lastTick := time.Date(2026, 2, 7, 10, 0, 0, 0, time.UTC)
+	state := newMockWatermarkState(lastTick)
+	state.DAGs["fail-dag"] = DAGWatermark{
+		LastScheduledTime: lastTick,
+	}
+	store := &mockWatermarkStore{state: state}
+
+	genRunIDFails := true
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore: store,
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{}, nil
+		},
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			return nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			if genRunIDFails {
+				return "", errors.New("transient ID generation error")
+			}
+			return "run-1", nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+		Events: eventCh,
+	})
+
+	dag := newHourlyCatchupDAG(t, "fail-dag")
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	buf, ok := tp.buffers["fail-dag"]
+	require.True(t, ok)
+	require.Equal(t, 2, buf.Len(), "expected 2 missed intervals (11:00 and 12:00)")
+
+	// Plan with GenRunID failing — should produce no runs
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+	assert.Empty(t, runs, "no runs should be produced when GenRunID fails")
+
+	// Item must still be in buffer (not popped)
+	buf, ok = tp.buffers["fail-dag"]
+	require.True(t, ok, "buffer should still exist")
+	assert.Equal(t, 2, buf.Len(), "both items should remain in buffer after failure")
+
+	// Watermark must NOT have advanced past the original value
+	tp.mu.RLock()
+	wm := tp.watermarkState.DAGs["fail-dag"]
+	tp.mu.RUnlock()
+	assert.Equal(t, lastTick, wm.LastScheduledTime,
+		"watermark should not advance when createPlannedRun fails")
+
+	// Now fix GenRunID and retry — should succeed
+	genRunIDFails = false
+	runs = tp.Plan(context.Background(), now)
+	require.Len(t, runs, 1, "retry should produce a run")
+	assert.Equal(t, core.TriggerTypeCatchUp, runs[0].TriggerType)
+	hour11 := time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)
+	assert.Equal(t, hour11, runs[0].ScheduledTime)
+
+	// Buffer should now have 1 remaining item
+	buf, ok = tp.buffers["fail-dag"]
+	require.True(t, ok)
+	assert.Equal(t, 1, buf.Len(), "one item should remain after successful retry")
+}

@@ -341,9 +341,10 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 						// Re-peek: front changed from oldest to latest
 						item, _ = buf.Peek()
 					}
-					buf.Pop()
 					run, ok := tp.createPlannedRun(ctx, item.DAG, item.ScheduledTime, item.TriggerType)
 					if ok {
+						buf.Pop()
+						tp.advanceDAGWatermark(dagName, item.ScheduledTime)
 						candidates = append(candidates, run)
 						catchupProduced = true
 					}
@@ -579,7 +580,7 @@ func (tp *TickPlanner) Advance(now time.Time) {
 			continue
 		}
 		if run.TriggerType == core.TriggerTypeCatchUp {
-			continue // watermark updated in DispatchRun on success
+			continue // watermark already advanced in Plan() under entryMu
 		}
 		tp.watermarkState.DAGs[run.DAG.Name] = DAGWatermark{
 			LastScheduledTime: run.ScheduledTime,
@@ -788,10 +789,5 @@ func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 			tag.Error(err),
 		)
 		return
-	}
-
-	// On successful catchup dispatch, advance the per-DAG watermark.
-	if run.TriggerType == core.TriggerTypeCatchUp && run.ScheduleType == ScheduleTypeStart {
-		tp.advanceDAGWatermark(run.DAG.Name, run.ScheduledTime)
 	}
 }
