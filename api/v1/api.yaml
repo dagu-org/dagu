@@ -5913,6 +5913,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /docs/delete-batch:
+    post:
+      summary: "Delete multiple documents or directories"
+      description: "Deletes multiple documents and/or directories in a single operation. Supports recursive directory deletion. Not-found items are treated as successful deletes for idempotency. Requires DAG write permission."
+      operationId: "deleteDocBatch"
+      tags:
+        - "docs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocDeleteBatchRequest"
+      responses:
+        "200":
+          description: "Batch delete completed (may include partial failures)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocDeleteBatchResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 
   /remote-nodes:
     get:
@@ -9362,6 +9391,52 @@ components:
       properties:
         newPath:
           $ref: "#/components/schemas/DocPath"
+
+    DocDeleteBatchRequest:
+      type: object
+      required:
+        - paths
+      description: "Request to delete multiple documents or directories"
+      properties:
+        paths:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/DocPath"
+          description: "Document or directory paths to delete (max 100)"
+
+    DocDeleteBatchResponse:
+      type: object
+      required:
+        - deleted
+        - failed
+        - message
+      properties:
+        deleted:
+          type: array
+          items:
+            type: string
+          description: "Successfully deleted paths"
+        failed:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocDeleteBatchFailedItem"
+          description: "Paths that failed to delete with error details"
+        message:
+          type: string
+          description: "Human-readable summary"
+
+    DocDeleteBatchFailedItem:
+      type: object
+      required:
+        - path
+        - error
+      properties:
+        path:
+          type: string
+        error:
+          type: string
 
     ModelPreset:
       type: object

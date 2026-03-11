@@ -12,6 +12,7 @@ import {
   Loader2,
   RefreshCw,
   Search,
+  Trash2,
   X,
 } from 'lucide-react';
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
@@ -31,6 +32,8 @@ type Props = {
   onSelectFile: (docPath: string, title: string) => void;
   onRename: (oldPath: string, newPath: string) => Promise<void>;
   onMove: (oldPath: string, newPath: string) => Promise<void>;
+  onBatchDelete: (paths: string[]) => void;
+  onSelectionChange?: (ids: string[]) => void;
   activeDocContent?: string | null;
   onHeadingClick?: (anchor: string) => void;
 };
@@ -97,6 +100,8 @@ function DocTreeSidebar({
   onSelectFile,
   onRename,
   onMove,
+  onBatchDelete,
+  onSelectionChange,
   activeDocContent,
   onHeadingClick,
 }: Props) {
@@ -112,6 +117,9 @@ function DocTreeSidebar({
   const treeRef = useRef<TreeApi<DocTreeNodeResponse>>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerHeight, setContainerHeight] = useState(400);
+
+  // Selection state for multi-select
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -147,12 +155,8 @@ function DocTreeSidebar({
         const n = api.get(a);
         if (n && !n.isOpen) n.open();
       }
-      // Select and scroll to active node
-      const activeNode = api.get(activeDocPath);
-      if (activeNode) {
-        activeNode.select();
-        api.scrollTo(activeDocPath);
-      }
+      // Scroll to active node (do NOT call select() — it accumulates multi-selections)
+      api.scrollTo(activeDocPath);
       hasRevealedRef.current = activeDocPath;
     }, 50);
     return () => clearTimeout(timer);
@@ -234,6 +238,13 @@ function DocTreeSidebar({
   const handleCollapseAll = useCallback(() => {
     treeRef.current?.closeAll();
   }, []);
+
+  // Track selection changes
+  const handleSelect = useCallback((nodes: NodeApi<DocTreeNodeResponse>[]) => {
+    const ids = nodes.map(n => n.id);
+    setSelectedIds(ids);
+    onSelectionChange?.(ids);
+  }, [onSelectionChange]);
 
   // Handle node activation (file click)
   const handleActivate = useCallback(
@@ -322,9 +333,11 @@ function DocTreeSidebar({
         {...props}
         onContextAction={onContextAction}
         canWrite={canWrite}
+        activeDocPath={activeDocPath}
+        selectedCount={selectedIds.length}
       />
     ),
-    [onContextAction, canWrite]
+    [onContextAction, canWrite, activeDocPath, selectedIds.length]
   );
 
   return (
@@ -364,38 +377,65 @@ function DocTreeSidebar({
         </div>
       </div>
 
-      {/* Search */}
-      <div className="px-2 py-1.5 border-b border-border">
-        <div className="relative">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search docs..."
-            className="w-full text-xs bg-muted/50 border border-border rounded px-2 py-1 pl-6 pr-6 outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/60"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-sm hover:bg-accent text-muted-foreground"
-            >
-              <X className="h-3 w-3" />
-            </button>
+      {/* Search / Selection bar (selection replaces search when active) */}
+      <div className="px-2 py-1.5 border-b border-border relative">
+        {/* Search input — always rendered to define the container height */}
+        <div className={selectedIds.length > 1 && canWrite ? 'invisible' : undefined}>
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search docs..."
+              className="w-full text-xs bg-muted/50 border border-border rounded px-2 py-1 pl-6 pr-6 outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/60"
+              tabIndex={selectedIds.length > 1 && canWrite ? -1 : undefined}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-sm hover:bg-accent text-muted-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+            {isSearching && (
+              <Loader2 className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground animate-spin" />
+            )}
+          </div>
+          {searchError && searchQuery.length >= 2 && (
+            <div className="text-[10px] text-destructive mt-0.5 px-1">
+              {searchError}
+            </div>
           )}
-          {isSearching && (
-            <Loader2 className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground animate-spin" />
+          {searchResults !== null && searchQuery.length >= 2 && !searchError && (
+            <div className="text-[10px] text-muted-foreground mt-0.5 px-1">
+              {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+            </div>
           )}
         </div>
-        {searchError && searchQuery.length >= 2 && (
-          <div className="text-[10px] text-destructive mt-0.5 px-1">
-            {searchError}
-          </div>
-        )}
-        {searchResults !== null && searchQuery.length >= 2 && !searchError && (
-          <div className="text-[10px] text-muted-foreground mt-0.5 px-1">
-            {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+        {/* Selection bar — overlaid on top when multi-select is active */}
+        {selectedIds.length > 1 && canWrite && (
+          <div className="absolute inset-0 flex items-center justify-between px-3">
+            <span className="text-xs text-muted-foreground">{selectedIds.length} selected</span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => onBatchDelete(selectedIds)}
+                className="flex items-center gap-0.5 text-xs text-destructive hover:text-destructive/80 px-1 py-0.5 rounded-sm hover:bg-destructive/10"
+              >
+                <Trash2 className="h-3 w-3" /> Delete
+              </button>
+              <button
+                type="button"
+                onClick={() => treeRef.current?.deselectAll()}
+                className="p-0.5 rounded-sm hover:bg-accent text-muted-foreground"
+                title="Clear selection"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -437,12 +477,11 @@ function DocTreeSidebar({
             rowHeight={28}
             openByDefault={false}
             initialOpenState={initialOpenState}
-            selection={activeDocPath ?? undefined}
-            disableMultiSelection
             disableEdit={!canWrite}
             disableDrag={disableDrag}
             disableDrop={disableDrop}
             onActivate={handleActivate}
+            onSelect={handleSelect}
             onRename={handleRename}
             onMove={handleMove}
             idAccessor="id"

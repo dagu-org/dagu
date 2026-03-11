@@ -1331,3 +1331,249 @@ func TestRenameOsRenameError(t *testing.T) {
 	err := store.Rename(ctx, "rename-src", "target-dir/dest")
 	assert.Error(t, err)
 }
+
+// ---------------------------------------------------------------------------
+// Directory Delete Tests
+// ---------------------------------------------------------------------------
+
+func TestDeleteDirectory(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "folder/doc1", "content1"))
+	require.NoError(t, store.Create(ctx, "folder/doc2", "content2"))
+
+	err := store.Delete(ctx, "folder")
+	require.NoError(t, err)
+
+	// All children should be gone.
+	_, err = store.Get(ctx, "folder/doc1")
+	assert.ErrorIs(t, err, agent.ErrDocNotFound)
+	_, err = store.Get(ctx, "folder/doc2")
+	assert.ErrorIs(t, err, agent.ErrDocNotFound)
+	// Directory itself should be gone.
+	_, err = os.Stat(filepath.Join(store.baseDir, "folder"))
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestDeleteDirectoryEmpty(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	// Create then delete doc to leave an empty dir.
+	require.NoError(t, store.Create(ctx, "emptydir/doc", "content"))
+	require.NoError(t, os.Remove(filepath.Join(store.baseDir, "emptydir", "doc.md")))
+
+	err := store.Delete(ctx, "emptydir")
+	require.NoError(t, err)
+
+	_, err = os.Stat(filepath.Join(store.baseDir, "emptydir"))
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestDeleteDirectoryNested(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "a/b/c/doc", "content"))
+
+	err := store.Delete(ctx, "a/b/c")
+	require.NoError(t, err)
+
+	// c and its parents should be cleaned.
+	_, err = os.Stat(filepath.Join(store.baseDir, "a", "b", "c"))
+	assert.True(t, os.IsNotExist(err))
+	_, err = os.Stat(filepath.Join(store.baseDir, "a", "b"))
+	assert.True(t, os.IsNotExist(err))
+	_, err = os.Stat(filepath.Join(store.baseDir, "a"))
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestDeleteDirectoryVsFileSameName(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	// Create both foo.md (file) and foo/ (directory with child).
+	require.NoError(t, store.Create(ctx, "foo", "file content"))
+	require.NoError(t, store.Create(ctx, "foo/child", "child content"))
+
+	// Delete("foo") should delete the file (foo.md), not the directory.
+	err := store.Delete(ctx, "foo")
+	require.NoError(t, err)
+
+	// File should be gone.
+	_, err = store.Get(ctx, "foo")
+	assert.ErrorIs(t, err, agent.ErrDocNotFound)
+
+	// Directory child should still exist.
+	doc, err := store.Get(ctx, "foo/child")
+	require.NoError(t, err)
+	assert.Equal(t, "child content", doc.Content)
+}
+
+func TestDeleteDirectoryNotFound(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	err := store.Delete(ctx, "nonexistent-dir")
+	assert.ErrorIs(t, err, agent.ErrDocNotFound)
+}
+
+// ---------------------------------------------------------------------------
+// Batch Delete Tests
+// ---------------------------------------------------------------------------
+
+func TestDeleteBatch(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "a", "content-a"))
+	require.NoError(t, store.Create(ctx, "b", "content-b"))
+	require.NoError(t, store.Create(ctx, "c", "content-c"))
+
+	deleted, failed, err := store.DeleteBatch(ctx, []string{"a", "b", "c"})
+	require.NoError(t, err)
+	assert.Len(t, deleted, 3)
+	assert.Empty(t, failed)
+
+	// All should be gone.
+	for _, id := range []string{"a", "b", "c"} {
+		_, err := store.Get(ctx, id)
+		assert.ErrorIs(t, err, agent.ErrDocNotFound)
+	}
+}
+
+func TestDeleteBatchMixed(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "file1", "content1"))
+	require.NoError(t, store.Create(ctx, "file2", "content2"))
+	require.NoError(t, store.Create(ctx, "dir/child1", "child1"))
+	require.NoError(t, store.Create(ctx, "dir/child2", "child2"))
+
+	deleted, failed, err := store.DeleteBatch(ctx, []string{"file1", "file2", "dir"})
+	require.NoError(t, err)
+	assert.Len(t, deleted, 3)
+	assert.Empty(t, failed)
+
+	_, err = store.Get(ctx, "dir/child1")
+	assert.ErrorIs(t, err, agent.ErrDocNotFound)
+}
+
+func TestDeleteBatchPartialFailure(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "valid1", "content1"))
+	require.NoError(t, store.Create(ctx, "valid2", "content2"))
+
+	deleted, failed, err := store.DeleteBatch(ctx, []string{"valid1", "..invalid", "valid2"})
+	require.NoError(t, err)
+	assert.Len(t, deleted, 2)
+	assert.Len(t, failed, 1)
+	assert.Equal(t, "..invalid", failed[0].ID)
+}
+
+func TestDeleteBatchDeduplication(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "dir/doc1", "content1"))
+	require.NoError(t, store.Create(ctx, "dir/doc2", "content2"))
+
+	// Delete dir (parent) and dir/doc1 (child) — child is subsumed.
+	deleted, failed, err := store.DeleteBatch(ctx, []string{"dir", "dir/doc1"})
+	require.NoError(t, err)
+	assert.Len(t, deleted, 2)
+	assert.Empty(t, failed)
+
+	// Both should be gone.
+	_, err = store.Get(ctx, "dir/doc1")
+	assert.ErrorIs(t, err, agent.ErrDocNotFound)
+}
+
+func TestDeleteBatchAllNotFound(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	deleted, failed, err := store.DeleteBatch(ctx, []string{"ghost1", "ghost2"})
+	require.NoError(t, err)
+	assert.Len(t, deleted, 2) // not-found = success (idempotency)
+	assert.Empty(t, failed)
+}
+
+func TestDeleteBatchEmpty(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	deleted, failed, err := store.DeleteBatch(ctx, []string{})
+	require.NoError(t, err)
+	assert.Empty(t, deleted)
+	assert.Empty(t, failed)
+}
+
+func TestDeleteBatchInvalidIDs(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	deleted, failed, err := store.DeleteBatch(ctx, []string{"..bad1", "../bad2"})
+	require.NoError(t, err)
+	assert.Empty(t, deleted)
+	assert.Len(t, failed, 2)
+}
+
+func TestDeleteBatchPathTraversal(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "legit", "content"))
+
+	deleted, failed, err := store.DeleteBatch(ctx, []string{"legit", "../escape"})
+	require.NoError(t, err)
+	assert.Len(t, deleted, 1)
+	assert.Equal(t, "legit", deleted[0])
+	assert.Len(t, failed, 1)
+	assert.Equal(t, "../escape", failed[0].ID)
+}
+
+func TestDeleteBatchDirectoryWithFiles(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	for i := range 5 {
+		require.NoError(t, store.Create(ctx, "bigdir/doc"+strings.Repeat("x", i+1), "content"))
+	}
+
+	deleted, failed, err := store.DeleteBatch(ctx, []string{"bigdir"})
+	require.NoError(t, err)
+	assert.Len(t, deleted, 1)
+	assert.Empty(t, failed)
+
+	// All children should be gone.
+	for i := range 5 {
+		_, err := store.Get(ctx, "bigdir/doc"+strings.Repeat("x", i+1))
+		assert.ErrorIs(t, err, agent.ErrDocNotFound)
+	}
+	// Parent dir should be cleaned.
+	_, err = os.Stat(filepath.Join(store.baseDir, "bigdir"))
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestDeleteBatchCleansEmptyParents(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "deep/nested/doc", "content"))
+
+	deleted, failed, err := store.DeleteBatch(ctx, []string{"deep/nested/doc"})
+	require.NoError(t, err)
+	assert.Len(t, deleted, 1)
+	assert.Empty(t, failed)
+
+	// All parent dirs should be cleaned.
+	_, err = os.Stat(filepath.Join(store.baseDir, "deep", "nested"))
+	assert.True(t, os.IsNotExist(err))
+	_, err = os.Stat(filepath.Join(store.baseDir, "deep"))
+	assert.True(t, os.IsNotExist(err))
+}

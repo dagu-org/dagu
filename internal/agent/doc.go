@@ -51,6 +51,12 @@ type DocSearchResult struct {
 	Matches []*exec.Match `json:"matches"`
 }
 
+// DeleteError represents a single item failure in a batch delete operation.
+type DeleteError struct {
+	ID    string
+	Error string
+}
+
 // DocStore defines the interface for doc persistence.
 type DocStore interface {
 	List(ctx context.Context, page, perPage int) (*exec.PaginatedResult[*DocTreeNode], error)
@@ -59,6 +65,7 @@ type DocStore interface {
 	Create(ctx context.Context, id, content string) error
 	Update(ctx context.Context, id, content string) error
 	Delete(ctx context.Context, id string) error
+	DeleteBatch(ctx context.Context, ids []string) (deleted []string, failed []DeleteError, err error)
 	Rename(ctx context.Context, oldID, newID string) error
 	Search(ctx context.Context, query string) ([]*DocSearchResult, error)
 }

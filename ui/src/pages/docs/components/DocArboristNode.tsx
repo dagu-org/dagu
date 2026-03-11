@@ -25,17 +25,21 @@ type DocTreeNodeResponse = components['schemas']['DocTreeNodeResponse'];
 export type ContextAction =
   | { type: 'create'; parentDir: string }
   | { type: 'rename'; docPath: string; title: string }
-  | { type: 'delete'; docPath: string; title: string; isDir: boolean; hasChildren: boolean };
+  | { type: 'delete'; docPath: string; title: string; isDir: boolean; hasChildren: boolean }
+  | { type: 'deleteBatch'; paths: string[] };
 
 type Props = NodeRendererProps<DocTreeNodeResponse> & {
   onContextAction: (action: ContextAction) => void;
   canWrite: boolean;
+  activeDocPath?: string | null;
+  selectedCount?: number;
 };
 
-function DocArboristNode({ node, style, dragHandle, onContextAction, canWrite }: Props) {
+function DocArboristNode({ node, style, dragHandle, onContextAction, canWrite, activeDocPath, selectedCount = 0 }: Props) {
   const isDir = node.data.type === DocTreeNodeResponseType.directory;
   const displayTitle = node.data.title || node.data.name;
   const hasChildren = !!(node.data.children && node.data.children.length > 0);
+  const isActiveDoc = !isDir && node.id === activeDocPath;
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Focus input when editing starts
@@ -46,7 +50,16 @@ function DocArboristNode({ node, style, dragHandle, onContextAction, canWrite }:
     }
   }, [node.isEditing]);
 
-  const handleClick = useCallback(() => {
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      node.selectMulti();
+      return;
+    }
+    if (e.shiftKey) {
+      node.selectContiguous();
+      return;
+    }
+    node.select();
     if (isDir) {
       node.toggle();
     } else {
@@ -88,7 +101,8 @@ function DocArboristNode({ node, style, dragHandle, onContextAction, canWrite }:
       className={cn(
         'flex items-center gap-1 py-1 pr-1 cursor-pointer group rounded-sm',
         'hover:bg-accent/50',
-        node.isSelected && !node.isEditing && 'bg-accent text-accent-foreground',
+        node.isSelected && !isActiveDoc && !node.isEditing && 'bg-primary/10',
+        isActiveDoc && !node.isEditing && 'bg-accent text-accent-foreground',
         node.willReceiveDrop && 'bg-primary/10 ring-1 ring-primary/30',
         node.isDragging && 'opacity-50'
       )}
@@ -164,20 +178,23 @@ function DocArboristNode({ node, style, dragHandle, onContextAction, canWrite }:
               Rename
             </DropdownMenuItem>
             <DropdownMenuItem
-              disabled={isDir && hasChildren}
               onClick={(e) => {
                 e.stopPropagation();
-                onContextAction({
-                  type: 'delete',
-                  docPath: node.id,
-                  title: displayTitle,
-                  isDir,
-                  hasChildren,
-                });
+                if (selectedCount > 1 && node.isSelected) {
+                  onContextAction({ type: 'deleteBatch', paths: [] });
+                } else {
+                  onContextAction({
+                    type: 'delete',
+                    docPath: node.id,
+                    title: displayTitle,
+                    isDir,
+                    hasChildren,
+                  });
+                }
               }}
             >
               <Trash2 className="h-3.5 w-3.5 mr-2" />
-              Delete
+              {selectedCount > 1 && node.isSelected ? `Delete ${selectedCount} items` : 'Delete'}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

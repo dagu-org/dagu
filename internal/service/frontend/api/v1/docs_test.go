@@ -150,6 +150,42 @@ func (m *mockDocStore) Rename(_ context.Context, oldID, newID string) error {
 	return nil
 }
 
+func (m *mockDocStore) DeleteBatch(_ context.Context, ids []string) ([]string, []agent.DeleteError, error) {
+	if m.failAll {
+		return nil, nil, errForced
+	}
+	var deleted []string
+	var failed []agent.DeleteError
+	for _, id := range ids {
+		if err := agent.ValidateDocID(id); err != nil {
+			failed = append(failed, agent.DeleteError{ID: id, Error: err.Error()})
+			continue
+		}
+		// Try exact match (file).
+		if _, ok := m.docs[id]; ok {
+			delete(m.docs, id)
+			deleted = append(deleted, id)
+			continue
+		}
+		// Try prefix match (directory).
+		prefix := id + "/"
+		found := false
+		for docID := range m.docs {
+			if strings.HasPrefix(docID, prefix) {
+				delete(m.docs, docID)
+				found = true
+			}
+		}
+		if found {
+			deleted = append(deleted, id)
+		} else {
+			// Not found = success (idempotency).
+			deleted = append(deleted, id)
+		}
+	}
+	return deleted, failed, nil
+}
+
 func (m *mockDocStore) Search(_ context.Context, query string) ([]*agent.DocSearchResult, error) {
 	if m.failAll {
 		return nil, errForced
@@ -1059,6 +1095,116 @@ func TestDocWritePermissionDenied(t *testing.T) {
 		_, err := a.RenameDoc(adminCtx(), apigen.RenameDocRequestObject{
 			Params: apigen.RenameDocParams{Path: "old"},
 			Body:   &apigen.RenameDocJSONRequestBody{NewPath: "new"},
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("DeleteDocBatch denied", func(t *testing.T) {
+		t.Parallel()
+		a := newNoWriteSetup(t)
+		_, err := a.DeleteDocBatch(adminCtx(), apigen.DeleteDocBatchRequestObject{
+			Body: &apigen.DeleteDocBatchJSONRequestBody{Paths: []string{"test"}},
+		})
+		require.Error(t, err)
+	})
+}
+
+func TestDeleteDocBatch(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+		setup := newDocTestSetup(t)
+		setup.store.docs["doc1"] = &agent.Doc{ID: "doc1", Title: "doc1", Content: "c1"}
+		setup.store.docs["doc2"] = &agent.Doc{ID: "doc2", Title: "doc2", Content: "c2"}
+
+		resp, err := setup.api.DeleteDocBatch(adminCtx(), apigen.DeleteDocBatchRequestObject{
+			Body: &apigen.DeleteDocBatchJSONRequestBody{Paths: []string{"doc1", "doc2"}},
+		})
+		require.NoError(t, err)
+
+		batchResp, ok := resp.(apigen.DeleteDocBatch200JSONResponse)
+		require.True(t, ok)
+		assert.Len(t, batchResp.Deleted, 2)
+		assert.Empty(t, batchResp.Failed)
+		assert.Equal(t, 0, len(setup.store.docs))
+	})
+
+	t.Run("partial failure", func(t *testing.T) {
+		t.Parallel()
+		setup := newDocTestSetup(t)
+		setup.store.docs["valid"] = &agent.Doc{ID: "valid", Title: "valid", Content: "c"}
+
+		resp, err := setup.api.DeleteDocBatch(adminCtx(), apigen.DeleteDocBatchRequestObject{
+			Body: &apigen.DeleteDocBatchJSONRequestBody{Paths: []string{"valid", "nonexistent"}},
+		})
+		require.NoError(t, err)
+
+		batchResp, ok := resp.(apigen.DeleteDocBatch200JSONResponse)
+		require.True(t, ok)
+		assert.Len(t, batchResp.Deleted, 2) // nonexistent treated as success
+		assert.Empty(t, batchResp.Failed)
+	})
+
+	t.Run("directory delete", func(t *testing.T) {
+		t.Parallel()
+		setup := newDocTestSetup(t)
+		setup.store.docs["dir/child1"] = &agent.Doc{ID: "dir/child1", Title: "child1", Content: "c1"}
+		setup.store.docs["dir/child2"] = &agent.Doc{ID: "dir/child2", Title: "child2", Content: "c2"}
+
+		resp, err := setup.api.DeleteDocBatch(adminCtx(), apigen.DeleteDocBatchRequestObject{
+			Body: &apigen.DeleteDocBatchJSONRequestBody{Paths: []string{"dir"}},
+		})
+		require.NoError(t, err)
+
+		batchResp, ok := resp.(apigen.DeleteDocBatch200JSONResponse)
+		require.True(t, ok)
+		assert.Len(t, batchResp.Deleted, 1)
+		assert.Empty(t, batchResp.Failed)
+		assert.Equal(t, 0, len(setup.store.docs))
+	})
+
+	t.Run("nil body", func(t *testing.T) {
+		t.Parallel()
+		setup := newDocTestSetup(t)
+		_, err := setup.api.DeleteDocBatch(adminCtx(), apigen.DeleteDocBatchRequestObject{Body: nil})
+		require.Error(t, err)
+	})
+
+	t.Run("empty paths", func(t *testing.T) {
+		t.Parallel()
+		setup := newDocTestSetup(t)
+		_, err := setup.api.DeleteDocBatch(adminCtx(), apigen.DeleteDocBatchRequestObject{
+			Body: &apigen.DeleteDocBatchJSONRequestBody{Paths: []string{}},
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("invalid path", func(t *testing.T) {
+		t.Parallel()
+		setup := newDocTestSetup(t)
+		_, err := setup.api.DeleteDocBatch(adminCtx(), apigen.DeleteDocBatchRequestObject{
+			Body: &apigen.DeleteDocBatchJSONRequestBody{Paths: []string{"..bad"}},
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("no doc store", func(t *testing.T) {
+		t.Parallel()
+		cfg := &config.Config{}
+		a := apiV1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
+		_, err := a.DeleteDocBatch(adminCtx(), apigen.DeleteDocBatchRequestObject{
+			Body: &apigen.DeleteDocBatchJSONRequestBody{Paths: []string{"test"}},
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("store error", func(t *testing.T) {
+		t.Parallel()
+		setup := newDocTestSetup(t)
+		setup.store.failAll = true
+		_, err := setup.api.DeleteDocBatch(adminCtx(), apigen.DeleteDocBatchRequestObject{
+			Body: &apigen.DeleteDocBatchJSONRequestBody{Paths: []string{"test"}},
 		})
 		require.Error(t, err)
 	})

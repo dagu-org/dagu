@@ -76,6 +76,10 @@ function DocsContent() {
   const [deleteDocPath, setDeleteDocPath] = useState('');
   const [deleteDocTitle, setDeleteDocTitle] = useState('');
 
+  // Batch delete state
+  const [batchDeletePaths, setBatchDeletePaths] = useState<string[]>([]);
+  const [batchDeleteConfirmOpen, setBatchDeleteConfirmOpen] = useState(false);
+
   // SSE for real-time updates with polling fallback
   const sseResult = useDocTreeSSE(true);
 
@@ -167,6 +171,12 @@ function DocsContent() {
     [openDoc, isMobile]
   );
 
+  // Track selected IDs from sidebar for batch operations
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const handleSelectionChange = useCallback((ids: string[]) => {
+    setSelectedIds(ids);
+  }, []);
+
   // Context menu actions
   const handleContextAction = useCallback(
     (action: ContextAction) => {
@@ -186,9 +196,13 @@ function DocsContent() {
           setDeleteDocTitle(action.title);
           setDeleteConfirmOpen(true);
           break;
+        case 'deleteBatch':
+          setBatchDeletePaths([...selectedIds]);
+          setBatchDeleteConfirmOpen(true);
+          break;
       }
     },
-    []
+    [selectedIds]
   );
 
   // Create handler
@@ -300,7 +314,7 @@ function DocsContent() {
     }
   }, []);
 
-  // Delete handler
+  // Delete handler (supports both files and directories)
   const handleDelete = useCallback(async () => {
     try {
       const { error } = await client.DELETE('/docs/doc', {
@@ -311,12 +325,13 @@ function DocsContent() {
         return;
       }
       mutate();
-      // Close tab if open
-      const openTab = tabs.find((t) => t.docPath === deleteDocPath);
-      if (openTab) {
-        clearDraft(openTab.id);
-        markTabSaved(openTab.id);
-        closeTab(openTab.id);
+      // Close tabs for deleted path (exact match + prefix for directories)
+      for (const tab of tabs) {
+        if (tab.docPath === deleteDocPath || tab.docPath.startsWith(deleteDocPath + '/')) {
+          clearDraft(tab.id);
+          markTabSaved(tab.id);
+          closeTab(tab.id);
+        }
       }
       showToast('Document deleted');
     } catch {
@@ -325,6 +340,49 @@ function DocsContent() {
       setDeleteConfirmOpen(false);
     }
   }, [client, remoteNode, deleteDocPath, mutate, tabs, closeTab, clearDraft, markTabSaved, showToast]);
+
+  // Batch delete handler
+  const handleBatchDelete = useCallback(async () => {
+    try {
+      const { data, error } = await client.POST('/docs/delete-batch', {
+        params: { query: { remoteNode } },
+        body: { paths: batchDeletePaths },
+      });
+      if (error) {
+        showToast('Failed to delete documents');
+        return;
+      }
+      mutate();
+      // Close tabs for all deleted paths (exact + prefix for directories)
+      const deletedSet = new Set(data.deleted);
+      for (const tab of tabs) {
+        const shouldClose = deletedSet.has(tab.docPath) ||
+          [...deletedSet].some(dp => tab.docPath.startsWith(dp + '/'));
+        if (shouldClose) {
+          clearDraft(tab.id);
+          markTabSaved(tab.id);
+          closeTab(tab.id);
+        }
+      }
+      const failCount = data.failed?.length || 0;
+      if (failCount > 0) {
+        showToast(`Deleted ${data.deleted.length}, ${failCount} failed`);
+      } else {
+        showToast(`Deleted ${data.deleted.length} items`);
+      }
+    } catch {
+      showToast('Failed to delete documents');
+    } finally {
+      setBatchDeleteConfirmOpen(false);
+      setBatchDeletePaths([]);
+    }
+  }, [batchDeletePaths, client, remoteNode, mutate, tabs, closeTab, clearDraft, markTabSaved, showToast]);
+
+  // Batch delete from selection bar
+  const handleBatchDeleteFromBar = useCallback((paths: string[]) => {
+    setBatchDeletePaths(paths);
+    setBatchDeleteConfirmOpen(true);
+  }, []);
 
   // Delete triggered from tab menu or editor header
   const handleDeleteFromTab = useCallback((docPath: string, title: string) => {
@@ -348,6 +406,8 @@ function DocsContent() {
       onSelectFile={handleSelectFile}
       onRename={handleInlineRename}
       onMove={handleMove}
+      onBatchDelete={handleBatchDeleteFromBar}
+      onSelectionChange={handleSelectionChange}
       activeDocContent={activeDocContent}
       onHeadingClick={handleHeadingClick}
     />
@@ -431,6 +491,17 @@ function DocsContent() {
           <p className="text-sm text-muted-foreground">
             Are you sure you want to delete <strong>{deleteDocTitle}</strong>? This
             action cannot be undone.
+          </p>
+        </ConfirmModal>
+        <ConfirmModal
+          title="Delete Documents"
+          buttonText={`Delete ${batchDeletePaths.length} items`}
+          visible={batchDeleteConfirmOpen}
+          dismissModal={() => setBatchDeleteConfirmOpen(false)}
+          onSubmit={handleBatchDelete}
+        >
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete {batchDeletePaths.length} items? This cannot be undone.
           </p>
         </ConfirmModal>
       </div>

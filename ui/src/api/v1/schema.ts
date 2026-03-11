@@ -2318,6 +2318,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/docs/delete-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete multiple documents or directories
+         * @description Deletes multiple documents and/or directories in a single operation. Supports recursive directory deletion. Not-found items are treated as successful deletes for idempotency. Requires DAG write permission.
+         */
+        post: operations["deleteDocBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/remote-nodes": {
         parameters: {
             query?: never;
@@ -3968,6 +3988,23 @@ export interface components {
         /** @description Request to rename/move a document or directory */
         RenameDocRequest: {
             newPath: components["schemas"]["DocPath"];
+        };
+        /** @description Request to delete multiple documents or directories */
+        DocDeleteBatchRequest: {
+            /** @description Document or directory paths to delete (max 100) */
+            paths: components["schemas"]["DocPath"][];
+        };
+        DocDeleteBatchResponse: {
+            /** @description Successfully deleted paths */
+            deleted: string[];
+            /** @description Paths that failed to delete with error details */
+            failed: components["schemas"]["DocDeleteBatchFailedItem"][];
+            /** @description Human-readable summary */
+            message: string;
+        };
+        DocDeleteBatchFailedItem: {
+            path: string;
+            error: string;
         };
         /** @description Hardcoded model preset with metadata */
         ModelPreset: {
@@ -11726,6 +11763,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteDocBatch: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocDeleteBatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Batch delete completed (may include partial failures) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocDeleteBatchResponse"];
                 };
             };
             /** @description Unexpected error */
