@@ -49,13 +49,11 @@ func New(baseDir string) *Store {
 	return &Store{baseDir: baseDir}
 }
 
-// docFilePath returns the file path for a doc ID and validates the path
-// stays within baseDir to prevent path traversal (including via symlinks).
-func (s *Store) docFilePath(id string) (string, error) {
-	p := filepath.Join(s.baseDir, id+".md")
+// safePath validates that the given path stays within baseDir (preventing
+// path traversal, including via symlinks) and returns the cleaned absolute path.
+func (s *Store) safePath(p string, id string) (string, error) {
 	cleaned := filepath.Clean(p)
 
-	// Resolve symlinks for stronger path traversal protection.
 	resolvedBase, err := filepath.EvalSymlinks(s.baseDir)
 	if err != nil {
 		return "", fmt.Errorf("filedoc: cannot resolve base dir: %w", err)
@@ -73,6 +71,11 @@ func (s *Store) docFilePath(id string) (string, error) {
 		return "", fmt.Errorf("filedoc: path traversal detected for id %q", id)
 	}
 	return cleaned, nil
+}
+
+// docFilePath returns the .md file path for a doc ID with path-traversal validation.
+func (s *Store) docFilePath(id string) (string, error) {
+	return s.safePath(filepath.Join(s.baseDir, id+".md"), id)
 }
 
 // parseDocFile parses a doc .md file into an agent.Doc.
@@ -320,7 +323,12 @@ func (s *Store) Delete(_ context.Context, id string) error {
 	return nil
 }
 
-// Rename moves a doc from oldID to newID.
+// dirPath returns the directory path for a doc ID with path-traversal validation.
+func (s *Store) dirPath(id string) (string, error) {
+	return s.safePath(filepath.Join(s.baseDir, id), id)
+}
+
+// Rename moves a doc (file or directory) from oldID to newID.
 func (s *Store) Rename(_ context.Context, oldID, newID string) error {
 	if err := agent.ValidateDocID(oldID); err != nil {
 		return err
@@ -329,32 +337,60 @@ func (s *Store) Rename(_ context.Context, oldID, newID string) error {
 		return err
 	}
 
-	oldPath, err := s.docFilePath(oldID)
+	// Try as file first (existing behavior).
+	oldFilePath, err := s.docFilePath(oldID)
 	if err != nil {
 		return err
 	}
-	newPath, err := s.docFilePath(newID)
+	newFilePath, err := s.docFilePath(newID)
 	if err != nil {
 		return err
 	}
 
-	if _, err := os.Stat(oldPath); os.IsNotExist(err) {
+	if _, err := os.Stat(oldFilePath); err == nil {
+		// Old file exists — rename as file.
+		if _, err := os.Stat(newFilePath); err == nil {
+			return agent.ErrDocAlreadyExists
+		}
+		if err := os.MkdirAll(filepath.Dir(newFilePath), docDirPermissions); err != nil {
+			return fmt.Errorf("filedoc: failed to create target directories: %w", err)
+		}
+		if err := os.Rename(oldFilePath, newFilePath); err != nil {
+			return fmt.Errorf("filedoc: failed to rename file: %w", err)
+		}
+		s.cleanEmptyParents(filepath.Dir(oldFilePath))
+		return nil
+	}
+
+	// Try as directory.
+	oldDirPath, err := s.dirPath(oldID)
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(oldDirPath)
+	if err != nil || !info.IsDir() {
 		return agent.ErrDocNotFound
 	}
-	if _, err := os.Stat(newPath); err == nil {
+
+	newDirPath, err := s.dirPath(newID)
+	if err != nil {
+		return err
+	}
+	// Check that neither a directory nor a file with the target name exists.
+	if _, err := os.Stat(newDirPath); err == nil {
+		return agent.ErrDocAlreadyExists
+	}
+	if _, err := os.Stat(newFilePath); err == nil {
 		return agent.ErrDocAlreadyExists
 	}
 
-	if err := os.MkdirAll(filepath.Dir(newPath), docDirPermissions); err != nil {
+	if err := os.MkdirAll(filepath.Dir(newDirPath), docDirPermissions); err != nil {
 		return fmt.Errorf("filedoc: failed to create target directories: %w", err)
 	}
-
-	if err := os.Rename(oldPath, newPath); err != nil {
-		return fmt.Errorf("filedoc: failed to rename file: %w", err)
+	if err := os.Rename(oldDirPath, newDirPath); err != nil {
+		return fmt.Errorf("filedoc: failed to rename directory: %w", err)
 	}
-
-	s.cleanEmptyParents(filepath.Dir(oldPath))
-
+	s.cleanEmptyParents(filepath.Dir(oldDirPath))
 	return nil
 }
 

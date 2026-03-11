@@ -233,10 +233,12 @@ function DocsContent() {
           return;
         }
         mutate();
-        // Update tab if this doc is open
-        const openTab = tabs.find((t) => t.docPath === renameDocPath);
-        if (openTab) {
-          updateTab(openTab.id, { docPath: newPath, title: titleFromPath(newPath) });
+        // Update all tabs under the renamed path (handles both file and directory renames).
+        for (const tab of tabs) {
+          if (tab.docPath === renameDocPath || tab.docPath.startsWith(renameDocPath + '/')) {
+            const updatedPath = newPath + tab.docPath.slice(renameDocPath.length);
+            updateTab(tab.id, { docPath: updatedPath, title: titleFromPath(updatedPath) });
+          }
         }
         showToast('Document renamed');
         setRenameModalOpen(false);
@@ -263,9 +265,12 @@ function DocsContent() {
           return;
         }
         mutate();
-        const openTab = tabs.find((t) => t.docPath === oldPath);
-        if (openTab) {
-          updateTab(openTab.id, { docPath: newPath, title: titleFromPath(newPath) });
+        // Update ALL tabs under the moved path (handles both file and directory moves).
+        for (const tab of tabs) {
+          if (tab.docPath === oldPath || tab.docPath.startsWith(oldPath + '/')) {
+            const updatedPath = newPath + tab.docPath.slice(oldPath.length);
+            updateTab(tab.id, { docPath: updatedPath, title: titleFromPath(updatedPath) });
+          }
         }
         showToast(`Document ${action}`);
       } catch {

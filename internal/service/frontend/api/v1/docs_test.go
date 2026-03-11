@@ -105,17 +105,48 @@ func (m *mockDocStore) Rename(_ context.Context, oldID, newID string) error {
 	if err := agent.ValidateDocID(newID); err != nil {
 		return agent.ErrInvalidDocID
 	}
-	doc, ok := m.docs[oldID]
-	if !ok {
+
+	// Try exact match first (file rename).
+	if doc, ok := m.docs[oldID]; ok {
+		if _, exists := m.docs[newID]; exists {
+			return agent.ErrDocAlreadyExists
+		}
+		delete(m.docs, oldID)
+		doc.ID = newID
+		doc.Title = path.Base(newID)
+		m.docs[newID] = doc
+		return nil
+	}
+
+	// Try prefix match (directory rename).
+	prefix := oldID + "/"
+	var toMove []string
+	for id := range m.docs {
+		if strings.HasPrefix(id, prefix) {
+			toMove = append(toMove, id)
+		}
+	}
+	if len(toMove) == 0 {
 		return agent.ErrDocNotFound
 	}
-	if _, exists := m.docs[newID]; exists {
-		return agent.ErrDocAlreadyExists
+
+	// Check target prefix doesn't conflict.
+	newPrefix := newID + "/"
+	for id := range m.docs {
+		if strings.HasPrefix(id, newPrefix) || id == newID {
+			return agent.ErrDocAlreadyExists
+		}
 	}
-	delete(m.docs, oldID)
-	doc.ID = newID
-	doc.Title = path.Base(newID)
-	m.docs[newID] = doc
+
+	// Move all matching docs.
+	for _, id := range toMove {
+		doc := m.docs[id]
+		delete(m.docs, id)
+		newDocID := newID + strings.TrimPrefix(id, oldID)
+		doc.ID = newDocID
+		doc.Title = path.Base(newDocID)
+		m.docs[newDocID] = doc
+	}
 	return nil
 }
 
@@ -680,6 +711,56 @@ func TestRenameDoc(t *testing.T) {
 		_, err := setup.api.RenameDoc(adminCtx(), apigen.RenameDocRequestObject{
 			Params: apigen.RenameDocParams{Path: "old"},
 			Body:   nil,
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("directory rename success", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newDocTestSetup(t)
+		setup.store.docs["folder/doc1"] = &agent.Doc{ID: "folder/doc1", Title: "doc1", Content: "c1"}
+		setup.store.docs["folder/doc2"] = &agent.Doc{ID: "folder/doc2", Title: "doc2", Content: "c2"}
+
+		resp, err := setup.api.RenameDoc(adminCtx(), apigen.RenameDocRequestObject{
+			Params: apigen.RenameDocParams{Path: "folder"},
+			Body:   &apigen.RenameDocJSONRequestBody{NewPath: "moved"},
+		})
+		require.NoError(t, err)
+
+		_, ok := resp.(apigen.RenameDoc200JSONResponse)
+		require.True(t, ok)
+
+		_, oldExists := setup.store.docs["folder/doc1"]
+		assert.False(t, oldExists)
+		_, newExists := setup.store.docs["moved/doc1"]
+		assert.True(t, newExists)
+		_, newExists2 := setup.store.docs["moved/doc2"]
+		assert.True(t, newExists2)
+	})
+
+	t.Run("directory rename target exists", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newDocTestSetup(t)
+		setup.store.docs["src/doc"] = &agent.Doc{ID: "src/doc", Title: "doc", Content: "c1"}
+		setup.store.docs["dst/doc"] = &agent.Doc{ID: "dst/doc", Title: "doc", Content: "c2"}
+
+		_, err := setup.api.RenameDoc(adminCtx(), apigen.RenameDocRequestObject{
+			Params: apigen.RenameDocParams{Path: "src"},
+			Body:   &apigen.RenameDocJSONRequestBody{NewPath: "dst"},
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("directory not found", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newDocTestSetup(t)
+
+		_, err := setup.api.RenameDoc(adminCtx(), apigen.RenameDocRequestObject{
+			Params: apigen.RenameDocParams{Path: "nonexistent-dir"},
+			Body:   &apigen.RenameDocJSONRequestBody{NewPath: "target"},
 		})
 		require.Error(t, err)
 	})

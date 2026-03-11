@@ -1127,6 +1127,191 @@ func TestCleanEmptyParentsNonRemovable(t *testing.T) {
 	assert.False(t, os.IsNotExist(err))
 }
 
+func TestRenameDirectory(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "folder/doc1", "content1"))
+	require.NoError(t, store.Create(ctx, "folder/doc2", "content2"))
+
+	err := store.Rename(ctx, "folder", "moved")
+	require.NoError(t, err)
+
+	doc1, err := store.Get(ctx, "moved/doc1")
+	require.NoError(t, err)
+	assert.Equal(t, "content1", doc1.Content)
+
+	doc2, err := store.Get(ctx, "moved/doc2")
+	require.NoError(t, err)
+	assert.Equal(t, "content2", doc2.Content)
+
+	_, err = store.Get(ctx, "folder/doc1")
+	assert.ErrorIs(t, err, agent.ErrDocNotFound)
+
+	_, err = os.Stat(filepath.Join(store.baseDir, "folder"))
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestRenameDirectoryNested(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "a/b/doc1", "c1"))
+
+	err := store.Rename(ctx, "a/b", "c/d")
+	require.NoError(t, err)
+
+	doc, err := store.Get(ctx, "c/d/doc1")
+	require.NoError(t, err)
+	assert.Equal(t, "c1", doc.Content)
+
+	_, err = store.Get(ctx, "a/b/doc1")
+	assert.ErrorIs(t, err, agent.ErrDocNotFound)
+
+	// Empty parent "a" should be cleaned up.
+	_, err = os.Stat(filepath.Join(store.baseDir, "a"))
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestRenameDirectoryToExisting(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "folder1/doc", "c1"))
+	require.NoError(t, store.Create(ctx, "folder2/doc", "c2"))
+
+	err := store.Rename(ctx, "folder1", "folder2")
+	assert.ErrorIs(t, err, agent.ErrDocAlreadyExists)
+
+	// Original files untouched.
+	doc, err := store.Get(ctx, "folder1/doc")
+	require.NoError(t, err)
+	assert.Equal(t, "c1", doc.Content)
+}
+
+func TestRenameDirectoryNotFound(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	err := store.Rename(ctx, "nonexistent", "target")
+	assert.ErrorIs(t, err, agent.ErrDocNotFound)
+}
+
+func TestRenameDirectoryTargetFileConflict(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "folder/doc", "content"))
+	require.NoError(t, store.Create(ctx, "readme", "hi"))
+
+	// Cannot rename dir "folder" to "readme" because readme.md exists.
+	err := store.Rename(ctx, "folder", "readme")
+	assert.ErrorIs(t, err, agent.ErrDocAlreadyExists)
+}
+
+func TestRenameDirectoryPreservesContent(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	content := string(marshalDocFile("My Title", "# Hello\nbody"))
+	require.NoError(t, store.Create(ctx, "dir/doc", content))
+
+	err := store.Rename(ctx, "dir", "newdir")
+	require.NoError(t, err)
+
+	doc, err := store.Get(ctx, "newdir/doc")
+	require.NoError(t, err)
+	assert.Equal(t, "My Title", doc.Title)
+	assert.Equal(t, strings.TrimRight(content, "\n"), doc.Content)
+}
+
+func TestRenameDirectoryToRoot(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "parent/child/doc", "content"))
+
+	err := store.Rename(ctx, "parent/child", "child")
+	require.NoError(t, err)
+
+	doc, err := store.Get(ctx, "child/doc")
+	require.NoError(t, err)
+	assert.Equal(t, "content", doc.Content)
+
+	_, err = store.Get(ctx, "parent/child/doc")
+	assert.ErrorIs(t, err, agent.ErrDocNotFound)
+
+	// parent/ should be cleaned up.
+	_, err = os.Stat(filepath.Join(store.baseDir, "parent"))
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestRenameDirectoryRootToNested(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "flat/doc", "content"))
+
+	err := store.Rename(ctx, "flat", "deep/nested/flat")
+	require.NoError(t, err)
+
+	doc, err := store.Get(ctx, "deep/nested/flat/doc")
+	require.NoError(t, err)
+	assert.Equal(t, "content", doc.Content)
+}
+
+func TestRenameDirectoryCleansEmptyParents(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "deep/nested/dir/doc", "content"))
+
+	err := store.Rename(ctx, "deep/nested/dir", "moved")
+	require.NoError(t, err)
+
+	// deep/nested and deep should be cleaned up.
+	_, err = os.Stat(filepath.Join(store.baseDir, "deep", "nested"))
+	assert.True(t, os.IsNotExist(err))
+	_, err = os.Stat(filepath.Join(store.baseDir, "deep"))
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestRenameDirectoryMkdirFails(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("cannot test permission errors as root")
+	}
+
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "src/doc", "content"))
+
+	// Make base dir read-only so MkdirAll for target parent fails.
+	require.NoError(t, os.Chmod(store.baseDir, 0500))
+	t.Cleanup(func() { _ = os.Chmod(store.baseDir, 0750) })
+
+	err := store.Rename(ctx, "src", "unwritable/target")
+	assert.Error(t, err)
+}
+
+func TestRenameDirectoryOsRenameFails(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("cannot test permission errors as root")
+	}
+
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "srcdir/doc", "content"))
+
+	// Make the source's parent directory (baseDir) read-only so os.Rename fails.
+	require.NoError(t, os.Chmod(store.baseDir, 0500))
+	t.Cleanup(func() { _ = os.Chmod(store.baseDir, 0750) })
+
+	err := store.Rename(ctx, "srcdir", "destdir")
+	assert.Error(t, err)
+}
+
 func TestRenameOsRenameError(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("cannot test permission errors as root")

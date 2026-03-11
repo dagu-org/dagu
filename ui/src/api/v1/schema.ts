@@ -2308,8 +2308,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Rename document
-         * @description Renames/moves a document to a new path. Requires DAG write permission.
+         * Rename document or directory
+         * @description Renames/moves a document or directory to a new path. When a directory path is given, all documents under it are moved atomically. Requires DAG write permission.
          */
         post: operations["renameDoc"];
         delete?: never;
@@ -3965,7 +3965,7 @@ export interface components {
             /** @description Full file content including optional YAML frontmatter */
             content: string;
         };
-        /** @description Request to rename/move a document */
+        /** @description Request to rename/move a document or directory */
         RenameDocRequest: {
             newPath: components["schemas"]["DocPath"];
         };
@@ -11686,7 +11686,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Current document path (may include slashes for nested docs) */
+                /** @description Current document or directory path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
             };
             header?: never;

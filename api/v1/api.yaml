@@ -5865,8 +5865,8 @@ paths:
 
   /docs/doc/rename:
     post:
-      summary: "Rename document"
-      description: "Renames/moves a document to a new path. Requires DAG write permission."
+      summary: "Rename document or directory"
+      description: "Renames/moves a document or directory to a new path. When a directory path is given, all documents under it are moved atomically. Requires DAG write permission."
       operationId: "renameDoc"
       tags:
         - "docs"
@@ -5874,7 +5874,7 @@ paths:
         - $ref: "#/components/parameters/RemoteNode"
         - name: path
           in: query
-          description: "Current document path (may include slashes for nested docs)"
+          description: "Current document or directory path (may include slashes for nested docs)"
           required: true
           schema:
             $ref: "#/components/schemas/DocPath"
@@ -9358,7 +9358,7 @@ components:
       type: object
       required:
         - newPath
-      description: "Request to rename/move a document"
+      description: "Request to rename/move a document or directory"
       properties:
         newPath:
           $ref: "#/components/schemas/DocPath"
