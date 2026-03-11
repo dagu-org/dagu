@@ -64,6 +64,13 @@ func WithQueuedAt(formattedTime string) StatusOption {
 	}
 }
 
+// WithScheduledTime returns a StatusOption that sets the scheduled execution time
+func WithScheduledTime(formattedTime string) StatusOption {
+	return func(s *exec.DAGRunStatus) {
+		s.ScheduledTime = formattedTime
+	}
+}
+
 // WithCreatedAt returns a StatusOption that sets the created time
 func WithCreatedAt(t int64) StatusOption {
 	return func(s *exec.DAGRunStatus) {

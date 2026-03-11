@@ -18,6 +18,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/dirlock"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -97,7 +98,8 @@ func New(
 		WatermarkStore:  watermarkStore,
 		IsSuspended:     isSuspended,
 		GetLatestStatus: drm.GetLatestStatus,
-		IsRunning: func(ctx context.Context, dag *core.DAG) (bool, error) {
+		IsRunning: func(ctx context.Context, dag *core.DAG, triggerType core.TriggerType, scheduledTime time.Time) (bool, error) {
+			// Check 1: alive processes
 			count, err := procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
 			if err != nil {
 				return false, err
@@ -105,14 +107,37 @@ func New(
 			if count > 0 {
 				return true, nil
 			}
-			// Check queue for pending items to close the enqueue→execution gap.
-			// Without this, Plan() would see IsRunning=false for items that are
-			// queued but not yet executing, breaking overlap policy enforcement.
-			items, err := queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
+
+			// Check 2: queued runs — only scheduler/catchup triggers.
+			// Manual/webhook triggers must not block scheduler decisions.
+			now := time.Now()
+			statuses, err := dagRunStore.ListStatuses(ctx,
+				exec.WithExactName(dag.Name),
+				exec.WithStatuses([]core.Status{core.Queued}),
+				exec.WithFrom(exec.NewUTC(now.Add(-24*time.Hour))),
+			)
 			if err != nil {
-				return false, fmt.Errorf("failed to check queue: %w", err)
+				return false, fmt.Errorf("failed to check queued runs: %w", err)
 			}
-			return len(items) > 0, nil
+			for _, st := range statuses {
+				// Filter: only scheduler/catchup triggers block scheduler decisions
+				if st.TriggerType != core.TriggerTypeScheduler &&
+					st.TriggerType != core.TriggerTypeCatchUp {
+					continue
+				}
+				// Staleness guard: if ScheduledTime is set and is more than 24h
+				// before now, the item is stuck — skip it. The zombie detector
+				// should clean these up, but this prevents permanent blocking.
+				if st.ScheduledTime != "" {
+					if parsed, err := stringutil.ParseTime(st.ScheduledTime); err == nil {
+						if parsed.Before(now.Add(-24 * time.Hour)) {
+							continue
+						}
+					}
+				}
+				return true, nil
+			}
+			return false, nil
 		},
 		GenRunID: drm.GenDAGRunID,
 		Dispatch: func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error {
@@ -122,7 +147,11 @@ func New(
 				runID, triggerType,
 			)
 		},
-		Enqueue: func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error {
+		Enqueue: func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType, scheduledTime time.Time) error {
+			scheduledTimeStr := ""
+			if !scheduledTime.IsZero() {
+				scheduledTimeStr = scheduledTime.Format(time.RFC3339)
+			}
 			// When queues are disabled, fall back to direct dispatch so
 			// catchup runs are not stuck forever retrying enqueue.
 			if !cfg.Queues.Enabled {
@@ -132,7 +161,7 @@ func New(
 					runID, triggerType,
 				)
 			}
-			return dagExecutor.EnqueueRun(ctx, dag, runID, triggerType)
+			return dagExecutor.EnqueueRun(ctx, dag, runID, triggerType, scheduledTimeStr)
 		},
 		Stop: func(ctx context.Context, dag *core.DAG) error {
 			return drm.Stop(ctx, dag, "")

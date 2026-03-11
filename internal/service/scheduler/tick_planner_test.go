@@ -84,13 +84,13 @@ func newTestTickPlanner(store WatermarkStore) (*TickPlanner, chan DAGChangeEvent
 		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
 			return nil
 		},
-		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			return nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
 			return "test-run-id", nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		Clock: func() time.Time {
@@ -224,14 +224,14 @@ func TestTickPlanner_PlanCatchupDispatches(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{}, nil
 		},
-		Enqueue: func(_ context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error {
+		Enqueue: func(_ context.Context, dag *core.DAG, runID string, triggerType core.TriggerType, _ time.Time) error {
 			enqueued = append(enqueued, PlannedRun{DAG: dag, RunID: runID, TriggerType: triggerType})
 			return nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
 			return "test-run-id", nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		Clock: func() time.Time {
@@ -272,13 +272,13 @@ func TestTickPlanner_PlanCatchupSkipOverlap(t *testing.T) {
 		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
 			return nil
 		},
-		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			return nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
 			return "run-1", nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return true, nil // DAG is always running
 		},
 		Clock: func() time.Time {
@@ -322,7 +322,7 @@ func TestTickPlanner_PlanLiveRun(t *testing.T) {
 		GenRunID: func(_ context.Context) (string, error) {
 			return "live-run-id", nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		Clock: func() time.Time {
@@ -363,7 +363,7 @@ func TestTickPlanner_PlanSuspendedDAGSkipped(t *testing.T) {
 		GenRunID: func(_ context.Context) (string, error) {
 			return "run-id", nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		Clock: func() time.Time {
@@ -614,7 +614,7 @@ func TestTickPlanner_ShouldRunGuardRunning(t *testing.T) {
 		GenRunID: func(_ context.Context) (string, error) {
 			return "run-id", nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		Clock: func() time.Time {
@@ -645,7 +645,7 @@ func TestTickPlanner_PlanStopSchedule(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{Status: core.Running}, nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -683,7 +683,7 @@ func TestTickPlanner_PlanStopSkipsNotRunning(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{Status: core.Succeeded}, nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -718,7 +718,7 @@ func TestTickPlanner_PlanRestartSchedule(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{}, nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -756,7 +756,7 @@ func TestTickPlanner_PlanSuspendedStopSkipped(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{Status: core.Running}, nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -834,7 +834,7 @@ func TestTickPlanner_PlanStopRestartWithNonUTCTimezone(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{Status: core.Running}, nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -879,11 +879,11 @@ func TestTickPlanner_IsRunningErrorAssumesNotRunning(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{}, nil
 		},
-		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			dispatchCalled = true
 			return nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, errors.New("proc store error")
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -917,7 +917,7 @@ func TestTickPlanner_GetLatestStatusErrorSkipsStop(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{}, errors.New("status error")
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -953,7 +953,7 @@ func TestTickPlanner_GenRunIDErrorSkipsStartRun(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{}, nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -1042,7 +1042,7 @@ func TestTickPlanner_StopRestartRunsHaveEmptyRunID(t *testing.T) {
 			}
 			return exec.DAGRunStatus{}, nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -1102,10 +1102,10 @@ func TestTickPlanner_CatchupBlocksStopRestartSchedules(t *testing.T) {
 		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
 			return nil
 		},
-		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			return nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -1148,7 +1148,7 @@ func TestTickPlanner_ConcurrentPlanAndEvents(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{}, nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -1217,7 +1217,7 @@ func TestTickPlanner_ShouldRunSkipIfSuccessful(t *testing.T) {
 				StartedAt: "2026-02-07T11:30:00Z",
 			}, nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) { return false, nil },
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) { return false, nil },
 		GenRunID:  func(_ context.Context) (string, error) { return "run-1", nil },
 		Clock:     func() time.Time { return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC) },
 		Events:    eventCh,
@@ -1248,7 +1248,7 @@ func TestTickPlanner_ShouldRunAlreadyFinished(t *testing.T) {
 				StartedAt: "2026-02-07T12:00:00Z",
 			}, nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) { return false, nil },
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) { return false, nil },
 		GenRunID:  func(_ context.Context) (string, error) { return "run-1", nil },
 		Clock:     func() time.Time { return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC) },
 		Events:    eventCh,
@@ -1278,7 +1278,7 @@ func TestTickPlanner_ShouldRunFailedPreviousRunNotSkipped(t *testing.T) {
 				StartedAt: "2026-02-07T11:30:00Z",
 			}, nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) { return false, nil },
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) { return false, nil },
 		GenRunID:  func(_ context.Context) (string, error) { return "run-1", nil },
 		Clock:     func() time.Time { return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC) },
 		Events:    eventCh,
@@ -1400,13 +1400,13 @@ func TestTickPlanner_PlanLatestNotRunning(t *testing.T) {
 		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
 			return nil
 		},
-		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			return nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
 			return "run-latest", nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil // DAG is not running
 		},
 		Clock: func() time.Time {
@@ -1456,7 +1456,7 @@ func TestTickPlanner_PlanLatestRunning(t *testing.T) {
 		GenRunID: func(_ context.Context) (string, error) {
 			return "run-latest", nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return true, nil // DAG is running
 		},
 		Clock: func() time.Time {
@@ -1590,13 +1590,13 @@ func TestTickPlanner_RecomputeBufferAfterPlanNoDuplicate(t *testing.T) {
 		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
 			return nil
 		},
-		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			return nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
 			return "run-1", nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		Clock: func() time.Time {
@@ -1683,7 +1683,7 @@ func TestTickPlanner_CatchupRetainedOnCreatePlannedRunFailure(t *testing.T) {
 		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
 			return nil
 		},
-		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			return nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -1692,7 +1692,7 @@ func TestTickPlanner_CatchupRetainedOnCreatePlannedRunFailure(t *testing.T) {
 			}
 			return "run-1", nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		Clock: func() time.Time {
@@ -1760,7 +1760,7 @@ func TestTickPlanner_CatchupEnqueueFailureRetainsBuffer(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{}, nil
 		},
-		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			if dispatchFails {
 				return errors.New("enqueue subprocess failed")
 			}
@@ -1769,7 +1769,7 @@ func TestTickPlanner_CatchupEnqueueFailureRetainsBuffer(t *testing.T) {
 		GenRunID: func(_ context.Context) (string, error) {
 			return "run-1", nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		Clock: func() time.Time {
@@ -1849,7 +1849,7 @@ func TestTickPlanner_CatchupEnqueueSuccessAdvancesWatermark(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{}, nil
 		},
-		Enqueue: func(_ context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error {
+		Enqueue: func(_ context.Context, dag *core.DAG, runID string, triggerType core.TriggerType, _ time.Time) error {
 			dispatched = append(dispatched, struct {
 				dagName     string
 				runID       string
@@ -1860,7 +1860,7 @@ func TestTickPlanner_CatchupEnqueueSuccessAdvancesWatermark(t *testing.T) {
 		GenRunID: func(_ context.Context) (string, error) {
 			return "run-1", nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		Clock: func() time.Time {
@@ -1931,13 +1931,13 @@ func TestTickPlanner_CatchupFailureBlocksLiveScheduling(t *testing.T) {
 			dispatchedRuns = append(dispatchedRuns, PlannedRun{DAG: dag, RunID: runID, TriggerType: triggerType})
 			return nil
 		},
-		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			return errors.New("enqueue temporarily unavailable")
 		},
 		GenRunID: func(_ context.Context) (string, error) {
 			return "run-1", nil
 		},
-		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+		IsRunning: func(_ context.Context, _ *core.DAG, _ core.TriggerType, _ time.Time) (bool, error) {
 			return false, nil
 		},
 		Clock: func() time.Time {

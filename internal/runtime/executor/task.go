@@ -91,6 +91,20 @@ func WithTags(tags string) TaskOption {
 	}
 }
 
+// WithTaskTriggerType sets the trigger type on the task.
+func WithTaskTriggerType(triggerType string) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		task.TriggerType = triggerType
+	}
+}
+
+// WithTaskScheduledTime sets the scheduled time on the task.
+func WithTaskScheduledTime(scheduledTime string) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		task.ScheduledTime = scheduledTime
+	}
+}
+
 // WithBaseConfig sets the base config YAML content on the task.
 // This allows workers to apply base config without needing local base config files.
 func WithBaseConfig(content string) TaskOption {

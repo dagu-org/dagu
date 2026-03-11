@@ -51,13 +51,14 @@ type DispatchFunc func(ctx context.Context, dag *core.DAG, runID string, trigger
 
 // EnqueueFunc persists a run to the queue. Used for catchup runs to ensure
 // persistence before advancing the watermark.
-type EnqueueFunc func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error
+type EnqueueFunc func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType, scheduledTime time.Time) error
 
 // RunIDFunc generates a unique run ID.
 type RunIDFunc func(ctx context.Context) (string, error)
 
-// IsRunningFunc checks if a DAG has any active run.
-type IsRunningFunc func(ctx context.Context, dag *core.DAG) (bool, error)
+// IsRunningFunc checks if a DAG has any active run that is relevant to
+// the given trigger type and scheduled time.
+type IsRunningFunc func(ctx context.Context, dag *core.DAG, triggerType core.TriggerType, scheduledTime time.Time) (bool, error)
 
 // GetLatestStatusFunc retrieves the latest status of a DAG.
 type GetLatestStatusFunc func(ctx context.Context, dag *core.DAG) (exec.DAGRunStatus, error)
@@ -142,7 +143,7 @@ func NewTickPlanner(cfg TickPlannerConfig) *TickPlanner {
 		cfg.IsSuspended = func(context.Context, string) bool { return false }
 	}
 	if cfg.IsRunning == nil {
-		cfg.IsRunning = func(context.Context, *core.DAG) (bool, error) { return false, nil }
+		cfg.IsRunning = func(context.Context, *core.DAG, core.TriggerType, time.Time) (bool, error) { return false, nil }
 	}
 	if cfg.GetLatestStatus == nil {
 		cfg.GetLatestStatus = func(context.Context, *core.DAG) (exec.DAGRunStatus, error) {
@@ -172,7 +173,7 @@ func NewTickPlanner(cfg TickPlannerConfig) *TickPlanner {
 		}
 	}
 	if cfg.Enqueue == nil {
-		cfg.Enqueue = func(context.Context, *core.DAG, string, core.TriggerType) error {
+		cfg.Enqueue = func(context.Context, *core.DAG, string, core.TriggerType, time.Time) error {
 			return fmt.Errorf("enqueue not configured")
 		}
 	}
@@ -338,7 +339,7 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 			} else {
 				catchupPending = true
 
-				running, err := tp.cfg.IsRunning(ctx, item.DAG)
+				running, err := tp.cfg.IsRunning(ctx, item.DAG, item.TriggerType, item.ScheduledTime)
 				if err != nil {
 					logger.Error(ctx, "Failed to check if DAG is running, assuming not running",
 						tag.DAG(dagName),
@@ -359,7 +360,7 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 					if ok {
 						// Enqueue synchronously; pop/advance only on success so
 						// failures retry on the next tick.
-						if err := tp.cfg.Enqueue(ctx, run.DAG, run.RunID, run.TriggerType); err != nil {
+						if err := tp.cfg.Enqueue(ctx, run.DAG, run.RunID, run.TriggerType, item.ScheduledTime); err != nil {
 							logger.Error(ctx, "Failed to enqueue catchup run",
 								tag.DAG(dagName),
 								tag.Error(err),
@@ -475,7 +476,7 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 // shouldRun checks all guards for a live scheduled run.
 func (tp *TickPlanner) shouldRun(ctx context.Context, dag *core.DAG, scheduledTime time.Time, schedule core.Schedule) bool {
 	// Guard 1: isRunning (uses process-level check)
-	running, err := tp.cfg.IsRunning(ctx, dag)
+	running, err := tp.cfg.IsRunning(ctx, dag, core.TriggerTypeScheduler, scheduledTime)
 	if err != nil {
 		logger.Error(ctx, "Failed to check if DAG is running",
 			tag.DAG(dag.Name),
@@ -496,8 +497,8 @@ func (tp *TickPlanner) shouldRun(ctx context.Context, dag *core.DAG, scheduledTi
 		return false
 	}
 
-	// Also check status-based running (belt and suspenders)
-	if latestStatus.Status == core.Running {
+	// Also check status-based running/queued (belt and suspenders)
+	if latestStatus.Status == core.Running || latestStatus.Status == core.Queued {
 		return false
 	}
 

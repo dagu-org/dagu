@@ -85,6 +85,10 @@ message Task {
   string tags = 16;
   // Base config YAML content for workers (avoids relying on local base config files).
   string base_config = 17;
+  // How this run was triggered (scheduler, catchup, manual, etc.)
+  string trigger_type = 18;
+  // When the run was scheduled for (RFC3339 format)
+  string scheduled_time = 19;
 }
 
 enum Operation {

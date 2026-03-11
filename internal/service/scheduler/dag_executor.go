@@ -93,7 +93,7 @@ func (e *DAGExecutor) HandleJob(
 ) error {
 	// For distributed execution with START operation, enqueue for persistence
 	if e.shouldUseDistributedExecution(dag) && operation == coordinatorv1.Operation_OPERATION_START {
-		return e.EnqueueRun(ctx, dag, runID, triggerType)
+		return e.EnqueueRun(ctx, dag, runID, triggerType, "")
 	}
 
 	// For all other cases (local execution or non-START operations), use ExecuteDAG
@@ -108,6 +108,7 @@ func (e *DAGExecutor) EnqueueRun(
 	dag *core.DAG,
 	runID string,
 	triggerType core.TriggerType,
+	scheduledTime string,
 ) error {
 	ctx = logger.WithValues(ctx,
 		tag.DAG(dag.Name),
@@ -119,8 +120,9 @@ func (e *DAGExecutor) EnqueueRun(
 	)
 
 	spec := e.subCmdBuilder.Enqueue(dag, runtime.EnqueueOptions{
-		DAGRunID:    runID,
-		TriggerType: triggerType.String(),
+		DAGRunID:      runID,
+		TriggerType:   triggerType.String(),
+		ScheduledTime: scheduledTime,
 	})
 	if err := runtime.Run(ctx, spec); err != nil {
 		return fmt.Errorf("failed to enqueue DAG run: %w", err)
@@ -147,14 +149,23 @@ func (e *DAGExecutor) ExecuteDAG(
 ) error {
 	if e.shouldUseDistributedExecution(dag) {
 		// Distributed execution: dispatch to coordinator
+		opts := []executor.TaskOption{
+			executor.WithWorkerSelector(dag.WorkerSelector),
+			executor.WithPreviousStatus(previousStatus),
+			executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, e.baseConfigPath)),
+			executor.WithTaskTriggerType(triggerType.String()),
+		}
+		// Carry scheduled time from the queued status to the task proto
+		// so the coordinator's initial status reflects it.
+		if previousStatus != nil && previousStatus.ScheduledTime != "" {
+			opts = append(opts, executor.WithTaskScheduledTime(previousStatus.ScheduledTime))
+		}
 		task := executor.CreateTask(
 			dag.Name,
 			string(dag.YamlData),
 			operation,
 			runID,
-			executor.WithWorkerSelector(dag.WorkerSelector),
-			executor.WithPreviousStatus(previousStatus),
-			executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, e.baseConfigPath)),
+			opts...,
 		)
 		return e.dispatchToCoordinator(ctx, task)
 	}
