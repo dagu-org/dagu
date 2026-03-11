@@ -246,7 +246,7 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute z-50 mt-1 w-80 max-h-[360px] rounded-md border border-border bg-popover shadow-md flex flex-col">
+        <div className="absolute z-50 mt-1 w-80 max-h-[min(70vh,600px)] rounded-md border border-border bg-popover shadow-md flex flex-col">
           {/* Search input */}
           <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border">
             <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -266,7 +266,7 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
 
           {/* Tag filter row */}
           {displayTags.length > 0 && (
-            <div className="flex flex-wrap gap-1 px-3 py-1.5 border-b border-border max-h-[48px] overflow-hidden">
+            <div className="flex flex-wrap gap-1 px-3 pt-2 pb-2.5 border-b border-border max-h-[200px] overflow-y-auto shrink-0">
               {displayTags.map((tag) => {
                 const isActive = selectedTags.includes(tag);
                 return (
@@ -278,7 +278,7 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
                   >
                     <Badge
                       variant={isActive ? 'primary' : 'default'}
-                      className="text-[10px] px-1 py-0 h-4 cursor-pointer"
+                      className="text-[10px] px-1.5 cursor-pointer"
                     >
                       {isActive && <X className="h-2 w-2 mr-0.5" />}
                       {tag}
@@ -290,7 +290,7 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
           )}
 
           {/* DAG list */}
-          <div ref={listRef} className="overflow-y-auto flex-1" onKeyDown={handleKeyDown}>
+          <div ref={listRef} className="overflow-y-auto flex-1 min-h-0" onKeyDown={handleKeyDown}>
             {flatList.length === 0 ? (
               <div className="px-3 py-4 text-xs text-muted-foreground text-center">
                 No DAGs found
