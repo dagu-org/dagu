@@ -160,6 +160,20 @@ func TestJQExecutor_RawOutput(t *testing.T) {
 			raw:            true,
 			expectedOutput: "-10\n",
 		},
+		{
+			name:           "LargeFloatWithRawTrue",
+			query:          ".big",
+			script:         `{"big": 13786123706}`,
+			raw:            true,
+			expectedOutput: "13786123706\n",
+		},
+		{
+			name:           "LargeFloatWithRawTrue",
+			query:          ".big",
+			script:         `{"big": 13786123706.101}`,
+			raw:            true,
+			expectedOutput: "13786123706.101\n",
+		},
 	}
 
 	for _, tt := range tests {

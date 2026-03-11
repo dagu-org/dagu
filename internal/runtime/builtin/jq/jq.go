@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
@@ -101,9 +102,9 @@ func (e *jq) Run(_ context.Context) error {
 				} else {
 					_, _ = fmt.Fprintln(e.stdout, "false")
 				}
-			case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+			case float64:
 				// For numbers, print without quotes
-				_, _ = fmt.Fprintln(e.stdout, v)
+				_, _ = fmt.Fprintln(e.stdout, strconv.FormatFloat(v, 'f', -1, 64))
 			default:
 				// For arrays/objects or other types, marshal to JSON
 				val, err := json.Marshal(v)
