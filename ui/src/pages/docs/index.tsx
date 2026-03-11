@@ -249,17 +249,17 @@ function DocsContent() {
     [client, remoteNode, renameDocPath, mutate, tabs, updateTab, showToast]
   );
 
-  // Inline rename handler (from tree F2/double-click)
-  const handleInlineRename = useCallback(
-    async (oldPath: string, newPath: string) => {
+  // Shared path-change handler for rename and move
+  const handlePathChange = useCallback(
+    async (oldPath: string, newPath: string, action: 'renamed' | 'moved') => {
       try {
         const { error } = await client.POST('/docs/doc/rename', {
           params: { query: { remoteNode, path: oldPath } },
           body: { newPath },
         });
         if (error) {
-          showToast(error?.message || 'Failed to rename document');
-          mutate(); // Rollback optimistic state
+          showToast(error?.message || `Failed to ${action === 'renamed' ? 'rename' : 'move'} document`);
+          mutate();
           return;
         }
         mutate();
@@ -267,40 +267,23 @@ function DocsContent() {
         if (openTab) {
           updateTab(openTab.id, { docPath: newPath, title: titleFromPath(newPath) });
         }
-        showToast('Document renamed');
+        showToast(`Document ${action}`);
       } catch {
-        showToast('Failed to rename document');
-        mutate(); // Rollback
+        showToast(`Failed to ${action === 'renamed' ? 'rename' : 'move'} document`);
+        mutate();
       }
     },
     [client, remoteNode, mutate, tabs, updateTab, showToast]
   );
 
-  // Move handler (drag-and-drop)
+  const handleInlineRename = useCallback(
+    (oldPath: string, newPath: string) => handlePathChange(oldPath, newPath, 'renamed'),
+    [handlePathChange]
+  );
+
   const handleMove = useCallback(
-    async (oldPath: string, newPath: string) => {
-      try {
-        const { error } = await client.POST('/docs/doc/rename', {
-          params: { query: { remoteNode, path: oldPath } },
-          body: { newPath },
-        });
-        if (error) {
-          showToast(error?.message || 'A document at that path already exists');
-          mutate(); // Rollback optimistic state
-          return;
-        }
-        mutate();
-        const openTab = tabs.find((t) => t.docPath === oldPath);
-        if (openTab) {
-          updateTab(openTab.id, { docPath: newPath, title: titleFromPath(newPath) });
-        }
-        showToast('Document moved');
-      } catch {
-        showToast('Failed to move document');
-        mutate(); // Rollback
-      }
-    },
-    [client, remoteNode, mutate, tabs, updateTab, showToast]
+    (oldPath: string, newPath: string) => handlePathChange(oldPath, newPath, 'moved'),
+    [handlePathChange]
   );
 
   // Heading click for outline panel

@@ -85,6 +85,8 @@ function filterTree(
     .filter((node) => node.type === DocTreeNodeResponseType.directory ? (node.children && node.children.length > 0) : true);
 }
 
+const SKELETON_WIDTHS = [75, 60, 85, 65, 90, 70];
+
 function DocTreeSidebar({
   tree,
   isLoading,
@@ -115,6 +117,7 @@ function DocTreeSidebar({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<string[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Measure container height for react-arborist
@@ -129,9 +132,11 @@ function DocTreeSidebar({
     return () => observer.disconnect();
   }, []);
 
-  // Auto-reveal active doc node on initial load
+  // Auto-reveal active doc node (once per activeDocPath change)
+  const hasRevealedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!activeDocPath || !treeRef.current || !tree) return;
+    if (hasRevealedRef.current === activeDocPath) return;
     // Small delay to ensure tree has rendered
     const timer = setTimeout(() => {
       const api = treeRef.current;
@@ -148,6 +153,7 @@ function DocTreeSidebar({
         activeNode.select();
         api.scrollTo(activeDocPath);
       }
+      hasRevealedRef.current = activeDocPath;
     }, 50);
     return () => clearTimeout(timer);
   }, [activeDocPath, tree]);
@@ -160,6 +166,7 @@ function DocTreeSidebar({
 
     if (searchQuery.length < 2) {
       setSearchResults(null);
+      setSearchError(null);
       setIsSearching(false);
       return;
     }
@@ -167,6 +174,7 @@ function DocTreeSidebar({
     setIsSearching(true);
     searchTimerRef.current = setTimeout(async () => {
       try {
+        setSearchError(null);
         const { data } = await client.GET('/docs/search', {
           params: { query: { remoteNode, q: searchQuery } },
         });
@@ -176,7 +184,8 @@ function DocTreeSidebar({
           setSearchResults([]);
         }
       } catch {
-        setSearchResults([]);
+        setSearchResults(null);
+        setSearchError('Search failed');
       } finally {
         setIsSearching(false);
       }
@@ -379,7 +388,12 @@ function DocTreeSidebar({
             <Loader2 className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground animate-spin" />
           )}
         </div>
-        {searchResults !== null && searchQuery.length >= 2 && (
+        {searchError && searchQuery.length >= 2 && (
+          <div className="text-[10px] text-destructive mt-0.5 px-1">
+            {searchError}
+          </div>
+        )}
+        {searchResults !== null && searchQuery.length >= 2 && !searchError && (
           <div className="text-[10px] text-muted-foreground mt-0.5 px-1">
             {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
           </div>
@@ -409,7 +423,7 @@ function DocTreeSidebar({
               <div
                 key={i}
                 className="h-5 rounded bg-muted/60 animate-pulse"
-                style={{ width: `${60 + Math.random() * 30}%`, marginLeft: `${(i % 3) * 12}px` }}
+                style={{ width: `${SKELETON_WIDTHS[i]}%`, marginLeft: `${(i % 3) * 12}px` }}
               />
             ))}
           </div>
