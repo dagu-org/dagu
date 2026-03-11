@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package frontend
 
 import (
@@ -176,6 +179,11 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		}
 	}
 
+	// Seed built-in knowledge references to data dir (not git-synced).
+	referencesDir := fileagentskill.SeedReferences(
+		filepath.Join(cfg.Paths.DataDir, "agent", "references"),
+	)
+
 	var agentSkillStore agent.SkillStore
 	skillsDir := filepath.Join(cfg.Paths.DAGsDir, "skills")
 	if fileagentskill.SeedExampleSkills(skillsDir) && agentConfigStore != nil {
@@ -310,7 +318,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	var agentAPI *agent.API
 	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSkillStore, agentSoulStore, &cfg.Paths, cfg.Server.Session.MaxPerUser, dr, auditSvc, memoryStore, newRemoteNodeAdapter(remoteNodeResolver))
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSkillStore, agentSoulStore, &cfg.Paths, referencesDir, cfg.Server.Session.MaxPerUser, dr, auditSvc, memoryStore, newRemoteNodeAdapter(remoteNodeResolver))
 		if err != nil {
 			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
 		}
@@ -641,7 +649,7 @@ func autoEnableExampleSkills(ctx context.Context, configStore agent.ConfigStore)
 
 // initAgentAPI creates and returns an agent API.
 // The API uses the config store to check enabled status and resolve providers via the model store.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, soulStore agent.SoulStore, paths *config.PathsConfig, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteNodeResolver) (*agent.API, error) {
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, soulStore agent.SoulStore, paths *config.PathsConfig, referencesDir string, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteNodeResolver) (*agent.API, error) {
 	sessStore, err := filesession.New(paths.SessionsDir, filesession.WithMaxPerUser(sessionMaxPerUser))
 	if err != nil {
 		logger.Warn(ctx, "Failed to create session store, persistence disabled", tag.Error(err))
@@ -673,6 +681,7 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 			ConfigFile:     paths.ConfigFileUsed,
 			WorkingDir:     paths.DAGsDir,
 			BaseConfigFile: paths.BaseConfig,
+			ReferencesDir:  referencesDir,
 		},
 	})
 
@@ -1185,17 +1194,15 @@ func (srv *Server) buildStreamAuthOptions(realm string) auth.Options {
 		return auth.Options{Realm: realm}
 	}
 
-	// Basic auth mode: The browser EventSource API cannot send custom headers,
-	// so it cannot provide Basic credentials. We enable Basic auth validation
-	// (so programmatic clients like curl are authenticated) but set
-	// AuthRequired=false so browser SSE connections without credentials are
-	// not blocked with 401.
-	// FIXME: add a session-token mechanism for basic-auth users so browser
-	// EventSource requests can authenticate via the ?token= query parameter.
+	// Basic auth mode: require credentials for SSE endpoints just like REST.
+	// Browsers handle 401 + WWW-Authenticate: Basic challenges natively,
+	// caching credentials per origin/realm, so EventSource requests will
+	// include Basic auth automatically after the user authenticates once.
 	if authCfg.Mode == config.AuthModeBasic {
 		return auth.Options{
 			Realm:            realm,
 			BasicAuthEnabled: true,
+			AuthRequired:     true,
 			Creds:            map[string]string{authCfg.Basic.Username: authCfg.Basic.Password},
 		}
 	}

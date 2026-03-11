@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package agent provides an AI-powered chat interface for managing DAGs.
 package agent
 
@@ -439,4 +442,6 @@ type EnvironmentInfo struct {
 	WorkingDir string
 	// BaseConfigFile is the path to the base configuration file.
 	BaseConfigFile string
+	// ReferencesDir is the directory containing built-in reference documents.
+	ReferencesDir string
 }

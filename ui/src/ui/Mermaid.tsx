@@ -19,24 +19,31 @@ function getCSSVariable(name: string, fallback: string): string {
   return value || fallback;
 }
 
+// Detect dark mode from Tailwind's .dark class on the root element
+function isDarkMode(): boolean {
+  if (typeof document === 'undefined') return false;
+  return document.documentElement.classList.contains('dark');
+}
+
 // Initialize Mermaid with theme-aware colors
 function initializeMermaid(): void {
+  const dark = isDarkMode();
   mermaid.initialize({
     securityLevel: 'loose',
     startOnLoad: false,
     maxTextSize: 99999999,
-    theme: 'default',
+    theme: dark ? 'dark' : 'default',
     themeVariables: {
       background: 'transparent',
-      primaryColor: getCSSVariable('--card', '#faf8f5'),
-      primaryTextColor: getCSSVariable('--foreground', '#3d3833'),
-      primaryBorderColor: getCSSVariable('--border', '#c8bfb0'),
-      lineColor: getCSSVariable('--muted-foreground', '#6b635a'),
+      primaryColor: getCSSVariable('--card', dark ? '#292a2d' : '#faf8f5'),
+      primaryTextColor: getCSSVariable('--foreground', dark ? '#e8eaed' : '#3d3833'),
+      primaryBorderColor: getCSSVariable('--border', dark ? '#5f6368' : '#d4cdc0'),
+      lineColor: getCSSVariable('--muted-foreground', dark ? '#9aa0a6' : '#7a7268'),
       sectionBkgColor: 'transparent',
       altSectionBkgColor: 'transparent',
       gridColor: 'transparent',
-      secondaryColor: getCSSVariable('--secondary', '#f0ebe3'),
-      tertiaryColor: getCSSVariable('--background', '#f5f0e8'),
+      secondaryColor: getCSSVariable('--secondary', dark ? '#35363a' : '#f5f0e8'),
+      tertiaryColor: getCSSVariable('--background', dark ? '#202124' : '#f5f0e8'),
     },
     flowchart: {
       curve: 'basis',

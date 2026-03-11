@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package postgres provides the PostgreSQL driver for the SQL executor.
 package postgres
 

@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package core
 
 import (
@@ -20,7 +23,7 @@ var (
 	ErrInvalidStepData                     = errors.New("invalid step data")
 	ErrStepNameRequired                    = errors.New("step name must be specified")
 	ErrStepNameDuplicate                   = errors.New("step name must be unique")
-	ErrStepNameTooLong                     = errors.New("step name must be at most 40 characters")
+	ErrStepNameTooLong                     = errors.New("step name must be at most 255 characters")
 	ErrStepIDTooLong                       = errors.New("step ID must be at most 40 characters")
 	ErrStepCommandIsRequired               = errors.New("step command is required")
 	ErrStepCommandIsEmpty                  = errors.New("step command is empty")

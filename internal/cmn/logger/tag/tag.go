@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package tag provides standardized tag functions for structured logging.
 //
 // All tag keys use kebab-case naming convention for consistency.

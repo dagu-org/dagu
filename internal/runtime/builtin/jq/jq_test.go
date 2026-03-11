@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package jq
 
 import (
@@ -156,6 +159,20 @@ func TestJQExecutor_RawOutput(t *testing.T) {
 			script:         `{"temp": -10}`,
 			raw:            true,
 			expectedOutput: "-10\n",
+		},
+		{
+			name:           "LargeFloatWithRawTrue",
+			query:          ".big",
+			script:         `{"big": 13786123706}`,
+			raw:            true,
+			expectedOutput: "13786123706\n",
+		},
+		{
+			name:           "LargeFloatWithRawTrue",
+			query:          ".big",
+			script:         `{"big": 13786123706.101}`,
+			raw:            true,
+			expectedOutput: "13786123706.101\n",
 		},
 	}
 

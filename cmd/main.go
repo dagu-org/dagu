@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 import (
@@ -53,6 +56,7 @@ func init() {
 	rootCmd.AddCommand(cmd.Schema())
 	rootCmd.AddCommand(cmd.Example())
 	rootCmd.AddCommand(cmd.Config())
+	rootCmd.AddCommand(cmd.AI())
 
 	config.Version = version
 }

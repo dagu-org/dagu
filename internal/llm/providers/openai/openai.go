@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package openai provides an LLM provider implementation for OpenAI's API.
 package openai
 

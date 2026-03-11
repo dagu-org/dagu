@@ -1,4 +1,7 @@
 #!/bin/sh
+# Copyright (C) 2026 Yota Hamada
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 
 # Set up constants and URLs
 RELEASES_URL="https://github.com/dagu-org/dagu/releases"

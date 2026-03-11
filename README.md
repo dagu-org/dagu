@@ -27,7 +27,13 @@ Built for developers who want powerful workflow orchestration without the operat
 - Legacy Script Friendly: Orchestrate existing shell commands, Python scripts, Docker containers, or HTTP calls without modification.
 - Air-gapped Ready: Runs in isolated environments without external dependencies or network access
 
-![Web UI](./assets/images/demo-web-ui.webp)
+<div align="center">
+  <img src="./assets/images/dagu-demo.gif" alt="Demo" width="720">
+</div>
+
+| Cockpit (Kanban) | DAG Run Details |
+|---|---|
+| ![Cockpit](./assets/images/ui-cockpit.png) | ![DAG Run Details](./assets/images/ui-dag-run-details.png) |
 
 **Try it live:** [Live Demo](https://demo-instance.dagu.sh/) (credentials: `demouser` / `demouser`)
 
@@ -78,7 +84,17 @@ docker run --rm -v ~/.dagu:/var/lib/dagu -p 8080:8080 ghcr.io/dagu-org/dagu:late
 
 > More options (npm, custom paths, specific versions): [Installation docs](https://docs.dagu.sh/getting-started/installation)
 
-### 2. Create your first workflow
+### 2. Set up AI-assisted workflow authoring (optional)
+
+If you use an AI coding tool (Claude Code, Codex, OpenCode, Gemini CLI, or Copilot CLI), install the Dagu skill so the AI can write correct DAG YAML:
+
+```bash
+dagu ai install
+```
+
+This auto-detects installed tools and installs the DAG authoring skill into each one. See [docs](https://docs.dagu.sh/reference/cli#ai-install) for details.
+
+### 3. Create your first workflow
 
 > When you first start Dagu with an empty DAGs directory, it automatically creates example workflows. Set `DAGU_SKIP_EXAMPLES=true` to skip this.
 
@@ -90,19 +106,19 @@ steps:
 EOF
 ```
 
-### 3. Run the workflow
+### 4. Run the workflow
 
 ```bash
 dagu start hello.yaml
 ```
 
-### 4. Check the status
+### 5. Check the status
 
 ```bash
 dagu status hello
 ```
 
-### 5. Explore the Web UI
+### 6. Explore the Web UI
 
 ```bash
 dagu start-all

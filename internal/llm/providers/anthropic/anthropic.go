@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package anthropic provides an LLM provider implementation for Anthropic's Claude API.
 package anthropic
 
