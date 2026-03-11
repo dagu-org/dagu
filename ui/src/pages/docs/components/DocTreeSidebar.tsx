@@ -324,6 +324,45 @@ function DocTreeSidebar({
     [canWrite]
   );
 
+  // Keyboard shortcuts: Delete and F2
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (!canWrite) return;
+      const api = treeRef.current;
+      if (!api) return;
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedIds.length > 1) {
+          e.preventDefault();
+          onBatchDelete(selectedIds);
+        } else if (selectedIds.length === 1) {
+          const node = api.get(selectedIds[0]);
+          if (node && !node.isEditing) {
+            e.preventDefault();
+            const isDir = node.data.type === DocTreeNodeResponseType.directory;
+            const hasChildren = !!(node.data.children && node.data.children.length > 0);
+            onContextAction({
+              type: 'delete',
+              docPath: node.id,
+              title: node.data.title || node.data.name,
+              isDir,
+              hasChildren,
+            });
+          }
+        }
+      } else if (e.key === 'F2') {
+        if (selectedIds.length === 1) {
+          const node = api.get(selectedIds[0]);
+          if (node && !node.isEditing) {
+            e.preventDefault();
+            node.edit();
+          }
+        }
+      }
+    },
+    [canWrite, selectedIds, onBatchDelete, onContextAction]
+  );
+
   const hasDocuments = treeData && treeData.length > 0;
 
   // Custom node renderer that passes through extra props
@@ -441,7 +480,7 @@ function DocTreeSidebar({
       </div>
 
       {/* Tree */}
-      <div ref={containerRef} className="flex-1 overflow-hidden min-h-0">
+      <div ref={containerRef} className="flex-1 overflow-hidden min-h-0 outline-none" onKeyDown={handleKeyDown} tabIndex={-1}>
         {error ? (
           <div className="flex flex-col items-center justify-center h-full gap-2 p-4 text-center">
             <AlertCircle className="h-6 w-6 text-destructive/60" />
