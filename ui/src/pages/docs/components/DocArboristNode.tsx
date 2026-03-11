@@ -143,62 +143,42 @@ function DocArboristNode({ node, style, dragHandle, onContextAction, canWrite }:
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">
-            {isDir ? (
-              <>
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onContextAction({ type: 'create', parentDir: node.id });
-                  }}
-                >
-                  <Plus className="h-3.5 w-3.5 mr-2" />
-                  New Document
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={hasChildren}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onContextAction({
-                      type: 'delete',
-                      docPath: node.id,
-                      title: displayTitle,
-                      isDir: true,
-                      hasChildren,
-                    });
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-2" />
-                  Delete
-                </DropdownMenuItem>
-              </>
-            ) : (
-              <>
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    node.edit();
-                  }}
-                >
-                  <Pencil className="h-3.5 w-3.5 mr-2" />
-                  Rename
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onContextAction({
-                      type: 'delete',
-                      docPath: node.id,
-                      title: displayTitle,
-                      isDir: false,
-                      hasChildren: false,
-                    });
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-2" />
-                  Delete
-                </DropdownMenuItem>
-              </>
+            {isDir && (
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onContextAction({ type: 'create', parentDir: node.id });
+                }}
+              >
+                <Plus className="h-3.5 w-3.5 mr-2" />
+                New Document
+              </DropdownMenuItem>
             )}
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                node.edit();
+              }}
+            >
+              <Pencil className="h-3.5 w-3.5 mr-2" />
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={isDir && hasChildren}
+              onClick={(e) => {
+                e.stopPropagation();
+                onContextAction({
+                  type: 'delete',
+                  docPath: node.id,
+                  title: displayTitle,
+                  isDir,
+                  hasChildren,
+                });
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-2" />
+              Delete
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       )}
