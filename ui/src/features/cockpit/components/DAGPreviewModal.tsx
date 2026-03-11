@@ -275,6 +275,6 @@ export function DAGPreviewModal({ fileName, isOpen, selectedWorkspace, onClose }
         </RootDAGRunContext.Provider>
       </div>
     </>,
-    document.body
+    document.querySelector('.radix-themes') || document.body
   );
 }
