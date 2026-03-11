@@ -28,7 +28,7 @@ export function CockpitToolbar({
 }: Props): React.ReactElement {
   const canWrite = useCanWrite();
   return (
-    <div className="flex items-center gap-3 flex-wrap mb-2">
+    <div className="flex items-center gap-3 flex-wrap mb-2 max-md:flex-col max-md:items-stretch">
       <WorkspaceSelector
         workspaces={workspaces}
         selectedWorkspace={selectedWorkspace}
