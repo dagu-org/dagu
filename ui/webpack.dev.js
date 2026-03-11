@@ -11,6 +11,14 @@ module.exports = merge(common, {
   devServer: {
     historyApiFallback: true,
     port: 8081,
+    proxy: [
+      {
+        context: ['/api'],
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        ws: true,
+      },
+    ],
     client: {
       overlay: {
         runtimeErrors: (error) => {
