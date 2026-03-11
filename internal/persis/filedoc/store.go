@@ -354,11 +354,14 @@ func (s *Store) safeDeleteDir(dirPath string) error {
 	// Reverse to delete deepest entries first (children before parents).
 	slices.Reverse(paths)
 
+	var lastErr error
 	for _, p := range paths {
 		// os.Remove: deletes file/symlink/empty-dir. Never follows symlinks.
-		_ = os.Remove(p) // best-effort, continue on error
+		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+			lastErr = err
+		}
 	}
-	return nil
+	return lastErr
 }
 
 // DeleteBatch deletes multiple docs/directories in one operation.

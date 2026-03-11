@@ -61,6 +61,11 @@ function DocsContent() {
   // Active doc content for outline panel
   const [activeDocContent, setActiveDocContent] = useState<string | null>(null);
 
+  // Clear stale content when switching tabs so the outline panel doesn't show old headings
+  useEffect(() => {
+    setActiveDocContent(null);
+  }, [activeTabId]);
+
   // Modal state
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createParentDir, setCreateParentDir] = useState('');
@@ -548,6 +553,17 @@ function DocsContent() {
         <p className="text-sm text-muted-foreground">
           Are you sure you want to delete <strong>{deleteDocTitle}</strong>? This
           action cannot be undone.
+        </p>
+      </ConfirmModal>
+      <ConfirmModal
+        title="Delete Documents"
+        buttonText={`Delete ${batchDeletePaths.length} items`}
+        visible={batchDeleteConfirmOpen}
+        dismissModal={() => setBatchDeleteConfirmOpen(false)}
+        onSubmit={handleBatchDelete}
+      >
+        <p className="text-sm text-muted-foreground">
+          Are you sure you want to delete {batchDeletePaths.length} items? This cannot be undone.
         </p>
       </ConfirmModal>
     </div>

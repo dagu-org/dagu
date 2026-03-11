@@ -5886,7 +5886,7 @@ paths:
               $ref: "#/components/schemas/RenameDocRequest"
       responses:
         "200":
-          description: "Document renamed"
+          description: "Document or directory renamed"
           content:
             application/json:
               schema:
@@ -5895,7 +5895,7 @@ paths:
                   message:
                     type: string
         "404":
-          description: "Document not found"
+          description: "Document or directory not found"
           content:
             application/json:
               schema:
@@ -9402,6 +9402,7 @@ components:
           type: array
           minItems: 1
           maxItems: 100
+          uniqueItems: true
           items:
             $ref: "#/components/schemas/DocPath"
           description: "Document or directory paths to delete (max 100)"

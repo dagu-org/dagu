@@ -11736,7 +11736,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Document renamed */
+            /** @description Document or directory renamed */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -11747,7 +11747,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Document not found */
+            /** @description Document or directory not found */
             404: {
                 headers: {
                     [name: string]: unknown;

@@ -85,7 +85,11 @@ function filterTree(
       const filteredChildren = filterTree(node.children, matchIds, ancestorIds);
       return { ...node, children: filteredChildren.length > 0 ? filteredChildren : undefined };
     })
-    .filter((node) => node.type === DocTreeNodeResponseType.directory ? (node.children && node.children.length > 0) : true);
+    .filter((node) =>
+      node.type !== DocTreeNodeResponseType.directory ||
+      matchIds.has(node.id) ||
+      !!(node.children && node.children.length > 0)
+    );
 }
 
 const SKELETON_WIDTHS = [75, 60, 85, 65, 90, 70];
@@ -164,6 +168,8 @@ function DocTreeSidebar({
 
   // Debounced search
   useEffect(() => {
+    let cancelled = false;
+
     if (searchTimerRef.current) {
       clearTimeout(searchTimerRef.current);
     }
@@ -179,23 +185,28 @@ function DocTreeSidebar({
     searchTimerRef.current = setTimeout(async () => {
       try {
         setSearchError(null);
-        const { data } = await client.GET('/docs/search', {
+        const { data, error } = await client.GET('/docs/search', {
           params: { query: { remoteNode, q: searchQuery } },
         });
-        if (data?.results) {
-          setSearchResults(data.results.map((r) => r.id));
-        } else {
-          setSearchResults([]);
+        if (cancelled) return;
+        if (error) {
+          setSearchResults(null);
+          setSearchError(error.message || 'Search failed');
+          return;
         }
+        setSearchResults(data?.results?.map((r) => r.id) ?? []);
       } catch {
-        setSearchResults(null);
-        setSearchError('Search failed');
+        if (!cancelled) {
+          setSearchResults(null);
+          setSearchError('Search failed');
+        }
       } finally {
-        setIsSearching(false);
+        if (!cancelled) setIsSearching(false);
       }
     }, 300);
 
     return () => {
+      cancelled = true;
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
   }, [searchQuery, client, remoteNode]);
@@ -373,10 +384,10 @@ function DocTreeSidebar({
         onContextAction={onContextAction}
         canWrite={canWrite}
         activeDocPath={activeDocPath}
-        selectedCount={selectedIds.length}
+        selectedIds={selectedIds}
       />
     ),
-    [onContextAction, canWrite, activeDocPath, selectedIds.length]
+    [onContextAction, canWrite, activeDocPath, selectedIds]
   );
 
   return (
@@ -481,7 +492,7 @@ function DocTreeSidebar({
 
       {/* Tree */}
       <div ref={containerRef} className="flex-1 overflow-hidden min-h-0 outline-none" onKeyDown={handleKeyDown} tabIndex={-1}>
-        {error ? (
+        {error && !tree ? (
           <div className="flex flex-col items-center justify-center h-full gap-2 p-4 text-center">
             <AlertCircle className="h-6 w-6 text-destructive/60" />
             <p className="text-xs text-muted-foreground">Failed to load documents</p>
@@ -507,11 +518,25 @@ function DocTreeSidebar({
             ))}
           </div>
         ) : hasDocuments ? (
-          <Tree<DocTreeNodeResponse>
-            ref={treeRef}
-            data={treeData}
-            width="100%"
-            height={containerHeight}
+          <>
+            {error && onRetry && (
+              <div className="flex items-center justify-between px-3 py-1 bg-destructive/10 border-b border-border">
+                <span className="text-xs text-destructive">Refresh failed</span>
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  Retry
+                </button>
+              </div>
+            )}
+            <Tree<DocTreeNodeResponse>
+              ref={treeRef}
+              data={treeData}
+              width="100%"
+              height={error && onRetry ? containerHeight - 28 : containerHeight}
             indent={16}
             rowHeight={28}
             openByDefault={false}
@@ -528,6 +553,7 @@ function DocTreeSidebar({
           >
             {renderNode}
           </Tree>
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center h-full gap-3 p-4 text-center">
             {searchResults !== null && searchQuery.length >= 2 ? (

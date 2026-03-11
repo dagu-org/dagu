@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { components, DocTreeNodeResponseType } from '@/api/v1/schema';
 import {
   DropdownMenu,
@@ -32,10 +35,10 @@ type Props = NodeRendererProps<DocTreeNodeResponse> & {
   onContextAction: (action: ContextAction) => void;
   canWrite: boolean;
   activeDocPath?: string | null;
-  selectedCount?: number;
+  selectedIds?: string[];
 };
 
-function DocArboristNode({ node, style, dragHandle, onContextAction, canWrite, activeDocPath, selectedCount = 0 }: Props) {
+function DocArboristNode({ node, style, dragHandle, onContextAction, canWrite, activeDocPath, selectedIds = [] }: Props) {
   const isDir = node.data.type === DocTreeNodeResponseType.directory;
   const displayTitle = node.data.title || node.data.name;
   const hasChildren = !!(node.data.children && node.data.children.length > 0);
@@ -51,6 +54,7 @@ function DocArboristNode({ node, style, dragHandle, onContextAction, canWrite, a
   }, [node.isEditing]);
 
   const handleClick = useCallback((e: React.MouseEvent) => {
+    if (node.isEditing) return;
     if (e.ctrlKey || e.metaKey) {
       node.selectMulti();
       return;
@@ -180,8 +184,8 @@ function DocArboristNode({ node, style, dragHandle, onContextAction, canWrite, a
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation();
-                if (selectedCount > 1 && node.isSelected) {
-                  onContextAction({ type: 'deleteBatch', paths: [] });
+                if (selectedIds.length > 1 && node.isSelected) {
+                  onContextAction({ type: 'deleteBatch', paths: selectedIds });
                 } else {
                   onContextAction({
                     type: 'delete',
@@ -194,7 +198,7 @@ function DocArboristNode({ node, style, dragHandle, onContextAction, canWrite, a
               }}
             >
               <Trash2 className="h-3.5 w-3.5 mr-2" />
-              {selectedCount > 1 && node.isSelected ? `Delete ${selectedCount} items` : 'Delete'}
+              {selectedIds.length > 1 && node.isSelected ? `Delete ${selectedIds.length} items` : 'Delete'}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
