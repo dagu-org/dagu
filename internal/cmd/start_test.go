@@ -239,3 +239,24 @@ steps:
 	})
 
 }
+
+func TestCmdStart_InvalidScheduledTime(t *testing.T) {
+	th := test.SetupCommand(t)
+	dag := th.DAG(t, `steps:
+  - name: "1"
+    command: "true"
+`)
+
+	err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+		Args: []string{"start", "--scheduled-time=not-a-time", dag.Location},
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid scheduled-time")
+}
+
+func TestCmdStart_QueuedRunFlagHidden(t *testing.T) {
+	cli := cmd.Start()
+	flag := cli.Flags().Lookup("queued-run")
+	require.NotNil(t, flag)
+	require.True(t, flag.Hidden)
+}

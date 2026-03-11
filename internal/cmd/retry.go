@@ -171,6 +171,8 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 			RootDAGRun:              rootRun,
 			PeerConfig:              ctx.Config.Core.Peer,
 			TriggerType:             core.TriggerTypeRetry,
+			ScheduledTime:           status.ScheduledTime,
+			StatusSeed:              status,
 			DefaultExecMode:         ctx.Config.DefaultExecMode,
 			AgentConfigStore:        as.ConfigStore,
 			AgentModelStore:         as.ModelStore,

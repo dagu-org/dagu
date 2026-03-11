@@ -200,6 +200,7 @@ func (e *SubDAGExecutor) BuildCoordinatorTask(ctx context.Context, runParams Run
 		}),
 		WithTaskParams(runParams.Params),
 		WithWorkerSelector(e.DAG.WorkerSelector),
+		WithTaskTriggerType(core.TriggerTypeSubDAG.String()),
 		WithBaseConfig(baseConfig),
 	)
 

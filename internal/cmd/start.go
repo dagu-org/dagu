@@ -21,6 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/proto/convert"
+	rt "github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
@@ -36,7 +37,7 @@ var (
 
 // Start creates and returns a cobra command for starting a dag-run
 func Start() *cobra.Command {
-	return NewCommand(
+	cmd := NewCommand(
 		&cobra.Command{
 			Use:   "start [flags] <DAG definition> [-- param1 param2 ...]",
 			Short: "Execute a DAG from a DAG definition",
@@ -57,10 +58,25 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 			Args: cobra.MinimumNArgs(1),
 		}, startFlags, runStart,
 	)
+	_ = cmd.Flags().MarkHidden("queued-run")
+	return cmd
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, tagsFlag, defaultWorkingDirFlag, startWorkerIDFlag, triggerTypeFlag}
+var startFlags = []commandLineFlag{
+	paramsFlag,
+	nameFlag,
+	dagRunIDFlag,
+	fromRunIDFlag,
+	parentDAGRunFlag,
+	rootDAGRunFlag,
+	tagsFlag,
+	defaultWorkingDirFlag,
+	startWorkerIDFlag,
+	triggerTypeFlag,
+	scheduledTimeFlag,
+	queuedRunFlag,
+}
 
 var fromRunIDFlag = commandLineFlag{
 	name:  "from-run-id",
@@ -80,6 +96,12 @@ var triggerTypeFlag = commandLineFlag{
 	defaultValue: "manual",
 }
 
+var queuedRunFlag = commandLineFlag{
+	name:   "queued-run",
+	usage:  "Reuse an existing queued/coordinator-created attempt (internal use)",
+	isBool: true,
+}
+
 func runStart(ctx *Context, args []string) error {
 	fromRunID, err := ctx.StringParam("from-run-id")
 	if err != nil {
@@ -91,6 +113,16 @@ func runStart(ctx *Context, args []string) error {
 	triggerType, err := parseTriggerTypeParam(ctx)
 	if err != nil {
 		return err
+	}
+
+	scheduledTime, err := parseScheduledTimeParam(ctx, "scheduled-time")
+	if err != nil {
+		return err
+	}
+
+	queuedRun, err := ctx.Command.Flags().GetBool("queued-run")
+	if err != nil {
+		return fmt.Errorf("failed to read queued-run flag: %w", err)
 	}
 
 	dagRunID, rootRef, parentRef, isSubDAGRun, err := getDAGRunInfo(ctx)
@@ -178,20 +210,16 @@ func runStart(ctx *Context, args []string) error {
 
 	ctx.Context = logger.WithValues(ctx.Context, tag.DAG(dag.Name), tag.RunID(dagRunID))
 
-	if isSubDAGRun {
-		parent, err := exec.ParseDAGRunRef(parentRef)
-		if err != nil {
-			return fmt.Errorf("failed to parse parent dag-run reference: %w", err)
-		}
-		return handleSubDAGRun(ctx, dag, dagRunID, params, root, parent, workerID, triggerType)
+	statusSeed, err := loadStartStatusSeed(ctx, dag.Name, dagRunID, root, isSubDAGRun, workerID, queuedRun)
+	if err != nil {
+		return err
 	}
 
-	attempt, _ := ctx.DAGRunStore.FindAttempt(ctx, root)
-	if attempt != nil {
-		status, readErr := attempt.ReadStatus(ctx)
-		if readErr == nil && status.Status != core.NotStarted && status.Status != core.Queued {
-			return fmt.Errorf("dag-run ID %s already exists for DAG %s (status: %s)", dagRunID, dag.Name, status.Status)
-		}
+	if statusSeed != nil && statusSeed.Status == core.Queued && !queuedRun && workerID == "local" {
+		return fmt.Errorf("dag-run ID %s already exists for DAG %s (status: %s)", dagRunID, dag.Name, statusSeed.Status)
+	}
+	if statusSeed != nil && statusSeed.Status != core.NotStarted && statusSeed.Status != core.Queued {
+		return fmt.Errorf("dag-run ID %s already exists for DAG %s (status: %s)", dagRunID, dag.Name, statusSeed.Status)
 	}
 
 	if fromRunID != "" {
@@ -203,33 +231,60 @@ func runStart(ctx *Context, args []string) error {
 		logger.Info(ctx, "Executing root dag-run", slog.String("params", params))
 	}
 
-	return tryExecuteDAG(ctx, dag, dagRunID, root, workerID, triggerType)
+	req := newStartExecutionRequest(
+		dag,
+		dagRunID,
+		root,
+		workerID,
+		triggerType,
+		scheduledTime,
+		queuedRun,
+		statusSeed,
+	)
+
+	if isSubDAGRun {
+		parent, err := exec.ParseDAGRunRef(parentRef)
+		if err != nil {
+			return fmt.Errorf("failed to parse parent dag-run reference: %w", err)
+		}
+		return handleSubDAGRun(ctx, req, params, parent)
+	}
+
+	return tryExecuteDAG(ctx, req)
 }
 
 var errProcAcquisitionFailed = errors.New("failed to acquire process handle")
 
+type startExecutionRequest struct {
+	dag      *core.DAG
+	dagRunID string
+	root     exec.DAGRunRef
+	workerID string
+	metadata rt.StartMetadata
+}
+
 // tryExecuteDAG acquires a process handle and executes the DAG.
-func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root exec.DAGRunRef, workerID string, triggerType core.TriggerType) error {
+func tryExecuteDAG(ctx *Context, req startExecutionRequest) error {
 	// Check for dispatch to coordinator for distributed execution.
 	// Skip if already running on a worker (workerID != "local").
-	if workerID == "local" {
+	if req.workerID == "local" {
 		coordinatorCli := ctx.NewCoordinatorClient()
-		if core.ShouldDispatchToCoordinator(dag, coordinatorCli != nil, ctx.Config.DefaultExecMode) {
-			return dispatchToCoordinatorAndWait(ctx, dag, dagRunID, coordinatorCli)
+		if core.ShouldDispatchToCoordinator(req.dag, coordinatorCli != nil, ctx.Config.DefaultExecMode) {
+			return dispatchToCoordinatorAndWait(ctx, req, coordinatorCli)
 		}
 	}
 
-	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
+	if err := ctx.ProcStore.Lock(ctx, req.dag.ProcGroup()); err != nil {
 		logger.Debug(ctx, "Failed to lock process group", tag.Error(err))
-		_ = ctx.RecordEarlyFailure(dag, dagRunID, err)
+		_ = ctx.RecordEarlyFailure(req.dag, req.dagRunID, err)
 		return errProcAcquisitionFailed
 	}
 
-	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), exec.NewDAGRunRef(dag.Name, dagRunID))
+	proc, err := ctx.ProcStore.Acquire(ctx, req.dag.ProcGroup(), exec.NewDAGRunRef(req.dag.Name, req.dagRunID))
 	if err != nil {
-		ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
+		ctx.ProcStore.Unlock(ctx, req.dag.ProcGroup())
 		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
-		_ = ctx.RecordEarlyFailure(dag, dagRunID, err)
+		_ = ctx.RecordEarlyFailure(req.dag, req.dagRunID, err)
 		return fmt.Errorf("failed to acquire process handle: %w", errProcAcquisitionFailed)
 	}
 	defer func() {
@@ -237,9 +292,9 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root exec.DAGRu
 	}()
 	ctx.Proc = proc
 
-	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
+	ctx.ProcStore.Unlock(ctx, req.dag.ProcGroup())
 
-	return executeDAGRun(ctx, dag, exec.DAGRunRef{}, dagRunID, root, workerID, triggerType)
+	return executeDAGRun(ctx, req, exec.DAGRunRef{})
 }
 
 // getDAGRunInfo extracts and validates dag-run ID and references from command flags.
@@ -349,47 +404,115 @@ func determineRootDAGRun(isSubDAGRun bool, rootDAGRun string, dag *core.DAG, dag
 	return exec.NewDAGRunRef(dag.Name, dagRunID), nil
 }
 
+func loadStartStatusSeed(
+	ctx *Context,
+	dagName string,
+	dagRunID string,
+	root exec.DAGRunRef,
+	isSubDAGRun bool,
+	workerID string,
+	queuedRun bool,
+) (*exec.DAGRunStatus, error) {
+	ref := exec.NewDAGRunRef(dagName, dagRunID)
+
+	var (
+		attempt exec.DAGRunAttempt
+		err     error
+	)
+	if isSubDAGRun {
+		attempt, err = ctx.DAGRunStore.FindSubAttempt(ctx, root, dagRunID)
+	} else {
+		attempt, err = ctx.DAGRunStore.FindAttempt(ctx, ref)
+	}
+	if errors.Is(err, exec.ErrDAGRunIDNotFound) {
+		if queuedRun {
+			return nil, fmt.Errorf("queued start requires an existing dag-run ID %s for DAG %s", dagRunID, dagName)
+		}
+		if workerID != "local" {
+			return nil, fmt.Errorf("worker start requires an existing dag-run ID %s for DAG %s", dagRunID, dagName)
+		}
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to load existing dag-run %s: %w", ref.String(), err)
+	}
+
+	status, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read existing status for dag-run %s: %w", ref.String(), err)
+	}
+	if queuedRun && status.Status != core.Queued {
+		return nil, fmt.Errorf("queued start requires dag-run ID %s for DAG %s to be queued (status: %s)", dagRunID, dagName, status.Status)
+	}
+
+	return status, nil
+}
+
+func newStartExecutionRequest(
+	dag *core.DAG,
+	dagRunID string,
+	root exec.DAGRunRef,
+	workerID string,
+	triggerType core.TriggerType,
+	scheduledTime string,
+	reuseAttempt bool,
+	statusSeed *exec.DAGRunStatus,
+) startExecutionRequest {
+	return startExecutionRequest{
+		dag:      dag,
+		dagRunID: dagRunID,
+		root:     root,
+		workerID: workerID,
+		metadata: rt.StartMetadata{
+			TriggerType:   triggerType,
+			ScheduledTime: scheduledTime,
+			StatusSeed:    statusSeed,
+			ReuseAttempt:  workerID != "local" || reuseAttempt,
+		}.Normalized(),
+	}
+}
+
 // handleSubDAGRun processes a sub dag-run, checking for previous runs.
-func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string, root exec.DAGRunRef, parent exec.DAGRunRef, workerID string, triggerType core.TriggerType) error {
+func handleSubDAGRun(ctx *Context, req startExecutionRequest, params string, parent exec.DAGRunRef) error {
 	logger.Info(ctx, "Executing sub dag-run",
 		slog.String("params", params),
-		slog.Any("root", root),
+		slog.Any("root", req.root),
 		slog.Any("parent", parent),
-		slog.String("workerID", workerID),
+		slog.String("workerID", req.workerID),
 	)
 
-	if dagRunID == "" {
+	if req.dagRunID == "" {
 		return fmt.Errorf("dag-run ID must be provided for sub DAGrun")
 	}
 
 	// For distributed execution, the coordinator already created the sub-attempt record.
-	if workerID != "local" {
-		return executeDAGRun(ctx, dag, parent, dagRunID, root, workerID, triggerType)
+	if req.workerID != "local" {
+		return executeDAGRun(ctx, req, parent)
 	}
 
 	logger.Debug(ctx, "Checking for previous sub dag-run with the dag-run ID")
 
-	subAttempt, err := ctx.DAGRunStore.FindSubAttempt(ctx, root, dagRunID)
+	subAttempt, err := ctx.DAGRunStore.FindSubAttempt(ctx, req.root, req.dagRunID)
 	if errors.Is(err, exec.ErrDAGRunIDNotFound) {
-		return executeDAGRun(ctx, dag, parent, dagRunID, root, workerID, triggerType)
+		return executeDAGRun(ctx, req, parent)
 	}
 	if err != nil {
-		return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRunID, err)
+		return fmt.Errorf("failed to find the record for dag-run ID %s: %w", req.dagRunID, err)
 	}
 
 	status, err := subAttempt.ReadStatus(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to read previous run status for dag-run ID %s: %w", dagRunID, err)
+		return fmt.Errorf("failed to read previous run status for dag-run ID %s: %w", req.dagRunID, err)
 	}
 
-	return executeRetry(ctx, dag, status, root, "", workerID)
+	return executeRetry(ctx, req.dag, status, req.root, "", req.workerID)
 }
 
 // executeDAGRun initializes execution state for a DAG run and invokes the shared agent executor.
-func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID string, root exec.DAGRunRef, workerID string, triggerType core.TriggerType) error {
-	logFile, err := ctx.OpenLogFile(d, dagRunID)
+func executeDAGRun(ctx *Context, req startExecutionRequest, parent exec.DAGRunRef) error {
+	logFile, err := ctx.OpenLogFile(req.dag, req.dagRunID)
 	if err != nil {
-		return fmt.Errorf("failed to initialize log file for DAG %s: %w", d.Name, err)
+		return fmt.Errorf("failed to initialize log file for DAG %s: %w", req.dag.Name, err)
 	}
 	defer func() {
 		_ = logFile.Close()
@@ -398,21 +521,18 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 	logger.Debug(ctx, "Dag-run initiated", tag.File(logFile.Name()))
 
 	dr, err := ctx.dagStore(dagStoreConfig{
-		SearchPaths:           []string{filepath.Dir(d.Location)},
-		SkipDirectoryCreation: workerID != "local",
+		SearchPaths:           []string{filepath.Dir(req.dag.Location)},
+		SkipDirectoryCreation: req.workerID != "local",
 	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	// When running on a worker, the dag-run was already created by the coordinator.
-	queuedRun := workerID != "local"
-
 	as := ctx.agentStores()
 
 	agentInstance := agent.New(
-		dagRunID,
-		d,
+		req.dagRunID,
+		req.dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
 		ctx.DAGRunMgr,
@@ -420,13 +540,15 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 		agent.Options{
 			ParentDAGRun:            parent,
 			ProgressDisplay:         shouldEnableProgress(ctx),
-			WorkerID:                workerID,
-			QueuedRun:               queuedRun,
+			WorkerID:                req.workerID,
+			QueuedRun:               req.metadata.ReuseAttempt,
 			DAGRunStore:             ctx.DAGRunStore,
 			ServiceRegistry:         ctx.ServiceRegistry,
-			RootDAGRun:              root,
+			RootDAGRun:              req.root,
 			PeerConfig:              ctx.Config.Core.Peer,
-			TriggerType:             triggerType,
+			TriggerType:             req.metadata.TriggerType,
+			ScheduledTime:           req.metadata.ScheduledTime,
+			StatusSeed:              req.metadata.StatusSeed,
 			DefaultExecMode:         ctx.Config.DefaultExecMode,
 			AgentConfigStore:        as.ConfigStore,
 			AgentModelStore:         as.ModelStore,
@@ -437,11 +559,11 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 		},
 	)
 
-	return ExecuteAgent(ctx, agentInstance, d, dagRunID, logFile)
+	return ExecuteAgent(ctx, agentInstance, req.dag, req.dagRunID, logFile)
 }
 
 // dispatchToCoordinatorAndWait dispatches a DAG to coordinator and waits for completion.
-func dispatchToCoordinatorAndWait(ctx *Context, d *core.DAG, dagRunID string, coordinatorCli coordinator.Client) error {
+func dispatchToCoordinatorAndWait(ctx *Context, req startExecutionRequest, coordinatorCli coordinator.Client) error {
 	signalCtx, stop := signal.NotifyContext(ctx.Context, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	signalAwareCtx := ctx.WithContext(signalCtx)
@@ -449,7 +571,7 @@ func dispatchToCoordinatorAndWait(ctx *Context, d *core.DAG, dagRunID string, co
 	showProgress := shouldEnableProgress(ctx)
 	var progress *RemoteProgressDisplay
 	if showProgress {
-		progress = NewRemoteProgressDisplay(d, dagRunID)
+		progress = NewRemoteProgressDisplay(req.dag, req.dagRunID)
 		progress.Start()
 	}
 
@@ -463,22 +585,31 @@ func dispatchToCoordinatorAndWait(ctx *Context, d *core.DAG, dagRunID string, co
 	}()
 
 	logger.Info(ctx, "Dispatching DAG for distributed execution",
-		slog.Any("worker-selector", d.WorkerSelector),
+		slog.Any("worker-selector", req.dag.WorkerSelector),
 	)
 
 	var taskOpts []executor.TaskOption
-	if len(d.WorkerSelector) > 0 {
-		taskOpts = append(taskOpts, executor.WithWorkerSelector(d.WorkerSelector))
+	if len(req.dag.WorkerSelector) > 0 {
+		taskOpts = append(taskOpts, executor.WithWorkerSelector(req.dag.WorkerSelector))
 	}
-	if len(d.Tags) > 0 {
-		taskOpts = append(taskOpts, executor.WithTags(strings.Join(d.Tags.Strings(), ",")))
+	if len(req.dag.Tags) > 0 {
+		taskOpts = append(taskOpts, executor.WithTags(strings.Join(req.dag.Tags.Strings(), ",")))
+	}
+	if req.metadata.TriggerType != core.TriggerTypeUnknown {
+		taskOpts = append(taskOpts, executor.WithTaskTriggerType(req.metadata.TriggerType.String()))
+	}
+	if req.metadata.ScheduledTime != "" {
+		taskOpts = append(taskOpts, executor.WithTaskScheduledTime(req.metadata.ScheduledTime))
+	}
+	if req.metadata.StatusSeed != nil {
+		taskOpts = append(taskOpts, executor.WithPreviousStatus(req.metadata.StatusSeed))
 	}
 
 	task := executor.CreateTask(
-		d.Name,
-		string(d.YamlData),
+		req.dag.Name,
+		string(req.dag.YamlData),
 		coordinatorv1.Operation_OPERATION_START,
-		dagRunID,
+		req.dagRunID,
 		taskOpts...,
 	)
 
@@ -487,11 +618,11 @@ func dispatchToCoordinatorAndWait(ctx *Context, d *core.DAG, dagRunID string, co
 	}
 
 	logger.Info(ctx, "DAG dispatched to coordinator; awaiting completion")
-	err := waitForDAGCompletionWithProgress(signalAwareCtx, d, dagRunID, coordinatorCli, progress)
+	err := waitForDAGCompletionWithProgress(signalAwareCtx, req.dag, req.dagRunID, coordinatorCli, progress)
 
 	// If context was cancelled (e.g., Ctrl+C), request cancellation on coordinator
 	if signalCtx.Err() != nil {
-		return handleDistributedCancellation(ctx, d, dagRunID, coordinatorCli, progress, err)
+		return handleDistributedCancellation(ctx, req.dag, req.dagRunID, coordinatorCli, progress, err)
 	}
 
 	return err

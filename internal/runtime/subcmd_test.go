@@ -95,9 +95,12 @@ func TestStart(t *testing.T) {
 	t.Run("StartWithAllOptions", func(t *testing.T) {
 		t.Parallel()
 		opts := runtime.StartOptions{
-			Params:   "env=prod",
-			Quiet:    true,
-			DAGRunID: "full-test-id",
+			Params:        "env=prod",
+			Quiet:         true,
+			DAGRunID:      "full-test-id",
+			TriggerType:   core.TriggerTypeScheduler.String(),
+			ScheduledTime: "2026-03-12T00:00:00Z",
+			QueuedRun:     true,
 		}
 		spec := builder.Start(dag, opts)
 
@@ -106,6 +109,9 @@ func TestStart(t *testing.T) {
 		assert.Contains(t, spec.Args, `"env=prod"`)
 		assert.Contains(t, spec.Args, "-q")
 		assert.Contains(t, spec.Args, "--run-id=full-test-id")
+		assert.Contains(t, spec.Args, "--trigger-type=scheduler")
+		assert.Contains(t, spec.Args, "--scheduled-time=2026-03-12T00:00:00Z")
+		assert.Contains(t, spec.Args, "--queued-run")
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/path/to/dag.yaml")
 	})
@@ -454,6 +460,21 @@ func TestTaskStart(t *testing.T) {
 
 		assert.Contains(t, spec.Args, "--")
 		assert.Contains(t, spec.Args, "env=production")
+	})
+
+	t.Run("TaskStartWithSchedulingMetadata", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			DagRunId:       "task-run-id",
+			Target:         "/path/to/task.yaml",
+			TriggerType:    core.TriggerTypeCatchUp.String(),
+			ScheduledTime:  "2026-03-12T00:00:00Z",
+			RootDagRunName: "task-dag",
+		}
+		spec := builder.TaskStart(task)
+
+		assert.Contains(t, spec.Args, "--trigger-type=catchup")
+		assert.Contains(t, spec.Args, "--scheduled-time=2026-03-12T00:00:00Z")
 	})
 
 	t.Run("TaskStartWithRootOnly", func(t *testing.T) {

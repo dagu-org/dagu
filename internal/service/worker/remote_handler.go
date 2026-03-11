@@ -78,6 +78,18 @@ type remoteTaskHandler struct {
 	config            *config.Config
 }
 
+type remoteExecutionRequest struct {
+	dag          *core.DAG
+	dagRunID     string
+	attemptID    string
+	root         exec.DAGRunRef
+	parent       exec.DAGRunRef
+	statusPusher *remote.StatusPusher
+	logStreamer  *remote.LogStreamer
+	metadata     runtime.StartMetadata
+	retry        *retryConfig
+}
+
 // Handle executes a task in-process with remote status/log streaming
 func (h *remoteTaskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) error {
 	logger.Info(ctx, "Executing remote task",
@@ -115,7 +127,21 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
 
-	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, root, parent, statusPusher, logStreamer, queuedRun, nil)
+	metadata, err := startMetadataFromTask(task, queuedRun)
+	if err != nil {
+		return err
+	}
+
+	return h.executeDAGRun(ctx, remoteExecutionRequest{
+		dag:          dag,
+		dagRunID:     task.DagRunId,
+		attemptID:    task.AttemptId,
+		root:         root,
+		parent:       parent,
+		statusPusher: statusPusher,
+		logStreamer:  logStreamer,
+		metadata:     metadata,
+	})
 }
 
 func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1.Task) error {
@@ -144,9 +170,23 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
 
-	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, root, parent, statusPusher, logStreamer, false, &retryConfig{
-		target:   status,
-		stepName: task.Step,
+	return h.executeDAGRun(ctx, remoteExecutionRequest{
+		dag:          dag,
+		dagRunID:     task.DagRunId,
+		attemptID:    task.AttemptId,
+		root:         root,
+		parent:       parent,
+		statusPusher: statusPusher,
+		logStreamer:  logStreamer,
+		metadata: runtime.StartMetadata{
+			TriggerType:   core.TriggerTypeRetry,
+			ScheduledTime: status.ScheduledTime,
+			StatusSeed:    status,
+		}.Normalized(),
+		retry: &retryConfig{
+			target:   status,
+			stepName: task.Step,
+		},
 	})
 }
 
@@ -272,20 +312,9 @@ func (h *remoteTaskHandler) createAgentEnv(ctx context.Context, dagRunID string)
 	}, nil
 }
 
-func (h *remoteTaskHandler) executeDAGRun(
-	ctx context.Context,
-	dag *core.DAG,
-	dagRunID string,
-	attemptID string,
-	root exec.DAGRunRef,
-	parent exec.DAGRunRef,
-	statusPusher *remote.StatusPusher,
-	logStreamer *remote.LogStreamer,
-	queuedRun bool,
-	retry *retryConfig,
-) error {
+func (h *remoteTaskHandler) executeDAGRun(ctx context.Context, req remoteExecutionRequest) error {
 	// Create temporary directory for local operations
-	env, err := h.createAgentEnv(ctx, dagRunID)
+	env, err := h.createAgentEnv(ctx, req.dagRunID)
 	if err != nil {
 		return err
 	}
@@ -305,8 +334,8 @@ func (h *remoteTaskHandler) executeDAGRun(
 	// Create a writer that writes to both local file AND streams to coordinator in real-time.
 	// This enables viewing scheduler logs while the DAG is still running.
 	var logWriter io.Writer = logFile
-	if logStreamer != nil {
-		streamingWriter := logStreamer.NewSchedulerLogWriter(ctx, logFile)
+	if req.logStreamer != nil {
+		streamingWriter := req.logStreamer.NewSchedulerLogWriter(ctx, logFile)
 		defer func() {
 			if closeErr := streamingWriter.Close(); closeErr != nil {
 				logger.Warn(ctx, "Failed to close scheduler log streamer", tag.Error(closeErr))
@@ -323,16 +352,19 @@ func (h *remoteTaskHandler) executeDAGRun(
 
 	// Build agent options
 	opts := rtagent.Options{
-		ParentDAGRun:     parent,
+		ParentDAGRun:     req.parent,
 		WorkerID:         h.workerID,
-		StatusPusher:     statusPusher,
-		LogWriterFactory: logStreamer,
-		QueuedRun:        queuedRun,
-		AttemptID:        attemptID,
+		StatusPusher:     req.statusPusher,
+		LogWriterFactory: req.logStreamer,
+		QueuedRun:        req.metadata.ReuseAttempt,
+		AttemptID:        req.attemptID,
 		DAGRunStore:      h.dagRunStore,
 		ServiceRegistry:  h.serviceRegistry,
-		RootDAGRun:       root,
+		RootDAGRun:       req.root,
 		PeerConfig:       h.peerConfig,
+		TriggerType:      req.metadata.TriggerType,
+		ScheduledTime:    req.metadata.ScheduledTime,
+		StatusSeed:       req.metadata.StatusSeed,
 		DefaultExecMode:  h.config.DefaultExecMode,
 		AgentConfigStore: agentConfigStore,
 		AgentModelStore:  agentModelStore,
@@ -340,15 +372,15 @@ func (h *remoteTaskHandler) executeDAGRun(
 	}
 
 	// Add retry configuration if present
-	if retry != nil {
-		opts.RetryTarget = retry.target
-		opts.StepRetry = retry.stepName
+	if req.retry != nil {
+		opts.RetryTarget = req.retry.target
+		opts.StepRetry = req.retry.stepName
 	}
 
 	// Create the agent
 	agentInstance := rtagent.New(
-		dagRunID,
-		dag,
+		req.dagRunID,
+		req.dag,
 		env.logDir,
 		env.logFile,
 		h.dagRunMgr,
@@ -359,13 +391,45 @@ func (h *remoteTaskHandler) executeDAGRun(
 	// Run the agent
 	if err := agentInstance.Run(ctx); err != nil {
 		logger.Error(ctx, "DAG execution failed",
-			tag.RunID(dagRunID),
+			tag.RunID(req.dagRunID),
 			tag.Error(err))
 		return err
 	}
 
 	logger.Info(ctx, "DAG execution completed",
-		tag.RunID(dagRunID))
+		tag.RunID(req.dagRunID))
 
 	return nil
+}
+
+func statusSeedFromTask(task *coordinatorv1.Task) (*exec.DAGRunStatus, error) {
+	if task.PreviousStatus == nil {
+		return nil, nil
+	}
+
+	status, err := convert.ProtoToDAGRunStatus(task.PreviousStatus)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert previous status: %w", err)
+	}
+
+	return status, nil
+}
+
+func startMetadataFromTask(task *coordinatorv1.Task, queuedRun bool) (runtime.StartMetadata, error) {
+	statusSeed, err := statusSeedFromTask(task)
+	if err != nil {
+		return runtime.StartMetadata{}, err
+	}
+
+	triggerType := core.TriggerTypeUnknown
+	if task.TriggerType != "" {
+		triggerType = core.ParseTriggerType(task.TriggerType)
+	}
+
+	return runtime.StartMetadata{
+		TriggerType:   triggerType,
+		ScheduledTime: task.ScheduledTime,
+		StatusSeed:    statusSeed,
+		ReuseAttempt:  queuedRun || task.AttemptId != "",
+	}.Normalized(), nil
 }

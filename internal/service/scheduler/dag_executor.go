@@ -36,7 +36,7 @@ import (
 //   - Ensures the job is tracked and can be retried if coordinator/workers are down
 //
 // 2. Queue Processing (from Scheduler queue handler):
-//   - Operation: OPERATION_RETRY (meaning "retry the dispatch", not "retry failed execution")
+//   - Operation: OPERATION_START for queued starts, OPERATION_RETRY for actual retries
 //   - Flow: Queue Handler → ExecuteDAG() → Dispatch to Coordinator
 //   - The item has already been persisted (was enqueued in step 1)
 //   - Directly dispatches to coordinator without enqueueing again
@@ -90,14 +90,15 @@ func (e *DAGExecutor) HandleJob(
 	operation coordinatorv1.Operation,
 	runID string,
 	triggerType core.TriggerType,
+	scheduledTime string,
 ) error {
 	// For distributed execution with START operation, enqueue for persistence
 	if e.shouldUseDistributedExecution(dag) && operation == coordinatorv1.Operation_OPERATION_START {
-		return e.EnqueueRun(ctx, dag, runID, triggerType, "")
+		return e.EnqueueRun(ctx, dag, runID, triggerType, scheduledTime)
 	}
 
 	// For all other cases (local execution or non-START operations), use ExecuteDAG
-	return e.ExecuteDAG(ctx, dag, operation, runID, nil, triggerType)
+	return e.ExecuteDAG(ctx, dag, operation, runID, nil, triggerType, scheduledTime)
 }
 
 // EnqueueRun persists a DAG run to the queue regardless of execution mode.
@@ -137,8 +138,8 @@ func (e *DAGExecutor) EnqueueRun(
 // For distributed execution: Creates a task and dispatches to coordinator
 // For local execution: Runs the DAG using the appropriate manager method
 //
-// Note: When called from the queue handler, operation is always OPERATION_RETRY,
-// which means "retry the dispatch", not "retry a failed execution".
+// Queue-backed starts dispatch as OPERATION_START with previousStatus pointing at the
+// queued attempt. Explicit retries use OPERATION_RETRY.
 func (e *DAGExecutor) ExecuteDAG(
 	ctx context.Context,
 	dag *core.DAG,
@@ -146,7 +147,12 @@ func (e *DAGExecutor) ExecuteDAG(
 	runID string,
 	previousStatus *exec.DAGRunStatus,
 	triggerType core.TriggerType,
+	scheduledTime string,
 ) error {
+	if scheduledTime == "" && previousStatus != nil {
+		scheduledTime = previousStatus.ScheduledTime
+	}
+
 	if e.shouldUseDistributedExecution(dag) {
 		// Distributed execution: dispatch to coordinator
 		opts := []executor.TaskOption{
@@ -155,10 +161,8 @@ func (e *DAGExecutor) ExecuteDAG(
 			executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, e.baseConfigPath)),
 			executor.WithTaskTriggerType(triggerType.String()),
 		}
-		// Carry scheduled time from the queued status to the task proto
-		// so the coordinator's initial status reflects it.
-		if previousStatus != nil && previousStatus.ScheduledTime != "" {
-			opts = append(opts, executor.WithTaskScheduledTime(previousStatus.ScheduledTime))
+		if scheduledTime != "" {
+			opts = append(opts, executor.WithTaskScheduledTime(scheduledTime))
 		}
 		task := executor.CreateTask(
 			dag.Name,
@@ -177,9 +181,11 @@ func (e *DAGExecutor) ExecuteDAG(
 
 	case coordinatorv1.Operation_OPERATION_START:
 		spec := e.subCmdBuilder.Start(dag, runtime.StartOptions{
-			DAGRunID:    runID,
-			Quiet:       true,
-			TriggerType: triggerType.String(),
+			DAGRunID:      runID,
+			Quiet:         true,
+			TriggerType:   triggerType.String(),
+			ScheduledTime: scheduledTime,
+			QueuedRun:     previousStatus != nil && previousStatus.Status == core.Queued,
 		})
 		return runtime.Start(ctx, spec)
 

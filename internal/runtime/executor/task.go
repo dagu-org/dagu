@@ -132,8 +132,8 @@ func ResolveBaseConfig(baseConfigData []byte, fallbackPath string) string {
 	return string(data)
 }
 
-// WithPreviousStatus sets the previous status for retry operations in shared-nothing mode.
-// When set, workers can retry without needing local DAGRunStore access.
+// WithPreviousStatus embeds prior status metadata for shared-nothing workers.
+// It is used for retries and for queued START tasks that need to preserve timing metadata.
 func WithPreviousStatus(status *exec.DAGRunStatus) TaskOption {
 	return func(task *coordinatorv1.Task) {
 		if status != nil {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/test"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEnqueueCommand(t *testing.T) {
@@ -57,4 +58,18 @@ steps:
 			th.RunCommand(t, cmd.Enqueue(), tc)
 		})
 	}
+}
+
+func TestEnqueueCommand_InvalidScheduledTime(t *testing.T) {
+	th := test.SetupCommand(t)
+	dag := th.DAG(t, `steps:
+  - name: "1"
+    command: "true"
+`)
+
+	err := th.RunCommandWithError(t, cmd.Enqueue(), test.CmdTest{
+		Args: []string{"enqueue", "--scheduled-time=not-a-time", dag.Location},
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid scheduled-time")
 }

@@ -77,9 +77,9 @@ func runEnqueue(ctx *Context, args []string) error {
 		return err
 	}
 
-	scheduledTime, err := ctx.StringParam("scheduled-time")
+	scheduledTime, err := parseScheduledTimeParam(ctx, "scheduled-time")
 	if err != nil {
-		return fmt.Errorf("failed to get scheduled-time: %w", err)
+		return err
 	}
 
 	return enqueueDAGRun(ctx, dag, runID, triggerType, scheduledTime)

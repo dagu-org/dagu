@@ -18,7 +18,6 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/dirlock"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
-	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -46,6 +45,7 @@ type Scheduler struct {
 	instanceID          string          // Unique instance identifier for service registry
 	queueProcessor      *QueueProcessor // Processor for queued DAG runs
 	planner             *TickPlanner    // Unified scheduling decision module
+	activeRunChecker    *activeRunChecker
 	stopOnce            sync.Once
 	lock                sync.Mutex
 	clock               Clock // Clock function for getting current time
@@ -85,6 +85,7 @@ func New(
 		cfg.Queues,
 	)
 	defaultClock := Clock(time.Now)
+	activeRunChecker := newActiveRunChecker(procStore, queueStore, dagRunStore, defaultClock)
 
 	// Resolve IsSuspended once at construction time and wire the event channel.
 	eventCh := make(chan DAGChangeEvent)
@@ -98,67 +99,30 @@ func New(
 		WatermarkStore:  watermarkStore,
 		IsSuspended:     isSuspended,
 		GetLatestStatus: drm.GetLatestStatus,
-		IsRunning: func(ctx context.Context, dag *core.DAG, triggerType core.TriggerType, scheduledTime time.Time) (bool, error) {
-			// Check 1: alive processes
-			count, err := procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
-			if err != nil {
-				return false, err
+		IsRunning:       activeRunChecker.IsRunning,
+		GenRunID:        drm.GenDAGRunID,
+		Dispatch: func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType, scheduledTime time.Time) error {
+			scheduledTimeStr := formatScheduledTime(scheduledTime)
+			if !cfg.Queues.Enabled {
+				return dagExecutor.ExecuteDAG(
+					ctx, dag,
+					coordinatorv1.Operation_OPERATION_START,
+					runID, nil, triggerType, scheduledTimeStr,
+				)
 			}
-			if count > 0 {
-				return true, nil
-			}
-
-			// Check 2: queued runs — only scheduler/catchup triggers.
-			// Manual/webhook triggers must not block scheduler decisions.
-			now := time.Now()
-			statuses, err := dagRunStore.ListStatuses(ctx,
-				exec.WithExactName(dag.Name),
-				exec.WithStatuses([]core.Status{core.Queued}),
-				exec.WithFrom(exec.NewUTC(now.Add(-24*time.Hour))),
-			)
-			if err != nil {
-				return false, fmt.Errorf("failed to check queued runs: %w", err)
-			}
-			for _, st := range statuses {
-				// Filter: only scheduler/catchup triggers block scheduler decisions
-				if st.TriggerType != core.TriggerTypeScheduler &&
-					st.TriggerType != core.TriggerTypeCatchUp {
-					continue
-				}
-				// Staleness guard: if ScheduledTime is set and is more than 24h
-				// before now, the item is stuck — skip it. The zombie detector
-				// should clean these up, but this prevents permanent blocking.
-				if st.ScheduledTime != "" {
-					if parsed, err := stringutil.ParseTime(st.ScheduledTime); err == nil {
-						if parsed.Before(now.Add(-24 * time.Hour)) {
-							continue
-						}
-					}
-				}
-				return true, nil
-			}
-			return false, nil
-		},
-		GenRunID: drm.GenDAGRunID,
-		Dispatch: func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error {
 			return dagExecutor.HandleJob(
 				ctx, dag,
 				coordinatorv1.Operation_OPERATION_START,
-				runID, triggerType,
+				runID, triggerType, scheduledTimeStr,
 			)
 		},
 		Enqueue: func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType, scheduledTime time.Time) error {
-			scheduledTimeStr := ""
-			if !scheduledTime.IsZero() {
-				scheduledTimeStr = scheduledTime.Format(time.RFC3339)
-			}
-			// When queues are disabled, fall back to direct dispatch so
-			// catchup runs are not stuck forever retrying enqueue.
+			scheduledTimeStr := formatScheduledTime(scheduledTime)
 			if !cfg.Queues.Enabled {
-				return dagExecutor.HandleJob(
+				return dagExecutor.ExecuteDAG(
 					ctx, dag,
 					coordinatorv1.Operation_OPERATION_START,
-					runID, triggerType,
+					runID, nil, triggerType, scheduledTimeStr,
 				)
 			}
 			return dagExecutor.EnqueueRun(ctx, dag, runID, triggerType, scheduledTimeStr)
@@ -175,19 +139,20 @@ func New(
 	})
 
 	return &Scheduler{
-		quit:            make(chan any),
-		entryReader:     er,
-		dagRunStore:     dagRunStore,
-		queueStore:      queueStore,
-		procStore:       procStore,
-		config:          cfg,
-		dirLock:         dirLock,
-		dagExecutor:     dagExecutor,
-		healthServer:    healthServer,
-		serviceRegistry: reg,
-		queueProcessor:  processor,
-		planner:         planner,
-		clock:           defaultClock,
+		quit:             make(chan any),
+		entryReader:      er,
+		dagRunStore:      dagRunStore,
+		queueStore:       queueStore,
+		procStore:        procStore,
+		config:           cfg,
+		dirLock:          dirLock,
+		dagExecutor:      dagExecutor,
+		healthServer:     healthServer,
+		serviceRegistry:  reg,
+		queueProcessor:   processor,
+		planner:          planner,
+		activeRunChecker: activeRunChecker,
+		clock:            defaultClock,
 	}, nil
 }
 
@@ -196,6 +161,14 @@ func New(
 func (s *Scheduler) SetClock(clock Clock) {
 	s.clock = clock
 	s.planner.cfg.Clock = clock
+	s.activeRunChecker.SetClock(clock)
+}
+
+func formatScheduledTime(scheduledTime time.Time) string {
+	if scheduledTime.IsZero() {
+		return ""
+	}
+	return scheduledTime.Format(time.RFC3339)
 }
 
 // SetRestartFunc overrides the planner's restart function for testing purposes.

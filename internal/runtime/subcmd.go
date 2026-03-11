@@ -118,6 +118,12 @@ func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	if opts.TriggerType != "" {
 		args = append(args, fmt.Sprintf("--trigger-type=%s", opts.TriggerType))
 	}
+	if opts.ScheduledTime != "" {
+		args = append(args, fmt.Sprintf("--scheduled-time=%s", opts.ScheduledTime))
+	}
+	if opts.QueuedRun {
+		args = append(args, "--queued-run")
+	}
 	if opts.Tags != "" {
 		args = append(args, fmt.Sprintf("--tags=%s", opts.Tags))
 	}
@@ -267,6 +273,9 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 	if task.TriggerType != "" {
 		args = append(args, fmt.Sprintf("--trigger-type=%s", task.TriggerType))
 	}
+	if task.ScheduledTime != "" {
+		args = append(args, fmt.Sprintf("--scheduled-time=%s", task.ScheduledTime))
+	}
 
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
@@ -326,11 +335,13 @@ type StartOptions struct {
 	Quiet    bool   // Whether to run in quiet mode
 	DAGRunID string // ID for the dag-run
 
-	NameOverride string // Optional DAG name override
-	FromRunID    string // Historic dag-run ID to use as a template
-	Target       string // Optional CLI argument override (DAG name or file path)
-	TriggerType  string // How this DAG run was initiated (scheduler, manual, webhook, subdag)
-	Tags         string // Additional tags (comma-separated)
+	NameOverride  string // Optional DAG name override
+	FromRunID     string // Historic dag-run ID to use as a template
+	Target        string // Optional CLI argument override (DAG name or file path)
+	TriggerType   string // How this DAG run was initiated (scheduler, manual, webhook, subdag)
+	ScheduledTime string // Scheduled execution time (RFC3339)
+	QueuedRun     bool   // Reuse an existing queued/coordinator-created attempt
+	Tags          string // Additional tags (comma-separated)
 }
 
 // EnqueueOptions contains options for enqueuing a dag-run.

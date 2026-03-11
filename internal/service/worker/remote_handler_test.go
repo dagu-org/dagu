@@ -17,6 +17,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/proto/convert"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/remote"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/test"
@@ -984,6 +985,31 @@ func TestHandle_OperationRetryWithStep(t *testing.T) {
 	require.Contains(t, err.Error(), "retry requires previous_status in task for shared-nothing mode")
 }
 
+func TestStartMetadataFromTask(t *testing.T) {
+	t.Parallel()
+
+	protoStatus, err := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+		Status:        core.Queued,
+		TriggerType:   core.TriggerTypeScheduler,
+		QueuedAt:      "2026-03-12T00:00:00Z",
+		ScheduledTime: "2026-03-12T00:01:00Z",
+	})
+	require.NoError(t, err)
+
+	metadata, err := startMetadataFromTask(&coordinatorv1.Task{
+		AttemptId:      "attempt-1",
+		TriggerType:    core.TriggerTypeCatchUp.String(),
+		ScheduledTime:  "",
+		PreviousStatus: protoStatus,
+	}, false)
+	require.NoError(t, err)
+	require.Equal(t, core.TriggerTypeCatchUp, metadata.TriggerType)
+	require.Equal(t, "2026-03-12T00:01:00Z", metadata.ScheduledTime)
+	require.NotNil(t, metadata.StatusSeed)
+	require.Equal(t, core.Queued, metadata.StatusSeed.Status)
+	require.True(t, metadata.ReuseAttempt)
+}
+
 func TestHandleStart_SuccessPathWithCleanup(t *testing.T) {
 	t.Parallel()
 
@@ -1313,7 +1339,17 @@ steps:
 	statusPusher, logStreamer := handler.createRemoteHandlers("run-error", dag.Name, root)
 
 	// Call executeDAGRun directly - should fail at createAgentEnv
-	err := handler.executeDAGRun(context.Background(), dag, "run-error", "", root, parent, statusPusher, logStreamer, false, nil)
+	err := handler.executeDAGRun(context.Background(), remoteExecutionRequest{
+		dag:          dag,
+		dagRunID:     "run-error",
+		root:         root,
+		parent:       parent,
+		statusPusher: statusPusher,
+		logStreamer:  logStreamer,
+		metadata: runtime.StartMetadata{
+			TriggerType: core.TriggerTypeUnknown,
+		},
+	})
 
 	// On systems where null byte in path fails, we should get an error
 	if err != nil {
@@ -1357,7 +1393,17 @@ steps:
 
 	// Call executeDAGRun - this should succeed and log completion
 	// For top-level runs, pass empty parent and ensure root matches dagRunID
-	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", root, exec.DAGRunRef{}, statusPusher, logStreamer, false, nil)
+	err := handler.executeDAGRun(th.Context, remoteExecutionRequest{
+		dag:          dag.DAG,
+		dagRunID:     dagRunID,
+		root:         root,
+		parent:       exec.DAGRunRef{},
+		statusPusher: statusPusher,
+		logStreamer:  logStreamer,
+		metadata: runtime.StartMetadata{
+			TriggerType: core.TriggerTypeUnknown,
+		},
+	})
 
 	// Should succeed for simple echo command
 	require.NoError(t, err, "executeDAGRun should succeed for simple echo command")

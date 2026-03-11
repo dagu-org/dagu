@@ -917,14 +917,15 @@ func (a *API) ensureDAGRunIDUnique(ctx context.Context, dag *core.DAG, dagRunID 
 }
 
 type startDAGRunOptions struct {
-	params       string
-	dagRunID     string
-	nameOverride string
-	singleton    bool
-	fromRunID    string
-	target       string
-	triggerType  core.TriggerType
-	tags         string
+	params        string
+	dagRunID      string
+	nameOverride  string
+	singleton     bool
+	fromRunID     string
+	target        string
+	triggerType   core.TriggerType
+	scheduledTime string
+	tags          string
 }
 
 // waitForDAGStatusChange waits until the DAG status transitions from NotStarted.
@@ -950,13 +951,27 @@ func (a *API) waitForDAGStatusChange(ctx context.Context, dag *core.DAG, dagRunI
 
 // dispatchStartToCoordinator dispatches a DAG start operation to the coordinator
 // and waits for the DAG status to change from NotStarted within the given timeout.
-func (a *API) dispatchStartToCoordinator(ctx context.Context, dag *core.DAG, dagRunID string, timeout time.Duration, tags string) error {
+func (a *API) dispatchStartToCoordinator(
+	ctx context.Context,
+	dag *core.DAG,
+	dagRunID string,
+	timeout time.Duration,
+	triggerType core.TriggerType,
+	scheduledTime string,
+	tags string,
+) error {
 	var taskOpts []executor.TaskOption
 	if len(dag.WorkerSelector) > 0 {
 		taskOpts = append(taskOpts, executor.WithWorkerSelector(dag.WorkerSelector))
 	}
 	if tags != "" {
 		taskOpts = append(taskOpts, executor.WithTags(tags))
+	}
+	if triggerType != core.TriggerTypeUnknown {
+		taskOpts = append(taskOpts, executor.WithTaskTriggerType(triggerType.String()))
+	}
+	if scheduledTime != "" {
+		taskOpts = append(taskOpts, executor.WithTaskScheduledTime(scheduledTime))
 	}
 	taskOpts = append(taskOpts, executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, a.config.Paths.BaseConfig)))
 
@@ -1000,7 +1015,7 @@ func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts st
 		if osrt.GOOS == "windows" {
 			timeout = 10 * time.Second
 		}
-		return a.dispatchStartToCoordinator(ctx, dag, opts.dagRunID, timeout, opts.tags)
+		return a.dispatchStartToCoordinator(ctx, dag, opts.dagRunID, timeout, opts.triggerType, opts.scheduledTime, opts.tags)
 	}
 
 	// Only pass trigger type if it's a known value (not TriggerTypeUnknown)
@@ -1009,14 +1024,15 @@ func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts st
 		triggerTypeStr = opts.triggerType.String()
 	}
 	spec := a.subCmdBuilder.Start(dag, runtime.StartOptions{
-		Params:       opts.params,
-		DAGRunID:     opts.dagRunID,
-		Quiet:        true,
-		NameOverride: opts.nameOverride,
-		FromRunID:    opts.fromRunID,
-		Target:       opts.target,
-		TriggerType:  triggerTypeStr,
-		Tags:         opts.tags,
+		Params:        opts.params,
+		DAGRunID:      opts.dagRunID,
+		Quiet:         true,
+		NameOverride:  opts.nameOverride,
+		FromRunID:     opts.fromRunID,
+		Target:        opts.target,
+		TriggerType:   triggerTypeStr,
+		ScheduledTime: opts.scheduledTime,
+		Tags:          opts.tags,
 	})
 
 	if err := runtime.Start(ctx, spec); err != nil {

@@ -143,6 +143,12 @@ type Agent struct {
 	// triggerType indicates how this DAG run was initiated.
 	triggerType core.TriggerType
 
+	// scheduledTime is the scheduler-assigned time for this run, if any.
+	scheduledTime string
+
+	// statusSeed carries metadata from an existing queued/coordinator-created attempt.
+	statusSeed *exec.DAGRunStatus
+
 	// defaultExecMode is the server-level default execution mode.
 	defaultExecMode config.ExecutionMode
 
@@ -224,10 +230,8 @@ type Options struct {
 	// LogWriterFactory is used to create log writers for step output.
 	// When nil, logs are written to local filesystem.
 	LogWriterFactory exec.LogWriterFactory
-	// QueuedRun indicates this execution is from a queued item.
-	// When true, the agent will find the existing dag-run (created by enqueue)
-	// instead of creating a new one. This is used for distributed execution
-	// where the dag-run directory was already created by the scheduler.
+	// QueuedRun indicates this execution should reuse an existing attempt.
+	// This is used for queued starts and coordinator-created start attempts.
 	QueuedRun bool
 	// AttemptID is the attempt ID from the coordinator.
 	// When set, the agent creates an attempt with this ID instead of generating a new one.
@@ -242,6 +246,10 @@ type Options struct {
 	PeerConfig config.Peer
 	// TriggerType indicates how this DAG run was initiated.
 	TriggerType core.TriggerType
+	// ScheduledTime is the scheduler-assigned time for this run, if any.
+	ScheduledTime string
+	// StatusSeed carries metadata from an existing queued/coordinator-created attempt.
+	StatusSeed *exec.DAGRunStatus
 	// DefaultExecMode is the server-level default execution mode.
 	DefaultExecMode config.ExecutionMode
 	// AgentConfigStore is the agent config store for agent step execution.
@@ -268,6 +276,21 @@ func New(
 	ds exec.DAGStore,
 	opts Options,
 ) *Agent {
+	statusSeed := opts.StatusSeed
+	if statusSeed == nil && opts.RetryTarget != nil {
+		statusSeed = opts.RetryTarget
+	}
+
+	triggerType := opts.TriggerType
+	if triggerType == core.TriggerTypeUnknown && statusSeed != nil {
+		triggerType = statusSeed.TriggerType
+	}
+
+	scheduledTime := opts.ScheduledTime
+	if scheduledTime == "" && statusSeed != nil {
+		scheduledTime = statusSeed.ScheduledTime
+	}
+
 	a := &Agent{
 		rootDAGRun:              opts.RootDAGRun,
 		parentDAGRun:            opts.ParentDAGRun,
@@ -288,7 +311,9 @@ func New(
 		logWriterFactory:        opts.LogWriterFactory,
 		queuedRun:               opts.QueuedRun,
 		attemptID:               opts.AttemptID,
-		triggerType:             opts.TriggerType,
+		triggerType:             triggerType,
+		scheduledTime:           scheduledTime,
+		statusSeed:              statusSeed,
 		defaultExecMode:         opts.DefaultExecMode,
 		agentConfigStore:        opts.AgentConfigStore,
 		agentModelStore:         opts.AgentModelStore,
@@ -1029,12 +1054,14 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 
 	// Handle case where runner wasn't initialized (early failure in Run())
 	if a.runner == nil {
+		opts := []transform.StatusOption{
+			transform.WithAttemptID(a.dagRunAttemptID),
+			transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
+		}
+		opts = append(opts, a.metadataStatusOptions()...)
+
 		return transform.NewStatusBuilder(a.dag).
-			Create(a.dagRunID, core.Failed, os.Getpid(), time.Time{},
-				transform.WithAttemptID(a.dagRunAttemptID),
-				transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
-				transform.WithTriggerType(a.triggerType),
-			)
+			Create(a.dagRunID, core.Failed, os.Getpid(), time.Time{}, opts...)
 	}
 
 	runnerStatus := a.runner.Status(ctx, a.plan)
@@ -1059,16 +1086,8 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 		transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
 		transform.WithPreconditions(a.dag.Preconditions),
 		transform.WithWorkerID(a.workerID),
-		transform.WithTriggerType(a.triggerType),
 	}
-
-	// If the current execution is a retry, copy timing data from the retry target.
-	if a.retryTarget != nil {
-		opts = append(opts,
-			transform.WithQueuedAt(a.retryTarget.QueuedAt),
-			transform.WithCreatedAt(a.retryTarget.CreatedAt),
-		)
-	}
+	opts = append(opts, a.metadataStatusOptions()...)
 
 	// Create the status object to record the current status.
 	return transform.NewStatusBuilder(a.dag).
@@ -1102,6 +1121,30 @@ func (a *Agent) writeStatus(ctx context.Context, attempt exec.DAGRunAttempt, sta
 			logger.Error(ctx, "Failed to write status to local storage", tag.Error(err))
 		}
 	}
+}
+
+func (a *Agent) metadataStatusOptions() []transform.StatusOption {
+	opts := []transform.StatusOption{
+		transform.WithTriggerType(a.triggerType),
+	}
+
+	if a.statusSeed != nil {
+		if a.statusSeed.QueuedAt != "" {
+			opts = append(opts, transform.WithQueuedAt(a.statusSeed.QueuedAt))
+		}
+		if a.statusSeed.CreatedAt != 0 {
+			opts = append(opts, transform.WithCreatedAt(a.statusSeed.CreatedAt))
+		}
+		if a.statusSeed.ScheduledTime != "" {
+			opts = append(opts, transform.WithScheduledTime(a.statusSeed.ScheduledTime))
+		}
+	}
+
+	if a.scheduledTime != "" {
+		opts = append(opts, transform.WithScheduledTime(a.scheduledTime))
+	}
+
+	return opts
 }
 
 // watchCancelRequested is a goroutine that watches for cancel requests

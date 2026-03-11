@@ -1520,6 +1520,7 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 			executor.WithWorkerSelector(dag.WorkerSelector),
 			executor.WithPreviousStatus(prevStatus),
 			executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, a.config.Paths.BaseConfig)),
+			executor.WithTaskTriggerType(core.TriggerTypeRetry.String()),
 		}
 		if stepName != "" {
 			opts = append(opts, executor.WithStep(stepName))

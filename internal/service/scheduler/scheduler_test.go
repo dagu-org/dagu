@@ -81,7 +81,7 @@ func TestScheduler(t *testing.T) {
 		sc.SetClock(func() time.Time { return now })
 
 		var dispatchCount atomic.Int32
-		sc.SetDispatchFunc(func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		sc.SetDispatchFunc(func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			dispatchCount.Add(1)
 			return nil
 		})
@@ -260,7 +260,9 @@ func TestScheduler_GracefulShutdown(t *testing.T) {
 		t.Fatal("Stop() did not return within 5 seconds")
 	}
 
-	require.False(t, sc.IsRunning(), "scheduler should not be running after stop")
+	require.Eventually(t, func() bool {
+		return !sc.IsRunning()
+	}, 5*time.Second, 10*time.Millisecond, "scheduler should not be running after stop")
 
 	select {
 	case err := <-errCh:

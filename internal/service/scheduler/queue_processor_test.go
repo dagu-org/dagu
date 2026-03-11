@@ -20,6 +20,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
 	"github.com/dagu-org/dagu/internal/persis/filequeue"
 	"github.com/dagu-org/dagu/internal/runtime"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -143,6 +144,18 @@ func TestQueueProcessor_LocalQueueAlwaysFIFO(t *testing.T) {
 
 	// Verify maxConcurrency is STILL 1 (not updated to DAG's 5)
 	assert.Equal(t, 1, f.getQueue("local-dag").getMaxConcurrency(), "Local queue should always have maxConcurrency=1")
+}
+
+func TestQueuedOperation(t *testing.T) {
+	t.Parallel()
+
+	require.Equal(t, coordinatorv1.Operation_OPERATION_START, queuedOperation(&exec.DAGRunStatus{
+		TriggerType: core.TriggerTypeManual,
+	}))
+	require.Equal(t, coordinatorv1.Operation_OPERATION_RETRY, queuedOperation(&exec.DAGRunStatus{
+		TriggerType: core.TriggerTypeRetry,
+	}))
+	require.Equal(t, coordinatorv1.Operation_OPERATION_START, queuedOperation(nil))
 }
 
 func TestQueueProcessor_GlobalQueue(t *testing.T) {

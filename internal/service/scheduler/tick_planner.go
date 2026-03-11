@@ -47,7 +47,7 @@ type PlannedRun struct {
 }
 
 // DispatchFunc dispatches a scheduled run for the given DAG.
-type DispatchFunc func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error
+type DispatchFunc func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType, scheduledTime time.Time) error
 
 // EnqueueFunc persists a run to the queue. Used for catchup runs to ensure
 // persistence before advancing the watermark.
@@ -168,7 +168,7 @@ func NewTickPlanner(cfg TickPlannerConfig) *TickPlanner {
 		}
 	}
 	if cfg.Dispatch == nil {
-		cfg.Dispatch = func(context.Context, *core.DAG, string, core.TriggerType) error {
+		cfg.Dispatch = func(context.Context, *core.DAG, string, core.TriggerType, time.Time) error {
 			return fmt.Errorf("dispatch not configured")
 		}
 	}
@@ -341,11 +341,11 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 
 				running, err := tp.cfg.IsRunning(ctx, item.DAG, item.TriggerType, item.ScheduledTime)
 				if err != nil {
-					logger.Error(ctx, "Failed to check if DAG is running, assuming not running",
+					logger.Error(ctx, "Failed to check if DAG is running; keeping catchup pending",
 						tag.DAG(dagName),
 						tag.Error(err),
 					)
-					running = false
+					running = true
 				}
 
 				if !running {
@@ -497,8 +497,8 @@ func (tp *TickPlanner) shouldRun(ctx context.Context, dag *core.DAG, scheduledTi
 		return false
 	}
 
-	// Also check status-based running/queued (belt and suspenders)
-	if latestStatus.Status == core.Running || latestStatus.Status == core.Queued {
+	// Also check latest live status as a fallback for already-started runs.
+	if latestStatus.Status == core.Running {
 		return false
 	}
 
@@ -796,7 +796,7 @@ func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 	var err error
 	switch run.ScheduleType {
 	case ScheduleTypeStart:
-		err = tp.cfg.Dispatch(ctx, run.DAG, run.RunID, run.TriggerType)
+		err = tp.cfg.Dispatch(ctx, run.DAG, run.RunID, run.TriggerType, run.ScheduledTime)
 	case ScheduleTypeStop:
 		err = tp.cfg.Stop(ctx, run.DAG)
 	case ScheduleTypeRestart:
