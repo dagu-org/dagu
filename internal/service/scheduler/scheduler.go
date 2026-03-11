@@ -102,7 +102,17 @@ func New(
 			if err != nil {
 				return false, err
 			}
-			return count > 0, nil
+			if count > 0 {
+				return true, nil
+			}
+			// Check queue for pending items to close the enqueue→execution gap.
+			// Without this, Plan() would see IsRunning=false for items that are
+			// queued but not yet executing, breaking overlap policy enforcement.
+			items, err := queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
+			if err != nil {
+				return false, fmt.Errorf("failed to check queue: %w", err)
+			}
+			return len(items) > 0, nil
 		},
 		GenRunID: drm.GenDAGRunID,
 		Dispatch: func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error {
@@ -111,6 +121,9 @@ func New(
 				coordinatorv1.Operation_OPERATION_START,
 				runID, triggerType,
 			)
+		},
+		Enqueue: func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error {
+			return dagExecutor.EnqueueRun(ctx, dag, runID, triggerType)
 		},
 		Stop: func(ctx context.Context, dag *core.DAG) error {
 			return drm.Stop(ctx, dag, "")

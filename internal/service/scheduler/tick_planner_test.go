@@ -84,6 +84,9 @@ func newTestTickPlanner(store WatermarkStore) (*TickPlanner, chan DAGChangeEvent
 		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
 			return nil
 		},
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			return nil
+		},
 		GenRunID: func(_ context.Context) (string, error) {
 			return "test-run-id", nil
 		},
@@ -209,7 +212,33 @@ func TestTickPlanner_PlanCatchupDispatches(t *testing.T) {
 	store := &mockWatermarkStore{
 		state: newMockWatermarkState(time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)),
 	}
-	tp, _ := newTestTickPlanner(store)
+
+	// Track enqueued catchup runs
+	var enqueued []PlannedRun
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore: store,
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{}, nil
+		},
+		Enqueue: func(_ context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error {
+			enqueued = append(enqueued, PlannedRun{DAG: dag, RunID: runID, TriggerType: triggerType})
+			return nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "test-run-id", nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+		Events: eventCh,
+	})
 
 	dag := newHourlyCatchupDAG(t, "my-dag")
 	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
@@ -217,10 +246,11 @@ func TestTickPlanner_PlanCatchupDispatches(t *testing.T) {
 	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
 	runs := tp.Plan(context.Background(), now)
 
-	// Should have one catchup run (drains one per tick)
-	assert.Len(t, runs, 1)
-	assert.Equal(t, "my-dag", runs[0].DAG.Name)
-	assert.Equal(t, core.TriggerTypeCatchUp, runs[0].TriggerType)
+	// Catchup runs are enqueued synchronously in Plan() and NOT returned in candidates.
+	assert.Empty(t, runs, "catchup runs should not be in candidates")
+	require.Len(t, enqueued, 1, "one catchup run should be enqueued")
+	assert.Equal(t, "my-dag", enqueued[0].DAG.Name)
+	assert.Equal(t, core.TriggerTypeCatchUp, enqueued[0].TriggerType)
 }
 
 func TestTickPlanner_PlanCatchupSkipOverlap(t *testing.T) {
@@ -240,6 +270,9 @@ func TestTickPlanner_PlanCatchupSkipOverlap(t *testing.T) {
 			return exec.DAGRunStatus{}, nil
 		},
 		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			return nil
+		},
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
 			return nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -836,6 +869,7 @@ func TestTickPlanner_IsRunningErrorAssumesNotRunning(t *testing.T) {
 		state: newMockWatermarkState(time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)),
 	}
 
+	dispatchCalled := false
 	eventCh := make(chan DAGChangeEvent, 256)
 	tp := NewTickPlanner(TickPlannerConfig{
 		WatermarkStore: store,
@@ -844,6 +878,10 @@ func TestTickPlanner_IsRunningErrorAssumesNotRunning(t *testing.T) {
 		},
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{}, nil
+		},
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			dispatchCalled = true
+			return nil
 		},
 		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
 			return false, errors.New("proc store error")
@@ -863,8 +901,9 @@ func TestTickPlanner_IsRunningErrorAssumesNotRunning(t *testing.T) {
 	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
 	runs := tp.Plan(context.Background(), now)
 
-	// IsRunning error should be logged, assumed not running, and catchup dispatched
-	assert.Len(t, runs, 1, "should still dispatch catchup run when IsRunning returns error")
+	// IsRunning error should be logged, assumed not running, and catchup dispatched inline
+	assert.Empty(t, runs, "catchup runs are dispatched inline, not returned in candidates")
+	assert.True(t, dispatchCalled, "should still dispatch catchup run when IsRunning returns error")
 }
 
 func TestTickPlanner_GetLatestStatusErrorSkipsStop(t *testing.T) {
@@ -1060,6 +1099,12 @@ func TestTickPlanner_CatchupBlocksStopRestartSchedules(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{Status: core.Running}, nil
 		},
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			return nil
+		},
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			return nil
+		},
 		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
 			return false, nil
 		},
@@ -1085,9 +1130,9 @@ func TestTickPlanner_CatchupBlocksStopRestartSchedules(t *testing.T) {
 	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
 	runs := tp.Plan(context.Background(), now)
 
-	// Should only produce the catchup run, not stop/restart
-	require.Len(t, runs, 1, "catchup should block stop/restart schedules")
-	assert.Equal(t, core.TriggerTypeCatchUp, runs[0].TriggerType)
+	// Catchup runs are dispatched inline (not in candidates), but should
+	// still block stop/restart schedules
+	assert.Empty(t, runs, "catchup should block stop/restart schedules; catchup is dispatched inline")
 }
 
 func TestTickPlanner_ConcurrentPlanAndEvents(t *testing.T) {
@@ -1355,6 +1400,9 @@ func TestTickPlanner_PlanLatestNotRunning(t *testing.T) {
 		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
 			return nil
 		},
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			return nil
+		},
 		GenRunID: func(_ context.Context) (string, error) {
 			return "run-latest", nil
 		},
@@ -1378,11 +1426,8 @@ func TestTickPlanner_PlanLatestNotRunning(t *testing.T) {
 	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
 	runs := tp.Plan(context.Background(), now)
 
-	// Should dispatch exactly 1 run — the latest (12:00), not the oldest (10:00)
-	require.Len(t, runs, 1)
-	assert.Equal(t, time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC), runs[0].ScheduledTime,
-		"should dispatch the latest interval, not the oldest")
-	assert.Equal(t, core.TriggerTypeCatchUp, runs[0].TriggerType)
+	// Catchup runs are dispatched inline (not in candidates)
+	assert.Empty(t, runs, "catchup runs dispatched inline, not in candidates")
 
 	// Buffer should be empty after dispatch
 	_, bufExists := tp.buffers["latest-nr-dag"]
@@ -1545,6 +1590,9 @@ func TestTickPlanner_RecomputeBufferAfterPlanNoDuplicate(t *testing.T) {
 		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
 			return nil
 		},
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			return nil
+		},
 		GenRunID: func(_ context.Context) (string, error) {
 			return "run-1", nil
 		},
@@ -1565,13 +1613,11 @@ func TestTickPlanner_RecomputeBufferAfterPlanNoDuplicate(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, 2, buf.Len(), "expected 2 missed intervals (11:00 and 12:00)")
 
-	// Step 1: Plan() pops the first catchup item (11:00)
+	// Step 1: Plan() dispatches the first catchup item (11:00) synchronously
 	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
 	runs := tp.Plan(context.Background(), now)
-	require.Len(t, runs, 1)
-	assert.Equal(t, core.TriggerTypeCatchUp, runs[0].TriggerType)
-	hour11 := time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)
-	assert.Equal(t, hour11, runs[0].ScheduledTime)
+	// Catchup runs are no longer returned in candidates (dispatched inline)
+	assert.Empty(t, runs)
 
 	// Step 2: BEFORE Advance(), simulate a DAG update event.
 	// This is the exact race: Plan() released entryMu, Advance() hasn't
@@ -1603,6 +1649,7 @@ func TestTickPlanner_RecomputeBufferAfterPlanNoDuplicate(t *testing.T) {
 		"recomputed buffer should only contain 12:00; 11:00 was already dispatched")
 
 	// Double-check: no 11:00 in the buffer (the duplicate scenario)
+	hour11 := time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)
 	for _, st := range scheduledTimes {
 		assert.NotEqual(t, hour11, st,
 			"11:00 must not reappear — it was already dispatched by Plan()")
@@ -1634,6 +1681,9 @@ func TestTickPlanner_CatchupRetainedOnCreatePlannedRunFailure(t *testing.T) {
 			return exec.DAGRunStatus{}, nil
 		},
 		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			return nil
+		},
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
 			return nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -1675,16 +1725,177 @@ func TestTickPlanner_CatchupRetainedOnCreatePlannedRunFailure(t *testing.T) {
 	assert.Equal(t, lastTick, wm.LastScheduledTime,
 		"watermark should not advance when createPlannedRun fails")
 
-	// Now fix GenRunID and retry — should succeed
+	// Now fix GenRunID and retry — should succeed (dispatched inline, not in candidates)
 	genRunIDFails = false
 	runs = tp.Plan(context.Background(), now)
-	require.Len(t, runs, 1, "retry should produce a run")
-	assert.Equal(t, core.TriggerTypeCatchUp, runs[0].TriggerType)
-	hour11 := time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)
-	assert.Equal(t, hour11, runs[0].ScheduledTime)
+	assert.Empty(t, runs, "catchup runs are dispatched inline, not returned in candidates")
 
-	// Buffer should now have 1 remaining item
+	// Buffer should now have 1 remaining item (11:00 was dispatched)
 	buf, ok = tp.buffers["fail-dag"]
 	require.True(t, ok)
 	assert.Equal(t, 1, buf.Len(), "one item should remain after successful retry")
+}
+
+// TestTickPlanner_CatchupEnqueueFailureRetainsBuffer verifies that when Dispatch
+// (enqueue) fails for a catchup run, the item stays in the buffer and the watermark
+// is NOT advanced. On the next tick when enqueue succeeds, the buffer is popped
+// and the watermark is advanced.
+func TestTickPlanner_CatchupEnqueueFailureRetainsBuffer(t *testing.T) {
+	t.Parallel()
+
+	lastTick := time.Date(2026, 2, 7, 10, 0, 0, 0, time.UTC)
+	state := newMockWatermarkState(lastTick)
+	state.DAGs["enq-fail-dag"] = DAGWatermark{
+		LastScheduledTime: lastTick,
+	}
+	store := &mockWatermarkStore{state: state}
+
+	dispatchFails := true
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore: store,
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{}, nil
+		},
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+			if dispatchFails {
+				return errors.New("enqueue subprocess failed")
+			}
+			return nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "run-1", nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+		Events: eventCh,
+	})
+
+	dag := newHourlyCatchupDAG(t, "enq-fail-dag")
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	buf, ok := tp.buffers["enq-fail-dag"]
+	require.True(t, ok)
+	require.Equal(t, 2, buf.Len(), "expected 2 missed intervals (11:00 and 12:00)")
+
+	// Plan with Dispatch failing — buffer should be retained.
+	// The live schedule may still fire (catchup failure doesn't block live runs).
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	_ = tp.Plan(context.Background(), now)
+
+	// Item must still be in buffer (not popped)
+	buf, ok = tp.buffers["enq-fail-dag"]
+	require.True(t, ok, "buffer should still exist")
+	assert.Equal(t, 2, buf.Len(), "both items should remain in buffer after enqueue failure")
+
+	// Watermark must NOT have advanced past the original value
+	tp.mu.RLock()
+	wm := tp.watermarkState.DAGs["enq-fail-dag"]
+	tp.mu.RUnlock()
+	assert.Equal(t, lastTick, wm.LastScheduledTime,
+		"watermark should not advance when enqueue fails")
+
+	// Now fix Dispatch and retry — should succeed
+	dispatchFails = false
+	retryRuns := tp.Plan(context.Background(), now)
+	assert.Empty(t, retryRuns, "catchup runs dispatched inline, not in candidates")
+
+	// Buffer should now have 1 remaining item (11:00 was dispatched)
+	buf, ok = tp.buffers["enq-fail-dag"]
+	require.True(t, ok)
+	assert.Equal(t, 1, buf.Len(), "one item should remain after successful enqueue")
+
+	// Watermark should now be advanced to 11:00
+	tp.mu.RLock()
+	wm = tp.watermarkState.DAGs["enq-fail-dag"]
+	tp.mu.RUnlock()
+	hour11 := time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)
+	assert.Equal(t, hour11, wm.LastScheduledTime,
+		"watermark should advance after successful enqueue")
+}
+
+// TestTickPlanner_CatchupEnqueueSuccessAdvancesWatermark verifies that a successful
+// catchup enqueue advances the watermark and pops the buffer, and the catchup run
+// is NOT returned in the Plan() candidates (it's already in the queue).
+func TestTickPlanner_CatchupEnqueueSuccessAdvancesWatermark(t *testing.T) {
+	t.Parallel()
+
+	lastTick := time.Date(2026, 2, 7, 10, 0, 0, 0, time.UTC)
+	state := newMockWatermarkState(lastTick)
+	state.DAGs["enq-ok-dag"] = DAGWatermark{
+		LastScheduledTime: lastTick,
+	}
+	store := &mockWatermarkStore{state: state}
+
+	var dispatched []struct {
+		dagName     string
+		runID       string
+		triggerType core.TriggerType
+	}
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore: store,
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{}, nil
+		},
+		Enqueue: func(_ context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error {
+			dispatched = append(dispatched, struct {
+				dagName     string
+				runID       string
+				triggerType core.TriggerType
+			}{dagName: dag.Name, runID: runID, triggerType: triggerType})
+			return nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "run-1", nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+		Events: eventCh,
+	})
+
+	dag := newHourlyCatchupDAG(t, "enq-ok-dag")
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	buf, ok := tp.buffers["enq-ok-dag"]
+	require.True(t, ok)
+	require.Equal(t, 2, buf.Len(), "expected 2 missed intervals (11:00 and 12:00)")
+
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+
+	// Catchup runs should NOT be in candidates
+	assert.Empty(t, runs, "catchup runs are dispatched inline, not returned in candidates")
+
+	// But Dispatch should have been called
+	require.Len(t, dispatched, 1, "one catchup run should be dispatched")
+	assert.Equal(t, "enq-ok-dag", dispatched[0].dagName)
+	assert.Equal(t, core.TriggerTypeCatchUp, dispatched[0].triggerType)
+
+	// Buffer should have 1 remaining item (11:00 was popped)
+	buf, ok = tp.buffers["enq-ok-dag"]
+	require.True(t, ok)
+	assert.Equal(t, 1, buf.Len())
+
+	// Watermark should be advanced to 11:00
+	tp.mu.RLock()
+	wm := tp.watermarkState.DAGs["enq-ok-dag"]
+	tp.mu.RUnlock()
+	hour11 := time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)
+	assert.Equal(t, hour11, wm.LastScheduledTime,
+		"watermark should advance after successful enqueue")
 }

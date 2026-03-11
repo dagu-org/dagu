@@ -93,27 +93,39 @@ func (e *DAGExecutor) HandleJob(
 ) error {
 	// For distributed execution with START operation, enqueue for persistence
 	if e.shouldUseDistributedExecution(dag) && operation == coordinatorv1.Operation_OPERATION_START {
-		ctx = logger.WithValues(ctx,
-			tag.DAG(dag.Name),
-			tag.RunID(runID),
-		)
-
-		logger.Info(ctx, "Enqueueing DAG for distributed execution",
-			slog.Any("worker-selector", dag.WorkerSelector),
-		)
-
-		spec := e.subCmdBuilder.Enqueue(dag, runtime.EnqueueOptions{
-			DAGRunID:    runID,
-			TriggerType: triggerType.String(),
-		})
-		if err := runtime.Run(ctx, spec); err != nil {
-			return fmt.Errorf("failed to enqueue DAG run: %w", err)
-		}
-		return nil
+		return e.EnqueueRun(ctx, dag, runID, triggerType)
 	}
 
 	// For all other cases (local execution or non-START operations), use ExecuteDAG
 	return e.ExecuteDAG(ctx, dag, operation, runID, nil, triggerType)
+}
+
+// EnqueueRun persists a DAG run to the queue regardless of execution mode.
+// Used by the scheduler for catchup runs to guarantee persistence before
+// advancing the watermark.
+func (e *DAGExecutor) EnqueueRun(
+	ctx context.Context,
+	dag *core.DAG,
+	runID string,
+	triggerType core.TriggerType,
+) error {
+	ctx = logger.WithValues(ctx,
+		tag.DAG(dag.Name),
+		tag.RunID(runID),
+	)
+
+	logger.Info(ctx, "Enqueueing DAG run",
+		slog.Any("worker-selector", dag.WorkerSelector),
+	)
+
+	spec := e.subCmdBuilder.Enqueue(dag, runtime.EnqueueOptions{
+		DAGRunID:    runID,
+		TriggerType: triggerType.String(),
+	})
+	if err := runtime.Run(ctx, spec); err != nil {
+		return fmt.Errorf("failed to enqueue DAG run: %w", err)
+	}
+	return nil
 }
 
 // ExecuteDAG executes or dispatches an already-persisted DAG.

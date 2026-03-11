@@ -46,8 +46,12 @@ type PlannedRun struct {
 	ScheduleType  ScheduleType
 }
 
-// DispatchFunc dispatches a catch-up or scheduled run for the given DAG.
+// DispatchFunc dispatches a scheduled run for the given DAG.
 type DispatchFunc func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error
+
+// EnqueueFunc persists a run to the queue. Used for catchup runs to ensure
+// persistence before advancing the watermark.
+type EnqueueFunc func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error
 
 // RunIDFunc generates a unique run ID.
 type RunIDFunc func(ctx context.Context) (string, error)
@@ -75,6 +79,7 @@ type TickPlannerConfig struct {
 	IsRunning       IsRunningFunc
 	GenRunID        RunIDFunc
 	Dispatch        DispatchFunc
+	Enqueue         EnqueueFunc
 	Stop            StopFunc
 	Restart         RestartFunc
 	Clock           Clock
@@ -164,6 +169,11 @@ func NewTickPlanner(cfg TickPlannerConfig) *TickPlanner {
 	if cfg.Dispatch == nil {
 		cfg.Dispatch = func(context.Context, *core.DAG, string, core.TriggerType) error {
 			return fmt.Errorf("dispatch not configured")
+		}
+	}
+	if cfg.Enqueue == nil {
+		cfg.Enqueue = func(context.Context, *core.DAG, string, core.TriggerType) error {
+			return fmt.Errorf("enqueue not configured")
 		}
 	}
 	return &TickPlanner{
@@ -343,10 +353,18 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 					}
 					run, ok := tp.createPlannedRun(ctx, item.DAG, item.ScheduledTime, item.TriggerType)
 					if ok {
-						buf.Pop()
-						tp.advanceDAGWatermark(dagName, item.ScheduledTime)
-						candidates = append(candidates, run)
-						catchupProduced = true
+						// Enqueue synchronously; pop/advance only on success so
+						// failures retry on the next tick.
+						if err := tp.cfg.Enqueue(ctx, run.DAG, run.RunID, run.TriggerType); err != nil {
+							logger.Error(ctx, "Failed to enqueue catchup run",
+								tag.DAG(dagName),
+								tag.Error(err),
+							)
+						} else {
+							buf.Pop()
+							tp.advanceDAGWatermark(dagName, item.ScheduledTime)
+							catchupProduced = true
+						}
 					}
 				} else {
 					switch buf.overlapPolicy {
@@ -579,9 +597,8 @@ func (tp *TickPlanner) Advance(now time.Time) {
 		if run.ScheduleType != ScheduleTypeStart {
 			continue
 		}
-		if run.TriggerType == core.TriggerTypeCatchUp {
-			continue // watermark already advanced in Plan() under entryMu
-		}
+		// Note: catchup runs are dispatched inline in Plan() and never appear
+		// in lastPlanResult, so no TriggerTypeCatchUp guard is needed here.
 		tp.watermarkState.DAGs[run.DAG.Name] = DAGWatermark{
 			LastScheduledTime: run.ScheduledTime,
 		}
