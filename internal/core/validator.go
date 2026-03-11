@@ -12,7 +12,8 @@ import (
 // Constants for validation limits.
 const (
 	DAGNameMaxLen  = 40
-	maxStepNameLen = 40
+	maxStepIDLen   = 40
+	maxStepNameLen = 255
 )
 
 // Regex patterns for validation.
@@ -106,7 +107,7 @@ func collectNamesAndIDs(dag *DAG, errs *ErrorList) (stepNames, stepIDs map[strin
 			*errs = append(*errs, NewValidationError("steps", step.ID, fmt.Errorf("invalid step ID format: must match %s (use '_' instead of '-')", stepIDPattern.String())))
 		}
 
-		if len(step.ID) > maxStepNameLen {
+		if len(step.ID) > maxStepIDLen {
 			*errs = append(*errs, NewValidationError("steps", step.ID, ErrStepIDTooLong))
 		}
 

@@ -298,7 +298,7 @@ func TestValidateSteps(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{
 			Steps: []Step{
-				{Name: strings.Repeat("a", 41)},
+				{Name: strings.Repeat("a", 256)},
 			},
 		}
 		err := ValidateSteps(dag)
@@ -310,7 +310,7 @@ func TestValidateSteps(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{
 			Steps: []Step{
-				{Name: strings.Repeat("a", 40), ExecutorConfig: testExecConfig},
+				{Name: strings.Repeat("a", 255), ExecutorConfig: testExecConfig},
 			},
 		}
 		assert.NoError(t, ValidateSteps(dag))
@@ -623,7 +623,7 @@ func TestValidateStep(t *testing.T) {
 
 	t.Run("name too long fails", func(t *testing.T) {
 		t.Parallel()
-		step := Step{Name: strings.Repeat("x", 41), ExecutorConfig: testExecConfig}
+		step := Step{Name: strings.Repeat("x", 256), ExecutorConfig: testExecConfig}
 		errs := validateStep(step)
 		require.NotEmpty(t, errs)
 		assert.ErrorIs(t, errs, ErrStepNameTooLong)
@@ -631,13 +631,13 @@ func TestValidateStep(t *testing.T) {
 
 	t.Run("name at exactly max length passes", func(t *testing.T) {
 		t.Parallel()
-		step := Step{Name: strings.Repeat("x", 40), ExecutorConfig: testExecConfig}
+		step := Step{Name: strings.Repeat("x", 255), ExecutorConfig: testExecConfig}
 		assert.Empty(t, validateStep(step))
 	})
 
 	t.Run("promoted ID too long gives clear error", func(t *testing.T) {
 		t.Parallel()
-		longID := strings.Repeat("a", 41)
+		longID := strings.Repeat("a", 256)
 		step := Step{Name: longID, ID: longID, ExecutorConfig: testExecConfig}
 		errs := validateStep(step)
 		require.NotEmpty(t, errs)
