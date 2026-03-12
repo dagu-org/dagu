@@ -20,12 +20,12 @@ import (
 
 // defaultListOpts returns default ListDocsOptions for tests.
 func defaultListOpts(page, perPage int) agent.ListDocsOptions {
-	return agent.ListDocsOptions{Page: page, PerPage: perPage, Sort: "type", Order: "asc"}
+	return agent.ListDocsOptions{Page: page, PerPage: perPage, Sort: agent.DocSortFieldType, Order: agent.DocSortOrderAsc}
 }
 
 // defaultFlatOpts returns default ListDocsOptions for flat listing.
 func defaultFlatOpts(page, perPage int) agent.ListDocsOptions {
-	return agent.ListDocsOptions{Page: page, PerPage: perPage, Sort: "name", Order: "asc"}
+	return agent.ListDocsOptions{Page: page, PerPage: perPage, Sort: agent.DocSortFieldName, Order: agent.DocSortOrderAsc}
 }
 
 // setModTime sets the modification time on a file.
@@ -1605,7 +1605,7 @@ func TestListTreeSortNameAsc(t *testing.T) {
 	require.NoError(t, store.Create(ctx, "a-doc", "a"))
 	require.NoError(t, store.Create(ctx, "b-doc", "b"))
 
-	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: "name", Order: "asc"})
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldName, Order: agent.DocSortOrderAsc})
 	require.NoError(t, err)
 	require.Len(t, result.Items, 3)
 	assert.Equal(t, "a-doc", result.Items[0].ID)
@@ -1621,7 +1621,7 @@ func TestListTreeSortNameDesc(t *testing.T) {
 	require.NoError(t, store.Create(ctx, "a-doc", "a"))
 	require.NoError(t, store.Create(ctx, "b-doc", "b"))
 
-	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: "name", Order: "desc"})
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldName, Order: agent.DocSortOrderDesc})
 	require.NoError(t, err)
 	require.Len(t, result.Items, 3)
 	assert.Equal(t, "c-doc", result.Items[0].ID)
@@ -1637,7 +1637,7 @@ func TestListTreeSortTypeAsc(t *testing.T) {
 	require.NoError(t, store.Create(ctx, "dir-a/child", "c"))
 	require.NoError(t, store.Create(ctx, "file-a", "a"))
 
-	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: "type", Order: "asc"})
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldType, Order: agent.DocSortOrderAsc})
 	require.NoError(t, err)
 	require.Len(t, result.Items, 3)
 	// Directories first.
@@ -1658,7 +1658,7 @@ func TestListTreeSortTypeDesc(t *testing.T) {
 	require.NoError(t, store.Create(ctx, "dir-a/child", "c"))
 	require.NoError(t, store.Create(ctx, "file-a", "a"))
 
-	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: "type", Order: "desc"})
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldType, Order: agent.DocSortOrderDesc})
 	require.NoError(t, err)
 	require.Len(t, result.Items, 3)
 	// Files first (desc reverses).
@@ -1680,7 +1680,7 @@ func TestListTreeSortMtimeDesc(t *testing.T) {
 	setModTime(t, filepath.Join(store.baseDir, "mid.md"), now.Add(-1*time.Hour))
 	setModTime(t, filepath.Join(store.baseDir, "new.md"), now)
 
-	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: "mtime", Order: "desc"})
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldMTime, Order: agent.DocSortOrderDesc})
 	require.NoError(t, err)
 	require.Len(t, result.Items, 3)
 	assert.Equal(t, "new", result.Items[0].ID)
@@ -1701,7 +1701,7 @@ func TestListTreeSortMtimeAsc(t *testing.T) {
 	setModTime(t, filepath.Join(store.baseDir, "mid.md"), now.Add(-1*time.Hour))
 	setModTime(t, filepath.Join(store.baseDir, "new.md"), now)
 
-	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: "mtime", Order: "asc"})
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldMTime, Order: agent.DocSortOrderAsc})
 	require.NoError(t, err)
 	require.Len(t, result.Items, 3)
 	assert.Equal(t, "old", result.Items[0].ID)
@@ -1720,7 +1720,7 @@ func TestListTreeSortMtimeWithDirectories(t *testing.T) {
 	setModTime(t, filepath.Join(store.baseDir, "dir-old", "child.md"), now.Add(-2*time.Hour))
 	setModTime(t, filepath.Join(store.baseDir, "dir-new", "child.md"), now)
 
-	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: "mtime", Order: "desc"})
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldMTime, Order: agent.DocSortOrderDesc})
 	require.NoError(t, err)
 	require.Len(t, result.Items, 2)
 	// Directory with newest child first.
@@ -1742,7 +1742,7 @@ func TestListTreeSortMtimeStable(t *testing.T) {
 	setModTime(t, filepath.Join(store.baseDir, "a-doc.md"), sameTime)
 	setModTime(t, filepath.Join(store.baseDir, "b-doc.md"), sameTime)
 
-	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: "mtime", Order: "asc"})
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldMTime, Order: agent.DocSortOrderAsc})
 	require.NoError(t, err)
 	require.Len(t, result.Items, 2)
 	// Stable: fallback to name.
@@ -1773,7 +1773,7 @@ func TestListFlatSortNameDesc(t *testing.T) {
 	require.NoError(t, store.Create(ctx, "c-doc", "c"))
 	require.NoError(t, store.Create(ctx, "b-doc", "b"))
 
-	result, err := store.ListFlat(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: "name", Order: "desc"})
+	result, err := store.ListFlat(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldName, Order: agent.DocSortOrderDesc})
 	require.NoError(t, err)
 	require.Len(t, result.Items, 3)
 	assert.Equal(t, "c-doc", result.Items[0].ID)
@@ -1792,7 +1792,7 @@ func TestListFlatSortMtime(t *testing.T) {
 	setModTime(t, filepath.Join(store.baseDir, "old-doc.md"), now.Add(-1*time.Hour))
 	setModTime(t, filepath.Join(store.baseDir, "new-doc.md"), now)
 
-	result, err := store.ListFlat(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: "mtime", Order: "desc"})
+	result, err := store.ListFlat(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldMTime, Order: agent.DocSortOrderDesc})
 	require.NoError(t, err)
 	require.Len(t, result.Items, 2)
 	assert.Equal(t, "new-doc", result.Items[0].ID)
@@ -1807,7 +1807,7 @@ func TestListTreeSortNestedChildren(t *testing.T) {
 	require.NoError(t, store.Create(ctx, "dir/a-child", "a"))
 	require.NoError(t, store.Create(ctx, "dir/b-child", "b"))
 
-	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: "name", Order: "asc"})
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldName, Order: agent.DocSortOrderAsc})
 	require.NoError(t, err)
 	require.Len(t, result.Items, 1)
 	require.Len(t, result.Items[0].Children, 3)
@@ -1825,7 +1825,7 @@ func TestListTreeSortPaginationConsistency(t *testing.T) {
 	require.NoError(t, store.Create(ctx, "a-doc", "a"))
 	require.NoError(t, store.Create(ctx, "b-doc", "b"))
 
-	opts := agent.ListDocsOptions{Page: 1, PerPage: 2, Sort: "name", Order: "desc"}
+	opts := agent.ListDocsOptions{Page: 1, PerPage: 2, Sort: agent.DocSortFieldName, Order: agent.DocSortOrderDesc}
 	page1, err := store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Len(t, page1.Items, 2)

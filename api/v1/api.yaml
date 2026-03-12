@@ -9304,6 +9304,10 @@ components:
           type: string
         title:
           type: string
+        modifiedAt:
+          type: string
+          format: date-time
+          description: "Last modification time of the document file"
 
     DocTreeNodeResponse:
       type: object

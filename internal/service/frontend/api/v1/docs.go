@@ -437,10 +437,15 @@ func toDocResponse(doc *agent.Doc) api.DocResponse {
 }
 
 func toDocMetadataResponse(m agent.DocMetadata) api.DocMetadataResponse {
-	return api.DocMetadataResponse{
+	resp := api.DocMetadataResponse{
 		Id:    m.ID,
 		Title: m.Title,
 	}
+	if !m.ModTime.IsZero() {
+		t := m.ModTime
+		resp.ModifiedAt = &t
+	}
+	return resp
 }
 
 func toDocTreeResponse(node *agent.DocTreeNode) api.DocTreeNodeResponse {
@@ -464,33 +469,35 @@ func toDocTreeResponse(node *agent.DocTreeNode) api.DocTreeNodeResponse {
 	return resp
 }
 
-const (
-	defaultDocSort  = string(api.ListDocsParamsSortType)
-	defaultDocOrder = string(api.ListDocsParamsOrderAsc)
-)
-
 // docSortParams extracts sort field and order from typed request params with defaults.
-func docSortParams(sort *api.ListDocsParamsSort, order *api.ListDocsParamsOrder) (string, string) {
-	s := defaultDocSort
+func docSortParams(sort *api.ListDocsParamsSort, order *api.ListDocsParamsOrder) (agent.DocSortField, agent.DocSortOrder) {
+	s := agent.DocSortFieldType
 	if sort != nil {
-		s = string(*sort)
+		s = agent.DocSortField(*sort)
 	}
-	o := defaultDocOrder
+	o := agent.DocSortOrderAsc
 	if order != nil {
-		o = string(*order)
+		o = agent.DocSortOrder(*order)
 	}
 	return s, o
 }
 
-// docSortParamsFromQuery extracts sort field and order from URL query values with defaults.
-func docSortParamsFromQuery(params url.Values) (string, string) {
-	s := params.Get("sort")
-	if s == "" {
-		s = defaultDocSort
+// docSortParamsFromQuery extracts sort field and order from URL query values
+// with validation. Invalid values fall back to defaults.
+func docSortParamsFromQuery(params url.Values) (agent.DocSortField, agent.DocSortOrder) {
+	s := agent.DocSortField(params.Get("sort"))
+	switch s {
+	case agent.DocSortFieldName, agent.DocSortFieldType, agent.DocSortFieldMTime:
+		// valid
+	default:
+		s = agent.DocSortFieldType
 	}
-	o := params.Get("order")
-	if o == "" {
-		o = defaultDocOrder
+	o := agent.DocSortOrder(params.Get("order"))
+	switch o {
+	case agent.DocSortOrderAsc, agent.DocSortOrderDesc:
+		// valid
+	default:
+		o = agent.DocSortOrderAsc
 	}
 	return s, o
 }

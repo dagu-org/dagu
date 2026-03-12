@@ -3946,6 +3946,11 @@ export interface components {
         DocMetadataResponse: {
             id: string;
             title: string;
+            /**
+             * Format: date-time
+             * @description Last modification time of the document file
+             */
+            modifiedAt?: string;
         };
         /** @description A file or directory node in the doc tree */
         DocTreeNodeResponse: {

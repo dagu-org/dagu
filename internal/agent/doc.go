@@ -32,8 +32,9 @@ type Doc struct {
 
 // DocMetadata is a lightweight doc view excluding Content.
 type DocMetadata struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
+	ID      string    `json:"id"`
+	Title   string    `json:"title"`
+	ModTime time.Time `json:"modTime"`
 }
 
 // DocTreeNode represents a file or directory in the doc tree.
@@ -46,12 +47,29 @@ type DocTreeNode struct {
 	ModTime  time.Time      `json:"modTime"`
 }
 
+// DocSortField defines the field to sort documents by.
+type DocSortField string
+
+const (
+	DocSortFieldName  DocSortField = "name"
+	DocSortFieldType  DocSortField = "type"
+	DocSortFieldMTime DocSortField = "mtime"
+)
+
+// DocSortOrder defines the sort direction.
+type DocSortOrder string
+
+const (
+	DocSortOrderAsc  DocSortOrder = "asc"
+	DocSortOrderDesc DocSortOrder = "desc"
+)
+
 // ListDocsOptions holds parameters for listing documents.
 type ListDocsOptions struct {
 	Page    int
 	PerPage int
-	Sort    string // "name", "type", or "mtime"
-	Order   string // "asc" or "desc"
+	Sort    DocSortField
+	Order   DocSortOrder
 }
 
 // DocSearchResult holds a doc ID/title and its grep matches.

@@ -144,10 +144,9 @@ func (s *Store) List(ctx context.Context, opts agent.ListDocsOptions) (*exec.Pag
 	return &result, nil
 }
 
-// flatDocItem is an intermediate struct for flat listing with mtime support.
+// flatDocItem is an intermediate struct for flat listing with sort support.
 type flatDocItem struct {
-	meta    agent.DocMetadata
-	modTime time.Time
+	meta agent.DocMetadata
 }
 
 // ListFlat returns a paginated flat list of doc metadata.
@@ -195,8 +194,7 @@ func (s *Store) ListFlat(ctx context.Context, opts agent.ListDocsOptions) (*exec
 		}
 
 		items = append(items, flatDocItem{
-			meta:    agent.DocMetadata{ID: doc.ID, Title: doc.Title},
-			modTime: modTime,
+			meta: agent.DocMetadata{ID: doc.ID, Title: doc.Title, ModTime: modTime},
 		})
 		return nil
 	})
@@ -208,10 +206,10 @@ func (s *Store) ListFlat(ctx context.Context, opts agent.ListDocsOptions) (*exec
 		var less bool
 		switch sortField {
 		case "mtime":
-			if items[i].modTime.Equal(items[j].modTime) {
+			if items[i].meta.ModTime.Equal(items[j].meta.ModTime) {
 				less = items[i].meta.ID < items[j].meta.ID
 			} else {
-				less = items[i].modTime.Before(items[j].modTime)
+				less = items[i].meta.ModTime.Before(items[j].meta.ModTime)
 			}
 		case "type":
 			less = items[i].meta.ID < items[j].meta.ID
@@ -611,20 +609,22 @@ func (s *Store) Search(ctx context.Context, query string) ([]*agent.DocSearchRes
 }
 
 // normalizeSortParams returns validated sort field and order with defaults.
-func normalizeSortParams(sortField, sortOrder string) (string, string) {
-	switch sortField {
+func normalizeSortParams(sortField agent.DocSortField, sortOrder agent.DocSortOrder) (string, string) {
+	sf := string(sortField)
+	switch sf {
 	case "name", "type", "mtime":
 		// valid
 	default:
-		sortField = "type"
+		sf = "type"
 	}
-	switch sortOrder {
+	so := string(sortOrder)
+	switch so {
 	case "asc", "desc":
 		// valid
 	default:
-		sortOrder = "asc"
+		so = "asc"
 	}
-	return sortField, sortOrder
+	return sf, so
 }
 
 // buildTree builds a tree of DocTreeNode from the filesystem.

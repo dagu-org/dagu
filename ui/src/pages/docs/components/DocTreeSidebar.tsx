@@ -445,18 +445,18 @@ function DocTreeSidebar({
               <DropdownMenuLabel className="text-xs py-1">Sort by</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuRadioGroup
-                value={`${sortField}-${sortOrder}`}
+                value={`${sortField}:${sortOrder}`}
                 onValueChange={(v) => {
-                  const [f, o] = v.split('-') as [DocSortField, DocSortOrder];
+                  const [f, o] = v.split(':') as [DocSortField, DocSortOrder];
                   onSortChange(f, o);
                 }}
               >
-                <DropdownMenuRadioItem value="name-asc" className="text-xs">Name A–Z</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="name-desc" className="text-xs">Name Z–A</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="type-asc" className="text-xs">Folders first</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="type-desc" className="text-xs">Files first</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="mtime-desc" className="text-xs">Newest first</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="mtime-asc" className="text-xs">Oldest first</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="name:asc" className="text-xs">Name A–Z</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="name:desc" className="text-xs">Name Z–A</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="type:asc" className="text-xs">Folders first</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="type:desc" className="text-xs">Files first</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="mtime:desc" className="text-xs">Newest first</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="mtime:asc" className="text-xs">Oldest first</DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
