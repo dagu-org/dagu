@@ -6,6 +6,7 @@ import { usePageContext } from '@/contexts/PageContext';
 import { UnsavedChangesProvider } from '@/contexts/UnsavedChangesContext';
 import { useClient, useQuery } from '@/hooks/api';
 import { useDocTreeSSE } from '@/hooks/useDocTreeSSE';
+import { useUserPreferences } from '@/contexts/UserPreference';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { ChevronLeft } from 'lucide-react';
@@ -85,14 +86,18 @@ function DocsContent() {
   const [batchDeletePaths, setBatchDeletePaths] = useState<string[]>([]);
   const [batchDeleteConfirmOpen, setBatchDeleteConfirmOpen] = useState(false);
 
+  // Sort preferences
+  const { preferences, updatePreference } = useUserPreferences();
+  const { docSortField, docSortOrder } = preferences;
+
   // SSE for real-time updates with polling fallback
-  const sseResult = useDocTreeSSE(true);
+  const sseResult = useDocTreeSSE({ sort: docSortField, order: docSortOrder }, true);
 
   const { data: treeData, mutate, error: treeError, isLoading: treeIsLoading } = useQuery(
     '/docs',
     {
       params: {
-        query: { remoteNode, perPage: 200 },
+        query: { remoteNode, perPage: 200, sort: docSortField, order: docSortOrder },
       },
     },
     {
@@ -415,6 +420,12 @@ function DocsContent() {
       onSelectionChange={handleSelectionChange}
       activeDocContent={activeDocContent}
       onHeadingClick={handleHeadingClick}
+      sortField={docSortField}
+      sortOrder={docSortOrder}
+      onSortChange={(field, order) => {
+        updatePreference('docSortField', field);
+        updatePreference('docSortOrder', order);
+      }}
     />
   );
 

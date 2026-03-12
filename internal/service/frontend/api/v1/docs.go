@@ -69,12 +69,19 @@ func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (
 		return nil, err
 	}
 
-	page := valueOf(request.Params.Page)
-	perPage := valueOf(request.Params.PerPage)
+	sortField, sortOrder := docSortParams(request.Params.Sort, request.Params.Order)
+
+	opts := agent.ListDocsOptions{
+		Page:    valueOf(request.Params.Page),
+		PerPage: valueOf(request.Params.PerPage),
+		Sort:    sortField,
+		Order:   sortOrder,
+	}
+
 	flat := valueOf(request.Params.Flat)
 
 	if flat {
-		result, err := a.docStore.ListFlat(ctx, page, perPage)
+		result, err := a.docStore.ListFlat(ctx, opts)
 		if err != nil {
 			logger.Error(ctx, "Failed to list docs flat", tag.Error(err))
 			return nil, internalError(err)
@@ -91,7 +98,7 @@ func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (
 		}, nil
 	}
 
-	result, err := a.docStore.List(ctx, page, perPage)
+	result, err := a.docStore.List(ctx, opts)
 	if err != nil {
 		logger.Error(ctx, "Failed to list docs tree", tag.Error(err))
 		return nil, internalError(err)
@@ -373,7 +380,14 @@ func (a *API) GetDocTreeData(ctx context.Context, queryString string) (any, erro
 	page := parseIntParam(params.Get("page"), 1)
 	perPage := min(parseIntParam(params.Get("perPage"), 200), 200)
 
-	result, err := a.docStore.List(ctx, page, perPage)
+	sortField, sortOrder := docSortParamsFromQuery(params)
+
+	result, err := a.docStore.List(ctx, agent.ListDocsOptions{
+		Page:    page,
+		PerPage: perPage,
+		Sort:    sortField,
+		Order:   sortOrder,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -423,10 +437,15 @@ func toDocResponse(doc *agent.Doc) api.DocResponse {
 }
 
 func toDocMetadataResponse(m agent.DocMetadata) api.DocMetadataResponse {
-	return api.DocMetadataResponse{
+	resp := api.DocMetadataResponse{
 		Id:    m.ID,
 		Title: m.Title,
 	}
+	if !m.ModTime.IsZero() {
+		t := m.ModTime
+		resp.ModifiedAt = &t
+	}
+	return resp
 }
 
 func toDocTreeResponse(node *agent.DocTreeNode) api.DocTreeNodeResponse {
@@ -436,6 +455,10 @@ func toDocTreeResponse(node *agent.DocTreeNode) api.DocTreeNodeResponse {
 		Title: ptrOf(node.Title),
 		Type:  api.DocTreeNodeResponseType(node.Type),
 	}
+	if !node.ModTime.IsZero() {
+		t := node.ModTime
+		resp.ModifiedAt = &t
+	}
 	if len(node.Children) > 0 {
 		children := make([]api.DocTreeNodeResponse, 0, len(node.Children))
 		for _, child := range node.Children {
@@ -444,4 +467,37 @@ func toDocTreeResponse(node *agent.DocTreeNode) api.DocTreeNodeResponse {
 		resp.Children = &children
 	}
 	return resp
+}
+
+// docSortParams extracts sort field and order from typed request params with defaults.
+func docSortParams(sort *api.ListDocsParamsSort, order *api.ListDocsParamsOrder) (agent.DocSortField, agent.DocSortOrder) {
+	s := agent.DocSortFieldType
+	if sort != nil {
+		s = agent.DocSortField(*sort)
+	}
+	o := agent.DocSortOrderAsc
+	if order != nil {
+		o = agent.DocSortOrder(*order)
+	}
+	return s, o
+}
+
+// docSortParamsFromQuery extracts sort field and order from URL query values
+// with validation. Invalid values fall back to defaults.
+func docSortParamsFromQuery(params url.Values) (agent.DocSortField, agent.DocSortOrder) {
+	s := agent.DocSortField(params.Get("sort"))
+	switch s {
+	case agent.DocSortFieldName, agent.DocSortFieldType, agent.DocSortFieldMTime:
+		// valid
+	default:
+		s = agent.DocSortFieldType
+	}
+	o := agent.DocSortOrder(params.Get("order"))
+	switch o {
+	case agent.DocSortOrderAsc, agent.DocSortOrderDesc:
+		// valid
+	default:
+		o = agent.DocSortOrderAsc
+	}
+	return s, o
 }

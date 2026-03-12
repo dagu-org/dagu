@@ -3946,6 +3946,11 @@ export interface components {
         DocMetadataResponse: {
             id: string;
             title: string;
+            /**
+             * Format: date-time
+             * @description Last modification time of the document file
+             */
+            modifiedAt?: string;
         };
         /** @description A file or directory node in the doc tree */
         DocTreeNodeResponse: {
@@ -3955,6 +3960,11 @@ export interface components {
             /** @enum {string} */
             type: DocTreeNodeResponseType;
             children?: components["schemas"]["DocTreeNodeResponse"][];
+            /**
+             * Format: date-time
+             * @description Last modification time. For files: file mtime. For directories: most recent descendant mtime.
+             */
+            modifiedAt?: string;
         };
         /** @description Paginated document list (tree or flat) */
         DocListResponse: {
@@ -11459,6 +11469,14 @@ export interface operations {
                 perPage?: components["parameters"]["PerPage"];
                 /** @description If true, returns flat list instead of tree */
                 flat?: boolean;
+                /** @description Field to sort by:
+                 *     - `name`: Alphabetically by display name (case-insensitive)
+                 *     - `type`: By node type (dirs vs files), then alphabetically within each group
+                 *     - `mtime`: By last modification time
+                 *      */
+                sort?: PathsDocsGetParametersQuerySort;
+                /** @description Sort order. For type: asc=folders first. For mtime: desc=newest first. */
+                order?: PathsDocsGetParametersQueryOrder;
             };
             header?: never;
             path?: never;
@@ -12251,6 +12269,15 @@ export enum PathsDagsGetParametersQueryOrder {
 export enum PathsQueuesNameItemsGetParametersQueryType {
     running = "running",
     queued = "queued"
+}
+export enum PathsDocsGetParametersQuerySort {
+    name = "name",
+    type = "type",
+    mtime = "mtime"
+}
+export enum PathsDocsGetParametersQueryOrder {
+    asc = "asc",
+    desc = "desc"
 }
 export enum ChatMessageRole {
     system = "system",
