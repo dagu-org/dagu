@@ -26,6 +26,7 @@ require (
 	github.com/google/addlicense v1.1.1
 	github.com/google/jsonschema-go v0.4.2
 	github.com/google/uuid v1.6.0
+	github.com/hashicorp/vault/api v1.22.0
 	github.com/itchyny/gojq v0.12.18
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/jedib0t/go-pretty/v6 v6.6.8
@@ -141,7 +142,6 @@ require (
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.1-vault-7 // indirect
-	github.com/hashicorp/vault/api v1.22.0 // indirect
 	github.com/hashicorp/yamux v0.1.1 // indirect
 	github.com/hdevalence/ed25519consensus v0.2.0 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
