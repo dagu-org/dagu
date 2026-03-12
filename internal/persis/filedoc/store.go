@@ -156,6 +156,8 @@ func (s *Store) ListFlat(ctx context.Context, opts agent.ListDocsOptions) (*exec
 
 	var items []flatDocItem
 
+	needMtime := sortField == "mtime"
+
 	err := filepath.WalkDir(s.baseDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -186,8 +188,10 @@ func (s *Store) ListFlat(ctx context.Context, opts agent.ListDocsOptions) (*exec
 		}
 
 		var modTime time.Time
-		if info, infoErr := d.Info(); infoErr == nil {
-			modTime = info.ModTime()
+		if needMtime {
+			if info, infoErr := d.Info(); infoErr == nil {
+				modTime = info.ModTime()
+			}
 		}
 
 		items = append(items, flatDocItem{
@@ -627,6 +631,7 @@ func normalizeSortParams(sortField, sortOrder string) (string, string) {
 func (s *Store) buildTree(ctx context.Context, sortField, sortOrder string) ([]*agent.DocTreeNode, error) {
 	root := make(map[string]*agent.DocTreeNode)
 	var topLevel []*agent.DocTreeNode
+	needMtime := sortField == "mtime"
 
 	err := filepath.WalkDir(s.baseDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -644,8 +649,10 @@ func (s *Store) buildTree(ctx context.Context, sortField, sortOrder string) ([]*
 
 		if d.IsDir() {
 			var modTime time.Time
-			if info, infoErr := d.Info(); infoErr == nil {
-				modTime = info.ModTime()
+			if needMtime {
+				if info, infoErr := d.Info(); infoErr == nil {
+					modTime = info.ModTime()
+				}
 			}
 			node := &agent.DocTreeNode{
 				ID:       relPath,
@@ -688,8 +695,10 @@ func (s *Store) buildTree(ctx context.Context, sortField, sortOrder string) ([]*
 		}
 
 		var modTime time.Time
-		if info, infoErr := d.Info(); infoErr == nil {
-			modTime = info.ModTime()
+		if needMtime {
+			if info, infoErr := d.Info(); infoErr == nil {
+				modTime = info.ModTime()
+			}
 		}
 
 		node := &agent.DocTreeNode{
@@ -712,7 +721,9 @@ func (s *Store) buildTree(ctx context.Context, sortField, sortOrder string) ([]*
 		return nil, fmt.Errorf("filedoc: failed to build tree: %w", err)
 	}
 
-	propagateModTime(topLevel)
+	if needMtime {
+		propagateModTime(topLevel)
+	}
 	sortTreeNodes(topLevel, sortField, sortOrder)
 
 	return topLevel, nil

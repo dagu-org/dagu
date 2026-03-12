@@ -69,14 +69,7 @@ func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (
 		return nil, err
 	}
 
-	sortField := "type"
-	if request.Params.Sort != nil {
-		sortField = string(*request.Params.Sort)
-	}
-	sortOrder := "asc"
-	if request.Params.Order != nil {
-		sortOrder = string(*request.Params.Order)
-	}
+	sortField, sortOrder := docSortParams(request.Params.Sort, request.Params.Order)
 
 	opts := agent.ListDocsOptions{
 		Page:    valueOf(request.Params.Page),
@@ -387,14 +380,7 @@ func (a *API) GetDocTreeData(ctx context.Context, queryString string) (any, erro
 	page := parseIntParam(params.Get("page"), 1)
 	perPage := min(parseIntParam(params.Get("perPage"), 200), 200)
 
-	sortField := params.Get("sort")
-	if sortField == "" {
-		sortField = "type"
-	}
-	sortOrder := params.Get("order")
-	if sortOrder == "" {
-		sortOrder = "asc"
-	}
+	sortField, sortOrder := docSortParamsFromQuery(params)
 
 	result, err := a.docStore.List(ctx, agent.ListDocsOptions{
 		Page:    page,
@@ -476,4 +462,35 @@ func toDocTreeResponse(node *agent.DocTreeNode) api.DocTreeNodeResponse {
 		resp.Children = &children
 	}
 	return resp
+}
+
+const (
+	defaultDocSort  = string(api.ListDocsParamsSortType)
+	defaultDocOrder = string(api.ListDocsParamsOrderAsc)
+)
+
+// docSortParams extracts sort field and order from typed request params with defaults.
+func docSortParams(sort *api.ListDocsParamsSort, order *api.ListDocsParamsOrder) (string, string) {
+	s := defaultDocSort
+	if sort != nil {
+		s = string(*sort)
+	}
+	o := defaultDocOrder
+	if order != nil {
+		o = string(*order)
+	}
+	return s, o
+}
+
+// docSortParamsFromQuery extracts sort field and order from URL query values with defaults.
+func docSortParamsFromQuery(params url.Values) (string, string) {
+	s := params.Get("sort")
+	if s == "" {
+		s = defaultDocSort
+	}
+	o := params.Get("order")
+	if o == "" {
+		o = defaultDocOrder
+	}
+	return s, o
 }

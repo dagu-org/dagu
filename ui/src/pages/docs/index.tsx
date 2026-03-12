@@ -88,8 +88,7 @@ function DocsContent() {
 
   // Sort preferences
   const { preferences, updatePreference } = useUserPreferences();
-  const docSortField = preferences.docSortField ?? 'type';
-  const docSortOrder = preferences.docSortOrder ?? 'asc';
+  const { docSortField, docSortOrder } = preferences;
 
   // SSE for real-time updates with polling fallback
   const sseResult = useDocTreeSSE({ sort: docSortField, order: docSortOrder }, true);
