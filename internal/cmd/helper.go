@@ -4,10 +4,15 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/goccy/go-yaml"
+	"github.com/goccy/go-yaml/parser"
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
@@ -114,6 +119,210 @@ func rebuildDAGFromYAML(ctx context.Context, dag *core.DAG) (*core.DAG, error) {
 	core.InitializeDefaults(dag)
 
 	return dag, nil
+}
+
+// --- YAML sync helpers ---
+//
+// syncYAMLData updates dag.YamlData to reflect runtime modifications to Tags,
+// Queue, and Name that were applied after the DAG was loaded from its YAML file.
+//
+// Call this after all overrides are applied and before the DAG is persisted or
+// dispatched. For multi-document YAML, only the first document is patched;
+// remaining documents are preserved verbatim via the AST.
+//
+// When no overrides differ from the YAML content, YamlData is left byte-equal
+// to the original (fast path — zero reformatting). On any error, YamlData is
+// left unchanged.
+//
+// Synced fields: Tags, Queue, Name.
+// Mutation sites: enqueue.go (queue, tags), start.go (name, tags).
+func syncYAMLData(dag *core.DAG) error {
+	if len(dag.YamlData) == 0 {
+		return nil
+	}
+
+	// Parse with the YAML parser for safe multi-document handling.
+	// This correctly treats "---" inside block scalars as content, not separators.
+	file, err := parser.ParseBytes(dag.YamlData, 0)
+	if err != nil {
+		return fmt.Errorf("parse YAML: %w", err)
+	}
+	if len(file.Docs) == 0 {
+		return nil
+	}
+
+	// Decode the first document as an ordered map to preserve key ordering.
+	var firstDoc yaml.MapSlice
+	if err := yaml.Unmarshal([]byte(file.Docs[0].String()), &firstDoc); err != nil {
+		return fmt.Errorf("unmarshal first document: %w", err)
+	}
+
+	// Fast path: check whether any field actually differs.
+	changed := false
+
+	// Tags comparison: normalize both sides through core.NewTags for case handling.
+	yamlTagStrs := extractTagStringsFromMapSlice(firstDoc)
+	yamlNorm := core.NewTags(yamlTagStrs).Strings()
+	dagNorm := dag.Tags.Strings()
+	slices.Sort(yamlNorm)
+	slices.Sort(dagNorm)
+	tagsChanged := !slices.Equal(yamlNorm, dagNorm)
+
+	// Name comparison: only if YAML already has a "name" key.
+	nameChanged := false
+	if yamlName, hasName := getMapSliceString(firstDoc, "name"); hasName {
+		if dag.Name != "" && dag.Name != yamlName {
+			nameChanged = true
+		}
+	}
+
+	// Queue comparison: check existing key and detect runtime addition.
+	queueChanged := false
+	if yamlQueue, hasQueue := getMapSliceString(firstDoc, "queue"); hasQueue {
+		if dag.Queue != "" && dag.Queue != yamlQueue {
+			queueChanged = true
+		}
+	} else if dag.Queue != "" {
+		queueChanged = true
+	}
+
+	changed = tagsChanged || nameChanged || queueChanged
+	if !changed {
+		return nil
+	}
+
+	// Patch the ordered map.
+	if tagsChanged {
+		if dag.Tags == nil {
+			removeMapSliceKey(&firstDoc, "tags")
+		} else {
+			setMapSliceValue(&firstDoc, "tags", dag.Tags.Strings())
+		}
+	}
+	if nameChanged {
+		setMapSliceValue(&firstDoc, "name", dag.Name)
+	}
+	if queueChanged {
+		setMapSliceValue(&firstDoc, "queue", dag.Queue)
+	}
+
+	// Marshal patched first document.
+	patched, err := yaml.Marshal(firstDoc)
+	if err != nil {
+		return fmt.Errorf("marshal patched document: %w", err)
+	}
+
+	// Reassemble: patched first doc + remaining docs from AST (verbatim).
+	if len(file.Docs) == 1 {
+		dag.YamlData = patched
+		return nil
+	}
+
+	var buf bytes.Buffer
+	buf.Write(patched)
+	for _, doc := range file.Docs[1:] {
+		buf.WriteString("---\n")
+		buf.WriteString(doc.String())
+		buf.WriteString("\n")
+	}
+	dag.YamlData = buf.Bytes()
+	return nil
+}
+
+// extractTagStringsFromMapSlice extracts tag strings from the "tags" field of a
+// MapSlice, handling all 4 YAML formats that the spec loader accepts:
+// space-separated string, map, array of strings, and array of maps.
+func extractTagStringsFromMapSlice(ms yaml.MapSlice) []string {
+	raw, ok := getMapSliceValue(ms, "tags")
+	if !ok {
+		return nil
+	}
+
+	switch v := raw.(type) {
+	case string:
+		// Space-separated: "foo=bar zoo=baz"
+		fields := strings.Fields(v)
+		if len(fields) == 0 {
+			return nil
+		}
+		return fields
+
+	case []any:
+		var tags []string
+		for _, item := range v {
+			switch t := item.(type) {
+			case string:
+				tags = append(tags, t)
+			case yaml.MapSlice:
+				for _, mi := range t {
+					tags = append(tags, fmt.Sprintf("%v=%v", mi.Key, mi.Value))
+				}
+			case map[string]any:
+				for k, val := range t {
+					tags = append(tags, fmt.Sprintf("%v=%v", k, val))
+				}
+			}
+		}
+		return tags
+
+	case yaml.MapSlice:
+		tags := make([]string, 0, len(v))
+		for _, mi := range v {
+			tags = append(tags, fmt.Sprintf("%v=%v", mi.Key, mi.Value))
+		}
+		return tags
+
+	case map[string]any:
+		tags := make([]string, 0, len(v))
+		for k, val := range v {
+			tags = append(tags, fmt.Sprintf("%v=%v", k, val))
+		}
+		return tags
+	}
+
+	return nil
+}
+
+// getMapSliceValue returns the value for a key in a MapSlice.
+func getMapSliceValue(ms yaml.MapSlice, key string) (any, bool) {
+	for _, item := range ms {
+		if fmt.Sprint(item.Key) == key {
+			return item.Value, true
+		}
+	}
+	return nil, false
+}
+
+// getMapSliceString returns the string value for a key, or ("", false) if
+// the key is missing or the value is not a string.
+func getMapSliceString(ms yaml.MapSlice, key string) (string, bool) {
+	v, ok := getMapSliceValue(ms, key)
+	if !ok {
+		return "", false
+	}
+	s, ok := v.(string)
+	return s, ok
+}
+
+// setMapSliceValue updates an existing key or appends a new entry.
+func setMapSliceValue(ms *yaml.MapSlice, key string, value any) {
+	for i := range *ms {
+		if fmt.Sprint((*ms)[i].Key) == key {
+			(*ms)[i].Value = value
+			return
+		}
+	}
+	*ms = append(*ms, yaml.MapItem{Key: key, Value: value})
+}
+
+// removeMapSliceKey removes a key from the MapSlice.
+func removeMapSliceKey(ms *yaml.MapSlice, key string) {
+	for i := range *ms {
+		if fmt.Sprint((*ms)[i].Key) == key {
+			*ms = slices.Delete(*ms, i, i+1)
+			return
+		}
+	}
 }
 
 // extractDAGName extracts the DAG name from a file path or name.

@@ -171,6 +171,10 @@ func runStart(ctx *Context, args []string) error {
 		return err
 	}
 
+	if err := syncYAMLData(dag); err != nil {
+		logger.Warn(ctx, "Failed to sync YAML data with runtime overrides", tag.Error(err))
+	}
+
 	root, err := determineRootDAGRun(isSubDAGRun, rootRef, dag, dagRunID)
 	if err != nil {
 		return err

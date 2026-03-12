@@ -67,6 +67,10 @@ func runEnqueue(ctx *Context, args []string) error {
 		return err
 	}
 
+	if err := syncYAMLData(dag); err != nil {
+		logger.Warn(ctx, "Failed to sync YAML data with runtime overrides", tag.Error(err))
+	}
+
 	triggerType, err := parseTriggerTypeParam(ctx)
 	if err != nil {
 		return err
