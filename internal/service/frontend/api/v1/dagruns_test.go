@@ -117,6 +117,149 @@ func TestGetDAGRunSpecInline(t *testing.T) {
 	require.Contains(t, specBody.Spec, "echo inline_dag_test")
 }
 
+func TestGetDAGRunSpecInlineStartWithTagsDoesNotPatchSpec(t *testing.T) {
+	server := test.SetupServer(t)
+
+	inlineSpec := `steps:
+  - name: inline_step
+    command: "echo inline_start_tags"`
+	name := "inline_spec_start_tags"
+	tags := []string{"env=prod", "team=backend"}
+
+	execResp := server.Client().Post("/api/v1/dag-runs", api.ExecuteDAGRunFromSpecJSONRequestBody{
+		Spec: inlineSpec,
+		Name: &name,
+		Tags: &tags,
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	var execBody api.ExecuteDAGRunFromSpec200JSONResponse
+	execResp.Unmarshal(t, &execBody)
+	require.NotEmpty(t, execBody.DagRunId)
+
+	require.Eventually(t, func() bool {
+		statusResp := server.Client().
+			Get(fmt.Sprintf("/api/v1/dag-runs/%s/%s", name, execBody.DagRunId)).
+			Send(t)
+		if statusResp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		var dagRunStatus api.GetDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		return dagRunStatus.DagRunDetails.Status == api.Status(core.Running) ||
+			dagRunStatus.DagRunDetails.Status == api.Status(core.Succeeded)
+	}, 10*time.Second, 200*time.Millisecond)
+
+	specResp := server.Client().Get(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/spec", name, execBody.DagRunId),
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var specBody api.GetDAGRunSpec200JSONResponse
+	specResp.Unmarshal(t, &specBody)
+	require.Contains(t, specBody.Spec, "echo inline_start_tags")
+	require.NotContains(t, specBody.Spec, "tags:")
+	require.NotContains(t, specBody.Spec, "env=prod")
+	require.NotContains(t, specBody.Spec, "team=backend")
+}
+
+func TestGetDAGRunSpecInlineEnqueueWithTagsPatchesSpec(t *testing.T) {
+	server := test.SetupServer(t)
+
+	inlineSpec := `steps:
+  - name: inline_step
+    command: "echo inline_enqueue_tags"`
+	name := "inline_enqueue_tags"
+	tags := []string{"env=prod", "team=backend"}
+
+	enqResp := server.Client().Post("/api/v1/dag-runs/enqueue", api.EnqueueDAGRunFromSpecJSONRequestBody{
+		Spec: inlineSpec,
+		Name: &name,
+		Tags: &tags,
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	var enqBody api.EnqueueDAGRunFromSpec200JSONResponse
+	enqResp.Unmarshal(t, &enqBody)
+	require.NotEmpty(t, enqBody.DagRunId)
+
+	require.Eventually(t, func() bool {
+		statusResp := server.Client().
+			Get(fmt.Sprintf("/api/v1/dag-runs/%s/%s", name, enqBody.DagRunId)).
+			Send(t)
+		if statusResp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		var dagRunStatus api.GetDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		status := dagRunStatus.DagRunDetails.Status
+		return status == api.Status(core.Queued) ||
+			status == api.Status(core.Running) ||
+			status == api.Status(core.Succeeded)
+	}, 10*time.Second, 200*time.Millisecond)
+
+	specResp := server.Client().Get(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/spec", name, enqBody.DagRunId),
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var specBody api.GetDAGRunSpec200JSONResponse
+	specResp.Unmarshal(t, &specBody)
+	require.Contains(t, specBody.Spec, "echo inline_enqueue_tags")
+	require.Contains(t, specBody.Spec, "tags:")
+	require.Contains(t, specBody.Spec, "env=prod")
+	require.Contains(t, specBody.Spec, "team=backend")
+}
+
+func TestGetDAGRunSpecFileEnqueueWithTagsDoesNotPatchSpec(t *testing.T) {
+	server := test.SetupServer(t)
+
+	dagSpec := `steps:
+  - name: main
+    command: "echo file_enqueue_tags"`
+	dagName := "file_enqueue_tags"
+	tags := []string{"env=staging", "priority=low"}
+
+	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+		Name: dagName,
+		Spec: &dagSpec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	enqResp := server.Client().Post(
+		fmt.Sprintf("/api/v1/dags/%s/enqueue", dagName),
+		api.EnqueueDAGDAGRunJSONRequestBody{Tags: &tags},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var enqBody api.EnqueueDAGDAGRun200JSONResponse
+	enqResp.Unmarshal(t, &enqBody)
+	require.NotEmpty(t, enqBody.DagRunId)
+
+	require.Eventually(t, func() bool {
+		statusResp := server.Client().
+			Get(fmt.Sprintf("/api/v1/dag-runs/%s/%s", dagName, enqBody.DagRunId)).
+			Send(t)
+		if statusResp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		var dagRunStatus api.GetDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		status := dagRunStatus.DagRunDetails.Status
+		return status == api.Status(core.Queued) ||
+			status == api.Status(core.Running) ||
+			status == api.Status(core.Succeeded)
+	}, 10*time.Second, 200*time.Millisecond)
+
+	specResp := server.Client().Get(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/spec", dagName, enqBody.DagRunId),
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var specBody api.GetDAGRunSpec200JSONResponse
+	specResp.Unmarshal(t, &specBody)
+	require.Contains(t, specBody.Spec, "echo file_enqueue_tags")
+	require.NotContains(t, specBody.Spec, "tags:")
+	require.NotContains(t, specBody.Spec, "env=staging")
+	require.NotContains(t, specBody.Spec, "priority=low")
+}
+
 func TestGetSubDAGRunSpec(t *testing.T) {
 	server := test.SetupServer(t)
 

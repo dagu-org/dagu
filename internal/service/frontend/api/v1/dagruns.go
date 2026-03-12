@@ -4,6 +4,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -29,10 +30,13 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
+	spectypes "github.com/dagu-org/dagu/internal/core/spec/types"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
+	"github.com/goccy/go-yaml"
+	"github.com/goccy/go-yaml/parser"
 )
 
 var filenameUnsafeChars = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
@@ -200,7 +204,15 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 		return nil, err
 	}
 
-	if err := a.enqueueDAGRun(ctx, dag, params, dagRunId, valueOf(request.Body.Name), core.TriggerTypeManual, tags); err != nil {
+	if err := persistInlineEnqueueTags(dag, tags); err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusInternalServerError,
+			Code:       api.ErrorCodeInternalError,
+			Message:    fmt.Sprintf("failed to prepare queued dag-run spec: %s", err.Error()),
+		}
+	}
+
+	if err := a.enqueueDAGRun(ctx, dag, params, dagRunId, valueOf(request.Body.Name), core.TriggerTypeManual, ""); err != nil {
 		return nil, fmt.Errorf("error enqueuing dag-run: %w", err)
 	}
 
@@ -217,6 +229,103 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 	return api.EnqueueDAGRunFromSpec200JSONResponse{
 		DagRunId: dagRunId,
 	}, nil
+}
+
+// persistInlineEnqueueTags patches the inline temp spec file so queued DAG runs
+// persist the effective tag set without relying on the generic CLI sync path.
+func persistInlineEnqueueTags(dag *core.DAG, tags string) error {
+	if tags == "" || len(dag.YamlData) == 0 {
+		return nil
+	}
+
+	patched, err := applyInlineEnqueueTags(dag.YamlData, tags)
+	if err != nil {
+		return err
+	}
+
+	dag.YamlData = patched
+	if dag.Location == "" {
+		return nil
+	}
+
+	if err := os.WriteFile(dag.Location, patched, 0o600); err != nil {
+		return fmt.Errorf("write patched inline spec: %w", err)
+	}
+
+	return nil
+}
+
+func applyInlineEnqueueTags(data []byte, tags string) ([]byte, error) {
+	if len(data) == 0 || tags == "" {
+		return data, nil
+	}
+
+	existingTags, err := extractInlineEnqueueTagStrings(data)
+	if err != nil {
+		return nil, err
+	}
+
+	var firstDoc yaml.MapSlice
+	if err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&firstDoc); err != nil {
+		return nil, fmt.Errorf("decode first document: %w", err)
+	}
+
+	merged := append(existingTags, strings.Split(tags, ",")...)
+	setInlineEnqueueMapValue(&firstDoc, "tags", core.NewTags(merged).Strings())
+
+	patched, err := yaml.Marshal(firstDoc)
+	if err != nil {
+		return nil, fmt.Errorf("marshal patched document: %w", err)
+	}
+
+	file, err := parser.ParseBytes(data, 0)
+	if err != nil {
+		return nil, fmt.Errorf("parse yaml documents: %w", err)
+	}
+	if len(file.Docs) <= 1 {
+		return patched, nil
+	}
+
+	var buf bytes.Buffer
+	buf.Grow(len(data))
+	buf.Write(patched)
+	for _, doc := range file.Docs[1:] {
+		buf.WriteString("---\n")
+		buf.WriteString(doc.String())
+		buf.WriteString("\n")
+	}
+
+	return buf.Bytes(), nil
+}
+
+func extractInlineEnqueueTagStrings(data []byte) ([]string, error) {
+	var parsed struct {
+		Tags spectypes.TagsValue `yaml:"tags"`
+	}
+	if err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&parsed); err != nil {
+		return nil, fmt.Errorf("decode existing tags: %w", err)
+	}
+	return parsed.Tags.Values(), nil
+}
+
+func getInlineEnqueueMapValue(ms yaml.MapSlice, key string) (any, bool) {
+	for _, item := range ms {
+		if itemKey, ok := item.Key.(string); ok && itemKey == key {
+			return item.Value, true
+		}
+	}
+	return nil, false
+}
+
+func setInlineEnqueueMapValue(ms *yaml.MapSlice, key string, value any) {
+	for i := range *ms {
+		if itemKey, ok := (*ms)[i].Key.(string); ok && itemKey == key {
+			(*ms)[i].Value = value
+			return
+		}
+	}
+
+	*ms = append(*ms, yaml.MapItem{Key: key, Value: value})
 }
 
 func (a *API) loadInlineDAG(ctx context.Context, specContent string, name *string, dagRunID string) (*core.DAG, func(), error) {
