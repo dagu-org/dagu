@@ -81,7 +81,7 @@ func newTestTickPlanner(store WatermarkStore) (*TickPlanner, chan DAGChangeEvent
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{}, nil
 		},
-		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			return nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -239,7 +239,7 @@ func TestTickPlanner_PlanCatchupSkipOverlap(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{}, nil
 		},
-		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			return nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -283,7 +283,7 @@ func TestTickPlanner_PlanLiveRun(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{}, nil
 		},
-		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			return nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -324,7 +324,7 @@ func TestTickPlanner_PlanSuspendedDAGSkipped(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{}, nil
 		},
-		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			return nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -575,7 +575,7 @@ func TestTickPlanner_ShouldRunGuardRunning(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{Status: core.Running}, nil
 		},
-		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			return nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -1256,7 +1256,7 @@ func TestTickPlanner_DispatchRunStart(t *testing.T) {
 
 	var dispatched bool
 	tp := NewTickPlanner(TickPlannerConfig{
-		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			dispatched = true
 			return nil
 		},
@@ -1352,7 +1352,7 @@ func TestTickPlanner_PlanLatestNotRunning(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{}, nil
 		},
-		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			return nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {
@@ -1405,7 +1405,7 @@ func TestTickPlanner_PlanLatestRunning(t *testing.T) {
 		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
 			return exec.DAGRunStatus{}, nil
 		},
-		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			return nil
 		},
 		GenRunID: func(_ context.Context) (string, error) {

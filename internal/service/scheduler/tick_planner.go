@@ -47,7 +47,7 @@ type PlannedRun struct {
 }
 
 // DispatchFunc dispatches a catch-up or scheduled run for the given DAG.
-type DispatchFunc func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error
+type DispatchFunc func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType, scheduleTime time.Time) error
 
 // RunIDFunc generates a unique run ID.
 type RunIDFunc func(ctx context.Context) (string, error)
@@ -162,7 +162,7 @@ func NewTickPlanner(cfg TickPlannerConfig) *TickPlanner {
 		}
 	}
 	if cfg.Dispatch == nil {
-		cfg.Dispatch = func(context.Context, *core.DAG, string, core.TriggerType) error {
+		cfg.Dispatch = func(context.Context, *core.DAG, string, core.TriggerType, time.Time) error {
 			return fmt.Errorf("dispatch not configured")
 		}
 	}
@@ -774,7 +774,7 @@ func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 	var err error
 	switch run.ScheduleType {
 	case ScheduleTypeStart:
-		err = tp.cfg.Dispatch(ctx, run.DAG, run.RunID, run.TriggerType)
+		err = tp.cfg.Dispatch(ctx, run.DAG, run.RunID, run.TriggerType, run.ScheduledTime)
 	case ScheduleTypeStop:
 		err = tp.cfg.Stop(ctx, run.DAG)
 	case ScheduleTypeRestart:

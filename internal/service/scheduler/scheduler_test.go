@@ -81,7 +81,7 @@ func TestScheduler(t *testing.T) {
 		sc.SetClock(func() time.Time { return now })
 
 		var dispatchCount atomic.Int32
-		sc.SetDispatchFunc(func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		sc.SetDispatchFunc(func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			dispatchCount.Add(1)
 			return nil
 		})

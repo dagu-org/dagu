@@ -157,6 +157,10 @@ type Agent struct {
 	// When nil, logs are written to local filesystem.
 	logWriterFactory exec.LogWriterFactory
 
+	// scheduleTime is the RFC 3339 timestamp of when this run was scheduled.
+	// Set by the scheduler for cron-triggered runs; empty for manual runs.
+	scheduleTime string
+
 	// queuedRun indicates this execution is from a queued item.
 	// The dag-run was already created by the enqueue command.
 	queuedRun bool
@@ -256,6 +260,9 @@ type Options struct {
 	AgentSoulStore agentpkg.SoulStore
 	// AgentRemoteNodeResolver is the remote node resolver for agent step execution.
 	AgentRemoteNodeResolver agentpkg.RemoteNodeResolver
+	// ScheduleTime is the RFC 3339 timestamp of when this run was scheduled.
+	// Set by the scheduler for cron-triggered runs; empty for manual runs.
+	ScheduleTime string
 }
 
 // New creates a new Agent.
@@ -296,6 +303,7 @@ func New(
 		agentSkillStore:         opts.AgentSkillStore,
 		agentSoulStore:          opts.AgentSoulStore,
 		agentRemoteNodeResolver: opts.AgentRemoteNodeResolver,
+		scheduleTime:            opts.ScheduleTime,
 	}
 
 	// Initialize progress display if enabled
@@ -1062,11 +1070,17 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 		transform.WithTriggerType(a.triggerType),
 	}
 
+	// Set schedule time if provided directly (from CLI flag).
+	if a.scheduleTime != "" {
+		opts = append(opts, transform.WithScheduleTime(a.scheduleTime))
+	}
+
 	// If the current execution is a retry, copy timing data from the retry target.
 	if a.retryTarget != nil {
 		opts = append(opts,
 			transform.WithQueuedAt(a.retryTarget.QueuedAt),
 			transform.WithCreatedAt(a.retryTarget.CreatedAt),
+			transform.WithScheduleTime(a.retryTarget.ScheduleTime),
 		)
 	}
 

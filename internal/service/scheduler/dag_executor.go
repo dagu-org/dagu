@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -90,6 +91,7 @@ func (e *DAGExecutor) HandleJob(
 	operation coordinatorv1.Operation,
 	runID string,
 	triggerType core.TriggerType,
+	scheduleTime time.Time,
 ) error {
 	// For distributed execution with START operation, enqueue for persistence
 	if e.shouldUseDistributedExecution(dag) && operation == coordinatorv1.Operation_OPERATION_START {
@@ -102,9 +104,14 @@ func (e *DAGExecutor) HandleJob(
 			slog.Any("worker-selector", dag.WorkerSelector),
 		)
 
+		var scheduleTimeStr string
+		if !scheduleTime.IsZero() {
+			scheduleTimeStr = scheduleTime.Format(time.RFC3339)
+		}
 		spec := e.subCmdBuilder.Enqueue(dag, runtime.EnqueueOptions{
-			DAGRunID:    runID,
-			TriggerType: triggerType.String(),
+			DAGRunID:     runID,
+			TriggerType:  triggerType.String(),
+			ScheduleTime: scheduleTimeStr,
 		})
 		if err := runtime.Run(ctx, spec); err != nil {
 			return fmt.Errorf("failed to enqueue DAG run: %w", err)
@@ -113,7 +120,11 @@ func (e *DAGExecutor) HandleJob(
 	}
 
 	// For all other cases (local execution or non-START operations), use ExecuteDAG
-	return e.ExecuteDAG(ctx, dag, operation, runID, nil, triggerType)
+	var scheduleTimeStr string
+	if !scheduleTime.IsZero() {
+		scheduleTimeStr = scheduleTime.Format(time.RFC3339)
+	}
+	return e.ExecuteDAG(ctx, dag, operation, runID, nil, triggerType, scheduleTimeStr)
 }
 
 // ExecuteDAG executes or dispatches an already-persisted DAG.
@@ -132,6 +143,7 @@ func (e *DAGExecutor) ExecuteDAG(
 	runID string,
 	previousStatus *exec.DAGRunStatus,
 	triggerType core.TriggerType,
+	scheduleTime string,
 ) error {
 	if e.shouldUseDistributedExecution(dag) {
 		// Distributed execution: dispatch to coordinator
@@ -154,9 +166,10 @@ func (e *DAGExecutor) ExecuteDAG(
 
 	case coordinatorv1.Operation_OPERATION_START:
 		spec := e.subCmdBuilder.Start(dag, runtime.StartOptions{
-			DAGRunID:    runID,
-			Quiet:       true,
-			TriggerType: triggerType.String(),
+			DAGRunID:     runID,
+			Quiet:        true,
+			TriggerType:  triggerType.String(),
+			ScheduleTime: scheduleTime,
 		})
 		return runtime.Start(ctx, spec)
 
