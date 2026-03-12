@@ -215,7 +215,7 @@ func (m *mockDocStore) Search(_ context.Context, query string) ([]*agent.DocSear
 	return results, nil
 }
 
-func (m *mockDocStore) List(_ context.Context, page, perPage int) (*exec.PaginatedResult[*agent.DocTreeNode], error) {
+func (m *mockDocStore) List(_ context.Context, opts agent.ListDocsOptions) (*exec.PaginatedResult[*agent.DocTreeNode], error) {
 	if m.failAll {
 		return nil, errForced
 	}
@@ -230,14 +230,14 @@ func (m *mockDocStore) List(_ context.Context, page, perPage int) (*exec.Paginat
 	}
 	sort.Slice(nodes, func(i, j int) bool { return nodes[i].ID < nodes[j].ID })
 
-	pg := exec.NewPaginator(page, perPage)
+	pg := exec.NewPaginator(opts.Page, opts.PerPage)
 	start := min(pg.Offset(), len(nodes))
 	end := min(start+pg.Limit(), len(nodes))
 	result := exec.NewPaginatedResult(nodes[start:end], len(nodes), pg)
 	return &result, nil
 }
 
-func (m *mockDocStore) ListFlat(_ context.Context, page, perPage int) (*exec.PaginatedResult[agent.DocMetadata], error) {
+func (m *mockDocStore) ListFlat(_ context.Context, opts agent.ListDocsOptions) (*exec.PaginatedResult[agent.DocMetadata], error) {
 	if m.failAll {
 		return nil, errForced
 	}
@@ -250,7 +250,7 @@ func (m *mockDocStore) ListFlat(_ context.Context, page, perPage int) (*exec.Pag
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
 
-	pg := exec.NewPaginator(page, perPage)
+	pg := exec.NewPaginator(opts.Page, opts.PerPage)
 	start := min(pg.Offset(), len(items))
 	end := min(start+pg.Limit(), len(items))
 	result := exec.NewPaginatedResult(items[start:end], len(items), pg)
@@ -897,7 +897,7 @@ type mockDocStoreWithTree struct {
 	*mockDocStore
 }
 
-func (m *mockDocStoreWithTree) List(_ context.Context, page, perPage int) (*exec.PaginatedResult[*agent.DocTreeNode], error) {
+func (m *mockDocStoreWithTree) List(_ context.Context, opts agent.ListDocsOptions) (*exec.PaginatedResult[*agent.DocTreeNode], error) {
 	nodes := []*agent.DocTreeNode{
 		{
 			ID:   "parent",
@@ -909,7 +909,7 @@ func (m *mockDocStoreWithTree) List(_ context.Context, page, perPage int) (*exec
 			},
 		},
 	}
-	pg := exec.NewPaginator(page, perPage)
+	pg := exec.NewPaginator(opts.Page, opts.PerPage)
 	result := exec.NewPaginatedResult(nodes, len(nodes), pg)
 	return &result, nil
 }

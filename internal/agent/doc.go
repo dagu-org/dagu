@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/core/exec"
 )
@@ -42,6 +43,15 @@ type DocTreeNode struct {
 	Title    string         `json:"title,omitempty"`
 	Type     string         `json:"type"` // "file" or "directory"
 	Children []*DocTreeNode `json:"children,omitempty"`
+	ModTime  time.Time      `json:"modTime"`
+}
+
+// ListDocsOptions holds parameters for listing documents.
+type ListDocsOptions struct {
+	Page    int
+	PerPage int
+	Sort    string // "name", "type", or "mtime"
+	Order   string // "asc" or "desc"
 }
 
 // DocSearchResult holds a doc ID/title and its grep matches.
@@ -59,8 +69,8 @@ type DeleteError struct {
 
 // DocStore defines the interface for doc persistence.
 type DocStore interface {
-	List(ctx context.Context, page, perPage int) (*exec.PaginatedResult[*DocTreeNode], error)
-	ListFlat(ctx context.Context, page, perPage int) (*exec.PaginatedResult[DocMetadata], error)
+	List(ctx context.Context, opts ListDocsOptions) (*exec.PaginatedResult[*DocTreeNode], error)
+	ListFlat(ctx context.Context, opts ListDocsOptions) (*exec.PaginatedResult[DocMetadata], error)
 	Get(ctx context.Context, id string) (*Doc, error)
 	Create(ctx context.Context, id, content string) error
 	Update(ctx context.Context, id, content string) error

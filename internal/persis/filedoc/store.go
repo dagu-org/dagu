@@ -127,13 +127,14 @@ func titleFromID(id string) string {
 }
 
 // List returns a paginated tree of doc nodes.
-func (s *Store) List(ctx context.Context, page, perPage int) (*exec.PaginatedResult[*agent.DocTreeNode], error) {
-	tree, err := s.buildTree(ctx)
+func (s *Store) List(ctx context.Context, opts agent.ListDocsOptions) (*exec.PaginatedResult[*agent.DocTreeNode], error) {
+	sortField, sortOrder := normalizeSortParams(opts.Sort, opts.Order)
+	tree, err := s.buildTree(ctx, sortField, sortOrder)
 	if err != nil {
 		return nil, err
 	}
 
-	pg := exec.NewPaginator(page, perPage)
+	pg := exec.NewPaginator(opts.Page, opts.PerPage)
 	total := len(tree)
 	offset := min(pg.Offset(), total)
 	end := min(offset+pg.Limit(), total)
@@ -143,9 +144,17 @@ func (s *Store) List(ctx context.Context, page, perPage int) (*exec.PaginatedRes
 	return &result, nil
 }
 
-// ListFlat returns a paginated flat list of doc metadata sorted alphabetically.
-func (s *Store) ListFlat(ctx context.Context, page, perPage int) (*exec.PaginatedResult[agent.DocMetadata], error) {
-	var items []agent.DocMetadata
+// flatDocItem is an intermediate struct for flat listing with mtime support.
+type flatDocItem struct {
+	meta    agent.DocMetadata
+	modTime time.Time
+}
+
+// ListFlat returns a paginated flat list of doc metadata.
+func (s *Store) ListFlat(ctx context.Context, opts agent.ListDocsOptions) (*exec.PaginatedResult[agent.DocMetadata], error) {
+	sortField, sortOrder := normalizeSortParams(opts.Sort, opts.Order)
+
+	var items []flatDocItem
 
 	err := filepath.WalkDir(s.baseDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -176,9 +185,14 @@ func (s *Store) ListFlat(ctx context.Context, page, perPage int) (*exec.Paginate
 			return nil
 		}
 
-		items = append(items, agent.DocMetadata{
-			ID:    doc.ID,
-			Title: doc.Title,
+		var modTime time.Time
+		if info, infoErr := d.Info(); infoErr == nil {
+			modTime = info.ModTime()
+		}
+
+		items = append(items, flatDocItem{
+			meta:    agent.DocMetadata{ID: doc.ID, Title: doc.Title},
+			modTime: modTime,
 		})
 		return nil
 	})
@@ -187,14 +201,35 @@ func (s *Store) ListFlat(ctx context.Context, page, perPage int) (*exec.Paginate
 	}
 
 	sort.Slice(items, func(i, j int) bool {
-		return items[i].ID < items[j].ID
+		var less bool
+		switch sortField {
+		case "mtime":
+			if items[i].modTime.Equal(items[j].modTime) {
+				less = items[i].meta.ID < items[j].meta.ID
+			} else {
+				less = items[i].modTime.Before(items[j].modTime)
+			}
+		case "type":
+			less = items[i].meta.ID < items[j].meta.ID
+		default: // "name"
+			less = strings.ToLower(items[i].meta.ID) < strings.ToLower(items[j].meta.ID)
+		}
+		if sortOrder == "desc" {
+			return !less
+		}
+		return less
 	})
 
-	pg := exec.NewPaginator(page, perPage)
-	total := len(items)
+	metadata := make([]agent.DocMetadata, len(items))
+	for i, item := range items {
+		metadata[i] = item.meta
+	}
+
+	pg := exec.NewPaginator(opts.Page, opts.PerPage)
+	total := len(metadata)
 	offset := min(pg.Offset(), total)
 	end := min(offset+pg.Limit(), total)
-	pageItems := items[offset:end]
+	pageItems := metadata[offset:end]
 
 	result := exec.NewPaginatedResult(pageItems, total, pg)
 	return &result, nil
@@ -571,8 +606,25 @@ func (s *Store) Search(ctx context.Context, query string) ([]*agent.DocSearchRes
 	return results, nil
 }
 
+// normalizeSortParams returns validated sort field and order with defaults.
+func normalizeSortParams(sortField, sortOrder string) (string, string) {
+	switch sortField {
+	case "name", "type", "mtime":
+		// valid
+	default:
+		sortField = "type"
+	}
+	switch sortOrder {
+	case "asc", "desc":
+		// valid
+	default:
+		sortOrder = "asc"
+	}
+	return sortField, sortOrder
+}
+
 // buildTree builds a tree of DocTreeNode from the filesystem.
-func (s *Store) buildTree(ctx context.Context) ([]*agent.DocTreeNode, error) {
+func (s *Store) buildTree(ctx context.Context, sortField, sortOrder string) ([]*agent.DocTreeNode, error) {
 	root := make(map[string]*agent.DocTreeNode)
 	var topLevel []*agent.DocTreeNode
 
@@ -591,11 +643,16 @@ func (s *Store) buildTree(ctx context.Context) ([]*agent.DocTreeNode, error) {
 		relPath = filepath.ToSlash(relPath)
 
 		if d.IsDir() {
+			var modTime time.Time
+			if info, infoErr := d.Info(); infoErr == nil {
+				modTime = info.ModTime()
+			}
 			node := &agent.DocTreeNode{
 				ID:       relPath,
 				Name:     d.Name(),
 				Type:     "directory",
 				Children: []*agent.DocTreeNode{},
+				ModTime:  modTime,
 			}
 			root[relPath] = node
 
@@ -630,11 +687,17 @@ func (s *Store) buildTree(ctx context.Context) ([]*agent.DocTreeNode, error) {
 			title = titleFromID(id)
 		}
 
+		var modTime time.Time
+		if info, infoErr := d.Info(); infoErr == nil {
+			modTime = info.ModTime()
+		}
+
 		node := &agent.DocTreeNode{
-			ID:    id,
-			Name:  d.Name(),
-			Title: title,
-			Type:  "file",
+			ID:      id,
+			Name:    d.Name(),
+			Title:   title,
+			Type:    "file",
+			ModTime: modTime,
 		}
 
 		parentDir := filepath.Dir(relPath)
@@ -649,22 +712,60 @@ func (s *Store) buildTree(ctx context.Context) ([]*agent.DocTreeNode, error) {
 		return nil, fmt.Errorf("filedoc: failed to build tree: %w", err)
 	}
 
-	sortTreeNodes(topLevel)
+	propagateModTime(topLevel)
+	sortTreeNodes(topLevel, sortField, sortOrder)
 
 	return topLevel, nil
 }
 
-// sortTreeNodes sorts nodes: directories first, then files, alphabetically within each group.
-func sortTreeNodes(nodes []*agent.DocTreeNode) {
-	sort.Slice(nodes, func(i, j int) bool {
-		if nodes[i].Type != nodes[j].Type {
-			return nodes[i].Type == "directory"
+// propagateModTime recursively sets each directory's ModTime to the max of
+// its own ModTime and all descendant ModTimes.
+func propagateModTime(nodes []*agent.DocTreeNode) time.Time {
+	var maxTime time.Time
+	for _, node := range nodes {
+		t := node.ModTime
+		if len(node.Children) > 0 {
+			childMax := propagateModTime(node.Children)
+			if childMax.After(t) {
+				t = childMax
+			}
+			node.ModTime = t
 		}
-		return nodes[i].Name < nodes[j].Name
+		if t.After(maxTime) {
+			maxTime = t
+		}
+	}
+	return maxTime
+}
+
+// sortTreeNodes sorts nodes recursively according to the given sort field and order.
+func sortTreeNodes(nodes []*agent.DocTreeNode, sortField, sortOrder string) {
+	sort.Slice(nodes, func(i, j int) bool {
+		var less bool
+		switch sortField {
+		case "type":
+			if nodes[i].Type != nodes[j].Type {
+				less = nodes[i].Type == "directory"
+			} else {
+				less = strings.ToLower(nodes[i].Name) < strings.ToLower(nodes[j].Name)
+			}
+		case "mtime":
+			if nodes[i].ModTime.Equal(nodes[j].ModTime) {
+				less = strings.ToLower(nodes[i].Name) < strings.ToLower(nodes[j].Name)
+			} else {
+				less = nodes[i].ModTime.Before(nodes[j].ModTime)
+			}
+		default: // "name"
+			less = strings.ToLower(nodes[i].Name) < strings.ToLower(nodes[j].Name)
+		}
+		if sortOrder == "desc" {
+			return !less
+		}
+		return less
 	})
 	for _, node := range nodes {
 		if len(node.Children) > 0 {
-			sortTreeNodes(node.Children)
+			sortTreeNodes(node.Children, sortField, sortOrder)
 		}
 	}
 }

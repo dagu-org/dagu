@@ -69,12 +69,26 @@ func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (
 		return nil, err
 	}
 
-	page := valueOf(request.Params.Page)
-	perPage := valueOf(request.Params.PerPage)
+	sortField := "type"
+	if request.Params.Sort != nil {
+		sortField = string(*request.Params.Sort)
+	}
+	sortOrder := "asc"
+	if request.Params.Order != nil {
+		sortOrder = string(*request.Params.Order)
+	}
+
+	opts := agent.ListDocsOptions{
+		Page:    valueOf(request.Params.Page),
+		PerPage: valueOf(request.Params.PerPage),
+		Sort:    sortField,
+		Order:   sortOrder,
+	}
+
 	flat := valueOf(request.Params.Flat)
 
 	if flat {
-		result, err := a.docStore.ListFlat(ctx, page, perPage)
+		result, err := a.docStore.ListFlat(ctx, opts)
 		if err != nil {
 			logger.Error(ctx, "Failed to list docs flat", tag.Error(err))
 			return nil, internalError(err)
@@ -91,7 +105,7 @@ func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (
 		}, nil
 	}
 
-	result, err := a.docStore.List(ctx, page, perPage)
+	result, err := a.docStore.List(ctx, opts)
 	if err != nil {
 		logger.Error(ctx, "Failed to list docs tree", tag.Error(err))
 		return nil, internalError(err)
@@ -373,7 +387,21 @@ func (a *API) GetDocTreeData(ctx context.Context, queryString string) (any, erro
 	page := parseIntParam(params.Get("page"), 1)
 	perPage := min(parseIntParam(params.Get("perPage"), 200), 200)
 
-	result, err := a.docStore.List(ctx, page, perPage)
+	sortField := params.Get("sort")
+	if sortField == "" {
+		sortField = "type"
+	}
+	sortOrder := params.Get("order")
+	if sortOrder == "" {
+		sortOrder = "asc"
+	}
+
+	result, err := a.docStore.List(ctx, agent.ListDocsOptions{
+		Page:    page,
+		PerPage: perPage,
+		Sort:    sortField,
+		Order:   sortOrder,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -435,6 +463,10 @@ func toDocTreeResponse(node *agent.DocTreeNode) api.DocTreeNodeResponse {
 		Name:  node.Name,
 		Title: ptrOf(node.Title),
 		Type:  api.DocTreeNodeResponseType(node.Type),
+	}
+	if !node.ModTime.IsZero() {
+		t := node.ModTime
+		resp.ModifiedAt = &t
 	}
 	if len(node.Children) > 0 {
 		children := make([]api.DocTreeNodeResponse, 0, len(node.Children))

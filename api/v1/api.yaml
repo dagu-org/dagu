@@ -5663,6 +5663,26 @@ paths:
           required: false
           schema:
             type: boolean
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [name, type, mtime]
+            default: type
+          description: |
+            Field to sort by:
+            - `name`: Alphabetically by display name (case-insensitive)
+            - `type`: By node type (dirs vs files), then alphabetically within each group
+            - `mtime`: By last modification time
+        - name: order
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+          description: "Sort order. For type: asc=folders first. For mtime: desc=newest first."
       responses:
         "200":
           description: "List of documents"
@@ -9308,6 +9328,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DocTreeNodeResponse"
+        modifiedAt:
+          type: string
+          format: date-time
+          description: "Last modification time. For files: file mtime. For directories: most recent descendant mtime."
 
     DocListResponse:
       type: object
