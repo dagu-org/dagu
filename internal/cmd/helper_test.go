@@ -170,11 +170,11 @@ func TestSyncYAMLData(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		yaml      string
-		dag       *core.DAG
-		nilYAML   bool
-		checkFn   func(t *testing.T, dag *core.DAG, err error)
+		name    string
+		yaml    string
+		dag     *core.DAG
+		nilYAML bool
+		checkFn func(t *testing.T, dag *core.DAG, err error)
 	}{
 		{
 			name: "no overrides - tags match YAML",
