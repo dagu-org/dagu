@@ -108,12 +108,12 @@ func (r *vaultResolver) getClient(ref core.SecretRef) (vaultClient, error) {
 		return r.client, nil
 	}
 
-	// 2. Resolve address and token
-	addr := ref.Options["address"]
+	// 2. Resolve vault_address and vault_token
+	addr := ref.Options["vault_address"]
 	if addr == "" {
 		addr = os.Getenv("VAULT_ADDR")
 	}
-	token := ref.Options["token"]
+	token := ref.Options["vault_token"]
 	if token == "" {
 		token = os.Getenv("VAULT_TOKEN")
 	}
