@@ -16,7 +16,7 @@ import { CreateDocModal } from './components/CreateDocModal';
 import DocTabEditorPanel from './components/DocTabEditorPanel';
 import DocTreeSidebar from './components/DocTreeSidebar';
 import { RenameDocModal } from './components/RenameDocModal';
-import type { ContextAction } from './components/DocTreeNode';
+import type { ContextAction } from './components/DocArboristNode';
 import { useCockpitState } from '@/features/cockpit/hooks/useCockpitState';
 import { CockpitToolbar } from '@/features/cockpit/components/CockpitToolbar';
 
@@ -58,6 +58,14 @@ function DocsContent() {
   // Mobile view state
   const [mobileView, setMobileView] = useState<'tree' | 'editor'>('tree');
 
+  // Active doc content for outline panel
+  const [activeDocContent, setActiveDocContent] = useState<string | null>(null);
+
+  // Clear stale content when switching tabs so the outline panel doesn't show old headings
+  useEffect(() => {
+    setActiveDocContent(null);
+  }, [activeTabId]);
+
   // Modal state
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createParentDir, setCreateParentDir] = useState('');
@@ -73,10 +81,14 @@ function DocsContent() {
   const [deleteDocPath, setDeleteDocPath] = useState('');
   const [deleteDocTitle, setDeleteDocTitle] = useState('');
 
+  // Batch delete state
+  const [batchDeletePaths, setBatchDeletePaths] = useState<string[]>([]);
+  const [batchDeleteConfirmOpen, setBatchDeleteConfirmOpen] = useState(false);
+
   // SSE for real-time updates with polling fallback
   const sseResult = useDocTreeSSE(true);
 
-  const { data: treeData, mutate } = useQuery(
+  const { data: treeData, mutate, error: treeError, isLoading: treeIsLoading } = useQuery(
     '/docs',
     {
       params: {
@@ -164,6 +176,12 @@ function DocsContent() {
     [openDoc, isMobile]
   );
 
+  // Track selected IDs from sidebar for batch operations
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const handleSelectionChange = useCallback((ids: string[]) => {
+    setSelectedIds(ids);
+  }, []);
+
   // Context menu actions
   const handleContextAction = useCallback(
     (action: ContextAction) => {
@@ -183,9 +201,13 @@ function DocsContent() {
           setDeleteDocTitle(action.title);
           setDeleteConfirmOpen(true);
           break;
+        case 'deleteBatch':
+          setBatchDeletePaths([...selectedIds]);
+          setBatchDeleteConfirmOpen(true);
+          break;
       }
     },
-    []
+    [selectedIds]
   );
 
   // Create handler
@@ -215,8 +237,8 @@ function DocsContent() {
     [client, remoteNode, mutate, openDoc, showToast]
   );
 
-  // Rename handler
-  const handleRename = useCallback(
+  // Rename handler (from modal)
+  const handleRenameModal = useCallback(
     async (newPath: string) => {
       setRenameLoading(true);
       setRenameError(null);
@@ -230,10 +252,12 @@ function DocsContent() {
           return;
         }
         mutate();
-        // Update tab if this doc is open
-        const openTab = tabs.find((t) => t.docPath === renameDocPath);
-        if (openTab) {
-          updateTab(openTab.id, { docPath: newPath, title: titleFromPath(newPath) });
+        // Update all tabs under the renamed path (handles both file and directory renames).
+        for (const tab of tabs) {
+          if (tab.docPath === renameDocPath || tab.docPath.startsWith(renameDocPath + '/')) {
+            const updatedPath = newPath + tab.docPath.slice(renameDocPath.length);
+            updateTab(tab.id, { docPath: updatedPath, title: titleFromPath(updatedPath) });
+          }
         }
         showToast('Document renamed');
         setRenameModalOpen(false);
@@ -246,7 +270,56 @@ function DocsContent() {
     [client, remoteNode, renameDocPath, mutate, tabs, updateTab, showToast]
   );
 
-  // Delete handler
+  // Shared path-change handler for rename and move
+  const handlePathChange = useCallback(
+    async (oldPath: string, newPath: string, action: 'renamed' | 'moved') => {
+      try {
+        const { error } = await client.POST('/docs/doc/rename', {
+          params: { query: { remoteNode, path: oldPath } },
+          body: { newPath },
+        });
+        if (error) {
+          showToast(error?.message || `Failed to ${action === 'renamed' ? 'rename' : 'move'} document`);
+          mutate();
+          return;
+        }
+        mutate();
+        // Update ALL tabs under the moved path (handles both file and directory moves).
+        for (const tab of tabs) {
+          if (tab.docPath === oldPath || tab.docPath.startsWith(oldPath + '/')) {
+            const updatedPath = newPath + tab.docPath.slice(oldPath.length);
+            updateTab(tab.id, { docPath: updatedPath, title: titleFromPath(updatedPath) });
+          }
+        }
+        showToast(`Document ${action}`);
+      } catch {
+        showToast(`Failed to ${action === 'renamed' ? 'rename' : 'move'} document`);
+        mutate();
+      }
+    },
+    [client, remoteNode, mutate, tabs, updateTab, showToast]
+  );
+
+  const handleInlineRename = useCallback(
+    (oldPath: string, newPath: string) => handlePathChange(oldPath, newPath, 'renamed'),
+    [handlePathChange]
+  );
+
+  const handleMove = useCallback(
+    (oldPath: string, newPath: string) => handlePathChange(oldPath, newPath, 'moved'),
+    [handlePathChange]
+  );
+
+  // Heading click for outline panel
+  const handleHeadingClick = useCallback((anchor: string) => {
+    // Find the heading in the preview panel and scroll to it
+    const el = document.getElementById(anchor);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+
+  // Delete handler (supports both files and directories)
   const handleDelete = useCallback(async () => {
     try {
       const { error } = await client.DELETE('/docs/doc', {
@@ -257,12 +330,13 @@ function DocsContent() {
         return;
       }
       mutate();
-      // Close tab if open
-      const openTab = tabs.find((t) => t.docPath === deleteDocPath);
-      if (openTab) {
-        clearDraft(openTab.id);
-        markTabSaved(openTab.id);
-        closeTab(openTab.id);
+      // Close tabs for deleted path (exact match + prefix for directories)
+      for (const tab of tabs) {
+        if (tab.docPath === deleteDocPath || tab.docPath.startsWith(deleteDocPath + '/')) {
+          clearDraft(tab.id);
+          markTabSaved(tab.id);
+          closeTab(tab.id);
+        }
       }
       showToast('Document deleted');
     } catch {
@@ -271,6 +345,49 @@ function DocsContent() {
       setDeleteConfirmOpen(false);
     }
   }, [client, remoteNode, deleteDocPath, mutate, tabs, closeTab, clearDraft, markTabSaved, showToast]);
+
+  // Batch delete handler
+  const handleBatchDelete = useCallback(async () => {
+    try {
+      const { data, error } = await client.POST('/docs/delete-batch', {
+        params: { query: { remoteNode } },
+        body: { paths: batchDeletePaths },
+      });
+      if (error) {
+        showToast('Failed to delete documents');
+        return;
+      }
+      mutate();
+      // Close tabs for all deleted paths (exact + prefix for directories)
+      const deletedSet = new Set(data.deleted);
+      for (const tab of tabs) {
+        const shouldClose = deletedSet.has(tab.docPath) ||
+          [...deletedSet].some(dp => tab.docPath.startsWith(dp + '/'));
+        if (shouldClose) {
+          clearDraft(tab.id);
+          markTabSaved(tab.id);
+          closeTab(tab.id);
+        }
+      }
+      const failCount = data.failed?.length || 0;
+      if (failCount > 0) {
+        showToast(`Deleted ${data.deleted.length}, ${failCount} failed`);
+      } else {
+        showToast(`Deleted ${data.deleted.length} items`);
+      }
+    } catch {
+      showToast('Failed to delete documents');
+    } finally {
+      setBatchDeleteConfirmOpen(false);
+      setBatchDeletePaths([]);
+    }
+  }, [batchDeletePaths, client, remoteNode, mutate, tabs, closeTab, clearDraft, markTabSaved, showToast]);
+
+  // Batch delete from selection bar
+  const handleBatchDeleteFromBar = useCallback((paths: string[]) => {
+    setBatchDeletePaths(paths);
+    setBatchDeleteConfirmOpen(true);
+  }, []);
 
   // Delete triggered from tab menu or editor header
   const handleDeleteFromTab = useCallback((docPath: string, title: string) => {
@@ -282,6 +399,9 @@ function DocsContent() {
   const leftPanel = (
     <DocTreeSidebar
       tree={treeData?.tree}
+      isLoading={treeIsLoading}
+      error={treeError}
+      onRetry={() => mutate()}
       onContextAction={handleContextAction}
       onCreateNew={() => {
         setCreateParentDir('');
@@ -289,6 +409,12 @@ function DocsContent() {
         setCreateModalOpen(true);
       }}
       onSelectFile={handleSelectFile}
+      onRename={handleInlineRename}
+      onMove={handleMove}
+      onBatchDelete={handleBatchDeleteFromBar}
+      onSelectionChange={handleSelectionChange}
+      activeDocContent={activeDocContent}
+      onHeadingClick={handleHeadingClick}
     />
   );
 
@@ -308,7 +434,11 @@ function DocsContent() {
 
   const rightPanel =
     tabs.length > 0 ? (
-      <DocTabEditorPanel onDeleteDoc={handleDeleteFromTab} toolbar={cockpitToolbar} />
+      <DocTabEditorPanel
+        onDeleteDoc={handleDeleteFromTab}
+        toolbar={cockpitToolbar}
+        onContentChange={setActiveDocContent}
+      />
     ) : null;
 
   // Mobile layout
@@ -351,7 +481,7 @@ function DocsContent() {
         <RenameDocModal
           isOpen={renameModalOpen}
           onClose={() => setRenameModalOpen(false)}
-          onSubmit={handleRename}
+          onSubmit={handleRenameModal}
           currentPath={renameDocPath}
           isLoading={renameLoading}
           externalError={renameError}
@@ -366,6 +496,17 @@ function DocsContent() {
           <p className="text-sm text-muted-foreground">
             Are you sure you want to delete <strong>{deleteDocTitle}</strong>? This
             action cannot be undone.
+          </p>
+        </ConfirmModal>
+        <ConfirmModal
+          title="Delete Documents"
+          buttonText={`Delete ${batchDeletePaths.length} items`}
+          visible={batchDeleteConfirmOpen}
+          dismissModal={() => setBatchDeleteConfirmOpen(false)}
+          onSubmit={handleBatchDelete}
+        >
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete {batchDeletePaths.length} items? This cannot be undone.
           </p>
         </ConfirmModal>
       </div>
@@ -397,7 +538,7 @@ function DocsContent() {
       <RenameDocModal
         isOpen={renameModalOpen}
         onClose={() => setRenameModalOpen(false)}
-        onSubmit={handleRename}
+        onSubmit={handleRenameModal}
         currentPath={renameDocPath}
         isLoading={renameLoading}
         externalError={renameError}
@@ -412,6 +553,17 @@ function DocsContent() {
         <p className="text-sm text-muted-foreground">
           Are you sure you want to delete <strong>{deleteDocTitle}</strong>? This
           action cannot be undone.
+        </p>
+      </ConfirmModal>
+      <ConfirmModal
+        title="Delete Documents"
+        buttonText={`Delete ${batchDeletePaths.length} items`}
+        visible={batchDeleteConfirmOpen}
+        dismissModal={() => setBatchDeleteConfirmOpen(false)}
+        onSubmit={handleBatchDelete}
+      >
+        <p className="text-sm text-muted-foreground">
+          Are you sure you want to delete {batchDeletePaths.length} items? This cannot be undone.
         </p>
       </ConfirmModal>
     </div>

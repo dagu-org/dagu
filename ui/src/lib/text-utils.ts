@@ -1,4 +1,18 @@
 /**
+ * Slugify a heading string into a URL-safe anchor ID.
+ * Used by both the markdown preview (to set heading IDs) and the outline panel
+ * (to generate matching anchors). Must stay in sync across both call sites.
+ */
+export function slugifyHeading(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
+
+/**
  * Get responsive text size class based on string length.
  * Used for titles in headers and sidebars to ensure they fit properly.
  *
