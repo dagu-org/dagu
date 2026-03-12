@@ -170,10 +170,11 @@ func TestSyncYAMLData(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		yaml    string
-		dag     *core.DAG
-		checkFn func(t *testing.T, dag *core.DAG, err error)
+		name      string
+		yaml      string
+		dag       *core.DAG
+		nilYAML   bool
+		checkFn   func(t *testing.T, dag *core.DAG, err error)
 	}{
 		{
 			name: "no overrides - tags match YAML",
@@ -287,8 +288,8 @@ func TestSyncYAMLData(t *testing.T) {
 			},
 		},
 		{
-			name: "nil YamlData",
-			yaml: "", // will be set to nil
+			name:    "nil YamlData",
+			nilYAML: true,
 			dag: &core.DAG{
 				Tags: core.NewTags([]string{"a=b"}),
 			},
@@ -425,7 +426,7 @@ func TestSyncYAMLData(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dag := tt.dag
-			if tt.name == "nil YamlData" {
+			if tt.nilYAML {
 				dag.YamlData = nil
 			} else {
 				dag.YamlData = []byte(tt.yaml)

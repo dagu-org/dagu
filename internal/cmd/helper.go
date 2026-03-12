@@ -141,53 +141,39 @@ func syncYAMLData(dag *core.DAG) error {
 		return nil
 	}
 
-	// Parse with the YAML parser for safe multi-document handling.
-	// This correctly treats "---" inside block scalars as content, not separators.
-	file, err := parser.ParseBytes(dag.YamlData, 0)
-	if err != nil {
-		return fmt.Errorf("parse YAML: %w", err)
-	}
-	if len(file.Docs) == 0 {
-		return nil
-	}
-
-	// Decode the first document as an ordered map to preserve key ordering.
+	// Decode first document as an ordered map to preserve key ordering.
 	var firstDoc yaml.MapSlice
-	if err := yaml.Unmarshal([]byte(file.Docs[0].String()), &firstDoc); err != nil {
-		return fmt.Errorf("unmarshal first document: %w", err)
+	if err := yaml.NewDecoder(bytes.NewReader(dag.YamlData)).Decode(&firstDoc); err != nil {
+		return fmt.Errorf("decode first document: %w", err)
 	}
 
 	// Fast path: check whether any field actually differs.
-	changed := false
-
-	// Tags comparison: normalize both sides through core.NewTags for case handling.
-	yamlTagStrs := extractTagStringsFromMapSlice(firstDoc)
-	yamlNorm := core.NewTags(yamlTagStrs).Strings()
+	// Tags: normalize both sides through core.NewTags for case handling.
+	yamlNorm := core.NewTags(extractTagStringsFromMapSlice(firstDoc)).Strings()
 	dagNorm := dag.Tags.Strings()
-	slices.Sort(yamlNorm)
-	slices.Sort(dagNorm)
 	tagsChanged := !slices.Equal(yamlNorm, dagNorm)
+	if tagsChanged {
+		// Order-independent comparison as a fallback.
+		slices.Sort(yamlNorm)
+		slices.Sort(dagNorm)
+		tagsChanged = !slices.Equal(yamlNorm, dagNorm)
+	}
 
-	// Name comparison: only if YAML already has a "name" key.
+	// Name: only compare if YAML already has a "name" key.
 	nameChanged := false
 	if yamlName, hasName := getMapSliceString(firstDoc, "name"); hasName {
-		if dag.Name != "" && dag.Name != yamlName {
-			nameChanged = true
-		}
+		nameChanged = dag.Name != "" && dag.Name != yamlName
 	}
 
-	// Queue comparison: check existing key and detect runtime addition.
+	// Queue: check existing key and detect runtime addition.
 	queueChanged := false
 	if yamlQueue, hasQueue := getMapSliceString(firstDoc, "queue"); hasQueue {
-		if dag.Queue != "" && dag.Queue != yamlQueue {
-			queueChanged = true
-		}
-	} else if dag.Queue != "" {
-		queueChanged = true
+		queueChanged = dag.Queue != "" && dag.Queue != yamlQueue
+	} else {
+		queueChanged = dag.Queue != ""
 	}
 
-	changed = tagsChanged || nameChanged || queueChanged
-	if !changed {
+	if !tagsChanged && !nameChanged && !queueChanged {
 		return nil
 	}
 
@@ -212,13 +198,17 @@ func syncYAMLData(dag *core.DAG) error {
 		return fmt.Errorf("marshal patched document: %w", err)
 	}
 
-	// Reassemble: patched first doc + remaining docs from AST (verbatim).
-	if len(file.Docs) == 1 {
+	// Check for multi-document YAML using the parser for safe boundary detection.
+	// parser.ParseBytes correctly treats "---" inside block scalars as content.
+	file, err := parser.ParseBytes(dag.YamlData, 0)
+	if err != nil || len(file.Docs) <= 1 {
 		dag.YamlData = patched
 		return nil
 	}
 
+	// Reassemble: patched first doc + remaining docs from AST (verbatim).
 	var buf bytes.Buffer
+	buf.Grow(len(dag.YamlData))
 	buf.Write(patched)
 	for _, doc := range file.Docs[1:] {
 		buf.WriteString("---\n")
@@ -241,11 +231,10 @@ func extractTagStringsFromMapSlice(ms yaml.MapSlice) []string {
 	switch v := raw.(type) {
 	case string:
 		// Space-separated: "foo=bar zoo=baz"
-		fields := strings.Fields(v)
-		if len(fields) == 0 {
-			return nil
+		if fields := strings.Fields(v); len(fields) > 0 {
+			return fields
 		}
-		return fields
+		return nil
 
 	case []any:
 		var tags []string
@@ -253,40 +242,54 @@ func extractTagStringsFromMapSlice(ms yaml.MapSlice) []string {
 			switch t := item.(type) {
 			case string:
 				tags = append(tags, t)
-			case yaml.MapSlice:
-				for _, mi := range t {
-					tags = append(tags, fmt.Sprintf("%v=%v", mi.Key, mi.Value))
-				}
-			case map[string]any:
-				for k, val := range t {
-					tags = append(tags, fmt.Sprintf("%v=%v", k, val))
-				}
+			default:
+				tags = append(tags, mapToTagStrings(t)...)
 			}
 		}
 		return tags
 
-	case yaml.MapSlice:
-		tags := make([]string, 0, len(v))
-		for _, mi := range v {
-			tags = append(tags, fmt.Sprintf("%v=%v", mi.Key, mi.Value))
+	default:
+		if t := mapToTagStrings(v); len(t) > 0 {
+			return t
 		}
-		return tags
-
-	case map[string]any:
-		tags := make([]string, 0, len(v))
-		for k, val := range v {
-			tags = append(tags, fmt.Sprintf("%v=%v", k, val))
-		}
-		return tags
 	}
 
 	return nil
 }
 
+// mapToTagStrings converts a map-like value (yaml.MapSlice or map[string]any)
+// to "key=value" tag strings.
+func mapToTagStrings(v any) []string {
+	switch m := v.(type) {
+	case yaml.MapSlice:
+		tags := make([]string, 0, len(m))
+		for _, mi := range m {
+			tags = append(tags, fmt.Sprintf("%v=%v", mi.Key, mi.Value))
+		}
+		return tags
+	case map[string]any:
+		tags := make([]string, 0, len(m))
+		for k, val := range m {
+			tags = append(tags, fmt.Sprintf("%v=%v", k, val))
+		}
+		return tags
+	}
+	return nil
+}
+
+// mapSliceKeyEquals checks if a MapItem's key matches a string.
+func mapSliceKeyEquals(key any, search string) bool {
+	s, ok := key.(string)
+	if ok {
+		return s == search
+	}
+	return fmt.Sprint(key) == search
+}
+
 // getMapSliceValue returns the value for a key in a MapSlice.
 func getMapSliceValue(ms yaml.MapSlice, key string) (any, bool) {
 	for _, item := range ms {
-		if fmt.Sprint(item.Key) == key {
+		if mapSliceKeyEquals(item.Key, key) {
 			return item.Value, true
 		}
 	}
@@ -307,7 +310,7 @@ func getMapSliceString(ms yaml.MapSlice, key string) (string, bool) {
 // setMapSliceValue updates an existing key or appends a new entry.
 func setMapSliceValue(ms *yaml.MapSlice, key string, value any) {
 	for i := range *ms {
-		if fmt.Sprint((*ms)[i].Key) == key {
+		if mapSliceKeyEquals((*ms)[i].Key, key) {
 			(*ms)[i].Value = value
 			return
 		}
@@ -318,7 +321,7 @@ func setMapSliceValue(ms *yaml.MapSlice, key string, value any) {
 // removeMapSliceKey removes a key from the MapSlice.
 func removeMapSliceKey(ms *yaml.MapSlice, key string) {
 	for i := range *ms {
-		if fmt.Sprint((*ms)[i].Key) == key {
+		if mapSliceKeyEquals((*ms)[i].Key, key) {
 			*ms = slices.Delete(*ms, i, i+1)
 			return
 		}
