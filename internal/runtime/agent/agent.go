@@ -1070,18 +1070,18 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 		transform.WithTriggerType(a.triggerType),
 	}
 
-	// Set schedule time if provided directly (from CLI flag).
-	if a.scheduleTime != "" {
-		opts = append(opts, transform.WithScheduleTime(a.scheduleTime))
-	}
-
 	// If the current execution is a retry, copy timing data from the retry target.
+	// Otherwise, use the schedule time provided directly via CLI flag.
 	if a.retryTarget != nil {
 		opts = append(opts,
 			transform.WithQueuedAt(a.retryTarget.QueuedAt),
 			transform.WithCreatedAt(a.retryTarget.CreatedAt),
-			transform.WithScheduleTime(a.retryTarget.ScheduleTime),
 		)
+		if a.retryTarget.ScheduleTime != "" {
+			opts = append(opts, transform.WithScheduleTime(a.retryTarget.ScheduleTime))
+		}
+	} else if a.scheduleTime != "" {
+		opts = append(opts, transform.WithScheduleTime(a.scheduleTime))
 	}
 
 	// Create the status object to record the current status.

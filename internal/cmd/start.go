@@ -99,14 +99,9 @@ func runStart(ctx *Context, args []string) error {
 		return err
 	}
 
-	scheduleTime, err := ctx.StringParam("schedule-time")
+	scheduleTime, err := parseScheduleTimeParam(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get schedule-time: %w", err)
-	}
-	if scheduleTime != "" {
-		if _, parseErr := time.Parse(time.RFC3339, scheduleTime); parseErr != nil {
-			return fmt.Errorf("invalid --schedule-time value %q: must be RFC 3339 format: %w", scheduleTime, parseErr)
-		}
+		return err
 	}
 
 	dagRunID, rootRef, parentRef, isSubDAGRun, err := getDAGRunInfo(ctx)

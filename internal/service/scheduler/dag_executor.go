@@ -11,6 +11,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
@@ -104,14 +105,10 @@ func (e *DAGExecutor) HandleJob(
 			slog.Any("worker-selector", dag.WorkerSelector),
 		)
 
-		var scheduleTimeStr string
-		if !scheduleTime.IsZero() {
-			scheduleTimeStr = scheduleTime.Format(time.RFC3339)
-		}
 		spec := e.subCmdBuilder.Enqueue(dag, runtime.EnqueueOptions{
 			DAGRunID:     runID,
 			TriggerType:  triggerType.String(),
-			ScheduleTime: scheduleTimeStr,
+			ScheduleTime: stringutil.FormatTime(scheduleTime),
 		})
 		if err := runtime.Run(ctx, spec); err != nil {
 			return fmt.Errorf("failed to enqueue DAG run: %w", err)
@@ -120,11 +117,7 @@ func (e *DAGExecutor) HandleJob(
 	}
 
 	// For all other cases (local execution or non-START operations), use ExecuteDAG
-	var scheduleTimeStr string
-	if !scheduleTime.IsZero() {
-		scheduleTimeStr = scheduleTime.Format(time.RFC3339)
-	}
-	return e.ExecuteDAG(ctx, dag, operation, runID, nil, triggerType, scheduleTimeStr)
+	return e.ExecuteDAG(ctx, dag, operation, runID, nil, triggerType, stringutil.FormatTime(scheduleTime))
 }
 
 // ExecuteDAG executes or dispatches an already-persisted DAG.
