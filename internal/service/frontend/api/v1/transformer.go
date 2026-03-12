@@ -206,6 +206,8 @@ func ToDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {
 		Name:             s.Name,
 		Params:           ptrOf(s.Params),
 		DagRunId:         s.DAGRunID,
+		QueuedAt:         ptrOf(s.QueuedAt),
+		ScheduleTime:     ptrOf(s.ScheduleTime),
 		StartedAt:        s.StartedAt,
 		FinishedAt:       s.FinishedAt,
 		Status:           api.Status(s.Status),

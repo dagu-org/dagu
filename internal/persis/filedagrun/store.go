@@ -271,17 +271,18 @@ func (store *Store) resolveStatus(
 		// Passed filters — construct status directly from index.
 		s := dagRun.summary
 		return &exec.DAGRunStatus{
-			Name:        s.Name,
-			DAGRunID:    s.DagRunID,
-			Status:      s.Status,
-			Tags:        s.Tags,
-			StartedAt:   formatUnixToRFC3339(s.StartedAtUnix),
-			FinishedAt:  formatUnixToRFC3339(s.FinishedAtUnix),
-			WorkerID:    s.WorkerID,
-			Params:      s.Params,
-			QueuedAt:    s.QueuedAt,
-			TriggerType: s.TriggerType,
-			CreatedAt:   s.CreatedAt,
+			Name:         s.Name,
+			DAGRunID:     s.DagRunID,
+			Status:       s.Status,
+			Tags:         s.Tags,
+			StartedAt:    formatUnixToRFC3339(s.StartedAtUnix),
+			FinishedAt:   formatUnixToRFC3339(s.FinishedAtUnix),
+			WorkerID:     s.WorkerID,
+			Params:       s.Params,
+			QueuedAt:     s.QueuedAt,
+			ScheduleTime: s.ScheduleTime,
+			TriggerType:  s.TriggerType,
+			CreatedAt:    s.CreatedAt,
 		}
 	}
 
