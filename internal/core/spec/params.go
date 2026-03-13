@@ -87,11 +87,7 @@ func overrideParams(paramPairs *[]paramPair, override []paramPair) {
 // parseParams parses and processes the parameters for the DAG.
 // Parameter values are always treated as literal strings — no variable
 // expansion or command substitution is performed.
-func parseParams(_ BuildContext, value any, params *[]paramPair, envs *[]string) error {
-	var paramPairs []paramPair
-
-	// Use a no-eval context for parsing so that parseStringParams
-	// never attempts any evaluation either.
+func parseParams(value any, params *[]paramPair, envs *[]string) error {
 	noEvalCtx := BuildContext{opts: BuildOpts{Flags: BuildFlagNoEval}}
 
 	paramPairs, err := parseParamValue(noEvalCtx, value)

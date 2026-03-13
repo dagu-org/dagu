@@ -381,8 +381,8 @@ func TestParseStringParamsWithJSON(t *testing.T) {
 	}
 }
 
-func TestParseStringParamsWithEval(t *testing.T) {
-	t.Run("BacktickCommandSubstitution", func(t *testing.T) {
+func TestParseStringParamsBackticksLiteral(t *testing.T) {
+	t.Run("BacktickValuesPreservedLiterally", func(t *testing.T) {
 		ctx := BuildContext{
 			ctx:  context.Background(),
 			opts: BuildOpts{},
@@ -722,15 +722,10 @@ func TestParseParams(t *testing.T) {
 	t.Run("SimpleParams", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := BuildContext{
-			ctx:  context.Background(),
-			opts: BuildOpts{Flags: BuildFlagNoEval},
-		}
-
 		var params []paramPair
 		var envs []string
 
-		err := parseParams(ctx, "foo=bar baz=qux", &params, &envs)
+		err := parseParams("foo=bar baz=qux", &params, &envs)
 		require.NoError(t, err)
 
 		assert.Equal(t, []paramPair{
@@ -743,15 +738,10 @@ func TestParseParams(t *testing.T) {
 	t.Run("PositionalParamsGetNames", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := BuildContext{
-			ctx:  context.Background(),
-			opts: BuildOpts{Flags: BuildFlagNoEval},
-		}
-
 		var params []paramPair
 		var envs []string
 
-		err := parseParams(ctx, "one two three", &params, &envs)
+		err := parseParams("one two three", &params, &envs)
 		require.NoError(t, err)
 
 		// Positional params get numbered names
@@ -762,16 +752,11 @@ func TestParseParams(t *testing.T) {
 		}, params)
 	})
 
-	t.Run("WithEvalAddsEnvs", func(t *testing.T) {
-		ctx := BuildContext{
-			ctx:  context.Background(),
-			opts: BuildOpts{},
-		}
-
+	t.Run("NamedParamsAddedToEnvs", func(t *testing.T) {
 		var params []paramPair
 		var envs []string
 
-		err := parseParams(ctx, "foo=bar baz=qux", &params, &envs)
+		err := parseParams("foo=bar baz=qux", &params, &envs)
 		require.NoError(t, err)
 
 		assert.Equal(t, []paramPair{
@@ -781,17 +766,11 @@ func TestParseParams(t *testing.T) {
 		assert.Equal(t, []string{"foo=bar", "baz=qux"}, envs)
 	})
 
-	t.Run("VariableReference", func(t *testing.T) {
-		ctx := BuildContext{
-			ctx:  context.Background(),
-			opts: BuildOpts{},
-		}
-
+	t.Run("VariableRefsPreservedLiterally", func(t *testing.T) {
 		var params []paramPair
 		var envs []string
 
-		// Second param references first param
-		err := parseParams(ctx, []any{
+		err := parseParams([]any{
 			map[string]any{"BASE": "/opt"},
 			map[string]any{"PATH_VAR": "${BASE}/bin"},
 		}, &params, &envs)
@@ -804,15 +783,10 @@ func TestParseParams(t *testing.T) {
 	t.Run("NilInput", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := BuildContext{
-			ctx:  context.Background(),
-			opts: BuildOpts{Flags: BuildFlagNoEval},
-		}
-
 		var params []paramPair
 		var envs []string
 
-		err := parseParams(ctx, nil, &params, &envs)
+		err := parseParams(nil, &params, &envs)
 		require.NoError(t, err)
 		assert.Empty(t, params)
 		assert.Empty(t, envs)
@@ -821,15 +795,10 @@ func TestParseParams(t *testing.T) {
 	t.Run("InvalidInput", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := BuildContext{
-			ctx:  context.Background(),
-			opts: BuildOpts{Flags: BuildFlagNoEval},
-		}
-
 		var params []paramPair
 		var envs []string
 
-		err := parseParams(ctx, 123, &params, &envs)
+		err := parseParams(123, &params, &envs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid parameter value")
 	})
