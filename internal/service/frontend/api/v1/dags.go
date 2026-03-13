@@ -987,7 +987,17 @@ func (a *API) dispatchStartToCoordinator(ctx context.Context, dag *core.DAG, dag
 }
 
 func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts startDAGRunOptions) error {
-	if err := a.validateExecutionParams(ctx, dag, opts.params); err != nil {
+	if _, err := spec.ResolveRuntimeParams(ctx, dag, opts.params, spec.ResolveRuntimeParamsOptions{
+		BaseConfig: a.config.Paths.BaseConfig,
+	}); err != nil {
+		return &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    err.Error(),
+		}
+	}
+
+	if err := buildErrorsToAPIError(dag.BuildErrors); err != nil {
 		return err
 	}
 
@@ -1137,7 +1147,17 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 }
 
 func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string, triggerType core.TriggerType, tags string) error {
-	if err := a.validateExecutionParams(ctx, dag, params); err != nil {
+	if _, err := spec.ResolveRuntimeParams(ctx, dag, params, spec.ResolveRuntimeParamsOptions{
+		BaseConfig: a.config.Paths.BaseConfig,
+	}); err != nil {
+		return &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    err.Error(),
+		}
+	}
+
+	if err := buildErrorsToAPIError(dag.BuildErrors); err != nil {
 		return err
 	}
 
@@ -1170,48 +1190,6 @@ func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID
 		}
 	}
 
-	return nil
-}
-
-func (a *API) validateExecutionParams(ctx context.Context, dag *core.DAG, params string) error {
-	loadOpts := []spec.LoadOption{
-		spec.WithParams(params),
-		spec.WithAllowBuildErrors(),
-	}
-
-	switch {
-	case len(dag.BaseConfigData) > 0:
-		loadOpts = append(loadOpts, spec.WithBaseConfigContent(dag.BaseConfigData))
-	case a.config.Paths.BaseConfig != "":
-		loadOpts = append(loadOpts, spec.WithBaseConfig(a.config.Paths.BaseConfig))
-	}
-
-	if dag.Name != "" {
-		loadOpts = append(loadOpts, spec.WithName(dag.Name))
-	}
-
-	var (
-		validated *core.DAG
-		err       error
-	)
-	switch {
-	case len(dag.YamlData) > 0:
-		validated, err = spec.LoadYAML(ctx, dag.YamlData, loadOpts...)
-	case dag.Location != "":
-		validated, err = spec.Load(ctx, dag.Location, loadOpts...)
-	default:
-		return nil
-	}
-	if err != nil {
-		return &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    err.Error(),
-		}
-	}
-	if apiErr := buildErrorsToAPIError(validated.BuildErrors); apiErr != nil {
-		return apiErr
-	}
 	return nil
 }
 
