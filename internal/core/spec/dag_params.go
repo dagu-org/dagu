@@ -5,6 +5,7 @@ package spec
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -49,10 +50,10 @@ func buildDAGParamsResult(ctx BuildContext, d *dag) (*paramsResult, error) {
 	finalEntries := cloneParamEntries(plan.entries)
 	if ctx.opts.Has(BuildFlagValidateRuntimeParams) || ctx.opts.Parameters != "" || len(ctx.opts.ParametersList) > 0 {
 		switch plan.kind {
+		case dagParamKindLegacy:
+			finalEntries, err = resolveLegacyEntries(plan, ctx.opts.Parameters, ctx.opts.ParametersList)
 		case dagParamKindExternalSchema:
 			finalEntries, err = resolveExternalSchemaEntries(plan, ctx.opts.Parameters, ctx.opts.ParametersList)
-		default:
-			finalEntries, err = resolveLegacyEntries(plan, ctx.opts.Parameters, ctx.opts.ParametersList)
 		}
 		if err != nil {
 			return nil, err
@@ -136,13 +137,13 @@ func buildLegacyParamPlan(input any) (*dagParamPlan, error) {
 				appendLegacyPairs(plan, pairs)
 
 			case map[string]any:
-				name, defMap, ok, err := detectInlineParamDefinition(value)
+				inlineDef, err := detectInlineParamDefinition(value)
 				if err != nil {
 					return nil, core.NewValidationError("params", item, err)
 				}
-				if ok {
+				if inlineDef != nil {
 					hasInlineDefinitions = true
-					paramDef, entry, err := parseInlineParamDefinition(name, defMap)
+					paramDef, entry, err := parseInlineParamDefinition(inlineDef.name, inlineDef.fields)
 					if err != nil {
 						return nil, core.NewValidationError("params", item, err)
 					}
@@ -163,11 +164,13 @@ func buildLegacyParamPlan(input any) (*dagParamPlan, error) {
 		}
 
 		if hasInlineDefinitions {
-			var err error
-			plan.schema, plan.schemaProperties, plan.schemaOrder, err = compileInlineParamSchema(plan.paramDefs)
+			compiledSchema, err := compileInlineParamSchema(plan.paramDefs)
 			if err != nil {
 				return nil, err
 			}
+			plan.schema = compiledSchema.resolved
+			plan.schemaProperties = compiledSchema.properties
+			plan.schemaOrder = compiledSchema.order
 			plan.entries, err = validateSchemaBackedEntries(plan.entries, plan.schema, plan.schemaProperties, plan.schemaOrder, true, false)
 			if err != nil {
 				return nil, err
@@ -201,9 +204,7 @@ func buildExternalSchemaParamPlan(input any, workingDir, dagLocation string) (*d
 	schemaOrder := topLevelSchemaOrder(root)
 	schemaProperties := map[string]*jsonschema.Schema{}
 	if root != nil {
-		for name, property := range root.Properties {
-			schemaProperties[name] = property
-		}
+		maps.Copy(schemaProperties, root.Properties)
 	}
 
 	typedDefaults, err := schemaPairsToMap(basePairs, schemaProperties, true)

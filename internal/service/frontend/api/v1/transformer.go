@@ -9,6 +9,8 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
+const maxIntValue = int(^uint(0) >> 1)
+
 func toDAG(dag *core.DAG) api.DAG {
 	schedules := make([]api.Schedule, len(dag.Schedule))
 	for i, s := range dag.Schedule {
@@ -399,17 +401,17 @@ func toParamScalar(value any) (api.ParamScalar, bool) {
 	case int32:
 		return scalar, scalar.FromParamScalar1(int(v)) == nil
 	case int64:
-		return scalar, scalar.FromParamScalar1(int(v)) == nil
+		return toParamScalarInt64(v)
 	case uint:
-		return scalar, scalar.FromParamScalar1(int(v)) == nil
+		return toParamScalarUint64(uint64(v))
 	case uint8:
 		return scalar, scalar.FromParamScalar1(int(v)) == nil
 	case uint16:
 		return scalar, scalar.FromParamScalar1(int(v)) == nil
 	case uint32:
-		return scalar, scalar.FromParamScalar1(int(v)) == nil
+		return toParamScalarUint64(uint64(v))
 	case uint64:
-		return scalar, scalar.FromParamScalar1(int(v)) == nil
+		return toParamScalarUint64(v)
 	case float32:
 		return scalar, scalar.FromParamScalar2(v) == nil
 	case float64:
@@ -417,6 +419,22 @@ func toParamScalar(value any) (api.ParamScalar, bool) {
 	default:
 		return scalar, false
 	}
+}
+
+func toParamScalarInt64(value int64) (api.ParamScalar, bool) {
+	var scalar api.ParamScalar
+	if value < -int64(maxIntValue)-1 || value > int64(maxIntValue) {
+		return scalar, false
+	}
+	return scalar, scalar.FromParamScalar1(int(value)) == nil
+}
+
+func toParamScalarUint64(value uint64) (api.ParamScalar, bool) {
+	var scalar api.ParamScalar
+	if value > uint64(maxIntValue) {
+		return scalar, false
+	}
+	return scalar, scalar.FromParamScalar1(int(value)) == nil
 }
 
 func toHandlerOn(handlers core.HandlerOn) api.HandlerOn {

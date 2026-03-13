@@ -12,25 +12,36 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 )
 
-func detectInlineParamDefinition(item map[string]any) (string, map[string]any, bool, error) {
+type inlineParamDefinition struct {
+	name   string
+	fields map[string]any
+}
+
+type compiledInlineParamSchema struct {
+	resolved   *jsonschema.Resolved
+	properties map[string]*jsonschema.Schema
+	order      []string
+}
+
+func detectInlineParamDefinition(item map[string]any) (*inlineParamDefinition, error) {
 	if len(item) != 1 {
 		for _, value := range item {
 			if _, ok := value.(map[string]any); ok {
-				return "", nil, false, fmt.Errorf("inline parameter definitions must be single-key maps")
+				return nil, fmt.Errorf("inline parameter definitions must be single-key maps")
 			}
 		}
-		return "", nil, false, nil
+		return nil, nil
 	}
 
 	for name, value := range item {
 		nested, ok := value.(map[string]any)
 		if !ok {
-			return "", nil, false, nil
+			return nil, nil
 		}
-		return name, nested, true, nil
+		return &inlineParamDefinition{name: name, fields: nested}, nil
 	}
 
-	return "", nil, false, nil
+	return nil, nil
 }
 
 func parseInlineParamDefinition(name string, raw map[string]any) (core.ParamDef, dagParamEntry, error) {
@@ -232,7 +243,7 @@ func validateInlineDefault(def core.ParamDef) error {
 	return nil
 }
 
-func compileInlineParamSchema(defs []core.ParamDef) (*jsonschema.Resolved, map[string]*jsonschema.Schema, []string, error) {
+func compileInlineParamSchema(defs []core.ParamDef) (*compiledInlineParamSchema, error) {
 	root := &jsonschema.Schema{
 		Type:       "object",
 		Properties: map[string]*jsonschema.Schema{},
@@ -252,7 +263,7 @@ func compileInlineParamSchema(defs []core.ParamDef) (*jsonschema.Resolved, map[s
 		if def.Default != nil {
 			data, err := json.Marshal(def.Default)
 			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to marshal default for parameter %q: %w", def.Name, err)
+				return nil, fmt.Errorf("failed to marshal default for parameter %q: %w", def.Name, err)
 			}
 			property.Default = data
 		}
@@ -293,8 +304,12 @@ func compileInlineParamSchema(defs []core.ParamDef) (*jsonschema.Resolved, map[s
 		ValidateDefaults: true,
 	})
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to resolve inline parameter schema: %w", err)
+		return nil, fmt.Errorf("failed to resolve inline parameter schema: %w", err)
 	}
 
-	return resolved, properties, order, nil
+	return &compiledInlineParamSchema{
+		resolved:   resolved,
+		properties: properties,
+		order:      order,
+	}, nil
 }

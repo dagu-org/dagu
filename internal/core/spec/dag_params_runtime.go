@@ -13,6 +13,9 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 )
 
+const maxInt64AsUint = ^uint64(0) >> 1
+const maxIntValue = int(^uint(0) >> 1)
+
 // ResolveRuntimeParamsOptions controls how a DAG is reloaded for runtime param validation.
 type ResolveRuntimeParamsOptions struct {
 	BaseConfig string
@@ -278,6 +281,9 @@ func toInt(value any) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	if number < -int64(maxIntValue)-1 || number > int64(maxIntValue) {
+		return 0, fmt.Errorf("integer overflow")
+	}
 	return int(number), nil
 }
 
@@ -294,7 +300,7 @@ func toInt64(value any) (int64, error) {
 	case int64:
 		return v, nil
 	case uint:
-		return int64(v), nil
+		return int64FromUint64(uint64(v))
 	case uint8:
 		return int64(v), nil
 	case uint16:
@@ -302,7 +308,7 @@ func toInt64(value any) (int64, error) {
 	case uint32:
 		return int64(v), nil
 	case uint64:
-		return int64(v), nil
+		return int64FromUint64(v)
 	case float32:
 		if float32(int64(v)) != v {
 			return 0, fmt.Errorf("expected an integer")
@@ -316,6 +322,18 @@ func toInt64(value any) (int64, error) {
 	default:
 		return 0, fmt.Errorf("got %T", value)
 	}
+}
+
+func int64FromUint64(value uint64) (int64, error) {
+	if value > maxInt64AsUint {
+		return 0, fmt.Errorf("integer overflow")
+	}
+
+	number, err := strconv.ParseInt(strconv.FormatUint(value, 10), 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("integer overflow")
+	}
+	return number, nil
 }
 
 func cloneParamEntries(entries []dagParamEntry) []dagParamEntry {
