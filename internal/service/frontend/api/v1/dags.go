@@ -950,10 +950,13 @@ func (a *API) waitForDAGStatusChange(ctx context.Context, dag *core.DAG, dagRunI
 
 // dispatchStartToCoordinator dispatches a DAG start operation to the coordinator
 // and waits for the DAG status to change from NotStarted within the given timeout.
-func (a *API) dispatchStartToCoordinator(ctx context.Context, dag *core.DAG, dagRunID string, timeout time.Duration, tags string) error {
+func (a *API) dispatchStartToCoordinator(ctx context.Context, dag *core.DAG, dagRunID string, timeout time.Duration, params, tags string) error {
 	var taskOpts []executor.TaskOption
 	if len(dag.WorkerSelector) > 0 {
 		taskOpts = append(taskOpts, executor.WithWorkerSelector(dag.WorkerSelector))
+	}
+	if params != "" {
+		taskOpts = append(taskOpts, executor.WithTaskParams(params))
 	}
 	if tags != "" {
 		taskOpts = append(taskOpts, executor.WithTags(tags))
@@ -984,6 +987,10 @@ func (a *API) dispatchStartToCoordinator(ctx context.Context, dag *core.DAG, dag
 }
 
 func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts startDAGRunOptions) error {
+	if err := a.validateExecutionParams(ctx, dag, opts.params); err != nil {
+		return err
+	}
+
 	if err := core.ValidateStartParams(dag.DefaultParams, core.StartParamInput{
 		RawParams: opts.params,
 	}); err != nil {
@@ -1000,7 +1007,7 @@ func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts st
 		if osrt.GOOS == "windows" {
 			timeout = 10 * time.Second
 		}
-		return a.dispatchStartToCoordinator(ctx, dag, opts.dagRunID, timeout, opts.tags)
+		return a.dispatchStartToCoordinator(ctx, dag, opts.dagRunID, timeout, opts.params, opts.tags)
 	}
 
 	// Only pass trigger type if it's a known value (not TriggerTypeUnknown)
@@ -1130,6 +1137,10 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 }
 
 func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string, triggerType core.TriggerType, tags string) error {
+	if err := a.validateExecutionParams(ctx, dag, params); err != nil {
+		return err
+	}
+
 	// Only pass trigger type if it's a known value (not TriggerTypeUnknown)
 	triggerTypeStr := ""
 	if triggerType != core.TriggerTypeUnknown {
@@ -1159,6 +1170,48 @@ func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID
 		}
 	}
 
+	return nil
+}
+
+func (a *API) validateExecutionParams(ctx context.Context, dag *core.DAG, params string) error {
+	loadOpts := []spec.LoadOption{
+		spec.WithParams(params),
+		spec.WithAllowBuildErrors(),
+	}
+
+	switch {
+	case len(dag.BaseConfigData) > 0:
+		loadOpts = append(loadOpts, spec.WithBaseConfigContent(dag.BaseConfigData))
+	case a.config.Paths.BaseConfig != "":
+		loadOpts = append(loadOpts, spec.WithBaseConfig(a.config.Paths.BaseConfig))
+	}
+
+	if dag.Name != "" {
+		loadOpts = append(loadOpts, spec.WithName(dag.Name))
+	}
+
+	var (
+		validated *core.DAG
+		err       error
+	)
+	switch {
+	case len(dag.YamlData) > 0:
+		validated, err = spec.LoadYAML(ctx, dag.YamlData, loadOpts...)
+	case dag.Location != "":
+		validated, err = spec.Load(ctx, dag.Location, loadOpts...)
+	default:
+		return nil
+	}
+	if err != nil {
+		return &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    err.Error(),
+		}
+	}
+	if apiErr := buildErrorsToAPIError(validated.BuildErrors); apiErr != nil {
+		return apiErr
+	}
 	return nil
 }
 

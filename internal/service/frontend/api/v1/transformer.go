@@ -302,6 +302,12 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		}
 	}
 
+	var paramDefs *[]api.ParamDef
+	if len(dag.ParamDefs) > 0 {
+		defs := toParamDefs(dag.ParamDefs)
+		paramDefs = ptrOf(defs)
+	}
+
 	return &api.DAGDetails{
 		Name:              dag.Name,
 		Description:       ptrOf(dag.Description),
@@ -315,11 +321,101 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		MaxActiveRuns:     ptrOf(dag.MaxActiveRuns),
 		MaxActiveSteps:    ptrOf(dag.MaxActiveSteps),
 		Params:            ptrOf(dag.Params),
+		ParamDefs:         paramDefs,
 		Preconditions:     ptrOf(preconditions),
 		Schedule:          ptrOf(schedules),
 		Steps:             ptrOf(steps),
 		Tags:              ptrOf(dag.Tags.Strings()),
 		RunConfig:         runConfig,
+	}
+}
+
+func toParamDefs(defs []core.ParamDef) []api.ParamDef {
+	result := make([]api.ParamDef, 0, len(defs))
+	for _, def := range defs {
+		paramDef := api.ParamDef{
+			Type:     api.ParamDefType(def.Type),
+			Required: ptrOf(def.Required),
+		}
+		if def.Name != "" {
+			paramDef.Name = ptrOf(def.Name)
+		}
+		if def.Default != nil {
+			value, ok := toParamScalar(def.Default)
+			if ok {
+				paramDef.Default = &value
+			}
+		}
+		if def.Description != "" {
+			paramDef.Description = ptrOf(def.Description)
+		}
+		if len(def.Enum) > 0 {
+			enum := make([]api.ParamScalar, 0, len(def.Enum))
+			for _, item := range def.Enum {
+				value, ok := toParamScalar(item)
+				if !ok {
+					continue
+				}
+				enum = append(enum, value)
+			}
+			if len(enum) > 0 {
+				paramDef.Enum = &enum
+			}
+		}
+		if def.Minimum != nil {
+			paramDef.Minimum = ptrOf(float32(*def.Minimum))
+		}
+		if def.Maximum != nil {
+			paramDef.Maximum = ptrOf(float32(*def.Maximum))
+		}
+		if def.MinLength != nil {
+			paramDef.MinLength = def.MinLength
+		}
+		if def.MaxLength != nil {
+			paramDef.MaxLength = def.MaxLength
+		}
+		if def.Pattern != nil {
+			paramDef.Pattern = def.Pattern
+		}
+		result = append(result, paramDef)
+	}
+	return result
+}
+
+func toParamScalar(value any) (api.ParamScalar, bool) {
+	var scalar api.ParamScalar
+
+	switch v := value.(type) {
+	case string:
+		return scalar, scalar.FromParamScalar0(v) == nil
+	case bool:
+		return scalar, scalar.FromParamScalar3(v) == nil
+	case int:
+		return scalar, scalar.FromParamScalar1(v) == nil
+	case int8:
+		return scalar, scalar.FromParamScalar1(int(v)) == nil
+	case int16:
+		return scalar, scalar.FromParamScalar1(int(v)) == nil
+	case int32:
+		return scalar, scalar.FromParamScalar1(int(v)) == nil
+	case int64:
+		return scalar, scalar.FromParamScalar1(int(v)) == nil
+	case uint:
+		return scalar, scalar.FromParamScalar1(int(v)) == nil
+	case uint8:
+		return scalar, scalar.FromParamScalar1(int(v)) == nil
+	case uint16:
+		return scalar, scalar.FromParamScalar1(int(v)) == nil
+	case uint32:
+		return scalar, scalar.FromParamScalar1(int(v)) == nil
+	case uint64:
+		return scalar, scalar.FromParamScalar1(int(v)) == nil
+	case float32:
+		return scalar, scalar.FromParamScalar2(v) == nil
+	case float64:
+		return scalar, scalar.FromParamScalar2(float32(v)) == nil
+	default:
+		return scalar, false
 	}
 }
 

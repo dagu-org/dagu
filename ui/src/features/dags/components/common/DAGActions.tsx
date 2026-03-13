@@ -77,9 +77,16 @@ function DAGActions({
   const { showError } = useErrorModal();
   const { showToast } = useSimpleToast();
   const [isEnqueueModal, setIsEnqueueModal] = React.useState(false);
+  const [startModalDag, setStartModalDag] =
+    React.useState<components['schemas']['DAGDetails']>();
+  const [startModalLoading, setStartModalLoading] = React.useState(false);
+  const [startModalLoadError, setStartModalLoadError] = React.useState<
+    string | null
+  >(null);
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
-  const [isUnsavedChangesModal, setIsUnsavedChangesModal] = React.useState(false);
+  const [isUnsavedChangesModal, setIsUnsavedChangesModal] =
+    React.useState(false);
   const [retryDagRunId, setRetryDagRunId] = React.useState<string>('');
   const [stopAllRunning, setStopAllRunning] = React.useState(false);
   const [isRejectModal, setIsRejectModal] = React.useState(false);
@@ -99,6 +106,48 @@ function DAGActions({
     }
   }, [dagContext.autoOpenStartModal]);
 
+  React.useEffect(() => {
+    if (!isEnqueueModal) {
+      return;
+    }
+
+    let cancelled = false;
+    setStartModalLoading(true);
+    setStartModalLoadError(null);
+
+    void client
+      .GET('/dags/{fileName}', {
+        params: {
+          path: { fileName },
+          query: {
+            remoteNode: appBarContext.selectedRemoteNode || 'local',
+          },
+        },
+      })
+      .then(({ data, error }) => {
+        if (cancelled) {
+          return;
+        }
+        if (error || !data?.dag) {
+          setStartModalDag(undefined);
+          setStartModalLoadError(
+            error?.message || 'Failed to load DAG details for execution.'
+          );
+          return;
+        }
+        setStartModalDag(data.dag);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setStartModalLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [appBarContext.selectedRemoteNode, client, fileName, isEnqueueModal]);
+
   /**
    * Reload DAG data after an action is performed
    */
@@ -109,7 +158,10 @@ function DAGActions({
   };
 
   const isWaiting = status?.status == 7;
-  const hasNodes = status && 'nodes' in status && Array.isArray((status as components['schemas']['DAGRunDetails']).nodes);
+  const hasNodes =
+    status &&
+    'nodes' in status &&
+    Array.isArray((status as components['schemas']['DAGRunDetails']).nodes);
 
   // Determine which buttons should be enabled based on current status
   const buttonState = {
@@ -267,7 +319,15 @@ function DAGActions({
           </TooltipContent>
         </Tooltip>
         {/* Reject Modal */}
-        <Dialog open={isRejectModal} onOpenChange={(open) => { if (!open) { setIsRejectModal(false); setRejectReason(''); } }}>
+        <Dialog
+          open={isRejectModal}
+          onOpenChange={(open) => {
+            if (!open) {
+              setIsRejectModal(false);
+              setRejectReason('');
+            }
+          }}
+        >
           <DialogContent className="sm:max-w-[450px]">
             <DialogHeader>
               <DialogTitle>Reject DAG Run</DialogTitle>
@@ -282,7 +342,14 @@ function DAGActions({
               />
             </div>
             <DialogFooter>
-              <Button variant="ghost" size="sm" onClick={() => { setIsRejectModal(false); setRejectReason(''); }}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setIsRejectModal(false);
+                  setRejectReason('');
+                }}
+              >
                 <X className="h-4 w-4" /> Cancel
               </Button>
               <Button
@@ -290,16 +357,26 @@ function DAGActions({
                 size="sm"
                 onClick={async () => {
                   setIsRejectModal(false);
-                  const details = status as components['schemas']['DAGRunDetails'];
-                  const waitingNodes = details.nodes.filter(n => n.status === NodeStatus.Waiting);
+                  const details =
+                    status as components['schemas']['DAGRunDetails'];
+                  const waitingNodes = details.nodes.filter(
+                    (n) => n.status === NodeStatus.Waiting
+                  );
                   const errors: string[] = [];
                   for (const node of waitingNodes) {
                     const { error } = await client.POST(
                       '/dag-runs/{name}/{dagRunId}/steps/{stepName}/reject',
                       {
                         params: {
-                          path: { name: status!.name, dagRunId: status!.dagRunId, stepName: node.step.name },
-                          query: { remoteNode: appBarContext.selectedRemoteNode || 'local' },
+                          path: {
+                            name: status!.name,
+                            dagRunId: status!.dagRunId,
+                            stepName: node.step.name,
+                          },
+                          query: {
+                            remoteNode:
+                              appBarContext.selectedRemoteNode || 'local',
+                          },
                         },
                         body: { reason: rejectReason || undefined },
                       }
@@ -611,21 +688,14 @@ function DAGActions({
           </div>
         </ConfirmModal>
         <StartDAGModal
-          dag={dag}
+          dag={startModalDag}
           visible={isEnqueueModal}
+          loading={startModalLoading}
+          loadError={startModalLoadError}
           action={dagContext.forceEnqueue ? 'enqueue' : undefined}
           onSubmit={async (params, dagRunId, immediate) => {
-            setIsEnqueueModal(false);
-
             if (dagContext.onEnqueue) {
-              try {
-                await dagContext.onEnqueue(params, dagRunId, immediate);
-              } catch (err) {
-                showError(
-                  err instanceof Error ? err.message : 'Failed to enqueue DAG',
-                  'Enqueue failed. Please try again.'
-                );
-              }
+              await dagContext.onEnqueue(params, dagRunId, immediate);
               return;
             }
 
@@ -659,11 +729,9 @@ function DAGActions({
                   body,
                 }));
             if (error) {
-              showError(
-                error.message || 'Failed to start DAG',
-                'Check if the worker is running and the DAG definition is valid.'
+              throw new Error(
+                error.message || 'Failed to start DAG execution.'
               );
-              return;
             }
 
             // Just refresh the current page data
@@ -675,6 +743,8 @@ function DAGActions({
           }}
           dismissModal={() => {
             setIsEnqueueModal(false);
+            setStartModalDag(undefined);
+            setStartModalLoadError(null);
           }}
         />
         <ConfirmModal
@@ -696,8 +766,8 @@ function DAGActions({
                 You have unsaved changes in the DAG definition.
               </p>
               <p className="text-sm text-muted-foreground">
-                The DAG will run with the last saved version, not your current edits.
-                Save your changes first if you want them to take effect.
+                The DAG will run with the last saved version, not your current
+                edits. Save your changes first if you want them to take effect.
               </p>
             </div>
           </div>

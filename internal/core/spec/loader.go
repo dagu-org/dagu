@@ -64,6 +64,7 @@ func WithBaseConfigContent(content []byte) LoadOption {
 // WithParams sets the parameters for the DAG.
 func WithParams(params any) LoadOption {
 	return func(o *LoadOptions) {
+		o.flags |= BuildFlagValidateRuntimeParams
 		switch params := params.(type) {
 		case string:
 			o.params = params

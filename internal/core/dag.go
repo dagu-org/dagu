@@ -124,6 +124,9 @@ type DAG struct {
 	LogOutput LogOutputMode `json:"logOutput,omitempty"`
 	// DefaultParams contains the default parameters to be passed to the DAG.
 	DefaultParams string `json:"defaultParams,omitempty"`
+	// ParamDefs contains ordered parameter metadata derived from DAG params.
+	// It is exposed to the API for typed UI rendering and validation hints.
+	ParamDefs []ParamDef `json:"paramDefs,omitempty"`
 	// Params contains the list of parameters to be passed to the DAG.
 	// Note: This field is evaluated at build time and may contain secrets.
 	// It is excluded from JSON serialization to prevent secret leakage.
@@ -218,6 +221,29 @@ type DAG struct {
 	// dotenvOnce ensures LoadDotEnv is called only once, even with concurrent calls.
 	// This provides thread-safe idempotency for dotenv loading.
 	dotenvOnce sync.Once
+}
+
+const (
+	ParamDefTypeString  = "string"
+	ParamDefTypeInteger = "integer"
+	ParamDefTypeNumber  = "number"
+	ParamDefTypeBoolean = "boolean"
+)
+
+// ParamDef describes a single DAG parameter for API/UI consumers.
+// Name is empty for positional parameters.
+type ParamDef struct {
+	Name        string   `json:"name,omitempty"`
+	Type        string   `json:"type,omitempty"`
+	Default     any      `json:"default,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Required    bool     `json:"required,omitempty"`
+	Enum        []any    `json:"enum,omitempty"`
+	Minimum     *float64 `json:"minimum,omitempty"`
+	Maximum     *float64 `json:"maximum,omitempty"`
+	MinLength   *int     `json:"minLength,omitempty"`
+	MaxLength   *int     `json:"maxLength,omitempty"`
+	Pattern     *string  `json:"pattern,omitempty"`
 }
 
 // SecretRef represents a reference to an external secret.

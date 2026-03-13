@@ -10,8 +10,18 @@ import { useUserPreferences } from '@/contexts/UserPreference';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { ChevronLeft } from 'lucide-react';
-import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import {
+  PathsDocsGetParametersQueryOrder,
+  PathsDocsGetParametersQuerySort,
+} from '@/api/v1/schema';
 import ConfirmModal from '@/ui/ConfirmModal';
 import { CreateDocModal } from './components/CreateDocModal';
 import DocTabEditorPanel from './components/DocTabEditorPanel';
@@ -89,15 +99,22 @@ function DocsContent() {
   // Sort preferences
   const { preferences, updatePreference } = useUserPreferences();
   const { docSortField, docSortOrder } = preferences;
+  const sort = docSortField as PathsDocsGetParametersQuerySort;
+  const order = docSortOrder as PathsDocsGetParametersQueryOrder;
 
   // SSE for real-time updates with polling fallback
-  const sseResult = useDocTreeSSE({ sort: docSortField, order: docSortOrder }, true);
+  const sseResult = useDocTreeSSE({ sort, order }, true);
 
-  const { data: treeData, mutate, error: treeError, isLoading: treeIsLoading } = useQuery(
+  const {
+    data: treeData,
+    mutate,
+    error: treeError,
+    isLoading: treeIsLoading,
+  } = useQuery(
     '/docs',
     {
       params: {
-        query: { remoteNode, perPage: 200, sort: docSortField, order: docSortOrder },
+        query: { remoteNode, perPage: 200, sort, order },
       },
     },
     {
@@ -141,7 +158,10 @@ function DocsContent() {
     if (isNavigatingRef.current) return;
     const docPath = location.pathname.replace(/^\/docs\/?/, '');
     if (docPath) {
-      openDoc(decodeURIComponent(docPath), titleFromPath(decodeURIComponent(docPath)));
+      openDoc(
+        decodeURIComponent(docPath),
+        titleFromPath(decodeURIComponent(docPath))
+      );
     }
   }, [location.pathname, openDoc]);
 
@@ -259,9 +279,16 @@ function DocsContent() {
         mutate();
         // Update all tabs under the renamed path (handles both file and directory renames).
         for (const tab of tabs) {
-          if (tab.docPath === renameDocPath || tab.docPath.startsWith(renameDocPath + '/')) {
-            const updatedPath = newPath + tab.docPath.slice(renameDocPath.length);
-            updateTab(tab.id, { docPath: updatedPath, title: titleFromPath(updatedPath) });
+          if (
+            tab.docPath === renameDocPath ||
+            tab.docPath.startsWith(renameDocPath + '/')
+          ) {
+            const updatedPath =
+              newPath + tab.docPath.slice(renameDocPath.length);
+            updateTab(tab.id, {
+              docPath: updatedPath,
+              title: titleFromPath(updatedPath),
+            });
           }
         }
         showToast('Document renamed');
@@ -284,21 +311,32 @@ function DocsContent() {
           body: { newPath },
         });
         if (error) {
-          showToast(error?.message || `Failed to ${action === 'renamed' ? 'rename' : 'move'} document`);
+          showToast(
+            error?.message ||
+              `Failed to ${action === 'renamed' ? 'rename' : 'move'} document`
+          );
           mutate();
           return;
         }
         mutate();
         // Update ALL tabs under the moved path (handles both file and directory moves).
         for (const tab of tabs) {
-          if (tab.docPath === oldPath || tab.docPath.startsWith(oldPath + '/')) {
+          if (
+            tab.docPath === oldPath ||
+            tab.docPath.startsWith(oldPath + '/')
+          ) {
             const updatedPath = newPath + tab.docPath.slice(oldPath.length);
-            updateTab(tab.id, { docPath: updatedPath, title: titleFromPath(updatedPath) });
+            updateTab(tab.id, {
+              docPath: updatedPath,
+              title: titleFromPath(updatedPath),
+            });
           }
         }
         showToast(`Document ${action}`);
       } catch {
-        showToast(`Failed to ${action === 'renamed' ? 'rename' : 'move'} document`);
+        showToast(
+          `Failed to ${action === 'renamed' ? 'rename' : 'move'} document`
+        );
         mutate();
       }
     },
@@ -306,12 +344,14 @@ function DocsContent() {
   );
 
   const handleInlineRename = useCallback(
-    (oldPath: string, newPath: string) => handlePathChange(oldPath, newPath, 'renamed'),
+    (oldPath: string, newPath: string) =>
+      handlePathChange(oldPath, newPath, 'renamed'),
     [handlePathChange]
   );
 
   const handleMove = useCallback(
-    (oldPath: string, newPath: string) => handlePathChange(oldPath, newPath, 'moved'),
+    (oldPath: string, newPath: string) =>
+      handlePathChange(oldPath, newPath, 'moved'),
     [handlePathChange]
   );
 
@@ -337,7 +377,10 @@ function DocsContent() {
       mutate();
       // Close tabs for deleted path (exact match + prefix for directories)
       for (const tab of tabs) {
-        if (tab.docPath === deleteDocPath || tab.docPath.startsWith(deleteDocPath + '/')) {
+        if (
+          tab.docPath === deleteDocPath ||
+          tab.docPath.startsWith(deleteDocPath + '/')
+        ) {
           clearDraft(tab.id);
           markTabSaved(tab.id);
           closeTab(tab.id);
@@ -349,7 +392,17 @@ function DocsContent() {
     } finally {
       setDeleteConfirmOpen(false);
     }
-  }, [client, remoteNode, deleteDocPath, mutate, tabs, closeTab, clearDraft, markTabSaved, showToast]);
+  }, [
+    client,
+    remoteNode,
+    deleteDocPath,
+    mutate,
+    tabs,
+    closeTab,
+    clearDraft,
+    markTabSaved,
+    showToast,
+  ]);
 
   // Batch delete handler
   const handleBatchDelete = useCallback(async () => {
@@ -366,8 +419,9 @@ function DocsContent() {
       // Close tabs for all deleted paths (exact + prefix for directories)
       const deletedSet = new Set(data.deleted);
       for (const tab of tabs) {
-        const shouldClose = deletedSet.has(tab.docPath) ||
-          [...deletedSet].some(dp => tab.docPath.startsWith(dp + '/'));
+        const shouldClose =
+          deletedSet.has(tab.docPath) ||
+          [...deletedSet].some((dp) => tab.docPath.startsWith(dp + '/'));
         if (shouldClose) {
           clearDraft(tab.id);
           markTabSaved(tab.id);
@@ -386,7 +440,17 @@ function DocsContent() {
       setBatchDeleteConfirmOpen(false);
       setBatchDeletePaths([]);
     }
-  }, [batchDeletePaths, client, remoteNode, mutate, tabs, closeTab, clearDraft, markTabSaved, showToast]);
+  }, [
+    batchDeletePaths,
+    client,
+    remoteNode,
+    mutate,
+    tabs,
+    closeTab,
+    clearDraft,
+    markTabSaved,
+    showToast,
+  ]);
 
   // Batch delete from selection bar
   const handleBatchDeleteFromBar = useCallback((paths: string[]) => {
@@ -505,8 +569,8 @@ function DocsContent() {
           onSubmit={handleDelete}
         >
           <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete <strong>{deleteDocTitle}</strong>? This
-            action cannot be undone.
+            Are you sure you want to delete <strong>{deleteDocTitle}</strong>?
+            This action cannot be undone.
           </p>
         </ConfirmModal>
         <ConfirmModal
@@ -517,7 +581,8 @@ function DocsContent() {
           onSubmit={handleBatchDelete}
         >
           <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete {batchDeletePaths.length} items? This cannot be undone.
+            Are you sure you want to delete {batchDeletePaths.length} items?
+            This cannot be undone.
           </p>
         </ConfirmModal>
       </div>
@@ -562,8 +627,8 @@ function DocsContent() {
         onSubmit={handleDelete}
       >
         <p className="text-sm text-muted-foreground">
-          Are you sure you want to delete <strong>{deleteDocTitle}</strong>? This
-          action cannot be undone.
+          Are you sure you want to delete <strong>{deleteDocTitle}</strong>?
+          This action cannot be undone.
         </p>
       </ConfirmModal>
       <ConfirmModal
@@ -574,7 +639,8 @@ function DocsContent() {
         onSubmit={handleBatchDelete}
       >
         <p className="text-sm text-muted-foreground">
-          Are you sure you want to delete {batchDeletePaths.length} items? This cannot be undone.
+          Are you sure you want to delete {batchDeletePaths.length} items? This
+          cannot be undone.
         </p>
       </ConfirmModal>
     </div>

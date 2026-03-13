@@ -504,11 +504,12 @@
               },
               {
                 "type": "object",
-                "additionalProperties": true
+                "additionalProperties": true,
+                "description": "Named parameter entries. Supports legacy KEY: value pairs and single-key inline definition objects such as {KEY: {type: integer, default: 3}}."
               }
             ]
           },
-          "description": "Named parameters as key-value pairs, accessible as ${KEY}"
+          "description": "Ordered parameter entries. Supports legacy strings, legacy KEY: value pairs, and inline rich definitions declared as single-key objects whose value is a definition map."
         },
         {
           "type": "object",
@@ -533,7 +534,7 @@
           "description": "JSON Schema validation mode: validates parameters against a schema. 'schema' field is required, 'values' field is optional."
         }
       ],
-      "description": "Default parameters that can be overridden when triggering the DAG. Supports three formats: 1) String format: space-separated positional parameters (e.g., 'arg1 arg2') accessible as $1, $2. 2) Array/Object format: named parameters as key-value pairs accessible as ${KEY}, supporting rich types (numbers, booleans, nested objects). 3) Schema validation format: object with 'schema' (path to JSON Schema file) and optional 'values' (parameter values) for runtime validation and defaults."
+      "description": "Default parameters that can be overridden when triggering the DAG. Supports four formats: 1) String format: space-separated positional parameters (e.g., 'arg1 arg2') accessible as $1, $2. 2) Array/Object format: named parameters as key-value pairs accessible as ${KEY}. 3) Inline rich definitions in array form, where a single-key object maps a parameter name to a definition object containing fields such as type, default, enum, minimum, maximum, min_length, max_length, pattern, description, and required. 4) Schema validation format: object with 'schema' (path to JSON Schema file) and optional 'values' (parameter values) for runtime validation and defaults."
     },
     "container": {
       "$ref": "#/definitions/container",

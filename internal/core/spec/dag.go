@@ -402,6 +402,7 @@ var metadataTransformers = []transform{
 	{"restart_schedule", newTransformer("RestartSchedule", buildRestartSchedule)},
 	{"params", newTransformer("Params", buildParams)},
 	{"default_params", newTransformer("DefaultParams", buildDefaultParams)},
+	{"param_defs", newTransformer("ParamDefs", buildParamDefs)},
 	{"params_json", newTransformer("ParamsJSON", buildParamsJSON)},
 	{"worker_selector", &workerSelectorTransformer{}},
 	{"timeout", newTransformer("Timeout", buildTimeout)},
@@ -500,6 +501,7 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 		scope:    baseScope,
 		buildEnv: buildEnv,
 	}
+	ctx.paramsState = &paramsState{}
 
 	// Run the transformer pipeline
 	errs := runTransformers(ctx, d, result)
@@ -759,6 +761,7 @@ func buildRestartSchedule(_ BuildContext, d *dag) ([]core.Schedule, error) {
 type paramsResult struct {
 	Params        []string
 	DefaultParams string
+	ParamDefs     []core.ParamDef
 	ParamsJSON    string // JSON representation of resolved params (original payload when provided as JSON)
 }
 
@@ -776,6 +779,14 @@ func buildDefaultParams(ctx BuildContext, d *dag) (string, error) {
 		return "", err
 	}
 	return result.DefaultParams, nil
+}
+
+func buildParamDefs(ctx BuildContext, d *dag) ([]core.ParamDef, error) {
+	result, err := parseParamsInternal(ctx, d)
+	if err != nil {
+		return nil, err
+	}
+	return result.ParamDefs, nil
 }
 
 func buildParamsJSON(ctx BuildContext, d *dag) (string, error) {
@@ -836,76 +847,17 @@ func marshalParamPairs(paramPairs []paramPair) (string, error) {
 }
 
 func parseParamsInternal(ctx BuildContext, d *dag) (*paramsResult, error) {
-	var (
-		paramPairs []paramPair
-		envs       []string
-	)
-
-	if err := parseParams(d.Params, &paramPairs, &envs); err != nil {
-		return nil, err
+	if ctx.paramsState != nil && ctx.paramsState.cached {
+		return ctx.paramsState.result, ctx.paramsState.err
 	}
 
-	// Create default parameters string in the form of "key=value key=value ..."
-	var paramsToJoin []string
-	for _, paramPair := range paramPairs {
-		paramsToJoin = append(paramsToJoin, paramPair.Escaped())
+	result, err := buildDAGParamsResult(ctx, d)
+	if ctx.paramsState != nil {
+		ctx.paramsState.cached = true
+		ctx.paramsState.result = result
+		ctx.paramsState.err = err
 	}
-	defaultParams := strings.Join(paramsToJoin, " ")
-
-	if ctx.opts.Parameters != "" {
-		var (
-			overridePairs []paramPair
-			overrideEnvs  []string
-		)
-		if err := parseParams(ctx.opts.Parameters, &overridePairs, &overrideEnvs); err != nil {
-			return nil, err
-		}
-		overrideParams(&paramPairs, overridePairs)
-	}
-
-	if len(ctx.opts.ParametersList) > 0 {
-		var (
-			overridePairs []paramPair
-			overrideEnvs  []string
-		)
-		if err := parseParams(ctx.opts.ParametersList, &overridePairs, &overrideEnvs); err != nil {
-			return nil, err
-		}
-		overrideParams(&paramPairs, overridePairs)
-	}
-
-	// Validate the parameters against a resolved schema (if declared)
-	if !ctx.opts.Has(BuildFlagSkipSchemaValidation) {
-		if resolvedSchema, err := resolveSchemaFromParams(d.Params, d.WorkingDir, ctx.file); err != nil {
-			return nil, fmt.Errorf("failed to get JSON schema: %w", err)
-		} else if resolvedSchema != nil {
-			updatedPairs, err := validateParams(paramPairs, resolvedSchema)
-			if err != nil {
-				return nil, err
-			}
-			paramPairs = updatedPairs
-		}
-	}
-
-	var params []string
-	for _, paramPair := range paramPairs {
-		params = append(params, paramPair.String())
-	}
-
-	paramsJSON, err := buildResolvedParamsJSON(paramPairs, ctx.opts.Parameters)
-	if err != nil {
-		return nil, err
-	}
-
-	// Note: envs from params are handled separately - they should be appended to Env
-	// This is a limitation of the current transformer design; we may need to handle this specially
-	_ = envs
-
-	return &paramsResult{
-		Params:        params,
-		DefaultParams: defaultParams,
-		ParamsJSON:    paramsJSON,
-	}, nil
+	return result, err
 }
 
 // workerSelectorTransformer is a custom transformer that sets both WorkerSelector and ForceLocal fields.

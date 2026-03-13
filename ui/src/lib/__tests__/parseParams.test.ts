@@ -3,9 +3,7 @@ import { parseParams, stringifyParams, Parameter } from '../parseParams';
 
 describe('parseParams', () => {
   it('parses basic named param', () => {
-    expect(parseParams('key=value')).toEqual([
-      { Name: 'key', Value: 'value' },
-    ]);
+    expect(parseParams('key=value')).toEqual([{ Name: 'key', Value: 'value' }]);
   });
 
   it('parses quoted value', () => {
@@ -59,7 +57,7 @@ describe('parseParams', () => {
     const input = 'msg="line1\nline2"';
     const result = parseParams(input);
     // The literal LF in the input passes through unescapeValue unchanged
-    expect(result[0].Value).toContain('\n');
+    expect(result[0]!.Value).toContain('\n');
   });
 });
 
@@ -143,7 +141,9 @@ describe('edge cases', () => {
   });
 
   it('handles unicode characters in values', () => {
-    const params: Parameter[] = [{ Name: 'x', Value: 'hello \u00e9\u00e8\u00ea' }];
+    const params: Parameter[] = [
+      { Name: 'x', Value: 'hello \u00e9\u00e8\u00ea' },
+    ];
     const result = stringifyParams(params);
     const parsed = JSON.parse(result);
     expect(parsed[0].x).toBe('hello \u00e9\u00e8\u00ea');
