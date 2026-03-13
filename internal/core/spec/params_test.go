@@ -381,8 +381,8 @@ func TestParseStringParamsWithJSON(t *testing.T) {
 	}
 }
 
-func TestParseStringParamsWithEval(t *testing.T) {
-	t.Run("BacktickCommandSubstitution", func(t *testing.T) {
+func TestParseStringParamsBackticksLiteral(t *testing.T) {
+	t.Run("BacktickValuesPreservedLiterally", func(t *testing.T) {
 		ctx := BuildContext{
 			ctx:  context.Background(),
 			opts: BuildOpts{},
@@ -392,7 +392,7 @@ func TestParseStringParamsWithEval(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, result, 1)
 		assert.Equal(t, "val", result[0].Name)
-		assert.Equal(t, "hello", result[0].Value)
+		assert.Equal(t, "`echo hello`", result[0].Value)
 	})
 }
 
@@ -722,37 +722,26 @@ func TestParseParams(t *testing.T) {
 	t.Run("SimpleParams", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := BuildContext{
-			ctx:  context.Background(),
-			opts: BuildOpts{Flags: BuildFlagNoEval},
-		}
-
 		var params []paramPair
 		var envs []string
 
-		err := parseParams(ctx, "foo=bar baz=qux", &params, &envs)
+		err := parseParams("foo=bar baz=qux", &params, &envs)
 		require.NoError(t, err)
 
 		assert.Equal(t, []paramPair{
 			{Name: "foo", Value: "bar"},
 			{Name: "baz", Value: "qux"},
 		}, params)
-		// NoEval flag prevents env vars from being added
-		assert.Empty(t, envs)
+		assert.Equal(t, []string{"foo=bar", "baz=qux"}, envs)
 	})
 
 	t.Run("PositionalParamsGetNames", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := BuildContext{
-			ctx:  context.Background(),
-			opts: BuildOpts{Flags: BuildFlagNoEval},
-		}
-
 		var params []paramPair
 		var envs []string
 
-		err := parseParams(ctx, "one two three", &params, &envs)
+		err := parseParams("one two three", &params, &envs)
 		require.NoError(t, err)
 
 		// Positional params get numbered names
@@ -763,16 +752,11 @@ func TestParseParams(t *testing.T) {
 		}, params)
 	})
 
-	t.Run("WithEvalAddsEnvs", func(t *testing.T) {
-		ctx := BuildContext{
-			ctx:  context.Background(),
-			opts: BuildOpts{},
-		}
-
+	t.Run("NamedParamsAddedToEnvs", func(t *testing.T) {
 		var params []paramPair
 		var envs []string
 
-		err := parseParams(ctx, "foo=bar baz=qux", &params, &envs)
+		err := parseParams("foo=bar baz=qux", &params, &envs)
 		require.NoError(t, err)
 
 		assert.Equal(t, []paramPair{
@@ -782,38 +766,27 @@ func TestParseParams(t *testing.T) {
 		assert.Equal(t, []string{"foo=bar", "baz=qux"}, envs)
 	})
 
-	t.Run("VariableReference", func(t *testing.T) {
-		ctx := BuildContext{
-			ctx:  context.Background(),
-			opts: BuildOpts{},
-		}
-
+	t.Run("VariableRefsPreservedLiterally", func(t *testing.T) {
 		var params []paramPair
 		var envs []string
 
-		// Second param references first param
-		err := parseParams(ctx, []any{
+		err := parseParams([]any{
 			map[string]any{"BASE": "/opt"},
 			map[string]any{"PATH_VAR": "${BASE}/bin"},
 		}, &params, &envs)
 		require.NoError(t, err)
 
 		assert.Equal(t, "/opt", params[0].Value)
-		assert.Equal(t, "/opt/bin", params[1].Value)
+		assert.Equal(t, "${BASE}/bin", params[1].Value)
 	})
 
 	t.Run("NilInput", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := BuildContext{
-			ctx:  context.Background(),
-			opts: BuildOpts{Flags: BuildFlagNoEval},
-		}
-
 		var params []paramPair
 		var envs []string
 
-		err := parseParams(ctx, nil, &params, &envs)
+		err := parseParams(nil, &params, &envs)
 		require.NoError(t, err)
 		assert.Empty(t, params)
 		assert.Empty(t, envs)
@@ -822,15 +795,10 @@ func TestParseParams(t *testing.T) {
 	t.Run("InvalidInput", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := BuildContext{
-			ctx:  context.Background(),
-			opts: BuildOpts{Flags: BuildFlagNoEval},
-		}
-
 		var params []paramPair
 		var envs []string
 
-		err := parseParams(ctx, 123, &params, &envs)
+		err := parseParams(123, &params, &envs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid parameter value")
 	})
@@ -866,51 +834,4 @@ func TestJSONParamsSkipBacktickSubstitution(t *testing.T) {
 	// tryParseJSONParams does not execute backtick commands;
 	// the value is returned as-is from JSON parsing.
 	assert.Equal(t, "`echo pwned`", result[0].Value)
-}
-
-func TestEvalParamValue(t *testing.T) {
-	t.Run("SimpleValue", func(t *testing.T) {
-		ctx := BuildContext{
-			ctx: context.Background(),
-		}
-
-		result, err := evalParamValue(ctx, "hello", nil)
-		require.NoError(t, err)
-		assert.Equal(t, "hello", result)
-	})
-
-	t.Run("WithAccumulatedVars", func(t *testing.T) {
-		ctx := BuildContext{
-			ctx: context.Background(),
-		}
-
-		vars := map[string]string{"BASE": "/opt"}
-		result, err := evalParamValue(ctx, "${BASE}/bin", vars)
-		require.NoError(t, err)
-		assert.Equal(t, "/opt/bin", result)
-	})
-
-	t.Run("WithBuildEnv", func(t *testing.T) {
-		ctx := BuildContext{
-			ctx:      context.Background(),
-			buildEnv: map[string]string{"ENV_VAR": "value"},
-		}
-
-		result, err := evalParamValue(ctx, "${ENV_VAR}", nil)
-		require.NoError(t, err)
-		assert.Equal(t, "value", result)
-	})
-
-	t.Run("AccumulatedVarsPrecedence", func(t *testing.T) {
-		ctx := BuildContext{
-			ctx:      context.Background(),
-			buildEnv: map[string]string{"VAR": "from-env"},
-		}
-
-		vars := map[string]string{"VAR": "from-accumulated"}
-		result, err := evalParamValue(ctx, "${VAR}", vars)
-		require.NoError(t, err)
-		// Accumulated vars should take precedence (added first to options)
-		assert.Equal(t, "from-accumulated", result)
-	})
 }

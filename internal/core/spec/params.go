@@ -6,13 +6,11 @@ package spec
 import (
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/google/jsonschema-go/jsonschema"
 )
@@ -87,40 +85,21 @@ func overrideParams(paramPairs *[]paramPair, override []paramPair) {
 }
 
 // parseParams parses and processes the parameters for the DAG.
-func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]string) error {
-	var paramPairs []paramPair
+// Parameter values are always treated as literal strings — no variable
+// expansion or command substitution is performed.
+func parseParams(value any, params *[]paramPair, envs *[]string) error {
+	noEvalCtx := BuildContext{opts: BuildOpts{Flags: BuildFlagNoEval}}
 
-	paramPairs, err := parseParamValue(ctx, value)
+	paramPairs, err := parseParamValue(noEvalCtx, value)
 	if err != nil {
 		return core.NewValidationError("params", value, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 	}
 
-	// Accumulated vars for sequential param expansion (e.g., Y=${P1})
-	accumulatedVars := make(map[string]string)
-
 	for index, paramPair := range paramPairs {
-		if !ctx.opts.Has(BuildFlagNoEval) {
-			evaluated, err := evalParamValue(ctx, paramPair.Value, accumulatedVars)
-			if err != nil {
-				return core.NewValidationError("params", paramPair.Value, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
-			}
-			paramPair.Value = evaluated
-		}
-
 		*params = append(*params, paramPair)
 
-		paramString := paramPair.String()
-
-		// Store in accumulated vars for next param expansion
-		// Positional params: $1, $2, $3, ...
-		accumulatedVars[strconv.Itoa(index+1)] = paramString
-
 		if paramPair.Name != "" {
-			accumulatedVars[paramPair.Name] = paramPair.Value
-		}
-
-		if !ctx.opts.Has(BuildFlagNoEval) && paramPair.Name != "" {
-			*envs = append(*envs, paramString)
+			*envs = append(*envs, paramPair.String())
 		}
 
 		if paramPair.Name == "" {
@@ -129,31 +108,6 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 	}
 
 	return nil
-}
-
-func evalParamValue(ctx BuildContext, raw string, accumulatedVars map[string]string) (string, error) {
-	var evalOptions []eval.Option
-
-	if len(accumulatedVars) > 0 {
-		evalOptions = append(evalOptions, eval.WithVariables(accumulatedVars))
-	}
-
-	// Use envScope.buildEnv if available (new thread-safe approach),
-	// fall back to ctx.buildEnv for backward compatibility
-	if ctx.envScope != nil && len(ctx.envScope.buildEnv) > 0 {
-		evalOptions = append(evalOptions, eval.WithVariables(ctx.envScope.buildEnv))
-	} else if ctx.buildEnv != nil {
-		evalOptions = append(evalOptions, eval.WithVariables(ctx.buildEnv))
-	}
-
-	// Also set EnvScope on context for command substitution
-	evalCtx := ctx.ctx
-	if ctx.envScope != nil && ctx.envScope.scope != nil {
-		evalCtx = eval.WithEnvScope(evalCtx, ctx.envScope.scope)
-	}
-
-	evalOptions = append(evalOptions, eval.WithOSExpansion())
-	return eval.String(evalCtx, raw, evalOptions...)
 }
 
 // parseParamValue parses the parameters for the DAG.
@@ -258,9 +212,6 @@ var paramRegex = regexp.MustCompile(
 	`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`[^`]*`" + `|[^"\s]+)`,
 )
 
-// backtickRegex matches backtick-enclosed commands for substitution.
-var backtickRegex = regexp.MustCompile("`[^`]*`")
-
 // tryParseJSONParams attempts to parse the input as JSON and convert it to paramPairs.
 // Returns an error if the input is not valid JSON.
 func tryParseJSONParams(ctx BuildContext, input string) ([]paramPair, error) {
@@ -316,44 +267,13 @@ func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
 		name := match[1]
 		value := match[2]
 
-		if strings.HasPrefix(value, `"`) || strings.HasPrefix(value, "`") {
-			if strings.HasPrefix(value, `"`) {
-				if unquoted, err := strconv.Unquote(value); err == nil {
-					value = unquoted
-				} else {
-					// Fallback for malformed strings (e.g., unterminated quotes)
-					value = strings.Trim(value, `"`)
-					value = strings.ReplaceAll(value, `\"`, `"`)
-				}
-			}
-
-			if !ctx.opts.Has(BuildFlagNoEval) {
-				// Perform backtick command substitution using package-level regex
-				var cmdErr error
-				value = backtickRegex.ReplaceAllStringFunc(
-					value,
-					func(match string) string {
-						var err error
-						cmdStr := strings.Trim(match, "`")
-						cmdStr, err = eval.String(ctx.ctx, cmdStr, eval.WithOSExpansion())
-						if err != nil {
-							cmdErr = err
-							// Leave the original command if it fails
-							return fmt.Sprintf("`%s`", cmdStr)
-						}
-						cmdOut, err := exec.Command("sh", "-c", cmdStr).Output() //nolint:gosec
-						if err != nil {
-							cmdErr = err
-							// Leave the original command if it fails
-							return fmt.Sprintf("`%s`", cmdStr)
-						}
-						return strings.TrimSpace(string(cmdOut))
-					},
-				)
-
-				if cmdErr != nil {
-					return nil, core.NewValidationError("params", value, fmt.Errorf("%w: %s", ErrInvalidParamValue, cmdErr))
-				}
+		if strings.HasPrefix(value, `"`) {
+			if unquoted, err := strconv.Unquote(value); err == nil {
+				value = unquoted
+			} else {
+				// Fallback for malformed strings (e.g., unterminated quotes)
+				value = strings.Trim(value, `"`)
+				value = strings.ReplaceAll(value, `\"`, `"`)
 			}
 		}
 

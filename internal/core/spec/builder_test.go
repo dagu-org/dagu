@@ -64,7 +64,7 @@ func TestEnvParams(t *testing.T) {
 			yaml: `
 params: "TEST_PARAM $1"
 `,
-			wantParams: []string{"1=TEST_PARAM", "2=TEST_PARAM"},
+			wantParams: []string{"1=TEST_PARAM", "2=$1"},
 		},
 		{
 			name: "ParamsWithQuotedValues",
@@ -81,7 +81,7 @@ params:
   - BAR: bar
   - BAZ: "` + "`echo baz`" + `"
 `,
-			wantParams: []string{"FOO=foo", "BAR=bar", "BAZ=baz"},
+			wantParams: []string{"FOO=foo", "BAR=bar", "BAZ=`echo baz`"},
 		},
 		{
 			name: "ParamsAsMapOverride",
@@ -101,7 +101,7 @@ params: first P1=foo P2=${A001} P3=` + "`/bin/echo BAR`" + ` X=bar Y=${P1} Z="A 
 env:
   - A001: TEXT
 `,
-			wantParams: []string{"1=first", "P1=foo", "P2=TEXT", "P3=BAR", "X=bar", "Y=foo", "Z=A B C"},
+			wantParams: []string{"1=first", "P1=foo", "P2=${A001}", "P3=`/bin/echo BAR`", "X=bar", "Y=${P1}", "Z=A B C"},
 		},
 		{
 			name: "ParamsWithSubstringAndDefaults",
@@ -114,7 +114,7 @@ params:
   - REMAINDER: ${BASE:5}
   - FALLBACK: ${MISSING_VALUE:-fallback}
 `,
-			wantParams: []string{"BASE=HBL01_22OCT2025_0536", "PREFIX=HBL01", "REMAINDER=_22OCT2025_0536", "FALLBACK=fallback"},
+			wantParams: []string{"BASE=${SOURCE_ID}", "PREFIX=${BASE:0:5}", "REMAINDER=${BASE:5}", "FALLBACK=${MISSING_VALUE:-fallback}"},
 		},
 		{
 			name: "ParamsNoEvalPreservesRaw",
@@ -238,7 +238,7 @@ env:
 		{
 			name: "InvalidParams",
 			yaml: `
-params: "` + "`invalid command`" + `"`,
+params: 123`,
 			expectedErr: spec.ErrInvalidParamValue,
 		},
 		{

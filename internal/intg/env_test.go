@@ -19,7 +19,7 @@ env:
   - TEST_ENV_1: "env_value_1"
 
 params:
-  - TEST_PARAM_1: ${TEST_ENV_1:0:3}_param
+  - TEST_PARAM_1: my_param
 
 steps:
   - command: echo "${TEST_PARAM_1}"
@@ -37,8 +37,8 @@ steps:
 
 		agent.RunSuccess(t)
 		dag.AssertOutputs(t, map[string]any{
-			"PARAM_OUTPUT": "env_param",
-			"STEP1_OUTPUT": "env_param_step1",
+			"PARAM_OUTPUT": "my_param",
+			"STEP1_OUTPUT": "my_param_step1",
 			"STEP2_OUTPUT": "env_step2",
 		})
 	})
