@@ -108,7 +108,7 @@ func TestRoundTrip(t *testing.T) {
 			OnExit:    &exec.Node{Step: core.Step{Name: "on-exit"}, Status: core.NodeSucceeded},
 			OnSuccess: &exec.Node{Step: core.Step{Name: "on-success"}, Status: core.NodeSucceeded},
 			OnFailure: &exec.Node{Step: core.Step{Name: "on-failure"}, Status: core.NodeNotStarted},
-			OnAbort:   &exec.Node{Step: core.Step{Name: "on-cancel"}, Status: core.NodeNotStarted},
+			OnAbort:   &exec.Node{Step: core.Step{Name: "onAbort"}, Status: core.NodeNotStarted},
 			OnWait:    &exec.Node{Step: core.Step{Name: "on-wait"}, Status: core.NodeNotStarted},
 		}
 
@@ -164,7 +164,7 @@ func TestRoundTrip(t *testing.T) {
 		require.NotNil(t, result.OnFailure)
 		assert.Equal(t, "on-failure", result.OnFailure.Step.Name)
 		require.NotNil(t, result.OnAbort)
-		assert.Equal(t, "on-cancel", result.OnAbort.Step.Name)
+		assert.Equal(t, "onAbort", result.OnAbort.Step.Name)
 		require.NotNil(t, result.OnWait)
 		assert.Equal(t, "on-wait", result.OnWait.Step.Name)
 	})

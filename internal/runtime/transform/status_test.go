@@ -123,7 +123,7 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 	exitNode := runtime.NewNode(core.Step{Name: "exit-step"}, runtime.NodeState{})
 	successNode := runtime.NewNode(core.Step{Name: "success-step"}, runtime.NodeState{})
 	failureNode := runtime.NewNode(core.Step{Name: "failure-step"}, runtime.NodeState{})
-	cancelNode := runtime.NewNode(core.Step{Name: "cancel-step"}, runtime.NodeState{})
+	abortNode := runtime.NewNode(core.Step{Name: "abort-step"}, runtime.NodeState{})
 
 	rootRef := exec.NewDAGRunRef("root-dag", "root-run-123")
 	parentRef := exec.NewDAGRunRef("parent-dag", "parent-run-456")
@@ -139,7 +139,7 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 		transform.WithOnExitNode(exitNode),
 		transform.WithOnSuccessNode(successNode),
 		transform.WithOnFailureNode(failureNode),
-		transform.WithOnAbortNode(cancelNode),
+		transform.WithOnAbortNode(abortNode),
 		transform.WithLogFilePath("/tmp/log.txt"),
 		transform.WithPreconditions([]*core.Condition{{Condition: "test", Expected: "true"}}),
 		transform.WithHierarchyRefs(rootRef, parentRef),
@@ -154,7 +154,7 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 	assert.Equal(t, "exit-step", result.OnExit.Step.Name)
 	assert.Equal(t, "success-step", result.OnSuccess.Step.Name)
 	assert.Equal(t, "failure-step", result.OnFailure.Step.Name)
-	assert.Equal(t, "cancel-step", result.OnAbort.Step.Name)
+	assert.Equal(t, "abort-step", result.OnAbort.Step.Name)
 	assert.Equal(t, "/tmp/log.txt", result.Log)
 	assert.Equal(t, 1, len(result.Preconditions))
 	assert.Equal(t, rootRef, result.Root)

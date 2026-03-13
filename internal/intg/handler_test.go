@@ -312,7 +312,7 @@ steps:
 //
 // Environment variables availability by handler:
 //
-// | Variable                   | Init   | Success   | Failure    | Cancel  | Exit      |
+// | Variable                   | Init   | Success   | Failure    | Abort   | Exit      |
 // |----------------------------|--------|-----------|------------|---------|-----------|
 // | DAG_NAME                   | ✓      | ✓         | ✓          | ✓       | ✓         |
 // | DAG_RUN_ID                 | ✓      | ✓         | ✓          | ✓       | ✓         |
@@ -560,7 +560,7 @@ steps:
 		assert.Contains(t, outputStr, "status:failed", "DAG_RUN_STATUS should be 'failed'")
 	})
 
-	t.Run("CancelHandler_AllEnvVars", func(t *testing.T) {
+	t.Run("AbortHandler_AllEnvVars", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
@@ -569,7 +569,7 @@ handler_on:
   abort:
     command: |
       echo "name:${DAG_NAME}|status:${DAG_RUN_STATUS}|stepname:${DAG_RUN_STEP_NAME}"
-    output: CANCEL_ENV_OUTPUT
+    output: ABORT_ENV_OUTPUT
 
 steps:
   - name: long-running
@@ -588,11 +588,11 @@ steps:
 		<-done
 
 		status := dagAgent.Status(th.Context)
-		require.NotNil(t, status.OnAbort, "cancel handler should have been executed")
+		require.NotNil(t, status.OnAbort, "abort handler should have been executed")
 		require.Equal(t, core.NodeSucceeded, status.OnAbort.Status)
 		require.NotNil(t, status.OnAbort.OutputVariables)
 
-		output, ok := status.OnAbort.OutputVariables.Load("CANCEL_ENV_OUTPUT")
+		output, ok := status.OnAbort.OutputVariables.Load("ABORT_ENV_OUTPUT")
 		require.True(t, ok)
 
 		outputStr := extractValue(output.(string))

@@ -117,7 +117,7 @@ func WithOnFailureNode(node *runtime.Node) StatusOption {
 	}
 }
 
-// WithOnAbortNode returns a StatusOption that sets the cancel handler node
+// WithOnAbortNode returns a StatusOption that sets the abort handler node
 func WithOnAbortNode(node *runtime.Node) StatusOption {
 	return func(s *exec.DAGRunStatus) {
 		s.OnAbort = convertNodeIfPresent(node)
