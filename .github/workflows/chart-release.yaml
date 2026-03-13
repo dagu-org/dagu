@@ -5,7 +5,15 @@ on:
     branches:
       - main
     paths:
-      - "charts/**"
+      - "charts/dagu/Chart.yaml"
+      - "charts/dagu/values.yaml"
+      - "charts/dagu/values.schema.json"
+      - "charts/dagu/.helmignore"
+      - "charts/dagu/README.md"
+      - "charts/dagu/LICENSE*"
+      - "charts/dagu/templates/**"
+      - "charts/dagu/charts/**"
+      - "charts/dagu/crds/**"
       - ".github/workflows/chart-release.yaml"
 
 concurrency:
@@ -33,6 +41,7 @@ jobs:
         with:
           charts_dir: charts
           pages_branch: gh-pages
+          skip_existing: true
           mark_as_latest: false
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"

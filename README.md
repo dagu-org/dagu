@@ -87,10 +87,10 @@ docker run --rm -v ~/.dagu:/var/lib/dagu -p 8080:8080 ghcr.io/dagu-org/dagu:late
 ```bash
 helm repo add dagu https://dagu-org.github.io/dagu
 helm repo update
-helm install dagu dagu/dagu --set persistence.storageClass=nfs-client
+helm install dagu dagu/dagu --set persistence.storageClass=<your-rwx-storage-class>
 ```
 
-> The chart requires a shared storage class that supports `ReadWriteMany`. See [charts/dagu/README.md](./charts/dagu/README.md) for chart details, values, and source-checkout installation.
+> Replace `<your-rwx-storage-class>` with a StorageClass in your cluster that supports `ReadWriteMany`. If your cluster default storage class already supports `ReadWriteMany`, you can omit the flag. See [charts/dagu/README.md](./charts/dagu/README.md) for chart details, values, and source-checkout installation.
 
 > More options (npm, custom paths, specific versions): [Installation docs](https://docs.dagu.sh/getting-started/installation)
 

@@ -5,7 +5,15 @@ on:
     branches:
       - main
     paths:
-      - "charts/**"
+      - "charts/dagu/Chart.yaml"
+      - "charts/dagu/values.yaml"
+      - "charts/dagu/values.schema.json"
+      - "charts/dagu/.helmignore"
+      - "charts/dagu/README.md"
+      - "charts/dagu/LICENSE*"
+      - "charts/dagu/templates/**"
+      - "charts/dagu/charts/**"
+      - "charts/dagu/crds/**"
       - ".github/workflows/chart-ci.yaml"
   pull_request:
     types:
@@ -14,7 +22,15 @@ on:
       - synchronize
       - ready_for_review
     paths:
-      - "charts/**"
+      - "charts/dagu/Chart.yaml"
+      - "charts/dagu/values.yaml"
+      - "charts/dagu/values.schema.json"
+      - "charts/dagu/.helmignore"
+      - "charts/dagu/README.md"
+      - "charts/dagu/LICENSE*"
+      - "charts/dagu/templates/**"
+      - "charts/dagu/charts/**"
+      - "charts/dagu/crds/**"
       - ".github/workflows/chart-ci.yaml"
 
 jobs:
@@ -24,6 +40,54 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Require chart version bump
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base_sha="${{ github.event.pull_request.base.sha }}"
+          else
+            base_sha="${{ github.event.before }}"
+          fi
+
+          if [[ -z "${base_sha}" || "${base_sha}" == "0000000000000000000000000000000000000000" ]]; then
+            echo "No base SHA available; skipping chart version check."
+            exit 0
+          fi
+
+          changed_files="$(git diff --name-only "${base_sha}" "${GITHUB_SHA}" -- \
+            charts/dagu/Chart.yaml \
+            charts/dagu/values.yaml \
+            charts/dagu/values.schema.json \
+            charts/dagu/.helmignore \
+            charts/dagu/README.md \
+            charts/dagu/LICENSE* \
+            charts/dagu/templates \
+            charts/dagu/charts \
+            charts/dagu/crds)"
+
+          if [[ -z "${changed_files}" ]]; then
+            echo "No packaged chart files changed."
+            exit 0
+          fi
+
+          old_version="$(git show "${base_sha}:charts/dagu/Chart.yaml" | awk -F': ' '$1=="version"{gsub(/"/,"",$2); print $2; exit}')"
+          new_version="$(awk -F': ' '$1=="version"{gsub(/"/,"",$2); print $2; exit}' charts/dagu/Chart.yaml)"
+
+          if [[ -z "${old_version}" || -z "${new_version}" ]]; then
+            echo "::error::Unable to read chart version from charts/dagu/Chart.yaml"
+            exit 1
+          fi
+
+          if [[ "${old_version}" == "${new_version}" ]]; then
+            echo "::error::Packaged chart files changed without a chart version bump in charts/dagu/Chart.yaml"
+            printf 'Changed packaged files:\n%s\n' "${changed_files}"
+            exit 1
+          fi
 
       - name: Set up Helm
         uses: azure/setup-helm@v4.3.1

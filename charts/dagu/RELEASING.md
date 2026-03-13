@@ -12,19 +12,23 @@ The publish workflow in this repository assumes the `gh-pages` branch already ex
 
 ## What Triggers A Chart Release
 
-- `.github/workflows/chart-release.yaml` runs on pushes to `main` that touch `charts/**` or the workflow file itself.
+- `.github/workflows/chart-release.yaml` runs on pushes to `main` that touch packaged chart files in `charts/dagu` or the workflow file itself.
 - A new chart release is created only when `charts/dagu/Chart.yaml` contains a chart `version` that has not already been published.
 - Published chart releases are created as GitHub Releases named `dagu-<chart-version>`.
+- The workflow sets `skip_existing: true` so reruns do not fail if the GitHub release tag already exists.
 - The workflow sets `mark_as_latest: false` so chart releases do not replace the repository's application release as GitHub's "latest release".
 
 ## Before Merging A Chart Release
 
 1. Update `charts/dagu/Chart.yaml -> version`.
+   Any change to packaged chart files, including `charts/dagu/README.md`, requires a new chart version.
 2. Update `values.yaml -> image.tag` only if you want the chart default image to change from `latest` to a different tag.
 3. Ensure the chart CI workflow passes:
    - `helm lint ./charts/dagu`
    - `helm template dagu ./charts/dagu --set persistence.storageClass=nfs-client`
    - `helm package ./charts/dagu`
+
+`charts/dagu/RELEASING.md` is ignored by `.helmignore` and is not part of the packaged chart.
 
 ## After Merge
 
