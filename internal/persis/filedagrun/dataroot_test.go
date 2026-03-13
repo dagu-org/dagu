@@ -82,6 +82,55 @@ func TestDataRootRuns(t *testing.T) {
 		assert.Equal(t, dagRun.DAGRun, actual, "FindByDAGRunID should return the correct run")
 	})
 
+	t.Run("FindByDAGRunIDReturnsNewestDuplicate", func(t *testing.T) {
+		ctx := context.Background()
+		dr := setupTestDataRoot(t)
+
+		oldRun := dr.CreateTestDAGRun(t, "duplicate-id", exec.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)))
+		newRun := dr.CreateTestDAGRun(t, "duplicate-id", exec.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)))
+
+		actual, err := dr.FindByDAGRunID(ctx, "duplicate-id")
+		require.NoError(t, err)
+
+		assert.NotEqual(t, oldRun.baseDir, actual.baseDir, "older duplicate should not be returned")
+		assert.Equal(t, newRun.baseDir, actual.baseDir, "newest duplicate should be returned")
+	})
+
+	t.Run("FindByDAGRunIDReturnsNewestDuplicateOnSameDay", func(t *testing.T) {
+		ctx := context.Background()
+		dr := setupTestDataRoot(t)
+
+		oldRun := dr.CreateTestDAGRun(t, "same-day-duplicate-id", exec.NewUTC(time.Date(2021, 1, 2, 1, 0, 0, 0, time.UTC)))
+		newRun := dr.CreateTestDAGRun(t, "same-day-duplicate-id", exec.NewUTC(time.Date(2021, 1, 2, 2, 0, 0, 0, time.UTC)))
+
+		actual, err := dr.FindByDAGRunID(ctx, "same-day-duplicate-id")
+		require.NoError(t, err)
+
+		assert.NotEqual(t, oldRun.baseDir, actual.baseDir, "older same-day duplicate should not be returned")
+		assert.Equal(t, newRun.baseDir, actual.baseDir, "newest same-day duplicate should be returned")
+	})
+
+	t.Run("FindByDAGRunIDUsesExactMatch", func(t *testing.T) {
+		ctx := context.Background()
+		dr := setupTestDataRoot(t)
+
+		exactRun := dr.CreateTestDAGRun(t, "123", exec.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)))
+		_ = dr.CreateTestDAGRun(t, "foo_123", exec.NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC)))
+
+		actual, err := dr.FindByDAGRunID(ctx, "123")
+		require.NoError(t, err)
+
+		assert.Equal(t, exactRun.baseDir, actual.baseDir, "suffix matches should not win over exact dag-run ID matches")
+	})
+
+	t.Run("FindByDAGRunIDNotFound", func(t *testing.T) {
+		ctx := context.Background()
+		dr := setupTestDataRoot(t)
+
+		_, err := dr.FindByDAGRunID(ctx, "missing-id")
+		require.ErrorIs(t, err, exec.ErrDAGRunIDNotFound)
+	})
+
 	t.Run("Latest", func(t *testing.T) {
 		root := setupTestDataRoot(t)
 
