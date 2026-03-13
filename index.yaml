@@ -1,0 +1,13 @@
+apiVersion: v1
+entries:
+  dagu:
+  - apiVersion: v2
+    created: "2026-03-13T16:11:23.445838599Z"
+    description: A DAG-based workflow engine
+    digest: b1c4ebfb55e684a6ad8fa0873c87790e57ef5ed2a954fefe931719e0a3c3e52d
+    name: dagu
+    type: application
+    urls:
+    - https://github.com/dagu-org/dagu/releases/download/dagu-1.0.0/dagu-1.0.0.tgz
+    version: 1.0.0
+generated: "2026-03-13T16:11:23.445848498Z"
