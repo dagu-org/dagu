@@ -31,6 +31,7 @@ data:
       data_dir: /data
       dags_dir: /data/dags
       log_dir: /data/logs
+      base_config: /data/base.yaml
       suspend_flags_dir: /data/suspend
       admin_logs_dir: /data/admin/logs
       dag_runs_dir: /data/dag-runs

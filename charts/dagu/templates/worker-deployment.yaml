@@ -42,6 +42,8 @@ spec:
             - {{ include "dagu.workerLabels" $pool.labels | quote }}
             {{- end }}
           env:
+            - name: DAGU_HOME
+              value: /data
             - name: WORKER_ID
               valueFrom:
                 fieldRef:

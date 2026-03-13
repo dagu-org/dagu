@@ -29,6 +29,9 @@ spec:
             - scheduler
             - --config
             - /etc/dagu/dagu.yaml
+          env:
+            - name: DAGU_HOME
+              value: /data
           ports:
             - name: health
               containerPort: 8090

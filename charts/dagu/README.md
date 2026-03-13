@@ -38,6 +38,7 @@ The chart deploys four components:
 - **UI**: Web interface for managing DAGs (port 8080)
 
 All components share a single PersistentVolumeClaim with `ReadWriteMany` access mode.
+The chart mounts that shared volume at `/data`, sets `DAGU_HOME=/data`, and stores the shared base config at `/data/base.yaml` so fallback paths and inherited env stay aligned across UI, scheduler, coordinator, and workers.
 
 ## Configuration
 
