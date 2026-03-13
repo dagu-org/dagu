@@ -904,9 +904,7 @@ func (t *multiplexTopic) changedSince(lastEventID uint64) bool {
 }
 
 func (t *multiplexTopic) start() {
-	t.wg.Add(1)
-	go func() {
-		defer t.wg.Done()
+	t.wg.Go(func() {
 
 		timer := time.NewTimer(0)
 		defer timer.Stop()
@@ -922,7 +920,7 @@ func (t *multiplexTopic) start() {
 				timer.Reset(t.currentInterval)
 			}
 		}
-	}()
+	})
 }
 
 func (t *multiplexTopic) stop() {
@@ -1032,7 +1030,7 @@ func parseInitialTopics(query map[string][]string) []string {
 	}
 
 	for _, group := range query["topics"] {
-		for _, topic := range strings.Split(group, ",") {
+		for topic := range strings.SplitSeq(group, ",") {
 			if strings.TrimSpace(topic) != "" {
 				rawTopics = append(rawTopics, topic)
 			}
