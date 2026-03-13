@@ -6,7 +6,7 @@ metadata:
     {{- include "dagu.labels" . | nindent 4 }}
 data:
   dagu.yaml: |
-    # Dagu configuration for Kubernetes (v0 Helm chart)
+    # Dagu configuration rendered by the Helm chart
     # This file intentionally includes only the minimal,
     # schema-correct configuration required to run dagu
     # in a distributed Kubernetes environment.
