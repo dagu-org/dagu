@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 import { slugifyHeading } from '@/lib/text-utils';
 import { ChevronDown, ChevronRight, List } from 'lucide-react';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 export interface OutlineHeading {
   level: number;
@@ -38,7 +38,20 @@ type Props = {
 };
 
 function DocOutlinePanel({ markdown, onHeadingClick }: Props) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('dagu_doc_outline_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('dagu_doc_outline_collapsed', collapsed.toString());
+    } catch { /* ignore */ }
+  }, [collapsed]);
+
   const headings = useMemo(() => extractHeadings(markdown), [markdown]);
 
   if (headings.length === 0) return null;
