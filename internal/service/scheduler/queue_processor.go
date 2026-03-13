@@ -6,7 +6,7 @@ package scheduler
 import (
 	"context"
 	"errors"
-	osExec "os/exec"
+	osexec "os/exec"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -403,7 +403,7 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 		defer p.wakeUp()
 		if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID, status, status.TriggerType); err != nil {
 			logger.Error(ctx, "Failed to execute DAG", tag.Error(err))
-			if shouldAbortStartupWait(err) {
+			if isPreStartExecutionFailure(err) {
 				select {
 				case execErrCh <- err:
 				default:
@@ -521,11 +521,16 @@ func readStartupExecutionError(execErrCh <-chan error) error {
 	}
 }
 
-func shouldAbortStartupWait(err error) bool {
-	if err == nil {
+// isPreStartExecutionFailure reports whether an execution error proves the DAG
+// never reached an observable started state. Spawn and dispatch failures should
+// abort the startup wait immediately, while process exit errors should continue
+// to rely on heartbeat/status because the attempt did start.
+func isPreStartExecutionFailure(err error) bool {
+	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return false
 	}
-	var exitErr *osExec.ExitError
+
+	var exitErr *osexec.ExitError
 	return !errors.As(err, &exitErr)
 }
 

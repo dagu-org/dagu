@@ -6,6 +6,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	osexec "os/exec"
 	"testing"
 	"time"
 
@@ -134,6 +135,28 @@ func TestQueueProcessor_CheckStartupStatus_AfterGraceFallsBackToStatus(t *testin
 
 			dagRunStore.AssertExpectations(t)
 			procStore.AssertExpectations(t)
+		})
+	}
+}
+
+func TestIsPreStartExecutionFailure(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "Nil", err: nil, want: false},
+		{name: "ContextCanceled", err: context.Canceled, want: false},
+		{name: "DeadlineExceeded", err: context.DeadlineExceeded, want: false},
+		{name: "ExitError", err: &osexec.ExitError{}, want: false},
+		{name: "DispatchFailure", err: errors.New("dispatch failed"), want: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, isPreStartExecutionFailure(tc.err))
 		})
 	}
 }

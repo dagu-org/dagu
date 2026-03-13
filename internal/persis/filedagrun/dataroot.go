@@ -93,6 +93,8 @@ func NewDataRootWithPrefix(baseDir, prefix string) DataRoot {
 	}
 }
 
+const dagRunTimestampLen = len("20060102_150405Z")
+
 // FindByDAGRunID locates a dag-run by its ID.
 // It scans the year/month/day hierarchy in reverse chronological order and
 // returns the first exact match, which preserves the "newest run wins" behavior
@@ -157,8 +159,34 @@ func findDAGRunInDay(dayPath, dagRunID string) (*DAGRun, error) {
 }
 
 func isMatchingDAGRunDir(dirName, dagRunID string) bool {
-	matches := reDAGRunDir.FindStringSubmatch(dirName)
-	return len(matches) == 3 && matches[2] == dagRunID
+	if !strings.HasPrefix(dirName, DAGRunDirPrefix) {
+		return false
+	}
+
+	remainder := strings.TrimPrefix(dirName, DAGRunDirPrefix)
+	if len(remainder) <= dagRunTimestampLen || remainder[dagRunTimestampLen] != '_' {
+		return false
+	}
+
+	return isDAGRunTimestamp(remainder[:dagRunTimestampLen]) &&
+		remainder[dagRunTimestampLen+1:] == dagRunID
+}
+
+func isDAGRunTimestamp(ts string) bool {
+	if len(ts) != dagRunTimestampLen || ts[8] != '_' || ts[15] != 'Z' {
+		return false
+	}
+
+	for i := range len(ts) {
+		if i == 8 || i == 15 {
+			continue
+		}
+		if ts[i] < '0' || ts[i] > '9' {
+			return false
+		}
+	}
+
+	return true
 }
 
 // Latest returns the most recent dag-runs up to the specified limit.
@@ -199,12 +227,6 @@ func (dr *DataRoot) CreateDAGRun(ts exec.TimeInUTC, dagRunID string) (*DAGRun, e
 	}
 
 	return NewDAGRun(dir)
-}
-
-// GlobPatternWithDAGRunID returns a glob pattern for finding dag-run directories
-// that contain the specified dag-run ID in their name.
-func (dr DataRoot) GlobPatternWithDAGRunID(dagRunID string) string {
-	return filepath.Join(dr.dagRunsDir, "2*", "*", "*", DAGRunDirPrefix+"*"+dagRunID)
 }
 
 // Exists checks if the dag-runs directory exists in the file system.
