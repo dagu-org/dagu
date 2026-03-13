@@ -12,11 +12,13 @@ The publish workflow in this repository assumes the `gh-pages` branch already ex
 
 ## What Triggers A Chart Release
 
-- `.github/workflows/chart-release.yaml` runs on pushes to `main` that touch packaged chart files in `charts/dagu` or the workflow file itself.
+- `.github/workflows/chart-release.yaml` runs on pushes to `main` that touch packaged chart files in `charts/dagu`.
 - A new chart release is created only when `charts/dagu/Chart.yaml` contains a chart `version` that has not already been published.
-- Published chart releases are created as GitHub Releases named `dagu-<chart-version>`.
+- Chart releases created by the current workflow are named `helm-dagu-<chart-version>`.
+- Existing chart releases `dagu-1.0.0` and `dagu-1.0.1` keep their original names.
 - The workflow sets `skip_existing: true` so reruns do not fail if the GitHub release tag already exists.
 - The workflow sets `mark_as_latest: false` so chart releases do not replace the repository's application release as GitHub's "latest release".
+- The release name template is defined in `cr.yaml`.
 
 ## Before Merging A Chart Release
 
@@ -33,7 +35,7 @@ The publish workflow in this repository assumes the `gh-pages` branch already ex
 ## After Merge
 
 1. Confirm the `ReleaseHelmCharts` workflow succeeded on `main`.
-2. Confirm a GitHub Release named `dagu-<chart-version>` exists and includes the `.tgz` package.
+2. Confirm a GitHub Release named `helm-dagu-<chart-version>` exists and includes the `.tgz` package.
 3. Confirm `gh-pages/index.yaml` contains the new chart version.
 4. Confirm the published repository works:
 
@@ -50,7 +52,7 @@ No automation is provided for yanking a published chart version.
 
 If a published version must be removed:
 
-1. Delete the GitHub Release `dagu-<chart-version>` and its chart asset.
+1. Delete the GitHub Release `helm-dagu-<chart-version>` and its chart asset.
 2. Remove that version entry from `gh-pages/index.yaml`.
 3. Commit the `index.yaml` change to `gh-pages`.
 4. Publish a new chart version. Do not reuse the removed version number.
