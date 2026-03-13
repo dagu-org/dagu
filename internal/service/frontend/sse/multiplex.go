@@ -74,6 +74,12 @@ type mutationResult struct {
 	statusCode int
 }
 
+type createSessionResult struct {
+	session *streamSession
+	control StreamControlEvent
+	topics  []*multiplexTopic
+}
+
 type queuedMessage struct {
 	topic   string
 	eventID uint64
@@ -172,17 +178,17 @@ func (m *Multiplexer) Shutdown() {
 	m.topics = make(map[string]*multiplexTopic)
 }
 
-// CreateSession creates a multiplexed SSE session and applies the initial topic set.
-func (m *Multiplexer) CreateSession(ctx context.Context, w http.ResponseWriter, requested []string, lastEventID uint64) (*streamSession, StreamControlEvent, []*multiplexTopic, error) {
+// createSession creates a multiplexed SSE session and applies the initial topic set.
+func (m *Multiplexer) createSession(ctx context.Context, w http.ResponseWriter, requested []string, lastEventID uint64) (createSessionResult, error) {
 	session, err := newStreamSession(w, m)
 	if err != nil {
-		return nil, StreamControlEvent{}, nil, err
+		return createSessionResult{}, err
 	}
 
 	m.mu.Lock()
 	if len(m.sessions) >= m.maxClients {
 		m.mu.Unlock()
-		return nil, StreamControlEvent{}, nil, fmt.Errorf("max clients reached (%d)", m.maxClients)
+		return createSessionResult{}, fmt.Errorf("max clients reached (%d)", m.maxClients)
 	}
 	m.sessions[session.id] = session
 	m.mu.Unlock()
@@ -194,7 +200,7 @@ func (m *Multiplexer) CreateSession(ctx context.Context, w http.ResponseWriter, 
 	result, err := m.applyMutation(ctx, session, requested, nil)
 	if err != nil {
 		m.removeSession(session)
-		return nil, StreamControlEvent{}, nil, err
+		return createSessionResult{}, err
 	}
 
 	control := StreamControlEvent{
@@ -207,29 +213,30 @@ func (m *Multiplexer) CreateSession(ctx context.Context, w http.ResponseWriter, 
 	}
 
 	session.lastSeenEventID = lastEventID
-	return session, control, result.added, nil
+	return createSessionResult{
+		session: session,
+		control: control,
+		topics:  result.added,
+	}, nil
 }
 
-// MutateSession applies add/remove topic mutations to an existing session.
-func (m *Multiplexer) MutateSession(ctx context.Context, sessionID string, add, remove []string) (TopicMutationResponse, []*multiplexTopic, int, error) {
+// mutateSession applies add/remove topic mutations to an existing session.
+func (m *Multiplexer) mutateSession(ctx context.Context, sessionID string, add, remove []string) (mutationResult, error) {
 	session, err := m.getSession(sessionID)
 	if err != nil {
-		return TopicMutationResponse{}, nil, http.StatusNotFound, err
+		return mutationResult{}, err
 	}
 
 	result, err := m.applyMutation(ctx, session, add, remove)
 	if err != nil {
-		if errors.Is(err, ErrTooManyTopics) {
-			return TopicMutationResponse{}, nil, http.StatusBadRequest, err
-		}
-		return TopicMutationResponse{}, nil, http.StatusBadRequest, err
+		return mutationResult{}, err
 	}
 
 	if m.metrics != nil {
 		m.metrics.ObserveTopicsPerSession(len(result.response.Subscribed))
 	}
 
-	return result.response, result.added, result.statusCode, nil
+	return result, nil
 }
 
 func (m *Multiplexer) getSession(sessionID string) (*streamSession, error) {
@@ -399,11 +406,6 @@ func (m *Multiplexer) cleanupResolvedTopics(topics []*multiplexTopic, keep map[s
 		}
 		m.deleteTopicIfUnused(topic)
 	}
-}
-
-func (m *Multiplexer) getOrCreateTopic(parsed ParsedTopic) (*multiplexTopic, error) {
-	topic, _, err := m.getOrCreateTopicForMutation(parsed)
-	return topic, err
 }
 
 func (m *Multiplexer) getOrCreateTopicForMutation(parsed ParsedTopic) (*multiplexTopic, bool, error) {
@@ -590,13 +592,6 @@ func (s *streamSession) removeTopic(topicKey string) *multiplexTopic {
 		delete(s.queuedByTopic, topicKey)
 	}
 	return topic
-}
-
-func (s *streamSession) hasTopic(topicKey string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	_, exists := s.topics[topicKey]
-	return exists
 }
 
 func (s *streamSession) topicKeys() []string {

@@ -56,18 +56,18 @@ func (h *MultiplexHandler) HandleStream(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	session, control, topics, err := h.mux.CreateSession(r.Context(), w, parseInitialTopics(r.URL.Query()), lastEventID)
+	result, err := h.mux.createSession(r.Context(), w, parseInitialTopics(r.URL.Query()), lastEventID)
 	if err != nil {
 		http.Error(w, "unable to open SSE stream", http.StatusServiceUnavailable)
 		return
 	}
-	defer h.mux.removeSession(session)
+	defer h.mux.removeSession(result.session)
 
-	if err := session.writeControl(control); err != nil {
+	if err := result.session.writeControl(result.control); err != nil {
 		return
 	}
-	session.bootstrapTopics(r.Context(), lastEventID, topics)
-	_ = session.Serve(r.Context())
+	result.session.bootstrapTopics(r.Context(), lastEventID, result.topics)
+	_ = result.session.Serve(r.Context())
 }
 
 // HandleTopicMutation adds and removes topics for an existing stream.
@@ -90,7 +90,7 @@ func (h *MultiplexHandler) HandleTopicMutation(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	response, addedTopics, statusCode, err := h.mux.MutateSession(r.Context(), req.SessionID, req.Add, req.Remove)
+	result, err := h.mux.mutateSession(r.Context(), req.SessionID, req.Add, req.Remove)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrUnknownSession):
@@ -105,13 +105,13 @@ func (h *MultiplexHandler) HandleTopicMutation(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if len(addedTopics) > 0 {
+	if len(result.added) > 0 {
 		if session, sessionErr := h.mux.getSession(req.SessionID); sessionErr == nil {
-			session.bootstrapTopics(r.Context(), 0, addedTopics)
+			session.bootstrapTopics(r.Context(), 0, result.added)
 		}
 	}
 
-	writeJSON(w, statusCode, response)
+	writeJSON(w, result.statusCode, result.response)
 }
 
 func parseLastEventID(r *http.Request) (uint64, error) {

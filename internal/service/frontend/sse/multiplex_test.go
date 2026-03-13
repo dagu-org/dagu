@@ -51,18 +51,18 @@ func TestMultiplexerCreateSessionFiltersUnauthorizedTopics(t *testing.T) {
 	})
 
 	recorder := httptest.NewRecorder()
-	session, control, _, err := mux.CreateSession(
+	result, err := mux.createSession(
 		context.Background(),
 		recorder,
 		[]string{"dag:test.yaml", "agent:sess-1"},
 		0,
 	)
 	require.NoError(t, err)
-	require.NotNil(t, session)
+	require.NotNil(t, result.session)
 
-	assert.Equal(t, []string{"dag:test.yaml"}, control.Subscribed)
-	require.Len(t, control.Errors, 1)
-	assert.Equal(t, "agent:sess-1", control.Errors[0].Topic)
+	assert.Equal(t, []string{"dag:test.yaml"}, result.control.Subscribed)
+	require.Len(t, result.control.Errors, 1)
+	assert.Equal(t, "agent:sess-1", result.control.Errors[0].Topic)
 }
 
 func TestMultiplexerMutateSessionPartialAuthorization(t *testing.T) {
@@ -80,22 +80,22 @@ func TestMultiplexerMutateSessionPartialAuthorization(t *testing.T) {
 	})
 
 	recorder := httptest.NewRecorder()
-	session, _, _, err := mux.CreateSession(context.Background(), recorder, nil, 0)
+	result, err := mux.createSession(context.Background(), recorder, nil, 0)
 	require.NoError(t, err)
-	require.NotNil(t, session)
+	require.NotNil(t, result.session)
 
-	response, _, statusCode, err := mux.MutateSession(
+	mutation, err := mux.mutateSession(
 		context.Background(),
-		session.id,
+		result.session.id,
 		[]string{"dag:test.yaml", "agent:sess-1"},
 		nil,
 	)
 	require.NoError(t, err)
 
-	assert.Equal(t, 403, statusCode)
-	assert.Equal(t, []string{"dag:test.yaml"}, response.Subscribed)
-	require.Len(t, response.Errors, 1)
-	assert.Equal(t, "agent:sess-1", response.Errors[0].Topic)
+	assert.Equal(t, 403, mutation.statusCode)
+	assert.Equal(t, []string{"dag:test.yaml"}, mutation.response.Subscribed)
+	require.Len(t, mutation.response.Errors, 1)
+	assert.Equal(t, "agent:sess-1", mutation.response.Errors[0].Topic)
 }
 
 func TestMultiplexerMutateSessionIsAtomicOnTopicResolutionFailure(t *testing.T) {
@@ -107,19 +107,19 @@ func TestMultiplexerMutateSessionIsAtomicOnTopicResolutionFailure(t *testing.T) 
 	})
 
 	recorder := httptest.NewRecorder()
-	session, _, _, err := mux.CreateSession(context.Background(), recorder, []string{"dag:test.yaml"}, 0)
+	result, err := mux.createSession(context.Background(), recorder, []string{"dag:test.yaml"}, 0)
 	require.NoError(t, err)
-	require.NotNil(t, session)
+	require.NotNil(t, result.session)
 
-	_, _, _, err = mux.MutateSession(
+	_, err = mux.mutateSession(
 		context.Background(),
-		session.id,
+		result.session.id,
 		[]string{"missing:test"},
 		[]string{"dag:test.yaml"},
 	)
 	require.Error(t, err)
 
-	assert.Equal(t, []string{"dag:test.yaml"}, session.topicKeys())
+	assert.Equal(t, []string{"dag:test.yaml"}, result.session.topicKeys())
 	_, missingTopicExists := mux.topics["missing:test"]
 	assert.False(t, missingTopicExists)
 }
@@ -133,18 +133,18 @@ func TestMultiplexerMutateSessionRejectsConflictingTopics(t *testing.T) {
 	})
 
 	recorder := httptest.NewRecorder()
-	session, _, _, err := mux.CreateSession(context.Background(), recorder, []string{"dag:test.yaml"}, 0)
+	result, err := mux.createSession(context.Background(), recorder, []string{"dag:test.yaml"}, 0)
 	require.NoError(t, err)
-	require.NotNil(t, session)
+	require.NotNil(t, result.session)
 
-	_, _, _, err = mux.MutateSession(
+	_, err = mux.mutateSession(
 		context.Background(),
-		session.id,
+		result.session.id,
 		[]string{"dag:test.yaml"},
 		[]string{"dag:test.yaml"},
 	)
 	require.ErrorIs(t, err, ErrConflictingTopicMutation)
-	assert.Equal(t, []string{"dag:test.yaml"}, session.topicKeys())
+	assert.Equal(t, []string{"dag:test.yaml"}, result.session.topicKeys())
 }
 
 func TestMultiplexerCreateSessionDoesNotRetainTopicsOnFailure(t *testing.T) {
@@ -156,14 +156,14 @@ func TestMultiplexerCreateSessionDoesNotRetainTopicsOnFailure(t *testing.T) {
 	})
 
 	recorder := httptest.NewRecorder()
-	session, _, _, err := mux.CreateSession(
+	result, err := mux.createSession(
 		context.Background(),
 		recorder,
 		[]string{"dag:test.yaml", "missing:test"},
 		0,
 	)
 	require.Error(t, err)
-	assert.Nil(t, session)
+	assert.Nil(t, result.session)
 	assert.Empty(t, mux.sessions)
 	assert.Empty(t, mux.topics)
 }
@@ -178,9 +178,9 @@ func TestMultiplexerSharesTopicRegistryAcrossSessions(t *testing.T) {
 
 	for range 20 {
 		recorder := httptest.NewRecorder()
-		session, _, _, err := mux.CreateSession(context.Background(), recorder, []string{"dag:test.yaml"}, 0)
+		result, err := mux.createSession(context.Background(), recorder, []string{"dag:test.yaml"}, 0)
 		require.NoError(t, err)
-		require.NotNil(t, session)
+		require.NotNil(t, result.session)
 	}
 
 	require.Len(t, mux.topics, 1)
