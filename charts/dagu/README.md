@@ -23,7 +23,7 @@ Official Helm repository URL:
 https://dagu-org.github.io/dagu
 ```
 
-After GitHub Pages is enabled for this repository and the first chart release completes, add the repository and install the chart:
+Add the repository and install the chart:
 
 ```bash
 helm repo add dagu https://dagu-org.github.io/dagu

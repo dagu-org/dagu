@@ -90,7 +90,7 @@ helm repo update
 helm install dagu dagu/dagu --set persistence.storageClass=nfs-client
 ```
 
-> The chart requires a shared storage class that supports `ReadWriteMany`. The published repository becomes available after GitHub Pages is enabled and the first chart release completes. See [charts/dagu/README.md](./charts/dagu/README.md) for chart details, values, and source-checkout installation.
+> The chart requires a shared storage class that supports `ReadWriteMany`. See [charts/dagu/README.md](./charts/dagu/README.md) for chart details, values, and source-checkout installation.
 
 > More options (npm, custom paths, specific versions): [Installation docs](https://docs.dagu.sh/getting-started/installation)
 
