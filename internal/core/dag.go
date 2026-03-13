@@ -658,7 +658,7 @@ type HandlerOn struct {
 	Init    *Step `json:"init,omitempty"`
 	Failure *Step `json:"failure,omitempty"`
 	Success *Step `json:"success,omitempty"`
-	Cancel  *Step `json:"cancel,omitempty"`
+	Abort   *Step `json:"abort,omitempty"`
 	Exit    *Step `json:"exit,omitempty"`
 	Wait    *Step `json:"wait,omitempty"`
 }
@@ -703,7 +703,7 @@ const (
 	HandlerOnInit    HandlerType = "onInit"
 	HandlerOnSuccess HandlerType = "onSuccess"
 	HandlerOnFailure HandlerType = "onFailure"
-	HandlerOnCancel  HandlerType = "onCancel"
+	HandlerOnAbort   HandlerType = "onAbort"
 	HandlerOnExit    HandlerType = "onExit"
 	HandlerOnWait    HandlerType = "onWait"
 )

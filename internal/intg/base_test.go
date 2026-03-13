@@ -247,7 +247,7 @@ func TestSkipBaseHandlers_AllHandlerTypesSkipped(t *testing.T) {
 	require.NotNil(t, dagWithHandlers.HandlerOn.Init, "init handler should be set")
 	require.NotNil(t, dagWithHandlers.HandlerOn.Success, "success handler should be set")
 	require.NotNil(t, dagWithHandlers.HandlerOn.Failure, "failure handler should be set")
-	require.NotNil(t, dagWithHandlers.HandlerOn.Cancel, "abort/cancel handler should be set")
+	require.NotNil(t, dagWithHandlers.HandlerOn.Abort, "abort handler should be set")
 	require.NotNil(t, dagWithHandlers.HandlerOn.Exit, "exit handler should be set")
 
 	// Load WITH skip - no handlers should be set
@@ -256,6 +256,6 @@ func TestSkipBaseHandlers_AllHandlerTypesSkipped(t *testing.T) {
 	require.Nil(t, dagWithoutHandlers.HandlerOn.Init, "init handler should NOT be set")
 	require.Nil(t, dagWithoutHandlers.HandlerOn.Success, "success handler should NOT be set")
 	require.Nil(t, dagWithoutHandlers.HandlerOn.Failure, "failure handler should NOT be set")
-	require.Nil(t, dagWithoutHandlers.HandlerOn.Cancel, "abort/cancel handler should NOT be set")
+	require.Nil(t, dagWithoutHandlers.HandlerOn.Abort, "abort handler should NOT be set")
 	require.Nil(t, dagWithoutHandlers.HandlerOn.Exit, "exit handler should NOT be set")
 }

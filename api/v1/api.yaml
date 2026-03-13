@@ -7373,7 +7373,7 @@ components:
           $ref: "#/components/schemas/Step"
         success:
           $ref: "#/components/schemas/Step"
-        cancel:
+        abort:
           $ref: "#/components/schemas/Step"
         exit:
           $ref: "#/components/schemas/Step"
@@ -7459,7 +7459,7 @@ components:
               $ref: "#/components/schemas/Node"
             onFailure:
               $ref: "#/components/schemas/Node"
-            onCancel:
+            onAbort:
               $ref: "#/components/schemas/Node"
             preconditions:
               type: array

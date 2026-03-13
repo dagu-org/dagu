@@ -29,7 +29,7 @@ These are only available inside lifecycle handler steps, not during normal step 
 
 | Variable | Handler Scope | Description |
 |----------|---------------|-------------|
-| `DAG_RUN_STATUS` | `onSuccess`, `onFailure`, `onCancel`, `onExit`, `onWait` | Current DAG run status (e.g., `success`, `failed`) |
+| `DAG_RUN_STATUS` | `onSuccess`, `onFailure`, `onAbort`, `onExit`, `onWait` | Current DAG run status (e.g., `success`, `failed`) |
 | `DAG_WAITING_STEPS` | `onWait` only | Comma-separated list of step names that are waiting for approval |
 
 ## Configuration Variables

@@ -501,8 +501,8 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "onExit", core.NodeFailed)
 	})
-	t.Run("OnCancelHandler", func(t *testing.T) {
-		r := setupRunner(t, withOnCancel(successStep("onCancel")))
+	t.Run("OnAbortHandler", func(t *testing.T) {
+		r := setupRunner(t, withOnAbort(successStep("onAbort")))
 
 		plan := r.newPlan(t,
 			newStep("1", withCommand("sleep 0.5")),
@@ -516,7 +516,7 @@ func TestRunner(t *testing.T) {
 		result := plan.assertRun(t, core.Aborted)
 
 		result.assertNodeStatus(t, "1", core.NodeAborted)
-		result.assertNodeStatus(t, "onCancel", core.NodeSucceeded)
+		result.assertNodeStatus(t, "onAbort", core.NodeSucceeded)
 	})
 	t.Run("OnSuccessHandler", func(t *testing.T) {
 		r := setupRunner(t, withOnSuccess(successStep("onSuccess")))
@@ -1568,13 +1568,13 @@ func TestRunner_HandlerNodeAccess(t *testing.T) {
 	exitStep := successStep("onExit")
 	successHandlerStep := successStep("onSuccess")
 	failureStep := successStep("onFailure")
-	cancelStep := successStep("onCancel")
+	cancelStep := successStep("onAbort")
 
 	r := setupRunner(t,
 		withOnExit(exitStep),
 		withOnSuccess(successHandlerStep),
 		withOnFailure(failureStep),
-		withOnCancel(cancelStep),
+		withOnAbort(cancelStep),
 	)
 
 	// Run a simple plan to trigger setup
@@ -1585,7 +1585,7 @@ func TestRunner_HandlerNodeAccess(t *testing.T) {
 	assert.NotNil(t, r.runner.HandlerNode(core.HandlerOnExit))
 	assert.NotNil(t, r.runner.HandlerNode(core.HandlerOnSuccess))
 	assert.NotNil(t, r.runner.HandlerNode(core.HandlerOnFailure))
-	assert.NotNil(t, r.runner.HandlerNode(core.HandlerOnCancel))
+	assert.NotNil(t, r.runner.HandlerNode(core.HandlerOnAbort))
 	assert.Nil(t, r.runner.HandlerNode(core.HandlerType("unknown")))
 }
 

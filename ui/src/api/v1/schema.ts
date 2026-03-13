@@ -2953,7 +2953,7 @@ export interface components {
         HandlerOn: {
             failure?: components["schemas"]["Step"];
             success?: components["schemas"]["Step"];
-            cancel?: components["schemas"]["Step"];
+            abort?: components["schemas"]["Step"];
             exit?: components["schemas"]["Step"];
         };
         /** @description Current status of a DAG-run */
@@ -2993,7 +2993,7 @@ export interface components {
             onExit?: components["schemas"]["Node"];
             onSuccess?: components["schemas"]["Node"];
             onFailure?: components["schemas"]["Node"];
-            onCancel?: components["schemas"]["Node"];
+            onAbort?: components["schemas"]["Node"];
             /** @description List of preconditions that must be met before the DAG-run can start */
             preconditions?: components["schemas"]["Condition"][];
         };

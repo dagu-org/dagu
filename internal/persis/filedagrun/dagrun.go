@@ -347,7 +347,7 @@ func (dr DAGRun) listLogFiles(ctx context.Context) ([]string, error) {
 			logFiles = append(logFiles, n.Stdout, n.Stderr)
 		}
 		for _, n := range []*exec.Node{
-			status.OnSuccess, status.OnExit, status.OnFailure, status.OnCancel,
+			status.OnSuccess, status.OnExit, status.OnFailure, status.OnAbort,
 		} {
 			if n == nil {
 				continue

@@ -1648,7 +1648,7 @@ func buildHandlers(ctx BuildContext, d *dag, result *core.DAG) (core.HandlerOn, 
 		return handlerOn, err
 	}
 
-	if handlerOn.Cancel, err = buildHandler(d.HandlerOn.Abort, core.HandlerOnCancel); err != nil {
+	if handlerOn.Abort, err = buildHandler(d.HandlerOn.Abort, core.HandlerOnAbort); err != nil {
 		return handlerOn, err
 	}
 

@@ -19,7 +19,10 @@ import { useClient, useQuery } from '../../../../hooks/api';
 import { useContentEditor } from '../../../../hooks/useContentEditor';
 import { useDAGSSE } from '../../../../hooks/useDAGSSE';
 import type { SSEState } from '../../../../hooks/useSSE';
-import { sseFallbackOptions, useSSECacheSync } from '../../../../hooks/useSSECacheSync';
+import {
+  sseFallbackOptions,
+  useSSECacheSync,
+} from '../../../../hooks/useSSECacheSync';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { DAGStepTable } from '../dag-details';
@@ -89,7 +92,11 @@ function DAGSpec({ fileName, localDags, sseResult: parentSSEResult }: Props) {
   const sseResult = parentSSEResult ?? ownSSEResult;
 
   // Fetch spec — SWR is the single source of truth, kept fresh by SSE sync
-  const { data, isLoading, mutate: mutateSpec } = useQuery(
+  const {
+    data,
+    isLoading,
+    mutate: mutateSpec,
+  } = useQuery(
     '/dags/{fileName}/spec',
     {
       params: {
@@ -105,7 +112,11 @@ function DAGSpec({ fileName, localDags, sseResult: parentSSEResult }: Props) {
   );
   useSSECacheSync(sseResult, mutateSpec, (sseData) => {
     // Cast to access DAG SSE fields (sseResult may be typed as unknown from parent)
-    const d = sseData as { dag?: components['schemas']['DAGDetails']; spec?: string; errors?: string[] };
+    const d = sseData as {
+      dag?: components['schemas']['DAGDetails'];
+      spec?: string;
+      errors?: string[];
+    };
     // Skip cache update when spec is missing to avoid overwriting valid
     // cached spec with empty string, which would trigger false conflicts.
     if (d.spec === undefined) return undefined;
@@ -464,8 +475,8 @@ function getHandlers(
   if (h?.failure) {
     steps.push(h?.failure);
   }
-  if (h?.cancel) {
-    steps.push(h?.cancel);
+  if (h?.abort) {
+    steps.push(h?.abort);
   }
   if (h?.exit) {
     steps.push(h?.exit);
