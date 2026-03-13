@@ -14,6 +14,7 @@ const (
 	EventTypeHeartbeat = "heartbeat"
 	EventTypeConnected = "connected"
 	EventTypeError     = "error"
+	legacyStreamSunset = "Sat, 13 Mar 2027 00:00:00 GMT"
 )
 
 // TopicType identifies the type of data being watched.
@@ -44,6 +45,7 @@ const (
 	TopicTypeDAGsList   TopicType = "dagslist"
 	TopicTypeDoc        TopicType = "doc"
 	TopicTypeDocTree    TopicType = "doctree"
+	TopicTypeAgent      TopicType = "agent"
 )
 
 // FetchFunc fetches data for a given identifier. The returned data is JSON
@@ -62,4 +64,10 @@ func SetSSEHeaders(w http.ResponseWriter) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
+}
+
+// SetLegacyStreamDeprecationHeaders marks a legacy SSE endpoint as deprecated.
+func SetLegacyStreamDeprecationHeaders(w http.ResponseWriter) {
+	w.Header().Set("Deprecation", "true")
+	w.Header().Set("Sunset", legacyStreamSunset)
 }

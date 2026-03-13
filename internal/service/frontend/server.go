@@ -93,6 +93,7 @@ type Server struct {
 	syncService        gitsync.Service
 	listener           net.Listener
 	sseHub             *sse.Hub
+	sseMultiplexer     *sse.Multiplexer
 	metricsRegistry    *prometheus.Registry
 	tunnelAPIOpts      []apiv1.APIOption
 	dagStore           exec.DAGStore
@@ -1038,9 +1039,19 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 
 	srv.sseHub = sse.NewHub(sse.WithMetrics(sseMetrics))
 	srv.sseHub.Start()
-	srv.registerSSEFetchers()
+	srv.sseMultiplexer = sse.NewMultiplexer(sse.StreamConfig{
+		MaxTopicsPerConnection: srv.config.Server.SSE.MaxTopicsPerConnection,
+		MaxClients:             srv.config.Server.SSE.MaxClients,
+		HeartbeatInterval:      srv.config.Server.SSE.HeartbeatInterval,
+		WriteBufferSize:        srv.config.Server.SSE.WriteBufferSize,
+		SlowClientTimeout:      srv.config.Server.SSE.SlowClientTimeout,
+	}, sseMetrics)
+	srv.registerSSEFetchers(srv.sseHub)
+	srv.registerSSEFetchers(srv.sseMultiplexer)
+	srv.registerMultiplexSSETopics()
 
 	handler := sse.NewHandler(srv.sseHub, srv.remoteNodeResolver)
+	multiplexHandler := sse.NewMultiplexHandler(srv.sseMultiplexer, srv.remoteNodeResolver)
 
 	authOpts := srv.buildStreamAuthOptions("restricted")
 
@@ -1049,6 +1060,8 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 		r.Use(auth.ClientIPMiddleware())
 		r.Use(auth.Middleware(authOpts))
 
+		r.Get("/stream", multiplexHandler.HandleStream)
+		r.Post("/stream/topics", multiplexHandler.HandleTopicMutation)
 		r.Get("/dags", handler.HandleDAGsListEvents)
 		r.Get("/dags/{fileName}", handler.HandleDAGEvents)
 		r.Get("/dags/{fileName}/dag-runs", handler.HandleDAGHistoryEvents)
@@ -1065,18 +1078,35 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 	logger.Info(ctx, "SSE routes configured", slog.String("basePath", apiV1BasePath))
 }
 
-func (srv *Server) registerSSEFetchers() {
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAG, srv.apiV1.GetDAGDetailsData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGHistory, srv.apiV1.GetDAGHistoryData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGsList, srv.apiV1.GetDAGsListData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRun, srv.apiV1.GetDAGRunDetailsData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRuns, srv.apiV1.GetDAGRunsListData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRunLogs, srv.apiV1.GetDAGRunLogsData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeStepLog, srv.apiV1.GetStepLogData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeQueues, srv.apiV1.GetQueuesListData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeQueueItems, srv.apiV1.GetQueueItemsData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDoc, srv.apiV1.GetDocContentData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDocTree, srv.apiV1.GetDocTreeData)
+type sseFetcherRegistrar interface {
+	RegisterFetcher(sse.TopicType, sse.FetchFunc)
+}
+
+func (srv *Server) registerSSEFetchers(registrar sseFetcherRegistrar) {
+	registrar.RegisterFetcher(sse.TopicTypeDAG, srv.apiV1.GetDAGDetailsData)
+	registrar.RegisterFetcher(sse.TopicTypeDAGHistory, srv.apiV1.GetDAGHistoryData)
+	registrar.RegisterFetcher(sse.TopicTypeDAGsList, srv.apiV1.GetDAGsListData)
+	registrar.RegisterFetcher(sse.TopicTypeDAGRun, srv.apiV1.GetDAGRunDetailsData)
+	registrar.RegisterFetcher(sse.TopicTypeDAGRuns, srv.apiV1.GetDAGRunsListData)
+	registrar.RegisterFetcher(sse.TopicTypeDAGRunLogs, srv.apiV1.GetDAGRunLogsData)
+	registrar.RegisterFetcher(sse.TopicTypeStepLog, srv.apiV1.GetStepLogData)
+	registrar.RegisterFetcher(sse.TopicTypeQueues, srv.apiV1.GetQueuesListData)
+	registrar.RegisterFetcher(sse.TopicTypeQueueItems, srv.apiV1.GetQueueItemsData)
+	registrar.RegisterFetcher(sse.TopicTypeDoc, srv.apiV1.GetDocContentData)
+	registrar.RegisterFetcher(sse.TopicTypeDocTree, srv.apiV1.GetDocTreeData)
+}
+
+func (srv *Server) registerMultiplexSSETopics() {
+	if srv.sseMultiplexer == nil || srv.agentAPI == nil {
+		return
+	}
+
+	srv.sseMultiplexer.RegisterFetcher(sse.TopicTypeAgent, func(ctx context.Context, identifier string) (any, error) {
+		return srv.agentAPI.GetSessionSnapshot(ctx, identifier)
+	})
+	srv.sseMultiplexer.RegisterAuthorizer(sse.TopicTypeAgent, func(ctx context.Context, identifier string) error {
+		return srv.agentAPI.AuthorizeSessionAccess(ctx, identifier)
+	})
 }
 
 func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath string) {
@@ -1094,6 +1124,8 @@ func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux, apiV1BasePa
 // proxies the SSE stream to the remote node or delegates to the local handler.
 func (srv *Server) handleAgentStream(apiV1BasePath string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		sse.SetLegacyStreamDeprecationHeaders(w)
+
 		remoteNodeName := r.URL.Query().Get("remoteNode")
 		if remoteNodeName == "" || remoteNodeName == "local" {
 			srv.agentAPI.HandleStream(w, r)
@@ -1304,6 +1336,10 @@ func (srv *Server) Shutdown(ctx context.Context) error {
 	if srv.sseHub != nil {
 		srv.sseHub.Shutdown()
 		logger.Info(ctx, "SSE hub shut down")
+	}
+	if srv.sseMultiplexer != nil {
+		srv.sseMultiplexer.Shutdown()
+		logger.Info(ctx, "SSE multiplexer shut down")
 	}
 
 	if srv.httpServer == nil {

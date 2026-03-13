@@ -145,7 +145,6 @@ export function useAgentChat() {
     appendSessions,
     setHasMoreSessions,
     setSessionPage,
-    addMessage,
     setPendingUserMessage,
     clearSession,
   } = useAgentChatContext();
@@ -155,17 +154,37 @@ export function useAgentChat() {
   const [error, setError] = useState<string | null>(null);
   const [answeredPrompts, setAnsweredPrompts] = useState<Record<string, string>>({});
 
-  const baseUrl = `${config.apiURL}/agent`;
+  const apiURL = config.apiURL;
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
   const dm = useDelegateManager();
+  const openDelegateSessionIds = dm.delegates.map((delegate) => delegate.id);
 
-  useSSEConnection(sessionId, baseUrl, remoteNode, {
-    onMessage: addMessage,
-    onSessionState: setSessionState,
-    onDelegateSnapshots: dm.handleDelegateSnapshots,
-    onDelegateMessages: dm.handleDelegateMessages,
-    onDelegateEvent: dm.handleDelegateEvent,
+  useSSEConnection(sessionId, openDelegateSessionIds, apiURL, remoteNode, {
+    onSnapshot: (snapshot) => {
+      const nextMessages = snapshot.messages || [];
+      if (
+        pendingUserMessage &&
+        nextMessages.some((message) => message.type === 'user' && message.content === pendingUserMessage)
+      ) {
+        setPendingUserMessage(null);
+      }
+
+      setMessages(nextMessages);
+      if (snapshot.session_state) {
+        setSessionState(snapshot.session_state);
+      }
+      dm.handleDelegateSnapshots(snapshot.delegates || []);
+    },
+    onDelegateSnapshot: (delegateId, snapshot) => {
+      const existing = dm.delegateStatuses[delegateId];
+      dm.applyDelegateSessionSnapshot(
+        delegateId,
+        snapshot.session?.delegate_task || existing?.task || '',
+        snapshot.session_state?.working ? 'running' : 'completed',
+        snapshot.messages || []
+      );
+    },
     onNavigate: (path) => navigate(path),
     onPreConnect: dm.resetDelegates,
   });

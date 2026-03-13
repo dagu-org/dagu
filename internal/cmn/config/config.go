@@ -142,6 +142,7 @@ type Server struct {
 	Terminal          TerminalConfig
 	Audit             AuditConfig
 	Session           SessionConfig
+	SSE               SSEConfig
 }
 
 // TerminalConfig contains configuration for the web-based terminal feature.
@@ -158,6 +159,15 @@ type AuditConfig struct {
 // SessionConfig contains configuration for agent session cleanup.
 type SessionConfig struct {
 	MaxPerUser int // Default: 100; 0 = unlimited
+}
+
+// SSEConfig contains configuration for multiplexed SSE streaming.
+type SSEConfig struct {
+	MaxTopicsPerConnection int
+	MaxClients             int
+	HeartbeatInterval      time.Duration
+	WriteBufferSize        int
+	SlowClientTimeout      time.Duration
 }
 
 // Permission represents a permission string used in the application.
@@ -448,6 +458,21 @@ func (c *Config) validateServer() error {
 
 	if c.Server.Session.MaxPerUser < 0 {
 		return fmt.Errorf("session.max_per_user must be >= 0")
+	}
+	if c.Server.SSE.MaxTopicsPerConnection < 0 {
+		return fmt.Errorf("sse.max_topics_per_connection must be >= 0")
+	}
+	if c.Server.SSE.MaxClients < 0 {
+		return fmt.Errorf("sse.max_clients must be >= 0")
+	}
+	if c.Server.SSE.HeartbeatInterval < 0 {
+		return fmt.Errorf("sse.heartbeat_interval must be >= 0")
+	}
+	if c.Server.SSE.WriteBufferSize < 0 {
+		return fmt.Errorf("sse.write_buffer_size must be >= 0")
+	}
+	if c.Server.SSE.SlowClientTimeout < 0 {
+		return fmt.Errorf("sse.slow_client_timeout must be >= 0")
 	}
 
 	return nil

@@ -1,114 +1,99 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { getAuthToken } from '@/lib/authHeaders';
-import { MAX_SSE_RETRIES } from '../constants';
-import { DelegateEvent, DelegateMessages, DelegateSnapshot, Message, StreamResponse } from '../types';
-
-function buildStreamUrl(baseUrl: string, sessionId: string, remoteNode: string): string {
-  const url = new URL(`${baseUrl}/sessions/${sessionId}/stream`, window.location.origin);
-  const token = getAuthToken();
-  if (token) {
-    url.searchParams.set('token', token);
-  }
-  url.searchParams.set('remoteNode', remoteNode);
-  return url.toString();
-}
+import { useEffect, useMemo, useRef } from 'react';
+import { buildAgentSessionTopic, sseManager } from '@/hooks/SSEManager';
+import { StreamResponse } from '../types';
 
 export interface SSECallbacks {
-  onMessage: (msg: Message) => void;
-  onSessionState: (state: NonNullable<StreamResponse['session_state']>) => void;
-  onDelegateSnapshots: (snapshots: DelegateSnapshot[]) => void;
-  onDelegateMessages: (dm: DelegateMessages) => void;
-  onDelegateEvent: (evt: DelegateEvent) => void;
+  onSnapshot: (snapshot: StreamResponse) => void;
+  onDelegateSnapshot: (delegateId: string, snapshot: StreamResponse) => void;
   onNavigate: (path: string) => void;
   onPreConnect: () => void;
 }
 
 export function useSSEConnection(
   sessionId: string | null,
-  baseUrl: string,
+  delegateSessionIds: string[],
+  apiURL: string,
   remoteNode: string,
   callbacks: SSECallbacks
 ) {
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const retryCountRef = useRef(0);
-  const [sseRetryTrigger, setSseRetryTrigger] = useState(0);
-
-  const closeEventSource = useCallback((): void => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    return closeEventSource;
-  }, [closeEventSource]);
-
-  // Stable ref for callbacks so the SSE effect doesn't re-fire on every render.
+  const handledNavigateIdsRef = useRef<Set<string>>(new Set());
   const cbRef = useRef(callbacks);
   cbRef.current = callbacks;
 
+  const delegateKey = useMemo(
+    () => [...delegateSessionIds].sort().join('|'),
+    [delegateSessionIds]
+  );
+  const stableDelegateSessionIds = useMemo(
+    () => (delegateKey ? delegateKey.split('|') : []),
+    [delegateKey]
+  );
+
+  useEffect(() => {
+    handledNavigateIdsRef.current = new Set();
+  }, [sessionId]);
+
   useEffect(() => {
     if (!sessionId) {
-      closeEventSource();
       return;
     }
 
-    eventSourceRef.current?.close();
-
     cbRef.current.onPreConnect();
 
-    const eventSource = new EventSource(buildStreamUrl(baseUrl, sessionId, remoteNode));
-    eventSourceRef.current = eventSource;
+    return sseManager.subscribeTopic(
+      buildAgentSessionTopic(sessionId),
+      remoteNode,
+      apiURL,
+      {
+        onData: (data) => {
+          const snapshot = data as StreamResponse;
+          cbRef.current.onSnapshot(snapshot);
 
-    eventSource.onmessage = (event) => {
-      try {
-        const data: StreamResponse = JSON.parse(event.data);
-        retryCountRef.current = 0;
-
-        for (const msg of data.messages ?? []) {
-          cbRef.current.onMessage(msg);
-          if (msg.type === 'ui_action' && msg.ui_action?.type === 'navigate' && msg.ui_action.path) {
-            cbRef.current.onNavigate(msg.ui_action.path);
+          for (const msg of snapshot.messages ?? []) {
+            if (
+              msg.id &&
+              msg.type === 'ui_action' &&
+              msg.ui_action?.type === 'navigate' &&
+              msg.ui_action.path &&
+              !handledNavigateIdsRef.current.has(msg.id)
+            ) {
+              handledNavigateIdsRef.current.add(msg.id);
+              cbRef.current.onNavigate(msg.ui_action.path);
+            }
           }
-        }
-
-        if (data.session_state) {
-          cbRef.current.onSessionState(data.session_state);
-        }
-
-        if (data.delegates && data.delegates.length > 0) {
-          cbRef.current.onDelegateSnapshots(data.delegates);
-        }
-
-        if (data.delegate_messages) {
-          cbRef.current.onDelegateMessages(data.delegate_messages);
-        }
-
-        if (data.delegate_event) {
-          cbRef.current.onDelegateEvent(data.delegate_event);
-        }
-      } catch {
-        // SSE parse errors are transient, stream will continue
+        },
+        onStateChange: () => {
+          // Agent UI handles reconnects implicitly through fresh snapshots.
+        },
       }
-    };
+    );
+  }, [sessionId, remoteNode, apiURL]);
 
-    eventSource.onerror = () => {
-      if (eventSource.readyState === EventSource.CLOSED && retryCountRef.current < MAX_SSE_RETRIES) {
-        const delay = 1000 * Math.pow(2, retryCountRef.current);
-        retryCountRef.current++;
-        setTimeout(() => {
-          if (sessionId && eventSourceRef.current === eventSource) {
-            setSseRetryTrigger((prev) => prev + 1);
-          }
-        }, delay);
-      }
-    };
+  useEffect(() => {
+    if (!delegateKey) {
+      return;
+    }
+
+    const unsubscribes = stableDelegateSessionIds.map((delegateId) =>
+      sseManager.subscribeTopic(
+        buildAgentSessionTopic(delegateId),
+        remoteNode,
+        apiURL,
+        {
+          onData: (data) => {
+            cbRef.current.onDelegateSnapshot(delegateId, data as StreamResponse);
+          },
+          onStateChange: () => {
+            // Delegate panels update from snapshots only.
+          },
+        }
+      )
+    );
 
     return () => {
-      eventSource.close();
+      for (const unsubscribe of unsubscribes) {
+        unsubscribe();
+      }
     };
-  }, [sessionId, baseUrl, remoteNode, sseRetryTrigger, closeEventSource]);
-
-  return { closeEventSource };
+  }, [delegateKey, stableDelegateSessionIds, remoteNode, apiURL]);
 }

@@ -152,6 +152,7 @@ func (h *Handler) handleSSE(w http.ResponseWriter, r *http.Request, topic string
 	// (both local and proxied to remote nodes). The server's WriteTimeout (60s)
 	// would otherwise kill long-lived SSE streams.
 	SetSSEHeaders(w)
+	SetLegacyStreamDeprecationHeaders(w)
 	rc := http.NewResponseController(w)
 	_ = rc.SetWriteDeadline(time.Time{})
 

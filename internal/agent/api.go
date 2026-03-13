@@ -843,6 +843,71 @@ func (a *API) GetSessionDetail(ctx context.Context, sessionID, userID string) (*
 	}, nil
 }
 
+// AuthorizeSessionAccess validates that the current request context may access the session.
+func (a *API) AuthorizeSessionAccess(ctx context.Context, sessionID string) error {
+	_, err := a.GetSessionDetail(ctx, sessionID, getUserIDFromContext(ctx))
+	return err
+}
+
+// GetSessionSnapshot returns the current full session snapshot without re-checking ownership.
+// Callers must perform authorization before exposing this data to a client.
+func (a *API) GetSessionSnapshot(ctx context.Context, sessionID string) (*StreamResponse, error) {
+	if mgrValue, ok := a.sessions.Load(sessionID); ok {
+		if mgr, ok := mgrValue.(*SessionManager); ok {
+			sess := mgr.GetSession()
+			return &StreamResponse{
+				Messages: mgr.GetMessages(),
+				Session:  &sess,
+				SessionState: &SessionState{
+					SessionID:        sessionID,
+					Working:          mgr.IsWorking(),
+					HasPendingPrompt: mgr.HasPendingPrompt(),
+					Model:            mgr.GetModel(),
+					TotalCost:        mgr.GetTotalCost(),
+				},
+				Delegates: mgr.GetDelegates(),
+			}, nil
+		}
+	}
+
+	if a.store == nil {
+		return nil, ErrSessionNotFound
+	}
+
+	sess, err := a.store.GetSession(ctx, sessionID)
+	if err != nil || sess == nil {
+		return nil, ErrSessionNotFound
+	}
+
+	messages, err := a.store.GetMessages(ctx, sessionID)
+	if err != nil {
+		a.logger.Error("Failed to get messages from store", "error", err)
+		messages = []Message{}
+	}
+
+	var delegates []DelegateSnapshot
+	subSessions, err := a.store.ListSubSessions(ctx, sessionID)
+	if err == nil {
+		for _, sub := range subSessions {
+			delegates = append(delegates, DelegateSnapshot{
+				ID:     sub.ID,
+				Task:   sub.DelegateTask,
+				Status: DelegateStatusCompleted,
+			})
+		}
+	}
+
+	return &StreamResponse{
+		Messages: messages,
+		Session:  sess,
+		SessionState: &SessionState{
+			SessionID: sessionID,
+			Working:   false,
+		},
+		Delegates: delegates,
+	}, nil
+}
+
 // SendMessage sends a message to an existing session.
 func (a *API) SendMessage(ctx context.Context, sessionID string, user UserIdentity, req ChatRequest) error {
 	mgr, ok := a.getOrReactivateSession(ctx, sessionID, user)
