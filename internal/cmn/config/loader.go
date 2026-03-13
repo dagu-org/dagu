@@ -524,26 +524,16 @@ func (l *ConfigLoader) setAuthDefaults(cfg *Config) {
 	if cfg.Server.Auth.Mode == AuthModeBuiltin {
 		// Warn on weak/default token secrets.
 		if cfg.Server.Auth.Builtin.Token.Secret != "" {
-			weakSecrets := []string{"changeme", "secret", "password", "test", "dagu"}
-			for _, weak := range weakSecrets {
-				if strings.EqualFold(cfg.Server.Auth.Builtin.Token.Secret, weak) {
-					l.warnings = append(l.warnings,
-						"Token secret is a well-known default value — use a strong random value for production")
-					break
-				}
-			}
+			l.warnIfWeakValue(cfg.Server.Auth.Builtin.Token.Secret,
+				[]string{"changeme", "secret", "password", "test", "dagu"},
+				"Token secret is a well-known default value — use a strong random value for production")
 		}
 
 		// Warn on weak initial admin passwords.
 		if cfg.Server.Auth.Builtin.InitialAdmin.IsConfigured() {
-			weakPasswords := []string{"password", "changeme", "admin", "dagu", "12345678"}
-			for _, weak := range weakPasswords {
-				if strings.EqualFold(cfg.Server.Auth.Builtin.InitialAdmin.Password, weak) {
-					l.warnings = append(l.warnings,
-						"Initial admin password is a well-known default value — use a strong password for production")
-					break
-				}
-			}
+			l.warnIfWeakValue(cfg.Server.Auth.Builtin.InitialAdmin.Password,
+				[]string{"password", "changeme", "admin", "dagu", "12345678"},
+				"Initial admin password is a well-known default value — use a strong password for production")
 		}
 	}
 	if len(cfg.Server.Auth.OIDC.Scopes) == 0 {
@@ -554,6 +544,16 @@ func (l *ConfigLoader) setAuthDefaults(cfg *Config) {
 	}
 	if cfg.Server.Auth.OIDC.ButtonLabel == "" {
 		cfg.Server.Auth.OIDC.ButtonLabel = "Login with SSO"
+	}
+}
+
+// warnIfWeakValue appends a warning if value matches any entry in weakList (case-insensitive).
+func (l *ConfigLoader) warnIfWeakValue(value string, weakList []string, msg string) {
+	for _, weak := range weakList {
+		if strings.EqualFold(value, weak) {
+			l.warnings = append(l.warnings, msg)
+			return
+		}
 	}
 }
 

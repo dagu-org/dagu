@@ -567,10 +567,8 @@ func initBuiltinAuthService(ctx context.Context, cfg *config.Config, collector *
 			logger.Info(ctx, "Auto-provisioned initial admin user",
 				slog.String("username", ia.Username),
 			)
-			setupRequired = false
-		} else {
-			setupRequired = false
 		}
+		setupRequired = false
 	}
 
 	logger.Info(ctx, "Builtin auth initialized",

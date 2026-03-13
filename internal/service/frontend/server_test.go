@@ -45,7 +45,7 @@ func testConfig(tmpDir string, ia config.InitialAdmin) *config.Config {
 func TestInitBuiltinAuthService_AutoProvision(t *testing.T) {
 	t.Parallel()
 
-	t.Run("ProvisionesAdminWhenNoUsers", func(t *testing.T) {
+	t.Run("ProvisionsAdminWhenNoUsers", func(t *testing.T) {
 		t.Parallel()
 		cfg := testConfig(t.TempDir(), config.InitialAdmin{
 			Username: "testadmin",
@@ -79,7 +79,7 @@ func TestInitBuiltinAuthService_AutoProvision(t *testing.T) {
 		// Pre-create a user directly in the store
 		store, err := fileuser.New(cfg.Paths.UsersDir)
 		require.NoError(t, err)
-		existing := authmodel.NewUser("existinguser", "$2a$12$dummyhash000000000000000000000000000000000000000000", authmodel.RoleAdmin)
+		existing := authmodel.NewUser("existinguser", "$2a$12$K8gHXqrFdFvMwJBG0VlJGuAGz3FwBmTm8xnNQblN2tCxrQgPLmwHa", authmodel.RoleAdmin)
 		require.NoError(t, store.Create(context.Background(), existing))
 
 		result, setupRequired, err := initBuiltinAuthService(context.Background(), cfg, nil)
