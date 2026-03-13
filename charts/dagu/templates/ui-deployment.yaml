@@ -30,6 +30,8 @@ spec:
             - --config
             - /etc/dagu/dagu.yaml
           env:
+            - name: DAGU_HOME
+              value: /data
             - name: DAGU_PORT
               value: {{ .Values.ui.service.port | quote }}
           ports:

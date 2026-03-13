@@ -30,6 +30,8 @@ spec:
             - --config
             - /etc/dagu/dagu.yaml
           env:
+            - name: DAGU_HOME
+              value: /data
             - name: DAGU_COORDINATOR_HOST
               value: "0.0.0.0"
             - name: DAGU_COORDINATOR_ADVERTISE
