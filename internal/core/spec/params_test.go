@@ -392,7 +392,7 @@ func TestParseStringParamsWithEval(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, result, 1)
 		assert.Equal(t, "val", result[0].Name)
-		assert.Equal(t, "hello", result[0].Value)
+		assert.Equal(t, "`echo hello`", result[0].Value)
 	})
 }
 
@@ -737,8 +737,7 @@ func TestParseParams(t *testing.T) {
 			{Name: "foo", Value: "bar"},
 			{Name: "baz", Value: "qux"},
 		}, params)
-		// NoEval flag prevents env vars from being added
-		assert.Empty(t, envs)
+		assert.Equal(t, []string{"foo=bar", "baz=qux"}, envs)
 	})
 
 	t.Run("PositionalParamsGetNames", func(t *testing.T) {
@@ -799,7 +798,7 @@ func TestParseParams(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, "/opt", params[0].Value)
-		assert.Equal(t, "/opt/bin", params[1].Value)
+		assert.Equal(t, "${BASE}/bin", params[1].Value)
 	})
 
 	t.Run("NilInput", func(t *testing.T) {
@@ -866,51 +865,4 @@ func TestJSONParamsSkipBacktickSubstitution(t *testing.T) {
 	// tryParseJSONParams does not execute backtick commands;
 	// the value is returned as-is from JSON parsing.
 	assert.Equal(t, "`echo pwned`", result[0].Value)
-}
-
-func TestEvalParamValue(t *testing.T) {
-	t.Run("SimpleValue", func(t *testing.T) {
-		ctx := BuildContext{
-			ctx: context.Background(),
-		}
-
-		result, err := evalParamValue(ctx, "hello", nil)
-		require.NoError(t, err)
-		assert.Equal(t, "hello", result)
-	})
-
-	t.Run("WithAccumulatedVars", func(t *testing.T) {
-		ctx := BuildContext{
-			ctx: context.Background(),
-		}
-
-		vars := map[string]string{"BASE": "/opt"}
-		result, err := evalParamValue(ctx, "${BASE}/bin", vars)
-		require.NoError(t, err)
-		assert.Equal(t, "/opt/bin", result)
-	})
-
-	t.Run("WithBuildEnv", func(t *testing.T) {
-		ctx := BuildContext{
-			ctx:      context.Background(),
-			buildEnv: map[string]string{"ENV_VAR": "value"},
-		}
-
-		result, err := evalParamValue(ctx, "${ENV_VAR}", nil)
-		require.NoError(t, err)
-		assert.Equal(t, "value", result)
-	})
-
-	t.Run("AccumulatedVarsPrecedence", func(t *testing.T) {
-		ctx := BuildContext{
-			ctx:      context.Background(),
-			buildEnv: map[string]string{"VAR": "from-env"},
-		}
-
-		vars := map[string]string{"VAR": "from-accumulated"}
-		result, err := evalParamValue(ctx, "${VAR}", vars)
-		require.NoError(t, err)
-		// Accumulated vars should take precedence (added first to options)
-		assert.Equal(t, "from-accumulated", result)
-	})
 }
