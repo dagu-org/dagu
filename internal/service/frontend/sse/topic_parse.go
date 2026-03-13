@@ -51,7 +51,7 @@ func canonicalizeTopicIdentifier(topicType TopicType, identifier string) (string
 	switch topicType {
 	case TopicTypeDAGRuns, TopicTypeQueues, TopicTypeDAGsList, TopicTypeDocTree:
 		identifier = strings.TrimPrefix(identifier, "?")
-		return sanitizeQueryForTopic(identifier), nil
+		return parseAndSanitizeQuery(identifier)
 	case TopicTypeDAGRunLogs:
 		pathPart, queryPart, hasQuery := strings.Cut(identifier, "?")
 		pathPart = strings.TrimSpace(pathPart)
@@ -61,7 +61,10 @@ func canonicalizeTopicIdentifier(topicType TopicType, identifier string) (string
 		if !hasQuery {
 			return pathPart, nil
 		}
-		queryPart = sanitizeQueryForTopic(queryPart)
+		queryPart, err := parseAndSanitizeQuery(queryPart)
+		if err != nil {
+			return "", err
+		}
 		if queryPart == "" {
 			return pathPart, nil
 		}

@@ -5,6 +5,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -673,6 +674,90 @@ func TestGetUserIDFromContext(t *testing.T) {
 		ctx := httptest.NewRequest("GET", "/", nil).Context()
 		result := getUserIDFromContext(ctx)
 		assert.Equal(t, defaultUserID, result)
+	})
+}
+
+func TestAPI_AuthorizeSessionAccess(t *testing.T) {
+	t.Parallel()
+
+	t.Run("fails closed without an authenticated user", func(t *testing.T) {
+		t.Parallel()
+
+		api := NewAPI(APIConfig{
+			ConfigStore:  newMockConfigStore(true),
+			SessionStore: newMockSessionStore(),
+			WorkingDir:   t.TempDir(),
+		})
+		api.sessions.Store("sess-1", NewSessionManager(SessionManagerConfig{
+			ID:   "sess-1",
+			User: UserIdentity{UserID: defaultUserID},
+		}))
+
+		err := api.AuthorizeSessionAccess(context.Background(), "sess-1")
+		assert.ErrorIs(t, err, ErrSessionNotFound)
+	})
+
+	t.Run("checks stored session metadata without loading messages", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockSessionStore()
+		store.sessions["sess-1"] = &Session{ID: "sess-1", UserID: "user-1"}
+		store.messages["sess-1"] = []Message{{ID: "msg-1"}}
+		store.getMessagesErr = errors.New("messages should not be loaded")
+
+		api := NewAPI(APIConfig{
+			ConfigStore:  newMockConfigStore(true),
+			SessionStore: store,
+			WorkingDir:   t.TempDir(),
+		})
+
+		ctx := auth.WithUser(context.Background(), &auth.User{
+			ID:       "user-1",
+			Username: "user-1",
+			Role:     auth.RoleAdmin,
+		})
+
+		err := api.AuthorizeSessionAccess(ctx, "sess-1")
+		require.NoError(t, err)
+	})
+}
+
+func TestAPI_GetSessionSnapshot_PropagatesStoreErrors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns GetSession errors directly", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockSessionStore()
+		store.getErr = errors.New("store unavailable")
+		api := NewAPI(APIConfig{
+			ConfigStore:  newMockConfigStore(true),
+			SessionStore: store,
+			WorkingDir:   t.TempDir(),
+		})
+
+		_, err := api.GetSessionSnapshot(context.Background(), "sess-1")
+		require.Error(t, err)
+		assert.EqualError(t, err, "store unavailable")
+	})
+
+	t.Run("returns GetMessages errors directly", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockSessionStore()
+		store.sessions["sess-1"] = &Session{ID: "sess-1", UserID: "user-1"}
+		store.messages["sess-1"] = []Message{{ID: "msg-1"}}
+		store.getMessagesErr = errors.New("messages unavailable")
+
+		api := NewAPI(APIConfig{
+			ConfigStore:  newMockConfigStore(true),
+			SessionStore: store,
+			WorkingDir:   t.TempDir(),
+		})
+
+		_, err := api.GetSessionSnapshot(context.Background(), "sess-1")
+		require.Error(t, err)
+		assert.EqualError(t, err, "messages unavailable")
 	})
 }
 

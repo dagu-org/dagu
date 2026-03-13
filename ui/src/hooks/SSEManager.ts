@@ -103,7 +103,11 @@ export function endpointToTopic(endpoint: string): string {
   if (segments.length === 3 && segments[1] === 'dags') {
     return buildTopic('dag', segments[2]);
   }
-  if (segments.length === 4 && segments[1] === 'dags' && segments[3] === 'dag-runs') {
+  if (
+    segments.length === 4 &&
+    segments[1] === 'dags' &&
+    segments[3] === 'dag-runs'
+  ) {
     return buildTopic('daghistory', segments[2]);
   }
   if (segments.length === 2 && segments[1] === 'dag-runs') {
@@ -118,7 +122,10 @@ export function endpointToTopic(endpoint: string): string {
     segments[4] === 'logs'
   ) {
     const identifier = `${segments[2]}/${segments[3]}`;
-    return buildTopic('dagrunlogs', query ? `${identifier}?${query}` : identifier);
+    return buildTopic(
+      'dagrunlogs',
+      query ? `${identifier}?${query}` : identifier
+    );
   }
   if (
     segments.length === 7 &&
@@ -126,12 +133,19 @@ export function endpointToTopic(endpoint: string): string {
     segments[4] === 'logs' &&
     segments[5] === 'steps'
   ) {
-    return buildTopic('steplog', `${segments[2]}/${segments[3]}/${segments[6]}`);
+    return buildTopic(
+      'steplog',
+      `${segments[2]}/${segments[3]}/${segments[6]}`
+    );
   }
   if (segments.length === 2 && segments[1] === 'queues') {
     return buildTopic('queues', query);
   }
-  if (segments.length === 4 && segments[1] === 'queues' && segments[3] === 'items') {
+  if (
+    segments.length === 4 &&
+    segments[1] === 'queues' &&
+    segments[3] === 'items'
+  ) {
     return buildTopic('queueitems', segments[2]);
   }
   if (segments.length === 2 && segments[1] === 'docs-tree') {
@@ -148,7 +162,12 @@ export function buildAgentSessionTopic(sessionId: string): string {
   return buildTopic('agent', sessionId);
 }
 
-function buildStreamUrl(apiURL: string, remoteNode: string, topics: string[], lastEventId: string): string {
+function buildStreamUrl(
+  apiURL: string,
+  remoteNode: string,
+  topics: string[],
+  lastEventId: string
+): string {
   const url = new URL(`${apiURL}/events/stream`, window.location.origin);
   for (const topic of [...topics].sort()) {
     url.searchParams.append('topic', topic);
@@ -172,11 +191,26 @@ function buildMutationUrl(apiURL: string, remoteNode: string): string {
   return url.toString();
 }
 
+function buildTopicState(
+  conn: ManagedConnection,
+  topic: string
+): SSEConnectionState {
+  const isSubscribed = conn.serverTopics.has(topic);
+  const isPendingAdd = conn.pendingAdd.has(topic);
+
+  return {
+    isConnected: conn.state.isConnected && isSubscribed,
+    isConnecting: conn.state.isConnecting || isPendingAdd,
+    shouldUseFallback: conn.state.shouldUseFallback,
+    error: conn.state.error,
+  };
+}
+
 function calculateRetryDelay(retryCount: number): number {
   return Math.min(1000 * 2 ** retryCount, MAX_RETRY_DELAY_MS);
 }
 
-class SSEManager {
+export class SSEManager {
   private connections = new Map<string, ManagedConnection>();
 
   subscribe(
@@ -185,7 +219,12 @@ class SSEManager {
     apiURL: string,
     callbacks: SubscriberCallbacks
   ): () => void {
-    return this.subscribeTopic(endpointToTopic(endpoint), remoteNode, apiURL, callbacks);
+    return this.subscribeTopic(
+      endpointToTopic(endpoint),
+      remoteNode,
+      apiURL,
+      callbacks
+    );
   }
 
   subscribeTopic(
@@ -214,10 +253,6 @@ class SSEManager {
     }
 
     topicEntry.subscribers.set(subscriberId, callbacks);
-    callbacks.onStateChange(conn.state);
-    if (topicEntry.lastPayload !== null) {
-      callbacks.onData(topicEntry.lastPayload);
-    }
 
     if (isNewTopic) {
       this.handleTopicAdded(conn, topic);
@@ -225,10 +260,19 @@ class SSEManager {
       this.ensureConnected(conn);
     }
 
+    callbacks.onStateChange(buildTopicState(conn, topic));
+    if (topicEntry.lastPayload !== null) {
+      callbacks.onData(topicEntry.lastPayload);
+    }
+
     return () => this.unsubscribe(key, topic, subscriberId);
   }
 
-  private getOrCreateConnection(key: string, apiURL: string, remoteNode: string): ManagedConnection {
+  private getOrCreateConnection(
+    key: string,
+    apiURL: string,
+    remoteNode: string
+  ): ManagedConnection {
     const existing = this.connections.get(key);
     if (existing) {
       return existing;
@@ -268,6 +312,7 @@ class SSEManager {
       if (!conn.serverTopics.has(topic)) {
         conn.pendingRemove.delete(topic);
         conn.pendingAdd.add(topic);
+        this.notifyTopicState(conn, topic);
         this.scheduleMutation(conn);
       }
       return;
@@ -276,6 +321,7 @@ class SSEManager {
     if (conn.eventSource && conn.state.isConnecting) {
       conn.pendingRemove.delete(topic);
       conn.pendingAdd.add(topic);
+      this.notifyTopicState(conn, topic);
       return;
     }
 
@@ -301,7 +347,12 @@ class SSEManager {
     conn.topics.delete(topic);
     conn.pendingAdd.delete(topic);
 
-    if (conn.sessionId && (conn.state.isConnected || conn.state.isConnecting || conn.serverTopics.has(topic))) {
+    if (
+      conn.sessionId &&
+      (conn.state.isConnected ||
+        conn.state.isConnecting ||
+        conn.serverTopics.has(topic))
+    ) {
       conn.pendingRemove.add(topic);
       this.scheduleMutation(conn);
     }
@@ -349,7 +400,12 @@ class SSEManager {
       conn.connectTimeout = null;
     }
 
-    const url = buildStreamUrl(conn.apiURL, conn.remoteNode, Array.from(conn.topics.keys()), conn.lastEventId);
+    const url = buildStreamUrl(
+      conn.apiURL,
+      conn.remoteNode,
+      Array.from(conn.topics.keys()),
+      conn.lastEventId
+    );
     const eventSource = new EventSource(url);
     conn.eventSource = eventSource;
     conn.sessionId = null;
@@ -377,7 +433,9 @@ class SSEManager {
       }
 
       try {
-        const control = JSON.parse((event as MessageEvent).data) as ControlEvent;
+        const control = JSON.parse(
+          (event as MessageEvent).data
+        ) as ControlEvent;
         conn.sessionId = control.sessionID;
         conn.serverTopics = new Set(control.subscribed ?? []);
         conn.retryCount = 0;
@@ -418,7 +476,10 @@ class SSEManager {
       }
 
       try {
-        const parsed = JSON.parse(messageEvent.data) as { topic?: string; payload?: unknown };
+        const parsed = JSON.parse(messageEvent.data) as {
+          topic?: string;
+          payload?: unknown;
+        };
         if (!parsed.topic) {
           return;
         }
@@ -432,7 +493,10 @@ class SSEManager {
         }
       } catch (error) {
         this.updateState(conn, {
-          error: error instanceof Error ? error : new Error('Invalid JSON response from SSE'),
+          error:
+            error instanceof Error
+              ? error
+              : new Error('Invalid JSON response from SSE'),
         });
       }
     });
@@ -479,7 +543,10 @@ class SSEManager {
     }, delay);
   }
 
-  private scheduleMutation(conn: ManagedConnection, delay: number = MUTATION_DEBOUNCE_MS): void {
+  private scheduleMutation(
+    conn: ManagedConnection,
+    delay: number = MUTATION_DEBOUNCE_MS
+  ): void {
     if (!conn.sessionId || !conn.state.isConnected) {
       return;
     }
@@ -498,7 +565,9 @@ class SSEManager {
       return;
     }
 
-    const add = Array.from(conn.pendingAdd).filter((topic) => conn.topics.has(topic));
+    const add = Array.from(conn.pendingAdd).filter((topic) =>
+      conn.topics.has(topic)
+    );
     const remove = Array.from(conn.pendingRemove);
     if (add.length === 0 && remove.length === 0) {
       return;
@@ -506,15 +575,18 @@ class SSEManager {
 
     conn.mutationInFlight = true;
     try {
-      const response = await fetch(buildMutationUrl(conn.apiURL, conn.remoteNode), {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          sessionID: conn.sessionId,
-          add,
-          remove,
-        }),
-      });
+      const response = await fetch(
+        buildMutationUrl(conn.apiURL, conn.remoteNode),
+        {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            sessionID: conn.sessionId,
+            add,
+            remove,
+          }),
+        }
+      );
 
       if (response.status === 404) {
         conn.pendingAdd.clear();
@@ -527,7 +599,9 @@ class SSEManager {
         return;
       }
 
-      const body = await response.json() as TopicMutationResponse | { error?: string; message?: string };
+      const body = (await response.json()) as
+        | TopicMutationResponse
+        | { error?: string; message?: string };
       if (!response.ok && response.status !== 403) {
         throw new Error(
           'message' in body && typeof body.message === 'string'
@@ -549,28 +623,60 @@ class SSEManager {
       if ('errors' in body && body.errors && body.errors.length > 0) {
         console.warn('SSE topic mutation errors:', body.errors);
       }
+      this.notifyAllTopicStates(conn);
     } catch (error) {
       this.updateState(conn, {
-        error: error instanceof Error ? error : new Error('Failed to update SSE topics'),
+        error:
+          error instanceof Error
+            ? error
+            : new Error('Failed to update SSE topics'),
       });
     } finally {
       conn.mutationInFlight = false;
-      if ((conn.pendingAdd.size > 0 || conn.pendingRemove.size > 0) && conn.sessionId && conn.state.isConnected) {
+      if (
+        (conn.pendingAdd.size > 0 || conn.pendingRemove.size > 0) &&
+        conn.sessionId &&
+        conn.state.isConnected
+      ) {
         this.scheduleMutation(conn, 0);
       }
     }
   }
 
-  private updateState(conn: ManagedConnection, partial: Partial<SSEConnectionState>): void {
+  private updateState(
+    conn: ManagedConnection,
+    partial: Partial<SSEConnectionState>
+  ): void {
     conn.state = {
       ...conn.state,
       ...partial,
     };
 
-    for (const topicEntry of conn.topics.values()) {
-      for (const subscriber of topicEntry.subscribers.values()) {
-        subscriber.onStateChange(conn.state);
-      }
+    this.notifyAllTopicStates(conn);
+  }
+
+  private notifyAllTopicStates(conn: ManagedConnection): void {
+    for (const [topic, topicEntry] of conn.topics.entries()) {
+      this.notifyTopicEntryState(conn, topic, topicEntry);
+    }
+  }
+
+  private notifyTopicState(conn: ManagedConnection, topic: string): void {
+    const topicEntry = conn.topics.get(topic);
+    if (!topicEntry) {
+      return;
+    }
+    this.notifyTopicEntryState(conn, topic, topicEntry);
+  }
+
+  private notifyTopicEntryState(
+    conn: ManagedConnection,
+    topic: string,
+    topicEntry: TopicSubscription
+  ): void {
+    const topicState = buildTopicState(conn, topic);
+    for (const subscriber of topicEntry.subscribers.values()) {
+      subscriber.onStateChange(topicState);
     }
   }
 

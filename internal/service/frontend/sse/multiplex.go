@@ -254,12 +254,6 @@ func (m *Multiplexer) getSession(sessionID string) (*streamSession, error) {
 }
 
 func (m *Multiplexer) applyMutation(ctx context.Context, session *streamSession, add, remove []string) (mutationResult, error) {
-	currentTopics := session.topicKeys()
-	currentSet := make(map[string]struct{}, len(currentTopics))
-	for _, topicKey := range currentTopics {
-		currentSet[topicKey] = struct{}{}
-	}
-
 	addedParsed, err := parseTopicList(add)
 	if err != nil {
 		return mutationResult{}, err
@@ -286,9 +280,6 @@ func (m *Multiplexer) applyMutation(ctx context.Context, session *streamSession,
 	authErrors := make([]TopicMutationError, 0)
 	authorizedAdds := make([]ParsedTopic, 0, len(addedParsed))
 	for _, parsed := range addedParsed {
-		if _, exists := currentSet[parsed.Key]; exists {
-			continue
-		}
 		authorizer := m.getAuthorizer(parsed.Type)
 		if authorizer == nil {
 			authorizedAdds = append(authorizedAdds, parsed)
@@ -305,48 +296,69 @@ func (m *Multiplexer) applyMutation(ctx context.Context, session *streamSession,
 		authorizedAdds = append(authorizedAdds, parsed)
 	}
 
-	finalCount := len(currentSet)
-	for key := range removeSet {
-		if _, exists := currentSet[key]; exists {
-			finalCount--
-		}
-	}
-	for _, parsed := range authorizedAdds {
-		if _, removed := removeSet[parsed.Key]; removed {
-			finalCount++
-			continue
-		}
-		finalCount++
-	}
-	if finalCount > m.maxTopicsPerConn {
-		return mutationResult{}, ErrTooManyTopics
-	}
-
 	resolvedAdds, createdTopics, err := m.resolveTopicsForMutation(authorizedAdds)
 	if err != nil {
 		return mutationResult{}, err
 	}
+	resolvedByKey := make(map[string]*multiplexTopic, len(authorizedAdds))
+	for idx, parsed := range authorizedAdds {
+		resolvedByKey[parsed.Key] = resolvedAdds[idx]
+	}
+
+	session.mutationMu.Lock()
+	defer session.mutationMu.Unlock()
 
 	if session.isClosed() {
 		m.cleanupResolvedTopics(createdTopics, nil)
 		return mutationResult{}, ErrUnknownSession
 	}
 
+	currentTopics := session.topicKeys()
+	currentSet := make(map[string]struct{}, len(currentTopics))
+	for _, topicKey := range currentTopics {
+		currentSet[topicKey] = struct{}{}
+	}
+
+	finalCount := len(currentSet)
+	for key := range removeSet {
+		if _, exists := currentSet[key]; exists {
+			finalCount--
+		}
+	}
+
+	addsToApply := make([]ParsedTopic, 0, len(authorizedAdds))
+	for _, parsed := range authorizedAdds {
+		if _, exists := currentSet[parsed.Key]; exists {
+			continue
+		}
+		addsToApply = append(addsToApply, parsed)
+		finalCount++
+	}
+	if finalCount > m.maxTopicsPerConn {
+		m.cleanupResolvedTopics(createdTopics, nil)
+		return mutationResult{}, ErrTooManyTopics
+	}
+
 	for _, parsed := range removedParsed {
 		m.unsubscribeTopic(session, parsed.Key)
 	}
 
-	addedTopics := make([]*multiplexTopic, 0, len(resolvedAdds))
-	addedTopicKeys := make(map[string]struct{}, len(resolvedAdds))
-	for idx, topic := range resolvedAdds {
-		parsed := authorizedAdds[idx]
-		if session.addTopic(topic) {
-			topic.addSession(session)
-			addedTopics = append(addedTopics, topic)
-			addedTopicKeys[topic.key] = struct{}{}
-			if m.metrics != nil {
-				m.metrics.TopicMutation("subscribe", string(parsed.Type))
-			}
+	addedTopics := make([]*multiplexTopic, 0, len(addsToApply))
+	addedTopicKeys := make(map[string]struct{}, len(addsToApply))
+	for _, parsed := range addsToApply {
+		topic, err := m.attachTopicToSession(session, parsed, resolvedByKey[parsed.Key])
+		if err != nil {
+			m.cleanupResolvedTopics(createdTopics, addedTopicKeys)
+			return mutationResult{}, err
+		}
+		if topic == nil {
+			continue
+		}
+
+		addedTopics = append(addedTopics, topic)
+		addedTopicKeys[topic.key] = struct{}{}
+		if m.metrics != nil {
+			m.metrics.TopicMutation("subscribe", string(parsed.Type))
 		}
 	}
 	m.cleanupResolvedTopics(createdTopics, addedTopicKeys)
@@ -364,6 +376,42 @@ func (m *Multiplexer) applyMutation(ctx context.Context, session *streamSession,
 		added:      addedTopics,
 		statusCode: statusCode,
 	}, nil
+}
+
+func (m *Multiplexer) attachTopicToSession(session *streamSession, parsed ParsedTopic, candidate *multiplexTopic) (*multiplexTopic, error) {
+	for range 3 {
+		topic, err := m.ensureAttachableTopic(parsed, candidate)
+		if err != nil {
+			return nil, err
+		}
+		if topic == nil {
+			return nil, nil
+		}
+
+		if !session.addTopic(topic) {
+			return nil, nil
+		}
+		if topic.addSession(session) {
+			return topic, nil
+		}
+
+		session.removeTopic(topic.key)
+		candidate = nil
+	}
+
+	return nil, fmt.Errorf("topic %q could not be attached", parsed.Key)
+}
+
+func (m *Multiplexer) ensureAttachableTopic(parsed ParsedTopic, candidate *multiplexTopic) (*multiplexTopic, error) {
+	if candidate != nil && !candidate.isRetiring() {
+		return candidate, nil
+	}
+
+	topic, _, err := m.getOrCreateTopicForMutation(parsed)
+	if err != nil {
+		return nil, err
+	}
+	return topic, nil
 }
 
 func (m *Multiplexer) getAuthorizer(topicType TopicType) TopicAuthorizer {
@@ -404,7 +452,7 @@ func (m *Multiplexer) cleanupResolvedTopics(topics []*multiplexTopic, keep map[s
 				continue
 			}
 		}
-		m.deleteTopicIfUnused(topic)
+		m.retireTopicIfUnused(topic)
 	}
 }
 
@@ -413,7 +461,11 @@ func (m *Multiplexer) getOrCreateTopicForMutation(parsed ParsedTopic) (*multiple
 	defer m.mu.Unlock()
 
 	if topic := m.topics[parsed.Key]; topic != nil {
-		return topic, false, nil
+		if topic.isRetiring() {
+			delete(m.topics, parsed.Key)
+		} else {
+			return topic, false, nil
+		}
 	}
 
 	fetcher := m.fetchers[parsed.Type]
@@ -426,16 +478,21 @@ func (m *Multiplexer) getOrCreateTopicForMutation(parsed ParsedTopic) (*multiple
 	return topic, true, nil
 }
 
-func (m *Multiplexer) deleteTopicIfUnused(topic *multiplexTopic) {
-	if topic == nil || topic.sessionCount() > 0 {
+func (m *Multiplexer) retireTopicIfUnused(topic *multiplexTopic) {
+	if topic == nil {
 		return
 	}
 
 	m.mu.Lock()
-	defer m.mu.Unlock()
-	if current := m.topics[topic.key]; current == topic && topic.sessionCount() == 0 {
-		delete(m.topics, topic.key)
+	current := m.topics[topic.key]
+	if current != topic || !topic.markRetiringIfUnused() {
+		m.mu.Unlock()
+		return
 	}
+	delete(m.topics, topic.key)
+	m.mu.Unlock()
+
+	topic.stop()
 }
 
 func (m *Multiplexer) unsubscribeTopic(session *streamSession, topicKey string) {
@@ -449,8 +506,7 @@ func (m *Multiplexer) unsubscribeTopic(session *streamSession, topicKey string) 
 		m.metrics.TopicMutation("unsubscribe", string(topic.topicType))
 	}
 	if topic.sessionCount() == 0 {
-		topic.stop()
-		m.deleteTopicIfUnused(topic)
+		m.retireTopicIfUnused(topic)
 	}
 }
 
@@ -459,12 +515,14 @@ func (m *Multiplexer) removeSession(session *streamSession) {
 		return
 	}
 
+	session.mutationMu.Lock()
 	topicKeys := session.topicKeys()
 	for _, topicKey := range topicKeys {
 		m.unsubscribeTopic(session, topicKey)
 	}
 
 	session.close()
+	session.mutationMu.Unlock()
 
 	m.mu.Lock()
 	delete(m.sessions, session.id)
@@ -534,6 +592,7 @@ type streamSession struct {
 	writeBufferSize   int
 	slowClientTimeout time.Duration
 
+	mutationMu      sync.Mutex
 	mu              sync.Mutex
 	closed          bool
 	topics          map[string]*multiplexTopic
@@ -626,6 +685,9 @@ func (s *streamSession) enqueueMessage(topic string, eventID uint64, data []byte
 	defer s.mu.Unlock()
 
 	if s.closed {
+		return false
+	}
+	if _, exists := s.topics[topic]; !exists {
 		return false
 	}
 	if s.queuedByTopic == nil {
@@ -841,6 +903,7 @@ type multiplexTopic struct {
 	fetcher           FetchFunc
 	clientsMu         sync.RWMutex
 	sessions          map[*streamSession]struct{}
+	retiring          bool
 	lastHash          string
 	lastChangeEventID uint64
 	stopCh            chan struct{}
@@ -867,17 +930,21 @@ func newMultiplexTopic(mux *Multiplexer, parsed ParsedTopic, fetcher FetchFunc) 
 	}
 }
 
-func (t *multiplexTopic) addSession(session *streamSession) {
+func (t *multiplexTopic) addSession(session *streamSession) bool {
 	t.clientsMu.Lock()
 	defer t.clientsMu.Unlock()
 
+	if t.retiring {
+		return false
+	}
 	if _, exists := t.sessions[session]; exists {
-		return
+		return true
 	}
 	t.sessions[session] = struct{}{}
 	if len(t.sessions) == 1 {
 		t.start()
 	}
+	return true
 }
 
 func (t *multiplexTopic) removeSession(session *streamSession) {
@@ -890,6 +957,22 @@ func (t *multiplexTopic) sessionCount() int {
 	t.clientsMu.RLock()
 	defer t.clientsMu.RUnlock()
 	return len(t.sessions)
+}
+
+func (t *multiplexTopic) isRetiring() bool {
+	t.clientsMu.RLock()
+	defer t.clientsMu.RUnlock()
+	return t.retiring
+}
+
+func (t *multiplexTopic) markRetiringIfUnused() bool {
+	t.clientsMu.Lock()
+	defer t.clientsMu.Unlock()
+	if t.retiring || len(t.sessions) > 0 {
+		return false
+	}
+	t.retiring = true
+	return true
 }
 
 func (t *multiplexTopic) changedSince(lastEventID uint64) bool {

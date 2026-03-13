@@ -61,18 +61,15 @@ describe('useSSEConnection', () => {
     const onSnapshot = vi.fn();
     const onDelegateSnapshot = vi.fn();
     const onNavigate = vi.fn();
-    const onPreConnect = vi.fn();
 
     const { result } = renderHook(() =>
       useSSEConnection('sess-1', ['delegate-1'], '/api/v1', 'local', {
         onSnapshot,
         onDelegateSnapshot,
         onNavigate,
-        onPreConnect,
       })
     );
 
-    expect(onPreConnect).toHaveBeenCalledTimes(1);
     expect(result.current.isSessionLive).toBe(false);
     expect(result.current.liveDelegateSessions['delegate-1']).toBe(false);
 
@@ -110,14 +107,12 @@ describe('useSSEConnection', () => {
     const onSnapshot = vi.fn();
     const onDelegateSnapshot = vi.fn();
     const onNavigate = vi.fn();
-    const onPreConnect = vi.fn();
 
     renderHook(() =>
       useSSEConnection('sess-1', [], '/api/v1', 'local', {
         onSnapshot,
         onDelegateSnapshot,
         onNavigate,
-        onPreConnect,
       })
     );
 

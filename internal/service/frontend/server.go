@@ -1059,6 +1059,7 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 		r.Use(auth.QueryTokenMiddleware())
 		r.Use(auth.ClientIPMiddleware())
 		r.Use(auth.Middleware(authOpts))
+		r.Use(srv.injectDefaultStreamUserMiddleware())
 
 		r.Get("/stream", multiplexHandler.HandleStream)
 		r.Post("/stream/topics", multiplexHandler.HandleTopicMutation)
@@ -1241,11 +1242,35 @@ func (srv *Server) buildAgentAuthMiddleware(_ context.Context) func(http.Handler
 	authOptions := srv.buildStreamAuthOptions("Dagu Agent")
 
 	return func(next http.Handler) http.Handler {
-		return auth.QueryTokenMiddleware()(
+		return srv.injectDefaultStreamUserMiddleware()(auth.QueryTokenMiddleware()(
 			auth.ClientIPMiddleware()(
 				auth.Middleware(authOptions)(next),
 			),
-		)
+		))
+	}
+}
+
+func (srv *Server) injectDefaultStreamUserMiddleware() func(http.Handler) http.Handler {
+	if srv.config.Server.Auth.Mode != config.AuthModeNone {
+		return func(next http.Handler) http.Handler {
+			return next
+		}
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if user, ok := authmodel.UserFromContext(r.Context()); ok && user != nil {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			ctx := authmodel.WithUser(r.Context(), &authmodel.User{
+				ID:       "admin",
+				Username: "admin",
+				Role:     authmodel.RoleAdmin,
+			})
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
 	}
 }
 

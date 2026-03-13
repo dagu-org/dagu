@@ -270,7 +270,6 @@ export function useAgentChat() {
         applyDelegateSnapshot(delegateId, snapshot);
       },
       onNavigate: (path) => navigate(path),
-      onPreConnect: resetDelegates,
     }
   );
 
@@ -289,6 +288,7 @@ export function useAgentChat() {
     }
 
     let active = true;
+    let nextPollTimeout: ReturnType<typeof setTimeout> | null = null;
     const pollFallbackSnapshots = async () => {
       if (shouldPollSession && sessionId) {
         try {
@@ -315,13 +315,27 @@ export function useAgentChat() {
       }
     };
 
-    const timer = setInterval(() => {
-      void pollFallbackSnapshots();
-    }, FALLBACK_POLL_INTERVAL_MS);
+    const scheduleNextPoll = () => {
+      if (!active) {
+        return;
+      }
+      nextPollTimeout = setTimeout(() => {
+        void runPollLoop();
+      }, FALLBACK_POLL_INTERVAL_MS);
+    };
+
+    const runPollLoop = async () => {
+      await pollFallbackSnapshots();
+      scheduleNextPoll();
+    };
+
+    scheduleNextPoll();
 
     return () => {
       active = false;
-      clearInterval(timer);
+      if (nextPollTimeout) {
+        clearTimeout(nextPollTimeout);
+      }
     };
   }, [
     sessionId,
@@ -535,7 +549,12 @@ export function useAgentChat() {
       }
       openDelegate(delegateId, task);
     },
-    [fetchSessionDetail, hasDelegateMessages, setDelegateMessagesForId, openDelegate]
+    [
+      fetchSessionDetail,
+      hasDelegateMessages,
+      setDelegateMessagesForId,
+      openDelegate,
+    ]
   );
 
   return {

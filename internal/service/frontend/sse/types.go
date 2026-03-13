@@ -10,11 +10,12 @@ import (
 
 // Event type constants for SSE messages.
 const (
-	EventTypeData      = "data"
-	EventTypeHeartbeat = "heartbeat"
-	EventTypeConnected = "connected"
-	EventTypeError     = "error"
-	legacyStreamSunset = "Sat, 13 Mar 2027 00:00:00 GMT"
+	EventTypeData            = "data"
+	EventTypeHeartbeat       = "heartbeat"
+	EventTypeConnected       = "connected"
+	EventTypeError           = "error"
+	legacyStreamDeprecatedAt = "@1773360000" // 2026-03-12T16:00:00Z
+	legacyStreamSunset       = "Sat, 13 Mar 2027 00:00:00 GMT"
 )
 
 // TopicType identifies the type of data being watched.
@@ -68,6 +69,6 @@ func SetSSEHeaders(w http.ResponseWriter) {
 
 // SetLegacyStreamDeprecationHeaders marks a legacy SSE endpoint as deprecated.
 func SetLegacyStreamDeprecationHeaders(w http.ResponseWriter) {
-	w.Header().Set("Deprecation", "true")
+	w.Header().Set("Deprecation", legacyStreamDeprecatedAt)
 	w.Header().Set("Sunset", legacyStreamSunset)
 }

@@ -142,6 +142,9 @@ func (h *MultiplexHandler) proxyStreamToRemoteNode(w http.ResponseWriter, r *htt
 		return
 	}
 	req.Header.Set("Accept", "text/event-stream")
+	if lastEventID := strings.TrimSpace(r.Header.Get("Last-Event-ID")); lastEventID != "" {
+		req.Header.Set("Last-Event-ID", lastEventID)
+	}
 	node.ApplyAuth(req)
 
 	resp, err := newProxyHTTPClient(node.SkipTLSVerify).Do(req)

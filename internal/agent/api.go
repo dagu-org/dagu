@@ -49,6 +49,13 @@ func getUserIDFromContext(ctx context.Context) string {
 	return defaultUserID
 }
 
+func getAuthenticatedUserIDFromContext(ctx context.Context) (string, bool) {
+	if user, ok := auth.UserFromContext(ctx); ok && user != nil {
+		return user.ID, true
+	}
+	return "", false
+}
+
 // API handles HTTP requests for the agent.
 type API struct {
 	sessions           sync.Map // id -> *SessionManager (active sessions)
@@ -444,24 +451,39 @@ func (a *API) getActiveSession(id, userID string) (*SessionManager, bool) {
 	return mgr, true
 }
 
-// getStoredSession retrieves a session from the store if it exists and belongs to the user.
-func (a *API) getStoredSession(ctx context.Context, id, userID string) (*Session, []Message, bool) {
+// getStoredSessionMetadata retrieves session metadata from the store.
+func (a *API) getStoredSessionMetadata(ctx context.Context, id string) (*Session, error) {
 	if a.store == nil {
-		return nil, nil, false
+		return nil, ErrSessionNotFound
 	}
 
 	sess, err := a.store.GetSession(ctx, id)
-	if err != nil || sess == nil || sess.UserID != userID {
-		return nil, nil, false
+	if err != nil {
+		return nil, err
+	}
+	if sess == nil {
+		return nil, ErrSessionNotFound
+	}
+
+	return sess, nil
+}
+
+// getStoredSession retrieves a session from the store if it exists and belongs to the user.
+func (a *API) getStoredSession(ctx context.Context, id, userID string) (*Session, []Message, error) {
+	sess, err := a.getStoredSessionMetadata(ctx, id)
+	if err != nil {
+		return nil, nil, err
+	}
+	if sess.UserID != userID {
+		return nil, nil, ErrSessionNotFound
 	}
 
 	messages, err := a.store.GetMessages(ctx, id)
 	if err != nil {
-		a.logger.Error("Failed to get messages from store", "error", err)
-		messages = []Message{}
+		return nil, nil, err
 	}
 
-	return sess, messages, true
+	return sess, messages, nil
 }
 
 // getOrReactivateSession retrieves an active session or reactivates it from storage.
@@ -796,40 +818,22 @@ func (a *API) ListSessionsPaginated(ctx context.Context, userID string, page, pe
 func (a *API) GetSessionDetail(ctx context.Context, sessionID, userID string) (*StreamResponse, error) {
 	// Check active sessions first
 	if mgr, ok := a.getActiveSession(sessionID, userID); ok {
-		sess := mgr.GetSession()
-		return &StreamResponse{
-			Messages: mgr.GetMessages(),
-			Session:  &sess,
-			SessionState: &SessionState{
-				SessionID:        sessionID,
-				Working:          mgr.IsWorking(),
-				HasPendingPrompt: mgr.HasPendingPrompt(),
-				Model:            mgr.GetModel(),
-				TotalCost:        mgr.GetTotalCost(),
-			},
-			Delegates: mgr.GetDelegates(),
-		}, nil
+		snapshot := mgr.Snapshot()
+		return responseWithDelegates(
+			snapshot.StreamResponse(),
+			snapshot.Delegates,
+		), nil
 	}
 
 	// Fall back to store for inactive sessions
-	sess, messages, ok := a.getStoredSession(ctx, sessionID, userID)
-	if !ok {
-		return nil, ErrSessionNotFound
+	sess, messages, err := a.getStoredSession(ctx, sessionID, userID)
+	if err != nil {
+		return nil, err
 	}
 
-	// Build delegate snapshots from stored sub-sessions.
-	var delegates []DelegateSnapshot
-	if a.store != nil {
-		subSessions, err := a.store.ListSubSessions(ctx, sessionID)
-		if err == nil {
-			for _, sub := range subSessions {
-				delegates = append(delegates, DelegateSnapshot{
-					ID:     sub.ID,
-					Task:   sub.DelegateTask,
-					Status: DelegateStatusCompleted,
-				})
-			}
-		}
+	delegates, err := a.getStoredDelegateSnapshots(ctx, sessionID)
+	if err != nil {
+		return nil, err
 	}
 
 	return &StreamResponse{
@@ -845,8 +849,24 @@ func (a *API) GetSessionDetail(ctx context.Context, sessionID, userID string) (*
 
 // AuthorizeSessionAccess validates that the current request context may access the session.
 func (a *API) AuthorizeSessionAccess(ctx context.Context, sessionID string) error {
-	_, err := a.GetSessionDetail(ctx, sessionID, getUserIDFromContext(ctx))
-	return err
+	userID, ok := getAuthenticatedUserIDFromContext(ctx)
+	if !ok {
+		return ErrSessionNotFound
+	}
+
+	if _, ok := a.getActiveSession(sessionID, userID); ok {
+		return nil
+	}
+
+	sess, err := a.getStoredSessionMetadata(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	if sess.UserID != userID {
+		return ErrSessionNotFound
+	}
+
+	return nil
 }
 
 // GetSessionSnapshot returns the current full session snapshot without re-checking ownership.
@@ -854,47 +874,27 @@ func (a *API) AuthorizeSessionAccess(ctx context.Context, sessionID string) erro
 func (a *API) GetSessionSnapshot(ctx context.Context, sessionID string) (*StreamResponse, error) {
 	if mgrValue, ok := a.sessions.Load(sessionID); ok {
 		if mgr, ok := mgrValue.(*SessionManager); ok {
-			sess := mgr.GetSession()
-			return &StreamResponse{
-				Messages: mgr.GetMessages(),
-				Session:  &sess,
-				SessionState: &SessionState{
-					SessionID:        sessionID,
-					Working:          mgr.IsWorking(),
-					HasPendingPrompt: mgr.HasPendingPrompt(),
-					Model:            mgr.GetModel(),
-					TotalCost:        mgr.GetTotalCost(),
-				},
-				Delegates: mgr.GetDelegates(),
-			}, nil
+			snapshot := mgr.Snapshot()
+			return responseWithDelegates(
+				snapshot.StreamResponse(),
+				snapshot.Delegates,
+			), nil
 		}
 	}
 
-	if a.store == nil {
-		return nil, ErrSessionNotFound
-	}
-
-	sess, err := a.store.GetSession(ctx, sessionID)
-	if err != nil || sess == nil {
-		return nil, ErrSessionNotFound
+	sess, err := a.getStoredSessionMetadata(ctx, sessionID)
+	if err != nil {
+		return nil, err
 	}
 
 	messages, err := a.store.GetMessages(ctx, sessionID)
 	if err != nil {
-		a.logger.Error("Failed to get messages from store", "error", err)
-		messages = []Message{}
+		return nil, err
 	}
 
-	var delegates []DelegateSnapshot
-	subSessions, err := a.store.ListSubSessions(ctx, sessionID)
-	if err == nil {
-		for _, sub := range subSessions {
-			delegates = append(delegates, DelegateSnapshot{
-				ID:     sub.ID,
-				Task:   sub.DelegateTask,
-				Status: DelegateStatusCompleted,
-			})
-		}
+	delegates, err := a.getStoredDelegateSnapshots(ctx, sessionID)
+	if err != nil {
+		return nil, err
 	}
 
 	return &StreamResponse{
@@ -906,6 +906,33 @@ func (a *API) GetSessionSnapshot(ctx context.Context, sessionID string) (*Stream
 		},
 		Delegates: delegates,
 	}, nil
+}
+
+func (a *API) getStoredDelegateSnapshots(ctx context.Context, sessionID string) ([]DelegateSnapshot, error) {
+	if a.store == nil {
+		return nil, ErrSessionNotFound
+	}
+
+	subSessions, err := a.store.ListSubSessions(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	delegates := make([]DelegateSnapshot, 0, len(subSessions))
+	for _, sub := range subSessions {
+		delegates = append(delegates, DelegateSnapshot{
+			ID:     sub.ID,
+			Task:   sub.DelegateTask,
+			Status: DelegateStatusCompleted,
+		})
+	}
+
+	return delegates, nil
+}
+
+func responseWithDelegates(response StreamResponse, delegates []DelegateSnapshot) *StreamResponse {
+	response.Delegates = delegates
+	return &response
 }
 
 // SendMessage sends a message to an existing session.

@@ -459,14 +459,16 @@ func (c *Config) validateServer() error {
 	if c.Server.Session.MaxPerUser < 0 {
 		return fmt.Errorf("session.max_per_user must be >= 0")
 	}
-	if c.Server.SSE.MaxTopicsPerConnection < 0 {
-		return fmt.Errorf("sse.max_topics_per_connection must be >= 0")
-	}
-	if c.Server.SSE.MaxClients < 0 {
-		return fmt.Errorf("sse.max_clients must be >= 0")
-	}
-	if c.Server.SSE.HeartbeatInterval < 0 {
-		return fmt.Errorf("sse.heartbeat_interval must be >= 0")
+	if c.Server.SSE != (SSEConfig{}) {
+		if c.Server.SSE.MaxTopicsPerConnection <= 0 {
+			return fmt.Errorf("sse.max_topics_per_connection must be > 0")
+		}
+		if c.Server.SSE.MaxClients <= 0 {
+			return fmt.Errorf("sse.max_clients must be > 0")
+		}
+		if c.Server.SSE.HeartbeatInterval <= 0 {
+			return fmt.Errorf("sse.heartbeat_interval must be > 0")
+		}
 	}
 	if c.Server.SSE.WriteBufferSize < 0 {
 		return fmt.Errorf("sse.write_buffer_size must be >= 0")

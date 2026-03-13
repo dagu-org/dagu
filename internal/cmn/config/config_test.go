@@ -5,6 +5,7 @@ package config
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,6 +19,11 @@ func validBaseConfig() *Config {
 		Server: Server{
 			Port: 8080,
 			Auth: Auth{Mode: AuthModeNone},
+			SSE: SSEConfig{
+				MaxTopicsPerConnection: 20,
+				MaxClients:             1000,
+				HeartbeatInterval:      10 * time.Second,
+			},
 		},
 		UI: UI{MaxDashboardPageLimit: 100},
 	}
@@ -118,6 +124,36 @@ func TestConfig_Validate(t *testing.T) {
 		err := cfg.Validate()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid max dashboard page limit")
+	})
+
+	t.Run("InvalidSSEHeartbeatInterval_Zero", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.SSE.HeartbeatInterval = 0
+
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "sse.heartbeat_interval must be > 0")
+	})
+
+	t.Run("InvalidSSEMaxClients_Zero", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.SSE.MaxClients = 0
+
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "sse.max_clients must be > 0")
+	})
+
+	t.Run("InvalidSSEMaxTopicsPerConnection_Zero", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.SSE.MaxTopicsPerConnection = 0
+
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "sse.max_topics_per_connection must be > 0")
 	})
 
 	t.Run("InvalidMaxDashboardPageLimit_Negative", func(t *testing.T) {

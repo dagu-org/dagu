@@ -6,9 +6,13 @@ package sse
 import (
 	"context"
 	"errors"
+	"io"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/remotenode"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,6 +24,11 @@ func TestParseTopicCanonicalizesQuery(t *testing.T) {
 	assert.Equal(t, TopicTypeDAGsList, parsed.Type)
 	assert.Equal(t, "page=1&perPage=100", parsed.Identifier)
 	assert.Equal(t, "dagslist:page=1&perPage=100", parsed.Key)
+}
+
+func TestParseTopicRejectsMalformedQuery(t *testing.T) {
+	_, err := ParseTopic("dagruns:%ZZ")
+	require.Error(t, err)
 }
 
 func TestParseInitialTopics(t *testing.T) {
@@ -168,6 +177,53 @@ func TestMultiplexerCreateSessionDoesNotRetainTopicsOnFailure(t *testing.T) {
 	assert.Empty(t, mux.topics)
 }
 
+func TestMultiplexerRetiresUnusedTopicsBeforeReuse(t *testing.T) {
+	mux := NewMultiplexer(StreamConfig{}, nil)
+	t.Cleanup(mux.Shutdown)
+
+	mux.RegisterFetcher(TopicTypeDAG, func(_ context.Context, identifier string) (any, error) {
+		return map[string]string{"id": identifier}, nil
+	})
+
+	parsed, err := ParseTopic("dag:test.yaml")
+	require.NoError(t, err)
+
+	topic, created, err := mux.getOrCreateTopicForMutation(parsed)
+	require.NoError(t, err)
+	require.True(t, created)
+
+	session, err := newStreamSession(httptest.NewRecorder(), mux)
+	require.NoError(t, err)
+	require.True(t, session.addTopic(topic))
+	require.True(t, topic.addSession(session))
+
+	mux.unsubscribeTopic(session, parsed.Key)
+
+	replacement, replacementCreated, err := mux.getOrCreateTopicForMutation(parsed)
+	require.NoError(t, err)
+	require.True(t, replacementCreated)
+	assert.NotSame(t, topic, replacement)
+}
+
+func TestMultiplexTopicSendSnapshotDropsRemovedTopics(t *testing.T) {
+	mux := NewMultiplexer(StreamConfig{}, nil)
+	t.Cleanup(mux.Shutdown)
+
+	parsed, err := ParseTopic("dag:test.yaml")
+	require.NoError(t, err)
+
+	topic := newMultiplexTopic(mux, parsed, func(_ context.Context, identifier string) (any, error) {
+		return map[string]string{"id": identifier}, nil
+	})
+	session, err := newStreamSession(httptest.NewRecorder(), mux)
+	require.NoError(t, err)
+	require.True(t, session.addTopic(topic))
+
+	require.NotNil(t, session.removeTopic(parsed.Key))
+	require.NoError(t, topic.sendSnapshot(context.Background(), session, 1))
+	assert.Nil(t, session.popNext())
+}
+
 func TestMultiplexerSharesTopicRegistryAcrossSessions(t *testing.T) {
 	mux := NewMultiplexer(StreamConfig{}, nil)
 	t.Cleanup(mux.Shutdown)
@@ -201,4 +257,33 @@ func TestBuildRemoteTopicMutationURLStripsSensitiveQueryParams(t *testing.T) {
 	remoteURL := buildRemoteTopicMutationURL("https://remote.example.com/api/v1", req.URL.Query())
 
 	assert.Equal(t, "https://remote.example.com/api/v1/events/stream/topics", remoteURL)
+}
+
+func TestMultiplexHandlerProxyStreamForwardsLastEventID(t *testing.T) {
+	var forwardedLastEventID string
+	remoteServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		forwardedLastEventID = r.Header.Get("Last-Event-ID")
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "event: control\ndata: {}\n\n")
+	}))
+	defer remoteServer.Close()
+
+	mux := NewMultiplexer(StreamConfig{}, nil)
+	t.Cleanup(mux.Shutdown)
+
+	handler := NewMultiplexHandler(mux, remotenode.NewResolver([]config.RemoteNode{
+		{
+			Name:       "remote1",
+			APIBaseURL: remoteServer.URL,
+		},
+	}, nil))
+
+	req := httptest.NewRequest("GET", "/api/v1/events/stream?remoteNode=remote1&topic=dag%3Atest.yaml", nil)
+	req.Header.Set("Last-Event-ID", "47")
+	recorder := httptest.NewRecorder()
+
+	handler.proxyStreamToRemoteNode(recorder, req, "remote1")
+
+	assert.Equal(t, "47", forwardedLastEventID)
+	assert.Equal(t, http.StatusOK, recorder.Code)
 }

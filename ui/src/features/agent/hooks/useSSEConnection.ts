@@ -6,7 +6,6 @@ export interface SSECallbacks {
   onSnapshot: (snapshot: StreamResponse) => void;
   onDelegateSnapshot: (delegateId: string, snapshot: StreamResponse) => void;
   onNavigate: (path: string) => void;
-  onPreConnect: () => void;
 }
 
 export interface AgentSSEStatus {
@@ -58,8 +57,6 @@ export function useSSEConnection(
       setIsSessionLive(false);
       return;
     }
-
-    cbRef.current.onPreConnect();
 
     return sseManager.subscribeTopic(
       buildAgentSessionTopic(sessionId),
