@@ -20,6 +20,8 @@ interface UseContentEditorResult {
   conflict: ConflictState;
   resolveConflict: (action: 'discard' | 'ignore') => void;
   markAsSaved: (savedContent: string) => void;
+  /** Revert editor to the last known server content, discarding all local edits. */
+  discardChanges: () => void;
 }
 
 /**
@@ -140,6 +142,15 @@ export function useContentEditor({
     [conflict.externalContent]
   );
 
+  // Discard local edits and revert to last known server content
+  const discardChanges = useCallback(() => {
+    if (lastServerContentRef.current !== null) {
+      currentValueRef.current = lastServerContentRef.current;
+      setCurrentValueState(lastServerContentRef.current);
+      hasUserEditedRef.current = false;
+    }
+  }, []);
+
   // Called after successful save
   const markAsSaved = useCallback((savedContent: string) => {
     pendingSaveContentRef.current = savedContent;
@@ -160,5 +171,6 @@ export function useContentEditor({
     conflict,
     resolveConflict,
     markAsSaved,
+    discardChanges,
   };
 }

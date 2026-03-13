@@ -14,7 +14,7 @@ import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import { cn } from '@/lib/utils';
 import { slugifyHeading } from '@/lib/text-utils';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { Check, ClipboardCopy, Copy, FileText, Save, Trash2 } from 'lucide-react';
+import { Check, ClipboardCopy, Copy, FileText, Save, Trash2, Undo2 } from 'lucide-react';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import DocExternalChangeDialog from './DocExternalChangeDialog';
 
@@ -75,6 +75,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
     conflict,
     resolveConflict,
     markAsSaved,
+    discardChanges,
   } = useContentEditor({
     key: `${docPath}:${remoteNode}`,
     serverContent,
@@ -291,6 +292,23 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
             Preview
           </button>
         </div>
+
+        {/* Discard button */}
+        {canWrite && hasUnsavedChanges && (
+          <button
+            type="button"
+            onClick={() => {
+              discardChanges();
+              clearDraft(tabId);
+              markTabSaved(tabId);
+            }}
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="Discard changes"
+          >
+            <Undo2 className="h-3 w-3" />
+            Discard
+          </button>
+        )}
 
         {/* Save button */}
         {canWrite && (
