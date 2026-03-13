@@ -111,13 +111,20 @@ type AuthBasicDef struct {
 
 // AuthBuiltinDef configures builtin authentication with RBAC.
 type AuthBuiltinDef struct {
-	Token *TokenConfigDef `mapstructure:"token"`
+	Token        *TokenConfigDef  `mapstructure:"token"`
+	InitialAdmin *InitialAdminDef `mapstructure:"initial_admin"`
 }
 
 // TokenConfigDef configures JWT token settings.
 type TokenConfigDef struct {
 	Secret string `mapstructure:"secret"`
 	TTL    string `mapstructure:"ttl"`
+}
+
+// InitialAdminDef configures the initial admin user for auto-provisioning.
+type InitialAdminDef struct {
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
 }
 
 // AuthOIDCDef configures OIDC authentication.

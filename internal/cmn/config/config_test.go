@@ -202,6 +202,85 @@ func TestConfig_Validate(t *testing.T) {
 		assert.Contains(t, err.Error(), "positive token TTL")
 	})
 
+	t.Run("BuiltinAuth_InitialAdmin_BothSet", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.Auth = Auth{
+			Mode: AuthModeBuiltin,
+			Builtin: AuthBuiltin{
+				Token:        TokenConfig{Secret: "secret", TTL: 1},
+				InitialAdmin: InitialAdmin{Username: "admin", Password: "strongpass123"},
+			},
+		}
+		cfg.Paths.UsersDir = "/tmp/users"
+		cfg.UI.MaxDashboardPageLimit = 1
+		err := cfg.Validate()
+		require.NoError(t, err)
+	})
+
+	t.Run("BuiltinAuth_InitialAdmin_UsernameOnly", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.Auth = Auth{
+			Mode: AuthModeBuiltin,
+			Builtin: AuthBuiltin{
+				Token:        TokenConfig{Secret: "secret", TTL: 1},
+				InitialAdmin: InitialAdmin{Username: "admin"},
+			},
+		}
+		cfg.Paths.UsersDir = "/tmp/users"
+		cfg.UI.MaxDashboardPageLimit = 1
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "both username and password")
+	})
+
+	t.Run("BuiltinAuth_InitialAdmin_PasswordOnly", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.Auth = Auth{
+			Mode: AuthModeBuiltin,
+			Builtin: AuthBuiltin{
+				Token:        TokenConfig{Secret: "secret", TTL: 1},
+				InitialAdmin: InitialAdmin{Password: "strongpass123"},
+			},
+		}
+		cfg.Paths.UsersDir = "/tmp/users"
+		cfg.UI.MaxDashboardPageLimit = 1
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "both username and password")
+	})
+
+	t.Run("BuiltinAuth_InitialAdmin_NeitherSet", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.Auth = Auth{
+			Mode: AuthModeBuiltin,
+			Builtin: AuthBuiltin{
+				Token: TokenConfig{Secret: "secret", TTL: 1},
+			},
+		}
+		cfg.Paths.UsersDir = "/tmp/users"
+		cfg.UI.MaxDashboardPageLimit = 1
+		err := cfg.Validate()
+		require.NoError(t, err)
+	})
+
+	t.Run("BuiltinAuth_InitialAdmin_IgnoredForOtherModes", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.Auth = Auth{
+			Mode: AuthModeNone,
+			Builtin: AuthBuiltin{
+				InitialAdmin: InitialAdmin{Username: "admin"},
+			},
+		}
+		cfg.UI.MaxDashboardPageLimit = 1
+		err := cfg.Validate()
+		require.NoError(t, err)
+	})
+
 	// Tests for incomplete OIDC config - with auto-detection, missing required fields
 	// means OIDC is simply not enabled (no error). This is intentional.
 	t.Run("BuiltinAuth_OIDC_IncompleteConfig_NoError", func(t *testing.T) {

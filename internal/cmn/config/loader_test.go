@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -961,6 +962,73 @@ auth:
       secret: "secret"
 `)
 		assert.Equal(t, 24*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
+	})
+}
+
+func TestLoad_AuthBuiltinInitialAdmin(t *testing.T) {
+	t.Run("FromYAML", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: "builtin"
+  builtin:
+    token:
+      secret: "jwt-signing-secret"
+      ttl: "24h"
+    initial_admin:
+      username: "myadmin"
+      password: "strongpass123"
+`)
+		assert.Equal(t, "myadmin", cfg.Server.Auth.Builtin.InitialAdmin.Username)
+		assert.Equal(t, "strongpass123", cfg.Server.Auth.Builtin.InitialAdmin.Password)
+		assert.True(t, cfg.Server.Auth.Builtin.InitialAdmin.IsConfigured())
+	})
+
+	t.Run("FromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_AUTH_MODE":                           "builtin",
+			"DAGU_AUTH_TOKEN_SECRET":                   "env-jwt-secret",
+			"DAGU_AUTH_BUILTIN_INITIAL_ADMIN_USERNAME": "envadmin",
+			"DAGU_AUTH_BUILTIN_INITIAL_ADMIN_PASSWORD": "envpass12345",
+		})
+		assert.Equal(t, "envadmin", cfg.Server.Auth.Builtin.InitialAdmin.Username)
+		assert.Equal(t, "envpass12345", cfg.Server.Auth.Builtin.InitialAdmin.Password)
+	})
+
+	t.Run("NotSet", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: "builtin"
+  builtin:
+    token:
+      secret: "jwt-signing-secret"
+      ttl: "24h"
+`)
+		assert.Equal(t, "", cfg.Server.Auth.Builtin.InitialAdmin.Username)
+		assert.Equal(t, "", cfg.Server.Auth.Builtin.InitialAdmin.Password)
+		assert.False(t, cfg.Server.Auth.Builtin.InitialAdmin.IsConfigured())
+	})
+
+	t.Run("WeakPasswordWarning", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: "builtin"
+  builtin:
+    token:
+      secret: "a-strong-random-secret-value"
+      ttl: "24h"
+    initial_admin:
+      username: "admin"
+      password: "changeme"
+`)
+		assert.True(t, cfg.Server.Auth.Builtin.InitialAdmin.IsConfigured())
+		found := false
+		for _, w := range cfg.Warnings {
+			if strings.Contains(w, "Initial admin password") {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "expected weak password warning, got warnings: %v", cfg.Warnings)
 	})
 }
 
