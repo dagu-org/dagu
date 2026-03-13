@@ -6,6 +6,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	osExec "os/exec"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,18 +27,25 @@ var (
 
 // BackoffConfig holds configuration for exponential backoff retry logic.
 type BackoffConfig struct {
-	InitialInterval time.Duration
-	MaxInterval     time.Duration
-	MaxRetries      int
+	InitialInterval    time.Duration
+	MaxInterval        time.Duration
+	MaxRetries         int
+	StartupGracePeriod time.Duration
 }
 
 // DefaultBackoffConfig returns the default backoff configuration.
 func DefaultBackoffConfig() BackoffConfig {
 	return BackoffConfig{
-		InitialInterval: 500 * time.Millisecond,
-		MaxInterval:     5 * time.Second,
-		MaxRetries:      8,
+		InitialInterval:    500 * time.Millisecond,
+		MaxInterval:        5 * time.Second,
+		MaxRetries:         8,
+		StartupGracePeriod: 100 * time.Millisecond,
 	}
+}
+
+type startupWaitState struct {
+	launchedAt time.Time
+	execErrCh  <-chan error
 }
 
 // QueueProcessor is responsible for processing queued DAG runs.
@@ -390,14 +398,24 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 	incInflight()
 	defer decInflight()
 
+	execErrCh := make(chan error, 1)
 	go func() {
 		defer p.wakeUp()
 		if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID, status, status.TriggerType); err != nil {
 			logger.Error(ctx, "Failed to execute DAG", tag.Error(err))
+			if shouldAbortStartupWait(err) {
+				select {
+				case execErrCh <- err:
+				default:
+				}
+			}
 		}
 	}()
 
-	return p.waitForStartup(ctx, queueName, runRef)
+	return p.waitForStartup(ctx, queueName, runRef, startupWaitState{
+		launchedAt: time.Now(),
+		execErrCh:  execErrCh,
+	})
 }
 
 func (p *QueueProcessor) wakeUp() {
@@ -430,7 +448,7 @@ func (p *QueueProcessor) removeInactiveQueues(activeQueues map[string]struct{}) 
 }
 
 // waitForStartup waits for the DAG execution to start using exponential backoff.
-func (p *QueueProcessor) waitForStartup(ctx context.Context, queueName string, runRef exec.DAGRunRef) bool {
+func (p *QueueProcessor) waitForStartup(ctx context.Context, queueName string, runRef exec.DAGRunRef, waitState startupWaitState) bool {
 	policy := backoff.NewExponentialBackoffPolicy(p.backoffConfig.InitialInterval)
 	policy.MaxInterval = p.backoffConfig.MaxInterval
 	policy.MaxRetries = p.backoffConfig.MaxRetries
@@ -438,7 +456,7 @@ func (p *QueueProcessor) waitForStartup(ctx context.Context, queueName string, r
 	var started bool
 	operation := func(ctx context.Context) error {
 		var err error
-		started, err = p.checkStartupStatus(ctx, queueName, runRef)
+		started, err = p.checkStartupStatus(ctx, queueName, runRef, waitState)
 		return err
 	}
 
@@ -450,9 +468,13 @@ func (p *QueueProcessor) waitForStartup(ctx context.Context, queueName string, r
 }
 
 // checkStartupStatus checks if the DAG execution has started.
-func (p *QueueProcessor) checkStartupStatus(ctx context.Context, queueName string, runRef exec.DAGRunRef) (bool, error) {
+func (p *QueueProcessor) checkStartupStatus(ctx context.Context, queueName string, runRef exec.DAGRunRef, waitState startupWaitState) (bool, error) {
 	if err := p.checkContextAndQuit(ctx); err != nil {
 		return false, err
+	}
+	if err := readStartupExecutionError(waitState.execErrCh); err != nil {
+		logger.Warn(ctx, "DAG execution failed before startup was observed", tag.Error(err))
+		return false, backoff.PermanentError(err)
 	}
 
 	isAlive, err := p.procStore.IsRunAlive(ctx, queueName, runRef)
@@ -461,6 +483,9 @@ func (p *QueueProcessor) checkStartupStatus(ctx context.Context, queueName strin
 	} else if isAlive {
 		logger.Info(ctx, "DAG run has started (heartbeat detected)")
 		return true, nil
+	}
+	if p.inStartupGracePeriod(waitState.launchedAt) {
+		return false, errNotStarted
 	}
 
 	attempt, err := p.dagRunStore.FindAttempt(ctx, runRef)
@@ -480,6 +505,28 @@ func (p *QueueProcessor) checkStartupStatus(ctx context.Context, queueName strin
 	}
 
 	return false, errNotStarted
+}
+
+func (p *QueueProcessor) inStartupGracePeriod(launchedAt time.Time) bool {
+	grace := p.backoffConfig.StartupGracePeriod
+	return grace > 0 && time.Since(launchedAt) < grace
+}
+
+func readStartupExecutionError(execErrCh <-chan error) error {
+	select {
+	case err := <-execErrCh:
+		return err
+	default:
+		return nil
+	}
+}
+
+func shouldAbortStartupWait(err error) bool {
+	if err == nil {
+		return false
+	}
+	var exitErr *osExec.ExitError
+	return !errors.As(err, &exitErr)
 }
 
 // checkContextAndQuit returns a permanent error if context is done or processor is closed.

@@ -94,30 +94,71 @@ func NewDataRootWithPrefix(baseDir, prefix string) DataRoot {
 }
 
 // FindByDAGRunID locates a dag-run by its ID.
-// It searches through all dag-run directories to find a match,
-// and returns the most recent one if multiple matches are found.
-//
-// Parameters:
-//   - ctx: Context for the operation (unused but kept for interface consistency)
-//   - dagRunID: The unique dag-run ID to search for
-//
-// Returns:
-//   - The matching DAGRun instance, or an error if not found
+// It scans the year/month/day hierarchy in reverse chronological order and
+// returns the first exact match, which preserves the "newest run wins" behavior
+// without materializing and sorting all matches across the full history tree.
 func (dr *DataRoot) FindByDAGRunID(_ context.Context, dagRunID string) (*DAGRun, error) {
-	// Find matching files
-	matches, err := filepath.Glob(dr.GlobPatternWithDAGRunID(dagRunID))
+	years, err := listDirsSorted(dr.dagRunsDir, true, reYear)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make glob pattern: %w", err)
+		return nil, fmt.Errorf("failed to list years: %w", err)
 	}
 
-	if len(matches) == 0 {
-		return nil, fmt.Errorf("%w: %s", exec.ErrDAGRunIDNotFound, dagRunID)
+	for _, year := range years {
+		yearPath := filepath.Join(dr.dagRunsDir, year)
+		months, err := listDirsSorted(yearPath, true, reMonth)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list months in %s: %w", yearPath, err)
+		}
+
+		for _, month := range months {
+			monthPath := filepath.Join(yearPath, month)
+			days, err := listDirsSorted(monthPath, true, reDay)
+			if err != nil {
+				return nil, fmt.Errorf("failed to list days in %s: %w", monthPath, err)
+			}
+
+			for _, day := range days {
+				dayPath := filepath.Join(monthPath, day)
+				run, err := findDAGRunInDay(dayPath, dagRunID)
+				if err != nil {
+					return nil, fmt.Errorf("failed to scan day directory %s: %w", dayPath, err)
+				}
+				if run != nil {
+					return run, nil
+				}
+			}
+		}
 	}
 
-	// Sort matches by timestamp (most recent first)
-	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
+	return nil, fmt.Errorf("%w: %s", exec.ErrDAGRunIDNotFound, dagRunID)
+}
 
-	return NewDAGRun(matches[0])
+func findDAGRunInDay(dayPath, dagRunID string) (*DAGRun, error) {
+	entries, err := os.ReadDir(dayPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	for i := len(entries) - 1; i >= 0; i-- {
+		entry := entries[i]
+		if !entry.IsDir() {
+			continue
+		}
+		if !isMatchingDAGRunDir(entry.Name(), dagRunID) {
+			continue
+		}
+		return NewDAGRun(filepath.Join(dayPath, entry.Name()))
+	}
+
+	return nil, nil
+}
+
+func isMatchingDAGRunDir(dirName, dagRunID string) bool {
+	matches := reDAGRunDir.FindStringSubmatch(dirName)
+	return len(matches) == 3 && matches[2] == dagRunID
 }
 
 // Latest returns the most recent dag-runs up to the specified limit.
