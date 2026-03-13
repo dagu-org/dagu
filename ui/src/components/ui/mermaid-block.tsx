@@ -52,17 +52,22 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
     async function render() {
       if (!containerRef.current) return;
 
+      // Generate a unique ID per render call to avoid mermaid's internal
+      // diagram cache conflicts when the code or diagram type changes.
+      const renderId = `mermaid-block-${idPrefix}-${mermaidIdCounter++}`;
+
       try {
         initializeMermaid();
-        // Generate a unique ID per render call to avoid mermaid's internal
-        // diagram cache conflicts when the code or diagram type changes.
-        const renderId = `mermaid-block-${idPrefix}-${mermaidIdCounter++}`;
         const { svg } = await mermaid.render(renderId, code.trim());
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg;
           setError(null);
         }
       } catch (err) {
+        // Mermaid injects error elements into the document body on parse
+        // failures. Remove them to prevent layout pollution.
+        document.getElementById(renderId)?.remove();
+
         if (!cancelled) {
           setError(String(err));
         }
