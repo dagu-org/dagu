@@ -2,6 +2,15 @@ apiVersion: v1
 entries:
   dagu:
   - apiVersion: v2
+    created: "2026-03-13T17:02:30.513117729Z"
+    description: A DAG-based workflow engine
+    digest: fdef8d50724495148c29ab18efb385c3cb54f2aa4a4b4f998fc8f5d48161727a
+    name: dagu
+    type: application
+    urls:
+    - https://github.com/dagu-org/dagu/releases/download/helm-dagu-1.0.2/dagu-1.0.2.tgz
+    version: 1.0.2
+  - apiVersion: v2
     created: "2026-03-13T16:30:21.852319694Z"
     description: A DAG-based workflow engine
     digest: 374fe04161d2cedb828f8b8bdfb1d3e6d1731a556d993fe5626e6c45fde1b8ca
@@ -19,4 +28,4 @@ entries:
     urls:
     - https://github.com/dagu-org/dagu/releases/download/dagu-1.0.0/dagu-1.0.0.tgz
     version: 1.0.0
-generated: "2026-03-13T16:30:21.852332729Z"
+generated: "2026-03-13T17:02:30.513129821Z"
