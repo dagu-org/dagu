@@ -510,6 +510,11 @@ func (l *ConfigLoader) loadBuiltinAuth(cfg *Config, auth *AuthDef) {
 		cfg.Server.Auth.Builtin.Token.Secret = auth.Builtin.Token.Secret
 		cfg.Server.Auth.Builtin.Token.TTL = l.parseDuration("auth.builtin.token.ttl", auth.Builtin.Token.TTL)
 	}
+
+	if auth.Builtin.InitialAdmin != nil {
+		cfg.Server.Auth.Builtin.InitialAdmin.Username = auth.Builtin.InitialAdmin.Username
+		cfg.Server.Auth.Builtin.InitialAdmin.Password = auth.Builtin.InitialAdmin.Password
+	}
 }
 
 func (l *ConfigLoader) setAuthDefaults(cfg *Config) {
@@ -529,6 +534,17 @@ func (l *ConfigLoader) setAuthDefaults(cfg *Config) {
 			}
 		}
 
+		// Warn on weak initial admin passwords.
+		if cfg.Server.Auth.Builtin.InitialAdmin.IsConfigured() {
+			weakPasswords := []string{"password", "changeme", "admin", "dagu", "12345678"}
+			for _, weak := range weakPasswords {
+				if strings.EqualFold(cfg.Server.Auth.Builtin.InitialAdmin.Password, weak) {
+					l.warnings = append(l.warnings,
+						"Initial admin password is a well-known default value — use a strong password for production")
+					break
+				}
+			}
+		}
 	}
 	if len(cfg.Server.Auth.OIDC.Scopes) == 0 {
 		cfg.Server.Auth.OIDC.Scopes = []string{"openid", "profile", "email"}
@@ -1264,6 +1280,8 @@ var envBindings = []envBinding{
 	// Auth (builtin)
 	{key: "auth.builtin.token.secret", env: "AUTH_TOKEN_SECRET"},
 	{key: "auth.builtin.token.ttl", env: "AUTH_TOKEN_TTL"},
+	{key: "auth.builtin.initial_admin.username", env: "AUTH_BUILTIN_INITIAL_ADMIN_USERNAME"},
+	{key: "auth.builtin.initial_admin.password", env: "AUTH_BUILTIN_INITIAL_ADMIN_PASSWORD"},
 
 	// TLS
 	{key: "tls.cert_file", env: "CERT_FILE"},

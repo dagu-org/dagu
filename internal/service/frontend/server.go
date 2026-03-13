@@ -34,6 +34,7 @@ import (
 	"github.com/dagu-org/dagu/internal/auth/tokensecret"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/crypto"
+	"github.com/dagu-org/dagu/internal/cmn/dirlock"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -534,6 +535,43 @@ func initBuiltinAuthService(ctx context.Context, cfg *config.Config, collector *
 		return nil, false, fmt.Errorf("failed to count users: %w", err)
 	}
 	setupRequired := count == 0
+
+	// Auto-provision initial admin if configured and no users exist.
+	if setupRequired && cfg.Server.Auth.Builtin.InitialAdmin.IsConfigured() {
+		ia := cfg.Server.Auth.Builtin.InitialAdmin
+
+		// Use dirlock for concurrent protection (same pattern as Setup API handler).
+		lock := dirlock.New(cfg.Paths.UsersDir, &dirlock.LockOptions{
+			StaleThreshold: 30 * time.Second,
+			RetryInterval:  50 * time.Millisecond,
+		})
+		if err := lock.Lock(ctx); err != nil {
+			return nil, false, fmt.Errorf("failed to acquire lock for initial admin provisioning: %w", err)
+		}
+		defer func() { _ = lock.Unlock() }()
+
+		// Re-check under lock to prevent race with concurrent Setup API call.
+		count, err = authSvc.CountUsers(ctx)
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to re-check user count: %w", err)
+		}
+
+		if count == 0 {
+			if _, err := authSvc.CreateUser(ctx, authservice.CreateUserInput{
+				Username: ia.Username,
+				Password: ia.Password,
+				Role:     authmodel.RoleAdmin,
+			}); err != nil {
+				return nil, false, fmt.Errorf("failed to auto-provision initial admin user: %w", err)
+			}
+			logger.Info(ctx, "Auto-provisioned initial admin user",
+				slog.String("username", ia.Username),
+			)
+			setupRequired = false
+		} else {
+			setupRequired = false
+		}
+	}
 
 	logger.Info(ctx, "Builtin auth initialized",
 		slog.Bool("setupRequired", setupRequired),

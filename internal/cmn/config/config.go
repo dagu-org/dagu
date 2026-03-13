@@ -210,13 +210,26 @@ type AuthBasic struct {
 
 // AuthBuiltin represents builtin authentication with RBAC.
 type AuthBuiltin struct {
-	Token TokenConfig
+	Token        TokenConfig
+	InitialAdmin InitialAdmin
 }
 
 // TokenConfig represents JWT token configuration.
 type TokenConfig struct {
 	Secret string
 	TTL    time.Duration
+}
+
+// InitialAdmin holds optional auto-provisioning credentials for the first admin user.
+// When configured and no users exist, the server creates this admin at startup.
+type InitialAdmin struct {
+	Username string
+	Password string
+}
+
+// IsConfigured returns true when both username and password are set.
+func (ia InitialAdmin) IsConfigured() bool {
+	return ia.Username != "" && ia.Password != ""
 }
 
 // AuthOIDC represents OIDC authentication configuration.
@@ -476,6 +489,13 @@ func (c *Config) validateBuiltinAuth() error {
 	if c.Server.Auth.Builtin.Token.TTL <= 0 {
 		return fmt.Errorf("builtin auth requires a positive token TTL")
 	}
+
+	// Validate initial_admin: both fields must be set, or neither.
+	ia := c.Server.Auth.Builtin.InitialAdmin
+	if (ia.Username == "") != (ia.Password == "") {
+		return fmt.Errorf("auth.builtin.initial_admin requires both username and password to be set, or neither")
+	}
+
 	if c.Server.Auth.OIDC.IsConfigured() {
 		return c.validateOIDCForBuiltin()
 	}
