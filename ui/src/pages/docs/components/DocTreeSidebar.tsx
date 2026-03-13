@@ -4,7 +4,18 @@ import { useDocTabContext } from '@/contexts/DocTabContext';
 import { useClient } from '@/hooks/api';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import type { DocSortField, DocSortOrder } from '@/contexts/UserPreference';
+import {
   AlertCircle,
+  ArrowUpDown,
   ChevronsDownUp,
   ChevronsUpDown,
   FileText,
@@ -36,6 +47,9 @@ type Props = {
   onSelectionChange?: (ids: string[]) => void;
   activeDocContent?: string | null;
   onHeadingClick?: (anchor: string) => void;
+  sortField: DocSortField;
+  sortOrder: DocSortOrder;
+  onSortChange: (field: DocSortField, order: DocSortOrder) => void;
 };
 
 function collectAncestors(path: string): string[] {
@@ -108,6 +122,9 @@ function DocTreeSidebar({
   onSelectionChange,
   activeDocContent,
   onHeadingClick,
+  sortField,
+  sortOrder,
+  onSortChange,
 }: Props) {
   const canWrite = useCanWrite();
   const client = useClient();
@@ -414,6 +431,35 @@ function DocTreeSidebar({
           >
             <ChevronsDownUp className="h-3.5 w-3.5" />
           </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="p-1 rounded-sm hover:bg-accent text-muted-foreground hover:text-foreground"
+                title="Sort"
+              >
+                <ArrowUpDown className="h-3.5 w-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuLabel className="text-xs py-1">Sort by</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuRadioGroup
+                value={`${sortField}:${sortOrder}`}
+                onValueChange={(v) => {
+                  const [f, o] = v.split(':') as [DocSortField, DocSortOrder];
+                  onSortChange(f, o);
+                }}
+              >
+                <DropdownMenuRadioItem value="name:asc" className="text-xs">Name A–Z</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="name:desc" className="text-xs">Name Z–A</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="type:asc" className="text-xs">Folders first</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="type:desc" className="text-xs">Files first</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="mtime:desc" className="text-xs">Newest first</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="mtime:asc" className="text-xs">Oldest first</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {canWrite && (
             <button
               type="button"

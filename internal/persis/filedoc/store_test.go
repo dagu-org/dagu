@@ -10,12 +10,29 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// defaultListOpts returns default ListDocsOptions for tests.
+func defaultListOpts(page, perPage int) agent.ListDocsOptions {
+	return agent.ListDocsOptions{Page: page, PerPage: perPage, Sort: agent.DocSortFieldType, Order: agent.DocSortOrderAsc}
+}
+
+// defaultFlatOpts returns default ListDocsOptions for flat listing.
+func defaultFlatOpts(page, perPage int) agent.ListDocsOptions {
+	return agent.ListDocsOptions{Page: page, PerPage: perPage, Sort: agent.DocSortFieldName, Order: agent.DocSortOrderAsc}
+}
+
+// setModTime sets the modification time on a file.
+func setModTime(t *testing.T, path string, mt time.Time) {
+	t.Helper()
+	require.NoError(t, os.Chtimes(path, mt, mt))
+}
 
 // marshalDocFile produces doc file content with optional frontmatter (test helper).
 func marshalDocFile(title, content string) []byte {
@@ -211,7 +228,7 @@ func TestListFlat(t *testing.T) {
 	require.NoError(t, store.Create(ctx, "a-doc", "a"))
 	require.NoError(t, store.Create(ctx, "sub/c-doc", "c"))
 
-	result, err := store.ListFlat(ctx, 1, 50)
+	result, err := store.ListFlat(ctx, defaultFlatOpts(1, 50))
 	require.NoError(t, err)
 	assert.Equal(t, 3, result.TotalCount)
 
@@ -229,7 +246,7 @@ func TestListTree(t *testing.T) {
 	require.NoError(t, store.Create(ctx, "guides/deploy", "deploy guide"))
 	require.NoError(t, store.Create(ctx, "guides/debug", "debug guide"))
 
-	result, err := store.List(ctx, 1, 50)
+	result, err := store.List(ctx, defaultListOpts(1, 50))
 	require.NoError(t, err)
 	assert.Equal(t, 2, result.TotalCount) // 1 dir + 1 file at top level
 
@@ -329,7 +346,7 @@ func TestListFlatSkipsNonConformingFiles(t *testing.T) {
 	// Write a hidden file directly — it should be skipped.
 	require.NoError(t, os.WriteFile(filepath.Join(store.baseDir, ".hidden.md"), []byte("hidden"), 0600))
 
-	result, err := store.ListFlat(ctx, 1, 50)
+	result, err := store.ListFlat(ctx, defaultFlatOpts(1, 50))
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.TotalCount)
 	assert.Equal(t, "good-doc", result.Items[0].ID)
@@ -344,7 +361,7 @@ func TestBuildTreeSkipsNonConformingFiles(t *testing.T) {
 	// Write a non-conforming file directly.
 	require.NoError(t, os.WriteFile(filepath.Join(store.baseDir, ".hidden.md"), []byte("hidden"), 0600))
 
-	result, err := store.List(ctx, 1, 50)
+	result, err := store.List(ctx, defaultListOpts(1, 50))
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.TotalCount)
 	assert.Equal(t, "good-doc", result.Items[0].ID)
@@ -374,7 +391,7 @@ func TestListFlatPagination(t *testing.T) {
 	require.NoError(t, store.Create(ctx, "doc-c", "c"))
 
 	// Page 1 of 2.
-	result, err := store.ListFlat(ctx, 1, 2)
+	result, err := store.ListFlat(ctx, defaultFlatOpts(1, 2))
 	require.NoError(t, err)
 	assert.Equal(t, 3, result.TotalCount)
 	assert.Len(t, result.Items, 2)
@@ -382,7 +399,7 @@ func TestListFlatPagination(t *testing.T) {
 	assert.Equal(t, "doc-b", result.Items[1].ID)
 
 	// Page 2 of 2.
-	result, err = store.ListFlat(ctx, 2, 2)
+	result, err = store.ListFlat(ctx, defaultFlatOpts(2, 2))
 	require.NoError(t, err)
 	assert.Equal(t, 3, result.TotalCount)
 	assert.Len(t, result.Items, 1)
@@ -396,7 +413,7 @@ func TestListFlatEmptyPage(t *testing.T) {
 	require.NoError(t, store.Create(ctx, "doc-a", "a"))
 
 	// Out-of-range page.
-	result, err := store.ListFlat(ctx, 10, 50)
+	result, err := store.ListFlat(ctx, defaultFlatOpts(10, 50))
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.TotalCount)
 	assert.Empty(t, result.Items)
@@ -411,13 +428,13 @@ func TestListTreePagination(t *testing.T) {
 	require.NoError(t, store.Create(ctx, "doc-c", "c"))
 
 	// Page 1 of 2 top-level nodes.
-	result, err := store.List(ctx, 1, 2)
+	result, err := store.List(ctx, defaultListOpts(1, 2))
 	require.NoError(t, err)
 	assert.Equal(t, 3, result.TotalCount)
 	assert.Len(t, result.Items, 2)
 
 	// Page 2.
-	result, err = store.List(ctx, 2, 2)
+	result, err = store.List(ctx, defaultListOpts(2, 2))
 	require.NoError(t, err)
 	assert.Equal(t, 3, result.TotalCount)
 	assert.Len(t, result.Items, 1)
@@ -486,7 +503,7 @@ func TestBuildTreeExcludesNonMdFiles(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(store.baseDir, "notes.txt"), []byte("text"), 0600))
 	require.NoError(t, os.WriteFile(filepath.Join(store.baseDir, "config.yaml"), []byte("yaml: true"), 0600))
 
-	result, err := store.List(ctx, 1, 50)
+	result, err := store.List(ctx, defaultListOpts(1, 50))
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.TotalCount)
 	assert.Equal(t, "real-doc", result.Items[0].ID)
@@ -692,7 +709,7 @@ func TestListEmpty(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	result, err := store.List(ctx, 1, 10)
+	result, err := store.List(ctx, defaultListOpts(1, 10))
 	require.NoError(t, err)
 	assert.Equal(t, 0, result.TotalCount)
 	assert.Empty(t, result.Items)
@@ -705,7 +722,7 @@ func TestListTreeEmptyPage(t *testing.T) {
 	require.NoError(t, store.Create(ctx, "doc-a", "a"))
 
 	// Out-of-range page for tree list triggers offset > total branch.
-	result, err := store.List(ctx, 10, 50)
+	result, err := store.List(ctx, defaultListOpts(10, 50))
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.TotalCount)
 	assert.Empty(t, result.Items)
@@ -715,7 +732,7 @@ func TestListFlatEmpty(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	result, err := store.ListFlat(ctx, 1, 10)
+	result, err := store.ListFlat(ctx, defaultFlatOpts(1, 10))
 	require.NoError(t, err)
 	assert.Equal(t, 0, result.TotalCount)
 	assert.Empty(t, result.Items)
@@ -805,7 +822,7 @@ func TestBuildTreeNestedDirectories(t *testing.T) {
 	require.NoError(t, store.Create(ctx, "a/b/c", "deep"))
 	require.NoError(t, store.Create(ctx, "a/d", "sibling"))
 
-	result, err := store.List(ctx, 1, 50)
+	result, err := store.List(ctx, defaultListOpts(1, 50))
 	require.NoError(t, err)
 	// Top level should have directory "a".
 	require.Equal(t, 1, result.TotalCount)
@@ -982,7 +999,7 @@ func TestListFlatWithUnreadableFile(t *testing.T) {
 	require.NoError(t, os.Chmod(filePath, 0000))
 	t.Cleanup(func() { _ = os.Chmod(filePath, 0600) })
 
-	result, err := store.ListFlat(ctx, 1, 50)
+	result, err := store.ListFlat(ctx, defaultFlatOpts(1, 50))
 	require.NoError(t, err)
 	// Only the readable file should be listed.
 	assert.Equal(t, 1, result.TotalCount)
@@ -1027,7 +1044,7 @@ func TestBuildTreeWithUnreadableFile(t *testing.T) {
 	require.NoError(t, os.Chmod(filePath, 0000))
 	t.Cleanup(func() { _ = os.Chmod(filePath, 0600) })
 
-	result, err := store.List(ctx, 1, 50)
+	result, err := store.List(ctx, defaultListOpts(1, 50))
 	require.NoError(t, err)
 	// Both files should still appear in tree (unreadable file uses ID-based title).
 	assert.Equal(t, 2, result.TotalCount)
@@ -1054,7 +1071,7 @@ func TestListFlatEmptyStore(t *testing.T) {
 	ctx := context.Background()
 
 	// Out-of-range page on empty store.
-	result, err := store.ListFlat(ctx, 5, 10)
+	result, err := store.ListFlat(ctx, defaultFlatOpts(5, 10))
 	require.NoError(t, err)
 	assert.Equal(t, 0, result.TotalCount)
 	assert.Empty(t, result.Items)
@@ -1066,7 +1083,7 @@ func TestListFlatMissingBaseDir(t *testing.T) {
 	_ = os.RemoveAll(store.baseDir)
 	ctx := context.Background()
 
-	result, err := store.ListFlat(ctx, 1, 10)
+	result, err := store.ListFlat(ctx, defaultFlatOpts(1, 10))
 	require.NoError(t, err)
 	assert.Equal(t, 0, result.TotalCount)
 }
@@ -1077,7 +1094,7 @@ func TestListTreeMissingBaseDir(t *testing.T) {
 	_ = os.RemoveAll(store.baseDir)
 	ctx := context.Background()
 
-	result, err := store.List(ctx, 1, 10)
+	result, err := store.List(ctx, defaultListOpts(1, 10))
 	require.NoError(t, err)
 	assert.Equal(t, 0, result.TotalCount)
 }
@@ -1576,4 +1593,292 @@ func TestDeleteBatchCleansEmptyParents(t *testing.T) {
 	assert.True(t, os.IsNotExist(err))
 	_, err = os.Stat(filepath.Join(store.baseDir, "deep"))
 	assert.True(t, os.IsNotExist(err))
+}
+
+// --- Sort tests ---
+
+func TestListTreeSortNameAsc(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "c-doc", "c"))
+	require.NoError(t, store.Create(ctx, "a-doc", "a"))
+	require.NoError(t, store.Create(ctx, "b-doc", "b"))
+
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldName, Order: agent.DocSortOrderAsc})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 3)
+	assert.Equal(t, "a-doc", result.Items[0].ID)
+	assert.Equal(t, "b-doc", result.Items[1].ID)
+	assert.Equal(t, "c-doc", result.Items[2].ID)
+}
+
+func TestListTreeSortNameDesc(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "c-doc", "c"))
+	require.NoError(t, store.Create(ctx, "a-doc", "a"))
+	require.NoError(t, store.Create(ctx, "b-doc", "b"))
+
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldName, Order: agent.DocSortOrderDesc})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 3)
+	assert.Equal(t, "c-doc", result.Items[0].ID)
+	assert.Equal(t, "b-doc", result.Items[1].ID)
+	assert.Equal(t, "a-doc", result.Items[2].ID)
+}
+
+func TestListTreeSortTypeAsc(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "file-b", "b"))
+	require.NoError(t, store.Create(ctx, "dir-a/child", "c"))
+	require.NoError(t, store.Create(ctx, "file-a", "a"))
+
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldType, Order: agent.DocSortOrderAsc})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 3)
+	// Directories first.
+	assert.Equal(t, "directory", result.Items[0].Type)
+	assert.Equal(t, "dir-a", result.Items[0].Name)
+	// Then files alphabetically.
+	assert.Equal(t, "file", result.Items[1].Type)
+	assert.Equal(t, "file-a.md", result.Items[1].Name)
+	assert.Equal(t, "file", result.Items[2].Type)
+	assert.Equal(t, "file-b.md", result.Items[2].Name)
+}
+
+func TestListTreeSortTypeDesc(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "file-b", "b"))
+	require.NoError(t, store.Create(ctx, "dir-a/child", "c"))
+	require.NoError(t, store.Create(ctx, "file-a", "a"))
+
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldType, Order: agent.DocSortOrderDesc})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 3)
+	// Files first (desc reverses).
+	assert.Equal(t, "file", result.Items[0].Type)
+	assert.Equal(t, "file", result.Items[1].Type)
+	assert.Equal(t, "directory", result.Items[2].Type)
+}
+
+func TestListTreeSortMtimeDesc(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "old", "old"))
+	require.NoError(t, store.Create(ctx, "mid", "mid"))
+	require.NoError(t, store.Create(ctx, "new", "new"))
+
+	now := time.Now()
+	setModTime(t, filepath.Join(store.baseDir, "old.md"), now.Add(-2*time.Hour))
+	setModTime(t, filepath.Join(store.baseDir, "mid.md"), now.Add(-1*time.Hour))
+	setModTime(t, filepath.Join(store.baseDir, "new.md"), now)
+
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldMTime, Order: agent.DocSortOrderDesc})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 3)
+	assert.Equal(t, "new", result.Items[0].ID)
+	assert.Equal(t, "mid", result.Items[1].ID)
+	assert.Equal(t, "old", result.Items[2].ID)
+}
+
+func TestListTreeSortMtimeAsc(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "old", "old"))
+	require.NoError(t, store.Create(ctx, "mid", "mid"))
+	require.NoError(t, store.Create(ctx, "new", "new"))
+
+	now := time.Now()
+	setModTime(t, filepath.Join(store.baseDir, "old.md"), now.Add(-2*time.Hour))
+	setModTime(t, filepath.Join(store.baseDir, "mid.md"), now.Add(-1*time.Hour))
+	setModTime(t, filepath.Join(store.baseDir, "new.md"), now)
+
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldMTime, Order: agent.DocSortOrderAsc})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 3)
+	assert.Equal(t, "old", result.Items[0].ID)
+	assert.Equal(t, "mid", result.Items[1].ID)
+	assert.Equal(t, "new", result.Items[2].ID)
+}
+
+func TestListTreeSortMtimeWithDirectories(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "dir-old/child", "old child"))
+	require.NoError(t, store.Create(ctx, "dir-new/child", "new child"))
+
+	now := time.Now()
+	setModTime(t, filepath.Join(store.baseDir, "dir-old", "child.md"), now.Add(-2*time.Hour))
+	setModTime(t, filepath.Join(store.baseDir, "dir-new", "child.md"), now)
+
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldMTime, Order: agent.DocSortOrderDesc})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 2)
+	// Directory with newest child first.
+	assert.Equal(t, "dir-new", result.Items[0].ID)
+	assert.Equal(t, "dir-old", result.Items[1].ID)
+	// Verify directory mtime = max of descendants.
+	assert.True(t, result.Items[0].ModTime.After(result.Items[1].ModTime))
+}
+
+func TestListTreeSortMtimeStable(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "b-doc", "b"))
+	require.NoError(t, store.Create(ctx, "a-doc", "a"))
+
+	// Set same mtime.
+	sameTime := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+	setModTime(t, filepath.Join(store.baseDir, "a-doc.md"), sameTime)
+	setModTime(t, filepath.Join(store.baseDir, "b-doc.md"), sameTime)
+
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldMTime, Order: agent.DocSortOrderAsc})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 2)
+	// Stable: fallback to name.
+	assert.Equal(t, "a-doc", result.Items[0].ID)
+	assert.Equal(t, "b-doc", result.Items[1].ID)
+}
+
+func TestListTreeSortDefaultsToTypeAsc(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "file-a", "a"))
+	require.NoError(t, store.Create(ctx, "dir-a/child", "c"))
+
+	// Empty sort/order → defaults to type/asc.
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 2)
+	assert.Equal(t, "directory", result.Items[0].Type)
+	assert.Equal(t, "file", result.Items[1].Type)
+}
+
+func TestListFlatSortNameDesc(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "a-doc", "a"))
+	require.NoError(t, store.Create(ctx, "c-doc", "c"))
+	require.NoError(t, store.Create(ctx, "b-doc", "b"))
+
+	result, err := store.ListFlat(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldName, Order: agent.DocSortOrderDesc})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 3)
+	assert.Equal(t, "c-doc", result.Items[0].ID)
+	assert.Equal(t, "b-doc", result.Items[1].ID)
+	assert.Equal(t, "a-doc", result.Items[2].ID)
+}
+
+func TestListFlatSortMtime(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "old-doc", "old"))
+	require.NoError(t, store.Create(ctx, "new-doc", "new"))
+
+	now := time.Now()
+	setModTime(t, filepath.Join(store.baseDir, "old-doc.md"), now.Add(-1*time.Hour))
+	setModTime(t, filepath.Join(store.baseDir, "new-doc.md"), now)
+
+	result, err := store.ListFlat(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldMTime, Order: agent.DocSortOrderDesc})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 2)
+	assert.Equal(t, "new-doc", result.Items[0].ID)
+	assert.Equal(t, "old-doc", result.Items[1].ID)
+}
+
+func TestListTreeSortNestedChildren(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "dir/c-child", "c"))
+	require.NoError(t, store.Create(ctx, "dir/a-child", "a"))
+	require.NoError(t, store.Create(ctx, "dir/b-child", "b"))
+
+	result, err := store.List(ctx, agent.ListDocsOptions{Page: 1, PerPage: 50, Sort: agent.DocSortFieldName, Order: agent.DocSortOrderAsc})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 1)
+	require.Len(t, result.Items[0].Children, 3)
+	// Children sorted by name asc.
+	assert.Equal(t, "dir/a-child", result.Items[0].Children[0].ID)
+	assert.Equal(t, "dir/b-child", result.Items[0].Children[1].ID)
+	assert.Equal(t, "dir/c-child", result.Items[0].Children[2].ID)
+}
+
+func TestListTreeSortPaginationConsistency(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "c-doc", "c"))
+	require.NoError(t, store.Create(ctx, "a-doc", "a"))
+	require.NoError(t, store.Create(ctx, "b-doc", "b"))
+
+	opts := agent.ListDocsOptions{Page: 1, PerPage: 2, Sort: agent.DocSortFieldName, Order: agent.DocSortOrderDesc}
+	page1, err := store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Len(t, page1.Items, 2)
+
+	opts.Page = 2
+	page2, err := store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Len(t, page2.Items, 1)
+
+	// Combined should be c, b, a (name desc).
+	assert.Equal(t, "c-doc", page1.Items[0].ID)
+	assert.Equal(t, "b-doc", page1.Items[1].ID)
+	assert.Equal(t, "a-doc", page2.Items[0].ID)
+}
+
+func TestPropagateModTime(t *testing.T) {
+	now := time.Now()
+	nodes := []*agent.DocTreeNode{
+		{
+			ID: "dir", Name: "dir", Type: "directory",
+			ModTime: now.Add(-10 * time.Hour),
+			Children: []*agent.DocTreeNode{
+				{ID: "dir/old", Name: "old", Type: "file", ModTime: now.Add(-5 * time.Hour)},
+				{
+					ID: "dir/sub", Name: "sub", Type: "directory",
+					ModTime: now.Add(-8 * time.Hour),
+					Children: []*agent.DocTreeNode{
+						{ID: "dir/sub/newest", Name: "newest", Type: "file", ModTime: now},
+					},
+				},
+			},
+		},
+	}
+
+	maxTime := propagateModTime(nodes)
+	assert.Equal(t, now.Unix(), maxTime.Unix())
+	// Top dir should have the deepest descendant's mtime.
+	assert.Equal(t, now.Unix(), nodes[0].ModTime.Unix())
+	// Sub-dir should have its child's mtime.
+	assert.Equal(t, now.Unix(), nodes[0].Children[1].ModTime.Unix())
+}
+
+func TestPropagateModTimeEmptyDir(t *testing.T) {
+	dirTime := time.Date(2025, 6, 1, 12, 0, 0, 0, time.UTC)
+	nodes := []*agent.DocTreeNode{
+		{
+			ID: "empty", Name: "empty", Type: "directory",
+			ModTime:  dirTime,
+			Children: []*agent.DocTreeNode{},
+		},
+	}
+
+	propagateModTime(nodes)
+	// Empty dir keeps its own mtime.
+	assert.Equal(t, dirTime, nodes[0].ModTime)
 }

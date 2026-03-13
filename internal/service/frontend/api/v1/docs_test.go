@@ -29,8 +29,9 @@ var errForced = errors.New("forced error")
 var _ agent.DocStore = (*mockDocStore)(nil)
 
 type mockDocStore struct {
-	docs    map[string]*agent.Doc
-	failAll bool // when true, all operations return errForced
+	docs         map[string]*agent.Doc
+	failAll      bool // when true, all operations return errForced
+	lastListOpts agent.ListDocsOptions
 }
 
 func (m *mockDocStore) Get(_ context.Context, id string) (*agent.Doc, error) {
@@ -215,7 +216,8 @@ func (m *mockDocStore) Search(_ context.Context, query string) ([]*agent.DocSear
 	return results, nil
 }
 
-func (m *mockDocStore) List(_ context.Context, page, perPage int) (*exec.PaginatedResult[*agent.DocTreeNode], error) {
+func (m *mockDocStore) List(_ context.Context, opts agent.ListDocsOptions) (*exec.PaginatedResult[*agent.DocTreeNode], error) {
+	m.lastListOpts = opts
 	if m.failAll {
 		return nil, errForced
 	}
@@ -230,14 +232,15 @@ func (m *mockDocStore) List(_ context.Context, page, perPage int) (*exec.Paginat
 	}
 	sort.Slice(nodes, func(i, j int) bool { return nodes[i].ID < nodes[j].ID })
 
-	pg := exec.NewPaginator(page, perPage)
+	pg := exec.NewPaginator(opts.Page, opts.PerPage)
 	start := min(pg.Offset(), len(nodes))
 	end := min(start+pg.Limit(), len(nodes))
 	result := exec.NewPaginatedResult(nodes[start:end], len(nodes), pg)
 	return &result, nil
 }
 
-func (m *mockDocStore) ListFlat(_ context.Context, page, perPage int) (*exec.PaginatedResult[agent.DocMetadata], error) {
+func (m *mockDocStore) ListFlat(_ context.Context, opts agent.ListDocsOptions) (*exec.PaginatedResult[agent.DocMetadata], error) {
+	m.lastListOpts = opts
 	if m.failAll {
 		return nil, errForced
 	}
@@ -250,7 +253,7 @@ func (m *mockDocStore) ListFlat(_ context.Context, page, perPage int) (*exec.Pag
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
 
-	pg := exec.NewPaginator(page, perPage)
+	pg := exec.NewPaginator(opts.Page, opts.PerPage)
 	start := min(pg.Offset(), len(items))
 	end := min(start+pg.Limit(), len(items))
 	result := exec.NewPaginatedResult(items[start:end], len(items), pg)
@@ -334,6 +337,72 @@ func TestListDocs(t *testing.T) {
 
 		_, err := a.ListDocs(adminCtx(), apigen.ListDocsRequestObject{})
 		require.Error(t, err)
+	})
+}
+
+func TestListDocsSortParamsForwarded(t *testing.T) {
+	t.Parallel()
+
+	t.Run("explicit sort params forwarded to store", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newDocTestSetup(t)
+		setup.store.docs["doc1"] = &agent.Doc{ID: "doc1", Title: "doc1", Content: "c"}
+
+		sortParam := apigen.ListDocsParamsSortMtime
+		orderParam := apigen.ListDocsParamsOrderDesc
+
+		_, err := setup.api.ListDocs(adminCtx(), apigen.ListDocsRequestObject{
+			Params: apigen.ListDocsParams{
+				Page:    new(1),
+				PerPage: new(10),
+				Sort:    &sortParam,
+				Order:   &orderParam,
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, agent.DocSortFieldMTime, setup.store.lastListOpts.Sort)
+		assert.Equal(t, agent.DocSortOrderDesc, setup.store.lastListOpts.Order)
+	})
+
+	t.Run("defaults to type asc when omitted", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newDocTestSetup(t)
+		setup.store.docs["doc1"] = &agent.Doc{ID: "doc1", Title: "doc1", Content: "c"}
+
+		_, err := setup.api.ListDocs(adminCtx(), apigen.ListDocsRequestObject{
+			Params: apigen.ListDocsParams{
+				Page:    new(1),
+				PerPage: new(10),
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, agent.DocSortFieldType, setup.store.lastListOpts.Sort)
+		assert.Equal(t, agent.DocSortOrderAsc, setup.store.lastListOpts.Order)
+	})
+
+	t.Run("flat mode forwards sort params", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newDocTestSetup(t)
+		setup.store.docs["doc1"] = &agent.Doc{ID: "doc1", Title: "doc1", Content: "c"}
+
+		sortParam := apigen.ListDocsParamsSortName
+		orderParam := apigen.ListDocsParamsOrderDesc
+
+		_, err := setup.api.ListDocs(adminCtx(), apigen.ListDocsRequestObject{
+			Params: apigen.ListDocsParams{
+				Flat:    new(true),
+				Page:    new(1),
+				PerPage: new(10),
+				Sort:    &sortParam,
+				Order:   &orderParam,
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, agent.DocSortFieldName, setup.store.lastListOpts.Sort)
+		assert.Equal(t, agent.DocSortOrderDesc, setup.store.lastListOpts.Order)
 	})
 }
 
@@ -897,7 +966,7 @@ type mockDocStoreWithTree struct {
 	*mockDocStore
 }
 
-func (m *mockDocStoreWithTree) List(_ context.Context, page, perPage int) (*exec.PaginatedResult[*agent.DocTreeNode], error) {
+func (m *mockDocStoreWithTree) List(_ context.Context, opts agent.ListDocsOptions) (*exec.PaginatedResult[*agent.DocTreeNode], error) {
 	nodes := []*agent.DocTreeNode{
 		{
 			ID:   "parent",
@@ -909,7 +978,7 @@ func (m *mockDocStoreWithTree) List(_ context.Context, page, perPage int) (*exec
 			},
 		},
 	}
-	pg := exec.NewPaginator(page, perPage)
+	pg := exec.NewPaginator(opts.Page, opts.PerPage)
 	result := exec.NewPaginatedResult(nodes, len(nodes), pg)
 	return &result, nil
 }

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/core/exec"
 )
@@ -31,8 +32,9 @@ type Doc struct {
 
 // DocMetadata is a lightweight doc view excluding Content.
 type DocMetadata struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
+	ID      string    `json:"id"`
+	Title   string    `json:"title"`
+	ModTime time.Time `json:"modTime"`
 }
 
 // DocTreeNode represents a file or directory in the doc tree.
@@ -42,6 +44,32 @@ type DocTreeNode struct {
 	Title    string         `json:"title,omitempty"`
 	Type     string         `json:"type"` // "file" or "directory"
 	Children []*DocTreeNode `json:"children,omitempty"`
+	ModTime  time.Time      `json:"modTime"`
+}
+
+// DocSortField defines the field to sort documents by.
+type DocSortField string
+
+const (
+	DocSortFieldName  DocSortField = "name"
+	DocSortFieldType  DocSortField = "type"
+	DocSortFieldMTime DocSortField = "mtime"
+)
+
+// DocSortOrder defines the sort direction.
+type DocSortOrder string
+
+const (
+	DocSortOrderAsc  DocSortOrder = "asc"
+	DocSortOrderDesc DocSortOrder = "desc"
+)
+
+// ListDocsOptions holds parameters for listing documents.
+type ListDocsOptions struct {
+	Page    int
+	PerPage int
+	Sort    DocSortField
+	Order   DocSortOrder
 }
 
 // DocSearchResult holds a doc ID/title and its grep matches.
@@ -59,8 +87,8 @@ type DeleteError struct {
 
 // DocStore defines the interface for doc persistence.
 type DocStore interface {
-	List(ctx context.Context, page, perPage int) (*exec.PaginatedResult[*DocTreeNode], error)
-	ListFlat(ctx context.Context, page, perPage int) (*exec.PaginatedResult[DocMetadata], error)
+	List(ctx context.Context, opts ListDocsOptions) (*exec.PaginatedResult[*DocTreeNode], error)
+	ListFlat(ctx context.Context, opts ListDocsOptions) (*exec.PaginatedResult[DocMetadata], error)
 	Get(ctx context.Context, id string) (*Doc, error)
 	Create(ctx context.Context, id, content string) error
 	Update(ctx context.Context, id, content string) error

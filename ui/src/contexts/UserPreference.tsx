@@ -2,12 +2,17 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 
 export type DAGRunsViewMode = 'list' | 'grouped';
 
+export type DocSortField = 'name' | 'type' | 'mtime';
+export type DocSortOrder = 'asc' | 'desc';
+
 export type UserPreferences = {
   pageLimit: number;
   dagRunsViewMode: DAGRunsViewMode;
   logWrap: boolean;
   theme: 'light' | 'dark';
   safeMode: boolean;
+  docSortField: DocSortField;
+  docSortOrder: DocSortOrder;
 };
 
 const UserPreferencesContext = createContext<{
@@ -24,6 +29,8 @@ const defaultPreferences: UserPreferences = {
   logWrap: true,
   theme: 'light', // Default to light theme (from main branch)
   safeMode: false,
+  docSortField: 'type',
+  docSortOrder: 'asc',
 };
 
 function loadPreferences(): UserPreferences {
