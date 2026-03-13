@@ -121,6 +121,9 @@ func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	if opts.Tags != "" {
 		args = append(args, fmt.Sprintf("--tags=%s", opts.Tags))
 	}
+	if opts.ScheduleTime != "" {
+		args = append(args, fmt.Sprintf("--schedule-time=%s", opts.ScheduleTime))
+	}
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
 	}
@@ -165,6 +168,9 @@ func (b *SubCmdBuilder) Enqueue(dag *core.DAG, opts EnqueueOptions) CmdSpec {
 	if opts.Tags != "" {
 		args = append(args, fmt.Sprintf("--tags=%s", opts.Tags))
 	}
+	if opts.ScheduleTime != "" {
+		args = append(args, fmt.Sprintf("--schedule-time=%s", opts.ScheduleTime))
+	}
 	args = append(args, dag.Location)
 
 	return CmdSpec{
@@ -200,6 +206,9 @@ func (b *SubCmdBuilder) Restart(dag *core.DAG, opts RestartOptions) CmdSpec {
 
 	if opts.Quiet {
 		args = append(args, "-q")
+	}
+	if opts.ScheduleTime != "" {
+		args = append(args, fmt.Sprintf("--schedule-time=%s", opts.ScheduleTime))
 	}
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
@@ -259,6 +268,9 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 
 	if task.Tags != "" {
 		args = append(args, fmt.Sprintf("--tags=%s", task.Tags))
+	}
+	if task.ScheduleTime != "" {
+		args = append(args, fmt.Sprintf("--schedule-time=%s", task.ScheduleTime))
 	}
 
 	if b.configFile != "" {
@@ -324,6 +336,7 @@ type StartOptions struct {
 	Target       string // Optional CLI argument override (DAG name or file path)
 	TriggerType  string // How this DAG run was initiated (scheduler, manual, webhook, subdag)
 	Tags         string // Additional tags (comma-separated)
+	ScheduleTime string // RFC 3339 timestamp of when this run was scheduled
 }
 
 // EnqueueOptions contains options for enqueuing a dag-run.
@@ -335,11 +348,13 @@ type EnqueueOptions struct {
 	NameOverride string // Optional DAG name override
 	TriggerType  string // How this DAG run was initiated (scheduler, manual, webhook, subdag)
 	Tags         string // Additional tags (comma-separated)
+	ScheduleTime string // RFC 3339 timestamp of when this run was scheduled
 }
 
 // RestartOptions contains options for restarting a dag-run.
 type RestartOptions struct {
-	Quiet bool // Whether to run in quiet mode
+	Quiet        bool   // Whether to run in quiet mode
+	ScheduleTime string // RFC 3339 timestamp of when this run was scheduled
 }
 
 // Run executes the command and waits for it to complete.

@@ -167,7 +167,22 @@ function QueueCard({
           </StatusChip>
         </td>
         <td className="py-1.5 px-2 text-xs text-muted-foreground tabular-nums">
-          {formatDateTime(showQueuedAt ? dagRun.queuedAt : dagRun.startedAt)}
+          <div className="flex flex-col gap-0.5">
+            {dagRun.scheduleTime && (
+              <span>
+                <span className="text-muted-foreground/80">Scheduled </span>
+                {formatDateTime(dagRun.scheduleTime)}
+              </span>
+            )}
+            <span>
+              <span className="text-muted-foreground/80">
+                {showQueuedAt ? 'Queued ' : 'Started '}
+              </span>
+              {formatDateTime(
+                showQueuedAt ? dagRun.queuedAt : dagRun.startedAt
+              )}
+            </span>
+          </div>
         </td>
         <td className="py-1.5 px-2 text-xs text-muted-foreground font-mono">
           {dagRun.dagRunId}
@@ -180,8 +195,7 @@ function QueueCard({
     <div
       className={cn(
         'card-obsidian transition-all duration-300 dark:hover:bg-white/[0.05] dark:hover:border-white/10',
-        isSelected &&
-          'shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)]'
+        isSelected && 'shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)]'
       )}
     >
       {/* Queue Header */}
@@ -269,7 +283,7 @@ function QueueCard({
                           Status
                         </th>
                         <th className="text-left py-1 px-2 font-medium text-muted-foreground">
-                          Started
+                          Timing
                         </th>
                         <th className="text-left py-1 px-2 font-medium text-muted-foreground">
                           Run ID
@@ -338,7 +352,7 @@ function QueueCard({
                           Status
                         </th>
                         <th className="text-left py-1 px-2 font-medium text-muted-foreground">
-                          Queued
+                          Timing
                         </th>
                         <th className="text-left py-1 px-2 font-medium text-muted-foreground">
                           Run ID

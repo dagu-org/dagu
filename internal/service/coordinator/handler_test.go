@@ -79,8 +79,14 @@ func (m *mockDAGRunStore) FindAttempt(_ context.Context, dagRun exec.DAGRunRef) 
 
 // Implement other required interface methods (unused in tests)
 // These methods return sentinel errors or panic to make test failures obvious if accidentally called.
-func (m *mockDAGRunStore) CreateAttempt(_ context.Context, _ *core.DAG, _ time.Time, _ string, _ exec.NewDAGRunAttemptOptions) (exec.DAGRunAttempt, error) {
-	panic("CreateAttempt not implemented in mock")
+func (m *mockDAGRunStore) CreateAttempt(_ context.Context, dag *core.DAG, _ time.Time, dagRunID string, _ exec.NewDAGRunAttemptOptions) (exec.DAGRunAttempt, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	attempt := &mockDAGRunAttempt{
+		status: &exec.DAGRunStatus{Name: dag.Name, DAGRunID: dagRunID},
+	}
+	m.attempts[dagRunID] = attempt
+	return attempt, nil
 }
 func (m *mockDAGRunStore) RecentAttempts(_ context.Context, _ string, _ int) []exec.DAGRunAttempt {
 	return nil // Empty slice is valid
@@ -325,6 +331,28 @@ func TestHandler_Poll(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, codes.FailedPrecondition, st.Code())
 		require.Contains(t, st.Message(), "no available workers")
+	})
+
+	t.Run("WriteInitialStatusPreservesScheduleTime", func(t *testing.T) {
+		t.Parallel()
+
+		h := NewHandler(HandlerConfig{})
+		attempt := &mockDAGRunAttempt{}
+
+		h.writeInitialStatus(
+			context.Background(),
+			attempt,
+			"test-dag",
+			"run-123",
+			"attempt-key",
+			"2026-03-13T10:00:00Z",
+			exec.DAGRunRef{},
+			nil,
+		)
+
+		status, err := attempt.ReadStatus(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, "2026-03-13T10:00:00Z", status.ScheduleTime)
 	})
 
 	t.Run("PollContextCancellation", func(t *testing.T) {

@@ -318,7 +318,7 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 		return fmt.Errorf("failed to open attempt: %w", err)
 	}
 
-	h.writeInitialStatus(ctx, attempt, dag.Name, task.DagRunId, task.AttemptKey, exec.DAGRunRef{}, dag.Tags.Strings())
+	h.writeInitialStatus(ctx, attempt, dag.Name, task.DagRunId, task.AttemptKey, task.ScheduleTime, exec.DAGRunRef{}, dag.Tags.Strings())
 
 	h.attemptsMu.Lock()
 	h.openAttempts[task.DagRunId] = attempt
@@ -370,7 +370,7 @@ func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinator
 		return fmt.Errorf("failed to open sub-attempt: %w", err)
 	}
 
-	h.writeInitialStatus(ctx, attempt, task.Target, task.DagRunId, task.AttemptKey, rootRef, dag.Tags.Strings())
+	h.writeInitialStatus(ctx, attempt, task.Target, task.DagRunId, task.AttemptKey, task.ScheduleTime, rootRef, dag.Tags.Strings())
 
 	h.attemptsMu.Lock()
 	h.openAttempts[task.DagRunId] = attempt
@@ -388,16 +388,17 @@ func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinator
 
 // writeInitialStatus writes an initial NotStarted status to the attempt.
 // This ensures the status file is not empty when read before the worker reports its first status.
-func (h *Handler) writeInitialStatus(ctx context.Context, attempt exec.DAGRunAttempt, dagName, dagRunID, attemptKey string, root exec.DAGRunRef, tags []string) {
+func (h *Handler) writeInitialStatus(ctx context.Context, attempt exec.DAGRunAttempt, dagName, dagRunID, attemptKey, scheduleTime string, root exec.DAGRunRef, tags []string) {
 	initialStatus := exec.DAGRunStatus{
-		Name:       dagName,
-		DAGRunID:   dagRunID,
-		AttemptID:  attempt.ID(),
-		AttemptKey: attemptKey,
-		Status:     core.NotStarted,
-		StartedAt:  time.Now().UTC().Format(time.RFC3339),
-		Root:       root,
-		Tags:       tags,
+		Name:         dagName,
+		DAGRunID:     dagRunID,
+		AttemptID:    attempt.ID(),
+		AttemptKey:   attemptKey,
+		Status:       core.NotStarted,
+		StartedAt:    time.Now().UTC().Format(time.RFC3339),
+		Root:         root,
+		Tags:         tags,
+		ScheduleTime: scheduleTime,
 	}
 	if err := attempt.Write(ctx, initialStatus); err != nil {
 		logger.Warn(ctx, "Failed to write initial status", tag.Error(err), tag.RunID(dagRunID))

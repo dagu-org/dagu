@@ -235,6 +235,20 @@ steps:
 		assert.Equal(t, "env=prod,region=us-east-1", task.Tags)
 	})
 
+	t.Run("WithScheduleTimeOption", func(t *testing.T) {
+		t.Parallel()
+
+		task := executor.CreateTask(
+			"test-dag",
+			`name: test-dag`,
+			coordinatorv1.Operation_OPERATION_START,
+			"run-123",
+			executor.WithScheduleTime("2026-03-13T10:00:00Z"),
+		)
+
+		assert.Equal(t, "2026-03-13T10:00:00Z", task.ScheduleTime)
+	})
+
 	t.Run("AllOperationTypes", func(t *testing.T) {
 		t.Parallel()
 

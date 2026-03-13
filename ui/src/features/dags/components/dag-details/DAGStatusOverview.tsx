@@ -50,11 +50,36 @@ type ExecutionStatusConfig = {
 };
 
 const EXECUTION_STATUS_CONFIG: ExecutionStatusConfig[] = [
-  { status: Status.Running, icon: PlayCircle, iconClass: 'text-[#81c784]', message: 'Execution in progress' },
-  { status: Status.Queued, icon: Clock, iconClass: 'text-[#5f6368]', message: 'DAGRun is queued for execution' },
-  { status: Status.Aborted, icon: StopCircle, iconClass: 'text-[#d946ef]', message: 'Execution was aborted' },
-  { status: Status.Waiting, icon: Clock, iconClass: 'text-[#e37400]', message: 'Waiting for approval' },
-  { status: Status.Rejected, icon: StopCircle, iconClass: 'text-[#d93025]', message: 'Execution was rejected' },
+  {
+    status: Status.Running,
+    icon: PlayCircle,
+    iconClass: 'text-[#81c784]',
+    message: 'Execution in progress',
+  },
+  {
+    status: Status.Queued,
+    icon: Clock,
+    iconClass: 'text-[#5f6368]',
+    message: 'DAGRun is queued for execution',
+  },
+  {
+    status: Status.Aborted,
+    icon: StopCircle,
+    iconClass: 'text-[#d946ef]',
+    message: 'Execution was aborted',
+  },
+  {
+    status: Status.Waiting,
+    icon: Clock,
+    iconClass: 'text-[#e37400]',
+    message: 'Waiting for approval',
+  },
+  {
+    status: Status.Rejected,
+    icon: StopCircle,
+    iconClass: 'text-[#d93025]',
+    message: 'Execution was rejected',
+  },
 ];
 
 function formatTimestamp(timestamp: string | undefined): string {
@@ -73,12 +98,13 @@ function truncateId(id: string): string {
   return `${id.slice(0, 8)}...${id.slice(-4)}`;
 }
 
-
 type PreconditionErrorsProps = {
   preconditions?: components['schemas']['Condition'][];
 };
 
-function PreconditionErrors({ preconditions }: PreconditionErrorsProps): React.JSX.Element | null {
+function PreconditionErrors({
+  preconditions,
+}: PreconditionErrorsProps): React.JSX.Element | null {
   const errors = preconditions?.filter((cond) => cond.error);
 
   if (!errors || errors.length === 0) {
@@ -99,7 +125,9 @@ function PreconditionErrors({ preconditions }: PreconditionErrorsProps): React.J
             key={idx}
             className="p-1.5 bg-warning-muted border border-warning/20 rounded-md text-xs text-warning font-medium whitespace-normal break-words"
           >
-            <div className="mb-0.5 break-words">Condition: {cond.condition}</div>
+            <div className="mb-0.5 break-words">
+              Condition: {cond.condition}
+            </div>
             <div className="mb-0.5 break-words">Expected: {cond.expected}</div>
             <div className="break-words">Error: {cond.error}</div>
           </div>
@@ -109,7 +137,10 @@ function PreconditionErrors({ preconditions }: PreconditionErrorsProps): React.J
   );
 }
 
-function formatDuration(startedAt: string | undefined, finishedAt: string | undefined): string {
+function formatDuration(
+  startedAt: string | undefined,
+  finishedAt: string | undefined
+): string {
   if (!startedAt || startedAt === '-') {
     return '-';
   }
@@ -142,7 +173,10 @@ function formatDuration(startedAt: string | undefined, finishedAt: string | unde
   return `${seconds}s`;
 }
 
-function DAGStatusOverview({ status, onViewLog }: Props): React.JSX.Element | null {
+function DAGStatusOverview({
+  status,
+  onViewLog,
+}: Props): React.JSX.Element | null {
   const [currentDuration, setCurrentDuration] = useState<string>('-');
   const [copied, setCopied] = useState(false);
 
@@ -212,23 +246,39 @@ function DAGStatusOverview({ status, onViewLog }: Props): React.JSX.Element | nu
 
       {/* Timing & Metadata - Compact grid */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+        {status.scheduleTime && (
+          <span>
+            <span className="text-muted-foreground">Scheduled </span>
+            <span className="font-mono text-foreground">
+              {formatTimestamp(status.scheduleTime)}
+            </span>
+          </span>
+        )}
         {status.queuedAt && (
           <span>
             <span className="text-muted-foreground">Queued </span>
-            <span className="font-mono text-foreground">{formatTimestamp(status.queuedAt)}</span>
+            <span className="font-mono text-foreground">
+              {formatTimestamp(status.queuedAt)}
+            </span>
           </span>
         )}
         <span>
           <span className="text-muted-foreground">Started </span>
-          <span className="font-mono text-foreground">{formatTimestamp(status.startedAt)}</span>
+          <span className="font-mono text-foreground">
+            {formatTimestamp(status.startedAt)}
+          </span>
         </span>
         <span>
           <span className="text-muted-foreground">Finished </span>
-          <span className="font-mono text-foreground">{formatTimestamp(status.finishedAt)}</span>
+          <span className="font-mono text-foreground">
+            {formatTimestamp(status.finishedAt)}
+          </span>
         </span>
         <span className="flex items-center gap-1">
           <span className="text-muted-foreground">Duration </span>
-          <span className="font-mono font-medium text-foreground">{currentDuration}</span>
+          <span className="font-mono font-medium text-foreground">
+            {currentDuration}
+          </span>
           {isRunning && (
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
           )}
@@ -248,7 +298,9 @@ function DAGStatusOverview({ status, onViewLog }: Props): React.JSX.Element | nu
         {status.workerId && (
           <span className="truncate max-w-[180px]" title={status.workerId}>
             <span className="text-muted-foreground">Worker </span>
-            <span className="font-medium text-foreground">{status.workerId}</span>
+            <span className="font-medium text-foreground">
+              {status.workerId}
+            </span>
           </span>
         )}
         {status.dagRunId && (
@@ -301,7 +353,9 @@ function DAGStatusOverview({ status, onViewLog }: Props): React.JSX.Element | nu
 
       {/* Execution status message */}
       {(() => {
-        const config = EXECUTION_STATUS_CONFIG.find(c => c.status === status.status);
+        const config = EXECUTION_STATUS_CONFIG.find(
+          (c) => c.status === status.status
+        );
         if (!config) return null;
         const Icon = config.icon;
         return (

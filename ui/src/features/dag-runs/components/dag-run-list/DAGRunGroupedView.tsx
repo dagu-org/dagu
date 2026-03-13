@@ -2,6 +2,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { components, Status } from '../../../../api/v1/schema';
 import dayjs from '../../../../lib/dayjs';
+import { getDAGRunScheduleSortValue } from '../../../../lib/dagRunTiming';
 import StatusChip from '../../../../ui/StatusChip';
 import { DAGRunDetailsModal } from '../dag-run-details';
 import { StepDetailsTooltip } from './StepDetailsTooltip';
@@ -33,15 +34,12 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
         runsList.push(dagRun);
       }
     });
-    // Sort runs within each group by queuedAt descending (most recent first)
+    // Sort runs within each group by scheduled time, then queued time.
     Object.keys(groups).forEach((dagName) => {
       const runs = groups[dagName];
       if (runs) {
         runs.sort((a, b) => {
-          return (
-            dayjs(b.queuedAt || '').valueOf() -
-            dayjs(a.queuedAt || '').valueOf()
-          );
+          return getDAGRunScheduleSortValue(b) - getDAGRunScheduleSortValue(a);
         });
       }
     });
@@ -125,7 +123,8 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
 
     // Check if all runs have the same status
     const firstStatus = runs[0]?.status;
-    const allSameStatus = firstStatus !== undefined && runs.every((r) => r.status === firstStatus);
+    const allSameStatus =
+      firstStatus !== undefined && runs.every((r) => r.status === firstStatus);
 
     return {
       latestRun,
@@ -273,6 +272,14 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
                               {dagRun.dagRunId}
                             </div>
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                              {dagRun.scheduleTime && (
+                                <div className="whitespace-nowrap">
+                                  <span className="text-muted-foreground">
+                                    Scheduled:{' '}
+                                  </span>
+                                  {dagRun.scheduleTime}
+                                </div>
+                              )}
                               <div className="whitespace-nowrap">
                                 <span className="text-muted-foreground">
                                   Queued:{' '}

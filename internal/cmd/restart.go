@@ -40,12 +40,16 @@ Example:
 	)
 }
 
-var restartFlags = []commandLineFlag{dagRunIDFlagRestart}
+var restartFlags = []commandLineFlag{dagRunIDFlagRestart, scheduleTimeFlag}
 
 func runRestart(ctx *Context, args []string) error {
 	dagRunID, err := ctx.StringParam("run-id")
 	if err != nil {
 		return fmt.Errorf("failed to get dag-run ID: %w", err)
+	}
+	scheduleTime, err := parseScheduleTimeParam(ctx)
+	if err != nil {
+		return err
 	}
 
 	name := args[0]
@@ -83,14 +87,14 @@ func runRestart(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to restore DAG from status: %w", err)
 	}
 
-	if err := handleRestartProcess(ctx, dag, dagRunID); err != nil {
+	if err := handleRestartProcess(ctx, dag, dagRunID, scheduleTime); err != nil {
 		return fmt.Errorf("restart process failed for DAG %s: %w", dag.Name, err)
 	}
 
 	return nil
 }
 
-func handleRestartProcess(ctx *Context, d *core.DAG, oldDagRunID string) error {
+func handleRestartProcess(ctx *Context, d *core.DAG, oldDagRunID string, scheduleTime string) error {
 	if err := stopDAGIfRunning(ctx, ctx.DAGRunMgr, d, oldDagRunID); err != nil {
 		return err
 	}
@@ -125,11 +129,11 @@ func handleRestartProcess(ctx *Context, d *core.DAG, oldDagRunID string) error {
 
 	ctx.ProcStore.Unlock(ctx, d.ProcGroup())
 
-	return executeDAGWithRunID(ctx, ctx.DAGRunMgr, d, newDagRunID)
+	return executeDAGWithRunID(ctx, ctx.DAGRunMgr, d, newDagRunID, scheduleTime)
 }
 
 // executeDAGWithRunID executes a DAG with a pre-generated run ID.
-func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRunID string) error {
+func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRunID string, scheduleTime string) error {
 	logFile, err := ctx.OpenLogFile(dag, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file: %w", err)
@@ -173,6 +177,7 @@ func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRu
 			AgentSkillStore:         as.SkillStore,
 			AgentSoulStore:          as.SoulStore,
 			AgentRemoteNodeResolver: as.RemoteNodeResolver,
+			ScheduleTime:            scheduleTime,
 		})
 
 	listenSignals(ctx, agentInstance)

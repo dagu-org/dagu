@@ -392,7 +392,7 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 
 	go func() {
 		defer p.wakeUp()
-		if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID, status, status.TriggerType); err != nil {
+		if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID, status, status.TriggerType, status.ScheduleTime); err != nil {
 			logger.Error(ctx, "Failed to execute DAG", tag.Error(err))
 		}
 	}()

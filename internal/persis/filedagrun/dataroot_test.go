@@ -437,6 +437,7 @@ func TestSummaryFromIndexEntry(t *testing.T) {
 		WorkerID:         "worker-1",
 		Params:           "key=val",
 		QueuedAt:         "2024-01-15T12:00:00Z",
+		ScheduleTime:     "2024-01-15T11:55:00Z",
 		TriggerType:      core.TriggerType(1),
 		CreatedAt:        1705320000000,
 	}
@@ -453,6 +454,7 @@ func TestSummaryFromIndexEntry(t *testing.T) {
 	assert.Equal(t, entry.WorkerID, summary.WorkerID)
 	assert.Equal(t, entry.Params, summary.Params)
 	assert.Equal(t, entry.QueuedAt, summary.QueuedAt)
+	assert.Equal(t, entry.ScheduleTime, summary.ScheduleTime)
 	assert.Equal(t, entry.TriggerType, summary.TriggerType)
 	assert.Equal(t, entry.CreatedAt, summary.CreatedAt)
 }

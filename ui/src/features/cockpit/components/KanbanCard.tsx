@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { components, Status } from '@/api/v1/schema';
+import dayjs from '@/lib/dayjs';
 import StatusChip from '@/ui/StatusChip';
 import Ticker from '@/ui/Ticker';
 
@@ -14,9 +15,12 @@ interface Props {
 function formatElapsed(run: DAGRunSummary): string {
   const start = run.startedAt ? new Date(run.startedAt).getTime() : 0;
   if (!start) return '';
-  const end = run.status === Status.Running
-    ? Date.now()
-    : run.finishedAt ? new Date(run.finishedAt).getTime() : Date.now();
+  const end =
+    run.status === Status.Running
+      ? Date.now()
+      : run.finishedAt
+        ? new Date(run.finishedAt).getTime()
+        : Date.now();
   const seconds = Math.floor((end - start) / 1000);
   if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
@@ -28,12 +32,24 @@ function formatElapsed(run: DAGRunSummary): string {
 
 function truncateParams(params: string | undefined, maxLen = 60): string {
   if (!params) return '';
-  const clean = params.length > maxLen ? params.slice(0, maxLen) + '...' : params;
+  const clean =
+    params.length > maxLen ? params.slice(0, maxLen) + '...' : params;
   return clean;
+}
+
+function formatScheduleTime(scheduleTime: string | undefined): string {
+  if (!scheduleTime) return '';
+  const parsed = dayjs(scheduleTime);
+  if (!parsed.isValid()) return '';
+  return parsed.format('MMM D, HH:mm:ss');
 }
 
 export function KanbanCard({ run, onClick }: Props): React.ReactElement {
   const params = useMemo(() => truncateParams(run.params), [run.params]);
+  const scheduleTime = useMemo(
+    () => formatScheduleTime(run.scheduleTime),
+    [run.scheduleTime]
+  );
 
   return (
     <motion.div
@@ -50,19 +66,33 @@ export function KanbanCard({ run, onClick }: Props): React.ReactElement {
       >
         <div className="flex items-center justify-between gap-2 mb-1">
           <span className="text-xs font-medium truncate">{run.name}</span>
-          <StatusChip status={run.status} size="xs">{run.statusLabel}</StatusChip>
+          <StatusChip status={run.status} size="xs">
+            {run.statusLabel}
+          </StatusChip>
         </div>
-        {run.startedAt && (
-          run.status === Status.Running ? (
+        {run.startedAt &&
+          (run.status === Status.Running ? (
             <Ticker intervalMs={1000}>
-              {() => <div className="text-[11px] text-muted-foreground">{formatElapsed(run)}</div>}
+              {() => (
+                <div className="text-[11px] text-muted-foreground">
+                  {formatElapsed(run)}
+                </div>
+              )}
             </Ticker>
           ) : (
-            <div className="text-[11px] text-muted-foreground">{formatElapsed(run)}</div>
-          )
+            <div className="text-[11px] text-muted-foreground">
+              {formatElapsed(run)}
+            </div>
+          ))}
+        {scheduleTime && (
+          <div className="text-[11px] text-muted-foreground">
+            Scheduled {scheduleTime}
+          </div>
         )}
         {params && (
-          <div className="text-[11px] text-muted-foreground mt-0.5 truncate font-mono">{params}</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5 truncate font-mono">
+            {params}
+          </div>
         )}
       </button>
     </motion.div>

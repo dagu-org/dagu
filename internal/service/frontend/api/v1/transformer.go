@@ -170,17 +170,18 @@ func toTriggerType(t core.TriggerType) *api.TriggerType {
 
 func toDAGRunSummary(s exec.DAGRunStatus) api.DAGRunSummary {
 	return api.DAGRunSummary{
-		Name:        s.Name,
-		DagRunId:    s.DAGRunID,
-		Params:      ptrOf(s.Params),
-		QueuedAt:    ptrOf(s.QueuedAt),
-		StartedAt:   s.StartedAt,
-		FinishedAt:  s.FinishedAt,
-		Status:      api.Status(s.Status),
-		StatusLabel: api.StatusLabel(s.Status.String()),
-		WorkerId:    ptrOf(s.WorkerID),
-		TriggerType: toTriggerType(s.TriggerType),
-		Tags:        &s.Tags,
+		Name:         s.Name,
+		DagRunId:     s.DAGRunID,
+		Params:       ptrOf(s.Params),
+		QueuedAt:     ptrOf(s.QueuedAt),
+		ScheduleTime: ptrOf(s.ScheduleTime),
+		StartedAt:    s.StartedAt,
+		FinishedAt:   s.FinishedAt,
+		Status:       api.Status(s.Status),
+		StatusLabel:  api.StatusLabel(s.Status.String()),
+		WorkerId:     ptrOf(s.WorkerID),
+		TriggerType:  toTriggerType(s.TriggerType),
+		Tags:         &s.Tags,
 	}
 }
 
@@ -205,6 +206,8 @@ func ToDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {
 		Name:             s.Name,
 		Params:           ptrOf(s.Params),
 		DagRunId:         s.DAGRunID,
+		QueuedAt:         ptrOf(s.QueuedAt),
+		ScheduleTime:     ptrOf(s.ScheduleTime),
 		StartedAt:        s.StartedAt,
 		FinishedAt:       s.FinishedAt,
 		Status:           api.Status(s.Status),

@@ -63,6 +63,7 @@ type DAGRunStatus struct {
 	OnWait        *Node             `json:"onWait,omitempty"`
 	CreatedAt     int64             `json:"createdAt,omitempty"`
 	QueuedAt      string            `json:"queuedAt,omitempty"`
+	ScheduleTime  string            `json:"scheduleTime,omitempty"`
 	StartedAt     string            `json:"startedAt,omitempty"`
 	FinishedAt    string            `json:"finishedAt,omitempty"`
 	Log           string            `json:"log,omitempty"`

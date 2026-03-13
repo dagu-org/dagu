@@ -323,6 +323,16 @@ func TestRestart(t *testing.T) {
 		assert.Contains(t, spec.Args, "-q")
 	})
 
+	t.Run("RestartWithScheduleTime", func(t *testing.T) {
+		t.Parallel()
+		opts := runtime.RestartOptions{
+			ScheduleTime: "2026-03-13T10:00:00Z",
+		}
+		spec := builder.Restart(dag, opts)
+
+		assert.Contains(t, spec.Args, "--schedule-time=2026-03-13T10:00:00Z")
+	})
+
 	t.Run("RestartWithoutConfig", func(t *testing.T) {
 		t.Parallel()
 		cfgNoFile := &config.Config{
@@ -500,6 +510,18 @@ func TestTaskStart(t *testing.T) {
 		spec := builder.TaskStart(task)
 
 		assert.Contains(t, spec.Args, "--tags=env=prod,team=backend")
+	})
+
+	t.Run("TaskStartWithScheduleTime", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			DagRunId:     "task-run-id",
+			Target:       "/path/to/task.yaml",
+			ScheduleTime: "2026-03-13T10:00:00Z",
+		}
+		spec := builder.TaskStart(task)
+
+		assert.Contains(t, spec.Args, "--schedule-time=2026-03-13T10:00:00Z")
 	})
 
 	t.Run("TaskStartWithoutTags", func(t *testing.T) {
