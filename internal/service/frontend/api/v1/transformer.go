@@ -215,7 +215,7 @@ func ToDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {
 		Nodes:            nodes,
 		OnSuccess:        ptrOf(toNode(s.OnSuccess)),
 		OnFailure:        ptrOf(toNode(s.OnFailure)),
-		OnCancel:         ptrOf(toNode(s.OnCancel)),
+		OnAbort:          ptrOf(toNode(s.OnAbort)),
 		OnExit:           ptrOf(toNode(s.OnExit)),
 		Tags:             &s.Tags,
 	}
@@ -328,8 +328,8 @@ func toHandlerOn(handlers core.HandlerOn) api.HandlerOn {
 	if handlers.Success != nil {
 		handlerOn.Success = ptrOf(toStep(*handlers.Success))
 	}
-	if handlers.Cancel != nil {
-		handlerOn.Cancel = ptrOf(toStep(*handlers.Cancel))
+	if handlers.Abort != nil {
+		handlerOn.Abort = ptrOf(toStep(*handlers.Abort))
 	}
 	if handlers.Exit != nil {
 		handlerOn.Exit = ptrOf(toStep(*handlers.Exit))

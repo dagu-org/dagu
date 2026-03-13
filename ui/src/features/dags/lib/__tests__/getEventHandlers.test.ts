@@ -2,21 +2,22 @@ import { describe, expect, it } from 'vitest';
 import { getEventHandlers } from '../getEventHandlers';
 
 describe('getEventHandlers', () => {
-  it('renames onCancel lifecycle hook to onAbort for display', () => {
+  it('includes the onAbort lifecycle hook as-is', () => {
     const dagRun = {
-      onCancel: {
-        step: { name: 'onCancel' },
+      onAbort: {
+        step: { name: 'onAbort' },
       },
     } as any;
 
     const handlers = getEventHandlers(dagRun);
+    const handler = handlers[0]!;
 
     expect(handlers).toHaveLength(1);
-    expect(handlers[0].step.name).toBe('onAbort');
-    expect(dagRun.onCancel.step.name).toBe('onCancel');
+    expect(handler.step.name).toBe('onAbort');
+    expect(handler).toBe(dagRun.onAbort);
   });
 
-  it('preserves non-cancel handlers as-is', () => {
+  it('preserves non-abort handlers as-is', () => {
     const dagRun = {
       onSuccess: {
         step: { name: 'onSuccess' },

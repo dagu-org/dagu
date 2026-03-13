@@ -57,7 +57,7 @@ func TestStatusBuilder(t *testing.T) {
 			Exit:    &core.Step{Name: "exit-handler"},
 			Success: &core.Step{Name: "success-handler"},
 			Failure: &core.Step{Name: "failure-handler"},
-			Cancel:  &core.Step{Name: "cancel-handler"},
+			Abort:   &core.Step{Name: "abort-handler"},
 		},
 		Steps: []core.Step{
 			{Name: "step1", Commands: []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}}},
@@ -87,7 +87,7 @@ func TestStatusBuilder(t *testing.T) {
 	assert.NotNil(t, result.OnExit)
 	assert.NotNil(t, result.OnSuccess)
 	assert.NotNil(t, result.OnFailure)
-	assert.NotNil(t, result.OnCancel)
+	assert.NotNil(t, result.OnAbort)
 	assert.Equal(t, "param1 param2", result.Params)
 	assert.Equal(t, dag.Params, result.ParamsList)
 	assert.Equal(t, dag.Preconditions, result.Preconditions)
@@ -139,7 +139,7 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 		transform.WithOnExitNode(exitNode),
 		transform.WithOnSuccessNode(successNode),
 		transform.WithOnFailureNode(failureNode),
-		transform.WithOnCancelNode(cancelNode),
+		transform.WithOnAbortNode(cancelNode),
 		transform.WithLogFilePath("/tmp/log.txt"),
 		transform.WithPreconditions([]*core.Condition{{Condition: "test", Expected: "true"}}),
 		transform.WithHierarchyRefs(rootRef, parentRef),
@@ -154,7 +154,7 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 	assert.Equal(t, "exit-step", result.OnExit.Step.Name)
 	assert.Equal(t, "success-step", result.OnSuccess.Step.Name)
 	assert.Equal(t, "failure-step", result.OnFailure.Step.Name)
-	assert.Equal(t, "cancel-step", result.OnCancel.Step.Name)
+	assert.Equal(t, "cancel-step", result.OnAbort.Step.Name)
 	assert.Equal(t, "/tmp/log.txt", result.Log)
 	assert.Equal(t, 1, len(result.Preconditions))
 	assert.Equal(t, rootRef, result.Root)
@@ -172,7 +172,7 @@ func TestInitialStatus(t *testing.T) {
 			Exit:    &core.Step{Name: "exit"},
 			Success: &core.Step{Name: "success"},
 			Failure: &core.Step{Name: "failure"},
-			Cancel:  &core.Step{Name: "cancel"},
+			Abort:   &core.Step{Name: "abort"},
 		},
 		Steps: []core.Step{
 			{Name: "step1"},
@@ -193,7 +193,7 @@ func TestInitialStatus(t *testing.T) {
 	assert.NotNil(t, st.OnExit)
 	assert.NotNil(t, st.OnSuccess)
 	assert.NotNil(t, st.OnFailure)
-	assert.NotNil(t, st.OnCancel)
+	assert.NotNil(t, st.OnAbort)
 	assert.Equal(t, "arg1 arg2", st.Params)
 	assert.Equal(t, dag.Params, st.ParamsList)
 	assert.Equal(t, dag.Preconditions, st.Preconditions)
@@ -233,7 +233,7 @@ func TestDAGRunStatus_Errors(t *testing.T) {
 		OnExit:    &exec.Node{Step: core.Step{Name: "exit"}, Error: "exit error"},
 		OnSuccess: &exec.Node{Step: core.Step{Name: "success"}, Error: ""},
 		OnFailure: &exec.Node{Step: core.Step{Name: "failure"}, Error: "failure error"},
-		OnCancel:  &exec.Node{Step: core.Step{Name: "cancel"}, Error: "cancel error"},
+		OnAbort:   &exec.Node{Step: core.Step{Name: "cancel"}, Error: "cancel error"},
 	}
 
 	errors := dagRunStatus.Errors()
@@ -242,7 +242,7 @@ func TestDAGRunStatus_Errors(t *testing.T) {
 	assert.Contains(t, errors[1].Error(), "node step3: error3")
 	assert.Contains(t, errors[2].Error(), "onExit: exit error")
 	assert.Contains(t, errors[3].Error(), "onFailure: failure error")
-	assert.Contains(t, errors[4].Error(), "onCancel: cancel error")
+	assert.Contains(t, errors[4].Error(), "onAbort: cancel error")
 }
 
 func TestDAGRunStatus_NodeByName(t *testing.T) {
@@ -254,7 +254,7 @@ func TestDAGRunStatus_NodeByName(t *testing.T) {
 		OnExit:    &exec.Node{Step: core.Step{Name: "exit"}},
 		OnSuccess: &exec.Node{Step: core.Step{Name: "success"}},
 		OnFailure: &exec.Node{Step: core.Step{Name: "failure"}},
-		OnCancel:  &exec.Node{Step: core.Step{Name: "cancel"}},
+		OnAbort:   &exec.Node{Step: core.Step{Name: "cancel"}},
 	}
 
 	// Test finding regular nodes

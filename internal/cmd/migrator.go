@@ -298,7 +298,10 @@ func (m *historyMigrator) convertStatus(legacy *legacymodel.Status, dag *core.DA
 		status.OnFailure = m.convertNode(legacy.OnFailure)
 	}
 	if legacy.OnCancel != nil {
-		status.OnCancel = m.convertNode(legacy.OnCancel)
+		status.OnAbort = m.convertNode(legacy.OnCancel)
+		if status.OnAbort.Step.Name == "onCancel" {
+			status.OnAbort.Step.Name = "onAbort"
+		}
 	}
 
 	return status

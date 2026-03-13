@@ -181,9 +181,9 @@ func withOnExit(step core.Step) runnerOption {
 	}
 }
 
-func withOnCancel(step core.Step) runnerOption {
+func withOnAbort(step core.Step) runnerOption {
 	return func(cfg *runtime.Config) {
-		cfg.OnCancel = &step
+		cfg.OnAbort = &step
 	}
 }
 
@@ -307,8 +307,8 @@ func (rr runResult) assertNodeStatus(t *testing.T, stepName string, expected cor
 		if rr.cfg.OnFailure != nil && rr.cfg.OnFailure.Name == stepName {
 			target = rr.runner.HandlerNode(core.HandlerOnFailure)
 		}
-		if rr.cfg.OnCancel != nil && rr.cfg.OnCancel.Name == stepName {
-			target = rr.runner.HandlerNode(core.HandlerOnCancel)
+		if rr.cfg.OnAbort != nil && rr.cfg.OnAbort.Name == stepName {
+			target = rr.runner.HandlerNode(core.HandlerOnAbort)
 		}
 	}
 
@@ -332,8 +332,8 @@ func (rr runResult) nodeByName(t *testing.T, stepName string) *runtime.Node {
 	if rr.cfg.OnFailure != nil && rr.cfg.OnFailure.Name == stepName {
 		return rr.runner.HandlerNode(core.HandlerOnFailure)
 	}
-	if rr.cfg.OnCancel != nil && rr.cfg.OnCancel.Name == stepName {
-		return rr.runner.HandlerNode(core.HandlerOnCancel)
+	if rr.cfg.OnAbort != nil && rr.cfg.OnAbort.Name == stepName {
+		return rr.runner.HandlerNode(core.HandlerOnAbort)
 	}
 
 	require.FailNow(t, "step not found", "step %s not found in nodes", stepName)

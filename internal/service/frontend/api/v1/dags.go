@@ -438,7 +438,7 @@ func (a *API) readHistoryData(_ context.Context, statusList []exec.DAGRunStatus)
 		}{
 			{core.HandlerOnSuccess, st.OnSuccess},
 			{core.HandlerOnFailure, st.OnFailure},
-			{core.HandlerOnCancel, st.OnCancel},
+			{core.HandlerOnAbort, st.OnAbort},
 			{core.HandlerOnExit, st.OnExit},
 		}
 		for _, h := range handlerPairs {
@@ -466,7 +466,7 @@ func (a *API) readHistoryData(_ context.Context, statusList []exec.DAGRunStatus)
 	})
 
 	for _, handlerType := range []core.HandlerType{
-		core.HandlerOnSuccess, core.HandlerOnFailure, core.HandlerOnCancel, core.HandlerOnExit,
+		core.HandlerOnSuccess, core.HandlerOnFailure, core.HandlerOnAbort, core.HandlerOnExit,
 	} {
 		if statuses, ok := handlerData[handlerType.String()]; ok {
 			grid = append(grid, api.DAGGridItem{Name: handlerType.String(), History: toHistory(statuses)})

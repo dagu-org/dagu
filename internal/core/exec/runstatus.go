@@ -14,6 +14,11 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 )
 
+const (
+	canonicalAbortHandlerName = "onAbort"
+	legacyAbortHandlerName    = "onCancel"
+)
+
 // InitialStatus creates an initial Status object for the given DAG
 func InitialStatus(dag *core.DAG) DAGRunStatus {
 	return DAGRunStatus{
@@ -25,7 +30,7 @@ func InitialStatus(dag *core.DAG) DAGRunStatus {
 		OnExit:        NewNodeOrNil(dag.HandlerOn.Exit),
 		OnSuccess:     NewNodeOrNil(dag.HandlerOn.Success),
 		OnFailure:     NewNodeOrNil(dag.HandlerOn.Failure),
-		OnCancel:      NewNodeOrNil(dag.HandlerOn.Cancel),
+		OnAbort:       NewNodeOrNil(dag.HandlerOn.Abort),
 		OnWait:        NewNodeOrNil(dag.HandlerOn.Wait),
 		Params:        strings.Join(dag.Params, " "),
 		ParamsList:    dag.Params,
@@ -54,7 +59,7 @@ type DAGRunStatus struct {
 	OnExit        *Node             `json:"onExit,omitempty"`
 	OnSuccess     *Node             `json:"onSuccess,omitempty"`
 	OnFailure     *Node             `json:"onFailure,omitempty"`
-	OnCancel      *Node             `json:"onCancel,omitempty"`
+	OnAbort       *Node             `json:"onAbort,omitempty"`
 	OnWait        *Node             `json:"onWait,omitempty"`
 	CreatedAt     int64             `json:"createdAt,omitempty"`
 	QueuedAt      string            `json:"queuedAt,omitempty"`
@@ -96,6 +101,7 @@ func (st *DAGRunStatus) Errors() []error {
 // For handlers, it matches on both the handler label (e.g., "onSuccess")
 // and the step name within the handler.
 func (st *DAGRunStatus) NodeByName(name string) (*Node, error) {
+	name = normalizeAbortHandlerLookup(name)
 	for _, node := range st.Nodes {
 		if node.Step.Name == name {
 			return node, nil
@@ -119,6 +125,26 @@ func StatusFromJSON(s string) (*DAGRunStatus, error) {
 		return nil, err
 	}
 	return &status, nil
+}
+
+// UnmarshalJSON keeps legacy onCancel status files readable while normalizing
+// the canonical handler identity to onAbort in memory.
+func (st *DAGRunStatus) UnmarshalJSON(data []byte) error {
+	type alias DAGRunStatus
+	aux := struct {
+		alias
+		OnCancel *Node `json:"onCancel,omitempty"`
+	}{}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	*st = DAGRunStatus(aux.alias)
+	if st.OnAbort == nil {
+		st.OnAbort = aux.OnCancel
+	}
+	normalizeAbortHandlerNode(st.OnAbort)
+	return nil
 }
 
 // PID represents a process ID for a running dag-run
@@ -151,7 +177,23 @@ func (st *DAGRunStatus) handlerNodes() []handlerNode {
 		{"onExit", st.OnExit},
 		{"onSuccess", st.OnSuccess},
 		{"onFailure", st.OnFailure},
-		{"onCancel", st.OnCancel},
+		{canonicalAbortHandlerName, st.OnAbort},
 		{"onWait", st.OnWait},
+	}
+}
+
+func normalizeAbortHandlerLookup(name string) string {
+	if name == legacyAbortHandlerName {
+		return canonicalAbortHandlerName
+	}
+	return name
+}
+
+func normalizeAbortHandlerNode(node *Node) {
+	if node == nil {
+		return
+	}
+	if node.Step.Name == "" || node.Step.Name == legacyAbortHandlerName {
+		node.Step.Name = canonicalAbortHandlerName
 	}
 }

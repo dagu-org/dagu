@@ -279,9 +279,9 @@ steps:
     command: sleep 10
 `)
 
-	// Verify parsing: abort field maps to internal Cancel
-	require.NotNil(t, dag.HandlerOn.Cancel)
-	require.Equal(t, "onCancel", dag.HandlerOn.Cancel.Name)
+	// Verify parsing: abort field maps to the canonical abort handler
+	require.NotNil(t, dag.HandlerOn.Abort)
+	require.Equal(t, "onAbort", dag.HandlerOn.Abort.Name)
 
 	dagAgent := dag.Agent()
 
@@ -303,8 +303,8 @@ steps:
 	// Verify the abort handler was executed
 	status := dagAgent.Status(th.Context)
 	require.Equal(t, core.Aborted, status.Status)
-	require.NotNil(t, status.OnCancel, "abort handler should have been executed")
-	require.Equal(t, core.NodeSucceeded, status.OnCancel.Status)
+	require.NotNil(t, status.OnAbort, "abort handler should have been executed")
+	require.Equal(t, core.NodeSucceeded, status.OnAbort.Status)
 }
 
 // TestHandlerOn_EnvironmentVariables tests that special environment variables
@@ -317,7 +317,7 @@ steps:
 // | DAG_NAME                   | ✓      | ✓         | ✓          | ✓       | ✓         |
 // | DAG_RUN_ID                 | ✓      | ✓         | ✓          | ✓       | ✓         |
 // | DAG_RUN_LOG_FILE           | ✓      | ✓         | ✓          | ✓       | ✓         |
-// | DAG_RUN_STEP_NAME          | onInit | onSuccess | onFailure  | onCancel| onExit    |
+// | DAG_RUN_STEP_NAME          | onInit | onSuccess | onFailure  | onAbort| onExit    |
 // | DAG_RUN_STATUS             | running| succeeded | failed     | aborted | succeeded/failed |
 // | DAG_RUN_STEP_STDOUT_FILE   | ✗      | ✗         | ✗          | ✗       | ✗         |
 // | DAG_RUN_STEP_STDERR_FILE   | ✗      | ✗         | ✗          | ✗       | ✗         |
@@ -588,11 +588,11 @@ steps:
 		<-done
 
 		status := dagAgent.Status(th.Context)
-		require.NotNil(t, status.OnCancel, "cancel handler should have been executed")
-		require.Equal(t, core.NodeSucceeded, status.OnCancel.Status)
-		require.NotNil(t, status.OnCancel.OutputVariables)
+		require.NotNil(t, status.OnAbort, "cancel handler should have been executed")
+		require.Equal(t, core.NodeSucceeded, status.OnAbort.Status)
+		require.NotNil(t, status.OnAbort.OutputVariables)
 
-		output, ok := status.OnCancel.OutputVariables.Load("CANCEL_ENV_OUTPUT")
+		output, ok := status.OnAbort.OutputVariables.Load("CANCEL_ENV_OUTPUT")
 		require.True(t, ok)
 
 		outputStr := extractValue(output.(string))
@@ -603,8 +603,8 @@ steps:
 		// Verify DAG_RUN_STATUS is "aborted"
 		assert.Contains(t, outputStr, "status:aborted", "DAG_RUN_STATUS should be 'aborted'")
 
-		// Verify DAG_RUN_STEP_NAME is "onCancel"
-		assert.Contains(t, outputStr, "stepname:onCancel", "DAG_RUN_STEP_NAME should be 'onCancel'")
+		// Verify DAG_RUN_STEP_NAME is "onAbort"
+		assert.Contains(t, outputStr, "stepname:onAbort", "DAG_RUN_STEP_NAME should be 'onAbort'")
 	})
 
 	t.Run("StepOutputVars_NotAvailableInHandlers", func(t *testing.T) {

@@ -1053,7 +1053,7 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 		transform.WithOnExitNode(a.runner.HandlerNode(core.HandlerOnExit)),
 		transform.WithOnSuccessNode(a.runner.HandlerNode(core.HandlerOnSuccess)),
 		transform.WithOnFailureNode(a.runner.HandlerNode(core.HandlerOnFailure)),
-		transform.WithOnCancelNode(a.runner.HandlerNode(core.HandlerOnCancel)),
+		transform.WithOnAbortNode(a.runner.HandlerNode(core.HandlerOnAbort)),
 		transform.WithOnWaitNode(a.runner.HandlerNode(core.HandlerOnWait)),
 		transform.WithAttemptID(a.dagRunAttemptID),
 		transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
@@ -1224,7 +1224,7 @@ func (a *Agent) newRunner(attempt exec.DAGRunAttempt) *runtime.Runner {
 		OnExit:          a.dag.HandlerOn.Exit,
 		OnSuccess:       a.dag.HandlerOn.Success,
 		OnFailure:       a.dag.HandlerOn.Failure,
-		OnCancel:        a.dag.HandlerOn.Cancel,
+		OnAbort:         a.dag.HandlerOn.Abort,
 		OnWait:          a.dag.HandlerOn.Wait,
 	}
 

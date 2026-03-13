@@ -53,7 +53,7 @@ type Runner struct {
 	onExit          *core.Step
 	onSuccess       *core.Step
 	onFailure       *core.Step
-	onCancel        *core.Step
+	onAbort         *core.Step
 	dagRunID        string
 	messagesHandler ChatMessagesHandler
 	onWait          *core.Step
@@ -88,7 +88,7 @@ func New(cfg *Config) *Runner {
 		onExit:          cfg.OnExit,
 		onSuccess:       cfg.OnSuccess,
 		onFailure:       cfg.OnFailure,
-		onCancel:        cfg.OnCancel,
+		onAbort:         cfg.OnAbort,
 		dagRunID:        cfg.DAGRunID,
 		messagesHandler: cfg.MessagesHandler,
 		pause:           time.Millisecond * 100,
@@ -106,7 +106,7 @@ type Config struct {
 	OnExit          *core.Step
 	OnSuccess       *core.Step
 	OnFailure       *core.Step
-	OnCancel        *core.Step
+	OnAbort         *core.Step
 	DAGRunID        string
 	MessagesHandler ChatMessagesHandler
 	OnWait          *core.Step
@@ -288,7 +288,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 		eventHandlers = append(eventHandlers, core.HandlerOnFailure)
 
 	case core.Aborted:
-		eventHandlers = append(eventHandlers, core.HandlerOnCancel)
+		eventHandlers = append(eventHandlers, core.HandlerOnAbort)
 
 	case core.Rejected:
 		eventHandlers = append(eventHandlers, core.HandlerOnFailure)
@@ -980,7 +980,7 @@ func (r *Runner) setup(ctx context.Context) (err error) {
 		core.HandlerOnExit:    r.onExit,
 		core.HandlerOnSuccess: r.onSuccess,
 		core.HandlerOnFailure: r.onFailure,
-		core.HandlerOnCancel:  r.onCancel,
+		core.HandlerOnAbort:   r.onAbort,
 		core.HandlerOnWait:    r.onWait,
 	}
 	for handlerType, step := range handlerSteps {

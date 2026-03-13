@@ -620,7 +620,7 @@ func (h *Handler) transformLogPaths(status *exec.DAGRunStatus) {
 	transformNode(status.OnExit, "on_exit")
 	transformNode(status.OnSuccess, "on_success")
 	transformNode(status.OnFailure, "on_failure")
-	transformNode(status.OnCancel, "on_cancel")
+	transformNode(status.OnAbort, "on_abort")
 	transformNode(status.OnWait, "on_wait")
 
 	// Transform scheduler log path
@@ -666,7 +666,7 @@ func (h *Handler) persistChatMessages(ctx context.Context, attempt exec.DAGRunAt
 	persistNode(status.OnExit, "on_exit")
 	persistNode(status.OnSuccess, "on_success")
 	persistNode(status.OnFailure, "on_failure")
-	persistNode(status.OnCancel, "on_cancel")
+	persistNode(status.OnAbort, "on_abort")
 	persistNode(status.OnWait, "on_wait")
 }
 
