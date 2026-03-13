@@ -10,6 +10,7 @@ on:
       - "charts/dagu/values.schema.json"
       - "charts/dagu/.helmignore"
       - "charts/dagu/README.md"
+      - "charts/dagu/RELEASE.md"
       - "charts/dagu/LICENSE*"
       - "charts/dagu/templates/**"
       - "charts/dagu/charts/**"
@@ -27,6 +28,7 @@ on:
       - "charts/dagu/values.schema.json"
       - "charts/dagu/.helmignore"
       - "charts/dagu/README.md"
+      - "charts/dagu/RELEASE.md"
       - "charts/dagu/LICENSE*"
       - "charts/dagu/templates/**"
       - "charts/dagu/charts/**"
@@ -65,6 +67,7 @@ jobs:
             charts/dagu/values.schema.json \
             charts/dagu/.helmignore \
             charts/dagu/README.md \
+            charts/dagu/RELEASE.md \
             charts/dagu/LICENSE* \
             charts/dagu/templates \
             charts/dagu/charts \
