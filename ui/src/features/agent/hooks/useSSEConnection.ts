@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildAgentSessionTopic, sseManager } from '@/hooks/SSEManager';
 import { StreamResponse } from '../types';
 
@@ -9,16 +9,25 @@ export interface SSECallbacks {
   onPreConnect: () => void;
 }
 
+export interface AgentSSEStatus {
+  isSessionLive: boolean;
+  liveDelegateSessions: Record<string, boolean>;
+}
+
 export function useSSEConnection(
   sessionId: string | null,
   delegateSessionIds: string[],
   apiURL: string,
   remoteNode: string,
   callbacks: SSECallbacks
-) {
+): AgentSSEStatus {
   const handledNavigateIdsRef = useRef<Set<string>>(new Set());
   const cbRef = useRef(callbacks);
   cbRef.current = callbacks;
+  const [isSessionLive, setIsSessionLive] = useState(false);
+  const [liveDelegateSessions, setLiveDelegateSessions] = useState<
+    Record<string, boolean>
+  >({});
 
   const delegateKey = useMemo(
     () => [...delegateSessionIds].sort().join('|'),
@@ -31,10 +40,22 @@ export function useSSEConnection(
 
   useEffect(() => {
     handledNavigateIdsRef.current = new Set();
+    setIsSessionLive(false);
   }, [sessionId]);
 
   useEffect(() => {
+    setLiveDelegateSessions((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const delegateId of stableDelegateSessionIds) {
+        next[delegateId] = prev[delegateId] ?? false;
+      }
+      return next;
+    });
+  }, [stableDelegateSessionIds]);
+
+  useEffect(() => {
     if (!sessionId) {
+      setIsSessionLive(false);
       return;
     }
 
@@ -62,8 +83,8 @@ export function useSSEConnection(
             }
           }
         },
-        onStateChange: () => {
-          // Agent UI handles reconnects implicitly through fresh snapshots.
+        onStateChange: (state) => {
+          setIsSessionLive(state.isConnected && !state.shouldUseFallback);
         },
       }
     );
@@ -71,6 +92,7 @@ export function useSSEConnection(
 
   useEffect(() => {
     if (!delegateKey) {
+      setLiveDelegateSessions({});
       return;
     }
 
@@ -81,10 +103,22 @@ export function useSSEConnection(
         apiURL,
         {
           onData: (data) => {
-            cbRef.current.onDelegateSnapshot(delegateId, data as StreamResponse);
+            cbRef.current.onDelegateSnapshot(
+              delegateId,
+              data as StreamResponse
+            );
           },
-          onStateChange: () => {
-            // Delegate panels update from snapshots only.
+          onStateChange: (state) => {
+            setLiveDelegateSessions((prev) => {
+              const nextValue = state.isConnected && !state.shouldUseFallback;
+              if (prev[delegateId] === nextValue) {
+                return prev;
+              }
+              return {
+                ...prev,
+                [delegateId]: nextValue,
+              };
+            });
           },
         }
       )
@@ -96,4 +130,9 @@ export function useSSEConnection(
       }
     };
   }, [delegateKey, stableDelegateSessionIds, remoteNode, apiURL]);
+
+  return {
+    isSessionLive,
+    liveDelegateSessions,
+  };
 }

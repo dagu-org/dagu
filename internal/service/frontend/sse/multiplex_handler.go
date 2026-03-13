@@ -97,6 +97,8 @@ func (h *MultiplexHandler) HandleTopicMutation(w http.ResponseWriter, r *http.Re
 			writeJSONError(w, http.StatusNotFound, "unknown_session", "unknown_session")
 		case errors.Is(err, ErrTooManyTopics):
 			writeJSONError(w, http.StatusBadRequest, "too_many_topics", err.Error())
+		case errors.Is(err, ErrConflictingTopicMutation):
+			writeJSONError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		default:
 			writeJSONError(w, http.StatusBadRequest, "invalid_topic", err.Error())
 		}

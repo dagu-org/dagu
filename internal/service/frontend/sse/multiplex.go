@@ -26,8 +26,9 @@ const (
 )
 
 var (
-	ErrUnknownSession = errors.New("unknown session")
-	ErrTooManyTopics  = errors.New("too many topics for one connection")
+	ErrUnknownSession           = errors.New("unknown session")
+	ErrTooManyTopics            = errors.New("too many topics for one connection")
+	ErrConflictingTopicMutation = errors.New("conflicting topic mutation")
 )
 
 // StreamConfig controls multiplexed SSE sessions.
@@ -265,6 +266,15 @@ func (m *Multiplexer) applyMutation(ctx context.Context, session *streamSession,
 	for _, parsed := range removedParsed {
 		removeSet[parsed.Key] = struct{}{}
 	}
+	for _, parsed := range addedParsed {
+		if _, exists := removeSet[parsed.Key]; exists {
+			return mutationResult{}, fmt.Errorf(
+				"%w: topic %q cannot be added and removed in the same request",
+				ErrConflictingTopicMutation,
+				parsed.Key,
+			)
+		}
+	}
 
 	authErrors := make([]TopicMutationError, 0)
 	authorizedAdds := make([]ParsedTopic, 0, len(addedParsed))
@@ -305,24 +315,34 @@ func (m *Multiplexer) applyMutation(ctx context.Context, session *streamSession,
 		return mutationResult{}, ErrTooManyTopics
 	}
 
+	resolvedAdds, createdTopics, err := m.resolveTopicsForMutation(authorizedAdds)
+	if err != nil {
+		return mutationResult{}, err
+	}
+
+	if session.isClosed() {
+		m.cleanupResolvedTopics(createdTopics, nil)
+		return mutationResult{}, ErrUnknownSession
+	}
+
 	for _, parsed := range removedParsed {
 		m.unsubscribeTopic(session, parsed.Key)
 	}
 
-	addedTopics := make([]*multiplexTopic, 0, len(authorizedAdds))
-	for _, parsed := range authorizedAdds {
-		topic, err := m.getOrCreateTopic(parsed)
-		if err != nil {
-			return mutationResult{}, err
-		}
+	addedTopics := make([]*multiplexTopic, 0, len(resolvedAdds))
+	addedTopicKeys := make(map[string]struct{}, len(resolvedAdds))
+	for idx, topic := range resolvedAdds {
+		parsed := authorizedAdds[idx]
 		if session.addTopic(topic) {
 			topic.addSession(session)
 			addedTopics = append(addedTopics, topic)
+			addedTopicKeys[topic.key] = struct{}{}
 			if m.metrics != nil {
 				m.metrics.TopicMutation("subscribe", string(parsed.Type))
 			}
 		}
 	}
+	m.cleanupResolvedTopics(createdTopics, addedTopicKeys)
 
 	statusCode := http.StatusOK
 	if len(authErrors) > 0 {
@@ -345,22 +365,63 @@ func (m *Multiplexer) getAuthorizer(topicType TopicType) TopicAuthorizer {
 	return m.authorizers[topicType]
 }
 
+func (m *Multiplexer) resolveTopicsForMutation(parsedTopics []ParsedTopic) ([]*multiplexTopic, []*multiplexTopic, error) {
+	if len(parsedTopics) == 0 {
+		return nil, nil, nil
+	}
+
+	resolved := make([]*multiplexTopic, 0, len(parsedTopics))
+	created := make([]*multiplexTopic, 0, len(parsedTopics))
+	for _, parsed := range parsedTopics {
+		topic, wasCreated, err := m.getOrCreateTopicForMutation(parsed)
+		if err != nil {
+			m.cleanupResolvedTopics(created, nil)
+			return nil, nil, err
+		}
+		resolved = append(resolved, topic)
+		if wasCreated {
+			created = append(created, topic)
+		}
+	}
+
+	return resolved, created, nil
+}
+
+func (m *Multiplexer) cleanupResolvedTopics(topics []*multiplexTopic, keep map[string]struct{}) {
+	for _, topic := range topics {
+		if topic == nil {
+			continue
+		}
+		if keep != nil {
+			if _, exists := keep[topic.key]; exists {
+				continue
+			}
+		}
+		m.deleteTopicIfUnused(topic)
+	}
+}
+
 func (m *Multiplexer) getOrCreateTopic(parsed ParsedTopic) (*multiplexTopic, error) {
+	topic, _, err := m.getOrCreateTopicForMutation(parsed)
+	return topic, err
+}
+
+func (m *Multiplexer) getOrCreateTopicForMutation(parsed ParsedTopic) (*multiplexTopic, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if topic := m.topics[parsed.Key]; topic != nil {
-		return topic, nil
+		return topic, false, nil
 	}
 
 	fetcher := m.fetchers[parsed.Type]
 	if fetcher == nil {
-		return nil, fmt.Errorf("no fetcher registered for topic type: %s", parsed.Type)
+		return nil, false, fmt.Errorf("no fetcher registered for topic type: %s", parsed.Type)
 	}
 
 	topic := newMultiplexTopic(m, parsed, fetcher)
 	m.topics[parsed.Key] = topic
-	return topic, nil
+	return topic, true, nil
 }
 
 func (m *Multiplexer) deleteTopicIfUnused(topic *multiplexTopic) {
