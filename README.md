@@ -82,6 +82,16 @@ irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1 |
 docker run --rm -v ~/.dagu:/var/lib/dagu -p 8080:8080 ghcr.io/dagu-org/dagu:latest dagu start-all
 ```
 
+**Kubernetes (Helm):**
+
+```bash
+helm repo add dagu https://dagu-org.github.io/dagu
+helm repo update
+helm install dagu dagu/dagu --set persistence.storageClass=nfs-client
+```
+
+> The chart requires a shared storage class that supports `ReadWriteMany`. The published repository becomes available after GitHub Pages is enabled and the first chart release completes. See [charts/dagu/README.md](./charts/dagu/README.md) for chart details, values, and source-checkout installation.
+
 > More options (npm, custom paths, specific versions): [Installation docs](https://docs.dagu.sh/getting-started/installation)
 
 ### 2. Set up AI-assisted workflow authoring (optional)

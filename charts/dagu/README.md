@@ -15,18 +15,48 @@ Dagu uses a shared filesystem for state persistence. You must have a storage cla
 - Azure Files (Premium)
 - GlusterFS
 
-## Installation
+## Install
+
+Official Helm repository URL:
+
+```text
+https://dagu-org.github.io/dagu
+```
+
+After GitHub Pages is enabled for this repository and the first chart release completes, add the repository and install the chart:
 
 ```bash
-# Install with default values
-helm install dagu ./charts/dagu
-
-# Install with custom storage class
-helm install dagu ./charts/dagu --set persistence.storageClass=nfs-client
-
-# Install with custom image tag
-helm install dagu ./charts/dagu --set image.tag=v1.12.0
+helm repo add dagu https://dagu-org.github.io/dagu
+helm repo update
+helm install dagu dagu/dagu --set persistence.storageClass=nfs-client
 ```
+
+Render manifests without installing:
+
+```bash
+helm template dagu dagu/dagu --set persistence.storageClass=nfs-client
+```
+
+Upgrade an existing release:
+
+```bash
+helm repo update
+helm upgrade dagu dagu/dagu --set persistence.storageClass=nfs-client
+```
+
+From a source checkout, the local chart path remains available:
+
+```bash
+helm install dagu ./charts/dagu --set persistence.storageClass=nfs-client
+```
+
+## Versions
+
+`charts/dagu/Chart.yaml` defines the chart `version`, which is the version published to the Helm repository.
+
+The deployed container image comes from `values.yaml -> image.repository` and `values.yaml -> image.tag`. With the current defaults, the chart deploys `ghcr.io/dagu-org/dagu:latest`.
+
+For chart publication and repository maintenance, see [`RELEASING.md`](./RELEASING.md).
 
 ## Architecture
 
@@ -42,11 +72,15 @@ The chart mounts that shared volume at `/data`, sets `DAGU_HOME=/data`, and stor
 
 ## Configuration
 
-### Required Values
+### Persistence Values
+
+The chart always renders a PVC. `persistence.enabled` must remain `true`.
+
+If `persistence.storageClass` is the empty string, the rendered PVC omits `storageClassName` and Kubernetes uses the cluster default behavior. If your cluster does not provide a suitable default RWX storage class, set `persistence.storageClass` explicitly:
 
 ```yaml
 persistence:
-  storageClass: "nfs-client"  # REQUIRED: Must support RWX
+  storageClass: "nfs-client"
 ```
 
 ### Local Testing (Kind, Docker Desktop)
@@ -54,7 +88,16 @@ persistence:
 For local single-node clusters that don't support RWX:
 
 ```bash
-helm install dagu charts/dagu \
+helm install dagu dagu/dagu \
+  --set persistence.accessMode=ReadWriteOnce \
+  --set persistence.skipValidation=true \
+  --set workerPools.general.replicas=1
+```
+
+From a source checkout, the equivalent command is:
+
+```bash
+helm install dagu ./charts/dagu \
   --set persistence.accessMode=ReadWriteOnce \
   --set persistence.skipValidation=true \
   --set workerPools.general.replicas=1
@@ -125,7 +168,9 @@ auth:
 
 To disable authentication:
 ```bash
-helm install dagu ./charts/dagu --set auth.mode=none
+helm install dagu dagu/dagu \
+  --set persistence.storageClass=nfs-client \
+  --set auth.mode=none
 ```
 
 ### Component Resources
@@ -164,6 +209,13 @@ ui:
     requests:
       memory: "256Mi"
       cpu: "250m"
+```
+
+To force a different tag:
+
+```yaml
+image:
+  tag: 2.2.4
 ```
 
 ## Accessing the UI
