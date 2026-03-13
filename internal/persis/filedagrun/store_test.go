@@ -737,6 +737,7 @@ func TestResolveStatus_FastPath(t *testing.T) {
 			WorkerID:       "worker-1",
 			Params:         "key=val",
 			QueuedAt:       "2024-01-15T12:00:00Z",
+			ScheduleTime:   "2024-01-15T11:55:00Z",
 			TriggerType:    core.TriggerType(1),
 			CreatedAt:      1705320000000,
 		},
@@ -753,6 +754,7 @@ func TestResolveStatus_FastPath(t *testing.T) {
 	assert.Equal(t, "worker-1", status.WorkerID)
 	assert.Equal(t, "key=val", status.Params)
 	assert.Equal(t, "2024-01-15T12:00:00Z", status.QueuedAt)
+	assert.Equal(t, "2024-01-15T11:55:00Z", status.ScheduleTime)
 	assert.Equal(t, int64(1705320000000), status.CreatedAt)
 }
 

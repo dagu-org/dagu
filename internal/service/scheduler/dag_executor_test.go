@@ -6,6 +6,7 @@ package scheduler_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
@@ -49,6 +50,7 @@ steps:
 			coordinatorv1.Operation_OPERATION_START,
 			"handle-job-test-123",
 			core.TriggerTypeScheduler,
+			time.Time{},
 		)
 
 		require.NoError(t, err)
@@ -64,6 +66,7 @@ steps:
 			"execute-dag-test-456",
 			nil,
 			core.TriggerTypeScheduler,
+			"",
 		)
 
 		require.Error(t, err)
@@ -82,6 +85,7 @@ steps:
 			coordinatorv1.Operation_OPERATION_START,
 			"handle-job-local-789",
 			core.TriggerTypeScheduler,
+			time.Time{},
 		)
 		require.NoError(t, err, "local execution with nil coordinator should succeed")
 	})
@@ -95,6 +99,7 @@ steps:
 			coordinatorv1.Operation_OPERATION_RETRY,
 			"handle-job-retry-999",
 			core.TriggerTypeScheduler,
+			time.Time{},
 		)
 
 		require.Error(t, err)

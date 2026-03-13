@@ -38,7 +38,7 @@ steps:
 	// Restart the DAG.
 	done2 := make(chan struct{})
 	go func() {
-		args := []string{"restart", dag.Location}
+		args := []string{"restart", "--schedule-time=2026-03-13T10:00:00Z", dag.Location}
 		th.RunCommand(t, cmd.Restart(), test.CmdTest{Args: args})
 		close(done2)
 	}()
@@ -56,4 +56,5 @@ steps:
 
 	require.Len(t, recentHistory, 2)
 	require.Equal(t, recentHistory[0].Params, recentHistory[1].Params)
+	require.Equal(t, "2026-03-13T10:00:00Z", recentHistory[0].ScheduleTime)
 }

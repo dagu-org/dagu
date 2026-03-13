@@ -7,10 +7,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -90,6 +92,7 @@ func (e *DAGExecutor) HandleJob(
 	operation coordinatorv1.Operation,
 	runID string,
 	triggerType core.TriggerType,
+	scheduleTime time.Time,
 ) error {
 	// For distributed execution with START operation, enqueue for persistence
 	if e.shouldUseDistributedExecution(dag) && operation == coordinatorv1.Operation_OPERATION_START {
@@ -103,8 +106,9 @@ func (e *DAGExecutor) HandleJob(
 		)
 
 		spec := e.subCmdBuilder.Enqueue(dag, runtime.EnqueueOptions{
-			DAGRunID:    runID,
-			TriggerType: triggerType.String(),
+			DAGRunID:     runID,
+			TriggerType:  triggerType.String(),
+			ScheduleTime: stringutil.FormatTime(scheduleTime),
 		})
 		if err := runtime.Run(ctx, spec); err != nil {
 			return fmt.Errorf("failed to enqueue DAG run: %w", err)
@@ -113,7 +117,7 @@ func (e *DAGExecutor) HandleJob(
 	}
 
 	// For all other cases (local execution or non-START operations), use ExecuteDAG
-	return e.ExecuteDAG(ctx, dag, operation, runID, nil, triggerType)
+	return e.ExecuteDAG(ctx, dag, operation, runID, nil, triggerType, stringutil.FormatTime(scheduleTime))
 }
 
 // ExecuteDAG executes or dispatches an already-persisted DAG.
@@ -132,17 +136,24 @@ func (e *DAGExecutor) ExecuteDAG(
 	runID string,
 	previousStatus *exec.DAGRunStatus,
 	triggerType core.TriggerType,
+	scheduleTime string,
 ) error {
 	if e.shouldUseDistributedExecution(dag) {
 		// Distributed execution: dispatch to coordinator
+		taskOpts := []executor.TaskOption{
+			executor.WithWorkerSelector(dag.WorkerSelector),
+			executor.WithPreviousStatus(previousStatus),
+			executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, e.baseConfigPath)),
+		}
+		if scheduleTime != "" {
+			taskOpts = append(taskOpts, executor.WithScheduleTime(scheduleTime))
+		}
 		task := executor.CreateTask(
 			dag.Name,
 			string(dag.YamlData),
 			operation,
 			runID,
-			executor.WithWorkerSelector(dag.WorkerSelector),
-			executor.WithPreviousStatus(previousStatus),
-			executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, e.baseConfigPath)),
+			taskOpts...,
 		)
 		return e.dispatchToCoordinator(ctx, task)
 	}
@@ -154,9 +165,10 @@ func (e *DAGExecutor) ExecuteDAG(
 
 	case coordinatorv1.Operation_OPERATION_START:
 		spec := e.subCmdBuilder.Start(dag, runtime.StartOptions{
-			DAGRunID:    runID,
-			Quiet:       true,
-			TriggerType: triggerType.String(),
+			DAGRunID:     runID,
+			Quiet:        true,
+			TriggerType:  triggerType.String(),
+			ScheduleTime: scheduleTime,
 		})
 		return runtime.Start(ctx, spec)
 
@@ -206,9 +218,10 @@ func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinat
 }
 
 // Restart restarts a DAG unconditionally.
-func (e *DAGExecutor) Restart(ctx context.Context, dag *core.DAG) error {
+func (e *DAGExecutor) Restart(ctx context.Context, dag *core.DAG, scheduleTime time.Time) error {
 	spec := e.subCmdBuilder.Restart(dag, runtime.RestartOptions{
-		Quiet: true,
+		Quiet:        true,
+		ScheduleTime: stringutil.FormatTime(scheduleTime),
 	})
 	return runtime.Start(ctx, spec)
 }

@@ -2964,6 +2964,8 @@ export interface components {
             statusLabel: components["schemas"]["StatusLabel"];
             /** @description RFC 3339 timestamp when the DAG-run was queued */
             queuedAt?: string;
+            /** @description RFC 3339 timestamp of when the DAG-run was scheduled to run */
+            scheduleTime?: string;
             /** @description RFC 3339 timestamp when the DAG-run started */
             startedAt: string;
             /** @description RFC 3339 timestamp when the DAG-run finished */

@@ -85,6 +85,8 @@ message Task {
   string tags = 16;
   // Base config YAML content for workers (avoids relying on local base config files).
   string base_config = 17;
+  // RFC 3339 timestamp of when this task was originally scheduled.
+  string schedule_time = 18;
 }
 
 enum Operation {

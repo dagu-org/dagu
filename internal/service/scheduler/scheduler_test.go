@@ -45,8 +45,10 @@ func TestScheduler(t *testing.T) {
 
 		// Track restart calls via the planner's Restart function
 		var restartCount atomic.Int32
-		sc.SetRestartFunc(func(_ context.Context, _ *core.DAG) error {
+		var restartScheduleTime time.Time
+		sc.SetRestartFunc(func(_ context.Context, _ *core.DAG, scheduleTime time.Time) error {
 			restartCount.Add(1)
+			restartScheduleTime = scheduleTime
 			return nil
 		})
 
@@ -57,6 +59,7 @@ func TestScheduler(t *testing.T) {
 
 		time.Sleep(time.Second + time.Millisecond*100)
 		require.GreaterOrEqual(t, restartCount.Load(), int32(1))
+		require.False(t, restartScheduleTime.IsZero())
 	})
 	t.Run("Start", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -81,7 +84,7 @@ func TestScheduler(t *testing.T) {
 		sc.SetClock(func() time.Time { return now })
 
 		var dispatchCount atomic.Int32
-		sc.SetDispatchFunc(func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType) error {
+		sc.SetDispatchFunc(func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
 			dispatchCount.Add(1)
 			return nil
 		})

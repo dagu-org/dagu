@@ -105,18 +105,18 @@ func New(
 			return count > 0, nil
 		},
 		GenRunID: drm.GenDAGRunID,
-		Dispatch: func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType) error {
+		Dispatch: func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType, scheduleTime time.Time) error {
 			return dagExecutor.HandleJob(
 				ctx, dag,
 				coordinatorv1.Operation_OPERATION_START,
-				runID, triggerType,
+				runID, triggerType, scheduleTime,
 			)
 		},
 		Stop: func(ctx context.Context, dag *core.DAG) error {
 			return drm.Stop(ctx, dag, "")
 		},
-		Restart: func(ctx context.Context, dag *core.DAG) error {
-			return dagExecutor.Restart(ctx, dag)
+		Restart: func(ctx context.Context, dag *core.DAG, scheduleTime time.Time) error {
+			return dagExecutor.Restart(ctx, dag, scheduleTime)
 		},
 		Clock:    defaultClock,
 		Location: timeLoc,

@@ -62,6 +62,7 @@ type DAGRunSummary struct {
 	WorkerID         string
 	Params           string
 	QueuedAt         string
+	ScheduleTime     string
 	TriggerType      core.TriggerType
 	CreatedAt        int64
 }

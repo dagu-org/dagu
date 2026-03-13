@@ -115,7 +115,7 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
 
-	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, root, parent, statusPusher, logStreamer, queuedRun, nil)
+	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, queuedRun, nil)
 }
 
 func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1.Task) error {
@@ -144,7 +144,7 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
 
-	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, root, parent, statusPusher, logStreamer, false, &retryConfig{
+	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, false, &retryConfig{
 		target:   status,
 		stepName: task.Step,
 	})
@@ -277,6 +277,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 	dag *core.DAG,
 	dagRunID string,
 	attemptID string,
+	scheduleTime string,
 	root exec.DAGRunRef,
 	parent exec.DAGRunRef,
 	statusPusher *remote.StatusPusher,
@@ -337,6 +338,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 		AgentConfigStore: agentConfigStore,
 		AgentModelStore:  agentModelStore,
 		AgentMemoryStore: agentMemoryStore,
+		ScheduleTime:     scheduleTime,
 	}
 
 	// Add retry configuration if present

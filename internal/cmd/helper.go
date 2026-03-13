@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
@@ -37,6 +38,21 @@ func parseTriggerTypeParam(ctx *Context) (core.TriggerType, error) {
 	}
 
 	return triggerType, nil
+}
+
+// parseScheduleTimeParam reads and validates the --schedule-time flag.
+// Returns the validated RFC 3339 string or empty if not set.
+func parseScheduleTimeParam(ctx *Context) (string, error) {
+	scheduleTime, err := ctx.StringParam("schedule-time")
+	if err != nil {
+		return "", fmt.Errorf("failed to get schedule-time: %w", err)
+	}
+	if scheduleTime != "" {
+		if _, parseErr := time.Parse(time.RFC3339, scheduleTime); parseErr != nil {
+			return "", fmt.Errorf("invalid --schedule-time value %q: must be RFC 3339 format: %w", scheduleTime, parseErr)
+		}
+	}
+	return scheduleTime, nil
 }
 
 // restoreDAGFromStatus restores a DAG from a previous run's status and YAML.

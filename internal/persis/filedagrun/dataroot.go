@@ -675,6 +675,7 @@ func summaryFromIndexEntry(ie dagrunindex.Entry) *DAGRunSummary {
 		WorkerID:         ie.WorkerID,
 		Params:           ie.Params,
 		QueuedAt:         ie.QueuedAt,
+		ScheduleTime:     ie.ScheduleTime,
 		TriggerType:      ie.TriggerType,
 		CreatedAt:        ie.CreatedAt,
 	}

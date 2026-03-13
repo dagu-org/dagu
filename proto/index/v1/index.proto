@@ -54,4 +54,5 @@ message DAGRunIndexEntry {
   int32 trigger_type = 14;
   int64 created_at = 15;    // Unix epoch milliseconds (matches DAGRunStatus.CreatedAt)
   string name = 16;
+  string schedule_time = 17;  // RFC 3339 string (matches DAGRunStatus.ScheduleTime)
 }
