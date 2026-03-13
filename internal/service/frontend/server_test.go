@@ -17,6 +17,15 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/fileuser"
 )
 
+// testContext returns a context that is cancelled when the test ends,
+// ensuring background goroutines (e.g. cache eviction) are cleaned up.
+func testContext(t *testing.T) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	return ctx
+}
+
 // testConfig creates a minimal config for initBuiltinAuthService tests.
 // All directories point to subdirectories of the given temp dir.
 func testConfig(tmpDir string, ia config.InitialAdmin) *config.Config {
@@ -52,17 +61,17 @@ func TestInitBuiltinAuthService_AutoProvision(t *testing.T) {
 			Password: "securepass123",
 		})
 
-		result, setupRequired, err := initBuiltinAuthService(context.Background(), cfg, nil)
+		result, setupRequired, err := initBuiltinAuthService(testContext(t), cfg, nil)
 		require.NoError(t, err)
 		assert.False(t, setupRequired, "setup should not be required after auto-provisioning")
 
 		// Verify user was created
-		count, err := result.AuthService.CountUsers(context.Background())
+		count, err := result.AuthService.CountUsers(testContext(t))
 		require.NoError(t, err)
 		assert.Equal(t, int64(1), count)
 
 		// Verify user has correct role and username
-		user, err := result.UserStore.GetByUsername(context.Background(), "testadmin")
+		user, err := result.UserStore.GetByUsername(testContext(t), "testadmin")
 		require.NoError(t, err)
 		assert.Equal(t, "testadmin", user.Username)
 		assert.Equal(t, authmodel.RoleAdmin, user.Role)
@@ -80,14 +89,14 @@ func TestInitBuiltinAuthService_AutoProvision(t *testing.T) {
 		store, err := fileuser.New(cfg.Paths.UsersDir)
 		require.NoError(t, err)
 		existing := authmodel.NewUser("existinguser", "$2a$12$K8gHXqrFdFvMwJBG0VlJGuAGz3FwBmTm8xnNQblN2tCxrQgPLmwHa", authmodel.RoleAdmin)
-		require.NoError(t, store.Create(context.Background(), existing))
+		require.NoError(t, store.Create(testContext(t), existing))
 
-		result, setupRequired, err := initBuiltinAuthService(context.Background(), cfg, nil)
+		result, setupRequired, err := initBuiltinAuthService(testContext(t), cfg, nil)
 		require.NoError(t, err)
 		assert.False(t, setupRequired)
 
 		// Verify no additional user was created
-		count, err := result.AuthService.CountUsers(context.Background())
+		count, err := result.AuthService.CountUsers(testContext(t))
 		require.NoError(t, err)
 		assert.Equal(t, int64(1), count)
 	})
@@ -96,7 +105,7 @@ func TestInitBuiltinAuthService_AutoProvision(t *testing.T) {
 		t.Parallel()
 		cfg := testConfig(t.TempDir(), config.InitialAdmin{})
 
-		_, setupRequired, err := initBuiltinAuthService(context.Background(), cfg, nil)
+		_, setupRequired, err := initBuiltinAuthService(testContext(t), cfg, nil)
 		require.NoError(t, err)
 		assert.True(t, setupRequired, "setup should be required when initial_admin is not configured")
 	})
@@ -108,7 +117,7 @@ func TestInitBuiltinAuthService_AutoProvision(t *testing.T) {
 			Password: "short", // less than 8 characters
 		})
 
-		_, _, err := initBuiltinAuthService(context.Background(), cfg, nil)
+		_, _, err := initBuiltinAuthService(testContext(t), cfg, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to auto-provision initial admin user")
 	})
@@ -122,16 +131,16 @@ func TestInitBuiltinAuthService_AutoProvision(t *testing.T) {
 		})
 
 		// First call: provisions the user
-		_, setupRequired, err := initBuiltinAuthService(context.Background(), cfg, nil)
+		_, setupRequired, err := initBuiltinAuthService(testContext(t), cfg, nil)
 		require.NoError(t, err)
 		assert.False(t, setupRequired)
 
 		// Second call: should not create a duplicate
-		result, setupRequired, err := initBuiltinAuthService(context.Background(), cfg, nil)
+		result, setupRequired, err := initBuiltinAuthService(testContext(t), cfg, nil)
 		require.NoError(t, err)
 		assert.False(t, setupRequired)
 
-		count, err := result.AuthService.CountUsers(context.Background())
+		count, err := result.AuthService.CountUsers(testContext(t))
 		require.NoError(t, err)
 		assert.Equal(t, int64(1), count)
 	})
@@ -146,16 +155,16 @@ func TestInitBuiltinAuthService_UserCanAuthenticate(t *testing.T) {
 		Password: "mypassword123",
 	})
 
-	result, _, err := initBuiltinAuthService(context.Background(), cfg, nil)
+	result, _, err := initBuiltinAuthService(testContext(t), cfg, nil)
 	require.NoError(t, err)
 
 	// Authenticate via the auth service
-	user, err := result.AuthService.Authenticate(context.Background(), "authadmin", "mypassword123")
+	user, err := result.AuthService.Authenticate(testContext(t), "authadmin", "mypassword123")
 	require.NoError(t, err)
 	assert.Equal(t, "authadmin", user.Username)
 	assert.Equal(t, authmodel.RoleAdmin, user.Role)
 
 	// Wrong password should fail
-	_, err = result.AuthService.Authenticate(context.Background(), "authadmin", "wrongpassword")
+	_, err = result.AuthService.Authenticate(testContext(t), "authadmin", "wrongpassword")
 	require.Error(t, err)
 }

@@ -564,9 +564,7 @@ func initBuiltinAuthService(ctx context.Context, cfg *config.Config, collector *
 			}); err != nil {
 				return nil, false, fmt.Errorf("failed to auto-provision initial admin user: %w", err)
 			}
-			logger.Info(ctx, "Auto-provisioned initial admin user",
-				slog.String("username", ia.Username),
-			)
+			logger.Info(ctx, "Auto-provisioned initial admin user")
 		}
 		setupRequired = false
 	}
