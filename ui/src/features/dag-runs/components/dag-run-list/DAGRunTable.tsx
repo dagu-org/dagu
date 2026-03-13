@@ -86,7 +86,8 @@ function DAGRunTable({
 
       if (event.key === 'ArrowDown') {
         event.preventDefault();
-        const newIndex = currentIdx < dagRuns.length - 1 ? currentIdx + 1 : currentIdx;
+        const newIndex =
+          currentIdx < dagRuns.length - 1 ? currentIdx + 1 : currentIdx;
         if (newIndex !== currentIdx) {
           setSelectedIndex(newIndex);
           scrollToSelectedRow(newIndex);
@@ -216,6 +217,9 @@ function DAGRunTable({
   };
 
   const timezoneInfo = getTimezoneInfo();
+  const showScheduleColumn = dagRuns.some((dagRun) =>
+    Boolean(dagRun.scheduleTime)
+  );
 
   // Empty state component
   const EmptyState = () => (
@@ -280,6 +284,14 @@ function DAGRunTable({
 
             {/* Timestamps */}
             <div className="space-y-1 text-xs mt-2">
+              {dagRun.scheduleTime && (
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="text-muted-foreground">Scheduled: </span>
+                    {dagRun.scheduleTime}
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <div>
                   <span className="text-muted-foreground">Queued: </span>
@@ -327,18 +339,18 @@ function DAGRunTable({
       <Table className="w-full text-xs">
         <TableHeader>
           <TableRow>
-            <TableHead>
-              DAG Name
-            </TableHead>
-            <TableHead>
-              Run ID
-            </TableHead>
-            <TableHead>
-              Status
-            </TableHead>
-            <TableHead>
-              Trigger
-            </TableHead>
+            <TableHead>DAG Name</TableHead>
+            <TableHead>Run ID</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Trigger</TableHead>
+            {showScheduleColumn && (
+              <TableHead>
+                <div>Scheduled At</div>
+                <div className="text-xs text-muted-foreground font-normal">
+                  {timezoneInfo}
+                </div>
+              </TableHead>
+            )}
             <TableHead>
               <div>Queued At</div>
               <div className="text-xs text-muted-foreground font-normal">
@@ -351,12 +363,8 @@ function DAGRunTable({
                 {timezoneInfo}
               </div>
             </TableHead>
-            <TableHead>
-              Duration
-            </TableHead>
-            <TableHead>
-              Worker
-            </TableHead>
+            <TableHead>Duration</TableHead>
+            <TableHead>Worker</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -364,7 +372,9 @@ function DAGRunTable({
             <TableRow
               key={dagRun.dagRunId}
               className={`cursor-pointer hover:bg-muted/50 border-l-4 ${
-                selectedIndex === index ? 'border-l-border' : 'border-l-transparent'
+                selectedIndex === index
+                  ? 'border-l-border'
+                  : 'border-l-transparent'
               } ${dagRun.status === Status.Running ? 'animate-running-row' : ''}`}
               style={{ fontSize: '0.8125rem' }}
               onClick={(e) => {
@@ -405,6 +415,11 @@ function DAGRunTable({
               <TableCell className="py-1 px-2">
                 <TriggerTypeIndicator type={dagRun.triggerType} />
               </TableCell>
+              {showScheduleColumn && (
+                <TableCell className="py-1 px-2 text-left">
+                  {dagRun.scheduleTime || '-'}
+                </TableCell>
+              )}
               <TableCell className="py-1 px-2 text-left">
                 {dagRun.queuedAt || '-'}
               </TableCell>

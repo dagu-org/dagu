@@ -1,0 +1,42 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package api
+
+import (
+	"testing"
+
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestToDAGRunSummaryIncludesScheduleTime(t *testing.T) {
+	status := exec.DAGRunStatus{
+		Name:         "test-dag",
+		DAGRunID:     "run-1",
+		Status:       core.Queued,
+		ScheduleTime: "2026-03-13T00:00:00Z",
+	}
+
+	summary := toDAGRunSummary(status)
+	require.NotNil(t, summary.ScheduleTime)
+	assert.Equal(t, status.ScheduleTime, *summary.ScheduleTime)
+}
+
+func TestToDAGRunDetailsIncludesScheduleTime(t *testing.T) {
+	status := exec.DAGRunStatus{
+		Name:         "test-dag",
+		DAGRunID:     "run-1",
+		Status:       core.Queued,
+		QueuedAt:     "2026-03-13T00:01:00Z",
+		ScheduleTime: "2026-03-13T00:00:00Z",
+	}
+
+	details := ToDAGRunDetails(status)
+	require.NotNil(t, details.ScheduleTime)
+	assert.Equal(t, status.ScheduleTime, *details.ScheduleTime)
+	require.NotNil(t, details.QueuedAt)
+	assert.Equal(t, status.QueuedAt, *details.QueuedAt)
+}
