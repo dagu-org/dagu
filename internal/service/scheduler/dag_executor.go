@@ -140,14 +140,20 @@ func (e *DAGExecutor) ExecuteDAG(
 ) error {
 	if e.shouldUseDistributedExecution(dag) {
 		// Distributed execution: dispatch to coordinator
+		taskOpts := []executor.TaskOption{
+			executor.WithWorkerSelector(dag.WorkerSelector),
+			executor.WithPreviousStatus(previousStatus),
+			executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, e.baseConfigPath)),
+		}
+		if scheduleTime != "" {
+			taskOpts = append(taskOpts, executor.WithScheduleTime(scheduleTime))
+		}
 		task := executor.CreateTask(
 			dag.Name,
 			string(dag.YamlData),
 			operation,
 			runID,
-			executor.WithWorkerSelector(dag.WorkerSelector),
-			executor.WithPreviousStatus(previousStatus),
-			executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, e.baseConfigPath)),
+			taskOpts...,
 		)
 		return e.dispatchToCoordinator(ctx, task)
 	}
@@ -212,9 +218,10 @@ func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinat
 }
 
 // Restart restarts a DAG unconditionally.
-func (e *DAGExecutor) Restart(ctx context.Context, dag *core.DAG) error {
+func (e *DAGExecutor) Restart(ctx context.Context, dag *core.DAG, scheduleTime time.Time) error {
 	spec := e.subCmdBuilder.Restart(dag, runtime.RestartOptions{
-		Quiet: true,
+		Quiet:        true,
+		ScheduleTime: stringutil.FormatTime(scheduleTime),
 	})
 	return runtime.Start(ctx, spec)
 }

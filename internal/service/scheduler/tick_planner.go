@@ -65,7 +65,7 @@ type IsSuspendedFunc func(ctx context.Context, dagName string) bool
 type StopFunc func(ctx context.Context, dag *core.DAG) error
 
 // RestartFunc restarts a DAG unconditionally.
-type RestartFunc func(ctx context.Context, dag *core.DAG) error
+type RestartFunc func(ctx context.Context, dag *core.DAG, scheduleTime time.Time) error
 
 // TickPlannerConfig holds the dependencies for creating a TickPlanner.
 type TickPlannerConfig struct {
@@ -148,7 +148,7 @@ func NewTickPlanner(cfg TickPlannerConfig) *TickPlanner {
 		cfg.Stop = func(context.Context, *core.DAG) error { return nil }
 	}
 	if cfg.Restart == nil {
-		cfg.Restart = func(context.Context, *core.DAG) error { return nil }
+		cfg.Restart = func(context.Context, *core.DAG, time.Time) error { return nil }
 	}
 	if cfg.Clock == nil {
 		cfg.Clock = time.Now
@@ -778,7 +778,7 @@ func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 	case ScheduleTypeStop:
 		err = tp.cfg.Stop(ctx, run.DAG)
 	case ScheduleTypeRestart:
-		err = tp.cfg.Restart(ctx, run.DAG)
+		err = tp.cfg.Restart(ctx, run.DAG, run.ScheduledTime)
 	}
 
 	if err != nil {

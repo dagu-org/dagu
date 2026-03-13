@@ -144,6 +144,7 @@ func TestTaskHandler(t *testing.T) {
 			RootDagRunName: dag.Name,
 			RootDagRunId:   dagRunID,
 			Params:         "param1=value1",
+			ScheduleTime:   "2026-03-13T10:00:00Z",
 		}
 
 		// Create a context with timeout for the task execution
@@ -163,6 +164,7 @@ func TestTaskHandler(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, dagRunID, status.DAGRunID)
 		require.Equal(t, "param1=value1", status.Params)
+		require.Equal(t, "2026-03-13T10:00:00Z", status.ScheduleTime)
 	})
 
 	t.Run("HandleTaskInvalidOperation", func(t *testing.T) {

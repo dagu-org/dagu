@@ -1313,7 +1313,7 @@ steps:
 	statusPusher, logStreamer := handler.createRemoteHandlers("run-error", dag.Name, root)
 
 	// Call executeDAGRun directly - should fail at createAgentEnv
-	err := handler.executeDAGRun(context.Background(), dag, "run-error", "", root, parent, statusPusher, logStreamer, false, nil)
+	err := handler.executeDAGRun(context.Background(), dag, "run-error", "", "", root, parent, statusPusher, logStreamer, false, nil)
 
 	// On systems where null byte in path fails, we should get an error
 	if err != nil {
@@ -1357,7 +1357,7 @@ steps:
 
 	// Call executeDAGRun - this should succeed and log completion
 	// For top-level runs, pass empty parent and ensure root matches dagRunID
-	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", root, exec.DAGRunRef{}, statusPusher, logStreamer, false, nil)
+	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", "", root, exec.DAGRunRef{}, statusPusher, logStreamer, false, nil)
 
 	// Should succeed for simple echo command
 	require.NoError(t, err, "executeDAGRun should succeed for simple echo command")

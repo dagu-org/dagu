@@ -115,8 +115,8 @@ func New(
 		Stop: func(ctx context.Context, dag *core.DAG) error {
 			return drm.Stop(ctx, dag, "")
 		},
-		Restart: func(ctx context.Context, dag *core.DAG) error {
-			return dagExecutor.Restart(ctx, dag)
+		Restart: func(ctx context.Context, dag *core.DAG, scheduleTime time.Time) error {
+			return dagExecutor.Restart(ctx, dag, scheduleTime)
 		},
 		Clock:    defaultClock,
 		Location: timeLoc,

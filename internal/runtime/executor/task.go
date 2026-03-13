@@ -91,6 +91,13 @@ func WithTags(tags string) TaskOption {
 	}
 }
 
+// WithScheduleTime sets the RFC 3339 timestamp of when the task was scheduled.
+func WithScheduleTime(scheduleTime string) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		task.ScheduleTime = scheduleTime
+	}
+}
+
 // WithBaseConfig sets the base config YAML content on the task.
 // This allows workers to apply base config without needing local base config files.
 func WithBaseConfig(content string) TaskOption {

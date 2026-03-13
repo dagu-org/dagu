@@ -207,6 +207,9 @@ func (b *SubCmdBuilder) Restart(dag *core.DAG, opts RestartOptions) CmdSpec {
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
+	if opts.ScheduleTime != "" {
+		args = append(args, fmt.Sprintf("--schedule-time=%s", opts.ScheduleTime))
+	}
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
 	}
@@ -265,6 +268,9 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 
 	if task.Tags != "" {
 		args = append(args, fmt.Sprintf("--tags=%s", task.Tags))
+	}
+	if task.ScheduleTime != "" {
+		args = append(args, fmt.Sprintf("--schedule-time=%s", task.ScheduleTime))
 	}
 
 	if b.configFile != "" {
@@ -347,7 +353,8 @@ type EnqueueOptions struct {
 
 // RestartOptions contains options for restarting a dag-run.
 type RestartOptions struct {
-	Quiet bool // Whether to run in quiet mode
+	Quiet        bool   // Whether to run in quiet mode
+	ScheduleTime string // RFC 3339 timestamp of when this run was scheduled
 }
 
 // Run executes the command and waits for it to complete.

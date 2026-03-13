@@ -226,7 +226,7 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root exec.DAGRu
 	if workerID == "local" {
 		coordinatorCli := ctx.NewCoordinatorClient()
 		if core.ShouldDispatchToCoordinator(dag, coordinatorCli != nil, ctx.Config.DefaultExecMode) {
-			return dispatchToCoordinatorAndWait(ctx, dag, dagRunID, coordinatorCli)
+			return dispatchToCoordinatorAndWait(ctx, dag, dagRunID, scheduleTime, coordinatorCli)
 		}
 	}
 
@@ -453,7 +453,7 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 }
 
 // dispatchToCoordinatorAndWait dispatches a DAG to coordinator and waits for completion.
-func dispatchToCoordinatorAndWait(ctx *Context, d *core.DAG, dagRunID string, coordinatorCli coordinator.Client) error {
+func dispatchToCoordinatorAndWait(ctx *Context, d *core.DAG, dagRunID string, scheduleTime string, coordinatorCli coordinator.Client) error {
 	signalCtx, stop := signal.NotifyContext(ctx.Context, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	signalAwareCtx := ctx.WithContext(signalCtx)
@@ -484,6 +484,9 @@ func dispatchToCoordinatorAndWait(ctx *Context, d *core.DAG, dagRunID string, co
 	}
 	if len(d.Tags) > 0 {
 		taskOpts = append(taskOpts, executor.WithTags(strings.Join(d.Tags.Strings(), ",")))
+	}
+	if scheduleTime != "" {
+		taskOpts = append(taskOpts, executor.WithScheduleTime(scheduleTime))
 	}
 
 	task := executor.CreateTask(

@@ -286,7 +286,7 @@ function DAGRunTable({
             <div className="space-y-1 text-xs mt-2">
               {dagRun.scheduleTime && (
                 <div className="flex justify-between items-center">
-                  <div>
+                  <div className="whitespace-normal break-words">
                     <span className="text-muted-foreground">Scheduled: </span>
                     {dagRun.scheduleTime}
                   </div>
@@ -416,7 +416,7 @@ function DAGRunTable({
                 <TriggerTypeIndicator type={dagRun.triggerType} />
               </TableCell>
               {showScheduleColumn && (
-                <TableCell className="py-1 px-2 text-left">
+                <TableCell className="py-1 px-2 text-left whitespace-normal break-words">
                   {dagRun.scheduleTime || '-'}
                 </TableCell>
               )}

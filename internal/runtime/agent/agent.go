@@ -1037,12 +1037,25 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 
 	// Handle case where runner wasn't initialized (early failure in Run())
 	if a.runner == nil {
-		return transform.NewStatusBuilder(a.dag).
-			Create(a.dagRunID, core.Failed, os.Getpid(), time.Time{},
-				transform.WithAttemptID(a.dagRunAttemptID),
-				transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
-				transform.WithTriggerType(a.triggerType),
+		statusOpts := []transform.StatusOption{
+			transform.WithAttemptID(a.dagRunAttemptID),
+			transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
+			transform.WithTriggerType(a.triggerType),
+		}
+		if a.retryTarget != nil {
+			statusOpts = append(statusOpts,
+				transform.WithQueuedAt(a.retryTarget.QueuedAt),
+				transform.WithCreatedAt(a.retryTarget.CreatedAt),
 			)
+			if a.retryTarget.ScheduleTime != "" {
+				statusOpts = append(statusOpts, transform.WithScheduleTime(a.retryTarget.ScheduleTime))
+			}
+		} else if a.scheduleTime != "" {
+			statusOpts = append(statusOpts, transform.WithScheduleTime(a.scheduleTime))
+		}
+
+		return transform.NewStatusBuilder(a.dag).
+			Create(a.dagRunID, core.Failed, os.Getpid(), time.Time{}, statusOpts...)
 	}
 
 	runnerStatus := a.runner.Status(ctx, a.plan)
