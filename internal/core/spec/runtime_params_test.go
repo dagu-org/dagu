@@ -5,6 +5,8 @@ package spec
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -66,4 +68,100 @@ func TestResolveRuntimeParams_RequiresSource(t *testing.T) {
 	_, err := ResolveRuntimeParams(context.Background(), dag, "", ResolveRuntimeParamsOptions{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "source")
+}
+
+func TestResolveRuntimeParams_RejectsInvalidEnum(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: runtime-params
+params:
+  - region:
+      type: string
+      enum: [us-east-1, us-west-2]
+      required: true
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	dag.YamlData = yaml
+
+	_, err = ResolveRuntimeParams(context.Background(), dag, "region=eu-central-1", ResolveRuntimeParamsOptions{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "region")
+}
+
+func TestResolveRuntimeParams_RejectsCoercionError(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: runtime-params
+params:
+  - count:
+      type: integer
+      required: true
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	dag.YamlData = yaml
+
+	_, err = ResolveRuntimeParams(context.Background(), dag, "count=abc", ResolveRuntimeParamsOptions{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `cannot coerce "abc" to integer`)
+}
+
+func TestResolveRuntimeParams_RejectsBoundaryViolation(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: runtime-params
+params:
+  - count:
+      type: integer
+      minimum: 1
+      maximum: 5
+      required: true
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	dag.YamlData = yaml
+
+	_, err = ResolveRuntimeParams(context.Background(), dag, "count=6", ResolveRuntimeParamsOptions{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "count")
+}
+
+func TestResolveRuntimeParams_PrefersLocationOverYamlData(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	schemaPath := filepath.Join(dir, "params.schema.json")
+	require.NoError(t, os.WriteFile(schemaPath, []byte(`{
+  "type": "object",
+  "properties": {
+    "region": {
+      "type": "string",
+      "enum": ["us-east-1", "us-west-2"]
+    }
+  },
+  "required": ["region"]
+}`), 0o600))
+
+	dagPath := filepath.Join(dir, "runtime-params.yaml")
+	require.NoError(t, os.WriteFile(dagPath, []byte(`
+name: runtime-params
+params:
+  schema: params.schema.json
+`), 0o600))
+
+	dag, err := Load(context.Background(), dagPath, WithoutEval())
+	require.NoError(t, err)
+	require.NotEmpty(t, dag.Location)
+	require.NotEmpty(t, dag.YamlData)
+
+	resolved, err := ResolveRuntimeParams(context.Background(), dag, "region=us-east-1", ResolveRuntimeParamsOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"region=us-east-1"}, resolved.Params)
 }

@@ -97,6 +97,40 @@ params:
 	assert.Equal(t, `environment="staging" TAG="latest" DRY_RUN="true"`, dag.DefaultParams)
 }
 
+func TestInlineParamDefs_RejectDuplicateNames(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: duplicate-inline-params
+params:
+  - region=us-east-1
+  - region:
+      type: string
+      default: us-west-2
+`)
+
+	_, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `duplicate parameter name "region"`)
+}
+
+func TestInlineParamDefs_RejectDefaultPatternMismatch(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: invalid-inline-default
+params:
+  - project_name:
+      type: string
+      default: INVALID_NAME
+      pattern: "^[a-z][a-z0-9-]*$"
+`)
+
+	_, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `default does not match pattern`)
+}
+
 func TestExternalSchemaParamDefs_MetadataAndExecution(t *testing.T) {
 	t.Parallel()
 

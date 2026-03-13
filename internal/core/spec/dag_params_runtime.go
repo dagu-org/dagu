@@ -35,10 +35,10 @@ func ResolveRuntimeParams(ctx context.Context, dag *core.DAG, params any, opts R
 	}
 
 	switch {
-	case len(dag.YamlData) > 0:
-		return LoadYAML(ctx, dag.YamlData, loadOpts...)
 	case dag.Location != "":
 		return Load(ctx, dag.Location, loadOpts...)
+	case len(dag.YamlData) > 0:
+		return LoadYAML(ctx, dag.YamlData, loadOpts...)
 	default:
 		return nil, fmt.Errorf("DAG source is required to resolve runtime params")
 	}

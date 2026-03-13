@@ -6,6 +6,7 @@ package spec
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -196,6 +197,11 @@ func validateInlineConstraintCompatibility(def core.ParamDef) error {
 	if !isString && (def.MinLength != nil || def.MaxLength != nil || def.Pattern != nil) {
 		return fmt.Errorf("parameter %q uses string constraints but type is %q", def.Name, def.Type)
 	}
+	if def.Pattern != nil {
+		if _, err := regexp.Compile(*def.Pattern); err != nil {
+			return fmt.Errorf("parameter %q has invalid pattern: %w", def.Name, err)
+		}
+	}
 	if def.Minimum != nil && def.Maximum != nil && *def.Minimum > *def.Maximum {
 		return fmt.Errorf("parameter %q minimum must be less than or equal to maximum", def.Name)
 	}
@@ -222,6 +228,15 @@ func validateInlineDefault(def core.ParamDef) error {
 		}
 		if def.MaxLength != nil && len(value) > *def.MaxLength {
 			return fmt.Errorf("parameter %q default is longer than max_length", def.Name)
+		}
+		if def.Pattern != nil {
+			re, err := regexp.Compile(*def.Pattern)
+			if err != nil {
+				return fmt.Errorf("parameter %q has invalid pattern: %w", def.Name, err)
+			}
+			if !re.MatchString(value) {
+				return fmt.Errorf("parameter %q default does not match pattern", def.Name)
+			}
 		}
 	case int64:
 		number := float64(value)

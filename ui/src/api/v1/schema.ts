@@ -2947,7 +2947,9 @@ export interface components {
             /** @default false */
             required: boolean;
             enum?: components["schemas"]["ParamScalar"][];
+            /** Format: double */
             minimum?: number;
+            /** Format: double */
             maximum?: number;
             minLength?: number;
             maxLength?: number;

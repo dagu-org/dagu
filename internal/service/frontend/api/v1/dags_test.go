@@ -205,10 +205,8 @@ steps:
 		// not tokenized by whitespace (regression test for JSON params bug).
 		spec := `
 params:
-  - name: key1
-    default: default1
-  - name: key2
-    default: default2
+  - key1: default1
+  - key2: default2
 steps:
   - name: echo_params
     command: echo "key1=$key1 key2=$key2"

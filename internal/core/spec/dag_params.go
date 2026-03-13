@@ -96,6 +96,7 @@ func buildDAGParamPlan(ctx BuildContext, d *dag) (*dagParamPlan, error) {
 func buildLegacyParamPlan(input any) (*dagParamPlan, error) {
 	noEvalCtx := BuildContext{opts: BuildOpts{Flags: BuildFlagNoEval}}
 	plan := &dagParamPlan{kind: dagParamKindLegacy}
+	seenNames := map[string]struct{}{}
 
 	switch v := input.(type) {
 	case nil:
@@ -106,7 +107,9 @@ func buildLegacyParamPlan(input any) (*dagParamPlan, error) {
 		if err != nil {
 			return nil, core.NewValidationError("params", v, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 		}
-		appendLegacyPairs(plan, pairs)
+		if err := appendLegacyPairs(plan, pairs, seenNames); err != nil {
+			return nil, err
+		}
 		return plan, nil
 
 	case []string:
@@ -114,7 +117,9 @@ func buildLegacyParamPlan(input any) (*dagParamPlan, error) {
 		if err != nil {
 			return nil, core.NewValidationError("params", v, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 		}
-		appendLegacyPairs(plan, pairs)
+		if err := appendLegacyPairs(plan, pairs, seenNames); err != nil {
+			return nil, err
+		}
 		return plan, nil
 
 	case map[string]any:
@@ -122,7 +127,9 @@ func buildLegacyParamPlan(input any) (*dagParamPlan, error) {
 		if err != nil {
 			return nil, core.NewValidationError("params", v, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 		}
-		appendLegacyPairs(plan, pairs)
+		if err := appendLegacyPairs(plan, pairs, seenNames); err != nil {
+			return nil, err
+		}
 		return plan, nil
 
 	case []any:
@@ -134,7 +141,9 @@ func buildLegacyParamPlan(input any) (*dagParamPlan, error) {
 				if err != nil {
 					return nil, core.NewValidationError("params", item, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 				}
-				appendLegacyPairs(plan, pairs)
+				if err := appendLegacyPairs(plan, pairs, seenNames); err != nil {
+					return nil, err
+				}
 
 			case map[string]any:
 				inlineDef, err := detectInlineParamDefinition(value)
@@ -147,6 +156,9 @@ func buildLegacyParamPlan(input any) (*dagParamPlan, error) {
 					if err != nil {
 						return nil, core.NewValidationError("params", item, err)
 					}
+					if err := rememberParamName(seenNames, paramDef.Name); err != nil {
+						return nil, err
+					}
 					plan.paramDefs = append(plan.paramDefs, paramDef)
 					plan.entries = append(plan.entries, entry)
 					continue
@@ -156,7 +168,9 @@ func buildLegacyParamPlan(input any) (*dagParamPlan, error) {
 				if err != nil {
 					return nil, core.NewValidationError("params", item, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 				}
-				appendLegacyPairs(plan, pairs)
+				if err := appendLegacyPairs(plan, pairs, seenNames); err != nil {
+					return nil, err
+				}
 
 			default:
 				return nil, core.NewValidationError("params", item, fmt.Errorf("%w: %T", ErrInvalidParamValue, item))
@@ -232,8 +246,11 @@ func buildExternalSchemaParamPlan(input any, workingDir, dagLocation string) (*d
 	return plan, nil
 }
 
-func appendLegacyPairs(plan *dagParamPlan, pairs []paramPair) {
+func appendLegacyPairs(plan *dagParamPlan, pairs []paramPair, seenNames map[string]struct{}) error {
 	for _, pair := range pairs {
+		if err := rememberParamName(seenNames, pair.Name); err != nil {
+			return err
+		}
 		plan.entries = append(plan.entries, dagParamEntry{
 			Name:     pair.Name,
 			Value:    pair.Value,
@@ -245,6 +262,22 @@ func appendLegacyPairs(plan *dagParamPlan, pairs []paramPair) {
 			Default: pair.Value,
 		})
 	}
+	return nil
+}
+
+func rememberParamName(seenNames map[string]struct{}, name string) error {
+	if name == "" {
+		return nil
+	}
+	if _, exists := seenNames[name]; exists {
+		return core.NewValidationError(
+			"params",
+			name,
+			fmt.Errorf("%w: duplicate parameter name %q", ErrInvalidParamValue, name),
+		)
+	}
+	seenNames[name] = struct{}{}
+	return nil
 }
 
 func validateSchemaBackedEntries(entries []dagParamEntry, schema *jsonschema.Resolved, schemaProperties map[string]*jsonschema.Schema, schemaOrder []string, metadataMode bool, allowSchemaFallbackJSON bool) ([]dagParamEntry, error) {

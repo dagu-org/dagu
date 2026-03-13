@@ -7338,10 +7338,11 @@ components:
         - name
 
     ParamScalar:
-      oneOf:
+      anyOf:
         - type: string
         - type: integer
         - type: number
+          format: double
         - type: boolean
       description: "Scalar parameter value"
 
@@ -7373,8 +7374,10 @@ components:
             $ref: "#/components/schemas/ParamScalar"
         minimum:
           type: number
+          format: double
         maximum:
           type: number
+          format: double
         minLength:
           type: integer
         maxLength:

@@ -216,7 +216,7 @@ func toolParamsFromParamDefs(defs []core.ParamDef) []toolParam {
 		param := toolParam{
 			Name:     def.Name,
 			Type:     def.Type,
-			Required: def.Required && def.Default == nil,
+			Required: def.Required,
 			Default:  def.Default,
 		}
 		if param.Type == "" {

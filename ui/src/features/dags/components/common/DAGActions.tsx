@@ -115,16 +115,16 @@ function DAGActions({
     setStartModalLoading(true);
     setStartModalLoadError(null);
 
-    void client
-      .GET('/dags/{fileName}', {
-        params: {
-          path: { fileName },
-          query: {
-            remoteNode: appBarContext.selectedRemoteNode || 'local',
+    void (async () => {
+      try {
+        const { data, error } = await client.GET('/dags/{fileName}', {
+          params: {
+            path: { fileName },
+            query: {
+              remoteNode: appBarContext.selectedRemoteNode || 'local',
+            },
           },
-        },
-      })
-      .then(({ data, error }) => {
+        });
         if (cancelled) {
           return;
         }
@@ -136,12 +136,21 @@ function DAGActions({
           return;
         }
         setStartModalDag(data.dag);
-      })
-      .finally(() => {
+      } catch (error) {
+        if (!cancelled) {
+          setStartModalDag(undefined);
+          setStartModalLoadError(
+            error instanceof Error
+              ? error.message
+              : 'Failed to load DAG details for execution.'
+          );
+        }
+      } finally {
         if (!cancelled) {
           setStartModalLoading(false);
         }
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;

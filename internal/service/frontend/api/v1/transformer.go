@@ -365,10 +365,10 @@ func toParamDefs(defs []core.ParamDef) []api.ParamDef {
 			}
 		}
 		if def.Minimum != nil {
-			paramDef.Minimum = ptrOf(float32(*def.Minimum))
+			paramDef.Minimum = ptrOf(*def.Minimum)
 		}
 		if def.Maximum != nil {
-			paramDef.Maximum = ptrOf(float32(*def.Maximum))
+			paramDef.Maximum = ptrOf(*def.Maximum)
 		}
 		if def.MinLength != nil {
 			paramDef.MinLength = def.MinLength
@@ -413,9 +413,9 @@ func toParamScalar(value any) (api.ParamScalar, bool) {
 	case uint64:
 		return toParamScalarUint64(v)
 	case float32:
-		return scalar, scalar.FromParamScalar2(v) == nil
+		return scalar, scalar.FromParamScalar2(float64(v)) == nil
 	case float64:
-		return scalar, scalar.FromParamScalar2(float32(v)) == nil
+		return scalar, scalar.FromParamScalar2(v) == nil
 	default:
 		return scalar, false
 	}

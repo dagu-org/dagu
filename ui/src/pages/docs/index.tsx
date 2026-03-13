@@ -103,7 +103,7 @@ function DocsContent() {
   const order = docSortOrder as PathsDocsGetParametersQueryOrder;
 
   // SSE for real-time updates with polling fallback
-  const sseResult = useDocTreeSSE({ sort, order }, true);
+  const sseResult = useDocTreeSSE({ sort, order, remoteNode }, true);
 
   const {
     data: treeData,

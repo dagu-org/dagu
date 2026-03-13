@@ -179,7 +179,14 @@ function validateParamFields(fields: ParamField[]): Record<string, string> {
       }
 
       case ParamDefType.number: {
-        const number = Number(value);
+        const trimmed = value.trim();
+        if (trimmed === '') {
+          if (field.required) {
+            errors[field.key] = 'Required';
+          }
+          continue;
+        }
+        const number = Number(trimmed);
         if (Number.isNaN(number)) {
           errors[field.key] = 'Must be a number';
           continue;
@@ -627,10 +634,10 @@ function renderTypedField({
           {!field.required && !field.hasDefault && (
             <SelectItem value="__unset__">Not set</SelectItem>
           )}
-          {field.enum.map((item) => {
+          {field.enum.map((item, index) => {
             const value = scalarToString(item);
             return (
-              <SelectItem key={value} value={value}>
+              <SelectItem key={`${field.key}-${index}-${value}`} value={value}>
                 {value}
               </SelectItem>
             );
@@ -657,7 +664,7 @@ function renderTypedField({
           onChange={(event) =>
             onChange({
               value: event.target.value,
-              hasValue: true,
+              hasValue: event.target.value !== '',
             })
           }
         />

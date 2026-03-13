@@ -504,6 +504,8 @@
               },
               {
                 "type": "object",
+                "minProperties": 1,
+                "maxProperties": 1,
                 "additionalProperties": true,
                 "description": "Named parameter entries. Supports legacy KEY: value pairs and single-key inline definition objects such as {KEY: {type: integer, default: 3}}."
               }
