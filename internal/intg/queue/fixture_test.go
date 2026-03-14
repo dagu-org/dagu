@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -212,12 +213,7 @@ func (f *fixture) WaitForStatusIn(runID string, expected []core.Status, timeout 
 		if err != nil {
 			return false
 		}
-		for _, candidate := range expected {
-			if status.Status == candidate {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(expected, status.Status)
 	}, timeout, 50*time.Millisecond, "timed out waiting for status in %v", expected)
 	return f
 }
