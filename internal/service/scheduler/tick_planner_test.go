@@ -75,6 +75,7 @@ func newTestTickPlanner(store WatermarkStore) (*TickPlanner, chan DAGChangeEvent
 	eventCh := make(chan DAGChangeEvent, 256)
 	tp := NewTickPlanner(TickPlannerConfig{
 		WatermarkStore: store,
+		QueuesEnabled:  true,
 		IsSuspended: func(_ context.Context, _ string) bool {
 			return false
 		},
@@ -233,6 +234,7 @@ func TestTickPlanner_PlanCatchupSkipOverlap(t *testing.T) {
 	eventCh := make(chan DAGChangeEvent, 256)
 	tp := NewTickPlanner(TickPlannerConfig{
 		WatermarkStore: store,
+		QueuesEnabled:  true,
 		IsSuspended: func(_ context.Context, _ string) bool {
 			return false
 		},
@@ -839,6 +841,7 @@ func TestTickPlanner_IsRunningErrorAssumesNotRunning(t *testing.T) {
 	eventCh := make(chan DAGChangeEvent, 256)
 	tp := NewTickPlanner(TickPlannerConfig{
 		WatermarkStore: store,
+		QueuesEnabled:  true,
 		IsSuspended: func(_ context.Context, _ string) bool {
 			return false
 		},
@@ -1054,6 +1057,7 @@ func TestTickPlanner_CatchupBlocksStopRestartSchedules(t *testing.T) {
 	eventCh := make(chan DAGChangeEvent, 256)
 	tp := NewTickPlanner(TickPlannerConfig{
 		WatermarkStore: store,
+		QueuesEnabled:  true,
 		IsSuspended: func(_ context.Context, _ string) bool {
 			return false
 		},
@@ -1376,6 +1380,7 @@ func TestTickPlanner_PlanLatestNotRunning(t *testing.T) {
 	eventCh := make(chan DAGChangeEvent, 256)
 	tp := NewTickPlanner(TickPlannerConfig{
 		WatermarkStore: store,
+		QueuesEnabled:  true,
 		IsSuspended: func(_ context.Context, _ string) bool {
 			return false
 		},
@@ -1429,6 +1434,7 @@ func TestTickPlanner_PlanLatestRunning(t *testing.T) {
 	eventCh := make(chan DAGChangeEvent, 256)
 	tp := NewTickPlanner(TickPlannerConfig{
 		WatermarkStore: store,
+		QueuesEnabled:  true,
 		IsSuspended: func(_ context.Context, _ string) bool {
 			return false
 		},
