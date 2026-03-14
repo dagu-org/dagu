@@ -4,6 +4,7 @@
 package cmd
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,6 +87,181 @@ func TestAIToolDetectionRequiresIndicatorFile(t *testing.T) {
 	assert.Empty(t, tools[0].detect(homeDir), "Claude Code should not be detected without .claude.json")
 	assert.Empty(t, tools[3].detect(homeDir), "Gemini CLI should not be detected without GEMINI.md")
 	assert.Empty(t, tools[4].detect(homeDir), "Copilot CLI should not be detected without config.json")
+}
+
+func TestDetectAITargetsIncludesBothCodexDirectories(t *testing.T) {
+	t.Setenv("AGENTS_HOME", "")
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	homeDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".agents"), 0o750))
+	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".codex"), 0o750))
+
+	detected := detectAITargets(homeDir, aiTools())
+
+	var codexTargets []string
+	for _, d := range detected {
+		if d.tool.Name == "Codex" {
+			codexTargets = append(codexTargets, d.targetPath)
+		}
+	}
+
+	assert.ElementsMatch(t, []string{
+		filepath.Join(homeDir, ".agents", "skills", "dagu", "SKILL.md"),
+		filepath.Join(homeDir, ".codex", "skills", "dagu", "SKILL.md"),
+	}, codexTargets)
+}
+
+func TestRunAIInstallInstallsBothCodexDirectories(t *testing.T) {
+	t.Setenv("AGENTS_HOME", "")
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+
+	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".agents"), 0o750))
+	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".codex"), 0o750))
+
+	cmd := aiInstallCmd()
+	require.NoError(t, cmd.Flags().Set("yes", "true"))
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	require.NoError(t, runAIInstall(cmd, nil))
+
+	for _, target := range []string{
+		filepath.Join(homeDir, ".agents", "skills", "dagu", "SKILL.md"),
+		filepath.Join(homeDir, ".codex", "skills", "dagu", "SKILL.md"),
+	} {
+		_, err := os.Stat(target)
+		assert.NoError(t, err, "expected skill to be installed at %s", target)
+	}
+}
+
+func TestRunAIInstallRequiresInputWithoutYes(t *testing.T) {
+	t.Setenv("AGENTS_HOME", "")
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+
+	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".agents"), 0o750))
+
+	cmd := aiInstallCmd()
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := runAIInstall(cmd, nil)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "rerun with --yes")
+
+	_, statErr := os.Stat(filepath.Join(homeDir, ".agents", "skills", "dagu", "SKILL.md"))
+	assert.ErrorIs(t, statErr, os.ErrNotExist)
+}
+
+func TestRunAIInstallPreservesExistingSkillWhenOverwriteDeclined(t *testing.T) {
+	t.Setenv("AGENTS_HOME", "")
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+
+	target := filepath.Join(homeDir, ".agents", "skills", "dagu", "SKILL.md")
+	require.NoError(t, os.MkdirAll(filepath.Dir(target), 0o750))
+	require.NoError(t, os.WriteFile(target, []byte("custom skill"), 0o600))
+
+	cmd := aiInstallCmd()
+	cmd.SetIn(strings.NewReader("y\nn\n"))
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	require.NoError(t, runAIInstall(cmd, nil))
+
+	data, err := os.ReadFile(target)
+	require.NoError(t, err)
+	assert.Equal(t, "custom skill", string(data))
+}
+
+func TestRunAIInstallOverwritesExistingSkillWhenConfirmed(t *testing.T) {
+	t.Setenv("AGENTS_HOME", "")
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+
+	target := filepath.Join(homeDir, ".agents", "skills", "dagu", "SKILL.md")
+	require.NoError(t, os.MkdirAll(filepath.Dir(target), 0o750))
+	require.NoError(t, os.WriteFile(target, []byte("custom skill"), 0o600))
+
+	cmd := aiInstallCmd()
+	cmd.SetIn(strings.NewReader("y\ny\n"))
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	require.NoError(t, runAIInstall(cmd, nil))
+
+	data, err := os.ReadFile(target)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "name: dagu")
+}
+
+func TestAIToolDetectionUsesConfiguredCodexHomes(t *testing.T) {
+	t.Setenv("AGENTS_HOME", filepath.Join(t.TempDir(), "agents-home"))
+	t.Setenv("CODEX_HOME", filepath.Join(t.TempDir(), "codex-home"))
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	tools := aiTools()
+	result := tools[1].detect(t.TempDir())
+
+	assert.ElementsMatch(t, []string{
+		filepath.Join(os.Getenv("AGENTS_HOME"), "skills"),
+		filepath.Join(os.Getenv("CODEX_HOME"), "skills"),
+	}, result)
+}
+
+func TestAIToolDetectionPrefersConfiguredCodexHomeOverDefault(t *testing.T) {
+	t.Setenv("AGENTS_HOME", filepath.Join(t.TempDir(), "agents-home"))
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	homeDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".agents"), 0o750))
+
+	tools := aiTools()
+	result := tools[1].detect(homeDir)
+
+	assert.Equal(t, []string{
+		filepath.Join(os.Getenv("AGENTS_HOME"), "skills"),
+	}, result)
+}
+
+func TestAIToolDetectionPrefersXDGCopilotHome(t *testing.T) {
+	t.Setenv("AGENTS_HOME", "")
+	t.Setenv("CODEX_HOME", "")
+
+	xdgConfigHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", xdgConfigHome)
+
+	homeDir := t.TempDir()
+
+	xdgCopilotDir := filepath.Join(xdgConfigHome, ".copilot")
+	require.NoError(t, os.MkdirAll(xdgCopilotDir, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(xdgCopilotDir, "config.json"), []byte("{}"), 0o600))
+
+	homeCopilotDir := filepath.Join(homeDir, ".copilot")
+	require.NoError(t, os.MkdirAll(homeCopilotDir, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(homeCopilotDir, "config.json"), []byte("{}"), 0o600))
+
+	tools := aiTools()
+	result := tools[4].detect(homeDir)
+
+	assert.Equal(t, []string{xdgCopilotDir}, result)
 }
 
 func TestInstallSkill(t *testing.T) {
@@ -202,6 +378,20 @@ func TestInstallCopilotAppend(t *testing.T) {
 	assert.Contains(t, content, copilotBeginMark)
 	assert.Contains(t, content, copilotEndMark)
 	assert.Contains(t, content, "Dagu DAG Authoring Reference")
+}
+
+func TestInstallCopilotRejectsMalformedMarkers(t *testing.T) {
+	t.Parallel()
+
+	targetDir := t.TempDir()
+	targetPath := filepath.Join(targetDir, copilotFileName)
+
+	require.NoError(t, os.WriteFile(targetPath, []byte(copilotBeginMark+"\npartial content\n"), 0o600))
+
+	skillFS := fileagentskill.SkillFS()
+	err := installCopilot(targetPath, skillFS)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "malformed DAGU markers")
 }
 
 func TestStripFrontmatter(t *testing.T) {
