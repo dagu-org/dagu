@@ -25,8 +25,7 @@ CONFIG_DIR=$(SCRIPT_DIR)/config
 # Local build settings
 BIN_DIR=$(SCRIPT_DIR)/.local/bin
 BUILD_VERSION=$(shell git describe --tags)
-DATE=$(shell date +'%y%m%d%H%M%S')
-LDFLAGS=-X 'main.version=$(BUILD_VERSION)-$(DATE)'
+LDFLAGS=-X 'main.version=$(BUILD_VERSION)'
 
 # Application name
 APP_NAME=dagu

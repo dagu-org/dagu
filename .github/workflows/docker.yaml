@@ -23,8 +23,6 @@ jobs:
           # Remove 'v' prefix from tag
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          # Get short SHA (first 7 characters)
-          echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
           # Detect prerelease (version contains '-')
           if [[ "$VERSION" == *-* ]]; then
             echo "IS_PRERELEASE=true" >> $GITHUB_ENV
@@ -52,7 +50,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           build-args: |
-            LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ env.SHORT_SHA }}'
+            LDFLAGS=-X 'main.version=${{ env.VERSION }}'
           tags: |
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}
             ${{ env.IS_PRERELEASE == 'false' && format('ghcr.io/{0}:latest', github.repository) || '' }}
@@ -72,8 +70,6 @@ jobs:
           # Remove 'v' prefix from tag
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          # Get short SHA (first 7 characters)
-          echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
           # Detect prerelease (version contains '-')
           if [[ "$VERSION" == *-* ]]; then
             echo "IS_PRERELEASE=true" >> $GITHUB_ENV
@@ -101,7 +97,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           build-args: |
-            LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ env.SHORT_SHA }}'
+            LDFLAGS=-X 'main.version=${{ env.VERSION }}'
           tags: |
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}-dev
             ${{ env.IS_PRERELEASE == 'false' && format('ghcr.io/{0}:dev', github.repository) || '' }}
@@ -121,8 +117,6 @@ jobs:
           # Remove 'v' prefix from tag
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          # Get short SHA (first 7 characters)
-          echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
           # Detect prerelease (version contains '-')
           if [[ "$VERSION" == *-* ]]; then
             echo "IS_PRERELEASE=true" >> $GITHUB_ENV
@@ -150,7 +144,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           build-args: |
-            LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ env.SHORT_SHA }}'
+            LDFLAGS=-X 'main.version=${{ env.VERSION }}'
           tags: |
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}-alpine
             ${{ env.IS_PRERELEASE == 'false' && format('ghcr.io/{0}:alpine', github.repository) || '' }}

@@ -45,7 +45,6 @@ jobs:
             *)            VERSION="${REF}" ;;
           esac
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -55,7 +54,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           build-args: |
-            LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ env.SHORT_SHA }}'
+            LDFLAGS=-X 'main.version=${{ env.VERSION }}'
           tags: |
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}
 
@@ -95,7 +94,6 @@ jobs:
             *)            VERSION="${REF}" ;;
           esac
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -105,7 +103,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           build-args: |
-            LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ env.SHORT_SHA }}'
+            LDFLAGS=-X 'main.version=${{ env.VERSION }}'
           tags: |
             ghcr.io/${{ github.repository }}:dev
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}-dev
@@ -146,7 +144,6 @@ jobs:
             *)            VERSION="${REF}" ;;
           esac
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -156,7 +153,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           build-args: |
-            LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ env.SHORT_SHA }}'
+            LDFLAGS=-X 'main.version=${{ env.VERSION }}'
           tags: |
             ghcr.io/${{ github.repository }}:alpine
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}-alpine
