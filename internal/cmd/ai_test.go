@@ -491,15 +491,50 @@ func TestInstallCopilotAppend(t *testing.T) {
 func TestInstallCopilotRejectsMalformedMarkers(t *testing.T) {
 	t.Parallel()
 
-	targetDir := t.TempDir()
-	targetPath := filepath.Join(targetDir, copilotFileName)
+	tests := []struct {
+		name     string
+		existing string
+	}{
+		{
+			name:     "missing end marker",
+			existing: copilotBeginMark + "\npartial content\n",
+		},
+		{
+			name: "duplicate blocks",
+			existing: copilotBeginMark + "\nold content\n" + copilotEndMark + "\n" +
+				"between\n" +
+				copilotBeginMark + "\nstale content\n" + copilotEndMark + "\n",
+		},
+		{
+			name: "duplicate begin marker",
+			existing: copilotBeginMark + "\nfirst\n" +
+				copilotBeginMark + "\nsecond\n" + copilotEndMark + "\n",
+		},
+		{
+			name: "duplicate end marker",
+			existing: copilotBeginMark + "\ncontent\n" +
+				copilotEndMark + "\n" + copilotEndMark + "\n",
+		},
+		{
+			name:     "end marker before begin marker",
+			existing: copilotEndMark + "\ncontent\n" + copilotBeginMark + "\n",
+		},
+	}
 
-	require.NoError(t, os.WriteFile(targetPath, []byte(copilotBeginMark+"\npartial content\n"), 0o600))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	skillFS := fileagentskill.SkillFS()
-	err := installCopilot(targetPath, skillFS)
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "malformed DAGU markers")
+			targetDir := t.TempDir()
+			targetPath := filepath.Join(targetDir, copilotFileName)
+			require.NoError(t, os.WriteFile(targetPath, []byte(tt.existing), 0o600))
+
+			skillFS := fileagentskill.SkillFS()
+			err := installCopilot(targetPath, skillFS)
+			require.Error(t, err)
+			assert.ErrorContains(t, err, "malformed DAGU markers")
+		})
+	}
 }
 
 func TestStripFrontmatter(t *testing.T) {

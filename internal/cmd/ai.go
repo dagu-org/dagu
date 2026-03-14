@@ -419,19 +419,22 @@ func installCopilot(targetPath string, skillFS embed.FS) error {
 }
 
 func inspectCopilotContent(content string) (copilotContentInspection, error) {
-	beginIdx := strings.Index(content, copilotBeginMark)
-	endIdx := strings.Index(content, copilotEndMark)
-	hasBegin := beginIdx >= 0
-	hasEnd := endIdx >= 0
+	beginCount := strings.Count(content, copilotBeginMark)
+	endCount := strings.Count(content, copilotEndMark)
 
 	switch {
-	case !hasBegin && !hasEnd:
+	case beginCount == 0 && endCount == 0:
 		return copilotContentInspection{
 			state:    installStateFresh,
 			beginIdx: -1,
 			endIdx:   -1,
 		}, nil
-	case hasBegin && hasEnd && endIdx > beginIdx:
+	case beginCount == 1 && endCount == 1:
+		beginIdx := strings.Index(content, copilotBeginMark)
+		endIdx := strings.Index(content, copilotEndMark)
+		if endIdx <= beginIdx {
+			return copilotContentInspection{}, errors.New("found malformed DAGU markers")
+		}
 		return copilotContentInspection{
 			state:    installStateUpdate,
 			beginIdx: beginIdx,
