@@ -1435,6 +1435,26 @@ steps:
 		require.Equal(t, 600*time.Second, dag.Steps[0].Timeout)
 	})
 
+	t.Run("BaseConfigDAGRetryPolicy", func(t *testing.T) {
+		t.Parallel()
+
+		base := createTempYAMLFile(t, `
+retry_policy:
+  limit: 1
+  interval_sec: 60
+`)
+		child := createTempYAMLFile(t, `
+steps:
+  - name: step1
+    command: echo "test"
+`)
+		dag, err := spec.Load(context.Background(), child, spec.WithBaseConfig(base))
+		require.NoError(t, err)
+		require.NotNil(t, dag.RetryPolicy)
+		require.Equal(t, 1, dag.RetryPolicy.Limit)
+		require.Equal(t, 60*time.Second, dag.RetryPolicy.Interval)
+	})
+
 	t.Run("UnknownKeyInDefaults", func(t *testing.T) {
 		t.Parallel()
 

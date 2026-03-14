@@ -6,6 +6,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -516,12 +517,7 @@ func cloneRetryStatus(status *exec.DAGRunStatus) *exec.DAGRunStatus {
 }
 
 func containsStatus(statuses []core.Status, want core.Status) bool {
-	for _, status := range statuses {
-		if status == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(statuses, want)
 }
 
 func withRetryCount(status *exec.DAGRunStatus, retryCount int) *exec.DAGRunStatus {

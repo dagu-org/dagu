@@ -126,6 +126,7 @@ func TestInitialize(t *testing.T) {
 		assert.Contains(t, string(data), "Base DAG Configuration")
 		assert.Contains(t, string(data), "catchup_window")
 		assert.Contains(t, string(data), "hist_retention_days")
+		assert.Contains(t, string(data), "\nretry_policy:\n  limit: 1\n  interval_sec: 60\n")
 	})
 
 	t.Run("skips when file already exists", func(t *testing.T) {
