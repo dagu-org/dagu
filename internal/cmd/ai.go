@@ -6,7 +6,9 @@ package cmd
 import (
 	"bufio"
 	"embed"
+	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -16,6 +18,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 const (
@@ -24,6 +27,7 @@ const (
 	copilotBeginMark = "<!-- BEGIN DAGU -->"
 	copilotEndMark   = "<!-- END DAGU -->"
 	copilotFileName  = "copilot-instructions.md"
+	flagSkillsDir    = "skills-dir"
 )
 
 var (
@@ -37,7 +41,7 @@ var (
 type aiTool struct {
 	Name   string
 	Format string // "skill" or "copilot"
-	detect func(homeDir string) string
+	detect func(homeDir string) []string
 }
 
 // AI returns the "ai" parent command.
@@ -64,6 +68,7 @@ Supported tools: Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI`,
 		RunE: runAIInstall,
 	}
 	cmd.Flags().BoolP("yes", "y", false, "Install to all detected tools without prompting")
+	cmd.Flags().StringArray(flagSkillsDir, nil, "Install into the specified skills directory; repeatable. If set, auto-detection is skipped")
 	return cmd
 }
 
@@ -72,72 +77,64 @@ func aiTools() []aiTool {
 		{
 			Name:   "Claude Code",
 			Format: "skill",
-			detect: func(homeDir string) string {
+			detect: func(homeDir string) []string {
 				if fileExists(filepath.Join(homeDir, ".claude", ".claude.json")) {
-					return filepath.Join(homeDir, ".claude", "skills")
+					return []string{filepath.Join(homeDir, ".claude", "skills")}
 				}
-				return ""
+				return nil
 			},
 		},
 		{
 			Name:   "Codex",
 			Format: "skill",
-			detect: func(homeDir string) string {
-				if v := os.Getenv("AGENTS_HOME"); v != "" {
-					if dirExists(v) {
-						return filepath.Join(v, "skills")
-					}
+			detect: func(homeDir string) []string {
+				var paths []string
+
+				if dir := resolveEnvOrExistingDir("AGENTS_HOME", filepath.Join(homeDir, ".agents")); dir != "" {
+					paths = append(paths, filepath.Join(dir, "skills"))
 				}
-				if dir := filepath.Join(homeDir, ".agents"); dirExists(dir) {
-					return filepath.Join(dir, "skills")
+				if dir := resolveEnvOrExistingDir("CODEX_HOME", filepath.Join(homeDir, ".codex")); dir != "" {
+					paths = append(paths, filepath.Join(dir, "skills"))
 				}
-				if v := os.Getenv("CODEX_HOME"); v != "" {
-					if dirExists(v) {
-						return filepath.Join(v, "skills")
-					}
-				}
-				if dir := filepath.Join(homeDir, ".codex"); dirExists(dir) {
-					return filepath.Join(dir, "skills")
-				}
-				return ""
+				return uniquePaths(paths)
 			},
 		},
 		{
 			Name:   "OpenCode",
 			Format: "skill",
-			detect: func(homeDir string) string {
+			detect: func(homeDir string) []string {
 				dir := filepath.Join(homeDir, ".config", "opencode")
 				if dirExists(dir) {
-					return filepath.Join(dir, "skills")
+					return []string{filepath.Join(dir, "skills")}
 				}
-				return ""
+				return nil
 			},
 		},
 		{
 			Name:   "Gemini CLI",
 			Format: "skill",
-			detect: func(homeDir string) string {
+			detect: func(homeDir string) []string {
 				if fileExists(filepath.Join(homeDir, ".gemini", "GEMINI.md")) {
-					return filepath.Join(homeDir, ".gemini", "skills")
+					return []string{filepath.Join(homeDir, ".gemini", "skills")}
 				}
-				return ""
+				return nil
 			},
 		},
 		{
 			Name:   "Copilot CLI",
 			Format: "copilot",
-			detect: func(homeDir string) string {
+			detect: func(homeDir string) []string {
 				if v := os.Getenv("XDG_CONFIG_HOME"); v != "" {
 					dir := filepath.Join(v, ".copilot")
 					if fileExists(filepath.Join(dir, "config.json")) {
-						return dir
+						return []string{dir}
 					}
 				}
 				dir := filepath.Join(homeDir, ".copilot")
 				if fileExists(filepath.Join(dir, "config.json")) {
-					return dir
+					return []string{dir}
 				}
-				return ""
+				return nil
 			},
 		},
 	}
@@ -147,6 +144,20 @@ type detectedTool struct {
 	tool       aiTool
 	targetPath string
 }
+
+type installState int
+
+type copilotContentInspection struct {
+	state    installState
+	beginIdx int
+	endIdx   int
+}
+
+const (
+	installStateFresh installState = iota
+	installStateOverwrite
+	installStateUpdate
+)
 
 func runAIInstall(cmd *cobra.Command, _ []string) error {
 	homeDir, err := os.UserHomeDir()
@@ -159,31 +170,32 @@ func runAIInstall(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to get yes flag: %w", err)
 	}
 
-	reader := bufio.NewReader(os.Stdin)
-	tools := aiTools()
+	customSkillDirs, err := cmd.Flags().GetStringArray(flagSkillsDir)
+	if err != nil {
+		return fmt.Errorf("failed to get skills-dir flag: %w", err)
+	}
+
+	in := cmd.InOrStdin()
+	out := cmd.OutOrStdout()
+	errOut := cmd.ErrOrStderr()
+	reader := bufio.NewReader(in)
 
 	var detected []detectedTool
-
-	for _, t := range tools {
-		baseDir := t.detect(homeDir)
-		if baseDir == "" {
-			continue
+	if len(customSkillDirs) > 0 {
+		detected, err = customSkillTargets(customSkillDirs)
+		if err != nil {
+			return err
 		}
-		var target string
-		if t.Format == "copilot" {
-			target = filepath.Join(baseDir, copilotFileName)
-		} else {
-			target = filepath.Join(baseDir, skillDirName, "SKILL.md")
-		}
-		detected = append(detected, detectedTool{tool: t, targetPath: target})
+	} else {
+		detected = detectAITargets(homeDir, aiTools())
 	}
 
 	if len(detected) == 0 {
-		fmt.Println("No AI coding tools detected.")
+		_, _ = fmt.Fprintln(out, "No AI coding tools detected.")
 		return nil
 	}
 
-	fmt.Printf("Found %s tool(s)\n\n", bold(len(detected)))
+	_, _ = fmt.Fprintf(out, "Found %s installation target(s)\n\n", bold(len(detected)))
 
 	skillFS := fileagentskill.SkillFS()
 
@@ -191,14 +203,42 @@ func runAIInstall(cmd *cobra.Command, _ []string) error {
 
 	for _, d := range detected {
 		displayPath := tildefy(d.targetPath, homeDir)
+		state, stateErr := detectInstallState(d)
+		if stateErr != nil {
+			hadFailure = true
+			_, _ = fmt.Fprintf(errOut, "  %-14s %s %s: %v\n", d.tool.Name, red("✗"), dim(displayPath), stateErr)
+			continue
+		}
 
 		if !skipPrompt {
-			if !promptDefault(reader, fmt.Sprintf("  %s?", bold(d.tool.Name)), true) {
-				clearLine()
-				fmt.Printf("  %-14s %s\n", d.tool.Name, dim("skipped"))
+			prompt := fmt.Sprintf("  %s %s?", bold(d.tool.Name), dim(displayPath))
+			confirmed, promptErr := promptDefault(reader, out, prompt, true)
+			if promptErr != nil {
+				return fmt.Errorf("interactive confirmation required for %s: %w; rerun with --yes to install non-interactively", displayPath, promptErr)
+			}
+			if !confirmed {
+				clearLine(out)
+				_, _ = fmt.Fprintf(out, "  %-14s %s %s\n", d.tool.Name, dim("skipped"), dim(displayPath))
 				continue
 			}
-			clearLine()
+			clearLine(out)
+		}
+
+		if state != installStateFresh && !skipPrompt {
+			action := "Overwrite"
+			if state == installStateUpdate {
+				action = "Update"
+			}
+			confirmed, promptErr := promptDefault(reader, out, fmt.Sprintf("  %s existing install at %s?", action, dim(displayPath)), false)
+			if promptErr != nil {
+				return fmt.Errorf("interactive confirmation required for %s: %w; rerun with --yes to install non-interactively", displayPath, promptErr)
+			}
+			if !confirmed {
+				clearLine(out)
+				_, _ = fmt.Fprintf(out, "  %-14s %s %s\n", d.tool.Name, dim("kept existing"), dim(displayPath))
+				continue
+			}
+			clearLine(out)
 		}
 
 		var installErr error
@@ -210,11 +250,15 @@ func runAIInstall(cmd *cobra.Command, _ []string) error {
 
 		if installErr != nil {
 			hadFailure = true
-			fmt.Fprintf(os.Stderr, "  %-14s %s %v\n", d.tool.Name, red("✗"), installErr)
+			_, _ = fmt.Fprintf(errOut, "  %-14s %s %s: %v\n", d.tool.Name, red("✗"), dim(displayPath), installErr)
 			continue
 		}
 
-		fmt.Printf("  %-14s %s %s\n", d.tool.Name, green("✓"), dim(displayPath))
+		status := "installed"
+		if state == installStateOverwrite || state == installStateUpdate {
+			status = "updated"
+		}
+		_, _ = fmt.Fprintf(out, "  %-14s %s %s %s\n", d.tool.Name, green("✓"), status, dim(displayPath))
 	}
 
 	if hadFailure {
@@ -222,6 +266,82 @@ func runAIInstall(cmd *cobra.Command, _ []string) error {
 	}
 
 	return nil
+}
+
+func detectAITargets(homeDir string, tools []aiTool) []detectedTool {
+	seen := make(map[string]struct{})
+	var detected []detectedTool
+
+	for _, t := range tools {
+		for _, baseDir := range t.detect(homeDir) {
+			var target string
+			if t.Format == "copilot" {
+				target = filepath.Join(baseDir, copilotFileName)
+			} else {
+				target = filepath.Join(baseDir, skillDirName, "SKILL.md")
+			}
+			target = filepath.Clean(target)
+
+			if _, ok := seen[target]; ok {
+				continue
+			}
+			seen[target] = struct{}{}
+			detected = append(detected, detectedTool{tool: t, targetPath: target})
+		}
+	}
+
+	return detected
+}
+
+func customSkillTargets(skillDirs []string) ([]detectedTool, error) {
+	seen := make(map[string]struct{})
+	customTool := aiTool{Name: "Custom", Format: "skill"}
+	var detected []detectedTool
+
+	for _, skillDir := range skillDirs {
+		rootDir, err := validateSkillRootDir(skillDir)
+		if err != nil {
+			return nil, err
+		}
+
+		target := filepath.Join(rootDir, skillDirName, "SKILL.md")
+		target = filepath.Clean(target)
+		if _, ok := seen[target]; ok {
+			continue
+		}
+
+		seen[target] = struct{}{}
+		detected = append(detected, detectedTool{tool: customTool, targetPath: target})
+	}
+
+	return detected, nil
+}
+
+func detectInstallState(target detectedTool) (installState, error) {
+	if target.tool.Format == "copilot" {
+		content, err := os.ReadFile(target.targetPath) //nolint:gosec // path is constructed internally
+		if os.IsNotExist(err) {
+			return installStateFresh, nil
+		}
+		if err != nil {
+			return installStateFresh, fmt.Errorf("read %s: %w", target.targetPath, err)
+		}
+
+		inspection, inspectErr := inspectCopilotContent(string(content))
+		if inspectErr != nil {
+			return installStateFresh, fmt.Errorf("inspect %s: %w", target.targetPath, inspectErr)
+		}
+		if inspection.state == installStateUpdate {
+			return installStateUpdate, nil
+		}
+		return installStateFresh, nil
+	}
+
+	if fileExists(target.targetPath) {
+		return installStateOverwrite, nil
+	}
+
+	return installStateFresh, nil
 }
 
 // installSkill copies the embedded dagu skill directory to the target path.
@@ -273,11 +393,13 @@ func installCopilot(targetPath string, skillFS embed.FS) error {
 	var result string
 	if readErr == nil {
 		existingStr := string(existing)
-		beginIdx := strings.Index(existingStr, copilotBeginMark)
-		endIdx := strings.Index(existingStr, copilotEndMark)
+		inspection, inspectErr := inspectCopilotContent(existingStr)
+		if inspectErr != nil {
+			return fmt.Errorf("inspect %s: %w", targetPath, inspectErr)
+		}
 
-		if beginIdx >= 0 && endIdx >= 0 && endIdx > beginIdx {
-			result = existingStr[:beginIdx] + wrappedContent + existingStr[endIdx+len(copilotEndMark):]
+		if inspection.state == installStateUpdate {
+			result = existingStr[:inspection.beginIdx] + wrappedContent + existingStr[inspection.endIdx+len(copilotEndMark):]
 		} else {
 			result = existingStr
 			if !strings.HasSuffix(result, "\n") && len(result) > 0 {
@@ -294,6 +416,33 @@ func installCopilot(targetPath string, skillFS embed.FS) error {
 	}
 
 	return os.WriteFile(targetPath, []byte(result), 0o600)
+}
+
+func inspectCopilotContent(content string) (copilotContentInspection, error) {
+	beginCount := strings.Count(content, copilotBeginMark)
+	endCount := strings.Count(content, copilotEndMark)
+
+	switch {
+	case beginCount == 0 && endCount == 0:
+		return copilotContentInspection{
+			state:    installStateFresh,
+			beginIdx: -1,
+			endIdx:   -1,
+		}, nil
+	case beginCount == 1 && endCount == 1:
+		beginIdx := strings.Index(content, copilotBeginMark)
+		endIdx := strings.Index(content, copilotEndMark)
+		if endIdx <= beginIdx {
+			return copilotContentInspection{}, errors.New("found malformed DAGU markers")
+		}
+		return copilotContentInspection{
+			state:    installStateUpdate,
+			beginIdx: beginIdx,
+			endIdx:   endIdx,
+		}, nil
+	default:
+		return copilotContentInspection{}, errors.New("found malformed DAGU markers")
+	}
 }
 
 // buildCopilotContent extracts SKILL.md body (without frontmatter) and appends reference files.
@@ -342,28 +491,46 @@ func stripFrontmatter(content string) string {
 }
 
 // promptDefault asks the user a yes/no question with a default answer.
-func promptDefault(reader *bufio.Reader, prompt string, defaultYes bool) bool {
+func promptDefault(reader *bufio.Reader, w io.Writer, prompt string, defaultYes bool) (bool, error) {
 	hint := "[Y/n]"
 	if !defaultYes {
 		hint = "[y/N]"
 	}
-	fmt.Printf("%s %s ", prompt, dim(hint))
+	if _, err := fmt.Fprintf(w, "%s %s ", prompt, dim(hint)); err != nil {
+		return false, err
+	}
 
 	response, err := reader.ReadString('\n')
 	if err != nil {
-		return false
+		if !errors.Is(err, io.EOF) || strings.TrimSpace(response) == "" {
+			return false, err
+		}
 	}
 
 	response = strings.ToLower(strings.TrimSpace(response))
 	if response == "" {
-		return defaultYes
+		if err != nil {
+			return false, err
+		}
+		return defaultYes, nil
 	}
-	return response == "y" || response == "yes"
+	return response == "y" || response == "yes", nil
 }
 
 // clearLine moves cursor to start of previous line and clears it.
-func clearLine() {
-	fmt.Print("\033[A\033[2K\r")
+func clearLine(w io.Writer) {
+	if !isTerminalWriter(w) {
+		return
+	}
+	_, _ = fmt.Fprint(w, "\033[A\033[2K\r")
+}
+
+func isTerminalWriter(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	return term.IsTerminal(int(f.Fd()))
 }
 
 // dirExists checks if a directory exists.
@@ -376,6 +543,63 @@ func dirExists(path string) bool {
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
+}
+
+func validateSkillRootDir(path string) (string, error) {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return "", fmt.Errorf("%s cannot be empty", flagSkillsDir)
+	}
+
+	clean := filepath.Clean(trimmed)
+	base := filepath.Base(clean)
+	switch base {
+	case copilotFileName, "SKILL.md":
+		return "", fmt.Errorf("%s %q must be a skills directory, not a file path", flagSkillsDir, path)
+	case skillDirName:
+		return "", fmt.Errorf("%s %q must be a skills root directory, not the %s skill directory itself", flagSkillsDir, path, skillDirName)
+	}
+
+	info, err := os.Stat(clean)
+	switch {
+	case err == nil && !info.IsDir():
+		return "", fmt.Errorf("%s %q must be a directory", flagSkillsDir, path)
+	case err != nil && !os.IsNotExist(err):
+		return "", fmt.Errorf("check %s %q: %w", flagSkillsDir, path, err)
+	}
+
+	return clean, nil
+}
+
+func resolveEnvOrExistingDir(envVar, fallbackDir string) string {
+	if v := os.Getenv(envVar); v != "" {
+		return filepath.Clean(v)
+	}
+	if dirExists(fallbackDir) {
+		return fallbackDir
+	}
+	return ""
+}
+
+func uniquePaths(paths []string) []string {
+	seen := make(map[string]struct{}, len(paths))
+	var unique []string
+
+	for _, path := range paths {
+		if path == "" {
+			continue
+		}
+
+		clean := filepath.Clean(path)
+		if _, ok := seen[clean]; ok {
+			continue
+		}
+
+		seen[clean] = struct{}{}
+		unique = append(unique, clean)
+	}
+
+	return unique
 }
 
 // tildefy replaces the home directory prefix with ~ for display.
