@@ -779,6 +779,30 @@ func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
 	}
 }
 
+// reinsertCatchupItem puts a failed catchup run back at the front of the
+// DAG's schedule buffer so it retries on the next tick. If the buffer was
+// already cleaned up, a new one is created.
+func (tp *TickPlanner) reinsertCatchupItem(ctx context.Context, run PlannedRun) {
+	tp.entryMu.Lock()
+	defer tp.entryMu.Unlock()
+
+	buf, ok := tp.buffers[run.DAG.Name]
+	if !ok {
+		buf = NewScheduleBuffer(run.DAG.Name, run.DAG.OverlapPolicy)
+		tp.buffers[run.DAG.Name] = buf
+	}
+	if !buf.Prepend(QueueItem{
+		DAG:           run.DAG,
+		ScheduledTime: run.ScheduledTime,
+		TriggerType:   run.TriggerType,
+		ScheduleType:  run.ScheduleType,
+	}) {
+		logger.Error(ctx, "Failed to re-insert catchup item; buffer full",
+			tag.DAG(run.DAG.Name),
+		)
+	}
+}
+
 // recomputeBuffer creates a new catch-up buffer for a DAG using the existing watermark.
 func (tp *TickPlanner) recomputeBuffer(ctx context.Context, dag *core.DAG) {
 	if !tp.cfg.QueuesEnabled {
@@ -858,16 +882,18 @@ func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 	}
 
 	if err != nil {
-		// For catchup runs: the item was already popped from the in-memory
-		// buffer by Plan(). The watermark is not advanced, so the interval
-		// will be regenerated on scheduler restart or the next DAG update
-		// event (which triggers recomputeBuffer). Within the current session,
-		// the item is lost until one of those events occurs.
 		logger.Error(ctx, "Failed to dispatch run",
 			tag.DAG(run.DAG.Name),
 			slog.String("scheduleType", run.ScheduleType.String()),
 			tag.Error(err),
 		)
+
+		// For catchup runs: the item was already popped from the buffer by
+		// Plan(). Re-insert it at the front so it retries on the next tick
+		// instead of being lost until scheduler restart.
+		if run.TriggerType == core.TriggerTypeCatchUp && run.ScheduleType == ScheduleTypeStart {
+			tp.reinsertCatchupItem(ctx, run)
+		}
 		return
 	}
 
