@@ -364,11 +364,11 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 
 				queued, qErr := tp.cfg.IsQueued(ctx, item.DAG)
 				if qErr != nil {
-					logger.Error(ctx, "Failed to check if DAG is queued, assuming not queued",
+					logger.Error(ctx, "Failed to check if DAG is queued; assuming busy",
 						tag.DAG(dagName),
 						tag.Error(qErr),
 					)
-					queued = false
+					queued = true
 				}
 
 				busy := running || queued
@@ -504,13 +504,15 @@ func (tp *TickPlanner) shouldRun(ctx context.Context, dag *core.DAG, scheduledTi
 		return false
 	}
 
-	// Guard 1b: isQueued — prevent live run while a catchup run is queued
+	// Guard 1b: isQueued — prevent live run while a catchup run is queued.
+	// On error, conservatively skip (assume busy) to avoid duplicates.
 	queued, qErr := tp.cfg.IsQueued(ctx, dag)
 	if qErr != nil {
-		logger.Error(ctx, "Failed to check if DAG is queued",
+		logger.Error(ctx, "Failed to check if DAG is queued; assuming busy",
 			tag.DAG(dag.Name),
 			tag.Error(qErr),
 		)
+		return false
 	}
 	if queued {
 		return false
@@ -856,6 +858,11 @@ func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 	}
 
 	if err != nil {
+		// For catchup runs: the item was already popped from the in-memory
+		// buffer by Plan(). The watermark is not advanced, so the interval
+		// will be regenerated on scheduler restart or the next DAG update
+		// event (which triggers recomputeBuffer). Within the current session,
+		// the item is lost until one of those events occurs.
 		logger.Error(ctx, "Failed to dispatch run",
 			tag.DAG(run.DAG.Name),
 			slog.String("scheduleType", run.ScheduleType.String()),

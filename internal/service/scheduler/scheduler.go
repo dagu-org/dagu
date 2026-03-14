@@ -460,11 +460,7 @@ func (s *Scheduler) stopCron(ctx context.Context) {
 // we need the result to decide whether to advance the watermark).
 // Non-catchup runs are dispatched in a goroutine (process spawn can be slow).
 func (s *Scheduler) dispatchRun(ctx context.Context, run PlannedRun) {
-	if run.TriggerType == core.TriggerTypeCatchUp {
-		s.planner.DispatchRun(ctx, run)
-		return
-	}
-	go func() {
+	dispatch := func() {
 		defer func() {
 			if r := recover(); r != nil {
 				logger.Error(ctx, "Run dispatch panicked",
@@ -474,5 +470,10 @@ func (s *Scheduler) dispatchRun(ctx context.Context, run PlannedRun) {
 			}
 		}()
 		s.planner.DispatchRun(ctx, run)
-	}()
+	}
+	if run.TriggerType == core.TriggerTypeCatchUp {
+		dispatch()
+		return
+	}
+	go dispatch()
 }

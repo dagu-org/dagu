@@ -57,6 +57,23 @@ func EnqueueCatchupRun(
 		return fmt.Errorf("failed to create catchup attempt: %w", err)
 	}
 
+	// Rollback the attempt on any failure after creation. Without this,
+	// an orphaned attempt would block all future retries for this run ID
+	// because FindAttempt would find it and skip.
+	committed := false
+	defer func() {
+		if committed {
+			return
+		}
+		if rmErr := dagRunStore.RemoveDAGRun(ctx, dagRun); rmErr != nil {
+			logger.Error(ctx, "Failed to rollback catchup attempt",
+				tag.DAG(dag.Name),
+				tag.RunID(runID),
+				tag.Error(rmErr),
+			)
+		}
+	}()
+
 	opts := []transform.StatusOption{
 		transform.WithAttemptID(att.ID()),
 		transform.WithPreconditions(dagCopy.Preconditions),
@@ -77,22 +94,15 @@ func EnqueueCatchupRun(
 		return fmt.Errorf("failed to write catchup status: %w", err)
 	}
 
-	// Close attempt before enqueue (and before potential rollback).
 	if err := att.Close(ctx); err != nil {
 		return fmt.Errorf("failed to close catchup attempt: %w", err)
 	}
 
 	if err := queueStore.Enqueue(ctx, dagCopy.ProcGroup(), exec.QueuePriorityLow, dagRun); err != nil {
-		// Rollback: remove the orphaned attempt record.
-		if rmErr := dagRunStore.RemoveDAGRun(ctx, dagRun); rmErr != nil {
-			logger.Error(ctx, "Failed to rollback catchup attempt after enqueue failure",
-				tag.DAG(dag.Name),
-				tag.RunID(runID),
-				tag.Error(rmErr),
-			)
-		}
 		return fmt.Errorf("failed to enqueue catchup run: %w", err)
 	}
+
+	committed = true
 
 	logger.Info(ctx, "Catchup run enqueued",
 		tag.DAG(dag.Name),
