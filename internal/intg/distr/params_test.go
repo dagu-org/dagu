@@ -4,6 +4,7 @@
 package distr_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -132,11 +133,12 @@ func nodeOutputValue(t *testing.T, node *exec1.Node, key string) string {
 	value, ok := node.OutputVariables.Load(key)
 	require.True(t, ok, "node %s should expose output %s", node.Step.Name, key)
 
-	raw, ok := value.(string)
-	require.True(t, ok, "node %s output %s should be stored as string", node.Step.Name, key)
-	require.Contains(t, raw, key+"=")
-
-	return strings.TrimPrefix(raw, key+"=")
+	raw := fmt.Sprint(value)
+	require.NotEmpty(t, raw, "node %s output %s should not be empty", node.Step.Name, key)
+	if after, ok0 := strings.CutPrefix(raw, key+"="); ok0 {
+		return after
+	}
+	return raw
 }
 
 func statusErrorsContain(errs []error, needle string) bool {

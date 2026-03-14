@@ -111,12 +111,23 @@ steps:
 			wantErr: "params",
 		},
 		{
-			name: "NameOnlyLegacyEntry",
+			name: "RejectNameOnlyRichEntry",
 			spec: `
 params:
   - name: foo
 steps:
-  - command: echo "${name}"
+  - command: echo "${foo}"
+`,
+			wantErr: "params",
+		},
+		{
+			name: "LegacyMapAllowsSchemaKey",
+			spec: `
+params:
+  schema: prod
+  region: us
+steps:
+  - command: echo "${schema} ${region}"
 `,
 		},
 	}

@@ -185,23 +185,50 @@ params:
 	assert.Contains(t, err.Error(), "rewrite")
 }
 
-func TestInlineParamDefs_NameOnlyEntryRemainsLegacyParam(t *testing.T) {
+func TestInlineParamDefs_RejectNameOnlyEntry(t *testing.T) {
 	t.Parallel()
 
 	yaml := []byte(`
-name: legacy-name-param
+name: invalid-inline-name-only
 params:
   - name: foo
 `)
 
+	_, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `must define at least one field in addition to name`)
+}
+
+func TestLegacyParamsMap_AllowsSchemaKey(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: legacy-schema-key
+params:
+  schema: prod
+  region: us
+`)
+
 	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
 	require.NoError(t, err)
-	require.Len(t, dag.ParamDefs, 1)
-	assert.Equal(t, "name", dag.ParamDefs[0].Name)
-	assert.Equal(t, core.ParamDefTypeString, dag.ParamDefs[0].Type)
-	assert.Equal(t, "foo", dag.ParamDefs[0].Default)
-	assert.Equal(t, []string{"name=foo"}, dag.Params)
-	assert.Equal(t, `name="foo"`, dag.DefaultParams)
+	assert.Equal(t, []string{"region=us", "schema=prod"}, dag.Params)
+	assert.Equal(t, `region="us" schema="prod"`, dag.DefaultParams)
+}
+
+func TestInlineParamDefs_RejectNegativeStringLengthConstraint(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: invalid-negative-length
+params:
+  - name: project
+    type: string
+    min_length: -1
+`)
+
+	_, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `min_length must be non-negative`)
 }
 
 func TestInlineParamDefs_LocalDAGYamlReload(t *testing.T) {

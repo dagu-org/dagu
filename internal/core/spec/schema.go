@@ -162,6 +162,9 @@ func extractSchemaReference(params any) string {
 	if !ok {
 		return ""
 	}
+	if !isExternalSchemaParamsMap(paramsMap) {
+		return ""
+	}
 
 	schemaRef, hasSchema := paramsMap["schema"]
 	if !hasSchema {
@@ -174,4 +177,37 @@ func extractSchemaReference(params any) string {
 	}
 
 	return schemaRefStr
+}
+
+func isExternalSchemaParamsMap(paramsMap map[string]any) bool {
+	schemaRef, ok := paramsMap["schema"].(string)
+	if !ok {
+		return false
+	}
+
+	for key := range paramsMap {
+		switch key {
+		case "schema", "values":
+		default:
+			return false
+		}
+	}
+
+	if _, hasValues := paramsMap["values"]; hasValues {
+		return true
+	}
+
+	return looksLikeSchemaReference(schemaRef)
+}
+
+func looksLikeSchemaReference(schemaRef string) bool {
+	schemaRef = strings.TrimSpace(schemaRef)
+	if schemaRef == "" {
+		return false
+	}
+
+	return strings.Contains(schemaRef, "://") ||
+		strings.Contains(schemaRef, "/") ||
+		strings.Contains(schemaRef, `\`) ||
+		strings.Contains(schemaRef, ".")
 }

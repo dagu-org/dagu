@@ -15,6 +15,7 @@ import (
 
 const maxInt64AsUint = ^uint64(0) >> 1
 const maxIntValue = int(^uint(0) >> 1)
+const maxSafeFloat64Integer = 1 << 53
 
 // ResolveRuntimeParamsOptions controls how a DAG is reloaded for runtime param validation.
 type ResolveRuntimeParamsOptions struct {
@@ -285,28 +286,42 @@ func toFloat64(value any) (float64, error) {
 	case float32:
 		return float64(v), nil
 	case int:
-		return float64(v), nil
+		return signedIntToFloat64(int64(v))
 	case int8:
-		return float64(v), nil
+		return signedIntToFloat64(int64(v))
 	case int16:
-		return float64(v), nil
+		return signedIntToFloat64(int64(v))
 	case int32:
-		return float64(v), nil
+		return signedIntToFloat64(int64(v))
 	case int64:
-		return float64(v), nil
+		return signedIntToFloat64(v)
 	case uint:
-		return float64(v), nil
+		return unsignedIntToFloat64(uint64(v))
 	case uint8:
-		return float64(v), nil
+		return unsignedIntToFloat64(uint64(v))
 	case uint16:
-		return float64(v), nil
+		return unsignedIntToFloat64(uint64(v))
 	case uint32:
-		return float64(v), nil
+		return unsignedIntToFloat64(uint64(v))
 	case uint64:
-		return float64(v), nil
+		return unsignedIntToFloat64(v)
 	default:
 		return 0, fmt.Errorf("got %T", value)
 	}
+}
+
+func signedIntToFloat64(value int64) (float64, error) {
+	if value < -maxSafeFloat64Integer || value > maxSafeFloat64Integer {
+		return 0, fmt.Errorf("integer exceeds float64 safe range")
+	}
+	return float64(value), nil
+}
+
+func unsignedIntToFloat64(value uint64) (float64, error) {
+	if value > maxSafeFloat64Integer {
+		return 0, fmt.Errorf("integer exceeds float64 safe range")
+	}
+	return float64(value), nil
 }
 
 func toInt(value any) (int, error) {
@@ -361,12 +376,7 @@ func int64FromUint64(value uint64) (int64, error) {
 	if value > maxInt64AsUint {
 		return 0, fmt.Errorf("integer overflow")
 	}
-
-	number, err := strconv.ParseInt(strconv.FormatUint(value, 10), 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("integer overflow")
-	}
-	return number, nil
+	return int64(value), nil
 }
 
 func cloneParamEntries(entries []dagParamEntry) []dagParamEntry {

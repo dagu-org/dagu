@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
@@ -158,6 +159,11 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 func (h *remoteTaskHandler) reportTaskLoadFailure(ctx context.Context, task *coordinatorv1.Task, root, parent exec.DAGRunRef, loadErr error) {
 	statusPusher := remote.NewStatusPusher(h.coordinatorClient, h.workerID)
 	finishedAt := stringutil.FormatTime(time.Now())
+	logger.Warn(ctx, "Failed to load DAG on worker",
+		tag.Target(task.Target),
+		tag.RunID(task.DagRunId),
+		tag.Error(loadErr),
+	)
 	status := exec.DAGRunStatus{
 		Root:       root,
 		Parent:     parent,
@@ -166,7 +172,7 @@ func (h *remoteTaskHandler) reportTaskLoadFailure(ctx context.Context, task *coo
 		AttemptID:  task.AttemptId,
 		Status:     core.Failed,
 		FinishedAt: finishedAt,
-		Error:      loadErr.Error(),
+		Error:      sanitizeTaskLoadError(task.Target, loadErr),
 		Params:     task.Params,
 	}
 
@@ -177,6 +183,20 @@ func (h *remoteTaskHandler) reportTaskLoadFailure(ctx context.Context, task *coo
 			tag.Error(err),
 		)
 	}
+}
+
+func sanitizeTaskLoadError(target string, loadErr error) string {
+	message := loadErr.Error()
+	rest, ok := strings.CutPrefix(message, "failed to load DAG from ")
+	if !ok {
+		return message
+	}
+
+	if _, reason, ok := strings.Cut(rest, ": "); ok {
+		return fmt.Sprintf("failed to load DAG %q: %s", target, reason)
+	}
+
+	return fmt.Sprintf("failed to load DAG %q", target)
 }
 
 // retryConfig holds retry-specific configuration

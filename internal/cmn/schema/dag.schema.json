@@ -510,27 +510,13 @@
               }
             ]
           },
-          "description": "Ordered parameter entries. Supports legacy strings, legacy KEY: value pairs, and rich parameter definitions declared as objects with a required name field."
+          "description": "Ordered parameter entries. Supports legacy strings, legacy KEY: value pairs, and rich parameter definitions declared as objects with a required name field plus at least one additional definition field."
         },
         {
           "$ref": "#/definitions/dagParamLegacyMap"
         },
         {
-          "type": "object",
-          "properties": {
-            "schema": {
-              "type": "string",
-              "description": "Path to JSON Schema file (local file or remote URL) for parameter validation"
-            },
-            "values": {
-              "type": "object",
-              "additionalProperties": true,
-              "description": "Default parameter values to be validated against the schema"
-            }
-          },
-          "required": ["schema"],
-          "additionalProperties": false,
-          "description": "JSON Schema validation mode: validates parameters against a schema. 'schema' field is required, 'values' field is optional."
+          "$ref": "#/definitions/dagParamExternalSchema"
         }
       ],
       "description": "Default parameters that can be overridden when triggering the DAG. Supports four formats: 1) String format: space-separated positional parameters (e.g., 'arg1 arg2') accessible as $1, $2. 2) Array/Object format: named parameters as key-value pairs accessible as ${KEY}. 3) Inline rich definitions in array form, where each definition is an object with a required 'name' field plus optional fields such as type, default, enum, minimum, maximum, min_length, max_length, pattern, description, and required. 4) Schema validation format: object with 'schema' (path to JSON Schema file) and optional 'values' (parameter values) for runtime validation and defaults."
@@ -702,6 +688,9 @@
       "type": "object",
       "minProperties": 1,
       "maxProperties": 1,
+      "not": {
+        "required": ["name"]
+      },
       "additionalProperties": {
         "$ref": "#/definitions/paramScalar"
       },
@@ -742,16 +731,47 @@
           "type": "number"
         },
         "min_length": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 0
         },
         "max_length": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 0
         },
         "pattern": {
           "type": "string"
         }
       },
-      "description": "Rich DAG parameter definition written as an object with a required name field. Types drive validation and UI metadata; runtime env values remain strings."
+      "description": "Rich DAG parameter definition written as an object with a required name field and at least one additional definition field. Types drive validation and UI metadata; runtime env values remain strings."
+    },
+    "dagParamExternalSchema": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "type": "string",
+          "description": "Path or URL to a JSON Schema file used for parameter validation."
+        },
+        "values": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Default parameter values to be validated against the schema."
+        }
+      },
+      "required": ["schema"],
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": ["schema", "values"]
+        },
+        {
+          "properties": {
+            "schema": {
+              "pattern": "(^[a-zA-Z][a-zA-Z0-9+.-]*://)|[./\\\\]"
+            }
+          }
+        }
+      ],
+      "description": "JSON Schema validation mode. Use `values` for explicit defaults, or provide a path-like `schema` reference by itself."
     },
     "dagParamLegacyMap": {
       "type": "object",
@@ -759,7 +779,7 @@
         "$ref": "#/definitions/paramScalar"
       },
       "not": {
-        "required": ["schema"]
+        "$ref": "#/definitions/dagParamExternalSchema"
       },
       "description": "Legacy named DAG parameters as a map of key-value pairs, accessible as ${KEY}."
     },

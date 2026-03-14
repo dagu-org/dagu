@@ -30,6 +30,24 @@ func testBuildContextWithOpts(opts BuildOpts) BuildContext {
 	return ctx
 }
 
+func TestBuildContextWithOpts_InvalidatesParamsState(t *testing.T) {
+	t.Parallel()
+
+	cached := &paramsState{
+		cached: true,
+		result: &paramsResult{Params: []string{"name=old"}},
+	}
+	ctx := BuildContext{
+		opts:        BuildOpts{Parameters: "name=old"},
+		paramsState: cached,
+	}
+
+	next := ctx.WithOpts(BuildOpts{Parameters: "name=new"})
+
+	require.Nil(t, next.paramsState)
+	require.Same(t, cached, ctx.paramsState)
+}
+
 // Helper to create PortValue from string
 func portValue(s string) types.PortValue {
 	var p types.PortValue

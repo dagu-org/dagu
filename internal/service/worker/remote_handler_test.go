@@ -28,6 +28,28 @@ import (
 
 var _ TaskHandler = (*remoteTaskHandler)(nil)
 
+func TestSanitizeTaskLoadError(t *testing.T) {
+	t.Parallel()
+
+	t.Run("worker temp path is removed", func(t *testing.T) {
+		t.Parallel()
+
+		err := fmt.Errorf("failed to load DAG from /tmp/dagu-worker/task.yaml: parameter validation failed: region is required")
+		assert.Equal(
+			t,
+			`failed to load DAG "child-dag": parameter validation failed: region is required`,
+			sanitizeTaskLoadError("child-dag", err),
+		)
+	})
+
+	t.Run("non loader error is preserved", func(t *testing.T) {
+		t.Parallel()
+
+		err := fmt.Errorf("plain error")
+		assert.Equal(t, "plain error", sanitizeTaskLoadError("child-dag", err))
+	})
+}
+
 type mockStreamLogsClient struct {
 	chunks   []*coordinatorv1.LogChunk
 	mu       sync.Mutex

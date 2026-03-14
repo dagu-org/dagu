@@ -57,6 +57,7 @@ type StepBuildContext struct {
 func (c BuildContext) WithOpts(opts BuildOpts) BuildContext {
 	copy := c
 	copy.opts = opts
+	copy.paramsState = nil
 	return copy
 }
 

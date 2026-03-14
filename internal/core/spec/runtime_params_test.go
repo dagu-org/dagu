@@ -183,3 +183,19 @@ params:
 	require.NoError(t, err)
 	assert.Equal(t, []string{"TAG=", "1=simple"}, resolved.Params)
 }
+
+func TestToFloat64_RejectsUnsafeIntegerPrecision(t *testing.T) {
+	t.Parallel()
+
+	_, err := toFloat64(int64(maxSafeFloat64Integer + 1))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "safe range")
+}
+
+func TestInt64FromUint64_ConvertsDirectly(t *testing.T) {
+	t.Parallel()
+
+	value, err := int64FromUint64(maxInt64AsUint)
+	require.NoError(t, err)
+	assert.Equal(t, int64(maxInt64AsUint), value)
+}

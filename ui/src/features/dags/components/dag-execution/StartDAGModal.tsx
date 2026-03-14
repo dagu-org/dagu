@@ -384,7 +384,6 @@ function StartDAGModal({
       }
       if (
         activeElement instanceof HTMLInputElement ||
-        activeElement instanceof HTMLTextAreaElement ||
         activeElement instanceof HTMLSelectElement ||
         !activeElement
       ) {

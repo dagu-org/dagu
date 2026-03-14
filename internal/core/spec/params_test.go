@@ -608,6 +608,16 @@ func TestParseParamValue(t *testing.T) {
 		assert.Empty(t, result)
 	})
 
+	t.Run("MapWithPlainSchemaKeyRemainsLegacy", func(t *testing.T) {
+		t.Parallel()
+		result, err := parseParamValue(ctx, map[string]any{
+			"schema": "prod",
+			"region": "us",
+		})
+		require.NoError(t, err)
+		assert.Len(t, result, 2)
+	})
+
 	t.Run("MapWithSchemaAndValues", func(t *testing.T) {
 		t.Parallel()
 		result, err := parseParamValue(ctx, map[string]any{

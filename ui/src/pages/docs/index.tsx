@@ -1,14 +1,3 @@
-import SplitLayout from '@/components/SplitLayout';
-import { useSimpleToast } from '@/components/ui/simple-toast';
-import { AppBarContext } from '@/contexts/AppBarContext';
-import { DocTabProvider, useDocTabContext } from '@/contexts/DocTabContext';
-import { usePageContext } from '@/contexts/PageContext';
-import { UnsavedChangesProvider } from '@/contexts/UnsavedChangesContext';
-import { useClient, useQuery } from '@/hooks/api';
-import { useDocTreeSSE } from '@/hooks/useDocTreeSSE';
-import { useUserPreferences } from '@/contexts/UserPreference';
-import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
-import { useIsMobile } from '@/hooks/useIsMobile';
 import { ChevronLeft } from 'lucide-react';
 import React, {
   useCallback,
@@ -22,14 +11,25 @@ import {
   PathsDocsGetParametersQueryOrder,
   PathsDocsGetParametersQuerySort,
 } from '@/api/v1/schema';
+import SplitLayout from '@/components/SplitLayout';
+import { useSimpleToast } from '@/components/ui/simple-toast';
+import { AppBarContext } from '@/contexts/AppBarContext';
+import { DocTabProvider, useDocTabContext } from '@/contexts/DocTabContext';
+import { usePageContext } from '@/contexts/PageContext';
+import { UnsavedChangesProvider } from '@/contexts/UnsavedChangesContext';
+import { useUserPreferences } from '@/contexts/UserPreference';
+import { CockpitToolbar } from '@/features/cockpit/components/CockpitToolbar';
+import { useCockpitState } from '@/features/cockpit/hooks/useCockpitState';
+import { useClient, useQuery } from '@/hooks/api';
+import { useDocTreeSSE } from '@/hooks/useDocTreeSSE';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import ConfirmModal from '@/ui/ConfirmModal';
 import { CreateDocModal } from './components/CreateDocModal';
 import DocTabEditorPanel from './components/DocTabEditorPanel';
 import DocTreeSidebar from './components/DocTreeSidebar';
 import { RenameDocModal } from './components/RenameDocModal';
 import type { ContextAction } from './components/DocArboristNode';
-import { useCockpitState } from '@/features/cockpit/hooks/useCockpitState';
-import { CockpitToolbar } from '@/features/cockpit/components/CockpitToolbar';
 
 function titleFromPath(docPath: string): string {
   const segments = docPath.split('/');

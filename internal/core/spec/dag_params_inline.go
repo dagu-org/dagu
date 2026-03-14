@@ -30,7 +30,7 @@ func detectInlineParamDefinition(item map[string]any) (*inlineParamDefinition, e
 	}
 
 	nameValue, hasName := item["name"]
-	if !hasName || len(item) == 1 {
+	if !hasName {
 		return nil, nil
 	}
 
@@ -41,6 +41,9 @@ func detectInlineParamDefinition(item map[string]any) (*inlineParamDefinition, e
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, fmt.Errorf(`inline parameter definition field "name" must not be empty`)
+	}
+	if len(item) == 1 {
+		return nil, fmt.Errorf("parameter %q must define at least one field in addition to name", name)
 	}
 
 	fields := make(map[string]any, len(item)-1)
@@ -168,6 +171,9 @@ func parseInlineParamDefinition(name string, raw map[string]any) (core.ParamDef,
 		if err != nil {
 			return def, entry, fmt.Errorf("parameter %q min_length must be an integer: %w", name, err)
 		}
+		if number < 0 {
+			return def, entry, fmt.Errorf("parameter %q min_length must be non-negative", name)
+		}
 		def.MinLength = &number
 	}
 
@@ -175,6 +181,9 @@ func parseInlineParamDefinition(name string, raw map[string]any) (core.ParamDef,
 		number, err := toInt(value)
 		if err != nil {
 			return def, entry, fmt.Errorf("parameter %q max_length must be an integer: %w", name, err)
+		}
+		if number < 0 {
+			return def, entry, fmt.Errorf("parameter %q max_length must be non-negative", name)
 		}
 		def.MaxLength = &number
 	}
@@ -216,7 +225,12 @@ func parseInlineParamDefinition(name string, raw map[string]any) (core.ParamDef,
 		entry.Value = stringifyTypedValue(normalized)
 	}
 
-	if err := validateInlineDefault(def); err != nil {
+	compiledPattern, err := compileInlinePattern(def.Name, def.Pattern)
+	if err != nil {
+		return def, entry, err
+	}
+
+	if err := validateInlineDefault(def, compiledPattern); err != nil {
 		return def, entry, err
 	}
 
@@ -233,11 +247,6 @@ func validateInlineConstraintCompatibility(def core.ParamDef) error {
 	if !isString && (def.MinLength != nil || def.MaxLength != nil || def.Pattern != nil) {
 		return fmt.Errorf("parameter %q uses string constraints but type is %q", def.Name, def.Type)
 	}
-	if def.Pattern != nil {
-		if _, err := regexp.Compile(*def.Pattern); err != nil {
-			return fmt.Errorf("parameter %q has invalid pattern: %w", def.Name, err)
-		}
-	}
 	if def.Minimum != nil && def.Maximum != nil && *def.Minimum > *def.Maximum {
 		return fmt.Errorf("parameter %q minimum must be less than or equal to maximum", def.Name)
 	}
@@ -248,7 +257,19 @@ func validateInlineConstraintCompatibility(def core.ParamDef) error {
 	return nil
 }
 
-func validateInlineDefault(def core.ParamDef) error {
+func compileInlinePattern(name string, pattern *string) (*regexp.Regexp, error) {
+	if pattern == nil {
+		return nil, nil
+	}
+
+	re, err := regexp.Compile(*pattern)
+	if err != nil {
+		return nil, fmt.Errorf("parameter %q has invalid pattern: %w", name, err)
+	}
+	return re, nil
+}
+
+func validateInlineDefault(def core.ParamDef, compiledPattern *regexp.Regexp) error {
 	if def.Default == nil {
 		return nil
 	}
@@ -265,14 +286,8 @@ func validateInlineDefault(def core.ParamDef) error {
 		if def.MaxLength != nil && len(value) > *def.MaxLength {
 			return fmt.Errorf("parameter %q default is longer than max_length", def.Name)
 		}
-		if def.Pattern != nil {
-			re, err := regexp.Compile(*def.Pattern)
-			if err != nil {
-				return fmt.Errorf("parameter %q has invalid pattern: %w", def.Name, err)
-			}
-			if !re.MatchString(value) {
-				return fmt.Errorf("parameter %q default does not match pattern", def.Name)
-			}
+		if compiledPattern != nil && !compiledPattern.MatchString(value) {
+			return fmt.Errorf("parameter %q default does not match pattern", def.Name)
 		}
 	case int64:
 		number := float64(value)

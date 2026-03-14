@@ -987,15 +987,17 @@ func (a *API) dispatchStartToCoordinator(ctx context.Context, dag *core.DAG, dag
 }
 
 func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts startDAGRunOptions) error {
-	if _, err := spec.ResolveRuntimeParams(ctx, dag, opts.params, spec.ResolveRuntimeParamsOptions{
+	resolvedDAG, err := spec.ResolveRuntimeParams(ctx, dag, opts.params, spec.ResolveRuntimeParamsOptions{
 		BaseConfig: a.config.Paths.BaseConfig,
-	}); err != nil {
+	})
+	if err != nil {
 		return &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeBadRequest,
 			Message:    err.Error(),
 		}
 	}
+	dag = resolvedDAG
 
 	if err := buildErrorsToAPIError(dag.BuildErrors); err != nil {
 		return err
@@ -1147,15 +1149,17 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 }
 
 func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string, triggerType core.TriggerType, tags string) error {
-	if _, err := spec.ResolveRuntimeParams(ctx, dag, params, spec.ResolveRuntimeParamsOptions{
+	resolvedDAG, err := spec.ResolveRuntimeParams(ctx, dag, params, spec.ResolveRuntimeParamsOptions{
 		BaseConfig: a.config.Paths.BaseConfig,
-	}); err != nil {
+	})
+	if err != nil {
 		return &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeBadRequest,
 			Message:    err.Error(),
 		}
 	}
+	dag = resolvedDAG
 
 	if err := buildErrorsToAPIError(dag.BuildErrors); err != nil {
 		return err
