@@ -27,12 +27,12 @@ type retryDecision struct {
 // RetryScanner periodically discovers failed latest attempts and enqueues
 // DAG-level retries once their backoff has elapsed.
 type RetryScanner struct {
-	entryReader   EntryReader
-	dagRunStore   exec.DAGRunStore
-	queueStore    exec.QueueStore
-	isSuspended   IsSuspendedFunc
-	failureWindow time.Duration
-	clock         Clock
+	entryReader EntryReader
+	dagRunStore exec.DAGRunStore
+	queueStore  exec.QueueStore
+	isSuspended IsSuspendedFunc
+	retryWindow time.Duration
+	clock       Clock
 }
 
 func NewRetryScanner(
@@ -40,7 +40,7 @@ func NewRetryScanner(
 	dagRunStore exec.DAGRunStore,
 	queueStore exec.QueueStore,
 	isSuspended IsSuspendedFunc,
-	failureWindow time.Duration,
+	retryWindow time.Duration,
 	clock Clock,
 ) (*RetryScanner, error) {
 	if clock == nil {
@@ -50,17 +50,17 @@ func NewRetryScanner(
 		isSuspended = func(context.Context, string) bool { return false }
 	}
 	return &RetryScanner{
-		entryReader:   entryReader,
-		dagRunStore:   dagRunStore,
-		queueStore:    queueStore,
-		isSuspended:   isSuspended,
-		failureWindow: failureWindow,
-		clock:         clock,
+		entryReader: entryReader,
+		dagRunStore: dagRunStore,
+		queueStore:  queueStore,
+		isSuspended: isSuspended,
+		retryWindow: retryWindow,
+		clock:       clock,
 	}, nil
 }
 
 func (s *RetryScanner) Start(ctx context.Context) {
-	if s == nil || s.failureWindow <= 0 {
+	if s == nil || s.retryWindow <= 0 {
 		return
 	}
 
@@ -85,7 +85,7 @@ func (s *RetryScanner) Start(ctx context.Context) {
 
 func (s *RetryScanner) scan(ctx context.Context) error {
 	now := s.clock().UTC()
-	from := exec.NewUTC(now.Add(-s.failureWindow))
+	from := exec.NewUTC(now.Add(-s.retryWindow))
 
 	for _, dag := range s.retryEnabledDAGs() {
 		if dag == nil {

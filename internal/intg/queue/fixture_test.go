@@ -32,6 +32,7 @@ type fixture struct {
 	schedDone    chan error
 	cancel       context.CancelFunc
 	globalQueues []config.QueueConfig
+	retryWindow  time.Duration
 }
 
 // newFixture creates a new queue integration test fixture.
@@ -52,6 +53,9 @@ func newFixture(t *testing.T, dagYAML string, opts ...func(*fixture)) *fixture {
 			c.Queues.Enabled = true
 			if len(f.globalQueues) > 0 {
 				c.Queues.Config = f.globalQueues
+			}
+			if f.retryWindow > 0 {
+				c.Scheduler.RetryFailureWindow = f.retryWindow
 			}
 			// Disable scheduler health server (port 8090) to avoid "address already in use"
 			// when multiple tests run in parallel
@@ -89,6 +93,11 @@ func WithGlobalQueue(name string, maxActiveRuns int) func(*fixture) {
 			MaxActiveRuns: maxActiveRuns,
 		})
 	}
+}
+
+// WithRetryWindow overrides scheduler.retry_failure_window for the fixture.
+func WithRetryWindow(window time.Duration) func(*fixture) {
+	return func(f *fixture) { f.retryWindow = window }
 }
 
 // Enqueue adds n DAG runs to the queue.
@@ -186,10 +195,7 @@ func (f *fixture) AssertConcurrent(maxDiff time.Duration) {
 func (f *fixture) collectStartTimes() []time.Time {
 	var times []time.Time
 	for _, id := range f.runIDs {
-		att, err := f.th.DAGRunStore.FindAttempt(f.th.Context, exec.NewDAGRunRef(f.dag.Name, id))
-		require.NoError(f.t, err)
-		st, err := att.ReadStatus(f.th.Context)
-		require.NoError(f.t, err)
+		st := f.Status(id)
 		t, err := stringutil.ParseTime(st.StartedAt)
 		require.NoError(f.t, err)
 		times = append(times, t)
@@ -197,34 +203,93 @@ func (f *fixture) collectStartTimes() []time.Time {
 	return times
 }
 
-// FailedRun creates a DAGRunAttempt with Failed status, simulating a completed but failed run.
-func (f *fixture) FailedRun() *fixture {
-	id := uuid.New().String()
-	att, err := f.th.DAGRunStore.CreateAttempt(f.th.Context, f.dag, time.Now(), id, exec.NewDAGRunAttemptOptions{})
+type runStatusOptions struct {
+	RunID        string
+	StartedAt    time.Time
+	FinishedAt   time.Time
+	QueuedAt     time.Time
+	ScheduleTime time.Time
+	RetryCount   int
+	TriggerType  core.TriggerType
+}
+
+func (f *fixture) writeRunStatus(status core.Status, opts runStatusOptions) string {
+	runID := opts.RunID
+	if runID == "" {
+		runID = uuid.New().String()
+	}
+
+	att, err := f.th.DAGRunStore.CreateAttempt(f.th.Context, f.dag, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
 	require.NoError(f.t, err)
-	logFile := filepath.Join(f.th.Config.Paths.LogDir, f.dag.Name, id+".log")
+	logFile := filepath.Join(f.th.Config.Paths.LogDir, f.dag.Name, runID+".log")
 	require.NoError(f.t, os.MkdirAll(filepath.Dir(logFile), 0755))
-	st := transform.NewStatusBuilder(f.dag).Create(id, core.Failed, 0, time.Now(),
+
+	startedAt := opts.StartedAt
+	if startedAt.IsZero() && status.IsActive() {
+		startedAt = time.Now()
+	}
+
+	statusOpts := []transform.StatusOption{
 		transform.WithLogFilePath(logFile),
 		transform.WithAttemptID(att.ID()),
-		transform.WithHierarchyRefs(exec.NewDAGRunRef(f.dag.Name, id), exec.DAGRunRef{}),
-	)
+		transform.WithHierarchyRefs(exec.NewDAGRunRef(f.dag.Name, runID), exec.DAGRunRef{}),
+		transform.WithRetryCount(opts.RetryCount),
+	}
+	if !opts.FinishedAt.IsZero() {
+		statusOpts = append(statusOpts, transform.WithFinishedAt(opts.FinishedAt))
+	}
+	if !opts.QueuedAt.IsZero() {
+		statusOpts = append(statusOpts, transform.WithQueuedAt(exec.FormatTime(opts.QueuedAt)))
+	}
+	if !opts.ScheduleTime.IsZero() {
+		statusOpts = append(statusOpts, transform.WithScheduleTime(exec.FormatTime(opts.ScheduleTime)))
+	}
+	if opts.TriggerType != core.TriggerTypeUnknown {
+		statusOpts = append(statusOpts, transform.WithTriggerType(opts.TriggerType))
+	}
+
+	st := transform.NewStatusBuilder(f.dag).Create(runID, status, 0, startedAt, statusOpts...)
 	require.NoError(f.t, att.Open(f.th.Context))
 	require.NoError(f.t, att.Write(f.th.Context, st))
 	require.NoError(f.t, att.Close(f.th.Context))
-	f.runIDs = append(f.runIDs, id)
+	return runID
+}
+
+// FailedRun creates a DAGRunAttempt with Failed status, simulating a completed but failed run.
+func (f *fixture) FailedRun() *fixture {
+	f.FailedRunWithMetadata(runStatusOptions{
+		StartedAt:  time.Now(),
+		FinishedAt: time.Now(),
+	})
 	return f
+}
+
+// FailedRunWithMetadata creates a failed DAG run with explicit persisted metadata.
+func (f *fixture) FailedRunWithMetadata(opts runStatusOptions) string {
+	runID := f.writeRunStatus(core.Failed, opts)
+	f.runIDs = append(f.runIDs, runID)
+	return runID
+}
+
+// RunningRunWithMetadata creates a running DAG run with explicit persisted metadata.
+func (f *fixture) RunningRunWithMetadata(opts runStatusOptions) string {
+	return f.writeRunStatus(core.Running, opts)
 }
 
 // RetryEnqueue enqueues a previously failed run for retry using exec.EnqueueRetry.
 func (f *fixture) RetryEnqueue(runID string) *fixture {
+	require.NoError(f.t, exec.EnqueueRetry(f.th.Context, f.th.DAGRunStore, f.th.QueueStore, f.dag, f.Status(runID)))
+	return f
+}
+
+// Status returns the latest persisted status for the given DAG run.
+func (f *fixture) Status(runID string) *exec.DAGRunStatus {
 	ref := exec.NewDAGRunRef(f.dag.Name, runID)
 	att, err := f.th.DAGRunStore.FindAttempt(f.th.Context, ref)
 	require.NoError(f.t, err)
 	status, err := att.ReadStatus(f.th.Context)
 	require.NoError(f.t, err)
-	require.NoError(f.t, exec.EnqueueRetry(f.th.Context, f.th.DAGRunStore, f.th.QueueStore, f.dag, status))
-	return f
+	return status
 }
 
 func (f *fixture) cleanup() {
