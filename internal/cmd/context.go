@@ -213,7 +213,11 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		hrOpts = append(hrOpts, filedagrun.WithHistoryFileCache(hc))
 	}
 
-	ps := fileproc.New(cfg.Paths.ProcDir)
+	ps := fileproc.New(cfg.Paths.ProcDir,
+		fileproc.WithStaleThreshold(cfg.Scheduler.StaleThreshold),
+		fileproc.WithHeartbeatInterval(cfg.Scheduler.HeartbeatInterval),
+		fileproc.WithHeartbeatSyncInterval(cfg.Scheduler.HeartbeatSyncInterval),
+	)
 	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
 	drm := runtime.NewManager(drs, ps, cfg)
 	qs := filequeue.New(cfg.Paths.QueueDir)

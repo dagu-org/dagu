@@ -6,6 +6,7 @@ package fileproc
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,13 +28,15 @@ var _ exec.ProcHandle = (*ProcHandle)(nil)
 
 // ProcHandle is a struct that implements the ProcHandle interface.
 type ProcHandle struct {
-	fileName string
-	started  atomic.Bool
-	canceled atomic.Bool
-	cancel   context.CancelFunc
-	mu       sync.Mutex
-	wg       sync.WaitGroup
-	meta     exec.ProcMeta
+	fileName          string
+	started           atomic.Bool
+	canceled          atomic.Bool
+	cancel            context.CancelFunc
+	mu                sync.Mutex
+	wg                sync.WaitGroup
+	meta              exec.ProcMeta
+	heartbeatInterval time.Duration
+	syncInterval      time.Duration
 }
 
 // GetMeta implements models.ProcHandle.
@@ -44,10 +47,18 @@ func (p *ProcHandle) GetMeta() exec.ProcMeta {
 }
 
 // NewProcHandler creates a new instance of Proc with the specified file name.
-func NewProcHandler(file string, meta exec.ProcMeta) *ProcHandle {
+func NewProcHandler(file string, meta exec.ProcMeta, heartbeatInterval, syncInterval time.Duration) *ProcHandle {
+	if heartbeatInterval <= 0 {
+		heartbeatInterval = 5 * time.Second
+	}
+	if syncInterval <= 0 {
+		syncInterval = 10 * time.Second
+	}
 	return &ProcHandle{
-		fileName: file,
-		meta:     meta,
+		fileName:          file,
+		meta:              meta,
+		heartbeatInterval: heartbeatInterval,
+		syncInterval:      syncInterval,
 	}
 }
 
@@ -152,8 +163,8 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 			p.wg.Done()
 		}()
 
-		ticker := time.NewTicker(15 * time.Second)
-		flush := time.NewTicker(30 * time.Second)
+		ticker := time.NewTicker(p.heartbeatInterval)
+		flush := time.NewTicker(p.syncInterval)
 		defer ticker.Stop()
 		defer flush.Stop()
 
@@ -169,6 +180,23 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 				if _, err := fd.WriteAt(buf, 0); err != nil {
 					logger.Error(ctx, "Failed to write heartbeat", tag.Error(err))
 				}
+				// Self-healing: detect if file was unlinked externally
+				if _, statErr := os.Stat(p.fileName); errors.Is(statErr, os.ErrNotExist) {
+					if hbCtx.Err() != nil {
+						return // Context cancelled — don't resurrect
+					}
+					logger.Warn(ctx, "Heartbeat file deleted externally, recreating",
+						tag.File(p.fileName))
+					_ = fd.Close()
+					newFd, err := p.recreateFile(buf)
+					if err != nil {
+						logger.Error(ctx, "Failed to recreate heartbeat file",
+							tag.File(p.fileName),
+							tag.Error(err))
+						return
+					}
+					fd = newFd
+				}
 
 			case <-flush.C:
 				_ = fd.Sync()
@@ -181,4 +209,23 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 	}()
 
 	return nil
+}
+
+// recreateFile creates a new heartbeat file after the original was deleted externally.
+func (p *ProcHandle) recreateFile(currentBuf []byte) (*os.File, error) {
+	dir := filepath.Dir(p.fileName)
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return nil, fmt.Errorf("failed to create directory: %w", err)
+	}
+	// Use O_CREATE without O_EXCL — intentional recreation of deleted file
+	fd, err := os.OpenFile(p.fileName, os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		return nil, fmt.Errorf("failed to recreate file: %w", err)
+	}
+	if _, err := fd.WriteAt(currentBuf, 0); err != nil {
+		_ = fd.Close()
+		return nil, fmt.Errorf("failed to write timestamp: %w", err)
+	}
+	_ = fd.Sync()
+	return fd, nil
 }

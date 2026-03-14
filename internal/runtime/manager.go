@@ -210,13 +210,6 @@ func (m *Manager) GetSavedStatus(ctx context.Context, dagRun exec.DAGRunRef) (*e
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
 
-	// If the status is running, ensure if the process is still alive
-	if dagRun.ID == st.Root.ID && st.Status == core.Running {
-		if err := m.checkAndUpdateStaleRunningStatus(ctx, attempt, st); err != nil {
-			logger.Error(ctx, "Failed to check and update stale running status", tag.Error(err))
-		}
-	}
-
 	return st, nil
 }
 
@@ -241,14 +234,6 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *core.DAG
 		currentStatus, err := m.currentStatus(ctx, dag, st.DAGRunID)
 		if err == nil {
 			return currentStatus, nil
-		}
-	}
-
-	// If querying the current status fails, even if the status is running,
-	// check if the process is actually alive before marking as error.
-	if st.Status == core.Running {
-		if err := m.checkAndUpdateStaleRunningStatus(ctx, attempt, st); err != nil {
-			logger.Error(ctx, "Failed to check and update stale running status", tag.Error(err))
 		}
 	}
 
@@ -327,11 +312,6 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *core.DAG) (exec.DAGR
 				st = currentStatus
 			} else {
 				logger.Debug(ctx, "Failed to get current status from socket", tag.Error(err))
-				// Socket is unavailable while persisted status is still running.
-				// Verify process liveness and downgrade stale running status.
-				if err := m.checkAndUpdateStaleRunningStatus(ctx, attempt, st); err != nil {
-					logger.Error(ctx, "Failed to check and update stale running status", tag.Error(err))
-				}
 			}
 		}
 	}
@@ -391,44 +371,6 @@ func (m *Manager) UpdateStatus(ctx context.Context, rootDAGRun exec.DAGRunRef, n
 	if err := attempt.Write(ctx, newStatus); err != nil {
 		return fmt.Errorf("failed to write status: %w", err)
 	}
-
-	return nil
-}
-
-// checkAndUpdateStaleRunningStatus checks if a running DAG has a live process
-// and updates its status to error if the process is not alive.
-func (m *Manager) checkAndUpdateStaleRunningStatus(
-	ctx context.Context,
-	att exec.DAGRunAttempt,
-	st *exec.DAGRunStatus,
-) error {
-	// Skip stale check for distributed DAGs - they run on remote workers
-	// and don't have local heartbeat files. The coordinator's zombie detector
-	// handles failure detection for distributed DAGs via worker heartbeats.
-	if st.WorkerID != "" {
-		return nil
-	}
-
-	dag, err := att.ReadDAG(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to read DAG for stale status check: %w", err)
-	}
-	dagRun := exec.DAGRunRef{
-		Name: dag.Name,
-		ID:   st.DAGRunID,
-	}
-	alive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), dagRun)
-	if err != nil {
-		// Log but don't fail - we can't determine if it's alive
-		logger.Error(ctx, "Failed to check if DAG run is alive", tag.Error(err))
-		return nil
-	}
-	if alive {
-		// Process is still alive, nothing to do
-		return nil
-	}
-	// Process is not alive, update status to error
-	st.Status = core.Failed
 
 	return nil
 }

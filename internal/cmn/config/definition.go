@@ -277,6 +277,10 @@ type SchedulerDef struct {
 	LockStaleThreshold      string `mapstructure:"lock_stale_threshold"`      // Default: 30s
 	LockRetryInterval       string `mapstructure:"lock_retry_interval"`       // Default: 5s
 	ZombieDetectionInterval string `mapstructure:"zombie_detection_interval"` // Default: 45s, 0 to disable
+	HeartbeatInterval       string `mapstructure:"heartbeat_interval"`        // Default: 5s
+	HeartbeatSyncInterval   string `mapstructure:"heartbeat_sync_interval"`   // Default: 10s
+	StaleThreshold          string `mapstructure:"stale_threshold"`           // Default: 90s
+	FailureThreshold        int    `mapstructure:"failure_threshold"`         // Default: 3
 }
 
 // QueueConfigDef configures global queue settings.

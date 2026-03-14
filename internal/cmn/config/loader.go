@@ -792,6 +792,10 @@ func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 		cfg.Scheduler.LockStaleThreshold = l.parseDuration("scheduler.lock_stale_threshold", def.Scheduler.LockStaleThreshold)
 		cfg.Scheduler.LockRetryInterval = l.parseDuration("scheduler.lock_retry_interval", def.Scheduler.LockRetryInterval)
 		cfg.Scheduler.ZombieDetectionInterval = l.parseDuration("scheduler.zombie_detection_interval", def.Scheduler.ZombieDetectionInterval)
+		cfg.Scheduler.HeartbeatInterval = l.parseDuration("scheduler.heartbeat_interval", def.Scheduler.HeartbeatInterval)
+		cfg.Scheduler.HeartbeatSyncInterval = l.parseDuration("scheduler.heartbeat_sync_interval", def.Scheduler.HeartbeatSyncInterval)
+		cfg.Scheduler.StaleThreshold = l.parseDuration("scheduler.stale_threshold", def.Scheduler.StaleThreshold)
+		cfg.Scheduler.FailureThreshold = def.Scheduler.FailureThreshold
 	}
 
 	l.setSchedulerDefaults(cfg)
@@ -811,6 +815,18 @@ func (l *ConfigLoader) setSchedulerDefaults(cfg *Config) {
 	// Default ZombieDetectionInterval only if not explicitly set (0 disables detection)
 	if cfg.Scheduler.ZombieDetectionInterval <= 0 && !l.v.IsSet("scheduler.zombie_detection_interval") {
 		cfg.Scheduler.ZombieDetectionInterval = 45 * time.Second
+	}
+	if cfg.Scheduler.HeartbeatInterval <= 0 {
+		cfg.Scheduler.HeartbeatInterval = 5 * time.Second
+	}
+	if cfg.Scheduler.HeartbeatSyncInterval <= 0 {
+		cfg.Scheduler.HeartbeatSyncInterval = 10 * time.Second
+	}
+	if cfg.Scheduler.StaleThreshold <= 0 {
+		cfg.Scheduler.StaleThreshold = 90 * time.Second
+	}
+	if cfg.Scheduler.FailureThreshold <= 0 {
+		cfg.Scheduler.FailureThreshold = 3
 	}
 }
 
@@ -1288,6 +1304,10 @@ var envBindings = []envBinding{
 	{key: "scheduler.lock_stale_threshold", env: "SCHEDULER_LOCK_STALE_THRESHOLD"},
 	{key: "scheduler.lock_retry_interval", env: "SCHEDULER_LOCK_RETRY_INTERVAL"},
 	{key: "scheduler.zombie_detection_interval", env: "SCHEDULER_ZOMBIE_DETECTION_INTERVAL"},
+	{key: "scheduler.heartbeat_interval", env: "SCHEDULER_HEARTBEAT_INTERVAL"},
+	{key: "scheduler.heartbeat_sync_interval", env: "SCHEDULER_HEARTBEAT_SYNC_INTERVAL"},
+	{key: "scheduler.stale_threshold", env: "SCHEDULER_STALE_THRESHOLD"},
+	{key: "scheduler.failure_threshold", env: "SCHEDULER_FAILURE_THRESHOLD"},
 
 	// UI
 	{key: "ui.max_dashboard_page_limit", env: "UI_MAX_DASHBOARD_PAGE_LIMIT"},

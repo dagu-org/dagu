@@ -23,7 +23,7 @@ func TestProcGroup(t *testing.T) {
 
 	baseDir := t.TempDir()
 	name := "test_proc"
-	procFiles := NewProcGroup(baseDir, name, time.Hour)
+	procFiles := NewProcGroup(baseDir, name, time.Hour, 0, 0)
 
 	// Create a proc file
 	proc, err := procFiles.Acquire(ctx, exec.DAGRunRef{
@@ -66,7 +66,7 @@ func TestProcGroup_Empty(t *testing.T) {
 
 	baseDir := t.TempDir()
 	name := "test_proc"
-	procFiles := NewProcGroup(baseDir, name, time.Hour)
+	procFiles := NewProcGroup(baseDir, name, time.Hour, 0, 0)
 
 	// Check if the count is 0
 	count, err := procFiles.Count(ctx)
@@ -81,7 +81,7 @@ func TestProcGroup_IsStale(t *testing.T) {
 
 	baseDir := t.TempDir()
 	name := "test_proc"
-	pg := NewProcGroup(baseDir, name, time.Second*5)
+	pg := NewProcGroup(baseDir, name, time.Second*5, 0, 0)
 
 	// create a proc
 	proc, err := pg.Acquire(ctx, exec.DAGRunRef{
@@ -130,7 +130,7 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 	ctx := context.Background()
 	baseDir := t.TempDir()
 	name := "test_proc"
-	pg := NewProcGroup(baseDir, name, time.Second*5)
+	pg := NewProcGroup(baseDir, name, time.Second*5, 0, 0)
 
 	t.Run("NoProcessFile", func(t *testing.T) {
 		dagRun := exec.DAGRunRef{
@@ -213,7 +213,7 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 
 	t.Run("StaleProcess", func(t *testing.T) {
 		// Create a ProcGroup with very short stale time
-		shortPG := NewProcGroup(baseDir, name, time.Millisecond*100)
+		shortPG := NewProcGroup(baseDir, name, time.Millisecond*100, 0, 0)
 
 		dagRun := exec.DAGRunRef{
 			Name: name,
@@ -244,14 +244,22 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		err = os.Chtimes(proc.fileName, oldTime, oldTime)
 		require.NoError(t, err)
 
-		// Check if the run is alive (should be false and file should be cleaned up)
+		// IsRunAlive should return false but NOT delete the file (non-destructive)
 		alive, err := shortPG.IsRunAlive(ctx, dagRun)
 		require.NoError(t, err)
 		require.False(t, alive)
 
-		// Verify file was removed
+		// Verify file still exists (non-destructive liveness check)
 		_, err = os.Stat(proc.fileName)
-		require.True(t, os.IsNotExist(err))
+		require.NoError(t, err, "stale file should NOT be deleted by IsRunAlive")
+
+		// CleanStaleFiles should remove the stale file
+		err = shortPG.CleanStaleFiles(ctx)
+		require.NoError(t, err)
+
+		// Verify file was removed by CleanStaleFiles
+		_, err = os.Stat(proc.fileName)
+		require.True(t, os.IsNotExist(err), "stale file should be deleted by CleanStaleFiles")
 	})
 
 	t.Run("StaleProcessRemovesEmptyDir", func(t *testing.T) {
@@ -261,7 +269,7 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create a ProcGroup with very short stale time
-		shortPG := NewProcGroup(testSubDir, name, time.Millisecond*100)
+		shortPG := NewProcGroup(testSubDir, name, time.Millisecond*100, 0, 0)
 
 		dagRun := exec.DAGRunRef{
 			Name: name,
@@ -295,18 +303,26 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		err = os.Chtimes(proc.fileName, oldTime, oldTime)
 		require.NoError(t, err)
 
-		// Check if the run is alive (should be false and file should be cleaned up)
+		// IsRunAlive should return false but NOT delete the file
 		alive, err := shortPG.IsRunAlive(ctx, dagRun)
 		require.NoError(t, err)
 		require.False(t, alive)
 
+		// Verify file still exists
+		_, err = os.Stat(proc.fileName)
+		require.NoError(t, err, "stale file should NOT be deleted by IsRunAlive")
+
+		// CleanStaleFiles should remove the stale file and empty parent dir
+		err = shortPG.CleanStaleFiles(ctx)
+		require.NoError(t, err)
+
 		// Verify file was removed
 		_, err = os.Stat(proc.fileName)
-		require.True(t, os.IsNotExist(err))
+		require.True(t, os.IsNotExist(err), "stale file should be deleted by CleanStaleFiles")
 
 		// Verify the parent directory was also removed (if it's empty)
 		_, err = os.Stat(procDir)
-		require.True(t, os.IsNotExist(err), "empty parent directory should be removed")
+		require.True(t, os.IsNotExist(err), "empty parent directory should be removed by CleanStaleFiles")
 	})
 
 	t.Run("InvalidFilePattern", func(t *testing.T) {

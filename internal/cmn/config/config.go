@@ -383,6 +383,10 @@ type Scheduler struct {
 	LockStaleThreshold      time.Duration // Default: 30s
 	LockRetryInterval       time.Duration // Default: 5s
 	ZombieDetectionInterval time.Duration // Default: 45s; 0 disables
+	HeartbeatInterval       time.Duration // Default: 5s
+	HeartbeatSyncInterval   time.Duration // Default: 10s
+	StaleThreshold          time.Duration // Default: 90s
+	FailureThreshold        int           // Default: 3
 }
 
 // PostgresPoolConfig holds PostgreSQL connection pool settings for workers.

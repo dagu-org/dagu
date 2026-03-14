@@ -158,7 +158,10 @@ steps:
 		err := cli.UpdateStatus(ctx, root, status)
 		require.Error(t, err)
 	})
-	t.Run("GetLatestStatusMarksStaleRunningAsFailed", func(t *testing.T) {
+	t.Run("GetLatestStatusReturnsRunningForStaleRun", func(t *testing.T) {
+		// After the zombie detector refactor, the manager no longer marks stale runs
+		// as Failed. That responsibility belongs solely to the zombie detector.
+		// GetLatestStatus returns Running and the zombie detector handles the kill.
 		dag := th.DAG(t, `steps:
   - name: "1"
     command: sleep 1
@@ -178,7 +181,7 @@ steps:
 
 		latest, err := th.DAGRunMgr.GetLatestStatus(ctx, dag.DAG)
 		require.NoError(t, err)
-		require.Equal(t, core.Failed, latest.Status)
+		require.Equal(t, core.Running, latest.Status)
 	})
 }
 

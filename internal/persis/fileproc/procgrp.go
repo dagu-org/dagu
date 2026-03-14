@@ -23,10 +23,12 @@ import (
 type ProcGroup struct {
 	dirlock.DirLock
 
-	groupName string
-	baseDir   string
-	staleTime time.Duration
-	mu        sync.Mutex
+	groupName         string
+	baseDir           string
+	staleTime         time.Duration
+	heartbeatInterval time.Duration
+	syncInterval      time.Duration
+	mu                sync.Mutex
 }
 
 // procFilePrefix is the prefix for the proc files
@@ -36,16 +38,18 @@ const procFilePrefix = "proc_"
 var procFileRegex = regexp.MustCompile(`^proc_\d{8}_\d{6}Z_.*\.proc$`)
 
 // NewProcGroup creates a new instance of a ProcGroup with the specified base directory and DAG name.
-func NewProcGroup(baseDir, groupName string, staleTime time.Duration) *ProcGroup {
+func NewProcGroup(baseDir, groupName string, staleTime, heartbeatInterval, syncInterval time.Duration) *ProcGroup {
 	dirLock := dirlock.New(baseDir, &dirlock.LockOptions{
 		StaleThreshold: 5 * time.Second,
 		RetryInterval:  100 * time.Millisecond,
 	})
 	return &ProcGroup{
-		DirLock:   dirLock,
-		baseDir:   baseDir,
-		groupName: groupName,
-		staleTime: staleTime,
+		DirLock:           dirLock,
+		baseDir:           baseDir,
+		groupName:         groupName,
+		staleTime:         staleTime,
+		heartbeatInterval: heartbeatInterval,
+		syncInterval:      syncInterval,
 	}
 }
 
@@ -69,18 +73,9 @@ func (pg *ProcGroup) CountByDAGName(ctx context.Context, dagName string) (int, e
 		if !procFileRegex.MatchString(filepath.Base(file)) {
 			continue
 		}
-		// Check if the file is stale
 		if !pg.isStale(ctx, file) {
 			aliveCount++
-			continue
 		}
-		// File is stale, remove it
-		if err := os.Remove(file); err != nil {
-			logger.Error(ctx, "Failed to remove stale file",
-				tag.File(file),
-				tag.Error(err))
-		}
-		continue
 	}
 
 	return aliveCount, nil
@@ -107,18 +102,9 @@ func (pg *ProcGroup) Count(ctx context.Context) (int, error) {
 		if !procFileRegex.MatchString(filepath.Base(file)) {
 			continue
 		}
-		// Check if the file is stale
 		if !pg.isStale(ctx, file) {
 			aliveCount++
-			continue
 		}
-		// File is stale, remove it
-		if err := os.Remove(file); err != nil {
-			logger.Error(ctx, "Failed to remove stale file",
-				tag.File(file),
-				tag.Error(err))
-		}
-		continue
 	}
 
 	return aliveCount, nil
@@ -190,7 +176,7 @@ func (pg *ProcGroup) Acquire(_ context.Context, dagRun exec.DAGRunRef) (*ProcHan
 	fileName := pg.getFileName(exec.NewUTC(time.Now()), dagRun)
 	return NewProcHandler(fileName, exec.ProcMeta{
 		StartedAt: time.Now().Unix(),
-	}), nil
+	}, pg.heartbeatInterval, pg.syncInterval), nil
 }
 
 // getFileName generates a proc file name based on the dag-run reference and the current time.
@@ -220,23 +206,13 @@ func (pg *ProcGroup) IsRunAlive(ctx context.Context, dagRun exec.DAGRunRef) (boo
 		return false, err
 	}
 
-	// Check each matching file
 	for _, file := range files {
 		if !procFileRegex.MatchString(filepath.Base(file)) {
 			continue
 		}
-		// Check if the file is stale
 		if !pg.isStale(ctx, file) {
 			return true, nil
 		}
-		// File is stale, remove it
-		if err := os.Remove(file); err != nil {
-			logger.Error(ctx, "Failed to remove stale file",
-				tag.File(file),
-				tag.Error(err))
-		}
-		// Remove parent directory if it's empty
-		_ = os.Remove(filepath.Dir(file))
 	}
 
 	return false, nil
@@ -264,7 +240,6 @@ func (pg *ProcGroup) ListAlive(ctx context.Context) ([]exec.DAGRunRef, error) {
 		if !procFileRegex.MatchString(basename) {
 			continue
 		}
-		// Check if the file is stale
 		if !pg.isStale(ctx, file) {
 			// Extract the run ID from the filename
 			// Format: proc_YYYYMMDD_HHMMSSZ_<runID>.proc
@@ -276,17 +251,42 @@ func (pg *ProcGroup) ListAlive(ctx context.Context) ([]exec.DAGRunRef, error) {
 					ID:   runID,
 				})
 			}
-			continue
-		}
-		// File is stale, remove it
-		if err := os.Remove(file); err != nil {
-			logger.Error(ctx, "Failed to remove stale file",
-				tag.File(file),
-				tag.Error(err))
 		}
 	}
 
 	return aliveRuns, nil
+}
+
+// CleanStaleFiles removes stale proc files for this group.
+// Only the zombie detector should call this after confirming a kill.
+func (pg *ProcGroup) CleanStaleFiles(ctx context.Context) error {
+	pg.mu.Lock()
+	defer pg.mu.Unlock()
+
+	if _, err := os.Stat(pg.baseDir); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+
+	files, err := filepath.Glob(filepath.Join(pg.baseDir, "*", procFilePrefix+"*.proc"))
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		if !procFileRegex.MatchString(filepath.Base(file)) {
+			continue
+		}
+		if pg.isStale(ctx, file) {
+			if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
+				logger.Error(ctx, "Failed to remove stale file",
+					tag.File(file),
+					tag.Error(err))
+			}
+			_ = os.Remove(filepath.Dir(file))
+		}
+	}
+
+	return nil
 }
 
 // extractRunIDFromFileName extracts the run ID from a proc file name.

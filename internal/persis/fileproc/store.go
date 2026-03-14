@@ -20,17 +20,55 @@ var _ exec.ProcStore = (*Store)(nil)
 
 // Store is a struct that implements the ProcStore interface.
 type Store struct {
-	baseDir    string
-	staleTime  time.Duration
-	procGroups sync.Map
+	baseDir           string
+	staleTime         time.Duration
+	heartbeatInterval time.Duration
+	syncInterval      time.Duration
+	procGroups        sync.Map
+}
+
+// StoreOption configures a Store.
+type StoreOption func(*Store)
+
+// WithStaleThreshold sets the duration after which a proc file is considered stale.
+func WithStaleThreshold(d time.Duration) StoreOption {
+	return func(s *Store) {
+		if d > 0 {
+			s.staleTime = d
+		}
+	}
+}
+
+// WithHeartbeatInterval sets the heartbeat write interval.
+func WithHeartbeatInterval(d time.Duration) StoreOption {
+	return func(s *Store) {
+		if d > 0 {
+			s.heartbeatInterval = d
+		}
+	}
+}
+
+// WithHeartbeatSyncInterval sets the heartbeat fsync interval.
+func WithHeartbeatSyncInterval(d time.Duration) StoreOption {
+	return func(s *Store) {
+		if d > 0 {
+			s.syncInterval = d
+		}
+	}
 }
 
 // New creates a new instance of Store with the specified base directory.
-func New(baseDir string) *Store {
-	return &Store{
-		baseDir:   baseDir,
-		staleTime: time.Second * 45,
+func New(baseDir string, opts ...StoreOption) *Store {
+	s := &Store{
+		baseDir:           baseDir,
+		staleTime:         90 * time.Second,
+		heartbeatInterval: 5 * time.Second,
+		syncInterval:      10 * time.Second,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // Lock locks process group
@@ -135,6 +173,12 @@ func (s *Store) ListAllAlive(ctx context.Context) (map[string][]exec.DAGRunRef, 
 	return result, nil
 }
 
+// CleanStaleFiles implements exec.ProcStore.
+func (s *Store) CleanStaleFiles(ctx context.Context, groupName string) error {
+	procGroup := s.newProcGroup(groupName)
+	return procGroup.CleanStaleFiles(ctx)
+}
+
 func (s *Store) newProcGroup(groupName string) *ProcGroup {
 	// Check if the ProcGroup already exists
 	if pg, ok := s.procGroups.Load(groupName); ok {
@@ -143,7 +187,7 @@ func (s *Store) newProcGroup(groupName string) *ProcGroup {
 
 	// Create a new ProcGroup only if it doesn't exist
 	pgBaseDir := filepath.Join(s.baseDir, groupName)
-	newPG := NewProcGroup(pgBaseDir, groupName, s.staleTime)
+	newPG := NewProcGroup(pgBaseDir, groupName, s.staleTime, s.heartbeatInterval, s.syncInterval)
 	pg, _ := s.procGroups.LoadOrStore(groupName, newPG)
 	return pg.(*ProcGroup)
 }
