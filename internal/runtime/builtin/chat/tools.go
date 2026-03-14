@@ -85,10 +85,13 @@ func NewToolRegistry(ctx context.Context, dagNames []string) (*ToolRegistry, err
 			toolName = dagName // Fallback to filename-based name
 		}
 
-		// Parse params from DefaultParams
-		params, err := parseToolParams(dag.DefaultParams)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse params for tool DAG %q: %w", dagName, err)
+		params := toolParamsFromParamDefs(dag.ParamDefs)
+		if len(params) == 0 {
+			var err error
+			params, err = parseToolParams(dag.DefaultParams)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse params for tool DAG %q: %w", dagName, err)
+			}
 		}
 
 		info := &toolInfo{
@@ -198,6 +201,30 @@ func parseToolParams(defaultParams string) ([]toolParam, error) {
 	}
 
 	return params, nil
+}
+
+func toolParamsFromParamDefs(defs []core.ParamDef) []toolParam {
+	if len(defs) == 0 {
+		return nil
+	}
+
+	params := make([]toolParam, 0, len(defs))
+	for _, def := range defs {
+		if def.Name == "" {
+			continue
+		}
+		param := toolParam{
+			Name:     def.Name,
+			Type:     def.Type,
+			Required: def.Required,
+			Default:  def.Default,
+		}
+		if param.Type == "" {
+			param.Type = "string"
+		}
+		params = append(params, param)
+	}
+	return params
 }
 
 // splitParams splits a param string by whitespace, respecting quotes.

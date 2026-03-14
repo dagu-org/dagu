@@ -2923,11 +2923,37 @@ export interface components {
             maxActiveSteps?: number;
             /** @description List of parameter names that can be passed to DAG-runs created from this DAG */
             params?: string[];
+            /** @description Ordered parameter definitions derived from DAG params for typed UI rendering and validation */
+            paramDefs?: components["schemas"]["ParamDef"][];
             /** @description Default parameter values in JSON format if not specified at DAG-run creation */
             defaultParams?: string;
             /** @description List of tags for categorizing and filtering DAGs */
             tags?: string[];
             runConfig?: components["schemas"]["RunConfig"];
+        };
+        /** @description Scalar parameter value */
+        ParamScalar: string | number | boolean;
+        /** @description Typed metadata for a single DAG parameter */
+        ParamDef: {
+            /** @description Parameter name. Omitted for positional parameters. */
+            name?: string;
+            /**
+             * @description Parameter type
+             * @enum {string}
+             */
+            type: ParamDefType;
+            default?: components["schemas"]["ParamScalar"];
+            description?: string;
+            /** @default false */
+            required: boolean;
+            enum?: components["schemas"]["ParamScalar"][];
+            /** Format: double */
+            minimum?: number;
+            /** Format: double */
+            maximum?: number;
+            minLength?: number;
+            maxLength?: number;
+            pattern?: string;
         };
         /** @description Configuration for controlling user interactions when starting DAG runs */
         RunConfig: {
@@ -12388,6 +12414,12 @@ export enum WorkerHealthStatus {
     healthy = "healthy",
     warning = "warning",
     unhealthy = "unhealthy"
+}
+export enum ParamDefType {
+    string = "string",
+    integer = "integer",
+    number = "number",
+    boolean = "boolean"
 }
 export enum RepeatMode {
     While = "while",

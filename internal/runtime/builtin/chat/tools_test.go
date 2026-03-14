@@ -90,6 +90,23 @@ func TestParseToolParams(t *testing.T) {
 	}
 }
 
+func TestToolParamsFromParamDefs_PreservesRequiredWithDefault(t *testing.T) {
+	t.Parallel()
+
+	params := toolParamsFromParamDefs([]core.ParamDef{
+		{
+			Name:     "query",
+			Type:     core.ParamDefTypeString,
+			Required: true,
+			Default:  "latest",
+		},
+	})
+
+	require.Len(t, params, 1)
+	assert.True(t, params[0].Required)
+	assert.Equal(t, "latest", params[0].Default)
+}
+
 func TestInferTypeFromDefault(t *testing.T) {
 	t.Parallel()
 

@@ -40,3 +40,22 @@ func TestToDAGRunDetailsIncludesScheduleTime(t *testing.T) {
 	require.NotNil(t, details.QueuedAt)
 	assert.Equal(t, status.QueuedAt, *details.QueuedAt)
 }
+
+func TestToDAGDetailsIncludesParamDefDescriptions(t *testing.T) {
+	details := toDAGDetails(&core.DAG{
+		Name: "described-params",
+		ParamDefs: []core.ParamDef{
+			{
+				Name:        "notes",
+				Type:        core.ParamDefTypeString,
+				Description: "Free-form operator notes",
+			},
+		},
+	})
+
+	require.NotNil(t, details)
+	require.NotNil(t, details.ParamDefs)
+	require.Len(t, *details.ParamDefs, 1)
+	require.NotNil(t, (*details.ParamDefs)[0].Description)
+	assert.Equal(t, "Free-form operator notes", *(*details.ParamDefs)[0].Description)
+}

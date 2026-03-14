@@ -12,50 +12,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/google/jsonschema-go/jsonschema"
 )
-
-func validateParams(paramPairs []paramPair, schema *jsonschema.Resolved) ([]paramPair, error) {
-	// Convert paramPairs to a map for validation
-	paramMap := make(map[string]any)
-	for _, pair := range paramPairs {
-		// Try to parse as JSON first, fall back to string
-		var value any
-		if err := json.Unmarshal([]byte(pair.Value), &value); err != nil {
-			// If JSON parsing fails, use as string
-			value = pair.Value
-		}
-		paramMap[pair.Name] = value
-	}
-
-	// Apply schema defaults to the parameter map
-	if err := schema.ApplyDefaults(&paramMap); err != nil {
-		return nil, fmt.Errorf("failed to apply schema defaults: %w", err)
-	}
-
-	if err := schema.Validate(paramMap); err != nil {
-		return nil, fmt.Errorf("parameter validation failed: %w", err)
-	}
-
-	// Convert the updated paramMap back to paramPair format
-	updatedPairs := make([]paramPair, 0, len(paramMap))
-	for name, value := range paramMap {
-		var valueStr string
-		if str, ok := value.(string); ok {
-			valueStr = str
-		} else {
-			// Convert non-string values to JSON string
-			if jsonBytes, err := json.Marshal(value); err == nil {
-				valueStr = string(jsonBytes)
-			} else {
-				valueStr = fmt.Sprintf("%v", value)
-			}
-		}
-		updatedPairs = append(updatedPairs, paramPair{Name: name, Value: valueStr})
-	}
-
-	return updatedPairs, nil
-}
 
 func overrideParams(paramPairs *[]paramPair, override []paramPair) {
 	// Override the default parameters with the command line parameters

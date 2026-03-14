@@ -26,7 +26,14 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Tree, TreeApi, NodeApi } from 'react-arborist';
 import DocArboristNode, { type ContextAction } from './DocArboristNode';
 import DocOutlinePanel from './DocOutlinePanel';
@@ -97,12 +104,16 @@ function filterTree(
     .map((node) => {
       if (!node.children) return node;
       const filteredChildren = filterTree(node.children, matchIds, ancestorIds);
-      return { ...node, children: filteredChildren.length > 0 ? filteredChildren : undefined };
+      return {
+        ...node,
+        children: filteredChildren.length > 0 ? filteredChildren : undefined,
+      };
     })
-    .filter((node) =>
-      node.type !== DocTreeNodeResponseType.directory ||
-      matchIds.has(node.id) ||
-      !!(node.children && node.children.length > 0)
+    .filter(
+      (node) =>
+        node.type !== DocTreeNodeResponseType.directory ||
+        matchIds.has(node.id) ||
+        !!(node.children && node.children.length > 0)
     );
 }
 
@@ -268,11 +279,14 @@ function DocTreeSidebar({
   }, []);
 
   // Track selection changes
-  const handleSelect = useCallback((nodes: NodeApi<DocTreeNodeResponse>[]) => {
-    const ids = nodes.map(n => n.id);
-    setSelectedIds(ids);
-    onSelectionChange?.(ids);
-  }, [onSelectionChange]);
+  const handleSelect = useCallback(
+    (nodes: NodeApi<DocTreeNodeResponse>[]) => {
+      const ids = nodes.map((n) => n.id);
+      setSelectedIds(ids);
+      onSelectionChange?.(ids);
+    },
+    [onSelectionChange]
+  );
 
   // Handle node activation (file click)
   const handleActivate = useCallback(
@@ -287,7 +301,14 @@ function DocTreeSidebar({
 
   // Handle inline rename
   const handleRename = useCallback(
-    async ({ id, name }: { id: string; name: string; node: NodeApi<DocTreeNodeResponse> }) => {
+    async ({
+      id,
+      name,
+    }: {
+      id: string;
+      name: string;
+      node: NodeApi<DocTreeNodeResponse>;
+    }) => {
       const parts = id.split('/');
       parts[parts.length - 1] = name;
       const newPath = parts.join('/');
@@ -364,11 +385,13 @@ function DocTreeSidebar({
           e.preventDefault();
           onBatchDelete(selectedIds);
         } else if (selectedIds.length === 1) {
-          const node = api.get(selectedIds[0]);
+          const node = api.get(selectedIds[0] ?? null);
           if (node && !node.isEditing) {
             e.preventDefault();
             const isDir = node.data.type === DocTreeNodeResponseType.directory;
-            const hasChildren = !!(node.data.children && node.data.children.length > 0);
+            const hasChildren = !!(
+              node.data.children && node.data.children.length > 0
+            );
             onContextAction({
               type: 'delete',
               docPath: node.id,
@@ -380,7 +403,7 @@ function DocTreeSidebar({
         }
       } else if (e.key === 'F2') {
         if (selectedIds.length === 1) {
-          const node = api.get(selectedIds[0]);
+          const node = api.get(selectedIds[0] ?? null);
           if (node && !node.isEditing) {
             e.preventDefault();
             node.edit();
@@ -395,7 +418,9 @@ function DocTreeSidebar({
 
   // Custom node renderer that passes through extra props
   const renderNode = useCallback(
-    (props: import('react-arborist').NodeRendererProps<DocTreeNodeResponse>) => (
+    (
+      props: import('react-arborist').NodeRendererProps<DocTreeNodeResponse>
+    ) => (
       <DocArboristNode
         {...props}
         onContextAction={onContextAction}
@@ -442,7 +467,9 @@ function DocTreeSidebar({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel className="text-xs py-1">Sort by</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-xs py-1">
+                Sort by
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuRadioGroup
                 value={`${sortField}:${sortOrder}`}
@@ -451,12 +478,24 @@ function DocTreeSidebar({
                   onSortChange(f, o);
                 }}
               >
-                <DropdownMenuRadioItem value="name:asc" className="text-xs">Name A–Z</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="name:desc" className="text-xs">Name Z–A</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="type:asc" className="text-xs">Folders first</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="type:desc" className="text-xs">Files first</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="mtime:desc" className="text-xs">Newest first</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="mtime:asc" className="text-xs">Oldest first</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="name:asc" className="text-xs">
+                  Name A–Z
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="name:desc" className="text-xs">
+                  Name Z–A
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="type:asc" className="text-xs">
+                  Folders first
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="type:desc" className="text-xs">
+                  Files first
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="mtime:desc" className="text-xs">
+                  Newest first
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="mtime:asc" className="text-xs">
+                  Oldest first
+                </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -476,7 +515,11 @@ function DocTreeSidebar({
       {/* Search / Selection bar (selection replaces search when active) */}
       <div className="px-2 py-1.5 border-b border-border relative">
         {/* Search input — always rendered to define the container height */}
-        <div className={selectedIds.length > 1 && canWrite ? 'invisible' : undefined}>
+        <div
+          className={
+            selectedIds.length > 1 && canWrite ? 'invisible' : undefined
+          }
+        >
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
             <input
@@ -505,16 +548,21 @@ function DocTreeSidebar({
               {searchError}
             </div>
           )}
-          {searchResults !== null && searchQuery.length >= 2 && !searchError && (
-            <div className="text-[10px] text-muted-foreground mt-0.5 px-1">
-              {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
-            </div>
-          )}
+          {searchResults !== null &&
+            searchQuery.length >= 2 &&
+            !searchError && (
+              <div className="text-[10px] text-muted-foreground mt-0.5 px-1">
+                {searchResults.length} result
+                {searchResults.length !== 1 ? 's' : ''}
+              </div>
+            )}
         </div>
         {/* Selection bar — overlaid on top when multi-select is active */}
         {selectedIds.length > 1 && canWrite && (
           <div className="absolute inset-0 flex items-center justify-between px-3">
-            <span className="text-xs text-muted-foreground">{selectedIds.length} selected</span>
+            <span className="text-xs text-muted-foreground">
+              {selectedIds.length} selected
+            </span>
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -537,11 +585,18 @@ function DocTreeSidebar({
       </div>
 
       {/* Tree */}
-      <div ref={containerRef} className="flex-1 overflow-hidden min-h-0 outline-none" onKeyDown={handleKeyDown} tabIndex={-1}>
+      <div
+        ref={containerRef}
+        className="flex-1 overflow-hidden min-h-0 outline-none"
+        onKeyDown={handleKeyDown}
+        tabIndex={-1}
+      >
         {error && !tree ? (
           <div className="flex flex-col items-center justify-center h-full gap-2 p-4 text-center">
             <AlertCircle className="h-6 w-6 text-destructive/60" />
-            <p className="text-xs text-muted-foreground">Failed to load documents</p>
+            <p className="text-xs text-muted-foreground">
+              Failed to load documents
+            </p>
             {onRetry && (
               <button
                 type="button"
@@ -559,7 +614,10 @@ function DocTreeSidebar({
               <div
                 key={i}
                 className="h-5 rounded bg-muted/60 animate-pulse"
-                style={{ width: `${SKELETON_WIDTHS[i]}%`, marginLeft: `${(i % 3) * 12}px` }}
+                style={{
+                  width: `${SKELETON_WIDTHS[i]}%`,
+                  marginLeft: `${(i % 3) * 12}px`,
+                }}
               />
             ))}
           </div>
@@ -583,34 +641,38 @@ function DocTreeSidebar({
               data={treeData}
               width="100%"
               height={error && onRetry ? containerHeight - 28 : containerHeight}
-            indent={16}
-            rowHeight={28}
-            openByDefault={false}
-            initialOpenState={initialOpenState}
-            disableEdit={!canWrite}
-            disableDrag={disableDrag}
-            disableDrop={disableDrop}
-            onActivate={handleActivate}
-            onSelect={handleSelect}
-            onRename={handleRename}
-            onMove={handleMove}
-            idAccessor="id"
-            childrenAccessor={(d) => d.children ?? null}
-          >
-            {renderNode}
-          </Tree>
+              indent={16}
+              rowHeight={28}
+              openByDefault={false}
+              initialOpenState={initialOpenState}
+              disableEdit={!canWrite}
+              disableDrag={disableDrag}
+              disableDrop={disableDrop}
+              onActivate={handleActivate}
+              onSelect={handleSelect}
+              onRename={handleRename}
+              onMove={handleMove}
+              idAccessor="id"
+              childrenAccessor={(d) => d.children ?? null}
+            >
+              {renderNode}
+            </Tree>
           </>
         ) : (
           <div className="flex flex-col items-center justify-center h-full gap-3 p-4 text-center">
             {searchResults !== null && searchQuery.length >= 2 ? (
               <>
                 <Search className="h-8 w-8 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground">No matching documents</p>
+                <p className="text-sm text-muted-foreground">
+                  No matching documents
+                </p>
               </>
             ) : (
               <>
                 <FileText className="h-8 w-8 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground">No documents yet.</p>
+                <p className="text-sm text-muted-foreground">
+                  No documents yet.
+                </p>
                 {canWrite && (
                   <button
                     type="button"

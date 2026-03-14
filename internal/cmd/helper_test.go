@@ -66,9 +66,10 @@ func TestQuoteParamValues(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name   string
-		input  []string
-		expect []string
+		name      string
+		input     []string
+		paramDefs []core.ParamDef
+		expect    []string
 	}{
 		{
 			name:   "named param with spaces",
@@ -105,12 +106,24 @@ func TestQuoteParamValues(t *testing.T) {
 			input:  []string{`msg=say "hi"`},
 			expect: []string{`msg="say \"hi\""`},
 		},
+		{
+			name:      "positional params stored with numeric placeholders",
+			input:     []string{"1=hello world", "2=42"},
+			paramDefs: []core.ParamDef{{Name: ""}, {Name: ""}},
+			expect:    []string{`"hello world"`, `"42"`},
+		},
+		{
+			name:      "numeric named params stay named",
+			input:     []string{"1=hello"},
+			paramDefs: []core.ParamDef{{Name: "1"}},
+			expect:    []string{`1="hello"`},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := quoteParamValues(tt.input)
+			result := quoteParamValues(tt.input, tt.paramDefs)
 			assert.Equal(t, tt.expect, result)
 		})
 	}
@@ -134,6 +147,26 @@ func TestRestoreDAGFromStatus_ParamsWithSpaces(t *testing.T) {
 	// The restored params should preserve "hello world" as a single value
 	found := slices.Contains(result.Params, "topic=hello world")
 	assert.True(t, found, "expected 'topic=hello world' in params, got: %v", result.Params)
+}
+
+func TestRestoreDAGFromStatus_PositionalParamsRemainOverrides(t *testing.T) {
+	t.Parallel()
+
+	dag := &core.DAG{
+		Name:     "test-dag",
+		YamlData: []byte("params: \"default\"\nsteps:\n  - name: test\n    command: echo $1"),
+		ParamDefs: []core.ParamDef{
+			{Name: ""},
+		},
+	}
+
+	status := &exec.DAGRunStatus{
+		ParamsList: []string{"1=override"},
+	}
+
+	result, err := restoreDAGFromStatus(context.Background(), dag, status)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"1=override"}, result.Params)
 }
 
 func TestRebuildDAGFromYAML_RebuildEnvFromYAML(t *testing.T) {

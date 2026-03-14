@@ -10,12 +10,15 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
@@ -103,16 +106,18 @@ func (h *remoteTaskHandler) Handle(ctx context.Context, task *coordinatorv1.Task
 }
 
 func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1.Task, queuedRun bool) error {
+	root := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
+	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
+
 	dag, cleanup, err := h.loadDAG(ctx, task)
 	if err != nil {
+		h.reportTaskLoadFailure(ctx, task, root, parent, err)
 		return fmt.Errorf("failed to load DAG: %w", err)
 	}
 	if cleanup != nil {
 		defer cleanup()
 	}
 
-	root := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
-	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
 
 	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, queuedRun, nil)
@@ -120,6 +125,7 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 
 func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1.Task) error {
 	root := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
+	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
 
 	if task.PreviousStatus == nil {
 		return fmt.Errorf("retry requires previous_status in task for shared-nothing mode")
@@ -135,19 +141,62 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 
 	dag, cleanup, err := h.loadDAG(ctx, task)
 	if err != nil {
+		h.reportTaskLoadFailure(ctx, task, root, parent, err)
 		return fmt.Errorf("failed to load DAG: %w", err)
 	}
 	if cleanup != nil {
 		defer cleanup()
 	}
 
-	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
 
 	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, false, &retryConfig{
 		target:   status,
 		stepName: task.Step,
 	})
+}
+
+func (h *remoteTaskHandler) reportTaskLoadFailure(ctx context.Context, task *coordinatorv1.Task, root, parent exec.DAGRunRef, loadErr error) {
+	statusPusher := remote.NewStatusPusher(h.coordinatorClient, h.workerID)
+	finishedAt := stringutil.FormatTime(time.Now())
+	logger.Warn(ctx, "Failed to load DAG on worker",
+		tag.Target(task.Target),
+		tag.RunID(task.DagRunId),
+		tag.Error(loadErr),
+	)
+	status := exec.DAGRunStatus{
+		Root:       root,
+		Parent:     parent,
+		Name:       task.Target,
+		DAGRunID:   task.DagRunId,
+		AttemptID:  task.AttemptId,
+		Status:     core.Failed,
+		FinishedAt: finishedAt,
+		Error:      sanitizeTaskLoadError(task.Target, loadErr),
+		Params:     task.Params,
+	}
+
+	if err := statusPusher.Push(ctx, status); err != nil {
+		logger.Warn(ctx, "Failed to report load failure status",
+			tag.Target(task.Target),
+			tag.RunID(task.DagRunId),
+			tag.Error(err),
+		)
+	}
+}
+
+func sanitizeTaskLoadError(target string, loadErr error) string {
+	message := loadErr.Error()
+	rest, ok := strings.CutPrefix(message, "failed to load DAG from ")
+	if !ok {
+		return message
+	}
+
+	if _, reason, ok := strings.Cut(rest, ": "); ok {
+		return fmt.Sprintf("failed to load DAG %q: %s", target, reason)
+	}
+
+	return fmt.Sprintf("failed to load DAG %q", target)
 }
 
 // retryConfig holds retry-specific configuration

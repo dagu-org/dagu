@@ -56,6 +56,10 @@ function snapshotState(state: SSEConnectionState): SSEConnectionState {
   };
 }
 
+function lastState(states: SSEConnectionState[]): SSEConnectionState | undefined {
+  return states[states.length - 1];
+}
+
 describe('endpointToTopic', () => {
   it('maps every supported legacy SSE endpoint to a canonical topic', () => {
     const cases: Array<[string, string]> = [
@@ -123,12 +127,16 @@ describe('SSEManager', () => {
 
     expect(MockEventSource.instances).toHaveLength(1);
     const eventSource = MockEventSource.instances[0];
+    expect(eventSource).toBeDefined();
+    if (!eventSource) {
+      throw new Error('expected EventSource instance');
+    }
     eventSource.emit('control', {
       sessionID: 'session-1',
       subscribed: ['agent:sess-1'],
     });
 
-    expect(primaryStates.at(-1)).toMatchObject({
+    expect(lastState(primaryStates)).toMatchObject({
       isConnected: true,
       isConnecting: false,
     });
@@ -152,7 +160,7 @@ describe('SSEManager', () => {
       }
     );
 
-    expect(delegateStates.at(-1)).toMatchObject({
+    expect(lastState(delegateStates)).toMatchObject({
       isConnected: false,
       isConnecting: true,
       shouldUseFallback: false,
@@ -160,7 +168,7 @@ describe('SSEManager', () => {
 
     await vi.advanceTimersByTimeAsync(200);
 
-    expect(delegateStates.at(-1)).toMatchObject({
+    expect(lastState(delegateStates)).toMatchObject({
       isConnected: true,
       isConnecting: false,
       shouldUseFallback: false,
@@ -185,6 +193,10 @@ describe('SSEManager', () => {
     );
 
     const eventSource = MockEventSource.instances[0];
+    expect(eventSource).toBeDefined();
+    if (!eventSource) {
+      throw new Error('expected EventSource instance');
+    }
     eventSource.emit('control', {
       sessionID: 'session-1',
       subscribed: ['agent:sess-1'],
@@ -217,7 +229,7 @@ describe('SSEManager', () => {
 
     await vi.advanceTimersByTimeAsync(200);
 
-    expect(delegateStates.at(-1)).toMatchObject({
+    expect(lastState(delegateStates)).toMatchObject({
       isConnected: false,
       isConnecting: false,
       shouldUseFallback: false,

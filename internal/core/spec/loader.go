@@ -64,6 +64,7 @@ func WithBaseConfigContent(content []byte) LoadOption {
 // WithParams sets the parameters for the DAG.
 func WithParams(params any) LoadOption {
 	return func(o *LoadOptions) {
+		o.flags |= BuildFlagValidateRuntimeParams
 		switch params := params.(type) {
 		case string:
 			o.params = params
@@ -449,10 +450,17 @@ func processDAGDocument(
 		return nil, err
 	}
 
+	docCtx := ctx
+	if docIndex > 0 {
+		docCtx.opts.Parameters = ""
+		docCtx.opts.ParametersList = nil
+		docCtx.opts.Flags &^= BuildFlagValidateRuntimeParams
+	}
+
 	// Build a fresh base core.DAG from base manifest if provided
 	var dest *core.DAG
 	if baseDef != nil {
-		dest, err = buildBaseDAG(ctx, baseDef)
+		dest, err = buildBaseDAG(docCtx, baseDef)
 		if err != nil {
 			return nil, err
 		}
@@ -461,7 +469,7 @@ func processDAGDocument(
 	}
 
 	// Build the core.DAG from the current document
-	dag, err := spec.build(ctx)
+	dag, err := spec.build(docCtx)
 	if err != nil {
 		return nil, err
 	}

@@ -29,6 +29,10 @@ type BuildContext struct {
 	// to expand variables without mutating global os.Env.
 	// This is initialized by build() and populated by buildEnvs transformer.
 	envScope *envScopeState
+
+	// paramsState caches DAG-level parameter parsing/resolution during a single build.
+	// This avoids reparsing params for Params, DefaultParams, ParamsJSON, and ParamDefs.
+	paramsState *paramsState
 }
 
 // envScopeState holds mutable state that needs to be shared across transformers.
@@ -36,6 +40,12 @@ type BuildContext struct {
 type envScopeState struct {
 	scope    *eval.EnvScope
 	buildEnv map[string]string // Also store as map for WithVariables
+}
+
+type paramsState struct {
+	cached bool
+	result *paramsResult
+	err    error
 }
 
 // StepBuildContext is the context for building a step.
@@ -47,6 +57,7 @@ type StepBuildContext struct {
 func (c BuildContext) WithOpts(opts BuildOpts) BuildContext {
 	copy := c
 	copy.opts = opts
+	copy.paramsState = nil
 	return copy
 }
 
@@ -67,6 +78,7 @@ const (
 	BuildFlagAllowBuildErrors
 	BuildFlagSkipSchemaValidation
 	BuildFlagSkipBaseHandlers // Skip merging handlerOn from base config (for sub-DAG runs)
+	BuildFlagValidateRuntimeParams
 )
 
 // BuildOpts is used to control the behavior of the builder.

@@ -7319,6 +7319,11 @@ components:
           description: "List of parameter names that can be passed to DAG-runs created from this DAG"
           items:
             type: string
+        paramDefs:
+          type: array
+          description: "Ordered parameter definitions derived from DAG params for typed UI rendering and validation"
+          items:
+            $ref: "#/components/schemas/ParamDef"
         defaultParams:
           type: string
           description: "Default parameter values in JSON format if not specified at DAG-run creation"
@@ -7331,6 +7336,56 @@ components:
           $ref: "#/components/schemas/RunConfig"
       required:
         - name
+
+    ParamScalar:
+      anyOf:
+        - type: string
+        - type: integer
+        - type: number
+          format: double
+        - type: boolean
+      description: "Scalar parameter value"
+
+    ParamDef:
+      type: object
+      description: "Typed metadata for a single DAG parameter"
+      properties:
+        name:
+          type: string
+          description: "Parameter name. Omitted for positional parameters."
+        type:
+          type: string
+          description: "Parameter type"
+          enum:
+            - string
+            - integer
+            - number
+            - boolean
+        default:
+          $ref: "#/components/schemas/ParamScalar"
+        description:
+          type: string
+        required:
+          type: boolean
+          default: false
+        enum:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParamScalar"
+        minimum:
+          type: number
+          format: double
+        maximum:
+          type: number
+          format: double
+        minLength:
+          type: integer
+        maxLength:
+          type: integer
+        pattern:
+          type: string
+      required:
+        - type
 
     RunConfig:
       type: object

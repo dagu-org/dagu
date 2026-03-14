@@ -162,7 +162,7 @@ test-coverage:
 	@printf '%b\n' "${COLOR_GREEN}Running tests with coverage...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
 	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} -coverpkg=./... -coverprofile="coverage.out" -covermode=atomic ${TEST_TARGET}
-	@go tool cover -html=coverage.out
+	@go tool cover -html=coverage.out -o coverage.html
 
 # lint runs the linter.
 .PHONY: lint
