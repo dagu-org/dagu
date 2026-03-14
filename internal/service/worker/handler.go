@@ -92,9 +92,6 @@ func (e *taskHandler) buildCommandSpec(task *coordinatorv1.Task) (runtime.CmdSpe
 	case coordinatorv1.Operation_OPERATION_RETRY:
 		return e.subCmdBuilder.TaskRetry(task), nil
 
-	case coordinatorv1.Operation_OPERATION_FINALIZE_FAILURE:
-		return e.subCmdBuilder.TaskFinalizeFailure(task), nil
-
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
 		return runtime.CmdSpec{}, fmt.Errorf("operation not specified")
 

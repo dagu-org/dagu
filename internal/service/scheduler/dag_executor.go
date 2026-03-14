@@ -176,10 +176,6 @@ func (e *DAGExecutor) ExecuteDAG(
 		spec := e.subCmdBuilder.Retry(dag, runID, "")
 		return runtime.Run(ctx, spec)
 
-	case coordinatorv1.Operation_OPERATION_FINALIZE_FAILURE:
-		spec := e.subCmdBuilder.FinalizeFailure(dag, runID)
-		return runtime.Start(ctx, spec)
-
 	default:
 		return fmt.Errorf("unsupported operation: %v", operation)
 	}

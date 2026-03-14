@@ -178,7 +178,6 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 			AgentSkillStore:         as.SkillStore,
 			AgentSoulStore:          as.SoulStore,
 			AgentRemoteNodeResolver: as.RemoteNodeResolver,
-			RetryFailureWindow:      ctx.Config.Scheduler.RetryFailureWindow,
 		},
 	)
 

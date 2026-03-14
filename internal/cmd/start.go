@@ -446,7 +446,6 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 			AgentSoulStore:          as.SoulStore,
 			AgentRemoteNodeResolver: as.RemoteNodeResolver,
 			ScheduleTime:            scheduleTime,
-			RetryFailureWindow:      ctx.Config.Scheduler.RetryFailureWindow,
 		},
 	)
 

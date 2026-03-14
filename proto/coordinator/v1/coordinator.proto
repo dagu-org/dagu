@@ -93,7 +93,6 @@ enum Operation {
   OPERATION_UNSPECIFIED = 0;
   OPERATION_START = 1;    // Start a new DAG run
   OPERATION_RETRY = 2;    // Retry an existing run
-  OPERATION_FINALIZE_FAILURE = 3; // Execute deferred terminal failure handling
 }
 
 // Health status of a worker based on heartbeat recency.

@@ -129,7 +129,6 @@ func New(
 		er,
 		dagRunStore,
 		queueStore,
-		dagExecutor,
 		isSuspended,
 		cfg.Scheduler.RetryFailureWindow,
 		defaultClock,

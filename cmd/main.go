@@ -47,7 +47,6 @@ func init() {
 	rootCmd.AddCommand(cmd.CmdCoordinator())
 	rootCmd.AddCommand(cmd.CmdWorker())
 	rootCmd.AddCommand(cmd.Retry())
-	rootCmd.AddCommand(cmd.FinalizeFailure())
 	rootCmd.AddCommand(cmd.StartAll())
 	rootCmd.AddCommand(cmd.Migrate())
 	rootCmd.AddCommand(cmd.Cleanup())
