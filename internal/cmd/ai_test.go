@@ -140,6 +140,75 @@ func TestRunAIInstallInstallsBothCodexDirectories(t *testing.T) {
 	}
 }
 
+func TestRunAIInstallInstallsIntoCustomSkillsDir(t *testing.T) {
+	t.Setenv("AGENTS_HOME", "")
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+
+	customSkillsDir := filepath.Join(t.TempDir(), "skills")
+
+	cmd := aiInstallCmd()
+	require.NoError(t, cmd.Flags().Set(flagSkillsDir, customSkillsDir))
+	require.NoError(t, cmd.Flags().Set("yes", "true"))
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	require.NoError(t, runAIInstall(cmd, nil))
+
+	_, err := os.Stat(filepath.Join(customSkillsDir, "dagu", "SKILL.md"))
+	assert.NoError(t, err)
+}
+
+func TestRunAIInstallCustomSkillsDirReplacesDetection(t *testing.T) {
+	t.Setenv("AGENTS_HOME", "")
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+
+	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".agents"), 0o750))
+	customSkillsDir := filepath.Join(t.TempDir(), "skills")
+
+	cmd := aiInstallCmd()
+	require.NoError(t, cmd.Flags().Set(flagSkillsDir, customSkillsDir))
+	require.NoError(t, cmd.Flags().Set("yes", "true"))
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	require.NoError(t, runAIInstall(cmd, nil))
+
+	_, customErr := os.Stat(filepath.Join(customSkillsDir, "dagu", "SKILL.md"))
+	assert.NoError(t, customErr)
+
+	_, autoErr := os.Stat(filepath.Join(homeDir, ".agents", "skills", "dagu", "SKILL.md"))
+	assert.ErrorIs(t, autoErr, os.ErrNotExist)
+}
+
+func TestRunAIInstallDeduplicatesCustomSkillsDirs(t *testing.T) {
+	t.Setenv("AGENTS_HOME", "")
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	customSkillsDir := filepath.Join(t.TempDir(), "skills")
+	target := filepath.Join(customSkillsDir, "dagu", "SKILL.md")
+
+	cmd := aiInstallCmd()
+	require.NoError(t, cmd.Flags().Set(flagSkillsDir, customSkillsDir))
+	require.NoError(t, cmd.Flags().Set(flagSkillsDir, customSkillsDir+string(os.PathSeparator)))
+	require.NoError(t, cmd.Flags().Set("yes", "true"))
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	require.NoError(t, runAIInstall(cmd, nil))
+
+	_, err := os.Stat(target)
+	assert.NoError(t, err)
+}
+
 func TestRunAIInstallRequiresInputWithoutYes(t *testing.T) {
 	t.Setenv("AGENTS_HOME", "")
 	t.Setenv("CODEX_HOME", "")
@@ -163,6 +232,22 @@ func TestRunAIInstallRequiresInputWithoutYes(t *testing.T) {
 	assert.ErrorIs(t, statErr, os.ErrNotExist)
 }
 
+func TestRunAIInstallRejectsInvalidCustomSkillsDir(t *testing.T) {
+	t.Setenv("AGENTS_HOME", "")
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	cmd := aiInstallCmd()
+	require.NoError(t, cmd.Flags().Set(flagSkillsDir, filepath.Join(t.TempDir(), "copilot-instructions.md")))
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := runAIInstall(cmd, nil)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, flagSkillsDir)
+	assert.ErrorContains(t, err, "skills directory")
+}
+
 func TestRunAIInstallPreservesExistingSkillWhenOverwriteDeclined(t *testing.T) {
 	t.Setenv("AGENTS_HOME", "")
 	t.Setenv("CODEX_HOME", "")
@@ -176,6 +261,29 @@ func TestRunAIInstallPreservesExistingSkillWhenOverwriteDeclined(t *testing.T) {
 	require.NoError(t, os.WriteFile(target, []byte("custom skill"), 0o600))
 
 	cmd := aiInstallCmd()
+	cmd.SetIn(strings.NewReader("y\nn\n"))
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	require.NoError(t, runAIInstall(cmd, nil))
+
+	data, err := os.ReadFile(target)
+	require.NoError(t, err)
+	assert.Equal(t, "custom skill", string(data))
+}
+
+func TestRunAIInstallPreservesExistingCustomSkillWhenOverwriteDeclined(t *testing.T) {
+	t.Setenv("AGENTS_HOME", "")
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	customSkillsDir := filepath.Join(t.TempDir(), "skills")
+	target := filepath.Join(customSkillsDir, "dagu", "SKILL.md")
+	require.NoError(t, os.MkdirAll(filepath.Dir(target), 0o750))
+	require.NoError(t, os.WriteFile(target, []byte("custom skill"), 0o600))
+
+	cmd := aiInstallCmd()
+	require.NoError(t, cmd.Flags().Set(flagSkillsDir, customSkillsDir))
 	cmd.SetIn(strings.NewReader("y\nn\n"))
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})

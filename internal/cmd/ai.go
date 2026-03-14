@@ -27,6 +27,7 @@ const (
 	copilotBeginMark = "<!-- BEGIN DAGU -->"
 	copilotEndMark   = "<!-- END DAGU -->"
 	copilotFileName  = "copilot-instructions.md"
+	flagSkillsDir    = "skills-dir"
 )
 
 var (
@@ -67,6 +68,7 @@ Supported tools: Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI`,
 		RunE: runAIInstall,
 	}
 	cmd.Flags().BoolP("yes", "y", false, "Install to all detected tools without prompting")
+	cmd.Flags().StringArray(flagSkillsDir, nil, "Install into the specified skills directory; repeatable. If set, auto-detection is skipped")
 	return cmd
 }
 
@@ -168,11 +170,25 @@ func runAIInstall(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to get yes flag: %w", err)
 	}
 
+	customSkillDirs, err := cmd.Flags().GetStringArray(flagSkillsDir)
+	if err != nil {
+		return fmt.Errorf("failed to get skills-dir flag: %w", err)
+	}
+
 	in := cmd.InOrStdin()
 	out := cmd.OutOrStdout()
 	errOut := cmd.ErrOrStderr()
 	reader := bufio.NewReader(in)
-	detected := detectAITargets(homeDir, aiTools())
+
+	var detected []detectedTool
+	if len(customSkillDirs) > 0 {
+		detected, err = customSkillTargets(customSkillDirs)
+		if err != nil {
+			return err
+		}
+	} else {
+		detected = detectAITargets(homeDir, aiTools())
+	}
 
 	if len(detected) == 0 {
 		_, _ = fmt.Fprintln(out, "No AI coding tools detected.")
@@ -275,6 +291,30 @@ func detectAITargets(homeDir string, tools []aiTool) []detectedTool {
 	}
 
 	return detected
+}
+
+func customSkillTargets(skillDirs []string) ([]detectedTool, error) {
+	seen := make(map[string]struct{})
+	customTool := aiTool{Name: "Custom", Format: "skill"}
+	var detected []detectedTool
+
+	for _, skillDir := range skillDirs {
+		rootDir, err := validateSkillRootDir(skillDir)
+		if err != nil {
+			return nil, err
+		}
+
+		target := filepath.Join(rootDir, skillDirName, "SKILL.md")
+		target = filepath.Clean(target)
+		if _, ok := seen[target]; ok {
+			continue
+		}
+
+		seen[target] = struct{}{}
+		detected = append(detected, detectedTool{tool: customTool, targetPath: target})
+	}
+
+	return detected, nil
 }
 
 func detectInstallState(target detectedTool) (installState, error) {
@@ -500,6 +540,32 @@ func dirExists(path string) bool {
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
+}
+
+func validateSkillRootDir(path string) (string, error) {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return "", fmt.Errorf("%s cannot be empty", flagSkillsDir)
+	}
+
+	clean := filepath.Clean(trimmed)
+	base := filepath.Base(clean)
+	switch base {
+	case copilotFileName, "SKILL.md":
+		return "", fmt.Errorf("%s %q must be a skills directory, not a file path", flagSkillsDir, path)
+	case skillDirName:
+		return "", fmt.Errorf("%s %q must be a skills root directory, not the %s skill directory itself", flagSkillsDir, path, skillDirName)
+	}
+
+	info, err := os.Stat(clean)
+	switch {
+	case err == nil && !info.IsDir():
+		return "", fmt.Errorf("%s %q must be a directory", flagSkillsDir, path)
+	case err != nil && !os.IsNotExist(err):
+		return "", fmt.Errorf("check %s %q: %w", flagSkillsDir, path, err)
+	}
+
+	return clean, nil
 }
 
 func resolveEnvOrExistingDir(envVar, fallbackDir string) string {

@@ -100,9 +100,12 @@ If you use an AI coding tool (Claude Code, Codex, OpenCode, Gemini CLI, or Copil
 
 ```bash
 dagu ai install
+
+# Or install into a specific skills directory
+dagu ai install --skills-dir ~/.agents/skills
 ```
 
-This auto-detects installed tools and installs the DAG authoring skill into each one. See [docs](https://docs.dagu.sh/getting-started/cli#ai-install) for details.
+This auto-detects installed tools and installs the DAG authoring skill into each one. Use `--skills-dir` to install only into the specified skills directory or directories. See [docs](https://docs.dagu.sh/getting-started/cli#ai-install) for details.
 
 ### 3. Create your first workflow
 

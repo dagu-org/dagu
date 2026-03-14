@@ -268,13 +268,14 @@ AI coding tool integrations.
 Install the Dagu DAG authoring skill into detected AI coding tools.
 
 ```
-dagu ai install [--yes/-y]
+dagu ai install [--yes/-y] [--skills-dir <path> ...]
 ```
 
 Supported tools: Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI.
 
 Flags:
 - `--yes/-y` — Install to all detected tools without prompting
+- `--skills-dir` — Install only into the specified skills directory. Repeatable. Skips auto-detection when provided.
 
 ### dagu schema
 
