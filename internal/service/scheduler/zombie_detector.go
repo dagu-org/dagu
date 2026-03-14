@@ -16,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/runtime"
 )
 
 // panicToError converts a panic value to an error, including stack trace.
@@ -240,77 +241,34 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *exec.DAGRu
 	runMu.Lock()
 	defer runMu.Unlock()
 
-	// Read the full status from the attempt rather than using the summary
-	// from ListStatuses, which lacks node data. This ensures we preserve
-	// the complete status (nodes, logs, params, etc.) when updating.
-	fullStatus, err := attempt.ReadStatus(ctx)
+	repairedStatus, repaired, err := runtime.RepairStaleLocalRun(ctx, attempt, dag)
 	if err != nil {
-		return fmt.Errorf("read full status: %w", err)
+		return fmt.Errorf("update status: %w", err)
 	}
-
-	// Compare-and-set guard: verify status is still active before writing Failed.
-	// If the run completed (Success/Cancelled/Failed) between ListStatuses and now,
-	// we must not overwrite the terminal status.
-	if !fullStatus.Status.IsActive() {
+	if !repaired {
 		logger.Info(ctx, "Run already in terminal state, skipping zombie cleanup",
 			tag.Queue(dag.ProcGroup()),
-			slog.String("status", fullStatus.Status.String()),
+			slog.String("status", repairedStatus.Status.String()),
 		)
 		delete(z.staleCounters, st.DAGRunID)
 		return nil
 	}
 
-	// Confirmed zombie — update status to Failed
-	logger.Info(ctx, "Confirmed zombie DAG run, updating to error status",
+	logger.Info(ctx, "Confirmed zombie DAG run, updated to failed status",
 		tag.Queue(dag.ProcGroup()),
 		slog.Int("stale_count", count),
 	)
 
-	fullStatus.Status = core.Failed
-	fullStatus.FinishedAt = time.Now().Format(time.RFC3339)
-
-	// If the process was killed before writing node data (e.g., SIGKILL before
-	// the initial 100ms status write), populate nodes from the DAG definition
-	// so the UI shows step names instead of "0/0 Log".
-	if len(fullStatus.Nodes) == 0 {
-		fullStatus.Nodes = exec.NewNodesFromSteps(dag.Steps)
-	}
-
-	for _, n := range fullStatus.Nodes {
-		if n.Status == core.NodeRunning || n.Status == core.NodeNotStarted {
-			n.Status = core.NodeFailed
-			n.Error = "process terminated unexpectedly - zombie process detected"
-		}
-	}
-
-	if err := z.updateStatus(ctx, attempt, *fullStatus); err != nil {
-		return fmt.Errorf("update status: %w", err)
-	}
-
 	// Clean up stale proc files for this specific run after persisting Failed status
-	_ = z.procStore.CleanStaleFiles(ctx, dag.ProcGroup(), exec.DAGRunRef{Name: dag.Name, ID: st.DAGRunID})
+	if err := z.procStore.CleanStaleFiles(ctx, dag.ProcGroup(), exec.DAGRunRef{Name: dag.Name, ID: st.DAGRunID}); err != nil {
+		logger.Error(ctx, "Failed to clean stale proc files",
+			tag.Queue(dag.ProcGroup()),
+			tag.Error(err),
+		)
+	}
 
 	// Clean up counter entry
 	delete(z.staleCounters, st.DAGRunID)
-
-	return nil
-}
-
-// updateStatus updates the status of a DAG run attempt
-func (z *ZombieDetector) updateStatus(ctx context.Context,
-	attempt exec.DAGRunAttempt, status exec.DAGRunStatus) error {
-	if err := attempt.Open(ctx); err != nil {
-		return fmt.Errorf("open attempt: %w", err)
-	}
-	defer func() {
-		if err := attempt.Close(ctx); err != nil {
-			logger.Error(ctx, "Failed to close attempt", tag.Error(err))
-		}
-	}()
-
-	if err := attempt.Write(ctx, status); err != nil {
-		return fmt.Errorf("write status: %w", err)
-	}
 
 	return nil
 }

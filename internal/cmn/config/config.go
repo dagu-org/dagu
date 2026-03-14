@@ -19,6 +19,7 @@ type Config struct {
 	Queues          Queues
 	Coordinator     Coordinator
 	Worker          Worker
+	Proc            Proc
 	Scheduler       Scheduler
 	Monitoring      MonitoringConfig
 	DefaultExecMode ExecutionMode
@@ -377,15 +378,19 @@ type Worker struct {
 	PostgresPool  PostgresPoolConfig
 }
 
+// Proc represents local proc-file heartbeat configuration.
+type Proc struct {
+	HeartbeatInterval     time.Duration // Default: 5s
+	HeartbeatSyncInterval time.Duration // Default: 10s
+	StaleThreshold        time.Duration // Default: 90s
+}
+
 // Scheduler represents the scheduler configuration.
 type Scheduler struct {
 	Port                    int           // Health check port (default: 8090)
 	LockStaleThreshold      time.Duration // Default: 30s
 	LockRetryInterval       time.Duration // Default: 5s
 	ZombieDetectionInterval time.Duration // Default: 45s; 0 disables
-	HeartbeatInterval       time.Duration // Default: 5s
-	HeartbeatSyncInterval   time.Duration // Default: 10s
-	StaleThreshold          time.Duration // Default: 90s
 	FailureThreshold        int           // Default: 3
 }
 
@@ -438,26 +443,26 @@ func (c *Config) Validate() error {
 	if err := c.validateLicense(); err != nil {
 		return err
 	}
-	if err := c.validateScheduler(); err != nil {
+	if err := c.validateProc(); err != nil {
 		return err
 	}
 	return nil
 }
 
-// validateScheduler validates scheduler timing settings to prevent
-// configurations that would cause false-positive zombie detection.
-func (c *Config) validateScheduler() error {
-	s := c.Scheduler
-	if s.HeartbeatInterval > 0 && s.StaleThreshold > 0 && s.HeartbeatInterval >= s.StaleThreshold {
+// validateProc validates proc heartbeat settings to prevent
+// configurations that would cause false-positive stale detection.
+func (c *Config) validateProc() error {
+	p := c.Proc
+	if p.HeartbeatInterval > 0 && p.StaleThreshold > 0 && p.HeartbeatInterval >= p.StaleThreshold {
 		return fmt.Errorf(
-			"scheduler.heartbeat_interval (%s) must be less than scheduler.stale_threshold (%s)",
-			s.HeartbeatInterval, s.StaleThreshold,
+			"proc.heartbeat_interval (%s) must be less than proc.stale_threshold (%s)",
+			p.HeartbeatInterval, p.StaleThreshold,
 		)
 	}
-	if s.HeartbeatSyncInterval > 0 && s.StaleThreshold > 0 && s.HeartbeatSyncInterval >= s.StaleThreshold {
+	if p.HeartbeatSyncInterval > 0 && p.StaleThreshold > 0 && p.HeartbeatSyncInterval >= p.StaleThreshold {
 		return fmt.Errorf(
-			"scheduler.heartbeat_sync_interval (%s) must be less than scheduler.stale_threshold (%s)",
-			s.HeartbeatSyncInterval, s.StaleThreshold,
+			"proc.heartbeat_sync_interval (%s) must be less than proc.stale_threshold (%s)",
+			p.HeartbeatSyncInterval, p.StaleThreshold,
 		)
 	}
 	return nil

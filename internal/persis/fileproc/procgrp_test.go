@@ -244,22 +244,14 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		err = os.Chtimes(proc.fileName, oldTime, oldTime)
 		require.NoError(t, err)
 
-		// IsRunAlive should return false but NOT delete the file (non-destructive)
+		// IsRunAlive should return false and prune the stale file.
 		alive, err := shortPG.IsRunAlive(ctx, dagRun)
 		require.NoError(t, err)
 		require.False(t, alive)
 
-		// Verify file still exists (non-destructive liveness check)
+		// Verify the stale file was removed during the liveness check.
 		_, err = os.Stat(proc.fileName)
-		require.NoError(t, err, "stale file should NOT be deleted by IsRunAlive")
-
-		// CleanStaleFiles should remove the stale file
-		err = shortPG.CleanStaleFiles(ctx, dagRun)
-		require.NoError(t, err)
-
-		// Verify file was removed by CleanStaleFiles
-		_, err = os.Stat(proc.fileName)
-		require.True(t, os.IsNotExist(err), "stale file should be deleted by CleanStaleFiles")
+		require.True(t, os.IsNotExist(err), "stale file should be deleted by IsRunAlive")
 	})
 
 	t.Run("StaleProcessRemovesEmptyDir", func(t *testing.T) {
@@ -303,26 +295,18 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		err = os.Chtimes(proc.fileName, oldTime, oldTime)
 		require.NoError(t, err)
 
-		// IsRunAlive should return false but NOT delete the file
+		// IsRunAlive should return false and remove the stale file plus empty directory.
 		alive, err := shortPG.IsRunAlive(ctx, dagRun)
 		require.NoError(t, err)
 		require.False(t, alive)
 
-		// Verify file still exists
+		// Verify the stale file was removed.
 		_, err = os.Stat(proc.fileName)
-		require.NoError(t, err, "stale file should NOT be deleted by IsRunAlive")
+		require.True(t, os.IsNotExist(err), "stale file should be deleted by IsRunAlive")
 
-		// CleanStaleFiles should remove the stale file and empty parent dir
-		err = shortPG.CleanStaleFiles(ctx, dagRun)
-		require.NoError(t, err)
-
-		// Verify file was removed
-		_, err = os.Stat(proc.fileName)
-		require.True(t, os.IsNotExist(err), "stale file should be deleted by CleanStaleFiles")
-
-		// Verify the parent directory was also removed (if it's empty)
+		// Verify the parent directory was also removed because it became empty.
 		_, err = os.Stat(procDir)
-		require.True(t, os.IsNotExist(err), "empty parent directory should be removed by CleanStaleFiles")
+		require.True(t, os.IsNotExist(err), "empty parent directory should be removed by IsRunAlive")
 	})
 
 	t.Run("InvalidFilePattern", func(t *testing.T) {

@@ -75,7 +75,9 @@ func (pg *ProcGroup) CountByDAGName(ctx context.Context, dagName string) (int, e
 		}
 		if !pg.isStale(ctx, file) {
 			aliveCount++
+			continue
 		}
+		pg.removeStaleFile(ctx, file)
 	}
 
 	return aliveCount, nil
@@ -104,7 +106,9 @@ func (pg *ProcGroup) Count(ctx context.Context) (int, error) {
 		}
 		if !pg.isStale(ctx, file) {
 			aliveCount++
+			continue
 		}
+		pg.removeStaleFile(ctx, file)
 	}
 
 	return aliveCount, nil
@@ -213,6 +217,7 @@ func (pg *ProcGroup) IsRunAlive(ctx context.Context, dagRun exec.DAGRunRef) (boo
 		if !pg.isStale(ctx, file) {
 			return true, nil
 		}
+		pg.removeStaleFile(ctx, file)
 	}
 
 	return false, nil
@@ -251,7 +256,9 @@ func (pg *ProcGroup) ListAlive(ctx context.Context) ([]exec.DAGRunRef, error) {
 					ID:   runID,
 				})
 			}
+			continue
 		}
+		pg.removeStaleFile(ctx, file)
 	}
 
 	return aliveRuns, nil
@@ -279,16 +286,22 @@ func (pg *ProcGroup) CleanStaleFiles(ctx context.Context, dagRun exec.DAGRunRef)
 			continue
 		}
 		if pg.isStale(ctx, file) {
-			if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
-				logger.Error(ctx, "Failed to remove stale file",
-					tag.File(file),
-					tag.Error(err))
-			}
-			_ = os.Remove(filepath.Dir(file))
+			pg.removeStaleFile(ctx, file)
 		}
 	}
 
 	return nil
+}
+
+func (pg *ProcGroup) removeStaleFile(ctx context.Context, file string) {
+	if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
+		logger.Error(ctx, "Failed to remove stale file",
+			tag.File(file),
+			tag.Error(err))
+		return
+	}
+
+	_ = os.Remove(filepath.Dir(file))
 }
 
 // extractRunIDFromFileName extracts the run ID from a proc file name.

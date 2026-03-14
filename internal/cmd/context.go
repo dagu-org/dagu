@@ -214,9 +214,9 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}
 
 	ps := fileproc.New(cfg.Paths.ProcDir,
-		fileproc.WithStaleThreshold(cfg.Scheduler.StaleThreshold),
-		fileproc.WithHeartbeatInterval(cfg.Scheduler.HeartbeatInterval),
-		fileproc.WithHeartbeatSyncInterval(cfg.Scheduler.HeartbeatSyncInterval),
+		fileproc.WithStaleThreshold(cfg.Proc.StaleThreshold),
+		fileproc.WithHeartbeatInterval(cfg.Proc.HeartbeatInterval),
+		fileproc.WithHeartbeatSyncInterval(cfg.Proc.HeartbeatSyncInterval),
 	)
 	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
 	drm := runtime.NewManager(drs, ps, cfg)

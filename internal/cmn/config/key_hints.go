@@ -124,6 +124,11 @@ var legacyToSnakeCaseKey = map[string]string{
 	"scheduler.stalethreshold":          "scheduler.stale_threshold",
 	"scheduler.failurethreshold":        "scheduler.failure_threshold",
 
+	// Proc
+	"proc.heartbeatinterval":     "proc.heartbeat_interval",
+	"proc.heartbeatsyncinterval": "proc.heartbeat_sync_interval",
+	"proc.stalethreshold":        "proc.stale_threshold",
+
 	// Queue
 	"queues.config.maxactiveruns":  "queues.config.max_active_runs",
 	"queues.config.maxconcurrency": "queues.config.max_concurrency",
