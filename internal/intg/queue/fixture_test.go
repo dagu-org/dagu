@@ -32,6 +32,19 @@ type fixture struct {
 	schedDone    chan error
 	cancel       context.CancelFunc
 	globalQueues []config.QueueConfig
+	procConfig   *procConfig
+	schedConfig  *schedulerConfig
+}
+
+type procConfig struct {
+	heartbeatInterval     time.Duration
+	heartbeatSyncInterval time.Duration
+	staleThreshold        time.Duration
+}
+
+type schedulerConfig struct {
+	zombieDetectionInterval time.Duration
+	failureThreshold        int
 }
 
 // newFixture creates a new queue integration test fixture.
@@ -56,6 +69,15 @@ func newFixture(t *testing.T, dagYAML string, opts ...func(*fixture)) *fixture {
 			// Disable scheduler health server (port 8090) to avoid "address already in use"
 			// when multiple tests run in parallel
 			c.Scheduler.Port = 0
+			if f.procConfig != nil {
+				c.Proc.HeartbeatInterval = f.procConfig.heartbeatInterval
+				c.Proc.HeartbeatSyncInterval = f.procConfig.heartbeatSyncInterval
+				c.Proc.StaleThreshold = f.procConfig.staleThreshold
+			}
+			if f.schedConfig != nil {
+				c.Scheduler.ZombieDetectionInterval = f.schedConfig.zombieDetectionInterval
+				c.Scheduler.FailureThreshold = f.schedConfig.failureThreshold
+			}
 		}),
 	}
 	f.th = test.SetupCommand(t, helperOpts...)
@@ -88,6 +110,25 @@ func WithGlobalQueue(name string, maxActiveRuns int) func(*fixture) {
 			Name:          name,
 			MaxActiveRuns: maxActiveRuns,
 		})
+	}
+}
+
+func WithProcConfig(heartbeatInterval, heartbeatSyncInterval, staleThreshold time.Duration) func(*fixture) {
+	return func(f *fixture) {
+		f.procConfig = &procConfig{
+			heartbeatInterval:     heartbeatInterval,
+			heartbeatSyncInterval: heartbeatSyncInterval,
+			staleThreshold:        staleThreshold,
+		}
+	}
+}
+
+func WithZombieConfig(zombieDetectionInterval time.Duration, failureThreshold int) func(*fixture) {
+	return func(f *fixture) {
+		f.schedConfig = &schedulerConfig{
+			zombieDetectionInterval: zombieDetectionInterval,
+			failureThreshold:        failureThreshold,
+		}
 	}
 }
 
@@ -155,6 +196,32 @@ func (f *fixture) WaitDrain(timeout time.Duration) *fixture {
 	return f
 }
 
+func (f *fixture) WaitForStatus(runID string, expected core.Status, timeout time.Duration) *fixture {
+	f.t.Helper()
+	require.Eventually(f.t, func() bool {
+		status, err := f.Status(runID)
+		return err == nil && status.Status == expected
+	}, timeout, 50*time.Millisecond, "timed out waiting for status %s", expected)
+	return f
+}
+
+func (f *fixture) WaitForStatusIn(runID string, expected []core.Status, timeout time.Duration) *fixture {
+	f.t.Helper()
+	require.Eventually(f.t, func() bool {
+		status, err := f.Status(runID)
+		if err != nil {
+			return false
+		}
+		for _, candidate := range expected {
+			if status.Status == candidate {
+				return true
+			}
+		}
+		return false
+	}, timeout, 50*time.Millisecond, "timed out waiting for status in %v", expected)
+	return f
+}
+
 // Stop stops the scheduler.
 func (f *fixture) Stop() {
 	if f.cancel != nil {
@@ -166,6 +233,15 @@ func (f *fixture) Stop() {
 		require.NoError(f.t, err)
 	case <-time.After(5 * time.Second):
 	}
+}
+
+func (f *fixture) Status(runID string) (*exec.DAGRunStatus, error) {
+	ref := exec.NewDAGRunRef(f.dag.Name, runID)
+	attempt, err := f.th.DAGRunStore.FindAttempt(f.th.Context, ref)
+	if err != nil {
+		return nil, err
+	}
+	return attempt.ReadStatus(f.th.Context)
 }
 
 // AssertConcurrent verifies all DAGs started within maxDiff of each other.
