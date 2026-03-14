@@ -97,6 +97,15 @@ func (m *mockDAGRunStore) LatestAttempt(_ context.Context, _ string) (exec.DAGRu
 func (m *mockDAGRunStore) ListStatuses(_ context.Context, _ ...exec.ListDAGRunStatusesOption) ([]*exec.DAGRunStatus, error) {
 	return nil, nil // Empty list is valid
 }
+func (m *mockDAGRunStore) CompareAndSwapLatestAttemptStatus(
+	_ context.Context,
+	_ exec.DAGRunRef,
+	_ string,
+	_ core.Status,
+	_ func(*exec.DAGRunStatus) error,
+) (*exec.DAGRunStatus, bool, error) {
+	return nil, false, nil
+}
 func (m *mockDAGRunStore) FindSubAttempt(_ context.Context, rootRef exec.DAGRunRef, subDAGRunID string) (exec.DAGRunAttempt, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

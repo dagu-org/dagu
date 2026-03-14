@@ -425,6 +425,16 @@ func (m *mockRemoteDAGRunStore) ListStatuses(_ context.Context, _ ...exec.ListDA
 	return nil, nil
 }
 
+func (m *mockRemoteDAGRunStore) CompareAndSwapLatestAttemptStatus(
+	_ context.Context,
+	_ exec.DAGRunRef,
+	_ string,
+	_ core.Status,
+	_ func(*exec.DAGRunStatus) error,
+) (*exec.DAGRunStatus, bool, error) {
+	return nil, false, nil
+}
+
 func (m *mockRemoteDAGRunStore) RemoveOldDAGRuns(_ context.Context, _ string, _ int, _ ...exec.RemoveOldDAGRunsOption) ([]string, error) {
 	return nil, nil
 }

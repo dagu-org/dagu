@@ -58,6 +58,9 @@ type RemoteTaskHandlerConfig struct {
 // NewRemoteTaskHandler creates a new TaskHandler that runs tasks in-process
 // with status pushing and log streaming to the coordinator.
 func NewRemoteTaskHandler(cfg RemoteTaskHandlerConfig) TaskHandler {
+	if cfg.Config == nil {
+		cfg.Config = &config.Config{}
+	}
 	return &remoteTaskHandler{
 		workerID:          cfg.WorkerID,
 		coordinatorClient: cfg.CoordinatorClient,
@@ -96,6 +99,9 @@ func (h *remoteTaskHandler) Handle(ctx context.Context, task *coordinatorv1.Task
 
 	case coordinatorv1.Operation_OPERATION_RETRY:
 		return h.handleRetry(ctx, task)
+
+	case coordinatorv1.Operation_OPERATION_FINALIZE_FAILURE:
+		return h.handleFinalizeFailure(ctx, task)
 
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
 		return fmt.Errorf("unsupported operation: unspecified")
@@ -150,9 +156,9 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
 
-	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, false, &retryConfig{
-		target:   status,
-		stepName: task.Step,
+	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, false, &executionConfig{
+		retryTarget: status,
+		stepName:    task.Step,
 	})
 }
 
@@ -199,10 +205,42 @@ func sanitizeTaskLoadError(target string, loadErr error) string {
 	return fmt.Sprintf("failed to load DAG %q", target)
 }
 
-// retryConfig holds retry-specific configuration
-type retryConfig struct {
-	target   *exec.DAGRunStatus
-	stepName string
+func (h *remoteTaskHandler) handleFinalizeFailure(ctx context.Context, task *coordinatorv1.Task) error {
+	root := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
+
+	if task.PreviousStatus == nil {
+		return fmt.Errorf("finalize failure requires previous_status in task for shared-nothing mode")
+	}
+
+	status, convErr := convert.ProtoToDAGRunStatus(task.PreviousStatus)
+	if convErr != nil {
+		return fmt.Errorf("failed to convert previous status: %w", convErr)
+	}
+	logger.Info(ctx, "Using previous status from task for deferred failure finalization",
+		tag.RunID(task.DagRunId),
+		slog.Int("nodes", len(status.Nodes)))
+
+	dag, cleanup, err := h.loadDAG(ctx, task)
+	if err != nil {
+		return fmt.Errorf("failed to load DAG: %w", err)
+	}
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
+	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
+
+	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, false, &executionConfig{
+		failureFinalizationTarget: status,
+	})
+}
+
+// executionConfig holds execution-mode-specific configuration.
+type executionConfig struct {
+	retryTarget               *exec.DAGRunStatus
+	stepName                  string
+	failureFinalizationTarget *exec.DAGRunStatus
 }
 
 // createRemoteHandlers creates the status pusher and log streamer for remote execution.
@@ -332,7 +370,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 	statusPusher *remote.StatusPusher,
 	logStreamer *remote.LogStreamer,
 	queuedRun bool,
-	retry *retryConfig,
+	execCfg *executionConfig,
 ) error {
 	// Create temporary directory for local operations
 	env, err := h.createAgentEnv(ctx, dagRunID)
@@ -373,27 +411,32 @@ func (h *remoteTaskHandler) executeDAGRun(
 
 	// Build agent options
 	opts := rtagent.Options{
-		ParentDAGRun:     parent,
-		WorkerID:         h.workerID,
-		StatusPusher:     statusPusher,
-		LogWriterFactory: logStreamer,
-		QueuedRun:        queuedRun,
-		AttemptID:        attemptID,
-		DAGRunStore:      h.dagRunStore,
-		ServiceRegistry:  h.serviceRegistry,
-		RootDAGRun:       root,
-		PeerConfig:       h.peerConfig,
-		DefaultExecMode:  h.config.DefaultExecMode,
-		AgentConfigStore: agentConfigStore,
-		AgentModelStore:  agentModelStore,
-		AgentMemoryStore: agentMemoryStore,
-		ScheduleTime:     scheduleTime,
+		ParentDAGRun:       parent,
+		WorkerID:           h.workerID,
+		StatusPusher:       statusPusher,
+		LogWriterFactory:   logStreamer,
+		QueuedRun:          queuedRun,
+		AttemptID:          attemptID,
+		DAGRunStore:        h.dagRunStore,
+		ServiceRegistry:    h.serviceRegistry,
+		RootDAGRun:         root,
+		PeerConfig:         h.peerConfig,
+		DefaultExecMode:    h.config.DefaultExecMode,
+		AgentConfigStore:   agentConfigStore,
+		AgentModelStore:    agentModelStore,
+		AgentMemoryStore:   agentMemoryStore,
+		ScheduleTime:       scheduleTime,
+		RetryFailureWindow: h.config.Scheduler.RetryFailureWindow,
 	}
 
-	// Add retry configuration if present
-	if retry != nil {
-		opts.RetryTarget = retry.target
-		opts.StepRetry = retry.stepName
+	if execCfg != nil {
+		if execCfg.retryTarget != nil {
+			opts.RetryTarget = execCfg.retryTarget
+			opts.StepRetry = execCfg.stepName
+		}
+		if execCfg.failureFinalizationTarget != nil {
+			opts.FailureFinalizationTarget = execCfg.failureFinalizationTarget
+		}
 	}
 
 	// Create the agent

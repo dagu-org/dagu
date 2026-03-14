@@ -34,6 +34,7 @@ func InitialStatus(dag *core.DAG) DAGRunStatus {
 		OnWait:        NewNodeOrNil(dag.HandlerOn.Wait),
 		Params:        strings.Join(dag.Params, " "),
 		ParamsList:    dag.Params,
+		RetryCount:    0,
 		CreatedAt:     time.Now().UnixMilli(),
 		StartedAt:     stringutil.FormatTime(time.Time{}),
 		FinishedAt:    stringutil.FormatTime(time.Time{}),
@@ -66,6 +67,11 @@ type DAGRunStatus struct {
 	ScheduleTime  string            `json:"scheduleTime,omitempty"`
 	StartedAt     string            `json:"startedAt,omitempty"`
 	FinishedAt    string            `json:"finishedAt,omitempty"`
+	RetryCount    int               `json:"retryCount,omitempty"`
+	// FailureFinalizingAt marks an in-flight deferred failure finalization.
+	FailureFinalizingAt string `json:"failureFinalizingAt,omitempty"`
+	// FailureFinalizedAt marks that deferred failure handling has completed.
+	FailureFinalizedAt string `json:"failureFinalizedAt,omitempty"`
 	Log           string            `json:"log,omitempty"`
 	Error         string            `json:"error,omitempty"`
 	Params        string            `json:"params,omitempty"`

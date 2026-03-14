@@ -278,6 +278,34 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 
 	// Check if dag-run already exists (e.g., queued via enqueue command)
 	existingAttempt, findErr := h.dagRunStore.FindAttempt(ctx, ref)
+	if task.Operation == coordinatorv1.Operation_OPERATION_FINALIZE_FAILURE {
+		if findErr != nil {
+			return fmt.Errorf("failed to locate existing attempt for deferred failure finalization: %w", findErr)
+		}
+
+		if task.PreviousStatus != nil {
+			previousStatus, convErr := convert.ProtoToDAGRunStatus(task.PreviousStatus)
+			if convErr != nil {
+				return fmt.Errorf("failed to convert previous status for deferred failure finalization: %w", convErr)
+			}
+			if task.AttemptId == "" {
+				task.AttemptId = previousStatus.AttemptID
+			}
+		}
+		if task.AttemptId == "" {
+			task.AttemptId = existingAttempt.ID()
+		}
+		task.AttemptKey = generateRootAttemptKey(task)
+
+		logger.Info(ctx, "Reusing existing failed attempt for deferred failure finalization",
+			tag.RunID(task.DagRunId),
+			tag.Target(task.Target),
+			tag.AttemptID(task.AttemptId),
+			tag.AttemptKey(task.AttemptKey),
+		)
+		return nil
+	}
+
 	if findErr == nil {
 		existingStatus, readErr := existingAttempt.ReadStatus(ctx)
 		if readErr == nil && existingStatus.Status == core.Queued {

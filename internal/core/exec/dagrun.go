@@ -59,6 +59,15 @@ type DAGRunStore interface {
 	LatestAttempt(ctx context.Context, name string) (DAGRunAttempt, error)
 	// ListStatuses returns a list of statuses.
 	ListStatuses(ctx context.Context, opts ...ListDAGRunStatusesOption) ([]*DAGRunStatus, error)
+	// CompareAndSwapLatestAttemptStatus atomically updates the latest attempt status
+	// when both the latest attempt ID and status still match the expected values.
+	CompareAndSwapLatestAttemptStatus(
+		ctx context.Context,
+		dagRun DAGRunRef,
+		expectedAttemptID string,
+		expectedStatus core.Status,
+		mutate func(*DAGRunStatus) error,
+	) (*DAGRunStatus, bool, error)
 	// FindAttempt finds the latest attempt for the dag-run.
 	FindAttempt(ctx context.Context, dagRun DAGRunRef) (DAGRunAttempt, error)
 	// FindSubAttempt finds a sub dag-run record by dag-run ID.
@@ -91,6 +100,7 @@ type ListDAGRunStatusesOptions struct {
 	Statuses  []core.Status
 	Limit     int
 	Tags      []string // Filter by DAG tags (AND logic - all tags must match)
+	Unlimited bool
 }
 
 // ListRunsOption is a functional option for configuring ListRunsOptions
@@ -149,6 +159,14 @@ func WithTags(tags []string) ListDAGRunStatusesOption {
 func WithLimit(limit int) ListDAGRunStatusesOption {
 	return func(o *ListDAGRunStatusesOptions) {
 		o.Limit = limit
+	}
+}
+
+// WithoutLimit disables the default 1000-item cap for internal callers that
+// need to scan the full recent result set.
+func WithoutLimit() ListDAGRunStatusesOption {
+	return func(o *ListDAGRunStatusesOptions) {
+		o.Unlimited = true
 	}
 }
 

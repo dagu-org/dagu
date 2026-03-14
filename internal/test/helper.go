@@ -662,6 +662,8 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 	var dagRunID string
 	if helper.opts.RetryTarget != nil {
 		dagRunID = helper.opts.RetryTarget.DAGRunID
+	} else if helper.opts.FailureFinalizationTarget != nil {
+		dagRunID = helper.opts.FailureFinalizationTarget.DAGRunID
 	} else if helper.dagRunID != "" {
 		dagRunID = helper.dagRunID
 	} else {
@@ -677,6 +679,9 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 	helper.opts.RootDAGRun = root
 	helper.opts.PeerConfig = d.Config.Core.Peer
 	helper.opts.DefaultExecMode = d.Config.DefaultExecMode
+	if helper.opts.RetryFailureWindow == 0 {
+		helper.opts.RetryFailureWindow = d.Config.Scheduler.RetryFailureWindow
+	}
 
 	helper.Agent = agent.New(
 		dagRunID,

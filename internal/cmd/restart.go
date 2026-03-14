@@ -178,6 +178,7 @@ func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRu
 			AgentSoulStore:          as.SoulStore,
 			AgentRemoteNodeResolver: as.RemoteNodeResolver,
 			ScheduleTime:            scheduleTime,
+			RetryFailureWindow:      ctx.Config.Scheduler.RetryFailureWindow,
 		})
 
 	listenSignals(ctx, agentInstance)

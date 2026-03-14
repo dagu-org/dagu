@@ -57,6 +57,7 @@ type Runner struct {
 	dagRunID        string
 	messagesHandler ChatMessagesHandler
 	onWait          *core.Step
+	forcedStatus    *core.Status
 
 	canceled  int32
 	mu        sync.RWMutex
@@ -93,6 +94,7 @@ func New(cfg *Config) *Runner {
 		messagesHandler: cfg.MessagesHandler,
 		pause:           time.Millisecond * 100,
 		onWait:          cfg.OnWait,
+		forcedStatus:    cfg.ForcedStatus,
 	}
 }
 
@@ -110,6 +112,33 @@ type Config struct {
 	DAGRunID        string
 	MessagesHandler ChatMessagesHandler
 	OnWait          *core.Step
+	ForcedStatus    *core.Status
+}
+
+// RunFailureFinalization executes only the failure handler against the supplied
+// persisted plan state. It is used when terminal failure handling was deferred
+// while DAG-level retries were still eligible.
+func (r *Runner) RunFailureFinalization(ctx context.Context, plan *Plan, progressCh chan *Node) error {
+	if err := r.setup(ctx); err != nil {
+		return err
+	}
+
+	r.handlerMu.RLock()
+	handlerNode := r.handlers[core.HandlerOnFailure]
+	r.handlerMu.RUnlock()
+
+	if handlerNode == nil {
+		return nil
+	}
+
+	logger.Debug(ctx, "Terminal failure handler execution started", tag.Handler(handlerNode.Name()))
+	if err := r.runEventHandler(ctx, plan, handlerNode); err != nil {
+		r.setLastError(err)
+	}
+	if progressCh != nil {
+		progressCh <- handlerNode
+	}
+	return r.lastError
 }
 
 // Run runs the plan of steps.
@@ -808,6 +837,9 @@ func (r *Runner) Cancel(p *Plan) {
 
 // Status returns the status of the runner.
 func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
+	if r.forcedStatus != nil {
+		return *r.forcedStatus
+	}
 	if r.isCanceled() && !r.isSucceed(p) {
 		return core.Aborted
 	}

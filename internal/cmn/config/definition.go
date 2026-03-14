@@ -277,6 +277,7 @@ type SchedulerDef struct {
 	LockStaleThreshold      string `mapstructure:"lock_stale_threshold"`      // Default: 30s
 	LockRetryInterval       string `mapstructure:"lock_retry_interval"`       // Default: 5s
 	ZombieDetectionInterval string `mapstructure:"zombie_detection_interval"` // Default: 45s, 0 to disable
+	RetryFailureWindow      string `mapstructure:"retry_failure_window"`      // Default: 24h, 0 to disable retry scanning
 }
 
 // QueueConfigDef configures global queue settings.

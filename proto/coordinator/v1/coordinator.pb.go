@@ -27,9 +27,10 @@ const (
 type Operation int32
 
 const (
-	Operation_OPERATION_UNSPECIFIED Operation = 0
-	Operation_OPERATION_START       Operation = 1 // Start a new DAG run
-	Operation_OPERATION_RETRY       Operation = 2 // Retry an existing run
+	Operation_OPERATION_UNSPECIFIED      Operation = 0
+	Operation_OPERATION_START            Operation = 1 // Start a new DAG run
+	Operation_OPERATION_RETRY            Operation = 2 // Retry an existing run
+	Operation_OPERATION_FINALIZE_FAILURE Operation = 3 // Execute deferred terminal failure handling
 )
 
 // Enum value maps for Operation.
@@ -38,11 +39,13 @@ var (
 		0: "OPERATION_UNSPECIFIED",
 		1: "OPERATION_START",
 		2: "OPERATION_RETRY",
+		3: "OPERATION_FINALIZE_FAILURE",
 	}
 	Operation_value = map[string]int32{
-		"OPERATION_UNSPECIFIED": 0,
-		"OPERATION_START":       1,
-		"OPERATION_RETRY":       2,
+		"OPERATION_UNSPECIFIED":      0,
+		"OPERATION_START":            1,
+		"OPERATION_RETRY":            2,
+		"OPERATION_FINALIZE_FAILURE": 3,
 	}
 )
 
@@ -1793,11 +1796,12 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x0froot_dag_run_id\x18\x04 \x01(\tR\frootDagRunId\"I\n" +
 	"\x15RequestCancelResponse\x12\x1a\n" +
 	"\baccepted\x18\x01 \x01(\bR\baccepted\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error*P\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error*p\n" +
 	"\tOperation\x12\x19\n" +
 	"\x15OPERATION_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fOPERATION_START\x10\x01\x12\x13\n" +
-	"\x0fOPERATION_RETRY\x10\x02*\xa2\x01\n" +
+	"\x0fOPERATION_RETRY\x10\x02\x12\x1e\n" +
+	"\x1aOPERATION_FINALIZE_FAILURE\x10\x03*\xa2\x01\n" +
 	"\x12WorkerHealthStatus\x12$\n" +
 	" WORKER_HEALTH_STATUS_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cWORKER_HEALTH_STATUS_HEALTHY\x10\x01\x12 \n" +

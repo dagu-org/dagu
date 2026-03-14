@@ -55,4 +55,6 @@ message DAGRunIndexEntry {
   int64 created_at = 15;    // Unix epoch milliseconds (matches DAGRunStatus.CreatedAt)
   string name = 16;
   string schedule_time = 17;  // RFC 3339 string (matches DAGRunStatus.ScheduleTime)
+  string attempt_id = 18;
+  int32 retry_count = 19;
 }

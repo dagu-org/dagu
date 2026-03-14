@@ -16,6 +16,7 @@ func TestToDAGRunSummaryIncludesScheduleTime(t *testing.T) {
 	status := exec.DAGRunStatus{
 		Name:         "test-dag",
 		DAGRunID:     "run-1",
+		RetryCount:   2,
 		Status:       core.Queued,
 		ScheduleTime: "2026-03-13T00:00:00Z",
 	}
@@ -23,12 +24,14 @@ func TestToDAGRunSummaryIncludesScheduleTime(t *testing.T) {
 	summary := toDAGRunSummary(status)
 	require.NotNil(t, summary.ScheduleTime)
 	assert.Equal(t, status.ScheduleTime, *summary.ScheduleTime)
+	assert.Equal(t, status.RetryCount, summary.RetryCount)
 }
 
 func TestToDAGRunDetailsIncludesScheduleTime(t *testing.T) {
 	status := exec.DAGRunStatus{
 		Name:         "test-dag",
 		DAGRunID:     "run-1",
+		RetryCount:   3,
 		Status:       core.Queued,
 		QueuedAt:     "2026-03-13T00:01:00Z",
 		ScheduleTime: "2026-03-13T00:00:00Z",
@@ -39,6 +42,7 @@ func TestToDAGRunDetailsIncludesScheduleTime(t *testing.T) {
 	assert.Equal(t, status.ScheduleTime, *details.ScheduleTime)
 	require.NotNil(t, details.QueuedAt)
 	assert.Equal(t, status.QueuedAt, *details.QueuedAt)
+	assert.Equal(t, status.RetryCount, details.RetryCount)
 }
 
 func TestToDAGDetailsIncludesParamDefDescriptions(t *testing.T) {

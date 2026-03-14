@@ -2990,6 +2990,8 @@ export interface components {
             statusLabel: components["schemas"]["StatusLabel"];
             /** @description RFC 3339 timestamp when the DAG-run was queued */
             queuedAt?: string;
+            /** @description Number of completed retry attempts for this DAG-run */
+            retryCount: number;
             /** @description RFC 3339 timestamp of when the DAG-run was scheduled to run */
             scheduleTime?: string;
             /** @description RFC 3339 timestamp when the DAG-run started */

@@ -24,7 +24,7 @@ const (
 	// IndexFileName is the name of the DAG run index file.
 	IndexFileName = ".dagrun.index"
 	// IndexVersion is the current index format version.
-	IndexVersion = 4
+	IndexVersion = 5
 	// MinRunsForIndex is the minimum number of runs needed to create an index.
 	MinRunsForIndex = 10
 
@@ -54,6 +54,8 @@ type Entry struct {
 	ScheduleTime     string
 	TriggerType      core.TriggerType
 	CreatedAt        int64
+	AttemptID        string
+	RetryCount       int
 }
 
 // TryLoadForDay attempts to load and validate the index for a day directory.
@@ -136,6 +138,8 @@ func RebuildForDay(dayDir string, dagRunDirs []os.DirEntry) ([]Entry, bool, erro
 			ScheduleTime:     status.ScheduleTime,
 			TriggerType:      status.TriggerType,
 			CreatedAt:        status.CreatedAt,
+			AttemptID:        status.AttemptID,
+			RetryCount:       status.RetryCount,
 		})
 	}
 
@@ -245,6 +249,8 @@ func writeIndex(dayDir string, entries []Entry) error {
 			ScheduleTime:        e.ScheduleTime,
 			TriggerType:         int32(e.TriggerType), //nolint:gosec
 			CreatedAt:           e.CreatedAt,
+			AttemptId:           e.AttemptID,
+			RetryCount:          int32(e.RetryCount),
 		})
 	}
 
@@ -280,6 +286,8 @@ func protoToEntries(protoEntries []*indexv1.DAGRunIndexEntry) []Entry {
 			ScheduleTime:     pe.ScheduleTime,
 			TriggerType:      core.TriggerType(pe.TriggerType),
 			CreatedAt:        pe.CreatedAt,
+			AttemptID:        pe.AttemptId,
+			RetryCount:       int(pe.RetryCount),
 		}
 	}
 	return entries

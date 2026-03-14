@@ -6,6 +6,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -44,6 +45,7 @@ type Scheduler struct {
 	zombieDetector      *ZombieDetector // Zombie DAG run detector
 	instanceID          string          // Unique instance identifier for service registry
 	queueProcessor      *QueueProcessor // Processor for queued DAG runs
+	retryScanner        *RetryScanner   // DAG-level retry scanner
 	planner             *TickPlanner    // Unified scheduling decision module
 	stopOnce            sync.Once
 	lock                sync.Mutex
@@ -123,6 +125,16 @@ func New(
 		Events:   eventCh,
 	})
 
+	retryScanner := NewRetryScanner(
+		er,
+		dagRunStore,
+		queueStore,
+		dagExecutor,
+		isSuspended,
+		cfg.Scheduler.RetryFailureWindow,
+		defaultClock,
+	)
+
 	return &Scheduler{
 		quit:            make(chan any),
 		entryReader:     er,
@@ -135,6 +147,7 @@ func New(
 		healthServer:    healthServer,
 		serviceRegistry: reg,
 		queueProcessor:  processor,
+		retryScanner:    retryScanner,
 		planner:         planner,
 		clock:           defaultClock,
 	}, nil
@@ -145,6 +158,9 @@ func New(
 func (s *Scheduler) SetClock(clock Clock) {
 	s.clock = clock
 	s.planner.cfg.Clock = clock
+	if s.retryScanner != nil {
+		s.retryScanner.clock = clock
+	}
 }
 
 // SetRestartFunc overrides the planner's restart function for testing purposes.
@@ -249,6 +265,10 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		s.startZombieDetector(ctx)
 	})
 
+	wg.Go(func() {
+		s.startRetryScanner(ctx)
+	})
+
 	if err := s.entryReader.Init(ctx); err != nil {
 		logger.Error(ctx, "Failed to initialize entry reader", tag.Error(err))
 		return err
@@ -326,6 +346,33 @@ func (s *Scheduler) startHeartbeat(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (s *Scheduler) startRetryScanner(ctx context.Context) {
+	if s.retryScanner == nil || s.config.Scheduler.RetryFailureWindow <= 0 {
+		logger.Info(ctx, "Retry scanner disabled",
+			tag.Interval(s.config.Scheduler.RetryFailureWindow),
+		)
+		return
+	}
+
+	logger.Info(ctx, "Started retry scanner",
+		tag.Interval(retryScanInterval),
+		slog.Duration("retry_failure_window", s.config.Scheduler.RetryFailureWindow),
+	)
+	scanCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	go func() {
+		select {
+		case <-s.quit:
+			cancel()
+		case <-ctx.Done():
+			cancel()
+		}
+	}()
+
+	s.retryScanner.Start(scanCtx)
 }
 
 // cronLoop runs the main scheduler loop to invoke jobs at scheduled times.

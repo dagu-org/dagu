@@ -300,6 +300,7 @@ steps:
 		dagAgent := dag.Agent()
 
 		dagAgent.RunError(t)
+		require.Equal(t, 0, dagAgent.Status(th.Context).RetryCount)
 
 		// Modify the DAG to make it successful
 		dagRunStatus := dagAgent.Status(th.Context)
@@ -312,6 +313,7 @@ steps:
 			RetryTarget: &dagRunStatus,
 		}))
 		dagAgent.RunSuccess(t)
+		require.Equal(t, 1, dagAgent.Status(th.Context).RetryCount)
 
 		for _, node := range dagAgent.Status(th.Context).Nodes {
 			if node.Status != core.NodeSucceeded &&

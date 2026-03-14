@@ -1670,7 +1670,7 @@ func (a *API) enqueueRetry(ctx context.Context, attempt exec.DAGRunAttempt, dag 
 	if err != nil {
 		return fmt.Errorf("error reading status: %w", err)
 	}
-	return exec.EnqueueRetry(ctx, a.queueStore, attempt, dag, status, dagRunID)
+	return exec.EnqueueRetry(ctx, a.dagRunStore, a.queueStore, dag, status)
 }
 
 func (a *API) logRetryAudit(ctx context.Context, dagName, dagRunID, stepName string, distributed bool) {

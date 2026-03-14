@@ -232,6 +232,7 @@ func TestLoad_Env(t *testing.T) {
 			LockStaleThreshold:      30 * time.Second,
 			LockRetryInterval:       5 * time.Second,
 			ZombieDetectionInterval: 90 * time.Second,
+			RetryFailureWindow:      24 * time.Hour,
 		},
 		Monitoring: MonitoringConfig{
 			Retention: 24 * time.Hour,
@@ -511,6 +512,7 @@ scheduler:
 			LockStaleThreshold:      50 * time.Second,
 			LockRetryInterval:       10 * time.Second,
 			ZombieDetectionInterval: 60 * time.Second,
+			RetryFailureWindow:      24 * time.Hour,
 		},
 		Monitoring: MonitoringConfig{
 			Retention: 24 * time.Hour,

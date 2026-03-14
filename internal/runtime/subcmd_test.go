@@ -407,6 +407,49 @@ func TestRetry(t *testing.T) {
 	})
 }
 
+func TestFinalizeFailure(t *testing.T) {
+	t.Parallel()
+	cfg := &config.Config{
+		Paths: config.PathsConfig{
+			Executable:     "/usr/bin/dagu",
+			ConfigFileUsed: "/etc/dagu/config.yaml",
+		},
+	}
+
+	builder := runtime.NewSubCmdBuilder(cfg)
+	dag := &core.DAG{
+		Name:       "test-dag",
+		Location:   "/path/to/dag.yaml",
+		WorkingDir: "/path/to",
+	}
+
+	t.Run("BasicFinalizeFailure", func(t *testing.T) {
+		t.Parallel()
+		spec := builder.FinalizeFailure(dag, "failed-run-id")
+
+		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
+		assert.Contains(t, spec.Args, "finalize-failure")
+		assert.Contains(t, spec.Args, "--run-id=failed-run-id")
+		assert.Contains(t, spec.Args, "-q")
+		assert.Contains(t, spec.Args, "--config")
+		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
+		assert.Contains(t, spec.Args, "test-dag")
+	})
+
+	t.Run("FinalizeFailureWithoutConfig", func(t *testing.T) {
+		t.Parallel()
+		cfgNoFile := &config.Config{
+			Paths: config.PathsConfig{
+				Executable: "/usr/bin/dagu",
+			},
+		}
+		builderNoFile := runtime.NewSubCmdBuilder(cfgNoFile)
+		spec := builderNoFile.FinalizeFailure(dag, "failed-run-id")
+
+		assert.NotContains(t, spec.Args, "--config")
+	})
+}
+
 func TestTaskStart(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
@@ -608,6 +651,53 @@ func TestTaskRetry(t *testing.T) {
 			Target:   "/path/to/task.yaml",
 		}
 		spec := builderNoFile.TaskRetry(task)
+
+		assert.NotContains(t, spec.Args, "--config")
+	})
+}
+
+func TestTaskFinalizeFailure(t *testing.T) {
+	t.Parallel()
+	cfg := &config.Config{
+		Paths: config.PathsConfig{
+			Executable:     "/usr/bin/dagu",
+			ConfigFileUsed: "/etc/dagu/config.yaml",
+		},
+	}
+
+	builder := runtime.NewSubCmdBuilder(cfg)
+
+	t.Run("BasicTaskFinalizeFailure", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			DagRunId:       "failed-run-id",
+			Target:         "/path/to/task.yaml",
+			RootDagRunName: "root-dag",
+		}
+		spec := builder.TaskFinalizeFailure(task)
+
+		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
+		assert.Contains(t, spec.Args, "finalize-failure")
+		assert.Contains(t, spec.Args, "--run-id=failed-run-id")
+		assert.Contains(t, spec.Args, "-q")
+		assert.Contains(t, spec.Args, "--config")
+		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
+		assert.Contains(t, spec.Args, "root-dag")
+	})
+
+	t.Run("TaskFinalizeFailureWithoutConfig", func(t *testing.T) {
+		t.Parallel()
+		cfgNoFile := &config.Config{
+			Paths: config.PathsConfig{
+				Executable: "/usr/bin/dagu",
+			},
+		}
+		builderNoFile := runtime.NewSubCmdBuilder(cfgNoFile)
+		task := &coordinatorv1.Task{
+			DagRunId: "failed-run-id",
+			Target:   "/path/to/task.yaml",
+		}
+		spec := builderNoFile.TaskFinalizeFailure(task)
 
 		assert.NotContains(t, spec.Args, "--config")
 	})

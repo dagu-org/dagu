@@ -67,6 +67,10 @@ type Agent struct {
 	// It is nil if it's not a retry execution.
 	retryTarget *exec.DAGRunStatus
 
+	// failureFinalizationTarget is the failed latest attempt whose deferred
+	// terminal failure handling should be executed in-place.
+	failureFinalizationTarget *exec.DAGRunStatus
+
 	// dagStore is the database to store the DAG definitions.
 	dagStore exec.DAGStore
 
@@ -161,6 +165,10 @@ type Agent struct {
 	// Set by the scheduler for cron-triggered runs; empty for manual runs.
 	scheduleTime string
 
+	// retryFailureWindow controls whether DAG-level failure handling may be
+	// deferred while automatic retries remain eligible.
+	retryFailureWindow time.Duration
+
 	// queuedRun indicates this execution is from a queued item.
 	// The dag-run was already created by the enqueue command.
 	queuedRun bool
@@ -210,6 +218,9 @@ type Options struct {
 	// If it's specified the agent will execute the DAG with the same
 	// configuration as the specified history.
 	RetryTarget *exec.DAGRunStatus
+	// FailureFinalizationTarget is the failed latest attempt whose deferred
+	// terminal failure handling should be executed in-place.
+	FailureFinalizationTarget *exec.DAGRunStatus
 	// ParentDAGRun is the dag-run reference of the parent dag-run.
 	// It is required for sub dag-runs to identify the parent dag-run.
 	ParentDAGRun exec.DAGRunRef
@@ -263,6 +274,9 @@ type Options struct {
 	// ScheduleTime is the RFC 3339 timestamp of when this run was scheduled.
 	// Set by the scheduler for cron-triggered runs; empty for manual runs.
 	ScheduleTime string
+	// RetryFailureWindow controls whether DAG-level failure handling may be
+	// deferred while automatic retries remain eligible.
+	RetryFailureWindow time.Duration
 }
 
 // New creates a new Agent.
@@ -276,34 +290,36 @@ func New(
 	opts Options,
 ) *Agent {
 	a := &Agent{
-		rootDAGRun:              opts.RootDAGRun,
-		parentDAGRun:            opts.ParentDAGRun,
-		dagRunID:                dagRunID,
-		dag:                     dag,
-		dry:                     opts.Dry,
-		retryTarget:             opts.RetryTarget,
-		logDir:                  logDir,
-		logFile:                 logFile,
-		dagRunMgr:               drm,
-		dagStore:                ds,
-		dagRunStore:             opts.DAGRunStore,
-		registry:                opts.ServiceRegistry,
-		stepRetry:               opts.StepRetry,
-		peerConfig:              opts.PeerConfig,
-		workerID:                opts.WorkerID,
-		statusPusher:            opts.StatusPusher,
-		logWriterFactory:        opts.LogWriterFactory,
-		queuedRun:               opts.QueuedRun,
-		attemptID:               opts.AttemptID,
-		triggerType:             opts.TriggerType,
-		defaultExecMode:         opts.DefaultExecMode,
-		agentConfigStore:        opts.AgentConfigStore,
-		agentModelStore:         opts.AgentModelStore,
-		agentMemoryStore:        opts.AgentMemoryStore,
-		agentSkillStore:         opts.AgentSkillStore,
-		agentSoulStore:          opts.AgentSoulStore,
-		agentRemoteNodeResolver: opts.AgentRemoteNodeResolver,
-		scheduleTime:            opts.ScheduleTime,
+		rootDAGRun:                opts.RootDAGRun,
+		parentDAGRun:              opts.ParentDAGRun,
+		dagRunID:                  dagRunID,
+		dag:                       dag,
+		dry:                       opts.Dry,
+		retryTarget:               opts.RetryTarget,
+		failureFinalizationTarget: opts.FailureFinalizationTarget,
+		logDir:                    logDir,
+		logFile:                   logFile,
+		dagRunMgr:                 drm,
+		dagStore:                  ds,
+		dagRunStore:               opts.DAGRunStore,
+		registry:                  opts.ServiceRegistry,
+		stepRetry:                 opts.StepRetry,
+		peerConfig:                opts.PeerConfig,
+		workerID:                  opts.WorkerID,
+		statusPusher:              opts.StatusPusher,
+		logWriterFactory:          opts.LogWriterFactory,
+		queuedRun:                 opts.QueuedRun,
+		attemptID:                 opts.AttemptID,
+		triggerType:               opts.TriggerType,
+		defaultExecMode:           opts.DefaultExecMode,
+		agentConfigStore:          opts.AgentConfigStore,
+		agentModelStore:           opts.AgentModelStore,
+		agentMemoryStore:          opts.AgentMemoryStore,
+		agentSkillStore:           opts.AgentSkillStore,
+		agentSoulStore:            opts.AgentSoulStore,
+		agentRemoteNodeResolver:   opts.AgentRemoteNodeResolver,
+		scheduleTime:              opts.ScheduleTime,
+		retryFailureWindow:        opts.RetryFailureWindow,
 	}
 
 	// Initialize progress display if enabled
@@ -545,9 +561,11 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Setup the reporter to send notifications (must be after mail config evaluation)
 	a.setupReporter(ctx)
 
-	// Update the status to running
+	// Update the initial persisted status.
 	st := a.Status(ctx)
-	st.Status = core.Running
+	if a.failureFinalizationTarget == nil {
+		st.Status = core.Running
+	}
 	a.writeStatus(ctx, attempt, st)
 
 	defer func() {
@@ -753,7 +771,11 @@ func (a *Agent) Run(ctx context.Context) error {
 	})
 
 	// Start the dag-run.
-	if a.retryTarget != nil {
+	if a.failureFinalizationTarget != nil {
+		logger.Info(ctx, "DAG failure finalization started",
+			slog.String("target-attempt-id", a.failureFinalizationTarget.AttemptID),
+		)
+	} else if a.retryTarget != nil {
 		logger.Info(ctx, "DAG run retry started",
 			slog.String("retry-target-attempt-id", a.retryTarget.AttemptID),
 		)
@@ -761,10 +783,12 @@ func (a *Agent) Run(ctx context.Context) error {
 		logger.Info(ctx, "DAG run started", slog.Any("params", a.dag.Params))
 	}
 
-	// Start watching for cancel requests
-	go execWithRecovery(ctx, func() {
-		a.watchCancelRequested(ctx, attempt)
-	})
+	if a.failureFinalizationTarget == nil {
+		// Start watching for cancel requests only for live DAG executions.
+		go execWithRecovery(ctx, func() {
+			a.watchCancelRequested(ctx, attempt)
+		})
+	}
 
 	// Add registry authentication to context for docker executors
 	if len(a.evaluatedRegistryAuths) > 0 {
@@ -776,7 +800,12 @@ func (a *Agent) Run(ctx context.Context) error {
 		ctx = s3.WithS3Config(ctx, a.evaluatedS3)
 	}
 
-	lastErr := a.runner.Run(ctx, a.plan, progressCh)
+	var lastErr error
+	if a.failureFinalizationTarget != nil {
+		lastErr = a.runner.RunFailureFinalization(ctx, a.plan, progressCh)
+	} else {
+		lastErr = a.runner.Run(ctx, a.plan, progressCh)
+	}
 
 	// Drain the progress goroutine before computing the final status.
 	// This prevents the progress goroutine from overwriting the final
@@ -813,14 +842,21 @@ func (a *Agent) Run(ctx context.Context) error {
 	)
 
 	// Collect and write step outputs BEFORE finalizing status (per spec)
-	if dagOutputs := a.buildOutputs(ctx, finishedStatus.Status); dagOutputs != nil {
-		if err := attempt.WriteOutputs(ctx, dagOutputs); err != nil {
-			logger.Error(ctx, "Failed to write outputs", tag.Error(err))
+	if a.failureFinalizationTarget == nil {
+		if dagOutputs := a.buildOutputs(ctx, finishedStatus.Status); dagOutputs != nil {
+			if err := attempt.WriteOutputs(ctx, dagOutputs); err != nil {
+				logger.Error(ctx, "Failed to write outputs", tag.Error(err))
+			}
 		}
 	}
 
+	if a.shouldMarkFailureFinalized(finishedStatus.Status) {
+		finishedStatus.FailureFinalizingAt = ""
+		finishedStatus.FailureFinalizedAt = stringutil.FormatTime(time.Now())
+	}
+
 	// Finalize status (after outputs are written)
-	a.writeStatus(ctx, attempt, a.Status(ctx))
+	a.writeStatus(ctx, attempt, finishedStatus)
 
 	// Stream scheduler log to coordinator if using remote logging (shared-nothing mode)
 	if a.logWriterFactory != nil {
@@ -833,7 +869,12 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Send the execution report if necessary.
 	a.lastErr = lastErr
-	if err := a.reporter.send(ctx, a.dag, finishedStatus, lastErr); err != nil {
+	if a.failureFinalizationTarget == nil && a.shouldDeferFailureHandling() && finishedStatus.Status == core.Failed {
+		logger.Info(ctx, "Deferring terminal failure mail/report until DAG-level retry becomes terminal",
+			slog.Int("retry-count", finishedStatus.RetryCount),
+			slog.Int("retry-limit", a.dag.RetryPolicy.Limit),
+		)
+	} else if err := a.reporter.send(ctx, a.dag, finishedStatus, lastErr); err != nil {
 		logger.Error(ctx, "Mail notification failed", tag.Error(err))
 	}
 
@@ -1035,23 +1076,32 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
+	source := a.statusSourceTarget()
+
 	// Handle case where runner wasn't initialized (early failure in Run())
 	if a.runner == nil {
 		statusOpts := []transform.StatusOption{
 			transform.WithAttemptID(a.dagRunAttemptID),
 			transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
 			transform.WithTriggerType(a.triggerType),
+			transform.WithRetryCount(a.currentRetryCount()),
 		}
-		if a.retryTarget != nil {
+		if source != nil {
 			statusOpts = append(statusOpts,
-				transform.WithQueuedAt(a.retryTarget.QueuedAt),
-				transform.WithCreatedAt(a.retryTarget.CreatedAt),
+				transform.WithQueuedAt(source.QueuedAt),
+				transform.WithCreatedAt(source.CreatedAt),
 			)
-			if a.retryTarget.ScheduleTime != "" {
-				statusOpts = append(statusOpts, transform.WithScheduleTime(a.retryTarget.ScheduleTime))
+			if source.ScheduleTime != "" {
+				statusOpts = append(statusOpts, transform.WithScheduleTime(source.ScheduleTime))
 			}
 		} else if a.scheduleTime != "" {
 			statusOpts = append(statusOpts, transform.WithScheduleTime(a.scheduleTime))
+		}
+		if a.failureFinalizationTarget != nil {
+			statusOpts = append(statusOpts,
+				transform.WithFailureFinalizingAt(a.failureFinalizationTarget.FailureFinalizingAt),
+				transform.WithFailureFinalizedAt(a.failureFinalizationTarget.FailureFinalizedAt),
+			)
 		}
 
 		return transform.NewStatusBuilder(a.dag).
@@ -1081,20 +1131,28 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 		transform.WithPreconditions(a.dag.Preconditions),
 		transform.WithWorkerID(a.workerID),
 		transform.WithTriggerType(a.triggerType),
+		transform.WithRetryCount(a.currentRetryCount()),
 	}
 
-	// If the current execution is a retry, copy timing data from the retry target.
+	// If the current execution is based on a persisted target, copy timing data
+	// from that target. Otherwise, use the schedule time provided directly.
 	// Otherwise, use the schedule time provided directly via CLI flag.
-	if a.retryTarget != nil {
+	if source != nil {
 		opts = append(opts,
-			transform.WithQueuedAt(a.retryTarget.QueuedAt),
-			transform.WithCreatedAt(a.retryTarget.CreatedAt),
+			transform.WithQueuedAt(source.QueuedAt),
+			transform.WithCreatedAt(source.CreatedAt),
 		)
-		if a.retryTarget.ScheduleTime != "" {
-			opts = append(opts, transform.WithScheduleTime(a.retryTarget.ScheduleTime))
+		if source.ScheduleTime != "" {
+			opts = append(opts, transform.WithScheduleTime(source.ScheduleTime))
 		}
 	} else if a.scheduleTime != "" {
 		opts = append(opts, transform.WithScheduleTime(a.scheduleTime))
+	}
+	if a.failureFinalizationTarget != nil {
+		opts = append(opts,
+			transform.WithFailureFinalizingAt(a.failureFinalizationTarget.FailureFinalizingAt),
+			transform.WithFailureFinalizedAt(a.failureFinalizationTarget.FailureFinalizedAt),
+		)
 	}
 
 	// Create the status object to record the current status.
@@ -1106,6 +1164,46 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 			a.plan.StartAt(),
 			opts...,
 		)
+}
+
+func (a *Agent) currentRetryCount() int {
+	if a.failureFinalizationTarget != nil {
+		return a.failureFinalizationTarget.RetryCount
+	}
+	if a.retryTarget == nil {
+		return 0
+	}
+	return a.retryTarget.RetryCount + 1
+}
+
+func (a *Agent) statusSourceTarget() *exec.DAGRunStatus {
+	if a.failureFinalizationTarget != nil {
+		return a.failureFinalizationTarget
+	}
+	return a.retryTarget
+}
+
+func (a *Agent) shouldDeferFailureHandling() bool {
+	if a.failureFinalizationTarget != nil {
+		return false
+	}
+	if !a.parentDAGRun.Zero() {
+		return false
+	}
+	if a.retryFailureWindow <= 0 || a.dag == nil || a.dag.RetryPolicy == nil {
+		return false
+	}
+	return a.currentRetryCount() < a.dag.RetryPolicy.Limit
+}
+
+func (a *Agent) shouldMarkFailureFinalized(status core.Status) bool {
+	if status != core.Failed {
+		return false
+	}
+	if a.failureFinalizationTarget != nil {
+		return true
+	}
+	return !a.shouldDeferFailureHandling()
 }
 
 // writeStatus writes the current status to storage.
@@ -1253,6 +1351,17 @@ func (a *Agent) newRunner(attempt exec.DAGRunAttempt) *runtime.Runner {
 		OnFailure:       a.dag.HandlerOn.Failure,
 		OnAbort:         a.dag.HandlerOn.Abort,
 		OnWait:          a.dag.HandlerOn.Wait,
+	}
+	if a.failureFinalizationTarget != nil {
+		failed := core.Failed
+		cfg.OnInit = nil
+		cfg.OnExit = nil
+		cfg.OnSuccess = nil
+		cfg.OnAbort = nil
+		cfg.OnWait = nil
+		cfg.ForcedStatus = &failed
+	} else if a.shouldDeferFailureHandling() {
+		cfg.OnFailure = nil
 	}
 
 	return runtime.New(cfg)
@@ -1538,10 +1647,35 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 // setupPlan setups the DAG plan. If is retry execution, it loads nodes
 // from the retry node so that it runs the same DAG as the previous run.
 func (a *Agent) setupPlan(ctx context.Context) error {
+	if a.failureFinalizationTarget != nil {
+		return a.setupFailureFinalizationPlan(ctx)
+	}
 	if a.retryTarget != nil {
 		return a.setupRetryPlan(ctx)
 	}
 	plan, err := runtime.NewPlan(a.dag.Steps...)
+	if err != nil {
+		return err
+	}
+	a.plan = plan
+	return nil
+}
+
+func (a *Agent) setupFailureFinalizationPlan(ctx context.Context) error {
+	nodes := make([]*runtime.Node, 0, len(a.failureFinalizationTarget.Nodes))
+	for _, n := range a.failureFinalizationTarget.Nodes {
+		nodes = append(nodes, transform.ToNode(n))
+	}
+	if len(nodes) == 0 {
+		logger.Warn(ctx, "Failure finalization target has no persisted nodes; falling back to DAG definition")
+		plan, err := runtime.NewPlan(a.dag.Steps...)
+		if err != nil {
+			return err
+		}
+		a.plan = plan
+		return nil
+	}
+	plan, err := runtime.NewPlanFromNodes(nodes...)
 	if err != nil {
 		return err
 	}
@@ -1598,6 +1732,31 @@ func (a *Agent) setupDefaultRetryPlan(ctx context.Context, nodes []*runtime.Node
 }
 
 func (a *Agent) setupDAGRunAttempt(ctx context.Context) (exec.DAGRunAttempt, error) {
+	if a.failureFinalizationTarget != nil {
+		if a.dagRunStore == nil {
+			logger.Debug(ctx, "Using no-op DAGRunAttempt for failure finalization in shared-nothing mode")
+			return exec.NewNoopDAGRunAttempt(a.failureFinalizationTarget.AttemptID, a.dag), nil
+		}
+
+		ref := exec.NewDAGRunRef(a.dag.Name, a.dagRunID)
+		attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find latest attempt for failure finalization: %w", err)
+		}
+
+		status, err := attempt.ReadStatus(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read latest attempt status for failure finalization: %w", err)
+		}
+		if a.failureFinalizationTarget.AttemptID != "" && status.AttemptID != a.failureFinalizationTarget.AttemptID {
+			return nil, fmt.Errorf("latest attempt changed during failure finalization: expected %s, got %s", a.failureFinalizationTarget.AttemptID, status.AttemptID)
+		}
+		if status.Status != core.Failed {
+			return nil, fmt.Errorf("latest attempt is no longer failed: %s", status.Status)
+		}
+		return attempt, nil
+	}
+
 	// In shared-nothing mode, dagRunStore is nil - return no-op attempt.
 	// Status updates are handled by statusPusher instead.
 	if a.dagRunStore == nil {

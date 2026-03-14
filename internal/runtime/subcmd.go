@@ -242,6 +242,22 @@ func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string) C
 	}
 }
 
+// FinalizeFailure creates a command spec for deferred terminal failure handling.
+func (b *SubCmdBuilder) FinalizeFailure(dag *core.DAG, dagRunID string) CmdSpec {
+	args := []string{"finalize-failure", fmt.Sprintf("--run-id=%s", dagRunID), "-q"}
+
+	if b.configFile != "" {
+		args = append(args, "--config", b.configFile)
+	}
+	args = append(args, dag.Name)
+
+	return CmdSpec{
+		Executable: b.executable,
+		Args:       args,
+		Env:        os.Environ(),
+	}
+}
+
 // TaskStart creates a start command spec for coordinator tasks.
 func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 	args := []string{"start", "-q"}
@@ -307,6 +323,25 @@ func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
 	}
 	// Use RootDagRunName instead of Target, because Target may be a temporary file
 	// created by the worker, but retry needs the original DAG name
+	args = append(args, task.RootDagRunName)
+
+	return CmdSpec{
+		Executable: b.executable,
+		Args:       args,
+		Env:        os.Environ(),
+	}
+}
+
+// TaskFinalizeFailure creates a finalize-failure command spec for coordinator tasks.
+func (b *SubCmdBuilder) TaskFinalizeFailure(task *coordinatorv1.Task) CmdSpec {
+	args := []string{"finalize-failure", fmt.Sprintf("--run-id=%s", task.DagRunId), "-q"}
+
+	if task.WorkerId != "" {
+		args = append(args, fmt.Sprintf("--worker-id=%s", task.WorkerId))
+	}
+	if b.configFile != "" {
+		args = append(args, "--config", b.configFile)
+	}
 	args = append(args, task.RootDagRunName)
 
 	return CmdSpec{

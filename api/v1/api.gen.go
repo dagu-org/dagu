@@ -1205,6 +1205,7 @@ type DAGRunDetails struct {
 
 	// QueuedAt RFC 3339 timestamp when the DAG-run was queued
 	QueuedAt     *string `json:"queuedAt,omitempty"`
+	RetryCount   int     `json:"retryCount"`
 	RootDAGRunId string  `json:"rootDAGRunId"`
 
 	// RootDAGRunName Name of the root DAG-run
@@ -1269,6 +1270,9 @@ type DAGRunSummary struct {
 
 	// QueuedAt RFC 3339 timestamp when the DAG-run was queued
 	QueuedAt *string `json:"queuedAt,omitempty"`
+
+	// RetryCount Number of completed retry attempts for this DAG-run
+	RetryCount int `json:"retryCount"`
 
 	// ScheduleTime RFC 3339 timestamp of when the DAG-run was scheduled to run
 	ScheduleTime *string `json:"scheduleTime,omitempty"`

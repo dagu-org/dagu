@@ -115,8 +115,8 @@ func runRetry(ctx *Context, args []string) error {
 // enqueueRetry enqueues the retry and persists Queued status via exec.EnqueueRetry.
 // Retries respect global queue capacity because the queue processor picks them up
 // when capacity is available.
-func enqueueRetry(ctx *Context, attempt exec.DAGRunAttempt, dag *core.DAG, status *exec.DAGRunStatus, dagRunID string) error {
-	if err := exec.EnqueueRetry(ctx.Context, ctx.QueueStore, attempt, dag, status, dagRunID); err != nil {
+func enqueueRetry(ctx *Context, _ exec.DAGRunAttempt, dag *core.DAG, status *exec.DAGRunStatus, dagRunID string) error {
+	if err := exec.EnqueueRetry(ctx.Context, ctx.DAGRunStore, ctx.QueueStore, dag, status); err != nil {
 		return err
 	}
 	logger.Info(ctx, "Enqueued retry; will run when queue capacity is available",
@@ -178,6 +178,7 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 			AgentSkillStore:         as.SkillStore,
 			AgentSoulStore:          as.SoulStore,
 			AgentRemoteNodeResolver: as.RemoteNodeResolver,
+			RetryFailureWindow:      ctx.Config.Scheduler.RetryFailureWindow,
 		},
 	)
 

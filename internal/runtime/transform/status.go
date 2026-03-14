@@ -173,6 +173,29 @@ func WithTriggerType(triggerType core.TriggerType) StatusOption {
 	}
 }
 
+// WithRetryCount returns a StatusOption that sets the DAG-run retry count.
+func WithRetryCount(retryCount int) StatusOption {
+	return func(s *exec.DAGRunStatus) {
+		s.RetryCount = retryCount
+	}
+}
+
+// WithFailureFinalizingAt returns a StatusOption that sets the in-flight
+// deferred failure finalization marker.
+func WithFailureFinalizingAt(formattedTime string) StatusOption {
+	return func(s *exec.DAGRunStatus) {
+		s.FailureFinalizingAt = formattedTime
+	}
+}
+
+// WithFailureFinalizedAt returns a StatusOption that sets the completed
+// deferred failure finalization marker.
+func WithFailureFinalizedAt(formattedTime string) StatusOption {
+	return func(s *exec.DAGRunStatus) {
+		s.FailureFinalizedAt = formattedTime
+	}
+}
+
 // Create builds a Status object for a dag-run with the specified parameters
 func (f *StatusBuilder) Create(
 	dagRunID string,
