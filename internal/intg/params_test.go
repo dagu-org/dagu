@@ -22,15 +22,15 @@ func TestInlineParams_DefaultsAndJSONSerialization(t *testing.T) {
 	dagFile := th.CreateDAGFile(t, "inline-defaults.yaml", `
 name: inline-defaults
 params:
-  - region:
-      default: us-east-1
-      type: string
-  - count:
-      default: 3
-      type: integer
-  - debug:
-      default: false
-      type: boolean
+  - name: region
+    default: us-east-1
+    type: string
+  - name: count
+    default: 3
+    type: integer
+  - name: debug
+    default: false
+    type: boolean
 steps:
   - name: shell-values
     command: echo "region=$region count=$count debug=$debug"
@@ -69,9 +69,9 @@ func TestInlineParams_StartFailsWhenRequiredMissing(t *testing.T) {
 	dagFile := th.CreateDAGFile(t, "inline-required.yaml", `
 name: inline-required
 params:
-  - region:
-      type: string
-      required: true
+  - name: region
+    type: string
+    required: true
 steps:
   - name: should-not-run
     command: echo "region=$region"
@@ -95,12 +95,12 @@ func TestInlineParams_StartFailsOnInvalidTypedValue(t *testing.T) {
 	dagFile := th.CreateDAGFile(t, "inline-invalid.yaml", `
 name: inline-invalid
 params:
-  - region:
-      type: string
-      required: true
-  - count:
-      type: integer
-      required: true
+  - name: region
+    type: string
+    required: true
+  - name: count
+    type: integer
+    required: true
 steps:
   - name: should-not-run
     command: echo "region=$region count=$count"
@@ -137,18 +137,18 @@ steps:
 ---
 name: inline-subdag-child
 params:
-  - region:
-      type: string
-      enum: [us-east-1, us-west-2]
-      required: true
-  - count:
-      type: integer
-      minimum: 1
-      maximum: 10
-      required: true
-  - debug:
-      type: boolean
-      required: true
+  - name: region
+    type: string
+    enum: [us-east-1, us-west-2]
+    required: true
+  - name: count
+    type: integer
+    minimum: 1
+    maximum: 10
+    required: true
+  - name: debug
+    type: boolean
+    required: true
 steps:
   - name: shell-values
     command: echo "region=$region count=$count debug=$debug"

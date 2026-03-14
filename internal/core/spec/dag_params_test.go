@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,19 +21,19 @@ func TestInlineParamDefs_MetadataAndExecution(t *testing.T) {
 	yaml := []byte(`
 name: inline-params
 params:
-  - region:
-      description: AWS region
-      type: string
-      enum: [us-east-1, us-west-2]
-      required: true
-  - instance_count:
-      default: 3
-      type: integer
-      minimum: 1
-      maximum: 10
-  - debug:
-      default: false
-      type: boolean
+  - name: region
+    description: AWS region
+    type: string
+    enum: [us-east-1, us-west-2]
+    required: true
+  - name: instance_count
+    default: 3
+    type: integer
+    minimum: 1
+    maximum: 10
+  - name: debug
+    default: false
+    type: boolean
 `)
 
 	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
@@ -72,10 +73,10 @@ func TestInlineParamDefs_MixedLegacyAndInline(t *testing.T) {
 	yaml := []byte(`
 name: mixed-params
 params:
-  - environment:
-      type: string
-      enum: [dev, staging, prod]
-      default: staging
+  - name: environment
+    type: string
+    enum: [dev, staging, prod]
+    default: staging
   - TAG: latest
   - DRY_RUN: "true"
 `)
@@ -104,9 +105,9 @@ func TestInlineParamDefs_RejectDuplicateNames(t *testing.T) {
 name: duplicate-inline-params
 params:
   - region=us-east-1
-  - region:
-      type: string
-      default: us-west-2
+  - name: region
+    type: string
+    default: us-west-2
 `)
 
 	_, err := LoadYAML(context.Background(), yaml, WithoutEval())
@@ -120,15 +121,106 @@ func TestInlineParamDefs_RejectDefaultPatternMismatch(t *testing.T) {
 	yaml := []byte(`
 name: invalid-inline-default
 params:
-  - project_name:
-      type: string
-      default: INVALID_NAME
-      pattern: "^[a-z][a-z0-9-]*$"
+  - name: project_name
+    type: string
+    default: INVALID_NAME
+    pattern: "^[a-z][a-z0-9-]*$"
 `)
 
 	_, err := LoadYAML(context.Background(), yaml, WithoutEval())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `default does not match pattern`)
+}
+
+func TestInlineParamDefs_RejectLegacyNestedMapSyntax(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: invalid-inline-shape
+params:
+  - region:
+      type: string
+      default: us-west-2
+`)
+
+	_, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must use object form with name")
+	assert.Contains(t, err.Error(), "rewrite")
+}
+
+func TestInlineParamDefs_NameOnlyEntryRemainsLegacyParam(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: legacy-name-param
+params:
+  - name: foo
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	require.Len(t, dag.ParamDefs, 1)
+	assert.Equal(t, "name", dag.ParamDefs[0].Name)
+	assert.Equal(t, core.ParamDefTypeString, dag.ParamDefs[0].Type)
+	assert.Equal(t, "foo", dag.ParamDefs[0].Default)
+	assert.Equal(t, []string{"name=foo"}, dag.Params)
+	assert.Equal(t, `name="foo"`, dag.DefaultParams)
+}
+
+func TestInlineParamDefs_LocalDAGYamlReload(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: inline-subdag-parent
+steps:
+  - name: invoke-child
+    call: inline-subdag-child
+
+---
+name: inline-subdag-child
+params:
+  - name: region
+    type: string
+    enum: [us-east-1, us-west-2]
+    required: true
+  - name: count
+    type: integer
+    minimum: 1
+    maximum: 10
+    required: true
+  - name: debug
+    type: boolean
+    required: true
+steps:
+  - name: shell-values
+    command: echo "region=$region count=$count debug=$debug"
+`)
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "inline-subdag.yaml")
+	require.NoError(t, os.WriteFile(path, yaml, 0o600))
+
+	dag, err := Load(context.Background(), path, WithoutEval())
+	require.NoError(t, err)
+
+	child, ok := dag.LocalDAGs["inline-subdag-child"]
+	require.True(t, ok)
+	require.NotEmpty(t, child.YamlData)
+
+	tempFile, err := fileutil.CreateTempDAGFile("spec-tests", child.Name, child.YamlData)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(tempFile) })
+
+	reloaded, err := Load(
+		context.Background(),
+		tempFile,
+		WithoutEval(),
+		WithName(child.Name),
+		WithParams("region=us-west-2 count=5 debug=true"),
+	)
+	require.NoError(t, err)
+	require.Equal(t, []string{"region=us-west-2", "count=5", "debug=true"}, reloaded.Params)
 }
 
 func TestExternalSchemaParamDefs_MetadataAndExecution(t *testing.T) {

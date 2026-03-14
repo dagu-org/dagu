@@ -20,14 +20,14 @@ func TestResolveRuntimeParams(t *testing.T) {
 	yaml := []byte(`
 name: runtime-params
 params:
-  - region:
-      type: string
-      enum: [us-east-1, us-west-2]
-      required: true
-  - count:
-      default: 3
-      type: integer
-      minimum: 1
+  - name: region
+    type: string
+    enum: [us-east-1, us-west-2]
+    required: true
+  - name: count
+    default: 3
+    type: integer
+    minimum: 1
 `)
 
 	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
@@ -46,9 +46,9 @@ func TestResolveRuntimeParams_ValidatesEmptyRuntimeInput(t *testing.T) {
 	yaml := []byte(`
 name: runtime-params
 params:
-  - region:
-      type: string
-      required: true
+  - name: region
+    type: string
+    required: true
 `)
 
 	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
@@ -76,10 +76,10 @@ func TestResolveRuntimeParams_RejectsInvalidEnum(t *testing.T) {
 	yaml := []byte(`
 name: runtime-params
 params:
-  - region:
-      type: string
-      enum: [us-east-1, us-west-2]
-      required: true
+  - name: region
+    type: string
+    enum: [us-east-1, us-west-2]
+    required: true
 `)
 
 	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
@@ -97,9 +97,9 @@ func TestResolveRuntimeParams_RejectsCoercionError(t *testing.T) {
 	yaml := []byte(`
 name: runtime-params
 params:
-  - count:
-      type: integer
-      required: true
+  - name: count
+    type: integer
+    required: true
 `)
 
 	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
@@ -117,11 +117,11 @@ func TestResolveRuntimeParams_RejectsBoundaryViolation(t *testing.T) {
 	yaml := []byte(`
 name: runtime-params
 params:
-  - count:
-      type: integer
-      minimum: 1
-      maximum: 5
-      required: true
+  - name: count
+    type: integer
+    minimum: 1
+    maximum: 5
+    required: true
 `)
 
 	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())

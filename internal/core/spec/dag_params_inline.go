@@ -25,24 +25,56 @@ type compiledInlineParamSchema struct {
 }
 
 func detectInlineParamDefinition(item map[string]any) (*inlineParamDefinition, error) {
-	if len(item) != 1 {
-		for _, value := range item {
-			if _, ok := value.(map[string]any); ok {
-				return nil, fmt.Errorf("inline parameter definitions must be single-key maps")
-			}
-		}
+	if isLegacyInlineParamDefinition(item) {
+		return nil, inlineParamLegacyShapeError(item)
+	}
+
+	nameValue, hasName := item["name"]
+	if !hasName || len(item) == 1 {
 		return nil, nil
 	}
 
-	for name, value := range item {
-		nested, ok := value.(map[string]any)
-		if !ok {
-			return nil, nil
-		}
-		return &inlineParamDefinition{name: name, fields: nested}, nil
+	name, ok := nameValue.(string)
+	if !ok {
+		return nil, fmt.Errorf(`inline parameter definition field "name" must be a string`)
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, fmt.Errorf(`inline parameter definition field "name" must not be empty`)
 	}
 
-	return nil, nil
+	fields := make(map[string]any, len(item)-1)
+	for key, value := range item {
+		if key == "name" {
+			continue
+		}
+		fields[key] = value
+	}
+
+	return &inlineParamDefinition{name: name, fields: fields}, nil
+}
+
+func isLegacyInlineParamDefinition(item map[string]any) bool {
+	for _, value := range item {
+		if _, ok := value.(map[string]any); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func inlineParamLegacyShapeError(item map[string]any) error {
+	for name, value := range item {
+		if _, ok := value.(map[string]any); !ok {
+			continue
+		}
+		return fmt.Errorf(
+			"inline parameter definitions must use object form with name; rewrite `- %s: { ... }` as `- name: %s` with the definition fields on the same object",
+			name,
+			name,
+		)
+	}
+	return fmt.Errorf(`inline parameter definitions must use object form with "name"`)
 }
 
 func parseInlineParamDefinition(name string, raw map[string]any) (core.ParamDef, dagParamEntry, error) {
@@ -63,6 +95,10 @@ func parseInlineParamDefinition(name string, raw map[string]any) (core.ParamDef,
 		"min_length":  {},
 		"max_length":  {},
 		"pattern":     {},
+	}
+
+	if len(raw) == 0 {
+		return def, entry, fmt.Errorf("parameter %q must define at least one field in addition to name", name)
 	}
 
 	for key := range raw {

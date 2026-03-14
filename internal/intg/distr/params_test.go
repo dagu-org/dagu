@@ -25,18 +25,18 @@ name: worker-inline-child
 worker_selector:
   type: test-worker
 params:
-  - region:
-      type: string
-      enum: [us-east-1, us-west-2]
-      required: true
-  - count:
-      type: integer
-      minimum: 1
-      maximum: 10
-      required: true
-  - debug:
-      type: boolean
-      required: true
+  - name: region
+    type: string
+    enum: [us-east-1, us-west-2]
+    required: true
+  - name: count
+    type: integer
+    minimum: 1
+    maximum: 10
+    required: true
+  - name: debug
+    type: boolean
+    required: true
 steps:
   - name: shell-values
     command: echo "region=$region count=$count debug=$debug"
@@ -78,15 +78,15 @@ name: worker-inline-child
 worker_selector:
   type: test-worker
 params:
-  - region:
-      type: string
-      enum: [us-east-1, us-west-2]
-      required: true
-  - count:
-      type: integer
-      minimum: 1
-      maximum: 10
-      required: true
+  - name: region
+    type: string
+    enum: [us-east-1, us-west-2]
+    required: true
+  - name: count
+    type: integer
+    minimum: 1
+    maximum: 10
+    required: true
 steps:
   - name: shell-values
     command: echo "region=$region count=$count"
