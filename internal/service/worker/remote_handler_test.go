@@ -14,10 +14,12 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/runtime/remote"
+	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/test"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -788,6 +790,77 @@ func TestHandleRetry(t *testing.T) {
 
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "retry requires previous_status in task for shared-nothing mode")
+	})
+
+	t.Run("QueuedCatchupPreservesTriggerType", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `name: remote-catchup-dag
+steps:
+  - name: step1
+    command: echo remote catchup
+`)
+
+		runID := "remote-catchup-run"
+		status := transform.NewStatusBuilder(dag.DAG).Create(
+			runID,
+			core.Queued,
+			0,
+			time.Time{},
+			transform.WithAttemptID("queued-attempt"),
+			transform.WithTriggerType(core.TriggerTypeCatchUp),
+			transform.WithQueuedAt(stringutil.FormatTime(time.Now())),
+			transform.WithScheduleTime(stringutil.FormatTime(time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC))),
+		)
+
+		previousStatus, convErr := convert.DAGRunStatusToProto(&status)
+		require.NoError(t, convErr)
+
+		var (
+			mu       sync.Mutex
+			reported []*exec.DAGRunStatus
+		)
+		client := newMockRemoteCoordinatorClient()
+		client.ReportStatusFunc = func(_ context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+			got, err := convert.ProtoToDAGRunStatus(req.Status)
+			require.NoError(t, err)
+			mu.Lock()
+			reported = append(reported, got)
+			mu.Unlock()
+			return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
+		}
+
+		handler := &remoteTaskHandler{
+			workerID:          "test-worker",
+			coordinatorClient: client,
+			dagRunStore:       nil,
+			dagStore:          th.DAGStore,
+			dagRunMgr:         th.DAGRunMgr,
+			serviceRegistry:   th.ServiceRegistry,
+			config:            th.Config,
+		}
+
+		task := &coordinatorv1.Task{
+			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
+			Target:         dag.Name,
+			Definition:     string(dag.YamlData),
+			PreviousStatus: previousStatus,
+			RootDagRunName: dag.Name,
+			RootDagRunId:   runID,
+			DagRunId:       runID,
+		}
+
+		err := handler.handleRetry(th.Context, task)
+		require.NoError(t, err)
+
+		mu.Lock()
+		defer mu.Unlock()
+		require.NotEmpty(t, reported)
+
+		final := reported[len(reported)-1]
+		require.Equal(t, core.Succeeded, final.Status)
+		require.Equal(t, core.TriggerTypeCatchUp, final.TriggerType)
 	})
 
 	t.Run("SharedNothingModeWithEmbeddedStatus", func(t *testing.T) {

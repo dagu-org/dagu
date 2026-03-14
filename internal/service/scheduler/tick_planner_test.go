@@ -870,6 +870,73 @@ func TestTickPlanner_IsRunningErrorAssumesNotRunning(t *testing.T) {
 	assert.Len(t, runs, 1, "should still dispatch catchup run when IsRunning returns error")
 }
 
+func TestTickPlanner_IsQueuedErrorDefersCatchupWithoutDroppingState(t *testing.T) {
+	t.Parallel()
+
+	store := &mockWatermarkStore{
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)),
+	}
+
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore: store,
+		QueuesEnabled:  true,
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{}, nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		IsQueued: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, errors.New("queue read failed")
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "run-1", nil
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+		Events: eventCh,
+	})
+
+	dag := newHourlyCatchupDAG(t, "queue-error-dag")
+	dag.OverlapPolicy = core.OverlapPolicySkip
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	initialBuf, ok := tp.buffers["queue-error-dag"]
+	require.True(t, ok)
+	initialLen := initialBuf.Len()
+	initialItem, ok := initialBuf.Peek()
+	require.True(t, ok)
+
+	tp.mu.RLock()
+	initialWatermark, hadInitialWatermark := tp.watermarkState.DAGs["queue-error-dag"]
+	tp.mu.RUnlock()
+
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+
+	assert.Len(t, runs, 0, "planner should defer the DAG instead of emitting live or catchup runs")
+
+	buf, ok := tp.buffers["queue-error-dag"]
+	require.True(t, ok, "catchup buffer must remain intact on queue read error")
+	assert.Equal(t, initialLen, buf.Len())
+	item, ok := buf.Peek()
+	require.True(t, ok)
+	assert.Equal(t, initialItem.ScheduledTime, item.ScheduledTime)
+
+	tp.mu.RLock()
+	deferWatermark, hasDeferredWatermark := tp.watermarkState.DAGs["queue-error-dag"]
+	tp.mu.RUnlock()
+	assert.Equal(t, hadInitialWatermark, hasDeferredWatermark)
+	if hadInitialWatermark {
+		assert.Equal(t, initialWatermark.LastScheduledTime, deferWatermark.LastScheduledTime)
+	}
+}
+
 func TestTickPlanner_GetLatestStatusErrorSkipsStop(t *testing.T) {
 	t.Parallel()
 

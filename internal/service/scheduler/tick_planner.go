@@ -348,6 +348,7 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 
 		// Check catchup buffer first (catchup has priority over live)
 		catchupProduced := false
+		catchupDeferred := false
 		if buf, ok := tp.buffers[dagName]; ok {
 			item, hasItem := buf.Peek()
 			if !hasItem {
@@ -364,64 +365,64 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 
 				queued, qErr := tp.cfg.IsQueued(ctx, item.DAG)
 				if qErr != nil {
-					logger.Error(ctx, "Failed to check if DAG is queued; assuming busy",
+					logger.Error(ctx, "Failed to check if DAG is queued; deferring catch-up item",
 						tag.DAG(dagName),
 						tag.Error(qErr),
 					)
-					queued = true
-				}
-
-				busy := running || queued
-				if !busy {
-					// For "latest", collapse to most recent before popping.
-					if buf.overlapPolicy == core.OverlapPolicyLatest && buf.Len() > 1 {
-						dropped := buf.DropAllButLast()
-						tp.advanceDAGWatermark(dagName, dropped[len(dropped)-1].ScheduledTime)
-						// Re-peek: front changed from oldest to latest
-						item, _ = buf.Peek()
-					}
-					buf.Pop()
-					run, ok := tp.createPlannedRun(ctx, item.DAG, item.ScheduledTime, item.TriggerType)
-					if ok {
-						candidates = append(candidates, run)
-						catchupProduced = true
-					}
+					catchupDeferred = true
 				} else {
-					switch buf.overlapPolicy {
-					case core.OverlapPolicySkip:
-						popped, _ := buf.Pop()
-						logger.Info(ctx, "Catch-up run skipped (overlap policy: skip)",
-							tag.DAG(dagName),
-						)
-						tp.advanceDAGWatermark(dagName, popped.ScheduledTime)
-					case core.OverlapPolicyAll:
-						// leave in buffer, retry next tick
-					case core.OverlapPolicyLatest:
-						// Collapse to latest, advance watermark past discarded items.
-						dropped := buf.DropAllButLast()
-						if len(dropped) > 0 {
+					busy := running || queued
+					if !busy {
+						// For "latest", collapse to most recent before popping.
+						if buf.overlapPolicy == core.OverlapPolicyLatest && buf.Len() > 1 {
+							dropped := buf.DropAllButLast()
 							tp.advanceDAGWatermark(dagName, dropped[len(dropped)-1].ScheduledTime)
+							// Re-peek: front changed from oldest to latest
+							item, _ = buf.Peek()
 						}
-						// Leave the single remaining (latest) item for retry next tick.
-					default:
-						popped, _ := buf.Pop()
-						logger.Warn(ctx, "Unknown overlap policy, treating as skip",
-							tag.DAG(dagName),
-							slog.String("overlapPolicy", string(buf.overlapPolicy)),
-						)
-						tp.advanceDAGWatermark(dagName, popped.ScheduledTime)
+						buf.Pop()
+						run, ok := tp.createPlannedRun(ctx, item.DAG, item.ScheduledTime, item.TriggerType)
+						if ok {
+							candidates = append(candidates, run)
+							catchupProduced = true
+						}
+					} else {
+						switch buf.overlapPolicy {
+						case core.OverlapPolicySkip:
+							popped, _ := buf.Pop()
+							logger.Info(ctx, "Catch-up run skipped (overlap policy: skip)",
+								tag.DAG(dagName),
+							)
+							tp.advanceDAGWatermark(dagName, popped.ScheduledTime)
+						case core.OverlapPolicyAll:
+							// leave in buffer, retry next tick
+						case core.OverlapPolicyLatest:
+							// Collapse to latest, advance watermark past discarded items.
+							dropped := buf.DropAllButLast()
+							if len(dropped) > 0 {
+								tp.advanceDAGWatermark(dagName, dropped[len(dropped)-1].ScheduledTime)
+							}
+							// Leave the single remaining (latest) item for retry next tick.
+						default:
+							popped, _ := buf.Pop()
+							logger.Warn(ctx, "Unknown overlap policy, treating as skip",
+								tag.DAG(dagName),
+								slog.String("overlapPolicy", string(buf.overlapPolicy)),
+							)
+							tp.advanceDAGWatermark(dagName, popped.ScheduledTime)
+						}
 					}
-				}
 
-				// Clean up empty buffers
-				if buf.Len() == 0 {
-					delete(tp.buffers, dagName)
+					// Clean up empty buffers
+					if buf.Len() == 0 {
+						delete(tp.buffers, dagName)
+					}
 				}
 			}
 		}
 
-		// If catchup produced a run, skip live eval (catchup has priority)
-		if catchupProduced {
+		// If catchup produced a run or was deferred, skip live eval.
+		if catchupProduced || catchupDeferred {
 			continue
 		}
 

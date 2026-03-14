@@ -10,6 +10,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/logpath"
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
@@ -30,6 +31,7 @@ func EnqueueCatchupRun(
 	ctx context.Context,
 	dagRunStore exec.DAGRunStore,
 	queueStore exec.QueueStore,
+	baseLogDir string,
 	dag *core.DAG,
 	runID string,
 	triggerType core.TriggerType,
@@ -51,6 +53,11 @@ func EnqueueCatchupRun(
 	// (same as cmd/enqueue.go:87).
 	dagCopy := dag.Clone()
 	dagCopy.Location = ""
+
+	logFile, err := logpath.Generate(ctx, baseLogDir, dagCopy.LogDir, dagCopy.Name, runID)
+	if err != nil {
+		return fmt.Errorf("failed to generate catchup log file name: %w", err)
+	}
 
 	att, err := dagRunStore.CreateAttempt(ctx, dagCopy, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
 	if err != nil {
@@ -75,6 +82,7 @@ func EnqueueCatchupRun(
 	}()
 
 	opts := []transform.StatusOption{
+		transform.WithLogFilePath(logFile),
 		transform.WithAttemptID(att.ID()),
 		transform.WithPreconditions(dagCopy.Preconditions),
 		transform.WithQueuedAt(stringutil.FormatTime(time.Now())),

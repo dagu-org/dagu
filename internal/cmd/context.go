@@ -20,10 +20,10 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/crypto"
-	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/logpath"
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/cmn/telemetry"
 	"github.com/dagu-org/dagu/internal/core"
@@ -564,35 +564,7 @@ func (c *Context) OpenLogFile(
 
 // GenLogFileName generates a log file name based on the DAG and dag-run ID.
 func (c *Context) GenLogFileName(dag *core.DAG, dagRunID string) (string, error) {
-	// Read the global configuration for log directory.
-	baseLogDir, err := eval.String(c, c.Config.Paths.LogDir, eval.WithOSExpansion())
-	if err != nil {
-		return "", fmt.Errorf("failed to expand log directory: %w", err)
-	}
-
-	// Read the log directory configuration from the DAG.
-	dagLogDir, err := eval.String(c, dag.LogDir, eval.WithOSExpansion())
-	if err != nil {
-		return "", fmt.Errorf("failed to expand DAG log directory: %w", err)
-	}
-
-	cfg := LogConfig{
-		BaseDir:   baseLogDir,
-		DAGLogDir: dagLogDir,
-		Name:      dag.Name,
-		DAGRunID:  dagRunID,
-	}
-
-	if err := cfg.Validate(); err != nil {
-		return "", fmt.Errorf("invalid log settings: %w", err)
-	}
-
-	d, err := cfg.LogDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to setup log directory: %w", err)
-	}
-
-	return filepath.Join(d, cfg.LogFile()), nil
+	return logpath.Generate(c, c.Config.Paths.LogDir, dag.LogDir, dag.Name, dagRunID)
 }
 
 // NewCommand creates a new command instance with the given cobra command and run function.
@@ -672,47 +644,7 @@ func listenSignals(ctx context.Context, listener signalListener) {
 }
 
 // LogConfig defines configuration for log file creation.
-type LogConfig struct {
-	BaseDir   string // Base directory for logs.
-	DAGLogDir string // Optional alternative log directory specified by the DAG definition.
-	Name      string // Name of the DAG; used for generating a safe directory name.
-	DAGRunID  string // Unique dag-run ID used in the filename.
-}
-
-// Validate checks that essential fields are provided.
-// It requires that DAGName is not empty and that at least one log directory is specified.
-func (cfg LogConfig) Validate() error {
-	if cfg.Name == "" {
-		return fmt.Errorf("DAGName cannot be empty")
-	}
-	if cfg.BaseDir == "" && cfg.DAGLogDir == "" {
-		return fmt.Errorf("either LogDir or DAGLogDir must be specified")
-	}
-	return nil
-}
-
-// LogDir creates (if necessary) and returns the log directory based on the log file settings.
-// It uses a safe version of the DAG name to avoid issues with invalid filesystem characters.
-func (cfg LogConfig) LogDir() (string, error) {
-	// Choose the base directory: if DAGLogDir is provided, use it; otherwise use LogDir.
-	baseDir := cfg.BaseDir
-	if cfg.DAGLogDir != "" {
-		baseDir = cfg.DAGLogDir
-	}
-	if baseDir == "" {
-		return "", fmt.Errorf("base log directory is not set")
-	}
-
-	utcTimestamp := time.Now().UTC().Format("20060102_150405Z")
-
-	safeName := fileutil.SafeName(cfg.Name)
-	logDir := filepath.Join(baseDir, safeName, "dag-run_"+utcTimestamp+"_"+cfg.DAGRunID)
-	if err := os.MkdirAll(logDir, 0750); err != nil {
-		return "", fmt.Errorf("failed to initialize directory %s: %w", logDir, err)
-	}
-
-	return logDir, nil
-}
+type LogConfig = logpath.Config
 
 // RecordEarlyFailure records a failure in the execution history before the DAG has fully started.
 // This is used for infrastructure errors like singleton conflicts or process acquisition failures.
@@ -759,16 +691,4 @@ func (c *Context) RecordEarlyFailure(dag *core.DAG, dagRunID string, err error) 
 	}
 
 	return nil
-}
-
-// LogFile constructs the log filename using the prefix, safe DAG name, current timestamp,
-// and a truncated version of the dag-run ID.
-func (cfg LogConfig) LogFile() string {
-	timestamp := time.Now().Format("20060102.150405.000")
-	truncDAGRunID := stringutil.TruncString(cfg.DAGRunID, 8)
-
-	return fmt.Sprintf("dag-run_%s.%s.log",
-		timestamp,
-		truncDAGRunID,
-	)
 }

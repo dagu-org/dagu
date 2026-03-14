@@ -143,17 +143,20 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 
 	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
+	triggerType := exec.PreservedQueueTriggerType(status)
 
 	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, false, &retryConfig{
-		target:   status,
-		stepName: task.Step,
+		target:      status,
+		stepName:    task.Step,
+		triggerType: triggerType,
 	})
 }
 
 // retryConfig holds retry-specific configuration
 type retryConfig struct {
-	target   *exec.DAGRunStatus
-	stepName string
+	target      *exec.DAGRunStatus
+	stepName    string
+	triggerType core.TriggerType
 }
 
 // createRemoteHandlers creates the status pusher and log streamer for remote execution.
@@ -345,6 +348,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 	if retry != nil {
 		opts.RetryTarget = retry.target
 		opts.StepRetry = retry.stepName
+		opts.TriggerType = retry.triggerType
 	}
 
 	// Create the agent
