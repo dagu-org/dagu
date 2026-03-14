@@ -223,7 +223,7 @@ func (f *fixture) RetryEnqueue(runID string) *fixture {
 	require.NoError(f.t, err)
 	status, err := att.ReadStatus(f.th.Context)
 	require.NoError(f.t, err)
-	require.NoError(f.t, exec.EnqueueRetry(f.th.Context, f.th.QueueStore, att, f.dag, status, runID))
+	require.NoError(f.t, exec.EnqueueRetry(f.th.Context, f.th.DAGRunStore, f.th.QueueStore, f.dag, status))
 	return f
 }
 

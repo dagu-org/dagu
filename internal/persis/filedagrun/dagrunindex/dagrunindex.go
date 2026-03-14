@@ -5,6 +5,7 @@ package dagrunindex
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -250,7 +251,7 @@ func writeIndex(dayDir string, entries []Entry) error {
 			TriggerType:         int32(e.TriggerType), //nolint:gosec
 			CreatedAt:           e.CreatedAt,
 			AttemptId:           e.AttemptID,
-			RetryCount:          int32(e.RetryCount),
+			RetryCount:          int32(min(e.RetryCount, math.MaxInt32)), //nolint:gosec
 		})
 	}
 

@@ -45,39 +45,39 @@ func InitialStatus(dag *core.DAG) DAGRunStatus {
 
 // DAGRunStatus represents the complete execution state of a dag-run.
 type DAGRunStatus struct {
-	Root          DAGRunRef         `json:"root,omitzero"`
-	Parent        DAGRunRef         `json:"parent,omitzero"`
-	Name          string            `json:"name"`
-	DAGRunID      string            `json:"dagRunId"`
-	AttemptID     string            `json:"attemptId"`
-	AttemptKey    string            `json:"attemptKey,omitempty"` // Globally unique attempt identifier
-	Status        core.Status       `json:"status"`
-	TriggerType   core.TriggerType  `json:"triggerType,omitempty"`
-	WorkerID      string            `json:"workerId,omitempty"`
-	PID           PID               `json:"pid,omitempty"`
-	Nodes         []*Node           `json:"nodes,omitempty"`
-	OnInit        *Node             `json:"onInit,omitempty"`
-	OnExit        *Node             `json:"onExit,omitempty"`
-	OnSuccess     *Node             `json:"onSuccess,omitempty"`
-	OnFailure     *Node             `json:"onFailure,omitempty"`
-	OnAbort       *Node             `json:"onAbort,omitempty"`
-	OnWait        *Node             `json:"onWait,omitempty"`
-	CreatedAt     int64             `json:"createdAt,omitempty"`
-	QueuedAt      string            `json:"queuedAt,omitempty"`
-	ScheduleTime  string            `json:"scheduleTime,omitempty"`
-	StartedAt     string            `json:"startedAt,omitempty"`
-	FinishedAt    string            `json:"finishedAt,omitempty"`
-	RetryCount    int               `json:"retryCount,omitempty"`
+	Root         DAGRunRef        `json:"root,omitzero"`
+	Parent       DAGRunRef        `json:"parent,omitzero"`
+	Name         string           `json:"name"`
+	DAGRunID     string           `json:"dagRunId"`
+	AttemptID    string           `json:"attemptId"`
+	AttemptKey   string           `json:"attemptKey,omitempty"` // Globally unique attempt identifier
+	Status       core.Status      `json:"status"`
+	TriggerType  core.TriggerType `json:"triggerType,omitempty"`
+	WorkerID     string           `json:"workerId,omitempty"`
+	PID          PID              `json:"pid,omitempty"`
+	Nodes        []*Node          `json:"nodes,omitempty"`
+	OnInit       *Node            `json:"onInit,omitempty"`
+	OnExit       *Node            `json:"onExit,omitempty"`
+	OnSuccess    *Node            `json:"onSuccess,omitempty"`
+	OnFailure    *Node            `json:"onFailure,omitempty"`
+	OnAbort      *Node            `json:"onAbort,omitempty"`
+	OnWait       *Node            `json:"onWait,omitempty"`
+	CreatedAt    int64            `json:"createdAt,omitempty"`
+	QueuedAt     string           `json:"queuedAt,omitempty"`
+	ScheduleTime string           `json:"scheduleTime,omitempty"`
+	StartedAt    string           `json:"startedAt,omitempty"`
+	FinishedAt   string           `json:"finishedAt,omitempty"`
+	RetryCount   int              `json:"retryCount,omitempty"`
 	// FailureFinalizingAt marks an in-flight deferred failure finalization.
 	FailureFinalizingAt string `json:"failureFinalizingAt,omitempty"`
 	// FailureFinalizedAt marks that deferred failure handling has completed.
-	FailureFinalizedAt string `json:"failureFinalizedAt,omitempty"`
-	Log           string            `json:"log,omitempty"`
-	Error         string            `json:"error,omitempty"`
-	Params        string            `json:"params,omitempty"`
-	ParamsList    []string          `json:"paramsList,omitempty"`
-	Preconditions []*core.Condition `json:"preconditions,omitempty"`
-	Tags          []string          `json:"tags,omitempty"`
+	FailureFinalizedAt string            `json:"failureFinalizedAt,omitempty"`
+	Log                string            `json:"log,omitempty"`
+	Error              string            `json:"error,omitempty"`
+	Params             string            `json:"params,omitempty"`
+	ParamsList         []string          `json:"paramsList,omitempty"`
+	Preconditions      []*core.Condition `json:"preconditions,omitempty"`
+	Tags               []string          `json:"tags,omitempty"`
 }
 
 // DAGRun returns a reference to the dag-run associated with this status

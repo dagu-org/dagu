@@ -79,8 +79,8 @@ func TestEnqueueRetry(t *testing.T) {
 				Status:    core.Failed,
 			},
 			store: &stubDAGRunStore{
-				status:    &exec.DAGRunStatus{Name: "test-dag", DAGRunID: "run-2", AttemptID: "att-2", Status: core.Failed},
-				firstErr:  errors.New("cas error"),
+				status:   &exec.DAGRunStatus{Name: "test-dag", DAGRunID: "run-2", AttemptID: "att-2", Status: core.Failed},
+				firstErr: errors.New("cas error"),
 			},
 			wantErr: "persist queued retry status",
 		},
@@ -94,8 +94,8 @@ func TestEnqueueRetry(t *testing.T) {
 				Status:    core.Failed,
 			},
 			store: &stubDAGRunStore{
-				status:        &exec.DAGRunStatus{Name: "test-dag", DAGRunID: "run-3", AttemptID: "att-new", Status: core.Queued},
-				firstSwapped:  false,
+				status:       &exec.DAGRunStatus{Name: "test-dag", DAGRunID: "run-3", AttemptID: "att-new", Status: core.Queued},
+				firstSwapped: false,
 			},
 			assertStore: func(t *testing.T, store *stubDAGRunStore) {
 				assert.Equal(t, 1, store.casCalls)
@@ -161,12 +161,12 @@ func TestEnqueueRetry(t *testing.T) {
 }
 
 type stubDAGRunStore struct {
-	status       *exec.DAGRunStatus
-	firstErr     error
-	secondErr    error
-	firstSwapped bool
+	status        *exec.DAGRunStatus
+	firstErr      error
+	secondErr     error
+	firstSwapped  bool
 	secondSwapped bool
-	casCalls     int
+	casCalls      int
 }
 
 func (s *stubDAGRunStore) CreateAttempt(context.Context, *core.DAG, time.Time, string, exec.NewDAGRunAttemptOptions) (exec.DAGRunAttempt, error) {
@@ -204,10 +204,8 @@ func (s *stubDAGRunStore) CompareAndSwapLatestAttemptStatus(
 		return nil, false, nil
 	}
 
-	swapped := true
-	if s.casCalls == 1 && !s.firstSwapped && (expectedAttemptID != s.status.AttemptID || expectedStatus != s.status.Status) {
-		swapped = false
-	}
+	swapped := !(s.casCalls == 1 && !s.firstSwapped && (expectedAttemptID != s.status.AttemptID || expectedStatus != s.status.Status))
+
 	if s.casCalls == 1 && !s.firstSwapped && s.status.Status == core.Queued {
 		return s.cloneStatus(), false, nil
 	}
