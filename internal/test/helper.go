@@ -643,12 +643,22 @@ type AgentOption func(*Agent)
 func WithAgentOptions(options agent.Options) AgentOption {
 	return func(a *Agent) {
 		a.opts = options
+		if options.RetryFailureWindow != 0 {
+			a.retryFailureWindowSet = true
+		}
 	}
 }
 
 func WithDAGRunID(dagRunID string) AgentOption {
 	return func(a *Agent) {
 		a.dagRunID = dagRunID
+	}
+}
+
+func WithRetryFailureWindow(window time.Duration) AgentOption {
+	return func(a *Agent) {
+		a.opts.RetryFailureWindow = window
+		a.retryFailureWindowSet = true
 	}
 }
 
@@ -679,7 +689,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 	helper.opts.RootDAGRun = root
 	helper.opts.PeerConfig = d.Config.Core.Peer
 	helper.opts.DefaultExecMode = d.Config.DefaultExecMode
-	if helper.opts.RetryFailureWindow == 0 {
+	if !helper.retryFailureWindowSet {
 		helper.opts.RetryFailureWindow = d.Config.Scheduler.RetryFailureWindow
 	}
 
@@ -700,8 +710,9 @@ type Agent struct {
 	*Helper
 	*core.DAG
 	*agent.Agent
-	opts     agent.Options
-	dagRunID string // the dag-run ID for this agent
+	opts                  agent.Options
+	dagRunID              string // the dag-run ID for this agent
+	retryFailureWindowSet bool
 }
 
 func (a *Agent) RunError(t *testing.T) {

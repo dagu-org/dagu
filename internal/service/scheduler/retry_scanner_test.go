@@ -42,9 +42,11 @@ func TestRetryScannerEvaluateRetryDecision(t *testing.T) {
 	}
 
 	newScanner := func(isSuspended IsSuspendedFunc) *RetryScanner {
-		return NewRetryScanner(nil, nil, nil, nil, isSuspended, 24*time.Hour, func() time.Time {
+		scanner, err := NewRetryScanner(nil, nil, nil, &stubRetryScannerExecutor{}, isSuspended, 24*time.Hour, func() time.Time {
 			return now
 		})
+		require.NoError(t, err)
+		return scanner
 	}
 
 	tests := []struct {
@@ -165,6 +167,51 @@ func TestRetryScannerEvaluateRetryDecision(t *testing.T) {
 	}
 }
 
+func TestNewRetryScanner(t *testing.T) {
+	t.Parallel()
+
+	t.Run("RequiresExecutorWhenEnabled", func(t *testing.T) {
+		t.Parallel()
+
+		scanner, err := NewRetryScanner(nil, nil, nil, nil, nil, time.Hour, time.Now)
+		require.ErrorIs(t, err, errRetryScannerRequiresExecutor)
+		assert.Nil(t, scanner)
+	})
+
+	t.Run("AllowsNilExecutorWhenDisabled", func(t *testing.T) {
+		t.Parallel()
+
+		scanner, err := NewRetryScanner(nil, nil, nil, nil, nil, 0, time.Now)
+		require.NoError(t, err)
+		require.NotNil(t, scanner)
+	})
+}
+
+func TestDAGSuspendFlagName(t *testing.T) {
+	t.Parallel()
+
+	t.Run("UsesFilenameStem", func(t *testing.T) {
+		t.Parallel()
+
+		got := dagSuspendFlagName(&core.DAG{
+			Name:     "logical-name",
+			Location: "/tmp/example-dag.yaml",
+		})
+
+		assert.Equal(t, "example-dag", got)
+	})
+
+	t.Run("FallsBackToDAGNameWhenLocationMissing", func(t *testing.T) {
+		t.Parallel()
+
+		got := dagSuspendFlagName(&core.DAG{
+			Name: "logical-name",
+		})
+
+		assert.Equal(t, "logical-name", got)
+	})
+}
+
 func TestRetryScannerScanEnqueuesRetry(t *testing.T) {
 	t.Parallel()
 
@@ -194,17 +241,18 @@ func TestRetryScannerScanEnqueuesRetry(t *testing.T) {
 		Return(nil).
 		Once()
 
-	scanner := NewRetryScanner(
+	scanner, err := NewRetryScanner(
 		&retryScannerEntryReader{dags: []*core.DAG{dag}},
 		store,
 		queueStore,
-		nil,
+		&stubRetryScannerExecutor{},
 		nil,
 		24*time.Hour,
 		func() time.Time { return now },
 	)
+	require.NoError(t, err)
 
-	err := scanner.scan(context.Background())
+	err = scanner.scan(context.Background())
 	require.NoError(t, err)
 
 	latest := store.mustStatus(status.DAGRun())
@@ -245,7 +293,7 @@ func TestRetryScannerScanFinalizesTerminalFailure(t *testing.T) {
 	}
 	store := newRetryScannerStore(status, dag)
 	executor := &stubRetryScannerExecutor{}
-	scanner := NewRetryScanner(
+	scanner, err := NewRetryScanner(
 		&retryScannerEntryReader{dags: []*core.DAG{dag}},
 		store,
 		&exec.MockQueueStore{},
@@ -254,8 +302,9 @@ func TestRetryScannerScanFinalizesTerminalFailure(t *testing.T) {
 		24*time.Hour,
 		func() time.Time { return now },
 	)
+	require.NoError(t, err)
 
-	err := scanner.scan(context.Background())
+	err = scanner.scan(context.Background())
 	require.NoError(t, err)
 
 	latest := store.mustStatus(status.DAGRun())
@@ -295,7 +344,7 @@ func TestRetryScannerDispatchFailureFinalizationRollsBackMarkerOnError(t *testin
 		ScheduleTime: now.Add(-20 * time.Minute).Format(time.RFC3339),
 	}
 	store := newRetryScannerStore(status, dag)
-	scanner := NewRetryScanner(
+	scanner, err := NewRetryScanner(
 		&retryScannerEntryReader{dags: []*core.DAG{dag}},
 		store,
 		&exec.MockQueueStore{},
@@ -304,8 +353,9 @@ func TestRetryScannerDispatchFailureFinalizationRollsBackMarkerOnError(t *testin
 		24*time.Hour,
 		func() time.Time { return now },
 	)
+	require.NoError(t, err)
 
-	err := scanner.dispatchFailureFinalization(context.Background(), dag, cloneRetryStatus(status), "retry_exhausted", now)
+	err = scanner.dispatchFailureFinalization(context.Background(), dag, cloneRetryStatus(status), "retry_exhausted", now)
 	require.ErrorContains(t, err, "dispatch failed")
 
 	latest := store.mustStatus(status.DAGRun())

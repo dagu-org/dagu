@@ -204,7 +204,10 @@ func (s *stubDAGRunStore) CompareAndSwapLatestAttemptStatus(
 		return nil, false, nil
 	}
 
-	swapped := !(s.casCalls == 1 && !s.firstSwapped && (expectedAttemptID != s.status.AttemptID || expectedStatus != s.status.Status))
+	swapped := true
+	if s.casCalls == 1 && !s.firstSwapped {
+		swapped = expectedAttemptID == s.status.AttemptID && expectedStatus == s.status.Status
+	}
 
 	if s.casCalls == 1 && !s.firstSwapped && s.status.Status == core.Queued {
 		return s.cloneStatus(), false, nil

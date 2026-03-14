@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
-	"path/filepath"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -312,8 +310,7 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 		// Check suspension.
 		// IsSuspended is keyed by filename stem (not dag.Name), matching the
 		// file-based suspension flag system in filedag/store.go.
-		dagBaseName := strings.TrimSuffix(filepath.Base(entry.dag.Location), filepath.Ext(entry.dag.Location))
-		if tp.cfg.IsSuspended(ctx, dagBaseName) {
+		if tp.cfg.IsSuspended(ctx, dagSuspendFlagName(entry.dag)) {
 			continue
 		}
 

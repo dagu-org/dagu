@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -18,8 +19,11 @@ import (
 
 // HealthServer represents the health check HTTP server for the scheduler
 type HealthServer struct {
-	server *http.Server
-	port   int
+	server     *http.Server
+	listener   net.Listener
+	port       int
+	listenAddr string
+	boundAddr  string
 }
 
 // HealthResponse represents the health check response
@@ -30,13 +34,29 @@ type HealthResponse struct {
 // NewHealthServer creates a new health check server
 func NewHealthServer(port int) *HealthServer {
 	return &HealthServer{
-		port: port,
+		port:       port,
+		listenAddr: fmt.Sprintf(":%d", port),
 	}
+}
+
+func newHealthServerWithAddr(addr string) *HealthServer {
+	return &HealthServer{
+		listenAddr: addr,
+	}
+}
+
+// URL returns the currently bound HTTP base URL for the health server.
+// It is primarily intended for tests and diagnostics.
+func (h *HealthServer) URL() string {
+	if h == nil || h.boundAddr == "" {
+		return ""
+	}
+	return "http://" + h.boundAddr
 }
 
 // Start starts the health check server
 func (h *HealthServer) Start(ctx context.Context) error {
-	if h.port == 0 {
+	if h.listenAddr == "" || (h.port == 0 && h.listenAddr == ":0") {
 		logger.Info(ctx, "Scheduler health check server disabled (port=0)")
 		return nil // Health check server disabled
 	}
@@ -49,15 +69,22 @@ func (h *HealthServer) Start(ctx context.Context) error {
 	router.Get("/health", h.healthHandler)
 
 	h.server = &http.Server{
-		Addr:              fmt.Sprintf(":%d", h.port),
+		Addr:              h.listenAddr,
 		Handler:           router,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
+	listener, err := net.Listen("tcp", h.listenAddr)
+	if err != nil {
+		return err
+	}
+	h.listener = listener
+	h.boundAddr = listener.Addr().String()
+
 	// Start server in a goroutine
 	go func() {
 		logger.Info(ctx, "Starting scheduler health check server", tag.Port(h.port))
-		if err := h.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := h.server.Serve(listener); err != nil && err != http.ErrServerClosed {
 			logger.Error(ctx, "Health check server error", tag.Error(err))
 		}
 	}()

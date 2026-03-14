@@ -125,7 +125,7 @@ func New(
 		Events:   eventCh,
 	})
 
-	retryScanner := NewRetryScanner(
+	retryScanner, err := NewRetryScanner(
 		er,
 		dagRunStore,
 		queueStore,
@@ -134,6 +134,9 @@ func New(
 		cfg.Scheduler.RetryFailureWindow,
 		defaultClock,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize retry scanner: %w", err)
+	}
 
 	return &Scheduler{
 		quit:            make(chan any),
@@ -222,18 +225,21 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		}
 	}
 
-	if !s.disableHealthServer {
-		if err := s.healthServer.Start(ctx); err != nil {
-			return fmt.Errorf("failed to start health check server: %w", err)
-		}
-	}
-
 	logger.Info(ctx, "Waiting to acquire scheduler lock")
 	if err := s.dirLock.Lock(ctx); err != nil {
 		return fmt.Errorf("failed to acquire scheduler lock: %w", err)
 	}
 
 	logger.Info(ctx, "Acquired scheduler lock")
+
+	if !s.disableHealthServer {
+		if err := s.healthServer.Start(ctx); err != nil {
+			if unlockErr := s.dirLock.Unlock(); unlockErr != nil {
+				logger.Error(ctx, "Failed to release scheduler lock after health server start failure", tag.Error(unlockErr))
+			}
+			return fmt.Errorf("failed to start health check server: %w", err)
+		}
+	}
 
 	if s.serviceRegistry != nil {
 		if err := s.serviceRegistry.UpdateStatus(ctx, exec.ServiceNameScheduler, exec.ServiceStatusActive); err != nil {

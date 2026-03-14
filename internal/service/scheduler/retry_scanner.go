@@ -5,10 +5,9 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"math"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -37,6 +36,8 @@ type retryDecision struct {
 	computedDelay time.Duration
 	nextRetryAt   time.Time
 }
+
+var errRetryScannerRequiresExecutor = errors.New("retry scanner requires DAG executor when retry_failure_window is enabled")
 
 type dagExecutioner interface {
 	ExecuteDAG(
@@ -70,12 +71,15 @@ func NewRetryScanner(
 	isSuspended IsSuspendedFunc,
 	failureWindow time.Duration,
 	clock Clock,
-) *RetryScanner {
+) (*RetryScanner, error) {
 	if clock == nil {
 		clock = time.Now
 	}
 	if isSuspended == nil {
 		isSuspended = func(context.Context, string) bool { return false }
+	}
+	if failureWindow > 0 && dagExecutor == nil {
+		return nil, errRetryScannerRequiresExecutor
 	}
 	return &RetryScanner{
 		entryReader:   entryReader,
@@ -85,7 +89,7 @@ func NewRetryScanner(
 		isSuspended:   isSuspended,
 		failureWindow: failureWindow,
 		clock:         clock,
-	}
+	}, nil
 }
 
 func (s *RetryScanner) Start(ctx context.Context) {
@@ -254,7 +258,7 @@ func (s *RetryScanner) evaluateRetryDecision(
 		return retryDecision{action: retryActionFinalize, reason: "retry_policy_missing"}
 	}
 
-	if s.isSuspended(ctx, dagSuspendName(currentDAG)) {
+	if s.isSuspended(ctx, dagSuspendFlagName(currentDAG)) {
 		return retryDecision{action: retryActionSkip, reason: "suspended"}
 	}
 
@@ -400,15 +404,4 @@ func parseRFC3339(val string) (time.Time, bool) {
 		return time.Time{}, false
 	}
 	return parsed, true
-}
-
-func dagSuspendName(dag *core.DAG) string {
-	if dag == nil {
-		return ""
-	}
-	base := strings.TrimSuffix(filepath.Base(dag.Location), filepath.Ext(dag.Location))
-	if base != "" && base != "." {
-		return base
-	}
-	return dag.Name
 }
