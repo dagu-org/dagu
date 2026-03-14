@@ -85,7 +85,9 @@ func CreateStaleProcFile(
 	procFile := filepath.Join(dir, fileName)
 
 	data := make([]byte, 8)
-	binary.BigEndian.PutUint64(data, uint64(staleTime.Unix()))
+	staleUnix := staleTime.Unix()
+	require.GreaterOrEqual(t, staleUnix, int64(0), "stale heartbeat timestamp must be after unix epoch")
+	binary.BigEndian.PutUint64(data, uint64(staleUnix)) //nolint:gosec // staleUnix is validated non-negative above
 	require.NoError(t, os.WriteFile(procFile, data, 0o600))
 	require.NoError(t, os.Chtimes(procFile, staleTime, staleTime))
 
@@ -109,7 +111,7 @@ func readHeartbeat(procFile string) (uint64, time.Time, error) {
 		return 0, time.Time{}, err
 	}
 
-	data, err := os.ReadFile(procFile)
+	data, err := os.ReadFile(procFile) //nolint:gosec // procFile is created in an isolated test temp directory
 	if err != nil {
 		return 0, time.Time{}, err
 	}
