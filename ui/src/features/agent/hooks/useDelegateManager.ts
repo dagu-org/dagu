@@ -5,6 +5,7 @@ import {
   DelegateInfo,
   DelegateMessages,
   DelegateSnapshot,
+  DelegateStatus,
   Message,
 } from '../types';
 
@@ -48,12 +49,46 @@ export function useDelegateManager() {
     setDelegateStore((prev) => {
       const next = { ...prev };
       for (const snap of snapshots) {
+        const existing = prev[snap.id];
         next[snap.id] = {
-          info: { id: snap.id, task: snap.task, status: snap.status, zIndex: ++zIndexCounterRef.current, positionIndex: 0 },
-          messages: prev[snap.id]?.messages || [],
-          isOpen: prev[snap.id]?.isOpen || false,
+          info: {
+            id: snap.id,
+            task: snap.task,
+            status: snap.status,
+            zIndex: existing?.info.zIndex ?? ++zIndexCounterRef.current,
+            positionIndex: 0,
+          },
+          messages: existing?.messages || [],
+          isOpen: existing?.isOpen || false,
         };
       }
+      delegateStoreRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const applyDelegateSessionSnapshot = useCallback((
+    delegateId: string,
+    task: string,
+    status: DelegateStatus,
+    messages: Message[]
+  ) => {
+    setDelegateStore((prev) => {
+      const existing = prev[delegateId];
+      const next = {
+        ...prev,
+        [delegateId]: {
+          info: {
+            id: delegateId,
+            task: task || existing?.info.task || '',
+            status,
+            zIndex: existing?.info.zIndex ?? ++zIndexCounterRef.current,
+            positionIndex: 0,
+          },
+          messages,
+          isOpen: existing?.isOpen || false,
+        },
+      };
       delegateStoreRef.current = next;
       return next;
     });
@@ -197,6 +232,7 @@ export function useDelegateManager() {
     delegateStatuses,
     delegateMessages,
     handleDelegateSnapshots,
+    applyDelegateSessionSnapshot,
     handleDelegateMessages,
     handleDelegateEvent,
     resetDelegates,

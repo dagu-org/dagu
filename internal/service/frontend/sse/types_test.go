@@ -21,3 +21,13 @@ func TestSetSSEHeaders(t *testing.T) {
 	assert.Equal(t, "keep-alive", w.Header().Get("Connection"))
 	assert.Equal(t, "no", w.Header().Get("X-Accel-Buffering"))
 }
+
+func TestSetLegacyStreamDeprecationHeaders(t *testing.T) {
+	t.Parallel()
+
+	w := httptest.NewRecorder()
+	SetLegacyStreamDeprecationHeaders(w)
+
+	assert.Equal(t, legacyStreamDeprecatedAt, w.Header().Get("Deprecation"))
+	assert.Equal(t, legacyStreamSunset, w.Header().Get("Sunset"))
+}

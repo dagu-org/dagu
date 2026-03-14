@@ -60,6 +60,17 @@ type SessionManager struct {
 	remoteNodeResolver RemoteNodeResolver
 }
 
+// SessionSnapshot is a point-in-time copy of the session state.
+type SessionSnapshot struct {
+	Messages         []Message
+	Session          Session
+	Working          bool
+	HasPendingPrompt bool
+	Model            string
+	TotalCost        float64
+	Delegates        []DelegateSnapshot
+}
+
 // SessionManagerConfig contains configuration for creating a SessionManager.
 type SessionManagerConfig struct {
 	ID              string
@@ -331,6 +342,63 @@ func (sm *SessionManager) GetSession() Session {
 	}
 }
 
+// Snapshot returns a consistent point-in-time copy of the session state.
+func (sm *SessionManager) Snapshot() SessionSnapshot {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	return sm.snapshotLocked()
+}
+
+func (sm *SessionManager) snapshotLocked() SessionSnapshot {
+	messages := make([]Message, len(sm.messages))
+	copy(messages, sm.messages)
+
+	sm.promptsMu.Lock()
+	hasPendingPrompt := len(sm.pendingPrompts) > 0
+	sm.promptsMu.Unlock()
+
+	snapshot := SessionSnapshot{
+		Messages: messages,
+		Session: Session{
+			ID:              sm.id,
+			UserID:          sm.user.UserID,
+			DAGName:         sm.dagName,
+			ParentSessionID: sm.parentSessionID,
+			DelegateTask:    sm.delegateTask,
+			CreatedAt:       sm.createdAt,
+			UpdatedAt:       sm.lastActivity,
+		},
+		Working:          sm.working,
+		HasPendingPrompt: hasPendingPrompt,
+		Model:            sm.model,
+		TotalCost:        sm.totalCost,
+	}
+	if len(sm.delegates) > 0 {
+		snapshot.Delegates = make([]DelegateSnapshot, 0, len(sm.delegates))
+		for _, delegateSnapshot := range sm.delegates {
+			snapshot.Delegates = append(snapshot.Delegates, delegateSnapshot)
+		}
+	}
+
+	return snapshot
+}
+
+// StreamResponse converts a session snapshot to the stream payload shape.
+func (s SessionSnapshot) StreamResponse() StreamResponse {
+	return StreamResponse{
+		Messages: s.Messages,
+		Session:  &s.Session,
+		SessionState: &SessionState{
+			SessionID:        s.Session.ID,
+			Working:          s.Working,
+			HasPendingPrompt: s.HasPendingPrompt,
+			Model:            s.Model,
+			TotalCost:        s.TotalCost,
+		},
+		Delegates: s.Delegates,
+	}
+}
+
 // RecordExternalMessage records a message from an external source (e.g., a delegate child loop).
 // It publishes the message to the SubPub for SSE streaming and persists it via onMessage.
 func (sm *SessionManager) RecordExternalMessage(ctx context.Context, msg Message) error {
@@ -446,48 +514,12 @@ func (sm *SessionManager) Subscribe(ctx context.Context) func() (StreamResponse,
 // SubscribeWithSnapshot atomically captures current state and subscribes.
 func (sm *SessionManager) SubscribeWithSnapshot(ctx context.Context) (StreamResponse, func() (StreamResponse, bool)) {
 	sm.mu.Lock()
-	msgs := make([]Message, len(sm.messages))
-	copy(msgs, sm.messages)
 	lastSeq := sm.sequenceID
-	working := sm.working
-	model := sm.model
-	totalCost := sm.totalCost
-	id := sm.id
-
-	sm.promptsMu.Lock()
-	hasPendingPrompt := len(sm.pendingPrompts) > 0
-	sm.promptsMu.Unlock()
-	sess := Session{
-		ID:              id,
-		UserID:          sm.user.UserID,
-		DAGName:         sm.dagName,
-		ParentSessionID: sm.parentSessionID,
-		DelegateTask:    sm.delegateTask,
-		CreatedAt:       sm.createdAt,
-		UpdatedAt:       sm.lastActivity,
-	}
-	var delegates []DelegateSnapshot
-	if len(sm.delegates) > 0 {
-		delegates = make([]DelegateSnapshot, 0, len(sm.delegates))
-		for _, snap := range sm.delegates {
-			delegates = append(delegates, snap)
-		}
-	}
+	snapshot := sm.snapshotLocked()
 	next := sm.subpub.Subscribe(ctx, lastSeq)
 	sm.mu.Unlock()
 
-	return StreamResponse{
-		Messages: msgs,
-		Session:  &sess,
-		SessionState: &SessionState{
-			SessionID:        id,
-			Working:          working,
-			HasPendingPrompt: hasPendingPrompt,
-			Model:            model,
-			TotalCost:        totalCost,
-		},
-		Delegates: delegates,
-	}, next
+	return snapshot.StreamResponse(), next
 }
 
 // Cancel stops the session loop. The context parameter is unused

@@ -583,6 +583,40 @@ func (l *ConfigLoader) loadServerDefaults(cfg *Config, def Definition) {
 	cfg.Server.Audit.RetentionDays = l.v.GetInt("audit.retention_days")
 
 	cfg.Server.Session.MaxPerUser = l.v.GetInt("session.max_per_user")
+
+	cfg.Server.SSE.MaxTopicsPerConnection = l.v.GetInt("sse.max_topics_per_connection")
+	cfg.Server.SSE.MaxClients = l.v.GetInt("sse.max_clients")
+	cfg.Server.SSE.HeartbeatInterval = l.v.GetDuration("sse.heartbeat_interval")
+	cfg.Server.SSE.WriteBufferSize = l.v.GetInt("sse.write_buffer_size")
+	cfg.Server.SSE.SlowClientTimeout = l.v.GetDuration("sse.slow_client_timeout")
+
+	if def.SSE == nil {
+		return
+	}
+
+	if def.SSE.MaxTopicsPerConnection != nil {
+		cfg.Server.SSE.MaxTopicsPerConnection = *def.SSE.MaxTopicsPerConnection
+	}
+	if def.SSE.MaxClients != nil {
+		cfg.Server.SSE.MaxClients = *def.SSE.MaxClients
+	}
+	if def.SSE.WriteBufferSize != nil {
+		cfg.Server.SSE.WriteBufferSize = *def.SSE.WriteBufferSize
+	}
+	if def.SSE.HeartbeatInterval != nil {
+		if duration, err := time.ParseDuration(*def.SSE.HeartbeatInterval); err == nil {
+			cfg.Server.SSE.HeartbeatInterval = duration
+		} else {
+			l.warnings = append(l.warnings, fmt.Sprintf("Invalid sse.heartbeat_interval value: %q", *def.SSE.HeartbeatInterval))
+		}
+	}
+	if def.SSE.SlowClientTimeout != nil {
+		if duration, err := time.ParseDuration(*def.SSE.SlowClientTimeout); err == nil {
+			cfg.Server.SSE.SlowClientTimeout = duration
+		} else {
+			l.warnings = append(l.warnings, fmt.Sprintf("Invalid sse.slow_client_timeout value: %q", *def.SSE.SlowClientTimeout))
+		}
+	}
 }
 
 func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
@@ -1202,6 +1236,13 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	// Session
 	l.v.SetDefault("session.max_per_user", 100)
 
+	// SSE
+	l.v.SetDefault("sse.max_topics_per_connection", 20)
+	l.v.SetDefault("sse.max_clients", 1000)
+	l.v.SetDefault("sse.heartbeat_interval", "10s")
+	l.v.SetDefault("sse.write_buffer_size", 65536)
+	l.v.SetDefault("sse.slow_client_timeout", "30s")
+
 	// Monitoring
 	l.v.SetDefault("monitoring.retention", "24h")
 	l.v.SetDefault("monitoring.interval", "5s")
@@ -1232,6 +1273,11 @@ var envBindings = []envBinding{
 	{key: "audit.enabled", env: "AUDIT_ENABLED"},
 	{key: "audit.retention_days", env: "AUDIT_RETENTION_DAYS"},
 	{key: "session.max_per_user", env: "SESSION_MAX_PER_USER"},
+	{key: "sse.max_topics_per_connection", env: "SSE_MAX_TOPICS_PER_CONNECTION"},
+	{key: "sse.max_clients", env: "SSE_MAX_CLIENTS"},
+	{key: "sse.heartbeat_interval", env: "SSE_HEARTBEAT_INTERVAL"},
+	{key: "sse.write_buffer_size", env: "SSE_WRITE_BUFFER_SIZE"},
+	{key: "sse.slow_client_timeout", env: "SSE_SLOW_CLIENT_TIMEOUT"},
 
 	// Core
 	{key: "default_shell", env: "DEFAULT_SHELL"},

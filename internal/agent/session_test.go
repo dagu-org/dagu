@@ -234,6 +234,40 @@ func TestSessionManager_SubscribeWithSnapshot(t *testing.T) {
 	})
 }
 
+func TestSessionManager_Snapshot(t *testing.T) {
+	t.Parallel()
+
+	sm := NewSessionManager(SessionManagerConfig{
+		ID:   "snapshot-test",
+		User: UserIdentity{UserID: "user1"},
+		History: []Message{
+			{ID: "1", Content: "first"},
+		},
+	})
+	sm.SetWorking(true)
+	sm.SetDelegateStarted("delegate-1", "summarize")
+	sm.promptsMu.Lock()
+	sm.pendingPrompts["prompt-1"] = make(chan UserPromptResponse, 1)
+	sm.promptsMu.Unlock()
+
+	snapshot := sm.Snapshot()
+
+	require.Len(t, snapshot.Messages, 1)
+	assert.Equal(t, "snapshot-test", snapshot.Session.ID)
+	assert.Equal(t, "user1", snapshot.Session.UserID)
+	assert.True(t, snapshot.Working)
+	assert.True(t, snapshot.HasPendingPrompt)
+	require.Len(t, snapshot.Delegates, 1)
+
+	response := snapshot.StreamResponse()
+	require.NotNil(t, response.Session)
+	require.NotNil(t, response.SessionState)
+	assert.Equal(t, "snapshot-test", response.Session.ID)
+	assert.True(t, response.SessionState.Working)
+	assert.True(t, response.SessionState.HasPendingPrompt)
+	require.Len(t, response.Delegates, 1)
+}
+
 func TestSessionManager_Cancel(t *testing.T) {
 	t.Parallel()
 

@@ -75,6 +75,7 @@ type Definition struct {
 	Terminal   *TerminalDef   `mapstructure:"terminal"`
 	Audit      *AuditDef      `mapstructure:"audit"`
 	Session    *SessionDef    `mapstructure:"session"`
+	SSE        *SSEDef        `mapstructure:"sse"`
 	GitSync    *GitSyncDef    `mapstructure:"git_sync"`
 	Tunnel     *TunnelDef     `mapstructure:"tunnel"`
 	License    *LicenseDef    `mapstructure:"license"`
@@ -315,6 +316,15 @@ type AuditDef struct {
 // SessionDef configures agent session storage.
 type SessionDef struct {
 	MaxPerUser *int `mapstructure:"max_per_user"` // Default: 100; 0 = unlimited
+}
+
+// SSEDef configures multiplexed SSE streaming.
+type SSEDef struct {
+	MaxTopicsPerConnection *int    `mapstructure:"max_topics_per_connection"`
+	MaxClients             *int    `mapstructure:"max_clients"`
+	HeartbeatInterval      *string `mapstructure:"heartbeat_interval"`
+	WriteBufferSize        *int    `mapstructure:"write_buffer_size"`
+	SlowClientTimeout      *string `mapstructure:"slow_client_timeout"`
 }
 
 // -----------------------------------------------------------------------------

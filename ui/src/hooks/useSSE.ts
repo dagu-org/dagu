@@ -63,29 +63,41 @@ export function useSSE<T>(endpoint: string, enabled: boolean = true): SSEState<T
       return;
     }
 
-    const unsubscribe = sseManager.subscribe(
-      endpoint,
-      remoteNode,
-      config.apiURL,
-      {
-        onData: (data) =>
-          setState((prev) => ({
-            ...prev,
-            data: data as T,
-            isConnected: true,
-            isConnecting: false,
-            shouldUseFallback: false,
-            error: null,
-          })),
-        onStateChange: (connState) =>
-          setState((prev) => ({
-            ...prev,
-            ...connState,
-          })),
-      }
-    );
+    let unsubscribe: (() => void) | undefined;
+    try {
+      unsubscribe = sseManager.subscribe(
+        endpoint,
+        remoteNode,
+        config.apiURL,
+        {
+          onData: (data) =>
+            setState((prev) => ({
+              ...prev,
+              data: data as T,
+              isConnected: true,
+              isConnecting: false,
+              shouldUseFallback: false,
+              error: null,
+            })),
+          onStateChange: (connState) =>
+            setState((prev) => ({
+              ...prev,
+              ...connState,
+            })),
+        }
+      );
+    } catch (error) {
+      setState((prev) => ({
+        ...prev,
+        isConnected: false,
+        isConnecting: false,
+        shouldUseFallback: true,
+        error: error instanceof Error ? error : new Error('Failed to subscribe to SSE'),
+      }));
+      return;
+    }
 
-    return unsubscribe;
+    return () => unsubscribe?.();
   }, [endpoint, remoteNode, config.apiURL, enabled]);
 
   return state;

@@ -1,4 +1,11 @@
-import { useCallback, useContext, useRef, useState } from 'react';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components } from '@/api/v1/schema';
 import { useConfig } from '@/contexts/ConfigContext';
@@ -23,6 +30,7 @@ import { useDelegateManager } from './useDelegateManager';
 type ApiSessionWithState = components['schemas']['AgentSessionWithState'];
 type ApiMessage = components['schemas']['AgentMessage'];
 type ApiSessionDetail = components['schemas']['AgentSessionDetailResponse'];
+const FALLBACK_POLL_INTERVAL_MS = 2000;
 
 function convertApiMessage(msg: ApiMessage): Message {
   return {
@@ -70,7 +78,9 @@ function convertApiMessage(msg: ApiMessage): Message {
   };
 }
 
-function convertApiSessions(sessions: ApiSessionWithState[]): SessionWithState[] {
+function convertApiSessions(
+  sessions: ApiSessionWithState[]
+): SessionWithState[] {
   return sessions.map((s) => ({
     session: {
       id: s.session.id,
@@ -121,7 +131,10 @@ function convertApiSessionDetail(detail: ApiSessionDetail): StreamResponse {
 }
 
 function toDagContextsBody(dagContexts?: DAGContext[]) {
-  return dagContexts?.map((dc) => ({ dagFile: dc.dag_file, dagRunId: dc.dag_run_id }));
+  return dagContexts?.map((dc) => ({
+    dagFile: dc.dag_file,
+    dagRunId: dc.dag_run_id,
+  }));
 }
 
 export function useAgentChat() {
@@ -145,7 +158,6 @@ export function useAgentChat() {
     appendSessions,
     setHasMoreSessions,
     setSessionPage,
-    addMessage,
     setPendingUserMessage,
     clearSession,
   } = useAgentChatContext();
@@ -153,44 +165,223 @@ export function useAgentChat() {
   const selectGenRef = useRef(0);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [answeredPrompts, setAnsweredPrompts] = useState<Record<string, string>>({});
+  const [answeredPrompts, setAnsweredPrompts] = useState<
+    Record<string, string>
+  >({});
 
-  const baseUrl = `${config.apiURL}/agent`;
+  const apiURL = config.apiURL;
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
   const dm = useDelegateManager();
+  const {
+    delegates,
+    delegateStatuses,
+    delegateMessages,
+    handleDelegateSnapshots,
+    applyDelegateSessionSnapshot,
+    resetDelegates,
+    restoreDelegates,
+    bringToFront,
+    openDelegate,
+    setDelegateMessagesForId,
+    hasDelegateMessages,
+    removeDelegate,
+  } = dm;
+  const openDelegateSessionIds = delegates.map((delegate) => delegate.id);
+  const sortedOpenDelegateSessionIds = useMemo(
+    () => [...openDelegateSessionIds].sort(),
+    [openDelegateSessionIds]
+  );
 
-  useSSEConnection(sessionId, baseUrl, remoteNode, {
-    onMessage: addMessage,
-    onSessionState: setSessionState,
-    onDelegateSnapshots: dm.handleDelegateSnapshots,
-    onDelegateMessages: dm.handleDelegateMessages,
-    onDelegateEvent: dm.handleDelegateEvent,
-    onNavigate: (path) => navigate(path),
-    onPreConnect: dm.resetDelegates,
-  });
-
-  const fetchSessionsPage = useCallback(async (page: number): Promise<void> => {
-    try {
-      const { data, error: apiError } = await client.GET('/agent/sessions', {
-        params: { query: { remoteNode, page, perPage: 30 } },
-      });
-      if (apiError) throw new Error(apiError.message || 'Failed to fetch sessions');
-      if (!data) return;
-
-      const converted = convertApiSessions(data.sessions);
-      if (page === 1) {
-        setSessions(converted);
-      } else {
-        appendSessions(converted);
+  const applySessionSnapshot = useCallback(
+    (snapshot: StreamResponse, resetDelegates: boolean = false) => {
+      const nextMessages = snapshot.messages || [];
+      if (
+        pendingUserMessage &&
+        nextMessages.some(
+          (message) =>
+            message.type === 'user' && message.content === pendingUserMessage
+        )
+      ) {
+        setPendingUserMessage(null);
       }
-      setHasMoreSessions(data.pagination.currentPage < data.pagination.totalPages);
-      setSessionPage(page);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch sessions');
-      if (page === 1) setSessions([]);
+
+      setMessages(nextMessages);
+      if (snapshot.session_state) {
+        setSessionState(snapshot.session_state);
+      }
+
+      const delegateSnapshots = snapshot.delegates || [];
+      if (resetDelegates) {
+        restoreDelegates(delegateSnapshots);
+        return;
+      }
+      handleDelegateSnapshots(delegateSnapshots);
+    },
+    [
+      pendingUserMessage,
+      setPendingUserMessage,
+      setMessages,
+      setSessionState,
+      restoreDelegates,
+      handleDelegateSnapshots,
+    ]
+  );
+
+  const applyDelegateSnapshot = useCallback(
+    (delegateId: string, snapshot: StreamResponse) => {
+      const existing = delegateStatuses[delegateId];
+      applyDelegateSessionSnapshot(
+        delegateId,
+        snapshot.session?.delegate_task || existing?.task || '',
+        snapshot.session_state?.working ? 'running' : 'completed',
+        snapshot.messages || []
+      );
+    },
+    [delegateStatuses, applyDelegateSessionSnapshot]
+  );
+
+  const fetchSessionDetail = useCallback(
+    async (id: string): Promise<StreamResponse> => {
+      const { data, error: apiError } = await client.GET(
+        '/agent/sessions/{sessionId}',
+        {
+          params: { path: { sessionId: id }, query: { remoteNode } },
+        }
+      );
+      if (apiError)
+        throw new Error(apiError.message || 'Failed to load session');
+      if (!data) throw new Error('Failed to load session');
+      return convertApiSessionDetail(data);
+    },
+    [client, remoteNode]
+  );
+
+  const sseStatus = useSSEConnection(
+    sessionId,
+    openDelegateSessionIds,
+    apiURL,
+    remoteNode,
+    {
+      onSnapshot: (snapshot) => {
+        applySessionSnapshot(snapshot);
+      },
+      onDelegateSnapshot: (delegateId, snapshot) => {
+        applyDelegateSnapshot(delegateId, snapshot);
+      },
+      onNavigate: (path) => navigate(path),
     }
-  }, [client, remoteNode, setSessions, appendSessions, setHasMoreSessions, setSessionPage]);
+  );
+
+  const offlineDelegateSessionIds = useMemo(
+    () =>
+      sortedOpenDelegateSessionIds.filter(
+        (delegateId) => !sseStatus.liveDelegateSessions[delegateId]
+      ),
+    [sortedOpenDelegateSessionIds, sseStatus.liveDelegateSessions]
+  );
+
+  useEffect(() => {
+    const shouldPollSession = !!sessionId && !sseStatus.isSessionLive;
+    if (!shouldPollSession && offlineDelegateSessionIds.length === 0) {
+      return;
+    }
+
+    let active = true;
+    let nextPollTimeout: ReturnType<typeof setTimeout> | null = null;
+    const pollFallbackSnapshots = async () => {
+      if (shouldPollSession && sessionId) {
+        try {
+          const snapshot = await fetchSessionDetail(sessionId);
+          if (!active) {
+            return;
+          }
+          applySessionSnapshot(snapshot);
+        } catch {
+          // Best effort — the next poll or SSE recovery can still heal state.
+        }
+      }
+
+      for (const delegateId of offlineDelegateSessionIds) {
+        try {
+          const snapshot = await fetchSessionDetail(delegateId);
+          if (!active) {
+            return;
+          }
+          applyDelegateSnapshot(delegateId, snapshot);
+        } catch {
+          // Best effort — live SSE recovery or the next poll can still heal state.
+        }
+      }
+    };
+
+    const scheduleNextPoll = () => {
+      if (!active) {
+        return;
+      }
+      nextPollTimeout = setTimeout(() => {
+        void runPollLoop();
+      }, FALLBACK_POLL_INTERVAL_MS);
+    };
+
+    const runPollLoop = async () => {
+      await pollFallbackSnapshots();
+      scheduleNextPoll();
+    };
+
+    scheduleNextPoll();
+
+    return () => {
+      active = false;
+      if (nextPollTimeout) {
+        clearTimeout(nextPollTimeout);
+      }
+    };
+  }, [
+    sessionId,
+    sseStatus.isSessionLive,
+    offlineDelegateSessionIds,
+    fetchSessionDetail,
+    applySessionSnapshot,
+    applyDelegateSnapshot,
+  ]);
+
+  const fetchSessionsPage = useCallback(
+    async (page: number): Promise<void> => {
+      try {
+        const { data, error: apiError } = await client.GET('/agent/sessions', {
+          params: { query: { remoteNode, page, perPage: 30 } },
+        });
+        if (apiError)
+          throw new Error(apiError.message || 'Failed to fetch sessions');
+        if (!data) return;
+
+        const converted = convertApiSessions(data.sessions);
+        if (page === 1) {
+          setSessions(converted);
+        } else {
+          appendSessions(converted);
+        }
+        setHasMoreSessions(
+          data.pagination.currentPage < data.pagination.totalPages
+        );
+        setSessionPage(page);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Failed to fetch sessions'
+        );
+        if (page === 1) setSessions([]);
+      }
+    },
+    [
+      client,
+      remoteNode,
+      setSessions,
+      appendSessions,
+      setHasMoreSessions,
+      setSessionPage,
+    ]
+  );
 
   const loadMoreSessions = useCallback(async (): Promise<void> => {
     if (!hasMoreSessions) return;
@@ -198,7 +389,12 @@ export function useAgentChat() {
   }, [fetchSessionsPage, sessionPage, hasMoreSessions]);
 
   const startSession = useCallback(
-    async (message: string, model?: string, dagContexts?: DAGContext[], soulId?: string): Promise<string> => {
+    async (
+      message: string,
+      model?: string,
+      dagContexts?: DAGContext[],
+      soulId?: string
+    ): Promise<string> => {
       const { data, error: apiError } = await client.POST('/agent/sessions', {
         params: { query: { remoteNode } },
         body: {
@@ -209,7 +405,8 @@ export function useAgentChat() {
           soulId: soulId || undefined,
         },
       });
-      if (apiError) throw new Error(apiError.message || 'Failed to create session');
+      if (apiError)
+        throw new Error(apiError.message || 'Failed to create session');
       setSessionId(data.sessionId);
       await fetchSessionsPage(1);
       return data.sessionId;
@@ -218,7 +415,12 @@ export function useAgentChat() {
   );
 
   const sendMessage = useCallback(
-    async (message: string, model?: string, dagContexts?: DAGContext[], soulId?: string): Promise<void> => {
+    async (
+      message: string,
+      model?: string,
+      dagContexts?: DAGContext[],
+      soulId?: string
+    ): Promise<void> => {
       setIsSending(true);
       setError(null);
       setPendingUserMessage(message);
@@ -228,17 +430,21 @@ export function useAgentChat() {
           await startSession(message, model, dagContexts, soulId);
           return;
         }
-        const { error: apiError } = await client.POST('/agent/sessions/{sessionId}/chat', {
-          params: { path: { sessionId }, query: { remoteNode } },
-          body: {
-            message,
-            model,
-            dagContexts: toDagContextsBody(dagContexts),
-            safeMode: preferences.safeMode,
-            soulId: soulId || undefined,
-          },
-        });
-        if (apiError) throw new Error(apiError.message || 'Failed to send message');
+        const { error: apiError } = await client.POST(
+          '/agent/sessions/{sessionId}/chat',
+          {
+            params: { path: { sessionId }, query: { remoteNode } },
+            body: {
+              message,
+              model,
+              dagContexts: toDagContextsBody(dagContexts),
+              safeMode: preferences.safeMode,
+              soulId: soulId || undefined,
+            },
+          }
+        );
+        if (apiError)
+          throw new Error(apiError.message || 'Failed to send message');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to send message');
         setPendingUserMessage(null);
@@ -247,36 +453,62 @@ export function useAgentChat() {
         setIsSending(false);
       }
     },
-    [client, remoteNode, sessionId, startSession, setPendingUserMessage, preferences.safeMode]
+    [
+      client,
+      remoteNode,
+      sessionId,
+      startSession,
+      setPendingUserMessage,
+      preferences.safeMode,
+    ]
   );
 
   const cancelSession = useCallback(async (): Promise<void> => {
     if (!sessionId) return;
-    const { error: apiError } = await client.POST('/agent/sessions/{sessionId}/cancel', {
-      params: { path: { sessionId }, query: { remoteNode } },
-    });
-    if (apiError) throw new Error(apiError.message || 'Failed to cancel session');
-  }, [client, remoteNode, sessionId]);
-
-  const respondToPrompt = useCallback(async (response: UserPromptResponse, displayValue: string): Promise<void> => {
-    if (!sessionId) return;
-
-    try {
-      const { error: apiError } = await client.POST('/agent/sessions/{sessionId}/respond', {
+    const { error: apiError } = await client.POST(
+      '/agent/sessions/{sessionId}/cancel',
+      {
         params: { path: { sessionId }, query: { remoteNode } },
-        body: {
-          promptId: response.prompt_id,
-          selectedOptionIds: response.selected_option_ids,
-          freeTextResponse: response.free_text_response,
-          cancelled: response.cancelled,
-        },
-      });
-      if (apiError) throw new Error(apiError.message || 'Failed to submit response');
-      setAnsweredPrompts(prev => ({ ...prev, [response.prompt_id]: displayValue }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit response');
-    }
+      }
+    );
+    if (apiError)
+      throw new Error(apiError.message || 'Failed to cancel session');
   }, [client, remoteNode, sessionId]);
+
+  const respondToPrompt = useCallback(
+    async (
+      response: UserPromptResponse,
+      displayValue: string
+    ): Promise<void> => {
+      if (!sessionId) return;
+
+      try {
+        const { error: apiError } = await client.POST(
+          '/agent/sessions/{sessionId}/respond',
+          {
+            params: { path: { sessionId }, query: { remoteNode } },
+            body: {
+              promptId: response.prompt_id,
+              selectedOptionIds: response.selected_option_ids,
+              freeTextResponse: response.free_text_response,
+              cancelled: response.cancelled,
+            },
+          }
+        );
+        if (apiError)
+          throw new Error(apiError.message || 'Failed to submit response');
+        setAnsweredPrompts((prev) => ({
+          ...prev,
+          [response.prompt_id]: displayValue,
+        }));
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Failed to submit response'
+        );
+      }
+    },
+    [client, remoteNode, sessionId]
+  );
 
   const fetchSessions = useCallback(async (): Promise<void> => {
     await fetchSessionsPage(1);
@@ -285,21 +517,13 @@ export function useAgentChat() {
   const selectSession = useCallback(
     async (id: string): Promise<void> => {
       const gen = ++selectGenRef.current;
-      const { data, error: apiError } = await client.GET('/agent/sessions/{sessionId}', {
-        params: { path: { sessionId: id }, query: { remoteNode } },
-      });
-      if (apiError) throw new Error(apiError.message || 'Failed to load session');
+      const converted = await fetchSessionDetail(id);
       if (gen !== selectGenRef.current) return;
-      const converted = convertApiSessionDetail(data);
       setSessionId(id);
-      setMessages(converted.messages || []);
       setAnsweredPrompts({});
-      dm.restoreDelegates(converted.delegates || []);
-      if (converted.session_state) {
-        setSessionState(converted.session_state);
-      }
+      applySessionSnapshot(converted, true);
     },
-    [client, remoteNode, setSessionId, setMessages, setSessionState, dm]
+    [fetchSessionDetail, setSessionId, applySessionSnapshot]
   );
 
   const isWorking = isSending || sessionState?.working || false;
@@ -310,25 +534,28 @@ export function useAgentChat() {
     selectGenRef.current++;
     clearSession();
     setAnsweredPrompts({});
-    dm.resetDelegates();
-  }, [clearSession, dm]);
+    resetDelegates();
+  }, [clearSession, resetDelegates]);
 
-  const reopenDelegate = useCallback(async (delegateId: string, task: string) => {
-    if (!dm.hasDelegateMessages(delegateId)) {
-      try {
-        const { data } = await client.GET('/agent/sessions/{sessionId}', {
-          params: { path: { sessionId: delegateId }, query: { remoteNode } },
-        });
-        if (data) {
-          const msgs = convertApiSessionDetail(data).messages || [];
-          dm.setDelegateMessagesForId(delegateId, task, msgs);
+  const reopenDelegate = useCallback(
+    async (delegateId: string, task: string) => {
+      if (!hasDelegateMessages(delegateId)) {
+        try {
+          const snapshot = await fetchSessionDetail(delegateId);
+          setDelegateMessagesForId(delegateId, task, snapshot.messages || []);
+        } catch {
+          // Best effort — panel will show empty state
         }
-      } catch {
-        // Best effort — panel will show empty state
       }
-    }
-    dm.openDelegate(delegateId, task);
-  }, [client, remoteNode, dm]);
+      openDelegate(delegateId, task);
+    },
+    [
+      fetchSessionDetail,
+      hasDelegateMessages,
+      setDelegateMessagesForId,
+      openDelegate,
+    ]
+  );
 
   return {
     sessionId,
@@ -349,11 +576,11 @@ export function useAgentChat() {
     loadMoreSessions,
     selectSession,
     respondToPrompt,
-    delegates: dm.delegates,
-    delegateStatuses: dm.delegateStatuses,
-    delegateMessages: dm.delegateMessages,
-    bringToFront: dm.bringToFront,
+    delegates,
+    delegateStatuses,
+    delegateMessages,
+    bringToFront,
     reopenDelegate,
-    removeDelegate: dm.removeDelegate,
+    removeDelegate,
   };
 }
