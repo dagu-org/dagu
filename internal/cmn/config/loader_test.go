@@ -232,6 +232,10 @@ func TestLoad_Env(t *testing.T) {
 			LockStaleThreshold:      30 * time.Second,
 			LockRetryInterval:       5 * time.Second,
 			ZombieDetectionInterval: 90 * time.Second,
+			HeartbeatInterval:       5 * time.Second,
+			HeartbeatSyncInterval:   10 * time.Second,
+			StaleThreshold:          90 * time.Second,
+			FailureThreshold:        3,
 		},
 		Monitoring: MonitoringConfig{
 			Retention: 24 * time.Hour,
@@ -511,6 +515,10 @@ scheduler:
 			LockStaleThreshold:      50 * time.Second,
 			LockRetryInterval:       10 * time.Second,
 			ZombieDetectionInterval: 60 * time.Second,
+			HeartbeatInterval:       5 * time.Second,
+			HeartbeatSyncInterval:   10 * time.Second,
+			StaleThreshold:          90 * time.Second,
+			FailureThreshold:        3,
 		},
 		Monitoring: MonitoringConfig{
 			Retention: 24 * time.Hour,
