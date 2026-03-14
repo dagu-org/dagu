@@ -66,6 +66,15 @@ type Props = {
   action?: 'start' | 'enqueue';
 };
 
+const maxTextareaHeight = 150;
+
+function autoGrowTextarea(el: HTMLTextAreaElement) {
+  el.style.height = 'auto';
+  const clamped = Math.min(el.scrollHeight, maxTextareaHeight);
+  el.style.height = `${clamped}px`;
+  el.style.overflowY = el.scrollHeight > maxTextareaHeight ? 'auto' : 'hidden';
+}
+
 function createParamFields(paramDefs: ParamDef[] = []): ParamField[] {
   return paramDefs.map((def, index) => {
     const hasDefault = def.default !== undefined;
@@ -370,7 +379,7 @@ function StartDAGModal({
       if (activeElement instanceof HTMLButtonElement) {
         return;
       }
-      if (activeElement instanceof HTMLTextAreaElement && event.shiftKey) {
+      if (activeElement instanceof HTMLTextAreaElement) {
         return;
       }
       if (
@@ -389,14 +398,6 @@ function StartDAGModal({
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [dismissModal, handleSubmit, visible]);
-
-  const maxHeight = 150;
-  const autoGrow = (el: HTMLTextAreaElement) => {
-    el.style.height = 'auto';
-    const clamped = Math.min(el.scrollHeight, maxHeight);
-    el.style.height = `${clamped}px`;
-    el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
-  };
 
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
@@ -539,7 +540,7 @@ function StartDAGModal({
                     id={`param-${index}`}
                     ref={(element) => {
                       if (element) {
-                        autoGrow(element);
+                        autoGrowTextarea(element);
                       }
                     }}
                     rows={1}
@@ -549,7 +550,7 @@ function StartDAGModal({
                     className={
                       paramsReadOnly ? 'bg-muted cursor-not-allowed' : ''
                     }
-                    onInput={(event) => autoGrow(event.currentTarget)}
+                    onInput={(event) => autoGrowTextarea(event.currentTarget)}
                     onChange={(event) => {
                       if (paramsReadOnly) {
                         return;
@@ -713,12 +714,19 @@ function renderTypedField({
     case ParamDefType.string:
     default:
       return (
-        <Input
+        <Textarea
           id={`param-${field.key}`}
-          className={controlClass}
+          className={`${controlClass} h-7 min-h-7 py-1`}
+          rows={1}
+          ref={(element) => {
+            if (element) {
+              autoGrowTextarea(element);
+            }
+          }}
           value={field.hasValue ? field.value : ''}
           placeholder={field.hasValue ? undefined : 'Not set'}
           disabled={disabled}
+          onInput={(event) => autoGrowTextarea(event.currentTarget)}
           onChange={(event) =>
             onChange({
               value: event.target.value,

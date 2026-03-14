@@ -98,6 +98,27 @@ params:
 	assert.Equal(t, `environment="staging" TAG="latest" DRY_RUN="true"`, dag.DefaultParams)
 }
 
+func TestInlineParamDefs_DescriptionOnlyDefaultsToString(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: described-inline-param
+params:
+  - name: notes
+    description: Free-form operator notes
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	require.Len(t, dag.ParamDefs, 1)
+	assert.Equal(t, "notes", dag.ParamDefs[0].Name)
+	assert.Equal(t, core.ParamDefTypeString, dag.ParamDefs[0].Type)
+	assert.Equal(t, "Free-form operator notes", dag.ParamDefs[0].Description)
+	assert.Nil(t, dag.ParamDefs[0].Default)
+	assert.Empty(t, dag.Params)
+	assert.Empty(t, dag.DefaultParams)
+}
+
 func TestInlineParamDefs_RejectDuplicateNames(t *testing.T) {
 	t.Parallel()
 
@@ -130,6 +151,21 @@ params:
 	_, err := LoadYAML(context.Background(), yaml, WithoutEval())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `default does not match pattern`)
+}
+
+func TestInlineParamDefs_RejectNonStringDescription(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: invalid-inline-description
+params:
+  - name: notes
+    description: 123
+`)
+
+	_, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `description must be a string`)
 }
 
 func TestInlineParamDefs_RejectLegacyNestedMapSyntax(t *testing.T) {
