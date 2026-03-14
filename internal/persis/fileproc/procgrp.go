@@ -257,9 +257,9 @@ func (pg *ProcGroup) ListAlive(ctx context.Context) ([]exec.DAGRunRef, error) {
 	return aliveRuns, nil
 }
 
-// CleanStaleFiles removes stale proc files for this group.
+// CleanStaleFiles removes stale proc files for a specific DAG run.
 // Only the zombie detector should call this after confirming a kill.
-func (pg *ProcGroup) CleanStaleFiles(ctx context.Context) error {
+func (pg *ProcGroup) CleanStaleFiles(ctx context.Context, dagRun exec.DAGRunRef) error {
 	pg.mu.Lock()
 	defer pg.mu.Unlock()
 
@@ -267,7 +267,9 @@ func (pg *ProcGroup) CleanStaleFiles(ctx context.Context) error {
 		return nil
 	}
 
-	files, err := filepath.Glob(filepath.Join(pg.baseDir, "*", procFilePrefix+"*.proc"))
+	// Scope to the specific run's proc files
+	pattern := filepath.Join(pg.baseDir, dagRun.Name, procFilePrefix+"*_"+dagRun.ID+".proc")
+	files, err := filepath.Glob(pattern)
 	if err != nil {
 		return err
 	}

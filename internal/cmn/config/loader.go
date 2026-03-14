@@ -260,6 +260,11 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		}
 	}
 
+	// Always set proc-store defaults regardless of service type.
+	// The heartbeat/stale tunables live under scheduler.* in config but are
+	// used by any process that creates a ProcStore (start, server, worker, etc.).
+	l.setProcStoreDefaults(&cfg)
+
 	l.loadCacheConfig(&cfg, def)
 	l.loadExecutionModeConfig(&cfg, def)
 
@@ -816,6 +821,12 @@ func (l *ConfigLoader) setSchedulerDefaults(cfg *Config) {
 	if cfg.Scheduler.ZombieDetectionInterval <= 0 && !l.v.IsSet("scheduler.zombie_detection_interval") {
 		cfg.Scheduler.ZombieDetectionInterval = 45 * time.Second
 	}
+}
+
+// setProcStoreDefaults sets defaults for heartbeat/stale tunables.
+// Called unconditionally because any process that creates a ProcStore needs these,
+// not just the scheduler.
+func (l *ConfigLoader) setProcStoreDefaults(cfg *Config) {
 	if cfg.Scheduler.HeartbeatInterval <= 0 {
 		cfg.Scheduler.HeartbeatInterval = 5 * time.Second
 	}

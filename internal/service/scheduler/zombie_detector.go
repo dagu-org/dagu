@@ -161,6 +161,17 @@ func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 			delete(z.staleCounters, id)
 		}
 	}
+
+	// Prune per-run mutexes for runs no longer in Running state.
+	// Safe because: once a run leaves Running, no code path will lock its mutex again,
+	// and this pruning runs in the same single-goroutine detection loop.
+	z.runMutexesMu.Lock()
+	for id := range z.runMutexes {
+		if _, ok := runningIDs[id]; !ok {
+			delete(z.runMutexes, id)
+		}
+	}
+	z.runMutexesMu.Unlock()
 }
 
 // checkAndCleanZombie checks if a single DAG run is a zombie and cleans it up
@@ -276,8 +287,8 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *exec.DAGRu
 		return fmt.Errorf("update status: %w", err)
 	}
 
-	// Clean up stale proc files after successfully persisting Failed status
-	_ = z.procStore.CleanStaleFiles(ctx, dag.ProcGroup())
+	// Clean up stale proc files for this specific run after persisting Failed status
+	_ = z.procStore.CleanStaleFiles(ctx, dag.ProcGroup(), exec.DAGRunRef{Name: dag.Name, ID: st.DAGRunID})
 
 	// Clean up counter entry
 	delete(z.staleCounters, st.DAGRunID)

@@ -438,6 +438,28 @@ func (c *Config) Validate() error {
 	if err := c.validateLicense(); err != nil {
 		return err
 	}
+	if err := c.validateScheduler(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// validateScheduler validates scheduler timing settings to prevent
+// configurations that would cause false-positive zombie detection.
+func (c *Config) validateScheduler() error {
+	s := c.Scheduler
+	if s.HeartbeatInterval > 0 && s.StaleThreshold > 0 && s.HeartbeatInterval >= s.StaleThreshold {
+		return fmt.Errorf(
+			"scheduler.heartbeat_interval (%s) must be less than scheduler.stale_threshold (%s)",
+			s.HeartbeatInterval, s.StaleThreshold,
+		)
+	}
+	if s.HeartbeatSyncInterval > 0 && s.StaleThreshold > 0 && s.HeartbeatSyncInterval >= s.StaleThreshold {
+		return fmt.Errorf(
+			"scheduler.heartbeat_sync_interval (%s) must be less than scheduler.stale_threshold (%s)",
+			s.HeartbeatSyncInterval, s.StaleThreshold,
+		)
+	}
 	return nil
 }
 

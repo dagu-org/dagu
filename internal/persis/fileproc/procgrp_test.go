@@ -254,7 +254,7 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		require.NoError(t, err, "stale file should NOT be deleted by IsRunAlive")
 
 		// CleanStaleFiles should remove the stale file
-		err = shortPG.CleanStaleFiles(ctx)
+		err = shortPG.CleanStaleFiles(ctx, dagRun)
 		require.NoError(t, err)
 
 		// Verify file was removed by CleanStaleFiles
@@ -313,7 +313,7 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		require.NoError(t, err, "stale file should NOT be deleted by IsRunAlive")
 
 		// CleanStaleFiles should remove the stale file and empty parent dir
-		err = shortPG.CleanStaleFiles(ctx)
+		err = shortPG.CleanStaleFiles(ctx, dagRun)
 		require.NoError(t, err)
 
 		// Verify file was removed

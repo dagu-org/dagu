@@ -6,6 +6,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -138,6 +139,9 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 		})).Return(nil)
 		attempt.On("Close", mock.Anything).Return(nil)
 
+		// Expect cleanup of stale proc files for the killed run
+		procStore.On("CleanStaleFiles", mock.Anything, dag.ProcGroup(), procRef).Return(nil)
+
 		detector.detectAndCleanZombies(ctx)
 
 		dagRunStore.AssertExpectations(t)
@@ -192,6 +196,9 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 				s.Nodes[1].Status == core.NodeFailed
 		})).Return(nil)
 		attempt.On("Close", mock.Anything).Return(nil)
+
+		// Expect cleanup of stale proc files for the killed run
+		procStore.On("CleanStaleFiles", mock.Anything, dag.ProcGroup(), procRef).Return(nil)
 
 		detector.detectAndCleanZombies(ctx)
 
@@ -463,10 +470,12 @@ func TestZombieDetector_failureThreshold(t *testing.T) {
 			return s.Status == core.Failed
 		})).Return(nil)
 		attempt.On("Close", mock.Anything).Return(nil)
+		procStore.On("CleanStaleFiles", mock.Anything, dag.ProcGroup(), procRef).Return(nil)
 
 		err := detector.checkAndCleanZombie(ctx, status)
 		assert.NoError(t, err)
 		attempt.AssertCalled(t, "Write", mock.Anything, mock.Anything)
+		procStore.AssertCalled(t, "CleanStaleFiles", mock.Anything, dag.ProcGroup(), procRef)
 	})
 
 	t.Run("CounterResetsOnRecovery", func(t *testing.T) {
@@ -512,22 +521,24 @@ func TestZombieDetector_failureThreshold(t *testing.T) {
 		attempt.AssertNotCalled(t, "ReadStatus", mock.Anything)
 	})
 
-	t.Run("CounterPrunedWhenRunCompletes", func(t *testing.T) {
+	t.Run("CounterAndMutexPrunedWhenRunCompletes", func(t *testing.T) {
 		t.Parallel()
 
 		dagRunStore := &mockDAGRunStore{}
 		procStore := &mockProcStore{}
 		detector := NewZombieDetector(dagRunStore, procStore, time.Second, 3)
 
-		// Pre-seed a stale counter
+		// Pre-seed a stale counter and a run mutex
 		detector.staleCounters["old-run"] = 2
+		detector.runMutexes["old-run"] = &sync.Mutex{}
 
 		// detectAndCleanZombies returns no running statuses
 		dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return([]*exec.DAGRunStatus{}, nil)
 		detector.detectAndCleanZombies(ctx)
 
-		// Counter should be pruned
+		// Both counter and mutex should be pruned
 		assert.Empty(t, detector.staleCounters)
+		assert.Empty(t, detector.runMutexes)
 	})
 }
 
@@ -736,6 +747,7 @@ func (m *mockProcStore) ListAllAlive(ctx context.Context) (map[string][]exec.DAG
 	return args.Get(0).(map[string][]exec.DAGRunRef), args.Error(1)
 }
 
-func (m *mockProcStore) CleanStaleFiles(_ context.Context, _ string) error {
-	return nil
+func (m *mockProcStore) CleanStaleFiles(ctx context.Context, groupName string, dagRun exec.DAGRunRef) error {
+	args := m.Called(ctx, groupName, dagRun)
+	return args.Error(0)
 }

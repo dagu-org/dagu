@@ -174,9 +174,9 @@ func (s *Store) ListAllAlive(ctx context.Context) (map[string][]exec.DAGRunRef, 
 }
 
 // CleanStaleFiles implements exec.ProcStore.
-func (s *Store) CleanStaleFiles(ctx context.Context, groupName string) error {
+func (s *Store) CleanStaleFiles(ctx context.Context, groupName string, dagRun exec.DAGRunRef) error {
 	procGroup := s.newProcGroup(groupName)
-	return procGroup.CleanStaleFiles(ctx)
+	return procGroup.CleanStaleFiles(ctx, dagRun)
 }
 
 func (s *Store) newProcGroup(groupName string) *ProcGroup {
