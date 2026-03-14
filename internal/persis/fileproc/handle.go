@@ -128,12 +128,9 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 
 	p.wg.Add(1)
 
-	// Start the heartbeat goroutine
-	// It will write the current timestamp to the file every 15 seconds
-	// and flush the file every 30 seconds.
-	// The goroutine will stop when the context is canceled.
-	// A proc file can be deemed stale if it has not been updated for 45 seconds
-	// and also the content of the timestamp is older than 45 seconds.
+	// Start the heartbeat goroutine.
+	// Writes timestamp every heartbeatInterval (default 5s), syncs every syncInterval (default 10s).
+	// Stops when context is cancelled. Proc files are stale after staleThreshold (default 90s).
 	go func() {
 		// recovery
 		defer func() {
@@ -200,10 +197,6 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 
 			case <-flush.C:
 				_ = fd.Sync()
-
-			case <-hbCtx.Done():
-				_ = fd.Sync()
-				return
 			}
 		}
 	}()
