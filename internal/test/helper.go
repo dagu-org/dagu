@@ -874,6 +874,7 @@ func buildCurrentExecutable(t *testing.T, root string) string {
 			path += ".exe"
 		}
 
+		//nolint:gosec // Test helper builds a fixed local package into an internally generated temp path.
 		cmd := exec.Command("go", "build", "-o", path, "./cmd")
 		cmd.Dir = root
 

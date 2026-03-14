@@ -217,10 +217,6 @@ func (f *fixture) collectStartTimes() []time.Time {
 	return times
 }
 
-func (f *fixture) latestStatus() (exec.DAGRunStatus, error) {
-	return f.th.DAGRunMgr.GetLatestStatus(f.th.Context, f.dag)
-}
-
 func (f *fixture) waitForRecentStatus(timeout time.Duration, match func(exec.DAGRunStatus) bool) exec.DAGRunStatus {
 	f.t.Helper()
 
