@@ -71,6 +71,39 @@ func runtimeParamLoadOptions(dag *core.DAG, params any, opts ResolveRuntimeParam
 	return loadOpts, nil
 }
 
+func resolveLegacyRuntimePairs(entries []dagParamEntry, rawParams string, paramsList []string) ([]paramPair, error) {
+	finalPairs := runtimePairsFromEntries(entries)
+
+	if rawParams != "" {
+		overridePairs, err := parseRuntimeLegacyOverrideInput(rawParams)
+		if err != nil {
+			return nil, core.NewValidationError("params", rawParams, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
+		}
+		overrideParams(&finalPairs, overridePairs)
+	}
+
+	if len(paramsList) > 0 {
+		overridePairs, err := parseRuntimeLegacyOverrideInput(paramsList)
+		if err != nil {
+			return nil, core.NewValidationError("params", paramsList, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
+		}
+		overrideParams(&finalPairs, overridePairs)
+	}
+
+	return finalPairs, nil
+}
+
+func parseRuntimeLegacyOverrideInput(value any) ([]paramPair, error) {
+	var (
+		pairs []paramPair
+		envs  []string
+	)
+	if err := parseParams(value, &pairs, &envs); err != nil {
+		return nil, err
+	}
+	return pairs, nil
+}
+
 func resolveLegacyEntries(plan *dagParamPlan, rawParams string, paramsList []string) ([]dagParamEntry, error) {
 	overridePairs, err := parseOverridePairs(rawParams, paramsList)
 	if err != nil {

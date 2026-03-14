@@ -165,3 +165,21 @@ params:
 	require.NoError(t, err)
 	assert.Equal(t, []string{"region=us-east-1"}, resolved.Params)
 }
+
+func TestResolveRuntimeParams_LegacyNamedParamsPreservePositionalOverrides(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: runtime-params
+params:
+  - TAG: ""
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	dag.YamlData = yaml
+
+	resolved, err := ResolveRuntimeParams(context.Background(), dag, []string{"simple"}, ResolveRuntimeParamsOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"TAG=", "1=simple"}, resolved.Params)
+}
