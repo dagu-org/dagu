@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -29,6 +30,9 @@ func (h *Handler) proxyToRemoteNode(w http.ResponseWriter, r *http.Request, node
 		return
 	}
 	req.Header.Set("Accept", "text/event-stream")
+	if lastEventID := strings.TrimSpace(r.Header.Get("Last-Event-ID")); lastEventID != "" {
+		req.Header.Set("Last-Event-ID", lastEventID)
+	}
 	node.ApplyAuth(req)
 
 	client := &http.Client{
@@ -114,6 +118,8 @@ func buildPathForTopic(topicType TopicType, identifier string) string {
 		return "/events/docs/" + identifier
 	case TopicTypeDocTree:
 		return pathWithOptionalQuery("/events/docs-tree", identifier)
+	case TopicTypeAgent:
+		return "/agent/sessions/" + url.PathEscape(identifier) + "/stream"
 	default:
 		return fmt.Sprintf("/events/%s/%s", topicType, identifier)
 	}

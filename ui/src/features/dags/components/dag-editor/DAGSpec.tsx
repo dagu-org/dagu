@@ -4,7 +4,7 @@
  * @module features/dags/components/dag-editor
  */
 import BorderedBox from '@/ui/BorderedBox';
-import { AlertTriangle, Save } from 'lucide-react';
+import { AlertTriangle, Save, Undo2 } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useCookies } from 'react-cookie';
 import { components } from '../../../../api/v1/schema';
@@ -138,6 +138,7 @@ function DAGSpec({ fileName, localDags, sseResult: parentSSEResult }: Props) {
     conflict,
     resolveConflict,
     markAsSaved,
+    discardChanges,
   } = useContentEditor({
     key: `${fileName}:${remoteNode}`,
     serverContent: serverSpec,
@@ -434,18 +435,30 @@ function DAGSpec({ fileName, localDags, sseResult: parentSSEResult }: Props) {
                   className="min-h-[400px]"
                   headerActions={
                     editable ? (
-                      <Button
-                        id="save-config"
-                        title="Save changes (Ctrl+S / Cmd+S)"
-                        disabled={!localHasUnsavedChanges}
-                        onClick={async () => {
-                          await handleSave();
-                          props.refresh();
-                        }}
-                      >
-                        <Save className="h-4 w-4" />
-                        Save
-                      </Button>
+                      <>
+                        {localHasUnsavedChanges && (
+                          <Button
+                            variant="ghost"
+                            title="Discard changes"
+                            onClick={discardChanges}
+                          >
+                            <Undo2 className="h-4 w-4" />
+                            Discard
+                          </Button>
+                        )}
+                        <Button
+                          id="save-config"
+                          title="Save changes (Ctrl+S / Cmd+S)"
+                          disabled={!localHasUnsavedChanges}
+                          onClick={async () => {
+                            await handleSave();
+                            props.refresh();
+                          }}
+                        >
+                          <Save className="h-4 w-4" />
+                          Save
+                        </Button>
+                      </>
                     ) : undefined
                   }
                 />

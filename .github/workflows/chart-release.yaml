@@ -10,11 +10,11 @@ on:
       - "charts/dagu/values.schema.json"
       - "charts/dagu/.helmignore"
       - "charts/dagu/README.md"
+      - "charts/dagu/RELEASE.md"
       - "charts/dagu/LICENSE*"
       - "charts/dagu/templates/**"
       - "charts/dagu/charts/**"
       - "charts/dagu/crds/**"
-      - ".github/workflows/chart-release.yaml"
 
 concurrency:
   group: chart-release-${{ github.ref }}
@@ -39,6 +39,7 @@ jobs:
       - name: Run chart releaser
         uses: helm/chart-releaser-action@v1.7.0
         with:
+          config: cr.yaml
           charts_dir: charts
           pages_branch: gh-pages
           skip_existing: true

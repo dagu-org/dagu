@@ -122,13 +122,21 @@ func buildTopic(topicType TopicType, parts ...string) string {
 // sanitizeQueryForTopic removes sensitive params (token, remoteNode) from query string
 // and limits length to prevent unbounded topic keys.
 func sanitizeQueryForTopic(rawQuery string) string {
-	if rawQuery == "" {
+	result, err := parseAndSanitizeQuery(rawQuery)
+	if err != nil {
 		return ""
+	}
+	return result
+}
+
+func parseAndSanitizeQuery(rawQuery string) (string, error) {
+	if rawQuery == "" {
+		return "", nil
 	}
 
 	values, err := url.ParseQuery(rawQuery)
 	if err != nil {
-		return ""
+		return "", err
 	}
 
 	// Remove sensitive parameters that should not be part of topic identity
@@ -137,9 +145,9 @@ func sanitizeQueryForTopic(rawQuery string) string {
 
 	result := values.Encode()
 	if len(result) > maxQueryLength {
-		return result[:maxQueryLength]
+		return result[:maxQueryLength], nil
 	}
-	return result
+	return result, nil
 }
 
 // handleSSE is the common SSE handling logic shared by all handlers.
@@ -152,6 +160,7 @@ func (h *Handler) handleSSE(w http.ResponseWriter, r *http.Request, topic string
 	// (both local and proxied to remote nodes). The server's WriteTimeout (60s)
 	// would otherwise kill long-lived SSE streams.
 	SetSSEHeaders(w)
+	SetLegacyStreamDeprecationHeaders(w)
 	rc := http.NewResponseController(w)
 	_ = rc.SetWriteDeadline(time.Time{})
 

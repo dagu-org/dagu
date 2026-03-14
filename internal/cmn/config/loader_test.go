@@ -171,6 +171,13 @@ func TestLoad_Env(t *testing.T) {
 			Terminal:          TerminalConfig{Enabled: true},
 			Audit:             AuditConfig{Enabled: false, RetentionDays: 7},
 			Session:           SessionConfig{MaxPerUser: 100},
+			SSE: SSEConfig{
+				MaxTopicsPerConnection: 20,
+				MaxClients:             1000,
+				HeartbeatInterval:      10 * time.Second,
+				WriteBufferSize:        65536,
+				SlowClientTimeout:      30 * time.Second,
+			},
 		},
 		Paths: PathsConfig{
 			DAGsDir:            filepath.Join(testPaths, "dags"),
@@ -435,6 +442,13 @@ scheduler:
 			Terminal: TerminalConfig{Enabled: false},
 			Audit:    AuditConfig{Enabled: true, RetentionDays: 7},
 			Session:  SessionConfig{MaxPerUser: 100},
+			SSE: SSEConfig{
+				MaxTopicsPerConnection: 20,
+				MaxClients:             1000,
+				HeartbeatInterval:      10 * time.Second,
+				WriteBufferSize:        65536,
+				SlowClientTimeout:      30 * time.Second,
+			},
 		},
 		Paths: PathsConfig{
 			DAGsDir:            "/var/dagu/dags",
