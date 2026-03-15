@@ -123,6 +123,12 @@ type Connection struct {
 	inputBuffer []byte // accumulates input until newline for command logging
 	inEscSeq    bool   // true when processing an ANSI escape sequence
 	closing     atomic.Bool
+
+	// onSessionEnd is called when the session event loop exits, before
+	// cleanup (process termination, I/O drain) begins. This allows the
+	// caller to release resources (e.g., session lease) without waiting
+	// for the potentially slow cleanup sequence.
+	onSessionEnd func()
 }
 
 // NewConnection creates a new terminal connection.
@@ -172,6 +178,13 @@ func (c *Connection) Run(ctx context.Context, auditSvc *audit.Service) (retErr e
 	c.startRunLoops(sessionCtx, auditSvc, state)
 	event = <-state.eventCh
 	c.emitRunEvent(event)
+
+	// Notify the caller that the session is done before the cleanup defer
+	// runs. This allows the session lease to be released immediately,
+	// without waiting for process termination and I/O drain.
+	if c.onSessionEnd != nil {
+		c.onSessionEnd()
+	}
 
 	return event.err
 }
