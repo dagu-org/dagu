@@ -87,6 +87,15 @@ func TestConfig_Validate(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("NegativeSchedulerFailureThreshold", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Scheduler.FailureThreshold = -1
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "scheduler.failure_threshold must be >= 0")
+	})
+
 	t.Run("IncompleteTLS_MissingCert", func(t *testing.T) {
 		t.Parallel()
 		cfg := validBaseConfig()

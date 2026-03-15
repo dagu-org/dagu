@@ -5,6 +5,7 @@ package intg_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -45,21 +46,47 @@ steps:
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- schedulerInstance.Start(ctx) }()
+	var schedulerErr error
+	var schedulerStopped bool
+	pollSchedulerErr := func() error {
+		if schedulerStopped {
+			return schedulerErr
+		}
+		select {
+		case err := <-errCh:
+			schedulerStopped = true
+			if err == nil {
+				err = errors.New("scheduler exited unexpectedly before test completed")
+			}
+			schedulerErr = err
+		default:
+		}
+		return schedulerErr
+	}
 
 	dag, err := spec.Load(th.Context, dagFile)
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
+		if err := pollSchedulerErr(); err != nil {
+			return true
+		}
 		return len(th.DAGRunMgr.ListRecentStatus(th.Context, dag.Name, 10)) >= 2
 	}, 2*time.Minute+30*time.Second, 5*time.Second)
+	require.NoError(t, schedulerErr)
 
 	schedulerInstance.Stop(ctx)
 	cancel()
 
-	select {
-	case err = <-errCh:
-		require.NoError(t, err)
-	case <-time.After(5 * time.Second):
+	if !schedulerStopped {
+		select {
+		case err = <-errCh:
+			require.True(t,
+				err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded),
+				"unexpected scheduler shutdown error: %v", err,
+			)
+		case <-time.After(5 * time.Second):
+		}
 	}
 
 	runs := th.DAGRunMgr.ListRecentStatus(th.Context, dag.Name, 10)

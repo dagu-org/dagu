@@ -172,6 +172,8 @@ type DAG struct {
 	HistRetentionDays int `json:"histRetentionDays,omitempty"`
 	// Queue is the name of the queue to assign this DAG to.
 	Queue string `json:"queue,omitempty"`
+	// RetryPolicy controls automatic DAG-level retry behavior for failed runs.
+	RetryPolicy *DAGRetryPolicy `json:"retryPolicy,omitempty"`
 	// WorkerSelector defines labels required for worker selection in distributed execution.
 	// If specified, the DAG will only run on workers with matching tag.
 	WorkerSelector map[string]string `json:"workerSelector,omitempty"`
@@ -244,6 +246,20 @@ type ParamDef struct {
 	MinLength   *int     `json:"minLength,omitempty"`
 	MaxLength   *int     `json:"maxLength,omitempty"`
 	Pattern     *string  `json:"pattern,omitempty"`
+}
+
+// DAGRetryPolicy contains the retry policy for a DAG run.
+type DAGRetryPolicy struct {
+	// Limit is the maximum number of retry attempts allowed.
+	Limit int `json:"limit,omitempty"`
+	// Interval is the base delay before retrying.
+	Interval time.Duration `json:"interval,omitempty"`
+	// IntervalSecStr preserves the original interval string representation.
+	IntervalSecStr string `json:"intervalSecStr,omitempty"`
+	// Backoff is the retry delay multiplier. Zero keeps a fixed interval.
+	Backoff float64 `json:"backoff,omitempty"`
+	// MaxInterval caps the computed retry delay.
+	MaxInterval time.Duration `json:"maxInterval,omitempty"`
 }
 
 // SecretRef represents a reference to an external secret.

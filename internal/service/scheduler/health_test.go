@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,18 +15,15 @@ import (
 
 func TestHealthServer(t *testing.T) {
 	t.Run("StartStop", func(t *testing.T) {
-		hs := NewHealthServer(8091)
+		hs := newHealthServerWithAddr("127.0.0.1:0")
 		ctx := context.Background()
 
 		// Start the server
 		err := hs.Start(ctx)
 		require.NoError(t, err)
 
-		// Give it a moment to start
-		time.Sleep(100 * time.Millisecond)
-
 		// Make a request to the health endpoint
-		resp, err := http.Get("http://localhost:8091/health")
+		resp, err := http.Get(hs.URL() + "/health")
 		require.NoError(t, err)
 		defer func() {
 			err := resp.Body.Close()

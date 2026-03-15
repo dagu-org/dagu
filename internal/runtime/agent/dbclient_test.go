@@ -285,6 +285,20 @@ func (m *mockDAGRunStore) ListStatuses(ctx context.Context, opts ...exec.ListDAG
 	return args.Get(0).([]*exec.DAGRunStatus), args.Error(1)
 }
 
+func (m *mockDAGRunStore) CompareAndSwapLatestAttemptStatus(
+	ctx context.Context,
+	dagRun exec.DAGRunRef,
+	expectedAttemptID string,
+	expectedStatus core.Status,
+	mutate func(*exec.DAGRunStatus) error,
+) (*exec.DAGRunStatus, bool, error) {
+	args := m.Called(ctx, dagRun, expectedAttemptID, expectedStatus, mutate)
+	if args.Get(0) == nil {
+		return nil, args.Bool(1), args.Error(2)
+	}
+	return args.Get(0).(*exec.DAGRunStatus), args.Bool(1), args.Error(2)
+}
+
 func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun exec.DAGRunRef) (exec.DAGRunAttempt, error) {
 	args := m.Called(ctx, dagRun)
 	if args.Get(0) == nil {

@@ -8,10 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -101,6 +103,8 @@ type dag struct {
 	Tags types.TagsValue `yaml:"tags,omitempty"`
 	// Queue is the name of the queue to assign this DAG to.
 	Queue string `yaml:"queue,omitempty"`
+	// RetryPolicy is the DAG-level retry policy.
+	RetryPolicy *dagRetryPolicy `yaml:"retry_policy,omitempty"`
 	// MaxOutputSize is the maximum size of the output for each step.
 	MaxOutputSize int `yaml:"max_output_size,omitempty"`
 	// OTel is the OpenTelemetry configuration.
@@ -132,6 +136,14 @@ type dag struct {
 	// Defaults defines default values for step configuration fields.
 	// Steps inherit these defaults and can override them individually.
 	Defaults any `yaml:"defaults,omitempty"`
+}
+
+// dagRetryPolicy defines the retry policy for a DAG run.
+type dagRetryPolicy struct {
+	Limit          any `yaml:"limit,omitempty"`
+	IntervalSec    any `yaml:"interval_sec,omitempty"`
+	Backoff        any `yaml:"backoff,omitempty"`
+	MaxIntervalSec any `yaml:"max_interval_sec,omitempty"`
 }
 
 // handlerOn defines the steps to be executed on different events.
@@ -411,6 +423,7 @@ var metadataTransformers = []transform{
 	{"max_active_runs", newTransformer("MaxActiveRuns", buildMaxActiveRuns)},
 	{"max_active_steps", newTransformer("MaxActiveSteps", buildMaxActiveSteps)},
 	{"queue", newTransformer("Queue", buildQueue)},
+	{"retry_policy", newTransformer("RetryPolicy", buildDAGRetryPolicy)},
 	{"max_output_size", newTransformer("MaxOutputSize", buildMaxOutputSize)},
 	{"skip_if_successful", newTransformer("SkipIfSuccessful", buildSkipIfSuccessful)},
 	{"catchup_window", newTransformer("CatchupWindow", buildCatchupWindow)},
@@ -649,6 +662,43 @@ func buildQueue(_ BuildContext, d *dag) (string, error) {
 	return strings.TrimSpace(d.Queue), nil
 }
 
+func buildDAGRetryPolicy(_ BuildContext, d *dag) (*core.DAGRetryPolicy, error) {
+	if d.RetryPolicy == nil {
+		return nil, nil
+	}
+
+	// Root DAG retry must be concrete when the DAG is loaded because scheduler
+	// retry decisions evaluate the persisted DAG snapshot without re-resolving
+	// retry expressions at runtime.
+	limit, err := parseDAGRetryLimit(d.RetryPolicy.Limit)
+	if err != nil {
+		return nil, err
+	}
+
+	interval, intervalStr, err := parseDAGRetryInterval(d.RetryPolicy.IntervalSec)
+	if err != nil {
+		return nil, err
+	}
+
+	backoff, err := parseDAGRetryBackoff(d.RetryPolicy.Backoff)
+	if err != nil {
+		return nil, err
+	}
+
+	maxInterval, err := parseDAGRetryMaxInterval(d.RetryPolicy.MaxIntervalSec)
+	if err != nil {
+		return nil, err
+	}
+
+	return &core.DAGRetryPolicy{
+		Limit:          limit,
+		Interval:       interval,
+		IntervalSecStr: intervalStr,
+		Backoff:        backoff,
+		MaxInterval:    maxInterval,
+	}, nil
+}
+
 func buildMaxOutputSize(_ BuildContext, d *dag) (int, error) {
 	return d.MaxOutputSize, nil
 }
@@ -818,6 +868,91 @@ func buildResolvedParamsJSON(paramPairs []paramPair, rawInput string) (string, e
 		return rawJSON, nil
 	}
 	return marshalParamPairs(paramPairs)
+}
+
+func parseDAGRetryInterval(v any) (time.Duration, string, error) {
+	if v == nil {
+		return 60 * time.Second, "", nil
+	}
+	interval, intervalStr, err := parseConcreteDAGRetryInt("retry_policy.interval_sec", v)
+	if err != nil {
+		return 0, "", err
+	}
+	return time.Second * time.Duration(interval), intervalStr, nil
+}
+
+func parseDAGRetryBackoff(v any) (float64, error) {
+	backoff, err := parseBackoffValue(v, "retry_policy.backoff")
+	if err != nil {
+		return 0, core.NewValidationError("retry_policy.backoff", v, err)
+	}
+	return backoff, nil
+}
+
+func parseDAGRetryMaxInterval(v any) (time.Duration, error) {
+	if v == nil {
+		return time.Hour, nil
+	}
+	seconds, _, err := parseConcreteDAGRetryInt("retry_policy.max_interval_sec", v)
+	if err != nil {
+		return 0, err
+	}
+	return time.Second * time.Duration(seconds), nil
+}
+
+func parseDAGRetryLimit(v any) (int, error) {
+	if v == nil {
+		return 0, core.NewValidationError("retry_policy.limit", nil, fmt.Errorf("limit is required when retry_policy is specified"))
+	}
+	limit, _, err := parseConcreteDAGRetryInt("retry_policy.limit", v)
+	if err != nil {
+		return 0, err
+	}
+	return limit, nil
+}
+
+func parseConcreteDAGRetryInt(fieldName string, val any) (int, string, error) {
+	switch v := val.(type) {
+	case int:
+		if v <= 0 {
+			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("%s must be > 0", retryFieldLabel(fieldName)))
+		}
+		return v, "", nil
+	case int64:
+		if v <= 0 {
+			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("%s must be > 0", retryFieldLabel(fieldName)))
+		}
+		if v > math.MaxInt {
+			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("value %d exceeds maximum int", v))
+		}
+		return int(v), "", nil
+	case uint64:
+		if v == 0 {
+			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("%s must be > 0", retryFieldLabel(fieldName)))
+		}
+		if v > math.MaxInt {
+			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("value %d exceeds maximum int", v))
+		}
+		return int(v), "", nil
+	case string:
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("%s must be an integer or numeric string", retryFieldLabel(fieldName)))
+		}
+		if parsed <= 0 {
+			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("%s must be > 0", retryFieldLabel(fieldName)))
+		}
+		return parsed, v, nil
+	default:
+		return 0, "", core.NewValidationError(fieldName, val, fmt.Errorf("invalid type: %T", val))
+	}
+}
+
+func retryFieldLabel(fieldName string) string {
+	if idx := strings.LastIndex(fieldName, "."); idx >= 0 {
+		return fieldName[idx+1:]
+	}
+	return fieldName
 }
 
 // marshalParamPairs converts the final param pairs into a JSON object string.

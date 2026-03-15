@@ -4,6 +4,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -119,8 +120,11 @@ func runRetry(ctx *Context, args []string) error {
 // enqueueRetry enqueues the retry and persists Queued status via exec.EnqueueRetry.
 // Retries respect global queue capacity because the queue processor picks them up
 // when capacity is available.
-func enqueueRetry(ctx *Context, attempt exec.DAGRunAttempt, dag *core.DAG, status *exec.DAGRunStatus, dagRunID string) error {
-	if err := exec.EnqueueRetry(ctx.Context, ctx.QueueStore, attempt, dag, status, dagRunID); err != nil {
+func enqueueRetry(ctx *Context, _ exec.DAGRunAttempt, dag *core.DAG, status *exec.DAGRunStatus, dagRunID string) error {
+	if err := exec.EnqueueRetry(ctx.Context, ctx.DAGRunStore, ctx.QueueStore, dag, status, exec.EnqueueRetryOptions{}); err != nil {
+		if errors.Is(err, exec.ErrRetryStaleLatest) {
+			return fmt.Errorf("dag-run state changed before retry could be queued")
+		}
 		return err
 	}
 	logger.Info(ctx, "Enqueued retry; will run when queue capacity is available",

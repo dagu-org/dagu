@@ -65,6 +65,8 @@ type DAGRunSummary struct {
 	ScheduleTime     string
 	TriggerType      core.TriggerType
 	CreatedAt        int64
+	AttemptID        string
+	AutoRetryCount   int
 }
 
 // DAGRun represents a dag-run with its associated timestamp and run ID.

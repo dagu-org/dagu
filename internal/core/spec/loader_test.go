@@ -1435,6 +1435,129 @@ steps:
 		require.Equal(t, 600*time.Second, dag.Steps[0].Timeout)
 	})
 
+	t.Run("BaseConfigDAGRetryPolicy", func(t *testing.T) {
+		t.Parallel()
+
+		base := createTempYAMLFile(t, `
+retry_policy:
+  limit: 1
+  interval_sec: 60
+`)
+		child := createTempYAMLFile(t, `
+steps:
+  - name: step1
+    command: echo "test"
+`)
+		dag, err := spec.Load(context.Background(), child, spec.WithBaseConfig(base))
+		require.NoError(t, err)
+		require.NotNil(t, dag.RetryPolicy)
+		require.Equal(t, 1, dag.RetryPolicy.Limit)
+		require.Equal(t, 60*time.Second, dag.RetryPolicy.Interval)
+	})
+
+	t.Run("DAGRetryPolicyNormalization", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name        string
+			spec        string
+			wantPolicy  *core.DAGRetryPolicy
+			errContains string
+		}{
+			{
+				name: "NumericStringsAndBackoffTrue",
+				spec: `
+name: retryable
+retry_policy:
+  limit: "3"
+  interval_sec: "60"
+  backoff: true
+  max_interval_sec: "300"
+steps:
+  - command: echo hi
+`,
+				wantPolicy: &core.DAGRetryPolicy{
+					Limit:          3,
+					Interval:       60 * time.Second,
+					IntervalSecStr: "60",
+					Backoff:        2.0,
+					MaxInterval:    300 * time.Second,
+				},
+			},
+			{
+				name: "BackoffFalseUsesFixedInterval",
+				spec: `
+name: retryable
+retry_policy:
+  limit: 2
+  interval_sec: "5"
+  backoff: false
+steps:
+  - command: echo hi
+`,
+				wantPolicy: &core.DAGRetryPolicy{
+					Limit:          2,
+					Interval:       5 * time.Second,
+					IntervalSecStr: "5",
+					Backoff:        0,
+					MaxInterval:    time.Hour,
+				},
+			},
+			{
+				name: "RejectsNonNumericStringLimit",
+				spec: `
+name: retryable
+retry_policy:
+  limit: three
+steps:
+  - command: echo hi
+`,
+				errContains: "retry_policy.limit",
+			},
+			{
+				name: "RejectsNonNumericStringInterval",
+				spec: `
+name: retryable
+retry_policy:
+  limit: 3
+  interval_sec: later
+steps:
+  - command: echo hi
+`,
+				errContains: "retry_policy.interval_sec",
+			},
+			{
+				name: "RejectsBackoffOnePointZero",
+				spec: `
+name: retryable
+retry_policy:
+  limit: 3
+  interval_sec: 10
+  backoff: 1.0
+steps:
+  - command: echo hi
+`,
+				errContains: "retry_policy.backoff",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				dag, err := spec.LoadYAML(context.Background(), []byte(tt.spec))
+				if tt.errContains != "" {
+					require.Error(t, err)
+					require.Contains(t, err.Error(), tt.errContains)
+					return
+				}
+
+				require.NoError(t, err)
+				require.Equal(t, tt.wantPolicy, dag.RetryPolicy)
+			})
+		}
+	})
+
 	t.Run("UnknownKeyInDefaults", func(t *testing.T) {
 		t.Parallel()
 

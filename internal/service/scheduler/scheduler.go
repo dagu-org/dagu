@@ -5,7 +5,9 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -44,10 +46,27 @@ type Scheduler struct {
 	zombieDetector      *ZombieDetector // Zombie DAG run detector
 	instanceID          string          // Unique instance identifier for service registry
 	queueProcessor      *QueueProcessor // Processor for queued DAG runs
+	retryScanner        *RetryScanner   // DAG-level retry scanner
 	planner             *TickPlanner    // Unified scheduling decision module
 	stopOnce            sync.Once
 	lock                sync.Mutex
+	lifecycleMu         sync.Mutex
+	startupCancel       context.CancelFunc
+	lockHeld            atomic.Bool
 	clock               Clock // Clock function for getting current time
+}
+
+type schedulerHooks struct {
+	onLockWait func()
+}
+
+type startupState struct {
+	serviceRegistered      bool
+	lockAcquired           bool
+	healthServerStarted    bool
+	queueProcessorStarted  bool
+	entryReaderInitialized bool
+	plannerStarted         bool
 }
 
 // New constructs a Scheduler from the provided stores, runtime manager,
@@ -63,6 +82,21 @@ func New(
 	coordinatorCli exec.Dispatcher,
 	watermarkStore WatermarkStore,
 ) (*Scheduler, error) {
+	return newScheduler(cfg, er, drm, dagRunStore, queueStore, procStore, reg, coordinatorCli, watermarkStore, schedulerHooks{})
+}
+
+func newScheduler(
+	cfg *config.Config,
+	er EntryReader,
+	drm runtime.Manager,
+	dagRunStore exec.DAGRunStore,
+	queueStore exec.QueueStore,
+	procStore exec.ProcStore,
+	reg exec.ServiceRegistry,
+	coordinatorCli exec.Dispatcher,
+	watermarkStore WatermarkStore,
+	hooks schedulerHooks,
+) (*Scheduler, error) {
 	timeLoc := cfg.Core.Location
 	if timeLoc == nil {
 		timeLoc = time.Local
@@ -70,6 +104,7 @@ func New(
 	lockOpts := &dirlock.LockOptions{
 		StaleThreshold: cfg.Scheduler.LockStaleThreshold,
 		RetryInterval:  cfg.Scheduler.LockRetryInterval,
+		OnWait:         hooks.onLockWait,
 	}
 	lockDir := filepath.Join(cfg.Paths.DataDir, "scheduler", "locks")
 	dirLock := dirlock.New(lockDir, lockOpts)
@@ -143,6 +178,17 @@ func New(
 		IsQueued:      isQueued,
 	})
 
+	retryScanner, err := NewRetryScanner(
+		dagRunStore,
+		queueStore,
+		isSuspended,
+		cfg.Scheduler.RetryFailureWindow,
+		defaultClock,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize retry scanner: %w", err)
+	}
+
 	return &Scheduler{
 		quit:            make(chan any),
 		entryReader:     er,
@@ -155,6 +201,7 @@ func New(
 		healthServer:    healthServer,
 		serviceRegistry: reg,
 		queueProcessor:  processor,
+		retryScanner:    retryScanner,
 		planner:         planner,
 		clock:           defaultClock,
 	}, nil
@@ -165,6 +212,9 @@ func New(
 func (s *Scheduler) SetClock(clock Clock) {
 	s.clock = clock
 	s.planner.cfg.Clock = clock
+	if s.retryScanner != nil {
+		s.retryScanner.clock = clock
+	}
 }
 
 // SetRestartFunc overrides the planner's restart function for testing purposes.
@@ -196,9 +246,130 @@ func (s *Scheduler) DisableHealthServer() {
 	s.disableHealthServer = true
 }
 
+func (s *Scheduler) registerStartupCancel(cancel context.CancelFunc) bool {
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+
+	select {
+	case <-s.quit:
+		return false
+	default:
+	}
+
+	s.startupCancel = cancel
+	return true
+}
+
+func (s *Scheduler) clearStartupCancel() {
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+
+	s.startupCancel = nil
+}
+
+func (s *Scheduler) stopping() bool {
+	select {
+	case <-s.quit:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Scheduler) releaseDirLock(ctx context.Context, msg string) {
+	if !s.lockHeld.CompareAndSwap(true, false) {
+		return
+	}
+	if err := s.dirLock.Unlock(); err != nil {
+		logger.Error(ctx, msg, tag.Error(err))
+	}
+}
+
+func (s *Scheduler) beginStartup(ctx context.Context) (context.Context, context.CancelFunc, bool) {
+	startupCtx, cancel := context.WithCancel(ctx)
+	if !s.registerStartupCancel(cancel) {
+		cancel()
+		return nil, nil, false
+	}
+	return startupCtx, cancel, true
+}
+
+func (s *Scheduler) cleanupFailedStartup(state startupState) {
+	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cleanupCancel()
+
+	if state.queueProcessorStarted {
+		s.queueProcessor.Stop()
+	}
+	if state.entryReaderInitialized {
+		s.entryReader.Stop()
+	}
+	if state.plannerStarted {
+		s.planner.Stop(cleanupCtx)
+	}
+	if state.healthServerStarted {
+		s.stopHealthServer(cleanupCtx, "Failed to stop health check server during startup cleanup")
+	}
+	s.closeDAGExecutor(cleanupCtx)
+	if state.serviceRegistered {
+		s.unregisterService(cleanupCtx)
+	}
+	if state.lockAcquired {
+		s.releaseDirLock(cleanupCtx, "Failed to release scheduler lock during startup cleanup")
+	}
+}
+
+func (s *Scheduler) updateServiceStatus(ctx context.Context, status exec.ServiceStatus, failureMsg, successMsg string) {
+	if s.serviceRegistry == nil {
+		return
+	}
+	if err := s.serviceRegistry.UpdateStatus(ctx, exec.ServiceNameScheduler, status); err != nil {
+		logger.Error(ctx, failureMsg, tag.Error(err))
+		return
+	}
+	if successMsg != "" {
+		logger.Info(ctx, successMsg)
+	}
+}
+
+func (s *Scheduler) stopHealthServer(ctx context.Context, failureMsg string) {
+	if s.healthServer == nil || s.disableHealthServer {
+		return
+	}
+	if err := s.healthServer.Stop(ctx); err != nil {
+		logger.Error(ctx, failureMsg, tag.Error(err))
+	}
+}
+
+func (s *Scheduler) closeDAGExecutor(ctx context.Context) {
+	if s.dagExecutor != nil {
+		s.dagExecutor.Close(ctx)
+	}
+}
+
+func (s *Scheduler) unregisterService(ctx context.Context) {
+	if s.serviceRegistry != nil {
+		s.serviceRegistry.Unregister(ctx)
+	}
+}
+
 func (s *Scheduler) Start(ctx context.Context) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx, cancel, ok := s.beginStartup(ctx)
+	if !ok {
+		return nil
+	}
+	state := startupState{}
+	cleanupOnFailure := true
+	defer func() {
+		if !cleanupOnFailure {
+			return
+		}
+		s.cleanupFailedStartup(state)
+	}()
+	defer func() {
+		s.clearStartupCancel()
+		cancel()
+	}()
 
 	if s.instanceID == "" {
 		hostname, _ := os.Hostname()
@@ -218,6 +389,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 			logger.Error(ctx, "Failed to register with service registry", tag.Error(err))
 			// Continue anyway - service registry is not critical
 		} else {
+			state.serviceRegistered = true
 			logger.Info(ctx, "Registered with service registry as inactive",
 				tag.ServiceID(s.instanceID),
 				tag.Host(hostname),
@@ -226,26 +398,34 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		}
 	}
 
+	logger.Info(ctx, "Waiting to acquire scheduler lock")
+	if err := s.dirLock.Lock(ctx); err != nil {
+		if errors.Is(err, context.Canceled) && s.stopping() {
+			return nil
+		}
+		return fmt.Errorf("failed to acquire scheduler lock: %w", err)
+	}
+	s.lockHeld.Store(true)
+	state.lockAcquired = true
+
+	logger.Info(ctx, "Acquired scheduler lock")
+
+	if ctx.Err() != nil && s.stopping() {
+		return nil
+	}
+
 	if !s.disableHealthServer {
 		if err := s.healthServer.Start(ctx); err != nil {
 			return fmt.Errorf("failed to start health check server: %w", err)
 		}
+		state.healthServerStarted = true
 	}
 
-	logger.Info(ctx, "Waiting to acquire scheduler lock")
-	if err := s.dirLock.Lock(ctx); err != nil {
-		return fmt.Errorf("failed to acquire scheduler lock: %w", err)
+	if ctx.Err() != nil && s.stopping() {
+		return nil
 	}
 
-	logger.Info(ctx, "Acquired scheduler lock")
-
-	if s.serviceRegistry != nil {
-		if err := s.serviceRegistry.UpdateStatus(ctx, exec.ServiceNameScheduler, exec.ServiceStatusActive); err != nil {
-			logger.Error(ctx, "Failed to update status to active", tag.Error(err))
-		} else {
-			logger.Info(ctx, "Updated scheduler status to active")
-		}
-	}
+	s.updateServiceStatus(ctx, exec.ServiceStatusActive, "Failed to update status to active", "Updated scheduler status to active")
 
 	sig := make(chan os.Signal, 1)
 
@@ -256,8 +436,10 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		return err
 	}
 	s.queueProcessor.Start(ctx, notifyCh)
+	state.queueProcessorStarted = true
 
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer signal.Stop(sig)
 
 	var wg sync.WaitGroup
 
@@ -265,14 +447,11 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		s.startHeartbeat(ctx)
 	})
 
-	wg.Go(func() {
-		s.startZombieDetector(ctx)
-	})
-
 	if err := s.entryReader.Init(ctx); err != nil {
 		logger.Error(ctx, "Failed to initialize entry reader", tag.Error(err))
 		return err
 	}
+	state.entryReaderInitialized = true
 
 	// planner.Init is best-effort: if watermark loading fails, Init falls back
 	// to an empty state internally, so catch-up windows replay from scratch.
@@ -281,12 +460,24 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	}
 
 	s.planner.Start(ctx)
+	state.plannerStarted = true
+
+	// Start background loops only after the last startup failure point.
+	// Heartbeat starts earlier to keep the scheduler lock alive during init.
+	wg.Go(func() {
+		s.startZombieDetector(ctx)
+	})
+
+	wg.Go(func() {
+		s.startRetryScanner(ctx)
+	})
 
 	wg.Go(func() {
 		s.entryReader.Start(ctx)
 	})
 
 	logger.Info(ctx, "Scheduler started")
+	cleanupOnFailure = false
 
 	wg.Add(1)
 	go func(ctx context.Context) {
@@ -310,6 +501,9 @@ func (s *Scheduler) startZombieDetector(ctx context.Context) {
 	s.lock.Lock()
 	select {
 	case <-s.quit:
+		s.lock.Unlock()
+		return
+	case <-ctx.Done():
 		s.lock.Unlock()
 		return
 	default:
@@ -347,6 +541,33 @@ func (s *Scheduler) startHeartbeat(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (s *Scheduler) startRetryScanner(ctx context.Context) {
+	if s.retryScanner == nil || s.config.Scheduler.RetryFailureWindow <= 0 {
+		logger.Info(ctx, "Retry scanner disabled",
+			tag.Interval(s.config.Scheduler.RetryFailureWindow),
+		)
+		return
+	}
+
+	logger.Info(ctx, "Started retry scanner",
+		tag.Interval(retryScanInterval),
+		slog.Duration("retry_failure_window", s.config.Scheduler.RetryFailureWindow),
+	)
+	scanCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	go func() {
+		select {
+		case <-s.quit:
+			cancel()
+		case <-ctx.Done():
+			cancel()
+		}
+	}()
+
+	s.retryScanner.Start(scanCtx)
 }
 
 // cronLoop runs the main scheduler loop to invoke jobs at scheduled times.
@@ -394,14 +615,23 @@ func (s *Scheduler) IsRunning() bool {
 
 // Stop stops the scheduler.
 func (s *Scheduler) Stop(ctx context.Context) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
 	s.stopOnce.Do(func() {
 		var wg sync.WaitGroup
 		wg.Add(2)
 
+		var startupCancel context.CancelFunc
+		var zd *ZombieDetector
+		s.lifecycleMu.Lock()
+		startupCancel = s.startupCancel
+		s.lock.Lock()
 		close(s.quit)
+		zd = s.zombieDetector
+		s.lock.Unlock()
+		s.lifecycleMu.Unlock()
+
+		if startupCancel != nil {
+			startupCancel()
+		}
 
 		go func() {
 			defer wg.Done()
@@ -418,40 +648,23 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		// sendEvent unblocks via the select on er.quit.
 		s.entryReader.Stop()
 
-		if s.zombieDetector != nil {
-			s.zombieDetector.Stop(ctx)
+		if zd != nil {
+			zd.Stop(ctx)
 		}
 
 		s.planner.Stop(ctx)
 
-		if err := s.dirLock.Unlock(); err != nil {
-			logger.Error(ctx, "Failed to release scheduler lock in Stop", tag.Error(err))
-		}
+		s.releaseDirLock(ctx, "Failed to release scheduler lock in Stop")
 
 		wg.Wait()
 	})
 }
 
 func (s *Scheduler) stopCron(ctx context.Context) {
-	if s.serviceRegistry != nil {
-		if err := s.serviceRegistry.UpdateStatus(ctx, exec.ServiceNameScheduler, exec.ServiceStatusInactive); err != nil {
-			logger.Error(ctx, "Failed to update status to inactive", tag.Error(err))
-		}
-	}
-
-	if s.healthServer != nil && !s.disableHealthServer {
-		if err := s.healthServer.Stop(ctx); err != nil {
-			logger.Error(ctx, "Failed to stop health check server", tag.Error(err))
-		}
-	}
-
-	if s.dagExecutor != nil {
-		s.dagExecutor.Close(ctx)
-	}
-
-	if s.serviceRegistry != nil {
-		s.serviceRegistry.Unregister(ctx)
-	}
+	s.updateServiceStatus(ctx, exec.ServiceStatusInactive, "Failed to update status to inactive", "")
+	s.stopHealthServer(ctx, "Failed to stop health check server")
+	s.closeDAGExecutor(ctx)
+	s.unregisterService(ctx)
 
 	logger.Info(ctx, "Scheduler stopped")
 }

@@ -545,7 +545,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Setup the reporter to send notifications (must be after mail config evaluation)
 	a.setupReporter(ctx)
 
-	// Update the status to running
+	// Update the initial persisted status.
 	st := a.Status(ctx)
 	st.Status = core.Running
 	a.writeStatus(ctx, attempt, st)
@@ -556,6 +556,9 @@ func (a *Agent) Run(ctx context.Context) error {
 			logger.Error(ctx, "Failed to initialize DAG execution", tag.Error(initErr))
 			st := a.Status(ctx)
 			st.Status = core.Failed
+			if st.FinishedAt == "" {
+				st.FinishedAt = exec.FormatTime(time.Now())
+			}
 			a.writeStatus(ctx, attempt, st)
 		}
 		if err := attempt.Close(ctx); err != nil {
@@ -761,7 +764,6 @@ func (a *Agent) Run(ctx context.Context) error {
 		logger.Info(ctx, "DAG run started", slog.Any("params", a.dag.Params))
 	}
 
-	// Start watching for cancel requests
 	go execWithRecovery(ctx, func() {
 		a.watchCancelRequested(ctx, attempt)
 	})
@@ -820,7 +822,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Finalize status (after outputs are written)
-	a.writeStatus(ctx, attempt, a.Status(ctx))
+	a.writeStatus(ctx, attempt, finishedStatus)
 
 	// Stream scheduler log to coordinator if using remote logging (shared-nothing mode)
 	if a.logWriterFactory != nil {
@@ -1035,25 +1037,27 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
+	source := a.statusSourceTarget()
+
 	// Handle case where runner wasn't initialized (early failure in Run())
 	if a.runner == nil {
 		statusOpts := []transform.StatusOption{
 			transform.WithAttemptID(a.dagRunAttemptID),
 			transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
 			transform.WithTriggerType(a.triggerType),
+			transform.WithAutoRetryCount(a.currentAutoRetryCount()),
 		}
-		if a.retryTarget != nil {
+		if source != nil {
 			statusOpts = append(statusOpts,
-				transform.WithQueuedAt(a.retryTarget.QueuedAt),
-				transform.WithCreatedAt(a.retryTarget.CreatedAt),
+				transform.WithQueuedAt(source.QueuedAt),
+				transform.WithCreatedAt(source.CreatedAt),
 			)
-			if a.retryTarget.ScheduleTime != "" {
-				statusOpts = append(statusOpts, transform.WithScheduleTime(a.retryTarget.ScheduleTime))
+			if source.ScheduleTime != "" {
+				statusOpts = append(statusOpts, transform.WithScheduleTime(source.ScheduleTime))
 			}
 		} else if a.scheduleTime != "" {
 			statusOpts = append(statusOpts, transform.WithScheduleTime(a.scheduleTime))
 		}
-
 		return transform.NewStatusBuilder(a.dag).
 			Create(a.dagRunID, core.Failed, os.Getpid(), time.Time{}, statusOpts...)
 	}
@@ -1081,17 +1085,19 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 		transform.WithPreconditions(a.dag.Preconditions),
 		transform.WithWorkerID(a.workerID),
 		transform.WithTriggerType(a.triggerType),
+		transform.WithAutoRetryCount(a.currentAutoRetryCount()),
 	}
 
-	// If the current execution is a retry, copy timing data from the retry target.
+	// If the current execution is based on a persisted target, copy timing data
+	// from that target. Otherwise, use the schedule time provided directly.
 	// Otherwise, use the schedule time provided directly via CLI flag.
-	if a.retryTarget != nil {
+	if source != nil {
 		opts = append(opts,
-			transform.WithQueuedAt(a.retryTarget.QueuedAt),
-			transform.WithCreatedAt(a.retryTarget.CreatedAt),
+			transform.WithQueuedAt(source.QueuedAt),
+			transform.WithCreatedAt(source.CreatedAt),
 		)
-		if a.retryTarget.ScheduleTime != "" {
-			opts = append(opts, transform.WithScheduleTime(a.retryTarget.ScheduleTime))
+		if source.ScheduleTime != "" {
+			opts = append(opts, transform.WithScheduleTime(source.ScheduleTime))
 		}
 	} else if a.scheduleTime != "" {
 		opts = append(opts, transform.WithScheduleTime(a.scheduleTime))
@@ -1106,6 +1112,17 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 			a.plan.StartAt(),
 			opts...,
 		)
+}
+
+func (a *Agent) currentAutoRetryCount() int {
+	if a.retryTarget == nil {
+		return 0
+	}
+	return a.retryTarget.AutoRetryCount
+}
+
+func (a *Agent) statusSourceTarget() *exec.DAGRunStatus {
+	return a.retryTarget
 }
 
 // writeStatus writes the current status to storage.

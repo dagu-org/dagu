@@ -155,6 +155,12 @@ func withMaxActiveRuns(n int) runnerOption {
 	}
 }
 
+func withForcedStatus(status core.Status) runnerOption {
+	return func(cfg *runtime.Config) {
+		cfg.ForcedStatus = &status
+	}
+}
+
 func newHandlerStep(_ *testing.T, name, id, command string) core.Step {
 	return core.Step{
 		Name:     name,

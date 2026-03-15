@@ -5,8 +5,11 @@ package agent_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -110,6 +113,48 @@ func TestAgent_Run(t *testing.T) {
 
 		// Check if the status is saved correctly
 		require.Equal(t, core.Failed, dagAgent.Status(th.Context).Status)
+	})
+	t.Run("InitFailurePersistsFinishedAt", func(t *testing.T) {
+		th := test.Setup(t)
+		blockingFile := filepath.Join(t.TempDir(), "not-a-dir")
+		require.NoError(t, os.WriteFile(blockingFile, []byte("x"), 0600))
+
+		dag := th.DAG(t, fmt.Sprintf(`working_dir: %q
+steps:
+  - "echo hi"
+`, blockingFile+string(os.PathSeparator)+"subdir"))
+		dagAgent := dag.Agent()
+
+		err := dagAgent.Run(th.Context)
+		require.ErrorContains(t, err, "failed to create working directory")
+
+		latest, readErr := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+		require.NoError(t, readErr)
+		require.Equal(t, core.Failed, latest.Status)
+		require.NotEmpty(t, latest.FinishedAt)
+	})
+	t.Run("FailureHandlerRunsInline", func(t *testing.T) {
+		th := test.Setup(t)
+		marker := filepath.Join(t.TempDir(), "failure-marker")
+		dag := th.DAG(t, fmt.Sprintf(`handler_on:
+  failure:
+    command: "printf failed > '%s'"
+steps:
+  - "false"
+`, marker))
+		dagAgent := dag.Agent()
+		dagAgent.RunError(t)
+
+		status := dagAgent.Status(th.Context)
+		require.Equal(t, core.Failed, status.Status)
+		require.NotNil(t, status.OnFailure)
+		require.Equal(t, core.NodeSucceeded, status.OnFailure.Status)
+		require.NotEmpty(t, status.StartedAt)
+		require.NotEmpty(t, status.FinishedAt)
+
+		data, err := os.ReadFile(marker)
+		require.NoError(t, err)
+		require.Equal(t, "failed", string(data))
 	})
 	t.Run("FinishWithTimeout", func(t *testing.T) {
 		th := test.Setup(t)
@@ -300,6 +345,7 @@ steps:
 		dagAgent := dag.Agent()
 
 		dagAgent.RunError(t)
+		require.Equal(t, 0, dagAgent.Status(th.Context).AutoRetryCount)
 
 		// Modify the DAG to make it successful
 		dagRunStatus := dagAgent.Status(th.Context)
@@ -312,6 +358,7 @@ steps:
 			RetryTarget: &dagRunStatus,
 		}))
 		dagAgent.RunSuccess(t)
+		require.Equal(t, 0, dagAgent.Status(th.Context).AutoRetryCount)
 
 		for _, node := range dagAgent.Status(th.Context).Nodes {
 			if node.Status != core.NodeSucceeded &&

@@ -392,6 +392,7 @@ type Scheduler struct {
 	LockStaleThreshold      time.Duration // Default: 30s
 	LockRetryInterval       time.Duration // Default: 5s
 	ZombieDetectionInterval time.Duration // Default: 45s; 0 disables
+	RetryFailureWindow      time.Duration // Default: 24h; 0 disables DAG-level retry scanning. Current limitation: the window is evaluated from the original DAG-run timestamp/day bucket, not the latest failed attempt timestamp.
 	FailureThreshold        int           // Default: 3
 }
 
@@ -421,6 +422,9 @@ func (c *Config) Validate() error {
 		return err
 	}
 	if err := c.validateUI(); err != nil {
+		return err
+	}
+	if err := c.validateScheduler(); err != nil {
 		return err
 	}
 	if err := c.validateBasicAuth(); err != nil {
@@ -465,6 +469,28 @@ func (c *Config) validateProc() error {
 			"proc.heartbeat_sync_interval (%s) must be less than proc.stale_threshold (%s)",
 			p.HeartbeatSyncInterval, p.StaleThreshold,
 		)
+	}
+	return nil
+}
+
+func (c *Config) validateScheduler() error {
+	if c.Scheduler.Port < 0 || c.Scheduler.Port > 65535 {
+		return fmt.Errorf("invalid scheduler.port: %d", c.Scheduler.Port)
+	}
+	if c.Scheduler.FailureThreshold < 0 {
+		return fmt.Errorf("scheduler.failure_threshold must be >= 0")
+	}
+	if c.Scheduler.LockStaleThreshold < 0 {
+		return fmt.Errorf("scheduler.lock_stale_threshold must be >= 0")
+	}
+	if c.Scheduler.LockRetryInterval < 0 {
+		return fmt.Errorf("scheduler.lock_retry_interval must be >= 0")
+	}
+	if c.Scheduler.ZombieDetectionInterval < 0 {
+		return fmt.Errorf("scheduler.zombie_detection_interval must be >= 0")
+	}
+	if c.Scheduler.RetryFailureWindow < 0 {
+		return fmt.Errorf("scheduler.retry_failure_window must be >= 0")
 	}
 	return nil
 }

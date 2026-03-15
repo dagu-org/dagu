@@ -4,6 +4,9 @@
 package queue_test
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -31,8 +34,6 @@ steps:
 }
 
 func TestGlobalConcurrency(t *testing.T) {
-	// This test uses a global queue with maxConcurrency=3 to verify concurrent execution.
-	// Note: maxActiveRuns at DAG level is deprecated and intentionally omitted.
 	f := newFixture(t, `
 name: sleep-dag
 queue: global-queue
@@ -48,8 +49,6 @@ steps:
 }
 
 func TestLocalQueueFIFOProcessing(t *testing.T) {
-	// Local queues always use maxConcurrency=1 (FIFO), ignoring DAG's maxActiveRuns.
-	// This verifies that even with maxActiveRuns: 3, local queues process sequentially.
 	f := newFixture(t, `
 name: batch-dag
 max_active_runs: 3
@@ -61,7 +60,6 @@ steps:
 	f.WaitDrain(20 * time.Second)
 	f.Stop()
 
-	// Verify sequential processing: start times should be at least 1 second apart
 	times := f.collectStartTimes()
 	require.Len(t, times, 3)
 	for i := 1; i < len(times); i++ {
@@ -88,10 +86,8 @@ steps:
 	f.WaitDrain(25 * time.Second)
 	f.Stop()
 
-	// Verify high priority runs started before low priority runs
 	times := f.collectStartTimes()
 	require.Len(t, times, 4)
-	// High priority (index 2,3) should start before low priority (index 0,1)
 	highPriorityStart := times[2]
 	if times[3].Before(highPriorityStart) {
 		highPriorityStart = times[3]
@@ -105,11 +101,6 @@ steps:
 }
 
 func TestRetryEnqueue(t *testing.T) {
-	// Verify EnqueueRetry works with real file-based stores:
-	// a failed run transitions to Queued with correct metadata and appears in the queue.
-	// Scheduler processing of queued items is already covered by TestBasicProcessing
-	// and TestGlobalConcurrency — retry-enqueued items are identical from the
-	// scheduler's perspective.
 	f := newFixture(t, `
 name: retry-dag
 queue: retry-queue
@@ -121,7 +112,6 @@ steps:
 
 	runID := f.runIDs[0]
 
-	// Verify the run is in Failed status before retry
 	ref := exec.NewDAGRunRef(f.dag.Name, runID)
 	att, err := f.th.DAGRunStore.FindAttempt(f.th.Context, ref)
 	require.NoError(t, err)
@@ -129,10 +119,8 @@ steps:
 	require.NoError(t, err)
 	require.Equal(t, core.Failed, status.Status)
 
-	// Enqueue the retry — status transitions from Failed to Queued
 	f.RetryEnqueue(runID)
 
-	// Verify status persisted as Queued with correct metadata
 	att, err = f.th.DAGRunStore.FindAttempt(f.th.Context, ref)
 	require.NoError(t, err)
 	status, err = att.ReadStatus(f.th.Context)
@@ -140,8 +128,8 @@ steps:
 	assert.Equal(t, core.Queued, status.Status)
 	assert.NotEmpty(t, status.QueuedAt)
 	assert.Equal(t, core.TriggerTypeRetry, status.TriggerType)
+	assert.Zero(t, status.AutoRetryCount)
 
-	// Verify item is in the queue
 	items, err := f.th.QueueStore.List(f.th.Context, "retry-queue")
 	require.NoError(t, err)
 	require.Len(t, items, 1)
@@ -149,6 +137,156 @@ steps:
 	require.NoError(t, err)
 	assert.Equal(t, f.dag.Name, data.Name)
 	assert.Equal(t, runID, data.ID)
+}
+
+func TestSchedulerRetryScanner(t *testing.T) {
+	t.Run("EligibleFailedRunRetries", func(t *testing.T) {
+		markerPath := filepath.Join(t.TempDir(), "failure.marker")
+		f := newFixture(t, fmt.Sprintf(`
+type: graph
+name: retry-dag
+queue: retry-queue
+retry_policy:
+  limit: 1
+  interval_sec: 1
+  backoff: false
+  max_interval_sec: 1
+handler_on:
+  failure:
+    command: "printf failed > %s"
+steps:
+  - id: retry_step
+    command: echo retried
+`, markerPath), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1))
+
+		failedAt := time.Now().UTC().Add(-30 * time.Second)
+		runID := f.FailedRunWithMetadata(runStatusOptions{
+			StartedAt:    failedAt.Add(-5 * time.Second),
+			FinishedAt:   failedAt,
+			ScheduleTime: failedAt.Add(-time.Minute),
+			TriggerType:  core.TriggerTypeScheduler,
+		})
+		markerModTime := prepareFailureMarker(t, markerPath)
+		originalAttemptID := f.MustStatus(runID).AttemptID
+
+		f.StartScheduler(40 * time.Second)
+		defer f.Stop()
+
+		require.Eventually(t, func() bool {
+			status := f.MustStatus(runID)
+			return status.Status == core.Succeeded &&
+				status.AttemptID != originalAttemptID &&
+				status.AutoRetryCount == 1
+		}, 25*time.Second, 250*time.Millisecond)
+
+		f.WaitDrain(5 * time.Second)
+
+		latest := f.MustStatus(runID)
+		assert.Equal(t, core.Succeeded, latest.Status)
+		assert.NotEqual(t, originalAttemptID, latest.AttemptID)
+		assert.Equal(t, 1, latest.AutoRetryCount)
+		assert.Equal(t, markerModTime, readMarkerModTime(t, markerPath))
+	})
+
+	t.Run("MissingFinishedAtStillRetriesViaCreatedAt", func(t *testing.T) {
+		markerPath := filepath.Join(t.TempDir(), "failure.marker")
+		f := newFixture(t, fmt.Sprintf(`
+type: graph
+name: retry-dag
+queue: retry-queue
+retry_policy:
+  limit: 1
+  interval_sec: 1
+  backoff: false
+  max_interval_sec: 1
+handler_on:
+  failure:
+    command: "printf failed > %s"
+steps:
+  - id: retry_step
+    command: echo retried
+`, markerPath), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1))
+
+		failedAt := time.Now().UTC().Add(-30 * time.Second)
+		runID := f.FailedRunWithMetadata(runStatusOptions{
+			CreatedAt:    failedAt,
+			StartedAt:    failedAt.Add(-5 * time.Second),
+			ScheduleTime: failedAt.Add(-time.Minute),
+			TriggerType:  core.TriggerTypeScheduler,
+		})
+		originalAttemptID := f.MustStatus(runID).AttemptID
+
+		f.StartScheduler(40 * time.Second)
+		defer f.Stop()
+
+		require.Eventually(t, func() bool {
+			status := f.MustStatus(runID)
+			return status.Status == core.Succeeded &&
+				status.AttemptID != originalAttemptID &&
+				status.AutoRetryCount == 1
+		}, 25*time.Second, 250*time.Millisecond)
+
+		latest := f.MustStatus(runID)
+		assert.Equal(t, core.Succeeded, latest.Status)
+		assert.NotEqual(t, originalAttemptID, latest.AttemptID)
+		assert.Equal(t, 1, latest.AutoRetryCount)
+	})
+
+	t.Run("NewerScheduledRunDoesNotSuppressRetry", func(t *testing.T) {
+		markerPath := filepath.Join(t.TempDir(), "failure.marker")
+		f := newFixture(t, fmt.Sprintf(`
+type: graph
+name: retry-dag
+queue: retry-queue
+retry_policy:
+  limit: 1
+  interval_sec: 1
+  backoff: false
+  max_interval_sec: 1
+handler_on:
+  failure:
+    command: "printf failed > %s"
+steps:
+  - id: retry_step
+    command: echo retried
+`, markerPath), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1), WithRetryWindow(48*time.Hour))
+
+		now := time.Now().UTC()
+		midnight := retryScanReferenceMidnight(now)
+		failedFinishedAt := midnight.Add(2 * time.Minute)
+		failedScheduleTime := midnight.Add(-10 * time.Minute)
+		newerScheduleTime := midnight.Add(-time.Minute)
+
+		runID := f.FailedRunWithMetadata(runStatusOptions{
+			StartedAt:    failedFinishedAt.Add(-5 * time.Second),
+			FinishedAt:   failedFinishedAt,
+			ScheduleTime: failedScheduleTime,
+			TriggerType:  core.TriggerTypeScheduler,
+		})
+		_ = f.RunningRunWithMetadata(runStatusOptions{
+			StartedAt:    now.Add(-time.Minute),
+			ScheduleTime: newerScheduleTime,
+			TriggerType:  core.TriggerTypeScheduler,
+		})
+		markerModTime := prepareFailureMarker(t, markerPath)
+		originalAttemptID := f.MustStatus(runID).AttemptID
+
+		f.StartScheduler(35 * time.Second)
+		defer f.Stop()
+
+		require.Eventually(t, func() bool {
+			status := f.MustStatus(runID)
+			return status.Status == core.Succeeded &&
+				status.AttemptID != originalAttemptID &&
+				status.AutoRetryCount == 1
+		}, 25*time.Second, 250*time.Millisecond)
+
+		latest := f.MustStatus(runID)
+		assert.Equal(t, core.Succeeded, latest.Status)
+		assert.NotEqual(t, originalAttemptID, latest.AttemptID)
+		assert.Equal(t, 1, latest.AutoRetryCount)
+		assert.Equal(t, markerModTime, readMarkerModTime(t, markerPath))
+	})
 }
 
 func TestCatchupQueuedHappyPath(t *testing.T) {
@@ -207,6 +345,31 @@ steps:
 	require.Equal(t, stringutil.FormatTime(scheduledTime), status.ScheduleTime)
 	require.NotEmpty(t, status.Log)
 	require.FileExists(t, status.Log)
+}
+
+func prepareFailureMarker(t *testing.T, markerPath string) time.Time {
+	t.Helper()
+
+	require.NoError(t, os.WriteFile(markerPath, []byte("failed"), 0644))
+	modTime := time.Unix(time.Now().Add(-time.Hour).Unix(), 0).UTC()
+	require.NoError(t, os.Chtimes(markerPath, modTime, modTime))
+	return readMarkerModTime(t, markerPath)
+}
+
+func readMarkerModTime(t *testing.T, markerPath string) time.Time {
+	t.Helper()
+
+	info, err := os.Stat(markerPath)
+	require.NoError(t, err)
+	return info.ModTime()
+}
+
+func retryScanReferenceMidnight(now time.Time) time.Time {
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	if now.Sub(midnight) < 5*time.Minute {
+		return midnight.Add(-24 * time.Hour)
+	}
+	return midnight
 }
 
 func stableCurrentMinute(t *testing.T) time.Time {

@@ -58,6 +58,9 @@ type RemoteTaskHandlerConfig struct {
 // NewRemoteTaskHandler creates a new TaskHandler that runs tasks in-process
 // with status pushing and log streaming to the coordinator.
 func NewRemoteTaskHandler(cfg RemoteTaskHandlerConfig) TaskHandler {
+	if cfg.Config == nil {
+		cfg.Config = &config.Config{}
+	}
 	return &remoteTaskHandler{
 		workerID:          cfg.WorkerID,
 		coordinatorClient: cfg.CoordinatorClient,
@@ -393,7 +396,6 @@ func (h *remoteTaskHandler) executeDAGRun(
 		ScheduleTime:     scheduleTime,
 	}
 
-	// Add retry configuration if present
 	if retry != nil {
 		opts.RetryTarget = retry.target
 		opts.StepRetry = retry.stepName

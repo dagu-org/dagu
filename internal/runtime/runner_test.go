@@ -1433,6 +1433,30 @@ func TestRunner_DAGPreconditions(t *testing.T) {
 	})
 }
 
+func TestRunner_StatusDefersForcedStatusUntilTerminal(t *testing.T) {
+	t.Run("RunningStatusWinsBeforeForcedTerminalStatus", func(t *testing.T) {
+		r := setupRunner(t, withForcedStatus(core.Failed))
+		plan := r.newPlan(t, newStep("1", withCommand("sleep 0.2")))
+
+		dag := &core.DAG{Name: "test_dag", WorkingDir: plan.workDir}
+		logFilename := fmt.Sprintf("%s_%s.log", dag.Name, r.cfg.DAGRunID)
+		logFilePath := filepath.Join(r.cfg.LogDir, logFilename)
+		ctx := runtime.NewContext(plan.Context, dag, r.cfg.DAGRunID, logFilePath)
+
+		done := make(chan error, 1)
+		go func() {
+			done <- r.runner.Run(ctx, plan.Plan, nil)
+		}()
+
+		require.Eventually(t, func() bool {
+			return r.runner.Status(ctx, plan.Plan) == core.Running
+		}, 2*time.Second, 10*time.Millisecond)
+
+		require.NoError(t, <-done)
+		require.Equal(t, core.Failed, r.runner.Status(ctx, plan.Plan))
+	})
+}
+
 func TestRunner_SignalHandling(t *testing.T) {
 	t.Run("SignalWithDoneChannel", func(t *testing.T) {
 		r := setupRunner(t)

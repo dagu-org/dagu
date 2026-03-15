@@ -132,9 +132,11 @@ func prepareListOptions(opts []exec.ListDAGRunStatusesOption) (exec.ListDAGRunSt
 	}
 
 	// Enforce a reasonable limit on the number of results
-	const maxLimit = 1000
-	if options.Limit == 0 || options.Limit > maxLimit {
-		options.Limit = maxLimit
+	if !options.Unlimited {
+		const maxLimit = 1000
+		if options.Limit == 0 || options.Limit > maxLimit {
+			options.Limit = maxLimit
+		}
 	}
 
 	return options, nil
@@ -157,7 +159,7 @@ func (store *Store) collectStatusesFromRoots(
 
 	var (
 		resultsMu      sync.Mutex
-		results        = make([]*exec.DAGRunStatus, 0, opts.Limit)
+		results        = make([]*exec.DAGRunStatus, 0, min(max(opts.Limit, 1), len(roots)))
 		remaining      atomic.Int64
 		statusesFilter = make(map[core.Status]struct{})
 	)
@@ -167,7 +169,11 @@ func (store *Store) collectStatusesFromRoots(
 	}
 	hasStatusFilter := len(statusesFilter) > 0
 
-	remaining.Store(int64(opts.Limit))
+	if opts.Unlimited {
+		remaining.Store(int64(^uint64(0) >> 1))
+	} else {
+		remaining.Store(int64(opts.Limit))
+	}
 
 	jobs := make(chan DataRoot)
 	var wg sync.WaitGroup
@@ -188,9 +194,11 @@ func (store *Store) collectStatusesFromRoots(
 				return
 			}
 
-			dagRuns := root.listDAGRunsInRange(ctx, opts.From, opts.To, &listDAGRunsInRangeOpts{
-				limit: int(remaining.Load()),
-			})
+			listOpts := &listDAGRunsInRangeOpts{}
+			if !opts.Unlimited {
+				listOpts.limit = int(remaining.Load())
+			}
+			dagRuns := root.listDAGRunsInRange(ctx, opts.From, opts.To, listOpts)
 
 			statuses := make([]*exec.DAGRunStatus, 0, len(dagRuns))
 			for _, dagRun := range dagRuns {
@@ -205,7 +213,7 @@ func (store *Store) collectStatusesFromRoots(
 			}
 
 			taken := int64(len(statuses))
-			if d := remaining.Add(-taken); d < 0 {
+			if !opts.Unlimited && remaining.Add(-taken) < 0 {
 				cancel()
 			}
 
@@ -223,7 +231,7 @@ func (store *Store) collectStatusesFromRoots(
 
 	// Send jobs to workers
 	for _, root := range roots {
-		if ctx.Err() != nil || remaining.Load() <= 0 {
+		if ctx.Err() != nil || (!opts.Unlimited && remaining.Load() <= 0) {
 			break
 		}
 		jobs <- root
@@ -238,7 +246,7 @@ func (store *Store) collectStatusesFromRoots(
 		}
 		return results[i].DAGRunID < results[j].DAGRunID
 	})
-	if len(results) > opts.Limit {
+	if !opts.Unlimited && len(results) > opts.Limit {
 		results = results[:opts.Limit]
 	}
 	return results, nil
@@ -271,18 +279,20 @@ func (store *Store) resolveStatus(
 		// Passed filters — construct status directly from index.
 		s := dagRun.summary
 		return &exec.DAGRunStatus{
-			Name:         s.Name,
-			DAGRunID:     s.DagRunID,
-			Status:       s.Status,
-			Tags:         s.Tags,
-			StartedAt:    formatUnixToRFC3339(s.StartedAtUnix),
-			FinishedAt:   formatUnixToRFC3339(s.FinishedAtUnix),
-			WorkerID:     s.WorkerID,
-			Params:       s.Params,
-			QueuedAt:     s.QueuedAt,
-			ScheduleTime: s.ScheduleTime,
-			TriggerType:  s.TriggerType,
-			CreatedAt:    s.CreatedAt,
+			Name:           s.Name,
+			DAGRunID:       s.DagRunID,
+			AttemptID:      s.AttemptID,
+			Status:         s.Status,
+			Tags:           s.Tags,
+			StartedAt:      formatUnixToRFC3339(s.StartedAtUnix),
+			FinishedAt:     formatUnixToRFC3339(s.FinishedAtUnix),
+			WorkerID:       s.WorkerID,
+			Params:         s.Params,
+			QueuedAt:       s.QueuedAt,
+			ScheduleTime:   s.ScheduleTime,
+			TriggerType:    s.TriggerType,
+			CreatedAt:      s.CreatedAt,
+			AutoRetryCount: s.AutoRetryCount,
 		}
 	}
 
@@ -315,6 +325,65 @@ func (store *Store) resolveStatus(
 	}
 
 	return status
+}
+
+func (store *Store) CompareAndSwapLatestAttemptStatus(
+	ctx context.Context,
+	dagRun exec.DAGRunRef,
+	expectedAttemptID string,
+	expectedStatus core.Status,
+	mutate func(*exec.DAGRunStatus) error,
+) (*exec.DAGRunStatus, bool, error) {
+	if dagRun.ID == "" {
+		return nil, false, ErrDAGRunIDEmpty
+	}
+
+	root := NewDataRoot(store.baseDir, dagRun.Name)
+	lockCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	if err := root.Lock(lockCtx); err != nil {
+		return nil, false, fmt.Errorf("failed to acquire lock for dag-run %s: %w", dagRun.ID, err)
+	}
+	defer func() {
+		if err := root.Unlock(); err != nil {
+			logger.Error(ctx, "Failed to unlock dag-run", tag.RunID(dagRun.ID), tag.Error(err))
+		}
+	}()
+
+	run, err := root.FindByDAGRunID(ctx, dagRun.ID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	attempt, err := run.LatestAttempt(ctx, store.cache)
+	if err != nil {
+		return nil, false, err
+	}
+
+	status, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	if expectedAttemptID != "" && status.AttemptID != expectedAttemptID {
+		return status, false, nil
+	}
+	if status.Status != expectedStatus {
+		return status, false, nil
+	}
+
+	if err := attempt.Open(ctx); err != nil {
+		return nil, false, fmt.Errorf("open attempt: %w", err)
+	}
+	defer func() { _ = attempt.Close(ctx) }()
+
+	if err := mutate(status); err != nil {
+		return nil, false, err
+	}
+	if err := attempt.Write(ctx, *status); err != nil {
+		return nil, false, err
+	}
+	return status, true, nil
 }
 
 func formatUnixToRFC3339(unix int64) string {

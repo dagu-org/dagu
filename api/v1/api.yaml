@@ -7448,6 +7448,9 @@ components:
         queuedAt:
           type: string
           description: "RFC 3339 timestamp when the DAG-run was queued"
+        autoRetryCount:
+          type: integer
+          description: "Number of scheduler-issued DAG auto-retries already consumed for this DAG-run"
         scheduleTime:
           type: string
           description: "RFC 3339 timestamp of when the DAG-run was scheduled to run"
@@ -7477,6 +7480,7 @@ components:
         - statusLabel
         - startedAt
         - finishedAt
+        - autoRetryCount
 
     DAGRunDetails:
       type: object

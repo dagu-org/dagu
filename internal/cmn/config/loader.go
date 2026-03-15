@@ -804,6 +804,7 @@ func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 		cfg.Scheduler.LockStaleThreshold = l.parseDuration("scheduler.lock_stale_threshold", def.Scheduler.LockStaleThreshold)
 		cfg.Scheduler.LockRetryInterval = l.parseDuration("scheduler.lock_retry_interval", def.Scheduler.LockRetryInterval)
 		cfg.Scheduler.ZombieDetectionInterval = l.parseDuration("scheduler.zombie_detection_interval", def.Scheduler.ZombieDetectionInterval)
+		cfg.Scheduler.RetryFailureWindow = l.parseDuration("scheduler.retry_failure_window", def.Scheduler.RetryFailureWindow)
 		cfg.Scheduler.FailureThreshold = def.Scheduler.FailureThreshold
 	}
 
@@ -824,6 +825,10 @@ func (l *ConfigLoader) setSchedulerDefaults(cfg *Config) {
 	// Default ZombieDetectionInterval only if not explicitly set (0 disables detection)
 	if cfg.Scheduler.ZombieDetectionInterval <= 0 && !l.v.IsSet("scheduler.zombie_detection_interval") {
 		cfg.Scheduler.ZombieDetectionInterval = 45 * time.Second
+	}
+	// Default RetryFailureWindow only if not explicitly set (0 disables scanning)
+	if cfg.Scheduler.RetryFailureWindow <= 0 && !l.v.IsSet("scheduler.retry_failure_window") {
+		cfg.Scheduler.RetryFailureWindow = 24 * time.Hour
 	}
 	if cfg.Scheduler.FailureThreshold <= 0 {
 		cfg.Scheduler.FailureThreshold = 3
@@ -1324,6 +1329,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	// Scheduler
 	l.v.SetDefault("scheduler.lock_stale_threshold", "30s")
 	l.v.SetDefault("scheduler.lock_retry_interval", "5s")
+	l.v.SetDefault("scheduler.retry_failure_window", "24h")
 
 	// Peer
 	l.v.SetDefault("peer.insecure", true)
@@ -1390,6 +1396,7 @@ var envBindings = []envBinding{
 	{key: "scheduler.lock_stale_threshold", env: "SCHEDULER_LOCK_STALE_THRESHOLD"},
 	{key: "scheduler.lock_retry_interval", env: "SCHEDULER_LOCK_RETRY_INTERVAL"},
 	{key: "scheduler.zombie_detection_interval", env: "SCHEDULER_ZOMBIE_DETECTION_INTERVAL"},
+	{key: "scheduler.retry_failure_window", env: "SCHEDULER_RETRY_FAILURE_WINDOW"},
 	{key: "scheduler.failure_threshold", env: "SCHEDULER_FAILURE_THRESHOLD"},
 
 	// Proc

@@ -5,6 +5,7 @@ package distr_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -97,6 +98,9 @@ type testFixture struct {
 	scheduler         *scheduler.Scheduler
 	schedulerCancel   context.CancelFunc
 	schedulerCtx      context.Context
+	schedulerErrCh    chan error
+	schedulerErr      error
+	schedulerErrSet   bool
 }
 
 func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixture {
@@ -257,9 +261,36 @@ func (f *testFixture) startScheduler(timeout time.Duration) {
 	)
 	require.NoError(f.t, err)
 
+	startupTimeout := timeout
+	if startupTimeout <= 0 {
+		startupTimeout = 5 * time.Second
+	}
+
+	schedulerCtx, schedulerCancel := f.schedulerCtx, f.schedulerCancel
+	if schedulerCtx == nil || schedulerCancel == nil {
+		schedulerCtx, schedulerCancel = context.WithTimeout(f.coord.Context, startupTimeout)
+	}
+	schedulerErrCh := make(chan error, 1)
+
 	f.scheduler = schedulerInst
-	f.schedulerCtx, f.schedulerCancel = context.WithTimeout(f.coord.Context, timeout)
-	go func() { _ = f.scheduler.Start(f.schedulerCtx) }()
+	f.schedulerCtx = schedulerCtx
+	f.schedulerCancel = schedulerCancel
+	f.schedulerErrCh = schedulerErrCh
+	f.schedulerErr = nil
+	f.schedulerErrSet = false
+	go func(s *scheduler.Scheduler, ctx context.Context, errCh chan<- error) {
+		errCh <- s.Start(ctx)
+	}(schedulerInst, schedulerCtx, schedulerErrCh)
+
+	var startErr error
+	require.Eventually(f.t, func() bool {
+		if f.scheduler.IsRunning() {
+			return true
+		}
+		startErr = f.pollSchedulerErr()
+		return startErr != nil
+	}, startupTimeout, 50*time.Millisecond, "scheduler did not start in time")
+	require.NoError(f.t, startErr)
 }
 
 func (f *testFixture) enqueue() error {
@@ -315,16 +346,27 @@ func (f *testFixture) retry(dagRunID string) error {
 
 func (f *testFixture) waitForQueued() {
 	f.t.Helper()
+	var schedulerErr error
 	require.Eventually(f.t, func() bool {
+		schedulerErr = f.pollSchedulerErr()
+		if schedulerErr != nil {
+			return true
+		}
 		items, err := f.coord.QueueStore.ListByDAGName(f.coord.Context, f.dagWrapper.ProcGroup(), f.dagWrapper.Name)
 		return err == nil && len(items) == 1
 	}, 5*time.Second, 100*time.Millisecond, "DAG should be enqueued")
+	require.NoError(f.t, schedulerErr)
 }
 
 func (f *testFixture) waitForStatus(expected core.Status, timeout time.Duration) exec.DAGRunStatus {
 	f.t.Helper()
 	var status exec.DAGRunStatus
+	var schedulerErr error
 	require.Eventually(f.t, func() bool {
+		schedulerErr = f.pollSchedulerErr()
+		if schedulerErr != nil {
+			return true
+		}
 		var err error
 		status, err = f.coord.DAGRunMgr.GetLatestStatus(f.coord.Context, f.dagWrapper.DAG)
 		if err != nil {
@@ -332,13 +374,19 @@ func (f *testFixture) waitForStatus(expected core.Status, timeout time.Duration)
 		}
 		return status.Status == expected
 	}, timeout, 100*time.Millisecond, "timeout waiting for status %s", expected)
+	require.NoError(f.t, schedulerErr)
 	return status
 }
 
 func (f *testFixture) waitForStatusIn(expected []core.Status, timeout time.Duration) exec.DAGRunStatus {
 	f.t.Helper()
 	var status exec.DAGRunStatus
+	var schedulerErr error
 	require.Eventually(f.t, func() bool {
+		schedulerErr = f.pollSchedulerErr()
+		if schedulerErr != nil {
+			return true
+		}
 		var err error
 		status, err = f.coord.DAGRunMgr.GetLatestStatus(f.coord.Context, f.dagWrapper.DAG)
 		if err != nil {
@@ -346,7 +394,30 @@ func (f *testFixture) waitForStatusIn(expected []core.Status, timeout time.Durat
 		}
 		return slices.Contains(expected, status.Status)
 	}, timeout, 100*time.Millisecond, "timeout waiting for status in %v", expected)
+	require.NoError(f.t, schedulerErr)
 	return status
+}
+
+func (f *testFixture) pollSchedulerErr() error {
+	if f.schedulerErrSet {
+		return f.schedulerErr
+	}
+	if f.schedulerErrCh == nil {
+		return nil
+	}
+
+	select {
+	case err := <-f.schedulerErrCh:
+		if err == nil {
+			err = fmt.Errorf("scheduler exited unexpectedly")
+		}
+		f.schedulerErr = err
+		f.schedulerErrSet = true
+	default:
+		return nil
+	}
+
+	return f.schedulerErr
 }
 
 func (f *testFixture) latestStatus() (exec.DAGRunStatus, error) {
@@ -359,8 +430,34 @@ func (f *testFixture) stop(dagRunID string) error {
 
 func (f *testFixture) cleanup() {
 	f.t.Helper()
-	if f.schedulerCancel != nil {
-		f.schedulerCancel()
+
+	schedulerInst := f.scheduler
+	schedulerCancel := f.schedulerCancel
+	schedulerErrCh := f.schedulerErrCh
+	schedulerErrSet := f.schedulerErrSet
+
+	f.scheduler = nil
+	f.schedulerCtx = nil
+	f.schedulerCancel = nil
+	f.schedulerErrCh = nil
+	f.schedulerErr = nil
+	f.schedulerErrSet = false
+
+	if schedulerCancel != nil {
+		schedulerCancel()
+	}
+	if schedulerInst != nil {
+		schedulerInst.Stop(context.Background())
+	}
+	if schedulerErrCh != nil && !schedulerErrSet {
+		select {
+		case err := <-schedulerErrCh:
+			if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+				f.t.Logf("scheduler stopped with error: %v", err)
+			}
+		case <-time.After(5 * time.Second):
+			f.t.Log("scheduler did not stop within 5 seconds")
+		}
 	}
 }
 

@@ -605,14 +605,13 @@ func buildStepRetryPolicy(_ StepBuildContext, s *step) (core.RetryPolicy, error)
 	var result core.RetryPolicy
 	var err error
 
-	// Parse Limit
-	result.Limit, result.LimitStr, err = parseRetryLimit(s.RetryPolicy.Limit)
+	// Step retry keeps string values so they can be resolved later at runtime.
+	result.Limit, result.LimitStr, err = parseStepRetryLimit(s.RetryPolicy.Limit)
 	if err != nil {
 		return core.RetryPolicy{}, err
 	}
 
-	// Parse Interval
-	result.Interval, result.IntervalSecStr, err = parseRetryInterval(s.RetryPolicy.IntervalSec)
+	result.Interval, result.IntervalSecStr, err = parseStepRetryInterval(s.RetryPolicy.IntervalSec)
 	if err != nil {
 		return core.RetryPolicy{}, err
 	}
@@ -636,7 +635,7 @@ func buildStepRetryPolicy(_ StepBuildContext, s *step) (core.RetryPolicy, error)
 	return result, nil
 }
 
-func parseRetryLimit(val any) (int, string, error) {
+func parseStepRetryLimit(val any) (int, string, error) {
 	switch v := val.(type) {
 	case int:
 		return v, "", nil
@@ -656,7 +655,7 @@ func parseRetryLimit(val any) (int, string, error) {
 	}
 }
 
-func parseRetryInterval(val any) (time.Duration, string, error) {
+func parseStepRetryInterval(val any) (time.Duration, string, error) {
 	switch v := val.(type) {
 	case int:
 		return time.Second * time.Duration(v), "", nil

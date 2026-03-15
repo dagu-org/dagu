@@ -5,12 +5,23 @@ package exec
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 )
+
+// ErrRetryStaleLatest indicates the caller tried to retry a non-latest attempt.
+var ErrRetryStaleLatest = errors.New("retry target is no longer the latest attempt")
+
+// EnqueueRetryOptions control how queued retry metadata is persisted.
+type EnqueueRetryOptions struct {
+	// AutoRetry marks scheduler-issued DAG auto-retries. These consume the
+	// DAG-level retry budget at enqueue time.
+	AutoRetry bool
+}
 
 // EnqueueRetry enqueues a DAG run for retry and persists the Queued status.
 // It persists the Queued status first, then enqueues, so the queue processor
@@ -19,45 +30,60 @@ import (
 // the queue processor picks them up when capacity is available.
 func EnqueueRetry(
 	ctx context.Context,
+	dagRunStore DAGRunStore,
 	queueStore QueueStore,
-	attempt DAGRunAttempt,
 	dag *core.DAG,
 	status *DAGRunStatus,
-	dagRunID string,
+	opts EnqueueRetryOptions,
 ) error {
 	if status.Status == core.Queued {
-		// Already queued (e.g. duplicate retry), treat as success
+		// Already queued (e.g. duplicate retry), treat as success.
 		return nil
 	}
-	if err := attempt.Open(ctx); err != nil {
-		return fmt.Errorf("open attempt: %w", err)
+
+	updatedStatus, swapped, err := dagRunStore.CompareAndSwapLatestAttemptStatus(
+		ctx,
+		status.DAGRun(),
+		status.AttemptID,
+		status.Status,
+		func(latest *DAGRunStatus) error {
+			latest.Status = core.Queued
+			latest.QueuedAt = stringutil.FormatTime(time.Now())
+			latest.TriggerType = core.TriggerTypeRetry
+			if opts.AutoRetry {
+				latest.AutoRetryCount++
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("persist queued retry status: %w", err)
 	}
-	defer func() { _ = attempt.Close(ctx) }()
-
-	// Snapshot original values for rollback
-	origStatus := status.Status
-	origQueuedAt := status.QueuedAt
-	origTriggerType := status.TriggerType
-
-	// Persist Queued status FIRST so the queue processor always sees
-	// the correct status when it picks up the item.
-	status.Status = core.Queued
-	status.QueuedAt = stringutil.FormatTime(time.Now())
-	status.TriggerType = core.TriggerTypeRetry
-	if err := attempt.Write(ctx, *status); err != nil {
-		status.Status = origStatus
-		status.QueuedAt = origQueuedAt
-		status.TriggerType = origTriggerType
-		return fmt.Errorf("write status: %w", err)
+	if !swapped {
+		// Another actor changed the latest attempt first. Treat an already queued
+		// retry as success; everything else is a no-op.
+		if updatedStatus != nil && updatedStatus.Status == core.Queued {
+			return nil
+		}
+		return ErrRetryStaleLatest
 	}
 
 	// Enqueue after status is persisted. If this fails, roll back the status.
-	dagRun := NewDAGRunRef(dag.Name, dagRunID)
+	dagRun := status.DAGRun()
 	if err := queueStore.Enqueue(ctx, dag.ProcGroup(), QueuePriorityLow, dagRun); err != nil {
-		status.Status = origStatus
-		status.QueuedAt = origQueuedAt
-		status.TriggerType = origTriggerType
-		_ = attempt.Write(ctx, *status) // best-effort rollback
+		_, _, _ = dagRunStore.CompareAndSwapLatestAttemptStatus(
+			ctx,
+			dagRun,
+			updatedStatus.AttemptID,
+			core.Queued,
+			func(latest *DAGRunStatus) error {
+				latest.Status = status.Status
+				latest.QueuedAt = status.QueuedAt
+				latest.TriggerType = status.TriggerType
+				latest.AutoRetryCount = status.AutoRetryCount
+				return nil
+			},
+		)
 		return fmt.Errorf("enqueue retry: %w", err)
 	}
 

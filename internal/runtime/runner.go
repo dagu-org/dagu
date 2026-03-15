@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
 	"os"
 	"runtime/debug"
 	"slices"
@@ -57,6 +56,7 @@ type Runner struct {
 	dagRunID        string
 	messagesHandler ChatMessagesHandler
 	onWait          *core.Step
+	forcedStatus    *core.Status
 
 	canceled  int32
 	mu        sync.RWMutex
@@ -93,6 +93,7 @@ func New(cfg *Config) *Runner {
 		messagesHandler: cfg.MessagesHandler,
 		pause:           time.Millisecond * 100,
 		onWait:          cfg.OnWait,
+		forcedStatus:    cfg.ForcedStatus,
 	}
 }
 
@@ -110,6 +111,7 @@ type Config struct {
 	DAGRunID        string
 	MessagesHandler ChatMessagesHandler
 	OnWait          *core.Step
+	ForcedStatus    *core.Status
 }
 
 // Run runs the plan of steps.
@@ -833,6 +835,9 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 	if states.HasNotStarted && !p.IsFinished() {
 		return core.Running
 	}
+	if r.forcedStatus != nil {
+		return *r.forcedStatus
+	}
 
 	if r.isPartialSuccess(ctx, p) {
 		return core.PartiallySucceeded
@@ -1126,7 +1131,7 @@ func (r *Runner) shouldRetryNode(ctx context.Context, node *Node, execErr error)
 
 	// Set the node status to none so that it can be retried
 	node.IncRetryCount()
-	interval := calculateBackoffInterval(
+	interval := core.CalculateBackoffInterval(
 		node.Step().RetryPolicy.Interval,
 		node.Step().RetryPolicy.Backoff,
 		node.Step().RetryPolicy.MaxInterval,
@@ -1349,7 +1354,7 @@ func (r *Runner) prepareNodeForRepeat(ctx context.Context, node *Node, progressC
 	logger.Info(ctx, "Step will be repeated",
 		slog.Duration("interval", step.RepeatPolicy.Interval),
 	)
-	interval := calculateBackoffInterval(
+	interval := core.CalculateBackoffInterval(
 		step.RepeatPolicy.Interval,
 		step.RepeatPolicy.Backoff,
 		step.RepeatPolicy.MaxInterval,
@@ -1362,17 +1367,6 @@ func (r *Runner) prepareNodeForRepeat(ctx context.Context, node *Node, progressC
 	if progressCh != nil {
 		progressCh <- node
 	}
-}
-
-func calculateBackoffInterval(interval time.Duration, backoff float64, maxInterval time.Duration, attemptCount int) time.Duration {
-	if backoff > 0 {
-		sleeptime := float64(interval) * math.Pow(backoff, float64(attemptCount))
-		if maxInterval > 0 && time.Duration(sleeptime) > maxInterval {
-			return maxInterval
-		}
-		return time.Duration(sleeptime)
-	}
-	return interval
 }
 
 func NewPlanEnv(ctx context.Context, step core.Step, plan *Plan) Env {

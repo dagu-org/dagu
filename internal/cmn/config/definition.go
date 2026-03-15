@@ -285,6 +285,7 @@ type SchedulerDef struct {
 	LockStaleThreshold      string `mapstructure:"lock_stale_threshold"`      // Default: 30s
 	LockRetryInterval       string `mapstructure:"lock_retry_interval"`       // Default: 5s
 	ZombieDetectionInterval string `mapstructure:"zombie_detection_interval"` // Default: 45s, 0 to disable
+	RetryFailureWindow      string `mapstructure:"retry_failure_window"`      // Default: 24h, 0 to disable retry scanning. Current limitation: the window is evaluated from the original DAG-run timestamp/day bucket, not the latest failed attempt timestamp.
 	HeartbeatInterval       string `mapstructure:"heartbeat_interval"`        // Deprecated: use proc.heartbeat_interval
 	HeartbeatSyncInterval   string `mapstructure:"heartbeat_sync_interval"`   // Deprecated: use proc.heartbeat_sync_interval
 	StaleThreshold          string `mapstructure:"stale_threshold"`           // Deprecated: use proc.stale_threshold

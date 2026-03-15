@@ -209,6 +209,9 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	// doesn't slow down tests that don't need authentication.
 	// Tests that need auth can override via WithConfigMutator.
 	cfg.Server.Auth.Mode = config.AuthModeNone
+	// Tests share the host network namespace, so avoid binding the default
+	// scheduler health port unless a test explicitly opts in.
+	cfg.Scheduler.Port = 0
 	if options.DAGsDir != "" {
 		cfg.Paths.DAGsDir = options.DAGsDir
 	}
