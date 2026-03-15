@@ -19,6 +19,7 @@ type Config struct {
 	Queues          Queues
 	Coordinator     Coordinator
 	Worker          Worker
+	Proc            Proc
 	Scheduler       Scheduler
 	Monitoring      MonitoringConfig
 	DefaultExecMode ExecutionMode
@@ -378,12 +379,20 @@ type Worker struct {
 	PostgresPool  PostgresPoolConfig
 }
 
+// Proc represents local proc-file heartbeat configuration.
+type Proc struct {
+	HeartbeatInterval     time.Duration // Default: 5s
+	HeartbeatSyncInterval time.Duration // Default: 10s
+	StaleThreshold        time.Duration // Default: 90s
+}
+
 // Scheduler represents the scheduler configuration.
 type Scheduler struct {
 	Port                    int           // Health check port (default: 8090)
 	LockStaleThreshold      time.Duration // Default: 30s
 	LockRetryInterval       time.Duration // Default: 5s
 	ZombieDetectionInterval time.Duration // Default: 45s; 0 disables
+	FailureThreshold        int           // Default: 3
 }
 
 // PostgresPoolConfig holds PostgreSQL connection pool settings for workers.
@@ -434,6 +443,28 @@ func (c *Config) Validate() error {
 	}
 	if err := c.validateLicense(); err != nil {
 		return err
+	}
+	if err := c.validateProc(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// validateProc validates proc heartbeat settings to prevent
+// configurations that would cause false-positive stale detection.
+func (c *Config) validateProc() error {
+	p := c.Proc
+	if p.HeartbeatInterval > 0 && p.StaleThreshold > 0 && p.HeartbeatInterval >= p.StaleThreshold {
+		return fmt.Errorf(
+			"proc.heartbeat_interval (%s) must be less than proc.stale_threshold (%s)",
+			p.HeartbeatInterval, p.StaleThreshold,
+		)
+	}
+	if p.HeartbeatSyncInterval > 0 && p.StaleThreshold > 0 && p.HeartbeatSyncInterval >= p.StaleThreshold {
+		return fmt.Errorf(
+			"proc.heartbeat_sync_interval (%s) must be less than proc.stale_threshold (%s)",
+			p.HeartbeatSyncInterval, p.StaleThreshold,
+		)
 	}
 	return nil
 }

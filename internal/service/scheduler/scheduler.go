@@ -318,6 +318,7 @@ func (s *Scheduler) startZombieDetector(ctx context.Context) {
 		s.dagRunStore,
 		s.procStore,
 		s.config.Scheduler.ZombieDetectionInterval,
+		s.config.Scheduler.FailureThreshold,
 	)
 	zd := s.zombieDetector
 	s.lock.Unlock()

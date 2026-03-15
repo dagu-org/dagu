@@ -158,7 +158,7 @@ steps:
 		err := cli.UpdateStatus(ctx, root, status)
 		require.Error(t, err)
 	})
-	t.Run("GetLatestStatusMarksStaleRunningAsFailed", func(t *testing.T) {
+	t.Run("GetLatestStatusRepairsStaleRun", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
     command: sleep 1
@@ -179,6 +179,63 @@ steps:
 		latest, err := th.DAGRunMgr.GetLatestStatus(ctx, dag.DAG)
 		require.NoError(t, err)
 		require.Equal(t, core.Failed, latest.Status)
+		require.Equal(t, core.NodeFailed, latest.Nodes[0].Status)
+		require.Equal(t, "process terminated unexpectedly - stale local process detected", latest.Nodes[0].Error)
+
+		persisted, err := att.ReadStatus(ctx)
+		require.NoError(t, err)
+		require.Equal(t, core.Failed, persisted.Status)
+		require.Equal(t, core.NodeFailed, persisted.Nodes[0].Status)
+	})
+	t.Run("GetSavedStatusRepairsStaleRun", func(t *testing.T) {
+		dag := th.DAG(t, `steps:
+  - name: "1"
+    command: sleep 1
+`)
+
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+		now := time.Now()
+		ctx := th.Context
+		ref := exec.NewDAGRunRef(dag.Name, dagRunID)
+
+		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, exec.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+		require.NoError(t, att.Open(ctx))
+
+		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		require.NoError(t, att.Write(ctx, runningStatus))
+		require.NoError(t, att.Close(ctx))
+
+		saved, err := th.DAGRunMgr.GetSavedStatus(ctx, ref)
+		require.NoError(t, err)
+		require.Equal(t, core.Failed, saved.Status)
+		require.Equal(t, core.NodeFailed, saved.Nodes[0].Status)
+		require.Equal(t, "process terminated unexpectedly - stale local process detected", saved.Nodes[0].Error)
+	})
+	t.Run("GetSavedStatusDoesNotRepairDistributedRun", func(t *testing.T) {
+		dag := th.DAG(t, `steps:
+  - name: "1"
+    command: sleep 1
+`)
+
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+		now := time.Now()
+		ctx := th.Context
+		ref := exec.NewDAGRunRef(dag.Name, dagRunID)
+
+		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, exec.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+		require.NoError(t, att.Open(ctx))
+
+		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		runningStatus.WorkerID = "worker-1"
+		require.NoError(t, att.Write(ctx, runningStatus))
+		require.NoError(t, att.Close(ctx))
+
+		saved, err := th.DAGRunMgr.GetSavedStatus(ctx, ref)
+		require.NoError(t, err)
+		require.Equal(t, core.Running, saved.Status)
+		require.Equal(t, "worker-1", saved.WorkerID)
 	})
 }
 
