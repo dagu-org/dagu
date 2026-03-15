@@ -130,6 +130,11 @@ func enqueueRetry(ctx *Context, attempt exec.DAGRunAttempt, dag *core.DAG, statu
 	return nil
 }
 
+// prepareQueuedCatchupRetry repairs queued catchup records before they run
+// through the retry path. The queue processor executes catchup items via
+// `retry`, and executeRetry expects status.Log to already exist. Older or
+// previously broken queued catchup statuses may have an empty log path, so
+// this fills it in and persists the repaired status before execution.
 func prepareQueuedCatchupRetry(ctx *Context, attempt exec.DAGRunAttempt, dag *core.DAG, status *exec.DAGRunStatus) error {
 	if !exec.IsQueuedCatchup(status) || status.Log != "" {
 		return nil
