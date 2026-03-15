@@ -110,19 +110,11 @@ func (c *Connection) Run(ctx context.Context, auditSvc *audit.Service) (retErr e
 	var (
 		ioWG        sync.WaitGroup
 		processDone = make(chan struct{})
-		processMu   sync.Mutex
-		processErr  error
 		eventCh     = make(chan runEvent, 1)
 		eventOnce   sync.Once
 		event       = runEvent{reason: terminalEndReasonClosed}
 	)
 
-	setProcessErr := func(err error) {
-		processMu.Lock()
-		processErr = err
-		processMu.Unlock()
-		close(processDone)
-	}
 	signalEvent := func(ev runEvent) {
 		eventOnce.Do(func() {
 			eventCh <- ev
@@ -152,14 +144,13 @@ func (c *Connection) Run(ctx context.Context, auditSvc *audit.Service) (retErr e
 	}()
 	go func() {
 		waitErr := cmd.Wait()
-		setProcessErr(waitErr)
+		close(processDone)
 		signalEvent(classifyProcessExit(waitErr))
 	}()
 	go func() {
 		<-sessionCtx.Done()
 		signalEvent(runEvent{
 			reason: terminalEndReasonShutdown,
-			err:    sessionCtx.Err(),
 		})
 	}()
 
@@ -171,12 +162,7 @@ func (c *Connection) Run(ctx context.Context, auditSvc *audit.Service) (retErr e
 		c.sendOutput(event.sendOutput)
 	}
 
-	processMu.Lock()
-	defer processMu.Unlock()
-	if event.err != nil {
-		return event.err
-	}
-	return processErr
+	return event.err
 }
 
 // readFromPTY reads output from the PTY and sends it to the WebSocket.
@@ -207,10 +193,7 @@ func (c *Connection) readFromPTY(ctx context.Context, processDone <-chan struct{
 			if c.isClosing() || errors.Is(ctx.Err(), context.Canceled) {
 				return
 			}
-			signal(runEvent{
-				reason: terminalEndReasonDisconnect,
-				err:    err,
-			})
+			signal(c.classifyWebSocketWriteError(ctx, err))
 			return
 		}
 
@@ -350,27 +333,44 @@ func (c *Connection) classifyWebSocketError(ctx context.Context, err error) runE
 	if errors.Is(ctx.Err(), context.Canceled) {
 		return runEvent{
 			reason: terminalEndReasonShutdown,
-			err:    ctx.Err(),
 		}
 	}
 
-	switch websocket.CloseStatus(err) {
-	case websocket.StatusNormalClosure, websocket.StatusGoingAway:
+	status := websocket.CloseStatus(err)
+	if status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway {
 		return runEvent{
 			reason: terminalEndReasonClientClose,
-			err:    err,
 		}
-	case -1:
+	}
+	if status == -1 {
 		return runEvent{
 			reason: terminalEndReasonDisconnect,
-			err:    err,
 		}
-	default:
+	}
+	return runEvent{
+		reason: terminalEndReasonDisconnect,
+	}
+}
+
+func (c *Connection) classifyWebSocketWriteError(ctx context.Context, err error) runEvent {
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return runEvent{reason: terminalEndReasonShutdown}
+	}
+
+	status := websocket.CloseStatus(err)
+	if status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway {
+		return runEvent{reason: terminalEndReasonClientClose}
+	}
+	if status == -1 {
+		if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+			return runEvent{reason: terminalEndReasonDisconnect}
+		}
 		return runEvent{
 			reason: terminalEndReasonDisconnect,
 			err:    err,
 		}
 	}
+	return runEvent{reason: terminalEndReasonDisconnect}
 }
 
 func classifyProcessExit(err error) runEvent {
@@ -388,7 +388,6 @@ func classifyProcessExit(err error) runEvent {
 			reason:        terminalEndReasonShellExit,
 			sendError:     "Shell closed: " + err.Error(),
 			gracefulClose: true,
-			err:           err,
 		}
 	}
 

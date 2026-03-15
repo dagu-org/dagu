@@ -4,6 +4,7 @@
 package terminal
 
 import (
+	"context"
 	"net/http"
 	"os"
 
@@ -92,7 +93,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h.manager != nil {
 		if err := h.manager.Register(tc); err != nil {
 			releasePending = false
-			h.manager.ReleasePending()
 			_ = conn.Close(websocket.StatusTryAgainLater, "terminal unavailable")
 			return
 		}
@@ -100,11 +100,29 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		releasePending = false
 	}
 
-	runCtx := ctx
+	var managerCtx context.Context
 	if h.manager != nil {
-		runCtx = h.manager.Context()
+		managerCtx = h.manager.Context()
 	}
+	runCtx, cancelRun := mergeSessionContext(ctx, managerCtx)
+	defer cancelRun()
 	_ = tc.Run(runCtx, h.auditService)
+}
+
+func mergeSessionContext(requestCtx, managerCtx context.Context) (context.Context, context.CancelFunc) {
+	if requestCtx == nil {
+		requestCtx = context.Background()
+	}
+	if managerCtx == nil {
+		return context.WithCancel(requestCtx)
+	}
+
+	ctx, cancel := context.WithCancel(requestCtx)
+	stop := context.AfterFunc(managerCtx, cancel)
+	return ctx, func() {
+		stop()
+		cancel()
+	}
 }
 
 // GetDefaultShell returns the default shell for the current system.

@@ -30,6 +30,9 @@ func TestTerminal_SessionLimitReturnsHTTP429(t *testing.T) {
 	t.Cleanup(func() { _ = conn.Close(websocket.StatusNormalClosure, "test complete") })
 
 	secondConn, resp, err := dialTerminal(server, token)
+	if resp != nil && resp.Body != nil {
+		t.Cleanup(func() { _ = resp.Body.Close() })
+	}
 	if secondConn != nil {
 		_ = secondConn.Close(websocket.StatusNormalClosure, "unexpected success")
 	}
@@ -194,6 +197,8 @@ func readTerminalUntilClose(t *testing.T, conn *websocket.Conn) (string, []strin
 			output.Write(decoded)
 		case terminalpkg.MessageTypeError:
 			errorMessages = append(errorMessages, msg.Data)
+		case terminalpkg.MessageTypeInput, terminalpkg.MessageTypeResize, terminalpkg.MessageTypeClose:
+			t.Fatalf("unexpected server message type: %s", msg.Type)
 		}
 	}
 }

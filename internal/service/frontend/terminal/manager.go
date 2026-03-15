@@ -14,6 +14,8 @@ var (
 	ErrMaxSessionsReached = errors.New("max terminal sessions reached")
 	// ErrManagerShuttingDown indicates that the terminal manager is shutting down.
 	ErrManagerShuttingDown = errors.New("terminal manager is shutting down")
+	// ErrReservationRequired indicates that a session registration was attempted without reserving a slot.
+	ErrReservationRequired = errors.New("terminal session reservation required")
 )
 
 // Manager tracks active terminal sessions and coordinates server shutdown.
@@ -23,11 +25,11 @@ type Manager struct {
 
 	maxSessions int
 
-	mu           sync.Mutex
-	activeSlots  int
-	shuttingDown bool
-	sessions     map[string]*Connection
-	wg           sync.WaitGroup
+	mu            sync.Mutex
+	reservedSlots int
+	shuttingDown  bool
+	sessions      map[string]*Connection
+	wg            sync.WaitGroup
 }
 
 // NewManager creates a terminal session manager bound to the server lifetime.
@@ -57,10 +59,10 @@ func (m *Manager) Acquire() error {
 	if m.shuttingDown {
 		return ErrManagerShuttingDown
 	}
-	if m.activeSlots >= m.maxSessions {
+	if m.reservedSlots+len(m.sessions) >= m.maxSessions {
 		return ErrMaxSessionsReached
 	}
-	m.activeSlots++
+	m.reservedSlots++
 	return nil
 }
 
@@ -68,8 +70,8 @@ func (m *Manager) Acquire() error {
 func (m *Manager) ReleasePending() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.activeSlots > 0 {
-		m.activeSlots--
+	if m.reservedSlots > 0 {
+		m.reservedSlots--
 	}
 }
 
@@ -82,10 +84,12 @@ func (m *Manager) Register(conn *Connection) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if m.reservedSlots <= 0 {
+		return ErrReservationRequired
+	}
+	m.reservedSlots--
+
 	if m.shuttingDown {
-		if m.activeSlots > 0 {
-			m.activeSlots--
-		}
 		return ErrManagerShuttingDown
 	}
 
@@ -100,9 +104,6 @@ func (m *Manager) ReleaseSession(id string) {
 	_, ok := m.sessions[id]
 	if ok {
 		delete(m.sessions, id)
-	}
-	if m.activeSlots > 0 {
-		m.activeSlots--
 	}
 	m.mu.Unlock()
 
