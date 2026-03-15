@@ -72,7 +72,20 @@ func EnqueueRetry(
 	dagRun := status.DAGRun()
 	procGroup := retryProcGroup(dag, updatedStatus)
 	if procGroup == "" {
-		return errors.New("retry proc group is empty")
+		_, _, _ = dagRunStore.CompareAndSwapLatestAttemptStatus(
+			ctx,
+			dagRun,
+			updatedStatus.AttemptID,
+			core.Queued,
+			func(latest *DAGRunStatus) error {
+				latest.Status = status.Status
+				latest.QueuedAt = status.QueuedAt
+				latest.TriggerType = status.TriggerType
+				latest.AutoRetryCount = status.AutoRetryCount
+				return nil
+			},
+		)
+		return errors.New("enqueue retry: proc group is empty")
 	}
 	if err := queueStore.Enqueue(ctx, procGroup, QueuePriorityLow, dagRun); err != nil {
 		_, _, _ = dagRunStore.CompareAndSwapLatestAttemptStatus(

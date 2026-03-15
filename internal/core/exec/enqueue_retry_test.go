@@ -111,7 +111,7 @@ func TestEnqueueRetry(t *testing.T) {
 				AttemptID:      "att-fast-path",
 				Status:         core.Failed,
 				AutoRetryCount: 1,
-				ProcGroup:      "custom-queue",
+				ProcGroup:      "input-queue",
 			},
 			store: &stubDAGRunStore{
 				status: &exec.DAGRunStatus{
@@ -130,6 +130,7 @@ func TestEnqueueRetry(t *testing.T) {
 			assertStore: func(t *testing.T, store *stubDAGRunStore) {
 				require.NotNil(t, store.status)
 				assert.Equal(t, core.Queued, store.status.Status)
+				assert.Equal(t, "custom-queue", store.status.ProcGroup)
 			},
 		},
 		{
@@ -218,6 +219,33 @@ func TestEnqueueRetry(t *testing.T) {
 				assert.Equal(t, 2, store.casCalls)
 			},
 			wantErr: "enqueue retry",
+		},
+		{
+			name: "EmptyProcGroupRollsBackQueuedStatus",
+			status: &exec.DAGRunStatus{
+				DAGRunID:       "run-empty-group",
+				AttemptID:      "att-empty-group",
+				Status:         core.Failed,
+				AutoRetryCount: 1,
+			},
+			store: &stubDAGRunStore{
+				status: &exec.DAGRunStatus{
+					DAGRunID:       "run-empty-group",
+					AttemptID:      "att-empty-group",
+					Status:         core.Failed,
+					AutoRetryCount: 1,
+				},
+				secondSwapped: true,
+			},
+			assertStore: func(t *testing.T, store *stubDAGRunStore) {
+				require.NotNil(t, store.status)
+				assert.Equal(t, core.Failed, store.status.Status)
+				assert.Empty(t, store.status.QueuedAt)
+				assert.Equal(t, core.TriggerTypeUnknown, store.status.TriggerType)
+				assert.Equal(t, 1, store.status.AutoRetryCount)
+				assert.Equal(t, 2, store.casCalls)
+			},
+			wantErr: "proc group is empty",
 		},
 	}
 

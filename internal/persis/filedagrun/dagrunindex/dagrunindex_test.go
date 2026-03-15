@@ -165,6 +165,7 @@ func TestTryLoadForDay_PreservesRetryMetadata(t *testing.T) {
 	require.NotNil(t, found)
 	assert.Equal(t, "parent-dag", found.ParentName)
 	assert.Equal(t, "parent-run", found.ParentID)
+	assert.Equal(t, 1, found.AutoRetryCount)
 	assert.Equal(t, 3, found.AutoRetryLimit)
 	assert.Equal(t, 2*time.Minute, found.AutoRetryInterval)
 	assert.Equal(t, 2.0, found.AutoRetryBackoff)

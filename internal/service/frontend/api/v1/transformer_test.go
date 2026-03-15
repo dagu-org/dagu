@@ -26,7 +26,8 @@ func TestToDAGRunSummaryIncludesScheduleTime(t *testing.T) {
 	require.NotNil(t, summary.ScheduleTime)
 	assert.Equal(t, status.ScheduleTime, *summary.ScheduleTime)
 	assert.Equal(t, status.AutoRetryCount, summary.AutoRetryCount)
-	assert.Equal(t, status.AutoRetryLimit, summary.AutoRetryLimit)
+	require.NotNil(t, summary.AutoRetryLimit)
+	assert.Equal(t, status.AutoRetryLimit, *summary.AutoRetryLimit)
 }
 
 func TestToDAGRunDetailsIncludesScheduleTime(t *testing.T) {
@@ -46,7 +47,34 @@ func TestToDAGRunDetailsIncludesScheduleTime(t *testing.T) {
 	require.NotNil(t, details.QueuedAt)
 	assert.Equal(t, status.QueuedAt, *details.QueuedAt)
 	assert.Equal(t, status.AutoRetryCount, details.AutoRetryCount)
-	assert.Equal(t, status.AutoRetryLimit, details.AutoRetryLimit)
+	require.NotNil(t, details.AutoRetryLimit)
+	assert.Equal(t, status.AutoRetryLimit, *details.AutoRetryLimit)
+}
+
+func TestToDAGRunSummaryOmitsAutoRetryLimitWhenUnconfigured(t *testing.T) {
+	status := exec.DAGRunStatus{
+		Name:           "test-dag",
+		DAGRunID:       "run-1",
+		AutoRetryCount: 0,
+		AutoRetryLimit: 0,
+		Status:         core.Failed,
+	}
+
+	summary := toDAGRunSummary(status)
+	assert.Nil(t, summary.AutoRetryLimit)
+}
+
+func TestToDAGRunDetailsOmitsAutoRetryLimitWhenUnconfigured(t *testing.T) {
+	status := exec.DAGRunStatus{
+		Name:           "test-dag",
+		DAGRunID:       "run-1",
+		AutoRetryCount: 0,
+		AutoRetryLimit: 0,
+		Status:         core.Failed,
+	}
+
+	details := ToDAGRunDetails(status)
+	assert.Nil(t, details.AutoRetryLimit)
 }
 
 func TestToDAGDetailsIncludesParamDefDescriptions(t *testing.T) {

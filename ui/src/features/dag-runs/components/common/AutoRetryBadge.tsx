@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { cn } from '@/lib/utils';
 
 type AutoRetryBadgeProps = {
@@ -24,7 +27,7 @@ function AutoRetryBadge({
   return (
     <span
       className={cn(
-        'inline-flex items-center whitespace-nowrap text-xs leading-none text-muted-foreground',
+        'inline-flex items-center whitespace-normal break-words text-xs leading-none text-muted-foreground',
         className
       )}
     >

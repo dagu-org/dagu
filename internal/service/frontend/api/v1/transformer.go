@@ -171,13 +171,18 @@ func toTriggerType(t core.TriggerType) *api.TriggerType {
 }
 
 func toDAGRunSummary(s exec.DAGRunStatus) api.DAGRunSummary {
+	var autoRetryLimit *int
+	if s.AutoRetryLimit > 0 {
+		autoRetryLimit = ptrOf(s.AutoRetryLimit)
+	}
+
 	return api.DAGRunSummary{
 		Name:           s.Name,
 		DagRunId:       s.DAGRunID,
 		Params:         ptrOf(s.Params),
 		QueuedAt:       ptrOf(s.QueuedAt),
 		AutoRetryCount: s.AutoRetryCount,
-		AutoRetryLimit: s.AutoRetryLimit,
+		AutoRetryLimit: autoRetryLimit,
 		ScheduleTime:   ptrOf(s.ScheduleTime),
 		StartedAt:      s.StartedAt,
 		FinishedAt:     s.FinishedAt,
@@ -201,6 +206,11 @@ func ToDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {
 		nodes[i] = toNode(n)
 	}
 
+	var autoRetryLimit *int
+	if s.AutoRetryLimit > 0 {
+		autoRetryLimit = ptrOf(s.AutoRetryLimit)
+	}
+
 	return api.DAGRunDetails{
 		RootDAGRunName:   s.Root.Name,
 		RootDAGRunId:     s.Root.ID,
@@ -212,7 +222,7 @@ func ToDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {
 		DagRunId:         s.DAGRunID,
 		QueuedAt:         ptrOf(s.QueuedAt),
 		AutoRetryCount:   s.AutoRetryCount,
-		AutoRetryLimit:   s.AutoRetryLimit,
+		AutoRetryLimit:   autoRetryLimit,
 		ScheduleTime:     ptrOf(s.ScheduleTime),
 		StartedAt:        s.StartedAt,
 		FinishedAt:       s.FinishedAt,

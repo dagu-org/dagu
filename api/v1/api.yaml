@@ -7453,7 +7453,8 @@ components:
           description: "Number of scheduler-issued DAG auto-retries already consumed for this DAG-run"
         autoRetryLimit:
           type: integer
-          description: "Configured DAG-level automatic retry limit captured for this DAG-run"
+          nullable: true
+          description: "Configured DAG-level automatic retry limit captured for this DAG-run; null when DAG-level automatic retry is not configured"
         scheduleTime:
           type: string
           description: "RFC 3339 timestamp of when the DAG-run was scheduled to run"
@@ -7484,7 +7485,6 @@ components:
         - startedAt
         - finishedAt
         - autoRetryCount
-        - autoRetryLimit
 
     DAGRunDetails:
       type: object
