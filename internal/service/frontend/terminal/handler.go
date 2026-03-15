@@ -59,8 +59,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Get client IP address
 	ipAddress := frontendauth.GetClientIP(r)
 
+	var lease *sessionLease
 	if h.manager != nil {
-		if err := h.manager.Acquire(); err != nil {
+		lease, err = h.manager.Acquire()
+		if err != nil {
 			status := http.StatusTooManyRequests
 			message := "Terminal session limit reached. Please close another terminal and try again."
 			if err == ErrManagerShuttingDown {
@@ -70,14 +72,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, message, status)
 			return
 		}
+		defer lease.Release()
 	}
-
-	releasePending := true
-	defer func() {
-		if releasePending && h.manager != nil {
-			h.manager.ReleasePending()
-		}
-	}()
 
 	// Upgrade to WebSocket
 	// InsecureSkipVerify allows any origin since access is already protected by token auth
@@ -90,14 +86,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Create and run connection
 	tc := NewConnection(user, h.shell, conn, ipAddress)
-	if h.manager != nil {
-		if err := h.manager.Register(tc); err != nil {
-			releasePending = false
+	if lease != nil {
+		if err := lease.Activate(tc); err != nil {
 			_ = conn.Close(websocket.StatusTryAgainLater, "terminal unavailable")
 			return
 		}
-		defer h.manager.ReleaseSession(tc.ID)
-		releasePending = false
 	}
 
 	var managerCtx context.Context

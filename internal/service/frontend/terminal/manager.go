@@ -14,8 +14,8 @@ var (
 	ErrMaxSessionsReached = errors.New("max terminal sessions reached")
 	// ErrManagerShuttingDown indicates that the terminal manager is shutting down.
 	ErrManagerShuttingDown = errors.New("terminal manager is shutting down")
-	// ErrReservationRequired indicates that a session registration was attempted without reserving a slot.
-	ErrReservationRequired = errors.New("terminal session reservation required")
+	// ErrReservationInactive indicates that a released or already-activated lease was reused.
+	ErrReservationInactive = errors.New("terminal session reservation is inactive")
 )
 
 // Manager tracks active terminal sessions and coordinates server shutdown.
@@ -30,6 +30,21 @@ type Manager struct {
 	shuttingDown  bool
 	sessions      map[string]*Connection
 	wg            sync.WaitGroup
+}
+
+type leaseState uint8
+
+const (
+	leaseStateReserved leaseState = iota + 1
+	leaseStateActive
+	leaseStateReleased
+)
+
+// sessionLease represents a reserved terminal slot that can be activated once.
+type sessionLease struct {
+	manager *Manager
+	state   leaseState
+	connID  string
 }
 
 // NewManager creates a terminal session manager bound to the server lifetime.
@@ -52,62 +67,84 @@ func (m *Manager) Context() context.Context {
 }
 
 // Acquire reserves capacity for a new terminal session before the WebSocket upgrade.
-func (m *Manager) Acquire() error {
+func (m *Manager) Acquire() (*sessionLease, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.shuttingDown {
-		return ErrManagerShuttingDown
+		return nil, ErrManagerShuttingDown
 	}
 	if m.reservedSlots+len(m.sessions) >= m.maxSessions {
-		return ErrMaxSessionsReached
+		return nil, ErrMaxSessionsReached
 	}
 	m.reservedSlots++
-	return nil
+	return &sessionLease{
+		manager: m,
+		state:   leaseStateReserved,
+	}, nil
 }
 
-// ReleasePending releases a slot that was reserved but never turned into an active session.
-func (m *Manager) ReleasePending() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.reservedSlots > 0 {
-		m.reservedSlots--
-	}
-}
-
-// Register marks a reserved slot as an active terminal session.
-func (m *Manager) Register(conn *Connection) error {
+// Activate turns a reserved lease into an active terminal session.
+func (l *sessionLease) Activate(conn *Connection) error {
 	if conn == nil {
 		return errors.New("nil terminal connection")
 	}
+	if l == nil || l.manager == nil {
+		return ErrReservationInactive
+	}
 
+	m := l.manager
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if l.state != leaseStateReserved {
+		return ErrReservationInactive
+	}
 	if m.reservedSlots <= 0 {
-		return ErrReservationRequired
+		l.state = leaseStateReleased
+		return ErrReservationInactive
 	}
 	m.reservedSlots--
 
 	if m.shuttingDown {
+		l.state = leaseStateReleased
 		return ErrManagerShuttingDown
 	}
 
 	m.sessions[conn.ID] = conn
 	m.wg.Add(1)
+	l.connID = conn.ID
+	l.state = leaseStateActive
 	return nil
 }
 
-// ReleaseSession unregisters an active session and frees its slot.
-func (m *Manager) ReleaseSession(id string) {
+// Release releases a reserved or active lease exactly once.
+func (l *sessionLease) Release() {
+	if l == nil || l.manager == nil {
+		return
+	}
+
+	m := l.manager
 	m.mu.Lock()
-	_, ok := m.sessions[id]
-	if ok {
-		delete(m.sessions, id)
+	var doneActive bool
+	switch l.state {
+	case leaseStateReserved:
+		if m.reservedSlots > 0 {
+			m.reservedSlots--
+		}
+		l.state = leaseStateReleased
+	case leaseStateActive:
+		if _, ok := m.sessions[l.connID]; ok {
+			delete(m.sessions, l.connID)
+			doneActive = true
+		}
+		l.state = leaseStateReleased
+	case leaseStateReleased:
+		// Already released.
 	}
 	m.mu.Unlock()
 
-	if ok {
+	if doneActive {
 		m.wg.Done()
 	}
 }

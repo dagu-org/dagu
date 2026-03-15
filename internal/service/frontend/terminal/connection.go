@@ -31,21 +31,57 @@ const (
 	processExitDetectionDelay = 250 * time.Millisecond
 )
 
+type terminalEndReason string
+
 const (
-	terminalEndReasonClosed      = "closed"
-	terminalEndReasonClientClose = "client_close"
-	terminalEndReasonDisconnect  = "disconnect"
-	terminalEndReasonShutdown    = "shutdown"
-	terminalEndReasonPTYError    = "pty_error"
-	terminalEndReasonShellExit   = "shell_exit"
+	terminalEndReasonClosed      terminalEndReason = "closed"
+	terminalEndReasonClientClose terminalEndReason = "client_close"
+	terminalEndReasonDisconnect  terminalEndReason = "disconnect"
+	terminalEndReasonShutdown    terminalEndReason = "shutdown"
+	terminalEndReasonPTYError    terminalEndReason = "pty_error"
+	terminalEndReasonShellExit   terminalEndReason = "shell_exit"
 )
 
+func (r terminalEndReason) String() string {
+	if r == "" {
+		return string(terminalEndReasonClosed)
+	}
+	return string(r)
+}
+
 type runEvent struct {
-	reason        string
+	reason        terminalEndReason
 	sendOutput    string
 	sendError     string
 	gracefulClose bool
 	err           error
+}
+
+type websocketOp uint8
+
+const (
+	websocketOpRead websocketOp = iota + 1
+	websocketOpWrite
+)
+
+type runState struct {
+	ioWG        sync.WaitGroup
+	processDone chan struct{}
+	eventCh     chan runEvent
+	eventOnce   sync.Once
+}
+
+func newRunState() *runState {
+	return &runState{
+		processDone: make(chan struct{}),
+		eventCh:     make(chan runEvent, 1),
+	}
+}
+
+func (s *runState) signal(ev runEvent) {
+	s.eventOnce.Do(func() {
+		s.eventCh <- ev
+	})
 }
 
 // Connection represents an interactive terminal connection.
@@ -91,38 +127,18 @@ func (c *Connection) Run(ctx context.Context, auditSvc *audit.Service) (retErr e
 	}
 
 	c.logConnectionStart(auditSvc)
-
-	cmd := exec.Command(c.Shell) //nolint:gosec // shell path is from config, not user input
-	cmd.Env = os.Environ()
-
-	ptmx, err := pty.Start(cmd)
-	if err != nil {
+	if err := c.startShell(); err != nil {
 		c.sendError("Failed to start shell: " + err.Error())
 		c.logConnectionEnd(auditSvc, terminalEndReasonPTYError)
 		return err
 	}
 
-	c.cmd = cmd
-	c.ptmx = ptmx
-	_ = pty.Setsize(ptmx, &pty.Winsize{Rows: defaultTerminalRows, Cols: defaultTerminalCols})
-
 	sessionCtx, cancel := context.WithCancel(ctx)
-	var (
-		ioWG        sync.WaitGroup
-		processDone = make(chan struct{})
-		eventCh     = make(chan runEvent, 1)
-		eventOnce   sync.Once
-		event       = runEvent{reason: terminalEndReasonClosed}
-	)
-
-	signalEvent := func(ev runEvent) {
-		eventOnce.Do(func() {
-			eventCh <- ev
-		})
-	}
+	state := newRunState()
+	event := runEvent{reason: terminalEndReasonClosed}
 
 	defer func() {
-		cleanupErr := c.cleanup(cancel, &ioWG, processDone, event.gracefulClose)
+		cleanupErr := c.cleanup(cancel, &state.ioWG, state.processDone, event.gracefulClose)
 		c.logConnectionEnd(auditSvc, event.reason)
 		if cleanupErr != nil {
 			if retErr != nil {
@@ -133,36 +149,56 @@ func (c *Connection) Run(ctx context.Context, auditSvc *audit.Service) (retErr e
 		}
 	}()
 
-	ioWG.Add(2)
-	go func() {
-		defer ioWG.Done()
-		c.readFromPTY(sessionCtx, processDone, signalEvent)
-	}()
-	go func() {
-		defer ioWG.Done()
-		c.readFromWebSocket(sessionCtx, auditSvc, signalEvent)
-	}()
-	go func() {
-		waitErr := cmd.Wait()
-		close(processDone)
-		signalEvent(classifyProcessExit(waitErr))
-	}()
-	go func() {
-		<-sessionCtx.Done()
-		signalEvent(runEvent{
-			reason: terminalEndReasonShutdown,
-		})
-	}()
+	c.startRunLoops(sessionCtx, auditSvc, state)
+	event = <-state.eventCh
+	c.emitRunEvent(event)
 
-	event = <-eventCh
+	return event.err
+}
+
+func (c *Connection) startShell() error {
+	cmd := exec.Command(c.Shell) //nolint:gosec // shell path is from config, not user input
+	cmd.Env = os.Environ()
+
+	ptmx, err := pty.Start(cmd)
+	if err != nil {
+		return err
+	}
+
+	c.cmd = cmd
+	c.ptmx = ptmx
+	_ = pty.Setsize(ptmx, &pty.Winsize{Rows: defaultTerminalRows, Cols: defaultTerminalCols})
+	return nil
+}
+
+func (c *Connection) startRunLoops(ctx context.Context, auditSvc *audit.Service, state *runState) {
+	state.ioWG.Add(2)
+	go func() {
+		defer state.ioWG.Done()
+		c.readFromPTY(ctx, state.processDone, state.signal)
+	}()
+	go func() {
+		defer state.ioWG.Done()
+		c.readFromWebSocket(ctx, auditSvc, state.signal)
+	}()
+	go func() {
+		waitErr := c.cmd.Wait()
+		close(state.processDone)
+		state.signal(classifyProcessExit(waitErr))
+	}()
+	go func() {
+		<-ctx.Done()
+		state.signal(runEvent{reason: terminalEndReasonShutdown})
+	}()
+}
+
+func (c *Connection) emitRunEvent(event runEvent) {
 	if event.sendError != "" {
 		c.sendError(event.sendError)
 	}
 	if event.sendOutput != "" {
 		c.sendOutput(event.sendOutput)
 	}
-
-	return event.err
 }
 
 // readFromPTY reads output from the PTY and sends it to the WebSocket.
@@ -193,7 +229,7 @@ func (c *Connection) readFromPTY(ctx context.Context, processDone <-chan struct{
 			if c.isClosing() || errors.Is(ctx.Err(), context.Canceled) {
 				return
 			}
-			signal(c.classifyWebSocketWriteError(ctx, err))
+			signal(classifyWebSocketEvent(ctx, err, websocketOpWrite))
 			return
 		}
 
@@ -206,7 +242,7 @@ func (c *Connection) readFromWebSocket(ctx context.Context, auditSvc *audit.Serv
 	for {
 		_, data, err := c.Conn.Read(ctx)
 		if err != nil {
-			signal(c.classifyWebSocketError(ctx, err))
+			signal(classifyWebSocketEvent(ctx, err, websocketOpRead))
 			return
 		}
 
@@ -329,7 +365,7 @@ func (c *Connection) terminateProcess(processDone <-chan struct{}) error {
 	return errors.Join(errs...)
 }
 
-func (c *Connection) classifyWebSocketError(ctx context.Context, err error) runEvent {
+func classifyWebSocketEvent(ctx context.Context, err error, op websocketOp) runEvent {
 	if errors.Is(ctx.Err(), context.Canceled) {
 		return runEvent{
 			reason: terminalEndReasonShutdown,
@@ -343,6 +379,12 @@ func (c *Connection) classifyWebSocketError(ctx context.Context, err error) runE
 		}
 	}
 	if status == -1 {
+		if op == websocketOpWrite && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
+			return runEvent{
+				reason: terminalEndReasonDisconnect,
+				err:    err,
+			}
+		}
 		return runEvent{
 			reason: terminalEndReasonDisconnect,
 		}
@@ -350,27 +392,6 @@ func (c *Connection) classifyWebSocketError(ctx context.Context, err error) runE
 	return runEvent{
 		reason: terminalEndReasonDisconnect,
 	}
-}
-
-func (c *Connection) classifyWebSocketWriteError(ctx context.Context, err error) runEvent {
-	if errors.Is(ctx.Err(), context.Canceled) {
-		return runEvent{reason: terminalEndReasonShutdown}
-	}
-
-	status := websocket.CloseStatus(err)
-	if status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway {
-		return runEvent{reason: terminalEndReasonClientClose}
-	}
-	if status == -1 {
-		if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
-			return runEvent{reason: terminalEndReasonDisconnect}
-		}
-		return runEvent{
-			reason: terminalEndReasonDisconnect,
-			err:    err,
-		}
-	}
-	return runEvent{reason: terminalEndReasonDisconnect}
 }
 
 func classifyProcessExit(err error) runEvent {
@@ -490,16 +511,13 @@ func (c *Connection) logConnectionStart(auditSvc *audit.Service) {
 	_ = auditSvc.LogTerminalConnectionStart(ctx, c.User.ID, c.User.Username, c.ID, c.IPAddress)
 }
 
-func (c *Connection) logConnectionEnd(auditSvc *audit.Service, reason string) {
+func (c *Connection) logConnectionEnd(auditSvc *audit.Service, reason terminalEndReason) {
 	if auditSvc == nil {
 		return
 	}
-	if reason == "" {
-		reason = terminalEndReasonClosed
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), auditTimeout)
 	defer cancel()
-	_ = auditSvc.LogTerminalConnectionEnd(ctx, c.User.ID, c.User.Username, c.ID, reason, c.IPAddress)
+	_ = auditSvc.LogTerminalConnectionEnd(ctx, c.User.ID, c.User.Username, c.ID, reason.String(), c.IPAddress)
 }
 
 func (c *Connection) logCommand(auditSvc *audit.Service, command string) {

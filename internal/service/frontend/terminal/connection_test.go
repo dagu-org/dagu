@@ -45,27 +45,25 @@ func TestMergeSessionContext_CancelsWhenEitherContextEnds(t *testing.T) {
 func TestConnection_ClassifyWebSocketError(t *testing.T) {
 	t.Parallel()
 
-	conn := &Connection{}
-
 	t.Run("Shutdown", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		event := conn.classifyWebSocketError(ctx, context.Canceled)
+		event := classifyWebSocketEvent(ctx, context.Canceled, websocketOpRead)
 		assert.Equal(t, terminalEndReasonShutdown, event.reason)
 		assert.NoError(t, event.err)
 	})
 
 	t.Run("ClientClose", func(t *testing.T) {
-		event := conn.classifyWebSocketError(context.Background(), websocket.CloseError{
+		event := classifyWebSocketEvent(context.Background(), websocket.CloseError{
 			Code: websocket.StatusNormalClosure,
-		})
+		}, websocketOpRead)
 		assert.Equal(t, terminalEndReasonClientClose, event.reason)
 		assert.NoError(t, event.err)
 	})
 
 	t.Run("Disconnect", func(t *testing.T) {
-		event := conn.classifyWebSocketError(context.Background(), errors.New("network drop"))
+		event := classifyWebSocketEvent(context.Background(), errors.New("network drop"), websocketOpRead)
 		assert.Equal(t, terminalEndReasonDisconnect, event.reason)
 		assert.NoError(t, event.err)
 	})
@@ -74,32 +72,30 @@ func TestConnection_ClassifyWebSocketError(t *testing.T) {
 func TestConnection_ClassifyWebSocketWriteError(t *testing.T) {
 	t.Parallel()
 
-	conn := &Connection{}
-
 	t.Run("ExpectedDisconnect", func(t *testing.T) {
-		event := conn.classifyWebSocketWriteError(context.Background(), net.ErrClosed)
+		event := classifyWebSocketEvent(context.Background(), net.ErrClosed, websocketOpWrite)
 		assert.Equal(t, terminalEndReasonDisconnect, event.reason)
 		assert.NoError(t, event.err)
 	})
 
 	t.Run("CloseFrame", func(t *testing.T) {
-		event := conn.classifyWebSocketWriteError(context.Background(), websocket.CloseError{
+		event := classifyWebSocketEvent(context.Background(), websocket.CloseError{
 			Code: websocket.StatusAbnormalClosure,
-		})
+		}, websocketOpWrite)
 		assert.Equal(t, terminalEndReasonDisconnect, event.reason)
 		assert.NoError(t, event.err)
 	})
 
 	t.Run("UnexpectedWriteError", func(t *testing.T) {
 		errBoom := errors.New("boom")
-		event := conn.classifyWebSocketWriteError(context.Background(), errBoom)
+		event := classifyWebSocketEvent(context.Background(), errBoom, websocketOpWrite)
 		assert.Equal(t, terminalEndReasonDisconnect, event.reason)
 		require.Error(t, event.err)
 		assert.ErrorIs(t, event.err, errBoom)
 	})
 
 	t.Run("EOF", func(t *testing.T) {
-		event := conn.classifyWebSocketWriteError(context.Background(), io.EOF)
+		event := classifyWebSocketEvent(context.Background(), io.EOF, websocketOpWrite)
 		assert.Equal(t, terminalEndReasonDisconnect, event.reason)
 		assert.NoError(t, event.err)
 	})
