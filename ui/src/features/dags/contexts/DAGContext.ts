@@ -6,7 +6,11 @@ export const DAGContext = React.createContext<{
   fileName: string;
   forceEnqueue?: boolean;
   autoOpenStartModal?: boolean;
-  onEnqueue?: (params: string, dagRunId?: string, immediate?: boolean) => void | Promise<void>;
+  onEnqueue?: (
+    params: string,
+    dagRunId?: string,
+    immediate?: boolean
+  ) => string | void | Promise<string | void>;
 }>({
   refresh: () => {
     return;

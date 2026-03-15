@@ -41,7 +41,11 @@ type DAGDetailsContentProps = {
   /** SSE result from parent — shared with DAGSpec to avoid duplicate connections */
   sseResult?: SSEState<unknown>;
   /** Custom enqueue handler, threaded to DAGHeader → DAGActions */
-  onEnqueue?: (params: string, dagRunId?: string, immediate?: boolean) => void | Promise<void>;
+  onEnqueue?: (
+    params: string,
+    dagRunId?: string,
+    immediate?: boolean
+  ) => string | void | Promise<string | void>;
   /** When true, forces enqueue mode in DAGContext (used by cockpit) */
   forceEnqueue?: boolean;
   /** When true, automatically opens the start/enqueue modal on mount */
