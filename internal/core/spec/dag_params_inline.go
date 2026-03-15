@@ -89,6 +89,7 @@ func parseInlineParamDefinition(name string, raw map[string]any) (core.ParamDef,
 
 	allowedKeys := map[string]struct{}{
 		"default":     {},
+		"eval":        {},
 		"description": {},
 		"type":        {},
 		"required":    {},
@@ -140,6 +141,18 @@ func parseInlineParamDefinition(name string, raw map[string]any) (core.ParamDef,
 			return def, entry, fmt.Errorf("parameter %q description must be a string", name)
 		}
 		def.Description = description
+	}
+
+	if value, ok := raw["eval"]; ok {
+		expr, ok := value.(string)
+		if !ok {
+			return def, entry, fmt.Errorf("parameter %q eval must be a string", name)
+		}
+		expr = strings.TrimSpace(expr)
+		if expr == "" {
+			return def, entry, fmt.Errorf("parameter %q eval must not be empty", name)
+		}
+		entry.Eval = expr
 	}
 
 	if value, ok := raw["required"]; ok {

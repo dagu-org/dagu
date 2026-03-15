@@ -184,6 +184,57 @@ params:
 	assert.Equal(t, []string{"TAG=", "1=simple"}, resolved.Params)
 }
 
+func TestResolveRuntimeParams_EvaluatesParamEvalOnReload(t *testing.T) {
+	t.Setenv("WORK_DIR", "/tmp/work")
+
+	yaml := []byte(`
+name: runtime-eval
+params:
+  - name: base_dir
+    eval: "$WORK_DIR/pipeline"
+  - name: output_dir
+    eval: "$base_dir/output"
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	dag.YamlData = yaml
+
+	resolved, err := ResolveRuntimeParams(context.Background(), dag, "", ResolveRuntimeParamsOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"base_dir=/tmp/work/pipeline",
+		"output_dir=/tmp/work/pipeline/output",
+	}, resolved.Params)
+	assert.Equal(t, `base_dir="/tmp/work/pipeline" output_dir="/tmp/work/pipeline/output"`, resolved.DefaultParams)
+}
+
+func TestResolveRuntimeParams_OverrideBeatsEvalAndFeedsLaterParams(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: runtime-eval-override
+params:
+  - name: base_dir
+    eval: "/default/base"
+  - name: output_dir
+    eval: "$base_dir/output"
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	dag.YamlData = yaml
+
+	resolved, err := ResolveRuntimeParams(context.Background(), dag, "base_dir=/custom/base", ResolveRuntimeParamsOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"base_dir=/custom/base",
+		"output_dir=/custom/base/output",
+	}, resolved.Params)
+	assert.Equal(t, `base_dir="/custom/base" output_dir="/custom/base/output"`, resolved.DefaultParams)
+	assert.JSONEq(t, `{"base_dir":"/custom/base","output_dir":"/custom/base/output"}`, resolved.ParamsJSON)
+}
+
 func TestToFloat64_RejectsUnsafeIntegerPrecision(t *testing.T) {
 	t.Parallel()
 

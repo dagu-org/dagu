@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
@@ -166,6 +167,189 @@ params:
 	_, err := LoadYAML(context.Background(), yaml, WithoutEval())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `description must be a string`)
+}
+
+func TestInlineParamDefs_EvalResolvesDuringNormalBuild(t *testing.T) {
+	t.Setenv("WORK_DIR", "/tmp/work")
+
+	yaml := []byte(`
+name: eval-params
+params:
+  - name: base_dir
+    eval: "$WORK_DIR/pipeline"
+  - name: output_dir
+    eval: "$base_dir/output"
+  - name: parallelism
+    type: integer
+    eval: "` + "`printf 7`" + `"
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml)
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"base_dir=/tmp/work/pipeline",
+		"output_dir=/tmp/work/pipeline/output",
+		"parallelism=7",
+	}, dag.Params)
+	assert.Equal(t, `base_dir="/tmp/work/pipeline" output_dir="/tmp/work/pipeline/output" parallelism="7"`, dag.DefaultParams)
+	assert.JSONEq(t, `{"base_dir":"/tmp/work/pipeline","output_dir":"/tmp/work/pipeline/output","parallelism":"7"}`, dag.ParamsJSON)
+	require.Len(t, dag.ParamDefs, 3)
+	assert.Nil(t, dag.ParamDefs[0].Default)
+	assert.Nil(t, dag.ParamDefs[1].Default)
+	assert.Nil(t, dag.ParamDefs[2].Default)
+}
+
+func TestInlineParamDefs_EvalOverrideWinsAndFeedsLaterParams(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: eval-override
+params:
+  - name: base_dir
+    eval: "/default/base"
+  - name: output_dir
+    eval: "$base_dir/output"
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithParams(`base_dir=/custom/base`))
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"base_dir=/custom/base",
+		"output_dir=/custom/base/output",
+	}, dag.Params)
+	assert.Equal(t, `base_dir="/custom/base" output_dir="/custom/base/output"`, dag.DefaultParams)
+	assert.JSONEq(t, `{"base_dir":"/custom/base","output_dir":"/custom/base/output"}`, dag.ParamsJSON)
+}
+
+func TestInlineParamDefs_EvalExplicitEmptyOverrideWins(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: eval-empty-override
+params:
+  - name: base_dir
+    eval: "/default/base"
+  - name: output_dir
+    eval: "$base_dir/output"
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithParams(`base_dir=""`))
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"base_dir=",
+		"output_dir=/output",
+	}, dag.Params)
+	assert.Equal(t, `base_dir="" output_dir="/output"`, dag.DefaultParams)
+	assert.JSONEq(t, `{"base_dir":"","output_dir":"/output"}`, dag.ParamsJSON)
+}
+
+func TestInlineParamDefs_EvalOverrideDoesNotReexecuteUnchangedParams(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires POSIX shell semantics")
+	}
+
+	countFile := filepath.Join(t.TempDir(), "eval-count")
+	t.Setenv("EVAL_COUNT_FILE", countFile)
+
+	yaml := []byte(`
+name: eval-single-execution
+params:
+  - name: token
+    eval: "` + "`sh -c 'n=0; [ -f $EVAL_COUNT_FILE ] && n=$(cat $EVAL_COUNT_FILE); n=$((n+1)); printf %s $n > $EVAL_COUNT_FILE; printf token-%s $n'`" + `"
+  - name: mode
+    default: default
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithParams(`mode=override`))
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"token=token-1",
+		"mode=override",
+	}, dag.Params)
+	assert.Equal(t, `token="token-1" mode="override"`, dag.DefaultParams)
+
+	data, err := os.ReadFile(countFile)
+	require.NoError(t, err)
+	assert.Equal(t, "1", string(data))
+}
+
+func TestInlineParamDefs_EvalFailureFallsBackToDefault(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: eval-fallback
+params:
+  - name: run_date
+    eval: "` + "`command_that_does_not_exist_12345`" + `"
+    default: fallback-date
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"run_date=fallback-date"}, dag.Params)
+	assert.Equal(t, `run_date="fallback-date"`, dag.DefaultParams)
+}
+
+func TestInlineParamDefs_EvalFailureWithoutDefaultFails(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: eval-failure
+params:
+  - name: run_date
+    eval: "` + "`command_that_does_not_exist_12345`" + `"
+`)
+
+	_, err := LoadYAML(context.Background(), yaml)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `parameter "run_date" eval failed`)
+}
+
+func TestInlineParamDefs_EvalRespectsWithoutEval(t *testing.T) {
+	t.Setenv("WORK_DIR", "/tmp/work")
+
+	yaml := []byte(`
+name: eval-noeval
+params:
+  - name: work_dir
+    eval: "$WORK_DIR/pipeline"
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	assert.Empty(t, dag.Params)
+	assert.Empty(t, dag.DefaultParams)
+	assert.Empty(t, dag.ParamsJSON)
+}
+
+func TestInlineParamDefs_RejectNonStringEval(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: invalid-inline-eval
+params:
+  - name: run_date
+    eval: 123
+`)
+
+	_, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `eval must be a string`)
+}
+
+func TestInlineParamDefs_RejectBlankEval(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: invalid-inline-eval
+params:
+  - name: run_date
+    eval: "   "
+`)
+
+	_, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `eval must not be empty`)
 }
 
 func TestInlineParamDefs_RejectLegacyNestedMapSyntax(t *testing.T) {

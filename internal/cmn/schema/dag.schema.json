@@ -768,6 +768,9 @@
         "default": {
           "$ref": "#/definitions/paramScalar"
         },
+        "eval": {
+          "type": "string"
+        },
         "description": {
           "type": "string"
         },
@@ -802,7 +805,7 @@
           "type": "string"
         }
       },
-      "description": "Rich DAG parameter definition written as an object with a required name field and at least one additional definition field. Types drive validation and UI metadata; runtime env values remain strings."
+      "description": "Rich DAG parameter definition written as an object with a required name field and at least one additional definition field. Types drive validation and UI metadata; runtime env values remain strings. The optional eval field computes the effective default during normal DAG builds unless evaluation is disabled."
     },
     "dagParamExternalSchema": {
       "type": "object",

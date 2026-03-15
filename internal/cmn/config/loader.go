@@ -227,8 +227,14 @@ func (l *ConfigLoader) Load() (*Config, error) {
 // loading only sections required by the configured service.
 func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	cfg := Config{
-		UI:     UI{MaxDashboardPageLimit: 1},
-		Server: Server{Port: 8080, Auth: Auth{Mode: AuthModeNone}},
+		UI: UI{MaxDashboardPageLimit: 1},
+		Server: Server{
+			Port: 8080,
+			Auth: Auth{Mode: AuthModeNone},
+			Terminal: TerminalConfig{
+				MaxSessions: 5,
+			},
+		},
 	}
 
 	if err := l.loadCoreConfig(&cfg, def); err != nil {
@@ -575,6 +581,10 @@ func (l *ConfigLoader) loadServerDefaults(cfg *Config, def Definition) {
 	cfg.Server.Terminal.Enabled = false
 	if def.Terminal != nil && def.Terminal.Enabled != nil {
 		cfg.Server.Terminal.Enabled = *def.Terminal.Enabled
+	}
+	cfg.Server.Terminal.MaxSessions = l.v.GetInt("terminal.max_sessions")
+	if def.Terminal != nil && def.Terminal.MaxSessions != nil {
+		cfg.Server.Terminal.MaxSessions = *def.Terminal.MaxSessions
 	}
 
 	cfg.Server.Audit.Enabled = true
@@ -1327,6 +1337,9 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	// Audit
 	l.v.SetDefault("audit.retention_days", 7)
 
+	// Terminal
+	l.v.SetDefault("terminal.max_sessions", 5)
+
 	// Session
 	l.v.SetDefault("session.max_per_user", 100)
 
@@ -1364,6 +1377,7 @@ var envBindings = []envBinding{
 	{key: "cache", env: "CACHE"},
 
 	{key: "terminal.enabled", env: "TERMINAL_ENABLED"},
+	{key: "terminal.max_sessions", env: "TERMINAL_MAX_SESSIONS"},
 	{key: "audit.enabled", env: "AUDIT_ENABLED"},
 	{key: "audit.retention_days", env: "AUDIT_RETENTION_DAYS"},
 	{key: "session.max_per_user", env: "SESSION_MAX_PER_USER"},

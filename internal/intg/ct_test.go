@@ -955,6 +955,90 @@ steps:
 				"STEP_SHELL_ENVVAR_OUT": "expanded_value",
 			},
 		},
+		{
+			// Regression test: DAG-level env vars must be resolvable in container.env
+			name: "DAGEnvInContainerEnv",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+env:
+  - CDEIC_DAG_VAR: dag_env_value
+steps:
+  - name: check-dag-env
+    container:
+      image: %s
+      env:
+        - CDEIC_RESULT: ${CDEIC_DAG_VAR}
+    command: printenv CDEIC_RESULT
+    output: CDEIC_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"CDEIC_OUT": "dag_env_value",
+			},
+		},
+		{
+			// Regression test: DAG-level params must be resolvable in container.env
+			name: "DAGParamInContainerEnv",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+params:
+  - CDPIC_PARAM: param_value
+steps:
+  - name: check-dag-param
+    container:
+      image: %s
+      env:
+        - CDPIC_RESULT: ${CDPIC_PARAM}
+    command: printenv CDPIC_RESULT
+    output: CDPIC_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"CDPIC_OUT": "param_value",
+			},
+		},
+		{
+			// Regression test: step env referencing DAG env must resolve when merged into container
+			name: "StepEnvWithDAGRefMergedIntoContainer",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+env:
+  - SEWDR_BASE: base_value
+steps:
+  - name: check-merged
+    env:
+      - SEWDR_STEP: ${SEWDR_BASE}
+    container:
+      image: %s
+    command: printenv SEWDR_STEP
+    output: SEWDR_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"SEWDR_OUT": "base_value",
+			},
+		},
+		{
+			// Regression test: container env entries can reference earlier entries
+			// in the same block (sequential evaluation).
+			name: "ContainerEnvToEnvReference",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+steps:
+  - name: check-env-ref
+    container:
+      image: %s
+      env:
+        - CETR_FIRST: first_val
+        - CETR_SECOND: ${CETR_FIRST}_extended
+    command: printenv CETR_SECOND
+    output: CETR_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"CETR_OUT": "first_val_extended",
+			},
+		},
 	}
 
 	for _, tt := range tests {
