@@ -15,7 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
-const retryScanInterval = 15 * time.Second
+const retryScanInterval = 30 * time.Second
 
 type retryDecision struct {
 	enqueue       bool
