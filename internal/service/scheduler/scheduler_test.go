@@ -21,6 +21,7 @@ func TestScheduler(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Restart", func(t *testing.T) {
+		ctx := context.Background()
 		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 
 		// Parse a cron that fires at minute 0 (matches "now")
@@ -45,23 +46,31 @@ func TestScheduler(t *testing.T) {
 
 		// Track restart calls via the planner's Restart function
 		var restartCount atomic.Int32
-		var restartScheduleTime time.Time
+		restartScheduleTimeCh := make(chan time.Time, 1)
 		sc.SetRestartFunc(func(_ context.Context, _ *core.DAG, scheduleTime time.Time) error {
 			restartCount.Add(1)
-			restartScheduleTime = scheduleTime
+			select {
+			case restartScheduleTimeCh <- scheduleTime:
+			default:
+			}
 			return nil
 		})
 
-		go func() {
-			_ = sc.Start(context.Background())
-		}()
-		defer sc.Stop(context.Background())
+		errCh := startSchedulerAsync(t, sc, ctx)
+		defer stopSchedulerAndWait(t, sc, errCh, ctx)
 
-		time.Sleep(time.Second + time.Millisecond*100)
-		require.GreaterOrEqual(t, restartCount.Load(), int32(1))
-		require.False(t, restartScheduleTime.IsZero())
+		require.Eventually(t, func() bool {
+			return restartCount.Load() >= int32(1)
+		}, 5*time.Second, 10*time.Millisecond, "restart should have been called")
+		select {
+		case restartScheduleTime := <-restartScheduleTimeCh:
+			require.False(t, restartScheduleTime.IsZero())
+		default:
+			t.Fatal("restart schedule time was not recorded")
+		}
 	})
 	t.Run("Start", func(t *testing.T) {
+		ctx := context.Background()
 		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 
 		cronParser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
@@ -89,13 +98,12 @@ func TestScheduler(t *testing.T) {
 			return nil
 		})
 
-		go func() {
-			_ = sc.Start(context.Background())
-		}()
-		defer sc.Stop(context.Background())
+		errCh := startSchedulerAsync(t, sc, ctx)
+		defer stopSchedulerAndWait(t, sc, errCh, ctx)
 
-		time.Sleep(time.Second + time.Millisecond*100)
-		require.GreaterOrEqual(t, dispatchCount.Load(), int32(1), "dispatch should have been called for start schedule")
+		require.Eventually(t, func() bool {
+			return dispatchCount.Load() >= int32(1)
+		}, 5*time.Second, 10*time.Millisecond, "dispatch should have been called for start schedule")
 	})
 	t.Run("NextTick", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
@@ -124,13 +132,7 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 
 	// Start first scheduler
 	ctx := context.Background()
-	errCh1 := make(chan error, 1)
-	go func() {
-		errCh1 <- sc1.Start(ctx)
-	}()
-
-	// Give first scheduler time to acquire lock
-	time.Sleep(time.Millisecond * 100)
+	errCh1 := startSchedulerAsync(t, sc1, ctx)
 
 	// Create second scheduler instance with same config
 	sc2, err := scheduler.New(th.Config, newMockJobManager(), th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
@@ -138,11 +140,18 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	sc2.SetClock(clock)
 
 	// Try to start second scheduler - should wait for lock
+	errCh2 := make(chan error, 1)
 	go func() {
-		_ = sc2.Start(ctx)
+		errCh2 <- sc2.Start(ctx)
 	}()
 
 	time.Sleep(time.Millisecond * 500)
+	select {
+	case err := <-errCh2:
+		require.NoError(t, err)
+		t.Fatal("second scheduler exited before first one stopped")
+	default:
+	}
 	// Check if second scheduler is still not running
 	require.False(t, sc2.IsRunning(), "Second scheduler should not be running while first one is active")
 
@@ -160,13 +169,10 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	require.False(t, sc1.IsRunning(), "First scheduler should not be running after stop")
 
 	// Give second scheduler time to start
-	time.Sleep(time.Millisecond * 100)
-
-	// Check if second scheduler is running
-	require.True(t, sc2.IsRunning(), "Second scheduler should be running after first one stopped")
+	requireSchedulerRunning(t, sc2, errCh2)
 
 	// Stop second scheduler to clean up
-	sc2.Stop(ctx)
+	stopSchedulerAndWait(t, sc2, errCh2, ctx)
 }
 
 func TestScheduler_StopSchedule(t *testing.T) {
@@ -202,13 +208,13 @@ func TestScheduler_StopSchedule(t *testing.T) {
 		return nil
 	})
 
-	go func() {
-		_ = sc.Start(context.Background())
-	}()
-	defer sc.Stop(context.Background())
+	ctx := context.Background()
+	errCh := startSchedulerAsync(t, sc, ctx)
+	defer stopSchedulerAndWait(t, sc, errCh, ctx)
 
-	time.Sleep(time.Second + time.Millisecond*100)
-	require.GreaterOrEqual(t, stopCount.Load(), int32(1), "stop function should have been called")
+	require.Eventually(t, func() bool {
+		return stopCount.Load() >= int32(1)
+	}, 5*time.Second, 10*time.Millisecond, "stop function should have been called")
 }
 
 func TestScheduler_GracefulShutdown(t *testing.T) {
@@ -233,26 +239,13 @@ func TestScheduler_GracefulShutdown(t *testing.T) {
 	require.NoError(t, err)
 	sc.SetClock(func() time.Time { return now })
 
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- sc.Start(context.Background())
-	}()
-
-	// Wait until scheduler is running
-	deadline := time.After(5 * time.Second)
-	for !sc.IsRunning() {
-		select {
-		case <-deadline:
-			t.Fatal("scheduler did not start in time")
-		default:
-			time.Sleep(10 * time.Millisecond)
-		}
-	}
+	ctx := context.Background()
+	errCh := startSchedulerAsync(t, sc, ctx)
 
 	// Stop and verify it completes within 5 seconds
 	done := make(chan struct{})
 	go func() {
-		sc.Stop(context.Background())
+		sc.Stop(ctx)
 		close(done)
 	}()
 
@@ -265,6 +258,55 @@ func TestScheduler_GracefulShutdown(t *testing.T) {
 
 	require.False(t, sc.IsRunning(), "scheduler should not be running after stop")
 
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("scheduler Start() did not return after Stop()")
+	}
+}
+
+func startSchedulerAsync(t *testing.T, sc *scheduler.Scheduler, ctx context.Context) chan error {
+	t.Helper()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- sc.Start(ctx)
+	}()
+
+	requireSchedulerRunning(t, sc, errCh)
+	return errCh
+}
+
+func requireSchedulerRunning(t *testing.T, sc *scheduler.Scheduler, errCh <-chan error) {
+	t.Helper()
+
+	var startErr error
+	var exited bool
+	require.Eventually(t, func() bool {
+		if sc.IsRunning() {
+			return true
+		}
+		select {
+		case err := <-errCh:
+			startErr = err
+			exited = true
+			return true
+		default:
+			return false
+		}
+	}, 5*time.Second, 10*time.Millisecond, "scheduler did not start in time")
+
+	if exited {
+		require.NoError(t, startErr)
+		t.Fatal("scheduler exited before reporting running")
+	}
+}
+
+func stopSchedulerAndWait(t *testing.T, sc *scheduler.Scheduler, errCh <-chan error, ctx context.Context) {
+	t.Helper()
+
+	sc.Stop(ctx)
 	select {
 	case err := <-errCh:
 		require.NoError(t, err)

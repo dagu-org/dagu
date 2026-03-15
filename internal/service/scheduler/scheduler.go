@@ -49,6 +49,7 @@ type Scheduler struct {
 	planner             *TickPlanner    // Unified scheduling decision module
 	stopOnce            sync.Once
 	lock                sync.Mutex
+	lifecycleMu         sync.Mutex
 	clock               Clock // Clock function for getting current time
 }
 
@@ -198,6 +199,20 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	s.lifecycleMu.Lock()
+	startupLocked := true
+	defer func() {
+		if startupLocked {
+			s.lifecycleMu.Unlock()
+		}
+	}()
+
+	select {
+	case <-s.quit:
+		return nil
+	default:
+	}
+
 	if s.instanceID == "" {
 		hostname, _ := os.Hostname()
 		s.instanceID = fmt.Sprintf("%s-%d-%d", hostname, os.Getpid(), time.Now().Unix())
@@ -247,6 +262,9 @@ func (s *Scheduler) Start(ctx context.Context) error {
 			logger.Info(ctx, "Updated scheduler status to active")
 		}
 	}
+
+	startupLocked = false
+	s.lifecycleMu.Unlock()
 
 	sig := make(chan os.Signal, 1)
 
@@ -425,14 +443,18 @@ func (s *Scheduler) IsRunning() bool {
 
 // Stop stops the scheduler.
 func (s *Scheduler) Stop(ctx context.Context) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
 
 	s.stopOnce.Do(func() {
 		var wg sync.WaitGroup
 		wg.Add(2)
 
+		var zd *ZombieDetector
+		s.lock.Lock()
 		close(s.quit)
+		zd = s.zombieDetector
+		s.lock.Unlock()
 
 		go func() {
 			defer wg.Done()
@@ -449,8 +471,8 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		// sendEvent unblocks via the select on er.quit.
 		s.entryReader.Stop()
 
-		if s.zombieDetector != nil {
-			s.zombieDetector.Stop(ctx)
+		if zd != nil {
+			zd.Stop(ctx)
 		}
 
 		s.planner.Stop(ctx)

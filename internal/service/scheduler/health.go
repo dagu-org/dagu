@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -19,6 +20,7 @@ import (
 
 // HealthServer represents the health check HTTP server for the scheduler
 type HealthServer struct {
+	mu         sync.Mutex
 	server     *http.Server
 	listener   net.Listener
 	port       int
@@ -48,7 +50,14 @@ func newHealthServerWithAddr(addr string) *HealthServer {
 // URL returns the currently bound HTTP base URL for the health server.
 // It is primarily intended for tests and diagnostics.
 func (h *HealthServer) URL() string {
-	if h == nil || h.boundAddr == "" {
+	if h == nil {
+		return ""
+	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if h.boundAddr == "" {
 		return ""
 	}
 	return "http://" + h.boundAddr
@@ -68,7 +77,7 @@ func (h *HealthServer) Start(ctx context.Context) error {
 
 	router.Get("/health", h.healthHandler)
 
-	h.server = &http.Server{
+	server := &http.Server{
 		Addr:              h.listenAddr,
 		Handler:           router,
 		ReadHeaderTimeout: 10 * time.Second,
@@ -78,25 +87,40 @@ func (h *HealthServer) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	boundAddr := listener.Addr().String()
+
+	h.mu.Lock()
+	if h.server != nil {
+		h.mu.Unlock()
+		_ = listener.Close()
+		return nil
+	}
+	h.server = server
 	h.listener = listener
-	h.boundAddr = listener.Addr().String()
+	h.boundAddr = boundAddr
+	h.mu.Unlock()
 
 	// Start server in a goroutine
-	go func() {
+	go func(server *http.Server, listener net.Listener) {
 		logger.Info(ctx, "Starting scheduler health check server", tag.Port(h.port))
-		if err := h.server.Serve(listener); err != nil && err != http.ErrServerClosed {
+		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
 			logger.Error(ctx, "Health check server error", tag.Error(err))
 		}
-	}()
+	}(server, listener)
 
 	return nil
 }
 
 // Stop gracefully stops the health check server
 func (h *HealthServer) Stop(ctx context.Context) error {
-	if h.server == nil {
+	h.mu.Lock()
+	server := h.server
+	listener := h.listener
+	if server == nil {
+		h.mu.Unlock()
 		return nil
 	}
+	h.mu.Unlock()
 
 	logger.Info(ctx, "Stopping scheduler health check server")
 
@@ -104,7 +128,20 @@ func (h *HealthServer) Stop(ctx context.Context) error {
 	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	if err := h.server.Shutdown(shutdownCtx); err != nil {
+	err := server.Shutdown(shutdownCtx)
+	if listener != nil {
+		_ = listener.Close()
+	}
+
+	h.mu.Lock()
+	if h.server == server {
+		h.server = nil
+		h.listener = nil
+		h.boundAddr = ""
+	}
+	h.mu.Unlock()
+
+	if err != nil {
 		logger.Error(ctx, "Failed to shutdown scheduler health check server", tag.Error(err))
 		return err
 	}
