@@ -902,7 +902,6 @@ func TestRunner(t *testing.T) {
 
 	t.Run("RepeatPolicyRepeatsWhileCommandExitCodeMatches", func(t *testing.T) {
 		r := setupRunner(t)
-		// This step will repeat until exit code is not 42.
 		countFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exitcode_%s", uuid.Must(uuid.NewV7()).String()))
 		err := os.Remove(countFile)
 		if err != nil && !os.IsNotExist(err) {
@@ -914,8 +913,8 @@ func TestRunner(t *testing.T) {
 				require.NoError(t, err)
 			}
 		}()
-		// Script: fail with exit 42 until file exists, then exit 0
-		script := fmt.Sprintf(`if [ ! -f %[1]s ]; then exit 42; else exit 0; fi`, countFile)
+		// Script: fail exactly once with exit 42, then succeed on the retry.
+		script := fmt.Sprintf(`if [ -f %[1]s ]; then exit 0; fi; : > %[1]s; exit 42`, countFile)
 		plan := r.newPlan(t,
 			newStep("1",
 				withScript(script),
@@ -926,12 +925,6 @@ func TestRunner(t *testing.T) {
 				},
 			),
 		)
-		go func() {
-			time.Sleep(350 * time.Millisecond)
-			f, _ := os.Create(countFile)
-			err := f.Close()
-			require.NoError(t, err)
-		}()
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		node := result.nodeByName(t, "1")

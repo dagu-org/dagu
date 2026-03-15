@@ -173,6 +173,9 @@ steps:
 		require.NoError(t, att.Open(ctx))
 
 		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		staleAt := time.Now().Add(-3 * time.Second)
+		runningStatus.StartedAt = staleAt.UTC().Format(time.RFC3339)
+		runningStatus.CreatedAt = staleAt.UnixMilli()
 		require.NoError(t, att.Write(ctx, runningStatus))
 		require.NoError(t, att.Close(ctx))
 
@@ -203,6 +206,9 @@ steps:
 		require.NoError(t, att.Open(ctx))
 
 		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		staleAt := time.Now().Add(-3 * time.Second)
+		runningStatus.StartedAt = staleAt.UTC().Format(time.RFC3339)
+		runningStatus.CreatedAt = staleAt.UnixMilli()
 		require.NoError(t, att.Write(ctx, runningStatus))
 		require.NoError(t, att.Close(ctx))
 
@@ -211,6 +217,58 @@ steps:
 		require.Equal(t, core.Failed, saved.Status)
 		require.Equal(t, core.NodeFailed, saved.Nodes[0].Status)
 		require.Equal(t, "process terminated unexpectedly - stale local process detected", saved.Nodes[0].Error)
+	})
+	t.Run("GetLatestStatusKeepsFreshRunDuringStartupGrace", func(t *testing.T) {
+		dag := th.DAG(t, `steps:
+  - name: "1"
+    command: sleep 1
+`)
+
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+		now := time.Now()
+		ctx := th.Context
+
+		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, exec.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+		require.NoError(t, att.Open(ctx))
+
+		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		require.NoError(t, att.Write(ctx, runningStatus))
+		require.NoError(t, att.Close(ctx))
+
+		latest, err := th.DAGRunMgr.GetLatestStatus(ctx, dag.DAG)
+		require.NoError(t, err)
+		require.Equal(t, core.Running, latest.Status)
+		require.Equal(t, core.NodeRunning, latest.Nodes[0].Status)
+
+		persisted, err := att.ReadStatus(ctx)
+		require.NoError(t, err)
+		require.Equal(t, core.Running, persisted.Status)
+		require.Equal(t, core.NodeRunning, persisted.Nodes[0].Status)
+	})
+	t.Run("GetSavedStatusKeepsFreshRunDuringStartupGrace", func(t *testing.T) {
+		dag := th.DAG(t, `steps:
+  - name: "1"
+    command: sleep 1
+`)
+
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+		now := time.Now()
+		ctx := th.Context
+		ref := exec.NewDAGRunRef(dag.Name, dagRunID)
+
+		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, exec.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+		require.NoError(t, att.Open(ctx))
+
+		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		require.NoError(t, att.Write(ctx, runningStatus))
+		require.NoError(t, att.Close(ctx))
+
+		saved, err := th.DAGRunMgr.GetSavedStatus(ctx, ref)
+		require.NoError(t, err)
+		require.Equal(t, core.Running, saved.Status)
+		require.Equal(t, core.NodeRunning, saved.Nodes[0].Status)
 	})
 	t.Run("GetSavedStatusDoesNotRepairDistributedRun", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
