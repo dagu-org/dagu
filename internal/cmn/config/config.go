@@ -147,7 +147,8 @@ type Server struct {
 
 // TerminalConfig contains configuration for the web-based terminal feature.
 type TerminalConfig struct {
-	Enabled bool // Default: false
+	Enabled     bool // Default: false
+	MaxSessions int  // Default: 5
 }
 
 // AuditConfig contains configuration for the audit logging feature.
@@ -458,6 +459,9 @@ func (c *Config) validateServer() error {
 
 	if c.Server.Session.MaxPerUser < 0 {
 		return fmt.Errorf("session.max_per_user must be >= 0")
+	}
+	if c.Server.Terminal.MaxSessions <= 0 {
+		return fmt.Errorf("terminal.max_sessions must be > 0")
 	}
 	if c.Server.SSE != (SSEConfig{}) {
 		if c.Server.SSE.MaxTopicsPerConnection <= 0 {

@@ -745,6 +745,12 @@
         "enabled": {
           "type": "boolean",
           "description": "Enable the web-based terminal. Default: false."
+        },
+        "max_sessions": {
+          "type": "integer",
+          "description": "Maximum concurrent terminal sessions. Default: 5.",
+          "minimum": 1,
+          "default": 5
         }
       }
     },

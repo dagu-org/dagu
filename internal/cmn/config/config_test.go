@@ -19,6 +19,9 @@ func validBaseConfig() *Config {
 		Server: Server{
 			Port: 8080,
 			Auth: Auth{Mode: AuthModeNone},
+			Terminal: TerminalConfig{
+				MaxSessions: 5,
+			},
 			SSE: SSEConfig{
 				MaxTopicsPerConnection: 20,
 				MaxClients:             1000,
@@ -154,6 +157,16 @@ func TestConfig_Validate(t *testing.T) {
 		err := cfg.Validate()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "sse.max_topics_per_connection must be > 0")
+	})
+
+	t.Run("InvalidTerminalMaxSessions_Zero", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Server.Terminal.MaxSessions = 0
+
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "terminal.max_sessions must be > 0")
 	})
 
 	t.Run("InvalidMaxDashboardPageLimit_Negative", func(t *testing.T) {

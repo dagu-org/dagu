@@ -168,7 +168,7 @@ func TestLoad_Env(t *testing.T) {
 			LatestStatusToday: true,
 			StrictValidation:  false,
 			Metrics:           MetricsAccessPrivate,
-			Terminal:          TerminalConfig{Enabled: true},
+			Terminal:          TerminalConfig{Enabled: true, MaxSessions: 5},
 			Audit:             AuditConfig{Enabled: false, RetentionDays: 7},
 			Session:           SessionConfig{MaxPerUser: 100},
 			SSE: SSEConfig{
@@ -439,7 +439,7 @@ scheduler:
 				PermissionRunDAGs:   false,
 			},
 			Metrics:  MetricsAccessPrivate,
-			Terminal: TerminalConfig{Enabled: false},
+			Terminal: TerminalConfig{Enabled: false, MaxSessions: 5},
 			Audit:    AuditConfig{Enabled: true, RetentionDays: 7},
 			Session:  SessionConfig{MaxPerUser: 100},
 			SSE: SSEConfig{
@@ -1240,14 +1240,17 @@ func TestLoad_Terminal(t *testing.T) {
 	t.Run("TerminalDefault", func(t *testing.T) {
 		cfg := loadFromYAML(t, "# empty")
 		assert.False(t, cfg.Server.Terminal.Enabled)
+		assert.Equal(t, 5, cfg.Server.Terminal.MaxSessions)
 	})
 
 	t.Run("TerminalEnabled", func(t *testing.T) {
 		cfg := loadFromYAML(t, `
 terminal:
   enabled: true
+  max_sessions: 7
 `)
 		assert.True(t, cfg.Server.Terminal.Enabled)
+		assert.Equal(t, 7, cfg.Server.Terminal.MaxSessions)
 	})
 
 	t.Run("TerminalDisabled", func(t *testing.T) {
@@ -1260,9 +1263,11 @@ terminal:
 
 	t.Run("TerminalEnabledFromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_TERMINAL_ENABLED": "true",
+			"DAGU_TERMINAL_ENABLED":      "true",
+			"DAGU_TERMINAL_MAX_SESSIONS": "8",
 		})
 		assert.True(t, cfg.Server.Terminal.Enabled)
+		assert.Equal(t, 8, cfg.Server.Terminal.MaxSessions)
 	})
 
 	t.Run("TerminalDisabledFromEnv", func(t *testing.T) {
@@ -1276,10 +1281,13 @@ terminal:
 		cfg := loadWithEnv(t, `
 terminal:
   enabled: false
+  max_sessions: 3
 `, map[string]string{
-			"DAGU_TERMINAL_ENABLED": "true",
+			"DAGU_TERMINAL_ENABLED":      "true",
+			"DAGU_TERMINAL_MAX_SESSIONS": "9",
 		})
 		assert.True(t, cfg.Server.Terminal.Enabled)
+		assert.Equal(t, 9, cfg.Server.Terminal.MaxSessions)
 	})
 }
 

@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -94,6 +95,7 @@ type Server struct {
 	listener           net.Listener
 	sseHub             *sse.Hub
 	sseMultiplexer     *sse.Multiplexer
+	terminalManager    *terminal.Manager
 	metricsRegistry    *prometheus.Registry
 	tunnelAPIOpts      []apiv1.APIOption
 	dagStore           exec.DAGStore
@@ -1025,7 +1027,12 @@ func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath
 }
 
 func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV1BasePath string) {
-	termHandler := terminal.NewHandler(srv.authService, srv.auditService, terminal.GetDefaultShell())
+	shell := srv.config.Core.DefaultShell
+	if shell == "" {
+		shell = terminal.GetDefaultShell()
+	}
+	srv.terminalManager = terminal.NewManager(ctx, srv.config.Server.Terminal.MaxSessions)
+	termHandler := terminal.NewHandler(srv.authService, srv.auditService, srv.terminalManager, shell)
 	wsPath := path.Join(apiV1BasePath, "terminal/ws")
 	r.Get(wsPath, termHandler.ServeHTTP)
 	logger.Info(ctx, "Terminal WebSocket route configured", slog.String("path", wsPath))
@@ -1346,11 +1353,10 @@ func (srv *Server) serveHTTP(tlsCfg *config.TLSConfig, hasListener bool) error {
 
 // Shutdown gracefully shuts down the server.
 func (srv *Server) Shutdown(ctx context.Context) error {
-	if srv.auditStore != nil {
-		if err := srv.auditStore.Close(); err != nil {
-			logger.Warn(ctx, "Failed to close audit store", tag.Error(err))
-		}
-	}
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var shutdownErr error
 
 	if srv.syncService != nil {
 		if err := srv.syncService.Stop(); err != nil {
@@ -1366,18 +1372,32 @@ func (srv *Server) Shutdown(ctx context.Context) error {
 		srv.sseMultiplexer.Shutdown()
 		logger.Info(ctx, "SSE multiplexer shut down")
 	}
+	if srv.terminalManager != nil {
+		if err := srv.terminalManager.Shutdown(shutdownCtx); err != nil {
+			logger.Warn(ctx, "Terminal manager did not shut down cleanly", tag.Error(err))
+			shutdownErr = errors.Join(shutdownErr, err)
+		} else {
+			logger.Info(ctx, "Terminal manager shut down")
+		}
+	}
+
+	if srv.auditStore != nil {
+		if err := srv.auditStore.Close(); err != nil {
+			logger.Warn(ctx, "Failed to close audit store", tag.Error(err))
+		}
+	}
 
 	if srv.httpServer == nil {
-		return nil
+		return shutdownErr
 	}
 
 	logger.Info(ctx, "Server is shutting down", tag.Addr(srv.httpServer.Addr))
 
-	shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
 	srv.httpServer.SetKeepAlivesEnabled(false)
-	return srv.httpServer.Shutdown(shutdownCtx)
+	if err := srv.httpServer.Shutdown(shutdownCtx); err != nil {
+		shutdownErr = errors.Join(shutdownErr, err)
+	}
+	return shutdownErr
 }
 
 func (srv *Server) setupGracefulShutdown(ctx context.Context) {

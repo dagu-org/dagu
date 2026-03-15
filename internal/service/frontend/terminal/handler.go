@@ -17,14 +17,16 @@ import (
 type Handler struct {
 	authService  *authservice.Service
 	auditService *audit.Service
+	manager      *Manager
 	shell        string
 }
 
 // NewHandler creates a new terminal handler.
-func NewHandler(authSvc *authservice.Service, auditSvc *audit.Service, shell string) *Handler {
+func NewHandler(authSvc *authservice.Service, auditSvc *audit.Service, manager *Manager, shell string) *Handler {
 	return &Handler{
 		authService:  authSvc,
 		auditService: auditSvc,
+		manager:      manager,
 		shell:        shell,
 	}
 }
@@ -56,6 +58,26 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Get client IP address
 	ipAddress := frontendauth.GetClientIP(r)
 
+	if h.manager != nil {
+		if err := h.manager.Acquire(); err != nil {
+			status := http.StatusTooManyRequests
+			message := "Terminal session limit reached. Please close another terminal and try again."
+			if err == ErrManagerShuttingDown {
+				status = http.StatusServiceUnavailable
+				message = "Terminal is shutting down. Please try again after the server restarts."
+			}
+			http.Error(w, message, status)
+			return
+		}
+	}
+
+	releasePending := true
+	defer func() {
+		if releasePending && h.manager != nil {
+			h.manager.ReleasePending()
+		}
+	}()
+
 	// Upgrade to WebSocket
 	// InsecureSkipVerify allows any origin since access is already protected by token auth
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
@@ -67,7 +89,22 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Create and run connection
 	tc := NewConnection(user, h.shell, conn, ipAddress)
-	_ = tc.Run(ctx, h.auditService)
+	if h.manager != nil {
+		if err := h.manager.Register(tc); err != nil {
+			releasePending = false
+			h.manager.ReleasePending()
+			_ = conn.Close(websocket.StatusTryAgainLater, "terminal unavailable")
+			return
+		}
+		defer h.manager.ReleaseSession(tc.ID)
+		releasePending = false
+	}
+
+	runCtx := ctx
+	if h.manager != nil {
+		runCtx = h.manager.Context()
+	}
+	_ = tc.Run(runCtx, h.auditService)
 }
 
 // GetDefaultShell returns the default shell for the current system.

@@ -1,0 +1,199 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package terminal_test
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/coder/websocket"
+	api "github.com/dagu-org/dagu/api/v1"
+	"github.com/dagu-org/dagu/internal/cmn/config"
+	terminalpkg "github.com/dagu-org/dagu/internal/service/frontend/terminal"
+	"github.com/dagu-org/dagu/internal/test"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestTerminal_SessionLimitReturnsHTTP429(t *testing.T) {
+	server, token := setupTerminalServer(t, 1)
+	conn := mustDialTerminal(t, server, token)
+	t.Cleanup(func() { _ = conn.Close(websocket.StatusNormalClosure, "test complete") })
+
+	secondConn, resp, err := dialTerminal(server, token)
+	if secondConn != nil {
+		_ = secondConn.Close(websocket.StatusNormalClosure, "unexpected success")
+	}
+	require.Error(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
+}
+
+func TestTerminal_CleanClientCloseReleasesSession(t *testing.T) {
+	server, token := setupTerminalServer(t, 1)
+	conn := mustDialTerminal(t, server, token)
+	require.NoError(t, conn.Close(websocket.StatusNormalClosure, "client closed"))
+
+	waitForTerminalSlot(t, server, token)
+}
+
+func TestTerminal_AbruptDisconnectReleasesSession(t *testing.T) {
+	server, token := setupTerminalServer(t, 1)
+	conn := mustDialTerminal(t, server, token)
+	require.NoError(t, conn.CloseNow())
+
+	waitForTerminalSlot(t, server, token)
+}
+
+func TestTerminal_ShellExitClosesCleanly(t *testing.T) {
+	server, token := setupTerminalServer(t, 1)
+	conn := mustDialTerminal(t, server, token)
+
+	sendInput(t, conn, "exit\r")
+	output, errorMessages := readTerminalUntilClose(t, conn)
+
+	assert.Contains(t, output, "Shell closed.")
+	for _, msg := range errorMessages {
+		assert.NotContains(t, strings.ToLower(msg), "i/o timeout")
+	}
+}
+
+func TestTerminal_ServerShutdownDoesNotEmitTimeoutError(t *testing.T) {
+	server, token := setupTerminalServer(t, 1)
+	conn := mustDialTerminal(t, server, token)
+
+	server.Cancel()
+	_, errorMessages := readTerminalUntilClose(t, conn)
+
+	for _, msg := range errorMessages {
+		assert.NotContains(t, strings.ToLower(msg), "i/o timeout")
+	}
+}
+
+func setupTerminalServer(t *testing.T, maxSessions int) (test.Server, string) {
+	t.Helper()
+
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Mode = config.AuthModeBuiltin
+		cfg.Server.Auth.Builtin.Token.Secret = "test-jwt-secret-key-terminal"
+		cfg.Server.Auth.Builtin.Token.TTL = time.Hour
+		cfg.Server.Terminal.Enabled = true
+		cfg.Server.Terminal.MaxSessions = maxSessions
+	}))
+
+	server.Client().Post("/api/v1/auth/setup", api.SetupRequest{
+		Username: "admin",
+		Password: "adminpass",
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	resp := server.Client().Post("/api/v1/auth/login", api.LoginRequest{
+		Username: "admin",
+		Password: "adminpass",
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	var result api.LoginResponse
+	resp.Unmarshal(t, &result)
+	require.NotEmpty(t, result.Token)
+	return server, result.Token
+}
+
+func mustDialTerminal(t *testing.T, server test.Server, token string) *websocket.Conn {
+	t.Helper()
+
+	conn, resp, err := dialTerminal(server, token)
+	if resp != nil && resp.Body != nil {
+		_ = resp.Body.Close()
+	}
+	require.NoError(t, err)
+	return conn
+}
+
+func dialTerminal(server test.Server, token string) (*websocket.Conn, *http.Response, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	wsURL := fmt.Sprintf(
+		"ws://%s:%d/api/v1/terminal/ws?token=%s",
+		server.Config.Server.Host,
+		server.Config.Server.Port,
+		url.QueryEscape(token),
+	)
+	return websocket.Dial(ctx, wsURL, nil)
+}
+
+func waitForTerminalSlot(t *testing.T, server test.Server, token string) {
+	t.Helper()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		conn, resp, err := dialTerminal(server, token)
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		if err == nil {
+			_ = conn.Close(websocket.StatusNormalClosure, "verification complete")
+			return
+		}
+		if resp == nil || resp.StatusCode != http.StatusTooManyRequests {
+			t.Fatalf("unexpected dial failure while waiting for slot release: %v", err)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	t.Fatal("terminal slot was not released within 5 seconds")
+}
+
+func sendInput(t *testing.T, conn *websocket.Conn, input string) {
+	t.Helper()
+
+	payload, err := json.Marshal(terminalpkg.Message{
+		Type: terminalpkg.MessageTypeInput,
+		Data: base64.StdEncoding.EncodeToString([]byte(input)),
+	})
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	require.NoError(t, conn.Write(ctx, websocket.MessageText, payload))
+}
+
+func readTerminalUntilClose(t *testing.T, conn *websocket.Conn) (string, []string) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var (
+		output        strings.Builder
+		errorMessages []string
+	)
+
+	for {
+		_, data, err := conn.Read(ctx)
+		if err != nil {
+			require.False(t, errors.Is(ctx.Err(), context.DeadlineExceeded), "terminal connection did not close before timeout")
+			return output.String(), errorMessages
+		}
+
+		var msg terminalpkg.Message
+		require.NoError(t, json.Unmarshal(data, &msg))
+
+		switch msg.Type {
+		case terminalpkg.MessageTypeOutput:
+			decoded, err := msg.DecodeData()
+			require.NoError(t, err)
+			output.Write(decoded)
+		case terminalpkg.MessageTypeError:
+			errorMessages = append(errorMessages, msg.Data)
+		}
+	}
+}

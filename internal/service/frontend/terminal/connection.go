@@ -6,10 +6,14 @@ package terminal
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/coder/websocket"
@@ -18,6 +22,31 @@ import (
 	"github.com/dagu-org/dagu/internal/service/audit"
 	"github.com/google/uuid"
 )
+
+const (
+	defaultTerminalRows       = 24
+	defaultTerminalCols       = 80
+	auditTimeout              = 5 * time.Second
+	processShutdownGrace      = 3 * time.Second
+	processExitDetectionDelay = 250 * time.Millisecond
+)
+
+const (
+	terminalEndReasonClosed      = "closed"
+	terminalEndReasonClientClose = "client_close"
+	terminalEndReasonDisconnect  = "disconnect"
+	terminalEndReasonShutdown    = "shutdown"
+	terminalEndReasonPTYError    = "pty_error"
+	terminalEndReasonShellExit   = "shell_exit"
+)
+
+type runEvent struct {
+	reason        string
+	sendOutput    string
+	sendError     string
+	gracefulClose bool
+	err           error
+}
 
 // Connection represents an interactive terminal connection.
 type Connection struct {
@@ -29,119 +58,172 @@ type Connection struct {
 	StartTime  time.Time
 	LastActive time.Time
 
-	ptmx        *os.File
-	cmd         *exec.Cmd
-	mu          sync.Mutex
-	closed      bool
+	ptmx *os.File
+	cmd  *exec.Cmd
+
+	sendMu sync.Mutex
+	state  sync.Mutex
+
 	inputBuffer []byte // accumulates input until newline for command logging
 	inEscSeq    bool   // true when processing an ANSI escape sequence
+	closing     atomic.Bool
 }
 
 // NewConnection creates a new terminal connection.
 func NewConnection(user *auth.User, shell string, conn *websocket.Conn, ipAddress string) *Connection {
+	now := time.Now()
 	return &Connection{
 		ID:         uuid.New().String(),
 		User:       user,
 		IPAddress:  ipAddress,
 		Shell:      shell,
 		Conn:       conn,
-		StartTime:  time.Now(),
-		LastActive: time.Now(),
+		StartTime:  now,
+		LastActive: now,
 	}
 }
 
 // Run starts the terminal connection and handles communication between
 // the WebSocket and the PTY.
-func (c *Connection) Run(ctx context.Context, auditSvc *audit.Service) error {
-	// Log connection start
-	if auditSvc != nil {
-		_ = auditSvc.LogTerminalConnectionStart(ctx, c.User.ID, c.User.Username, c.ID, c.IPAddress)
+func (c *Connection) Run(ctx context.Context, auditSvc *audit.Service) (retErr error) {
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
-	// Start PTY with shell
+	c.logConnectionStart(auditSvc)
+
 	cmd := exec.Command(c.Shell) //nolint:gosec // shell path is from config, not user input
 	cmd.Env = os.Environ()
 
 	ptmx, err := pty.Start(cmd)
 	if err != nil {
 		c.sendError("Failed to start shell: " + err.Error())
-		if auditSvc != nil {
-			_ = auditSvc.LogTerminalConnectionEnd(ctx, c.User.ID, c.User.Username, c.ID, "pty_error", c.IPAddress)
-		}
+		c.logConnectionEnd(auditSvc, terminalEndReasonPTYError)
 		return err
 	}
 
-	c.ptmx = ptmx
 	c.cmd = cmd
+	c.ptmx = ptmx
+	_ = pty.Setsize(ptmx, &pty.Winsize{Rows: defaultTerminalRows, Cols: defaultTerminalCols})
 
-	// Set initial size
-	_ = pty.Setsize(ptmx, &pty.Winsize{Rows: 24, Cols: 80})
+	sessionCtx, cancel := context.WithCancel(ctx)
+	var (
+		ioWG        sync.WaitGroup
+		processDone = make(chan struct{})
+		processMu   sync.Mutex
+		processErr  error
+		eventCh     = make(chan runEvent, 1)
+		eventOnce   sync.Once
+		event       = runEvent{reason: terminalEndReasonClosed}
+	)
 
-	// Create done channel for cleanup
-	done := make(chan struct{})
-
-	// Use WaitGroup to track goroutine lifecycle
-	var wg sync.WaitGroup
-
-	// Read from PTY and write to WebSocket
-	wg.Go(func() {
-		c.readFromPTY(ctx, done)
-	})
-
-	// Read from WebSocket and write to PTY
-	c.readFromWebSocket(ctx, auditSvc)
-
-	// Set read deadline to unblock PTY read, then signal done
-	_ = ptmx.SetReadDeadline(time.Now())
-	close(done)
-
-	// Wait for goroutine to finish
-	wg.Wait()
-
-	// Wait for command to finish
-	_ = cmd.Wait()
-
-	// Log connection end
-	if auditSvc != nil {
-		_ = auditSvc.LogTerminalConnectionEnd(ctx, c.User.ID, c.User.Username, c.ID, "closed", c.IPAddress)
+	setProcessErr := func(err error) {
+		processMu.Lock()
+		processErr = err
+		processMu.Unlock()
+		close(processDone)
+	}
+	signalEvent := func(ev runEvent) {
+		eventOnce.Do(func() {
+			eventCh <- ev
+		})
 	}
 
-	return nil
+	defer func() {
+		cleanupErr := c.cleanup(cancel, &ioWG, processDone, event.gracefulClose)
+		c.logConnectionEnd(auditSvc, event.reason)
+		if cleanupErr != nil {
+			if retErr != nil {
+				retErr = errors.Join(retErr, cleanupErr)
+			} else {
+				retErr = cleanupErr
+			}
+		}
+	}()
+
+	ioWG.Add(2)
+	go func() {
+		defer ioWG.Done()
+		c.readFromPTY(sessionCtx, processDone, signalEvent)
+	}()
+	go func() {
+		defer ioWG.Done()
+		c.readFromWebSocket(sessionCtx, auditSvc, signalEvent)
+	}()
+	go func() {
+		waitErr := cmd.Wait()
+		setProcessErr(waitErr)
+		signalEvent(classifyProcessExit(waitErr))
+	}()
+	go func() {
+		<-sessionCtx.Done()
+		signalEvent(runEvent{
+			reason: terminalEndReasonShutdown,
+			err:    sessionCtx.Err(),
+		})
+	}()
+
+	event = <-eventCh
+	if event.sendError != "" {
+		c.sendError(event.sendError)
+	}
+	if event.sendOutput != "" {
+		c.sendOutput(event.sendOutput)
+	}
+
+	processMu.Lock()
+	defer processMu.Unlock()
+	if event.err != nil {
+		return event.err
+	}
+	return processErr
 }
 
 // readFromPTY reads output from the PTY and sends it to the WebSocket.
-func (c *Connection) readFromPTY(ctx context.Context, done chan struct{}) {
+func (c *Connection) readFromPTY(ctx context.Context, processDone <-chan struct{}, signal func(runEvent)) {
 	buf := make([]byte, 4096)
 	for {
-		select {
-		case <-done:
-			return
-		case <-ctx.Done():
-			return
-		default:
-		}
-
 		n, err := c.ptmx.Read(buf)
 		if err != nil {
-			if err != io.EOF {
-				c.sendError("Shell closed: " + err.Error())
+			if c.shouldSuppressPTYReadError(err, processDone) {
+				return
 			}
+			signal(runEvent{
+				reason:    terminalEndReasonPTYError,
+				sendError: "Shell closed: " + err.Error(),
+				err:       err,
+			})
 			return
 		}
 
-		if n > 0 {
-			msg := NewOutputMessage(buf[:n])
-			c.sendMessage(ctx, msg)
-			c.updateLastActive()
+		if n == 0 {
+			continue
 		}
+
+		writeCtx, cancel := context.WithTimeout(ctx, auditTimeout)
+		err = c.sendMessage(writeCtx, NewOutputMessage(buf[:n]))
+		cancel()
+		if err != nil {
+			if c.isClosing() || errors.Is(ctx.Err(), context.Canceled) {
+				return
+			}
+			signal(runEvent{
+				reason: terminalEndReasonDisconnect,
+				err:    err,
+			})
+			return
+		}
+
+		c.updateLastActive()
 	}
 }
 
 // readFromWebSocket reads input from the WebSocket and writes to the PTY.
-func (c *Connection) readFromWebSocket(ctx context.Context, auditSvc *audit.Service) {
+func (c *Connection) readFromWebSocket(ctx context.Context, auditSvc *audit.Service, signal func(runEvent)) {
 	for {
 		_, data, err := c.Conn.Read(ctx)
 		if err != nil {
+			signal(c.classifyWebSocketError(ctx, err))
 			return
 		}
 
@@ -158,86 +240,280 @@ func (c *Connection) readFromWebSocket(ctx context.Context, auditSvc *audit.Serv
 			if err != nil {
 				continue
 			}
-			if len(input) > 0 {
-				// Write input to PTY
-				_, _ = c.ptmx.Write(input)
+			if len(input) == 0 {
+				continue
+			}
 
-				// Accumulate input for command logging
-				if auditSvc != nil {
-					c.accumulateAndLogCommand(ctx, auditSvc, input)
+			if _, err := c.ptmx.Write(input); err != nil {
+				if c.isClosing() || errors.Is(ctx.Err(), context.Canceled) {
+					return
 				}
+				signal(runEvent{
+					reason:    terminalEndReasonPTYError,
+					sendError: "Failed to write to shell: " + err.Error(),
+					err:       err,
+				})
+				return
+			}
+
+			if auditSvc != nil {
+				c.accumulateAndLogCommand(auditSvc, input)
 			}
 
 		case MessageTypeResize:
 			if msg.Cols > 0 && msg.Cols <= 500 && msg.Rows > 0 && msg.Rows <= 500 {
-				_ = pty.Setsize(c.ptmx, &pty.Winsize{
+				if err := pty.Setsize(c.ptmx, &pty.Winsize{
 					Rows: uint16(msg.Rows), //nolint:gosec // bounds checked above
 					Cols: uint16(msg.Cols), //nolint:gosec // bounds checked above
-				})
+				}); err != nil && !c.isClosing() {
+					signal(runEvent{
+						reason:    terminalEndReasonPTYError,
+						sendError: "Failed to resize terminal: " + err.Error(),
+						err:       err,
+					})
+					return
+				}
 			}
 
 		case MessageTypeClose:
-			c.Close()
+			signal(runEvent{reason: terminalEndReasonClientClose})
 			return
 
 		case MessageTypeOutput, MessageTypeError:
-			// These are server-to-client message types, ignore if received from client
+			// These are server-to-client message types, ignore if received from client.
 		}
 	}
 }
 
-// sendMessage sends a message to the WebSocket.
-func (c *Connection) sendMessage(ctx context.Context, msg *Message) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.closed {
-		return
+// ForceKill expedites terminal teardown during hard server shutdown.
+func (c *Connection) ForceKill() {
+	c.closing.Store(true)
+	if c.ptmx != nil {
+		_ = c.ptmx.SetReadDeadline(time.Now())
 	}
-
-	data, err := json.Marshal(msg)
-	if err != nil {
-		return
+	if c.Conn != nil {
+		_ = c.Conn.CloseNow()
 	}
-
-	_ = c.Conn.Write(ctx, websocket.MessageText, data)
+	_ = forceKillProcess(c.cmd)
 }
 
-// sendError sends an error message to the WebSocket.
-func (c *Connection) sendError(errMsg string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	c.sendMessage(ctx, NewErrorMessage(errMsg))
-}
-
-// updateLastActive updates the last active timestamp.
-func (c *Connection) updateLastActive() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.LastActive = time.Now()
-}
-
-// Close closes the terminal connection.
-func (c *Connection) Close() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.closed {
-		return
+func (c *Connection) cleanup(cancel context.CancelFunc, ioWG *sync.WaitGroup, processDone <-chan struct{}, gracefulClose bool) error {
+	if !c.closing.CompareAndSwap(false, true) {
+		return nil
 	}
-	c.closed = true
+
+	cancel()
+	if c.Conn != nil {
+		if gracefulClose {
+			_ = c.Conn.Close(websocket.StatusNormalClosure, "connection closed")
+		} else {
+			_ = c.Conn.CloseNow()
+		}
+	}
+	if c.ptmx != nil {
+		_ = c.ptmx.SetReadDeadline(time.Now())
+	}
+
+	ioWG.Wait()
 
 	if c.ptmx != nil {
 		_ = c.ptmx.Close()
 	}
-	if c.cmd != nil && c.cmd.Process != nil {
-		_ = c.cmd.Process.Kill()
+
+	return c.terminateProcess(processDone)
+}
+
+func (c *Connection) terminateProcess(processDone <-chan struct{}) error {
+	if c.cmd == nil {
+		return nil
 	}
-	_ = c.Conn.Close(websocket.StatusNormalClosure, "connection closed")
+	if waitForSignal(processDone, 0) {
+		return nil
+	}
+
+	var errs []error
+	if err := requestHangup(c.cmd); err != nil {
+		errs = append(errs, err)
+	}
+	if waitForSignal(processDone, processShutdownGrace) {
+		return errors.Join(errs...)
+	}
+
+	if err := forceKillProcess(c.cmd); err != nil {
+		errs = append(errs, err)
+	}
+	<-processDone
+	return errors.Join(errs...)
+}
+
+func (c *Connection) classifyWebSocketError(ctx context.Context, err error) runEvent {
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return runEvent{
+			reason: terminalEndReasonShutdown,
+			err:    ctx.Err(),
+		}
+	}
+
+	switch websocket.CloseStatus(err) {
+	case websocket.StatusNormalClosure, websocket.StatusGoingAway:
+		return runEvent{
+			reason: terminalEndReasonClientClose,
+			err:    err,
+		}
+	case -1:
+		return runEvent{
+			reason: terminalEndReasonDisconnect,
+			err:    err,
+		}
+	default:
+		return runEvent{
+			reason: terminalEndReasonDisconnect,
+			err:    err,
+		}
+	}
+}
+
+func classifyProcessExit(err error) runEvent {
+	if err == nil {
+		return runEvent{
+			reason:        terminalEndReasonShellExit,
+			sendOutput:    "\r\nShell closed.\r\n",
+			gracefulClose: true,
+		}
+	}
+
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return runEvent{
+			reason:        terminalEndReasonShellExit,
+			sendError:     "Shell closed: " + err.Error(),
+			gracefulClose: true,
+			err:           err,
+		}
+	}
+
+	return runEvent{
+		reason:    terminalEndReasonPTYError,
+		sendError: "Shell closed: " + err.Error(),
+		err:       err,
+	}
+}
+
+func (c *Connection) shouldSuppressPTYReadError(err error, processDone <-chan struct{}) bool {
+	if c.isClosing() && isExpectedShutdownReadError(err) {
+		return true
+	}
+	if errors.Is(err, io.EOF) {
+		return waitForSignal(processDone, processExitDetectionDelay)
+	}
+	if errors.Is(err, syscall.EIO) {
+		return waitForSignal(processDone, processExitDetectionDelay)
+	}
+	return c.isClosing()
+}
+
+func isExpectedShutdownReadError(err error) bool {
+	if errors.Is(err, os.ErrClosed) || errors.Is(err, os.ErrDeadlineExceeded) || errors.Is(err, io.EOF) {
+		return true
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
+func waitForSignal(ch <-chan struct{}, timeout time.Duration) bool {
+	if timeout <= 0 {
+		select {
+		case <-ch:
+			return true
+		default:
+			return false
+		}
+	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case <-ch:
+		return true
+	case <-timer.C:
+		return false
+	}
+}
+
+// sendMessage sends a message to the WebSocket.
+func (c *Connection) sendMessage(ctx context.Context, msg *Message) error {
+	c.sendMu.Lock()
+	defer c.sendMu.Unlock()
+
+	if c.isClosing() {
+		return net.ErrClosed
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	return c.Conn.Write(ctx, websocket.MessageText, data)
+}
+
+func (c *Connection) sendOutput(output string) {
+	ctx, cancel := context.WithTimeout(context.Background(), auditTimeout)
+	defer cancel()
+	_ = c.sendMessage(ctx, NewOutputMessage([]byte(output)))
+}
+
+// sendError sends an error message to the WebSocket.
+func (c *Connection) sendError(errMsg string) {
+	ctx, cancel := context.WithTimeout(context.Background(), auditTimeout)
+	defer cancel()
+	_ = c.sendMessage(ctx, NewErrorMessage(errMsg))
+}
+
+// updateLastActive updates the last active timestamp.
+func (c *Connection) updateLastActive() {
+	c.state.Lock()
+	defer c.state.Unlock()
+	c.LastActive = time.Now()
+}
+
+func (c *Connection) isClosing() bool {
+	return c.closing.Load()
+}
+
+func (c *Connection) logConnectionStart(auditSvc *audit.Service) {
+	if auditSvc == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), auditTimeout)
+	defer cancel()
+	_ = auditSvc.LogTerminalConnectionStart(ctx, c.User.ID, c.User.Username, c.ID, c.IPAddress)
+}
+
+func (c *Connection) logConnectionEnd(auditSvc *audit.Service, reason string) {
+	if auditSvc == nil {
+		return
+	}
+	if reason == "" {
+		reason = terminalEndReasonClosed
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), auditTimeout)
+	defer cancel()
+	_ = auditSvc.LogTerminalConnectionEnd(ctx, c.User.ID, c.User.Username, c.ID, reason, c.IPAddress)
+}
+
+func (c *Connection) logCommand(auditSvc *audit.Service, command string) {
+	if auditSvc == nil || command == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), auditTimeout)
+	defer cancel()
+	_ = auditSvc.LogTerminalCommand(ctx, c.User.ID, c.User.Username, c.ID, command, c.IPAddress)
 }
 
 // accumulateAndLogCommand accumulates input and logs complete commands when Enter is pressed.
-func (c *Connection) accumulateAndLogCommand(ctx context.Context, auditSvc *audit.Service, input []byte) {
+func (c *Connection) accumulateAndLogCommand(auditSvc *audit.Service, input []byte) {
 	for _, b := range input {
 		// Handle ANSI escape sequences (e.g., arrow keys send ESC[A, ESC[B, etc.)
 		if c.inEscSeq {
@@ -254,8 +530,7 @@ func (c *Connection) accumulateAndLogCommand(ctx context.Context, auditSvc *audi
 		case '\r', '\n':
 			// Enter pressed - log the accumulated command
 			if len(c.inputBuffer) > 0 {
-				command := string(c.inputBuffer)
-				_ = auditSvc.LogTerminalCommand(ctx, c.User.ID, c.User.Username, c.ID, command, c.IPAddress)
+				c.logCommand(auditSvc, string(c.inputBuffer))
 				c.inputBuffer = nil
 			}
 		case 127, '\b':
