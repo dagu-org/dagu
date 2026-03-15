@@ -67,6 +67,12 @@ type StopFunc func(ctx context.Context, dag *core.DAG) error
 // RestartFunc restarts a DAG unconditionally.
 type RestartFunc func(ctx context.Context, dag *core.DAG, scheduleTime time.Time) error
 
+// EnqueueFunc enqueues a catchup run for the given DAG.
+type EnqueueFunc func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType, scheduleTime time.Time) error
+
+// IsQueuedFunc checks if a DAG has any pending queued items.
+type IsQueuedFunc func(ctx context.Context, dag *core.DAG) (bool, error)
+
 // TickPlannerConfig holds the dependencies for creating a TickPlanner.
 type TickPlannerConfig struct {
 	WatermarkStore  WatermarkStore
@@ -80,6 +86,14 @@ type TickPlannerConfig struct {
 	Clock           Clock
 	Location        *time.Location // timezone for cron schedule evaluation
 	Events          <-chan DAGChangeEvent
+
+	// QueuesEnabled indicates whether the queue subsystem is active.
+	// When false, catchup buffers are not populated.
+	QueuesEnabled bool
+	// Enqueue enqueues a catchup run. Nil when queues are disabled.
+	Enqueue EnqueueFunc
+	// IsQueued checks if a DAG has any pending queued items.
+	IsQueued IsQueuedFunc
 }
 
 // TickPlanner is the unified scheduling decision module.
@@ -149,6 +163,9 @@ func NewTickPlanner(cfg TickPlannerConfig) *TickPlanner {
 	}
 	if cfg.Restart == nil {
 		cfg.Restart = func(context.Context, *core.DAG, time.Time) error { return nil }
+	}
+	if cfg.IsQueued == nil {
+		cfg.IsQueued = func(context.Context, *core.DAG) (bool, error) { return false, nil }
 	}
 	if cfg.Clock == nil {
 		cfg.Clock = time.Now
@@ -224,8 +241,20 @@ func (tp *TickPlanner) Init(ctx context.Context, dags []*core.DAG) error {
 }
 
 // initBuffers creates per-DAG queues for DAGs with CatchupWindow > 0
-// and enqueues catch-up items.
+// and enqueues catch-up items. Requires QueuesEnabled; when disabled,
+// catchup buffers are not populated and a warning is logged per DAG.
 func (tp *TickPlanner) initBuffers(ctx context.Context, dags []*core.DAG) {
+	if !tp.cfg.QueuesEnabled {
+		for _, dag := range dags {
+			if dag.CatchupWindow > 0 {
+				logger.Warn(ctx, "DAG has catchup enabled but queues are disabled; catchup will not run",
+					tag.DAG(dag.Name),
+				)
+			}
+		}
+		return
+	}
+
 	// Snapshot watermark state under the lock. Although initBuffers is only
 	// called from Init (before Start), we snapshot defensively to avoid
 	// reading the shared DAGs map outside the lock.
@@ -319,6 +348,7 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 
 		// Check catchup buffer first (catchup has priority over live)
 		catchupProduced := false
+		catchupDeferred := false
 		if buf, ok := tp.buffers[dagName]; ok {
 			item, hasItem := buf.Peek()
 			if !hasItem {
@@ -333,56 +363,66 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 					running = false
 				}
 
-				if !running {
-					// For "latest", collapse to most recent before popping.
-					if buf.overlapPolicy == core.OverlapPolicyLatest && buf.Len() > 1 {
-						dropped := buf.DropAllButLast()
-						tp.advanceDAGWatermark(dagName, dropped[len(dropped)-1].ScheduledTime)
-						// Re-peek: front changed from oldest to latest
-						item, _ = buf.Peek()
-					}
-					buf.Pop()
-					run, ok := tp.createPlannedRun(ctx, item.DAG, item.ScheduledTime, item.TriggerType)
-					if ok {
-						candidates = append(candidates, run)
-						catchupProduced = true
-					}
+				queued, qErr := tp.cfg.IsQueued(ctx, item.DAG)
+				if qErr != nil {
+					logger.Error(ctx, "Failed to check if DAG is queued; deferring catch-up item",
+						tag.DAG(dagName),
+						tag.Error(qErr),
+					)
+					catchupDeferred = true
 				} else {
-					switch buf.overlapPolicy {
-					case core.OverlapPolicySkip:
-						popped, _ := buf.Pop()
-						logger.Info(ctx, "Catch-up run skipped (overlap policy: skip)",
-							tag.DAG(dagName),
-						)
-						tp.advanceDAGWatermark(dagName, popped.ScheduledTime)
-					case core.OverlapPolicyAll:
-						// leave in buffer, retry next tick
-					case core.OverlapPolicyLatest:
-						// Collapse to latest, advance watermark past discarded items.
-						dropped := buf.DropAllButLast()
-						if len(dropped) > 0 {
+					busy := running || queued
+					if !busy {
+						// For "latest", collapse to most recent before popping.
+						if buf.overlapPolicy == core.OverlapPolicyLatest && buf.Len() > 1 {
+							dropped := buf.DropAllButLast()
 							tp.advanceDAGWatermark(dagName, dropped[len(dropped)-1].ScheduledTime)
+							// Re-peek: front changed from oldest to latest
+							item, _ = buf.Peek()
 						}
-						// Leave the single remaining (latest) item for retry next tick.
-					default:
-						popped, _ := buf.Pop()
-						logger.Warn(ctx, "Unknown overlap policy, treating as skip",
-							tag.DAG(dagName),
-							slog.String("overlapPolicy", string(buf.overlapPolicy)),
-						)
-						tp.advanceDAGWatermark(dagName, popped.ScheduledTime)
+						buf.Pop()
+						run, ok := tp.createPlannedRun(ctx, item.DAG, item.ScheduledTime, item.TriggerType)
+						if ok {
+							candidates = append(candidates, run)
+							catchupProduced = true
+						}
+					} else {
+						switch buf.overlapPolicy {
+						case core.OverlapPolicySkip:
+							popped, _ := buf.Pop()
+							logger.Info(ctx, "Catch-up run skipped (overlap policy: skip)",
+								tag.DAG(dagName),
+							)
+							tp.advanceDAGWatermark(dagName, popped.ScheduledTime)
+						case core.OverlapPolicyAll:
+							// leave in buffer, retry next tick
+						case core.OverlapPolicyLatest:
+							// Collapse to latest, advance watermark past discarded items.
+							dropped := buf.DropAllButLast()
+							if len(dropped) > 0 {
+								tp.advanceDAGWatermark(dagName, dropped[len(dropped)-1].ScheduledTime)
+							}
+							// Leave the single remaining (latest) item for retry next tick.
+						default:
+							popped, _ := buf.Pop()
+							logger.Warn(ctx, "Unknown overlap policy, treating as skip",
+								tag.DAG(dagName),
+								slog.String("overlapPolicy", string(buf.overlapPolicy)),
+							)
+							tp.advanceDAGWatermark(dagName, popped.ScheduledTime)
+						}
 					}
-				}
 
-				// Clean up empty buffers
-				if buf.Len() == 0 {
-					delete(tp.buffers, dagName)
+					// Clean up empty buffers
+					if buf.Len() == 0 {
+						delete(tp.buffers, dagName)
+					}
 				}
 			}
 		}
 
-		// If catchup produced a run, skip live eval (catchup has priority)
-		if catchupProduced {
+		// If catchup produced a run or was deferred, skip live eval.
+		if catchupProduced || catchupDeferred {
 			continue
 		}
 
@@ -462,6 +502,20 @@ func (tp *TickPlanner) shouldRun(ctx context.Context, dag *core.DAG, scheduledTi
 		return false
 	}
 	if running {
+		return false
+	}
+
+	// Guard 1b: isQueued — prevent live run while a catchup run is queued.
+	// On error, conservatively skip (assume busy) to avoid duplicates.
+	queued, qErr := tp.cfg.IsQueued(ctx, dag)
+	if qErr != nil {
+		logger.Error(ctx, "Failed to check if DAG is queued; assuming busy",
+			tag.DAG(dag.Name),
+			tag.Error(qErr),
+		)
+		return false
+	}
+	if queued {
 		return false
 	}
 
@@ -549,14 +603,22 @@ func scheduleDueAt(schedule core.Schedule, now time.Time) (time.Time, bool) {
 }
 
 // createPlannedRun generates a run ID and constructs a PlannedRun.
+// For catchup runs, a deterministic ID is generated from the DAG name and
+// scheduled time. For all other runs, a random UUID v7 is used.
 func (tp *TickPlanner) createPlannedRun(ctx context.Context, dag *core.DAG, scheduledTime time.Time, triggerType core.TriggerType) (PlannedRun, bool) {
-	runID, err := tp.cfg.GenRunID(ctx)
-	if err != nil {
-		logger.Error(ctx, "Failed to generate run ID",
-			tag.DAG(dag.Name),
-			tag.Error(err),
-		)
-		return PlannedRun{}, false
+	var runID string
+	if triggerType == core.TriggerTypeCatchUp {
+		runID = GenerateCatchupRunID(dag.Name, scheduledTime)
+	} else {
+		var err error
+		runID, err = tp.cfg.GenRunID(ctx)
+		if err != nil {
+			logger.Error(ctx, "Failed to generate run ID",
+				tag.DAG(dag.Name),
+				tag.Error(err),
+			)
+			return PlannedRun{}, false
+		}
 	}
 
 	return PlannedRun{
@@ -564,6 +626,7 @@ func (tp *TickPlanner) createPlannedRun(ctx context.Context, dag *core.DAG, sche
 		RunID:         runID,
 		ScheduledTime: scheduledTime,
 		TriggerType:   triggerType,
+		ScheduleType:  ScheduleTypeStart,
 	}, true
 }
 
@@ -717,8 +780,36 @@ func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
 	}
 }
 
+// reinsertCatchupItem puts a failed catchup run back at the front of the
+// DAG's schedule buffer so it retries on the next tick. If the buffer was
+// already cleaned up, a new one is created.
+func (tp *TickPlanner) reinsertCatchupItem(ctx context.Context, run PlannedRun) {
+	tp.entryMu.Lock()
+	defer tp.entryMu.Unlock()
+
+	buf, ok := tp.buffers[run.DAG.Name]
+	if !ok {
+		buf = NewScheduleBuffer(run.DAG.Name, run.DAG.OverlapPolicy)
+		tp.buffers[run.DAG.Name] = buf
+	}
+	if !buf.Prepend(QueueItem{
+		DAG:           run.DAG,
+		ScheduledTime: run.ScheduledTime,
+		TriggerType:   run.TriggerType,
+		ScheduleType:  run.ScheduleType,
+	}) {
+		logger.Error(ctx, "Failed to re-insert catchup item; buffer full",
+			tag.DAG(run.DAG.Name),
+		)
+	}
+}
+
 // recomputeBuffer creates a new catch-up buffer for a DAG using the existing watermark.
 func (tp *TickPlanner) recomputeBuffer(ctx context.Context, dag *core.DAG) {
+	if !tp.cfg.QueuesEnabled {
+		return
+	}
+
 	// Snapshot needed values under the lock to avoid reading the shared map
 	// after releasing it (Advance and handleEvent can modify DAGs concurrently).
 	tp.mu.RLock()
@@ -774,7 +865,17 @@ func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 	var err error
 	switch run.ScheduleType {
 	case ScheduleTypeStart:
-		err = tp.cfg.Dispatch(ctx, run.DAG, run.RunID, run.TriggerType, run.ScheduledTime)
+		if run.TriggerType == core.TriggerTypeCatchUp {
+			if tp.cfg.Enqueue == nil {
+				logger.Error(ctx, "Catchup dispatch requires queues to be enabled; skipping",
+					tag.DAG(run.DAG.Name),
+				)
+				return
+			}
+			err = tp.cfg.Enqueue(ctx, run.DAG, run.RunID, run.TriggerType, run.ScheduledTime)
+		} else {
+			err = tp.cfg.Dispatch(ctx, run.DAG, run.RunID, run.TriggerType, run.ScheduledTime)
+		}
 	case ScheduleTypeStop:
 		err = tp.cfg.Stop(ctx, run.DAG)
 	case ScheduleTypeRestart:
@@ -787,6 +888,13 @@ func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 			slog.String("scheduleType", run.ScheduleType.String()),
 			tag.Error(err),
 		)
+
+		// For catchup runs: the item was already popped from the buffer by
+		// Plan(). Re-insert it at the front so it retries on the next tick
+		// instead of being lost until scheduler restart.
+		if run.TriggerType == core.TriggerTypeCatchUp && run.ScheduleType == ScheduleTypeStart {
+			tp.reinsertCatchupItem(ctx, run)
+		}
 		return
 	}
 

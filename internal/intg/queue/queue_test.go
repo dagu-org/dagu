@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
@@ -148,4 +149,74 @@ steps:
 	require.NoError(t, err)
 	assert.Equal(t, f.dag.Name, data.Name)
 	assert.Equal(t, runID, data.ID)
+}
+
+func TestCatchupQueuedHappyPath(t *testing.T) {
+	scheduleTime := time.Date(2026, 3, 13, 10, 0, 0, 0, time.UTC)
+
+	f := newFixture(t, `
+name: catchup-local-test
+steps:
+  - name: echo-step
+    command: echo catchup-local
+`)
+
+	runID := f.enqueueCatchup(scheduleTime)
+	f.StartScheduler(30 * time.Second)
+	defer f.Stop()
+
+	f.WaitDrain(25 * time.Second)
+	status := f.waitForRecentStatus(25*time.Second, func(st exec.DAGRunStatus) bool {
+		return st.DAGRunID == runID && st.Status == core.Succeeded
+	})
+
+	require.Equal(t, core.TriggerTypeCatchUp, status.TriggerType)
+	require.Equal(t, stringutil.FormatTime(scheduleTime), status.ScheduleTime)
+	require.NotEmpty(t, status.Log)
+	require.FileExists(t, status.Log)
+
+	items, err := f.th.QueueStore.List(f.th.Context, f.queue)
+	require.NoError(t, err)
+	require.Empty(t, items)
+}
+
+func TestSchedulerCatchupFromPersistedWatermark(t *testing.T) {
+	scheduledTime := stableCurrentMinute(t)
+
+	f := newFixture(t, `
+name: catchup-watermark-test
+schedule: "* * * * *"
+catchup_window: "2m"
+steps:
+  - name: echo-step
+    command: echo catchup-from-watermark
+`)
+
+	f.seedWatermark(scheduledTime.Add(-time.Minute), scheduledTime.Add(-time.Minute))
+	f.StartScheduler(45 * time.Second)
+	defer f.Stop()
+
+	f.WaitDrain(30 * time.Second)
+	status := f.waitForRecentStatus(30*time.Second, func(st exec.DAGRunStatus) bool {
+		return st.Status == core.Succeeded &&
+			st.TriggerType == core.TriggerTypeCatchUp &&
+			st.ScheduleTime == stringutil.FormatTime(scheduledTime)
+	})
+
+	require.Equal(t, core.TriggerTypeCatchUp, status.TriggerType)
+	require.Equal(t, stringutil.FormatTime(scheduledTime), status.ScheduleTime)
+	require.NotEmpty(t, status.Log)
+	require.FileExists(t, status.Log)
+}
+
+func stableCurrentMinute(t *testing.T) time.Time {
+	t.Helper()
+
+	now := time.Now().UTC()
+	if now.Second() >= 50 {
+		nextSafe := now.Truncate(time.Minute).Add(time.Minute + 2*time.Second)
+		time.Sleep(time.Until(nextSafe))
+	}
+
+	return time.Now().UTC().Truncate(time.Minute)
 }

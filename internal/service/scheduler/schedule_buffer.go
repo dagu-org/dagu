@@ -92,6 +92,16 @@ func (q *ScheduleBuffer) DropAllButLast() []QueueItem {
 	return dropped
 }
 
+// Prepend inserts an item at the front of the queue.
+// Returns false if the buffer is full.
+func (q *ScheduleBuffer) Prepend(item QueueItem) bool {
+	if q.maxItems > 0 && len(q.items) >= q.maxItems {
+		return false
+	}
+	q.items = append([]QueueItem{item}, q.items...)
+	return true
+}
+
 // Len returns the number of items in the queue.
 func (q *ScheduleBuffer) Len() int {
 	return len(q.items)

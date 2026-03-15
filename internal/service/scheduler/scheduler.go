@@ -93,6 +93,23 @@ func New(
 		impl.setEvents(eventCh)
 	}
 
+	// Build catchup-enqueue callbacks when queues are enabled.
+	queuesEnabled := cfg.Queues.Enabled
+	var isQueued IsQueuedFunc
+	var enqueueFunc EnqueueFunc
+	if queuesEnabled {
+		isQueued = func(ctx context.Context, dag *core.DAG) (bool, error) {
+			items, err := queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
+			if err != nil {
+				return false, err
+			}
+			return len(items) > 0, nil
+		}
+		enqueueFunc = func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType, scheduleTime time.Time) error {
+			return EnqueueCatchupRun(ctx, dagRunStore, queueStore, cfg.Paths.LogDir, dag, runID, triggerType, scheduleTime)
+		}
+	}
+
 	planner := NewTickPlanner(TickPlannerConfig{
 		WatermarkStore:  watermarkStore,
 		IsSuspended:     isSuspended,
@@ -118,9 +135,12 @@ func New(
 		Restart: func(ctx context.Context, dag *core.DAG, scheduleTime time.Time) error {
 			return dagExecutor.Restart(ctx, dag, scheduleTime)
 		},
-		Clock:    defaultClock,
-		Location: timeLoc,
-		Events:   eventCh,
+		Clock:         defaultClock,
+		Location:      timeLoc,
+		Events:        eventCh,
+		QueuesEnabled: queuesEnabled,
+		Enqueue:       enqueueFunc,
+		IsQueued:      isQueued,
 	})
 
 	return &Scheduler{
@@ -435,9 +455,12 @@ func (s *Scheduler) stopCron(ctx context.Context) {
 	logger.Info(ctx, "Scheduler stopped")
 }
 
-// dispatchRun dispatches a planned run in a goroutine.
+// dispatchRun dispatches a planned run.
+// Catchup runs are dispatched synchronously (enqueue is fast file I/O and
+// we need the result to decide whether to advance the watermark).
+// Non-catchup runs are dispatched in a goroutine (process spawn can be slow).
 func (s *Scheduler) dispatchRun(ctx context.Context, run PlannedRun) {
-	go func() {
+	dispatch := func() {
 		defer func() {
 			if r := recover(); r != nil {
 				logger.Error(ctx, "Run dispatch panicked",
@@ -447,5 +470,10 @@ func (s *Scheduler) dispatchRun(ctx context.Context, run PlannedRun) {
 			}
 		}()
 		s.planner.DispatchRun(ctx, run)
-	}()
+	}
+	if run.TriggerType == core.TriggerTypeCatchUp {
+		dispatch()
+		return
+	}
+	go dispatch()
 }
