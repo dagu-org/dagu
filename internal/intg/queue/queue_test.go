@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
@@ -33,8 +34,6 @@ steps:
 }
 
 func TestGlobalConcurrency(t *testing.T) {
-	// This test uses a global queue with maxConcurrency=3 to verify concurrent execution.
-	// Note: maxActiveRuns at DAG level is deprecated and intentionally omitted.
 	f := newFixture(t, `
 name: sleep-dag
 queue: global-queue
@@ -50,8 +49,6 @@ steps:
 }
 
 func TestLocalQueueFIFOProcessing(t *testing.T) {
-	// Local queues always use maxConcurrency=1 (FIFO), ignoring DAG's maxActiveRuns.
-	// This verifies that even with maxActiveRuns: 3, local queues process sequentially.
 	f := newFixture(t, `
 name: batch-dag
 max_active_runs: 3
@@ -63,7 +60,6 @@ steps:
 	f.WaitDrain(20 * time.Second)
 	f.Stop()
 
-	// Verify sequential processing: start times should be at least 1 second apart
 	times := f.collectStartTimes()
 	require.Len(t, times, 3)
 	for i := 1; i < len(times); i++ {
@@ -90,10 +86,8 @@ steps:
 	f.WaitDrain(25 * time.Second)
 	f.Stop()
 
-	// Verify high priority runs started before low priority runs
 	times := f.collectStartTimes()
 	require.Len(t, times, 4)
-	// High priority (index 2,3) should start before low priority (index 0,1)
 	highPriorityStart := times[2]
 	if times[3].Before(highPriorityStart) {
 		highPriorityStart = times[3]
@@ -107,11 +101,6 @@ steps:
 }
 
 func TestRetryEnqueue(t *testing.T) {
-	// Verify EnqueueRetry works with real file-based stores:
-	// a failed run transitions to Queued with correct metadata and appears in the queue.
-	// Scheduler processing of queued items is already covered by TestBasicProcessing
-	// and TestGlobalConcurrency — retry-enqueued items are identical from the
-	// scheduler's perspective.
 	f := newFixture(t, `
 name: retry-dag
 queue: retry-queue
@@ -123,7 +112,6 @@ steps:
 
 	runID := f.runIDs[0]
 
-	// Verify the run is in Failed status before retry
 	ref := exec.NewDAGRunRef(f.dag.Name, runID)
 	att, err := f.th.DAGRunStore.FindAttempt(f.th.Context, ref)
 	require.NoError(t, err)
@@ -131,10 +119,8 @@ steps:
 	require.NoError(t, err)
 	require.Equal(t, core.Failed, status.Status)
 
-	// Enqueue the retry — status transitions from Failed to Queued
 	f.RetryEnqueue(runID)
 
-	// Verify status persisted as Queued with correct metadata
 	att, err = f.th.DAGRunStore.FindAttempt(f.th.Context, ref)
 	require.NoError(t, err)
 	status, err = att.ReadStatus(f.th.Context)
@@ -143,7 +129,6 @@ steps:
 	assert.NotEmpty(t, status.QueuedAt)
 	assert.Equal(t, core.TriggerTypeRetry, status.TriggerType)
 
-	// Verify item is in the queue
 	items, err := f.th.QueueStore.List(f.th.Context, "retry-queue")
 	require.NoError(t, err)
 	require.Len(t, items, 1)
@@ -257,6 +242,64 @@ steps:
 	})
 }
 
+func TestCatchupQueuedHappyPath(t *testing.T) {
+	scheduleTime := time.Date(2026, 3, 13, 10, 0, 0, 0, time.UTC)
+
+	f := newFixture(t, `
+name: catchup-local-test
+steps:
+  - name: echo-step
+    command: echo catchup-local
+`)
+
+	runID := f.enqueueCatchup(scheduleTime)
+	f.StartScheduler(30 * time.Second)
+	defer f.Stop()
+
+	f.WaitDrain(25 * time.Second)
+	status := f.waitForRecentStatus(25*time.Second, func(st exec.DAGRunStatus) bool {
+		return st.DAGRunID == runID && st.Status == core.Succeeded
+	})
+
+	require.Equal(t, core.TriggerTypeCatchUp, status.TriggerType)
+	require.Equal(t, stringutil.FormatTime(scheduleTime), status.ScheduleTime)
+	require.NotEmpty(t, status.Log)
+	require.FileExists(t, status.Log)
+
+	items, err := f.th.QueueStore.List(f.th.Context, f.queue)
+	require.NoError(t, err)
+	require.Empty(t, items)
+}
+
+func TestSchedulerCatchupFromPersistedWatermark(t *testing.T) {
+	scheduledTime := stableCurrentMinute(t)
+
+	f := newFixture(t, `
+name: catchup-watermark-test
+schedule: "* * * * *"
+catchup_window: "2m"
+steps:
+  - name: echo-step
+    command: echo catchup-from-watermark
+`)
+
+	f.seedWatermark(scheduledTime.Add(-time.Minute), scheduledTime.Add(-time.Minute))
+	f.StartScheduler(45 * time.Second)
+	defer f.Stop()
+
+	f.WaitDrain(30 * time.Second)
+	status := f.waitForRecentStatus(30*time.Second, func(st exec.DAGRunStatus) bool {
+		return st.Status == core.Succeeded &&
+			st.TriggerType == core.TriggerTypeCatchUp &&
+			st.ScheduleTime == stringutil.FormatTime(scheduledTime)
+	})
+
+	require.Equal(t, core.TriggerTypeCatchUp, status.TriggerType)
+	require.Equal(t, stringutil.FormatTime(scheduledTime), status.ScheduleTime)
+	require.NotEmpty(t, status.Log)
+	require.FileExists(t, status.Log)
+}
+
 func prepareFailureMarker(t *testing.T, markerPath string) time.Time {
 	t.Helper()
 
@@ -297,4 +340,16 @@ func assertRunRemainsFailed(t *testing.T, f *fixture, runID, attemptID string, d
 
 		time.Sleep(250 * time.Millisecond)
 	}
+}
+
+func stableCurrentMinute(t *testing.T) time.Time {
+	t.Helper()
+
+	now := time.Now().UTC()
+	if now.Second() >= 50 {
+		nextSafe := now.Truncate(time.Minute).Add(time.Minute + 2*time.Second)
+		time.Sleep(time.Until(nextSafe))
+	}
+
+	return time.Now().UTC().Truncate(time.Minute)
 }

@@ -1,0 +1,67 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package scheduler
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"strings"
+	"time"
+)
+
+const (
+	// catchupPrefix is the scheme identifier for catchup run IDs.
+	catchupPrefix = "catchup-"
+
+	// maxRunIDLen matches exec.maxDAGRunIDLen (64 chars).
+	maxRunIDLen = 64
+
+	// hashLen is the number of hex characters from the SHA-256 hash.
+	hashLen = 8
+
+	// timestampLayout is the format for the scheduled time portion.
+	timestampLayout = "20060102T150405"
+
+	// fixedOverhead = len("catchup-") + len("-") + len("-HASH8-") + len(timestamp)
+	//               = 8 + 1 + 8 + 1 + 15 = 33, leaving 31 for dagName.
+	// But we also need the separator before the hash: "catchup-{name}-{hash8}-{ts}"
+	// = 8 + len(name) + 1 + 8 + 1 + 15 = 33 + len(name)
+	maxNameLen = maxRunIDLen - len(catchupPrefix) - 1 - hashLen - 1 - len(timestampLayout)
+)
+
+// GenerateCatchupRunID produces a deterministic run ID for a catchup run.
+// The format is: catchup-{sanitizedName}-{hash8}-{20060102T150405}
+//
+// The hash is derived from the original (unsanitized) DAG name, ensuring
+// that DAGs whose names differ only in characters that get sanitized
+// (e.g., dots vs underscores) still produce distinct run IDs.
+//
+// When the sanitized name exceeds the available space, it is truncated.
+func GenerateCatchupRunID(dagName string, scheduledTime time.Time) string {
+	sanitized := sanitizeDagName(dagName)
+	hash := dagNameHash(dagName)
+	ts := scheduledTime.UTC().Format(timestampLayout)
+
+	if len(sanitized) > maxNameLen {
+		sanitized = sanitized[:maxNameLen]
+	}
+
+	return fmt.Sprintf("%s%s-%s-%s", catchupPrefix, sanitized, hash, ts)
+}
+
+// sanitizeDagName replaces characters not allowed in run IDs.
+// Run IDs allow: [a-zA-Z0-9_-]. DAG names also allow dots,
+// which are replaced with underscores to avoid ambiguity.
+func sanitizeDagName(name string) string {
+	return strings.ReplaceAll(name, ".", "_")
+}
+
+// dagNameHash returns the first 8 hex characters of the SHA-256 hash
+// of the original DAG name. This ensures uniqueness even when sanitization
+// would collapse different names to the same string.
+func dagNameHash(name string) string {
+	h := sha256.Sum256([]byte(name))
+	return hex.EncodeToString(h[:])[:hashLen]
+}

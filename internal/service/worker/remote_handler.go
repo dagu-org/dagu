@@ -152,10 +152,12 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 	}
 
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
+	triggerType := exec.PreservedQueueTriggerType(status)
 
-	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, false, &executionConfig{
-		retryTarget: status,
+	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, false, &retryConfig{
+		target:      status,
 		stepName:    task.Step,
+		triggerType: triggerType,
 	})
 }
 
@@ -202,10 +204,11 @@ func sanitizeTaskLoadError(target string, loadErr error) string {
 	return fmt.Sprintf("failed to load DAG %q", target)
 }
 
-// executionConfig holds execution-mode-specific configuration.
-type executionConfig struct {
-	retryTarget *exec.DAGRunStatus
+// retryConfig holds retry-specific configuration
+type retryConfig struct {
+	target      *exec.DAGRunStatus
 	stepName    string
+	triggerType core.TriggerType
 }
 
 // createRemoteHandlers creates the status pusher and log streamer for remote execution.
@@ -335,7 +338,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 	statusPusher *remote.StatusPusher,
 	logStreamer *remote.LogStreamer,
 	queuedRun bool,
-	execCfg *executionConfig,
+	retry *retryConfig,
 ) error {
 	// Create temporary directory for local operations
 	env, err := h.createAgentEnv(ctx, dagRunID)
@@ -393,11 +396,10 @@ func (h *remoteTaskHandler) executeDAGRun(
 		ScheduleTime:     scheduleTime,
 	}
 
-	if execCfg != nil {
-		if execCfg.retryTarget != nil {
-			opts.RetryTarget = execCfg.retryTarget
-			opts.StepRetry = execCfg.stepName
-		}
+	if retry != nil {
+		opts.RetryTarget = retry.target
+		opts.StepRetry = retry.stepName
+		opts.TriggerType = retry.triggerType
 	}
 
 	// Create the agent

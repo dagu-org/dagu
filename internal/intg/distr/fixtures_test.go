@@ -106,6 +106,9 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 	if cfg.logPersistence {
 		coordOpts = append(coordOpts, test.WithLogPersistence())
 	}
+	if cfg.workerMode == sharedFSMode {
+		coordOpts = append(coordOpts, test.WithBuiltExecutable())
+	}
 	if cfg.dagsDir != "" {
 		coordOpts = append(coordOpts, test.WithDAGsDir(cfg.dagsDir))
 	}
@@ -267,6 +270,31 @@ func (f *testFixture) enqueue() error {
 	subCmdBuilder := runtime.NewSubCmdBuilder(f.coord.Config)
 	enqueueSpec := subCmdBuilder.Enqueue(f.dagWrapper.DAG, runtime.EnqueueOptions{Quiet: true})
 	return runtime.Run(f.coord.Context, enqueueSpec)
+}
+
+func (f *testFixture) enqueueCatchup(scheduleTime time.Time) (string, error) {
+	f.t.Helper()
+
+	runID, err := f.coord.DAGRunMgr.GenDAGRunID(f.coord.Context)
+	if err != nil {
+		return "", err
+	}
+
+	err = scheduler.EnqueueCatchupRun(
+		f.coord.Context,
+		f.coord.DAGRunStore,
+		f.coord.QueueStore,
+		f.coord.Config.Paths.LogDir,
+		f.dagWrapper.DAG,
+		runID,
+		core.TriggerTypeCatchUp,
+		scheduleTime,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	return runID, nil
 }
 
 func (f *testFixture) start() error {

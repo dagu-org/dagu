@@ -41,6 +41,9 @@ import (
 )
 
 var setupLock sync.Mutex
+var builtExecutableOnce sync.Once
+var builtExecutablePath string
+var builtExecutableErr error
 
 const (
 	latestStatusAssertTimeout  = 30 * time.Second
@@ -58,6 +61,7 @@ type Options struct {
 	CoordinatorHost      string
 	CoordinatorPort      int
 	ServerOptions        []frontend.ServerOption
+	UseBuiltExecutable   bool // UseBuiltExecutable builds the current ./cmd binary for subprocess-based tests
 	// Coordinator handler options for shared-nothing worker tests
 	WithStatusPersistence bool // Enable status persistence via DAGRunStore
 	WithLogPersistence    bool // Enable log persistence to filesystem
@@ -120,6 +124,14 @@ func WithServerOptions(serverOpts ...frontend.ServerOption) HelperOption {
 	}
 }
 
+// WithBuiltExecutable makes Setup build the current ./cmd binary once and use it
+// as cfg.Paths.Executable for subprocess-based tests.
+func WithBuiltExecutable() HelperOption {
+	return func(opts *Options) {
+		opts.UseBuiltExecutable = true
+	}
+}
+
 // Setup creates and returns a Helper preconfigured for tests.
 //
 // Setup prepares an isolated test environment: it creates a temporary DAGU_HOME, writes a minimal config file, initializes stores and a runtime manager, sets key environment variables (e.g. DEBUG, CI, TZ, DAGU_EXECUTABLE, DAGU_CONFIG, SHELL), installs a cancellable context, and registers cleanup to restore the working directory and remove the temp directory. Use the returned Helper to interact with the test runtime and stores.
@@ -158,6 +170,9 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	executablePath := filepath.Join(root, ".local", "bin", "dagu")
 	if runtime.GOOS == "windows" {
 		executablePath += ".exe"
+	}
+	if options.UseBuiltExecutable {
+		executablePath = buildCurrentExecutable(t, root)
 	}
 
 	_ = os.Setenv("DAGU_EXECUTABLE", executablePath)
@@ -845,4 +860,41 @@ func getProjectRoot(t *testing.T) string {
 	rootDir := filepath.Join(filepath.Dir(filename), "..", "..")
 
 	return filepath.Clean(rootDir)
+}
+
+func buildCurrentExecutable(t *testing.T, root string) string {
+	t.Helper()
+
+	builtExecutableOnce.Do(func() {
+		tmpDir, err := os.MkdirTemp("", "dagu-test-bin-*")
+		if err != nil {
+			builtExecutableErr = fmt.Errorf("failed to create temp dir for test executable: %w", err)
+			return
+		}
+
+		path := filepath.Join(tmpDir, "dagu")
+		if runtime.GOOS == "windows" {
+			path += ".exe"
+		}
+
+		//nolint:gosec // Test helper builds a fixed local package into an internally generated temp path.
+		cmd := exec.Command("go", "build", "-o", path, "./cmd")
+		cmd.Dir = root
+
+		var output bytes.Buffer
+		cmd.Stdout = &output
+		cmd.Stderr = &output
+
+		if err := cmd.Run(); err != nil {
+			builtExecutableErr = fmt.Errorf("failed to build current dagu executable: %w: %s", err, strings.TrimSpace(output.String()))
+			return
+		}
+
+		builtExecutablePath = path
+	})
+
+	require.NoError(t, builtExecutableErr)
+	require.NotEmpty(t, builtExecutablePath)
+
+	return builtExecutablePath
 }

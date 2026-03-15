@@ -23,7 +23,7 @@ import (
 )
 
 func TestTaskHandler(t *testing.T) {
-	th := test.Setup(t)
+	th := test.Setup(t, test.WithBuiltExecutable())
 
 	t.Run("HandleQueueDispatch", func(t *testing.T) {
 		// This test simulates the queue dispatch scenario:

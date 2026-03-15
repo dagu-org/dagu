@@ -16,7 +16,9 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
+	"github.com/dagu-org/dagu/internal/persis/filewatermark"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
+	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -42,13 +44,12 @@ func newFixture(t *testing.T, dagYAML string, opts ...func(*fixture)) *fixture {
 
 	f := &fixture{t: t, schedDone: make(chan error, 1)}
 
-	// Apply options to collect configuration
 	for _, opt := range opts {
 		opt(f)
 	}
 
-	// Setup test helper with queue config
 	helperOpts := []test.HelperOption{
+		test.WithBuiltExecutable(),
 		test.WithConfigMutator(func(c *config.Config) {
 			c.Queues.Enabled = true
 			if len(f.globalQueues) > 0 {
@@ -57,14 +58,11 @@ func newFixture(t *testing.T, dagYAML string, opts ...func(*fixture)) *fixture {
 			if f.retryWindow > 0 {
 				c.Scheduler.RetryFailureWindow = f.retryWindow
 			}
-			// Disable scheduler health server (port 8090) to avoid "address already in use"
-			// when multiple tests run in parallel
 			c.Scheduler.Port = 0
 		}),
 	}
 	f.th = test.SetupCommand(t, helperOpts...)
 
-	// Create DAG file
 	require.NoError(t, os.MkdirAll(f.th.Config.Paths.DAGsDir, 0755))
 	dagFile := filepath.Join(f.th.Config.Paths.DAGsDir, "test.yaml")
 	require.NoError(t, os.WriteFile(dagFile, []byte(dagYAML), 0644))
@@ -129,6 +127,23 @@ func (f *fixture) enqueueWithPriority(priority exec.QueuePriority) string {
 	require.NoError(f.t, att.Close(f.th.Context))
 	require.NoError(f.t, f.th.QueueStore.Enqueue(f.th.Context, f.queue, priority, exec.NewDAGRunRef(f.dag.Name, id)))
 	return id
+}
+
+func (f *fixture) enqueueCatchup(scheduleTime time.Time) string {
+	runID, err := f.th.DAGRunMgr.GenDAGRunID(f.th.Context)
+	require.NoError(f.t, err)
+	require.NoError(f.t, scheduler.EnqueueCatchupRun(
+		f.th.Context,
+		f.th.DAGRunStore,
+		f.th.QueueStore,
+		f.th.Config.Paths.LogDir,
+		f.dag,
+		runID,
+		core.TriggerTypeCatchUp,
+		scheduleTime,
+	))
+	f.runIDs = append(f.runIDs, runID)
+	return runID
 }
 
 // EnqueueWithPriority adds a single DAG run with specified priority.
@@ -201,6 +216,23 @@ func (f *fixture) collectStartTimes() []time.Time {
 		times = append(times, t)
 	}
 	return times
+}
+
+func (f *fixture) waitForRecentStatus(timeout time.Duration, match func(exec.DAGRunStatus) bool) exec.DAGRunStatus {
+	f.t.Helper()
+
+	var matched exec.DAGRunStatus
+	require.Eventually(f.t, func() bool {
+		for _, status := range f.th.DAGRunMgr.ListRecentStatus(f.th.Context, f.dag.Name, 10) {
+			if match(status) {
+				matched = status
+				return true
+			}
+		}
+		return false
+	}, timeout, 200*time.Millisecond)
+
+	return matched
 }
 
 type runStatusOptions struct {
@@ -296,4 +328,18 @@ func (f *fixture) cleanup() {
 	if f.cancel != nil {
 		f.cancel()
 	}
+}
+
+func (f *fixture) seedWatermark(lastTick, lastScheduledTime time.Time) {
+	f.t.Helper()
+
+	store := filewatermark.New(filepath.Join(f.th.Config.Paths.DataDir, "scheduler"))
+	state := &scheduler.SchedulerState{
+		Version:  1,
+		LastTick: lastTick,
+		DAGs: map[string]scheduler.DAGWatermark{
+			f.dag.Name: {LastScheduledTime: lastScheduledTime},
+		},
+	}
+	require.NoError(f.t, store.Save(f.th.Context, state))
 }
