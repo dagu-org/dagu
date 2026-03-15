@@ -7,9 +7,13 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmd"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -80,4 +84,79 @@ steps:
 			ExpectedOut: []string{`[1=bar]`},
 		})
 	})
+
+	t.Run("QueuedCatchupRegeneratesLogAndPreservesTriggerType", func(t *testing.T) {
+		th := test.SetupCommand(t)
+
+		dagFile := th.DAG(t, `name: queued-catchup-dag
+steps:
+  - name: "1"
+    command: echo queued catchup
+`)
+
+		runID := "queued-catchup-run"
+		attempt, err := th.DAGRunStore.CreateAttempt(th.Context, dagFile.DAG, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+
+		scheduleTime := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		status := transform.NewStatusBuilder(dagFile.DAG).Create(
+			runID,
+			core.Queued,
+			0,
+			time.Time{},
+			transform.WithAttemptID(attempt.ID()),
+			transform.WithTriggerType(core.TriggerTypeCatchUp),
+			transform.WithQueuedAt(stringutil.FormatTime(time.Now())),
+			transform.WithScheduleTime(stringutil.FormatTime(scheduleTime)),
+		)
+		writeStatus(t, th.Context, attempt, status)
+
+		args := []string{"retry", fmt.Sprintf("--run-id=%s", runID), dagFile.Location}
+		th.RunCommand(t, cmd.Retry(), test.CmdTest{Args: args})
+
+		latestAttempt, err := th.DAGRunStore.FindAttempt(th.Context, exec.NewDAGRunRef(dagFile.Name, runID))
+		require.NoError(t, err)
+
+		latestStatus, err := latestAttempt.ReadStatus(th.Context)
+		require.NoError(t, err)
+		require.Equal(t, core.Succeeded, latestStatus.Status)
+		require.Equal(t, core.TriggerTypeCatchUp, latestStatus.TriggerType)
+		require.NotEmpty(t, latestStatus.Log)
+		require.FileExists(t, latestStatus.Log)
+	})
+
+	t.Run("TrueRetryKeepsRetryTriggerType", func(t *testing.T) {
+		th := test.SetupCommand(t)
+
+		dagFile := th.DAG(t, `name: retry-trigger-dag
+steps:
+  - name: "1"
+    command: echo retry trigger
+`)
+
+		th.RunCommand(t, cmd.Start(), test.CmdTest{Args: []string{"start", dagFile.Location}})
+
+		status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dagFile.DAG)
+		require.NoError(t, err)
+		require.Equal(t, core.Succeeded, status.Status)
+
+		args := []string{"retry", fmt.Sprintf("--run-id=%s", status.DAGRunID), dagFile.Location}
+		th.RunCommand(t, cmd.Retry(), test.CmdTest{Args: args})
+
+		latestAttempt, err := th.DAGRunStore.FindAttempt(th.Context, exec.NewDAGRunRef(dagFile.Name, status.DAGRunID))
+		require.NoError(t, err)
+
+		latestStatus, err := latestAttempt.ReadStatus(th.Context)
+		require.NoError(t, err)
+		require.Equal(t, core.Succeeded, latestStatus.Status)
+		require.Equal(t, core.TriggerTypeRetry, latestStatus.TriggerType)
+	})
+}
+
+func writeStatus(t *testing.T, ctx context.Context, attempt exec.DAGRunAttempt, status exec.DAGRunStatus) {
+	t.Helper()
+
+	require.NoError(t, attempt.Open(ctx))
+	require.NoError(t, attempt.Write(ctx, status))
+	require.NoError(t, attempt.Close(ctx))
 }

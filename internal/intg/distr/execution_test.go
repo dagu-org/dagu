@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -447,5 +448,75 @@ steps:
 		require.Equal(t, core.Succeeded, status.Status)
 		require.Len(t, status.Nodes, 2)
 		f.assertAllNodesSucceeded(status)
+	})
+}
+
+func TestExecution_QueuedCatchupHappyPath(t *testing.T) {
+	t.Run("sharedNothingPreservesCatchupMetadata", func(t *testing.T) {
+		scheduleTime := time.Date(2026, 3, 13, 10, 0, 0, 0, time.UTC)
+		expectedOutput := "distributed-catchup-remote"
+
+		f := newTestFixture(t, `
+name: distributed-catchup-remote-test
+worker_selector:
+  test: "true"
+steps:
+  - name: echo-step
+    command: echo "`+expectedOutput+`"
+`, withLogPersistence())
+		defer f.cleanup()
+
+		runID, err := f.enqueueCatchup(scheduleTime)
+		require.NoError(t, err)
+
+		f.waitForQueued()
+		f.startScheduler(30 * time.Second)
+
+		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+
+		require.Equal(t, runID, status.DAGRunID)
+		require.Equal(t, core.TriggerTypeCatchUp, status.TriggerType)
+		require.Equal(t, stringutil.FormatTime(scheduleTime), status.ScheduleTime)
+		require.NotEmpty(t, status.Log)
+		f.assertWorkerID(status, "worker-1")
+		f.assertAllNodesSucceeded(status)
+		assertLogContains(t, f.logDir(), f.dagWrapper.Name, status.DAGRunID, "echo-step", expectedOutput)
+	})
+
+	t.Run("sharedFSPreservesCatchupMetadata", func(t *testing.T) {
+		scheduleTime := time.Date(2026, 3, 13, 11, 0, 0, 0, time.UTC)
+		expectedOutput := "distributed-catchup-sharedfs"
+
+		f := newTestFixture(t, `
+name: distributed-catchup-sharedfs-test
+worker_selector:
+  test: "true"
+steps:
+  - name: echo-step
+    command: echo "`+expectedOutput+`"
+`, withWorkerMode(sharedFSMode))
+		defer f.cleanup()
+
+		runID, err := f.enqueueCatchup(scheduleTime)
+		require.NoError(t, err)
+
+		f.waitForQueued()
+		f.startScheduler(30 * time.Second)
+
+		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+
+		require.Equal(t, runID, status.DAGRunID)
+		require.Equal(t, core.TriggerTypeCatchUp, status.TriggerType)
+		require.Equal(t, stringutil.FormatTime(scheduleTime), status.ScheduleTime)
+		require.NotEmpty(t, status.Log)
+		require.FileExists(t, status.Log)
+		require.Len(t, status.Nodes, 1)
+		require.NotEmpty(t, status.Nodes[0].Stdout)
+		require.FileExists(t, status.Nodes[0].Stdout)
+		f.assertWorkerID(status, "worker-1")
+		f.assertAllNodesSucceeded(status)
+		content, err := os.ReadFile(status.Nodes[0].Stdout)
+		require.NoError(t, err)
+		assert.Contains(t, string(content), expectedOutput)
 	})
 }

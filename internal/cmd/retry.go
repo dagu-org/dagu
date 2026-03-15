@@ -74,6 +74,10 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to restore DAG from status: %w", err)
 	}
 
+	if err := prepareQueuedCatchupRetry(ctx, attempt, dag, status); err != nil {
+		return err
+	}
+
 	// Block retry via CLI for DAGs with workerSelector, UNLESS this is a distributed worker execution
 	// (indicated by --worker-id being set to something other than "local")
 	if len(dag.WorkerSelector) > 0 && workerID == "local" {
@@ -126,7 +130,39 @@ func enqueueRetry(ctx *Context, attempt exec.DAGRunAttempt, dag *core.DAG, statu
 	return nil
 }
 
+// prepareQueuedCatchupRetry repairs queued catchup records before they run
+// through the retry path. The queue processor executes catchup items via
+// `retry`, and executeRetry expects status.Log to already exist. Older or
+// previously broken queued catchup statuses may have an empty log path, so
+// this fills it in and persists the repaired status before execution.
+func prepareQueuedCatchupRetry(ctx *Context, attempt exec.DAGRunAttempt, dag *core.DAG, status *exec.DAGRunStatus) error {
+	if !exec.IsQueuedCatchup(status) || status.Log != "" {
+		return nil
+	}
+
+	logPath, err := ctx.GenLogFileName(dag, status.DAGRunID)
+	if err != nil {
+		return fmt.Errorf("failed to generate queued catchup log file: %w", err)
+	}
+
+	status.Log = logPath
+
+	if err := attempt.Open(ctx.Context); err != nil {
+		return fmt.Errorf("failed to open queued catchup attempt: %w", err)
+	}
+	defer func() {
+		_ = attempt.Close(ctx.Context)
+	}()
+
+	if err := attempt.Write(ctx.Context, *status); err != nil {
+		return fmt.Errorf("failed to persist queued catchup log file path: %w", err)
+	}
+
+	return nil
+}
+
 // executeRetry runs a retry of a DAG run using the original run's log file.
+// Queued catchup runs reuse this path but preserve their catchup trigger type.
 func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRun exec.DAGRunRef, stepName, workerID string) error {
 	if stepName != "" {
 		ctx.Context = logger.WithValues(ctx.Context, tag.Step(stepName))
@@ -152,6 +188,10 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 	}
 
 	as := ctx.agentStores()
+	triggerType := exec.PreservedQueueTriggerType(status)
+	if triggerType == core.TriggerTypeUnknown {
+		triggerType = core.TriggerTypeRetry
+	}
 
 	agentInstance := agent.New(
 		status.DAGRunID,
@@ -170,7 +210,7 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 			ServiceRegistry:         ctx.ServiceRegistry,
 			RootDAGRun:              rootRun,
 			PeerConfig:              ctx.Config.Core.Peer,
-			TriggerType:             core.TriggerTypeRetry,
+			TriggerType:             triggerType,
 			DefaultExecMode:         ctx.Config.DefaultExecMode,
 			AgentConfigStore:        as.ConfigStore,
 			AgentModelStore:         as.ModelStore,
