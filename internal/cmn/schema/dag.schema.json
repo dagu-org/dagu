@@ -662,6 +662,7 @@
             },
             {
               "type": "number",
+              "exclusiveMinimum": 1.0,
               "description": "Custom exponential backoff multiplier"
             }
           ],
@@ -669,6 +670,7 @@
         },
         "max_interval_sec": {
           "type": "integer",
+          "minimum": 1,
           "description": "Maximum interval in seconds (caps exponential growth)"
         }
       }
@@ -694,11 +696,43 @@
       "description": "Configuration for automatically retrying failed steps."
     },
     "dagRetryPolicy": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/retryPolicyCommon"
+      "type": "object",
+      "required": ["limit"],
+      "properties": {
+        "limit": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "string", "pattern": "^0*[1-9][0-9]*$" }
+          ],
+          "description": "Maximum number of retry attempts"
+        },
+        "interval_sec": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "string", "pattern": "^0*[1-9][0-9]*$" }
+          ],
+          "description": "Seconds to wait between retry attempts"
+        },
+        "backoff": {
+          "oneOf": [
+            {
+              "type": "boolean",
+              "description": "When true, uses default multiplier of 2.0; false keeps a fixed interval"
+            },
+            {
+              "type": "number",
+              "exclusiveMinimum": 1.0,
+              "description": "Custom exponential backoff multiplier"
+            }
+          ],
+          "description": "Exponential backoff multiplier for retry delays"
+        },
+        "max_interval_sec": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum interval in seconds (caps exponential growth)"
         }
-      ],
+      },
       "not": {
         "required": ["exit_code"]
       },

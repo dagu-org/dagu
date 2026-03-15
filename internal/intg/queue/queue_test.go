@@ -149,7 +149,7 @@ queue: retry-queue
 retry_policy:
   limit: 1
   interval_sec: 1
-  backoff: 1.0
+  backoff: false
   max_interval_sec: 1
 handler_on:
   failure:
@@ -188,6 +188,49 @@ steps:
 		assert.Equal(t, markerModTime, readMarkerModTime(t, markerPath))
 	})
 
+	t.Run("MissingFinishedAtStillRetriesViaCreatedAt", func(t *testing.T) {
+		markerPath := filepath.Join(t.TempDir(), "failure.marker")
+		f := newFixture(t, fmt.Sprintf(`
+type: graph
+name: retry-dag
+queue: retry-queue
+retry_policy:
+  limit: 1
+  interval_sec: 1
+  backoff: false
+  max_interval_sec: 1
+handler_on:
+  failure:
+    command: "printf failed > %s"
+steps:
+  - id: retry_step
+    command: echo retried
+`, markerPath), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1))
+
+		failedAt := time.Now().UTC().Add(-30 * time.Second)
+		runID := f.FailedRunWithMetadata(runStatusOptions{
+			StartedAt:    failedAt.Add(-5 * time.Second),
+			ScheduleTime: failedAt.Add(-time.Minute),
+			TriggerType:  core.TriggerTypeScheduler,
+		})
+		originalAttemptID := f.MustStatus(runID).AttemptID
+
+		f.StartScheduler(40 * time.Second)
+		defer f.Stop()
+
+		require.Eventually(t, func() bool {
+			status := f.MustStatus(runID)
+			return status.Status == core.Succeeded &&
+				status.AttemptID != originalAttemptID &&
+				status.AutoRetryCount == 1
+		}, 25*time.Second, 250*time.Millisecond)
+
+		latest := f.MustStatus(runID)
+		assert.Equal(t, core.Succeeded, latest.Status)
+		assert.NotEqual(t, originalAttemptID, latest.AttemptID)
+		assert.Equal(t, 1, latest.AutoRetryCount)
+	})
+
 	t.Run("NewerScheduledRunDoesNotSuppressRetry", func(t *testing.T) {
 		markerPath := filepath.Join(t.TempDir(), "failure.marker")
 		f := newFixture(t, fmt.Sprintf(`
@@ -197,7 +240,7 @@ queue: retry-queue
 retry_policy:
   limit: 1
   interval_sec: 1
-  backoff: 1.0
+  backoff: false
   max_interval_sec: 1
 handler_on:
   failure:

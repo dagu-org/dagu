@@ -23,7 +23,7 @@ func TestRetryScannerEvaluateRetryDecision(t *testing.T) {
 	now := time.Date(2026, 3, 14, 14, 0, 0, 0, time.UTC)
 	baseDAG := &core.DAG{
 		Name:        "retry-dag",
-		RetryPolicy: &core.DAGRetryPolicy{Limit: 3, Interval: time.Minute, Backoff: 1.0, MaxInterval: 10 * time.Minute},
+		RetryPolicy: &core.DAGRetryPolicy{Limit: 3, Interval: time.Minute, Backoff: 0, MaxInterval: 10 * time.Minute},
 	}
 	baseStatus := &exec.DAGRunStatus{
 		Name:           "retry-dag",
@@ -59,10 +59,18 @@ func TestRetryScannerEvaluateRetryDecision(t *testing.T) {
 			reason:      "retry_exhausted",
 		},
 		{
-			name:        "MissingFinishedAtSkips",
-			status:      withFinishedAt(baseStatus, ""),
+			name:        "MissingFinishedAtFallsBackToCreatedAt",
+			status:      withCreatedAt(withFinishedAt(baseStatus, ""), now.Add(-2*time.Minute).UnixMilli()),
 			dagSnapshot: baseDAG,
-			reason:      "missing_finished_at",
+			enqueue:     true,
+			nextRetry:   now.Add(-time.Minute),
+			delay:       time.Minute,
+		},
+		{
+			name:        "MissingRetryReferenceTimeSkips",
+			status:      withStartedAt(withCreatedAt(withFinishedAt(baseStatus, ""), 0), ""),
+			dagSnapshot: baseDAG,
+			reason:      "missing_retry_reference_time",
 		},
 		{
 			name:        "BackoffNotElapsedSkips",
@@ -110,6 +118,34 @@ func TestRetryScannerEvaluateRetryDecision(t *testing.T) {
 	}
 }
 
+func TestDAGRetryDelay(t *testing.T) {
+	t.Parallel()
+
+	t.Run("FixedIntervalBackoffStaysConstant", func(t *testing.T) {
+		t.Parallel()
+
+		delay := dagRetryDelay(&core.DAGRetryPolicy{
+			Interval:    time.Minute,
+			Backoff:     0,
+			MaxInterval: 10 * time.Minute,
+		}, 3)
+
+		assert.Equal(t, time.Minute, delay)
+	})
+
+	t.Run("ExponentialBackoffIsCapped", func(t *testing.T) {
+		t.Parallel()
+
+		delay := dagRetryDelay(&core.DAGRetryPolicy{
+			Interval:    time.Minute,
+			Backoff:     2.0,
+			MaxInterval: 3 * time.Minute,
+		}, 3)
+
+		assert.Equal(t, 3*time.Minute, delay)
+	})
+}
+
 func TestNewRetryScanner(t *testing.T) {
 	t.Parallel()
 
@@ -153,7 +189,7 @@ func TestRetryScannerScanEnqueuesRetry(t *testing.T) {
 		RetryPolicy: &core.DAGRetryPolicy{
 			Limit:       3,
 			Interval:    time.Minute,
-			Backoff:     1.0,
+			Backoff:     0,
 			MaxInterval: 10 * time.Minute,
 		},
 	}
@@ -206,7 +242,7 @@ func TestRetryScannerScanRetriesCrossMidnightFailureDespiteNewerRun(t *testing.T
 		RetryPolicy: &core.DAGRetryPolicy{
 			Limit:       3,
 			Interval:    time.Minute,
-			Backoff:     1.0,
+			Backoff:     0,
 			MaxInterval: 10 * time.Minute,
 		},
 	}
@@ -263,7 +299,7 @@ func TestRetryScannerScanUsesPersistedRetryPolicy(t *testing.T) {
 		RetryPolicy: &core.DAGRetryPolicy{
 			Limit:       3,
 			Interval:    time.Minute,
-			Backoff:     1.0,
+			Backoff:     0,
 			MaxInterval: 10 * time.Minute,
 		},
 	}
@@ -324,7 +360,7 @@ func TestRetryScannerScanIsIdempotentForQueuedRun(t *testing.T) {
 		RetryPolicy: &core.DAGRetryPolicy{
 			Limit:       3,
 			Interval:    time.Minute,
-			Backoff:     1.0,
+			Backoff:     0,
 			MaxInterval: 10 * time.Minute,
 		},
 	}
@@ -545,5 +581,17 @@ func withAutoRetryCount(status *exec.DAGRunStatus, retryCount int) *exec.DAGRunS
 func withFinishedAt(status *exec.DAGRunStatus, finishedAt string) *exec.DAGRunStatus {
 	cloned := cloneRetryStatus(status)
 	cloned.FinishedAt = finishedAt
+	return cloned
+}
+
+func withCreatedAt(status *exec.DAGRunStatus, createdAt int64) *exec.DAGRunStatus {
+	cloned := cloneRetryStatus(status)
+	cloned.CreatedAt = createdAt
+	return cloned
+}
+
+func withStartedAt(status *exec.DAGRunStatus, startedAt string) *exec.DAGRunStatus {
+	cloned := cloneRetryStatus(status)
+	cloned.StartedAt = startedAt
 	return cloned
 }

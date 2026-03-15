@@ -114,6 +114,25 @@ func TestAgent_Run(t *testing.T) {
 		// Check if the status is saved correctly
 		require.Equal(t, core.Failed, dagAgent.Status(th.Context).Status)
 	})
+	t.Run("InitFailurePersistsFinishedAt", func(t *testing.T) {
+		th := test.Setup(t)
+		blockingFile := filepath.Join(t.TempDir(), "not-a-dir")
+		require.NoError(t, os.WriteFile(blockingFile, []byte("x"), 0600))
+
+		dag := th.DAG(t, fmt.Sprintf(`working_dir: %q
+steps:
+  - "echo hi"
+`, blockingFile+string(os.PathSeparator)+"subdir"))
+		dagAgent := dag.Agent()
+
+		err := dagAgent.Run(th.Context)
+		require.ErrorContains(t, err, "failed to create working directory")
+
+		latest, readErr := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+		require.NoError(t, readErr)
+		require.Equal(t, core.Failed, latest.Status)
+		require.NotEmpty(t, latest.FinishedAt)
+	})
 	t.Run("FailureHandlerRunsInline", func(t *testing.T) {
 		th := test.Setup(t)
 		marker := filepath.Join(t.TempDir(), "failure-marker")

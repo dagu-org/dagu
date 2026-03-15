@@ -6,7 +6,6 @@ package scheduler
 import (
 	"context"
 	"log/slog"
-	"math"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -199,13 +198,13 @@ func (s *RetryScanner) evaluateRetryDecision(
 		return retryDecision{reason: "retry_exhausted"}
 	}
 
-	finishedAt, ok := parseRFC3339(status.FinishedAt)
+	referenceTime, ok := retryReferenceTime(status)
 	if !ok {
-		return retryDecision{reason: "missing_finished_at"}
+		return retryDecision{reason: "missing_retry_reference_time"}
 	}
 
 	delay := dagRetryDelay(dagSnapshot.RetryPolicy, status.AutoRetryCount)
-	nextRetryAt := finishedAt.Add(delay)
+	nextRetryAt := referenceTime.Add(delay)
 	if now.Before(nextRetryAt) {
 		return retryDecision{
 			reason:        "backoff_not_elapsed",
@@ -225,12 +224,23 @@ func dagRetryDelay(policy *core.DAGRetryPolicy, retryCount int) time.Duration {
 	if policy == nil {
 		return 0
 	}
-	base := float64(policy.Interval)
-	delay := base * math.Pow(policy.Backoff, float64(retryCount))
-	if delay > float64(policy.MaxInterval) {
-		delay = float64(policy.MaxInterval)
+	return core.CalculateBackoffInterval(policy.Interval, policy.Backoff, policy.MaxInterval, retryCount)
+}
+
+func retryReferenceTime(status *exec.DAGRunStatus) (time.Time, bool) {
+	if status == nil {
+		return time.Time{}, false
 	}
-	return time.Duration(delay)
+	if finishedAt, ok := parseRFC3339(status.FinishedAt); ok {
+		return finishedAt, true
+	}
+	if status.CreatedAt > 0 {
+		return time.UnixMilli(status.CreatedAt).UTC(), true
+	}
+	if startedAt, ok := parseRFC3339(status.StartedAt); ok {
+		return startedAt, true
+	}
+	return time.Time{}, false
 }
 
 func parseRFC3339(val string) (time.Time, bool) {

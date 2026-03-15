@@ -556,6 +556,9 @@ func (a *Agent) Run(ctx context.Context) error {
 			logger.Error(ctx, "Failed to initialize DAG execution", tag.Error(initErr))
 			st := a.Status(ctx)
 			st.Status = core.Failed
+			if st.FinishedAt == "" {
+				st.FinishedAt = exec.FormatTime(time.Now())
+			}
 			a.writeStatus(ctx, attempt, st)
 		}
 		if err := attempt.Close(ctx); err != nil {

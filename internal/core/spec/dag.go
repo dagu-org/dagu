@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -868,51 +869,19 @@ func buildResolvedParamsJSON(paramPairs []paramPair, rawInput string) (string, e
 
 func parseDAGRetryInterval(v any) (time.Duration, string, error) {
 	if v == nil {
-		return 60 * time.Second, "60", nil
+		return 60 * time.Second, "", nil
 	}
-	switch value := v.(type) {
-	case int:
-		if value <= 0 {
-			return 0, "", core.NewValidationError("retry_policy.interval_sec", value, fmt.Errorf("interval_sec must be > 0"))
-		}
-		return time.Second * time.Duration(value), "", nil
-	case int64:
-		if value <= 0 {
-			return 0, "", core.NewValidationError("retry_policy.interval_sec", value, fmt.Errorf("interval_sec must be > 0"))
-		}
-		return time.Second * time.Duration(value), "", nil
-	case uint64:
-		if value > math.MaxInt64 {
-			return 0, "", core.NewValidationError("retry_policy.interval_sec", value, fmt.Errorf("value %d exceeds maximum int64", value))
-		}
-		if value == 0 {
-			return 0, "", core.NewValidationError("retry_policy.interval_sec", value, fmt.Errorf("interval_sec must be > 0"))
-		}
-		return time.Second * time.Duration(value), "", nil
-	default:
-		return 0, "", core.NewValidationError("retry_policy.interval_sec", v, fmt.Errorf("invalid type: %T", v))
+	interval, intervalStr, err := parseConcreteRetryInt("retry_policy.interval_sec", v)
+	if err != nil {
+		return 0, "", err
 	}
+	return time.Second * time.Duration(interval), intervalStr, nil
 }
 
 func parseDAGRetryBackoff(v any) (float64, error) {
-	if v == nil {
-		return 1.0, nil
-	}
-
-	var backoff float64
-	switch value := v.(type) {
-	case int:
-		backoff = float64(value)
-	case int64:
-		backoff = float64(value)
-	case float64:
-		backoff = value
-	default:
-		return 0, core.NewValidationError("retry_policy.backoff", v, fmt.Errorf("invalid type: %T", v))
-	}
-
-	if backoff <= 0 {
-		return 0, core.NewValidationError("retry_policy.backoff", v, fmt.Errorf("backoff must be > 0"))
+	backoff, err := parseBackoffValue(v, "retry_policy.backoff")
+	if err != nil {
+		return 0, core.NewValidationError("retry_policy.backoff", v, err)
 	}
 	return backoff, nil
 }
@@ -946,33 +915,58 @@ func parseDAGRetryMaxInterval(v any) (time.Duration, error) {
 }
 
 func parseDAGRetryLimit(v any) (int, error) {
-	switch value := v.(type) {
-	case int:
-		if value < 1 {
-			return 0, core.NewValidationError("retry_policy.limit", value, fmt.Errorf("limit must be >= 1"))
-		}
-		return value, nil
-	case int64:
-		if value < 1 {
-			return 0, core.NewValidationError("retry_policy.limit", value, fmt.Errorf("limit must be >= 1"))
-		}
-		if value > math.MaxInt {
-			return 0, core.NewValidationError("retry_policy.limit", value, fmt.Errorf("value %d exceeds maximum int", value))
-		}
-		return int(value), nil
-	case uint64:
-		if value == 0 {
-			return 0, core.NewValidationError("retry_policy.limit", value, fmt.Errorf("limit must be >= 1"))
-		}
-		if value > math.MaxInt {
-			return 0, core.NewValidationError("retry_policy.limit", value, fmt.Errorf("value %d exceeds maximum int", value))
-		}
-		return int(value), nil
-	case nil:
+	if v == nil {
 		return 0, core.NewValidationError("retry_policy.limit", nil, fmt.Errorf("limit is required when retry_policy is specified"))
-	default:
-		return 0, core.NewValidationError("retry_policy.limit", v, fmt.Errorf("invalid type: %T", v))
 	}
+	limit, _, err := parseConcreteRetryInt("retry_policy.limit", v)
+	if err != nil {
+		return 0, err
+	}
+	return limit, nil
+}
+
+func parseConcreteRetryInt(fieldName string, val any) (int, string, error) {
+	switch v := val.(type) {
+	case int:
+		if v <= 0 {
+			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("%s must be > 0", retryFieldLabel(fieldName)))
+		}
+		return v, "", nil
+	case int64:
+		if v <= 0 {
+			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("%s must be > 0", retryFieldLabel(fieldName)))
+		}
+		if v > math.MaxInt {
+			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("value %d exceeds maximum int", v))
+		}
+		return int(v), "", nil
+	case uint64:
+		if v == 0 {
+			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("%s must be > 0", retryFieldLabel(fieldName)))
+		}
+		if v > math.MaxInt {
+			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("value %d exceeds maximum int", v))
+		}
+		return int(v), "", nil
+	case string:
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("%s must be an integer or numeric string", retryFieldLabel(fieldName)))
+		}
+		if parsed <= 0 {
+			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("%s must be > 0", retryFieldLabel(fieldName)))
+		}
+		return parsed, v, nil
+	default:
+		return 0, "", core.NewValidationError(fieldName, val, fmt.Errorf("invalid type: %T", val))
+	}
+}
+
+func retryFieldLabel(fieldName string) string {
+	if idx := strings.LastIndex(fieldName, "."); idx >= 0 {
+		return fieldName[idx+1:]
+	}
+	return fieldName
 }
 
 // marshalParamPairs converts the final param pairs into a JSON object string.

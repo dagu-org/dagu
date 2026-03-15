@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
 	"os"
 	"runtime/debug"
 	"slices"
@@ -1132,7 +1131,7 @@ func (r *Runner) shouldRetryNode(ctx context.Context, node *Node, execErr error)
 
 	// Set the node status to none so that it can be retried
 	node.IncRetryCount()
-	interval := calculateBackoffInterval(
+	interval := core.CalculateBackoffInterval(
 		node.Step().RetryPolicy.Interval,
 		node.Step().RetryPolicy.Backoff,
 		node.Step().RetryPolicy.MaxInterval,
@@ -1355,7 +1354,7 @@ func (r *Runner) prepareNodeForRepeat(ctx context.Context, node *Node, progressC
 	logger.Info(ctx, "Step will be repeated",
 		slog.Duration("interval", step.RepeatPolicy.Interval),
 	)
-	interval := calculateBackoffInterval(
+	interval := core.CalculateBackoffInterval(
 		step.RepeatPolicy.Interval,
 		step.RepeatPolicy.Backoff,
 		step.RepeatPolicy.MaxInterval,
@@ -1368,17 +1367,6 @@ func (r *Runner) prepareNodeForRepeat(ctx context.Context, node *Node, progressC
 	if progressCh != nil {
 		progressCh <- node
 	}
-}
-
-func calculateBackoffInterval(interval time.Duration, backoff float64, maxInterval time.Duration, attemptCount int) time.Duration {
-	if backoff > 0 {
-		sleeptime := float64(interval) * math.Pow(backoff, float64(attemptCount))
-		if maxInterval > 0 && time.Duration(sleeptime) > maxInterval {
-			return maxInterval
-		}
-		return time.Duration(sleeptime)
-	}
-	return interval
 }
 
 func NewPlanEnv(ctx context.Context, step core.Step, plan *Plan) Env {
