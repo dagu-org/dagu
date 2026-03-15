@@ -207,7 +207,7 @@ func (c *Connection) readFromPTY(ctx context.Context, processDone <-chan struct{
 	for {
 		n, err := c.ptmx.Read(buf)
 		if err != nil {
-			if c.shouldSuppressPTYReadError(err, processDone) {
+			if c.shouldSuppressPTYReadError(ctx, err, processDone) {
 				return
 			}
 			signal(runEvent{
@@ -306,7 +306,6 @@ func (c *Connection) readFromWebSocket(ctx context.Context, auditSvc *audit.Serv
 
 // ForceKill expedites terminal teardown during hard server shutdown.
 func (c *Connection) ForceKill() {
-	c.closing.Store(true)
 	if c.ptmx != nil {
 		_ = c.ptmx.SetReadDeadline(time.Now())
 	}
@@ -419,7 +418,10 @@ func classifyProcessExit(err error) runEvent {
 	}
 }
 
-func (c *Connection) shouldSuppressPTYReadError(err error, processDone <-chan struct{}) bool {
+func (c *Connection) shouldSuppressPTYReadError(ctx context.Context, err error, processDone <-chan struct{}) bool {
+	if errors.Is(ctx.Err(), context.Canceled) && isExpectedShutdownReadError(err) {
+		return true
+	}
 	if c.isClosing() && isExpectedShutdownReadError(err) {
 		return true
 	}

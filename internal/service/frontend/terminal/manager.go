@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 )
 
 var (
@@ -177,10 +178,13 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 		conn.ForceKill()
 	}
 
+	graceTimer := time.NewTimer(processShutdownGrace)
+	defer graceTimer.Stop()
+
 	select {
 	case <-done:
 		return nil
-	case <-ctx.Done():
+	case <-graceTimer.C:
 		return ctx.Err()
 	}
 }

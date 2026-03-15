@@ -124,3 +124,25 @@ func TestManager_ShutdownWaitsForActiveSessionsOnly(t *testing.T) {
 		lease.Release()
 	})
 }
+
+func TestManager_ShutdownWaitsForCleanupAfterForceKill(t *testing.T) {
+	t.Parallel()
+
+	manager := NewManager(context.Background(), 1)
+	lease, err := manager.Acquire()
+	require.NoError(t, err)
+	require.NoError(t, lease.Activate(&Connection{ID: "conn-1"}))
+
+	go func() {
+		<-manager.Context().Done()
+		time.Sleep(50 * time.Millisecond)
+		lease.Release()
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	require.NoError(t, manager.Shutdown(ctx))
+	assert.GreaterOrEqual(t, time.Since(start), 50*time.Millisecond)
+}

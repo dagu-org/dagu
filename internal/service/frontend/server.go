@@ -79,6 +79,11 @@ import (
 	"github.com/dagu-org/dagu/internal/upgrade"
 )
 
+const (
+	serverShutdownTimeout = 10 * time.Second
+	httpShutdownBudget    = 5 * time.Second
+)
+
 // Server represents the HTTP server for the frontend application.
 type Server struct {
 	apiV1              *apiv1.API
@@ -1353,10 +1358,17 @@ func (srv *Server) serveHTTP(tlsCfg *config.TLSConfig, hasListener bool) error {
 
 // Shutdown gracefully shuts down the server.
 func (srv *Server) Shutdown(ctx context.Context) error {
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
 	defer cancel()
 
 	var shutdownErr error
+	defer func() {
+		if srv.auditStore != nil {
+			if err := srv.auditStore.Close(); err != nil {
+				logger.Warn(ctx, "Failed to close audit store", tag.Error(err))
+			}
+		}
+	}()
 
 	if srv.syncService != nil {
 		if err := srv.syncService.Stop(); err != nil {
@@ -1372,32 +1384,59 @@ func (srv *Server) Shutdown(ctx context.Context) error {
 		srv.sseMultiplexer.Shutdown()
 		logger.Info(ctx, "SSE multiplexer shut down")
 	}
-	if srv.terminalManager != nil {
-		if err := srv.terminalManager.Shutdown(shutdownCtx); err != nil {
-			logger.Warn(ctx, "Terminal manager did not shut down cleanly", tag.Error(err))
-			shutdownErr = errors.Join(shutdownErr, err)
-		} else {
-			logger.Info(ctx, "Terminal manager shut down")
-		}
-	}
-
-	if srv.auditStore != nil {
-		if err := srv.auditStore.Close(); err != nil {
-			logger.Warn(ctx, "Failed to close audit store", tag.Error(err))
-		}
-	}
 
 	if srv.httpServer == nil {
+		if srv.terminalManager != nil {
+			if err := srv.terminalManager.Shutdown(shutdownCtx); err != nil {
+				logger.Warn(ctx, "Terminal manager did not shut down cleanly", tag.Error(err))
+				shutdownErr = errors.Join(shutdownErr, err)
+			} else {
+				logger.Info(ctx, "Terminal manager shut down")
+			}
+		}
 		return shutdownErr
 	}
 
 	logger.Info(ctx, "Server is shutting down", tag.Addr(srv.httpServer.Addr))
 
 	srv.httpServer.SetKeepAlivesEnabled(false)
-	if err := srv.httpServer.Shutdown(shutdownCtx); err != nil {
+	httpCtx, cancelHTTP := newShutdownPhaseContext(shutdownCtx, httpShutdownBudget)
+	if err := srv.httpServer.Shutdown(httpCtx); err != nil {
 		shutdownErr = errors.Join(shutdownErr, err)
 	}
+	cancelHTTP()
+
+	if srv.terminalManager != nil {
+		terminalCtx, cancelTerminal := context.WithDeadline(context.Background(), shutdownDeadline(shutdownCtx))
+		if err := srv.terminalManager.Shutdown(terminalCtx); err != nil {
+			logger.Warn(ctx, "Terminal manager did not shut down cleanly", tag.Error(err))
+			shutdownErr = errors.Join(shutdownErr, err)
+		} else {
+			logger.Info(ctx, "Terminal manager shut down")
+		}
+		cancelTerminal()
+	}
+
 	return shutdownErr
+}
+
+func newShutdownPhaseContext(shutdownCtx context.Context, budget time.Duration) (context.Context, context.CancelFunc) {
+	deadline := shutdownDeadline(shutdownCtx)
+	if budget > 0 {
+		candidate := time.Now().Add(budget)
+		if candidate.Before(deadline) {
+			deadline = candidate
+		}
+	}
+	return context.WithDeadline(context.Background(), deadline)
+}
+
+func shutdownDeadline(ctx context.Context) time.Time {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return time.Now()
+	}
+	return deadline
 }
 
 func (srv *Server) setupGracefulShutdown(ctx context.Context) {

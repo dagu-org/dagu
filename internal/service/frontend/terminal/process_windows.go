@@ -12,6 +12,9 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 )
 
+// requestHangup is intentionally a no-op on Windows because there is no
+// portable SIGHUP equivalent. terminateProcess therefore falls back to
+// forceKillProcess once its grace period expires.
 func requestHangup(_ *exec.Cmd) error {
 	return nil
 }

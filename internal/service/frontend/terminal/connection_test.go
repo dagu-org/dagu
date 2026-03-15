@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -99,6 +100,16 @@ func TestConnection_ClassifyWebSocketWriteError(t *testing.T) {
 		assert.Equal(t, terminalEndReasonDisconnect, event.reason)
 		assert.NoError(t, event.err)
 	})
+}
+
+func TestConnection_ShouldSuppressPTYReadErrorOnCanceledContext(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	conn := &Connection{}
+	assert.True(t, conn.shouldSuppressPTYReadError(ctx, os.ErrDeadlineExceeded, make(chan struct{})))
 }
 
 func waitForContextDone(t *testing.T, ctx context.Context) {
