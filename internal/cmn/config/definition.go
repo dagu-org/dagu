@@ -62,6 +62,7 @@ type Definition struct {
 	// Services
 	Coordinator *CoordinatorDef `mapstructure:"coordinator"`
 	Worker      *WorkerDef      `mapstructure:"worker"`
+	Proc        *ProcDef        `mapstructure:"proc"`
 	Scheduler   *SchedulerDef   `mapstructure:"scheduler"`
 	Queues      *QueueConfigDef `mapstructure:"queues"`
 
@@ -271,12 +272,23 @@ type PostgresPoolDef struct {
 	ConnMaxIdleTime int `mapstructure:"conn_max_idle_time"` // Maximum idle time in seconds (default: 60)
 }
 
+// ProcDef configures local proc-file heartbeat behavior.
+type ProcDef struct {
+	HeartbeatInterval     string `mapstructure:"heartbeat_interval"`      // Default: 5s
+	HeartbeatSyncInterval string `mapstructure:"heartbeat_sync_interval"` // Default: 10s
+	StaleThreshold        string `mapstructure:"stale_threshold"`         // Default: 90s
+}
+
 // SchedulerDef configures the scheduler.
 type SchedulerDef struct {
 	Port                    int    `mapstructure:"port"`
 	LockStaleThreshold      string `mapstructure:"lock_stale_threshold"`      // Default: 30s
 	LockRetryInterval       string `mapstructure:"lock_retry_interval"`       // Default: 5s
 	ZombieDetectionInterval string `mapstructure:"zombie_detection_interval"` // Default: 45s, 0 to disable
+	HeartbeatInterval       string `mapstructure:"heartbeat_interval"`        // Deprecated: use proc.heartbeat_interval
+	HeartbeatSyncInterval   string `mapstructure:"heartbeat_sync_interval"`   // Deprecated: use proc.heartbeat_sync_interval
+	StaleThreshold          string `mapstructure:"stale_threshold"`           // Deprecated: use proc.stale_threshold
+	FailureThreshold        int    `mapstructure:"failure_threshold"`         // Default: 3
 }
 
 // QueueConfigDef configures global queue settings.

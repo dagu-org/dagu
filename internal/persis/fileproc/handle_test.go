@@ -20,7 +20,7 @@ func TestProcHandle(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	fileName := filepath.Join(tmpDir, "test_proc")
-	proc := NewProcHandler(fileName, exec.ProcMeta{})
+	proc := NewProcHandler(fileName, exec.ProcMeta{}, 0, 0)
 
 	ctx := context.Background()
 	err := proc.startHeartbeat(ctx)
@@ -54,7 +54,7 @@ func TestProcHandle_Restart(t *testing.T) {
 	ctx := context.Background()
 
 	fileName := filepath.Join(tmpDir, "test_proc")
-	proc := NewProcHandler(fileName, exec.ProcMeta{})
+	proc := NewProcHandler(fileName, exec.ProcMeta{}, 0, 0)
 
 	err := proc.startHeartbeat(ctx)
 	require.NoError(t, err)
@@ -91,7 +91,7 @@ func TestProcHandle_RemovesEmptyParentDir(t *testing.T) {
 	require.NoError(t, err)
 
 	fileName := filepath.Join(subDir, "test_proc")
-	proc := NewProcHandler(fileName, exec.ProcMeta{})
+	proc := NewProcHandler(fileName, exec.ProcMeta{}, 0, 0)
 
 	err = proc.startHeartbeat(ctx)
 	require.NoError(t, err)

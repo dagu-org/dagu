@@ -156,6 +156,28 @@ func TestConfig_Validate(t *testing.T) {
 		assert.Contains(t, err.Error(), "sse.max_topics_per_connection must be > 0")
 	})
 
+	t.Run("InvalidProcHeartbeatInterval", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Proc.HeartbeatInterval = 10 * time.Second
+		cfg.Proc.StaleThreshold = 10 * time.Second
+
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "proc.heartbeat_interval")
+	})
+
+	t.Run("InvalidProcHeartbeatSyncInterval", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Proc.HeartbeatSyncInterval = 10 * time.Second
+		cfg.Proc.StaleThreshold = 10 * time.Second
+
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "proc.heartbeat_sync_interval")
+	})
+
 	t.Run("InvalidMaxDashboardPageLimit_Negative", func(t *testing.T) {
 		t.Parallel()
 		cfg := validBaseConfig()

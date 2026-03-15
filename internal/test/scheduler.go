@@ -12,7 +12,6 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
-	"github.com/dagu-org/dagu/internal/persis/fileproc"
 	"github.com/dagu-org/dagu/internal/persis/filequeue"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
@@ -62,7 +61,7 @@ func SetupScheduler(t *testing.T, opts ...HelperOption) *Scheduler {
 	// Create additional stores needed for scheduler
 	ds := filedag.New(helper.Config.Paths.DAGsDir, filedag.WithFlagsBaseDir(helper.Config.Paths.SuspendFlagsDir), filedag.WithSkipExamples(true))
 	drs := filedagrun.New(helper.Config.Paths.DAGRunsDir)
-	ps := fileproc.New(helper.Config.Paths.ProcDir)
+	ps := newProcStore(helper.Config)
 	qs := filequeue.New(helper.Config.Paths.QueueDir)
 
 	// Create DAG run manager
