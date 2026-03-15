@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "ui/**"
+      - ".github/workflows/frontend-ci.yaml"
   pull_request:
     types:
       - opened
@@ -14,6 +15,7 @@ on:
       - ready_for_review
     paths:
       - "ui/**"
+      - ".github/workflows/frontend-ci.yaml"
 
 jobs:
   build:
@@ -38,6 +40,10 @@ jobs:
       - name: Install dependencies
         working-directory: ui
         run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        working-directory: ui
+        run: pnpm test
 
       - name: Build
         working-directory: ui
