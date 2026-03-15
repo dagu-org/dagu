@@ -474,7 +474,7 @@ func EvalContainerFields(ctx context.Context, ct core.Container) (core.Container
 	if ct.Ports, err = evalStringSlice(ctx, ct.Ports); err != nil {
 		return ct, fmt.Errorf("failed to evaluate ports: %w", err)
 	}
-	if ct.Env, err = evalStringSlice(ctx, ct.Env); err != nil {
+	if ct.Env, err = evalEnvSequentially(ctx, ct.Env); err != nil {
 		return ct, fmt.Errorf("failed to evaluate env: %w", err)
 	}
 	if ct.Command, err = evalStringSlice(ctx, ct.Command); err != nil {
@@ -499,6 +499,31 @@ func evalStringSlice(ctx context.Context, ss []string) ([]string, error) {
 			return nil, err
 		}
 		result[i] = evaluated
+	}
+	return result, nil
+}
+
+// evalEnvSequentially evaluates "KEY=VALUE" env entries in order,
+// accumulating resolved keys so that later entries can reference earlier
+// ones (e.g., B=${A} where A is defined earlier in the same list).
+func evalEnvSequentially(ctx context.Context, envs []string) ([]string, error) {
+	if len(envs) == 0 {
+		return envs, nil
+	}
+	resolved := make(map[string]string, len(envs))
+	result := make([]string, 0, len(envs))
+	for _, entry := range envs {
+		key, rawVal, found := strings.Cut(entry, "=")
+		if !found {
+			result = append(result, entry)
+			continue
+		}
+		val, err := runtime.EvalString(ctx, rawVal, eval.WithVariables(resolved))
+		if err != nil {
+			return nil, fmt.Errorf("env %s: %w", key, err)
+		}
+		resolved[key] = val
+		result = append(result, key+"="+val)
 	}
 	return result, nil
 }

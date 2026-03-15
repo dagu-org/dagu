@@ -1018,6 +1018,27 @@ steps:
 				"SEWDR_OUT": "base_value",
 			},
 		},
+		{
+			// Regression test: container env entries can reference earlier entries
+			// in the same block (sequential evaluation).
+			name: "ContainerEnvToEnvReference",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+steps:
+  - name: check-env-ref
+    container:
+      image: %s
+      env:
+        - CETR_FIRST: first_val
+        - CETR_SECOND: ${CETR_FIRST}_extended
+    command: printenv CETR_SECOND
+    output: CETR_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"CETR_OUT": "first_val_extended",
+			},
+		},
 	}
 
 	for _, tt := range tests {
