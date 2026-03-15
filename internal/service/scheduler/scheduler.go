@@ -307,9 +307,6 @@ func (s *Scheduler) cleanupFailedStartup(state startupState) {
 	if state.plannerStarted {
 		s.planner.Stop(cleanupCtx)
 	}
-	if zd := s.getZombieDetector(); zd != nil {
-		zd.Stop(cleanupCtx)
-	}
 	if state.healthServerStarted {
 		s.stopHealthServer(cleanupCtx, "Failed to stop health check server during startup cleanup")
 	}
@@ -354,12 +351,6 @@ func (s *Scheduler) unregisterService(ctx context.Context) {
 	if s.serviceRegistry != nil {
 		s.serviceRegistry.Unregister(ctx)
 	}
-}
-
-func (s *Scheduler) getZombieDetector() *ZombieDetector {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	return s.zombieDetector
 }
 
 func (s *Scheduler) Start(ctx context.Context) error {
@@ -456,14 +447,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		s.startHeartbeat(ctx)
 	})
 
-	wg.Go(func() {
-		s.startZombieDetector(ctx)
-	})
-
-	wg.Go(func() {
-		s.startRetryScanner(ctx)
-	})
-
 	if err := s.entryReader.Init(ctx); err != nil {
 		logger.Error(ctx, "Failed to initialize entry reader", tag.Error(err))
 		return err
@@ -478,6 +461,16 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	s.planner.Start(ctx)
 	state.plannerStarted = true
+
+	// Start background loops only after the last startup failure point.
+	// Heartbeat starts earlier to keep the scheduler lock alive during init.
+	wg.Go(func() {
+		s.startZombieDetector(ctx)
+	})
+
+	wg.Go(func() {
+		s.startRetryScanner(ctx)
+	})
 
 	wg.Go(func() {
 		s.entryReader.Start(ctx)
