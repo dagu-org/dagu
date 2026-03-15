@@ -292,7 +292,7 @@ func (store *Store) resolveStatus(
 			ScheduleTime: s.ScheduleTime,
 			TriggerType:  s.TriggerType,
 			CreatedAt:    s.CreatedAt,
-			RetryCount:   s.RetryCount,
+			AutoRetryCount: s.AutoRetryCount,
 		}
 	}
 

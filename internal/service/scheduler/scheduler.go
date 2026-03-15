@@ -5,6 +5,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -50,6 +51,8 @@ type Scheduler struct {
 	stopOnce            sync.Once
 	lock                sync.Mutex
 	lifecycleMu         sync.Mutex
+	startupCancel       context.CancelFunc
+	lockHeld            atomic.Bool
 	clock               Clock // Clock function for getting current time
 }
 
@@ -215,23 +218,87 @@ func (s *Scheduler) DisableHealthServer() {
 	s.disableHealthServer = true
 }
 
-func (s *Scheduler) Start(ctx context.Context) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
+func (s *Scheduler) registerStartupCancel(cancel context.CancelFunc) bool {
 	s.lifecycleMu.Lock()
-	startupLocked := true
-	defer func() {
-		if startupLocked {
-			s.lifecycleMu.Unlock()
-		}
-	}()
+	defer s.lifecycleMu.Unlock()
 
 	select {
 	case <-s.quit:
-		return nil
+		return false
 	default:
 	}
+
+	s.startupCancel = cancel
+	return true
+}
+
+func (s *Scheduler) clearStartupCancel(cancel context.CancelFunc) {
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+
+	if cancel != nil {
+		s.startupCancel = nil
+	}
+}
+
+func (s *Scheduler) stopping() bool {
+	select {
+	case <-s.quit:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Scheduler) releaseDirLock(ctx context.Context, msg string) {
+	if !s.lockHeld.CompareAndSwap(true, false) {
+		return
+	}
+	if err := s.dirLock.Unlock(); err != nil {
+		logger.Error(ctx, msg, tag.Error(err))
+	}
+}
+
+func (s *Scheduler) Start(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	if !s.registerStartupCancel(cancel) {
+		cancel()
+		return nil
+	}
+	defer func() {
+		s.clearStartupCancel(cancel)
+		cancel()
+	}()
+
+	cleanupOnFailure := true
+	defer func() {
+		if !cleanupOnFailure {
+			return
+		}
+
+		cancel()
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cleanupCancel()
+
+		s.queueProcessor.Stop()
+		s.entryReader.Stop()
+		s.planner.Stop(cleanupCtx)
+		if s.zombieDetector != nil {
+			s.zombieDetector.Stop(cleanupCtx)
+		}
+		if s.healthServer != nil && !s.disableHealthServer {
+			if err := s.healthServer.Stop(cleanupCtx); err != nil {
+				logger.Error(cleanupCtx, "Failed to stop health check server during startup cleanup", tag.Error(err))
+			}
+		}
+		if s.dagExecutor != nil {
+			s.dagExecutor.Close(cleanupCtx)
+		}
+		if s.serviceRegistry != nil {
+			s.serviceRegistry.Unregister(cleanupCtx)
+		}
+		s.releaseDirLock(cleanupCtx, "Failed to release scheduler lock during startup cleanup")
+	}()
 
 	if s.instanceID == "" {
 		hostname, _ := os.Hostname()
@@ -261,18 +328,27 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	logger.Info(ctx, "Waiting to acquire scheduler lock")
 	if err := s.dirLock.Lock(ctx); err != nil {
+		if errors.Is(err, context.Canceled) && s.stopping() {
+			return nil
+		}
 		return fmt.Errorf("failed to acquire scheduler lock: %w", err)
 	}
+	s.lockHeld.Store(true)
 
 	logger.Info(ctx, "Acquired scheduler lock")
 
+	if ctx.Err() != nil && s.stopping() {
+		return nil
+	}
+
 	if !s.disableHealthServer {
 		if err := s.healthServer.Start(ctx); err != nil {
-			if unlockErr := s.dirLock.Unlock(); unlockErr != nil {
-				logger.Error(ctx, "Failed to release scheduler lock after health server start failure", tag.Error(unlockErr))
-			}
 			return fmt.Errorf("failed to start health check server: %w", err)
 		}
+	}
+
+	if ctx.Err() != nil && s.stopping() {
+		return nil
 	}
 
 	if s.serviceRegistry != nil {
@@ -282,9 +358,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 			logger.Info(ctx, "Updated scheduler status to active")
 		}
 	}
-
-	startupLocked = false
-	s.lifecycleMu.Unlock()
 
 	sig := make(chan os.Signal, 1)
 
@@ -330,6 +403,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	})
 
 	logger.Info(ctx, "Scheduler started")
+	cleanupOnFailure = false
 
 	wg.Add(1)
 	go func(ctx context.Context) {
@@ -464,18 +538,23 @@ func (s *Scheduler) IsRunning() bool {
 
 // Stop stops the scheduler.
 func (s *Scheduler) Stop(ctx context.Context) {
-	s.lifecycleMu.Lock()
-	defer s.lifecycleMu.Unlock()
-
 	s.stopOnce.Do(func() {
 		var wg sync.WaitGroup
 		wg.Add(2)
 
+		var startupCancel context.CancelFunc
 		var zd *ZombieDetector
+		s.lifecycleMu.Lock()
+		startupCancel = s.startupCancel
 		s.lock.Lock()
 		close(s.quit)
 		zd = s.zombieDetector
 		s.lock.Unlock()
+		s.lifecycleMu.Unlock()
+
+		if startupCancel != nil {
+			startupCancel()
+		}
 
 		go func() {
 			defer wg.Done()
@@ -498,9 +577,7 @@ func (s *Scheduler) Stop(ctx context.Context) {
 
 		s.planner.Stop(ctx)
 
-		if err := s.dirLock.Unlock(); err != nil {
-			logger.Error(ctx, "Failed to release scheduler lock in Stop", tag.Error(err))
-		}
+		s.releaseDirLock(ctx, "Failed to release scheduler lock in Stop")
 
 		wg.Wait()
 	})

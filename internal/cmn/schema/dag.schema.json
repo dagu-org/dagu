@@ -350,6 +350,37 @@
       },
       "description": "Default values for step configuration fields. Steps inherit these defaults and can override them individually. Most fields use full replacement when overridden; env and preconditions are additive."
     },
+    "retry_policy": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "oneOf": [
+            { "type": "integer" },
+            { "type": "string" }
+          ],
+          "description": "Maximum number of DAG-level retry attempts"
+        },
+        "interval_sec": {
+          "oneOf": [
+            { "type": "integer" },
+            { "type": "string" }
+          ],
+          "description": "Seconds to wait before retrying a failed DAG"
+        },
+        "backoff": {
+          "oneOf": [
+            { "type": "boolean" },
+            { "type": "number" }
+          ],
+          "description": "Exponential backoff multiplier for DAG retry delays"
+        },
+        "max_interval_sec": {
+          "type": "integer",
+          "description": "Maximum DAG retry interval in seconds"
+        }
+      },
+      "description": "Retry policy for automatic DAG-level retries after failure"
+    },
     "log_dir": {
       "type": "string",
       "description": "Base directory for storing logs. Defaults to ${HOME}/.local/share/logs if not specified."

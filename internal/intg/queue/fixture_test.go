@@ -317,13 +317,13 @@ func (f *fixture) waitForRecentStatus(timeout time.Duration, match func(exec.DAG
 }
 
 type runStatusOptions struct {
-	RunID        string
-	StartedAt    time.Time
-	FinishedAt   time.Time
-	QueuedAt     time.Time
-	ScheduleTime time.Time
-	RetryCount   int
-	TriggerType  core.TriggerType
+	RunID          string
+	StartedAt      time.Time
+	FinishedAt     time.Time
+	QueuedAt       time.Time
+	ScheduleTime   time.Time
+	AutoRetryCount int
+	TriggerType    core.TriggerType
 }
 
 func (f *fixture) writeRunStatus(status core.Status, opts runStatusOptions) string {
@@ -346,7 +346,7 @@ func (f *fixture) writeRunStatus(status core.Status, opts runStatusOptions) stri
 		transform.WithLogFilePath(logFile),
 		transform.WithAttemptID(att.ID()),
 		transform.WithHierarchyRefs(exec.NewDAGRunRef(f.dag.Name, runID), exec.DAGRunRef{}),
-		transform.WithRetryCount(opts.RetryCount),
+		transform.WithAutoRetryCount(opts.AutoRetryCount),
 	}
 	if !opts.FinishedAt.IsZero() {
 		statusOpts = append(statusOpts, transform.WithFinishedAt(opts.FinishedAt))
@@ -391,7 +391,14 @@ func (f *fixture) RunningRunWithMetadata(opts runStatusOptions) string {
 
 // RetryEnqueue enqueues a previously failed run for retry using exec.EnqueueRetry.
 func (f *fixture) RetryEnqueue(runID string) *fixture {
-	require.NoError(f.t, exec.EnqueueRetry(f.th.Context, f.th.DAGRunStore, f.th.QueueStore, f.dag, f.MustStatus(runID)))
+	require.NoError(f.t, exec.EnqueueRetry(
+		f.th.Context,
+		f.th.DAGRunStore,
+		f.th.QueueStore,
+		f.dag,
+		f.MustStatus(runID),
+		exec.EnqueueRetryOptions{},
+	))
 	return f
 }
 

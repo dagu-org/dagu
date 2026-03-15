@@ -1042,7 +1042,7 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 			transform.WithAttemptID(a.dagRunAttemptID),
 			transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
 			transform.WithTriggerType(a.triggerType),
-			transform.WithRetryCount(a.currentRetryCount()),
+			transform.WithAutoRetryCount(a.currentAutoRetryCount()),
 		}
 		if source != nil {
 			statusOpts = append(statusOpts,
@@ -1082,7 +1082,7 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 		transform.WithPreconditions(a.dag.Preconditions),
 		transform.WithWorkerID(a.workerID),
 		transform.WithTriggerType(a.triggerType),
-		transform.WithRetryCount(a.currentRetryCount()),
+		transform.WithAutoRetryCount(a.currentAutoRetryCount()),
 	}
 
 	// If the current execution is based on a persisted target, copy timing data
@@ -1111,11 +1111,11 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 		)
 }
 
-func (a *Agent) currentRetryCount() int {
+func (a *Agent) currentAutoRetryCount() int {
 	if a.retryTarget == nil {
 		return 0
 	}
-	return a.retryTarget.RetryCount + 1
+	return a.retryTarget.AutoRetryCount
 }
 
 func (a *Agent) statusSourceTarget() *exec.DAGRunStatus {

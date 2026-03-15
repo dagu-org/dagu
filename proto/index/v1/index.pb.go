@@ -284,7 +284,7 @@ type DAGRunIndexEntry struct {
 	Name                string                 `protobuf:"bytes,16,opt,name=name,proto3" json:"name,omitempty"`
 	ScheduleTime        string                 `protobuf:"bytes,17,opt,name=schedule_time,json=scheduleTime,proto3" json:"schedule_time,omitempty"` // RFC 3339 string (matches DAGRunStatus.ScheduleTime)
 	AttemptId           string                 `protobuf:"bytes,18,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
-	RetryCount          int32                  `protobuf:"varint,19,opt,name=retry_count,json=retryCount,proto3" json:"retry_count,omitempty"`
+	AutoRetryCount      int32                  `protobuf:"varint,19,opt,name=auto_retry_count,json=autoRetryCount,proto3" json:"auto_retry_count,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -445,9 +445,9 @@ func (x *DAGRunIndexEntry) GetAttemptId() string {
 	return ""
 }
 
-func (x *DAGRunIndexEntry) GetRetryCount() int32 {
+func (x *DAGRunIndexEntry) GetAutoRetryCount() int32 {
 	if x != nil {
-		return x.RetryCount
+		return x.AutoRetryCount
 	}
 	return 0
 }
@@ -477,7 +477,7 @@ const file_proto_index_v1_index_proto_rawDesc = "" +
 	"\vDAGRunIndex\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\rR\aversion\x12\"\n" +
 	"\rbuilt_at_unix\x18\x02 \x01(\x03R\vbuiltAtUnix\x124\n" +
-	"\aentries\x18\x03 \x03(\v2\x1a.index.v1.DAGRunIndexEntryR\aentries\"\x83\x05\n" +
+	"\aentries\x18\x03 \x03(\v2\x1a.index.v1.DAGRunIndexEntryR\aentries\"\x8c\x05\n" +
 	"\x10DAGRunIndexEntry\x12\x1e\n" +
 	"\vdag_run_dir\x18\x01 \x01(\tR\tdagRunDir\x12\x1c\n" +
 	"\n" +
@@ -502,9 +502,8 @@ const file_proto_index_v1_index_proto_rawDesc = "" +
 	"\x04name\x18\x10 \x01(\tR\x04name\x12#\n" +
 	"\rschedule_time\x18\x11 \x01(\tR\fscheduleTime\x12\x1d\n" +
 	"\n" +
-	"attempt_id\x18\x12 \x01(\tR\tattemptId\x12\x1f\n" +
-	"\vretry_count\x18\x13 \x01(\x05R\n" +
-	"retryCountB1Z/github.com/dagu-org/dagu/proto/index/v1;indexv1b\x06proto3"
+	"attempt_id\x18\x12 \x01(\tR\tattemptId\x12(\n" +
+	"\x10auto_retry_count\x18\x13 \x01(\x05R\x0eautoRetryCountB1Z/github.com/dagu-org/dagu/proto/index/v1;indexv1b\x06proto3"
 
 var (
 	file_proto_index_v1_index_proto_rawDescOnce sync.Once

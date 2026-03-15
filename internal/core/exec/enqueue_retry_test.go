@@ -23,6 +23,7 @@ func TestEnqueueRetry(t *testing.T) {
 		name        string
 		dag         *core.DAG
 		status      *exec.DAGRunStatus
+		opts        exec.EnqueueRetryOptions
 		store       *stubDAGRunStore
 		setupQueue  func(qs *exec.MockQueueStore)
 		assertStore func(t *testing.T, store *stubDAGRunStore)
@@ -44,17 +45,19 @@ func TestEnqueueRetry(t *testing.T) {
 			name: "Success",
 			dag:  &core.DAG{Name: "test-dag"},
 			status: &exec.DAGRunStatus{
-				Name:      "test-dag",
-				DAGRunID:  "run-1",
-				AttemptID: "att-1",
-				Status:    core.Failed,
+				Name:           "test-dag",
+				DAGRunID:       "run-1",
+				AttemptID:      "att-1",
+				Status:         core.Failed,
+				AutoRetryCount: 2,
 			},
 			store: &stubDAGRunStore{
 				status: &exec.DAGRunStatus{
-					Name:      "test-dag",
-					DAGRunID:  "run-1",
-					AttemptID: "att-1",
-					Status:    core.Failed,
+					Name:           "test-dag",
+					DAGRunID:       "run-1",
+					AttemptID:      "att-1",
+					Status:         core.Failed,
+					AutoRetryCount: 2,
 				},
 			},
 			setupQueue: func(qs *exec.MockQueueStore) {
@@ -66,7 +69,37 @@ func TestEnqueueRetry(t *testing.T) {
 				assert.Equal(t, core.Queued, store.status.Status)
 				assert.Equal(t, core.TriggerTypeRetry, store.status.TriggerType)
 				assert.NotEmpty(t, store.status.QueuedAt)
+				assert.Equal(t, 2, store.status.AutoRetryCount)
 				assert.Equal(t, 1, store.casCalls)
+			},
+		},
+		{
+			name: "AutoRetryIncrementsCount",
+			dag:  &core.DAG{Name: "test-dag"},
+			status: &exec.DAGRunStatus{
+				Name:           "test-dag",
+				DAGRunID:       "run-auto",
+				AttemptID:      "att-auto",
+				Status:         core.Failed,
+				AutoRetryCount: 2,
+			},
+			opts: exec.EnqueueRetryOptions{AutoRetry: true},
+			store: &stubDAGRunStore{
+				status: &exec.DAGRunStatus{
+					Name:           "test-dag",
+					DAGRunID:       "run-auto",
+					AttemptID:      "att-auto",
+					Status:         core.Failed,
+					AutoRetryCount: 2,
+				},
+			},
+			setupQueue: func(qs *exec.MockQueueStore) {
+				qs.On("Enqueue", mock.Anything, "test-dag", exec.QueuePriorityLow, exec.NewDAGRunRef("test-dag", "run-auto")).
+					Return(nil)
+			},
+			assertStore: func(t *testing.T, store *stubDAGRunStore) {
+				require.NotNil(t, store.status)
+				assert.Equal(t, 3, store.status.AutoRetryCount)
 			},
 		},
 		{
@@ -105,20 +138,23 @@ func TestEnqueueRetry(t *testing.T) {
 			name: "EnqueueFailsAndRollsBack",
 			dag:  &core.DAG{Name: "test-dag"},
 			status: &exec.DAGRunStatus{
-				Name:      "test-dag",
-				DAGRunID:  "run-4",
-				AttemptID: "att-4",
-				Status:    core.Failed,
+				Name:           "test-dag",
+				DAGRunID:       "run-4",
+				AttemptID:      "att-4",
+				Status:         core.Failed,
+				AutoRetryCount: 1,
 			},
 			store: &stubDAGRunStore{
 				status: &exec.DAGRunStatus{
-					Name:      "test-dag",
-					DAGRunID:  "run-4",
-					AttemptID: "att-4",
-					Status:    core.Failed,
+					Name:           "test-dag",
+					DAGRunID:       "run-4",
+					AttemptID:      "att-4",
+					Status:         core.Failed,
+					AutoRetryCount: 1,
 				},
 				secondSwapped: true,
 			},
+			opts: exec.EnqueueRetryOptions{AutoRetry: true},
 			setupQueue: func(qs *exec.MockQueueStore) {
 				qs.On("Enqueue", mock.Anything, "test-dag", exec.QueuePriorityLow, exec.NewDAGRunRef("test-dag", "run-4")).
 					Return(errors.New("enqueue error"))
@@ -128,6 +164,7 @@ func TestEnqueueRetry(t *testing.T) {
 				assert.Equal(t, core.Failed, store.status.Status)
 				assert.Empty(t, store.status.QueuedAt)
 				assert.Equal(t, core.TriggerTypeUnknown, store.status.TriggerType)
+				assert.Equal(t, 1, store.status.AutoRetryCount)
 				assert.Equal(t, 2, store.casCalls)
 			},
 			wantErr: "enqueue retry",
@@ -144,7 +181,7 @@ func TestEnqueueRetry(t *testing.T) {
 				tt.setupQueue(qs)
 			}
 
-			err := exec.EnqueueRetry(ctx, tt.store, qs, tt.dag, tt.status)
+			err := exec.EnqueueRetry(ctx, tt.store, qs, tt.dag, tt.status, tt.opts)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)

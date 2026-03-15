@@ -12,6 +12,13 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 )
 
+// EnqueueRetryOptions control how queued retry metadata is persisted.
+type EnqueueRetryOptions struct {
+	// AutoRetry marks scheduler-issued DAG auto-retries. These consume the
+	// DAG-level retry budget at enqueue time.
+	AutoRetry bool
+}
+
 // EnqueueRetry enqueues a DAG run for retry and persists the Queued status.
 // It persists the Queued status first, then enqueues, so the queue processor
 // always sees the correct status when it picks up the item. If enqueue fails,
@@ -23,6 +30,7 @@ func EnqueueRetry(
 	queueStore QueueStore,
 	dag *core.DAG,
 	status *DAGRunStatus,
+	opts EnqueueRetryOptions,
 ) error {
 	if status.Status == core.Queued {
 		// Already queued (e.g. duplicate retry), treat as success
@@ -38,6 +46,9 @@ func EnqueueRetry(
 			latest.Status = core.Queued
 			latest.QueuedAt = stringutil.FormatTime(time.Now())
 			latest.TriggerType = core.TriggerTypeRetry
+			if opts.AutoRetry {
+				latest.AutoRetryCount++
+			}
 			return nil
 		},
 	)
@@ -65,6 +76,7 @@ func EnqueueRetry(
 				latest.Status = status.Status
 				latest.QueuedAt = status.QueuedAt
 				latest.TriggerType = status.TriggerType
+				latest.AutoRetryCount = status.AutoRetryCount
 				return nil
 			},
 		)

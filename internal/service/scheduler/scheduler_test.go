@@ -266,6 +266,52 @@ func TestScheduler_GracefulShutdown(t *testing.T) {
 	}
 }
 
+func TestScheduler_StopWhileWaitingForLock(t *testing.T) {
+	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	clock := func() time.Time { return now }
+
+	th := test.SetupScheduler(t)
+
+	sc1, err := scheduler.New(th.Config, newMockJobManager(), th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
+	require.NoError(t, err)
+	sc1.SetClock(clock)
+
+	ctx := context.Background()
+	errCh1 := startSchedulerAsync(t, sc1, ctx)
+	defer stopSchedulerAndWait(t, sc1, errCh1, ctx)
+
+	sc2, err := scheduler.New(th.Config, newMockJobManager(), th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
+	require.NoError(t, err)
+	sc2.SetClock(clock)
+
+	errCh2 := make(chan error, 1)
+	go func() {
+		errCh2 <- sc2.Start(ctx)
+	}()
+
+	time.Sleep(500 * time.Millisecond)
+	require.False(t, sc2.IsRunning(), "Second scheduler should still be waiting on the lock")
+
+	stopDone := make(chan struct{})
+	go func() {
+		sc2.Stop(ctx)
+		close(stopDone)
+	}()
+
+	select {
+	case <-stopDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop() blocked while Start() was waiting on the scheduler lock")
+	}
+
+	select {
+	case err := <-errCh2:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("waiting scheduler Start() did not return after Stop()")
+	}
+}
+
 func startSchedulerAsync(t *testing.T, sc *scheduler.Scheduler, ctx context.Context) chan error {
 	t.Helper()
 

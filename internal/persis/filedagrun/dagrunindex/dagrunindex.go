@@ -56,7 +56,7 @@ type Entry struct {
 	TriggerType      core.TriggerType
 	CreatedAt        int64
 	AttemptID        string
-	RetryCount       int
+	AutoRetryCount   int
 }
 
 // TryLoadForDay attempts to load and validate the index for a day directory.
@@ -140,7 +140,7 @@ func RebuildForDay(dayDir string, dagRunDirs []os.DirEntry) ([]Entry, bool, erro
 			TriggerType:      status.TriggerType,
 			CreatedAt:        status.CreatedAt,
 			AttemptID:        status.AttemptID,
-			RetryCount:       status.RetryCount,
+			AutoRetryCount:   status.AutoRetryCount,
 		})
 	}
 
@@ -251,7 +251,7 @@ func writeIndex(dayDir string, entries []Entry) error {
 			TriggerType:         int32(e.TriggerType), //nolint:gosec
 			CreatedAt:           e.CreatedAt,
 			AttemptId:           e.AttemptID,
-			RetryCount:          int32(min(e.RetryCount, math.MaxInt32)), //nolint:gosec
+			AutoRetryCount:      int32(min(e.AutoRetryCount, math.MaxInt32)), //nolint:gosec
 		})
 	}
 
@@ -288,7 +288,7 @@ func protoToEntries(protoEntries []*indexv1.DAGRunIndexEntry) []Entry {
 			TriggerType:      core.TriggerType(pe.TriggerType),
 			CreatedAt:        pe.CreatedAt,
 			AttemptID:        pe.AttemptId,
-			RetryCount:       int(pe.RetryCount),
+			AutoRetryCount:   int(pe.AutoRetryCount),
 		}
 	}
 	return entries

@@ -148,6 +148,24 @@ steps:
 	}
 }
 
+func TestDAGSchemaRootRetryPolicy(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+	doc := mustParseYAMLDocument(t, `
+name: retryable-dag
+retry_policy:
+  limit: 3
+  interval_sec: 10
+  backoff: 2.0
+  max_interval_sec: 60
+steps:
+  - command: echo hi
+`)
+
+	require.NoError(t, resolved.Validate(doc))
+}
+
 func mustResolveDAGSchema(t *testing.T) *jsonschema.Resolved {
 	t.Helper()
 

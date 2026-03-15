@@ -173,10 +173,10 @@ func WithTriggerType(triggerType core.TriggerType) StatusOption {
 	}
 }
 
-// WithRetryCount returns a StatusOption that sets the DAG-run retry count.
-func WithRetryCount(retryCount int) StatusOption {
+// WithAutoRetryCount returns a StatusOption that sets the DAG-run auto-retry count.
+func WithAutoRetryCount(autoRetryCount int) StatusOption {
 	return func(s *exec.DAGRunStatus) {
-		s.RetryCount = retryCount
+		s.AutoRetryCount = autoRetryCount
 	}
 }
 

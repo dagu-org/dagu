@@ -10,20 +10,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAgentCurrentRetryCount(t *testing.T) {
+func TestAgentCurrentAutoRetryCount(t *testing.T) {
 	t.Parallel()
 
 	t.Run("InitialAttemptStartsAtZero", func(t *testing.T) {
 		t.Parallel()
 		a := &Agent{}
-		assert.Equal(t, 0, a.currentRetryCount())
+		assert.Equal(t, 0, a.currentAutoRetryCount())
 	})
 
-	t.Run("RetryTargetIncrementsPersistedCount", func(t *testing.T) {
+	t.Run("RetryTargetPreservesPersistedCount", func(t *testing.T) {
 		t.Parallel()
 		a := &Agent{
-			retryTarget: &exec.DAGRunStatus{RetryCount: 1},
+			retryTarget: &exec.DAGRunStatus{AutoRetryCount: 1},
 		}
-		assert.Equal(t, 2, a.currentRetryCount())
+		assert.Equal(t, 1, a.currentAutoRetryCount())
 	})
 }

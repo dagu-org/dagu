@@ -128,6 +128,7 @@ steps:
 	assert.Equal(t, core.Queued, status.Status)
 	assert.NotEmpty(t, status.QueuedAt)
 	assert.Equal(t, core.TriggerTypeRetry, status.TriggerType)
+	assert.Zero(t, status.AutoRetryCount)
 
 	items, err := f.th.QueueStore.List(f.th.Context, "retry-queue")
 	require.NoError(t, err)
@@ -175,7 +176,7 @@ steps:
 			status := f.MustStatus(runID)
 			return status.Status == core.Succeeded &&
 				status.AttemptID != originalAttemptID &&
-				status.RetryCount == 1
+				status.AutoRetryCount == 1
 		}, 25*time.Second, 250*time.Millisecond)
 
 		f.WaitDrain(5 * time.Second)
@@ -183,7 +184,7 @@ steps:
 		latest := f.MustStatus(runID)
 		assert.Equal(t, core.Succeeded, latest.Status)
 		assert.NotEqual(t, originalAttemptID, latest.AttemptID)
-		assert.Equal(t, 1, latest.RetryCount)
+		assert.Equal(t, 1, latest.AutoRetryCount)
 		assert.Equal(t, markerModTime, readMarkerModTime(t, markerPath))
 	})
 

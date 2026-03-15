@@ -742,7 +742,7 @@ func summaryFromIndexEntry(ie dagrunindex.Entry) *DAGRunSummary {
 		TriggerType:      ie.TriggerType,
 		CreatedAt:        ie.CreatedAt,
 		AttemptID:        ie.AttemptID,
-		RetryCount:       ie.RetryCount,
+		AutoRetryCount:   ie.AutoRetryCount,
 	}
 }
 
