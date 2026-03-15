@@ -136,7 +136,10 @@ func dialTerminal(server test.Server, token string) (*websocket.Conn, *http.Resp
 func waitForTerminalSlot(t *testing.T, server test.Server, token string) {
 	t.Helper()
 
-	deadline := time.Now().Add(5 * time.Second)
+	// Session cleanup involves I/O goroutine teardown + process termination
+	// (up to processShutdownGrace = 3s). Use a generous deadline to avoid
+	// flaky failures on slow CI runners.
+	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
 		conn, resp, err := dialTerminal(server, token)
 		if resp != nil && resp.Body != nil {
@@ -152,7 +155,7 @@ func waitForTerminalSlot(t *testing.T, server test.Server, token string) {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	t.Fatal("terminal slot was not released within 5 seconds")
+	t.Fatal("terminal slot was not released within timeout")
 }
 
 func sendInput(t *testing.T, conn *websocket.Conn, input string) {
