@@ -39,7 +39,6 @@ func TestRetryScannerEvaluateRetryDecision(t *testing.T) {
 		name        string
 		status      *exec.DAGRunStatus
 		dagSnapshot *core.DAG
-		activeRuns  []*exec.DAGRunStatus
 		suspended   bool
 		enqueue     bool
 		reason      string
@@ -52,13 +51,6 @@ func TestRetryScannerEvaluateRetryDecision(t *testing.T) {
 			dagSnapshot: baseDAG,
 			suspended:   true,
 			reason:      "suspended",
-		},
-		{
-			name:        "NewerScheduledRunSkips",
-			status:      cloneRetryStatus(baseStatus),
-			dagSnapshot: baseDAG,
-			activeRuns:  []*exec.DAGRunStatus{{Name: baseStatus.Name, DAGRunID: "run-2", ScheduleTime: now.Add(-5 * time.Minute).Format(time.RFC3339)}},
-			reason:      "newer_run_exists",
 		},
 		{
 			name:        "RetryExhaustedSkips",
@@ -107,7 +99,6 @@ func TestRetryScannerEvaluateRetryDecision(t *testing.T) {
 				context.Background(),
 				tt.status,
 				tt.dagSnapshot,
-				latestActiveScheduleByName(tt.activeRuns),
 				now,
 			)
 
@@ -198,16 +189,14 @@ func TestRetryScannerScanEnqueuesRetry(t *testing.T) {
 	assert.Equal(t, core.TriggerTypeRetry, latest.TriggerType)
 	assert.NotEmpty(t, latest.QueuedAt)
 	assert.Equal(t, 2, latest.AutoRetryCount)
-	assert.Len(t, store.listCalls, 2)
+	assert.Len(t, store.listCalls, 1)
 	assert.Empty(t, store.listCalls[0].ExactName)
 	assert.False(t, store.listCalls[0].From.IsZero())
-	assert.Empty(t, store.listCalls[1].ExactName)
-	assert.False(t, store.listCalls[1].From.IsZero())
 
 	queueStore.AssertExpectations(t)
 }
 
-func TestRetryScannerScanSkipsCrossMidnightNewerRun(t *testing.T) {
+func TestRetryScannerScanRetriesCrossMidnightFailureDespiteNewerRun(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 3, 15, 0, 10, 0, 0, time.UTC)
@@ -239,9 +228,14 @@ func TestRetryScannerScanSkipsCrossMidnightNewerRun(t *testing.T) {
 	}
 
 	store := newRetryScannerStore(dag, failed, active)
+	queueStore := &exec.MockQueueStore{}
+	queueStore.On("Enqueue", mock.Anything, dag.ProcGroup(), exec.QueuePriorityLow, failed.DAGRun()).
+		Return(nil).
+		Once()
+
 	scanner, err := NewRetryScanner(
 		store,
-		&exec.MockQueueStore{},
+		queueStore,
 		nil,
 		24*time.Hour,
 		func() time.Time { return now },
@@ -252,9 +246,11 @@ func TestRetryScannerScanSkipsCrossMidnightNewerRun(t *testing.T) {
 	require.NoError(t, err)
 
 	latest := store.mustStatus(failed.DAGRun())
-	assert.Equal(t, core.Failed, latest.Status)
-	assert.Len(t, store.listCalls, 2)
-	assert.False(t, store.listCalls[1].From.IsZero())
+	assert.Equal(t, core.Queued, latest.Status)
+	assert.Equal(t, 1, latest.AutoRetryCount)
+	assert.Len(t, store.listCalls, 1)
+	assert.False(t, store.listCalls[0].From.IsZero())
+	queueStore.AssertExpectations(t)
 }
 
 func TestRetryScannerScanUsesPersistedRetryPolicy(t *testing.T) {
@@ -311,9 +307,8 @@ func TestRetryScannerScanUsesPersistedRetryPolicy(t *testing.T) {
 	err = scanner.scan(context.Background())
 	require.NoError(t, err)
 
-	assert.Len(t, store.listCalls, 2)
+	assert.Len(t, store.listCalls, 1)
 	assert.Empty(t, store.listCalls[0].ExactName)
-	assert.Empty(t, store.listCalls[1].ExactName)
 	assert.Equal(t, 1, store.mustStatus(retryStatus.DAGRun()).AutoRetryCount)
 	assert.Equal(t, core.Failed, store.mustStatus(plainStatus.DAGRun()).Status)
 	queueStore.AssertExpectations(t)
@@ -362,24 +357,6 @@ func TestRetryScannerScanIsIdempotentForQueuedRun(t *testing.T) {
 
 	assert.Equal(t, core.Queued, store.mustStatus(status.DAGRun()).Status)
 	queueStore.AssertExpectations(t)
-}
-
-func TestLatestActiveScheduleByName(t *testing.T) {
-	t.Parallel()
-
-	statuses := []*exec.DAGRunStatus{
-		{Name: "alpha", ScheduleTime: "invalid"},
-		{Name: "alpha", ScheduleTime: time.Date(2026, 3, 14, 12, 0, 0, 0, time.UTC).Format(time.RFC3339)},
-		{Name: "alpha", ScheduleTime: time.Date(2026, 3, 14, 12, 5, 0, 0, time.UTC).Format(time.RFC3339)},
-		{Name: "beta", ScheduleTime: time.Date(2026, 3, 14, 11, 0, 0, 0, time.UTC).Format(time.RFC3339)},
-		nil,
-	}
-
-	got := latestActiveScheduleByName(statuses)
-
-	require.Len(t, got, 2)
-	assert.Equal(t, time.Date(2026, 3, 14, 12, 5, 0, 0, time.UTC), got["alpha"])
-	assert.Equal(t, time.Date(2026, 3, 14, 11, 0, 0, 0, time.UTC), got["beta"])
 }
 
 type retryScannerStore struct {

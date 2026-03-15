@@ -188,7 +188,7 @@ steps:
 		assert.Equal(t, markerModTime, readMarkerModTime(t, markerPath))
 	})
 
-	t.Run("NewerScheduledRunSuppressesRetry", func(t *testing.T) {
+	t.Run("NewerScheduledRunDoesNotSuppressRetry", func(t *testing.T) {
 		markerPath := filepath.Join(t.TempDir(), "failure.marker")
 		f := newFixture(t, fmt.Sprintf(`
 type: graph
@@ -230,16 +230,18 @@ steps:
 		f.StartScheduler(35 * time.Second)
 		defer f.Stop()
 
-		assertRunRemainsFailed(t, f, runID, originalAttemptID, 20*time.Second)
+		require.Eventually(t, func() bool {
+			status := f.MustStatus(runID)
+			return status.Status == core.Succeeded &&
+				status.AttemptID != originalAttemptID &&
+				status.AutoRetryCount == 1
+		}, 25*time.Second, 250*time.Millisecond)
 
 		latest := f.MustStatus(runID)
-		assert.Equal(t, core.Failed, latest.Status)
-		assert.Equal(t, originalAttemptID, latest.AttemptID)
+		assert.Equal(t, core.Succeeded, latest.Status)
+		assert.NotEqual(t, originalAttemptID, latest.AttemptID)
+		assert.Equal(t, 1, latest.AutoRetryCount)
 		assert.Equal(t, markerModTime, readMarkerModTime(t, markerPath))
-
-		items, err := f.th.QueueStore.List(f.th.Context, f.queue)
-		require.NoError(t, err)
-		require.Empty(t, items)
 	})
 }
 
@@ -324,23 +326,6 @@ func retryScanReferenceMidnight(now time.Time) time.Time {
 		return midnight.Add(-24 * time.Hour)
 	}
 	return midnight
-}
-
-func assertRunRemainsFailed(t *testing.T, f *fixture, runID, attemptID string, duration time.Duration) {
-	t.Helper()
-
-	deadline := time.Now().Add(duration)
-	for time.Now().Before(deadline) {
-		status := f.MustStatus(runID)
-		require.Equal(t, core.Failed, status.Status)
-		require.Equal(t, attemptID, status.AttemptID)
-
-		items, err := f.th.QueueStore.List(f.th.Context, f.queue)
-		require.NoError(t, err)
-		require.Empty(t, items)
-
-		time.Sleep(250 * time.Millisecond)
-	}
 }
 
 func stableCurrentMinute(t *testing.T) time.Time {
