@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from '../../../../components/ui/card';
 import StatusChip from '../../../../ui/StatusChip';
+import AutoRetryBadge from '../common/AutoRetryBadge';
 import { DAGRunDetailsModal } from '../../components/dag-run-details';
 
 interface DAGRunCardProps {
@@ -60,9 +61,16 @@ function DAGRunCard({ dagRun, timezoneInfo }: DAGRunCardProps) {
         <CardContent className="space-y-1.5 pt-0 px-4 pb-3">
           <div className="flex justify-between items-center text-xs">
             <span className="text-muted-foreground text-xs">Status:</span>
-            <StatusChip status={dagRun.status} size="xs">
-              {dagRun.statusLabel}
-            </StatusChip>
+            <div className="flex flex-col items-end gap-1">
+              <StatusChip status={dagRun.status} size="xs">
+                {dagRun.statusLabel}
+              </StatusChip>
+              <AutoRetryBadge
+                count={dagRun.autoRetryCount}
+                limit={dagRun.autoRetryLimit}
+                className="h-4 px-1.5 text-[10px]"
+              />
+            </div>
           </div>
           <div className="flex justify-between items-center text-xs">
             <span className="text-muted-foreground text-xs">Started:</span>

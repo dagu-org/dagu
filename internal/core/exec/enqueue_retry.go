@@ -70,7 +70,11 @@ func EnqueueRetry(
 
 	// Enqueue after status is persisted. If this fails, roll back the status.
 	dagRun := status.DAGRun()
-	if err := queueStore.Enqueue(ctx, dag.ProcGroup(), QueuePriorityLow, dagRun); err != nil {
+	procGroup := retryProcGroup(dag, updatedStatus)
+	if procGroup == "" {
+		return errors.New("retry proc group is empty")
+	}
+	if err := queueStore.Enqueue(ctx, procGroup, QueuePriorityLow, dagRun); err != nil {
 		_, _, _ = dagRunStore.CompareAndSwapLatestAttemptStatus(
 			ctx,
 			dagRun,
@@ -88,4 +92,17 @@ func EnqueueRetry(
 	}
 
 	return nil
+}
+
+func retryProcGroup(dag *core.DAG, status *DAGRunStatus) string {
+	if status != nil && status.ProcGroup != "" {
+		return status.ProcGroup
+	}
+	if dag != nil {
+		return dag.ProcGroup()
+	}
+	if status != nil {
+		return status.Name
+	}
+	return ""
 }

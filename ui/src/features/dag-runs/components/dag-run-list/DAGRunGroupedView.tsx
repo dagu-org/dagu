@@ -4,6 +4,7 @@ import { components, Status } from '../../../../api/v1/schema';
 import dayjs from '../../../../lib/dayjs';
 import { getDAGRunScheduleSortValue } from '../../../../lib/dagRunTiming';
 import StatusChip from '../../../../ui/StatusChip';
+import AutoRetryBadge from '../common/AutoRetryBadge';
 import { DAGRunDetailsModal } from '../dag-run-details';
 import { StepDetailsTooltip } from './StepDetailsTooltip';
 
@@ -314,6 +315,11 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
                                 <StatusChip status={dagRun.status} size="xs">
                                   {dagRun.statusLabel}
                                 </StatusChip>
+                                <AutoRetryBadge
+                                  count={dagRun.autoRetryCount}
+                                  limit={dagRun.autoRetryLimit}
+                                  className="h-4 px-1.5 text-[10px]"
+                                />
                               </div>
                             </StepDetailsTooltip>
                           </div>

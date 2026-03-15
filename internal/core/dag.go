@@ -529,6 +529,19 @@ func (d *DAG) ProcGroup() string {
 	return d.Name
 }
 
+// SuspendFlagName returns the filename stem used by the file-based suspend
+// flag system. This intentionally follows DAG file naming, not dag.Name.
+func (d *DAG) SuspendFlagName() string {
+	if d == nil {
+		return ""
+	}
+	base := strings.TrimSuffix(filepath.Base(d.Location), filepath.Ext(d.Location))
+	if base != "" && base != "." {
+		return base
+	}
+	return d.Name
+}
+
 // FileName returns the filename of the DAG without the extension.
 func (d *DAG) FileName() string {
 	if d.Location == "" {

@@ -12,6 +12,7 @@ import {
 import { useConfig } from '../../../../contexts/ConfigContext';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
+import AutoRetryBadge from '../common/AutoRetryBadge';
 import { TriggerTypeIndicator } from '../../../dags/components/common/TriggerTypeIndicator';
 import { StepDetailsTooltip } from './StepDetailsTooltip';
 
@@ -266,10 +267,15 @@ function DAGRunTable({
             <div className="flex justify-between items-start mb-2">
               <div className="font-normal text-sm">{dagRun.name}</div>
               <StepDetailsTooltip dagRun={dagRun}>
-                <div className="flex items-center">
+                <div className="flex flex-col items-end gap-1">
                   <StatusChip status={dagRun.status} size="xs">
                     {dagRun.statusLabel}
                   </StatusChip>
+                  <AutoRetryBadge
+                    count={dagRun.autoRetryCount}
+                    limit={dagRun.autoRetryLimit}
+                    className="h-4 px-1.5 text-[10px]"
+                  />
                 </div>
               </StepDetailsTooltip>
             </div>
@@ -405,10 +411,15 @@ function DAGRunTable({
               </TableCell>
               <TableCell className="py-1 px-2">
                 <StepDetailsTooltip dagRun={dagRun}>
-                  <div className="flex items-center">
+                  <div className="flex flex-wrap items-center gap-1">
                     <StatusChip status={dagRun.status} size="xs">
                       {dagRun.statusLabel}
                     </StatusChip>
+                    <AutoRetryBadge
+                      count={dagRun.autoRetryCount}
+                      limit={dagRun.autoRetryLimit}
+                      className="h-4 px-1.5 text-[10px]"
+                    />
                   </div>
                 </StepDetailsTooltip>
               </TableCell>

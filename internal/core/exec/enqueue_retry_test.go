@@ -104,6 +104,35 @@ func TestEnqueueRetry(t *testing.T) {
 			},
 		},
 		{
+			name: "UsesPersistedProcGroupWhenDAGIsNil",
+			status: &exec.DAGRunStatus{
+				Name:           "test-dag",
+				DAGRunID:       "run-fast-path",
+				AttemptID:      "att-fast-path",
+				Status:         core.Failed,
+				AutoRetryCount: 1,
+				ProcGroup:      "custom-queue",
+			},
+			store: &stubDAGRunStore{
+				status: &exec.DAGRunStatus{
+					Name:           "test-dag",
+					DAGRunID:       "run-fast-path",
+					AttemptID:      "att-fast-path",
+					Status:         core.Failed,
+					AutoRetryCount: 1,
+					ProcGroup:      "custom-queue",
+				},
+			},
+			setupQueue: func(qs *exec.MockQueueStore) {
+				qs.On("Enqueue", mock.Anything, "custom-queue", exec.QueuePriorityLow, exec.NewDAGRunRef("test-dag", "run-fast-path")).
+					Return(nil)
+			},
+			assertStore: func(t *testing.T, store *stubDAGRunStore) {
+				require.NotNil(t, store.status)
+				assert.Equal(t, core.Queued, store.status.Status)
+			},
+		},
+		{
 			name: "PersistQueuedStatusFails",
 			dag:  &core.DAG{Name: "test-dag"},
 			status: &exec.DAGRunStatus{

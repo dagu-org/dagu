@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { components, Status } from '../../../../api/v1/schema';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
+import AutoRetryBadge from '../common/AutoRetryBadge';
 import { DAGRunActions } from '../common';
 
 interface DAGRunHeaderProps {
@@ -147,6 +148,10 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
                 {dagRun.statusLabel || ''}
               </StatusChip>
             )}
+            <AutoRetryBadge
+              count={dagRun.autoRetryCount}
+              limit={dagRun.autoRetryLimit}
+            />
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}

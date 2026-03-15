@@ -5,3 +5,4 @@
  */
 
 export { default as DAGRunActions } from './DAGRunActions';
+export { default as AutoRetryBadge } from './AutoRetryBadge';
