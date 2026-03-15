@@ -108,7 +108,7 @@ function Content({ navbarColor, children }: LayoutProps) {
   // Sidebar state with localStorage persistence
   const [isSidebarExpanded, setIsSidebarExpanded] = React.useState(() => {
     const saved = localStorage.getItem('sidebarExpanded');
-    return saved ? saved === 'true' : false;
+    return saved ? saved === 'true' : true;
   });
   // Mobile sidebar state (hidden by default)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
