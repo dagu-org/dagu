@@ -111,6 +111,48 @@ func evaluatePairs(ctx BuildContext, pairs []pair) (map[string]string, error) {
 	return vars, nil
 }
 
+// collectRawPairs parses environment variable definitions from strVariables
+// into raw "KEY=VALUE" strings without any evaluation or expansion.
+// This is used for container env, where evaluation is deferred to runtime
+// so that DAG-level env, params, and step outputs are available in scope.
+func collectRawPairs(strVariables any) ([]string, error) {
+	var pairs []pair
+	switch a := strVariables.(type) {
+	case map[string]any:
+		if err := parseKeyValue(a, &pairs); err != nil {
+			return nil, core.NewValidationError("env", a, err)
+		}
+
+	case []any:
+		for _, v := range a {
+			switch vv := v.(type) {
+			case map[string]any:
+				if err := parseKeyValue(vv, &pairs); err != nil {
+					return nil, core.NewValidationError("env", v, err)
+				}
+			case string:
+				key, _, found := strings.Cut(vv, "=")
+				if !found {
+					return nil, core.NewValidationError("env", &pairs, fmt.Errorf("%w: %s", ErrInvalidEnvValue, v))
+				}
+				pairs = append(pairs, pair{key: key, val: vv[len(key)+1:]})
+			default:
+				return nil, core.NewValidationError("env", &pairs, fmt.Errorf("%w: %s", ErrInvalidEnvValue, v))
+			}
+		}
+	}
+
+	if len(pairs) == 0 {
+		return nil, nil
+	}
+
+	envs := make([]string, len(pairs))
+	for i, p := range pairs {
+		envs[i] = fmt.Sprintf("%s=%s", p.key, p.val)
+	}
+	return envs, nil
+}
+
 // pair represents a key-value pair.
 type pair struct {
 	key string

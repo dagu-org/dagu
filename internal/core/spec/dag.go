@@ -1086,7 +1086,7 @@ func buildContainerField(ctx BuildContext, raw any) (*core.Container, error) {
 
 // buildContainerFromSpec is a shared function that builds a core.Container from a container spec.
 // It is used by both DAG-level and step-level container configuration.
-func buildContainerFromSpec(ctx BuildContext, c *container) (*core.Container, error) {
+func buildContainerFromSpec(_ BuildContext, c *container) (*core.Container, error) {
 	// Validate mutual exclusivity
 	if c.Exec != "" && c.Image != "" {
 		return nil, core.NewValidationError("container", nil,
@@ -1148,15 +1148,11 @@ func buildContainerFromSpec(ctx BuildContext, c *container) (*core.Container, er
 				fmt.Errorf("fields %v cannot be used with 'exec'", invalidFields))
 		}
 
-		// Parse env for exec mode
-		vars, err := loadVariables(ctx, c.Env)
+		// Collect raw env pairs without evaluation — evaluation is deferred
+		// to runtime so that DAG-level env, params, and step outputs are in scope.
+		envs, err := collectRawPairs(c.Env)
 		if err != nil {
 			return nil, core.NewValidationError("container.env", c.Env, err)
-		}
-
-		var envs []string
-		for k, v := range vars {
-			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 		}
 
 		// Build exec-mode container
@@ -1175,14 +1171,11 @@ func buildContainerFromSpec(ctx BuildContext, c *container) (*core.Container, er
 		return nil, core.NewValidationError("container.pull_policy", c.PullPolicy, err)
 	}
 
-	vars, err := loadVariables(ctx, c.Env)
+	// Collect raw env pairs without evaluation — evaluation is deferred
+	// to runtime so that DAG-level env, params, and step outputs are in scope.
+	envs, err := collectRawPairs(c.Env)
 	if err != nil {
 		return nil, core.NewValidationError("container.env", c.Env, err)
-	}
-
-	var envs []string
-	for k, v := range vars {
-		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 	}
 
 	// Parse healthcheck if provided
