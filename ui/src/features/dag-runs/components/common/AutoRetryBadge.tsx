@@ -1,6 +1,4 @@
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { RefreshCw } from 'lucide-react';
 
 type AutoRetryBadgeProps = {
   count?: number | null;
@@ -19,15 +17,19 @@ function AutoRetryBadge({
 
   const normalizedCount = Math.max(count ?? 0, 0);
   const exhausted = normalizedCount >= limit;
+  const label = exhausted
+    ? 'auto retries exhausted'
+    : `${normalizedCount}/${limit} auto retries`;
 
   return (
-    <Badge
-      variant={exhausted ? 'warning' : 'info'}
-      className={cn('gap-1 px-2 normal-case tracking-normal', className)}
+    <span
+      className={cn(
+        'inline-flex items-center whitespace-nowrap text-xs leading-none text-muted-foreground',
+        className
+      )}
     >
-      <RefreshCw className="h-3 w-3" />
-      <span>{`Auto retry ${normalizedCount}/${limit}`}</span>
-    </Badge>
+      {label}
+    </span>
   );
 }
 

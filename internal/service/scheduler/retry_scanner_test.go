@@ -46,11 +46,13 @@ func TestRetryScannerEvaluateRetryDecision(t *testing.T) {
 		delay     time.Duration
 	}{
 		{
-			name:      "SuspendedSkips",
+			name:      "SuspendedDoesNotBlockRetry",
 			status:    cloneRetryStatus(baseStatus),
 			metadata:  mustRetryMetadataFromDAG(t, baseDAG),
 			suspended: true,
-			reason:    "suspended",
+			enqueue:   true,
+			nextRetry: now.Add(-time.Minute),
+			delay:     time.Minute,
 		},
 		{
 			name:     "RetryExhaustedSkips",
@@ -345,6 +347,54 @@ func TestRetryScannerScanUsesPersistedRetryPolicy(t *testing.T) {
 	queueStore.AssertExpectations(t)
 }
 
+func TestRetryScannerScanIgnoresSuspendFlagsForPersistedRetries(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 3, 14, 14, 0, 0, 0, time.UTC)
+	dag := &core.DAG{
+		Name:     "retry-dag",
+		Location: "/tmp/retry-dag.yaml",
+		RetryPolicy: &core.DAGRetryPolicy{
+			Limit:       3,
+			Interval:    time.Minute,
+			Backoff:     0,
+			MaxInterval: 10 * time.Minute,
+		},
+	}
+	status := &exec.DAGRunStatus{
+		Name:           dag.Name,
+		DAGRunID:       "run-1",
+		AttemptID:      "att-1",
+		Status:         core.Failed,
+		AutoRetryCount: 0,
+		FinishedAt:     now.Add(-2 * time.Minute).Format(time.RFC3339),
+		ScheduleTime:   now.Add(-10 * time.Minute).Format(time.RFC3339),
+	}
+	store := newRetryScannerStore(dag, status)
+	store.attempts[status.DAGRun().String()].status.SuspendFlagName = ""
+
+	queueStore := &exec.MockQueueStore{}
+	queueStore.On("Enqueue", mock.Anything, dag.ProcGroup(), exec.QueuePriorityLow, status.DAGRun()).
+		Return(nil).
+		Once()
+
+	scanner, err := NewRetryScanner(
+		store,
+		queueStore,
+		func(context.Context, string) bool { return true },
+		24*time.Hour,
+		func() time.Time { return now },
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, scanner.scan(context.Background()))
+
+	assert.Equal(t, core.Queued, store.mustStatus(status.DAGRun()).Status)
+	assert.Equal(t, 1, store.mustStatus(status.DAGRun()).AutoRetryCount)
+	assert.Equal(t, 0, store.findAttemptCalls)
+	queueStore.AssertExpectations(t)
+}
+
 func TestRetryScannerScanFallsBackForLegacyStatuses(t *testing.T) {
 	t.Parallel()
 
@@ -386,7 +436,7 @@ func TestRetryScannerScanFallsBackForLegacyStatuses(t *testing.T) {
 	scanner, err := NewRetryScanner(
 		store,
 		queueStore,
-		nil,
+		func(context.Context, string) bool { return true },
 		24*time.Hour,
 		func() time.Time { return now },
 	)

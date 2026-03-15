@@ -25,11 +25,10 @@ type retryDecision struct {
 }
 
 type dagRetryMetadata struct {
-	limit           int
-	interval        time.Duration
-	backoff         float64
-	maxInterval     time.Duration
-	suspendFlagName string
+	limit       int
+	interval    time.Duration
+	backoff     float64
+	maxInterval time.Duration
 }
 
 // RetryScanner periodically discovers failed latest attempts and enqueues
@@ -260,9 +259,6 @@ func (s *RetryScanner) evaluateRetryDecision(
 	if metadata.limit <= 0 {
 		return retryDecision{reason: "retry_policy_missing"}
 	}
-	if s.isSuspended(ctx, metadata.suspendFlagName) {
-		return retryDecision{reason: "suspended"}
-	}
 	if status.AutoRetryCount >= metadata.limit {
 		return retryDecision{reason: "retry_exhausted"}
 	}
@@ -321,15 +317,14 @@ func parseRFC3339(val string) (time.Time, bool) {
 }
 
 func retryMetadataFromStatus(status *exec.DAGRunStatus) (dagRetryMetadata, bool) {
-	if status == nil || status.ProcGroup == "" || status.SuspendFlagName == "" {
+	if status == nil || status.ProcGroup == "" {
 		return dagRetryMetadata{}, false
 	}
 	return dagRetryMetadata{
-		limit:           status.AutoRetryLimit,
-		interval:        status.AutoRetryInterval,
-		backoff:         status.AutoRetryBackoff,
-		maxInterval:     status.AutoRetryMaxInterval,
-		suspendFlagName: status.SuspendFlagName,
+		limit:       status.AutoRetryLimit,
+		interval:    status.AutoRetryInterval,
+		backoff:     status.AutoRetryBackoff,
+		maxInterval: status.AutoRetryMaxInterval,
 	}, true
 }
 
@@ -338,10 +333,9 @@ func retryMetadataFromDAG(dag *core.DAG) (dagRetryMetadata, bool) {
 		return dagRetryMetadata{}, false
 	}
 	return dagRetryMetadata{
-		limit:           dag.RetryPolicy.Limit,
-		interval:        dag.RetryPolicy.Interval,
-		backoff:         dag.RetryPolicy.Backoff,
-		maxInterval:     dag.RetryPolicy.MaxInterval,
-		suspendFlagName: dagSuspendFlagName(dag),
+		limit:       dag.RetryPolicy.Limit,
+		interval:    dag.RetryPolicy.Interval,
+		backoff:     dag.RetryPolicy.Backoff,
+		maxInterval: dag.RetryPolicy.MaxInterval,
 	}, true
 }

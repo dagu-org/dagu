@@ -93,6 +93,6 @@ describe('DAGRunTable', () => {
     expect(screen.getByText('Scheduled At')).toBeInTheDocument();
     expect(screen.getByText('2026-03-13T10:00:00Z')).toBeInTheDocument();
     expect(screen.getByText('2026-03-13T10:00:30Z')).toBeInTheDocument();
-    expect(screen.getByText('Auto retry 1/3')).toBeInTheDocument();
+    expect(screen.getByText('1/3 auto retries')).toBeInTheDocument();
   });
 });

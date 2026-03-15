@@ -274,7 +274,7 @@ function DAGRunTable({
                   <AutoRetryBadge
                     count={dagRun.autoRetryCount}
                     limit={dagRun.autoRetryLimit}
-                    className="h-4 px-1.5 text-[10px]"
+                    className="text-[10px]"
                   />
                 </div>
               </StepDetailsTooltip>
@@ -418,7 +418,7 @@ function DAGRunTable({
                     <AutoRetryBadge
                       count={dagRun.autoRetryCount}
                       limit={dagRun.autoRetryLimit}
-                      className="h-4 px-1.5 text-[10px]"
+                      className="text-[10px]"
                     />
                   </div>
                 </StepDetailsTooltip>

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { components, Status } from '@/api/v1/schema';
+import AutoRetryBadge from '@/features/dag-runs/components/common/AutoRetryBadge';
 import dayjs from '@/lib/dayjs';
 import StatusChip from '@/ui/StatusChip';
 import Ticker from '@/ui/Ticker';
@@ -64,11 +65,20 @@ export function KanbanCard({ run, onClick }: Props): React.ReactElement {
         onClick={onClick}
         className="w-full text-left p-2 rounded-md border border-border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
       >
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <span className="text-xs font-medium truncate">{run.name}</span>
-          <StatusChip status={run.status} size="xs">
-            {run.statusLabel}
-          </StatusChip>
+        <div className="mb-1 flex items-start justify-between gap-2">
+          <span className="min-w-0 flex-1 truncate text-xs font-medium leading-tight">
+            {run.name}
+          </span>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <StatusChip status={run.status} size="xs">
+              {run.statusLabel}
+            </StatusChip>
+            <AutoRetryBadge
+              count={run.autoRetryCount}
+              limit={run.autoRetryLimit}
+              className="text-[11px]"
+            />
+          </div>
         </div>
         {run.startedAt &&
           (run.status === Status.Running ? (
