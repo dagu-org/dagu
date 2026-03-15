@@ -102,19 +102,20 @@ const (
 	SectionGitSync                               // 256
 	SectionTunnel                                // 512
 	SectionLicense                               // 1024
+	SectionProc                                  // 2048
 
 	// SectionAll combines all sections (useful for ServiceNone/CLI)
-	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel | SectionLicense
+	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel | SectionLicense | SectionProc
 )
 
 // serviceRequirements maps services to their required config sections using bitwise OR.
 var serviceRequirements = map[Service]ConfigSection{
 	ServiceNone:        SectionAll,
-	ServiceServer:      SectionServer | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel | SectionLicense,
-	ServiceScheduler:   SectionScheduler | SectionCoordinator | SectionQueues,
-	ServiceWorker:      SectionWorker | SectionCoordinator,
-	ServiceCoordinator: SectionCoordinator,
-	ServiceAgent:       SectionQueues,
+	ServiceServer:      SectionServer | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel | SectionLicense | SectionProc,
+	ServiceScheduler:   SectionScheduler | SectionCoordinator | SectionQueues | SectionProc,
+	ServiceWorker:      SectionWorker | SectionCoordinator | SectionProc,
+	ServiceCoordinator: SectionCoordinator | SectionProc,
+	ServiceAgent:       SectionQueues | SectionProc,
 }
 
 // requires checks if the loader's service requires the given config section.
@@ -247,6 +248,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		{SectionQueues, func() { l.loadQueuesConfig(&cfg, def) }},
 		{SectionCoordinator, func() { l.loadCoordinatorConfig(&cfg, def) }},
 		{SectionWorker, func() { l.loadWorkerConfig(&cfg, def) }},
+		{SectionProc, func() { l.loadProcConfig(&cfg, def) }},
 		{SectionScheduler, func() { l.loadSchedulerConfig(&cfg, def) }},
 		{SectionMonitoring, func() { l.loadMonitoringConfig(&cfg, def) }},
 		{SectionGitSync, func() { l.loadGitSyncConfig(&cfg, def) }},
@@ -793,6 +795,7 @@ func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 		cfg.Scheduler.LockRetryInterval = l.parseDuration("scheduler.lock_retry_interval", def.Scheduler.LockRetryInterval)
 		cfg.Scheduler.ZombieDetectionInterval = l.parseDuration("scheduler.zombie_detection_interval", def.Scheduler.ZombieDetectionInterval)
 		cfg.Scheduler.RetryFailureWindow = l.parseDuration("scheduler.retry_failure_window", def.Scheduler.RetryFailureWindow)
+		cfg.Scheduler.FailureThreshold = def.Scheduler.FailureThreshold
 	}
 
 	l.setSchedulerDefaults(cfg)
@@ -816,6 +819,91 @@ func (l *ConfigLoader) setSchedulerDefaults(cfg *Config) {
 	// Default RetryFailureWindow only if not explicitly set (0 disables scanning)
 	if cfg.Scheduler.RetryFailureWindow <= 0 && !l.v.IsSet("scheduler.retry_failure_window") {
 		cfg.Scheduler.RetryFailureWindow = 24 * time.Hour
+	}
+	if cfg.Scheduler.FailureThreshold <= 0 {
+		cfg.Scheduler.FailureThreshold = 3
+	}
+}
+
+func (l *ConfigLoader) loadProcConfig(cfg *Config, def Definition) {
+	if l.v.IsSet("proc.heartbeat_interval") {
+		cfg.Proc.HeartbeatInterval = l.parseDuration(
+			"proc.heartbeat_interval", l.v.GetString("proc.heartbeat_interval"),
+		)
+	}
+	if l.v.IsSet("proc.heartbeat_sync_interval") {
+		cfg.Proc.HeartbeatSyncInterval = l.parseDuration(
+			"proc.heartbeat_sync_interval", l.v.GetString("proc.heartbeat_sync_interval"),
+		)
+	}
+	if l.v.IsSet("proc.stale_threshold") {
+		cfg.Proc.StaleThreshold = l.parseDuration(
+			"proc.stale_threshold", l.v.GetString("proc.stale_threshold"),
+		)
+	}
+
+	l.loadLegacySchedulerProcConfig(cfg, def)
+	l.setProcDefaults(cfg)
+}
+
+func (l *ConfigLoader) loadLegacySchedulerProcConfig(cfg *Config, def Definition) {
+	l.applyDeprecatedProcAlias(
+		&cfg.Proc.HeartbeatInterval,
+		"proc.heartbeat_interval",
+		"scheduler.heartbeat_interval",
+		l.schedulerLegacyValue(def, "scheduler.heartbeat_interval", func(sd *SchedulerDef) string { return sd.HeartbeatInterval }),
+	)
+	l.applyDeprecatedProcAlias(
+		&cfg.Proc.HeartbeatSyncInterval,
+		"proc.heartbeat_sync_interval",
+		"scheduler.heartbeat_sync_interval",
+		l.schedulerLegacyValue(def, "scheduler.heartbeat_sync_interval", func(sd *SchedulerDef) string { return sd.HeartbeatSyncInterval }),
+	)
+	l.applyDeprecatedProcAlias(
+		&cfg.Proc.StaleThreshold,
+		"proc.stale_threshold",
+		"scheduler.stale_threshold",
+		l.schedulerLegacyValue(def, "scheduler.stale_threshold", func(sd *SchedulerDef) string { return sd.StaleThreshold }),
+	)
+}
+
+func (l *ConfigLoader) schedulerLegacyValue(
+	def Definition,
+	key string,
+	getter func(*SchedulerDef) string,
+) string {
+	if def.Scheduler != nil {
+		return getter(def.Scheduler)
+	}
+	return l.v.GetString(key)
+}
+
+func (l *ConfigLoader) applyDeprecatedProcAlias(
+	target *time.Duration,
+	canonicalKey, legacyKey, legacyValue string,
+) {
+	if !l.v.IsSet(legacyKey) {
+		return
+	}
+	if l.v.IsSet(canonicalKey) {
+		l.warnings = append(l.warnings,
+			fmt.Sprintf("%s is deprecated and ignored because %s is set", legacyKey, canonicalKey))
+		return
+	}
+
+	*target = l.parseDuration(legacyKey, legacyValue)
+	l.warnings = append(l.warnings, fmt.Sprintf("%s is deprecated; use %s instead", legacyKey, canonicalKey))
+}
+
+func (l *ConfigLoader) setProcDefaults(cfg *Config) {
+	if cfg.Proc.HeartbeatInterval <= 0 {
+		cfg.Proc.HeartbeatInterval = 5 * time.Second
+	}
+	if cfg.Proc.HeartbeatSyncInterval <= 0 {
+		cfg.Proc.HeartbeatSyncInterval = 10 * time.Second
+	}
+	if cfg.Proc.StaleThreshold <= 0 {
+		cfg.Proc.StaleThreshold = 90 * time.Second
 	}
 }
 
@@ -1295,6 +1383,16 @@ var envBindings = []envBinding{
 	{key: "scheduler.lock_retry_interval", env: "SCHEDULER_LOCK_RETRY_INTERVAL"},
 	{key: "scheduler.zombie_detection_interval", env: "SCHEDULER_ZOMBIE_DETECTION_INTERVAL"},
 	{key: "scheduler.retry_failure_window", env: "SCHEDULER_RETRY_FAILURE_WINDOW"},
+	{key: "scheduler.failure_threshold", env: "SCHEDULER_FAILURE_THRESHOLD"},
+
+	// Proc
+	{key: "proc.heartbeat_interval", env: "PROC_HEARTBEAT_INTERVAL"},
+	{key: "proc.heartbeat_sync_interval", env: "PROC_HEARTBEAT_SYNC_INTERVAL"},
+	{key: "proc.stale_threshold", env: "PROC_STALE_THRESHOLD"},
+	// Proc (legacy scheduler aliases)
+	{key: "scheduler.heartbeat_interval", env: "SCHEDULER_HEARTBEAT_INTERVAL"},
+	{key: "scheduler.heartbeat_sync_interval", env: "SCHEDULER_HEARTBEAT_SYNC_INTERVAL"},
+	{key: "scheduler.stale_threshold", env: "SCHEDULER_STALE_THRESHOLD"},
 
 	// UI
 	{key: "ui.max_dashboard_page_limit", env: "UI_MAX_DASHBOARD_PAGE_LIMIT"},

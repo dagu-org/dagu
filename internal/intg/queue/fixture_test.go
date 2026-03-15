@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -35,6 +36,19 @@ type fixture struct {
 	cancel       context.CancelFunc
 	globalQueues []config.QueueConfig
 	retryWindow  time.Duration
+	procConfig   *procConfig
+	schedConfig  *schedulerConfig
+}
+
+type procConfig struct {
+	heartbeatInterval     time.Duration
+	heartbeatSyncInterval time.Duration
+	staleThreshold        time.Duration
+}
+
+type schedulerConfig struct {
+	zombieDetectionInterval time.Duration
+	failureThreshold        int
 }
 
 // newFixture creates a new queue integration test fixture.
@@ -59,6 +73,15 @@ func newFixture(t *testing.T, dagYAML string, opts ...func(*fixture)) *fixture {
 				c.Scheduler.RetryFailureWindow = f.retryWindow
 			}
 			c.Scheduler.Port = 0
+			if f.procConfig != nil {
+				c.Proc.HeartbeatInterval = f.procConfig.heartbeatInterval
+				c.Proc.HeartbeatSyncInterval = f.procConfig.heartbeatSyncInterval
+				c.Proc.StaleThreshold = f.procConfig.staleThreshold
+			}
+			if f.schedConfig != nil {
+				c.Scheduler.ZombieDetectionInterval = f.schedConfig.zombieDetectionInterval
+				c.Scheduler.FailureThreshold = f.schedConfig.failureThreshold
+			}
 		}),
 	}
 	f.th = test.SetupCommand(t, helperOpts...)
@@ -96,6 +119,25 @@ func WithGlobalQueue(name string, maxActiveRuns int) func(*fixture) {
 // WithRetryWindow overrides scheduler.retry_failure_window for the fixture.
 func WithRetryWindow(window time.Duration) func(*fixture) {
 	return func(f *fixture) { f.retryWindow = window }
+}
+
+func WithProcConfig(heartbeatInterval, heartbeatSyncInterval, staleThreshold time.Duration) func(*fixture) {
+	return func(f *fixture) {
+		f.procConfig = &procConfig{
+			heartbeatInterval:     heartbeatInterval,
+			heartbeatSyncInterval: heartbeatSyncInterval,
+			staleThreshold:        staleThreshold,
+		}
+	}
+}
+
+func WithZombieConfig(zombieDetectionInterval time.Duration, failureThreshold int) func(*fixture) {
+	return func(f *fixture) {
+		f.schedConfig = &schedulerConfig{
+			zombieDetectionInterval: zombieDetectionInterval,
+			failureThreshold:        failureThreshold,
+		}
+	}
 }
 
 // Enqueue adds n DAG runs to the queue.
@@ -179,6 +221,27 @@ func (f *fixture) WaitDrain(timeout time.Duration) *fixture {
 	return f
 }
 
+func (f *fixture) WaitForStatus(runID string, expected core.Status, timeout time.Duration) *fixture {
+	f.t.Helper()
+	require.Eventually(f.t, func() bool {
+		status, err := f.Status(runID)
+		return err == nil && status.Status == expected
+	}, timeout, 50*time.Millisecond, "timed out waiting for status %s", expected)
+	return f
+}
+
+func (f *fixture) WaitForStatusIn(runID string, expected []core.Status, timeout time.Duration) *fixture {
+	f.t.Helper()
+	require.Eventually(f.t, func() bool {
+		status, err := f.Status(runID)
+		if err != nil {
+			return false
+		}
+		return slices.Contains(expected, status.Status)
+	}, timeout, 50*time.Millisecond, "timed out waiting for status in %v", expected)
+	return f
+}
+
 // Stop stops the scheduler.
 func (f *fixture) Stop() {
 	if f.cancel != nil {
@@ -190,6 +253,24 @@ func (f *fixture) Stop() {
 		require.NoError(f.t, err)
 	case <-time.After(5 * time.Second):
 	}
+}
+
+// Status returns the latest persisted status for the given DAG run.
+func (f *fixture) Status(runID string) (*exec.DAGRunStatus, error) {
+	ref := exec.NewDAGRunRef(f.dag.Name, runID)
+	attempt, err := f.th.DAGRunStore.FindAttempt(f.th.Context, ref)
+	if err != nil {
+		return nil, err
+	}
+	return attempt.ReadStatus(f.th.Context)
+}
+
+// MustStatus returns the latest persisted status and fails the test on error.
+func (f *fixture) MustStatus(runID string) *exec.DAGRunStatus {
+	f.t.Helper()
+	status, err := f.Status(runID)
+	require.NoError(f.t, err)
+	return status
 }
 
 // AssertConcurrent verifies all DAGs started within maxDiff of each other.
@@ -210,7 +291,7 @@ func (f *fixture) AssertConcurrent(maxDiff time.Duration) {
 func (f *fixture) collectStartTimes() []time.Time {
 	var times []time.Time
 	for _, id := range f.runIDs {
-		st := f.Status(id)
+		st := f.MustStatus(id)
 		t, err := stringutil.ParseTime(st.StartedAt)
 		require.NoError(f.t, err)
 		times = append(times, t)
@@ -310,18 +391,8 @@ func (f *fixture) RunningRunWithMetadata(opts runStatusOptions) string {
 
 // RetryEnqueue enqueues a previously failed run for retry using exec.EnqueueRetry.
 func (f *fixture) RetryEnqueue(runID string) *fixture {
-	require.NoError(f.t, exec.EnqueueRetry(f.th.Context, f.th.DAGRunStore, f.th.QueueStore, f.dag, f.Status(runID)))
+	require.NoError(f.t, exec.EnqueueRetry(f.th.Context, f.th.DAGRunStore, f.th.QueueStore, f.dag, f.MustStatus(runID)))
 	return f
-}
-
-// Status returns the latest persisted status for the given DAG run.
-func (f *fixture) Status(runID string) *exec.DAGRunStatus {
-	ref := exec.NewDAGRunRef(f.dag.Name, runID)
-	att, err := f.th.DAGRunStore.FindAttempt(f.th.Context, ref)
-	require.NoError(f.t, err)
-	status, err := att.ReadStatus(f.th.Context)
-	require.NoError(f.t, err)
-	return status
 }
 
 func (f *fixture) cleanup() {

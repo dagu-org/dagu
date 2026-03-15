@@ -227,12 +227,18 @@ func TestLoad_Env(t *testing.T) {
 				ConnMaxIdleTime: 60,
 			},
 		},
+		Proc: Proc{
+			HeartbeatInterval:     5 * time.Second,
+			HeartbeatSyncInterval: 10 * time.Second,
+			StaleThreshold:        90 * time.Second,
+		},
 		Scheduler: Scheduler{
 			Port:                    9999,
 			LockStaleThreshold:      30 * time.Second,
 			LockRetryInterval:       5 * time.Second,
 			ZombieDetectionInterval: 90 * time.Second,
 			RetryFailureWindow:      24 * time.Hour,
+			FailureThreshold:        3,
 		},
 		Monitoring: MonitoringConfig{
 			Retention: 24 * time.Hour,
@@ -507,12 +513,18 @@ scheduler:
 				ConnMaxIdleTime: 60,
 			},
 		},
+		Proc: Proc{
+			HeartbeatInterval:     5 * time.Second,
+			HeartbeatSyncInterval: 10 * time.Second,
+			StaleThreshold:        90 * time.Second,
+		},
 		Scheduler: Scheduler{
 			Port:                    7890,
 			LockStaleThreshold:      50 * time.Second,
 			LockRetryInterval:       10 * time.Second,
 			ZombieDetectionInterval: 60 * time.Second,
 			RetryFailureWindow:      24 * time.Hour,
+			FailureThreshold:        3,
 		},
 		Monitoring: MonitoringConfig{
 			Retention: 24 * time.Hour,
@@ -634,6 +646,80 @@ scheduler:
 		assert.Contains(t, cfg.Warnings[0], "Invalid scheduler.lock_stale_threshold")
 		assert.Contains(t, cfg.Warnings[1], "Invalid scheduler.lock_retry_interval")
 		assert.Contains(t, cfg.Warnings[2], "Invalid scheduler.zombie_detection_interval")
+	})
+
+	t.Run("ProcConfigLegacySchedulerAliases", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: none
+proc:
+  heartbeat_interval: 7s
+  heartbeat_sync_interval: 11s
+  stale_threshold: 95s
+scheduler:
+  heartbeat_interval: 20s
+  heartbeat_sync_interval: 25s
+  stale_threshold: 120s
+`)
+
+		assert.Equal(t, 7*time.Second, cfg.Proc.HeartbeatInterval)
+		assert.Equal(t, 11*time.Second, cfg.Proc.HeartbeatSyncInterval)
+		assert.Equal(t, 95*time.Second, cfg.Proc.StaleThreshold)
+		require.Len(t, cfg.Warnings, 3)
+		assert.Contains(t, cfg.Warnings[0], "scheduler.heartbeat_interval is deprecated and ignored")
+		assert.Contains(t, cfg.Warnings[1], "scheduler.heartbeat_sync_interval is deprecated and ignored")
+		assert.Contains(t, cfg.Warnings[2], "scheduler.stale_threshold is deprecated and ignored")
+	})
+
+	t.Run("ProcConfigLegacySchedulerFallback", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: none
+scheduler:
+  heartbeat_interval: 8s
+  heartbeat_sync_interval: 12s
+  stale_threshold: 100s
+`)
+
+		assert.Equal(t, 8*time.Second, cfg.Proc.HeartbeatInterval)
+		assert.Equal(t, 12*time.Second, cfg.Proc.HeartbeatSyncInterval)
+		assert.Equal(t, 100*time.Second, cfg.Proc.StaleThreshold)
+		require.Len(t, cfg.Warnings, 3)
+		assert.Contains(t, cfg.Warnings[0], "scheduler.heartbeat_interval is deprecated")
+		assert.Contains(t, cfg.Warnings[1], "scheduler.heartbeat_sync_interval is deprecated")
+		assert.Contains(t, cfg.Warnings[2], "scheduler.stale_threshold is deprecated")
+	})
+
+	t.Run("ProcConfigLoadsForServiceScopedCommands", func(t *testing.T) {
+		for _, tc := range []struct {
+			name    string
+			service Service
+		}{
+			{name: "Server", service: ServiceServer},
+			{name: "Scheduler", service: ServiceScheduler},
+			{name: "Worker", service: ServiceWorker},
+			{name: "Coordinator", service: ServiceCoordinator},
+			{name: "Agent", service: ServiceAgent},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				configFile := filepath.Join(t.TempDir(), "config.yaml")
+				err := os.WriteFile(configFile, []byte(`
+auth:
+  mode: none
+proc:
+  heartbeat_interval: 6s
+  heartbeat_sync_interval: 9s
+  stale_threshold: 75s
+`), 0600)
+				require.NoError(t, err)
+
+				cfg := testLoad(t, WithConfigFile(configFile), WithService(tc.service))
+
+				assert.Equal(t, 6*time.Second, cfg.Proc.HeartbeatInterval)
+				assert.Equal(t, 9*time.Second, cfg.Proc.HeartbeatSyncInterval)
+				assert.Equal(t, 75*time.Second, cfg.Proc.StaleThreshold)
+			})
+		}
 	})
 
 	t.Run("BuiltinAuthWithBasicAuthError", func(t *testing.T) {
@@ -888,6 +974,36 @@ monitoring:
 		cfg := loadFromYAML(t, "")
 		assert.Equal(t, 24*time.Hour, cfg.Monitoring.Retention)
 		assert.Equal(t, 5*time.Second, cfg.Monitoring.Interval)
+	})
+}
+
+func TestLoad_ProcConfig(t *testing.T) {
+	t.Run("FromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_AUTH_MODE":                    "none",
+			"DAGU_PROC_HEARTBEAT_INTERVAL":      "6s",
+			"DAGU_PROC_HEARTBEAT_SYNC_INTERVAL": "9s",
+			"DAGU_PROC_STALE_THRESHOLD":         "75s",
+		})
+		assert.Equal(t, 6*time.Second, cfg.Proc.HeartbeatInterval)
+		assert.Equal(t, 9*time.Second, cfg.Proc.HeartbeatSyncInterval)
+		assert.Equal(t, 75*time.Second, cfg.Proc.StaleThreshold)
+	})
+
+	t.Run("LegacySchedulerEnvFallback", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_AUTH_MODE":                         "none",
+			"DAGU_SCHEDULER_HEARTBEAT_INTERVAL":      "8s",
+			"DAGU_SCHEDULER_HEARTBEAT_SYNC_INTERVAL": "12s",
+			"DAGU_SCHEDULER_STALE_THRESHOLD":         "100s",
+		})
+		assert.Equal(t, 8*time.Second, cfg.Proc.HeartbeatInterval)
+		assert.Equal(t, 12*time.Second, cfg.Proc.HeartbeatSyncInterval)
+		assert.Equal(t, 100*time.Second, cfg.Proc.StaleThreshold)
+		require.Len(t, cfg.Warnings, 3)
+		assert.Contains(t, cfg.Warnings[0], "scheduler.heartbeat_interval is deprecated")
+		assert.Contains(t, cfg.Warnings[1], "scheduler.heartbeat_sync_interval is deprecated")
+		assert.Contains(t, cfg.Warnings[2], "scheduler.stale_threshold is deprecated")
 	})
 }
 

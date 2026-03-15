@@ -27,6 +27,9 @@ type ProcStore interface {
 	// ListAllAlive returns all running DAG runs across all groups.
 	// Returns a map where key is the group name and value is list of DAG runs.
 	ListAllAlive(ctx context.Context) (map[string][]DAGRunRef, error)
+	// CleanStaleFiles removes stale proc files for a specific DAG run.
+	// Only the zombie detector should call this after confirming a kill.
+	CleanStaleFiles(ctx context.Context, groupName string, dagRun DAGRunRef) error
 }
 
 // ProcHandle represents a process that is associated with a dag-run.

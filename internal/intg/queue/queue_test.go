@@ -166,13 +166,13 @@ steps:
 			TriggerType:  core.TriggerTypeScheduler,
 		})
 		markerModTime := prepareFailureMarker(t, markerPath)
-		originalAttemptID := f.Status(runID).AttemptID
+		originalAttemptID := f.MustStatus(runID).AttemptID
 
 		f.StartScheduler(40 * time.Second)
 		defer f.Stop()
 
 		require.Eventually(t, func() bool {
-			status := f.Status(runID)
+			status := f.MustStatus(runID)
 			return status.Status == core.Succeeded &&
 				status.AttemptID != originalAttemptID &&
 				status.RetryCount == 1
@@ -180,7 +180,7 @@ steps:
 
 		f.WaitDrain(5 * time.Second)
 
-		latest := f.Status(runID)
+		latest := f.MustStatus(runID)
 		assert.Equal(t, core.Succeeded, latest.Status)
 		assert.NotEqual(t, originalAttemptID, latest.AttemptID)
 		assert.Equal(t, 1, latest.RetryCount)
@@ -224,14 +224,14 @@ steps:
 			TriggerType:  core.TriggerTypeScheduler,
 		})
 		markerModTime := prepareFailureMarker(t, markerPath)
-		originalAttemptID := f.Status(runID).AttemptID
+		originalAttemptID := f.MustStatus(runID).AttemptID
 
 		f.StartScheduler(35 * time.Second)
 		defer f.Stop()
 
 		assertRunRemainsFailed(t, f, runID, originalAttemptID, 20*time.Second)
 
-		latest := f.Status(runID)
+		latest := f.MustStatus(runID)
 		assert.Equal(t, core.Failed, latest.Status)
 		assert.Equal(t, originalAttemptID, latest.AttemptID)
 		assert.Equal(t, markerModTime, readMarkerModTime(t, markerPath))
@@ -330,7 +330,7 @@ func assertRunRemainsFailed(t *testing.T, f *fixture, runID, attemptID string, d
 
 	deadline := time.Now().Add(duration)
 	for time.Now().Before(deadline) {
-		status := f.Status(runID)
+		status := f.MustStatus(runID)
 		require.Equal(t, core.Failed, status.Status)
 		require.Equal(t, attemptID, status.AttemptID)
 

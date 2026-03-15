@@ -6,6 +6,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
@@ -15,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/runtime"
 )
 
 // panicToError converts a panic value to an error, including stack trace.
@@ -28,11 +30,15 @@ func panicToError(r any) error {
 
 // ZombieDetector finds and cleans up zombie DAG runs
 type ZombieDetector struct {
-	dagRunStore exec.DAGRunStore
-	procStore   exec.ProcStore
-	interval    time.Duration
-	quit        chan struct{}
-	closeOnce   sync.Once
+	dagRunStore      exec.DAGRunStore
+	procStore        exec.ProcStore
+	interval         time.Duration
+	failureThreshold int
+	staleCounters    map[string]int // dagRunID -> consecutive stale count
+	runMutexesMu     sync.Mutex
+	runMutexes       map[string]*sync.Mutex
+	quit             chan struct{}
+	closeOnce        sync.Once
 }
 
 // NewZombieDetector creates a new zombie detector
@@ -40,15 +46,22 @@ func NewZombieDetector(
 	dagRunStore exec.DAGRunStore,
 	procStore exec.ProcStore,
 	interval time.Duration,
+	failureThreshold int,
 ) *ZombieDetector {
 	if interval <= 0 {
 		interval = 45 * time.Second
 	}
+	if failureThreshold <= 0 {
+		failureThreshold = 3
+	}
 	return &ZombieDetector{
-		dagRunStore: dagRunStore,
-		procStore:   procStore,
-		interval:    interval,
-		quit:        make(chan struct{}),
+		dagRunStore:      dagRunStore,
+		procStore:        procStore,
+		interval:         interval,
+		failureThreshold: failureThreshold,
+		staleCounters:    make(map[string]int),
+		runMutexes:       make(map[string]*sync.Mutex),
+		quit:             make(chan struct{}),
 	}
 }
 
@@ -95,6 +108,20 @@ func (z *ZombieDetector) Stop(ctx context.Context) {
 	})
 }
 
+// getRunMutex returns or creates a per-run mutex for serializing status access.
+func (z *ZombieDetector) getRunMutex(dagRunID string) *sync.Mutex {
+	z.runMutexesMu.Lock()
+	defer z.runMutexesMu.Unlock()
+
+	if mu, ok := z.runMutexes[dagRunID]; ok {
+		return mu
+	}
+
+	mu := &sync.Mutex{}
+	z.runMutexes[dagRunID] = mu
+	return mu
+}
+
 // detectAndCleanZombies finds all running DAG runs and checks if they're actually alive
 func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 	// Query all running DAG runs
@@ -124,6 +151,28 @@ func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 				tag.Error(err))
 		}
 	}
+
+	// Prune stale counters for runs no longer in Running state
+	runningIDs := make(map[string]struct{}, len(statuses))
+	for _, st := range statuses {
+		runningIDs[st.DAGRunID] = struct{}{}
+	}
+	for id := range z.staleCounters {
+		if _, ok := runningIDs[id]; !ok {
+			delete(z.staleCounters, id)
+		}
+	}
+
+	// Prune per-run mutexes for runs no longer in Running state.
+	// Safe because: once a run leaves Running, no code path will lock its mutex again,
+	// and this pruning runs in the same single-goroutine detection loop.
+	z.runMutexesMu.Lock()
+	for id := range z.runMutexes {
+		if _, ok := runningIDs[id]; !ok {
+			delete(z.runMutexes, id)
+		}
+	}
+	z.runMutexesMu.Unlock()
 }
 
 // checkAndCleanZombie checks if a single DAG run is a zombie and cleans it up
@@ -166,64 +215,60 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *exec.DAGRu
 	}
 
 	if alive {
+		// Reset consecutive stale counter — run is healthy
+		delete(z.staleCounters, st.DAGRunID)
 		logger.Debug(ctx, "Dag-run heartbeat detected; skipping zombie cleanup",
 			tag.Queue(dag.ProcGroup()),
 		)
 		return nil
 	}
 
-	// Process is zombie, update status to error
-	logger.Info(ctx, "Found zombie DAG run, updating to error status",
-		tag.Queue(dag.ProcGroup()),
-	)
+	// Increment consecutive stale counter
+	z.staleCounters[st.DAGRunID]++
+	count := z.staleCounters[st.DAGRunID]
 
-	// Read the full status from the attempt rather than using the summary
-	// from ListStatuses, which lacks node data. This ensures we preserve
-	// the complete status (nodes, logs, params, etc.) when updating.
-	fullStatus, err := attempt.ReadStatus(ctx)
+	if count < z.failureThreshold {
+		logger.Warn(ctx, "DAG run appears stale, waiting for threshold",
+			tag.Queue(dag.ProcGroup()),
+			slog.Int("stale_count", count),
+			slog.Int("threshold", z.failureThreshold),
+		)
+		return nil
+	}
+
+	// Threshold reached — acquire per-run mutex and proceed with kill
+	runMu := z.getRunMutex(st.DAGRunID)
+	runMu.Lock()
+	defer runMu.Unlock()
+
+	repairedStatus, repaired, err := runtime.RepairStaleLocalRun(ctx, attempt, dag)
 	if err != nil {
-		return fmt.Errorf("read full status: %w", err)
-	}
-
-	fullStatus.Status = core.Failed
-	fullStatus.FinishedAt = time.Now().Format(time.RFC3339)
-
-	// If the process was killed before writing node data (e.g., SIGKILL before
-	// the initial 100ms status write), populate nodes from the DAG definition
-	// so the UI shows step names instead of "0/0 Log".
-	if len(fullStatus.Nodes) == 0 {
-		fullStatus.Nodes = exec.NewNodesFromSteps(dag.Steps)
-	}
-
-	for _, n := range fullStatus.Nodes {
-		if n.Status == core.NodeRunning || n.Status == core.NodeNotStarted {
-			n.Status = core.NodeFailed
-			n.Error = "process terminated unexpectedly - zombie process detected"
-		}
-	}
-
-	if err := z.updateStatus(ctx, attempt, *fullStatus); err != nil {
 		return fmt.Errorf("update status: %w", err)
 	}
-
-	return nil
-}
-
-// updateStatus updates the status of a DAG run attempt
-func (z *ZombieDetector) updateStatus(ctx context.Context,
-	attempt exec.DAGRunAttempt, status exec.DAGRunStatus) error {
-	if err := attempt.Open(ctx); err != nil {
-		return fmt.Errorf("open attempt: %w", err)
+	if !repaired {
+		logger.Info(ctx, "Run already in terminal state, skipping zombie cleanup",
+			tag.Queue(dag.ProcGroup()),
+			slog.String("status", repairedStatus.Status.String()),
+		)
+		delete(z.staleCounters, st.DAGRunID)
+		return nil
 	}
-	defer func() {
-		if err := attempt.Close(ctx); err != nil {
-			logger.Error(ctx, "Failed to close attempt", tag.Error(err))
-		}
-	}()
 
-	if err := attempt.Write(ctx, status); err != nil {
-		return fmt.Errorf("write status: %w", err)
+	logger.Info(ctx, "Confirmed zombie DAG run, updated to failed status",
+		tag.Queue(dag.ProcGroup()),
+		slog.Int("stale_count", count),
+	)
+
+	// Clean up stale proc files for this specific run after persisting Failed status
+	if err := z.procStore.CleanStaleFiles(ctx, dag.ProcGroup(), exec.DAGRunRef{Name: dag.Name, ID: st.DAGRunID}); err != nil {
+		logger.Error(ctx, "Failed to clean stale proc files",
+			tag.Queue(dag.ProcGroup()),
+			tag.Error(err),
+		)
 	}
+
+	// Clean up counter entry
+	delete(z.staleCounters, st.DAGRunID)
 
 	return nil
 }

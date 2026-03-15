@@ -28,7 +28,6 @@ import (
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
-	"github.com/dagu-org/dagu/internal/persis/fileproc"
 	"github.com/dagu-org/dagu/internal/persis/filequeue"
 	"github.com/dagu-org/dagu/internal/persis/fileserviceregistry"
 	runtimepkg "github.com/dagu-org/dagu/internal/runtime"
@@ -240,7 +239,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 	dagStore := filedag.New(cfg.Paths.DAGsDir, filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir), filedag.WithSkipExamples(true))
 	runStore := filedagrun.New(cfg.Paths.DAGRunsDir)
-	procStore := fileproc.New(cfg.Paths.ProcDir)
+	procStore := newProcStore(cfg)
 	queueStore := filequeue.New(cfg.Paths.QueueDir)
 	serviceMonitor := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
@@ -344,6 +343,12 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 		configData["queues"] = qcfg
 	}
 
+	configData["proc"] = map[string]any{
+		"heartbeat_interval":      cfg.Proc.HeartbeatInterval.String(),
+		"heartbeat_sync_interval": cfg.Proc.HeartbeatSyncInterval.String(),
+		"stale_threshold":         cfg.Proc.StaleThreshold.String(),
+	}
+
 	scheduler := map[string]any{}
 	// Always write port so that 0 (disable health server) is preserved when loading
 	scheduler["port"] = cfg.Scheduler.Port
@@ -355,6 +360,9 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 	}
 	if cfg.Scheduler.ZombieDetectionInterval >= 0 {
 		scheduler["zombie_detection_interval"] = cfg.Scheduler.ZombieDetectionInterval.String()
+	}
+	if cfg.Scheduler.FailureThreshold > 0 {
+		scheduler["failure_threshold"] = cfg.Scheduler.FailureThreshold
 	}
 	if len(scheduler) > 0 {
 		configData["scheduler"] = scheduler
