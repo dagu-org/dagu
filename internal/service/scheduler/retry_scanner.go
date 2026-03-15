@@ -251,7 +251,7 @@ func (s *RetryScanner) processFailedRunLegacy(
 }
 
 func (s *RetryScanner) evaluateRetryDecision(
-	ctx context.Context,
+	_ context.Context,
 	status *exec.DAGRunStatus,
 	metadata dagRetryMetadata,
 	now time.Time,
