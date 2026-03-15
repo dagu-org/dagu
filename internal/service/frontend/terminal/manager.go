@@ -47,9 +47,9 @@ type leaseState uint8
 
 const (
 	leaseStateReserved     leaseState = iota + 1
-	leaseStateActive                          // Slot occupied, connection in sessions map
-	leaseStateSlotReleased                    // Slot freed, connection still cleaning up
-	leaseStateReleased                        // Fully done
+	leaseStateActive                  // Slot occupied, connection in sessions map
+	leaseStateSlotReleased            // Slot freed, connection still cleaning up
+	leaseStateReleased                // Fully done
 )
 
 // sessionLease represents a reserved terminal slot that can be activated once.
