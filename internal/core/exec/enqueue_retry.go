@@ -19,6 +19,22 @@ type EnqueueRetryOptions struct {
 	AutoRetry bool
 }
 
+// EnqueueRetryOutcome describes the final state of a retry enqueue attempt.
+type EnqueueRetryOutcome string
+
+const (
+	EnqueueRetryOutcomeQueued        EnqueueRetryOutcome = "queued"
+	EnqueueRetryOutcomeAlreadyQueued EnqueueRetryOutcome = "already_queued"
+	EnqueueRetryOutcomeStaleLatest   EnqueueRetryOutcome = "stale_latest"
+)
+
+// EnqueueRetryResult reports the persisted status observed at the end of an
+// enqueue attempt.
+type EnqueueRetryResult struct {
+	Outcome EnqueueRetryOutcome
+	Status  *DAGRunStatus
+}
+
 // EnqueueRetry enqueues a DAG run for retry and persists the Queued status.
 // It persists the Queued status first, then enqueues, so the queue processor
 // always sees the correct status when it picks up the item. If enqueue fails,
@@ -31,10 +47,13 @@ func EnqueueRetry(
 	dag *core.DAG,
 	status *DAGRunStatus,
 	opts EnqueueRetryOptions,
-) error {
+) (EnqueueRetryResult, error) {
 	if status.Status == core.Queued {
 		// Already queued (e.g. duplicate retry), treat as success
-		return nil
+		return EnqueueRetryResult{
+			Outcome: EnqueueRetryOutcomeAlreadyQueued,
+			Status:  status,
+		}, nil
 	}
 
 	updatedStatus, swapped, err := dagRunStore.CompareAndSwapLatestAttemptStatus(
@@ -53,15 +72,21 @@ func EnqueueRetry(
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("persist queued retry status: %w", err)
+		return EnqueueRetryResult{}, fmt.Errorf("persist queued retry status: %w", err)
 	}
 	if !swapped {
 		// Another actor changed the latest attempt first. Treat an already queued
 		// retry as success; everything else is a no-op.
 		if updatedStatus != nil && updatedStatus.Status == core.Queued {
-			return nil
+			return EnqueueRetryResult{
+				Outcome: EnqueueRetryOutcomeAlreadyQueued,
+				Status:  updatedStatus,
+			}, nil
 		}
-		return nil
+		return EnqueueRetryResult{
+			Outcome: EnqueueRetryOutcomeStaleLatest,
+			Status:  updatedStatus,
+		}, nil
 	}
 
 	// Enqueue after status is persisted. If this fails, roll back the status.
@@ -80,8 +105,11 @@ func EnqueueRetry(
 				return nil
 			},
 		)
-		return fmt.Errorf("enqueue retry: %w", err)
+		return EnqueueRetryResult{}, fmt.Errorf("enqueue retry: %w", err)
 	}
 
-	return nil
+	return EnqueueRetryResult{
+		Outcome: EnqueueRetryOutcomeQueued,
+		Status:  updatedStatus,
+	}, nil
 }

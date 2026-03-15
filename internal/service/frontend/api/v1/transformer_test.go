@@ -14,11 +14,11 @@ import (
 
 func TestToDAGRunSummaryIncludesScheduleTime(t *testing.T) {
 	status := exec.DAGRunStatus{
-		Name:         "test-dag",
-		DAGRunID:     "run-1",
+		Name:           "test-dag",
+		DAGRunID:       "run-1",
 		AutoRetryCount: 2,
-		Status:       core.Queued,
-		ScheduleTime: "2026-03-13T00:00:00Z",
+		Status:         core.Queued,
+		ScheduleTime:   "2026-03-13T00:00:00Z",
 	}
 
 	summary := toDAGRunSummary(status)
@@ -29,12 +29,12 @@ func TestToDAGRunSummaryIncludesScheduleTime(t *testing.T) {
 
 func TestToDAGRunDetailsIncludesScheduleTime(t *testing.T) {
 	status := exec.DAGRunStatus{
-		Name:         "test-dag",
-		DAGRunID:     "run-1",
+		Name:           "test-dag",
+		DAGRunID:       "run-1",
 		AutoRetryCount: 3,
-		Status:       core.Queued,
-		QueuedAt:     "2026-03-13T00:01:00Z",
-		ScheduleTime: "2026-03-13T00:00:00Z",
+		Status:         core.Queued,
+		QueuedAt:       "2026-03-13T00:01:00Z",
+		ScheduleTime:   "2026-03-13T00:00:00Z",
 	}
 
 	details := ToDAGRunDetails(status)

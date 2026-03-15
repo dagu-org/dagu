@@ -166,6 +166,25 @@ steps:
 	require.NoError(t, resolved.Validate(doc))
 }
 
+func TestDAGSchemaRootRetryPolicyRejectsExitCode(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+	doc := mustParseYAMLDocument(t, `
+name: retryable-dag
+retry_policy:
+  limit: 3
+  interval_sec: 10
+  exit_code: [1]
+steps:
+  - command: echo hi
+`)
+
+	err := resolved.Validate(doc)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "retry_policy")
+}
+
 func mustResolveDAGSchema(t *testing.T) *jsonschema.Resolved {
 	t.Helper()
 

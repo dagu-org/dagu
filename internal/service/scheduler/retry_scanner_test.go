@@ -97,14 +97,19 @@ func TestRetryScannerEvaluateRetryDecision(t *testing.T) {
 			scanner, err := NewRetryScanner(
 				nil,
 				nil,
-				nil,
 				func(context.Context, string) bool { return tt.suspended },
 				24*time.Hour,
 				func() time.Time { return now },
 			)
 			require.NoError(t, err)
 
-			got := scanner.evaluateRetryDecision(context.Background(), tt.status, tt.dagSnapshot, tt.activeRuns, now)
+			got := scanner.evaluateRetryDecision(
+				context.Background(),
+				tt.status,
+				tt.dagSnapshot,
+				latestActiveScheduleByName(tt.activeRuns),
+				now,
+			)
 
 			assert.Equal(t, tt.enqueue, got.enqueue)
 			assert.Equal(t, tt.reason, got.reason)
@@ -117,7 +122,7 @@ func TestRetryScannerEvaluateRetryDecision(t *testing.T) {
 func TestNewRetryScanner(t *testing.T) {
 	t.Parallel()
 
-	scanner, err := NewRetryScanner(nil, nil, nil, nil, 0, time.Now)
+	scanner, err := NewRetryScanner(nil, nil, nil, 0, time.Now)
 	require.NoError(t, err)
 	require.NotNil(t, scanner)
 }
@@ -177,7 +182,6 @@ func TestRetryScannerScanEnqueuesRetry(t *testing.T) {
 		Once()
 
 	scanner, err := NewRetryScanner(
-		&retryScannerEntryReader{dags: []*core.DAG{dag}},
 		store,
 		queueStore,
 		nil,
@@ -236,7 +240,6 @@ func TestRetryScannerScanSkipsCrossMidnightNewerRun(t *testing.T) {
 
 	store := newRetryScannerStore(dag, failed, active)
 	scanner, err := NewRetryScanner(
-		&retryScannerEntryReader{dags: []*core.DAG{dag}},
 		store,
 		&exec.MockQueueStore{},
 		nil,
@@ -297,7 +300,6 @@ func TestRetryScannerScanUsesPersistedRetryPolicy(t *testing.T) {
 		Once()
 
 	scanner, err := NewRetryScanner(
-		&retryScannerEntryReader{dags: []*core.DAG{retryDAG, noRetryDAG}},
 		store,
 		queueStore,
 		nil,
@@ -347,7 +349,6 @@ func TestRetryScannerScanIsIdempotentForQueuedRun(t *testing.T) {
 		Once()
 
 	scanner, err := NewRetryScanner(
-		&retryScannerEntryReader{dags: []*core.DAG{dag}},
 		store,
 		queueStore,
 		nil,
@@ -363,14 +364,23 @@ func TestRetryScannerScanIsIdempotentForQueuedRun(t *testing.T) {
 	queueStore.AssertExpectations(t)
 }
 
-type retryScannerEntryReader struct {
-	dags []*core.DAG
-}
+func TestLatestActiveScheduleByName(t *testing.T) {
+	t.Parallel()
 
-func (r *retryScannerEntryReader) Init(context.Context) error { return nil }
-func (r *retryScannerEntryReader) Start(context.Context)      {}
-func (r *retryScannerEntryReader) Stop()                      {}
-func (r *retryScannerEntryReader) DAGs() []*core.DAG          { return r.dags }
+	statuses := []*exec.DAGRunStatus{
+		{Name: "alpha", ScheduleTime: "invalid"},
+		{Name: "alpha", ScheduleTime: time.Date(2026, 3, 14, 12, 0, 0, 0, time.UTC).Format(time.RFC3339)},
+		{Name: "alpha", ScheduleTime: time.Date(2026, 3, 14, 12, 5, 0, 0, time.UTC).Format(time.RFC3339)},
+		{Name: "beta", ScheduleTime: time.Date(2026, 3, 14, 11, 0, 0, 0, time.UTC).Format(time.RFC3339)},
+		nil,
+	}
+
+	got := latestActiveScheduleByName(statuses)
+
+	require.Len(t, got, 2)
+	assert.Equal(t, time.Date(2026, 3, 14, 12, 5, 0, 0, time.UTC), got["alpha"])
+	assert.Equal(t, time.Date(2026, 3, 14, 11, 0, 0, 0, time.UTC), got["beta"])
+}
 
 type retryScannerStore struct {
 	attempts  map[string]*retryScannerAttempt

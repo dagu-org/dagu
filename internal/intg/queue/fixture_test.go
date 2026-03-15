@@ -391,14 +391,15 @@ func (f *fixture) RunningRunWithMetadata(opts runStatusOptions) string {
 
 // RetryEnqueue enqueues a previously failed run for retry using exec.EnqueueRetry.
 func (f *fixture) RetryEnqueue(runID string) *fixture {
-	require.NoError(f.t, exec.EnqueueRetry(
+	_, err := exec.EnqueueRetry(
 		f.th.Context,
 		f.th.DAGRunStore,
 		f.th.QueueStore,
 		f.dag,
 		f.MustStatus(runID),
 		exec.EnqueueRetryOptions{},
-	))
+	)
+	require.NoError(f.t, err)
 	return f
 }
 

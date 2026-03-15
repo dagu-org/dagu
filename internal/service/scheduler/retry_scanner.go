@@ -35,7 +35,6 @@ type RetryScanner struct {
 }
 
 func NewRetryScanner(
-	_ EntryReader,
 	dagRunStore exec.DAGRunStore,
 	queueStore exec.QueueStore,
 	isSuspended IsSuspendedFunc,
@@ -104,12 +103,12 @@ func (s *RetryScanner) scan(ctx context.Context) error {
 		return err
 	}
 
-	activeRunsByName := groupStatusesByName(activeRuns)
+	activeRunIndex := latestActiveScheduleByName(activeRuns)
 	for _, listed := range failedRuns {
 		if listed == nil {
 			continue
 		}
-		if err := s.processFailedRun(ctx, listed, activeRunsByName[listed.Name], now); err != nil {
+		if err := s.processFailedRun(ctx, listed, activeRunIndex, now); err != nil {
 			logger.Error(ctx, "Retry scanner failed to process DAG run",
 				tag.DAG(listed.Name),
 				tag.RunID(listed.DAGRunID),
@@ -123,7 +122,7 @@ func (s *RetryScanner) scan(ctx context.Context) error {
 func (s *RetryScanner) processFailedRun(
 	ctx context.Context,
 	listed *exec.DAGRunStatus,
-	activeRuns []*exec.DAGRunStatus,
+	activeRunIndex map[string]time.Time,
 	now time.Time,
 ) error {
 	ref := listed.DAGRun()
@@ -148,7 +147,7 @@ func (s *RetryScanner) processFailedRun(
 		return err
 	}
 
-	decision := s.evaluateRetryDecision(ctx, latestStatus, dagSnapshot, activeRuns, now)
+	decision := s.evaluateRetryDecision(ctx, latestStatus, dagSnapshot, activeRunIndex, now)
 	if !decision.enqueue {
 		if decision.reason != "" {
 			logger.Debug(ctx, "Retry scanner skipped DAG run",
@@ -160,24 +159,38 @@ func (s *RetryScanner) processFailedRun(
 		return nil
 	}
 
-	if err := exec.EnqueueRetry(ctx, s.dagRunStore, s.queueStore, dagSnapshot, latestStatus, exec.EnqueueRetryOptions{
+	result, err := exec.EnqueueRetry(ctx, s.dagRunStore, s.queueStore, dagSnapshot, latestStatus, exec.EnqueueRetryOptions{
 		AutoRetry: true,
-	}); err != nil {
+	})
+	if err != nil {
 		return err
 	}
 
-	queuedStatus, err := attempt.ReadStatus(ctx)
-	if err != nil {
-		queuedStatus = latestStatus
+	switch result.Outcome {
+	case exec.EnqueueRetryOutcomeQueued:
+		queuedStatus := latestStatus
+		if result.Status != nil {
+			queuedStatus = result.Status
+		}
+		logger.Info(ctx, "Retry scanner enqueued DAG-level retry",
+			tag.DAG(latestStatus.Name),
+			tag.RunID(latestStatus.DAGRunID),
+			slog.Int("auto_retry_count", queuedStatus.AutoRetryCount),
+			slog.String("next_retry_at", decision.nextRetryAt.Format(time.RFC3339)),
+			slog.Duration("computed_delay", decision.computedDelay),
+		)
+	case exec.EnqueueRetryOutcomeAlreadyQueued:
+		logger.Debug(ctx, "Retry scanner found DAG run already queued for retry",
+			tag.DAG(latestStatus.Name),
+			tag.RunID(latestStatus.DAGRunID),
+		)
+	case exec.EnqueueRetryOutcomeStaleLatest:
+		logger.Debug(ctx, "Retry scanner skipped DAG run",
+			tag.DAG(latestStatus.Name),
+			tag.RunID(latestStatus.DAGRunID),
+			slog.String("skip_reason", "stale_latest"),
+		)
 	}
-
-	logger.Info(ctx, "Retry scanner enqueued DAG-level retry",
-		tag.DAG(latestStatus.Name),
-		tag.RunID(latestStatus.DAGRunID),
-		slog.Int("auto_retry_count", queuedStatus.AutoRetryCount),
-		slog.String("next_retry_at", decision.nextRetryAt.Format(time.RFC3339)),
-		slog.Duration("computed_delay", decision.computedDelay),
-	)
 	return nil
 }
 
@@ -185,7 +198,7 @@ func (s *RetryScanner) evaluateRetryDecision(
 	ctx context.Context,
 	status *exec.DAGRunStatus,
 	dagSnapshot *core.DAG,
-	activeRuns []*exec.DAGRunStatus,
+	activeRunIndex map[string]time.Time,
 	now time.Time,
 ) retryDecision {
 	if dagSnapshot == nil || dagSnapshot.RetryPolicy == nil {
@@ -194,7 +207,7 @@ func (s *RetryScanner) evaluateRetryDecision(
 	if s.isSuspended(ctx, dagSuspendFlagName(dagSnapshot)) {
 		return retryDecision{reason: "suspended"}
 	}
-	if newerScheduledRunExists(status, activeRuns) {
+	if newerScheduledRunExists(status, activeRunIndex) {
 		return retryDecision{reason: "newer_run_exists"}
 	}
 	if status.AutoRetryCount >= dagSnapshot.RetryPolicy.Limit {
@@ -223,13 +236,19 @@ func (s *RetryScanner) evaluateRetryDecision(
 	}
 }
 
-func groupStatusesByName(statuses []*exec.DAGRunStatus) map[string][]*exec.DAGRunStatus {
-	grouped := make(map[string][]*exec.DAGRunStatus, len(statuses))
+func latestActiveScheduleByName(statuses []*exec.DAGRunStatus) map[string]time.Time {
+	grouped := make(map[string]time.Time, len(statuses))
 	for _, status := range statuses {
 		if status == nil {
 			continue
 		}
-		grouped[status.Name] = append(grouped[status.Name], status)
+		scheduleTime, ok := parseRFC3339(status.ScheduleTime)
+		if !ok {
+			continue
+		}
+		if current, exists := grouped[status.Name]; !exists || scheduleTime.After(current) {
+			grouped[status.Name] = scheduleTime
+		}
 	}
 	return grouped
 }
@@ -246,28 +265,13 @@ func dagRetryDelay(policy *core.DAGRetryPolicy, retryCount int) time.Duration {
 	return time.Duration(delay)
 }
 
-func newerScheduledRunExists(failed *exec.DAGRunStatus, activeRuns []*exec.DAGRunStatus) bool {
+func newerScheduledRunExists(failed *exec.DAGRunStatus, activeRunIndex map[string]time.Time) bool {
 	failedSchedule, ok := parseRFC3339(failed.ScheduleTime)
 	if !ok {
 		return false
 	}
-
-	for _, candidate := range activeRuns {
-		if candidate == nil || candidate.DAGRunID == failed.DAGRunID {
-			continue
-		}
-		if candidate.Name != failed.Name {
-			continue
-		}
-		activeSchedule, ok := parseRFC3339(candidate.ScheduleTime)
-		if !ok {
-			continue
-		}
-		if activeSchedule.After(failedSchedule) {
-			return true
-		}
-	}
-	return false
+	activeSchedule, ok := activeRunIndex[failed.Name]
+	return ok && activeSchedule.After(failedSchedule)
 }
 
 func parseRFC3339(val string) (time.Time, bool) {

@@ -5,6 +5,7 @@ package scheduler_test
 
 import (
 	"context"
+	"errors"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -312,6 +313,40 @@ func TestScheduler_StopWhileWaitingForLock(t *testing.T) {
 	}
 }
 
+func TestScheduler_StartFailureCleansUpPartialStartup(t *testing.T) {
+	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	clock := func() time.Time { return now }
+
+	th := test.SetupScheduler(t)
+
+	sc1, err := scheduler.New(
+		th.Config,
+		&failingInitEntryReader{mockJobManager: newMockJobManager(), initErr: errors.New("init failed")},
+		th.DAGRunMgr,
+		th.DAGRunStore,
+		th.QueueStore,
+		th.ProcStore,
+		th.ServiceRegistry,
+		th.CoordinatorCli,
+		nil,
+	)
+	require.NoError(t, err)
+	sc1.SetClock(clock)
+
+	err = sc1.Start(context.Background())
+	require.Error(t, err)
+	require.ErrorContains(t, err, "init failed")
+	require.False(t, sc1.IsRunning())
+
+	sc2, err := scheduler.New(th.Config, newMockJobManager(), th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
+	require.NoError(t, err)
+	sc2.SetClock(clock)
+
+	ctx := context.Background()
+	errCh2 := startSchedulerAsync(t, sc2, ctx)
+	defer stopSchedulerAndWait(t, sc2, errCh2, ctx)
+}
+
 func startSchedulerAsync(t *testing.T, sc *scheduler.Scheduler, ctx context.Context) chan error {
 	t.Helper()
 
@@ -359,4 +394,13 @@ func stopSchedulerAndWait(t *testing.T, sc *scheduler.Scheduler, errCh <-chan er
 	case <-time.After(5 * time.Second):
 		t.Fatal("scheduler Start() did not return after Stop()")
 	}
+}
+
+type failingInitEntryReader struct {
+	*mockJobManager
+	initErr error
+}
+
+func (er *failingInitEntryReader) Init(context.Context) error {
+	return er.initErr
 }

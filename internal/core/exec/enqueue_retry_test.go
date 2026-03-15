@@ -20,20 +20,26 @@ func TestEnqueueRetry(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		dag         *core.DAG
-		status      *exec.DAGRunStatus
-		opts        exec.EnqueueRetryOptions
-		store       *stubDAGRunStore
-		setupQueue  func(qs *exec.MockQueueStore)
-		assertStore func(t *testing.T, store *stubDAGRunStore)
-		wantErr     string
+		name         string
+		dag          *core.DAG
+		status       *exec.DAGRunStatus
+		opts         exec.EnqueueRetryOptions
+		store        *stubDAGRunStore
+		setupQueue   func(qs *exec.MockQueueStore)
+		assertResult func(t *testing.T, result exec.EnqueueRetryResult)
+		assertStore  func(t *testing.T, store *stubDAGRunStore)
+		wantErr      string
 	}{
 		{
 			name:   "AlreadyQueued",
 			dag:    &core.DAG{Name: "test-dag"},
 			status: &exec.DAGRunStatus{Status: core.Queued},
 			store:  &stubDAGRunStore{},
+			assertResult: func(t *testing.T, result exec.EnqueueRetryResult) {
+				assert.Equal(t, exec.EnqueueRetryOutcomeAlreadyQueued, result.Outcome)
+				require.NotNil(t, result.Status)
+				assert.Equal(t, core.Queued, result.Status.Status)
+			},
 			setupQueue: func(qs *exec.MockQueueStore) {
 				qs.AssertNotCalled(t, "Enqueue", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			},
@@ -63,6 +69,12 @@ func TestEnqueueRetry(t *testing.T) {
 			setupQueue: func(qs *exec.MockQueueStore) {
 				qs.On("Enqueue", mock.Anything, "test-dag", exec.QueuePriorityLow, exec.NewDAGRunRef("test-dag", "run-1")).
 					Return(nil)
+			},
+			assertResult: func(t *testing.T, result exec.EnqueueRetryResult) {
+				assert.Equal(t, exec.EnqueueRetryOutcomeQueued, result.Outcome)
+				require.NotNil(t, result.Status)
+				assert.Equal(t, core.Queued, result.Status.Status)
+				assert.Equal(t, 2, result.Status.AutoRetryCount)
 			},
 			assertStore: func(t *testing.T, store *stubDAGRunStore) {
 				require.NotNil(t, store.status)
@@ -97,6 +109,11 @@ func TestEnqueueRetry(t *testing.T) {
 				qs.On("Enqueue", mock.Anything, "test-dag", exec.QueuePriorityLow, exec.NewDAGRunRef("test-dag", "run-auto")).
 					Return(nil)
 			},
+			assertResult: func(t *testing.T, result exec.EnqueueRetryResult) {
+				assert.Equal(t, exec.EnqueueRetryOutcomeQueued, result.Outcome)
+				require.NotNil(t, result.Status)
+				assert.Equal(t, 3, result.Status.AutoRetryCount)
+			},
 			assertStore: func(t *testing.T, store *stubDAGRunStore) {
 				require.NotNil(t, store.status)
 				assert.Equal(t, 3, store.status.AutoRetryCount)
@@ -129,6 +146,35 @@ func TestEnqueueRetry(t *testing.T) {
 			store: &stubDAGRunStore{
 				status:       &exec.DAGRunStatus{Name: "test-dag", DAGRunID: "run-3", AttemptID: "att-new", Status: core.Queued},
 				firstSwapped: false,
+			},
+			assertResult: func(t *testing.T, result exec.EnqueueRetryResult) {
+				assert.Equal(t, exec.EnqueueRetryOutcomeAlreadyQueued, result.Outcome)
+				require.NotNil(t, result.Status)
+				assert.Equal(t, "att-new", result.Status.AttemptID)
+				assert.Equal(t, core.Queued, result.Status.Status)
+			},
+			assertStore: func(t *testing.T, store *stubDAGRunStore) {
+				assert.Equal(t, 1, store.casCalls)
+			},
+		},
+		{
+			name: "CompareAndSwapLosesRaceToDifferentLatestStatus",
+			dag:  &core.DAG{Name: "test-dag"},
+			status: &exec.DAGRunStatus{
+				Name:      "test-dag",
+				DAGRunID:  "run-3b",
+				AttemptID: "att-3b",
+				Status:    core.Failed,
+			},
+			store: &stubDAGRunStore{
+				status:       &exec.DAGRunStatus{Name: "test-dag", DAGRunID: "run-3b", AttemptID: "att-other", Status: core.Running},
+				firstSwapped: false,
+			},
+			assertResult: func(t *testing.T, result exec.EnqueueRetryResult) {
+				assert.Equal(t, exec.EnqueueRetryOutcomeStaleLatest, result.Outcome)
+				require.NotNil(t, result.Status)
+				assert.Equal(t, "att-other", result.Status.AttemptID)
+				assert.Equal(t, core.Running, result.Status.Status)
 			},
 			assertStore: func(t *testing.T, store *stubDAGRunStore) {
 				assert.Equal(t, 1, store.casCalls)
@@ -181,12 +227,15 @@ func TestEnqueueRetry(t *testing.T) {
 				tt.setupQueue(qs)
 			}
 
-			err := exec.EnqueueRetry(ctx, tt.store, qs, tt.dag, tt.status, tt.opts)
+			result, err := exec.EnqueueRetry(ctx, tt.store, qs, tt.dag, tt.status, tt.opts)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
 			} else {
 				require.NoError(t, err)
+				if tt.assertResult != nil {
+					tt.assertResult(t, result)
+				}
 			}
 
 			if tt.assertStore != nil {
