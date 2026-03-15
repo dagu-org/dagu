@@ -231,6 +231,7 @@ params:
 		"base_dir=/custom/base",
 		"output_dir=/custom/base/output",
 	}, resolved.Params)
+	assert.Equal(t, `base_dir="/custom/base" output_dir="/custom/base/output"`, resolved.DefaultParams)
 	assert.JSONEq(t, `{"base_dir":"/custom/base","output_dir":"/custom/base/output"}`, resolved.ParamsJSON)
 }
 

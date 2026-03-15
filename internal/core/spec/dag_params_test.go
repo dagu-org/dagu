@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
@@ -216,6 +217,7 @@ params:
 		"base_dir=/custom/base",
 		"output_dir=/custom/base/output",
 	}, dag.Params)
+	assert.Equal(t, `base_dir="/custom/base" output_dir="/custom/base/output"`, dag.DefaultParams)
 	assert.JSONEq(t, `{"base_dir":"/custom/base","output_dir":"/custom/base/output"}`, dag.ParamsJSON)
 }
 
@@ -237,7 +239,38 @@ params:
 		"base_dir=",
 		"output_dir=/output",
 	}, dag.Params)
+	assert.Equal(t, `base_dir="" output_dir="/output"`, dag.DefaultParams)
 	assert.JSONEq(t, `{"base_dir":"","output_dir":"/output"}`, dag.ParamsJSON)
+}
+
+func TestInlineParamDefs_EvalOverrideDoesNotReexecuteUnchangedParams(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires POSIX shell semantics")
+	}
+
+	countFile := filepath.Join(t.TempDir(), "eval-count")
+	t.Setenv("EVAL_COUNT_FILE", countFile)
+
+	yaml := []byte(`
+name: eval-single-execution
+params:
+  - name: token
+    eval: "` + "`sh -c 'n=0; [ -f $EVAL_COUNT_FILE ] && n=$(cat $EVAL_COUNT_FILE); n=$((n+1)); printf %s $n > $EVAL_COUNT_FILE; printf token-%s $n'`" + `"
+  - name: mode
+    default: default
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithParams(`mode=override`))
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"token=token-1",
+		"mode=override",
+	}, dag.Params)
+	assert.Equal(t, `token="token-1" mode="override"`, dag.DefaultParams)
+
+	data, err := os.ReadFile(countFile)
+	require.NoError(t, err)
+	assert.Equal(t, "1", string(data))
 }
 
 func TestInlineParamDefs_EvalFailureFallsBackToDefault(t *testing.T) {

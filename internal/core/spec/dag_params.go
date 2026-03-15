@@ -41,6 +41,7 @@ func buildDAGParamsResult(ctx BuildContext, d *dag) (*paramsResult, error) {
 		return nil, err
 	}
 
+	resolveRuntimeParams := shouldResolveRuntimeParams(ctx)
 	defaultEntries := cloneParamEntries(plan.entries)
 	defaultPairs := runtimePairsFromEntries(defaultEntries)
 	finalPairs := defaultPairs
@@ -49,7 +50,7 @@ func buildDAGParamsResult(ctx BuildContext, d *dag) (*paramsResult, error) {
 	case dagParamKindLegacy:
 		if plan.schema == nil {
 			finalPairs = defaultPairs
-			if ctx.opts.Has(BuildFlagValidateRuntimeParams) || ctx.opts.Parameters != "" || len(ctx.opts.ParametersList) > 0 {
+			if resolveRuntimeParams {
 				finalPairs, err = resolveLegacyRuntimePairs(plan.entries, ctx.opts.Parameters, ctx.opts.ParametersList)
 				if err != nil {
 					return nil, err
@@ -58,23 +59,33 @@ func buildDAGParamsResult(ctx BuildContext, d *dag) (*paramsResult, error) {
 			break
 		}
 
-		defaultEntries, err = resolveLegacyEntries(ctx, plan, "", nil, true)
-		if err != nil {
-			return nil, err
-		}
-		defaultPairs = runtimePairsFromEntries(defaultEntries)
-		finalPairs = defaultPairs
-
-		if ctx.opts.Has(BuildFlagValidateRuntimeParams) || ctx.opts.Parameters != "" || len(ctx.opts.ParametersList) > 0 {
+		if resolveRuntimeParams {
 			finalEntries, err := resolveLegacyEntries(ctx, plan, ctx.opts.Parameters, ctx.opts.ParametersList, false)
 			if err != nil {
 				return nil, err
 			}
 			finalPairs = runtimePairsFromEntries(finalEntries)
+
+			// Eval-backed inline params may depend on mutable state or perform command
+			// execution, so reuse the execution-time resolution instead of running
+			// the same expressions again just to populate DefaultParams.
+			if legacyPlanHasEval(plan) && !ctx.opts.Has(BuildFlagNoEval) {
+				defaultPairs = finalPairs
+				break
+			}
+		}
+
+		defaultEntries, err = resolveLegacyEntries(ctx, plan, "", nil, true)
+		if err != nil {
+			return nil, err
+		}
+		defaultPairs = runtimePairsFromEntries(defaultEntries)
+		if !resolveRuntimeParams {
+			finalPairs = defaultPairs
 		}
 
 	case dagParamKindExternalSchema:
-		if ctx.opts.Has(BuildFlagValidateRuntimeParams) || ctx.opts.Parameters != "" || len(ctx.opts.ParametersList) > 0 {
+		if resolveRuntimeParams {
 			finalEntries, err := resolveExternalSchemaEntries(plan, ctx.opts.Parameters, ctx.opts.ParametersList)
 			if err != nil {
 				return nil, err
@@ -109,6 +120,19 @@ func buildDAGParamsResult(ctx BuildContext, d *dag) (*paramsResult, error) {
 		ParamDefs:     cloneParamDefs(plan.paramDefs),
 		ParamsJSON:    paramsJSON,
 	}, nil
+}
+
+func shouldResolveRuntimeParams(ctx BuildContext) bool {
+	return ctx.opts.Has(BuildFlagValidateRuntimeParams) || ctx.opts.Parameters != "" || len(ctx.opts.ParametersList) > 0
+}
+
+func legacyPlanHasEval(plan *dagParamPlan) bool {
+	for _, entry := range plan.entries {
+		if strings.TrimSpace(entry.Eval) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func buildDAGParamPlan(ctx BuildContext, d *dag) (*dagParamPlan, error) {
