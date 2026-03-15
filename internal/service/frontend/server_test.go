@@ -170,6 +170,74 @@ func TestInitBuiltinAuthService_UserCanAuthenticate(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestNewServerShutdownContext(t *testing.T) {
+	t.Parallel()
+
+	t.Run("HonorsCallerDeadline", func(t *testing.T) {
+		t.Parallel()
+
+		parent, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+
+		shutdownCtx, cleanup := newServerShutdownContext(parent)
+		defer cleanup()
+
+		parentDeadline, ok := parent.Deadline()
+		require.True(t, ok)
+		shutdownDeadline, ok := shutdownCtx.Deadline()
+		require.True(t, ok)
+		assert.WithinDuration(t, parentDeadline, shutdownDeadline, 10*time.Millisecond)
+	})
+
+	t.Run("AlreadyCanceledStaysCanceled", func(t *testing.T) {
+		t.Parallel()
+
+		parent, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		shutdownCtx, cleanup := newServerShutdownContext(parent)
+		defer cleanup()
+
+		require.ErrorIs(t, shutdownCtx.Err(), context.Canceled)
+	})
+
+	t.Run("NoDeadlineGetsDefaultTimeout", func(t *testing.T) {
+		t.Parallel()
+
+		type ctxKey string
+		start := time.Now()
+		parent := context.WithValue(context.Background(), ctxKey("trace_id"), "abc123")
+
+		shutdownCtx, cleanup := newServerShutdownContext(parent)
+		defer cleanup()
+
+		deadline, ok := shutdownCtx.Deadline()
+		require.True(t, ok)
+		assert.WithinDuration(t, start.Add(serverShutdownTimeout), deadline, 500*time.Millisecond)
+		assert.Equal(t, "abc123", shutdownCtx.Value(ctxKey("trace_id")))
+	})
+}
+
+func TestNewGracefulShutdownContext(t *testing.T) {
+	t.Parallel()
+
+	type ctxKey string
+
+	parent := context.WithValue(context.Background(), ctxKey("trace_id"), "abc123")
+	canceledParent, cancelParent := context.WithCancel(parent)
+	cancelParent()
+
+	start := time.Now()
+	gracefulCtx, cleanup := newGracefulShutdownContext(canceledParent)
+	defer cleanup()
+
+	assert.NoError(t, gracefulCtx.Err())
+	deadline, ok := gracefulCtx.Deadline()
+	require.True(t, ok)
+	assert.WithinDuration(t, start.Add(serverShutdownTimeout), deadline, 500*time.Millisecond)
+	assert.Equal(t, "abc123", gracefulCtx.Value(ctxKey("trace_id")))
+}
+
 func TestRunShutdownSequence_OrderAndBudgets(t *testing.T) {
 	t.Parallel()
 

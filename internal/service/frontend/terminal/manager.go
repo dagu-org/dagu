@@ -169,17 +169,38 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 		close(done)
 	}()
 
+	if waitForSignal(done, 0) {
+		return nil
+	}
+
+	if delay, ok := forceKillDelay(ctx, processShutdownGrace); ok {
+		if delay <= 0 {
+			m.forceKillSessions()
+			return waitForForcedCleanup(done, ctx)
+		}
+
+		timer := time.NewTimer(delay)
+		defer timer.Stop()
+
+		select {
+		case <-done:
+			return nil
+		case <-timer.C:
+			m.forceKillSessions()
+			return waitForForcedCleanup(done, ctx)
+		case <-ctx.Done():
+			m.forceKillSessions()
+			return waitForForcedCleanup(done, ctx)
+		}
+	}
+
 	select {
 	case <-done:
 		return nil
 	case <-ctx.Done():
+		m.forceKillSessions()
+		return waitForForcedCleanup(done, ctx)
 	}
-
-	for _, conn := range m.snapshotSessions() {
-		conn.ForceKill()
-	}
-
-	return waitForForcedCleanup(done, ctx, processShutdownGrace)
 }
 
 func (m *Manager) snapshotSessions() []*Connection {
@@ -193,24 +214,41 @@ func (m *Manager) snapshotSessions() []*Connection {
 	return sessions
 }
 
-func waitForForcedCleanup(done <-chan struct{}, ctx context.Context, grace time.Duration) error {
-	if grace <= 0 {
-		if err := ctx.Err(); err != nil {
-			return errors.Join(err, errTerminalShutdownTimeout)
-		}
-		return errTerminalShutdownTimeout
+func (m *Manager) forceKillSessions() {
+	for _, conn := range m.snapshotSessions() {
+		conn.ForceKill()
 	}
+}
 
-	graceTimer := time.NewTimer(grace)
-	defer graceTimer.Stop()
+func forceKillDelay(ctx context.Context, reserve time.Duration) (time.Duration, bool) {
+	if reserve <= 0 {
+		return 0, true
+	}
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return 0, false
+	}
+	return time.Until(deadline) - reserve, true
+}
+
+func waitForForcedCleanup(done <-chan struct{}, ctx context.Context) error {
+	if waitForSignal(done, 0) {
+		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		if waitForSignal(done, 0) {
+			return nil
+		}
+		return errors.Join(err, errTerminalShutdownTimeout)
+	}
 
 	select {
 	case <-done:
 		return nil
-	case <-graceTimer.C:
-		if err := ctx.Err(); err != nil {
-			return errors.Join(err, errTerminalShutdownTimeout)
+	case <-ctx.Done():
+		if waitForSignal(done, 0) {
+			return nil
 		}
-		return errTerminalShutdownTimeout
+		return errors.Join(ctx.Err(), errTerminalShutdownTimeout)
 	}
 }

@@ -125,7 +125,7 @@ func TestManager_ShutdownWaitsForActiveSessionsOnly(t *testing.T) {
 	})
 }
 
-func TestManager_ShutdownWaitsForCleanupAfterForceKill(t *testing.T) {
+func TestManager_ShutdownObservesCleanupWithinRemainingBudget(t *testing.T) {
 	t.Parallel()
 
 	manager := NewManager(context.Background(), 1)
@@ -134,7 +134,29 @@ func TestManager_ShutdownWaitsForCleanupAfterForceKill(t *testing.T) {
 	require.NoError(t, lease.Activate(&Connection{ID: "conn-1"}))
 
 	go func() {
-		<-manager.Context().Done()
+		time.Sleep(50 * time.Millisecond)
+		lease.Release()
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	require.NoError(t, manager.Shutdown(ctx))
+	elapsed := time.Since(start)
+	assert.GreaterOrEqual(t, elapsed, 50*time.Millisecond)
+	assert.Less(t, elapsed, 100*time.Millisecond)
+}
+
+func TestManager_ShutdownReturnsPromptlyWhenDeadlineExpires(t *testing.T) {
+	t.Parallel()
+
+	manager := NewManager(context.Background(), 1)
+	lease, err := manager.Acquire()
+	require.NoError(t, err)
+	require.NoError(t, lease.Activate(&Connection{ID: "conn-1"}))
+
+	go func() {
 		time.Sleep(50 * time.Millisecond)
 		lease.Release()
 	}()
@@ -143,27 +165,49 @@ func TestManager_ShutdownWaitsForCleanupAfterForceKill(t *testing.T) {
 	defer cancel()
 
 	start := time.Now()
-	require.NoError(t, manager.Shutdown(ctx))
-	assert.GreaterOrEqual(t, time.Since(start), 50*time.Millisecond)
+	err = manager.Shutdown(ctx)
+	elapsed := time.Since(start)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.ErrorIs(t, err, errTerminalShutdownTimeout)
+	assert.Less(t, elapsed, 50*time.Millisecond)
 }
 
-func TestWaitForForcedCleanupTimeout(t *testing.T) {
+func TestForceKillDelay(t *testing.T) {
 	t.Parallel()
 
-	t.Run("TimeoutOnly", func(t *testing.T) {
-		done := make(chan struct{})
-
-		err := waitForForcedCleanup(done, context.Background(), 10*time.Millisecond)
-		require.ErrorIs(t, err, errTerminalShutdownTimeout)
-		assert.NotErrorIs(t, err, context.Canceled)
+	t.Run("NoDeadline", func(t *testing.T) {
+		delay, ok := forceKillDelay(context.Background(), processShutdownGrace)
+		assert.False(t, ok)
+		assert.Zero(t, delay)
 	})
 
-	t.Run("JoinedWithContextError", func(t *testing.T) {
+	t.Run("ReservesCleanupWindow", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3200*time.Millisecond)
+		defer cancel()
+
+		delay, ok := forceKillDelay(ctx, processShutdownGrace)
+		require.True(t, ok)
+		assert.GreaterOrEqual(t, delay, 150*time.Millisecond)
+		assert.Less(t, delay, 400*time.Millisecond)
+	})
+}
+
+func TestWaitForForcedCleanup(t *testing.T) {
+	t.Parallel()
+
+	t.Run("DoneWinsImmediately", func(t *testing.T) {
+		done := make(chan struct{})
+		close(done)
+
+		require.NoError(t, waitForForcedCleanup(done, context.Background()))
+	})
+
+	t.Run("ReturnsTimeoutWhenContextDone", func(t *testing.T) {
 		done := make(chan struct{})
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		err := waitForForcedCleanup(done, ctx, 10*time.Millisecond)
+		err := waitForForcedCleanup(done, ctx)
 		require.ErrorIs(t, err, errTerminalShutdownTimeout)
 		require.ErrorIs(t, err, context.Canceled)
 	})

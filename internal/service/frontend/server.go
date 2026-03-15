@@ -1369,33 +1369,44 @@ func (srv *Server) serveHTTP(tlsCfg *config.TLSConfig, hasListener bool) error {
 
 // Shutdown gracefully shuts down the server.
 func (srv *Server) Shutdown(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
+	shutdownCtx, cancel := newServerShutdownContext(ctx)
 	defer cancel()
 
-	return runShutdownSequence(shutdownCtx, srv.shutdownActions(ctx))
+	return runShutdownSequence(shutdownCtx, srv.shutdownActions(shutdownCtx))
 }
 
-func newShutdownPhaseContext(shutdownCtx context.Context, budget time.Duration) (context.Context, context.CancelFunc) {
-	deadline := shutdownDeadline(shutdownCtx)
-	if budget > 0 {
+func newServerShutdownContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	if ctx == nil {
+		return context.WithTimeout(context.Background(), serverShutdownTimeout)
+	}
+	if _, ok := ctx.Deadline(); ok {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, serverShutdownTimeout)
+}
+
+func newGracefulShutdownContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	if ctx == nil {
+		return context.WithTimeout(context.Background(), serverShutdownTimeout)
+	}
+	return context.WithTimeout(context.WithoutCancel(ctx), serverShutdownTimeout)
+}
+
+func newShutdownPhaseContext(parent context.Context, budget time.Duration) (context.Context, context.CancelFunc) {
+	if parent == nil {
+		parent = context.Background()
+	}
+	if budget <= 0 {
+		return context.WithCancel(parent)
+	}
+	if deadline, ok := parent.Deadline(); ok {
 		candidate := time.Now().Add(budget)
 		if candidate.Before(deadline) {
-			deadline = candidate
+			return context.WithDeadline(parent, candidate)
 		}
+		return context.WithDeadline(parent, deadline)
 	}
-	return context.WithDeadline(context.Background(), deadline)
-}
-
-func shutdownDeadline(ctx context.Context) time.Time {
-	deadline, ok := ctx.Deadline()
-	if !ok {
-		return time.Now()
-	}
-	return deadline
+	return context.WithTimeout(parent, budget)
 }
 
 func (srv *Server) shutdownActions(ctx context.Context) shutdownActions {
@@ -1506,7 +1517,10 @@ func (srv *Server) setupGracefulShutdown(ctx context.Context) {
 		logger.Info(ctx, "Received shutdown signal", slog.String("signal", sig.String()))
 	}
 
-	if err := srv.Shutdown(ctx); err != nil {
+	shutdownCtx, cancel := newGracefulShutdownContext(ctx)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error(ctx, "Failed to shutdown server gracefully", tag.Error(err))
 	}
 }
