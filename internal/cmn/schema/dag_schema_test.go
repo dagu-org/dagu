@@ -238,7 +238,7 @@ steps:
 name: retryable-dag
 retry_policy:
   limit: 3
-  limt: 10
+  unknown_retry_field: 10
 steps:
   - command: echo hi
 `,
@@ -291,7 +291,7 @@ steps:
     retry_policy:
       limit: 1
       interval_sec: 5
-      limt: 2
+      unknown_retry_field: 2
 `)
 
 	err := resolved.Validate(doc)
