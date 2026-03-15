@@ -1,9 +1,13 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { components, Status } from '../../../../api/v1/schema';
 import dayjs from '../../../../lib/dayjs';
 import { getDAGRunScheduleSortValue } from '../../../../lib/dagRunTiming';
 import StatusChip from '../../../../ui/StatusChip';
+import AutoRetryBadge from '../common/AutoRetryBadge';
 import { DAGRunDetailsModal } from '../dag-run-details';
 import { StepDetailsTooltip } from './StepDetailsTooltip';
 
@@ -314,6 +318,11 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
                                 <StatusChip status={dagRun.status} size="xs">
                                   {dagRun.statusLabel}
                                 </StatusChip>
+                                <AutoRetryBadge
+                                  count={dagRun.autoRetryCount}
+                                  limit={dagRun.autoRetryLimit}
+                                  className="text-[10px]"
+                                />
                               </div>
                             </StepDetailsTooltip>
                           </div>

@@ -25,7 +25,7 @@ const (
 	// IndexFileName is the name of the DAG run index file.
 	IndexFileName = ".dagrun.index"
 	// IndexVersion is the current index format version.
-	IndexVersion = 5
+	IndexVersion = 6
 	// MinRunsForIndex is the minimum number of runs needed to create an index.
 	MinRunsForIndex = 10
 
@@ -41,22 +41,30 @@ var (
 
 // Entry holds a cached summary for a single DAG run.
 type Entry struct {
-	DagRunDir        string
-	DagRunID         string
-	LatestAttemptDir string
-	Status           core.Status
-	StartedAtUnix    int64
-	FinishedAtUnix   int64
-	Tags             []string
-	Name             string
-	WorkerID         string
-	Params           string
-	QueuedAt         string
-	ScheduleTime     string
-	TriggerType      core.TriggerType
-	CreatedAt        int64
-	AttemptID        string
-	AutoRetryCount   int
+	DagRunDir            string
+	DagRunID             string
+	LatestAttemptDir     string
+	Status               core.Status
+	StartedAtUnix        int64
+	FinishedAtUnix       int64
+	Tags                 []string
+	Name                 string
+	WorkerID             string
+	Params               string
+	QueuedAt             string
+	ScheduleTime         string
+	TriggerType          core.TriggerType
+	CreatedAt            int64
+	AttemptID            string
+	AutoRetryCount       int
+	ParentName           string
+	ParentID             string
+	AutoRetryLimit       int
+	AutoRetryInterval    time.Duration
+	AutoRetryBackoff     float64
+	AutoRetryMaxInterval time.Duration
+	ProcGroup            string
+	SuspendFlagName      string
 }
 
 // TryLoadForDay attempts to load and validate the index for a day directory.
@@ -125,22 +133,30 @@ func RebuildForDay(dayDir string, dagRunDirs []os.DirEntry) ([]Entry, bool, erro
 		finishedAt := parseTimeToUnix(status.FinishedAt)
 
 		entries = append(entries, Entry{
-			DagRunDir:        rd.Name(),
-			DagRunID:         dagRunID,
-			LatestAttemptDir: latestAttemptDir,
-			Status:           status.Status,
-			StartedAtUnix:    startedAt,
-			FinishedAtUnix:   finishedAt,
-			Tags:             status.Tags,
-			Name:             status.Name,
-			WorkerID:         status.WorkerID,
-			Params:           status.Params,
-			QueuedAt:         status.QueuedAt,
-			ScheduleTime:     status.ScheduleTime,
-			TriggerType:      status.TriggerType,
-			CreatedAt:        status.CreatedAt,
-			AttemptID:        status.AttemptID,
-			AutoRetryCount:   status.AutoRetryCount,
+			DagRunDir:            rd.Name(),
+			DagRunID:             dagRunID,
+			LatestAttemptDir:     latestAttemptDir,
+			Status:               status.Status,
+			StartedAtUnix:        startedAt,
+			FinishedAtUnix:       finishedAt,
+			Tags:                 status.Tags,
+			Name:                 status.Name,
+			WorkerID:             status.WorkerID,
+			Params:               status.Params,
+			QueuedAt:             status.QueuedAt,
+			ScheduleTime:         status.ScheduleTime,
+			TriggerType:          status.TriggerType,
+			CreatedAt:            status.CreatedAt,
+			AttemptID:            status.AttemptID,
+			AutoRetryCount:       status.AutoRetryCount,
+			ParentName:           status.Parent.Name,
+			ParentID:             status.Parent.ID,
+			AutoRetryLimit:       status.AutoRetryLimit,
+			AutoRetryInterval:    status.AutoRetryInterval,
+			AutoRetryBackoff:     status.AutoRetryBackoff,
+			AutoRetryMaxInterval: status.AutoRetryMaxInterval,
+			ProcGroup:            status.ProcGroup,
+			SuspendFlagName:      status.SuspendFlagName,
 		})
 	}
 
@@ -233,25 +249,33 @@ func writeIndex(dayDir string, entries []Entry) error {
 		}
 
 		protoEntries = append(protoEntries, &indexv1.DAGRunIndexEntry{
-			DagRunDir:           e.DagRunDir,
-			DagRunId:            e.DagRunID,
-			LatestAttemptDir:    e.LatestAttemptDir,
-			LatestStatusSize:    info.Size(),
-			LatestStatusModTime: info.ModTime().UnixNano(),
-			RunDirModTime:       runDirInfo.ModTime().UnixNano(),
-			Status:              int32(e.Status), //nolint:gosec
-			StartedAt:           e.StartedAtUnix,
-			FinishedAt:          e.FinishedAtUnix,
-			Tags:                e.Tags,
-			Name:                e.Name,
-			WorkerId:            e.WorkerID,
-			Params:              e.Params,
-			QueuedAt:            e.QueuedAt,
-			ScheduleTime:        e.ScheduleTime,
-			TriggerType:         int32(e.TriggerType), //nolint:gosec
-			CreatedAt:           e.CreatedAt,
-			AttemptId:           e.AttemptID,
-			AutoRetryCount:      int32(min(e.AutoRetryCount, math.MaxInt32)), //nolint:gosec
+			DagRunDir:            e.DagRunDir,
+			DagRunId:             e.DagRunID,
+			LatestAttemptDir:     e.LatestAttemptDir,
+			LatestStatusSize:     info.Size(),
+			LatestStatusModTime:  info.ModTime().UnixNano(),
+			RunDirModTime:        runDirInfo.ModTime().UnixNano(),
+			Status:               int32(e.Status), //nolint:gosec
+			StartedAt:            e.StartedAtUnix,
+			FinishedAt:           e.FinishedAtUnix,
+			Tags:                 e.Tags,
+			Name:                 e.Name,
+			WorkerId:             e.WorkerID,
+			Params:               e.Params,
+			QueuedAt:             e.QueuedAt,
+			ScheduleTime:         e.ScheduleTime,
+			TriggerType:          int32(e.TriggerType), //nolint:gosec
+			CreatedAt:            e.CreatedAt,
+			AttemptId:            e.AttemptID,
+			AutoRetryCount:       int32(min(e.AutoRetryCount, math.MaxInt32)), //nolint:gosec
+			ParentDagRunName:     e.ParentName,
+			ParentDagRunId:       e.ParentID,
+			AutoRetryLimit:       int32(min(e.AutoRetryLimit, math.MaxInt32)), //nolint:gosec
+			AutoRetryInterval:    int64(e.AutoRetryInterval),
+			AutoRetryBackoff:     e.AutoRetryBackoff,
+			AutoRetryMaxInterval: int64(e.AutoRetryMaxInterval),
+			ProcGroup:            e.ProcGroup,
+			SuspendFlagName:      e.SuspendFlagName,
 		})
 	}
 
@@ -273,22 +297,30 @@ func protoToEntries(protoEntries []*indexv1.DAGRunIndexEntry) []Entry {
 	entries := make([]Entry, len(protoEntries))
 	for i, pe := range protoEntries {
 		entries[i] = Entry{
-			DagRunDir:        pe.DagRunDir,
-			DagRunID:         pe.DagRunId,
-			LatestAttemptDir: pe.LatestAttemptDir,
-			Status:           core.Status(pe.Status),
-			StartedAtUnix:    pe.StartedAt,
-			FinishedAtUnix:   pe.FinishedAt,
-			Tags:             pe.Tags,
-			Name:             pe.Name,
-			WorkerID:         pe.WorkerId,
-			Params:           pe.Params,
-			QueuedAt:         pe.QueuedAt,
-			ScheduleTime:     pe.ScheduleTime,
-			TriggerType:      core.TriggerType(pe.TriggerType),
-			CreatedAt:        pe.CreatedAt,
-			AttemptID:        pe.AttemptId,
-			AutoRetryCount:   int(pe.AutoRetryCount),
+			DagRunDir:            pe.DagRunDir,
+			DagRunID:             pe.DagRunId,
+			LatestAttemptDir:     pe.LatestAttemptDir,
+			Status:               core.Status(pe.Status),
+			StartedAtUnix:        pe.StartedAt,
+			FinishedAtUnix:       pe.FinishedAt,
+			Tags:                 pe.Tags,
+			Name:                 pe.Name,
+			WorkerID:             pe.WorkerId,
+			Params:               pe.Params,
+			QueuedAt:             pe.QueuedAt,
+			ScheduleTime:         pe.ScheduleTime,
+			TriggerType:          core.TriggerType(pe.TriggerType),
+			CreatedAt:            pe.CreatedAt,
+			AttemptID:            pe.AttemptId,
+			AutoRetryCount:       int(pe.AutoRetryCount),
+			ParentName:           pe.ParentDagRunName,
+			ParentID:             pe.ParentDagRunId,
+			AutoRetryLimit:       int(pe.AutoRetryLimit),
+			AutoRetryInterval:    time.Duration(pe.AutoRetryInterval),
+			AutoRetryBackoff:     pe.AutoRetryBackoff,
+			AutoRetryMaxInterval: time.Duration(pe.AutoRetryMaxInterval),
+			ProcGroup:            pe.ProcGroup,
+			SuspendFlagName:      pe.SuspendFlagName,
 		}
 	}
 	return entries

@@ -265,28 +265,36 @@ func (x *DAGRunIndex) GetEntries() []*DAGRunIndexEntry {
 
 // DAGRunIndexEntry holds a cached summary for a single DAG run.
 type DAGRunIndexEntry struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	DagRunDir           string                 `protobuf:"bytes,1,opt,name=dag_run_dir,json=dagRunDir,proto3" json:"dag_run_dir,omitempty"`
-	DagRunId            string                 `protobuf:"bytes,2,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"`
-	LatestAttemptDir    string                 `protobuf:"bytes,3,opt,name=latest_attempt_dir,json=latestAttemptDir,proto3" json:"latest_attempt_dir,omitempty"`
-	LatestStatusSize    int64                  `protobuf:"varint,4,opt,name=latest_status_size,json=latestStatusSize,proto3" json:"latest_status_size,omitempty"`
-	LatestStatusModTime int64                  `protobuf:"varint,5,opt,name=latest_status_mod_time,json=latestStatusModTime,proto3" json:"latest_status_mod_time,omitempty"`
-	Status              int32                  `protobuf:"varint,6,opt,name=status,proto3" json:"status,omitempty"`
-	StartedAt           int64                  `protobuf:"varint,7,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`    // Unix epoch seconds
-	FinishedAt          int64                  `protobuf:"varint,8,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"` // Unix epoch seconds
-	Tags                []string               `protobuf:"bytes,9,rep,name=tags,proto3" json:"tags,omitempty"`
-	RunDirModTime       int64                  `protobuf:"varint,10,opt,name=run_dir_mod_time,json=runDirModTime,proto3" json:"run_dir_mod_time,omitempty"`
-	WorkerId            string                 `protobuf:"bytes,11,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
-	Params              string                 `protobuf:"bytes,12,opt,name=params,proto3" json:"params,omitempty"`
-	QueuedAt            string                 `protobuf:"bytes,13,opt,name=queued_at,json=queuedAt,proto3" json:"queued_at,omitempty"` // RFC 3339 string (matches DAGRunStatus.QueuedAt)
-	TriggerType         int32                  `protobuf:"varint,14,opt,name=trigger_type,json=triggerType,proto3" json:"trigger_type,omitempty"`
-	CreatedAt           int64                  `protobuf:"varint,15,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"` // Unix epoch milliseconds (matches DAGRunStatus.CreatedAt)
-	Name                string                 `protobuf:"bytes,16,opt,name=name,proto3" json:"name,omitempty"`
-	ScheduleTime        string                 `protobuf:"bytes,17,opt,name=schedule_time,json=scheduleTime,proto3" json:"schedule_time,omitempty"` // RFC 3339 string (matches DAGRunStatus.ScheduleTime)
-	AttemptId           string                 `protobuf:"bytes,18,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
-	AutoRetryCount      int32                  `protobuf:"varint,19,opt,name=auto_retry_count,json=autoRetryCount,proto3" json:"auto_retry_count,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	DagRunDir            string                 `protobuf:"bytes,1,opt,name=dag_run_dir,json=dagRunDir,proto3" json:"dag_run_dir,omitempty"`
+	DagRunId             string                 `protobuf:"bytes,2,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"`
+	LatestAttemptDir     string                 `protobuf:"bytes,3,opt,name=latest_attempt_dir,json=latestAttemptDir,proto3" json:"latest_attempt_dir,omitempty"`
+	LatestStatusSize     int64                  `protobuf:"varint,4,opt,name=latest_status_size,json=latestStatusSize,proto3" json:"latest_status_size,omitempty"`
+	LatestStatusModTime  int64                  `protobuf:"varint,5,opt,name=latest_status_mod_time,json=latestStatusModTime,proto3" json:"latest_status_mod_time,omitempty"`
+	Status               int32                  `protobuf:"varint,6,opt,name=status,proto3" json:"status,omitempty"`
+	StartedAt            int64                  `protobuf:"varint,7,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`    // Unix epoch seconds
+	FinishedAt           int64                  `protobuf:"varint,8,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"` // Unix epoch seconds
+	Tags                 []string               `protobuf:"bytes,9,rep,name=tags,proto3" json:"tags,omitempty"`
+	RunDirModTime        int64                  `protobuf:"varint,10,opt,name=run_dir_mod_time,json=runDirModTime,proto3" json:"run_dir_mod_time,omitempty"`
+	WorkerId             string                 `protobuf:"bytes,11,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
+	Params               string                 `protobuf:"bytes,12,opt,name=params,proto3" json:"params,omitempty"`
+	QueuedAt             string                 `protobuf:"bytes,13,opt,name=queued_at,json=queuedAt,proto3" json:"queued_at,omitempty"` // RFC 3339 string (matches DAGRunStatus.QueuedAt)
+	TriggerType          int32                  `protobuf:"varint,14,opt,name=trigger_type,json=triggerType,proto3" json:"trigger_type,omitempty"`
+	CreatedAt            int64                  `protobuf:"varint,15,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"` // Unix epoch milliseconds (matches DAGRunStatus.CreatedAt)
+	Name                 string                 `protobuf:"bytes,16,opt,name=name,proto3" json:"name,omitempty"`
+	ScheduleTime         string                 `protobuf:"bytes,17,opt,name=schedule_time,json=scheduleTime,proto3" json:"schedule_time,omitempty"` // RFC 3339 string (matches DAGRunStatus.ScheduleTime)
+	AttemptId            string                 `protobuf:"bytes,18,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
+	AutoRetryCount       int32                  `protobuf:"varint,19,opt,name=auto_retry_count,json=autoRetryCount,proto3" json:"auto_retry_count,omitempty"`
+	ParentDagRunName     string                 `protobuf:"bytes,20,opt,name=parent_dag_run_name,json=parentDagRunName,proto3" json:"parent_dag_run_name,omitempty"`
+	ParentDagRunId       string                 `protobuf:"bytes,21,opt,name=parent_dag_run_id,json=parentDagRunId,proto3" json:"parent_dag_run_id,omitempty"`
+	AutoRetryLimit       int32                  `protobuf:"varint,22,opt,name=auto_retry_limit,json=autoRetryLimit,proto3" json:"auto_retry_limit,omitempty"`
+	AutoRetryInterval    int64                  `protobuf:"varint,23,opt,name=auto_retry_interval,json=autoRetryInterval,proto3" json:"auto_retry_interval,omitempty"` // Duration in nanoseconds
+	AutoRetryBackoff     float64                `protobuf:"fixed64,24,opt,name=auto_retry_backoff,json=autoRetryBackoff,proto3" json:"auto_retry_backoff,omitempty"`
+	AutoRetryMaxInterval int64                  `protobuf:"varint,25,opt,name=auto_retry_max_interval,json=autoRetryMaxInterval,proto3" json:"auto_retry_max_interval,omitempty"` // Duration in nanoseconds
+	ProcGroup            string                 `protobuf:"bytes,26,opt,name=proc_group,json=procGroup,proto3" json:"proc_group,omitempty"`
+	SuspendFlagName      string                 `protobuf:"bytes,27,opt,name=suspend_flag_name,json=suspendFlagName,proto3" json:"suspend_flag_name,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *DAGRunIndexEntry) Reset() {
@@ -452,6 +460,62 @@ func (x *DAGRunIndexEntry) GetAutoRetryCount() int32 {
 	return 0
 }
 
+func (x *DAGRunIndexEntry) GetParentDagRunName() string {
+	if x != nil {
+		return x.ParentDagRunName
+	}
+	return ""
+}
+
+func (x *DAGRunIndexEntry) GetParentDagRunId() string {
+	if x != nil {
+		return x.ParentDagRunId
+	}
+	return ""
+}
+
+func (x *DAGRunIndexEntry) GetAutoRetryLimit() int32 {
+	if x != nil {
+		return x.AutoRetryLimit
+	}
+	return 0
+}
+
+func (x *DAGRunIndexEntry) GetAutoRetryInterval() int64 {
+	if x != nil {
+		return x.AutoRetryInterval
+	}
+	return 0
+}
+
+func (x *DAGRunIndexEntry) GetAutoRetryBackoff() float64 {
+	if x != nil {
+		return x.AutoRetryBackoff
+	}
+	return 0
+}
+
+func (x *DAGRunIndexEntry) GetAutoRetryMaxInterval() int64 {
+	if x != nil {
+		return x.AutoRetryMaxInterval
+	}
+	return 0
+}
+
+func (x *DAGRunIndexEntry) GetProcGroup() string {
+	if x != nil {
+		return x.ProcGroup
+	}
+	return ""
+}
+
+func (x *DAGRunIndexEntry) GetSuspendFlagName() string {
+	if x != nil {
+		return x.SuspendFlagName
+	}
+	return ""
+}
+
 var File_proto_index_v1_index_proto protoreflect.FileDescriptor
 
 const file_proto_index_v1_index_proto_rawDesc = "" +
@@ -477,7 +541,7 @@ const file_proto_index_v1_index_proto_rawDesc = "" +
 	"\vDAGRunIndex\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\rR\aversion\x12\"\n" +
 	"\rbuilt_at_unix\x18\x02 \x01(\x03R\vbuiltAtUnix\x124\n" +
-	"\aentries\x18\x03 \x03(\v2\x1a.index.v1.DAGRunIndexEntryR\aentries\"\x8c\x05\n" +
+	"\aentries\x18\x03 \x03(\v2\x1a.index.v1.DAGRunIndexEntryR\aentries\"\xf0\a\n" +
 	"\x10DAGRunIndexEntry\x12\x1e\n" +
 	"\vdag_run_dir\x18\x01 \x01(\tR\tdagRunDir\x12\x1c\n" +
 	"\n" +
@@ -503,7 +567,16 @@ const file_proto_index_v1_index_proto_rawDesc = "" +
 	"\rschedule_time\x18\x11 \x01(\tR\fscheduleTime\x12\x1d\n" +
 	"\n" +
 	"attempt_id\x18\x12 \x01(\tR\tattemptId\x12(\n" +
-	"\x10auto_retry_count\x18\x13 \x01(\x05R\x0eautoRetryCountB1Z/github.com/dagu-org/dagu/proto/index/v1;indexv1b\x06proto3"
+	"\x10auto_retry_count\x18\x13 \x01(\x05R\x0eautoRetryCount\x12-\n" +
+	"\x13parent_dag_run_name\x18\x14 \x01(\tR\x10parentDagRunName\x12)\n" +
+	"\x11parent_dag_run_id\x18\x15 \x01(\tR\x0eparentDagRunId\x12(\n" +
+	"\x10auto_retry_limit\x18\x16 \x01(\x05R\x0eautoRetryLimit\x12.\n" +
+	"\x13auto_retry_interval\x18\x17 \x01(\x03R\x11autoRetryInterval\x12,\n" +
+	"\x12auto_retry_backoff\x18\x18 \x01(\x01R\x10autoRetryBackoff\x125\n" +
+	"\x17auto_retry_max_interval\x18\x19 \x01(\x03R\x14autoRetryMaxInterval\x12\x1d\n" +
+	"\n" +
+	"proc_group\x18\x1a \x01(\tR\tprocGroup\x12*\n" +
+	"\x11suspend_flag_name\x18\x1b \x01(\tR\x0fsuspendFlagNameB1Z/github.com/dagu-org/dagu/proto/index/v1;indexv1b\x06proto3"
 
 var (
 	file_proto_index_v1_index_proto_rawDescOnce sync.Once

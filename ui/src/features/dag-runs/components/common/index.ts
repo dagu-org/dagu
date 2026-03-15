@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /**
  * Common components for dagRuns
  *
@@ -5,3 +8,4 @@
  */
 
 export { default as DAGRunActions } from './DAGRunActions';
+export { default as AutoRetryBadge } from './AutoRetryBadge';

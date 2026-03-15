@@ -52,21 +52,29 @@ const JSONLStatusFile = "status.jsonl"
 // When non-nil, it allows filtering and constructing list responses
 // without reading status.jsonl.
 type DAGRunSummary struct {
-	LatestAttemptDir string
-	Status           core.Status
-	StartedAtUnix    int64
-	FinishedAtUnix   int64
-	Tags             []string
-	Name             string
-	DagRunID         string
-	WorkerID         string
-	Params           string
-	QueuedAt         string
-	ScheduleTime     string
-	TriggerType      core.TriggerType
-	CreatedAt        int64
-	AttemptID        string
-	AutoRetryCount   int
+	LatestAttemptDir     string
+	Status               core.Status
+	StartedAtUnix        int64
+	FinishedAtUnix       int64
+	Tags                 []string
+	Name                 string
+	DagRunID             string
+	WorkerID             string
+	Params               string
+	QueuedAt             string
+	ScheduleTime         string
+	TriggerType          core.TriggerType
+	CreatedAt            int64
+	AttemptID            string
+	AutoRetryCount       int
+	ParentName           string
+	ParentID             string
+	AutoRetryLimit       int
+	AutoRetryInterval    time.Duration
+	AutoRetryBackoff     float64
+	AutoRetryMaxInterval time.Duration
+	ProcGroup            string
+	SuspendFlagName      string
 }
 
 // DAGRun represents a dag-run with its associated timestamp and run ID.
