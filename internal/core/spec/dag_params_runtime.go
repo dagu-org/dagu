@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 )
 
@@ -105,22 +106,33 @@ func parseRuntimeLegacyOverrideInput(value any) ([]paramPair, error) {
 	return pairs, nil
 }
 
-func resolveLegacyEntries(plan *dagParamPlan, rawParams string, paramsList []string) ([]dagParamEntry, error) {
+func resolveLegacyEntries(ctx BuildContext, plan *dagParamPlan, rawParams string, paramsList []string, metadataMode bool) ([]dagParamEntry, error) {
 	overridePairs, err := parseOverridePairs(rawParams, paramsList)
 	if err != nil {
 		return nil, err
 	}
 
-	entries, err := applyOverridePairs(plan.entries, overridePairs)
+	entries, overridden, err := applyOverridePairsTracked(plan.entries, overridePairs)
 	if err != nil {
 		return nil, err
+	}
+
+	scope := buildParamEvalScope(ctx)
+	for i := range entries {
+		if i < len(plan.entries) {
+			if err := resolveLegacyEntry(ctx, &entries[i], plan.entries[i], overridden[i], &scope, i); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		addEntryToParamScope(&scope, entries[i], i)
 	}
 
 	if plan.schema == nil {
 		return entries, nil
 	}
 
-	entries, err = validateSchemaBackedEntries(entries, plan.schema, plan.schemaProperties, plan.schemaOrder, false, false)
+	entries, err = validateSchemaBackedEntries(entries, plan.schema, plan.schemaProperties, plan.schemaOrder, metadataMode, false)
 	if err != nil {
 		return nil, err
 	}
@@ -148,21 +160,24 @@ func parseOverridePairs(rawParams string, paramsList []string) ([]paramPair, err
 	return pairs, nil
 }
 
-func applyOverridePairs(entries []dagParamEntry, override []paramPair) ([]dagParamEntry, error) {
+func applyOverridePairsTracked(entries []dagParamEntry, override []paramPair) ([]dagParamEntry, []bool, error) {
 	result := cloneParamEntries(entries)
+	overridden := make([]bool, len(result))
 	positionalIndex := 0
 
 	for _, pair := range override {
 		if pair.Name == "" {
 			if len(entries) == 0 {
 				result = append(result, dagParamEntry{Value: pair.Value, HasValue: true})
+				overridden = append(overridden, true)
 				continue
 			}
 			if positionalIndex >= len(entries) {
-				return nil, fmt.Errorf("too many positional params: expected at most %d, got %d", len(entries), positionalIndex+1)
+				return nil, nil, fmt.Errorf("too many positional params: expected at most %d, got %d", len(entries), positionalIndex+1)
 			}
 			result[positionalIndex].Value = pair.Value
 			result[positionalIndex].HasValue = true
+			overridden[positionalIndex] = true
 			positionalIndex++
 			continue
 		}
@@ -174,15 +189,17 @@ func applyOverridePairs(entries []dagParamEntry, override []paramPair) ([]dagPar
 			}
 			result[i].Value = pair.Value
 			result[i].HasValue = true
+			overridden[i] = true
 			found = true
 			break
 		}
 		if !found {
 			result = append(result, dagParamEntry{Name: pair.Name, Value: pair.Value, HasValue: true})
+			overridden = append(overridden, true)
 		}
 	}
 
-	return result, nil
+	return result, overridden, nil
 }
 
 func runtimePairsFromEntries(entries []dagParamEntry) []paramPair {
@@ -199,6 +216,78 @@ func runtimePairsFromEntries(entries []dagParamEntry) []paramPair {
 		}
 	}
 	return pairs
+}
+
+func buildParamEvalScope(ctx BuildContext) *eval.EnvScope {
+	if ctx.envScope != nil && ctx.envScope.scope != nil {
+		return ctx.envScope.scope
+	}
+
+	scope := eval.NewEnvScope(nil, true)
+	if len(ctx.opts.BuildEnv) > 0 {
+		scope = scope.WithEntries(ctx.opts.BuildEnv, eval.EnvSourceDotEnv)
+	}
+	return scope
+}
+
+func resolveLegacyEntry(
+	ctx BuildContext,
+	entry *dagParamEntry,
+	base dagParamEntry,
+	overridden bool,
+	scope **eval.EnvScope,
+	index int,
+) error {
+	if overridden || strings.TrimSpace(base.Eval) == "" || ctx.opts.Has(BuildFlagNoEval) {
+		addEntryToParamScope(scope, *entry, index)
+		return nil
+	}
+
+	evalCtx := ctx.ctx
+	if evalCtx == nil {
+		evalCtx = context.Background()
+	}
+	if *scope != nil {
+		evalCtx = eval.WithEnvScope(evalCtx, *scope)
+	}
+
+	value, err := eval.String(evalCtx, base.Eval, eval.WithOSExpansion())
+	if err != nil {
+		if base.HasValue {
+			entry.Value = base.Value
+			entry.HasValue = true
+			addEntryToParamScope(scope, *entry, index)
+			return nil
+		}
+		return core.NewValidationError(
+			"params",
+			base.Eval,
+			fmt.Errorf("%w: parameter %q eval failed: %v", ErrInvalidParamValue, paramScopeName(base, index), err),
+		)
+	}
+
+	entry.Value = value
+	entry.HasValue = true
+	addEntryToParamScope(scope, *entry, index)
+	return nil
+}
+
+func addEntryToParamScope(scope **eval.EnvScope, entry dagParamEntry, index int) {
+	if scope == nil || *scope == nil || !entry.HasValue {
+		return
+	}
+	name := paramScopeName(entry, index)
+	if name == "" {
+		return
+	}
+	*scope = (*scope).WithEntry(name, entry.Value, eval.EnvSourceParam)
+}
+
+func paramScopeName(entry dagParamEntry, index int) string {
+	if entry.Name != "" {
+		return entry.Name
+	}
+	return strconv.Itoa(index + 1)
 }
 
 func normalizeTypedParamValue(value any, paramType string) (any, error) {

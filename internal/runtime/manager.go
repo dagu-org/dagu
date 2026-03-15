@@ -8,16 +8,20 @@ import (
 	"fmt"
 	"log/slog"
 	"runtime/debug"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/cmn/sock"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/google/uuid"
 )
+
+const staleLocalRunStartupGrace = 2 * time.Second
 
 // New creates a new Manager instance.
 // The Manager is used to interact with the DAG.
@@ -360,6 +364,14 @@ func (m *Manager) repairStaleLocalRunIfDead(
 	if st.WorkerID != "" && st.WorkerID != "local" {
 		return st, nil
 	}
+	if shouldDelayStaleLocalRunRepair(st, time.Now()) {
+		logger.Debug(ctx, "Skipping stale local run repair during startup grace window",
+			tag.RunID(st.DAGRunID),
+			slog.String("started-at", st.StartedAt),
+			slog.Duration("grace", staleLocalRunStartupGrace),
+		)
+		return st, nil
+	}
 
 	alive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), exec.DAGRunRef{
 		Name: dag.Name,
@@ -377,6 +389,25 @@ func (m *Manager) repairStaleLocalRunIfDead(
 		return nil, fmt.Errorf("repair stale local run: %w", err)
 	}
 	return repaired, nil
+}
+
+func shouldDelayStaleLocalRunRepair(st *exec.DAGRunStatus, now time.Time) bool {
+	startedAt, ok := statusStartTime(st)
+	if !ok {
+		return false
+	}
+	age := now.Sub(startedAt)
+	return age >= 0 && age < staleLocalRunStartupGrace
+}
+
+func statusStartTime(st *exec.DAGRunStatus) (time.Time, bool) {
+	if startedAt, err := stringutil.ParseTime(st.StartedAt); err == nil && !startedAt.IsZero() {
+		return startedAt, true
+	}
+	if st.CreatedAt > 0 {
+		return time.UnixMilli(st.CreatedAt), true
+	}
+	return time.Time{}, false
 }
 
 // ListRecentStatus retrieves the n most recent statuses for a DAG by name.
