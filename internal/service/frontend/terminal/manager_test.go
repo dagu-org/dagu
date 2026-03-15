@@ -146,3 +146,25 @@ func TestManager_ShutdownWaitsForCleanupAfterForceKill(t *testing.T) {
 	require.NoError(t, manager.Shutdown(ctx))
 	assert.GreaterOrEqual(t, time.Since(start), 50*time.Millisecond)
 }
+
+func TestWaitForForcedCleanupTimeout(t *testing.T) {
+	t.Parallel()
+
+	t.Run("TimeoutOnly", func(t *testing.T) {
+		done := make(chan struct{})
+
+		err := waitForForcedCleanup(done, context.Background(), 10*time.Millisecond)
+		require.ErrorIs(t, err, errTerminalShutdownTimeout)
+		assert.NotErrorIs(t, err, context.Canceled)
+	})
+
+	t.Run("JoinedWithContextError", func(t *testing.T) {
+		done := make(chan struct{})
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		err := waitForForcedCleanup(done, ctx, 10*time.Millisecond)
+		require.ErrorIs(t, err, errTerminalShutdownTimeout)
+		require.ErrorIs(t, err, context.Canceled)
+	})
+}

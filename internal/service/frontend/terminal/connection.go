@@ -64,6 +64,26 @@ const (
 	websocketOpWrite
 )
 
+type websocketConn interface {
+	Read(ctx context.Context) (websocket.MessageType, []byte, error)
+	Write(ctx context.Context, typ websocket.MessageType, p []byte) error
+	Close(status websocket.StatusCode, reason string) error
+	CloseNow() error
+}
+
+type terminalErrorSource uint8
+
+const (
+	terminalErrorSourcePTYRead terminalErrorSource = iota + 1
+	terminalErrorSourceWebSocketRead
+	terminalErrorSourceWebSocketWrite
+)
+
+type terminalErrorDecision struct {
+	suppress bool
+	event    runEvent
+}
+
 type runState struct {
 	ioWG        sync.WaitGroup
 	processDone chan struct{}
@@ -90,7 +110,7 @@ type Connection struct {
 	User       *auth.User
 	IPAddress  string
 	Shell      string
-	Conn       *websocket.Conn
+	Conn       websocketConn
 	StartTime  time.Time
 	LastActive time.Time
 
@@ -207,14 +227,11 @@ func (c *Connection) readFromPTY(ctx context.Context, processDone <-chan struct{
 	for {
 		n, err := c.ptmx.Read(buf)
 		if err != nil {
-			if c.shouldSuppressPTYReadError(ctx, err, processDone) {
+			decision := classifyTerminalError(ctx, err, terminalErrorSourcePTYRead, processDone, c.isClosing())
+			if decision.suppress {
 				return
 			}
-			signal(runEvent{
-				reason:    terminalEndReasonPTYError,
-				sendError: "Shell closed: " + err.Error(),
-				err:       err,
-			})
+			signal(decision.event)
 			return
 		}
 
@@ -226,10 +243,11 @@ func (c *Connection) readFromPTY(ctx context.Context, processDone <-chan struct{
 		err = c.sendMessage(writeCtx, NewOutputMessage(buf[:n]))
 		cancel()
 		if err != nil {
-			if c.isClosing() || errors.Is(ctx.Err(), context.Canceled) {
+			decision := classifyTerminalError(ctx, err, terminalErrorSourceWebSocketWrite, nil, c.isClosing())
+			if decision.suppress {
 				return
 			}
-			signal(classifyWebSocketEvent(ctx, err, websocketOpWrite))
+			signal(decision.event)
 			return
 		}
 
@@ -242,7 +260,11 @@ func (c *Connection) readFromWebSocket(ctx context.Context, auditSvc *audit.Serv
 	for {
 		_, data, err := c.Conn.Read(ctx)
 		if err != nil {
-			signal(classifyWebSocketEvent(ctx, err, websocketOpRead))
+			decision := classifyTerminalError(ctx, err, terminalErrorSourceWebSocketRead, nil, c.isClosing())
+			if decision.suppress {
+				return
+			}
+			signal(decision.event)
 			return
 		}
 
@@ -306,12 +328,7 @@ func (c *Connection) readFromWebSocket(ctx context.Context, auditSvc *audit.Serv
 
 // ForceKill expedites terminal teardown during hard server shutdown.
 func (c *Connection) ForceKill() {
-	if c.ptmx != nil {
-		_ = c.ptmx.SetReadDeadline(time.Now())
-	}
-	if c.Conn != nil {
-		_ = c.Conn.CloseNow()
-	}
+	c.interruptTransport(false)
 	_ = forceKillProcess(c.cmd)
 }
 
@@ -321,16 +338,7 @@ func (c *Connection) cleanup(cancel context.CancelFunc, ioWG *sync.WaitGroup, pr
 	}
 
 	cancel()
-	if c.Conn != nil {
-		if gracefulClose {
-			_ = c.Conn.Close(websocket.StatusNormalClosure, "connection closed")
-		} else {
-			_ = c.Conn.CloseNow()
-		}
-	}
-	if c.ptmx != nil {
-		_ = c.ptmx.SetReadDeadline(time.Now())
-	}
+	c.interruptTransport(gracefulClose)
 
 	ioWG.Wait()
 
@@ -365,32 +373,11 @@ func (c *Connection) terminateProcess(processDone <-chan struct{}) error {
 }
 
 func classifyWebSocketEvent(ctx context.Context, err error, op websocketOp) runEvent {
-	if errors.Is(ctx.Err(), context.Canceled) {
-		return runEvent{
-			reason: terminalEndReasonShutdown,
-		}
+	source := terminalErrorSourceWebSocketRead
+	if op == websocketOpWrite {
+		source = terminalErrorSourceWebSocketWrite
 	}
-
-	status := websocket.CloseStatus(err)
-	if status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway {
-		return runEvent{
-			reason: terminalEndReasonClientClose,
-		}
-	}
-	if status == -1 {
-		if op == websocketOpWrite && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
-			return runEvent{
-				reason: terminalEndReasonDisconnect,
-				err:    err,
-			}
-		}
-		return runEvent{
-			reason: terminalEndReasonDisconnect,
-		}
-	}
-	return runEvent{
-		reason: terminalEndReasonDisconnect,
-	}
+	return classifyTerminalError(ctx, err, source, nil, false).event
 }
 
 func classifyProcessExit(err error) runEvent {
@@ -419,19 +406,7 @@ func classifyProcessExit(err error) runEvent {
 }
 
 func (c *Connection) shouldSuppressPTYReadError(ctx context.Context, err error, processDone <-chan struct{}) bool {
-	if errors.Is(ctx.Err(), context.Canceled) && isExpectedShutdownReadError(err) {
-		return true
-	}
-	if c.isClosing() && isExpectedShutdownReadError(err) {
-		return true
-	}
-	if errors.Is(err, io.EOF) {
-		return waitForSignal(processDone, processExitDetectionDelay)
-	}
-	if errors.Is(err, syscall.EIO) {
-		return waitForSignal(processDone, processExitDetectionDelay)
-	}
-	return c.isClosing()
+	return classifyTerminalError(ctx, err, terminalErrorSourcePTYRead, processDone, c.isClosing()).suppress
 }
 
 func isExpectedShutdownReadError(err error) bool {
@@ -440,6 +415,81 @@ func isExpectedShutdownReadError(err error) bool {
 	}
 	var netErr net.Error
 	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
+func classifyTerminalError(ctx context.Context, err error, source terminalErrorSource, processDone <-chan struct{}, closing bool) terminalErrorDecision {
+	switch source {
+	case terminalErrorSourcePTYRead:
+		if errors.Is(ctx.Err(), context.Canceled) && isExpectedShutdownReadError(err) {
+			return terminalErrorDecision{suppress: true}
+		}
+		if closing && isExpectedShutdownReadError(err) {
+			return terminalErrorDecision{suppress: true}
+		}
+		if errors.Is(err, io.EOF) || errors.Is(err, syscall.EIO) {
+			return terminalErrorDecision{suppress: waitForSignal(processDone, processExitDetectionDelay)}
+		}
+		if closing {
+			return terminalErrorDecision{suppress: true}
+		}
+		return terminalErrorDecision{
+			event: runEvent{
+				reason:    terminalEndReasonPTYError,
+				sendError: "Shell closed: " + err.Error(),
+				err:       err,
+			},
+		}
+	case terminalErrorSourceWebSocketWrite:
+		if closing {
+			return terminalErrorDecision{suppress: true}
+		}
+		fallthrough
+	case terminalErrorSourceWebSocketRead:
+		if errors.Is(ctx.Err(), context.Canceled) {
+			return terminalErrorDecision{
+				event: runEvent{reason: terminalEndReasonShutdown},
+			}
+		}
+
+		status := websocket.CloseStatus(err)
+		if status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway {
+			return terminalErrorDecision{
+				event: runEvent{reason: terminalEndReasonClientClose},
+			}
+		}
+		if status == -1 {
+			if source == terminalErrorSourceWebSocketWrite && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
+				return terminalErrorDecision{
+					event: runEvent{
+						reason: terminalEndReasonDisconnect,
+						err:    err,
+					},
+				}
+			}
+			return terminalErrorDecision{
+				event: runEvent{reason: terminalEndReasonDisconnect},
+			}
+		}
+		return terminalErrorDecision{
+			event: runEvent{reason: terminalEndReasonDisconnect},
+		}
+	default:
+		return terminalErrorDecision{}
+	}
+}
+
+func (c *Connection) interruptTransport(gracefulClose bool) {
+	if c.ptmx != nil {
+		_ = c.ptmx.SetReadDeadline(time.Now())
+	}
+	if c.Conn == nil {
+		return
+	}
+	if gracefulClose {
+		_ = c.Conn.Close(websocket.StatusNormalClosure, "connection closed")
+		return
+	}
+	_ = c.Conn.CloseNow()
 }
 
 func waitForSignal(ch <-chan struct{}, timeout time.Duration) bool {

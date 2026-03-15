@@ -16,7 +16,8 @@ var (
 	// ErrManagerShuttingDown indicates that the terminal manager is shutting down.
 	ErrManagerShuttingDown = errors.New("terminal manager is shutting down")
 	// ErrReservationInactive indicates that a released or already-activated lease was reused.
-	ErrReservationInactive = errors.New("terminal session reservation is inactive")
+	ErrReservationInactive     = errors.New("terminal session reservation is inactive")
+	errTerminalShutdownTimeout = errors.New("terminal cleanup timed out after force kill")
 )
 
 // Manager tracks active terminal sessions and coordinates server shutdown.
@@ -178,15 +179,7 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 		conn.ForceKill()
 	}
 
-	graceTimer := time.NewTimer(processShutdownGrace)
-	defer graceTimer.Stop()
-
-	select {
-	case <-done:
-		return nil
-	case <-graceTimer.C:
-		return ctx.Err()
-	}
+	return waitForForcedCleanup(done, ctx, processShutdownGrace)
 }
 
 func (m *Manager) snapshotSessions() []*Connection {
@@ -198,4 +191,26 @@ func (m *Manager) snapshotSessions() []*Connection {
 		sessions = append(sessions, conn)
 	}
 	return sessions
+}
+
+func waitForForcedCleanup(done <-chan struct{}, ctx context.Context, grace time.Duration) error {
+	if grace <= 0 {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(err, errTerminalShutdownTimeout)
+		}
+		return errTerminalShutdownTimeout
+	}
+
+	graceTimer := time.NewTimer(grace)
+	defer graceTimer.Stop()
+
+	select {
+	case <-done:
+		return nil
+	case <-graceTimer.C:
+		if err := ctx.Err(); err != nil {
+			return errors.Join(err, errTerminalShutdownTimeout)
+		}
+		return errTerminalShutdownTimeout
+	}
 }

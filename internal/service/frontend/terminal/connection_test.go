@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -112,6 +113,50 @@ func TestConnection_ShouldSuppressPTYReadErrorOnCanceledContext(t *testing.T) {
 	assert.True(t, conn.shouldSuppressPTYReadError(ctx, os.ErrDeadlineExceeded, make(chan struct{})))
 }
 
+func TestConnection_InterruptTransportUsesExpectedWebSocketCloseMode(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Graceful", func(t *testing.T) {
+		fake := &fakeWebSocketConn{}
+		conn := &Connection{Conn: fake}
+
+		conn.interruptTransport(true)
+
+		assert.Equal(t, 1, fake.closeCalls)
+		assert.Equal(t, 0, fake.closeNowCalls)
+		assert.Equal(t, websocket.StatusNormalClosure, fake.closeStatus)
+		assert.Equal(t, "connection closed", fake.closeReason)
+	})
+
+	t.Run("Forced", func(t *testing.T) {
+		fake := &fakeWebSocketConn{}
+		conn := &Connection{Conn: fake}
+
+		conn.interruptTransport(false)
+
+		assert.Equal(t, 0, fake.closeCalls)
+		assert.Equal(t, 1, fake.closeNowCalls)
+	})
+}
+
+func TestConnection_ForceKillDoesNotBypassCleanup(t *testing.T) {
+	t.Parallel()
+
+	fake := &fakeWebSocketConn{}
+	conn := &Connection{Conn: fake}
+
+	var ioWG sync.WaitGroup
+	processDone := make(chan struct{})
+	close(processDone)
+
+	_, cancel := context.WithCancel(context.Background())
+	conn.ForceKill()
+	require.NoError(t, conn.cleanup(cancel, &ioWG, processDone, false))
+
+	assert.Equal(t, 2, fake.closeNowCalls)
+	assert.True(t, conn.isClosing())
+}
+
 func waitForContextDone(t *testing.T, ctx context.Context) {
 	t.Helper()
 
@@ -120,4 +165,31 @@ func waitForContextDone(t *testing.T, ctx context.Context) {
 	case <-time.After(time.Second):
 		t.Fatal("context was not cancelled")
 	}
+}
+
+type fakeWebSocketConn struct {
+	closeCalls    int
+	closeNowCalls int
+	closeStatus   websocket.StatusCode
+	closeReason   string
+}
+
+func (f *fakeWebSocketConn) Read(context.Context) (websocket.MessageType, []byte, error) {
+	return websocket.MessageText, nil, errors.New("unexpected read")
+}
+
+func (f *fakeWebSocketConn) Write(context.Context, websocket.MessageType, []byte) error {
+	return nil
+}
+
+func (f *fakeWebSocketConn) Close(status websocket.StatusCode, reason string) error {
+	f.closeCalls++
+	f.closeStatus = status
+	f.closeReason = reason
+	return nil
+}
+
+func (f *fakeWebSocketConn) CloseNow() error {
+	f.closeNowCalls++
+	return nil
 }
