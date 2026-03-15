@@ -391,7 +391,7 @@ type Scheduler struct {
 	LockStaleThreshold      time.Duration // Default: 30s
 	LockRetryInterval       time.Duration // Default: 5s
 	ZombieDetectionInterval time.Duration // Default: 45s; 0 disables
-	RetryFailureWindow      time.Duration // Default: 24h; 0 disables DAG-level retry scanning
+	RetryFailureWindow      time.Duration // Default: 24h; 0 disables DAG-level retry scanning. Current limitation: the window is evaluated from the original DAG-run timestamp/day bucket, not the latest failed attempt timestamp.
 	FailureThreshold        int           // Default: 3
 }
 

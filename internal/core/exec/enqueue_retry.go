@@ -5,6 +5,7 @@ package exec
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,27 +13,14 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 )
 
+// ErrRetryStaleLatest indicates the caller tried to retry a non-latest attempt.
+var ErrRetryStaleLatest = errors.New("retry target is no longer the latest attempt")
+
 // EnqueueRetryOptions control how queued retry metadata is persisted.
 type EnqueueRetryOptions struct {
 	// AutoRetry marks scheduler-issued DAG auto-retries. These consume the
 	// DAG-level retry budget at enqueue time.
 	AutoRetry bool
-}
-
-// EnqueueRetryOutcome describes the final state of a retry enqueue attempt.
-type EnqueueRetryOutcome string
-
-const (
-	EnqueueRetryOutcomeQueued        EnqueueRetryOutcome = "queued"
-	EnqueueRetryOutcomeAlreadyQueued EnqueueRetryOutcome = "already_queued"
-	EnqueueRetryOutcomeStaleLatest   EnqueueRetryOutcome = "stale_latest"
-)
-
-// EnqueueRetryResult reports the persisted status observed at the end of an
-// enqueue attempt.
-type EnqueueRetryResult struct {
-	Outcome EnqueueRetryOutcome
-	Status  *DAGRunStatus
 }
 
 // EnqueueRetry enqueues a DAG run for retry and persists the Queued status.
@@ -47,13 +35,10 @@ func EnqueueRetry(
 	dag *core.DAG,
 	status *DAGRunStatus,
 	opts EnqueueRetryOptions,
-) (EnqueueRetryResult, error) {
+) error {
 	if status.Status == core.Queued {
-		// Already queued (e.g. duplicate retry), treat as success
-		return EnqueueRetryResult{
-			Outcome: EnqueueRetryOutcomeAlreadyQueued,
-			Status:  status,
-		}, nil
+		// Already queued (e.g. duplicate retry), treat as success.
+		return nil
 	}
 
 	updatedStatus, swapped, err := dagRunStore.CompareAndSwapLatestAttemptStatus(
@@ -72,21 +57,15 @@ func EnqueueRetry(
 		},
 	)
 	if err != nil {
-		return EnqueueRetryResult{}, fmt.Errorf("persist queued retry status: %w", err)
+		return fmt.Errorf("persist queued retry status: %w", err)
 	}
 	if !swapped {
 		// Another actor changed the latest attempt first. Treat an already queued
 		// retry as success; everything else is a no-op.
 		if updatedStatus != nil && updatedStatus.Status == core.Queued {
-			return EnqueueRetryResult{
-				Outcome: EnqueueRetryOutcomeAlreadyQueued,
-				Status:  updatedStatus,
-			}, nil
+			return nil
 		}
-		return EnqueueRetryResult{
-			Outcome: EnqueueRetryOutcomeStaleLatest,
-			Status:  updatedStatus,
-		}, nil
+		return ErrRetryStaleLatest
 	}
 
 	// Enqueue after status is persisted. If this fails, roll back the status.
@@ -105,11 +84,8 @@ func EnqueueRetry(
 				return nil
 			},
 		)
-		return EnqueueRetryResult{}, fmt.Errorf("enqueue retry: %w", err)
+		return fmt.Errorf("enqueue retry: %w", err)
 	}
 
-	return EnqueueRetryResult{
-		Outcome: EnqueueRetryOutcomeQueued,
-		Status:  updatedStatus,
-	}, nil
+	return nil
 }

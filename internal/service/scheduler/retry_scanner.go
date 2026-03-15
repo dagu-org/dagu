@@ -5,6 +5,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -147,38 +148,27 @@ func (s *RetryScanner) processFailedRun(
 		return nil
 	}
 
-	result, err := exec.EnqueueRetry(ctx, s.dagRunStore, s.queueStore, dagSnapshot, latestStatus, exec.EnqueueRetryOptions{
+	err = exec.EnqueueRetry(ctx, s.dagRunStore, s.queueStore, dagSnapshot, latestStatus, exec.EnqueueRetryOptions{
 		AutoRetry: true,
 	})
 	if err != nil {
+		if errors.Is(err, exec.ErrRetryStaleLatest) {
+			logger.Debug(ctx, "Retry scanner skipped DAG run",
+				tag.DAG(latestStatus.Name),
+				tag.RunID(latestStatus.DAGRunID),
+				slog.String("skip_reason", "stale_latest"),
+			)
+			return nil
+		}
 		return err
 	}
 
-	switch result.Outcome {
-	case exec.EnqueueRetryOutcomeQueued:
-		queuedStatus := latestStatus
-		if result.Status != nil {
-			queuedStatus = result.Status
-		}
-		logger.Info(ctx, "Retry scanner enqueued DAG-level retry",
-			tag.DAG(latestStatus.Name),
-			tag.RunID(latestStatus.DAGRunID),
-			slog.Int("auto_retry_count", queuedStatus.AutoRetryCount),
-			slog.String("next_retry_at", decision.nextRetryAt.Format(time.RFC3339)),
-			slog.Duration("computed_delay", decision.computedDelay),
-		)
-	case exec.EnqueueRetryOutcomeAlreadyQueued:
-		logger.Debug(ctx, "Retry scanner found DAG run already queued for retry",
-			tag.DAG(latestStatus.Name),
-			tag.RunID(latestStatus.DAGRunID),
-		)
-	case exec.EnqueueRetryOutcomeStaleLatest:
-		logger.Debug(ctx, "Retry scanner skipped DAG run",
-			tag.DAG(latestStatus.Name),
-			tag.RunID(latestStatus.DAGRunID),
-			slog.String("skip_reason", "stale_latest"),
-		)
-	}
+	logger.Info(ctx, "Retry scanner ensured DAG-level retry is queued",
+		tag.DAG(latestStatus.Name),
+		tag.RunID(latestStatus.DAGRunID),
+		slog.String("next_retry_at", decision.nextRetryAt.Format(time.RFC3339)),
+		slog.Duration("computed_delay", decision.computedDelay),
+	)
 	return nil
 }
 

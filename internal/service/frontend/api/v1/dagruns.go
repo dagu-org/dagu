@@ -1670,8 +1670,17 @@ func (a *API) enqueueRetry(ctx context.Context, attempt exec.DAGRunAttempt, dag 
 	if err != nil {
 		return fmt.Errorf("error reading status: %w", err)
 	}
-	_, err = exec.EnqueueRetry(ctx, a.dagRunStore, a.queueStore, dag, status, exec.EnqueueRetryOptions{})
-	return err
+	if err := exec.EnqueueRetry(ctx, a.dagRunStore, a.queueStore, dag, status, exec.EnqueueRetryOptions{}); err != nil {
+		if errors.Is(err, exec.ErrRetryStaleLatest) {
+			return &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "dag-run state changed before retry could be queued",
+			}
+		}
+		return err
+	}
+	return nil
 }
 
 func (a *API) logRetryAudit(ctx context.Context, dagName, dagRunID, stepName string, distributed bool) {
