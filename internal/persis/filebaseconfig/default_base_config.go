@@ -50,8 +50,8 @@ catchup_window: "6h"
 # This absorbs transient infrastructure or dependency failures by default.
 # Override or disable per DAG if the workflow is intentionally non-idempotent.
 retry_policy:
-  limit: 1
-  interval_sec: 60
+  limit: 3
+  interval_sec: 5
 
 # -- Shell --
 # Shell interpreter for command steps.
