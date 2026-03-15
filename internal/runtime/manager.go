@@ -346,6 +346,11 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *core.DAG) (exec.DAGR
 	return *st, nil
 }
 
+// repairStaleLocalRunIfDead repairs a persisted local Running status only when
+// the run has no matching fresh proc heartbeat. "Dead" here means the proc
+// store cannot find any non-stale heartbeat file for the local run; it is not
+// an OS-level PID liveness check. Distributed runs are excluded because local
+// proc heartbeats are not authoritative for remote workers.
 func (m *Manager) repairStaleLocalRunIfDead(
 	ctx context.Context,
 	attempt exec.DAGRunAttempt,
