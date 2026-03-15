@@ -21,6 +21,14 @@ var (
 )
 
 // Manager tracks active terminal sessions and coordinates server shutdown.
+//
+// Slot availability and connection cleanup are tracked independently:
+//   - activeSlots controls whether new sessions can be acquired. It is
+//     decremented when the session event loop exits (via ReleaseSlot),
+//     immediately freeing capacity for new connections.
+//   - sessions/wg track connections that still need cleanup (process
+//     termination, I/O drain). Shutdown waits for wg and can force-kill
+//     connections still in the sessions map.
 type Manager struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -29,6 +37,7 @@ type Manager struct {
 
 	mu            sync.Mutex
 	reservedSlots int
+	activeSlots   int
 	shuttingDown  bool
 	sessions      map[string]*Connection
 	wg            sync.WaitGroup
@@ -37,9 +46,10 @@ type Manager struct {
 type leaseState uint8
 
 const (
-	leaseStateReserved leaseState = iota + 1
-	leaseStateActive
-	leaseStateReleased
+	leaseStateReserved     leaseState = iota + 1
+	leaseStateActive                          // Slot occupied, connection in sessions map
+	leaseStateSlotReleased                    // Slot freed, connection still cleaning up
+	leaseStateReleased                        // Fully done
 )
 
 // sessionLease represents a reserved terminal slot that can be activated once.
@@ -76,7 +86,7 @@ func (m *Manager) Acquire() (*sessionLease, error) {
 	if m.shuttingDown {
 		return nil, ErrManagerShuttingDown
 	}
-	if m.reservedSlots+len(m.sessions) >= m.maxSessions {
+	if m.reservedSlots+m.activeSlots >= m.maxSessions {
 		return nil, ErrMaxSessionsReached
 	}
 	m.reservedSlots++
@@ -113,6 +123,7 @@ func (l *sessionLease) Activate(conn *Connection) error {
 		return ErrManagerShuttingDown
 	}
 
+	m.activeSlots++
 	m.sessions[conn.ID] = conn
 	m.wg.Add(1)
 	l.connID = conn.ID
@@ -120,7 +131,37 @@ func (l *sessionLease) Activate(conn *Connection) error {
 	return nil
 }
 
-// Release releases a reserved or active lease exactly once.
+// ReleaseSlot frees the session slot so new connections can be accepted,
+// without waiting for cleanup to finish. This should be called when the
+// session event loop exits (before process termination and I/O drain).
+// The connection remains in the sessions map for shutdown/force-kill
+// until Release is called.
+func (l *sessionLease) ReleaseSlot() {
+	if l == nil || l.manager == nil {
+		return
+	}
+
+	m := l.manager
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	switch l.state {
+	case leaseStateReserved:
+		if m.reservedSlots > 0 {
+			m.reservedSlots--
+		}
+		l.state = leaseStateReleased
+	case leaseStateActive:
+		m.activeSlots--
+		l.state = leaseStateSlotReleased
+	case leaseStateSlotReleased, leaseStateReleased:
+		// Already released or fully done — nothing to do.
+	}
+}
+
+// Release signals that cleanup is fully complete. It removes the connection
+// from the sessions map and signals the shutdown WaitGroup. If ReleaseSlot
+// was not called, Release also frees the slot.
 func (l *sessionLease) Release() {
 	if l == nil || l.manager == nil {
 		return
@@ -136,10 +177,15 @@ func (l *sessionLease) Release() {
 		}
 		l.state = leaseStateReleased
 	case leaseStateActive:
-		if _, ok := m.sessions[l.connID]; ok {
-			delete(m.sessions, l.connID)
-			doneActive = true
-		}
+		// ReleaseSlot was never called; free the slot too.
+		m.activeSlots--
+		delete(m.sessions, l.connID)
+		doneActive = true
+		l.state = leaseStateReleased
+	case leaseStateSlotReleased:
+		// Slot already freed by ReleaseSlot; finish cleanup tracking.
+		delete(m.sessions, l.connID)
+		doneActive = true
 		l.state = leaseStateReleased
 	case leaseStateReleased:
 		// Already released.

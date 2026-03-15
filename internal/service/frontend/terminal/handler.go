@@ -72,8 +72,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, message, status)
 			return
 		}
-		// Release is deferred as a safety net in case we return early
-		// before Run() is called. Normal release happens via onSessionEnd.
 		defer lease.Release()
 	}
 
@@ -93,9 +91,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			_ = conn.Close(websocket.StatusTryAgainLater, "terminal unavailable")
 			return
 		}
-		// Release the lease as soon as the session event loop exits,
-		// before the potentially slow cleanup (process kill, I/O drain).
-		tc.onSessionEnd = lease.Release
+		// Free the session slot as soon as the event loop exits, before
+		// the potentially slow cleanup (process kill, I/O drain). The
+		// connection stays in the sessions map for shutdown/force-kill
+		// until defer lease.Release() runs after cleanup completes.
+		tc.onSessionEnd = lease.ReleaseSlot
 	}
 
 	var managerCtx context.Context
