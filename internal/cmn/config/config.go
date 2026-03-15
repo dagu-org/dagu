@@ -476,6 +476,9 @@ func (c *Config) validateScheduler() error {
 	if c.Scheduler.Port < 0 || c.Scheduler.Port > 65535 {
 		return fmt.Errorf("invalid scheduler.port: %d", c.Scheduler.Port)
 	}
+	if c.Scheduler.FailureThreshold < 0 {
+		return fmt.Errorf("scheduler.failure_threshold must be >= 0")
+	}
 	if c.Scheduler.LockStaleThreshold < 0 {
 		return fmt.Errorf("scheduler.lock_stale_threshold must be >= 0")
 	}

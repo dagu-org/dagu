@@ -1472,7 +1472,7 @@ retry_policy:
   limit: "3"
   interval_sec: "60"
   backoff: true
-  max_interval_sec: 300
+  max_interval_sec: "300"
 steps:
   - command: echo hi
 `,

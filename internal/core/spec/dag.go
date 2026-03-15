@@ -890,28 +890,11 @@ func parseDAGRetryMaxInterval(v any) (time.Duration, error) {
 	if v == nil {
 		return time.Hour, nil
 	}
-	switch value := v.(type) {
-	case int:
-		if value <= 0 {
-			return 0, core.NewValidationError("retry_policy.max_interval_sec", value, fmt.Errorf("max_interval_sec must be > 0"))
-		}
-		return time.Second * time.Duration(value), nil
-	case int64:
-		if value <= 0 {
-			return 0, core.NewValidationError("retry_policy.max_interval_sec", value, fmt.Errorf("max_interval_sec must be > 0"))
-		}
-		return time.Second * time.Duration(value), nil
-	case uint64:
-		if value > math.MaxInt64 {
-			return 0, core.NewValidationError("retry_policy.max_interval_sec", value, fmt.Errorf("value %d exceeds maximum int64", value))
-		}
-		if value == 0 {
-			return 0, core.NewValidationError("retry_policy.max_interval_sec", value, fmt.Errorf("max_interval_sec must be > 0"))
-		}
-		return time.Second * time.Duration(value), nil
-	default:
-		return 0, core.NewValidationError("retry_policy.max_interval_sec", v, fmt.Errorf("invalid type: %T", v))
+	seconds, _, err := parseConcreteRetryInt("retry_policy.max_interval_sec", v)
+	if err != nil {
+		return 0, err
 	}
+	return time.Second * time.Duration(seconds), nil
 }
 
 func parseDAGRetryLimit(v any) (int, error) {

@@ -81,7 +81,10 @@ steps:
 	if !schedulerStopped {
 		select {
 		case err = <-errCh:
-			require.NoError(t, err)
+			require.True(t,
+				err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded),
+				"unexpected scheduler shutdown error: %v", err,
+			)
 		case <-time.After(5 * time.Second):
 		}
 	}

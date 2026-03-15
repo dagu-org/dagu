@@ -66,6 +66,10 @@ type LockOptions struct {
 
 	// RetryInterval for lock acquisition attempts (default: 50ms)
 	RetryInterval time.Duration
+
+	// OnWait is called once when Lock transitions into retry/wait mode after
+	// encountering a lock conflict.
+	OnWait func()
 }
 
 // LockInfo contains information about a lock
@@ -174,6 +178,11 @@ func (l *dirLock) Lock(ctx context.Context) error {
 	// Try once without blocking
 	if err := l.TryLock(); err == nil {
 		return nil
+	} else if err != ErrLockConflict {
+		return err
+	}
+	if l.opts.OnWait != nil {
+		l.opts.OnWait()
 	}
 
 	// Set up retry with context

@@ -179,7 +179,7 @@ retry_policy:
   limit: "03"
   interval_sec: "10"
   backoff: false
-  max_interval_sec: 60
+  max_interval_sec: "60"
 steps:
   - command: echo hi
 `,
@@ -232,6 +232,18 @@ steps:
 `,
 			wantErr: "retry_policy",
 		},
+		{
+			name: "RejectsUnknownRetryField",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: 3
+  limt: 10
+steps:
+  - command: echo hi
+`,
+			wantErr: "retry_policy",
+		},
 	}
 
 	for _, tt := range tests {
@@ -267,6 +279,24 @@ steps:
 	err := resolved.Validate(doc)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "retry_policy")
+}
+
+func TestDAGSchemaStepRetryPolicyRejectsUnknownField(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+	doc := mustParseYAMLDocument(t, `
+steps:
+  - command: echo hi
+    retry_policy:
+      limit: 1
+      interval_sec: 5
+      limt: 2
+`)
+
+	err := resolved.Validate(doc)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "steps")
 }
 
 func mustResolveDAGSchema(t *testing.T) *jsonschema.Resolved {

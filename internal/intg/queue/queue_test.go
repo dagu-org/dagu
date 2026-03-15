@@ -209,6 +209,7 @@ steps:
 
 		failedAt := time.Now().UTC().Add(-30 * time.Second)
 		runID := f.FailedRunWithMetadata(runStatusOptions{
+			CreatedAt:    failedAt,
 			StartedAt:    failedAt.Add(-5 * time.Second),
 			ScheduleTime: failedAt.Add(-time.Minute),
 			TriggerType:  core.TriggerTypeScheduler,

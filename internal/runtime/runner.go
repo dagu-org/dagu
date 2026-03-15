@@ -810,9 +810,6 @@ func (r *Runner) Cancel(p *Plan) {
 
 // Status returns the status of the runner.
 func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
-	if r.forcedStatus != nil {
-		return *r.forcedStatus
-	}
 	if r.isCanceled() && !r.isSucceed(p) {
 		return core.Aborted
 	}
@@ -837,6 +834,9 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 	}
 	if states.HasNotStarted && !p.IsFinished() {
 		return core.Running
+	}
+	if r.forcedStatus != nil {
+		return *r.forcedStatus
 	}
 
 	if r.isPartialSuccess(ctx, p) {

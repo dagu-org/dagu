@@ -261,9 +261,14 @@ func (f *testFixture) startScheduler(timeout time.Duration) {
 	)
 	require.NoError(f.t, err)
 
+	startupTimeout := timeout
+	if startupTimeout <= 0 {
+		startupTimeout = 5 * time.Second
+	}
+
 	schedulerCtx, schedulerCancel := f.schedulerCtx, f.schedulerCancel
 	if schedulerCtx == nil || schedulerCancel == nil {
-		schedulerCtx, schedulerCancel = context.WithTimeout(f.coord.Context, timeout)
+		schedulerCtx, schedulerCancel = context.WithTimeout(f.coord.Context, startupTimeout)
 	}
 	schedulerErrCh := make(chan error, 1)
 
@@ -284,7 +289,7 @@ func (f *testFixture) startScheduler(timeout time.Duration) {
 		}
 		startErr = f.pollSchedulerErr()
 		return startErr != nil
-	}, 5*time.Second, 50*time.Millisecond, "scheduler did not start in time")
+	}, startupTimeout, 50*time.Millisecond, "scheduler did not start in time")
 	require.NoError(f.t, startErr)
 }
 

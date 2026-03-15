@@ -637,8 +637,9 @@
     }
   },
   "definitions": {
-    "retryPolicyCommon": {
+    "stepRetryPolicy": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "limit": {
           "oneOf": [
@@ -672,31 +673,20 @@
           "type": "integer",
           "minimum": 1,
           "description": "Maximum interval in seconds (caps exponential growth)"
-        }
-      }
-    },
-    "stepRetryPolicy": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/retryPolicyCommon"
         },
-        {
-          "type": "object",
-          "properties": {
-            "exit_code": {
-              "type": "array",
-              "items": {
-                "type": "integer"
-              },
-              "description": "List of exit codes that should trigger a retry. If not specified, all non-zero exit codes will trigger a retry."
-            }
-          }
+        "exit_code": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "List of exit codes that should trigger a retry. If not specified, all non-zero exit codes will trigger a retry."
         }
-      ],
+      },
       "description": "Configuration for automatically retrying failed steps."
     },
     "dagRetryPolicy": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["limit"],
       "properties": {
         "limit": {
@@ -728,13 +718,12 @@
           "description": "Exponential backoff multiplier for retry delays"
         },
         "max_interval_sec": {
-          "type": "integer",
-          "minimum": 1,
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "string", "pattern": "^0*[1-9][0-9]*$" }
+          ],
           "description": "Maximum interval in seconds (caps exponential growth)"
         }
-      },
-      "not": {
-        "required": ["exit_code"]
       },
       "description": "Retry policy for automatic DAG-level retries after failure"
     },

@@ -141,18 +141,7 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	sc2.SetClock(clock)
 
 	// Try to start second scheduler - should wait for lock
-	errCh2 := make(chan error, 1)
-	go func() {
-		errCh2 <- sc2.Start(ctx)
-	}()
-
-	time.Sleep(time.Millisecond * 500)
-	select {
-	case err := <-errCh2:
-		require.NoError(t, err)
-		t.Fatal("second scheduler exited before first one stopped")
-	default:
-	}
+	errCh2 := startWaitingSchedulerAsync(t, sc2, ctx)
 	// Check if second scheduler is still not running
 	require.False(t, sc2.IsRunning(), "Second scheduler should not be running while first one is active")
 
@@ -285,12 +274,7 @@ func TestScheduler_StopWhileWaitingForLock(t *testing.T) {
 	require.NoError(t, err)
 	sc2.SetClock(clock)
 
-	errCh2 := make(chan error, 1)
-	go func() {
-		errCh2 <- sc2.Start(ctx)
-	}()
-
-	time.Sleep(500 * time.Millisecond)
+	errCh2 := startWaitingSchedulerAsync(t, sc2, ctx)
 	require.False(t, sc2.IsRunning(), "Second scheduler should still be waiting on the lock")
 
 	stopDone := make(chan struct{})
@@ -356,6 +340,34 @@ func startSchedulerAsync(t *testing.T, sc *scheduler.Scheduler, ctx context.Cont
 	}()
 
 	requireSchedulerRunning(t, sc, errCh)
+	return errCh
+}
+
+func startWaitingSchedulerAsync(t *testing.T, sc *scheduler.Scheduler, ctx context.Context) chan error {
+	t.Helper()
+
+	errCh := make(chan error, 1)
+	waitStarted := make(chan struct{}, 1)
+	sc.SetLockWaitHook(func() {
+		select {
+		case waitStarted <- struct{}{}:
+		default:
+		}
+	})
+
+	go func() {
+		errCh <- sc.Start(ctx)
+	}()
+
+	select {
+	case <-waitStarted:
+		return errCh
+	case err := <-errCh:
+		require.NoError(t, err)
+		t.Fatal("scheduler exited before waiting on the lock")
+	case <-time.After(5 * time.Second):
+		t.Fatal("scheduler did not begin waiting on the lock")
+	}
 	return errCh
 }
 

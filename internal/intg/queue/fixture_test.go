@@ -318,6 +318,7 @@ func (f *fixture) waitForRecentStatus(timeout time.Duration, match func(exec.DAG
 
 type runStatusOptions struct {
 	RunID          string
+	CreatedAt      time.Time
 	StartedAt      time.Time
 	FinishedAt     time.Time
 	QueuedAt       time.Time
@@ -347,6 +348,9 @@ func (f *fixture) writeRunStatus(status core.Status, opts runStatusOptions) stri
 		transform.WithAttemptID(att.ID()),
 		transform.WithHierarchyRefs(exec.NewDAGRunRef(f.dag.Name, runID), exec.DAGRunRef{}),
 		transform.WithAutoRetryCount(opts.AutoRetryCount),
+	}
+	if !opts.CreatedAt.IsZero() {
+		statusOpts = append(statusOpts, transform.WithCreatedAt(opts.CreatedAt.UnixMilli()))
 	}
 	if !opts.FinishedAt.IsZero() {
 		statusOpts = append(statusOpts, transform.WithFinishedAt(opts.FinishedAt))
