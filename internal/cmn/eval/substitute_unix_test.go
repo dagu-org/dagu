@@ -9,6 +9,7 @@ import (
 	"context"
 	"os/exec"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -80,6 +81,25 @@ func TestRunCommandWithContext_WithBuildShellCommand(t *testing.T) {
 	output, err := runCommandWithContext(context.Background(), "echo test123")
 	require.NoError(t, err)
 	assert.Equal(t, "test123", output)
+}
+
+func TestRunCommandWithContext_DefaultTimeout(t *testing.T) {
+	start := time.Now()
+	_, err := runCommandWithContext(context.Background(), "sleep 3")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "timed out after")
+	assert.Less(t, time.Since(start), 3*time.Second)
+}
+
+func TestRunCommandWithContext_UsesParentDeadline(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	_, err := runCommandWithContext(ctx, "sleep 3")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "timed out after")
+	assert.Less(t, time.Since(start), time.Second)
 }
 
 func TestBuildShellCommand_ComplexCommands(t *testing.T) {

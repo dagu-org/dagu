@@ -6,35 +6,46 @@ package eval
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 )
 
+const substituteCommandTimeout = 2 * time.Second
+
 // buildShellCommand creates an exec.Cmd with appropriate arguments for the shell type.
 func buildShellCommand(shell, cmdStr string) *exec.Cmd {
+	return buildShellCommandContext(context.Background(), shell, cmdStr)
+}
+
+func buildShellCommandContext(ctx context.Context, shell, cmdStr string) *exec.Cmd {
 	if shell == "" {
-		return exec.Command("sh", "-c", cmdStr) //nolint:gosec
+		return exec.CommandContext(ctx, "sh", "-c", cmdStr) //nolint:gosec
 	}
 
 	switch strings.ToLower(filepath.Base(shell)) {
 	case "powershell.exe", "powershell", "pwsh.exe", "pwsh":
-		return exec.Command(shell, "-Command", cmdStr) //nolint:gosec
+		return exec.CommandContext(ctx, shell, "-Command", cmdStr) //nolint:gosec
 	case "cmd.exe", "cmd":
-		return exec.Command(shell, "/c", cmdStr) //nolint:gosec
+		return exec.CommandContext(ctx, shell, "/c", cmdStr) //nolint:gosec
 	default:
-		return exec.Command(shell, "-c", cmdStr) //nolint:gosec
+		return exec.CommandContext(ctx, shell, "-c", cmdStr) //nolint:gosec
 	}
 }
 
 // runCommandWithContext executes cmdStr in a shell using the EnvScope from context,
 // falling back to os.Environ() when no scope is present.
 func runCommandWithContext(ctx context.Context, cmdStr string) (string, error) {
-	cmd := buildShellCommand(cmdutil.GetShellCommand(""), cmdStr)
+	commandCtx, cancel, timeout := withCommandTimeout(ctx, substituteCommandTimeout)
+	defer cancel()
+
+	cmd := buildShellCommandContext(commandCtx, cmdutil.GetShellCommand(""), cmdStr)
 
 	if scope := GetEnvScope(ctx); scope != nil {
 		cmd.Env = scope.ToSlice()
@@ -47,12 +58,34 @@ func runCommandWithContext(ctx context.Context, cmdStr string) (string, error) {
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
+		if errors.Is(commandCtx.Err(), context.DeadlineExceeded) {
+			return "", fmt.Errorf(
+				"failed to execute command %q: timed out after %v\nstderr=%s",
+				cmdStr, timeout, stderr.String(),
+			)
+		}
 		return "", fmt.Errorf(
 			"failed to execute command %q: %w\nstderr=%s",
 			cmdStr, err, stderr.String(),
 		)
 	}
 	return strings.TrimSpace(stdout.String()), nil
+}
+
+func withCommandTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc, time.Duration) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := time.Until(deadline)
+		if remaining <= timeout {
+			return ctx, func() {}, remaining
+		}
+	}
+
+	commandCtx, cancel := context.WithTimeout(ctx, timeout)
+	return commandCtx, cancel, timeout
 }
 
 // substituteCommandsWithContext replaces backtick-delimited commands in input

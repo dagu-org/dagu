@@ -32,6 +32,7 @@ type dagParamEntry struct {
 	Name     string
 	Value    string
 	HasValue bool
+	Eval     string
 }
 
 func buildDAGParamsResult(ctx BuildContext, d *dag) (*paramsResult, error) {
@@ -40,34 +41,53 @@ func buildDAGParamsResult(ctx BuildContext, d *dag) (*paramsResult, error) {
 		return nil, err
 	}
 
-	defaultPairs := runtimePairsFromEntries(plan.entries)
+	defaultEntries := cloneParamEntries(plan.entries)
+	defaultPairs := runtimePairsFromEntries(defaultEntries)
+	finalPairs := defaultPairs
+
+	switch plan.kind {
+	case dagParamKindLegacy:
+		if plan.schema == nil {
+			finalPairs = defaultPairs
+			if ctx.opts.Has(BuildFlagValidateRuntimeParams) || ctx.opts.Parameters != "" || len(ctx.opts.ParametersList) > 0 {
+				finalPairs, err = resolveLegacyRuntimePairs(plan.entries, ctx.opts.Parameters, ctx.opts.ParametersList)
+				if err != nil {
+					return nil, err
+				}
+			}
+			break
+		}
+
+		defaultEntries, err = resolveLegacyEntries(ctx, plan, "", nil, true)
+		if err != nil {
+			return nil, err
+		}
+		defaultPairs = runtimePairsFromEntries(defaultEntries)
+		finalPairs = defaultPairs
+
+		if ctx.opts.Has(BuildFlagValidateRuntimeParams) || ctx.opts.Parameters != "" || len(ctx.opts.ParametersList) > 0 {
+			finalEntries, err := resolveLegacyEntries(ctx, plan, ctx.opts.Parameters, ctx.opts.ParametersList, false)
+			if err != nil {
+				return nil, err
+			}
+			finalPairs = runtimePairsFromEntries(finalEntries)
+		}
+
+	case dagParamKindExternalSchema:
+		if ctx.opts.Has(BuildFlagValidateRuntimeParams) || ctx.opts.Parameters != "" || len(ctx.opts.ParametersList) > 0 {
+			finalEntries, err := resolveExternalSchemaEntries(plan, ctx.opts.Parameters, ctx.opts.ParametersList)
+			if err != nil {
+				return nil, err
+			}
+			finalPairs = runtimePairsFromEntries(finalEntries)
+		}
+	}
+
 	defaultParts := make([]string, 0, len(defaultPairs))
 	for _, pair := range defaultPairs {
 		defaultParts = append(defaultParts, pair.Escaped())
 	}
 	defaultParams := strings.Join(defaultParts, " ")
-
-	finalPairs := defaultPairs
-	if ctx.opts.Has(BuildFlagValidateRuntimeParams) || ctx.opts.Parameters != "" || len(ctx.opts.ParametersList) > 0 {
-		switch {
-		case plan.kind == dagParamKindLegacy && plan.schema == nil:
-			finalPairs, err = resolveLegacyRuntimePairs(plan.entries, ctx.opts.Parameters, ctx.opts.ParametersList)
-		default:
-			finalEntries := cloneParamEntries(plan.entries)
-			switch plan.kind {
-			case dagParamKindLegacy:
-				finalEntries, err = resolveLegacyEntries(plan, ctx.opts.Parameters, ctx.opts.ParametersList)
-			case dagParamKindExternalSchema:
-				finalEntries, err = resolveExternalSchemaEntries(plan, ctx.opts.Parameters, ctx.opts.ParametersList)
-			}
-			if err == nil {
-				finalPairs = runtimePairsFromEntries(finalEntries)
-			}
-		}
-		if err != nil {
-			return nil, err
-		}
-	}
 
 	params := make([]string, 0, len(finalPairs))
 	for _, pair := range finalPairs {
