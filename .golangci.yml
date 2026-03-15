@@ -28,6 +28,7 @@ linters:
     paths:
       - .github
       - .vscode
+      - node_modules
       - local
       - config
       - scripts

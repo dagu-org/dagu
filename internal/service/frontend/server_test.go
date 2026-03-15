@@ -5,6 +5,7 @@ package frontend
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -167,4 +168,172 @@ func TestInitBuiltinAuthService_UserCanAuthenticate(t *testing.T) {
 	// Wrong password should fail
 	_, err = result.AuthService.Authenticate(testContext(t), "authadmin", "wrongpassword")
 	require.Error(t, err)
+}
+
+func TestNewServerShutdownContext(t *testing.T) {
+	t.Parallel()
+
+	t.Run("HonorsCallerDeadline", func(t *testing.T) {
+		t.Parallel()
+
+		parent, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+
+		shutdownCtx, cleanup := newServerShutdownContext(parent)
+		defer cleanup()
+
+		parentDeadline, ok := parent.Deadline()
+		require.True(t, ok)
+		shutdownDeadline, ok := shutdownCtx.Deadline()
+		require.True(t, ok)
+		assert.WithinDuration(t, parentDeadline, shutdownDeadline, 10*time.Millisecond)
+	})
+
+	t.Run("AlreadyCanceledStaysCanceled", func(t *testing.T) {
+		t.Parallel()
+
+		parent, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		shutdownCtx, cleanup := newServerShutdownContext(parent)
+		defer cleanup()
+
+		require.ErrorIs(t, shutdownCtx.Err(), context.Canceled)
+	})
+
+	t.Run("NoDeadlineGetsDefaultTimeout", func(t *testing.T) {
+		t.Parallel()
+
+		type ctxKey string
+		start := time.Now()
+		parent := context.WithValue(context.Background(), ctxKey("trace_id"), "abc123")
+
+		shutdownCtx, cleanup := newServerShutdownContext(parent)
+		defer cleanup()
+
+		deadline, ok := shutdownCtx.Deadline()
+		require.True(t, ok)
+		assert.WithinDuration(t, start.Add(serverShutdownTimeout), deadline, 500*time.Millisecond)
+		assert.Equal(t, "abc123", shutdownCtx.Value(ctxKey("trace_id")))
+	})
+}
+
+func TestNewGracefulShutdownContext(t *testing.T) {
+	t.Parallel()
+
+	type ctxKey string
+
+	parent := context.WithValue(context.Background(), ctxKey("trace_id"), "abc123")
+	canceledParent, cancelParent := context.WithCancel(parent)
+	cancelParent()
+
+	start := time.Now()
+	gracefulCtx, cleanup := newGracefulShutdownContext(canceledParent)
+	defer cleanup()
+
+	assert.NoError(t, gracefulCtx.Err())
+	deadline, ok := gracefulCtx.Deadline()
+	require.True(t, ok)
+	assert.WithinDuration(t, start.Add(serverShutdownTimeout), deadline, 500*time.Millisecond)
+	assert.Equal(t, "abc123", gracefulCtx.Value(ctxKey("trace_id")))
+}
+
+func TestRunShutdownSequence_OrderAndBudgets(t *testing.T) {
+	t.Parallel()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	overallDeadline, ok := shutdownCtx.Deadline()
+	require.True(t, ok)
+
+	var (
+		calls            []string
+		httpDeadline     time.Time
+		terminalDeadline time.Time
+	)
+
+	httpErr := errors.New("http shutdown failed")
+	terminalErr := errors.New("terminal shutdown failed")
+	auditErr := errors.New("audit close failed")
+
+	err := runShutdownSequence(shutdownCtx, shutdownActions{
+		stopSync: func() error {
+			calls = append(calls, "sync")
+			return errors.New("ignored sync stop failure")
+		},
+		shutdownSSE: func() {
+			calls = append(calls, "sse")
+		},
+		shutdownSSEMultiplexer: func() {
+			calls = append(calls, "sse_multiplexer")
+		},
+		beforeHTTPShutdown: func() {
+			calls = append(calls, "http_prepare")
+		},
+		disableHTTPKeepAlives: func() {
+			calls = append(calls, "keepalives_off")
+		},
+		shutdownHTTP: func(ctx context.Context) error {
+			calls = append(calls, "http")
+			var ok bool
+			httpDeadline, ok = ctx.Deadline()
+			require.True(t, ok)
+			return httpErr
+		},
+		shutdownTerminal: func(ctx context.Context) error {
+			calls = append(calls, "terminal")
+			var ok bool
+			terminalDeadline, ok = ctx.Deadline()
+			require.True(t, ok)
+			return terminalErr
+		},
+		closeAudit: func() error {
+			calls = append(calls, "audit")
+			return auditErr
+		},
+	})
+
+	require.Error(t, err)
+	require.ErrorIs(t, err, httpErr)
+	require.ErrorIs(t, err, terminalErr)
+	assert.NotErrorIs(t, err, auditErr)
+	assert.Equal(t, []string{
+		"sync",
+		"sse",
+		"sse_multiplexer",
+		"http_prepare",
+		"keepalives_off",
+		"http",
+		"terminal",
+		"audit",
+	}, calls)
+	assert.WithinDuration(t, start.Add(httpShutdownBudget), httpDeadline, 500*time.Millisecond)
+	assert.WithinDuration(t, overallDeadline, terminalDeadline, 500*time.Millisecond)
+	assert.True(t, httpDeadline.Before(terminalDeadline))
+}
+
+func TestRunShutdownSequence_WithoutHTTPStillShutsDownTerminalAndAudit(t *testing.T) {
+	t.Parallel()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	var calls []string
+	terminalErr := errors.New("terminal shutdown failed")
+
+	err := runShutdownSequence(shutdownCtx, shutdownActions{
+		shutdownTerminal: func(context.Context) error {
+			calls = append(calls, "terminal")
+			return terminalErr
+		},
+		closeAudit: func() error {
+			calls = append(calls, "audit")
+			return nil
+		},
+	})
+
+	require.ErrorIs(t, err, terminalErr)
+	assert.Equal(t, []string{"terminal", "audit"}, calls)
 }

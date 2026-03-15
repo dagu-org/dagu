@@ -4,6 +4,7 @@
 package terminal
 
 import (
+	"context"
 	"net/http"
 	"os"
 
@@ -17,14 +18,16 @@ import (
 type Handler struct {
 	authService  *authservice.Service
 	auditService *audit.Service
+	manager      *Manager
 	shell        string
 }
 
 // NewHandler creates a new terminal handler.
-func NewHandler(authSvc *authservice.Service, auditSvc *audit.Service, shell string) *Handler {
+func NewHandler(authSvc *authservice.Service, auditSvc *audit.Service, manager *Manager, shell string) *Handler {
 	return &Handler{
 		authService:  authSvc,
 		auditService: auditSvc,
+		manager:      manager,
 		shell:        shell,
 	}
 }
@@ -56,6 +59,22 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Get client IP address
 	ipAddress := frontendauth.GetClientIP(r)
 
+	var lease *sessionLease
+	if h.manager != nil {
+		lease, err = h.manager.Acquire()
+		if err != nil {
+			status := http.StatusTooManyRequests
+			message := "Terminal session limit reached. Please close another terminal and try again."
+			if err == ErrManagerShuttingDown {
+				status = http.StatusServiceUnavailable
+				message = "Terminal is shutting down. Please try again after the server restarts."
+			}
+			http.Error(w, message, status)
+			return
+		}
+		defer lease.Release()
+	}
+
 	// Upgrade to WebSocket
 	// InsecureSkipVerify allows any origin since access is already protected by token auth
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
@@ -67,7 +86,36 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Create and run connection
 	tc := NewConnection(user, h.shell, conn, ipAddress)
-	_ = tc.Run(ctx, h.auditService)
+	if lease != nil {
+		if err := lease.Activate(tc); err != nil {
+			_ = conn.Close(websocket.StatusTryAgainLater, "terminal unavailable")
+			return
+		}
+	}
+
+	var managerCtx context.Context
+	if h.manager != nil {
+		managerCtx = h.manager.Context()
+	}
+	runCtx, cancelRun := mergeSessionContext(ctx, managerCtx)
+	defer cancelRun()
+	_ = tc.Run(runCtx, h.auditService)
+}
+
+func mergeSessionContext(requestCtx, managerCtx context.Context) (context.Context, context.CancelFunc) {
+	if requestCtx == nil {
+		requestCtx = context.Background()
+	}
+	if managerCtx == nil {
+		return context.WithCancel(requestCtx)
+	}
+
+	ctx, cancel := context.WithCancel(requestCtx)
+	stop := context.AfterFunc(managerCtx, cancel)
+	return ctx, func() {
+		stop()
+		cancel()
+	}
 }
 
 // GetDefaultShell returns the default shell for the current system.

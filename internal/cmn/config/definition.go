@@ -316,7 +316,8 @@ type MonitoringDef struct {
 
 // TerminalDef configures the web-based terminal feature.
 type TerminalDef struct {
-	Enabled *bool `mapstructure:"enabled"` // Default: false
+	Enabled     *bool `mapstructure:"enabled"`      // Default: false
+	MaxSessions *int  `mapstructure:"max_sessions"` // Default: 5
 }
 
 // AuditDef configures the audit logging feature.

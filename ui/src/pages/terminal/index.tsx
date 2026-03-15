@@ -7,6 +7,11 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import {
+  base64ToBytes,
+  binaryStringToBase64,
+  stringToBase64,
+} from './encoding';
 
 type MessageType = 'input' | 'output' | 'resize' | 'close' | 'error';
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
@@ -105,7 +110,6 @@ export default function TerminalPage() {
       },
       allowProposedApi: true,
     });
-    /* ... existing initialization ... */
     const fitAddon = new FitAddon();
     const webLinksAddon = new WebLinksAddon();
 
@@ -115,13 +119,15 @@ export default function TerminalPage() {
 
     terminalRef.current = term;
     fitAddonRef.current = fitAddon;
-    /* ... rest of the effect ... */
     // Initial fit
     setTimeout(() => fitAddon.fit(), 0);
 
     // Get token from localStorage
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) {
+      term.dispose();
+      terminalRef.current = null;
+      fitAddonRef.current = null;
       setErrorMessage('Authentication required');
       setConnectionStatus('error');
       return;
@@ -155,8 +161,7 @@ export default function TerminalPage() {
       try {
         const msg: TerminalMessage = JSON.parse(event.data);
         if (msg.type === 'output' && msg.data) {
-          const decoded = atob(msg.data);
-          term.write(decoded);
+          term.write(base64ToBytes(msg.data));
         } else if (msg.type === 'error' && msg.data) {
           term.write(`\r\n\x1b[31mError: ${msg.data}\x1b[0m\r\n`);
         }
@@ -183,7 +188,18 @@ export default function TerminalPage() {
         ws.send(
           JSON.stringify({
             type: 'input',
-            data: btoa(data),
+            data: stringToBase64(data),
+          })
+        );
+      }
+    });
+
+    term.onBinary((data) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(
+          JSON.stringify({
+            type: 'input',
+            data: binaryStringToBase64(data),
           })
         );
       }

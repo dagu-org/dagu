@@ -357,6 +357,7 @@ When `DAGU_AUTH_MODE=builtin`, a file-based user management system with role-bas
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
 | `DAGU_TERMINAL_ENABLED` | `false` | Enable web-based terminal |
+| `DAGU_TERMINAL_MAX_SESSIONS` | `5` | Maximum concurrent terminal sessions |
 | `DAGU_AUDIT_ENABLED` | `true` | Enable audit logging for security events |
 
 ### Git Sync Configuration
