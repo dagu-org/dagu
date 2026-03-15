@@ -51,30 +51,13 @@ type Scheduler struct {
 	stopOnce            sync.Once
 	lock                sync.Mutex
 	lifecycleMu         sync.Mutex
-	lockWaitHook        *lockWaitHook
 	startupCancel       context.CancelFunc
 	lockHeld            atomic.Bool
 	clock               Clock // Clock function for getting current time
 }
 
-type lockWaitHook struct {
-	mu sync.RWMutex
-	fn func()
-}
-
-func (h *lockWaitHook) set(fn func()) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.fn = fn
-}
-
-func (h *lockWaitHook) call() {
-	h.mu.RLock()
-	fn := h.fn
-	h.mu.RUnlock()
-	if fn != nil {
-		fn()
-	}
+type schedulerHooks struct {
+	onLockWait func()
 }
 
 type startupState struct {
@@ -99,15 +82,29 @@ func New(
 	coordinatorCli exec.Dispatcher,
 	watermarkStore WatermarkStore,
 ) (*Scheduler, error) {
+	return newScheduler(cfg, er, drm, dagRunStore, queueStore, procStore, reg, coordinatorCli, watermarkStore, schedulerHooks{})
+}
+
+func newScheduler(
+	cfg *config.Config,
+	er EntryReader,
+	drm runtime.Manager,
+	dagRunStore exec.DAGRunStore,
+	queueStore exec.QueueStore,
+	procStore exec.ProcStore,
+	reg exec.ServiceRegistry,
+	coordinatorCli exec.Dispatcher,
+	watermarkStore WatermarkStore,
+	hooks schedulerHooks,
+) (*Scheduler, error) {
 	timeLoc := cfg.Core.Location
 	if timeLoc == nil {
 		timeLoc = time.Local
 	}
-	lockWaitHook := &lockWaitHook{}
 	lockOpts := &dirlock.LockOptions{
 		StaleThreshold: cfg.Scheduler.LockStaleThreshold,
 		RetryInterval:  cfg.Scheduler.LockRetryInterval,
-		OnWait:         lockWaitHook.call,
+		OnWait:         hooks.onLockWait,
 	}
 	lockDir := filepath.Join(cfg.Paths.DataDir, "scheduler", "locks")
 	dirLock := dirlock.New(lockDir, lockOpts)
@@ -206,7 +203,6 @@ func New(
 		queueProcessor:  processor,
 		retryScanner:    retryScanner,
 		planner:         planner,
-		lockWaitHook:    lockWaitHook,
 		clock:           defaultClock,
 	}, nil
 }
@@ -243,15 +239,6 @@ func (s *Scheduler) SetGetLatestStatusFunc(fn GetLatestStatusFunc) {
 // This must be called before Start().
 func (s *Scheduler) SetDispatchFunc(fn DispatchFunc) {
 	s.planner.cfg.Dispatch = fn
-}
-
-// SetLockWaitHook installs a callback invoked when scheduler startup begins
-// waiting to acquire the global scheduler lock. Used by tests.
-func (s *Scheduler) SetLockWaitHook(fn func()) {
-	if s == nil || s.lockWaitHook == nil {
-		return
-	}
-	s.lockWaitHook.set(fn)
 }
 
 // DisableHealthServer disables the health check server (used when running from start-all)

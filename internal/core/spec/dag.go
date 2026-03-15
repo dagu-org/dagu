@@ -667,6 +667,9 @@ func buildDAGRetryPolicy(_ BuildContext, d *dag) (*core.DAGRetryPolicy, error) {
 		return nil, nil
 	}
 
+	// Root DAG retry must be concrete when the DAG is loaded because scheduler
+	// retry decisions evaluate the persisted DAG snapshot without re-resolving
+	// retry expressions at runtime.
 	limit, err := parseDAGRetryLimit(d.RetryPolicy.Limit)
 	if err != nil {
 		return nil, err
@@ -871,7 +874,7 @@ func parseDAGRetryInterval(v any) (time.Duration, string, error) {
 	if v == nil {
 		return 60 * time.Second, "", nil
 	}
-	interval, intervalStr, err := parseConcreteRetryInt("retry_policy.interval_sec", v)
+	interval, intervalStr, err := parseConcreteDAGRetryInt("retry_policy.interval_sec", v)
 	if err != nil {
 		return 0, "", err
 	}
@@ -890,7 +893,7 @@ func parseDAGRetryMaxInterval(v any) (time.Duration, error) {
 	if v == nil {
 		return time.Hour, nil
 	}
-	seconds, _, err := parseConcreteRetryInt("retry_policy.max_interval_sec", v)
+	seconds, _, err := parseConcreteDAGRetryInt("retry_policy.max_interval_sec", v)
 	if err != nil {
 		return 0, err
 	}
@@ -901,14 +904,14 @@ func parseDAGRetryLimit(v any) (int, error) {
 	if v == nil {
 		return 0, core.NewValidationError("retry_policy.limit", nil, fmt.Errorf("limit is required when retry_policy is specified"))
 	}
-	limit, _, err := parseConcreteRetryInt("retry_policy.limit", v)
+	limit, _, err := parseConcreteDAGRetryInt("retry_policy.limit", v)
 	if err != nil {
 		return 0, err
 	}
 	return limit, nil
 }
 
-func parseConcreteRetryInt(fieldName string, val any) (int, string, error) {
+func parseConcreteDAGRetryInt(fieldName string, val any) (int, string, error) {
 	switch v := val.(type) {
 	case int:
 		if v <= 0 {
