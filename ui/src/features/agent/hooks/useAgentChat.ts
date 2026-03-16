@@ -197,6 +197,7 @@ export function useAgentChat() {
   const { preferences } = useUserPreferences();
   const appBarContext = useContext(AppBarContext);
   const {
+    isOpen: isChatOpen,
     sessionId,
     messages,
     pendingUserMessage,
@@ -369,8 +370,10 @@ export function useAgentChat() {
   });
 
   useEffect(() => {
-    const shouldPollSession = !!sessionId && !sseStatus.isSessionLive;
-    if (!shouldPollSession) {
+    // Only poll when the chat modal is visible and a session is selected.
+    // Without the isChatOpen check, polling continues after the modal closes
+    // because sessionId stays set in the context, wasting connection slots.
+    if (!isChatOpen || !sessionId || sseStatus.isSessionLive) {
       return;
     }
 
@@ -422,7 +425,7 @@ export function useAgentChat() {
         clearTimeout(nextPollTimeout);
       }
     };
-  }, [sessionId, sseStatus.isSessionLive, sortedOpenDelegateSessionIds]);
+  }, [isChatOpen, sessionId, sseStatus.isSessionLive, sortedOpenDelegateSessionIds]);
 
   const fetchSessionsPage = useCallback(
     async (page: number): Promise<void> => {

@@ -4,8 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConfigContext, type Config } from '@/contexts/ConfigContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { UserPreferencesProvider } from '@/contexts/UserPreference';
-import { AgentChatProvider } from '../../context/AgentChatContext';
+import { AgentChatProvider, useAgentChatContext } from '../../context/AgentChatContext';
 import { useAgentChat } from '../useAgentChat';
+
+// Combined hook so tests can call openChat() to simulate the modal being visible.
+// Polling only runs when isChatOpen is true.
+function useAgentChatWithOpen() {
+  const ctx = useAgentChatContext();
+  const chat = useAgentChat();
+  return { ...chat, openChat: ctx.openChat };
+}
 
 const getMock = vi.fn();
 const postMock = vi.fn();
@@ -188,10 +196,11 @@ describe('useAgentChat fallback polling', () => {
       }
     );
 
-    const { result, rerender } = renderHook(() => useAgentChat(), {
+    const { result, rerender } = renderHook(() => useAgentChatWithOpen(), {
       wrapper: TestProviders,
     });
 
+    act(() => { result.current.openChat(); });
     await act(async () => {
       await result.current.selectSession('sess-1');
     });
@@ -266,10 +275,11 @@ describe('useAgentChat fallback polling', () => {
       }
     );
 
-    const { result, rerender } = renderHook(() => useAgentChat(), {
+    const { result, rerender } = renderHook(() => useAgentChatWithOpen(), {
       wrapper: TestProviders,
     });
 
+    act(() => { result.current.openChat(); });
     await act(async () => {
       await result.current.selectSession('sess-1');
     });
@@ -321,10 +331,11 @@ describe('useAgentChat fallback polling', () => {
       }
     );
 
-    const { result } = renderHook(() => useAgentChat(), {
+    const { result } = renderHook(() => useAgentChatWithOpen(), {
       wrapper: TestProviders,
     });
 
+    act(() => { result.current.openChat(); });
     await act(async () => {
       await result.current.selectSession('sess-1');
     });
@@ -466,10 +477,11 @@ describe('useAgentChat fallback polling', () => {
       }
     );
 
-    const { result, rerender } = renderHook(() => useAgentChat(), {
+    const { result, rerender } = renderHook(() => useAgentChatWithOpen(), {
       wrapper: TestProviders,
     });
 
+    act(() => { result.current.openChat(); });
     await act(async () => {
       await result.current.selectSession('sess-1');
     });

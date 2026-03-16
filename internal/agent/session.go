@@ -125,6 +125,15 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 
 	messages := copyMessages(cfg.History)
 
+	// Reconstruct accumulated cost from historical messages so that
+	// reactivated sessions display the correct total.
+	var totalCost float64
+	for _, msg := range messages {
+		if msg.Cost != nil {
+			totalCost += *msg.Cost
+		}
+	}
+
 	now := time.Now()
 	createdAt := cfg.CreatedAt
 	if createdAt.IsZero() {
@@ -161,6 +170,7 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		delegates:          delegates,
 		inputCostPer1M:     cfg.InputCostPer1M,
 		outputCostPer1M:    cfg.OutputCostPer1M,
+		totalCost:          totalCost,
 		memoryStore:        cfg.MemoryStore,
 		skillStore:         cfg.SkillStore,
 		enabledSkills:      cfg.EnabledSkills,

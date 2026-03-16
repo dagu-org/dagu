@@ -864,12 +864,20 @@ func (a *API) GetSessionDetail(ctx context.Context, sessionID, userID string) (*
 		return nil, err
 	}
 
+	var totalCost float64
+	for _, msg := range messages {
+		if msg.Cost != nil {
+			totalCost += *msg.Cost
+		}
+	}
+
 	return &StreamResponse{
 		Messages: messages,
 		Session:  sess,
 		SessionState: &SessionState{
 			SessionID: sessionID,
 			Working:   false,
+			TotalCost: totalCost,
 		},
 		Delegates: delegates,
 	}, nil
