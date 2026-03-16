@@ -15,7 +15,7 @@ interface ChatMessagesProps {
   messages: Message[];
   pendingUserMessage: string | null;
   isWorking: boolean;
-  onPromptRespond?: (response: UserPromptResponse, displayValue: string) => void;
+  onPromptRespond?: (response: UserPromptResponse, displayValue: string) => Promise<void>;
   answeredPrompts?: Record<string, string>;
   delegateStatuses?: Record<string, DelegateInfo>;
   onOpenDelegate?: (id: string) => void;
@@ -34,7 +34,7 @@ export function ChatMessages({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, pendingUserMessage, isWorking]);
 
   const completedToolCallIds = useMemo(() => {
     const ids = new Set<string>();
@@ -99,7 +99,7 @@ interface MessageItemProps {
   message: Message;
   messages: Message[];
   messageIndex: number;
-  onPromptRespond?: (response: UserPromptResponse, displayValue: string) => void;
+  onPromptRespond?: (response: UserPromptResponse, displayValue: string) => Promise<void>;
   answeredPrompts?: Record<string, string>;
   delegateStatuses?: Record<string, DelegateInfo>;
   onOpenDelegate?: (id: string) => void;

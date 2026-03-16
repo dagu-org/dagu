@@ -45,9 +45,9 @@ export function useDelegateManager() {
 
   // --- SSE event handlers ---
 
-  const handleDelegateSnapshots = useCallback((snapshots: DelegateSnapshot[]) => {
+  const reconcileDelegateSnapshots = useCallback((snapshots: DelegateSnapshot[]) => {
     setDelegateStore((prev) => {
-      const next = { ...prev };
+      const next: Record<string, DelegateState> = {};
       for (const snap of snapshots) {
         const existing = prev[snap.id];
         next[snap.id] = {
@@ -157,19 +157,6 @@ export function useDelegateManager() {
     delegateStoreRef.current = {};
   }, []);
 
-  const restoreDelegates = useCallback((snapshots: DelegateSnapshot[]) => {
-    const newStore: Record<string, DelegateState> = {};
-    for (const snap of snapshots) {
-      newStore[snap.id] = {
-        info: { id: snap.id, task: snap.task, status: snap.status, zIndex: ++zIndexCounterRef.current, positionIndex: 0 },
-        messages: [],
-        isOpen: false,
-      };
-    }
-    setDelegateStore(newStore);
-    delegateStoreRef.current = newStore;
-  }, []);
-
   // --- User actions ---
 
   const bringToFront = useCallback((delegateId: string) => {
@@ -231,12 +218,11 @@ export function useDelegateManager() {
     delegates,
     delegateStatuses,
     delegateMessages,
-    handleDelegateSnapshots,
+    reconcileDelegateSnapshots,
     applyDelegateSessionSnapshot,
     handleDelegateMessages,
     handleDelegateEvent,
     resetDelegates,
-    restoreDelegates,
     bringToFront,
     openDelegate,
     setDelegateMessagesForId,

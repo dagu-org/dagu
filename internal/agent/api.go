@@ -56,6 +56,21 @@ func getAuthenticatedUserIDFromContext(ctx context.Context) (string, bool) {
 	return "", false
 }
 
+func userIdentityFromContext(ctx context.Context) UserIdentity {
+	user := UserIdentity{
+		UserID:   defaultUserID,
+		Username: defaultUserID,
+		Role:     defaultUserRole,
+	}
+	if authUser, ok := auth.UserFromContext(ctx); ok && authUser != nil {
+		user.UserID = authUser.ID
+		user.Username = authUser.Username
+		user.Role = authUser.Role
+	}
+	user.IPAddress, _ = auth.ClientIPFromContext(ctx)
+	return user
+}
+
 // API handles HTTP requests for the agent.
 type API struct {
 	sessions           sync.Map // id -> *SessionManager (active sessions)
@@ -427,12 +442,69 @@ func (a *API) appendPersistedSessions(ctx context.Context, userID string, active
 			continue
 		}
 		sessions = append(sessions, SessionWithState{
-			Session: *sess,
-			Working: false,
+			Session:   *sess,
+			Working:   false,
+			TotalCost: a.getStoredSessionCost(ctx, sess.ID),
 		})
 	}
 
 	return sessions
+}
+
+// getStoredSessionCost sums the cost of all messages in a stored session,
+// including costs from delegate sub-sessions.
+func (a *API) getStoredSessionCost(ctx context.Context, sessionID string) float64 {
+	if a.store == nil {
+		return 0
+	}
+	messages, err := a.store.GetMessages(ctx, sessionID)
+	if err != nil {
+		return 0
+	}
+	return sumMessageCosts(messages) + a.sumSubSessionCosts(ctx, sessionID)
+}
+
+// sumMessageCosts sums the Cost field across a slice of messages.
+func sumMessageCosts(messages []Message) float64 {
+	var total float64
+	for _, msg := range messages {
+		if msg.Cost != nil {
+			total += *msg.Cost
+		}
+	}
+	return total
+}
+
+// sumSubSessionCosts returns the total cost from all direct sub-session messages.
+func (a *API) sumSubSessionCosts(ctx context.Context, sessionID string) float64 {
+	if a.store == nil {
+		return 0
+	}
+	subSessions, err := a.store.ListSubSessions(ctx, sessionID)
+	if err != nil {
+		return 0
+	}
+	var total float64
+	for _, sub := range subSessions {
+		subMessages, err := a.store.GetMessages(ctx, sub.ID)
+		if err != nil {
+			continue
+		}
+		total += sumMessageCosts(subMessages)
+	}
+	return total
+}
+
+// sumSessionMessageCosts loads messages for a single session and sums their costs.
+func (a *API) sumSessionMessageCosts(ctx context.Context, sessionID string) float64 {
+	if a.store == nil {
+		return 0
+	}
+	messages, err := a.store.GetMessages(ctx, sessionID)
+	if err != nil {
+		return 0
+	}
+	return sumMessageCosts(messages)
 }
 
 // getActiveSession retrieves an active session if it exists and belongs to the user.
@@ -524,17 +596,39 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		seqID = int64(len(messages))
 	}
 
+	delegates, err := a.getStoredDelegateSnapshots(ctx, id)
+	if err != nil {
+		a.logger.Warn("Failed to load delegates for reactivation", "error", err)
+		delegates = nil
+	}
+
+	// Resolve pricing from the default model so that reactivated sessions
+	// can calculate costs for new messages immediately.
+	var inputCost, outputCost float64
+	defaultModelID := a.getDefaultModelID(ctx)
+	if defaultModelID != "" {
+		if _, modelCfg, err := a.resolveProvider(ctx, defaultModelID); err == nil {
+			inputCost = modelCfg.InputCostPer1M
+			outputCost = modelCfg.OutputCostPer1M
+		}
+	}
+
 	mgr := NewSessionManager(SessionManagerConfig{
 		ID:                 id,
 		User:               user,
 		Logger:             a.logger,
 		WorkingDir:         a.workingDir,
+		Title:              sess.Title,
+		CreatedAt:          sess.CreatedAt,
+		LastActivity:       time.Now(),
 		OnMessage:          a.createMessageCallback(id),
 		History:            messages,
 		SequenceID:         seqID,
 		Environment:        a.environment,
 		SafeMode:           true, // Default to safe mode for reactivated sessions
 		Hooks:              a.hooks,
+		InputCostPer1M:     inputCost,
+		OutputCostPer1M:    outputCost,
 		MemoryStore:        a.memoryStore,
 		SkillStore:         a.skillStore,
 		EnabledSkills:      a.loadEnabledSkills(ctx),
@@ -543,6 +637,7 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		Soul:               a.loadSelectedSoul(ctx),
 		WebSearch:          a.loadWebSearch(ctx),
 		RemoteNodeResolver: a.remoteNodeResolver,
+		Delegates:          delegates,
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 	a.sessions.Store(id, mgr)
@@ -554,15 +649,17 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 // GET /api/v1/agent/sessions/{id}/stream
 func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	userID := getUserIDFromContext(r.Context())
+	user := userIdentityFromContext(r.Context())
 
-	mgr, ok := a.getActiveSession(id, userID)
+	mgr, ok := a.getOrReactivateSession(r.Context(), id, user)
 	if !ok {
 		respondErrorDirect(w, http.StatusNotFound, api.ErrorCodeNotFound, "Session not found")
 		return
 	}
 
 	a.setupSSEHeaders(w)
+	rc := http.NewResponseController(w)
+	_ = rc.SetWriteDeadline(time.Time{})
 
 	// Use atomic subscribe+snapshot to prevent race condition
 	// where messages could be missed between getting initial state and subscribing
@@ -625,6 +722,7 @@ func (a *API) setupSSEHeaders(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
 	// CORS headers are managed by the server's CORS middleware configuration.
 	// Do not set Access-Control-Allow-Origin here to avoid security issues.
 }
@@ -802,7 +900,10 @@ func (a *API) ListSessionsPaginated(ctx context.Context, userID string, page, pe
 				if sess.ParentSessionID != "" {
 					continue
 				}
-				combined = append(combined, SessionWithState{Session: *sess})
+				combined = append(combined, SessionWithState{
+					Session: *sess,
+					Working: false,
+				})
 			}
 		}
 	}
@@ -810,8 +911,16 @@ func (a *API) ListSessionsPaginated(ctx context.Context, userID string, page, pe
 	total := len(combined)
 	start := min(pg.Offset(), total)
 	end := min(pg.Offset()+pg.Limit(), total)
+	pageItems := combined[start:end]
 
-	return exec.NewPaginatedResult(combined[start:end], total, pg)
+	// Load costs only for the visible page's inactive sessions.
+	for i := range pageItems {
+		if _, isActive := activeIDs[pageItems[i].Session.ID]; !isActive {
+			pageItems[i].TotalCost = a.getStoredSessionCost(ctx, pageItems[i].Session.ID)
+		}
+	}
+
+	return exec.NewPaginatedResult(pageItems, total, pg)
 }
 
 // GetSessionDetail returns session details including messages and state.
@@ -836,66 +945,7 @@ func (a *API) GetSessionDetail(ctx context.Context, sessionID, userID string) (*
 		return nil, err
 	}
 
-	return &StreamResponse{
-		Messages: messages,
-		Session:  sess,
-		SessionState: &SessionState{
-			SessionID: sessionID,
-			Working:   false,
-		},
-		Delegates: delegates,
-	}, nil
-}
-
-// AuthorizeSessionAccess validates that the current request context may access the session.
-func (a *API) AuthorizeSessionAccess(ctx context.Context, sessionID string) error {
-	userID, ok := getAuthenticatedUserIDFromContext(ctx)
-	if !ok {
-		return ErrSessionNotFound
-	}
-
-	if _, ok := a.getActiveSession(sessionID, userID); ok {
-		return nil
-	}
-
-	sess, err := a.getStoredSessionMetadata(ctx, sessionID)
-	if err != nil {
-		return err
-	}
-	if sess.UserID != userID {
-		return ErrSessionNotFound
-	}
-
-	return nil
-}
-
-// GetSessionSnapshot returns the current full session snapshot without re-checking ownership.
-// Callers must perform authorization before exposing this data to a client.
-func (a *API) GetSessionSnapshot(ctx context.Context, sessionID string) (*StreamResponse, error) {
-	if mgrValue, ok := a.sessions.Load(sessionID); ok {
-		if mgr, ok := mgrValue.(*SessionManager); ok {
-			snapshot := mgr.Snapshot()
-			return responseWithDelegates(
-				snapshot.StreamResponse(),
-				snapshot.Delegates,
-			), nil
-		}
-	}
-
-	sess, err := a.getStoredSessionMetadata(ctx, sessionID)
-	if err != nil {
-		return nil, err
-	}
-
-	messages, err := a.store.GetMessages(ctx, sessionID)
-	if err != nil {
-		return nil, err
-	}
-
-	delegates, err := a.getStoredDelegateSnapshots(ctx, sessionID)
-	if err != nil {
-		return nil, err
-	}
+	totalCost := sumMessageCosts(messages) + a.sumSubSessionCosts(ctx, sessionID)
 
 	return &StreamResponse{
 		Messages: messages,
@@ -903,6 +953,7 @@ func (a *API) GetSessionSnapshot(ctx context.Context, sessionID string) (*Stream
 		SessionState: &SessionState{
 			SessionID: sessionID,
 			Working:   false,
+			TotalCost: totalCost,
 		},
 		Delegates: delegates,
 	}, nil
@@ -924,6 +975,7 @@ func (a *API) getStoredDelegateSnapshots(ctx context.Context, sessionID string) 
 			ID:     sub.ID,
 			Task:   sub.DelegateTask,
 			Status: DelegateStatusCompleted,
+			Cost:   a.sumSessionMessageCosts(ctx, sub.ID),
 		})
 	}
 

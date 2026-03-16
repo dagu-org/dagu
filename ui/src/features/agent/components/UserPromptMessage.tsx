@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Check, MessageCircleQuestion, SkipForward } from 'lucide-react';
+import { Check, Loader2, MessageCircleQuestion, SkipForward } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserPrompt, UserPromptResponse } from '../types';
 
 interface UserPromptMessageProps {
   prompt: UserPrompt;
-  onRespond: (response: UserPromptResponse, displayValue: string) => void;
+  onRespond: (response: UserPromptResponse, displayValue: string) => Promise<void>;
   isAnswered: boolean;
   answeredValue?: string;
 }
@@ -19,6 +19,7 @@ export function UserPromptMessage({
   const [selectedOptions, setSelectedOptions] = useState<Set<string>>(new Set());
   const [freeText, setFreeText] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(-1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -62,32 +63,42 @@ export function UserPromptMessage({
     }
   };
 
-  const handleSubmit = () => {
-    const response: UserPromptResponse = {
-      prompt_id: prompt.prompt_id,
-    };
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      const response: UserPromptResponse = {
+        prompt_id: prompt.prompt_id,
+      };
 
-    let displayValue = '';
-    if (selectedOptions.size > 0) {
-      response.selected_option_ids = Array.from(selectedOptions);
-      const selectedLabels = prompt.options
-        ?.filter(opt => selectedOptions.has(opt.id))
-        .map(opt => opt.label) ?? [];
-      displayValue = selectedLabels.join(', ');
-    }
-    if (freeText) {
-      response.free_text_response = freeText;
-      displayValue = displayValue ? `${displayValue}; ${freeText}` : freeText;
-    }
+      let displayValue = '';
+      if (selectedOptions.size > 0) {
+        response.selected_option_ids = Array.from(selectedOptions);
+        const selectedLabels = prompt.options
+          ?.filter(opt => selectedOptions.has(opt.id))
+          .map(opt => opt.label) ?? [];
+        displayValue = selectedLabels.join(', ');
+      }
+      if (freeText) {
+        response.free_text_response = freeText;
+        displayValue = displayValue ? `${displayValue}; ${freeText}` : freeText;
+      }
 
-    onRespond(response, displayValue || 'Submitted');
+      await onRespond(response, displayValue || 'Submitted');
+    } catch {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleSkip = () => {
-    onRespond({
-      prompt_id: prompt.prompt_id,
-      cancelled: true,
-    }, 'Skipped');
+  const handleSkip = async () => {
+    setIsSubmitting(true);
+    try {
+      await onRespond({
+        prompt_id: prompt.prompt_id,
+        cancelled: true,
+      }, 'Skipped');
+    } catch {
+      setIsSubmitting(false);
+    }
   };
 
   const canSubmit = selectedOptions.size > 0 || freeText.trim().length > 0;
@@ -213,19 +224,24 @@ export function UserPromptMessage({
         <div className="flex gap-1">
           <button
             onClick={handleSubmit}
-            disabled={!canSubmit}
+            disabled={!canSubmit || isSubmitting}
             className={cn(
-              'px-2 py-1 text-xs rounded transition-colors font-medium',
-              canSubmit
+              'px-2 py-1 text-xs rounded transition-colors font-medium flex items-center gap-1',
+              canSubmit && !isSubmitting
                 ? 'bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400'
                 : 'bg-muted text-muted-foreground cursor-not-allowed'
             )}
           >
-            Submit
+            {isSubmitting && <Loader2 className="h-3 w-3 animate-spin" />}
+            {isSubmitting ? 'Sending...' : 'Submit'}
           </button>
           <button
             onClick={handleSkip}
-            className="px-2 py-1 text-xs rounded border border-border hover:bg-muted transition-colors flex items-center gap-1"
+            disabled={isSubmitting}
+            className={cn(
+              'px-2 py-1 text-xs rounded border border-border transition-colors flex items-center gap-1',
+              isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted'
+            )}
           >
             <SkipForward className="h-3 w-3" />
             Skip

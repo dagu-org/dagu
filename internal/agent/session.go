@@ -25,6 +25,7 @@ type SessionManager struct {
 	loop               *Loop
 	loopCancel         context.CancelFunc
 	mu                 sync.Mutex
+	title              string
 	createdAt          time.Time
 	lastActivity       time.Time
 	lastHeartbeat      time.Time
@@ -77,6 +78,9 @@ type SessionManagerConfig struct {
 	User            UserIdentity
 	Logger          *slog.Logger
 	WorkingDir      string
+	Title           string
+	CreatedAt       time.Time
+	LastActivity    time.Time
 	OnWorkingChange func(id string, working bool)
 	OnMessage       func(ctx context.Context, msg Message) error
 	History         []Message
@@ -103,6 +107,8 @@ type SessionManagerConfig struct {
 	WebSearch *llm.WebSearchRequest
 	// RemoteNodeResolver provides access to remote nodes for remote_agent tools.
 	RemoteNodeResolver RemoteNodeResolver
+	// Delegates seeds known delegate sessions when restoring from storage.
+	Delegates []DelegateSnapshot
 }
 
 // NewSessionManager creates a new SessionManager.
@@ -119,12 +125,39 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 
 	messages := copyMessages(cfg.History)
 
+	// Reconstruct accumulated cost from historical messages and delegate
+	// snapshots so that reactivated sessions display the correct total.
+	var totalCost float64
+	for _, msg := range messages {
+		if msg.Cost != nil {
+			totalCost += *msg.Cost
+		}
+	}
+	for _, d := range cfg.Delegates {
+		totalCost += d.Cost
+	}
+
 	now := time.Now()
+	createdAt := cfg.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = now
+	}
+	lastActivity := cfg.LastActivity
+	if lastActivity.IsZero() {
+		lastActivity = createdAt
+	}
+
+	delegates := make(map[string]DelegateSnapshot, len(cfg.Delegates))
+	for _, delegateSnapshot := range cfg.Delegates {
+		delegates[delegateSnapshot.ID] = delegateSnapshot
+	}
+
 	return &SessionManager{
 		id:                 id,
 		user:               cfg.User,
-		createdAt:          now,
-		lastActivity:       now,
+		title:              cfg.Title,
+		createdAt:          createdAt,
+		lastActivity:       lastActivity,
 		logger:             logger.With("session_id", id),
 		subpub:             NewSubPub[StreamResponse](),
 		messages:           messages,
@@ -137,9 +170,10 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		hooks:              cfg.Hooks,
 		pendingPrompts:     make(map[string]chan UserPromptResponse),
 		promptTypes:        make(map[string]PromptType),
-		delegates:          make(map[string]DelegateSnapshot),
+		delegates:          delegates,
 		inputCostPer1M:     cfg.InputCostPer1M,
 		outputCostPer1M:    cfg.OutputCostPer1M,
+		totalCost:          totalCost,
 		memoryStore:        cfg.MemoryStore,
 		skillStore:         cfg.SkillStore,
 		enabledSkills:      cfg.EnabledSkills,
@@ -335,6 +369,7 @@ func (sm *SessionManager) GetSession() Session {
 		ID:              sm.id,
 		UserID:          sm.user.UserID,
 		DAGName:         sm.dagName,
+		Title:           sm.title,
 		ParentSessionID: sm.parentSessionID,
 		DelegateTask:    sm.delegateTask,
 		CreatedAt:       sm.createdAt,
@@ -363,6 +398,7 @@ func (sm *SessionManager) snapshotLocked() SessionSnapshot {
 			ID:              sm.id,
 			UserID:          sm.user.UserID,
 			DAGName:         sm.dagName,
+			Title:           sm.title,
 			ParentSessionID: sm.parentSessionID,
 			DelegateTask:    sm.delegateTask,
 			CreatedAt:       sm.createdAt,

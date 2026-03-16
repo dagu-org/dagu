@@ -1,10 +1,14 @@
-import { AlertTriangle, Check, FolderOpen, Terminal, X } from 'lucide-react';
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+import { useState } from 'react';
+import { AlertTriangle, Check, FolderOpen, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserPrompt, UserPromptResponse } from '../types';
 
 interface CommandApprovalMessageProps {
   prompt: UserPrompt;
-  onRespond: (response: UserPromptResponse, displayValue: string) => void;
+  onRespond: (response: UserPromptResponse, displayValue: string) => Promise<void>;
   isAnswered: boolean;
   answeredValue?: string;
 }
@@ -15,24 +19,38 @@ export function CommandApprovalMessage({
   isAnswered,
   answeredValue,
 }: CommandApprovalMessageProps): React.ReactNode {
-  const handleApprove = () => {
-    onRespond(
-      {
-        prompt_id: prompt.prompt_id,
-        selected_option_ids: ['approve'],
-      },
-      'Approved'
-    );
+  const [pendingAction, setPendingAction] = useState<'approve' | 'reject' | null>(null);
+
+  const handleApprove = async () => {
+    if (pendingAction || isAnswered) return;
+    setPendingAction('approve');
+    try {
+      await onRespond(
+        {
+          prompt_id: prompt.prompt_id,
+          selected_option_ids: ['approve'],
+        },
+        'Approved'
+      );
+    } finally {
+      setPendingAction(null);
+    }
   };
 
-  const handleReject = () => {
-    onRespond(
-      {
-        prompt_id: prompt.prompt_id,
-        selected_option_ids: ['reject'],
-      },
-      'Rejected'
-    );
+  const handleReject = async () => {
+    if (pendingAction || isAnswered) return;
+    setPendingAction('reject');
+    try {
+      await onRespond(
+        {
+          prompt_id: prompt.prompt_id,
+          selected_option_ids: ['reject'],
+        },
+        'Rejected'
+      );
+    } finally {
+      setPendingAction(null);
+    }
   };
 
   const wasApproved = answeredValue === 'Approved';
@@ -94,15 +112,25 @@ export function CommandApprovalMessage({
         <div className="flex gap-1.5">
           <button
             onClick={handleApprove}
-            className="px-2 py-1 text-xs rounded font-medium bg-green-600 text-white hover:bg-green-700"
+            disabled={pendingAction !== null}
+            className={cn(
+              'px-2 py-1 text-xs rounded font-medium flex items-center gap-1',
+              pendingAction ? 'bg-green-600/50 text-white cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'
+            )}
           >
-            Approve
+            {pendingAction === 'approve' && <Loader2 className="h-3 w-3 animate-spin" />}
+            {pendingAction === 'approve' ? 'Sending...' : 'Approve'}
           </button>
           <button
             onClick={handleReject}
-            className="px-2 py-1 text-xs rounded font-medium border border-border hover:bg-muted"
+            disabled={pendingAction !== null}
+            className={cn(
+              'px-2 py-1 text-xs rounded font-medium border border-border flex items-center gap-1',
+              pendingAction ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted'
+            )}
           >
-            Reject
+            {pendingAction === 'reject' && <Loader2 className="h-3 w-3 animate-spin" />}
+            {pendingAction === 'reject' ? 'Sending...' : 'Reject'}
           </button>
         </div>
       </div>

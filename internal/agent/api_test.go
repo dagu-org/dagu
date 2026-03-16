@@ -5,10 +5,10 @@ package agent
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 
 	"testing"
@@ -488,6 +488,78 @@ func TestAPI_HandleStream(t *testing.T) {
 		<-done
 
 		assert.Equal(t, "text/event-stream", rec.Header().Get("Content-Type"))
+		assert.Equal(t, "no", rec.Header().Get("X-Accel-Buffering"))
+		assert.Empty(t, rec.Header().Get("Deprecation"))
+	})
+
+	t.Run("reactivates a stored session and streams stored delegates", func(t *testing.T) {
+		t.Parallel()
+
+		api, store := createAPIWithSessionStore(t, newStopProvider("hello"))
+		now := time.Now()
+
+		parentSess := &Session{
+			ID:        "parent-sess-1",
+			UserID:    defaultUserID,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		require.NoError(t, store.CreateSession(context.Background(), parentSess))
+		require.NoError(t, store.AddMessage(context.Background(), parentSess.ID, &Message{
+			ID:         "parent-msg-1",
+			SessionID:  parentSess.ID,
+			Type:       MessageTypeAssistant,
+			SequenceID: 1,
+			Content:    "stored reply",
+			CreatedAt:  now,
+		}))
+
+		delegateSess := &Session{
+			ID:              "delegate-sess-1",
+			UserID:          defaultUserID,
+			ParentSessionID: parentSess.ID,
+			DelegateTask:    "Delegate task",
+			CreatedAt:       now,
+			UpdatedAt:       now,
+		}
+		require.NoError(t, store.CreateSession(context.Background(), delegateSess))
+
+		r := chi.NewRouter()
+		api.RegisterRoutes(r, nil)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		req := httptest.NewRequest(
+			http.MethodGet,
+			"/api/v1/agent/sessions/"+parentSess.ID+"/stream",
+			nil,
+		).WithContext(ctx)
+		rec := httptest.NewRecorder()
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			r.ServeHTTP(rec, req)
+		}()
+
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+		<-done
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), `"messages":[{"id":"parent-msg-1"`)
+		assert.Contains(
+			t,
+			rec.Body.String(),
+			`"delegates":[{"id":"delegate-sess-1","task":"Delegate task","status":"completed"}]`,
+		)
+
+		_, active := api.sessions.Load(parentSess.ID)
+		assert.True(t, active, "streaming should reactivate the stored parent session")
+		assert.False(
+			t,
+			strings.Contains(rec.Body.String(), `"Deprecation"`),
+			"agent stream payload should not include legacy deprecation metadata",
+		)
 	})
 }
 
@@ -674,90 +746,6 @@ func TestGetUserIDFromContext(t *testing.T) {
 		ctx := httptest.NewRequest("GET", "/", nil).Context()
 		result := getUserIDFromContext(ctx)
 		assert.Equal(t, defaultUserID, result)
-	})
-}
-
-func TestAPI_AuthorizeSessionAccess(t *testing.T) {
-	t.Parallel()
-
-	t.Run("fails closed without an authenticated user", func(t *testing.T) {
-		t.Parallel()
-
-		api := NewAPI(APIConfig{
-			ConfigStore:  newMockConfigStore(true),
-			SessionStore: newMockSessionStore(),
-			WorkingDir:   t.TempDir(),
-		})
-		api.sessions.Store("sess-1", NewSessionManager(SessionManagerConfig{
-			ID:   "sess-1",
-			User: UserIdentity{UserID: defaultUserID},
-		}))
-
-		err := api.AuthorizeSessionAccess(context.Background(), "sess-1")
-		assert.ErrorIs(t, err, ErrSessionNotFound)
-	})
-
-	t.Run("checks stored session metadata without loading messages", func(t *testing.T) {
-		t.Parallel()
-
-		store := newMockSessionStore()
-		store.sessions["sess-1"] = &Session{ID: "sess-1", UserID: "user-1"}
-		store.messages["sess-1"] = []Message{{ID: "msg-1"}}
-		store.getMessagesErr = errors.New("messages should not be loaded")
-
-		api := NewAPI(APIConfig{
-			ConfigStore:  newMockConfigStore(true),
-			SessionStore: store,
-			WorkingDir:   t.TempDir(),
-		})
-
-		ctx := auth.WithUser(context.Background(), &auth.User{
-			ID:       "user-1",
-			Username: "user-1",
-			Role:     auth.RoleAdmin,
-		})
-
-		err := api.AuthorizeSessionAccess(ctx, "sess-1")
-		require.NoError(t, err)
-	})
-}
-
-func TestAPI_GetSessionSnapshot_PropagatesStoreErrors(t *testing.T) {
-	t.Parallel()
-
-	t.Run("returns GetSession errors directly", func(t *testing.T) {
-		t.Parallel()
-
-		store := newMockSessionStore()
-		store.getErr = errors.New("store unavailable")
-		api := NewAPI(APIConfig{
-			ConfigStore:  newMockConfigStore(true),
-			SessionStore: store,
-			WorkingDir:   t.TempDir(),
-		})
-
-		_, err := api.GetSessionSnapshot(context.Background(), "sess-1")
-		require.Error(t, err)
-		assert.EqualError(t, err, "store unavailable")
-	})
-
-	t.Run("returns GetMessages errors directly", func(t *testing.T) {
-		t.Parallel()
-
-		store := newMockSessionStore()
-		store.sessions["sess-1"] = &Session{ID: "sess-1", UserID: "user-1"}
-		store.messages["sess-1"] = []Message{{ID: "msg-1"}}
-		store.getMessagesErr = errors.New("messages unavailable")
-
-		api := NewAPI(APIConfig{
-			ConfigStore:  newMockConfigStore(true),
-			SessionStore: store,
-			WorkingDir:   t.TempDir(),
-		})
-
-		_, err := api.GetSessionSnapshot(context.Background(), "sess-1")
-		require.Error(t, err)
-		assert.EqualError(t, err, "messages unavailable")
 	})
 }
 
@@ -1632,4 +1620,270 @@ func TestAPI_CreateSession_IdempotentWithSessionID(t *testing.T) {
 		}
 		assert.Equal(t, 1, acceptedCount, "exactly one goroutine should win the creation race")
 	})
+}
+
+func TestAPI_ReactivateSession_HasPricing(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("priced-model")
+	model.InputCostPer1M = 3.0
+	model.OutputCostPer1M = 15.0
+
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = model.ID
+	sessStore := newMockSessionStore()
+
+	api := NewAPI(APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   newMockModelStore().addModel(model),
+		WorkingDir:   t.TempDir(),
+		SessionStore: sessStore,
+	})
+	api.providers.Set(model.ToLLMConfig(), newStopProvider("hello"))
+
+	// Create a session, wait for it to finish, then remove from active
+	sessID, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "initial"})
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		mgr, ok := api.sessions.Load(sessID)
+		if !ok {
+			return false
+		}
+		return !mgr.(*SessionManager).IsWorking()
+	}, 5*time.Second, 50*time.Millisecond)
+
+	api.sessions.Delete(sessID)
+
+	// Reactivate via getOrReactivateSession
+	mgr, ok := api.getOrReactivateSession(context.Background(), sessID, UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole})
+	require.True(t, ok)
+
+	// Verify pricing fields are set
+	mgr.mu.Lock()
+	inputCost := mgr.inputCostPer1M
+	outputCost := mgr.outputCostPer1M
+	mgr.mu.Unlock()
+
+	assert.Equal(t, 3.0, inputCost, "reactivated session should have input pricing")
+	assert.Equal(t, 15.0, outputCost, "reactivated session should have output pricing")
+}
+
+func TestAPI_ListSessions_ShowsCostForInactiveSessions(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("cost-model")
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = model.ID
+	sessStore := newMockSessionStore()
+
+	api := NewAPI(APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   newMockModelStore().addModel(model),
+		WorkingDir:   t.TempDir(),
+		SessionStore: sessStore,
+	})
+
+	now := time.Now()
+
+	// Create a persisted session with messages that have costs
+	sess := &Session{
+		ID:        "cost-sess-1",
+		UserID:    defaultUserID,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	require.NoError(t, sessStore.CreateSession(context.Background(), sess))
+
+	cost1, cost2 := 0.05, 0.03
+	require.NoError(t, sessStore.AddMessage(context.Background(), "cost-sess-1", &Message{
+		ID:   "msg-1",
+		Type: MessageTypeAssistant,
+		Cost: &cost1,
+	}))
+	require.NoError(t, sessStore.AddMessage(context.Background(), "cost-sess-1", &Message{
+		ID:   "msg-2",
+		Type: MessageTypeAssistant,
+		Cost: &cost2,
+	}))
+
+	// List sessions (no active sessions, only persisted)
+	sessions := api.ListSessions(context.Background(), defaultUserID)
+	require.Len(t, sessions, 1)
+	assert.InDelta(t, 0.08, sessions[0].TotalCost, 1e-9, "inactive session should show accumulated cost")
+	assert.False(t, sessions[0].Working)
+}
+
+func TestAPI_ListSessionsPaginated_ShowsCostForInactiveSessions(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("cost-model-pag")
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = model.ID
+	sessStore := newMockSessionStore()
+
+	api := NewAPI(APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   newMockModelStore().addModel(model),
+		WorkingDir:   t.TempDir(),
+		SessionStore: sessStore,
+	})
+
+	now := time.Now()
+
+	sess := &Session{
+		ID:        "pag-cost-sess",
+		UserID:    defaultUserID,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	require.NoError(t, sessStore.CreateSession(context.Background(), sess))
+
+	cost := 0.10
+	require.NoError(t, sessStore.AddMessage(context.Background(), "pag-cost-sess", &Message{
+		ID:   "msg-1",
+		Type: MessageTypeAssistant,
+		Cost: &cost,
+	}))
+
+	result := api.ListSessionsPaginated(context.Background(), defaultUserID, 1, 10)
+	require.Len(t, result.Items, 1)
+	assert.InDelta(t, 0.10, result.Items[0].TotalCost, 1e-9, "paginated inactive session should show cost")
+}
+
+// createCostTestAPI creates an API with a session store for cost tests.
+func createCostTestAPI(t *testing.T) (*API, *mockSessionStore) {
+	t.Helper()
+	model := testModelConfig("cost-test-model")
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = model.ID
+	sessStore := newMockSessionStore()
+	api := NewAPI(APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   newMockModelStore().addModel(model),
+		WorkingDir:   t.TempDir(),
+		SessionStore: sessStore,
+	})
+	return api, sessStore
+}
+
+// seedParentWithDelegate creates a parent session and a delegate sub-session
+// with the given costs, returning the parent session ID.
+func seedParentWithDelegate(t *testing.T, store *mockSessionStore, parentCost, delegateCost float64) string {
+	t.Helper()
+	now := time.Now()
+
+	parent := &Session{
+		ID:        "parent-cost-sess",
+		UserID:    defaultUserID,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	require.NoError(t, store.CreateSession(context.Background(), parent))
+	require.NoError(t, store.AddMessage(context.Background(), parent.ID, &Message{
+		ID:   "parent-msg-1",
+		Type: MessageTypeAssistant,
+		Cost: &parentCost,
+	}))
+
+	sub := &Session{
+		ID:              "delegate-cost-sess",
+		UserID:          defaultUserID,
+		ParentSessionID: parent.ID,
+		DelegateTask:    "analyze data",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	require.NoError(t, store.CreateSession(context.Background(), sub))
+	require.NoError(t, store.AddMessage(context.Background(), sub.ID, &Message{
+		ID:   "delegate-msg-1",
+		Type: MessageTypeAssistant,
+		Cost: &delegateCost,
+	}))
+
+	return parent.ID
+}
+
+func TestAPI_ListSessions_ShowsCostIncludingDelegates(t *testing.T) {
+	t.Parallel()
+
+	api, store := createCostTestAPI(t)
+	seedParentWithDelegate(t, store, 0.05, 0.03)
+
+	sessions := api.ListSessions(context.Background(), defaultUserID)
+
+	// Only the parent session should appear (sub-sessions are excluded).
+	require.Len(t, sessions, 1)
+	assert.Equal(t, "parent-cost-sess", sessions[0].Session.ID)
+	assert.InDelta(t, 0.08, sessions[0].TotalCost, 1e-9,
+		"TotalCost should include both parent (0.05) and delegate (0.03) costs")
+}
+
+func TestAPI_GetSessionDetail_ShowsCostIncludingDelegates(t *testing.T) {
+	t.Parallel()
+
+	api, store := createCostTestAPI(t)
+	seedParentWithDelegate(t, store, 0.10, 0.04)
+
+	resp, err := api.GetSessionDetail(context.Background(), "parent-cost-sess", defaultUserID)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.SessionState)
+
+	assert.InDelta(t, 0.14, resp.SessionState.TotalCost, 1e-9,
+		"GetSessionDetail TotalCost should include delegate sub-session costs")
+
+	// Delegate snapshots should also include per-delegate cost.
+	require.Len(t, resp.Delegates, 1)
+	assert.Equal(t, "analyze data", resp.Delegates[0].Task)
+	assert.InDelta(t, 0.04, resp.Delegates[0].Cost, 1e-9,
+		"delegate snapshot should include its own cost")
+}
+
+func TestAPI_ListSessionsPaginated_ShowsCostIncludingDelegates(t *testing.T) {
+	t.Parallel()
+
+	api, store := createCostTestAPI(t)
+	seedParentWithDelegate(t, store, 0.06, 0.02)
+
+	result := api.ListSessionsPaginated(context.Background(), defaultUserID, 1, 10)
+
+	require.Len(t, result.Items, 1)
+	assert.InDelta(t, 0.08, result.Items[0].TotalCost, 1e-9,
+		"paginated TotalCost should include delegate costs")
+}
+
+func TestAPI_ListSessionsPaginated_DefersCostToPageSlice(t *testing.T) {
+	t.Parallel()
+
+	api, store := createCostTestAPI(t)
+	now := time.Now()
+
+	// Create 5 persisted sessions with different costs.
+	for i := range 5 {
+		id := fmt.Sprintf("deferred-sess-%d", i)
+		cost := float64(i+1) * 0.01
+		require.NoError(t, store.CreateSession(context.Background(), &Session{
+			ID:        id,
+			UserID:    defaultUserID,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}))
+		require.NoError(t, store.AddMessage(context.Background(), id, &Message{
+			ID:   fmt.Sprintf("msg-%d", i),
+			Type: MessageTypeAssistant,
+			Cost: &cost,
+		}))
+	}
+
+	// Request page 1 with 2 items — should return 2 items, total 5.
+	result := api.ListSessionsPaginated(context.Background(), defaultUserID, 1, 2)
+	assert.Equal(t, 5, result.TotalCount)
+	assert.Len(t, result.Items, 2)
+
+	// Each visible item should have a non-zero TotalCost.
+	for _, item := range result.Items {
+		assert.Greater(t, item.TotalCost, 0.0,
+			"visible page item %s should have cost loaded", item.Session.ID)
+	}
 }

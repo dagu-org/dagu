@@ -33,16 +33,16 @@ func TestParseTopicRejectsMalformedQuery(t *testing.T) {
 
 func TestParseInitialTopics(t *testing.T) {
 	query := map[string][]string{
-		"topic":  {"dag:test.yaml", "agent:sess-1"},
+		"topic":  {"dag:test.yaml", "queueitems:default"},
 		"topics": {"ignored:topic"},
 	}
 
-	assert.Equal(t, []string{"dag:test.yaml", "agent:sess-1"}, parseInitialTopics(query))
+	assert.Equal(t, []string{"dag:test.yaml", "queueitems:default"}, parseInitialTopics(query))
 
 	query = map[string][]string{
-		"topics": {"dag:test.yaml,agent:sess-1"},
+		"topics": {"dag:test.yaml,queueitems:default"},
 	}
-	assert.Equal(t, []string{"dag:test.yaml", "agent:sess-1"}, parseInitialTopics(query))
+	assert.Equal(t, []string{"dag:test.yaml", "queueitems:default"}, parseInitialTopics(query))
 }
 
 func TestMultiplexerCreateSessionFiltersUnauthorizedTopics(t *testing.T) {
@@ -52,10 +52,10 @@ func TestMultiplexerCreateSessionFiltersUnauthorizedTopics(t *testing.T) {
 	mux.RegisterFetcher(TopicTypeDAG, func(_ context.Context, identifier string) (any, error) {
 		return map[string]string{"id": identifier}, nil
 	})
-	mux.RegisterFetcher(TopicTypeAgent, func(_ context.Context, identifier string) (any, error) {
+	mux.RegisterFetcher(TopicTypeQueueItems, func(_ context.Context, identifier string) (any, error) {
 		return map[string]string{"id": identifier}, nil
 	})
-	mux.RegisterAuthorizer(TopicTypeAgent, func(_ context.Context, _ string) error {
+	mux.RegisterAuthorizer(TopicTypeQueueItems, func(_ context.Context, _ string) error {
 		return errors.New("forbidden")
 	})
 
@@ -63,7 +63,7 @@ func TestMultiplexerCreateSessionFiltersUnauthorizedTopics(t *testing.T) {
 	result, err := mux.createSession(
 		context.Background(),
 		recorder,
-		[]string{"dag:test.yaml", "agent:sess-1"},
+		[]string{"dag:test.yaml", "queueitems:default"},
 		0,
 	)
 	require.NoError(t, err)
@@ -71,7 +71,7 @@ func TestMultiplexerCreateSessionFiltersUnauthorizedTopics(t *testing.T) {
 
 	assert.Equal(t, []string{"dag:test.yaml"}, result.control.Subscribed)
 	require.Len(t, result.control.Errors, 1)
-	assert.Equal(t, "agent:sess-1", result.control.Errors[0].Topic)
+	assert.Equal(t, "queueitems:default", result.control.Errors[0].Topic)
 }
 
 func TestMultiplexerMutateSessionPartialAuthorization(t *testing.T) {
@@ -81,10 +81,10 @@ func TestMultiplexerMutateSessionPartialAuthorization(t *testing.T) {
 	mux.RegisterFetcher(TopicTypeDAG, func(_ context.Context, identifier string) (any, error) {
 		return map[string]string{"id": identifier}, nil
 	})
-	mux.RegisterFetcher(TopicTypeAgent, func(_ context.Context, identifier string) (any, error) {
+	mux.RegisterFetcher(TopicTypeQueueItems, func(_ context.Context, identifier string) (any, error) {
 		return map[string]string{"id": identifier}, nil
 	})
-	mux.RegisterAuthorizer(TopicTypeAgent, func(_ context.Context, _ string) error {
+	mux.RegisterAuthorizer(TopicTypeQueueItems, func(_ context.Context, _ string) error {
 		return errors.New("forbidden")
 	})
 
@@ -96,7 +96,7 @@ func TestMultiplexerMutateSessionPartialAuthorization(t *testing.T) {
 	mutation, err := mux.mutateSession(
 		context.Background(),
 		result.session.id,
-		[]string{"dag:test.yaml", "agent:sess-1"},
+		[]string{"dag:test.yaml", "queueitems:default"},
 		nil,
 	)
 	require.NoError(t, err)
@@ -104,7 +104,7 @@ func TestMultiplexerMutateSessionPartialAuthorization(t *testing.T) {
 	assert.Equal(t, 403, mutation.statusCode)
 	assert.Equal(t, []string{"dag:test.yaml"}, mutation.response.Subscribed)
 	require.Len(t, mutation.response.Errors, 1)
-	assert.Equal(t, "agent:sess-1", mutation.response.Errors[0].Topic)
+	assert.Equal(t, "queueitems:default", mutation.response.Errors[0].Topic)
 }
 
 func TestMultiplexerMutateSessionIsAtomicOnTopicResolutionFailure(t *testing.T) {

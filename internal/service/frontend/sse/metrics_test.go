@@ -19,12 +19,12 @@ func TestNewMetrics(t *testing.T) {
 	m := NewMetrics(registry)
 
 	require.NotNil(t, m)
-	assert.NotNil(t, m.clientsConnected)
-	assert.NotNil(t, m.watchersActive)
 	assert.NotNil(t, m.messagesSent)
 	assert.NotNil(t, m.fetchErrors)
 
-	// Verify metrics are registered by gathering them
+	// Verify metrics are registered by gathering them after incrementing
+	m.MessageSent(EventTypeData)
+
 	families, err := registry.Gather()
 	require.NoError(t, err)
 
@@ -33,70 +33,7 @@ func TestNewMetrics(t *testing.T) {
 		metricNames[family.GetName()] = true
 	}
 
-	// Initially gauges are 0 so they may not appear, but we can verify by incrementing
-	m.ClientConnected()
-	m.WatcherStarted()
-
-	families, err = registry.Gather()
-	require.NoError(t, err)
-
-	metricNames = make(map[string]bool)
-	for _, family := range families {
-		metricNames[family.GetName()] = true
-	}
-
-	assert.True(t, metricNames["dagu_sse_clients_connected"])
-	assert.True(t, metricNames["dagu_sse_watchers_active"])
-}
-
-func TestMetricsClientConnectedDisconnected(t *testing.T) {
-	t.Parallel()
-	registry := prometheus.NewRegistry()
-	m := NewMetrics(registry)
-
-	// Initial value should be 0
-	assert.Equal(t, float64(0), getGaugeValue(t, m.clientsConnected))
-
-	// Connect a client
-	m.ClientConnected()
-	assert.Equal(t, float64(1), getGaugeValue(t, m.clientsConnected))
-
-	// Connect another client
-	m.ClientConnected()
-	assert.Equal(t, float64(2), getGaugeValue(t, m.clientsConnected))
-
-	// Disconnect a client
-	m.ClientDisconnected()
-	assert.Equal(t, float64(1), getGaugeValue(t, m.clientsConnected))
-
-	// Disconnect the last client
-	m.ClientDisconnected()
-	assert.Equal(t, float64(0), getGaugeValue(t, m.clientsConnected))
-}
-
-func TestMetricsWatcherStartedStopped(t *testing.T) {
-	t.Parallel()
-	registry := prometheus.NewRegistry()
-	m := NewMetrics(registry)
-
-	// Initial value should be 0
-	assert.Equal(t, float64(0), getGaugeValue(t, m.watchersActive))
-
-	// Start a watcher
-	m.WatcherStarted()
-	assert.Equal(t, float64(1), getGaugeValue(t, m.watchersActive))
-
-	// Start another watcher
-	m.WatcherStarted()
-	assert.Equal(t, float64(2), getGaugeValue(t, m.watchersActive))
-
-	// Stop a watcher
-	m.WatcherStopped()
-	assert.Equal(t, float64(1), getGaugeValue(t, m.watchersActive))
-
-	// Stop the last watcher
-	m.WatcherStopped()
-	assert.Equal(t, float64(0), getGaugeValue(t, m.watchersActive))
+	assert.True(t, metricNames["dagu_sse_messages_sent_total"])
 }
 
 func TestMetricsMessageSent(t *testing.T) {
@@ -134,23 +71,17 @@ func TestMetricsNilSafety(t *testing.T) {
 	var m *Metrics
 
 	// None of these should panic
-	assert.NotPanics(t, func() { m.ClientConnected() })
-	assert.NotPanics(t, func() { m.ClientDisconnected() })
-	assert.NotPanics(t, func() { m.WatcherStarted() })
-	assert.NotPanics(t, func() { m.WatcherStopped() })
 	assert.NotPanics(t, func() { m.MessageSent(EventTypeData) })
 	assert.NotPanics(t, func() { m.FetchError(string(TopicTypeDAGRun)) })
+	assert.NotPanics(t, func() { m.MultiplexSessionConnected() })
+	assert.NotPanics(t, func() { m.MultiplexSessionDisconnected() })
+	assert.NotPanics(t, func() { m.ObserveTopicsPerSession(5) })
+	assert.NotPanics(t, func() { m.TopicMutation("subscribe", "dag") })
+	assert.NotPanics(t, func() { m.BackpressureDisconnect() })
+	assert.NotPanics(t, func() { m.UnknownSessionMutation() })
 }
 
 // Helper functions
-
-func getGaugeValue(t *testing.T, gauge prometheus.Gauge) float64 {
-	t.Helper()
-	var metric dto.Metric
-	err := gauge.Write(&metric)
-	require.NoError(t, err)
-	return metric.GetGauge().GetValue()
-}
 
 func getCounterValue(t *testing.T, counter *prometheus.CounterVec, eventType string) float64 {
 	t.Helper()

@@ -5,17 +5,37 @@ package sse
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"io"
 	"net/http"
+	"net/url"
+	"time"
+)
+
+// Sentinel errors for SSE operations.
+var (
+	ErrStreamingNotSupported = errors.New("streaming not supported")
+	ErrQueryTooLong          = errors.New("query string exceeds maximum length")
 )
 
 // Event type constants for SSE messages.
 const (
-	EventTypeData            = "data"
-	EventTypeHeartbeat       = "heartbeat"
-	EventTypeConnected       = "connected"
-	EventTypeError           = "error"
-	legacyStreamDeprecatedAt = "@1773360000" // 2026-03-12T16:00:00Z
-	legacyStreamSunset       = "Sat, 13 Mar 2027 00:00:00 GMT"
+	EventTypeData      = "data"
+	EventTypeHeartbeat = "heartbeat"
+	EventTypeConnected = "connected"
+	EventTypeError     = "error"
+)
+
+// Default configuration constants for the multiplexer.
+const (
+	defaultMaxClients   = 1000
+	heartbeatInterval   = 10 * time.Second
+	defaultBaseInterval = time.Second      // Minimum polling interval
+	defaultMaxInterval  = 10 * time.Second // Maximum polling interval cap
+	intervalMultiplier  = 3                // interval = multiplier * fetchDuration
+	smoothingFactor     = 0.3              // EMA alpha: weight for new value (0.3 = 30% new, 70% old)
 )
 
 // TopicType identifies the type of data being watched.
@@ -46,18 +66,20 @@ const (
 	TopicTypeDAGsList   TopicType = "dagslist"
 	TopicTypeDoc        TopicType = "doc"
 	TopicTypeDocTree    TopicType = "doctree"
-	TopicTypeAgent      TopicType = "agent"
 )
 
 // FetchFunc fetches data for a given identifier. The returned data is JSON
 // marshaled and sent to clients with the same structure as the REST API.
 type FetchFunc func(ctx context.Context, identifier string) (any, error)
 
-// Event represents an SSE event to be sent to clients.
-type Event struct {
-	Type string
-	Data string
+// computeHash returns a short hex digest of the given data for change detection.
+func computeHash(data []byte) string {
+	h := sha256.Sum256(data)
+	return hex.EncodeToString(h[:8])
 }
+
+// maxQueryLength is the maximum length of a sanitized query string used as a topic identifier.
+const maxQueryLength = 4096
 
 // SetSSEHeaders sets the standard headers required for SSE responses.
 func SetSSEHeaders(w http.ResponseWriter) {
@@ -67,8 +89,42 @@ func SetSSEHeaders(w http.ResponseWriter) {
 	w.Header().Set("X-Accel-Buffering", "no")
 }
 
-// SetLegacyStreamDeprecationHeaders marks a legacy SSE endpoint as deprecated.
-func SetLegacyStreamDeprecationHeaders(w http.ResponseWriter) {
-	w.Header().Set("Deprecation", legacyStreamDeprecatedAt)
-	w.Header().Set("Sunset", legacyStreamSunset)
+// streamResponse copies data from the response body to the client.
+func streamResponse(w http.ResponseWriter, flusher http.Flusher, body io.Reader) {
+	buf := make([]byte, 4096)
+	for {
+		n, readErr := body.Read(buf)
+		if n > 0 {
+			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+				return
+			}
+			flusher.Flush()
+		}
+		if readErr != nil {
+			return
+		}
+	}
+}
+
+// parseAndSanitizeQuery parses and sanitizes a URL query string,
+// removing sensitive parameters and enforcing a maximum length.
+func parseAndSanitizeQuery(rawQuery string) (string, error) {
+	if rawQuery == "" {
+		return "", nil
+	}
+
+	values, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return "", err
+	}
+
+	// Remove sensitive parameters that should not be part of topic identity
+	values.Del("token")
+	values.Del("remoteNode")
+
+	result := values.Encode()
+	if len(result) > maxQueryLength {
+		return "", ErrQueryTooLong
+	}
+	return result, nil
 }

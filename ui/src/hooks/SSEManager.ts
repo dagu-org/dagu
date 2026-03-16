@@ -158,10 +158,6 @@ export function endpointToTopic(endpoint: string): string {
   throw new Error(`Unsupported SSE endpoint: ${endpoint}`);
 }
 
-export function buildAgentSessionTopic(sessionId: string): string {
-  return buildTopic('agent', sessionId);
-}
-
 function buildStreamUrl(
   apiURL: string,
   remoteNode: string,
@@ -445,6 +441,13 @@ export class SSEManager {
           conn.connectTimeout = null;
         }
 
+        // Clear pendingAdd for topics the server already subscribed via the
+        // initial URL params. Without this, scheduleMutation would fire a
+        // redundant POST that wastes an HTTP connection slot.
+        for (const topic of conn.serverTopics) {
+          conn.pendingAdd.delete(topic);
+        }
+
         this.updateState(conn, {
           isConnected: true,
           isConnecting: false,
@@ -565,6 +568,8 @@ export class SSEManager {
       return;
     }
 
+    const mutationSessionId = conn.sessionId;
+    const mutationEventSource = conn.eventSource;
     const add = Array.from(conn.pendingAdd).filter((topic) =>
       conn.topics.has(topic)
     );
@@ -581,12 +586,20 @@ export class SSEManager {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify({
-            sessionID: conn.sessionId,
+            sessionID: mutationSessionId,
             add,
             remove,
           }),
         }
       );
+
+      const isStaleMutation = () =>
+        conn.sessionId !== mutationSessionId ||
+        conn.eventSource !== mutationEventSource;
+
+      if (isStaleMutation()) {
+        return;
+      }
 
       if (response.status === 404) {
         conn.pendingAdd.clear();
@@ -602,6 +615,11 @@ export class SSEManager {
       const body = (await response.json()) as
         | TopicMutationResponse
         | { error?: string; message?: string };
+
+      if (isStaleMutation()) {
+        return;
+      }
+
       if (!response.ok && response.status !== 403) {
         throw new Error(
           'message' in body && typeof body.message === 'string'

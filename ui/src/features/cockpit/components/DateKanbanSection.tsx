@@ -1,7 +1,7 @@
 import React from 'react';
 import { components } from '@/api/v1/schema';
 import dayjs from '@/lib/dayjs';
-import { useDateKanbanData } from '../hooks/useDateKanbanData';
+import type { KanbanColumns } from '../hooks/useDateKanbanData';
 import { KanbanBoard } from './KanbanBoard';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
@@ -9,7 +9,8 @@ type DAGRunSummary = components['schemas']['DAGRunSummary'];
 interface Props {
   date: string;
   todayStr: string;
-  selectedWorkspace: string;
+  columns: KanbanColumns;
+  isLoading: boolean;
   onCardClick: (run: DAGRunSummary) => void;
 }
 
@@ -19,12 +20,16 @@ function formatDateHeader(date: string): string {
 
 export function DateKanbanSection({
   date,
-  todayStr,
-  selectedWorkspace,
+  columns,
+  isLoading,
   onCardClick,
 }: Props): React.ReactElement {
-  const isToday = date === todayStr;
-  const { columns, isEmpty } = useDateKanbanData(date, selectedWorkspace, isToday);
+  const isEmpty =
+    columns.queued.length === 0 &&
+    columns.running.length === 0 &&
+    columns.review.length === 0 &&
+    columns.done.length === 0 &&
+    columns.failed.length === 0;
 
   return (
     <div>
@@ -33,7 +38,9 @@ export function DateKanbanSection({
           {formatDateHeader(date)}
         </h2>
       </div>
-      {isEmpty ? (
+      {isLoading ? (
+        <div className="px-1 py-3 text-xs text-muted-foreground">Loading runs...</div>
+      ) : isEmpty ? (
         <div className="px-1 py-3 text-xs text-muted-foreground">No runs</div>
       ) : (
         <KanbanBoard columns={columns} onCardClick={onCardClick} />
