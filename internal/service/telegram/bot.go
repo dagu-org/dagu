@@ -51,6 +51,7 @@ type Config struct {
 // chatState tracks the agent session state for a single Telegram chat.
 type chatState struct {
 	sessionID       string
+	subSessionID    string             // session ID the subscription is listening to
 	subCancel       context.CancelFunc
 	mu              sync.Mutex
 	pendingPromptID string
@@ -311,8 +312,8 @@ func (b *Bot) sendMessage(ctx context.Context, cs *chatState, chatID int64, user
 		return
 	}
 
-	// Restart subscription if needed
-	b.startSubscription(ctx, cs, chatID, user.UserID, sid)
+	// Ensure a subscription is running (but don't restart if already active for this session)
+	b.ensureSubscription(ctx, cs, chatID, user.UserID, sid)
 }
 
 // submitPromptResponse submits a text response to a pending agent prompt.
@@ -337,16 +338,37 @@ func (b *Bot) submitPromptResponse(ctx context.Context, cs *chatState, chatID in
 	}
 }
 
-// startSubscription starts a goroutine that subscribes to session updates
-// and forwards them to the Telegram chat.
-func (b *Bot) startSubscription(ctx context.Context, cs *chatState, chatID int64, userID, sessionID string) {
+// ensureSubscription starts a subscription only if one isn't already running
+// for the given session. Safe to call on every message.
+func (b *Bot) ensureSubscription(ctx context.Context, cs *chatState, chatID int64, userID, sessionID string) {
 	cs.mu.Lock()
-	// Cancel any existing subscription
+	if cs.subSessionID == sessionID && cs.subCancel != nil {
+		// Already subscribed to this session — nothing to do.
+		cs.mu.Unlock()
+		return
+	}
+	// Different session or no subscription — start a new one.
 	if cs.subCancel != nil {
 		cs.subCancel()
 	}
 	subCtx, cancel := context.WithCancel(ctx)
 	cs.subCancel = cancel
+	cs.subSessionID = sessionID
+	cs.mu.Unlock()
+
+	go b.subscribeLoop(subCtx, cs, chatID, userID, sessionID)
+}
+
+// startSubscription cancels any existing subscription and starts a fresh one.
+// Use this when creating a new session or adopting a notification session.
+func (b *Bot) startSubscription(ctx context.Context, cs *chatState, chatID int64, userID, sessionID string) {
+	cs.mu.Lock()
+	if cs.subCancel != nil {
+		cs.subCancel()
+	}
+	subCtx, cancel := context.WithCancel(ctx)
+	cs.subCancel = cancel
+	cs.subSessionID = sessionID
 	cs.mu.Unlock()
 
 	go b.subscribeLoop(subCtx, cs, chatID, userID, sessionID)
@@ -494,6 +516,7 @@ func (b *Bot) resetChat(cs *chatState) {
 		cs.subCancel = nil
 	}
 	cs.sessionID = ""
+	cs.subSessionID = ""
 	cs.pendingPromptID = ""
 }
 
