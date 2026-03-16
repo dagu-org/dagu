@@ -1,5 +1,3 @@
-import { queuedFetch } from './fetchQueue';
-
 declare const getConfig: () => { apiURL: string };
 
 /**
@@ -19,7 +17,7 @@ export default async function fetchJson<JSON = unknown>(
     (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await queuedFetch(`${getConfig().apiURL}${input}`, {
+  const response = await fetch(`${getConfig().apiURL}${input}`, {
     ...init,
     headers,
   });
