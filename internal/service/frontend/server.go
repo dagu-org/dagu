@@ -1071,7 +1071,6 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 	}, sseMetrics)
 	srv.registerSSEFetchers(srv.sseHub)
 	srv.registerSSEFetchers(srv.sseMultiplexer)
-	srv.registerMultiplexSSETopics()
 
 	handler := sse.NewHandler(srv.sseHub, srv.remoteNodeResolver)
 	multiplexHandler := sse.NewMultiplexHandler(srv.sseMultiplexer, srv.remoteNodeResolver)
@@ -1120,19 +1119,6 @@ func (srv *Server) registerSSEFetchers(registrar sseFetcherRegistrar) {
 	registrar.RegisterFetcher(sse.TopicTypeDocTree, srv.apiV1.GetDocTreeData)
 }
 
-func (srv *Server) registerMultiplexSSETopics() {
-	if srv.sseMultiplexer == nil || srv.agentAPI == nil {
-		return
-	}
-
-	srv.sseMultiplexer.RegisterFetcher(sse.TopicTypeAgent, func(ctx context.Context, identifier string) (any, error) {
-		return srv.agentAPI.GetSessionSnapshot(ctx, identifier)
-	})
-	srv.sseMultiplexer.RegisterAuthorizer(sse.TopicTypeAgent, func(ctx context.Context, identifier string) error {
-		return srv.agentAPI.AuthorizeSessionAccess(ctx, identifier)
-	})
-}
-
 func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath string) {
 	authMiddleware := srv.buildAgentAuthMiddleware(ctx)
 	// Only the SSE stream endpoint is registered as a manual route.
@@ -1148,8 +1134,6 @@ func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux, apiV1BasePa
 // proxies the SSE stream to the remote node or delegates to the local handler.
 func (srv *Server) handleAgentStream(apiV1BasePath string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sse.SetLegacyStreamDeprecationHeaders(w)
-
 		remoteNodeName := r.URL.Query().Get("remoteNode")
 		if remoteNodeName == "" || remoteNodeName == "local" {
 			srv.agentAPI.HandleStream(w, r)

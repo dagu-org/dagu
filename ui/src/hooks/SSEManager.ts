@@ -565,6 +565,8 @@ export class SSEManager {
       return;
     }
 
+    const mutationSessionId = conn.sessionId;
+    const mutationEventSource = conn.eventSource;
     const add = Array.from(conn.pendingAdd).filter((topic) =>
       conn.topics.has(topic)
     );
@@ -581,12 +583,20 @@ export class SSEManager {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify({
-            sessionID: conn.sessionId,
+            sessionID: mutationSessionId,
             add,
             remove,
           }),
         }
       );
+
+      const isStaleMutation =
+        conn.sessionId !== mutationSessionId ||
+        conn.eventSource !== mutationEventSource;
+
+      if (isStaleMutation) {
+        return;
+      }
 
       if (response.status === 404) {
         conn.pendingAdd.clear();

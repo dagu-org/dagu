@@ -137,6 +137,31 @@ function toDagContextsBody(dagContexts?: DAGContext[]) {
   }));
 }
 
+function mergeMessages(current: Message[], incoming: Message[]): Message[] {
+  if (incoming.length === 0) {
+    return current;
+  }
+
+  const next = [...current];
+  const indexById = new Map<string, number>();
+  next.forEach((message, index) => {
+    indexById.set(message.id, index);
+  });
+
+  for (const message of incoming) {
+    const existingIndex = indexById.get(message.id);
+    if (existingIndex === undefined) {
+      indexById.set(message.id, next.length);
+      next.push(message);
+      continue;
+    }
+    next[existingIndex] = message;
+  }
+
+  next.sort((left, right) => left.sequence_id - right.sequence_id);
+  return next;
+}
+
 export function useAgentChat() {
   const config = useConfig();
   const client = useClient();
@@ -177,10 +202,11 @@ export function useAgentChat() {
     delegates,
     delegateStatuses,
     delegateMessages,
-    handleDelegateSnapshots,
+    reconcileDelegateSnapshots,
     applyDelegateSessionSnapshot,
+    handleDelegateMessages,
+    handleDelegateEvent,
     resetDelegates,
-    restoreDelegates,
     bringToFront,
     openDelegate,
     setDelegateMessagesForId,
@@ -193,12 +219,42 @@ export function useAgentChat() {
     [openDelegateSessionIds]
   );
 
-  const applySessionSnapshot = useCallback(
-    (snapshot: StreamResponse, resetDelegates: boolean = false) => {
-      const nextMessages = snapshot.messages || [];
+  const applySessionSnapshot = useCallback((snapshot: StreamResponse) => {
+    const nextMessages = snapshot.messages || [];
+    if (
+      pendingUserMessage &&
+      nextMessages.some(
+        (message) =>
+          message.type === 'user' && message.content === pendingUserMessage
+      )
+    ) {
+      setPendingUserMessage(null);
+    }
+
+    setMessages(nextMessages);
+    if (snapshot.session_state) {
+      setSessionState(snapshot.session_state);
+    }
+
+    reconcileDelegateSnapshots(snapshot.delegates || []);
+  }, [
+    pendingUserMessage,
+    setPendingUserMessage,
+    setMessages,
+    setSessionState,
+    reconcileDelegateSnapshots,
+  ]);
+
+  const applySessionEvent = useCallback((event: StreamResponse, replace = false) => {
+    if (replace) {
+      applySessionSnapshot(event);
+      return;
+    }
+
+    if (event.messages && event.messages.length > 0) {
       if (
         pendingUserMessage &&
-        nextMessages.some(
+        event.messages.some(
           (message) =>
             message.type === 'user' && message.content === pendingUserMessage
         )
@@ -206,31 +262,41 @@ export function useAgentChat() {
         setPendingUserMessage(null);
       }
 
-      setMessages(nextMessages);
-      if (snapshot.session_state) {
-        setSessionState(snapshot.session_state);
-      }
+      setMessages((current) => mergeMessages(current, event.messages || []));
+    }
 
-      const delegateSnapshots = snapshot.delegates || [];
-      if (resetDelegates) {
-        restoreDelegates(delegateSnapshots);
-        return;
-      }
-      handleDelegateSnapshots(delegateSnapshots);
-    },
-    [
-      pendingUserMessage,
-      setPendingUserMessage,
-      setMessages,
-      setSessionState,
-      restoreDelegates,
-      handleDelegateSnapshots,
-    ]
-  );
+    if (event.session_state) {
+      setSessionState(event.session_state);
+    }
+
+    if (event.delegates) {
+      reconcileDelegateSnapshots(event.delegates);
+    }
+
+    if (event.delegate_event) {
+      handleDelegateEvent(event.delegate_event);
+    }
+
+    if (event.delegate_messages) {
+      handleDelegateMessages(event.delegate_messages);
+    }
+  }, [
+    applySessionSnapshot,
+    pendingUserMessage,
+    setPendingUserMessage,
+    setMessages,
+    setSessionState,
+    reconcileDelegateSnapshots,
+    handleDelegateEvent,
+    handleDelegateMessages,
+  ]);
+
+  const delegateStatusesRef = useRef(delegateStatuses);
+  delegateStatusesRef.current = delegateStatuses;
 
   const applyDelegateSnapshot = useCallback(
     (delegateId: string, snapshot: StreamResponse) => {
-      const existing = delegateStatuses[delegateId];
+      const existing = delegateStatusesRef.current[delegateId];
       applyDelegateSessionSnapshot(
         delegateId,
         snapshot.session?.delegate_task || existing?.task || '',
@@ -238,8 +304,14 @@ export function useAgentChat() {
         snapshot.messages || []
       );
     },
-    [delegateStatuses, applyDelegateSessionSnapshot]
+    [applyDelegateSessionSnapshot]
   );
+
+  const applySessionSnapshotRef = useRef(applySessionSnapshot);
+  applySessionSnapshotRef.current = applySessionSnapshot;
+
+  const applyDelegateSnapshotRef = useRef(applyDelegateSnapshot);
+  applyDelegateSnapshotRef.current = applyDelegateSnapshot;
 
   const fetchSessionDetail = useCallback(
     async (id: string): Promise<StreamResponse> => {
@@ -257,63 +329,24 @@ export function useAgentChat() {
     [client, remoteNode]
   );
 
-  const sseStatus = useSSEConnection(
-    sessionId,
-    openDelegateSessionIds,
-    apiURL,
-    remoteNode,
-    {
-      onSnapshot: (snapshot) => {
-        applySessionSnapshot(snapshot);
-      },
-      onDelegateSnapshot: (delegateId, snapshot) => {
-        applyDelegateSnapshot(delegateId, snapshot);
-      },
-      onNavigate: (path) => navigate(path),
-    }
-  );
+  const fetchSessionDetailRef = useRef(fetchSessionDetail);
+  fetchSessionDetailRef.current = fetchSessionDetail;
 
-  const offlineDelegateSessionIds = useMemo(
-    () =>
-      sortedOpenDelegateSessionIds.filter(
-        (delegateId) => !sseStatus.liveDelegateSessions[delegateId]
-      ),
-    [sortedOpenDelegateSessionIds, sseStatus.liveDelegateSessions]
-  );
+  const sseStatus = useSSEConnection(sessionId, apiURL, remoteNode, {
+    onEvent: (event, replace) => {
+      applySessionEvent(event, replace);
+    },
+    onNavigate: (path) => navigate(path),
+  });
 
   useEffect(() => {
     const shouldPollSession = !!sessionId && !sseStatus.isSessionLive;
-    if (!shouldPollSession && offlineDelegateSessionIds.length === 0) {
+    if (!shouldPollSession) {
       return;
     }
 
     let active = true;
     let nextPollTimeout: ReturnType<typeof setTimeout> | null = null;
-    const pollFallbackSnapshots = async () => {
-      if (shouldPollSession && sessionId) {
-        try {
-          const snapshot = await fetchSessionDetail(sessionId);
-          if (!active) {
-            return;
-          }
-          applySessionSnapshot(snapshot);
-        } catch {
-          // Best effort — the next poll or SSE recovery can still heal state.
-        }
-      }
-
-      for (const delegateId of offlineDelegateSessionIds) {
-        try {
-          const snapshot = await fetchSessionDetail(delegateId);
-          if (!active) {
-            return;
-          }
-          applyDelegateSnapshot(delegateId, snapshot);
-        } catch {
-          // Best effort — live SSE recovery or the next poll can still heal state.
-        }
-      }
-    };
 
     const scheduleNextPoll = () => {
       if (!active) {
@@ -325,7 +358,30 @@ export function useAgentChat() {
     };
 
     const runPollLoop = async () => {
-      await pollFallbackSnapshots();
+      if (sessionId) {
+        try {
+          const snapshot = await fetchSessionDetailRef.current(sessionId);
+          if (!active) {
+            return;
+          }
+          applySessionSnapshotRef.current(snapshot);
+        } catch {
+          // Best effort — the next poll or SSE recovery can still heal state.
+        }
+      }
+
+      for (const delegateId of sortedOpenDelegateSessionIds) {
+        try {
+          const snapshot = await fetchSessionDetailRef.current(delegateId);
+          if (!active) {
+            return;
+          }
+          applyDelegateSnapshotRef.current(delegateId, snapshot);
+        } catch {
+          // Best effort — the next poll or SSE recovery can still heal state.
+        }
+      }
+
       scheduleNextPoll();
     };
 
@@ -337,14 +393,7 @@ export function useAgentChat() {
         clearTimeout(nextPollTimeout);
       }
     };
-  }, [
-    sessionId,
-    sseStatus.isSessionLive,
-    offlineDelegateSessionIds,
-    fetchSessionDetail,
-    applySessionSnapshot,
-    applyDelegateSnapshot,
-  ]);
+  }, [sessionId, sseStatus.isSessionLive, sortedOpenDelegateSessionIds]);
 
   const fetchSessionsPage = useCallback(
     async (page: number): Promise<void> => {
@@ -521,7 +570,7 @@ export function useAgentChat() {
       if (gen !== selectGenRef.current) return;
       setSessionId(id);
       setAnsweredPrompts({});
-      applySessionSnapshot(converted, true);
+      applySessionSnapshot(converted);
     },
     [fetchSessionDetail, setSessionId, applySessionSnapshot]
   );

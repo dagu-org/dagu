@@ -67,6 +67,28 @@ export function useDelegateManager() {
     });
   }, []);
 
+  const reconcileDelegateSnapshots = useCallback((snapshots: DelegateSnapshot[]) => {
+    setDelegateStore((prev) => {
+      const next: Record<string, DelegateState> = {};
+      for (const snap of snapshots) {
+        const existing = prev[snap.id];
+        next[snap.id] = {
+          info: {
+            id: snap.id,
+            task: snap.task,
+            status: snap.status,
+            zIndex: existing?.info.zIndex ?? ++zIndexCounterRef.current,
+            positionIndex: 0,
+          },
+          messages: existing?.messages || [],
+          isOpen: existing?.isOpen || false,
+        };
+      }
+      delegateStoreRef.current = next;
+      return next;
+    });
+  }, []);
+
   const applyDelegateSessionSnapshot = useCallback((
     delegateId: string,
     task: string,
@@ -232,6 +254,7 @@ export function useDelegateManager() {
     delegateStatuses,
     delegateMessages,
     handleDelegateSnapshots,
+    reconcileDelegateSnapshots,
     applyDelegateSessionSnapshot,
     handleDelegateMessages,
     handleDelegateEvent,

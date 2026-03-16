@@ -1,56 +1,54 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { buildAgentSessionTopic, sseManager } from '@/hooks/SSEManager';
+import { useEffect, useRef, useState } from 'react';
+import { getAuthToken } from '@/lib/authHeaders';
 import { StreamResponse } from '../types';
 
 export interface SSECallbacks {
-  onSnapshot: (snapshot: StreamResponse) => void;
-  onDelegateSnapshot: (delegateId: string, snapshot: StreamResponse) => void;
+  onEvent: (event: StreamResponse, replace: boolean) => void;
   onNavigate: (path: string) => void;
 }
 
 export interface AgentSSEStatus {
   isSessionLive: boolean;
-  liveDelegateSessions: Record<string, boolean>;
+}
+
+function buildAgentStreamUrl(
+  apiURL: string,
+  remoteNode: string,
+  sessionId: string
+): string {
+  const url = new URL(
+    `${apiURL}/agent/sessions/${encodeURIComponent(sessionId)}/stream`,
+    window.location.origin
+  );
+  url.searchParams.set('remoteNode', remoteNode);
+
+  const token = getAuthToken();
+  if (token) {
+    url.searchParams.set('token', token);
+  }
+
+  return url.toString();
 }
 
 export function useSSEConnection(
   sessionId: string | null,
-  delegateSessionIds: string[],
   apiURL: string,
   remoteNode: string,
   callbacks: SSECallbacks
 ): AgentSSEStatus {
   const handledNavigateIdsRef = useRef<Set<string>>(new Set());
+  const awaitingSnapshotRef = useRef(false);
+  const connectionGenerationRef = useRef(0);
   const cbRef = useRef(callbacks);
   cbRef.current = callbacks;
-  const [isSessionLive, setIsSessionLive] = useState(false);
-  const [liveDelegateSessions, setLiveDelegateSessions] = useState<
-    Record<string, boolean>
-  >({});
 
-  const delegateKey = useMemo(
-    () => [...delegateSessionIds].sort().join('|'),
-    [delegateSessionIds]
-  );
-  const stableDelegateSessionIds = useMemo(
-    () => (delegateKey ? delegateKey.split('|') : []),
-    [delegateKey]
-  );
+  const [isSessionLive, setIsSessionLive] = useState(false);
 
   useEffect(() => {
     handledNavigateIdsRef.current = new Set();
+    awaitingSnapshotRef.current = false;
     setIsSessionLive(false);
   }, [sessionId]);
-
-  useEffect(() => {
-    setLiveDelegateSessions((prev) => {
-      const next: Record<string, boolean> = {};
-      for (const delegateId of stableDelegateSessionIds) {
-        next[delegateId] = prev[delegateId] ?? false;
-      }
-      return next;
-    });
-  }, [stableDelegateSessionIds]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -58,78 +56,69 @@ export function useSSEConnection(
       return;
     }
 
-    return sseManager.subscribeTopic(
-      buildAgentSessionTopic(sessionId),
-      remoteNode,
-      apiURL,
-      {
-        onData: (data) => {
-          const snapshot = data as StreamResponse;
-          cbRef.current.onSnapshot(snapshot);
+    const generation = connectionGenerationRef.current + 1;
+    connectionGenerationRef.current = generation;
+    let closed = false;
+    const eventSource = new EventSource(
+      buildAgentStreamUrl(apiURL, remoteNode, sessionId)
+    );
 
-          for (const msg of snapshot.messages ?? []) {
-            if (
-              msg.id &&
-              msg.type === 'ui_action' &&
-              msg.ui_action?.type === 'navigate' &&
-              msg.ui_action.path &&
-              !handledNavigateIdsRef.current.has(msg.id)
-            ) {
-              handledNavigateIdsRef.current.add(msg.id);
-              cbRef.current.onNavigate(msg.ui_action.path);
-            }
-          }
-        },
-        onStateChange: (state) => {
-          setIsSessionLive(state.isConnected && !state.shouldUseFallback);
-        },
+    const isCurrentConnection = () =>
+      !closed && connectionGenerationRef.current === generation;
+
+    eventSource.onopen = () => {
+      if (!isCurrentConnection()) {
+        return;
       }
-    );
-  }, [sessionId, remoteNode, apiURL]);
+      awaitingSnapshotRef.current = true;
+      setIsSessionLive(true);
+    };
 
-  useEffect(() => {
-    if (!delegateKey) {
-      setLiveDelegateSessions({});
-      return;
-    }
+    eventSource.addEventListener('message', (event) => {
+      if (!isCurrentConnection()) {
+        return;
+      }
 
-    const unsubscribes = stableDelegateSessionIds.map((delegateId) =>
-      sseManager.subscribeTopic(
-        buildAgentSessionTopic(delegateId),
-        remoteNode,
-        apiURL,
-        {
-          onData: (data) => {
-            cbRef.current.onDelegateSnapshot(
-              delegateId,
-              data as StreamResponse
-            );
-          },
-          onStateChange: (state) => {
-            setLiveDelegateSessions((prev) => {
-              const nextValue = state.isConnected && !state.shouldUseFallback;
-              if (prev[delegateId] === nextValue) {
-                return prev;
-              }
-              return {
-                ...prev,
-                [delegateId]: nextValue,
-              };
-            });
-          },
+      try {
+        const parsed = JSON.parse(
+          (event as MessageEvent<string>).data
+        ) as StreamResponse;
+        const replace = awaitingSnapshotRef.current;
+        awaitingSnapshotRef.current = false;
+        cbRef.current.onEvent(parsed, replace);
+
+        for (const msg of parsed.messages ?? []) {
+          if (
+            msg.id &&
+            msg.type === 'ui_action' &&
+            msg.ui_action?.type === 'navigate' &&
+            msg.ui_action.path &&
+            !handledNavigateIdsRef.current.has(msg.id)
+          ) {
+            handledNavigateIdsRef.current.add(msg.id);
+            cbRef.current.onNavigate(msg.ui_action.path);
+          }
         }
-      )
-    );
+      } catch (error) {
+        console.error('Invalid JSON response from agent SSE', error);
+      }
+    });
+
+    eventSource.onerror = () => {
+      if (!isCurrentConnection()) {
+        return;
+      }
+      setIsSessionLive(false);
+    };
 
     return () => {
-      for (const unsubscribe of unsubscribes) {
-        unsubscribe();
+      closed = true;
+      eventSource.close();
+      if (connectionGenerationRef.current === generation) {
+        setIsSessionLive(false);
       }
     };
-  }, [delegateKey, stableDelegateSessionIds, remoteNode, apiURL]);
+  }, [sessionId, apiURL, remoteNode]);
 
-  return {
-    isSessionLive,
-    liveDelegateSessions,
-  };
+  return { isSessionLive };
 }

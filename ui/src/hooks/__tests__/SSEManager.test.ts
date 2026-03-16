@@ -238,4 +238,156 @@ describe('SSEManager', () => {
     unsubscribeDelegate();
     unsubscribePrimary();
   });
+
+  it('ignores stale 404 mutation responses after a reconnect', async () => {
+    const manager = new SSEManager();
+    const delegateStates: SSEConnectionState[] = [];
+    let resolveFirstMutation:
+      | ((value: Response | PromiseLike<Response>) => void)
+      | undefined;
+
+    vi.mocked(fetch).mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFirstMutation = resolve;
+        })
+    );
+
+    const unsubscribePrimary = manager.subscribeTopic(
+      'agent:sess-1',
+      'local',
+      '/api/v1',
+      {
+        onData: () => undefined,
+        onStateChange: () => undefined,
+      }
+    );
+
+    const firstEventSource = MockEventSource.instances[0];
+    if (!firstEventSource) {
+      throw new Error('expected EventSource instance');
+    }
+    firstEventSource.emit('control', {
+      sessionID: 'session-1',
+      subscribed: ['agent:sess-1'],
+    });
+
+    const unsubscribeDelegate = manager.subscribeTopic(
+      'agent:delegate-1',
+      'local',
+      '/api/v1',
+      {
+        onData: () => undefined,
+        onStateChange: (state) => delegateStates.push(snapshotState(state)),
+      }
+    );
+
+    await vi.advanceTimersByTimeAsync(200);
+    firstEventSource.onerror?.();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    const secondEventSource = MockEventSource.instances[1];
+    if (!secondEventSource) {
+      throw new Error('expected replacement EventSource instance');
+    }
+    secondEventSource.emit('control', {
+      sessionID: 'session-2',
+      subscribed: ['agent:sess-1', 'agent:delegate-1'],
+    });
+
+    resolveFirstMutation?.({
+      ok: false,
+      status: 404,
+      json: async () => ({
+        message: 'unknown_session',
+      }),
+    } as Response);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(secondEventSource.close).not.toHaveBeenCalled();
+    expect(lastState(delegateStates)).toMatchObject({
+      isConnected: true,
+      isConnecting: false,
+    });
+
+    unsubscribeDelegate();
+    unsubscribePrimary();
+  });
+
+  it('ignores stale mutation payloads that refer to an older session', async () => {
+    const manager = new SSEManager();
+    const delegateStates: SSEConnectionState[] = [];
+    let resolveFirstMutation:
+      | ((value: Response | PromiseLike<Response>) => void)
+      | undefined;
+
+    vi.mocked(fetch).mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFirstMutation = resolve;
+        })
+    );
+
+    const unsubscribePrimary = manager.subscribeTopic(
+      'agent:sess-1',
+      'local',
+      '/api/v1',
+      {
+        onData: () => undefined,
+        onStateChange: () => undefined,
+      }
+    );
+
+    const firstEventSource = MockEventSource.instances[0];
+    if (!firstEventSource) {
+      throw new Error('expected EventSource instance');
+    }
+    firstEventSource.emit('control', {
+      sessionID: 'session-1',
+      subscribed: ['agent:sess-1'],
+    });
+
+    const unsubscribeDelegate = manager.subscribeTopic(
+      'agent:delegate-1',
+      'local',
+      '/api/v1',
+      {
+        onData: () => undefined,
+        onStateChange: (state) => delegateStates.push(snapshotState(state)),
+      }
+    );
+
+    await vi.advanceTimersByTimeAsync(200);
+    firstEventSource.onerror?.();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    const secondEventSource = MockEventSource.instances[1];
+    if (!secondEventSource) {
+      throw new Error('expected replacement EventSource instance');
+    }
+    secondEventSource.emit('control', {
+      sessionID: 'session-2',
+      subscribed: ['agent:sess-1', 'agent:delegate-1'],
+    });
+
+    resolveFirstMutation?.({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        subscribed: ['agent:sess-1'],
+        errors: [],
+      }),
+    } as Response);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(lastState(delegateStates)).toMatchObject({
+      isConnected: true,
+      isConnecting: false,
+    });
+
+    unsubscribeDelegate();
+    unsubscribePrimary();
+  });
 });

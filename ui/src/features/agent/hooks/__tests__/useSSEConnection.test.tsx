@@ -1,120 +1,136 @@
 import { renderHook, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type {
-  SubscriberCallbacks,
-  SSEConnectionState,
-} from '@/hooks/SSEManager';
 import { useSSEConnection } from '../useSSEConnection';
 
-const subscribeTopicMock = vi.fn();
-const topicSubscribers = new Map<string, SubscriberCallbacks>();
+class MockEventSource {
+  static instances: MockEventSource[] = [];
 
-vi.mock('@/hooks/SSEManager', () => ({
-  buildAgentSessionTopic: (sessionId: string) => `agent:${sessionId}`,
-  sseManager: {
-    subscribeTopic: (...args: unknown[]) => subscribeTopicMock(...args),
-  },
-}));
+  readonly url: string;
+  onopen: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  close = vi.fn();
+  private listeners = new Map<
+    string,
+    Set<(event: MessageEvent<string>) => void>
+  >();
 
-function emitState(topic: string, state: SSEConnectionState) {
-  const subscriber = topicSubscribers.get(topic);
-  if (!subscriber) {
-    throw new Error(`missing subscriber for topic ${topic}`);
+  constructor(url: string) {
+    this.url = url;
+    MockEventSource.instances.push(this);
   }
-  subscriber.onStateChange(state);
-}
 
-function emitData(topic: string, data: unknown) {
-  const subscriber = topicSubscribers.get(topic);
-  if (!subscriber) {
-    throw new Error(`missing subscriber for topic ${topic}`);
+  addEventListener(
+    type: string,
+    listener: (event: MessageEvent<string>) => void
+  ) {
+    const listeners = this.listeners.get(type) ?? new Set();
+    listeners.add(listener);
+    this.listeners.set(type, listeners);
   }
-  subscriber.onData(data);
+
+  open() {
+    this.onopen?.();
+  }
+
+  error() {
+    this.onerror?.();
+  }
+
+  emitMessage(data: unknown) {
+    const listeners = this.listeners.get('message');
+    if (!listeners) {
+      return;
+    }
+
+    const event = {
+      data: JSON.stringify(data),
+    } as MessageEvent<string>;
+    for (const listener of listeners) {
+      listener(event);
+    }
+  }
 }
 
 describe('useSSEConnection', () => {
   beforeEach(() => {
-    topicSubscribers.clear();
-    subscribeTopicMock.mockReset();
-    subscribeTopicMock.mockImplementation(
-      (
-        topic: string,
-        _remoteNode: string,
-        _apiURL: string,
-        callbacks: SubscriberCallbacks
-      ) => {
-        topicSubscribers.set(topic, callbacks);
-        callbacks.onStateChange({
-          isConnected: false,
-          isConnecting: true,
-          shouldUseFallback: false,
-          error: null,
-        });
-        return () => {
-          topicSubscribers.delete(topic);
-        };
-      }
-    );
+    MockEventSource.instances = [];
+    vi.stubGlobal('EventSource', MockEventSource);
   });
 
-  it('tracks primary and delegate liveness from SSE manager state', () => {
-    const onSnapshot = vi.fn();
-    const onDelegateSnapshot = vi.fn();
+  it('marks the session live on open and treats the first event after each open as a snapshot replace', () => {
+    const onEvent = vi.fn();
     const onNavigate = vi.fn();
 
     const { result } = renderHook(() =>
-      useSSEConnection('sess-1', ['delegate-1'], '/api/v1', 'local', {
-        onSnapshot,
-        onDelegateSnapshot,
+      useSSEConnection('sess-1', '/api/v1', 'local', {
+        onEvent,
         onNavigate,
       })
     );
 
     expect(result.current.isSessionLive).toBe(false);
-    expect(result.current.liveDelegateSessions['delegate-1']).toBe(false);
+    expect(MockEventSource.instances).toHaveLength(1);
+
+    const eventSource = MockEventSource.instances[0];
+    if (!eventSource) {
+      throw new Error('expected EventSource instance');
+    }
 
     act(() => {
-      emitState('agent:sess-1', {
-        isConnected: true,
-        isConnecting: false,
-        shouldUseFallback: false,
-        error: null,
-      });
-      emitState('agent:delegate-1', {
-        isConnected: true,
-        isConnecting: false,
-        shouldUseFallback: false,
-        error: null,
-      });
+      eventSource.open();
     });
 
     expect(result.current.isSessionLive).toBe(true);
-    expect(result.current.liveDelegateSessions['delegate-1']).toBe(true);
 
     act(() => {
-      emitState('agent:delegate-1', {
-        isConnected: false,
-        isConnecting: false,
-        shouldUseFallback: true,
-        error: new Error('down'),
-      });
+      eventSource.emitMessage({ messages: [{ id: 'm1', type: 'assistant' }] });
+      eventSource.emitMessage({ messages: [{ id: 'm2', type: 'assistant' }] });
     });
 
-    expect(result.current.liveDelegateSessions['delegate-1']).toBe(false);
+    expect(onEvent).toHaveBeenNthCalledWith(
+      1,
+      { messages: [{ id: 'm1', type: 'assistant' }] },
+      true
+    );
+    expect(onEvent).toHaveBeenNthCalledWith(
+      2,
+      { messages: [{ id: 'm2', type: 'assistant' }] },
+      false
+    );
+
+    act(() => {
+      eventSource.error();
+    });
+
+    expect(result.current.isSessionLive).toBe(false);
+
+    act(() => {
+      eventSource.open();
+      eventSource.emitMessage({ messages: [{ id: 'm3', type: 'assistant' }] });
+    });
+
+    expect(onEvent).toHaveBeenNthCalledWith(
+      3,
+      { messages: [{ id: 'm3', type: 'assistant' }] },
+      true
+    );
   });
 
-  it('deduplicates repeated navigate UI actions while still forwarding snapshots', () => {
-    const onSnapshot = vi.fn();
-    const onDelegateSnapshot = vi.fn();
+  it('deduplicates repeated navigate UI actions across reconnect snapshots', () => {
+    const onEvent = vi.fn();
     const onNavigate = vi.fn();
 
     renderHook(() =>
-      useSSEConnection('sess-1', [], '/api/v1', 'local', {
-        onSnapshot,
-        onDelegateSnapshot,
+      useSSEConnection('sess-1', '/api/v1', 'local', {
+        onEvent,
         onNavigate,
       })
     );
+
+    const eventSource = MockEventSource.instances[0];
+    if (!eventSource) {
+      throw new Error('expected EventSource instance');
+    }
 
     const snapshot = {
       messages: [
@@ -127,13 +143,62 @@ describe('useSSEConnection', () => {
     };
 
     act(() => {
-      emitData('agent:sess-1', snapshot);
-      emitData('agent:sess-1', snapshot);
+      eventSource.open();
+      eventSource.emitMessage(snapshot);
+      eventSource.error();
+      eventSource.open();
+      eventSource.emitMessage(snapshot);
     });
 
-    expect(onSnapshot).toHaveBeenCalledTimes(2);
+    expect(onEvent).toHaveBeenCalledTimes(2);
     expect(onNavigate).toHaveBeenCalledTimes(1);
     expect(onNavigate).toHaveBeenCalledWith('/runs/run-1');
-    expect(onDelegateSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('ignores messages from a stale connection after switching sessions', () => {
+    const onEvent = vi.fn();
+    const onNavigate = vi.fn();
+
+    const { rerender } = renderHook(
+      ({ sessionId }) =>
+        useSSEConnection(sessionId, '/api/v1', 'local', {
+          onEvent,
+          onNavigate,
+        }),
+      {
+        initialProps: { sessionId: 'sess-1' as string | null },
+      }
+    );
+
+    const firstEventSource = MockEventSource.instances[0];
+    if (!firstEventSource) {
+      throw new Error('expected initial EventSource instance');
+    }
+
+    rerender({ sessionId: 'sess-2' });
+
+    expect(MockEventSource.instances).toHaveLength(2);
+
+    const secondEventSource = MockEventSource.instances[1];
+    if (!secondEventSource) {
+      throw new Error('expected replacement EventSource instance');
+    }
+
+    act(() => {
+      secondEventSource.open();
+      secondEventSource.emitMessage({
+        messages: [{ id: 'new-msg', type: 'assistant' }],
+      });
+      firstEventSource.emitMessage({
+        messages: [{ id: 'stale-msg', type: 'assistant' }],
+      });
+      firstEventSource.error();
+    });
+
+    expect(onEvent).toHaveBeenCalledTimes(1);
+    expect(onEvent).toHaveBeenCalledWith(
+      { messages: [{ id: 'new-msg', type: 'assistant' }] },
+      true
+    );
   });
 });

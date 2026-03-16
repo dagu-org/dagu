@@ -13,7 +13,6 @@ const navigateMock = vi.fn();
 const useSSEConnectionMock = vi.fn();
 let mockedSSEStatus = {
   isSessionLive: false,
-  liveDelegateSessions: {} as Record<string, boolean>,
 };
 
 vi.mock('@/hooks/api', () => ({
@@ -153,7 +152,6 @@ describe('useAgentChat fallback polling', () => {
     navigateMock.mockReset();
     mockedSSEStatus = {
       isSessionLive: false,
-      liveDelegateSessions: {},
     };
     useSSEConnectionMock.mockReset();
     useSSEConnectionMock.mockImplementation(() => mockedSSEStatus);
@@ -212,7 +210,6 @@ describe('useAgentChat fallback polling', () => {
 
     mockedSSEStatus = {
       isSessionLive: true,
-      liveDelegateSessions: {},
     };
     rerender();
     const callsAfterReconnect = sessionFetchCount;
@@ -224,12 +221,9 @@ describe('useAgentChat fallback polling', () => {
     expect(sessionFetchCount).toBe(callsAfterReconnect);
   });
 
-  it('polls open delegate panes while their topic is offline and stops after delegate SSE recovers', async () => {
+  it('polls open delegate panes while the root agent stream is offline and stops after reconnect', async () => {
     mockedSSEStatus = {
-      isSessionLive: true,
-      liveDelegateSessions: {
-        'delegate-1': false,
-      },
+      isSessionLive: false,
     };
     useSSEConnectionMock.mockImplementation(() => mockedSSEStatus);
 
@@ -299,9 +293,6 @@ describe('useAgentChat fallback polling', () => {
 
     mockedSSEStatus = {
       isSessionLive: true,
-      liveDelegateSessions: {
-        'delegate-1': true,
-      },
     };
     rerender();
     const callsAfterReconnect = delegateFetchCount;
@@ -311,5 +302,100 @@ describe('useAgentChat fallback polling', () => {
     });
 
     expect(delegateFetchCount).toBe(callsAfterReconnect);
+  });
+
+  it('merges incremental stream updates from the dedicated agent stream', async () => {
+    getMock.mockImplementation(
+      async (
+        _path: string,
+        request?: { params?: { path?: { sessionId?: string } } }
+      ) => {
+        if (request?.params?.path?.sessionId === 'sess-1') {
+          return {
+            data: makeSessionDetailResponse({
+              messages: [makeApiMessage('msg-1', 'initial snapshot')],
+            }),
+          };
+        }
+        throw new Error('unexpected request');
+      }
+    );
+
+    const { result } = renderHook(() => useAgentChat(), {
+      wrapper: TestProviders,
+    });
+
+    await act(async () => {
+      await result.current.selectSession('sess-1');
+    });
+
+    const latestCall =
+      useSSEConnectionMock.mock.calls[
+        useSSEConnectionMock.mock.calls.length - 1
+      ];
+    const callbacks = latestCall?.[3] as
+      | {
+          onEvent: (event: unknown, replace: boolean) => void;
+        }
+      | undefined;
+    expect(callbacks).toBeDefined();
+    if (!callbacks) {
+      throw new Error('expected agent stream callbacks');
+    }
+
+    act(() => {
+      callbacks.onEvent(
+        {
+          messages: [
+            {
+              id: 'msg-2',
+              session_id: 'sess-1',
+              type: 'assistant',
+              sequence_id: 2,
+              content: 'streamed reply',
+              created_at: '2026-03-13T00:00:01Z',
+            },
+          ],
+        },
+        false
+      );
+      callbacks.onEvent(
+        {
+          delegate_event: {
+            type: 'started',
+            delegate_id: 'delegate-1',
+            task: 'Delegate task',
+          },
+        },
+        false
+      );
+      callbacks.onEvent(
+        {
+          delegate_messages: {
+            delegate_id: 'delegate-1',
+            messages: [
+              {
+                id: 'delegate-msg-1',
+                session_id: 'delegate-1',
+                type: 'assistant',
+                sequence_id: 1,
+                content: 'delegate reply',
+                created_at: '2026-03-13T00:00:02Z',
+              },
+            ],
+          },
+        },
+        false
+      );
+    });
+
+    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.messages[1]?.content).toBe('streamed reply');
+    expect(result.current.delegateStatuses['delegate-1']?.status).toBe(
+      'running'
+    );
+    expect(result.current.delegateMessages['delegate-1']?.[0]?.content).toBe(
+      'delegate reply'
+    );
   });
 });

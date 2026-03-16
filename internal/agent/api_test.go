@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 
 	"testing"
@@ -488,6 +489,78 @@ func TestAPI_HandleStream(t *testing.T) {
 		<-done
 
 		assert.Equal(t, "text/event-stream", rec.Header().Get("Content-Type"))
+		assert.Equal(t, "no", rec.Header().Get("X-Accel-Buffering"))
+		assert.Empty(t, rec.Header().Get("Deprecation"))
+	})
+
+	t.Run("reactivates a stored session and streams stored delegates", func(t *testing.T) {
+		t.Parallel()
+
+		api, store := createAPIWithSessionStore(t, newStopProvider("hello"))
+		now := time.Now()
+
+		parentSess := &Session{
+			ID:        "parent-sess-1",
+			UserID:    defaultUserID,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		require.NoError(t, store.CreateSession(context.Background(), parentSess))
+		require.NoError(t, store.AddMessage(context.Background(), parentSess.ID, &Message{
+			ID:         "parent-msg-1",
+			SessionID:  parentSess.ID,
+			Type:       MessageTypeAssistant,
+			SequenceID: 1,
+			Content:    "stored reply",
+			CreatedAt:  now,
+		}))
+
+		delegateSess := &Session{
+			ID:              "delegate-sess-1",
+			UserID:          defaultUserID,
+			ParentSessionID: parentSess.ID,
+			DelegateTask:    "Delegate task",
+			CreatedAt:       now,
+			UpdatedAt:       now,
+		}
+		require.NoError(t, store.CreateSession(context.Background(), delegateSess))
+
+		r := chi.NewRouter()
+		api.RegisterRoutes(r, nil)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		req := httptest.NewRequest(
+			http.MethodGet,
+			"/api/v1/agent/sessions/"+parentSess.ID+"/stream",
+			nil,
+		).WithContext(ctx)
+		rec := httptest.NewRecorder()
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			r.ServeHTTP(rec, req)
+		}()
+
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+		<-done
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), `"messages":[{"id":"parent-msg-1"`)
+		assert.Contains(
+			t,
+			rec.Body.String(),
+			`"delegates":[{"id":"delegate-sess-1","task":"Delegate task","status":"completed"}]`,
+		)
+
+		_, active := api.sessions.Load(parentSess.ID)
+		assert.True(t, active, "streaming should reactivate the stored parent session")
+		assert.False(
+			t,
+			strings.Contains(rec.Body.String(), `"Deprecation"`),
+			"agent stream payload should not include legacy deprecation metadata",
+		)
 	})
 }
 

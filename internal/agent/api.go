@@ -56,6 +56,21 @@ func getAuthenticatedUserIDFromContext(ctx context.Context) (string, bool) {
 	return "", false
 }
 
+func userIdentityFromContext(ctx context.Context) UserIdentity {
+	user := UserIdentity{
+		UserID:   defaultUserID,
+		Username: defaultUserID,
+		Role:     defaultUserRole,
+	}
+	if authUser, ok := auth.UserFromContext(ctx); ok && authUser != nil {
+		user.UserID = authUser.ID
+		user.Username = authUser.Username
+		user.Role = authUser.Role
+	}
+	user.IPAddress, _ = auth.ClientIPFromContext(ctx)
+	return user
+}
+
 // API handles HTTP requests for the agent.
 type API struct {
 	sessions           sync.Map // id -> *SessionManager (active sessions)
@@ -524,11 +539,20 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		seqID = int64(len(messages))
 	}
 
+	delegates, err := a.getStoredDelegateSnapshots(ctx, id)
+	if err != nil {
+		a.logger.Warn("Failed to load delegates for reactivation", "error", err)
+		delegates = nil
+	}
+
 	mgr := NewSessionManager(SessionManagerConfig{
 		ID:                 id,
 		User:               user,
 		Logger:             a.logger,
 		WorkingDir:         a.workingDir,
+		Title:              sess.Title,
+		CreatedAt:          sess.CreatedAt,
+		LastActivity:       sess.UpdatedAt,
 		OnMessage:          a.createMessageCallback(id),
 		History:            messages,
 		SequenceID:         seqID,
@@ -543,6 +567,7 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		Soul:               a.loadSelectedSoul(ctx),
 		WebSearch:          a.loadWebSearch(ctx),
 		RemoteNodeResolver: a.remoteNodeResolver,
+		Delegates:          delegates,
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 	a.sessions.Store(id, mgr)
@@ -554,15 +579,17 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 // GET /api/v1/agent/sessions/{id}/stream
 func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	userID := getUserIDFromContext(r.Context())
+	user := userIdentityFromContext(r.Context())
 
-	mgr, ok := a.getActiveSession(id, userID)
+	mgr, ok := a.getOrReactivateSession(r.Context(), id, user)
 	if !ok {
 		respondErrorDirect(w, http.StatusNotFound, api.ErrorCodeNotFound, "Session not found")
 		return
 	}
 
 	a.setupSSEHeaders(w)
+	rc := http.NewResponseController(w)
+	_ = rc.SetWriteDeadline(time.Time{})
 
 	// Use atomic subscribe+snapshot to prevent race condition
 	// where messages could be missed between getting initial state and subscribing
@@ -625,6 +652,7 @@ func (a *API) setupSSEHeaders(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
 	// CORS headers are managed by the server's CORS middleware configuration.
 	// Do not set Access-Control-Allow-Origin here to avoid security issues.
 }
