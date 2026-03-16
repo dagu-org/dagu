@@ -251,17 +251,18 @@ func (b *Bot) handleChannelMessage(ctx context.Context, channelID, userID, msgTi
 	b.activeThreads.Store(threadKey, true)
 
 	cs := b.getOrCreateChat(threadKey, channelID, threadTS)
-	b.processIncoming(ctx, cs, userID, msgTimestamp, text)
+	b.processIncoming(ctx, cs, threadKey, userID, msgTimestamp, text)
 }
 
 // handleDMMessage processes a direct message.
 func (b *Bot) handleDMMessage(ctx context.Context, channelID, userID, msgTimestamp, text string) {
 	cs := b.getOrCreateChat(channelID, channelID, "")
-	b.processIncoming(ctx, cs, userID, msgTimestamp, text)
+	b.processIncoming(ctx, cs, channelID, userID, msgTimestamp, text)
 }
 
 // processIncoming is the core message handler shared by channel and DM flows.
-func (b *Bot) processIncoming(ctx context.Context, cs *chatState, userID, msgTimestamp, text string) {
+// convKey uniquely identifies the conversation (channelID or channelID:threadTS).
+func (b *Bot) processIncoming(ctx context.Context, cs *chatState, convKey, userID, msgTimestamp, text string) {
 	if text == "" {
 		return
 	}
@@ -286,7 +287,7 @@ func (b *Bot) processIncoming(ctx context.Context, cs *chatState, userID, msgTim
 	b.addReaction(cs.channelID, msgTimestamp, "hourglass_flowing_sand")
 	thinkingTS := b.postThinking(cs)
 
-	user := b.userIdentity(userID)
+	user := b.userIdentity(convKey, userID)
 
 	cs.mu.Lock()
 	cs.pendingReaction = &messageRef{channel: cs.channelID, timestamp: msgTimestamp}
@@ -806,10 +807,11 @@ func (b *Bot) resetChat(cs *chatState) {
 	cs.thinkingMessage = nil
 }
 
-// userIdentity creates a UserIdentity from a Slack user ID.
-func (b *Bot) userIdentity(userID string) agent.UserIdentity {
+// userIdentity creates a UserIdentity scoped to a specific conversation.
+// Using convKey ensures each conversation (DM, thread) gets its own agent session.
+func (b *Bot) userIdentity(convKey, userID string) agent.UserIdentity {
 	return agent.UserIdentity{
-		UserID:   fmt.Sprintf("slack:%s", userID),
+		UserID:   fmt.Sprintf("slack:%s:%s", convKey, userID),
 		Username: "slack",
 		Role:     auth.RoleAdmin,
 	}
