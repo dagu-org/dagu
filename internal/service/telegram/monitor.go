@@ -19,6 +19,13 @@ import (
 // monitorPollInterval is how often the monitor checks for DAG run status changes.
 const monitorPollInterval = 10 * time.Second
 
+// seenEvictInterval is how often stale entries are purged from the seen map.
+const seenEvictInterval = 10 * time.Minute
+
+// seenTTL is how long a seen entry is kept before eviction. This must be
+// longer than the lookback window in checkForCompletions (1 hour).
+const seenTTL = 2 * time.Hour
+
 // notifyStatuses are the statuses that trigger a notification.
 var notifyStatuses = []core.Status{
 	core.Succeeded,
@@ -33,7 +40,7 @@ var notifyStatuses = []core.Status{
 // notifications via Telegram.
 type DAGRunMonitor struct {
 	dagRunStore exec.DAGRunStore
-	agentAPI    *agent.API
+	agentAPI    AgentService
 	bot         *Bot
 	logger      *slog.Logger
 
@@ -42,7 +49,7 @@ type DAGRunMonitor struct {
 }
 
 // NewDAGRunMonitor creates a new monitor instance.
-func NewDAGRunMonitor(dagRunStore exec.DAGRunStore, agentAPI *agent.API, bot *Bot, logger *slog.Logger) *DAGRunMonitor {
+func NewDAGRunMonitor(dagRunStore exec.DAGRunStore, agentAPI AgentService, bot *Bot, logger *slog.Logger) *DAGRunMonitor {
 	return &DAGRunMonitor{
 		dagRunStore: dagRunStore,
 		agentAPI:    agentAPI,
@@ -63,6 +70,9 @@ func (m *DAGRunMonitor) Run(ctx context.Context) {
 	ticker := time.NewTicker(monitorPollInterval)
 	defer ticker.Stop()
 
+	evictTicker := time.NewTicker(seenEvictInterval)
+	defer evictTicker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -70,6 +80,8 @@ func (m *DAGRunMonitor) Run(ctx context.Context) {
 			return
 		case <-ticker.C:
 			m.checkForCompletions(ctx)
+		case <-evictTicker.C:
+			m.evictStaleSeen()
 		}
 	}
 }
@@ -131,13 +143,24 @@ func seenKey(s *exec.DAGRunStatus) string {
 
 // markSeen marks a DAG run as already notified.
 func (m *DAGRunMonitor) markSeen(s *exec.DAGRunStatus) {
-	m.seen.Store(seenKey(s), true)
+	m.seen.Store(seenKey(s), time.Now())
 }
 
 // isSeen checks if we've already sent a notification for this run.
 func (m *DAGRunMonitor) isSeen(s *exec.DAGRunStatus) bool {
 	_, ok := m.seen.Load(seenKey(s))
 	return ok
+}
+
+// evictStaleSeen removes entries from the seen map that are older than seenTTL.
+func (m *DAGRunMonitor) evictStaleSeen() {
+	cutoff := time.Now().Add(-seenTTL)
+	m.seen.Range(func(key, value any) bool {
+		if ts, ok := value.(time.Time); ok && ts.Before(cutoff) {
+			m.seen.Delete(key)
+		}
+		return true
+	})
 }
 
 // notifyCompletion creates an agent session per chat to generate a notification

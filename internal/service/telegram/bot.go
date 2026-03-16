@@ -29,6 +29,17 @@ const defaultContextLimit = 200_000
 // contextRotationRatio is the fraction of the context limit at which sessions are rotated.
 const contextRotationRatio = 0.5
 
+// AgentService is the subset of the agent API that the Telegram bot requires.
+// Defining this as an interface decouples the bot from the concrete agent.API
+// implementation, making it testable in isolation.
+type AgentService interface {
+	CreateSession(ctx context.Context, user agent.UserIdentity, req agent.ChatRequest) (string, string, error)
+	SendMessage(ctx context.Context, sessionID string, user agent.UserIdentity, req agent.ChatRequest) error
+	CancelSession(ctx context.Context, sessionID, userID string) error
+	SubmitUserResponse(ctx context.Context, sessionID, userID string, resp agent.UserPromptResponse) error
+	GetSessionDetail(ctx context.Context, sessionID, userID string) (*agent.StreamResponse, error)
+}
+
 // Config holds configuration for the Telegram bot.
 type Config struct {
 	Token          string
@@ -48,7 +59,7 @@ type chatState struct {
 // Bot is a Telegram bot that forwards messages to the Dagu agent API.
 type Bot struct {
 	cfg          Config
-	agentAPI     *agent.API
+	agentAPI     AgentService
 	botAPI       *tgbotapi.BotAPI
 	chats        sync.Map // chatID (int64) -> *chatState
 	allowedChats map[int64]struct{}
@@ -57,9 +68,12 @@ type Bot struct {
 }
 
 // New creates a new Telegram bot instance.
-func New(cfg Config, agentAPI *agent.API, logger *slog.Logger) (*Bot, error) {
+func New(cfg Config, agentAPI AgentService, logger *slog.Logger) (*Bot, error) {
 	if cfg.Token == "" {
 		return nil, fmt.Errorf("telegram bot token is required (set DAGU_TELEGRAM_TOKEN)")
+	}
+	if len(cfg.AllowedChatIDs) == 0 {
+		return nil, fmt.Errorf("at least one allowed chat ID is required (set DAGU_TELEGRAM_ALLOWED_CHAT_IDS)")
 	}
 
 	botAPI, err := tgbotapi.NewBotAPI(cfg.Token)
@@ -357,7 +371,13 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, chatID int64, us
 		lastSeqID = detail.Messages[len(detail.Messages)-1].SequenceID
 	}
 
-	ticker := time.NewTicker(1 * time.Second)
+	const (
+		minPollInterval = 1 * time.Second
+		maxPollInterval = 5 * time.Second
+	)
+
+	pollInterval := minPollInterval
+	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
 	idleCount := 0
@@ -380,14 +400,29 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, chatID int64, us
 				}
 			}
 
+			isWorking := detail.SessionState != nil && detail.SessionState.Working
+
 			if len(newMsgs) > 0 {
 				idleCount = 0
+				// Reset to fast polling when there's activity
+				if pollInterval != minPollInterval {
+					pollInterval = minPollInterval
+					ticker.Reset(pollInterval)
+				}
 				b.processStreamResponse(cs, chatID, agent.StreamResponse{
 					Messages:     newMsgs,
 					SessionState: detail.SessionState,
 				})
 			} else {
 				idleCount++
+				// Only back off when the agent is NOT working. While it's
+				// processing we keep polling fast so responses appear quickly.
+				if !isWorking {
+					if newInterval := pollInterval * 2; newInterval <= maxPollInterval && pollInterval < maxPollInterval {
+						pollInterval = newInterval
+						ticker.Reset(pollInterval)
+					}
+				}
 			}
 
 			// Stop polling if not working and idle for a while
@@ -487,9 +522,6 @@ func (b *Bot) sendText(chatID int64, text string) {
 
 // isChatAllowed checks if a chat ID is authorized to use the bot.
 func (b *Bot) isChatAllowed(chatID int64) bool {
-	if len(b.allowedChats) == 0 {
-		return true
-	}
 	_, ok := b.allowedChats[chatID]
 	return ok
 }

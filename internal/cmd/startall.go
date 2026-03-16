@@ -13,9 +13,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/frontend"
 	"github.com/dagu-org/dagu/internal/service/resource"
 	"github.com/dagu-org/dagu/internal/service/telegram"
 	"github.com/spf13/cobra"
@@ -117,8 +119,17 @@ func runStartAll(ctx *Context, _ []string) error {
 	// Initialize resource monitoring service
 	resourceService := resource.NewService(ctx.Config)
 
+	// Capture the agent API via callback so it can be shared with the Telegram bot
+	// without the server permanently exposing its internals.
+	var agentAPI *agent.API
+	serverOpts := []frontend.ServerOption{
+		frontend.WithAgentAPICallback(func(api *agent.API) {
+			agentAPI = api
+		}),
+	}
+
 	// Use serviceCtx so auth initialization can respond to termination signals
-	server, err := serviceCtx.NewServer(resourceService)
+	server, err := serviceCtx.NewServer(resourceService, serverOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
@@ -136,10 +147,9 @@ func runStartAll(ctx *Context, _ []string) error {
 		logger.Info(serviceCtx, "Coordinator disabled via configuration")
 	}
 
-	// Initialize Telegram bot if configured, using the server's agent API
+	// Initialize Telegram bot if configured
 	var tgBot *telegram.Bot
 	if ctx.Config.Telegram.Token != "" {
-		agentAPI := server.AgentAPI()
 		if agentAPI == nil {
 			logger.Warn(serviceCtx, "Telegram bot: agent API not available, notifications will use fallback messages")
 		}
