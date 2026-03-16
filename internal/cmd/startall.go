@@ -149,10 +149,7 @@ func runStartAll(ctx *Context, _ []string) error {
 
 	// Initialize Telegram bot if configured
 	var tgBot *telegram.Bot
-	if ctx.Config.Telegram.Token != "" {
-		if agentAPI == nil {
-			logger.Warn(serviceCtx, "Telegram bot: agent API not available, notifications will use fallback messages")
-		}
+	if ctx.Config.Telegram.Token != "" && agentAPI != nil {
 		tgBot, err = telegram.New(
 			telegram.Config{
 				Token:          ctx.Config.Telegram.Token,

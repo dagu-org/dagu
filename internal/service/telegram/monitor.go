@@ -131,8 +131,9 @@ func (m *DAGRunMonitor) checkForCompletions(ctx context.Context) {
 		if m.isSeen(s) {
 			continue
 		}
-		m.markSeen(s)
-		m.notifyCompletion(ctx, s)
+		if m.notifyCompletion(ctx, s) {
+			m.markSeen(s)
+		}
 	}
 }
 
@@ -166,7 +167,7 @@ func (m *DAGRunMonitor) evictStaleSeen() {
 // notifyCompletion creates an agent session per chat to generate a notification
 // about a completed DAG run. The session is adopted by the chat so the user
 // can continue the conversation (e.g., ask follow-up questions about the run).
-func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStatus) {
+func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStatus) bool {
 	m.logger.Info("DAG run completed, generating notification",
 		slog.String("dag", s.Name),
 		slog.String("status", s.Status.String()),
@@ -175,25 +176,30 @@ func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStat
 
 	if m.agentAPI == nil {
 		m.sendFallbackNotification(s, "")
-		return
+		return true // fallback always delivers
 	}
 
 	if len(m.bot.allowedChats) == 0 {
 		m.logger.Warn("No allowed chats configured, cannot send notification")
-		return
+		return false
 	}
 
 	prompt := buildNotificationPrompt(s)
 
 	// Create a separate session for each chat so each user can follow up.
+	allDelivered := true
 	for chatID := range m.bot.allowedChats {
-		m.notifyChat(ctx, chatID, s, prompt)
+		if !m.notifyChat(ctx, chatID, s, prompt) {
+			allDelivered = false
+		}
 	}
+	return allDelivered
 }
 
 // notifyChat creates an agent session for a specific chat, waits for the
 // response, sends it, and adopts the session so the user can follow up.
-func (m *DAGRunMonitor) notifyChat(ctx context.Context, chatID int64, s *exec.DAGRunStatus, prompt string) {
+// Returns true if the notification was delivered successfully.
+func (m *DAGRunMonitor) notifyChat(ctx context.Context, chatID int64, s *exec.DAGRunStatus, prompt string) bool {
 	user := m.bot.userIdentityFromChatID(chatID)
 
 	req := agent.ChatRequest{
@@ -209,7 +215,7 @@ func (m *DAGRunMonitor) notifyChat(ctx context.Context, chatID int64, s *exec.DA
 		)
 		m.bot.sendText(chatID, fmt.Sprintf("%s DAG '%s' %s\n(AI unavailable: %s)",
 			statusEmoji(s.Status), s.Name, s.Status.String(), err.Error()))
-		return
+		return false
 	}
 
 	// Wait for the agent to generate a response
@@ -217,7 +223,7 @@ func (m *DAGRunMonitor) notifyChat(ctx context.Context, chatID int64, s *exec.DA
 	if response == "" {
 		m.bot.sendText(chatID, fmt.Sprintf("%s DAG '%s' %s\n(AI agent timed out)",
 			statusEmoji(s.Status), s.Name, s.Status.String()))
-		return
+		return false
 	}
 
 	// Adopt this session as the chat's active session so the user can
@@ -226,12 +232,14 @@ func (m *DAGRunMonitor) notifyChat(ctx context.Context, chatID int64, s *exec.DA
 	m.bot.resetChat(cs)
 	cs.mu.Lock()
 	cs.sessionID = sessionID
+	cs.ownerUserID = user.UserID
 	cs.mu.Unlock()
 
 	m.bot.sendLongText(chatID, response)
 
 	// Start subscription so any further agent activity is forwarded
 	m.bot.startSubscription(ctx, cs, chatID, user.UserID, sessionID)
+	return true
 }
 
 // buildNotificationPrompt creates a prompt for the AI agent to analyze

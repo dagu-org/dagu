@@ -51,7 +51,8 @@ type Config struct {
 // chatState tracks the agent session state for a single Telegram chat.
 type chatState struct {
 	sessionID       string
-	subSessionID    string // session ID the subscription is listening to
+	ownerUserID     string             // user ID that owns the session
+	subSessionID    string             // session ID the subscription is listening to
 	subCancel       context.CancelFunc
 	mu              sync.Mutex
 	pendingPromptID string
@@ -195,6 +196,7 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 		cs := b.getOrCreateChat(chatID)
 		cs.mu.Lock()
 		sid := cs.sessionID
+		ownerUID := cs.ownerUserID
 		cs.mu.Unlock()
 
 		if sid == "" {
@@ -202,8 +204,7 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 			return
 		}
 
-		user := b.userIdentity(msg)
-		if err := b.agentAPI.CancelSession(ctx, sid, user.UserID); err != nil {
+		if err := b.agentAPI.CancelSession(ctx, sid, ownerUID); err != nil {
 			b.sendText(chatID, "Failed to cancel session: "+err.Error())
 			return
 		}
@@ -235,6 +236,7 @@ func (b *Bot) handleCallbackQuery(ctx context.Context, cq *tgbotapi.CallbackQuer
 	cs := b.getOrCreateChat(chatID)
 	cs.mu.Lock()
 	sid := cs.sessionID
+	ownerUID := cs.ownerUserID
 	cs.pendingPromptID = ""
 	cs.mu.Unlock()
 
@@ -244,16 +246,15 @@ func (b *Bot) handleCallbackQuery(ctx context.Context, cq *tgbotapi.CallbackQuer
 		return
 	}
 
-	user := b.userIdentityFromCallback(cq)
 	resp := agent.UserPromptResponse{
 		PromptID:          promptID,
 		SelectedOptionIDs: []string{optionID},
 	}
 
-	if err := b.agentAPI.SubmitUserResponse(ctx, sid, user.UserID, resp); err != nil {
+	if err := b.agentAPI.SubmitUserResponse(ctx, sid, ownerUID, resp); err != nil {
 		b.logger.Warn("Failed to submit prompt response",
 			slog.String("session", sid),
-			slog.String("user", user.UserID),
+			slog.String("user", ownerUID),
 			slog.String("prompt", promptID),
 			slog.String("error", err.Error()),
 		)
@@ -298,6 +299,7 @@ func (b *Bot) createSession(ctx context.Context, cs *chatState, chatID int64, us
 
 	cs.mu.Lock()
 	cs.sessionID = sessionID
+	cs.ownerUserID = user.UserID
 	cs.mu.Unlock()
 
 	b.startSubscription(ctx, cs, chatID, user.UserID, sessionID)
@@ -330,6 +332,7 @@ func (b *Bot) sendMessage(ctx context.Context, cs *chatState, chatID int64, user
 func (b *Bot) submitPromptResponse(ctx context.Context, cs *chatState, chatID int64, promptID, text string) {
 	cs.mu.Lock()
 	sid := cs.sessionID
+	ownerUserID := cs.ownerUserID
 	cs.pendingPromptID = ""
 	cs.mu.Unlock()
 
@@ -337,13 +340,12 @@ func (b *Bot) submitPromptResponse(ctx context.Context, cs *chatState, chatID in
 		return
 	}
 
-	user := b.userIdentityFromChatID(chatID)
 	resp := agent.UserPromptResponse{
 		PromptID:         promptID,
 		FreeTextResponse: text,
 	}
 
-	if err := b.agentAPI.SubmitUserResponse(ctx, sid, user.UserID, resp); err != nil {
+	if err := b.agentAPI.SubmitUserResponse(ctx, sid, ownerUserID, resp); err != nil {
 		b.sendText(chatID, "Failed to submit response: "+err.Error())
 	}
 }
@@ -450,7 +452,7 @@ func (b *Bot) sendPrompt(cs *chatState, chatID int64, prompt *agent.UserPrompt) 
 
 	text := prompt.Question
 	if prompt.Command != "" {
-		text += "\n\nCommand: `" + prompt.Command + "`"
+		text += "\n\nCommand: " + prompt.Command
 	}
 	if prompt.AllowFreeText {
 		text += "\n\n(You can also reply with text)"
@@ -471,7 +473,6 @@ func (b *Bot) sendPrompt(cs *chatState, chatID int64, prompt *agent.UserPrompt) 
 
 		msg := tgbotapi.NewMessage(chatID, text)
 		msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(rows...)
-		msg.ParseMode = tgbotapi.ModeMarkdown
 		if _, err := b.botAPI.Send(msg); err != nil {
 			b.logger.Warn("Failed to send prompt", slog.String("error", err.Error()))
 		}
@@ -521,6 +522,7 @@ func (b *Bot) resetChat(cs *chatState) {
 		cs.subCancel = nil
 	}
 	cs.sessionID = ""
+	cs.ownerUserID = ""
 	cs.subSessionID = ""
 	cs.pendingPromptID = ""
 }
@@ -533,19 +535,6 @@ func (b *Bot) userIdentity(msg *tgbotapi.Message) agent.UserIdentity {
 	}
 	return agent.UserIdentity{
 		UserID:   fmt.Sprintf("telegram:%d", msg.From.ID),
-		Username: username,
-		Role:     auth.RoleAdmin,
-	}
-}
-
-// userIdentityFromCallback creates a UserIdentity from a callback query.
-func (b *Bot) userIdentityFromCallback(cq *tgbotapi.CallbackQuery) agent.UserIdentity {
-	username := cq.From.UserName
-	if username == "" {
-		username = strings.TrimSpace(cq.From.FirstName + " " + cq.From.LastName)
-	}
-	return agent.UserIdentity{
-		UserID:   fmt.Sprintf("telegram:%d", cq.From.ID),
 		Username: username,
 		Role:     auth.RoleAdmin,
 	}

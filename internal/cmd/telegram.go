@@ -71,6 +71,11 @@ func runTelegram(ctx *Context, _ []string) error {
 		logger.Warn(serviceCtx, "Failed to create session store, persistence disabled", tag.Error(err))
 	}
 
+	dagStore, err := ctx.dagStore(dagStoreConfig{})
+	if err != nil {
+		return fmt.Errorf("failed to initialize DAG store: %w", err)
+	}
+
 	hooks := agent.NewHooks()
 
 	agentAPI := agent.NewAPI(agent.APIConfig{
@@ -84,6 +89,7 @@ func runTelegram(ctx *Context, _ []string) error {
 		Hooks:              hooks,
 		MemoryStore:        stores.MemoryStore,
 		RemoteNodeResolver: stores.RemoteNodeResolver,
+		DAGStore:           dagStore,
 		Environment: agent.EnvironmentInfo{
 			DAGsDir:        ctx.Config.Paths.DAGsDir,
 			DocsDir:        ctx.Config.Paths.DocsDir,

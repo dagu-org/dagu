@@ -1551,6 +1551,11 @@ var envBindings = []envBinding{
 	{key: "tunnel.rate_limiting.window_seconds", env: "TUNNEL_RATE_LIMITING_WINDOW_SECONDS"},
 	{key: "tunnel.rate_limiting.block_duration_seconds", env: "TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS"},
 
+	// Telegram
+	{key: "telegram.token", env: "TELEGRAM_TOKEN"},
+	{key: "telegram.allowed_chat_ids", env: "TELEGRAM_ALLOWED_CHAT_IDS"},
+	{key: "telegram.safe_mode", env: "TELEGRAM_SAFE_MODE"},
+
 	// License
 	{key: "license.key", env: "LICENSE_KEY"},
 	{key: "license.cloud_url", env: "LICENSE_CLOUD_URL"},
