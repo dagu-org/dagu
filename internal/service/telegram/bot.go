@@ -51,8 +51,8 @@ type Config struct {
 // chatState tracks the agent session state for a single Telegram chat.
 type chatState struct {
 	sessionID       string
-	ownerUserID     string             // user ID that owns the session
-	subSessionID    string             // session ID the subscription is listening to
+	ownerUserID     string // user ID that owns the session
+	subSessionID    string // session ID the subscription is listening to
 	subCancel       context.CancelFunc
 	mu              sync.Mutex
 	pendingPromptID string
