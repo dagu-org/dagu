@@ -211,7 +211,7 @@ func (m *DAGRunMonitor) notifyChannel(ctx context.Context, channelID string, s *
 		return false
 	}
 
-	cs := m.bot.getOrCreateChat(channelID)
+	cs := m.bot.getOrCreateChat(channelID, channelID, "")
 	m.bot.resetChat(cs)
 	cs.mu.Lock()
 	cs.sessionID = sessionID

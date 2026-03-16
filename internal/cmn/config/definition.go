@@ -432,6 +432,7 @@ type SlackBotDef struct {
 	BotToken          string   `mapstructure:"bot_token"`
 	AppToken          string   `mapstructure:"app_token"`
 	AllowedChannelIDs []string `mapstructure:"allowed_channel_ids"`
+	RespondToAll      *bool    `mapstructure:"respond_to_all"` // Default: false
 }
 
 // -----------------------------------------------------------------------------

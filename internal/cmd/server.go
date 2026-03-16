@@ -149,6 +149,7 @@ func runServer(ctx *Context, _ []string) error {
 					BotToken:          ctx.Config.Bots.Slack.BotToken,
 					AppToken:          ctx.Config.Bots.Slack.AppToken,
 					AllowedChannelIDs: ctx.Config.Bots.Slack.AllowedChannelIDs,
+					RespondToAll:      ctx.Config.Bots.Slack.RespondToAll,
 					SafeMode:          ctx.Config.Bots.SafeMode,
 					DAGRunStore:       ctx.DAGRunStore,
 				},

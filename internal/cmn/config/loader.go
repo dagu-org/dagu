@@ -1138,6 +1138,9 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 		if len(def.Bots.Slack.AllowedChannelIDs) > 0 {
 			cfg.Bots.Slack.AllowedChannelIDs = def.Bots.Slack.AllowedChannelIDs
 		}
+		if def.Bots.Slack.RespondToAll != nil {
+			cfg.Bots.Slack.RespondToAll = *def.Bots.Slack.RespondToAll
+		}
 	}
 }
 
@@ -1591,6 +1594,7 @@ var envBindings = []envBinding{
 	{key: "bots.slack.bot_token", env: "BOTS_SLACK_BOT_TOKEN"},
 	{key: "bots.slack.app_token", env: "BOTS_SLACK_APP_TOKEN"},
 	{key: "bots.slack.allowed_channel_ids", env: "BOTS_SLACK_ALLOWED_CHANNEL_IDS"},
+	{key: "bots.slack.respond_to_all", env: "BOTS_SLACK_RESPOND_TO_ALL"},
 
 	// License
 	{key: "license.key", env: "LICENSE_KEY"},

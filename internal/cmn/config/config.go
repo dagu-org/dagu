@@ -59,6 +59,7 @@ type SlackBotConfig struct {
 	BotToken          string
 	AppToken          string
 	AllowedChannelIDs []string
+	RespondToAll      bool // respond to all channel messages, not just @mentions
 }
 
 // GitSyncConfig holds the configuration for Git sync functionality.

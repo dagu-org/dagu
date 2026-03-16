@@ -46,6 +46,7 @@ type Config struct {
 	AppToken          string
 	AllowedChannelIDs []string
 	SafeMode          bool
+	RespondToAll      bool             // respond to all channel messages, not just @mentions
 	DAGRunStore       exec.DAGRunStore // optional: enables DAG run monitoring
 }
 
@@ -55,8 +56,11 @@ type messageRef struct {
 	timestamp string
 }
 
-// chatState tracks the agent session state for a single Slack channel.
+// chatState tracks the agent session state for a single conversation.
+// A conversation is either a DM channel or a specific thread in a channel.
 type chatState struct {
+	channelID       string // Slack channel ID
+	threadTS        string // thread parent timestamp (empty for DMs)
 	sessionID       string
 	ownerUserID     string // user ID that owns the session
 	subSessionID    string // session ID the subscription is listening to
@@ -72,7 +76,8 @@ type Bot struct {
 	agentAPI        AgentService
 	slackClient     *slack.Client
 	socketClient    *socketmode.Client
-	chats           sync.Map // channelID (string) -> *chatState
+	chats           sync.Map // conversationKey -> *chatState
+	activeThreads   sync.Map // "channelID:threadTS" -> true
 	allowedChannels map[string]struct{}
 	dagRunStore     exec.DAGRunStore
 	logger          *slog.Logger
@@ -187,12 +192,19 @@ func (b *Bot) handleEventsAPI(ctx context.Context, evt slackevents.EventsAPIEven
 		if !ok {
 			return
 		}
-		// Strip the bot mention from the text
 		text := stripBotMention(ev.Text)
 		if text == "" {
 			return
 		}
-		b.handleMessage(ctx, ev.Channel, ev.User, ev.TimeStamp, text)
+
+		// Determine thread TS: if already in a thread, use it;
+		// otherwise start a new thread from this message.
+		threadTS := ev.ThreadTimeStamp
+		if threadTS == "" {
+			threadTS = ev.TimeStamp
+		}
+
+		b.handleChannelMessage(ctx, ev.Channel, ev.User, ev.TimeStamp, threadTS, text)
 
 	case slackevents.Message:
 		ev, ok := evt.InnerEvent.Data.(*slackevents.MessageEvent)
@@ -203,92 +215,115 @@ func (b *Bot) handleEventsAPI(ctx context.Context, evt slackevents.EventsAPIEven
 		if ev.SubType != "" || ev.BotID != "" {
 			return
 		}
-		b.handleMessage(ctx, ev.Channel, ev.User, ev.TimeStamp, ev.Text)
+
+		// DMs: always respond.
+		if ev.ChannelType == "im" {
+			b.handleDMMessage(ctx, ev.Channel, ev.User, ev.TimeStamp, ev.Text)
+			return
+		}
+
+		// Channel thread reply: respond without @mention if bot is
+		// already participating in this thread.
+		if ev.ThreadTimeStamp != "" {
+			threadKey := ev.Channel + ":" + ev.ThreadTimeStamp
+			if _, ok := b.activeThreads.Load(threadKey); ok {
+				b.handleChannelMessage(ctx, ev.Channel, ev.User, ev.TimeStamp, ev.ThreadTimeStamp, ev.Text)
+				return
+			}
+		}
+
+		// respond_to_all: treat every channel message as a conversation.
+		if b.cfg.RespondToAll {
+			b.handleDMMessage(ctx, ev.Channel, ev.User, ev.TimeStamp, ev.Text)
+		}
 	}
 }
 
-// handleMessage processes an incoming Slack message.
-func (b *Bot) handleMessage(ctx context.Context, channelID, userID, msgTimestamp, text string) {
+// handleChannelMessage processes a message in a channel (from @mention or thread reply).
+func (b *Bot) handleChannelMessage(ctx context.Context, channelID, userID, msgTimestamp, threadTS, text string) {
 	if !b.isChannelAllowed(channelID) {
 		return
 	}
 
+	// Track this thread so future replies don't need @mention
+	threadKey := channelID + ":" + threadTS
+	b.activeThreads.Store(threadKey, true)
+
+	cs := b.getOrCreateChat(threadKey, channelID, threadTS)
+	b.processIncoming(ctx, cs, userID, msgTimestamp, text)
+}
+
+// handleDMMessage processes a direct message.
+func (b *Bot) handleDMMessage(ctx context.Context, channelID, userID, msgTimestamp, text string) {
+	cs := b.getOrCreateChat(channelID, channelID, "")
+	b.processIncoming(ctx, cs, userID, msgTimestamp, text)
+}
+
+// processIncoming is the core message handler shared by channel and DM flows.
+func (b *Bot) processIncoming(ctx context.Context, cs *chatState, userID, msgTimestamp, text string) {
 	if text == "" {
 		return
 	}
 
-	// Handle text commands (e.g., "new", "cancel")
-	if strings.HasPrefix(text, "new") || strings.HasPrefix(text, "cancel") {
-		b.handleTextCommand(ctx, channelID, userID, text)
+	// Handle text commands
+	if cmd := strings.Fields(text)[0]; cmd == "new" || cmd == "cancel" {
+		b.handleTextCommand(ctx, cs, cmd)
 		return
 	}
 
 	// Check if this is a response to a pending prompt
-	cs := b.getOrCreateChat(channelID)
 	cs.mu.Lock()
 	pendingPrompt := cs.pendingPromptID
 	cs.mu.Unlock()
 
 	if pendingPrompt != "" {
-		b.submitPromptResponse(ctx, cs, channelID, pendingPrompt, text)
+		b.submitPromptResponse(ctx, cs, pendingPrompt, text)
 		return
 	}
 
 	// Add a "thinking" reaction to the user's message
-	b.addReaction(channelID, msgTimestamp, "hourglass_flowing_sand")
+	b.addReaction(cs.channelID, msgTimestamp, "hourglass_flowing_sand")
 
-	// Send message to agent
 	user := b.userIdentity(userID)
 
-	// Store the message ref so the subscription can remove the reaction
-	// once the first response arrives.
 	cs.mu.Lock()
-	cs.pendingReaction = &messageRef{channel: channelID, timestamp: msgTimestamp}
+	cs.pendingReaction = &messageRef{channel: cs.channelID, timestamp: msgTimestamp}
 	cs.mu.Unlock()
 
 	if cs.sessionID == "" {
-		b.createSession(ctx, cs, channelID, user, text)
+		b.createSession(ctx, cs, user, text)
 	} else {
-		// Rotate session if approaching context limit
 		if b.shouldRotateSession(ctx, cs, user.UserID) {
-			b.rotateSession(ctx, cs, channelID, user, text)
+			b.rotateSession(ctx, cs, user, text)
 		} else {
-			b.sendAgentMessage(ctx, cs, channelID, user, text)
+			b.sendAgentMessage(ctx, cs, user, text)
 		}
 	}
 }
 
-// handleTextCommand processes text commands.
-func (b *Bot) handleTextCommand(ctx context.Context, channelID, userID, text string) {
-	cmd := strings.Fields(text)[0]
-
+// handleTextCommand processes text commands ("new", "cancel").
+func (b *Bot) handleTextCommand(ctx context.Context, cs *chatState, cmd string) {
 	switch cmd {
 	case "new":
-		cs := b.getOrCreateChat(channelID)
 		b.resetChat(cs)
-		b.sendText(channelID, "Session cleared. Send a message to start a new conversation.")
+		b.sendReply(cs, "Session cleared. Send a message to start a new conversation.")
 
 	case "cancel":
-		cs := b.getOrCreateChat(channelID)
 		cs.mu.Lock()
 		sid := cs.sessionID
 		ownerUID := cs.ownerUserID
 		cs.mu.Unlock()
 
 		if sid == "" {
-			b.sendText(channelID, "No active session.")
+			b.sendReply(cs, "No active session.")
 			return
 		}
 
 		if err := b.agentAPI.CancelSession(ctx, sid, ownerUID); err != nil {
-			b.sendText(channelID, "Failed to cancel session: "+err.Error())
+			b.sendReply(cs, "Failed to cancel session: "+err.Error())
 			return
 		}
-		b.sendText(channelID, "Session cancelled.")
-
-	default:
-		// Not a command, treat as normal message
-		b.handleMessage(ctx, channelID, userID, "", text)
+		b.sendReply(cs, "Session cancelled.")
 	}
 }
 
@@ -300,32 +335,33 @@ func (b *Bot) handleSlashCommand(ctx context.Context, cmd slack.SlashCommand) {
 		return
 	}
 
+	// Slash commands don't have thread context, so use channel-level state.
+	cs := b.getOrCreateChat(channelID, channelID, "")
+
 	switch cmd.Command {
 	case "/dagu-new":
-		cs := b.getOrCreateChat(channelID)
 		b.resetChat(cs)
-		b.sendText(channelID, "Session cleared. Send a message to start a new conversation.")
+		b.sendReply(cs, "Session cleared. Send a message to start a new conversation.")
 
 	case "/dagu-cancel":
-		cs := b.getOrCreateChat(channelID)
 		cs.mu.Lock()
 		sid := cs.sessionID
 		ownerUID := cs.ownerUserID
 		cs.mu.Unlock()
 
 		if sid == "" {
-			b.sendText(channelID, "No active session.")
+			b.sendReply(cs, "No active session.")
 			return
 		}
 
 		if err := b.agentAPI.CancelSession(ctx, sid, ownerUID); err != nil {
-			b.sendText(channelID, "Failed to cancel session: "+err.Error())
+			b.sendReply(cs, "Failed to cancel session: "+err.Error())
 			return
 		}
-		b.sendText(channelID, "Session cancelled.")
+		b.sendReply(cs, "Session cancelled.")
 
 	default:
-		b.sendText(channelID, "Unknown command. Use /dagu-new, /dagu-cancel, or just send a message.")
+		b.sendReply(cs, "Unknown command. Use /dagu-new, /dagu-cancel, or just send a message.")
 	}
 }
 
@@ -348,7 +384,14 @@ func (b *Bot) handleInteraction(ctx context.Context, callback slack.InteractionC
 	promptID := parts[1]
 	optionID := parts[2]
 
-	cs := b.getOrCreateChat(channelID)
+	// Determine conversation key from the message thread
+	threadTS := callback.Message.ThreadTimestamp
+	convKey := channelID
+	if threadTS != "" {
+		convKey = channelID + ":" + threadTS
+	}
+
+	cs := b.getOrCreateChat(convKey, channelID, threadTS)
 	cs.mu.Lock()
 	sid := cs.sessionID
 	ownerUID := cs.ownerUserID
@@ -371,7 +414,7 @@ func (b *Bot) handleInteraction(ctx context.Context, callback slack.InteractionC
 			slog.String("prompt", promptID),
 			slog.String("error", err.Error()),
 		)
-		b.sendText(channelID, fmt.Sprintf("Failed to submit response: %s", err.Error()))
+		b.sendReply(cs, fmt.Sprintf("Failed to submit response: %s", err.Error()))
 		return
 	}
 
@@ -386,8 +429,12 @@ func (b *Bot) handleInteraction(ctx context.Context, callback slack.InteractionC
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Agent session management
+// ---------------------------------------------------------------------------
+
 // createSession creates a new agent session and starts listening for responses.
-func (b *Bot) createSession(ctx context.Context, cs *chatState, channelID string, user agent.UserIdentity, text string) {
+func (b *Bot) createSession(ctx context.Context, cs *chatState, user agent.UserIdentity, text string) {
 	req := agent.ChatRequest{
 		Message:  text,
 		SafeMode: b.cfg.SafeMode,
@@ -396,7 +443,7 @@ func (b *Bot) createSession(ctx context.Context, cs *chatState, channelID string
 	sessionID, _, err := b.agentAPI.CreateSession(ctx, user, req)
 	if err != nil {
 		b.logger.Error("Failed to create session", slog.String("error", err.Error()))
-		b.sendText(channelID, "Failed to start session: "+err.Error())
+		b.sendReply(cs, "Failed to start session: "+err.Error())
 		return
 	}
 
@@ -405,11 +452,11 @@ func (b *Bot) createSession(ctx context.Context, cs *chatState, channelID string
 	cs.ownerUserID = user.UserID
 	cs.mu.Unlock()
 
-	b.startSubscription(ctx, cs, channelID, user.UserID, sessionID)
+	b.startSubscription(ctx, cs, user.UserID, sessionID)
 }
 
 // sendAgentMessage sends a message to an existing session.
-func (b *Bot) sendAgentMessage(ctx context.Context, cs *chatState, channelID string, user agent.UserIdentity, text string) {
+func (b *Bot) sendAgentMessage(ctx context.Context, cs *chatState, user agent.UserIdentity, text string) {
 	cs.mu.Lock()
 	sid := cs.sessionID
 	cs.mu.Unlock()
@@ -421,16 +468,15 @@ func (b *Bot) sendAgentMessage(ctx context.Context, cs *chatState, channelID str
 
 	if err := b.agentAPI.SendMessage(ctx, sid, user, req); err != nil {
 		b.logger.Error("Failed to send message", slog.String("error", err.Error()))
-		b.sendText(channelID, "Failed to send message: "+err.Error())
+		b.sendReply(cs, "Failed to send message: "+err.Error())
 		return
 	}
 
-	// Ensure a subscription is running
-	b.ensureSubscription(ctx, cs, channelID, user.UserID, sid)
+	b.ensureSubscription(ctx, cs, user.UserID, sid)
 }
 
 // submitPromptResponse submits a text response to a pending agent prompt.
-func (b *Bot) submitPromptResponse(ctx context.Context, cs *chatState, channelID, promptID, text string) {
+func (b *Bot) submitPromptResponse(ctx context.Context, cs *chatState, promptID, text string) {
 	cs.mu.Lock()
 	sid := cs.sessionID
 	ownerUserID := cs.ownerUserID
@@ -447,13 +493,17 @@ func (b *Bot) submitPromptResponse(ctx context.Context, cs *chatState, channelID
 	}
 
 	if err := b.agentAPI.SubmitUserResponse(ctx, sid, ownerUserID, resp); err != nil {
-		b.sendText(channelID, "Failed to submit response: "+err.Error())
+		b.sendReply(cs, "Failed to submit response: "+err.Error())
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Subscription management
+// ---------------------------------------------------------------------------
+
 // ensureSubscription starts a subscription only if one isn't already running
 // for the given session.
-func (b *Bot) ensureSubscription(ctx context.Context, cs *chatState, channelID, userID, sessionID string) {
+func (b *Bot) ensureSubscription(ctx context.Context, cs *chatState, userID, sessionID string) {
 	cs.mu.Lock()
 	if cs.subSessionID == sessionID && cs.subCancel != nil {
 		cs.mu.Unlock()
@@ -467,11 +517,11 @@ func (b *Bot) ensureSubscription(ctx context.Context, cs *chatState, channelID, 
 	cs.subSessionID = sessionID
 	cs.mu.Unlock()
 
-	go b.subscribeLoop(subCtx, cs, channelID, userID, sessionID)
+	go b.subscribeLoop(subCtx, cs, userID, sessionID)
 }
 
 // startSubscription cancels any existing subscription and starts a fresh one.
-func (b *Bot) startSubscription(ctx context.Context, cs *chatState, channelID, userID, sessionID string) {
+func (b *Bot) startSubscription(ctx context.Context, cs *chatState, userID, sessionID string) {
 	cs.mu.Lock()
 	if cs.subCancel != nil {
 		cs.subCancel()
@@ -481,12 +531,12 @@ func (b *Bot) startSubscription(ctx context.Context, cs *chatState, channelID, u
 	cs.subSessionID = sessionID
 	cs.mu.Unlock()
 
-	go b.subscribeLoop(subCtx, cs, channelID, userID, sessionID)
+	go b.subscribeLoop(subCtx, cs, userID, sessionID)
 }
 
 // subscribeLoop uses the agent's built-in pub-sub to receive session updates
 // in real time and forward them to Slack.
-func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, channelID, userID, sessionID string) {
+func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, userID, sessionID string) {
 	user := agent.UserIdentity{
 		UserID:   userID,
 		Username: "slack",
@@ -502,7 +552,7 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, channelID, userI
 		return
 	}
 
-	b.processStreamResponse(cs, channelID, snapshot)
+	b.processStreamResponse(cs, snapshot)
 
 	for {
 		resp, ok := next()
@@ -516,31 +566,30 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, channelID, userI
 			cs.mu.Unlock()
 			return
 		}
-		b.processStreamResponse(cs, channelID, resp)
+		b.processStreamResponse(cs, resp)
 	}
 }
 
 // processStreamResponse handles a stream response and sends relevant content to Slack.
-func (b *Bot) processStreamResponse(cs *chatState, channelID string, resp agent.StreamResponse) {
+func (b *Bot) processStreamResponse(cs *chatState, resp agent.StreamResponse) {
 	for _, msg := range resp.Messages {
 		switch msg.Type {
 		case agent.MessageTypeAssistant:
 			if msg.Content != "" {
-				// Remove the "thinking" reaction on first response
 				b.clearPendingReaction(cs)
-				b.sendLongText(channelID, msg.Content)
+				b.sendLongReply(cs, msg.Content)
 			}
 
 		case agent.MessageTypeError:
 			if msg.Content != "" {
 				b.clearPendingReaction(cs)
-				b.sendText(channelID, "Error: "+msg.Content)
+				b.sendReply(cs, "Error: "+msg.Content)
 			}
 
 		case agent.MessageTypeUserPrompt:
 			if msg.UserPrompt != nil {
 				b.clearPendingReaction(cs)
-				b.sendPrompt(cs, channelID, msg.UserPrompt)
+				b.sendPrompt(cs, msg.UserPrompt)
 			}
 
 		case agent.MessageTypeUser, agent.MessageTypeUIAction:
@@ -549,8 +598,12 @@ func (b *Bot) processStreamResponse(cs *chatState, channelID string, resp agent.
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Slack messaging helpers
+// ---------------------------------------------------------------------------
+
 // sendPrompt sends a user prompt with interactive buttons.
-func (b *Bot) sendPrompt(cs *chatState, channelID string, prompt *agent.UserPrompt) {
+func (b *Bot) sendPrompt(cs *chatState, prompt *agent.UserPrompt) {
 	cs.mu.Lock()
 	cs.pendingPromptID = prompt.PromptID
 	cs.mu.Unlock()
@@ -590,15 +643,63 @@ func (b *Bot) sendPrompt(cs *chatState, channelID string, prompt *agent.UserProm
 			slack.NewActionBlock("prompt_actions", buttons...),
 		}
 
-		_, _, err := b.slackClient.PostMessage(
-			channelID,
-			slack.MsgOptionBlocks(blocks...),
-		)
+		opts := []slack.MsgOption{slack.MsgOptionBlocks(blocks...)}
+		if cs.threadTS != "" {
+			opts = append(opts, slack.MsgOptionTS(cs.threadTS))
+		}
+
+		_, _, err := b.slackClient.PostMessage(cs.channelID, opts...)
 		if err != nil {
 			b.logger.Warn("Failed to send prompt", slog.String("error", err.Error()))
 		}
 	} else {
-		b.sendText(channelID, text)
+		b.sendReply(cs, text)
+	}
+}
+
+// sendLongReply sends a message, splitting it if it exceeds Slack's limit.
+func (b *Bot) sendLongReply(cs *chatState, text string) {
+	chunks := splitMessage(text, maxSlackMessageLen)
+	for _, chunk := range chunks {
+		b.sendReply(cs, chunk)
+	}
+}
+
+// sendReply sends a text message to the correct channel and thread.
+func (b *Bot) sendReply(cs *chatState, text string) {
+	opts := []slack.MsgOption{slack.MsgOptionText(text, false)}
+	if cs.threadTS != "" {
+		opts = append(opts, slack.MsgOptionTS(cs.threadTS))
+	}
+
+	_, _, err := b.slackClient.PostMessage(cs.channelID, opts...)
+	if err != nil {
+		b.logger.Warn("Failed to send Slack message",
+			slog.String("channel_id", cs.channelID),
+			slog.String("error", err.Error()),
+		)
+	}
+}
+
+// sendText sends a simple text message to a channel (used by monitor for notifications).
+func (b *Bot) sendText(channelID, text string) {
+	_, _, err := b.slackClient.PostMessage(
+		channelID,
+		slack.MsgOptionText(text, false),
+	)
+	if err != nil {
+		b.logger.Warn("Failed to send Slack message",
+			slog.String("channel_id", channelID),
+			slog.String("error", err.Error()),
+		)
+	}
+}
+
+// sendLongText sends a long message to a channel, splitting if needed (used by monitor).
+func (b *Bot) sendLongText(channelID, text string) {
+	chunks := splitMessage(text, maxSlackMessageLen)
+	for _, chunk := range chunks {
+		b.sendText(channelID, chunk)
 	}
 }
 
@@ -640,27 +741,9 @@ func (b *Bot) clearPendingReaction(cs *chatState) {
 	}
 }
 
-// sendLongText sends a message, splitting it if it exceeds Slack's limit.
-func (b *Bot) sendLongText(channelID, text string) {
-	chunks := splitMessage(text, maxSlackMessageLen)
-	for _, chunk := range chunks {
-		b.sendText(channelID, chunk)
-	}
-}
-
-// sendText sends a simple text message to a Slack channel.
-func (b *Bot) sendText(channelID, text string) {
-	_, _, err := b.slackClient.PostMessage(
-		channelID,
-		slack.MsgOptionText(text, false),
-	)
-	if err != nil {
-		b.logger.Warn("Failed to send Slack message",
-			slog.String("channel_id", channelID),
-			slog.String("error", err.Error()),
-		)
-	}
-}
+// ---------------------------------------------------------------------------
+// State management
+// ---------------------------------------------------------------------------
 
 // isChannelAllowed checks if a channel ID is authorized to use the bot.
 func (b *Bot) isChannelAllowed(channelID string) bool {
@@ -668,9 +751,13 @@ func (b *Bot) isChannelAllowed(channelID string) bool {
 	return ok
 }
 
-// getOrCreateChat returns or creates a chatState for the given channel ID.
-func (b *Bot) getOrCreateChat(channelID string) *chatState {
-	val, _ := b.chats.LoadOrStore(channelID, &chatState{})
+// getOrCreateChat returns or creates a chatState for the given conversation.
+// convKey is the map key (channelID for DMs, "channelID:threadTS" for threads).
+func (b *Bot) getOrCreateChat(convKey, channelID, threadTS string) *chatState {
+	val, _ := b.chats.LoadOrStore(convKey, &chatState{
+		channelID: channelID,
+		threadTS:  threadTS,
+	})
 	return val.(*chatState)
 }
 
@@ -708,35 +795,12 @@ func (b *Bot) userIdentityFromChannelID(channelID string) agent.UserIdentity {
 	}
 }
 
-// splitMessage splits text into chunks that fit within the Slack message limit.
-func splitMessage(text string, maxLen int) []string {
-	if len(text) <= maxLen {
-		return []string{text}
-	}
-
-	var chunks []string
-	for len(text) > 0 {
-		if len(text) <= maxLen {
-			chunks = append(chunks, text)
-			break
-		}
-
-		cut := maxLen
-		if idx := strings.LastIndex(text[:maxLen], "\n\n"); idx > maxLen/2 {
-			cut = idx + 2
-		} else if idx := strings.LastIndex(text[:maxLen], "\n"); idx > maxLen/2 {
-			cut = idx + 1
-		}
-
-		chunks = append(chunks, text[:cut])
-		text = text[cut:]
-	}
-
-	return chunks
-}
+// ---------------------------------------------------------------------------
+// Session rotation
+// ---------------------------------------------------------------------------
 
 // rotateSession creates a new session carrying forward recent context.
-func (b *Bot) rotateSession(ctx context.Context, cs *chatState, channelID string, user agent.UserIdentity, text string) {
+func (b *Bot) rotateSession(ctx context.Context, cs *chatState, user agent.UserIdentity, text string) {
 	cs.mu.Lock()
 	oldSID := cs.sessionID
 	cs.mu.Unlock()
@@ -747,7 +811,7 @@ func (b *Bot) rotateSession(ctx context.Context, cs *chatState, channelID string
 	}
 
 	b.resetChat(cs)
-	b.sendText(channelID, "(Session context limit reached — continuing with recent context carried forward)")
+	b.sendReply(cs, "(Session context limit reached — continuing with recent context carried forward)")
 
 	var message string
 	if summary != "" {
@@ -756,7 +820,7 @@ func (b *Bot) rotateSession(ctx context.Context, cs *chatState, channelID string
 		message = text
 	}
 
-	b.createSession(ctx, cs, channelID, user, message)
+	b.createSession(ctx, cs, user, message)
 }
 
 // buildSessionSummary extracts the last few assistant messages from a session.
@@ -827,6 +891,37 @@ func (b *Bot) shouldRotateSession(ctx context.Context, cs *chatState, userID str
 
 	limit := int(float64(defaultContextLimit) * contextRotationRatio)
 	return totalTokens > limit
+}
+
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
+
+// splitMessage splits text into chunks that fit within the Slack message limit.
+func splitMessage(text string, maxLen int) []string {
+	if len(text) <= maxLen {
+		return []string{text}
+	}
+
+	var chunks []string
+	for len(text) > 0 {
+		if len(text) <= maxLen {
+			chunks = append(chunks, text)
+			break
+		}
+
+		cut := maxLen
+		if idx := strings.LastIndex(text[:maxLen], "\n\n"); idx > maxLen/2 {
+			cut = idx + 2
+		} else if idx := strings.LastIndex(text[:maxLen], "\n"); idx > maxLen/2 {
+			cut = idx + 1
+		}
+
+		chunks = append(chunks, text[:cut])
+		text = text[cut:]
+	}
+
+	return chunks
 }
 
 // stripBotMention removes the bot mention prefix from a message text.
