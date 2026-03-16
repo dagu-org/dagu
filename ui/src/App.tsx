@@ -202,7 +202,12 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
       grayColor="slate"
       radius="large"
     >
-      <SWRConfig value={{ fetcher: fetchJson, onError: console.error }}>
+      <SWRConfig value={{
+        fetcher: fetchJson,
+        onError: console.error,
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }}>
         <AppBarContext.Provider
           value={{
             title,

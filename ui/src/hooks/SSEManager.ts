@@ -1,5 +1,4 @@
 import { getAuthHeaders, getAuthToken } from '@/lib/authHeaders';
-import { queuedFetch } from '@/lib/fetchQueue';
 
 const MAX_RETRY_DELAY_MS = 16000;
 const CONNECT_TIMEOUT_MS = 15000;
@@ -581,7 +580,7 @@ export class SSEManager {
 
     conn.mutationInFlight = true;
     try {
-      const response = await queuedFetch(
+      const response = await fetch(
         buildMutationUrl(conn.apiURL, conn.remoteNode),
         {
           method: 'POST',
