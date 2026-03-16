@@ -148,18 +148,46 @@ function mergeMessages(current: Message[], incoming: Message[]): Message[] {
     indexById.set(message.id, index);
   });
 
+  let requiresSort = false;
+  let lastAppendedSequence =
+    current.length > 0
+      ? current[current.length - 1]!.sequence_id
+      : Number.NEGATIVE_INFINITY;
+
   for (const message of incoming) {
     const existingIndex = indexById.get(message.id);
     if (existingIndex === undefined) {
       indexById.set(message.id, next.length);
       next.push(message);
+      if (message.sequence_id < lastAppendedSequence) {
+        requiresSort = true;
+      }
+      lastAppendedSequence = message.sequence_id;
       continue;
     }
+
+    const previousSequence =
+      existingIndex > 0
+        ? next[existingIndex - 1]!.sequence_id
+        : Number.NEGATIVE_INFINITY;
+    const followingSequence =
+      existingIndex < next.length - 1
+        ? next[existingIndex + 1]!.sequence_id
+        : Number.POSITIVE_INFINITY;
     next[existingIndex] = message;
+    if (
+      message.sequence_id < previousSequence ||
+      message.sequence_id > followingSequence
+    ) {
+      requiresSort = true;
+    }
   }
 
-  next.sort((left, right) => left.sequence_id - right.sequence_id);
-  return next;
+  if (!requiresSort) {
+    return next;
+  }
+
+  return next.sort((left, right) => left.sequence_id - right.sequence_id);
 }
 
 export function useAgentChat() {

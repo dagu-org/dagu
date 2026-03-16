@@ -108,6 +108,8 @@ export function useSSEConnection(
       if (!isCurrentConnection()) {
         return;
       }
+      // Keep the EventSource alive so the browser can apply its built-in
+      // reconnect policy while the polling fallback covers the gap.
       setIsSessionLive(false);
     };
 

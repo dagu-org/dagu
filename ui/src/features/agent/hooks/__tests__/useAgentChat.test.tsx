@@ -79,12 +79,12 @@ const testConfig: Config = {
   },
 };
 
-function makeApiMessage(id: string, content: string) {
+function makeApiMessage(id: string, content: string, sequenceId = 1) {
   return {
     id,
     sessionId: 'sess-1',
     type: 'assistant',
-    sequenceId: 1,
+    sequenceId,
     content,
     createdAt: '2026-03-13T00:00:00Z',
   };
@@ -313,7 +313,7 @@ describe('useAgentChat fallback polling', () => {
         if (request?.params?.path?.sessionId === 'sess-1') {
           return {
             data: makeSessionDetailResponse({
-              messages: [makeApiMessage('msg-1', 'initial snapshot')],
+              messages: [makeApiMessage('msg-1', 'initial snapshot', 1)],
             }),
           };
         }
@@ -348,11 +348,41 @@ describe('useAgentChat fallback polling', () => {
         {
           messages: [
             {
+              id: 'msg-3',
+              session_id: 'sess-1',
+              type: 'assistant',
+              sequence_id: 3,
+              content: 'streamed reply',
+              created_at: '2026-03-13T00:00:01Z',
+            },
+          ],
+        },
+        false
+      );
+      callbacks.onEvent(
+        {
+          messages: [
+            {
+              id: 'msg-3',
+              session_id: 'sess-1',
+              type: 'assistant',
+              sequence_id: 3,
+              content: 'streamed reply updated',
+              created_at: '2026-03-13T00:00:01Z',
+            },
+          ],
+        },
+        false
+      );
+      callbacks.onEvent(
+        {
+          messages: [
+            {
               id: 'msg-2',
               session_id: 'sess-1',
               type: 'assistant',
               sequence_id: 2,
-              content: 'streamed reply',
+              content: 'out-of-order reply',
               created_at: '2026-03-13T00:00:01Z',
             },
           ],
@@ -389,13 +419,127 @@ describe('useAgentChat fallback polling', () => {
       );
     });
 
-    expect(result.current.messages).toHaveLength(2);
-    expect(result.current.messages[1]?.content).toBe('streamed reply');
+    expect(result.current.messages).toHaveLength(3);
+    expect(result.current.messages.map((message) => message.id)).toEqual([
+      'msg-1',
+      'msg-2',
+      'msg-3',
+    ]);
+    expect(result.current.messages[1]?.content).toBe('out-of-order reply');
+    expect(result.current.messages[2]?.content).toBe('streamed reply updated');
     expect(result.current.delegateStatuses['delegate-1']?.status).toBe(
       'running'
     );
     expect(result.current.delegateMessages['delegate-1']?.[0]?.content).toBe(
       'delegate reply'
     );
+  });
+
+  it('heals correctly when polling updates state before the stream reconnect snapshot arrives', async () => {
+    mockedSSEStatus = {
+      isSessionLive: false,
+    };
+    useSSEConnectionMock.mockImplementation(() => mockedSSEStatus);
+
+    const sessionResponses = [
+      makeSessionDetailResponse({
+        messages: [makeApiMessage('msg-1', 'initial snapshot', 1)],
+      }),
+      makeSessionDetailResponse({
+        messages: [makeApiMessage('msg-2', 'polled snapshot', 2)],
+        working: true,
+      }),
+    ];
+    let sessionFetchCount = 0;
+
+    getMock.mockImplementation(
+      async (
+        _path: string,
+        request?: { params?: { path?: { sessionId?: string } } }
+      ) => {
+        if (request?.params?.path?.sessionId === 'sess-1') {
+          const idx = Math.min(sessionFetchCount, sessionResponses.length - 1);
+          sessionFetchCount += 1;
+          return { data: sessionResponses[idx] };
+        }
+        throw new Error('unexpected request');
+      }
+    );
+
+    const { result, rerender } = renderHook(() => useAgentChat(), {
+      wrapper: TestProviders,
+    });
+
+    await act(async () => {
+      await result.current.selectSession('sess-1');
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(result.current.messages.map((message) => message.id)).toEqual([
+      'msg-2',
+    ]);
+    expect(result.current.messages[0]?.content).toBe('polled snapshot');
+    expect(result.current.sessionState?.working).toBe(true);
+
+    mockedSSEStatus = {
+      isSessionLive: true,
+    };
+    rerender();
+
+    const latestCall =
+      useSSEConnectionMock.mock.calls[
+        useSSEConnectionMock.mock.calls.length - 1
+      ];
+    const callbacks = latestCall?.[3] as
+      | {
+          onEvent: (event: unknown, replace: boolean) => void;
+        }
+      | undefined;
+    expect(callbacks).toBeDefined();
+    if (!callbacks) {
+      throw new Error('expected agent stream callbacks');
+    }
+
+    act(() => {
+      callbacks.onEvent(
+        {
+          messages: [makeApiMessage('msg-3', 'reconnect snapshot', 3)],
+          session_state: {
+            session_id: 'sess-1',
+            working: false,
+            has_pending_prompt: false,
+            model: 'gpt-test',
+            total_cost: 0,
+          },
+        },
+        true
+      );
+      callbacks.onEvent(
+        {
+          messages: [
+            {
+              id: 'msg-4',
+              session_id: 'sess-1',
+              type: 'assistant',
+              sequence_id: 4,
+              content: 'post-reconnect delta',
+              created_at: '2026-03-13T00:00:03Z',
+            },
+          ],
+        },
+        false
+      );
+    });
+
+    expect(result.current.messages.map((message) => message.id)).toEqual([
+      'msg-3',
+      'msg-4',
+    ]);
+    expect(result.current.messages[0]?.content).toBe('reconnect snapshot');
+    expect(result.current.messages[1]?.content).toBe('post-reconnect delta');
+    expect(result.current.sessionState?.working).toBe(false);
   });
 });

@@ -57,7 +57,7 @@ describe('useSSEConnection', () => {
     vi.stubGlobal('EventSource', MockEventSource);
   });
 
-  it('marks the session live on open and treats the first event after each open as a snapshot replace', () => {
+  it('keeps native EventSource reconnect active and treats the first event after each open as a snapshot replace', () => {
     const onEvent = vi.fn();
     const onNavigate = vi.fn();
 
@@ -103,6 +103,7 @@ describe('useSSEConnection', () => {
     });
 
     expect(result.current.isSessionLive).toBe(false);
+    expect(eventSource.close).not.toHaveBeenCalled();
 
     act(() => {
       eventSource.open();
