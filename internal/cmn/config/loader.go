@@ -48,6 +48,10 @@ const (
 	// ServiceAgent is for the agent executor (runs DAGs).
 	// Requires: Core, Paths, Queues (to check if distributed execution is enabled)
 	ServiceAgent
+
+	// ServiceTelegram is the Telegram bot service.
+	// Requires: Core, Paths, Telegram config, and Proc for agent stores.
+	ServiceTelegram
 )
 
 // ConfigLoader reads and merges configuration from various sources.
@@ -103,9 +107,10 @@ const (
 	SectionTunnel                                // 512
 	SectionLicense                               // 1024
 	SectionProc                                  // 2048
+	SectionTelegram                              // 4096
 
 	// SectionAll combines all sections (useful for ServiceNone/CLI)
-	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel | SectionLicense | SectionProc
+	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel | SectionLicense | SectionProc | SectionTelegram
 )
 
 // serviceRequirements maps services to their required config sections using bitwise OR.
@@ -116,6 +121,7 @@ var serviceRequirements = map[Service]ConfigSection{
 	ServiceWorker:      SectionWorker | SectionCoordinator | SectionProc,
 	ServiceCoordinator: SectionCoordinator | SectionProc,
 	ServiceAgent:       SectionQueues | SectionProc,
+	ServiceTelegram:    SectionTelegram | SectionProc,
 }
 
 // requires checks if the loader's service requires the given config section.
@@ -259,6 +265,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		{SectionMonitoring, func() { l.loadMonitoringConfig(&cfg, def) }},
 		{SectionGitSync, func() { l.loadGitSyncConfig(&cfg, def) }},
 		{SectionTunnel, func() { l.loadTunnelConfig(&cfg, def) }},
+		{SectionTelegram, func() { l.loadTelegramConfig(&cfg, def) }},
 		{SectionLicense, func() { l.loadLicenseConfig(&cfg, def) }},
 	}
 
@@ -1075,6 +1082,30 @@ func (l *ConfigLoader) loadTunnelRateLimiting(cfg *Config, def Definition) {
 func setDefaultIfNotPositive(target *int, defaultValue int) {
 	if *target <= 0 {
 		*target = defaultValue
+	}
+}
+
+func (l *ConfigLoader) loadTelegramConfig(cfg *Config, def Definition) {
+	// Default safe mode to true
+	cfg.Telegram.SafeMode = true
+
+	// Check env var override for token
+	if token := l.v.GetString("telegram.token"); token != "" {
+		cfg.Telegram.Token = token
+	}
+
+	if def.Telegram == nil {
+		return
+	}
+
+	if cfg.Telegram.Token == "" {
+		cfg.Telegram.Token = def.Telegram.Token
+	}
+	if len(def.Telegram.AllowedChatIDs) > 0 {
+		cfg.Telegram.AllowedChatIDs = def.Telegram.AllowedChatIDs
+	}
+	if def.Telegram.SafeMode != nil {
+		cfg.Telegram.SafeMode = *def.Telegram.SafeMode
 	}
 }
 

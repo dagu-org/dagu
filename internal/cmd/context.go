@@ -298,6 +298,8 @@ func serviceForCommand(cmdName string) config.Service {
 		return config.ServiceCoordinator
 	case "start", "restart", "retry", "dry", "exec":
 		return config.ServiceAgent
+	case "telegram":
+		return config.ServiceTelegram
 	default:
 		// For all other commands (status, stop, validate, etc.), load all config
 		return config.ServiceNone
