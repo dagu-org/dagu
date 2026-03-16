@@ -19,13 +19,14 @@ import (
 // monitorPollInterval is how often the monitor checks for DAG run status changes.
 const monitorPollInterval = 10 * time.Second
 
-// notifyStatuses are the terminal statuses that trigger a notification.
+// notifyStatuses are the statuses that trigger a notification.
 var notifyStatuses = []core.Status{
 	core.Succeeded,
 	core.Failed,
 	core.Aborted,
 	core.PartiallySucceeded,
 	core.Rejected,
+	core.Waiting,
 }
 
 // DAGRunMonitor watches for DAG run completions and sends AI-generated
@@ -187,11 +188,18 @@ func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStat
 // buildNotificationPrompt creates a prompt for the AI agent to analyze
 // a completed DAG run and generate a user-friendly notification.
 func buildNotificationPrompt(s *exec.DAGRunStatus) string {
-	prompt := fmt.Sprintf(`A DAG run just completed. Please write a brief, helpful notification message for the user about this event. Keep it concise (2-4 sentences). Include the key facts and any actionable information.
+	var intro string
+	if s.Status == core.Waiting {
+		intro = "A DAG run is waiting for human approval. Please write a brief, urgent notification message for the user. Let them know which steps are waiting and that action is needed. Keep it concise (2-4 sentences)."
+	} else {
+		intro = "A DAG run just completed. Please write a brief, helpful notification message for the user about this event. Keep it concise (2-4 sentences). Include the key facts and any actionable information."
+	}
+
+	prompt := fmt.Sprintf(`%s
 
 DAG Name: %s
 Status: %s
-DAG Run ID: %s`, s.Name, s.Status.String(), s.DAGRunID)
+DAG Run ID: %s`, intro, s.Name, s.Status.String(), s.DAGRunID)
 
 	if s.Error != "" {
 		prompt += fmt.Sprintf("\nError: %s", s.Error)
@@ -291,13 +299,15 @@ func (m *DAGRunMonitor) broadcastToChats(text string) {
 
 // statusEmoji returns an emoji for the DAG run status.
 func statusEmoji(s core.Status) string {
-	switch s { //nolint:exhaustive // only terminal statuses are notified
+	switch s { //nolint:exhaustive // only notified statuses are handled
 	case core.Succeeded, core.PartiallySucceeded:
 		return "\u2705" // green check
 	case core.Failed, core.Rejected:
 		return "\u274C" // red X
 	case core.Aborted:
 		return "\u26A0\uFE0F" // warning
+	case core.Waiting:
+		return "\u23F3" // hourglass
 	default:
 		return "\u2139\uFE0F" // info
 	}
