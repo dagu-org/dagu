@@ -1,9 +1,13 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { Calendar, Check, Copy, RefreshCw, Server, Timer } from 'lucide-react';
 import React, { useCallback, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { components, Status } from '../../../../api/v1/schema';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
+import AutoRetryBadge from '../../../dag-runs/components/common/AutoRetryBadge';
 import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';
 import { DAGActions } from '../common';
 
@@ -239,6 +243,10 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
             <StatusChip status={dagRunToDisplay.status} size="md">
               {dagRunToDisplay.statusLabel || ''}
             </StatusChip>
+            <AutoRetryBadge
+              count={dagRunToDisplay.autoRetryCount}
+              limit={dagRunToDisplay.autoRetryLimit}
+            />
 
             <button
               onClick={handleRefresh}

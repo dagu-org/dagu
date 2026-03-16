@@ -57,4 +57,12 @@ message DAGRunIndexEntry {
   string schedule_time = 17;  // RFC 3339 string (matches DAGRunStatus.ScheduleTime)
   string attempt_id = 18;
   int32 auto_retry_count = 19;
+  string parent_dag_run_name = 20;
+  string parent_dag_run_id = 21;
+  int32 auto_retry_limit = 22;
+  int64 auto_retry_interval = 23;      // Duration in nanoseconds
+  double auto_retry_backoff = 24;
+  int64 auto_retry_max_interval = 25;  // Duration in nanoseconds
+  string proc_group = 26;
+  string suspend_flag_name = 27;
 }

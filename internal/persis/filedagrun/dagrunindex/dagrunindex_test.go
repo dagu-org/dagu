@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
@@ -118,6 +119,59 @@ func TestTryLoadForDay_ValidIndex(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, entries2, 10)
 	assert.True(t, fromIndex2)
+}
+
+func TestTryLoadForDay_PreservesRetryMetadata(t *testing.T) {
+	dayDir := t.TempDir()
+	runDir := filepath.Join(dayDir, "dag-run_20240115_120000Z_retry-run")
+	attemptDir := filepath.Join(runDir, "attempt_20240115_120000_001Z_abc123")
+	require.NoError(t, os.MkdirAll(attemptDir, 0750))
+
+	st := exec.DAGRunStatus{
+		Name:                 "retry-dag",
+		DAGRunID:             "retry-run",
+		AttemptID:            "abc123",
+		Status:               core.Failed,
+		StartedAt:            "2024-01-15T12:00:00Z",
+		FinishedAt:           "2024-01-15T12:01:00Z",
+		Parent:               exec.NewDAGRunRef("parent-dag", "parent-run"),
+		AutoRetryCount:       1,
+		AutoRetryLimit:       3,
+		AutoRetryInterval:    2 * time.Minute,
+		AutoRetryBackoff:     2.0,
+		AutoRetryMaxInterval: 10 * time.Minute,
+		ProcGroup:            "shared-queue",
+		SuspendFlagName:      "retry-dag",
+	}
+	data, err := json.Marshal(st)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(attemptDir, "status.jsonl"), append(data, '\n'), 0600))
+
+	// Add enough runs for the index to be written.
+	createDayDir(t, dayDir, 9, core.Succeeded)
+
+	entries, fromIndex, err := TryLoadForDay(dayDir, readDayDir(t, dayDir))
+	require.NoError(t, err)
+	require.True(t, fromIndex)
+	require.Len(t, entries, 10)
+
+	var found *Entry
+	for i := range entries {
+		if entries[i].DagRunID == "retry-run" {
+			found = &entries[i]
+			break
+		}
+	}
+	require.NotNil(t, found)
+	assert.Equal(t, "parent-dag", found.ParentName)
+	assert.Equal(t, "parent-run", found.ParentID)
+	assert.Equal(t, 1, found.AutoRetryCount)
+	assert.Equal(t, 3, found.AutoRetryLimit)
+	assert.Equal(t, 2*time.Minute, found.AutoRetryInterval)
+	assert.Equal(t, 2.0, found.AutoRetryBackoff)
+	assert.Equal(t, 10*time.Minute, found.AutoRetryMaxInterval)
+	assert.Equal(t, "shared-queue", found.ProcGroup)
+	assert.Equal(t, "retry-dag", found.SuspendFlagName)
 }
 
 func TestTryLoadForDay_StaleIndex_NewRun(t *testing.T) {

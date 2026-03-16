@@ -578,6 +578,27 @@ func TestListStatuses(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, statuses)
 	})
+
+	t.Run("IncludesAutoRetryLimit", func(t *testing.T) {
+		th := setupTestStore(t)
+
+		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+		dag := th.DAG("retry_dag")
+		dag.RetryPolicy = &core.DAGRetryPolicy{
+			Limit:       3,
+			Interval:    time.Minute,
+			Backoff:     2.0,
+			MaxInterval: 10 * time.Minute,
+		}
+
+		th.CreateAttemptWithDAG(t, ts, "retry-run", core.Failed, dag.DAG)
+
+		statuses, err := th.Store.ListStatuses(th.Context, exec.WithFrom(exec.NewUTC(ts)))
+		require.NoError(t, err)
+		require.Len(t, statuses, 1)
+		assert.Equal(t, 3, statuses[0].AutoRetryLimit)
+		assert.Equal(t, dag.ProcGroup(), statuses[0].ProcGroup)
+	})
 }
 
 func TestLatestStatusTimezone(t *testing.T) {

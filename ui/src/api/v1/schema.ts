@@ -2992,6 +2992,8 @@ export interface components {
             queuedAt?: string;
             /** @description Number of scheduler-issued DAG auto-retries already consumed for this DAG-run */
             autoRetryCount: number;
+            /** @description Configured DAG-level automatic retry limit captured for this DAG-run; null when DAG-level automatic retry is not configured */
+            autoRetryLimit?: number | null;
             /** @description RFC 3339 timestamp of when the DAG-run was scheduled to run */
             scheduleTime?: string;
             /** @description RFC 3339 timestamp when the DAG-run started */
