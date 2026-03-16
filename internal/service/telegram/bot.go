@@ -419,9 +419,6 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, chatID int64, us
 
 // processStreamResponse handles a stream response and sends relevant content to Telegram.
 func (b *Bot) processStreamResponse(cs *chatState, chatID int64, resp agent.StreamResponse) {
-	// Check if the session actually has a pending prompt right now.
-	hasPendingPrompt := resp.SessionState != nil && resp.SessionState.HasPendingPrompt
-
 	for _, msg := range resp.Messages {
 		switch msg.Type {
 		case agent.MessageTypeAssistant:
@@ -435,9 +432,7 @@ func (b *Bot) processStreamResponse(cs *chatState, chatID int64, resp agent.Stre
 			}
 
 		case agent.MessageTypeUserPrompt:
-			// Only show prompt buttons if the session currently has a pending prompt.
-			// This prevents re-showing prompts that were already answered.
-			if msg.UserPrompt != nil && hasPendingPrompt {
+			if msg.UserPrompt != nil {
 				b.sendPrompt(cs, chatID, msg.UserPrompt)
 			}
 
