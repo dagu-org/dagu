@@ -169,15 +169,15 @@ func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStat
 			slog.String("dag", s.Name),
 			slog.String("error", err.Error()),
 		)
-		// Fall back to a simple notification
-		m.sendFallbackNotification(s)
+		// Fall back to a simple notification with the error reason
+		m.sendFallbackNotification(s, fmt.Sprintf("(AI unavailable: %s)", err.Error()))
 		return
 	}
 
 	// Wait for the agent to generate a response
 	response := m.waitForAgentResponse(ctx, sessionID, user.UserID)
 	if response == "" {
-		m.sendFallbackNotification(s)
+		m.sendFallbackNotification(s, "(AI agent timed out)")
 		return
 	}
 
@@ -276,11 +276,14 @@ func (m *DAGRunMonitor) waitForAgentResponse(ctx context.Context, sessionID, use
 
 // sendFallbackNotification sends a simple non-AI notification when the agent
 // is unavailable or fails to generate a response.
-func (m *DAGRunMonitor) sendFallbackNotification(s *exec.DAGRunStatus) {
+func (m *DAGRunMonitor) sendFallbackNotification(s *exec.DAGRunStatus, reason string) {
 	emoji := statusEmoji(s.Status)
 	text := fmt.Sprintf("%s DAG '%s' %s", emoji, s.Name, s.Status.String())
 	if s.Error != "" {
 		text += "\nError: " + s.Error
+	}
+	if reason != "" {
+		text += "\n" + reason
 	}
 	m.broadcastToChats(text)
 }
