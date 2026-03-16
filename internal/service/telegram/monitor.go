@@ -233,7 +233,7 @@ DAG Run ID: %s`, intro, s.Name, s.Status.String(), s.DAGRunID)
 
 // waitForAgentResponse polls the agent session for a response with a timeout.
 func (m *DAGRunMonitor) waitForAgentResponse(ctx context.Context, sessionID, userID string) string {
-	timeout := time.After(60 * time.Second)
+	timeout := time.After(10 * time.Minute)
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
