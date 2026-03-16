@@ -26,7 +26,7 @@ func TestStartAllCommand(t *testing.T) {
 				"--coordinator.host=0.0.0.0",
 				fmt.Sprintf("--coordinator.port=%s", findPort(t)),
 			},
-			ExpectedOut: []string{"Server initialization", "Scheduler initialization", "Coordinator initialization"},
+			ExpectedOut: []string{"Server initialization", "Scheduler initialization", "Coordinator initialization", "Scheduler stopped"},
 		})
 
 	})

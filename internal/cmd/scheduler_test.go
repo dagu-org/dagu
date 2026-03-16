@@ -21,7 +21,7 @@ func TestSchedulerCommand(t *testing.T) {
 
 		th.RunCommand(t, cmd.Scheduler(), test.CmdTest{
 			Args:        []string{"scheduler"},
-			ExpectedOut: []string{"Scheduler started"},
+			ExpectedOut: []string{"Scheduler started", "Scheduler stopped"},
 		})
 	})
 	t.Run("StartSchedulerWithConfig", func(t *testing.T) {

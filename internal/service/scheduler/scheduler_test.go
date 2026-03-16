@@ -275,6 +275,76 @@ func TestScheduler_GracefulShutdown(t *testing.T) {
 	}
 }
 
+func TestScheduler_StopReleasesLock(t *testing.T) {
+	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	clock := func() time.Time { return now }
+
+	th := test.SetupScheduler(t)
+	ctx := context.Background()
+
+	// Start and stop first scheduler.
+	sc1, err := scheduler.New(th.Config, newMockJobManager(), th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
+	require.NoError(t, err)
+	sc1.SetClock(clock)
+
+	errCh := startSchedulerAsync(t, sc1, ctx)
+	stopSchedulerAndWait(t, sc1, errCh, ctx)
+
+	// A second scheduler must be able to acquire the lock immediately
+	// (no 30s stale wait) because Stop() released it.
+	sc2, err := scheduler.New(th.Config, newMockJobManager(), th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
+	require.NoError(t, err)
+	sc2.SetClock(clock)
+
+	errCh2 := startSchedulerAsync(t, sc2, ctx)
+	defer stopSchedulerAndWait(t, sc2, errCh2, ctx)
+}
+
+func TestScheduler_StopAfterContextCancellation(t *testing.T) {
+	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	clock := func() time.Time { return now }
+
+	th := test.SetupScheduler(t)
+
+	sc, err := scheduler.New(th.Config, newMockJobManager(), th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
+	require.NoError(t, err)
+	sc.SetClock(clock)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := startSchedulerAsync(t, sc, ctx)
+
+	// Cancel context first (simulates SIGINT in startall), then call Stop().
+	cancel()
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("scheduler Start() did not return after context cancellation")
+	}
+
+	// Stop() after Start() returned must still complete cleanup (lock release).
+	done := make(chan struct{})
+	go func() {
+		sc.Stop(context.Background())
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop() did not return within 5 seconds after context cancellation")
+	}
+
+	// Verify lock was released: a new scheduler can start immediately.
+	sc2, err := scheduler.New(th.Config, newMockJobManager(), th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
+	require.NoError(t, err)
+	sc2.SetClock(clock)
+
+	errCh2 := startSchedulerAsync(t, sc2, context.Background())
+	defer stopSchedulerAndWait(t, sc2, errCh2, context.Background())
+}
+
 func TestScheduler_StopWhileWaitingForLock(t *testing.T) {
 	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	clock := func() time.Time { return now }

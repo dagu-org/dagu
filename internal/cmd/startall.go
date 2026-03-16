@@ -220,6 +220,9 @@ func runStartAll(ctx *Context, _ []string) error {
 		coordHandler.Close(ctx)
 	}
 
+	// Stop scheduler to release lock, flush planner, clean up
+	scheduler.Stop(ctx)
+
 	// Stop resource service
 	if err := resourceService.Stop(ctx); err != nil {
 		logger.Error(ctx, "Failed to stop resource service", tag.Error(err))
