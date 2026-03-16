@@ -149,6 +149,11 @@ func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStat
 		slog.String("dag_run_id", s.DAGRunID),
 	)
 
+	if m.agentAPI == nil {
+		m.sendFallbackNotification(s, "")
+		return
+	}
+
 	// Build a prompt for the AI agent to generate a notification
 	prompt := buildNotificationPrompt(s)
 

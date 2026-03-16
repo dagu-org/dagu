@@ -840,6 +840,12 @@ func skipPathsMiddleware(mw func(http.Handler) http.Handler, skip map[string]str
 }
 
 // Serve starts the HTTP server and configures routes.
+// AgentAPI returns the server's agent API instance.
+// Returns nil if the agent feature is not configured.
+func (srv *Server) AgentAPI() *agent.API {
+	return srv.agentAPI
+}
+
 func (srv *Server) Serve(ctx context.Context) error {
 	r := chi.NewMux()
 	r.Use(middleware.RealIP)
