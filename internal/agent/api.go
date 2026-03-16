@@ -875,67 +875,6 @@ func (a *API) GetSessionDetail(ctx context.Context, sessionID, userID string) (*
 	}, nil
 }
 
-// AuthorizeSessionAccess validates that the current request context may access the session.
-func (a *API) AuthorizeSessionAccess(ctx context.Context, sessionID string) error {
-	userID, ok := getAuthenticatedUserIDFromContext(ctx)
-	if !ok {
-		return ErrSessionNotFound
-	}
-
-	if _, ok := a.getActiveSession(sessionID, userID); ok {
-		return nil
-	}
-
-	sess, err := a.getStoredSessionMetadata(ctx, sessionID)
-	if err != nil {
-		return err
-	}
-	if sess.UserID != userID {
-		return ErrSessionNotFound
-	}
-
-	return nil
-}
-
-// GetSessionSnapshot returns the current full session snapshot without re-checking ownership.
-// Callers must perform authorization before exposing this data to a client.
-func (a *API) GetSessionSnapshot(ctx context.Context, sessionID string) (*StreamResponse, error) {
-	if mgrValue, ok := a.sessions.Load(sessionID); ok {
-		if mgr, ok := mgrValue.(*SessionManager); ok {
-			snapshot := mgr.Snapshot()
-			return responseWithDelegates(
-				snapshot.StreamResponse(),
-				snapshot.Delegates,
-			), nil
-		}
-	}
-
-	sess, err := a.getStoredSessionMetadata(ctx, sessionID)
-	if err != nil {
-		return nil, err
-	}
-
-	messages, err := a.store.GetMessages(ctx, sessionID)
-	if err != nil {
-		return nil, err
-	}
-
-	delegates, err := a.getStoredDelegateSnapshots(ctx, sessionID)
-	if err != nil {
-		return nil, err
-	}
-
-	return &StreamResponse{
-		Messages: messages,
-		Session:  sess,
-		SessionState: &SessionState{
-			SessionID: sessionID,
-			Working:   false,
-		},
-		Delegates: delegates,
-	}, nil
-}
-
 func (a *API) getStoredDelegateSnapshots(ctx context.Context, sessionID string) ([]DelegateSnapshot, error) {
 	if a.store == nil {
 		return nil, ErrSessionNotFound

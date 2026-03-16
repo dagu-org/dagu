@@ -46,7 +46,6 @@ const (
 	TopicTypeDAGsList   TopicType = "dagslist"
 	TopicTypeDoc        TopicType = "doc"
 	TopicTypeDocTree    TopicType = "doctree"
-	TopicTypeAgent      TopicType = "agent"
 )
 
 // FetchFunc fetches data for a given identifier. The returned data is JSON

@@ -158,10 +158,6 @@ export function endpointToTopic(endpoint: string): string {
   throw new Error(`Unsupported SSE endpoint: ${endpoint}`);
 }
 
-export function buildAgentSessionTopic(sessionId: string): string {
-  return buildTopic('agent', sessionId);
-}
-
 function buildStreamUrl(
   apiURL: string,
   remoteNode: string,

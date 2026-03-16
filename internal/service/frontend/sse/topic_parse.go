@@ -69,7 +69,7 @@ func canonicalizeTopicIdentifier(topicType TopicType, identifier string) (string
 			return pathPart, nil
 		}
 		return pathPart + "?" + queryPart, nil
-	case TopicTypeDAGRun, TopicTypeDAG, TopicTypeDAGHistory, TopicTypeStepLog, TopicTypeQueueItems, TopicTypeDoc, TopicTypeAgent:
+	case TopicTypeDAGRun, TopicTypeDAG, TopicTypeDAGHistory, TopicTypeStepLog, TopicTypeQueueItems, TopicTypeDoc:
 		if identifier == "" {
 			return "", fmt.Errorf("topic %q requires an identifier", topicType)
 		}

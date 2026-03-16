@@ -85,18 +85,6 @@ func TestBuildRemoteURL(t *testing.T) {
 			expected: "http://remote:8080/api/v1/events/dag-runs/mydag/run123",
 		},
 		{
-			name:     "agent topic",
-			baseURL:  "http://remote:8080/api/v1",
-			topic:    "agent:sess-123",
-			expected: "http://remote:8080/api/v1/agent/sessions/sess-123/stream",
-		},
-		{
-			name:     "agent topic escapes reserved characters",
-			baseURL:  "http://remote:8080/api/v1",
-			topic:    "agent:a/b?x=y",
-			expected: "http://remote:8080/api/v1/agent/sessions/a%2Fb%3Fx=y/stream",
-		},
-		{
 			name:     "topic without colon (fallback)",
 			baseURL:  "http://remote:8080/api/v1",
 			topic:    "invalidtopic",
@@ -131,8 +119,6 @@ func TestBuildPathForTopic(t *testing.T) {
 		{TopicTypeQueues, "", "/events/queues"},
 		{TopicTypeDAGsList, "page=1", "/events/dags?page=1"},
 		{TopicTypeDAGsList, "", "/events/dags"},
-		{TopicTypeAgent, "sess-123", "/agent/sessions/sess-123/stream"},
-		{TopicTypeAgent, "a/b?x=y", "/agent/sessions/a%2Fb%3Fx=y/stream"},
 		{TopicType("unknown"), "identifier", "/events/unknown/identifier"},
 	}
 

@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SSEConnectionState } from '../SSEManager';
-import {
-  buildAgentSessionTopic,
-  endpointToTopic,
-  SSEManager,
-} from '../SSEManager';
+import { endpointToTopic, SSEManager } from '../SSEManager';
 
 class MockEventSource {
   static instances: MockEventSource[] = [];
@@ -91,12 +87,6 @@ describe('endpointToTopic', () => {
   });
 });
 
-describe('buildAgentSessionTopic', () => {
-  it('builds an agent topic key', () => {
-    expect(buildAgentSessionTopic('sess-123')).toBe('agent:sess-123');
-  });
-});
-
 describe('SSEManager', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -113,10 +103,10 @@ describe('SSEManager', () => {
   it('keeps a fresh topic pending until the server acknowledges the subscription', async () => {
     const manager = new SSEManager();
     const primaryStates: SSEConnectionState[] = [];
-    const delegateStates: SSEConnectionState[] = [];
+    const secondaryStates: SSEConnectionState[] = [];
 
     const unsubscribePrimary = manager.subscribeTopic(
-      'agent:sess-1',
+      'dag:test.yaml',
       'local',
       '/api/v1',
       {
@@ -133,7 +123,7 @@ describe('SSEManager', () => {
     }
     eventSource.emit('control', {
       sessionID: 'session-1',
-      subscribed: ['agent:sess-1'],
+      subscribed: ['dag:test.yaml'],
     });
 
     expect(lastState(primaryStates)).toMatchObject({
@@ -145,22 +135,22 @@ describe('SSEManager', () => {
       ok: true,
       status: 200,
       json: async () => ({
-        subscribed: ['agent:sess-1', 'agent:delegate-1'],
+        subscribed: ['dag:test.yaml', 'queueitems:default'],
         errors: [],
       }),
     } as Response);
 
-    const unsubscribeDelegate = manager.subscribeTopic(
-      'agent:delegate-1',
+    const unsubscribeSecondary = manager.subscribeTopic(
+      'queueitems:default',
       'local',
       '/api/v1',
       {
         onData: () => undefined,
-        onStateChange: (state) => delegateStates.push(snapshotState(state)),
+        onStateChange: (state) => secondaryStates.push(snapshotState(state)),
       }
     );
 
-    expect(lastState(delegateStates)).toMatchObject({
+    expect(lastState(secondaryStates)).toMatchObject({
       isConnected: false,
       isConnecting: true,
       shouldUseFallback: false,
@@ -168,22 +158,22 @@ describe('SSEManager', () => {
 
     await vi.advanceTimersByTimeAsync(200);
 
-    expect(lastState(delegateStates)).toMatchObject({
+    expect(lastState(secondaryStates)).toMatchObject({
       isConnected: true,
       isConnecting: false,
       shouldUseFallback: false,
     });
 
-    unsubscribeDelegate();
+    unsubscribeSecondary();
     unsubscribePrimary();
   });
 
   it('leaves rejected topics offline after the mutation response arrives', async () => {
     const manager = new SSEManager();
-    const delegateStates: SSEConnectionState[] = [];
+    const secondaryStates: SSEConnectionState[] = [];
 
     const unsubscribePrimary = manager.subscribeTopic(
-      'agent:sess-1',
+      'dag:test.yaml',
       'local',
       '/api/v1',
       {
@@ -199,17 +189,17 @@ describe('SSEManager', () => {
     }
     eventSource.emit('control', {
       sessionID: 'session-1',
-      subscribed: ['agent:sess-1'],
+      subscribed: ['dag:test.yaml'],
     });
 
     vi.mocked(fetch).mockResolvedValue({
       ok: false,
       status: 403,
       json: async () => ({
-        subscribed: ['agent:sess-1'],
+        subscribed: ['dag:test.yaml'],
         errors: [
           {
-            topic: 'agent:delegate-1',
+            topic: 'queueitems:default',
             code: 'unauthorized',
             message: 'forbidden',
           },
@@ -217,31 +207,31 @@ describe('SSEManager', () => {
       }),
     } as Response);
 
-    const unsubscribeDelegate = manager.subscribeTopic(
-      'agent:delegate-1',
+    const unsubscribeSecondary = manager.subscribeTopic(
+      'queueitems:default',
       'local',
       '/api/v1',
       {
         onData: () => undefined,
-        onStateChange: (state) => delegateStates.push(snapshotState(state)),
+        onStateChange: (state) => secondaryStates.push(snapshotState(state)),
       }
     );
 
     await vi.advanceTimersByTimeAsync(200);
 
-    expect(lastState(delegateStates)).toMatchObject({
+    expect(lastState(secondaryStates)).toMatchObject({
       isConnected: false,
       isConnecting: false,
       shouldUseFallback: false,
     });
 
-    unsubscribeDelegate();
+    unsubscribeSecondary();
     unsubscribePrimary();
   });
 
   it('ignores stale 404 mutation responses after a reconnect', async () => {
     const manager = new SSEManager();
-    const delegateStates: SSEConnectionState[] = [];
+    const secondaryStates: SSEConnectionState[] = [];
     let resolveFirstMutation:
       | ((value: Response | PromiseLike<Response>) => void)
       | undefined;
@@ -254,7 +244,7 @@ describe('SSEManager', () => {
     );
 
     const unsubscribePrimary = manager.subscribeTopic(
-      'agent:sess-1',
+      'dag:test.yaml',
       'local',
       '/api/v1',
       {
@@ -269,16 +259,16 @@ describe('SSEManager', () => {
     }
     firstEventSource.emit('control', {
       sessionID: 'session-1',
-      subscribed: ['agent:sess-1'],
+      subscribed: ['dag:test.yaml'],
     });
 
-    const unsubscribeDelegate = manager.subscribeTopic(
-      'agent:delegate-1',
+    const unsubscribeSecondary = manager.subscribeTopic(
+      'queueitems:default',
       'local',
       '/api/v1',
       {
         onData: () => undefined,
-        onStateChange: (state) => delegateStates.push(snapshotState(state)),
+        onStateChange: (state) => secondaryStates.push(snapshotState(state)),
       }
     );
 
@@ -292,7 +282,7 @@ describe('SSEManager', () => {
     }
     secondEventSource.emit('control', {
       sessionID: 'session-2',
-      subscribed: ['agent:sess-1', 'agent:delegate-1'],
+      subscribed: ['dag:test.yaml', 'queueitems:default'],
     });
 
     resolveFirstMutation?.({
@@ -306,18 +296,18 @@ describe('SSEManager', () => {
     await Promise.resolve();
 
     expect(secondEventSource.close).not.toHaveBeenCalled();
-    expect(lastState(delegateStates)).toMatchObject({
+    expect(lastState(secondaryStates)).toMatchObject({
       isConnected: true,
       isConnecting: false,
     });
 
-    unsubscribeDelegate();
+    unsubscribeSecondary();
     unsubscribePrimary();
   });
 
   it('ignores stale mutation payloads that refer to an older session', async () => {
     const manager = new SSEManager();
-    const delegateStates: SSEConnectionState[] = [];
+    const secondaryStates: SSEConnectionState[] = [];
     let resolveFirstMutation:
       | ((value: Response | PromiseLike<Response>) => void)
       | undefined;
@@ -330,7 +320,7 @@ describe('SSEManager', () => {
     );
 
     const unsubscribePrimary = manager.subscribeTopic(
-      'agent:sess-1',
+      'dag:test.yaml',
       'local',
       '/api/v1',
       {
@@ -345,16 +335,16 @@ describe('SSEManager', () => {
     }
     firstEventSource.emit('control', {
       sessionID: 'session-1',
-      subscribed: ['agent:sess-1'],
+      subscribed: ['dag:test.yaml'],
     });
 
-    const unsubscribeDelegate = manager.subscribeTopic(
-      'agent:delegate-1',
+    const unsubscribeSecondary = manager.subscribeTopic(
+      'queueitems:default',
       'local',
       '/api/v1',
       {
         onData: () => undefined,
-        onStateChange: (state) => delegateStates.push(snapshotState(state)),
+        onStateChange: (state) => secondaryStates.push(snapshotState(state)),
       }
     );
 
@@ -368,26 +358,26 @@ describe('SSEManager', () => {
     }
     secondEventSource.emit('control', {
       sessionID: 'session-2',
-      subscribed: ['agent:sess-1', 'agent:delegate-1'],
+      subscribed: ['dag:test.yaml', 'queueitems:default'],
     });
 
     resolveFirstMutation?.({
       ok: true,
       status: 200,
       json: async () => ({
-        subscribed: ['agent:sess-1'],
+        subscribed: ['dag:test.yaml'],
         errors: [],
       }),
     } as Response);
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(lastState(delegateStates)).toMatchObject({
+    expect(lastState(secondaryStates)).toMatchObject({
       isConnected: true,
       isConnecting: false,
     });
 
-    unsubscribeDelegate();
+    unsubscribeSecondary();
     unsubscribePrimary();
   });
 });

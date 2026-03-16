@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 )
@@ -118,8 +117,6 @@ func buildPathForTopic(topicType TopicType, identifier string) string {
 		return "/events/docs/" + identifier
 	case TopicTypeDocTree:
 		return pathWithOptionalQuery("/events/docs-tree", identifier)
-	case TopicTypeAgent:
-		return "/agent/sessions/" + url.PathEscape(identifier) + "/stream"
 	default:
 		return fmt.Sprintf("/events/%s/%s", topicType, identifier)
 	}
