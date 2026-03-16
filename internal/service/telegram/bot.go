@@ -23,6 +23,12 @@ import (
 // maxTelegramMessageLen is the maximum length for a single Telegram message.
 const maxTelegramMessageLen = 4096
 
+// defaultContextLimit is the assumed context window size when no model config is available.
+const defaultContextLimit = 200_000
+
+// contextRotationRatio is the fraction of the context limit at which sessions are rotated.
+const contextRotationRatio = 0.5
+
 // Config holds configuration for the Telegram bot.
 type Config struct {
 	Token          string
@@ -151,7 +157,17 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	if cs.sessionID == "" {
 		b.createSession(ctx, cs, chatID, user, text)
 	} else {
-		b.sendMessage(ctx, cs, chatID, user, text)
+		// Rotate session if approaching context limit
+		if b.shouldRotateSession(ctx, cs, user.UserID) {
+			b.sendText(chatID, "(Session rotated — context limit reached)")
+			b.resetChat(cs)
+		}
+
+		if cs.sessionID == "" {
+			b.createSession(ctx, cs, chatID, user, text)
+		} else {
+			b.sendMessage(ctx, cs, chatID, user, text)
+		}
 	}
 }
 
@@ -563,4 +579,36 @@ func splitMessage(text string, maxLen int) []string {
 	}
 
 	return chunks
+}
+
+// shouldRotateSession checks if the session's token usage has reached
+// 50% of the context limit and should be rotated to a fresh session.
+func (b *Bot) shouldRotateSession(ctx context.Context, cs *chatState, userID string) bool {
+	if b.agentAPI == nil {
+		return false
+	}
+
+	cs.mu.Lock()
+	sid := cs.sessionID
+	cs.mu.Unlock()
+
+	if sid == "" {
+		return false
+	}
+
+	detail, err := b.agentAPI.GetSessionDetail(ctx, sid, userID)
+	if err != nil || detail == nil {
+		return false
+	}
+
+	// Sum total tokens across all messages
+	var totalTokens int
+	for _, msg := range detail.Messages {
+		if msg.Usage != nil {
+			totalTokens += msg.Usage.TotalTokens
+		}
+	}
+
+	limit := int(float64(defaultContextLimit) * contextRotationRatio)
+	return totalTokens > limit
 }
