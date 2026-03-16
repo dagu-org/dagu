@@ -593,11 +593,11 @@ export class SSEManager {
         }
       );
 
-      const isStaleMutation =
+      const isStaleMutation = () =>
         conn.sessionId !== mutationSessionId ||
         conn.eventSource !== mutationEventSource;
 
-      if (isStaleMutation) {
+      if (isStaleMutation()) {
         return;
       }
 
@@ -615,6 +615,11 @@ export class SSEManager {
       const body = (await response.json()) as
         | TopicMutationResponse
         | { error?: string; message?: string };
+
+      if (isStaleMutation()) {
+        return;
+      }
+
       if (!response.ok && response.status !== 403) {
         throw new Error(
           'message' in body && typeof body.message === 'string'

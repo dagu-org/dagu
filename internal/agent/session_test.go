@@ -71,6 +71,23 @@ func TestNewSessionManager_ReconstructsTotalCostFromHistory(t *testing.T) {
 	assert.InDelta(t, 0.08, sm.GetTotalCost(), 1e-9)
 }
 
+func TestNewSessionManager_ReconstructsTotalCostIncludingDelegates(t *testing.T) {
+	t.Parallel()
+
+	msgCost := 0.05
+	sm := NewSessionManager(SessionManagerConfig{
+		History: []Message{
+			{Type: MessageTypeAssistant, Cost: &msgCost},
+		},
+		Delegates: []DelegateSnapshot{
+			{ID: "del-1", Cost: 0.03},
+			{ID: "del-2", Cost: 0.02},
+		},
+	})
+	// 0.05 (message) + 0.03 + 0.02 (delegates) = 0.10
+	assert.InDelta(t, 0.10, sm.GetTotalCost(), 1e-9)
+}
+
 func TestSessionManager_SetWorking(t *testing.T) {
 	t.Parallel()
 

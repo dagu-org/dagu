@@ -5,7 +5,7 @@ import { UserPrompt, UserPromptResponse } from '../types';
 
 interface UserPromptMessageProps {
   prompt: UserPrompt;
-  onRespond: (response: UserPromptResponse, displayValue: string) => void;
+  onRespond: (response: UserPromptResponse, displayValue: string) => Promise<void>;
   isAnswered: boolean;
   answeredValue?: string;
 }
@@ -63,34 +63,42 @@ export function UserPromptMessage({
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setIsSubmitting(true);
-    const response: UserPromptResponse = {
-      prompt_id: prompt.prompt_id,
-    };
+    try {
+      const response: UserPromptResponse = {
+        prompt_id: prompt.prompt_id,
+      };
 
-    let displayValue = '';
-    if (selectedOptions.size > 0) {
-      response.selected_option_ids = Array.from(selectedOptions);
-      const selectedLabels = prompt.options
-        ?.filter(opt => selectedOptions.has(opt.id))
-        .map(opt => opt.label) ?? [];
-      displayValue = selectedLabels.join(', ');
-    }
-    if (freeText) {
-      response.free_text_response = freeText;
-      displayValue = displayValue ? `${displayValue}; ${freeText}` : freeText;
-    }
+      let displayValue = '';
+      if (selectedOptions.size > 0) {
+        response.selected_option_ids = Array.from(selectedOptions);
+        const selectedLabels = prompt.options
+          ?.filter(opt => selectedOptions.has(opt.id))
+          .map(opt => opt.label) ?? [];
+        displayValue = selectedLabels.join(', ');
+      }
+      if (freeText) {
+        response.free_text_response = freeText;
+        displayValue = displayValue ? `${displayValue}; ${freeText}` : freeText;
+      }
 
-    onRespond(response, displayValue || 'Submitted');
+      await onRespond(response, displayValue || 'Submitted');
+    } catch {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
     setIsSubmitting(true);
-    onRespond({
-      prompt_id: prompt.prompt_id,
-      cancelled: true,
-    }, 'Skipped');
+    try {
+      await onRespond({
+        prompt_id: prompt.prompt_id,
+        cancelled: true,
+      }, 'Skipped');
+    } catch {
+      setIsSubmitting(false);
+    }
   };
 
   const canSubmit = selectedOptions.size > 0 || freeText.trim().length > 0;

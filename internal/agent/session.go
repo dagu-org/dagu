@@ -125,13 +125,16 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 
 	messages := copyMessages(cfg.History)
 
-	// Reconstruct accumulated cost from historical messages so that
-	// reactivated sessions display the correct total.
+	// Reconstruct accumulated cost from historical messages and delegate
+	// snapshots so that reactivated sessions display the correct total.
 	var totalCost float64
 	for _, msg := range messages {
 		if msg.Cost != nil {
 			totalCost += *msg.Cost
 		}
+	}
+	for _, d := range cfg.Delegates {
+		totalCost += d.Cost
 	}
 
 	now := time.Now()

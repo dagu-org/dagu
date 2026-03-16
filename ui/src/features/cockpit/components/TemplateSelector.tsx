@@ -29,7 +29,6 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const hasOpenedRef = useRef(false);
-  if (isOpen) hasOpenedRef.current = true;
 
   // Debounce search term
   useEffect(() => {
@@ -186,6 +185,7 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
   };
 
   const handleOpen = () => {
+    hasOpenedRef.current = true;
     setSearchTerm('');
     setDebouncedTerm('');
     setSelectedTags([]);

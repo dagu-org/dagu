@@ -252,7 +252,10 @@ export function useAgentChat() {
     const nextMessages = snapshot.messages || [];
     if (
       pendingUserMessage &&
-      (nextMessages.some((message) => message.type === 'user') ||
+      (nextMessages.some(
+        (message) =>
+          message.type === 'user' && message.content === pendingUserMessage
+      ) ||
         snapshot.session_state?.working)
     ) {
       setPendingUserMessage(null);

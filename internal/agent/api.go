@@ -620,7 +620,7 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		WorkingDir:         a.workingDir,
 		Title:              sess.Title,
 		CreatedAt:          sess.CreatedAt,
-		LastActivity:       sess.UpdatedAt,
+		LastActivity:       time.Now(),
 		OnMessage:          a.createMessageCallback(id),
 		History:            messages,
 		SequenceID:         seqID,

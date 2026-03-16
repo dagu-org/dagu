@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useCallback, useContext, useMemo } from 'react';
 import { useQuery } from '@/hooks/api';
 import { useDAGRunsListSSE } from '@/hooks/useDAGRunsListSSE';
@@ -89,7 +92,8 @@ export function useCockpitDagRuns(
   );
   const sseResult = useDAGRunsListSSE(sseParams, true);
 
-  // One SWR fetch for the full range
+  // One SWR fetch for the full range. keepPreviousData keeps existing
+  // boards visible while fetching a wider date range.
   const { data, mutate } = useQuery(
     '/dag-runs',
     {
@@ -102,7 +106,7 @@ export function useCockpitDagRuns(
         },
       },
     },
-    sseFallbackOptions(sseResult)
+    { ...sseFallbackOptions(sseResult), keepPreviousData: true }
   );
   useSSECacheSync(sseResult, mutate);
 
@@ -132,9 +136,11 @@ export function useCockpitDagRuns(
     }
 
     for (const run of allRuns) {
-      const startedAt = run.startedAt;
-      if (!startedAt) continue;
-      const ts = dayjs(startedAt).unix();
+      // For queued/not-started runs without startedAt, fall back to
+      // queuedAt or scheduleTime so they appear in the correct bucket.
+      const timeStr = run.startedAt || run.queuedAt || run.scheduleTime;
+      if (!timeStr) continue;
+      const ts = dayjs(timeStr).unix();
       for (const dateStr of loadedDates) {
         const bounds = dateBounds.get(dateStr)!;
         if (ts >= bounds.from && ts < bounds.to) {

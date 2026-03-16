@@ -17,6 +17,7 @@ import (
 // Sentinel errors for SSE operations.
 var (
 	ErrStreamingNotSupported = errors.New("streaming not supported")
+	ErrQueryTooLong          = errors.New("query string exceeds maximum length")
 )
 
 // Event type constants for SSE messages.
@@ -95,7 +96,6 @@ func streamResponse(w http.ResponseWriter, flusher http.Flusher, body io.Reader)
 		n, readErr := body.Read(buf)
 		if n > 0 {
 			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
-				_, _ = io.Copy(io.Discard, body) // Drain remaining to allow connection reuse
 				return
 			}
 			flusher.Flush()
@@ -124,7 +124,7 @@ func parseAndSanitizeQuery(rawQuery string) (string, error) {
 
 	result := values.Encode()
 	if len(result) > maxQueryLength {
-		return result[:maxQueryLength], nil
+		return "", ErrQueryTooLong
 	}
 	return result, nil
 }
