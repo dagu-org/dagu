@@ -329,7 +329,8 @@ func (b *Bot) startSubscription(ctx context.Context, cs *chatState, chatID int64
 
 // subscribeLoop listens for session updates and sends them to Telegram.
 func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, chatID int64, userID, sessionID string) {
-	// Get the session detail to check current state
+	// Get the initial snapshot to find the current sequence ID.
+	// We do NOT process historical messages — only new ones going forward.
 	detail, err := b.agentAPI.GetSessionDetail(ctx, sessionID, userID)
 	if err != nil {
 		b.logger.Warn("Failed to get session detail for subscription",
@@ -339,24 +340,14 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, chatID int64, us
 		return
 	}
 
-	// Process any existing messages from the snapshot
-	if detail != nil {
-		b.processStreamResponse(cs, chatID, agent.StreamResponse{
-			Messages:     detail.Messages,
-			SessionState: detail.SessionState,
-		})
-	}
-
-	// Poll for updates using GetSessionDetail periodically
-	// The agent API doesn't expose direct subscription access outside HTTP,
-	// so we poll for new messages.
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
+	// Start tracking from the current position so we only see new messages.
 	var lastSeqID int64
 	if detail != nil && len(detail.Messages) > 0 {
 		lastSeqID = detail.Messages[len(detail.Messages)-1].SequenceID
 	}
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
 
 	idleCount := 0
 	for {
@@ -365,14 +356,11 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, chatID int64, us
 			return
 		case <-ticker.C:
 			detail, err := b.agentAPI.GetSessionDetail(ctx, sessionID, userID)
-			if err != nil {
-				continue
-			}
-			if detail == nil {
+			if err != nil || detail == nil {
 				continue
 			}
 
-			// Find new messages
+			// Find new messages only
 			var newMsgs []agent.Message
 			for _, msg := range detail.Messages {
 				if msg.SequenceID > lastSeqID {
@@ -401,6 +389,9 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, chatID int64, us
 
 // processStreamResponse handles a stream response and sends relevant content to Telegram.
 func (b *Bot) processStreamResponse(cs *chatState, chatID int64, resp agent.StreamResponse) {
+	// Check if the session actually has a pending prompt right now.
+	hasPendingPrompt := resp.SessionState != nil && resp.SessionState.HasPendingPrompt
+
 	for _, msg := range resp.Messages {
 		switch msg.Type {
 		case agent.MessageTypeAssistant:
@@ -414,7 +405,9 @@ func (b *Bot) processStreamResponse(cs *chatState, chatID int64, resp agent.Stre
 			}
 
 		case agent.MessageTypeUserPrompt:
-			if msg.UserPrompt != nil {
+			// Only show prompt buttons if the session currently has a pending prompt.
+			// This prevents re-showing prompts that were already answered.
+			if msg.UserPrompt != nil && hasPendingPrompt {
 				b.sendPrompt(cs, chatID, msg.UserPrompt)
 			}
 
