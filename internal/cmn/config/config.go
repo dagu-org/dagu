@@ -37,6 +37,7 @@ type BotProvider string
 const (
 	BotProviderNone     BotProvider = ""
 	BotProviderTelegram BotProvider = "telegram"
+	BotProviderSlack    BotProvider = "slack"
 )
 
 // BotsConfig holds the configuration for bot integrations.
@@ -44,12 +45,21 @@ type BotsConfig struct {
 	Provider BotProvider
 	SafeMode bool
 	Telegram TelegramBotConfig
+	Slack    SlackBotConfig
 }
 
 // TelegramBotConfig holds the Telegram-specific bot configuration.
 type TelegramBotConfig struct {
 	Token          string
 	AllowedChatIDs []int64
+}
+
+// SlackBotConfig holds the Slack-specific bot configuration.
+type SlackBotConfig struct {
+	BotToken          string
+	AppToken          string
+	AllowedChannelIDs []string
+	RespondToAll      bool // respond to all channel messages, not just @mentions
 }
 
 // GitSyncConfig holds the configuration for Git sync functionality.

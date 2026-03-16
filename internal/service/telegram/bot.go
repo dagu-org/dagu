@@ -413,6 +413,13 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, chatID int64, us
 	for {
 		resp, ok := next()
 		if !ok {
+			// Session ended — clear the session ID so the next message
+			// creates a fresh session instead of reusing a dead one.
+			cs.mu.Lock()
+			if cs.sessionID == sessionID {
+				cs.sessionID = ""
+			}
+			cs.mu.Unlock()
 			return
 		}
 		b.processStreamResponse(cs, chatID, resp)

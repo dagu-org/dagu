@@ -415,15 +415,24 @@ type TunnelRateLimitDef struct {
 
 // BotsDef configures bot integrations.
 type BotsDef struct {
-	Provider string          `mapstructure:"provider"`  // "telegram", etc.
+	Provider string          `mapstructure:"provider"`  // "telegram", "slack", etc.
 	SafeMode *bool           `mapstructure:"safe_mode"` // Default: true
 	Telegram *TelegramBotDef `mapstructure:"telegram"`
+	Slack    *SlackBotDef    `mapstructure:"slack"`
 }
 
 // TelegramBotDef configures the Telegram bot.
 type TelegramBotDef struct {
 	Token          string  `mapstructure:"token"`
 	AllowedChatIDs []int64 `mapstructure:"allowed_chat_ids"`
+}
+
+// SlackBotDef configures the Slack bot.
+type SlackBotDef struct {
+	BotToken          string   `mapstructure:"bot_token"`
+	AppToken          string   `mapstructure:"app_token"`
+	AllowedChannelIDs []string `mapstructure:"allowed_channel_ids"`
+	RespondToAll      *bool    `mapstructure:"respond_to_all"` // Default: true
 }
 
 // -----------------------------------------------------------------------------

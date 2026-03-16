@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package telegram
+package slack
 
 import (
 	"context"
@@ -22,8 +22,7 @@ const monitorPollInterval = 10 * time.Second
 // seenEvictInterval is how often stale entries are purged from the seen map.
 const seenEvictInterval = 10 * time.Minute
 
-// seenTTL is how long a seen entry is kept before eviction. This must be
-// longer than the lookback window in checkForCompletions (1 hour).
+// seenTTL is how long a seen entry is kept before eviction.
 const seenTTL = 2 * time.Hour
 
 // notifyStatuses are the statuses that trigger a notification.
@@ -37,14 +36,13 @@ var notifyStatuses = []core.Status{
 }
 
 // DAGRunMonitor watches for DAG run completions and sends AI-generated
-// notifications via Telegram.
+// notifications via Slack.
 type DAGRunMonitor struct {
 	dagRunStore exec.DAGRunStore
 	agentAPI    AgentService
 	bot         *Bot
 	logger      *slog.Logger
 
-	// seen tracks DAG runs we've already notified about (dagRunID+attemptID -> true)
 	seen sync.Map
 }
 
@@ -58,13 +56,10 @@ func NewDAGRunMonitor(dagRunStore exec.DAGRunStore, agentAPI AgentService, bot *
 	}
 }
 
-// Run starts the monitor loop. It polls for completed DAG runs and sends
-// AI-generated notifications to all allowed Telegram chats.
+// Run starts the monitor loop.
 func (m *DAGRunMonitor) Run(ctx context.Context) {
 	m.logger.Info("DAG run monitor started")
 
-	// Seed the seen set with currently completed runs so we don't notify
-	// about old completions on startup.
 	m.seedSeen(ctx)
 
 	ticker := time.NewTicker(monitorPollInterval)
@@ -113,7 +108,6 @@ func (m *DAGRunMonitor) seedSeen(ctx context.Context) {
 // checkForCompletions polls for recently completed DAG runs and notifies.
 func (m *DAGRunMonitor) checkForCompletions(ctx context.Context) {
 	now := time.Now()
-	// Look at runs from the last hour to catch anything we might have missed
 	from := exec.NewUTC(now.Add(-1 * time.Hour))
 	to := exec.NewUTC(now)
 
@@ -137,23 +131,19 @@ func (m *DAGRunMonitor) checkForCompletions(ctx context.Context) {
 	}
 }
 
-// seenKey returns a unique key for a DAG run status.
 func seenKey(s *exec.DAGRunStatus) string {
 	return s.DAGRunID + ":" + s.AttemptID
 }
 
-// markSeen marks a DAG run as already notified.
 func (m *DAGRunMonitor) markSeen(s *exec.DAGRunStatus) {
 	m.seen.Store(seenKey(s), time.Now())
 }
 
-// isSeen checks if we've already sent a notification for this run.
 func (m *DAGRunMonitor) isSeen(s *exec.DAGRunStatus) bool {
 	_, ok := m.seen.Load(seenKey(s))
 	return ok
 }
 
-// evictStaleSeen removes entries from the seen map that are older than seenTTL.
 func (m *DAGRunMonitor) evictStaleSeen() {
 	cutoff := time.Now().Add(-seenTTL)
 	m.seen.Range(func(key, value any) bool {
@@ -164,9 +154,7 @@ func (m *DAGRunMonitor) evictStaleSeen() {
 	})
 }
 
-// notifyCompletion creates an agent session per chat to generate a notification
-// about a completed DAG run. The session is adopted by the chat so the user
-// can continue the conversation (e.g., ask follow-up questions about the run).
+// notifyCompletion creates an agent session per channel to generate a notification.
 func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStatus) bool {
 	m.logger.Info("DAG run completed, generating notification",
 		slog.String("dag", s.Name),
@@ -176,28 +164,26 @@ func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStat
 
 	if m.agentAPI == nil {
 		m.sendFallbackNotification(s, "")
-		return true // fallback always delivers
+		return true
 	}
 
-	if len(m.bot.allowedChats) == 0 {
-		m.logger.Warn("No allowed chats configured, cannot send notification")
+	if len(m.bot.allowedChannels) == 0 {
+		m.logger.Warn("No allowed channels configured, cannot send notification")
 		return false
 	}
 
 	prompt := buildNotificationPrompt(s)
 
-	// Create a separate session for each chat so each user can follow up.
-	for chatID := range m.bot.allowedChats {
-		m.notifyChat(ctx, chatID, s, prompt)
+	for channelID := range m.bot.allowedChannels {
+		m.notifyChannel(ctx, channelID, s, prompt)
 	}
 	return true // Mark as seen even on partial failure to avoid duplicates
 }
 
-// notifyChat creates an agent session for a specific chat, waits for the
+// notifyChannel creates an agent session for a specific channel, waits for the
 // response, sends it, and adopts the session so the user can follow up.
-// Returns true if the notification was delivered successfully.
-func (m *DAGRunMonitor) notifyChat(ctx context.Context, chatID int64, s *exec.DAGRunStatus, prompt string) bool {
-	user := m.bot.userIdentityFromChatID(chatID)
+func (m *DAGRunMonitor) notifyChannel(ctx context.Context, channelID string, s *exec.DAGRunStatus, prompt string) bool {
+	user := m.bot.userIdentityFromChannelID(channelID)
 
 	req := agent.ChatRequest{
 		Message:  prompt,
@@ -210,22 +196,19 @@ func (m *DAGRunMonitor) notifyChat(ctx context.Context, chatID int64, s *exec.DA
 			slog.String("dag", s.Name),
 			slog.String("error", err.Error()),
 		)
-		m.bot.sendText(chatID, fmt.Sprintf("%s DAG '%s' %s\n(AI unavailable: %s)",
+		m.bot.sendText(channelID, fmt.Sprintf("%s DAG '%s' %s\n(AI unavailable: %s)",
 			statusEmoji(s.Status), s.Name, s.Status.String(), err.Error()))
 		return false
 	}
 
-	// Wait for the agent to generate a response
 	response := m.waitForAgentResponse(ctx, sessionID, user.UserID)
 	if response == "" {
-		m.bot.sendText(chatID, fmt.Sprintf("%s DAG '%s' %s\n(AI agent timed out)",
+		m.bot.sendText(channelID, fmt.Sprintf("%s DAG '%s' %s\n(AI agent timed out)",
 			statusEmoji(s.Status), s.Name, s.Status.String()))
 		return false
 	}
 
-	// Adopt this session as the chat's active session so the user can
-	// send follow-up messages (e.g., "show me the logs", "retry it").
-	cs := m.bot.getOrCreateChat(chatID)
+	cs := m.bot.getOrCreateChat(channelID, channelID, "")
 	// Reset and set new session atomically to avoid races.
 	cs.mu.Lock()
 	if cs.subCancel != nil {
@@ -234,11 +217,12 @@ func (m *DAGRunMonitor) notifyChat(ctx context.Context, chatID int64, s *exec.DA
 	}
 	cs.subSessionID = ""
 	cs.pendingPromptID = ""
+	cs.thinkingMessage = nil
 	cs.sessionID = sessionID
 	cs.ownerUserID = user.UserID
 	cs.mu.Unlock()
 
-	m.bot.sendLongText(chatID, response)
+	m.bot.sendLongText(channelID, response)
 
 	// Don't start a subscription here — the notification session is already
 	// done, and subscribing would re-send the same response from the snapshot.
@@ -276,7 +260,6 @@ DAG Run ID: %s`, intro, s.Name, s.Status.String(), s.DAGRunID)
 		fmt.Fprintf(&prompt, "\nLog file: %s", s.Log)
 	}
 
-	// Include step summary
 	if len(s.Nodes) > 0 {
 		prompt.WriteString("\n\nStep results:")
 		for _, n := range s.Nodes {
@@ -299,10 +282,6 @@ func (m *DAGRunMonitor) waitForAgentResponse(ctx context.Context, sessionID, use
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
-	// Track the latest assistant content across all polls, not just within
-	// a single poll. The assistant message may arrive while Working is still
-	// true, and by the next poll (when Working is false) there are no new
-	// messages — so we must remember what we saw earlier.
 	var latestAssistant string
 
 	for {
@@ -320,19 +299,16 @@ func (m *DAGRunMonitor) waitForAgentResponse(ctx context.Context, sessionID, use
 				continue
 			}
 
-			// Scan all messages for the latest assistant content.
 			for _, msg := range detail.Messages {
 				if msg.Type == agent.MessageTypeAssistant && msg.Content != "" {
 					latestAssistant = msg.Content
 				}
 			}
 
-			// If agent is done working and we have a response, return it
 			if detail.SessionState != nil && !detail.SessionState.Working {
 				if latestAssistant != "" {
 					return latestAssistant
 				}
-				// Agent finished but produced no text — give up
 				m.logger.Warn("Agent finished without producing a text response",
 					slog.String("session", sessionID),
 				)
@@ -342,7 +318,7 @@ func (m *DAGRunMonitor) waitForAgentResponse(ctx context.Context, sessionID, use
 	}
 }
 
-// sendFallbackNotification sends a simple non-AI notification to all chats.
+// sendFallbackNotification sends a simple non-AI notification to all channels.
 func (m *DAGRunMonitor) sendFallbackNotification(s *exec.DAGRunStatus, reason string) {
 	emoji := statusEmoji(s.Status)
 	text := fmt.Sprintf("%s DAG '%s' %s", emoji, s.Name, s.Status.String())
@@ -352,12 +328,11 @@ func (m *DAGRunMonitor) sendFallbackNotification(s *exec.DAGRunStatus, reason st
 	if reason != "" {
 		text += "\n" + reason
 	}
-	for chatID := range m.bot.allowedChats {
-		m.bot.sendText(chatID, text)
+	for channelID := range m.bot.allowedChannels {
+		m.bot.sendText(channelID, text)
 	}
 }
 
-// statusEmoji returns an emoji for the DAG run status.
 func statusEmoji(s core.Status) string {
 	switch s { //nolint:exhaustive // only notified statuses are handled
 	case core.Succeeded, core.PartiallySucceeded:
