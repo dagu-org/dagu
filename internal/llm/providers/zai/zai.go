@@ -32,8 +32,9 @@ func init() {
 var _ llm.Provider = (*Provider)(nil)
 
 type Provider struct {
-	config     llm.Config
-	httpClient *llm.HTTPClient
+	config      llm.Config
+	httpClient  *llm.HTTPClient
+	headers map[string]string
 }
 
 // New creates a new Z.AI provider.
@@ -45,6 +46,9 @@ func New(cfg llm.Config) (llm.Provider, error) {
 	return &Provider{
 		config:     cfg,
 		httpClient: llm.NewHTTPClient(cfg),
+		headers: map[string]string{
+			"Authorization": "Bearer " + cfg.APIKey,
+		},
 	}, nil
 }
 
@@ -191,7 +195,9 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 	}
 
 	// Add thinking configuration if enabled.
-	// Z.AI uses {"thinking": {"type": "enabled"}} instead of OpenAI's reasoning field.
+	// Z.AI uses a binary toggle {"thinking": {"type": "enabled"}} instead of
+	// OpenAI's reasoning effort levels. Effort and BudgetTokens are not supported
+	// by the Z.AI API and are intentionally ignored here.
 	if req.Thinking != nil && req.Thinking.Enabled {
 		chatReq.Thinking = &thinkingRequest{Type: "enabled"}
 	}
@@ -200,13 +206,7 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 }
 
 func (p *Provider) doRequest(ctx context.Context, body []byte) (io.ReadCloser, error) {
-	return p.httpClient.Do(ctx, p.config.BaseURL+defaultChatEndpoint, body, p.authHeaders())
-}
-
-func (p *Provider) authHeaders() map[string]string {
-	return map[string]string{
-		"Authorization": "Bearer " + p.config.APIKey,
-	}
+	return p.httpClient.Do(ctx, p.config.BaseURL+defaultChatEndpoint, body, p.headers)
 }
 
 func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, events chan<- llm.StreamEvent) {
@@ -256,10 +256,14 @@ func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, event
 		if len(chunk.Choices) > 0 {
 			delta := chunk.Choices[0].Delta
 			// Z.AI sends thinking output in reasoning_content and main output in content.
-			// Emit both as delta text so thinking is visible in the stream.
-			combined := delta.ReasoningContent + delta.Content
-			if combined != "" {
-				events <- llm.StreamEvent{Delta: combined}
+			// Emit whichever is non-empty; avoid allocating a concatenation on every chunk.
+			switch {
+			case delta.ReasoningContent != "" && delta.Content != "":
+				events <- llm.StreamEvent{Delta: delta.ReasoningContent + delta.Content}
+			case delta.ReasoningContent != "":
+				events <- llm.StreamEvent{Delta: delta.ReasoningContent}
+			case delta.Content != "":
+				events <- llm.StreamEvent{Delta: delta.Content}
 			}
 		}
 	}
