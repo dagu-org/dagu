@@ -294,9 +294,11 @@ func (b *Bot) processIncoming(ctx context.Context, cs *chatState, convKey, userI
 	}
 
 	// Handle text commands
-	if cmd := strings.Fields(text)[0]; cmd == "new" || cmd == "cancel" {
-		b.handleTextCommand(ctx, cs, cmd)
-		return
+	if fields := strings.Fields(text); len(fields) > 0 {
+		if cmd := fields[0]; cmd == "new" || cmd == "cancel" {
+			b.handleTextCommand(ctx, cs, cmd)
+			return
+		}
 	}
 
 	// Check if this is a response to a pending prompt

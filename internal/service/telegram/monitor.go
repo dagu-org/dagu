@@ -187,13 +187,10 @@ func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStat
 	prompt := buildNotificationPrompt(s)
 
 	// Create a separate session for each chat so each user can follow up.
-	allDelivered := true
 	for chatID := range m.bot.allowedChats {
-		if !m.notifyChat(ctx, chatID, s, prompt) {
-			allDelivered = false
-		}
+		m.notifyChat(ctx, chatID, s, prompt)
 	}
-	return allDelivered
+	return true // Mark as seen even on partial failure to avoid duplicates
 }
 
 // notifyChat creates an agent session for a specific chat, waits for the
@@ -229,8 +226,14 @@ func (m *DAGRunMonitor) notifyChat(ctx context.Context, chatID int64, s *exec.DA
 	// Adopt this session as the chat's active session so the user can
 	// send follow-up messages (e.g., "show me the logs", "retry it").
 	cs := m.bot.getOrCreateChat(chatID)
-	m.bot.resetChat(cs)
+	// Reset and set new session atomically to avoid races.
 	cs.mu.Lock()
+	if cs.subCancel != nil {
+		cs.subCancel()
+		cs.subCancel = nil
+	}
+	cs.subSessionID = ""
+	cs.pendingPromptID = ""
 	cs.sessionID = sessionID
 	cs.ownerUserID = user.UserID
 	cs.mu.Unlock()

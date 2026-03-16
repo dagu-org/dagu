@@ -174,13 +174,10 @@ func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStat
 
 	prompt := buildNotificationPrompt(s)
 
-	allDelivered := true
 	for channelID := range m.bot.allowedChannels {
-		if !m.notifyChannel(ctx, channelID, s, prompt) {
-			allDelivered = false
-		}
+		m.notifyChannel(ctx, channelID, s, prompt)
 	}
-	return allDelivered
+	return true // Mark as seen even on partial failure to avoid duplicates
 }
 
 // notifyChannel creates an agent session for a specific channel, waits for the
@@ -212,8 +209,15 @@ func (m *DAGRunMonitor) notifyChannel(ctx context.Context, channelID string, s *
 	}
 
 	cs := m.bot.getOrCreateChat(channelID, channelID, "")
-	m.bot.resetChat(cs)
+	// Reset and set new session atomically to avoid races.
 	cs.mu.Lock()
+	if cs.subCancel != nil {
+		cs.subCancel()
+		cs.subCancel = nil
+	}
+	cs.subSessionID = ""
+	cs.pendingPromptID = ""
+	cs.thinkingMessage = nil
 	cs.sessionID = sessionID
 	cs.ownerUserID = user.UserID
 	cs.mu.Unlock()
