@@ -55,6 +55,8 @@ func runScheduler(ctx *Context, _ []string) error {
 		return fmt.Errorf("failed to initialize scheduler: %w", err)
 	}
 
+	defer scheduler.Stop(ctx)
+
 	if err := scheduler.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start scheduler in directory %s: %w",
 			ctx.Config.Paths.DAGsDir, err)
