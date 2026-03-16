@@ -166,6 +166,9 @@ func runServer(ctx *Context, _ []string) error {
 				}()
 				logger.Info(serviceCtx, "Slack bot started")
 			}
+
+		case config.BotProviderNone:
+			// No bot configured
 		}
 	}
 

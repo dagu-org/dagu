@@ -66,8 +66,8 @@ type chatState struct {
 	subSessionID    string // session ID the subscription is listening to
 	subCancel       context.CancelFunc
 	mu              sync.Mutex
-	pendingPromptID  string
-	thinkingMessage  *messageRef // "Thinking..." message to delete on first response
+	pendingPromptID string
+	thinkingMessage *messageRef // "Thinking..." message to delete on first response
 }
 
 // Bot is a Slack bot that forwards messages to the Dagu agent API.
@@ -160,7 +160,7 @@ func (b *Bot) Run(ctx context.Context) error {
 func (b *Bot) handleEvent(ctx context.Context, evt socketmode.Event) {
 	b.logger.Debug("Socket mode event", slog.String("event_type", string(evt.Type)))
 
-	switch evt.Type {
+	switch evt.Type { //nolint:exhaustive // only handling relevant event types
 	case socketmode.EventTypeEventsAPI:
 		eventsAPIEvent, ok := evt.Data.(slackevents.EventsAPIEvent)
 		if !ok {
@@ -184,6 +184,9 @@ func (b *Bot) handleEvent(ctx context.Context, evt socketmode.Event) {
 		}
 		b.socketClient.Ack(*evt.Request)
 		b.handleSlashCommand(ctx, cmd)
+
+	default:
+		// Ignore other socket mode events (connecting, hello, errors, etc.)
 	}
 }
 
@@ -191,7 +194,7 @@ func (b *Bot) handleEvent(ctx context.Context, evt socketmode.Event) {
 func (b *Bot) handleEventsAPI(ctx context.Context, evt slackevents.EventsAPIEvent) {
 	b.logger.Debug("Received event", slog.String("type", evt.InnerEvent.Type))
 
-	switch slackevents.EventsAPIType(evt.InnerEvent.Type) {
+	switch slackevents.EventsAPIType(evt.InnerEvent.Type) { //nolint:exhaustive // only handling relevant event types
 	case slackevents.AppMention:
 		ev, ok := evt.InnerEvent.Data.(*slackevents.AppMentionEvent)
 		if !ok {
@@ -257,6 +260,9 @@ func (b *Bot) handleEventsAPI(ctx context.Context, evt slackevents.EventsAPIEven
 				slog.Bool("channel_allowed", b.isChannelAllowed(ev.Channel)),
 			)
 		}
+
+	default:
+		// Ignore other Events API event types
 	}
 }
 
