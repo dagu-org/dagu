@@ -901,6 +901,9 @@ func (srv *Server) Serve(ctx context.Context) error {
 
 	addr := net.JoinHostPort(srv.config.Server.Host, strconv.Itoa(srv.config.Server.Port))
 	srv.httpServer = &http.Server{
+		BaseContext: func(net.Listener) context.Context {
+			return ctx
+		},
 		Handler:           r,
 		Addr:              addr,
 		ReadHeaderTimeout: 10 * time.Second,
