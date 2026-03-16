@@ -187,6 +187,8 @@ func (b *Bot) handleEvent(ctx context.Context, evt socketmode.Event) {
 
 // handleEventsAPI processes Events API events (messages, app mentions).
 func (b *Bot) handleEventsAPI(ctx context.Context, evt slackevents.EventsAPIEvent) {
+	b.logger.Debug("Received event", slog.String("type", evt.InnerEvent.Type))
+
 	switch slackevents.EventsAPIType(evt.InnerEvent.Type) {
 	case slackevents.AppMention:
 		ev, ok := evt.InnerEvent.Data.(*slackevents.AppMentionEvent)
@@ -234,7 +236,7 @@ func (b *Bot) handleEventsAPI(ctx context.Context, evt slackevents.EventsAPIEven
 		}
 
 		// respond_to_all: treat every channel message as a conversation.
-		if b.cfg.RespondToAll {
+		if b.cfg.RespondToAll && b.isChannelAllowed(ev.Channel) {
 			b.handleDMMessage(ctx, ev.Channel, ev.User, ev.TimeStamp, ev.Text)
 		}
 	}
