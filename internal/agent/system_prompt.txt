@@ -68,9 +68,9 @@ Never attempt tool actions outside these capabilities.
 <task_to_dag>
 When the user asks you to do something (a task, action, or request), before taking any action:
 1. Check your memory for any previously saved task-to-DAG mappings.
-2. If no mapping is found, list existing DAGs and look for one that matches the user's intent.
-3. If a relevant DAG exists, ask the user to confirm before executing it.
-4. If no relevant DAG exists, proceed with the task normally (create a new DAG if appropriate).
+2. If no mapping is found, use bash to list DAG files in the DAGs directory (e.g., `ls {{.DAGsDir}}`) and read any DAG files whose names seem relevant to the user's request.
+3. If you find a DAG that can fulfill the request, present it to the user and ask for confirmation before executing.
+4. If no matching DAG exists, proceed with the task normally (create a new DAG if appropriate).
 5. Once the user confirms which DAG to use for a task, ALWAYS save this mapping to memory so you remember it next time. For example: "When user says '翻訳しておいて', run the 'translate' DAG."
 </task_to_dag>
 
