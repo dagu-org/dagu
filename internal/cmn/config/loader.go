@@ -1119,6 +1119,26 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 			cfg.Bots.Telegram.AllowedChatIDs = def.Bots.Telegram.AllowedChatIDs
 		}
 	}
+
+	// Check env var override for Slack tokens
+	if botToken := l.v.GetString("bots.slack.bot_token"); botToken != "" {
+		cfg.Bots.Slack.BotToken = botToken
+	}
+	if appToken := l.v.GetString("bots.slack.app_token"); appToken != "" {
+		cfg.Bots.Slack.AppToken = appToken
+	}
+
+	if def.Bots.Slack != nil {
+		if cfg.Bots.Slack.BotToken == "" {
+			cfg.Bots.Slack.BotToken = def.Bots.Slack.BotToken
+		}
+		if cfg.Bots.Slack.AppToken == "" {
+			cfg.Bots.Slack.AppToken = def.Bots.Slack.AppToken
+		}
+		if len(def.Bots.Slack.AllowedChannelIDs) > 0 {
+			cfg.Bots.Slack.AllowedChannelIDs = def.Bots.Slack.AllowedChannelIDs
+		}
+	}
 }
 
 func (l *ConfigLoader) loadLicenseConfig(cfg *Config, def Definition) {
@@ -1568,6 +1588,9 @@ var envBindings = []envBinding{
 	{key: "bots.safe_mode", env: "BOTS_SAFE_MODE"},
 	{key: "bots.telegram.token", env: "BOTS_TELEGRAM_TOKEN"},
 	{key: "bots.telegram.allowed_chat_ids", env: "BOTS_TELEGRAM_ALLOWED_CHAT_IDS"},
+	{key: "bots.slack.bot_token", env: "BOTS_SLACK_BOT_TOKEN"},
+	{key: "bots.slack.app_token", env: "BOTS_SLACK_APP_TOKEN"},
+	{key: "bots.slack.allowed_channel_ids", env: "BOTS_SLACK_ALLOWED_CHANNEL_IDS"},
 
 	// License
 	{key: "license.key", env: "LICENSE_KEY"},

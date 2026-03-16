@@ -17,6 +17,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/frontend"
 	"github.com/dagu-org/dagu/internal/service/resource"
+	daguslack "github.com/dagu-org/dagu/internal/service/slack"
 	"github.com/dagu-org/dagu/internal/service/telegram"
 	"github.com/dagu-org/dagu/internal/tunnel"
 	"github.com/spf13/cobra"
@@ -118,26 +119,52 @@ func runServer(ctx *Context, _ []string) error {
 	}
 
 	// Start bot if a provider is configured and agent API is available.
-	if ctx.Config.Bots.Provider == config.BotProviderTelegram && agentAPI != nil {
-		tgBot, tgErr := telegram.New(
-			telegram.Config{
-				Token:          ctx.Config.Bots.Telegram.Token,
-				AllowedChatIDs: ctx.Config.Bots.Telegram.AllowedChatIDs,
-				SafeMode:       ctx.Config.Bots.SafeMode,
-				DAGRunStore:    ctx.DAGRunStore,
-			},
-			agentAPI,
-			slog.Default(),
-		)
-		if tgErr != nil {
-			logger.Warn(serviceCtx, "Failed to initialize Telegram bot", tag.Error(tgErr))
-		} else {
-			go func() {
-				if runErr := tgBot.Run(signalCtx); runErr != nil {
-					logger.Error(serviceCtx, "Telegram bot failed", tag.Error(runErr))
-				}
-			}()
-			logger.Info(serviceCtx, "Telegram bot started")
+	if agentAPI != nil {
+		switch ctx.Config.Bots.Provider {
+		case config.BotProviderTelegram:
+			tgBot, tgErr := telegram.New(
+				telegram.Config{
+					Token:          ctx.Config.Bots.Telegram.Token,
+					AllowedChatIDs: ctx.Config.Bots.Telegram.AllowedChatIDs,
+					SafeMode:       ctx.Config.Bots.SafeMode,
+					DAGRunStore:    ctx.DAGRunStore,
+				},
+				agentAPI,
+				slog.Default(),
+			)
+			if tgErr != nil {
+				logger.Warn(serviceCtx, "Failed to initialize Telegram bot", tag.Error(tgErr))
+			} else {
+				go func() {
+					if runErr := tgBot.Run(signalCtx); runErr != nil {
+						logger.Error(serviceCtx, "Telegram bot failed", tag.Error(runErr))
+					}
+				}()
+				logger.Info(serviceCtx, "Telegram bot started")
+			}
+
+		case config.BotProviderSlack:
+			slackBot, slackErr := daguslack.New(
+				daguslack.Config{
+					BotToken:          ctx.Config.Bots.Slack.BotToken,
+					AppToken:          ctx.Config.Bots.Slack.AppToken,
+					AllowedChannelIDs: ctx.Config.Bots.Slack.AllowedChannelIDs,
+					SafeMode:          ctx.Config.Bots.SafeMode,
+					DAGRunStore:       ctx.DAGRunStore,
+				},
+				agentAPI,
+				slog.Default(),
+			)
+			if slackErr != nil {
+				logger.Warn(serviceCtx, "Failed to initialize Slack bot", tag.Error(slackErr))
+			} else {
+				go func() {
+					if runErr := slackBot.Run(signalCtx); runErr != nil {
+						logger.Error(serviceCtx, "Slack bot failed", tag.Error(runErr))
+					}
+				}()
+				logger.Info(serviceCtx, "Slack bot started")
+			}
 		}
 	}
 
