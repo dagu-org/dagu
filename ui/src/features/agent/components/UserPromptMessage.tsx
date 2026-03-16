@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Check, MessageCircleQuestion, SkipForward } from 'lucide-react';
+import { Check, Loader2, MessageCircleQuestion, SkipForward } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserPrompt, UserPromptResponse } from '../types';
 
@@ -19,6 +19,7 @@ export function UserPromptMessage({
   const [selectedOptions, setSelectedOptions] = useState<Set<string>>(new Set());
   const [freeText, setFreeText] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(-1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -63,6 +64,7 @@ export function UserPromptMessage({
   };
 
   const handleSubmit = () => {
+    setIsSubmitting(true);
     const response: UserPromptResponse = {
       prompt_id: prompt.prompt_id,
     };
@@ -84,6 +86,7 @@ export function UserPromptMessage({
   };
 
   const handleSkip = () => {
+    setIsSubmitting(true);
     onRespond({
       prompt_id: prompt.prompt_id,
       cancelled: true,
@@ -213,19 +216,24 @@ export function UserPromptMessage({
         <div className="flex gap-1">
           <button
             onClick={handleSubmit}
-            disabled={!canSubmit}
+            disabled={!canSubmit || isSubmitting}
             className={cn(
-              'px-2 py-1 text-xs rounded transition-colors font-medium',
-              canSubmit
+              'px-2 py-1 text-xs rounded transition-colors font-medium flex items-center gap-1',
+              canSubmit && !isSubmitting
                 ? 'bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400'
                 : 'bg-muted text-muted-foreground cursor-not-allowed'
             )}
           >
-            Submit
+            {isSubmitting && <Loader2 className="h-3 w-3 animate-spin" />}
+            {isSubmitting ? 'Sending...' : 'Submit'}
           </button>
           <button
             onClick={handleSkip}
-            className="px-2 py-1 text-xs rounded border border-border hover:bg-muted transition-colors flex items-center gap-1"
+            disabled={isSubmitting}
+            className={cn(
+              'px-2 py-1 text-xs rounded border border-border transition-colors flex items-center gap-1',
+              isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted'
+            )}
           >
             <SkipForward className="h-3 w-3" />
             Skip

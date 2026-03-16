@@ -1,4 +1,5 @@
-import { AlertTriangle, Check, FolderOpen, Terminal, X } from 'lucide-react';
+import { useState } from 'react';
+import { AlertTriangle, Check, FolderOpen, Loader2, Terminal, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserPrompt, UserPromptResponse } from '../types';
 
@@ -15,7 +16,10 @@ export function CommandApprovalMessage({
   isAnswered,
   answeredValue,
 }: CommandApprovalMessageProps): React.ReactNode {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleApprove = () => {
+    setIsSubmitting(true);
     onRespond(
       {
         prompt_id: prompt.prompt_id,
@@ -26,6 +30,7 @@ export function CommandApprovalMessage({
   };
 
   const handleReject = () => {
+    setIsSubmitting(true);
     onRespond(
       {
         prompt_id: prompt.prompt_id,
@@ -94,13 +99,22 @@ export function CommandApprovalMessage({
         <div className="flex gap-1.5">
           <button
             onClick={handleApprove}
-            className="px-2 py-1 text-xs rounded font-medium bg-green-600 text-white hover:bg-green-700"
+            disabled={isSubmitting}
+            className={cn(
+              'px-2 py-1 text-xs rounded font-medium flex items-center gap-1',
+              isSubmitting ? 'bg-green-600/50 text-white cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'
+            )}
           >
-            Approve
+            {isSubmitting && <Loader2 className="h-3 w-3 animate-spin" />}
+            {isSubmitting ? 'Sending...' : 'Approve'}
           </button>
           <button
             onClick={handleReject}
-            className="px-2 py-1 text-xs rounded font-medium border border-border hover:bg-muted"
+            disabled={isSubmitting}
+            className={cn(
+              'px-2 py-1 text-xs rounded font-medium border border-border',
+              isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted'
+            )}
           >
             Reject
           </button>

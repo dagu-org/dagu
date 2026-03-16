@@ -251,10 +251,8 @@ export function useAgentChat() {
     const nextMessages = snapshot.messages || [];
     if (
       pendingUserMessage &&
-      nextMessages.some(
-        (message) =>
-          message.type === 'user' && message.content === pendingUserMessage
-      )
+      (nextMessages.some((message) => message.type === 'user') ||
+        snapshot.session_state?.working)
     ) {
       setPendingUserMessage(null);
     }
@@ -282,15 +280,18 @@ export function useAgentChat() {
     if (event.messages && event.messages.length > 0) {
       if (
         pendingUserMessage &&
-        event.messages.some(
-          (message) =>
-            message.type === 'user' && message.content === pendingUserMessage
-        )
+        event.messages.some((message) => message.type === 'user')
       ) {
         setPendingUserMessage(null);
       }
 
       setMessages((current) => mergeMessages(current, event.messages || []));
+    }
+
+    // Clear the pending message when the server acknowledges it is working,
+    // even if the user message hasn't appeared in the stream yet.
+    if (pendingUserMessage && event.session_state?.working) {
+      setPendingUserMessage(null);
     }
 
     if (event.session_state) {
