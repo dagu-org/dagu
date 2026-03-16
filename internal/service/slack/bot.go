@@ -49,6 +49,12 @@ type Config struct {
 	DAGRunStore       exec.DAGRunStore // optional: enables DAG run monitoring
 }
 
+// messageRef identifies a specific Slack message for reaction management.
+type messageRef struct {
+	channel   string
+	timestamp string
+}
+
 // chatState tracks the agent session state for a single Slack channel.
 type chatState struct {
 	sessionID       string
@@ -57,6 +63,7 @@ type chatState struct {
 	subCancel       context.CancelFunc
 	mu              sync.Mutex
 	pendingPromptID string
+	pendingReaction *messageRef // message awaiting reaction removal on first response
 }
 
 // Bot is a Slack bot that forwards messages to the Dagu agent API.
@@ -185,7 +192,7 @@ func (b *Bot) handleEventsAPI(ctx context.Context, evt slackevents.EventsAPIEven
 		if text == "" {
 			return
 		}
-		b.handleMessage(ctx, ev.Channel, ev.User, text)
+		b.handleMessage(ctx, ev.Channel, ev.User, ev.TimeStamp, text)
 
 	case slackevents.Message:
 		ev, ok := evt.InnerEvent.Data.(*slackevents.MessageEvent)
@@ -196,12 +203,12 @@ func (b *Bot) handleEventsAPI(ctx context.Context, evt slackevents.EventsAPIEven
 		if ev.SubType != "" || ev.BotID != "" {
 			return
 		}
-		b.handleMessage(ctx, ev.Channel, ev.User, ev.Text)
+		b.handleMessage(ctx, ev.Channel, ev.User, ev.TimeStamp, ev.Text)
 	}
 }
 
 // handleMessage processes an incoming Slack message.
-func (b *Bot) handleMessage(ctx context.Context, channelID, userID, text string) {
+func (b *Bot) handleMessage(ctx context.Context, channelID, userID, msgTimestamp, text string) {
 	if !b.isChannelAllowed(channelID) {
 		return
 	}
@@ -227,8 +234,17 @@ func (b *Bot) handleMessage(ctx context.Context, channelID, userID, text string)
 		return
 	}
 
+	// Add a "thinking" reaction to the user's message
+	b.addReaction(channelID, msgTimestamp, "hourglass_flowing_sand")
+
 	// Send message to agent
 	user := b.userIdentity(userID)
+
+	// Store the message ref so the subscription can remove the reaction
+	// once the first response arrives.
+	cs.mu.Lock()
+	cs.pendingReaction = &messageRef{channel: channelID, timestamp: msgTimestamp}
+	cs.mu.Unlock()
 
 	if cs.sessionID == "" {
 		b.createSession(ctx, cs, channelID, user, text)
@@ -272,7 +288,7 @@ func (b *Bot) handleTextCommand(ctx context.Context, channelID, userID, text str
 
 	default:
 		// Not a command, treat as normal message
-		b.handleMessage(ctx, channelID, userID, text)
+		b.handleMessage(ctx, channelID, userID, "", text)
 	}
 }
 
@@ -491,6 +507,13 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, channelID, userI
 	for {
 		resp, ok := next()
 		if !ok {
+			// Session ended — clear the session ID so the next message
+			// creates a fresh session instead of reusing a dead one.
+			cs.mu.Lock()
+			if cs.sessionID == sessionID {
+				cs.sessionID = ""
+			}
+			cs.mu.Unlock()
 			return
 		}
 		b.processStreamResponse(cs, channelID, resp)
@@ -503,16 +526,20 @@ func (b *Bot) processStreamResponse(cs *chatState, channelID string, resp agent.
 		switch msg.Type {
 		case agent.MessageTypeAssistant:
 			if msg.Content != "" {
+				// Remove the "thinking" reaction on first response
+				b.clearPendingReaction(cs)
 				b.sendLongText(channelID, msg.Content)
 			}
 
 		case agent.MessageTypeError:
 			if msg.Content != "" {
+				b.clearPendingReaction(cs)
 				b.sendText(channelID, "Error: "+msg.Content)
 			}
 
 		case agent.MessageTypeUserPrompt:
 			if msg.UserPrompt != nil {
+				b.clearPendingReaction(cs)
 				b.sendPrompt(cs, channelID, msg.UserPrompt)
 			}
 
@@ -575,6 +602,44 @@ func (b *Bot) sendPrompt(cs *chatState, channelID string, prompt *agent.UserProm
 	}
 }
 
+// addReaction adds an emoji reaction to a message.
+func (b *Bot) addReaction(channelID, timestamp, emoji string) {
+	if timestamp == "" {
+		return
+	}
+	if err := b.slackClient.AddReaction(emoji, slack.ItemRef{
+		Channel:   channelID,
+		Timestamp: timestamp,
+	}); err != nil {
+		b.logger.Debug("Failed to add reaction", slog.String("error", err.Error()))
+	}
+}
+
+// removeReaction removes an emoji reaction from a message.
+func (b *Bot) removeReaction(channelID, timestamp, emoji string) {
+	if timestamp == "" {
+		return
+	}
+	if err := b.slackClient.RemoveReaction(emoji, slack.ItemRef{
+		Channel:   channelID,
+		Timestamp: timestamp,
+	}); err != nil {
+		b.logger.Debug("Failed to remove reaction", slog.String("error", err.Error()))
+	}
+}
+
+// clearPendingReaction removes the "thinking" reaction if one is pending.
+func (b *Bot) clearPendingReaction(cs *chatState) {
+	cs.mu.Lock()
+	ref := cs.pendingReaction
+	cs.pendingReaction = nil
+	cs.mu.Unlock()
+
+	if ref != nil {
+		b.removeReaction(ref.channel, ref.timestamp, "hourglass_flowing_sand")
+	}
+}
+
 // sendLongText sends a message, splitting it if it exceeds Slack's limit.
 func (b *Bot) sendLongText(channelID, text string) {
 	chunks := splitMessage(text, maxSlackMessageLen)
@@ -622,6 +687,7 @@ func (b *Bot) resetChat(cs *chatState) {
 	cs.ownerUserID = ""
 	cs.subSessionID = ""
 	cs.pendingPromptID = ""
+	cs.pendingReaction = nil
 }
 
 // userIdentity creates a UserIdentity from a Slack user ID.

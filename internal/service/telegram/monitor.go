@@ -237,8 +237,9 @@ func (m *DAGRunMonitor) notifyChat(ctx context.Context, chatID int64, s *exec.DA
 
 	m.bot.sendLongText(chatID, response)
 
-	// Start subscription so any further agent activity is forwarded
-	m.bot.startSubscription(ctx, cs, chatID, user.UserID, sessionID)
+	// Don't start a subscription here — the notification session is already
+	// done, and subscribing would re-send the same response from the snapshot.
+	// If the user sends a follow-up, handleMessage will create a fresh session.
 	return true
 }
 

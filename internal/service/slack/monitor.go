@@ -220,7 +220,9 @@ func (m *DAGRunMonitor) notifyChannel(ctx context.Context, channelID string, s *
 
 	m.bot.sendLongText(channelID, response)
 
-	m.bot.startSubscription(ctx, cs, channelID, user.UserID, sessionID)
+	// Don't start a subscription here — the notification session is already
+	// done, and subscribing would re-send the same response from the snapshot.
+	// If the user sends a follow-up, handleMessage will create a fresh session.
 	return true
 }
 
