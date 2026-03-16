@@ -1120,6 +1120,9 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 		}
 	}
 
+	// Default Slack respond_to_all to true
+	cfg.Bots.Slack.RespondToAll = true
+
 	// Check env var override for Slack tokens
 	if botToken := l.v.GetString("bots.slack.bot_token"); botToken != "" {
 		cfg.Bots.Slack.BotToken = botToken
