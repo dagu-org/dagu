@@ -5,16 +5,19 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 	"os/signal"
 	"strconv"
 	"syscall"
 
+	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/frontend"
 	"github.com/dagu-org/dagu/internal/service/resource"
+	"github.com/dagu-org/dagu/internal/service/telegram"
 	"github.com/dagu-org/dagu/internal/tunnel"
 	"github.com/spf13/cobra"
 )
@@ -99,11 +102,43 @@ func runServer(ctx *Context, _ []string) error {
 		serverOpts = append(serverOpts, frontend.WithTunnelService(tunnelService))
 	}
 
+	// If Telegram is configured, capture the agent API via callback to start the bot.
+	var agentAPI *agent.API
+	if ctx.Config.Telegram.Token != "" {
+		serverOpts = append(serverOpts, frontend.WithAgentAPICallback(func(api *agent.API) {
+			agentAPI = api
+		}))
+	}
+
 	// Initialize server (includes auth setup). Use serviceCtx so auth providers can
 	// respond to termination signals during potentially slow network operations.
 	server, err := serviceCtx.NewServer(resourceService, serverOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
+	}
+
+	// Start Telegram bot if configured and agent API is available.
+	if ctx.Config.Telegram.Token != "" && agentAPI != nil {
+		tgBot, tgErr := telegram.New(
+			telegram.Config{
+				Token:          ctx.Config.Telegram.Token,
+				AllowedChatIDs: ctx.Config.Telegram.AllowedChatIDs,
+				SafeMode:       ctx.Config.Telegram.SafeMode,
+				DAGRunStore:    ctx.DAGRunStore,
+			},
+			agentAPI,
+			slog.Default(),
+		)
+		if tgErr != nil {
+			logger.Warn(serviceCtx, "Failed to initialize Telegram bot", tag.Error(tgErr))
+		} else {
+			go func() {
+				if runErr := tgBot.Run(signalCtx); runErr != nil {
+					logger.Error(serviceCtx, "Telegram bot failed", tag.Error(runErr))
+				}
+			}()
+			logger.Info(serviceCtx, "Telegram bot started")
+		}
 	}
 
 	// Start resource monitoring now that server initialization is complete.
