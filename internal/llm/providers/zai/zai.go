@@ -32,9 +32,9 @@ func init() {
 var _ llm.Provider = (*Provider)(nil)
 
 type Provider struct {
-	config      llm.Config
-	httpClient  *llm.HTTPClient
-	headers map[string]string
+	config     llm.Config
+	httpClient *llm.HTTPClient
+	headers    map[string]string
 }
 
 // New creates a new Z.AI provider.
@@ -80,8 +80,14 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 	}
 
 	choice := resp.Choices[0]
+	// Prepend reasoning content to the response when present so thinking
+	// output is not silently lost (ChatResponse has no separate field for it).
+	content := choice.Message.Content
+	if choice.Message.ReasoningContent != "" {
+		content = choice.Message.ReasoningContent + content
+	}
 	result := &llm.ChatResponse{
-		Content:      choice.Message.Content,
+		Content:      content,
 		FinishReason: choice.FinishReason,
 		Usage: llm.Usage{
 			PromptTokens:     resp.Usage.PromptTokens,
@@ -347,10 +353,11 @@ type chatCompletionResponse struct {
 }
 
 type responseMessage struct {
-	Role       string     `json:"role"`
-	Content    string     `json:"content"`
-	ToolCalls  []toolCall `json:"tool_calls,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
+	Role             string     `json:"role"`
+	Content          string     `json:"content"`
+	ReasoningContent string     `json:"reasoning_content,omitempty"`
+	ToolCalls        []toolCall `json:"tool_calls,omitempty"`
+	ToolCallID       string     `json:"tool_call_id,omitempty"`
 }
 
 type streamChunk struct {
