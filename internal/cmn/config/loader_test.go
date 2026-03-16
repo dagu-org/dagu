@@ -260,6 +260,9 @@ func TestLoad_Env(t *testing.T) {
 				BlockDurationSeconds: 1800,
 			},
 		},
+		Telegram: TelegramConfig{
+			SafeMode: true,
+		},
 		DefaultExecMode: ExecutionModeLocal,
 		Warnings:        nil,
 		Cache:           CacheModeNormal,
@@ -529,6 +532,9 @@ scheduler:
 		Monitoring: MonitoringConfig{
 			Retention: 24 * time.Hour,
 			Interval:  5 * time.Second,
+		},
+		Telegram: TelegramConfig{
+			SafeMode: true,
 		},
 		DefaultExecMode: ExecutionModeLocal,
 		Warnings:        nil,
