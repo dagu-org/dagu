@@ -66,8 +66,9 @@ type chatState struct {
 	subSessionID    string // session ID the subscription is listening to
 	subCancel       context.CancelFunc
 	mu              sync.Mutex
-	pendingPromptID string
-	pendingReaction *messageRef // message awaiting reaction removal on first response
+	pendingPromptID  string
+	pendingReaction  *messageRef // message awaiting reaction removal on first response
+	thinkingMessage  *messageRef // "Thinking..." message to delete on first response
 }
 
 // Bot is a Slack bot that forwards messages to the Dagu agent API.
@@ -281,13 +282,17 @@ func (b *Bot) processIncoming(ctx context.Context, cs *chatState, userID, msgTim
 		return
 	}
 
-	// Add a "thinking" reaction to the user's message
+	// Add a "thinking" reaction and post a typing indicator message
 	b.addReaction(cs.channelID, msgTimestamp, "hourglass_flowing_sand")
+	thinkingTS := b.postThinking(cs)
 
 	user := b.userIdentity(userID)
 
 	cs.mu.Lock()
 	cs.pendingReaction = &messageRef{channel: cs.channelID, timestamp: msgTimestamp}
+	if thinkingTS != "" {
+		cs.thinkingMessage = &messageRef{channel: cs.channelID, timestamp: thinkingTS}
+	}
 	cs.mu.Unlock()
 
 	if cs.sessionID == "" {
@@ -576,19 +581,19 @@ func (b *Bot) processStreamResponse(cs *chatState, resp agent.StreamResponse) {
 		switch msg.Type {
 		case agent.MessageTypeAssistant:
 			if msg.Content != "" {
-				b.clearPendingReaction(cs)
+				b.clearPendingIndicators(cs)
 				b.sendLongReply(cs, msg.Content)
 			}
 
 		case agent.MessageTypeError:
 			if msg.Content != "" {
-				b.clearPendingReaction(cs)
+				b.clearPendingIndicators(cs)
 				b.sendReply(cs, "Error: "+msg.Content)
 			}
 
 		case agent.MessageTypeUserPrompt:
 			if msg.UserPrompt != nil {
-				b.clearPendingReaction(cs)
+				b.clearPendingIndicators(cs)
 				b.sendPrompt(cs, msg.UserPrompt)
 			}
 
@@ -729,15 +734,38 @@ func (b *Bot) removeReaction(channelID, timestamp, emoji string) {
 	}
 }
 
-// clearPendingReaction removes the "thinking" reaction if one is pending.
-func (b *Bot) clearPendingReaction(cs *chatState) {
+// postThinking posts a "Thinking..." message and returns its timestamp.
+func (b *Bot) postThinking(cs *chatState) string {
+	opts := []slack.MsgOption{slack.MsgOptionText("_Thinking..._", false)}
+	if cs.threadTS != "" {
+		opts = append(opts, slack.MsgOptionTS(cs.threadTS))
+	}
+
+	_, ts, err := b.slackClient.PostMessage(cs.channelID, opts...)
+	if err != nil {
+		b.logger.Debug("Failed to post thinking message", slog.String("error", err.Error()))
+		return ""
+	}
+	return ts
+}
+
+// clearPendingIndicators removes the "thinking" reaction and deletes the
+// "Thinking..." message when the first response arrives.
+func (b *Bot) clearPendingIndicators(cs *chatState) {
 	cs.mu.Lock()
-	ref := cs.pendingReaction
+	reaction := cs.pendingReaction
 	cs.pendingReaction = nil
+	thinking := cs.thinkingMessage
+	cs.thinkingMessage = nil
 	cs.mu.Unlock()
 
-	if ref != nil {
-		b.removeReaction(ref.channel, ref.timestamp, "hourglass_flowing_sand")
+	if reaction != nil {
+		b.removeReaction(reaction.channel, reaction.timestamp, "hourglass_flowing_sand")
+	}
+	if thinking != nil {
+		if _, _, err := b.slackClient.DeleteMessage(thinking.channel, thinking.timestamp); err != nil {
+			b.logger.Debug("Failed to delete thinking message", slog.String("error", err.Error()))
+		}
 	}
 }
 
@@ -775,6 +803,7 @@ func (b *Bot) resetChat(cs *chatState) {
 	cs.subSessionID = ""
 	cs.pendingPromptID = ""
 	cs.pendingReaction = nil
+	cs.thinkingMessage = nil
 }
 
 // userIdentity creates a UserIdentity from a Slack user ID.
