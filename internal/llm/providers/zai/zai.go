@@ -220,7 +220,10 @@ func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, event
 	defer func() { _ = body.Close() }()
 
 	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
 	var usage *llm.Usage
+	var toolCalls []llm.ToolCall
+	var finishReason string
 
 	for scanner.Scan() {
 		select {
@@ -241,7 +244,7 @@ func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, event
 
 		data := strings.TrimPrefix(line, streamPrefix)
 		if data == streamDoneMarker {
-			events <- llm.StreamEvent{Done: true, Usage: usage}
+			events <- llm.StreamEvent{Done: true, Usage: usage, ToolCalls: toolCalls, FinishReason: finishReason}
 			return
 		}
 
@@ -260,7 +263,26 @@ func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, event
 		}
 
 		if len(chunk.Choices) > 0 {
-			delta := chunk.Choices[0].Delta
+			choice := chunk.Choices[0]
+			delta := choice.Delta
+
+			// Capture finish reason
+			if choice.FinishReason != "" {
+				finishReason = choice.FinishReason
+			}
+
+			// Accumulate streamed tool calls
+			for _, tc := range delta.ToolCalls {
+				toolCalls = append(toolCalls, llm.ToolCall{
+					ID:   tc.ID,
+					Type: tc.Type,
+					Function: llm.ToolCallFunction{
+						Name:      tc.Function.Name,
+						Arguments: tc.Function.Arguments,
+					},
+				})
+			}
+
 			// Z.AI sends thinking output in reasoning_content and main output in content.
 			// Emit whichever is non-empty; avoid allocating a concatenation on every chunk.
 			switch {
@@ -280,7 +302,7 @@ func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, event
 	}
 
 	// If we get here without [DONE], still signal completion
-	events <- llm.StreamEvent{Done: true, Usage: usage}
+	events <- llm.StreamEvent{Done: true, Usage: usage, ToolCalls: toolCalls, FinishReason: finishReason}
 }
 
 // API request/response types (OpenAI-compatible with Z.AI thinking extension)
@@ -368,9 +390,10 @@ type streamChunk struct {
 	Choices []struct {
 		Index int `json:"index"`
 		Delta struct {
-			Role             string `json:"role,omitempty"`
-			Content          string `json:"content,omitempty"`
-			ReasoningContent string `json:"reasoning_content,omitempty"`
+			Role             string     `json:"role,omitempty"`
+			Content          string     `json:"content,omitempty"`
+			ReasoningContent string     `json:"reasoning_content,omitempty"`
+			ToolCalls        []toolCall `json:"tool_calls,omitempty"`
 		} `json:"delta"`
 		FinishReason string `json:"finish_reason,omitempty"`
 	} `json:"choices"`
