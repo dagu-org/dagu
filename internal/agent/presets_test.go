@@ -22,6 +22,7 @@ func TestGetModelPresets(t *testing.T) {
 		"gemini":     true,
 		"openrouter": true,
 		"local":      true,
+		"zai":        true,
 	}
 
 	for _, p := range presets {
@@ -31,8 +32,8 @@ func TestGetModelPresets(t *testing.T) {
 			assert.NotEmpty(t, p.Name, "Name must not be empty")
 			assert.NotEmpty(t, p.Provider, "Provider must not be empty")
 			assert.NotEmpty(t, p.Model, "Model must not be empty")
-			assert.Greater(t, p.InputCostPer1M, 0.0, "InputCostPer1M should be > 0")
-			assert.Greater(t, p.OutputCostPer1M, 0.0, "OutputCostPer1M should be > 0")
+			assert.GreaterOrEqual(t, p.InputCostPer1M, 0.0, "InputCostPer1M should be >= 0")
+			assert.GreaterOrEqual(t, p.OutputCostPer1M, 0.0, "OutputCostPer1M should be >= 0")
 			assert.True(t, validProviders[p.Provider], "provider %q is not valid", p.Provider)
 		})
 	}

@@ -12484,21 +12484,24 @@ export enum ModelConfigResponseProvider {
     openai = "openai",
     gemini = "gemini",
     openrouter = "openrouter",
-    local = "local"
+    local = "local",
+    zai = "zai"
 }
 export enum CreateModelConfigRequestProvider {
     anthropic = "anthropic",
     openai = "openai",
     gemini = "gemini",
     openrouter = "openrouter",
-    local = "local"
+    local = "local",
+    zai = "zai"
 }
 export enum UpdateModelConfigRequestProvider {
     anthropic = "anthropic",
     openai = "openai",
     gemini = "gemini",
     openrouter = "openrouter",
-    local = "local"
+    local = "local",
+    zai = "zai"
 }
 export enum SkillResponseType {
     builtin = "builtin",
@@ -12513,7 +12516,8 @@ export enum ModelPresetProvider {
     openai = "openai",
     gemini = "gemini",
     openrouter = "openrouter",
-    local = "local"
+    local = "local",
+    zai = "zai"
 }
 export enum AgentUserPromptPromptType {
     general = "general",

@@ -36,6 +36,7 @@ const LLM_PROVIDERS = [
   { value: 'gemini', label: 'Google Gemini' },
   { value: 'openrouter', label: 'OpenRouter' },
   { value: 'local', label: 'Local' },
+  { value: 'zai', label: 'Z.AI' },
 ];
 
 interface ModelFormModalProps {
