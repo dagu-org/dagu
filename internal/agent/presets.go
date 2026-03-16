@@ -68,6 +68,20 @@ var modelPresets = []ModelConfig{
 		ContextWindow: 1_048_576, MaxOutputTokens: 65_536,
 		InputCostPer1M: 0.30, OutputCostPer1M: 2.50, SupportsThinking: true,
 		Description: "Stable and fast with thinking. 1M context."},
+	// --- Z.AI ---
+	// https://docs.z.ai/guides/overview/pricing
+	{Name: "GLM-5", Provider: "zai", Model: "glm-5",
+		ContextWindow: 200_000, MaxOutputTokens: 128_000,
+		InputCostPer1M: 1, OutputCostPer1M: 3.2, SupportsThinking: true,
+		Description: "Z.AI flagship. 200K context with deep thinking."},
+	{Name: "GLM-4.6", Provider: "zai", Model: "glm-4.6",
+		ContextWindow: 200_000, MaxOutputTokens: 128_000,
+		InputCostPer1M: 0.6, OutputCostPer1M: 2.2, SupportsThinking: true,
+		Description: "Strong reasoning and coding. 200K context."},
+	{Name: "GLM-4.7-Flash", Provider: "zai", Model: "glm-4.7-flash",
+		ContextWindow: 200_000, MaxOutputTokens: 128_000,
+		InputCostPer1M: 0, OutputCostPer1M: 0, SupportsThinking: false,
+		Description: "Free tier. Fast responses."},
 }
 
 // GetModelPresets returns a copy of the built-in model presets.

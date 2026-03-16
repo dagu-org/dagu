@@ -31,6 +31,7 @@ const PROVIDERS = [
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'gemini', label: 'Google Gemini' },
+  { value: 'zai', label: 'Z.AI' },
 ] as const;
 
 function generateSlugId(name: string): string {
@@ -189,6 +190,7 @@ export default function SetupPage() {
         CreateModelConfigRequestProvider.anthropic,
         CreateModelConfigRequestProvider.openai,
         CreateModelConfigRequestProvider.gemini,
+        CreateModelConfigRequestProvider.zai,
       ] as const;
       const isValidProvider = (v: string): v is CreateModelConfigRequestProvider =>
         (supportedProviders as readonly string[]).includes(v);

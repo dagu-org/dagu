@@ -1,9 +1,10 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package local provides an LLM provider implementation for local OpenAI-compatible servers.
-// This includes Ollama, vLLM, llama.cpp server, LocalAI, and other compatible implementations.
-package local
+// Package zai provides an LLM provider implementation for Z.AI's API.
+// Z.AI offers GLM-series models via an OpenAI-compatible API with
+// custom thinking support.
+package zai
 
 import (
 	"bufio"
@@ -17,36 +18,37 @@ import (
 )
 
 const (
-	providerName        = "local"
+	providerName        = "zai"
 	defaultChatEndpoint = "/chat/completions"
 	streamPrefix        = "data: "
 	streamDoneMarker    = "[DONE]"
 )
 
 func init() {
-	llm.RegisterProvider(llm.ProviderLocal, New)
+	llm.RegisterProvider(llm.ProviderZAI, New)
 }
 
-// Provider implements the llm.Provider interface for local OpenAI-compatible servers.
+// Provider implements the llm.Provider interface for Z.AI.
 var _ llm.Provider = (*Provider)(nil)
 
 type Provider struct {
 	config     llm.Config
 	httpClient *llm.HTTPClient
+	headers    map[string]string
 }
 
-// New creates a new local provider.
-// Unlike cloud providers, local providers don't require an API key.
+// New creates a new Z.AI provider.
 func New(cfg llm.Config) (llm.Provider, error) {
-	// Local providers don't require API key
-	// BaseURL should be set; use default if not provided
-	if cfg.BaseURL == "" {
-		cfg.BaseURL = llm.DefaultBaseURL(llm.ProviderLocal)
+	if cfg.APIKey == "" {
+		return nil, llm.ErrNoAPIKey
 	}
 
 	return &Provider{
 		config:     cfg,
 		httpClient: llm.NewHTTPClient(cfg),
+		headers: map[string]string{
+			"Authorization": "Bearer " + cfg.APIKey,
+		},
 	}, nil
 }
 
@@ -78,8 +80,14 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 	}
 
 	choice := resp.Choices[0]
+	// Prepend reasoning content to the response when present so thinking
+	// output is not silently lost (ChatResponse has no separate field for it).
+	content := choice.Message.Content
+	if choice.Message.ReasoningContent != "" {
+		content = choice.Message.ReasoningContent + content
+	}
 	result := &llm.ChatResponse{
-		Content:      choice.Message.Content,
+		Content:      content,
 		FinishReason: choice.FinishReason,
 		Usage: llm.Usage{
 			PromptTokens:     resp.Usage.PromptTokens,
@@ -192,27 +200,19 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 		chatReq.ToolChoice = req.ToolChoice
 	}
 
-	// Note: Reasoning/thinking support for local models is highly model-dependent.
-	// Most local models ignore unrecognized fields, so we omit reasoning config
-	// rather than sending potentially incompatible parameters.
-	// Users needing reasoning with specific models (DeepSeek-R1, etc.) should
-	// configure model-specific parameters through the model's native interface.
+	// Add thinking configuration if enabled.
+	// Z.AI uses a binary toggle {"thinking": {"type": "enabled"}} instead of
+	// OpenAI's reasoning effort levels. Effort and BudgetTokens are not supported
+	// by the Z.AI API and are intentionally ignored here.
+	if req.Thinking != nil && req.Thinking.Enabled {
+		chatReq.Thinking = &thinkingRequest{Type: "enabled"}
+	}
 
 	return json.Marshal(chatReq)
 }
 
 func (p *Provider) doRequest(ctx context.Context, body []byte) (io.ReadCloser, error) {
-	return p.httpClient.Do(ctx, p.config.BaseURL+defaultChatEndpoint, body, p.authHeaders())
-}
-
-func (p *Provider) authHeaders() map[string]string {
-	// Only set Authorization header if API key is provided
-	if p.config.APIKey != "" {
-		return map[string]string{
-			"Authorization": "Bearer " + p.config.APIKey,
-		}
-	}
-	return nil
+	return p.httpClient.Do(ctx, p.config.BaseURL+defaultChatEndpoint, body, p.headers)
 }
 
 func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, events chan<- llm.StreamEvent) {
@@ -222,6 +222,8 @@ func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, event
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
 	var usage *llm.Usage
+	var toolCalls []llm.ToolCall
+	var finishReason string
 
 	for scanner.Scan() {
 		select {
@@ -242,7 +244,7 @@ func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, event
 
 		data := strings.TrimPrefix(line, streamPrefix)
 		if data == streamDoneMarker {
-			events <- llm.StreamEvent{Done: true, Usage: usage}
+			events <- llm.StreamEvent{Done: true, Usage: usage, ToolCalls: toolCalls, FinishReason: finishReason}
 			return
 		}
 
@@ -260,8 +262,37 @@ func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, event
 			}
 		}
 
-		if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
-			events <- llm.StreamEvent{Delta: chunk.Choices[0].Delta.Content}
+		if len(chunk.Choices) > 0 {
+			choice := chunk.Choices[0]
+			delta := choice.Delta
+
+			// Capture finish reason
+			if choice.FinishReason != "" {
+				finishReason = choice.FinishReason
+			}
+
+			// Accumulate streamed tool calls
+			for _, tc := range delta.ToolCalls {
+				toolCalls = append(toolCalls, llm.ToolCall{
+					ID:   tc.ID,
+					Type: tc.Type,
+					Function: llm.ToolCallFunction{
+						Name:      tc.Function.Name,
+						Arguments: tc.Function.Arguments,
+					},
+				})
+			}
+
+			// Z.AI sends thinking output in reasoning_content and main output in content.
+			// Emit whichever is non-empty; avoid allocating a concatenation on every chunk.
+			switch {
+			case delta.ReasoningContent != "" && delta.Content != "":
+				events <- llm.StreamEvent{Delta: delta.ReasoningContent + delta.Content}
+			case delta.ReasoningContent != "":
+				events <- llm.StreamEvent{Delta: delta.ReasoningContent}
+			case delta.Content != "":
+				events <- llm.StreamEvent{Delta: delta.Content}
+			}
 		}
 	}
 
@@ -271,10 +302,10 @@ func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, event
 	}
 
 	// If we get here without [DONE], still signal completion
-	events <- llm.StreamEvent{Done: true, Usage: usage}
+	events <- llm.StreamEvent{Done: true, Usage: usage, ToolCalls: toolCalls, FinishReason: finishReason}
 }
 
-// API request/response types (OpenAI-compatible)
+// API request/response types (OpenAI-compatible with Z.AI thinking extension)
 
 type message struct {
 	Role       string     `json:"role"`
@@ -307,22 +338,23 @@ type toolCallFunction struct {
 	Arguments string `json:"arguments"`
 }
 
-type chatCompletionRequest struct {
-	Model       string    `json:"model"`
-	Messages    []message `json:"messages"`
-	Temperature *float64  `json:"temperature,omitempty"`
-	MaxTokens   *int      `json:"max_tokens,omitempty"`
-	TopP        *float64  `json:"top_p,omitempty"`
-	Stop        []string  `json:"stop,omitempty"`
-	Stream      bool      `json:"stream,omitempty"`
-	Tools       []tool    `json:"tools,omitempty"`
-	ToolChoice  any       `json:"tool_choice,omitempty"`
+// thinkingRequest represents Z.AI's thinking configuration.
+// Unlike OpenAI's reasoning field, Z.AI uses {"type": "enabled"/"disabled"}.
+type thinkingRequest struct {
+	Type string `json:"type"`
 }
 
-type responseMessage struct {
-	Role      string     `json:"role"`
-	Content   string     `json:"content"`
-	ToolCalls []toolCall `json:"tool_calls,omitempty"`
+type chatCompletionRequest struct {
+	Model       string           `json:"model"`
+	Messages    []message        `json:"messages"`
+	Temperature *float64         `json:"temperature,omitempty"`
+	MaxTokens   *int             `json:"max_tokens,omitempty"`
+	TopP        *float64         `json:"top_p,omitempty"`
+	Stop        []string         `json:"stop,omitempty"`
+	Stream      bool             `json:"stream,omitempty"`
+	Thinking    *thinkingRequest `json:"thinking,omitempty"`
+	Tools       []tool           `json:"tools,omitempty"`
+	ToolChoice  any              `json:"tool_choice,omitempty"`
 }
 
 type chatCompletionResponse struct {
@@ -342,6 +374,14 @@ type chatCompletionResponse struct {
 	} `json:"usage"`
 }
 
+type responseMessage struct {
+	Role             string     `json:"role"`
+	Content          string     `json:"content"`
+	ReasoningContent string     `json:"reasoning_content,omitempty"`
+	ToolCalls        []toolCall `json:"tool_calls,omitempty"`
+	ToolCallID       string     `json:"tool_call_id,omitempty"`
+}
+
 type streamChunk struct {
 	ID      string `json:"id"`
 	Object  string `json:"object"`
@@ -350,8 +390,10 @@ type streamChunk struct {
 	Choices []struct {
 		Index int `json:"index"`
 		Delta struct {
-			Role    string `json:"role,omitempty"`
-			Content string `json:"content,omitempty"`
+			Role             string     `json:"role,omitempty"`
+			Content          string     `json:"content,omitempty"`
+			ReasoningContent string     `json:"reasoning_content,omitempty"`
+			ToolCalls        []toolCall `json:"tool_calls,omitempty"`
 		} `json:"delta"`
 		FinishReason string `json:"finish_reason,omitempty"`
 	} `json:"choices"`

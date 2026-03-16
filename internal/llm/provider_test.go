@@ -28,6 +28,10 @@ func TestParseProviderType(t *testing.T) {
 		{"ollama", ProviderLocal, false},
 		{"vllm", ProviderLocal, false},
 		{"llama", ProviderLocal, false},
+		{"zai", ProviderZAI, false},
+		{"zhipu", ProviderZAI, false},
+		{"zhipuai", ProviderZAI, false},
+		{"glm", ProviderZAI, false},
 		{"unknown", "", true},
 		{"", "", true},
 	}
@@ -58,6 +62,7 @@ func TestDefaultAPIKeyEnvVar(t *testing.T) {
 		{ProviderGemini, "GOOGLE_API_KEY"},
 		{ProviderOpenRouter, "OPENROUTER_API_KEY"},
 		{ProviderLocal, ""},
+		{ProviderZAI, "ZAI_API_KEY"},
 		{ProviderType("unknown"), ""},
 	}
 
@@ -81,6 +86,7 @@ func TestDefaultBaseURL(t *testing.T) {
 		{ProviderGemini, "https://generativelanguage.googleapis.com/v1beta"},
 		{ProviderOpenRouter, "https://openrouter.ai/api/v1"},
 		{ProviderLocal, "http://localhost:11434/v1"},
+		{ProviderZAI, "https://api.z.ai/api/paas/v4"},
 		{ProviderType("unknown"), ""},
 	}
 

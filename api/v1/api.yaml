@@ -9027,7 +9027,7 @@ components:
           type: string
         provider:
           type: string
-          enum: [anthropic, openai, gemini, openrouter, local]
+          enum: [anthropic, openai, gemini, openrouter, local, zai]
         model:
           type: string
         apiKeyConfigured:
@@ -9068,7 +9068,7 @@ components:
           type: string
         provider:
           type: string
-          enum: [anthropic, openai, gemini, openrouter, local]
+          enum: [anthropic, openai, gemini, openrouter, local, zai]
         model:
           type: string
         apiKey:
@@ -9103,7 +9103,7 @@ components:
           type: string
         provider:
           type: string
-          enum: [anthropic, openai, gemini, openrouter, local]
+          enum: [anthropic, openai, gemini, openrouter, local, zai]
         model:
           type: string
         apiKey:
@@ -9545,7 +9545,7 @@ components:
           type: string
         provider:
           type: string
-          enum: [anthropic, openai, gemini, openrouter, local]
+          enum: [anthropic, openai, gemini, openrouter, local, zai]
         model:
           type: string
         contextWindow:

@@ -36,6 +36,8 @@ const (
 	ProviderOpenRouter ProviderType = "openrouter"
 	// ProviderLocal is for local OpenAI-compatible servers (Ollama, vLLM, etc).
 	ProviderLocal ProviderType = "local"
+	// ProviderZAI is the Z.AI provider (GLM models).
+	ProviderZAI ProviderType = "zai"
 )
 
 // ParseProviderType converts a string to a ProviderType.
@@ -51,6 +53,8 @@ func ParseProviderType(s string) (ProviderType, error) {
 		return ProviderOpenRouter, nil
 	case "local", "ollama", "vllm", "llama":
 		return ProviderLocal, nil
+	case "zai", "zhipu", "zhipuai", "glm":
+		return ProviderZAI, nil
 	default:
 		return "", fmt.Errorf("%w: %s", ErrInvalidProvider, s)
 	}
@@ -70,6 +74,8 @@ func DefaultAPIKeyEnvVar(providerType ProviderType) string {
 		return "OPENROUTER_API_KEY"
 	case ProviderLocal:
 		return "" // Local providers typically don't need an API key
+	case ProviderZAI:
+		return "ZAI_API_KEY"
 	default:
 		return ""
 	}
@@ -88,6 +94,8 @@ func DefaultBaseURL(providerType ProviderType) string {
 		return "https://openrouter.ai/api/v1"
 	case ProviderLocal:
 		return "http://localhost:11434/v1" // Default Ollama endpoint
+	case ProviderZAI:
+		return "https://api.z.ai/api/paas/v4"
 	default:
 		return ""
 	}
