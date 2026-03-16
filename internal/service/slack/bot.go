@@ -67,7 +67,6 @@ type chatState struct {
 	subCancel       context.CancelFunc
 	mu              sync.Mutex
 	pendingPromptID  string
-	pendingReaction  *messageRef // message awaiting reaction removal on first response
 	thinkingMessage  *messageRef // "Thinking..." message to delete on first response
 }
 
@@ -126,6 +125,7 @@ func New(cfg Config, agentAPI AgentService, logger *slog.Logger) (*Bot, error) {
 func (b *Bot) Run(ctx context.Context) error {
 	b.logger.Info("Slack bot started",
 		slog.Int("allowed_channels", len(b.allowedChannels)),
+		slog.Bool("respond_to_all", b.cfg.RespondToAll),
 	)
 
 	// Start DAG run monitor if a DAGRunStore is available
@@ -158,6 +158,8 @@ func (b *Bot) Run(ctx context.Context) error {
 
 // handleEvent routes a socket mode event to the appropriate handler.
 func (b *Bot) handleEvent(ctx context.Context, evt socketmode.Event) {
+	b.logger.Debug("Socket mode event", slog.String("event_type", string(evt.Type)))
+
 	switch evt.Type {
 	case socketmode.EventTypeEventsAPI:
 		eventsAPIEvent, ok := evt.Data.(slackevents.EventsAPIEvent)
@@ -214,8 +216,18 @@ func (b *Bot) handleEventsAPI(ctx context.Context, evt slackevents.EventsAPIEven
 		if !ok {
 			return
 		}
+
+		b.logger.Debug("Message event received",
+			slog.String("channel", ev.Channel),
+			slog.String("channel_type", ev.ChannelType),
+			slog.String("user", ev.User),
+			slog.String("sub_type", ev.SubType),
+			slog.String("bot_id", ev.BotID),
+		)
+
 		// Only handle regular messages (not bot messages, edits, etc.)
 		if ev.SubType != "" || ev.BotID != "" {
+			b.logger.Debug("Skipping message", slog.String("reason", "subtype or bot"))
 			return
 		}
 
@@ -237,13 +249,19 @@ func (b *Bot) handleEventsAPI(ctx context.Context, evt slackevents.EventsAPIEven
 
 		// respond_to_all: treat every channel message as a conversation.
 		if b.cfg.RespondToAll && b.isChannelAllowed(ev.Channel) {
+			b.logger.Debug("Processing channel message (respond_to_all)")
 			b.handleDMMessage(ctx, ev.Channel, ev.User, ev.TimeStamp, ev.Text)
+		} else {
+			b.logger.Debug("Ignoring channel message",
+				slog.Bool("respond_to_all", b.cfg.RespondToAll),
+				slog.Bool("channel_allowed", b.isChannelAllowed(ev.Channel)),
+			)
 		}
 	}
 }
 
 // handleChannelMessage processes a message in a channel (from @mention or thread reply).
-func (b *Bot) handleChannelMessage(ctx context.Context, channelID, userID, msgTimestamp, threadTS, text string) {
+func (b *Bot) handleChannelMessage(ctx context.Context, channelID, userID, _, threadTS, text string) {
 	if !b.isChannelAllowed(channelID) {
 		return
 	}
@@ -253,18 +271,18 @@ func (b *Bot) handleChannelMessage(ctx context.Context, channelID, userID, msgTi
 	b.activeThreads.Store(threadKey, true)
 
 	cs := b.getOrCreateChat(threadKey, channelID, threadTS)
-	b.processIncoming(ctx, cs, threadKey, userID, msgTimestamp, text)
+	b.processIncoming(ctx, cs, threadKey, userID, text)
 }
 
 // handleDMMessage processes a direct message.
-func (b *Bot) handleDMMessage(ctx context.Context, channelID, userID, msgTimestamp, text string) {
+func (b *Bot) handleDMMessage(ctx context.Context, channelID, userID, _, text string) {
 	cs := b.getOrCreateChat(channelID, channelID, "")
-	b.processIncoming(ctx, cs, channelID, userID, msgTimestamp, text)
+	b.processIncoming(ctx, cs, channelID, userID, text)
 }
 
 // processIncoming is the core message handler shared by channel and DM flows.
 // convKey uniquely identifies the conversation (channelID or channelID:threadTS).
-func (b *Bot) processIncoming(ctx context.Context, cs *chatState, convKey, userID, msgTimestamp, text string) {
+func (b *Bot) processIncoming(ctx context.Context, cs *chatState, convKey, userID, text string) {
 	if text == "" {
 		return
 	}
@@ -285,14 +303,12 @@ func (b *Bot) processIncoming(ctx context.Context, cs *chatState, convKey, userI
 		return
 	}
 
-	// Add a "thinking" reaction and post a typing indicator message
-	b.addReaction(cs.channelID, msgTimestamp, "hourglass_flowing_sand")
+	// Post a typing indicator message
 	thinkingTS := b.postThinking(cs)
 
 	user := b.userIdentity(convKey, userID)
 
 	cs.mu.Lock()
-	cs.pendingReaction = &messageRef{channel: cs.channelID, timestamp: msgTimestamp}
 	if thinkingTS != "" {
 		cs.thinkingMessage = &messageRef{channel: cs.channelID, timestamp: thinkingTS}
 	}
@@ -711,32 +727,6 @@ func (b *Bot) sendLongText(channelID, text string) {
 	}
 }
 
-// addReaction adds an emoji reaction to a message.
-func (b *Bot) addReaction(channelID, timestamp, emoji string) {
-	if timestamp == "" {
-		return
-	}
-	if err := b.slackClient.AddReaction(emoji, slack.ItemRef{
-		Channel:   channelID,
-		Timestamp: timestamp,
-	}); err != nil {
-		b.logger.Debug("Failed to add reaction", slog.String("error", err.Error()))
-	}
-}
-
-// removeReaction removes an emoji reaction from a message.
-func (b *Bot) removeReaction(channelID, timestamp, emoji string) {
-	if timestamp == "" {
-		return
-	}
-	if err := b.slackClient.RemoveReaction(emoji, slack.ItemRef{
-		Channel:   channelID,
-		Timestamp: timestamp,
-	}); err != nil {
-		b.logger.Debug("Failed to remove reaction", slog.String("error", err.Error()))
-	}
-}
-
 // postThinking posts a "Thinking..." message and returns its timestamp.
 func (b *Bot) postThinking(cs *chatState) string {
 	opts := []slack.MsgOption{slack.MsgOptionText("_Thinking..._", false)}
@@ -752,19 +742,13 @@ func (b *Bot) postThinking(cs *chatState) string {
 	return ts
 }
 
-// clearPendingIndicators removes the "thinking" reaction and deletes the
-// "Thinking..." message when the first response arrives.
+// clearPendingIndicators deletes the "Thinking..." message when the first response arrives.
 func (b *Bot) clearPendingIndicators(cs *chatState) {
 	cs.mu.Lock()
-	reaction := cs.pendingReaction
-	cs.pendingReaction = nil
 	thinking := cs.thinkingMessage
 	cs.thinkingMessage = nil
 	cs.mu.Unlock()
 
-	if reaction != nil {
-		b.removeReaction(reaction.channel, reaction.timestamp, "hourglass_flowing_sand")
-	}
 	if thinking != nil {
 		if _, _, err := b.slackClient.DeleteMessage(thinking.channel, thinking.timestamp); err != nil {
 			b.logger.Debug("Failed to delete thinking message", slog.String("error", err.Error()))
@@ -805,7 +789,6 @@ func (b *Bot) resetChat(cs *chatState) {
 	cs.ownerUserID = ""
 	cs.subSessionID = ""
 	cs.pendingPromptID = ""
-	cs.pendingReaction = nil
 	cs.thinkingMessage = nil
 }
 
