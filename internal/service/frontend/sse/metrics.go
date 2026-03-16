@@ -11,8 +11,6 @@ import (
 
 // Metrics holds Prometheus metrics for SSE operations.
 type Metrics struct {
-	clientsConnected        prometheus.Gauge
-	watchersActive          prometheus.Gauge
 	messagesSent            *prometheus.CounterVec
 	fetchErrors             *prometheus.CounterVec
 	fetchDuration           *prometheus.HistogramVec
@@ -26,14 +24,6 @@ type Metrics struct {
 // NewMetrics creates and registers SSE metrics with the given registry.
 func NewMetrics(registry *prometheus.Registry) *Metrics {
 	m := &Metrics{
-		clientsConnected: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "dagu_sse_clients_connected",
-			Help: "Current number of connected SSE clients",
-		}),
-		watchersActive: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "dagu_sse_watchers_active",
-			Help: "Current number of active SSE watchers",
-		}),
 		messagesSent: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "dagu_sse_messages_sent_total",
 			Help: "Total number of SSE messages sent by type",
@@ -71,8 +61,6 @@ func NewMetrics(registry *prometheus.Registry) *Metrics {
 	}
 
 	registry.MustRegister(
-		m.clientsConnected,
-		m.watchersActive,
 		m.messagesSent,
 		m.fetchErrors,
 		m.fetchDuration,
@@ -84,38 +72,6 @@ func NewMetrics(registry *prometheus.Registry) *Metrics {
 	)
 
 	return m
-}
-
-// ClientConnected increments the connected clients count.
-func (m *Metrics) ClientConnected() {
-	if m == nil {
-		return
-	}
-	m.clientsConnected.Inc()
-}
-
-// ClientDisconnected decrements the connected clients count.
-func (m *Metrics) ClientDisconnected() {
-	if m == nil {
-		return
-	}
-	m.clientsConnected.Dec()
-}
-
-// WatcherStarted increments the active watchers count.
-func (m *Metrics) WatcherStarted() {
-	if m == nil {
-		return
-	}
-	m.watchersActive.Inc()
-}
-
-// WatcherStopped decrements the active watchers count.
-func (m *Metrics) WatcherStopped() {
-	if m == nil {
-		return
-	}
-	m.watchersActive.Dec()
 }
 
 // MessageSent increments the messages sent counter for the given type.

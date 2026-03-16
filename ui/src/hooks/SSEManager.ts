@@ -1,4 +1,5 @@
 import { getAuthHeaders, getAuthToken } from '@/lib/authHeaders';
+import { queuedFetch } from '@/lib/fetchQueue';
 
 const MAX_RETRY_DELAY_MS = 16000;
 const CONNECT_TIMEOUT_MS = 15000;
@@ -441,6 +442,13 @@ export class SSEManager {
           conn.connectTimeout = null;
         }
 
+        // Clear pendingAdd for topics the server already subscribed via the
+        // initial URL params. Without this, scheduleMutation would fire a
+        // redundant POST that wastes an HTTP connection slot.
+        for (const topic of conn.serverTopics) {
+          conn.pendingAdd.delete(topic);
+        }
+
         this.updateState(conn, {
           isConnected: true,
           isConnecting: false,
@@ -573,7 +581,7 @@ export class SSEManager {
 
     conn.mutationInFlight = true;
     try {
-      const response = await fetch(
+      const response = await queuedFetch(
         buildMutationUrl(conn.apiURL, conn.remoteNode),
         {
           method: 'POST',

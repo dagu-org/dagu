@@ -594,11 +594,18 @@ export function useAgentChat() {
   const selectSession = useCallback(
     async (id: string): Promise<void> => {
       const gen = ++selectGenRef.current;
-      const converted = await fetchSessionDetail(id);
-      if (gen !== selectGenRef.current) return;
+      // Set sessionId first so the old agent EventSource closes and frees
+      // a connection slot. Without this, fetchSessionDetail would deadlock
+      // waiting for a connection while the old SSE holds it.
       setSessionId(id);
       setAnsweredPrompts({});
-      applySessionSnapshot(converted);
+      try {
+        const converted = await fetchSessionDetail(id);
+        if (gen !== selectGenRef.current) return;
+        applySessionSnapshot(converted);
+      } catch {
+        // The SSE connection or polling fallback will recover state.
+      }
     },
     [fetchSessionDetail, setSessionId, applySessionSnapshot]
   );

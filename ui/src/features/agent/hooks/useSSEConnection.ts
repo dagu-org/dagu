@@ -11,6 +11,8 @@ export interface AgentSSEStatus {
   isSessionLive: boolean;
 }
 
+const MAX_RETRY_DELAY_MS = 16000;
+
 function buildAgentStreamUrl(
   apiURL: string,
   remoteNode: string,
@@ -38,7 +40,6 @@ export function useSSEConnection(
 ): AgentSSEStatus {
   const handledNavigateIdsRef = useRef<Set<string>>(new Set());
   const awaitingSnapshotRef = useRef(false);
-  const connectionGenerationRef = useRef(0);
   const cbRef = useRef(callbacks);
   cbRef.current = callbacks;
 
@@ -56,69 +57,76 @@ export function useSSEConnection(
       return;
     }
 
-    const generation = connectionGenerationRef.current + 1;
-    connectionGenerationRef.current = generation;
-    let closed = false;
-    const eventSource = new EventSource(
-      buildAgentStreamUrl(apiURL, remoteNode, sessionId)
-    );
+    let disposed = false;
+    let eventSource: EventSource | null = null;
+    let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+    let retryCount = 0;
 
-    const isCurrentConnection = () =>
-      !closed && connectionGenerationRef.current === generation;
+    function connect() {
+      if (disposed) return;
 
-    eventSource.onopen = () => {
-      if (!isCurrentConnection()) {
-        return;
-      }
-      awaitingSnapshotRef.current = true;
-      setIsSessionLive(true);
-    };
+      eventSource = new EventSource(
+        buildAgentStreamUrl(apiURL, remoteNode, sessionId!)
+      );
 
-    eventSource.addEventListener('message', (event) => {
-      if (!isCurrentConnection()) {
-        return;
-      }
+      eventSource.onopen = () => {
+        if (disposed) return;
+        retryCount = 0;
+        awaitingSnapshotRef.current = true;
+        setIsSessionLive(true);
+      };
 
-      try {
-        const parsed = JSON.parse(
-          (event as MessageEvent<string>).data
-        ) as StreamResponse;
-        const replace = awaitingSnapshotRef.current;
-        awaitingSnapshotRef.current = false;
-        cbRef.current.onEvent(parsed, replace);
+      eventSource.addEventListener('message', (event) => {
+        if (disposed) return;
 
-        for (const msg of parsed.messages ?? []) {
-          if (
-            msg.id &&
-            msg.type === 'ui_action' &&
-            msg.ui_action?.type === 'navigate' &&
-            msg.ui_action.path &&
-            !handledNavigateIdsRef.current.has(msg.id)
-          ) {
-            handledNavigateIdsRef.current.add(msg.id);
-            cbRef.current.onNavigate(msg.ui_action.path);
+        try {
+          const parsed = JSON.parse(
+            (event as MessageEvent<string>).data
+          ) as StreamResponse;
+          const replace = awaitingSnapshotRef.current;
+          awaitingSnapshotRef.current = false;
+          cbRef.current.onEvent(parsed, replace);
+
+          for (const msg of parsed.messages ?? []) {
+            if (
+              msg.id &&
+              msg.type === 'ui_action' &&
+              msg.ui_action?.type === 'navigate' &&
+              msg.ui_action.path &&
+              !handledNavigateIdsRef.current.has(msg.id)
+            ) {
+              handledNavigateIdsRef.current.add(msg.id);
+              cbRef.current.onNavigate(msg.ui_action.path);
+            }
           }
+        } catch (error) {
+          console.error('Invalid JSON response from agent SSE', error);
         }
-      } catch (error) {
-        console.error('Invalid JSON response from agent SSE', error);
-      }
-    });
+      });
 
-    eventSource.onerror = () => {
-      if (!isCurrentConnection()) {
-        return;
-      }
-      // Keep the EventSource alive so the browser can apply its built-in
-      // reconnect policy while the polling fallback covers the gap.
-      setIsSessionLive(false);
-    };
+      eventSource.onerror = () => {
+        if (disposed) return;
+        // Close immediately to free the HTTP connection slot. Without this,
+        // the browser's built-in EventSource reconnect holds the slot while
+        // retrying, which can exhaust the 6-connection-per-origin budget.
+        eventSource?.close();
+        eventSource = null;
+        setIsSessionLive(false);
+
+        // Reconnect with exponential backoff.
+        const delay = Math.min(1000 * 2 ** retryCount, MAX_RETRY_DELAY_MS);
+        retryCount++;
+        retryTimeout = setTimeout(connect, delay);
+      };
+    }
+
+    connect();
 
     return () => {
-      closed = true;
-      eventSource.close();
-      if (connectionGenerationRef.current === generation) {
-        setIsSessionLive(false);
-      }
+      disposed = true;
+      if (retryTimeout) clearTimeout(retryTimeout);
+      if (eventSource) eventSource.close();
+      setIsSessionLive(false);
     };
   }, [sessionId, apiURL, remoteNode]);
 

@@ -28,6 +28,8 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const hasOpenedRef = useRef(false);
+  if (isOpen) hasOpenedRef.current = true;
 
   // Debounce search term
   useEffect(() => {
@@ -35,13 +37,15 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Fetch tags when dropdown opens
+  // Defer fetches until the dropdown has been opened at least once to avoid
+  // consuming HTTP connection slots on page load (browser 6-connection limit).
   const { data: tagsData } = useQuery('/dags/tags', {
     params: { query: { remoteNode } },
-  });
+  }, { isPaused: () => !hasOpenedRef.current });
   const availableTags = tagsData?.tags ?? [];
 
-  // Fetch DAGs with search + tag filters
+  // DAGs list: also needed when a template is pre-selected so we can resolve
+  // its display name for the trigger button.
   const { data, isLoading } = useQuery('/dags', {
     params: {
       query: {
@@ -51,7 +55,7 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
         ...(selectedTags.length > 0 ? { tags: selectedTags.join(',') } : {}),
       },
     },
-  });
+  }, { isPaused: () => !hasOpenedRef.current && !selectedTemplate });
   const dags = data?.dags ?? [];
 
   // Filter out DAGs with a workspace= tag that doesn't match the selected workspace

@@ -117,8 +117,8 @@ func TestAuth_Combinations(t *testing.T) {
 	}
 }
 
-// TestAuth_BasicAuth_SSE_Requires_Credentials verifies that SSE endpoints
-// require basic auth when auth.mode is "basic" (regression test for auth bypass).
+// TestAuth_BasicAuth_SSE_Requires_Credentials verifies that the multiplexed SSE
+// endpoint requires basic auth when auth.mode is "basic" (regression test for auth bypass).
 func TestAuth_BasicAuth_SSE_Requires_Credentials(t *testing.T) {
 	t.Parallel()
 
@@ -129,9 +129,7 @@ func TestAuth_BasicAuth_SSE_Requires_Credentials(t *testing.T) {
 	}))
 
 	sseEndpoints := []string{
-		"/api/v1/events/dags",
-		"/api/v1/events/dag-runs",
-		"/api/v1/events/queues",
+		"/api/v1/events/stream",
 	}
 
 	for _, endpoint := range sseEndpoints {

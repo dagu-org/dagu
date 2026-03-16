@@ -263,9 +263,6 @@ func TestRunShutdownSequence_OrderAndBudgets(t *testing.T) {
 			calls = append(calls, "sync")
 			return errors.New("ignored sync stop failure")
 		},
-		shutdownSSE: func() {
-			calls = append(calls, "sse")
-		},
 		shutdownSSEMultiplexer: func() {
 			calls = append(calls, "sse_multiplexer")
 		},
@@ -301,7 +298,6 @@ func TestRunShutdownSequence_OrderAndBudgets(t *testing.T) {
 	assert.NotErrorIs(t, err, auditErr)
 	assert.Equal(t, []string{
 		"sync",
-		"sse",
 		"sse_multiplexer",
 		"http_prepare",
 		"keepalives_off",

@@ -86,7 +86,6 @@ const (
 
 type shutdownActions struct {
 	stopSync               func() error
-	shutdownSSE            func()
 	shutdownSSEMultiplexer func()
 	beforeHTTPShutdown     func()
 	disableHTTPKeepAlives  func()
@@ -109,7 +108,6 @@ type Server struct {
 	auditStore         *fileaudit.Store
 	syncService        gitsync.Service
 	listener           net.Listener
-	sseHub             *sse.Hub
 	sseMultiplexer     *sse.Multiplexer
 	terminalManager    *terminal.Manager
 	metricsRegistry    *prometheus.Registry
@@ -1060,8 +1058,6 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 		sseMetrics = sse.NewMetrics(srv.metricsRegistry)
 	}
 
-	srv.sseHub = sse.NewHub(sse.WithMetrics(sseMetrics))
-	srv.sseHub.Start()
 	srv.sseMultiplexer = sse.NewMultiplexer(sse.StreamConfig{
 		MaxTopicsPerConnection: srv.config.Server.SSE.MaxTopicsPerConnection,
 		MaxClients:             srv.config.Server.SSE.MaxClients,
@@ -1069,10 +1065,8 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 		WriteBufferSize:        srv.config.Server.SSE.WriteBufferSize,
 		SlowClientTimeout:      srv.config.Server.SSE.SlowClientTimeout,
 	}, sseMetrics)
-	srv.registerSSEFetchers(srv.sseHub)
 	srv.registerSSEFetchers(srv.sseMultiplexer)
 
-	handler := sse.NewHandler(srv.sseHub, srv.remoteNodeResolver)
 	multiplexHandler := sse.NewMultiplexHandler(srv.sseMultiplexer, srv.remoteNodeResolver)
 
 	authOpts := srv.buildStreamAuthOptions("restricted")
@@ -1085,27 +1079,12 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 
 		r.Get("/stream", multiplexHandler.HandleStream)
 		r.Post("/stream/topics", multiplexHandler.HandleTopicMutation)
-		r.Get("/dags", handler.HandleDAGsListEvents)
-		r.Get("/dags/{fileName}", handler.HandleDAGEvents)
-		r.Get("/dags/{fileName}/dag-runs", handler.HandleDAGHistoryEvents)
-		r.Get("/dag-runs", handler.HandleDAGRunsListEvents)
-		r.Get("/dag-runs/{name}/{dagRunId}", handler.HandleDAGRunEvents)
-		r.Get("/dag-runs/{name}/{dagRunId}/logs", handler.HandleDAGRunLogsEvents)
-		r.Get("/dag-runs/{name}/{dagRunId}/logs/steps/{stepName}", handler.HandleStepLogEvents)
-		r.Get("/queues", handler.HandleQueuesListEvents)
-		r.Get("/queues/{name}/items", handler.HandleQueueItemsEvents)
-		r.Get("/docs-tree", handler.HandleDocTreeEvents)
-		r.Get("/docs/*", handler.HandleDocEvents)
 	})
 
 	logger.Info(ctx, "SSE routes configured", slog.String("basePath", apiV1BasePath))
 }
 
-type sseFetcherRegistrar interface {
-	RegisterFetcher(sse.TopicType, sse.FetchFunc)
-}
-
-func (srv *Server) registerSSEFetchers(registrar sseFetcherRegistrar) {
+func (srv *Server) registerSSEFetchers(registrar *sse.Multiplexer) {
 	registrar.RegisterFetcher(sse.TopicTypeDAG, srv.apiV1.GetDAGDetailsData)
 	registrar.RegisterFetcher(sse.TopicTypeDAGHistory, srv.apiV1.GetDAGHistoryData)
 	registrar.RegisterFetcher(sse.TopicTypeDAGsList, srv.apiV1.GetDAGsListData)
@@ -1405,12 +1384,6 @@ func (srv *Server) shutdownActions(ctx context.Context) shutdownActions {
 			return nil
 		}
 	}
-	if srv.sseHub != nil {
-		actions.shutdownSSE = func() {
-			srv.sseHub.Shutdown()
-			logger.Info(ctx, "SSE hub shut down")
-		}
-	}
 	if srv.sseMultiplexer != nil {
 		actions.shutdownSSEMultiplexer = func() {
 			srv.sseMultiplexer.Shutdown()
@@ -1456,9 +1429,6 @@ func runShutdownSequence(shutdownCtx context.Context, actions shutdownActions) e
 
 	if actions.stopSync != nil {
 		_ = actions.stopSync()
-	}
-	if actions.shutdownSSE != nil {
-		actions.shutdownSSE()
 	}
 	if actions.shutdownSSEMultiplexer != nil {
 		actions.shutdownSSEMultiplexer()

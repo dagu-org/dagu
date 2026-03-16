@@ -57,7 +57,8 @@ describe('useSSEConnection', () => {
     vi.stubGlobal('EventSource', MockEventSource);
   });
 
-  it('keeps native EventSource reconnect active and treats the first event after each open as a snapshot replace', () => {
+  it('closes EventSource on error, reconnects with backoff, and treats the first event after each open as a snapshot replace', () => {
+    vi.useFakeTimers();
     const onEvent = vi.fn();
     const onNavigate = vi.fn();
 
@@ -98,16 +99,25 @@ describe('useSSEConnection', () => {
       false
     );
 
+    // Error closes the EventSource to free the connection slot
     act(() => {
       eventSource.error();
     });
 
     expect(result.current.isSessionLive).toBe(false);
-    expect(eventSource.close).not.toHaveBeenCalled();
+    expect(eventSource.close).toHaveBeenCalled();
+
+    // Advance past the 1s backoff to trigger reconnect
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    expect(MockEventSource.instances).toHaveLength(2);
+    const reconnected = MockEventSource.instances[1]!;
 
     act(() => {
-      eventSource.open();
-      eventSource.emitMessage({ messages: [{ id: 'm3', type: 'assistant' }] });
+      reconnected.open();
+      reconnected.emitMessage({ messages: [{ id: 'm3', type: 'assistant' }] });
     });
 
     expect(onEvent).toHaveBeenNthCalledWith(
@@ -115,6 +125,8 @@ describe('useSSEConnection', () => {
       { messages: [{ id: 'm3', type: 'assistant' }] },
       true
     );
+
+    vi.useRealTimers();
   });
 
   it('deduplicates repeated navigate UI actions across reconnect snapshots', () => {
