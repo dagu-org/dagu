@@ -274,8 +274,16 @@ func (b *Bot) handleCallbackQuery(ctx context.Context, cq *tgbotapi.CallbackQuer
 	_, _ = b.botAPI.Send(edit)
 }
 
+// sendTyping sends a "typing..." indicator to the Telegram chat.
+func (b *Bot) sendTyping(chatID int64) {
+	action := tgbotapi.NewChatAction(chatID, tgbotapi.ChatTyping)
+	_, _ = b.botAPI.Send(action)
+}
+
 // createSession creates a new agent session and starts listening for responses.
 func (b *Bot) createSession(ctx context.Context, cs *chatState, chatID int64, user agent.UserIdentity, text string) {
+	b.sendTyping(chatID)
+
 	req := agent.ChatRequest{
 		Message:  text,
 		SafeMode: b.cfg.SafeMode,
@@ -297,6 +305,8 @@ func (b *Bot) createSession(ctx context.Context, cs *chatState, chatID int64, us
 
 // sendMessage sends a message to an existing session.
 func (b *Bot) sendMessage(ctx context.Context, cs *chatState, chatID int64, user agent.UserIdentity, text string) {
+	b.sendTyping(chatID)
+
 	cs.mu.Lock()
 	sid := cs.sessionID
 	cs.mu.Unlock()
