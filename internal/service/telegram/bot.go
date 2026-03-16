@@ -225,8 +225,15 @@ func (b *Bot) handleCallbackQuery(ctx context.Context, cq *tgbotapi.CallbackQuer
 	}
 
 	if err := b.agentAPI.SubmitUserResponse(ctx, sid, user.UserID, resp); err != nil {
-		b.logger.Warn("Failed to submit prompt response", slog.String("error", err.Error()))
-		callback := tgbotapi.NewCallback(cq.ID, "Failed to submit response")
+		b.logger.Warn("Failed to submit prompt response",
+			slog.String("session", sid),
+			slog.String("user", user.UserID),
+			slog.String("prompt", promptID),
+			slog.String("error", err.Error()),
+		)
+		// Send the actual error to Telegram so user can see what went wrong
+		b.sendText(chatID, fmt.Sprintf("Failed to submit response: %s", err.Error()))
+		callback := tgbotapi.NewCallback(cq.ID, "Error - see message")
 		_, _ = b.botAPI.Send(callback)
 		return
 	}
