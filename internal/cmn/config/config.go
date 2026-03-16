@@ -26,16 +26,21 @@ type Config struct {
 	Cache           CacheMode
 	GitSync         GitSyncConfig
 	Tunnel          TunnelConfig
-	Telegram        TelegramConfig
+	Bots            BotsConfig
 	License         LicenseConfig
 	Warnings        []string
 }
 
-// TelegramConfig holds the configuration for the Telegram bot integration.
-type TelegramConfig struct {
+// BotsConfig holds the configuration for bot integrations.
+type BotsConfig struct {
+	SafeMode bool
+	Telegram TelegramBotConfig
+}
+
+// TelegramBotConfig holds the Telegram-specific bot configuration.
+type TelegramBotConfig struct {
 	Token          string
 	AllowedChatIDs []int64
-	SafeMode       bool
 }
 
 // GitSyncConfig holds the configuration for Git sync functionality.

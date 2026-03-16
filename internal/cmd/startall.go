@@ -149,12 +149,12 @@ func runStartAll(ctx *Context, _ []string) error {
 
 	// Initialize Telegram bot if configured
 	var tgBot *telegram.Bot
-	if ctx.Config.Telegram.Token != "" && agentAPI != nil {
+	if ctx.Config.Bots.Telegram.Token != "" && agentAPI != nil {
 		tgBot, err = telegram.New(
 			telegram.Config{
-				Token:          ctx.Config.Telegram.Token,
-				AllowedChatIDs: ctx.Config.Telegram.AllowedChatIDs,
-				SafeMode:       ctx.Config.Telegram.SafeMode,
+				Token:          ctx.Config.Bots.Telegram.Token,
+				AllowedChatIDs: ctx.Config.Bots.Telegram.AllowedChatIDs,
+				SafeMode:       ctx.Config.Bots.SafeMode,
 				DAGRunStore:    ctx.DAGRunStore,
 			},
 			agentAPI,

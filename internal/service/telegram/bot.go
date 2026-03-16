@@ -72,10 +72,10 @@ type Bot struct {
 // New creates a new Telegram bot instance.
 func New(cfg Config, agentAPI AgentService, logger *slog.Logger) (*Bot, error) {
 	if cfg.Token == "" {
-		return nil, fmt.Errorf("telegram bot token is required (set DAGU_TELEGRAM_TOKEN)")
+		return nil, fmt.Errorf("telegram bot token is required (set DAGU_BOTS_TELEGRAM_TOKEN)")
 	}
 	if len(cfg.AllowedChatIDs) == 0 {
-		return nil, fmt.Errorf("at least one allowed chat ID is required (set DAGU_TELEGRAM_ALLOWED_CHAT_IDS)")
+		return nil, fmt.Errorf("at least one allowed chat ID is required (set DAGU_BOTS_TELEGRAM_ALLOWED_CHAT_IDS)")
 	}
 
 	botAPI, err := tgbotapi.NewBotAPI(cfg.Token)

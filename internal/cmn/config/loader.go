@@ -49,9 +49,9 @@ const (
 	// Requires: Core, Paths, Queues (to check if distributed execution is enabled)
 	ServiceAgent
 
-	// ServiceTelegram is the Telegram bot service.
-	// Requires: Core, Paths, Telegram config, and Proc for agent stores.
-	ServiceTelegram
+	// ServiceBots is the bot service (Telegram, etc.).
+	// Requires: Core, Paths, Bots config, and Proc for agent stores.
+	ServiceBots
 )
 
 // ConfigLoader reads and merges configuration from various sources.
@@ -107,10 +107,10 @@ const (
 	SectionTunnel                                // 512
 	SectionLicense                               // 1024
 	SectionProc                                  // 2048
-	SectionTelegram                              // 4096
+	SectionBots                                  // 4096
 
 	// SectionAll combines all sections (useful for ServiceNone/CLI)
-	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel | SectionLicense | SectionProc | SectionTelegram
+	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel | SectionLicense | SectionProc | SectionBots
 )
 
 // serviceRequirements maps services to their required config sections using bitwise OR.
@@ -121,7 +121,7 @@ var serviceRequirements = map[Service]ConfigSection{
 	ServiceWorker:      SectionWorker | SectionCoordinator | SectionProc,
 	ServiceCoordinator: SectionCoordinator | SectionProc,
 	ServiceAgent:       SectionQueues | SectionProc,
-	ServiceTelegram:    SectionTelegram | SectionProc,
+	ServiceBots:        SectionBots | SectionProc,
 }
 
 // requires checks if the loader's service requires the given config section.
@@ -265,7 +265,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		{SectionMonitoring, func() { l.loadMonitoringConfig(&cfg, def) }},
 		{SectionGitSync, func() { l.loadGitSyncConfig(&cfg, def) }},
 		{SectionTunnel, func() { l.loadTunnelConfig(&cfg, def) }},
-		{SectionTelegram, func() { l.loadTelegramConfig(&cfg, def) }},
+		{SectionBots, func() { l.loadBotsConfig(&cfg, def) }},
 		{SectionLicense, func() { l.loadLicenseConfig(&cfg, def) }},
 	}
 
@@ -1085,27 +1085,30 @@ func setDefaultIfNotPositive(target *int, defaultValue int) {
 	}
 }
 
-func (l *ConfigLoader) loadTelegramConfig(cfg *Config, def Definition) {
+func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 	// Default safe mode to true
-	cfg.Telegram.SafeMode = true
+	cfg.Bots.SafeMode = true
 
 	// Check env var override for token
-	if token := l.v.GetString("telegram.token"); token != "" {
-		cfg.Telegram.Token = token
+	if token := l.v.GetString("bots.telegram.token"); token != "" {
+		cfg.Bots.Telegram.Token = token
 	}
 
-	if def.Telegram == nil {
+	if def.Bots == nil {
 		return
 	}
 
-	if cfg.Telegram.Token == "" {
-		cfg.Telegram.Token = def.Telegram.Token
+	if def.Bots.SafeMode != nil {
+		cfg.Bots.SafeMode = *def.Bots.SafeMode
 	}
-	if len(def.Telegram.AllowedChatIDs) > 0 {
-		cfg.Telegram.AllowedChatIDs = def.Telegram.AllowedChatIDs
-	}
-	if def.Telegram.SafeMode != nil {
-		cfg.Telegram.SafeMode = *def.Telegram.SafeMode
+
+	if def.Bots.Telegram != nil {
+		if cfg.Bots.Telegram.Token == "" {
+			cfg.Bots.Telegram.Token = def.Bots.Telegram.Token
+		}
+		if len(def.Bots.Telegram.AllowedChatIDs) > 0 {
+			cfg.Bots.Telegram.AllowedChatIDs = def.Bots.Telegram.AllowedChatIDs
+		}
 	}
 }
 
@@ -1551,10 +1554,10 @@ var envBindings = []envBinding{
 	{key: "tunnel.rate_limiting.window_seconds", env: "TUNNEL_RATE_LIMITING_WINDOW_SECONDS"},
 	{key: "tunnel.rate_limiting.block_duration_seconds", env: "TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS"},
 
-	// Telegram
-	{key: "telegram.token", env: "TELEGRAM_TOKEN"},
-	{key: "telegram.allowed_chat_ids", env: "TELEGRAM_ALLOWED_CHAT_IDS"},
-	{key: "telegram.safe_mode", env: "TELEGRAM_SAFE_MODE"},
+	// Bots
+	{key: "bots.safe_mode", env: "BOTS_SAFE_MODE"},
+	{key: "bots.telegram.token", env: "BOTS_TELEGRAM_TOKEN"},
+	{key: "bots.telegram.allowed_chat_ids", env: "BOTS_TELEGRAM_ALLOWED_CHAT_IDS"},
 
 	// License
 	{key: "license.key", env: "LICENSE_KEY"},

@@ -104,7 +104,7 @@ func runServer(ctx *Context, _ []string) error {
 
 	// If Telegram is configured, capture the agent API via callback to start the bot.
 	var agentAPI *agent.API
-	if ctx.Config.Telegram.Token != "" {
+	if ctx.Config.Bots.Telegram.Token != "" {
 		serverOpts = append(serverOpts, frontend.WithAgentAPICallback(func(api *agent.API) {
 			agentAPI = api
 		}))
@@ -118,12 +118,12 @@ func runServer(ctx *Context, _ []string) error {
 	}
 
 	// Start Telegram bot if configured and agent API is available.
-	if ctx.Config.Telegram.Token != "" && agentAPI != nil {
+	if ctx.Config.Bots.Telegram.Token != "" && agentAPI != nil {
 		tgBot, tgErr := telegram.New(
 			telegram.Config{
-				Token:          ctx.Config.Telegram.Token,
-				AllowedChatIDs: ctx.Config.Telegram.AllowedChatIDs,
-				SafeMode:       ctx.Config.Telegram.SafeMode,
+				Token:          ctx.Config.Bots.Telegram.Token,
+				AllowedChatIDs: ctx.Config.Bots.Telegram.AllowedChatIDs,
+				SafeMode:       ctx.Config.Bots.SafeMode,
 				DAGRunStore:    ctx.DAGRunStore,
 			},
 			agentAPI,

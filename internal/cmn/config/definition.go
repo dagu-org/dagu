@@ -79,7 +79,7 @@ type Definition struct {
 	SSE        *SSEDef        `mapstructure:"sse"`
 	GitSync    *GitSyncDef    `mapstructure:"git_sync"`
 	Tunnel     *TunnelDef     `mapstructure:"tunnel"`
-	Telegram   *TelegramDef   `mapstructure:"telegram"`
+	Bots       *BotsDef       `mapstructure:"bots"`
 	License    *LicenseDef    `mapstructure:"license"`
 }
 
@@ -410,14 +410,19 @@ type TunnelRateLimitDef struct {
 }
 
 // -----------------------------------------------------------------------------
-// Telegram Configuration
+// Bots Configuration
 // -----------------------------------------------------------------------------
 
-// TelegramDef configures the Telegram bot integration.
-type TelegramDef struct {
+// BotsDef configures bot integrations.
+type BotsDef struct {
+	SafeMode *bool           `mapstructure:"safe_mode"` // Default: true
+	Telegram *TelegramBotDef `mapstructure:"telegram"`
+}
+
+// TelegramBotDef configures the Telegram bot.
+type TelegramBotDef struct {
 	Token          string  `mapstructure:"token"`
 	AllowedChatIDs []int64 `mapstructure:"allowed_chat_ids"`
-	SafeMode       *bool   `mapstructure:"safe_mode"` // Default: true
 }
 
 // -----------------------------------------------------------------------------

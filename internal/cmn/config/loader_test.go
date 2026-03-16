@@ -260,7 +260,7 @@ func TestLoad_Env(t *testing.T) {
 				BlockDurationSeconds: 1800,
 			},
 		},
-		Telegram: TelegramConfig{
+		Bots: BotsConfig{
 			SafeMode: true,
 		},
 		DefaultExecMode: ExecutionModeLocal,
@@ -533,7 +533,7 @@ scheduler:
 			Retention: 24 * time.Hour,
 			Interval:  5 * time.Second,
 		},
-		Telegram: TelegramConfig{
+		Bots: BotsConfig{
 			SafeMode: true,
 		},
 		DefaultExecMode: ExecutionModeLocal,
