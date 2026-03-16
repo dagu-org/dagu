@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -220,40 +221,41 @@ func buildNotificationPrompt(s *exec.DAGRunStatus) string {
 		intro = "A DAG run just completed. Please write a brief, helpful notification message for the user about this event. Keep it concise (2-4 sentences). Include the key facts and any actionable information."
 	}
 
-	prompt := fmt.Sprintf(`%s
+	var prompt strings.Builder
+	fmt.Fprintf(&prompt, `%s
 
 DAG Name: %s
 Status: %s
 DAG Run ID: %s`, intro, s.Name, s.Status.String(), s.DAGRunID)
 
 	if s.Error != "" {
-		prompt += fmt.Sprintf("\nError: %s", s.Error)
+		fmt.Fprintf(&prompt, "\nError: %s", s.Error)
 	}
 	if s.StartedAt != "" {
-		prompt += fmt.Sprintf("\nStarted: %s", s.StartedAt)
+		fmt.Fprintf(&prompt, "\nStarted: %s", s.StartedAt)
 	}
 	if s.FinishedAt != "" {
-		prompt += fmt.Sprintf("\nFinished: %s", s.FinishedAt)
+		fmt.Fprintf(&prompt, "\nFinished: %s", s.FinishedAt)
 	}
 	if s.Log != "" {
-		prompt += fmt.Sprintf("\nLog file: %s", s.Log)
+		fmt.Fprintf(&prompt, "\nLog file: %s", s.Log)
 	}
 
 	// Include step summary
 	if len(s.Nodes) > 0 {
-		prompt += "\n\nStep results:"
+		prompt.WriteString("\n\nStep results:")
 		for _, n := range s.Nodes {
 			line := fmt.Sprintf("\n- %s: %s", n.Step.Name, n.Status.String())
 			if n.Error != "" {
 				line += fmt.Sprintf(" (error: %s)", n.Error)
 			}
-			prompt += line
+			prompt.WriteString(line)
 		}
 	}
 
-	prompt += "\n\nWrite a notification message. Do NOT use tools or execute any commands. Just write the message text directly."
+	prompt.WriteString("\n\nWrite a notification message. Do NOT use tools or execute any commands. Just write the message text directly.")
 
-	return prompt
+	return prompt.String()
 }
 
 // waitForAgentResponse polls the agent session for a response with a timeout.

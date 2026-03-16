@@ -284,4 +284,3 @@ func runStartAll(ctx *Context, _ []string) error {
 
 	return firstErr
 }
-

@@ -39,9 +39,9 @@ type Config struct {
 
 // chatState tracks the agent session state for a single Telegram chat.
 type chatState struct {
-	sessionID  string
-	subCancel  context.CancelFunc
-	mu         sync.Mutex
+	sessionID       string
+	subCancel       context.CancelFunc
+	mu              sync.Mutex
 	pendingPromptID string
 }
 
@@ -159,12 +159,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	} else {
 		// Rotate session if approaching context limit
 		if b.shouldRotateSession(ctx, cs, user.UserID) {
-			b.sendText(chatID, "(Session rotated — context limit reached)")
-			b.resetChat(cs)
-		}
-
-		if cs.sessionID == "" {
-			b.createSession(ctx, cs, chatID, user, text)
+			b.rotateSession(ctx, cs, chatID, user, text)
 		} else {
 			b.sendMessage(ctx, cs, chatID, user, text)
 		}
@@ -579,6 +574,76 @@ func splitMessage(text string, maxLen int) []string {
 	}
 
 	return chunks
+}
+
+// rotateSession creates a new session carrying forward recent context from the
+// old session. The user's new message is prepended with a summary of the recent
+// conversation so the agent doesn't lose context.
+func (b *Bot) rotateSession(ctx context.Context, cs *chatState, chatID int64, user agent.UserIdentity, text string) {
+	cs.mu.Lock()
+	oldSID := cs.sessionID
+	cs.mu.Unlock()
+
+	// Collect the last few assistant messages as context summary
+	var summary string
+	if oldSID != "" {
+		summary = b.buildSessionSummary(ctx, oldSID, user.UserID)
+	}
+
+	b.resetChat(cs)
+	b.sendText(chatID, "(Session context limit reached — continuing with recent context carried forward)")
+
+	// Prepend the summary to the user's message so the new session has context
+	var message string
+	if summary != "" {
+		message = fmt.Sprintf("[Previous conversation summary:\n%s]\n\n%s", summary, text)
+	} else {
+		message = text
+	}
+
+	b.createSession(ctx, cs, chatID, user, message)
+}
+
+// buildSessionSummary extracts the last few assistant messages from a session
+// to use as context when rotating to a new session.
+func (b *Bot) buildSessionSummary(ctx context.Context, sessionID, userID string) string {
+	detail, err := b.agentAPI.GetSessionDetail(ctx, sessionID, userID)
+	if err != nil || detail == nil {
+		return ""
+	}
+
+	// Collect the last few user+assistant exchanges (up to 3 pairs)
+	const maxExchanges = 3
+	var exchanges []string
+	var count int
+
+	// Walk backwards through messages
+	for i := len(detail.Messages) - 1; i >= 0 && count < maxExchanges; i-- {
+		msg := detail.Messages[i]
+		switch msg.Type {
+		case agent.MessageTypeAssistant:
+			if msg.Content != "" {
+				content := msg.Content
+				if len(content) > 300 {
+					content = content[:300] + "..."
+				}
+				exchanges = append([]string{"Assistant: " + content}, exchanges...)
+			}
+		case agent.MessageTypeUser:
+			if msg.Content != "" {
+				content := msg.Content
+				if len(content) > 200 {
+					content = content[:200] + "..."
+				}
+				exchanges = append([]string{"User: " + content}, exchanges...)
+				count++
+			}
+		case agent.MessageTypeError, agent.MessageTypeUIAction, agent.MessageTypeUserPrompt:
+			// Skip non-conversational messages in summary
+		}
+	}
+
+	return strings.Join(exchanges, "\n")
 }
 
 // shouldRotateSession checks if the session's token usage has reached
