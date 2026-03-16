@@ -34,7 +34,7 @@ export function ChatMessages({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, pendingUserMessage, isWorking]);
 
   const completedToolCallIds = useMemo(() => {
     const ids = new Set<string>();
