@@ -48,6 +48,10 @@ const (
 	// ServiceAgent is for the agent executor (runs DAGs).
 	// Requires: Core, Paths, Queues (to check if distributed execution is enabled)
 	ServiceAgent
+
+	// ServiceBots is the bot service (Telegram, etc.).
+	// Requires: Core, Paths, Bots config, and Proc for agent stores.
+	ServiceBots
 )
 
 // ConfigLoader reads and merges configuration from various sources.
@@ -103,9 +107,10 @@ const (
 	SectionTunnel                                // 512
 	SectionLicense                               // 1024
 	SectionProc                                  // 2048
+	SectionBots                                  // 4096
 
 	// SectionAll combines all sections (useful for ServiceNone/CLI)
-	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel | SectionLicense | SectionProc
+	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel | SectionLicense | SectionProc | SectionBots
 )
 
 // serviceRequirements maps services to their required config sections using bitwise OR.
@@ -116,6 +121,7 @@ var serviceRequirements = map[Service]ConfigSection{
 	ServiceWorker:      SectionWorker | SectionCoordinator | SectionProc,
 	ServiceCoordinator: SectionCoordinator | SectionProc,
 	ServiceAgent:       SectionQueues | SectionProc,
+	ServiceBots:        SectionBots | SectionProc,
 }
 
 // requires checks if the loader's service requires the given config section.
@@ -259,6 +265,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		{SectionMonitoring, func() { l.loadMonitoringConfig(&cfg, def) }},
 		{SectionGitSync, func() { l.loadGitSyncConfig(&cfg, def) }},
 		{SectionTunnel, func() { l.loadTunnelConfig(&cfg, def) }},
+		{SectionBots, func() { l.loadBotsConfig(&cfg, def) }},
 		{SectionLicense, func() { l.loadLicenseConfig(&cfg, def) }},
 	}
 
@@ -1078,6 +1085,42 @@ func setDefaultIfNotPositive(target *int, defaultValue int) {
 	}
 }
 
+func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
+	// Default safe mode to true
+	cfg.Bots.SafeMode = true
+
+	// Check env var override for provider
+	if provider := l.v.GetString("bots.provider"); provider != "" {
+		cfg.Bots.Provider = BotProvider(provider)
+	}
+
+	// Check env var override for token
+	if token := l.v.GetString("bots.telegram.token"); token != "" {
+		cfg.Bots.Telegram.Token = token
+	}
+
+	if def.Bots == nil {
+		return
+	}
+
+	if cfg.Bots.Provider == BotProviderNone {
+		cfg.Bots.Provider = BotProvider(def.Bots.Provider)
+	}
+
+	if def.Bots.SafeMode != nil {
+		cfg.Bots.SafeMode = *def.Bots.SafeMode
+	}
+
+	if def.Bots.Telegram != nil {
+		if cfg.Bots.Telegram.Token == "" {
+			cfg.Bots.Telegram.Token = def.Bots.Telegram.Token
+		}
+		if len(def.Bots.Telegram.AllowedChatIDs) > 0 {
+			cfg.Bots.Telegram.AllowedChatIDs = def.Bots.Telegram.AllowedChatIDs
+		}
+	}
+}
+
 func (l *ConfigLoader) loadLicenseConfig(cfg *Config, def Definition) {
 	if def.License == nil {
 		return
@@ -1519,6 +1562,12 @@ var envBindings = []envBinding{
 	{key: "tunnel.rate_limiting.login_attempts", env: "TUNNEL_RATE_LIMITING_LOGIN_ATTEMPTS"},
 	{key: "tunnel.rate_limiting.window_seconds", env: "TUNNEL_RATE_LIMITING_WINDOW_SECONDS"},
 	{key: "tunnel.rate_limiting.block_duration_seconds", env: "TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS"},
+
+	// Bots
+	{key: "bots.provider", env: "BOTS_PROVIDER"},
+	{key: "bots.safe_mode", env: "BOTS_SAFE_MODE"},
+	{key: "bots.telegram.token", env: "BOTS_TELEGRAM_TOKEN"},
+	{key: "bots.telegram.allowed_chat_ids", env: "BOTS_TELEGRAM_ALLOWED_CHAT_IDS"},
 
 	// License
 	{key: "license.key", env: "LICENSE_KEY"},

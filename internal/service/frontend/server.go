@@ -116,6 +116,7 @@ type Server struct {
 	licenseManager     *license.Manager
 	remoteNodeResolver *remotenode.Resolver
 	upgradeStore       upgrade.CacheStore
+	agentAPICallback   func(*agent.API)
 }
 
 // ServerOption is a functional option for configuring the Server.
@@ -134,6 +135,15 @@ func WithLicenseManager(m *license.Manager) ServerOption {
 		if m != nil {
 			s.licenseManager = m
 		}
+	}
+}
+
+// WithAgentAPICallback registers a callback that is invoked with the agent API
+// instance after the server creates it. This allows external consumers (e.g. the
+// Telegram bot) to receive the agent API without the server permanently exposing it.
+func WithAgentAPICallback(fn func(*agent.API)) ServerOption {
+	return func(s *Server) {
+		s.agentAPICallback = fn
 	}
 }
 
@@ -386,6 +396,11 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	for _, opt := range opts {
 		opt(srv)
+	}
+
+	// Notify callback with the agent API instance (if both are set).
+	if srv.agentAPICallback != nil && srv.agentAPI != nil {
+		srv.agentAPICallback(srv.agentAPI)
 	}
 
 	// Populate license checker and manager in funcsConfig after opts

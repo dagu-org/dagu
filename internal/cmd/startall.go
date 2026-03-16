@@ -13,10 +13,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/frontend"
 	"github.com/dagu-org/dagu/internal/service/resource"
+	"github.com/dagu-org/dagu/internal/service/telegram"
 	"github.com/spf13/cobra"
 )
 
@@ -116,8 +120,18 @@ func runStartAll(ctx *Context, _ []string) error {
 	// Initialize resource monitoring service
 	resourceService := resource.NewService(ctx.Config)
 
+	// Capture the agent API via callback so it can be shared with bots
+	// without the server permanently exposing its internals.
+	var agentAPI *agent.API
+	var serverOpts []frontend.ServerOption
+	if ctx.Config.Bots.Provider != config.BotProviderNone {
+		serverOpts = append(serverOpts, frontend.WithAgentAPICallback(func(api *agent.API) {
+			agentAPI = api
+		}))
+	}
+
 	// Use serviceCtx so auth initialization can respond to termination signals
-	server, err := serviceCtx.NewServer(resourceService)
+	server, err := serviceCtx.NewServer(resourceService, serverOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
@@ -135,6 +149,26 @@ func runStartAll(ctx *Context, _ []string) error {
 		logger.Info(serviceCtx, "Coordinator disabled via configuration")
 	}
 
+	// Initialize Telegram bot if selected as provider
+	var tgBot *telegram.Bot
+	if ctx.Config.Bots.Provider == config.BotProviderTelegram && agentAPI != nil {
+		tgBot, err = telegram.New(
+			telegram.Config{
+				Token:          ctx.Config.Bots.Telegram.Token,
+				AllowedChatIDs: ctx.Config.Bots.Telegram.AllowedChatIDs,
+				SafeMode:       ctx.Config.Bots.SafeMode,
+				DAGRunStore:    ctx.DAGRunStore,
+			},
+			agentAPI,
+			slog.Default(),
+		)
+		if err != nil {
+			logger.Warn(serviceCtx, "Failed to initialize Telegram bot", tag.Error(err))
+		} else {
+			logger.Info(serviceCtx, "Telegram bot initialized")
+		}
+	}
+
 	// Start resource monitoring service (starts its own goroutine internally)
 	if err := resourceService.Start(serviceCtx); err != nil {
 		return fmt.Errorf("failed to start resource service: %w", err)
@@ -144,6 +178,9 @@ func runStartAll(ctx *Context, _ []string) error {
 	var wg sync.WaitGroup
 	serviceCount := 2 // scheduler + server
 	if coord != nil {
+		serviceCount++
+	}
+	if tgBot != nil {
 		serviceCount++
 	}
 	errCh := make(chan error, serviceCount)
@@ -166,6 +203,18 @@ func runStartAll(ctx *Context, _ []string) error {
 			if err := coord.Start(serviceCtx); err != nil {
 				select {
 				case errCh <- fmt.Errorf("coordinator failed: %w", err):
+				default:
+				}
+			}
+		})
+	}
+
+	// Start Telegram bot
+	if tgBot != nil {
+		wg.Go(func() {
+			if err := tgBot.Run(signalCtx); err != nil {
+				select {
+				case errCh <- fmt.Errorf("telegram bot failed: %w", err):
 				default:
 				}
 			}
