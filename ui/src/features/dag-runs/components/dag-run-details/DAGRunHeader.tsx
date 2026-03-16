@@ -152,6 +152,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
               </StatusChip>
             )}
             <AutoRetryBadge
+              status={dagRun.status}
               count={dagRun.autoRetryCount}
               limit={dagRun.autoRetryLimit}
             />

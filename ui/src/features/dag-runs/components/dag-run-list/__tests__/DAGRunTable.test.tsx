@@ -74,8 +74,8 @@ describe('DAGRunTable', () => {
               {
                 dagRunId: 'run-1',
                 name: 'scheduled-dag',
-                status: Status.Queued,
-                statusLabel: StatusLabel.queued,
+                status: Status.Failed,
+                statusLabel: StatusLabel.failed,
                 autoRetryCount: 1,
                 autoRetryLimit: 3,
                 triggerType: TriggerType.scheduler,

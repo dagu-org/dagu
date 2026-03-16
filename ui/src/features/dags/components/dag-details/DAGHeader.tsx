@@ -244,6 +244,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
               {dagRunToDisplay.statusLabel || ''}
             </StatusChip>
             <AutoRetryBadge
+              status={dagRunToDisplay.status}
               count={dagRunToDisplay.autoRetryCount}
               limit={dagRunToDisplay.autoRetryLimit}
             />

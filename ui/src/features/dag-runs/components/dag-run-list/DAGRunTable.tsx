@@ -272,6 +272,7 @@ function DAGRunTable({
                     {dagRun.statusLabel}
                   </StatusChip>
                   <AutoRetryBadge
+                    status={dagRun.status}
                     count={dagRun.autoRetryCount}
                     limit={dagRun.autoRetryLimit}
                     className="text-[10px]"
@@ -416,6 +417,7 @@ function DAGRunTable({
                       {dagRun.statusLabel}
                     </StatusChip>
                     <AutoRetryBadge
+                      status={dagRun.status}
                       count={dagRun.autoRetryCount}
                       limit={dagRun.autoRetryLimit}
                       className="text-[10px]"

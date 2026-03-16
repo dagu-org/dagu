@@ -74,6 +74,7 @@ export function KanbanCard({ run, onClick }: Props): React.ReactElement {
               {run.statusLabel}
             </StatusChip>
             <AutoRetryBadge
+              status={run.status}
               count={run.autoRetryCount}
               limit={run.autoRetryLimit}
               className="text-[11px]"
