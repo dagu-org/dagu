@@ -451,7 +451,8 @@ func (a *API) appendPersistedSessions(ctx context.Context, userID string, active
 	return sessions
 }
 
-// getStoredSessionCost sums the cost of all messages in a stored session.
+// getStoredSessionCost sums the cost of all messages in a stored session,
+// including costs from delegate sub-sessions.
 func (a *API) getStoredSessionCost(ctx context.Context, sessionID string) float64 {
 	if a.store == nil {
 		return 0
@@ -460,6 +461,11 @@ func (a *API) getStoredSessionCost(ctx context.Context, sessionID string) float6
 	if err != nil {
 		return 0
 	}
+	return sumMessageCosts(messages) + a.sumSubSessionCosts(ctx, sessionID)
+}
+
+// sumMessageCosts sums the Cost field across a slice of messages.
+func sumMessageCosts(messages []Message) float64 {
 	var total float64
 	for _, msg := range messages {
 		if msg.Cost != nil {
@@ -467,6 +473,38 @@ func (a *API) getStoredSessionCost(ctx context.Context, sessionID string) float6
 		}
 	}
 	return total
+}
+
+// sumSubSessionCosts returns the total cost from all direct sub-session messages.
+func (a *API) sumSubSessionCosts(ctx context.Context, sessionID string) float64 {
+	if a.store == nil {
+		return 0
+	}
+	subSessions, err := a.store.ListSubSessions(ctx, sessionID)
+	if err != nil {
+		return 0
+	}
+	var total float64
+	for _, sub := range subSessions {
+		subMessages, err := a.store.GetMessages(ctx, sub.ID)
+		if err != nil {
+			continue
+		}
+		total += sumMessageCosts(subMessages)
+	}
+	return total
+}
+
+// sumSessionMessageCosts loads messages for a single session and sums their costs.
+func (a *API) sumSessionMessageCosts(ctx context.Context, sessionID string) float64 {
+	if a.store == nil {
+		return 0
+	}
+	messages, err := a.store.GetMessages(ctx, sessionID)
+	if err != nil {
+		return 0
+	}
+	return sumMessageCosts(messages)
 }
 
 // getActiveSession retrieves an active session if it exists and belongs to the user.
@@ -863,9 +901,8 @@ func (a *API) ListSessionsPaginated(ctx context.Context, userID string, page, pe
 					continue
 				}
 				combined = append(combined, SessionWithState{
-					Session:   *sess,
-					Working:   false,
-					TotalCost: a.getStoredSessionCost(ctx, sess.ID),
+					Session: *sess,
+					Working: false,
 				})
 			}
 		}
@@ -874,8 +911,16 @@ func (a *API) ListSessionsPaginated(ctx context.Context, userID string, page, pe
 	total := len(combined)
 	start := min(pg.Offset(), total)
 	end := min(pg.Offset()+pg.Limit(), total)
+	pageItems := combined[start:end]
 
-	return exec.NewPaginatedResult(combined[start:end], total, pg)
+	// Load costs only for the visible page's inactive sessions.
+	for i := range pageItems {
+		if _, isActive := activeIDs[pageItems[i].Session.ID]; !isActive {
+			pageItems[i].TotalCost = a.getStoredSessionCost(ctx, pageItems[i].Session.ID)
+		}
+	}
+
+	return exec.NewPaginatedResult(pageItems, total, pg)
 }
 
 // GetSessionDetail returns session details including messages and state.
@@ -900,12 +945,7 @@ func (a *API) GetSessionDetail(ctx context.Context, sessionID, userID string) (*
 		return nil, err
 	}
 
-	var totalCost float64
-	for _, msg := range messages {
-		if msg.Cost != nil {
-			totalCost += *msg.Cost
-		}
-	}
+	totalCost := sumMessageCosts(messages) + a.sumSubSessionCosts(ctx, sessionID)
 
 	return &StreamResponse{
 		Messages: messages,
@@ -935,6 +975,7 @@ func (a *API) getStoredDelegateSnapshots(ctx context.Context, sessionID string) 
 			ID:     sub.ID,
 			Task:   sub.DelegateTask,
 			Status: DelegateStatusCompleted,
+			Cost:   a.sumSessionMessageCosts(ctx, sub.ID),
 		})
 	}
 

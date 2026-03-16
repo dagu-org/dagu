@@ -1750,3 +1750,140 @@ func TestAPI_ListSessionsPaginated_ShowsCostForInactiveSessions(t *testing.T) {
 	require.Len(t, result.Items, 1)
 	assert.InDelta(t, 0.10, result.Items[0].TotalCost, 1e-9, "paginated inactive session should show cost")
 }
+
+// createCostTestAPI creates an API with a session store for cost tests.
+func createCostTestAPI(t *testing.T) (*API, *mockSessionStore) {
+	t.Helper()
+	model := testModelConfig("cost-test-model")
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = model.ID
+	sessStore := newMockSessionStore()
+	api := NewAPI(APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   newMockModelStore().addModel(model),
+		WorkingDir:   t.TempDir(),
+		SessionStore: sessStore,
+	})
+	return api, sessStore
+}
+
+// seedParentWithDelegate creates a parent session and a delegate sub-session
+// with the given costs, returning the parent session ID.
+func seedParentWithDelegate(t *testing.T, store *mockSessionStore, parentCost, delegateCost float64) string {
+	t.Helper()
+	now := time.Now()
+
+	parent := &Session{
+		ID:        "parent-cost-sess",
+		UserID:    defaultUserID,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	require.NoError(t, store.CreateSession(context.Background(), parent))
+	require.NoError(t, store.AddMessage(context.Background(), parent.ID, &Message{
+		ID:   "parent-msg-1",
+		Type: MessageTypeAssistant,
+		Cost: &parentCost,
+	}))
+
+	sub := &Session{
+		ID:              "delegate-cost-sess",
+		UserID:          defaultUserID,
+		ParentSessionID: parent.ID,
+		DelegateTask:    "analyze data",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	require.NoError(t, store.CreateSession(context.Background(), sub))
+	require.NoError(t, store.AddMessage(context.Background(), sub.ID, &Message{
+		ID:   "delegate-msg-1",
+		Type: MessageTypeAssistant,
+		Cost: &delegateCost,
+	}))
+
+	return parent.ID
+}
+
+func TestAPI_ListSessions_ShowsCostIncludingDelegates(t *testing.T) {
+	t.Parallel()
+
+	api, store := createCostTestAPI(t)
+	seedParentWithDelegate(t, store, 0.05, 0.03)
+
+	sessions := api.ListSessions(context.Background(), defaultUserID)
+
+	// Only the parent session should appear (sub-sessions are excluded).
+	require.Len(t, sessions, 1)
+	assert.Equal(t, "parent-cost-sess", sessions[0].Session.ID)
+	assert.InDelta(t, 0.08, sessions[0].TotalCost, 1e-9,
+		"TotalCost should include both parent (0.05) and delegate (0.03) costs")
+}
+
+func TestAPI_GetSessionDetail_ShowsCostIncludingDelegates(t *testing.T) {
+	t.Parallel()
+
+	api, store := createCostTestAPI(t)
+	seedParentWithDelegate(t, store, 0.10, 0.04)
+
+	resp, err := api.GetSessionDetail(context.Background(), "parent-cost-sess", defaultUserID)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.SessionState)
+
+	assert.InDelta(t, 0.14, resp.SessionState.TotalCost, 1e-9,
+		"GetSessionDetail TotalCost should include delegate sub-session costs")
+
+	// Delegate snapshots should also include per-delegate cost.
+	require.Len(t, resp.Delegates, 1)
+	assert.Equal(t, "analyze data", resp.Delegates[0].Task)
+	assert.InDelta(t, 0.04, resp.Delegates[0].Cost, 1e-9,
+		"delegate snapshot should include its own cost")
+}
+
+func TestAPI_ListSessionsPaginated_ShowsCostIncludingDelegates(t *testing.T) {
+	t.Parallel()
+
+	api, store := createCostTestAPI(t)
+	seedParentWithDelegate(t, store, 0.06, 0.02)
+
+	result := api.ListSessionsPaginated(context.Background(), defaultUserID, 1, 10)
+
+	require.Len(t, result.Items, 1)
+	assert.InDelta(t, 0.08, result.Items[0].TotalCost, 1e-9,
+		"paginated TotalCost should include delegate costs")
+}
+
+func TestAPI_ListSessionsPaginated_DefersCostToPageSlice(t *testing.T) {
+	t.Parallel()
+
+	api, store := createCostTestAPI(t)
+	now := time.Now()
+
+	// Create 5 persisted sessions with different costs.
+	for i := range 5 {
+		id := fmt.Sprintf("deferred-sess-%d", i)
+		cost := float64(i+1) * 0.01
+		require.NoError(t, store.CreateSession(context.Background(), &Session{
+			ID:        id,
+			UserID:    defaultUserID,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}))
+		require.NoError(t, store.AddMessage(context.Background(), id, &Message{
+			ID:   fmt.Sprintf("msg-%d", i),
+			Type: MessageTypeAssistant,
+			Cost: &cost,
+		}))
+	}
+
+	// Request page 1 with 2 items — should return 2 items, total 5.
+	result := api.ListSessionsPaginated(context.Background(), defaultUserID, 1, 2)
+	assert.Equal(t, 5, result.TotalCount)
+	assert.Len(t, result.Items, 2)
+
+	// Each visible item should have a non-zero TotalCost.
+	for _, item := range result.Items {
+		assert.Greater(t, item.TotalCost, 0.0,
+			"visible page item %s should have cost loaded", item.Session.ID)
+	}
+}
