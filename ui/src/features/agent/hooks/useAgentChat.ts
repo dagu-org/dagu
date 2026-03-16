@@ -252,11 +252,10 @@ export function useAgentChat() {
     const nextMessages = snapshot.messages || [];
     if (
       pendingUserMessage &&
-      (nextMessages.some(
+      nextMessages.some(
         (message) =>
           message.type === 'user' && message.content === pendingUserMessage
-      ) ||
-        snapshot.session_state?.working)
+      )
     ) {
       setPendingUserMessage(null);
     }
@@ -292,11 +291,9 @@ export function useAgentChat() {
       setMessages((current) => mergeMessages(current, event.messages || []));
     }
 
-    // Clear the pending message when the server acknowledges it is working,
-    // even if the user message hasn't appeared in the stream yet.
-    if (pendingUserMessage && event.session_state?.working) {
-      setPendingUserMessage(null);
-    }
+    // Only clear the pending message once the actual user message appears in
+    // the stream. Previously this also cleared on working=true, but that
+    // caused the pending bubble to vanish before the real message arrived.
 
     if (event.session_state) {
       setSessionState(event.session_state);

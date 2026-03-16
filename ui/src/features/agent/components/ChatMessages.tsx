@@ -49,7 +49,7 @@ export function ChatMessages({
     return ids;
   }, [messages]);
 
-  if (messages.length === 0) {
+  if (messages.length === 0 && !pendingUserMessage) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground p-4 bg-popover">
         <div className="text-center">
