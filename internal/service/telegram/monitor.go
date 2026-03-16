@@ -242,7 +242,11 @@ func (m *DAGRunMonitor) waitForAgentResponse(ctx context.Context, sessionID, use
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
-	var lastSeqID int64
+	// Track the latest assistant content across all polls, not just within
+	// a single poll. The assistant message may arrive while Working is still
+	// true, and by the next poll (when Working is false) there are no new
+	// messages — so we must remember what we saw earlier.
+	var latestAssistant string
 
 	for {
 		select {
@@ -259,21 +263,23 @@ func (m *DAGRunMonitor) waitForAgentResponse(ctx context.Context, sessionID, use
 				continue
 			}
 
-			// Find the latest assistant message
-			var latestAssistant string
+			// Scan all messages for the latest assistant content.
 			for _, msg := range detail.Messages {
-				if msg.SequenceID <= lastSeqID {
-					continue
-				}
-				lastSeqID = msg.SequenceID
 				if msg.Type == agent.MessageTypeAssistant && msg.Content != "" {
 					latestAssistant = msg.Content
 				}
 			}
 
 			// If agent is done working and we have a response, return it
-			if detail.SessionState != nil && !detail.SessionState.Working && latestAssistant != "" {
-				return latestAssistant
+			if detail.SessionState != nil && !detail.SessionState.Working {
+				if latestAssistant != "" {
+					return latestAssistant
+				}
+				// Agent finished but produced no text — give up
+				m.logger.Warn("Agent finished without producing a text response",
+					slog.String("session", sessionID),
+				)
+				return ""
 			}
 		}
 	}
