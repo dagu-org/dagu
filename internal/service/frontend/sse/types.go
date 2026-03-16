@@ -29,8 +29,8 @@ const (
 
 // Default configuration constants for the multiplexer.
 const (
-	defaultMaxClients  = 1000
-	heartbeatInterval  = 10 * time.Second
+	defaultMaxClients   = 1000
+	heartbeatInterval   = 10 * time.Second
 	defaultBaseInterval = time.Second      // Minimum polling interval
 	defaultMaxInterval  = 10 * time.Second // Maximum polling interval cap
 	intervalMultiplier  = 3                // interval = multiplier * fetchDuration

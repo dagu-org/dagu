@@ -442,12 +442,31 @@ func (a *API) appendPersistedSessions(ctx context.Context, userID string, active
 			continue
 		}
 		sessions = append(sessions, SessionWithState{
-			Session: *sess,
-			Working: false,
+			Session:   *sess,
+			Working:   false,
+			TotalCost: a.getStoredSessionCost(ctx, sess.ID),
 		})
 	}
 
 	return sessions
+}
+
+// getStoredSessionCost sums the cost of all messages in a stored session.
+func (a *API) getStoredSessionCost(ctx context.Context, sessionID string) float64 {
+	if a.store == nil {
+		return 0
+	}
+	messages, err := a.store.GetMessages(ctx, sessionID)
+	if err != nil {
+		return 0
+	}
+	var total float64
+	for _, msg := range messages {
+		if msg.Cost != nil {
+			total += *msg.Cost
+		}
+	}
+	return total
 }
 
 // getActiveSession retrieves an active session if it exists and belongs to the user.
@@ -545,6 +564,17 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		delegates = nil
 	}
 
+	// Resolve pricing from the default model so that reactivated sessions
+	// can calculate costs for new messages immediately.
+	var inputCost, outputCost float64
+	defaultModelID := a.getDefaultModelID(ctx)
+	if defaultModelID != "" {
+		if _, modelCfg, err := a.resolveProvider(ctx, defaultModelID); err == nil {
+			inputCost = modelCfg.InputCostPer1M
+			outputCost = modelCfg.OutputCostPer1M
+		}
+	}
+
 	mgr := NewSessionManager(SessionManagerConfig{
 		ID:                 id,
 		User:               user,
@@ -559,6 +589,8 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		Environment:        a.environment,
 		SafeMode:           true, // Default to safe mode for reactivated sessions
 		Hooks:              a.hooks,
+		InputCostPer1M:     inputCost,
+		OutputCostPer1M:    outputCost,
 		MemoryStore:        a.memoryStore,
 		SkillStore:         a.skillStore,
 		EnabledSkills:      a.loadEnabledSkills(ctx),
@@ -830,7 +862,11 @@ func (a *API) ListSessionsPaginated(ctx context.Context, userID string, page, pe
 				if sess.ParentSessionID != "" {
 					continue
 				}
-				combined = append(combined, SessionWithState{Session: *sess})
+				combined = append(combined, SessionWithState{
+					Session:   *sess,
+					Working:   false,
+					TotalCost: a.getStoredSessionCost(ctx, sess.ID),
+				})
 			}
 		}
 	}

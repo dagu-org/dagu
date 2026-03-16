@@ -1621,3 +1621,132 @@ func TestAPI_CreateSession_IdempotentWithSessionID(t *testing.T) {
 		assert.Equal(t, 1, acceptedCount, "exactly one goroutine should win the creation race")
 	})
 }
+
+func TestAPI_ReactivateSession_HasPricing(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("priced-model")
+	model.InputCostPer1M = 3.0
+	model.OutputCostPer1M = 15.0
+
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = model.ID
+	sessStore := newMockSessionStore()
+
+	api := NewAPI(APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   newMockModelStore().addModel(model),
+		WorkingDir:   t.TempDir(),
+		SessionStore: sessStore,
+	})
+	api.providers.Set(model.ToLLMConfig(), newStopProvider("hello"))
+
+	// Create a session, wait for it to finish, then remove from active
+	sessID, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "initial"})
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		mgr, ok := api.sessions.Load(sessID)
+		if !ok {
+			return false
+		}
+		return !mgr.(*SessionManager).IsWorking()
+	}, 5*time.Second, 50*time.Millisecond)
+
+	api.sessions.Delete(sessID)
+
+	// Reactivate via getOrReactivateSession
+	mgr, ok := api.getOrReactivateSession(context.Background(), sessID, UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole})
+	require.True(t, ok)
+
+	// Verify pricing fields are set
+	mgr.mu.Lock()
+	inputCost := mgr.inputCostPer1M
+	outputCost := mgr.outputCostPer1M
+	mgr.mu.Unlock()
+
+	assert.Equal(t, 3.0, inputCost, "reactivated session should have input pricing")
+	assert.Equal(t, 15.0, outputCost, "reactivated session should have output pricing")
+}
+
+func TestAPI_ListSessions_ShowsCostForInactiveSessions(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("cost-model")
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = model.ID
+	sessStore := newMockSessionStore()
+
+	api := NewAPI(APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   newMockModelStore().addModel(model),
+		WorkingDir:   t.TempDir(),
+		SessionStore: sessStore,
+	})
+
+	now := time.Now()
+
+	// Create a persisted session with messages that have costs
+	sess := &Session{
+		ID:        "cost-sess-1",
+		UserID:    defaultUserID,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	require.NoError(t, sessStore.CreateSession(context.Background(), sess))
+
+	cost1, cost2 := 0.05, 0.03
+	require.NoError(t, sessStore.AddMessage(context.Background(), "cost-sess-1", &Message{
+		ID:   "msg-1",
+		Type: MessageTypeAssistant,
+		Cost: &cost1,
+	}))
+	require.NoError(t, sessStore.AddMessage(context.Background(), "cost-sess-1", &Message{
+		ID:   "msg-2",
+		Type: MessageTypeAssistant,
+		Cost: &cost2,
+	}))
+
+	// List sessions (no active sessions, only persisted)
+	sessions := api.ListSessions(context.Background(), defaultUserID)
+	require.Len(t, sessions, 1)
+	assert.InDelta(t, 0.08, sessions[0].TotalCost, 1e-9, "inactive session should show accumulated cost")
+	assert.False(t, sessions[0].Working)
+}
+
+func TestAPI_ListSessionsPaginated_ShowsCostForInactiveSessions(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("cost-model-pag")
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = model.ID
+	sessStore := newMockSessionStore()
+
+	api := NewAPI(APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   newMockModelStore().addModel(model),
+		WorkingDir:   t.TempDir(),
+		SessionStore: sessStore,
+	})
+
+	now := time.Now()
+
+	sess := &Session{
+		ID:        "pag-cost-sess",
+		UserID:    defaultUserID,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	require.NoError(t, sessStore.CreateSession(context.Background(), sess))
+
+	cost := 0.10
+	require.NoError(t, sessStore.AddMessage(context.Background(), "pag-cost-sess", &Message{
+		ID:   "msg-1",
+		Type: MessageTypeAssistant,
+		Cost: &cost,
+	}))
+
+	result := api.ListSessionsPaginated(context.Background(), defaultUserID, 1, 10)
+	require.Len(t, result.Items, 1)
+	assert.InDelta(t, 0.10, result.Items[0].TotalCost, 1e-9, "paginated inactive session should show cost")
+}
