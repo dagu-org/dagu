@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
@@ -119,13 +120,14 @@ func runStartAll(ctx *Context, _ []string) error {
 	// Initialize resource monitoring service
 	resourceService := resource.NewService(ctx.Config)
 
-	// Capture the agent API via callback so it can be shared with the Telegram bot
+	// Capture the agent API via callback so it can be shared with bots
 	// without the server permanently exposing its internals.
 	var agentAPI *agent.API
-	serverOpts := []frontend.ServerOption{
-		frontend.WithAgentAPICallback(func(api *agent.API) {
+	var serverOpts []frontend.ServerOption
+	if ctx.Config.Bots.Provider != config.BotProviderNone {
+		serverOpts = append(serverOpts, frontend.WithAgentAPICallback(func(api *agent.API) {
 			agentAPI = api
-		}),
+		}))
 	}
 
 	// Use serviceCtx so auth initialization can respond to termination signals
@@ -147,9 +149,9 @@ func runStartAll(ctx *Context, _ []string) error {
 		logger.Info(serviceCtx, "Coordinator disabled via configuration")
 	}
 
-	// Initialize Telegram bot if configured
+	// Initialize Telegram bot if selected as provider
 	var tgBot *telegram.Bot
-	if ctx.Config.Bots.Telegram.Token != "" && agentAPI != nil {
+	if ctx.Config.Bots.Provider == config.BotProviderTelegram && agentAPI != nil {
 		tgBot, err = telegram.New(
 			telegram.Config{
 				Token:          ctx.Config.Bots.Telegram.Token,

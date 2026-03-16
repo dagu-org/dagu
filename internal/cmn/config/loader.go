@@ -1089,6 +1089,11 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 	// Default safe mode to true
 	cfg.Bots.SafeMode = true
 
+	// Check env var override for provider
+	if provider := l.v.GetString("bots.provider"); provider != "" {
+		cfg.Bots.Provider = BotProvider(provider)
+	}
+
 	// Check env var override for token
 	if token := l.v.GetString("bots.telegram.token"); token != "" {
 		cfg.Bots.Telegram.Token = token
@@ -1096,6 +1101,10 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 
 	if def.Bots == nil {
 		return
+	}
+
+	if cfg.Bots.Provider == BotProviderNone {
+		cfg.Bots.Provider = BotProvider(def.Bots.Provider)
 	}
 
 	if def.Bots.SafeMode != nil {
@@ -1555,6 +1564,7 @@ var envBindings = []envBinding{
 	{key: "tunnel.rate_limiting.block_duration_seconds", env: "TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS"},
 
 	// Bots
+	{key: "bots.provider", env: "BOTS_PROVIDER"},
 	{key: "bots.safe_mode", env: "BOTS_SAFE_MODE"},
 	{key: "bots.telegram.token", env: "BOTS_TELEGRAM_TOKEN"},
 	{key: "bots.telegram.allowed_chat_ids", env: "BOTS_TELEGRAM_ALLOWED_CHAT_IDS"},

@@ -102,9 +102,9 @@ func runServer(ctx *Context, _ []string) error {
 		serverOpts = append(serverOpts, frontend.WithTunnelService(tunnelService))
 	}
 
-	// If Telegram is configured, capture the agent API via callback to start the bot.
+	// If a bot provider is configured, capture the agent API via callback to start the bot.
 	var agentAPI *agent.API
-	if ctx.Config.Bots.Telegram.Token != "" {
+	if ctx.Config.Bots.Provider != config.BotProviderNone {
 		serverOpts = append(serverOpts, frontend.WithAgentAPICallback(func(api *agent.API) {
 			agentAPI = api
 		}))
@@ -117,8 +117,8 @@ func runServer(ctx *Context, _ []string) error {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
 
-	// Start Telegram bot if configured and agent API is available.
-	if ctx.Config.Bots.Telegram.Token != "" && agentAPI != nil {
+	// Start bot if a provider is configured and agent API is available.
+	if ctx.Config.Bots.Provider == config.BotProviderTelegram && agentAPI != nil {
 		tgBot, tgErr := telegram.New(
 			telegram.Config{
 				Token:          ctx.Config.Bots.Telegram.Token,

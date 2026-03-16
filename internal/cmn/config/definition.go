@@ -415,6 +415,7 @@ type TunnelRateLimitDef struct {
 
 // BotsDef configures bot integrations.
 type BotsDef struct {
+	Provider string          `mapstructure:"provider"`  // "telegram", etc.
 	SafeMode *bool           `mapstructure:"safe_mode"` // Default: true
 	Telegram *TelegramBotDef `mapstructure:"telegram"`
 }

@@ -31,8 +31,17 @@ type Config struct {
 	Warnings        []string
 }
 
+// BotProvider identifies which bot integration to use.
+type BotProvider string
+
+const (
+	BotProviderNone     BotProvider = ""
+	BotProviderTelegram BotProvider = "telegram"
+)
+
 // BotsConfig holds the configuration for bot integrations.
 type BotsConfig struct {
+	Provider BotProvider
 	SafeMode bool
 	Telegram TelegramBotConfig
 }
