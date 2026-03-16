@@ -102,6 +102,7 @@ func runTelegram(ctx *Context, _ []string) error {
 			Token:          ctx.Config.Telegram.Token,
 			AllowedChatIDs: ctx.Config.Telegram.AllowedChatIDs,
 			SafeMode:       ctx.Config.Telegram.SafeMode,
+			DAGRunStore:    ctx.DAGRunStore,
 		},
 		agentAPI,
 		slog.Default(),

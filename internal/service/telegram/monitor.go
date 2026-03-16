@@ -1,0 +1,304 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package telegram
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"sync"
+	"time"
+
+	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
+)
+
+// monitorPollInterval is how often the monitor checks for DAG run status changes.
+const monitorPollInterval = 10 * time.Second
+
+// notifyStatuses are the terminal statuses that trigger a notification.
+var notifyStatuses = []core.Status{
+	core.Succeeded,
+	core.Failed,
+	core.Aborted,
+	core.PartiallySucceeded,
+	core.Rejected,
+}
+
+// DAGRunMonitor watches for DAG run completions and sends AI-generated
+// notifications via Telegram.
+type DAGRunMonitor struct {
+	dagRunStore exec.DAGRunStore
+	agentAPI    *agent.API
+	bot         *Bot
+	logger      *slog.Logger
+
+	// seen tracks DAG runs we've already notified about (dagRunID+attemptID -> true)
+	seen sync.Map
+}
+
+// NewDAGRunMonitor creates a new monitor instance.
+func NewDAGRunMonitor(dagRunStore exec.DAGRunStore, agentAPI *agent.API, bot *Bot, logger *slog.Logger) *DAGRunMonitor {
+	return &DAGRunMonitor{
+		dagRunStore: dagRunStore,
+		agentAPI:    agentAPI,
+		bot:         bot,
+		logger:      logger,
+	}
+}
+
+// Run starts the monitor loop. It polls for completed DAG runs and sends
+// AI-generated notifications to all allowed Telegram chats.
+func (m *DAGRunMonitor) Run(ctx context.Context) {
+	m.logger.Info("DAG run monitor started")
+
+	// Seed the seen set with currently completed runs so we don't notify
+	// about old completions on startup.
+	m.seedSeen(ctx)
+
+	ticker := time.NewTicker(monitorPollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			m.logger.Info("DAG run monitor stopped")
+			return
+		case <-ticker.C:
+			m.checkForCompletions(ctx)
+		}
+	}
+}
+
+// seedSeen marks all currently completed runs as already seen.
+func (m *DAGRunMonitor) seedSeen(ctx context.Context) {
+	now := time.Now()
+	from := exec.NewUTC(now.Add(-24 * time.Hour))
+	to := exec.NewUTC(now)
+
+	statuses, err := m.dagRunStore.ListStatuses(ctx,
+		exec.WithFrom(from),
+		exec.WithTo(to),
+	)
+	if err != nil {
+		m.logger.Warn("Failed to seed monitor with existing runs", slog.String("error", err.Error()))
+		return
+	}
+
+	for _, s := range statuses {
+		if !s.Status.IsActive() {
+			m.markSeen(s)
+		}
+	}
+
+	m.logger.Info("DAG run monitor seeded", slog.Int("existing_runs", len(statuses)))
+}
+
+// checkForCompletions polls for recently completed DAG runs and notifies.
+func (m *DAGRunMonitor) checkForCompletions(ctx context.Context) {
+	now := time.Now()
+	// Look at runs from the last hour to catch anything we might have missed
+	from := exec.NewUTC(now.Add(-1 * time.Hour))
+	to := exec.NewUTC(now)
+
+	statuses, err := m.dagRunStore.ListStatuses(ctx,
+		exec.WithFrom(from),
+		exec.WithTo(to),
+		exec.WithStatuses(notifyStatuses),
+	)
+	if err != nil {
+		m.logger.Debug("Failed to list DAG run statuses", slog.String("error", err.Error()))
+		return
+	}
+
+	for _, s := range statuses {
+		if m.isSeen(s) {
+			continue
+		}
+		m.markSeen(s)
+		m.notifyCompletion(ctx, s)
+	}
+}
+
+// seenKey returns a unique key for a DAG run status.
+func seenKey(s *exec.DAGRunStatus) string {
+	return s.DAGRunID + ":" + s.AttemptID
+}
+
+// markSeen marks a DAG run as already notified.
+func (m *DAGRunMonitor) markSeen(s *exec.DAGRunStatus) {
+	m.seen.Store(seenKey(s), true)
+}
+
+// isSeen checks if we've already sent a notification for this run.
+func (m *DAGRunMonitor) isSeen(s *exec.DAGRunStatus) bool {
+	_, ok := m.seen.Load(seenKey(s))
+	return ok
+}
+
+// notifyCompletion creates an agent session to generate a notification
+// message about a completed DAG run, then sends it to all allowed chats.
+func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStatus) {
+	m.logger.Info("DAG run completed, generating notification",
+		slog.String("dag", s.Name),
+		slog.String("status", s.Status.String()),
+		slog.String("dag_run_id", s.DAGRunID),
+	)
+
+	// Build a prompt for the AI agent to generate a notification
+	prompt := buildNotificationPrompt(s)
+
+	user := agent.UserIdentity{
+		UserID:   "system:telegram-monitor",
+		Username: "telegram-monitor",
+		Role:     auth.RoleAdmin,
+	}
+
+	req := agent.ChatRequest{
+		Message:  prompt,
+		SafeMode: true,
+	}
+
+	sessionID, _, err := m.agentAPI.CreateSession(ctx, user, req)
+	if err != nil {
+		m.logger.Warn("Failed to create notification session",
+			slog.String("dag", s.Name),
+			slog.String("error", err.Error()),
+		)
+		// Fall back to a simple notification
+		m.sendFallbackNotification(s)
+		return
+	}
+
+	// Wait for the agent to generate a response
+	response := m.waitForAgentResponse(ctx, sessionID, user.UserID)
+	if response == "" {
+		m.sendFallbackNotification(s)
+		return
+	}
+
+	// Send the AI-generated message to all allowed chats
+	m.broadcastToChats(response)
+}
+
+// buildNotificationPrompt creates a prompt for the AI agent to analyze
+// a completed DAG run and generate a user-friendly notification.
+func buildNotificationPrompt(s *exec.DAGRunStatus) string {
+	prompt := fmt.Sprintf(`A DAG run just completed. Please write a brief, helpful notification message for the user about this event. Keep it concise (2-4 sentences). Include the key facts and any actionable information.
+
+DAG Name: %s
+Status: %s
+DAG Run ID: %s`, s.Name, s.Status.String(), s.DAGRunID)
+
+	if s.Error != "" {
+		prompt += fmt.Sprintf("\nError: %s", s.Error)
+	}
+	if s.StartedAt != "" {
+		prompt += fmt.Sprintf("\nStarted: %s", s.StartedAt)
+	}
+	if s.FinishedAt != "" {
+		prompt += fmt.Sprintf("\nFinished: %s", s.FinishedAt)
+	}
+	if s.Log != "" {
+		prompt += fmt.Sprintf("\nLog file: %s", s.Log)
+	}
+
+	// Include step summary
+	if len(s.Nodes) > 0 {
+		prompt += "\n\nStep results:"
+		for _, n := range s.Nodes {
+			line := fmt.Sprintf("\n- %s: %s", n.Step.Name, n.Status.String())
+			if n.Error != "" {
+				line += fmt.Sprintf(" (error: %s)", n.Error)
+			}
+			prompt += line
+		}
+	}
+
+	prompt += "\n\nWrite a notification message. Do NOT use tools or execute any commands. Just write the message text directly."
+
+	return prompt
+}
+
+// waitForAgentResponse polls the agent session for a response with a timeout.
+func (m *DAGRunMonitor) waitForAgentResponse(ctx context.Context, sessionID, userID string) string {
+	timeout := time.After(30 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	var lastSeqID int64
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ""
+		case <-timeout:
+			m.logger.Warn("Timeout waiting for agent notification response",
+				slog.String("session", sessionID),
+			)
+			return ""
+		case <-ticker.C:
+			detail, err := m.agentAPI.GetSessionDetail(ctx, sessionID, userID)
+			if err != nil || detail == nil {
+				continue
+			}
+
+			// Find the latest assistant message
+			var latestAssistant string
+			for _, msg := range detail.Messages {
+				if msg.SequenceID <= lastSeqID {
+					continue
+				}
+				lastSeqID = msg.SequenceID
+				if msg.Type == agent.MessageTypeAssistant && msg.Content != "" {
+					latestAssistant = msg.Content
+				}
+			}
+
+			// If agent is done working and we have a response, return it
+			if detail.SessionState != nil && !detail.SessionState.Working && latestAssistant != "" {
+				return latestAssistant
+			}
+		}
+	}
+}
+
+// sendFallbackNotification sends a simple non-AI notification when the agent
+// is unavailable or fails to generate a response.
+func (m *DAGRunMonitor) sendFallbackNotification(s *exec.DAGRunStatus) {
+	emoji := statusEmoji(s.Status)
+	text := fmt.Sprintf("%s DAG '%s' %s", emoji, s.Name, s.Status.String())
+	if s.Error != "" {
+		text += "\nError: " + s.Error
+	}
+	m.broadcastToChats(text)
+}
+
+// broadcastToChats sends a message to all allowed Telegram chats.
+func (m *DAGRunMonitor) broadcastToChats(text string) {
+	if len(m.bot.allowedChats) == 0 {
+		m.logger.Warn("No allowed chats configured, cannot send notification")
+		return
+	}
+
+	for chatID := range m.bot.allowedChats {
+		m.bot.sendLongText(chatID, text)
+	}
+}
+
+// statusEmoji returns an emoji for the DAG run status.
+func statusEmoji(s core.Status) string {
+	switch s { //nolint:exhaustive // only terminal statuses are notified
+	case core.Succeeded, core.PartiallySucceeded:
+		return "\u2705" // green check
+	case core.Failed, core.Rejected:
+		return "\u274C" // red X
+	case core.Aborted:
+		return "\u26A0\uFE0F" // warning
+	default:
+		return "\u2139\uFE0F" // info
+	}
+}

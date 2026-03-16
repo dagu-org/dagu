@@ -16,6 +16,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -27,6 +28,7 @@ type Config struct {
 	Token          string
 	AllowedChatIDs []int64
 	SafeMode       bool
+	DAGRunStore    exec.DAGRunStore // optional: enables DAG run monitoring
 }
 
 // chatState tracks the agent session state for a single Telegram chat.
@@ -44,6 +46,7 @@ type Bot struct {
 	botAPI       *tgbotapi.BotAPI
 	chats        sync.Map // chatID (int64) -> *chatState
 	allowedChats map[int64]struct{}
+	dagRunStore  exec.DAGRunStore
 	logger       *slog.Logger
 }
 
@@ -68,6 +71,7 @@ func New(cfg Config, agentAPI *agent.API, logger *slog.Logger) (*Bot, error) {
 		agentAPI:     agentAPI,
 		botAPI:       botAPI,
 		allowedChats: allowed,
+		dagRunStore:  cfg.DAGRunStore,
 		logger:       logger,
 	}, nil
 }
@@ -78,6 +82,12 @@ func (b *Bot) Run(ctx context.Context) error {
 		slog.String("username", b.botAPI.Self.UserName),
 		slog.Int("allowed_chats", len(b.allowedChats)),
 	)
+
+	// Start DAG run monitor if a DAGRunStore is available
+	if b.dagRunStore != nil {
+		monitor := NewDAGRunMonitor(b.dagRunStore, b.agentAPI, b, b.logger)
+		go monitor.Run(ctx)
+	}
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 30

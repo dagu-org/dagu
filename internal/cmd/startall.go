@@ -319,6 +319,7 @@ func initTelegramBot(serviceCtx *Context, ctx *Context) (*telegram.Bot, error) {
 			Token:          ctx.Config.Telegram.Token,
 			AllowedChatIDs: ctx.Config.Telegram.AllowedChatIDs,
 			SafeMode:       ctx.Config.Telegram.SafeMode,
+			DAGRunStore:    ctx.DAGRunStore,
 		},
 		agentAPI,
 		slog.Default(),
