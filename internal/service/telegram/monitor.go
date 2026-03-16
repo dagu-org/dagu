@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 )
@@ -140,8 +139,9 @@ func (m *DAGRunMonitor) isSeen(s *exec.DAGRunStatus) bool {
 	return ok
 }
 
-// notifyCompletion creates an agent session to generate a notification
-// message about a completed DAG run, then sends it to all allowed chats.
+// notifyCompletion creates an agent session per chat to generate a notification
+// about a completed DAG run. The session is adopted by the chat so the user
+// can continue the conversation (e.g., ask follow-up questions about the run).
 func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStatus) {
 	m.logger.Info("DAG run completed, generating notification",
 		slog.String("dag", s.Name),
@@ -154,18 +154,27 @@ func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStat
 		return
 	}
 
-	// Build a prompt for the AI agent to generate a notification
+	if len(m.bot.allowedChats) == 0 {
+		m.logger.Warn("No allowed chats configured, cannot send notification")
+		return
+	}
+
 	prompt := buildNotificationPrompt(s)
 
-	user := agent.UserIdentity{
-		UserID:   "system:telegram-monitor",
-		Username: "telegram-monitor",
-		Role:     auth.RoleAdmin,
+	// Create a separate session for each chat so each user can follow up.
+	for chatID := range m.bot.allowedChats {
+		m.notifyChat(ctx, chatID, s, prompt)
 	}
+}
+
+// notifyChat creates an agent session for a specific chat, waits for the
+// response, sends it, and adopts the session so the user can follow up.
+func (m *DAGRunMonitor) notifyChat(ctx context.Context, chatID int64, s *exec.DAGRunStatus, prompt string) {
+	user := m.bot.userIdentityFromChatID(chatID)
 
 	req := agent.ChatRequest{
 		Message:  prompt,
-		SafeMode: false, // no tools needed for generating a notification message
+		SafeMode: false,
 	}
 
 	sessionID, _, err := m.agentAPI.CreateSession(ctx, user, req)
@@ -174,20 +183,31 @@ func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStat
 			slog.String("dag", s.Name),
 			slog.String("error", err.Error()),
 		)
-		// Fall back to a simple notification with the error reason
-		m.sendFallbackNotification(s, fmt.Sprintf("(AI unavailable: %s)", err.Error()))
+		m.bot.sendText(chatID, fmt.Sprintf("%s DAG '%s' %s\n(AI unavailable: %s)",
+			statusEmoji(s.Status), s.Name, s.Status.String(), err.Error()))
 		return
 	}
 
 	// Wait for the agent to generate a response
 	response := m.waitForAgentResponse(ctx, sessionID, user.UserID)
 	if response == "" {
-		m.sendFallbackNotification(s, "(AI agent timed out)")
+		m.bot.sendText(chatID, fmt.Sprintf("%s DAG '%s' %s\n(AI agent timed out)",
+			statusEmoji(s.Status), s.Name, s.Status.String()))
 		return
 	}
 
-	// Send the AI-generated message to all allowed chats
-	m.broadcastToChats(response)
+	// Adopt this session as the chat's active session so the user can
+	// send follow-up messages (e.g., "show me the logs", "retry it").
+	cs := m.bot.getOrCreateChat(chatID)
+	m.bot.resetChat(cs)
+	cs.mu.Lock()
+	cs.sessionID = sessionID
+	cs.mu.Unlock()
+
+	m.bot.sendLongText(chatID, response)
+
+	// Start subscription so any further agent activity is forwarded
+	m.bot.startSubscription(ctx, cs, chatID, user.UserID, sessionID)
 }
 
 // buildNotificationPrompt creates a prompt for the AI agent to analyze
@@ -285,8 +305,7 @@ func (m *DAGRunMonitor) waitForAgentResponse(ctx context.Context, sessionID, use
 	}
 }
 
-// sendFallbackNotification sends a simple non-AI notification when the agent
-// is unavailable or fails to generate a response.
+// sendFallbackNotification sends a simple non-AI notification to all chats.
 func (m *DAGRunMonitor) sendFallbackNotification(s *exec.DAGRunStatus, reason string) {
 	emoji := statusEmoji(s.Status)
 	text := fmt.Sprintf("%s DAG '%s' %s", emoji, s.Name, s.Status.String())
@@ -296,18 +315,8 @@ func (m *DAGRunMonitor) sendFallbackNotification(s *exec.DAGRunStatus, reason st
 	if reason != "" {
 		text += "\n" + reason
 	}
-	m.broadcastToChats(text)
-}
-
-// broadcastToChats sends a message to all allowed Telegram chats.
-func (m *DAGRunMonitor) broadcastToChats(text string) {
-	if len(m.bot.allowedChats) == 0 {
-		m.logger.Warn("No allowed chats configured, cannot send notification")
-		return
-	}
-
 	for chatID := range m.bot.allowedChats {
-		m.bot.sendLongText(chatID, text)
+		m.bot.sendText(chatID, text)
 	}
 }
 
