@@ -12,7 +12,6 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/auth"
@@ -38,6 +37,7 @@ type AgentService interface {
 	CancelSession(ctx context.Context, sessionID, userID string) error
 	SubmitUserResponse(ctx context.Context, sessionID, userID string, resp agent.UserPromptResponse) error
 	GetSessionDetail(ctx context.Context, sessionID, userID string) (*agent.StreamResponse, error)
+	SubscribeSession(ctx context.Context, sessionID string, user agent.UserIdentity) (agent.StreamResponse, func() (agent.StreamResponse, bool), error)
 }
 
 // Config holds configuration for the Telegram bot.
@@ -352,84 +352,36 @@ func (b *Bot) startSubscription(ctx context.Context, cs *chatState, chatID int64
 	go b.subscribeLoop(subCtx, cs, chatID, userID, sessionID)
 }
 
-// subscribeLoop listens for session updates and sends them to Telegram.
+// subscribeLoop uses the agent's built-in pub-sub to receive session updates
+// in real time and forward them to Telegram.
 func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, chatID int64, userID, sessionID string) {
-	// Get the initial snapshot to find the current sequence ID.
-	// We do NOT process historical messages — only new ones going forward.
-	detail, err := b.agentAPI.GetSessionDetail(ctx, sessionID, userID)
+	user := agent.UserIdentity{
+		UserID:   userID,
+		Username: "telegram",
+		Role:     auth.RoleAdmin,
+	}
+
+	snapshot, next, err := b.agentAPI.SubscribeSession(ctx, sessionID, user)
 	if err != nil {
-		b.logger.Warn("Failed to get session detail for subscription",
+		b.logger.Warn("Failed to subscribe to session",
 			slog.String("session", sessionID),
 			slog.String("error", err.Error()),
 		)
 		return
 	}
 
-	// Start tracking from the current position so we only see new messages.
-	var lastSeqID int64
-	if detail != nil && len(detail.Messages) > 0 {
-		lastSeqID = detail.Messages[len(detail.Messages)-1].SequenceID
-	}
+	// Process the initial snapshot — skip user messages (we sent those),
+	// but forward any assistant/error/prompt messages that arrived before
+	// the subscription started.
+	b.processStreamResponse(cs, chatID, snapshot)
 
-	const (
-		minPollInterval = 1 * time.Second
-		maxPollInterval = 5 * time.Second
-	)
-
-	pollInterval := minPollInterval
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
-
-	idleCount := 0
+	// Listen for real-time updates via the pub-sub channel.
 	for {
-		select {
-		case <-ctx.Done():
+		resp, ok := next()
+		if !ok {
 			return
-		case <-ticker.C:
-			detail, err := b.agentAPI.GetSessionDetail(ctx, sessionID, userID)
-			if err != nil || detail == nil {
-				continue
-			}
-
-			// Find new messages only
-			var newMsgs []agent.Message
-			for _, msg := range detail.Messages {
-				if msg.SequenceID > lastSeqID {
-					newMsgs = append(newMsgs, msg)
-					lastSeqID = msg.SequenceID
-				}
-			}
-
-			isWorking := detail.SessionState != nil && detail.SessionState.Working
-
-			if len(newMsgs) > 0 {
-				idleCount = 0
-				// Reset to fast polling when there's activity
-				if pollInterval != minPollInterval {
-					pollInterval = minPollInterval
-					ticker.Reset(pollInterval)
-				}
-				b.processStreamResponse(cs, chatID, agent.StreamResponse{
-					Messages:     newMsgs,
-					SessionState: detail.SessionState,
-				})
-			} else {
-				idleCount++
-				// Only back off when the agent is NOT working. While it's
-				// processing we keep polling fast so responses appear quickly.
-				if !isWorking {
-					if newInterval := pollInterval * 2; newInterval <= maxPollInterval && pollInterval < maxPollInterval {
-						pollInterval = newInterval
-						ticker.Reset(pollInterval)
-					}
-				}
-			}
-
-			// Stop polling if not working and idle for a while
-			if detail.SessionState != nil && !detail.SessionState.Working && idleCount > 3 {
-				return
-			}
 		}
+		b.processStreamResponse(cs, chatID, resp)
 	}
 }
 

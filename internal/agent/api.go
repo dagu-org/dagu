@@ -1052,6 +1052,19 @@ func (a *API) SubmitUserResponse(_ context.Context, sessionID, userID string, re
 	return nil
 }
 
+// SubscribeSession subscribes to real-time updates for a session.
+// Returns the initial snapshot and a next function that blocks until the next
+// update is available. The bool return from next is false when the subscription ends.
+// Returns ErrSessionNotFound if the session doesn't exist or the user doesn't match.
+func (a *API) SubscribeSession(ctx context.Context, sessionID string, user UserIdentity) (StreamResponse, func() (StreamResponse, bool), error) {
+	mgr, ok := a.getOrReactivateSession(ctx, sessionID, user)
+	if !ok {
+		return StreamResponse{}, nil, ErrSessionNotFound
+	}
+	snapshot, next := mgr.SubscribeWithSnapshot(ctx)
+	return snapshot, next, nil
+}
+
 // EnabledMiddleware returns middleware that checks if agent is enabled.
 func (a *API) EnabledMiddleware() func(http.Handler) http.Handler {
 	return a.enabledMiddleware()
