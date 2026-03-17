@@ -23,7 +23,7 @@ Built for developers who want powerful workflow orchestration without the operat
 
 - Zero-Ops: Single binary, file-based storage, under 128MB memory footprint
 - Full-Power: Docker steps, SSH execution, DAG composition, distributed mode, Git-based version management for DAGs & docs, [19+ executors](https://docs.dagu.sh/step-types/shell)
-- AI-Native: Built-in LLM agent creates, edits, and debugs workflows from natural language
+- AI-Native: Built-in LLM agent creates, edits, and debugs workflows from natural language. Chat with it from Slack or Telegram
 - Legacy Script Friendly: Orchestrate existing shell commands, Python scripts, Docker containers, or HTTP calls without modification.
 - Air-gapped Ready: Runs in isolated environments without external dependencies or network access
 
@@ -267,6 +267,7 @@ For more examples, see the [Examples](https://docs.dagu.sh/writing-workflows/exa
 ### AI-Native
 
 - Built-in [AI agent](https://docs.dagu.sh/features/agent/) — creates, edits, runs, and debugs workflows from natural language
+- [Slack & Telegram bots](https://docs.dagu.sh/features/bots/) — talk to the AI agent from Slack or Telegram to debug issues, check logs, and recover from incidents
 - [Agent and chat step types](https://docs.dagu.sh/features/agent/step) in DAGs with tool calling
 - Multi-provider LLM support (Anthropic, OpenAI, Google Gemini, OpenRouter)
 - Persistent memory, sub-agent delegation, and domain-specific skills
@@ -423,6 +424,7 @@ Full documentation at [docs.dagu.sh](https://docs.dagu.sh/).
 - [Getting Started](https://docs.dagu.sh/getting-started/installation) — Installation and first workflow
 - [Examples](https://docs.dagu.sh/writing-workflows/examples) — Feature walkthroughs with YAML samples
 - [AI Agent](https://docs.dagu.sh/features/agent/) — Built-in AI assistant for workflow management
+- [Slack & Telegram Bots](https://docs.dagu.sh/features/bots/) — Manage workflows through chat
 - [Distributed Execution](https://docs.dagu.sh/server-admin/distributed/) — Coordinator/worker setup
 - [Configuration](https://docs.dagu.sh/server-admin/reference) — Environment variables and settings
 - [Changelog](https://docs.dagu.sh/overview/changelog) — Recent updates and releases
