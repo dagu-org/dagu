@@ -1651,11 +1651,16 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		return api.RetryDAGRun200Response{}, nil
 	}
 
-	// Local retry path
+	// Local retry path: launch the retry subprocess asynchronously so the API
+	// returns immediately instead of blocking until the DAG run completes.
 	spec := a.subCmdBuilder.Retry(dag, request.Body.DagRunId, stepName)
 	if err := runtime.Start(ctx, spec); err != nil {
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
+
+	// Wait briefly for the retry process to start, matching the pattern used
+	// by the start endpoint to confirm the subprocess launched successfully.
+	a.waitForRetryStarted(ctx, dag, request.Body.DagRunId)
 
 	// Log local DAG retry
 	a.logRetryAudit(ctx, request.Name, request.DagRunId, stepName, false)
@@ -1693,6 +1698,29 @@ func (a *API) logRetryAudit(ctx context.Context, dagName, dagRunID, stepName str
 		detailsMap["step_name"] = stepName
 	}
 	a.logAudit(ctx, audit.CategoryDAG, "dag_retry", detailsMap)
+}
+
+// waitForRetryStarted polls briefly to confirm the retry subprocess has started.
+// This is best-effort: if the timeout elapses we still return 200 since the
+// subprocess was spawned successfully by runtime.Start.
+func (a *API) waitForRetryStarted(ctx context.Context, dag *core.DAG, dagRunID string) {
+	const (
+		timeout      = 3 * time.Second
+		pollInterval = 100 * time.Millisecond
+	)
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			status, _ := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRunID)
+			if status != nil && (status.Status == core.Running || status.Status == core.Queued) {
+				return
+			}
+			time.Sleep(pollInterval)
+		}
+	}
 }
 
 func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRequestObject) (api.TerminateDAGRunResponseObject, error) {
