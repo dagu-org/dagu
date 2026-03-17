@@ -1715,7 +1715,7 @@ func (a *API) waitForRetryStarted(ctx context.Context, dag *core.DAG, dagRunID s
 			return
 		default:
 			status, _ := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRunID)
-			if status != nil && status.Status == core.Running {
+			if status != nil && (status.Status == core.Running || status.Status == core.Queued) {
 				return
 			}
 			time.Sleep(pollInterval)
