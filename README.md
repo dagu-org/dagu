@@ -24,6 +24,7 @@ Built for developers who want powerful workflow orchestration without the operat
 - Zero-Ops: Single binary, file-based storage, under 128MB memory footprint
 - Full-Power: Docker steps, SSH execution, DAG composition, distributed mode, Git-based version management for DAGs & docs, [19+ executors](https://docs.dagu.sh/step-types/shell)
 - AI-Native: Built-in LLM agent creates, edits, and debugs workflows from natural language. Chat with it from Slack or Telegram
+- Chat Ops: Orchestrate and debug workflows via Slack, Telegram, or the Web UI. Ask the AI agent to check logs, retry failed steps, or create new workflows in plain language
 - Legacy Script Friendly: Orchestrate existing shell commands, Python scripts, Docker containers, or HTTP calls without modification.
 - Air-gapped Ready: Runs in isolated environments without external dependencies or network access
 
