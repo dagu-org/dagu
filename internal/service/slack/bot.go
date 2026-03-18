@@ -761,20 +761,6 @@ func (b *Bot) postText(channelID, threadTS, text string) (string, error) {
 	return ts, err
 }
 
-func (b *Bot) sendLongTextInThread(channelID, threadTS, text string) {
-	chunks := splitMessage(text, maxSlackMessageLen)
-	for _, chunk := range chunks {
-		if _, err := b.postText(channelID, threadTS, chunk); err != nil {
-			b.logger.Warn("Failed to send Slack thread message",
-				slog.String("channel_id", channelID),
-				slog.String("thread_ts", threadTS),
-				slog.String("error", err.Error()),
-			)
-			return
-		}
-	}
-}
-
 func (b *Bot) sendLongRootThread(channelID, text string) string {
 	chunks := splitMessage(text, maxSlackMessageLen)
 	if len(chunks) == 0 {

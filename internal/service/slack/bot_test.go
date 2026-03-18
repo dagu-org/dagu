@@ -45,6 +45,7 @@ func (c *fakeSlackClient) DeleteMessage(_, _ string) (string, string, error) {
 	return "ok", "", nil
 }
 
+//nolint:revive // Signature must match slackClientAPI.
 func (c *fakeSlackClient) SendMessage(_ string, _ ...slack.MsgOption) (string, string, string, error) {
 	return "ok", "", "", nil
 }
