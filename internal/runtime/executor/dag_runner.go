@@ -119,11 +119,6 @@ func NewSubDAGExecutor(ctx context.Context, childName string) (*SubDAGExecutor, 
 
 // buildCommand builds the command to execute the sub DAG.
 func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, workDir string) (*osexec.Cmd, error) {
-	executable, err := executablePath()
-	if err != nil {
-		return nil, fmt.Errorf("failed to find executable path: %w", err)
-	}
-
 	if runParams.RunID == "" {
 		return nil, errDAGRunIDNotSet
 	}
@@ -143,37 +138,20 @@ func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, 
 	if workDir != "" {
 		args = append(args, fmt.Sprintf("--default-working-dir=%s", workDir))
 	}
-	if configFile := config.ConfigFileUsed(ctx); configFile != "" {
-		args = append(args, "--config", configFile)
-	}
-	args = append(args, e.DAG.Location)
 
 	if runParams.Params != "" {
-		args = append(args, "--", runParams.Params)
+		cmd, err := e.newLocalCLICommand(ctx, workDir, args, e.DAG.Location, "--", runParams.Params)
+		if err != nil {
+			return nil, err
+		}
+		return e.injectTraceContext(ctx, cmd), nil
 	}
 
-	cmd := osexec.CommandContext(ctx, executable, args...) // nolint:gosec
-	cmd.Dir = workDir
-	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, rCtx.AllEnvs()...)
-	if e.externalStepRetry {
-		cmd.Env = append(cmd.Env, exec.EnvKeyExternalStepRetry+"=1")
+	cmd, err := e.newLocalCLICommand(ctx, workDir, args, e.DAG.Location)
+	if err != nil {
+		return nil, err
 	}
-
-	// Inject OpenTelemetry trace context into environment variables
-	logCtx := logger.WithValues(ctx, tag.DAG(e.DAG.Name))
-	traceEnvVars := extractTraceContext(ctx)
-	if len(traceEnvVars) > 0 {
-		cmd.Env = append(cmd.Env, traceEnvVars...)
-		logger.Debug(logCtx, "Injecting trace context into sub DAG",
-			slog.Any("trace-env-vars", traceEnvVars),
-		)
-	} else {
-		logger.Debug(logCtx, "No trace context to inject into sub DAG")
-	}
-
-	cmdutil.SetupCommand(cmd)
-	return cmd, nil
+	return e.injectTraceContext(ctx, cmd), nil
 }
 
 func (e *SubDAGExecutor) buildRetryCommand(
@@ -182,11 +160,6 @@ func (e *SubDAGExecutor) buildRetryCommand(
 	stepName string,
 	workDir string,
 ) (*osexec.Cmd, error) {
-	executable, err := executablePath()
-	if err != nil {
-		return nil, fmt.Errorf("failed to find executable path: %w", err)
-	}
-
 	if runParams.RunID == "" {
 		return nil, errDAGRunIDNotSet
 	}
@@ -204,24 +177,58 @@ func (e *SubDAGExecutor) buildRetryCommand(
 	if stepName != "" {
 		args = append(args, fmt.Sprintf("--step=%s", stepName))
 	}
-	if configFile := config.ConfigFileUsed(ctx); configFile != "" {
-		args = append(args, "--config", configFile)
-	}
-	args = append(args, e.DAG.Location)
-
-	cmd := osexec.CommandContext(ctx, executable, args...) // nolint:gosec
-	cmd.Dir = workDir
-	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, rCtx.AllEnvs()...)
-	if e.externalStepRetry {
-		cmd.Env = append(cmd.Env, exec.EnvKeyExternalStepRetry+"=1")
-	}
-	cmdutil.SetupCommand(cmd)
-	return cmd, nil
+	return e.newLocalCLICommand(ctx, workDir, args, e.DAG.Location)
 }
 
 func (e *SubDAGExecutor) SetExternalStepRetry(enabled bool) {
 	e.externalStepRetry = enabled
+}
+
+func (e *SubDAGExecutor) newLocalCLICommand(
+	ctx context.Context,
+	workDir string,
+	args []string,
+	target string,
+	trailingArgs ...string,
+) (*osexec.Cmd, error) {
+	executable, err := executablePath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to find executable path: %w", err)
+	}
+
+	fullArgs := append([]string{}, args...)
+	if configFile := config.ConfigFileUsed(ctx); configFile != "" {
+		fullArgs = append(fullArgs, "--config", configFile)
+	}
+	fullArgs = append(fullArgs, target)
+	fullArgs = append(fullArgs, trailingArgs...)
+
+	cmd := osexec.CommandContext(ctx, executable, fullArgs...) // nolint:gosec
+	cmd.Dir = workDir
+	cmd.Env = os.Environ()
+
+	rCtx := exec.GetContext(ctx)
+	cmd.Env = append(cmd.Env, rCtx.AllEnvs()...)
+	if e.externalStepRetry {
+		cmd.Env = append(cmd.Env, exec.EnvKeyExternalStepRetry+"=1")
+	}
+
+	cmdutil.SetupCommand(cmd)
+	return cmd, nil
+}
+
+func (e *SubDAGExecutor) injectTraceContext(ctx context.Context, cmd *osexec.Cmd) *osexec.Cmd {
+	logCtx := logger.WithValues(ctx, tag.DAG(e.DAG.Name))
+	traceEnvVars := extractTraceContext(ctx)
+	if len(traceEnvVars) > 0 {
+		cmd.Env = append(cmd.Env, traceEnvVars...)
+		logger.Debug(logCtx, "Injecting trace context into sub DAG",
+			slog.Any("trace-env-vars", traceEnvVars),
+		)
+	} else {
+		logger.Debug(logCtx, "No trace context to inject into sub DAG")
+	}
+	return cmd
 }
 
 // BuildCoordinatorTask creates a coordinator task for distributed execution
@@ -594,7 +601,7 @@ func (e *SubDAGExecutor) getStatusFromCoordinator(ctx context.Context, dagRunID 
 		Params:             dagRunStatus.Params,
 		Outputs:            outputs,
 		Status:             dagRunStatus.Status,
-		PendingStepRetries: exec.PendingStepRetriesFromNodes(dagRunStatus.Nodes),
+		PendingStepRetries: exec.PendingStepRetriesFromStatus(dagRunStatus),
 	}, nil
 }
 

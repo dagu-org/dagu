@@ -1058,10 +1058,8 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 		} else if a.scheduleTime != "" {
 			statusOpts = append(statusOpts, transform.WithScheduleTime(a.scheduleTime))
 		}
-		status := transform.NewStatusBuilder(a.dag).
+		return transform.NewStatusBuilder(a.dag).
 			Create(a.dagRunID, core.Failed, os.Getpid(), time.Time{}, statusOpts...)
-		status.PendingStepRetries = exec.PendingStepRetriesFromNodes(status.Nodes)
-		return status
 	}
 
 	runnerStatus := a.runner.Status(ctx, a.plan)
@@ -1114,7 +1112,6 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 			a.plan.StartAt(),
 			opts...,
 		)
-	status.PendingStepRetries = exec.PendingStepRetriesFromNodes(status.Nodes)
 	return status
 }
 

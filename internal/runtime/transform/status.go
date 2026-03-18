@@ -207,6 +207,10 @@ func (f *StatusBuilder) Create(
 		opt(&statusObj)
 	}
 
+	if statusObj.PendingStepRetries == nil && len(statusObj.Nodes) > 0 {
+		statusObj.PendingStepRetries = exec.PendingStepRetriesFromNodes(statusObj.Nodes)
+	}
+
 	// Generate AttemptKey if not already set and we have all required fields
 	if statusObj.AttemptKey == "" && statusObj.AttemptID != "" {
 		rootName := statusObj.Root.Name

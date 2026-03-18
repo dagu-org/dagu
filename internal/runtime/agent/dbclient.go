@@ -59,7 +59,7 @@ func (o *dbClient) GetSubDAGRunStatus(ctx context.Context, dagRunID string, root
 		Name:               status.Name,
 		DAGRunID:           status.DAGRunID,
 		Params:             status.Params,
-		PendingStepRetries: exec.PendingStepRetriesFromNodes(status.Nodes),
+		PendingStepRetries: exec.PendingStepRetriesFromStatus(status),
 	}, nil
 }
 

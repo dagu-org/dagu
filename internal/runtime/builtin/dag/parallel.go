@@ -11,7 +11,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"os/exec"
 	"sync"
 	"time"
 
@@ -39,7 +38,6 @@ type parallelExecutor struct {
 	maxConcurrent int
 
 	// Runtime state
-	running map[string]*exec.Cmd        // Maps DAG run ID to running command
 	results map[string]*exec1.RunStatus // Maps DAG run ID to result
 	errors  []error                     // Collects errors from failed executions
 
@@ -94,7 +92,6 @@ func newParallelExecutor(
 		child:         child,
 		workDir:       dir,
 		maxConcurrent: maxConcurrent,
-		running:       make(map[string]*exec.Cmd),
 		results:       make(map[string]*exec1.RunStatus),
 		errors:        make([]error, 0),
 		cancel:        make(chan struct{}),

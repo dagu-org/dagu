@@ -157,6 +157,19 @@ func PendingStepRetriesFromNodes(nodes []*Node) []PendingStepRetry {
 	return retries
 }
 
+// PendingStepRetriesFromStatus returns the persisted pending step retries when
+// present and falls back to deriving them from node state for older statuses
+// that predate the field.
+func PendingStepRetriesFromStatus(status *DAGRunStatus) []PendingStepRetry {
+	if status == nil {
+		return nil
+	}
+	if status.PendingStepRetries != nil {
+		return status.PendingStepRetries
+	}
+	return PendingStepRetriesFromNodes(status.Nodes)
+}
+
 // NodeByName returns the node with the specified name.
 // For handlers, it matches on both the handler label (e.g., "onSuccess")
 // and the step name within the handler.

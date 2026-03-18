@@ -36,3 +36,54 @@ func TestInitialStatusSnapshotsDAGRetryMetadata(t *testing.T) {
 	assert.Equal(t, "shared-queue", status.ProcGroup)
 	assert.Equal(t, "retry-dag", status.SuspendFlagName)
 }
+
+func TestPendingStepRetriesFromStatus(t *testing.T) {
+	t.Parallel()
+
+	t.Run("PrefersPersistedField", func(t *testing.T) {
+		status := &exec.DAGRunStatus{
+			PendingStepRetries: []exec.PendingStepRetry{
+				{StepName: "persisted", Interval: 5 * time.Second},
+			},
+			Nodes: []*exec.Node{
+				{
+					Step: core.Step{
+						Name: "derived",
+						RetryPolicy: core.RetryPolicy{
+							Interval: 2 * time.Second,
+						},
+					},
+					Status:     core.NodeRetrying,
+					RetryCount: 1,
+				},
+			},
+		}
+
+		retries := exec.PendingStepRetriesFromStatus(status)
+		assert.Equal(t, []exec.PendingStepRetry{
+			{StepName: "persisted", Interval: 5 * time.Second},
+		}, retries)
+	})
+
+	t.Run("FallsBackToNodesForLegacyStatuses", func(t *testing.T) {
+		status := &exec.DAGRunStatus{
+			Nodes: []*exec.Node{
+				{
+					Step: core.Step{
+						Name: "legacy",
+						RetryPolicy: core.RetryPolicy{
+							Interval: 2 * time.Second,
+						},
+					},
+					Status:     core.NodeRetrying,
+					RetryCount: 1,
+				},
+			},
+		}
+
+		retries := exec.PendingStepRetriesFromStatus(status)
+		assert.Equal(t, []exec.PendingStepRetry{
+			{StepName: "legacy", Interval: 2 * time.Second},
+		}, retries)
+	})
+}

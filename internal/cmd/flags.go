@@ -17,6 +17,7 @@ type commandLineFlag struct {
 	usage        string
 	required     bool
 	isBool       bool
+	hidden       bool
 	bindViper    bool
 	viperKey     string // Custom viper key (if different from kebab-to-camel name)
 }
@@ -160,13 +161,15 @@ var (
 // Sub DAG run flags
 var (
 	rootDAGRunFlag = commandLineFlag{
-		name:  "root",
-		usage: "[only for sub dag-runs] reference for the root dag-run",
+		name:   "root",
+		usage:  "[only for sub dag-runs] reference for the root dag-run",
+		hidden: true,
 	}
 
 	parentDAGRunFlag = commandLineFlag{
-		name:  "parent",
-		usage: "[only for sub dag-runs] reference for the parent dag-run",
+		name:   "parent",
+		usage:  "[only for sub dag-runs] reference for the parent dag-run",
+		hidden: true,
 	}
 )
 
@@ -394,6 +397,9 @@ func registerFlag(cmd *cobra.Command, flag commandLineFlag) {
 
 	if flag.required {
 		_ = cmd.MarkFlagRequired(flag.name)
+	}
+	if flag.hidden {
+		_ = cmd.Flags().MarkHidden(flag.name)
 	}
 }
 
