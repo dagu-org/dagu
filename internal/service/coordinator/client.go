@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -413,19 +414,19 @@ func (cli *clientImpl) getCoordinatorMembers(ctx context.Context) ([]exec.HostIn
 	if len(members) == 0 {
 		return nil, fmt.Errorf("no coordinators available")
 	}
-	return members, nil
+	return sortCoordinatorMembers(members), nil
 }
 
 // GetWorkers retrieves the list of workers from all coordinators
 func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error) {
 	// Get all available coordinators from discovery
-	members, err := cli.registry.GetServiceMembers(ctx, exec.ServiceNameCoordinator)
+	members, err := cli.getCoordinatorMembers(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to discover coordinators: %w", err)
+		return nil, err
 	}
 
 	// Collect workers from all coordinators
-	var allWorkers []*coordinatorv1.WorkerInfo
+	workersByID := make(map[string]*coordinatorv1.WorkerInfo)
 	var lastErr error
 
 	for _, member := range members {
@@ -460,9 +461,22 @@ func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerI
 
 		// Append workers from this coordinator
 		if resp != nil && resp.Workers != nil {
-			allWorkers = append(allWorkers, resp.Workers...)
+			for _, worker := range resp.Workers {
+				if worker == nil {
+					continue
+				}
+				workersByID[worker.WorkerId] = selectAuthoritativeWorker(workersByID[worker.WorkerId], worker)
+			}
 		}
 	}
+
+	allWorkers := make([]*coordinatorv1.WorkerInfo, 0, len(workersByID))
+	for _, worker := range workersByID {
+		allWorkers = append(allWorkers, worker)
+	}
+	sort.Slice(allWorkers, func(i, j int) bool {
+		return allWorkers[i].WorkerId < allWorkers[j].WorkerId
+	})
 
 	// If we got some workers, return them even if some coordinators failed
 	if len(allWorkers) > 0 {
@@ -475,6 +489,34 @@ func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerI
 	}
 
 	return allWorkers, nil
+}
+
+func sortCoordinatorMembers(members []exec.HostInfo) []exec.HostInfo {
+	sorted := append([]exec.HostInfo(nil), members...)
+	sort.Slice(sorted, func(i, j int) bool {
+		return coordinatorMemberKey(sorted[i]) < coordinatorMemberKey(sorted[j])
+	})
+	return sorted
+}
+
+func coordinatorMemberKey(member exec.HostInfo) string {
+	if member.ID != "" {
+		return member.ID
+	}
+	return fmt.Sprintf("%s:%d", member.Host, member.Port)
+}
+
+func selectAuthoritativeWorker(current, candidate *coordinatorv1.WorkerInfo) *coordinatorv1.WorkerInfo {
+	if candidate == nil {
+		return current
+	}
+	if current == nil {
+		return candidate
+	}
+	if candidate.LastHeartbeatAt > current.LastHeartbeatAt {
+		return candidate
+	}
+	return current
 }
 
 // Heartbeat sends a heartbeat to coordinators and returns the response
