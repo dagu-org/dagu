@@ -39,6 +39,8 @@ func TestSchemaCommand(t *testing.T) {
 		out, err := runSchemaCmd("schema", "config")
 		require.NoError(t, err)
 		assert.Contains(t, out, "server")
+		assert.Contains(t, out, "bots")
+		assert.Contains(t, out, "license")
 	})
 
 	t.Run("DAGSteps", func(t *testing.T) {
