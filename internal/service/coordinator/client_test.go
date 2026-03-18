@@ -406,9 +406,11 @@ func TestClientGetWorkers_PartialFailureStillReturnsWorkers(t *testing.T) {
 	defer cancel()
 
 	workers, err := client.GetWorkers(ctx)
-	require.NoError(t, err)
+	require.Error(t, err)
 	require.Len(t, workers, 1)
 	assert.Equal(t, "worker-1", workers[0].WorkerId)
+	assert.ErrorContains(t, err, "partial failure getting workers")
+	assert.ErrorContains(t, err, "coordinator unavailable")
 }
 
 func TestClientHeartbeat(t *testing.T) {

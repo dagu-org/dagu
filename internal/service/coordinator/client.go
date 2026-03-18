@@ -234,7 +234,7 @@ func (cli *clientImpl) attemptCall(ctx context.Context, members []exec.HostInfo,
 				tag.Host(member.Host),
 				tag.Port(member.Port),
 				tag.Error(err))
-			cli.removeClient(member.ID) // Remove failed client
+			cli.removeClient(member) // Remove failed client
 			cli.recordFailure(err)
 			lastErr = err
 			continue
@@ -297,9 +297,11 @@ func (cli *clientImpl) isHealthy(ctx context.Context, member exec.HostInfo) erro
 
 // getOrCreateClient gets an existing client or creates a new one for the given member
 func (cli *clientImpl) getOrCreateClient(member exec.HostInfo) (*client, error) {
+	key := coordinatorMemberKey(member)
+
 	// Try to get existing client with read lock
 	cli.clientsMu.RLock()
-	if c, exists := cli.clients[member.ID]; exists {
+	if c, exists := cli.clients[key]; exists {
 		cli.clientsMu.RUnlock()
 		return c, nil
 	}
@@ -310,7 +312,7 @@ func (cli *clientImpl) getOrCreateClient(member exec.HostInfo) (*client, error) 
 	defer cli.clientsMu.Unlock()
 
 	// Double-check after acquiring write lock
-	if c, exists := cli.clients[member.ID]; exists {
+	if c, exists := cli.clients[key]; exists {
 		return c, nil
 	}
 
@@ -321,7 +323,7 @@ func (cli *clientImpl) getOrCreateClient(member exec.HostInfo) (*client, error) 
 	}
 
 	// Cache it
-	cli.clients[member.ID] = c
+	cli.clients[key] = c
 	return c, nil
 }
 
@@ -350,13 +352,15 @@ func (cli *clientImpl) createClient(member exec.HostInfo) (*client, error) {
 }
 
 // removeClient removes a client from the cache
-func (cli *clientImpl) removeClient(coordinatorID string) {
+func (cli *clientImpl) removeClient(member exec.HostInfo) {
+	key := coordinatorMemberKey(member)
+
 	cli.clientsMu.Lock()
 	defer cli.clientsMu.Unlock()
 
-	if c, exists := cli.clients[coordinatorID]; exists {
+	if c, exists := cli.clients[key]; exists {
 		_ = c.conn.Close()
-		delete(cli.clients, coordinatorID)
+		delete(cli.clients, key)
 	}
 }
 
@@ -428,6 +432,7 @@ func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerI
 	// Collect workers from all coordinators
 	workersByID := make(map[string]*coordinatorv1.WorkerInfo)
 	var lastErr error
+	var successfulReads bool
 
 	for _, member := range members {
 		// Get or create client for this member
@@ -454,10 +459,11 @@ func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerI
 
 			// If this is a connection error, remove the client from cache
 			if st, ok := status.FromError(err); ok && st.Code() == codes.Unavailable {
-				cli.removeClient(member.ID)
+				cli.removeClient(member)
 			}
 			continue
 		}
+		successfulReads = true
 
 		// Append workers from this coordinator
 		if resp != nil && resp.Workers != nil {
@@ -478,13 +484,10 @@ func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerI
 		return allWorkers[i].WorkerId < allWorkers[j].WorkerId
 	})
 
-	// If we got some workers, return them even if some coordinators failed
-	if len(allWorkers) > 0 {
-		return allWorkers, nil
-	}
-
-	// All attempts failed and no workers found
 	if lastErr != nil {
+		if successfulReads {
+			return allWorkers, fmt.Errorf("partial failure getting workers: %w", lastErr)
+		}
 		return nil, fmt.Errorf("failed to get workers from any coordinator: %w", lastErr)
 	}
 

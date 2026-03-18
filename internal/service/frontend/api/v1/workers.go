@@ -37,18 +37,16 @@ func (a *API) GetWorkers(ctx context.Context, _ api.GetWorkersRequestObject) (ap
 	workerInfos, err := a.coordinatorCli.GetWorkers(ctx)
 	if err != nil {
 		// Check if it's a connection error
-		if st, ok := status.FromError(err); ok {
-			if st.Code() == codes.Unavailable {
-				return api.GetWorkers503JSONResponse{
-					Message: "Coordinator service unavailable",
-				}, nil
+		if len(workerInfos) == 0 {
+			if st, ok := status.FromError(err); ok {
+				if st.Code() == codes.Unavailable {
+					return api.GetWorkers503JSONResponse{
+						Message: "Coordinator service unavailable",
+					}, nil
+				}
 			}
 		}
 		errors = append(errors, err.Error())
-		return api.GetWorkers200JSONResponse{
-			Workers: workers,
-			Errors:  errors,
-		}, nil
 	}
 
 	// Transform the response
