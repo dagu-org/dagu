@@ -9,6 +9,7 @@ import (
 	"io"
 	"maps"
 	"path/filepath"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
@@ -88,6 +89,11 @@ type Database interface {
 }
 
 // SubDAGRunStatus is an interface that represents the status of a sub dag-run.
+type PendingStepRetry struct {
+	StepName string        `json:"stepName"`
+	Interval time.Duration `json:"interval"`
+}
+
 type RunStatus struct {
 	// Name represents the name of the executed DAG.
 	Name string
@@ -99,22 +105,27 @@ type RunStatus struct {
 	Outputs map[string]string
 	// Status is the execution status of the dag-run.
 	Status core.Status
+	// PendingStepRetries contains any step retries that are waiting to be scheduled
+	// by the parent executor.
+	PendingStepRetries []PendingStepRetry
 }
 
 // MarshalJSON implements the json.Marshaler interface for RunStatus.
 func (r *RunStatus) MarshalJSON() ([]byte, error) {
 	return json.MarshalIndent(struct {
-		Name     string            `json:"name,omitempty"`
-		DAGRunID string            `json:"dagRunId,omitempty"`
-		Params   string            `json:"params,omitempty"`
-		Outputs  map[string]string `json:"outputs,omitzero"`
-		Status   string            `json:"status"`
+		Name               string             `json:"name,omitempty"`
+		DAGRunID           string             `json:"dagRunId,omitempty"`
+		Params             string             `json:"params,omitempty"`
+		Outputs            map[string]string  `json:"outputs,omitzero"`
+		Status             string             `json:"status"`
+		PendingStepRetries []PendingStepRetry `json:"pendingStepRetries,omitempty"`
 	}{
-		Name:     r.Name,
-		DAGRunID: r.DAGRunID,
-		Params:   r.Params,
-		Outputs:  r.Outputs,
-		Status:   r.Status.String(),
+		Name:               r.Name,
+		DAGRunID:           r.DAGRunID,
+		Params:             r.Params,
+		Outputs:            r.Outputs,
+		Status:             r.Status.String(),
+		PendingStepRetries: r.PendingStepRetries,
 	}, "", "  ")
 }
 

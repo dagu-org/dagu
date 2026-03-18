@@ -54,11 +54,12 @@ func (o *dbClient) GetSubDAGRunStatus(ctx context.Context, dagRunID string, root
 	}
 
 	return &runtime.RunStatus{
-		Status:   status.Status,
-		Outputs:  outputVariables,
-		Name:     status.Name,
-		DAGRunID: status.DAGRunID,
-		Params:   status.Params,
+		Status:             status.Status,
+		Outputs:            outputVariables,
+		Name:               status.Name,
+		DAGRunID:           status.DAGRunID,
+		Params:             status.Params,
+		PendingStepRetries: exec.PendingStepRetriesFromNodes(status.Nodes),
 	}, nil
 }
 

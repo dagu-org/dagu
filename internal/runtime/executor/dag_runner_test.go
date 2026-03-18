@@ -262,6 +262,64 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 	assert.Contains(t, err.Error(), "root DAG run ID is not set")
 }
 
+func TestBuildRetryCommand(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	mockDB := new(mockDatabase)
+	dagCtx := exec1.Context{
+		DAG:        &core.DAG{Name: "parent"},
+		DB:         mockDB,
+		RootDAGRun: exec1.NewDAGRunRef("parent", "root-123"),
+		DAGRunID:   "parent-456",
+	}
+	ctx = exec1.WithContext(ctx, dagCtx)
+
+	executor := &SubDAGExecutor{
+		DAG: &core.DAG{
+			Name:     "test-child",
+			Location: "/path/to/test.yaml",
+		},
+		killed: make(chan struct{}),
+	}
+
+	cmd, err := executor.buildRetryCommand(ctx, RunParams{RunID: "child-789"}, "flaky", "/work/dir")
+	require.NoError(t, err)
+	require.NotNil(t, cmd)
+
+	assert.Equal(t, "/work/dir", cmd.Dir)
+	assert.Contains(t, cmd.Args, "retry")
+	assert.Contains(t, cmd.Args, "--run-id=child-789")
+	assert.Contains(t, cmd.Args, "--root=parent:root-123")
+	assert.Contains(t, cmd.Args, "--step=flaky")
+	assert.Contains(t, cmd.Args, "/path/to/test.yaml")
+}
+
+func TestBuildRetryCommand_NoRootDAGRun(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	mockDB := new(mockDatabase)
+	dagCtx := exec1.Context{
+		DAG:      &core.DAG{Name: "parent"},
+		DB:       mockDB,
+		DAGRunID: "parent-456",
+	}
+	ctx = exec1.WithContext(ctx, dagCtx)
+
+	executor := &SubDAGExecutor{
+		DAG:    &core.DAG{Name: "test-child"},
+		killed: make(chan struct{}),
+	}
+
+	cmd, err := executor.buildRetryCommand(ctx, RunParams{RunID: "child-789"}, "flaky", "/work/dir")
+	assert.Error(t, err)
+	assert.Nil(t, cmd)
+	assert.Contains(t, err.Error(), "root DAG run ID is not set")
+}
+
 func TestCleanup_LocalDAG(t *testing.T) {
 	t.Parallel()
 

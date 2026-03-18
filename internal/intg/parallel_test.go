@@ -237,6 +237,78 @@ steps:
 	require.Equal(t, core.NodeSucceeded, useOutputNode.Status)
 }
 
+func TestParallelExecution_RetryBackoffDoesNotBlockScheduling(t *testing.T) {
+	th := test.Setup(t, test.WithBuiltExecutable())
+
+	dag := th.DAG(t, `type: graph
+steps:
+  - name: process-items
+    call: processor
+    parallel:
+      items:
+        - "1"
+        - "2"
+        - "3"
+      max_concurrent: 2
+
+---
+name: processor
+params:
+  - ITEM: ""
+steps:
+  - name: flaky
+    command: exit 1
+    retry_policy:
+      limit: 1
+      interval_sec: 2
+`)
+
+	agent := dag.Agent()
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- agent.Run(agent.Context)
+	}()
+
+	require.Eventually(t, func() bool {
+		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
+		return err == nil && len(status.Nodes) == 1 && len(status.Nodes[0].SubRuns) == 3
+	}, time.Second, 50*time.Millisecond, "parallel sub-runs were not persisted")
+
+	require.Eventually(t, func() bool {
+		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
+		if err != nil || len(status.Nodes) == 0 {
+			return false
+		}
+
+		rootRun := exec.NewDAGRunRef(status.Name, status.DAGRunID)
+		started := 0
+		for _, subRun := range status.Nodes[0].SubRuns {
+			if _, subErr := dag.DAGRunMgr.FindSubDAGRunStatus(dag.Context, rootRun, subRun.DAGRunID); subErr == nil {
+				started++
+			}
+		}
+		return started >= 2
+	}, time.Second, 50*time.Millisecond, "first two items never started")
+
+	require.Eventually(t, func() bool {
+		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
+		if err != nil || len(status.Nodes) == 0 {
+			return false
+		}
+
+		rootRun := exec.NewDAGRunRef(status.Name, status.DAGRunID)
+		started := 0
+		for _, subRun := range status.Nodes[0].SubRuns {
+			if _, subErr := dag.DAGRunMgr.FindSubDAGRunStatus(dag.Context, rootRun, subRun.DAGRunID); subErr == nil {
+				started++
+			}
+		}
+		return started == 3
+	}, 500*time.Millisecond, 50*time.Millisecond, "third item should start before the 2s retry backoff expires")
+
+	require.Error(t, <-errCh)
+}
+
 func TestParallelExecution_DeterministicIDs(t *testing.T) {
 	const dagContent = `steps:
   - call: child-echo

@@ -67,6 +67,7 @@ type NodeStatus int
 const (
 	NodeNotStarted NodeStatus = iota
 	NodeRunning
+	NodeRetrying
 	NodeFailed
 	NodeAborted
 	NodeSucceeded
@@ -103,6 +104,8 @@ func (s NodeStatus) String() string {
 		return "not_started"
 	case NodeRunning:
 		return "running"
+	case NodeRetrying:
+		return "retrying"
 	case NodeFailed:
 		return "failed"
 	case NodeAborted:

@@ -98,15 +98,16 @@ type DAGRunStatus struct {
 	AutoRetryInterval time.Duration `json:"autoRetryInterval,omitempty"`
 	AutoRetryBackoff  float64       `json:"autoRetryBackoff,omitempty"`
 	// AutoRetryMaxInterval is stored as a duration snapshot for retry scanner decisions.
-	AutoRetryMaxInterval time.Duration     `json:"autoRetryMaxInterval,omitempty"`
-	ProcGroup            string            `json:"procGroup,omitempty"`
-	SuspendFlagName      string            `json:"suspendFlagName,omitempty"`
-	Log                  string            `json:"log,omitempty"`
-	Error                string            `json:"error,omitempty"`
-	Params               string            `json:"params,omitempty"`
-	ParamsList           []string          `json:"paramsList,omitempty"`
-	Preconditions        []*core.Condition `json:"preconditions,omitempty"`
-	Tags                 []string          `json:"tags,omitempty"`
+	AutoRetryMaxInterval time.Duration      `json:"autoRetryMaxInterval,omitempty"`
+	ProcGroup            string             `json:"procGroup,omitempty"`
+	SuspendFlagName      string             `json:"suspendFlagName,omitempty"`
+	Log                  string             `json:"log,omitempty"`
+	Error                string             `json:"error,omitempty"`
+	Params               string             `json:"params,omitempty"`
+	ParamsList           []string           `json:"paramsList,omitempty"`
+	PendingStepRetries   []PendingStepRetry `json:"pendingStepRetries,omitempty"`
+	Preconditions        []*core.Condition  `json:"preconditions,omitempty"`
+	Tags                 []string           `json:"tags,omitempty"`
 }
 
 // DAGRun returns a reference to the dag-run associated with this status
@@ -131,6 +132,29 @@ func (st *DAGRunStatus) Errors() []error {
 		}
 	}
 	return errs
+}
+
+// PendingStepRetriesFromNodes extracts pending parent-managed step retries from
+// a DAG status snapshot.
+func PendingStepRetriesFromNodes(nodes []*Node) []PendingStepRetry {
+	var retries []PendingStepRetry
+	for _, node := range nodes {
+		if node == nil || node.Status != core.NodeRetrying {
+			continue
+		}
+
+		interval := core.CalculateBackoffInterval(
+			node.Step.RetryPolicy.Interval,
+			node.Step.RetryPolicy.Backoff,
+			node.Step.RetryPolicy.MaxInterval,
+			node.RetryCount-1,
+		)
+		retries = append(retries, PendingStepRetry{
+			StepName: node.Step.Name,
+			Interval: interval,
+		})
+	}
+	return retries
 }
 
 // NodeByName returns the node with the specified name.

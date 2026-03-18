@@ -56,6 +56,10 @@ type SubDAGExecutor struct {
 	// killed should be closed when Kill is called
 	killed     chan struct{}
 	cancelOnce sync.Once
+
+	// externalStepRetry shifts step retry waiting out of the child process and
+	// back to the parent executor.
+	externalStepRetry bool
 }
 
 // NewSubDAGExecutor creates a new SubDAGExecutor.
@@ -152,6 +156,9 @@ func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, 
 	cmd.Dir = workDir
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, rCtx.AllEnvs()...)
+	if e.externalStepRetry {
+		cmd.Env = append(cmd.Env, exec.EnvKeyExternalStepRetry+"=1")
+	}
 
 	// Inject OpenTelemetry trace context into environment variables
 	logCtx := logger.WithValues(ctx, tag.DAG(e.DAG.Name))
@@ -167,6 +174,54 @@ func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, 
 
 	cmdutil.SetupCommand(cmd)
 	return cmd, nil
+}
+
+func (e *SubDAGExecutor) buildRetryCommand(
+	ctx context.Context,
+	runParams RunParams,
+	stepName string,
+	workDir string,
+) (*osexec.Cmd, error) {
+	executable, err := executablePath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to find executable path: %w", err)
+	}
+
+	if runParams.RunID == "" {
+		return nil, errDAGRunIDNotSet
+	}
+
+	rCtx := exec.GetContext(ctx)
+	if rCtx.RootDAGRun.Zero() {
+		return nil, errRootDAGRunNotSet
+	}
+
+	args := []string{
+		"retry",
+		fmt.Sprintf("--run-id=%s", runParams.RunID),
+		fmt.Sprintf("--root=%s", rCtx.RootDAGRun.String()),
+	}
+	if stepName != "" {
+		args = append(args, fmt.Sprintf("--step=%s", stepName))
+	}
+	if configFile := config.ConfigFileUsed(ctx); configFile != "" {
+		args = append(args, "--config", configFile)
+	}
+	args = append(args, e.DAG.Location)
+
+	cmd := osexec.CommandContext(ctx, executable, args...) // nolint:gosec
+	cmd.Dir = workDir
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, rCtx.AllEnvs()...)
+	if e.externalStepRetry {
+		cmd.Env = append(cmd.Env, exec.EnvKeyExternalStepRetry+"=1")
+	}
+	cmdutil.SetupCommand(cmd)
+	return cmd, nil
+}
+
+func (e *SubDAGExecutor) SetExternalStepRetry(enabled bool) {
+	e.externalStepRetry = enabled
 }
 
 // BuildCoordinatorTask creates a coordinator task for distributed execution
@@ -249,12 +304,30 @@ func (e *SubDAGExecutor) Execute(ctx context.Context, runParams RunParams, workD
 		return e.dispatch(ctx, runParams)
 	}
 
-	// Handle local execution
 	cmd, err := e.buildCommand(ctx, runParams, workDir)
 	if err != nil {
 		return nil, err
 	}
+	return e.runLocalCommand(ctx, runParams.RunID, cmd)
+}
 
+// Retry executes a parent-managed step retry for a previously started sub DAG.
+func (e *SubDAGExecutor) Retry(ctx context.Context, runParams RunParams, stepName, workDir string) (*exec.RunStatus, error) {
+	ctx = logger.WithValues(ctx, tag.SubDAG(e.DAG.Name), tag.SubRunID(runParams.RunID))
+
+	rCtx := exec.GetContext(ctx)
+	if core.ShouldDispatchToCoordinator(e.DAG, e.coordinatorCli != nil, rCtx.DefaultExecMode) {
+		return nil, fmt.Errorf("external step retry is only supported for local sub DAG execution")
+	}
+
+	cmd, err := e.buildRetryCommand(ctx, runParams, stepName, workDir)
+	if err != nil {
+		return nil, err
+	}
+	return e.runLocalCommand(ctx, runParams.RunID, cmd)
+}
+
+func (e *SubDAGExecutor) runLocalCommand(ctx context.Context, runID string, cmd *osexec.Cmd) (*exec.RunStatus, error) {
 	// Discard subprocess output (logging is handled internally by the sub-DAG)
 	cmd.Stdout = io.Discard
 	stderrTail := NewTailWriter(io.Discard, 4096)
@@ -263,7 +336,7 @@ func (e *SubDAGExecutor) Execute(ctx context.Context, runParams RunParams, workD
 	// Ensure we clear command reference when done
 	defer func() {
 		e.mu.Lock()
-		delete(e.cmds, runParams.RunID)
+		delete(e.cmds, runID)
 		e.mu.Unlock()
 	}()
 
@@ -276,7 +349,7 @@ func (e *SubDAGExecutor) Execute(ctx context.Context, runParams RunParams, workD
 
 	// Store command reference for Kill AFTER starting, so cmd.Process is already set
 	e.mu.Lock()
-	e.cmds[runParams.RunID] = cmd
+	e.cmds[runID] = cmd
 	e.mu.Unlock()
 
 	waitErr := cmd.Wait()
@@ -293,10 +366,10 @@ func (e *SubDAGExecutor) Execute(ctx context.Context, runParams RunParams, workD
 	default:
 	}
 
-	rCtx = exec.GetContext(ctx)
-	result, resultErr := rCtx.DB.GetSubDAGRunStatus(ctx, runParams.RunID, rCtx.RootDAGRun)
+	rCtx := exec.GetContext(ctx)
+	result, resultErr := rCtx.DB.GetSubDAGRunStatus(ctx, runID, rCtx.RootDAGRun)
 	if resultErr != nil {
-		errMsg := fmt.Sprintf("sub dag-run %q failed and wrote no status", runParams.RunID)
+		errMsg := fmt.Sprintf("sub dag-run %q failed and wrote no status", runID)
 		if waitErr != nil {
 			errMsg += fmt.Sprintf(" (process: %v)", waitErr)
 		}
@@ -397,6 +470,11 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 				continue
 			}
 			consecutiveErrors = 0 // Reset on success
+
+			if len(result.PendingStepRetries) > 0 {
+				logger.Info(waitCtx, "Distributed sub DAG returned pending step retry")
+				return result, nil
+			}
 
 			if result.Status.IsActive() || result.Status == core.NotStarted {
 				logger.Debug(waitCtx, "Sub DAG run not completed yet")
@@ -511,11 +589,12 @@ func (e *SubDAGExecutor) getStatusFromCoordinator(ctx context.Context, dagRunID 
 	outputs := extractOutputsFromNodes(dagRunStatus.Nodes)
 
 	return &exec.RunStatus{
-		Name:     dagRunStatus.Name,
-		DAGRunID: dagRunID,
-		Params:   dagRunStatus.Params,
-		Outputs:  outputs,
-		Status:   dagRunStatus.Status,
+		Name:               dagRunStatus.Name,
+		DAGRunID:           dagRunID,
+		Params:             dagRunStatus.Params,
+		Outputs:            outputs,
+		Status:             dagRunStatus.Status,
+		PendingStepRetries: exec.PendingStepRetriesFromNodes(dagRunStatus.Nodes),
 	}, nil
 }
 
