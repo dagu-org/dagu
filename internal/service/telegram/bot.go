@@ -8,6 +8,7 @@ package telegram
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -599,7 +600,7 @@ func (b *Bot) prepareSessionForMessage(ctx context.Context, cs *chatState, user 
 
 	newSID, rotated, err := b.agentAPI.CompactSessionIfNeeded(ctx, sid, user)
 	if err != nil {
-		if err == agent.ErrSessionNotFound {
+		if errors.Is(err, agent.ErrSessionNotFound) {
 			b.logger.Warn("Session missing during compaction, resetting chat",
 				slog.String("session", sid),
 				slog.String("user", user.UserID),

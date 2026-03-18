@@ -5,6 +5,7 @@ package slack
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -175,10 +176,13 @@ func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStat
 
 	prompt := buildNotificationPrompt(s)
 
+	delivered := false
 	for channelID := range m.bot.allowedChannels {
-		m.notifyChannel(ctx, channelID, s, prompt)
+		if m.notifyChannel(ctx, channelID, s, prompt) {
+			delivered = true
+		}
 	}
-	return true // Mark as seen even on partial failure to avoid duplicates
+	return delivered
 }
 
 // notifyChannel appends a notification to either the DM conversation or a new
@@ -260,16 +264,10 @@ func (m *DAGRunMonitor) appendNotification(ctx context.Context, cs *chatState, s
 	}
 
 	if sessionID == "" {
-		newSessionID, err := m.agentAPI.CreateEmptySession(ctx, user, dagName, m.bot.cfg.SafeMode)
-		if err != nil {
-			m.logger.Warn("Failed to create notification session",
-				slog.String("dag", dagName),
-				slog.String("user", user.UserID),
-				slog.String("error", err.Error()),
-			)
+		newSessionID, ok := m.getOrCreateNotificationSession(ctx, cs, user, dagName)
+		if !ok {
 			return "", agent.Message{}, false
 		}
-		m.bot.setActiveSession(cs, newSessionID, user.UserID)
 		stored, err := appendToSession(newSessionID)
 		if err != nil {
 			m.logger.Warn("Failed to append notification message to new session",
@@ -285,7 +283,7 @@ func (m *DAGRunMonitor) appendNotification(ctx context.Context, cs *chatState, s
 	if err == nil {
 		return sessionID, stored, true
 	}
-	if err != agent.ErrSessionNotFound {
+	if !errors.Is(err, agent.ErrSessionNotFound) {
 		m.logger.Warn("Failed to append notification message",
 			slog.String("session", sessionID),
 			slog.String("error", err.Error()),
@@ -293,16 +291,10 @@ func (m *DAGRunMonitor) appendNotification(ctx context.Context, cs *chatState, s
 		return "", agent.Message{}, false
 	}
 
-	newSessionID, createErr := m.agentAPI.CreateEmptySession(ctx, user, dagName, m.bot.cfg.SafeMode)
-	if createErr != nil {
-		m.logger.Warn("Failed to replace missing notification session",
-			slog.String("dag", dagName),
-			slog.String("user", user.UserID),
-			slog.String("error", createErr.Error()),
-		)
+	newSessionID, ok := m.replaceMissingNotificationSession(ctx, cs, sessionID, user, dagName)
+	if !ok {
 		return "", agent.Message{}, false
 	}
-	m.bot.setActiveSession(cs, newSessionID, user.UserID)
 	stored, err = appendToSession(newSessionID)
 	if err != nil {
 		m.logger.Warn("Failed to append notification message after session recreation",
@@ -312,6 +304,58 @@ func (m *DAGRunMonitor) appendNotification(ctx context.Context, cs *chatState, s
 		return "", agent.Message{}, false
 	}
 	return newSessionID, stored, true
+}
+
+func (m *DAGRunMonitor) getOrCreateNotificationSession(ctx context.Context, cs *chatState, user agent.UserIdentity, dagName string) (string, bool) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+
+	if cs.sessionID != "" {
+		return cs.sessionID, true
+	}
+
+	newSessionID, err := m.agentAPI.CreateEmptySession(ctx, user, dagName, m.bot.cfg.SafeMode)
+	if err != nil {
+		m.logger.Warn("Failed to create notification session",
+			slog.String("dag", dagName),
+			slog.String("user", user.UserID),
+			slog.String("error", err.Error()),
+		)
+		return "", false
+	}
+
+	if cs.sessionID != newSessionID {
+		cs.lastDeliveredSeq = 0
+	}
+	cs.sessionID = newSessionID
+	cs.ownerUserID = user.UserID
+	return newSessionID, true
+}
+
+func (m *DAGRunMonitor) replaceMissingNotificationSession(ctx context.Context, cs *chatState, missingSessionID string, user agent.UserIdentity, dagName string) (string, bool) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+
+	if cs.sessionID != "" && cs.sessionID != missingSessionID {
+		return cs.sessionID, true
+	}
+
+	newSessionID, err := m.agentAPI.CreateEmptySession(ctx, user, dagName, m.bot.cfg.SafeMode)
+	if err != nil {
+		m.logger.Warn("Failed to replace missing notification session",
+			slog.String("dag", dagName),
+			slog.String("user", user.UserID),
+			slog.String("error", err.Error()),
+		)
+		return "", false
+	}
+
+	if cs.sessionID != newSessionID {
+		cs.lastDeliveredSeq = 0
+	}
+	cs.sessionID = newSessionID
+	cs.ownerUserID = user.UserID
+	return newSessionID, true
 }
 
 func (m *DAGRunMonitor) buildNotificationMessage(ctx context.Context, sessionID string, user agent.UserIdentity, s *exec.DAGRunStatus, prompt string) agent.Message {

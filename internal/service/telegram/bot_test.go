@@ -52,6 +52,9 @@ type fakeTelegramAgentService struct {
 	createEmptyCalls int
 	appendSessionIDs []string
 	generated        agent.Message
+	createEmptyErr   error
+	createDelay      time.Duration
+	compactErr       error
 }
 
 func newFakeTelegramAgentService(content string) *fakeTelegramAgentService {
@@ -76,8 +79,14 @@ func (s *fakeTelegramAgentService) CreateSession(context.Context, agent.UserIden
 func (s *fakeTelegramAgentService) CreateEmptySession(_ context.Context, _ agent.UserIdentity, _ string, _ bool) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.createDelay > 0 {
+		time.Sleep(s.createDelay)
+	}
 	s.nextSessionID++
 	s.createEmptyCalls++
+	if s.createEmptyErr != nil {
+		return "", s.createEmptyErr
+	}
 	return fmt.Sprintf("sess-%d", s.nextSessionID), nil
 }
 
@@ -108,6 +117,9 @@ func (s *fakeTelegramAgentService) AppendExternalMessage(_ context.Context, sess
 }
 
 func (s *fakeTelegramAgentService) CompactSessionIfNeeded(_ context.Context, sessionID string, _ agent.UserIdentity) (string, bool, error) {
+	if s.compactErr != nil {
+		return "", false, s.compactErr
+	}
 	return sessionID, false, nil
 }
 
@@ -190,4 +202,75 @@ func TestDAGRunMonitor_NotifyChat_CreatesSessionWhenMissing(t *testing.T) {
 	assert.Equal(t, int64(1), bot.lastDeliveredSeq(cs))
 	assert.Equal(t, 1, service.createEmptyCalls)
 	assert.Equal(t, 1, api.sendCount())
+}
+
+func TestDAGRunMonitor_AppendNotification_CreatesSessionOnceConcurrently(t *testing.T) {
+	t.Parallel()
+
+	api := &fakeTelegramAPI{}
+	service := newFakeTelegramAgentService("telegram notification")
+	service.createDelay = 25 * time.Millisecond
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	bot := &Bot{
+		cfg:          Config{SafeMode: true},
+		agentAPI:     service,
+		botAPI:       api,
+		allowedChats: map[int64]struct{}{123: {}},
+		logger:       logger,
+	}
+	monitor := NewDAGRunMonitor(nil, service, bot, logger)
+	cs := bot.getOrCreateChat(123)
+	user := bot.userIdentity(123)
+	msg := agent.Message{Type: agent.MessageTypeAssistant, Content: "hello"}
+
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	results := make(chan string, 2)
+	for range 2 {
+		wg.Go(func() {
+			<-start
+			sessionID, _, ok := monitor.appendNotification(context.Background(), cs, "", user, "briefing", msg)
+			if ok {
+				results <- sessionID
+			}
+		})
+	}
+	close(start)
+	wg.Wait()
+	close(results)
+
+	var sessionIDs []string
+	for sessionID := range results {
+		sessionIDs = append(sessionIDs, sessionID)
+	}
+
+	require.Len(t, sessionIDs, 2)
+	assert.Equal(t, 1, service.createEmptyCalls)
+	assert.Equal(t, "sess-1", cs.sessionID)
+	assert.ElementsMatch(t, []string{"sess-1", "sess-1"}, service.appendSessionIDs)
+}
+
+func TestBot_PrepareSessionForMessage_ResetsOnWrappedSessionNotFound(t *testing.T) {
+	t.Parallel()
+
+	service := newFakeTelegramAgentService("telegram notification")
+	service.compactErr = fmt.Errorf("wrapped: %w", agent.ErrSessionNotFound)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	bot := &Bot{
+		cfg:          Config{SafeMode: true},
+		agentAPI:     service,
+		botAPI:       &fakeTelegramAPI{},
+		allowedChats: map[int64]struct{}{123: {}},
+		logger:       logger,
+	}
+
+	cs := bot.getOrCreateChat(123)
+	user := bot.userIdentity(123)
+	bot.setActiveSession(cs, "existing-session", user.UserID)
+
+	sessionID, rotated := bot.prepareSessionForMessage(context.Background(), cs, user)
+	assert.Empty(t, sessionID)
+	assert.False(t, rotated)
+	assert.Empty(t, cs.sessionID)
+	assert.Empty(t, cs.ownerUserID)
 }

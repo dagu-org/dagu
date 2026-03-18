@@ -8,6 +8,7 @@ package slack
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -325,9 +326,10 @@ func (b *Bot) processIncoming(ctx context.Context, cs *chatState, convKey, _ str
 	if thinkingTS != "" {
 		cs.thinkingMessage = &messageRef{channel: cs.channelID, timestamp: thinkingTS}
 	}
+	sid := cs.sessionID
 	cs.mu.Unlock()
 
-	if cs.sessionID == "" {
+	if sid == "" {
 		b.createSession(ctx, cs, user, text)
 	} else {
 		sid, rotated := b.prepareSessionForMessage(ctx, cs, user)
@@ -890,7 +892,7 @@ func (b *Bot) prepareSessionForMessage(ctx context.Context, cs *chatState, user 
 
 	newSID, rotated, err := b.agentAPI.CompactSessionIfNeeded(ctx, sid, user)
 	if err != nil {
-		if err == agent.ErrSessionNotFound {
+		if errors.Is(err, agent.ErrSessionNotFound) {
 			b.logger.Warn("Session missing during compaction, resetting conversation",
 				slog.String("session", sid),
 				slog.String("user", user.UserID),
