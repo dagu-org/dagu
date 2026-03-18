@@ -27,7 +27,6 @@ func TestConfigSchemaTopLevelPropertiesCoverDefinition(t *testing.T) {
 
 	defType := reflect.TypeFor[config.Definition]()
 	for field := range defType.Fields() {
-		field := field
 		key := field.Tag.Get("mapstructure")
 		if key == "" || key == "-" {
 			continue
