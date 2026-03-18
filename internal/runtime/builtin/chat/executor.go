@@ -507,33 +507,13 @@ func (e *Executor) runSimpleForModel(ctx context.Context, provider llmpkg.Provid
 
 	// Execute request (streaming or non-streaming)
 	if cfg.StreamEnabled() {
-		events, err := provider.ChatStream(ctx, req)
+		var err error
+		responseContent, usage, err = e.runStreamForModel(ctx, provider, req)
 		if err != nil {
-			return fmt.Errorf("chat stream request failed: %w", err)
-		}
-
-		// Collect response content while streaming to stdout
-		for event := range events {
-			if event.Error != nil {
-				return fmt.Errorf("chat stream error: %w", event.Error)
-			}
-			if event.Delta != "" {
-				responseContent += event.Delta
-				if _, err := e.stdout.Write([]byte(event.Delta)); err != nil {
-					logger.Error(ctx, "failed to write streaming response", tag.Error(err))
-				}
-			}
-			// Capture usage from final event
-			if event.Usage != nil {
-				usage = event.Usage
-			}
-		}
-		// Add newline after streaming response
-		if _, err := e.stdout.Write([]byte("\n")); err != nil {
-			logger.Error(ctx, "failed to write newline", tag.Error(err))
+			return err
 		}
 	} else {
-		resp, err := provider.Chat(ctx, req)
+		resp, err := llmpkg.ChatWithRetry(ctx, provider, req, llmpkg.DefaultLogicalRetryConfig())
 		if err != nil {
 			return fmt.Errorf("chat request failed: %w", err)
 		}
@@ -648,7 +628,7 @@ func (e *Executor) executeToolStep(
 	}
 
 	// Execute request
-	resp, err := provider.Chat(ctx, req)
+	resp, err := llmpkg.ChatWithRetry(ctx, provider, req, llmpkg.DefaultLogicalRetryConfig())
 	if err != nil {
 		return nil, false, fmt.Errorf("chat request failed: %w", err)
 	}
@@ -667,6 +647,81 @@ func (e *Executor) executeToolStep(
 
 	// Process tool calls
 	return e.processToolCalls(ctx, msgs, resp, iteration)
+}
+
+func (e *Executor) runStreamForModel(ctx context.Context, provider llmpkg.Provider, req *llmpkg.ChatRequest) (string, *llmpkg.Usage, error) {
+	retryCfg := llmpkg.DefaultLogicalRetryConfig()
+
+	for attempt := 1; attempt <= retryCfg.MaxAttempts; attempt++ {
+		events, err := provider.ChatStream(ctx, req)
+		if err != nil {
+			if attempt < retryCfg.MaxAttempts && llmpkg.ShouldRetryRequest(ctx, err) {
+				if waitErr := waitForStreamRetry(ctx, retryCfg, attempt); waitErr != nil {
+					return "", nil, waitErr
+				}
+				continue
+			}
+			return "", nil, fmt.Errorf("chat stream request failed: %w", err)
+		}
+
+		var responseContent string
+		var usage *llmpkg.Usage
+		emittedDelta := false
+
+		for event := range events {
+			if event.Error != nil {
+				if !emittedDelta && attempt < retryCfg.MaxAttempts && llmpkg.ShouldRetryRequest(ctx, event.Error) {
+					if waitErr := waitForStreamRetry(ctx, retryCfg, attempt); waitErr != nil {
+						return "", nil, waitErr
+					}
+					responseContent = ""
+					usage = nil
+					goto retryStream
+				}
+				return "", nil, fmt.Errorf("chat stream error: %w", event.Error)
+			}
+			if event.Delta != "" {
+				emittedDelta = true
+				responseContent += event.Delta
+				if _, err := e.stdout.Write([]byte(event.Delta)); err != nil {
+					logger.Error(ctx, "failed to write streaming response", tag.Error(err))
+				}
+			}
+			if event.Usage != nil {
+				usage = event.Usage
+			}
+		}
+
+		if _, err := e.stdout.Write([]byte("\n")); err != nil {
+			logger.Error(ctx, "failed to write newline", tag.Error(err))
+		}
+		return responseContent, usage, nil
+
+	retryStream:
+	}
+
+	return "", nil, fmt.Errorf("chat stream request failed after retries")
+}
+
+func waitForStreamRetry(ctx context.Context, cfg llmpkg.LogicalRetryConfig, failedAttempt int) error {
+	delay := cfg.InitialInterval
+	for i := 1; i < failedAttempt; i++ {
+		delay = time.Duration(float64(delay) * cfg.Multiplier)
+		if delay > cfg.MaxInterval {
+			delay = cfg.MaxInterval
+			break
+		}
+	}
+
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // handleFinalResponse processes and logs the final response from the LLM.

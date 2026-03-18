@@ -6,7 +6,10 @@ package chat
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"io"
 	"os"
+	"sync/atomic"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -462,6 +465,169 @@ func TestToThinkingRequest(t *testing.T) {
 		assert.Nil(t, result.BudgetTokens)
 		assert.False(t, result.IncludeInOutput)
 	})
+}
+
+type mockProvider struct {
+	chatFunc       func(ctx context.Context, req *llmpkg.ChatRequest) (*llmpkg.ChatResponse, error)
+	chatStreamFunc func(ctx context.Context, req *llmpkg.ChatRequest) (<-chan llmpkg.StreamEvent, error)
+}
+
+func (m *mockProvider) Chat(ctx context.Context, req *llmpkg.ChatRequest) (*llmpkg.ChatResponse, error) {
+	return m.chatFunc(ctx, req)
+}
+
+func (m *mockProvider) ChatStream(ctx context.Context, req *llmpkg.ChatRequest) (<-chan llmpkg.StreamEvent, error) {
+	return m.chatStreamFunc(ctx, req)
+}
+
+func (m *mockProvider) Name() string {
+	return "mock"
+}
+
+func TestExecutor_RunSimpleForModel_RetriesTransientChatFailure(t *testing.T) {
+	t.Parallel()
+
+	var calls atomic.Int32
+	stream := false
+	cfg := &core.LLMConfig{Provider: "openai", Model: "gpt-4o", Stream: &stream}
+	var stdout bytes.Buffer
+	executor := &Executor{
+		stdout: stdoutWriter(&stdout),
+		step:   core.Step{LLM: cfg},
+	}
+
+	provider := &mockProvider{
+		chatFunc: func(_ context.Context, _ *llmpkg.ChatRequest) (*llmpkg.ChatResponse, error) {
+			if calls.Add(1) == 1 {
+				return nil, llmpkg.WrapError("openrouter", fmt.Errorf("failed to decode response: %w", io.ErrUnexpectedEOF))
+			}
+			return &llmpkg.ChatResponse{
+				Content:      "done",
+				FinishReason: "stop",
+				Usage:        llmpkg.Usage{PromptTokens: 1, CompletionTokens: 1, TotalTokens: 2},
+			}, nil
+		},
+		chatStreamFunc: func(context.Context, *llmpkg.ChatRequest) (<-chan llmpkg.StreamEvent, error) {
+			ch := make(chan llmpkg.StreamEvent)
+			close(ch)
+			return ch, nil
+		},
+	}
+
+	err := executor.runSimpleForModel(context.Background(), provider, []exec.LLMMessage{{Role: exec.RoleUser, Content: "hello"}}, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, int32(2), calls.Load())
+	assert.Contains(t, stdout.String(), "done")
+	require.Len(t, executor.savedMessages, 2)
+	assert.Equal(t, "done", executor.savedMessages[1].Content)
+}
+
+func TestExecutor_RunSimpleForModel_RetriesStreamBeforeFirstDelta(t *testing.T) {
+	t.Parallel()
+
+	var calls atomic.Int32
+	stream := true
+	cfg := &core.LLMConfig{Provider: "openai", Model: "gpt-4o", Stream: &stream}
+	var stdout bytes.Buffer
+	executor := &Executor{
+		stdout: stdoutWriter(&stdout),
+		step:   core.Step{LLM: cfg},
+	}
+
+	provider := &mockProvider{
+		chatFunc: func(context.Context, *llmpkg.ChatRequest) (*llmpkg.ChatResponse, error) {
+			return nil, fmt.Errorf("unexpected Chat call")
+		},
+		chatStreamFunc: func(_ context.Context, _ *llmpkg.ChatRequest) (<-chan llmpkg.StreamEvent, error) {
+			if calls.Add(1) == 1 {
+				return nil, llmpkg.WrapError("openrouter", fmt.Errorf("failed to decode response: %w", io.ErrUnexpectedEOF))
+			}
+			ch := make(chan llmpkg.StreamEvent, 2)
+			ch <- llmpkg.StreamEvent{Delta: "done"}
+			ch <- llmpkg.StreamEvent{Done: true}
+			close(ch)
+			return ch, nil
+		},
+	}
+
+	err := executor.runSimpleForModel(context.Background(), provider, []exec.LLMMessage{{Role: exec.RoleUser, Content: "hello"}}, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, int32(2), calls.Load())
+	assert.Equal(t, "done\n", stdout.String())
+}
+
+func TestExecutor_RunSimpleForModel_DoesNotRetryStreamAfterDelta(t *testing.T) {
+	t.Parallel()
+
+	var calls atomic.Int32
+	stream := true
+	cfg := &core.LLMConfig{Provider: "openai", Model: "gpt-4o", Stream: &stream}
+	var stdout bytes.Buffer
+	executor := &Executor{
+		stdout: stdoutWriter(&stdout),
+		step:   core.Step{LLM: cfg},
+	}
+
+	provider := &mockProvider{
+		chatFunc: func(context.Context, *llmpkg.ChatRequest) (*llmpkg.ChatResponse, error) {
+			return nil, fmt.Errorf("unexpected Chat call")
+		},
+		chatStreamFunc: func(_ context.Context, _ *llmpkg.ChatRequest) (<-chan llmpkg.StreamEvent, error) {
+			calls.Add(1)
+			ch := make(chan llmpkg.StreamEvent, 2)
+			ch <- llmpkg.StreamEvent{Delta: "partial"}
+			ch <- llmpkg.StreamEvent{Error: llmpkg.WrapError("openrouter", fmt.Errorf("failed to decode response: %w", io.ErrUnexpectedEOF)), Done: true}
+			close(ch)
+			return ch, nil
+		},
+	}
+
+	err := executor.runSimpleForModel(context.Background(), provider, []exec.LLMMessage{{Role: exec.RoleUser, Content: "hello"}}, cfg)
+	require.Error(t, err)
+	assert.Equal(t, int32(1), calls.Load())
+	assert.Equal(t, "partial", stdout.String())
+}
+
+func TestExecutor_ExecuteToolStep_RetriesTransientChatFailure(t *testing.T) {
+	t.Parallel()
+
+	var calls atomic.Int32
+	var stdout bytes.Buffer
+	cfg := &core.LLMConfig{Provider: "openai", Model: "gpt-4o"}
+	executor := &Executor{
+		stdout: stdoutWriter(&stdout),
+		step:   core.Step{LLM: cfg},
+	}
+
+	provider := &mockProvider{
+		chatFunc: func(_ context.Context, _ *llmpkg.ChatRequest) (*llmpkg.ChatResponse, error) {
+			if calls.Add(1) == 1 {
+				return nil, llmpkg.WrapError("openrouter", fmt.Errorf("failed to decode response: %w", io.ErrUnexpectedEOF))
+			}
+			return &llmpkg.ChatResponse{
+				Content:      "tool loop done",
+				FinishReason: "stop",
+				Usage:        llmpkg.Usage{PromptTokens: 1, CompletionTokens: 1, TotalTokens: 2},
+			}, nil
+		},
+		chatStreamFunc: func(context.Context, *llmpkg.ChatRequest) (<-chan llmpkg.StreamEvent, error) {
+			ch := make(chan llmpkg.StreamEvent)
+			close(ch)
+			return ch, nil
+		},
+	}
+
+	msgs, done, err := executor.executeToolStep(context.Background(), provider, cfg, nil, []exec.LLMMessage{{Role: exec.RoleUser, Content: "hello"}}, 0)
+	require.NoError(t, err)
+	assert.True(t, done)
+	assert.Equal(t, int32(2), calls.Load())
+	require.Len(t, msgs, 2)
+	assert.Equal(t, "tool loop done", msgs[1].Content)
+	assert.Contains(t, stdout.String(), "tool loop done")
+}
+
+func stdoutWriter(buf *bytes.Buffer) *bytes.Buffer {
+	return buf
 }
 
 // createContextWithSecrets creates a test context with the given secrets.

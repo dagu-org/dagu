@@ -130,6 +130,7 @@ func CreateLLMProvider(agentCfg LLMConfig) (llm.Provider, error) {
 	}
 
 	cfg := llm.DefaultConfig()
+	cfg.Timeout = llmRequestTimeout
 	cfg.APIKey = cmp.Or(agentCfg.APIKey, cfg.APIKey)
 	cfg.BaseURL = cmp.Or(agentCfg.BaseURL, cfg.BaseURL)
 

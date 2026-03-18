@@ -11,14 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
 const (
-	// llmRetryInitialInterval is the initial backoff interval for LLM request retries.
-	llmRetryInitialInterval = time.Second
-
 	// idlePollingInterval is the interval for polling when no messages are queued.
 	idlePollingInterval = 100 * time.Millisecond
 
@@ -119,6 +115,7 @@ type Loop struct {
 	allowedSkills    map[string]struct{}
 	webSearch        *llm.WebSearchRequest
 	onTurnComplete   func()
+	activeTurn       bool
 }
 
 // NewLoop creates a new Loop instance.
@@ -187,8 +184,6 @@ func (l *Loop) Go(ctx context.Context) error {
 
 	l.logger.Info("starting session loop", "tools", len(l.tools))
 
-	retrier := backoff.NewRetrier(backoff.NewExponentialBackoffPolicy(llmRetryInitialInterval))
-
 	idleTimer := time.NewTimer(idlePollingInterval)
 	defer idleTimer.Stop()
 
@@ -212,24 +207,16 @@ func (l *Loop) Go(ctx context.Context) error {
 		default:
 		}
 
-		// Process any queued messages
-		l.mu.Lock()
-		hasQueuedMessages := len(l.messageQueue) > 0
-		if hasQueuedMessages {
-			l.history = append(l.history, l.messageQueue...)
-			l.messageQueue = l.messageQueue[:0]
-		}
-		l.mu.Unlock()
+		hasActiveTurn, historyCount := l.activateQueuedTurn()
 
-		if hasQueuedMessages {
-			l.logger.Info("processing queued messages", "history_count", len(l.history))
+		if hasActiveTurn {
+			l.logger.Info("processing queued messages", "history_count", historyCount)
 			if err := l.processLLMRequest(ctx); err != nil {
 				l.logger.Error("failed to process LLM request", "error", err)
-				interval, _ := retrier.Next(err)
-				l.sleepWithContext(ctx, interval)
+				l.finishActiveTurn()
 				continue
 			}
-			retrier.Reset()
+			l.finishActiveTurn()
 			l.logger.Info("finished processing queued messages")
 			if l.onTurnComplete != nil {
 				l.onTurnComplete()
@@ -307,8 +294,10 @@ func (l *Loop) sendRequest(ctx context.Context) (*llm.ChatResponse, error) {
 
 	llmCtx, cancel := context.WithTimeout(ctx, llmRequestTimeout)
 	defer cancel()
+	stopHeartbeat := startHeartbeatPump(llmCtx, loopHeartbeatInterval, l.onHeartbeat)
+	defer stopHeartbeat()
 
-	resp, err := l.provider.Chat(llmCtx, req)
+	resp, err := llm.ChatWithRetry(llmCtx, l.provider, req, llm.DefaultLogicalRetryConfig())
 	if err != nil {
 		l.recordErrorMessage(ctx, fmt.Sprintf("LLM request failed: %v", err))
 		l.setWorking(false)
@@ -325,10 +314,60 @@ func (l *Loop) sendRequest(ctx context.Context) (*llm.ChatResponse, error) {
 	return resp, nil
 }
 
+func (l *Loop) activateQueuedTurn() (bool, int) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if !l.activeTurn && len(l.messageQueue) > 0 {
+		l.history = append(l.history, l.messageQueue...)
+		l.messageQueue = l.messageQueue[:0]
+		l.activeTurn = true
+	}
+
+	return l.activeTurn, len(l.history)
+}
+
+func (l *Loop) finishActiveTurn() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.activeTurn = false
+}
+
 // setWorking safely calls the onWorking callback if configured.
 func (l *Loop) setWorking(working bool) {
 	if l.onWorking != nil {
 		l.onWorking(working)
+	}
+}
+
+func startHeartbeatPump(ctx context.Context, interval time.Duration, heartbeat func()) func() {
+	if heartbeat == nil || interval <= 0 {
+		return func() {}
+	}
+
+	done := make(chan struct{})
+	var once sync.Once
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-done:
+				return
+			case <-ticker.C:
+				heartbeat()
+			}
+		}
+	}()
+
+	return func() {
+		once.Do(func() {
+			close(done)
+		})
 	}
 }
 

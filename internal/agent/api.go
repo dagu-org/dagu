@@ -549,10 +549,10 @@ func (a *API) runOneShotPrompt(ctx context.Context, provider llm.Provider, model
 	llmCtx, cancel := context.WithTimeout(ctx, llmRequestTimeout)
 	defer cancel()
 
-	return provider.Chat(llmCtx, &llm.ChatRequest{
+	return llm.ChatWithRetry(llmCtx, provider, &llm.ChatRequest{
 		Model:    model,
 		Messages: messages,
-	})
+	}, llm.DefaultLogicalRetryConfig())
 }
 
 func latestPromptTokens(messages []Message) int {

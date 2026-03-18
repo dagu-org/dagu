@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"testing"
 	"time"
@@ -928,6 +929,38 @@ func TestAPI_GenerateAssistantMessage_UsesSessionDAGMemory(t *testing.T) {
 	require.Len(t, req.Messages, 2)
 	assert.Equal(t, llm.RoleSystem, req.Messages[0].Role)
 	assert.Contains(t, req.Messages[0].Content, "Remember the DAG-specific state")
+}
+
+func TestAPI_GenerateAssistantMessage_RetriesTransientFailure(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("retry-model")
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = model.ID
+
+	var calls atomic.Int32
+	api := NewAPI(APIConfig{
+		ConfigStore: configStore,
+		ModelStore:  newMockModelStore().addModel(model),
+		WorkingDir:  t.TempDir(),
+	})
+	api.providers.Set(model.ToLLMConfig(), &mockLLMProvider{
+		chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+			if calls.Add(1) == 1 {
+				return nil, llm.WrapError("openrouter", fmt.Errorf("failed to decode response: %w", context.Canceled))
+			}
+			return simpleStopResponse("ok"), nil
+		},
+	})
+
+	user := UserIdentity{UserID: "telegram:321", Username: "telegram", Role: auth.RoleAdmin}
+	sessionID, err := api.CreateEmptySession(context.Background(), user, "briefing", false)
+	require.NoError(t, err)
+
+	msg, err := api.GenerateAssistantMessage(context.Background(), sessionID, user, "", "summarize the DAG run")
+	require.NoError(t, err)
+	assert.Equal(t, "ok", msg.Content)
+	assert.Equal(t, int32(2), calls.Load())
 }
 
 func TestAPI_CompactSessionIfNeeded_CreatesSummarySession(t *testing.T) {

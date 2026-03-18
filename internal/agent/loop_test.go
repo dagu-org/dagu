@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -387,6 +388,97 @@ func TestLoop_Go(t *testing.T) {
 		assert.Equal(t, 20, usage.CompletionTokens)
 		assert.Equal(t, 30, usage.TotalTokens)
 	})
+
+	t.Run("retries transient failures without losing the turn", func(t *testing.T) {
+		t.Parallel()
+
+		var callCount atomic.Int32
+		requestCh := make(chan *llm.ChatRequest, 2)
+		var recorded []Message
+		var recordMu sync.Mutex
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		provider := &mockLLMProvider{
+			chatFunc: func(_ context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
+				select {
+				case requestCh <- req:
+				default:
+				}
+				if callCount.Add(1) == 1 {
+					return nil, llm.WrapError("openrouter", fmt.Errorf("failed to decode response: %w", context.Canceled))
+				}
+				return simpleStopResponse("recovered"), nil
+			},
+		}
+
+		loop := NewLoop(LoopConfig{
+			Provider: provider,
+			Model:    "test-model",
+			RecordMessage: func(_ context.Context, msg Message) {
+				recordMu.Lock()
+				recorded = append(recorded, msg)
+				recordMu.Unlock()
+			},
+			OnTurnComplete: cancel,
+		})
+		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "hello"})
+
+		err := loop.Go(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.Equal(t, int32(2), callCount.Load())
+
+		firstReq := waitForRequest(t, requestCh, 200*time.Millisecond)
+		secondReq := waitForRequest(t, requestCh, 200*time.Millisecond)
+		require.Len(t, firstReq.Messages, 1)
+		require.Len(t, secondReq.Messages, 1)
+		assert.Equal(t, "hello", firstReq.Messages[0].Content)
+		assert.Equal(t, "hello", secondReq.Messages[0].Content)
+
+		recordMu.Lock()
+		msgs := append([]Message(nil), recorded...)
+		recordMu.Unlock()
+		require.Len(t, msgs, 1)
+		assert.Equal(t, MessageTypeAssistant, msgs[0].Type)
+		assert.Equal(t, "recovered", msgs[0].Content)
+	})
+
+	t.Run("records one terminal error after retry exhaustion", func(t *testing.T) {
+		t.Parallel()
+
+		var callCount atomic.Int32
+		var recorded []Message
+		var recordMu sync.Mutex
+
+		provider := &mockLLMProvider{
+			chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+				callCount.Add(1)
+				return nil, llm.WrapError("openrouter", fmt.Errorf("failed to decode response: %w", io.ErrUnexpectedEOF))
+			},
+		}
+
+		loop := NewLoop(LoopConfig{
+			Provider: provider,
+			Model:    "test-model",
+			RecordMessage: func(_ context.Context, msg Message) {
+				recordMu.Lock()
+				recorded = append(recorded, msg)
+				recordMu.Unlock()
+			},
+		})
+		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "hello"})
+
+		runLoopForDuration(t, loop, 3500*time.Millisecond)
+
+		assert.Equal(t, int32(3), callCount.Load())
+		recordMu.Lock()
+		msgs := append([]Message(nil), recorded...)
+		recordMu.Unlock()
+		require.Len(t, msgs, 1)
+		assert.Equal(t, MessageTypeError, msgs[0].Type)
+		assert.Contains(t, msgs[0].Content, "LLM request failed")
+	})
 }
 
 func TestLoop_ExecuteTool(t *testing.T) {
@@ -645,6 +737,22 @@ func TestLoop_BuildToolDefinitions(t *testing.T) {
 			assert.NotEmpty(t, tool.Function.Name)
 		}
 	})
+}
+
+func TestStartHeartbeatPump(t *testing.T) {
+	t.Parallel()
+
+	var beats atomic.Int32
+	ctx := t.Context()
+
+	stop := startHeartbeatPump(ctx, 10*time.Millisecond, func() {
+		beats.Add(1)
+	})
+	defer stop()
+
+	require.Eventually(t, func() bool {
+		return beats.Load() >= 2
+	}, 200*time.Millisecond, 10*time.Millisecond)
 }
 
 // Test helpers
