@@ -240,6 +240,19 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		assert.Contains(t, result, "dagu enqueue dag -- name=\"John Doe\"")
 		assert.NotContains(t, result, "2. Start: `dagu start <dag-name>`")
 	})
+
+	t.Run("includes active progress reporting guidance", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+
+		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Role: auth.RoleDeveloper})
+
+		assert.Contains(t, result, "<communication>")
+		assert.Contains(t, result, "Actively report your progress during multi-step work")
+		assert.Contains(t, result, "Before using tools or starting a long-running action")
+		assert.Contains(t, result, "Do not stay silent until the final answer")
+		assert.Contains(t, result, "what you did, what you found, and what you will do next")
+	})
 }
 
 func TestFallbackPrompt(t *testing.T) {

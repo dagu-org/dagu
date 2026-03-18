@@ -157,6 +157,16 @@ Do not use placeholder values (example.com, your-api-key) in user DAGs unless ex
 After creating or modifying DAGs, navigate to the UI page so the user can review.
 After creating or modifying documents, navigate to `/docs/<doc-id>` so the user can review the changes.
 </ui_flow>
+
+<communication>
+Actively report your progress during multi-step work so the user is not left waiting without context.
+- Before using tools or starting a long-running action, send a brief assistant update stating what you are about to do.
+- After each meaningful batch of work, or when you learn something important or change approach, send another brief update covering what you did, what you found, and what you will do next.
+- Do not stay silent until the final answer on tasks that take multiple steps.
+- Keep progress updates concise and factual: usually 1-3 short sentences.
+- If the task is a single quick read-only action, one short upfront note is enough.
+- Do not claim completion until the work is actually finished and validated.
+</communication>
 </rules>
 
 <tools>
