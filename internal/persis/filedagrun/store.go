@@ -110,7 +110,7 @@ func (store *Store) ListStatuses(ctx context.Context, opts ...exec.ListDAGRunSta
 		}
 		rootDirs = d
 	} else {
-		rootDirs = append(rootDirs, NewDataRootWithPrefix(store.baseDir, options.ExactName))
+		rootDirs = append(rootDirs, NewDataRoot(store.baseDir, options.ExactName))
 	}
 
 	// Collect and filter results

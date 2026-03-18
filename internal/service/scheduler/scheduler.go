@@ -188,6 +188,17 @@ func newScheduler(
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize retry scanner: %w", err)
 	}
+	retryScanner.listTargets = func() []string {
+		dags := er.DAGs()
+		targets := make([]string, 0, len(dags))
+		for _, dag := range dags {
+			if dag == nil || dag.RetryPolicy == nil {
+				continue
+			}
+			targets = append(targets, dag.Name)
+		}
+		return targets
+	}
 
 	return &Scheduler{
 		quit:            make(chan any),

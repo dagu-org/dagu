@@ -504,13 +504,14 @@ SCAN:
 					continue
 				}
 
-				indexEntries, fromIndex, indexErr := dagrunindex.TryLoadForDay(dayPath, dayEntries)
+				indexEntries, _, indexErr := dagrunindex.TryLoadForDay(dayPath, dayEntries)
 				if indexErr != nil {
 					logger.Debug(ctx, "Failed to load day index, falling back to filesystem scan",
 						tag.Dir(dayPath),
 						tag.Error(indexErr))
 				}
-				if fromIndex && indexEntries != nil {
+				dagRunDirCount := countDAGRunDirs(dayEntries)
+				if indexEntries != nil && len(indexEntries) == dagRunDirCount {
 					for _, ie := range indexEntries {
 						runPath := filepath.Join(dayPath, ie.DagRunDir)
 						run, err := NewDAGRun(runPath)
@@ -677,6 +678,16 @@ func listDirsSorted(path string, reverse bool, pattern *regexp.Regexp) ([]string
 	}
 
 	return dirs, nil
+}
+
+func countDAGRunDirs(entries []os.DirEntry) int {
+	count := 0
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), DAGRunDirPrefix) {
+			count++
+		}
+	}
+	return count
 }
 
 // processFilesParallel processes files in parallel using a worker pool.
