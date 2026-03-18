@@ -1723,6 +1723,89 @@ func (a *API) waitForRetryStarted(ctx context.Context, dag *core.DAG, dagRunID s
 	}
 }
 
+type latestAttemptStatusSwapper interface {
+	CompareAndSwapLatestAttemptStatus(
+		ctx context.Context,
+		dagRun exec.DAGRunRef,
+		expectedAttemptID string,
+		expectedStatus core.Status,
+		mutate func(*exec.DAGRunStatus) error,
+	) (*exec.DAGRunStatus, bool, error)
+}
+
+func isFailedAutoRetryPendingDAGRun(status *exec.DAGRunStatus) bool {
+	if status == nil || status.Status != core.Failed || !status.Parent.Zero() {
+		return false
+	}
+	return status.AutoRetryLimit > 0 && status.AutoRetryCount < status.AutoRetryLimit
+}
+
+func failedAutoRetryCancelError(status *exec.DAGRunStatus) *Error {
+	switch {
+	case status == nil:
+		return &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "failed DAG run cannot be canceled: missing status",
+		}
+	case !status.Parent.Zero():
+		return &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "only root DAG runs with pending auto-retries can be canceled after failure",
+		}
+	case status.AutoRetryLimit <= 0 || status.AutoRetryCount >= status.AutoRetryLimit:
+		return &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "failed DAG run is not pending auto-retry and cannot be canceled",
+		}
+	default:
+		return &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "failed DAG run cannot be canceled",
+		}
+	}
+}
+
+func cancelFailedAutoRetryPendingDAGRun(
+	ctx context.Context,
+	dagRunStore latestAttemptStatusSwapper,
+	dagRun exec.DAGRunRef,
+	attemptID string,
+) error {
+	updatedStatus, swapped, err := dagRunStore.CompareAndSwapLatestAttemptStatus(
+		ctx,
+		dagRun,
+		attemptID,
+		core.Failed,
+		func(latest *exec.DAGRunStatus) error {
+			latest.Status = core.Aborted
+			return nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("error canceling failed DAG run: %w", err)
+	}
+	if swapped {
+		return nil
+	}
+
+	currentStatus := "unknown"
+	if updatedStatus != nil {
+		currentStatus = updatedStatus.Status.String()
+	}
+	return &Error{
+		HTTPStatus: http.StatusBadRequest,
+		Code:       api.ErrorCodeBadRequest,
+		Message: fmt.Sprintf(
+			"dag-run state changed before cancel could be applied; current status is %s. Refresh and try again.",
+			currentStatus,
+		),
+	}
+}
+
 func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRequestObject) (api.TerminateDAGRunResponseObject, error) {
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
@@ -1756,54 +1839,66 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 		}
 	}
 
-	// Check if it's a distributed DAG (has WorkerID)
-	if savedStatus.WorkerID != "" {
-		// For distributed DAGs, use saved status for running check
-		if savedStatus.Status != core.Running {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeNotRunning,
-				Message:    "DAG is not running",
-			}
+	terminateMode := "running_stop"
+	if savedStatus.Status == core.Failed {
+		if !isFailedAutoRetryPendingDAGRun(savedStatus) {
+			return nil, failedAutoRetryCancelError(savedStatus)
 		}
-		// Send cancel request via coordinator
-		if a.coordinatorCli == nil {
-			return nil, &Error{
-				HTTPStatus: http.StatusServiceUnavailable,
-				Code:       api.ErrorCodeInternalError,
-				Message:    "coordinator not configured for distributed DAG cancellation",
-			}
+		if err := cancelFailedAutoRetryPendingDAGRun(ctx, a.dagRunStore, ref, attempt.ID()); err != nil {
+			return nil, err
 		}
-		if err := a.coordinatorCli.RequestCancel(ctx, request.Name, request.DagRunId, nil); err != nil {
-			return nil, fmt.Errorf("error requesting cancel: %w", err)
-		}
+		terminateMode = "failed_auto_retry_cancel"
 	} else {
-		// For local DAGs, use existing logic with GetCurrentStatus and socket
-		dagStatus, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, request.DagRunId)
-		if err != nil {
-			return nil, &Error{
-				HTTPStatus: http.StatusNotFound,
-				Code:       api.ErrorCodeNotFound,
-				Message:    fmt.Sprintf("DAG %s not found", request.Name),
+		// Check if it's a distributed DAG (has WorkerID)
+		if savedStatus.WorkerID != "" {
+			// For distributed DAGs, use saved status for running check
+			if savedStatus.Status != core.Running {
+				return nil, &Error{
+					HTTPStatus: http.StatusBadRequest,
+					Code:       api.ErrorCodeNotRunning,
+					Message:    "DAG is not running",
+				}
 			}
-		}
-
-		if dagStatus.Status != core.Running {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeNotRunning,
-				Message:    "DAG is not running",
+			// Send cancel request via coordinator
+			if a.coordinatorCli == nil {
+				return nil, &Error{
+					HTTPStatus: http.StatusServiceUnavailable,
+					Code:       api.ErrorCodeInternalError,
+					Message:    "coordinator not configured for distributed DAG cancellation",
+				}
 			}
-		}
+			if err := a.coordinatorCli.RequestCancel(ctx, request.Name, request.DagRunId, nil); err != nil {
+				return nil, fmt.Errorf("error requesting cancel: %w", err)
+			}
+		} else {
+			// For local DAGs, use existing logic with GetCurrentStatus and socket
+			dagStatus, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, request.DagRunId)
+			if err != nil {
+				return nil, &Error{
+					HTTPStatus: http.StatusNotFound,
+					Code:       api.ErrorCodeNotFound,
+					Message:    fmt.Sprintf("DAG %s not found", request.Name),
+				}
+			}
 
-		if err := a.dagRunMgr.Stop(ctx, dag, dagStatus.DAGRunID); err != nil {
-			return nil, fmt.Errorf("error stopping DAG: %w", err)
+			if dagStatus.Status != core.Running {
+				return nil, &Error{
+					HTTPStatus: http.StatusBadRequest,
+					Code:       api.ErrorCodeNotRunning,
+					Message:    "DAG is not running",
+				}
+			}
+
+			if err := a.dagRunMgr.Stop(ctx, dag, dagStatus.DAGRunID); err != nil {
+				return nil, fmt.Errorf("error stopping DAG: %w", err)
+			}
 		}
 	}
 
 	a.logAudit(ctx, audit.CategoryDAG, "dag_terminate", map[string]any{
-		"dag_name":   request.Name,
-		"dag_run_id": request.DagRunId,
+		"dag_name":       request.Name,
+		"dag_run_id":     request.DagRunId,
+		"terminate_mode": terminateMode,
 	})
 
 	return api.TerminateDAGRun200Response{}, nil
