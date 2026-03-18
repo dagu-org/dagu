@@ -141,7 +141,8 @@ env:
   - B: ${A}/bar
 ```
 
-Parameter values with spaces must be quoted: `dagu enqueue dag -- name="John Doe"`. Unquoted `name=John Doe` splits into two separate parameters.
+For `dagu start` and `dagu enqueue`, pass user parameters with `-p`. If a value contains spaces, wrap the whole assignment in single quotes and the value in double quotes, for example: `dagu enqueue my-dag -p 'topic="OpenAI new model released March 2026"'`.
+Avoid passing spaced values after `--` like `dagu start my-dag -- topic="OpenAI new model released March 2026"` because shells split that into multiple broken parameters.
 </correctness>
 
 <output_documents>

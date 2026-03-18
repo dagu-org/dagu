@@ -237,7 +237,9 @@ func TestGenerateSystemPrompt(t *testing.T) {
 
 		assert.Contains(t, result, "Default to queue-based execution: `dagu enqueue <dag-name>`")
 		assert.Contains(t, result, "Do not check running jobs, queued jobs")
-		assert.Contains(t, result, "dagu enqueue dag -- name=\"John Doe\"")
+		assert.Contains(t, result, "pass user parameters with `-p`")
+		assert.Contains(t, result, `dagu enqueue my-dag -p 'topic="OpenAI new model released March 2026"'`)
+		assert.Contains(t, result, "Avoid passing spaced values after `--`")
 		assert.NotContains(t, result, "2. Start: `dagu start <dag-name>`")
 	})
 
