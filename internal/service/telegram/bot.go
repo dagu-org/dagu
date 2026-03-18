@@ -23,6 +23,7 @@ import (
 // maxTelegramMessageLen is the maximum length for a single Telegram message.
 const maxTelegramMessageLen = 4096
 const defaultIncomingBatchDelay = 750 * time.Millisecond
+const defaultTypingRefreshInterval = 4 * time.Second
 
 // AgentService is the subset of the agent API that the Telegram bot requires.
 // Defining this as an interface decouples the bot from the concrete agent.API
@@ -60,11 +61,13 @@ type chatState struct {
 	ownerUserID      string // conversation-scoped session identity
 	subSessionID     string // session ID the subscription is listening to
 	subCancel        context.CancelFunc
+	typingCancel     context.CancelFunc
 	mu               sync.Mutex
 	pendingPromptID  string
 	lastDeliveredSeq int64
 	pendingMessages  []string
 	pendingFlushGen  uint64
+	typingLoopGen    uint64
 }
 
 // Bot is a Telegram bot that forwards messages to the Dagu agent API.
@@ -78,6 +81,7 @@ type Bot struct {
 	dagRunStore   exec.DAGRunStore
 	logger        *slog.Logger
 	incomingDelay time.Duration
+	typingDelay   time.Duration
 }
 
 // New creates a new Telegram bot instance.
@@ -108,6 +112,7 @@ func New(cfg Config, agentAPI AgentService, logger *slog.Logger) (*Bot, error) {
 		dagRunStore:   cfg.DAGRunStore,
 		logger:        logger,
 		incomingDelay: defaultIncomingBatchDelay,
+		typingDelay:   defaultTypingRefreshInterval,
 	}, nil
 }
 
@@ -212,6 +217,7 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 			b.sendText(chatID, "Failed to cancel session: "+err.Error())
 			return
 		}
+		b.stopTypingLoop(cs)
 		b.sendText(chatID, "Session cancelled.")
 
 	case "start":
@@ -299,7 +305,9 @@ func (b *Bot) handleCallbackQuery(ctx context.Context, cq *tgbotapi.CallbackQuer
 		SelectedOptionIDs: []string{optionID},
 	}
 
+	b.startTypingLoop(ctx, cs, chatID)
 	if err := b.agentAPI.SubmitUserResponse(ctx, sid, ownerUID, resp); err != nil {
+		b.stopTypingLoop(cs)
 		b.logger.Warn("Failed to submit prompt response",
 			slog.String("session", sid),
 			slog.String("user", ownerUID),
@@ -329,9 +337,63 @@ func (b *Bot) sendTyping(chatID int64) {
 	_, _ = b.botAPI.Send(action)
 }
 
+func (b *Bot) startTypingLoop(ctx context.Context, cs *chatState, chatID int64) {
+	cs.mu.Lock()
+	if cs.typingCancel != nil {
+		cs.mu.Unlock()
+		return
+	}
+	loopCtx, cancel := context.WithCancel(ctx)
+	cs.typingLoopGen++
+	gen := cs.typingLoopGen
+	cs.typingCancel = cancel
+	cs.mu.Unlock()
+
+	b.sendTyping(chatID)
+
+	refresh := b.typingDelay
+	if refresh <= 0 {
+		refresh = defaultTypingRefreshInterval
+	}
+
+	go func() {
+		ticker := time.NewTicker(refresh)
+		defer ticker.Stop()
+		defer b.finishTypingLoop(cs, gen)
+
+		for {
+			select {
+			case <-loopCtx.Done():
+				return
+			case <-ticker.C:
+				b.sendTyping(chatID)
+			}
+		}
+	}()
+}
+
+func (b *Bot) stopTypingLoop(cs *chatState) {
+	cs.mu.Lock()
+	cancel := cs.typingCancel
+	cs.typingCancel = nil
+	cs.mu.Unlock()
+
+	if cancel != nil {
+		cancel()
+	}
+}
+
+func (b *Bot) finishTypingLoop(cs *chatState, gen uint64) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	if cs.typingLoopGen == gen {
+		cs.typingCancel = nil
+	}
+}
+
 // createSession creates a new agent session and starts listening for responses.
 func (b *Bot) createSession(ctx context.Context, cs *chatState, chatID int64, user agent.UserIdentity, text string) {
-	b.sendTyping(chatID)
+	b.startTypingLoop(ctx, cs, chatID)
 
 	req := agent.ChatRequest{
 		Message:  text,
@@ -340,6 +402,7 @@ func (b *Bot) createSession(ctx context.Context, cs *chatState, chatID int64, us
 
 	sessionID, _, err := b.agentAPI.CreateSession(ctx, user, req)
 	if err != nil {
+		b.stopTypingLoop(cs)
 		b.logger.Error("Failed to create session", slog.String("error", err.Error()))
 		b.sendText(chatID, "Failed to start session: "+err.Error())
 		return
@@ -351,7 +414,7 @@ func (b *Bot) createSession(ctx context.Context, cs *chatState, chatID int64, us
 
 // sendMessage sends a message to an existing session.
 func (b *Bot) sendMessage(ctx context.Context, cs *chatState, chatID int64, user agent.UserIdentity, text string) {
-	b.sendTyping(chatID)
+	b.startTypingLoop(ctx, cs, chatID)
 
 	cs.mu.Lock()
 	sid := cs.sessionID
@@ -363,6 +426,7 @@ func (b *Bot) sendMessage(ctx context.Context, cs *chatState, chatID int64, user
 	}
 
 	if err := b.agentAPI.SendMessage(ctx, sid, user, req); err != nil {
+		b.stopTypingLoop(cs)
 		b.logger.Error("Failed to send message", slog.String("error", err.Error()))
 		b.sendText(chatID, "Failed to send message: "+err.Error())
 		return
@@ -389,7 +453,9 @@ func (b *Bot) submitPromptResponse(ctx context.Context, cs *chatState, chatID in
 		FreeTextResponse: text,
 	}
 
+	b.startTypingLoop(ctx, cs, chatID)
 	if err := b.agentAPI.SubmitUserResponse(ctx, sid, ownerUserID, resp); err != nil {
+		b.stopTypingLoop(cs)
 		b.sendText(chatID, "Failed to submit response: "+err.Error())
 	}
 }
@@ -457,6 +523,7 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, chatID int64, us
 	for {
 		resp, ok := next()
 		if !ok {
+			b.stopTypingLoop(cs)
 			// Session ended — clear the session ID so the next message
 			// creates a fresh session instead of reusing a dead one.
 			cs.mu.Lock()
@@ -472,6 +539,14 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, chatID int64, us
 
 // processStreamResponse handles a stream response and sends relevant content to Telegram.
 func (b *Bot) processStreamResponse(cs *chatState, chatID int64, resp agent.StreamResponse) {
+	if resp.SessionState != nil {
+		if resp.SessionState.Working {
+			b.startTypingLoop(context.Background(), cs, chatID)
+		} else {
+			b.stopTypingLoop(cs)
+		}
+	}
+
 	lastDelivered := b.lastDeliveredSeq(cs)
 	maxSeen := lastDelivered
 	for _, msg := range resp.Messages {
@@ -484,16 +559,19 @@ func (b *Bot) processStreamResponse(cs *chatState, chatID int64, resp agent.Stre
 		switch msg.Type {
 		case agent.MessageTypeAssistant:
 			if msg.Content != "" {
+				b.stopTypingLoop(cs)
 				b.sendLongText(chatID, msg.Content)
 			}
 
 		case agent.MessageTypeError:
 			if msg.Content != "" {
+				b.stopTypingLoop(cs)
 				b.sendText(chatID, "Error: "+msg.Content)
 			}
 
 		case agent.MessageTypeUserPrompt:
 			if msg.UserPrompt != nil {
+				b.stopTypingLoop(cs)
 				b.sendPrompt(cs, chatID, msg.UserPrompt)
 			}
 
@@ -582,6 +660,10 @@ func (b *Bot) resetChat(cs *chatState) {
 	if cs.subCancel != nil {
 		cs.subCancel()
 		cs.subCancel = nil
+	}
+	if cs.typingCancel != nil {
+		cs.typingCancel()
+		cs.typingCancel = nil
 	}
 	cs.sessionID = ""
 	cs.ownerUserID = ""

@@ -22,8 +22,10 @@ import (
 )
 
 type fakeTelegramAPI struct {
-	mu    sync.Mutex
-	sends []tgbotapi.Chattable
+	mu           sync.Mutex
+	sends        []tgbotapi.Chattable
+	actionCount  int
+	messageCount int
 }
 
 func (a *fakeTelegramAPI) GetUpdatesChan(tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel {
@@ -36,6 +38,12 @@ func (a *fakeTelegramAPI) Send(c tgbotapi.Chattable) (tgbotapi.Message, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.sends = append(a.sends, c)
+	switch c.(type) {
+	case tgbotapi.ChatActionConfig:
+		a.actionCount++
+	default:
+		a.messageCount++
+	}
 	return tgbotapi.Message{}, nil
 }
 
@@ -43,6 +51,18 @@ func (a *fakeTelegramAPI) sendCount() int {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return len(a.sends)
+}
+
+func (a *fakeTelegramAPI) typingCount() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.actionCount
+}
+
+func (a *fakeTelegramAPI) textCount() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.messageCount
 }
 
 type fakeTelegramAgentService struct {
@@ -229,4 +249,62 @@ func TestBot_HandleMessage_BatchesRapidMessagesIntoSingleCreate(t *testing.T) {
 	defer service.mu.Unlock()
 	require.Len(t, service.createMessages, 1)
 	assert.Equal(t, "first\n\nsecond", service.createMessages[0])
+}
+
+func TestBot_ProcessStreamResponse_RefreshesTypingWhileWorking(t *testing.T) {
+	t.Parallel()
+
+	api := &fakeTelegramAPI{}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	bot := &Bot{
+		botAPI:      api,
+		logger:      logger,
+		typingDelay: 10 * time.Millisecond,
+	}
+	cs := bot.getOrCreateChat(123)
+
+	bot.processStreamResponse(cs, 123, agent.StreamResponse{
+		SessionState: &agent.SessionState{Working: true},
+	})
+
+	require.Eventually(t, func() bool {
+		return api.typingCount() >= 2
+	}, time.Second, 10*time.Millisecond)
+
+	beforeStop := api.typingCount()
+	bot.processStreamResponse(cs, 123, agent.StreamResponse{
+		SessionState: &agent.SessionState{Working: false},
+	})
+
+	time.Sleep(40 * time.Millisecond)
+	assert.Equal(t, beforeStop, api.typingCount(), "typing loop should stop once working=false arrives")
+}
+
+func TestBot_ProcessStreamResponse_StopsTypingOnAssistantMessage(t *testing.T) {
+	t.Parallel()
+
+	api := &fakeTelegramAPI{}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	bot := &Bot{
+		botAPI:      api,
+		logger:      logger,
+		typingDelay: 10 * time.Millisecond,
+	}
+	cs := bot.getOrCreateChat(123)
+
+	bot.startTypingLoop(context.Background(), cs, 123)
+	require.Eventually(t, func() bool {
+		return api.typingCount() >= 1
+	}, time.Second, 10*time.Millisecond)
+
+	beforeStop := api.typingCount()
+	bot.processStreamResponse(cs, 123, agent.StreamResponse{
+		Messages: []agent.Message{
+			{Type: agent.MessageTypeAssistant, SequenceID: 1, Content: "done"},
+		},
+	})
+
+	time.Sleep(40 * time.Millisecond)
+	assert.Equal(t, beforeStop, api.typingCount(), "assistant output should stop typing immediately")
+	assert.Equal(t, 1, api.textCount())
 }
