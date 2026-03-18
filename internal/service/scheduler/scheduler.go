@@ -398,6 +398,16 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		}
 	}
 
+	// Every scheduler process should expose /health, even while it is waiting
+	// on the HA lock. Active/inactive role is tracked separately via the
+	// service registry status.
+	if !s.disableHealthServer {
+		if err := s.healthServer.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start health check server: %w", err)
+		}
+		state.healthServerStarted = true
+	}
+
 	logger.Info(ctx, "Waiting to acquire scheduler lock")
 	if err := s.dirLock.Lock(ctx); err != nil {
 		if errors.Is(err, context.Canceled) && s.stopping() {
@@ -409,17 +419,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	state.lockAcquired = true
 
 	logger.Info(ctx, "Acquired scheduler lock")
-
-	if ctx.Err() != nil && s.stopping() {
-		return nil
-	}
-
-	if !s.disableHealthServer {
-		if err := s.healthServer.Start(ctx); err != nil {
-			return fmt.Errorf("failed to start health check server: %w", err)
-		}
-		state.healthServerStarted = true
-	}
 
 	if ctx.Err() != nil && s.stopping() {
 		return nil
