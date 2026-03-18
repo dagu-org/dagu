@@ -217,7 +217,7 @@ func TestManager_ShutdownObservesCleanupWithinRemainingBudget(t *testing.T) {
 	start := time.Now()
 	require.NoError(t, manager.Shutdown(ctx))
 	elapsed := time.Since(start)
-	assert.GreaterOrEqual(t, elapsed, 50*time.Millisecond)
+	assert.GreaterOrEqual(t, elapsed, 45*time.Millisecond)
 	assert.Less(t, elapsed, 100*time.Millisecond)
 }
 

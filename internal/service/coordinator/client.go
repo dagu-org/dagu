@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -233,7 +234,7 @@ func (cli *clientImpl) attemptCall(ctx context.Context, members []exec.HostInfo,
 				tag.Host(member.Host),
 				tag.Port(member.Port),
 				tag.Error(err))
-			cli.removeClient(member.ID) // Remove failed client
+			cli.removeClient(member) // Remove failed client
 			cli.recordFailure(err)
 			lastErr = err
 			continue
@@ -296,9 +297,11 @@ func (cli *clientImpl) isHealthy(ctx context.Context, member exec.HostInfo) erro
 
 // getOrCreateClient gets an existing client or creates a new one for the given member
 func (cli *clientImpl) getOrCreateClient(member exec.HostInfo) (*client, error) {
+	key := coordinatorMemberKey(member)
+
 	// Try to get existing client with read lock
 	cli.clientsMu.RLock()
-	if c, exists := cli.clients[member.ID]; exists {
+	if c, exists := cli.clients[key]; exists {
 		cli.clientsMu.RUnlock()
 		return c, nil
 	}
@@ -309,7 +312,7 @@ func (cli *clientImpl) getOrCreateClient(member exec.HostInfo) (*client, error) 
 	defer cli.clientsMu.Unlock()
 
 	// Double-check after acquiring write lock
-	if c, exists := cli.clients[member.ID]; exists {
+	if c, exists := cli.clients[key]; exists {
 		return c, nil
 	}
 
@@ -320,7 +323,7 @@ func (cli *clientImpl) getOrCreateClient(member exec.HostInfo) (*client, error) 
 	}
 
 	// Cache it
-	cli.clients[member.ID] = c
+	cli.clients[key] = c
 	return c, nil
 }
 
@@ -349,13 +352,15 @@ func (cli *clientImpl) createClient(member exec.HostInfo) (*client, error) {
 }
 
 // removeClient removes a client from the cache
-func (cli *clientImpl) removeClient(coordinatorID string) {
+func (cli *clientImpl) removeClient(member exec.HostInfo) {
+	key := coordinatorMemberKey(member)
+
 	cli.clientsMu.Lock()
 	defer cli.clientsMu.Unlock()
 
-	if c, exists := cli.clients[coordinatorID]; exists {
+	if c, exists := cli.clients[key]; exists {
 		_ = c.conn.Close()
-		delete(cli.clients, coordinatorID)
+		delete(cli.clients, key)
 	}
 }
 
@@ -413,20 +418,21 @@ func (cli *clientImpl) getCoordinatorMembers(ctx context.Context) ([]exec.HostIn
 	if len(members) == 0 {
 		return nil, fmt.Errorf("no coordinators available")
 	}
-	return members, nil
+	return sortCoordinatorMembers(members), nil
 }
 
 // GetWorkers retrieves the list of workers from all coordinators
 func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error) {
 	// Get all available coordinators from discovery
-	members, err := cli.registry.GetServiceMembers(ctx, exec.ServiceNameCoordinator)
+	members, err := cli.getCoordinatorMembers(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to discover coordinators: %w", err)
+		return nil, err
 	}
 
 	// Collect workers from all coordinators
-	var allWorkers []*coordinatorv1.WorkerInfo
+	workersByID := make(map[string]*coordinatorv1.WorkerInfo)
 	var lastErr error
+	var successfulReads bool
 
 	for _, member := range members {
 		// Get or create client for this member
@@ -453,28 +459,67 @@ func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerI
 
 			// If this is a connection error, remove the client from cache
 			if st, ok := status.FromError(err); ok && st.Code() == codes.Unavailable {
-				cli.removeClient(member.ID)
+				cli.removeClient(member)
 			}
 			continue
 		}
+		successfulReads = true
 
 		// Append workers from this coordinator
 		if resp != nil && resp.Workers != nil {
-			allWorkers = append(allWorkers, resp.Workers...)
+			for _, worker := range resp.Workers {
+				if worker == nil {
+					continue
+				}
+				workersByID[worker.WorkerId] = selectAuthoritativeWorker(workersByID[worker.WorkerId], worker)
+			}
 		}
 	}
 
-	// If we got some workers, return them even if some coordinators failed
-	if len(allWorkers) > 0 {
-		return allWorkers, nil
+	allWorkers := make([]*coordinatorv1.WorkerInfo, 0, len(workersByID))
+	for _, worker := range workersByID {
+		allWorkers = append(allWorkers, worker)
 	}
+	sort.Slice(allWorkers, func(i, j int) bool {
+		return allWorkers[i].WorkerId < allWorkers[j].WorkerId
+	})
 
-	// All attempts failed and no workers found
 	if lastErr != nil {
+		if successfulReads {
+			return allWorkers, fmt.Errorf("partial failure getting workers: %w", lastErr)
+		}
 		return nil, fmt.Errorf("failed to get workers from any coordinator: %w", lastErr)
 	}
 
 	return allWorkers, nil
+}
+
+func sortCoordinatorMembers(members []exec.HostInfo) []exec.HostInfo {
+	sorted := append([]exec.HostInfo(nil), members...)
+	sort.Slice(sorted, func(i, j int) bool {
+		return coordinatorMemberKey(sorted[i]) < coordinatorMemberKey(sorted[j])
+	})
+	return sorted
+}
+
+func coordinatorMemberKey(member exec.HostInfo) string {
+	if member.ID != "" {
+		return member.ID
+	}
+	return fmt.Sprintf("%s:%d", member.Host, member.Port)
+}
+
+func selectAuthoritativeWorker(current, candidate *coordinatorv1.WorkerInfo) *coordinatorv1.WorkerInfo {
+	if candidate == nil {
+		return current
+	}
+	if current == nil {
+		return candidate
+	}
+	if candidate.LastHeartbeatAt > current.LastHeartbeatAt {
+		return candidate
+	}
+	return current
 }
 
 // Heartbeat sends a heartbeat to coordinators and returns the response

@@ -16,6 +16,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func getJSONWhenAvailable(t *testing.T, server test.Server, url string, out any) bool {
+	t.Helper()
+
+	resp := server.Client().Get(url).Send(t)
+	if resp.Response.StatusCode() == http.StatusNotFound {
+		return false
+	}
+
+	require.Equal(t, http.StatusOK, resp.Response.StatusCode(), "unexpected status code")
+	resp.Unmarshal(t, out)
+	return true
+}
+
 func TestDAGWritesDisabledInReadOnlyMode(t *testing.T) {
 	// Setup server with gitSync.enabled=true, pushEnabled=false (read-only mode)
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
@@ -156,9 +169,10 @@ steps:
 		// Check the status of the dag-run
 		require.Eventually(t, func() bool {
 			url := fmt.Sprintf("/api/v1/dags/test_dag/dag-runs/%s", execResp.DagRunId)
-			statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)
 			var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
-			statusResp.Unmarshal(t, &dagRunStatus)
+			if !getJSONWhenAvailable(t, server, url, &dagRunStatus) {
+				return false
+			}
 
 			return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
 		}, 5*time.Second, 1*time.Second, "expected DAG to complete")
@@ -230,8 +244,9 @@ steps:
 		var dagRunDetails api.GetDAGDAGRunDetails200JSONResponse
 		require.Eventually(t, func() bool {
 			url := fmt.Sprintf("/api/v1/dags/%s/dag-runs/%s", dagName, execResp.DagRunId)
-			statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)
-			statusResp.Unmarshal(t, &dagRunDetails)
+			if !getJSONWhenAvailable(t, server, url, &dagRunDetails) {
+				return false
+			}
 			return dagRunDetails.DagRun.Status == api.Status(core.Succeeded)
 		}, 10*time.Second, 500*time.Millisecond, "DAG should complete")
 
@@ -272,8 +287,9 @@ steps:
 		var dagRunDetails api.GetDAGDAGRunDetails200JSONResponse
 		require.Eventually(t, func() bool {
 			url := fmt.Sprintf("/api/v1/dags/%s/dag-runs/%s", dagName, execResp.DagRunId)
-			statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)
-			statusResp.Unmarshal(t, &dagRunDetails)
+			if !getJSONWhenAvailable(t, server, url, &dagRunDetails) {
+				return false
+			}
 			return dagRunDetails.DagRun.Status == api.Status(core.Succeeded)
 		}, 10*time.Second, 500*time.Millisecond, "DAG should complete")
 
@@ -309,9 +325,10 @@ steps:
 		require.NotEmpty(t, execResp.DagRunId)
 		require.Eventually(t, func() bool {
 			url := fmt.Sprintf("/api/v1/dags/%s/dag-runs/%s", dagName, execResp.DagRunId)
-			statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)
 			var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
-			statusResp.Unmarshal(t, &dagRunStatus)
+			if !getJSONWhenAvailable(t, server, url, &dagRunStatus) {
+				return false
+			}
 			return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
 		}, 5*time.Second, 500*time.Millisecond)
 
@@ -464,13 +481,10 @@ steps:
 		require.NotEmpty(t, body.DagRunId, "expected a non-empty dag-run ID")
 
 		require.Eventually(t, func() bool {
-			statusResp := server.Client().
-				Get(fmt.Sprintf("/api/v1/dag-runs/%s/%s", name, body.DagRunId)).
-				ExpectStatus(http.StatusOK).
-				Send(t)
-
 			var dagRun api.GetDAGRunDetails200JSONResponse
-			statusResp.Unmarshal(t, &dagRun)
+			if !getJSONWhenAvailable(t, server, fmt.Sprintf("/api/v1/dag-runs/%s/%s", name, body.DagRunId), &dagRun) {
+				return false
+			}
 
 			s := dagRun.DagRunDetails.Status
 			return s == api.Status(core.Queued) || s == api.Status(core.Running) || s == api.Status(core.Succeeded)

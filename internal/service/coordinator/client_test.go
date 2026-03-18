@@ -208,6 +208,211 @@ func TestClientGetWorkers(t *testing.T) {
 	assert.Equal(t, "worker-2", workers[1].WorkerId)
 }
 
+func TestClientGetWorkers_DeduplicatesAndSorts(t *testing.T) {
+	t.Parallel()
+
+	config := coordinator.DefaultConfig()
+	config.RequestTimeout = 100 * time.Millisecond
+
+	olderHeartbeat := time.Now().Add(-2 * time.Minute).Unix()
+	newerHeartbeat := time.Now().Unix()
+
+	oldTask := &coordinatorv1.RunningTask{DagRunId: "old-run", DagName: "old-dag"}
+	newTask := &coordinatorv1.RunningTask{DagRunId: "new-run", DagName: "new-dag"}
+
+	coord1 := &mockCoordinatorService{
+		getWorkersFunc: func(_ context.Context, _ *coordinatorv1.GetWorkersRequest) (*coordinatorv1.GetWorkersResponse, error) {
+			return &coordinatorv1.GetWorkersResponse{
+				Workers: []*coordinatorv1.WorkerInfo{
+					{
+						WorkerId:        "worker-b",
+						Labels:          map[string]string{"source": "old"},
+						TotalPollers:    2,
+						BusyPollers:     1,
+						RunningTasks:    []*coordinatorv1.RunningTask{oldTask},
+						LastHeartbeatAt: olderHeartbeat,
+						HealthStatus:    coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_WARNING,
+					},
+				},
+			}, nil
+		},
+	}
+	server1, addr1 := startMockServer(t, coord1)
+	defer server1.Stop()
+
+	coord2 := &mockCoordinatorService{
+		getWorkersFunc: func(_ context.Context, _ *coordinatorv1.GetWorkersRequest) (*coordinatorv1.GetWorkersResponse, error) {
+			return &coordinatorv1.GetWorkersResponse{
+				Workers: []*coordinatorv1.WorkerInfo{
+					{
+						WorkerId:        "worker-a",
+						Labels:          map[string]string{"role": "gpu"},
+						TotalPollers:    4,
+						BusyPollers:     0,
+						LastHeartbeatAt: newerHeartbeat,
+						HealthStatus:    coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_HEALTHY,
+					},
+					{
+						WorkerId:        "worker-b",
+						Labels:          map[string]string{"source": "new"},
+						TotalPollers:    5,
+						BusyPollers:     3,
+						RunningTasks:    []*coordinatorv1.RunningTask{newTask},
+						LastHeartbeatAt: newerHeartbeat,
+						HealthStatus:    coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_HEALTHY,
+					},
+				},
+			}, nil
+		},
+	}
+	server2, addr2 := startMockServer(t, coord2)
+	defer server2.Stop()
+
+	host1, port1 := parseHostPort(addr1)
+	host2, port2 := parseHostPort(addr2)
+	monitor := &mockServiceMonitor{
+		members: []exec.HostInfo{
+			{ID: "coord-2", Host: host2, Port: port2, Status: exec.ServiceStatusActive},
+			{ID: "coord-1", Host: host1, Port: port1, Status: exec.ServiceStatusActive},
+		},
+	}
+
+	client := coordinator.New(monitor, config)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	workers, err := client.GetWorkers(ctx)
+	require.NoError(t, err)
+	require.Len(t, workers, 2)
+
+	assert.Equal(t, "worker-a", workers[0].WorkerId)
+	assert.Equal(t, "worker-b", workers[1].WorkerId)
+
+	assert.Equal(t, newerHeartbeat, workers[1].LastHeartbeatAt)
+	assert.Equal(t, map[string]string{"source": "new"}, workers[1].Labels)
+	assert.Equal(t, int32(5), workers[1].TotalPollers)
+	assert.Equal(t, int32(3), workers[1].BusyPollers)
+	assert.Equal(t, coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_HEALTHY, workers[1].HealthStatus)
+	require.Len(t, workers[1].RunningTasks, 1)
+	assert.Equal(t, "new-run", workers[1].RunningTasks[0].DagRunId)
+}
+
+func TestClientGetWorkers_TieBreaksByStableCoordinatorOrder(t *testing.T) {
+	t.Parallel()
+
+	config := coordinator.DefaultConfig()
+	config.RequestTimeout = 100 * time.Millisecond
+
+	sameHeartbeat := time.Now().Unix()
+
+	coordA := &mockCoordinatorService{
+		getWorkersFunc: func(_ context.Context, _ *coordinatorv1.GetWorkersRequest) (*coordinatorv1.GetWorkersResponse, error) {
+			return &coordinatorv1.GetWorkersResponse{
+				Workers: []*coordinatorv1.WorkerInfo{
+					{
+						WorkerId:        "worker-1",
+						Labels:          map[string]string{"source": "coord-a"},
+						BusyPollers:     1,
+						LastHeartbeatAt: sameHeartbeat,
+					},
+				},
+			}, nil
+		},
+	}
+	serverA, addrA := startMockServer(t, coordA)
+	defer serverA.Stop()
+
+	coordB := &mockCoordinatorService{
+		getWorkersFunc: func(_ context.Context, _ *coordinatorv1.GetWorkersRequest) (*coordinatorv1.GetWorkersResponse, error) {
+			return &coordinatorv1.GetWorkersResponse{
+				Workers: []*coordinatorv1.WorkerInfo{
+					{
+						WorkerId:        "worker-1",
+						Labels:          map[string]string{"source": "coord-b"},
+						BusyPollers:     2,
+						LastHeartbeatAt: sameHeartbeat,
+					},
+				},
+			}, nil
+		},
+	}
+	serverB, addrB := startMockServer(t, coordB)
+	defer serverB.Stop()
+
+	hostA, portA := parseHostPort(addrA)
+	hostB, portB := parseHostPort(addrB)
+	monitor := &mockServiceMonitor{
+		members: []exec.HostInfo{
+			{ID: "coord-b", Host: hostB, Port: portB, Status: exec.ServiceStatusActive},
+			{ID: "coord-a", Host: hostA, Port: portA, Status: exec.ServiceStatusActive},
+		},
+	}
+
+	client := coordinator.New(monitor, config)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	workers, err := client.GetWorkers(ctx)
+	require.NoError(t, err)
+	require.Len(t, workers, 1)
+
+	assert.Equal(t, map[string]string{"source": "coord-a"}, workers[0].Labels)
+	assert.Equal(t, int32(1), workers[0].BusyPollers)
+}
+
+func TestClientGetWorkers_PartialFailureStillReturnsWorkers(t *testing.T) {
+	t.Parallel()
+
+	config := coordinator.DefaultConfig()
+	config.RequestTimeout = 100 * time.Millisecond
+
+	failingCoord := &mockCoordinatorService{
+		getWorkersFunc: func(_ context.Context, _ *coordinatorv1.GetWorkersRequest) (*coordinatorv1.GetWorkersResponse, error) {
+			return nil, status.Error(codes.Unavailable, "coordinator unavailable")
+		},
+	}
+	failingServer, failingAddr := startMockServer(t, failingCoord)
+	defer failingServer.Stop()
+
+	successCoord := &mockCoordinatorService{
+		getWorkersFunc: func(_ context.Context, _ *coordinatorv1.GetWorkersRequest) (*coordinatorv1.GetWorkersResponse, error) {
+			return &coordinatorv1.GetWorkersResponse{
+				Workers: []*coordinatorv1.WorkerInfo{
+					{
+						WorkerId:        "worker-1",
+						LastHeartbeatAt: time.Now().Unix(),
+					},
+				},
+			}, nil
+		},
+	}
+	successServer, successAddr := startMockServer(t, successCoord)
+	defer successServer.Stop()
+
+	failingHost, failingPort := parseHostPort(failingAddr)
+	successHost, successPort := parseHostPort(successAddr)
+	monitor := &mockServiceMonitor{
+		members: []exec.HostInfo{
+			{ID: "coord-fail", Host: failingHost, Port: failingPort, Status: exec.ServiceStatusActive},
+			{ID: "coord-ok", Host: successHost, Port: successPort, Status: exec.ServiceStatusActive},
+		},
+	}
+
+	client := coordinator.New(monitor, config)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	workers, err := client.GetWorkers(ctx)
+	require.Error(t, err)
+	require.Len(t, workers, 1)
+	assert.Equal(t, "worker-1", workers[0].WorkerId)
+	assert.ErrorContains(t, err, "partial failure getting workers")
+	assert.ErrorContains(t, err, "coordinator unavailable")
+}
+
 func TestClientHeartbeat(t *testing.T) {
 	t.Parallel()
 
