@@ -227,6 +227,35 @@ func TestRetryScannerScanEnqueuesRetry(t *testing.T) {
 	queueStore.AssertExpectations(t)
 }
 
+func TestRetryScannerScanSkipsWhenNoRetryTargets(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 3, 14, 14, 0, 0, 0, time.UTC)
+	dag := &core.DAG{Name: "plain-dag"}
+	status := &exec.DAGRunStatus{
+		Name:      dag.Name,
+		DAGRunID:  "run-1",
+		AttemptID: "att-1",
+		Status:    core.Failed,
+	}
+
+	store := newRetryScannerStore(dag, status)
+	scanner, err := NewRetryScanner(
+		store,
+		&exec.MockQueueStore{},
+		nil,
+		24*time.Hour,
+		func() time.Time { return now },
+	)
+	require.NoError(t, err)
+	scanner.listTargets = func() []string { return nil }
+
+	err = scanner.scan(context.Background())
+	require.NoError(t, err)
+	assert.Empty(t, store.listCalls)
+	assert.Equal(t, 0, store.findAttemptCalls)
+}
+
 func TestRetryScannerScanRetriesCrossMidnightFailureDespiteNewerRun(t *testing.T) {
 	t.Parallel()
 
@@ -335,12 +364,13 @@ func TestRetryScannerScanUsesPersistedRetryPolicy(t *testing.T) {
 		func() time.Time { return now },
 	)
 	require.NoError(t, err)
+	scanner.listTargets = func() []string { return []string{retryDAG.Name} }
 
 	err = scanner.scan(context.Background())
 	require.NoError(t, err)
 
 	assert.Len(t, store.listCalls, 1)
-	assert.Empty(t, store.listCalls[0].ExactName)
+	assert.Equal(t, retryDAG.Name, store.listCalls[0].ExactName)
 	assert.Equal(t, 1, store.mustStatus(retryStatus.DAGRun()).AutoRetryCount)
 	assert.Equal(t, core.Failed, store.mustStatus(plainStatus.DAGRun()).Status)
 	assert.Equal(t, 0, store.findAttemptCalls)
