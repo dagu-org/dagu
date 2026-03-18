@@ -1723,38 +1723,27 @@ func (a *API) waitForRetryStarted(ctx context.Context, dag *core.DAG, dagRunID s
 	}
 }
 
-type latestAttemptStatusSwapper interface {
-	CompareAndSwapLatestAttemptStatus(
-		ctx context.Context,
-		dagRun exec.DAGRunRef,
-		expectedAttemptID string,
-		expectedStatus core.Status,
-		mutate func(*exec.DAGRunStatus) error,
-	) (*exec.DAGRunStatus, bool, error)
-}
-
-func isFailedAutoRetryPendingDAGRun(status *exec.DAGRunStatus) bool {
-	if status == nil || status.Status != core.Failed || !status.Parent.Zero() {
-		return false
-	}
-	return status.AutoRetryLimit > 0 && status.AutoRetryCount < status.AutoRetryLimit
-}
-
 func failedAutoRetryCancelError(status *exec.DAGRunStatus) *Error {
-	switch {
-	case status == nil:
+	switch exec.FailedAutoRetryCancelEligibilityOf(status) {
+	case exec.FailedAutoRetryCancelEligible:
+		return &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "failed DAG run cannot be canceled",
+		}
+	case exec.FailedAutoRetryCancelMissingStatus:
 		return &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeBadRequest,
 			Message:    "failed DAG run cannot be canceled: missing status",
 		}
-	case !status.Parent.Zero():
+	case exec.FailedAutoRetryCancelNotRoot:
 		return &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeBadRequest,
 			Message:    "only root DAG runs with pending auto-retries can be canceled after failure",
 		}
-	case status.AutoRetryLimit <= 0 || status.AutoRetryCount >= status.AutoRetryLimit:
+	case exec.FailedAutoRetryCancelNotPending:
 		return &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeBadRequest,
@@ -1769,29 +1758,7 @@ func failedAutoRetryCancelError(status *exec.DAGRunStatus) *Error {
 	}
 }
 
-func cancelFailedAutoRetryPendingDAGRun(
-	ctx context.Context,
-	dagRunStore latestAttemptStatusSwapper,
-	dagRun exec.DAGRunRef,
-	attemptID string,
-) error {
-	updatedStatus, swapped, err := dagRunStore.CompareAndSwapLatestAttemptStatus(
-		ctx,
-		dagRun,
-		attemptID,
-		core.Failed,
-		func(latest *exec.DAGRunStatus) error {
-			latest.Status = core.Aborted
-			return nil
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("error canceling failed DAG run: %w", err)
-	}
-	if swapped {
-		return nil
-	}
-
+func failedAutoRetryCancelStateChangedError(updatedStatus *exec.DAGRunStatus) *Error {
 	currentStatus := "unknown"
 	if updatedStatus != nil {
 		currentStatus = updatedStatus.Status.String()
@@ -1824,11 +1791,6 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 		}
 	}
 
-	dag, err := attempt.ReadDAG(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error reading DAG: %w", err)
-	}
-
 	// Get saved status to check if it's a distributed DAG
 	savedStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
@@ -1841,10 +1803,14 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 
 	terminateMode := "running_stop"
 	if savedStatus.Status == core.Failed {
-		if !isFailedAutoRetryPendingDAGRun(savedStatus) {
+		if !exec.CanCancelFailedAutoRetryPendingRun(savedStatus) {
 			return nil, failedAutoRetryCancelError(savedStatus)
 		}
-		if err := cancelFailedAutoRetryPendingDAGRun(ctx, a.dagRunStore, ref, attempt.ID()); err != nil {
+		if err := exec.CancelFailedAutoRetryPendingRun(ctx, a.dagRunStore, savedStatus); err != nil {
+			var stateChangedErr *exec.FailedAutoRetryCancelStateChangedError
+			if errors.As(err, &stateChangedErr) {
+				return nil, failedAutoRetryCancelStateChangedError(stateChangedErr.CurrentStatus)
+			}
 			return nil, err
 		}
 		terminateMode = "failed_auto_retry_cancel"
@@ -1872,6 +1838,10 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 			}
 		} else {
 			// For local DAGs, use existing logic with GetCurrentStatus and socket
+			dag, err := attempt.ReadDAG(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("error reading DAG: %w", err)
+			}
 			dagStatus, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, request.DagRunId)
 			if err != nil {
 				return nil, &Error{

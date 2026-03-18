@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Status } from '@/api/v1/schema';
 import DAGActions from '../DAGActions';
@@ -52,5 +52,25 @@ describe('DAGActions', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
+  });
+
+  it('disables retry for running DAG executions', () => {
+    const view = render(
+      <DAGActions
+        status={{
+          name: 'running-dag',
+          dagRunId: 'run-1',
+          status: Status.Running,
+        }}
+        fileName="running-dag.yaml"
+        dag={{ name: 'running-dag' }}
+        displayMode="full"
+      />
+    );
+
+    const queries = within(view.container);
+
+    expect(queries.getByRole('button', { name: 'Retry' })).toBeDisabled();
+    expect(queries.getByRole('button', { name: 'Stop' })).toBeEnabled();
   });
 });

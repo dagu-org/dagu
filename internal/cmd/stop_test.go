@@ -9,8 +9,11 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStopCommand(t *testing.T) {
@@ -38,7 +41,7 @@ func TestStopCommand(t *testing.T) {
 		// Stop the dag-run.
 		th.RunCommand(t, cmd.Stop(), test.CmdTest{
 			Args:        []string{"stop", dag.Location},
-			ExpectedOut: []string{"stopped"}})
+			ExpectedOut: []string{"stop/cancel completed"}})
 
 		// Check the dag-run is stopped.
 		dag.AssertLatestStatus(t, core.Aborted)
@@ -69,10 +72,82 @@ func TestStopCommand(t *testing.T) {
 		// Stop the dag-run with a specific run ID.
 		th.RunCommand(t, cmd.Stop(), test.CmdTest{
 			Args:        []string{"stop", dag.Location, "--run-id=" + dagRunID},
-			ExpectedOut: []string{"stopped"}})
+			ExpectedOut: []string{"stop/cancel completed"}})
 
 		// Check the dag-run is stopped.
 		dag.AssertLatestStatus(t, core.Aborted)
 		<-done
 	})
+	t.Run("CancelFailedAutoRetryPendingDAGRunWithRunID", func(t *testing.T) {
+		th := test.SetupCommand(t)
+
+		dag := th.DAG(t, `name: cancel-stop-retry
+retry_policy:
+  limit: 3
+  interval_sec: 60
+steps:
+  - name: "1"
+    command: "echo fail"
+`)
+
+		dagRunID := "failed-auto-retry-run"
+		seedFailedAutoRetryPendingRun(t, th, dag, dagRunID, 1)
+
+		th.RunCommand(t, cmd.Stop(), test.CmdTest{
+			Args:        []string{"stop", dag.Location, "--run-id=" + dagRunID},
+			ExpectedOut: []string{"stop/cancel completed"},
+		})
+
+		dag.AssertLatestStatus(t, core.Aborted)
+	})
+	t.Run("StopWithoutRunIDDoesNotCancelFailedAutoRetryPendingDAGRun", func(t *testing.T) {
+		th := test.SetupCommand(t)
+
+		dag := th.DAG(t, `name: stop-running-only
+retry_policy:
+  limit: 3
+  interval_sec: 60
+steps:
+  - name: "1"
+    command: "echo fail"
+`)
+
+		dagRunID := "failed-auto-retry-run"
+		seedFailedAutoRetryPendingRun(t, th, dag, dagRunID, 1)
+
+		th.RunCommand(t, cmd.Stop(), test.CmdTest{
+			Args:        []string{"stop", dag.Location},
+			ExpectedOut: []string{"No running DAG runs found"},
+		})
+
+		dag.AssertLatestStatus(t, core.Failed)
+	})
+}
+
+func seedFailedAutoRetryPendingRun(t *testing.T, th test.Command, dag test.DAG, dagRunID string, autoRetryCount int) {
+	t.Helper()
+
+	attempt, err := th.DAGRunStore.CreateAttempt(
+		th.Context,
+		dag.DAG,
+		time.Now(),
+		dagRunID,
+		exec.NewDAGRunAttemptOptions{},
+	)
+	require.NoError(t, err)
+
+	status := transform.NewStatusBuilder(dag.DAG).Create(
+		dagRunID,
+		core.Failed,
+		0,
+		time.Now().Add(-time.Minute),
+		transform.WithAttemptID(attempt.ID()),
+		transform.WithAutoRetryCount(autoRetryCount),
+		transform.WithError("step failed"),
+	)
+	status.FinishedAt = time.Now().Add(-30 * time.Second).UTC().Format(time.RFC3339)
+
+	require.NoError(t, attempt.Open(th.Context))
+	require.NoError(t, attempt.Write(th.Context, status))
+	require.NoError(t, attempt.Close(th.Context))
 }

@@ -33,7 +33,7 @@ import { useClient } from '../../../../hooks/api';
 import ConfirmModal from '../../../../ui/ConfirmModal';
 import LabeledItem from '../../../../ui/LabeledItem';
 import StatusChip from '../../../../ui/StatusChip';
-import { getDAGRunTerminateAction } from './terminateAction';
+import { getDAGRunTerminateActionDetails } from './terminateAction';
 
 /**
  * Props for the DAGRunActions component
@@ -96,16 +96,10 @@ function DAGRunActions({
     dagRun &&
     'nodes' in dagRun &&
     Array.isArray((dagRun as components['schemas']['DAGRunDetails']).nodes);
-  const terminateAction = isRootLevel
-    ? getDAGRunTerminateAction(dagRun)
-    : 'none';
-  const terminateButtonText =
-    terminateAction === 'cancel' ? 'Cancel' : 'Stop';
-  const terminateTooltipText = !isRootLevel
-    ? 'Stop action only available at root dagRun level'
-    : terminateAction === 'cancel'
-      ? 'Cancel auto-retry for this failed DAGRun'
-      : 'Stop DAGRun execution';
+  const terminateDetails = getDAGRunTerminateActionDetails(dagRun, {
+    isRootLevel,
+  });
+  const terminateAction = terminateDetails.action;
 
   // Determine which buttons should be enabled based on current status and root level
   const buttonState = {
@@ -165,12 +159,12 @@ function DAGRunActions({
                   onClick={() => setIsStopModal(true)}
                   className="cursor-pointer"
                 >
-                  {terminateButtonText}
+                  {terminateDetails.buttonText}
                 </ActionButton>
               </span>
             </TooltipTrigger>
             <TooltipContent>
-              <p>{terminateTooltipText}</p>
+              <p>{terminateDetails.tooltipText}</p>
             </TooltipContent>
           </Tooltip>
         )}
@@ -226,7 +220,7 @@ function DAGRunActions({
         {/* Stop Confirmation Modal */}
         <ConfirmModal
           title="Confirmation"
-          buttonText={terminateButtonText}
+          buttonText={terminateDetails.buttonText}
           visible={isStopModal}
           dismissModal={() => setIsStopModal(false)}
           onSubmit={async () => {
@@ -248,22 +242,15 @@ function DAGRunActions({
             if (error) {
               console.error('Stop API error:', error);
               showError(
-                error.message ||
-                  `Failed to ${terminateAction === 'cancel' ? 'cancel' : 'stop'} DAG run`,
-                terminateAction === 'cancel'
-                  ? 'The DAG run may have already changed state. Refresh and try again.'
-                  : 'The DAG run may have already completed or the worker is unavailable.'
+                error.message || terminateDetails.errorTitle,
+                terminateDetails.errorDescription
               );
               return;
             }
             reloadData();
           }}
         >
-          <div>
-            {terminateAction === 'cancel'
-              ? 'Do you really want to cancel auto-retry for this dagRun?'
-              : 'Do you really want to stop this dagRun?'}
-          </div>
+          <div>{terminateDetails.confirmText}</div>
         </ConfirmModal>
 
         {/* Retry Confirmation Modal */}

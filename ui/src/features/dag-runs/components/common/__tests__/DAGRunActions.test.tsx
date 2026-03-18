@@ -4,6 +4,7 @@ import { Status } from '@/api/v1/schema';
 import DAGRunActions from '../DAGRunActions';
 import {
   getDAGRunTerminateAction,
+  getDAGRunTerminateActionDetails,
   isFailedAutoRetryPendingRun,
 } from '../terminateAction';
 
@@ -43,6 +44,18 @@ describe('DAGRunActions', () => {
         autoRetryLimit: 3,
       })
     ).toBe('stop');
+    expect(
+      getDAGRunTerminateActionDetails({
+        status: Status.Running,
+        autoRetryCount: 0,
+        autoRetryLimit: 3,
+      })
+    ).toMatchObject({
+      action: 'stop',
+      buttonText: 'Stop',
+      tooltipText: 'Stop DAGRun execution',
+      errorTitle: 'Failed to stop DAG run',
+    });
   });
 
   it('treats failed runs with remaining auto retries as cancelable', () => {
@@ -60,6 +73,18 @@ describe('DAGRunActions', () => {
         autoRetryLimit: 3,
       })
     ).toBe('cancel');
+    expect(
+      getDAGRunTerminateActionDetails({
+        status: Status.Failed,
+        autoRetryCount: 1,
+        autoRetryLimit: 3,
+      })
+    ).toMatchObject({
+      action: 'cancel',
+      buttonText: 'Cancel',
+      tooltipText: 'Cancel auto-retry for this failed DAGRun',
+      errorTitle: 'Failed to cancel DAG run',
+    });
   });
 
   it('does not allow cancel once auto retries are exhausted', () => {
@@ -105,5 +130,24 @@ describe('DAGRunActions', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
+  });
+
+  it('keeps stop disabled with a root-level tooltip for nested runs', () => {
+    render(
+      <DAGRunActions
+        dagRun={{
+          name: 'nested-dag',
+          dagRunId: 'run-1',
+          status: Status.Failed,
+          autoRetryCount: 1,
+          autoRetryLimit: 3,
+        }}
+        name="nested-dag"
+        displayMode="full"
+        isRootLevel={false}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeDisabled();
   });
 });

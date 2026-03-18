@@ -27,14 +27,14 @@ import {
 import { AlertTriangle, Ban, Play, RefreshCw, Square, X } from 'lucide-react';
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { components, NodeStatus } from '../../../../api/v1/schema';
+import { components, NodeStatus, Status } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
 import { useClient } from '../../../../hooks/api';
 import ConfirmModal from '../../../../ui/ConfirmModal';
 import LabeledItem from '../../../../ui/LabeledItem';
-import { getDAGRunTerminateAction } from '../../../dag-runs/components/common/terminateAction';
+import { getDAGRunTerminateActionDetails } from '../../../dag-runs/components/common/terminateAction';
 import { DAGContext } from '../../contexts/DAGContext';
 import { StartDAGModal } from '../dag-execution';
 
@@ -167,25 +167,33 @@ function DAGActions({
     }
   };
 
-  const isWaiting = status?.status == 7;
+  const isWaiting = status?.status === Status.Waiting;
   const hasNodes =
     status &&
     'nodes' in status &&
     Array.isArray((status as components['schemas']['DAGRunDetails']).nodes);
-  const terminateAction = getDAGRunTerminateAction(status);
-  const terminateButtonText =
-    terminateAction === 'cancel' ? 'Cancel' : 'Stop';
-  const terminateTooltipText =
-    terminateAction === 'cancel'
-      ? 'Cancel auto-retry for this failed DAG execution'
-      : 'Stop DAG execution';
+  const terminateDetails = getDAGRunTerminateActionDetails(status, {
+    copy: {
+      stopTooltipText: 'Stop DAG execution',
+      cancelTooltipText: 'Cancel auto-retry for this failed DAG execution',
+      stopConfirmText:
+        status?.name && status?.dagRunId
+          ? `Do you really want to stop the dag-run "${status.name}"?`
+          : 'Do you really want to cancel the DAG?',
+      cancelConfirmText: `Do you really want to cancel auto-retry for the dag-run "${status?.name || ''}"?`,
+    },
+  });
+  const terminateAction = terminateDetails.action;
 
   // Determine which buttons should be enabled based on current status
   const buttonState = {
     enqueue: true,
     terminate: terminateAction !== 'none',
     reject: isWaiting && hasNodes,
-    retry: status?.status != 1 && status?.status != 5 && status?.dagRunId != '',
+    retry:
+      status?.status !== Status.Running &&
+      status?.status !== Status.Queued &&
+      status?.dagRunId !== '',
   };
 
   if (!dag || !config.permissions.runDags) {
@@ -258,11 +266,11 @@ function DAGActions({
                 }}
                 className="cursor-pointer"
               >
-                {terminateButtonText}
+                {terminateDetails.buttonText}
               </ActionButton>
             </TooltipTrigger>
             <TooltipContent>
-              <p>{terminateTooltipText}</p>
+              <p>{terminateDetails.tooltipText}</p>
             </TooltipContent>
           </Tooltip>
         )}
@@ -429,7 +437,7 @@ function DAGActions({
 
         <ConfirmModal
           title="Confirmation"
-          buttonText={terminateButtonText}
+          buttonText={terminateDetails.buttonText}
           visible={isStopModal}
           dismissModal={() => {
             setIsStopModal(false);
@@ -478,11 +486,8 @@ function DAGActions({
                 if (error) {
                   console.error('Stop dag-run API error:', error);
                   showError(
-                    error.message ||
-                      `Failed to ${terminateAction === 'cancel' ? 'cancel' : 'stop'} DAG run`,
-                    terminateAction === 'cancel'
-                      ? 'The DAG run may have already changed state. Refresh and try again.'
-                      : 'The DAG run may have already completed or the worker is unavailable.'
+                    error.message || terminateDetails.errorTitle,
+                    terminateDetails.errorDescription
                   );
                   return;
                 }
@@ -499,13 +504,9 @@ function DAGActions({
         >
           <div>
             <p className="mb-2">
-              {terminateAction === 'cancel'
-                ? `Do you really want to cancel auto-retry for the dag-run "${status?.name || ''}"?`
-                : stopAllRunning
+              {terminateAction === 'stop' && stopAllRunning
                 ? `Do you really want to stop all running instances of this DAG?`
-                : status?.name && status?.dagRunId
-                  ? `Do you really want to stop the dag-run "${status.name}"?`
-                  : 'Do you really want to cancel the DAG?'}
+                : terminateDetails.confirmText}
             </p>
             {!stopAllRunning && status?.name && (
               <LabeledItem label="DAG-Run-Name">
