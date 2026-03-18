@@ -532,6 +532,8 @@ func nodeStatusToStatus(ns core.NodeStatus) core.Status {
 	switch ns {
 	case core.NodeRunning:
 		return core.Running
+	case core.NodeRetrying:
+		return core.Running
 	case core.NodeSucceeded:
 		return core.Succeeded
 	case core.NodeFailed:

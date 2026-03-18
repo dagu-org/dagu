@@ -702,10 +702,13 @@ func TestNodeStatusToStatus(t *testing.T) {
 		expected   core.Status
 	}{
 		{core.NodeRunning, core.Running},
+		{core.NodeRetrying, core.Running},
 		{core.NodeSucceeded, core.Succeeded},
 		{core.NodeFailed, core.Failed},
 		{core.NodeAborted, core.Aborted},
 		{core.NodePartiallySucceeded, core.PartiallySucceeded},
+		{core.NodeWaiting, core.Waiting},
+		{core.NodeRejected, core.Rejected},
 		{core.NodeSkipped, core.NotStarted},
 		{core.NodeNotStarted, core.NotStarted},
 		{core.NodeStatus(999), core.NotStarted},
