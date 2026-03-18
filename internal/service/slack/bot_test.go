@@ -56,6 +56,12 @@ func (c *fakeSlackClient) postCount() int {
 	return len(c.posts)
 }
 
+func (c *fakeSlackClient) deleteCount() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.deletes
+}
+
 type fakeSlackAgentService struct {
 	mu               sync.Mutex
 	nextSessionID    int
@@ -254,4 +260,39 @@ func TestBot_ProcessIncoming_BatchesRapidMessagesIntoSingleCreate(t *testing.T) 
 	defer service.mu.Unlock()
 	require.Len(t, service.createMessages, 1)
 	assert.Equal(t, "first\n\nsecond", service.createMessages[0])
+}
+
+func TestBot_ProcessStreamResponse_RestartsThinkingWhenWorkContinues(t *testing.T) {
+	t.Parallel()
+
+	client := &fakeSlackClient{}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	bot := &Bot{
+		slackClient: client,
+		logger:      logger,
+	}
+	cs := bot.getOrCreateChat("D123", "D123", "")
+
+	bot.processStreamResponse(cs, agent.StreamResponse{
+		SessionState: &agent.SessionState{Working: true},
+	})
+	assert.Equal(t, 1, client.postCount(), "working state should post a thinking indicator")
+
+	bot.processStreamResponse(cs, agent.StreamResponse{
+		Messages: []agent.Message{
+			{Type: agent.MessageTypeAssistant, SequenceID: 1, Content: "partial reply"},
+		},
+	})
+	assert.Equal(t, 2, client.postCount(), "assistant message should be delivered")
+	assert.Equal(t, 1, client.deleteCount(), "assistant message should clear the current thinking indicator")
+
+	bot.processStreamResponse(cs, agent.StreamResponse{
+		SessionState: &agent.SessionState{Working: true},
+	})
+	assert.Equal(t, 3, client.postCount(), "continued work should post a fresh thinking indicator")
+
+	bot.processStreamResponse(cs, agent.StreamResponse{
+		SessionState: &agent.SessionState{Working: true},
+	})
+	assert.Equal(t, 3, client.postCount(), "duplicate working pulses should not stack thinking indicators")
 }

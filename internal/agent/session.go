@@ -230,12 +230,14 @@ func (sm *SessionManager) UserID() string {
 }
 
 // SetWorking updates the agent working state and notifies subscribers.
+// Repeated true values are broadcast as progress pulses so transports can
+// refresh visible activity indicators during multi-phase turns.
 func (sm *SessionManager) SetWorking(working bool) {
-	id, model, totalCost, hasPendingPrompt, callback, changed := sm.updateWorkingState(working)
-	if !changed {
+	id, model, totalCost, hasPendingPrompt, callback, changed, shouldBroadcast := sm.updateWorkingState(working)
+	if !shouldBroadcast {
 		return
 	}
-	sm.logger.Debug("agent working state changed", "working", working)
+	sm.logger.Debug("broadcasting agent working state", "working", working, "changed", changed)
 	sm.subpub.Broadcast(StreamResponse{
 		SessionState: &SessionState{
 			SessionID:        id,
@@ -245,19 +247,27 @@ func (sm *SessionManager) SetWorking(working bool) {
 			TotalCost:        totalCost,
 		},
 	})
-	if callback != nil {
+	if changed && callback != nil {
 		callback(id, working)
 	}
 }
 
 // updateWorkingState atomically updates the working state and returns relevant data.
-// Returns (id, model, totalCost, hasPendingPrompt, callback, changed) where changed indicates if the state actually changed.
-func (sm *SessionManager) updateWorkingState(working bool) (string, string, float64, bool, func(string, bool), bool) {
+// Returns (id, model, totalCost, hasPendingPrompt, callback, changed, shouldBroadcast)
+// where changed indicates whether the boolean state changed and shouldBroadcast
+// allows repeated working=true pulses to be sent while already working.
+func (sm *SessionManager) updateWorkingState(working bool) (string, string, float64, bool, func(string, bool), bool, bool) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
 	if sm.working == working {
-		return "", "", 0, false, nil, false
+		if working {
+			sm.promptsMu.Lock()
+			hasPending := len(sm.pendingPrompts) > 0
+			sm.promptsMu.Unlock()
+			return sm.id, sm.model, sm.totalCost, hasPending, sm.onWorkingChange, false, true
+		}
+		return "", "", 0, false, nil, false, false
 	}
 
 	sm.working = working
@@ -266,7 +276,7 @@ func (sm *SessionManager) updateWorkingState(working bool) (string, string, floa
 	hasPending := len(sm.pendingPrompts) > 0
 	sm.promptsMu.Unlock()
 
-	return sm.id, sm.model, sm.totalCost, hasPending, sm.onWorkingChange, true
+	return sm.id, sm.model, sm.totalCost, hasPending, sm.onWorkingChange, true, true
 }
 
 // IsWorking returns the current agent working state.

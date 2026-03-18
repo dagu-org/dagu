@@ -602,6 +602,13 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, userID, sessionI
 // processStreamResponse handles a stream response and sends relevant content to Slack.
 func (b *Bot) processStreamResponse(cs *chatState, resp agent.StreamResponse) {
 	chatbridge.ProcessStreamResponse(&cs.State, resp, chatbridge.StreamHandlers{
+		OnWorking: func(working bool) {
+			if working {
+				b.ensureThinkingIndicator(cs)
+			} else {
+				b.clearPendingIndicators(cs)
+			}
+		},
 		OnAssistant: func(msg agent.Message) {
 			b.clearPendingIndicators(cs)
 			b.sendLongReply(cs, msg.Content)
@@ -768,6 +775,32 @@ func (b *Bot) clearPendingIndicators(cs *chatState) {
 		if _, _, err := b.slackClient.DeleteMessage(thinking.channel, thinking.timestamp); err != nil {
 			b.logger.Debug("Failed to delete thinking message", slog.String("error", err.Error()))
 		}
+	}
+}
+
+func (b *Bot) ensureThinkingIndicator(cs *chatState) {
+	cs.thinkingMu.Lock()
+	existing := cs.thinkingMessage
+	cs.thinkingMu.Unlock()
+	if existing != nil {
+		return
+	}
+
+	thinkingTS := b.postThinking(cs)
+	if thinkingTS == "" {
+		return
+	}
+
+	cs.thinkingMu.Lock()
+	if cs.thinkingMessage == nil {
+		cs.thinkingMessage = &messageRef{channel: cs.channelID, timestamp: thinkingTS}
+		cs.thinkingMu.Unlock()
+		return
+	}
+	cs.thinkingMu.Unlock()
+
+	if _, _, err := b.slackClient.DeleteMessage(cs.channelID, thinkingTS); err != nil {
+		b.logger.Debug("Failed to delete duplicate thinking message", slog.String("error", err.Error()))
 	}
 }
 

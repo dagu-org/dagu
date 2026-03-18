@@ -143,9 +143,7 @@ func TestSessionManager_SetWorking(t *testing.T) {
 		t.Parallel()
 
 		sm := NewSessionManager(SessionManagerConfig{ID: "test"})
-
 		ctx := t.Context()
-
 		next := sm.Subscribe(ctx)
 
 		go func() {
@@ -168,6 +166,26 @@ func TestSessionManager_SetWorking(t *testing.T) {
 		case <-time.After(500 * time.Millisecond):
 			t.Fatal("timeout waiting for broadcast")
 		}
+	})
+
+	t.Run("broadcasts repeated working pulses while already working", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "test"})
+		ctx := t.Context()
+		next := sm.Subscribe(ctx)
+
+		sm.SetWorking(true)
+		first, ok := next()
+		require.True(t, ok)
+		require.NotNil(t, first.SessionState)
+		assert.True(t, first.SessionState.Working)
+
+		sm.SetWorking(true)
+		second, ok := next()
+		require.True(t, ok)
+		require.NotNil(t, second.SessionState)
+		assert.True(t, second.SessionState.Working)
 	})
 }
 

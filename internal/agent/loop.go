@@ -468,6 +468,7 @@ func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) er
 // executeToolCalls runs all tool calls sequentially.
 // The delegate tool handles its own parallelism internally.
 func (l *Loop) executeToolCalls(ctx context.Context, toolCalls []llm.ToolCall) {
+	l.setWorking(true)
 	for _, tc := range toolCalls {
 		l.logger.Debug("executing tool", "name", tc.Function.Name, "id", tc.ID)
 		result := l.executeTool(ctx, tc)

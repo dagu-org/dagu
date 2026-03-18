@@ -293,6 +293,53 @@ func TestLoop_Go(t *testing.T) {
 		require.GreaterOrEqual(t, count, 1, "OnHeartbeat should fire during tool call handling")
 	})
 
+	t.Run("emits working pulses across tool phases", func(t *testing.T) {
+		t.Parallel()
+
+		callCount := atomic.Int32{}
+		provider := &mockLLMProvider{
+			chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+				n := callCount.Add(1)
+				if n == 1 {
+					return &llm.ChatResponse{
+						Content:      "partial",
+						FinishReason: "tool_calls",
+						ToolCalls: []llm.ToolCall{{
+							ID:   "pulse-call",
+							Type: "function",
+							Function: llm.ToolCallFunction{
+								Name:      "think",
+								Arguments: `{"thought": "pulse test"}`,
+							},
+						}},
+					}, nil
+				}
+				return simpleStopResponse("done"), nil
+			},
+		}
+
+		var workingStates []bool
+		var mu sync.Mutex
+		loop := NewLoop(LoopConfig{
+			Provider: provider,
+			Tools:    CreateTools(ToolConfig{}),
+			OnWorking: func(working bool) {
+				mu.Lock()
+				workingStates = append(workingStates, working)
+				mu.Unlock()
+			},
+		})
+		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
+
+		runLoopForDuration(t, loop, 500*time.Millisecond)
+
+		mu.Lock()
+		states := append([]bool(nil), workingStates...)
+		mu.Unlock()
+
+		assert.Equal(t, []bool{true, true, true, false}, states)
+	})
+
 	t.Run("accumulates token usage", func(t *testing.T) {
 		t.Parallel()
 
