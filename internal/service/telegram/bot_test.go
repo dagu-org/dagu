@@ -51,6 +51,8 @@ type fakeTelegramAgentService struct {
 	nextSequenceID   int64
 	createEmptyCalls int
 	appendSessionIDs []string
+	createMessages   []string
+	sendMessages     []string
 	generated        agent.Message
 }
 
@@ -69,8 +71,12 @@ func newFakeTelegramAgentService(content string) *fakeTelegramAgentService {
 	}
 }
 
-func (s *fakeTelegramAgentService) CreateSession(context.Context, agent.UserIdentity, agent.ChatRequest) (string, string, error) {
-	return "created", "", nil
+func (s *fakeTelegramAgentService) CreateSession(_ context.Context, _ agent.UserIdentity, req agent.ChatRequest) (string, string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.createMessages = append(s.createMessages, req.Message)
+	s.nextSessionID++
+	return fmt.Sprintf("created-%d", s.nextSessionID), "", nil
 }
 
 func (s *fakeTelegramAgentService) CreateEmptySession(_ context.Context, _ agent.UserIdentity, _ string, _ bool) (string, error) {
@@ -81,7 +87,10 @@ func (s *fakeTelegramAgentService) CreateEmptySession(_ context.Context, _ agent
 	return fmt.Sprintf("sess-%d", s.nextSessionID), nil
 }
 
-func (s *fakeTelegramAgentService) SendMessage(context.Context, string, agent.UserIdentity, agent.ChatRequest) error {
+func (s *fakeTelegramAgentService) SendMessage(_ context.Context, _ string, _ agent.UserIdentity, req agent.ChatRequest) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sendMessages = append(s.sendMessages, req.Message)
 	return nil
 }
 
@@ -190,4 +199,34 @@ func TestDAGRunMonitor_NotifyChat_CreatesSessionWhenMissing(t *testing.T) {
 	assert.Equal(t, int64(1), bot.lastDeliveredSeq(cs))
 	assert.Equal(t, 1, service.createEmptyCalls)
 	assert.Equal(t, 1, api.sendCount())
+}
+
+func TestBot_HandleMessage_BatchesRapidMessagesIntoSingleCreate(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	api := &fakeTelegramAPI{}
+	service := newFakeTelegramAgentService("ignored")
+	bot := &Bot{
+		cfg:           Config{SafeMode: true},
+		agentAPI:      service,
+		botAPI:        api,
+		allowedChats:  map[int64]struct{}{123: {}},
+		logger:        logger,
+		incomingDelay: 10 * time.Millisecond,
+	}
+
+	first := &tgbotapi.Message{Text: "first", Chat: &tgbotapi.Chat{ID: 123}}
+	second := &tgbotapi.Message{Text: "second", Chat: &tgbotapi.Chat{ID: 123}}
+	bot.handleMessage(context.Background(), first)
+	bot.handleMessage(context.Background(), second)
+
+	require.Eventually(t, func() bool {
+		service.mu.Lock()
+		defer service.mu.Unlock()
+		return len(service.createMessages) == 1
+	}, time.Second, 10*time.Millisecond)
+
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	require.Len(t, service.createMessages, 1)
+	assert.Equal(t, "first\n\nsecond", service.createMessages[0])
 }

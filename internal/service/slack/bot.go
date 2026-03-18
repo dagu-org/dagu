@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/auth"
@@ -23,6 +24,7 @@ import (
 
 // maxSlackMessageLen is the maximum length for a single Slack message.
 const maxSlackMessageLen = 4000
+const defaultIncomingBatchDelay = 750 * time.Millisecond
 
 // AgentService is the subset of the agent API that the Slack bot requires.
 type AgentService interface {
@@ -73,6 +75,8 @@ type chatState struct {
 	pendingPromptID  string
 	thinkingMessage  *messageRef // "Thinking..." message to delete on first response
 	lastDeliveredSeq int64
+	pendingMessages  []string
+	pendingFlushGen  uint64
 }
 
 // Bot is a Slack bot that forwards messages to the Dagu agent API.
@@ -86,6 +90,7 @@ type Bot struct {
 	allowedChannels map[string]struct{}
 	dagRunStore     exec.DAGRunStore
 	logger          *slog.Logger
+	incomingDelay   time.Duration
 }
 
 // New creates a new Slack bot instance.
@@ -123,6 +128,7 @@ func New(cfg Config, agentAPI AgentService, logger *slog.Logger) (*Bot, error) {
 		allowedChannels: allowed,
 		dagRunStore:     cfg.DAGRunStore,
 		logger:          logger,
+		incomingDelay:   defaultIncomingBatchDelay,
 	}, nil
 }
 
@@ -301,6 +307,7 @@ func (b *Bot) processIncoming(ctx context.Context, cs *chatState, convKey, _ str
 	// Handle text commands
 	if fields := strings.Fields(text); len(fields) > 0 {
 		if cmd := fields[0]; cmd == "new" || cmd == "cancel" {
+			b.clearPendingMessages(cs)
 			b.handleTextCommand(ctx, cs, cmd)
 			return
 		}
@@ -316,9 +323,40 @@ func (b *Bot) processIncoming(ctx context.Context, cs *chatState, convKey, _ str
 		return
 	}
 
-	// Post a typing indicator message
-	thinkingTS := b.postThinking(cs)
+	b.enqueueIncomingMessage(ctx, cs, convKey, text)
+}
 
+func (b *Bot) enqueueIncomingMessage(ctx context.Context, cs *chatState, convKey, text string) {
+	if text == "" {
+		return
+	}
+
+	cs.mu.Lock()
+	cs.pendingMessages = append(cs.pendingMessages, text)
+	cs.pendingFlushGen++
+	gen := cs.pendingFlushGen
+	cs.mu.Unlock()
+
+	delay := b.incomingDelay
+	if delay <= 0 {
+		delay = defaultIncomingBatchDelay
+	}
+	time.AfterFunc(delay, func() {
+		b.flushIncomingMessages(ctx, cs, convKey, gen)
+	})
+}
+
+func (b *Bot) flushIncomingMessages(ctx context.Context, cs *chatState, convKey string, gen uint64) {
+	cs.mu.Lock()
+	if gen != cs.pendingFlushGen || len(cs.pendingMessages) == 0 {
+		cs.mu.Unlock()
+		return
+	}
+	text := strings.Join(append([]string(nil), cs.pendingMessages...), "\n\n")
+	cs.pendingMessages = nil
+	cs.mu.Unlock()
+
+	thinkingTS := b.postThinking(cs)
 	user := b.userIdentity(convKey)
 
 	cs.mu.Lock()
@@ -381,10 +419,12 @@ func (b *Bot) handleSlashCommand(ctx context.Context, cmd slack.SlashCommand) {
 
 	switch cmd.Command {
 	case "/dagu-new":
+		b.clearPendingMessages(cs)
 		b.resetChat(cs)
 		b.sendReply(cs, "Session cleared. Send a message to start a new conversation.")
 
 	case "/dagu-cancel":
+		b.clearPendingMessages(cs)
 		cs.mu.Lock()
 		sid := cs.sessionID
 		ownerUID := cs.ownerUserID
@@ -837,6 +877,8 @@ func (b *Bot) resetChat(cs *chatState) {
 	cs.pendingPromptID = ""
 	cs.thinkingMessage = nil
 	cs.lastDeliveredSeq = 0
+	cs.pendingMessages = nil
+	cs.pendingFlushGen++
 }
 
 // userIdentity creates a UserIdentity scoped to a specific conversation.
@@ -871,6 +913,13 @@ func (b *Bot) markDelivered(cs *chatState, seq int64) {
 	if seq > cs.lastDeliveredSeq {
 		cs.lastDeliveredSeq = seq
 	}
+}
+
+func (b *Bot) clearPendingMessages(cs *chatState) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	cs.pendingMessages = nil
+	cs.pendingFlushGen++
 }
 
 func (b *Bot) subscriptionActive(cs *chatState, sessionID string) bool {

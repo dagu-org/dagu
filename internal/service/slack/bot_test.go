@@ -62,6 +62,8 @@ type fakeSlackAgentService struct {
 	nextSequenceID   int64
 	createEmptyCalls int
 	appendSessionIDs []string
+	createMessages   []string
+	sendMessages     []string
 	generated        agent.Message
 }
 
@@ -80,8 +82,12 @@ func newFakeSlackAgentService(content string) *fakeSlackAgentService {
 	}
 }
 
-func (s *fakeSlackAgentService) CreateSession(context.Context, agent.UserIdentity, agent.ChatRequest) (string, string, error) {
-	return "created", "", nil
+func (s *fakeSlackAgentService) CreateSession(_ context.Context, _ agent.UserIdentity, req agent.ChatRequest) (string, string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.createMessages = append(s.createMessages, req.Message)
+	s.nextSessionID++
+	return fmt.Sprintf("created-%d", s.nextSessionID), "", nil
 }
 
 func (s *fakeSlackAgentService) CreateEmptySession(_ context.Context, _ agent.UserIdentity, _ string, _ bool) (string, error) {
@@ -92,7 +98,10 @@ func (s *fakeSlackAgentService) CreateEmptySession(_ context.Context, _ agent.Us
 	return fmt.Sprintf("sess-%d", s.nextSessionID), nil
 }
 
-func (s *fakeSlackAgentService) SendMessage(context.Context, string, agent.UserIdentity, agent.ChatRequest) error {
+func (s *fakeSlackAgentService) SendMessage(_ context.Context, _ string, _ agent.UserIdentity, req agent.ChatRequest) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sendMessages = append(s.sendMessages, req.Message)
 	return nil
 }
 
@@ -217,4 +226,32 @@ func TestDAGRunMonitor_NotifyDirectMessage_AppendsToExistingSession(t *testing.T
 	})
 
 	assert.Equal(t, 2, client.postCount(), "replayed notification should be suppressed on the next snapshot")
+}
+
+func TestBot_ProcessIncoming_BatchesRapidMessagesIntoSingleCreate(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	client := &fakeSlackClient{}
+	service := newFakeSlackAgentService("ignored")
+	bot := &Bot{
+		cfg:           Config{SafeMode: true},
+		agentAPI:      service,
+		slackClient:   client,
+		logger:        logger,
+		incomingDelay: 10 * time.Millisecond,
+	}
+
+	cs := bot.getOrCreateChat("D123", "D123", "")
+	bot.processIncoming(context.Background(), cs, "D123", "", "first")
+	bot.processIncoming(context.Background(), cs, "D123", "", "second")
+
+	require.Eventually(t, func() bool {
+		service.mu.Lock()
+		defer service.mu.Unlock()
+		return len(service.createMessages) == 1
+	}, time.Second, 10*time.Millisecond)
+
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	require.Len(t, service.createMessages, 1)
+	assert.Equal(t, "first\n\nsecond", service.createMessages[0])
 }

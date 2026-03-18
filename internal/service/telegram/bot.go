@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/auth"
@@ -21,6 +22,7 @@ import (
 
 // maxTelegramMessageLen is the maximum length for a single Telegram message.
 const maxTelegramMessageLen = 4096
+const defaultIncomingBatchDelay = 750 * time.Millisecond
 
 // AgentService is the subset of the agent API that the Telegram bot requires.
 // Defining this as an interface decouples the bot from the concrete agent.API
@@ -61,18 +63,21 @@ type chatState struct {
 	mu               sync.Mutex
 	pendingPromptID  string
 	lastDeliveredSeq int64
+	pendingMessages  []string
+	pendingFlushGen  uint64
 }
 
 // Bot is a Telegram bot that forwards messages to the Dagu agent API.
 type Bot struct {
-	cfg          Config
-	agentAPI     AgentService
-	botAPI       telegramAPI
-	selfUsername string
-	chats        sync.Map // chatID (int64) -> *chatState
-	allowedChats map[int64]struct{}
-	dagRunStore  exec.DAGRunStore
-	logger       *slog.Logger
+	cfg           Config
+	agentAPI      AgentService
+	botAPI        telegramAPI
+	selfUsername  string
+	chats         sync.Map // chatID (int64) -> *chatState
+	allowedChats  map[int64]struct{}
+	dagRunStore   exec.DAGRunStore
+	logger        *slog.Logger
+	incomingDelay time.Duration
 }
 
 // New creates a new Telegram bot instance.
@@ -95,13 +100,14 @@ func New(cfg Config, agentAPI AgentService, logger *slog.Logger) (*Bot, error) {
 	}
 
 	return &Bot{
-		cfg:          cfg,
-		agentAPI:     agentAPI,
-		botAPI:       botAPI,
-		selfUsername: botAPI.Self.UserName,
-		allowedChats: allowed,
-		dagRunStore:  cfg.DAGRunStore,
-		logger:       logger,
+		cfg:           cfg,
+		agentAPI:      agentAPI,
+		botAPI:        botAPI,
+		selfUsername:  botAPI.Self.UserName,
+		allowedChats:  allowed,
+		dagRunStore:   cfg.DAGRunStore,
+		logger:        logger,
+		incomingDelay: defaultIncomingBatchDelay,
 	}, nil
 }
 
@@ -175,18 +181,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	}
 
 	// Send message to agent
-	user := b.userIdentity(chatID)
-
-	if cs.sessionID == "" {
-		b.createSession(ctx, cs, chatID, user, text)
-	} else {
-		sid, _ := b.prepareSessionForMessage(ctx, cs, user)
-		if sid == "" {
-			b.createSession(ctx, cs, chatID, user, text)
-			return
-		}
-		b.sendMessage(ctx, cs, chatID, user, text)
-	}
+	b.enqueueIncomingMessage(ctx, cs, chatID, text)
 }
 
 // handleCommand processes bot commands.
@@ -196,11 +191,13 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 	switch msg.Command() {
 	case "new":
 		cs := b.getOrCreateChat(chatID)
+		b.clearPendingMessages(cs)
 		b.resetChat(cs)
 		b.sendText(chatID, "Session cleared. Send a message to start a new conversation.")
 
 	case "cancel":
 		cs := b.getOrCreateChat(chatID)
+		b.clearPendingMessages(cs)
 		cs.mu.Lock()
 		sid := cs.sessionID
 		ownerUID := cs.ownerUserID
@@ -223,6 +220,50 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 	default:
 		b.sendText(chatID, "Unknown command. Use /new, /cancel, or just send a message.")
 	}
+}
+
+func (b *Bot) enqueueIncomingMessage(ctx context.Context, cs *chatState, chatID int64, text string) {
+	if text == "" {
+		return
+	}
+
+	cs.mu.Lock()
+	cs.pendingMessages = append(cs.pendingMessages, text)
+	cs.pendingFlushGen++
+	gen := cs.pendingFlushGen
+	cs.mu.Unlock()
+
+	delay := b.incomingDelay
+	if delay <= 0 {
+		delay = defaultIncomingBatchDelay
+	}
+	time.AfterFunc(delay, func() {
+		b.flushIncomingMessages(ctx, cs, chatID, gen)
+	})
+}
+
+func (b *Bot) flushIncomingMessages(ctx context.Context, cs *chatState, chatID int64, gen uint64) {
+	cs.mu.Lock()
+	if gen != cs.pendingFlushGen || len(cs.pendingMessages) == 0 {
+		cs.mu.Unlock()
+		return
+	}
+	text := strings.Join(append([]string(nil), cs.pendingMessages...), "\n\n")
+	cs.pendingMessages = nil
+	cs.mu.Unlock()
+
+	user := b.userIdentity(chatID)
+	if cs.sessionID == "" {
+		b.createSession(ctx, cs, chatID, user, text)
+		return
+	}
+
+	sid, _ := b.prepareSessionForMessage(ctx, cs, user)
+	if sid == "" {
+		b.createSession(ctx, cs, chatID, user, text)
+		return
+	}
+	b.sendMessage(ctx, cs, chatID, user, text)
 }
 
 // handleCallbackQuery processes inline keyboard button presses.
@@ -547,6 +588,8 @@ func (b *Bot) resetChat(cs *chatState) {
 	cs.subSessionID = ""
 	cs.pendingPromptID = ""
 	cs.lastDeliveredSeq = 0
+	cs.pendingMessages = nil
+	cs.pendingFlushGen++
 }
 
 // userIdentity creates a chat-scoped UserIdentity so the entire chat shares one session.
@@ -580,6 +623,13 @@ func (b *Bot) markDelivered(cs *chatState, seq int64) {
 	if seq > cs.lastDeliveredSeq {
 		cs.lastDeliveredSeq = seq
 	}
+}
+
+func (b *Bot) clearPendingMessages(cs *chatState) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	cs.pendingMessages = nil
+	cs.pendingFlushGen++
 }
 
 func (b *Bot) subscriptionActive(cs *chatState, sessionID string) bool {
