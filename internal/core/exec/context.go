@@ -6,6 +6,7 @@ package exec
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"maps"
 	"path/filepath"
@@ -92,6 +93,47 @@ type Database interface {
 type PendingStepRetry struct {
 	StepName string        `json:"stepName"`
 	Interval time.Duration `json:"interval"`
+}
+
+// MarshalJSON emits Interval as a Go duration string while keeping the
+// surrounding shape stable for callers.
+func (p PendingStepRetry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		StepName string `json:"stepName"`
+		Interval string `json:"interval"`
+	}{
+		StepName: p.StepName,
+		Interval: p.Interval.String(),
+	})
+}
+
+// UnmarshalJSON accepts both the current string encoding and the legacy
+// numeric nanosecond encoding for backward compatibility with persisted data.
+func (p *PendingStepRetry) UnmarshalJSON(data []byte) error {
+	var current struct {
+		StepName string `json:"stepName"`
+		Interval string `json:"interval"`
+	}
+	if err := json.Unmarshal(data, &current); err == nil && current.Interval != "" {
+		interval, parseErr := time.ParseDuration(current.Interval)
+		if parseErr != nil {
+			return fmt.Errorf("parse pending step retry interval: %w", parseErr)
+		}
+		p.StepName = current.StepName
+		p.Interval = interval
+		return nil
+	}
+
+	var legacy struct {
+		StepName string        `json:"stepName"`
+		Interval time.Duration `json:"interval"`
+	}
+	if err := json.Unmarshal(data, &legacy); err != nil {
+		return err
+	}
+	p.StepName = legacy.StepName
+	p.Interval = legacy.Interval
+	return nil
 }
 
 type RunStatus struct {

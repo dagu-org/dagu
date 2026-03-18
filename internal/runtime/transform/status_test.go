@@ -235,6 +235,41 @@ func TestStatusBuilderPendingStepRetriesOptionOverridesAutoDerivation(t *testing
 	assert.Empty(t, result.PendingStepRetries)
 }
 
+func TestStatusBuilderPopulatesPendingStepRetriesFromHandlerNodes(t *testing.T) {
+	dag := &core.DAG{
+		Name: "retrying-dag",
+		HandlerOn: core.HandlerOn{
+			Failure: &core.Step{Name: "onFailure"},
+		},
+	}
+
+	failureHandler := runtime.NewNode(
+		core.Step{
+			Name: "onFailure",
+			RetryPolicy: core.RetryPolicy{
+				Interval: 3 * time.Second,
+			},
+		},
+		runtime.NodeState{
+			Status:     core.NodeRetrying,
+			RetryCount: 1,
+		},
+	)
+
+	builder := transform.NewStatusBuilder(dag)
+	result := builder.Create(
+		"retry-run",
+		core.Queued,
+		123,
+		time.Now(),
+		transform.WithOnFailureNode(failureHandler),
+	)
+
+	assert.Equal(t, []exec.PendingStepRetry{
+		{StepName: "onFailure", Interval: 3 * time.Second},
+	}, result.PendingStepRetries)
+}
+
 func TestInitialStatus(t *testing.T) {
 	dag := &core.DAG{
 		Name: "initial-test",

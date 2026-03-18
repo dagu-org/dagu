@@ -5,13 +5,16 @@ package exec_test
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDAGContext_UserEnvsMap(t *testing.T) {
@@ -225,4 +228,29 @@ func TestNewContext_DAGRunWorkDir(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPendingStepRetryJSON(t *testing.T) {
+	t.Parallel()
+
+	t.Run("MarshalUsesDurationString", func(t *testing.T) {
+		t.Parallel()
+
+		data, err := json.Marshal(exec.PendingStepRetry{
+			StepName: "step1",
+			Interval: 2 * time.Second,
+		})
+		require.NoError(t, err)
+		assert.JSONEq(t, `{"stepName":"step1","interval":"2s"}`, string(data))
+	})
+
+	t.Run("UnmarshalSupportsLegacyNumericInterval", func(t *testing.T) {
+		t.Parallel()
+
+		var retry exec.PendingStepRetry
+		err := json.Unmarshal([]byte(`{"stepName":"step1","interval":2000000000}`), &retry)
+		require.NoError(t, err)
+		assert.Equal(t, "step1", retry.StepName)
+		assert.Equal(t, 2*time.Second, retry.Interval)
+	})
 }

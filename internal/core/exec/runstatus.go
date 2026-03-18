@@ -105,7 +105,7 @@ type DAGRunStatus struct {
 	Error                string             `json:"error,omitempty"`
 	Params               string             `json:"params,omitempty"`
 	ParamsList           []string           `json:"paramsList,omitempty"`
-	PendingStepRetries   []PendingStepRetry `json:"pendingStepRetries,omitempty"`
+	PendingStepRetries   []PendingStepRetry `json:"pendingStepRetries"`
 	Preconditions        []*core.Condition  `json:"preconditions,omitempty"`
 	Tags                 []string           `json:"tags,omitempty"`
 }
@@ -167,7 +167,7 @@ func PendingStepRetriesFromStatus(status *DAGRunStatus) []PendingStepRetry {
 	if status.PendingStepRetries != nil {
 		return status.PendingStepRetries
 	}
-	return PendingStepRetriesFromNodes(status.Nodes)
+	return PendingStepRetriesFromNodes(status.executableNodes())
 }
 
 // NodeByName returns the node with the specified name.
@@ -253,6 +253,20 @@ func (st *DAGRunStatus) handlerNodes() []handlerNode {
 		{canonicalAbortHandlerName, st.OnAbort},
 		{"onWait", st.OnWait},
 	}
+}
+
+// executableNodes returns regular nodes plus any handler nodes that exist.
+func (st *DAGRunStatus) executableNodes() []*Node {
+	if st == nil {
+		return nil
+	}
+	nodes := append([]*Node{}, st.Nodes...)
+	for _, handler := range st.handlerNodes() {
+		if handler.node != nil {
+			nodes = append(nodes, handler.node)
+		}
+	}
+	return nodes
 }
 
 func normalizeAbortHandlerLookup(name string) string {

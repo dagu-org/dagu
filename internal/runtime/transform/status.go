@@ -207,8 +207,8 @@ func (f *StatusBuilder) Create(
 		opt(&statusObj)
 	}
 
-	if statusObj.PendingStepRetries == nil && len(statusObj.Nodes) > 0 {
-		statusObj.PendingStepRetries = exec.PendingStepRetriesFromNodes(statusObj.Nodes)
+	if statusObj.PendingStepRetries == nil {
+		statusObj.PendingStepRetries = exec.PendingStepRetriesFromStatus(&statusObj)
 	}
 
 	// Generate AttemptKey if not already set and we have all required fields

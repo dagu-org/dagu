@@ -103,6 +103,7 @@ func runRetry(ctx *Context, args []string) error {
 			rootRun = status.DAGRun()
 		}
 	}
+	status.Root = rootRun
 
 	// Block retry via CLI for DAGs with workerSelector, UNLESS this is a distributed worker execution
 	// (indicated by --worker-id being set to something other than "local")
