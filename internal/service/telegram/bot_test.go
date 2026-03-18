@@ -180,7 +180,7 @@ func TestDAGRunMonitor_NotifyChat_ReusesExistingSessionAndSkipsReplay(t *testing
 	assert.Equal(t, int64(1), bot.lastDeliveredSeq(cs))
 	assert.Equal(t, 1, api.sendCount())
 
-	bot.processStreamResponse(cs, 123, agent.StreamResponse{
+	bot.processStreamResponse(context.Background(), cs, 123, agent.StreamResponse{
 		Messages: []agent.Message{
 			{Type: agent.MessageTypeAssistant, SequenceID: 1, Content: "telegram notification"},
 			{Type: agent.MessageTypeAssistant, SequenceID: 2, Content: "actual reply"},
@@ -214,8 +214,9 @@ func TestDAGRunMonitor_NotifyChat_CreatesSessionWhenMissing(t *testing.T) {
 	require.True(t, ok)
 
 	cs := bot.getOrCreateChat(456)
-	assert.Equal(t, "sess-1", cs.sessionID)
-	assert.Equal(t, "telegram:456", cs.ownerUserID)
+	sessionID, ownerUserID := cs.ActiveSession()
+	assert.Equal(t, "sess-1", sessionID)
+	assert.Equal(t, "telegram:456", ownerUserID)
 	assert.Equal(t, int64(1), bot.lastDeliveredSeq(cs))
 	assert.Equal(t, 1, service.createEmptyCalls)
 	assert.Equal(t, 1, api.sendCount())
@@ -263,7 +264,7 @@ func TestBot_ProcessStreamResponse_RefreshesTypingWhileWorking(t *testing.T) {
 	}
 	cs := bot.getOrCreateChat(123)
 
-	bot.processStreamResponse(cs, 123, agent.StreamResponse{
+	bot.processStreamResponse(context.Background(), cs, 123, agent.StreamResponse{
 		SessionState: &agent.SessionState{Working: true},
 	})
 
@@ -272,7 +273,7 @@ func TestBot_ProcessStreamResponse_RefreshesTypingWhileWorking(t *testing.T) {
 	}, time.Second, 10*time.Millisecond)
 
 	beforeStop := api.typingCount()
-	bot.processStreamResponse(cs, 123, agent.StreamResponse{
+	bot.processStreamResponse(context.Background(), cs, 123, agent.StreamResponse{
 		SessionState: &agent.SessionState{Working: false},
 	})
 
@@ -298,7 +299,7 @@ func TestBot_ProcessStreamResponse_StopsTypingOnAssistantMessage(t *testing.T) {
 	}, time.Second, 10*time.Millisecond)
 
 	beforeStop := api.typingCount()
-	bot.processStreamResponse(cs, 123, agent.StreamResponse{
+	bot.processStreamResponse(context.Background(), cs, 123, agent.StreamResponse{
 		Messages: []agent.Message{
 			{Type: agent.MessageTypeAssistant, SequenceID: 1, Content: "done"},
 		},

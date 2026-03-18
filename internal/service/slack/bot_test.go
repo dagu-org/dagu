@@ -166,7 +166,7 @@ func TestDAGRunMonitor_NotifyChannelThread_SkipsManualNotificationReplay(t *test
 	val, exists := bot.chats.Load("C123:1")
 	require.True(t, exists)
 	cs := val.(*chatState)
-	assert.Equal(t, "sess-1", cs.sessionID)
+	assert.Equal(t, "sess-1", cs.SessionID())
 	assert.Equal(t, "1", cs.threadTS)
 	assert.Equal(t, int64(1), bot.lastDeliveredSeq(cs))
 
@@ -214,7 +214,7 @@ func TestDAGRunMonitor_NotifyDirectMessage_AppendsToExistingSession(t *testing.T
 	assert.Equal(t, 0, service.createEmptyCalls, "existing DM session should be reused")
 	require.Len(t, service.appendSessionIDs, 1)
 	assert.Equal(t, "existing-session", service.appendSessionIDs[0])
-	assert.Equal(t, "existing-session", cs.sessionID)
+	assert.Equal(t, "existing-session", cs.SessionID())
 	assert.Equal(t, int64(1), bot.lastDeliveredSeq(cs))
 	assert.Equal(t, 1, client.postCount(), "notification should still be delivered to Slack once")
 

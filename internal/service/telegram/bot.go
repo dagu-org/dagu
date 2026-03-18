@@ -17,6 +17,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/service/chatbridge"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -28,18 +29,7 @@ const defaultTypingRefreshInterval = 4 * time.Second
 // AgentService is the subset of the agent API that the Telegram bot requires.
 // Defining this as an interface decouples the bot from the concrete agent.API
 // implementation, making it testable in isolation.
-type AgentService interface {
-	CreateSession(ctx context.Context, user agent.UserIdentity, req agent.ChatRequest) (string, string, error)
-	CreateEmptySession(ctx context.Context, user agent.UserIdentity, dagName string, safeMode bool) (string, error)
-	SendMessage(ctx context.Context, sessionID string, user agent.UserIdentity, req agent.ChatRequest) error
-	CancelSession(ctx context.Context, sessionID, userID string) error
-	SubmitUserResponse(ctx context.Context, sessionID, userID string, resp agent.UserPromptResponse) error
-	GenerateAssistantMessage(ctx context.Context, sessionID string, user agent.UserIdentity, dagName, prompt string) (agent.Message, error)
-	AppendExternalMessage(ctx context.Context, sessionID string, user agent.UserIdentity, msg agent.Message) (agent.Message, error)
-	CompactSessionIfNeeded(ctx context.Context, sessionID string, user agent.UserIdentity) (string, bool, error)
-	GetSessionDetail(ctx context.Context, sessionID, userID string) (*agent.StreamResponse, error)
-	SubscribeSession(ctx context.Context, sessionID string, user agent.UserIdentity) (agent.StreamResponse, func() (agent.StreamResponse, bool), error)
-}
+type AgentService = chatbridge.AgentService
 
 type telegramAPI interface {
 	GetUpdatesChan(config tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel
@@ -57,17 +47,11 @@ type Config struct {
 
 // chatState tracks the agent session state for a single Telegram chat.
 type chatState struct {
-	sessionID        string
-	ownerUserID      string // conversation-scoped session identity
-	subSessionID     string // session ID the subscription is listening to
-	subCancel        context.CancelFunc
-	typingCancel     context.CancelFunc
-	mu               sync.Mutex
-	pendingPromptID  string
-	lastDeliveredSeq int64
-	pendingMessages  []string
-	pendingFlushGen  uint64
-	typingLoopGen    uint64
+	chatbridge.State
+
+	typingMu      sync.Mutex
+	typingCancel  context.CancelFunc
+	typingLoopGen uint64
 }
 
 // Bot is a Telegram bot that forwards messages to the Dagu agent API.
@@ -176,9 +160,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 
 	// Check if this is a response to a pending prompt
 	cs := b.getOrCreateChat(chatID)
-	cs.mu.Lock()
-	pendingPrompt := cs.pendingPromptID
-	cs.mu.Unlock()
+	pendingPrompt := cs.PendingPromptID()
 
 	if pendingPrompt != "" {
 		b.submitPromptResponse(ctx, cs, chatID, pendingPrompt, text)
@@ -203,10 +185,7 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 	case "cancel":
 		cs := b.getOrCreateChat(chatID)
 		b.clearPendingMessages(cs)
-		cs.mu.Lock()
-		sid := cs.sessionID
-		ownerUID := cs.ownerUserID
-		cs.mu.Unlock()
+		sid, ownerUID := cs.ActiveSession()
 
 		if sid == "" {
 			b.sendText(chatID, "No active session.")
@@ -233,11 +212,7 @@ func (b *Bot) enqueueIncomingMessage(ctx context.Context, cs *chatState, chatID 
 		return
 	}
 
-	cs.mu.Lock()
-	cs.pendingMessages = append(cs.pendingMessages, text)
-	cs.pendingFlushGen++
-	gen := cs.pendingFlushGen
-	cs.mu.Unlock()
+	gen := cs.EnqueuePendingMessage(text)
 
 	delay := b.incomingDelay
 	if delay <= 0 {
@@ -249,17 +224,13 @@ func (b *Bot) enqueueIncomingMessage(ctx context.Context, cs *chatState, chatID 
 }
 
 func (b *Bot) flushIncomingMessages(ctx context.Context, cs *chatState, chatID int64, gen uint64) {
-	cs.mu.Lock()
-	if gen != cs.pendingFlushGen || len(cs.pendingMessages) == 0 {
-		cs.mu.Unlock()
+	text, ok := cs.TakePendingMessages(gen, "\n\n")
+	if !ok {
 		return
 	}
-	text := strings.Join(append([]string(nil), cs.pendingMessages...), "\n\n")
-	cs.pendingMessages = nil
-	cs.mu.Unlock()
 
 	user := b.userIdentity(chatID)
-	if cs.sessionID == "" {
+	if cs.SessionID() == "" {
 		b.createSession(ctx, cs, chatID, user, text)
 		return
 	}
@@ -288,11 +259,8 @@ func (b *Bot) handleCallbackQuery(ctx context.Context, cq *tgbotapi.CallbackQuer
 	optionID := parts[2]
 
 	cs := b.getOrCreateChat(chatID)
-	cs.mu.Lock()
-	sid := cs.sessionID
-	ownerUID := cs.ownerUserID
-	cs.pendingPromptID = ""
-	cs.mu.Unlock()
+	sid, ownerUID := cs.ActiveSession()
+	cs.ClearPendingPrompt()
 
 	if sid == "" {
 		callback := tgbotapi.NewCallback(cq.ID, "No active session")
@@ -338,16 +306,16 @@ func (b *Bot) sendTyping(chatID int64) {
 }
 
 func (b *Bot) startTypingLoop(ctx context.Context, cs *chatState, chatID int64) {
-	cs.mu.Lock()
+	cs.typingMu.Lock()
 	if cs.typingCancel != nil {
-		cs.mu.Unlock()
+		cs.typingMu.Unlock()
 		return
 	}
 	loopCtx, cancel := context.WithCancel(ctx)
 	cs.typingLoopGen++
 	gen := cs.typingLoopGen
 	cs.typingCancel = cancel
-	cs.mu.Unlock()
+	cs.typingMu.Unlock()
 
 	b.sendTyping(chatID)
 
@@ -373,10 +341,10 @@ func (b *Bot) startTypingLoop(ctx context.Context, cs *chatState, chatID int64) 
 }
 
 func (b *Bot) stopTypingLoop(cs *chatState) {
-	cs.mu.Lock()
+	cs.typingMu.Lock()
 	cancel := cs.typingCancel
 	cs.typingCancel = nil
-	cs.mu.Unlock()
+	cs.typingMu.Unlock()
 
 	if cancel != nil {
 		cancel()
@@ -384,8 +352,8 @@ func (b *Bot) stopTypingLoop(cs *chatState) {
 }
 
 func (b *Bot) finishTypingLoop(cs *chatState, gen uint64) {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
+	cs.typingMu.Lock()
+	defer cs.typingMu.Unlock()
 	if cs.typingLoopGen == gen {
 		cs.typingCancel = nil
 	}
@@ -416,9 +384,7 @@ func (b *Bot) createSession(ctx context.Context, cs *chatState, chatID int64, us
 func (b *Bot) sendMessage(ctx context.Context, cs *chatState, chatID int64, user agent.UserIdentity, text string) {
 	b.startTypingLoop(ctx, cs, chatID)
 
-	cs.mu.Lock()
-	sid := cs.sessionID
-	cs.mu.Unlock()
+	sid := cs.SessionID()
 
 	req := agent.ChatRequest{
 		Message:  text,
@@ -438,11 +404,8 @@ func (b *Bot) sendMessage(ctx context.Context, cs *chatState, chatID int64, user
 
 // submitPromptResponse submits a text response to a pending agent prompt.
 func (b *Bot) submitPromptResponse(ctx context.Context, cs *chatState, chatID int64, promptID, text string) {
-	cs.mu.Lock()
-	sid := cs.sessionID
-	ownerUserID := cs.ownerUserID
-	cs.pendingPromptID = ""
-	cs.mu.Unlock()
+	sid, ownerUserID := cs.ActiveSession()
+	cs.ClearPendingPrompt()
 
 	if sid == "" {
 		return
@@ -463,20 +426,17 @@ func (b *Bot) submitPromptResponse(ctx context.Context, cs *chatState, chatID in
 // ensureSubscription starts a subscription only if one isn't already running
 // for the given session. Safe to call on every message.
 func (b *Bot) ensureSubscription(ctx context.Context, cs *chatState, chatID int64, userID, sessionID string) {
-	cs.mu.Lock()
-	if cs.subSessionID == sessionID && cs.subCancel != nil {
-		// Already subscribed to this session — nothing to do.
-		cs.mu.Unlock()
+	subCtx, cancel := context.WithCancel(ctx)
+	cleanup, started := cs.PrepareSubscription(sessionID, cancel, false)
+	if !started {
+		if cleanup != nil {
+			cleanup()
+		}
 		return
 	}
-	// Different session or no subscription — start a new one.
-	if cs.subCancel != nil {
-		cs.subCancel()
+	if cleanup != nil {
+		cleanup()
 	}
-	subCtx, cancel := context.WithCancel(ctx)
-	cs.subCancel = cancel
-	cs.subSessionID = sessionID
-	cs.mu.Unlock()
 
 	go b.subscribeLoop(subCtx, cs, chatID, userID, sessionID)
 }
@@ -484,14 +444,11 @@ func (b *Bot) ensureSubscription(ctx context.Context, cs *chatState, chatID int6
 // startSubscription cancels any existing subscription and starts a fresh one.
 // Use this when creating a new session or adopting a notification session.
 func (b *Bot) startSubscription(ctx context.Context, cs *chatState, chatID int64, userID, sessionID string) {
-	cs.mu.Lock()
-	if cs.subCancel != nil {
-		cs.subCancel()
-	}
 	subCtx, cancel := context.WithCancel(ctx)
-	cs.subCancel = cancel
-	cs.subSessionID = sessionID
-	cs.mu.Unlock()
+	cleanup, _ := cs.PrepareSubscription(sessionID, cancel, true)
+	if cleanup != nil {
+		cleanup()
+	}
 
 	go b.subscribeLoop(subCtx, cs, chatID, userID, sessionID)
 }
@@ -517,7 +474,7 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, chatID int64, us
 	// Process the initial snapshot — skip user messages (we sent those),
 	// but forward any assistant/error/prompt messages that arrived before
 	// the subscription started.
-	b.processStreamResponse(cs, chatID, snapshot)
+	b.processStreamResponse(ctx, cs, chatID, snapshot)
 
 	// Listen for real-time updates via the pub-sub channel.
 	for {
@@ -526,69 +483,41 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, chatID int64, us
 			b.stopTypingLoop(cs)
 			// Session ended — clear the session ID so the next message
 			// creates a fresh session instead of reusing a dead one.
-			cs.mu.Lock()
-			if cs.sessionID == sessionID {
-				cs.sessionID = ""
-			}
-			cs.mu.Unlock()
+			cs.ClearSessionIfActive(sessionID)
 			return
 		}
-		b.processStreamResponse(cs, chatID, resp)
+		b.processStreamResponse(ctx, cs, chatID, resp)
 	}
 }
 
 // processStreamResponse handles a stream response and sends relevant content to Telegram.
-func (b *Bot) processStreamResponse(cs *chatState, chatID int64, resp agent.StreamResponse) {
-	if resp.SessionState != nil {
-		if resp.SessionState.Working {
-			b.startTypingLoop(context.Background(), cs, chatID)
-		} else {
+func (b *Bot) processStreamResponse(ctx context.Context, cs *chatState, chatID int64, resp agent.StreamResponse) {
+	chatbridge.ProcessStreamResponse(&cs.State, resp, chatbridge.StreamHandlers{
+		OnWorking: func(working bool) {
+			if working {
+				b.startTypingLoop(ctx, cs, chatID)
+			} else {
+				b.stopTypingLoop(cs)
+			}
+		},
+		OnAssistant: func(msg agent.Message) {
 			b.stopTypingLoop(cs)
-		}
-	}
-
-	lastDelivered := b.lastDeliveredSeq(cs)
-	maxSeen := lastDelivered
-	for _, msg := range resp.Messages {
-		if msg.SequenceID > maxSeen {
-			maxSeen = msg.SequenceID
-		}
-		if msg.SequenceID != 0 && msg.SequenceID <= lastDelivered {
-			continue
-		}
-		switch msg.Type {
-		case agent.MessageTypeAssistant:
-			if msg.Content != "" {
-				b.stopTypingLoop(cs)
-				b.sendLongText(chatID, msg.Content)
-			}
-
-		case agent.MessageTypeError:
-			if msg.Content != "" {
-				b.stopTypingLoop(cs)
-				b.sendText(chatID, "Error: "+msg.Content)
-			}
-
-		case agent.MessageTypeUserPrompt:
-			if msg.UserPrompt != nil {
-				b.stopTypingLoop(cs)
-				b.sendPrompt(cs, chatID, msg.UserPrompt)
-			}
-
-		case agent.MessageTypeUser, agent.MessageTypeUIAction:
-			// Skip user messages and UI actions in Telegram output
-		}
-	}
-	if maxSeen > lastDelivered {
-		b.markDelivered(cs, maxSeen)
-	}
+			b.sendLongText(chatID, msg.Content)
+		},
+		OnError: func(msg agent.Message) {
+			b.stopTypingLoop(cs)
+			b.sendText(chatID, "Error: "+msg.Content)
+		},
+		OnPrompt: func(prompt *agent.UserPrompt) {
+			b.stopTypingLoop(cs)
+			b.sendPrompt(cs, chatID, prompt)
+		},
+	})
 }
 
 // sendPrompt sends a user prompt with inline keyboard buttons.
 func (b *Bot) sendPrompt(cs *chatState, chatID int64, prompt *agent.UserPrompt) {
-	cs.mu.Lock()
-	cs.pendingPromptID = prompt.PromptID
-	cs.mu.Unlock()
+	cs.SetPendingPrompt(prompt.PromptID)
 
 	text := prompt.Question
 	if prompt.Command != "" {
@@ -654,24 +583,10 @@ func (b *Bot) getOrCreateChat(chatID int64) *chatState {
 
 // resetChat clears the session state for a chat.
 func (b *Bot) resetChat(cs *chatState) {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-
-	if cs.subCancel != nil {
-		cs.subCancel()
-		cs.subCancel = nil
+	if cancel := cs.Reset(); cancel != nil {
+		cancel()
 	}
-	if cs.typingCancel != nil {
-		cs.typingCancel()
-		cs.typingCancel = nil
-	}
-	cs.sessionID = ""
-	cs.ownerUserID = ""
-	cs.subSessionID = ""
-	cs.pendingPromptID = ""
-	cs.lastDeliveredSeq = 0
-	cs.pendingMessages = nil
-	cs.pendingFlushGen++
+	b.stopTypingLoop(cs)
 }
 
 // userIdentity creates a chat-scoped UserIdentity so the entire chat shares one session.
@@ -684,92 +599,47 @@ func (b *Bot) userIdentity(chatID int64) agent.UserIdentity {
 }
 
 func (b *Bot) setActiveSession(cs *chatState, sessionID, ownerUserID string) {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	if cs.sessionID != sessionID {
-		cs.lastDeliveredSeq = 0
-	}
-	cs.sessionID = sessionID
-	cs.ownerUserID = ownerUserID
+	cs.SetActiveSession(sessionID, ownerUserID)
 }
 
 func (b *Bot) lastDeliveredSeq(cs *chatState) int64 {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	return cs.lastDeliveredSeq
+	return cs.LastDeliveredSeq()
 }
 
 func (b *Bot) markDelivered(cs *chatState, seq int64) {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	if seq > cs.lastDeliveredSeq {
-		cs.lastDeliveredSeq = seq
-	}
+	cs.MarkDelivered(seq)
 }
 
 func (b *Bot) clearPendingMessages(cs *chatState) {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	cs.pendingMessages = nil
-	cs.pendingFlushGen++
+	cs.ClearPendingMessages()
 }
 
 func (b *Bot) subscriptionActive(cs *chatState, sessionID string) bool {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	return cs.subSessionID == sessionID && cs.subCancel != nil
+	return cs.SubscriptionActive(sessionID)
 }
 
 func (b *Bot) prepareSessionForMessage(ctx context.Context, cs *chatState, user agent.UserIdentity) (string, bool) {
-	cs.mu.Lock()
-	sid := cs.sessionID
-	cs.mu.Unlock()
-
-	if sid == "" {
+	result, err := chatbridge.MaybeCompactSession(ctx, b.agentAPI, &cs.State, user)
+	if result.SessionID == "" && !result.Missing && err == nil {
 		return "", false
 	}
-
-	newSID, rotated, err := b.agentAPI.CompactSessionIfNeeded(ctx, sid, user)
 	if err != nil {
-		if err == agent.ErrSessionNotFound {
-			b.logger.Warn("Session missing during compaction, resetting chat",
-				slog.String("session", sid),
-				slog.String("user", user.UserID),
-			)
-			b.resetChat(cs)
-			return "", false
-		}
 		b.logger.Warn("Failed to compact Telegram session",
-			slog.String("session", sid),
+			slog.String("session", result.SessionID),
 			slog.String("user", user.UserID),
 			slog.String("error", err.Error()),
 		)
-		return sid, false
+		return result.SessionID, false
 	}
-	if !rotated {
-		return newSID, false
+	if result.Missing {
+		b.logger.Warn("Session missing during compaction, resetting chat",
+			slog.String("session", result.SessionID),
+			slog.String("user", user.UserID),
+		)
+		b.resetChat(cs)
+		return "", false
 	}
-
-	b.setActiveSession(cs, newSID, user.UserID)
-	b.markSessionSnapshotDelivered(ctx, cs, newSID, user.UserID)
-	return newSID, true
-}
-
-func (b *Bot) markSessionSnapshotDelivered(ctx context.Context, cs *chatState, sessionID, userID string) {
-	detail, err := b.agentAPI.GetSessionDetail(ctx, sessionID, userID)
-	if err != nil || detail == nil {
-		return
-	}
-
-	var maxSeq int64
-	for _, msg := range detail.Messages {
-		if msg.SequenceID > maxSeq {
-			maxSeq = msg.SequenceID
-		}
-	}
-	if maxSeq > 0 {
-		b.markDelivered(cs, maxSeq)
-	}
+	return result.SessionID, result.Rotated
 }
 
 // splitMessage splits text into chunks that fit within the Telegram message limit.

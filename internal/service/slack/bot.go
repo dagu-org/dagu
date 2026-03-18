@@ -17,6 +17,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/service/chatbridge"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	"github.com/slack-go/slack/socketmode"
@@ -27,18 +28,7 @@ const maxSlackMessageLen = 4000
 const defaultIncomingBatchDelay = 750 * time.Millisecond
 
 // AgentService is the subset of the agent API that the Slack bot requires.
-type AgentService interface {
-	CreateSession(ctx context.Context, user agent.UserIdentity, req agent.ChatRequest) (string, string, error)
-	CreateEmptySession(ctx context.Context, user agent.UserIdentity, dagName string, safeMode bool) (string, error)
-	SendMessage(ctx context.Context, sessionID string, user agent.UserIdentity, req agent.ChatRequest) error
-	CancelSession(ctx context.Context, sessionID, userID string) error
-	SubmitUserResponse(ctx context.Context, sessionID, userID string, resp agent.UserPromptResponse) error
-	GenerateAssistantMessage(ctx context.Context, sessionID string, user agent.UserIdentity, dagName, prompt string) (agent.Message, error)
-	AppendExternalMessage(ctx context.Context, sessionID string, user agent.UserIdentity, msg agent.Message) (agent.Message, error)
-	CompactSessionIfNeeded(ctx context.Context, sessionID string, user agent.UserIdentity) (string, bool, error)
-	GetSessionDetail(ctx context.Context, sessionID, userID string) (*agent.StreamResponse, error)
-	SubscribeSession(ctx context.Context, sessionID string, user agent.UserIdentity) (agent.StreamResponse, func() (agent.StreamResponse, bool), error)
-}
+type AgentService = chatbridge.AgentService
 
 type slackClientAPI interface {
 	PostMessage(channelID string, options ...slack.MsgOption) (string, string, error)
@@ -65,18 +55,12 @@ type messageRef struct {
 // chatState tracks the agent session state for a single conversation.
 // A conversation is either a DM channel or a specific thread in a channel.
 type chatState struct {
-	channelID        string // Slack channel ID
-	threadTS         string // thread parent timestamp (empty for DMs)
-	sessionID        string
-	ownerUserID      string // conversation-scoped session identity
-	subSessionID     string // session ID the subscription is listening to
-	subCancel        context.CancelFunc
-	mu               sync.Mutex
-	pendingPromptID  string
-	thinkingMessage  *messageRef // "Thinking..." message to delete on first response
-	lastDeliveredSeq int64
-	pendingMessages  []string
-	pendingFlushGen  uint64
+	chatbridge.State
+
+	channelID       string // Slack channel ID
+	threadTS        string // thread parent timestamp (empty for DMs)
+	thinkingMu      sync.Mutex
+	thinkingMessage *messageRef // "Thinking..." message to delete on first response
 }
 
 // Bot is a Slack bot that forwards messages to the Dagu agent API.
@@ -314,9 +298,7 @@ func (b *Bot) processIncoming(ctx context.Context, cs *chatState, convKey, _ str
 	}
 
 	// Check if this is a response to a pending prompt
-	cs.mu.Lock()
-	pendingPrompt := cs.pendingPromptID
-	cs.mu.Unlock()
+	pendingPrompt := cs.PendingPromptID()
 
 	if pendingPrompt != "" {
 		b.submitPromptResponse(ctx, cs, pendingPrompt, text)
@@ -331,11 +313,7 @@ func (b *Bot) enqueueIncomingMessage(ctx context.Context, cs *chatState, convKey
 		return
 	}
 
-	cs.mu.Lock()
-	cs.pendingMessages = append(cs.pendingMessages, text)
-	cs.pendingFlushGen++
-	gen := cs.pendingFlushGen
-	cs.mu.Unlock()
+	gen := cs.EnqueuePendingMessage(text)
 
 	delay := b.incomingDelay
 	if delay <= 0 {
@@ -347,25 +325,21 @@ func (b *Bot) enqueueIncomingMessage(ctx context.Context, cs *chatState, convKey
 }
 
 func (b *Bot) flushIncomingMessages(ctx context.Context, cs *chatState, convKey string, gen uint64) {
-	cs.mu.Lock()
-	if gen != cs.pendingFlushGen || len(cs.pendingMessages) == 0 {
-		cs.mu.Unlock()
+	text, ok := cs.TakePendingMessages(gen, "\n\n")
+	if !ok {
 		return
 	}
-	text := strings.Join(append([]string(nil), cs.pendingMessages...), "\n\n")
-	cs.pendingMessages = nil
-	cs.mu.Unlock()
 
 	thinkingTS := b.postThinking(cs)
 	user := b.userIdentity(convKey)
 
-	cs.mu.Lock()
+	cs.thinkingMu.Lock()
 	if thinkingTS != "" {
 		cs.thinkingMessage = &messageRef{channel: cs.channelID, timestamp: thinkingTS}
 	}
-	cs.mu.Unlock()
+	cs.thinkingMu.Unlock()
 
-	if cs.sessionID == "" {
+	if cs.SessionID() == "" {
 		b.createSession(ctx, cs, user, text)
 	} else {
 		sid, rotated := b.prepareSessionForMessage(ctx, cs, user)
@@ -388,10 +362,7 @@ func (b *Bot) handleTextCommand(ctx context.Context, cs *chatState, cmd string) 
 		b.sendReply(cs, "Session cleared. Send a message to start a new conversation.")
 
 	case "cancel":
-		cs.mu.Lock()
-		sid := cs.sessionID
-		ownerUID := cs.ownerUserID
-		cs.mu.Unlock()
+		sid, ownerUID := cs.ActiveSession()
 
 		if sid == "" {
 			b.sendReply(cs, "No active session.")
@@ -425,10 +396,7 @@ func (b *Bot) handleSlashCommand(ctx context.Context, cmd slack.SlashCommand) {
 
 	case "/dagu-cancel":
 		b.clearPendingMessages(cs)
-		cs.mu.Lock()
-		sid := cs.sessionID
-		ownerUID := cs.ownerUserID
-		cs.mu.Unlock()
+		sid, ownerUID := cs.ActiveSession()
 
 		if sid == "" {
 			b.sendReply(cs, "No active session.")
@@ -473,11 +441,8 @@ func (b *Bot) handleInteraction(ctx context.Context, callback slack.InteractionC
 	}
 
 	cs := b.getOrCreateChat(convKey, channelID, threadTS)
-	cs.mu.Lock()
-	sid := cs.sessionID
-	ownerUID := cs.ownerUserID
-	cs.pendingPromptID = ""
-	cs.mu.Unlock()
+	sid, ownerUID := cs.ActiveSession()
+	cs.ClearPendingPrompt()
 
 	if sid == "" {
 		return
@@ -534,9 +499,7 @@ func (b *Bot) createSession(ctx context.Context, cs *chatState, user agent.UserI
 
 // sendAgentMessage sends a message to an existing session.
 func (b *Bot) sendAgentMessage(ctx context.Context, cs *chatState, user agent.UserIdentity, text string) {
-	cs.mu.Lock()
-	sid := cs.sessionID
-	cs.mu.Unlock()
+	sid := cs.SessionID()
 
 	req := agent.ChatRequest{
 		Message:  text,
@@ -554,11 +517,8 @@ func (b *Bot) sendAgentMessage(ctx context.Context, cs *chatState, user agent.Us
 
 // submitPromptResponse submits a text response to a pending agent prompt.
 func (b *Bot) submitPromptResponse(ctx context.Context, cs *chatState, promptID, text string) {
-	cs.mu.Lock()
-	sid := cs.sessionID
-	ownerUserID := cs.ownerUserID
-	cs.pendingPromptID = ""
-	cs.mu.Unlock()
+	sid, ownerUserID := cs.ActiveSession()
+	cs.ClearPendingPrompt()
 
 	if sid == "" {
 		return
@@ -581,32 +541,28 @@ func (b *Bot) submitPromptResponse(ctx context.Context, cs *chatState, promptID,
 // ensureSubscription starts a subscription only if one isn't already running
 // for the given session.
 func (b *Bot) ensureSubscription(ctx context.Context, cs *chatState, userID, sessionID string) {
-	cs.mu.Lock()
-	if cs.subSessionID == sessionID && cs.subCancel != nil {
-		cs.mu.Unlock()
+	subCtx, cancel := context.WithCancel(ctx)
+	cleanup, started := cs.PrepareSubscription(sessionID, cancel, false)
+	if !started {
+		if cleanup != nil {
+			cleanup()
+		}
 		return
 	}
-	if cs.subCancel != nil {
-		cs.subCancel()
+	if cleanup != nil {
+		cleanup()
 	}
-	subCtx, cancel := context.WithCancel(ctx)
-	cs.subCancel = cancel
-	cs.subSessionID = sessionID
-	cs.mu.Unlock()
 
 	go b.subscribeLoop(subCtx, cs, userID, sessionID)
 }
 
 // startSubscription cancels any existing subscription and starts a fresh one.
 func (b *Bot) startSubscription(ctx context.Context, cs *chatState, userID, sessionID string) {
-	cs.mu.Lock()
-	if cs.subCancel != nil {
-		cs.subCancel()
-	}
 	subCtx, cancel := context.WithCancel(ctx)
-	cs.subCancel = cancel
-	cs.subSessionID = sessionID
-	cs.mu.Unlock()
+	cleanup, _ := cs.PrepareSubscription(sessionID, cancel, true)
+	if cleanup != nil {
+		cleanup()
+	}
 
 	go b.subscribeLoop(subCtx, cs, userID, sessionID)
 }
@@ -636,11 +592,7 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, userID, sessionI
 		if !ok {
 			// Session ended — clear the session ID so the next message
 			// creates a fresh session instead of reusing a dead one.
-			cs.mu.Lock()
-			if cs.sessionID == sessionID {
-				cs.sessionID = ""
-			}
-			cs.mu.Unlock()
+			cs.ClearSessionIfActive(sessionID)
 			return
 		}
 		b.processStreamResponse(cs, resp)
@@ -649,41 +601,20 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, userID, sessionI
 
 // processStreamResponse handles a stream response and sends relevant content to Slack.
 func (b *Bot) processStreamResponse(cs *chatState, resp agent.StreamResponse) {
-	lastDelivered := b.lastDeliveredSeq(cs)
-	maxSeen := lastDelivered
-	for _, msg := range resp.Messages {
-		if msg.SequenceID > maxSeen {
-			maxSeen = msg.SequenceID
-		}
-		if msg.SequenceID != 0 && msg.SequenceID <= lastDelivered {
-			continue
-		}
-		switch msg.Type {
-		case agent.MessageTypeAssistant:
-			if msg.Content != "" {
-				b.clearPendingIndicators(cs)
-				b.sendLongReply(cs, msg.Content)
-			}
-
-		case agent.MessageTypeError:
-			if msg.Content != "" {
-				b.clearPendingIndicators(cs)
-				b.sendReply(cs, "Error: "+msg.Content)
-			}
-
-		case agent.MessageTypeUserPrompt:
-			if msg.UserPrompt != nil {
-				b.clearPendingIndicators(cs)
-				b.sendPrompt(cs, msg.UserPrompt)
-			}
-
-		case agent.MessageTypeUser, agent.MessageTypeUIAction:
-			// Skip user messages and UI actions in Slack output
-		}
-	}
-	if maxSeen > lastDelivered {
-		b.markDelivered(cs, maxSeen)
-	}
+	chatbridge.ProcessStreamResponse(&cs.State, resp, chatbridge.StreamHandlers{
+		OnAssistant: func(msg agent.Message) {
+			b.clearPendingIndicators(cs)
+			b.sendLongReply(cs, msg.Content)
+		},
+		OnError: func(msg agent.Message) {
+			b.clearPendingIndicators(cs)
+			b.sendReply(cs, "Error: "+msg.Content)
+		},
+		OnPrompt: func(prompt *agent.UserPrompt) {
+			b.clearPendingIndicators(cs)
+			b.sendPrompt(cs, prompt)
+		},
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -692,9 +623,7 @@ func (b *Bot) processStreamResponse(cs *chatState, resp agent.StreamResponse) {
 
 // sendPrompt sends a user prompt with interactive buttons.
 func (b *Bot) sendPrompt(cs *chatState, prompt *agent.UserPrompt) {
-	cs.mu.Lock()
-	cs.pendingPromptID = prompt.PromptID
-	cs.mu.Unlock()
+	cs.SetPendingPrompt(prompt.PromptID)
 
 	text := prompt.Question
 	if prompt.Command != "" {
@@ -830,10 +759,10 @@ func (b *Bot) sendLongRootThread(channelID, text string) string {
 
 // clearPendingIndicators deletes the "Thinking..." message when the first response arrives.
 func (b *Bot) clearPendingIndicators(cs *chatState) {
-	cs.mu.Lock()
+	cs.thinkingMu.Lock()
 	thinking := cs.thinkingMessage
 	cs.thinkingMessage = nil
-	cs.mu.Unlock()
+	cs.thinkingMu.Unlock()
 
 	if thinking != nil {
 		if _, _, err := b.slackClient.DeleteMessage(thinking.channel, thinking.timestamp); err != nil {
@@ -864,21 +793,12 @@ func (b *Bot) getOrCreateChat(convKey, channelID, threadTS string) *chatState {
 
 // resetChat clears the session state for a chat.
 func (b *Bot) resetChat(cs *chatState) {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-
-	if cs.subCancel != nil {
-		cs.subCancel()
-		cs.subCancel = nil
+	if cancel := cs.Reset(); cancel != nil {
+		cancel()
 	}
-	cs.sessionID = ""
-	cs.ownerUserID = ""
-	cs.subSessionID = ""
-	cs.pendingPromptID = ""
+	cs.thinkingMu.Lock()
 	cs.thinkingMessage = nil
-	cs.lastDeliveredSeq = 0
-	cs.pendingMessages = nil
-	cs.pendingFlushGen++
+	cs.thinkingMu.Unlock()
 }
 
 // userIdentity creates a UserIdentity scoped to a specific conversation.
@@ -892,92 +812,47 @@ func (b *Bot) userIdentity(convKey string) agent.UserIdentity {
 }
 
 func (b *Bot) setActiveSession(cs *chatState, sessionID, ownerUserID string) {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	if cs.sessionID != sessionID {
-		cs.lastDeliveredSeq = 0
-	}
-	cs.sessionID = sessionID
-	cs.ownerUserID = ownerUserID
+	cs.SetActiveSession(sessionID, ownerUserID)
 }
 
 func (b *Bot) lastDeliveredSeq(cs *chatState) int64 {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	return cs.lastDeliveredSeq
+	return cs.LastDeliveredSeq()
 }
 
 func (b *Bot) markDelivered(cs *chatState, seq int64) {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	if seq > cs.lastDeliveredSeq {
-		cs.lastDeliveredSeq = seq
-	}
+	cs.MarkDelivered(seq)
 }
 
 func (b *Bot) clearPendingMessages(cs *chatState) {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	cs.pendingMessages = nil
-	cs.pendingFlushGen++
+	cs.ClearPendingMessages()
 }
 
 func (b *Bot) subscriptionActive(cs *chatState, sessionID string) bool {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	return cs.subSessionID == sessionID && cs.subCancel != nil
+	return cs.SubscriptionActive(sessionID)
 }
 
 func (b *Bot) prepareSessionForMessage(ctx context.Context, cs *chatState, user agent.UserIdentity) (string, bool) {
-	cs.mu.Lock()
-	sid := cs.sessionID
-	cs.mu.Unlock()
-
-	if sid == "" {
+	result, err := chatbridge.MaybeCompactSession(ctx, b.agentAPI, &cs.State, user)
+	if result.SessionID == "" && !result.Missing && err == nil {
 		return "", false
 	}
-
-	newSID, rotated, err := b.agentAPI.CompactSessionIfNeeded(ctx, sid, user)
 	if err != nil {
-		if err == agent.ErrSessionNotFound {
-			b.logger.Warn("Session missing during compaction, resetting conversation",
-				slog.String("session", sid),
-				slog.String("user", user.UserID),
-			)
-			b.resetChat(cs)
-			return "", false
-		}
 		b.logger.Warn("Failed to compact Slack session",
-			slog.String("session", sid),
+			slog.String("session", result.SessionID),
 			slog.String("user", user.UserID),
 			slog.String("error", err.Error()),
 		)
-		return sid, false
+		return result.SessionID, false
 	}
-	if !rotated {
-		return newSID, false
+	if result.Missing {
+		b.logger.Warn("Session missing during compaction, resetting conversation",
+			slog.String("session", result.SessionID),
+			slog.String("user", user.UserID),
+		)
+		b.resetChat(cs)
+		return "", false
 	}
-
-	b.setActiveSession(cs, newSID, user.UserID)
-	b.markSessionSnapshotDelivered(ctx, cs, newSID, user.UserID)
-	return newSID, true
-}
-
-func (b *Bot) markSessionSnapshotDelivered(ctx context.Context, cs *chatState, sessionID, userID string) {
-	detail, err := b.agentAPI.GetSessionDetail(ctx, sessionID, userID)
-	if err != nil || detail == nil {
-		return
-	}
-
-	var maxSeq int64
-	for _, msg := range detail.Messages {
-		if msg.SequenceID > maxSeq {
-			maxSeq = msg.SequenceID
-		}
-	}
-	if maxSeq > 0 {
-		b.markDelivered(cs, maxSeq)
-	}
+	return result.SessionID, result.Rotated
 }
 
 // ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagu-org/dagu/internal/service/chatbridge"
 )
 
 // monitorPollInterval is how often the monitor checks for DAG run status changes.
@@ -211,64 +212,14 @@ func (m *DAGRunMonitor) notifyChat(ctx context.Context, chatID int64, s *exec.DA
 }
 
 func (m *DAGRunMonitor) currentSessionID(cs *chatState) string {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	return cs.sessionID
+	return cs.SessionID()
 }
 
 func (m *DAGRunMonitor) appendNotification(ctx context.Context, cs *chatState, sessionID string, user agent.UserIdentity, dagName string, msg agent.Message) (string, agent.Message, bool) {
-	appendToSession := func(targetSessionID string) (agent.Message, error) {
-		return m.agentAPI.AppendExternalMessage(ctx, targetSessionID, user, msg)
-	}
-
-	if sessionID == "" {
-		newSessionID, err := m.agentAPI.CreateEmptySession(ctx, user, dagName, m.bot.cfg.SafeMode)
-		if err != nil {
-			m.logger.Warn("Failed to create notification session",
-				slog.String("dag", dagName),
-				slog.String("user", user.UserID),
-				slog.String("error", err.Error()),
-			)
-			return "", agent.Message{}, false
-		}
-		m.bot.setActiveSession(cs, newSessionID, user.UserID)
-		stored, err := appendToSession(newSessionID)
-		if err != nil {
-			m.logger.Warn("Failed to append notification message to new session",
-				slog.String("session", newSessionID),
-				slog.String("error", err.Error()),
-			)
-			return "", agent.Message{}, false
-		}
-		return newSessionID, stored, true
-	}
-
-	stored, err := appendToSession(sessionID)
-	if err == nil {
-		return sessionID, stored, true
-	}
-	if err != agent.ErrSessionNotFound {
+	newSessionID, stored, err := chatbridge.AppendNotification(ctx, m.agentAPI, &cs.State, user, dagName, m.bot.cfg.SafeMode, msg)
+	if err != nil {
 		m.logger.Warn("Failed to append notification message",
 			slog.String("session", sessionID),
-			slog.String("error", err.Error()),
-		)
-		return "", agent.Message{}, false
-	}
-
-	newSessionID, createErr := m.agentAPI.CreateEmptySession(ctx, user, dagName, m.bot.cfg.SafeMode)
-	if createErr != nil {
-		m.logger.Warn("Failed to replace missing notification session",
-			slog.String("dag", dagName),
-			slog.String("user", user.UserID),
-			slog.String("error", createErr.Error()),
-		)
-		return "", agent.Message{}, false
-	}
-	m.bot.setActiveSession(cs, newSessionID, user.UserID)
-	stored, err = appendToSession(newSessionID)
-	if err != nil {
-		m.logger.Warn("Failed to append notification message after session recreation",
-			slog.String("session", newSessionID),
 			slog.String("error", err.Error()),
 		)
 		return "", agent.Message{}, false
