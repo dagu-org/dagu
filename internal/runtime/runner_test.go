@@ -822,82 +822,65 @@ func TestRunner(t *testing.T) {
 	t.Run("RepeatPolicyRepeatsUntilCommandConditionMatchesExpected", func(t *testing.T) {
 		r := setupRunner(t)
 
-		// This step will repeat until the file contains 'ready'
-		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_test_%s.txt", uuid.Must(uuid.NewV7()).String()))
-		err := os.Remove(file)
-		if err != nil && !os.IsNotExist(err) {
-			require.NoError(t, err)
-		}
-		defer func() {
-			err := os.Remove(file)
-			if err != nil && !os.IsNotExist(err) {
-				require.NoError(t, err)
-			}
-		}()
+		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_test_%s.txt", uuid.Must(uuid.NewV7()).String()))
+		defer func() { _ = os.Remove(counterFile) }()
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand(fmt.Sprintf("cat %s || true", file)),
+				withScript(fmt.Sprintf(`
+					if [ -f "%s" ]; then
+						COUNT=$(cat "%s")
+					else
+						COUNT=0
+					fi
+					COUNT=$((COUNT + 1))
+					echo "$COUNT" > "%s"
+					echo "$COUNT"
+				`, counterFile, counterFile, counterFile)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("`cat %s || true`", file),
-						Expected:  "ready",
+						Condition: fmt.Sprintf("`cat %s`", counterFile),
+						Expected:  "2",
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
 
-		go func() {
-			time.Sleep(400 * time.Millisecond)
-			err := os.WriteFile(file, []byte("ready"), 0600)
-			require.NoError(t, err, "failed to write to file")
-		}()
-
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
-		// Should have run at least twice (first: not ready, second: ready)
 		node := result.nodeByName(t, "1")
-		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+		assert.Equal(t, 2, node.State().DoneCount)
 	})
 
 	t.Run("RepeatPolicyRepeatWhileConditionExits0", func(t *testing.T) {
 		r := setupRunner(t)
-		// This step will repeat until the file exists
-		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exit0_%s", uuid.Must(uuid.NewV7()).String()))
-		err := os.Remove(file)
-		if err != nil && !os.IsNotExist(err) {
-			require.NoError(t, err)
-		}
-		defer func() {
-			err := os.Remove(file)
-			if err != nil && !os.IsNotExist(err) {
-				require.NoError(t, err)
-			}
-		}()
+		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exit0_%s", uuid.Must(uuid.NewV7()).String()))
+		defer func() { _ = os.Remove(counterFile) }()
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("echo hello"),
+				withScript(fmt.Sprintf(`
+					if [ -f "%s" ]; then
+						COUNT=$(cat "%s")
+					else
+						COUNT=0
+					fi
+					COUNT=$((COUNT + 1))
+					echo "$COUNT" > "%s"
+				`, counterFile, counterFile, counterFile)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeWhile
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: "test ! -f " + file,
+						Condition: fmt.Sprintf("test \"$(cat %s)\" = \"1\"", counterFile),
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
-		// Create file 100 ms after step runs
-		go func() {
-			time.Sleep(200 * time.Millisecond)
-			f, _ := os.Create(file)
-			err := f.Close()
-			require.NoError(t, err)
-		}()
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		node := result.nodeByName(t, "1")
-		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+		assert.Equal(t, 2, node.State().DoneCount)
 	})
 
 	t.Run("RepeatPolicyRepeatsWhileCommandExitCodeMatches", func(t *testing.T) {
@@ -933,73 +916,75 @@ func TestRunner(t *testing.T) {
 
 	t.Run("RepeatPolicyRepeatsUntilFileConditionMatchesExpected", func(t *testing.T) {
 		r := setupRunner(t)
-		// This step will repeat until the file content equals 'done'
-		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_envvar_%s", uuid.Must(uuid.NewV7()).String()))
-		err := os.WriteFile(file, []byte("notyet"), 0644)
-		require.NoError(t, err)
+		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_envvar_%s", uuid.Must(uuid.NewV7()).String()))
 		t.Cleanup(func() {
-			if err := os.Remove(file); err != nil && !os.IsNotExist(err) {
-				t.Logf("cleanup: failed to remove %s: %v", file, err)
+			if err := os.Remove(counterFile); err != nil && !os.IsNotExist(err) {
+				t.Logf("cleanup: failed to remove %s: %v", counterFile, err)
 			}
 		})
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand(fmt.Sprintf("cat %s", file)),
+				withScript(fmt.Sprintf(`
+					if [ -f "%s" ]; then
+						COUNT=$(cat "%s")
+					else
+						COUNT=0
+					fi
+					COUNT=$((COUNT + 1))
+					echo "$COUNT" > "%s"
+				`, counterFile, counterFile, counterFile)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("`cat %s`", file),
-						Expected:  "done",
+						Condition: fmt.Sprintf("`cat %s`", counterFile),
+						Expected:  "2",
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
-		go func() {
-			time.Sleep(300 * time.Millisecond)
-			err := os.WriteFile(file, []byte("done"), 0644)
-			require.NoError(t, err)
-		}()
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		node := result.nodeByName(t, "1")
-		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+		assert.Equal(t, 2, node.State().DoneCount)
 	})
 
 	t.Run("RepeatPolicyRepeatsUntilOutputVarConditionMatchesExpected", func(t *testing.T) {
 		r := setupRunner(t)
-		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_outputvar_%s", uuid.Must(uuid.NewV7()).String()))
-		err := os.Remove(file)
-		if err != nil && !os.IsNotExist(err) {
-			require.NoError(t, err)
-		}
-		t.Cleanup(func() { err := os.Remove(file); require.NoError(t, err) })
-		// Write initial value
-		err = os.WriteFile(file, []byte("notyet"), 0600)
-		require.NoError(t, err)
+		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_outputvar_%s", uuid.Must(uuid.NewV7()).String()))
+		t.Cleanup(func() {
+			err := os.Remove(counterFile)
+			if err != nil && !os.IsNotExist(err) {
+				require.NoError(t, err)
+			}
+		})
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand(fmt.Sprintf("cat %s", file)),
+				withScript(fmt.Sprintf(`
+					if [ -f "%s" ]; then
+						COUNT=$(cat "%s")
+					else
+						COUNT=0
+					fi
+					COUNT=$((COUNT + 1))
+					echo "$COUNT" > "%s"
+					echo "$COUNT"
+				`, counterFile, counterFile, counterFile)),
 				withOutput("OUT"),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
 						Condition: "$OUT",
-						Expected:  "done",
+						Expected:  "2",
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
-		go func() {
-			time.Sleep(300 * time.Millisecond)
-			err := os.WriteFile(file, []byte("done"), 0600)
-			require.NoError(t, err)
-		}()
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		node := result.nodeByName(t, "1")
-		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+		assert.Equal(t, 2, node.State().DoneCount)
 	})
 	t.Run("RetryPolicyWithOutputCapture", func(t *testing.T) {
 		r := setupRunner(t)

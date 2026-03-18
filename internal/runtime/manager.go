@@ -42,8 +42,8 @@ type Manager struct {
 	subCmdBuilder *SubCmdBuilder   // Command builder for constructing command specs
 }
 
-// Stop stops a running DAG by sending a stop request to its socket.
-// If the DAG is not running, it logs a message and returns nil.
+// Stop stops running DAG-runs and can cancel an explicit failed DAG-run that is
+// still pending DAG-level auto-retry when dagRunID is provided.
 func (m *Manager) Stop(ctx context.Context, dag *core.DAG, dagRunID string) error {
 	// Set DAG name in context for all logs in this function
 	ctx = logger.WithValues(ctx, tag.Name(dag.Name))
@@ -121,7 +121,8 @@ func (m *Manager) Stop(ctx context.Context, dag *core.DAG, dagRunID string) erro
 	return m.stopSingleDAGRun(ctx, dag, dagRunID)
 }
 
-// stopSingleDAGRun stops a single DAG run by its ID
+// stopSingleDAGRun stops a single DAG run by its ID. For explicit run IDs, it
+// can also cancel a failed root run that is waiting for DAG-level auto-retry.
 func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *core.DAG, dagRunID string) error {
 	// Set run ID in context for all logs in this function
 	ctx = logger.WithValues(ctx, tag.RunID(dagRunID))
@@ -147,11 +148,21 @@ func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *core.DAG, dagRunID 
 		}
 	}
 
-	// Try to find the dag-run attempt and request cancel (works for both local and distributed runs)
-	// This creates an abort flag that the coordinator can detect on heartbeat
 	runRef := exec.NewDAGRunRef(dag.Name, dagRunID)
 	run, err := m.dagRunStore.FindAttempt(ctx, runRef)
 	if err == nil {
+		status, statusErr := run.ReadStatus(ctx)
+		if statusErr == nil && exec.CanCancelFailedAutoRetryPendingRun(status) {
+			if err := exec.CancelFailedAutoRetryPendingRun(ctx, m.dagRunStore, status); err != nil {
+				return fmt.Errorf("failed to cancel pending auto-retry for dag-run %s: %w", dagRunID, err)
+			}
+			logger.Info(ctx, "Canceled pending auto-retry for failed DAG run")
+			return nil
+		}
+
+		// Request cancel for active runs (works for both local and distributed
+		// execution). This creates an abort flag that the runner or coordinator
+		// can detect on heartbeat.
 		if err := run.Abort(ctx); err != nil {
 			return fmt.Errorf("failed to request cancel for dag-run %s: %w", dagRunID, err)
 		}

@@ -18,17 +18,21 @@ func Stop() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "stop [flags] <DAG name>",
-			Short: "Stop a running DAG-run gracefully",
+			Short: "Stop active DAG-runs or cancel pending auto-retry by run ID",
 			Long: `Gracefully terminate an active DAG-run instance.
 
 This command sends termination signals to all running tasks of the specified DAG-run,
 ensuring resources are properly released and cleanup handlers are executed. It waits
 for tasks to complete their shutdown procedures before exiting.
 
+When --run-id is provided, the command can also cancel a failed root DAG-run that is
+still pending DAG-level auto-retry. In that case the latest failed attempt is marked
+as aborted so the scheduler will not enqueue another retry.
+
 Flags:
   --run-id string   (optional) Unique identifier of the DAG-run to stop.
-                                   If not provided, it will find and stop the currently
-                                   running DAG-run by the given DAG definition name.
+                                   If not provided, it will stop the currently running
+                                   DAG-run(s) for the given DAG definition name.
 
 Example:
   dagu stop --run-id=abc123 my_dag
@@ -75,12 +79,12 @@ func runStop(ctx *Context, args []string) error {
 		dag = d
 	}
 
-	logger.Info(ctx, "Dag-run is stopping", tag.DAG(dag.Name))
+	logger.Info(ctx, "Dag-run stop/cancel requested", tag.DAG(dag.Name))
 
 	if err := ctx.DAGRunMgr.Stop(ctx, dag, dagRunID); err != nil {
-		return fmt.Errorf("failed to stop DAG: %w", err)
+		return fmt.Errorf("failed to stop or cancel DAG: %w", err)
 	}
 
-	logger.Info(ctx, "Dag-run stopped", tag.DAG(dag.Name))
+	logger.Info(ctx, "Dag-run stop/cancel completed", tag.DAG(dag.Name))
 	return nil
 }

@@ -1,8 +1,12 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /**
  * DAGActions component provides action buttons for DAG operations (start, stop, retry).
  *
  * @module features/dags/components/common
  */
+
 import { Checkbox } from '@/components/ui/checkbox';
 import { useErrorModal } from '@/components/ui/error-modal';
 import { useSimpleToast } from '@/components/ui/simple-toast';
@@ -27,13 +31,14 @@ import {
 import { AlertTriangle, Ban, Play, RefreshCw, Square, X } from 'lucide-react';
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { components, NodeStatus } from '../../../../api/v1/schema';
+import { components, NodeStatus, Status } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
 import { useClient } from '../../../../hooks/api';
 import ConfirmModal from '../../../../ui/ConfirmModal';
 import LabeledItem from '../../../../ui/LabeledItem';
+import { getDAGRunTerminateActionDetails } from '../../../dag-runs/components/common/terminateAction';
 import { DAGContext } from '../../contexts/DAGContext';
 import { StartDAGModal } from '../dag-execution';
 
@@ -166,18 +171,33 @@ function DAGActions({
     }
   };
 
-  const isWaiting = status?.status == 7;
+  const isWaiting = status?.status === Status.Waiting;
   const hasNodes =
     status &&
     'nodes' in status &&
     Array.isArray((status as components['schemas']['DAGRunDetails']).nodes);
+  const terminateDetails = getDAGRunTerminateActionDetails(status, {
+    copy: {
+      stopTooltipText: 'Stop DAG execution',
+      cancelTooltipText: 'Cancel auto-retry for this failed DAG execution',
+      stopConfirmText:
+        status?.name && status?.dagRunId
+          ? `Do you really want to stop the dag-run "${status.name}"?`
+          : 'Do you really want to cancel the DAG?',
+      cancelConfirmText: `Do you really want to cancel auto-retry for the dag-run "${status?.name || ''}"?`,
+    },
+  });
+  const terminateAction = terminateDetails.action;
 
   // Determine which buttons should be enabled based on current status
   const buttonState = {
     enqueue: true,
-    stop: status?.status == 1,
+    terminate: terminateAction !== 'none',
     reject: isWaiting && hasNodes,
-    retry: status?.status != 1 && status?.status != 5 && status?.dagRunId != '',
+    retry:
+      Boolean(status?.dagRunId) &&
+      status?.status !== Status.Running &&
+      status?.status !== Status.Queued,
   };
 
   if (!dag || !config.permissions.runDags) {
@@ -236,16 +256,25 @@ function DAGActions({
             <TooltipTrigger asChild>
               <ActionButton
                 label={displayMode !== 'compact'}
-                icon={<Square className="h-4 w-4" />}
-                disabled={!buttonState['stop']}
-                onClick={() => setIsStopModal(true)}
+                icon={
+                  terminateAction === 'cancel' ? (
+                    <X className="h-4 w-4" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )
+                }
+                disabled={!buttonState['terminate']}
+                onClick={() => {
+                  setStopAllRunning(false);
+                  setIsStopModal(true);
+                }}
                 className="cursor-pointer"
               >
-                Stop
+                {terminateDetails.buttonText}
               </ActionButton>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Stop DAG execution</p>
+              <p>{terminateDetails.tooltipText}</p>
             </TooltipContent>
           </Tooltip>
         )}
@@ -412,7 +441,7 @@ function DAGActions({
 
         <ConfirmModal
           title="Confirmation"
-          buttonText="Stop"
+          buttonText={terminateDetails.buttonText}
           visible={isStopModal}
           dismissModal={() => {
             setIsStopModal(false);
@@ -422,7 +451,7 @@ function DAGActions({
             setIsStopModal(false);
 
             // If stopAllRunning is checked, use the stop-all endpoint
-            if (stopAllRunning) {
+            if (terminateAction === 'stop' && stopAllRunning) {
               const { error } = await client.POST('/dags/{fileName}/stop-all', {
                 params: {
                   path: { fileName },
@@ -461,8 +490,8 @@ function DAGActions({
                 if (error) {
                   console.error('Stop dag-run API error:', error);
                   showError(
-                    error.message || 'Failed to stop DAG run',
-                    'The DAG run may have already completed or the worker is unavailable.'
+                    error.message || terminateDetails.errorTitle,
+                    terminateDetails.errorDescription
                   );
                   return;
                 }
@@ -479,11 +508,9 @@ function DAGActions({
         >
           <div>
             <p className="mb-2">
-              {stopAllRunning
+              {terminateAction === 'stop' && stopAllRunning
                 ? `Do you really want to stop all running instances of this DAG?`
-                : status?.name && status?.dagRunId
-                  ? `Do you really want to stop the dag-run "${status.name}"?`
-                  : 'Do you really want to cancel the DAG?'}
+                : terminateDetails.confirmText}
             </p>
             {!stopAllRunning && status?.name && (
               <LabeledItem label="DAG-Run-Name">
@@ -509,22 +536,24 @@ function DAGActions({
                 </StatusChip>
               </LabeledItem>
             )}
-            <div className="mt-4 flex items-center space-x-2 p-2 bg-warning-muted rounded border border-warning/30">
-              <Checkbox
-                id="stop-all"
-                checked={stopAllRunning}
-                onCheckedChange={(checked) =>
-                  setStopAllRunning(checked as boolean)
-                }
-                className="border-warning data-[state=checked]:bg-warning data-[state=checked]:border-warning data-[state=checked]:text-white=checked]:text-black"
-              />
-              <label
-                htmlFor="stop-all"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-warning"
-              >
-                Stop all running instances
-              </label>
-            </div>
+            {terminateAction === 'stop' && (
+              <div className="mt-4 flex items-center space-x-2 p-2 bg-warning-muted rounded border border-warning/30">
+                <Checkbox
+                  id="stop-all"
+                  checked={stopAllRunning}
+                  onCheckedChange={(checked) =>
+                    setStopAllRunning(checked as boolean)
+                  }
+                  className="border-warning data-[state=checked]:bg-warning data-[state=checked]:border-warning data-[state=checked]:text-black"
+                />
+                <label
+                  htmlFor="stop-all"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-warning"
+                >
+                  Stop all running instances
+                </label>
+              </div>
+            )}
           </div>
         </ConfirmModal>
         <ConfirmModal

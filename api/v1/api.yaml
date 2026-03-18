@@ -2114,8 +2114,8 @@ paths:
 
   /dag-runs/{name}/{dagRunId}/stop:
     post:
-      summary: "Terminate a running DAG-run"
-      description: "Forcefully stops a running DAG-run created from this DAG"
+      summary: "Terminate or cancel a DAG-run"
+      description: "Forcefully stops a running DAG-run, or cancels a failed root DAG-run that is still pending DAG-level automatic retry."
       operationId: "terminateDAGRun"
       tags:
         - "dag-runs"

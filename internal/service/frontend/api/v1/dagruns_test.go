@@ -12,6 +12,8 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -731,6 +733,93 @@ func TestRescheduleDAGRun(t *testing.T) {
 	}, 10*time.Second, 200*time.Millisecond)
 }
 
+func TestTerminateDAGRunCancelsFailedAutoRetryPendingRun(t *testing.T) {
+	server := test.SetupServer(t)
+
+	dag := server.DAG(t, `
+name: cancel_failed_retry_dag
+retry_policy:
+  limit: 3
+  interval_sec: 60
+steps:
+  - name: main
+    command: "echo fail"
+`)
+
+	ref := seedLatestDAGRunStatus(
+		t,
+		server,
+		dag.DAG,
+		"cancel-failed-run",
+		core.Failed,
+		seedDAGRunStatusOptions{
+			autoRetryCount: 1,
+			errorText:      "step failed",
+		},
+	)
+
+	_ = server.Client().Post(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/stop", dag.Name, ref.ID),
+		nil,
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	persisted := test.ReadRunStatus(server.Context, t, server.DAGRunStore, ref)
+	require.Equal(t, core.Aborted, persisted.Status)
+	require.Equal(t, 1, persisted.AutoRetryCount)
+	require.Equal(t, 3, persisted.AutoRetryLimit)
+	require.Equal(t, "step failed", persisted.Error)
+	require.Len(t, persisted.Nodes, 1)
+	require.Equal(t, core.NodeFailed, persisted.Nodes[0].Status)
+
+	resp := server.Client().Get(fmt.Sprintf("/api/v1/dag-runs/%s/%s", dag.Name, ref.ID)).
+		ExpectStatus(http.StatusOK).
+		Send(t)
+
+	var body api.GetDAGRunDetails200JSONResponse
+	resp.Unmarshal(t, &body)
+	require.Equal(t, api.Status(core.Aborted), body.DagRunDetails.Status)
+}
+
+func TestTerminateDAGRunRejectsFailedRunWithoutPendingAutoRetry(t *testing.T) {
+	server := test.SetupServer(t)
+
+	dag := server.DAG(t, `
+name: cancel_failed_retry_exhausted_dag
+retry_policy:
+  limit: 3
+  interval_sec: 60
+steps:
+  - name: main
+    command: "echo fail"
+`)
+
+	ref := seedLatestDAGRunStatus(
+		t,
+		server,
+		dag.DAG,
+		"cancel-failed-exhausted-run",
+		core.Failed,
+		seedDAGRunStatusOptions{
+			autoRetryCount: 3,
+			errorText:      "still failed",
+		},
+	)
+
+	resp := server.Client().Post(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/stop", dag.Name, ref.ID),
+		nil,
+	).ExpectStatus(http.StatusBadRequest).Send(t)
+
+	var errBody api.Error
+	resp.Unmarshal(t, &errBody)
+	require.Equal(t, api.ErrorCodeBadRequest, errBody.Code)
+	require.Contains(t, errBody.Message, "not pending auto-retry")
+
+	persisted := test.ReadRunStatus(server.Context, t, server.DAGRunStore, ref)
+	require.Equal(t, core.Failed, persisted.Status)
+	require.Equal(t, 3, persisted.AutoRetryCount)
+}
+
 func TestExecuteDAGSync(t *testing.T) {
 	server := test.SetupServer(t)
 
@@ -818,6 +907,56 @@ func TestExecuteDAGSyncWithWaitingStatus(t *testing.T) {
 	require.NotEmpty(t, syncBody.DagRun.DagRunId)
 	require.Equal(t, api.Status(core.Waiting), syncBody.DagRun.Status)
 	require.Equal(t, api.StatusLabel("waiting"), syncBody.DagRun.StatusLabel)
+}
+
+type seedDAGRunStatusOptions struct {
+	autoRetryCount int
+	errorText      string
+	parentRef      exec.DAGRunRef
+}
+
+func seedLatestDAGRunStatus(
+	t *testing.T,
+	server test.Server,
+	dag *core.DAG,
+	dagRunID string,
+	status core.Status,
+	opts seedDAGRunStatusOptions,
+) exec.DAGRunRef {
+	t.Helper()
+
+	attempt, err := server.DAGRunStore.CreateAttempt(
+		server.Context,
+		dag,
+		time.Now().Add(-2*time.Minute),
+		dagRunID,
+		exec.NewDAGRunAttemptOptions{},
+	)
+	require.NoError(t, err)
+
+	ref := exec.NewDAGRunRef(dag.Name, dagRunID)
+	dagRunStatus := transform.NewStatusBuilder(dag).Create(
+		dagRunID,
+		status,
+		0,
+		time.Now().Add(-2*time.Minute),
+		transform.WithAttemptID(attempt.ID()),
+		transform.WithHierarchyRefs(ref, opts.parentRef),
+		transform.WithFinishedAt(time.Now().Add(-time.Minute)),
+		transform.WithAutoRetryCount(opts.autoRetryCount),
+		transform.WithError(opts.errorText),
+	)
+	if len(dagRunStatus.Nodes) > 0 {
+		dagRunStatus.Nodes[0].Status = core.NodeFailed
+		dagRunStatus.Nodes[0].FinishedAt = exec.FormatTime(time.Now().Add(-time.Minute))
+		dagRunStatus.Nodes[0].Error = opts.errorText
+	}
+
+	require.NoError(t, attempt.Open(server.Context))
+	require.NoError(t, attempt.Write(server.Context, dagRunStatus))
+	require.NoError(t, attempt.Close(server.Context))
+
+	return ref
 }
 
 func TestExecuteDAGSyncSingleton(t *testing.T) {
