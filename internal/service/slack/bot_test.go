@@ -45,6 +45,7 @@ func (c *fakeSlackClient) DeleteMessage(_, _ string) (string, string, error) {
 	return "ok", "", nil
 }
 
+//revive:disable-next-line:function-result-limit // matches slackClientAPI
 func (c *fakeSlackClient) SendMessage(_ string, _ ...slack.MsgOption) (string, string, string, error) {
 	return "ok", "", "", nil
 }
