@@ -44,6 +44,9 @@ func TestNodeStatusConstants(t *testing.T) {
 		{"NodeStatusSuccess", NodeSucceeded, 4},
 		{"NodeStatusSkipped", NodeSkipped, 5},
 		{"NodeStatusPartialSuccess", NodePartiallySucceeded, 6},
+		{"NodeStatusWaiting", NodeWaiting, 7},
+		{"NodeStatusRejected", NodeRejected, 8},
+		{"NodeStatusRetrying", NodeRetrying, 9},
 	}
 
 	for _, tt := range tests {
@@ -85,6 +88,7 @@ func TestNodeStatusString(t *testing.T) {
 	}{
 		{NodeNotStarted, "not_started"},
 		{NodeRunning, "running"},
+		{NodeRetrying, "retrying"},
 		{NodeFailed, "failed"},
 		{NodeAborted, "aborted"},
 		{NodeSucceeded, "succeeded"},
@@ -108,6 +112,7 @@ func TestNodeStatus_IsDone(t *testing.T) {
 	}{
 		{NodeNotStarted, false},
 		{NodeRunning, false},
+		{NodeRetrying, false},
 		{NodeWaiting, false},
 		{NodeSucceeded, true},
 		{NodeFailed, true},
