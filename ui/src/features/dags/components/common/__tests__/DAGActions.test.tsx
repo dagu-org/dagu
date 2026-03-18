@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Status } from '@/api/v1/schema';
@@ -72,5 +75,23 @@ describe('DAGActions', () => {
 
     expect(queries.getByRole('button', { name: 'Retry' })).toBeDisabled();
     expect(queries.getByRole('button', { name: 'Stop' })).toBeEnabled();
+  });
+
+  it('disables retry when there is no DAG run id', () => {
+    const view = render(
+      <DAGActions
+        status={{
+          name: 'finished-dag',
+          status: Status.Failed,
+          autoRetryCount: 3,
+          autoRetryLimit: 3,
+        }}
+        fileName="finished-dag.yaml"
+        dag={{ name: 'finished-dag' }}
+        displayMode="full"
+      />
+    );
+
+    expect(within(view.container).getByRole('button', { name: 'Retry' })).toBeDisabled();
   });
 });

@@ -69,6 +69,16 @@ func TestFailedAutoRetryCancelEligibilityOf(t *testing.T) {
 		status := *base
 		status.AutoRetryCount = status.AutoRetryLimit
 		assert.Equal(t, FailedAutoRetryCancelNotPending, FailedAutoRetryCancelEligibilityOf(&status))
+		assert.False(t, CanCancelFailedAutoRetryPendingRun(&status))
+	})
+
+	t.Run("NotPendingNoRetryConfigured", func(t *testing.T) {
+		t.Parallel()
+		status := *base
+		status.AutoRetryLimit = 0
+		status.AutoRetryCount = 0
+		assert.Equal(t, FailedAutoRetryCancelNotPending, FailedAutoRetryCancelEligibilityOf(&status))
+		assert.False(t, CanCancelFailedAutoRetryPendingRun(&status))
 	})
 
 	t.Run("NotFailed", func(t *testing.T) {
@@ -144,5 +154,63 @@ func TestCancelFailedAutoRetryPendingRun(t *testing.T) {
 		require.True(t, errors.As(err, &stateChangedErr))
 		require.NotNil(t, stateChangedErr.CurrentStatus)
 		assert.Equal(t, core.Queued, stateChangedErr.CurrentStatus.Status)
+	})
+
+	t.Run("ReturnsErrorForIneligibleStatus", func(t *testing.T) {
+		t.Parallel()
+
+		compareAndSwapCalled := false
+		ineligible := &DAGRunStatus{
+			Name:           "retry-dag",
+			DAGRunID:       "run-1",
+			AttemptID:      "attempt-1",
+			Status:         core.Succeeded,
+			AutoRetryCount: 1,
+			AutoRetryLimit: 3,
+		}
+
+		err := CancelFailedAutoRetryPendingRun(
+			context.Background(),
+			&failedAutoRetryCancelStoreStub{
+				compareAndSwap: func(
+					_ context.Context,
+					_ DAGRunRef,
+					_ string,
+					_ core.Status,
+					_ func(*DAGRunStatus) error,
+				) (*DAGRunStatus, bool, error) {
+					compareAndSwapCalled = true
+					return nil, false, nil
+				},
+			},
+			ineligible,
+		)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "not eligible")
+		assert.False(t, compareAndSwapCalled)
+	})
+
+	t.Run("WrapsStoreError", func(t *testing.T) {
+		t.Parallel()
+
+		storeErr := errors.New("store failure")
+		err := CancelFailedAutoRetryPendingRun(
+			context.Background(),
+			&failedAutoRetryCancelStoreStub{
+				compareAndSwap: func(
+					_ context.Context,
+					_ DAGRunRef,
+					_ string,
+					_ core.Status,
+					_ func(*DAGRunStatus) error,
+				) (*DAGRunStatus, bool, error) {
+					return nil, false, storeErr
+				},
+			},
+			status,
+		)
+		require.Error(t, err)
+		require.ErrorIs(t, err, storeErr)
+		assert.ErrorContains(t, err, "cancel failed auto-retry pending DAG-run")
 	})
 }

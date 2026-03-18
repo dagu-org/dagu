@@ -1,8 +1,12 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /**
  * DAGActions component provides action buttons for DAG operations (start, stop, retry).
  *
  * @module features/dags/components/common
  */
+
 import { Checkbox } from '@/components/ui/checkbox';
 import { useErrorModal } from '@/components/ui/error-modal';
 import { useSimpleToast } from '@/components/ui/simple-toast';
@@ -191,9 +195,9 @@ function DAGActions({
     terminate: terminateAction !== 'none',
     reject: isWaiting && hasNodes,
     retry:
+      Boolean(status?.dagRunId) &&
       status?.status !== Status.Running &&
-      status?.status !== Status.Queued &&
-      status?.dagRunId !== '',
+      status?.status !== Status.Queued,
   };
 
   if (!dag || !config.permissions.runDags) {
@@ -540,7 +544,7 @@ function DAGActions({
                   onCheckedChange={(checked) =>
                     setStopAllRunning(checked as boolean)
                   }
-                  className="border-warning data-[state=checked]:bg-warning data-[state=checked]:border-warning data-[state=checked]:text-white=checked]:text-black"
+                  className="border-warning data-[state=checked]:bg-warning data-[state=checked]:border-warning data-[state=checked]:text-black"
                 />
                 <label
                   htmlFor="stop-all"
