@@ -228,6 +228,18 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		// Fallback prompt must NOT be used.
 		assert.NotContains(t, result, "You are Dagu Assistant, an AI assistant")
 	})
+
+	t.Run("execution guidance prefers enqueue without preflight checks", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+
+		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Role: auth.RoleDeveloper})
+
+		assert.Contains(t, result, "Default to queue-based execution: `dagu enqueue <dag-name>`")
+		assert.Contains(t, result, "Do not check running jobs, queued jobs")
+		assert.Contains(t, result, "dagu enqueue dag -- name=\"John Doe\"")
+		assert.NotContains(t, result, "2. Start: `dagu start <dag-name>`")
+	})
 }
 
 func TestFallbackPrompt(t *testing.T) {

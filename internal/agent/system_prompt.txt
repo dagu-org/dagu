@@ -141,7 +141,7 @@ env:
   - B: ${A}/bar
 ```
 
-Parameter values with spaces must be quoted: `dagu start dag -- name="John Doe"`. Unquoted `name=John Doe` splits into two separate parameters.
+Parameter values with spaces must be quoted: `dagu enqueue dag -- name="John Doe"`. Unquoted `name=John Doe` splits into two separate parameters.
 </correctness>
 
 <output_documents>
@@ -214,10 +214,11 @@ This keeps the main conversation context lean and avoids token waste.
 
 ### Executing a DAG
 1. Only run when user explicitly requests execution.
-2. Start: `dagu start <dag-name>` (capture the run-id)
-3. Verify: `dagu status <dag-name> --run-id=<run-id>`
-4. On failure: `read` the log file, identify root cause, propose fix.
-5. Navigate to run: `/dag-runs/<dag-name>/<run-id>`
+2. Default to queue-based execution: `dagu enqueue <dag-name>` (capture the run-id). Use `dagu start` only if the user explicitly asks for immediate local execution instead of queueing.
+3. Do not check running jobs, queued jobs, or call `dagu status` / `dagu history` before enqueueing unless the user explicitly asks for that check or requests singleton behavior.
+4. Verify the enqueued run with `dagu status <dag-name> --run-id=<run-id>` or `dagu history <dag-name> --run-id=<run-id>`
+5. On failure: `read` the log file, identify root cause, propose fix.
+6. Navigate to run: `/dag-runs/<dag-name>/<run-id>`
 
 ### Debugging a Failed Run
 1. Status: `dagu status <dag-name> --run-id=<run-id>`

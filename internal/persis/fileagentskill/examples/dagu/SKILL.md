@@ -133,7 +133,7 @@ steps:
     command: deploy --env ${env} --region ${region}
 ```
 
-Override at runtime: `dagu start my-dag -- env=staging region=eu-west-1`
+Override at runtime: `dagu enqueue my-dag -- env=staging region=eu-west-1`
 
 ## Environment Variables
 
@@ -240,7 +240,9 @@ dagu schema config auth            # Auth config
 
 ## Checking Run Status
 
-After running a DAG with `dagu start`, use `dagu status` to inspect the result. The output is a tree showing each step's status, command, stdout/stderr content, and errors.
+For agent-triggered execution, prefer `dagu enqueue` over `dagu start`. Do not check whether the DAG is already running or queued before enqueueing unless the user explicitly asks for that check or requests singleton behavior.
+
+After enqueueing or starting a DAG, use `dagu status` to inspect the result. The output is a tree showing each step's status, command, stdout/stderr content, and errors.
 
 ```bash
 dagu status my-dag                          # Latest run

@@ -87,3 +87,15 @@ func TestSeedExampleSkills_ValidContent(t *testing.T) {
 		assert.NotEmpty(t, skill.Knowledge, "skill %s should have knowledge", skill.ID)
 	}
 }
+
+func TestBundledDaguSkillPrefersEnqueue(t *testing.T) {
+	t.Parallel()
+
+	data, err := SkillFS().ReadFile("examples/dagu/SKILL.md")
+	require.NoError(t, err)
+
+	content := string(data)
+	assert.Contains(t, content, "Override at runtime: `dagu enqueue my-dag -- env=staging region=eu-west-1`")
+	assert.Contains(t, content, "prefer `dagu enqueue` over `dagu start`")
+	assert.Contains(t, content, "Do not check whether the DAG is already running or queued before enqueueing")
+}
