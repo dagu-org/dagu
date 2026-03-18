@@ -22,22 +22,26 @@ import (
 // maxTelegramMessageLen is the maximum length for a single Telegram message.
 const maxTelegramMessageLen = 4096
 
-// defaultContextLimit is the assumed context window size when no model config is available.
-const defaultContextLimit = 200_000
-
-// contextRotationRatio is the fraction of the context limit at which sessions are rotated.
-const contextRotationRatio = 0.5
-
 // AgentService is the subset of the agent API that the Telegram bot requires.
 // Defining this as an interface decouples the bot from the concrete agent.API
 // implementation, making it testable in isolation.
 type AgentService interface {
 	CreateSession(ctx context.Context, user agent.UserIdentity, req agent.ChatRequest) (string, string, error)
+	CreateEmptySession(ctx context.Context, user agent.UserIdentity, dagName string, safeMode bool) (string, error)
 	SendMessage(ctx context.Context, sessionID string, user agent.UserIdentity, req agent.ChatRequest) error
 	CancelSession(ctx context.Context, sessionID, userID string) error
 	SubmitUserResponse(ctx context.Context, sessionID, userID string, resp agent.UserPromptResponse) error
+	GenerateAssistantMessage(ctx context.Context, sessionID string, user agent.UserIdentity, dagName, prompt string) (agent.Message, error)
+	AppendExternalMessage(ctx context.Context, sessionID string, user agent.UserIdentity, msg agent.Message) (agent.Message, error)
+	CompactSessionIfNeeded(ctx context.Context, sessionID string, user agent.UserIdentity) (string, bool, error)
 	GetSessionDetail(ctx context.Context, sessionID, userID string) (*agent.StreamResponse, error)
 	SubscribeSession(ctx context.Context, sessionID string, user agent.UserIdentity) (agent.StreamResponse, func() (agent.StreamResponse, bool), error)
+}
+
+type telegramAPI interface {
+	GetUpdatesChan(config tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel
+	StopReceivingUpdates()
+	Send(c tgbotapi.Chattable) (tgbotapi.Message, error)
 }
 
 // Config holds configuration for the Telegram bot.
@@ -50,19 +54,21 @@ type Config struct {
 
 // chatState tracks the agent session state for a single Telegram chat.
 type chatState struct {
-	sessionID       string
-	ownerUserID     string // user ID that owns the session
-	subSessionID    string // session ID the subscription is listening to
-	subCancel       context.CancelFunc
-	mu              sync.Mutex
-	pendingPromptID string
+	sessionID        string
+	ownerUserID      string // conversation-scoped session identity
+	subSessionID     string // session ID the subscription is listening to
+	subCancel        context.CancelFunc
+	mu               sync.Mutex
+	pendingPromptID  string
+	lastDeliveredSeq int64
 }
 
 // Bot is a Telegram bot that forwards messages to the Dagu agent API.
 type Bot struct {
 	cfg          Config
 	agentAPI     AgentService
-	botAPI       *tgbotapi.BotAPI
+	botAPI       telegramAPI
+	selfUsername string
 	chats        sync.Map // chatID (int64) -> *chatState
 	allowedChats map[int64]struct{}
 	dagRunStore  exec.DAGRunStore
@@ -92,6 +98,7 @@ func New(cfg Config, agentAPI AgentService, logger *slog.Logger) (*Bot, error) {
 		cfg:          cfg,
 		agentAPI:     agentAPI,
 		botAPI:       botAPI,
+		selfUsername: botAPI.Self.UserName,
 		allowedChats: allowed,
 		dagRunStore:  cfg.DAGRunStore,
 		logger:       logger,
@@ -101,7 +108,7 @@ func New(cfg Config, agentAPI AgentService, logger *slog.Logger) (*Bot, error) {
 // Run starts the bot and blocks until the context is cancelled.
 func (b *Bot) Run(ctx context.Context) error {
 	b.logger.Info("Telegram bot started",
-		slog.String("username", b.botAPI.Self.UserName),
+		slog.String("username", b.selfUsername),
 		slog.Int("allowed_chats", len(b.allowedChats)),
 	)
 
@@ -168,17 +175,17 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	}
 
 	// Send message to agent
-	user := b.userIdentity(msg)
+	user := b.userIdentity(chatID)
 
 	if cs.sessionID == "" {
 		b.createSession(ctx, cs, chatID, user, text)
 	} else {
-		// Rotate session if approaching context limit
-		if b.shouldRotateSession(ctx, cs, user.UserID) {
-			b.rotateSession(ctx, cs, chatID, user, text)
-		} else {
-			b.sendMessage(ctx, cs, chatID, user, text)
+		sid, _ := b.prepareSessionForMessage(ctx, cs, user)
+		if sid == "" {
+			b.createSession(ctx, cs, chatID, user, text)
+			return
 		}
+		b.sendMessage(ctx, cs, chatID, user, text)
 	}
 }
 
@@ -297,11 +304,7 @@ func (b *Bot) createSession(ctx context.Context, cs *chatState, chatID int64, us
 		return
 	}
 
-	cs.mu.Lock()
-	cs.sessionID = sessionID
-	cs.ownerUserID = user.UserID
-	cs.mu.Unlock()
-
+	b.setActiveSession(cs, sessionID, user.UserID)
 	b.startSubscription(ctx, cs, chatID, user.UserID, sessionID)
 }
 
@@ -428,7 +431,15 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, chatID int64, us
 
 // processStreamResponse handles a stream response and sends relevant content to Telegram.
 func (b *Bot) processStreamResponse(cs *chatState, chatID int64, resp agent.StreamResponse) {
+	lastDelivered := b.lastDeliveredSeq(cs)
+	maxSeen := lastDelivered
 	for _, msg := range resp.Messages {
+		if msg.SequenceID > maxSeen {
+			maxSeen = msg.SequenceID
+		}
+		if msg.SequenceID != 0 && msg.SequenceID <= lastDelivered {
+			continue
+		}
 		switch msg.Type {
 		case agent.MessageTypeAssistant:
 			if msg.Content != "" {
@@ -448,6 +459,9 @@ func (b *Bot) processStreamResponse(cs *chatState, chatID int64, resp agent.Stre
 		case agent.MessageTypeUser, agent.MessageTypeUIAction:
 			// Skip user messages and UI actions in Telegram output
 		}
+	}
+	if maxSeen > lastDelivered {
+		b.markDelivered(cs, maxSeen)
 	}
 }
 
@@ -532,27 +546,97 @@ func (b *Bot) resetChat(cs *chatState) {
 	cs.ownerUserID = ""
 	cs.subSessionID = ""
 	cs.pendingPromptID = ""
+	cs.lastDeliveredSeq = 0
 }
 
-// userIdentity creates a UserIdentity from a Telegram message.
-func (b *Bot) userIdentity(msg *tgbotapi.Message) agent.UserIdentity {
-	username := msg.From.UserName
-	if username == "" {
-		username = strings.TrimSpace(msg.From.FirstName + " " + msg.From.LastName)
-	}
-	return agent.UserIdentity{
-		UserID:   fmt.Sprintf("telegram:%d", msg.From.ID),
-		Username: username,
-		Role:     auth.RoleAdmin,
-	}
-}
-
-// userIdentityFromChatID creates a minimal UserIdentity from a chat ID.
-func (b *Bot) userIdentityFromChatID(chatID int64) agent.UserIdentity {
+// userIdentity creates a chat-scoped UserIdentity so the entire chat shares one session.
+func (b *Bot) userIdentity(chatID int64) agent.UserIdentity {
 	return agent.UserIdentity{
 		UserID:   fmt.Sprintf("telegram:%d", chatID),
 		Username: "telegram",
 		Role:     auth.RoleAdmin,
+	}
+}
+
+func (b *Bot) setActiveSession(cs *chatState, sessionID, ownerUserID string) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	if cs.sessionID != sessionID {
+		cs.lastDeliveredSeq = 0
+	}
+	cs.sessionID = sessionID
+	cs.ownerUserID = ownerUserID
+}
+
+func (b *Bot) lastDeliveredSeq(cs *chatState) int64 {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	return cs.lastDeliveredSeq
+}
+
+func (b *Bot) markDelivered(cs *chatState, seq int64) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	if seq > cs.lastDeliveredSeq {
+		cs.lastDeliveredSeq = seq
+	}
+}
+
+func (b *Bot) subscriptionActive(cs *chatState, sessionID string) bool {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	return cs.subSessionID == sessionID && cs.subCancel != nil
+}
+
+func (b *Bot) prepareSessionForMessage(ctx context.Context, cs *chatState, user agent.UserIdentity) (string, bool) {
+	cs.mu.Lock()
+	sid := cs.sessionID
+	cs.mu.Unlock()
+
+	if sid == "" {
+		return "", false
+	}
+
+	newSID, rotated, err := b.agentAPI.CompactSessionIfNeeded(ctx, sid, user)
+	if err != nil {
+		if err == agent.ErrSessionNotFound {
+			b.logger.Warn("Session missing during compaction, resetting chat",
+				slog.String("session", sid),
+				slog.String("user", user.UserID),
+			)
+			b.resetChat(cs)
+			return "", false
+		}
+		b.logger.Warn("Failed to compact Telegram session",
+			slog.String("session", sid),
+			slog.String("user", user.UserID),
+			slog.String("error", err.Error()),
+		)
+		return sid, false
+	}
+	if !rotated {
+		return newSID, false
+	}
+
+	b.setActiveSession(cs, newSID, user.UserID)
+	b.markSessionSnapshotDelivered(ctx, cs, newSID, user.UserID)
+	return newSID, true
+}
+
+func (b *Bot) markSessionSnapshotDelivered(ctx context.Context, cs *chatState, sessionID, userID string) {
+	detail, err := b.agentAPI.GetSessionDetail(ctx, sessionID, userID)
+	if err != nil || detail == nil {
+		return
+	}
+
+	var maxSeq int64
+	for _, msg := range detail.Messages {
+		if msg.SequenceID > maxSeq {
+			maxSeq = msg.SequenceID
+		}
+	}
+	if maxSeq > 0 {
+		b.markDelivered(cs, maxSeq)
 	}
 }
 
@@ -582,106 +666,4 @@ func splitMessage(text string, maxLen int) []string {
 	}
 
 	return chunks
-}
-
-// rotateSession creates a new session carrying forward recent context from the
-// old session. The user's new message is prepended with a summary of the recent
-// conversation so the agent doesn't lose context.
-func (b *Bot) rotateSession(ctx context.Context, cs *chatState, chatID int64, user agent.UserIdentity, text string) {
-	cs.mu.Lock()
-	oldSID := cs.sessionID
-	cs.mu.Unlock()
-
-	// Collect the last few assistant messages as context summary
-	var summary string
-	if oldSID != "" {
-		summary = b.buildSessionSummary(ctx, oldSID, user.UserID)
-	}
-
-	b.resetChat(cs)
-	b.sendText(chatID, "(Session context limit reached — continuing with recent context carried forward)")
-
-	// Prepend the summary to the user's message so the new session has context
-	var message string
-	if summary != "" {
-		message = fmt.Sprintf("[Previous conversation summary:\n%s]\n\n%s", summary, text)
-	} else {
-		message = text
-	}
-
-	b.createSession(ctx, cs, chatID, user, message)
-}
-
-// buildSessionSummary extracts the last few assistant messages from a session
-// to use as context when rotating to a new session.
-func (b *Bot) buildSessionSummary(ctx context.Context, sessionID, userID string) string {
-	detail, err := b.agentAPI.GetSessionDetail(ctx, sessionID, userID)
-	if err != nil || detail == nil {
-		return ""
-	}
-
-	// Collect the last few user+assistant exchanges (up to 3 pairs)
-	const maxExchanges = 3
-	var exchanges []string
-	var count int
-
-	// Walk backwards through messages
-	for i := len(detail.Messages) - 1; i >= 0 && count < maxExchanges; i-- {
-		msg := detail.Messages[i]
-		switch msg.Type {
-		case agent.MessageTypeAssistant:
-			if msg.Content != "" {
-				content := msg.Content
-				if len(content) > 300 {
-					content = content[:300] + "..."
-				}
-				exchanges = append([]string{"Assistant: " + content}, exchanges...)
-			}
-		case agent.MessageTypeUser:
-			if msg.Content != "" {
-				content := msg.Content
-				if len(content) > 200 {
-					content = content[:200] + "..."
-				}
-				exchanges = append([]string{"User: " + content}, exchanges...)
-				count++
-			}
-		case agent.MessageTypeError, agent.MessageTypeUIAction, agent.MessageTypeUserPrompt:
-			// Skip non-conversational messages in summary
-		}
-	}
-
-	return strings.Join(exchanges, "\n")
-}
-
-// shouldRotateSession checks if the session's token usage has reached
-// 50% of the context limit and should be rotated to a fresh session.
-func (b *Bot) shouldRotateSession(ctx context.Context, cs *chatState, userID string) bool {
-	if b.agentAPI == nil {
-		return false
-	}
-
-	cs.mu.Lock()
-	sid := cs.sessionID
-	cs.mu.Unlock()
-
-	if sid == "" {
-		return false
-	}
-
-	detail, err := b.agentAPI.GetSessionDetail(ctx, sid, userID)
-	if err != nil || detail == nil {
-		return false
-	}
-
-	// Sum total tokens across all messages
-	var totalTokens int
-	for _, msg := range detail.Messages {
-		if msg.Usage != nil {
-			totalTokens += msg.Usage.TotalTokens
-		}
-	}
-
-	limit := int(float64(defaultContextLimit) * contextRotationRatio)
-	return totalTokens > limit
 }

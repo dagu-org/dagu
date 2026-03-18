@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/llm"
 )
 
 // monitorPollInterval is how often the monitor checks for DAG run status changes.
@@ -164,9 +165,7 @@ func (m *DAGRunMonitor) evictStaleSeen() {
 	})
 }
 
-// notifyCompletion creates an agent session per chat to generate a notification
-// about a completed DAG run. The session is adopted by the chat so the user
-// can continue the conversation (e.g., ask follow-up questions about the run).
+// notifyCompletion appends a notification into the active conversation for each chat.
 func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStatus) bool {
 	m.logger.Info("DAG run completed, generating notification",
 		slog.String("dag", s.Name),
@@ -186,64 +185,118 @@ func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStat
 
 	prompt := buildNotificationPrompt(s)
 
-	// Create a separate session for each chat so each user can follow up.
 	for chatID := range m.bot.allowedChats {
 		m.notifyChat(ctx, chatID, s, prompt)
 	}
 	return true // Mark as seen even on partial failure to avoid duplicates
 }
 
-// notifyChat creates an agent session for a specific chat, waits for the
-// response, sends it, and adopts the session so the user can follow up.
-// Returns true if the notification was delivered successfully.
+// notifyChat appends the notification into the chat-scoped session.
 func (m *DAGRunMonitor) notifyChat(ctx context.Context, chatID int64, s *exec.DAGRunStatus, prompt string) bool {
-	user := m.bot.userIdentityFromChatID(chatID)
-
-	req := agent.ChatRequest{
-		Message:  prompt,
-		SafeMode: false,
+	user := m.bot.userIdentity(chatID)
+	cs := m.bot.getOrCreateChat(chatID)
+	sessionID := m.currentSessionID(cs)
+	msg := m.buildNotificationMessage(ctx, sessionID, user, s, prompt)
+	sessionID, stored, ok := m.appendNotification(ctx, cs, sessionID, user, s.Name, msg)
+	if !ok {
+		return false
+	}
+	if m.bot.subscriptionActive(cs, sessionID) {
+		return true
 	}
 
-	sessionID, _, err := m.agentAPI.CreateSession(ctx, user, req)
-	if err != nil {
-		m.logger.Warn("Failed to create notification session",
-			slog.String("dag", s.Name),
+	m.bot.sendLongText(chatID, msg.Content)
+	m.bot.markDelivered(cs, stored.SequenceID)
+	return true
+}
+
+func (m *DAGRunMonitor) currentSessionID(cs *chatState) string {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	return cs.sessionID
+}
+
+func (m *DAGRunMonitor) appendNotification(ctx context.Context, cs *chatState, sessionID string, user agent.UserIdentity, dagName string, msg agent.Message) (string, agent.Message, bool) {
+	appendToSession := func(targetSessionID string) (agent.Message, error) {
+		return m.agentAPI.AppendExternalMessage(ctx, targetSessionID, user, msg)
+	}
+
+	if sessionID == "" {
+		newSessionID, err := m.agentAPI.CreateEmptySession(ctx, user, dagName, m.bot.cfg.SafeMode)
+		if err != nil {
+			m.logger.Warn("Failed to create notification session",
+				slog.String("dag", dagName),
+				slog.String("user", user.UserID),
+				slog.String("error", err.Error()),
+			)
+			return "", agent.Message{}, false
+		}
+		m.bot.setActiveSession(cs, newSessionID, user.UserID)
+		stored, err := appendToSession(newSessionID)
+		if err != nil {
+			m.logger.Warn("Failed to append notification message to new session",
+				slog.String("session", newSessionID),
+				slog.String("error", err.Error()),
+			)
+			return "", agent.Message{}, false
+		}
+		return newSessionID, stored, true
+	}
+
+	stored, err := appendToSession(sessionID)
+	if err == nil {
+		return sessionID, stored, true
+	}
+	if err != agent.ErrSessionNotFound {
+		m.logger.Warn("Failed to append notification message",
+			slog.String("session", sessionID),
 			slog.String("error", err.Error()),
 		)
-		m.bot.sendText(chatID, fmt.Sprintf("%s DAG '%s' %s\n(AI unavailable: %s)",
-			statusEmoji(s.Status), s.Name, s.Status.String(), err.Error()))
-		return false
+		return "", agent.Message{}, false
 	}
 
-	// Wait for the agent to generate a response
-	response := m.waitForAgentResponse(ctx, sessionID, user.UserID)
-	if response == "" {
-		m.bot.sendText(chatID, fmt.Sprintf("%s DAG '%s' %s\n(AI agent timed out)",
-			statusEmoji(s.Status), s.Name, s.Status.String()))
-		return false
+	newSessionID, createErr := m.agentAPI.CreateEmptySession(ctx, user, dagName, m.bot.cfg.SafeMode)
+	if createErr != nil {
+		m.logger.Warn("Failed to replace missing notification session",
+			slog.String("dag", dagName),
+			slog.String("user", user.UserID),
+			slog.String("error", createErr.Error()),
+		)
+		return "", agent.Message{}, false
+	}
+	m.bot.setActiveSession(cs, newSessionID, user.UserID)
+	stored, err = appendToSession(newSessionID)
+	if err != nil {
+		m.logger.Warn("Failed to append notification message after session recreation",
+			slog.String("session", newSessionID),
+			slog.String("error", err.Error()),
+		)
+		return "", agent.Message{}, false
+	}
+	return newSessionID, stored, true
+}
+
+func (m *DAGRunMonitor) buildNotificationMessage(ctx context.Context, sessionID string, user agent.UserIdentity, s *exec.DAGRunStatus, prompt string) agent.Message {
+	msg, err := m.agentAPI.GenerateAssistantMessage(ctx, sessionID, user, s.Name, prompt)
+	if err == nil {
+		return msg
 	}
 
-	// Adopt this session as the chat's active session so the user can
-	// send follow-up messages (e.g., "show me the logs", "retry it").
-	cs := m.bot.getOrCreateChat(chatID)
-	// Reset and set new session atomically to avoid races.
-	cs.mu.Lock()
-	if cs.subCancel != nil {
-		cs.subCancel()
-		cs.subCancel = nil
+	m.logger.Warn("Failed to generate AI notification, falling back to plain text",
+		slog.String("dag", s.Name),
+		slog.String("status", s.Status.String()),
+		slog.String("error", err.Error()),
+	)
+	text := fallbackNotificationText(s, "AI unavailable: "+err.Error())
+	return agent.Message{
+		Type:      agent.MessageTypeAssistant,
+		Content:   text,
+		CreatedAt: time.Now(),
+		LLMData: &llm.Message{
+			Role:    llm.RoleAssistant,
+			Content: text,
+		},
 	}
-	cs.subSessionID = ""
-	cs.pendingPromptID = ""
-	cs.sessionID = sessionID
-	cs.ownerUserID = user.UserID
-	cs.mu.Unlock()
-
-	m.bot.sendLongText(chatID, response)
-
-	// Don't start a subscription here — the notification session is already
-	// done, and subscribing would re-send the same response from the snapshot.
-	// If the user sends a follow-up, handleMessage will create a fresh session.
-	return true
 }
 
 // buildNotificationPrompt creates a prompt for the AI agent to analyze
@@ -293,57 +346,15 @@ DAG Run ID: %s`, intro, s.Name, s.Status.String(), s.DAGRunID)
 	return prompt.String()
 }
 
-// waitForAgentResponse polls the agent session for a response with a timeout.
-func (m *DAGRunMonitor) waitForAgentResponse(ctx context.Context, sessionID, userID string) string {
-	timeout := time.After(10 * time.Minute)
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	// Track the latest assistant content across all polls, not just within
-	// a single poll. The assistant message may arrive while Working is still
-	// true, and by the next poll (when Working is false) there are no new
-	// messages — so we must remember what we saw earlier.
-	var latestAssistant string
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ""
-		case <-timeout:
-			m.logger.Warn("Timeout waiting for agent notification response",
-				slog.String("session", sessionID),
-			)
-			return ""
-		case <-ticker.C:
-			detail, err := m.agentAPI.GetSessionDetail(ctx, sessionID, userID)
-			if err != nil || detail == nil {
-				continue
-			}
-
-			// Scan all messages for the latest assistant content.
-			for _, msg := range detail.Messages {
-				if msg.Type == agent.MessageTypeAssistant && msg.Content != "" {
-					latestAssistant = msg.Content
-				}
-			}
-
-			// If agent is done working and we have a response, return it
-			if detail.SessionState != nil && !detail.SessionState.Working {
-				if latestAssistant != "" {
-					return latestAssistant
-				}
-				// Agent finished but produced no text — give up
-				m.logger.Warn("Agent finished without producing a text response",
-					slog.String("session", sessionID),
-				)
-				return ""
-			}
-		}
+// sendFallbackNotification sends a simple non-AI notification to all chats.
+func (m *DAGRunMonitor) sendFallbackNotification(s *exec.DAGRunStatus, reason string) {
+	text := fallbackNotificationText(s, reason)
+	for chatID := range m.bot.allowedChats {
+		m.bot.sendText(chatID, text)
 	}
 }
 
-// sendFallbackNotification sends a simple non-AI notification to all chats.
-func (m *DAGRunMonitor) sendFallbackNotification(s *exec.DAGRunStatus, reason string) {
+func fallbackNotificationText(s *exec.DAGRunStatus, reason string) string {
 	emoji := statusEmoji(s.Status)
 	text := fmt.Sprintf("%s DAG '%s' %s", emoji, s.Name, s.Status.String())
 	if s.Error != "" {
@@ -352,9 +363,7 @@ func (m *DAGRunMonitor) sendFallbackNotification(s *exec.DAGRunStatus, reason st
 	if reason != "" {
 		text += "\n" + reason
 	}
-	for chatID := range m.bot.allowedChats {
-		m.bot.sendText(chatID, text)
-	}
+	return text
 }
 
 // statusEmoji returns an emoji for the DAG run status.

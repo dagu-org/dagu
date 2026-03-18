@@ -359,6 +359,57 @@ func (m *mockSessionStore) HasSession(id string) bool {
 
 var _ SessionStore = (*mockSessionStore)(nil)
 
+type mockMemoryStore struct {
+	global string
+	dag    map[string]string
+}
+
+func newMockMemoryStore() *mockMemoryStore {
+	return &mockMemoryStore{dag: make(map[string]string)}
+}
+
+func (m *mockMemoryStore) LoadGlobalMemory(_ context.Context) (string, error) {
+	return m.global, nil
+}
+
+func (m *mockMemoryStore) LoadDAGMemory(_ context.Context, dagName string) (string, error) {
+	return m.dag[dagName], nil
+}
+
+func (m *mockMemoryStore) SaveGlobalMemory(_ context.Context, content string) error {
+	m.global = content
+	return nil
+}
+
+func (m *mockMemoryStore) SaveDAGMemory(_ context.Context, dagName string, content string) error {
+	m.dag[dagName] = content
+	return nil
+}
+
+func (m *mockMemoryStore) MemoryDir() string {
+	return "/tmp/mock-memory"
+}
+
+func (m *mockMemoryStore) ListDAGMemories(_ context.Context) ([]string, error) {
+	out := make([]string, 0, len(m.dag))
+	for dagName := range m.dag {
+		out = append(out, dagName)
+	}
+	return out, nil
+}
+
+func (m *mockMemoryStore) DeleteGlobalMemory(_ context.Context) error {
+	m.global = ""
+	return nil
+}
+
+func (m *mockMemoryStore) DeleteDAGMemory(_ context.Context, dagName string) error {
+	delete(m.dag, dagName)
+	return nil
+}
+
+var _ MemoryStore = (*mockMemoryStore)(nil)
+
 // newStopProvider creates a mock provider that returns a simple stop response.
 func newStopProvider(content string) *mockLLMProvider {
 	return &mockLLMProvider{

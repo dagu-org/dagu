@@ -24,20 +24,24 @@ import (
 // maxSlackMessageLen is the maximum length for a single Slack message.
 const maxSlackMessageLen = 4000
 
-// defaultContextLimit is the assumed context window size when no model config is available.
-const defaultContextLimit = 200_000
-
-// contextRotationRatio is the fraction of the context limit at which sessions are rotated.
-const contextRotationRatio = 0.5
-
 // AgentService is the subset of the agent API that the Slack bot requires.
 type AgentService interface {
 	CreateSession(ctx context.Context, user agent.UserIdentity, req agent.ChatRequest) (string, string, error)
+	CreateEmptySession(ctx context.Context, user agent.UserIdentity, dagName string, safeMode bool) (string, error)
 	SendMessage(ctx context.Context, sessionID string, user agent.UserIdentity, req agent.ChatRequest) error
 	CancelSession(ctx context.Context, sessionID, userID string) error
 	SubmitUserResponse(ctx context.Context, sessionID, userID string, resp agent.UserPromptResponse) error
+	GenerateAssistantMessage(ctx context.Context, sessionID string, user agent.UserIdentity, dagName, prompt string) (agent.Message, error)
+	AppendExternalMessage(ctx context.Context, sessionID string, user agent.UserIdentity, msg agent.Message) (agent.Message, error)
+	CompactSessionIfNeeded(ctx context.Context, sessionID string, user agent.UserIdentity) (string, bool, error)
 	GetSessionDetail(ctx context.Context, sessionID, userID string) (*agent.StreamResponse, error)
 	SubscribeSession(ctx context.Context, sessionID string, user agent.UserIdentity) (agent.StreamResponse, func() (agent.StreamResponse, bool), error)
+}
+
+type slackClientAPI interface {
+	PostMessage(channelID string, options ...slack.MsgOption) (string, string, error)
+	DeleteMessage(channel, timestamp string) (string, string, error)
+	SendMessage(channelID string, options ...slack.MsgOption) (string, string, string, error)
 }
 
 // Config holds configuration for the Slack bot.
@@ -59,22 +63,23 @@ type messageRef struct {
 // chatState tracks the agent session state for a single conversation.
 // A conversation is either a DM channel or a specific thread in a channel.
 type chatState struct {
-	channelID       string // Slack channel ID
-	threadTS        string // thread parent timestamp (empty for DMs)
-	sessionID       string
-	ownerUserID     string // user ID that owns the session
-	subSessionID    string // session ID the subscription is listening to
-	subCancel       context.CancelFunc
-	mu              sync.Mutex
-	pendingPromptID string
-	thinkingMessage *messageRef // "Thinking..." message to delete on first response
+	channelID        string // Slack channel ID
+	threadTS         string // thread parent timestamp (empty for DMs)
+	sessionID        string
+	ownerUserID      string // conversation-scoped session identity
+	subSessionID     string // session ID the subscription is listening to
+	subCancel        context.CancelFunc
+	mu               sync.Mutex
+	pendingPromptID  string
+	thinkingMessage  *messageRef // "Thinking..." message to delete on first response
+	lastDeliveredSeq int64
 }
 
 // Bot is a Slack bot that forwards messages to the Dagu agent API.
 type Bot struct {
 	cfg             Config
 	agentAPI        AgentService
-	slackClient     *slack.Client
+	slackClient     slackClientAPI
 	socketClient    *socketmode.Client
 	chats           sync.Map // conversationKey -> *chatState
 	activeThreads   sync.Map // "channelID:threadTS" -> true
@@ -288,7 +293,7 @@ func (b *Bot) handleDMMessage(ctx context.Context, channelID, userID, _, text st
 
 // processIncoming is the core message handler shared by channel and DM flows.
 // convKey uniquely identifies the conversation (channelID or channelID:threadTS).
-func (b *Bot) processIncoming(ctx context.Context, cs *chatState, convKey, userID, text string) {
+func (b *Bot) processIncoming(ctx context.Context, cs *chatState, convKey, _ string, text string) {
 	if text == "" {
 		return
 	}
@@ -314,7 +319,7 @@ func (b *Bot) processIncoming(ctx context.Context, cs *chatState, convKey, userI
 	// Post a typing indicator message
 	thinkingTS := b.postThinking(cs)
 
-	user := b.userIdentity(convKey, userID)
+	user := b.userIdentity(convKey)
 
 	cs.mu.Lock()
 	if thinkingTS != "" {
@@ -325,11 +330,15 @@ func (b *Bot) processIncoming(ctx context.Context, cs *chatState, convKey, userI
 	if cs.sessionID == "" {
 		b.createSession(ctx, cs, user, text)
 	} else {
-		if b.shouldRotateSession(ctx, cs, user.UserID) {
-			b.rotateSession(ctx, cs, user, text)
-		} else {
-			b.sendAgentMessage(ctx, cs, user, text)
+		sid, rotated := b.prepareSessionForMessage(ctx, cs, user)
+		if sid == "" {
+			b.createSession(ctx, cs, user, text)
+			return
 		}
+		if rotated {
+			b.clearPendingIndicators(cs)
+		}
+		b.sendAgentMessage(ctx, cs, user, text)
 	}
 }
 
@@ -479,11 +488,7 @@ func (b *Bot) createSession(ctx context.Context, cs *chatState, user agent.UserI
 		return
 	}
 
-	cs.mu.Lock()
-	cs.sessionID = sessionID
-	cs.ownerUserID = user.UserID
-	cs.mu.Unlock()
-
+	b.setActiveSession(cs, sessionID, user.UserID)
 	b.startSubscription(ctx, cs, user.UserID, sessionID)
 }
 
@@ -604,7 +609,15 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, userID, sessionI
 
 // processStreamResponse handles a stream response and sends relevant content to Slack.
 func (b *Bot) processStreamResponse(cs *chatState, resp agent.StreamResponse) {
+	lastDelivered := b.lastDeliveredSeq(cs)
+	maxSeen := lastDelivered
 	for _, msg := range resp.Messages {
+		if msg.SequenceID > maxSeen {
+			maxSeen = msg.SequenceID
+		}
+		if msg.SequenceID != 0 && msg.SequenceID <= lastDelivered {
+			continue
+		}
 		switch msg.Type {
 		case agent.MessageTypeAssistant:
 			if msg.Content != "" {
@@ -627,6 +640,9 @@ func (b *Bot) processStreamResponse(cs *chatState, resp agent.StreamResponse) {
 		case agent.MessageTypeUser, agent.MessageTypeUIAction:
 			// Skip user messages and UI actions in Slack output
 		}
+	}
+	if maxSeen > lastDelivered {
+		b.markDelivered(cs, maxSeen)
 	}
 }
 
@@ -699,13 +715,7 @@ func (b *Bot) sendLongReply(cs *chatState, text string) {
 
 // sendReply sends a text message to the correct channel and thread.
 func (b *Bot) sendReply(cs *chatState, text string) {
-	opts := []slack.MsgOption{slack.MsgOptionText(text, false)}
-	if cs.threadTS != "" {
-		opts = append(opts, slack.MsgOptionTS(cs.threadTS))
-	}
-
-	_, _, err := b.slackClient.PostMessage(cs.channelID, opts...)
-	if err != nil {
+	if _, err := b.postText(cs.channelID, cs.threadTS, text); err != nil {
 		b.logger.Warn("Failed to send Slack message",
 			slog.String("channel_id", cs.channelID),
 			slog.String("error", err.Error()),
@@ -715,11 +725,7 @@ func (b *Bot) sendReply(cs *chatState, text string) {
 
 // sendText sends a simple text message to a channel (used by monitor for notifications).
 func (b *Bot) sendText(channelID, text string) {
-	_, _, err := b.slackClient.PostMessage(
-		channelID,
-		slack.MsgOptionText(text, false),
-	)
-	if err != nil {
+	if _, err := b.postText(channelID, "", text); err != nil {
 		b.logger.Warn("Failed to send Slack message",
 			slog.String("channel_id", channelID),
 			slog.String("error", err.Error()),
@@ -737,17 +743,63 @@ func (b *Bot) sendLongText(channelID, text string) {
 
 // postThinking posts a "Thinking..." message and returns its timestamp.
 func (b *Bot) postThinking(cs *chatState) string {
-	opts := []slack.MsgOption{slack.MsgOptionText("_Thinking..._", false)}
-	if cs.threadTS != "" {
-		opts = append(opts, slack.MsgOptionTS(cs.threadTS))
-	}
-
-	_, ts, err := b.slackClient.PostMessage(cs.channelID, opts...)
+	ts, err := b.postText(cs.channelID, cs.threadTS, "_Thinking..._")
 	if err != nil {
 		b.logger.Debug("Failed to post thinking message", slog.String("error", err.Error()))
 		return ""
 	}
 	return ts
+}
+
+func (b *Bot) postText(channelID, threadTS, text string) (string, error) {
+	opts := []slack.MsgOption{slack.MsgOptionText(text, false)}
+	if threadTS != "" {
+		opts = append(opts, slack.MsgOptionTS(threadTS))
+	}
+
+	_, ts, err := b.slackClient.PostMessage(channelID, opts...)
+	return ts, err
+}
+
+func (b *Bot) sendLongTextInThread(channelID, threadTS, text string) {
+	chunks := splitMessage(text, maxSlackMessageLen)
+	for _, chunk := range chunks {
+		if _, err := b.postText(channelID, threadTS, chunk); err != nil {
+			b.logger.Warn("Failed to send Slack thread message",
+				slog.String("channel_id", channelID),
+				slog.String("thread_ts", threadTS),
+				slog.String("error", err.Error()),
+			)
+			return
+		}
+	}
+}
+
+func (b *Bot) sendLongRootThread(channelID, text string) string {
+	chunks := splitMessage(text, maxSlackMessageLen)
+	if len(chunks) == 0 {
+		return ""
+	}
+
+	rootTS, err := b.postText(channelID, "", chunks[0])
+	if err != nil {
+		b.logger.Warn("Failed to send Slack thread root",
+			slog.String("channel_id", channelID),
+			slog.String("error", err.Error()),
+		)
+		return ""
+	}
+	for _, chunk := range chunks[1:] {
+		if _, err := b.postText(channelID, rootTS, chunk); err != nil {
+			b.logger.Warn("Failed to send Slack thread reply",
+				slog.String("channel_id", channelID),
+				slog.String("thread_ts", rootTS),
+				slog.String("error", err.Error()),
+			)
+			return rootTS
+		}
+	}
+	return rootTS
 }
 
 // clearPendingIndicators deletes the "Thinking..." message when the first response arrives.
@@ -798,123 +850,99 @@ func (b *Bot) resetChat(cs *chatState) {
 	cs.subSessionID = ""
 	cs.pendingPromptID = ""
 	cs.thinkingMessage = nil
+	cs.lastDeliveredSeq = 0
 }
 
 // userIdentity creates a UserIdentity scoped to a specific conversation.
 // Using convKey ensures each conversation (DM, thread) gets its own agent session.
-func (b *Bot) userIdentity(convKey, userID string) agent.UserIdentity {
+func (b *Bot) userIdentity(convKey string) agent.UserIdentity {
 	return agent.UserIdentity{
-		UserID:   fmt.Sprintf("slack:%s:%s", convKey, userID),
+		UserID:   fmt.Sprintf("slack:%s", convKey),
 		Username: "slack",
 		Role:     auth.RoleAdmin,
 	}
 }
 
-// userIdentityFromChannelID creates a minimal UserIdentity from a channel ID.
-func (b *Bot) userIdentityFromChannelID(channelID string) agent.UserIdentity {
-	return agent.UserIdentity{
-		UserID:   fmt.Sprintf("slack:%s", channelID),
-		Username: "slack",
-		Role:     auth.RoleAdmin,
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Session rotation
-// ---------------------------------------------------------------------------
-
-// rotateSession creates a new session carrying forward recent context.
-func (b *Bot) rotateSession(ctx context.Context, cs *chatState, user agent.UserIdentity, text string) {
+func (b *Bot) setActiveSession(cs *chatState, sessionID, ownerUserID string) {
 	cs.mu.Lock()
-	oldSID := cs.sessionID
-	cs.mu.Unlock()
-
-	var summary string
-	if oldSID != "" {
-		summary = b.buildSessionSummary(ctx, oldSID, user.UserID)
+	defer cs.mu.Unlock()
+	if cs.sessionID != sessionID {
+		cs.lastDeliveredSeq = 0
 	}
-
-	b.resetChat(cs)
-	b.sendReply(cs, "(Session context limit reached — continuing with recent context carried forward)")
-
-	var message string
-	if summary != "" {
-		message = fmt.Sprintf("[Previous conversation summary:\n%s]\n\n%s", summary, text)
-	} else {
-		message = text
-	}
-
-	b.createSession(ctx, cs, user, message)
+	cs.sessionID = sessionID
+	cs.ownerUserID = ownerUserID
 }
 
-// buildSessionSummary extracts the last few assistant messages from a session.
-func (b *Bot) buildSessionSummary(ctx context.Context, sessionID, userID string) string {
-	detail, err := b.agentAPI.GetSessionDetail(ctx, sessionID, userID)
-	if err != nil || detail == nil {
-		return ""
-	}
-
-	const maxExchanges = 3
-	var exchanges []string
-	var count int
-
-	for i := len(detail.Messages) - 1; i >= 0 && count < maxExchanges; i-- {
-		msg := detail.Messages[i]
-		switch msg.Type {
-		case agent.MessageTypeAssistant:
-			if msg.Content != "" {
-				content := msg.Content
-				if len(content) > 300 {
-					content = content[:300] + "..."
-				}
-				exchanges = append([]string{"Assistant: " + content}, exchanges...)
-			}
-		case agent.MessageTypeUser:
-			if msg.Content != "" {
-				content := msg.Content
-				if len(content) > 200 {
-					content = content[:200] + "..."
-				}
-				exchanges = append([]string{"User: " + content}, exchanges...)
-				count++
-			}
-		case agent.MessageTypeError, agent.MessageTypeUIAction, agent.MessageTypeUserPrompt:
-			// Skip non-conversational messages in summary
-		}
-	}
-
-	return strings.Join(exchanges, "\n")
+func (b *Bot) lastDeliveredSeq(cs *chatState) int64 {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	return cs.lastDeliveredSeq
 }
 
-// shouldRotateSession checks if the session's token usage has reached
-// 50% of the context limit and should be rotated to a fresh session.
-func (b *Bot) shouldRotateSession(ctx context.Context, cs *chatState, userID string) bool {
-	if b.agentAPI == nil {
-		return false
+func (b *Bot) markDelivered(cs *chatState, seq int64) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	if seq > cs.lastDeliveredSeq {
+		cs.lastDeliveredSeq = seq
 	}
+}
 
+func (b *Bot) subscriptionActive(cs *chatState, sessionID string) bool {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	return cs.subSessionID == sessionID && cs.subCancel != nil
+}
+
+func (b *Bot) prepareSessionForMessage(ctx context.Context, cs *chatState, user agent.UserIdentity) (string, bool) {
 	cs.mu.Lock()
 	sid := cs.sessionID
 	cs.mu.Unlock()
 
 	if sid == "" {
-		return false
+		return "", false
 	}
 
-	detail, err := b.agentAPI.GetSessionDetail(ctx, sid, userID)
+	newSID, rotated, err := b.agentAPI.CompactSessionIfNeeded(ctx, sid, user)
+	if err != nil {
+		if err == agent.ErrSessionNotFound {
+			b.logger.Warn("Session missing during compaction, resetting conversation",
+				slog.String("session", sid),
+				slog.String("user", user.UserID),
+			)
+			b.resetChat(cs)
+			return "", false
+		}
+		b.logger.Warn("Failed to compact Slack session",
+			slog.String("session", sid),
+			slog.String("user", user.UserID),
+			slog.String("error", err.Error()),
+		)
+		return sid, false
+	}
+	if !rotated {
+		return newSID, false
+	}
+
+	b.setActiveSession(cs, newSID, user.UserID)
+	b.markSessionSnapshotDelivered(ctx, cs, newSID, user.UserID)
+	return newSID, true
+}
+
+func (b *Bot) markSessionSnapshotDelivered(ctx context.Context, cs *chatState, sessionID, userID string) {
+	detail, err := b.agentAPI.GetSessionDetail(ctx, sessionID, userID)
 	if err != nil || detail == nil {
-		return false
+		return
 	}
 
-	var totalTokens int
+	var maxSeq int64
 	for _, msg := range detail.Messages {
-		if msg.Usage != nil {
-			totalTokens += msg.Usage.TotalTokens
+		if msg.SequenceID > maxSeq {
+			maxSeq = msg.SequenceID
 		}
 	}
-
-	limit := int(float64(defaultContextLimit) * contextRotationRatio)
-	return totalTokens > limit
+	if maxSeq > 0 {
+		b.markDelivered(cs, maxSeq)
+	}
 }
 
 // ---------------------------------------------------------------------------

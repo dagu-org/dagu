@@ -163,6 +163,15 @@ func (l *Loop) QueueUserMessage(message llm.Message) {
 	l.logger.Info("queued user message", "queue_size", len(l.messageQueue))
 }
 
+// AppendExternalHistory injects a message into the loop's in-memory LLM history.
+// This keeps future turns consistent when assistant content is appended outside
+// the loop itself, such as bot notifications seeded into an active session.
+func (l *Loop) AppendExternalHistory(message llm.Message) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.history = append(l.history, message)
+}
+
 // SetSafeMode updates the safe mode setting for this loop.
 func (l *Loop) SetSafeMode(enabled bool) {
 	l.mu.Lock()

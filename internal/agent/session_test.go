@@ -724,7 +724,7 @@ func TestSessionManager_RecordExternalMessage(t *testing.T) {
 		Type:    MessageTypeAssistant,
 		Content: "external message",
 	}
-	err := sm.RecordExternalMessage(ctx, msg)
+	_, err := sm.RecordExternalMessage(ctx, msg)
 	require.NoError(t, err)
 
 	done := make(chan struct{})
@@ -764,7 +764,7 @@ func TestSessionManager_RecordExternalMessage_UpdatesLastActivity(t *testing.T) 
 
 	time.Sleep(10 * time.Millisecond)
 
-	err := sm.RecordExternalMessage(context.Background(), Message{
+	_, err := sm.RecordExternalMessage(context.Background(), Message{
 		Type:    MessageTypeAssistant,
 		Content: "update activity",
 	})
@@ -772,6 +772,36 @@ func TestSessionManager_RecordExternalMessage_UpdatesLastActivity(t *testing.T) 
 
 	updatedActivity := sm.LastActivity()
 	assert.True(t, updatedActivity.After(initialActivity), "LastActivity should be updated after RecordExternalMessage")
+}
+
+func TestSessionManager_RecordExternalMessage_AppendsToActiveLoopHistory(t *testing.T) {
+	t.Parallel()
+
+	sm := NewSessionManager(SessionManagerConfig{
+		ID:   "loop-history-test",
+		User: UserIdentity{UserID: "user-1"},
+	})
+	loop := &Loop{}
+	sm.mu.Lock()
+	sm.loop = loop
+	sm.mu.Unlock()
+
+	stored, err := sm.RecordExternalMessage(context.Background(), Message{
+		Type:    MessageTypeAssistant,
+		Content: "notification context",
+		LLMData: &llm.Message{
+			Role:    llm.RoleAssistant,
+			Content: "notification context",
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), stored.SequenceID)
+
+	loop.mu.Lock()
+	defer loop.mu.Unlock()
+	require.Len(t, loop.history, 1)
+	assert.Equal(t, llm.RoleAssistant, loop.history[0].Role)
+	assert.Equal(t, "notification context", loop.history[0].Content)
 }
 
 func TestSessionManager_GetSession_IncludesDelegateFields(t *testing.T) {

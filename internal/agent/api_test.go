@@ -897,6 +897,114 @@ func TestAPI_SendMessage_UpdatesPricing(t *testing.T) {
 	})
 }
 
+func TestAPI_GenerateAssistantMessage_UsesSessionDAGMemory(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("memory-model")
+	reqCh := make(chan *llm.ChatRequest, 1)
+	memoryStore := newMockMemoryStore()
+	require.NoError(t, memoryStore.SaveDAGMemory(context.Background(), "briefing", "Remember the DAG-specific state"))
+
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = model.ID
+
+	api := NewAPI(APIConfig{
+		ConfigStore: configStore,
+		ModelStore:  newMockModelStore().addModel(model),
+		WorkingDir:  t.TempDir(),
+		MemoryStore: memoryStore,
+	})
+	api.providers.Set(model.ToLLMConfig(), newCapturingProvider(reqCh, simpleStopResponse("ok")))
+
+	user := UserIdentity{UserID: "telegram:123", Username: "telegram", Role: auth.RoleAdmin}
+	sessionID, err := api.CreateEmptySession(context.Background(), user, "briefing", false)
+	require.NoError(t, err)
+
+	msg, err := api.GenerateAssistantMessage(context.Background(), sessionID, user, "", "summarize the DAG run")
+	require.NoError(t, err)
+	assert.Equal(t, "ok", msg.Content)
+
+	req := <-reqCh
+	require.Len(t, req.Messages, 2)
+	assert.Equal(t, llm.RoleSystem, req.Messages[0].Role)
+	assert.Contains(t, req.Messages[0].Content, "Remember the DAG-specific state")
+}
+
+func TestAPI_CompactSessionIfNeeded_CreatesSummarySession(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("compact-model")
+	model.ContextWindow = 100
+	memoryStore := newMockMemoryStore()
+	require.NoError(t, memoryStore.SaveDAGMemory(context.Background(), "briefing", "Carry this DAG memory forward"))
+
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = model.ID
+
+	api := NewAPI(APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   newMockModelStore().addModel(model),
+		WorkingDir:   t.TempDir(),
+		MemoryStore:  memoryStore,
+		SessionStore: newMockSessionStore(),
+	})
+	api.providers.Set(model.ToLLMConfig(), newStopProvider("- User is following up on briefing"))
+
+	user := UserIdentity{UserID: "slack:C123:thread", Username: "slack", Role: auth.RoleAdmin}
+	sessionID, err := api.CreateEmptySession(context.Background(), user, "briefing", true)
+	require.NoError(t, err)
+
+	_, err = api.AppendExternalMessage(context.Background(), sessionID, user, Message{
+		Type:      MessageTypeAssistant,
+		Content:   "recent assistant reply",
+		CreatedAt: time.Now(),
+		Usage:     &llm.Usage{PromptTokens: 90, TotalTokens: 90},
+		LLMData: &llm.Message{
+			Role:    llm.RoleAssistant,
+			Content: "recent assistant reply",
+		},
+	})
+	require.NoError(t, err)
+
+	newSessionID, rotated, err := api.CompactSessionIfNeeded(context.Background(), sessionID, user)
+	require.NoError(t, err)
+	assert.True(t, rotated)
+	assert.NotEqual(t, sessionID, newSessionID)
+
+	mgrVal, ok := api.sessions.Load(newSessionID)
+	require.True(t, ok)
+	mgr := mgrVal.(*SessionManager)
+	assert.Equal(t, "briefing", mgr.dagName)
+	assert.True(t, mgr.safeMode)
+
+	detail, err := api.GetSessionDetail(context.Background(), newSessionID, user.UserID)
+	require.NoError(t, err)
+	require.Len(t, detail.Messages, 1)
+	assert.True(t, strings.HasPrefix(detail.Messages[0].Content, sessionSummaryPrefix))
+	assert.Contains(t, detail.Messages[0].Content, "briefing")
+
+	_, oldActive := api.sessions.Load(sessionID)
+	assert.False(t, oldActive)
+}
+
+func TestShouldCompactMessages_UsesLatestPromptTokens(t *testing.T) {
+	t.Parallel()
+
+	messages := []Message{
+		{
+			Type:  MessageTypeAssistant,
+			Usage: &llm.Usage{PromptTokens: 95, TotalTokens: 95},
+		},
+		{
+			Type:  MessageTypeAssistant,
+			Usage: &llm.Usage{PromptTokens: 10, TotalTokens: 10_000},
+		},
+	}
+
+	assert.False(t, shouldCompactMessages(messages, 100), "should use the latest assistant prompt usage, not cumulative history")
+	assert.Equal(t, 10, latestPromptTokens(messages))
+}
+
 func TestAPI_CleanupIdleSessions(t *testing.T) {
 	t.Parallel()
 

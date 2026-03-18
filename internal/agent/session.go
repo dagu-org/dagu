@@ -436,16 +436,30 @@ func (s SessionSnapshot) StreamResponse() StreamResponse {
 }
 
 // RecordExternalMessage records a message from an external source (e.g., a delegate child loop).
-// It publishes the message to the SubPub for SSE streaming and persists it via onMessage.
-func (sm *SessionManager) RecordExternalMessage(ctx context.Context, msg Message) error {
+// It publishes the message to the SubPub for SSE streaming, persists it via onMessage,
+// and returns the stored message with assigned ID/sequence metadata.
+func (sm *SessionManager) RecordExternalMessage(ctx context.Context, msg Message) (Message, error) {
 	msg.SessionID = sm.id
 	if msg.ID == "" {
 		msg.ID = uuid.New().String()
 	}
 
+	if msg.Type == MessageTypeAssistant && msg.Usage != nil {
+		cost := sm.calculateCost(msg.Usage)
+		if cost > 0 && msg.Cost == nil {
+			msg.Cost = &cost
+		}
+		sm.addCost(cost)
+	}
+
 	sm.mu.Lock()
 	sm.lastActivity = time.Now()
+	loop := sm.loop
 	sm.mu.Unlock()
+
+	if loop != nil && msg.LLMData != nil {
+		loop.AppendExternalHistory(*msg.LLMData)
+	}
 
 	msg.SequenceID = sm.appendMessage(msg)
 
@@ -456,11 +470,11 @@ func (sm *SessionManager) RecordExternalMessage(ctx context.Context, msg Message
 	if sm.onMessage != nil {
 		if err := sm.onMessage(ctx, msg); err != nil {
 			sm.logger.Warn("failed to persist message", "error", err)
-			return err
+			return Message{}, err
 		}
 	}
 
-	return nil
+	return msg, nil
 }
 
 // AcceptUserMessage enqueues a user message, ensuring the loop is ready first.
