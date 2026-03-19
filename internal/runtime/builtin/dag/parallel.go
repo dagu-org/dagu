@@ -29,7 +29,7 @@ var _ executor.ParallelExecutor = (*parallelExecutor)(nil)
 var _ executor.NodeStatusDeterminer = (*parallelExecutor)(nil)
 
 type parallelExecutor struct {
-	child         *executor.SubDAGExecutor
+	step          core.Step
 	lock          sync.Mutex
 	workDir       string
 	stdout        io.Writer
@@ -38,8 +38,9 @@ type parallelExecutor struct {
 	maxConcurrent int
 
 	// Runtime state
-	results map[string]*exec1.RunStatus // Maps DAG run ID to result
-	errors  []error                     // Collects errors from failed executions
+	results  map[string]*exec1.RunStatus         // Maps DAG run ID to result
+	errors   []error                             // Collects errors from failed executions
+	children map[string]*executor.SubDAGExecutor // Active child executors keyed by attempt
 
 	cancel     chan struct{}
 	cancelOnce sync.Once
@@ -67,17 +68,6 @@ func newParallelExecutor(
 		return nil, fmt.Errorf("sub DAG configuration is missing")
 	}
 
-	child, err := executor.NewSubDAGExecutor(ctx, step.SubDAG.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	// Validate: sub-DAGs with approval steps cannot be dispatched to workers
-	if len(step.WorkerSelector) > 0 && child.DAG.HasApprovalSteps() {
-		return nil, fmt.Errorf("%w: %s", ErrApprovalStepsWithWorker, step.SubDAG.Name)
-	}
-	child.SetExternalStepRetry(true)
-
 	dir := runtime.GetEnv(ctx).WorkingDir
 	if dir != "" && !fileutil.FileExists(dir) {
 		return nil, ErrWorkingDirNotExist
@@ -89,23 +79,17 @@ func newParallelExecutor(
 	}
 
 	return &parallelExecutor{
-		child:         child,
+		step:          step,
 		workDir:       dir,
 		maxConcurrent: maxConcurrent,
 		results:       make(map[string]*exec1.RunStatus),
 		errors:        make([]error, 0),
+		children:      make(map[string]*executor.SubDAGExecutor),
 		cancel:        make(chan struct{}),
 	}, nil
 }
 
 func (e *parallelExecutor) Run(ctx context.Context) error {
-	// Ensure cleanup happens even if there's an error
-	defer func() {
-		if err := e.child.Cleanup(ctx); err != nil {
-			logger.Error(ctx, "Failed to cleanup sub DAG executor", tag.Error(err))
-		}
-	}()
-
 	if len(e.runParamsList) == 0 {
 		return fmt.Errorf("no sub DAG runs to execute")
 	}
@@ -113,7 +97,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	logger.Info(ctx, "Starting parallel execution",
 		slog.Int("total", len(e.runParamsList)),
 		slog.Int("max-concurrent", e.maxConcurrent),
-		tag.DAG(e.child.DAG.Name),
+		tag.DAG(e.step.SubDAG.Name),
 	)
 
 	pending := make([]scheduledAttempt, 0, len(e.runParamsList))
@@ -325,10 +309,29 @@ func (e *parallelExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 }
 
 func (e *parallelExecutor) runAttempt(ctx context.Context, attempt scheduledAttempt) (*exec1.RunStatus, error) {
-	if attempt.stepName != "" {
-		return e.child.Retry(ctx, attempt.runParams, attempt.stepName, e.workDir)
+	child, err := e.newChildExecutor(ctx, attempt.runParams)
+	if err != nil {
+		return nil, err
 	}
-	return e.child.Execute(ctx, attempt.runParams, e.workDir)
+
+	key := pendingAttemptKey(attempt)
+	e.lock.Lock()
+	e.children[key] = child
+	e.lock.Unlock()
+
+	defer func() {
+		e.lock.Lock()
+		delete(e.children, key)
+		e.lock.Unlock()
+		if cleanErr := child.Cleanup(ctx); cleanErr != nil {
+			logger.Error(ctx, "Failed to cleanup sub DAG executor", tag.Error(cleanErr))
+		}
+	}()
+
+	if attempt.stepName != "" {
+		return child.Retry(ctx, attempt.runParams, attempt.stepName, e.workDir)
+	}
+	return child.Execute(ctx, attempt.runParams, e.workDir)
 }
 
 func pendingAttemptKey(attempt scheduledAttempt) string {
@@ -446,14 +449,42 @@ func (e *parallelExecutor) outputResults() error {
 
 func (e *parallelExecutor) Kill(sig os.Signal) error {
 	e.lock.Lock()
-	defer e.lock.Unlock()
 	e.cancelOnce.Do(func() {
 		close(e.cancel)
 	})
-	if e.child != nil {
-		return e.child.Kill(sig)
+	children := make([]*executor.SubDAGExecutor, 0, len(e.children))
+	for _, child := range e.children {
+		children = append(children, child)
 	}
-	return nil
+	e.lock.Unlock()
+
+	var killErr error
+	for _, child := range children {
+		killErr = errors.Join(killErr, child.Kill(sig))
+	}
+	return killErr
+}
+
+func (e *parallelExecutor) newChildExecutor(
+	ctx context.Context, runParams executor.RunParams,
+) (*executor.SubDAGExecutor, error) {
+	target := runParams.DAGName
+	if target == "" && e.step.SubDAG != nil {
+		target = e.step.SubDAG.Name
+	}
+
+	child, err := executor.NewSubDAGExecutor(ctx, target)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(e.step.WorkerSelector) > 0 && child.DAG.HasApprovalSteps() {
+		_ = child.Cleanup(ctx)
+		return nil, fmt.Errorf("%w: %s", ErrApprovalStepsWithWorker, target)
+	}
+
+	child.SetExternalStepRetry(true)
+	return child, nil
 }
 
 func init() {

@@ -324,6 +324,23 @@ func TestGenerateSubDAGRunID(t *testing.T) {
 	}
 }
 
+func TestGenerateSubDAGRunIDForTarget(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
+	env.DAGRunID = "parent-run-123"
+	env.Step.Name = "child-step"
+	ctx = runtime.WithEnv(ctx, env)
+
+	idA := runtime.GenerateSubDAGRunIDForTarget(ctx, "child-a", "ITEM=01", false)
+	idB := runtime.GenerateSubDAGRunIDForTarget(ctx, "child-b", "ITEM=01", false)
+
+	assert.NotEmpty(t, idA)
+	assert.NotEmpty(t, idB)
+	assert.NotEqual(t, idA, idB)
+}
+
 func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 	t.Parallel()
 

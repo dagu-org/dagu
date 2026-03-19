@@ -1226,6 +1226,81 @@ steps:
 	}
 }
 
+// TestIssue1790_ParallelCallPathItemResolution verifies that `${ITEM}` is
+// resolved inside `call:` before each parallel sub-DAG is loaded.
+// See: https://github.com/dagu-org/dagu/issues/1790
+func TestIssue1790_ParallelCallPathItemResolution(t *testing.T) {
+	th := test.Setup(t)
+
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "parallel-child_01.yaml", []byte(`
+name: parallel-child-01
+params:
+  - ITEM: ""
+steps:
+  - command: echo "child=01 item=${ITEM}"
+    output: CHILD_RESULT
+`))
+
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "parallel-child_02.yaml", []byte(`
+name: parallel-child-02
+params:
+  - ITEM: ""
+steps:
+  - command: echo "child=02 item=${ITEM}"
+    output: CHILD_RESULT
+`))
+
+	callPattern := filepath.Join(th.Config.Paths.DAGsDir, "parallel-child_${ITEM}.yaml")
+	dag := th.DAG(t, fmt.Sprintf(`steps:
+  - name: dynamic-call
+    call: %q
+    parallel:
+      items:
+        - "01"
+        - "02"
+    params: "ITEM=${ITEM}"
+    output: RESULTS
+`, callPattern))
+
+	agent := dag.Agent()
+	require.NoError(t, agent.Run(agent.Context))
+	dag.AssertLatestStatus(t, core.Succeeded)
+
+	dagStatus, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
+	require.NoError(t, err)
+	require.Len(t, dagStatus.Nodes, 1)
+
+	parallelNode := dagStatus.Nodes[0]
+	require.Equal(t, core.NodeSucceeded, parallelNode.Status)
+	require.Len(t, parallelNode.SubRuns, 2)
+
+	gotNames := make(map[string]struct{}, len(parallelNode.SubRuns))
+	rootRun := exec.NewDAGRunRef(dag.Name, dagStatus.DAGRunID)
+	for _, subRun := range parallelNode.SubRuns {
+		subStatus, err := dag.DAGRunMgr.FindSubDAGRunStatus(dag.Context, rootRun, subRun.DAGRunID)
+		require.NoError(t, err)
+		gotNames[subStatus.Name] = struct{}{}
+	}
+	require.Contains(t, gotNames, "parallel-child-01")
+	require.Contains(t, gotNames, "parallel-child-02")
+
+	require.NotNil(t, parallelNode.OutputVariables, "no outputs recorded")
+	rawRaw, ok := parallelNode.OutputVariables.Load("RESULTS")
+	require.True(t, ok, "output RESULTS not found")
+	raw, ok := rawRaw.(string)
+	require.True(t, ok, "output RESULTS is not a string")
+
+	results := parseParallelResults(t, raw)
+	require.Equal(t, 2, results.Summary.Total)
+	require.Equal(t, 2, results.Summary.Succeeded)
+	require.Equal(t, 0, results.Summary.Failed)
+
+	outputs := collectOutputs(results.Outputs, "CHILD_RESULT")
+	require.Len(t, outputs, 2)
+	require.Contains(t, outputs, "child=01 item=01")
+	require.Contains(t, outputs, "child=02 item=02")
+}
+
 type parallelSummary struct {
 	Total     int `json:"total"`
 	Succeeded int `json:"succeeded"`
