@@ -329,6 +329,11 @@ func (b *Bot) startTypingLoop(ctx context.Context, cs *chatState, chatID int64) 
 			case <-loopCtx.Done():
 				return
 			case <-ticker.C:
+				select {
+				case <-loopCtx.Done():
+					return
+				default:
+				}
 				b.sendTyping(chatID)
 			}
 		}

@@ -5,16 +5,13 @@ package slack
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/dagu-org/dagu/internal/service/chatbridge"
 )
 
@@ -27,15 +24,7 @@ const seenEvictInterval = 10 * time.Minute
 // seenTTL is how long a seen entry is kept before eviction.
 const seenTTL = 2 * time.Hour
 
-// notifyStatuses are the statuses that trigger a notification.
-var notifyStatuses = []core.Status{
-	core.Succeeded,
-	core.Failed,
-	core.Aborted,
-	core.PartiallySucceeded,
-	core.Rejected,
-	core.Waiting,
-}
+const notificationFlushTimeout = 30 * time.Second
 
 // DAGRunMonitor watches for DAG run completions and sends AI-generated
 // notifications via Slack.
@@ -45,22 +34,30 @@ type DAGRunMonitor struct {
 	bot         *Bot
 	logger      *slog.Logger
 
-	seen sync.Map
+	seen    sync.Map
+	batcher *chatbridge.NotificationBatcher
 }
 
 // NewDAGRunMonitor creates a new monitor instance.
 func NewDAGRunMonitor(dagRunStore exec.DAGRunStore, agentAPI AgentService, bot *Bot, logger *slog.Logger) *DAGRunMonitor {
-	return &DAGRunMonitor{
+	monitor := &DAGRunMonitor{
 		dagRunStore: dagRunStore,
 		agentAPI:    agentAPI,
 		bot:         bot,
 		logger:      logger,
 	}
+	monitor.batcher = chatbridge.NewNotificationBatcher(
+		chatbridge.DefaultUrgentNotificationWindow,
+		chatbridge.DefaultSuccessNotificationWindow,
+		monitor.flushBatch,
+	)
+	return monitor
 }
 
 // Run starts the monitor loop.
 func (m *DAGRunMonitor) Run(ctx context.Context) {
 	m.logger.Info("DAG run monitor started")
+	defer m.batcher.Stop()
 
 	m.seedSeen(ctx)
 
@@ -116,7 +113,7 @@ func (m *DAGRunMonitor) checkForCompletions(ctx context.Context) {
 	statuses, err := m.dagRunStore.ListStatuses(ctx,
 		exec.WithFrom(from),
 		exec.WithTo(to),
-		exec.WithStatuses(notifyStatuses),
+		exec.WithStatuses(chatbridge.NotificationStatuses),
 	)
 	if err != nil {
 		m.logger.Debug("Failed to list DAG run statuses", slog.String("error", err.Error()))
@@ -134,7 +131,7 @@ func (m *DAGRunMonitor) checkForCompletions(ctx context.Context) {
 }
 
 func seenKey(s *exec.DAGRunStatus) string {
-	return s.DAGRunID + ":" + s.AttemptID
+	return chatbridge.NotificationSeenKey(s)
 }
 
 func (m *DAGRunMonitor) markSeen(s *exec.DAGRunStatus) {
@@ -156,49 +153,47 @@ func (m *DAGRunMonitor) evictStaleSeen() {
 	})
 }
 
-// notifyCompletion appends a notification into the active conversation for each channel.
-func (m *DAGRunMonitor) notifyCompletion(ctx context.Context, s *exec.DAGRunStatus) bool {
-	m.logger.Info("DAG run completed, generating notification",
+// notifyCompletion queues a notification batch item for each destination.
+func (m *DAGRunMonitor) notifyCompletion(_ context.Context, s *exec.DAGRunStatus) bool {
+	m.logger.Info("DAG run notification queued",
 		slog.String("dag", s.Name),
 		slog.String("status", s.Status.String()),
 		slog.String("dag_run_id", s.DAGRunID),
 	)
-
-	if m.agentAPI == nil {
-		m.sendFallbackNotification(s, "")
-		return true
-	}
 
 	if len(m.bot.allowedChannels) == 0 {
 		m.logger.Warn("No allowed channels configured, cannot send notification")
 		return false
 	}
 
-	prompt := buildNotificationPrompt(s)
-
+	accepted := false
 	for channelID := range m.bot.allowedChannels {
-		m.notifyChannel(ctx, channelID, s, prompt)
+		if m.batcher.Enqueue(channelID, s) {
+			accepted = true
+		}
 	}
-	return true // Mark as seen even on partial failure to avoid duplicates
+	return accepted
 }
 
-// notifyChannel appends a notification to either the DM conversation or a new
-// per-notification thread in a Slack channel.
-func (m *DAGRunMonitor) notifyChannel(ctx context.Context, channelID string, s *exec.DAGRunStatus, prompt string) bool {
+func (m *DAGRunMonitor) flushBatch(channelID string, batch chatbridge.NotificationBatch) {
+	ctx, cancel := context.WithTimeout(context.Background(), notificationFlushTimeout)
+	defer cancel()
+
 	if strings.HasPrefix(channelID, "D") {
-		return m.notifyDirectMessage(ctx, channelID, s, prompt)
+		m.flushDirectMessage(ctx, channelID, batch)
+		return
 	}
-	return m.notifyChannelThread(ctx, channelID, s, prompt)
+	m.flushChannelThread(ctx, channelID, batch)
 }
 
-func (m *DAGRunMonitor) notifyDirectMessage(ctx context.Context, channelID string, s *exec.DAGRunStatus, prompt string) bool {
+func (m *DAGRunMonitor) flushDirectMessage(ctx context.Context, channelID string, batch chatbridge.NotificationBatch) bool {
 	convKey := channelID
 	user := m.bot.userIdentity(convKey)
 	cs := m.bot.getOrCreateChat(convKey, channelID, "")
 	sessionID := m.currentSessionID(cs)
 
-	msg := m.buildNotificationMessage(ctx, sessionID, user, s, prompt)
-	sessionID, stored, ok := m.appendNotification(ctx, cs, sessionID, user, s.Name, msg)
+	msg := m.buildNotificationMessage(ctx, sessionID, user, batch)
+	sessionID, stored, ok := m.appendNotification(ctx, cs, sessionID, user, chatbridge.NotificationBatchDAGName(batch), msg)
 	if !ok {
 		return false
 	}
@@ -211,8 +206,8 @@ func (m *DAGRunMonitor) notifyDirectMessage(ctx context.Context, channelID strin
 	return true
 }
 
-func (m *DAGRunMonitor) notifyChannelThread(ctx context.Context, channelID string, s *exec.DAGRunStatus, prompt string) bool {
-	msg := m.buildNotificationMessage(ctx, "", m.bot.userIdentity(channelID), s, prompt)
+func (m *DAGRunMonitor) flushChannelThread(ctx context.Context, channelID string, batch chatbridge.NotificationBatch) bool {
+	msg := m.buildNotificationMessage(ctx, "", m.bot.userIdentity(channelID), batch)
 	threadTS := m.bot.sendLongRootThread(channelID, msg.Content)
 	if threadTS == "" {
 		return false
@@ -224,11 +219,11 @@ func (m *DAGRunMonitor) notifyChannelThread(ctx context.Context, channelID strin
 	cs := m.bot.getOrCreateChat(threadKey, channelID, threadTS)
 	user := m.bot.userIdentity(threadKey)
 
-	sessionID, stored, err := chatbridge.AppendNotification(ctx, m.agentAPI, &cs.State, user, s.Name, m.bot.cfg.SafeMode, msg)
+	sessionID, stored, err := chatbridge.AppendNotification(ctx, m.agentAPI, &cs.State, user, chatbridge.NotificationBatchDAGName(batch), m.bot.cfg.SafeMode, msg)
 	if err != nil {
 		m.logger.Warn("Failed to append threaded notification message",
 			slog.String("session", sessionID),
-			slog.String("dag", s.Name),
+			slog.String("channel_id", channelID),
 			slog.String("error", err.Error()),
 		)
 		return true
@@ -253,106 +248,14 @@ func (m *DAGRunMonitor) appendNotification(ctx context.Context, cs *chatState, s
 	return newSessionID, stored, true
 }
 
-func (m *DAGRunMonitor) buildNotificationMessage(ctx context.Context, sessionID string, user agent.UserIdentity, s *exec.DAGRunStatus, prompt string) agent.Message {
-	msg, err := m.agentAPI.GenerateAssistantMessage(ctx, sessionID, user, s.Name, prompt)
-	if err == nil {
-		return msg
+func (m *DAGRunMonitor) buildNotificationMessage(ctx context.Context, sessionID string, user agent.UserIdentity, batch chatbridge.NotificationBatch) agent.Message {
+	msg, err := chatbridge.GenerateNotificationMessage(ctx, m.agentAPI, sessionID, user, batch)
+	if err != nil && len(batch.Events) > 0 && batch.Events[0].Status != nil {
+		m.logger.Warn("Failed to generate AI notification, using deterministic fallback",
+			slog.String("dag", batch.Events[0].Status.Name),
+			slog.String("status", batch.Events[0].Status.Status.String()),
+			slog.String("error", err.Error()),
+		)
 	}
-
-	m.logger.Warn("Failed to generate AI notification, falling back to plain text",
-		slog.String("dag", s.Name),
-		slog.String("status", s.Status.String()),
-		slog.String("error", err.Error()),
-	)
-	text := fallbackNotificationText(s, "AI unavailable: "+err.Error())
-	return agent.Message{
-		Type:      agent.MessageTypeAssistant,
-		Content:   text,
-		CreatedAt: time.Now(),
-		LLMData: &llm.Message{
-			Role:    llm.RoleAssistant,
-			Content: text,
-		},
-	}
-}
-
-// buildNotificationPrompt creates a prompt for the AI agent to analyze
-// a completed DAG run and generate a user-friendly notification.
-func buildNotificationPrompt(s *exec.DAGRunStatus) string {
-	var intro string
-	if s.Status == core.Waiting {
-		intro = "A DAG run is waiting for human approval. Please write a brief, urgent notification message for the user. Let them know which steps are waiting and that action is needed. Keep it concise (2-4 sentences)."
-	} else {
-		intro = "A DAG run just completed. Please write a brief, helpful notification message for the user about this event. Keep it concise (2-4 sentences). Include the key facts and any actionable information."
-	}
-
-	var prompt strings.Builder
-	fmt.Fprintf(&prompt, `%s
-
-DAG Name: %s
-Status: %s
-DAG Run ID: %s`, intro, s.Name, s.Status.String(), s.DAGRunID)
-
-	if s.Error != "" {
-		fmt.Fprintf(&prompt, "\nError: %s", s.Error)
-	}
-	if s.StartedAt != "" {
-		fmt.Fprintf(&prompt, "\nStarted: %s", s.StartedAt)
-	}
-	if s.FinishedAt != "" {
-		fmt.Fprintf(&prompt, "\nFinished: %s", s.FinishedAt)
-	}
-	if s.Log != "" {
-		fmt.Fprintf(&prompt, "\nLog file: %s", s.Log)
-	}
-
-	if len(s.Nodes) > 0 {
-		prompt.WriteString("\n\nStep results:")
-		for _, n := range s.Nodes {
-			line := fmt.Sprintf("\n- %s: %s", n.Step.Name, n.Status.String())
-			if n.Error != "" {
-				line += fmt.Sprintf(" (error: %s)", n.Error)
-			}
-			prompt.WriteString(line)
-		}
-	}
-
-	prompt.WriteString("\n\nWrite a notification message. Do NOT use tools or execute any commands. Just write the message text directly.")
-
-	return prompt.String()
-}
-
-// sendFallbackNotification sends a simple non-AI notification to all channels.
-func (m *DAGRunMonitor) sendFallbackNotification(s *exec.DAGRunStatus, reason string) {
-	text := fallbackNotificationText(s, reason)
-	for channelID := range m.bot.allowedChannels {
-		m.bot.sendText(channelID, text)
-	}
-}
-
-func fallbackNotificationText(s *exec.DAGRunStatus, reason string) string {
-	emoji := statusEmoji(s.Status)
-	text := fmt.Sprintf("%s DAG '%s' %s", emoji, s.Name, s.Status.String())
-	if s.Error != "" {
-		text += "\nError: " + s.Error
-	}
-	if reason != "" {
-		text += "\n" + reason
-	}
-	return text
-}
-
-func statusEmoji(s core.Status) string {
-	switch s { //nolint:exhaustive // only notified statuses are handled
-	case core.Succeeded, core.PartiallySucceeded:
-		return "\u2705" // green check
-	case core.Failed, core.Rejected:
-		return "\u274C" // red X
-	case core.Aborted:
-		return "\u26A0\uFE0F" // warning
-	case core.Waiting:
-		return "\u23F3" // hourglass
-	default:
-		return "\u2139\uFE0F" // info
-	}
+	return msg
 }

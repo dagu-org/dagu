@@ -19,6 +19,8 @@ type fakeAgentService struct {
 
 	appendErrBySession map[string]error
 	appendCalls        []string
+	generatedMessage   agent.Message
+	generateErr        error
 
 	compactSessionID string
 	compactRotated   bool
@@ -57,7 +59,10 @@ func (f *fakeAgentService) SubmitUserResponse(context.Context, string, string, a
 }
 
 func (f *fakeAgentService) GenerateAssistantMessage(context.Context, string, agent.UserIdentity, string, string) (agent.Message, error) {
-	return agent.Message{}, nil
+	if f.generateErr != nil {
+		return agent.Message{}, f.generateErr
+	}
+	return f.generatedMessage, nil
 }
 
 func (f *fakeAgentService) AppendExternalMessage(_ context.Context, sessionID string, _ agent.UserIdentity, msg agent.Message) (agent.Message, error) {

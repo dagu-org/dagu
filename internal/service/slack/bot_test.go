@@ -17,6 +17,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagu-org/dagu/internal/service/chatbridge"
 	"github.com/slack-go/slack"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -68,10 +69,12 @@ type fakeSlackAgentService struct {
 	nextSequenceID   int64
 	createEmptyCalls int
 	appendSessionIDs []string
+	appendMessages   []agent.Message
 	createMessages   []string
 	sendMessages     []string
 	flushCalls       int
 	generated        agent.Message
+	generatedErr     error
 	enqueueResult    agent.ChatQueueResult
 	flushResult      agent.ChatQueueResult
 }
@@ -148,6 +151,9 @@ func (s *fakeSlackAgentService) SubmitUserResponse(context.Context, string, stri
 }
 
 func (s *fakeSlackAgentService) GenerateAssistantMessage(context.Context, string, agent.UserIdentity, string, string) (agent.Message, error) {
+	if s.generatedErr != nil {
+		return agent.Message{}, s.generatedErr
+	}
 	return s.generated, nil
 }
 
@@ -158,6 +164,7 @@ func (s *fakeSlackAgentService) AppendExternalMessage(_ context.Context, session
 	msg.SequenceID = s.nextSequenceID
 	s.nextSequenceID++
 	s.appendSessionIDs = append(s.appendSessionIDs, sessionID)
+	s.appendMessages = append(s.appendMessages, msg)
 	return msg, nil
 }
 
@@ -173,7 +180,7 @@ func (s *fakeSlackAgentService) SubscribeSession(context.Context, string, agent.
 	return agent.StreamResponse{}, func() (agent.StreamResponse, bool) { return agent.StreamResponse{}, false }, nil
 }
 
-func TestDAGRunMonitor_NotifyChannelThread_SkipsManualNotificationReplay(t *testing.T) {
+func TestDAGRunMonitor_FlushesSuccessDigestIntoSingleThreadAndSkipsReplay(t *testing.T) {
 	t.Parallel()
 
 	client := &fakeSlackClient{}
@@ -187,15 +194,30 @@ func TestDAGRunMonitor_NotifyChannelThread_SkipsManualNotificationReplay(t *test
 		logger:          logger,
 	}
 	monitor := NewDAGRunMonitor(nil, service, bot, logger)
+	monitor.batcher = chatbridge.NewNotificationBatcher(10*time.Millisecond, 20*time.Millisecond, monitor.flushBatch)
+	defer monitor.batcher.Stop()
 
-	ok := monitor.notifyChannel(context.Background(), "C123", &exec.DAGRunStatus{
+	ok := monitor.notifyCompletion(context.Background(), &exec.DAGRunStatus{
 		Name:      "briefing",
 		Status:    core.Succeeded,
 		DAGRunID:  "run-1",
 		AttemptID: "attempt-1",
-	}, "prompt")
+	})
 	require.True(t, ok)
-	assert.Equal(t, 1, client.postCount(), "notification should be delivered once as a thread root")
+	ok = monitor.notifyCompletion(context.Background(), &exec.DAGRunStatus{
+		Name:      "briefing",
+		Status:    core.Succeeded,
+		DAGRunID:  "run-2",
+		AttemptID: "attempt-2",
+	})
+	require.True(t, ok)
+
+	require.Eventually(t, func() bool {
+		service.mu.Lock()
+		defer service.mu.Unlock()
+		return len(service.appendMessages) == 1
+	}, time.Second, 10*time.Millisecond)
+	assert.Equal(t, 1, client.postCount(), "digest should be delivered once as a single thread root")
 
 	val, exists := bot.chats.Load("C123:1")
 	require.True(t, exists)
@@ -203,18 +225,23 @@ func TestDAGRunMonitor_NotifyChannelThread_SkipsManualNotificationReplay(t *test
 	assert.Equal(t, "sess-1", cs.SessionID())
 	assert.Equal(t, "1", cs.threadTS)
 	assert.Equal(t, int64(1), bot.lastDeliveredSeq(cs))
+	service.mu.Lock()
+	require.Len(t, service.appendMessages, 1)
+	assert.Contains(t, service.appendMessages[0].Content, "DAG completion digest")
+	assert.Contains(t, service.appendMessages[0].Content, "briefing: succeeded x2")
+	service.mu.Unlock()
 
 	bot.processStreamResponse(context.Background(), cs, agent.StreamResponse{
 		Messages: []agent.Message{
-			{Type: agent.MessageTypeAssistant, SequenceID: 1, Content: "thread notification"},
+			{Type: agent.MessageTypeAssistant, SequenceID: 1, Content: "digest"},
 			{Type: agent.MessageTypeAssistant, SequenceID: 2, Content: "follow-up answer"},
 		},
 	})
 
-	assert.Equal(t, 2, client.postCount(), "snapshot replay should skip the already delivered notification")
+	assert.Equal(t, 2, client.postCount(), "snapshot replay should skip the already delivered digest")
 }
 
-func TestDAGRunMonitor_NotifyDirectMessage_AppendsToExistingSession(t *testing.T) {
+func TestDAGRunMonitor_FlushesUrgentSingleIntoExistingDMSession(t *testing.T) {
 	t.Parallel()
 
 	client := &fakeSlackClient{}
@@ -228,6 +255,8 @@ func TestDAGRunMonitor_NotifyDirectMessage_AppendsToExistingSession(t *testing.T
 		logger:          logger,
 	}
 	monitor := NewDAGRunMonitor(nil, service, bot, logger)
+	monitor.batcher = chatbridge.NewNotificationBatcher(10*time.Millisecond, 20*time.Millisecond, monitor.flushBatch)
+	defer monitor.batcher.Stop()
 
 	cs := bot.getOrCreateChat("D123", "D123", "")
 	user := agent.UserIdentity{
@@ -237,20 +266,33 @@ func TestDAGRunMonitor_NotifyDirectMessage_AppendsToExistingSession(t *testing.T
 	}
 	bot.setActiveSession(cs, "existing-session", user.UserID)
 
-	ok := monitor.notifyChannel(context.Background(), "D123", &exec.DAGRunStatus{
+	ok := monitor.notifyCompletion(context.Background(), &exec.DAGRunStatus{
 		Name:      "briefing",
-		Status:    core.Succeeded,
+		Status:    core.Failed,
 		DAGRunID:  "run-2",
 		AttemptID: "attempt-2",
-	}, "prompt")
+		Error:     "boom",
+	})
 	require.True(t, ok)
 
+	require.Eventually(t, func() bool {
+		service.mu.Lock()
+		defer service.mu.Unlock()
+		return len(service.appendMessages) == 1
+	}, time.Second, 10*time.Millisecond)
+
+	service.mu.Lock()
 	assert.Equal(t, 0, service.createEmptyCalls, "existing DM session should be reused")
 	require.Len(t, service.appendSessionIDs, 1)
 	assert.Equal(t, "existing-session", service.appendSessionIDs[0])
+	service.mu.Unlock()
 	assert.Equal(t, "existing-session", cs.SessionID())
 	assert.Equal(t, int64(1), bot.lastDeliveredSeq(cs))
 	assert.Equal(t, 1, client.postCount(), "notification should still be delivered to Slack once")
+	service.mu.Lock()
+	require.Len(t, service.appendMessages, 1)
+	assert.Equal(t, "dm notification", service.appendMessages[0].Content)
+	service.mu.Unlock()
 
 	bot.processStreamResponse(context.Background(), cs, agent.StreamResponse{
 		Messages: []agent.Message{
