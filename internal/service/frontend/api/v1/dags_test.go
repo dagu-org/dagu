@@ -4,6 +4,7 @@
 package api_test
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"testing"
@@ -27,6 +28,40 @@ func getJSONWhenAvailable(t *testing.T, server test.Server, url string, out any)
 	require.Equal(t, http.StatusOK, resp.Response.StatusCode(), "unexpected status code")
 	resp.Unmarshal(t, out)
 	return true
+}
+
+func sendRawRequestStatus(
+	t *testing.T,
+	server test.Server,
+	method string,
+	requestPath string,
+	body []byte,
+) int {
+	t.Helper()
+
+	baseURL := fmt.Sprintf(
+		"http://%s:%d",
+		server.Config.Server.Host,
+		server.Config.Server.Port,
+	)
+	var bodyReader *bytes.Reader
+	if body == nil {
+		bodyReader = bytes.NewReader(nil)
+	} else {
+		bodyReader = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequest(method, baseURL+requestPath, bodyReader)
+	require.NoError(t, err)
+	req.URL.RawPath = requestPath
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = resp.Body.Close() })
+	return resp.StatusCode
 }
 
 func TestDAGWritesDisabledInReadOnlyMode(t *testing.T) {
@@ -134,6 +169,45 @@ func TestCreateNewDAGPathTraversal(t *testing.T) {
 			Name: "..",
 		}).ExpectStatus(http.StatusBadRequest).Send(t)
 	})
+}
+
+func TestDAGFileNameRejectsEncodedTraversal(t *testing.T) {
+	server := test.SetupServer(t)
+
+	tests := []struct {
+		name       string
+		method     string
+		path       string
+		body       []byte
+		wantStatus int
+	}{
+		{
+			name:       "get spec",
+			method:     http.MethodGet,
+			path:       "/api/v1/dags/..%2F..%2Ftmp%2Fsecret/spec",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "delete dag",
+			method:     http.MethodDelete,
+			path:       "/api/v1/dags/..%2F..%2Ftmp%2Fsecret",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "start dag",
+			method:     http.MethodPost,
+			path:       "/api/v1/dags/..%2F..%2Ftmp%2Fsecret/start",
+			body:       []byte(`{}`),
+			wantStatus: http.StatusBadRequest,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			status := sendRawRequestStatus(t, server, tc.method, tc.path, tc.body)
+			require.Equal(t, tc.wantStatus, status)
+		})
+	}
 }
 
 func TestDAG(t *testing.T) {

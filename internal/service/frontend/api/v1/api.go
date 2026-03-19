@@ -21,6 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/baseconfig"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/license"
@@ -303,13 +304,56 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		r.Use(WithRemoteNode(a.remoteNodeResolver, a.apiBasePath))
 		r.Use(WebhookRawBodyMiddleware())
 
+		middlewares := []api.StrictMiddlewareFunc{validateDAGFileNameMiddleware}
 		options := api.StrictHTTPServerOptions{
 			ResponseErrorHandlerFunc: a.handleError,
 		}
-		handler := api.NewStrictHandlerWithOptions(a, nil, options)
+		handler := api.NewStrictHandlerWithOptions(a, middlewares, options)
 		r.Mount("/", api.Handler(handler))
 	})
 
+	return nil
+}
+
+func validateDAGFileNameMiddleware(
+	next api.StrictHandlerFunc,
+	_ string,
+) api.StrictHandlerFunc {
+	return func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		if err := validateDAGFileNameFromRequest(request); err != nil {
+			return nil, err
+		}
+		return next(ctx, w, r, request)
+	}
+}
+
+func validateDAGFileNameFromRequest(request any) error {
+	v := reflect.ValueOf(request)
+	if !v.IsValid() {
+		return nil
+	}
+	if v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return nil
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return nil
+	}
+
+	fileName := v.FieldByName("FileName")
+	if !fileName.IsValid() || fileName.Kind() != reflect.String {
+		return nil
+	}
+
+	if err := core.ValidateDAGName(fileName.String()); err != nil {
+		return &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    err.Error(),
+		}
+	}
 	return nil
 }
 
