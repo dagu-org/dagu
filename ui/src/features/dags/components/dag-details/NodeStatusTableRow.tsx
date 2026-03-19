@@ -16,6 +16,7 @@ import {
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient } from '@/hooks/api';
 import { getExecutorCommand } from '@/lib/executor-utils';
+import { isActiveNodeStatus } from '@/lib/status-utils';
 import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
 import {
@@ -158,10 +159,13 @@ function NodeStatusTableRow({
   // Use step.call OR fallback to first subRun's dagName (for chat tools, etc.)
   const subDagName = node.step.call || allSubRuns[0]?.dagName;
   const hasSubDAGRun = !!subDagName && allSubRuns.length > 0;
+  const isActiveNode = isActiveNodeStatus(node.status);
+  const activeDotClass =
+    node.status === NodeStatus.Retrying ? 'bg-warning' : 'bg-success';
 
-  // Update duration every second for running tasks
+  // Update duration every second for active tasks.
   useEffect(() => {
-    if (node.status === NodeStatus.Running && node.startedAt) {
+    if (isActiveNode && node.startedAt) {
       // Initial calculation
       setCurrentDuration(calculateDuration(node.startedAt, node.finishedAt));
 
@@ -176,7 +180,7 @@ function NodeStatusTableRow({
       // For non-running tasks, calculate once
       setCurrentDuration(calculateDuration(node.startedAt, node.finishedAt));
     }
-  }, [node.status, node.startedAt, node.finishedAt]);
+  }, [isActiveNode, node.startedAt, node.finishedAt]);
 
   // Build URL for log viewing
   const searchParams = new URLSearchParams();
@@ -195,6 +199,8 @@ function NodeStatusTableRow({
     switch (node.status) {
       case NodeStatus.Running:
         return 'bg-success-muted';
+      case NodeStatus.Retrying:
+        return 'bg-warning-muted';
       case NodeStatus.Failed:
         return 'bg-error-muted';
       case NodeStatus.Waiting:
@@ -556,8 +562,10 @@ function NodeStatusTableRow({
                 <div className="text-xs text-muted-foreground flex items-center gap-1.5 leading-tight">
                   <span className="font-medium flex items-center">
                     Duration:
-                    {node.status === NodeStatus.Running && (
-                      <span className="inline-block w-2 h-2 rounded-full bg-success ml-1.5 animate-pulse" />
+                    {isActiveNode && (
+                      <span
+                        className={`inline-block w-2 h-2 rounded-full ml-1.5 animate-pulse ${activeDotClass}`}
+                      />
                     )}
                   </span>
                   {currentDuration}
@@ -985,8 +993,10 @@ function NodeStatusTableRow({
             <div className="text-xs text-muted-foreground flex items-center gap-1.5">
               <span className="font-medium flex items-center">
                 Duration:
-                {node.status === NodeStatus.Running && (
-                  <span className="inline-block w-2 h-2 rounded-full bg-success ml-1.5 animate-pulse" />
+                {isActiveNode && (
+                  <span
+                    className={`inline-block w-2 h-2 rounded-full ml-1.5 animate-pulse ${activeDotClass}`}
+                  />
                 )}
               </span>
               {currentDuration}

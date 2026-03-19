@@ -7104,7 +7104,7 @@ components:
 
     NodeStatus:
       type: integer
-      enum: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+      enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
       x-enum-varnames:
         - "NotStarted"
         - "Running"
@@ -7115,6 +7115,7 @@ components:
         - "PartialSuccess"
         - "Waiting"
         - "Rejected"
+        - "Retrying"
       description: |
         Numeric status code indicating current node state:
         0: "Not started"
@@ -7126,6 +7127,7 @@ components:
         6: "Partial Success"
         7: "Waiting for approval"
         8: "Rejected"
+        9: "Retrying"
 
     NodeStatusLabel:
       type: string
@@ -7140,6 +7142,7 @@ components:
         - "partially_succeeded"
         - "waiting"
         - "rejected"
+        - "retrying"
 
     SchedulerStatusResponse:
       type: object

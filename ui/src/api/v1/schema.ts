@@ -2804,6 +2804,7 @@ export interface components {
          *     6: "Partial Success"
          *     7: "Waiting for approval"
          *     8: "Rejected"
+         *     9: "Retrying"
          *
          * @enum {integer}
          */
@@ -12381,7 +12382,8 @@ export enum NodeStatus {
     Skipped = 5,
     PartialSuccess = 6,
     Waiting = 7,
-    Rejected = 8
+    Rejected = 8,
+    Retrying = 9
 }
 export enum NodeStatusLabel {
     not_started = "not_started",
@@ -12392,7 +12394,8 @@ export enum NodeStatusLabel {
     skipped = "skipped",
     partially_succeeded = "partially_succeeded",
     waiting = "waiting",
-    rejected = "rejected"
+    rejected = "rejected",
+    retrying = "retrying"
 }
 export enum SchedulerInstanceStatus {
     active = "active",

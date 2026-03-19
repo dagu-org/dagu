@@ -1572,14 +1572,16 @@ func (a *API) UpdateSubDAGRunStepStatus(ctx context.Context, request api.UpdateS
 }
 
 var nodeStatusMapping = map[api.NodeStatus]core.NodeStatus{
-	api.NodeStatusNotStarted: core.NodeNotStarted,
-	api.NodeStatusRunning:    core.NodeRunning,
-	api.NodeStatusFailed:     core.NodeFailed,
-	api.NodeStatusAborted:    core.NodeAborted,
-	api.NodeStatusSuccess:    core.NodeSucceeded,
-	api.NodeStatusSkipped:    core.NodeSkipped,
-	api.NodeStatusWaiting:    core.NodeWaiting,
-	api.NodeStatusRejected:   core.NodeRejected,
+	api.NodeStatusNotStarted:     core.NodeNotStarted,
+	api.NodeStatusRunning:        core.NodeRunning,
+	api.NodeStatusFailed:         core.NodeFailed,
+	api.NodeStatusAborted:        core.NodeAborted,
+	api.NodeStatusSuccess:        core.NodeSucceeded,
+	api.NodeStatusSkipped:        core.NodeSkipped,
+	api.NodeStatusPartialSuccess: core.NodePartiallySucceeded,
+	api.NodeStatusWaiting:        core.NodeWaiting,
+	api.NodeStatusRejected:       core.NodeRejected,
+	api.NodeStatusRetrying:       core.NodeRetrying,
 }
 
 func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObject) (api.RetryDAGRunResponseObject, error) {

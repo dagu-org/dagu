@@ -302,6 +302,7 @@ function Graph({
     const statusColors = {
       none: '#5f6368',      // neutral gray
       running: '#81c784',   // light green (distinct from success)
+      retrying: '#e37400',  // warning amber for scheduled backoff
       done: '#1e8e3e',      // success green
       error: '#d93025',     // error red
       cancel: '#d946ef',    // pink/magenta for aborted
@@ -316,6 +317,9 @@ function Graph({
     );
     dat.push(
       `classDef running color:${nodeColor},fill:${nodeFill},stroke:${statusColors.running},stroke-width:2.5px`
+    );
+    dat.push(
+      `classDef retrying color:${nodeColor},fill:${nodeFill},stroke:${statusColors.retrying},stroke-width:2.5px`
     );
     dat.push(
       `classDef error color:${nodeColor},fill:${nodeFill},stroke:${statusColors.error},stroke-width:2.5px`
@@ -541,6 +545,7 @@ export default Graph;
 const graphStatusMap: Record<NodeStatus, string> = {
   [NodeStatus.NotStarted]: ':::none',
   [NodeStatus.Running]: ':::running',
+  [NodeStatus.Retrying]: ':::retrying',
   [NodeStatus.Failed]: ':::error',
   [NodeStatus.Aborted]: ':::cancel',
   [NodeStatus.Success]: ':::done',

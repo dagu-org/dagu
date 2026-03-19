@@ -6,6 +6,7 @@ package api
 import (
 	"testing"
 
+	openapi "github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
@@ -94,4 +95,23 @@ func TestToDAGDetailsIncludesParamDefDescriptions(t *testing.T) {
 	require.Len(t, *details.ParamDefs, 1)
 	require.NotNil(t, (*details.ParamDefs)[0].Description)
 	assert.Equal(t, "Free-form operator notes", *(*details.ParamDefs)[0].Description)
+}
+
+func TestToNodeIncludesRetryingStatus(t *testing.T) {
+	node := &exec.Node{
+		Status: core.NodeRetrying,
+		Step: core.Step{
+			Name: "flaky",
+		},
+	}
+
+	converted := toNode(node)
+
+	assert.Equal(t, openapi.NodeStatusRetrying, converted.Status)
+	assert.Equal(t, openapi.NodeStatusLabelRetrying, converted.StatusLabel)
+}
+
+func TestNodeStatusMappingIncludesRetrying(t *testing.T) {
+	assert.Equal(t, core.NodeRetrying, nodeStatusMapping[openapi.NodeStatusRetrying])
+	assert.Equal(t, core.NodePartiallySucceeded, nodeStatusMapping[openapi.NodeStatusPartialSuccess])
 }

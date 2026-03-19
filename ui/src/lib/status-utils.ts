@@ -1,5 +1,9 @@
 import { NodeStatus, Status } from '@/api/v1/schema';
 
+export function isActiveNodeStatus(status?: NodeStatus): boolean {
+  return status === NodeStatus.Running || status === NodeStatus.Retrying;
+}
+
 /**
  * Get Tailwind CSS utility class for Status or NodeStatus enum.
  * Uses utility classes defined in global.css.
@@ -22,6 +26,9 @@ export function getStatusClass(status?: Status | NodeStatus): string {
     case Status.Running:
     case NodeStatus.Running:
       return 'status-running';
+
+    case NodeStatus.Retrying:
+      return 'status-warning';
 
     case Status.Queued:
     case Status.NotStarted:
@@ -60,7 +67,10 @@ export function getStatusColors(
   animation: string;
 } {
   const baseClass = getStatusClass(status);
-  const isWaiting = status === Status.Waiting || status === NodeStatus.Waiting;
+  const isPulsingWarning =
+    status === Status.Waiting ||
+    status === NodeStatus.Waiting ||
+    status === NodeStatus.Retrying;
 
   switch (baseClass) {
     case 'status-success':
@@ -100,7 +110,7 @@ export function getStatusColors(
         bgClass: 'bg-[#e37400] dark:bg-[#fdd663]',
         textClass: 'text-[#e37400] dark:text-[#fdd663]',
         borderClass: 'border-[#e37400] dark:border-[#fdd663]',
-        animation: isWaiting ? 'animate-pulse' : '',
+        animation: isPulsingWarning ? 'animate-pulse' : '',
       };
 
     case 'status-aborted':
@@ -135,6 +145,8 @@ export function getNodeStatusIcon(status: NodeStatus): string {
       return '✕';
     case NodeStatus.Rejected:
       return '⊘';
+    case NodeStatus.Retrying:
+      return '↻';
     case NodeStatus.NotStarted:
       return '○';
     case NodeStatus.Skipped:
