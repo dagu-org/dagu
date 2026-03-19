@@ -241,7 +241,8 @@ func isSkippedStatus(status core.NodeStatus) bool {
 // shouldShowDuration returns true for statuses that should display duration.
 func shouldShowDuration(status core.NodeStatus) bool {
 	return status == core.NodeSucceeded || status == core.NodeFailed ||
-		status == core.NodeRunning || status == core.NodePartiallySucceeded
+		status == core.NodeRunning || status == core.NodeRetrying ||
+		status == core.NodePartiallySucceeded
 }
 
 // getStatusLabel returns a text label for the node status.

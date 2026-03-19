@@ -110,9 +110,6 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 		return fmt.Errorf("no sub DAG runs to execute")
 	}
 
-	// Channel to collect errors from goroutines
-	errChan := make(chan error, len(e.runParamsList))
-
 	logger.Info(ctx, "Starting parallel execution",
 		slog.Int("total", len(e.runParamsList)),
 		slog.Int("max-concurrent", e.maxConcurrent),
@@ -160,6 +157,10 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 		if delay, ok := nextPendingDelay(pending, busyRuns, time.Now()); ok && delay > 0 {
 			timer = time.NewTimer(delay)
 		}
+		var timerCh <-chan time.Time
+		if timer != nil {
+			timerCh = timer.C
+		}
 
 		select {
 		case res := <-resultCh:
@@ -195,43 +196,29 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 					pendingSet[key] = struct{}{}
 				}
 			} else if res.err != nil {
-				errChan <- fmt.Errorf("sub DAG %s failed: %w", res.attempt.runParams.RunID, res.err)
+				e.errors = append(e.errors, fmt.Errorf("sub DAG %s failed: %w", res.attempt.runParams.RunID, res.err))
 			}
 
 		case <-e.cancel:
 			if timer != nil {
 				timer.Stop()
 			}
-			errChan <- errParallelCancelled
-			close(errChan)
+			e.errors = append(e.errors, errParallelCancelled)
 			return errParallelCancelled
 
 		case <-ctx.Done():
 			if timer != nil {
 				timer.Stop()
 			}
-			errChan <- ctx.Err()
-			close(errChan)
+			e.errors = append(e.errors, ctx.Err())
 			return ctx.Err()
 
-		case <-func() <-chan time.Time {
-			if timer == nil {
-				return nil
-			}
-			return timer.C
-		}():
+		case <-timerCh:
 		}
 
 		if timer != nil {
 			timer.Stop()
 		}
-	}
-
-	close(errChan)
-
-	// Collect all errors
-	for err := range errChan {
-		e.errors = append(e.errors, err)
 	}
 
 	// Always output aggregated results, even if some executions failed

@@ -260,7 +260,7 @@ steps:
     command: exit 1
     retry_policy:
       limit: 1
-      interval_sec: 2
+      interval_sec: 5
 `)
 
 	agent := dag.Agent()
@@ -288,7 +288,7 @@ steps:
 			}
 		}
 		return started >= 2
-	}, time.Second, 50*time.Millisecond, "first two items never started")
+	}, 3*time.Second, 50*time.Millisecond, "first two items never started")
 
 	require.Eventually(t, func() bool {
 		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
@@ -304,9 +304,14 @@ steps:
 			}
 		}
 		return started == 3
-	}, 500*time.Millisecond, 50*time.Millisecond, "third item should start before the 2s retry backoff expires")
+	}, 3*time.Second, 50*time.Millisecond, "third item should start before the retry backoff expires")
 
-	require.Error(t, <-errCh)
+	select {
+	case err := <-errCh:
+		require.Error(t, err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("parallel retry run did not exit")
+	}
 }
 
 func TestParallelExecution_DeterministicIDs(t *testing.T) {

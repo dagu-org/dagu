@@ -35,6 +35,8 @@ var (
 	WithRootDAGRun = exec.WithRootDAGRun
 	// WithParams sets runtime parameters.
 	WithParams = exec.WithParams
+	// WithEnvVars sets additional execution-scoped environment variables.
+	WithEnvVars = exec.WithEnvVars
 	// WithCoordinator sets the coordinator dispatcher for distributed execution.
 	WithCoordinator = exec.WithCoordinator
 	// WithSecrets sets secret environment variables.

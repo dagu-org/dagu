@@ -184,6 +184,8 @@ type Agent struct {
 
 	// workDir is the per-run work directory (for DAG_RUN_WORK_DIR).
 	workDir string
+	// extraEnvs are additional execution-scoped env vars injected into the DAG run context.
+	extraEnvs []string
 
 	// Evaluated configs - these are expanded at runtime and stored separately
 	// to avoid mutating the original DAG struct.
@@ -216,6 +218,8 @@ type Options struct {
 	// ProgressDisplay indicates if the progress display should be shown.
 	// This is typically enabled for CLI execution in a TTY environment.
 	ProgressDisplay bool
+	// ExtraEnvs are additional execution-scoped env vars injected into the DAG run context.
+	ExtraEnvs []string
 	// StepRetry is the name of the step to retry, if specified.
 	StepRetry string
 	// WorkerID is the identifier of the worker executing this DAG run.
@@ -288,6 +292,7 @@ func New(
 		dagStore:                ds,
 		dagRunStore:             opts.DAGRunStore,
 		registry:                opts.ServiceRegistry,
+		extraEnvs:               append([]string{}, opts.ExtraEnvs...),
 		stepRetry:               opts.StepRetry,
 		peerConfig:              opts.PeerConfig,
 		workerID:                opts.WorkerID,
@@ -461,6 +466,9 @@ func (a *Agent) Run(ctx context.Context) error {
 		runtime.WithCoordinator(coordinatorCli),
 		runtime.WithSecrets(secretEnvs),
 		runtime.WithDefaultExecMode(a.defaultExecMode),
+	}
+	if len(a.extraEnvs) > 0 {
+		contextOpts = append(contextOpts, runtime.WithEnvVars(a.extraEnvs...))
 	}
 
 	if a.workDir != "" {

@@ -122,6 +122,25 @@ func TestPendingStepRetriesFromStatus(t *testing.T) {
 		}, retries)
 	})
 
+	t.Run("FallsBackToHandlerIdentityWhenHandlerStepNameMissing", func(t *testing.T) {
+		status := &exec.DAGRunStatus{
+			OnFailure: &exec.Node{
+				Step: core.Step{
+					RetryPolicy: core.RetryPolicy{
+						Interval: 3 * time.Second,
+					},
+				},
+				Status:     core.NodeRetrying,
+				RetryCount: 1,
+			},
+		}
+
+		retries := exec.PendingStepRetriesFromStatus(status)
+		assert.Equal(t, []exec.PendingStepRetry{
+			{StepName: "onFailure", Interval: 3 * time.Second},
+		}, retries)
+	})
+
 	t.Run("ExplicitEmptySliceSurvivesJSONRoundTrip", func(t *testing.T) {
 		status := &exec.DAGRunStatus{
 			PendingStepRetries: []exec.PendingStepRetry{},

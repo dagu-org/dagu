@@ -139,20 +139,9 @@ func (st *DAGRunStatus) Errors() []error {
 func PendingStepRetriesFromNodes(nodes []*Node) []PendingStepRetry {
 	var retries []PendingStepRetry
 	for _, node := range nodes {
-		if node == nil || node.Status != core.NodeRetrying {
-			continue
+		if retry, ok := pendingStepRetryForNode(node.Step.Name, node); ok {
+			retries = append(retries, retry)
 		}
-
-		interval := core.CalculateBackoffInterval(
-			node.Step.RetryPolicy.Interval,
-			node.Step.RetryPolicy.Backoff,
-			node.Step.RetryPolicy.MaxInterval,
-			node.RetryCount-1,
-		)
-		retries = append(retries, PendingStepRetry{
-			StepName: node.Step.Name,
-			Interval: interval,
-		})
 	}
 	return retries
 }
@@ -167,7 +156,18 @@ func PendingStepRetriesFromStatus(status *DAGRunStatus) []PendingStepRetry {
 	if status.PendingStepRetries != nil {
 		return status.PendingStepRetries
 	}
-	return PendingStepRetriesFromNodes(status.executableNodes())
+
+	retries := PendingStepRetriesFromNodes(status.Nodes)
+	for _, handler := range status.handlerNodes() {
+		stepName := handler.name
+		if handler.node != nil && handler.node.Step.Name != "" {
+			stepName = handler.node.Step.Name
+		}
+		if retry, ok := pendingStepRetryForNode(stepName, handler.node); ok {
+			retries = append(retries, retry)
+		}
+	}
+	return retries
 }
 
 // NodeByName returns the node with the specified name.
@@ -255,20 +255,6 @@ func (st *DAGRunStatus) handlerNodes() []handlerNode {
 	}
 }
 
-// executableNodes returns regular nodes plus any handler nodes that exist.
-func (st *DAGRunStatus) executableNodes() []*Node {
-	if st == nil {
-		return nil
-	}
-	nodes := append([]*Node{}, st.Nodes...)
-	for _, handler := range st.handlerNodes() {
-		if handler.node != nil {
-			nodes = append(nodes, handler.node)
-		}
-	}
-	return nodes
-}
-
 func normalizeAbortHandlerLookup(name string) string {
 	if name == legacyAbortHandlerName {
 		return canonicalAbortHandlerName
@@ -283,4 +269,21 @@ func normalizeAbortHandlerNode(node *Node) {
 	if node.Step.Name == "" || node.Step.Name == legacyAbortHandlerName {
 		node.Step.Name = canonicalAbortHandlerName
 	}
+}
+
+func pendingStepRetryForNode(stepName string, node *Node) (PendingStepRetry, bool) {
+	if node == nil || node.Status != core.NodeRetrying || stepName == "" {
+		return PendingStepRetry{}, false
+	}
+
+	interval := core.CalculateBackoffInterval(
+		node.Step.RetryPolicy.Interval,
+		node.Step.RetryPolicy.Backoff,
+		node.Step.RetryPolicy.MaxInterval,
+		node.RetryCount-1,
+	)
+	return PendingStepRetry{
+		StepName: stepName,
+		Interval: interval,
+	}, true
 }

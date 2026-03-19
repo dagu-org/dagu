@@ -123,7 +123,7 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
 
-	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, queuedRun, nil)
+	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, queuedRun, nil, taskExtraEnvs(task))
 }
 
 func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1.Task) error {
@@ -158,7 +158,7 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 		target:      status,
 		stepName:    task.Step,
 		triggerType: triggerType,
-	})
+	}, taskExtraEnvs(task))
 }
 
 func (h *remoteTaskHandler) reportTaskLoadFailure(ctx context.Context, task *coordinatorv1.Task, root, parent exec.DAGRunRef, loadErr error) {
@@ -209,6 +209,13 @@ type retryConfig struct {
 	target      *exec.DAGRunStatus
 	stepName    string
 	triggerType core.TriggerType
+}
+
+func taskExtraEnvs(task *coordinatorv1.Task) []string {
+	if task == nil || !task.ExternalStepRetry {
+		return nil
+	}
+	return []string{exec.EnvKeyExternalStepRetry + "=1"}
 }
 
 // createRemoteHandlers creates the status pusher and log streamer for remote execution.
@@ -339,6 +346,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 	logStreamer *remote.LogStreamer,
 	queuedRun bool,
 	retry *retryConfig,
+	extraEnvs []string,
 ) error {
 	// Create temporary directory for local operations
 	env, err := h.createAgentEnv(ctx, dagRunID)
@@ -383,6 +391,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 		WorkerID:         h.workerID,
 		StatusPusher:     statusPusher,
 		LogWriterFactory: logStreamer,
+		ExtraEnvs:        extraEnvs,
 		QueuedRun:        queuedRun,
 		AttemptID:        attemptID,
 		DAGRunStore:      h.dagRunStore,

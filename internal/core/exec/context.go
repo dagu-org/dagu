@@ -196,6 +196,7 @@ type contextOptions struct {
 	db                 Database
 	rootDAGRun         DAGRunRef
 	params             []string
+	envs               []string
 	coordinator        Dispatcher
 	secretEnvs         []string
 	logEncodingCharset string
@@ -225,6 +226,13 @@ func WithRootDAGRun(ref DAGRunRef) ContextOption {
 func WithParams(params []string) ContextOption {
 	return func(o *contextOptions) {
 		o.params = params
+	}
+}
+
+// WithEnvVars sets additional execution-scoped environment variables.
+func WithEnvVars(envs ...string) ContextOption {
+	return func(o *contextOptions) {
+		o.envs = append(o.envs, envs...)
 	}
 }
 
@@ -302,6 +310,7 @@ func NewContext(
 
 	maps.Copy(envs, stringutil.KeyValuesToMap(options.params))
 	maps.Copy(envs, stringutil.KeyValuesToMap(dag.Env))
+	maps.Copy(envs, stringutil.KeyValuesToMap(options.envs))
 
 	// Set runtime-managed env vars after merges so user-defined params/env cannot override them.
 	if options.workDir != "" {

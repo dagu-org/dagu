@@ -37,7 +37,13 @@ Examples:
 	)
 }
 
-var retryFlags = []commandLineFlag{dagRunIDFlagRetry, stepNameForRetry, rootDAGRunFlag, retryWorkerIDFlag}
+var retryFlags = []commandLineFlag{
+	dagRunIDFlagRetry,
+	stepNameForRetry,
+	rootDAGRunFlag,
+	defaultWorkingDirFlag,
+	retryWorkerIDFlag,
+}
 
 var retryWorkerIDFlag = commandLineFlag{
 	name:  "worker-id",

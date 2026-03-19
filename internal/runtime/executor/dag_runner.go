@@ -174,6 +174,9 @@ func (e *SubDAGExecutor) buildRetryCommand(
 		fmt.Sprintf("--run-id=%s", runParams.RunID),
 		fmt.Sprintf("--root=%s", rCtx.RootDAGRun.String()),
 	}
+	if workDir != "" {
+		args = append(args, fmt.Sprintf("--default-working-dir=%s", workDir))
+	}
 	if stepName != "" {
 		args = append(args, fmt.Sprintf("--step=%s", stepName))
 	}
@@ -243,26 +246,13 @@ func (e *SubDAGExecutor) BuildCoordinatorTask(ctx context.Context, runParams Run
 		return nil, errRootDAGRunNotSet
 	}
 
-	// Determine base config to propagate: prefer sub-DAG's own, fall back to parent's
-	baseConfig := string(e.DAG.BaseConfigData)
-	if baseConfig == "" && rCtx.DAG != nil {
-		baseConfig = string(rCtx.DAG.BaseConfigData)
-	}
-
 	// Build task for coordinator dispatch using DAG.CreateTask
 	task := CreateTask(
 		e.DAG.Name,
 		string(e.DAG.YamlData),
 		coordinatorv1.Operation_OPERATION_START,
 		runParams.RunID,
-		WithRootDagRun(rCtx.RootDAGRun),
-		WithParentDagRun(exec.DAGRunRef{
-			Name: rCtx.DAG.Name,
-			ID:   rCtx.DAGRunID,
-		}),
-		WithTaskParams(runParams.Params),
-		WithWorkerSelector(e.DAG.WorkerSelector),
-		WithBaseConfig(baseConfig),
+		e.coordinatorTaskOptions(ctx, WithTaskParams(runParams.Params))...,
 	)
 
 	taskCtx := logger.WithValues(ctx,
@@ -274,6 +264,59 @@ func (e *SubDAGExecutor) BuildCoordinatorTask(ctx context.Context, runParams Run
 	)
 
 	return task, nil
+}
+
+func (e *SubDAGExecutor) buildCoordinatorRetryTask(
+	ctx context.Context,
+	runParams RunParams,
+	stepName string,
+	previousStatus *exec.DAGRunStatus,
+) (*coordinatorv1.Task, error) {
+	rCtx := exec.GetContext(ctx)
+	if runParams.RunID == "" {
+		return nil, errDAGRunIDNotSet
+	}
+	if rCtx.RootDAGRun.Zero() {
+		return nil, errRootDAGRunNotSet
+	}
+
+	task := CreateTask(
+		e.DAG.Name,
+		string(e.DAG.YamlData),
+		coordinatorv1.Operation_OPERATION_RETRY,
+		runParams.RunID,
+		e.coordinatorTaskOptions(
+			ctx,
+			WithStep(stepName),
+			WithPreviousStatus(previousStatus),
+		)...,
+	)
+	return task, nil
+}
+
+func (e *SubDAGExecutor) coordinatorTaskOptions(ctx context.Context, extra ...TaskOption) []TaskOption {
+	rCtx := exec.GetContext(ctx)
+
+	// Prefer the sub-DAG base config and fall back to the parent's base config.
+	baseConfig := string(e.DAG.BaseConfigData)
+	if baseConfig == "" && rCtx.DAG != nil {
+		baseConfig = string(rCtx.DAG.BaseConfigData)
+	}
+
+	options := []TaskOption{
+		WithRootDagRun(rCtx.RootDAGRun),
+		WithParentDagRun(exec.DAGRunRef{
+			Name: rCtx.DAG.Name,
+			ID:   rCtx.DAGRunID,
+		}),
+		WithWorkerSelector(e.DAG.WorkerSelector),
+		WithBaseConfig(baseConfig),
+	}
+	if e.externalStepRetry {
+		options = append(options, WithExternalStepRetry(true))
+	}
+	options = append(options, extra...)
+	return options
 }
 
 // Cleanup removes any temporary files created for local DAGs.
@@ -324,7 +367,11 @@ func (e *SubDAGExecutor) Retry(ctx context.Context, runParams RunParams, stepNam
 
 	rCtx := exec.GetContext(ctx)
 	if core.ShouldDispatchToCoordinator(e.DAG, e.coordinatorCli != nil, rCtx.DefaultExecMode) {
-		return nil, fmt.Errorf("external step retry is only supported for local sub DAG execution")
+		logger.Info(ctx, "Retrying sub DAG via distributed execution", tag.Step(stepName))
+		if err := e.dispatchRetryToCoordinator(ctx, runParams, stepName); err != nil {
+			return nil, fmt.Errorf("distributed step retry failed: %w", err)
+		}
+		return e.waitCompletion(ctx, runParams.RunID)
 	}
 
 	cmd, err := e.buildRetryCommand(ctx, runParams, stepName, workDir)
@@ -433,6 +480,36 @@ func (e *SubDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams Ru
 		return fmt.Errorf("failed to dispatch task: %w", err)
 	}
 
+	return nil
+}
+
+func (e *SubDAGExecutor) dispatchRetryToCoordinator(ctx context.Context, runParams RunParams, stepName string) error {
+	if e.coordinatorCli == nil {
+		return fmt.Errorf("no coordinator client configured for distributed execution")
+	}
+
+	previousStatus, err := e.getFullSubDAGRunStatus(ctx, runParams.RunID)
+	if err != nil {
+		return fmt.Errorf("failed to load sub DAG status for retry: %w", err)
+	}
+
+	task, err := e.buildCoordinatorRetryTask(ctx, runParams, stepName, previousStatus)
+	if err != nil {
+		return fmt.Errorf("failed to build retry coordinator task: %w", err)
+	}
+
+	taskCtx := logger.WithValues(ctx,
+		tag.RunID(task.DagRunId),
+		tag.Target(task.Target),
+		tag.Step(stepName),
+	)
+	logger.Info(taskCtx, "Dispatching retry task to coordinator",
+		slog.Any("worker-selector", task.WorkerSelector),
+	)
+
+	if err := e.coordinatorCli.Dispatch(ctx, task); err != nil {
+		return fmt.Errorf("failed to dispatch retry task: %w", err)
+	}
 	return nil
 }
 
@@ -575,8 +652,37 @@ func (e *SubDAGExecutor) getSubDAGRunStatus(ctx context.Context, dagRunID string
 	return nil, fmt.Errorf("no coordinator or database available to get sub-DAG status")
 }
 
+func (e *SubDAGExecutor) getFullSubDAGRunStatus(ctx context.Context, dagRunID string) (*exec.DAGRunStatus, error) {
+	rCtx := exec.GetContext(ctx)
+	if e.coordinatorCli == nil {
+		return nil, fmt.Errorf("no coordinator available to get full sub-DAG status")
+	}
+	return e.getFullStatusFromCoordinator(ctx, dagRunID, rCtx.RootDAGRun)
+}
+
 // getStatusFromCoordinator queries the coordinator for sub-DAG run status.
 func (e *SubDAGExecutor) getStatusFromCoordinator(ctx context.Context, dagRunID string, rootDAGRun exec.DAGRunRef) (*exec.RunStatus, error) {
+	dagRunStatus, err := e.getFullStatusFromCoordinator(ctx, dagRunID, rootDAGRun)
+	if err != nil {
+		return nil, err
+	}
+	outputs := extractOutputsFromNodes(dagRunStatus.Nodes)
+
+	return &exec.RunStatus{
+		Name:               dagRunStatus.Name,
+		DAGRunID:           dagRunID,
+		Params:             dagRunStatus.Params,
+		Outputs:            outputs,
+		Status:             dagRunStatus.Status,
+		PendingStepRetries: exec.PendingStepRetriesFromStatus(dagRunStatus),
+	}, nil
+}
+
+func (e *SubDAGExecutor) getFullStatusFromCoordinator(
+	ctx context.Context,
+	dagRunID string,
+	rootDAGRun exec.DAGRunRef,
+) (*exec.DAGRunStatus, error) {
 	rootRef := &rootDAGRun
 	resp, err := e.coordinatorCli.GetDAGRunStatus(ctx, e.DAG.Name, dagRunID, rootRef)
 	if err != nil {
@@ -593,16 +699,7 @@ func (e *SubDAGExecutor) getStatusFromCoordinator(ctx context.Context, dagRunID 
 	if convErr != nil {
 		return nil, fmt.Errorf("failed to convert status: %w", convErr)
 	}
-	outputs := extractOutputsFromNodes(dagRunStatus.Nodes)
-
-	return &exec.RunStatus{
-		Name:               dagRunStatus.Name,
-		DAGRunID:           dagRunID,
-		Params:             dagRunStatus.Params,
-		Outputs:            outputs,
-		Status:             dagRunStatus.Status,
-		PendingStepRetries: exec.PendingStepRetriesFromStatus(dagRunStatus),
-	}, nil
+	return dagRunStatus, nil
 }
 
 // extractOutputsFromNodes extracts output variables from nodes.

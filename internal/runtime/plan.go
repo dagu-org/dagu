@@ -146,6 +146,7 @@ func CreateStepRetryPlan(dag *core.DAG, nodes []*Node, stepName string) (*Plan, 
 	if targetNode == nil {
 		return nil, fmt.Errorf("%w: %s", ErrMissingNode, stepName)
 	}
+	preserveRetryBudget := targetNode.State().Status == core.NodeRetrying
 
 	step, ok := steps[targetNode.Name()]
 	if !ok {
@@ -155,7 +156,9 @@ func CreateStepRetryPlan(dag *core.DAG, nodes []*Node, stepName string) (*Plan, 
 	retryCount := targetNode.GetRetryCount()
 	targetNode.ClearState(step)
 	targetNode.SetRetryCount(retryCount)
-	targetNode.retryPolicy = RetryPolicy{} // force a fresh retry without prior policy
+	if !preserveRetryBudget {
+		targetNode.retryPolicy = RetryPolicy{} // manual step retries start with a fresh retry budget
+	}
 
 	return p, nil
 }

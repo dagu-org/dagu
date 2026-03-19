@@ -53,3 +53,17 @@ func TestHiddenHierarchyFlagsStillParse(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "root-dag:root-run", rootRetry)
 }
+
+func TestRetryCommandAcceptsDefaultWorkingDirFlag(t *testing.T) {
+	t.Parallel()
+
+	retryCmd := cmd.Retry()
+	require.NotNil(t, retryCmd.Flags().Lookup("default-working-dir"))
+	require.NoError(t, retryCmd.Flags().Parse([]string{
+		"--default-working-dir=/tmp/dags",
+	}))
+
+	defaultWorkingDir, err := retryCmd.Flags().GetString("default-working-dir")
+	require.NoError(t, err)
+	assert.Equal(t, "/tmp/dags", defaultWorkingDir)
+}

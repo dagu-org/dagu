@@ -10,6 +10,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -719,6 +720,16 @@ func TestNodeStatusToStatus(t *testing.T) {
 			require.Equal(t, tt.expected, nodeStatusToStatus(tt.nodeStatus))
 		})
 	}
+}
+
+func TestShouldShowDuration(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, shouldShowDuration(core.NodeRunning))
+	assert.True(t, shouldShowDuration(core.NodeRetrying))
+	assert.True(t, shouldShowDuration(core.NodeSucceeded))
+	assert.False(t, shouldShowDuration(core.NodeWaiting))
+	assert.False(t, shouldShowDuration(core.NodeSkipped))
 }
 
 func TestRenderDAGStatus_UnknownStatus(t *testing.T) {

@@ -524,6 +524,18 @@ func TestTaskStart(t *testing.T) {
 		assert.Contains(t, spec.Args, "--schedule-time=2026-03-13T10:00:00Z")
 	})
 
+	t.Run("TaskStartWithExternalStepRetry", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			DagRunId:          "task-run-id",
+			Target:            "/path/to/task.yaml",
+			ExternalStepRetry: true,
+		}
+		spec := builder.TaskStart(task)
+
+		assert.Contains(t, spec.Env, exec.EnvKeyExternalStepRetry+"=1")
+	})
+
 	t.Run("TaskStartWithoutTags", func(t *testing.T) {
 		t.Parallel()
 		task := &coordinatorv1.Task{
@@ -593,6 +605,19 @@ func TestTaskRetry(t *testing.T) {
 		spec := builder.TaskRetry(task)
 
 		assert.Contains(t, spec.Args, "--step=failed-step")
+	})
+
+	t.Run("TaskRetryWithExternalStepRetry", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			DagRunId:          "retry-run-id",
+			Target:            "/path/to/task.yaml",
+			RootDagRunName:    "root-dag",
+			ExternalStepRetry: true,
+		}
+		spec := builder.TaskRetry(task)
+
+		assert.Contains(t, spec.Env, exec.EnvKeyExternalStepRetry+"=1")
 	})
 
 	t.Run("TaskRetryWithoutConfig", func(t *testing.T) {

@@ -394,9 +394,11 @@ type Task struct {
 	// Base config YAML content for workers (avoids relying on local base config files).
 	BaseConfig string `protobuf:"bytes,17,opt,name=base_config,json=baseConfig,proto3" json:"base_config,omitempty"`
 	// RFC 3339 timestamp of when this task was originally scheduled.
-	ScheduleTime  string `protobuf:"bytes,18,opt,name=schedule_time,json=scheduleTime,proto3" json:"schedule_time,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ScheduleTime string `protobuf:"bytes,18,opt,name=schedule_time,json=scheduleTime,proto3" json:"schedule_time,omitempty"`
+	// Enables parent-managed step retries for this task.
+	ExternalStepRetry bool `protobuf:"varint,19,opt,name=external_step_retry,json=externalStepRetry,proto3" json:"external_step_retry,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *Task) Reset() {
@@ -553,6 +555,13 @@ func (x *Task) GetScheduleTime() string {
 		return x.ScheduleTime
 	}
 	return ""
+}
+
+func (x *Task) GetExternalStepRetry() bool {
+	if x != nil {
+		return x.ExternalStepRetry
+	}
+	return false
 }
 
 // Request message for getting workers.
@@ -1672,7 +1681,7 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\";\n" +
 	"\x0fDispatchRequest\x12(\n" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\"\x12\n" +
-	"\x10DispatchResponse\"\x86\x06\n" +
+	"\x10DispatchResponse\"\xb6\x06\n" +
 	"\x04Task\x127\n" +
 	"\toperation\x18\x06 \x01(\x0e2\x19.coordinator.v1.OperationR\toperation\x12)\n" +
 	"\x11root_dag_run_name\x18\x01 \x01(\tR\x0erootDagRunName\x12%\n" +
@@ -1698,7 +1707,8 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x04tags\x18\x10 \x01(\tR\x04tags\x12\x1f\n" +
 	"\vbase_config\x18\x11 \x01(\tR\n" +
 	"baseConfig\x12#\n" +
-	"\rschedule_time\x18\x12 \x01(\tR\fscheduleTime\x1aA\n" +
+	"\rschedule_time\x18\x12 \x01(\tR\fscheduleTime\x12.\n" +
+	"\x13external_step_retry\x18\x13 \x01(\bR\x11externalStepRetry\x1aA\n" +
 	"\x13WorkerSelectorEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x13\n" +

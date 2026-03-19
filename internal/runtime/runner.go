@@ -472,6 +472,12 @@ ExecRepeat: // repeat execution
 		if isRetriable {
 			continue ExecRepeat
 		}
+		if node.State().Status == core.NodeRetrying {
+			if progressCh != nil {
+				progressCh <- node
+			}
+			return
+		}
 
 		if node.State().Status != core.NodeAborted {
 			node.IncDoneCount()
@@ -1145,7 +1151,7 @@ func (r *Runner) shouldRetryNode(ctx context.Context, node *Node, execErr error)
 		tag.ExitCode(exitCode),
 	)
 
-	if externalStepRetryEnabled() {
+	if externalStepRetryEnabled(ctx) {
 		node.IncRetryCount()
 		node.SetStatus(core.NodeRetrying)
 		logger.Info(ctx, "Step retry will be scheduled by the parent executor",
@@ -1223,8 +1229,16 @@ func (r *Runner) finishNode(node *Node, wg *sync.WaitGroup) {
 	wg.Done()
 }
 
-func externalStepRetryEnabled() bool {
-	return os.Getenv(exec.EnvKeyExternalStepRetry) != ""
+func externalStepRetryEnabled(ctx context.Context) bool {
+	if os.Getenv(exec.EnvKeyExternalStepRetry) != "" {
+		return true
+	}
+
+	rCtx := exec.GetContext(ctx)
+	if value, ok := rCtx.UserEnvsMap()[exec.EnvKeyExternalStepRetry]; ok {
+		return value != ""
+	}
+	return false
 }
 
 // checkPreconditions evaluates the preconditions for a node and updates its status accordingly.
