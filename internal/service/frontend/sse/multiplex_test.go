@@ -5,11 +5,14 @@ package sse
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/remotenode"
@@ -74,6 +77,30 @@ func TestMultiplexerCreateSessionFiltersUnauthorizedTopics(t *testing.T) {
 	assert.Equal(t, "queueitems:default", result.control.Errors[0].Topic)
 }
 
+func TestMultiplexerCreateSessionFiltersUnsupportedTopics(t *testing.T) {
+	mux := NewMultiplexer(StreamConfig{}, nil)
+	t.Cleanup(mux.Shutdown)
+
+	mux.RegisterFetcher(TopicTypeDoc, func(_ context.Context, identifier string) (any, error) {
+		return map[string]string{"id": identifier}, nil
+	})
+
+	recorder := httptest.NewRecorder()
+	result, err := mux.createSession(
+		context.Background(),
+		recorder,
+		[]string{"agent:session-1", "doc:briefing/demo"},
+		0,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, result.session)
+
+	assert.Equal(t, []string{"doc:briefing/demo"}, result.control.Subscribed)
+	require.Len(t, result.control.Errors, 1)
+	assert.Equal(t, "agent:session-1", result.control.Errors[0].Topic)
+	assert.Equal(t, "unsupported_topic", result.control.Errors[0].Code)
+}
+
 func TestMultiplexerMutateSessionPartialAuthorization(t *testing.T) {
 	mux := NewMultiplexer(StreamConfig{}, nil)
 	t.Cleanup(mux.Shutdown)
@@ -107,7 +134,35 @@ func TestMultiplexerMutateSessionPartialAuthorization(t *testing.T) {
 	assert.Equal(t, "queueitems:default", mutation.response.Errors[0].Topic)
 }
 
-func TestMultiplexerMutateSessionIsAtomicOnTopicResolutionFailure(t *testing.T) {
+func TestMultiplexerMutateSessionPartialUnsupportedTopic(t *testing.T) {
+	mux := NewMultiplexer(StreamConfig{}, nil)
+	t.Cleanup(mux.Shutdown)
+
+	mux.RegisterFetcher(TopicTypeDoc, func(_ context.Context, identifier string) (any, error) {
+		return map[string]string{"id": identifier}, nil
+	})
+
+	recorder := httptest.NewRecorder()
+	result, err := mux.createSession(context.Background(), recorder, nil, 0)
+	require.NoError(t, err)
+	require.NotNil(t, result.session)
+
+	mutation, err := mux.mutateSession(
+		context.Background(),
+		result.session.id,
+		[]string{"agent:session-1", "doc:briefing/demo"},
+		nil,
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusForbidden, mutation.statusCode)
+	assert.Equal(t, []string{"doc:briefing/demo"}, mutation.response.Subscribed)
+	require.Len(t, mutation.response.Errors, 1)
+	assert.Equal(t, "agent:session-1", mutation.response.Errors[0].Topic)
+	assert.Equal(t, "unsupported_topic", mutation.response.Errors[0].Code)
+}
+
+func TestMultiplexerMutateSessionIsAtomicOnInvalidTopicFailure(t *testing.T) {
 	mux := NewMultiplexer(StreamConfig{}, nil)
 	t.Cleanup(mux.Shutdown)
 
@@ -123,13 +178,13 @@ func TestMultiplexerMutateSessionIsAtomicOnTopicResolutionFailure(t *testing.T) 
 	_, err = mux.mutateSession(
 		context.Background(),
 		result.session.id,
-		[]string{"missing:test"},
+		[]string{"invalid-topic"},
 		[]string{"dag:test.yaml"},
 	)
 	require.Error(t, err)
 
 	assert.Equal(t, []string{"dag:test.yaml"}, result.session.topicKeys())
-	_, missingTopicExists := mux.topics["missing:test"]
+	_, missingTopicExists := mux.topics["invalid-topic"]
 	assert.False(t, missingTopicExists)
 }
 
@@ -168,7 +223,7 @@ func TestMultiplexerCreateSessionDoesNotRetainTopicsOnFailure(t *testing.T) {
 	result, err := mux.createSession(
 		context.Background(),
 		recorder,
-		[]string{"dag:test.yaml", "missing:test"},
+		[]string{"dag:test.yaml", "invalid-topic"},
 		0,
 	)
 	require.Error(t, err)
@@ -286,4 +341,61 @@ func TestMultiplexHandlerProxyStreamForwardsLastEventID(t *testing.T) {
 
 	assert.Equal(t, "47", forwardedLastEventID)
 	assert.Equal(t, http.StatusOK, recorder.Code)
+}
+
+func TestMultiplexHandlerHandleStreamAllowsUnsupportedInitialTopics(t *testing.T) {
+	mux := NewMultiplexer(StreamConfig{HeartbeatInterval: time.Hour}, nil)
+	t.Cleanup(mux.Shutdown)
+
+	mux.RegisterFetcher(TopicTypeDoc, func(_ context.Context, identifier string) (any, error) {
+		return map[string]string{"id": identifier}, nil
+	})
+
+	handler := NewMultiplexHandler(mux, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/events/stream?topic=agent%3Asession-1&topic=doc%3Abriefing%2Fdemo",
+		nil,
+	).WithContext(ctx)
+	recorder := httptest.NewRecorder()
+
+	handler.HandleStream(recorder, req)
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+
+	body := recorder.Body.String()
+	assert.NotContains(t, body, "unable to open SSE stream")
+
+	control := parseControlEvent(t, body)
+	assert.Equal(t, []string{"doc:briefing/demo"}, control.Subscribed)
+	require.Len(t, control.Errors, 1)
+	assert.Equal(t, "agent:session-1", control.Errors[0].Topic)
+	assert.Equal(t, "unsupported_topic", control.Errors[0].Code)
+}
+
+func parseControlEvent(t *testing.T, body string) StreamControlEvent {
+	t.Helper()
+
+	for frame := range strings.SplitSeq(body, "\n\n") {
+		if !strings.Contains(frame, "event: control\n") {
+			continue
+		}
+
+		for line := range strings.SplitSeq(frame, "\n") {
+			if !strings.HasPrefix(line, "data: ") {
+				continue
+			}
+
+			var control StreamControlEvent
+			require.NoError(t, json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &control))
+			return control
+		}
+	}
+
+	t.Fatalf("control event not found in stream body: %q", body)
+	return StreamControlEvent{}
 }

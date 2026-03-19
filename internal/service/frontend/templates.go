@@ -6,13 +6,16 @@ package frontend
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -30,6 +33,39 @@ const (
 	baseTemplateName = "base"
 	baseTemplateFile = "base.gohtml"
 )
+
+var (
+	// TODO: Cache only the bundle hash here once when we can revisit this
+	// package-global state without widening this low-risk regression fix.
+	assetVersionOnce sync.Once
+	assetVersion     string
+)
+
+func formatAssetVersion(version string, bundle []byte) string {
+	sum := sha256.Sum256(bundle)
+	suffix := hex.EncodeToString(sum[:8])
+	if version == "" {
+		return suffix
+	}
+	return version + "-" + suffix
+}
+
+func currentAssetVersion() string {
+	assetVersionOnce.Do(func() {
+		switch config.Version {
+		case "", "0.0.0", "dev":
+			data, err := assetsFS.ReadFile("assets/bundle.js")
+			if err != nil {
+				assetVersion = config.Version
+				return
+			}
+			assetVersion = formatAssetVersion(config.Version, data)
+		default:
+			assetVersion = config.Version
+		}
+	})
+	return assetVersion
+}
 
 func (srv *Server) useTemplate(ctx context.Context, layout, name string) func(http.ResponseWriter, any) {
 	if srv.config.Server.Headless {
@@ -106,6 +142,7 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 	return template.FuncMap{
 		"defTitle":              func(v any) string { s, _ := v.(string); return s },
 		"version":               func() string { return config.Version },
+		"assetVersion":          currentAssetVersion,
 		"navbarColor":           func() string { return cfg.NavbarColor },
 		"navbarTitle":           func() string { return cfg.NavbarTitle },
 		"basePath":              func() string { return cfg.BasePath },
