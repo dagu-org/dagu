@@ -32,6 +32,18 @@ func EvalObject[T any](ctx context.Context, obj T) (T, error) {
 
 // GenerateSubDAGRunID generates a unique run ID based on the current DAG run ID, step name, and parameters.
 func GenerateSubDAGRunID(ctx context.Context, params string, repeated bool) string {
+	return GenerateSubDAGRunIDForTarget(ctx, "", params, repeated)
+}
+
+// GenerateSubDAGRunIDForTarget generates a unique run ID for a sub-DAG target.
+// Including the target keeps deterministic IDs stable for retries while avoiding
+// collisions when one parent step dispatches different child DAGs with identical params.
+func GenerateSubDAGRunIDForTarget(ctx context.Context, dagName, params string, repeated bool) string {
+	identity := params
+	if dagName != "" {
+		identity = dagName + "\x00" + params
+	}
+
 	if repeated {
 		// If this is a repeated sub DAG run, we need to generate a unique ID with randomness
 		// to avoid collisions with previous runs.
@@ -40,11 +52,11 @@ func GenerateSubDAGRunID(ctx context.Context, params string, repeated bool) stri
 			randomBytes = fmt.Appendf(nil, "%d", time.Now().UnixNano())
 		}
 		return stringutil.Base58EncodeSHA256(
-			fmt.Sprintf("%s:%s:%s:%x", GetEnv(ctx).DAGRunID, GetEnv(ctx).Step.Name, params, randomBytes),
+			fmt.Sprintf("%s:%s:%s:%x", GetEnv(ctx).DAGRunID, GetEnv(ctx).Step.Name, identity, randomBytes),
 		)
 	}
 	env := GetEnv(ctx)
 	return stringutil.Base58EncodeSHA256(
-		fmt.Sprintf("%s:%s:%s", env.DAGRunID, env.Step.Name, params),
+		fmt.Sprintf("%s:%s:%s", env.DAGRunID, env.Step.Name, identity),
 	)
 }

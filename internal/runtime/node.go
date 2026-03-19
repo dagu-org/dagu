@@ -445,12 +445,14 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 
 	// Evaluate the sub DAG if set
 	if child := n.Step().SubDAG; child != nil {
-		dagName, err := EvalString(ctx, child.Name)
-		if err != nil {
-			return nil, fmt.Errorf("failed to eval sub DAG name: %w", err)
-		}
 		copy := *child
-		copy.Name = dagName
+		if n.Step().Parallel == nil {
+			dagName, err := EvalString(ctx, child.Name)
+			if err != nil {
+				return nil, fmt.Errorf("failed to eval sub DAG name: %w", err)
+			}
+			copy.Name = dagName
+		}
 		n.SetSubDAG(copy)
 	}
 
@@ -494,8 +496,9 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 				return nil, fmt.Errorf("executor %T does not support sub DAG execution", cmd)
 			}
 			exec.SetParams(executor.RunParams{
-				RunID:  subRuns[0].DAGRunID,
-				Params: subRuns[0].Params,
+				RunID:   subRuns[0].DAGRunID,
+				Params:  subRuns[0].Params,
+				DAGName: subRuns[0].DAGName,
 			})
 		} else {
 			// Parallel sub DAG execution
@@ -507,8 +510,9 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 			var runParamsList []executor.RunParams
 			for _, subRun := range subRuns {
 				runParamsList = append(runParamsList, executor.RunParams{
-					RunID:  subRun.DAGRunID,
-					Params: subRun.Params,
+					RunID:   subRun.DAGRunID,
+					Params:  subRun.Params,
+					DAGName: subRun.DAGName,
 				})
 			}
 			exec.SetParamsList(runParamsList)
@@ -753,14 +757,16 @@ func (n *Node) BuildSubDAGRuns(ctx context.Context, subDAG *core.SubDAG) ([]SubD
 		if err != nil {
 			return nil, fmt.Errorf("failed to eval sub dag params: %w", err)
 		}
+		dagName := subDAG.Name
 		repeated := n.IsRepeated()
 		if repeated && len(n.State().SubRuns) > 0 {
 			n.AddSubRunsRepeated(n.State().SubRuns[0])
 		}
-		dagRunID := GenerateSubDAGRunID(ctx, params, repeated)
+		dagRunID := GenerateSubDAGRunIDForTarget(ctx, dagName, params, repeated)
 		return []SubDAGRun{{
 			DAGRunID: dagRunID,
 			Params:   params,
+			DAGName:  dagName,
 		}}, nil
 	}
 
@@ -836,13 +842,18 @@ func (n *Node) BuildSubDAGRuns(ctx context.Context, subDAG *core.SubDAG) ([]SubD
 			return nil, fmt.Errorf("failed to process item %d: %w", i, err)
 		}
 
+		variables := map[string]string{
+			"ITEM": param,
+		}
+
+		dagName, err := EvalString(ctx, subDAG.Name, eval.WithVariables(variables))
+		if err != nil {
+			return nil, fmt.Errorf("failed to eval sub dag name: %w", err)
+		}
+
 		// Merge the item param with the step's params if they exist
 		finalParams := param
 		if subDAG.Params != "" {
-			// Create variables map with ITEM set to the current item value
-			variables := map[string]string{
-				"ITEM": param,
-			}
 			params := subDAG.Params
 			evaluatedStepParams, err := EvalString(ctx, params, eval.WithVariables(variables))
 			if err != nil {
@@ -851,11 +862,12 @@ func (n *Node) BuildSubDAGRuns(ctx context.Context, subDAG *core.SubDAG) ([]SubD
 			finalParams = evaluatedStepParams
 		}
 
-		dagRunID := GenerateSubDAGRunID(ctx, finalParams, repeated)
+		dagRunID := GenerateSubDAGRunIDForTarget(ctx, dagName, finalParams, repeated)
 		// Use dagRunID as key to deduplicate - same params will generate same ID
 		subRunMap[dagRunID] = SubDAGRun{
 			DAGRunID: dagRunID,
 			Params:   finalParams,
+			DAGName:  dagName,
 		}
 	}
 
