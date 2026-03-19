@@ -596,6 +596,12 @@
           "description": "Coordinator port number.",
           "minimum": 0,
           "maximum": 65535
+        },
+        "health_port": {
+          "type": "integer",
+          "description": "Coordinator HTTP health check port. Default: 8091. Set to 0 to disable.",
+          "minimum": 0,
+          "maximum": 65535
         }
       }
     },
@@ -611,6 +617,12 @@
         "max_active_runs": {
           "type": "integer",
           "description": "Maximum concurrent DAG runs for this worker."
+        },
+        "health_port": {
+          "type": "integer",
+          "description": "Worker HTTP health check port. Default: 8092. Set to 0 to disable.",
+          "minimum": 0,
+          "maximum": 65535
         },
         "labels": {
           "oneOf": [

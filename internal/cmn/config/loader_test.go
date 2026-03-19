@@ -78,12 +78,14 @@ func TestLoad_Env(t *testing.T) {
 
 		"DAGU_QUEUE_ENABLED": "false",
 
-		"DAGU_COORDINATOR_HOST":      "0.0.0.0",
-		"DAGU_COORDINATOR_ADVERTISE": "dagu-coordinator",
-		"DAGU_COORDINATOR_PORT":      "50099",
+		"DAGU_COORDINATOR_HOST":        "0.0.0.0",
+		"DAGU_COORDINATOR_ADVERTISE":   "dagu-coordinator",
+		"DAGU_COORDINATOR_PORT":        "50099",
+		"DAGU_COORDINATOR_HEALTH_PORT": "50101",
 
 		"DAGU_WORKER_ID":              "test-worker-123",
 		"DAGU_WORKER_MAX_ACTIVE_RUNS": "200",
+		"DAGU_WORKER_HEALTH_PORT":     "50102",
 
 		"DAGU_SCHEDULER_PORT":                      "9999",
 		"DAGU_SCHEDULER_ZOMBIE_DETECTION_INTERVAL": "90s",
@@ -212,14 +214,16 @@ func TestLoad_Env(t *testing.T) {
 		},
 		Queues: Queues{Enabled: false},
 		Coordinator: Coordinator{
-			Enabled:   true,
-			Host:      "0.0.0.0",
-			Advertise: "dagu-coordinator",
-			Port:      50099,
+			Enabled:    true,
+			Host:       "0.0.0.0",
+			Advertise:  "dagu-coordinator",
+			Port:       50099,
+			HealthPort: 50101,
 		},
 		Worker: Worker{
 			ID:            "test-worker-123",
 			MaxActiveRuns: 200,
+			HealthPort:    50102,
 			PostgresPool: PostgresPoolConfig{
 				MaxOpenConns:    25,
 				MaxIdleConns:    5,
@@ -269,6 +273,35 @@ func TestLoad_Env(t *testing.T) {
 	}
 
 	assert.Equal(t, expected, cfg)
+}
+
+func TestLoad_HealthPortDefaults(t *testing.T) {
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	err := os.WriteFile(configFile, []byte("# minimal config"), 0600)
+	require.NoError(t, err)
+
+	cfg := testLoad(t, WithConfigFile(configFile))
+
+	assert.Equal(t, 8091, cfg.Coordinator.HealthPort)
+	assert.Equal(t, 8092, cfg.Worker.HealthPort)
+}
+
+func TestLoad_HealthPortsCanBeDisabledWithZero(t *testing.T) {
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	err := os.WriteFile(configFile, []byte(`
+coordinator:
+  health_port: 0
+worker:
+  health_port: 0
+`), 0600)
+	require.NoError(t, err)
+
+	cfg := testLoad(t, WithConfigFile(configFile))
+
+	assert.Zero(t, cfg.Coordinator.HealthPort)
+	assert.Zero(t, cfg.Worker.HealthPort)
 }
 
 func TestLoad_WithAppHomeDir(t *testing.T) {
@@ -498,13 +531,15 @@ scheduler:
 			},
 		},
 		Coordinator: Coordinator{
-			Enabled: true,
-			Host:    "coordinator.example.com",
-			Port:    8081,
+			Enabled:    true,
+			Host:       "coordinator.example.com",
+			Port:       8081,
+			HealthPort: 8091,
 		},
 		Worker: Worker{
 			ID:            "worker-1",
 			MaxActiveRuns: 50,
+			HealthPort:    8092,
 			Labels: map[string]string{
 				"env":    "production",
 				"region": "us-west-2",

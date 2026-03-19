@@ -16,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/service/healthcheck"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -23,15 +24,17 @@ import (
 )
 
 type Service struct {
-	server         *grpc.Server
-	handler        *Handler
-	grpcListener   net.Listener
-	healthServer   *health.Server
-	registry       exec.ServiceRegistry
-	cfg            *config.Config
-	instanceID     string
-	hostPort       string
-	configuredHost string
+	server              *grpc.Server
+	handler             *Handler
+	grpcListener        net.Listener
+	grpcHealthServer    *health.Server
+	httpHealthServer    *healthcheck.Server
+	registry            exec.ServiceRegistry
+	cfg                 *config.Config
+	instanceID          string
+	hostPort            string
+	configuredHost      string
+	disableHealthServer bool
 
 	// For graceful shutdown
 	mu         sync.Mutex
@@ -42,38 +45,68 @@ func NewService(
 	server *grpc.Server,
 	handler *Handler,
 	grpcListener net.Listener,
-	healthServer *health.Server,
+	grpcHealthServer *health.Server,
+	httpHealthServer *healthcheck.Server,
 	registry exec.ServiceRegistry,
 	cfg *config.Config,
 	instanceID string,
 	configuredHost string,
 ) *Service {
 	return &Service{
-		server:         server,
-		handler:        handler,
-		grpcListener:   grpcListener,
-		healthServer:   healthServer,
-		registry:       registry,
-		cfg:            cfg,
-		instanceID:     instanceID,
-		hostPort:       grpcListener.Addr().String(),
-		configuredHost: configuredHost,
+		server:           server,
+		handler:          handler,
+		grpcListener:     grpcListener,
+		grpcHealthServer: grpcHealthServer,
+		httpHealthServer: httpHealthServer,
+		registry:         registry,
+		cfg:              cfg,
+		instanceID:       instanceID,
+		hostPort:         grpcListener.Addr().String(),
+		configuredHost:   configuredHost,
 	}
 }
 
-func (srv *Service) Start(ctx context.Context) error {
+// DisableHealthServer disables the dedicated HTTP health check server.
+func (srv *Service) DisableHealthServer() {
+	srv.disableHealthServer = true
+}
+
+func (srv *Service) Start(ctx context.Context) (err error) {
 	coordinatorv1.RegisterCoordinatorServiceServer(srv.server, srv.handler)
 
 	// Set the serving status for the coordinator service
-	srv.healthServer.SetServingStatus(coordinatorv1.CoordinatorService_ServiceDesc.ServiceName, grpc_health_v1.HealthCheckResponse_SERVING)
+	srv.grpcHealthServer.SetServingStatus(coordinatorv1.CoordinatorService_ServiceDesc.ServiceName, grpc_health_v1.HealthCheckResponse_SERVING)
 	// Also set the overall server status
-	srv.healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
+	srv.grpcHealthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 
 	// Create an internal context that can be cancelled by Stop()
 	internalCtx, cancel := context.WithCancel(ctx)
 	srv.mu.Lock()
 	srv.stopCancel = cancel
 	srv.mu.Unlock()
+
+	startedZombieDetector := false
+	startedHealthServer := false
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		srv.grpcHealthServer.SetServingStatus(coordinatorv1.CoordinatorService_ServiceDesc.ServiceName, grpc_health_v1.HealthCheckResponse_NOT_SERVING)
+		srv.grpcHealthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
+
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cleanupCancel()
+
+		cancel()
+		if startedZombieDetector {
+			srv.handler.WaitZombieDetector()
+			srv.handler.Close(cleanupCtx)
+		}
+		if startedHealthServer {
+			srv.stopHealthServer(cleanupCtx, "Failed to stop coordinator health check server during startup cleanup")
+		}
+	}()
 
 	// Start the zombie detector to clean up runs from crashed workers
 	// Use configured interval or default to 45 seconds
@@ -82,7 +115,15 @@ func (srv *Service) Start(ctx context.Context) error {
 		zombieInterval = srv.cfg.Scheduler.ZombieDetectionInterval
 	}
 	srv.handler.StartZombieDetector(internalCtx, zombieInterval)
+	startedZombieDetector = true
 	logger.Info(ctx, "Started zombie detector", tag.Interval(zombieInterval))
+
+	if srv.httpHealthServer != nil && !srv.disableHealthServer {
+		if err := srv.httpHealthServer.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start coordinator health check server: %w", err)
+		}
+		startedHealthServer = true
+	}
 
 	// Register with service registry if monitor is available
 	if srv.registry != nil {
@@ -124,8 +165,8 @@ func (srv *Service) Start(ctx context.Context) error {
 
 func (srv *Service) Stop(ctx context.Context) error {
 	// Set NOT_SERVING status when shutting down
-	srv.healthServer.SetServingStatus(coordinatorv1.CoordinatorService_ServiceDesc.ServiceName, grpc_health_v1.HealthCheckResponse_NOT_SERVING)
-	srv.healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
+	srv.grpcHealthServer.SetServingStatus(coordinatorv1.CoordinatorService_ServiceDesc.ServiceName, grpc_health_v1.HealthCheckResponse_NOT_SERVING)
+	srv.grpcHealthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
 
 	// Unregister from service registry if monitor is available
 	if srv.registry != nil {
@@ -155,5 +196,16 @@ func (srv *Service) Stop(ctx context.Context) error {
 	// Close handler resources (open attempts, etc.)
 	srv.handler.Close(ctx)
 
+	srv.stopHealthServer(ctx, "Failed to stop coordinator health check server")
+
 	return nil
+}
+
+func (srv *Service) stopHealthServer(ctx context.Context, msg string) {
+	if srv.httpHealthServer == nil || srv.disableHealthServer {
+		return
+	}
+	if err := srv.httpHealthServer.Stop(ctx); err != nil {
+		logger.Error(ctx, msg, tag.Error(err))
+	}
 }

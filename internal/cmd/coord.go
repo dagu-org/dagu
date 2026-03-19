@@ -17,6 +17,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/healthcheck"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -49,6 +50,7 @@ Flags:
   --coordinator.host string         Host address to bind the gRPC server to (default: 127.0.0.1)
   --coordinator.advertise string    Address to advertise in service registry (default: auto-detected hostname)
   --coordinator.port int            Port number for the gRPC server to listen on (default: 50055)
+  --coordinator.health-port int     Port number for the HTTP health check server (default: 8091, 0 disables)
   --peer.cert-file string           Path to TLS certificate file for peer connections
   --peer.key-file string            Path to TLS key file for peer connections
   --peer.client-ca-file string      Path to CA certificate file for client verification (mTLS)
@@ -61,6 +63,9 @@ Example:
 
   # Bind to all interfaces and advertise service name (for containers/K8s)
   dagu coordinator --coordinator.host=0.0.0.0 --coordinator.advertise=dagu-server
+
+  # Disable the dedicated HTTP health server
+  dagu coordinator --coordinator.health-port=0
 
   # With TLS
   dagu coordinator --peer.cert-file=server.crt --peer.key-file=server.key
@@ -77,6 +82,7 @@ This process runs continuously in the foreground until terminated.
 var coordinatorFlags = []commandLineFlag{
 	coordinatorHostFlag,
 	coordinatorPortFlag,
+	coordinatorHealthPortFlag,
 	coordinatorAdvertiseFlag,
 	// Peer configuration flags for TLS
 	peerInsecureFlag,
@@ -87,16 +93,10 @@ var coordinatorFlags = []commandLineFlag{
 }
 
 func runCoordinator(ctx *Context, _ []string) error {
-	svc, handler, err := newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry, ctx.DAGRunStore)
+	svc, _, err := newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry, ctx.DAGRunStore)
 	if err != nil {
 		return fmt.Errorf("failed to initialize coordinator: %w", err)
 	}
-
-	// Ensure handler resources are cleaned up on shutdown
-	defer func() {
-		handler.WaitZombieDetector()
-		handler.Close(ctx)
-	}()
 
 	if err := svc.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start coordinator: %w", err)
@@ -189,6 +189,9 @@ func newCoordinator(ctx context.Context, cfg *config.Config, registry exec.Servi
 	healthServer := health.NewServer()
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
 
+	// Create dedicated HTTP health server
+	httpHealthServer := healthcheck.NewServer("coordinator", cfg.Coordinator.HealthPort)
+
 	// Create listener
 	addr := fmt.Sprintf("%s:%d", cfg.Coordinator.Host, cfg.Coordinator.Port)
 	listener, err := net.Listen("tcp", addr)
@@ -203,7 +206,7 @@ func newCoordinator(ctx context.Context, cfg *config.Config, registry exec.Servi
 	})
 
 	// Create and return service with advertise address for service registry
-	return coordinator.NewService(grpcServer, handler, listener, healthServer, registry, cfg, instanceID, advertiseAddr), handler, nil
+	return coordinator.NewService(grpcServer, handler, listener, healthServer, httpHealthServer, registry, cfg, instanceID, advertiseAddr), handler, nil
 }
 
 // loadCoordinatorTLSCredentials loads TLS credentials for the coordinator server.

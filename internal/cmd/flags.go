@@ -191,6 +191,14 @@ var (
 		bindViper:    true,
 	}
 
+	coordinatorHealthPortFlag = commandLineFlag{
+		name:         "coordinator.health-port",
+		defaultValue: "8091",
+		usage:        "Coordinator HTTP health check server port (default: 8091, 0 disables)",
+		bindViper:    true,
+		viperKey:     "coordinator.health_port",
+	}
+
 	coordinatorAdvertiseFlag = commandLineFlag{
 		name:      "coordinator.advertise",
 		shorthand: "A",
@@ -222,6 +230,14 @@ var (
 		shorthand: "l",
 		usage:     "Worker labels for capability matching (format: key1=value1,key2=value2)",
 		bindViper: true,
+	}
+
+	workerHealthPortFlag = commandLineFlag{
+		name:         "worker.health-port",
+		defaultValue: "8092",
+		usage:        "Worker HTTP health check server port (default: 8092, 0 disables)",
+		bindViper:    true,
+		viperKey:     "worker.health_port",
 	}
 
 	workerCoordinatorsFlag = commandLineFlag{

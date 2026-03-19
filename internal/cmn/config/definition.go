@@ -245,16 +245,18 @@ type RemoteNodeDef struct {
 
 // CoordinatorDef configures the coordinator service.
 type CoordinatorDef struct {
-	Enabled   *bool  `mapstructure:"enabled"` // Default: true
-	Host      string `mapstructure:"host"`
-	Advertise string `mapstructure:"advertise"` // Auto-detected if empty
-	Port      int    `mapstructure:"port"`
+	Enabled    *bool  `mapstructure:"enabled"` // Default: true
+	Host       string `mapstructure:"host"`
+	Advertise  string `mapstructure:"advertise"` // Auto-detected if empty
+	Port       int    `mapstructure:"port"`
+	HealthPort int    `mapstructure:"health_port"`
 }
 
 // WorkerDef configures the worker.
 type WorkerDef struct {
 	ID            string `mapstructure:"id"`
 	MaxActiveRuns int    `mapstructure:"max_active_runs"`
+	HealthPort    int    `mapstructure:"health_port"`
 	// Labels accepts either a string "key=value,key2=value2,..." or map[string]string.
 	// When string, parsed as comma-separated key=value pairs.
 	Labels any `mapstructure:"labels"`

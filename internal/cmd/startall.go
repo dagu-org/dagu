@@ -139,13 +139,13 @@ func runStartAll(ctx *Context, _ []string) error {
 
 	// Initialize coordinator if enabled
 	var coord *coordinator.Service
-	var coordHandler *coordinator.Handler
 	if ctx.Config.Coordinator.Enabled {
 		var err error
-		coord, coordHandler, err = newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry, ctx.DAGRunStore)
+		coord, _, err = newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry, ctx.DAGRunStore)
 		if err != nil {
 			return fmt.Errorf("failed to initialize coordinator: %w", err)
 		}
+		coord.DisableHealthServer()
 	} else {
 		logger.Info(serviceCtx, "Coordinator disabled via configuration")
 	}
@@ -306,9 +306,6 @@ func runStartAll(ctx *Context, _ []string) error {
 				tag.Error(err),
 			)
 		}
-		// Clean up coordinator handler resources
-		coordHandler.WaitZombieDetector()
-		coordHandler.Close(ctx)
 	}
 
 	// Stop scheduler to release lock, flush planner, clean up

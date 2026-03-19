@@ -19,6 +19,7 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/sql"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/healthcheck"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -44,7 +45,8 @@ type Worker struct {
 	stopDone   chan struct{}      // Signals when all goroutines have stopped
 
 	// For global PostgreSQL connection pool (shared-nothing mode)
-	poolManager *sql.GlobalPoolManager
+	poolManager  *sql.GlobalPoolManager
+	healthServer *healthcheck.Server
 }
 
 // SetHandler sets a custom task executor for testing or custom execution logic
@@ -63,6 +65,11 @@ func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator
 		workerID = fmt.Sprintf("%s@%d", hostname, os.Getpid())
 	}
 
+	healthPort := 0
+	if cfg != nil {
+		healthPort = cfg.Worker.HealthPort
+	}
+
 	return &Worker{
 		id:             workerID,
 		maxActiveRuns:  maxActiveRuns,
@@ -72,11 +79,12 @@ func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator
 		cfg:            cfg,
 		runningTasks:   make(map[string]*coordinatorv1.RunningTask),
 		cancelFuncs:    make(map[string]context.CancelFunc),
+		healthServer:   healthcheck.NewServer("worker", healthPort),
 	}
 }
 
 // Start begins the worker's operation, launching multiple polling goroutines.
-func (w *Worker) Start(ctx context.Context) error {
+func (w *Worker) Start(ctx context.Context) (err error) {
 	logger.Info(ctx, "Starting worker",
 		tag.WorkerID(w.id),
 		tag.MaxConcurrency(w.maxActiveRuns))
@@ -100,6 +108,29 @@ func (w *Worker) Start(ctx context.Context) error {
 			tag.WorkerID(w.id),
 			slog.Int("maxOpenConns", w.cfg.Worker.PostgresPool.MaxOpenConns),
 			slog.Int("maxIdleConns", w.cfg.Worker.PostgresPool.MaxIdleConns))
+	}
+
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cleanupCancel()
+
+		if w.healthServer != nil {
+			_ = w.healthServer.Stop(cleanupCtx)
+		}
+		if w.poolManager != nil {
+			_ = w.poolManager.Close()
+			w.poolManager = nil
+		}
+	}()
+
+	if w.healthServer != nil {
+		if err := w.healthServer.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start worker health check server: %w", err)
+		}
 	}
 
 	// Create a wait group to track all polling goroutines
@@ -178,6 +209,12 @@ func (w *Worker) Stop(ctx context.Context) error {
 		if cleanupErr := w.coordinatorCli.Cleanup(ctx); cleanupErr != nil {
 			if err == nil {
 				err = fmt.Errorf("failed to cleanup coordinator client: %w", cleanupErr)
+			}
+		}
+
+		if w.healthServer != nil {
+			if stopErr := w.healthServer.Stop(ctx); stopErr != nil && err == nil {
+				err = fmt.Errorf("failed to stop worker health check server: %w", stopErr)
 			}
 		}
 	})

@@ -10,9 +10,15 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/test"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCoordinatorCommand(t *testing.T) {
+	t.Run("CoordinatorCommandHasHealthPortFlag", func(t *testing.T) {
+		cli := cmd.CmdCoordinator()
+		require.NotNil(t, cli.Flags().Lookup("coordinator.health-port"))
+	})
+
 	t.Run("StartCoordinator", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		go func() {

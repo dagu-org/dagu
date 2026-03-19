@@ -44,15 +44,31 @@ spec:
           env:
             - name: DAGU_HOME
               value: /data
-            - name: WORKER_ID
+            - name: DAGU_WORKER_ID
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+          ports:
+            - name: health
+              containerPort: {{ $.Values.worker.healthPort }}
+              protocol: TCP
           volumeMounts:
             - name: data
               mountPath: /data
             - name: config
               mountPath: /etc/dagu
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: health
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 5
           resources:
             {{- toYaml $pool.resources | nindent 12 }}
       {{- with $pool.nodeSelector }}

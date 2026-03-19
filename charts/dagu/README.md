@@ -64,9 +64,9 @@ For chart publication and repository maintenance, see [`RELEASING.md`](./RELEASI
 
 The chart deploys four components:
 
-- **Coordinator**: gRPC server for distributed task execution (port 50055)
+- **Coordinator**: gRPC server for distributed task execution (port 50055, HTTP health on 8091 by default)
 - **Scheduler**: Manages DAG execution schedules (port 8090 for health)
-- **Worker**: Executes DAG steps (configurable pools with independent replicas)
+- **Worker**: Executes DAG steps (configurable pools with independent replicas, HTTP health on 8092 by default)
 - **UI**: Web interface for managing DAGs (port 8080)
 
 All components share a single PersistentVolumeClaim with `ReadWriteMany` access mode.

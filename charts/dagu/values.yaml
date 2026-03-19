@@ -21,6 +21,7 @@ scheduler:
 # Coordinator configuration (gRPC server for distributed task execution)
 coordinator:
   replicas: 1
+  healthPort: 8091
   resources:
     requests:
       memory: "128Mi"
@@ -32,6 +33,9 @@ coordinator:
 # Worker pool configuration
 # Each pool creates a separate Kubernetes Deployment.
 # Pool names become part of the Deployment name: <release>-dagu-worker-<poolName>
+worker:
+  healthPort: 8092
+
 workerPools:
   general:
     replicas: 2
