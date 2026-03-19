@@ -99,7 +99,7 @@ export function ChatHistoryTab({ dagRun }: ChatHistoryTabProps) {
           dagName={dagRun.name}
           dagRunId={dagRun.dagRunId}
           stepName={selectedStep}
-          isRunning={isSelectedActive}
+          isActive={isSelectedActive}
           subDAGRunId={isSubDAGRun ? dagRun.dagRunId : undefined}
           rootDagName={isSubDAGRun ? dagRun.rootDAGRunName : undefined}
           rootDagRunId={isSubDAGRun ? dagRun.rootDAGRunId : undefined}

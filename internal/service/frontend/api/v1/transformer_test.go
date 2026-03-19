@@ -97,21 +97,70 @@ func TestToDAGDetailsIncludesParamDefDescriptions(t *testing.T) {
 	assert.Equal(t, "Free-form operator notes", *(*details.ParamDefs)[0].Description)
 }
 
-func TestToNodeIncludesRetryingStatus(t *testing.T) {
-	node := &exec.Node{
-		Status: core.NodeRetrying,
-		Step: core.Step{
-			Name: "flaky",
+func TestToNodeMapsStatuses(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name        string
+		coreStatus  core.NodeStatus
+		apiStatus   openapi.NodeStatus
+		statusLabel openapi.NodeStatusLabel
+	}{
+		{
+			name:        "running",
+			coreStatus:  core.NodeRunning,
+			apiStatus:   openapi.NodeStatusRunning,
+			statusLabel: openapi.NodeStatusLabelRunning,
+		},
+		{
+			name:        "retrying",
+			coreStatus:  core.NodeRetrying,
+			apiStatus:   openapi.NodeStatusRetrying,
+			statusLabel: openapi.NodeStatusLabelRetrying,
+		},
+		{
+			name:        "partial success",
+			coreStatus:  core.NodePartiallySucceeded,
+			apiStatus:   openapi.NodeStatusPartialSuccess,
+			statusLabel: openapi.NodeStatusLabelPartiallySucceeded,
 		},
 	}
 
-	converted := toNode(node)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	assert.Equal(t, openapi.NodeStatusRetrying, converted.Status)
-	assert.Equal(t, openapi.NodeStatusLabelRetrying, converted.StatusLabel)
+			node := &exec.Node{
+				Status: tc.coreStatus,
+				Step: core.Step{
+					Name: "step-" + tc.name,
+				},
+			}
+
+			converted := toNode(node)
+
+			assert.Equal(t, tc.apiStatus, converted.Status)
+			assert.Equal(t, tc.statusLabel, converted.StatusLabel)
+		})
+	}
 }
 
-func TestNodeStatusMappingIncludesRetrying(t *testing.T) {
-	assert.Equal(t, core.NodeRetrying, nodeStatusMapping[openapi.NodeStatusRetrying])
-	assert.Equal(t, core.NodePartiallySucceeded, nodeStatusMapping[openapi.NodeStatusPartialSuccess])
+func TestNodeStatusMappingIsExhaustive(t *testing.T) {
+	t.Parallel()
+
+	expected := map[openapi.NodeStatus]core.NodeStatus{
+		openapi.NodeStatusNotStarted:     core.NodeNotStarted,
+		openapi.NodeStatusRunning:        core.NodeRunning,
+		openapi.NodeStatusFailed:         core.NodeFailed,
+		openapi.NodeStatusAborted:        core.NodeAborted,
+		openapi.NodeStatusSuccess:        core.NodeSucceeded,
+		openapi.NodeStatusSkipped:        core.NodeSkipped,
+		openapi.NodeStatusPartialSuccess: core.NodePartiallySucceeded,
+		openapi.NodeStatusWaiting:        core.NodeWaiting,
+		openapi.NodeStatusRejected:       core.NodeRejected,
+		openapi.NodeStatusRetrying:       core.NodeRetrying,
+	}
+
+	assert.Len(t, nodeStatusMapping, len(expected))
+	assert.Equal(t, expected, nodeStatusMapping)
 }

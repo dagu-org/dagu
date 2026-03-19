@@ -82,6 +82,12 @@ function StepLog({
 
   const [isLiveMode, setIsLiveMode] = useState(isActive);
 
+  useEffect(() => {
+    if (!isActive) {
+      setIsLiveMode(false);
+    }
+  }, [isActive]);
+
   const [cachedData, setCachedData] = useState<LogWithPagination | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
 
