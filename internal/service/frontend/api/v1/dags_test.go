@@ -30,13 +30,13 @@ func getJSONWhenAvailable(t *testing.T, server test.Server, url string, out any)
 	return true
 }
 
-func sendRawRequest(
+func sendRawRequestStatus(
 	t *testing.T,
 	server test.Server,
 	method string,
 	requestPath string,
 	body []byte,
-) *http.Response {
+) int {
 	t.Helper()
 
 	baseURL := fmt.Sprintf(
@@ -61,7 +61,7 @@ func sendRawRequest(
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = resp.Body.Close() })
-	return resp
+	return resp.StatusCode
 }
 
 func TestDAGWritesDisabledInReadOnlyMode(t *testing.T) {
@@ -204,8 +204,8 @@ func TestDAGFileNameRejectsEncodedTraversal(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			resp := sendRawRequest(t, server, tc.method, tc.path, tc.body)
-			require.Equal(t, tc.wantStatus, resp.StatusCode)
+			status := sendRawRequestStatus(t, server, tc.method, tc.path, tc.body)
+			require.Equal(t, tc.wantStatus, status)
 		})
 	}
 }
