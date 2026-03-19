@@ -4,7 +4,8 @@
 package frontend
 
 import (
-	"strings"
+	"crypto/sha256"
+	"encoding/hex"
 	"sync"
 	"testing"
 
@@ -17,20 +18,20 @@ func resetAssetVersionCache() {
 	assetVersionOnce = sync.Once{}
 }
 
-func TestCurrentAssetVersionUsesBundleHashForDevBuilds(t *testing.T) {
-	originalVersion := config.Version
-	t.Cleanup(func() {
-		config.Version = originalVersion
-		resetAssetVersionCache()
-	})
+func TestFormatAssetVersionUsesBundleHashForDevBuilds(t *testing.T) {
+	bundle := []byte("bundle")
+	sum := sha256.Sum256(bundle)
+	want := "0.0.0-" + hex.EncodeToString(sum[:8])
 
-	config.Version = "0.0.0"
-	resetAssetVersionCache()
+	assert.Equal(t, want, formatAssetVersion("0.0.0", bundle))
+}
 
-	got := currentAssetVersion()
+func TestFormatAssetVersionSupportsEmptyVersion(t *testing.T) {
+	bundle := []byte("bundle")
+	sum := sha256.Sum256(bundle)
+	want := hex.EncodeToString(sum[:8])
 
-	assert.True(t, strings.HasPrefix(got, "0.0.0-"))
-	assert.Greater(t, len(got), len("0.0.0-"))
+	assert.Equal(t, want, formatAssetVersion("", bundle))
 }
 
 func TestCurrentAssetVersionUsesReleaseVersionWhenSet(t *testing.T) {

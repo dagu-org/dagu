@@ -277,6 +277,8 @@ func (m *Multiplexer) applyMutation(ctx context.Context, session *streamSession,
 		}
 	}
 
+	// TODO: Extract add-topic classification into a helper when we can do a
+	// broader cleanup without mixing behavior changes into this regression fix.
 	mutationErrors := make([]TopicMutationError, 0)
 	authorizedAdds := make([]ParsedTopic, 0, len(addedParsed))
 	for _, parsed := range addedParsed {
@@ -376,6 +378,9 @@ func (m *Multiplexer) applyMutation(ctx context.Context, session *streamSession,
 	}
 	m.cleanupResolvedTopics(createdTopics, addedTopicKeys)
 
+	// TODO: Split partial-mutation HTTP semantics in a dedicated API/UI cleanup.
+	// Unsupported topics currently share 403 with authorization failures because
+	// the frontend already treats 403 as a partial-success response.
 	statusCode := http.StatusOK
 	if len(mutationErrors) > 0 {
 		statusCode = http.StatusForbidden

@@ -35,9 +35,20 @@ const (
 )
 
 var (
+	// TODO: Cache only the bundle hash here once when we can revisit this
+	// package-global state without widening this low-risk regression fix.
 	assetVersionOnce sync.Once
 	assetVersion     string
 )
+
+func formatAssetVersion(version string, bundle []byte) string {
+	sum := sha256.Sum256(bundle)
+	suffix := hex.EncodeToString(sum[:8])
+	if version == "" {
+		return suffix
+	}
+	return version + "-" + suffix
+}
 
 func currentAssetVersion() string {
 	assetVersionOnce.Do(func() {
@@ -48,13 +59,7 @@ func currentAssetVersion() string {
 				assetVersion = config.Version
 				return
 			}
-			sum := sha256.Sum256(data)
-			suffix := hex.EncodeToString(sum[:8])
-			if config.Version == "" {
-				assetVersion = suffix
-				return
-			}
-			assetVersion = config.Version + "-" + suffix
+			assetVersion = formatAssetVersion(config.Version, data)
 		default:
 			assetVersion = config.Version
 		}

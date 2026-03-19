@@ -5,11 +5,14 @@ package sse
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/remotenode"
@@ -338,4 +341,61 @@ func TestMultiplexHandlerProxyStreamForwardsLastEventID(t *testing.T) {
 
 	assert.Equal(t, "47", forwardedLastEventID)
 	assert.Equal(t, http.StatusOK, recorder.Code)
+}
+
+func TestMultiplexHandlerHandleStreamAllowsUnsupportedInitialTopics(t *testing.T) {
+	mux := NewMultiplexer(StreamConfig{HeartbeatInterval: time.Hour}, nil)
+	t.Cleanup(mux.Shutdown)
+
+	mux.RegisterFetcher(TopicTypeDoc, func(_ context.Context, identifier string) (any, error) {
+		return map[string]string{"id": identifier}, nil
+	})
+
+	handler := NewMultiplexHandler(mux, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/events/stream?topic=agent%3Asession-1&topic=doc%3Abriefing%2Fdemo",
+		nil,
+	).WithContext(ctx)
+	recorder := httptest.NewRecorder()
+
+	handler.HandleStream(recorder, req)
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+
+	body := recorder.Body.String()
+	assert.NotContains(t, body, "unable to open SSE stream")
+
+	control := parseControlEvent(t, body)
+	assert.Equal(t, []string{"doc:briefing/demo"}, control.Subscribed)
+	require.Len(t, control.Errors, 1)
+	assert.Equal(t, "agent:session-1", control.Errors[0].Topic)
+	assert.Equal(t, "unsupported_topic", control.Errors[0].Code)
+}
+
+func parseControlEvent(t *testing.T, body string) StreamControlEvent {
+	t.Helper()
+
+	for frame := range strings.SplitSeq(body, "\n\n") {
+		if !strings.Contains(frame, "event: control\n") {
+			continue
+		}
+
+		for line := range strings.SplitSeq(frame, "\n") {
+			if !strings.HasPrefix(line, "data: ") {
+				continue
+			}
+
+			var control StreamControlEvent
+			require.NoError(t, json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &control))
+			return control
+		}
+	}
+
+	t.Fatalf("control event not found in stream body: %q", body)
+	return StreamControlEvent{}
 }
