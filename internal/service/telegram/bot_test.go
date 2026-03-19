@@ -16,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagu-org/dagu/internal/testutil"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,17 +67,22 @@ func (a *fakeTelegramAPI) textCount() int {
 }
 
 type fakeTelegramAgentService struct {
-	mu               sync.Mutex
-	nextSessionID    int
-	nextSequenceID   int64
-	createEmptyCalls int
-	appendSessionIDs []string
-	createMessages   []string
-	sendMessages     []string
-	flushCalls       int
-	generated        agent.Message
-	enqueueResult    agent.ChatQueueResult
-	flushResult      agent.ChatQueueResult
+	mu                 sync.Mutex
+	nextSessionID      int
+	nextSequenceID     int64
+	createEmptyCalls   int
+	appendAttempts     []string
+	appendSessionIDs   []string
+	appendMessages     []agent.Message
+	createMessages     []string
+	sendMessages       []string
+	flushCalls         int
+	generateCalls      int
+	generated          agent.Message
+	generatedErr       error
+	appendErrBySession map[string]error
+	enqueueResult      agent.ChatQueueResult
+	flushResult        agent.ChatQueueResult
 }
 
 func newFakeTelegramAgentService(content string) *fakeTelegramAgentService {
@@ -151,16 +157,29 @@ func (s *fakeTelegramAgentService) SubmitUserResponse(context.Context, string, s
 }
 
 func (s *fakeTelegramAgentService) GenerateAssistantMessage(context.Context, string, agent.UserIdentity, string, string) (agent.Message, error) {
-	return s.generated, nil
+	s.mu.Lock()
+	s.generateCalls++
+	err := s.generatedErr
+	msg := s.generated
+	s.mu.Unlock()
+	if err != nil {
+		return agent.Message{}, err
+	}
+	return msg, nil
 }
 
 func (s *fakeTelegramAgentService) AppendExternalMessage(_ context.Context, sessionID string, _ agent.UserIdentity, msg agent.Message) (agent.Message, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.appendAttempts = append(s.appendAttempts, sessionID)
+	if err := s.appendErrBySession[sessionID]; err != nil {
+		return agent.Message{}, err
+	}
 	msg.SessionID = sessionID
 	msg.SequenceID = s.nextSequenceID
 	s.nextSequenceID++
 	s.appendSessionIDs = append(s.appendSessionIDs, sessionID)
+	s.appendMessages = append(s.appendMessages, msg)
 	return msg, nil
 }
 
@@ -176,7 +195,7 @@ func (s *fakeTelegramAgentService) SubscribeSession(context.Context, string, age
 	return agent.StreamResponse{}, func() (agent.StreamResponse, bool) { return agent.StreamResponse{}, false }, nil
 }
 
-func TestDAGRunMonitor_NotifyChat_ReusesExistingSessionAndSkipsReplay(t *testing.T) {
+func TestDAGRunMonitor_FlushesSuccessDigestIntoExistingChatAndSkipsReplay(t *testing.T) {
 	t.Parallel()
 
 	api := &fakeTelegramAPI{}
@@ -189,36 +208,58 @@ func TestDAGRunMonitor_NotifyChat_ReusesExistingSessionAndSkipsReplay(t *testing
 		allowedChats: map[int64]struct{}{123: {}},
 		logger:       logger,
 	}
-	monitor := NewDAGRunMonitor(nil, service, bot, logger)
+	monitor := newDAGRunMonitorWithWindows(nil, service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
+	stopMonitor := testutil.StartContextRunner(t, monitor)
+	defer stopMonitor()
 
 	cs := bot.getOrCreateChat(123)
 	bot.setActiveSession(cs, "existing-session", "telegram:123")
 
-	ok := monitor.notifyChat(context.Background(), 123, &exec.DAGRunStatus{
+	ok := monitor.notifyCompletion(context.Background(), &exec.DAGRunStatus{
 		Name:      "briefing",
 		Status:    core.Succeeded,
 		DAGRunID:  "run-1",
 		AttemptID: "attempt-1",
-	}, "prompt")
+	})
+	require.True(t, ok)
+	ok = monitor.notifyCompletion(context.Background(), &exec.DAGRunStatus{
+		Name:      "briefing",
+		Status:    core.Succeeded,
+		DAGRunID:  "run-2",
+		AttemptID: "attempt-2",
+	})
 	require.True(t, ok)
 
+	require.Eventually(t, func() bool {
+		service.mu.Lock()
+		defer service.mu.Unlock()
+		return len(service.appendMessages) == 1
+	}, time.Second, 10*time.Millisecond)
+
+	service.mu.Lock()
 	assert.Equal(t, 0, service.createEmptyCalls, "existing chat session should be reused")
 	require.Len(t, service.appendSessionIDs, 1)
 	assert.Equal(t, "existing-session", service.appendSessionIDs[0])
+	service.mu.Unlock()
 	assert.Equal(t, int64(1), bot.lastDeliveredSeq(cs))
 	assert.Equal(t, 1, api.sendCount())
+	service.mu.Lock()
+	require.Len(t, service.appendMessages, 1)
+	assert.Contains(t, service.appendMessages[0].Content, "DAG completion digest")
+	assert.Contains(t, service.appendMessages[0].Content, "briefing: succeeded x2")
+	service.mu.Unlock()
 
 	bot.processStreamResponse(context.Background(), cs, 123, agent.StreamResponse{
 		Messages: []agent.Message{
-			{Type: agent.MessageTypeAssistant, SequenceID: 1, Content: "telegram notification"},
+			{Type: agent.MessageTypeAssistant, SequenceID: 1, Content: "digest"},
 			{Type: agent.MessageTypeAssistant, SequenceID: 2, Content: "actual reply"},
 		},
 	})
 
-	assert.Equal(t, 2, api.sendCount(), "the manually delivered notification must not be replayed")
+	assert.Equal(t, 2, api.sendCount(), "the manually delivered digest must not be replayed")
 }
 
-func TestDAGRunMonitor_NotifyChat_CreatesSessionWhenMissing(t *testing.T) {
+func TestDAGRunMonitor_FlushesUrgentSingleCreatesSessionWhenMissing(t *testing.T) {
 	t.Parallel()
 
 	api := &fakeTelegramAPI{}
@@ -231,15 +272,24 @@ func TestDAGRunMonitor_NotifyChat_CreatesSessionWhenMissing(t *testing.T) {
 		allowedChats: map[int64]struct{}{456: {}},
 		logger:       logger,
 	}
-	monitor := NewDAGRunMonitor(nil, service, bot, logger)
+	monitor := newDAGRunMonitorWithWindows(nil, service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
+	stopMonitor := testutil.StartContextRunner(t, monitor)
+	defer stopMonitor()
 
-	ok := monitor.notifyChat(context.Background(), 456, &exec.DAGRunStatus{
+	ok := monitor.notifyCompletion(context.Background(), &exec.DAGRunStatus{
 		Name:      "briefing",
-		Status:    core.Succeeded,
+		Status:    core.Failed,
 		DAGRunID:  "run-2",
 		AttemptID: "attempt-2",
-	}, "prompt")
+		Error:     "boom",
+	})
 	require.True(t, ok)
+
+	require.Eventually(t, func() bool {
+		service.mu.Lock()
+		defer service.mu.Unlock()
+		return len(service.appendMessages) == 1
+	}, time.Second, 10*time.Millisecond)
 
 	cs := bot.getOrCreateChat(456)
 	sessionID, ownerUserID := cs.ActiveSession()
@@ -248,6 +298,10 @@ func TestDAGRunMonitor_NotifyChat_CreatesSessionWhenMissing(t *testing.T) {
 	assert.Equal(t, int64(1), bot.lastDeliveredSeq(cs))
 	assert.Equal(t, 1, service.createEmptyCalls)
 	assert.Equal(t, 1, api.sendCount())
+	service.mu.Lock()
+	require.Len(t, service.appendMessages, 1)
+	assert.Equal(t, "fresh notification", service.appendMessages[0].Content)
+	service.mu.Unlock()
 }
 
 func TestBot_HandleMessage_BatchesRapidMessagesIntoSingleCreate(t *testing.T) {
