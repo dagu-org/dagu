@@ -197,6 +197,10 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 			logger.Info(ctx, "DAG entering wait status - waiting for human approval")
 			break
 		}
+		if running == 0 && len(readyCh) == 0 && nodeStates.HasRetrying {
+			logger.Info(ctx, "DAG pending step retry - returning control to parent scheduler")
+			break
+		}
 
 		// Deadlock detection: if no nodes are running, no nodes are ready, and the graph is not finished,
 		// then we are stuck (nodes are waiting for dependencies that will never be satisfied).
@@ -325,7 +329,11 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 		logger.Info(ctx, "DAG waiting for approval")
 		return r.lastError
 
-	case core.NotStarted, core.Running, core.Queued:
+	case core.Queued:
+		logger.Info(ctx, "DAG queued for pending step retry")
+		return r.lastError
+
+	case core.NotStarted, core.Running:
 		// These states should not occur at this point
 		logger.Warn(ctx, "Unexpected final status",
 			tag.Status(r.Status(ctx, plan).String()),
@@ -463,6 +471,12 @@ ExecRepeat: // repeat execution
 		isRetriable := r.handleNodeExecutionError(ctx, plan, node, execErr)
 		if isRetriable {
 			continue ExecRepeat
+		}
+		if node.State().Status == core.NodeRetrying {
+			if progressCh != nil {
+				progressCh <- node
+			}
+			return
 		}
 
 		if node.State().Status != core.NodeAborted {
@@ -826,6 +840,9 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 	if states.HasRunning {
 		return core.Running
 	}
+	if states.HasRetrying {
+		return core.Queued
+	}
 	if states.HasRejected {
 		return core.Rejected
 	}
@@ -923,6 +940,11 @@ func isReady(ctx context.Context, plan *Plan, node *Node) bool {
 			logger.Debug(ctx, "Dependency not finished",
 				tag.Step(node.Name()), tag.Dependency(dep.Name()),
 				tag.Status(status.String()))
+			return false
+
+		case core.NodeRetrying:
+			logger.Debug(ctx, "Dependency waiting for retry",
+				tag.Step(node.Name()), tag.Dependency(dep.Name()))
 			return false
 
 		case core.NodeWaiting:
@@ -1059,7 +1081,7 @@ func (r *Runner) isPartialSuccess(ctx context.Context, p *Plan) bool {
 			// Partial success at node level contributes to overall partial success
 			hasFailuresWithContinueOn = true
 			hasSuccessfulNodes = true
-		case core.NodeNotStarted, core.NodeRunning, core.NodeAborted, core.NodeSkipped, core.NodeWaiting, core.NodeRejected:
+		case core.NodeNotStarted, core.NodeRunning, core.NodeRetrying, core.NodeAborted, core.NodeSkipped, core.NodeWaiting, core.NodeRejected:
 			// These statuses don't affect partial success determination, but are needed for linter
 		}
 	}
@@ -1129,7 +1151,22 @@ func (r *Runner) shouldRetryNode(ctx context.Context, node *Node, execErr error)
 		tag.ExitCode(exitCode),
 	)
 
-	// Set the node status to none so that it can be retried
+	if externalStepRetryEnabled(ctx) {
+		node.IncRetryCount()
+		node.SetStatus(core.NodeRetrying)
+		logger.Info(ctx, "Step retry will be scheduled by the parent executor",
+			slog.Int("retry", node.GetRetryCount()),
+			slog.Duration("interval", core.CalculateBackoffInterval(
+				node.Step().RetryPolicy.Interval,
+				node.Step().RetryPolicy.Backoff,
+				node.Step().RetryPolicy.MaxInterval,
+				node.GetRetryCount()-1,
+			)),
+		)
+		return false
+	}
+
+	// Set the node status to running so that it can be retried inline
 	node.IncRetryCount()
 	interval := core.CalculateBackoffInterval(
 		node.Step().RetryPolicy.Interval,
@@ -1183,13 +1220,25 @@ func (r *Runner) finishNode(node *Node, wg *sync.WaitGroup) {
 		r.metrics.skippedNodes++
 	case core.NodeAborted:
 		r.metrics.canceledNodes++
-	case core.NodeWaiting, core.NodeNotStarted, core.NodeRunning:
+	case core.NodeWaiting, core.NodeNotStarted, core.NodeRunning, core.NodeRetrying:
 		// Waiting nodes are counted when they complete after approval.
 		// NotStarted/Running should not happen at this point.
 	}
 
 	node.Finish()
 	wg.Done()
+}
+
+func externalStepRetryEnabled(ctx context.Context) bool {
+	if os.Getenv(exec.EnvKeyExternalStepRetry) != "" {
+		return true
+	}
+
+	rCtx := exec.GetContext(ctx)
+	if value, ok := rCtx.UserEnvsMap()[exec.EnvKeyExternalStepRetry]; ok {
+		return value != ""
+	}
+	return false
 }
 
 // checkPreconditions evaluates the preconditions for a node and updates its status accordingly.

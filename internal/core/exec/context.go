@@ -6,9 +6,11 @@ package exec
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"maps"
 	"path/filepath"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
@@ -88,6 +90,52 @@ type Database interface {
 }
 
 // SubDAGRunStatus is an interface that represents the status of a sub dag-run.
+type PendingStepRetry struct {
+	StepName string        `json:"stepName"`
+	Interval time.Duration `json:"interval"`
+}
+
+// MarshalJSON emits Interval as a Go duration string while keeping the
+// surrounding shape stable for callers.
+func (p PendingStepRetry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		StepName string `json:"stepName"`
+		Interval string `json:"interval"`
+	}{
+		StepName: p.StepName,
+		Interval: p.Interval.String(),
+	})
+}
+
+// UnmarshalJSON accepts both the current string encoding and the legacy
+// numeric nanosecond encoding for backward compatibility with persisted data.
+func (p *PendingStepRetry) UnmarshalJSON(data []byte) error {
+	var current struct {
+		StepName string `json:"stepName"`
+		Interval string `json:"interval"`
+	}
+	if err := json.Unmarshal(data, &current); err == nil && current.Interval != "" {
+		interval, parseErr := time.ParseDuration(current.Interval)
+		if parseErr != nil {
+			return fmt.Errorf("parse pending step retry interval: %w", parseErr)
+		}
+		p.StepName = current.StepName
+		p.Interval = interval
+		return nil
+	}
+
+	var legacy struct {
+		StepName string        `json:"stepName"`
+		Interval time.Duration `json:"interval"`
+	}
+	if err := json.Unmarshal(data, &legacy); err != nil {
+		return err
+	}
+	p.StepName = legacy.StepName
+	p.Interval = legacy.Interval
+	return nil
+}
+
 type RunStatus struct {
 	// Name represents the name of the executed DAG.
 	Name string
@@ -99,22 +147,27 @@ type RunStatus struct {
 	Outputs map[string]string
 	// Status is the execution status of the dag-run.
 	Status core.Status
+	// PendingStepRetries contains any step retries that are waiting to be scheduled
+	// by the parent executor.
+	PendingStepRetries []PendingStepRetry
 }
 
 // MarshalJSON implements the json.Marshaler interface for RunStatus.
 func (r *RunStatus) MarshalJSON() ([]byte, error) {
 	return json.MarshalIndent(struct {
-		Name     string            `json:"name,omitempty"`
-		DAGRunID string            `json:"dagRunId,omitempty"`
-		Params   string            `json:"params,omitempty"`
-		Outputs  map[string]string `json:"outputs,omitzero"`
-		Status   string            `json:"status"`
+		Name               string             `json:"name,omitempty"`
+		DAGRunID           string             `json:"dagRunId,omitempty"`
+		Params             string             `json:"params,omitempty"`
+		Outputs            map[string]string  `json:"outputs,omitzero"`
+		Status             string             `json:"status"`
+		PendingStepRetries []PendingStepRetry `json:"pendingStepRetries,omitempty"`
 	}{
-		Name:     r.Name,
-		DAGRunID: r.DAGRunID,
-		Params:   r.Params,
-		Outputs:  r.Outputs,
-		Status:   r.Status.String(),
+		Name:               r.Name,
+		DAGRunID:           r.DAGRunID,
+		Params:             r.Params,
+		Outputs:            r.Outputs,
+		Status:             r.Status.String(),
+		PendingStepRetries: r.PendingStepRetries,
 	}, "", "  ")
 }
 
@@ -143,6 +196,7 @@ type contextOptions struct {
 	db                 Database
 	rootDAGRun         DAGRunRef
 	params             []string
+	envs               []string
 	coordinator        Dispatcher
 	secretEnvs         []string
 	logEncodingCharset string
@@ -172,6 +226,13 @@ func WithRootDAGRun(ref DAGRunRef) ContextOption {
 func WithParams(params []string) ContextOption {
 	return func(o *contextOptions) {
 		o.params = params
+	}
+}
+
+// WithEnvVars sets additional execution-scoped environment variables.
+func WithEnvVars(envs ...string) ContextOption {
+	return func(o *contextOptions) {
+		o.envs = append(o.envs, envs...)
 	}
 }
 
@@ -249,6 +310,7 @@ func NewContext(
 
 	maps.Copy(envs, stringutil.KeyValuesToMap(options.params))
 	maps.Copy(envs, stringutil.KeyValuesToMap(dag.Env))
+	maps.Copy(envs, stringutil.KeyValuesToMap(options.envs))
 
 	// Set runtime-managed env vars after merges so user-defined params/env cannot override them.
 	if options.workDir != "" {

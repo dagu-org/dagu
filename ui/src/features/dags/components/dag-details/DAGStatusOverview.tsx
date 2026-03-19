@@ -33,6 +33,7 @@ type NodeStatusConfig = {
 const NODE_STATUS_CONFIG: NodeStatusConfig[] = [
   { key: 'succeeded', label: 'success', colorClass: 'bg-[#1e8e3e]' },
   { key: 'running', label: 'running', colorClass: 'bg-[#81c784]' },
+  { key: 'retrying', label: 'retrying', colorClass: 'bg-[#e37400]' },
   { key: 'failed', label: 'failed', colorClass: 'bg-[#d93025]' },
   { key: 'queued', label: 'queued', colorClass: 'bg-[#5f6368]' },
   { key: 'not_started', label: 'not started', colorClass: 'bg-[#5f6368]' },

@@ -4,7 +4,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Status, StatusLabel } from '@/api/v1/schema';
+import { NodeStatus, NodeStatusLabel, Status, StatusLabel } from '@/api/v1/schema';
 import dayjs from '@/lib/dayjs';
 import DAGStatusOverview from '../DAGStatusOverview';
 
@@ -65,5 +65,34 @@ describe('DAGStatusOverview', () => {
     );
 
     expect(screen.queryByText('Scheduled')).not.toBeInTheDocument();
+  });
+
+  it('renders a retrying node segment in the overview bar', () => {
+    const { container } = render(
+      <DAGStatusOverview
+        status={{
+          dagRunId: 'run-3',
+          name: 'retrying-dag',
+          rootDAGRunName: 'retrying-dag',
+          rootDAGRunId: 'run-3',
+          log: '/tmp/test.log',
+          autoRetryCount: 0,
+          autoRetryLimit: 0,
+          startedAt: '2026-03-13T10:01:00Z',
+          finishedAt: '-',
+          status: Status.Running,
+          statusLabel: StatusLabel.running,
+          nodes: [
+            {
+              status: NodeStatus.Retrying,
+              statusLabel: NodeStatusLabel.retrying,
+              step: { name: 'flaky' },
+            } as never,
+          ],
+        }}
+      />
+    );
+
+    expect(container.querySelector('.bg-\\[\\#e37400\\]')).not.toBeNull();
   });
 });

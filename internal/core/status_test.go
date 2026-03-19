@@ -5,6 +5,8 @@ package core
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestStatusConstants(t *testing.T) {
@@ -24,9 +26,7 @@ func TestStatusConstants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if int(tt.status) != tt.expected {
-				t.Errorf("Expected %s = %d, got %d", tt.name, tt.expected, int(tt.status))
-			}
+			assert.Equal(t, tt.expected, int(tt.status))
 		})
 	}
 }
@@ -44,13 +44,14 @@ func TestNodeStatusConstants(t *testing.T) {
 		{"NodeStatusSuccess", NodeSucceeded, 4},
 		{"NodeStatusSkipped", NodeSkipped, 5},
 		{"NodeStatusPartialSuccess", NodePartiallySucceeded, 6},
+		{"NodeStatusWaiting", NodeWaiting, 7},
+		{"NodeStatusRejected", NodeRejected, 8},
+		{"NodeStatusRetrying", NodeRetrying, 9},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if int(tt.nodeStatus) != tt.expected {
-				t.Errorf("Expected %s = %d, got %d", tt.name, tt.expected, int(tt.nodeStatus))
-			}
+			assert.Equal(t, tt.expected, int(tt.nodeStatus))
 		})
 	}
 }
@@ -71,9 +72,7 @@ func TestStatusString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
-			if tt.status.String() != tt.expected {
-				t.Errorf("Expected Status(%d).String() = %q, got %q", tt.status, tt.expected, tt.status.String())
-			}
+			assert.Equal(t, tt.expected, tt.status.String())
 		})
 	}
 }
@@ -85,6 +84,7 @@ func TestNodeStatusString(t *testing.T) {
 	}{
 		{NodeNotStarted, "not_started"},
 		{NodeRunning, "running"},
+		{NodeRetrying, "retrying"},
 		{NodeFailed, "failed"},
 		{NodeAborted, "aborted"},
 		{NodeSucceeded, "succeeded"},
@@ -94,9 +94,7 @@ func TestNodeStatusString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
-			if tt.nodeStatus.String() != tt.expected {
-				t.Errorf("Expected NodeStatus(%d).String() = %q, got %q", tt.nodeStatus, tt.expected, tt.nodeStatus.String())
-			}
+			assert.Equal(t, tt.expected, tt.nodeStatus.String())
 		})
 	}
 }
@@ -108,6 +106,7 @@ func TestNodeStatus_IsDone(t *testing.T) {
 	}{
 		{NodeNotStarted, false},
 		{NodeRunning, false},
+		{NodeRetrying, false},
 		{NodeWaiting, false},
 		{NodeSucceeded, true},
 		{NodeFailed, true},
@@ -119,9 +118,7 @@ func TestNodeStatus_IsDone(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.status.String(), func(t *testing.T) {
-			if got := tt.status.IsDone(); got != tt.expected {
-				t.Errorf("NodeStatus(%d).IsDone() = %v, want %v", tt.status, got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, tt.status.IsDone())
 		})
 	}
 }

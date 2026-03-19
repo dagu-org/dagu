@@ -15,6 +15,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import dayjs from '@/lib/dayjs';
+import { isActiveNodeStatus } from '@/lib/status-utils';
 import { useMemo } from 'react';
 import { components, NodeStatus } from '../../../../api/v1/schema';
 
@@ -38,6 +39,8 @@ function getStatusLabel(status: NodeStatus): string {
       return 'Not Started';
     case NodeStatus.Running:
       return 'Running';
+    case NodeStatus.Retrying:
+      return 'Retrying';
     case NodeStatus.Success:
       return 'Success';
     case NodeStatus.Failed:
@@ -89,6 +92,10 @@ const statusColors: Record<NodeStatus, { bg: string; border: string }> = {
   [NodeStatus.Running]: {
     bg: 'var(--status-running)',
     border: 'var(--status-running)',
+  },
+  [NodeStatus.Retrying]: {
+    bg: 'var(--status-warning)',
+    border: 'var(--status-warning)',
   },
   [NodeStatus.Failed]: {
     bg: 'var(--status-error)',
@@ -152,7 +159,7 @@ function TimelineChart({ status }: Props) {
       const startMs = dayjs(node.startedAt).valueOf();
       let endMs: number;
 
-      // Use current time for running steps
+      // Use current time for active steps
       if (!node.finishedAt || node.finishedAt === '-') {
         endMs = now;
       } else {
@@ -259,7 +266,7 @@ function TimelineChart({ status }: Props) {
             ((item.startMs - timelineStart) / totalRange) * 100;
           const widthPercent = ((item.endMs - item.startMs) / totalRange) * 100;
           const colors = getStatusColor(item.status);
-          const isRunning = item.status === NodeStatus.Running;
+          const isActive = isActiveNodeStatus(item.status);
 
           return (
             <div
@@ -278,7 +285,7 @@ function TimelineChart({ status }: Props) {
                 <TooltipTrigger asChild>
                   <div
                     className={`absolute h-5 rounded cursor-pointer transition-opacity hover:opacity-80 ${
-                      isRunning ? 'animate-pulse' : ''
+                      isActive ? 'animate-pulse' : ''
                     }`}
                     style={{
                       left: `calc(${leftPercent}% + 130px)`,

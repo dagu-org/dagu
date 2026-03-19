@@ -249,6 +249,20 @@ steps:
 		assert.Equal(t, "2026-03-13T10:00:00Z", task.ScheduleTime)
 	})
 
+	t.Run("WithExternalStepRetryOption", func(t *testing.T) {
+		t.Parallel()
+
+		task := executor.CreateTask(
+			"test-dag",
+			`name: test-dag`,
+			coordinatorv1.Operation_OPERATION_START,
+			"run-123",
+			executor.WithExternalStepRetry(true),
+		)
+
+		assert.True(t, task.ExternalStepRetry)
+	})
+
 	t.Run("AllOperationTypes", func(t *testing.T) {
 		t.Parallel()
 
@@ -387,5 +401,14 @@ func TestTaskOption_Functions(t *testing.T) {
 		executor.WithPreviousStatus(nil)(task)
 
 		assert.Nil(t, task.PreviousStatus)
+	})
+
+	t.Run("WithExternalStepRetry", func(t *testing.T) {
+		t.Parallel()
+
+		task := &coordinatorv1.Task{}
+		executor.WithExternalStepRetry(true)(task)
+
+		assert.True(t, task.ExternalStepRetry)
 	})
 }

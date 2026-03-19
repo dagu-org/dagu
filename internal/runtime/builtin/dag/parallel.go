@@ -11,8 +11,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -38,12 +38,23 @@ type parallelExecutor struct {
 	maxConcurrent int
 
 	// Runtime state
-	running map[string]*exec.Cmd        // Maps DAG run ID to running command
 	results map[string]*exec1.RunStatus // Maps DAG run ID to result
 	errors  []error                     // Collects errors from failed executions
 
 	cancel     chan struct{}
 	cancelOnce sync.Once
+}
+
+type scheduledAttempt struct {
+	runParams executor.RunParams
+	stepName  string
+	readyAt   time.Time
+}
+
+type attemptResult struct {
+	attempt scheduledAttempt
+	result  *exec1.RunStatus
+	err     error
 }
 
 func newParallelExecutor(
@@ -65,6 +76,7 @@ func newParallelExecutor(
 	if len(step.WorkerSelector) > 0 && child.DAG.HasApprovalSteps() {
 		return nil, fmt.Errorf("%w: %s", ErrApprovalStepsWithWorker, step.SubDAG.Name)
 	}
+	child.SetExternalStepRetry(true)
 
 	dir := runtime.GetEnv(ctx).WorkingDir
 	if dir != "" && !fileutil.FileExists(dir) {
@@ -80,7 +92,6 @@ func newParallelExecutor(
 		child:         child,
 		workDir:       dir,
 		maxConcurrent: maxConcurrent,
-		running:       make(map[string]*exec.Cmd),
 		results:       make(map[string]*exec1.RunStatus),
 		errors:        make([]error, 0),
 		cancel:        make(chan struct{}),
@@ -99,54 +110,115 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 		return fmt.Errorf("no sub DAG runs to execute")
 	}
 
-	// Create a semaphore channel to limit concurrent executions
-	semaphore := make(chan struct{}, e.maxConcurrent)
-
-	// Channel to collect errors from goroutines
-	errChan := make(chan error, len(e.runParamsList))
-
 	logger.Info(ctx, "Starting parallel execution",
 		slog.Int("total", len(e.runParamsList)),
 		slog.Int("max-concurrent", e.maxConcurrent),
 		tag.DAG(e.child.DAG.Name),
 	)
 
-	// Launch all sub DAG executions
-	var wg sync.WaitGroup
+	pending := make([]scheduledAttempt, 0, len(e.runParamsList))
+	pendingSet := make(map[string]struct{}, len(e.runParamsList))
+	busyRuns := make(map[string]struct{}, len(e.runParamsList))
 	for _, params := range e.runParamsList {
-		wg.Add(1)
-		go func(runParams executor.RunParams) {
-			defer wg.Done()
-
-			select {
-			case semaphore <- struct{}{}:
-				defer func() { <-semaphore }()
-			case <-e.cancel:
-				errChan <- errParallelCancelled
-				return
-			case <-ctx.Done():
-				errChan <- ctx.Err()
-				return
-			}
-
-			// Execute sub DAG
-			if err := e.executeChild(ctx, runParams); err != nil {
-				logger.Error(ctx, "Sub DAG execution failed",
-					tag.RunID(runParams.RunID),
-					tag.Error(err),
-				)
-				errChan <- fmt.Errorf("sub DAG %s failed: %w", runParams.RunID, err)
-			}
-		}(params)
+		attempt := scheduledAttempt{runParams: params}
+		pending = append(pending, attempt)
+		pendingSet[pendingAttemptKey(attempt)] = struct{}{}
 	}
 
-	// Wait for all executions to complete
-	wg.Wait()
-	close(errChan)
+	resultCh := make(chan attemptResult, len(e.runParamsList))
+	inFlight := 0
 
-	// Collect all errors
-	for err := range errChan {
-		e.errors = append(e.errors, err)
+	for len(pending) > 0 || inFlight > 0 {
+		now := time.Now()
+
+		for e.maxConcurrent == 0 || inFlight < e.maxConcurrent {
+			idx := nextRunnableAttemptIndex(pending, now, busyRuns)
+			if idx < 0 {
+				break
+			}
+
+			attempt := pending[idx]
+			pending = append(pending[:idx], pending[idx+1:]...)
+			delete(pendingSet, pendingAttemptKey(attempt))
+			busyRuns[attempt.runParams.RunID] = struct{}{}
+			inFlight++
+
+			go func(a scheduledAttempt) {
+				res, err := e.runAttempt(ctx, a)
+				resultCh <- attemptResult{attempt: a, result: res, err: err}
+			}(attempt)
+		}
+
+		if len(pending) == 0 && inFlight == 0 {
+			break
+		}
+
+		var timer *time.Timer
+		if delay, ok := nextPendingDelay(pending, busyRuns, time.Now()); ok && delay > 0 {
+			timer = time.NewTimer(delay)
+		}
+		var timerCh <-chan time.Time
+		if timer != nil {
+			timerCh = timer.C
+		}
+
+		select {
+		case res := <-resultCh:
+			inFlight--
+			delete(busyRuns, res.attempt.runParams.RunID)
+
+			if res.result != nil {
+				e.lock.Lock()
+				e.results[res.attempt.runParams.RunID] = res.result
+				e.lock.Unlock()
+			}
+
+			if res.err != nil {
+				logger.Error(ctx, "Sub DAG execution failed",
+					tag.RunID(res.attempt.runParams.RunID),
+					tag.Error(res.err),
+				)
+			}
+
+			if res.result != nil && len(res.result.PendingStepRetries) > 0 {
+				scheduledAt := time.Now()
+				for _, retry := range res.result.PendingStepRetries {
+					next := scheduledAttempt{
+						runParams: res.attempt.runParams,
+						stepName:  retry.StepName,
+						readyAt:   scheduledAt.Add(retry.Interval),
+					}
+					key := pendingAttemptKey(next)
+					if _, exists := pendingSet[key]; exists {
+						continue
+					}
+					pending = append(pending, next)
+					pendingSet[key] = struct{}{}
+				}
+			} else if res.err != nil {
+				e.errors = append(e.errors, fmt.Errorf("sub DAG %s failed: %w", res.attempt.runParams.RunID, res.err))
+			}
+
+		case <-e.cancel:
+			if timer != nil {
+				timer.Stop()
+			}
+			e.errors = append(e.errors, errParallelCancelled)
+			return errParallelCancelled
+
+		case <-ctx.Done():
+			if timer != nil {
+				timer.Stop()
+			}
+			e.errors = append(e.errors, ctx.Err())
+			return ctx.Err()
+
+		case <-timerCh:
+		}
+
+		if timer != nil {
+			timer.Stop()
+		}
 	}
 
 	// Always output aggregated results, even if some executions failed
@@ -252,17 +324,63 @@ func (e *parallelExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 	return core.NodeSucceeded, nil
 }
 
-// executeChild executes a single sub DAG with the given parameters
-func (e *parallelExecutor) executeChild(ctx context.Context, runParams executor.RunParams) error {
-	result, err := e.child.Execute(ctx, runParams, e.workDir)
-
-	e.lock.Lock()
-	if result != nil {
-		e.results[runParams.RunID] = result
+func (e *parallelExecutor) runAttempt(ctx context.Context, attempt scheduledAttempt) (*exec1.RunStatus, error) {
+	if attempt.stepName != "" {
+		return e.child.Retry(ctx, attempt.runParams, attempt.stepName, e.workDir)
 	}
-	e.lock.Unlock()
+	return e.child.Execute(ctx, attempt.runParams, e.workDir)
+}
 
-	return err
+func pendingAttemptKey(attempt scheduledAttempt) string {
+	return attempt.runParams.RunID + ":" + attempt.stepName
+}
+
+func nextRunnableAttemptIndex(
+	pending []scheduledAttempt,
+	now time.Time,
+	busyRuns map[string]struct{},
+) int {
+	bestIdx := -1
+	for i, attempt := range pending {
+		if _, busy := busyRuns[attempt.runParams.RunID]; busy {
+			continue
+		}
+		if !attempt.readyAt.IsZero() && attempt.readyAt.After(now) {
+			continue
+		}
+		if bestIdx == -1 || pending[bestIdx].readyAt.After(attempt.readyAt) {
+			bestIdx = i
+		}
+	}
+	return bestIdx
+}
+
+func nextPendingDelay(
+	pending []scheduledAttempt,
+	busyRuns map[string]struct{},
+	now time.Time,
+) (time.Duration, bool) {
+	var (
+		found bool
+		min   time.Duration
+	)
+	for _, attempt := range pending {
+		if _, busy := busyRuns[attempt.runParams.RunID]; busy {
+			continue
+		}
+		delay := time.Until(attempt.readyAt)
+		if attempt.readyAt.IsZero() || delay <= 0 {
+			return 0, true
+		}
+		if !found || delay < min {
+			min = delay
+			found = true
+		}
+	}
+	if !found {
+		return 0, false
+	}
+	return min, true
 }
 
 // outputResults aggregates and outputs all sub DAG results

@@ -4,7 +4,7 @@
  * @module features/dags/components/common
  */
 import { cn } from '@/lib/utils';
-import { getStatusClass } from '@/lib/status-utils';
+import { getStatusClass, isActiveNodeStatus } from '@/lib/status-utils';
 import MatrixText from '@/ui/MatrixText';
 import React, { useEffect, useState } from 'react';
 import { NodeStatus } from '../../../../api/v1/schema';
@@ -50,8 +50,9 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
   };
 
   const isRunning = status === NodeStatus.Running;
+  const isActive = isActiveNodeStatus(status);
 
-  // Render a minimal badge - animated spinner for running, text-only for others
+  // Render a minimal badge - animated spinner for active states, matrix text only for running
   return (
     <div
       className={cn(
@@ -60,7 +61,7 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
         sizeClasses[size]
       )}
     >
-      {isRunning && (
+      {isActive && (
         <span className="mr-1.5 inline-flex" aria-hidden="true">
           <BrailleSpinner />
         </span>

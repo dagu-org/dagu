@@ -98,15 +98,16 @@ type DAGRunStatus struct {
 	AutoRetryInterval time.Duration `json:"autoRetryInterval,omitempty"`
 	AutoRetryBackoff  float64       `json:"autoRetryBackoff,omitempty"`
 	// AutoRetryMaxInterval is stored as a duration snapshot for retry scanner decisions.
-	AutoRetryMaxInterval time.Duration     `json:"autoRetryMaxInterval,omitempty"`
-	ProcGroup            string            `json:"procGroup,omitempty"`
-	SuspendFlagName      string            `json:"suspendFlagName,omitempty"`
-	Log                  string            `json:"log,omitempty"`
-	Error                string            `json:"error,omitempty"`
-	Params               string            `json:"params,omitempty"`
-	ParamsList           []string          `json:"paramsList,omitempty"`
-	Preconditions        []*core.Condition `json:"preconditions,omitempty"`
-	Tags                 []string          `json:"tags,omitempty"`
+	AutoRetryMaxInterval time.Duration      `json:"autoRetryMaxInterval,omitempty"`
+	ProcGroup            string             `json:"procGroup,omitempty"`
+	SuspendFlagName      string             `json:"suspendFlagName,omitempty"`
+	Log                  string             `json:"log,omitempty"`
+	Error                string             `json:"error,omitempty"`
+	Params               string             `json:"params,omitempty"`
+	ParamsList           []string           `json:"paramsList,omitempty"`
+	PendingStepRetries   []PendingStepRetry `json:"pendingStepRetries"`
+	Preconditions        []*core.Condition  `json:"preconditions,omitempty"`
+	Tags                 []string           `json:"tags,omitempty"`
 }
 
 // DAGRun returns a reference to the dag-run associated with this status
@@ -131,6 +132,42 @@ func (st *DAGRunStatus) Errors() []error {
 		}
 	}
 	return errs
+}
+
+// PendingStepRetriesFromNodes extracts pending parent-managed step retries from
+// a DAG status snapshot.
+func PendingStepRetriesFromNodes(nodes []*Node) []PendingStepRetry {
+	var retries []PendingStepRetry
+	for _, node := range nodes {
+		if retry, ok := pendingStepRetryForNode(node.Step.Name, node); ok {
+			retries = append(retries, retry)
+		}
+	}
+	return retries
+}
+
+// PendingStepRetriesFromStatus returns the persisted pending step retries when
+// present and falls back to deriving them from node state for older statuses
+// that predate the field.
+func PendingStepRetriesFromStatus(status *DAGRunStatus) []PendingStepRetry {
+	if status == nil {
+		return nil
+	}
+	if status.PendingStepRetries != nil {
+		return status.PendingStepRetries
+	}
+
+	retries := PendingStepRetriesFromNodes(status.Nodes)
+	for _, handler := range status.handlerNodes() {
+		stepName := handler.name
+		if handler.node != nil && handler.node.Step.Name != "" {
+			stepName = handler.node.Step.Name
+		}
+		if retry, ok := pendingStepRetryForNode(stepName, handler.node); ok {
+			retries = append(retries, retry)
+		}
+	}
+	return retries
 }
 
 // NodeByName returns the node with the specified name.
@@ -232,4 +269,21 @@ func normalizeAbortHandlerNode(node *Node) {
 	if node.Step.Name == "" || node.Step.Name == legacyAbortHandlerName {
 		node.Step.Name = canonicalAbortHandlerName
 	}
+}
+
+func pendingStepRetryForNode(stepName string, node *Node) (PendingStepRetry, bool) {
+	if node == nil || node.Status != core.NodeRetrying || stepName == "" {
+		return PendingStepRetry{}, false
+	}
+
+	interval := core.CalculateBackoffInterval(
+		node.Step.RetryPolicy.Interval,
+		node.Step.RetryPolicy.Backoff,
+		node.Step.RetryPolicy.MaxInterval,
+		node.RetryCount-1,
+	)
+	return PendingStepRetry{
+		StepName: stepName,
+		Interval: interval,
+	}, true
 }

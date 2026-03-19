@@ -146,14 +146,19 @@ func CreateStepRetryPlan(dag *core.DAG, nodes []*Node, stepName string) (*Plan, 
 	if targetNode == nil {
 		return nil, fmt.Errorf("%w: %s", ErrMissingNode, stepName)
 	}
+	preserveRetryBudget := targetNode.State().Status == core.NodeRetrying
 
 	step, ok := steps[targetNode.Name()]
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingNode, targetNode.Name())
 	}
 
+	retryCount := targetNode.GetRetryCount()
 	targetNode.ClearState(step)
-	targetNode.retryPolicy = RetryPolicy{} // force a fresh retry without prior policy
+	targetNode.SetRetryCount(retryCount)
+	if !preserveRetryBudget {
+		targetNode.retryPolicy = RetryPolicy{} // manual step retries start with a fresh retry budget
+	}
 
 	return p, nil
 }
@@ -243,6 +248,7 @@ func (p *Plan) setupRetry(ctx context.Context, steps map[string]core.Step) error
 		for _, u := range frontier {
 			shouldRetry := toRetry[u] ||
 				nodeStatus[u] == core.NodeFailed ||
+				nodeStatus[u] == core.NodeRetrying ||
 				nodeStatus[u] == core.NodeAborted ||
 				nodeStatus[u] == core.NodeRejected
 
@@ -362,6 +368,7 @@ func (p *Plan) Finish() {
 // PlanNodeStates holds the state flags for nodes in a plan.
 type PlanNodeStates struct {
 	HasRunning    bool
+	HasRetrying   bool
 	HasWaiting    bool
 	HasNotStarted bool
 	HasRejected   bool
@@ -377,6 +384,8 @@ func (p *Plan) NodeStates() PlanNodeStates {
 		switch node.State().Status {
 		case core.NodeRunning:
 			states.HasRunning = true
+		case core.NodeRetrying:
+			states.HasRetrying = true
 		case core.NodeWaiting:
 			states.HasWaiting = true
 		case core.NodeNotStarted:
@@ -414,7 +423,7 @@ func (p *Plan) IsRunning() bool {
 func (p *Plan) isRunningLocked() bool {
 	for _, node := range p.nodes {
 		s := node.State().Status
-		if s == core.NodeRunning {
+		if s == core.NodeRunning || s == core.NodeRetrying {
 			return true
 		}
 		if s == core.NodeNotStarted && p.finishedAt.IsZero() {
@@ -430,6 +439,7 @@ func (p *Plan) CheckFinished() bool {
 	defer p.mu.RUnlock()
 	for _, node := range p.nodes {
 		if node.State().Status == core.NodeRunning ||
+			node.State().Status == core.NodeRetrying ||
 			node.State().Status == core.NodeNotStarted {
 			return false
 		}

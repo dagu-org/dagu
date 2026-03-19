@@ -4,12 +4,14 @@
 package exec_test
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInitialStatusSnapshotsDAGRetryMetadata(t *testing.T) {
@@ -35,4 +37,134 @@ func TestInitialStatusSnapshotsDAGRetryMetadata(t *testing.T) {
 	assert.Equal(t, 10*time.Minute, status.AutoRetryMaxInterval)
 	assert.Equal(t, "shared-queue", status.ProcGroup)
 	assert.Equal(t, "retry-dag", status.SuspendFlagName)
+}
+
+func TestPendingStepRetriesFromStatus(t *testing.T) {
+	t.Parallel()
+
+	t.Run("PrefersPersistedField", func(t *testing.T) {
+		status := &exec.DAGRunStatus{
+			PendingStepRetries: []exec.PendingStepRetry{
+				{StepName: "persisted", Interval: 5 * time.Second},
+			},
+			Nodes: []*exec.Node{
+				{
+					Step: core.Step{
+						Name: "derived",
+						RetryPolicy: core.RetryPolicy{
+							Interval: 2 * time.Second,
+						},
+					},
+					Status:     core.NodeRetrying,
+					RetryCount: 1,
+				},
+			},
+		}
+
+		retries := exec.PendingStepRetriesFromStatus(status)
+		assert.Equal(t, []exec.PendingStepRetry{
+			{StepName: "persisted", Interval: 5 * time.Second},
+		}, retries)
+	})
+
+	t.Run("FallsBackToNodesForLegacyStatuses", func(t *testing.T) {
+		status := &exec.DAGRunStatus{
+			Nodes: []*exec.Node{
+				{
+					Step: core.Step{
+						Name: "legacy",
+						RetryPolicy: core.RetryPolicy{
+							Interval: 2 * time.Second,
+						},
+					},
+					Status:     core.NodeRetrying,
+					RetryCount: 1,
+				},
+			},
+		}
+
+		retries := exec.PendingStepRetriesFromStatus(status)
+		assert.Equal(t, []exec.PendingStepRetry{
+			{StepName: "legacy", Interval: 2 * time.Second},
+		}, retries)
+	})
+
+	t.Run("FallsBackToRegularAndHandlerNodesForLegacyStatuses", func(t *testing.T) {
+		status := &exec.DAGRunStatus{
+			Nodes: []*exec.Node{
+				{
+					Step: core.Step{
+						Name: "regular",
+						RetryPolicy: core.RetryPolicy{
+							Interval: time.Second,
+						},
+					},
+					Status:     core.NodeRetrying,
+					RetryCount: 1,
+				},
+			},
+			OnFailure: &exec.Node{
+				Step: core.Step{
+					Name: "onFailure",
+					RetryPolicy: core.RetryPolicy{
+						Interval: 3 * time.Second,
+					},
+				},
+				Status:     core.NodeRetrying,
+				RetryCount: 1,
+			},
+		}
+
+		retries := exec.PendingStepRetriesFromStatus(status)
+		assert.Equal(t, []exec.PendingStepRetry{
+			{StepName: "regular", Interval: time.Second},
+			{StepName: "onFailure", Interval: 3 * time.Second},
+		}, retries)
+	})
+
+	t.Run("FallsBackToHandlerIdentityWhenHandlerStepNameMissing", func(t *testing.T) {
+		status := &exec.DAGRunStatus{
+			OnFailure: &exec.Node{
+				Step: core.Step{
+					RetryPolicy: core.RetryPolicy{
+						Interval: 3 * time.Second,
+					},
+				},
+				Status:     core.NodeRetrying,
+				RetryCount: 1,
+			},
+		}
+
+		retries := exec.PendingStepRetriesFromStatus(status)
+		assert.Equal(t, []exec.PendingStepRetry{
+			{StepName: "onFailure", Interval: 3 * time.Second},
+		}, retries)
+	})
+
+	t.Run("ExplicitEmptySliceSurvivesJSONRoundTrip", func(t *testing.T) {
+		status := &exec.DAGRunStatus{
+			PendingStepRetries: []exec.PendingStepRetry{},
+			Nodes: []*exec.Node{
+				{
+					Step: core.Step{
+						Name: "legacy",
+						RetryPolicy: core.RetryPolicy{
+							Interval: 2 * time.Second,
+						},
+					},
+					Status:     core.NodeRetrying,
+					RetryCount: 1,
+				},
+			},
+		}
+
+		data, err := json.Marshal(status)
+		require.NoError(t, err)
+		assert.Contains(t, string(data), `"pendingStepRetries":[]`)
+
+		var decoded exec.DAGRunStatus
+		require.NoError(t, json.Unmarshal(data, &decoded))
+		require.NotNil(t, decoded.PendingStepRetries)
+		assert.Empty(t, exec.PendingStepRetriesFromStatus(&decoded))
+	})
 }

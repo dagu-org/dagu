@@ -241,7 +241,8 @@ func isSkippedStatus(status core.NodeStatus) bool {
 // shouldShowDuration returns true for statuses that should display duration.
 func shouldShowDuration(status core.NodeStatus) bool {
 	return status == core.NodeSucceeded || status == core.NodeFailed ||
-		status == core.NodeRunning || status == core.NodePartiallySucceeded
+		status == core.NodeRunning || status == core.NodeRetrying ||
+		status == core.NodePartiallySucceeded
 }
 
 // getStatusLabel returns a text label for the node status.
@@ -531,6 +532,8 @@ func (r *Renderer) calculateNodeDuration(node *exec.Node) string {
 func nodeStatusToStatus(ns core.NodeStatus) core.Status {
 	switch ns {
 	case core.NodeRunning:
+		return core.Running
+	case core.NodeRetrying:
 		return core.Running
 	case core.NodeSucceeded:
 		return core.Succeeded

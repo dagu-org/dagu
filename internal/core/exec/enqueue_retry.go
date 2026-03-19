@@ -53,6 +53,9 @@ func EnqueueRetry(
 			if opts.AutoRetry {
 				latest.AutoRetryCount++
 			}
+			if latest.Root.Zero() && !status.Root.Zero() {
+				latest.Root = status.Root
+			}
 			return nil
 		},
 	)

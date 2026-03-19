@@ -37,7 +37,13 @@ Examples:
 	)
 }
 
-var retryFlags = []commandLineFlag{dagRunIDFlagRetry, stepNameForRetry, retryWorkerIDFlag}
+var retryFlags = []commandLineFlag{
+	dagRunIDFlagRetry,
+	stepNameForRetry,
+	rootDAGRunFlag,
+	defaultWorkingDirFlag,
+	retryWorkerIDFlag,
+}
 
 var retryWorkerIDFlag = commandLineFlag{
 	name:  "worker-id",
@@ -47,7 +53,17 @@ var retryWorkerIDFlag = commandLineFlag{
 func runRetry(ctx *Context, args []string) error {
 	dagRunID, _ := ctx.StringParam("run-id")
 	stepName, _ := ctx.StringParam("step")
+	rootRefStr, _ := ctx.StringParam("root")
 	workerID := getWorkerID(ctx)
+
+	var rootRun exec.DAGRunRef
+	if rootRefStr != "" {
+		var err error
+		rootRun, err = exec.ParseDAGRunRef(rootRefStr)
+		if err != nil {
+			return fmt.Errorf("failed to parse root dag-run reference: %w", err)
+		}
+	}
 
 	name, err := extractDAGName(ctx, args[0])
 	if err != nil {
@@ -55,9 +71,17 @@ func runRetry(ctx *Context, args []string) error {
 	}
 
 	ref := exec.NewDAGRunRef(name, dagRunID)
-	attempt, err := ctx.DAGRunStore.FindAttempt(ctx, ref)
-	if err != nil {
-		return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRunID, err)
+	var attempt exec.DAGRunAttempt
+	if rootRun.Zero() {
+		attempt, err = ctx.DAGRunStore.FindAttempt(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRunID, err)
+		}
+	} else {
+		attempt, err = ctx.DAGRunStore.FindSubAttempt(ctx, rootRun, dagRunID)
+		if err != nil {
+			return fmt.Errorf("failed to find the sub DAG record for dag-run ID %s under root %s: %w", dagRunID, rootRun, err)
+		}
 	}
 
 	status, err := attempt.ReadStatus(ctx)
@@ -78,6 +102,14 @@ func runRetry(ctx *Context, args []string) error {
 	if err := prepareQueuedCatchupRetry(ctx, attempt, dag, status); err != nil {
 		return err
 	}
+
+	if rootRun.Zero() {
+		rootRun = status.Root
+		if rootRun.Zero() {
+			rootRun = status.DAGRun()
+		}
+	}
+	status.Root = rootRun
 
 	// Block retry via CLI for DAGs with workerSelector, UNLESS this is a distributed worker execution
 	// (indicated by --worker-id being set to something other than "local")
@@ -114,7 +146,7 @@ func runRetry(ctx *Context, args []string) error {
 
 	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
-	return executeRetry(ctx, dag, status, status.DAGRun(), stepName, workerID)
+	return executeRetry(ctx, dag, status, rootRun, stepName, workerID)
 }
 
 // enqueueRetry enqueues the retry and persists Queued status via exec.EnqueueRetry.

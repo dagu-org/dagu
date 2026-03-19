@@ -65,15 +65,18 @@ func (s Status) IsWaiting() bool {
 type NodeStatus int
 
 const (
-	NodeNotStarted NodeStatus = iota
-	NodeRunning
-	NodeFailed
-	NodeAborted
-	NodeSucceeded
-	NodeSkipped
-	NodePartiallySucceeded
-	NodeWaiting
-	NodeRejected
+	// Keep numeric values stable because NodeStatus is persisted in run status
+	// snapshots and older files/tests depend on the historical encoding.
+	NodeNotStarted         NodeStatus = 0
+	NodeRunning            NodeStatus = 1
+	NodeFailed             NodeStatus = 2
+	NodeAborted            NodeStatus = 3
+	NodeSucceeded          NodeStatus = 4
+	NodeSkipped            NodeStatus = 5
+	NodePartiallySucceeded NodeStatus = 6
+	NodeWaiting            NodeStatus = 7
+	NodeRejected           NodeStatus = 8
+	NodeRetrying           NodeStatus = 9
 )
 
 // IsSuccess checks if the node status indicates a successful execution.
@@ -103,6 +106,8 @@ func (s NodeStatus) String() string {
 		return "not_started"
 	case NodeRunning:
 		return "running"
+	case NodeRetrying:
+		return "retrying"
 	case NodeFailed:
 		return "failed"
 	case NodeAborted:

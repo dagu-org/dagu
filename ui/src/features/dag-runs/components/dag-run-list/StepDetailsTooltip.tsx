@@ -89,9 +89,15 @@ export function StepDetailsTooltip({
   const runningSteps = nodes.filter(
     (node) => node.status === NodeStatus.Running
   );
+  const retryingSteps = nodes.filter(
+    (node) => node.status === NodeStatus.Retrying
+  );
   const failedSteps = nodes.filter((node) => node.status === NodeStatus.Failed);
 
-  const hasStepData = runningSteps.length > 0 || failedSteps.length > 0;
+  const hasStepData =
+    runningSteps.length > 0 ||
+    retryingSteps.length > 0 ||
+    failedSteps.length > 0;
 
   return (
     <Tooltip open={isOpen} onOpenChange={setIsOpen}>
@@ -121,11 +127,16 @@ export function StepDetailsTooltip({
                   runningSteps,
                   'text-success'
                 )}
+                {renderStepList(
+                  'Retrying steps',
+                  retryingSteps,
+                  'text-warning'
+                )}
                 {renderStepList('Failed steps', failedSteps, 'text-error')}
               </>
             ) : (
               <div className="text-xs text-muted-foreground">
-                No running or failed steps at the moment.
+                No running, retrying, or failed steps at the moment.
               </div>
             )}
           </>

@@ -106,6 +106,13 @@ func WithBaseConfig(content string) TaskOption {
 	}
 }
 
+// WithExternalStepRetry enables parent-managed step retries for the dispatched task.
+func WithExternalStepRetry(enabled bool) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		task.ExternalStepRetry = enabled
+	}
+}
+
 // ResolveBaseConfig returns the base config content for a DAG task.
 // It prefers embedded BaseConfigData from the DAG, falling back to reading the file at fallbackPath.
 func ResolveBaseConfig(baseConfigData []byte, fallbackPath string) string {

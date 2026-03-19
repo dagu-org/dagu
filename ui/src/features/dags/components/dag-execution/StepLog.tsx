@@ -16,6 +16,7 @@ import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUserPreferences } from '../../../../contexts/UserPreference';
 import { useQuery } from '../../../../hooks/api';
 import { useStepLogSSE } from '../../../../hooks/useStepLogSSE';
+import { isActiveNodeStatus } from '../../../../lib/status-utils';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 
 // Extended Log type with pagination fields
@@ -77,9 +78,15 @@ function StepLog({
   const [pageSize, setPageSize] = useState(1000);
   const [currentPage, setCurrentPage] = useState(1);
   const [jumpToLine, setJumpToLine] = useState<number | ''>('');
-  const isRunning = node?.status === NodeStatus.Running;
+  const isActive = isActiveNodeStatus(node?.status);
 
-  const [isLiveMode, setIsLiveMode] = useState(isRunning);
+  const [isLiveMode, setIsLiveMode] = useState(isActive);
+
+  useEffect(() => {
+    if (!isActive) {
+      setIsLiveMode(false);
+    }
+  }, [isActive]);
 
   const [cachedData, setCachedData] = useState<LogWithPagination | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
@@ -94,8 +101,8 @@ function StepLog({
     dagRun.rootDAGRunName &&
     dagRun.rootDAGRunId !== dagRun.dagRunId;
 
-  // SSE is used for real-time updates when viewing tail of a running step (not sub-DAG runs)
-  const shouldUseSSE = viewMode === 'tail' && isLiveMode && isRunning && !isSubDAGRun;
+  // SSE is used for real-time updates when viewing tail of an active step (not sub-DAG runs)
+  const shouldUseSSE = viewMode === 'tail' && isLiveMode && isActive && !isSubDAGRun;
   const sseResult = useStepLogSSE(dagName, dagRunId, stepName, shouldUseSSE);
   const sseIsActive = shouldUseSSE && sseResult.isConnected && !sseResult.shouldUseFallback;
 
@@ -111,12 +118,12 @@ function StepLog({
   // SWR options - poll only when SSE is not available
   const swrOptions = React.useMemo(
     () => ({
-      refreshInterval: usePolling && isLiveMode && isRunning ? 2000 : 0,
+      refreshInterval: usePolling && isLiveMode && isActive ? 2000 : 0,
       keepPreviousData: true,
       revalidateOnFocus: false,
       dedupingInterval: 1000,
     }),
-    [isLiveMode, isRunning, usePolling]
+    [isActive, isLiveMode, usePolling]
   );
 
   const subDAGQuery = useQuery(
@@ -430,8 +437,8 @@ function StepLog({
               <Download className="h-4 w-4" />
             </Button>
 
-            {/* Live mode toggle - only show when node is running */}
-            {isRunning && (
+            {/* Live mode toggle - only show when the node is active */}
+            {isActive && (
               <Button
                 size="sm"
                 variant={isLiveMode ? 'primary' : 'default'}

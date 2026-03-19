@@ -138,7 +138,7 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 		// Rejected nodes should not allow dependents to continue
 		return false
 
-	case core.NodeNotStarted, core.NodeRunning, core.NodeWaiting:
+	case core.NodeNotStarted, core.NodeRunning, core.NodeRetrying, core.NodeWaiting:
 		// Unexpected state
 		logger.Error(ctx, "Unexpected node status",
 			tag.Status(s.String()),
@@ -955,6 +955,13 @@ func (n *Node) setupRetryPolicy(ctx context.Context) error {
 		Interval:  interval,
 		ExitCodes: exitCodes,
 	}
+
+	// Persist the evaluated retry policy so status snapshots carry the concrete
+	// values even when the DAG used string-based retry settings.
+	step.RetryPolicy.Limit = limit
+	step.RetryPolicy.Interval = interval
+	step.RetryPolicy.ExitCodes = exitCodes
+	n.SetStep(step)
 
 	return nil
 }

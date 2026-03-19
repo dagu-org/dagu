@@ -39,4 +39,9 @@ const (
 
 	// EnvKeyDAGRunWorkDir holds the path to the per-DAG-run working directory.
 	EnvKeyDAGRunWorkDir = "DAG_RUN_WORK_DIR"
+
+	// EnvKeyExternalStepRetry enables parent-managed step retries for sub-DAG runs.
+	// When set, retriable step failures transition to a queued retry state instead of
+	// sleeping inline inside the child DAG process.
+	EnvKeyExternalStepRetry = "DAGU_EXTERNAL_STEP_RETRY"
 )

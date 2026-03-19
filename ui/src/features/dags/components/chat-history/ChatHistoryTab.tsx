@@ -1,4 +1,5 @@
 import { components, NodeStatus } from '@/api/v1/schema';
+import { isActiveNodeStatus } from '@/lib/status-utils';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { StepMessagesTable } from './StepMessagesTable';
@@ -52,7 +53,7 @@ export function ChatHistoryTab({ dagRun }: ChatHistoryTabProps) {
 
   // Get selected node info
   const selectedNode = chatSteps.find((n) => n.step.name === selectedStep);
-  const isSelectedRunning = selectedNode?.status === NodeStatus.Running;
+  const isSelectedActive = isActiveNodeStatus(selectedNode?.status);
 
   // Determine if this is a sub-DAG run
   const isSubDAGRun =
@@ -87,7 +88,7 @@ export function ChatHistoryTab({ dagRun }: ChatHistoryTabProps) {
             </option>
           ))}
         </select>
-        {isSelectedRunning && (
+        {isSelectedActive && (
           <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
         )}
       </div>
@@ -98,7 +99,7 @@ export function ChatHistoryTab({ dagRun }: ChatHistoryTabProps) {
           dagName={dagRun.name}
           dagRunId={dagRun.dagRunId}
           stepName={selectedStep}
-          isRunning={isSelectedRunning || false}
+          isActive={isSelectedActive}
           subDAGRunId={isSubDAGRun ? dagRun.dagRunId : undefined}
           rootDagName={isSubDAGRun ? dagRun.rootDAGRunName : undefined}
           rootDagRunId={isSubDAGRun ? dagRun.rootDAGRunId : undefined}

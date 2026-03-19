@@ -393,19 +393,25 @@ func (cli *clientImpl) recordFailure(err error) {
 
 // recordSuccess updates the state for a successful coordinator operation
 func (cli *clientImpl) recordSuccess(ctx context.Context) {
-	cli.stateMu.Lock()
-	defer cli.stateMu.Unlock()
+	var previousConsecutiveFailures int
 
-	// Log recovery if this was a disconnection
+	cli.stateMu.Lock()
 	if !cli.state.IsConnected && cli.state.ConsecutiveFails > 0 {
-		logger.Info(ctx, "CoordinatorCli connection recovered",
-			slog.Int("previous-consecutive-failures", cli.state.ConsecutiveFails))
+		previousConsecutiveFailures = cli.state.ConsecutiveFails
 	}
 
-	// Reset consecutive failures on success
+	// Reset consecutive failures on success before logging so any logging side
+	// effects cannot deadlock by re-entering the coordinator client while the
+	// state mutex is held.
 	cli.state.IsConnected = true
 	cli.state.ConsecutiveFails = 0
 	cli.state.LastError = nil
+	cli.stateMu.Unlock()
+
+	if previousConsecutiveFailures > 0 {
+		logger.Info(ctx, "CoordinatorCli connection recovered",
+			slog.Int("previous-consecutive-failures", previousConsecutiveFailures))
+	}
 }
 
 // getCoordinatorMembers discovers available coordinators from the service registry.

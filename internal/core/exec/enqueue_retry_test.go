@@ -134,6 +134,33 @@ func TestEnqueueRetry(t *testing.T) {
 			},
 		},
 		{
+			name: "BackfillsMissingRootFromCallerStatus",
+			dag:  &core.DAG{Name: "child-dag"},
+			status: &exec.DAGRunStatus{
+				Name:      "child-dag",
+				DAGRunID:  "run-root",
+				AttemptID: "att-root",
+				Status:    core.Failed,
+				Root:      exec.NewDAGRunRef("root-dag", "root-run"),
+			},
+			store: &stubDAGRunStore{
+				status: &exec.DAGRunStatus{
+					Name:      "child-dag",
+					DAGRunID:  "run-root",
+					AttemptID: "att-root",
+					Status:    core.Failed,
+				},
+			},
+			setupQueue: func(qs *exec.MockQueueStore) {
+				qs.On("Enqueue", mock.Anything, "child-dag", exec.QueuePriorityLow, exec.NewDAGRunRef("child-dag", "run-root")).
+					Return(nil)
+			},
+			assertStore: func(t *testing.T, store *stubDAGRunStore) {
+				require.NotNil(t, store.status)
+				assert.Equal(t, exec.NewDAGRunRef("root-dag", "root-run"), store.status.Root)
+			},
+		},
+		{
 			name: "PersistQueuedStatusFails",
 			dag:  &core.DAG{Name: "test-dag"},
 			status: &exec.DAGRunStatus{

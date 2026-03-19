@@ -271,6 +271,27 @@ func TestStepRetryPlan(t *testing.T) {
 	}
 }
 
+func TestStepRetryPlan_PreservesRetryCountForRetryingStep(t *testing.T) {
+	dag := &core.DAG{Steps: []core.Step{
+		{Name: "retrying-step", RetryPolicy: core.RetryPolicy{Limit: 1}},
+	}}
+	nodes := []*runtime.Node{
+		runtime.NodeWithData(runtime.NodeData{
+			Step: dag.Steps[0],
+			State: runtime.NodeState{
+				Status:     core.NodeRetrying,
+				RetryCount: 1,
+			},
+		}),
+	}
+
+	p, err := runtime.CreateStepRetryPlan(dag, nodes, "retrying-step")
+	require.NoError(t, err)
+	require.NotNil(t, p)
+	require.Equal(t, core.NodeNotStarted, nodes[0].State().Status)
+	require.Equal(t, 1, nodes[0].State().RetryCount)
+}
+
 func TestPlan_Timing(t *testing.T) {
 	steps := []core.Step{{Name: "a"}}
 	p, err := runtime.NewPlan(steps...)

@@ -245,6 +245,7 @@ func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string) C
 // TaskStart creates a start command spec for coordinator tasks.
 func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 	args := []string{"start", "-q"}
+	env := os.Environ()
 
 	// Add hierarchy flags for sub DAGs
 	if task.RootDagRunId != "" {
@@ -281,17 +282,21 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 	if task.Params != "" {
 		args = append(args, "--", task.Params)
 	}
+	if task.ExternalStepRetry {
+		env = append(env, exec1.EnvKeyExternalStepRetry+"=1")
+	}
 
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        os.Environ(),
+		Env:        env,
 	}
 }
 
 // TaskRetry creates a retry command spec for coordinator tasks.
 func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
 	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId), "-q"}
+	env := os.Environ()
 
 	if task.Step != "" {
 		args = append(args, fmt.Sprintf("--step=%s", task.Step))
@@ -308,11 +313,14 @@ func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
 	// Use RootDagRunName instead of Target, because Target may be a temporary file
 	// created by the worker, but retry needs the original DAG name
 	args = append(args, task.RootDagRunName)
+	if task.ExternalStepRetry {
+		env = append(env, exec1.EnvKeyExternalStepRetry+"=1")
+	}
 
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        os.Environ(),
+		Env:        env,
 	}
 }
 

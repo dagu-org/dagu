@@ -13,6 +13,8 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
 	exec1 "github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/proto/convert"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -262,6 +264,160 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 	assert.Contains(t, err.Error(), "root DAG run ID is not set")
 }
 
+func TestBuildRetryCommand(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	mockDB := new(mockDatabase)
+	dagCtx := exec1.Context{
+		DAG:        &core.DAG{Name: "parent"},
+		DB:         mockDB,
+		RootDAGRun: exec1.NewDAGRunRef("parent", "root-123"),
+		DAGRunID:   "parent-456",
+	}
+	ctx = exec1.WithContext(ctx, dagCtx)
+
+	executor := &SubDAGExecutor{
+		DAG: &core.DAG{
+			Name:     "test-child",
+			Location: "/path/to/test.yaml",
+		},
+		killed: make(chan struct{}),
+	}
+
+	cmd, err := executor.buildRetryCommand(ctx, RunParams{RunID: "child-789"}, "flaky", "/work/dir")
+	require.NoError(t, err)
+	require.NotNil(t, cmd)
+
+	assert.Equal(t, "/work/dir", cmd.Dir)
+	assert.Contains(t, cmd.Args, "retry")
+	assert.Contains(t, cmd.Args, "--run-id=child-789")
+	assert.Contains(t, cmd.Args, "--root=parent:root-123")
+	assert.Contains(t, cmd.Args, "--default-working-dir=/work/dir")
+	assert.Contains(t, cmd.Args, "--step=flaky")
+	assert.Contains(t, cmd.Args, "/path/to/test.yaml")
+}
+
+func TestBuildCoordinatorTask_ExternalStepRetry(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	dagCtx := exec1.Context{
+		DAG:        &core.DAG{Name: "parent"},
+		RootDAGRun: exec1.NewDAGRunRef("parent", "root-123"),
+		DAGRunID:   "parent-456",
+	}
+	ctx = exec1.WithContext(ctx, dagCtx)
+
+	executor := &SubDAGExecutor{
+		DAG: &core.DAG{
+			Name:           "test-child",
+			YamlData:       []byte("name: test-child"),
+			WorkerSelector: map[string]string{"role": "worker"},
+		},
+		externalStepRetry: true,
+		killed:            make(chan struct{}),
+	}
+
+	task, err := executor.BuildCoordinatorTask(ctx, RunParams{RunID: "child-789", Params: "ITEM=1"})
+	require.NoError(t, err)
+
+	assert.Equal(t, coordinatorv1.Operation_OPERATION_START, task.Operation)
+	assert.True(t, task.ExternalStepRetry)
+	assert.Equal(t, "ITEM=1", task.Params)
+}
+
+func TestRetry_Distributed(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	dagCtx := exec1.Context{
+		DAG:             &core.DAG{Name: "parent"},
+		RootDAGRun:      exec1.NewDAGRunRef("parent", "root-123"),
+		DAGRunID:        "parent-456",
+		DefaultExecMode: config.ExecutionModeDistributed,
+	}
+	ctx = exec1.WithContext(ctx, dagCtx)
+
+	previousStatus := &exec1.DAGRunStatus{
+		Name:     "test-child",
+		DAGRunID: "child-789",
+		Root:     exec1.NewDAGRunRef("parent", "root-123"),
+		Parent:   exec1.NewDAGRunRef("parent", "parent-456"),
+		Status:   core.Queued,
+		Nodes: []*exec1.Node{
+			{
+				Step:   core.Step{Name: "flaky"},
+				Status: core.NodeRetrying,
+			},
+		},
+	}
+	completedStatus := &exec1.DAGRunStatus{
+		Name:     "test-child",
+		DAGRunID: "child-789",
+		Root:     exec1.NewDAGRunRef("parent", "root-123"),
+		Parent:   exec1.NewDAGRunRef("parent", "parent-456"),
+		Status:   core.Succeeded,
+	}
+
+	dispatcher := &mockDispatcher{
+		getStatusResponses: []*coordinatorv1.GetDAGRunStatusResponse{
+			mustStatusResponse(t, previousStatus),
+			mustStatusResponse(t, completedStatus),
+		},
+	}
+
+	executor := &SubDAGExecutor{
+		DAG: &core.DAG{
+			Name:           "test-child",
+			YamlData:       []byte("name: test-child"),
+			WorkerSelector: map[string]string{"role": "worker"},
+		},
+		coordinatorCli:    dispatcher,
+		externalStepRetry: true,
+		distributedRuns:   make(map[string]bool),
+		cmds:              make(map[string]*exec.Cmd),
+		killed:            make(chan struct{}),
+	}
+
+	result, err := executor.Retry(ctx, RunParams{RunID: "child-789"}, "flaky", "")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, core.Succeeded, result.Status)
+
+	require.Len(t, dispatcher.dispatches, 1)
+	task := dispatcher.dispatches[0]
+	assert.Equal(t, coordinatorv1.Operation_OPERATION_RETRY, task.Operation)
+	assert.Equal(t, "flaky", task.Step)
+	assert.True(t, task.ExternalStepRetry)
+	require.NotNil(t, task.PreviousStatus)
+}
+
+func TestBuildRetryCommand_NoRootDAGRun(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	mockDB := new(mockDatabase)
+	dagCtx := exec1.Context{
+		DAG:      &core.DAG{Name: "parent"},
+		DB:       mockDB,
+		DAGRunID: "parent-456",
+	}
+	ctx = exec1.WithContext(ctx, dagCtx)
+
+	executor := &SubDAGExecutor{
+		DAG:    &core.DAG{Name: "test-child"},
+		killed: make(chan struct{}),
+	}
+
+	cmd, err := executor.buildRetryCommand(ctx, RunParams{RunID: "child-789"}, "flaky", "/work/dir")
+	assert.Error(t, err)
+	assert.Nil(t, cmd)
+	assert.Contains(t, err.Error(), "root DAG run ID is not set")
+}
+
 func TestCleanup_LocalDAG(t *testing.T) {
 	t.Parallel()
 
@@ -498,6 +654,42 @@ type mockDatabase struct {
 	mock.Mock
 }
 
+type mockDispatcher struct {
+	dispatches          []*coordinatorv1.Task
+	getStatusResponses  []*coordinatorv1.GetDAGRunStatusResponse
+	getStatusErr        error
+	requestCancelCalled int
+}
+
+func (m *mockDispatcher) Dispatch(_ context.Context, task *coordinatorv1.Task) error {
+	m.dispatches = append(m.dispatches, task)
+	return nil
+}
+
+func (m *mockDispatcher) Cleanup(context.Context) error { return nil }
+
+func (m *mockDispatcher) GetDAGRunStatus(
+	_ context.Context,
+	_ string,
+	_ string,
+	_ *exec1.DAGRunRef,
+) (*coordinatorv1.GetDAGRunStatusResponse, error) {
+	if m.getStatusErr != nil {
+		return nil, m.getStatusErr
+	}
+	if len(m.getStatusResponses) == 0 {
+		return &coordinatorv1.GetDAGRunStatusResponse{Found: false}, nil
+	}
+	resp := m.getStatusResponses[0]
+	m.getStatusResponses = m.getStatusResponses[1:]
+	return resp, nil
+}
+
+func (m *mockDispatcher) RequestCancel(context.Context, string, string, *exec1.DAGRunRef) error {
+	m.requestCancelCalled++
+	return nil
+}
+
 func (m *mockDatabase) GetDAG(ctx context.Context, name string) (*core.DAG, error) {
 	args := m.Called(ctx, name)
 	if args.Get(0) == nil {
@@ -524,4 +716,14 @@ func (m *mockDatabase) IsSubDAGRunCompleted(ctx context.Context, dagRunID string
 func (m *mockDatabase) RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun exec1.DAGRunRef) error {
 	args := m.Called(ctx, dagRunID, rootDAGRun)
 	return args.Error(0)
+}
+
+func mustStatusResponse(t *testing.T, status *exec1.DAGRunStatus) *coordinatorv1.GetDAGRunStatusResponse {
+	t.Helper()
+	protoStatus, err := convert.DAGRunStatusToProto(status)
+	require.NoError(t, err)
+	return &coordinatorv1.GetDAGRunStatusResponse{
+		Found:  true,
+		Status: protoStatus,
+	}
 }

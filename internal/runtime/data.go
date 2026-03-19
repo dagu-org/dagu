@@ -435,6 +435,13 @@ func (d *Data) GetRetryCount() int {
 	return d.inner.State.RetryCount
 }
 
+func (d *Data) SetRetryCount(retryCount int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.inner.State.RetryCount = retryCount
+}
+
 func (d *Data) SetRetriedAt(retriedAt time.Time) {
 	d.mu.Lock()
 	defer d.mu.Unlock()

@@ -180,6 +180,14 @@ func WithAutoRetryCount(autoRetryCount int) StatusOption {
 	}
 }
 
+// WithPendingStepRetries returns a StatusOption that sets any parent-managed
+// step retries that are waiting to be scheduled.
+func WithPendingStepRetries(retries []exec.PendingStepRetry) StatusOption {
+	return func(s *exec.DAGRunStatus) {
+		s.PendingStepRetries = retries
+	}
+}
+
 // Create builds a Status object for a dag-run with the specified parameters
 func (f *StatusBuilder) Create(
 	dagRunID string,
@@ -197,6 +205,10 @@ func (f *StatusBuilder) Create(
 
 	for _, opt := range opts {
 		opt(&statusObj)
+	}
+
+	if statusObj.PendingStepRetries == nil {
+		statusObj.PendingStepRetries = exec.PendingStepRetriesFromStatus(&statusObj)
 	}
 
 	// Generate AttemptKey if not already set and we have all required fields

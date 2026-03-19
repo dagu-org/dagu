@@ -947,6 +947,71 @@ steps:
 	})
 }
 
+func TestTaskExtraEnvs(t *testing.T) {
+	t.Parallel()
+
+	assert.Nil(t, taskExtraEnvs(nil))
+	assert.Nil(t, taskExtraEnvs(&coordinatorv1.Task{}))
+	assert.Equal(t, []string{exec.EnvKeyExternalStepRetry + "=1"}, taskExtraEnvs(&coordinatorv1.Task{
+		ExternalStepRetry: true,
+	}))
+}
+
+func TestHandleStart_ExternalStepRetryQueuesPendingRetry(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+	dag := th.DAG(t, `name: remote-external-retry
+steps:
+  - name: flaky
+    command: exit 1
+    retry_policy:
+      limit: 1
+      interval_sec: 30
+`)
+
+	var reported []*exec.DAGRunStatus
+	client := newMockRemoteCoordinatorClient()
+	client.ReportStatusFunc = func(_ context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+		status, err := convert.ProtoToDAGRunStatus(req.Status)
+		require.NoError(t, err)
+		reported = append(reported, status)
+		return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
+	}
+
+	handler := &remoteTaskHandler{
+		workerID:          "test-worker",
+		coordinatorClient: client,
+		dagRunStore:       nil,
+		dagStore:          th.DAGStore,
+		dagRunMgr:         th.DAGRunMgr,
+		serviceRegistry:   th.ServiceRegistry,
+		config:            th.Config,
+	}
+
+	task := &coordinatorv1.Task{
+		Operation:         coordinatorv1.Operation_OPERATION_START,
+		Target:            dag.Name,
+		Definition:        string(dag.YamlData),
+		RootDagRunName:    dag.Name,
+		RootDagRunId:      "run-queued",
+		DagRunId:          "run-queued",
+		ExternalStepRetry: true,
+	}
+
+	started := time.Now()
+	err := handler.handleStart(th.Context, task, false)
+	require.NoError(t, err)
+	require.Less(t, time.Since(started), 5*time.Second)
+	require.NotEmpty(t, reported)
+
+	final := reported[len(reported)-1]
+	require.Equal(t, core.Queued, final.Status)
+	require.Equal(t, []exec.PendingStepRetry{
+		{StepName: "flaky", Interval: 30 * time.Second},
+	}, final.PendingStepRetries)
+}
+
 func TestHandleStart(t *testing.T) {
 	t.Parallel()
 
@@ -1418,7 +1483,7 @@ steps:
 	statusPusher, logStreamer := handler.createRemoteHandlers("run-error", dag.Name, root)
 
 	// Call executeDAGRun directly - should fail at createAgentEnv
-	err := handler.executeDAGRun(context.Background(), dag, "run-error", "", "", root, parent, statusPusher, logStreamer, false, nil)
+	err := handler.executeDAGRun(context.Background(), dag, "run-error", "", "", root, parent, statusPusher, logStreamer, false, nil, nil)
 
 	// On systems where null byte in path fails, we should get an error
 	if err != nil {
@@ -1462,7 +1527,7 @@ steps:
 
 	// Call executeDAGRun - this should succeed and log completion
 	// For top-level runs, pass empty parent and ensure root matches dagRunID
-	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", "", root, exec.DAGRunRef{}, statusPusher, logStreamer, false, nil)
+	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", "", root, exec.DAGRunRef{}, statusPusher, logStreamer, false, nil, nil)
 
 	// Should succeed for simple echo command
 	require.NoError(t, err, "executeDAGRun should succeed for simple echo command")

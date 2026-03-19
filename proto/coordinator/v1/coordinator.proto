@@ -87,6 +87,8 @@ message Task {
   string base_config = 17;
   // RFC 3339 timestamp of when this task was originally scheduled.
   string schedule_time = 18;
+  // Enables parent-managed step retries for this task.
+  bool external_step_retry = 19;
 }
 
 enum Operation {

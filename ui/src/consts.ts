@@ -35,6 +35,10 @@ export const statusColorMapping: statusColorMapping = {
     backgroundColor: 'var(--warning)',
     color: 'var(--primary-foreground)',
   },
+  [Status.Waiting]: {
+    backgroundColor: 'var(--warning)',
+    color: 'var(--primary-foreground)',
+  },
   [Status.Rejected]: {
     backgroundColor: 'var(--destructive)',
     color: 'var(--destructive-foreground)',
@@ -52,5 +56,7 @@ export const nodeStatusColorMapping = {
     color: 'var(--muted-foreground)',
   },
   [NodeStatus.PartialSuccess]: statusColorMapping[Status.PartialSuccess],
+  [NodeStatus.Waiting]: statusColorMapping[Status.Waiting],
   [NodeStatus.Rejected]: statusColorMapping[Status.Rejected],
+  [NodeStatus.Retrying]: statusColorMapping[Status.Waiting],
 };

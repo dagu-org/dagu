@@ -165,6 +165,111 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 	assert.Equal(t, "worker-abc", result.WorkerID)
 }
 
+func TestStatusBuilderPopulatesPendingStepRetriesFromNodes(t *testing.T) {
+	dag := &core.DAG{
+		Name: "retrying-dag",
+		Steps: []core.Step{
+			{Name: "step1"},
+		},
+	}
+
+	builder := transform.NewStatusBuilder(dag)
+	result := builder.Create(
+		"retry-run",
+		core.Queued,
+		123,
+		time.Now(),
+		transform.WithNodes([]runtime.NodeData{
+			{
+				Step: core.Step{
+					Name: "step1",
+					RetryPolicy: core.RetryPolicy{
+						Interval: 2 * time.Second,
+					},
+				},
+				State: runtime.NodeState{
+					Status:     core.NodeRetrying,
+					RetryCount: 1,
+				},
+			},
+		}),
+	)
+
+	assert.Equal(t, []exec.PendingStepRetry{
+		{StepName: "step1", Interval: 2 * time.Second},
+	}, result.PendingStepRetries)
+}
+
+func TestStatusBuilderPendingStepRetriesOptionOverridesAutoDerivation(t *testing.T) {
+	dag := &core.DAG{
+		Name: "retrying-dag",
+		Steps: []core.Step{
+			{Name: "step1"},
+		},
+	}
+
+	builder := transform.NewStatusBuilder(dag)
+	result := builder.Create(
+		"retry-run",
+		core.Queued,
+		123,
+		time.Now(),
+		transform.WithNodes([]runtime.NodeData{
+			{
+				Step: core.Step{
+					Name: "step1",
+					RetryPolicy: core.RetryPolicy{
+						Interval: 2 * time.Second,
+					},
+				},
+				State: runtime.NodeState{
+					Status:     core.NodeRetrying,
+					RetryCount: 1,
+				},
+			},
+		}),
+		transform.WithPendingStepRetries([]exec.PendingStepRetry{}),
+	)
+
+	assert.NotNil(t, result.PendingStepRetries)
+	assert.Empty(t, result.PendingStepRetries)
+}
+
+func TestStatusBuilderPopulatesPendingStepRetriesFromHandlerNodes(t *testing.T) {
+	dag := &core.DAG{
+		Name: "retrying-dag",
+		HandlerOn: core.HandlerOn{
+			Failure: &core.Step{Name: "onFailure"},
+		},
+	}
+
+	failureHandler := runtime.NewNode(
+		core.Step{
+			Name: "onFailure",
+			RetryPolicy: core.RetryPolicy{
+				Interval: 3 * time.Second,
+			},
+		},
+		runtime.NodeState{
+			Status:     core.NodeRetrying,
+			RetryCount: 1,
+		},
+	)
+
+	builder := transform.NewStatusBuilder(dag)
+	result := builder.Create(
+		"retry-run",
+		core.Queued,
+		123,
+		time.Now(),
+		transform.WithOnFailureNode(failureHandler),
+	)
+
+	assert.Equal(t, []exec.PendingStepRetry{
+		{StepName: "onFailure", Interval: 3 * time.Second},
+	}, result.PendingStepRetries)
+}
+
 func TestInitialStatus(t *testing.T) {
 	dag := &core.DAG{
 		Name: "initial-test",

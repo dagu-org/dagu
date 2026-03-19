@@ -11,7 +11,7 @@ interface StepMessagesTableProps {
   dagName: string;
   dagRunId: string;
   stepName: string;
-  isRunning: boolean;
+  isActive: boolean;
   // For sub-DAG runs
   subDAGRunId?: string;
   rootDagName?: string;
@@ -50,7 +50,7 @@ export function StepMessagesTable({
   dagName,
   dagRunId,
   stepName,
-  isRunning,
+  isActive,
   subDAGRunId,
   rootDagName,
   rootDagRunId,
@@ -73,7 +73,7 @@ export function StepMessagesTable({
       },
     },
     {
-      refreshInterval: isRunning ? 2000 : 0,
+      refreshInterval: isActive ? 2000 : 0,
       revalidateOnFocus: false,
       isPaused: () => isSubDAGRun,
     }
@@ -94,7 +94,7 @@ export function StepMessagesTable({
       },
     },
     {
-      refreshInterval: isRunning ? 2000 : 0,
+      refreshInterval: isActive ? 2000 : 0,
       revalidateOnFocus: false,
       isPaused: () => !isSubDAGRun,
     }
