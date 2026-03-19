@@ -314,6 +314,155 @@ steps:
 	}
 }
 
+func TestParallelExecution_AbortStopsPendingLaunches(t *testing.T) {
+	th := test.Setup(t, test.WithBuiltExecutable())
+
+	dag := th.DAG(t, `type: graph
+steps:
+  - name: process-items
+    call: child-slow
+    parallel:
+      items:
+        - "one"
+        - "two"
+        - "three"
+      max_concurrent: 1
+
+---
+name: child-slow
+params:
+  - ITEM: ""
+steps:
+  - name: hold
+    command: sleep 30
+`)
+
+	agent := dag.Agent()
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- agent.Run(agent.Context)
+	}()
+
+	require.Eventually(t, func() bool {
+		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
+		if err != nil || status.Status != core.Running || len(status.Nodes) == 0 {
+			return false
+		}
+		if len(status.Nodes[0].SubRuns) != 3 {
+			return false
+		}
+
+		return countStartedParallelSubRuns(t, dag, &status) == 1
+	}, 10*time.Second, 50*time.Millisecond, "expected exactly one started sub-run before abort")
+
+	agent.Abort()
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("parallel abort run did not exit")
+	}
+
+	dag.AssertLatestStatus(t, core.Aborted)
+
+	finalStatus, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
+	require.NoError(t, err)
+	require.Len(t, finalStatus.Nodes, 1)
+
+	parallelNode := finalStatus.Nodes[0]
+	require.Equal(t, core.NodeAborted, parallelNode.Status)
+	require.Equal(t, 1, countStartedParallelSubRuns(t, dag, &finalStatus))
+
+	rootRun := exec.NewDAGRunRef(finalStatus.Name, finalStatus.DAGRunID)
+	startedRunID := ""
+	for _, subRun := range parallelNode.SubRuns {
+		if _, subErr := dag.DAGRunMgr.FindSubDAGRunStatus(dag.Context, rootRun, subRun.DAGRunID); subErr != nil {
+			continue
+		}
+		startedRunID = subRun.DAGRunID
+	}
+	require.NotEmpty(t, startedRunID, "expected one persisted started sub-run")
+}
+
+func TestParallelExecution_AbortSuppressesPendingRetry(t *testing.T) {
+	counterFile := filepath.Join(t.TempDir(), "parallel-retry-counter.txt")
+
+	th := test.Setup(t, test.WithBuiltExecutable())
+	dag := th.DAG(t, fmt.Sprintf(`type: graph
+steps:
+  - name: process-items
+    call: child-flaky
+    parallel:
+      items:
+        - "item1"
+
+---
+name: child-flaky
+params:
+  - ITEM: ""
+steps:
+  - name: flaky
+    command: |
+      COUNTER_FILE=%q
+      count=0
+      if [ -f "$COUNTER_FILE" ]; then
+        count=$(cat "$COUNTER_FILE")
+      fi
+      count=$((count + 1))
+      echo "$count" > "$COUNTER_FILE"
+      exit 1
+    retry_policy:
+      limit: 1
+      interval_sec: 2
+`, counterFile))
+
+	agent := dag.Agent()
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- agent.Run(agent.Context)
+	}()
+
+	require.Eventually(t, func() bool {
+		data, err := os.ReadFile(counterFile)
+		return err == nil && strings.TrimSpace(string(data)) == "1"
+	}, 10*time.Second, 50*time.Millisecond, "expected first attempt to increment counter")
+
+	time.Sleep(300 * time.Millisecond)
+
+	require.Eventually(t, func() bool {
+		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
+		if err != nil {
+			return false
+		}
+		return status.Status == core.Running
+	}, 5*time.Second, 50*time.Millisecond, "expected parent DAG to still be waiting on retry before abort")
+
+	agent.Abort()
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("parallel retry abort run did not exit")
+	}
+
+	dag.AssertLatestStatus(t, core.Aborted)
+
+	finalStatus, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
+	require.NoError(t, err)
+	require.Len(t, finalStatus.Nodes, 1)
+	require.Equal(t, core.NodeAborted, finalStatus.Nodes[0].Status)
+
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		data, readErr := os.ReadFile(counterFile)
+		require.NoError(t, readErr)
+		require.Equal(t, "1", strings.TrimSpace(string(data)), "retry should not launch after abort")
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
 func TestParallelExecution_DeterministicIDs(t *testing.T) {
 	const dagContent = `steps:
   - call: child-echo
@@ -1331,4 +1480,21 @@ func collectOutputs(entries []map[string]any, key string) []string {
 		}
 	}
 	return out
+}
+
+func countStartedParallelSubRuns(t *testing.T, dag test.DAG, status *exec.DAGRunStatus) int {
+	t.Helper()
+
+	if len(status.Nodes) == 0 {
+		return 0
+	}
+
+	rootRun := exec.NewDAGRunRef(status.Name, status.DAGRunID)
+	started := 0
+	for _, subRun := range status.Nodes[0].SubRuns {
+		if _, err := dag.DAGRunMgr.FindSubDAGRunStatus(dag.Context, rootRun, subRun.DAGRunID); err == nil {
+			started++
+		}
+	}
+	return started
 }

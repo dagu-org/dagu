@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
@@ -42,6 +43,8 @@ type parallelExecutor struct {
 	errors   []error                             // Collects errors from failed executions
 	children map[string]*executor.SubDAGExecutor // Active child executors keyed by attempt
 
+	runCancel  context.CancelFunc
+	isCanceled atomic.Bool
 	cancel     chan struct{}
 	cancelOnce sync.Once
 }
@@ -93,6 +96,27 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	if len(e.runParamsList) == 0 {
 		return fmt.Errorf("no sub DAG runs to execute")
 	}
+	if e.cancelled() {
+		return errParallelCancelled
+	}
+
+	runCtx, runCancel := context.WithCancel(ctx)
+	e.lock.Lock()
+	e.runCancel = runCancel
+	alreadyCanceled := e.isCanceled.Load()
+	e.lock.Unlock()
+	if alreadyCanceled {
+		runCancel()
+		return errParallelCancelled
+	}
+	defer func() {
+		runCancel()
+		e.lock.Lock()
+		if e.runCancel != nil {
+			e.runCancel = nil
+		}
+		e.lock.Unlock()
+	}()
 
 	logger.Info(ctx, "Starting parallel execution",
 		slog.Int("total", len(e.runParamsList)),
@@ -113,9 +137,17 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	inFlight := 0
 
 	for len(pending) > 0 || inFlight > 0 {
+		if e.cancelled() {
+			return errParallelCancelled
+		}
+
 		now := time.Now()
 
 		for e.maxConcurrent == 0 || inFlight < e.maxConcurrent {
+			if e.cancelled() {
+				break
+			}
+
 			idx := nextRunnableAttemptIndex(pending, now, busyRuns)
 			if idx < 0 {
 				break
@@ -128,8 +160,11 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 			inFlight++
 
 			go func(a scheduledAttempt) {
-				res, err := e.runAttempt(ctx, a)
-				resultCh <- attemptResult{attempt: a, result: res, err: err}
+				res, err := e.runAttempt(runCtx, a)
+				select {
+				case resultCh <- attemptResult{attempt: a, result: res, err: err}:
+				case <-runCtx.Done():
+				}
 			}(attempt)
 		}
 
@@ -157,11 +192,15 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 				e.lock.Unlock()
 			}
 
-			if res.err != nil {
+			if res.err != nil && !e.cancelled() {
 				logger.Error(ctx, "Sub DAG execution failed",
 					tag.RunID(res.attempt.runParams.RunID),
 					tag.Error(res.err),
 				)
+			}
+
+			if e.cancelled() {
+				continue
 			}
 
 			if res.result != nil && len(res.result.PendingStepRetries) > 0 {
@@ -179,7 +218,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 					pending = append(pending, next)
 					pendingSet[key] = struct{}{}
 				}
-			} else if res.err != nil {
+			} else if res.err != nil && !errors.Is(res.err, errParallelCancelled) && !errors.Is(res.err, context.Canceled) {
 				e.errors = append(e.errors, fmt.Errorf("sub DAG %s failed: %w", res.attempt.runParams.RunID, res.err))
 			}
 
@@ -187,15 +226,16 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 			if timer != nil {
 				timer.Stop()
 			}
-			e.errors = append(e.errors, errParallelCancelled)
 			return errParallelCancelled
 
-		case <-ctx.Done():
+		case <-runCtx.Done():
 			if timer != nil {
 				timer.Stop()
 			}
-			e.errors = append(e.errors, ctx.Err())
-			return ctx.Err()
+			if e.cancelled() {
+				return errParallelCancelled
+			}
+			return runCtx.Err()
 
 		case <-timerCh:
 		}
@@ -260,6 +300,10 @@ func (e *parallelExecutor) SetStderr(out io.Writer) {
 
 // DetermineNodeStatus implements NodeStatusDeterminer.
 func (e *parallelExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
+	if e.cancelled() {
+		return core.NodeAborted, nil
+	}
+
 	if len(e.results) == 0 {
 		if len(e.errors) > 0 {
 			return core.NodeFailed, fmt.Errorf(
@@ -309,13 +353,28 @@ func (e *parallelExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 }
 
 func (e *parallelExecutor) runAttempt(ctx context.Context, attempt scheduledAttempt) (*exec1.RunStatus, error) {
+	if e.cancelled() {
+		return nil, errParallelCancelled
+	}
+
 	child, err := e.newChildExecutor(ctx, attempt.runParams)
 	if err != nil {
+		if e.cancelled() || errors.Is(ctx.Err(), context.Canceled) {
+			return nil, errParallelCancelled
+		}
 		return nil, err
 	}
 
 	key := pendingAttemptKey(attempt)
+	cleanupCtx := context.WithoutCancel(ctx)
 	e.lock.Lock()
+	if e.isCanceled.Load() {
+		e.lock.Unlock()
+		if cleanErr := child.Cleanup(cleanupCtx); cleanErr != nil {
+			logger.Error(cleanupCtx, "Failed to cleanup sub DAG executor", tag.Error(cleanErr))
+		}
+		return nil, errParallelCancelled
+	}
 	e.children[key] = child
 	e.lock.Unlock()
 
@@ -323,10 +382,14 @@ func (e *parallelExecutor) runAttempt(ctx context.Context, attempt scheduledAtte
 		e.lock.Lock()
 		delete(e.children, key)
 		e.lock.Unlock()
-		if cleanErr := child.Cleanup(ctx); cleanErr != nil {
-			logger.Error(ctx, "Failed to cleanup sub DAG executor", tag.Error(cleanErr))
+		if cleanErr := child.Cleanup(cleanupCtx); cleanErr != nil {
+			logger.Error(cleanupCtx, "Failed to cleanup sub DAG executor", tag.Error(cleanErr))
 		}
 	}()
+
+	if e.cancelled() {
+		return nil, errParallelCancelled
+	}
 
 	if attempt.stepName != "" {
 		return child.Retry(ctx, attempt.runParams, attempt.stepName, e.workDir)
@@ -448,21 +511,41 @@ func (e *parallelExecutor) outputResults() error {
 }
 
 func (e *parallelExecutor) Kill(sig os.Signal) error {
-	e.lock.Lock()
-	e.cancelOnce.Do(func() {
-		close(e.cancel)
-	})
-	children := make([]*executor.SubDAGExecutor, 0, len(e.children))
-	for _, child := range e.children {
-		children = append(children, child)
-	}
-	e.lock.Unlock()
+	children := e.cancelExecution()
 
 	var killErr error
 	for _, child := range children {
 		killErr = errors.Join(killErr, child.Kill(sig))
 	}
 	return killErr
+}
+
+func (e *parallelExecutor) cancelled() bool {
+	return e.isCanceled.Load()
+}
+
+func (e *parallelExecutor) cancelExecution() []*executor.SubDAGExecutor {
+	e.cancelOnce.Do(func() {
+		e.isCanceled.Store(true)
+
+		e.lock.Lock()
+		runCancel := e.runCancel
+		close(e.cancel)
+		e.lock.Unlock()
+
+		if runCancel != nil {
+			runCancel()
+		}
+	})
+
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	children := make([]*executor.SubDAGExecutor, 0, len(e.children))
+	for _, child := range e.children {
+		children = append(children, child)
+	}
+	return children
 }
 
 func (e *parallelExecutor) newChildExecutor(
