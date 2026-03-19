@@ -1894,6 +1894,39 @@ func TestAPI_CleanupIdleSessions_CancelsStuckSession(t *testing.T) {
 	require.False(t, mgr.IsWorking(), "stuck session should be cancelled")
 }
 
+func TestAPI_CleanupIdleSessions_DoesNotCancelWorkingSessionWithPendingPrompt(t *testing.T) {
+	t.Parallel()
+
+	api := NewAPI(APIConfig{
+		ConfigStore: newMockConfigStore(true),
+		WorkingDir:  t.TempDir(),
+	})
+
+	mgr := NewSessionManager(SessionManagerConfig{
+		ID:                 "prompt-waiting-sess",
+		User:               UserIdentity{UserID: defaultUserID},
+		PromptWaitInterval: 5 * time.Millisecond,
+	})
+	mgr.mu.Lock()
+	mgr.working = true
+	mgr.lastHeartbeat = time.Now().Add(-1 * time.Minute)
+	mgr.lastActivity = time.Now()
+	mgr.mu.Unlock()
+
+	mgr.promptsMu.Lock()
+	mgr.pendingPrompts["approval-1"] = make(chan UserPromptResponse, 1)
+	mgr.promptTypes["approval-1"] = PromptTypeCommandApproval
+	mgr.promptsMu.Unlock()
+
+	api.sessions.Store("prompt-waiting-sess", mgr)
+
+	api.cleanupIdleSessions()
+
+	require.True(t, mgr.IsWorking(), "working session waiting on prompt should not be cancelled")
+	_, exists := api.sessions.Load("prompt-waiting-sess")
+	require.True(t, exists, "session waiting on prompt should remain active")
+}
+
 func TestAPI_CleanupIdleSessions_DoesNotCancelHealthyWorkingSession(t *testing.T) {
 	t.Parallel()
 
@@ -1940,6 +1973,55 @@ func TestAPI_CleanupIdleSessions_DoesNotCancelZeroHeartbeat(t *testing.T) {
 	// Should not be cancelled because lastHeartbeat is zero
 	_, exists := api.sessions.Load("no-hb-sess")
 	require.True(t, exists, "session with zero heartbeat should not be cancelled")
+}
+
+func TestAPI_SubmitUserResponse_ReturnsExpiredAfterCancelledApprovalPrompt(t *testing.T) {
+	t.Parallel()
+
+	setup := newAPITestSetup(t, true, false, "")
+	mgr := NewSessionManager(SessionManagerConfig{
+		ID:                 "submit-expired",
+		User:               UserIdentity{UserID: defaultUserID},
+		PromptWaitInterval: 5 * time.Millisecond,
+	})
+	setup.api.sessions.Store("submit-expired", mgr)
+
+	emit := mgr.createEmitUserPromptFunc()
+	wait := mgr.createWaitUserResponseFunc()
+	emit(UserPrompt{
+		PromptID:   "approval-expired",
+		PromptType: PromptTypeCommandApproval,
+		Question:   "Approve command?",
+	})
+
+	type waitResult struct {
+		resp UserPromptResponse
+		err  error
+	}
+	resultCh := make(chan waitResult, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go func() {
+		resp, err := wait(ctx, "approval-expired")
+		resultCh <- waitResult{resp: resp, err: err}
+	}()
+
+	require.Eventually(t, mgr.HasPendingPrompt, time.Second, 5*time.Millisecond)
+	require.NoError(t, mgr.Cancel(context.Background()))
+
+	select {
+	case result := <-resultCh:
+		require.NoError(t, result.err)
+		assert.True(t, result.resp.Cancelled)
+	case <-time.After(time.Second):
+		t.Fatal("wait did not return after cancel")
+	}
+
+	err := setup.api.SubmitUserResponse(context.Background(), "submit-expired", defaultUserID, UserPromptResponse{
+		PromptID:          "approval-expired",
+		SelectedOptionIDs: []string{"approve"},
+	})
+	assert.ErrorIs(t, err, ErrPromptExpired)
 }
 
 func TestAPI_CreateSession_IdempotentWithSessionID(t *testing.T) {

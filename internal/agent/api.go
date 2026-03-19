@@ -1666,7 +1666,12 @@ func (a *API) cleanupIdleSessions() {
 			return true
 		}
 		// Detect stuck sessions: working but no heartbeat in 30s (3x the 10s interval).
+		// Sessions waiting on a human prompt are intentionally blocked and must not
+		// be treated as stuck.
 		if mgr.IsWorking() {
+			if mgr.HasPendingPrompt() {
+				return true
+			}
 			lastHB := mgr.LastHeartbeat()
 			if !lastHB.IsZero() && time.Since(lastHB) > stuckHeartbeatTimeout {
 				if err := mgr.Cancel(context.Background()); err != nil {

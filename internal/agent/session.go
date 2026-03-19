@@ -38,6 +38,7 @@ type SessionManager struct {
 	flushingQueuedChat bool
 	subpub             *SubPub[StreamResponse]
 	working            bool
+	canceling          bool
 	logger             *slog.Logger
 	workingDir         string
 	sequenceID         int64
@@ -64,6 +65,7 @@ type SessionManager struct {
 	soul               *Soul
 	webSearch          *llm.WebSearchRequest
 	remoteNodeResolver RemoteNodeResolver
+	promptWaitInterval time.Duration
 }
 
 // SessionSnapshot is a point-in-time copy of the session state.
@@ -115,6 +117,9 @@ type SessionManagerConfig struct {
 	RemoteNodeResolver RemoteNodeResolver
 	// Delegates seeds known delegate sessions when restoring from storage.
 	Delegates []DelegateSnapshot
+	// PromptWaitInterval overrides the heartbeat interval used while waiting
+	// for a user prompt response. Zero uses loopHeartbeatInterval.
+	PromptWaitInterval time.Duration
 }
 
 // NewSessionManager creates a new SessionManager.
@@ -151,6 +156,10 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 	lastActivity := cfg.LastActivity
 	if lastActivity.IsZero() {
 		lastActivity = createdAt
+	}
+	promptWaitInterval := cfg.PromptWaitInterval
+	if promptWaitInterval <= 0 {
+		promptWaitInterval = loopHeartbeatInterval
 	}
 
 	delegates := make(map[string]DelegateSnapshot, len(cfg.Delegates))
@@ -191,6 +200,7 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		soul:               cfg.Soul,
 		webSearch:          cfg.WebSearch,
 		remoteNodeResolver: cfg.RemoteNodeResolver,
+		promptWaitInterval: promptWaitInterval,
 	}
 }
 
@@ -322,9 +332,20 @@ func (sm *SessionManager) hasQueuedChatInputLocked() bool {
 // unblocking any goroutines waiting in WaitUserResponse. Command approval prompts
 // are left pending because the user may intend to approve/reject them.
 func (sm *SessionManager) CancelPendingPrompts() {
+	sm.cancelPendingPrompts(false)
+}
+
+// CancelAllPendingPrompts sends a cancellation response to all pending prompts,
+// including command approval prompts. This is used when the entire session is
+// ending and no prompt should remain answerable.
+func (sm *SessionManager) CancelAllPendingPrompts() {
+	sm.cancelPendingPrompts(true)
+}
+
+func (sm *SessionManager) cancelPendingPrompts(includeApprovals bool) {
 	sm.promptsMu.Lock()
 	for promptID, ch := range sm.pendingPrompts {
-		if sm.promptTypes[promptID] == PromptTypeCommandApproval {
+		if !includeApprovals && sm.promptTypes[promptID] == PromptTypeCommandApproval {
 			continue
 		}
 		select {
@@ -371,6 +392,12 @@ func (sm *SessionManager) LastHeartbeat() time.Time {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	return sm.lastHeartbeat
+}
+
+func (sm *SessionManager) isCanceling() bool {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	return sm.canceling
 }
 
 // GetModel returns the model ID used by this session.
@@ -681,11 +708,14 @@ func (sm *SessionManager) SubscribeWithSnapshot(ctx context.Context) (StreamResp
 // Cancel stops the session loop. The context parameter is unused
 // because cancellation is performed synchronously via the internal cancel function.
 func (sm *SessionManager) Cancel(_ context.Context) error {
+	sm.mu.Lock()
+	sm.canceling = true
+	sm.mu.Unlock()
+
 	// Cancel pending prompts first, before cancelling the loop context.
-	// This sends Cancelled responses through channels, allowing WaitUserResponse
-	// to return cleanly and record proper tool results ("User skipped")
-	// instead of noisy "Failed to get user response: context canceled" errors.
-	sm.CancelPendingPrompts()
+	// This lets waiting prompt handlers exit cleanly instead of surfacing
+	// raw context cancellation errors.
+	sm.CancelAllPendingPrompts()
 
 	if cancel := sm.clearLoop(); cancel != nil {
 		cancel()
@@ -715,6 +745,7 @@ func (sm *SessionManager) ensureLoop(provider llm.Provider, modelID string, reso
 		sm.mu.Unlock()
 		return nil
 	}
+	sm.canceling = false
 	sm.model = modelID
 	history := sm.extractLLMHistoryLocked()
 	safeMode := sm.safeMode
@@ -1003,8 +1034,10 @@ func (sm *SessionManager) createWaitUserResponseFunc() WaitUserResponseFunc {
 		sm.promptsMu.Lock()
 		sm.pendingPrompts[promptID] = ch
 		sm.promptsMu.Unlock()
+		stopHeartbeat := sm.startPromptWaitHeartbeat(ctx)
 
 		defer func() {
+			stopHeartbeat()
 			sm.promptsMu.Lock()
 			delete(sm.pendingPrompts, promptID)
 			delete(sm.promptTypes, promptID)
@@ -1013,10 +1046,53 @@ func (sm *SessionManager) createWaitUserResponseFunc() WaitUserResponseFunc {
 
 		select {
 		case resp := <-ch:
+			sm.RecordHeartbeat()
 			return resp, nil
 		case <-ctx.Done():
+			select {
+			case resp := <-ch:
+				sm.RecordHeartbeat()
+				return resp, nil
+			default:
+			}
+			if sm.isCanceling() {
+				sm.RecordHeartbeat()
+				return UserPromptResponse{PromptID: promptID, Cancelled: true}, nil
+			}
 			return UserPromptResponse{}, ctx.Err()
 		}
+	}
+}
+
+func (sm *SessionManager) startPromptWaitHeartbeat(ctx context.Context) func() {
+	sm.RecordHeartbeat()
+	if ctx == nil || sm.promptWaitInterval <= 0 {
+		return func() {}
+	}
+
+	done := make(chan struct{})
+	var once sync.Once
+
+	go func() {
+		ticker := time.NewTicker(sm.promptWaitInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-done:
+				return
+			case <-ticker.C:
+				sm.RecordHeartbeat()
+			}
+		}
+	}()
+
+	return func() {
+		once.Do(func() {
+			close(done)
+		})
 	}
 }
 
@@ -1034,6 +1110,7 @@ func (sm *SessionManager) SubmitUserResponse(response UserPromptResponse) bool {
 
 	select {
 	case ch <- response:
+		sm.RecordHeartbeat()
 		return true
 	default:
 		slog.Warn("response dropped, channel full", "promptID", response.PromptID)
