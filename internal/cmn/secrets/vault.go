@@ -130,6 +130,8 @@ func (r *vaultResolver) getClient(ref core.SecretRef) (vaultClient, error) {
 	config := api.DefaultConfig()
 	if addr != "" {
 		config.Address = addr
+	} else {
+		config.Address = api.DefaultAddress
 	}
 
 	client, err := api.NewClient(config)
@@ -139,6 +141,8 @@ func (r *vaultResolver) getClient(ref core.SecretRef) (vaultClient, error) {
 
 	if token != "" {
 		client.SetToken(token)
+	} else {
+		client.ClearToken()
 	}
 
 	realClient := &realVaultClient{client: client}
