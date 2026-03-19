@@ -73,7 +73,10 @@ type fakeTelegramAgentService struct {
 	appendSessionIDs []string
 	createMessages   []string
 	sendMessages     []string
+	flushCalls       int
 	generated        agent.Message
+	enqueueResult    agent.ChatQueueResult
+	flushResult      agent.ChatQueueResult
 }
 
 func newFakeTelegramAgentService(content string) *fakeTelegramAgentService {
@@ -112,6 +115,31 @@ func (s *fakeTelegramAgentService) SendMessage(_ context.Context, _ string, _ ag
 	defer s.mu.Unlock()
 	s.sendMessages = append(s.sendMessages, req.Message)
 	return nil
+}
+
+func (s *fakeTelegramAgentService) EnqueueChatMessage(_ context.Context, sessionID string, _ agent.UserIdentity, req agent.ChatRequest) (agent.ChatQueueResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sendMessages = append(s.sendMessages, req.Message)
+	result := s.enqueueResult
+	if result.SessionID == "" {
+		result.SessionID = sessionID
+	}
+	if !result.Queued {
+		result.Started = true
+	}
+	return result, nil
+}
+
+func (s *fakeTelegramAgentService) FlushQueuedChatMessage(_ context.Context, sessionID string, _ agent.UserIdentity) (agent.ChatQueueResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.flushCalls++
+	result := s.flushResult
+	if result.SessionID == "" {
+		result.SessionID = sessionID
+	}
+	return result, nil
 }
 
 func (s *fakeTelegramAgentService) CancelSession(context.Context, string, string) error {
@@ -344,5 +372,38 @@ func TestBot_ProcessStreamResponse_RestartsTypingWhenWorkContinues(t *testing.T)
 	})
 	require.Eventually(t, func() bool {
 		return api.typingCount() > beforeRestart
+	}, time.Second, 10*time.Millisecond)
+}
+
+func TestBot_ProcessStreamResponse_FlushesQueuedTurnWhenIdle(t *testing.T) {
+	t.Parallel()
+
+	api := &fakeTelegramAPI{}
+	service := newFakeTelegramAgentService("ignored")
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	bot := &Bot{
+		agentAPI:    service,
+		botAPI:      api,
+		logger:      logger,
+		typingDelay: 10 * time.Millisecond,
+	}
+	cs := bot.getOrCreateChat(123)
+	bot.setActiveSession(cs, "existing-session", "telegram:123")
+
+	bot.processStreamResponse(context.Background(), cs, 123, agent.StreamResponse{
+		SessionState: &agent.SessionState{
+			SessionID:          "existing-session",
+			Working:            false,
+			HasQueuedUserInput: true,
+		},
+	})
+
+	require.Eventually(t, func() bool {
+		service.mu.Lock()
+		defer service.mu.Unlock()
+		return service.flushCalls == 1
+	}, time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool {
+		return api.typingCount() >= 1
 	}, time.Second, 10*time.Millisecond)
 }

@@ -481,6 +481,161 @@ func TestLoop_Go(t *testing.T) {
 	})
 }
 
+func TestLoop_InterruptAfterLLMResponseSkipsToolExecution(t *testing.T) {
+	t.Parallel()
+
+	var (
+		callCount         atomic.Int32
+		turnCompleteCount atomic.Int32
+		recordMu          sync.Mutex
+		recorded          []Message
+	)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var enteredOnce sync.Once
+
+	loop := NewLoop(LoopConfig{
+		Provider: &mockLLMProvider{
+			chatFunc: func(ctx context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+				callCount.Add(1)
+				enteredOnce.Do(func() { close(entered) })
+				select {
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				case <-release:
+					return &llm.ChatResponse{
+						ToolCalls: []llm.ToolCall{{
+							ID:   "call-1",
+							Type: "function",
+							Function: llm.ToolCallFunction{
+								Name:      "think",
+								Arguments: `{"thought":"test"}`,
+							},
+						}},
+					}, nil
+				}
+			},
+		},
+		Tools:     CreateTools(ToolConfig{}),
+		SessionID: "sess-1",
+		RecordMessage: func(_ context.Context, msg Message) {
+			recordMu.Lock()
+			recorded = append(recorded, msg)
+			recordMu.Unlock()
+		},
+		OnTurnComplete: func() {
+			turnCompleteCount.Add(1)
+		},
+	})
+	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "run tool"})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- loop.Go(ctx) }()
+
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for first LLM request")
+	}
+
+	loop.RequestInterrupt()
+	close(release)
+
+	require.Eventually(t, func() bool {
+		recordMu.Lock()
+		defer recordMu.Unlock()
+		return len(recorded) >= 2
+	}, time.Second, 10*time.Millisecond)
+
+	cancel()
+	<-done
+
+	recordMu.Lock()
+	msgs := append([]Message(nil), recorded...)
+	recordMu.Unlock()
+	require.Len(t, msgs, 2)
+	assert.Equal(t, MessageTypeAssistant, msgs[0].Type)
+	require.Len(t, msgs[0].ToolCalls, 1)
+	assert.Equal(t, MessageTypeUser, msgs[1].Type)
+	require.Len(t, msgs[1].ToolResults, 1)
+	assert.Equal(t, "Tool execution was cancelled.", msgs[1].ToolResults[0].Content)
+	assert.Equal(t, int32(1), callCount.Load(), "interrupt should stop before the follow-up LLM request")
+	assert.Equal(t, int32(0), turnCompleteCount.Load(), "interrupted turns must not report completion")
+}
+
+func TestLoop_InterruptAfterCompletedReplyStillDeliversAssistant(t *testing.T) {
+	t.Parallel()
+
+	var (
+		callCount         atomic.Int32
+		turnCompleteCount atomic.Int32
+		recordMu          sync.Mutex
+		recorded          []Message
+	)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var enteredOnce sync.Once
+
+	loop := NewLoop(LoopConfig{
+		Provider: &mockLLMProvider{
+			chatFunc: func(ctx context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+				callCount.Add(1)
+				enteredOnce.Do(func() { close(entered) })
+				select {
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				case <-release:
+					return simpleStopResponse("done"), nil
+				}
+			},
+		},
+		SessionID: "sess-1",
+		RecordMessage: func(_ context.Context, msg Message) {
+			recordMu.Lock()
+			recorded = append(recorded, msg)
+			recordMu.Unlock()
+		},
+		OnTurnComplete: func() {
+			turnCompleteCount.Add(1)
+		},
+	})
+	loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "say hi"})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- loop.Go(ctx) }()
+
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for first LLM request")
+	}
+
+	loop.RequestInterrupt()
+	close(release)
+
+	require.Eventually(t, func() bool {
+		recordMu.Lock()
+		defer recordMu.Unlock()
+		return len(recorded) >= 1
+	}, time.Second, 10*time.Millisecond)
+
+	cancel()
+	<-done
+
+	recordMu.Lock()
+	msgs := append([]Message(nil), recorded...)
+	recordMu.Unlock()
+	require.Len(t, msgs, 1)
+	assert.Equal(t, MessageTypeAssistant, msgs[0].Type)
+	assert.Equal(t, "done", msgs[0].Content)
+	assert.Equal(t, int32(1), callCount.Load())
+	assert.Equal(t, int32(0), turnCompleteCount.Load(), "completed reply from an interrupted turn should not count as a clean turn completion")
+}
+
 func TestLoop_ExecuteTool(t *testing.T) {
 	t.Parallel()
 

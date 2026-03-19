@@ -330,28 +330,15 @@ func (b *Bot) flushIncomingMessages(ctx context.Context, cs *chatState, convKey 
 		return
 	}
 
-	thinkingTS := b.postThinking(cs)
+	b.ensureThinkingIndicator(cs)
 	user := b.userIdentity(convKey)
-
-	cs.thinkingMu.Lock()
-	if thinkingTS != "" {
-		cs.thinkingMessage = &messageRef{channel: cs.channelID, timestamp: thinkingTS}
-	}
-	cs.thinkingMu.Unlock()
 
 	if cs.SessionID() == "" {
 		b.createSession(ctx, cs, user, text)
-	} else {
-		sid, rotated := b.prepareSessionForMessage(ctx, cs, user)
-		if sid == "" {
-			b.createSession(ctx, cs, user, text)
-			return
-		}
-		if rotated {
-			b.clearPendingIndicators(cs)
-		}
-		b.sendAgentMessage(ctx, cs, user, text)
+		return
 	}
+
+	b.sendAgentMessage(ctx, cs, user, text)
 }
 
 // handleTextCommand processes text commands ("new", "cancel").
@@ -499,20 +486,36 @@ func (b *Bot) createSession(ctx context.Context, cs *chatState, user agent.UserI
 
 // sendAgentMessage sends a message to an existing session.
 func (b *Bot) sendAgentMessage(ctx context.Context, cs *chatState, user agent.UserIdentity, text string) {
-	sid := cs.SessionID()
-
 	req := agent.ChatRequest{
 		Message:  text,
 		SafeMode: b.cfg.SafeMode,
 	}
 
-	if err := b.agentAPI.SendMessage(ctx, sid, user, req); err != nil {
-		b.logger.Error("Failed to send message", slog.String("error", err.Error()))
+	result, err := chatbridge.EnqueueMessage(ctx, b.agentAPI, &cs.State, user, req)
+	if err != nil {
+		b.logger.Error("Failed to enqueue message", slog.String("error", err.Error()))
 		b.sendReply(cs, "Failed to send message: "+err.Error())
 		return
 	}
-
-	b.ensureSubscription(ctx, cs, user.UserID, sid)
+	if result.Missing {
+		b.logger.Warn("Session missing during Slack send, recreating conversation",
+			slog.String("session", result.SessionID),
+			slog.String("user", user.UserID),
+		)
+		b.resetChat(cs)
+		b.createSession(ctx, cs, user, text)
+		return
+	}
+	sid := result.SessionID
+	if sid == "" {
+		sid = cs.SessionID()
+	}
+	if result.Queued {
+		b.ensureThinkingIndicator(cs)
+	}
+	if sid != "" {
+		b.ensureSubscription(ctx, cs, user.UserID, sid)
+	}
 }
 
 // submitPromptResponse submits a text response to a pending agent prompt.
@@ -585,7 +588,7 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, userID, sessionI
 		return
 	}
 
-	b.processStreamResponse(cs, snapshot)
+	b.processStreamResponse(ctx, cs, snapshot)
 
 	for {
 		resp, ok := next()
@@ -595,17 +598,24 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, userID, sessionI
 			cs.ClearSessionIfActive(sessionID)
 			return
 		}
-		b.processStreamResponse(cs, resp)
+		b.processStreamResponse(ctx, cs, resp)
 	}
 }
 
 // processStreamResponse handles a stream response and sends relevant content to Slack.
-func (b *Bot) processStreamResponse(cs *chatState, resp agent.StreamResponse) {
+func (b *Bot) processStreamResponse(ctx context.Context, cs *chatState, resp agent.StreamResponse) {
+	var shouldFlushQueued bool
 	chatbridge.ProcessStreamResponse(&cs.State, resp, chatbridge.StreamHandlers{
+		OnSessionState: func(state agent.SessionState) {
+			if !state.Working && state.HasQueuedUserInput {
+				shouldFlushQueued = true
+				b.ensureThinkingIndicator(cs)
+			}
+		},
 		OnWorking: func(working bool) {
 			if working {
 				b.ensureThinkingIndicator(cs)
-			} else {
+			} else if !cs.HasQueuedUserInput() {
 				b.clearPendingIndicators(cs)
 			}
 		},
@@ -622,6 +632,37 @@ func (b *Bot) processStreamResponse(cs *chatState, resp agent.StreamResponse) {
 			b.sendPrompt(cs, prompt)
 		},
 	})
+	if shouldFlushQueued {
+		_, ownerUserID := cs.ActiveSession()
+		if ownerUserID == "" {
+			return
+		}
+		user := agent.UserIdentity{
+			UserID:   ownerUserID,
+			Username: "slack",
+			Role:     auth.RoleAdmin,
+		}
+		result, err := chatbridge.FlushQueuedMessage(ctx, b.agentAPI, &cs.State, user)
+		if err != nil {
+			b.logger.Warn("Failed to flush queued Slack message",
+				slog.String("session", result.SessionID),
+				slog.String("user", user.UserID),
+				slog.String("error", err.Error()),
+			)
+			return
+		}
+		if result.Missing {
+			b.logger.Warn("Session missing during queued Slack flush",
+				slog.String("session", result.SessionID),
+				slog.String("user", user.UserID),
+			)
+			b.resetChat(cs)
+			return
+		}
+		if result.SessionID != "" {
+			b.ensureSubscription(ctx, cs, user.UserID, result.SessionID)
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -862,30 +903,6 @@ func (b *Bot) clearPendingMessages(cs *chatState) {
 
 func (b *Bot) subscriptionActive(cs *chatState, sessionID string) bool {
 	return cs.SubscriptionActive(sessionID)
-}
-
-func (b *Bot) prepareSessionForMessage(ctx context.Context, cs *chatState, user agent.UserIdentity) (string, bool) {
-	result, err := chatbridge.MaybeCompactSession(ctx, b.agentAPI, &cs.State, user)
-	if result.SessionID == "" && !result.Missing && err == nil {
-		return "", false
-	}
-	if err != nil {
-		b.logger.Warn("Failed to compact Slack session",
-			slog.String("session", result.SessionID),
-			slog.String("user", user.UserID),
-			slog.String("error", err.Error()),
-		)
-		return result.SessionID, false
-	}
-	if result.Missing {
-		b.logger.Warn("Session missing during compaction, resetting conversation",
-			slog.String("session", result.SessionID),
-			slog.String("user", user.UserID),
-		)
-		b.resetChat(cs)
-		return "", false
-	}
-	return result.SessionID, result.Rotated
 }
 
 // ---------------------------------------------------------------------------

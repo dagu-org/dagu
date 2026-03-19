@@ -235,11 +235,6 @@ func (b *Bot) flushIncomingMessages(ctx context.Context, cs *chatState, chatID i
 		return
 	}
 
-	sid, _ := b.prepareSessionForMessage(ctx, cs, user)
-	if sid == "" {
-		b.createSession(ctx, cs, chatID, user, text)
-		return
-	}
 	b.sendMessage(ctx, cs, chatID, user, text)
 }
 
@@ -384,22 +379,39 @@ func (b *Bot) createSession(ctx context.Context, cs *chatState, chatID int64, us
 func (b *Bot) sendMessage(ctx context.Context, cs *chatState, chatID int64, user agent.UserIdentity, text string) {
 	b.startTypingLoop(ctx, cs, chatID)
 
-	sid := cs.SessionID()
-
 	req := agent.ChatRequest{
 		Message:  text,
 		SafeMode: b.cfg.SafeMode,
 	}
 
-	if err := b.agentAPI.SendMessage(ctx, sid, user, req); err != nil {
+	result, err := chatbridge.EnqueueMessage(ctx, b.agentAPI, &cs.State, user, req)
+	if err != nil {
 		b.stopTypingLoop(cs)
-		b.logger.Error("Failed to send message", slog.String("error", err.Error()))
+		b.logger.Error("Failed to enqueue message", slog.String("error", err.Error()))
 		b.sendText(chatID, "Failed to send message: "+err.Error())
 		return
 	}
+	if result.Missing {
+		b.logger.Warn("Session missing during Telegram send, recreating chat",
+			slog.String("session", result.SessionID),
+			slog.String("user", user.UserID),
+		)
+		b.resetChat(cs)
+		b.createSession(ctx, cs, chatID, user, text)
+		return
+	}
+	sid := result.SessionID
+	if sid == "" {
+		sid = cs.SessionID()
+	}
+	if result.Queued {
+		b.startTypingLoop(ctx, cs, chatID)
+	}
 
 	// Ensure a subscription is running (but don't restart if already active for this session)
-	b.ensureSubscription(ctx, cs, chatID, user.UserID, sid)
+	if sid != "" {
+		b.ensureSubscription(ctx, cs, chatID, user.UserID, sid)
+	}
 }
 
 // submitPromptResponse submits a text response to a pending agent prompt.
@@ -492,11 +504,18 @@ func (b *Bot) subscribeLoop(ctx context.Context, cs *chatState, chatID int64, us
 
 // processStreamResponse handles a stream response and sends relevant content to Telegram.
 func (b *Bot) processStreamResponse(ctx context.Context, cs *chatState, chatID int64, resp agent.StreamResponse) {
+	var shouldFlushQueued bool
 	chatbridge.ProcessStreamResponse(&cs.State, resp, chatbridge.StreamHandlers{
+		OnSessionState: func(state agent.SessionState) {
+			if !state.Working && state.HasQueuedUserInput {
+				shouldFlushQueued = true
+				b.startTypingLoop(ctx, cs, chatID)
+			}
+		},
 		OnWorking: func(working bool) {
 			if working {
 				b.startTypingLoop(ctx, cs, chatID)
-			} else {
+			} else if !cs.HasQueuedUserInput() {
 				b.stopTypingLoop(cs)
 			}
 		},
@@ -513,6 +532,37 @@ func (b *Bot) processStreamResponse(ctx context.Context, cs *chatState, chatID i
 			b.sendPrompt(cs, chatID, prompt)
 		},
 	})
+	if shouldFlushQueued {
+		_, ownerUserID := cs.ActiveSession()
+		if ownerUserID == "" {
+			return
+		}
+		user := agent.UserIdentity{
+			UserID:   ownerUserID,
+			Username: "telegram",
+			Role:     auth.RoleAdmin,
+		}
+		result, err := chatbridge.FlushQueuedMessage(ctx, b.agentAPI, &cs.State, user)
+		if err != nil {
+			b.logger.Warn("Failed to flush queued Telegram message",
+				slog.String("session", result.SessionID),
+				slog.String("user", user.UserID),
+				slog.String("error", err.Error()),
+			)
+			return
+		}
+		if result.Missing {
+			b.logger.Warn("Session missing during queued Telegram flush",
+				slog.String("session", result.SessionID),
+				slog.String("user", user.UserID),
+			)
+			b.resetChat(cs)
+			return
+		}
+		if result.SessionID != "" {
+			b.ensureSubscription(ctx, cs, chatID, user.UserID, result.SessionID)
+		}
+	}
 }
 
 // sendPrompt sends a user prompt with inline keyboard buttons.
@@ -616,30 +666,6 @@ func (b *Bot) clearPendingMessages(cs *chatState) {
 
 func (b *Bot) subscriptionActive(cs *chatState, sessionID string) bool {
 	return cs.SubscriptionActive(sessionID)
-}
-
-func (b *Bot) prepareSessionForMessage(ctx context.Context, cs *chatState, user agent.UserIdentity) (string, bool) {
-	result, err := chatbridge.MaybeCompactSession(ctx, b.agentAPI, &cs.State, user)
-	if result.SessionID == "" && !result.Missing && err == nil {
-		return "", false
-	}
-	if err != nil {
-		b.logger.Warn("Failed to compact Telegram session",
-			slog.String("session", result.SessionID),
-			slog.String("user", user.UserID),
-			slog.String("error", err.Error()),
-		)
-		return result.SessionID, false
-	}
-	if result.Missing {
-		b.logger.Warn("Session missing during compaction, resetting chat",
-			slog.String("session", result.SessionID),
-			slog.String("user", user.UserID),
-		)
-		b.resetChat(cs)
-		return "", false
-	}
-	return result.SessionID, result.Rotated
 }
 
 // splitMessage splits text into chunks that fit within the Telegram message limit.

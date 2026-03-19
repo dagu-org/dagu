@@ -6,6 +6,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -28,6 +29,8 @@ const (
 	// loopHeartbeatInterval is the interval at which the loop emits heartbeats.
 	loopHeartbeatInterval = 10 * time.Second
 )
+
+var errTurnInterrupted = errors.New("turn interrupted")
 
 // MessageRecordFunc is called to record new messages to persistent storage.
 // Implementations should log persistence errors internally rather than returning them,
@@ -88,34 +91,35 @@ type LoopConfig struct {
 
 // Loop manages a session turn with an LLM including tool execution.
 type Loop struct {
-	provider         llm.Provider
-	model            string
-	tools            []*AgentTool
-	recordMessage    MessageRecordFunc
-	history          []llm.Message
-	messageQueue     []llm.Message
-	totalUsage       llm.Usage
-	mu               sync.Mutex
-	logger           *slog.Logger
-	systemPrompt     string
-	workingDir       string
-	sessionID        string
-	onWorking        func(working bool)
-	onHeartbeat      func()
-	sequenceID       int64
-	emitUIAction     UIActionFunc
-	emitUserPrompt   EmitUserPromptFunc
-	waitUserResponse WaitUserResponseFunc
-	safeMode         bool
-	hooks            *Hooks
-	user             UserIdentity
-	sessionStore     SessionStore
-	registry         SubSessionRegistry
-	skillStore       SkillStore
-	allowedSkills    map[string]struct{}
-	webSearch        *llm.WebSearchRequest
-	onTurnComplete   func()
-	activeTurn       bool
+	provider           llm.Provider
+	model              string
+	tools              []*AgentTool
+	recordMessage      MessageRecordFunc
+	history            []llm.Message
+	messageQueue       []llm.Message
+	totalUsage         llm.Usage
+	mu                 sync.Mutex
+	logger             *slog.Logger
+	systemPrompt       string
+	workingDir         string
+	sessionID          string
+	onWorking          func(working bool)
+	onHeartbeat        func()
+	sequenceID         int64
+	emitUIAction       UIActionFunc
+	emitUserPrompt     EmitUserPromptFunc
+	waitUserResponse   WaitUserResponseFunc
+	safeMode           bool
+	hooks              *Hooks
+	user               UserIdentity
+	sessionStore       SessionStore
+	registry           SubSessionRegistry
+	skillStore         SkillStore
+	allowedSkills      map[string]struct{}
+	webSearch          *llm.WebSearchRequest
+	onTurnComplete     func()
+	activeTurn         bool
+	interruptRequested bool
 }
 
 // NewLoop creates a new Loop instance.
@@ -158,6 +162,13 @@ func (l *Loop) QueueUserMessage(message llm.Message) {
 	defer l.mu.Unlock()
 	l.messageQueue = append(l.messageQueue, message)
 	l.logger.Info("queued user message", "queue_size", len(l.messageQueue))
+}
+
+// RequestInterrupt asks the loop to stop the current turn at the next safe boundary.
+func (l *Loop) RequestInterrupt() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.interruptRequested = true
 }
 
 // AppendExternalHistory injects a message into the loop's in-memory LLM history.
@@ -212,6 +223,11 @@ func (l *Loop) Go(ctx context.Context) error {
 		if hasActiveTurn {
 			l.logger.Info("processing queued messages", "history_count", historyCount)
 			if err := l.processLLMRequest(ctx); err != nil {
+				if errors.Is(err, errTurnInterrupted) {
+					l.logger.Info("turn interrupted at safe boundary")
+					l.finishActiveTurn()
+					continue
+				}
 				l.logger.Error("failed to process LLM request", "error", err)
 				l.finishActiveTurn()
 				continue
@@ -260,6 +276,14 @@ func (l *Loop) processLLMRequest(ctx context.Context) error {
 	resp, err := l.sendRequest(ctx)
 	if err != nil {
 		return err
+	}
+
+	if l.hasInterruptRequested() {
+		if len(resp.ToolCalls) > 0 {
+			l.recordCancelledToolResults(ctx, resp.ToolCalls)
+		}
+		l.setWorking(false)
+		return errTurnInterrupted
 	}
 
 	if len(resp.ToolCalls) > 0 {
@@ -322,6 +346,7 @@ func (l *Loop) activateQueuedTurn() (bool, int) {
 		l.history = append(l.history, l.messageQueue...)
 		l.messageQueue = l.messageQueue[:0]
 		l.activeTurn = true
+		l.interruptRequested = false
 	}
 
 	return l.activeTurn, len(l.history)
@@ -338,6 +363,12 @@ func (l *Loop) setWorking(working bool) {
 	if l.onWorking != nil {
 		l.onWorking(working)
 	}
+}
+
+func (l *Loop) hasInterruptRequested() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.interruptRequested
 }
 
 func startHeartbeatPump(ctx context.Context, interval time.Duration, heartbeat func()) func() {
@@ -483,11 +514,27 @@ func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) er
 			l.onHeartbeat()
 		}
 
-		l.executeToolCalls(ctx, toolCalls)
+		executed := l.executeToolCalls(ctx, toolCalls)
+		if executed < len(toolCalls) {
+			l.recordCancelledToolResults(ctx, toolCalls[executed:])
+			l.setWorking(false)
+			return errTurnInterrupted
+		}
+		if l.hasInterruptRequested() {
+			l.setWorking(false)
+			return errTurnInterrupted
+		}
 
 		resp, err := l.sendRequest(ctx)
 		if err != nil {
 			return err
+		}
+		if l.hasInterruptRequested() {
+			if len(resp.ToolCalls) > 0 {
+				l.recordCancelledToolResults(ctx, resp.ToolCalls)
+			}
+			l.setWorking(false)
+			return errTurnInterrupted
 		}
 
 		if len(resp.ToolCalls) == 0 {
@@ -506,13 +553,17 @@ func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) er
 
 // executeToolCalls runs all tool calls sequentially.
 // The delegate tool handles its own parallelism internally.
-func (l *Loop) executeToolCalls(ctx context.Context, toolCalls []llm.ToolCall) {
+func (l *Loop) executeToolCalls(ctx context.Context, toolCalls []llm.ToolCall) int {
 	l.setWorking(true)
-	for _, tc := range toolCalls {
+	for i, tc := range toolCalls {
 		l.logger.Debug("executing tool", "name", tc.Function.Name, "id", tc.ID)
 		result := l.executeTool(ctx, tc)
 		l.recordToolResult(ctx, tc, result)
+		if l.hasInterruptRequested() {
+			return i + 1
+		}
 	}
+	return len(toolCalls)
 }
 
 // recordToolResult adds a tool result to history and records it.
@@ -542,6 +593,12 @@ func (l *Loop) recordToolResult(ctx context.Context, tc llm.ToolCall, result Too
 		DelegateIDs: result.DelegateIDs,
 	}
 	l.recordMessage(ctx, msg)
+}
+
+func (l *Loop) recordCancelledToolResults(ctx context.Context, toolCalls []llm.ToolCall) {
+	for _, tc := range toolCalls {
+		l.recordToolResult(ctx, tc, ToolOut{Content: "Tool execution was cancelled."})
+	}
 }
 
 // nextSequenceID increments and returns the next sequence ID.

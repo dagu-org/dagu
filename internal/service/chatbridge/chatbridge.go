@@ -17,6 +17,8 @@ type AgentService interface {
 	CreateSession(ctx context.Context, user agent.UserIdentity, req agent.ChatRequest) (string, string, error)
 	CreateEmptySession(ctx context.Context, user agent.UserIdentity, dagName string, safeMode bool) (string, error)
 	SendMessage(ctx context.Context, sessionID string, user agent.UserIdentity, req agent.ChatRequest) error
+	EnqueueChatMessage(ctx context.Context, sessionID string, user agent.UserIdentity, req agent.ChatRequest) (agent.ChatQueueResult, error)
+	FlushQueuedChatMessage(ctx context.Context, sessionID string, user agent.UserIdentity) (agent.ChatQueueResult, error)
 	CancelSession(ctx context.Context, sessionID, userID string) error
 	SubmitUserResponse(ctx context.Context, sessionID, userID string, resp agent.UserPromptResponse) error
 	GenerateAssistantMessage(ctx context.Context, sessionID string, user agent.UserIdentity, dagName, prompt string) (agent.Message, error)
@@ -38,6 +40,8 @@ type State struct {
 	lastDeliveredSeq int64
 	pendingMessages  []string
 	pendingFlushGen  uint64
+	working          bool
+	hasQueuedInput   bool
 }
 
 func (s *State) SessionID() string {
@@ -58,9 +62,28 @@ func (s *State) SetActiveSession(sessionID, ownerUserID string) {
 	if s.sessionID != sessionID {
 		s.lastDeliveredSeq = 0
 		s.pendingPromptID = ""
+		s.working = false
+		s.hasQueuedInput = false
 	}
 	s.sessionID = sessionID
 	s.ownerUserID = ownerUserID
+}
+
+// UpdateSessionState stores the latest session-state snapshot from the stream.
+func (s *State) UpdateSessionState(sessionState *agent.SessionState) {
+	if sessionState == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.working = sessionState.Working
+	s.hasQueuedInput = sessionState.HasQueuedUserInput
+}
+
+func (s *State) HasQueuedUserInput() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.hasQueuedInput
 }
 
 func (s *State) PendingPromptID() string {
@@ -147,6 +170,8 @@ func (s *State) ClearSessionIfActive(sessionID string) {
 	if s.sessionID == sessionID {
 		s.sessionID = ""
 		s.pendingPromptID = ""
+		s.working = false
+		s.hasQueuedInput = false
 	}
 }
 
@@ -164,15 +189,27 @@ func (s *State) Reset() context.CancelFunc {
 	s.lastDeliveredSeq = 0
 	s.pendingMessages = nil
 	s.pendingFlushGen++
+	s.working = false
+	s.hasQueuedInput = false
 	return cancel
 }
 
 // StreamHandlers contains transport-specific output hooks.
 type StreamHandlers struct {
-	OnWorking   func(bool)
-	OnAssistant func(agent.Message)
-	OnError     func(agent.Message)
-	OnPrompt    func(*agent.UserPrompt)
+	OnSessionState func(agent.SessionState)
+	OnWorking      func(bool)
+	OnAssistant    func(agent.Message)
+	OnError        func(agent.Message)
+	OnPrompt       func(*agent.UserPrompt)
+}
+
+// MessageResult describes the outcome of a chat enqueue/flush attempt.
+type MessageResult struct {
+	SessionID string
+	Rotated   bool
+	Queued    bool
+	Started   bool
+	Missing   bool
 }
 
 // CompactionResult describes the outcome of a compaction attempt.
@@ -185,8 +222,14 @@ type CompactionResult struct {
 // ProcessStreamResponse handles common delivery bookkeeping and dispatches only
 // the transport-specific rendering work to the provided handlers.
 func ProcessStreamResponse(state *State, resp agent.StreamResponse, handlers StreamHandlers) {
-	if resp.SessionState != nil && handlers.OnWorking != nil {
-		handlers.OnWorking(resp.SessionState.Working)
+	if resp.SessionState != nil {
+		state.UpdateSessionState(resp.SessionState)
+		if handlers.OnSessionState != nil {
+			handlers.OnSessionState(*resp.SessionState)
+		}
+		if handlers.OnWorking != nil {
+			handlers.OnWorking(resp.SessionState.Working)
+		}
 	}
 
 	lastDelivered := state.LastDeliveredSeq()
@@ -220,6 +263,64 @@ func ProcessStreamResponse(state *State, resp agent.StreamResponse, handlers Str
 	if maxSeen > lastDelivered {
 		state.MarkDelivered(maxSeen)
 	}
+}
+
+// EnqueueMessage appends or merges bot text into the current session.
+func EnqueueMessage(ctx context.Context, svc AgentService, state *State, user agent.UserIdentity, req agent.ChatRequest) (MessageResult, error) {
+	sessionID := state.SessionID()
+	if sessionID == "" {
+		return MessageResult{}, nil
+	}
+
+	result, err := svc.EnqueueChatMessage(ctx, sessionID, user, req)
+	if err != nil {
+		if errors.Is(err, agent.ErrSessionNotFound) {
+			return MessageResult{SessionID: sessionID, Missing: true}, nil
+		}
+		return MessageResult{SessionID: sessionID}, err
+	}
+	if result.SessionID == "" {
+		result.SessionID = sessionID
+	}
+	if result.Rotated {
+		state.SetActiveSession(result.SessionID, user.UserID)
+		MarkSessionSnapshotDelivered(ctx, svc, state, result.SessionID, user.UserID)
+	}
+	return MessageResult{
+		SessionID: result.SessionID,
+		Rotated:   result.Rotated,
+		Queued:    result.Queued,
+		Started:   result.Started,
+	}, nil
+}
+
+// FlushQueuedMessage starts a merged queued bot follow-up turn after the session becomes idle.
+func FlushQueuedMessage(ctx context.Context, svc AgentService, state *State, user agent.UserIdentity) (MessageResult, error) {
+	sessionID := state.SessionID()
+	if sessionID == "" {
+		return MessageResult{}, nil
+	}
+
+	result, err := svc.FlushQueuedChatMessage(ctx, sessionID, user)
+	if err != nil {
+		if errors.Is(err, agent.ErrSessionNotFound) {
+			return MessageResult{SessionID: sessionID, Missing: true}, nil
+		}
+		return MessageResult{SessionID: sessionID}, err
+	}
+	if result.SessionID == "" {
+		result.SessionID = sessionID
+	}
+	if result.Rotated {
+		state.SetActiveSession(result.SessionID, user.UserID)
+		MarkSessionSnapshotDelivered(ctx, svc, state, result.SessionID, user.UserID)
+	}
+	return MessageResult{
+		SessionID: result.SessionID,
+		Rotated:   result.Rotated,
+		Queued:    result.Queued,
+		Started:   result.Started,
+	}, nil
 }
 
 // AppendNotification appends a notification message into the active

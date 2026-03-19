@@ -9,12 +9,15 @@ import (
 	"fmt"
 	"log/slog"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/google/uuid"
 )
+
+const queuedChatMessageSeparator = "\n\n"
 
 // SessionManager manages a single active session.
 // It links the Loop with SSE streaming and handles state management.
@@ -31,6 +34,8 @@ type SessionManager struct {
 	lastHeartbeat      time.Time
 	model              string
 	messages           []Message
+	queuedChatMessages []string
+	flushingQueuedChat bool
 	subpub             *SubPub[StreamResponse]
 	working            bool
 	logger             *slog.Logger
@@ -67,6 +72,7 @@ type SessionSnapshot struct {
 	Session          Session
 	Working          bool
 	HasPendingPrompt bool
+	HasQueuedInput   bool
 	Model            string
 	TotalCost        float64
 	Delegates        []DelegateSnapshot
@@ -233,18 +239,19 @@ func (sm *SessionManager) UserID() string {
 // Repeated true values are broadcast as progress pulses so transports can
 // refresh visible activity indicators during multi-phase turns.
 func (sm *SessionManager) SetWorking(working bool) {
-	id, model, totalCost, hasPendingPrompt, callback, changed, shouldBroadcast := sm.updateWorkingState(working)
+	id, model, totalCost, hasPendingPrompt, hasQueuedUserInput, callback, changed, shouldBroadcast := sm.updateWorkingState(working)
 	if !shouldBroadcast {
 		return
 	}
 	sm.logger.Debug("broadcasting agent working state", "working", working, "changed", changed)
 	sm.subpub.Broadcast(StreamResponse{
 		SessionState: &SessionState{
-			SessionID:        id,
-			Working:          working,
-			HasPendingPrompt: hasPendingPrompt,
-			Model:            model,
-			TotalCost:        totalCost,
+			SessionID:          id,
+			Working:            working,
+			HasPendingPrompt:   hasPendingPrompt,
+			HasQueuedUserInput: hasQueuedUserInput,
+			Model:              model,
+			TotalCost:          totalCost,
 		},
 	})
 	if changed && callback != nil {
@@ -253,10 +260,10 @@ func (sm *SessionManager) SetWorking(working bool) {
 }
 
 // updateWorkingState atomically updates the working state and returns relevant data.
-// Returns (id, model, totalCost, hasPendingPrompt, callback, changed, shouldBroadcast)
+// Returns (id, model, totalCost, hasPendingPrompt, hasQueuedUserInput, callback, changed, shouldBroadcast)
 // where changed indicates whether the boolean state changed and shouldBroadcast
 // allows repeated working=true pulses to be sent while already working.
-func (sm *SessionManager) updateWorkingState(working bool) (string, string, float64, bool, func(string, bool), bool, bool) {
+func (sm *SessionManager) updateWorkingState(working bool) (string, string, float64, bool, bool, func(string, bool), bool, bool) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -265,9 +272,9 @@ func (sm *SessionManager) updateWorkingState(working bool) (string, string, floa
 			sm.promptsMu.Lock()
 			hasPending := len(sm.pendingPrompts) > 0
 			sm.promptsMu.Unlock()
-			return sm.id, sm.model, sm.totalCost, hasPending, sm.onWorkingChange, false, true
+			return sm.id, sm.model, sm.totalCost, hasPending, sm.hasQueuedChatInputLocked(), sm.onWorkingChange, false, true
 		}
-		return "", "", 0, false, nil, false, false
+		return "", "", 0, false, false, nil, false, false
 	}
 
 	sm.working = working
@@ -276,7 +283,7 @@ func (sm *SessionManager) updateWorkingState(working bool) (string, string, floa
 	hasPending := len(sm.pendingPrompts) > 0
 	sm.promptsMu.Unlock()
 
-	return sm.id, sm.model, sm.totalCost, hasPending, sm.onWorkingChange, true, true
+	return sm.id, sm.model, sm.totalCost, hasPending, sm.hasQueuedChatInputLocked(), sm.onWorkingChange, true, true
 }
 
 // IsWorking returns the current agent working state.
@@ -298,6 +305,17 @@ func (sm *SessionManager) HasPendingPrompt() bool {
 	sm.promptsMu.Lock()
 	defer sm.promptsMu.Unlock()
 	return len(sm.pendingPrompts) > 0
+}
+
+// HasQueuedChatInput returns true when a merged bot follow-up is waiting to run.
+func (sm *SessionManager) HasQueuedChatInput() bool {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	return sm.hasQueuedChatInputLocked()
+}
+
+func (sm *SessionManager) hasQueuedChatInputLocked() bool {
+	return sm.flushingQueuedChat || len(sm.queuedChatMessages) > 0
 }
 
 // CancelPendingPrompts sends a cancellation response to all pending general prompts,
@@ -416,6 +434,7 @@ func (sm *SessionManager) snapshotLocked() SessionSnapshot {
 		},
 		Working:          sm.working,
 		HasPendingPrompt: hasPendingPrompt,
+		HasQueuedInput:   sm.hasQueuedChatInputLocked(),
 		Model:            sm.model,
 		TotalCost:        sm.totalCost,
 	}
@@ -435,11 +454,12 @@ func (s SessionSnapshot) StreamResponse() StreamResponse {
 		Messages: s.Messages,
 		Session:  &s.Session,
 		SessionState: &SessionState{
-			SessionID:        s.Session.ID,
-			Working:          s.Working,
-			HasPendingPrompt: s.HasPendingPrompt,
-			Model:            s.Model,
-			TotalCost:        s.TotalCost,
+			SessionID:          s.Session.ID,
+			Working:            s.Working,
+			HasPendingPrompt:   s.HasPendingPrompt,
+			HasQueuedUserInput: s.HasQueuedInput,
+			Model:              s.Model,
+			TotalCost:          s.TotalCost,
 		},
 		Delegates: s.Delegates,
 	}
@@ -487,6 +507,64 @@ func (sm *SessionManager) RecordExternalMessage(ctx context.Context, msg Message
 	return msg, nil
 }
 
+func (sm *SessionManager) enqueueImmediateUserMessage(ctx context.Context, content string) error {
+	llmMsg := llm.Message{Role: llm.RoleUser, Content: content}
+	sm.recordAndPublishUserMessage(ctx, content, &llmMsg)
+
+	// Cancel any pending general prompts so the loop unblocks from WaitUserResponse.
+	sm.CancelPendingPrompts()
+
+	sm.mu.Lock()
+	loop := sm.loop
+	sm.mu.Unlock()
+	if loop == nil {
+		return errors.New("session loop not initialized")
+	}
+	sm.SetWorking(true)
+	loop.QueueUserMessage(llmMsg)
+	return nil
+}
+
+// EnqueueChatMessage accepts bot text for a session. When the agent is already
+// working, the text is merged into a single queued follow-up and marked as a
+// safe-boundary interrupt instead of immediately entering LLM history.
+func (sm *SessionManager) EnqueueChatMessage(ctx context.Context, provider llm.Provider, modelID string, resolvedModel string, content string) (bool, error) {
+	if provider == nil {
+		return false, errors.New("LLM provider is required")
+	}
+
+	if err := sm.ensureLoop(provider, modelID, resolvedModel); err != nil {
+		return false, err
+	}
+
+	// If a general prompt is pending, route text as the prompt response.
+	if _, routed := sm.tryRouteToGeneralPrompt(content); routed {
+		sm.recordAndPublishUserMessage(ctx, content, nil)
+		return false, nil
+	}
+
+	sm.mu.Lock()
+	shouldQueue := sm.working || sm.hasQueuedChatInputLocked()
+	if shouldQueue {
+		sm.queuedChatMessages = append(sm.queuedChatMessages, content)
+		sm.lastActivity = time.Now()
+	}
+	loop := sm.loop
+	sm.mu.Unlock()
+
+	if shouldQueue {
+		if loop == nil {
+			return false, errors.New("session loop not initialized")
+		}
+		if sm.IsWorking() {
+			loop.RequestInterrupt()
+		}
+		return true, nil
+	}
+
+	return false, sm.enqueueImmediateUserMessage(ctx, content)
+}
+
 // AcceptUserMessage enqueues a user message, ensuring the loop is ready first.
 // If a general (non-approval) prompt is pending, the text is routed as the
 // prompt response instead of starting a new LLM turn. This lets users answer
@@ -508,23 +586,41 @@ func (sm *SessionManager) AcceptUserMessage(ctx context.Context, provider llm.Pr
 		return nil
 	}
 
-	// No pending prompt (or routing failed) — normal flow.
-	llmMsg := llm.Message{Role: llm.RoleUser, Content: content}
-	sm.recordAndPublishUserMessage(ctx, content, &llmMsg)
+	return sm.enqueueImmediateUserMessage(ctx, content)
+}
 
-	// Cancel any pending general prompts so the loop unblocks from WaitUserResponse.
-	sm.CancelPendingPrompts()
-
+// BeginQueuedChatFlush drains the current merged chat buffer and marks a flush
+// as in progress so concurrent enqueues continue merging instead of racing a new turn.
+func (sm *SessionManager) BeginQueuedChatFlush() (string, bool) {
 	sm.mu.Lock()
-	loop := sm.loop
-	sm.mu.Unlock()
-	if loop == nil {
-		return errors.New("session loop not initialized")
+	defer sm.mu.Unlock()
+	if sm.flushingQueuedChat || len(sm.queuedChatMessages) == 0 {
+		return "", false
 	}
-	sm.SetWorking(true)
-	loop.QueueUserMessage(llmMsg)
+	sm.flushingQueuedChat = true
+	text := strings.Join(append([]string(nil), sm.queuedChatMessages...), queuedChatMessageSeparator)
+	sm.queuedChatMessages = nil
+	return text, true
+}
 
-	return nil
+// RestoreQueuedChatInput restores a drained merged chat buffer after a failed flush.
+func (sm *SessionManager) RestoreQueuedChatInput(text string) {
+	if text == "" {
+		sm.CompleteQueuedChatFlush()
+		return
+	}
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.flushingQueuedChat = false
+	sm.queuedChatMessages = append([]string{text}, sm.queuedChatMessages...)
+	sm.lastActivity = time.Now()
+}
+
+// CompleteQueuedChatFlush clears the in-flight flush marker after the queued turn starts.
+func (sm *SessionManager) CompleteQueuedChatFlush() {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.flushingQueuedChat = false
 }
 
 // recordAndPublishUserMessage builds a user message, publishes it to SSE

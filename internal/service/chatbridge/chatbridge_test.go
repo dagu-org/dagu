@@ -40,6 +40,14 @@ func (f *fakeAgentService) SendMessage(context.Context, string, agent.UserIdenti
 	return nil
 }
 
+func (f *fakeAgentService) EnqueueChatMessage(context.Context, string, agent.UserIdentity, agent.ChatRequest) (agent.ChatQueueResult, error) {
+	return agent.ChatQueueResult{}, nil
+}
+
+func (f *fakeAgentService) FlushQueuedChatMessage(context.Context, string, agent.UserIdentity) (agent.ChatQueueResult, error) {
+	return agent.ChatQueueResult{}, nil
+}
+
 func (f *fakeAgentService) CancelSession(context.Context, string, string) error {
 	return nil
 }
@@ -116,6 +124,21 @@ func TestProcessStreamResponseSkipsDeliveredMessages(t *testing.T) {
 	assert.Equal(t, []string{"new"}, assistants)
 	assert.Equal(t, []string{"p1"}, prompts)
 	assert.Equal(t, int64(3), state.LastDeliveredSeq())
+}
+
+func TestProcessStreamResponse_TracksQueuedSessionState(t *testing.T) {
+	t.Parallel()
+
+	var state State
+	ProcessStreamResponse(&state, agent.StreamResponse{
+		SessionState: &agent.SessionState{
+			SessionID:          "sess-1",
+			Working:            false,
+			HasQueuedUserInput: true,
+		},
+	}, StreamHandlers{})
+
+	assert.True(t, state.HasQueuedUserInput())
 }
 
 func TestAppendNotificationRecreatesMissingSession(t *testing.T) {

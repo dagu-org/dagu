@@ -170,6 +170,8 @@ type SessionState struct {
 	Working bool `json:"working"`
 	// HasPendingPrompt indicates whether the agent is waiting for user input.
 	HasPendingPrompt bool `json:"has_pending_prompt"`
+	// HasQueuedUserInput indicates whether a queued follow-up turn is waiting.
+	HasQueuedUserInput bool `json:"has_queued_user_input,omitempty"`
 	// Model is the LLM model being used for this session.
 	Model string `json:"model,omitempty"`
 	// TotalCost is the accumulated cost of the session in USD.

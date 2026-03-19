@@ -70,7 +70,10 @@ type fakeSlackAgentService struct {
 	appendSessionIDs []string
 	createMessages   []string
 	sendMessages     []string
+	flushCalls       int
 	generated        agent.Message
+	enqueueResult    agent.ChatQueueResult
+	flushResult      agent.ChatQueueResult
 }
 
 func newFakeSlackAgentService(content string) *fakeSlackAgentService {
@@ -109,6 +112,31 @@ func (s *fakeSlackAgentService) SendMessage(_ context.Context, _ string, _ agent
 	defer s.mu.Unlock()
 	s.sendMessages = append(s.sendMessages, req.Message)
 	return nil
+}
+
+func (s *fakeSlackAgentService) EnqueueChatMessage(_ context.Context, sessionID string, _ agent.UserIdentity, req agent.ChatRequest) (agent.ChatQueueResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sendMessages = append(s.sendMessages, req.Message)
+	result := s.enqueueResult
+	if result.SessionID == "" {
+		result.SessionID = sessionID
+	}
+	if !result.Queued {
+		result.Started = true
+	}
+	return result, nil
+}
+
+func (s *fakeSlackAgentService) FlushQueuedChatMessage(_ context.Context, sessionID string, _ agent.UserIdentity) (agent.ChatQueueResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.flushCalls++
+	result := s.flushResult
+	if result.SessionID == "" {
+		result.SessionID = sessionID
+	}
+	return result, nil
 }
 
 func (s *fakeSlackAgentService) CancelSession(context.Context, string, string) error {
@@ -176,7 +204,7 @@ func TestDAGRunMonitor_NotifyChannelThread_SkipsManualNotificationReplay(t *test
 	assert.Equal(t, "1", cs.threadTS)
 	assert.Equal(t, int64(1), bot.lastDeliveredSeq(cs))
 
-	bot.processStreamResponse(cs, agent.StreamResponse{
+	bot.processStreamResponse(context.Background(), cs, agent.StreamResponse{
 		Messages: []agent.Message{
 			{Type: agent.MessageTypeAssistant, SequenceID: 1, Content: "thread notification"},
 			{Type: agent.MessageTypeAssistant, SequenceID: 2, Content: "follow-up answer"},
@@ -224,7 +252,7 @@ func TestDAGRunMonitor_NotifyDirectMessage_AppendsToExistingSession(t *testing.T
 	assert.Equal(t, int64(1), bot.lastDeliveredSeq(cs))
 	assert.Equal(t, 1, client.postCount(), "notification should still be delivered to Slack once")
 
-	bot.processStreamResponse(cs, agent.StreamResponse{
+	bot.processStreamResponse(context.Background(), cs, agent.StreamResponse{
 		Messages: []agent.Message{
 			{Type: agent.MessageTypeAssistant, SequenceID: 1, Content: "dm notification"},
 			{Type: agent.MessageTypeAssistant, SequenceID: 2, Content: "actual reply"},
@@ -273,12 +301,12 @@ func TestBot_ProcessStreamResponse_RestartsThinkingWhenWorkContinues(t *testing.
 	}
 	cs := bot.getOrCreateChat("D123", "D123", "")
 
-	bot.processStreamResponse(cs, agent.StreamResponse{
+	bot.processStreamResponse(context.Background(), cs, agent.StreamResponse{
 		SessionState: &agent.SessionState{Working: true},
 	})
 	assert.Equal(t, 1, client.postCount(), "working state should post a thinking indicator")
 
-	bot.processStreamResponse(cs, agent.StreamResponse{
+	bot.processStreamResponse(context.Background(), cs, agent.StreamResponse{
 		Messages: []agent.Message{
 			{Type: agent.MessageTypeAssistant, SequenceID: 1, Content: "partial reply"},
 		},
@@ -286,13 +314,43 @@ func TestBot_ProcessStreamResponse_RestartsThinkingWhenWorkContinues(t *testing.
 	assert.Equal(t, 2, client.postCount(), "assistant message should be delivered")
 	assert.Equal(t, 1, client.deleteCount(), "assistant message should clear the current thinking indicator")
 
-	bot.processStreamResponse(cs, agent.StreamResponse{
+	bot.processStreamResponse(context.Background(), cs, agent.StreamResponse{
 		SessionState: &agent.SessionState{Working: true},
 	})
 	assert.Equal(t, 3, client.postCount(), "continued work should post a fresh thinking indicator")
 
-	bot.processStreamResponse(cs, agent.StreamResponse{
+	bot.processStreamResponse(context.Background(), cs, agent.StreamResponse{
 		SessionState: &agent.SessionState{Working: true},
 	})
 	assert.Equal(t, 3, client.postCount(), "duplicate working pulses should not stack thinking indicators")
+}
+
+func TestBot_ProcessStreamResponse_FlushesQueuedTurnWhenIdle(t *testing.T) {
+	t.Parallel()
+
+	client := &fakeSlackClient{}
+	service := newFakeSlackAgentService("ignored")
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	bot := &Bot{
+		agentAPI:    service,
+		slackClient: client,
+		logger:      logger,
+	}
+	cs := bot.getOrCreateChat("D123", "D123", "")
+	bot.setActiveSession(cs, "existing-session", "slack:D123")
+
+	bot.processStreamResponse(context.Background(), cs, agent.StreamResponse{
+		SessionState: &agent.SessionState{
+			SessionID:          "existing-session",
+			Working:            false,
+			HasQueuedUserInput: true,
+		},
+	})
+
+	require.Eventually(t, func() bool {
+		service.mu.Lock()
+		defer service.mu.Unlock()
+		return service.flushCalls == 1
+	}, time.Second, 10*time.Millisecond)
+	assert.Equal(t, 1, client.postCount(), "queued idle state should keep a visible thinking indicator")
 }

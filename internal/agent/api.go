@@ -1238,10 +1238,146 @@ func (a *API) CompactSessionIfNeeded(ctx context.Context, sessionID string, user
 		return "", false, err
 	}
 
+	mgr.mu.Lock()
+	queuedChatMessages := append([]string(nil), mgr.queuedChatMessages...)
+	flushingQueuedChat := mgr.flushingQueuedChat
+	mgr.mu.Unlock()
+	if len(queuedChatMessages) > 0 || flushingQueuedChat {
+		newMgr.mu.Lock()
+		newMgr.queuedChatMessages = append(newMgr.queuedChatMessages, queuedChatMessages...)
+		newMgr.flushingQueuedChat = flushingQueuedChat
+		newMgr.mu.Unlock()
+	}
+
 	_ = mgr.Cancel(ctx)
 	a.sessions.Delete(sessionID)
 
 	return newID, true, nil
+}
+
+// ChatQueueResult describes the outcome of a bot chat enqueue/flush request.
+type ChatQueueResult struct {
+	SessionID string
+	Rotated   bool
+	Queued    bool
+	Started   bool
+}
+
+func (a *API) prepareSessionMessage(ctx context.Context, mgr *SessionManager, user UserIdentity, req ChatRequest) (llm.Provider, string, string, string, error) {
+	mgr.UpdateUserContext(user)
+
+	if req.Message == "" {
+		return nil, "", "", "", ErrMessageRequired
+	}
+
+	model := selectModel(req.Model, mgr.GetModel(), a.getDefaultModelID(ctx))
+	provider, modelCfg, err := a.resolveProvider(ctx, model)
+	if err != nil {
+		a.logger.Error("Failed to get LLM provider", "error", err)
+		return nil, "", "", "", ErrAgentNotConfigured
+	}
+
+	messageWithContext := a.formatMessage(ctx, req.Message, req.DAGContexts)
+	mgr.SetSafeMode(req.SafeMode)
+	mgr.UpdatePricing(modelCfg.InputCostPer1M, modelCfg.OutputCostPer1M)
+	return provider, model, modelCfg.Model, messageWithContext, nil
+}
+
+// EnqueueChatMessage accepts bot chat input for an existing session. Idle sessions
+// start immediately, while working sessions merge the text into a queued
+// safe-boundary interrupt turn.
+func (a *API) EnqueueChatMessage(ctx context.Context, sessionID string, user UserIdentity, req ChatRequest) (ChatQueueResult, error) {
+	mgr, ok := a.getOrReactivateSession(ctx, sessionID, user)
+	if !ok {
+		return ChatQueueResult{}, ErrSessionNotFound
+	}
+
+	provider, model, resolvedModel, messageWithContext, err := a.prepareSessionMessage(ctx, mgr, user, req)
+	if err != nil {
+		return ChatQueueResult{}, err
+	}
+
+	if mgr.IsWorking() || mgr.HasQueuedChatInput() {
+		queued, err := mgr.EnqueueChatMessage(ctx, provider, model, resolvedModel, messageWithContext)
+		if err != nil {
+			a.logger.Error("Failed to enqueue chat message", "error", err)
+			return ChatQueueResult{}, ErrFailedToProcessMessage
+		}
+		return ChatQueueResult{SessionID: sessionID, Queued: queued}, nil
+	}
+
+	targetSessionID, rotated, err := a.CompactSessionIfNeeded(ctx, sessionID, user)
+	if err != nil {
+		return ChatQueueResult{}, err
+	}
+	targetMgr, ok := a.getOrReactivateSession(ctx, targetSessionID, user)
+	if !ok {
+		return ChatQueueResult{}, ErrSessionNotFound
+	}
+	provider, model, resolvedModel, messageWithContext, err = a.prepareSessionMessage(ctx, targetMgr, user, req)
+	if err != nil {
+		return ChatQueueResult{}, err
+	}
+	queued, err := targetMgr.EnqueueChatMessage(ctx, provider, model, resolvedModel, messageWithContext)
+	if err != nil {
+		a.logger.Error("Failed to enqueue chat message", "error", err)
+		return ChatQueueResult{}, ErrFailedToProcessMessage
+	}
+	return ChatQueueResult{SessionID: targetSessionID, Rotated: rotated, Queued: queued}, nil
+}
+
+// FlushQueuedChatMessage starts a previously queued bot follow-up turn when the
+// session becomes idle. It compacts/rotates first if the session is near its
+// context window.
+func (a *API) FlushQueuedChatMessage(ctx context.Context, sessionID string, user UserIdentity) (ChatQueueResult, error) {
+	mgr, ok := a.getOrReactivateSession(ctx, sessionID, user)
+	if !ok {
+		return ChatQueueResult{}, ErrSessionNotFound
+	}
+	if mgr.IsWorking() || mgr.HasPendingPrompt() {
+		return ChatQueueResult{SessionID: sessionID}, nil
+	}
+
+	text, ok := mgr.BeginQueuedChatFlush()
+	if !ok {
+		return ChatQueueResult{SessionID: sessionID}, nil
+	}
+
+	targetSessionID := sessionID
+	rotated := false
+
+	targetSessionID, rotated, err := a.CompactSessionIfNeeded(ctx, sessionID, user)
+	if err != nil {
+		mgr.RestoreQueuedChatInput(text)
+		return ChatQueueResult{}, err
+	}
+
+	targetMgr, ok := a.getOrReactivateSession(ctx, targetSessionID, user)
+	if !ok {
+		if rotated {
+			mgr.RestoreQueuedChatInput(text)
+		} else {
+			mgr.RestoreQueuedChatInput(text)
+		}
+		return ChatQueueResult{}, ErrSessionNotFound
+	}
+
+	req := ChatRequest{
+		Message:  text,
+		SafeMode: targetMgr.safeMode,
+	}
+	provider, model, resolvedModel, messageWithContext, err := a.prepareSessionMessage(ctx, targetMgr, user, req)
+	if err != nil {
+		targetMgr.RestoreQueuedChatInput(text)
+		return ChatQueueResult{}, err
+	}
+	if err := targetMgr.AcceptUserMessage(ctx, provider, model, resolvedModel, messageWithContext); err != nil {
+		targetMgr.RestoreQueuedChatInput(text)
+		a.logger.Error("Failed to flush queued chat message", "error", err)
+		return ChatQueueResult{}, ErrFailedToProcessMessage
+	}
+	targetMgr.CompleteQueuedChatFlush()
+	return ChatQueueResult{SessionID: targetSessionID, Rotated: rotated, Started: true}, nil
 }
 
 // isValidUUID checks if a string is a valid UUID.
@@ -1378,25 +1514,11 @@ func (a *API) SendMessage(ctx context.Context, sessionID string, user UserIdenti
 	if !ok {
 		return ErrSessionNotFound
 	}
-	mgr.UpdateUserContext(user)
-
-	if req.Message == "" {
-		return ErrMessageRequired
-	}
-
-	model := selectModel(req.Model, mgr.GetModel(), a.getDefaultModelID(ctx))
-
-	provider, modelCfg, err := a.resolveProvider(ctx, model)
+	provider, model, resolvedModel, messageWithContext, err := a.prepareSessionMessage(ctx, mgr, user, req)
 	if err != nil {
-		a.logger.Error("Failed to get LLM provider", "error", err)
-		return ErrAgentNotConfigured
+		return err
 	}
-	messageWithContext := a.formatMessage(ctx, req.Message, req.DAGContexts)
-
-	mgr.SetSafeMode(req.SafeMode)
-	mgr.UpdatePricing(modelCfg.InputCostPer1M, modelCfg.OutputCostPer1M)
-
-	if err := mgr.AcceptUserMessage(ctx, provider, model, modelCfg.Model, messageWithContext); err != nil {
+	if err := mgr.AcceptUserMessage(ctx, provider, model, resolvedModel, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		return ErrFailedToProcessMessage
 	}

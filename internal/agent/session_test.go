@@ -235,6 +235,67 @@ func TestSessionManager_AcceptUserMessage(t *testing.T) {
 	})
 }
 
+func TestSessionManager_EnqueueChatMessage_MergesWhileWorking(t *testing.T) {
+	t.Parallel()
+
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	provider := &mockLLMProvider{
+		chatFunc: func(ctx context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+			select {
+			case <-entered:
+			default:
+				close(entered)
+			}
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-release:
+				return simpleStopResponse("done"), nil
+			}
+		},
+	}
+
+	sm := NewSessionManager(SessionManagerConfig{})
+	require.NoError(t, sm.AcceptUserMessage(context.Background(), provider, "config-id", "provider-model", "first"))
+
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for active turn")
+	}
+
+	queued, err := sm.EnqueueChatMessage(context.Background(), provider, "config-id", "provider-model", "second")
+	require.NoError(t, err)
+	assert.True(t, queued)
+
+	queued, err = sm.EnqueueChatMessage(context.Background(), provider, "config-id", "provider-model", "third")
+	require.NoError(t, err)
+	assert.True(t, queued)
+
+	msgs := sm.GetMessages()
+	require.Len(t, msgs, 1)
+	assert.Equal(t, "first", msgs[0].Content)
+	assert.True(t, sm.HasQueuedChatInput())
+
+	text, ok := sm.BeginQueuedChatFlush()
+	require.True(t, ok)
+	assert.Equal(t, "second\n\nthird", text)
+	assert.True(t, sm.HasQueuedChatInput(), "flush marker should keep queued state visible")
+
+	sm.RestoreQueuedChatInput(text)
+	assert.True(t, sm.HasQueuedChatInput())
+
+	text, ok = sm.BeginQueuedChatFlush()
+	require.True(t, ok)
+	assert.Equal(t, "second\n\nthird", text)
+	sm.CompleteQueuedChatFlush()
+	assert.False(t, sm.HasQueuedChatInput())
+
+	close(release)
+	_ = sm.Cancel(context.Background())
+}
+
 func TestSessionManager_Subscribe(t *testing.T) {
 	t.Parallel()
 

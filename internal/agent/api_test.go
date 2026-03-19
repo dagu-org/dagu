@@ -1020,6 +1020,79 @@ func TestAPI_CompactSessionIfNeeded_CreatesSummarySession(t *testing.T) {
 	assert.False(t, oldActive)
 }
 
+func TestAPI_FlushQueuedChatMessage_RotatesAndStartsMergedTurn(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("compact-model")
+	model.ContextWindow = 100
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = model.ID
+
+	callCount := atomic.Int32{}
+	api := NewAPI(APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   newMockModelStore().addModel(model),
+		WorkingDir:   t.TempDir(),
+		SessionStore: newMockSessionStore(),
+	})
+	api.providers.Set(model.ToLLMConfig(), &mockLLMProvider{
+		chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+			switch callCount.Add(1) {
+			case 1:
+				return simpleStopResponse("- summary"), nil
+			default:
+				return simpleStopResponse("queued reply"), nil
+			}
+		},
+	})
+
+	user := UserIdentity{UserID: "telegram:123", Username: "telegram", Role: auth.RoleAdmin}
+	sessionID, err := api.CreateEmptySession(context.Background(), user, "briefing", true)
+	require.NoError(t, err)
+
+	_, err = api.AppendExternalMessage(context.Background(), sessionID, user, Message{
+		Type:      MessageTypeAssistant,
+		Content:   "recent assistant reply",
+		CreatedAt: time.Now(),
+		Usage:     &llm.Usage{PromptTokens: 90, TotalTokens: 90},
+		LLMData: &llm.Message{
+			Role:    llm.RoleAssistant,
+			Content: "recent assistant reply",
+		},
+	})
+	require.NoError(t, err)
+
+	mgrVal, ok := api.sessions.Load(sessionID)
+	require.True(t, ok)
+	mgr := mgrVal.(*SessionManager)
+	mgr.queuedChatMessages = []string{"follow up", "and another"}
+
+	result, err := api.FlushQueuedChatMessage(context.Background(), sessionID, user)
+	require.NoError(t, err)
+	assert.True(t, result.Rotated)
+	assert.True(t, result.Started)
+	assert.NotEqual(t, sessionID, result.SessionID)
+
+	require.Eventually(t, func() bool {
+		detail, err := api.GetSessionDetail(context.Background(), result.SessionID, user.UserID)
+		if err != nil || detail == nil {
+			return false
+		}
+		return len(detail.Messages) >= 3
+	}, time.Second, 10*time.Millisecond)
+
+	detail, err := api.GetSessionDetail(context.Background(), result.SessionID, user.UserID)
+	require.NoError(t, err)
+	require.Len(t, detail.Messages, 3)
+	assert.True(t, strings.HasPrefix(detail.Messages[0].Content, sessionSummaryPrefix))
+	assert.Equal(t, MessageTypeUser, detail.Messages[1].Type)
+	assert.Equal(t, "follow up\n\nand another", detail.Messages[1].Content)
+	assert.Equal(t, MessageTypeAssistant, detail.Messages[2].Type)
+	assert.Equal(t, "queued reply", detail.Messages[2].Content)
+	require.NotNil(t, detail.SessionState)
+	assert.False(t, detail.SessionState.HasQueuedUserInput)
+}
+
 func TestShouldCompactMessages_UsesLatestPromptTokens(t *testing.T) {
 	t.Parallel()
 
