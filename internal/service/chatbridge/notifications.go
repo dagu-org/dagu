@@ -79,14 +79,12 @@ type NotificationBatcher struct {
 	stopped       bool
 	buckets       map[string]*notificationBucket
 	runIndex      map[string]string
-	flush         func(destination string, batch NotificationBatch)
+	ready         []NotificationPendingBatch
+	readyCh       chan struct{}
 }
 
 // NewNotificationBatcher creates a new notification batcher.
-func NewNotificationBatcher(
-	urgentWindow, successWindow time.Duration,
-	flush func(destination string, batch NotificationBatch),
-) *NotificationBatcher {
+func NewNotificationBatcher(urgentWindow, successWindow time.Duration) *NotificationBatcher {
 	if urgentWindow <= 0 {
 		urgentWindow = DefaultUrgentNotificationWindow
 	}
@@ -98,7 +96,7 @@ func NewNotificationBatcher(
 		successWindow: successWindow,
 		buckets:       make(map[string]*notificationBucket),
 		runIndex:      make(map[string]string),
-		flush:         flush,
+		readyCh:       make(chan struct{}, 1),
 	}
 }
 
@@ -118,6 +116,7 @@ func (b *NotificationBatcher) Stop() {
 	}
 	b.buckets = make(map[string]*notificationBucket)
 	b.runIndex = make(map[string]string)
+	b.ready = nil
 	b.mu.Unlock()
 
 	for _, timer := range timers {
@@ -137,7 +136,8 @@ func (b *NotificationBatcher) DrainAndStop() []NotificationPendingBatch {
 	b.stopped = true
 	now := time.Now()
 	timers := make([]*time.Timer, 0, len(b.buckets))
-	drained := make([]NotificationPendingBatch, 0, len(b.buckets))
+	drained := make([]NotificationPendingBatch, 0, len(b.ready)+len(b.buckets))
+	drained = append(drained, append([]NotificationPendingBatch(nil), b.ready...)...)
 	for _, bucket := range b.buckets {
 		if bucket.timer != nil {
 			timers = append(timers, bucket.timer)
@@ -153,6 +153,7 @@ func (b *NotificationBatcher) DrainAndStop() []NotificationPendingBatch {
 	}
 	b.buckets = make(map[string]*notificationBucket)
 	b.runIndex = make(map[string]string)
+	b.ready = nil
 	b.mu.Unlock()
 
 	for _, timer := range timers {
@@ -228,7 +229,7 @@ func (b *NotificationBatcher) Enqueue(destination string, status *exec.DAGRunSta
 		window := b.windowForClass(class)
 		bucketID := bucket.id
 		bucket.timer = time.AfterFunc(window, func() {
-			b.flushBucket(bucketKey, bucketID)
+			b.readyBucket(bucketKey, bucketID)
 		})
 	}
 
@@ -240,7 +241,24 @@ func (b *NotificationBatcher) Enqueue(destination string, status *exec.DAGRunSta
 	return true
 }
 
-func (b *NotificationBatcher) flushBucket(bucketKey string, bucketID uint64) {
+// ReadyC is signaled when one or more batches are ready for delivery.
+func (b *NotificationBatcher) ReadyC() <-chan struct{} {
+	return b.readyCh
+}
+
+// TakeReady returns all batches currently ready for delivery.
+func (b *NotificationBatcher) TakeReady() []NotificationPendingBatch {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if len(b.ready) == 0 {
+		return nil
+	}
+	ready := append([]NotificationPendingBatch(nil), b.ready...)
+	b.ready = nil
+	return ready
+}
+
+func (b *NotificationBatcher) readyBucket(bucketKey string, bucketID uint64) {
 	b.mu.Lock()
 	if b.stopped {
 		b.mu.Unlock()
@@ -257,12 +275,18 @@ func (b *NotificationBatcher) flushBucket(bucketKey string, bucketID uint64) {
 	for runKey := range bucket.events {
 		delete(b.runIndex, notificationDestinationRunKey(bucket.destination, runKey))
 	}
-	b.mu.Unlock()
-
 	batch := notificationBatchFromBucket(bucket, time.Now())
-	if b.flush != nil && len(batch.Events) > 0 {
-		b.flush(bucket.destination, batch)
+	if len(batch.Events) > 0 {
+		b.ready = append(b.ready, NotificationPendingBatch{
+			Destination: bucket.destination,
+			Batch:       batch,
+		})
+		select {
+		case b.readyCh <- struct{}{}:
+		default:
+		}
 	}
+	b.mu.Unlock()
 }
 
 func (b *NotificationBatcher) windowForClass(class NotificationClass) time.Duration {

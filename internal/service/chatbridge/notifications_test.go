@@ -29,33 +29,21 @@ func TestNotificationSeenKeyIncludesStatus(t *testing.T) {
 func TestNotificationBatcher_SuccessBurstFlushesSingleDigest(t *testing.T) {
 	t.Parallel()
 
-	type flushedBatch struct {
-		destination string
-		batch       NotificationBatch
-	}
-
-	flushCh := make(chan flushedBatch, 1)
-	batcher := NewNotificationBatcher(10*time.Millisecond, 20*time.Millisecond, func(destination string, batch NotificationBatch) {
-		flushCh <- flushedBatch{destination: destination, batch: batch}
-	})
+	batcher := NewNotificationBatcher(10*time.Millisecond, 20*time.Millisecond)
 	defer batcher.Stop()
 
 	require.True(t, batcher.Enqueue("dest-1", &exec.DAGRunStatus{Name: "briefing", DAGRunID: "run-1", AttemptID: "a1", Status: core.Succeeded}))
 	require.True(t, batcher.Enqueue("dest-1", &exec.DAGRunStatus{Name: "briefing", DAGRunID: "run-2", AttemptID: "a2", Status: core.Succeeded}))
 	require.True(t, batcher.Enqueue("dest-1", &exec.DAGRunStatus{Name: "sync", DAGRunID: "run-3", AttemptID: "a3", Status: core.PartiallySucceeded}))
 
-	select {
-	case flushed := <-flushCh:
-		assert.Equal(t, "dest-1", flushed.destination)
-		assert.Equal(t, NotificationClassSuccessDigest, flushed.batch.Class)
-		assert.Len(t, flushed.batch.Events, 3)
-		text := FormatNotificationBatch(flushed.batch)
-		assert.Contains(t, text, "DAG completion digest")
-		assert.Contains(t, text, "briefing: succeeded x2")
-		assert.Contains(t, text, "sync: partially_succeeded x1")
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for success digest flush")
-	}
+	ready := waitForReadyBatch(t, batcher)
+	assert.Equal(t, "dest-1", ready.Destination)
+	assert.Equal(t, NotificationClassSuccessDigest, ready.Batch.Class)
+	assert.Len(t, ready.Batch.Events, 3)
+	text := FormatNotificationBatch(ready.Batch)
+	assert.Contains(t, text, "DAG completion digest")
+	assert.Contains(t, text, "briefing: succeeded x2")
+	assert.Contains(t, text, "sync: partially_succeeded x1")
 }
 
 func TestNotificationBatcher_ReplacesWaitingWithSuccessBeforeFlush(t *testing.T) {
@@ -65,11 +53,7 @@ func TestNotificationBatcher_ReplacesWaitingWithSuccessBeforeFlush(t *testing.T)
 		mu      sync.Mutex
 		flushed []NotificationBatch
 	)
-	batcher := NewNotificationBatcher(15*time.Millisecond, 25*time.Millisecond, func(_ string, batch NotificationBatch) {
-		mu.Lock()
-		defer mu.Unlock()
-		flushed = append(flushed, batch)
-	})
+	batcher := NewNotificationBatcher(15*time.Millisecond, 25*time.Millisecond)
 	defer batcher.Stop()
 
 	require.True(t, batcher.Enqueue("dest-1", &exec.DAGRunStatus{Name: "briefing", DAGRunID: "run-1", AttemptID: "a1", Status: core.Waiting}))
@@ -82,11 +66,10 @@ func TestNotificationBatcher_ReplacesWaitingWithSuccessBeforeFlush(t *testing.T)
 	mu.Unlock()
 	assert.Zero(t, currentFlushes, "waiting batch should have been replaced before urgent flush")
 
-	require.Eventually(t, func() bool {
-		mu.Lock()
-		defer mu.Unlock()
-		return len(flushed) == 1
-	}, time.Second, 10*time.Millisecond)
+	ready := waitForReadyBatch(t, batcher)
+	mu.Lock()
+	flushed = append(flushed, ready.Batch)
+	mu.Unlock()
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -99,15 +82,7 @@ func TestNotificationBatcher_ReplacesWaitingWithSuccessBeforeFlush(t *testing.T)
 func TestNotificationBatcher_DuplicateStatusDoesNotDuplicateBatch(t *testing.T) {
 	t.Parallel()
 
-	type flushedBatch struct {
-		destination string
-		batch       NotificationBatch
-	}
-
-	flushCh := make(chan flushedBatch, 1)
-	batcher := NewNotificationBatcher(20*time.Millisecond, 40*time.Millisecond, func(destination string, batch NotificationBatch) {
-		flushCh <- flushedBatch{destination: destination, batch: batch}
-	})
+	batcher := NewNotificationBatcher(20*time.Millisecond, 40*time.Millisecond)
 	defer batcher.Stop()
 
 	status := &exec.DAGRunStatus{Name: "briefing", DAGRunID: "run-1", AttemptID: "a1", Status: core.Failed, Error: "boom"}
@@ -115,28 +90,16 @@ func TestNotificationBatcher_DuplicateStatusDoesNotDuplicateBatch(t *testing.T) 
 	time.Sleep(10 * time.Millisecond)
 	require.True(t, batcher.Enqueue("dest-1", status))
 
-	select {
-	case flushed := <-flushCh:
-		assert.Equal(t, NotificationClassUrgent, flushed.batch.Class)
-		require.Len(t, flushed.batch.Events, 1)
-		assert.Equal(t, core.Failed, flushed.batch.Events[0].Status.Status)
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for urgent flush")
-	}
+	ready := waitForReadyBatch(t, batcher)
+	assert.Equal(t, NotificationClassUrgent, ready.Batch.Class)
+	require.Len(t, ready.Batch.Events, 1)
+	assert.Equal(t, core.Failed, ready.Batch.Events[0].Status.Status)
 }
 
 func TestNotificationBatcher_DrainAndStopReturnsPendingBatchesOrderedAndStopsFlushes(t *testing.T) {
 	t.Parallel()
 
-	var (
-		mu         sync.Mutex
-		flushCount int
-	)
-	batcher := NewNotificationBatcher(80*time.Millisecond, 120*time.Millisecond, func(_ string, _ NotificationBatch) {
-		mu.Lock()
-		defer mu.Unlock()
-		flushCount++
-	})
+	batcher := NewNotificationBatcher(80*time.Millisecond, 120*time.Millisecond)
 
 	require.True(t, batcher.Enqueue("success-dest", &exec.DAGRunStatus{
 		Name:      "briefing",
@@ -169,9 +132,7 @@ func TestNotificationBatcher_DrainAndStopReturnsPendingBatchesOrderedAndStopsFlu
 	assert.Equal(t, NotificationClassSuccessDigest, drained[2].Batch.Class)
 
 	time.Sleep(150 * time.Millisecond)
-	mu.Lock()
-	assert.Zero(t, flushCount)
-	mu.Unlock()
+	assert.Empty(t, batcher.TakeReady())
 	assert.False(t, batcher.Enqueue("ignored", &exec.DAGRunStatus{
 		Name:      "ignored",
 		DAGRunID:  "run-4",
@@ -232,4 +193,18 @@ func TestFormatNotificationBatch_CapsVisibleGroups(t *testing.T) {
 
 	assert.Contains(t, text, "DAG completion digest")
 	assert.Contains(t, text, "and 2 more DAG groups")
+}
+
+func waitForReadyBatch(t *testing.T, batcher *NotificationBatcher) NotificationPendingBatch {
+	t.Helper()
+
+	select {
+	case <-batcher.ReadyC():
+		ready := batcher.TakeReady()
+		require.NotEmpty(t, ready)
+		return ready[0]
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for ready notification batch")
+		return NotificationPendingBatch{}
+	}
 }

@@ -17,7 +17,6 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/llm"
-	"github.com/dagu-org/dagu/internal/service/chatbridge"
 	"github.com/slack-go/slack"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -217,9 +216,9 @@ func TestDAGRunMonitor_FlushesSuccessDigestIntoSingleThreadAndSkipsReplay(t *tes
 		allowedChannels: map[string]struct{}{"C123": {}},
 		logger:          logger,
 	}
-	monitor := NewDAGRunMonitor(nil, service, bot, logger)
-	monitor.batcher = chatbridge.NewNotificationBatcher(10*time.Millisecond, 20*time.Millisecond, monitor.flushBatch)
-	defer monitor.batcher.Stop()
+	monitor := newDAGRunMonitorWithWindows(nil, service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
+	stopMonitor := startTestMonitor(t, monitor)
+	defer stopMonitor()
 
 	ok := monitor.notifyCompletion(context.Background(), &exec.DAGRunStatus{
 		Name:      "briefing",
@@ -278,9 +277,9 @@ func TestDAGRunMonitor_FlushesUrgentSingleIntoExistingDMSession(t *testing.T) {
 		allowedChannels: map[string]struct{}{"D123": {}},
 		logger:          logger,
 	}
-	monitor := NewDAGRunMonitor(nil, service, bot, logger)
-	monitor.batcher = chatbridge.NewNotificationBatcher(10*time.Millisecond, 20*time.Millisecond, monitor.flushBatch)
-	defer monitor.batcher.Stop()
+	monitor := newDAGRunMonitorWithWindows(nil, service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
+	stopMonitor := startTestMonitor(t, monitor)
+	defer stopMonitor()
 
 	cs := bot.getOrCreateChat("D123", "D123", "")
 	user := agent.UserIdentity{

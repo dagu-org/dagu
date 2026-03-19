@@ -13,12 +13,31 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/service/chatbridge"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type stubNotificationDAGRunStore struct{}
+
+func startTestMonitor(t *testing.T, monitor *DAGRunMonitor) func() {
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		monitor.Run(ctx)
+		close(done)
+	}()
+
+	return func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for monitor shutdown")
+		}
+	}
+}
 
 func (s *stubNotificationDAGRunStore) CreateAttempt(context.Context, *core.DAG, time.Time, string, exec.NewDAGRunAttemptOptions) (exec.DAGRunAttempt, error) {
 	return nil, errors.New("unexpected call")
@@ -79,9 +98,9 @@ func TestDAGRunMonitor_RetriesOnlyUndeliveredSlackChannel(t *testing.T) {
 		allowedChannels: map[string]struct{}{"COK": {}, "CFAIL": {}},
 		logger:          logger,
 	}
-	monitor := NewDAGRunMonitor(nil, service, bot, logger)
-	monitor.batcher = chatbridge.NewNotificationBatcher(10*time.Millisecond, 20*time.Millisecond, monitor.flushBatch)
-	defer monitor.batcher.Stop()
+	monitor := newDAGRunMonitorWithWindows(nil, service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
+	stopMonitor := startTestMonitor(t, monitor)
+	defer stopMonitor()
 
 	status := &exec.DAGRunStatus{
 		Name:      "briefing",
@@ -122,8 +141,7 @@ func TestDAGRunMonitor_RunDrainsPendingSlackNotificationsWithoutLLM(t *testing.T
 		allowedChannels: map[string]struct{}{"D123": {}},
 		logger:          logger,
 	}
-	monitor := NewDAGRunMonitor(&stubNotificationDAGRunStore{}, service, bot, logger)
-	monitor.batcher = chatbridge.NewNotificationBatcher(time.Hour, time.Hour, monitor.flushBatch)
+	monitor := newDAGRunMonitorWithWindows(&stubNotificationDAGRunStore{}, service, bot, logger, time.Hour, time.Hour)
 
 	status := &exec.DAGRunStatus{
 		Name:      "briefing",
@@ -132,21 +150,10 @@ func TestDAGRunMonitor_RunDrainsPendingSlackNotificationsWithoutLLM(t *testing.T
 		AttemptID: "attempt-2",
 		Error:     "boom",
 	}
-	require.True(t, monitor.batcher.Enqueue("D123", status))
+	require.True(t, monitor.notifyCompletion(context.Background(), status))
 
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() {
-		monitor.Run(ctx)
-		close(done)
-	}()
-	cancel()
-
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for monitor shutdown drain")
-	}
+	stopMonitor := startTestMonitor(t, monitor)
+	stopMonitor()
 
 	service.mu.Lock()
 	defer service.mu.Unlock()
