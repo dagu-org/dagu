@@ -114,11 +114,11 @@ func (r *vaultResolver) getClient(ref core.SecretRef) (vaultClient, error) {
 	// 2. Resolve vault_address and vault_token
 	addr := ref.Options["vault_address"]
 	if addr == "" {
-		addr = os.Getenv("VAULT_ADDR")
+		addr = os.Getenv("DAGU_VAULT_ADDR")
 	}
 	token := ref.Options["vault_token"]
 	if token == "" {
-		token = os.Getenv("VAULT_TOKEN")
+		token = os.Getenv("DAGU_VAULT_TOKEN")
 	}
 
 	// 3. Check cache
@@ -130,6 +130,8 @@ func (r *vaultResolver) getClient(ref core.SecretRef) (vaultClient, error) {
 	config := api.DefaultConfig()
 	if addr != "" {
 		config.Address = addr
+	} else {
+		config.Address = api.DefaultAddress
 	}
 
 	client, err := api.NewClient(config)
@@ -139,6 +141,8 @@ func (r *vaultResolver) getClient(ref core.SecretRef) (vaultClient, error) {
 
 	if token != "" {
 		client.SetToken(token)
+	} else {
+		client.ClearToken()
 	}
 
 	realClient := &realVaultClient{client: client}
