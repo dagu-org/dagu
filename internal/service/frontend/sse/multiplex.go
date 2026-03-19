@@ -277,7 +277,7 @@ func (m *Multiplexer) applyMutation(ctx context.Context, session *streamSession,
 		}
 	}
 
-	authErrors := make([]TopicMutationError, 0)
+	mutationErrors := make([]TopicMutationError, 0)
 	authorizedAdds := make([]ParsedTopic, 0, len(addedParsed))
 	for _, parsed := range addedParsed {
 		authorizer := m.getAuthorizer(parsed.Type)
@@ -286,7 +286,7 @@ func (m *Multiplexer) applyMutation(ctx context.Context, session *streamSession,
 			continue
 		}
 		if err := authorizer(ctx, parsed.Identifier); err != nil {
-			authErrors = append(authErrors, TopicMutationError{
+			mutationErrors = append(mutationErrors, TopicMutationError{
 				Topic:   parsed.Key,
 				Code:    "unauthorized",
 				Message: err.Error(),
@@ -296,12 +296,25 @@ func (m *Multiplexer) applyMutation(ctx context.Context, session *streamSession,
 		authorizedAdds = append(authorizedAdds, parsed)
 	}
 
-	resolvedAdds, createdTopics, err := m.resolveTopicsForMutation(authorizedAdds)
+	supportedAdds := make([]ParsedTopic, 0, len(authorizedAdds))
+	for _, parsed := range authorizedAdds {
+		if m.hasFetcher(parsed.Type) {
+			supportedAdds = append(supportedAdds, parsed)
+			continue
+		}
+		mutationErrors = append(mutationErrors, TopicMutationError{
+			Topic:   parsed.Key,
+			Code:    "unsupported_topic",
+			Message: fmt.Sprintf("topic type %q is not supported by this server", parsed.Type),
+		})
+	}
+
+	resolvedAdds, createdTopics, err := m.resolveTopicsForMutation(supportedAdds)
 	if err != nil {
 		return mutationResult{}, err
 	}
-	resolvedByKey := make(map[string]*multiplexTopic, len(authorizedAdds))
-	for idx, parsed := range authorizedAdds {
+	resolvedByKey := make(map[string]*multiplexTopic, len(supportedAdds))
+	for idx, parsed := range supportedAdds {
 		resolvedByKey[parsed.Key] = resolvedAdds[idx]
 	}
 
@@ -326,8 +339,8 @@ func (m *Multiplexer) applyMutation(ctx context.Context, session *streamSession,
 		}
 	}
 
-	addsToApply := make([]ParsedTopic, 0, len(authorizedAdds))
-	for _, parsed := range authorizedAdds {
+	addsToApply := make([]ParsedTopic, 0, len(supportedAdds))
+	for _, parsed := range supportedAdds {
 		if _, exists := currentSet[parsed.Key]; exists {
 			continue
 		}
@@ -364,14 +377,14 @@ func (m *Multiplexer) applyMutation(ctx context.Context, session *streamSession,
 	m.cleanupResolvedTopics(createdTopics, addedTopicKeys)
 
 	statusCode := http.StatusOK
-	if len(authErrors) > 0 {
+	if len(mutationErrors) > 0 {
 		statusCode = http.StatusForbidden
 	}
 
 	return mutationResult{
 		response: TopicMutationResponse{
 			Subscribed: session.topicKeys(),
-			Errors:     authErrors,
+			Errors:     mutationErrors,
 		},
 		added:      addedTopics,
 		statusCode: statusCode,
@@ -418,6 +431,12 @@ func (m *Multiplexer) getAuthorizer(topicType TopicType) TopicAuthorizer {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.authorizers[topicType]
+}
+
+func (m *Multiplexer) hasFetcher(topicType TopicType) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.fetchers[topicType] != nil
 }
 
 func (m *Multiplexer) resolveTopicsForMutation(parsedTopics []ParsedTopic) ([]*multiplexTopic, []*multiplexTopic, error) {

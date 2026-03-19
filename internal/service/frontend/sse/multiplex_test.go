@@ -74,6 +74,30 @@ func TestMultiplexerCreateSessionFiltersUnauthorizedTopics(t *testing.T) {
 	assert.Equal(t, "queueitems:default", result.control.Errors[0].Topic)
 }
 
+func TestMultiplexerCreateSessionFiltersUnsupportedTopics(t *testing.T) {
+	mux := NewMultiplexer(StreamConfig{}, nil)
+	t.Cleanup(mux.Shutdown)
+
+	mux.RegisterFetcher(TopicTypeDoc, func(_ context.Context, identifier string) (any, error) {
+		return map[string]string{"id": identifier}, nil
+	})
+
+	recorder := httptest.NewRecorder()
+	result, err := mux.createSession(
+		context.Background(),
+		recorder,
+		[]string{"agent:session-1", "doc:briefing/demo"},
+		0,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, result.session)
+
+	assert.Equal(t, []string{"doc:briefing/demo"}, result.control.Subscribed)
+	require.Len(t, result.control.Errors, 1)
+	assert.Equal(t, "agent:session-1", result.control.Errors[0].Topic)
+	assert.Equal(t, "unsupported_topic", result.control.Errors[0].Code)
+}
+
 func TestMultiplexerMutateSessionPartialAuthorization(t *testing.T) {
 	mux := NewMultiplexer(StreamConfig{}, nil)
 	t.Cleanup(mux.Shutdown)
@@ -107,7 +131,35 @@ func TestMultiplexerMutateSessionPartialAuthorization(t *testing.T) {
 	assert.Equal(t, "queueitems:default", mutation.response.Errors[0].Topic)
 }
 
-func TestMultiplexerMutateSessionIsAtomicOnTopicResolutionFailure(t *testing.T) {
+func TestMultiplexerMutateSessionPartialUnsupportedTopic(t *testing.T) {
+	mux := NewMultiplexer(StreamConfig{}, nil)
+	t.Cleanup(mux.Shutdown)
+
+	mux.RegisterFetcher(TopicTypeDoc, func(_ context.Context, identifier string) (any, error) {
+		return map[string]string{"id": identifier}, nil
+	})
+
+	recorder := httptest.NewRecorder()
+	result, err := mux.createSession(context.Background(), recorder, nil, 0)
+	require.NoError(t, err)
+	require.NotNil(t, result.session)
+
+	mutation, err := mux.mutateSession(
+		context.Background(),
+		result.session.id,
+		[]string{"agent:session-1", "doc:briefing/demo"},
+		nil,
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusForbidden, mutation.statusCode)
+	assert.Equal(t, []string{"doc:briefing/demo"}, mutation.response.Subscribed)
+	require.Len(t, mutation.response.Errors, 1)
+	assert.Equal(t, "agent:session-1", mutation.response.Errors[0].Topic)
+	assert.Equal(t, "unsupported_topic", mutation.response.Errors[0].Code)
+}
+
+func TestMultiplexerMutateSessionIsAtomicOnInvalidTopicFailure(t *testing.T) {
 	mux := NewMultiplexer(StreamConfig{}, nil)
 	t.Cleanup(mux.Shutdown)
 
@@ -123,13 +175,13 @@ func TestMultiplexerMutateSessionIsAtomicOnTopicResolutionFailure(t *testing.T) 
 	_, err = mux.mutateSession(
 		context.Background(),
 		result.session.id,
-		[]string{"missing:test"},
+		[]string{"invalid-topic"},
 		[]string{"dag:test.yaml"},
 	)
 	require.Error(t, err)
 
 	assert.Equal(t, []string{"dag:test.yaml"}, result.session.topicKeys())
-	_, missingTopicExists := mux.topics["missing:test"]
+	_, missingTopicExists := mux.topics["invalid-topic"]
 	assert.False(t, missingTopicExists)
 }
 
@@ -168,7 +220,7 @@ func TestMultiplexerCreateSessionDoesNotRetainTopicsOnFailure(t *testing.T) {
 	result, err := mux.createSession(
 		context.Background(),
 		recorder,
-		[]string{"dag:test.yaml", "missing:test"},
+		[]string{"dag:test.yaml", "invalid-topic"},
 		0,
 	)
 	require.Error(t, err)
