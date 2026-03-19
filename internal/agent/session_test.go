@@ -1068,6 +1068,154 @@ func TestSessionManager_RecordHeartbeat(t *testing.T) {
 	})
 }
 
+func TestSessionManager_CreateWaitUserResponseFunc(t *testing.T) {
+	t.Parallel()
+
+	type waitResult struct {
+		resp UserPromptResponse
+		err  error
+	}
+
+	t.Run("keeps heartbeat fresh while waiting and accepts delayed approval", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{
+			ID:                 "wait-heartbeat",
+			PromptWaitInterval: 5 * time.Millisecond,
+		})
+		emit := sm.createEmitUserPromptFunc()
+		wait := sm.createWaitUserResponseFunc()
+
+		emit(UserPrompt{
+			PromptID:   "approval-1",
+			PromptType: PromptTypeCommandApproval,
+			Question:   "Approve command?",
+		})
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		resultCh := make(chan waitResult, 1)
+		go func() {
+			resp, err := wait(ctx, "approval-1")
+			resultCh <- waitResult{resp: resp, err: err}
+		}()
+
+		require.Eventually(t, sm.HasPendingPrompt, time.Second, 5*time.Millisecond)
+
+		firstHB := sm.LastHeartbeat()
+		require.False(t, firstHB.IsZero())
+		require.Eventually(t, func() bool {
+			return sm.LastHeartbeat().After(firstHB)
+		}, time.Second, 5*time.Millisecond)
+
+		time.Sleep(30 * time.Millisecond)
+		require.True(t, sm.SubmitUserResponse(UserPromptResponse{
+			PromptID:          "approval-1",
+			SelectedOptionIDs: []string{"approve"},
+		}))
+
+		select {
+		case result := <-resultCh:
+			require.NoError(t, result.err)
+			assert.Equal(t, []string{"approve"}, result.resp.SelectedOptionIDs)
+			assert.False(t, result.resp.Cancelled)
+		case <-time.After(time.Second):
+			t.Fatal("wait did not return after approval")
+		}
+
+		require.Eventually(t, func() bool { return !sm.HasPendingPrompt() }, time.Second, 5*time.Millisecond)
+	})
+
+	t.Run("session cancel unblocks approval wait cleanly", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{
+			ID:                 "cancel-approval",
+			PromptWaitInterval: 5 * time.Millisecond,
+		})
+		emit := sm.createEmitUserPromptFunc()
+		wait := sm.createWaitUserResponseFunc()
+
+		emit(UserPrompt{
+			PromptID:   "approval-cancel",
+			PromptType: PromptTypeCommandApproval,
+			Question:   "Approve command?",
+		})
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		resultCh := make(chan waitResult, 1)
+		go func() {
+			resp, err := wait(ctx, "approval-cancel")
+			resultCh <- waitResult{resp: resp, err: err}
+		}()
+
+		require.Eventually(t, sm.HasPendingPrompt, time.Second, 5*time.Millisecond)
+		require.NoError(t, sm.Cancel(context.Background()))
+
+		select {
+		case result := <-resultCh:
+			require.NoError(t, result.err)
+			assert.True(t, result.resp.Cancelled)
+			assert.Equal(t, "approval-cancel", result.resp.PromptID)
+		case <-time.After(time.Second):
+			t.Fatal("wait did not return after session cancel")
+		}
+
+		require.Eventually(t, func() bool { return !sm.HasPendingPrompt() }, time.Second, 5*time.Millisecond)
+	})
+
+	t.Run("general prompt timeout returns deadline exceeded and heartbeat stops", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{
+			ID:                 "general-timeout",
+			PromptWaitInterval: 5 * time.Millisecond,
+		})
+		emit := sm.createEmitUserPromptFunc()
+		wait := sm.createWaitUserResponseFunc()
+
+		emit(UserPrompt{
+			PromptID:   "general-timeout-1",
+			PromptType: PromptTypeGeneral,
+			Question:   "Need more details?",
+		})
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+		defer cancel()
+
+		resultCh := make(chan waitResult, 1)
+		go func() {
+			resp, err := wait(ctx, "general-timeout-1")
+			resultCh <- waitResult{resp: resp, err: err}
+		}()
+
+		require.Eventually(t, sm.HasPendingPrompt, time.Second, 5*time.Millisecond)
+		firstHB := sm.LastHeartbeat()
+		require.False(t, firstHB.IsZero())
+		require.Eventually(t, func() bool {
+			return sm.LastHeartbeat().After(firstHB)
+		}, time.Second, 5*time.Millisecond)
+
+		select {
+		case result := <-resultCh:
+			require.ErrorIs(t, result.err, context.DeadlineExceeded)
+			assert.Empty(t, result.resp.PromptID)
+			assert.False(t, result.resp.Cancelled)
+		case <-time.After(time.Second):
+			t.Fatal("wait did not time out")
+		}
+
+		require.Eventually(t, func() bool { return !sm.HasPendingPrompt() }, time.Second, 5*time.Millisecond)
+		time.Sleep(15 * time.Millisecond)
+		stableHB := sm.LastHeartbeat()
+		time.Sleep(20 * time.Millisecond)
+		assert.Equal(t, stableHB, sm.LastHeartbeat(), "heartbeat should stop after wait timeout")
+	})
+}
+
 func TestSessionManager_CancelPendingPrompts(t *testing.T) {
 	t.Parallel()
 
@@ -1180,6 +1328,40 @@ func TestSessionManager_CancelPendingPrompts(t *testing.T) {
 		assert.Equal(t, "answer", resp.FreeTextResponse)
 		assert.False(t, resp.Cancelled)
 	})
+}
+
+func TestSessionManager_CancelAllPendingPrompts(t *testing.T) {
+	t.Parallel()
+
+	sm := NewSessionManager(SessionManagerConfig{ID: "cancel-all"})
+
+	generalCh := make(chan UserPromptResponse, 1)
+	approvalCh := make(chan UserPromptResponse, 1)
+
+	sm.promptsMu.Lock()
+	sm.pendingPrompts["general"] = generalCh
+	sm.pendingPrompts["approval"] = approvalCh
+	sm.promptTypes["general"] = PromptTypeGeneral
+	sm.promptTypes["approval"] = PromptTypeCommandApproval
+	sm.promptsMu.Unlock()
+
+	sm.CancelAllPendingPrompts()
+
+	select {
+	case resp := <-generalCh:
+		assert.True(t, resp.Cancelled)
+		assert.Equal(t, "general", resp.PromptID)
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("general prompt not cancelled")
+	}
+
+	select {
+	case resp := <-approvalCh:
+		assert.True(t, resp.Cancelled)
+		assert.Equal(t, "approval", resp.PromptID)
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("approval prompt not cancelled")
+	}
 }
 
 func TestRepairOrphanedToolCalls(t *testing.T) {

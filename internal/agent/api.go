@@ -1621,6 +1621,8 @@ const heartbeatInterval = 15 * time.Second
 const idleSessionTimeout = 30 * time.Minute
 
 // cleanupInterval is how often the cleanup goroutine runs.
+// Stuck sessions become eligible for cancellation after stuckHeartbeatTimeout,
+// but actual cancellation only happens on this sweep.
 const cleanupInterval = 5 * time.Minute
 
 // stuckHeartbeatTimeout is the maximum time without a heartbeat before
@@ -1648,7 +1650,8 @@ func (a *API) StartCleanup(ctx context.Context) {
 
 // cleanupIdleSessions removes sessions that have been idle too long and are not working.
 func (a *API) cleanupIdleSessions() {
-	cutoff := time.Now().Add(-idleSessionTimeout)
+	now := time.Now()
+	cutoff := now.Add(-idleSessionTimeout)
 	var toDelete []string
 
 	a.sessions.Range(func(key, value any) bool {
@@ -1665,15 +1668,11 @@ func (a *API) cleanupIdleSessions() {
 		if sess.ParentSessionID != "" {
 			return true
 		}
-		// Detect stuck sessions: working but no heartbeat in 30s (3x the 10s interval).
-		if mgr.IsWorking() {
-			lastHB := mgr.LastHeartbeat()
-			if !lastHB.IsZero() && time.Since(lastHB) > stuckHeartbeatTimeout {
-				if err := mgr.Cancel(context.Background()); err != nil {
-					a.logger.Warn("Failed to cancel stuck session", "session_id", id, "error", err)
-				} else {
-					a.logger.Warn("Cancelled stuck session", "session_id", id)
-				}
+		if shouldCancelStuckSession(mgr, now) {
+			if err := mgr.Cancel(context.Background()); err != nil {
+				a.logger.Warn("Failed to cancel stuck session", "session_id", id, "error", err)
+			} else {
+				a.logger.Warn("Cancelled stuck session", "session_id", id)
 			}
 		}
 		// Cancelled sessions remain in the map until the next cleanup cycle
@@ -1693,4 +1692,15 @@ func (a *API) cleanupIdleSessions() {
 		a.sessions.Delete(id)
 		a.logger.Debug("Cleaned up idle session", "session_id", id)
 	}
+}
+
+func shouldCancelStuckSession(mgr *SessionManager, now time.Time) bool {
+	if mgr == nil || !mgr.IsWorking() {
+		return false
+	}
+	if mgr.HasPendingPrompt() {
+		return false
+	}
+	lastHB := mgr.LastHeartbeat()
+	return !lastHB.IsZero() && now.Sub(lastHB) > stuckHeartbeatTimeout
 }
