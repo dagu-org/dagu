@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -279,4 +281,146 @@ func TestVaultResolver_CheckAccessibility(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "token lookup failed")
 	})
+}
+
+func TestVaultResolver_resolveClientSettings(t *testing.T) {
+	t.Run("DefaultsWithoutConfig", func(t *testing.T) {
+		resolver := &vaultResolver{}
+
+		settings := resolver.resolveClientSettings(context.Background(), core.SecretRef{})
+
+		assert.Equal(t, api.DefaultAddress, settings.address)
+		assert.Empty(t, settings.token)
+	})
+
+	t.Run("ConfigOnly", func(t *testing.T) {
+		resolver := &vaultResolver{}
+		ctx := config.WithConfig(context.Background(), &config.Config{
+			Secrets: config.SecretsConfig{
+				Vault: config.VaultSecretsConfig{
+					Address: "https://vault.example.com",
+					Token:   "config-token",
+				},
+			},
+		})
+
+		settings := resolver.resolveClientSettings(ctx, core.SecretRef{})
+
+		assert.Equal(t, "https://vault.example.com", settings.address)
+		assert.Equal(t, "config-token", settings.token)
+	})
+
+	t.Run("OptionsOverridePerField", func(t *testing.T) {
+		resolver := &vaultResolver{}
+		ctx := config.WithConfig(context.Background(), &config.Config{
+			Secrets: config.SecretsConfig{
+				Vault: config.VaultSecretsConfig{
+					Address: "https://vault.example.com",
+					Token:   "config-token",
+				},
+			},
+		})
+		ref := core.SecretRef{
+			Options: map[string]string{
+				"vault_address": "https://override.example.com",
+			},
+		}
+
+		settings := resolver.resolveClientSettings(ctx, ref)
+
+		assert.Equal(t, "https://override.example.com", settings.address)
+		assert.Equal(t, "config-token", settings.token)
+	})
+}
+
+func TestVaultResolver_getClient_CachesByResolvedSettings(t *testing.T) {
+	var created []vaultClientSettings
+
+	resolver := &vaultResolver{
+		clientFactory: func(settings vaultClientSettings) (vaultClient, error) {
+			created = append(created, settings)
+			return &MockVaultClient{}, nil
+		},
+	}
+	ctx := config.WithConfig(context.Background(), &config.Config{
+		Secrets: config.SecretsConfig{
+			Vault: config.VaultSecretsConfig{
+				Address: "https://vault.example.com",
+				Token:   "config-token",
+			},
+		},
+	})
+	ref := core.SecretRef{Name: "TEST", Provider: "vault", Key: "path/value"}
+
+	client1, err := resolver.getClient(ctx, ref)
+	require.NoError(t, err)
+	client2, err := resolver.getClient(ctx, ref)
+	require.NoError(t, err)
+	assert.Same(t, client1, client2)
+	require.Len(t, created, 1)
+	assert.Equal(t, vaultClientSettings{
+		address: "https://vault.example.com",
+		token:   "config-token",
+	}, created[0])
+
+	overrideRef := core.SecretRef{
+		Name:     "TEST",
+		Provider: "vault",
+		Key:      "path/value",
+		Options: map[string]string{
+			"vault_token": "override-token",
+		},
+	}
+
+	client3, err := resolver.getClient(ctx, overrideRef)
+	require.NoError(t, err)
+	assert.NotSame(t, client1, client3)
+	require.Len(t, created, 2)
+	assert.Equal(t, vaultClientSettings{
+		address: "https://vault.example.com",
+		token:   "override-token",
+	}, created[1])
+}
+
+func TestVaultResolver_CheckAccessibility_UsesMergedSettingsPath(t *testing.T) {
+	var created []vaultClientSettings
+
+	mockClient := &MockVaultClient{
+		LookupSelfFunc: func(_ context.Context) (map[string]any, error) {
+			return map[string]any{"id": "token"}, nil
+		},
+		ReadFunc: func(_ context.Context, _ string) (map[string]any, error) {
+			return map[string]any{"value": "exists"}, nil
+		},
+	}
+	resolver := &vaultResolver{
+		clientFactory: func(settings vaultClientSettings) (vaultClient, error) {
+			created = append(created, settings)
+			return mockClient, nil
+		},
+	}
+	ctx := config.WithConfig(context.Background(), &config.Config{
+		Secrets: config.SecretsConfig{
+			Vault: config.VaultSecretsConfig{
+				Address: "https://vault.example.com",
+				Token:   "config-token",
+			},
+		},
+	})
+	ref := core.SecretRef{
+		Name:     "TEST",
+		Provider: "vault",
+		Key:      "path/value",
+		Options: map[string]string{
+			"vault_token": "override-token",
+		},
+	}
+
+	err := resolver.CheckAccessibility(ctx, ref)
+	require.NoError(t, err)
+	require.Len(t, created, 1)
+	assert.Equal(t, vaultClientSettings{
+		address: "https://vault.example.com",
+		token:   "override-token",
+	}, created[0])
 }
