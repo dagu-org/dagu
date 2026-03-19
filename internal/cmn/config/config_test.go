@@ -96,6 +96,24 @@ func TestConfig_Validate(t *testing.T) {
 		assert.Contains(t, err.Error(), "scheduler.failure_threshold must be >= 0")
 	})
 
+	t.Run("InvalidCoordinatorHealthPort", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Coordinator.HealthPort = -1
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid coordinator.health_port")
+	})
+
+	t.Run("InvalidWorkerHealthPort", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Worker.HealthPort = 65536
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid worker.health_port")
+	})
+
 	t.Run("IncompleteTLS_MissingCert", func(t *testing.T) {
 		t.Parallel()
 		cfg := validBaseConfig()

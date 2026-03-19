@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/healthcheck"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -71,7 +72,17 @@ func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 	handler := coordinator.NewHandler(cfg)
 
 	// Create service with ServiceMonitor from helper
-	service := coordinator.NewService(grpcServer, handler, listener, healthServer, helper.ServiceRegistry, helper.Config, "test-coordinator", "127.0.0.1")
+	service := coordinator.NewService(
+		grpcServer,
+		handler,
+		listener,
+		healthServer,
+		healthcheck.NewServer("coordinator", 0),
+		helper.ServiceRegistry,
+		helper.Config,
+		"test-coordinator",
+		"127.0.0.1",
+	)
 
 	coord := &Coordinator{
 		Helper:       helper,

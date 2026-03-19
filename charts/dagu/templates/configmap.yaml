@@ -21,6 +21,11 @@ data:
     coordinator:
       host: "0.0.0.0"
       port: 50055
+      health_port: {{ .Values.coordinator.healthPort }}
+
+    # Worker
+    worker:
+      health_port: {{ .Values.worker.healthPort }}
 
     # Scheduler
     scheduler:

@@ -395,11 +395,12 @@ func (c *Config) FindQueueConfig(queueName string) *QueueConfig {
 
 // Coordinator represents the coordinator service configuration.
 type Coordinator struct {
-	Enabled   bool   // Default: true
-	ID        string // Default: hostname@port
-	Host      string // gRPC bind address
-	Advertise string // Registry address (auto-detected if empty)
-	Port      int
+	Enabled    bool   // Default: true
+	ID         string // Default: hostname@port
+	Host       string // gRPC bind address
+	Advertise  string // Registry address (auto-detected if empty)
+	Port       int
+	HealthPort int // HTTP health check port (default: 8091, 0 disables)
 }
 
 // Worker represents the worker configuration.
@@ -408,6 +409,7 @@ type Worker struct {
 	MaxActiveRuns int               // Default: 100
 	Labels        map[string]string // Capability matching labels
 	Coordinators  []string          // Static discovery addresses (host:port)
+	HealthPort    int               // HTTP health check port (default: 8092, 0 disables)
 	PostgresPool  PostgresPoolConfig
 }
 
@@ -457,6 +459,12 @@ func (c *Config) Validate() error {
 		return err
 	}
 	if err := c.validateScheduler(); err != nil {
+		return err
+	}
+	if err := c.validateCoordinator(); err != nil {
+		return err
+	}
+	if err := c.validateWorker(); err != nil {
 		return err
 	}
 	if err := c.validateBasicAuth(); err != nil {
@@ -523,6 +531,23 @@ func (c *Config) validateScheduler() error {
 	}
 	if c.Scheduler.RetryFailureWindow < 0 {
 		return fmt.Errorf("scheduler.retry_failure_window must be >= 0")
+	}
+	return nil
+}
+
+func (c *Config) validateCoordinator() error {
+	if c.Coordinator.Port < 0 || c.Coordinator.Port > 65535 {
+		return fmt.Errorf("invalid coordinator.port: %d", c.Coordinator.Port)
+	}
+	if c.Coordinator.HealthPort < 0 || c.Coordinator.HealthPort > 65535 {
+		return fmt.Errorf("invalid coordinator.health_port: %d", c.Coordinator.HealthPort)
+	}
+	return nil
+}
+
+func (c *Config) validateWorker() error {
+	if c.Worker.HealthPort < 0 || c.Worker.HealthPort > 65535 {
+		return fmt.Errorf("invalid worker.health_port: %d", c.Worker.HealthPort)
 	}
 	return nil
 }

@@ -685,13 +685,14 @@ func (l *ConfigLoader) loadQueuesConfig(cfg *Config, def Definition) {
 func (l *ConfigLoader) loadCoordinatorConfig(cfg *Config, def Definition) {
 	cfg.Coordinator.Enabled = l.resolveCoordinatorEnabled(def)
 
-	if def.Coordinator == nil {
-		return
+	if def.Coordinator != nil {
+		cfg.Coordinator.Host = def.Coordinator.Host
+		cfg.Coordinator.Advertise = def.Coordinator.Advertise
+		cfg.Coordinator.Port = def.Coordinator.Port
+		cfg.Coordinator.HealthPort = def.Coordinator.HealthPort
 	}
 
-	cfg.Coordinator.Host = def.Coordinator.Host
-	cfg.Coordinator.Advertise = def.Coordinator.Advertise
-	cfg.Coordinator.Port = def.Coordinator.Port
+	l.setCoordinatorDefaults(cfg)
 }
 
 func (l *ConfigLoader) resolveCoordinatorEnabled(def Definition) bool {
@@ -708,6 +709,7 @@ func (l *ConfigLoader) loadWorkerConfig(cfg *Config, def Definition) {
 	if def.Worker != nil {
 		cfg.Worker.ID = def.Worker.ID
 		cfg.Worker.MaxActiveRuns = def.Worker.MaxActiveRuns
+		cfg.Worker.HealthPort = def.Worker.HealthPort
 
 		if def.Worker.Labels != nil {
 			cfg.Worker.Labels = parseLabels(def.Worker.Labels)
@@ -724,7 +726,20 @@ func (l *ConfigLoader) loadWorkerConfig(cfg *Config, def Definition) {
 		}
 	}
 
+	l.setWorkerDefaults(cfg)
 	l.setPostgresPoolDefaults(&cfg.Worker.PostgresPool)
+}
+
+func (l *ConfigLoader) setCoordinatorDefaults(cfg *Config) {
+	if !l.v.IsSet("coordinator.health_port") && cfg.Coordinator.HealthPort <= 0 {
+		cfg.Coordinator.HealthPort = 8091
+	}
+}
+
+func (l *ConfigLoader) setWorkerDefaults(cfg *Config) {
+	if !l.v.IsSet("worker.health_port") && cfg.Worker.HealthPort <= 0 {
+		cfg.Worker.HealthPort = 8092
+	}
 }
 
 func (l *ConfigLoader) loadPostgresPoolConfig(pool *PostgresPoolConfig, def *PostgresPoolDef) {
@@ -1550,12 +1565,14 @@ var envBindings = []envBinding{
 	{key: "coordinator.host", env: "COORDINATOR_HOST"},
 	{key: "coordinator.advertise", env: "COORDINATOR_ADVERTISE"},
 	{key: "coordinator.port", env: "COORDINATOR_PORT"},
+	{key: "coordinator.health_port", env: "COORDINATOR_HEALTH_PORT"},
 
 	// Worker
 	{key: "worker.id", env: "WORKER_ID"},
 	{key: "worker.max_active_runs", env: "WORKER_MAX_ACTIVE_RUNS"},
 	{key: "worker.labels", env: "WORKER_LABELS"},
 	{key: "worker.coordinators", env: "WORKER_COORDINATORS"},
+	{key: "worker.health_port", env: "WORKER_HEALTH_PORT"},
 
 	// Peer
 	{key: "peer.cert_file", env: "PEER_CERT_FILE"},

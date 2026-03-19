@@ -205,6 +205,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	cfg.Paths.SuspendFlagsDir = filepath.Join(tmpDir, "suspend-flags")
 	cfg.Paths.AdminLogsDir = filepath.Join(tmpDir, "admin-logs")
 	cfg.Coordinator.Enabled = false
+	cfg.Coordinator.HealthPort = 0
 	// Default to "none" in tests so auth setup (bcrypt, token generation)
 	// doesn't slow down tests that don't need authentication.
 	// Tests that need auth can override via WithConfigMutator.
@@ -212,6 +213,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	// Tests share the host network namespace, so avoid binding the default
 	// scheduler health port unless a test explicitly opts in.
 	cfg.Scheduler.Port = 0
+	cfg.Worker.HealthPort = 0
 	if options.DAGsDir != "" {
 		cfg.Paths.DAGsDir = options.DAGsDir
 	}
@@ -369,7 +371,8 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 	}
 
 	coordData := map[string]any{
-		"enabled": cfg.Coordinator.Enabled,
+		"enabled":     cfg.Coordinator.Enabled,
+		"health_port": cfg.Coordinator.HealthPort,
 	}
 	if cfg.Coordinator.Host != "" {
 		coordData["host"] = cfg.Coordinator.Host
@@ -382,13 +385,22 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 	}
 	configData["coordinator"] = coordData
 
-	if cfg.Worker.ID != "" || cfg.Worker.MaxActiveRuns != 0 || len(cfg.Worker.Labels) > 0 {
-		configData["worker"] = map[string]any{
-			"id":              cfg.Worker.ID,
-			"max_active_runs": cfg.Worker.MaxActiveRuns,
-			"labels":          cfg.Worker.Labels,
-		}
+	workerData := map[string]any{
+		"health_port": cfg.Worker.HealthPort,
 	}
+	if cfg.Worker.ID != "" {
+		workerData["id"] = cfg.Worker.ID
+	}
+	if cfg.Worker.MaxActiveRuns != 0 {
+		workerData["max_active_runs"] = cfg.Worker.MaxActiveRuns
+	}
+	if len(cfg.Worker.Labels) > 0 {
+		workerData["labels"] = cfg.Worker.Labels
+	}
+	if len(cfg.Worker.Coordinators) > 0 {
+		workerData["coordinators"] = cfg.Worker.Coordinators
+	}
+	configData["worker"] = workerData
 
 	ui := map[string]any{}
 	if cfg.UI.LogEncodingCharset != "" {

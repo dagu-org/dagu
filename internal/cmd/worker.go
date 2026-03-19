@@ -32,6 +32,7 @@ By default, the worker ID is set to hostname@PID, but can be overridden.
 Flags:
   --worker.id string                       Worker instance ID (default: hostname@PID)
   --worker.max-active-runs int             Maximum number of active runs (default: 100)
+  --worker.health-port int                 Port number for the HTTP health check server (default: 8092, 0 disables)
   --worker.labels -l string                Worker labels for capability matching (format: key1=value1,key2=value2)
   --worker.coordinators string             Coordinator addresses for static discovery (format: host1:port1,host2:port2)
 
@@ -46,6 +47,7 @@ Example:
   dagu worker
   dagu worker --worker.max-active-runs=50
   dagu worker --worker.id=worker-1 --worker.max-active-runs=200
+  dagu worker --worker.health-port=0
 
   # Worker with labels for capability matching:
   dagu worker --worker.labels gpu=true,memory=64G,region=us-east-1
@@ -68,6 +70,7 @@ This process runs continuously in the foreground until terminated.
 var workerFlags = []commandLineFlag{
 	workerIDFlag,
 	workerMaxActiveRunsFlag,
+	workerHealthPortFlag,
 	workerLabelsFlag,
 	workerCoordinatorsFlag,
 	// Peer configuration flags for TLS

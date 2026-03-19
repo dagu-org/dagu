@@ -40,19 +40,24 @@ spec:
             - name: grpc
               containerPort: 50055
               protocol: TCP
+            - name: health
+              containerPort: {{ .Values.coordinator.healthPort }}
+              protocol: TCP
           volumeMounts:
             - name: data
               mountPath: /data
             - name: config
               mountPath: /etc/dagu
           livenessProbe:
-            tcpSocket:
-              port: grpc
+            httpGet:
+              path: /health
+              port: health
             initialDelaySeconds: 10
             periodSeconds: 10
           readinessProbe:
-            tcpSocket:
-              port: grpc
+            httpGet:
+              path: /health
+              port: health
             initialDelaySeconds: 5
             periodSeconds: 5
           resources:

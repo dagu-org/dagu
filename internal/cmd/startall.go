@@ -146,6 +146,7 @@ func runStartAll(ctx *Context, _ []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to initialize coordinator: %w", err)
 		}
+		coord.DisableHealthServer()
 	} else {
 		logger.Info(serviceCtx, "Coordinator disabled via configuration")
 	}

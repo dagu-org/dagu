@@ -31,6 +31,7 @@ func TestWorkerCommand(t *testing.T) {
 		// Check worker-specific flags exist (note: they may be prefixed)
 		// The actual flag names depend on how they're registered
 		assert.NotEmpty(t, cli.Long, "Long description should be set")
+		require.NotNil(t, flags.Lookup("worker.health-port"))
 	})
 
 	t.Run("WorkerCommandLongDescriptionContainsUsageInfo", func(t *testing.T) {
@@ -42,6 +43,7 @@ func TestWorkerCommand(t *testing.T) {
 		assert.Contains(t, cli.Long, "coordinator")
 		assert.Contains(t, cli.Long, "TLS")
 		assert.Contains(t, cli.Long, "labels")
+		assert.Contains(t, cli.Long, "health")
 	})
 
 	t.Run("WorkerCommandExamples", func(t *testing.T) {

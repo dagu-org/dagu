@@ -399,8 +399,10 @@ This configuration is used for worker instances that execute DAGs. See the [Dist
 | `DAGU_COORDINATOR_HOST` | `127.0.0.1` | Coordinator gRPC server bind address |
 | `DAGU_COORDINATOR_ADVERTISE` | (auto) | Address to advertise in service registry (default: hostname) |
 | `DAGU_COORDINATOR_PORT` | `50055` | Coordinator gRPC server port |
+| `DAGU_COORDINATOR_HEALTH_PORT` | `8091` | Coordinator HTTP health check server port (`0` disables) |
 | `DAGU_WORKER_ID` | - | Worker instance ID |
 | `DAGU_WORKER_MAX_ACTIVE_RUNS` | `100` | Maximum concurrent runs per worker |
+| `DAGU_WORKER_HEALTH_PORT` | `8092` | Worker HTTP health check server port (`0` disables) |
 | `DAGU_WORKER_LABELS` | - | Worker labels (format: `key1=value1,key2=value2`, e.g., `gpu=true,memory=64G`) |
 | `DAGU_SCHEDULER_PORT` | `8090` | Scheduler health check server port |
 | `DAGU_SCHEDULER_LOCK_STALE_THRESHOLD` | `30s` | Time after which scheduler lock is considered stale |
