@@ -44,7 +44,7 @@ spec:
           env:
             - name: DAGU_HOME
               value: /data
-            - name: WORKER_ID
+            - name: DAGU_WORKER_ID
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name

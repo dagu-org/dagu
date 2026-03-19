@@ -542,6 +542,9 @@ func (c *Config) validateCoordinator() error {
 	if c.Coordinator.HealthPort < 0 || c.Coordinator.HealthPort > 65535 {
 		return fmt.Errorf("invalid coordinator.health_port: %d", c.Coordinator.HealthPort)
 	}
+	if c.Coordinator.HealthPort != 0 && c.Coordinator.Port == c.Coordinator.HealthPort {
+		return fmt.Errorf("coordinator.port and coordinator.health_port must be different when health checks are enabled")
+	}
 	return nil
 }
 

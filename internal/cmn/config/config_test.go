@@ -105,6 +105,25 @@ func TestConfig_Validate(t *testing.T) {
 		assert.Contains(t, err.Error(), "invalid coordinator.health_port")
 	})
 
+	t.Run("InvalidCoordinatorHealthPortCollision", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Coordinator.Port = 50055
+		cfg.Coordinator.HealthPort = 50055
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "coordinator.port and coordinator.health_port must be different")
+	})
+
+	t.Run("ValidCoordinatorHealthPortDisabled", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Coordinator.Port = 50055
+		cfg.Coordinator.HealthPort = 0
+		err := cfg.Validate()
+		require.NoError(t, err)
+	})
+
 	t.Run("InvalidWorkerHealthPort", func(t *testing.T) {
 		t.Parallel()
 		cfg := validBaseConfig()

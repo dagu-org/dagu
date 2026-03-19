@@ -93,16 +93,10 @@ var coordinatorFlags = []commandLineFlag{
 }
 
 func runCoordinator(ctx *Context, _ []string) error {
-	svc, handler, err := newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry, ctx.DAGRunStore)
+	svc, _, err := newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry, ctx.DAGRunStore)
 	if err != nil {
 		return fmt.Errorf("failed to initialize coordinator: %w", err)
 	}
-
-	// Ensure handler resources are cleaned up on shutdown
-	defer func() {
-		handler.WaitZombieDetector()
-		handler.Close(ctx)
-	}()
 
 	if err := svc.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start coordinator: %w", err)
