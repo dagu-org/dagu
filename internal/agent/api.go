@@ -40,6 +40,13 @@ func respondErrorDirect(w http.ResponseWriter, status int, code api.ErrorCode, m
 const defaultUserID = "admin"
 const defaultUserRole = auth.RoleAdmin
 
+const (
+	defaultBotContextWindow = 200_000
+	sessionCompactionRatio  = 0.80
+	sessionSummaryPrefix    = "Session handoff summary:\n"
+	compactionSummaryPrompt = "You are compressing a Dagu agent session into a continuation handoff. Write a concise markdown bullet summary for the next assistant turn. Include the user's goal, durable preferences or constraints, important DAG/file/runtime facts, recent decisions or outcomes, and unresolved next steps. Do not invent facts. Omit trivial chatter. Keep it under 12 bullets."
+)
+
 // getUserIDFromContext extracts the user ID from the request context.
 // Returns "admin" if no user is authenticated (e.g., auth mode is "none").
 func getUserIDFromContext(ctx context.Context) string {
@@ -75,6 +82,7 @@ func userIdentityFromContext(ctx context.Context) UserIdentity {
 type API struct {
 	sessions           sync.Map // id -> *SessionManager (active sessions)
 	creatingIDs        sync.Map // id -> struct{} (session IDs currently being created)
+	spillMu            sync.Mutex
 	store              SessionStore
 	configStore        ConfigStore
 	modelStore         ModelStore
@@ -113,6 +121,20 @@ type SessionWithState struct {
 	HasPendingPrompt bool    `json:"has_pending_prompt"`
 	Model            string  `json:"model,omitempty"`
 	TotalCost        float64 `json:"total_cost"`
+}
+
+type sessionRuntimeConfig struct {
+	modelID         string
+	resolvedModel   string
+	modelCfg        *ModelConfig
+	dagName         string
+	title           string
+	safeMode        bool
+	enabledSkills   []string
+	soul            *Soul
+	webSearch       *llm.WebSearchRequest
+	inputCostPer1M  float64
+	outputCostPer1M float64
 }
 
 // NewAPI creates a new API instance.
@@ -376,6 +398,220 @@ func (a *API) persistNewSession(ctx context.Context, id, userID, dagName string,
 	if err := a.store.CreateSession(ctx, sess); err != nil {
 		a.logger.Warn("Failed to persist session", "error", err)
 	}
+}
+
+func (a *API) loadMemoryContent(ctx context.Context, dagName string) MemoryContent {
+	if a.memoryStore == nil {
+		return MemoryContent{}
+	}
+	global, err := a.memoryStore.LoadGlobalMemory(ctx)
+	if err != nil {
+		a.logger.Debug("failed to load global memory", "error", err)
+	}
+	var dagMemory string
+	if dagName != "" {
+		dagMemory, err = a.memoryStore.LoadDAGMemory(ctx, dagName)
+		if err != nil {
+			a.logger.Debug("failed to load DAG memory", "error", err, "dag_name", dagName)
+		}
+	}
+	return MemoryContent{
+		GlobalMemory: global,
+		DAGMemory:    dagMemory,
+		DAGName:      dagName,
+		MemoryDir:    a.memoryStore.MemoryDir(),
+	}
+}
+
+func (a *API) loadSkillSummaries(ctx context.Context, enabledSkills []string) []SkillSummary {
+	if len(enabledSkills) == 0 || len(enabledSkills) > SkillListThreshold {
+		return nil
+	}
+	return LoadSkillSummaries(ctx, a.skillStore, enabledSkills)
+}
+
+func cloneWebSearchRequest(req *llm.WebSearchRequest) *llm.WebSearchRequest {
+	if req == nil {
+		return nil
+	}
+	out := *req
+	if req.AllowedDomains != nil {
+		out.AllowedDomains = append([]string(nil), req.AllowedDomains...)
+	}
+	if req.BlockedDomains != nil {
+		out.BlockedDomains = append([]string(nil), req.BlockedDomains...)
+	}
+	if req.UserLocation != nil {
+		loc := *req.UserLocation
+		out.UserLocation = &loc
+	}
+	return &out
+}
+
+func (a *API) defaultSessionRuntime(ctx context.Context, dagName string, safeMode bool) (sessionRuntimeConfig, error) {
+	modelID := a.getDefaultModelID(ctx)
+	if modelID == "" {
+		return sessionRuntimeConfig{}, ErrAgentNotConfigured
+	}
+	_, modelCfg, err := a.resolveProvider(ctx, modelID)
+	if err != nil {
+		return sessionRuntimeConfig{}, ErrAgentNotConfigured
+	}
+	enabledSkills := append([]string(nil), a.loadEnabledSkills(ctx)...)
+	return sessionRuntimeConfig{
+		modelID:         modelID,
+		resolvedModel:   modelCfg.Model,
+		modelCfg:        modelCfg,
+		dagName:         dagName,
+		safeMode:        safeMode,
+		enabledSkills:   enabledSkills,
+		soul:            a.loadSelectedSoul(ctx),
+		webSearch:       cloneWebSearchRequest(a.loadWebSearch(ctx)),
+		inputCostPer1M:  modelCfg.InputCostPer1M,
+		outputCostPer1M: modelCfg.OutputCostPer1M,
+	}, nil
+}
+
+func (a *API) runtimeConfigForSession(ctx context.Context, mgr *SessionManager, overrideDAGName string) (sessionRuntimeConfig, error) {
+	modelID := selectModel("", mgr.GetModel(), a.getDefaultModelID(ctx))
+	if modelID == "" {
+		return sessionRuntimeConfig{}, ErrAgentNotConfigured
+	}
+	_, modelCfg, err := a.resolveProvider(ctx, modelID)
+	if err != nil {
+		return sessionRuntimeConfig{}, ErrAgentNotConfigured
+	}
+	enabledSkills := append([]string(nil), mgr.enabledSkills...)
+	return sessionRuntimeConfig{
+		modelID:         modelID,
+		resolvedModel:   modelCfg.Model,
+		modelCfg:        modelCfg,
+		dagName:         cmp.Or(overrideDAGName, mgr.dagName),
+		title:           mgr.title,
+		safeMode:        mgr.safeMode,
+		enabledSkills:   enabledSkills,
+		soul:            mgr.soul,
+		webSearch:       cloneWebSearchRequest(mgr.webSearch),
+		inputCostPer1M:  modelCfg.InputCostPer1M,
+		outputCostPer1M: modelCfg.OutputCostPer1M,
+	}, nil
+}
+
+func (a *API) newManagedSession(ctx context.Context, id string, user UserIdentity, cfg sessionRuntimeConfig, now time.Time) *SessionManager {
+	mgr := NewSessionManager(SessionManagerConfig{
+		ID:                 id,
+		User:               user,
+		Logger:             a.logger,
+		WorkingDir:         a.workingDir,
+		Title:              cfg.title,
+		OnMessage:          a.createMessageCallback(id),
+		Environment:        a.environment,
+		SafeMode:           cfg.safeMode,
+		Hooks:              a.hooks,
+		InputCostPer1M:     cfg.inputCostPer1M,
+		OutputCostPer1M:    cfg.outputCostPer1M,
+		MemoryStore:        a.memoryStore,
+		SkillStore:         a.skillStore,
+		EnabledSkills:      cfg.enabledSkills,
+		DAGName:            cfg.dagName,
+		SessionStore:       a.store,
+		Soul:               cfg.soul,
+		WebSearch:          cfg.webSearch,
+		RemoteNodeResolver: a.remoteNodeResolver,
+	})
+	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
+	mgr.mu.Lock()
+	mgr.model = cfg.modelID
+	mgr.mu.Unlock()
+
+	a.persistNewSession(ctx, id, user.UserID, cfg.dagName, now)
+	a.sessions.Store(id, mgr)
+
+	return mgr
+}
+
+func (a *API) buildSystemPrompt(ctx context.Context, role auth.Role, dagName string, enabledSkills []string, soul *Soul) string {
+	return GenerateSystemPrompt(SystemPromptParams{
+		Env:             a.environment,
+		Memory:          a.loadMemoryContent(ctx, dagName),
+		Role:            role,
+		AvailableSkills: a.loadSkillSummaries(ctx, enabledSkills),
+		SkillCount:      len(enabledSkills),
+		Soul:            soul,
+	})
+}
+
+func (a *API) runOneShotPrompt(ctx context.Context, provider llm.Provider, model, systemPrompt, prompt string) (*llm.ChatResponse, error) {
+	messages := []llm.Message{
+		{Role: llm.RoleSystem, Content: systemPrompt},
+		{Role: llm.RoleUser, Content: prompt},
+	}
+
+	llmCtx, cancel := context.WithTimeout(ctx, llmRequestTimeout)
+	defer cancel()
+
+	return llm.ChatWithRetry(llmCtx, provider, &llm.ChatRequest{
+		Model:    model,
+		Messages: messages,
+	}, llm.DefaultLogicalRetryConfig())
+}
+
+func latestPromptTokens(messages []Message) int {
+	for i := len(messages) - 1; i >= 0; i-- {
+		msg := messages[i]
+		if msg.Type != MessageTypeAssistant || msg.Usage == nil {
+			continue
+		}
+		if msg.Usage.PromptTokens > 0 {
+			return msg.Usage.PromptTokens
+		}
+		if msg.Usage.TotalTokens > 0 {
+			return msg.Usage.TotalTokens
+		}
+	}
+	return 0
+}
+
+func shouldCompactMessages(messages []Message, contextWindow int) bool {
+	if contextWindow <= 0 {
+		contextWindow = defaultBotContextWindow
+	}
+	promptTokens := latestPromptTokens(messages)
+	if promptTokens == 0 {
+		return false
+	}
+	return promptTokens >= int(float64(contextWindow)*sessionCompactionRatio)
+}
+
+func buildCompactionTranscript(messages []Message) string {
+	var b strings.Builder
+	for _, msg := range messages {
+		switch msg.Type {
+		case MessageTypeUser:
+			if msg.Content == "" || len(msg.ToolResults) > 0 {
+				continue
+			}
+			fmt.Fprintf(&b, "User: %s\n\n", msg.Content)
+		case MessageTypeAssistant:
+			if msg.Content == "" {
+				continue
+			}
+			fmt.Fprintf(&b, "Assistant: %s\n\n", msg.Content)
+		case MessageTypeError:
+			if msg.Content == "" {
+				continue
+			}
+			fmt.Fprintf(&b, "Error: %s\n\n", msg.Content)
+		case MessageTypeUserPrompt:
+			if msg.UserPrompt == nil {
+				continue
+			}
+			fmt.Fprintf(&b, "Prompt: %s\n\n", msg.UserPrompt.Question)
+		case MessageTypeUIAction:
+			continue
+		}
+	}
+	return strings.TrimSpace(b.String())
 }
 
 // formatMessage resolves DAG contexts and formats the message with context information.
@@ -843,13 +1079,21 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 		RemoteNodeResolver: a.remoteNodeResolver,
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
+	mgr.mu.Lock()
+	mgr.model = model
+	mgr.mu.Unlock()
+
+	messageWithContext, err := a.prepareChatContent(ctx, id, req)
+	if err != nil {
+		a.logger.Error("Failed to prepare chat content", "error", err)
+		return "", "", ErrFailedToProcessMessage
+	}
 
 	// Persist session before accepting the first message so that
 	// the onMessage callback (store.AddMessage) can find the session.
 	a.persistNewSession(ctx, id, user.UserID, dagName, now)
 	a.sessions.Store(id, mgr)
 
-	messageWithContext := formatMessageWithContexts(req.Message, resolved)
 	if err := mgr.AcceptUserMessage(ctx, provider, model, modelCfg.Model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		a.sessions.Delete(id)
@@ -857,6 +1101,311 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 	}
 
 	return id, "accepted", nil
+}
+
+// CreateEmptySession creates a persisted session without an initial user turn.
+// This is used by chat bridges that need a conversation container before the
+// next live user message, such as notification-seeded bot sessions.
+func (a *API) CreateEmptySession(ctx context.Context, user UserIdentity, dagName string, safeMode bool) (string, error) {
+	cfg, err := a.defaultSessionRuntime(ctx, dagName, safeMode)
+	if err != nil {
+		return "", err
+	}
+
+	id := uuid.New().String()
+	a.newManagedSession(ctx, id, user, cfg, time.Now())
+	return id, nil
+}
+
+// GenerateAssistantMessage runs a one-shot assistant generation without mutating
+// session state. When sessionID is provided, the current session's model, soul,
+// DAG scope, and enabled skills are reused.
+func (a *API) GenerateAssistantMessage(ctx context.Context, sessionID string, user UserIdentity, dagName, prompt string) (Message, error) {
+	if strings.TrimSpace(prompt) == "" {
+		return Message{}, ErrMessageRequired
+	}
+
+	var (
+		runtimeCfg sessionRuntimeConfig
+		provider   llm.Provider
+		err        error
+	)
+
+	if sessionID != "" {
+		mgr, ok := a.getOrReactivateSession(ctx, sessionID, user)
+		if !ok {
+			return Message{}, ErrSessionNotFound
+		}
+		runtimeCfg, err = a.runtimeConfigForSession(ctx, mgr, dagName)
+		if err != nil {
+			return Message{}, err
+		}
+		provider, _, err = a.resolveProvider(ctx, runtimeCfg.modelID)
+		if err != nil {
+			return Message{}, err
+		}
+	} else {
+		runtimeCfg, err = a.defaultSessionRuntime(ctx, dagName, false)
+		if err != nil {
+			return Message{}, err
+		}
+		provider, _, err = a.resolveProvider(ctx, runtimeCfg.modelID)
+		if err != nil {
+			return Message{}, err
+		}
+	}
+
+	systemPrompt := a.buildSystemPrompt(ctx, user.Role, runtimeCfg.dagName, runtimeCfg.enabledSkills, runtimeCfg.soul)
+	resp, err := a.runOneShotPrompt(ctx, provider, runtimeCfg.resolvedModel, systemPrompt, prompt)
+	if err != nil {
+		return Message{}, err
+	}
+	if len(resp.ToolCalls) > 0 {
+		return Message{}, fmt.Errorf("unexpected tool call in one-shot assistant generation")
+	}
+	if strings.TrimSpace(resp.Content) == "" {
+		return Message{}, fmt.Errorf("assistant returned empty content")
+	}
+
+	llmMsg := llm.Message{
+		Role:    llm.RoleAssistant,
+		Content: resp.Content,
+	}
+	msg := Message{
+		Type:      MessageTypeAssistant,
+		Content:   resp.Content,
+		Usage:     &resp.Usage,
+		CreatedAt: time.Now(),
+		LLMData:   &llmMsg,
+	}
+	return msg, nil
+}
+
+// AppendExternalMessage appends a prebuilt message into a session and returns
+// the stored message with assigned sequence metadata.
+func (a *API) AppendExternalMessage(ctx context.Context, sessionID string, user UserIdentity, msg Message) (Message, error) {
+	mgr, ok := a.getOrReactivateSession(ctx, sessionID, user)
+	if !ok {
+		return Message{}, ErrSessionNotFound
+	}
+	return mgr.RecordExternalMessage(ctx, msg)
+}
+
+// CompactSessionIfNeeded creates a continuation session with an LLM-generated
+// handoff summary when the current session is approaching its context window.
+func (a *API) CompactSessionIfNeeded(ctx context.Context, sessionID string, user UserIdentity) (string, bool, error) {
+	mgr, ok := a.getOrReactivateSession(ctx, sessionID, user)
+	if !ok {
+		return "", false, ErrSessionNotFound
+	}
+	if mgr.IsWorking() || mgr.HasPendingPrompt() {
+		return sessionID, false, nil
+	}
+
+	runtimeCfg, err := a.runtimeConfigForSession(ctx, mgr, "")
+	if err != nil {
+		return "", false, err
+	}
+	messages := mgr.GetMessages()
+	if !shouldCompactMessages(messages, runtimeCfg.modelCfg.ContextWindow) {
+		return sessionID, false, nil
+	}
+
+	provider, _, err := a.resolveProvider(ctx, runtimeCfg.modelID)
+	if err != nil {
+		return "", false, err
+	}
+	transcript := buildCompactionTranscript(messages)
+	if transcript == "" {
+		return sessionID, false, nil
+	}
+	resp, err := a.runOneShotPrompt(ctx, provider, runtimeCfg.resolvedModel, compactionSummaryPrompt, "<session_transcript>\n"+transcript+"\n</session_transcript>")
+	if err != nil {
+		return "", false, err
+	}
+	if strings.TrimSpace(resp.Content) == "" {
+		return "", false, fmt.Errorf("compaction summary was empty")
+	}
+
+	newID := uuid.New().String()
+	newMgr := a.newManagedSession(ctx, newID, user, runtimeCfg, time.Now())
+	summaryContent := sessionSummaryPrefix + strings.TrimSpace(resp.Content)
+	if _, err := newMgr.RecordExternalMessage(ctx, Message{
+		Type:      MessageTypeAssistant,
+		Content:   summaryContent,
+		Usage:     &resp.Usage,
+		CreatedAt: time.Now(),
+		LLMData: &llm.Message{
+			Role:    llm.RoleAssistant,
+			Content: summaryContent,
+		},
+	}); err != nil {
+		a.sessions.Delete(newID)
+		return "", false, err
+	}
+
+	mgr.mu.Lock()
+	queuedChatMessages := append([]string(nil), mgr.queuedChatMessages...)
+	flushingQueuedChat := mgr.flushingQueuedChat
+	mgr.mu.Unlock()
+	if len(queuedChatMessages) > 0 || flushingQueuedChat {
+		newMgr.mu.Lock()
+		newMgr.queuedChatMessages = append(newMgr.queuedChatMessages, queuedChatMessages...)
+		newMgr.flushingQueuedChat = flushingQueuedChat
+		newMgr.mu.Unlock()
+	}
+
+	_ = mgr.Cancel(ctx)
+	a.sessions.Delete(sessionID)
+
+	return newID, true, nil
+}
+
+// ChatQueueResult describes the outcome of a bot chat enqueue/flush request.
+type ChatQueueResult struct {
+	SessionID string
+	Rotated   bool
+	Queued    bool
+	Started   bool
+}
+
+func (a *API) prepareSessionMessage(ctx context.Context, mgr *SessionManager, user UserIdentity, req ChatRequest) (llm.Provider, string, string, string, error) {
+	provider, model, resolvedModel, err := a.prepareSessionRuntime(ctx, mgr, user, req)
+	if err != nil {
+		return nil, "", "", "", err
+	}
+	messageWithContext, err := a.prepareChatContent(ctx, mgr.ID(), req)
+	if err != nil {
+		return nil, "", "", "", err
+	}
+	return provider, model, resolvedModel, messageWithContext, nil
+}
+
+func (a *API) prepareSessionRuntime(ctx context.Context, mgr *SessionManager, user UserIdentity, req ChatRequest) (llm.Provider, string, string, error) {
+	mgr.UpdateUserContext(user)
+
+	if req.Message == "" {
+		return nil, "", "", ErrMessageRequired
+	}
+
+	model := selectModel(req.Model, mgr.GetModel(), a.getDefaultModelID(ctx))
+	provider, modelCfg, err := a.resolveProvider(ctx, model)
+	if err != nil {
+		a.logger.Error("Failed to get LLM provider", "error", err)
+		return nil, "", "", ErrAgentNotConfigured
+	}
+
+	mgr.SetSafeMode(req.SafeMode)
+	mgr.UpdatePricing(modelCfg.InputCostPer1M, modelCfg.OutputCostPer1M)
+	return provider, model, modelCfg.Model, nil
+}
+
+// EnqueueChatMessage accepts bot chat input for an existing session. Idle sessions
+// start immediately, while working sessions merge the text into a queued
+// safe-boundary interrupt turn.
+func (a *API) EnqueueChatMessage(ctx context.Context, sessionID string, user UserIdentity, req ChatRequest) (ChatQueueResult, error) {
+	mgr, ok := a.getOrReactivateSession(ctx, sessionID, user)
+	if !ok {
+		return ChatQueueResult{}, ErrSessionNotFound
+	}
+
+	provider, model, resolvedModel, err := a.prepareSessionRuntime(ctx, mgr, user, req)
+	if err != nil {
+		return ChatQueueResult{}, err
+	}
+
+	if mgr.IsWorking() || mgr.HasQueuedChatInput() {
+		queued, err := mgr.EnqueueChatMessage(ctx, provider, model, resolvedModel, req.Message)
+		if err != nil {
+			a.logger.Error("Failed to enqueue chat message", "error", err)
+			return ChatQueueResult{}, ErrFailedToProcessMessage
+		}
+		return ChatQueueResult{SessionID: sessionID, Queued: queued}, nil
+	}
+
+	targetSessionID, rotated, err := a.CompactSessionIfNeeded(ctx, sessionID, user)
+	if err != nil {
+		return ChatQueueResult{}, err
+	}
+	targetMgr, ok := a.getOrReactivateSession(ctx, targetSessionID, user)
+	if !ok {
+		return ChatQueueResult{}, ErrSessionNotFound
+	}
+	provider, model, resolvedModel, err = a.prepareSessionRuntime(ctx, targetMgr, user, req)
+	if err != nil {
+		return ChatQueueResult{}, err
+	}
+	messageWithContext, err := a.prepareChatContent(ctx, targetSessionID, req)
+	if err != nil {
+		a.logger.Error("Failed to prepare queued chat content", "error", err)
+		return ChatQueueResult{}, ErrFailedToProcessMessage
+	}
+	queued, err := targetMgr.EnqueueChatMessage(ctx, provider, model, resolvedModel, messageWithContext)
+	if err != nil {
+		a.logger.Error("Failed to enqueue chat message", "error", err)
+		return ChatQueueResult{}, ErrFailedToProcessMessage
+	}
+	return ChatQueueResult{SessionID: targetSessionID, Rotated: rotated, Queued: queued}, nil
+}
+
+// FlushQueuedChatMessage starts a previously queued bot follow-up turn when the
+// session becomes idle. It compacts/rotates first if the session is near its
+// context window.
+func (a *API) FlushQueuedChatMessage(ctx context.Context, sessionID string, user UserIdentity) (ChatQueueResult, error) {
+	mgr, ok := a.getOrReactivateSession(ctx, sessionID, user)
+	if !ok {
+		return ChatQueueResult{}, ErrSessionNotFound
+	}
+	if mgr.IsWorking() || mgr.HasPendingPrompt() {
+		return ChatQueueResult{SessionID: sessionID}, nil
+	}
+
+	text, ok := mgr.BeginQueuedChatFlush()
+	if !ok {
+		return ChatQueueResult{SessionID: sessionID}, nil
+	}
+
+	targetSessionID := sessionID
+	rotated := false
+
+	targetSessionID, rotated, err := a.CompactSessionIfNeeded(ctx, sessionID, user)
+	if err != nil {
+		mgr.RestoreQueuedChatInput(text)
+		return ChatQueueResult{}, err
+	}
+
+	targetMgr, ok := a.getOrReactivateSession(ctx, targetSessionID, user)
+	if !ok {
+		if rotated {
+			mgr.RestoreQueuedChatInput(text)
+		} else {
+			mgr.RestoreQueuedChatInput(text)
+		}
+		return ChatQueueResult{}, ErrSessionNotFound
+	}
+
+	req := ChatRequest{
+		Message:  text,
+		SafeMode: targetMgr.safeMode,
+	}
+	provider, model, resolvedModel, err := a.prepareSessionRuntime(ctx, targetMgr, user, req)
+	if err != nil {
+		targetMgr.RestoreQueuedChatInput(text)
+		return ChatQueueResult{}, err
+	}
+	messageWithContext, err := a.prepareChatContent(ctx, targetSessionID, req)
+	if err != nil {
+		targetMgr.RestoreQueuedChatInput(text)
+		a.logger.Error("Failed to prepare queued chat content", "error", err)
+		return ChatQueueResult{}, ErrFailedToProcessMessage
+	}
+	if err := targetMgr.AcceptUserMessage(ctx, provider, model, resolvedModel, messageWithContext); err != nil {
+		targetMgr.RestoreQueuedChatInput(text)
+		a.logger.Error("Failed to flush queued chat message", "error", err)
+		return ChatQueueResult{}, ErrFailedToProcessMessage
+	}
+	targetMgr.CompleteQueuedChatFlush()
+	return ChatQueueResult{SessionID: targetSessionID, Rotated: rotated, Started: true}, nil
 }
 
 // isValidUUID checks if a string is a valid UUID.
@@ -993,25 +1542,15 @@ func (a *API) SendMessage(ctx context.Context, sessionID string, user UserIdenti
 	if !ok {
 		return ErrSessionNotFound
 	}
-	mgr.UpdateUserContext(user)
-
-	if req.Message == "" {
-		return ErrMessageRequired
-	}
-
-	model := selectModel(req.Model, mgr.GetModel(), a.getDefaultModelID(ctx))
-
-	provider, modelCfg, err := a.resolveProvider(ctx, model)
+	provider, model, resolvedModel, messageWithContext, err := a.prepareSessionMessage(ctx, mgr, user, req)
 	if err != nil {
-		a.logger.Error("Failed to get LLM provider", "error", err)
-		return ErrAgentNotConfigured
+		if errors.Is(err, ErrMessageRequired) || errors.Is(err, ErrAgentNotConfigured) {
+			return err
+		}
+		a.logger.Error("Failed to prepare chat content", "error", err)
+		return ErrFailedToProcessMessage
 	}
-	messageWithContext := a.formatMessage(ctx, req.Message, req.DAGContexts)
-
-	mgr.SetSafeMode(req.SafeMode)
-	mgr.UpdatePricing(modelCfg.InputCostPer1M, modelCfg.OutputCostPer1M)
-
-	if err := mgr.AcceptUserMessage(ctx, provider, model, modelCfg.Model, messageWithContext); err != nil {
+	if err := mgr.AcceptUserMessage(ctx, provider, model, resolvedModel, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		return ErrFailedToProcessMessage
 	}

@@ -4,10 +4,13 @@
 package llm
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAPIError(t *testing.T) {
@@ -115,5 +118,14 @@ func TestWrapError(t *testing.T) {
 		var apiErr *APIError
 		assert.True(t, errors.As(wrapped, &apiErr))
 		assert.Equal(t, "test", apiErr.Provider)
+	})
+
+	t.Run("MarksWrappedContextCanceledAsRetryable", func(t *testing.T) {
+		t.Parallel()
+
+		wrapped := WrapError("openrouter", fmt.Errorf("failed to decode response: %w", context.Canceled))
+		var apiErr *APIError
+		require.True(t, errors.As(wrapped, &apiErr))
+		assert.True(t, apiErr.Retryable)
 	})
 }

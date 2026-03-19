@@ -4,6 +4,7 @@
 package llm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 )
@@ -98,6 +99,10 @@ func IsRetryable(err error) bool {
 		return true
 	}
 
+	if isRetryableTransportError(err) {
+		return true
+	}
+
 	return false
 }
 
@@ -144,7 +149,7 @@ func WrapError(provider string, err error) error {
 	return &APIError{
 		Provider:  provider,
 		Message:   err.Error(),
-		Retryable: IsRetryable(err),
+		Retryable: IsRetryable(err) || errors.Is(err, context.Canceled),
 		Err:       err,
 	}
 }

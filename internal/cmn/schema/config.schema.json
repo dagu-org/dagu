@@ -177,6 +177,9 @@
     "session": {
       "$ref": "#/definitions/SessionDef"
     },
+    "sse": {
+      "$ref": "#/definitions/SSEDef"
+    },
     "git_sync": {
       "$ref": "#/definitions/GitSyncDef"
     },
@@ -188,6 +191,12 @@
     },
     "tunnel": {
       "$ref": "#/definitions/TunnelDef"
+    },
+    "bots": {
+      "$ref": "#/definitions/BotsDef"
+    },
+    "license": {
+      "$ref": "#/definitions/LicenseDef"
     }
   },
   "definitions": {
@@ -821,6 +830,38 @@
         }
       }
     },
+    "SSEDef": {
+      "type": "object",
+      "description": "Multiplexed server-sent events (SSE) stream configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "max_topics_per_connection": {
+          "type": "integer",
+          "description": "Maximum topics a single client connection may subscribe to. Default: 20.",
+          "default": 20
+        },
+        "max_clients": {
+          "type": "integer",
+          "description": "Maximum concurrent SSE clients. Default: 1000.",
+          "default": 1000
+        },
+        "heartbeat_interval": {
+          "type": "string",
+          "description": "Heartbeat interval duration string. Default: '10s'.",
+          "default": "10s"
+        },
+        "write_buffer_size": {
+          "type": "integer",
+          "description": "Per-client write buffer size in bytes. Default: 65536.",
+          "default": 65536
+        },
+        "slow_client_timeout": {
+          "type": "string",
+          "description": "Timeout before disconnecting a slow client. Default: '30s'.",
+          "default": "30s"
+        }
+      }
+    },
     "GitSyncDef": {
       "type": "object",
       "description": "Git synchronization configuration for DAG definitions.",
@@ -990,6 +1031,159 @@
         "block_duration_seconds": {
           "type": "integer",
           "description": "Duration to block after exceeding limit in seconds. Default: 900."
+        }
+      }
+    },
+    "BotsDef": {
+      "type": "object",
+      "description": "Bot integration configuration for Telegram or Slack.",
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Bot provider to run. Empty or omitted disables bot integrations.",
+          "enum": ["", "telegram", "slack"],
+          "default": ""
+        },
+        "safe_mode": {
+          "type": "boolean",
+          "description": "Require approval for dangerous commands executed through the bot-backed agent. Default: true.",
+          "default": true
+        },
+        "telegram": {
+          "$ref": "#/definitions/TelegramBotDef"
+        },
+        "slack": {
+          "$ref": "#/definitions/SlackBotDef"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["provider"],
+            "properties": {
+              "provider": {
+                "const": "telegram"
+              }
+            }
+          },
+          "then": {
+            "required": ["telegram"],
+            "properties": {
+              "telegram": {
+                "required": ["token", "allowed_chat_ids"],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "allowed_chat_ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["provider"],
+            "properties": {
+              "provider": {
+                "const": "slack"
+              }
+            }
+          },
+          "then": {
+            "required": ["slack"],
+            "properties": {
+              "slack": {
+                "required": ["bot_token", "app_token", "allowed_channel_ids"],
+                "properties": {
+                  "bot_token": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "app_token": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "allowed_channel_ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "TelegramBotDef": {
+      "type": "object",
+      "description": "Telegram bot settings.",
+      "additionalProperties": false,
+      "properties": {
+        "token": {
+          "type": "string",
+          "description": "Telegram bot token obtained from BotFather."
+        },
+        "allowed_chat_ids": {
+          "type": "array",
+          "description": "Telegram chat IDs allowed to talk to the bot. Required and must be non-empty when provider is 'telegram'.",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "SlackBotDef": {
+      "type": "object",
+      "description": "Slack bot settings.",
+      "additionalProperties": false,
+      "properties": {
+        "bot_token": {
+          "type": "string",
+          "description": "Slack bot token."
+        },
+        "app_token": {
+          "type": "string",
+          "description": "Slack app-level token for Socket Mode."
+        },
+        "allowed_channel_ids": {
+          "type": "array",
+          "description": "Slack channel IDs the bot is allowed to operate in. Required and must be non-empty when provider is 'slack'.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "respond_to_all": {
+          "type": "boolean",
+          "description": "Respond to all messages in allowed channels, not just direct mentions. Default: true.",
+          "default": true
+        }
+      }
+    },
+    "LicenseDef": {
+      "type": "object",
+      "description": "License activation configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "License key."
+        },
+        "cloud_url": {
+          "type": "string",
+          "description": "License service URL."
         }
       }
     }

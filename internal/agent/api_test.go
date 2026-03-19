@@ -8,8 +8,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"testing"
 	"time"
@@ -82,6 +85,17 @@ func (s *apiTestSetup) get(path string) *httptest.ResponseRecorder {
 	rec := httptest.NewRecorder()
 	s.router.ServeHTTP(rec, req)
 	return rec
+}
+
+func extractSpillPath(t *testing.T, content string) string {
+	t.Helper()
+	for line := range strings.SplitSeq(content, "\n") {
+		if rest, ok := strings.CutPrefix(line, "Path: "); ok {
+			return rest
+		}
+	}
+	t.Fatalf("spill path not found in content: %q", content)
+	return ""
 }
 
 func TestNewAPI(t *testing.T) {
@@ -452,6 +466,152 @@ func TestAPI_SendMessage(t *testing.T) {
 
 		assert.ErrorIs(t, err, ErrMessageRequired)
 	})
+}
+
+func TestAPI_CreateSession_SpillsOversizedMessage(t *testing.T) {
+	t.Parallel()
+
+	dataDir := t.TempDir()
+	model := testModelConfig("spill-create-model")
+	api, _ := testAPIWithModels(t, model)
+	api.environment.DataDir = dataDir
+
+	reqCh := make(chan *llm.ChatRequest, 1)
+	api.providers.Set(model.ToLLMConfig(), newCapturingProvider(reqCh, simpleStopResponse("done")))
+
+	large := strings.Repeat("A", maxInlineChatInputBytes+512)
+	user := UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}
+
+	sessionID, _, err := api.CreateSession(context.Background(), user, ChatRequest{Message: large})
+	require.NoError(t, err)
+
+	req := waitForRequest(t, reqCh, time.Second)
+	require.NotEmpty(t, req.Messages)
+	userMsg := req.Messages[len(req.Messages)-1]
+	assert.Contains(t, userMsg.Content, "Large user input was stored in a local file")
+	assert.Contains(t, userMsg.Content, "Preview (truncated):")
+	assert.Contains(t, userMsg.Content, "Treat the file contents as the user's full message")
+
+	spillPath := extractSpillPath(t, userMsg.Content)
+	assert.Equal(t, filepath.Join(dataDir, "agent", chatInputSpillDirName), filepath.Dir(spillPath))
+
+	spilled, err := os.ReadFile(spillPath)
+	require.NoError(t, err)
+	assert.Equal(t, large, string(spilled))
+
+	detail, err := api.GetSessionDetail(context.Background(), sessionID, user.UserID)
+	require.NoError(t, err)
+	require.NotEmpty(t, detail.Messages)
+	assert.Equal(t, userMsg.Content, detail.Messages[0].Content)
+
+	entries, err := os.ReadDir(filepath.Join(dataDir, "agent", chatInputSpillDirName))
+	require.NoError(t, err)
+	assert.Len(t, entries, 1)
+}
+
+func TestAPI_SendMessage_SpillsOversizedFollowUp(t *testing.T) {
+	t.Parallel()
+
+	dataDir := t.TempDir()
+	model := testModelConfig("spill-send-model")
+	api, _ := testAPIWithModels(t, model)
+	api.environment.DataDir = dataDir
+
+	reqCh := make(chan *llm.ChatRequest, 2)
+	api.providers.Set(model.ToLLMConfig(), newCapturingProvider(reqCh, simpleStopResponse("done")))
+
+	user := UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}
+	sessionID, _, err := api.CreateSession(context.Background(), user, ChatRequest{Message: "hello"})
+	require.NoError(t, err)
+	_ = waitForRequest(t, reqCh, time.Second)
+
+	large := strings.Repeat("B", maxInlineChatInputBytes+256)
+	err = api.SendMessage(context.Background(), sessionID, user, ChatRequest{Message: large})
+	require.NoError(t, err)
+
+	req := waitForRequest(t, reqCh, time.Second)
+	require.NotEmpty(t, req.Messages)
+	userMsg := req.Messages[len(req.Messages)-1]
+	assert.Contains(t, userMsg.Content, "Large user input was stored in a local file")
+
+	spillPath := extractSpillPath(t, userMsg.Content)
+	spilled, err := os.ReadFile(spillPath)
+	require.NoError(t, err)
+	assert.Equal(t, large, string(spilled))
+
+	require.Eventually(t, func() bool {
+		detail, err := api.GetSessionDetail(context.Background(), sessionID, user.UserID)
+		if err != nil || len(detail.Messages) < 3 {
+			return false
+		}
+		lastUser := -1
+		for i, msg := range detail.Messages {
+			if msg.Type == MessageTypeUser {
+				lastUser = i
+			}
+		}
+		return lastUser >= 0 && detail.Messages[lastUser].Content == userMsg.Content
+	}, time.Second, 10*time.Millisecond)
+}
+
+func TestAPI_EnqueueChatMessage_QueuesRawOversizedText(t *testing.T) {
+	t.Parallel()
+
+	dataDir := t.TempDir()
+	model := testModelConfig("spill-queue-model")
+	api, _ := testAPIWithModels(t, model)
+	api.environment.DataDir = dataDir
+
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	api.providers.Set(model.ToLLMConfig(), &mockLLMProvider{
+		chatFunc: func(ctx context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+			select {
+			case <-entered:
+			default:
+				close(entered)
+			}
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-release:
+				return simpleStopResponse("done"), nil
+			}
+		},
+	})
+
+	user := UserIdentity{UserID: "telegram:123", Username: "telegram", Role: auth.RoleAdmin}
+	sessionID, _, err := api.CreateSession(context.Background(), user, ChatRequest{Message: "start"})
+	require.NoError(t, err)
+
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for active turn")
+	}
+
+	raw := strings.Repeat("Q", maxInlineChatInputBytes+512)
+	result, err := api.EnqueueChatMessage(context.Background(), sessionID, user, ChatRequest{Message: raw})
+	require.NoError(t, err)
+	assert.True(t, result.Queued)
+
+	mgrVal, ok := api.sessions.Load(sessionID)
+	require.True(t, ok)
+	mgr := mgrVal.(*SessionManager)
+	require.Len(t, mgr.queuedChatMessages, 1)
+	assert.Equal(t, raw, mgr.queuedChatMessages[0])
+
+	spillDir := filepath.Join(dataDir, "agent", chatInputSpillDirName)
+	entries, err := os.ReadDir(spillDir)
+	if os.IsNotExist(err) {
+		err = nil
+		entries = nil
+	}
+	require.NoError(t, err)
+	assert.Empty(t, entries)
+
+	close(release)
+	_ = api.CancelSession(context.Background(), sessionID, user.UserID)
 }
 
 func TestAPI_HandleStream(t *testing.T) {
@@ -895,6 +1055,308 @@ func TestAPI_SendMessage_UpdatesPricing(t *testing.T) {
 		cost := mgr.calculateCost(usage)
 		assert.InDelta(t, 5.0, cost, 1e-9, "pricing should be updated to model-b's input cost")
 	})
+}
+
+func TestAPI_GenerateAssistantMessage_UsesSessionDAGMemory(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("memory-model")
+	reqCh := make(chan *llm.ChatRequest, 1)
+	memoryStore := newMockMemoryStore()
+	require.NoError(t, memoryStore.SaveDAGMemory(context.Background(), "briefing", "Remember the DAG-specific state"))
+
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = model.ID
+
+	api := NewAPI(APIConfig{
+		ConfigStore: configStore,
+		ModelStore:  newMockModelStore().addModel(model),
+		WorkingDir:  t.TempDir(),
+		MemoryStore: memoryStore,
+	})
+	api.providers.Set(model.ToLLMConfig(), newCapturingProvider(reqCh, simpleStopResponse("ok")))
+
+	user := UserIdentity{UserID: "telegram:123", Username: "telegram", Role: auth.RoleAdmin}
+	sessionID, err := api.CreateEmptySession(context.Background(), user, "briefing", false)
+	require.NoError(t, err)
+
+	msg, err := api.GenerateAssistantMessage(context.Background(), sessionID, user, "", "summarize the DAG run")
+	require.NoError(t, err)
+	assert.Equal(t, "ok", msg.Content)
+
+	req := <-reqCh
+	require.Len(t, req.Messages, 2)
+	assert.Equal(t, llm.RoleSystem, req.Messages[0].Role)
+	assert.Contains(t, req.Messages[0].Content, "Remember the DAG-specific state")
+}
+
+func TestAPI_GenerateAssistantMessage_RetriesTransientFailure(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("retry-model")
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = model.ID
+
+	var calls atomic.Int32
+	api := NewAPI(APIConfig{
+		ConfigStore: configStore,
+		ModelStore:  newMockModelStore().addModel(model),
+		WorkingDir:  t.TempDir(),
+	})
+	api.providers.Set(model.ToLLMConfig(), &mockLLMProvider{
+		chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+			if calls.Add(1) == 1 {
+				return nil, llm.WrapError("openrouter", fmt.Errorf("failed to decode response: %w", context.Canceled))
+			}
+			return simpleStopResponse("ok"), nil
+		},
+	})
+
+	user := UserIdentity{UserID: "telegram:321", Username: "telegram", Role: auth.RoleAdmin}
+	sessionID, err := api.CreateEmptySession(context.Background(), user, "briefing", false)
+	require.NoError(t, err)
+
+	msg, err := api.GenerateAssistantMessage(context.Background(), sessionID, user, "", "summarize the DAG run")
+	require.NoError(t, err)
+	assert.Equal(t, "ok", msg.Content)
+	assert.Equal(t, int32(2), calls.Load())
+}
+
+func TestAPI_CompactSessionIfNeeded_CreatesSummarySession(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("compact-model")
+	model.ContextWindow = 100
+	memoryStore := newMockMemoryStore()
+	require.NoError(t, memoryStore.SaveDAGMemory(context.Background(), "briefing", "Carry this DAG memory forward"))
+
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = model.ID
+
+	api := NewAPI(APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   newMockModelStore().addModel(model),
+		WorkingDir:   t.TempDir(),
+		MemoryStore:  memoryStore,
+		SessionStore: newMockSessionStore(),
+	})
+	api.providers.Set(model.ToLLMConfig(), newStopProvider("- User is following up on briefing"))
+
+	user := UserIdentity{UserID: "slack:C123:thread", Username: "slack", Role: auth.RoleAdmin}
+	sessionID, err := api.CreateEmptySession(context.Background(), user, "briefing", true)
+	require.NoError(t, err)
+
+	_, err = api.AppendExternalMessage(context.Background(), sessionID, user, Message{
+		Type:      MessageTypeAssistant,
+		Content:   "recent assistant reply",
+		CreatedAt: time.Now(),
+		Usage:     &llm.Usage{PromptTokens: 90, TotalTokens: 90},
+		LLMData: &llm.Message{
+			Role:    llm.RoleAssistant,
+			Content: "recent assistant reply",
+		},
+	})
+	require.NoError(t, err)
+
+	newSessionID, rotated, err := api.CompactSessionIfNeeded(context.Background(), sessionID, user)
+	require.NoError(t, err)
+	assert.True(t, rotated)
+	assert.NotEqual(t, sessionID, newSessionID)
+
+	mgrVal, ok := api.sessions.Load(newSessionID)
+	require.True(t, ok)
+	mgr := mgrVal.(*SessionManager)
+	assert.Equal(t, "briefing", mgr.dagName)
+	assert.True(t, mgr.safeMode)
+
+	detail, err := api.GetSessionDetail(context.Background(), newSessionID, user.UserID)
+	require.NoError(t, err)
+	require.Len(t, detail.Messages, 1)
+	assert.True(t, strings.HasPrefix(detail.Messages[0].Content, sessionSummaryPrefix))
+	assert.Contains(t, detail.Messages[0].Content, "briefing")
+
+	_, oldActive := api.sessions.Load(sessionID)
+	assert.False(t, oldActive)
+}
+
+func TestAPI_FlushQueuedChatMessage_RotatesAndStartsMergedTurn(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("compact-model")
+	model.ContextWindow = 100
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = model.ID
+
+	callCount := atomic.Int32{}
+	api := NewAPI(APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   newMockModelStore().addModel(model),
+		WorkingDir:   t.TempDir(),
+		SessionStore: newMockSessionStore(),
+	})
+	api.providers.Set(model.ToLLMConfig(), &mockLLMProvider{
+		chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+			switch callCount.Add(1) {
+			case 1:
+				return simpleStopResponse("- summary"), nil
+			default:
+				return simpleStopResponse("queued reply"), nil
+			}
+		},
+	})
+
+	user := UserIdentity{UserID: "telegram:123", Username: "telegram", Role: auth.RoleAdmin}
+	sessionID, err := api.CreateEmptySession(context.Background(), user, "briefing", true)
+	require.NoError(t, err)
+
+	_, err = api.AppendExternalMessage(context.Background(), sessionID, user, Message{
+		Type:      MessageTypeAssistant,
+		Content:   "recent assistant reply",
+		CreatedAt: time.Now(),
+		Usage:     &llm.Usage{PromptTokens: 90, TotalTokens: 90},
+		LLMData: &llm.Message{
+			Role:    llm.RoleAssistant,
+			Content: "recent assistant reply",
+		},
+	})
+	require.NoError(t, err)
+
+	mgrVal, ok := api.sessions.Load(sessionID)
+	require.True(t, ok)
+	mgr := mgrVal.(*SessionManager)
+	mgr.queuedChatMessages = []string{"follow up", "and another"}
+
+	result, err := api.FlushQueuedChatMessage(context.Background(), sessionID, user)
+	require.NoError(t, err)
+	assert.True(t, result.Rotated)
+	assert.True(t, result.Started)
+	assert.NotEqual(t, sessionID, result.SessionID)
+
+	require.Eventually(t, func() bool {
+		detail, err := api.GetSessionDetail(context.Background(), result.SessionID, user.UserID)
+		if err != nil || detail == nil {
+			return false
+		}
+		return len(detail.Messages) >= 3
+	}, time.Second, 10*time.Millisecond)
+
+	detail, err := api.GetSessionDetail(context.Background(), result.SessionID, user.UserID)
+	require.NoError(t, err)
+	require.Len(t, detail.Messages, 3)
+	assert.True(t, strings.HasPrefix(detail.Messages[0].Content, sessionSummaryPrefix))
+	assert.Equal(t, MessageTypeUser, detail.Messages[1].Type)
+	assert.Equal(t, "follow up\n\nand another", detail.Messages[1].Content)
+	assert.Equal(t, MessageTypeAssistant, detail.Messages[2].Type)
+	assert.Equal(t, "queued reply", detail.Messages[2].Content)
+	require.NotNil(t, detail.SessionState)
+	assert.False(t, detail.SessionState.HasQueuedUserInput)
+}
+
+func TestAPI_FlushQueuedChatMessage_SpillsMergedTurnOnce(t *testing.T) {
+	t.Parallel()
+
+	dataDir := t.TempDir()
+	model := testModelConfig("spill-flush-model")
+	api, _ := testAPIWithModels(t, model)
+	api.environment.DataDir = dataDir
+
+	reqCh := make(chan *llm.ChatRequest, 1)
+	api.providers.Set(model.ToLLMConfig(), newCapturingProvider(reqCh, simpleStopResponse("queued reply")))
+
+	user := UserIdentity{UserID: "telegram:456", Username: "telegram", Role: auth.RoleAdmin}
+	sessionID, err := api.CreateEmptySession(context.Background(), user, "briefing", true)
+	require.NoError(t, err)
+
+	partA := strings.Repeat("a", 20*1024)
+	partB := strings.Repeat("b", 20*1024)
+
+	mgrVal, ok := api.sessions.Load(sessionID)
+	require.True(t, ok)
+	mgr := mgrVal.(*SessionManager)
+	mgr.queuedChatMessages = []string{partA, partB}
+
+	result, err := api.FlushQueuedChatMessage(context.Background(), sessionID, user)
+	require.NoError(t, err)
+	assert.True(t, result.Started)
+	assert.Equal(t, sessionID, result.SessionID)
+
+	req := waitForRequest(t, reqCh, time.Second)
+	require.NotEmpty(t, req.Messages)
+	userMsg := req.Messages[len(req.Messages)-1]
+	assert.Contains(t, userMsg.Content, "Large user input was stored in a local file")
+
+	spillPath := extractSpillPath(t, userMsg.Content)
+	spilled, err := os.ReadFile(spillPath)
+	require.NoError(t, err)
+	assert.Equal(t, partA+"\n\n"+partB, string(spilled))
+
+	entries, err := os.ReadDir(filepath.Join(dataDir, "agent", chatInputSpillDirName))
+	require.NoError(t, err)
+	assert.Len(t, entries, 1)
+}
+
+func TestAPI_FlushQueuedChatMessage_RestoresQueuedTextOnSpillFailure(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("spill-failure-model")
+	api, _ := testAPIWithModels(t, model)
+	api.providers.Set(model.ToLLMConfig(), newCapturingProvider(make(chan *llm.ChatRequest, 1), simpleStopResponse("queued reply")))
+
+	user := UserIdentity{UserID: "telegram:789", Username: "telegram", Role: auth.RoleAdmin}
+	sessionID, err := api.CreateEmptySession(context.Background(), user, "briefing", true)
+	require.NoError(t, err)
+
+	raw := strings.Repeat("z", maxInlineChatInputBytes+256)
+	mgrVal, ok := api.sessions.Load(sessionID)
+	require.True(t, ok)
+	mgr := mgrVal.(*SessionManager)
+	mgr.queuedChatMessages = []string{raw}
+
+	result, err := api.FlushQueuedChatMessage(context.Background(), sessionID, user)
+	assert.ErrorIs(t, err, ErrFailedToProcessMessage)
+	assert.Equal(t, ChatQueueResult{}, result)
+	assert.True(t, mgr.HasQueuedChatInput())
+	require.Len(t, mgr.queuedChatMessages, 1)
+	assert.Equal(t, raw, mgr.queuedChatMessages[0])
+}
+
+func TestAPI_MaterializeChatInput_PrunesToNewestTenFiles(t *testing.T) {
+	t.Parallel()
+
+	dataDir := t.TempDir()
+	api := NewAPI(APIConfig{
+		ConfigStore: newMockConfigStore(true),
+		Environment: EnvironmentInfo{DataDir: dataDir},
+	})
+
+	for i := range 12 {
+		content := strings.Repeat(fmt.Sprintf("message-%02d-", i), (maxInlineChatInputBytes/len(fmt.Sprintf("message-%02d-", i)))+2)
+		materialized, err := api.materializeChatInput(fmt.Sprintf("session-%02d", i), content)
+		require.NoError(t, err)
+		assert.Contains(t, materialized, "Large user input was stored in a local file")
+	}
+
+	entries, err := os.ReadDir(filepath.Join(dataDir, "agent", chatInputSpillDirName))
+	require.NoError(t, err)
+	assert.Len(t, entries, maxChatInputSpillFiles)
+}
+
+func TestShouldCompactMessages_UsesLatestPromptTokens(t *testing.T) {
+	t.Parallel()
+
+	messages := []Message{
+		{
+			Type:  MessageTypeAssistant,
+			Usage: &llm.Usage{PromptTokens: 95, TotalTokens: 95},
+		},
+		{
+			Type:  MessageTypeAssistant,
+			Usage: &llm.Usage{PromptTokens: 10, TotalTokens: 10_000},
+		},
+	}
+
+	assert.False(t, shouldCompactMessages(messages, 100), "should use the latest assistant prompt usage, not cumulative history")
+	assert.Equal(t, 10, latestPromptTokens(messages))
 }
 
 func TestAPI_CleanupIdleSessions(t *testing.T) {

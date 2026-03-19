@@ -291,7 +291,7 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 		Content:   userContent,
 		CreatedAt: time.Now(),
 	}
-	if err := subMgr.RecordExternalMessage(ctx.Context, userMsg); err != nil {
+	if _, err := subMgr.RecordExternalMessage(ctx.Context, userMsg); err != nil {
 		logger.Warn("Failed to record initial delegate message", "error", err)
 	}
 	forwardToParent(userMsg)
@@ -343,7 +343,7 @@ func runSingleDelegate(ctx ToolContext, task delegateTask) singleDelegateResult 
 			msg.ID = uuid.New().String()
 		}
 		msg.SessionID = delegateID
-		if err := subMgr.RecordExternalMessage(msgCtx, msg); err != nil {
+		if _, err := subMgr.RecordExternalMessage(msgCtx, msg); err != nil {
 			logger.Warn("Failed to record delegate message", "error", err)
 		}
 		forwardToParent(msg)

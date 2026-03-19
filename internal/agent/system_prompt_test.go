@@ -228,6 +228,33 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		// Fallback prompt must NOT be used.
 		assert.NotContains(t, result, "You are Dagu Assistant, an AI assistant")
 	})
+
+	t.Run("execution guidance prefers enqueue without preflight checks", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+
+		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Role: auth.RoleDeveloper})
+
+		assert.Contains(t, result, "Default to queue-based execution: `dagu enqueue <dag-name>`")
+		assert.Contains(t, result, "Do not check running jobs, queued jobs")
+		assert.Contains(t, result, "pass user parameters with `-p`")
+		assert.Contains(t, result, `dagu enqueue my-dag -p 'topic="OpenAI new model released March 2026"'`)
+		assert.Contains(t, result, "Avoid passing spaced values after `--`")
+		assert.NotContains(t, result, "2. Start: `dagu start <dag-name>`")
+	})
+
+	t.Run("includes active progress reporting guidance", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+
+		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Role: auth.RoleDeveloper})
+
+		assert.Contains(t, result, "<communication>")
+		assert.Contains(t, result, "Actively report your progress during multi-step work")
+		assert.Contains(t, result, "Before using tools or starting a long-running action")
+		assert.Contains(t, result, "Do not stay silent until the final answer")
+		assert.Contains(t, result, "what you did, what you found, and what you will do next")
+	})
 }
 
 func TestFallbackPrompt(t *testing.T) {

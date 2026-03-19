@@ -143,9 +143,7 @@ func TestSessionManager_SetWorking(t *testing.T) {
 		t.Parallel()
 
 		sm := NewSessionManager(SessionManagerConfig{ID: "test"})
-
 		ctx := t.Context()
-
 		next := sm.Subscribe(ctx)
 
 		go func() {
@@ -168,6 +166,26 @@ func TestSessionManager_SetWorking(t *testing.T) {
 		case <-time.After(500 * time.Millisecond):
 			t.Fatal("timeout waiting for broadcast")
 		}
+	})
+
+	t.Run("broadcasts repeated working pulses while already working", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{ID: "test"})
+		ctx := t.Context()
+		next := sm.Subscribe(ctx)
+
+		sm.SetWorking(true)
+		first, ok := next()
+		require.True(t, ok)
+		require.NotNil(t, first.SessionState)
+		assert.True(t, first.SessionState.Working)
+
+		sm.SetWorking(true)
+		second, ok := next()
+		require.True(t, ok)
+		require.NotNil(t, second.SessionState)
+		assert.True(t, second.SessionState.Working)
 	})
 }
 
@@ -215,6 +233,67 @@ func TestSessionManager_AcceptUserMessage(t *testing.T) {
 
 		_ = sm.Cancel(context.Background())
 	})
+}
+
+func TestSessionManager_EnqueueChatMessage_MergesWhileWorking(t *testing.T) {
+	t.Parallel()
+
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	provider := &mockLLMProvider{
+		chatFunc: func(ctx context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+			select {
+			case <-entered:
+			default:
+				close(entered)
+			}
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-release:
+				return simpleStopResponse("done"), nil
+			}
+		},
+	}
+
+	sm := NewSessionManager(SessionManagerConfig{})
+	require.NoError(t, sm.AcceptUserMessage(context.Background(), provider, "config-id", "provider-model", "first"))
+
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for active turn")
+	}
+
+	queued, err := sm.EnqueueChatMessage(context.Background(), provider, "config-id", "provider-model", "second")
+	require.NoError(t, err)
+	assert.True(t, queued)
+
+	queued, err = sm.EnqueueChatMessage(context.Background(), provider, "config-id", "provider-model", "third")
+	require.NoError(t, err)
+	assert.True(t, queued)
+
+	msgs := sm.GetMessages()
+	require.Len(t, msgs, 1)
+	assert.Equal(t, "first", msgs[0].Content)
+	assert.True(t, sm.HasQueuedChatInput())
+
+	text, ok := sm.BeginQueuedChatFlush()
+	require.True(t, ok)
+	assert.Equal(t, "second\n\nthird", text)
+	assert.True(t, sm.HasQueuedChatInput(), "flush marker should keep queued state visible")
+
+	sm.RestoreQueuedChatInput(text)
+	assert.True(t, sm.HasQueuedChatInput())
+
+	text, ok = sm.BeginQueuedChatFlush()
+	require.True(t, ok)
+	assert.Equal(t, "second\n\nthird", text)
+	sm.CompleteQueuedChatFlush()
+	assert.False(t, sm.HasQueuedChatInput())
+
+	close(release)
+	_ = sm.Cancel(context.Background())
 }
 
 func TestSessionManager_Subscribe(t *testing.T) {
@@ -724,7 +803,7 @@ func TestSessionManager_RecordExternalMessage(t *testing.T) {
 		Type:    MessageTypeAssistant,
 		Content: "external message",
 	}
-	err := sm.RecordExternalMessage(ctx, msg)
+	_, err := sm.RecordExternalMessage(ctx, msg)
 	require.NoError(t, err)
 
 	done := make(chan struct{})
@@ -764,7 +843,7 @@ func TestSessionManager_RecordExternalMessage_UpdatesLastActivity(t *testing.T) 
 
 	time.Sleep(10 * time.Millisecond)
 
-	err := sm.RecordExternalMessage(context.Background(), Message{
+	_, err := sm.RecordExternalMessage(context.Background(), Message{
 		Type:    MessageTypeAssistant,
 		Content: "update activity",
 	})
@@ -772,6 +851,36 @@ func TestSessionManager_RecordExternalMessage_UpdatesLastActivity(t *testing.T) 
 
 	updatedActivity := sm.LastActivity()
 	assert.True(t, updatedActivity.After(initialActivity), "LastActivity should be updated after RecordExternalMessage")
+}
+
+func TestSessionManager_RecordExternalMessage_AppendsToActiveLoopHistory(t *testing.T) {
+	t.Parallel()
+
+	sm := NewSessionManager(SessionManagerConfig{
+		ID:   "loop-history-test",
+		User: UserIdentity{UserID: "user-1"},
+	})
+	loop := &Loop{}
+	sm.mu.Lock()
+	sm.loop = loop
+	sm.mu.Unlock()
+
+	stored, err := sm.RecordExternalMessage(context.Background(), Message{
+		Type:    MessageTypeAssistant,
+		Content: "notification context",
+		LLMData: &llm.Message{
+			Role:    llm.RoleAssistant,
+			Content: "notification context",
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), stored.SequenceID)
+
+	loop.mu.Lock()
+	defer loop.mu.Unlock()
+	require.Len(t, loop.history, 1)
+	assert.Equal(t, llm.RoleAssistant, loop.history[0].Role)
+	assert.Equal(t, "notification context", loop.history[0].Content)
 }
 
 func TestSessionManager_GetSession_IncludesDelegateFields(t *testing.T) {
