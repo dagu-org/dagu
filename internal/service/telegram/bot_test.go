@@ -67,19 +67,22 @@ func (a *fakeTelegramAPI) textCount() int {
 }
 
 type fakeTelegramAgentService struct {
-	mu               sync.Mutex
-	nextSessionID    int
-	nextSequenceID   int64
-	createEmptyCalls int
-	appendSessionIDs []string
-	appendMessages   []agent.Message
-	createMessages   []string
-	sendMessages     []string
-	flushCalls       int
-	generated        agent.Message
-	generatedErr     error
-	enqueueResult    agent.ChatQueueResult
-	flushResult      agent.ChatQueueResult
+	mu                 sync.Mutex
+	nextSessionID      int
+	nextSequenceID     int64
+	createEmptyCalls   int
+	appendAttempts     []string
+	appendSessionIDs   []string
+	appendMessages     []agent.Message
+	createMessages     []string
+	sendMessages       []string
+	flushCalls         int
+	generateCalls      int
+	generated          agent.Message
+	generatedErr       error
+	appendErrBySession map[string]error
+	enqueueResult      agent.ChatQueueResult
+	flushResult        agent.ChatQueueResult
 }
 
 func newFakeTelegramAgentService(content string) *fakeTelegramAgentService {
@@ -154,6 +157,9 @@ func (s *fakeTelegramAgentService) SubmitUserResponse(context.Context, string, s
 }
 
 func (s *fakeTelegramAgentService) GenerateAssistantMessage(context.Context, string, agent.UserIdentity, string, string) (agent.Message, error) {
+	s.mu.Lock()
+	s.generateCalls++
+	s.mu.Unlock()
 	if s.generatedErr != nil {
 		return agent.Message{}, s.generatedErr
 	}
@@ -163,6 +169,10 @@ func (s *fakeTelegramAgentService) GenerateAssistantMessage(context.Context, str
 func (s *fakeTelegramAgentService) AppendExternalMessage(_ context.Context, sessionID string, _ agent.UserIdentity, msg agent.Message) (agent.Message, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.appendAttempts = append(s.appendAttempts, sessionID)
+	if err := s.appendErrBySession[sessionID]; err != nil {
+		return agent.Message{}, err
+	}
 	msg.SessionID = sessionID
 	msg.SequenceID = s.nextSequenceID
 	s.nextSequenceID++

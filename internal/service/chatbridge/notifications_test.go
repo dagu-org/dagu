@@ -125,6 +125,61 @@ func TestNotificationBatcher_DuplicateStatusDoesNotDuplicateBatch(t *testing.T) 
 	}
 }
 
+func TestNotificationBatcher_DrainAndStopReturnsPendingBatchesOrderedAndStopsFlushes(t *testing.T) {
+	t.Parallel()
+
+	var (
+		mu         sync.Mutex
+		flushCount int
+	)
+	batcher := NewNotificationBatcher(80*time.Millisecond, 120*time.Millisecond, func(_ string, _ NotificationBatch) {
+		mu.Lock()
+		defer mu.Unlock()
+		flushCount++
+	})
+
+	require.True(t, batcher.Enqueue("success-dest", &exec.DAGRunStatus{
+		Name:      "briefing",
+		DAGRunID:  "run-1",
+		AttemptID: "a1",
+		Status:    core.Succeeded,
+	}))
+	time.Sleep(5 * time.Millisecond)
+	require.True(t, batcher.Enqueue("urgent-old", &exec.DAGRunStatus{
+		Name:      "sync",
+		DAGRunID:  "run-2",
+		AttemptID: "a2",
+		Status:    core.Failed,
+	}))
+	time.Sleep(5 * time.Millisecond)
+	require.True(t, batcher.Enqueue("urgent-new", &exec.DAGRunStatus{
+		Name:      "sync",
+		DAGRunID:  "run-3",
+		AttemptID: "a3",
+		Status:    core.Waiting,
+	}))
+
+	drained := batcher.DrainAndStop()
+	require.Len(t, drained, 3)
+	assert.Equal(t, "urgent-old", drained[0].Destination)
+	assert.Equal(t, NotificationClassUrgent, drained[0].Batch.Class)
+	assert.Equal(t, "urgent-new", drained[1].Destination)
+	assert.Equal(t, NotificationClassUrgent, drained[1].Batch.Class)
+	assert.Equal(t, "success-dest", drained[2].Destination)
+	assert.Equal(t, NotificationClassSuccessDigest, drained[2].Batch.Class)
+
+	time.Sleep(150 * time.Millisecond)
+	mu.Lock()
+	assert.Zero(t, flushCount)
+	mu.Unlock()
+	assert.False(t, batcher.Enqueue("ignored", &exec.DAGRunStatus{
+		Name:      "ignored",
+		DAGRunID:  "run-4",
+		AttemptID: "a4",
+		Status:    core.Succeeded,
+	}))
+}
+
 func TestGenerateNotificationMessage_UrgentSingleUsesLLMAndFallsBack(t *testing.T) {
 	t.Parallel()
 

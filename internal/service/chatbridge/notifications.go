@@ -55,6 +55,12 @@ type NotificationBatch struct {
 	WindowEnd   time.Time
 }
 
+// NotificationPendingBatch is a pending batch drained during monitor shutdown.
+type NotificationPendingBatch struct {
+	Destination string
+	Batch       NotificationBatch
+}
+
 type notificationBucket struct {
 	id          uint64
 	destination string
@@ -117,6 +123,53 @@ func (b *NotificationBatcher) Stop() {
 	for _, timer := range timers {
 		timer.Stop()
 	}
+}
+
+// DrainAndStop prevents future flushes, stops all pending timers, and returns
+// the currently buffered batches for synchronous shutdown delivery.
+func (b *NotificationBatcher) DrainAndStop() []NotificationPendingBatch {
+	b.mu.Lock()
+	if b.stopped {
+		b.mu.Unlock()
+		return nil
+	}
+
+	b.stopped = true
+	now := time.Now()
+	timers := make([]*time.Timer, 0, len(b.buckets))
+	drained := make([]NotificationPendingBatch, 0, len(b.buckets))
+	for _, bucket := range b.buckets {
+		if bucket.timer != nil {
+			timers = append(timers, bucket.timer)
+		}
+		batch := notificationBatchFromBucket(bucket, now)
+		if len(batch.Events) == 0 {
+			continue
+		}
+		drained = append(drained, NotificationPendingBatch{
+			Destination: bucket.destination,
+			Batch:       batch,
+		})
+	}
+	b.buckets = make(map[string]*notificationBucket)
+	b.runIndex = make(map[string]string)
+	b.mu.Unlock()
+
+	for _, timer := range timers {
+		timer.Stop()
+	}
+
+	sort.Slice(drained, func(i, j int) bool {
+		if drained[i].Batch.Class != drained[j].Batch.Class {
+			return drained[i].Batch.Class == NotificationClassUrgent
+		}
+		if !drained[i].Batch.WindowStart.Equal(drained[j].Batch.WindowStart) {
+			return drained[i].Batch.WindowStart.Before(drained[j].Batch.WindowStart)
+		}
+		return drained[i].Destination < drained[j].Destination
+	})
+
+	return drained
 }
 
 // Enqueue adds a status snapshot into the appropriate destination/window bucket.
@@ -201,30 +254,14 @@ func (b *NotificationBatcher) flushBucket(bucketKey string, bucketID uint64) {
 	}
 
 	delete(b.buckets, bucketKey)
-	events := make([]NotificationEvent, 0, len(bucket.events))
-	for runKey, event := range bucket.events {
+	for runKey := range bucket.events {
 		delete(b.runIndex, notificationDestinationRunKey(bucket.destination, runKey))
-		events = append(events, event)
 	}
 	b.mu.Unlock()
 
-	sort.Slice(events, func(i, j int) bool {
-		if !events[i].ObservedAt.Equal(events[j].ObservedAt) {
-			return events[i].ObservedAt.After(events[j].ObservedAt)
-		}
-		if events[i].Status.Name != events[j].Status.Name {
-			return events[i].Status.Name < events[j].Status.Name
-		}
-		return events[i].Status.DAGRunID < events[j].Status.DAGRunID
-	})
-
-	if b.flush != nil && len(events) > 0 {
-		b.flush(bucket.destination, NotificationBatch{
-			Class:       bucket.class,
-			Events:      events,
-			WindowStart: bucket.windowStart,
-			WindowEnd:   time.Now(),
-		})
+	batch := notificationBatchFromBucket(bucket, time.Now())
+	if b.flush != nil && len(batch.Events) > 0 {
+		b.flush(bucket.destination, batch)
 	}
 }
 
@@ -561,6 +598,32 @@ func cloneNotificationStatus(status *exec.DAGRunStatus) *exec.DAGRunStatus {
 	}
 	clone := *status
 	return &clone
+}
+
+func notificationBatchFromBucket(bucket *notificationBucket, windowEnd time.Time) NotificationBatch {
+	events := make([]NotificationEvent, 0, len(bucket.events))
+	for _, event := range bucket.events {
+		events = append(events, event)
+	}
+	sortNotificationEvents(events)
+	return NotificationBatch{
+		Class:       bucket.class,
+		Events:      events,
+		WindowStart: bucket.windowStart,
+		WindowEnd:   windowEnd,
+	}
+}
+
+func sortNotificationEvents(events []NotificationEvent) {
+	sort.Slice(events, func(i, j int) bool {
+		if !events[i].ObservedAt.Equal(events[j].ObservedAt) {
+			return events[i].ObservedAt.After(events[j].ObservedAt)
+		}
+		if events[i].Status.Name != events[j].Status.Name {
+			return events[i].Status.Name < events[j].Status.Name
+		}
+		return events[i].Status.DAGRunID < events[j].Status.DAGRunID
+	})
 }
 
 func notificationBucketKey(destination string, class NotificationClass) string {

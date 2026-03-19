@@ -36,6 +36,8 @@ type DAGRunMonitor struct {
 	logger      *slog.Logger
 
 	// seen tracks DAG runs we've already notified about (dagRunID+attemptID -> true)
+	ctxMu   sync.RWMutex
+	runCtx  context.Context
 	seen    sync.Map
 	batcher *chatbridge.NotificationBatcher
 }
@@ -47,6 +49,7 @@ func NewDAGRunMonitor(dagRunStore exec.DAGRunStore, agentAPI AgentService, bot *
 		agentAPI:    agentAPI,
 		bot:         bot,
 		logger:      logger,
+		runCtx:      context.Background(),
 	}
 	monitor.batcher = chatbridge.NewNotificationBatcher(
 		chatbridge.DefaultUrgentNotificationWindow,
@@ -60,7 +63,7 @@ func NewDAGRunMonitor(dagRunStore exec.DAGRunStore, agentAPI AgentService, bot *
 // AI-generated notifications to all allowed Telegram chats.
 func (m *DAGRunMonitor) Run(ctx context.Context) {
 	m.logger.Info("DAG run monitor started")
-	defer m.batcher.Stop()
+	m.setRunContext(ctx)
 
 	// Seed the seen set with currently completed runs so we don't notify
 	// about old completions on startup.
@@ -75,6 +78,7 @@ func (m *DAGRunMonitor) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			m.drainPendingBatches(ctx)
 			m.logger.Info("DAG run monitor stopped")
 			return
 		case <-ticker.C:
@@ -87,6 +91,11 @@ func (m *DAGRunMonitor) Run(ctx context.Context) {
 
 // seedSeen marks all currently completed runs as already seen.
 func (m *DAGRunMonitor) seedSeen(ctx context.Context) {
+	destinations := m.destinations()
+	if len(destinations) == 0 {
+		return
+	}
+
 	now := time.Now()
 	from := exec.NewUTC(now.Add(-24 * time.Hour))
 	to := exec.NewUTC(now)
@@ -102,7 +111,9 @@ func (m *DAGRunMonitor) seedSeen(ctx context.Context) {
 
 	for _, s := range statuses {
 		if !s.Status.IsActive() {
-			m.markSeen(s)
+			for _, destination := range destinations {
+				m.markSeen(destination, s)
+			}
 		}
 	}
 
@@ -127,28 +138,23 @@ func (m *DAGRunMonitor) checkForCompletions(ctx context.Context) {
 	}
 
 	for _, s := range statuses {
-		if m.isSeen(s) {
-			continue
-		}
-		if m.notifyCompletion(ctx, s) {
-			m.markSeen(s)
-		}
+		m.notifyCompletion(ctx, s)
 	}
 }
 
 // seenKey returns a unique key for a DAG run status.
-func seenKey(s *exec.DAGRunStatus) string {
-	return chatbridge.NotificationSeenKey(s)
+func seenKey(destination string, s *exec.DAGRunStatus) string {
+	return destination + "|" + chatbridge.NotificationSeenKey(s)
 }
 
 // markSeen marks a DAG run as already notified.
-func (m *DAGRunMonitor) markSeen(s *exec.DAGRunStatus) {
-	m.seen.Store(seenKey(s), time.Now())
+func (m *DAGRunMonitor) markSeen(destination string, s *exec.DAGRunStatus) {
+	m.seen.Store(seenKey(destination, s), time.Now())
 }
 
 // isSeen checks if we've already sent a notification for this run.
-func (m *DAGRunMonitor) isSeen(s *exec.DAGRunStatus) bool {
-	_, ok := m.seen.Load(seenKey(s))
+func (m *DAGRunMonitor) isSeen(destination string, s *exec.DAGRunStatus) bool {
+	_, ok := m.seen.Load(seenKey(destination, s))
 	return ok
 }
 
@@ -177,8 +183,11 @@ func (m *DAGRunMonitor) notifyCompletion(_ context.Context, s *exec.DAGRunStatus
 	}
 
 	accepted := false
-	for chatID := range m.bot.allowedChats {
-		if m.batcher.Enqueue(strconv.FormatInt(chatID, 10), s) {
+	for _, chatID := range m.destinations() {
+		if m.isSeen(chatID, s) {
+			continue
+		}
+		if m.batcher.Enqueue(chatID, s) {
 			accepted = true
 		}
 	}
@@ -195,22 +204,23 @@ func (m *DAGRunMonitor) flushBatch(chatIDKey string, batch chatbridge.Notificati
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), notificationFlushTimeout)
+	ctx, cancel := context.WithTimeout(m.runContext(), notificationFlushTimeout)
 	defer cancel()
 
-	m.flushChat(ctx, chatID, batch)
+	m.flushChat(ctx, chatID, batch, true)
 }
 
 // flushChat appends the notification batch into the chat-scoped session.
-func (m *DAGRunMonitor) flushChat(ctx context.Context, chatID int64, batch chatbridge.NotificationBatch) bool {
+func (m *DAGRunMonitor) flushChat(ctx context.Context, chatID int64, batch chatbridge.NotificationBatch, allowLLM bool) bool {
 	user := m.bot.userIdentity(chatID)
 	cs := m.bot.getOrCreateChat(chatID)
 	sessionID := m.currentSessionID(cs)
-	msg := m.buildNotificationMessage(ctx, sessionID, user, batch)
+	msg := m.buildNotificationMessage(ctx, sessionID, user, batch, allowLLM)
 	sessionID, stored, ok := m.appendNotification(ctx, cs, sessionID, user, chatbridge.NotificationBatchDAGName(batch), msg)
 	if !ok {
 		return false
 	}
+	m.markBatchSeen(strconv.FormatInt(chatID, 10), batch)
 	if m.bot.subscriptionActive(cs, sessionID) {
 		return true
 	}
@@ -236,8 +246,13 @@ func (m *DAGRunMonitor) appendNotification(ctx context.Context, cs *chatState, s
 	return newSessionID, stored, true
 }
 
-func (m *DAGRunMonitor) buildNotificationMessage(ctx context.Context, sessionID string, user agent.UserIdentity, batch chatbridge.NotificationBatch) agent.Message {
-	msg, err := chatbridge.GenerateNotificationMessage(ctx, m.agentAPI, sessionID, user, batch)
+func (m *DAGRunMonitor) buildNotificationMessage(ctx context.Context, sessionID string, user agent.UserIdentity, batch chatbridge.NotificationBatch, allowLLM bool) agent.Message {
+	service := m.agentAPI
+	if !allowLLM {
+		service = nil
+	}
+
+	msg, err := chatbridge.GenerateNotificationMessage(ctx, service, sessionID, user, batch)
 	if err != nil && len(batch.Events) > 0 && batch.Events[0].Status != nil {
 		m.logger.Warn("Failed to generate AI notification, using deterministic fallback",
 			slog.String("dag", batch.Events[0].Status.Name),
@@ -246,4 +261,61 @@ func (m *DAGRunMonitor) buildNotificationMessage(ctx context.Context, sessionID 
 		)
 	}
 	return msg
+}
+
+func (m *DAGRunMonitor) markBatchSeen(destination string, batch chatbridge.NotificationBatch) {
+	for _, event := range batch.Events {
+		m.markSeen(destination, event.Status)
+	}
+}
+
+func (m *DAGRunMonitor) destinations() []string {
+	destinations := make([]string, 0, len(m.bot.allowedChats))
+	for chatID := range m.bot.allowedChats {
+		destinations = append(destinations, strconv.FormatInt(chatID, 10))
+	}
+	return destinations
+}
+
+func (m *DAGRunMonitor) setRunContext(ctx context.Context) {
+	m.ctxMu.Lock()
+	defer m.ctxMu.Unlock()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	m.runCtx = ctx
+}
+
+func (m *DAGRunMonitor) runContext() context.Context {
+	m.ctxMu.RLock()
+	defer m.ctxMu.RUnlock()
+	if m.runCtx == nil {
+		return context.Background()
+	}
+	return m.runCtx
+}
+
+func (m *DAGRunMonitor) drainPendingBatches(ctx context.Context) {
+	drained := m.batcher.DrainAndStop()
+	if len(drained) == 0 {
+		return
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), notificationFlushTimeout)
+	defer cancel()
+
+	for _, pending := range drained {
+		if shutdownCtx.Err() != nil {
+			return
+		}
+		chatID, err := strconv.ParseInt(pending.Destination, 10, 64)
+		if err != nil {
+			m.logger.Warn("Failed to parse Telegram chat ID for drained notification batch",
+				slog.String("chat_id", pending.Destination),
+				slog.String("error", err.Error()),
+			)
+			continue
+		}
+		m.flushChat(shutdownCtx, chatID, pending.Batch, false)
+	}
 }

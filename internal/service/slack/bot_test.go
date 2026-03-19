@@ -24,18 +24,30 @@ import (
 )
 
 type fakeSlackClient struct {
-	mu      sync.Mutex
-	postTS  int
-	posts   []string
-	deletes int
+	mu           sync.Mutex
+	postTS       int
+	posts        []string
+	postChannels []string
+	postAttempts map[string]int
+	failChannels map[string]int
+	deletes      int
 }
 
-func (c *fakeSlackClient) PostMessage(_ string, _ ...slack.MsgOption) (string, string, error) {
+func (c *fakeSlackClient) PostMessage(channel string, _ ...slack.MsgOption) (string, string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.postAttempts == nil {
+		c.postAttempts = make(map[string]int)
+	}
+	c.postAttempts[channel]++
+	if remaining := c.failChannels[channel]; remaining > 0 {
+		c.failChannels[channel] = remaining - 1
+		return "", "", assert.AnError
+	}
 	c.postTS++
 	ts := fmt.Sprintf("%d", c.postTS)
 	c.posts = append(c.posts, ts)
+	c.postChannels = append(c.postChannels, channel)
 	return "ok", ts, nil
 }
 
@@ -63,16 +75,24 @@ func (c *fakeSlackClient) deleteCount() int {
 	return c.deletes
 }
 
+func (c *fakeSlackClient) attemptsForChannel(channel string) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.postAttempts[channel]
+}
+
 type fakeSlackAgentService struct {
 	mu               sync.Mutex
 	nextSessionID    int
 	nextSequenceID   int64
 	createEmptyCalls int
+	appendAttempts   []string
 	appendSessionIDs []string
 	appendMessages   []agent.Message
 	createMessages   []string
 	sendMessages     []string
 	flushCalls       int
+	generateCalls    int
 	generated        agent.Message
 	generatedErr     error
 	enqueueResult    agent.ChatQueueResult
@@ -151,6 +171,9 @@ func (s *fakeSlackAgentService) SubmitUserResponse(context.Context, string, stri
 }
 
 func (s *fakeSlackAgentService) GenerateAssistantMessage(context.Context, string, agent.UserIdentity, string, string) (agent.Message, error) {
+	s.mu.Lock()
+	s.generateCalls++
+	s.mu.Unlock()
 	if s.generatedErr != nil {
 		return agent.Message{}, s.generatedErr
 	}
@@ -160,6 +183,7 @@ func (s *fakeSlackAgentService) GenerateAssistantMessage(context.Context, string
 func (s *fakeSlackAgentService) AppendExternalMessage(_ context.Context, sessionID string, _ agent.UserIdentity, msg agent.Message) (agent.Message, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.appendAttempts = append(s.appendAttempts, sessionID)
 	msg.SessionID = sessionID
 	msg.SequenceID = s.nextSequenceID
 	s.nextSequenceID++
