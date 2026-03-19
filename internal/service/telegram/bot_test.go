@@ -16,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagu-org/dagu/internal/testutil"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -158,11 +159,13 @@ func (s *fakeTelegramAgentService) SubmitUserResponse(context.Context, string, s
 func (s *fakeTelegramAgentService) GenerateAssistantMessage(context.Context, string, agent.UserIdentity, string, string) (agent.Message, error) {
 	s.mu.Lock()
 	s.generateCalls++
+	err := s.generatedErr
+	msg := s.generated
 	s.mu.Unlock()
-	if s.generatedErr != nil {
-		return agent.Message{}, s.generatedErr
+	if err != nil {
+		return agent.Message{}, err
 	}
-	return s.generated, nil
+	return msg, nil
 }
 
 func (s *fakeTelegramAgentService) AppendExternalMessage(_ context.Context, sessionID string, _ agent.UserIdentity, msg agent.Message) (agent.Message, error) {
@@ -206,7 +209,7 @@ func TestDAGRunMonitor_FlushesSuccessDigestIntoExistingChatAndSkipsReplay(t *tes
 		logger:       logger,
 	}
 	monitor := newDAGRunMonitorWithWindows(nil, service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
-	stopMonitor := startTestMonitor(t, monitor)
+	stopMonitor := testutil.StartContextRunner(t, monitor)
 	defer stopMonitor()
 
 	cs := bot.getOrCreateChat(123)
@@ -270,7 +273,7 @@ func TestDAGRunMonitor_FlushesUrgentSingleCreatesSessionWhenMissing(t *testing.T
 		logger:       logger,
 	}
 	monitor := newDAGRunMonitorWithWindows(nil, service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
-	stopMonitor := startTestMonitor(t, monitor)
+	stopMonitor := testutil.StartContextRunner(t, monitor)
 	defer stopMonitor()
 
 	ok := monitor.notifyCompletion(context.Background(), &exec.DAGRunStatus{

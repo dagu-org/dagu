@@ -6,7 +6,7 @@ package chatbridge
 import (
 	"context"
 	"errors"
-	"sync"
+	"fmt"
 	"testing"
 	"time"
 
@@ -49,10 +49,6 @@ func TestNotificationBatcher_SuccessBurstFlushesSingleDigest(t *testing.T) {
 func TestNotificationBatcher_ReplacesWaitingWithSuccessBeforeFlush(t *testing.T) {
 	t.Parallel()
 
-	var (
-		mu      sync.Mutex
-		flushed []NotificationBatch
-	)
 	batcher := NewNotificationBatcher(15*time.Millisecond, 25*time.Millisecond)
 	defer batcher.Stop()
 
@@ -61,22 +57,12 @@ func TestNotificationBatcher_ReplacesWaitingWithSuccessBeforeFlush(t *testing.T)
 	require.True(t, batcher.Enqueue("dest-1", &exec.DAGRunStatus{Name: "briefing", DAGRunID: "run-1", AttemptID: "a1", Status: core.Succeeded}))
 
 	time.Sleep(20 * time.Millisecond)
-	mu.Lock()
-	currentFlushes := len(flushed)
-	mu.Unlock()
-	assert.Zero(t, currentFlushes, "waiting batch should have been replaced before urgent flush")
+	assert.Empty(t, batcher.TakeReady(), "waiting batch should have been replaced before urgent flush")
 
 	ready := waitForReadyBatch(t, batcher)
-	mu.Lock()
-	flushed = append(flushed, ready.Batch)
-	mu.Unlock()
-
-	mu.Lock()
-	defer mu.Unlock()
-	require.Len(t, flushed, 1)
-	assert.Equal(t, NotificationClassSuccessDigest, flushed[0].Class)
-	require.Len(t, flushed[0].Events, 1)
-	assert.Equal(t, core.Succeeded, flushed[0].Events[0].Status.Status)
+	assert.Equal(t, NotificationClassSuccessDigest, ready.Batch.Class)
+	require.Len(t, ready.Batch.Events, 1)
+	assert.Equal(t, core.Succeeded, ready.Batch.Events[0].Status.Status)
 }
 
 func TestNotificationBatcher_DuplicateStatusDoesNotDuplicateBatch(t *testing.T) {
@@ -175,8 +161,8 @@ func TestFormatNotificationBatch_CapsVisibleGroups(t *testing.T) {
 	for i := range maxNotificationGroups + 2 {
 		events = append(events, NotificationEvent{
 			Status: &exec.DAGRunStatus{
-				Name:      "dag-" + string(rune('a'+i)),
-				DAGRunID:  "run-" + string(rune('a'+i)),
+				Name:      fmt.Sprintf("dag-%d", i),
+				DAGRunID:  fmt.Sprintf("run-%d", i),
 				AttemptID: "a1",
 				Status:    core.Succeeded,
 			},
@@ -193,6 +179,49 @@ func TestFormatNotificationBatch_CapsVisibleGroups(t *testing.T) {
 
 	assert.Contains(t, text, "DAG completion digest")
 	assert.Contains(t, text, "and 2 more DAG groups")
+}
+
+func TestNotificationBatcher_ClonesStatusSnapshot(t *testing.T) {
+	t.Parallel()
+
+	batcher := NewNotificationBatcher(10*time.Millisecond, 20*time.Millisecond)
+	defer batcher.Stop()
+
+	status := &exec.DAGRunStatus{
+		Name:      "briefing",
+		DAGRunID:  "run-1",
+		AttemptID: "a1",
+		Status:    core.Failed,
+		Error:     "original error",
+		Nodes: []*exec.Node{
+			{
+				Step:   core.Step{Name: "fetch"},
+				Status: core.NodeFailed,
+				Error:  "node failed",
+			},
+		},
+		OnFailure: &exec.Node{
+			Step:  core.Step{Name: "notify"},
+			Error: "handler failed",
+		},
+	}
+	require.True(t, batcher.Enqueue("dest-1", status))
+
+	status.Error = "mutated error"
+	status.Nodes[0].Error = "mutated node error"
+	status.Nodes[0].Step.Name = "mutated"
+	status.OnFailure.Error = "mutated handler error"
+
+	ready := waitForReadyBatch(t, batcher)
+	require.Len(t, ready.Batch.Events, 1)
+	got := ready.Batch.Events[0].Status
+	require.NotNil(t, got)
+	assert.Equal(t, "original error", got.Error)
+	require.Len(t, got.Nodes, 1)
+	assert.Equal(t, "fetch", got.Nodes[0].Step.Name)
+	assert.Equal(t, "node failed", got.Nodes[0].Error)
+	require.NotNil(t, got.OnFailure)
+	assert.Equal(t, "handler failed", got.OnFailure.Error)
 }
 
 func waitForReadyBatch(t *testing.T, batcher *NotificationBatcher) NotificationPendingBatch {

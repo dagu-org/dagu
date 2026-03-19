@@ -17,6 +17,7 @@ const (
 	DefaultNotificationSeenEvictInterval   = 10 * time.Minute
 	DefaultNotificationSeenTTL             = 2 * time.Hour
 	DefaultNotificationFlushTimeout        = 30 * time.Second
+	DefaultNotificationSeedLimit           = 1000
 )
 
 // NotificationMonitorConfig controls polling, batching, and shutdown behavior.
@@ -27,6 +28,7 @@ type NotificationMonitorConfig struct {
 	FlushTimeout      time.Duration
 	UrgentWindow      time.Duration
 	SuccessWindow     time.Duration
+	SeedLimit         int
 }
 
 // DefaultNotificationMonitorConfig returns the default monitor settings.
@@ -38,6 +40,7 @@ func DefaultNotificationMonitorConfig() NotificationMonitorConfig {
 		FlushTimeout:      DefaultNotificationFlushTimeout,
 		UrgentWindow:      DefaultUrgentNotificationWindow,
 		SuccessWindow:     DefaultSuccessNotificationWindow,
+		SeedLimit:         DefaultNotificationSeedLimit,
 	}
 }
 
@@ -163,6 +166,7 @@ func (m *NotificationMonitor) seedDelivered(ctx context.Context) {
 	statuses, err := m.dagRunStore.ListStatuses(ctx,
 		exec.WithFrom(from),
 		exec.WithTo(to),
+		exec.WithLimit(m.cfg.SeedLimit),
 	)
 	if err != nil {
 		m.logger.Warn("Failed to seed monitor with existing runs", slog.String("error", err.Error()))
@@ -294,5 +298,8 @@ func normalizeNotificationMonitorConfig(cfg *NotificationMonitorConfig) {
 	}
 	if cfg.SuccessWindow <= 0 {
 		cfg.SuccessWindow = defaults.SuccessWindow
+	}
+	if cfg.SeedLimit <= 0 {
+		cfg.SeedLimit = defaults.SeedLimit
 	}
 }

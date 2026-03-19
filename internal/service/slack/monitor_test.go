@@ -13,31 +13,12 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type stubNotificationDAGRunStore struct{}
-
-func startTestMonitor(t *testing.T, monitor *DAGRunMonitor) func() {
-	t.Helper()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() {
-		monitor.Run(ctx)
-		close(done)
-	}()
-
-	return func() {
-		cancel()
-		select {
-		case <-done:
-		case <-time.After(time.Second):
-			t.Fatal("timed out waiting for monitor shutdown")
-		}
-	}
-}
 
 func (s *stubNotificationDAGRunStore) CreateAttempt(context.Context, *core.DAG, time.Time, string, exec.NewDAGRunAttemptOptions) (exec.DAGRunAttempt, error) {
 	return nil, errors.New("unexpected call")
@@ -99,7 +80,7 @@ func TestDAGRunMonitor_RetriesOnlyUndeliveredSlackChannel(t *testing.T) {
 		logger:          logger,
 	}
 	monitor := newDAGRunMonitorWithWindows(nil, service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
-	stopMonitor := startTestMonitor(t, monitor)
+	stopMonitor := testutil.StartContextRunner(t, monitor)
 	defer stopMonitor()
 
 	status := &exec.DAGRunStatus{
@@ -152,7 +133,7 @@ func TestDAGRunMonitor_RunDrainsPendingSlackNotificationsWithoutLLM(t *testing.T
 	}
 	require.True(t, monitor.notifyCompletion(context.Background(), status))
 
-	stopMonitor := startTestMonitor(t, monitor)
+	stopMonitor := testutil.StartContextRunner(t, monitor)
 	stopMonitor()
 
 	service.mu.Lock()

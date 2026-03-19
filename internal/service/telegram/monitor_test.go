@@ -12,29 +12,10 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func startTestMonitor(t *testing.T, monitor *DAGRunMonitor) func() {
-	t.Helper()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() {
-		monitor.Run(ctx)
-		close(done)
-	}()
-
-	return func() {
-		cancel()
-		select {
-		case <-done:
-		case <-time.After(time.Second):
-			t.Fatal("timed out waiting for monitor shutdown")
-		}
-	}
-}
 
 func TestDAGRunMonitor_RetriesOnlyUndeliveredTelegramChat(t *testing.T) {
 	t.Parallel()
@@ -56,7 +37,7 @@ func TestDAGRunMonitor_RetriesOnlyUndeliveredTelegramChat(t *testing.T) {
 	bot.setActiveSession(cs2, "session-2", "telegram:2")
 
 	monitor := newDAGRunMonitorWithWindows(nil, service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
-	stopMonitor := startTestMonitor(t, monitor)
+	stopMonitor := testutil.StartContextRunner(t, monitor)
 	defer stopMonitor()
 
 	status := &exec.DAGRunStatus{

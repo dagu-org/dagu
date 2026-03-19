@@ -5,6 +5,7 @@ package chatbridge
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -620,7 +621,20 @@ func cloneNotificationStatus(status *exec.DAGRunStatus) *exec.DAGRunStatus {
 	if status == nil {
 		return nil
 	}
-	clone := *status
+	// Notification batches may stay buffered for minutes, so take an isolated
+	// snapshot rather than sharing mutable slices or handler pointers from the
+	// store object.
+	data, err := json.Marshal(status)
+	if err != nil {
+		clone := *status
+		return &clone
+	}
+
+	var clone exec.DAGRunStatus
+	if err := json.Unmarshal(data, &clone); err != nil {
+		fallback := *status
+		return &fallback
+	}
 	return &clone
 }
 
