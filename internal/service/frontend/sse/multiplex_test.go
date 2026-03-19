@@ -34,6 +34,21 @@ func TestParseTopicRejectsMalformedQuery(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestParseTopicRejectsDAGTraversalIdentifiers(t *testing.T) {
+	tests := []string{
+		"dag:../../tmp/secret.yaml",
+		"daghistory:..%2F..%2Ftmp%2Fsecret.yaml",
+		"dag:foo/bar",
+	}
+
+	for _, topic := range tests {
+		t.Run(topic, func(t *testing.T) {
+			_, err := ParseTopic(topic)
+			require.Error(t, err)
+		})
+	}
+}
+
 func TestParseInitialTopics(t *testing.T) {
 	query := map[string][]string{
 		"topic":  {"dag:test.yaml", "queueitems:default"},
