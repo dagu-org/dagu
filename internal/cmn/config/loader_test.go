@@ -47,7 +47,9 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_DEBUG":        "true",
 		"DAGU_HEADLESS":     "true",
 
-		"DAGU_DEFAULT_SHELL": "/bin/zsh",
+		"DAGU_DEFAULT_SHELL":         "/bin/zsh",
+		"DAGU_SECRETS_VAULT_ADDRESS": "https://vault.example.com",
+		"DAGU_SECRETS_VAULT_TOKEN":   "vault-token",
 
 		"DAGU_UI_MAX_DASHBOARD_PAGE_LIMIT": "250",
 		"DAGU_UI_LOG_ENCODING_CHARSET":     "iso-8859-1",
@@ -201,6 +203,12 @@ func TestLoad_Env(t *testing.T) {
 			SessionsDir:        filepath.Join(testPaths, "data", "agent", "sessions"), // Derived from DataDir
 			RemoteNodesDir:     filepath.Join(testPaths, "data", "remote-nodes"),      // Derived from DataDir
 			WorkspacesDir:      filepath.Join(testPaths, "data", "workspaces"),        // Derived from DataDir
+		},
+		Secrets: SecretsConfig{
+			Vault: VaultSecretsConfig{
+				Address: "https://vault.example.com",
+				Token:   "vault-token",
+			},
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
@@ -1015,6 +1023,71 @@ monitoring:
 		cfg := loadFromYAML(t, "")
 		assert.Equal(t, 24*time.Hour, cfg.Monitoring.Retention)
 		assert.Equal(t, 5*time.Second, cfg.Monitoring.Interval)
+	})
+}
+
+func TestLoad_SecretsVaultConfig(t *testing.T) {
+	t.Run("FromYAML", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+secrets:
+  vault:
+    address: "https://vault.example.com"
+    token: "yaml-token"
+`)
+
+		assert.Equal(t, "https://vault.example.com", cfg.Secrets.Vault.Address)
+		assert.Equal(t, "yaml-token", cfg.Secrets.Vault.Token)
+	})
+
+	t.Run("FromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_SECRETS_VAULT_ADDRESS": "https://vault.example.com",
+			"DAGU_SECRETS_VAULT_TOKEN":   "env-token",
+		})
+
+		assert.Equal(t, "https://vault.example.com", cfg.Secrets.Vault.Address)
+		assert.Equal(t, "env-token", cfg.Secrets.Vault.Token)
+	})
+
+	t.Run("OldEnvNamesIgnored", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"VAULT_ADDR":       "https://legacy.example.com",
+			"VAULT_TOKEN":      "legacy-token",
+			"DAGU_VAULT_ADDR":  "https://legacy-dagu.example.com",
+			"DAGU_VAULT_TOKEN": "legacy-dagu-token",
+		})
+
+		assert.Empty(t, cfg.Secrets.Vault.Address)
+		assert.Empty(t, cfg.Secrets.Vault.Token)
+	})
+
+	t.Run("LoadsForServiceScopedCommands", func(t *testing.T) {
+		for _, tc := range []struct {
+			name    string
+			service Service
+		}{
+			{name: "Server", service: ServiceServer},
+			{name: "Scheduler", service: ServiceScheduler},
+			{name: "Worker", service: ServiceWorker},
+			{name: "Coordinator", service: ServiceCoordinator},
+			{name: "Agent", service: ServiceAgent},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				configFile := filepath.Join(t.TempDir(), "config.yaml")
+				err := os.WriteFile(configFile, []byte(`
+secrets:
+  vault:
+    address: "https://vault.example.com"
+    token: "scoped-token"
+`), 0600)
+				require.NoError(t, err)
+
+				cfg := testLoad(t, WithConfigFile(configFile), WithService(tc.service))
+
+				assert.Equal(t, "https://vault.example.com", cfg.Secrets.Vault.Address)
+				assert.Equal(t, "scoped-token", cfg.Secrets.Vault.Token)
+			})
+		}
 	})
 }
 

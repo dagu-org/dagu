@@ -43,6 +43,9 @@ type Definition struct {
 	// Paths (structured)
 	Paths *PathsDef `mapstructure:"paths"`
 
+	// Secrets
+	Secrets *SecretsDef `mapstructure:"secrets"`
+
 	// UI settings (legacy flat fields)
 	LogEncodingCharset    string `mapstructure:"log_encoding_charset"`
 	NavbarColor           string `mapstructure:"navbar_color"`
@@ -190,6 +193,17 @@ type PathsDef struct {
 	SessionsDir        string `mapstructure:"sessions_dir"`
 	RemoteNodesDir     string `mapstructure:"remote_nodes_dir"`
 	WorkspacesDir      string `mapstructure:"workspaces_dir"`
+}
+
+// SecretsDef configures shared defaults for secret providers.
+type SecretsDef struct {
+	Vault *VaultSecretsDef `mapstructure:"vault"`
+}
+
+// VaultSecretsDef configures global HashiCorp Vault client defaults.
+type VaultSecretsDef struct {
+	Address string `mapstructure:"address"`
+	Token   string `mapstructure:"token"`
 }
 
 // -----------------------------------------------------------------------------

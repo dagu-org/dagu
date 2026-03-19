@@ -15,6 +15,7 @@ type Config struct {
 	Core            Core
 	Server          Server
 	Paths           PathsConfig
+	Secrets         SecretsConfig
 	UI              UI
 	Queues          Queues
 	Coordinator     Coordinator
@@ -330,6 +331,17 @@ type PathsConfig struct {
 	RemoteNodesDir     string
 	WorkspacesDir      string
 	ConfigFileUsed     string
+}
+
+// SecretsConfig holds global defaults for external secret providers.
+type SecretsConfig struct {
+	Vault VaultSecretsConfig
+}
+
+// VaultSecretsConfig holds shared HashiCorp Vault client defaults.
+type VaultSecretsConfig struct {
+	Address string
+	Token   string
 }
 
 // UI holds user interface configuration.

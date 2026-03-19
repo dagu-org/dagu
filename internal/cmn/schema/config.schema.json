@@ -105,6 +105,9 @@
     "paths": {
       "$ref": "#/definitions/PathsDef"
     },
+    "secrets": {
+      "$ref": "#/definitions/SecretsDef"
+    },
     "log_encoding_charset": {
       "type": "string",
       "description": "Deprecated: use ui.log_encoding_charset instead. Character encoding for log display."
@@ -452,6 +455,31 @@
         "remote_nodes_dir": {
           "type": "string",
           "description": "Directory for remote node data storage."
+        }
+      }
+    },
+    "SecretsDef": {
+      "type": "object",
+      "description": "Shared defaults for external secret providers.",
+      "additionalProperties": false,
+      "properties": {
+        "vault": {
+          "$ref": "#/definitions/VaultSecretsDef"
+        }
+      }
+    },
+    "VaultSecretsDef": {
+      "type": "object",
+      "description": "Global HashiCorp Vault client defaults.",
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "type": "string",
+          "description": "Default Vault server address."
+        },
+        "token": {
+          "type": "string",
+          "description": "Default Vault token."
         }
       }
     },

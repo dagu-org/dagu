@@ -7,11 +7,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"sort"
 	"strings"
 	"sync"
 
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/hashicorp/vault/api"
 )
@@ -27,12 +27,18 @@ func init() {
 // approach where the last segment of the key is treated as the field name.
 type vaultResolver struct {
 	client vaultClient // For testing
-	mu     sync.Mutex
+	// clientFactory is used to create real clients in tests without contacting Vault.
+	clientFactory func(vaultClientSettings) (vaultClient, error)
+	mu            sync.Mutex
 
 	// Caching real clients
-	cachedClient vaultClient
-	cachedAddr   string
-	cachedToken  string
+	cachedClient   vaultClient
+	cachedSettings vaultClientSettings
+}
+
+type vaultClientSettings struct {
+	address string
+	token   string
 }
 
 // Name returns the provider identifier.
@@ -50,7 +56,7 @@ func (r *vaultResolver) Validate(ref core.SecretRef) error {
 
 // Resolve fetches the secret value from HashiCorp Vault.
 func (r *vaultResolver) Resolve(ctx context.Context, ref core.SecretRef) (string, error) {
-	client, err := r.getClient(ref)
+	client, err := r.getClient(ctx, ref)
 	if err != nil {
 		return "", err
 	}
@@ -89,7 +95,7 @@ func (r *vaultResolver) Resolve(ctx context.Context, ref core.SecretRef) (string
 
 // CheckAccessibility verifies the secret is accessible without fetching its value.
 func (r *vaultResolver) CheckAccessibility(ctx context.Context, ref core.SecretRef) error {
-	client, err := r.getClient(ref)
+	client, err := r.getClient(ctx, ref)
 	if err != nil {
 		return err
 	}
@@ -102,7 +108,7 @@ func (r *vaultResolver) CheckAccessibility(ctx context.Context, ref core.SecretR
 	return err
 }
 
-func (r *vaultResolver) getClient(ref core.SecretRef) (vaultClient, error) {
+func (r *vaultResolver) getClient(ctx context.Context, ref core.SecretRef) (vaultClient, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -111,46 +117,67 @@ func (r *vaultResolver) getClient(ref core.SecretRef) (vaultClient, error) {
 		return r.client, nil
 	}
 
-	// 2. Resolve vault_address and vault_token
-	addr := ref.Options["vault_address"]
-	if addr == "" {
-		addr = os.Getenv("DAGU_VAULT_ADDR")
-	}
-	token := ref.Options["vault_token"]
-	if token == "" {
-		token = os.Getenv("DAGU_VAULT_TOKEN")
-	}
+	settings := r.resolveClientSettings(ctx, ref)
 
 	// 3. Check cache
-	if r.cachedClient != nil && r.cachedAddr == addr && r.cachedToken == token {
+	if r.cachedClient != nil && r.cachedSettings == settings {
 		return r.cachedClient, nil
 	}
 
 	// 4. Create new client
-	config := api.DefaultConfig()
-	if addr != "" {
-		config.Address = addr
-	} else {
-		config.Address = api.DefaultAddress
+	client, err := r.newClient(settings)
+	if err != nil {
+		return nil, err
 	}
 
-	client, err := api.NewClient(config)
+	r.cachedClient = client
+	r.cachedSettings = settings
+
+	return client, nil
+}
+
+func (r *vaultResolver) resolveClientSettings(ctx context.Context, ref core.SecretRef) vaultClientSettings {
+	settings := vaultClientSettings{
+		address: api.DefaultAddress,
+	}
+
+	cfg := config.GetConfig(ctx)
+	if cfg.Secrets.Vault.Address != "" {
+		settings.address = cfg.Secrets.Vault.Address
+	}
+	if cfg.Secrets.Vault.Token != "" {
+		settings.token = cfg.Secrets.Vault.Token
+	}
+	if addr := ref.Options["vault_address"]; addr != "" {
+		settings.address = addr
+	}
+	if token := ref.Options["vault_token"]; token != "" {
+		settings.token = token
+	}
+
+	return settings
+}
+
+func (r *vaultResolver) newClient(settings vaultClientSettings) (vaultClient, error) {
+	if r.clientFactory != nil {
+		return r.clientFactory(settings)
+	}
+
+	cfg := api.DefaultConfig()
+	cfg.Address = settings.address
+
+	client, err := api.NewClient(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vault client: %w", err)
 	}
 
-	if token != "" {
-		client.SetToken(token)
+	if settings.token != "" {
+		client.SetToken(settings.token)
 	} else {
 		client.ClearToken()
 	}
 
-	realClient := &realVaultClient{client: client}
-	r.cachedClient = realClient
-	r.cachedAddr = addr
-	r.cachedToken = token
-
-	return realClient, nil
+	return &realVaultClient{client: client}, nil
 }
 
 func (r *vaultResolver) parseKey(ref core.SecretRef) (string, string) {

@@ -249,6 +249,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	if err := l.loadPathsConfig(&cfg, def); err != nil {
 		return nil, err
 	}
+	l.loadSecretsConfig(&cfg, def)
 
 	// Load service-specific sections
 	sectionLoaders := []struct {
@@ -365,6 +366,17 @@ func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) error {
 	}
 
 	return nil
+}
+
+func (l *ConfigLoader) loadSecretsConfig(cfg *Config, def Definition) {
+	if def.Secrets == nil || def.Secrets.Vault == nil {
+		return
+	}
+
+	cfg.Secrets.Vault = VaultSecretsConfig{
+		Address: def.Secrets.Vault.Address,
+		Token:   def.Secrets.Vault.Token,
+	}
 }
 
 func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
@@ -1474,6 +1486,10 @@ var envBindings = []envBinding{
 	// Core
 	{key: "default_shell", env: "DEFAULT_SHELL"},
 	{key: "skip_examples", env: "SKIP_EXAMPLES"},
+
+	// Secrets
+	{key: "secrets.vault.address", env: "SECRETS_VAULT_ADDRESS"},
+	{key: "secrets.vault.token", env: "SECRETS_VAULT_TOKEN"},
 
 	// Scheduler
 	{key: "scheduler.port", env: "SCHEDULER_PORT"},
