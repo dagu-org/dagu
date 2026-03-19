@@ -23,11 +23,26 @@ func requestCommandApproval(
 	workingDir string,
 	question string,
 ) (bool, error) {
+	return requestCommandApprovalWithTimeout(parentCtx, emit, wait, cmd, workingDir, question, approvalTimeout)
+}
+
+func requestCommandApprovalWithTimeout(
+	parentCtx context.Context,
+	emit EmitUserPromptFunc,
+	wait WaitUserResponseFunc,
+	cmd string,
+	workingDir string,
+	question string,
+	timeout time.Duration,
+) (bool, error) {
 	if emit == nil || wait == nil {
 		return false, errors.New("approval channel unavailable")
 	}
 	if parentCtx == nil {
 		parentCtx = context.Background()
+	}
+	if timeout <= 0 {
+		timeout = approvalTimeout
 	}
 
 	promptID := uuid.New().String()
@@ -43,13 +58,13 @@ func requestCommandApproval(
 		},
 	})
 
-	timeoutCtx, cancel := context.WithTimeout(parentCtx, approvalTimeout)
+	timeoutCtx, cancel := context.WithTimeout(parentCtx, timeout)
 	defer cancel()
 
 	resp, err := wait(timeoutCtx, promptID)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return false, fmt.Errorf("approval timed out after %v", approvalTimeout)
+			return false, fmt.Errorf("approval timed out after %v", timeout)
 		}
 		return false, err
 	}

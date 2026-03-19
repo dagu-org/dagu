@@ -1894,6 +1894,70 @@ func TestAPI_CleanupIdleSessions_CancelsStuckSession(t *testing.T) {
 	require.False(t, mgr.IsWorking(), "stuck session should be cancelled")
 }
 
+func TestShouldCancelStuckSession(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+
+	t.Run("stale working session without prompt is cancelable", func(t *testing.T) {
+		t.Parallel()
+
+		mgr := NewSessionManager(SessionManagerConfig{ID: "stale-no-prompt"})
+		mgr.mu.Lock()
+		mgr.working = true
+		mgr.lastHeartbeat = now.Add(-stuckHeartbeatTimeout - time.Second)
+		mgr.mu.Unlock()
+
+		assert.True(t, shouldCancelStuckSession(mgr, now))
+	})
+
+	t.Run("working session with pending prompt is not cancelable", func(t *testing.T) {
+		t.Parallel()
+
+		mgr := NewSessionManager(SessionManagerConfig{ID: "stale-with-prompt"})
+		mgr.mu.Lock()
+		mgr.working = true
+		mgr.lastHeartbeat = now.Add(-stuckHeartbeatTimeout - time.Second)
+		mgr.mu.Unlock()
+		mgr.promptsMu.Lock()
+		mgr.pendingPrompts["approval-1"] = make(chan UserPromptResponse, 1)
+		mgr.promptTypes["approval-1"] = PromptTypeCommandApproval
+		mgr.promptsMu.Unlock()
+
+		assert.False(t, shouldCancelStuckSession(mgr, now))
+	})
+
+	t.Run("working session with zero heartbeat is not cancelable", func(t *testing.T) {
+		t.Parallel()
+
+		mgr := NewSessionManager(SessionManagerConfig{ID: "zero-heartbeat"})
+		mgr.mu.Lock()
+		mgr.working = true
+		mgr.mu.Unlock()
+
+		assert.False(t, shouldCancelStuckSession(mgr, now))
+	})
+
+	t.Run("fresh working session is not cancelable", func(t *testing.T) {
+		t.Parallel()
+
+		mgr := NewSessionManager(SessionManagerConfig{ID: "fresh-working"})
+		mgr.mu.Lock()
+		mgr.working = true
+		mgr.lastHeartbeat = now
+		mgr.mu.Unlock()
+
+		assert.False(t, shouldCancelStuckSession(mgr, now))
+	})
+
+	t.Run("non-working session is not cancelable", func(t *testing.T) {
+		t.Parallel()
+
+		mgr := NewSessionManager(SessionManagerConfig{ID: "idle-session"})
+		assert.False(t, shouldCancelStuckSession(mgr, now))
+	})
+}
+
 func TestAPI_CleanupIdleSessions_DoesNotCancelWorkingSessionWithPendingPrompt(t *testing.T) {
 	t.Parallel()
 

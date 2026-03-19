@@ -1166,6 +1166,54 @@ func TestSessionManager_CreateWaitUserResponseFunc(t *testing.T) {
 
 		require.Eventually(t, func() bool { return !sm.HasPendingPrompt() }, time.Second, 5*time.Millisecond)
 	})
+
+	t.Run("general prompt timeout returns deadline exceeded and heartbeat stops", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{
+			ID:                 "general-timeout",
+			PromptWaitInterval: 5 * time.Millisecond,
+		})
+		emit := sm.createEmitUserPromptFunc()
+		wait := sm.createWaitUserResponseFunc()
+
+		emit(UserPrompt{
+			PromptID:   "general-timeout-1",
+			PromptType: PromptTypeGeneral,
+			Question:   "Need more details?",
+		})
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+		defer cancel()
+
+		resultCh := make(chan waitResult, 1)
+		go func() {
+			resp, err := wait(ctx, "general-timeout-1")
+			resultCh <- waitResult{resp: resp, err: err}
+		}()
+
+		require.Eventually(t, sm.HasPendingPrompt, time.Second, 5*time.Millisecond)
+		firstHB := sm.LastHeartbeat()
+		require.False(t, firstHB.IsZero())
+		require.Eventually(t, func() bool {
+			return sm.LastHeartbeat().After(firstHB)
+		}, time.Second, 5*time.Millisecond)
+
+		select {
+		case result := <-resultCh:
+			require.ErrorIs(t, result.err, context.DeadlineExceeded)
+			assert.Empty(t, result.resp.PromptID)
+			assert.False(t, result.resp.Cancelled)
+		case <-time.After(time.Second):
+			t.Fatal("wait did not time out")
+		}
+
+		require.Eventually(t, func() bool { return !sm.HasPendingPrompt() }, time.Second, 5*time.Millisecond)
+		time.Sleep(15 * time.Millisecond)
+		stableHB := sm.LastHeartbeat()
+		time.Sleep(20 * time.Millisecond)
+		assert.Equal(t, stableHB, sm.LastHeartbeat(), "heartbeat should stop after wait timeout")
+	})
 }
 
 func TestSessionManager_CancelPendingPrompts(t *testing.T) {
