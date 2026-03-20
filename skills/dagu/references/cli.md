@@ -2,7 +2,7 @@
 
 Global flags on all commands: `--config/-c`, `--dagu-home`, `--quiet/-q`, `--cpu-profile`
 
-## Commands
+## Core Commands
 
 ### dagu start
 
@@ -61,82 +61,35 @@ Flags:
 
 ### dagu dequeue
 
-Dequeue a DAG run from the specified queue. Marks the dequeued run as aborted.
-
-```
-dagu dequeue <queue-name>
-```
-
-Flags:
-- `--dag-run/-d` — DAG run identifier (format: `<dag-name>:<run-id>`). If omitted, dequeues the first item in the queue.
-- `--params/-p` — Parameters
+Dequeue a DAG run from a queue (marks it as aborted): `dagu dequeue <queue-name> [--dag-run/-d <dag:run-id>]`
 
 ### dagu stop
 
-Stop an active DAG run.
-
-```
-dagu stop <dag-name>
-```
-
-Flags:
-- `--run-id/-r` — Run ID to stop (if omitted, stops the currently active run)
+Stop an active DAG run: `dagu stop <dag-name> [--run-id/-r <id>]`
 
 ### dagu restart
 
-Stop and restart a DAG run with a new run ID.
-
-```
-dagu restart <dag-name>
-```
-
-Flags:
-- `--run-id/-r` — Run ID to restart
+Stop and restart a DAG run: `dagu restart <dag-name> [--run-id/-r <id>]`
 
 ### dagu retry
 
 Retry a previous DAG run using the same run ID.
 
 ```
-dagu retry [flags] <dag>
+dagu retry <dag> --run-id/-r <id> [--step <name>] [--worker-id <id>]
 ```
-
-Flags:
-- `--run-id/-r` — Run ID to retry (required)
-- `--step` — Retry only the specified step
-- `--worker-id` — Worker ID (defaults to `local`)
 
 ### dagu dry
 
-Dry-run a DAG without executing commands.
-
-```
-dagu dry [flags] <dag> [-- params...]
-```
-
-Flags:
-- `--params/-p` — Parameters
-- `--name/-N` — Override name
+Dry-run a DAG without executing commands: `dagu dry [--params/-p] [--name/-N] <dag> [-- params...]`
 
 ### dagu validate
 
-Validate DAG YAML without executing.
-
-```
-dagu validate <dag>
-```
+Validate DAG YAML without executing: `dagu validate <dag>`
 
 ### dagu status
 
-Show DAG run status.
-
-```
-dagu status <dag-name>
-```
-
-Flags:
-- `--run-id/-r` — Specific run ID
-- `--sub-run-id/-s` — Sub-run ID (requires `--run-id`)
+Show DAG run status: `dagu status <dag-name> [--run-id/-r <id>] [--sub-run-id/-s <id>]`
 
 ### dagu history
 
@@ -163,152 +116,26 @@ Default: shows runs from the last 30 days, newest first.
 Remove old DAG run history. Active runs are never deleted.
 
 ```
-dagu cleanup <dag-name>
+dagu cleanup <dag-name> [--retention-days <n>] [--dry-run] [--yes/-y]
 ```
-
-Flags:
-- `--retention-days` — Days to retain (default 0 = delete all except active)
-- `--dry-run` — Preview what would be deleted
-- `--yes/-y` — Skip confirmation
-
-### dagu server
-
-Start web UI + REST API.
-
-```
-dagu server [flags]
-```
-
-Flags:
-- `--host/-s` — Host (default `localhost`)
-- `--port/-p` — Port (default `8080`)
-- `--dags/-d` — DAGs directory
-- `--tunnel/-t` — Enable tunnel mode for remote access
-- `--tunnel-token` — Tailscale auth key for headless authentication
-- `--tunnel-funnel` — Enable Tailscale Funnel for public internet access
-- `--tunnel-https` — Use HTTPS for Tailscale
-
-### dagu scheduler
-
-Start cron scheduler. Monitors DAG definitions and triggers runs based on schedule expressions. Also processes queued runs.
-
-```
-dagu scheduler [flags]
-```
-
-Flags:
-- `--dags/-d` — DAGs directory
-
-### dagu coordinator
-
-Start gRPC coordinator for distributed execution.
-
-```
-dagu coordinator [flags]
-```
-
-Flags:
-- `--coordinator.host/-H` — Host (default `127.0.0.1`)
-- `--coordinator.port/-P` — Port (default `50055`)
-- `--coordinator.advertise/-A` — Advertise address for service registry (default: auto-detected hostname)
-- `--peer.insecure` — Use insecure connection (h2c) instead of TLS
-- `--peer.cert-file` — Path to TLS certificate file for mutual TLS
-- `--peer.key-file` — Path to TLS key file for mutual TLS
-- `--peer.client-ca-file` — Path to CA certificate file for client verification (mTLS)
-- `--peer.skip-tls-verify` — Skip TLS certificate verification
-
-### dagu worker
-
-Start distributed worker. Connects to coordinator and polls for tasks.
-
-```
-dagu worker [flags]
-```
-
-Flags:
-- `--worker.id/-w` — Worker instance ID (default: `hostname@PID`)
-- `--worker.max-active-runs/-m` — Max concurrent runs (default 100)
-- `--worker.labels/-l` — Worker labels for capability matching (format: `key1=value1,key2=value2`)
-- `--worker.coordinators` — Coordinator addresses for static discovery (format: `host1:port1,host2:port2`). When set, uses shared-nothing mode (no shared filesystem needed).
-- `--peer.insecure` — Use insecure connection (h2c) instead of TLS
-- `--peer.cert-file` — Path to TLS certificate file for mutual TLS
-- `--peer.key-file` — Path to TLS key file for mutual TLS
-- `--peer.client-ca-file` — Path to CA certificate file for server verification
-- `--peer.skip-tls-verify` — Skip TLS certificate verification
-
-### dagu start-all
-
-Start server + scheduler + optionally coordinator in one process.
-
-```
-dagu start-all [flags]
-```
-
-The coordinator is enabled by default. Disable with `coordinator.enabled=false` in config or `DAGU_COORDINATOR_ENABLED=false`.
-
-Flags:
-- `--host/-s` — Web server host (default `localhost`)
-- `--port/-p` — Web server port (default `8080`)
-- `--dags/-d` — DAGs directory
-- `--coordinator.host/-H` — Coordinator gRPC host (default `127.0.0.1`)
-- `--coordinator.port/-P` — Coordinator gRPC port (default `50055`)
-- `--coordinator.advertise/-A` — Advertise address for service registry
-- `--peer.insecure` — Use insecure connection (h2c) instead of TLS
-- `--peer.cert-file` — Path to TLS certificate file
-- `--peer.key-file` — Path to TLS key file
-- `--peer.client-ca-file` — Path to CA certificate file for client verification (mTLS)
-- `--peer.skip-tls-verify` — Skip TLS certificate verification
-
-### dagu ai
-
-AI coding tool integrations.
-
-#### dagu ai install
-
-Install the Dagu DAG authoring skill into detected AI coding tools.
-
-```
-dagu ai install [--yes/-y] [--skills-dir <path> ...]
-```
-
-Supported tools: Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI.
-
-Flags:
-- `--yes/-y` — Install to all detected tools without prompting
-- `--skills-dir` — Install only into the specified skills directory. Repeatable. Skips auto-detection when provided.
 
 ### dagu schema
 
-Show JSON schema documentation.
+Show JSON schema documentation. Use a dot-separated path to drill into nested sections.
 
 ```
 dagu schema <dag|config> [path]
 ```
 
-Use a dot-separated path to drill into nested sections.
-
 Examples:
-- `dagu schema dag` — Show all DAG root-level fields
-- `dagu schema dag steps` — Show step definition structure
-- `dagu schema dag steps.container` — Show container configuration
-- `dagu schema dag steps.retry_policy` — Show retry policy fields
-- `dagu schema dag steps.agent` — Show agent step configuration
-- `dagu schema dag handler_on` — Show lifecycle event hooks
-- `dagu schema dag defaults` — Show default step configuration
-- `dagu schema dag overlap_policy` — Show overlap policy options
-- `dagu schema config` — Show all config root-level fields
-- `dagu schema config auth` — Show authentication configuration
-- `dagu schema config queues` — Show global queue configuration
-
-### dagu example
-
-Show example DAGs.
-
-```
-dagu example [id]
-```
-
-12 built-in examples: `parallel-steps`, `output-passing`, `schedule-params-env`, `defaults-and-retry`, `preconditions`, `lifecycle-hooks`, `http-requests`, `docker-container`, `sub-dag`, `conditional-routing`, `approval-gate`, `agent-step`
+- `dagu schema dag` — All DAG root-level fields
+- `dagu schema dag steps` — Step definition structure
+- `dagu schema dag steps.container` — Container configuration
+- `dagu schema dag steps.retry_policy` — Retry policy fields
+- `dagu schema dag steps.agent` — Agent step configuration
+- `dagu schema dag handler_on` — Lifecycle event hooks
+- `dagu schema config` — All config root-level fields
+- `dagu schema config auth` — Authentication configuration
 
 ### dagu config
 
@@ -318,145 +145,64 @@ Show resolved configuration paths.
 dagu config
 ```
 
-### dagu version
+## Server & Scheduling
 
-Show version.
+### dagu start-all
 
-```
-dagu version
-```
-
-### dagu migrate
-
-Migrate data formats.
+Start server + scheduler + optionally coordinator in one process. Coordinator enabled by default (disable with `DAGU_COORDINATOR_ENABLED=false`).
 
 ```
-dagu migrate history
+dagu start-all [--host/-s <host>] [--port/-p <port>] [--dags/-d <dir>]
 ```
 
-Migrates history from v1.16 to v1.17+ format.
+Also accepts `--coordinator.*` and `--peer.*` flags for distributed setup.
 
-### dagu upgrade
+### dagu server
 
-Self-update binary. Cannot be used if installed via Homebrew, Snap, `go install`, or Docker.
-
-```
-dagu upgrade [flags]
-```
-
-Flags:
-- `--check` — Only check for updates
-- `--version/-v` — Target version (e.g. `v1.30.0`)
-- `--dry-run` — Show what would happen
-- `--backup` — Backup current binary before upgrade
-- `--yes/-y` — Skip confirmation
-- `--force/-f` — Allow downgrade
-- `--pre-release` — Include pre-release versions
-
-### dagu license
-
-Manage license.
+Start web UI + REST API.
 
 ```
-dagu license <activate|deactivate|check>
+dagu server [--host/-s <host>] [--port/-p <port>] [--dags/-d <dir>] [--tunnel/-t]
 ```
 
-### dagu sync
+### dagu scheduler
 
-Git sync operations for DAG definitions.
-
-```
-dagu sync <subcommand>
-```
-
-#### dagu sync status
-
-Show Git sync status (repository, branch, per-DAG status).
+Start cron scheduler. Monitors DAGs and triggers runs on schedule; also processes queued runs.
 
 ```
-dagu sync status
+dagu scheduler [--dags/-d <dir>]
 ```
 
-#### dagu sync pull
+## Distributed Execution
 
-Pull changes from remote repository.
+### dagu coordinator
 
-```
-dagu sync pull
-```
+Start gRPC coordinator: `dagu coordinator [--coordinator.host/-H <host>] [--coordinator.port/-P <port>] [--peer.*]`
 
-#### dagu sync publish
+### dagu worker
 
-Publish local changes to remote repository.
+Start distributed worker: `dagu worker [--worker.id/-w <id>] [--worker.max-active-runs/-m <n>] [--worker.labels/-l <k=v,...>] [--worker.coordinators <addrs>] [--peer.*]`
 
-```
-dagu sync publish [dag-name]
-```
+## Git Sync
 
-Flags:
-- `--message/-m` — Commit message
-- `--all` — Publish all modified DAGs (cannot combine with dag-name argument)
-- `--force/-f` — Force publish even with conflicts
+`dagu sync <subcommand>` — Git sync operations for DAG definitions.
 
-#### dagu sync discard
+| Subcommand | Description |
+|------------|-------------|
+| `sync status` | Show sync status (repository, branch, per-DAG status) |
+| `sync pull` | Pull changes from remote |
+| `sync publish [dag] [--message/-m] [--all] [--force/-f]` | Publish local changes to remote |
+| `sync discard <dag> [--yes/-y]` | Discard local changes, restore remote version |
+| `sync forget <id>... [--yes/-y]` | Remove state entries for missing/untracked items |
+| `sync cleanup [--dry-run] [--yes/-y]` | Remove all missing entries from sync state |
+| `sync delete <id> [--message/-m] [--force] [--all-missing] [--dry-run] [--yes/-y]` | Delete from remote, local, and sync state |
+| `sync mv <old> <new> [--message/-m] [--force] [--dry-run] [--yes/-y]` | Rename across local, remote, and sync state |
 
-Discard local changes for a DAG and restore the remote version.
+## Other Commands
 
-```
-dagu sync discard <dag-name>
-```
-
-Flags:
-- `--yes/-y` — Skip confirmation
-
-#### dagu sync forget
-
-Remove state entries for missing/untracked/conflict sync items without deleting from remote.
-
-```
-dagu sync forget <item-id> [item-id...]
-```
-
-Flags:
-- `--yes/-y` — Skip confirmation
-
-#### dagu sync cleanup
-
-Remove all missing entries from sync state.
-
-```
-dagu sync cleanup
-```
-
-Flags:
-- `--yes/-y` — Skip confirmation
-- `--dry-run` — Show what would be cleaned up
-
-#### dagu sync delete
-
-Delete a sync item from remote repository, local disk, and sync state.
-
-```
-dagu sync delete <item-id>
-```
-
-Flags:
-- `--message/-m` — Commit message
-- `--force` — Force delete even with local modifications
-- `--all-missing` — Delete all missing items (cannot combine with item-id argument)
-- `--dry-run` — Show what would be deleted
-- `--yes/-y` — Skip confirmation
-
-#### dagu sync mv
-
-Atomically rename a sync item across local filesystem, remote repository, and sync state.
-
-```
-dagu sync mv <old-id> <new-id>
-```
-
-Flags:
-- `--message/-m` — Commit message
-- `--force` — Force move even with conflicts
-- `--dry-run` — Show what would be moved
-- `--yes/-y` — Skip confirmation
+- `dagu ai install [--yes/-y] [--skills-dir <path>]` — Install DAG authoring skill into AI coding tools (Claude Code, Codex, etc.)
+- `dagu example [id]` — Show built-in example DAGs (12 available)
+- `dagu version` — Show version
+- `dagu upgrade [--check] [--version/-v <ver>] [--dry-run] [--yes/-y]` — Self-update binary
+- `dagu license <activate|deactivate|check>` — Manage license
+- `dagu migrate history` — Migrate data from v1.16 to v1.17+ format

@@ -123,7 +123,7 @@ If a step captures large JSON via `output: VAR`, using `${VAR}` inside a `script
 
 ## 23. Iterating over multiline output requires `parallel:` or file read
 
-`output: VAR` stores multiline stdout as a single string. `for x in ${VAR}` does not split on newlines — it runs once with the entire string. Use `parallel: ${VAR}` with a sub-DAG (see pitfall #20), or read the stdout file: `while IFS= read -r line; do ... done < "${step_id.stdout}"`.
+`output: VAR` stores multiline stdout as a single string. `for x in ${VAR}` does not split on newlines — it runs once with the entire string. Use `parallel: ${VAR}` with a sub-DAG (requires `call:`), or read the stdout file: `while IFS= read -r line; do ... done < "${step_id.stdout}"`.
 
 ## 24. Use `printenv` for params with arbitrary content
 

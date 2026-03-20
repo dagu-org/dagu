@@ -4,7 +4,7 @@ description: Writes, validates, and debugs Dagu DAG workflow definitions in YAML
 ---
 # Dagu DAG Authoring Reference
 
-Dagu runs workflows defined as DAGs in YAML. Each YAML file defines steps with commands, dependencies, and executor configurations. This reference covers everything needed to write correct DAG files.
+Dagu runs workflows defined as DAGs in YAML. Each YAML file defines steps with commands, dependencies, and executor configurations.
 
 ## Execution Types
 
@@ -13,26 +13,17 @@ Dagu runs workflows defined as DAGs in YAML. Each YAML file defines steps with c
 | `chain` (default) | Steps run sequentially in definition order. `depends:` is not allowed. |
 | `graph` | Steps run based on `depends:` declarations. Steps without `depends:` run immediately in parallel. |
 
-**Always use `type: graph`** in DAG definitions. It supports both sequential (via `depends:`) and parallel execution, making it strictly more capable than `chain`. Every DAG you write should include `type: graph` at the top level.
+**Always use `type: graph`** — it supports both sequential (via `depends:`) and parallel execution, making it strictly more capable than `chain`.
 
 ## Step Identity: `id` vs `name`
 
-**Always set `id` on every step. Omit `name` — it is redundant.** When `name` is omitted, it is automatically set to the `id` value. When both are omitted, a name is auto-generated (e.g., `cmd_1`, `docker_1`), but the step cannot be referenced by other steps.
+**Always set `id` on every step. Omit `name` — it is redundant.** When `name` is omitted, it defaults to the `id` value. Without both, a name is auto-generated but the step cannot be referenced.
 
-The `id` field is required for:
-- Referencing step outputs via `${step_id.stdout}`, `${step_id.stderr}`, `${step_id.exit_code}`
-- Dependencies via `depends: [step_id]`
+`id` is required for output references (`${step_id.stdout}`, `${step_id.exit_code}`) and dependencies (`depends: [step_id]`).
 
-**Step ID rules:**
-- Regex: `^[a-zA-Z][a-zA-Z0-9_]*$`
-- Must start with a letter, followed by letters, digits, or underscores
-- Max length: 40 characters
-- **No hyphens** — use underscores instead
-- Reserved words (cannot be used as IDs): `env`, `params`, `args`, `stdout`, `stderr`, `output`, `outputs`
+**Step ID rules:** regex `^[a-zA-Z][a-zA-Z0-9_]*$`, max 40 chars, **no hyphens** (use underscores). Reserved words: `env`, `params`, `args`, `stdout`, `stderr`, `output`, `outputs`.
 
 ## Step Execution
-
-Steps can run commands via different executor types. The default executor runs shell commands.
 
 ```yaml
 type: graph
@@ -52,21 +43,19 @@ steps:
 
 ### Captured output variables (`output:`)
 
-Capture stdout **content** to a named variable with `output:`, reference with `${VAR}`:
+Capture stdout **content** to a named variable with `output:`, reference with `${VAR}`. For JSON output, extract fields with `${VAR.key}`.
 
-```yaml
-type: graph
-steps:
-  - id: get_date
-    command: date +%Y-%m-%d
-    output: TODAY
+### Step reference properties (`${step_id.XXX}`)
 
-  - id: use_date
-    command: echo "Today is ${TODAY}"
-    depends: [get_date]
-```
+| Reference | Value |
+|-----------|-------|
+| `${step_id.stdout}` | **File path** to the step's stdout log |
+| `${step_id.stderr}` | **File path** to the step's stderr log |
+| `${step_id.exit_code}` | Exit code as a string |
 
-For JSON output, extract fields with `${VAR.key}`:
+**Important:** `${step_id.stdout}` returns the **file path**, not the content. Use `output:` to capture **content**. Slicing is supported: `${step_id.stdout:start:length}`.
+
+### Combined example
 
 ```yaml
 type: graph
@@ -75,52 +64,22 @@ steps:
     command: echo '{"host":"db.example.com","port":5432}'
     output: CONFIG
 
-  - id: use_config
-    command: echo "Host is ${CONFIG.host}"
-    depends: [get_config]
-```
-
-### Step reference properties (`${step_id.XXX}`)
-
-Steps with an `id` expose three properties to downstream steps:
-
-| Reference | Value |
-|-----------|-------|
-| `${step_id.stdout}` | **File path** to the step's stdout log |
-| `${step_id.stderr}` | **File path** to the step's stderr log |
-| `${step_id.exit_code}` | Exit code as a string |
-
-**Important:** `${step_id.stdout}` returns the **file path**, not the content. Use `output:` to capture **content** into a variable.
-
-Slicing syntax is supported: `${step_id.stdout:start:length}`
-
-```yaml
-type: graph
-steps:
-  - id: producer
-    command: echo "hello world"
-    output: CONTENT
-
   - id: consumer
-    depends: [producer]
+    depends: [get_config]
     script: |
-      # Content captured by output: field
-      echo "Content: ${CONTENT}"
+      # Content via output: variable (direct value + JSON field access)
+      echo "Full: ${CONFIG}"
+      echo "Host: ${CONFIG.host}"
 
       # File paths to log files
-      echo "Stdout file: ${producer.stdout}"
-      echo "Stderr file: ${producer.stderr}"
-
-      # Exit code
-      echo "Exit code: ${producer.exit_code}"
-
-      # Slicing: first 5 chars of stdout path
-      echo "Prefix: ${producer.stdout:0:5}"
+      echo "Stdout file: ${get_config.stdout}"
+      echo "Stderr file: ${get_config.stderr}"
+      echo "Exit code: ${get_config.exit_code}"
 ```
 
 Resolution priority: when `${foo.bar}` is evaluated, step references are checked first, then JSON path on variables.
 
-## Parameters
+## Parameters and Environment Variables
 
 ```yaml
 type: graph
@@ -128,22 +87,17 @@ params:
   env: production
   region: us-east-1
 
-steps:
-  - id: deploy
-    command: deploy --env ${env} --region ${region}
-```
-
-Override at runtime: `dagu enqueue my-dag -- env=staging region=eu-west-1`
-
-## Environment Variables
-
-```yaml
-type: graph
 # Use list-of-maps to preserve ordering (maps iterate randomly in Go):
 env:
   - BASE_DIR: /data
   - OUTPUT_DIR: ${BASE_DIR}/output
+
+steps:
+  - id: deploy
+    command: deploy --env ${env} --region ${region} --out ${OUTPUT_DIR}
 ```
+
+Override params at runtime: `dagu enqueue my-dag -- env=staging region=eu-west-1`
 
 ## Lifecycle Hooks
 
@@ -188,7 +142,7 @@ steps:
 
 ## Dynamic Fan-Out with `parallel:`
 
-Use `parallel:` to iterate over dynamic output from a previous step. Each item gets its own sub-DAG run with retry, timeout, and UI visibility. Requires `call:` (see pitfall #20). Do NOT use bash `for` loops over output variables (see pitfall #23).
+Use `parallel:` to iterate over dynamic output from a previous step. Each item gets its own sub-DAG run with retry, timeout, and UI visibility. Requires `call:` (see pitfalls). Do NOT use bash `for` loops over output variables.
 
 ```yaml
 type: graph
@@ -240,76 +194,27 @@ steps:
     command: echo "handling error"
 ```
 
-## Finding DAG Files
-
-Run `dagu config` to discover where DAGs and other files are stored on the local system. The `DAGs directory` line shows where DAG YAML files should be created and read from.
+## CLI Quick Reference
 
 ```bash
-dagu config    # Shows all resolved paths (DAGs dir, logs, data, etc.)
+dagu config                            # Show resolved paths (DAGs dir, logs, data, etc.)
+dagu schema dag                        # All DAG root-level fields
+dagu schema dag steps.container        # Drill into nested fields with dot paths
+dagu schema config                     # All config fields
+dagu enqueue my-dag                    # Preferred over `dagu start` for agent use
+dagu status my-dag                     # Latest run status
+dagu status --run-id=<id> my-dag       # Specific run
+dagu history my-dag --last 7d --status failed  # Find past run IDs
 ```
 
-## Schema Lookup via CLI
-
-Run `dagu schema <dag|config> [path]` to look up field definitions, types, defaults, and allowed values. Use dot-separated paths to drill into nested fields (e.g. `dagu schema dag steps.container`).
-
-```bash
-dagu schema dag                    # All DAG root-level fields
-dagu schema dag steps              # Step fields
-dagu schema dag steps.container    # Container config
-dagu schema dag steps.retry_policy # Retry policy fields
-dagu schema dag steps.agent        # Agent step config
-dagu schema dag handler_on         # Lifecycle hooks
-dagu schema dag defaults           # Default step config
-dagu schema config                 # All config fields
-dagu schema config auth            # Auth config
-```
-
-## Checking Run Status
-
-For agent-triggered execution, prefer `dagu enqueue` over `dagu start`. Do not check whether the DAG is already running or queued before enqueueing unless the user explicitly asks for that check or requests singleton behavior.
-
-After enqueueing or starting a DAG, use `dagu status` to inspect the result. The output is a tree showing each step's status, command, stdout/stderr content, and errors.
-
-```bash
-dagu status my-dag                          # Latest run
-dagu status --run-id=<id> my-dag            # Specific run
-dagu status --run-id=<id> --sub-run-id=<id> my-dag  # Sub-DAG run
-```
-
-Example output for a failed run:
-
-```
-Failed ✗ - 2026-03-10 14:22:15
-dag: my-dag (45s)
-│
-├─fetch_data (12s) [succeeded]
-│ ├─curl -f https://api.example.com/data -o data.json
-│ └─stdout: /path/to/stdout.log
-│   {"status": "ok", "records": 142}
-│
-└─process_data (33s) [failed]
-  ├─python transform.py --input data.json
-  ├─stderr: /path/to/stderr.log
-  │   Traceback (most recent call last):
-  │     File "transform.py", line 42
-  │   KeyError: 'missing_field'
-  └─error: command exited with code 1
-
-Result: Failed ✗
-```
-
-Use `dagu history` to find run IDs of past executions:
-
-```bash
-dagu history my-dag --last 7d --status failed
-```
+Prefer `dagu enqueue` over `dagu start`. Do not check whether the DAG is already running before enqueueing unless the user explicitly asks.
 
 ## Quick Reference Tables
 
-See the `references/` directory for complete details:
-- `cli.md` — All 25 CLI subcommands with flags
-- `schema.md` — Complete DAG YAML schema (top-level and step-level fields)
-- `executors.md` — All 18 executor types with configuration
-- `env.md` — Execution and configuration environment variables
+See the `references/` directory:
+- `cli.md` — CLI subcommands and flags
+- `schema.md` — Complete DAG YAML schema
+- `executors.md` — All executor types with configuration
+- `env.md` — Environment variables
 - `pitfalls.md` — Critical pitfalls with examples
-- `codingagent.md` — Integrating AI coding agents (Claude Code, Codex, Gemini, etc.) into DAG workflows
+- `codingagent.md` — AI coding agent integration
