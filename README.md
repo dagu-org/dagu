@@ -62,7 +62,7 @@ One binary. No Postgres. No Redis. No Python. Just `dagu start-all`.
 **macOS/Linux:**
 
 ```bash
-curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
 ```
 
 **Homebrew:**
@@ -76,6 +76,10 @@ brew install dagu
 ```powershell
 irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1 | iex
 ```
+
+The script installers open a guided wizard. They can install Dagu, add it to your PATH, set it up as a background service, create the first admin account, and install the Dagu AI skill when a supported AI tool is detected.
+
+Homebrew, npm, Docker, Helm, and manual downloads install Dagu without the guided wizard. See the [Installation docs](https://docs.dagu.sh/getting-started/installation) for the full install guide and advanced options.
 
 **Docker:**
 
@@ -94,24 +98,28 @@ helm install dagu dagu/dagu --set persistence.storageClass=<your-rwx-storage-cla
 > Replace `<your-rwx-storage-class>` with a StorageClass in your cluster that supports `ReadWriteMany`. If your cluster default storage class already supports `ReadWriteMany`, you can omit the flag. See [charts/dagu/README.md](./charts/dagu/README.md) for chart details, values, and source-checkout installation.
 
 > More options (npm, custom paths, specific versions): [Installation docs](https://docs.dagu.sh/getting-started/installation)
+>
+> The script installers also support uninstall. See the [Installation docs](https://docs.dagu.sh/getting-started/installation#uninstall) for `--uninstall` / `-Uninstall`, optional data purge, and AI skill removal.
 
 ### 2. Set up AI-assisted workflow authoring (optional)
 
 If you use an AI coding tool (Claude Code, Codex, OpenCode, Gemini CLI, or Copilot CLI), install the Dagu skill so the AI can write correct DAG YAML.
 
+If you installed Dagu with Homebrew, npm, or a manual binary download, run this after `dagu` is available on your PATH. The guided installer can offer the same step automatically.
+
 Use Dagu's built-in installer:
 
 ```bash
-dagu ai install --skills-dir ~/.agents/skills
+dagu ai install --yes
 ```
 
-Or use the shared `skills` CLI:
+Fallback via the shared `skills` CLI:
 
 ```bash
 npx skills add https://github.com/dagu-org/dagu --skill dagu
 ```
 
-See [docs](https://docs.dagu.sh/getting-started/cli#ai) for more details.
+For explicit skills directories, see the [installation docs](https://docs.dagu.sh/getting-started/installation) and the [CLI reference](https://docs.dagu.sh/getting-started/cli#ai).
 
 ### 3. Create your first workflow
 
@@ -340,7 +348,7 @@ For more examples, see the [Examples](https://docs.dagu.sh/writing-workflows/exa
 
 ### Builtin Authentication (RBAC)
 
-When `DAGU_AUTH_MODE=builtin`, a file-based user management system with role-based access control is enabled. Roles: `admin`, `manager`, `developer`, `operator`, `viewer`. On first startup, visit the web UI to create your admin account via the setup page.
+When `DAGU_AUTH_MODE=builtin`, a file-based user management system with role-based access control is enabled. Roles: `admin`, `manager`, `developer`, `operator`, `viewer`. On first startup, create the first admin with the guided installer, configure `initial_admin`, or visit the web UI setup page.
 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
