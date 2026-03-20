@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Loader2, Terminal } from 'lucide-react';
 import { DelegateInfo, Message, UserPromptResponse } from '../types';
 import { CommandApprovalMessage } from './CommandApprovalMessage';
@@ -31,9 +31,21 @@ export function ChatMessages({
   onOpenDelegate,
 }: ChatMessagesProps): React.ReactNode {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const threshold = 80;
+    isNearBottomRef.current =
+      el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+  }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isNearBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, pendingUserMessage, isWorking]);
 
   const completedToolCallIds = useMemo(() => {
@@ -67,7 +79,7 @@ export function ChatMessages({
   );
 
   return (
-    <div className="flex-1 overflow-y-auto p-2 space-y-2 font-mono text-xs bg-popover">
+    <div ref={containerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-2 space-y-2 font-mono text-xs bg-popover">
       {messages.map((message, idx) => (
         <MessageItem
           key={message.id}
