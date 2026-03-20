@@ -390,7 +390,7 @@ func TestInstallSkill(t *testing.T) {
 
 	// Check references exist
 	refDir := filepath.Join(targetDir, "dagu", "references")
-	for _, name := range []string{"cli.md", "schema.md", "executors.md", "env.md", "pitfalls.md"} {
+	for _, name := range []string{"cli.md", "codingagent.md", "schema.md", "executors.md", "env.md", "pitfalls.md"} {
 		_, err := os.Stat(filepath.Join(refDir, name))
 		assert.NoError(t, err, "reference file %s should exist", name)
 	}
@@ -584,13 +584,13 @@ func TestEmbeddedSkillFS(t *testing.T) {
 	skillFS := fileagentskill.SkillFS()
 
 	// Verify SKILL.md exists and has correct frontmatter
-	data, err := skillFS.ReadFile("examples/dagu/SKILL.md")
+	data, err := skillFS.ReadFile("dagu/SKILL.md")
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "name: dagu")
 
 	// Verify all reference files exist
-	for _, name := range []string{"cli.md", "schema.md", "executors.md", "env.md", "pitfalls.md"} {
-		_, err := skillFS.ReadFile("examples/dagu/references/" + name)
+	for _, name := range []string{"cli.md", "codingagent.md", "schema.md", "executors.md", "env.md", "pitfalls.md"} {
+		_, err := skillFS.ReadFile("dagu/references/" + name)
 		assert.NoError(t, err, "reference file %s should be embedded", name)
 	}
 }

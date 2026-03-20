@@ -17,13 +17,14 @@ import (
 	"github.com/fatih/color"
 
 	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
+	bundledskills "github.com/dagu-org/dagu/skills"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
 
 const (
-	skillDirName     = "dagu"
-	skillEmbedPrefix = "examples/dagu"
+	skillDirName     = bundledskills.DaguSkillDir
+	skillEmbedPrefix = bundledskills.DaguSkillDir
 	copilotBeginMark = "<!-- BEGIN DAGU -->"
 	copilotEndMark   = "<!-- END DAGU -->"
 	copilotFileName  = "copilot-instructions.md"

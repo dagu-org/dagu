@@ -10,21 +10,22 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-)
 
-//go:embed all:examples
-var exampleSkillsFS embed.FS
+	bundledskills "github.com/dagu-org/dagu/skills"
+)
 
 const examplesMarkerFile = ".examples-created"
 
+var exampleSkillsFS = bundledskills.Assets
+
 // ExampleSkillIDs returns the IDs of bundled example skills.
 func ExampleSkillIDs() []string {
-	return []string{"dagu-ai-workflows", "dagu-containers", "dagu-server-worker"}
+	return bundledskills.ExampleIDs()
 }
 
 // SkillFS returns the embedded example skills filesystem.
 func SkillFS() embed.FS {
-	return exampleSkillsFS
+	return bundledskills.Assets
 }
 
 // SeedExampleSkills writes bundled example skills to baseDir if not already seeded.
@@ -50,12 +51,11 @@ func SeedExampleSkills(baseDir string) bool {
 		seedableIDs[id] = struct{}{}
 	}
 
-	err := fs.WalkDir(exampleSkillsFS, "examples", func(path string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(exampleSkillsFS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
 		}
-		// path is "examples/{skill-id}/SKILL.md"
-		relPath := strings.TrimPrefix(path, "examples/")
+		relPath := path
 		topDir := strings.SplitN(relPath, "/", 2)[0]
 		if _, ok := seedableIDs[topDir]; !ok {
 			return nil // skip non-example skills (e.g. dagu/ used by ai install)
@@ -96,7 +96,7 @@ func SeedExampleSkills(baseDir string) bool {
 	return true
 }
 
-const builtinKnowledgeEmbedDir = "examples/dagu/references"
+const builtinKnowledgeEmbedDir = bundledskills.DaguReferencesDir
 
 // SeedReferences extracts built-in reference documents to the given directory.
 // These are read-only knowledge files the AI agent can read on demand.

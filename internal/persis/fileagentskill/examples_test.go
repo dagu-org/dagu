@@ -91,7 +91,7 @@ func TestSeedExampleSkills_ValidContent(t *testing.T) {
 func TestBundledDaguSkillPrefersEnqueue(t *testing.T) {
 	t.Parallel()
 
-	data, err := SkillFS().ReadFile("examples/dagu/SKILL.md")
+	data, err := SkillFS().ReadFile("dagu/SKILL.md")
 	require.NoError(t, err)
 
 	content := string(data)
