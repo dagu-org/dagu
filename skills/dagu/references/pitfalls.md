@@ -124,3 +124,24 @@ If a step captures large JSON via `output: VAR`, using `${VAR}` inside a `script
 ## 23. Iterating over multiline output requires `parallel:` or file read
 
 `output: VAR` stores multiline stdout as a single string. `for x in ${VAR}` does not split on newlines — it runs once with the entire string. Use `parallel: ${VAR}` with a sub-DAG (see pitfall #20), or read the stdout file: `while IFS= read -r line; do ... done < "${step_id.stdout}"`.
+
+## 24. Use `printenv` for params with arbitrary content
+
+`${param_name}` in a `script:` block is expanded by Dagu before the shell runs. If the param value contains shell metacharacters (backticks, `$`, quotes, newlines, code blocks), the expanded script breaks shell parsing. Step-level `env:` has the same problem — Dagu evaluates backtick expressions found in the expanded value.
+
+**Use `printenv param_name` instead.** Dagu sets all params as OS environment variables. `printenv` reads the raw value from the OS without any shell or Dagu interpretation.
+
+```yaml
+params:
+  - name: user_text
+    type: string
+
+steps:
+  - id: save_input
+    script: |
+      printenv user_text > "${DAG_DOCS_DIR}/input.md"
+```
+
+## 25. `repeat_policy.limit` does not accept variable references
+
+`repeat_policy.limit` requires a literal integer in YAML. `limit: ${max_rounds}` fails with a type error at parse time. **Workaround:** set a high fixed limit and enforce the real max inside the repeated step by checking a counter file.
