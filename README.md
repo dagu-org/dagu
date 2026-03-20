@@ -97,16 +97,21 @@ helm install dagu dagu/dagu --set persistence.storageClass=<your-rwx-storage-cla
 
 ### 2. Set up AI-assisted workflow authoring (optional)
 
-If you use an AI coding tool (Claude Code, Codex, OpenCode, Gemini CLI, or Copilot CLI), install the Dagu skill so the AI can write correct DAG YAML:
+If you use an AI coding tool (Claude Code, Codex, OpenCode, Gemini CLI, or Copilot CLI), install the Dagu skill so the AI can write correct DAG YAML.
+
+Use Dagu's built-in installer:
 
 ```bash
-dagu ai install
-
-# Or install into a specific skills directory
 dagu ai install --skills-dir ~/.agents/skills
 ```
 
-This auto-detects installed tools and installs the DAG authoring skill into each one. Use `--skills-dir` to install only into the specified skills directory or directories. See [docs](https://docs.dagu.sh/getting-started/cli#ai-install) for details.
+Or use the shared `skills` CLI:
+
+```bash
+npx skills add https://github.com/dagu-org/dagu --skill dagu
+```
+
+See [docs](https://docs.dagu.sh/getting-started/cli#ai) for more details.
 
 ### 3. Create your first workflow
 
