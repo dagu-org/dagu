@@ -69,3 +69,54 @@ Missed runs are skipped unless `catchup_window:` is set.
 ## 16. params values are always strings
 
 Complex types become `fmt.Sprintf("%v")` output. Pass structured data as JSON strings.
+
+## 17. env: cannot reference params: values
+
+`env:` is evaluated before `params:` are resolved. `env: - X: "${my_param}/foo"` silently resolves `${my_param}` to empty. **Workaround:** compute derived values in a shell step instead:
+
+```yaml
+params:
+  base: /tmp
+
+steps:
+  - id: setup
+    command: echo "${base}/output"
+    output: FULL_PATH
+```
+
+## 18. Built-in jq executor cannot read files
+
+The `type: jq` executor only accepts inline JSON in `script:`. It cannot read from `${step_id.stdout}` file paths. **Workaround:** use `gh api --jq` for GitHub API JSON, or use a shell step with the `jq` CLI for local files.
+
+## 19. Sub-DAG output variables are not propagated to parent
+
+When a child sub-DAG sets `output:` on its steps, the parent sees `"outputs": {}` in the parallel results. **Workaround:** have the child write results to a shared temp directory, and the parent reads from there after the parallel step completes.
+
+## 20. parallel: only works with call: (sub-DAGs)
+
+You cannot use `parallel:` on a regular step to iterate over items. It requires `call:` to a sub-DAG. **Workaround:** define an inline sub-DAG with `---` separator, even for single-step operations.
+
+```yaml
+- id: fan_out
+  call: my-step
+  parallel: ${ITEMS}
+---
+name: my-step
+steps:
+  - id: run
+    script: echo "Processing ${ITEM}"
+```
+
+## 21. No simple expression-based step skipping
+
+Conditional step execution requires `preconditions:` with a shell command + exact string match. There is no `skip_if:` expression syntax. **Workaround:** use a shell test command in preconditions:
+
+```yaml
+preconditions:
+  - condition: 'test -n "${MY_VAR}" && echo yes'
+    expected: "yes"
+```
+
+## 22. Large output variables break jq script: interpolation
+
+If a step captures large JSON via `output: VAR`, using `${VAR}` inside a `script:` field (especially for `type: jq`) can break JSON parsing due to unescaped characters. **Workaround:** use `${step_id.stdout}` file paths and read with `cat` in shell steps instead of string interpolation.
