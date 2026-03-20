@@ -83,6 +83,7 @@ SERVICE_LABEL="local.dagu.server"
 DAGU_HOME_DIR=""
 INSTALL_PATH=""
 SERVICE_URL=""
+SERVICE_PATH=""
 SKILL_DETECTED_COUNT=0
 SCRUB_BACKUP_FILE=""
 declare -a UNINSTALL_INSTALL_PATHS=()
@@ -710,6 +711,7 @@ configure_defaults() {
     DAGU_HOME_DIR="$(default_dagu_home)"
     INSTALL_PATH="${DAGU_INSTALL_DIR}/dagu"
     SERVICE_URL="http://${HOST}:${PORT}"
+    resolve_service_path
     if [[ -z "$OPEN_BROWSER" ]]; then
         OPEN_BROWSER="yes"
     fi
@@ -721,6 +723,57 @@ configure_defaults() {
         else
             SKILL_MODE="skip"
         fi
+    fi
+}
+
+append_service_path_segment() {
+    local segment="$1"
+    [[ -z "$segment" ]] && return 0
+    case ":${SERVICE_PATH}:" in
+        *":${segment}:"*) return 0 ;;
+    esac
+    if [[ -z "${SERVICE_PATH}" ]]; then
+        SERVICE_PATH="${segment}"
+    else
+        SERVICE_PATH="${SERVICE_PATH}:${segment}"
+    fi
+}
+
+append_service_path_list() {
+    local list="$1"
+    local segment
+    local old_ifs="${IFS}"
+    [[ -z "$list" ]] && return 0
+    IFS=':'
+    for segment in $list; do
+        append_service_path_segment "$segment"
+    done
+    IFS="${old_ifs}"
+}
+
+resolve_service_path() {
+    local path_helper_output=""
+    SERVICE_PATH=""
+    append_service_path_list "${PATH:-}"
+    if [[ "$OS" == "macos" && -x /usr/libexec/path_helper ]]; then
+        path_helper_output="$("/usr/libexec/path_helper" -s 2>/dev/null | sed -n 's/^PATH=\"\(.*\)\"; export PATH$/\1/p' | head -n1 || true)"
+        append_service_path_list "${path_helper_output}"
+    fi
+    append_service_path_segment "${DAGU_INSTALL_DIR}"
+    append_service_path_segment "${HOME}/.local/bin"
+    append_service_path_segment "${HOME}/bin"
+    append_service_path_segment "${HOME}/.npm-global/bin"
+    append_service_path_segment "${HOME}/.local/share/pnpm"
+    append_service_path_segment "${HOME}/.bun/bin"
+    append_service_path_segment "${HOME}/.deno/bin"
+    append_service_path_segment "/opt/homebrew/bin"
+    append_service_path_segment "/usr/local/bin"
+    append_service_path_segment "/usr/bin"
+    append_service_path_segment "/bin"
+    append_service_path_segment "/usr/sbin"
+    append_service_path_segment "/sbin"
+    if [[ -z "${SERVICE_PATH}" ]]; then
+        SERVICE_PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
     fi
 }
 
@@ -1589,6 +1642,7 @@ write_linux_env_file() {
         printf 'DAGU_HOME=%s\n' "$(quote_env_value "${DAGU_HOME_DIR}")"
         printf 'DAGU_HOST=%s\n' "$(quote_env_value "${HOST}")"
         printf 'DAGU_PORT=%s\n' "$(quote_env_value "${PORT}")"
+        printf 'PATH=%s\n' "$(quote_env_value "${SERVICE_PATH}")"
         if [[ "$bootstrap" == "yes" ]]; then
             printf 'DAGU_AUTH_BUILTIN_INITIAL_ADMIN_USERNAME=%s\n' "$(quote_env_value "${ADMIN_USERNAME}")"
             printf 'DAGU_AUTH_BUILTIN_INITIAL_ADMIN_PASSWORD=%s\n' "$(quote_env_value "${ADMIN_PASSWORD}")"
@@ -1692,6 +1746,7 @@ write_mac_env_file() {
         printf 'DAGU_HOME=%s\n' "$(quote_env_value "${DAGU_HOME_DIR}")"
         printf 'DAGU_HOST=%s\n' "$(quote_env_value "${HOST}")"
         printf 'DAGU_PORT=%s\n' "$(quote_env_value "${PORT}")"
+        printf 'PATH=%s\n' "$(quote_env_value "${SERVICE_PATH}")"
         if [[ "$bootstrap" == "yes" ]]; then
             printf 'DAGU_AUTH_BUILTIN_INITIAL_ADMIN_USERNAME=%s\n' "$(quote_env_value "${ADMIN_USERNAME}")"
             printf 'DAGU_AUTH_BUILTIN_INITIAL_ADMIN_PASSWORD=%s\n' "$(quote_env_value "${ADMIN_PASSWORD}")"
@@ -1711,11 +1766,17 @@ read_env_value() {
 
 write_mac_plist() {
     local logs_dir="${HOME}/Library/Logs/Dagu"
-    local bootstrap_user="" bootstrap_pass="" tmp
+    local bootstrap_user="" bootstrap_pass="" service_path="" tmp
     mkdir -p "${logs_dir}" "$(dirname "${SERVICE_PLIST_FILE}")"
     if [[ -f "${SERVICE_BOOTSTRAP_FILE}" ]]; then
         bootstrap_user="$(read_env_value "${SERVICE_BOOTSTRAP_FILE}" "DAGU_AUTH_BUILTIN_INITIAL_ADMIN_USERNAME")"
         bootstrap_pass="$(read_env_value "${SERVICE_BOOTSTRAP_FILE}" "DAGU_AUTH_BUILTIN_INITIAL_ADMIN_PASSWORD")"
+    fi
+    if [[ -f "${SERVICE_ENV_FILE}" ]]; then
+        service_path="$(read_env_value "${SERVICE_ENV_FILE}" "PATH")"
+    fi
+    if [[ -z "${service_path}" ]]; then
+        service_path="${SERVICE_PATH}"
     fi
     tmp="$(mktempfile)"
     cat >"${tmp}" <<EOF
@@ -1748,6 +1809,8 @@ write_mac_plist() {
     <string>$(xml_escape "${HOST}")</string>
     <key>DAGU_PORT</key>
     <string>$(xml_escape "${PORT}")</string>
+    <key>PATH</key>
+    <string>$(xml_escape "${service_path}")</string>
 EOF
     if [[ -n "${bootstrap_user}" ]]; then
         cat >>"${tmp}" <<EOF
