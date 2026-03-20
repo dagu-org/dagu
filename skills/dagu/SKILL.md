@@ -186,6 +186,32 @@ steps:
       input_file: /data/input.csv
 ```
 
+## Dynamic Fan-Out with `parallel:`
+
+Use `parallel:` to iterate over dynamic output from a previous step. Each item gets its own sub-DAG run with retry, timeout, and UI visibility. Requires `call:` (see pitfall #20). Do NOT use bash `for` loops over output variables (see pitfall #23).
+
+```yaml
+type: graph
+steps:
+  - id: get_items
+    command: gh api repos/org/repo/tags --jq '.[].name'
+    output: TAG_LIST
+
+  - id: process_each
+    depends: [get_items]
+    call: process-tag
+    parallel:
+      items: ${TAG_LIST}     # auto-splits on newlines, commas, or spaces
+      max_concurrent: 5
+    params:
+      tag: ${ITEM}
+---
+name: process-tag
+steps:
+  - id: run
+    command: echo "Processing tag ${tag}"
+```
+
 ## Conditional Routing
 
 Routes map patterns to lists of existing step names (not inline step definitions).

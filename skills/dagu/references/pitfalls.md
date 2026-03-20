@@ -120,3 +120,7 @@ preconditions:
 ## 22. Large output variables break jq script: interpolation
 
 If a step captures large JSON via `output: VAR`, using `${VAR}` inside a `script:` field (especially for `type: jq`) can break JSON parsing due to unescaped characters. **Workaround:** use `${step_id.stdout}` file paths and read with `cat` in shell steps instead of string interpolation.
+
+## 23. Iterating over multiline output requires `parallel:` or file read
+
+`output: VAR` stores multiline stdout as a single string. `for x in ${VAR}` does not split on newlines — it runs once with the entire string. Use `parallel: ${VAR}` with a sub-DAG (see pitfall #20), or read the stdout file: `while IFS= read -r line; do ... done < "${step_id.stdout}"`.
