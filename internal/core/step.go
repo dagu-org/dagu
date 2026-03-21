@@ -254,12 +254,18 @@ type RepeatPolicy struct {
 	RepeatMode RepeatMode `json:"repeatMode,omitempty"`
 	// Interval is the time to wait between repeats.
 	Interval time.Duration `json:"interval,omitempty"`
+	// IntervalStr is the string representation of interval_sec for deferred evaluation.
+	IntervalStr string `json:"intervalStr,omitempty"`
 	// Limit is the maximum number of times to repeat the step.
 	Limit int `json:"limit,omitempty"`
+	// LimitStr is the string representation of the limit for deferred evaluation.
+	LimitStr string `json:"limitStr,omitempty"`
 	// Backoff is the exponential backoff multiplier (e.g., 2.0 for doubling).
 	Backoff float64 `json:"backoff,omitempty"`
 	// MaxInterval is the maximum interval cap for exponential backoff.
 	MaxInterval time.Duration `json:"maxInterval,omitempty"`
+	// MaxIntervalStr is the string representation of max_interval_sec for deferred evaluation.
+	MaxIntervalStr string `json:"maxIntervalStr,omitempty"`
 	// Condition is the condition object to be met for the repeat.
 	Condition *Condition `json:"condition,omitempty"`
 	// ExitCode is the list of exit codes that should trigger a repeat.
@@ -281,11 +287,14 @@ func (r *RepeatPolicy) UnmarshalJSON(data []byte) error {
 	// Copy the fields
 	r.RepeatMode = aux.RepeatMode
 	r.Interval = aux.Interval
+	r.IntervalStr = aux.IntervalStr
 	r.Limit = aux.Limit
+	r.LimitStr = aux.LimitStr
 	r.Condition = aux.Condition
 	r.ExitCode = aux.ExitCode
 	r.Backoff = aux.Backoff
 	r.MaxInterval = aux.MaxInterval
+	r.MaxIntervalStr = aux.MaxIntervalStr
 
 	// If RepeatMode is already set, we're done (new format)
 	if r.RepeatMode != "" {

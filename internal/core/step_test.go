@@ -280,6 +280,30 @@ func TestRepeatPolicy_MarshalUnmarshal(t *testing.T) {
 	})
 }
 
+func TestRepeatPolicy_StrFieldsRoundTrip(t *testing.T) {
+	original := RepeatPolicy{
+		RepeatMode:     RepeatModeWhile,
+		LimitStr:       "${max_rounds}",
+		IntervalStr:    "$INTERVAL",
+		MaxIntervalStr: "${MAX_INTERVAL}",
+		Condition: &Condition{
+			Condition: "true",
+		},
+	}
+
+	data, err := json.Marshal(original)
+	require.NoError(t, err)
+
+	var unmarshaled RepeatPolicy
+	err = json.Unmarshal(data, &unmarshaled)
+	require.NoError(t, err)
+
+	assert.Equal(t, original.LimitStr, unmarshaled.LimitStr)
+	assert.Equal(t, original.IntervalStr, unmarshaled.IntervalStr)
+	assert.Equal(t, original.MaxIntervalStr, unmarshaled.MaxIntervalStr)
+	assert.Equal(t, original.RepeatMode, unmarshaled.RepeatMode)
+}
+
 func TestCommandEntry_String(t *testing.T) {
 	tests := []struct {
 		name     string

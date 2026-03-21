@@ -6,6 +6,7 @@ package spec
 import (
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/core/spec/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -78,7 +79,7 @@ func TestApplyDefaults(t *testing.T) {
 
 	t.Run("RepeatPolicy_Inherits", func(t *testing.T) {
 		t.Parallel()
-		rp := &repeatPolicy{Repeat: "while", IntervalSec: 30}
+		rp := &repeatPolicy{Repeat: types.RepeatModeFromString("while"), IntervalSec: types.IntOrDynamicFromInt(30)}
 		s := &step{}
 		applyDefaults(s, &defaults{RepeatPolicy: rp}, nil)
 		require.Equal(t, rp, s.RepeatPolicy)
@@ -86,8 +87,8 @@ func TestApplyDefaults(t *testing.T) {
 
 	t.Run("RepeatPolicy_StepOverrides", func(t *testing.T) {
 		t.Parallel()
-		stepRP := &repeatPolicy{Repeat: "until", IntervalSec: 10}
-		defRP := &repeatPolicy{Repeat: "while", IntervalSec: 30}
+		stepRP := &repeatPolicy{Repeat: types.RepeatModeFromString("until"), IntervalSec: types.IntOrDynamicFromInt(10)}
+		defRP := &repeatPolicy{Repeat: types.RepeatModeFromString("while"), IntervalSec: types.IntOrDynamicFromInt(30)}
 		s := &step{RepeatPolicy: stepRP}
 		applyDefaults(s, &defaults{RepeatPolicy: defRP}, nil)
 		require.Equal(t, stepRP, s.RepeatPolicy)
@@ -226,7 +227,7 @@ func TestApplyDefaults(t *testing.T) {
 		d := &defaults{
 			RetryPolicy:   &retryPolicy{Limit: 3, IntervalSec: 5},
 			ContinueOn:    continueOnValue("failed"),
-			RepeatPolicy:  &repeatPolicy{Repeat: "while", IntervalSec: 30},
+			RepeatPolicy:  &repeatPolicy{Repeat: types.RepeatModeFromString("while"), IntervalSec: types.IntOrDynamicFromInt(30)},
 			TimeoutSec:    600,
 			MailOnError:   boolPtr(true),
 			SignalOnStop:  strPtr("SIGTERM"),

@@ -705,6 +705,18 @@ func TypedUnionDecodeHook() mapstructure.DecodeHookFunc {
 		if to == reflect.TypeFor[types.TagsValue]() {
 			return decodeViaYAML[types.TagsValue](data)
 		}
+		// Handle types.RepeatMode
+		if to == reflect.TypeFor[types.RepeatMode]() {
+			return decodeViaYAML[types.RepeatMode](data)
+		}
+		// Handle types.IntOrDynamic
+		if to == reflect.TypeFor[types.IntOrDynamic]() {
+			return decodeViaYAML[types.IntOrDynamic](data)
+		}
+		// Handle types.BackoffValue
+		if to == reflect.TypeFor[types.BackoffValue]() {
+			return decodeViaYAML[types.BackoffValue](data)
+		}
 		return data, nil
 	}
 }
