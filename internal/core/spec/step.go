@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -133,13 +134,13 @@ type approvalConfig struct {
 // repeatPolicy defines the repeat policy for a step.
 type repeatPolicy struct {
 	Repeat         any    `yaml:"repeat,omitempty"`           // Flag to indicate if the step should be repeated, can be bool (legacy) or string ("while" or "until")
-	IntervalSec    int    `yaml:"interval_sec,omitempty"`     // Interval in seconds to wait before repeating the step
-	Limit          int    `yaml:"limit,omitempty"`            // Maximum number of times to repeat the step
+	IntervalSec    any    `yaml:"interval_sec,omitempty"`     // Interval in seconds to wait before repeating the step
+	Limit          any    `yaml:"limit,omitempty"`            // Maximum number of times to repeat the step
 	Condition      string `yaml:"condition,omitempty"`        // Condition to check before repeating
 	Expected       string `yaml:"expected,omitempty"`         // Expected output to match before repeating
 	ExitCode       []int  `yaml:"exit_code,omitempty"`        // List of exit codes to consider for repeating the step
 	Backoff        any    `yaml:"backoff,omitempty"`          // Accepts bool or float
-	MaxIntervalSec int    `yaml:"max_interval_sec,omitempty"` // Maximum interval in seconds
+	MaxIntervalSec any    `yaml:"max_interval_sec,omitempty"` // Maximum interval in seconds
 }
 
 // retryPolicy defines the retry policy for a step.
@@ -706,6 +707,42 @@ func parseBackoffValue(val any, fieldName string) (float64, error) {
 	return backoff, nil
 }
 
+// parseRepeatIntOrDynamic parses an integer field that may contain a variable reference.
+// Unlike parseStepRetryLimit which defers all strings, this validates eagerly and
+// only defers genuinely dynamic references (containing ${, $, or backticks).
+func parseRepeatIntOrDynamic(val any, fieldName string) (int, string, error) {
+	switch v := val.(type) {
+	case int:
+		return v, "", nil
+	case int64:
+		return int(v), "", nil
+	case uint64:
+		if v > math.MaxInt {
+			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("value %d exceeds maximum int", v))
+		}
+		return int(v), "", nil
+	case string:
+		if isDynamicString(v) {
+			return 0, v, nil
+		}
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("must be an integer or a variable reference like ${VAR}"))
+		}
+		return n, "", nil
+	case nil:
+		return 0, "", nil
+	default:
+		return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("invalid type: %T", v))
+	}
+}
+
+// isDynamicString returns true if s contains variable references or command substitutions.
+func isDynamicString(s string) bool {
+	return strings.Contains(s, "${") || strings.Contains(s, "`") ||
+		(strings.HasPrefix(s, "$") && len(s) > 1)
+}
+
 func buildStepRepeatPolicy(_ StepBuildContext, s *step) (core.RepeatPolicy, error) {
 	if s.RepeatPolicy == nil {
 		return core.RepeatPolicy{}, nil
@@ -760,10 +797,22 @@ func buildStepRepeatPolicy(_ StepBuildContext, s *step) (core.RepeatPolicy, erro
 
 	var result core.RepeatPolicy
 	result.RepeatMode = mode
-	if rp.IntervalSec > 0 {
-		result.Interval = time.Second * time.Duration(rp.IntervalSec)
+
+	// Parse interval_sec
+	intervalSec, intervalStr, err := parseRepeatIntOrDynamic(rp.IntervalSec, "repeat_policy.interval_sec")
+	if err != nil {
+		return core.RepeatPolicy{}, err
 	}
-	result.Limit = rp.Limit
+	if intervalSec > 0 {
+		result.Interval = time.Second * time.Duration(intervalSec)
+	}
+	result.IntervalStr = intervalStr
+
+	// Parse limit
+	result.Limit, result.LimitStr, err = parseRepeatIntOrDynamic(rp.Limit, "repeat_policy.limit")
+	if err != nil {
+		return core.RepeatPolicy{}, err
+	}
 
 	if rp.Condition != "" {
 		result.Condition = &core.Condition{
@@ -780,10 +829,15 @@ func buildStepRepeatPolicy(_ StepBuildContext, s *step) (core.RepeatPolicy, erro
 	}
 	result.Backoff = backoff
 
-	// Parse maxIntervalSec
-	if rp.MaxIntervalSec > 0 {
-		result.MaxInterval = time.Second * time.Duration(rp.MaxIntervalSec)
+	// Parse max_interval_sec
+	maxIntervalSec, maxIntervalStr, err := parseRepeatIntOrDynamic(rp.MaxIntervalSec, "repeat_policy.max_interval_sec")
+	if err != nil {
+		return core.RepeatPolicy{}, err
 	}
+	if maxIntervalSec > 0 {
+		result.MaxInterval = time.Second * time.Duration(maxIntervalSec)
+	}
+	result.MaxIntervalStr = maxIntervalStr
 
 	return result, nil
 }

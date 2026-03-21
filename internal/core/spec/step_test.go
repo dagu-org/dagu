@@ -768,6 +768,71 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "LimitWithVariableReference",
+			repeatPolicy: &repeatPolicy{
+				Repeat:    "while",
+				Condition: "true",
+				Limit:     "${max_rounds}",
+			},
+			expected: core.RepeatPolicy{
+				RepeatMode: core.RepeatModeWhile,
+				Condition:  &core.Condition{Condition: "true"},
+				LimitStr:   "${max_rounds}",
+			},
+		},
+		{
+			name: "IntervalSecWithVariableReference",
+			repeatPolicy: &repeatPolicy{
+				Repeat:      "while",
+				Condition:   "true",
+				IntervalSec: "$INTERVAL",
+			},
+			expected: core.RepeatPolicy{
+				RepeatMode:  core.RepeatModeWhile,
+				Condition:   &core.Condition{Condition: "true"},
+				IntervalStr: "$INTERVAL",
+			},
+		},
+		{
+			name: "MaxIntervalSecWithVariableReference",
+			repeatPolicy: &repeatPolicy{
+				Repeat:         "while",
+				Condition:      "true",
+				IntervalSec:    5,
+				Backoff:        2.0,
+				MaxIntervalSec: "${MAX_INTERVAL}",
+			},
+			expected: core.RepeatPolicy{
+				RepeatMode:     core.RepeatModeWhile,
+				Condition:      &core.Condition{Condition: "true"},
+				Interval:       5 * time.Second,
+				Backoff:        2.0,
+				MaxIntervalStr: "${MAX_INTERVAL}",
+			},
+		},
+		{
+			name: "LimitWithQuotedNumericString",
+			repeatPolicy: &repeatPolicy{
+				Repeat:    "while",
+				Condition: "true",
+				Limit:     "7",
+			},
+			expected: core.RepeatPolicy{
+				RepeatMode: core.RepeatModeWhile,
+				Condition:  &core.Condition{Condition: "true"},
+				Limit:      7,
+			},
+		},
+		{
+			name: "LimitWithInvalidString",
+			repeatPolicy: &repeatPolicy{
+				Repeat:    "while",
+				Condition: "true",
+				Limit:     "three",
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -782,6 +847,41 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestParseRepeatIntOrDynamic(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		val     any
+		wantInt int
+		wantStr string
+		wantErr bool
+	}{
+		{name: "Int", val: 5, wantInt: 5},
+		{name: "Int64", val: int64(10), wantInt: 10},
+		{name: "VarRef", val: "${max_rounds}", wantStr: "${max_rounds}"},
+		{name: "DollarVar", val: "$MAX", wantStr: "$MAX"},
+		{name: "Backtick", val: "`echo 5`", wantStr: "`echo 5`"},
+		{name: "QuotedNumeric", val: "3", wantInt: 3},
+		{name: "NonNumericString", val: "three", wantErr: true},
+		{name: "Nil", val: nil},
+		{name: "InvalidType", val: 3.14, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotInt, gotStr, err := parseRepeatIntOrDynamic(tt.val, "test_field")
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantInt, gotInt)
+			assert.Equal(t, tt.wantStr, gotStr)
 		})
 	}
 }

@@ -650,6 +650,9 @@ func (n *Node) Prepare(ctx context.Context, logDir string, dagRunID string) erro
 	if err := n.setupRetryPolicy(ctx); err != nil {
 		return fmt.Errorf("failed to setup retry policy: %w", err)
 	}
+	if err := n.setupRepeatPolicy(ctx); err != nil {
+		return fmt.Errorf("failed to setup repeat policy: %w", err)
+	}
 	return nil
 }
 
@@ -973,6 +976,40 @@ func (n *Node) setupRetryPolicy(ctx context.Context) error {
 	step.RetryPolicy.Limit = limit
 	step.RetryPolicy.Interval = interval
 	step.RetryPolicy.ExitCodes = exitCodes
+	n.SetStep(step)
+
+	return nil
+}
+
+func (n *Node) setupRepeatPolicy(ctx context.Context) error {
+	step := n.Step()
+	rp := step.RepeatPolicy
+
+	if rp.LimitStr != "" {
+		v, err := eval.IntString(ctx, rp.LimitStr, eval.WithOSExpansion())
+		if err != nil {
+			return fmt.Errorf("failed to substitute repeat limit %q: %w", rp.LimitStr, err)
+		}
+		rp.Limit = v
+	}
+
+	if rp.IntervalStr != "" {
+		v, err := eval.IntString(ctx, rp.IntervalStr, eval.WithOSExpansion())
+		if err != nil {
+			return fmt.Errorf("failed to substitute repeat interval %q: %w", rp.IntervalStr, err)
+		}
+		rp.Interval = time.Duration(v) * time.Second
+	}
+
+	if rp.MaxIntervalStr != "" {
+		v, err := eval.IntString(ctx, rp.MaxIntervalStr, eval.WithOSExpansion())
+		if err != nil {
+			return fmt.Errorf("failed to substitute repeat max_interval %q: %w", rp.MaxIntervalStr, err)
+		}
+		rp.MaxInterval = time.Duration(v) * time.Second
+	}
+
+	step.RepeatPolicy = rp
 	n.SetStep(step)
 
 	return nil
