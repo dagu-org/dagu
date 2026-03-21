@@ -17,33 +17,52 @@ import (
 func TestSeedExampleSkills_NoBundledExamplesNoop(t *testing.T) {
 	t.Parallel()
 	baseDir := t.TempDir()
+	exampleIDs := ExampleSkillIDs()
 
 	seeded := SeedExampleSkills(baseDir)
 
-	assert.False(t, seeded)
+	if len(exampleIDs) == 0 {
+		assert.False(t, seeded)
+		_, err := os.Stat(filepath.Join(baseDir, examplesMarkerFile))
+		assert.True(t, os.IsNotExist(err))
+		return
+	}
 
-	// No marker should be created when no example skills are bundled.
+	assert.True(t, seeded)
+
 	_, err := os.Stat(filepath.Join(baseDir, examplesMarkerFile))
-	assert.True(t, os.IsNotExist(err))
+	assert.NoError(t, err)
+
+	for _, id := range exampleIDs {
+		skillPath := filepath.Join(baseDir, id, skillFilename)
+		info, err := os.Stat(skillPath)
+		require.NoError(t, err, "expected %s to exist", skillPath)
+		assert.True(t, info.Size() > 0)
+	}
 }
 
 func TestSeedExampleSkills_MarkerPreventsReCreation(t *testing.T) {
 	t.Parallel()
-	if len(ExampleSkillIDs()) == 0 {
-		t.Skip("no bundled example skills")
-	}
 	baseDir := t.TempDir()
+	exampleIDs := ExampleSkillIDs()
+
+	if len(exampleIDs) == 0 {
+		assert.False(t, SeedExampleSkills(baseDir))
+		_, err := os.Stat(filepath.Join(baseDir, examplesMarkerFile))
+		assert.True(t, os.IsNotExist(err))
+		return
+	}
 
 	assert.True(t, SeedExampleSkills(baseDir))
 
 	// Delete one skill directory.
-	require.NoError(t, os.RemoveAll(filepath.Join(baseDir, ExampleSkillIDs()[0])))
+	require.NoError(t, os.RemoveAll(filepath.Join(baseDir, exampleIDs[0])))
 
 	// Second seed should not re-create (marker exists).
 	assert.False(t, SeedExampleSkills(baseDir))
 
 	// Deleted skill stays deleted.
-	_, err := os.Stat(filepath.Join(baseDir, ExampleSkillIDs()[0], skillFilename))
+	_, err := os.Stat(filepath.Join(baseDir, exampleIDs[0], skillFilename))
 	assert.True(t, os.IsNotExist(err))
 }
 
@@ -65,10 +84,18 @@ func TestSeedExampleSkills_ExistingSkillsSkipSeed(t *testing.T) {
 
 func TestSeedExampleSkills_ValidContent(t *testing.T) {
 	t.Parallel()
-	if len(ExampleSkillIDs()) == 0 {
-		t.Skip("no bundled example skills")
-	}
 	baseDir := t.TempDir()
+	exampleIDs := ExampleSkillIDs()
+
+	if len(exampleIDs) == 0 {
+		assert.False(t, SeedExampleSkills(baseDir))
+		store, err := New(baseDir)
+		require.NoError(t, err)
+		skills, err := store.List(context.Background())
+		require.NoError(t, err)
+		assert.Empty(t, skills)
+		return
+	}
 
 	require.True(t, SeedExampleSkills(baseDir))
 
@@ -77,7 +104,7 @@ func TestSeedExampleSkills_ValidContent(t *testing.T) {
 
 	skills, err := store.List(context.Background())
 	require.NoError(t, err)
-	assert.Len(t, skills, len(ExampleSkillIDs()))
+	assert.Len(t, skills, len(exampleIDs))
 
 	for _, skill := range skills {
 		assert.NotEmpty(t, skill.Name, "skill %s should have a name", skill.ID)
@@ -94,7 +121,6 @@ func TestBundledDaguSkillPrefersEnqueue(t *testing.T) {
 	require.NoError(t, err)
 
 	content := string(data)
-	// Keep this assertion tolerant to wording differences between branch tip and PR merge-ref skill docs.
 	assert.Contains(t, content, "`dagu enqueue my-dag -- env=staging region=eu-west-1`")
 	assert.Contains(t, strings.ToLower(content), "prefer `dagu enqueue` over `dagu start`")
 	assert.Contains(t, content, "Do not check whether the DAG is already running")
