@@ -34,7 +34,7 @@ export function StepReviewModal({
   const inputFields = step.approval?.input || [];
   const requiredFields = step.approval?.required || [];
 
-  const isValid = requiredFields.every(
+  const isValid = onApprove || requiredFields.every(
     (field) => inputs[field] && inputs[field].trim() !== ''
   );
 
@@ -98,7 +98,7 @@ export function StepReviewModal({
         </DialogHeader>
 
         <div className="py-2 space-y-3" onKeyDown={handleKeyDown}>
-          {inputFields.length > 0 && (
+          {inputFields.length > 0 && !onApprove && (
             <div className="space-y-3">
               {inputFields.map((field) => {
                 const isRequired = requiredFields.includes(field);
