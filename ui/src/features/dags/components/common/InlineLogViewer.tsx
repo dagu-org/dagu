@@ -40,49 +40,51 @@ export function InlineLogViewer({
   // Fetch sub-DAG-run step log (only when isSubDAGRun is true)
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log',
-    {
-      params: {
-        query: {
-          remoteNode,
-          stream,
-          tail: 100,
-        },
-        path: {
-          name: dagRun?.rootDAGRunName as string,
-          dagRunId: dagRun?.rootDAGRunId as string,
-          subDAGRunId: dagRun?.dagRunId as string,
-          stepName,
-        },
-      },
-    },
+    isSubDAGRun
+      ? {
+          params: {
+            query: {
+              remoteNode,
+              stream,
+              tail: 100,
+            },
+            path: {
+              name: dagRun?.rootDAGRunName as string,
+              dagRunId: dagRun?.rootDAGRunId as string,
+              subDAGRunId: dagRun?.dagRunId as string,
+              stepName,
+            },
+          },
+        }
+      : null,
     {
       refreshInterval: 2000,
       revalidateOnFocus: false,
-      isPaused: () => !isSubDAGRun,
     }
   );
 
   // Fetch regular DAG-run step log (only when isSubDAGRun is false)
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log',
-    {
-      params: {
-        query: {
-          remoteNode,
-          stream,
-          tail: 100,
+    isSubDAGRun
+      ? null
+      : {
+          params: {
+            query: {
+              remoteNode,
+              stream,
+              tail: 100,
+            },
+            path: {
+              name: dagName,
+              dagRunId,
+              stepName,
+            },
+          },
         },
-        path: {
-          name: dagName,
-          dagRunId,
-          stepName,
-        },
-      },
-    },
     {
       refreshInterval: 2000,
       revalidateOnFocus: false,
-      isPaused: () => !!isSubDAGRun,
     }
   );
 

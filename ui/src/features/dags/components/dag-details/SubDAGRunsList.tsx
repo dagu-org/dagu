@@ -56,21 +56,22 @@ export function SubDAGRunsList({
   const isNestedSubDAG = dagRunId !== rootDagRunId;
   const { data: subRunsData, mutate: refetchSubRuns } = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs',
+    shouldFetch
+      ? {
+          params: {
+            path: {
+              name: rootDagName,
+              dagRunId: rootDagRunId,
+            },
+            query: {
+              remoteNode,
+              // For multi-level nested DAGs, pass the parent sub DAG run ID
+              parentSubDAGRunId: isNestedSubDAG ? dagRunId : undefined,
+            },
+          },
+        }
+      : null,
     {
-      params: {
-        path: {
-          name: rootDagName,
-          dagRunId: rootDagRunId,
-        },
-        query: {
-          remoteNode,
-          // For multi-level nested DAGs, pass the parent sub DAG run ID
-          parentSubDAGRunId: isNestedSubDAG ? dagRunId : undefined,
-        },
-      },
-    },
-    {
-      isPaused: () => !shouldFetch,
       refreshInterval: shouldFetch ? 3000 : 0,
     }
   );

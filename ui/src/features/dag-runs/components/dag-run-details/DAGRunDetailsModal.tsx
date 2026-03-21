@@ -69,39 +69,43 @@ function DAGRunDetailsModal({
   const parentDAGRunId = searchParams.get('dagRunId');
   const parentName = searchParams.get('dagRunName') || name;
   const canQuerySubDag = Boolean(subDAGRunId && parentDAGRunId && parentName);
+  const subDAGQueryEnabled = isOpen && canQuerySubDag;
+  const dagRunQueryEnabled = isOpen && !canQuerySubDag && Boolean(name && dagRunId);
 
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
+    subDAGQueryEnabled
+      ? {
+          params: {
+            query: { remoteNode },
+            path: {
+              name: parentName,
+              dagRunId: parentDAGRunId ?? '',
+              subDAGRunId: subDAGRunId ?? '',
+            },
+          },
+        }
+      : null,
     {
-      params: {
-        query: { remoteNode },
-        path: {
-          name: parentName,
-          dagRunId: parentDAGRunId ?? '',
-          subDAGRunId: subDAGRunId ?? '',
-        },
-      },
-    },
-    {
-      refreshInterval: 2000,
-      isPaused: () => !canQuerySubDag,
+      refreshInterval: subDAGQueryEnabled ? 2000 : 0,
     }
   );
 
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}',
+    dagRunQueryEnabled
+      ? {
+          params: {
+            query: { remoteNode },
+            path: {
+              name: name || '',
+              dagRunId: dagRunId || 'latest',
+            },
+          },
+        }
+      : null,
     {
-      params: {
-        query: { remoteNode },
-        path: {
-          name: name || '',
-          dagRunId: dagRunId || 'latest',
-        },
-      },
-    },
-    {
-      refreshInterval: 2000,
-      isPaused: () => canQuerySubDag,
+      refreshInterval: dagRunQueryEnabled ? 2000 : 0,
     }
   );
 

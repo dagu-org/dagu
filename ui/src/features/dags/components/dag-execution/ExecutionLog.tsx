@@ -119,44 +119,48 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
   // Fetch sub-DAG-run log (only when isSubDAGRun is true)
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/log',
-    {
-      params: {
-        query: {
-          remoteNode,
-          tail,
-          head,
-          offset,
-          limit,
-        },
-        path: {
-          name: dagRun?.rootDAGRunName as string,
-          dagRunId: dagRun?.rootDAGRunId as string,
-          subDAGRunId: dagRun?.dagRunId as string,
-        },
-      },
-    },
-    { ...swrOptions, isPaused: () => !isSubDAGRun }
+    isSubDAGRun
+      ? {
+          params: {
+            query: {
+              remoteNode,
+              tail,
+              head,
+              offset,
+              limit,
+            },
+            path: {
+              name: dagRun?.rootDAGRunName as string,
+              dagRunId: dagRun?.rootDAGRunId as string,
+              subDAGRunId: dagRun?.dagRunId as string,
+            },
+          },
+        }
+      : null,
+    swrOptions
   );
 
   // Fetch regular DAG-run log (only when isSubDAGRun is false)
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/log',
-    {
-      params: {
-        query: {
-          remoteNode,
-          tail,
-          head,
-          offset,
-          limit,
+    isSubDAGRun
+      ? null
+      : {
+          params: {
+            query: {
+              remoteNode,
+              tail,
+              head,
+              offset,
+              limit,
+            },
+            path: {
+              name,
+              dagRunId,
+            },
+          },
         },
-        path: {
-          name,
-          dagRunId,
-        },
-      },
-    },
-    { ...swrOptions, isPaused: () => !!isSubDAGRun }
+    swrOptions
   );
 
   // Use the appropriate query based on whether this is a sub-DAG-run

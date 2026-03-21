@@ -43,45 +43,45 @@ function DAGRunDetailsPanel({
   const liveState = useLiveConnection(liveEnabled);
 
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const subDAGQueryEnabled = Boolean(isSubDAGRun);
+  const dagRunQueryEnabled = !isSubDAGRun && Boolean(name && dagRunId);
 
   // Sub-DAG query (only enabled for sub-DAG runs)
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
-    {
-      params: {
-        query: { remoteNode },
-        path: {
-          name: parentName as string,
-          dagRunId: parentDAGRunId as string,
-          subDAGRunId: subDAGRunId as string,
-        },
-      },
-    },
-    {
-      ...liveFallbackOptions(liveState),
-      isPaused: () => !isSubDAGRun,
-    }
+    subDAGQueryEnabled
+      ? {
+          params: {
+            query: { remoteNode },
+            path: {
+              name: parentName as string,
+              dagRunId: parentDAGRunId as string,
+              subDAGRunId: subDAGRunId as string,
+            },
+          },
+        }
+      : null,
+    liveFallbackOptions(liveState)
   );
-  useLiveDAGRuns(subDAGQuery.mutate, isSubDAGRun);
+  useLiveDAGRuns(subDAGQuery.mutate, subDAGQueryEnabled);
 
   // Regular DAG query — SWR is the single source of truth, refreshed by live invalidations
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}',
-    {
-      params: {
-        query: { remoteNode },
-        path: {
-          name: name || '',
-          dagRunId: dagRunId || 'latest',
-        },
-      },
-    },
-    {
-      ...liveFallbackOptions(liveState),
-      isPaused: () => isSubDAGRun,
-    }
+    dagRunQueryEnabled
+      ? {
+          params: {
+            query: { remoteNode },
+            path: {
+              name: name || '',
+              dagRunId: dagRunId || 'latest',
+            },
+          },
+        }
+      : null,
+    liveFallbackOptions(liveState)
   );
-  useLiveDAGRuns(dagRunQuery.mutate, !isSubDAGRun);
+  useLiveDAGRuns(dagRunQuery.mutate, dagRunQueryEnabled);
 
   // Select data source: sub-DAG query or regular query
   const { mutate } = isSubDAGRun ? subDAGQuery : dagRunQuery;

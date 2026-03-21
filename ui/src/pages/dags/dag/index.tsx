@@ -120,52 +120,45 @@ function DAGDetails() {
 
   // Use dagRunName from URL if available, otherwise use the name from dagData
   const dagRunName = queriedDAGRunName || dagData?.dag?.name || '';
+  const dagRunQueryEnabled = Boolean(dagRunName && dagRunId && !subDAGRunId);
 
   // Fetch specific DAG-run data if dagRunId is provided
   const { data: dagRunResponse, mutate: mutateDagRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}',
-    {
-      params: {
-        path: {
-          name: dagRunName,
-          dagRunId: dagRunId || '',
-        },
-        query: { remoteNode },
-      },
-    },
-    {
-      ...liveFallbackOptions(liveState),
-      isPaused: () =>
-        (!dagRunName && !queriedDAGRunName) || !dagRunId || !!subDAGRunId,
-    }
+    dagRunQueryEnabled
+      ? {
+          params: {
+            path: {
+              name: dagRunName,
+              dagRunId: dagRunId || '',
+            },
+            query: { remoteNode },
+          },
+        }
+      : null,
+    liveFallbackOptions(liveState)
   );
-  useLiveDAGRuns(
-    mutateDagRun,
-    Boolean((dagRunName || queriedDAGRunName) && dagRunId && !subDAGRunId)
-  );
+  useLiveDAGRuns(mutateDagRun, dagRunQueryEnabled);
 
   // Fetch sub DAG-run data if needed
+  const subDAGRunQueryEnabled = Boolean(subDAGRunId && dagRunId && dagRunName);
   const { data: subDAGRunResponse, mutate: mutateSubDagRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
-    {
-      params: {
-        path: {
-          name: dagRunName,
-          dagRunId: dagRunId || '',
-          subDAGRunId: subDAGRunId || '',
-        },
-        query: { remoteNode },
-      },
-    },
-    {
-      ...liveFallbackOptions(liveState),
-      isPaused: () => !subDAGRunId || !dagRunId || !dagRunName,
-    }
+    subDAGRunQueryEnabled
+      ? {
+          params: {
+            path: {
+              name: dagRunName,
+              dagRunId: dagRunId || '',
+              subDAGRunId: subDAGRunId || '',
+            },
+            query: { remoteNode },
+          },
+        }
+      : null,
+    liveFallbackOptions(liveState)
   );
-  useLiveDAGRuns(
-    mutateSubDagRun,
-    Boolean(subDAGRunId && dagRunId && dagRunName)
-  );
+  useLiveDAGRuns(mutateSubDagRun, subDAGRunQueryEnabled);
 
   // Determine the current DAG-run to display based on URL parameters
   function getCurrentDAGRun(): DAGRunDetails | undefined {

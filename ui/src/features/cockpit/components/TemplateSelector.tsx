@@ -12,9 +12,15 @@ interface Props {
   selectedTemplate: string;
   selectedWorkspace: string;
   onSelect: (fileName: string) => void;
+  onOpenChange?: (isOpen: boolean) => void;
 }
 
-export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect }: Props): React.ReactElement {
+export function TemplateSelector({
+  selectedTemplate,
+  selectedWorkspace,
+  onSelect,
+  onOpenChange,
+}: Props): React.ReactElement {
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
@@ -36,25 +42,39 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  useEffect(() => {
+    onOpenChange?.(isOpen);
+  }, [isOpen, onOpenChange]);
+
   // Keep tags fully lazy. We only request them when the user explicitly opens
   // the tag filter UI inside the selector.
-  const { data: tagsData } = useQuery('/dags/tags', {
-    params: { query: { remoteNode } },
-  }, { isPaused: () => !isOpen || !isTagFilterOpen });
+  const { data: tagsData } = useQuery(
+    '/dags/tags',
+    isOpen && isTagFilterOpen
+      ? {
+          params: { query: { remoteNode } },
+        }
+      : null
+  );
   const availableTags = tagsData?.tags ?? [];
 
   // The DAG list only stays live while the selector dropdown is open. The
   // closed trigger uses locally cached selection metadata instead.
-  const { data, isLoading } = useQuery('/dags', {
-    params: {
-      query: {
-        remoteNode,
-        perPage: 50,
-        ...(debouncedTerm ? { name: debouncedTerm } : {}),
-        ...(selectedTags.length > 0 ? { tags: selectedTags.join(',') } : {}),
-      },
-    },
-  }, { isPaused: () => !isOpen });
+  const { data, isLoading } = useQuery(
+    '/dags',
+    isOpen
+      ? {
+          params: {
+            query: {
+              remoteNode,
+              perPage: 50,
+              ...(debouncedTerm ? { name: debouncedTerm } : {}),
+              ...(selectedTags.length > 0 ? { tags: selectedTags.join(',') } : {}),
+            },
+          },
+        }
+      : null
+  );
   const dags = data?.dags ?? [];
 
   // Filter out DAGs with a workspace= tag that doesn't match the selected workspace

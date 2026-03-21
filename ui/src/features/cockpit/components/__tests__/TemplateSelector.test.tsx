@@ -37,7 +37,7 @@ const mockDags = [
 
 const queryCalls: Array<{
   path: string;
-  options?: { isPaused?: () => boolean };
+  init?: unknown;
 }> = [];
 
 const useQueryMock = useQuery as unknown as {
@@ -45,7 +45,6 @@ const useQueryMock = useQuery as unknown as {
     fn: (
       path: string,
       params?: unknown,
-      options?: { isPaused?: () => boolean }
     ) => unknown
   ) => void;
 };
@@ -78,8 +77,8 @@ afterEach(() => {
 
 describe('TemplateSelector', () => {
   it('loads dags only while open and loads tags only when the tag filter is opened', () => {
-    useQueryMock.mockImplementation((path, _params, options) => {
-      queryCalls.push({ path, options });
+    useQueryMock.mockImplementation((path, init) => {
+      queryCalls.push({ path, init });
       if (path === '/dags') {
         return { data: { dags: mockDags }, isLoading: false } as never;
       }
@@ -91,22 +90,34 @@ describe('TemplateSelector', () => {
 
     renderSelector();
 
-    expect(latestQueryCall('/dags')?.options?.isPaused?.()).toBe(true);
-    expect(latestQueryCall('/dags/tags')?.options?.isPaused?.()).toBe(true);
+    expect(latestQueryCall('/dags')?.init).toBeNull();
+    expect(latestQueryCall('/dags/tags')?.init).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /select template/i }));
 
-    expect(latestQueryCall('/dags')?.options?.isPaused?.()).toBe(false);
-    expect(latestQueryCall('/dags/tags')?.options?.isPaused?.()).toBe(true);
+    expect(latestQueryCall('/dags')?.init).toEqual(
+      expect.objectContaining({
+        params: expect.objectContaining({
+          query: expect.objectContaining({ remoteNode: 'local' }),
+        }),
+      })
+    );
+    expect(latestQueryCall('/dags/tags')?.init).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /tags/i }));
 
-    expect(latestQueryCall('/dags/tags')?.options?.isPaused?.()).toBe(false);
+    expect(latestQueryCall('/dags/tags')?.init).toEqual(
+      expect.objectContaining({
+        params: expect.objectContaining({
+          query: { remoteNode: 'local' },
+        }),
+      })
+    );
   });
 
   it('keeps the selected template label after close without keeping /dags active', () => {
-    useQueryMock.mockImplementation((path, _params, options) => {
-      queryCalls.push({ path, options });
+    useQueryMock.mockImplementation((path, init) => {
+      queryCalls.push({ path, init });
       if (path === '/dags') {
         return { data: { dags: mockDags }, isLoading: false } as never;
       }
@@ -136,6 +147,28 @@ describe('TemplateSelector', () => {
 
     expect(screen.queryByPlaceholderText('Search DAGs...')).not.toBeInTheDocument();
     expect(screen.getByText('Example DAG')).toBeInTheDocument();
-    expect(latestQueryCall('/dags')?.options?.isPaused?.()).toBe(true);
+    expect(latestQueryCall('/dags')?.init).toBeNull();
+  });
+
+  it('reports selector open state changes to the parent', () => {
+    const onOpenChange = vi.fn();
+    useQueryMock.mockImplementation((path, init) => {
+      queryCalls.push({ path, init });
+      if (path === '/dags') {
+        return { data: { dags: mockDags }, isLoading: false } as never;
+      }
+      if (path === '/dags/tags') {
+        return { data: { tags: [] } } as never;
+      }
+      return { data: undefined } as never;
+    });
+
+    renderSelector({ onOpenChange });
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    fireEvent.click(screen.getByRole('button', { name: /select template/i }));
+
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
   });
 });

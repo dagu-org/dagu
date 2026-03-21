@@ -128,47 +128,51 @@ function StepLog({
 
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log',
-    {
-      params: {
-        query: {
-          remoteNode,
-          stream,
-          tail,
-          head,
-          offset,
-          limit,
-        },
-        path: {
-          name: dagRun?.rootDAGRunName as string,
-          dagRunId: dagRun?.rootDAGRunId as string,
-          subDAGRunId: dagRun?.dagRunId as string,
-          stepName,
-        },
-      },
-    },
-    { ...swrOptions, isPaused: () => !isSubDAGRun }
+    isSubDAGRun
+      ? {
+          params: {
+            query: {
+              remoteNode,
+              stream,
+              tail,
+              head,
+              offset,
+              limit,
+            },
+            path: {
+              name: dagRun?.rootDAGRunName as string,
+              dagRunId: dagRun?.rootDAGRunId as string,
+              subDAGRunId: dagRun?.dagRunId as string,
+              stepName,
+            },
+          },
+        }
+      : null,
+    swrOptions
   );
 
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log',
-    {
-      params: {
-        query: {
-          remoteNode,
-          stream,
-          tail,
-          head,
-          offset,
-          limit,
+    isSubDAGRun
+      ? null
+      : {
+          params: {
+            query: {
+              remoteNode,
+              stream,
+              tail,
+              head,
+              offset,
+              limit,
+            },
+            path: {
+              name: dagName,
+              dagRunId,
+              stepName,
+            },
+          },
         },
-        path: {
-          name: dagName,
-          dagRunId,
-          stepName,
-        },
-      },
-    },
-    { ...swrOptions, isPaused: () => !!isSubDAGRun }
+    swrOptions
   );
 
   const { data, isLoading, error, mutate } = isSubDAGRun ? subDAGQuery : dagRunQuery;

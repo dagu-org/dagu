@@ -167,37 +167,37 @@ function DAGDetailsSidePanel({
     setActiveTab('status');
   }, []);
 
-  const liveState = useLiveConnection(isOpen && !!stableFileName);
+  const dagDetailsEnabled = isOpen && !!stableFileName;
+  const liveState = useLiveConnection(dagDetailsEnabled);
   const { data, error, mutate } = useQuery(
     '/dags/{fileName}',
-    {
-      params: {
-        query: { remoteNode },
-        path: { fileName: stableFileName },
-      },
-    },
-    {
-      ...liveFallbackOptions(liveState),
-      isPaused: () => !isOpen || !stableFileName,
-    }
+    dagDetailsEnabled
+      ? {
+          params: {
+            query: { remoteNode },
+            path: { fileName: stableFileName },
+          },
+        }
+      : null,
+    liveFallbackOptions(liveState)
   );
-  useLiveDAG(stableFileName, mutate, isOpen && !!stableFileName);
+  useLiveDAG(stableFileName, mutate, dagDetailsEnabled);
 
   const dagName = data?.dag?.name || '';
+  const trackedRunEnabled = isOpen && !!dagName && !!trackedDagRunId;
   const { data: trackedRunData, mutate: mutateTrackedRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}',
-    {
-      params: {
-        path: { name: dagName, dagRunId: trackedDagRunId || '' },
-        query: { remoteNode },
-      },
-    },
-    {
-      ...liveFallbackOptions(liveState),
-      isPaused: () => !isOpen || !dagName || !trackedDagRunId,
-    }
+    trackedRunEnabled
+      ? {
+          params: {
+            path: { name: dagName, dagRunId: trackedDagRunId || '' },
+            query: { remoteNode },
+          },
+        }
+      : null,
+    liveFallbackOptions(liveState)
   );
-  useLiveDAGRuns(mutateTrackedRun, isOpen && !!dagName && !!trackedDagRunId);
+  useLiveDAGRuns(mutateTrackedRun, trackedRunEnabled);
 
   React.useEffect(() => {
     if (trackedRunData?.dagRunDetails) {

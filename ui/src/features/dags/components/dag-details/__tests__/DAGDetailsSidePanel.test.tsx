@@ -69,7 +69,7 @@ const liveState = {
   shouldUseFallback: true,
 };
 const useQueryMock = useQuery as unknown as {
-  mockImplementation: (fn: (path: string) => unknown) => void;
+  mockImplementation: (fn: (path: string, init?: unknown) => unknown) => void;
 };
 
 function renderPanel(props?: Partial<React.ComponentProps<typeof DAGDetailsSidePanel>>) {
@@ -112,6 +112,23 @@ describe('DAGDetailsSidePanel', () => {
     renderPanel();
 
     expect(screen.getByText('Loading DAG details...')).toBeInTheDocument();
+  });
+
+  it('uses a null query key while closed so the detail request is truly disabled', () => {
+    const queryCalls: Array<{ path: string; init?: unknown }> = [];
+    vi.mocked(useLiveConnection).mockReturnValue(liveState);
+    useQueryMock.mockImplementation((path, init) => {
+      queryCalls.push({ path, init });
+      return {
+        data: undefined,
+        error: undefined,
+        mutate: vi.fn(),
+      } as never;
+    });
+
+    renderPanel({ isOpen: false });
+
+    expect(queryCalls.find((call) => call.path === '/dags/{fileName}')?.init).toBeNull();
   });
 
   it('shows a not-found state with a close action for 404s', () => {

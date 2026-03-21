@@ -56,20 +56,21 @@ export function ParallelExecutionModal({
   // Fetch sub DAG run details with status information
   const { data: subRunsData } = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs',
+    isOpen
+      ? {
+          params: {
+            path: {
+              name: rootDagName,
+              dagRunId: rootDagRunId,
+            },
+            query: {
+              remoteNode,
+              parentSubDAGRunId: isNestedSubDAG ? parentDagRunId : undefined,
+            },
+          },
+        }
+      : null,
     {
-      params: {
-        path: {
-          name: rootDagName,
-          dagRunId: rootDagRunId,
-        },
-        query: {
-          remoteNode,
-          parentSubDAGRunId: isNestedSubDAG ? parentDagRunId : undefined,
-        },
-      },
-    },
-    {
-      isPaused: () => !isOpen,
       refreshInterval: isOpen ? 3000 : 0,
     }
   );

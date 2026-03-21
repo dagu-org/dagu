@@ -66,37 +66,39 @@ export function StepMessagesTable({
   // Query for regular DAG runs
   const regularQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/steps/{stepName}/messages',
-    {
-      params: {
-        path: { name: effectiveName, dagRunId: effectiveRunId, stepName },
-        query: { remoteNode: appBarContext.selectedRemoteNode || 'local' },
-      },
-    },
+    isSubDAGRun
+      ? null
+      : {
+          params: {
+            path: { name: effectiveName, dagRunId: effectiveRunId, stepName },
+            query: { remoteNode: appBarContext.selectedRemoteNode || 'local' },
+          },
+        },
     {
       refreshInterval: isActive ? 2000 : 0,
       revalidateOnFocus: false,
-      isPaused: () => isSubDAGRun,
     }
   );
 
   // Query for sub-DAG runs
   const subDagQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/messages',
-    {
-      params: {
-        path: {
-          name: effectiveName,
-          dagRunId: effectiveRunId,
-          subDAGRunId: subDAGRunId || '',
-          stepName,
-        },
-        query: { remoteNode: appBarContext.selectedRemoteNode || 'local' },
-      },
-    },
+    isSubDAGRun
+      ? {
+          params: {
+            path: {
+              name: effectiveName,
+              dagRunId: effectiveRunId,
+              subDAGRunId: subDAGRunId || '',
+              stepName,
+            },
+            query: { remoteNode: appBarContext.selectedRemoteNode || 'local' },
+          },
+        }
+      : null,
     {
       refreshInterval: isActive ? 2000 : 0,
       revalidateOnFocus: false,
-      isPaused: () => !isSubDAGRun,
     }
   );
 

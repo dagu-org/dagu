@@ -25,6 +25,8 @@ client.use(authMiddleware);
 
 const prefix = '/';
 
+// swr-openapi uses `null` init as the real conditional-fetch switch.
+// Do not use SWR's `isPaused` to turn GET requests on or off.
 export const useQuery = createQueryHook(client, prefix);
 export const useImmutable = createImmutableHook(client, prefix);
 export const useInfinite = createInfiniteHook(client, prefix);
