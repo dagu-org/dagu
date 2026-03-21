@@ -19,8 +19,11 @@ import { DAGRunDetailsModal } from '../features/dag-runs/components/dag-run-deta
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
 import PathsCard from '../features/system-status/components/PathsCard';
 import { useQuery } from '../hooks/api';
-import { useDAGRunsListSSE } from '../hooks/useDAGRunsListSSE';
-import { sseFallbackOptions, useSSECacheSync } from '../hooks/useSSECacheSync';
+import {
+  liveFallbackOptions,
+  useLiveConnection,
+  useLiveDAGRuns,
+} from '../hooks/useAppLive';
 import dayjs from '../lib/dayjs';
 import Title from '../ui/Title';
 
@@ -175,14 +178,7 @@ function Dashboard(): React.ReactElement | null {
 
   const selectedDAGName = selectedDAGRun !== 'all' ? selectedDAGRun : undefined;
 
-  const sseResult = useDAGRunsListSSE(
-    {
-      fromDate: dateRange.startDate,
-      toDate: dateRange.endDate,
-      name: selectedDAGName,
-    },
-    true
-  );
+  const liveState = useLiveConnection();
 
   const { data, error, isLoading, mutate } = useQuery(
     '/dag-runs',
@@ -196,9 +192,9 @@ function Dashboard(): React.ReactElement | null {
         },
       },
     },
-    sseFallbackOptions(sseResult, 5000)
+    liveFallbackOptions(liveState, 5000)
   );
-  useSSECacheSync(sseResult, mutate);
+  useLiveDAGRuns(mutate);
 
   const handleRefreshAll = async () => {
     await mutate();

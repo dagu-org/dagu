@@ -10,6 +10,7 @@ const (
 	DaguReferencesDir = DaguSkillDir + "/references"
 )
 
+// No example skills are currently bundled with the binary.
 var exampleSkillIDs []string
 
 // Assets contains the bundled skill content shipped with the binary.

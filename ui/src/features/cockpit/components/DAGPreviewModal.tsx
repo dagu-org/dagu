@@ -21,7 +21,7 @@ export function DAGPreviewModal({
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
   const handleEnqueue = React.useCallback(
-    async (params: string, dagRunId?: string) => {
+    async (params: string, dagRunId?: string): Promise<string | void> => {
       const tags: string[] = [];
       if (selectedWorkspace) {
         const safeName = selectedWorkspace.replace(/[^a-zA-Z0-9_-]/g, '');
@@ -51,14 +51,23 @@ export function DAGPreviewModal({
     [client, fileName, remoteNode, selectedWorkspace]
   );
 
+  const toolbarHint = selectedWorkspace ? (
+    <>
+      Workspace:{' '}
+      <span className="font-medium text-foreground">{selectedWorkspace}</span>
+    </>
+  ) : (
+    'Template details'
+  );
+
   return (
     <DAGDetailsSidePanel
       fileName={fileName}
       isOpen={isOpen}
       onClose={onClose}
-      initialTab="spec"
+      initialTab="status"
+      toolbarHint={toolbarHint}
       renderInPortal={true}
-      backdropVisibleClassName="bg-black/5"
       forceEnqueue={true}
       onEnqueue={handleEnqueue}
     />

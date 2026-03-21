@@ -1,5 +1,6 @@
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
+import { whenEnabled } from '@/hooks/queryUtils';
 import { useContext } from 'react';
 import { components, Stream } from '../../../../api/v1/schema';
 
@@ -40,7 +41,7 @@ export function InlineLogViewer({
   // Fetch sub-DAG-run step log (only when isSubDAGRun is true)
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log',
-    {
+    whenEnabled(!!isSubDAGRun, {
       params: {
         query: {
           remoteNode,
@@ -54,18 +55,17 @@ export function InlineLogViewer({
           stepName,
         },
       },
-    },
+    }),
     {
       refreshInterval: 2000,
       revalidateOnFocus: false,
-      isPaused: () => !isSubDAGRun,
     }
   );
 
   // Fetch regular DAG-run step log (only when isSubDAGRun is false)
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log',
-    {
+    whenEnabled(!isSubDAGRun, {
       params: {
         query: {
           remoteNode,
@@ -78,11 +78,10 @@ export function InlineLogViewer({
           stepName,
         },
       },
-    },
+    }),
     {
       refreshInterval: 2000,
       revalidateOnFocus: false,
-      isPaused: () => !!isSubDAGRun,
     }
   );
 

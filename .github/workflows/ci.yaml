@@ -14,6 +14,7 @@ on:
       - "Makefile"
       - ".github/workflows/ci.yaml"
   pull_request:
+    # Keep this workflow directly rerunnable from PR-only maintenance commits.
     types:
       - opened
       - reopened # new commits are pushed to the branch that the PR is based on

@@ -11,8 +11,13 @@ import {
 import { DAGContext } from '../../../features/dags/contexts/DAGContext';
 import { RootDAGRunContext } from '../../../features/dags/contexts/RootDAGRunContext';
 import { useQuery } from '../../../hooks/api';
-import { useDAGSSE } from '../../../hooks/useDAGSSE';
-import { sseFallbackOptions, useSSECacheSync } from '../../../hooks/useSSECacheSync';
+import { whenEnabled } from '../../../hooks/queryUtils';
+import {
+  liveFallbackOptions,
+  useLiveConnection,
+  useLiveDAG,
+  useLiveDAGRuns,
+} from '../../../hooks/useAppLive';
 import dayjs from '../../../lib/dayjs';
 
 type Params = {
@@ -51,8 +56,7 @@ function DAGDetails() {
     };
   }, [fileName, dagRunId, setContext]);
 
-  // SSE for real-time updates with polling fallback
-  const sseResult = useDAGSSE(fileName || '', !!fileName);
+  const liveState = useLiveConnection(!!fileName);
 
   // Determine active tab
   const tab = params.tab || 'status';
@@ -102,7 +106,7 @@ function DAGDetails() {
     }
   }, [tab, handleTabChange]);
 
-  // Fetch DAG details — SWR is the single source of truth, kept fresh by SSE sync
+  // Fetch DAG details — SWR is the single source of truth, refreshed by live invalidations
   const { data: dagData, mutate: mutateDag } = useQuery(
     '/dags/{fileName}',
     {
@@ -111,17 +115,18 @@ function DAGDetails() {
         path: { fileName },
       },
     },
-    sseFallbackOptions(sseResult)
+    liveFallbackOptions(liveState)
   );
-  useSSECacheSync(sseResult, mutateDag);
+  useLiveDAG(fileName, mutateDag, !!fileName);
 
   // Use dagRunName from URL if available, otherwise use the name from dagData
   const dagRunName = queriedDAGRunName || dagData?.dag?.name || '';
+  const dagRunQueryEnabled = Boolean(dagRunName && dagRunId && !subDAGRunId);
 
   // Fetch specific DAG-run data if dagRunId is provided
   const { data: dagRunResponse, mutate: mutateDagRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}',
-    {
+    whenEnabled(dagRunQueryEnabled, {
       params: {
         path: {
           name: dagRunName,
@@ -129,18 +134,16 @@ function DAGDetails() {
         },
         query: { remoteNode },
       },
-    },
-    {
-      isPaused: () =>
-        (!dagRunName && !queriedDAGRunName) || !dagRunId || !!subDAGRunId,
-      refreshInterval: 2000,
-    }
+    }),
+    liveFallbackOptions(liveState)
   );
+  useLiveDAGRuns(mutateDagRun, dagRunQueryEnabled);
 
   // Fetch sub DAG-run data if needed
+  const subDAGRunQueryEnabled = Boolean(subDAGRunId && dagRunId && dagRunName);
   const { data: subDAGRunResponse, mutate: mutateSubDagRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
-    {
+    whenEnabled(subDAGRunQueryEnabled, {
       params: {
         path: {
           name: dagRunName,
@@ -149,12 +152,10 @@ function DAGDetails() {
         },
         query: { remoteNode },
       },
-    },
-    {
-      refreshInterval: 2000,
-      isPaused: () => !subDAGRunId || !dagRunId || !dagRunName,
-    }
+    }),
+    liveFallbackOptions(liveState)
   );
+  useLiveDAGRuns(mutateSubDagRun, subDAGRunQueryEnabled);
 
   // Determine the current DAG-run to display based on URL parameters
   function getCurrentDAGRun(): DAGRunDetails | undefined {
@@ -234,7 +235,6 @@ function DAGDetails() {
                   navigateToStatusTab={navigateToStatusTab}
                   skipHeader={true}
                   localDags={dagData?.localDags}
-                  sseResult={sseResult}
                 />
               </>
             )}

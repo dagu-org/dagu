@@ -15,6 +15,7 @@ interface Props {
   onCreateWorkspace: (name: string) => void;
   onDeleteWorkspace: (id: string) => void;
   onSelectTemplate: (fileName: string) => void;
+  onTemplateSelectorOpenChange?: (isOpen: boolean) => void;
 }
 
 export function CockpitToolbar({
@@ -25,6 +26,7 @@ export function CockpitToolbar({
   onCreateWorkspace,
   onDeleteWorkspace,
   onSelectTemplate,
+  onTemplateSelectorOpenChange,
 }: Props): React.ReactElement {
   const canWrite = useCanWrite();
   return (
@@ -41,6 +43,7 @@ export function CockpitToolbar({
         selectedTemplate={selectedTemplate}
         selectedWorkspace={selectedWorkspace}
         onSelect={onSelectTemplate}
+        onOpenChange={onTemplateSelectorOpenChange}
       />
       <DAGPreviewModal
         fileName={selectedTemplate}

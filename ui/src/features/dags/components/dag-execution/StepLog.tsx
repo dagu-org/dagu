@@ -15,6 +15,7 @@ import { TOKEN_KEY } from '../../../../contexts/AuthContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUserPreferences } from '../../../../contexts/UserPreference';
 import { useQuery } from '../../../../hooks/api';
+import { whenEnabled } from '../../../../hooks/queryUtils';
 import { useStepLogSSE } from '../../../../hooks/useStepLogSSE';
 import { isActiveNodeStatus } from '../../../../lib/status-utils';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -128,7 +129,7 @@ function StepLog({
 
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log',
-    {
+    whenEnabled(!!isSubDAGRun, {
       params: {
         query: {
           remoteNode,
@@ -145,13 +146,13 @@ function StepLog({
           stepName,
         },
       },
-    },
-    { ...swrOptions, isPaused: () => !isSubDAGRun }
+    }),
+    swrOptions
   );
 
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log',
-    {
+    whenEnabled(!isSubDAGRun, {
       params: {
         query: {
           remoteNode,
@@ -167,8 +168,8 @@ function StepLog({
           stepName,
         },
       },
-    },
-    { ...swrOptions, isPaused: () => !!isSubDAGRun }
+    }),
+    swrOptions
   );
 
   const { data, isLoading, error, mutate } = isSubDAGRun ? subDAGQuery : dagRunQuery;

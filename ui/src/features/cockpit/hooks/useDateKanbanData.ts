@@ -1,7 +1,10 @@
 import { useContext, useMemo } from 'react';
 import { useQuery } from '@/hooks/api';
-import { useDAGRunsListSSE } from '@/hooks/useDAGRunsListSSE';
-import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
+import {
+  liveFallbackOptions,
+  useLiveConnection,
+  useLiveDAGRuns,
+} from '@/hooks/useAppLive';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import dayjs from '@/lib/dayjs';
@@ -74,14 +77,9 @@ export function useDateKanbanData(
     [date, tzOffsetInSec]
   );
 
-  // SSE only for today
-  const sseParams = useMemo(
-    () => ({ remoteNode, tags: tag, fromDate, toDate }),
-    [remoteNode, tag, fromDate, toDate]
-  );
-  const sseResult = useDAGRunsListSSE(sseParams, isToday);
+  const liveState = useLiveConnection(isToday);
 
-  const { data, mutate } = useQuery(
+  const { data, error, mutate } = useQuery(
     '/dag-runs',
     {
       params: {
@@ -94,12 +92,27 @@ export function useDateKanbanData(
       },
     },
     {
-      ...(isToday ? sseFallbackOptions(sseResult) : { refreshInterval: 0 }),
+      ...(isToday
+        ? liveFallbackOptions(liveState)
+        : {
+            refreshInterval: 0,
+            revalidateOnFocus: false,
+            revalidateIfStale: false,
+            revalidateOnMount: true,
+          }),
     }
   );
+  useLiveDAGRuns(mutate, isToday);
 
-  // Always call the hook (rules of hooks), but SSE data is only present when isToday
-  useSSECacheSync(sseResult, mutate);
+  const typedError = useMemo(() => {
+    if (!error) {
+      return null;
+    }
+    if (error instanceof Error) {
+      return error;
+    }
+    return new Error('Failed to load runs');
+  }, [error]);
 
   const columns = useMemo(
     () => groupByStatus(data?.dagRuns ?? []),
@@ -113,5 +126,11 @@ export function useDateKanbanData(
     columns.done.length === 0 &&
     columns.failed.length === 0;
 
-  return { columns, isLoading: !data, isEmpty };
+  return {
+    columns,
+    error: typedError,
+    isLoading: !data && !typedError,
+    isEmpty,
+    retry: mutate,
+  };
 }

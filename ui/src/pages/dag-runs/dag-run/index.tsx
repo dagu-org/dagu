@@ -5,6 +5,7 @@ import { usePageContext } from '../../../contexts/PageContext';
 import { DAGRunDetailsContent } from '../../../features/dag-runs/components/dag-run-details';
 import { DAGRunContext } from '../../../features/dag-runs/contexts/DAGRunContext';
 import { useQuery } from '../../../hooks/api';
+import { whenEnabled } from '../../../hooks/queryUtils';
 
 type ApiError = {
   response?: { status?: number };
@@ -57,12 +58,14 @@ function DAGRunDetailsPage() {
   const parentName = searchParams.get('dagRunName') || name;
 
   const canQuerySubDag = !!(subDAGRunId && parentDAGRunId && parentName);
+  const subDAGQueryEnabled = Boolean(canQuerySubDag);
+  const dagRunQueryEnabled = !canQuerySubDag && Boolean(name && dagRunId);
 
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
-    {
+    whenEnabled(subDAGQueryEnabled, {
       params: {
         query: { remoteNode },
         path: {
@@ -71,13 +74,13 @@ function DAGRunDetailsPage() {
           subDAGRunId: subDAGRunId as string,
         },
       },
-    },
-    { refreshInterval: 2000, isPaused: () => !canQuerySubDag }
+    }),
+    { refreshInterval: subDAGQueryEnabled ? 2000 : 0 }
   );
 
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}',
-    {
+    whenEnabled(dagRunQueryEnabled, {
       params: {
         query: { remoteNode },
         path: {
@@ -85,8 +88,8 @@ function DAGRunDetailsPage() {
           dagRunId: dagRunId || 'latest',
         },
       },
-    },
-    { refreshInterval: 2000, isPaused: () => canQuerySubDag }
+    }),
+    { refreshInterval: dagRunQueryEnabled ? 2000 : 0 }
   );
 
   const { data, error, mutate } = canQuerySubDag ? subDAGQuery : dagRunQuery;

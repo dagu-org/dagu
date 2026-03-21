@@ -48,6 +48,7 @@ const testConfig: Config = {
   version: 'test',
   maxDashboardPageLimit: 100,
   remoteNodes: '',
+  initialWorkspaces: [],
   authMode: 'none',
   setupRequired: false,
   oidcEnabled: false,

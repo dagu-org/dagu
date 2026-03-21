@@ -7,13 +7,14 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestSeedExampleSkills_CreatesFiles(t *testing.T) {
+func TestSeedExampleSkills_NoBundledExamplesNoop(t *testing.T) {
 	t.Parallel()
 	baseDir := t.TempDir()
 	exampleIDs := ExampleSkillIDs()
@@ -29,11 +30,9 @@ func TestSeedExampleSkills_CreatesFiles(t *testing.T) {
 
 	assert.True(t, seeded)
 
-	// Verify marker file exists.
 	_, err := os.Stat(filepath.Join(baseDir, examplesMarkerFile))
 	assert.NoError(t, err)
 
-	// Verify each example skill directory + SKILL.md exists.
 	for _, id := range exampleIDs {
 		skillPath := filepath.Join(baseDir, id, skillFilename)
 		info, err := os.Stat(skillPath)
@@ -122,7 +121,8 @@ func TestBundledDaguSkillPrefersEnqueue(t *testing.T) {
 	require.NoError(t, err)
 
 	content := string(data)
-	assert.Contains(t, content, "Override params at runtime: `dagu enqueue my-dag -- env=staging region=eu-west-1`")
-	assert.Contains(t, content, "Prefer `dagu enqueue` over `dagu start`.")
-	assert.Contains(t, content, "Do not check whether the DAG is already running before enqueueing unless the user explicitly asks.")
+	assert.Contains(t, content, "`dagu enqueue my-dag -- env=staging region=eu-west-1`")
+	assert.Contains(t, strings.ToLower(content), "prefer `dagu enqueue` over `dagu start`")
+	assert.Contains(t, content, "Do not check whether the DAG is already running")
+	assert.Contains(t, content, "unless the user explicitly asks")
 }

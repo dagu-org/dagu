@@ -108,6 +108,7 @@ type Server struct {
 	auditStore         *fileaudit.Store
 	syncService        gitsync.Service
 	listener           net.Listener
+	appStream          *sse.AppStreamService
 	sseMultiplexer     *sse.Multiplexer
 	terminalManager    *terminal.Manager
 	metricsRegistry    *prometheus.Registry
@@ -388,6 +389,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			OIDCButtonLabel:       oidcButtonLabel,
 			TerminalEnabled:       cfg.Server.Terminal.Enabled && authSvc != nil,
 			GitSyncEnabled:        cfg.GitSync.Enabled,
+			WorkspaceStore:        wsStore,
 			SetupRequiredChecker:  &setupChecker{authSvc: authSvc, fallback: setupRequired},
 			UpdateChecker:         &updateChecker{store: upgradeStore},
 			AgentEnabledChecker:   agentConfigStore,
@@ -1071,6 +1073,16 @@ func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV1Base
 }
 
 func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath string) {
+	appStream, err := sse.NewAppStreamService(sse.AppStreamConfig{
+		Paths:             srv.config.Paths,
+		HeartbeatInterval: srv.config.Server.SSE.HeartbeatInterval,
+	})
+	if err != nil {
+		logger.Warn(ctx, "Failed to initialize app SSE stream", tag.Error(err))
+	} else {
+		srv.appStream = appStream
+	}
+
 	var sseMetrics *sse.Metrics
 	if srv.metricsRegistry != nil {
 		sseMetrics = sse.NewMetrics(srv.metricsRegistry)
@@ -1083,9 +1095,10 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 		WriteBufferSize:        srv.config.Server.SSE.WriteBufferSize,
 		SlowClientTimeout:      srv.config.Server.SSE.SlowClientTimeout,
 	}, sseMetrics)
-	srv.registerSSEFetchers(srv.sseMultiplexer)
+	srv.registerDedicatedSSEFetchers(srv.sseMultiplexer)
 
 	multiplexHandler := sse.NewMultiplexHandler(srv.sseMultiplexer, srv.remoteNodeResolver)
+	appHandler := sse.NewAppHandler(srv.appStream, srv.remoteNodeResolver)
 
 	authOpts := srv.buildStreamAuthOptions("restricted")
 
@@ -1095,6 +1108,7 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 		r.Use(auth.Middleware(authOpts))
 		r.Use(srv.injectDefaultStreamUserMiddleware())
 
+		r.Get("/app", appHandler.HandleStream)
 		r.Get("/stream", multiplexHandler.HandleStream)
 		r.Post("/stream/topics", multiplexHandler.HandleTopicMutation)
 	})
@@ -1102,18 +1116,9 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 	logger.Info(ctx, "SSE routes configured", slog.String("basePath", apiV1BasePath))
 }
 
-func (srv *Server) registerSSEFetchers(registrar *sse.Multiplexer) {
-	registrar.RegisterFetcher(sse.TopicTypeDAG, srv.apiV1.GetDAGDetailsData)
-	registrar.RegisterFetcher(sse.TopicTypeDAGHistory, srv.apiV1.GetDAGHistoryData)
-	registrar.RegisterFetcher(sse.TopicTypeDAGsList, srv.apiV1.GetDAGsListData)
-	registrar.RegisterFetcher(sse.TopicTypeDAGRun, srv.apiV1.GetDAGRunDetailsData)
-	registrar.RegisterFetcher(sse.TopicTypeDAGRuns, srv.apiV1.GetDAGRunsListData)
+func (srv *Server) registerDedicatedSSEFetchers(registrar *sse.Multiplexer) {
 	registrar.RegisterFetcher(sse.TopicTypeDAGRunLogs, srv.apiV1.GetDAGRunLogsData)
 	registrar.RegisterFetcher(sse.TopicTypeStepLog, srv.apiV1.GetStepLogData)
-	registrar.RegisterFetcher(sse.TopicTypeQueues, srv.apiV1.GetQueuesListData)
-	registrar.RegisterFetcher(sse.TopicTypeQueueItems, srv.apiV1.GetQueueItemsData)
-	registrar.RegisterFetcher(sse.TopicTypeDoc, srv.apiV1.GetDocContentData)
-	registrar.RegisterFetcher(sse.TopicTypeDocTree, srv.apiV1.GetDocTreeData)
 }
 
 func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath string) {
@@ -1402,8 +1407,18 @@ func (srv *Server) shutdownActions(ctx context.Context) shutdownActions {
 			return nil
 		}
 	}
+	if srv.appStream != nil && srv.sseMultiplexer == nil {
+		actions.shutdownSSEMultiplexer = func() {
+			srv.appStream.Shutdown()
+			logger.Info(ctx, "App SSE stream shut down")
+		}
+	}
 	if srv.sseMultiplexer != nil {
 		actions.shutdownSSEMultiplexer = func() {
+			if srv.appStream != nil {
+				srv.appStream.Shutdown()
+				logger.Info(ctx, "App SSE stream shut down")
+			}
 			srv.sseMultiplexer.Shutdown()
 			logger.Info(ctx, "SSE multiplexer shut down")
 		}

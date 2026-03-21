@@ -9,8 +9,11 @@ import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-d
 import QueueList from '../../features/queues/components/QueueList';
 import QueueMetrics from '../../features/queues/components/QueueMetrics';
 import { useQuery } from '../../hooks/api';
-import { useQueuesListSSE } from '../../hooks/useQueuesListSSE';
-import { sseFallbackOptions, useSSECacheSync } from '../../hooks/useSSECacheSync';
+import {
+  liveFallbackOptions,
+  useLiveConnection,
+  useLiveQueues,
+} from '../../hooks/useAppLive';
 import Title from '../../ui/Title';
 
 function Queues() {
@@ -97,7 +100,7 @@ function Queues() {
     appBarContext.setTitle('Queue Dashboard');
   }, [appBarContext]);
 
-  const sseResult = useQueuesListSSE(true);
+  const liveState = useLiveConnection();
 
   const { data, error, isLoading, mutate } = useQuery(
     '/queues',
@@ -108,9 +111,9 @@ function Queues() {
         },
       },
     },
-    sseFallbackOptions(sseResult, 3000)
+    liveFallbackOptions(liveState, 3000)
   );
-  useSSECacheSync(sseResult, mutate);
+  useLiveQueues(mutate);
 
   async function handleRefresh(): Promise<void> {
     await mutate();

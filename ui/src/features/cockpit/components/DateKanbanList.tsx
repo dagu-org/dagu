@@ -2,20 +2,24 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { components } from '@/api/v1/schema';
 import DAGRunDetailsModal from '@/features/dag-runs/components/dag-run-details/DAGRunDetailsModal';
 import { useInfiniteKanban } from '../hooks/useInfiniteKanban';
-import { useCockpitDagRuns } from '../hooks/useCockpitDagRuns';
 import { DateKanbanSection } from './DateKanbanSection';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
 
 interface Props {
   selectedWorkspace: string;
+  suspendLoadMore?: boolean;
 }
 
-export function DateKanbanList({ selectedWorkspace }: Props): React.ReactElement {
+export function DateKanbanList({
+  selectedWorkspace,
+  suspendLoadMore = false,
+}: Props): React.ReactElement {
   const { loadedDates, todayStr, hasMore, loadNextDate } = useInfiniteKanban(selectedWorkspace);
-  const { getColumnsForDate, isLoading } = useCockpitDagRuns(loadedDates, selectedWorkspace);
   const [selectedRun, setSelectedRun] = useState<DAGRunSummary | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const awaitingSentinelExitRef = useRef(false);
 
   const handleCardClick = useCallback((run: DAGRunSummary) => {
     setSelectedRun(run);
@@ -25,35 +29,75 @@ export function DateKanbanList({ selectedWorkspace }: Props): React.ReactElement
     setSelectedRun(null);
   }, []);
 
+  const triggerLoadNextDate = useCallback(() => {
+    if (!hasMore || suspendLoadMore) {
+      return;
+    }
+    awaitingSentinelExitRef.current = true;
+    loadNextDate();
+  }, [hasMore, loadNextDate, suspendLoadMore]);
+
   const dateCount = loadedDates.length;
   useEffect(() => {
+    awaitingSentinelExitRef.current = false;
+  }, [selectedWorkspace]);
+
+  useEffect(() => {
+    const root = containerRef.current;
     const el = sentinelRef.current;
-    if (!el || !hasMore) return;
+    if (
+      !root ||
+      !el ||
+      !hasMore ||
+      suspendLoadMore ||
+      typeof IntersectionObserver === 'undefined'
+    ) {
+      return;
+    }
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry?.isIntersecting) loadNextDate();
+        const isIntersecting = !!entry?.isIntersecting;
+        if (!isIntersecting) {
+          awaitingSentinelExitRef.current = false;
+          return;
+        }
+        if (!awaitingSentinelExitRef.current) {
+          triggerLoadNextDate();
+        }
       },
-      { threshold: 0.1 }
+      { root, threshold: 0.1 }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasMore, loadNextDate, dateCount]);
+  }, [dateCount, hasMore, suspendLoadMore, triggerLoadNextDate]);
 
   return (
     <>
-      <div className="flex flex-col overflow-y-auto flex-1 min-h-0 gap-6 p-1">
+      <div
+        ref={containerRef}
+        className="flex flex-col overflow-y-auto flex-1 min-h-0 gap-6 p-1"
+      >
         {loadedDates.map((date) => (
           <DateKanbanSection
             key={date}
             date={date}
             todayStr={todayStr}
-            columns={getColumnsForDate(date)}
-            isLoading={isLoading}
+            selectedWorkspace={selectedWorkspace}
             onCardClick={handleCardClick}
           />
         ))}
         {hasMore && (
-          <div ref={sentinelRef} className="h-1 shrink-0" />
+          <div className="flex flex-col items-center gap-3 pb-3">
+            <button
+              type="button"
+              onClick={triggerLoadNextDate}
+              disabled={suspendLoadMore}
+              className="rounded border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Load older day
+            </button>
+            <div ref={sentinelRef} className="h-1 w-full shrink-0" />
+          </div>
         )}
       </div>
       {selectedRun && (

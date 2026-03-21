@@ -19,10 +19,12 @@ import (
 	"text/template"
 	"time"
 
+	apiv1 "github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/license"
+	workspacepkg "github.com/dagu-org/dagu/internal/workspace"
 )
 
 //go:embed templates/* assets/*
@@ -128,6 +130,7 @@ type funcsConfig struct {
 	OIDCButtonLabel       string
 	TerminalEnabled       bool
 	GitSyncEnabled        bool
+	WorkspaceStore        workspacepkg.Store
 
 	SetupRequiredChecker SetupRequiredChecker
 	UpdateChecker        UpdateChecker
@@ -153,6 +156,40 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 		"remoteNodes":           func() string { return strings.Join(cfg.RemoteNodes, ",") },
 		"authMode":              func() string { return string(cfg.AuthMode) },
 		"oidcButtonLabel":       func() string { return cfg.OIDCButtonLabel },
+		"initialWorkspacesJSON": func() string {
+			if cfg.WorkspaceStore == nil {
+				return "[]"
+			}
+			workspaces, err := cfg.WorkspaceStore.List(context.Background())
+			if err != nil {
+				return "[]"
+			}
+			response := make([]apiv1.WorkspaceResponse, 0, len(workspaces))
+			for _, ws := range workspaces {
+				if ws == nil {
+					continue
+				}
+				item := apiv1.WorkspaceResponse{
+					Id:   ws.ID,
+					Name: ws.Name,
+				}
+				if ws.Description != "" {
+					item.Description = &ws.Description
+				}
+				if !ws.CreatedAt.IsZero() {
+					item.CreatedAt = &ws.CreatedAt
+				}
+				if !ws.UpdatedAt.IsZero() {
+					item.UpdatedAt = &ws.UpdatedAt
+				}
+				response = append(response, item)
+			}
+			data, err := json.Marshal(response)
+			if err != nil {
+				return "[]"
+			}
+			return string(data)
+		},
 
 		// Permission functions
 		"permissionsWriteDags": func() string { return boolStr(cfg.Permissions[config.PermissionWriteDAGs]) },

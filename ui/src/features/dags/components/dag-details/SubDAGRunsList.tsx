@@ -1,6 +1,7 @@
 import { components, StatusLabel } from '@/api/v1/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
+import { whenEnabled } from '@/hooks/queryUtils';
 import dayjs from '@/lib/dayjs';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useContext, useEffect, useMemo, useState } from 'react';
@@ -56,7 +57,7 @@ export function SubDAGRunsList({
   const isNestedSubDAG = dagRunId !== rootDagRunId;
   const { data: subRunsData, mutate: refetchSubRuns } = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs',
-    {
+    whenEnabled(shouldFetch, {
       params: {
         path: {
           name: rootDagName,
@@ -68,9 +69,8 @@ export function SubDAGRunsList({
           parentSubDAGRunId: isNestedSubDAG ? dagRunId : undefined,
         },
       },
-    },
+    }),
     {
-      isPaused: () => !shouldFetch,
       refreshInterval: shouldFetch ? 3000 : 0,
     }
   );

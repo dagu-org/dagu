@@ -2,6 +2,7 @@ import { ChatMessageRole } from '@/api/v1/schema';
 import { Markdown } from '@/components/ui/markdown';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
+import { whenEnabled } from '@/hooks/queryUtils';
 import { cn } from '@/lib/utils';
 import { Check, ChevronRight, Copy, Loader2, Wrench } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
@@ -66,23 +67,22 @@ export function StepMessagesTable({
   // Query for regular DAG runs
   const regularQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/steps/{stepName}/messages',
-    {
+    whenEnabled(!isSubDAGRun, {
       params: {
         path: { name: effectiveName, dagRunId: effectiveRunId, stepName },
         query: { remoteNode: appBarContext.selectedRemoteNode || 'local' },
       },
-    },
+    }),
     {
       refreshInterval: isActive ? 2000 : 0,
       revalidateOnFocus: false,
-      isPaused: () => isSubDAGRun,
     }
   );
 
   // Query for sub-DAG runs
   const subDagQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/messages',
-    {
+    whenEnabled(isSubDAGRun, {
       params: {
         path: {
           name: effectiveName,
@@ -92,11 +92,10 @@ export function StepMessagesTable({
         },
         query: { remoteNode: appBarContext.selectedRemoteNode || 'local' },
       },
-    },
+    }),
     {
       refreshInterval: isActive ? 2000 : 0,
       revalidateOnFocus: false,
-      isPaused: () => !isSubDAGRun,
     }
   );
 

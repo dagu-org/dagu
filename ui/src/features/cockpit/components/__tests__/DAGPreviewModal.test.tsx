@@ -1,15 +1,14 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { render, screen } from '@testing-library/react';
 import React from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient } from '@/hooks/api';
 import { DAGPreviewModal } from '../DAGPreviewModal';
 
-const mockSidePanel = vi.fn((_props?: unknown) => <div>shared side panel</div>);
+const mockSidePanel = vi.fn((_props: unknown) => <div>dag details panel</div>);
 
 vi.mock('@/hooks/api', () => ({
   useClient: vi.fn(),
@@ -28,18 +27,30 @@ const appBarValue = {
   selectRemoteNode: vi.fn(),
 };
 
-function renderPreview(selectedWorkspace = 'briefing/alpha') {
+const useClientMock = useClient as unknown as {
+  mockReturnValue: (value: unknown) => void;
+};
+
+const sidePanelMock = mockSidePanel as unknown as {
+  mock: {
+    calls: unknown[][];
+  };
+};
+
+function renderPreview(
+  props?: Partial<React.ComponentProps<typeof DAGPreviewModal>>
+) {
+  const onClose = props?.onClose ?? vi.fn();
   return render(
-    <MemoryRouter>
-      <AppBarContext.Provider value={appBarValue}>
-        <DAGPreviewModal
-          fileName="example"
-          isOpen={true}
-          selectedWorkspace={selectedWorkspace}
-          onClose={vi.fn()}
-        />
-      </AppBarContext.Provider>
-    </MemoryRouter>
+    <AppBarContext.Provider value={appBarValue}>
+      <DAGPreviewModal
+        fileName="example"
+        isOpen={true}
+        selectedWorkspace="briefing/alpha"
+        onClose={onClose}
+        {...props}
+      />
+    </AppBarContext.Provider>
   );
 }
 
@@ -48,44 +59,45 @@ afterEach(() => {
 });
 
 describe('DAGPreviewModal', () => {
-  it('passes cockpit-specific configuration to the shared side panel', () => {
-    vi.mocked(useClient).mockReturnValue({
-      POST: vi.fn(),
-    } as never);
+  it('renders the shared DAG details side panel with cockpit-specific props', () => {
+    useClientMock.mockReturnValue({ POST: vi.fn() } as never);
 
     renderPreview();
 
-    expect(screen.getByText('shared side panel')).toBeInTheDocument();
     expect(mockSidePanel).toHaveBeenCalledWith(
       expect.objectContaining({
         fileName: 'example',
         isOpen: true,
-        initialTab: 'spec',
+        initialTab: 'status',
         renderInPortal: true,
-        backdropVisibleClassName: 'bg-black/5',
         forceEnqueue: true,
+        onClose: expect.any(Function),
         onEnqueue: expect.any(Function),
+        toolbarHint: expect.anything(),
       })
     );
   });
 
-  it('enqueues with a sanitized workspace tag and returns the new dag run id', async () => {
+  it('enqueues with a sanitized workspace tag and returns the dag run id', async () => {
     const post = vi.fn().mockResolvedValue({
       data: { dagRunId: 'queued-run' },
       error: undefined,
     });
-    vi.mocked(useClient).mockReturnValue({ POST: post } as never);
+    const onClose = vi.fn();
+    useClientMock.mockReturnValue({ POST: post } as never);
 
-    renderPreview();
+    renderPreview({ onClose });
 
-    const props = mockSidePanel.mock.calls[mockSidePanel.mock.calls.length - 1]?.[0] as {
+    const props = sidePanelMock.mock.calls[
+      sidePanelMock.mock.calls.length - 1
+    ]?.[0] as unknown as {
       onEnqueue: (
         params: string,
         dagRunId?: string
       ) => Promise<string | void>;
     };
 
-    await expect(props.onEnqueue('[\"x\"]', 'manual-run')).resolves.toBe(
+    await expect(props.onEnqueue('["x"]', 'manual-run')).resolves.toBe(
       'queued-run'
     );
     expect(post).toHaveBeenCalledWith('/dags/{fileName}/enqueue', {
@@ -99,6 +111,7 @@ describe('DAGPreviewModal', () => {
         tags: ['workspace=briefingalpha'],
       },
     });
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('throws when the cockpit enqueue request fails', async () => {
@@ -106,11 +119,13 @@ describe('DAGPreviewModal', () => {
       data: undefined,
       error: { message: 'enqueue failed' },
     });
-    vi.mocked(useClient).mockReturnValue({ POST: post } as never);
+    useClientMock.mockReturnValue({ POST: post } as never);
 
-    renderPreview('ops');
+    renderPreview({ selectedWorkspace: 'ops' });
 
-    const props = mockSidePanel.mock.calls[mockSidePanel.mock.calls.length - 1]?.[0] as {
+    const props = sidePanelMock.mock.calls[
+      sidePanelMock.mock.calls.length - 1
+    ]?.[0] as unknown as {
       onEnqueue: () => Promise<string | void>;
     };
 

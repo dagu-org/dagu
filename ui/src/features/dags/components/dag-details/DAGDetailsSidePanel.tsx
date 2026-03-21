@@ -6,8 +6,13 @@ import { Button } from '@/components/ui/button';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { UnsavedChangesProvider } from '@/contexts/UnsavedChangesContext';
 import { useQuery } from '@/hooks/api';
-import { useDAGSSE } from '@/hooks/useDAGSSE';
-import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
+import { whenEnabled } from '@/hooks/queryUtils';
+import {
+  liveFallbackOptions,
+  useLiveConnection,
+  useLiveDAG,
+  useLiveDAGRuns,
+} from '@/hooks/useAppLive';
 import dayjs from '@/lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '@/lib/keyboard-shortcuts';
 import { cn } from '@/lib/utils';
@@ -163,36 +168,33 @@ function DAGDetailsSidePanel({
     setActiveTab('status');
   }, []);
 
-  const sseResult = useDAGSSE(stableFileName, isOpen && !!stableFileName);
+  const dagDetailsEnabled = isOpen && !!stableFileName;
+  const liveState = useLiveConnection(dagDetailsEnabled);
   const { data, error, mutate } = useQuery(
     '/dags/{fileName}',
-    {
+    whenEnabled(dagDetailsEnabled, {
       params: {
         query: { remoteNode },
         path: { fileName: stableFileName },
       },
-    },
-    {
-      ...sseFallbackOptions(sseResult),
-      isPaused: () => !isOpen || !stableFileName,
-    }
+    }),
+    liveFallbackOptions(liveState)
   );
-  useSSECacheSync(sseResult, mutate);
+  useLiveDAG(stableFileName, mutate, dagDetailsEnabled);
 
   const dagName = data?.dag?.name || '';
-  const { data: trackedRunData } = useQuery(
+  const trackedRunEnabled = isOpen && !!dagName && !!trackedDagRunId;
+  const { data: trackedRunData, mutate: mutateTrackedRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}',
-    {
+    whenEnabled(trackedRunEnabled, {
       params: {
         path: { name: dagName, dagRunId: trackedDagRunId || '' },
         query: { remoteNode },
       },
-    },
-    {
-      isPaused: () => !isOpen || !dagName || !trackedDagRunId,
-      refreshInterval: 2000,
-    }
+    }),
+    liveFallbackOptions(liveState)
   );
+  useLiveDAGRuns(mutateTrackedRun, trackedRunEnabled);
 
   React.useEffect(() => {
     if (trackedRunData?.dagRunDetails) {
@@ -213,12 +215,14 @@ function DAGDetailsSidePanel({
       }
 
       const result = await onEnqueue(params, dagRunId, immediate);
+      setActiveTab('status');
       if (typeof result === 'string' && result) {
         setTrackedDagRunId(result);
       }
+      await mutate();
       return result;
     },
-    [onEnqueue]
+    [mutate, onEnqueue]
   );
 
   const handleFullscreenClick = React.useCallback(
@@ -374,7 +378,6 @@ function DAGDetailsSidePanel({
                     isModal={true}
                     navigateToStatusTab={navigateToStatusTab}
                     localDags={data.localDags}
-                    sseResult={sseResult}
                     onEnqueue={onEnqueue ? handleEnqueue : undefined}
                     forceEnqueue={forceEnqueue}
                     autoOpenStartModal={false}
