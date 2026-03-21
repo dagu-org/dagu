@@ -37,9 +37,7 @@ function DAGRunDetailsPanel({
   const parentDAGRunId = searchParams.get('dagRunId');
   const parentName = searchParams.get('dagRunName') || name;
   const isSubDAGRun = Boolean(subDAGRunId && parentDAGRunId && parentName);
-  const liveEnabled = isSubDAGRun
-    ? Boolean(parentName && parentDAGRunId && subDAGRunId)
-    : Boolean(name && dagRunId);
+  const liveEnabled = isSubDAGRun || Boolean(name && dagRunId);
 
   const liveState = useLiveConnection(liveEnabled);
 

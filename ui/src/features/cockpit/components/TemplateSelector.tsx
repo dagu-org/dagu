@@ -106,14 +106,11 @@ export function TemplateSelector({
       setSelectedDag(null);
       return;
     }
-    if (!isOpen) {
-      return;
-    }
     const found = filteredDags.find((d) => d.fileName === selectedTemplate);
     if (found) {
       setSelectedDag(found);
     }
-  }, [filteredDags, isOpen, selectedTemplate]);
+  }, [filteredDags, selectedTemplate]);
 
   // Group DAGs by group field
   const groupedDags = useMemo(() => {

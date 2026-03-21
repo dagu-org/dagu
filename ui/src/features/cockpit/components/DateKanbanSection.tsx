@@ -41,10 +41,7 @@ export function DateKanbanSection({
         <div className="px-1 py-3 text-xs text-muted-foreground">Loading runs...</div>
       ) : error ? (
         <div className="px-1 py-3 flex items-center gap-3 text-xs">
-          <span className="text-destructive">
-            {(error as { message?: string } | undefined)?.message ||
-              'Failed to load runs'}
-          </span>
+          <span className="text-destructive">{error.message || 'Failed to load runs'}</span>
           <button
             type="button"
             onClick={() => void retry()}

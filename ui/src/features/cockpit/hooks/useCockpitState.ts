@@ -21,6 +21,7 @@ export function useCockpitState() {
   const [workspaces, setWorkspaces] = useState<WorkspaceResponse[]>(
     () => config.initialWorkspaces ?? []
   );
+  const [workspaceError, setWorkspaceError] = useState<Error | null>(null);
 
   const applyWorkspaces = useCallback(
     (
@@ -57,11 +58,18 @@ export function useCockpitState() {
   const createWorkspace = useCallback(
     async (name: string) => {
       if (!name) return;
+      setWorkspaceError(null);
       const { data, error } = await client.POST('/workspaces', {
         params: { query: { remoteNode } },
         body: { name },
       });
-      if (!error && data) {
+      if (error) {
+        const nextError = new Error(error.message || 'Failed to create workspace');
+        console.error(nextError);
+        setWorkspaceError(nextError);
+        return;
+      }
+      if (data) {
         applyWorkspaces((prev) => {
           const next = [...prev.filter((ws) => ws.id !== data.id), data];
           return next.sort((a, b) => a.name.localeCompare(b.name));
@@ -74,20 +82,25 @@ export function useCockpitState() {
 
   const deleteWorkspace = useCallback(
     async (id: string) => {
+      setWorkspaceError(null);
       const { error } = await client.DELETE('/workspaces/{workspaceId}', {
         params: { path: { workspaceId: id }, query: { remoteNode } },
       });
-      if (!error) {
-        applyWorkspaces((prev) => prev.filter((ws) => ws.id !== id));
-        selectWorkspace('');
+      if (error) {
+        const nextError = new Error(error.message || 'Failed to delete workspace');
+        console.error(nextError);
+        setWorkspaceError(nextError);
+        return;
       }
+      applyWorkspaces((prev) => prev.filter((ws) => ws.id !== id));
+      selectWorkspace('');
     },
     [applyWorkspaces, client, remoteNode, selectWorkspace]
   );
 
   return {
     workspaces,
-    workspaceError: null,
+    workspaceError,
     selectedWorkspace,
     selectedTemplate,
     selectWorkspace,

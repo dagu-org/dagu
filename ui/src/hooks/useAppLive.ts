@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useContext, useEffect, useRef, useState } from 'react';
 import type { KeyedMutator } from 'swr';
 import { AppBarContext } from '@/contexts/AppBarContext';

@@ -6,6 +6,9 @@ internal/service/frontend/assets/*
 # copied schema
 ui/src/assets/dag.schema.json
 
+# frontend test artifacts
+ui/test-results/
+
 # NVM
 .nvmrc
 
@@ -44,4 +47,3 @@ __debug_bin*
 
 # Ralph PRD file
 prd.json
-

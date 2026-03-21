@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { getAuthToken } from '@/lib/authHeaders';
 
 const MAX_RETRY_DELAY_MS = 16000;
@@ -292,8 +295,12 @@ export class AppLiveManager {
 
   private notifySubscribers(conn: ManagedConnection, event: AppLiveEvent): void {
     for (const subscriber of conn.subscribers.values()) {
-      if (event.type === 'reset' || subscriber.matches(event)) {
-        subscriber.onInvalidate(event);
+      try {
+        if (event.type === 'reset' || subscriber.matches(event)) {
+          subscriber.onInvalidate(event);
+        }
+      } catch (error) {
+        console.error('AppLiveManager subscriber invalidate failed', error);
       }
     }
   }
@@ -308,7 +315,11 @@ export class AppLiveManager {
     };
 
     for (const subscriber of conn.subscribers.values()) {
-      subscriber.onStateChange(conn.state);
+      try {
+        subscriber.onStateChange(conn.state);
+      } catch (error) {
+        console.error('AppLiveManager subscriber state change failed', error);
+      }
     }
   }
 

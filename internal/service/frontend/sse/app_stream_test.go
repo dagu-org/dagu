@@ -8,6 +8,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWriteAppEventFrame(t *testing.T) {
@@ -18,20 +21,12 @@ func TestWriteAppEventFrame(t *testing.T) {
 		FileName: "example.yaml",
 		Reason:   "updated",
 	})
-	if err != nil {
-		t.Fatalf("writeAppEventFrame() error = %v", err)
-	}
+	require.NoError(t, err)
 
 	body := recorder.Body.String()
-	if !strings.Contains(body, "event: dag.changed\n") {
-		t.Fatalf("expected SSE event frame, got %q", body)
-	}
-	if !strings.Contains(body, `"fileName":"example.yaml"`) {
-		t.Fatalf("expected serialized file name in frame, got %q", body)
-	}
-	if !strings.Contains(body, `"reason":"updated"`) {
-		t.Fatalf("expected serialized reason in frame, got %q", body)
-	}
+	assert.Contains(t, body, "event: dag.changed\n")
+	assert.Contains(t, body, `"fileName":"example.yaml"`)
+	assert.Contains(t, body, `"reason":"updated"`)
 }
 
 func TestRecursiveWatcherStopIsIdempotent(_ *testing.T) {
@@ -39,6 +34,7 @@ func TestRecursiveWatcherStopIsIdempotent(_ *testing.T) {
 		done: make(chan struct{}),
 	}
 
+	// Calling Stop twice asserts the method is idempotent and does not panic.
 	watcher.Stop()
 	watcher.Stop()
 }
@@ -51,6 +47,7 @@ func TestAppStreamServiceShutdownIsIdempotent(_ *testing.T) {
 		},
 	}
 
+	// Calling Shutdown twice asserts the method is idempotent and does not panic.
 	service.Shutdown()
 	service.Shutdown()
 }

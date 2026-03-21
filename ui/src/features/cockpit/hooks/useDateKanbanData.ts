@@ -104,6 +104,16 @@ export function useDateKanbanData(
   );
   useLiveDAGRuns(mutate, isToday);
 
+  const typedError = useMemo(() => {
+    if (!error) {
+      return null;
+    }
+    if (error instanceof Error) {
+      return error;
+    }
+    return new Error('Failed to load runs');
+  }, [error]);
+
   const columns = useMemo(
     () => groupByStatus(data?.dagRuns ?? []),
     [data?.dagRuns]
@@ -118,8 +128,8 @@ export function useDateKanbanData(
 
   return {
     columns,
-    error,
-    isLoading: !data && !error,
+    error: typedError,
+    isLoading: !data && !typedError,
     isEmpty,
     retry: mutate,
   };

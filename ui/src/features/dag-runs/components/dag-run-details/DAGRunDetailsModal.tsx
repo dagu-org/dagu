@@ -71,7 +71,7 @@ function DAGRunDetailsModal({
   const parentName = searchParams.get('dagRunName') || name;
   const canQuerySubDag = Boolean(subDAGRunId && parentDAGRunId && parentName);
   const subDAGQueryEnabled = isOpen && canQuerySubDag;
-  const dagRunQueryEnabled = isOpen && !canQuerySubDag && Boolean(name && dagRunId);
+  const dagRunQueryEnabled = isOpen && !canQuerySubDag && Boolean(name);
 
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',

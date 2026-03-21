@@ -257,7 +257,9 @@ func (w *recursiveWatcher) handleEvent(event fsnotify.Event) {
 
 	if event.Op&fsnotify.Create != 0 {
 		if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
-			_ = w.addDirRecursive(event.Name)
+			if err := w.addDirRecursive(event.Name); err != nil {
+				w.onReset(fmt.Sprintf("failed to register watcher for %s: %v", event.Name, err))
+			}
 		}
 	}
 
@@ -271,7 +273,7 @@ func (w *recursiveWatcher) handleEvent(event fsnotify.Event) {
 func (w *recursiveWatcher) addDirRecursive(root string) error {
 	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return nil
+			return err
 		}
 		if !d.IsDir() {
 			return nil
@@ -311,6 +313,11 @@ func NewAppStreamService(cfg AppStreamConfig) (*AppStreamService, error) {
 	}
 	service.coalescer = newAppEventCoalescer(appStreamDebounceInterval, hub.Publish)
 
+	primaryDAGRoot := ""
+	if cfg.Paths.DAGsDir != "" {
+		primaryDAGRoot = filepath.Clean(cfg.Paths.DAGsDir)
+	}
+
 	paths := uniqueNonEmptyPaths(
 		cfg.Paths.DAGsDir,
 		cfg.Paths.AltDAGsDir,
@@ -318,7 +325,7 @@ func NewAppStreamService(cfg AppStreamConfig) (*AppStreamService, error) {
 	for _, dagRoot := range paths {
 		service.watchers = append(service.watchers, newRecursiveWatcher(
 			dagRoot,
-			dagRoot == cfg.Paths.DAGsDir,
+			dagRoot == primaryDAGRoot,
 			service.handleDAGFileEvent,
 			service.publishReset,
 		))
