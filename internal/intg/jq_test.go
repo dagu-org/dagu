@@ -289,6 +289,37 @@ func TestJQExecutor(t *testing.T) {
 		})
 	})
 
+	t.Run("InputFromFileWithStepRef", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `
+type: graph
+steps:
+  - id: producer
+    command: 'echo ''{"items": [{"name": "a"}, {"name": "b"}]}'''
+    output: PRODUCER_OUT
+
+  - id: filter
+    depends:
+      - producer
+    type: jq
+    config:
+      raw: true
+    script: "file://${producer.stdout}"
+    command: '.items[] | .name'
+    output: RESULT
+`)
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": "a\nb",
+		})
+	})
+
 	t.Run("StringWithSpecialCharsWithRawTrue", func(t *testing.T) {
 		t.Parallel()
 

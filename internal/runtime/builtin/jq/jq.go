@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
@@ -40,9 +41,23 @@ func newJQ(_ context.Context, step core.Step) (executor.Executor, error) {
 			return nil, err
 		}
 	}
+	if step.Script == "" {
+		return nil, fmt.Errorf("jq: no input provided (set script to inline JSON or file://<path>)")
+	}
+
 	var input any
-	if err := json.Unmarshal([]byte(step.Script), &input); err != nil {
-		return nil, err
+	if after, ok := strings.CutPrefix(step.Script, "file://"); ok {
+		data, err := os.ReadFile(after)
+		if err != nil {
+			return nil, fmt.Errorf("jq: reading input file %q: %w", after, err)
+		}
+		if err := json.Unmarshal(data, &input); err != nil {
+			return nil, fmt.Errorf("jq: parsing JSON from file %q: %w", after, err)
+		}
+	} else {
+		if err := json.Unmarshal([]byte(step.Script), &input); err != nil {
+			return nil, err
+		}
 	}
 
 	// Extract query from Commands field
