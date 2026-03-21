@@ -31,6 +31,10 @@ func SkillFS() embed.FS {
 // SeedExampleSkills writes bundled example skills to baseDir if not already seeded.
 // Returns true if examples were created this call.
 func SeedExampleSkills(baseDir string) bool {
+	if len(ExampleSkillIDs()) == 0 {
+		return false
+	}
+
 	markerPath := filepath.Join(baseDir, examplesMarkerFile)
 	if _, err := os.Stat(markerPath); err == nil {
 		return false // already seeded

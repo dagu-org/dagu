@@ -13,29 +13,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSeedExampleSkills_CreatesFiles(t *testing.T) {
+func TestSeedExampleSkills_NoBundledExamplesNoop(t *testing.T) {
 	t.Parallel()
 	baseDir := t.TempDir()
 
 	seeded := SeedExampleSkills(baseDir)
 
-	assert.True(t, seeded)
+	assert.False(t, seeded)
 
-	// Verify marker file exists.
+	// No marker should be created when no example skills are bundled.
 	_, err := os.Stat(filepath.Join(baseDir, examplesMarkerFile))
-	assert.NoError(t, err)
-
-	// Verify each example skill directory + SKILL.md exists.
-	for _, id := range ExampleSkillIDs() {
-		skillPath := filepath.Join(baseDir, id, skillFilename)
-		info, err := os.Stat(skillPath)
-		require.NoError(t, err, "expected %s to exist", skillPath)
-		assert.True(t, info.Size() > 0)
-	}
+	assert.True(t, os.IsNotExist(err))
 }
 
 func TestSeedExampleSkills_MarkerPreventsReCreation(t *testing.T) {
 	t.Parallel()
+	if len(ExampleSkillIDs()) == 0 {
+		t.Skip("no bundled example skills")
+	}
 	baseDir := t.TempDir()
 
 	assert.True(t, SeedExampleSkills(baseDir))
@@ -69,6 +64,9 @@ func TestSeedExampleSkills_ExistingSkillsSkipSeed(t *testing.T) {
 
 func TestSeedExampleSkills_ValidContent(t *testing.T) {
 	t.Parallel()
+	if len(ExampleSkillIDs()) == 0 {
+		t.Skip("no bundled example skills")
+	}
 	baseDir := t.TempDir()
 
 	require.True(t, SeedExampleSkills(baseDir))
