@@ -2237,6 +2237,10 @@
         "raw": {
           "type": "boolean",
           "description": "When true, outputs values without JSON formatting. Strings are printed without quotes, nulls print empty lines."
+        },
+        "input": {
+          "type": "string",
+          "description": "File path to read JSON input from. Mutually exclusive with script."
         }
       },
       "description": "Configuration for JQ JSON query executor."

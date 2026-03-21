@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/itchyny/gojq"
@@ -29,10 +30,11 @@ type jq struct {
 }
 
 type jqConfig struct {
-	Raw bool `mapstructure:"raw"`
+	Raw   bool   `mapstructure:"raw"`
+	Input string `mapstructure:"input"`
 }
 
-func newJQ(_ context.Context, step core.Step) (executor.Executor, error) {
+func newJQ(ctx context.Context, step core.Step) (executor.Executor, error) {
 	var jqCfg jqConfig
 	if step.ExecutorConfig.Config != nil {
 		if err := decodeJqConfig(
@@ -41,23 +43,39 @@ func newJQ(_ context.Context, step core.Step) (executor.Executor, error) {
 			return nil, err
 		}
 	}
-	if step.Script == "" {
-		return nil, fmt.Errorf("jq: no input provided (set script to inline JSON or file://<path>)")
-	}
-
 	var input any
-	if after, ok := strings.CutPrefix(step.Script, "file://"); ok {
-		data, err := os.ReadFile(after)
+	switch {
+	case jqCfg.Input != "" && step.Script != "":
+		return nil, fmt.Errorf("jq: config.input and script are mutually exclusive; provide one, not both")
+	case jqCfg.Input != "":
+		// Evaluate the input path to resolve step references like ${step.stdout}
+		inputPath, err := runtime.EvalString(ctx, jqCfg.Input)
 		if err != nil {
-			return nil, fmt.Errorf("jq: reading input file %q: %w", after, err)
+			return nil, fmt.Errorf("jq: failed to evaluate config.input: %w", err)
+		}
+		data, err := os.ReadFile(inputPath)
+		if err != nil {
+			return nil, fmt.Errorf("jq: reading input file %q: %w", inputPath, err)
 		}
 		if err := json.Unmarshal(data, &input); err != nil {
-			return nil, fmt.Errorf("jq: parsing JSON from file %q: %w", after, err)
+			return nil, fmt.Errorf("jq: parsing JSON from input file %q: %w", inputPath, err)
 		}
-	} else {
-		if err := json.Unmarshal([]byte(step.Script), &input); err != nil {
-			return nil, err
+	case step.Script != "":
+		if after, ok := strings.CutPrefix(step.Script, "file://"); ok {
+			data, err := os.ReadFile(after)
+			if err != nil {
+				return nil, fmt.Errorf("jq: reading input file %q: %w", after, err)
+			}
+			if err := json.Unmarshal(data, &input); err != nil {
+				return nil, fmt.Errorf("jq: parsing JSON from file %q: %w", after, err)
+			}
+		} else {
+			if err := json.Unmarshal([]byte(step.Script), &input); err != nil {
+				return nil, err
+			}
 		}
+	default:
+		return nil, fmt.Errorf("jq: no input provided (set config.input to a file path, or script to inline JSON)")
 	}
 
 	// Extract query from Commands field

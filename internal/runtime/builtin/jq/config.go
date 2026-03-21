@@ -11,7 +11,8 @@ import (
 var configSchema = &jsonschema.Schema{
 	Type: "object",
 	Properties: map[string]*jsonschema.Schema{
-		"raw": {Type: "boolean", Description: "Output raw strings without JSON encoding (like jq -r)"},
+		"raw":   {Type: "boolean", Description: "Output raw strings without JSON encoding (like jq -r)"},
+		"input": {Type: "string", Description: "File path to read JSON input from. Mutually exclusive with script."},
 	},
 }
 
