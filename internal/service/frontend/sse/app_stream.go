@@ -213,11 +213,9 @@ func (w *recursiveWatcher) Start(ctx context.Context) error {
 		return err
 	}
 
-	w.wg.Add(1)
-	go func() {
-		defer w.wg.Done()
+	w.wg.Go(func() {
 		w.loop(ctx)
-	}()
+	})
 	return nil
 }
 
