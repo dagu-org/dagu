@@ -11,6 +11,7 @@ import {
 import { DAGContext } from '../../../features/dags/contexts/DAGContext';
 import { RootDAGRunContext } from '../../../features/dags/contexts/RootDAGRunContext';
 import { useQuery } from '../../../hooks/api';
+import { whenEnabled } from '../../../hooks/queryUtils';
 import {
   liveFallbackOptions,
   useLiveConnection,
@@ -125,17 +126,15 @@ function DAGDetails() {
   // Fetch specific DAG-run data if dagRunId is provided
   const { data: dagRunResponse, mutate: mutateDagRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}',
-    dagRunQueryEnabled
-      ? {
-          params: {
-            path: {
-              name: dagRunName,
-              dagRunId: dagRunId || '',
-            },
-            query: { remoteNode },
-          },
-        }
-      : null,
+    whenEnabled(dagRunQueryEnabled, {
+      params: {
+        path: {
+          name: dagRunName,
+          dagRunId: dagRunId || '',
+        },
+        query: { remoteNode },
+      },
+    }),
     liveFallbackOptions(liveState)
   );
   useLiveDAGRuns(mutateDagRun, dagRunQueryEnabled);
@@ -144,18 +143,16 @@ function DAGDetails() {
   const subDAGRunQueryEnabled = Boolean(subDAGRunId && dagRunId && dagRunName);
   const { data: subDAGRunResponse, mutate: mutateSubDagRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
-    subDAGRunQueryEnabled
-      ? {
-          params: {
-            path: {
-              name: dagRunName,
-              dagRunId: dagRunId || '',
-              subDAGRunId: subDAGRunId || '',
-            },
-            query: { remoteNode },
-          },
-        }
-      : null,
+    whenEnabled(subDAGRunQueryEnabled, {
+      params: {
+        path: {
+          name: dagRunName,
+          dagRunId: dagRunId || '',
+          subDAGRunId: subDAGRunId || '',
+        },
+        query: { remoteNode },
+      },
+    }),
     liveFallbackOptions(liveState)
   );
   useLiveDAGRuns(mutateSubDagRun, subDAGRunQueryEnabled);

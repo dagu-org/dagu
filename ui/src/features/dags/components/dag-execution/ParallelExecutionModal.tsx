@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/dialog';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
+import { whenEnabled } from '@/hooks/queryUtils';
 import { ExternalLink, Layers } from 'lucide-react';
 import React, { useContext, useMemo, useState } from 'react';
 import { components, StatusLabel } from '../../../../api/v1/schema';
@@ -56,20 +57,18 @@ export function ParallelExecutionModal({
   // Fetch sub DAG run details with status information
   const { data: subRunsData } = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs',
-    isOpen
-      ? {
-          params: {
-            path: {
-              name: rootDagName,
-              dagRunId: rootDagRunId,
-            },
-            query: {
-              remoteNode,
-              parentSubDAGRunId: isNestedSubDAG ? parentDagRunId : undefined,
-            },
-          },
-        }
-      : null,
+    whenEnabled(isOpen, {
+      params: {
+        path: {
+          name: rootDagName,
+          dagRunId: rootDagRunId,
+        },
+        query: {
+          remoteNode,
+          parentSubDAGRunId: isNestedSubDAG ? parentDagRunId : undefined,
+        },
+      },
+    }),
     {
       refreshInterval: isOpen ? 3000 : 0,
     }

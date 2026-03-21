@@ -1,5 +1,6 @@
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
+import { whenEnabled } from '@/hooks/queryUtils';
 import { useContext } from 'react';
 import { components, Stream } from '../../../../api/v1/schema';
 
@@ -40,23 +41,21 @@ export function InlineLogViewer({
   // Fetch sub-DAG-run step log (only when isSubDAGRun is true)
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log',
-    isSubDAGRun
-      ? {
-          params: {
-            query: {
-              remoteNode,
-              stream,
-              tail: 100,
-            },
-            path: {
-              name: dagRun?.rootDAGRunName as string,
-              dagRunId: dagRun?.rootDAGRunId as string,
-              subDAGRunId: dagRun?.dagRunId as string,
-              stepName,
-            },
-          },
-        }
-      : null,
+    whenEnabled(!!isSubDAGRun, {
+      params: {
+        query: {
+          remoteNode,
+          stream,
+          tail: 100,
+        },
+        path: {
+          name: dagRun?.rootDAGRunName as string,
+          dagRunId: dagRun?.rootDAGRunId as string,
+          subDAGRunId: dagRun?.dagRunId as string,
+          stepName,
+        },
+      },
+    }),
     {
       refreshInterval: 2000,
       revalidateOnFocus: false,
@@ -66,22 +65,20 @@ export function InlineLogViewer({
   // Fetch regular DAG-run step log (only when isSubDAGRun is false)
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log',
-    isSubDAGRun
-      ? null
-      : {
-          params: {
-            query: {
-              remoteNode,
-              stream,
-              tail: 100,
-            },
-            path: {
-              name: dagName,
-              dagRunId,
-              stepName,
-            },
-          },
+    whenEnabled(!isSubDAGRun, {
+      params: {
+        query: {
+          remoteNode,
+          stream,
+          tail: 100,
         },
+        path: {
+          name: dagName,
+          dagRunId,
+          stepName,
+        },
+      },
+    }),
     {
       refreshInterval: 2000,
       revalidateOnFocus: false,

@@ -4,6 +4,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
+import { whenEnabled } from '../../../../hooks/queryUtils';
 import {
   liveFallbackOptions,
   useLiveConnection,
@@ -49,18 +50,16 @@ function DAGRunDetailsPanel({
   // Sub-DAG query (only enabled for sub-DAG runs)
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
-    subDAGQueryEnabled
-      ? {
-          params: {
-            query: { remoteNode },
-            path: {
-              name: parentName as string,
-              dagRunId: parentDAGRunId as string,
-              subDAGRunId: subDAGRunId as string,
-            },
-          },
-        }
-      : null,
+    whenEnabled(subDAGQueryEnabled, {
+      params: {
+        query: { remoteNode },
+        path: {
+          name: parentName as string,
+          dagRunId: parentDAGRunId as string,
+          subDAGRunId: subDAGRunId as string,
+        },
+      },
+    }),
     liveFallbackOptions(liveState)
   );
   useLiveDAGRuns(subDAGQuery.mutate, subDAGQueryEnabled);
@@ -68,17 +67,15 @@ function DAGRunDetailsPanel({
   // Regular DAG query — SWR is the single source of truth, refreshed by live invalidations
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}',
-    dagRunQueryEnabled
-      ? {
-          params: {
-            query: { remoteNode },
-            path: {
-              name: name || '',
-              dagRunId: dagRunId || 'latest',
-            },
-          },
-        }
-      : null,
+    whenEnabled(dagRunQueryEnabled, {
+      params: {
+        query: { remoteNode },
+        path: {
+          name: name || '',
+          dagRunId: dagRunId || 'latest',
+        },
+      },
+    }),
     liveFallbackOptions(liveState)
   );
   useLiveDAGRuns(dagRunQuery.mutate, dagRunQueryEnabled);

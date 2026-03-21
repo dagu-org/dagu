@@ -5,6 +5,7 @@ import { usePageContext } from '../../../contexts/PageContext';
 import { DAGRunDetailsContent } from '../../../features/dag-runs/components/dag-run-details';
 import { DAGRunContext } from '../../../features/dag-runs/contexts/DAGRunContext';
 import { useQuery } from '../../../hooks/api';
+import { whenEnabled } from '../../../hooks/queryUtils';
 
 type ApiError = {
   response?: { status?: number };
@@ -64,34 +65,30 @@ function DAGRunDetailsPage() {
 
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
-    subDAGQueryEnabled
-      ? {
-          params: {
-            query: { remoteNode },
-            path: {
-              name: parentName as string,
-              dagRunId: parentDAGRunId as string,
-              subDAGRunId: subDAGRunId as string,
-            },
-          },
-        }
-      : null,
+    whenEnabled(subDAGQueryEnabled, {
+      params: {
+        query: { remoteNode },
+        path: {
+          name: parentName as string,
+          dagRunId: parentDAGRunId as string,
+          subDAGRunId: subDAGRunId as string,
+        },
+      },
+    }),
     { refreshInterval: subDAGQueryEnabled ? 2000 : 0 }
   );
 
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}',
-    dagRunQueryEnabled
-      ? {
-          params: {
-            query: { remoteNode },
-            path: {
-              name: name || '',
-              dagRunId: dagRunId || 'latest',
-            },
-          },
-        }
-      : null,
+    whenEnabled(dagRunQueryEnabled, {
+      params: {
+        query: { remoteNode },
+        path: {
+          name: name || '',
+          dagRunId: dagRunId || 'latest',
+        },
+      },
+    }),
     { refreshInterval: dagRunQueryEnabled ? 2000 : 0 }
   );
 

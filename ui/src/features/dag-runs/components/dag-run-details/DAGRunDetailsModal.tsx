@@ -7,6 +7,7 @@ import { components } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { usePageContext } from '../../../../contexts/PageContext';
 import { useQuery } from '../../../../hooks/api';
+import { whenEnabled } from '../../../../hooks/queryUtils';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGRunContext } from '../../contexts/DAGRunContext';
@@ -74,18 +75,16 @@ function DAGRunDetailsModal({
 
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
-    subDAGQueryEnabled
-      ? {
-          params: {
-            query: { remoteNode },
-            path: {
-              name: parentName,
-              dagRunId: parentDAGRunId ?? '',
-              subDAGRunId: subDAGRunId ?? '',
-            },
-          },
-        }
-      : null,
+    whenEnabled(subDAGQueryEnabled, {
+      params: {
+        query: { remoteNode },
+        path: {
+          name: parentName,
+          dagRunId: parentDAGRunId ?? '',
+          subDAGRunId: subDAGRunId ?? '',
+        },
+      },
+    }),
     {
       refreshInterval: subDAGQueryEnabled ? 2000 : 0,
     }
@@ -93,17 +92,15 @@ function DAGRunDetailsModal({
 
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}',
-    dagRunQueryEnabled
-      ? {
-          params: {
-            query: { remoteNode },
-            path: {
-              name: name || '',
-              dagRunId: dagRunId || 'latest',
-            },
-          },
-        }
-      : null,
+    whenEnabled(dagRunQueryEnabled, {
+      params: {
+        query: { remoteNode },
+        path: {
+          name: name || '',
+          dagRunId: dagRunId || 'latest',
+        },
+      },
+    }),
     {
       refreshInterval: dagRunQueryEnabled ? 2000 : 0,
     }

@@ -1,6 +1,7 @@
 import { components, StatusLabel } from '@/api/v1/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
+import { whenEnabled } from '@/hooks/queryUtils';
 import dayjs from '@/lib/dayjs';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useContext, useEffect, useMemo, useState } from 'react';
@@ -56,21 +57,19 @@ export function SubDAGRunsList({
   const isNestedSubDAG = dagRunId !== rootDagRunId;
   const { data: subRunsData, mutate: refetchSubRuns } = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs',
-    shouldFetch
-      ? {
-          params: {
-            path: {
-              name: rootDagName,
-              dagRunId: rootDagRunId,
-            },
-            query: {
-              remoteNode,
-              // For multi-level nested DAGs, pass the parent sub DAG run ID
-              parentSubDAGRunId: isNestedSubDAG ? dagRunId : undefined,
-            },
-          },
-        }
-      : null,
+    whenEnabled(shouldFetch, {
+      params: {
+        path: {
+          name: rootDagName,
+          dagRunId: rootDagRunId,
+        },
+        query: {
+          remoteNode,
+          // For multi-level nested DAGs, pass the parent sub DAG run ID
+          parentSubDAGRunId: isNestedSubDAG ? dagRunId : undefined,
+        },
+      },
+    }),
     {
       refreshInterval: shouldFetch ? 3000 : 0,
     }

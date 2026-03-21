@@ -15,6 +15,7 @@ import { TOKEN_KEY } from '../../../../contexts/AuthContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUserPreferences } from '../../../../contexts/UserPreference';
 import { useQuery } from '../../../../hooks/api';
+import { whenEnabled } from '../../../../hooks/queryUtils';
 import { useStepLogSSE } from '../../../../hooks/useStepLogSSE';
 import { isActiveNodeStatus } from '../../../../lib/status-utils';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -128,50 +129,46 @@ function StepLog({
 
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log',
-    isSubDAGRun
-      ? {
-          params: {
-            query: {
-              remoteNode,
-              stream,
-              tail,
-              head,
-              offset,
-              limit,
-            },
-            path: {
-              name: dagRun?.rootDAGRunName as string,
-              dagRunId: dagRun?.rootDAGRunId as string,
-              subDAGRunId: dagRun?.dagRunId as string,
-              stepName,
-            },
-          },
-        }
-      : null,
+    whenEnabled(!!isSubDAGRun, {
+      params: {
+        query: {
+          remoteNode,
+          stream,
+          tail,
+          head,
+          offset,
+          limit,
+        },
+        path: {
+          name: dagRun?.rootDAGRunName as string,
+          dagRunId: dagRun?.rootDAGRunId as string,
+          subDAGRunId: dagRun?.dagRunId as string,
+          stepName,
+        },
+      },
+    }),
     swrOptions
   );
 
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log',
-    isSubDAGRun
-      ? null
-      : {
-          params: {
-            query: {
-              remoteNode,
-              stream,
-              tail,
-              head,
-              offset,
-              limit,
-            },
-            path: {
-              name: dagName,
-              dagRunId,
-              stepName,
-            },
-          },
+    whenEnabled(!isSubDAGRun, {
+      params: {
+        query: {
+          remoteNode,
+          stream,
+          tail,
+          head,
+          offset,
+          limit,
         },
+        path: {
+          name: dagName,
+          dagRunId,
+          stepName,
+        },
+      },
+    }),
     swrOptions
   );
 

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { UnsavedChangesProvider } from '@/contexts/UnsavedChangesContext';
 import { useQuery } from '@/hooks/api';
+import { whenEnabled } from '@/hooks/queryUtils';
 import {
   liveFallbackOptions,
   useLiveConnection,
@@ -171,14 +172,12 @@ function DAGDetailsSidePanel({
   const liveState = useLiveConnection(dagDetailsEnabled);
   const { data, error, mutate } = useQuery(
     '/dags/{fileName}',
-    dagDetailsEnabled
-      ? {
-          params: {
-            query: { remoteNode },
-            path: { fileName: stableFileName },
-          },
-        }
-      : null,
+    whenEnabled(dagDetailsEnabled, {
+      params: {
+        query: { remoteNode },
+        path: { fileName: stableFileName },
+      },
+    }),
     liveFallbackOptions(liveState)
   );
   useLiveDAG(stableFileName, mutate, dagDetailsEnabled);
@@ -187,14 +186,12 @@ function DAGDetailsSidePanel({
   const trackedRunEnabled = isOpen && !!dagName && !!trackedDagRunId;
   const { data: trackedRunData, mutate: mutateTrackedRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}',
-    trackedRunEnabled
-      ? {
-          params: {
-            path: { name: dagName, dagRunId: trackedDagRunId || '' },
-            query: { remoteNode },
-          },
-        }
-      : null,
+    whenEnabled(trackedRunEnabled, {
+      params: {
+        path: { name: dagName, dagRunId: trackedDagRunId || '' },
+        query: { remoteNode },
+      },
+    }),
     liveFallbackOptions(liveState)
   );
   useLiveDAGRuns(mutateTrackedRun, trackedRunEnabled);

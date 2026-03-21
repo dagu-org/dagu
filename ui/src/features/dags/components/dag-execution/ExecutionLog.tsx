@@ -15,6 +15,7 @@ import { TOKEN_KEY } from '../../../../contexts/AuthContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUserPreferences } from '../../../../contexts/UserPreference';
 import { useQuery } from '../../../../hooks/api';
+import { whenEnabled } from '../../../../hooks/queryUtils';
 import { useDAGRunLogsSSE } from '../../../../hooks/useDAGRunLogsSSE';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 
@@ -119,47 +120,43 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
   // Fetch sub-DAG-run log (only when isSubDAGRun is true)
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/log',
-    isSubDAGRun
-      ? {
-          params: {
-            query: {
-              remoteNode,
-              tail,
-              head,
-              offset,
-              limit,
-            },
-            path: {
-              name: dagRun?.rootDAGRunName as string,
-              dagRunId: dagRun?.rootDAGRunId as string,
-              subDAGRunId: dagRun?.dagRunId as string,
-            },
-          },
-        }
-      : null,
+    whenEnabled(!!isSubDAGRun, {
+      params: {
+        query: {
+          remoteNode,
+          tail,
+          head,
+          offset,
+          limit,
+        },
+        path: {
+          name: dagRun?.rootDAGRunName as string,
+          dagRunId: dagRun?.rootDAGRunId as string,
+          subDAGRunId: dagRun?.dagRunId as string,
+        },
+      },
+    }),
     swrOptions
   );
 
   // Fetch regular DAG-run log (only when isSubDAGRun is false)
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/log',
-    isSubDAGRun
-      ? null
-      : {
-          params: {
-            query: {
-              remoteNode,
-              tail,
-              head,
-              offset,
-              limit,
-            },
-            path: {
-              name,
-              dagRunId,
-            },
-          },
+    whenEnabled(!isSubDAGRun, {
+      params: {
+        query: {
+          remoteNode,
+          tail,
+          head,
+          offset,
+          limit,
         },
+        path: {
+          name,
+          dagRunId,
+        },
+      },
+    }),
     swrOptions
   );
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useContext, useMemo } 
 import { useQuery } from '@/hooks/api';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { Badge } from '@/components/ui/badge';
+import { whenEnabled } from '@/hooks/queryUtils';
 import { Search, ChevronDown, X, AlertTriangle, Tags } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { components } from '@/api/v1/schema';
@@ -50,11 +51,9 @@ export function TemplateSelector({
   // the tag filter UI inside the selector.
   const { data: tagsData } = useQuery(
     '/dags/tags',
-    isOpen && isTagFilterOpen
-      ? {
-          params: { query: { remoteNode } },
-        }
-      : null
+    whenEnabled(isOpen && isTagFilterOpen, {
+      params: { query: { remoteNode } },
+    })
   );
   const availableTags = tagsData?.tags ?? [];
 
@@ -62,18 +61,16 @@ export function TemplateSelector({
   // closed trigger uses locally cached selection metadata instead.
   const { data, isLoading } = useQuery(
     '/dags',
-    isOpen
-      ? {
-          params: {
-            query: {
-              remoteNode,
-              perPage: 50,
-              ...(debouncedTerm ? { name: debouncedTerm } : {}),
-              ...(selectedTags.length > 0 ? { tags: selectedTags.join(',') } : {}),
-            },
-          },
-        }
-      : null
+    whenEnabled(isOpen, {
+      params: {
+        query: {
+          remoteNode,
+          perPage: 50,
+          ...(debouncedTerm ? { name: debouncedTerm } : {}),
+          ...(selectedTags.length > 0 ? { tags: selectedTags.join(',') } : {}),
+        },
+      },
+    })
   );
   const dags = data?.dags ?? [];
 
