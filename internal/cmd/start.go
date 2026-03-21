@@ -230,27 +230,32 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root exec.DAGRu
 		}
 	}
 
-	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
-		logger.Debug(ctx, "Failed to lock process group", tag.Error(err))
-		_ = ctx.RecordEarlyFailure(dag, dagRunID, err)
-		return errProcAcquisitionFailed
-	}
-
-	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), exec.NewDAGRunRef(dag.Name, dagRunID))
+	prepared, err := prepareLocalExecution(
+		ctx,
+		dag,
+		dagRunID,
+		root,
+		exec.DAGRunRef{},
+		triggerType,
+		scheduleTime,
+		func(execCtx context.Context) (exec.DAGRunAttempt, error) {
+			return ctx.DAGRunStore.CreateAttempt(execCtx, dag, time.Now(), dagRunID, exec.NewDAGRunAttemptOptions{})
+		},
+	)
 	if err != nil {
-		ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
-		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
-		_ = ctx.RecordEarlyFailure(dag, dagRunID, err)
-		return fmt.Errorf("failed to acquire process handle: %w", errProcAcquisitionFailed)
+		logger.Debug(ctx, "Failed to prepare local execution", tag.Error(err))
+		if !errors.Is(err, errProcAcquisitionFailed) {
+			_ = ctx.RecordEarlyFailure(dag, dagRunID, err)
+		}
+		return err
 	}
+	proc := prepared.Proc
 	defer func() {
 		_ = proc.Stop(ctx)
 	}()
 	ctx.Proc = proc
 
-	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
-
-	return executeDAGRun(ctx, dag, exec.DAGRunRef{}, dagRunID, root, workerID, triggerType, scheduleTime)
+	return executeDAGRun(ctx, dag, exec.DAGRunRef{}, dagRunID, root, workerID, triggerType, scheduleTime, prepared.Attempt)
 }
 
 // getDAGRunInfo extracts and validates dag-run ID and references from command flags.
@@ -375,14 +380,35 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 
 	// For distributed execution, the coordinator already created the sub-attempt record.
 	if workerID != "local" {
-		return executeDAGRun(ctx, dag, parent, dagRunID, root, workerID, triggerType, scheduleTime)
+		return executeDAGRun(ctx, dag, parent, dagRunID, root, workerID, triggerType, scheduleTime, nil)
 	}
 
 	logger.Debug(ctx, "Checking for previous sub dag-run with the dag-run ID")
 
 	subAttempt, err := ctx.DAGRunStore.FindSubAttempt(ctx, root, dagRunID)
 	if errors.Is(err, exec.ErrDAGRunIDNotFound) {
-		return executeDAGRun(ctx, dag, parent, dagRunID, root, workerID, triggerType, scheduleTime)
+		prepared, prepErr := prepareLocalExecution(
+			ctx,
+			dag,
+			dagRunID,
+			root,
+			parent,
+			triggerType,
+			scheduleTime,
+			func(execCtx context.Context) (exec.DAGRunAttempt, error) {
+				return ctx.DAGRunStore.CreateAttempt(execCtx, dag, time.Now(), dagRunID, exec.NewDAGRunAttemptOptions{
+					RootDAGRun: &root,
+				})
+			},
+		)
+		if prepErr != nil {
+			return prepErr
+		}
+		defer func() {
+			_ = prepared.Proc.Stop(ctx)
+		}()
+		ctx.Proc = prepared.Proc
+		return executeDAGRun(ctx, dag, parent, dagRunID, root, workerID, triggerType, scheduleTime, prepared.Attempt)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRunID, err)
@@ -393,11 +419,38 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 		return fmt.Errorf("failed to read previous run status for dag-run ID %s: %w", dagRunID, err)
 	}
 
-	return executeRetry(ctx, dag, status, root, "", workerID)
+	prepared, prepErr := prepareLocalExecution(
+		ctx,
+		dag,
+		dagRunID,
+		root,
+		status.Parent,
+		exec.PreservedQueueTriggerType(status),
+		status.ScheduleTime,
+		func(execCtx context.Context) (exec.DAGRunAttempt, error) {
+			if status.Status == core.Queued {
+				subAttempt.SetDAG(dag)
+				return subAttempt, nil
+			}
+			return ctx.DAGRunStore.CreateAttempt(execCtx, dag, time.Now(), dagRunID, exec.NewDAGRunAttemptOptions{
+				Retry:      true,
+				RootDAGRun: &root,
+			})
+		},
+	)
+	if prepErr != nil {
+		return prepErr
+	}
+	defer func() {
+		_ = prepared.Proc.Stop(ctx)
+	}()
+	ctx.Proc = prepared.Proc
+
+	return executeRetry(ctx, dag, status, root, "", workerID, prepared.Attempt)
 }
 
 // executeDAGRun initializes execution state for a DAG run and invokes the shared agent executor.
-func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID string, root exec.DAGRunRef, workerID string, triggerType core.TriggerType, scheduleTime string) error {
+func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID string, root exec.DAGRunRef, workerID string, triggerType core.TriggerType, scheduleTime string, preparedAttempt exec.DAGRunAttempt) error {
 	logFile, err := ctx.OpenLogFile(d, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", d.Name, err)
@@ -433,6 +486,7 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 			ProgressDisplay:         shouldEnableProgress(ctx),
 			WorkerID:                workerID,
 			QueuedRun:               queuedRun,
+			PreparedAttempt:         preparedAttempt,
 			DAGRunStore:             ctx.DAGRunStore,
 			ServiceRegistry:         ctx.ServiceRegistry,
 			RootDAGRun:              root,

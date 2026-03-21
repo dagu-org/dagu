@@ -305,18 +305,69 @@ func (*Manager) currentStatus(_ context.Context, dag *core.DAG, dagRunID string)
 	return exec.StatusFromJSON(statusJSON)
 }
 
+func (m *Manager) freshestLocalProcEntry(ctx context.Context, dag *core.DAG) (*exec.ProcEntry, error) {
+	entries, err := m.procStore.ListEntries(ctx, dag.ProcGroup())
+	if err != nil {
+		return nil, err
+	}
+
+	var freshest *exec.ProcEntry
+	for i := range entries {
+		entry := entries[i]
+		if !entry.Fresh || entry.Meta.Name != dag.Name {
+			continue
+		}
+		if freshest == nil ||
+			entry.Meta.StartedAt > freshest.Meta.StartedAt ||
+			(entry.Meta.StartedAt == freshest.Meta.StartedAt && entry.LastHeartbeatAt > freshest.LastHeartbeatAt) {
+			copy := entry
+			freshest = &copy
+		}
+	}
+
+	return freshest, nil
+}
+
+func (m *Manager) isAttemptAlive(ctx context.Context, dag *core.DAG, dagRunID, attemptID string) (bool, error) {
+	if dag == nil || dagRunID == "" || attemptID == "" {
+		return false, nil
+	}
+
+	entries, err := m.procStore.ListEntries(ctx, dag.ProcGroup())
+	if err != nil {
+		return false, err
+	}
+	for _, entry := range entries {
+		if !entry.Fresh {
+			continue
+		}
+		if entry.Meta.Name == dag.Name && entry.Meta.DAGRunID == dagRunID && entry.Meta.AttemptID == attemptID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func isRootProcEntry(entry exec.ProcEntry) bool {
+	return entry.Meta.RootName == entry.Meta.Name && entry.Meta.RootDAGRunID == entry.Meta.DAGRunID
+}
+
 // GetLatestStatus retrieves the latest status of a DAG.
 // If the DAG is running, it attempts to get the current status from the socket.
 // If that fails and the local proc is dead, it repairs the stale run before returning it.
 func (m *Manager) GetLatestStatus(ctx context.Context, dag *core.DAG) (exec.DAGRunStatus, error) {
-	// Find the proc store to check if the DAG is running
-	alive, _ := m.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if alive > 0 {
-		items, _ := m.dagRunStore.ListStatuses(
-			ctx, exec.WithName(dag.Name), exec.WithStatuses([]core.Status{core.Running}),
-		)
-		if len(items) > 0 {
-			return *items[0], nil
+	if entry, err := m.freshestLocalProcEntry(ctx, dag); err == nil && entry != nil {
+		attempt, findErr := m.dagRunStore.FindAttempt(ctx, entry.DAGRun())
+		if findErr == nil {
+			st, readErr := attempt.ReadStatus(ctx)
+			if readErr == nil && st.AttemptID == entry.Meta.AttemptID {
+				if st.Status == core.Running && isRootProcEntry(*entry) {
+					if current, currentErr := m.currentStatus(ctx, dag, st.DAGRunID); currentErr == nil {
+						return *current, nil
+					}
+				}
+				return *st, nil
+			}
 		}
 	}
 
@@ -384,10 +435,7 @@ func (m *Manager) repairStaleLocalRunIfDead(
 		return st, nil
 	}
 
-	alive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), exec.DAGRunRef{
-		Name: dag.Name,
-		ID:   st.DAGRunID,
-	})
+	alive, err := m.isAttemptAlive(ctx, dag, st.DAGRunID, st.AttemptID)
 	if err != nil {
 		return nil, fmt.Errorf("check alive: %w", err)
 	}

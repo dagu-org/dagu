@@ -5,7 +5,6 @@ package fileproc
 
 import (
 	"context"
-	"encoding/binary"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,10 +25,10 @@ func TestProcGroup(t *testing.T) {
 	procFiles := NewProcGroup(baseDir, name, time.Hour, 0, 0)
 
 	// Create a proc file
-	proc, err := procFiles.Acquire(ctx, exec.DAGRunRef{
+	proc, err := procFiles.Acquire(ctx, testProcMetaFromRun(exec.DAGRunRef{
 		Name: "test_proc",
 		ID:   "test_id",
-	})
+	}))
 	require.NoError(t, err, "failed to get proc")
 
 	// Start the process
@@ -84,10 +83,10 @@ func TestProcGroup_IsStale(t *testing.T) {
 	pg := NewProcGroup(baseDir, name, time.Second*5, 0, 0)
 
 	// create a proc
-	proc, err := pg.Acquire(ctx, exec.DAGRunRef{
+	proc, err := pg.Acquire(ctx, testProcMetaFromRun(exec.DAGRunRef{
 		Name: "test_proc",
 		ID:   "test_id",
-	})
+	}))
 	require.NoError(t, err, "failed to get proc")
 
 	// Make sure the directory exists
@@ -98,11 +97,9 @@ func TestProcGroup_IsStale(t *testing.T) {
 	fd, err := os.OpenFile(proc.fileName, os.O_CREATE|os.O_RDWR, 0600)
 	assert.NoError(t, err, "failed to create proc file")
 
-	// Write a timestamp that is older than the stale time
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, uint64(time.Now().Add(-pg.staleTime).Unix()))
-	_, err = fd.WriteAt(buf, 0)
-	require.NoError(t, err, "failed to write timestamp to proc file")
+	// Write a full proc record with an old heartbeat timestamp.
+	oldHeartbeat := time.Now().Add(-pg.staleTime).Unix()
+	require.NoError(t, writeProcFile(fd, oldHeartbeat, proc.meta), "failed to write proc file")
 
 	// Close the file
 	_ = fd.Sync()
@@ -151,7 +148,7 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		}
 
 		// Create a process
-		proc, err := pg.Acquire(ctx, dagRun)
+		proc, err := pg.Acquire(ctx, testProcMetaFromRun(dagRun))
 		require.NoError(t, err)
 
 		// Start heartbeat
@@ -182,7 +179,7 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 			Name: name,
 			ID:   "run-789",
 		}
-		proc1, err := pg.Acquire(ctx, dagRun1)
+		proc1, err := pg.Acquire(ctx, testProcMetaFromRun(dagRun1))
 		require.NoError(t, err)
 
 		// Start heartbeat
@@ -221,7 +218,7 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		}
 
 		// Create a process
-		proc, err := shortPG.Acquire(ctx, dagRun)
+		proc, err := shortPG.Acquire(ctx, testProcMetaFromRun(dagRun))
 		require.NoError(t, err)
 
 		// Ensure directory exists
@@ -232,26 +229,22 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		fd, err := os.OpenFile(proc.fileName, os.O_CREATE|os.O_RDWR, 0600)
 		require.NoError(t, err)
 
-		// Write an old timestamp
-		buf := make([]byte, 8)
 		oldTime := time.Now().Add(-time.Second * 10)
-		binary.BigEndian.PutUint64(buf, uint64(oldTime.Unix()))
-		_, err = fd.WriteAt(buf, 0)
-		require.NoError(t, err)
+		require.NoError(t, writeProcFile(fd, oldTime.Unix(), proc.meta))
 		_ = fd.Close()
 
 		// Set old modification time
 		err = os.Chtimes(proc.fileName, oldTime, oldTime)
 		require.NoError(t, err)
 
-		// IsRunAlive should return false and prune the stale file.
+		// IsRunAlive should return false without deleting the file as a side effect.
 		alive, err := shortPG.IsRunAlive(ctx, dagRun)
 		require.NoError(t, err)
 		require.False(t, alive)
 
-		// Verify the stale file was removed during the liveness check.
+		// Verify the stale file still exists until RemoveIfStale is called explicitly.
 		_, err = os.Stat(proc.fileName)
-		require.True(t, os.IsNotExist(err), "stale file should be deleted by IsRunAlive")
+		require.NoError(t, err)
 	})
 
 	t.Run("StaleProcessRemovesEmptyDir", func(t *testing.T) {
@@ -269,7 +262,7 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		}
 
 		// Create a process in a subdirectory
-		proc, err := shortPG.Acquire(ctx, dagRun)
+		proc, err := shortPG.Acquire(ctx, testProcMetaFromRun(dagRun))
 		require.NoError(t, err)
 
 		// The proc file will be in a subdirectory like testSubDir/YYYY-MM-DD/
@@ -283,30 +276,33 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		fd, err := os.OpenFile(proc.fileName, os.O_CREATE|os.O_RDWR, 0600)
 		require.NoError(t, err)
 
-		// Write an old timestamp
-		buf := make([]byte, 8)
 		oldTime := time.Now().Add(-time.Second * 10)
-		binary.BigEndian.PutUint64(buf, uint64(oldTime.Unix()))
-		_, err = fd.WriteAt(buf, 0)
-		require.NoError(t, err)
+		require.NoError(t, writeProcFile(fd, oldTime.Unix(), proc.meta))
 		_ = fd.Close()
 
 		// Set old modification time
 		err = os.Chtimes(proc.fileName, oldTime, oldTime)
 		require.NoError(t, err)
 
-		// IsRunAlive should return false and remove the stale file plus empty directory.
+		// IsRunAlive should return false without deleting the stale file.
 		alive, err := shortPG.IsRunAlive(ctx, dagRun)
 		require.NoError(t, err)
 		require.False(t, alive)
 
+		entries, err := shortPG.ListEntries(ctx)
+		require.NoError(t, err)
+		require.Len(t, entries, 1)
+		require.False(t, entries[0].Fresh)
+
+		require.NoError(t, shortPG.RemoveIfStale(ctx, entries[0]))
+
 		// Verify the stale file was removed.
 		_, err = os.Stat(proc.fileName)
-		require.True(t, os.IsNotExist(err), "stale file should be deleted by IsRunAlive")
+		require.True(t, os.IsNotExist(err), "stale file should be deleted by RemoveIfStale")
 
 		// Verify the parent directory was also removed because it became empty.
 		_, err = os.Stat(procDir)
-		require.True(t, os.IsNotExist(err), "empty parent directory should be removed by IsRunAlive")
+		require.True(t, os.IsNotExist(err), "empty parent directory should be removed by RemoveIfStale")
 	})
 
 	t.Run("InvalidFilePattern", func(t *testing.T) {

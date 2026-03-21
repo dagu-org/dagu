@@ -6,6 +6,8 @@ package test
 import (
 	"context"
 	"encoding/binary"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,7 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const procFilePattern = "proc_*_%s.proc"
+const procFilePattern = "proc_*.proc"
 
 func newProcStore(cfg *config.Config) *fileproc.Store {
 	return fileproc.New(
@@ -39,7 +41,7 @@ func WaitForProcFile(t *testing.T, procDir, groupName string, dagRun exec.DAGRun
 
 	var match string
 	require.Eventually(t, func() bool {
-		pattern := filepath.Join(procGroupDir(procDir, groupName, dagRun.Name), fmt.Sprintf(procFilePattern, dagRun.ID))
+		pattern := filepath.Join(procGroupDir(procDir, groupName, dagRun.Name), procFilePattern)
 		matches, err := filepath.Glob(pattern)
 		require.NoError(t, err)
 		if len(matches) == 0 {
@@ -75,19 +77,49 @@ func CreateStaleProcFile(
 	startedAt time.Time,
 	age time.Duration,
 ) string {
+	return CreateStaleProcFileWithAttempt(t, procDir, groupName, dagRun, "attempt_"+dagRun.ID, startedAt, age)
+}
+
+// CreateStaleProcFileWithAttempt writes a stale proc heartbeat file for the given dag-run and attempt.
+func CreateStaleProcFileWithAttempt(
+	t *testing.T,
+	procDir string,
+	groupName string,
+	dagRun exec.DAGRunRef,
+	attemptID string,
+	startedAt time.Time,
+	age time.Duration,
+) string {
 	t.Helper()
 
 	dir := procGroupDir(procDir, groupName, dagRun.Name)
 	require.NoError(t, os.MkdirAll(dir, 0o750))
 
 	staleTime := startedAt.Add(-age).UTC()
-	fileName := fmt.Sprintf("proc_%sZ_%s.proc", staleTime.Format("20060102_150405"), dagRun.ID)
+	fileName := fmt.Sprintf(
+		"proc_%sZ_%s_%s.proc",
+		staleTime.Format("20060102_150405"),
+		hex.EncodeToString([]byte(dagRun.ID)),
+		hex.EncodeToString([]byte(attemptID)),
+	)
 	procFile := filepath.Join(dir, fileName)
 
-	data := make([]byte, 8)
 	staleUnix := staleTime.Unix()
 	require.GreaterOrEqual(t, staleUnix, int64(0), "stale heartbeat timestamp must be after unix epoch")
-	binary.BigEndian.PutUint64(data, uint64(staleUnix)) //nolint:gosec // staleUnix is validated non-negative above
+	meta, err := json.Marshal(map[string]any{
+		"version":         1,
+		"dag_name":        dagRun.Name,
+		"dag_run_id":      dagRun.ID,
+		"attempt_id":      attemptID,
+		"root_name":       dagRun.Name,
+		"root_dag_run_id": dagRun.ID,
+		"started_at":      startedAt.Unix(),
+	})
+	require.NoError(t, err)
+
+	data := make([]byte, 8+len(meta))
+	binary.BigEndian.PutUint64(data[:8], uint64(staleUnix)) //nolint:gosec // staleUnix is validated non-negative above
+	copy(data[8:], meta)
 	require.NoError(t, os.WriteFile(procFile, data, 0o600))
 	require.NoError(t, os.Chtimes(procFile, staleTime, staleTime))
 

@@ -87,6 +87,11 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 		return ErrHeartbeatAlreadyStarted
 	}
 
+	if err := validateProcMeta(p.meta); err != nil {
+		p.started.Store(false)
+		return fmt.Errorf("invalid proc metadata: %w", err)
+	}
+
 	// Ensure the directory exists
 	dir := filepath.Dir(p.fileName)
 	if err := os.MkdirAll(dir, 0750); err != nil {
@@ -103,10 +108,8 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 	p.cancel = cancel
 	p.canceled.Store(false)
 
-	// Write the initial heartbeat timestamp in binary format
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, uint64(time.Now().Unix())) // nolint:gosec
-	if _, err := fd.WriteAt(buf, 0); err != nil {
+	heartbeatUnix := time.Now().Unix()
+	if err := writeProcFile(fd, heartbeatUnix, p.meta); err != nil {
 		_ = fd.Close()
 		if err := os.Remove(p.fileName); err != nil {
 			logger.Error(ctx, "Failed to remove heartbeat file", tag.Error(err))
@@ -165,16 +168,14 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 		defer ticker.Stop()
 		defer flush.Stop()
 
-		buf := make([]byte, 8)
-
 		for {
 			select {
 			case <-hbCtx.Done():
 				_ = fd.Sync()
 				return
 			case <-ticker.C:
-				binary.BigEndian.PutUint64(buf, uint64(time.Now().Unix())) // nolint:gosec
-				if _, err := fd.WriteAt(buf, 0); err != nil {
+				heartbeatUnix := time.Now().Unix()
+				if err := writeHeartbeat(fd, heartbeatUnix); err != nil {
 					logger.Error(ctx, "Failed to write heartbeat", tag.Error(err))
 				}
 				// Self-healing: detect if file was unlinked externally
@@ -185,7 +186,7 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 					logger.Warn(ctx, "Heartbeat file deleted externally, recreating",
 						tag.File(p.fileName))
 					_ = fd.Close()
-					newFd, err := p.recreateFile(buf)
+					newFd, err := p.recreateFile(heartbeatUnix)
 					if err != nil {
 						logger.Error(ctx, "Failed to recreate heartbeat file",
 							tag.File(p.fileName),
@@ -205,7 +206,7 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 }
 
 // recreateFile creates a new heartbeat file after the original was deleted externally.
-func (p *ProcHandle) recreateFile(currentBuf []byte) (*os.File, error) {
+func (p *ProcHandle) recreateFile(heartbeatUnix int64) (*os.File, error) {
 	dir := filepath.Dir(p.fileName)
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
@@ -215,10 +216,17 @@ func (p *ProcHandle) recreateFile(currentBuf []byte) (*os.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to recreate file: %w", err)
 	}
-	if _, err := fd.WriteAt(currentBuf, 0); err != nil {
+	if err := writeProcFile(fd, heartbeatUnix, p.meta); err != nil {
 		_ = fd.Close()
-		return nil, fmt.Errorf("failed to write timestamp: %w", err)
+		return nil, fmt.Errorf("failed to write proc file: %w", err)
 	}
 	_ = fd.Sync()
 	return fd, nil
+}
+
+func writeHeartbeat(fd *os.File, heartbeatUnix int64) error {
+	buf := make([]byte, heartbeatSize)
+	binary.BigEndian.PutUint64(buf, uint64(heartbeatUnix)) //nolint:gosec // caller uses local unix timestamp
+	_, err := fd.WriteAt(buf, 0)
+	return err
 }

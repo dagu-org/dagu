@@ -750,9 +750,13 @@ func (a *Agent) RunError(t *testing.T) {
 func (a *Agent) RunCancel(t *testing.T) {
 	t.Helper()
 
-	proc, err := a.ProcStore.Acquire(a.Context, a.ProcGroup(), exec1.DAGRunRef{
-		Name: a.Name,
-		ID:   a.dagRunID,
+	proc, err := a.ProcStore.Acquire(a.Context, a.ProcGroup(), exec1.ProcMeta{
+		StartedAt:    time.Now().Unix(),
+		Name:         a.Name,
+		DAGRunID:     a.dagRunID,
+		AttemptID:    "attempt_" + a.dagRunID,
+		RootName:     a.Name,
+		RootDAGRunID: a.dagRunID,
 	})
 	require.NoError(t, err, "failed to acquire proc")
 	t.Cleanup(func() {

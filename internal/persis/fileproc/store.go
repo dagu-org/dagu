@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -114,9 +115,9 @@ func (s *Store) ListAlive(ctx context.Context, groupName string) ([]exec.DAGRunR
 }
 
 // Acquire implements models.ProcStore.
-func (s *Store) Acquire(ctx context.Context, groupName string, dagRun exec.DAGRunRef) (exec.ProcHandle, error) {
+func (s *Store) Acquire(ctx context.Context, groupName string, meta exec.ProcMeta) (exec.ProcHandle, error) {
 	procGroup := s.newProcGroup(groupName)
-	proc, err := procGroup.Acquire(ctx, dagRun)
+	proc, err := procGroup.Acquire(ctx, meta)
 	if err != nil {
 		return nil, err
 	}
@@ -137,46 +138,91 @@ func (s *Store) IsRunAlive(ctx context.Context, groupName string, dagRun exec.DA
 func (s *Store) ListAllAlive(ctx context.Context) (map[string][]exec.DAGRunRef, error) {
 	result := make(map[string][]exec.DAGRunRef)
 
+	entries, err := s.ListAllEntries(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range entries {
+		if !entry.Fresh {
+			continue
+		}
+		result[entry.GroupName] = append(result[entry.GroupName], entry.Meta.DAGRun())
+	}
+	for groupName := range result {
+		deduped := freshRefs(entriesForGroup(entries, groupName))
+		if len(deduped) == 0 {
+			delete(result, groupName)
+			continue
+		}
+		result[groupName] = deduped
+	}
+	return result, nil
+}
+
+// ListEntries implements exec.ProcStore.
+func (s *Store) ListEntries(ctx context.Context, groupName string) ([]exec.ProcEntry, error) {
+	procGroup := s.newProcGroup(groupName)
+	return procGroup.ListEntries(ctx)
+}
+
+// ListAllEntries implements exec.ProcStore.
+func (s *Store) ListAllEntries(ctx context.Context) ([]exec.ProcEntry, error) {
 	// Create base directory if it doesn't exist
 	if _, err := os.Stat(s.baseDir); os.IsNotExist(err) {
-		return result, nil // No processes if directory doesn't exist
+		return []exec.ProcEntry{}, nil
 	}
 
 	// Read all directories in the base directory - each directory is a process group
-	entries, err := os.ReadDir(s.baseDir)
+	dirEntries, err := os.ReadDir(s.baseDir)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, entry := range entries {
+	groupNames := make([]string, 0, len(dirEntries))
+	for _, entry := range dirEntries {
 		if !entry.IsDir() {
 			continue
 		}
+		groupNames = append(groupNames, entry.Name())
+	}
+	sort.Strings(groupNames)
 
-		groupName := entry.Name()
+	var result []exec.ProcEntry
+	for _, groupName := range groupNames {
 		procGroup := s.newProcGroup(groupName)
-
-		// Get all alive processes for this group
-		aliveRuns, err := procGroup.ListAlive(ctx)
+		entries, err := procGroup.ListEntries(ctx)
 		if err != nil {
-			logger.Warn(ctx, "Failed to list alive processes for group",
-				tag.Name(groupName),
-				tag.Error(err))
-			continue
+			return nil, err
 		}
-
-		if len(aliveRuns) > 0 {
-			result[groupName] = aliveRuns
-		}
+		result = append(result, entries...)
 	}
 
 	return result, nil
 }
 
-// CleanStaleFiles implements exec.ProcStore.
-func (s *Store) CleanStaleFiles(ctx context.Context, groupName string, dagRun exec.DAGRunRef) error {
-	procGroup := s.newProcGroup(groupName)
-	return procGroup.CleanStaleFiles(ctx, dagRun)
+// RemoveIfStale implements exec.ProcStore.
+func (s *Store) RemoveIfStale(ctx context.Context, entry exec.ProcEntry) error {
+	if entry.GroupName == "" {
+		return nil
+	}
+	procGroup := s.newProcGroup(entry.GroupName)
+	return procGroup.RemoveIfStale(ctx, entry)
+}
+
+// Validate fails if any proc entry in the store is invalid or uses an unsupported format.
+func (s *Store) Validate(ctx context.Context) error {
+	_, err := s.ListAllEntries(ctx)
+	return err
+}
+
+func entriesForGroup(entries []exec.ProcEntry, groupName string) []exec.ProcEntry {
+	filtered := make([]exec.ProcEntry, 0, len(entries))
+	for _, entry := range entries {
+		if entry.GroupName == groupName {
+			filtered = append(filtered, entry)
+		}
+	}
+	return filtered
 }
 
 func (s *Store) newProcGroup(groupName string) *ProcGroup {

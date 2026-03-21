@@ -218,6 +218,9 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		fileproc.WithHeartbeatInterval(cfg.Proc.HeartbeatInterval),
 		fileproc.WithHeartbeatSyncInterval(cfg.Proc.HeartbeatSyncInterval),
 	)
+	if err := ps.Validate(ctx); err != nil {
+		return nil, fmt.Errorf("failed to validate proc directory %s: %w", cfg.Paths.ProcDir, err)
+	}
 	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
 	drm := runtime.NewManager(drs, ps, cfg)
 	qs := filequeue.New(cfg.Paths.QueueDir)
@@ -404,7 +407,18 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr)
 	watermarkDir := filepath.Join(c.Config.Paths.DataDir, "scheduler")
 	wmStore := filewatermark.New(watermarkDir)
-	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli, wmStore)
+
+	statusCache := fileutil.NewCache[*exec.DAGRunStatus]("scheduler_dag_run_status", limits.DAGRun.Limit, limits.DAGRun.TTL)
+	statusCache.StartEviction(c)
+	schedulerRunStore := filedagrun.New(
+		c.Config.Paths.DAGRunsDir,
+		filedagrun.WithLatestStatusToday(false),
+		filedagrun.WithLocation(c.Config.Core.Location),
+		filedagrun.WithHistoryFileCache(statusCache),
+	)
+	schedulerRunMgr := runtime.NewManager(schedulerRunStore, c.ProcStore, c.Config)
+
+	return scheduler.New(c.Config, m, schedulerRunMgr, schedulerRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli, wmStore)
 }
 
 // StringParam retrieves a string parameter from the command line flags.

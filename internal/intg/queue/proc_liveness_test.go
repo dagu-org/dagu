@@ -73,11 +73,12 @@ steps:
 	require.NoError(t, attempt.Write(f.th.Context, status))
 	require.NoError(t, attempt.Close(f.th.Context))
 
-	procFile := test.CreateStaleProcFile(
+	procFile := test.CreateStaleProcFileWithAttempt(
 		t,
 		f.th.Config.Paths.ProcDir,
 		f.dag.ProcGroup(),
 		ref,
+		attempt.ID(),
 		time.Now().Add(-2*time.Second),
 		time.Second,
 	)

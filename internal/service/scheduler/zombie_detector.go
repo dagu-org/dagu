@@ -34,7 +34,7 @@ type ZombieDetector struct {
 	procStore        exec.ProcStore
 	interval         time.Duration
 	failureThreshold int
-	staleCounters    map[string]int // dagRunID -> consecutive stale count
+	staleCounters    map[string]int // attempt identity -> consecutive stale count
 	runMutexesMu     sync.Mutex
 	runMutexes       map[string]*sync.Mutex
 	quit             chan struct{}
@@ -108,33 +108,69 @@ func (z *ZombieDetector) Stop(ctx context.Context) {
 	})
 }
 
-// getRunMutex returns or creates a per-run mutex for serializing status access.
-func (z *ZombieDetector) getRunMutex(dagRunID string) *sync.Mutex {
+// getRunMutex returns or creates a per-attempt mutex for serializing repair access.
+func (z *ZombieDetector) getRunMutex(attemptKey string) *sync.Mutex {
 	z.runMutexesMu.Lock()
 	defer z.runMutexesMu.Unlock()
 
-	if mu, ok := z.runMutexes[dagRunID]; ok {
+	if mu, ok := z.runMutexes[attemptKey]; ok {
 		return mu
 	}
 
 	mu := &sync.Mutex{}
-	z.runMutexes[dagRunID] = mu
+	z.runMutexes[attemptKey] = mu
 	return mu
 }
 
-// detectAndCleanZombies finds all running DAG runs and checks if they're actually alive
+func zombieAttemptKey(entry exec.ProcEntry) string {
+	return entry.GroupName + "|" + entry.Meta.Root().String() + "|" + entry.Meta.Name + "|" + entry.Meta.DAGRunID + "|" + entry.Meta.AttemptID
+}
+
+func zombieRunScopeKey(entry exec.ProcEntry) string {
+	return entry.GroupName + "|" + entry.Meta.Root().String() + "|" + entry.Meta.Name + "|" + entry.Meta.DAGRunID
+}
+
+func isRootProcEntry(entry exec.ProcEntry) bool {
+	return entry.Meta.RootName == entry.Meta.Name && entry.Meta.RootDAGRunID == entry.Meta.DAGRunID
+}
+
+func (z *ZombieDetector) clearAttemptState(attemptKey string) {
+	delete(z.staleCounters, attemptKey)
+}
+
+func (z *ZombieDetector) findAttempt(ctx context.Context, entry exec.ProcEntry) (exec.DAGRunAttempt, error) {
+	if isRootProcEntry(entry) {
+		return z.dagRunStore.FindAttempt(ctx, entry.Meta.DAGRun())
+	}
+	return z.dagRunStore.FindSubAttempt(ctx, entry.Meta.Root(), entry.Meta.DAGRunID)
+}
+
+// detectAndCleanZombies finds stale proc entries and repairs only the matching persisted attempt.
 func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
-	// Query all running DAG runs
-	statuses, err := z.dagRunStore.ListStatuses(ctx,
-		exec.WithStatuses([]core.Status{core.Running}))
+	entries, err := z.procStore.ListAllEntries(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to list running DAG runs", tag.Error(err))
+		logger.Error(ctx, "Failed to list proc entries", tag.Error(err))
 		return
 	}
 
-	logger.Debug(ctx, "Checking for zombie DAG runs", tag.Count(len(statuses)))
+	logger.Debug(ctx, "Checking proc entries for zombie DAG runs", tag.Count(len(entries)))
 
-	for _, st := range statuses {
+	freshByRunScope := make(map[string]exec.ProcEntry)
+	activeAttemptKeys := make(map[string]struct{}, len(entries))
+	for _, entry := range entries {
+		activeAttemptKeys[zombieAttemptKey(entry)] = struct{}{}
+		if !entry.Fresh {
+			continue
+		}
+		scopeKey := zombieRunScopeKey(entry)
+		current, ok := freshByRunScope[scopeKey]
+		if !ok || current.Meta.StartedAt < entry.Meta.StartedAt ||
+			(current.Meta.StartedAt == entry.Meta.StartedAt && current.LastHeartbeatAt < entry.LastHeartbeatAt) {
+			freshByRunScope[scopeKey] = entry
+		}
+	}
+
+	for _, entry := range entries {
 		// Check for quit signal
 		select {
 		case <-ctx.Done():
@@ -144,131 +180,116 @@ func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 		default:
 		}
 
-		if err := z.checkAndCleanZombie(ctx, st); err != nil {
+		if err := z.checkAndCleanZombie(ctx, entry, freshByRunScope); err != nil {
 			logger.Error(ctx, "Failed to check zombie status",
-				tag.Name(st.Name),
-				tag.RunID(st.DAGRunID),
+				tag.Name(entry.Meta.Name),
+				tag.RunID(entry.Meta.DAGRunID),
+				tag.AttemptID(entry.Meta.AttemptID),
 				tag.Error(err))
 		}
 	}
 
-	// Prune stale counters for runs no longer in Running state
-	runningIDs := make(map[string]struct{}, len(statuses))
-	for _, st := range statuses {
-		runningIDs[st.DAGRunID] = struct{}{}
-	}
 	for id := range z.staleCounters {
-		if _, ok := runningIDs[id]; !ok {
+		if _, ok := activeAttemptKeys[id]; !ok {
 			delete(z.staleCounters, id)
 		}
 	}
 
-	// Prune per-run mutexes for runs no longer in Running state.
-	// Safe because: once a run leaves Running, no code path will lock its mutex again,
-	// and this pruning runs in the same single-goroutine detection loop.
 	z.runMutexesMu.Lock()
 	for id := range z.runMutexes {
-		if _, ok := runningIDs[id]; !ok {
+		if _, ok := activeAttemptKeys[id]; !ok {
 			delete(z.runMutexes, id)
 		}
 	}
 	z.runMutexesMu.Unlock()
 }
 
-// checkAndCleanZombie checks if a single DAG run is a zombie and cleans it up
-func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *exec.DAGRunStatus) error {
+// checkAndCleanZombie checks if a single stale proc entry is a zombie candidate and cleans it up.
+func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, entry exec.ProcEntry, freshByRunScope map[string]exec.ProcEntry) error {
+	attemptKey := zombieAttemptKey(entry)
 	ctx = logger.WithValues(ctx,
-		tag.DAG(st.Name),
-		tag.RunID(st.DAGRunID),
+		tag.DAG(entry.Meta.Name),
+		tag.RunID(entry.Meta.DAGRunID),
+		tag.AttemptID(entry.Meta.AttemptID),
+		tag.Queue(entry.GroupName),
 	)
 
-	// Find the attempt for this status
-	dagRunRef := exec.NewDAGRunRef(st.Name, st.DAGRunID)
-	attempt, err := z.dagRunStore.FindAttempt(ctx, dagRunRef)
-	if err != nil {
-		return fmt.Errorf("find attempt: %w", err)
-	}
-
-	// Read the DAG to get queue proc name
-	dag, err := attempt.ReadDAG(ctx)
-	if err != nil {
-		return fmt.Errorf("read dag: %w", err)
-	}
-
-	// Skip zombie detection for distributed runs - they're monitored by coordinator's heartbeat detector
-	if st.WorkerID != "" && st.WorkerID != "local" {
-		logger.Debug(ctx, "Skipping zombie detection for distributed run",
-			tag.Queue(dag.ProcGroup()),
-			tag.WorkerID(st.WorkerID),
-		)
+	if entry.Fresh {
+		z.clearAttemptState(attemptKey)
 		return nil
 	}
 
-	// Check if process is alive (only for local runs)
-	alive, err := z.procStore.IsRunAlive(ctx, dag.ProcGroup(), exec.DAGRunRef{Name: dag.Name, ID: st.DAGRunID})
-	if err != nil {
-		logger.Warn(ctx, "Failed to check process liveness for dag-run",
-			tag.Error(err),
-			tag.Queue(dag.ProcGroup()),
-		)
-		return fmt.Errorf("check alive: %w", err)
-	}
-
-	if alive {
-		// Reset consecutive stale counter — run is healthy
-		delete(z.staleCounters, st.DAGRunID)
-		logger.Debug(ctx, "Dag-run heartbeat detected; skipping zombie cleanup",
-			tag.Queue(dag.ProcGroup()),
-		)
+	if sibling, ok := freshByRunScope[zombieRunScopeKey(entry)]; ok && sibling.Meta.AttemptID != entry.Meta.AttemptID {
+		z.clearAttemptState(attemptKey)
+		if err := z.procStore.RemoveIfStale(ctx, entry); err != nil {
+			return fmt.Errorf("remove stale proc with fresh sibling: %w", err)
+		}
 		return nil
 	}
 
-	// Increment consecutive stale counter
-	z.staleCounters[st.DAGRunID]++
-	count := z.staleCounters[st.DAGRunID]
+	z.staleCounters[attemptKey]++
+	count := z.staleCounters[attemptKey]
 
 	if count < z.failureThreshold {
-		logger.Warn(ctx, "DAG run appears stale, waiting for threshold",
-			tag.Queue(dag.ProcGroup()),
+		logger.Warn(ctx, "Proc entry appears stale, waiting for threshold",
 			slog.Int("stale_count", count),
 			slog.Int("threshold", z.failureThreshold),
 		)
 		return nil
 	}
 
-	// Threshold reached — acquire per-run mutex and proceed with kill
-	runMu := z.getRunMutex(st.DAGRunID)
+	runMu := z.getRunMutex(attemptKey)
 	runMu.Lock()
 	defer runMu.Unlock()
 
-	repairedStatus, repaired, err := runtime.RepairStaleLocalRun(ctx, attempt, dag)
+	attempt, err := z.findAttempt(ctx, entry)
 	if err != nil {
-		return fmt.Errorf("update status: %w", err)
+		return fmt.Errorf("find attempt: %w", err)
 	}
-	if !repaired {
-		logger.Info(ctx, "Run already in terminal state, skipping zombie cleanup",
-			tag.Queue(dag.ProcGroup()),
-			slog.String("status", repairedStatus.Status.String()),
-		)
-		delete(z.staleCounters, st.DAGRunID)
+
+	status, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return fmt.Errorf("read status: %w", err)
+	}
+	if status.AttemptID != entry.Meta.AttemptID || status.Status != core.Running {
+		z.clearAttemptState(attemptKey)
+		if err := z.procStore.RemoveIfStale(ctx, entry); err != nil {
+			return fmt.Errorf("remove mismatched stale proc: %w", err)
+		}
 		return nil
 	}
 
-	logger.Info(ctx, "Confirmed zombie DAG run, updated to failed status",
-		tag.Queue(dag.ProcGroup()),
-		slog.Int("stale_count", count),
-	)
+	if status.WorkerID != "" && status.WorkerID != "local" {
+		z.clearAttemptState(attemptKey)
+		if err := z.procStore.RemoveIfStale(ctx, entry); err != nil {
+			return fmt.Errorf("remove remote stale proc: %w", err)
+		}
+		return nil
+	}
 
-	// Clean up stale proc files for this specific run after persisting Failed status
-	if err := z.procStore.CleanStaleFiles(ctx, dag.ProcGroup(), exec.DAGRunRef{Name: dag.Name, ID: st.DAGRunID}); err != nil {
-		logger.Error(ctx, "Failed to clean stale proc files",
-			tag.Queue(dag.ProcGroup()),
-			tag.Error(err),
+	dag, err := attempt.ReadDAG(ctx)
+	if err != nil {
+		return fmt.Errorf("read dag: %w", err)
+	}
+
+	repairedStatus, repaired, err := runtime.RepairStaleLocalRun(ctx, attempt, dag)
+	if err != nil {
+		return fmt.Errorf("repair stale local run: %w", err)
+	}
+	if !repaired {
+		logger.Info(ctx, "Run already terminal, removing stale proc entry",
+			slog.String("status", repairedStatus.Status.String()),
+		)
+	} else {
+		logger.Info(ctx, "Confirmed zombie DAG run, updated to failed status",
+			slog.Int("stale_count", count),
 		)
 	}
 
-	// Clean up counter entry
-	delete(z.staleCounters, st.DAGRunID)
+	if err := z.procStore.RemoveIfStale(ctx, entry); err != nil {
+		return fmt.Errorf("remove stale proc after repair: %w", err)
+	}
+	z.clearAttemptState(attemptKey)
 
 	return nil
 }

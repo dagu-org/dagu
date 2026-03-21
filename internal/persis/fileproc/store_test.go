@@ -29,7 +29,7 @@ func TestStore(t *testing.T) {
 
 	// Get the process for the dag-run
 	// Using different group name (queue) vs dag name to test hierarchy
-	proc, err := store.Acquire(ctx, "test_queue", dagRun)
+	proc, err := store.Acquire(ctx, "test_queue", testProcMetaFromRun(dagRun))
 	require.NoError(t, err, "failed to get proc")
 
 	requireCountAlive(t, ctx, store, "test_queue", 1)
@@ -67,7 +67,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 
 		// Create a process and start heartbeat
 		// Use different group name (queue-2) vs dag name (test-dag)
-		proc, err := store.Acquire(ctx, "queue-2", dagRun)
+		proc, err := store.Acquire(ctx, "queue-2", testProcMetaFromRun(dagRun))
 		require.NoError(t, err)
 
 		requireRunAliveState(t, ctx, store, "queue-2", dagRun, true)
@@ -85,7 +85,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 			Name: "test-dag-3",
 			ID:   "run-789",
 		}
-		proc1, err := store.Acquire(ctx, "queue-3", dagRun1)
+		proc1, err := store.Acquire(ctx, "queue-3", testProcMetaFromRun(dagRun1))
 		require.NoError(t, err)
 
 		requireRunAliveState(t, ctx, store, "queue-3", dagRun1, true)
@@ -121,7 +121,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 
 		// Create a process
 		// Use different group name vs dag name
-		proc, err := shortStore.Acquire(ctx, "stale-queue", dagRun)
+		proc, err := shortStore.Acquire(ctx, "stale-queue", testProcMetaFromRun(dagRun))
 		require.NoError(t, err)
 
 		// Stop the heartbeat immediately
@@ -162,11 +162,11 @@ func TestStore_ListAllAlive(t *testing.T) {
 			ID:   "run2",
 		}
 
-		proc1, err := store.Acquire(ctx, "queue1", dagRun1)
+		proc1, err := store.Acquire(ctx, "queue1", testProcMetaFromRun(dagRun1))
 		require.NoError(t, err)
 		defer func() { _ = proc1.Stop(ctx) }()
 
-		proc2, err := store.Acquire(ctx, "queue1", dagRun2)
+		proc2, err := store.Acquire(ctx, "queue1", testProcMetaFromRun(dagRun2))
 		require.NoError(t, err)
 		defer func() { _ = proc2.Stop(ctx) }()
 
@@ -205,15 +205,15 @@ func TestStore_ListAllAlive(t *testing.T) {
 			ID:   "run-c1",
 		}
 
-		proc1, err := store.Acquire(ctx, "queue-alpha", dagRun1)
+		proc1, err := store.Acquire(ctx, "queue-alpha", testProcMetaFromRun(dagRun1))
 		require.NoError(t, err)
 		defer func() { _ = proc1.Stop(ctx) }()
 
-		proc2, err := store.Acquire(ctx, "queue-beta", dagRun2)
+		proc2, err := store.Acquire(ctx, "queue-beta", testProcMetaFromRun(dagRun2))
 		require.NoError(t, err)
 		defer func() { _ = proc2.Stop(ctx) }()
 
-		proc3, err := store.Acquire(ctx, "queue-alpha", dagRun3)
+		proc3, err := store.Acquire(ctx, "queue-alpha", testProcMetaFromRun(dagRun3))
 		require.NoError(t, err)
 		defer func() { _ = proc3.Stop(ctx) }()
 
@@ -250,13 +250,13 @@ func TestStore_ListAllAlive(t *testing.T) {
 			ID:   "run-z1",
 		}
 
-		proc1, err := store.Acquire(ctx, "mixed-queue", dagRun1)
+		proc1, err := store.Acquire(ctx, "mixed-queue", testProcMetaFromRun(dagRun1))
 		require.NoError(t, err)
 
-		proc2, err := store.Acquire(ctx, "mixed-queue", dagRun2)
+		proc2, err := store.Acquire(ctx, "mixed-queue", testProcMetaFromRun(dagRun2))
 		require.NoError(t, err)
 
-		proc3, err := store.Acquire(ctx, "mixed-queue", dagRun3)
+		proc3, err := store.Acquire(ctx, "mixed-queue", testProcMetaFromRun(dagRun3))
 		require.NoError(t, err)
 
 		// Stop proc2

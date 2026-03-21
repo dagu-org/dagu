@@ -5,11 +5,11 @@ package fileproc
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
+	"sort"
 	"sync"
 	"time"
 
@@ -19,7 +19,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
-// ProcGroup is a struct that manages process files for a given DAG name.
+// ProcGroup is a struct that manages process files for a given process group.
 type ProcGroup struct {
 	dirlock.DirLock
 
@@ -31,13 +31,7 @@ type ProcGroup struct {
 	mu                sync.Mutex
 }
 
-// procFilePrefix is the prefix for the proc files
-const procFilePrefix = "proc_"
-
-// procFileRegex is a regex pattern to match the proc file name format
-var procFileRegex = regexp.MustCompile(`^proc_\d{8}_\d{6}Z_.*\.proc$`)
-
-// NewProcGroup creates a new instance of a ProcGroup with the specified base directory and DAG name.
+// NewProcGroup creates a new instance of a ProcGroup with the specified base directory and group name.
 func NewProcGroup(baseDir, groupName string, staleTime, heartbeatInterval, syncInterval time.Duration) *ProcGroup {
 	dirLock := dirlock.New(baseDir, &dirlock.LockOptions{
 		StaleThreshold: 5 * time.Second,
@@ -54,285 +48,192 @@ func NewProcGroup(baseDir, groupName string, staleTime, heartbeatInterval, syncI
 }
 
 func (pg *ProcGroup) CountByDAGName(ctx context.Context, dagName string) (int, error) {
-	pg.mu.Lock()
-	defer pg.mu.Unlock()
-
-	// If directory does not exist, return 0
-	if _, err := os.Stat(pg.baseDir); errors.Is(err, os.ErrNotExist) {
-		return 0, nil
-	}
-
-	// Grep for all proc files in subdirectories
-	files, err := filepath.Glob(filepath.Join(pg.baseDir, dagName, procFilePrefix+"*.proc"))
+	entries, err := pg.ListEntries(ctx)
 	if err != nil {
 		return 0, err
 	}
-
-	aliveCount := 0
-	for _, file := range files {
-		if !procFileRegex.MatchString(filepath.Base(file)) {
+	seen := make(map[string]struct{})
+	for _, entry := range entries {
+		if !entry.Fresh || entry.Meta.Name != dagName {
 			continue
 		}
-		if !pg.isStale(ctx, file) {
-			aliveCount++
-			continue
-		}
-		pg.removeStaleFile(ctx, file)
+		seen[entry.Meta.DAGRun().String()] = struct{}{}
 	}
-
-	return aliveCount, nil
+	return len(seen), nil
 }
 
-// Count retrieves the count of alive proc files for the specified DAG name.
+// Count retrieves the count of alive proc entries for the specified group.
 func (pg *ProcGroup) Count(ctx context.Context) (int, error) {
-	pg.mu.Lock()
-	defer pg.mu.Unlock()
-
-	// If directory does not exist, return 0
-	if _, err := os.Stat(pg.baseDir); errors.Is(err, os.ErrNotExist) {
-		return 0, nil
-	}
-
-	// Grep for all proc files in subdirectories
-	files, err := filepath.Glob(filepath.Join(pg.baseDir, "*", procFilePrefix+"*.proc"))
+	entries, err := pg.ListEntries(ctx)
 	if err != nil {
 		return 0, err
 	}
-
-	aliveCount := 0
-	for _, file := range files {
-		if !procFileRegex.MatchString(filepath.Base(file)) {
+	seen := make(map[string]struct{})
+	for _, entry := range entries {
+		if !entry.Fresh {
 			continue
 		}
-		if !pg.isStale(ctx, file) {
-			aliveCount++
-			continue
-		}
-		pg.removeStaleFile(ctx, file)
+		seen[entry.Meta.DAGRun().String()] = struct{}{}
 	}
-
-	return aliveCount, nil
+	return len(seen), nil
 }
 
-// isStale checks if the proc file is stale based on its content (timestamp).
-func (pg *ProcGroup) isStale(ctx context.Context, file string) bool {
-	// Check if the file exists
-	fileInfo, err := os.Stat(file)
-	if err != nil {
-		return true // File does not exist, consider it stale
+// Acquire creates a proc heartbeat for the specified execution metadata.
+func (pg *ProcGroup) Acquire(_ context.Context, meta exec.ProcMeta) (*ProcHandle, error) {
+	if meta.StartedAt <= 0 {
+		meta.StartedAt = time.Now().Unix()
 	}
-
-	if time.Since(fileInfo.ModTime()) < pg.staleTime {
-		return false // File is not stale
+	if err := validateProcMeta(meta); err != nil {
+		return nil, err
 	}
-
-	// Check if the file is stale by checking its content (timestamp).
-	data, err := os.ReadFile(file) // nolint:gosec
-	if err != nil {
-		logger.Warn(ctx, "Failed to read file",
-			tag.File(file),
-			tag.Error(err))
-		// If we can't read the file, consider it stale
-		return true
-	}
-
-	// It is assumed that the first 8 bytes of the file contain a timestamp in seconds (unix time).
-	if len(data) < 8 {
-		logger.Warn(ctx, "File is too short, considering it stale",
-			tag.File(file),
-			tag.Size(len(data)))
-		return true
-	}
-
-	// Parse the timestamp from the file
-	unixTime := int64(binary.BigEndian.Uint64(data[:8])) // nolint:gosec
-
-	// Validate the timestamp is reasonable (not in the future, not too old)
-	now := time.Now()
-	parsedTime := time.Unix(unixTime, 0)
-
-	if parsedTime.After(now.Add(5 * time.Minute)) {
-		logger.Warn(ctx, "Proc file has timestamp in the future, considering it stale",
-			tag.File(file),
-			tag.Timestamp(parsedTime))
-		return true
-	}
-
-	duration := now.Sub(parsedTime)
-	if duration < pg.staleTime {
-		logger.Debug(ctx, "Proc file is not stale",
-			tag.File(file),
-			tag.Timestamp(parsedTime),
-			tag.Duration(duration))
-		return false
-	}
-	logger.Debug(ctx, "Proc file is stale",
-		tag.File(file),
-		tag.Timestamp(parsedTime),
-		tag.Duration(duration))
-	return true
+	fileName := procFilePath(pg.baseDir, exec.NewUTC(time.Now()), meta)
+	return NewProcHandler(fileName, meta, pg.heartbeatInterval, pg.syncInterval), nil
 }
 
-// GetProc retrieves a proc file for the specified dag-run reference.
-// It returns a new Proc instance with the generated file name.
-func (pg *ProcGroup) Acquire(_ context.Context, dagRun exec.DAGRunRef) (*ProcHandle, error) {
-	// Generate the proc file name
-	fileName := pg.getFileName(exec.NewUTC(time.Now()), dagRun)
-	return NewProcHandler(fileName, exec.ProcMeta{
-		StartedAt: time.Now().Unix(),
-	}, pg.heartbeatInterval, pg.syncInterval), nil
-}
-
-// getFileName generates a proc file name based on the dag-run reference and the current time.
-func (pg *ProcGroup) getFileName(t exec.TimeInUTC, dagRun exec.DAGRunRef) string {
-	timestamp := t.Format(dateTimeFormatUTC)
-	fileName := procFilePrefix + timestamp + "Z_" + dagRun.ID + ".proc"
-	return filepath.Join(pg.baseDir, dagRun.Name, fileName)
-}
-
-// dateTimeFormat is the format used for the timestamp in the queue file name
-const dateTimeFormatUTC = "20060102_150405"
-
-// IsRunAlive checks if a specific DAG run has an alive process file.
+// IsRunAlive checks if a specific DAG run has a fresh proc heartbeat entry.
 func (pg *ProcGroup) IsRunAlive(ctx context.Context, dagRun exec.DAGRunRef) (bool, error) {
-	pg.mu.Lock()
-	defer pg.mu.Unlock()
-
-	// If directory does not exist, return false
-	if _, err := os.Stat(pg.baseDir); errors.Is(err, os.ErrNotExist) {
-		return false, nil
-	}
-
-	// Look for proc files with the specific run ID
-	pattern := filepath.Join(pg.baseDir, dagRun.Name, procFilePrefix+"*_"+dagRun.ID+".proc")
-	files, err := filepath.Glob(pattern)
+	entries, err := pg.ListEntries(ctx)
 	if err != nil {
 		return false, err
 	}
-
-	for _, file := range files {
-		if !procFileRegex.MatchString(filepath.Base(file)) {
-			continue
-		}
-		if !pg.isStale(ctx, file) {
+	for _, entry := range entries {
+		if entry.Fresh && entry.Meta.Name == dagRun.Name && entry.Meta.DAGRunID == dagRun.ID {
 			return true, nil
 		}
-		pg.removeStaleFile(ctx, file)
 	}
-
 	return false, nil
 }
 
-// ListAlive returns a list of alive DAG runs by scanning process files.
+// ListAlive returns a list of alive DAG runs by scanning proc entries.
 func (pg *ProcGroup) ListAlive(ctx context.Context) ([]exec.DAGRunRef, error) {
+	entries, err := pg.ListEntries(ctx)
+	if err != nil {
+		return nil, err
+	}
+	refs := freshRefs(entries)
+	return refs, nil
+}
+
+// ListEntries returns all proc entries for the group, including stale entries.
+func (pg *ProcGroup) ListEntries(ctx context.Context) ([]exec.ProcEntry, error) {
 	pg.mu.Lock()
 	defer pg.mu.Unlock()
 
-	// If directory does not exist, return empty list
+	entries, err := pg.listEntriesLocked(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entries, nil
+}
+
+// RemoveIfStale removes the exact proc file if it is still stale and unchanged.
+func (pg *ProcGroup) RemoveIfStale(ctx context.Context, entry exec.ProcEntry) error {
+	pg.mu.Lock()
+	defer pg.mu.Unlock()
+
+	current, err := readProcEntry(entry.FilePath, pg.groupName, pg.staleTime, time.Now())
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if current.Fresh || !sameProcEntry(current, entry) {
+		return nil
+	}
+	if err := os.Remove(entry.FilePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	_ = os.Remove(filepath.Dir(entry.FilePath))
+	logger.Info(ctx, "Removed stale proc file", tag.File(entry.FilePath))
+	return nil
+}
+
+func (pg *ProcGroup) listEntriesLocked(_ context.Context) ([]exec.ProcEntry, error) {
 	if _, err := os.Stat(pg.baseDir); errors.Is(err, os.ErrNotExist) {
-		return []exec.DAGRunRef{}, nil
+		return []exec.ProcEntry{}, nil
 	}
 
-	// Grep for all proc files in the directory
-	files, err := filepath.Glob(filepath.Join(pg.baseDir, "*", procFilePrefix+"*.proc"))
+	dagEntries, err := os.ReadDir(pg.baseDir)
 	if err != nil {
 		return nil, err
 	}
 
-	var aliveRuns []exec.DAGRunRef
-	for _, file := range files {
-		basename := filepath.Base(file)
-		if !procFileRegex.MatchString(basename) {
+	var files []string
+	for _, dagEntry := range dagEntries {
+		if !dagEntry.IsDir() || dagEntry.Name() == "" || dagEntry.Name()[0] == '.' {
 			continue
 		}
-		if !pg.isStale(ctx, file) {
-			// Extract the run ID from the filename
-			// Format: proc_YYYYMMDD_HHMMSSZ_<runID>.proc
-			runID := extractRunIDFromFileName(basename)
-			dagName := filepath.Base(filepath.Dir(file))
-			if runID != "" {
-				aliveRuns = append(aliveRuns, exec.DAGRunRef{
-					Name: dagName,
-					ID:   runID,
-				})
+		dagDir := filepath.Join(pg.baseDir, dagEntry.Name())
+		procEntries, err := os.ReadDir(dagDir)
+		if err != nil {
+			return nil, err
+		}
+		for _, procEntry := range procEntries {
+			if procEntry.IsDir() || filepath.Ext(procEntry.Name()) != procFileExt {
+				continue
 			}
-			continue
+			files = append(files, filepath.Join(dagDir, procEntry.Name()))
 		}
-		pg.removeStaleFile(ctx, file)
 	}
 
-	return aliveRuns, nil
+	sort.Strings(files)
+
+	now := time.Now()
+	entries := make([]exec.ProcEntry, 0, len(files))
+	for _, file := range files {
+		entry, err := readProcEntry(file, pg.groupName, pg.staleTime, now)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+
+	return entries, nil
 }
 
-// CleanStaleFiles removes stale proc files for a specific DAG run.
-// Only the zombie detector should call this after confirming a kill.
-func (pg *ProcGroup) CleanStaleFiles(ctx context.Context, dagRun exec.DAGRunRef) error {
-	pg.mu.Lock()
-	defer pg.mu.Unlock()
-
-	if _, err := os.Stat(pg.baseDir); errors.Is(err, os.ErrNotExist) {
-		return nil
+func freshRefs(entries []exec.ProcEntry) []exec.DAGRunRef {
+	seen := make(map[string]exec.DAGRunRef)
+	for _, entry := range entries {
+		if !entry.Fresh {
+			continue
+		}
+		ref := entry.Meta.DAGRun()
+		seen[ref.String()] = ref
 	}
 
-	// Scope to the specific run's proc files
-	pattern := filepath.Join(pg.baseDir, dagRun.Name, procFilePrefix+"*_"+dagRun.ID+".proc")
-	files, err := filepath.Glob(pattern)
+	refs := make([]exec.DAGRunRef, 0, len(seen))
+	for _, ref := range seen {
+		refs = append(refs, ref)
+	}
+	sort.Slice(refs, func(i, j int) bool {
+		if refs[i].Name == refs[j].Name {
+			return refs[i].ID < refs[j].ID
+		}
+		return refs[i].Name < refs[j].Name
+	})
+	return refs
+}
+
+func latestFreshEntriesByRun(entries []exec.ProcEntry) map[string]exec.ProcEntry {
+	latest := make(map[string]exec.ProcEntry)
+	for _, entry := range entries {
+		if !entry.Fresh {
+			continue
+		}
+		key := entry.Meta.DAGRun().String()
+		current, ok := latest[key]
+		if !ok || current.LastHeartbeatAt < entry.LastHeartbeatAt {
+			latest[key] = entry
+		}
+	}
+	return latest
+}
+
+func (pg *ProcGroup) Validate(ctx context.Context) error {
+	_, err := pg.ListEntries(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("validate proc group %s: %w", pg.groupName, err)
 	}
-
-	for _, file := range files {
-		if !procFileRegex.MatchString(filepath.Base(file)) {
-			continue
-		}
-		if pg.isStale(ctx, file) {
-			pg.removeStaleFile(ctx, file)
-		}
-	}
-
 	return nil
-}
-
-func (pg *ProcGroup) removeStaleFile(ctx context.Context, file string) {
-	if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
-		logger.Error(ctx, "Failed to remove stale file",
-			tag.File(file),
-			tag.Error(err))
-		return
-	}
-
-	_ = os.Remove(filepath.Dir(file))
-}
-
-// extractRunIDFromFileName extracts the run ID from a proc file name.
-// Format: proc_YYYYMMDD_HHMMSSZ_<runID>.proc
-func extractRunIDFromFileName(filename string) string {
-	// Remove the prefix and suffix
-	if !procFileRegex.MatchString(filename) {
-		return ""
-	}
-	// Remove "proc_" prefix and ".proc" suffix
-	trimmed := filename[len(procFilePrefix):]
-	trimmed = trimmed[:len(trimmed)-5] // Remove ".proc"
-
-	// Find the second underscore (after the date) to extract run ID
-	// Format after removing prefix: YYYYMMDD_HHMMSSZ_<runID>
-	firstUnderscore := -1
-	secondUnderscore := -1
-	for i, r := range trimmed {
-		if r == '_' {
-			if firstUnderscore == -1 {
-				firstUnderscore = i
-			} else if secondUnderscore == -1 {
-				secondUnderscore = i
-				break
-			}
-		}
-	}
-
-	if secondUnderscore != -1 && secondUnderscore < len(trimmed)-1 {
-		return trimmed[secondUnderscore+1:]
-	}
-
-	return ""
 }

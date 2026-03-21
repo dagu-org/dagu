@@ -115,11 +115,12 @@ steps:
 	require.NoError(t, attempt.Write(server.Context, status))
 	require.NoError(t, attempt.Close(server.Context))
 
-	_ = test.CreateStaleProcFile(
+	_ = test.CreateStaleProcFileWithAttempt(
 		t,
 		server.Config.Paths.ProcDir,
 		dag.ProcGroup(),
 		ref,
+		attempt.ID(),
 		time.Now().Add(-2*time.Second),
 		time.Second,
 	)
