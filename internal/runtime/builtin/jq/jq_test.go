@@ -6,6 +6,8 @@ package jq
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -376,6 +378,249 @@ func TestJQExecutor_Kill(t *testing.T) {
 	// Kill should return nil (jq executor doesn't need cleanup)
 	err = executor.Kill(nil)
 	assert.NoError(t, err)
+}
+
+func TestJQExecutor_InputFromFile(t *testing.T) {
+	t.Parallel()
+
+	var stdout, stderr bytes.Buffer
+
+	// Write valid JSON to a temp file
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "input.json")
+	err := os.WriteFile(filePath, []byte(`{"items": [{"name": "a"}, {"name": "b"}]}`), 0o600)
+	require.NoError(t, err)
+
+	step := core.Step{
+		Commands: []core.CommandEntry{{CmdWithArgs: `.items[] | .name`}},
+		Script:   "file://" + filePath,
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "jq",
+			Config: map[string]any{
+				"raw": true,
+			},
+		},
+	}
+
+	ctx := context.Background()
+	executor, err := newJQ(ctx, step)
+	require.NoError(t, err)
+
+	executor.SetStdout(&stdout)
+	executor.SetStderr(&stderr)
+
+	err = executor.Run(ctx)
+	require.NoError(t, err)
+
+	assert.Equal(t, "a\nb\n", stdout.String())
+}
+
+func TestJQExecutor_ConfigInput(t *testing.T) {
+	t.Parallel()
+
+	var stdout, stderr bytes.Buffer
+
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "input.json")
+	err := os.WriteFile(filePath, []byte(`{"items": [{"name": "a"}, {"name": "b"}]}`), 0o600)
+	require.NoError(t, err)
+
+	step := core.Step{
+		Commands: []core.CommandEntry{{CmdWithArgs: `.items[] | .name`}},
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "jq",
+			Config: map[string]any{
+				"raw":   true,
+				"input": filePath,
+			},
+		},
+	}
+
+	ctx := context.Background()
+	executor, err := newJQ(ctx, step)
+	require.NoError(t, err)
+
+	executor.SetStdout(&stdout)
+	executor.SetStderr(&stderr)
+
+	err = executor.Run(ctx)
+	require.NoError(t, err)
+
+	assert.Equal(t, "a\nb\n", stdout.String())
+}
+
+func TestJQExecutor_ConfigInputWithRawFalse(t *testing.T) {
+	t.Parallel()
+
+	var stdout, stderr bytes.Buffer
+
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "input.json")
+	err := os.WriteFile(filePath, []byte(`{"items": [{"name": "a"}, {"name": "b"}]}`), 0o600)
+	require.NoError(t, err)
+
+	step := core.Step{
+		Commands: []core.CommandEntry{{CmdWithArgs: `.items[] | .name`}},
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "jq",
+			Config: map[string]any{
+				"raw":   false,
+				"input": filePath,
+			},
+		},
+	}
+
+	ctx := context.Background()
+	executor, err := newJQ(ctx, step)
+	require.NoError(t, err)
+
+	executor.SetStdout(&stdout)
+	executor.SetStderr(&stderr)
+
+	err = executor.Run(ctx)
+	require.NoError(t, err)
+
+	assert.Equal(t, "\"a\"\n\"b\"\n", stdout.String())
+}
+
+func TestJQExecutor_ConfigInputMutualExclusion(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "input.json")
+	err := os.WriteFile(filePath, []byte(`{"foo": "bar"}`), 0o600)
+	require.NoError(t, err)
+
+	step := core.Step{
+		Commands: []core.CommandEntry{{CmdWithArgs: ".foo"}},
+		Script:   `{"foo": "bar"}`,
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "jq",
+			Config: map[string]any{
+				"input": filePath,
+			},
+		},
+	}
+
+	ctx := context.Background()
+	_, err = newJQ(ctx, step)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "mutually exclusive")
+}
+
+func TestJQExecutor_ConfigInputFileNotFound(t *testing.T) {
+	t.Parallel()
+
+	step := core.Step{
+		Commands: []core.CommandEntry{{CmdWithArgs: "."}},
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "jq",
+			Config: map[string]any{
+				"input": "/nonexistent/path/input.json",
+			},
+		},
+	}
+
+	ctx := context.Background()
+	_, err := newJQ(ctx, step)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "reading input file")
+	assert.Contains(t, err.Error(), "/nonexistent/path/input.json")
+}
+
+func TestJQExecutor_ConfigInputInvalidJSON(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "bad.json")
+	err := os.WriteFile(filePath, []byte(`not valid json`), 0o600)
+	require.NoError(t, err)
+
+	step := core.Step{
+		Commands: []core.CommandEntry{{CmdWithArgs: "."}},
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "jq",
+			Config: map[string]any{
+				"input": filePath,
+			},
+		},
+	}
+
+	ctx := context.Background()
+	_, err = newJQ(ctx, step)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "parsing JSON from input file")
+}
+
+func TestJQExecutor_InputFromFile_InvalidJSON(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "bad.json")
+	err := os.WriteFile(filePath, []byte(`not valid json`), 0o600)
+	require.NoError(t, err)
+
+	step := core.Step{
+		Commands: []core.CommandEntry{{CmdWithArgs: "."}},
+		Script:   "file://" + filePath,
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "jq",
+		},
+	}
+
+	ctx := context.Background()
+	_, err = newJQ(ctx, step)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "parsing JSON from file")
+}
+
+func TestJQExecutor_InputFromFile_NotFound(t *testing.T) {
+	t.Parallel()
+
+	step := core.Step{
+		Commands: []core.CommandEntry{{CmdWithArgs: "."}},
+		Script:   "file:///nonexistent/path/input.json",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "jq",
+		},
+	}
+
+	ctx := context.Background()
+	_, err := newJQ(ctx, step)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "reading input file")
+}
+
+func TestJQExecutor_NoInput(t *testing.T) {
+	t.Parallel()
+
+	step := core.Step{
+		Commands: []core.CommandEntry{{CmdWithArgs: "."}},
+		Script:   "",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "jq",
+		},
+	}
+
+	ctx := context.Background()
+	_, err := newJQ(ctx, step)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no input provided")
+}
+
+func TestDecodeJqConfig_WithInput(t *testing.T) {
+	t.Parallel()
+
+	cfg := map[string]any{
+		"raw":   true,
+		"input": "/some/path.json",
+	}
+
+	var jqCfg jqConfig
+	err := decodeJqConfig(cfg, &jqCfg)
+	require.NoError(t, err)
+	assert.True(t, jqCfg.Raw)
+	assert.Equal(t, "/some/path.json", jqCfg.Input)
 }
 
 func TestDecodeJqConfig(t *testing.T) {

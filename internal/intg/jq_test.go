@@ -289,6 +289,163 @@ func TestJQExecutor(t *testing.T) {
 		})
 	})
 
+	t.Run("InputFromFileWithStepRef", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `
+type: graph
+steps:
+  - id: producer
+    command: 'echo ''{"items": [{"name": "a"}, {"name": "b"}]}'''
+    output: PRODUCER_OUT
+
+  - id: filter
+    depends:
+      - producer
+    type: jq
+    config:
+      raw: true
+    script: "file://${producer.stdout}"
+    command: '.items[] | .name'
+    output: RESULT
+`)
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": "a\nb",
+		})
+	})
+
+	t.Run("ConfigInputWithStepRef", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `
+type: graph
+steps:
+  - id: producer
+    command: 'echo ''{"items": [{"name": "a"}, {"name": "b"}]}'''
+    output: PRODUCER_OUT
+
+  - id: filter
+    depends:
+      - producer
+    type: jq
+    config:
+      raw: true
+      input: "${producer.stdout}"
+    command: '.items[] | .name'
+    output: RESULT
+`)
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": "a\nb",
+		})
+	})
+
+	t.Run("ConfigInputWithRawFalse", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `
+type: graph
+steps:
+  - id: producer
+    command: 'echo ''{"items": [{"name": "a"}, {"name": "b"}]}'''
+    output: PRODUCER_OUT
+
+  - id: filter
+    depends:
+      - producer
+    type: jq
+    config:
+      raw: false
+      input: "${producer.stdout}"
+    command: '.items[] | .name'
+    output: RESULT
+`)
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": "\"a\"\n\"b\"",
+		})
+	})
+
+	t.Run("ConfigInputLargePayload", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		// Generate a JSON array with 100 items via a shell command
+		dag := th.DAG(t, `
+type: graph
+steps:
+  - id: producer
+    command: |
+      python3 -c "import json; print(json.dumps({'items': [{'id': i, 'name': f'item-{i}'} for i in range(100)]}))"
+    output: PRODUCER_OUT
+
+  - id: filter
+    depends:
+      - producer
+    type: jq
+    config:
+      raw: true
+      input: "${producer.stdout}"
+    command: '[.items | length] | .[0]'
+    output: RESULT
+`)
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": "100",
+		})
+	})
+
+	t.Run("ConfigInputNestedQuery", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `
+type: graph
+steps:
+  - id: producer
+    command: 'echo ''{"data": {"users": [{"name": "Alice", "email": "alice@example.com"}, {"name": "Bob", "email": "bob@example.com"}]}}'''
+    output: PRODUCER_OUT
+
+  - id: filter
+    depends:
+      - producer
+    type: jq
+    config:
+      raw: true
+      input: "${producer.stdout}"
+    command: '.data.users[] | .name'
+    output: RESULT
+`)
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": "Alice\nBob",
+		})
+	})
+
 	t.Run("StringWithSpecialCharsWithRawTrue", func(t *testing.T) {
 		t.Parallel()
 
