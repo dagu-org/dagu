@@ -23,8 +23,11 @@ import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-d
 import DAGRunGroupedView from '../../features/dag-runs/components/dag-run-list/DAGRunGroupedView';
 import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
 import { useQuery } from '../../hooks/api';
-import { useDAGRunsListSSE } from '../../hooks/useDAGRunsListSSE';
-import { sseFallbackOptions, useSSECacheSync } from '../../hooks/useSSECacheSync';
+import {
+  liveFallbackOptions,
+  useLiveConnection,
+  useLiveDAGRuns,
+} from '../../hooks/useAppLive';
 import StatusChip from '../../ui/StatusChip';
 import Title from '../../ui/Title';
 
@@ -412,16 +415,7 @@ function DAGRuns() {
   );
   const availableTags = tagsData?.tags ?? [];
 
-  // SSE for real-time updates with polling fallback
-  const sseParams = {
-    name: apiSearchText || undefined,
-    dagRunId: apiDagRunId || undefined,
-    status: apiStatus !== 'all' ? parseInt(apiStatus) : undefined,
-    tags: apiTags.length > 0 ? apiTags.join(',') : undefined,
-    fromDate: formatDateForApi(apiFromDate),
-    toDate: formatDateForApi(apiToDate),
-  };
-  const sseResult = useDAGRunsListSSE(sseParams, true);
+  const liveState = useLiveConnection();
   const { data, mutate } = useQuery(
     '/dag-runs',
     {
@@ -437,9 +431,9 @@ function DAGRuns() {
         },
       },
     },
-    sseFallbackOptions(sseResult)
+    liveFallbackOptions(liveState)
   );
-  useSSECacheSync(sseResult, mutate);
+  useLiveDAGRuns(mutate);
 
   const addSearchParam = (key: string, value: string | undefined) => {
     const locationQuery = new URLSearchParams(window.location.search);

@@ -1,22 +1,22 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
-import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { useClient } from '@/hooks/api';
+import { useClient, useQuery } from '@/hooks/api';
 import { DAGPreviewModal } from '../DAGPreviewModal';
 
-const mockSidePanel = vi.fn((_props?: unknown) => <div>shared side panel</div>);
+const mockStartModal = vi.fn((_props?: unknown) => <div>start modal</div>);
 
 vi.mock('@/hooks/api', () => ({
   useClient: vi.fn(),
+  useQuery: vi.fn(),
 }));
 
-vi.mock('@/features/dags/components/dag-details/DAGDetailsSidePanel', () => ({
-  default: (props: unknown) => mockSidePanel(props),
+vi.mock('@/features/dags/components/dag-execution/StartDAGModal', () => ({
+  default: (props: unknown) => mockStartModal(props),
 }));
 
 const appBarValue = {
@@ -28,18 +28,24 @@ const appBarValue = {
   selectRemoteNode: vi.fn(),
 };
 
+const useClientMock = useClient as unknown as {
+  mockReturnValue: (value: unknown) => void;
+};
+
+const useQueryMock = useQuery as unknown as {
+  mockReturnValue: (value: unknown) => void;
+};
+
 function renderPreview(selectedWorkspace = 'briefing/alpha') {
   return render(
-    <MemoryRouter>
-      <AppBarContext.Provider value={appBarValue}>
-        <DAGPreviewModal
-          fileName="example"
-          isOpen={true}
-          selectedWorkspace={selectedWorkspace}
-          onClose={vi.fn()}
-        />
-      </AppBarContext.Provider>
-    </MemoryRouter>
+    <AppBarContext.Provider value={appBarValue}>
+      <DAGPreviewModal
+        fileName="example"
+        isOpen={true}
+        selectedWorkspace={selectedWorkspace}
+        onClose={vi.fn()}
+      />
+    </AppBarContext.Provider>
   );
 }
 
@@ -48,46 +54,69 @@ afterEach(() => {
 });
 
 describe('DAGPreviewModal', () => {
-  it('passes cockpit-specific configuration to the shared side panel', () => {
-    vi.mocked(useClient).mockReturnValue({
+  it('loads the preview from /dags/{fileName} and passes the DAG to the start modal', () => {
+    useClientMock.mockReturnValue({
       POST: vi.fn(),
+    } as never);
+    useQueryMock.mockReturnValue({
+      data: {
+        dag: { name: 'Example DAG' },
+        spec: 'steps:\n  - name: hello',
+      },
+      error: undefined,
+      isLoading: false,
     } as never);
 
     renderPreview();
 
-    expect(screen.getByText('shared side panel')).toBeInTheDocument();
-    expect(mockSidePanel).toHaveBeenCalledWith(
+    expect(vi.mocked(useQuery)).toHaveBeenCalledWith(
+      '/dags/{fileName}',
       expect.objectContaining({
-        fileName: 'example',
-        isOpen: true,
-        initialTab: 'spec',
-        renderInPortal: true,
-        backdropVisibleClassName: 'bg-black/5',
-        forceEnqueue: true,
-        onEnqueue: expect.any(Function),
+        params: {
+          path: { fileName: 'example' },
+          query: { remoteNode: 'local' },
+        },
+      }),
+      expect.any(Object)
+    );
+    expect(screen.getByText('Example DAG')).toBeInTheDocument();
+    expect(screen.getByText(/steps:/)).toBeInTheDocument();
+    expect(mockStartModal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dag: { name: 'Example DAG' },
+        action: 'enqueue',
       })
     );
   });
 
-  it('enqueues with a sanitized workspace tag and returns the new dag run id', async () => {
+  it('opens the start modal and enqueues with a sanitized workspace tag', async () => {
     const post = vi.fn().mockResolvedValue({
       data: { dagRunId: 'queued-run' },
       error: undefined,
     });
-    vi.mocked(useClient).mockReturnValue({ POST: post } as never);
+    useClientMock.mockReturnValue({ POST: post } as never);
+    useQueryMock.mockReturnValue({
+      data: {
+        dag: { name: 'Example DAG' },
+        spec: 'steps:\n  - name: hello',
+      },
+      error: undefined,
+      isLoading: false,
+    } as never);
 
     renderPreview();
+    fireEvent.click(screen.getByRole('button', { name: /enqueue/i }));
 
-    const props = mockSidePanel.mock.calls[mockSidePanel.mock.calls.length - 1]?.[0] as {
-      onEnqueue: (
+    const props = mockStartModal.mock.calls[mockStartModal.mock.calls.length - 1]?.[0] as {
+      visible: boolean;
+      onSubmit: (
         params: string,
         dagRunId?: string
-      ) => Promise<string | void>;
+      ) => Promise<void>;
     };
 
-    await expect(props.onEnqueue('[\"x\"]', 'manual-run')).resolves.toBe(
-      'queued-run'
-    );
+    expect(props.visible).toBe(true);
+    await expect(props.onSubmit('[\"x\"]', 'manual-run')).resolves.toBeUndefined();
     expect(post).toHaveBeenCalledWith('/dags/{fileName}/enqueue', {
       params: {
         path: { fileName: 'example' },
@@ -106,14 +135,23 @@ describe('DAGPreviewModal', () => {
       data: undefined,
       error: { message: 'enqueue failed' },
     });
-    vi.mocked(useClient).mockReturnValue({ POST: post } as never);
+    useClientMock.mockReturnValue({ POST: post } as never);
+    useQueryMock.mockReturnValue({
+      data: {
+        dag: { name: 'Example DAG' },
+        spec: 'steps:\n  - name: hello',
+      },
+      error: undefined,
+      isLoading: false,
+    } as never);
 
     renderPreview('ops');
+    fireEvent.click(screen.getByRole('button', { name: /enqueue/i }));
 
-    const props = mockSidePanel.mock.calls[mockSidePanel.mock.calls.length - 1]?.[0] as {
-      onEnqueue: () => Promise<string | void>;
+    const props = mockStartModal.mock.calls[mockStartModal.mock.calls.length - 1]?.[0] as {
+      onSubmit: () => Promise<void>;
     };
 
-    await expect(props.onEnqueue()).rejects.toThrow('enqueue failed');
+    await expect(props.onSubmit()).rejects.toThrow('enqueue failed');
   });
 });

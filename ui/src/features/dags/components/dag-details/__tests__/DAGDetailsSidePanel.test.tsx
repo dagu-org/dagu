@@ -7,20 +7,18 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
-import { useDAGSSE } from '@/hooks/useDAGSSE';
+import { useLiveConnection } from '@/hooks/useAppLive';
 import DAGDetailsSidePanel from '../DAGDetailsSidePanel';
 
 vi.mock('@/hooks/api', () => ({
   useQuery: vi.fn(),
 }));
 
-vi.mock('@/hooks/useDAGSSE', () => ({
-  useDAGSSE: vi.fn(),
-}));
-
-vi.mock('@/hooks/useSSECacheSync', () => ({
-  sseFallbackOptions: vi.fn(() => ({})),
-  useSSECacheSync: vi.fn(),
+vi.mock('@/hooks/useAppLive', () => ({
+  liveFallbackOptions: vi.fn(() => ({})),
+  useLiveConnection: vi.fn(),
+  useLiveDAG: vi.fn(),
+  useLiveDAGRuns: vi.fn(),
 }));
 
 vi.mock('../DAGDetailsContent', () => ({
@@ -48,7 +46,7 @@ const appBarValue = {
   selectRemoteNode: vi.fn(),
 };
 
-const sseState = {
+const liveState = {
   data: null,
   error: null,
   isConnected: false,
@@ -81,7 +79,7 @@ afterEach(() => {
 
 describe('DAGDetailsSidePanel', () => {
   it('shows a loading state while DAG details are pending', () => {
-    vi.mocked(useDAGSSE).mockReturnValue(sseState);
+    vi.mocked(useLiveConnection).mockReturnValue(liveState);
     useQueryMock.mockImplementation((path) => {
       if (path === '/dags/{fileName}') {
         return {
@@ -103,7 +101,7 @@ describe('DAGDetailsSidePanel', () => {
 
   it('shows a not-found state with a close action for 404s', () => {
     const onClose = vi.fn();
-    vi.mocked(useDAGSSE).mockReturnValue(sseState);
+    vi.mocked(useLiveConnection).mockReturnValue(liveState);
     useQueryMock.mockImplementation((path) => {
       if (path === '/dags/{fileName}') {
         return {
@@ -130,7 +128,7 @@ describe('DAGDetailsSidePanel', () => {
 
   it('shows an error state with retry when the load fails', () => {
     const mutate = vi.fn();
-    vi.mocked(useDAGSSE).mockReturnValue(sseState);
+    vi.mocked(useLiveConnection).mockReturnValue(liveState);
     useQueryMock.mockImplementation((path) => {
       if (path === '/dags/{fileName}') {
         return {
@@ -153,7 +151,7 @@ describe('DAGDetailsSidePanel', () => {
   });
 
   it('renders DAG details content when data is available', () => {
-    vi.mocked(useDAGSSE).mockReturnValue(sseState);
+    vi.mocked(useLiveConnection).mockReturnValue(liveState);
     useQueryMock.mockImplementation((path) => {
       if (path === '/dags/{fileName}') {
         return {

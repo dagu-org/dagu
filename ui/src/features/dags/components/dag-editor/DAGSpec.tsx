@@ -16,13 +16,12 @@ import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
 import { useClient, useQuery } from '../../../../hooks/api';
-import { useContentEditor } from '../../../../hooks/useContentEditor';
-import { useDAGSSE } from '../../../../hooks/useDAGSSE';
-import type { SSEState } from '../../../../hooks/useSSE';
 import {
-  sseFallbackOptions,
-  useSSECacheSync,
-} from '../../../../hooks/useSSECacheSync';
+  liveFallbackOptions,
+  useLiveConnection,
+  useLiveDAGSpec,
+} from '../../../../hooks/useAppLive';
+import { useContentEditor } from '../../../../hooks/useContentEditor';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { DAGStepTable } from '../dag-details';
@@ -39,15 +38,13 @@ type Props = {
   fileName: string;
   /** Local DAGs from parent (optional, avoids redundant fetch) */
   localDags?: components['schemas']['LocalDag'][];
-  /** SSE result from parent — avoids duplicate SSE connection for the same DAG */
-  sseResult?: SSEState<unknown>;
 };
 
 /**
  * DAGSpec displays and allows editing of a DAG specification
  * including visualization, attributes, steps, and YAML definition
  */
-function DAGSpec({ fileName, localDags, sseResult: parentSSEResult }: Props) {
+function DAGSpec({ fileName, localDags }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const client = useClient();
@@ -86,12 +83,9 @@ function DAGSpec({ fileName, localDags, sseResult: parentSSEResult }: Props) {
     [setCookie, setFlowchart]
   );
 
-  // Reuse parent's SSE connection when available to avoid duplicate connections
-  // that exhaust the browser's HTTP/1.1 connection pool.
-  const ownSSEResult = useDAGSSE(fileName, !parentSSEResult);
-  const sseResult = parentSSEResult ?? ownSSEResult;
+  const liveState = useLiveConnection(!!fileName);
 
-  // Fetch spec — SWR is the single source of truth, kept fresh by SSE sync
+  // Fetch spec — SWR is the single source of truth, refreshed by live invalidations
   const {
     data,
     isLoading,
@@ -108,26 +102,11 @@ function DAGSpec({ fileName, localDags, sseResult: parentSSEResult }: Props) {
         },
       },
     },
-    sseFallbackOptions(sseResult)
+    liveFallbackOptions(liveState)
   );
-  useSSECacheSync(sseResult, mutateSpec, (sseData) => {
-    // Cast to access DAG SSE fields (sseResult may be typed as unknown from parent)
-    const d = sseData as {
-      dag?: components['schemas']['DAGDetails'];
-      spec?: string;
-      errors?: string[];
-    };
-    // Skip cache update when spec is missing to avoid overwriting valid
-    // cached spec with empty string, which would trigger false conflicts.
-    if (d.spec === undefined) return undefined;
-    return {
-      dag: d.dag,
-      spec: d.spec,
-      errors: d.errors ?? [],
-    };
-  });
+  useLiveDAGSpec(fileName, mutateSpec, !!fileName);
 
-  // Server spec — SWR cache is always fresh (updated by SSE sync or polling)
+  // Server spec — SWR cache stays current via live invalidations or polling fallback
   const serverSpec = data?.spec ?? null;
 
   // Change tracking (source-agnostic)

@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { components } from '@/api/v1/schema';
 import DAGRunDetailsModal from '@/features/dag-runs/components/dag-run-details/DAGRunDetailsModal';
 import { useInfiniteKanban } from '../hooks/useInfiniteKanban';
-import { useCockpitDagRuns } from '../hooks/useCockpitDagRuns';
 import { DateKanbanSection } from './DateKanbanSection';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
@@ -13,7 +12,6 @@ interface Props {
 
 export function DateKanbanList({ selectedWorkspace }: Props): React.ReactElement {
   const { loadedDates, todayStr, hasMore, loadNextDate } = useInfiniteKanban(selectedWorkspace);
-  const { getColumnsForDate, isLoading } = useCockpitDagRuns(loadedDates, selectedWorkspace);
   const [selectedRun, setSelectedRun] = useState<DAGRunSummary | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -47,8 +45,7 @@ export function DateKanbanList({ selectedWorkspace }: Props): React.ReactElement
             key={date}
             date={date}
             todayStr={todayStr}
-            columns={getColumnsForDate(date)}
-            isLoading={isLoading}
+            selectedWorkspace={selectedWorkspace}
             onCardClick={handleCardClick}
           />
         ))}

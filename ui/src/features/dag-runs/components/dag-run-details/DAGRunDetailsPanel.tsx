@@ -4,8 +4,11 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
-import { useDAGRunSSE } from '../../../../hooks/useDAGRunSSE';
-import { sseFallbackOptions, useSSECacheSync } from '../../../../hooks/useSSECacheSync';
+import {
+  liveFallbackOptions,
+  useLiveConnection,
+  useLiveDAGRuns,
+} from '../../../../hooks/useAppLive';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGRunContext } from '../../contexts/DAGRunContext';
@@ -33,13 +36,11 @@ function DAGRunDetailsPanel({
   const parentDAGRunId = searchParams.get('dagRunId');
   const parentName = searchParams.get('dagRunName') || name;
   const isSubDAGRun = Boolean(subDAGRunId && parentDAGRunId && parentName);
+  const liveEnabled = isSubDAGRun
+    ? Boolean(parentName && parentDAGRunId && subDAGRunId)
+    : Boolean(name && dagRunId);
 
-  // SSE for real-time updates (disabled for sub-DAG runs)
-  const sseResult = useDAGRunSSE(
-    name || '',
-    dagRunId || 'latest',
-    !isSubDAGRun
-  );
+  const liveState = useLiveConnection(liveEnabled);
 
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
@@ -56,10 +57,14 @@ function DAGRunDetailsPanel({
         },
       },
     },
-    { refreshInterval: 2000, isPaused: () => !isSubDAGRun }
+    {
+      ...liveFallbackOptions(liveState),
+      isPaused: () => !isSubDAGRun,
+    }
   );
+  useLiveDAGRuns(subDAGQuery.mutate, isSubDAGRun);
 
-  // Regular DAG query — SWR is the single source of truth, kept fresh by SSE sync
+  // Regular DAG query — SWR is the single source of truth, refreshed by live invalidations
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}',
     {
@@ -72,11 +77,11 @@ function DAGRunDetailsPanel({
       },
     },
     {
-      ...sseFallbackOptions(sseResult),
+      ...liveFallbackOptions(liveState),
       isPaused: () => isSubDAGRun,
     }
   );
-  useSSECacheSync(sseResult, dagRunQuery.mutate);
+  useLiveDAGRuns(dagRunQuery.mutate, !isSubDAGRun);
 
   // Select data source: sub-DAG query or regular query
   const { mutate } = isSubDAGRun ? subDAGQuery : dagRunQuery;

@@ -16,8 +16,11 @@ import { DAGErrors } from '../../features/dags/components/dag-editor';
 import { DAGTable } from '../../features/dags/components/dag-list';
 import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
 import { useQuery } from '../../hooks/api';
-import { useDAGsListSSE } from '../../hooks/useDAGsListSSE';
-import { sseFallbackOptions, useSSECacheSync } from '../../hooks/useSSECacheSync';
+import {
+  liveFallbackOptions,
+  useLiveConnection,
+  useLiveDAGsList,
+} from '../../hooks/useAppLive';
 import LoadingIndicator from '../../ui/LoadingIndicator';
 
 type DAGDefinitionsFilters = {
@@ -204,8 +207,7 @@ function DAGsContent() {
     [page, preferences.pageLimit, apiSearchText, apiSearchTags, sortField, sortOrder]
   );
 
-  const sseResult = useDAGsListSSE(queryParams, true);
-
+  const liveState = useLiveConnection();
   const { data, mutate, isLoading } = useQuery(
     '/dags',
     {
@@ -219,13 +221,13 @@ function DAGsContent() {
       },
     },
     {
-      ...sseFallbackOptions(sseResult),
+      ...liveFallbackOptions(liveState),
       revalidateIfStale: false,
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
     }
   );
-  useSSECacheSync(sseResult, mutate);
+  useLiveDAGsList(mutate);
 
   const addSearchParam = (key: string, value: string | string[]) => {
     const locationQuery = new URLSearchParams(window.location.search);

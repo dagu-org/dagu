@@ -6,8 +6,12 @@ import { Button } from '@/components/ui/button';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { UnsavedChangesProvider } from '@/contexts/UnsavedChangesContext';
 import { useQuery } from '@/hooks/api';
-import { useDAGSSE } from '@/hooks/useDAGSSE';
-import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
+import {
+  liveFallbackOptions,
+  useLiveConnection,
+  useLiveDAG,
+  useLiveDAGRuns,
+} from '@/hooks/useAppLive';
 import dayjs from '@/lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '@/lib/keyboard-shortcuts';
 import { cn } from '@/lib/utils';
@@ -163,7 +167,7 @@ function DAGDetailsSidePanel({
     setActiveTab('status');
   }, []);
 
-  const sseResult = useDAGSSE(stableFileName, isOpen && !!stableFileName);
+  const liveState = useLiveConnection(isOpen && !!stableFileName);
   const { data, error, mutate } = useQuery(
     '/dags/{fileName}',
     {
@@ -173,14 +177,14 @@ function DAGDetailsSidePanel({
       },
     },
     {
-      ...sseFallbackOptions(sseResult),
+      ...liveFallbackOptions(liveState),
       isPaused: () => !isOpen || !stableFileName,
     }
   );
-  useSSECacheSync(sseResult, mutate);
+  useLiveDAG(stableFileName, mutate, isOpen && !!stableFileName);
 
   const dagName = data?.dag?.name || '';
-  const { data: trackedRunData } = useQuery(
+  const { data: trackedRunData, mutate: mutateTrackedRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}',
     {
       params: {
@@ -189,10 +193,11 @@ function DAGDetailsSidePanel({
       },
     },
     {
+      ...liveFallbackOptions(liveState),
       isPaused: () => !isOpen || !dagName || !trackedDagRunId,
-      refreshInterval: 2000,
     }
   );
+  useLiveDAGRuns(mutateTrackedRun, isOpen && !!dagName && !!trackedDagRunId);
 
   React.useEffect(() => {
     if (trackedRunData?.dagRunDetails) {
@@ -374,7 +379,6 @@ function DAGDetailsSidePanel({
                     isModal={true}
                     navigateToStatusTab={navigateToStatusTab}
                     localDags={data.localDags}
-                    sseResult={sseResult}
                     onEnqueue={onEnqueue ? handleEnqueue : undefined}
                     forceEnqueue={forceEnqueue}
                     autoOpenStartModal={false}

@@ -8,8 +8,11 @@ import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { usePageContext } from '../../../../contexts/PageContext';
 import { UnsavedChangesProvider } from '../../../../contexts/UnsavedChangesContext';
 import { useQuery } from '../../../../hooks/api';
-import { useDAGSSE } from '../../../../hooks/useDAGSSE';
-import { sseFallbackOptions, useSSECacheSync } from '../../../../hooks/useSSECacheSync';
+import {
+  liveFallbackOptions,
+  useLiveConnection,
+  useLiveDAG,
+} from '../../../../hooks/useAppLive';
 import dayjs from '../../../../lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -66,11 +69,10 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
     };
   }, [fileName, setContext]);
 
-  // SSE for real-time updates with polling fallback
-  const sseResult = useDAGSSE(fileName || '', !!fileName);
+  const liveState = useLiveConnection(!!fileName);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  // Fetch DAG details — SWR is the single source of truth, kept fresh by SSE sync
-  const sseOpts = sseFallbackOptions(sseResult);
+  // Fetch DAG details — SWR is the single source of truth, refreshed by live invalidations
+  const sseOpts = liveFallbackOptions(liveState);
   const { data, error, mutate } = useQuery(
     '/dags/{fileName}',
     {
@@ -81,7 +83,7 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
     },
     { ...sseOpts, refreshInterval: notFound ? 0 : sseOpts.refreshInterval }
   );
-  useSSECacheSync(sseResult, mutate);
+  useLiveDAG(fileName, mutate, !!fileName);
 
   // Track data loading state and handle 404 errors
   useEffect(() => {
@@ -227,7 +229,6 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
                 isModal={true}
                 navigateToStatusTab={() => setActiveTab('status')}
                 localDags={data.localDags}
-                sseResult={sseResult}
               />
             </div>
           </div>

@@ -9,8 +9,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { components, NodeStatus, Status, Stream } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient, useQuery } from '../../../../hooks/api';
-import { useDAGHistorySSE } from '../../../../hooks/useDAGHistorySSE';
-import { sseFallbackOptions, useSSECacheSync } from '../../../../hooks/useSSECacheSync';
+import {
+  liveFallbackOptions,
+  useLiveConnection,
+  useLiveDAGRuns,
+} from '../../../../hooks/useAppLive';
 import { toMermaidNodeId } from '../../../../lib/utils';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
@@ -40,9 +43,8 @@ function DAGExecutionHistory({
 }: Omit<Props, 'isInModal' | 'activeTab'>) {
   const appBarContext = React.useContext(AppBarContext);
 
-  // SSE for real-time updates with polling fallback
-  const sseResult = useDAGHistorySSE(fileName, !!fileName);
-  // Fetch execution history data — SWR is the single source of truth, kept fresh by SSE sync
+  const liveState = useLiveConnection(!!fileName);
+  // Fetch execution history data — SWR is the single source of truth, refreshed by live invalidations
   const { data, mutate } = useQuery(
     '/dags/{fileName}/dag-runs',
     {
@@ -55,9 +57,9 @@ function DAGExecutionHistory({
         },
       },
     },
-    sseFallbackOptions(sseResult)
+    liveFallbackOptions(liveState)
   );
-  useSSECacheSync(sseResult, mutate);
+  useLiveDAGRuns(mutate, !!fileName);
 
   // Show loading indicator while fetching data
   if (!data) {

@@ -8,9 +8,12 @@ import './DocPreview.css';
 import { useCanWrite } from '@/contexts/AuthContext';
 import { useDocTabContext } from '@/contexts/DocTabContext';
 import { useClient, useQuery } from '@/hooks/api';
+import {
+  liveFallbackOptions,
+  useLiveConnection,
+  useLiveDoc,
+} from '@/hooks/useAppLive';
 import { useContentEditor } from '@/hooks/useContentEditor';
-import { useDocSSE } from '@/hooks/useDocSSE';
-import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import { cn } from '@/lib/utils';
 import { slugifyHeading } from '@/lib/text-utils';
 import { AppBarContext } from '@/contexts/AppBarContext';
@@ -48,10 +51,9 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
     markTabSaved,
   } = useDocTabContext();
 
-  // SSE connection for real-time doc data
-  const sseResult = useDocSSE(docPath);
+  const liveState = useLiveConnection();
 
-  // Fetch doc — SWR is the single source of truth, kept fresh by SSE sync
+  // Fetch doc — SWR is the single source of truth, refreshed by live invalidations
   const { data: doc, mutate: mutateDoc } = useQuery(
     '/docs/doc',
     {
@@ -62,9 +64,9 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
         },
       },
     },
-    sseFallbackOptions(sseResult)
+    liveFallbackOptions(liveState)
   );
-  useSSECacheSync(sseResult, mutateDoc);
+  useLiveDoc(docPath, mutateDoc);
   const serverContent = doc?.content ?? null;
 
   // Change tracking (source-agnostic)

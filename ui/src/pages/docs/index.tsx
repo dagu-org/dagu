@@ -21,9 +21,12 @@ import { useUserPreferences } from '@/contexts/UserPreference';
 import { CockpitToolbar } from '@/features/cockpit/components/CockpitToolbar';
 import { useCockpitState } from '@/features/cockpit/hooks/useCockpitState';
 import { useClient, useQuery } from '@/hooks/api';
-import { useDocTreeSSE } from '@/hooks/useDocTreeSSE';
+import {
+  liveFallbackOptions,
+  useLiveConnection,
+  useLiveDocTree,
+} from '@/hooks/useAppLive';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import ConfirmModal from '@/ui/ConfirmModal';
 import { CreateDocModal } from './components/CreateDocModal';
 import DocTabEditorPanel from './components/DocTabEditorPanel';
@@ -102,8 +105,7 @@ function DocsContent() {
   const sort = docSortField as PathsDocsGetParametersQuerySort;
   const order = docSortOrder as PathsDocsGetParametersQueryOrder;
 
-  // SSE for real-time updates with polling fallback
-  const sseResult = useDocTreeSSE({ sort, order, remoteNode }, true);
+  const liveState = useLiveConnection();
 
   const {
     data: treeData,
@@ -118,14 +120,14 @@ function DocsContent() {
       },
     },
     {
-      ...sseFallbackOptions(sseResult),
+      ...liveFallbackOptions(liveState),
       revalidateIfStale: false,
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
       keepPreviousData: true,
     }
   );
-  useSSECacheSync(sseResult, mutate);
+  useLiveDocTree(mutate);
 
   // Set page title
   useEffect(() => {
