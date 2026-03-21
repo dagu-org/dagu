@@ -14,13 +14,13 @@ func TestIntOrDynamic_UnmarshalYAML(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		yaml      string
-		wantInt   int
-		wantStr   string
-		wantDyn   bool
-		wantSet   bool
-		wantErr   bool
+		name    string
+		yaml    string
+		wantInt int
+		wantStr string
+		wantDyn bool
+		wantSet bool
+		wantErr bool
 	}{
 		{
 			name:    "integer",

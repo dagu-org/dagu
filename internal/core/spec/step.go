@@ -132,14 +132,14 @@ type approvalConfig struct {
 
 // repeatPolicy defines the repeat policy for a step.
 type repeatPolicy struct {
-	Repeat         types.RepeatMode    `yaml:"repeat,omitempty"`           // Flag to indicate if the step should be repeated, can be bool (legacy) or string ("while" or "until")
-	IntervalSec    types.IntOrDynamic  `yaml:"interval_sec,omitempty"`     // Interval in seconds to wait before repeating the step
-	Limit          types.IntOrDynamic  `yaml:"limit,omitempty"`            // Maximum number of times to repeat the step
-	Condition      string              `yaml:"condition,omitempty"`        // Condition to check before repeating
-	Expected       string              `yaml:"expected,omitempty"`         // Expected output to match before repeating
-	ExitCode       []int               `yaml:"exit_code,omitempty"`        // List of exit codes to consider for repeating the step
-	Backoff        types.BackoffValue  `yaml:"backoff,omitempty"`          // Accepts bool or float
-	MaxIntervalSec types.IntOrDynamic  `yaml:"max_interval_sec,omitempty"` // Maximum interval in seconds
+	Repeat         types.RepeatMode   `yaml:"repeat,omitempty"`           // Flag to indicate if the step should be repeated, can be bool (legacy) or string ("while" or "until")
+	IntervalSec    types.IntOrDynamic `yaml:"interval_sec,omitempty"`     // Interval in seconds to wait before repeating the step
+	Limit          types.IntOrDynamic `yaml:"limit,omitempty"`            // Maximum number of times to repeat the step
+	Condition      string             `yaml:"condition,omitempty"`        // Condition to check before repeating
+	Expected       string             `yaml:"expected,omitempty"`         // Expected output to match before repeating
+	ExitCode       []int              `yaml:"exit_code,omitempty"`        // List of exit codes to consider for repeating the step
+	Backoff        types.BackoffValue `yaml:"backoff,omitempty"`          // Accepts bool or float
+	MaxIntervalSec types.IntOrDynamic `yaml:"max_interval_sec,omitempty"` // Maximum interval in seconds
 }
 
 // retryPolicy defines the retry policy for a step.
