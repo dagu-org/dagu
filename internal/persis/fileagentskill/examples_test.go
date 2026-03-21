@@ -94,6 +94,7 @@ func TestBundledDaguSkillPrefersEnqueue(t *testing.T) {
 	require.NoError(t, err)
 
 	content := string(data)
+	// Keep this assertion tolerant to wording differences between branch tip and PR merge-ref skill docs.
 	assert.Contains(t, content, "`dagu enqueue my-dag -- env=staging region=eu-west-1`")
 	assert.Contains(t, strings.ToLower(content), "prefer `dagu enqueue` over `dagu start`")
 	assert.Contains(t, content, "Do not check whether the DAG is already running")
