@@ -215,21 +215,6 @@ func freshRefs(entries []exec.ProcEntry) []exec.DAGRunRef {
 	return refs
 }
 
-func latestFreshEntriesByRun(entries []exec.ProcEntry) map[string]exec.ProcEntry {
-	latest := make(map[string]exec.ProcEntry)
-	for _, entry := range entries {
-		if !entry.Fresh {
-			continue
-		}
-		key := entry.Meta.DAGRun().String()
-		current, ok := latest[key]
-		if !ok || current.LastHeartbeatAt < entry.LastHeartbeatAt {
-			latest[key] = entry
-		}
-	}
-	return latest
-}
-
 func (pg *ProcGroup) Validate(ctx context.Context) error {
 	_, err := pg.ListEntries(ctx)
 	if err != nil {
