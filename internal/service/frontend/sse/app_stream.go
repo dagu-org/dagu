@@ -392,7 +392,7 @@ func (s *AppStreamService) publishReset(reason string) {
 	s.coalescer.PublishReset(reason)
 }
 
-func (s *AppStreamService) handleDAGFileEvent(root, relPath string, op fsnotify.Op) {
+func (s *AppStreamService) handleDAGFileEvent(_, relPath string, op fsnotify.Op) {
 	ext := strings.ToLower(filepath.Ext(relPath))
 	if ext != ".yaml" && ext != ".yml" {
 		return

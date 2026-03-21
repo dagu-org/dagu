@@ -95,5 +95,5 @@ func TestBundledDaguSkillPrefersEnqueue(t *testing.T) {
 	content := string(data)
 	assert.Contains(t, content, "Override at runtime: `dagu enqueue my-dag -- env=staging region=eu-west-1`")
 	assert.Contains(t, content, "prefer `dagu enqueue` over `dagu start`")
-	assert.Contains(t, content, "Do not check whether the DAG is already running or queued before enqueueing")
+	assert.Contains(t, content, "Do not check whether the DAG is already running or queued before enqueueing unless the user explicitly asks")
 }

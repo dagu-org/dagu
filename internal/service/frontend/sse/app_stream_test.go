@@ -34,7 +34,7 @@ func TestWriteAppEventFrame(t *testing.T) {
 	}
 }
 
-func TestRecursiveWatcherStopIsIdempotent(t *testing.T) {
+func TestRecursiveWatcherStopIsIdempotent(_ *testing.T) {
 	watcher := &recursiveWatcher{
 		done: make(chan struct{}),
 	}
@@ -43,7 +43,7 @@ func TestRecursiveWatcherStopIsIdempotent(t *testing.T) {
 	watcher.Stop()
 }
 
-func TestAppStreamServiceShutdownIsIdempotent(t *testing.T) {
+func TestAppStreamServiceShutdownIsIdempotent(_ *testing.T) {
 	service := &AppStreamService{
 		cancel: func() {},
 		watchers: []*recursiveWatcher{
