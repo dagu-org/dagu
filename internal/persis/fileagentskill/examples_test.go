@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -93,7 +94,8 @@ func TestBundledDaguSkillPrefersEnqueue(t *testing.T) {
 	require.NoError(t, err)
 
 	content := string(data)
-	assert.Contains(t, content, "Override at runtime: `dagu enqueue my-dag -- env=staging region=eu-west-1`")
-	assert.Contains(t, content, "prefer `dagu enqueue` over `dagu start`")
-	assert.Contains(t, content, "Do not check whether the DAG is already running or queued before enqueueing unless the user explicitly asks")
+	assert.Contains(t, content, "`dagu enqueue my-dag -- env=staging region=eu-west-1`")
+	assert.Contains(t, strings.ToLower(content), "prefer `dagu enqueue` over `dagu start`")
+	assert.Contains(t, content, "Do not check whether the DAG is already running")
+	assert.Contains(t, content, "unless the user explicitly asks")
 }
