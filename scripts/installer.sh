@@ -262,7 +262,10 @@ gum_is_tty() {
 verify_sha256sum_file() {
     local checksums="$1"
     if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum --ignore-missing -c "$checksums" >/dev/null 2>&1
+        # NOTE: Callers must pre-filter $checksums to contain only the entry
+        # for the file being verified. This avoids --ignore-missing, which is
+        # not supported by all sha256sum implementations (e.g., BusyBox).
+        sha256sum -c "$checksums" >/dev/null 2>&1
         return $?
     fi
     if command -v shasum >/dev/null 2>&1; then
