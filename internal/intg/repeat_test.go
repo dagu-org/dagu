@@ -5,7 +5,8 @@ package intg_test
 
 import (
 	"context"
-	"os"
+	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 )
 
 func TestRepeatPolicy_WithLimit(t *testing.T) {
+	t.Parallel()
 	th := test.Setup(t)
 
 	// Load DAG with repeat limit
@@ -52,12 +54,16 @@ func TestRepeatPolicy_WithLimit(t *testing.T) {
 }
 
 func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
+	t.Parallel()
 	th := test.Setup(t)
 
+	counterFile := filepath.Join(t.TempDir(), "counter")
+
 	// Load DAG with repeat limit and condition
-	dag := th.DAG(t, `steps:
+	dag := th.DAG(t, fmt.Sprintf(`env:
+  - COUNTER_FILE: %s
+steps:
   - script: |
-      COUNTER_FILE="/tmp/dagu_repeat_counter_test2"
       COUNT=0
       if [ -f "$COUNTER_FILE" ]; then
         COUNT=$(cat "$COUNTER_FILE")
@@ -65,20 +71,15 @@ func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
       COUNT=$((COUNT + 1))
       echo "$COUNT" > "$COUNTER_FILE"
       echo "Count: $COUNT"
-      # Output the count so we can verify in test
       echo "$COUNT"
-      # Clean up on final run
-      if [ "$COUNT" -ge 5 ]; then
-        rm -f "$COUNTER_FILE"
-      fi
     output: FINAL_COUNT
     repeat_policy:
       repeat: until
       limit: 5
       interval_sec: 0
-      condition: "`+"`"+`[ -f /tmp/dagu_repeat_counter_test2 ] && cat /tmp/dagu_repeat_counter_test2 || echo 0`+"`"+`"
+      condition: "`+"`"+`[ -f %s ] && cat %s || echo 0`+"`"+`"
       expected: "10"
-`)
+`, counterFile, counterFile, counterFile))
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -105,6 +106,7 @@ func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
 }
 
 func TestRepeatPolicy_WithLimitReachedBeforeCondition(t *testing.T) {
+	t.Parallel()
 	th := test.Setup(t)
 
 	// Load DAG that repeats with a limit
@@ -139,6 +141,7 @@ func TestRepeatPolicy_WithLimitReachedBeforeCondition(t *testing.T) {
 }
 
 func TestRepeatPolicy_BooleanModeWhileUnconditional(t *testing.T) {
+	t.Parallel()
 	th := test.Setup(t)
 
 	// Load DAG with boolean repeat mode (should repeat while step succeeds, like unconditional while)
@@ -175,23 +178,26 @@ func TestRepeatPolicy_BooleanModeWhileUnconditional(t *testing.T) {
 }
 
 func TestRepeatPolicy_UntilWithExitCode(t *testing.T) {
+	t.Parallel()
 	th := test.Setup(t)
 
-	// Load DAG with until mode and exitCode (should repeat until step returns exit code 0)
-	dag := th.DAG(t, `steps:
+	counterFile := filepath.Join(t.TempDir(), "counter")
+
+	dag := th.DAG(t, fmt.Sprintf(`env:
+  - COUNTER_FILE: %s
+steps:
   - script: |
-      COUNT_FILE="/tmp/dagu_repeat_until_unconditional_test"
       COUNT=0
-      if [ -f "$COUNT_FILE" ]; then
-        COUNT=$(cat "$COUNT_FILE")
+      if [ -f "$COUNTER_FILE" ]; then
+        COUNT=$(cat "$COUNTER_FILE")
       fi
       COUNT=$((COUNT + 1))
-      echo "$COUNT" > "$COUNT_FILE"
+      echo "$COUNT" > "$COUNTER_FILE"
       echo "Count: $COUNT"
       if [ "$COUNT" -le 2 ]; then
         exit 1
       else
-        rm -f "$COUNT_FILE"
+        rm -f "$COUNTER_FILE"
         exit 0
       fi
     repeat_policy:
@@ -202,7 +208,7 @@ func TestRepeatPolicy_UntilWithExitCode(t *testing.T) {
       interval_sec: 0
     continue_on:
       exit_code: [1]
-`)
+`, counterFile))
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -229,6 +235,7 @@ func TestRepeatPolicy_UntilWithExitCode(t *testing.T) {
 }
 
 func TestRepeatPolicy_BackwardCompatibilityTrue(t *testing.T) {
+	t.Parallel()
 	th := test.Setup(t)
 
 	// Load DAG with repeat: true (should work as "while" mode)
@@ -265,18 +272,16 @@ func TestRepeatPolicy_BackwardCompatibilityTrue(t *testing.T) {
 }
 
 func TestRepeatPolicy_OnExitCode(t *testing.T) {
-	counterFile := "/tmp/dagu-test-counter-repeat-on-exitcode"
-	_ = os.Remove(counterFile)
-	t.Cleanup(func() {
-		_ = os.Remove(counterFile)
-	})
-
+	t.Parallel()
 	th := test.Setup(t)
 
-	dag := th.DAG(t, `steps:
+	counterFile := filepath.Join(t.TempDir(), "counter")
+
+	dag := th.DAG(t, fmt.Sprintf(`env:
+  - COUNTER_FILE: %s
+steps:
   - command: |
       #!/bin/bash
-      COUNTER_FILE="/tmp/dagu-test-counter-repeat-on-exitcode"
       if [ ! -f "$COUNTER_FILE" ]; then
           echo 1 > "$COUNTER_FILE"
           exit 1
@@ -293,8 +298,8 @@ func TestRepeatPolicy_OnExitCode(t *testing.T) {
     repeat_policy:
       exit_code: [1]
       limit: 5
-      interval_sec: 0.1
-`)
+      interval_sec: 0
+`, counterFile))
 	agent := dag.Agent()
 
 	ctx, cancel := context.WithTimeout(agent.Context, 15*time.Second)
@@ -315,4 +320,135 @@ func TestRepeatPolicy_OnExitCode(t *testing.T) {
 	assert.Equal(t, core.NodeSucceeded, nodeStatus.Status, "The final status of the node should be Success")
 	assert.True(t, nodeStatus.Repeated, "The step should be marked as repeated")
 	assert.GreaterOrEqual(t, nodeStatus.DoneCount, 3, "The step should have executed at least 3 times")
+}
+
+func TestRepeatPolicy_LimitFromEnvVar(t *testing.T) {
+	t.Setenv("REPEAT_LIMIT", "3")
+	th := test.Setup(t)
+
+	dag := th.DAG(t, `steps:
+  - command: echo "repeating"
+    repeat_policy:
+      repeat: true
+      limit: $REPEAT_LIMIT
+      interval_sec: 0
+`)
+	agent := dag.Agent()
+
+	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	defer cancel()
+
+	err := agent.Run(ctx)
+	require.NoError(t, err)
+
+	dag.AssertLatestStatus(t, core.Succeeded)
+
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.Len(t, dagRunStatus.Nodes, 1)
+	assert.Equal(t, 3, dagRunStatus.Nodes[0].DoneCount)
+}
+
+func TestRepeatPolicy_IntervalSecFromEnvVar(t *testing.T) {
+	t.Setenv("INTERVAL_SEC", "0")
+	th := test.Setup(t)
+
+	dag := th.DAG(t, `steps:
+  - command: echo "repeating with env interval"
+    repeat_policy:
+      repeat: true
+      limit: 3
+      interval_sec: $INTERVAL_SEC
+`)
+	agent := dag.Agent()
+
+	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	defer cancel()
+
+	err := agent.Run(ctx)
+	require.NoError(t, err)
+
+	dag.AssertLatestStatus(t, core.Succeeded)
+
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.Len(t, dagRunStatus.Nodes, 1)
+	assert.Equal(t, 3, dagRunStatus.Nodes[0].DoneCount)
+}
+
+func TestRepeatPolicy_MaxIntervalSecFromEnvVar(t *testing.T) {
+	t.Setenv("MAX_INTERVAL", "10")
+	th := test.Setup(t)
+
+	dag := th.DAG(t, `steps:
+  - command: echo "repeating with env max interval"
+    repeat_policy:
+      repeat: true
+      limit: 2
+      interval_sec: 0
+      max_interval_sec: $MAX_INTERVAL
+`)
+	agent := dag.Agent()
+
+	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	defer cancel()
+
+	err := agent.Run(ctx)
+	require.NoError(t, err)
+
+	dag.AssertLatestStatus(t, core.Succeeded)
+
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.Len(t, dagRunStatus.Nodes, 1)
+	assert.Equal(t, 2, dagRunStatus.Nodes[0].DoneCount)
+}
+
+func TestRepeatPolicy_LimitFromCommandSubstitution(t *testing.T) {
+	t.Parallel()
+	th := test.Setup(t)
+
+	dag := th.DAG(t, "steps:\n  - command: echo \"repeating with cmd sub\"\n    repeat_policy:\n      repeat: true\n      limit: \"`echo 3`\"\n      interval_sec: 0\n")
+	agent := dag.Agent()
+
+	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	defer cancel()
+
+	err := agent.Run(ctx)
+	require.NoError(t, err)
+
+	dag.AssertLatestStatus(t, core.Succeeded)
+
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.Len(t, dagRunStatus.Nodes, 1)
+	assert.Equal(t, 3, dagRunStatus.Nodes[0].DoneCount)
+}
+
+func TestRepeatPolicy_MultipleDynamicFields(t *testing.T) {
+	t.Setenv("DYN_LIMIT", "4")
+	t.Setenv("DYN_INTERVAL", "0")
+	th := test.Setup(t)
+
+	dag := th.DAG(t, `steps:
+  - command: echo "multiple dynamic fields"
+    repeat_policy:
+      repeat: true
+      limit: $DYN_LIMIT
+      interval_sec: $DYN_INTERVAL
+`)
+	agent := dag.Agent()
+
+	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	defer cancel()
+
+	err := agent.Run(ctx)
+	require.NoError(t, err)
+
+	dag.AssertLatestStatus(t, core.Succeeded)
+
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.Len(t, dagRunStatus.Nodes, 1)
+	assert.Equal(t, 4, dagRunStatus.Nodes[0].DoneCount)
 }

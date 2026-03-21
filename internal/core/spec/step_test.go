@@ -654,9 +654,9 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 		{
 			name: "WhileModeWithCondition",
 			repeatPolicy: &repeatPolicy{
-				Repeat:      "while",
+				Repeat:      types.RepeatModeFromString("while"),
 				Condition:   "test -f /tmp/flag",
-				IntervalSec: 5,
+				IntervalSec: types.IntOrDynamicFromInt(5),
 			},
 			expected: core.RepeatPolicy{
 				RepeatMode: core.RepeatModeWhile,
@@ -667,10 +667,10 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 		{
 			name: "UntilModeWithConditionAndExpected",
 			repeatPolicy: &repeatPolicy{
-				Repeat:      "until",
+				Repeat:      types.RepeatModeFromString("until"),
 				Condition:   "cat /tmp/status",
 				Expected:    "done",
-				IntervalSec: 10,
+				IntervalSec: types.IntOrDynamicFromInt(10),
 			},
 			expected: core.RepeatPolicy{
 				RepeatMode: core.RepeatModeUntil,
@@ -681,7 +681,7 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 		{
 			name: "LegacyBooleanTrue",
 			repeatPolicy: &repeatPolicy{
-				Repeat:    true,
+				Repeat:    types.RepeatModeFromBool(true),
 				Condition: "test condition",
 			},
 			expected: core.RepeatPolicy{
@@ -692,7 +692,7 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 		{
 			name: "WithExitCodes",
 			repeatPolicy: &repeatPolicy{
-				Repeat:   "while",
+				Repeat:   types.RepeatModeFromString("while"),
 				ExitCode: []int{0, 1},
 			},
 			expected: core.RepeatPolicy{
@@ -703,9 +703,9 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 		{
 			name: "WithLimit",
 			repeatPolicy: &repeatPolicy{
-				Repeat:    "while",
+				Repeat:    types.RepeatModeFromString("while"),
 				Condition: "true",
-				Limit:     10,
+				Limit:     types.IntOrDynamicFromInt(10),
 			},
 			expected: core.RepeatPolicy{
 				RepeatMode: core.RepeatModeWhile,
@@ -716,10 +716,10 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 		{
 			name: "WithBackoff",
 			repeatPolicy: &repeatPolicy{
-				Repeat:      "while",
+				Repeat:      types.RepeatModeFromString("while"),
 				Condition:   "true",
-				IntervalSec: 5,
-				Backoff:     2.0,
+				IntervalSec: types.IntOrDynamicFromInt(5),
+				Backoff:     types.BackoffValueFromFloat(2.0),
 			},
 			expected: core.RepeatPolicy{
 				RepeatMode: core.RepeatModeWhile,
@@ -731,11 +731,11 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 		{
 			name: "WithMaxInterval",
 			repeatPolicy: &repeatPolicy{
-				Repeat:         "while",
+				Repeat:         types.RepeatModeFromString("while"),
 				Condition:      "true",
-				IntervalSec:    5,
-				Backoff:        2.0,
-				MaxIntervalSec: 120,
+				IntervalSec:    types.IntOrDynamicFromInt(5),
+				Backoff:        types.BackoffValueFromFloat(2.0),
+				MaxIntervalSec: types.IntOrDynamicFromInt(120),
 			},
 			expected: core.RepeatPolicy{
 				RepeatMode:  core.RepeatModeWhile,
@@ -746,34 +746,18 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 			},
 		},
 		{
-			name: "InvalidRepeatValue",
-			repeatPolicy: &repeatPolicy{
-				Repeat: "invalid",
-			},
-			wantErr: true,
-		},
-		{
 			name: "WhileWithoutConditionOrExitCode",
 			repeatPolicy: &repeatPolicy{
-				Repeat: "while",
-			},
-			wantErr: true,
-		},
-		{
-			name: "InvalidBackoff",
-			repeatPolicy: &repeatPolicy{
-				Repeat:    "while",
-				Condition: "true",
-				Backoff:   0.5,
+				Repeat: types.RepeatModeFromString("while"),
 			},
 			wantErr: true,
 		},
 		{
 			name: "LimitWithVariableReference",
 			repeatPolicy: &repeatPolicy{
-				Repeat:    "while",
+				Repeat:    types.RepeatModeFromString("while"),
 				Condition: "true",
-				Limit:     "${max_rounds}",
+				Limit:     types.IntOrDynamicFromStr("${max_rounds}"),
 			},
 			expected: core.RepeatPolicy{
 				RepeatMode: core.RepeatModeWhile,
@@ -784,9 +768,9 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 		{
 			name: "IntervalSecWithVariableReference",
 			repeatPolicy: &repeatPolicy{
-				Repeat:      "while",
+				Repeat:      types.RepeatModeFromString("while"),
 				Condition:   "true",
-				IntervalSec: "$INTERVAL",
+				IntervalSec: types.IntOrDynamicFromStr("$INTERVAL"),
 			},
 			expected: core.RepeatPolicy{
 				RepeatMode:  core.RepeatModeWhile,
@@ -797,11 +781,11 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 		{
 			name: "MaxIntervalSecWithVariableReference",
 			repeatPolicy: &repeatPolicy{
-				Repeat:         "while",
+				Repeat:         types.RepeatModeFromString("while"),
 				Condition:      "true",
-				IntervalSec:    5,
-				Backoff:        2.0,
-				MaxIntervalSec: "${MAX_INTERVAL}",
+				IntervalSec:    types.IntOrDynamicFromInt(5),
+				Backoff:        types.BackoffValueFromFloat(2.0),
+				MaxIntervalSec: types.IntOrDynamicFromStr("${MAX_INTERVAL}"),
 			},
 			expected: core.RepeatPolicy{
 				RepeatMode:     core.RepeatModeWhile,
@@ -810,28 +794,6 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 				Backoff:        2.0,
 				MaxIntervalStr: "${MAX_INTERVAL}",
 			},
-		},
-		{
-			name: "LimitWithQuotedNumericString",
-			repeatPolicy: &repeatPolicy{
-				Repeat:    "while",
-				Condition: "true",
-				Limit:     "7",
-			},
-			expected: core.RepeatPolicy{
-				RepeatMode: core.RepeatModeWhile,
-				Condition:  &core.Condition{Condition: "true"},
-				Limit:      7,
-			},
-		},
-		{
-			name: "LimitWithInvalidString",
-			repeatPolicy: &repeatPolicy{
-				Repeat:    "while",
-				Condition: "true",
-				Limit:     "three",
-			},
-			wantErr: true,
 		},
 	}
 
@@ -847,41 +809,6 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestParseRepeatIntOrDynamic(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		val     any
-		wantInt int
-		wantStr string
-		wantErr bool
-	}{
-		{name: "Int", val: 5, wantInt: 5},
-		{name: "Int64", val: int64(10), wantInt: 10},
-		{name: "VarRef", val: "${max_rounds}", wantStr: "${max_rounds}"},
-		{name: "DollarVar", val: "$MAX", wantStr: "$MAX"},
-		{name: "Backtick", val: "`echo 5`", wantStr: "`echo 5`"},
-		{name: "QuotedNumeric", val: "3", wantInt: 3},
-		{name: "NonNumericString", val: "three", wantErr: true},
-		{name: "Nil", val: nil},
-		{name: "InvalidType", val: 3.14, wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotInt, gotStr, err := parseRepeatIntOrDynamic(tt.val, "test_field")
-			if tt.wantErr {
-				assert.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantInt, gotInt)
-			assert.Equal(t, tt.wantStr, gotStr)
 		})
 	}
 }
