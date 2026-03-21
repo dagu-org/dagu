@@ -31,7 +31,10 @@ export default function CockpitPage(): React.ReactElement {
         onDeleteWorkspace={deleteWorkspace}
         onSelectTemplate={selectTemplate}
       />
-      <DateKanbanList selectedWorkspace={selectedWorkspace} />
+      <DateKanbanList
+        selectedWorkspace={selectedWorkspace}
+        suspendLoadMore={!!selectedTemplate}
+      />
     </div>
   );
 }

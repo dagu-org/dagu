@@ -65,8 +65,7 @@ function groupByStatus(runs: DAGRunSummary[]): KanbanColumns {
 export function useDateKanbanData(
   date: string,
   selectedWorkspace: string,
-  isToday: boolean,
-  enabled: boolean
+  isToday: boolean
 ) {
   const appBarContext = useContext(AppBarContext);
   const { tzOffsetInSec } = useConfig();
@@ -78,7 +77,7 @@ export function useDateKanbanData(
     [date, tzOffsetInSec]
   );
 
-  const liveState = useLiveConnection(enabled && isToday);
+  const liveState = useLiveConnection(isToday);
 
   const { data, error, mutate } = useQuery(
     '/dag-runs',
@@ -95,11 +94,15 @@ export function useDateKanbanData(
     {
       ...(isToday
         ? liveFallbackOptions(liveState)
-        : { refreshInterval: 0, revalidateOnFocus: false, revalidateIfStale: false }),
-      isPaused: () => !enabled,
+        : {
+            refreshInterval: 0,
+            revalidateOnFocus: false,
+            revalidateIfStale: false,
+            revalidateOnMount: true,
+          }),
     }
   );
-  useLiveDAGRuns(mutate, enabled && isToday);
+  useLiveDAGRuns(mutate, isToday);
 
   const columns = useMemo(
     () => groupByStatus(data?.dagRuns ?? []),
@@ -116,7 +119,8 @@ export function useDateKanbanData(
   return {
     columns,
     error,
-    isLoading: enabled && !data && !error,
+    isLoading: !data && !error,
     isEmpty,
+    retry: mutate,
   };
 }

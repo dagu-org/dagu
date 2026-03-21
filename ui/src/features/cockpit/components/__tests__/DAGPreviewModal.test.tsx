@@ -1,22 +1,21 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
+import { render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { useClient, useQuery } from '@/hooks/api';
+import { useClient } from '@/hooks/api';
 import { DAGPreviewModal } from '../DAGPreviewModal';
 
-const mockStartModal = vi.fn((_props?: unknown) => <div>start modal</div>);
+const mockSidePanel = vi.fn((_props: unknown) => <div>dag details panel</div>);
 
 vi.mock('@/hooks/api', () => ({
   useClient: vi.fn(),
-  useQuery: vi.fn(),
 }));
 
-vi.mock('@/features/dags/components/dag-execution/StartDAGModal', () => ({
-  default: (props: unknown) => mockStartModal(props),
+vi.mock('@/features/dags/components/dag-details/DAGDetailsSidePanel', () => ({
+  default: (props: unknown) => mockSidePanel(props),
 }));
 
 const appBarValue = {
@@ -32,18 +31,24 @@ const useClientMock = useClient as unknown as {
   mockReturnValue: (value: unknown) => void;
 };
 
-const useQueryMock = useQuery as unknown as {
-  mockReturnValue: (value: unknown) => void;
+const sidePanelMock = mockSidePanel as unknown as {
+  mock: {
+    calls: unknown[][];
+  };
 };
 
-function renderPreview(selectedWorkspace = 'briefing/alpha') {
+function renderPreview(
+  props?: Partial<React.ComponentProps<typeof DAGPreviewModal>>
+) {
+  const onClose = props?.onClose ?? vi.fn();
   return render(
     <AppBarContext.Provider value={appBarValue}>
       <DAGPreviewModal
         fileName="example"
         isOpen={true}
-        selectedWorkspace={selectedWorkspace}
-        onClose={vi.fn()}
+        selectedWorkspace="briefing/alpha"
+        onClose={onClose}
+        {...props}
       />
     </AppBarContext.Provider>
   );
@@ -54,69 +59,47 @@ afterEach(() => {
 });
 
 describe('DAGPreviewModal', () => {
-  it('loads the preview from /dags/{fileName} and passes the DAG to the start modal', () => {
-    useClientMock.mockReturnValue({
-      POST: vi.fn(),
-    } as never);
-    useQueryMock.mockReturnValue({
-      data: {
-        dag: { name: 'Example DAG' },
-        spec: 'steps:\n  - name: hello',
-      },
-      error: undefined,
-      isLoading: false,
-    } as never);
+  it('renders the shared DAG details side panel with cockpit-specific props', () => {
+    useClientMock.mockReturnValue({ POST: vi.fn() } as never);
 
     renderPreview();
 
-    expect(vi.mocked(useQuery)).toHaveBeenCalledWith(
-      '/dags/{fileName}',
+    expect(mockSidePanel).toHaveBeenCalledWith(
       expect.objectContaining({
-        params: {
-          path: { fileName: 'example' },
-          query: { remoteNode: 'local' },
-        },
-      }),
-      expect.any(Object)
-    );
-    expect(screen.getByText('Example DAG')).toBeInTheDocument();
-    expect(screen.getByText(/steps:/)).toBeInTheDocument();
-    expect(mockStartModal).toHaveBeenCalledWith(
-      expect.objectContaining({
-        dag: { name: 'Example DAG' },
-        action: 'enqueue',
+        fileName: 'example',
+        isOpen: true,
+        initialTab: 'status',
+        renderInPortal: true,
+        forceEnqueue: true,
+        onClose: expect.any(Function),
+        onEnqueue: expect.any(Function),
+        toolbarHint: expect.anything(),
       })
     );
   });
 
-  it('opens the start modal and enqueues with a sanitized workspace tag', async () => {
+  it('enqueues with a sanitized workspace tag and returns the dag run id', async () => {
     const post = vi.fn().mockResolvedValue({
       data: { dagRunId: 'queued-run' },
       error: undefined,
     });
+    const onClose = vi.fn();
     useClientMock.mockReturnValue({ POST: post } as never);
-    useQueryMock.mockReturnValue({
-      data: {
-        dag: { name: 'Example DAG' },
-        spec: 'steps:\n  - name: hello',
-      },
-      error: undefined,
-      isLoading: false,
-    } as never);
 
-    renderPreview();
-    fireEvent.click(screen.getByRole('button', { name: /enqueue/i }));
+    renderPreview({ onClose });
 
-    const props = mockStartModal.mock.calls[mockStartModal.mock.calls.length - 1]?.[0] as {
-      visible: boolean;
-      onSubmit: (
+    const props = sidePanelMock.mock.calls[
+      sidePanelMock.mock.calls.length - 1
+    ]?.[0] as unknown as {
+      onEnqueue: (
         params: string,
         dagRunId?: string
-      ) => Promise<void>;
+      ) => Promise<string | void>;
     };
 
-    expect(props.visible).toBe(true);
-    await expect(props.onSubmit('[\"x\"]', 'manual-run')).resolves.toBeUndefined();
+    await expect(props.onEnqueue('["x"]', 'manual-run')).resolves.toBe(
+      'queued-run'
+    );
     expect(post).toHaveBeenCalledWith('/dags/{fileName}/enqueue', {
       params: {
         path: { fileName: 'example' },
@@ -128,6 +111,7 @@ describe('DAGPreviewModal', () => {
         tags: ['workspace=briefingalpha'],
       },
     });
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('throws when the cockpit enqueue request fails', async () => {
@@ -136,22 +120,15 @@ describe('DAGPreviewModal', () => {
       error: { message: 'enqueue failed' },
     });
     useClientMock.mockReturnValue({ POST: post } as never);
-    useQueryMock.mockReturnValue({
-      data: {
-        dag: { name: 'Example DAG' },
-        spec: 'steps:\n  - name: hello',
-      },
-      error: undefined,
-      isLoading: false,
-    } as never);
 
-    renderPreview('ops');
-    fireEvent.click(screen.getByRole('button', { name: /enqueue/i }));
+    renderPreview({ selectedWorkspace: 'ops' });
 
-    const props = mockStartModal.mock.calls[mockStartModal.mock.calls.length - 1]?.[0] as {
-      onSubmit: () => Promise<void>;
+    const props = sidePanelMock.mock.calls[
+      sidePanelMock.mock.calls.length - 1
+    ]?.[0] as unknown as {
+      onEnqueue: () => Promise<string | void>;
     };
 
-    await expect(props.onSubmit()).rejects.toThrow('enqueue failed');
+    await expect(props.onEnqueue()).rejects.toThrow('enqueue failed');
   });
 });

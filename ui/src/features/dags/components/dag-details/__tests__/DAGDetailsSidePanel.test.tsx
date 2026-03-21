@@ -25,14 +25,29 @@ vi.mock('../DAGDetailsContent', () => ({
   default: ({
     dag,
     activeTab,
+    dagRunId,
     forceEnqueue,
+    onEnqueue,
   }: {
     dag: { name: string };
     activeTab: string;
+    dagRunId?: string;
     forceEnqueue?: boolean;
+    onEnqueue?: (
+      params: string,
+      dagRunId?: string,
+      immediate?: boolean
+    ) => void | Promise<void>;
   }) => (
     <div>
-      Previewing {dag.name} [{activeTab}] {forceEnqueue ? 'forced' : 'default'}
+      <div>
+        Previewing {dag.name} [{activeTab}] {forceEnqueue ? 'forced' : 'default'} {dagRunId || 'latest'}
+      </div>
+      {onEnqueue ? (
+        <button type="button" onClick={() => void onEnqueue('["x"]', 'manual-run')}>
+          Enqueue Now
+        </button>
+      ) : null}
     </div>
   ),
 }));
@@ -174,7 +189,48 @@ describe('DAGDetailsSidePanel', () => {
     renderPanel({ forceEnqueue: true, initialTab: 'history' });
 
     expect(
-      screen.getByText('Previewing example-dag [history] forced')
+      screen.getByText('Previewing example-dag [history] forced latest')
     ).toBeInTheDocument();
+  });
+
+  it('tracks the returned dag run, switches to status, and revalidates after enqueue', async () => {
+    const mutate = vi.fn().mockResolvedValue(undefined);
+    const onEnqueue = vi.fn().mockResolvedValue('queued-run');
+
+    vi.mocked(useLiveConnection).mockReturnValue(liveState);
+    useQueryMock.mockImplementation((path) => {
+      if (path === '/dags/{fileName}') {
+        return {
+          data: {
+            dag: { name: 'example-dag' },
+            filePath: '/tmp/example.yaml',
+            latestDAGRun: undefined,
+            localDags: [],
+          },
+          error: undefined,
+          mutate,
+        } as never;
+      }
+
+      if (path === '/dag-runs/{name}/{dagRunId}') {
+        return {
+          data: undefined,
+          error: undefined,
+          mutate: vi.fn(),
+        } as never;
+      }
+
+      return {
+        data: undefined,
+      } as never;
+    });
+
+    renderPanel({ initialTab: 'history', forceEnqueue: true, onEnqueue });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enqueue Now' }));
+
+    expect(await screen.findByText('Previewing example-dag [status] forced queued-run')).toBeInTheDocument();
+    expect(onEnqueue).toHaveBeenCalledWith('["x"]', 'manual-run', undefined);
+    expect(mutate).toHaveBeenCalled();
   });
 });

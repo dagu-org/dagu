@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react';
+import type { components } from '../api/v1/schema';
 
 export type PathsConfig = {
   dagsDir: string;
@@ -28,6 +29,8 @@ export type LicenseStatus = {
   warningCode: string;
 };
 
+export type WorkspaceResponse = components['schemas']['WorkspaceResponse'];
+
 export type Config = {
   apiURL: string;
   basePath: string;
@@ -38,6 +41,7 @@ export type Config = {
   version: string;
   maxDashboardPageLimit: number;
   remoteNodes: string;
+  initialWorkspaces: WorkspaceResponse[];
   authMode: AuthMode;
   setupRequired: boolean;
   oidcEnabled: boolean;

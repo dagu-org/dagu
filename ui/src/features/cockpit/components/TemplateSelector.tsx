@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useContext, useMemo } 
 import { useQuery } from '@/hooks/api';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { Badge } from '@/components/ui/badge';
-import { Search, ChevronDown, X, AlertTriangle } from 'lucide-react';
+import { Search, ChevronDown, X, AlertTriangle, Tags } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { components } from '@/api/v1/schema';
 
@@ -22,13 +22,13 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedTerm, setDebouncedTerm] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [selectedDag, setSelectedDag] = useState<DAGFile | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const hasOpenedRef = useRef(false);
 
   // Debounce search term
   useEffect(() => {
@@ -36,15 +36,15 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Defer fetches until the dropdown has been opened at least once to avoid
-  // consuming HTTP connection slots on page load (browser 6-connection limit).
+  // Keep tags fully lazy. We only request them when the user explicitly opens
+  // the tag filter UI inside the selector.
   const { data: tagsData } = useQuery('/dags/tags', {
     params: { query: { remoteNode } },
-  }, { isPaused: () => !hasOpenedRef.current });
+  }, { isPaused: () => !isOpen || !isTagFilterOpen });
   const availableTags = tagsData?.tags ?? [];
 
-  // DAGs list: also needed when a template is pre-selected so we can resolve
-  // its display name for the trigger button.
+  // The DAG list only stays live while the selector dropdown is open. The
+  // closed trigger uses locally cached selection metadata instead.
   const { data, isLoading } = useQuery('/dags', {
     params: {
       query: {
@@ -54,7 +54,7 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
         ...(selectedTags.length > 0 ? { tags: selectedTags.join(',') } : {}),
       },
     },
-  }, { isPaused: () => !hasOpenedRef.current && !selectedTemplate });
+  }, { isPaused: () => !isOpen });
   const dags = data?.dags ?? [];
 
   // Filter out DAGs with a workspace= tag that doesn't match the selected workspace
@@ -75,17 +75,28 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
     [availableTags]
   );
 
+  const resetFilters = useCallback(() => {
+    setSearchTerm('');
+    setDebouncedTerm('');
+    setSelectedTags([]);
+    setHighlightedIndex(-1);
+    setIsTagFilterOpen(false);
+  }, []);
+
   // Cache selected DAG for trigger display
   useEffect(() => {
     if (!selectedTemplate) {
       setSelectedDag(null);
       return;
     }
+    if (!isOpen) {
+      return;
+    }
     const found = filteredDags.find((d) => d.fileName === selectedTemplate);
     if (found) {
       setSelectedDag(found);
     }
-  }, [selectedTemplate, filteredDags]);
+  }, [filteredDags, isOpen, selectedTemplate]);
 
   // Group DAGs by group field
   const groupedDags = useMemo(() => {
@@ -125,11 +136,22 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        resetFilters();
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [resetFilters]);
+
+  useEffect(() => {
+    setIsOpen(false);
+    setIsTagFilterOpen(false);
+    setSearchTerm('');
+    setDebouncedTerm('');
+    setSelectedTags([]);
+    setHighlightedIndex(-1);
+    setSelectedDag(null);
+  }, [remoteNode]);
 
   // Scroll highlighted item into view
   useEffect(() => {
@@ -142,13 +164,11 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
     (fileName: string) => {
       const dag = filteredDags.find((d) => d.fileName === fileName);
       if (dag) setSelectedDag(dag);
-      onSelect(fileName);
       setIsOpen(false);
-      setSearchTerm('');
-      setDebouncedTerm('');
-      setSelectedTags([]);
+      resetFilters();
+      onSelect(fileName);
     },
-    [onSelect, filteredDags]
+    [filteredDags, onSelect, resetFilters]
   );
 
   const toggleTag = useCallback((tag: string) => {
@@ -176,20 +196,13 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
         break;
       case 'Escape':
         setIsOpen(false);
-        setSearchTerm('');
-        setDebouncedTerm('');
-        setSelectedTags([]);
-        setHighlightedIndex(-1);
+        resetFilters();
         break;
     }
   };
 
   const handleOpen = () => {
-    hasOpenedRef.current = true;
-    setSearchTerm('');
-    setDebouncedTerm('');
-    setSelectedTags([]);
-    setHighlightedIndex(-1);
+    resetFilters();
     setIsOpen(true);
     setTimeout(() => inputRef.current?.focus(), 0);
   };
@@ -266,12 +279,27 @@ export function TemplateSelector({ selectedTemplate, selectedWorkspace, onSelect
             {isLoading && debouncedTerm && (
               <span className="text-[10px] text-muted-foreground">Searching...</span>
             )}
+            <button
+              type="button"
+              onClick={() => setIsTagFilterOpen((prev) => !prev)}
+              className={cn(
+                'inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground',
+                isTagFilterOpen && 'border-ring text-foreground'
+              )}
+            >
+              <Tags className="h-3 w-3" />
+              Tags
+            </button>
           </div>
 
           {/* Tag filter row */}
-          {displayTags.length > 0 && (
+          {isTagFilterOpen && (
             <div className="flex flex-wrap gap-1 px-3 pt-2 pb-2.5 border-b border-border max-h-[200px] overflow-y-auto shrink-0">
-              {displayTags.map((tag) => {
+              {displayTags.length === 0 ? (
+                <span className="text-[10px] text-muted-foreground">
+                  {tagsData ? 'No tags found' : 'Loading tags...'}
+                </span>
+              ) : displayTags.map((tag) => {
                 const isActive = selectedTags.includes(tag);
                 return (
                   <button

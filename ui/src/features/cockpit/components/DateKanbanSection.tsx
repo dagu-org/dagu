@@ -24,52 +24,34 @@ export function DateKanbanSection({
   onCardClick,
 }: Props): React.ReactElement {
   const isToday = date === todayStr;
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const [shouldLoad, setShouldLoad] = React.useState(isToday);
-
-  React.useEffect(() => {
-    if (shouldLoad) {
-      return;
-    }
-    const el = containerRef.current;
-    if (!el) {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) {
-          setShouldLoad(true);
-        }
-      },
-      { rootMargin: '400px 0px' }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [shouldLoad]);
-
-  const { columns, error, isLoading, isEmpty } = useDateKanbanData(
+  const { columns, error, isLoading, isEmpty, retry } = useDateKanbanData(
     date,
     selectedWorkspace,
-    isToday,
-    shouldLoad
+    isToday
   );
 
   return (
-    <div ref={containerRef}>
+    <div>
       <div className="px-1 pb-2">
         <h2 className="text-sm font-semibold text-foreground">
           {formatDateHeader(date)}
         </h2>
       </div>
-      {!shouldLoad ? (
-        <div className="px-1 py-3 text-xs text-muted-foreground">Scroll to load runs...</div>
-      ) : isLoading ? (
+      {isLoading ? (
         <div className="px-1 py-3 text-xs text-muted-foreground">Loading runs...</div>
       ) : error ? (
-        <div className="px-1 py-3 text-xs text-destructive">
-          {(error as { message?: string } | undefined)?.message ||
-            'Failed to load runs'}
+        <div className="px-1 py-3 flex items-center gap-3 text-xs">
+          <span className="text-destructive">
+            {(error as { message?: string } | undefined)?.message ||
+              'Failed to load runs'}
+          </span>
+          <button
+            type="button"
+            onClick={() => void retry()}
+            className="rounded border border-border px-2 py-1 text-muted-foreground hover:text-foreground"
+          >
+            Retry
+          </button>
         </div>
       ) : isEmpty ? (
         <div className="px-1 py-3 text-xs text-muted-foreground">No runs</div>

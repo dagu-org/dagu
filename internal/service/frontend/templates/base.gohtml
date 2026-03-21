@@ -19,6 +19,7 @@
           tzOffsetInSec: +"{{ tzOffsetInSec }}",
           maxDashboardPageLimit: "{{ maxDashboardPageLimit }}",
           remoteNodes: "{{ remoteNodes }}",
+          initialWorkspaces: (() => { try { return JSON.parse('{{ js initialWorkspacesJSON }}'); } catch { return []; } })(),
           authMode: "{{ authMode }}",
           setupRequired: "{{ setupRequired }}" === "true",
           oidcEnabled: "{{ oidcEnabled }}" === "true",

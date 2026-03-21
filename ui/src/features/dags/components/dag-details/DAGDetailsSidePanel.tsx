@@ -218,12 +218,14 @@ function DAGDetailsSidePanel({
       }
 
       const result = await onEnqueue(params, dagRunId, immediate);
+      setActiveTab('status');
       if (typeof result === 'string' && result) {
         setTrackedDagRunId(result);
       }
+      await mutate();
       return result;
     },
-    [onEnqueue]
+    [mutate, onEnqueue]
   );
 
   const handleFullscreenClick = React.useCallback(
