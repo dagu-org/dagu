@@ -8,6 +8,7 @@ on:
       - "ui/**"
       - ".github/workflows/frontend-ci.yaml"
   pull_request:
+    # Keep this workflow directly rerunnable from PR-only maintenance commits.
     types:
       - opened
       - reopened
