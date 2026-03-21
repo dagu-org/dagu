@@ -10,16 +10,12 @@ const (
 	DaguReferencesDir = DaguSkillDir + "/references"
 )
 
-var exampleSkillIDs = []string{
-	"dagu-ai-workflows",
-	"dagu-containers",
-	"dagu-server-worker",
-}
+var exampleSkillIDs []string
 
 // Assets contains the bundled skill content shipped with the binary.
 // Patterns are explicit so repo-local docs and Go files in this directory are not embedded.
 //
-//go:embed dagu/SKILL.md dagu/references/*.md dagu-ai-workflows/SKILL.md dagu-containers/SKILL.md dagu-server-worker/SKILL.md
+//go:embed dagu/SKILL.md dagu/references/*.md
 var Assets embed.FS
 
 // ExampleIDs returns the bundled example skill IDs seeded for first-time users.

@@ -71,7 +71,7 @@ func (s *capturingNotificationStore) RemoveDAGRun(context.Context, exec.DAGRunRe
 	return errors.New("unexpected call")
 }
 
-func TestNotificationMonitor_SeedDeliveredUsesConfiguredLimit(t *testing.T) {
+func TestNotificationMonitor_SeedDeliveredUsesNotificationStatusFilterWithoutLimit(t *testing.T) {
 	t.Parallel()
 
 	store := &capturingNotificationStore{
@@ -86,12 +86,38 @@ func TestNotificationMonitor_SeedDeliveredUsesConfiguredLimit(t *testing.T) {
 	}
 	transport := &fakeNotificationTransport{destinations: []string{"dest-1"}}
 	cfg := DefaultNotificationMonitorConfig()
-	cfg.SeedLimit = 42
 
 	monitor := NewNotificationMonitor(store, transport, slog.New(slog.NewTextHandler(io.Discard, nil)), cfg)
 	monitor.seedDelivered(context.Background())
 
 	require.Len(t, store.opts, 1)
-	assert.Equal(t, 42, store.opts[0].Limit)
+	assert.True(t, store.opts[0].Unlimited)
+	assert.ElementsMatch(t, NotificationStatuses, store.opts[0].Statuses)
 	assert.True(t, monitor.IsDelivered("dest-1", store.statuses[0]))
+}
+
+func TestNotificationMonitor_CheckForCompletionsUsesIncrementalUnlimitedPoll(t *testing.T) {
+	t.Parallel()
+
+	status := &exec.DAGRunStatus{
+		Name:      "briefing",
+		Status:    core.Succeeded,
+		DAGRunID:  "run-1",
+		AttemptID: "attempt-1",
+	}
+	store := &capturingNotificationStore{statuses: []*exec.DAGRunStatus{status}}
+	transport := &fakeNotificationTransport{destinations: []string{"dest-1"}}
+	cfg := DefaultNotificationMonitorConfig()
+	cfg.PollInterval = 30 * time.Second
+
+	monitor := NewNotificationMonitor(store, transport, slog.New(slog.NewTextHandler(io.Discard, nil)), cfg)
+	lastPollAt := time.Now().Add(-2 * time.Minute)
+	nextPollAt := monitor.checkForCompletions(context.Background(), lastPollAt)
+
+	require.Len(t, store.opts, 1)
+	assert.True(t, store.opts[0].Unlimited)
+	assert.ElementsMatch(t, NotificationStatuses, store.opts[0].Statuses)
+	assert.WithinDuration(t, lastPollAt.Add(-cfg.PollInterval), store.opts[0].From.Time, 2*time.Second)
+	assert.WithinDuration(t, nextPollAt, store.opts[0].To.Time, 2*time.Second)
+	assert.True(t, nextPollAt.After(lastPollAt))
 }

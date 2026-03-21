@@ -17,7 +17,6 @@ const (
 	DefaultNotificationSeenEvictInterval   = 10 * time.Minute
 	DefaultNotificationSeenTTL             = 2 * time.Hour
 	DefaultNotificationFlushTimeout        = 30 * time.Second
-	DefaultNotificationSeedLimit           = 1000
 )
 
 // NotificationMonitorConfig controls polling, batching, and shutdown behavior.
@@ -28,7 +27,6 @@ type NotificationMonitorConfig struct {
 	FlushTimeout      time.Duration
 	UrgentWindow      time.Duration
 	SuccessWindow     time.Duration
-	SeedLimit         int
 }
 
 // DefaultNotificationMonitorConfig returns the default monitor settings.
@@ -40,7 +38,6 @@ func DefaultNotificationMonitorConfig() NotificationMonitorConfig {
 		FlushTimeout:      DefaultNotificationFlushTimeout,
 		UrgentWindow:      DefaultUrgentNotificationWindow,
 		SuccessWindow:     DefaultSuccessNotificationWindow,
-		SeedLimit:         DefaultNotificationSeedLimit,
 	}
 }
 
@@ -80,7 +77,7 @@ func NewNotificationMonitor(
 // Run starts the shared notification monitor loop.
 func (m *NotificationMonitor) Run(ctx context.Context) {
 	m.logger.Info("DAG run monitor started")
-	m.seedDelivered(ctx)
+	lastPollAt := m.seedDelivered(ctx)
 
 	ticker := time.NewTicker(m.cfg.PollInterval)
 	defer ticker.Stop()
@@ -105,7 +102,7 @@ func (m *NotificationMonitor) Run(ctx context.Context) {
 			m.logger.Info("DAG run monitor stopped")
 			return
 		case <-ticker.C:
-			m.checkForCompletions(ctx)
+			lastPollAt = m.checkForCompletions(ctx, lastPollAt)
 		case <-evictTicker.C:
 			m.evictStaleDelivered()
 		case <-m.batcher.ReadyC():
@@ -149,28 +146,29 @@ func (m *NotificationMonitor) IsDelivered(destination string, s *exec.DAGRunStat
 	return ok
 }
 
-func (m *NotificationMonitor) seedDelivered(ctx context.Context) {
+func (m *NotificationMonitor) seedDelivered(ctx context.Context) time.Time {
+	seededAt := time.Now()
 	if m.dagRunStore == nil {
-		return
+		return seededAt
 	}
 
 	destinations := m.transport.NotificationDestinations()
 	if len(destinations) == 0 {
-		return
+		return seededAt
 	}
 
-	now := time.Now()
-	from := exec.NewUTC(now.Add(-24 * time.Hour))
-	to := exec.NewUTC(now)
+	from := exec.NewUTC(seededAt.Add(-24 * time.Hour))
+	to := exec.NewUTC(seededAt)
 
 	statuses, err := m.dagRunStore.ListStatuses(ctx,
 		exec.WithFrom(from),
 		exec.WithTo(to),
-		exec.WithLimit(m.cfg.SeedLimit),
+		exec.WithStatuses(NotificationStatuses),
+		exec.WithoutLimit(),
 	)
 	if err != nil {
 		m.logger.Warn("Failed to seed monitor with existing runs", slog.String("error", err.Error()))
-		return
+		return seededAt
 	}
 
 	for _, status := range statuses {
@@ -183,30 +181,41 @@ func (m *NotificationMonitor) seedDelivered(ctx context.Context) {
 	}
 
 	m.logger.Info("DAG run monitor seeded", slog.Int("existing_runs", len(statuses)))
+	return seededAt
 }
 
-func (m *NotificationMonitor) checkForCompletions(ctx context.Context) {
+func (m *NotificationMonitor) checkForCompletions(ctx context.Context, lastPollAt time.Time) time.Time {
 	if m.dagRunStore == nil {
-		return
+		return lastPollAt
 	}
 
-	now := time.Now()
-	from := exec.NewUTC(now.Add(-1 * time.Hour))
-	to := exec.NewUTC(now)
+	pollTo := time.Now()
+	pollFrom := lastPollAt
+	if pollFrom.IsZero() {
+		pollFrom = pollTo.Add(-m.cfg.PollInterval)
+	} else {
+		// Overlap one poll interval so short timing gaps do not drop completions.
+		pollFrom = pollFrom.Add(-m.cfg.PollInterval)
+	}
+	if pollFrom.After(pollTo) {
+		pollFrom = pollTo.Add(-m.cfg.PollInterval)
+	}
 
 	statuses, err := m.dagRunStore.ListStatuses(ctx,
-		exec.WithFrom(from),
-		exec.WithTo(to),
+		exec.WithFrom(exec.NewUTC(pollFrom)),
+		exec.WithTo(exec.NewUTC(pollTo)),
 		exec.WithStatuses(NotificationStatuses),
+		exec.WithoutLimit(),
 	)
 	if err != nil {
 		m.logger.Debug("Failed to list DAG run statuses", slog.String("error", err.Error()))
-		return
+		return lastPollAt
 	}
 
 	for _, status := range statuses {
 		m.NotifyCompletion(status)
 	}
+	return pollTo
 }
 
 func (m *NotificationMonitor) evictStaleDelivered() {
@@ -298,8 +307,5 @@ func normalizeNotificationMonitorConfig(cfg *NotificationMonitorConfig) {
 	}
 	if cfg.SuccessWindow <= 0 {
 		cfg.SuccessWindow = defaults.SuccessWindow
-	}
-	if cfg.SeedLimit <= 0 {
-		cfg.SeedLimit = defaults.SeedLimit
 	}
 }
