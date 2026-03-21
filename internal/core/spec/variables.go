@@ -81,7 +81,13 @@ func evaluatePairs(ctx BuildContext, pairs []pair) (map[string]string, error) {
 	var scope *eval.EnvScope
 	var evalCtx context.Context
 	if !ctx.opts.Has(BuildFlagNoEval) {
-		scope = eval.NewEnvScope(nil, true)
+		// Use the shared build scope (which includes resolved params)
+		// instead of a fresh OS-only scope, so env: can reference ${param_name}.
+		if ctx.envScope != nil && ctx.envScope.scope != nil {
+			scope = ctx.envScope.scope
+		} else {
+			scope = eval.NewEnvScope(nil, true)
+		}
 		evalCtx = ctx.ctx
 		if evalCtx == nil {
 			evalCtx = context.Background()

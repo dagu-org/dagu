@@ -6,7 +6,13 @@ package intg_test
 import (
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/cmd"
+	"github.com/dagu-org/dagu/internal/core"
+	exec1 "github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/test"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEnv(t *testing.T) {
@@ -127,6 +133,43 @@ steps:
 		})
 	})
 
+	t.Run("EnvReferencesParams", func(t *testing.T) {
+		th := test.Setup(t)
+		dag := th.DAG(t, `
+params:
+  data_dir: /tmp/foo
+env:
+  - FULL_PATH: "${data_dir}/output"
+steps:
+  - command: echo "${FULL_PATH}"
+    output: RESULT
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": "/tmp/foo/output",
+		})
+	})
+
+	t.Run("EnvReferencesParamsChained", func(t *testing.T) {
+		th := test.Setup(t)
+		dag := th.DAG(t, `
+params:
+  base: /data
+env:
+  - DIR: "${base}/subdir"
+  - FULL: "${DIR}/file.txt"
+steps:
+  - command: echo "${FULL}"
+    output: RESULT
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": "/data/subdir/file.txt",
+		})
+	})
+
 	t.Run("StepOutputSubstrings", func(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `
@@ -155,4 +198,53 @@ steps:
 			"SUBSTRING_VALIDATION": "OK",
 		})
 	})
+}
+
+func TestSubDAGParamsReferencedInChildEnv(t *testing.T) {
+	t.Parallel()
+
+	th := test.SetupCommand(t)
+	dagFile := th.CreateDAGFile(t, "subdag-env-from-params.yaml", `
+name: subdag-env-parent
+steps:
+  - name: invoke-child
+    call: subdag-env-child
+    params: "data_dir=/mnt/data"
+
+---
+name: subdag-env-child
+params:
+  - name: data_dir
+    type: string
+    required: true
+env:
+  - OUTPUT_PATH: "${data_dir}/results"
+steps:
+  - name: check-env
+    command: echo "${OUTPUT_PATH}"
+    output: RESULT
+`)
+
+	runID := uuid.Must(uuid.NewV7()).String()
+	th.RunCommand(t, cmd.Start(), test.CmdTest{
+		Args:        []string{"start", "--run-id", runID, dagFile},
+		ExpectedOut: []string{"DAG run finished"},
+	})
+
+	rootRef := exec1.NewDAGRunRef("subdag-env-parent", runID)
+	parentAttempt, err := th.DAGRunStore.FindAttempt(th.Context, rootRef)
+	require.NoError(t, err)
+
+	parentStatus, err := parentAttempt.ReadStatus(th.Context)
+	require.NoError(t, err)
+	require.Equal(t, core.Succeeded, parentStatus.Status)
+	require.Len(t, parentStatus.Nodes, 1)
+	require.Len(t, parentStatus.Nodes[0].SubRuns, 1)
+
+	subRunID := parentStatus.Nodes[0].SubRuns[0].DAGRunID
+	subStatus, subOutputs := readSubAttemptStatusAndOutputs(t, th, rootRef, subRunID)
+	require.Equal(t, core.Succeeded, subStatus.Status)
+
+	require.Contains(t, subOutputs.Outputs, "result")
+	assert.Equal(t, "/mnt/data/results", subOutputs.Outputs["result"])
 }

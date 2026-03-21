@@ -4,7 +4,9 @@
 package spec
 
 import (
+	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -2554,6 +2556,78 @@ func TestChainTypeDependsValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBuildEnvReferencesParams(t *testing.T) {
+	t.Parallel()
+
+	yamlData := `
+params:
+  data_dir: /tmp/foo
+env:
+  - FULL_PATH: "${data_dir}/output"
+steps:
+  - command: echo test
+`
+	d, err := LoadYAML(context.Background(), []byte(yamlData))
+	require.NoError(t, err)
+
+	found := false
+	for _, e := range d.Env {
+		if strings.HasPrefix(e, "FULL_PATH=") {
+			require.Equal(t, "FULL_PATH=/tmp/foo/output", e)
+			found = true
+		}
+	}
+	require.True(t, found, "FULL_PATH env var not found")
+}
+
+func TestBuildEnvReferencesParamsWithoutEval(t *testing.T) {
+	t.Parallel()
+
+	yamlData := `
+params:
+  data_dir: /tmp/foo
+env:
+  - FULL_PATH: "${data_dir}/output"
+steps:
+  - command: echo test
+`
+	d, err := LoadYAML(context.Background(), []byte(yamlData), WithoutEval())
+	require.NoError(t, err)
+
+	found := false
+	for _, e := range d.Env {
+		if strings.HasPrefix(e, "FULL_PATH=") {
+			require.Equal(t, "FULL_PATH=${data_dir}/output", e)
+			found = true
+		}
+	}
+	require.True(t, found, "FULL_PATH env var not found")
+}
+
+func TestBuildEnvReferencesParamsOnlyMetadata(t *testing.T) {
+	t.Parallel()
+
+	yamlData := `
+params:
+  data_dir: /tmp/foo
+env:
+  - FULL_PATH: "${data_dir}/output"
+steps:
+  - command: echo test
+`
+	d, err := LoadYAML(context.Background(), []byte(yamlData), OnlyMetadata())
+	require.NoError(t, err)
+
+	found := false
+	for _, e := range d.Env {
+		if strings.HasPrefix(e, "FULL_PATH=") {
+			require.Equal(t, "FULL_PATH=/tmp/foo/output", e)
+			found = true
+		}
+	}
+	require.True(t, found, "FULL_PATH env var not found")
 }
 
 func TestRouterNotAllowedInChainType(t *testing.T) {

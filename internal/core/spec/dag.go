@@ -408,14 +408,15 @@ var metadataTransformers = []transform{
 	{"description", newTransformer("Description", buildDescription)},
 	{"type", newTransformer("Type", buildType)},
 	{"tags", newTransformer("Tags", buildTags)},
-	{"env", newTransformer("Env", buildEnvs)},
-	{"schedule", newTransformer("Schedule", buildSchedule)},
-	{"stop_schedule", newTransformer("StopSchedule", buildStopSchedule)},
-	{"restart_schedule", newTransformer("RestartSchedule", buildRestartSchedule)},
+	// params must run BEFORE env so that env: values can reference ${param_name}
 	{"params", newTransformer("Params", buildParams)},
 	{"default_params", newTransformer("DefaultParams", buildDefaultParams)},
 	{"param_defs", newTransformer("ParamDefs", buildParamDefs)},
 	{"params_json", newTransformer("ParamsJSON", buildParamsJSON)},
+	{"env", newTransformer("Env", buildEnvs)},
+	{"schedule", newTransformer("Schedule", buildSchedule)},
+	{"stop_schedule", newTransformer("StopSchedule", buildStopSchedule)},
+	{"restart_schedule", newTransformer("RestartSchedule", buildRestartSchedule)},
 	{"worker_selector", &workerSelectorTransformer{}},
 	{"timeout", newTransformer("Timeout", buildTimeout)},
 	{"delay", newTransformer("Delay", buildDelay)},
@@ -819,6 +820,16 @@ func buildParams(ctx BuildContext, d *dag) ([]string, error) {
 	result, err := parseParamsInternal(ctx, d)
 	if err != nil {
 		return nil, err
+	}
+	// Add resolved params to envScope so env: can reference ${param_name}
+	if ctx.envScope != nil && len(result.Params) > 0 {
+		paramVars := make(map[string]string, len(result.Params))
+		for _, p := range result.Params {
+			if k, v, ok := strings.Cut(p, "="); ok {
+				paramVars[k] = v
+			}
+		}
+		ctx.envScope.scope = ctx.envScope.scope.WithEntries(paramVars, eval.EnvSourceParam)
 	}
 	return result.Params, nil
 }
