@@ -51,6 +51,7 @@ type chatState struct {
 
 	typingMu      sync.Mutex
 	typingCancel  context.CancelFunc
+	typingDone    chan struct{}
 	typingLoopGen uint64
 }
 
@@ -307,9 +308,11 @@ func (b *Bot) startTypingLoop(ctx context.Context, cs *chatState, chatID int64) 
 		return
 	}
 	loopCtx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
 	cs.typingLoopGen++
 	gen := cs.typingLoopGen
 	cs.typingCancel = cancel
+	cs.typingDone = done
 	cs.typingMu.Unlock()
 
 	b.sendTyping(chatID)
@@ -322,6 +325,7 @@ func (b *Bot) startTypingLoop(ctx context.Context, cs *chatState, chatID int64) 
 	go func() {
 		ticker := time.NewTicker(refresh)
 		defer ticker.Stop()
+		defer close(done)
 		defer b.finishTypingLoop(cs, gen)
 
 		for {
@@ -343,11 +347,16 @@ func (b *Bot) startTypingLoop(ctx context.Context, cs *chatState, chatID int64) 
 func (b *Bot) stopTypingLoop(cs *chatState) {
 	cs.typingMu.Lock()
 	cancel := cs.typingCancel
+	done := cs.typingDone
 	cs.typingCancel = nil
+	cs.typingDone = nil
 	cs.typingMu.Unlock()
 
 	if cancel != nil {
 		cancel()
+	}
+	if done != nil {
+		<-done
 	}
 }
 
@@ -356,6 +365,7 @@ func (b *Bot) finishTypingLoop(cs *chatState, gen uint64) {
 	defer cs.typingMu.Unlock()
 	if cs.typingLoopGen == gen {
 		cs.typingCancel = nil
+		cs.typingDone = nil
 	}
 }
 
