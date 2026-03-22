@@ -6,6 +6,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"sort"
 	"time"
@@ -49,6 +50,7 @@ func NewRetryScanner(
 	isSuspended IsSuspendedFunc,
 	retryWindow time.Duration,
 	clock Clock,
+	listTargets func() []string,
 ) (*RetryScanner, error) {
 	if clock == nil {
 		clock = time.Now
@@ -56,12 +58,16 @@ func NewRetryScanner(
 	if isSuspended == nil {
 		isSuspended = func(context.Context, string) bool { return false }
 	}
+	if listTargets == nil {
+		return nil, fmt.Errorf("retry scanner targets are required")
+	}
 	return &RetryScanner{
 		dagRunStore: dagRunStore,
 		queueStore:  queueStore,
 		isSuspended: isSuspended,
 		retryWindow: retryWindow,
 		clock:       clock,
+		listTargets: listTargets,
 	}, nil
 }
 
@@ -196,9 +202,6 @@ func (s *RetryScanner) processLatestAttempt(ctx context.Context, dagName string,
 }
 
 func (s *RetryScanner) retryTargetNames() []string {
-	if s.listTargets == nil {
-		return nil
-	}
 	raw := s.listTargets()
 	if len(raw) == 0 {
 		return nil

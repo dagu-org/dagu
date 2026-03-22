@@ -372,6 +372,14 @@ func (m *mockProcStore) IsRunAlive(ctx context.Context, groupName string, dagRun
 	return args.Bool(0), args.Error(1)
 }
 
+func (m *mockProcStore) IsAttemptAlive(ctx context.Context, groupName string, dagRun exec.DAGRunRef, attemptID string) (bool, error) {
+	if !m.hasExpectedCall("IsAttemptAlive") {
+		return false, nil
+	}
+	args := m.Called(ctx, groupName, dagRun, attemptID)
+	return args.Bool(0), args.Error(1)
+}
+
 func (m *mockProcStore) ListAlive(ctx context.Context, groupName string) ([]exec.DAGRunRef, error) {
 	if !m.hasExpectedCall("ListAlive") {
 		return nil, nil
@@ -403,6 +411,18 @@ func (m *mockProcStore) ListEntries(ctx context.Context, groupName string) ([]ex
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]exec.ProcEntry), args.Error(1)
+}
+
+func (m *mockProcStore) LatestFreshEntryByDAGName(ctx context.Context, groupName, dagName string) (*exec.ProcEntry, error) {
+	if !m.hasExpectedCall("LatestFreshEntryByDAGName") {
+		return nil, nil
+	}
+	args := m.Called(ctx, groupName, dagName)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	entry := args.Get(0).(exec.ProcEntry)
+	return &entry, args.Error(1)
 }
 
 func (m *mockProcStore) ListAllEntries(ctx context.Context) ([]exec.ProcEntry, error) {

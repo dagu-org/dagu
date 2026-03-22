@@ -5,6 +5,7 @@ package fileproc
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -133,10 +134,17 @@ func (s *Store) IsRunAlive(ctx context.Context, groupName string, dagRun exec.DA
 	return procGroup.IsRunAlive(ctx, dagRun)
 }
 
+// IsAttemptAlive implements models.ProcStore.
+func (s *Store) IsAttemptAlive(ctx context.Context, groupName string, dagRun exec.DAGRunRef, attemptID string) (bool, error) {
+	procGroup := s.newProcGroup(groupName)
+	return procGroup.IsAttemptAlive(ctx, dagRun, attemptID)
+}
+
 // ListAllAlive implements models.ProcStore.
 // Returns all running DAG runs across all process groups.
 func (s *Store) ListAllAlive(ctx context.Context) (map[string][]exec.DAGRunRef, error) {
 	result := make(map[string][]exec.DAGRunRef)
+	seen := make(map[string]map[string]struct{})
 
 	entries, err := s.ListAllEntries(ctx)
 	if err != nil {
@@ -146,15 +154,26 @@ func (s *Store) ListAllAlive(ctx context.Context) (map[string][]exec.DAGRunRef, 
 		if !entry.Fresh {
 			continue
 		}
-		result[entry.GroupName] = append(result[entry.GroupName], entry.Meta.DAGRun())
-	}
-	for groupName := range result {
-		deduped := freshRefs(entriesForGroup(entries, groupName))
-		if len(deduped) == 0 {
-			delete(result, groupName)
+		if _, ok := seen[entry.GroupName]; !ok {
+			seen[entry.GroupName] = make(map[string]struct{})
+		}
+		ref := entry.Meta.DAGRun()
+		key := ref.String()
+		if _, ok := seen[entry.GroupName][key]; ok {
 			continue
 		}
-		result[groupName] = deduped
+		seen[entry.GroupName][key] = struct{}{}
+		result[entry.GroupName] = append(result[entry.GroupName], ref)
+	}
+	for groupName := range result {
+		sort.Slice(result[groupName], func(i, j int) bool {
+			left := result[groupName][i]
+			right := result[groupName][j]
+			if left.Name == right.Name {
+				return left.ID < right.ID
+			}
+			return left.Name < right.Name
+		})
 	}
 	return result, nil
 }
@@ -163,6 +182,12 @@ func (s *Store) ListAllAlive(ctx context.Context) (map[string][]exec.DAGRunRef, 
 func (s *Store) ListEntries(ctx context.Context, groupName string) ([]exec.ProcEntry, error) {
 	procGroup := s.newProcGroup(groupName)
 	return procGroup.ListEntries(ctx)
+}
+
+// LatestFreshEntryByDAGName implements exec.ProcStore.
+func (s *Store) LatestFreshEntryByDAGName(ctx context.Context, groupName, dagName string) (*exec.ProcEntry, error) {
+	procGroup := s.newProcGroup(groupName)
+	return procGroup.LatestFreshEntryByDAGName(ctx, dagName)
 }
 
 // ListAllEntries implements exec.ProcStore.
@@ -212,17 +237,10 @@ func (s *Store) RemoveIfStale(ctx context.Context, entry exec.ProcEntry) error {
 // Validate fails if any proc entry in the store is invalid or uses an unsupported format.
 func (s *Store) Validate(ctx context.Context) error {
 	_, err := s.ListAllEntries(ctx)
-	return err
-}
-
-func entriesForGroup(entries []exec.ProcEntry, groupName string) []exec.ProcEntry {
-	filtered := make([]exec.ProcEntry, 0, len(entries))
-	for _, entry := range entries {
-		if entry.GroupName == groupName {
-			filtered = append(filtered, entry)
-		}
+	if err != nil {
+		return fmt.Errorf("invalid proc artifact detected; stop services and clear %s before restarting: %w", s.baseDir, err)
 	}
-	return filtered
+	return err
 }
 
 func (s *Store) newProcGroup(groupName string) *ProcGroup {

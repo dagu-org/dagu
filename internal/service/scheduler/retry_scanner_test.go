@@ -102,6 +102,7 @@ func TestRetryScannerEvaluateRetryDecision(t *testing.T) {
 				func(context.Context, string) bool { return tt.suspended },
 				24*time.Hour,
 				func() time.Time { return now },
+				func() []string { return nil },
 			)
 			require.NoError(t, err)
 
@@ -143,9 +144,21 @@ func TestDAGRetryDelay(t *testing.T) {
 func TestNewRetryScanner(t *testing.T) {
 	t.Parallel()
 
-	scanner, err := NewRetryScanner(nil, nil, nil, 0, time.Now)
-	require.NoError(t, err)
-	require.NotNil(t, scanner)
+	t.Run("RequiresTargets", func(t *testing.T) {
+		t.Parallel()
+
+		scanner, err := NewRetryScanner(nil, nil, nil, 0, time.Now, nil)
+		require.Error(t, err)
+		require.Nil(t, scanner)
+	})
+
+	t.Run("Valid", func(t *testing.T) {
+		t.Parallel()
+
+		scanner, err := NewRetryScanner(nil, nil, nil, 0, time.Now, func() []string { return nil })
+		require.NoError(t, err)
+		require.NotNil(t, scanner)
+	})
 }
 
 func TestDAGSuspendFlagName(t *testing.T) {
@@ -208,9 +221,9 @@ func TestRetryScannerScanEnqueuesRetry(t *testing.T) {
 		nil,
 		24*time.Hour,
 		func() time.Time { return now },
+		func() []string { return []string{dag.Name} },
 	)
 	require.NoError(t, err)
-	scanner.listTargets = func() []string { return []string{dag.Name} }
 
 	err = scanner.scan(context.Background())
 	require.NoError(t, err)
@@ -246,9 +259,9 @@ func TestRetryScannerScanSkipsWhenNoRetryTargets(t *testing.T) {
 		nil,
 		24*time.Hour,
 		func() time.Time { return now },
+		func() []string { return nil },
 	)
 	require.NoError(t, err)
-	scanner.listTargets = func() []string { return nil }
 
 	err = scanner.scan(context.Background())
 	require.NoError(t, err)
@@ -296,9 +309,9 @@ func TestRetryScannerScanSkipsWhenLatestAttemptIsNewerAndNotFailed(t *testing.T)
 		nil,
 		24*time.Hour,
 		func() time.Time { return now },
+		func() []string { return []string{dag.Name} },
 	)
 	require.NoError(t, err)
-	scanner.listTargets = func() []string { return []string{dag.Name} }
 
 	err = scanner.scan(context.Background())
 	require.NoError(t, err)
@@ -358,9 +371,9 @@ func TestRetryScannerScanUsesPersistedRetryPolicy(t *testing.T) {
 		nil,
 		24*time.Hour,
 		func() time.Time { return now },
+		func() []string { return []string{retryDAG.Name} },
 	)
 	require.NoError(t, err)
-	scanner.listTargets = func() []string { return []string{retryDAG.Name} }
 
 	err = scanner.scan(context.Background())
 	require.NoError(t, err)
@@ -410,9 +423,9 @@ func TestRetryScannerScanIgnoresSuspendFlagsForPersistedRetries(t *testing.T) {
 		func(context.Context, string) bool { return true },
 		24*time.Hour,
 		func() time.Time { return now },
+		func() []string { return []string{dag.Name} },
 	)
 	require.NoError(t, err)
-	scanner.listTargets = func() []string { return []string{dag.Name} }
 
 	require.NoError(t, scanner.scan(context.Background()))
 
@@ -466,9 +479,9 @@ func TestRetryScannerScanFallsBackForLegacyStatuses(t *testing.T) {
 		func(context.Context, string) bool { return true },
 		24*time.Hour,
 		func() time.Time { return now },
+		func() []string { return []string{dag.Name} },
 	)
 	require.NoError(t, err)
-	scanner.listTargets = func() []string { return []string{dag.Name} }
 
 	require.NoError(t, scanner.scan(context.Background()))
 
@@ -513,9 +526,9 @@ func TestRetryScannerScanIsIdempotentForQueuedRun(t *testing.T) {
 		nil,
 		24*time.Hour,
 		func() time.Time { return now },
+		func() []string { return []string{dag.Name} },
 	)
 	require.NoError(t, err)
-	scanner.listTargets = func() []string { return []string{dag.Name} }
 
 	require.NoError(t, scanner.scan(context.Background()))
 	require.NoError(t, scanner.scan(context.Background()))

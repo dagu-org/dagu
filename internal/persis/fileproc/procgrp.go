@@ -104,6 +104,23 @@ func (pg *ProcGroup) IsRunAlive(ctx context.Context, dagRun exec.DAGRunRef) (boo
 	return false, nil
 }
 
+// IsAttemptAlive checks if a specific DAG-run attempt has a fresh proc heartbeat entry.
+func (pg *ProcGroup) IsAttemptAlive(ctx context.Context, dagRun exec.DAGRunRef, attemptID string) (bool, error) {
+	entries, err := pg.ListEntries(ctx)
+	if err != nil {
+		return false, err
+	}
+	for _, entry := range entries {
+		if !entry.Fresh {
+			continue
+		}
+		if entry.Meta.Name == dagRun.Name && entry.Meta.DAGRunID == dagRun.ID && entry.Meta.AttemptID == attemptID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // ListAlive returns a list of alive DAG runs by scanning proc entries.
 func (pg *ProcGroup) ListAlive(ctx context.Context) ([]exec.DAGRunRef, error) {
 	entries, err := pg.ListEntries(ctx)
@@ -124,6 +141,30 @@ func (pg *ProcGroup) ListEntries(ctx context.Context) ([]exec.ProcEntry, error) 
 		return nil, err
 	}
 	return entries, nil
+}
+
+// LatestFreshEntryByDAGName returns the freshest proc entry for the DAG in the group.
+func (pg *ProcGroup) LatestFreshEntryByDAGName(ctx context.Context, dagName string) (*exec.ProcEntry, error) {
+	entries, err := pg.ListEntries(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var freshest *exec.ProcEntry
+	for i := range entries {
+		entry := entries[i]
+		if !entry.Fresh || entry.Meta.Name != dagName {
+			continue
+		}
+		if freshest == nil ||
+			entry.Meta.StartedAt > freshest.Meta.StartedAt ||
+			(entry.Meta.StartedAt == freshest.Meta.StartedAt && entry.LastHeartbeatAt > freshest.LastHeartbeatAt) {
+			copy := entry
+			freshest = &copy
+		}
+	}
+
+	return freshest, nil
 }
 
 // RemoveIfStale removes the exact proc file if it is still stale and unchanged.

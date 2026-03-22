@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"runtime/debug"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -67,23 +66,13 @@ func NewZombieDetector(
 
 // Start begins the zombie detection loop
 func (z *ZombieDetector) Start(ctx context.Context) {
-	var running atomic.Bool
 	ticker := time.NewTicker(z.interval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			if !running.CompareAndSwap(false, true) {
-				logger.Warn(ctx, "Skipping zombie detection, previous check still running")
-				continue
-			}
-
-			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer running.Store(false)
-				defer wg.Done()
+			func() {
 				defer func() {
 					if r := recover(); r != nil {
 						logger.Error(ctx, "Zombie detection check panicked", tag.Error(panicToError(r)))
@@ -91,7 +80,6 @@ func (z *ZombieDetector) Start(ctx context.Context) {
 				}()
 				z.detectAndCleanZombies(ctx)
 			}()
-			wg.Wait()
 
 		case <-z.quit:
 			return
@@ -122,24 +110,12 @@ func (z *ZombieDetector) getRunMutex(attemptKey string) *sync.Mutex {
 	return mu
 }
 
-func zombieAttemptKey(entry exec.ProcEntry) string {
-	return entry.GroupName + "|" + entry.Meta.Root().String() + "|" + entry.Meta.Name + "|" + entry.Meta.DAGRunID + "|" + entry.Meta.AttemptID
-}
-
-func zombieRunScopeKey(entry exec.ProcEntry) string {
-	return entry.GroupName + "|" + entry.Meta.Root().String() + "|" + entry.Meta.Name + "|" + entry.Meta.DAGRunID
-}
-
-func isRootProcEntry(entry exec.ProcEntry) bool {
-	return entry.Meta.RootName == entry.Meta.Name && entry.Meta.RootDAGRunID == entry.Meta.DAGRunID
-}
-
 func (z *ZombieDetector) clearAttemptState(attemptKey string) {
 	delete(z.staleCounters, attemptKey)
 }
 
 func (z *ZombieDetector) findAttempt(ctx context.Context, entry exec.ProcEntry) (exec.DAGRunAttempt, error) {
-	if isRootProcEntry(entry) {
+	if entry.IsRoot() {
 		return z.dagRunStore.FindAttempt(ctx, entry.Meta.DAGRun())
 	}
 	return z.dagRunStore.FindSubAttempt(ctx, entry.Meta.Root(), entry.Meta.DAGRunID)
@@ -158,11 +134,11 @@ func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 	freshByRunScope := make(map[string]exec.ProcEntry)
 	activeAttemptKeys := make(map[string]struct{}, len(entries))
 	for _, entry := range entries {
-		activeAttemptKeys[zombieAttemptKey(entry)] = struct{}{}
+		activeAttemptKeys[entry.AttemptKey()] = struct{}{}
 		if !entry.Fresh {
 			continue
 		}
-		scopeKey := zombieRunScopeKey(entry)
+		scopeKey := entry.RunScopeKey()
 		current, ok := freshByRunScope[scopeKey]
 		if !ok || current.Meta.StartedAt < entry.Meta.StartedAt ||
 			(current.Meta.StartedAt == entry.Meta.StartedAt && current.LastHeartbeatAt < entry.LastHeartbeatAt) {
@@ -206,7 +182,7 @@ func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 
 // checkAndCleanZombie checks if a single stale proc entry is a zombie candidate and cleans it up.
 func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, entry exec.ProcEntry, freshByRunScope map[string]exec.ProcEntry) error {
-	attemptKey := zombieAttemptKey(entry)
+	attemptKey := entry.AttemptKey()
 	ctx = logger.WithValues(ctx,
 		tag.DAG(entry.Meta.Name),
 		tag.RunID(entry.Meta.DAGRunID),
@@ -219,7 +195,7 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, entry exec.Pro
 		return nil
 	}
 
-	if sibling, ok := freshByRunScope[zombieRunScopeKey(entry)]; ok && sibling.Meta.AttemptID != entry.Meta.AttemptID {
+	if sibling, ok := freshByRunScope[entry.RunScopeKey()]; ok && sibling.Meta.AttemptID != entry.Meta.AttemptID {
 		z.clearAttemptState(attemptKey)
 		if err := z.procStore.RemoveIfStale(ctx, entry); err != nil {
 			return fmt.Errorf("remove stale proc with fresh sibling: %w", err)

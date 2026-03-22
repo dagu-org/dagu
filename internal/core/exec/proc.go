@@ -22,6 +22,8 @@ type ProcStore interface {
 	CountAliveByDAGName(ctx context.Context, groupName, dagName string) (int, error)
 	// IsRunAlive checks if a specific DAG run is currently alive.
 	IsRunAlive(ctx context.Context, groupName string, dagRun DAGRunRef) (bool, error)
+	// IsAttemptAlive checks if a specific DAG-run attempt is currently alive.
+	IsAttemptAlive(ctx context.Context, groupName string, dagRun DAGRunRef, attemptID string) (bool, error)
 	// ListAlive returns list of running DAG runs by the group name.
 	ListAlive(ctx context.Context, groupName string) ([]DAGRunRef, error)
 	// ListAllAlive returns all running DAG runs across all groups.
@@ -29,6 +31,8 @@ type ProcStore interface {
 	ListAllAlive(ctx context.Context) (map[string][]DAGRunRef, error)
 	// ListEntries returns all proc entries for a group, including stale entries.
 	ListEntries(ctx context.Context, groupName string) ([]ProcEntry, error)
+	// LatestFreshEntryByDAGName returns the freshest proc entry for the DAG in the group.
+	LatestFreshEntryByDAGName(ctx context.Context, groupName, dagName string) (*ProcEntry, error)
 	// ListAllEntries returns all proc entries across all groups, including stale entries.
 	ListAllEntries(ctx context.Context) ([]ProcEntry, error)
 	// RemoveIfStale removes the exact proc entry if it is still stale and unchanged.
@@ -78,4 +82,19 @@ type ProcEntry struct {
 // DAGRun returns the DAG-run reference for the proc entry.
 func (e ProcEntry) DAGRun() DAGRunRef {
 	return e.Meta.DAGRun()
+}
+
+// IsRoot reports whether the proc entry belongs to a root DAG run.
+func (e ProcEntry) IsRoot() bool {
+	return e.Meta.RootName == e.Meta.Name && e.Meta.RootDAGRunID == e.Meta.DAGRunID
+}
+
+// AttemptKey returns a stable identifier for the exact proc-backed attempt.
+func (e ProcEntry) AttemptKey() string {
+	return e.GroupName + "|" + e.Meta.Root().String() + "|" + e.Meta.Name + "|" + e.Meta.DAGRunID + "|" + e.Meta.AttemptID
+}
+
+// RunScopeKey returns a stable identifier for the DAG-run scope across attempts.
+func (e ProcEntry) RunScopeKey() string {
+	return e.GroupName + "|" + e.Meta.Root().String() + "|" + e.Meta.Name + "|" + e.Meta.DAGRunID
 }

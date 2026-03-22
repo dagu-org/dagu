@@ -130,9 +130,8 @@ func runRetry(ctx *Context, args []string) error {
 
 	ctx.Context = logger.WithValues(ctx.Context, tag.DAG(dag.Name), tag.RunID(dagRunID))
 
-	var preparedAttempt exec.DAGRunAttempt
 	if workerID == "local" {
-		prepared, prepErr := prepareLocalExecution(
+		return withPreparedLocalExecution(
 			ctx,
 			dag,
 			dagRunID,
@@ -151,22 +150,16 @@ func runRetry(ctx *Context, args []string) error {
 				}
 				return ctx.DAGRunStore.CreateAttempt(execCtx, dag, time.Now(), dagRunID, opts)
 			},
+			func(err error) {
+				_ = ctx.RecordEarlyFailure(dag, dagRunID, err)
+			},
+			func(preparedAttempt exec.DAGRunAttempt) error {
+				return executeRetry(ctx, dag, status, rootRun, stepName, workerID, preparedAttempt)
+			},
 		)
-		if prepErr != nil {
-			logger.Debug(ctx, "Failed to prepare local retry execution", tag.Error(prepErr))
-			if !errors.Is(prepErr, errProcAcquisitionFailed) {
-				_ = ctx.RecordEarlyFailure(dag, dagRunID, prepErr)
-			}
-			return prepErr
-		}
-		defer func() {
-			_ = prepared.Proc.Stop(ctx)
-		}()
-		ctx.Proc = prepared.Proc
-		preparedAttempt = prepared.Attempt
 	}
 
-	return executeRetry(ctx, dag, status, rootRun, stepName, workerID, preparedAttempt)
+	return executeRetry(ctx, dag, status, rootRun, stepName, workerID, nil)
 }
 
 // enqueueRetry enqueues the retry and persists Queued status via exec.EnqueueRetry.

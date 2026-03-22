@@ -136,6 +136,77 @@ func TestStore_IsRunAlive(t *testing.T) {
 	})
 }
 
+func TestStore_IsAttemptAlive(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseDir := t.TempDir()
+	store := New(baseDir)
+	dagRun := exec.DAGRunRef{
+		Name: "attempt-dag",
+		ID:   "run-1",
+	}
+	meta := testProcMetaFromRun(dagRun)
+	meta.AttemptID = "attempt-1"
+
+	proc, err := store.Acquire(ctx, "attempt-queue", meta)
+	require.NoError(t, err)
+	defer func() { _ = proc.Stop(ctx) }()
+
+	require.Eventually(t, func() bool {
+		alive, err := store.IsAttemptAlive(ctx, "attempt-queue", dagRun, "attempt-1")
+		require.NoError(t, err)
+		return alive
+	}, heartbeatWait, heartbeatPoll, "expected exact attempt to be alive")
+
+	otherAlive, err := store.IsAttemptAlive(ctx, "attempt-queue", dagRun, "attempt-2")
+	require.NoError(t, err)
+	require.False(t, otherAlive)
+}
+
+func TestStore_LatestFreshEntryByDAGName(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseDir := t.TempDir()
+	store := New(baseDir)
+
+	older := exec.ProcMeta{
+		StartedAt:    100,
+		Name:         "latest-dag",
+		DAGRunID:     "run-older",
+		AttemptID:    "attempt-older",
+		RootName:     "latest-dag",
+		RootDAGRunID: "run-older",
+	}
+	newer := exec.ProcMeta{
+		StartedAt:    200,
+		Name:         "latest-dag",
+		DAGRunID:     "run-newer",
+		AttemptID:    "attempt-newer",
+		RootName:     "latest-dag",
+		RootDAGRunID: "run-newer",
+	}
+
+	proc1, err := store.Acquire(ctx, "latest-queue", older)
+	require.NoError(t, err)
+	defer func() { _ = proc1.Stop(ctx) }()
+
+	proc2, err := store.Acquire(ctx, "latest-queue", newer)
+	require.NoError(t, err)
+	defer func() { _ = proc2.Stop(ctx) }()
+
+	require.Eventually(t, func() bool {
+		entry, err := store.LatestFreshEntryByDAGName(ctx, "latest-queue", "latest-dag")
+		require.NoError(t, err)
+		return entry != nil && entry.Meta.DAGRunID == "run-newer" && entry.Meta.AttemptID == "attempt-newer"
+	}, heartbeatWait, heartbeatPoll, "expected newest started attempt to be selected")
+
+	entry, err := store.LatestFreshEntryByDAGName(ctx, "latest-queue", "missing-dag")
+	require.NoError(t, err)
+	require.Nil(t, entry)
+}
+
 func TestStore_ListAllAlive(t *testing.T) {
 	t.Parallel()
 

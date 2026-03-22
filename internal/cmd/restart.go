@@ -5,7 +5,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -110,7 +109,7 @@ func handleRestartProcess(ctx *Context, d *core.DAG, oldDagRunID string, schedul
 		return fmt.Errorf("failed to generate dag-run ID: %w", err)
 	}
 
-	prepared, err := prepareLocalExecution(
+	return withPreparedLocalExecution(
 		ctx,
 		d,
 		newDagRunID,
@@ -121,20 +120,13 @@ func handleRestartProcess(ctx *Context, d *core.DAG, oldDagRunID string, schedul
 		func(execCtx context.Context) (exec.DAGRunAttempt, error) {
 			return ctx.DAGRunStore.CreateAttempt(execCtx, d, time.Now(), newDagRunID, exec.NewDAGRunAttemptOptions{})
 		},
-	)
-	if err != nil {
-		logger.Debug(ctx, "Failed to prepare restart execution", tag.Error(err))
-		if !errors.Is(err, errProcAcquisitionFailed) {
+		func(err error) {
 			_ = ctx.RecordEarlyFailure(d, newDagRunID, err)
-		}
-		return err
-	}
-	defer func() {
-		_ = prepared.Proc.Stop(ctx)
-	}()
-	ctx.Proc = prepared.Proc
-
-	return executeDAGWithRunID(ctx, ctx.DAGRunMgr, d, newDagRunID, scheduleTime, prepared.Attempt)
+		},
+		func(preparedAttempt exec.DAGRunAttempt) error {
+			return executeDAGWithRunID(ctx, ctx.DAGRunMgr, d, newDagRunID, scheduleTime, preparedAttempt)
+		},
+	)
 }
 
 // executeDAGWithRunID executes a DAG with a pre-generated run ID.

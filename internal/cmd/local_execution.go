@@ -5,9 +5,12 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
@@ -17,6 +20,8 @@ type localExecutionPreparation struct {
 	Attempt exec.DAGRunAttempt
 	Proc    exec.ProcHandle
 }
+
+type localExecutionErrorRecorder func(error)
 
 func prepareLocalExecution(
 	ctx *Context,
@@ -124,4 +129,44 @@ func recordPreparedAttemptFailure(
 		return fmt.Errorf("failed to write failed status: %w", err)
 	}
 	return nil
+}
+
+func withPreparedLocalExecution(
+	ctx *Context,
+	dag *core.DAG,
+	dagRunID string,
+	root exec.DAGRunRef,
+	parent exec.DAGRunRef,
+	triggerType core.TriggerType,
+	scheduleTime string,
+	buildAttempt func(context.Context) (exec.DAGRunAttempt, error),
+	recordPrepareError localExecutionErrorRecorder,
+	run func(exec.DAGRunAttempt) error,
+) error {
+	prepared, err := prepareLocalExecution(
+		ctx,
+		dag,
+		dagRunID,
+		root,
+		parent,
+		triggerType,
+		scheduleTime,
+		buildAttempt,
+	)
+	if err != nil {
+		logger.Debug(ctx, "Failed to prepare local execution", tag.Error(err))
+		if recordPrepareError != nil && !errors.Is(err, errProcAcquisitionFailed) {
+			recordPrepareError(err)
+		}
+		return err
+	}
+
+	prevProc := ctx.Proc
+	ctx.Proc = prepared.Proc
+	defer func() {
+		ctx.Proc = prevProc
+		_ = prepared.Proc.Stop(ctx)
+	}()
+
+	return run(prepared.Attempt)
 }

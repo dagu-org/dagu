@@ -35,6 +35,11 @@ type Coordinator struct {
 func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 	t.Helper()
 
+	// Coordinator-backed tests often hand this config to workers or runtime
+	// helpers that launch DAG subprocesses. Keep those subprocesses on the
+	// current source tree's binary instead of .local/bin.
+	opts = append(opts, WithBuiltExecutable())
+
 	// Parse options to access coordinator-specific settings
 	var options Options
 	for _, opt := range opts {
