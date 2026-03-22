@@ -49,60 +49,90 @@ func NewServer(
 // Serve starts listening and serving requests.
 func (srv *Server) Serve(ctx context.Context, listen chan error) error {
 	_ = os.Remove(srv.addr)
-	var err error
-	srv.listener, err = net.Listen("unix", srv.addr)
+	listener, err := net.Listen("unix", srv.addr)
 	if err != nil {
 		if listen != nil {
 			listen <- err
 		}
 		return err
 	}
+	if !srv.setListener(listener) {
+		if listen != nil {
+			listen <- nil
+		}
+		_ = listener.Close()
+		_ = os.Remove(srv.addr)
+		return ErrServerRequestedShutdown
+	}
 	if listen != nil {
-		listen <- err
+		listen <- nil
 	}
 	logger.Debug(ctx, "Unix socket is listening",
 		tag.Addr(srv.addr))
 
 	defer func() {
+		srv.clearListener(listener)
 		_ = srv.Shutdown(ctx)
 		_ = os.Remove(srv.addr)
 	}()
 	for {
-		conn, err := srv.listener.Accept()
-		if srv.quit.Load() {
-			return ErrServerRequestedShutdown
+		conn, err := listener.Accept()
+		if err != nil {
+			if srv.quit.Load() {
+				return ErrServerRequestedShutdown
+			}
+			return err
 		}
-		if err == nil {
-			go func() {
-				request, err := http.ReadRequest(bufio.NewReader(conn))
-				if err != nil {
-					logger.Error(ctx, "Failed to read request",
-						tag.Error(err))
-				} else {
-					srv.handlerFunc(newHTTPResponseWriter(&conn), request)
-				}
-				_ = conn.Close()
-			}()
-		}
+		go func() {
+			request, err := http.ReadRequest(bufio.NewReader(conn))
+			if err != nil {
+				logger.Error(ctx, "Failed to read request",
+					tag.Error(err))
+			} else {
+				srv.handlerFunc(newHTTPResponseWriter(&conn), request)
+			}
+			_ = conn.Close()
+		}()
 	}
 }
 
 // Shutdown stops the frontend.
 func (srv *Server) Shutdown(ctx context.Context) error {
 	srv.mu.Lock()
-	defer srv.mu.Unlock()
 	if !srv.quit.Load() {
 		srv.quit.Store(true)
-		if srv.listener != nil {
-			err := srv.listener.Close()
-			if err != nil && !errors.Is(err, os.ErrClosed) {
-				logger.Error(ctx, "Failed to close listener",
-					tag.Error(err))
-			}
-			return err
+	}
+	listener := srv.listener
+	srv.listener = nil
+	srv.mu.Unlock()
+
+	if listener != nil {
+		err := listener.Close()
+		if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, os.ErrClosed) {
+			logger.Error(ctx, "Failed to close listener",
+				tag.Error(err))
 		}
+		return err
 	}
 	return nil
+}
+
+func (srv *Server) setListener(listener net.Listener) bool {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	if srv.quit.Load() {
+		return false
+	}
+	srv.listener = listener
+	return true
+}
+
+func (srv *Server) clearListener(listener net.Listener) {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	if srv.listener == listener {
+		srv.listener = nil
+	}
 }
 
 var _ http.ResponseWriter = (*httpResponseWriter)(nil)
