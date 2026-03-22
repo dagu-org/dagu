@@ -6,9 +6,7 @@ package scheduler
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
-	"sort"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -41,7 +39,6 @@ type RetryScanner struct {
 	isSuspended IsSuspendedFunc
 	retryWindow time.Duration
 	clock       Clock
-	listTargets func() []string
 }
 
 func NewRetryScanner(
@@ -50,7 +47,6 @@ func NewRetryScanner(
 	isSuspended IsSuspendedFunc,
 	retryWindow time.Duration,
 	clock Clock,
-	listTargets func() []string,
 ) (*RetryScanner, error) {
 	if clock == nil {
 		clock = time.Now
@@ -58,16 +54,12 @@ func NewRetryScanner(
 	if isSuspended == nil {
 		isSuspended = func(context.Context, string) bool { return false }
 	}
-	if listTargets == nil {
-		return nil, fmt.Errorf("retry scanner targets are required")
-	}
 	return &RetryScanner{
 		dagRunStore: dagRunStore,
 		queueStore:  queueStore,
 		isSuspended: isSuspended,
 		retryWindow: retryWindow,
 		clock:       clock,
-		listTargets: listTargets,
 	}, nil
 }
 
@@ -120,29 +112,11 @@ func (s *RetryScanner) scan(ctx context.Context) error {
 }
 
 func (s *RetryScanner) listFailedRuns(ctx context.Context, from exec.TimeInUTC) ([]*exec.DAGRunStatus, error) {
-	baseOpts := []exec.ListDAGRunStatusesOption{
+	return s.dagRunStore.ListStatuses(ctx,
 		exec.WithStatuses([]core.Status{core.Failed}),
 		exec.WithFrom(from),
 		exec.WithoutLimit(),
-	}
-
-	targets := s.retryTargetNames()
-	if len(targets) == 0 {
-		return nil, nil
-	}
-
-	var failedRuns []*exec.DAGRunStatus
-	for _, name := range targets {
-		opts := append([]exec.ListDAGRunStatusesOption{}, baseOpts...)
-		opts = append(opts, exec.WithExactName(name))
-		items, err := s.dagRunStore.ListStatuses(ctx, opts...)
-		if err != nil {
-			return nil, err
-		}
-		failedRuns = append(failedRuns, items...)
-	}
-
-	return failedRuns, nil
+	)
 }
 
 func (s *RetryScanner) processFailedRun(
@@ -276,28 +250,6 @@ func (s *RetryScanner) processFailedRunLegacy(
 		slog.Duration("computed_delay", decision.computedDelay),
 	)
 	return nil
-}
-
-func (s *RetryScanner) retryTargetNames() []string {
-	raw := s.listTargets()
-	if len(raw) == 0 {
-		return nil
-	}
-
-	targets := make([]string, 0, len(raw))
-	seen := make(map[string]struct{}, len(raw))
-	for _, name := range raw {
-		if name == "" {
-			continue
-		}
-		if _, ok := seen[name]; ok {
-			continue
-		}
-		seen[name] = struct{}{}
-		targets = append(targets, name)
-	}
-	sort.Strings(targets)
-	return targets
 }
 
 func (s *RetryScanner) evaluateRetryDecision(

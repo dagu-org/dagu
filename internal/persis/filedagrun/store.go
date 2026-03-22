@@ -439,7 +439,7 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *core.DAG, timestamp 
 		existingRun, _ := dataRoot.FindByDAGRunID(ctx, dagRunID)
 		if existingRun != nil {
 			// Error if the dag-run already exists
-			return nil, fmt.Errorf("dag-run with ID %s already exists", dagRunID)
+			return nil, fmt.Errorf("%w: %s", exec.ErrDAGRunAlreadyExists, dagRunID)
 		}
 		r, err := dataRoot.CreateDAGRun(ts, dagRunID)
 		if err != nil {

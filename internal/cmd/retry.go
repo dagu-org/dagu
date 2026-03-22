@@ -146,9 +146,6 @@ func runRetry(ctx *Context, args []string) error {
 				}
 				return ctx.DAGRunStore.CreateAttempt(execCtx, dag, time.Now(), dagRunID, opts)
 			},
-			func(err error) {
-				_ = ctx.RecordEarlyFailure(dag, dagRunID, err)
-			},
 			func(preparedAttempt exec.DAGRunAttempt) error {
 				return executeRetry(ctx, dag, status, rootRun, stepName, workerID, preparedAttempt)
 			},

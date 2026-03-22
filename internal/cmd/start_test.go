@@ -5,12 +5,16 @@ package cmd_test
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -238,4 +242,86 @@ steps:
 		require.Equal(t, originalStatus.ParamsList, newStatus.ParamsList)
 	})
 
+}
+
+func TestCmdStart_DuplicateRunIDDoesNotOverwriteExistingAttempt(t *testing.T) {
+	th := test.SetupCommand(t)
+
+	dag := th.DAG(t, `name: duplicate-start-dag
+steps:
+  - name: "1"
+    command: "true"
+`)
+
+	runID := "existing-run"
+	attempt, err := th.DAGRunStore.CreateAttempt(th.Context, dag.DAG, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
+	require.NoError(t, err)
+
+	status := exec.InitialStatus(dag.DAG)
+	status.DAGRunID = runID
+	status.AttemptID = attempt.ID()
+	writeStatus(t, th.Context, attempt, status)
+
+	err = th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+		Args: []string{"start", "--run-id", runID, dag.Location},
+	})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "already exists")
+
+	latestAttempt, err := th.DAGRunStore.FindAttempt(th.Context, exec.NewDAGRunRef(dag.Name, runID))
+	require.NoError(t, err)
+	require.Equal(t, attempt.ID(), latestAttempt.ID())
+
+	latestStatus, err := latestAttempt.ReadStatus(th.Context)
+	require.NoError(t, err)
+	require.Equal(t, core.NotStarted, latestStatus.Status)
+	require.Empty(t, latestStatus.Error)
+}
+
+func TestCmdStart_AcceptsLegacyProcArtifactsDuringContextInit(t *testing.T) {
+	th := test.SetupCommand(t)
+
+	dag := th.DAG(t, `name: start-after-legacy-proc
+steps:
+  - name: "1"
+    command: "true"
+`)
+
+	writeLegacyCommandProcFile(
+		t,
+		th.Config.Paths.ProcDir,
+		"legacy-group",
+		"legacy-dag",
+		"legacy-run",
+		time.Now().UTC().Add(-time.Minute),
+		time.Now().UTC().Add(-10*time.Second),
+	)
+
+	err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+		Args: []string{"start", dag.Location},
+	})
+	require.NoError(t, err)
+}
+
+func writeLegacyCommandProcFile(
+	t *testing.T,
+	procDir, groupName, dagName, dagRunID string,
+	createdAt, heartbeatAt time.Time,
+) string {
+	t.Helper()
+
+	path := filepath.Join(
+		procDir,
+		groupName,
+		dagName,
+		fmt.Sprintf("proc_%s_%s.proc", createdAt.UTC().Format("20060102_150405Z"), dagRunID),
+	)
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
+
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, uint64(heartbeatAt.UTC().Unix())) //nolint:gosec
+	require.NoError(t, os.WriteFile(path, buf, 0o600))
+	require.NoError(t, os.Chtimes(path, heartbeatAt, heartbeatAt))
+
+	return path
 }

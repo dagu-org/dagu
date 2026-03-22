@@ -16,12 +16,12 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 )
 
+var errLocalExecutionAlreadyExists = errors.New("local execution already exists")
+
 type localExecutionPreparation struct {
 	Attempt exec.DAGRunAttempt
 	Proc    exec.ProcHandle
 }
-
-type localExecutionErrorRecorder func(error)
 
 func prepareLocalExecution(
 	ctx *Context,
@@ -53,7 +53,10 @@ func prepareLocalExecution(
 
 	attempt, err := buildAttempt(ctx.Context)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, exec.ErrDAGRunAlreadyExists) {
+			return nil, fmt.Errorf("%w: dag-run ID %s already exists for DAG %s", errLocalExecutionAlreadyExists, dagRunID, dag.Name)
+		}
+		return nil, fmt.Errorf("failed to prepare execution attempt: %w", err)
 	}
 	if attempt == nil {
 		return nil, fmt.Errorf("attempt builder returned nil attempt")
@@ -140,7 +143,6 @@ func withPreparedLocalExecution(
 	triggerType core.TriggerType,
 	scheduleTime string,
 	buildAttempt func(context.Context) (exec.DAGRunAttempt, error),
-	recordPrepareError localExecutionErrorRecorder,
 	run func(exec.DAGRunAttempt) error,
 ) error {
 	prepared, err := prepareLocalExecution(
@@ -155,9 +157,6 @@ func withPreparedLocalExecution(
 	)
 	if err != nil {
 		logger.Debug(ctx, "Failed to prepare local execution", tag.Error(err))
-		if recordPrepareError != nil && !errors.Is(err, errProcAcquisitionFailed) {
-			recordPrepareError(err)
-		}
 		return err
 	}
 

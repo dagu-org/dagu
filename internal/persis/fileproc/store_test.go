@@ -6,6 +6,8 @@ package fileproc
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -388,6 +390,77 @@ func TestStore_ListAllAlive(t *testing.T) {
 		require.NotNil(t, result)
 		require.Empty(t, result)
 	})
+}
+
+func TestStore_ValidateAcceptsLegacyProcArtifacts(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseDir := t.TempDir()
+	store := New(baseDir)
+	now := time.Now().UTC()
+
+	writeLegacyProcFile(t, baseDir, "legacy-group", "legacy-dag", "legacy-run", now.Add(-time.Minute), now.Add(-10*time.Second))
+
+	require.NoError(t, store.Validate(ctx))
+
+	entries, err := store.ListEntries(ctx, "legacy-group")
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	require.Equal(t, "legacy-dag", entries[0].Meta.Name)
+	require.Equal(t, "legacy-run", entries[0].Meta.DAGRunID)
+	require.Equal(t, legacyProcAttemptID("legacy-run"), entries[0].Meta.AttemptID)
+}
+
+func TestStore_ValidateRejectsMalformedProcArtifacts(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseDir := t.TempDir()
+	store := New(baseDir)
+	path := filepath.Join(baseDir, "bad-group", "bad-dag", "garbage.proc")
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
+	require.NoError(t, os.WriteFile(path, []byte("bad"), 0o600))
+
+	err := store.Validate(ctx)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "invalid proc artifact detected")
+}
+
+func TestStore_IsRunAlive_LegacyProcFile(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseDir := t.TempDir()
+	store := New(baseDir)
+	now := time.Now().UTC()
+
+	writeLegacyProcFile(t, baseDir, "legacy-group", "legacy-dag", "legacy-run", now.Add(-time.Minute), now.Add(-10*time.Second))
+
+	alive, err := store.IsRunAlive(ctx, "legacy-group", exec.NewDAGRunRef("legacy-dag", "legacy-run"))
+	require.NoError(t, err)
+	require.True(t, alive)
+}
+
+func TestStore_RemoveIfStale_LegacyProcFile(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseDir := t.TempDir()
+	store := New(baseDir, WithStaleThreshold(100*time.Millisecond))
+	now := time.Now().UTC()
+
+	path := writeLegacyProcFile(t, baseDir, "legacy-group", "legacy-dag", "legacy-run", now.Add(-time.Minute), now.Add(-time.Second))
+
+	entries, err := store.ListEntries(ctx, "legacy-group")
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	require.False(t, entries[0].Fresh)
+
+	require.NoError(t, store.RemoveIfStale(ctx, entries[0]))
+
+	_, err = os.Stat(path)
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 const (

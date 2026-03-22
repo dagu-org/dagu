@@ -120,9 +120,6 @@ func handleRestartProcess(ctx *Context, d *core.DAG, oldDagRunID string, schedul
 		func(execCtx context.Context) (exec.DAGRunAttempt, error) {
 			return ctx.DAGRunStore.CreateAttempt(execCtx, d, time.Now(), newDagRunID, exec.NewDAGRunAttemptOptions{})
 		},
-		func(err error) {
-			_ = ctx.RecordEarlyFailure(d, newDagRunID, err)
-		},
 		func(preparedAttempt exec.DAGRunAttempt) error {
 			return executeDAGWithRunID(ctx, ctx.DAGRunMgr, d, newDagRunID, scheduleTime, preparedAttempt)
 		},

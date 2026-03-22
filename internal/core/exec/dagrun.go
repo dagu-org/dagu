@@ -19,6 +19,7 @@ import (
 // Errors related to dag-run management
 var (
 	ErrDAGRunIDNotFound    = errors.New("dag-run ID not found")
+	ErrDAGRunAlreadyExists = errors.New("dag-run already exists")
 	ErrNoStatusData        = errors.New("no status data")
 	ErrCorruptedStatusFile = errors.New("corrupted status file") // Status file exists but contains no valid data or is corrupted
 )

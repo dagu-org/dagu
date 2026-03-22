@@ -197,14 +197,6 @@ func runStart(ctx *Context, args []string) error {
 		return handleSubDAGRun(ctx, dag, dagRunID, params, root, parent, workerID, triggerType, scheduleTime)
 	}
 
-	attempt, _ := ctx.DAGRunStore.FindAttempt(ctx, root)
-	if attempt != nil {
-		status, readErr := attempt.ReadStatus(ctx)
-		if readErr == nil && status.Status != core.NotStarted && status.Status != core.Queued {
-			return fmt.Errorf("dag-run ID %s already exists for DAG %s (status: %s)", dagRunID, dag.Name, status.Status)
-		}
-	}
-
 	if fromRunID != "" {
 		logger.Info(ctx, "Rescheduling dag-run",
 			slog.String("from-dag-run-id", fromRunID),
@@ -240,9 +232,6 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root exec.DAGRu
 		scheduleTime,
 		func(execCtx context.Context) (exec.DAGRunAttempt, error) {
 			return ctx.DAGRunStore.CreateAttempt(execCtx, dag, time.Now(), dagRunID, exec.NewDAGRunAttemptOptions{})
-		},
-		func(err error) {
-			_ = ctx.RecordEarlyFailure(dag, dagRunID, err)
 		},
 		func(preparedAttempt exec.DAGRunAttempt) error {
 			return executeDAGRun(ctx, dag, exec.DAGRunRef{}, dagRunID, root, workerID, triggerType, scheduleTime, preparedAttempt)
@@ -392,7 +381,6 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 					RootDAGRun: &root,
 				})
 			},
-			nil,
 			func(preparedAttempt exec.DAGRunAttempt) error {
 				return executeDAGRun(ctx, dag, parent, dagRunID, root, workerID, triggerType, scheduleTime, preparedAttempt)
 			},
@@ -425,7 +413,6 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 				RootDAGRun: &root,
 			})
 		},
-		nil,
 		func(preparedAttempt exec.DAGRunAttempt) error {
 			return executeRetry(ctx, dag, status, root, "", workerID, preparedAttempt)
 		},

@@ -102,7 +102,6 @@ func TestRetryScannerEvaluateRetryDecision(t *testing.T) {
 				func(context.Context, string) bool { return tt.suspended },
 				24*time.Hour,
 				func() time.Time { return now },
-				func() []string { return nil },
 			)
 			require.NoError(t, err)
 
@@ -144,18 +143,18 @@ func TestDAGRetryDelay(t *testing.T) {
 func TestNewRetryScanner(t *testing.T) {
 	t.Parallel()
 
-	t.Run("RequiresTargets", func(t *testing.T) {
+	t.Run("AllowsNilDependencies", func(t *testing.T) {
 		t.Parallel()
 
-		scanner, err := NewRetryScanner(nil, nil, nil, 0, time.Now, nil)
-		require.Error(t, err)
-		require.Nil(t, scanner)
+		scanner, err := NewRetryScanner(nil, nil, nil, 0, time.Now)
+		require.NoError(t, err)
+		require.NotNil(t, scanner)
 	})
 
 	t.Run("Valid", func(t *testing.T) {
 		t.Parallel()
 
-		scanner, err := NewRetryScanner(nil, nil, nil, 0, time.Now, func() []string { return nil })
+		scanner, err := NewRetryScanner(nil, nil, nil, 0, time.Now)
 		require.NoError(t, err)
 		require.NotNil(t, scanner)
 	})
@@ -221,7 +220,6 @@ func TestRetryScannerScanEnqueuesRetry(t *testing.T) {
 		nil,
 		24*time.Hour,
 		func() time.Time { return now },
-		func() []string { return []string{dag.Name} },
 	)
 	require.NoError(t, err)
 
@@ -240,33 +238,50 @@ func TestRetryScannerScanEnqueuesRetry(t *testing.T) {
 	queueStore.AssertExpectations(t)
 }
 
-func TestRetryScannerScanSkipsWhenNoRetryTargets(t *testing.T) {
+func TestRetryScannerScanEnqueuesRetryWithoutLiveTargets(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 3, 14, 14, 0, 0, 0, time.UTC)
-	dag := &core.DAG{Name: "plain-dag"}
-	status := &exec.DAGRunStatus{
-		Name:      dag.Name,
-		DAGRunID:  "run-1",
-		AttemptID: "att-1",
-		Status:    core.Failed,
+	dag := &core.DAG{
+		Name:     "retry-dag",
+		Location: "/tmp/retry-dag.yaml",
+		RetryPolicy: &core.DAGRetryPolicy{
+			Limit:       3,
+			Interval:    time.Minute,
+			Backoff:     0,
+			MaxInterval: 10 * time.Minute,
+		},
 	}
-
+	status := &exec.DAGRunStatus{
+		Name:           dag.Name,
+		DAGRunID:       "run-1",
+		AttemptID:      "att-1",
+		Status:         core.Failed,
+		AutoRetryCount: 0,
+		FinishedAt:     now.Add(-2 * time.Minute).Format(time.RFC3339),
+		ScheduleTime:   now.Add(-10 * time.Minute).Format(time.RFC3339),
+	}
 	store := newRetryScannerStore(dag, status)
+	queueStore := &exec.MockQueueStore{}
+	queueStore.On("Enqueue", mock.Anything, dag.ProcGroup(), exec.QueuePriorityLow, status.DAGRun()).
+		Return(nil).
+		Once()
+
 	scanner, err := NewRetryScanner(
 		store,
-		&exec.MockQueueStore{},
+		queueStore,
 		nil,
 		24*time.Hour,
 		func() time.Time { return now },
-		func() []string { return nil },
 	)
 	require.NoError(t, err)
 
 	err = scanner.scan(context.Background())
 	require.NoError(t, err)
-	assert.Empty(t, store.listCalls)
+	assert.Equal(t, core.Queued, store.mustStatus(status.DAGRun()).Status)
+	assert.Len(t, store.listCalls, 1)
 	assert.Equal(t, 0, store.findAttemptCalls)
+	queueStore.AssertExpectations(t)
 }
 
 func TestRetryScannerScanRetriesOlderFailedRunEvenWhenNewerRunExists(t *testing.T) {
@@ -312,7 +327,6 @@ func TestRetryScannerScanRetriesOlderFailedRunEvenWhenNewerRunExists(t *testing.
 		nil,
 		24*time.Hour,
 		func() time.Time { return now },
-		func() []string { return []string{dag.Name} },
 	)
 	require.NoError(t, err)
 
@@ -375,7 +389,6 @@ func TestRetryScannerScanUsesPersistedRetryPolicy(t *testing.T) {
 		nil,
 		24*time.Hour,
 		func() time.Time { return now },
-		func() []string { return []string{retryDAG.Name} },
 	)
 	require.NoError(t, err)
 
@@ -427,7 +440,6 @@ func TestRetryScannerScanIgnoresSuspendFlagsForPersistedRetries(t *testing.T) {
 		func(context.Context, string) bool { return true },
 		24*time.Hour,
 		func() time.Time { return now },
-		func() []string { return []string{dag.Name} },
 	)
 	require.NoError(t, err)
 
@@ -485,7 +497,6 @@ func TestRetryScannerScanFallsBackForLegacyStatuses(t *testing.T) {
 		func(context.Context, string) bool { return true },
 		24*time.Hour,
 		func() time.Time { return now },
-		func() []string { return []string{dag.Name} },
 	)
 	require.NoError(t, err)
 
@@ -533,7 +544,6 @@ func TestRetryScannerScanIsIdempotentForQueuedRun(t *testing.T) {
 		nil,
 		24*time.Hour,
 		func() time.Time { return now },
-		func() []string { return []string{dag.Name} },
 	)
 	require.NoError(t, err)
 
