@@ -6,18 +6,11 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { useQuery } from '@/hooks/api';
-import { useLiveConnection } from '@/hooks/useAppLive';
+import { useBoundedDAGRunDetails } from '../../../hooks/useBoundedDAGRunDetails';
 import DAGRunDetailsPanel from '../DAGRunDetailsPanel';
 
-vi.mock('@/hooks/api', () => ({
-  useQuery: vi.fn(),
-}));
-
-vi.mock('@/hooks/useAppLive', () => ({
-  liveFallbackOptions: vi.fn(() => ({})),
-  useLiveConnection: vi.fn(),
-  useLiveDAGRuns: vi.fn(),
+vi.mock('../../../hooks/useBoundedDAGRunDetails', () => ({
+  useBoundedDAGRunDetails: vi.fn(),
 }));
 
 vi.mock('../DAGRunDetailsContent', () => ({
@@ -35,18 +28,12 @@ const appBarValue = {
   selectRemoteNode: vi.fn(),
 };
 
-const liveState = {
-  data: null,
-  error: null,
-  isConnected: false,
-  isConnecting: false,
-  shouldUseFallback: true,
-};
-
-const useQueryMock = useQuery as unknown as {
-  mockImplementation: (
-    fn: (path: string, init?: unknown) => unknown
-  ) => void;
+const useBoundedDAGRunDetailsMock = useBoundedDAGRunDetails as unknown as {
+  mockReturnValue: (value: unknown) => void;
+  mockClear: () => void;
+  mock: {
+    calls: Array<[unknown]>;
+  };
 };
 
 function renderPanel() {
@@ -69,84 +56,61 @@ afterEach(() => {
 });
 
 describe('DAGRunDetailsPanel', () => {
-  it('enables the regular dag-run query and disables the sub-dag query by null init', () => {
-    const queryCalls: Array<{ path: string; init?: unknown }> = [];
-    vi.mocked(useLiveConnection).mockReturnValue(liveState);
-    useQueryMock.mockImplementation((path, init) => {
-      queryCalls.push({ path, init });
-      if (path === '/dag-runs/{name}/{dagRunId}') {
-        return {
-          data: { dagRunDetails: { dagRunId: 'child-run' } },
-          mutate: vi.fn(),
-        } as never;
-      }
-      return {
-        data: undefined,
-        mutate: vi.fn(),
-      } as never;
+  it('enables the regular dag-run details target when no sub-dag params exist', () => {
+    useBoundedDAGRunDetailsMock.mockReturnValue({
+      data: { dagRunId: 'child-run' },
+      error: null,
+      refresh: vi.fn(),
     });
 
     renderPanel();
 
     expect(
-      queryCalls.find((call) => call.path === '/dag-runs/{name}/{dagRunId}')?.init
+      useBoundedDAGRunDetailsMock.mock.calls[0]?.[0]
     ).toEqual(
       expect.objectContaining({
-        params: expect.objectContaining({
-          path: { name: 'child-dag', dagRunId: 'child-run' },
-        }),
+        target: {
+          remoteNode: 'local',
+          name: 'child-dag',
+          dagRunId: 'child-run',
+        },
+        enabled: true,
+        pollIntervalMs: 2000,
       })
     );
-    expect(
-      queryCalls.find(
-        (call) => call.path === '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}'
-      )?.init
-    ).toBeNull();
     expect(screen.getByText('run child-run')).toBeInTheDocument();
   });
 
-  it('enables the sub-dag query and disables the regular dag-run query by null init', () => {
-    const queryCalls: Array<{ path: string; init?: unknown }> = [];
+  it('enables the sub-dag details target when sub-dag params exist', () => {
     window.history.pushState(
       {},
       '',
       '/?subDAGRunId=sub-run&dagRunId=root-run&dagRunName=root-dag'
     );
-    vi.mocked(useLiveConnection).mockReturnValue(liveState);
-    useQueryMock.mockImplementation((path, init) => {
-      queryCalls.push({ path, init });
-      if (path === '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}') {
-        return {
-          data: { dagRunDetails: { dagRunId: 'sub-run' } },
-          mutate: vi.fn(),
-        } as never;
-      }
-      return {
-        data: undefined,
-        mutate: vi.fn(),
-      } as never;
+    useBoundedDAGRunDetailsMock.mockReturnValue({
+      data: { dagRunId: 'sub-run' },
+      error: null,
+      refresh: vi.fn(),
     });
 
     renderPanel();
 
     expect(
-      queryCalls.find(
-        (call) => call.path === '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}'
-      )?.init
+      useBoundedDAGRunDetailsMock.mock.calls[0]?.[0]
     ).toEqual(
       expect.objectContaining({
-        params: expect.objectContaining({
-          path: {
-            name: 'root-dag',
-            dagRunId: 'root-run',
-            subDAGRunId: 'sub-run',
-          },
-        }),
+        target: {
+          remoteNode: 'local',
+          name: 'child-dag',
+          dagRunId: 'child-run',
+          parentName: 'root-dag',
+          parentDAGRunId: 'root-run',
+          subDAGRunId: 'sub-run',
+        },
+        enabled: true,
+        pollIntervalMs: 2000,
       })
     );
-    expect(
-      queryCalls.find((call) => call.path === '/dag-runs/{name}/{dagRunId}')?.init
-    ).toBeNull();
     expect(screen.getByText('run sub-run')).toBeInTheDocument();
   });
 });
