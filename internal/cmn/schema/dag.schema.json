@@ -2059,6 +2059,11 @@
           "type": "boolean",
           "description": "When true, formats output as JSON including status_code, headers, and parsed body."
         },
+        "format": {
+          "type": "string",
+          "enum": ["json"],
+          "description": "Response output format. Use \"json\" for structured output."
+        },
         "skip_tls_verify": {
           "type": "boolean",
           "description": "Skip TLS certificate verification. WARNING: Only use for testing with self-signed certificates."
