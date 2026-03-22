@@ -200,18 +200,23 @@ func (m *Manager) IsRunning(ctx context.Context, dag *core.DAG, dagRunID string)
 // If the dag-run is running, it queries the socket for the current status.
 // If the socket doesn't exist or times out, it falls back to stored status or creates an initial status.
 func (m *Manager) GetCurrentStatus(ctx context.Context, dag *core.DAG, dagRunID string) (*exec.DAGRunStatus, error) {
-	status, err := m.currentStatus(ctx, dag, dagRunID)
-	if err != nil {
-		goto FALLBACK
-	}
-	return status, nil
-
-FALLBACK:
 	if dagRunID == "" {
+		status, err := m.currentStatus(ctx, dag, dagRunID)
+		if err == nil {
+			return status, nil
+		}
 		// The DAG is not running so return the default status
 		return new(exec.InitialStatus(dag)), nil
 	}
-	return m.getPersistedOrCurrentStatus(ctx, dag, dagRunID)
+	status, err := m.getPersistedOrCurrentStatus(ctx, dag, dagRunID)
+	if err == nil {
+		return status, nil
+	}
+	currentStatus, currentErr := m.currentStatus(ctx, dag, dagRunID)
+	if currentErr == nil {
+		return currentStatus, nil
+	}
+	return nil, err
 }
 
 // GetSavedStatus retrieves the saved status of a dag-run by its core.DAGRun reference.
@@ -256,18 +261,9 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *core.DAG
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
 
-	// If the DAG is running, query the current status
+	// If the DAG is running, query current local status or repair stale local state.
 	if st.Status == core.Running {
-		currentStatus, err := m.currentStatus(ctx, dag, st.DAGRunID)
-		if err == nil {
-			return currentStatus, nil
-		}
-		repaired, repairErr := m.repairStaleLocalRunIfDead(ctx, attempt, dag, st)
-		if repairErr != nil {
-			logger.Error(ctx, "Failed to repair stale running status", tag.Error(repairErr))
-		} else {
-			st = repaired
-		}
+		st = m.resolveRunningStatus(ctx, dag, attempt, st, true)
 	}
 
 	return st, nil
@@ -305,19 +301,59 @@ func (*Manager) currentStatus(_ context.Context, dag *core.DAG, dagRunID string)
 	return exec.StatusFromJSON(statusJSON)
 }
 
+func isLocalWorkerID(workerID string) bool {
+	return workerID == "" || workerID == "local"
+}
+
+func (m *Manager) findAttemptForProcEntry(ctx context.Context, entry exec.ProcEntry) (exec.DAGRunAttempt, error) {
+	if entry.IsRoot() {
+		return m.dagRunStore.FindAttempt(ctx, entry.DAGRun())
+	}
+	return m.dagRunStore.FindSubAttempt(ctx, entry.Meta.Root(), entry.Meta.DAGRunID)
+}
+
+func (m *Manager) resolveRunningStatus(
+	ctx context.Context,
+	dag *core.DAG,
+	attempt exec.DAGRunAttempt,
+	status *exec.DAGRunStatus,
+	isRoot bool,
+) *exec.DAGRunStatus {
+	if status == nil || status.Status != core.Running || !isLocalWorkerID(status.WorkerID) {
+		return status
+	}
+
+	if isRoot {
+		currentStatus, err := m.currentStatus(ctx, dag, status.DAGRunID)
+		if err == nil {
+			return currentStatus
+		}
+		logger.Debug(ctx, "Failed to get current status from socket", tag.Error(err))
+	}
+
+	repaired, repairErr := m.repairStaleLocalRunIfDead(ctx, attempt, dag, status)
+	if repairErr != nil {
+		logger.Error(ctx, "Failed to repair stale running status", tag.Error(repairErr))
+		return status
+	}
+	return repaired
+}
+
 // GetLatestStatus retrieves the latest status of a DAG.
 // If the DAG is running, it attempts to get the current status from the socket.
 // If that fails and the local proc is dead, it repairs the stale run before returning it.
 func (m *Manager) GetLatestStatus(ctx context.Context, dag *core.DAG) (exec.DAGRunStatus, error) {
-	// Find the proc store to check if the DAG is running
-	alive, _ := m.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if alive > 0 {
-		items, _ := m.dagRunStore.ListStatuses(
-			ctx, exec.WithName(dag.Name), exec.WithStatuses([]core.Status{core.Running}),
-		)
-		if len(items) > 0 {
-			return *items[0], nil
+	if entry, err := m.procStore.LatestFreshEntryByDAGName(ctx, dag.ProcGroup(), dag.Name); err == nil && entry != nil {
+		attempt, findErr := m.findAttemptForProcEntry(ctx, *entry)
+		if findErr == nil {
+			st, readErr := attempt.ReadStatus(ctx)
+			if readErr == nil && st.AttemptID == entry.Meta.AttemptID {
+				st = m.resolveRunningStatus(ctx, dag, attempt, st, entry.IsRoot())
+				return *st, nil
+			}
 		}
+	} else if err != nil {
+		logger.Debug(ctx, "Failed to resolve freshest proc entry for latest status", tag.Error(err))
 	}
 
 	// Find the latest status by name
@@ -344,18 +380,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *core.DAG) (exec.DAGR
 		} else {
 			dag = runDAG
 		}
-		currentStatus, err := m.currentStatus(ctx, dag, st.DAGRunID)
-		if err == nil {
-			st = currentStatus
-		} else {
-			logger.Debug(ctx, "Failed to get current status from socket", tag.Error(err))
-			repaired, repairErr := m.repairStaleLocalRunIfDead(ctx, attempt, dag, st)
-			if repairErr != nil {
-				logger.Error(ctx, "Failed to repair stale running status", tag.Error(repairErr))
-			} else {
-				st = repaired
-			}
-		}
+		st = m.resolveRunningStatus(ctx, dag, attempt, st, st.Parent.Zero())
 	}
 
 	return *st, nil
@@ -372,7 +397,7 @@ func (m *Manager) repairStaleLocalRunIfDead(
 	dag *core.DAG,
 	st *exec.DAGRunStatus,
 ) (*exec.DAGRunStatus, error) {
-	if st.WorkerID != "" && st.WorkerID != "local" {
+	if !isLocalWorkerID(st.WorkerID) {
 		return st, nil
 	}
 	if shouldDelayStaleLocalRunRepair(st, time.Now()) {
@@ -384,10 +409,7 @@ func (m *Manager) repairStaleLocalRunIfDead(
 		return st, nil
 	}
 
-	alive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), exec.DAGRunRef{
-		Name: dag.Name,
-		ID:   st.DAGRunID,
-	})
+	alive, err := m.procStore.IsAttemptAlive(ctx, dag.ProcGroup(), st.DAGRun(), st.AttemptID)
 	if err != nil {
 		return nil, fmt.Errorf("check alive: %w", err)
 	}

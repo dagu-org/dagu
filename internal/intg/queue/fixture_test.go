@@ -5,6 +5,7 @@ package queue_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -54,7 +55,9 @@ type schedulerConfig struct {
 // newFixture creates a new queue integration test fixture.
 func newFixture(t *testing.T, dagYAML string, opts ...func(*fixture)) *fixture {
 	t.Helper()
-	t.Parallel()
+	if !raceEnabled() {
+		t.Parallel()
+	}
 
 	f := &fixture{t: t, schedDone: make(chan error, 1)}
 
@@ -202,7 +205,7 @@ func (f *fixture) StartScheduler(timeout time.Duration) *fixture {
 	go func() {
 		th := f.th
 		th.Context = ctx
-		f.schedDone <- th.RunCommandWithError(f.t, cmd.Scheduler(), test.CmdTest{
+		f.schedDone <- th.ExecuteCommand(cmd.Scheduler(), test.CmdTest{
 			Args:        []string{"scheduler", "--dagu-home", home},
 			ExpectedOut: []string{"Scheduler started"},
 		})
@@ -212,33 +215,44 @@ func (f *fixture) StartScheduler(timeout time.Duration) *fixture {
 
 // WaitDrain waits for the queue to empty.
 func (f *fixture) WaitDrain(timeout time.Duration) *fixture {
-	require.Eventually(f.t, func() bool {
+	deadline := time.Now().Add(timeout)
+	var (
+		lastCount int
+		lastErr   error
+	)
+	for time.Now().Before(deadline) {
 		items, err := f.th.QueueStore.List(f.th.Context, f.queue)
-		require.NoError(f.t, err)
-		f.t.Logf("Queue %s: %d remaining", f.queue, len(items))
-		return len(items) == 0
-	}, timeout, 200*time.Millisecond)
+		if err == nil {
+			lastCount = len(items)
+			if lastCount == 0 {
+				return f
+			}
+		} else {
+			lastErr = err
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	require.NoError(f.t, lastErr)
+	f.t.Fatalf("timed out waiting for queue %s to drain; %d item(s) remaining", f.queue, lastCount)
 	return f
 }
 
 func (f *fixture) WaitForStatus(runID string, expected core.Status, timeout time.Duration) *fixture {
 	f.t.Helper()
-	require.Eventually(f.t, func() bool {
-		status, err := f.Status(runID)
-		return err == nil && status.Status == expected
-	}, timeout, 50*time.Millisecond, "timed out waiting for status %s", expected)
+	_, err := f.WaitForStatusMatch(runID, timeout, func(status *exec.DAGRunStatus) bool {
+		return status.Status == expected
+	})
+	require.NoError(f.t, err)
 	return f
 }
 
 func (f *fixture) WaitForStatusIn(runID string, expected []core.Status, timeout time.Duration) *fixture {
 	f.t.Helper()
-	require.Eventually(f.t, func() bool {
-		status, err := f.Status(runID)
-		if err != nil {
-			return false
-		}
+	_, err := f.WaitForStatusMatch(runID, timeout, func(status *exec.DAGRunStatus) bool {
 		return slices.Contains(expected, status.Status)
-	}, timeout, 50*time.Millisecond, "timed out waiting for status in %v", expected)
+	})
+	require.NoError(f.t, err)
 	return f
 }
 
@@ -280,6 +294,30 @@ func (f *fixture) MustStatus(runID string) *exec.DAGRunStatus {
 	return status
 }
 
+func (f *fixture) WaitForStatusMatch(
+	runID string,
+	timeout time.Duration,
+	match func(*exec.DAGRunStatus) bool,
+) (*exec.DAGRunStatus, error) {
+	f.t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	var lastErr error
+	for time.Now().Before(deadline) {
+		status, err := f.Status(runID)
+		if err == nil {
+			if match(status) {
+				return status, nil
+			}
+		} else {
+			lastErr = err
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	return nil, fmt.Errorf("timed out waiting for matching status for run %s: %w", runID, lastErr)
+}
+
 // AssertConcurrent verifies all DAGs started within maxDiff of each other.
 func (f *fixture) AssertConcurrent(maxDiff time.Duration) {
 	times := f.collectStartTimes()
@@ -310,17 +348,19 @@ func (f *fixture) waitForRecentStatus(timeout time.Duration, match func(exec.DAG
 	f.t.Helper()
 
 	var matched exec.DAGRunStatus
-	require.Eventually(f.t, func() bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
 		for _, status := range f.th.DAGRunMgr.ListRecentStatus(f.th.Context, f.dag.Name, 10) {
 			if match(status) {
 				matched = status
-				return true
+				return matched
 			}
 		}
-		return false
-	}, timeout, 200*time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
+	}
 
-	return matched
+	f.t.Fatalf("timed out waiting for recent status match")
+	return exec.DAGRunStatus{}
 }
 
 type runStatusOptions struct {

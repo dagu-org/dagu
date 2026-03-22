@@ -5,8 +5,10 @@ package fileproc
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -114,9 +116,9 @@ func (s *Store) ListAlive(ctx context.Context, groupName string) ([]exec.DAGRunR
 }
 
 // Acquire implements models.ProcStore.
-func (s *Store) Acquire(ctx context.Context, groupName string, dagRun exec.DAGRunRef) (exec.ProcHandle, error) {
+func (s *Store) Acquire(ctx context.Context, groupName string, meta exec.ProcMeta) (exec.ProcHandle, error) {
 	procGroup := s.newProcGroup(groupName)
-	proc, err := procGroup.Acquire(ctx, dagRun)
+	proc, err := procGroup.Acquire(ctx, meta)
 	if err != nil {
 		return nil, err
 	}
@@ -132,51 +134,113 @@ func (s *Store) IsRunAlive(ctx context.Context, groupName string, dagRun exec.DA
 	return procGroup.IsRunAlive(ctx, dagRun)
 }
 
+// IsAttemptAlive implements models.ProcStore.
+func (s *Store) IsAttemptAlive(ctx context.Context, groupName string, dagRun exec.DAGRunRef, attemptID string) (bool, error) {
+	procGroup := s.newProcGroup(groupName)
+	return procGroup.IsAttemptAlive(ctx, dagRun, attemptID)
+}
+
 // ListAllAlive implements models.ProcStore.
 // Returns all running DAG runs across all process groups.
 func (s *Store) ListAllAlive(ctx context.Context) (map[string][]exec.DAGRunRef, error) {
 	result := make(map[string][]exec.DAGRunRef)
+	seen := make(map[string]map[string]struct{})
 
+	entries, err := s.ListAllEntries(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range entries {
+		if !entry.Fresh {
+			continue
+		}
+		if _, ok := seen[entry.GroupName]; !ok {
+			seen[entry.GroupName] = make(map[string]struct{})
+		}
+		ref := entry.Meta.DAGRun()
+		key := ref.String()
+		if _, ok := seen[entry.GroupName][key]; ok {
+			continue
+		}
+		seen[entry.GroupName][key] = struct{}{}
+		result[entry.GroupName] = append(result[entry.GroupName], ref)
+	}
+	for groupName := range result {
+		sort.Slice(result[groupName], func(i, j int) bool {
+			left := result[groupName][i]
+			right := result[groupName][j]
+			if left.Name == right.Name {
+				return left.ID < right.ID
+			}
+			return left.Name < right.Name
+		})
+	}
+	return result, nil
+}
+
+// ListEntries implements exec.ProcStore.
+func (s *Store) ListEntries(ctx context.Context, groupName string) ([]exec.ProcEntry, error) {
+	procGroup := s.newProcGroup(groupName)
+	return procGroup.ListEntries(ctx)
+}
+
+// LatestFreshEntryByDAGName implements exec.ProcStore.
+func (s *Store) LatestFreshEntryByDAGName(ctx context.Context, groupName, dagName string) (*exec.ProcEntry, error) {
+	procGroup := s.newProcGroup(groupName)
+	return procGroup.LatestFreshEntryByDAGName(ctx, dagName)
+}
+
+// ListAllEntries implements exec.ProcStore.
+func (s *Store) ListAllEntries(ctx context.Context) ([]exec.ProcEntry, error) {
 	// Create base directory if it doesn't exist
 	if _, err := os.Stat(s.baseDir); os.IsNotExist(err) {
-		return result, nil // No processes if directory doesn't exist
+		return []exec.ProcEntry{}, nil
 	}
 
 	// Read all directories in the base directory - each directory is a process group
-	entries, err := os.ReadDir(s.baseDir)
+	dirEntries, err := os.ReadDir(s.baseDir)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, entry := range entries {
+	groupNames := make([]string, 0, len(dirEntries))
+	for _, entry := range dirEntries {
 		if !entry.IsDir() {
 			continue
 		}
+		groupNames = append(groupNames, entry.Name())
+	}
+	sort.Strings(groupNames)
 
-		groupName := entry.Name()
+	var result []exec.ProcEntry
+	for _, groupName := range groupNames {
 		procGroup := s.newProcGroup(groupName)
-
-		// Get all alive processes for this group
-		aliveRuns, err := procGroup.ListAlive(ctx)
+		entries, err := procGroup.ListEntries(ctx)
 		if err != nil {
-			logger.Warn(ctx, "Failed to list alive processes for group",
-				tag.Name(groupName),
-				tag.Error(err))
-			continue
+			return nil, err
 		}
-
-		if len(aliveRuns) > 0 {
-			result[groupName] = aliveRuns
-		}
+		result = append(result, entries...)
 	}
 
 	return result, nil
 }
 
-// CleanStaleFiles implements exec.ProcStore.
-func (s *Store) CleanStaleFiles(ctx context.Context, groupName string, dagRun exec.DAGRunRef) error {
-	procGroup := s.newProcGroup(groupName)
-	return procGroup.CleanStaleFiles(ctx, dagRun)
+// RemoveIfStale implements exec.ProcStore.
+func (s *Store) RemoveIfStale(ctx context.Context, entry exec.ProcEntry) error {
+	if entry.GroupName == "" {
+		return nil
+	}
+	procGroup := s.newProcGroup(entry.GroupName)
+	return procGroup.RemoveIfStale(ctx, entry)
+}
+
+// Validate fails if any proc entry in the store is invalid or uses an unsupported format.
+func (s *Store) Validate(ctx context.Context) error {
+	_, err := s.ListAllEntries(ctx)
+	if err != nil {
+		return fmt.Errorf("invalid proc artifact detected; stop services and clear %s before restarting: %w", s.baseDir, err)
+	}
+	return err
 }
 
 func (s *Store) newProcGroup(groupName string) *ProcGroup {

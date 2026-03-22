@@ -5,15 +5,22 @@ package runtime_test
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/runtime/transform"
+	"github.com/dagu-org/dagu/internal/test"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -33,12 +40,165 @@ func TestNewSubCmdBuilder(t *testing.T) {
 	require.NotNil(t, builder)
 }
 
+func TestRunRetryWithBuiltExecutable(t *testing.T) {
+	th := test.Setup(t, test.WithBuiltExecutable())
+
+	dagFile := th.DAG(t, `name: built-exec-retry
+steps:
+  - name: step1
+    command: echo built exec retry
+`)
+
+	runID := "built-exec-retry-run"
+	attempt, err := th.DAGRunStore.CreateAttempt(th.Context, dagFile.DAG, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
+	require.NoError(t, err)
+
+	logPath := filepath.Join(th.Config.Paths.LogDir, "built-exec-retry.log")
+	require.NoError(t, os.MkdirAll(filepath.Dir(logPath), 0o750))
+
+	status := transform.NewStatusBuilder(dagFile.DAG).Create(
+		runID,
+		core.Queued,
+		0,
+		time.Time{},
+		transform.WithAttemptID(attempt.ID()),
+		transform.WithTriggerType(core.TriggerTypeRetry),
+		transform.WithQueuedAt(stringutil.FormatTime(time.Now())),
+		transform.WithLogFilePath(logPath),
+	)
+
+	require.NoError(t, attempt.Open(th.Context))
+	require.NoError(t, attempt.Write(th.Context, status))
+	require.NoError(t, attempt.Close(th.Context))
+
+	spec := th.SubCmdBuilder.Retry(dagFile.DAG, runID, "")
+	err = runtime.Run(th.Context, spec)
+	require.NoError(t, err, "env=%s", strings.Join(spec.Env, "\n"))
+}
+
+func TestRunRetryWithBuiltExecutableFromQueuedQueueStatus(t *testing.T) {
+	th := test.Setup(t, test.WithBuiltExecutable())
+
+	dagFile := th.DAG(t, `name: built-exec-queue-retry
+steps:
+  - name: step1
+    command: echo built exec queue retry
+`)
+
+	runID := "built-exec-queue-retry-run"
+	attempt, err := th.DAGRunStore.CreateAttempt(th.Context, dagFile.DAG, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
+	require.NoError(t, err)
+
+	logPath := filepath.Join(th.Config.Paths.LogDir, dagFile.Name, runID+".log")
+	require.NoError(t, os.MkdirAll(filepath.Dir(logPath), 0o750))
+
+	status := transform.NewStatusBuilder(dagFile.DAG).Create(
+		runID,
+		core.Queued,
+		0,
+		time.Time{},
+		transform.WithLogFilePath(logPath),
+		transform.WithAttemptID(attempt.ID()),
+		transform.WithHierarchyRefs(exec.NewDAGRunRef(dagFile.Name, runID), exec.DAGRunRef{}),
+	)
+
+	require.NoError(t, attempt.Open(th.Context))
+	require.NoError(t, attempt.Write(th.Context, status))
+	require.NoError(t, attempt.Close(th.Context))
+
+	spec := th.SubCmdBuilder.Retry(dagFile.DAG, runID, "")
+	err = runtime.Run(th.Context, spec)
+	require.NoError(t, err, "env=%s", strings.Join(spec.Env, "\n"))
+}
+
+func TestRunRetryWithBuiltExecutableFromQueuedQueueStatusUsingSetupCommand(t *testing.T) {
+	th := test.SetupCommand(t, test.WithBuiltExecutable())
+
+	dagFile := th.DAG(t, `name: built-exec-command-queue-retry
+steps:
+  - name: step1
+    command: echo built exec command queue retry
+`)
+
+	runID := "built-exec-command-queue-retry-run"
+	attempt, err := th.DAGRunStore.CreateAttempt(th.Context, dagFile.DAG, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
+	require.NoError(t, err)
+
+	logPath := filepath.Join(th.Config.Paths.LogDir, dagFile.Name, runID+".log")
+	require.NoError(t, os.MkdirAll(filepath.Dir(logPath), 0o750))
+
+	status := transform.NewStatusBuilder(dagFile.DAG).Create(
+		runID,
+		core.Queued,
+		0,
+		time.Time{},
+		transform.WithLogFilePath(logPath),
+		transform.WithAttemptID(attempt.ID()),
+		transform.WithHierarchyRefs(exec.NewDAGRunRef(dagFile.Name, runID), exec.DAGRunRef{}),
+	)
+
+	require.NoError(t, attempt.Open(th.Context))
+	require.NoError(t, attempt.Write(th.Context, status))
+	require.NoError(t, attempt.Close(th.Context))
+
+	spec := th.SubCmdBuilder.Retry(dagFile.DAG, runID, "")
+	err = runtime.Run(th.Context, spec)
+	require.NoError(t, err, "env=%s", strings.Join(spec.Env, "\n"))
+}
+
+func TestRunRetryWithBuiltExecutableFromFreshLoadedConfig(t *testing.T) {
+	th := test.Setup(t, test.WithBuiltExecutable())
+
+	dagFile := th.DAG(t, `name: built-exec-fresh-config-retry
+steps:
+  - name: step1
+    command: echo built exec fresh config retry
+`)
+
+	runID := "built-exec-fresh-config-retry-run"
+	attempt, err := th.DAGRunStore.CreateAttempt(th.Context, dagFile.DAG, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
+	require.NoError(t, err)
+
+	logPath := filepath.Join(th.Config.Paths.LogDir, dagFile.Name, runID+".log")
+	require.NoError(t, os.MkdirAll(filepath.Dir(logPath), 0o750))
+
+	status := transform.NewStatusBuilder(dagFile.DAG).Create(
+		runID,
+		core.Queued,
+		0,
+		time.Time{},
+		transform.WithLogFilePath(logPath),
+		transform.WithAttemptID(attempt.ID()),
+		transform.WithHierarchyRefs(exec.NewDAGRunRef(dagFile.Name, runID), exec.DAGRunRef{}),
+	)
+
+	require.NoError(t, attempt.Open(th.Context))
+	require.NoError(t, attempt.Write(th.Context, status))
+	require.NoError(t, attempt.Close(th.Context))
+
+	loader := config.NewConfigLoader(
+		viper.New(),
+		config.WithConfigFile(th.Config.Paths.ConfigFileUsed),
+		config.WithAppHomeDir(filepath.Dir(th.Config.Paths.DAGsDir)),
+	)
+	freshCfg, err := loader.Load()
+	require.NoError(t, err)
+
+	spec := runtime.NewSubCmdBuilder(freshCfg).Retry(dagFile.DAG, runID, "")
+	err = runtime.Run(th.Context, spec)
+	require.NoError(t, err, "env=%s", strings.Join(spec.Env, "\n"))
+}
+
 func TestStart(t *testing.T) {
 	t.Parallel()
+	baseEnv := config.NewBaseEnv([]string{"PATH=/usr/bin", "HOME=/tmp/test-home"})
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
 			Executable:     "/usr/bin/dagu",
 			ConfigFileUsed: "/etc/dagu/config.yaml",
+		},
+		Core: config.Core{
+			BaseEnv: baseEnv,
 		},
 	}
 
@@ -58,7 +218,7 @@ func TestStart(t *testing.T) {
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
 		assert.Contains(t, spec.Args, "/path/to/dag.yaml")
-		assert.NotNil(t, spec.Env)
+		assert.Equal(t, baseEnv.AsSlice(), spec.Env)
 	})
 
 	t.Run("StartWithParams", func(t *testing.T) {
@@ -409,10 +569,14 @@ func TestRetry(t *testing.T) {
 
 func TestTaskStart(t *testing.T) {
 	t.Parallel()
+	baseEnv := config.NewBaseEnv([]string{"PATH=/usr/bin", "HOME=/tmp/test-home"})
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
 			Executable:     "/usr/bin/dagu",
 			ConfigFileUsed: "/etc/dagu/config.yaml",
+		},
+		Core: config.Core{
+			BaseEnv: baseEnv,
 		},
 	}
 
@@ -433,6 +597,7 @@ func TestTaskStart(t *testing.T) {
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
 		assert.Contains(t, spec.Args, "/path/to/task.yaml")
+		assert.Equal(t, baseEnv.AsSlice(), spec.Env)
 	})
 
 	t.Run("TaskStartWithHierarchy", func(t *testing.T) {
@@ -569,10 +734,14 @@ func TestTaskStart(t *testing.T) {
 
 func TestTaskRetry(t *testing.T) {
 	t.Parallel()
+	baseEnv := config.NewBaseEnv([]string{"PATH=/usr/bin", "HOME=/tmp/test-home"})
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
 			Executable:     "/usr/bin/dagu",
 			ConfigFileUsed: "/etc/dagu/config.yaml",
+		},
+		Core: config.Core{
+			BaseEnv: baseEnv,
 		},
 	}
 
@@ -593,6 +762,7 @@ func TestTaskRetry(t *testing.T) {
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
 		assert.Contains(t, spec.Args, "root-dag")
+		assert.Equal(t, baseEnv.AsSlice(), spec.Env)
 	})
 
 	t.Run("TaskRetryWithStep", func(t *testing.T) {
@@ -617,6 +787,8 @@ func TestTaskRetry(t *testing.T) {
 		}
 		spec := builder.TaskRetry(task)
 
+		assert.Contains(t, spec.Env, "PATH=/usr/bin")
+		assert.Contains(t, spec.Env, "HOME=/tmp/test-home")
 		assert.Contains(t, spec.Env, exec.EnvKeyExternalStepRetry+"=1")
 	})
 

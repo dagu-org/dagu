@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"sort"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -40,7 +39,6 @@ type RetryScanner struct {
 	isSuspended IsSuspendedFunc
 	retryWindow time.Duration
 	clock       Clock
-	listTargets func() []string
 }
 
 func NewRetryScanner(
@@ -114,55 +112,11 @@ func (s *RetryScanner) scan(ctx context.Context) error {
 }
 
 func (s *RetryScanner) listFailedRuns(ctx context.Context, from exec.TimeInUTC) ([]*exec.DAGRunStatus, error) {
-	baseOpts := []exec.ListDAGRunStatusesOption{
+	return s.dagRunStore.ListStatuses(ctx,
 		exec.WithStatuses([]core.Status{core.Failed}),
 		exec.WithFrom(from),
 		exec.WithoutLimit(),
-	}
-
-	if s.listTargets == nil {
-		return s.dagRunStore.ListStatuses(ctx, baseOpts...)
-	}
-
-	targets := s.retryTargetNames()
-	if len(targets) == 0 {
-		return nil, nil
-	}
-
-	var failedRuns []*exec.DAGRunStatus
-	for _, name := range targets {
-		opts := append([]exec.ListDAGRunStatusesOption{}, baseOpts...)
-		opts = append(opts, exec.WithExactName(name))
-		items, err := s.dagRunStore.ListStatuses(ctx, opts...)
-		if err != nil {
-			return nil, err
-		}
-		failedRuns = append(failedRuns, items...)
-	}
-
-	return failedRuns, nil
-}
-
-func (s *RetryScanner) retryTargetNames() []string {
-	raw := s.listTargets()
-	if len(raw) == 0 {
-		return nil
-	}
-
-	targets := make([]string, 0, len(raw))
-	seen := make(map[string]struct{}, len(raw))
-	for _, name := range raw {
-		if name == "" {
-			continue
-		}
-		if _, ok := seen[name]; ok {
-			continue
-		}
-		seen[name] = struct{}{}
-		targets = append(targets, name)
-	}
-	sort.Strings(targets)
-	return targets
+	)
 }
 
 func (s *RetryScanner) processFailedRun(
@@ -254,11 +208,10 @@ func (s *RetryScanner) processFailedRunLegacy(
 
 	metadata, ok := retryMetadataFromDAG(dagSnapshot)
 	if !ok {
-		decision := retryDecision{reason: "retry_policy_missing"}
 		logger.Debug(ctx, "Retry scanner skipped DAG run",
 			tag.DAG(latestStatus.Name),
 			tag.RunID(latestStatus.DAGRunID),
-			slog.String("skip_reason", decision.reason),
+			slog.String("skip_reason", "retry_policy_missing"),
 		)
 		return nil
 	}

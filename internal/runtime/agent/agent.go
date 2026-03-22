@@ -169,6 +169,10 @@ type Agent struct {
 	// When set, the agent creates an attempt with this ID instead of generating a new one.
 	attemptID string
 
+	// preparedAttempt is an exact local attempt prepared before proc acquisition.
+	// When set, the agent must reuse this attempt instead of creating another one.
+	preparedAttempt exec.DAGRunAttempt
+
 	// agentConfigStore is the agent config store for agent step execution.
 	agentConfigStore agentpkg.ConfigStore
 	// agentModelStore is the agent model store for agent step execution.
@@ -240,6 +244,9 @@ type Options struct {
 	// AttemptID is the attempt ID from the coordinator.
 	// When set, the agent creates an attempt with this ID instead of generating a new one.
 	AttemptID string
+	// PreparedAttempt is an exact attempt that was created or reopened before proc acquisition.
+	// This is used for local execution so the proc heartbeat can include the final attempt ID.
+	PreparedAttempt exec.DAGRunAttempt
 	// DAGRunStore is the store for dag-run data. Nil in shared-nothing mode.
 	DAGRunStore exec.DAGRunStore
 	// ServiceRegistry is the registry for service discovery.
@@ -300,6 +307,7 @@ func New(
 		logWriterFactory:        opts.LogWriterFactory,
 		queuedRun:               opts.QueuedRun,
 		attemptID:               opts.AttemptID,
+		preparedAttempt:         opts.PreparedAttempt,
 		triggerType:             opts.TriggerType,
 		defaultExecMode:         opts.DefaultExecMode,
 		agentConfigStore:        opts.AgentConfigStore,
@@ -314,6 +322,12 @@ func New(
 	// Initialize progress display if enabled
 	if opts.ProgressDisplay {
 		a.progressDisplay = createProgressReporter(dag, dagRunID, dag.Params)
+	}
+
+	if opts.PreparedAttempt != nil {
+		a.dagRunAttemptID = opts.PreparedAttempt.ID()
+	} else if opts.AttemptID != "" {
+		a.dagRunAttemptID = opts.AttemptID
 	}
 
 	return a
@@ -1638,6 +1652,11 @@ func (a *Agent) setupDAGRunAttempt(ctx context.Context) (exec.DAGRunAttempt, err
 	retentionDays := a.dag.HistRetentionDays
 	if _, err := a.dagRunStore.RemoveOldDAGRuns(ctx, a.dag.Name, retentionDays); err != nil {
 		logger.Error(ctx, "DAG runs data cleanup failed", tag.Error(err))
+	}
+
+	if a.preparedAttempt != nil {
+		a.preparedAttempt.SetDAG(a.dag)
+		return a.preparedAttempt, nil
 	}
 
 	// Retry is true when:

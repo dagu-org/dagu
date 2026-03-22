@@ -95,6 +95,15 @@ func NewSubCmdBuilder(cfg *config.Config) *SubCmdBuilder {
 	}
 }
 
+func (b *SubCmdBuilder) env(extra ...string) []string {
+	env := b.baseEnv.AsSlice()
+	if len(env) == 0 {
+		env = os.Environ()
+	}
+	env = append(env, extra...)
+	return env
+}
+
 // Start creates a start command spec.
 func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	args := []string{"start"}
@@ -136,7 +145,7 @@ func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        os.Environ(),
+		Env:        b.env(),
 	}
 }
 
@@ -176,7 +185,7 @@ func (b *SubCmdBuilder) Enqueue(dag *core.DAG, opts EnqueueOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        os.Environ(),
+		Env:        b.env(),
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
 	}
@@ -194,7 +203,7 @@ func (b *SubCmdBuilder) Dequeue(dag *core.DAG, dagRun exec1.DAGRunRef) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        os.Environ(),
+		Env:        b.env(),
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
 	}
@@ -218,7 +227,7 @@ func (b *SubCmdBuilder) Restart(dag *core.DAG, opts RestartOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        os.Environ(),
+		Env:        b.env(),
 	}
 }
 
@@ -238,14 +247,14 @@ func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string) C
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        os.Environ(),
+		Env:        b.env(),
 	}
 }
 
 // TaskStart creates a start command spec for coordinator tasks.
 func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 	args := []string{"start", "-q"}
-	env := os.Environ()
+	env := b.env()
 
 	// Add hierarchy flags for sub DAGs
 	if task.RootDagRunId != "" {
@@ -296,7 +305,7 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 // TaskRetry creates a retry command spec for coordinator tasks.
 func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
 	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId), "-q"}
-	env := os.Environ()
+	env := b.env()
 
 	if task.Step != "" {
 		args = append(args, fmt.Sprintf("--step=%s", task.Step))

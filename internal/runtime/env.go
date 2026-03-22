@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -278,7 +279,7 @@ func evalShellWithScope(ctx context.Context, scope *eval.EnvScope, shell string,
 
 // defaultShell returns the global default shell.
 func defaultShell(ctx context.Context) []string {
-	shellCmd := cmdutil.GetShellCommand("")
+	shellCmd := cmdutil.GetShellCommand(config.GetConfig(ctx).Core.DefaultShell)
 	if shellCmd != "" {
 		return []string{shellCmd}
 	}

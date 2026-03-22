@@ -29,6 +29,11 @@ type Server struct {
 func SetupServer(t *testing.T, opts ...HelperOption) Server {
 	t.Helper()
 
+	// Frontend server tests exercise API paths that launch DAG subprocesses.
+	// Force them onto a binary built from the current source tree rather than
+	// relying on whatever happens to exist in .local/bin.
+	opts = append(opts, WithBuiltExecutable())
+
 	// Create a listener and keep it alive until the server binds.
 	// This prevents race conditions where parallel tests could steal the port
 	// between finding it and binding to it.

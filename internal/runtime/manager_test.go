@@ -4,6 +4,7 @@
 package runtime_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -37,12 +38,12 @@ func TestManager(t *testing.T) {
 				status := transform.NewStatusBuilder(dag.DAG).Create(
 					dagRunID, core.Running, 0, time.Now(),
 				)
-				w.WriteHeader(http.StatusOK)
 				jsonData, err := json.Marshal(status)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
+				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write(jsonData)
 			},
 		)
@@ -295,9 +296,94 @@ steps:
 		require.Equal(t, core.Running, saved.Status)
 		require.Equal(t, "worker-1", saved.WorkerID)
 	})
+	t.Run("GetLatestStatusDoesNotReadLocalSocketForDistributedRun", func(t *testing.T) {
+		dag := th.DAG(t, `steps:
+  - name: "1"
+    command: sleep 1
+`)
+
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+		now := time.Now()
+		ctx := th.Context
+
+		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, exec.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+		require.NoError(t, att.Open(ctx))
+
+		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		runningStatus.WorkerID = "worker-1"
+		require.NoError(t, att.Write(ctx, runningStatus))
+		require.NoError(t, att.Close(ctx))
+
+		stopSocket := startStatusSocketServer(t, ctx, dag.DAG, dagRunID, transform.NewStatusBuilder(dag.DAG).Create(
+			dagRunID, core.Failed, 0, time.Now(),
+		))
+		defer stopSocket()
+
+		latest, err := th.DAGRunMgr.GetLatestStatus(ctx, dag.DAG)
+		require.NoError(t, err)
+		require.Equal(t, core.Running, latest.Status)
+		require.Equal(t, "worker-1", latest.WorkerID)
+	})
+	t.Run("GetCurrentStatusDoesNotReadLocalSocketForDistributedRun", func(t *testing.T) {
+		dag := th.DAG(t, `steps:
+  - name: "1"
+    command: sleep 1
+`)
+
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+		now := time.Now()
+		ctx := th.Context
+
+		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, exec.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+		require.NoError(t, att.Open(ctx))
+
+		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		runningStatus.WorkerID = "worker-1"
+		require.NoError(t, att.Write(ctx, runningStatus))
+		require.NoError(t, att.Close(ctx))
+
+		stopSocket := startStatusSocketServer(t, ctx, dag.DAG, dagRunID, transform.NewStatusBuilder(dag.DAG).Create(
+			dagRunID, core.Failed, 0, time.Now(),
+		))
+		defer stopSocket()
+
+		current, err := th.DAGRunMgr.GetCurrentStatus(ctx, dag.DAG, dagRunID)
+		require.NoError(t, err)
+		require.Equal(t, core.Running, current.Status)
+		require.Equal(t, "worker-1", current.WorkerID)
+	})
 }
 
 func testNewStatus(dag *core.DAG, dagRunID string, dagStatus core.Status, nodeStatus core.NodeStatus) exec.DAGRunStatus {
 	nodes := []runtime.NodeData{{State: runtime.NodeState{Status: nodeStatus}}}
 	return transform.NewStatusBuilder(dag).Create(dagRunID, dagStatus, 0, time.Now(), transform.WithNodes(nodes))
+}
+
+func startStatusSocketServer(t *testing.T, ctx context.Context, dag *core.DAG, dagRunID string, status exec.DAGRunStatus) func() {
+	t.Helper()
+
+	socketServer, err := sock.NewServer(
+		dag.SockAddr(dagRunID),
+		func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			jsonData, marshalErr := json.Marshal(status)
+			if marshalErr != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			_, _ = w.Write(jsonData)
+		},
+	)
+	require.NoError(t, err)
+
+	go func() {
+		_ = socketServer.Serve(ctx, nil)
+		_ = socketServer.Shutdown(ctx)
+	}()
+
+	return func() {
+		_ = socketServer.Shutdown(ctx)
+	}
 }

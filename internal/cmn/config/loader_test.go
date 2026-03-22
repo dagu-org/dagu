@@ -324,6 +324,28 @@ func TestLoad_WithAppHomeDir(t *testing.T) {
 	require.Contains(t, baseEnv, fmt.Sprintf("DAGU_HOME=%s", tempDir))
 }
 
+func TestLoad_BaseEnvIncludesConfigDerivedOverrides(t *testing.T) {
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	executablePath := filepath.Join(tempDir, "bin", "dagu")
+	err := os.WriteFile(configFile, fmt.Appendf(nil, `
+default_shell: /bin/sh
+tz: UTC
+paths:
+  executable: %s
+`, executablePath), 0o600)
+	require.NoError(t, err)
+
+	cfg := testLoad(t, WithConfigFile(configFile), WithAppHomeDir(tempDir))
+	baseEnv := cfg.Core.BaseEnv.AsSlice()
+
+	require.Contains(t, baseEnv, fmt.Sprintf("DAGU_HOME=%s", tempDir))
+	require.Contains(t, baseEnv, fmt.Sprintf("DAGU_CONFIG=%s", configFile))
+	require.Contains(t, baseEnv, fmt.Sprintf("DAGU_EXECUTABLE=%s", executablePath))
+	require.Contains(t, baseEnv, "SHELL=/bin/sh")
+	require.Contains(t, baseEnv, "TZ=UTC")
+}
+
 func TestLoad_YAML(t *testing.T) {
 	cfg := loadFromYAML(t, `
 host: "0.0.0.0"

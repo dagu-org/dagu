@@ -4,9 +4,11 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -128,25 +130,29 @@ func runRetry(ctx *Context, args []string) error {
 
 	ctx.Context = logger.WithValues(ctx.Context, tag.DAG(dag.Name), tag.RunID(dagRunID))
 
-	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
-		return fmt.Errorf("failed to lock process group: %w", err)
+	if workerID == "local" {
+		return withPreparedLocalExecution(
+			ctx,
+			dag,
+			dagRunID,
+			rootRun,
+			status.Parent,
+			exec.PreservedQueueTriggerType(status),
+			status.ScheduleTime,
+			func(execCtx context.Context) (exec.DAGRunAttempt, error) {
+				opts := exec.NewDAGRunAttemptOptions{Retry: true}
+				if !rootRun.Zero() && rootRun.ID != dagRunID {
+					opts.RootDAGRun = &rootRun
+				}
+				return ctx.DAGRunStore.CreateAttempt(execCtx, dag, time.Now(), dagRunID, opts)
+			},
+			func(preparedAttempt exec.DAGRunAttempt) error {
+				return executeRetry(ctx, dag, status, rootRun, stepName, workerID, preparedAttempt)
+			},
+		)
 	}
 
-	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), exec.NewDAGRunRef(dag.Name, dagRunID))
-	if err != nil {
-		ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
-		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
-		_ = ctx.RecordEarlyFailure(dag, dagRunID, err)
-		return fmt.Errorf("failed to acquire process handle: %w", errProcAcquisitionFailed)
-	}
-	defer func() {
-		_ = proc.Stop(ctx)
-	}()
-	ctx.Proc = proc
-
-	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
-
-	return executeRetry(ctx, dag, status, rootRun, stepName, workerID)
+	return executeRetry(ctx, dag, status, rootRun, stepName, workerID, nil)
 }
 
 // enqueueRetry enqueues the retry and persists Queued status via exec.EnqueueRetry.
@@ -199,7 +205,7 @@ func prepareQueuedCatchupRetry(ctx *Context, attempt exec.DAGRunAttempt, dag *co
 
 // executeRetry runs a retry of a DAG run using the original run's log file.
 // Queued catchup runs reuse this path but preserve their catchup trigger type.
-func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRun exec.DAGRunRef, stepName, workerID string) error {
+func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRun exec.DAGRunRef, stepName, workerID string, preparedAttempt exec.DAGRunAttempt) error {
 	if stepName != "" {
 		ctx.Context = logger.WithValues(ctx.Context, tag.Step(stepName))
 	}
@@ -242,6 +248,7 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 			ProgressDisplay:         shouldEnableProgress(ctx),
 			StepRetry:               stepName,
 			WorkerID:                workerID,
+			PreparedAttempt:         preparedAttempt,
 			DAGRunStore:             ctx.DAGRunStore,
 			ServiceRegistry:         ctx.ServiceRegistry,
 			RootDAGRun:              rootRun,

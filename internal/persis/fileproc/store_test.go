@@ -6,6 +6,8 @@ package fileproc
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -29,7 +31,7 @@ func TestStore(t *testing.T) {
 
 	// Get the process for the dag-run
 	// Using different group name (queue) vs dag name to test hierarchy
-	proc, err := store.Acquire(ctx, "test_queue", dagRun)
+	proc, err := store.Acquire(ctx, "test_queue", testProcMetaFromRun(dagRun))
 	require.NoError(t, err, "failed to get proc")
 
 	requireCountAlive(t, ctx, store, "test_queue", 1)
@@ -67,7 +69,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 
 		// Create a process and start heartbeat
 		// Use different group name (queue-2) vs dag name (test-dag)
-		proc, err := store.Acquire(ctx, "queue-2", dagRun)
+		proc, err := store.Acquire(ctx, "queue-2", testProcMetaFromRun(dagRun))
 		require.NoError(t, err)
 
 		requireRunAliveState(t, ctx, store, "queue-2", dagRun, true)
@@ -85,7 +87,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 			Name: "test-dag-3",
 			ID:   "run-789",
 		}
-		proc1, err := store.Acquire(ctx, "queue-3", dagRun1)
+		proc1, err := store.Acquire(ctx, "queue-3", testProcMetaFromRun(dagRun1))
 		require.NoError(t, err)
 
 		requireRunAliveState(t, ctx, store, "queue-3", dagRun1, true)
@@ -121,7 +123,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 
 		// Create a process
 		// Use different group name vs dag name
-		proc, err := shortStore.Acquire(ctx, "stale-queue", dagRun)
+		proc, err := shortStore.Acquire(ctx, "stale-queue", testProcMetaFromRun(dagRun))
 		require.NoError(t, err)
 
 		// Stop the heartbeat immediately
@@ -134,6 +136,77 @@ func TestStore_IsRunAlive(t *testing.T) {
 			return err == nil && !alive
 		}, 200*time.Millisecond, 10*time.Millisecond, "expected process to become stale")
 	})
+}
+
+func TestStore_IsAttemptAlive(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseDir := t.TempDir()
+	store := New(baseDir)
+	dagRun := exec.DAGRunRef{
+		Name: "attempt-dag",
+		ID:   "run-1",
+	}
+	meta := testProcMetaFromRun(dagRun)
+	meta.AttemptID = "attempt-1"
+
+	proc, err := store.Acquire(ctx, "attempt-queue", meta)
+	require.NoError(t, err)
+	defer func() { _ = proc.Stop(ctx) }()
+
+	require.Eventually(t, func() bool {
+		alive, err := store.IsAttemptAlive(ctx, "attempt-queue", dagRun, "attempt-1")
+		require.NoError(t, err)
+		return alive
+	}, heartbeatWait, heartbeatPoll, "expected exact attempt to be alive")
+
+	otherAlive, err := store.IsAttemptAlive(ctx, "attempt-queue", dagRun, "attempt-2")
+	require.NoError(t, err)
+	require.False(t, otherAlive)
+}
+
+func TestStore_LatestFreshEntryByDAGName(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseDir := t.TempDir()
+	store := New(baseDir)
+
+	older := exec.ProcMeta{
+		StartedAt:    100,
+		Name:         "latest-dag",
+		DAGRunID:     "run-older",
+		AttemptID:    "attempt-older",
+		RootName:     "latest-dag",
+		RootDAGRunID: "run-older",
+	}
+	newer := exec.ProcMeta{
+		StartedAt:    200,
+		Name:         "latest-dag",
+		DAGRunID:     "run-newer",
+		AttemptID:    "attempt-newer",
+		RootName:     "latest-dag",
+		RootDAGRunID: "run-newer",
+	}
+
+	proc1, err := store.Acquire(ctx, "latest-queue", older)
+	require.NoError(t, err)
+	defer func() { _ = proc1.Stop(ctx) }()
+
+	proc2, err := store.Acquire(ctx, "latest-queue", newer)
+	require.NoError(t, err)
+	defer func() { _ = proc2.Stop(ctx) }()
+
+	require.Eventually(t, func() bool {
+		entry, err := store.LatestFreshEntryByDAGName(ctx, "latest-queue", "latest-dag")
+		require.NoError(t, err)
+		return entry != nil && entry.Meta.DAGRunID == "run-newer" && entry.Meta.AttemptID == "attempt-newer"
+	}, heartbeatWait, heartbeatPoll, "expected newest started attempt to be selected")
+
+	entry, err := store.LatestFreshEntryByDAGName(ctx, "latest-queue", "missing-dag")
+	require.NoError(t, err)
+	require.Nil(t, entry)
 }
 
 func TestStore_ListAllAlive(t *testing.T) {
@@ -162,11 +235,11 @@ func TestStore_ListAllAlive(t *testing.T) {
 			ID:   "run2",
 		}
 
-		proc1, err := store.Acquire(ctx, "queue1", dagRun1)
+		proc1, err := store.Acquire(ctx, "queue1", testProcMetaFromRun(dagRun1))
 		require.NoError(t, err)
 		defer func() { _ = proc1.Stop(ctx) }()
 
-		proc2, err := store.Acquire(ctx, "queue1", dagRun2)
+		proc2, err := store.Acquire(ctx, "queue1", testProcMetaFromRun(dagRun2))
 		require.NoError(t, err)
 		defer func() { _ = proc2.Stop(ctx) }()
 
@@ -205,15 +278,15 @@ func TestStore_ListAllAlive(t *testing.T) {
 			ID:   "run-c1",
 		}
 
-		proc1, err := store.Acquire(ctx, "queue-alpha", dagRun1)
+		proc1, err := store.Acquire(ctx, "queue-alpha", testProcMetaFromRun(dagRun1))
 		require.NoError(t, err)
 		defer func() { _ = proc1.Stop(ctx) }()
 
-		proc2, err := store.Acquire(ctx, "queue-beta", dagRun2)
+		proc2, err := store.Acquire(ctx, "queue-beta", testProcMetaFromRun(dagRun2))
 		require.NoError(t, err)
 		defer func() { _ = proc2.Stop(ctx) }()
 
-		proc3, err := store.Acquire(ctx, "queue-alpha", dagRun3)
+		proc3, err := store.Acquire(ctx, "queue-alpha", testProcMetaFromRun(dagRun3))
 		require.NoError(t, err)
 		defer func() { _ = proc3.Stop(ctx) }()
 
@@ -250,13 +323,13 @@ func TestStore_ListAllAlive(t *testing.T) {
 			ID:   "run-z1",
 		}
 
-		proc1, err := store.Acquire(ctx, "mixed-queue", dagRun1)
+		proc1, err := store.Acquire(ctx, "mixed-queue", testProcMetaFromRun(dagRun1))
 		require.NoError(t, err)
 
-		proc2, err := store.Acquire(ctx, "mixed-queue", dagRun2)
+		proc2, err := store.Acquire(ctx, "mixed-queue", testProcMetaFromRun(dagRun2))
 		require.NoError(t, err)
 
-		proc3, err := store.Acquire(ctx, "mixed-queue", dagRun3)
+		proc3, err := store.Acquire(ctx, "mixed-queue", testProcMetaFromRun(dagRun3))
 		require.NoError(t, err)
 
 		// Stop proc2
@@ -317,6 +390,77 @@ func TestStore_ListAllAlive(t *testing.T) {
 		require.NotNil(t, result)
 		require.Empty(t, result)
 	})
+}
+
+func TestStore_ValidateAcceptsLegacyProcArtifacts(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseDir := t.TempDir()
+	store := New(baseDir)
+	now := time.Now().UTC()
+
+	writeLegacyProcFile(t, baseDir, "legacy-group", "legacy-dag", "legacy-run", now.Add(-time.Minute), now.Add(-10*time.Second))
+
+	require.NoError(t, store.Validate(ctx))
+
+	entries, err := store.ListEntries(ctx, "legacy-group")
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	require.Equal(t, "legacy-dag", entries[0].Meta.Name)
+	require.Equal(t, "legacy-run", entries[0].Meta.DAGRunID)
+	require.Equal(t, legacyProcAttemptID("legacy-run"), entries[0].Meta.AttemptID)
+}
+
+func TestStore_ValidateRejectsMalformedProcArtifacts(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseDir := t.TempDir()
+	store := New(baseDir)
+	path := filepath.Join(baseDir, "bad-group", "bad-dag", "garbage.proc")
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
+	require.NoError(t, os.WriteFile(path, []byte("bad"), 0o600))
+
+	err := store.Validate(ctx)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "invalid proc artifact detected")
+}
+
+func TestStore_IsRunAlive_LegacyProcFile(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseDir := t.TempDir()
+	store := New(baseDir)
+	now := time.Now().UTC()
+
+	writeLegacyProcFile(t, baseDir, "legacy-group", "legacy-dag", "legacy-run", now.Add(-time.Minute), now.Add(-10*time.Second))
+
+	alive, err := store.IsRunAlive(ctx, "legacy-group", exec.NewDAGRunRef("legacy-dag", "legacy-run"))
+	require.NoError(t, err)
+	require.True(t, alive)
+}
+
+func TestStore_RemoveIfStale_LegacyProcFile(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseDir := t.TempDir()
+	store := New(baseDir, WithStaleThreshold(100*time.Millisecond))
+	now := time.Now().UTC()
+
+	path := writeLegacyProcFile(t, baseDir, "legacy-group", "legacy-dag", "legacy-run", now.Add(-time.Minute), now.Add(-time.Second))
+
+	entries, err := store.ListEntries(ctx, "legacy-group")
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	require.False(t, entries[0].Fresh)
+
+	require.NoError(t, store.RemoveIfStale(ctx, entries[0]))
+
+	_, err = os.Stat(path)
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 const (

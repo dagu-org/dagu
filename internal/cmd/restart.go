@@ -109,31 +109,25 @@ func handleRestartProcess(ctx *Context, d *core.DAG, oldDagRunID string, schedul
 		return fmt.Errorf("failed to generate dag-run ID: %w", err)
 	}
 
-	if err := ctx.ProcStore.Lock(ctx, d.ProcGroup()); err != nil {
-		logger.Debug(ctx, "Failed to lock process group", tag.Error(err))
-		_ = ctx.RecordEarlyFailure(d, newDagRunID, err)
-		return errProcAcquisitionFailed
-	}
-
-	proc, err := ctx.ProcStore.Acquire(ctx, d.ProcGroup(), exec.NewDAGRunRef(d.Name, newDagRunID))
-	if err != nil {
-		ctx.ProcStore.Unlock(ctx, d.ProcGroup())
-		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
-		_ = ctx.RecordEarlyFailure(d, newDagRunID, err)
-		return fmt.Errorf("failed to acquire process handle: %w", errProcAcquisitionFailed)
-	}
-	defer func() {
-		_ = proc.Stop(ctx)
-	}()
-	ctx.Proc = proc
-
-	ctx.ProcStore.Unlock(ctx, d.ProcGroup())
-
-	return executeDAGWithRunID(ctx, ctx.DAGRunMgr, d, newDagRunID, scheduleTime)
+	return withPreparedLocalExecution(
+		ctx,
+		d,
+		newDagRunID,
+		exec.NewDAGRunRef(d.Name, newDagRunID),
+		exec.DAGRunRef{},
+		core.TriggerTypeUnknown,
+		scheduleTime,
+		func(execCtx context.Context) (exec.DAGRunAttempt, error) {
+			return ctx.DAGRunStore.CreateAttempt(execCtx, d, time.Now(), newDagRunID, exec.NewDAGRunAttemptOptions{})
+		},
+		func(preparedAttempt exec.DAGRunAttempt) error {
+			return executeDAGWithRunID(ctx, ctx.DAGRunMgr, d, newDagRunID, scheduleTime, preparedAttempt)
+		},
+	)
 }
 
 // executeDAGWithRunID executes a DAG with a pre-generated run ID.
-func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRunID string, scheduleTime string) error {
+func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRunID string, scheduleTime string, preparedAttempt exec.DAGRunAttempt) error {
 	logFile, err := ctx.OpenLogFile(dag, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file: %w", err)
@@ -166,6 +160,7 @@ func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRu
 		dr,
 		agent.Options{
 			Dry:                     false,
+			PreparedAttempt:         preparedAttempt,
 			DAGRunStore:             ctx.DAGRunStore,
 			ServiceRegistry:         ctx.ServiceRegistry,
 			RootDAGRun:              exec.NewDAGRunRef(dag.Name, dagRunID),

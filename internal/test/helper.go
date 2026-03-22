@@ -6,6 +6,8 @@ package test
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -154,16 +156,12 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		opt(&options)
 	}
 
-	// Set the log level to debug
-	_ = os.Setenv("DEBUG", "true")
-
-	// Set the CI flag
-	_ = os.Setenv("CI", "true")
+	// Keep test time-dependent subprocess behavior deterministic.
 	_ = os.Setenv("TZ", "UTC")
 
 	random := uuid.New().String()
 	tmpDir := fileutil.MustTempDir(fmt.Sprintf("dagu-test-%s", random))
-	require.NoError(t, os.Setenv("DAGU_HOME", tmpDir))
+	shellPath := testShellPath(t)
 
 	root := getProjectRoot(t)
 	executablePath := filepath.Join(root, ".local", "bin", "dagu")
@@ -174,25 +172,18 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		executablePath = buildCurrentExecutable(t, root)
 	}
 
-	_ = os.Setenv("DAGU_EXECUTABLE", executablePath)
-
-	// on Windows, set SHELL to powershell
-	if runtime.GOOS == "windows" {
-		powershellPath, err := exec.LookPath("powershell")
-		require.NoError(t, err, "failed to find powershell in PATH")
-		require.NoError(t, os.Setenv("SHELL", powershellPath))
-	}
-
 	ctx := createDefaultContext()
 	// Use a fresh viper instance to avoid any global state issues between tests.
 	v := viper.New()
-	loader := config.NewConfigLoader(v)
+	loader := config.NewConfigLoader(v, config.WithAppHomeDir(tmpDir))
 	cfg, loadErr := loader.Load()
 	require.NoError(t, loadErr)
 
+	cfg.Core.Debug = true
 	cfg.Core.TZ = "UTC"
 	cfg.Core.Location = time.UTC
 	cfg.Core.TzOffsetInSec = 0
+	cfg.Core.DefaultShell = shellPath
 	cfg.Paths.Executable = executablePath
 	cfg.Paths.LogDir = filepath.Join(tmpDir, "logs")
 	dataDir := filepath.Join(tmpDir, "data")
@@ -233,9 +224,9 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	}
 
 	configFile := filepath.Join(tmpDir, "config.yaml")
-	writeHelperConfigFile(t, cfg, configFile)
 	cfg.Paths.ConfigFileUsed = configFile
-	_ = os.Setenv("DAGU_CONFIG", configFile)
+	cfg.Core.BaseEnv = config.NewBaseEnv(buildHelperChildEnv(cfg.Core.BaseEnv.AsSlice(), tmpDir, configFile, executablePath, shellPath))
+	writeHelperConfigFile(t, cfg, configFile)
 
 	ctx = config.WithConfig(ctx, cfg)
 
@@ -250,6 +241,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	helper := Helper{
 		Context:         ctx,
 		Config:          cfg,
+		ChildEnv:        cfg.Core.BaseEnv.AsSlice(),
 		DAGRunMgr:       drm,
 		DAGStore:        dagStore,
 		DAGRunStore:     runStore,
@@ -275,20 +267,6 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	ctx, cancel := context.WithCancel(helper.Context)
 	helper.Context = ctx
 	helper.Cancel = cancel
-
-	// setup the default shell for reproducible result
-	if runtime.GOOS == "windows" {
-		// On Windows, try PowerShell first, then cmd
-		if _, err := exec.LookPath("powershell"); err == nil {
-			setShell(t, "powershell")
-		} else if _, err := exec.LookPath("cmd"); err == nil {
-			setShell(t, "cmd")
-		} else {
-			t.Fatal("No suitable shell found on Windows")
-		}
-	} else {
-		setShell(t, "sh")
-	}
 
 	t.Cleanup(helper.Cleanup)
 	return helper
@@ -460,6 +438,7 @@ type Helper struct {
 	Context         context.Context
 	Cancel          context.CancelFunc
 	Config          *config.Config
+	ChildEnv        []string
 	LoggingOutput   *SyncBuffer
 	DAGStore        exec1.DAGStore
 	DAGRunStore     exec1.DAGRunStore
@@ -705,6 +684,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 	} else {
 		dagRunID = genDAGRunID()
 	}
+	helper.dagRunID = dagRunID
 
 	logDir := d.Config.Paths.LogDir
 	logFile := filepath.Join(d.Config.Paths.LogDir, dagRunID+".log")
@@ -750,9 +730,14 @@ func (a *Agent) RunError(t *testing.T) {
 func (a *Agent) RunCancel(t *testing.T) {
 	t.Helper()
 
-	proc, err := a.ProcStore.Acquire(a.Context, a.ProcGroup(), exec1.DAGRunRef{
-		Name: a.Name,
-		ID:   a.dagRunID,
+	attemptID := newTestAttemptID(t)
+	proc, err := a.ProcStore.Acquire(a.Context, a.ProcGroup(), exec1.ProcMeta{
+		StartedAt:    time.Now().Unix(),
+		Name:         a.Name,
+		DAGRunID:     a.dagRunID,
+		AttemptID:    attemptID,
+		RootName:     a.Name,
+		RootDAGRunID: a.dagRunID,
 	})
 	require.NoError(t, err, "failed to acquire proc")
 	t.Cleanup(func() {
@@ -799,6 +784,15 @@ func (a *Agent) Abort() {
 	a.Signal(a.Context, syscall.SIGTERM)
 }
 
+func newTestAttemptID(t *testing.T) string {
+	t.Helper()
+
+	b := make([]byte, 3)
+	_, err := rand.Read(b)
+	require.NoError(t, err)
+	return hex.EncodeToString(b)
+}
+
 // SyncBuffer provides thread-safe buffer operations
 type SyncBuffer struct {
 	buf  *bytes.Buffer
@@ -832,13 +826,60 @@ func createDefaultContext() context.Context {
 	))
 }
 
-// getShell returns the path to the default shell.
-func setShell(t *testing.T, shell string) {
+func testShellPath(t *testing.T) string {
 	t.Helper()
 
-	shPath, err := exec.LookPath(shell)
-	require.NoError(t, err, "failed to find shell")
-	_ = os.Setenv("SHELL", shPath)
+	if runtime.GOOS == "windows" {
+		if shPath, err := exec.LookPath("powershell"); err == nil {
+			return shPath
+		}
+		if shPath, err := exec.LookPath("cmd"); err == nil {
+			return shPath
+		}
+		t.Fatal("no suitable shell found on Windows")
+	}
+
+	shPath, err := exec.LookPath("sh")
+	require.NoError(t, err, "failed to find sh")
+	return shPath
+}
+
+func buildHelperChildEnv(base []string, daguHome, configFile, executablePath, shellPath string) []string {
+	env := append([]string{}, base...)
+	return withEnvOverrides(
+		env,
+		fmt.Sprintf("DAGU_HOME=%s", daguHome),
+		fmt.Sprintf("DAGU_CONFIG=%s", configFile),
+		fmt.Sprintf("DAGU_EXECUTABLE=%s", executablePath),
+		fmt.Sprintf("SHELL=%s", shellPath),
+		"DEBUG=true",
+		"CI=true",
+		"TZ=UTC",
+	)
+}
+
+func withEnvOverrides(base []string, overrides ...string) []string {
+	env := append([]string{}, base...)
+	indexByKey := make(map[string]int, len(env))
+	for i, entry := range env {
+		key, _, found := strings.Cut(entry, "=")
+		if found {
+			indexByKey[key] = i
+		}
+	}
+	for _, entry := range overrides {
+		key, _, found := strings.Cut(entry, "=")
+		if !found {
+			continue
+		}
+		if idx, ok := indexByKey[key]; ok {
+			env[idx] = entry
+			continue
+		}
+		indexByKey[key] = len(env)
+		env = append(env, entry)
+	}
+	return env
 }
 
 // genDAGRunID generates a new unique dag-run ID using UUID v7.

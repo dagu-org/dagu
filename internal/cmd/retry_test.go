@@ -6,6 +6,8 @@ package cmd_test
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -123,6 +125,46 @@ steps:
 		require.Equal(t, core.TriggerTypeCatchUp, latestStatus.TriggerType)
 		require.NotEmpty(t, latestStatus.Log)
 		require.FileExists(t, latestStatus.Log)
+	})
+
+	t.Run("QueuedRetryCreatesNewAttempt", func(t *testing.T) {
+		th := test.SetupCommand(t)
+
+		dagFile := th.DAG(t, `name: queued-retry-dag
+steps:
+  - name: "1"
+    command: echo queued retry
+`)
+
+		runID := "queued-retry-run"
+		attempt, err := th.DAGRunStore.CreateAttempt(th.Context, dagFile.DAG, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+		logPath := filepath.Join(th.Config.Paths.LogDir, "queued-retry-test.log")
+		require.NoError(t, os.MkdirAll(filepath.Dir(logPath), 0o750))
+
+		status := transform.NewStatusBuilder(dagFile.DAG).Create(
+			runID,
+			core.Queued,
+			0,
+			time.Time{},
+			transform.WithAttemptID(attempt.ID()),
+			transform.WithTriggerType(core.TriggerTypeRetry),
+			transform.WithQueuedAt(stringutil.FormatTime(time.Now())),
+			transform.WithLogFilePath(logPath),
+		)
+		writeStatus(t, th.Context, attempt, status)
+
+		args := []string{"retry", fmt.Sprintf("--run-id=%s", runID), dagFile.Location}
+		th.RunCommand(t, cmd.Retry(), test.CmdTest{Args: args})
+
+		latestAttempt, err := th.DAGRunStore.FindAttempt(th.Context, exec.NewDAGRunRef(dagFile.Name, runID))
+		require.NoError(t, err)
+		require.NotEqual(t, attempt.ID(), latestAttempt.ID())
+
+		latestStatus, err := latestAttempt.ReadStatus(th.Context)
+		require.NoError(t, err)
+		require.Equal(t, core.Succeeded, latestStatus.Status)
+		require.Equal(t, core.TriggerTypeRetry, latestStatus.TriggerType)
 	})
 
 	t.Run("TrueRetryKeepsRetryTriggerType", func(t *testing.T) {

@@ -130,3 +130,33 @@ func TestErrorResponse(t *testing.T) {
 	_, err = client.Request(http.MethodGet, "/")
 	require.Error(t, err)
 }
+
+func TestShutdownWhileServerStarts(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "test_shutdown_while_server_starts")
+	require.NoError(t, err)
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
+
+	unixServer, err := sock.NewServer(
+		tmpFile.Name(),
+		func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		},
+	)
+	require.NoError(t, err)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- unixServer.Serve(context.Background(), nil)
+	}()
+
+	require.NoError(t, unixServer.Shutdown(context.Background()))
+
+	select {
+	case err := <-done:
+		require.True(t, errors.Is(err, sock.ErrServerRequestedShutdown))
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for socket server to stop")
+	}
+}
