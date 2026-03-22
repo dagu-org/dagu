@@ -65,7 +65,8 @@ function groupByStatus(runs: DAGRunSummary[]): KanbanColumns {
 export function useDateKanbanData(
   date: string,
   selectedWorkspace: string,
-  isToday: boolean
+  isToday: boolean,
+  isLive: boolean
 ) {
   const appBarContext = useContext(AppBarContext);
   const { tzOffsetInSec } = useConfig();
@@ -102,7 +103,7 @@ export function useDateKanbanData(
           }),
     }
   );
-  useLiveDAGRuns(mutate, isToday);
+  useLiveDAGRuns(mutate, isLive);
 
   const typedError = useMemo(() => {
     if (!error) {
