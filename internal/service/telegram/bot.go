@@ -315,7 +315,11 @@ func (b *Bot) startTypingLoop(ctx context.Context, cs *chatState, chatID int64) 
 	cs.typingDone = done
 	cs.typingMu.Unlock()
 
-	b.sendTyping(chatID)
+	if !b.sendTypingIfCurrent(cs, gen, chatID) {
+		close(done)
+		b.finishTypingLoop(cs, gen)
+		return
+	}
 
 	refresh := b.typingDelay
 	if refresh <= 0 {
@@ -338,7 +342,9 @@ func (b *Bot) startTypingLoop(ctx context.Context, cs *chatState, chatID int64) 
 					return
 				default:
 				}
-				b.sendTyping(chatID)
+				if !b.sendTypingIfCurrent(cs, gen, chatID) {
+					return
+				}
 			}
 		}
 	}()
@@ -367,6 +373,16 @@ func (b *Bot) finishTypingLoop(cs *chatState, gen uint64) {
 		cs.typingCancel = nil
 		cs.typingDone = nil
 	}
+}
+
+func (b *Bot) sendTypingIfCurrent(cs *chatState, gen uint64, chatID int64) bool {
+	cs.typingMu.Lock()
+	defer cs.typingMu.Unlock()
+	if cs.typingLoopGen != gen || cs.typingCancel == nil {
+		return false
+	}
+	b.sendTyping(chatID)
+	return true
 }
 
 // createSession creates a new agent session and starts listening for responses.
