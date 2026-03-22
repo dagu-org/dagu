@@ -6,6 +6,7 @@ import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGRunContext } from '../../contexts/DAGRunContext';
+import { matchesRequestedDAGRunDetails } from '../../hooks/dagRunDetailsRequest';
 import { useBoundedDAGRunDetails } from '../../hooks/useBoundedDAGRunDetails';
 import DAGRunDetailsContent from './DAGRunDetailsContent';
 
@@ -62,7 +63,7 @@ function DAGRunDetailsPanel({
 
   const expectedDagRunId = isSubDAGRun ? (subDAGRunId as string) : (dagRunId || 'latest');
   const data =
-    latestDetails?.dagRunId === expectedDagRunId
+    matchesRequestedDAGRunDetails(latestDetails, expectedDagRunId)
       ? { dagRunDetails: latestDetails }
       : null;
 

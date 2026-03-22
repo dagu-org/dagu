@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isAbortLikeError } from '@/lib/requestTimeout';
 import {
@@ -108,6 +111,10 @@ export function useBoundedDAGRunDetails({
 
     const request = targetRef.current;
     const promise = (async () => {
+      let shouldContinue = false;
+      let shouldRunPending = false;
+      let shouldScheduleNextPoll = false;
+
       try {
         const next = await fetchDAGRunDetails(request, {
           signal: controller.signal,
@@ -131,25 +138,30 @@ export function useBoundedDAGRunDetails({
           controllerRef.current = null;
         }
         inFlightRef.current = null;
-        if (!mountedRef.current) {
-          return;
-        }
-        setIsLoading(false);
-        setIsValidating(false);
-
-        if (pendingRef.current) {
-          pendingRef.current = false;
-          void runFetch();
-          return;
-        }
-
-        if (
+        shouldContinue = mountedRef.current;
+        shouldRunPending = pendingRef.current;
+        pendingRef.current = false;
+        shouldScheduleNextPoll =
+          !shouldRunPending &&
           enabledRef.current &&
           targetRef.current != null &&
-          pollIntervalRef.current > 0
-        ) {
-          schedulePoll(runFetch);
+          pollIntervalRef.current > 0;
+
+        if (shouldContinue) {
+          setIsLoading(false);
+          setIsValidating(false);
         }
+      }
+
+      if (!shouldContinue) {
+        return;
+      }
+      if (shouldRunPending) {
+        void runFetch();
+        return;
+      }
+      if (shouldScheduleNextPoll) {
+        schedulePoll(runFetch);
       }
     })();
 
@@ -186,7 +198,6 @@ export function useBoundedDAGRunDetails({
   ]);
 
   useEffect(() => {
-    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       clearPollTimer();

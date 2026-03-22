@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 const READ_METHODS = new Set(['GET', 'HEAD']);
 
 export const DEFAULT_READ_TIMEOUT_MS = 10_000;

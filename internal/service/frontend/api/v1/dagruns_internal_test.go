@@ -210,3 +210,51 @@ func TestAPIListDAGRunsReturnsGatewayTimeoutWhenReadDeadlineExpires(t *testing.T
 	require.Equal(t, openapiv1.ErrorCodeTimeout, timeoutResp.Body.Code)
 	require.Equal(t, "dag-run list request timed out", timeoutResp.Body.Message)
 }
+
+type blockingLatestAttemptStore struct {
+	blockingDAGRunStore
+}
+
+func (blockingLatestAttemptStore) LatestAttempt(ctx context.Context, _ string) (exec.DAGRunAttempt, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestWithDAGRunReadTimeoutReturnsDeadlineExceededOnLateSuccess(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+	defer cancel()
+
+	_, err := withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint: "/dag-runs/{name}/{dagRunId}",
+	}, func(readCtx context.Context) (string, error) {
+		<-readCtx.Done()
+		return "late-success", nil
+	})
+
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestGetDAGRunDetailsReturnsClientClosedRequestWhenReadCanceled(t *testing.T) {
+	t.Parallel()
+
+	api := &API{
+		dagRunStore: blockingLatestAttemptStore{},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	resp, err := api.GetDAGRunDetails(ctx, openapiv1.GetDAGRunDetailsRequestObject{
+		Name:     "test",
+		DagRunId: "latest",
+	})
+	require.NoError(t, err)
+
+	canceledResp, ok := resp.(*openapiv1.GetDAGRunDetailsdefaultJSONResponse)
+	require.True(t, ok)
+	require.Equal(t, statusClientClosedRequest, canceledResp.StatusCode)
+	require.Equal(t, openapiv1.ErrorCodeInternalError, canceledResp.Body.Code)
+	require.Equal(t, "dag-run details request canceled", canceledResp.Body.Message)
+}

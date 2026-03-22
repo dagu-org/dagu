@@ -4,6 +4,7 @@ import { AppBarContext } from '../../../contexts/AppBarContext';
 import { usePageContext } from '../../../contexts/PageContext';
 import { DAGRunDetailsContent } from '../../../features/dag-runs/components/dag-run-details';
 import { DAGRunContext } from '../../../features/dag-runs/contexts/DAGRunContext';
+import { matchesRequestedDAGRunDetails } from '../../../features/dag-runs/hooks/dagRunDetailsRequest';
 import { useBoundedDAGRunDetails } from '../../../features/dag-runs/hooks/useBoundedDAGRunDetails';
 
 type ApiError = {
@@ -93,7 +94,9 @@ function DAGRunDetailsPage() {
 
   const expectedDagRunId = subDAGRunId || dagRunId || 'latest';
   const dagRunDetails =
-    latestDetails?.dagRunId === expectedDagRunId ? latestDetails : null;
+    matchesRequestedDAGRunDetails(latestDetails, expectedDagRunId)
+      ? latestDetails
+      : null;
   const displayDAGRunId = subDAGRunId || dagRunId || '';
 
   function getDisplayName(): string {

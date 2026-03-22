@@ -108,12 +108,11 @@ export function StepDetailsTooltip({
 
     setDetails(null);
     setError(null);
-    setIsLoading(false);
+    setIsLoading(true);
 
     fetchTimerRef.current = setTimeout(() => {
       const controller = new AbortController();
       controllerRef.current = controller;
-      setIsLoading(true);
 
       void fetchDAGRunDetails(
         {
@@ -143,8 +142,8 @@ export function StepDetailsTooltip({
         .finally(() => {
           if (controllerRef.current === controller) {
             controllerRef.current = null;
+            setIsLoading(false);
           }
-          setIsLoading(false);
         });
     }, HOVER_FETCH_DELAY_MS);
 

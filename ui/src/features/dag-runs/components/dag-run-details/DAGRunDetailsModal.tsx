@@ -10,6 +10,7 @@ import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcut
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGRunContext } from '../../contexts/DAGRunContext';
 import { useBoundedDAGRunDetails } from '../../hooks/useBoundedDAGRunDetails';
+import { matchesRequestedDAGRunDetails } from '../../hooks/dagRunDetailsRequest';
 import DAGRunDetailsContent from './DAGRunDetailsContent';
 
 type DAGRunDetailsModalProps = {
@@ -102,7 +103,9 @@ function DAGRunDetailsModal({
 
   const expectedDagRunId = canQuerySubDag ? (subDAGRunId ?? '') : (dagRunId || 'latest');
   const freshDetails =
-    latestDetails?.dagRunId === expectedDagRunId ? latestDetails : null;
+    matchesRequestedDAGRunDetails(latestDetails, expectedDagRunId)
+      ? latestDetails
+      : null;
   const displayData = freshDetails ?? previousDataRef.current?.dagRunDetails;
   const displayName = freshDetails ? name : (previousDataRef.current?.name ?? name);
   const displayDagRunId = freshDetails ? dagRunId : (previousDataRef.current?.dagRunId ?? dagRunId);

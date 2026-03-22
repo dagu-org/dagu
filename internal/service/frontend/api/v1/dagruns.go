@@ -42,6 +42,7 @@ import (
 var filenameUnsafeChars = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
 
 const dagRunReadTimeout = 10 * time.Second
+const statusClientClosedRequest = 499
 
 type dagRunReadRequestInfo struct {
 	endpoint    string
@@ -81,6 +82,19 @@ func withDAGRunReadTimeout[T any](
 
 	startedAt := time.Now()
 	result, err := read(readCtx)
+	if readErr := readCtx.Err(); readErr != nil {
+		duration := time.Since(startedAt)
+		switch {
+		case errors.Is(readErr, context.DeadlineExceeded):
+			logger.Warn(ctx, "DAG run read timed out", info.attrs(duration)...)
+			var zero T
+			return zero, context.DeadlineExceeded
+		case errors.Is(readErr, context.Canceled):
+			logger.Warn(ctx, "DAG run read canceled", info.attrs(duration)...)
+			var zero T
+			return zero, context.Canceled
+		}
+	}
 	if err == nil {
 		return result, nil
 	}
@@ -103,6 +117,13 @@ func withDAGRunReadTimeout[T any](
 func dagRunReadTimeoutResponse(message string) api.Error {
 	return api.Error{
 		Code:    api.ErrorCodeTimeout,
+		Message: message,
+	}
+}
+
+func dagRunReadCanceledResponse(message string) api.Error {
+	return api.Error{
+		Code:    api.ErrorCodeInternalError,
 		Message: message,
 	}
 }
@@ -1364,6 +1385,12 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 		return a.getDAGRunDetailsData(readCtx, request.Name, request.DagRunId)
 	})
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return &api.GetDAGRunDetailsdefaultJSONResponse{
+				StatusCode: statusClientClosedRequest,
+				Body:       dagRunReadCanceledResponse("dag-run details request canceled"),
+			}, nil
+		}
 		if errors.Is(err, context.DeadlineExceeded) {
 			return &api.GetDAGRunDetailsdefaultJSONResponse{
 				StatusCode: http.StatusGatewayTimeout,
@@ -1452,6 +1479,12 @@ func (a *API) GetSubDAGRunDetails(ctx context.Context, request api.GetSubDAGRunD
 		return a.dagRunMgr.FindSubDAGRunStatus(readCtx, root, request.SubDAGRunId)
 	})
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return &api.GetSubDAGRunDetailsdefaultJSONResponse{
+				StatusCode: statusClientClosedRequest,
+				Body:       dagRunReadCanceledResponse("sub dag-run details request canceled"),
+			}, nil
+		}
 		if errors.Is(err, context.DeadlineExceeded) {
 			return &api.GetSubDAGRunDetailsdefaultJSONResponse{
 				StatusCode: http.StatusGatewayTimeout,

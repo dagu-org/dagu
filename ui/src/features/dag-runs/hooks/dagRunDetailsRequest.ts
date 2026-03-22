@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { components } from '@/api/v1/schema';
 import fetchJson from '@/lib/fetchJson';
 
@@ -15,6 +18,16 @@ export type DAGRunDetailsRequestTarget = {
 type DAGRunDetailsResponse = {
   dagRunDetails: DAGRunDetails;
 };
+
+export function matchesRequestedDAGRunDetails(
+  details: DAGRunDetails | null | undefined,
+  requestedDagRunId: string
+): boolean {
+  if (!details) {
+    return false;
+  }
+  return requestedDagRunId === 'latest' || details.dagRunId === requestedDagRunId;
+}
 
 function buildQueryString(remoteNode: string): string {
   return new URLSearchParams({ remoteNode }).toString();
