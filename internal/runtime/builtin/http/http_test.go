@@ -35,7 +35,7 @@ func TestHTTPExecutor_SkipTLSVerify(t *testing.T) {
 				Config: map[string]any{
 					"skip_tls_verify": true,
 					"silent":          true,
-					"json":            true,
+					"format":          "json",
 				},
 			},
 		}
@@ -257,7 +257,7 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 			ExecutorConfig: core.ExecutorConfig{
 				Type: "http",
 				Config: map[string]any{
-					"json":   true,
+					"format": "json",
 					"silent": false, // Don't suppress headers for this test
 				},
 			},
@@ -333,6 +333,42 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 		assert.Contains(t, output, "Internal Server Error")
 
 		t.Logf("Platform: %s, Error handling verified", runtime.GOOS)
+	})
+
+	t.Run("LegacyJSONBooleanCompatibility", func(t *testing.T) {
+		server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, _ *nethttp.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(nethttp.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]string{"message": "legacy"})
+		}))
+		defer server.Close()
+
+		step := core.Step{
+			Commands: []core.CommandEntry{{Command: "GET", Args: []string{server.URL}}},
+			ExecutorConfig: core.ExecutorConfig{
+				Type: "http",
+				Config: map[string]any{
+					"json": true,
+				},
+			},
+		}
+
+		executor, err := newHTTP(context.Background(), step)
+		require.NoError(t, err)
+
+		out := &testWriter{}
+		httpExec, ok := executor.(*http)
+		require.True(t, ok)
+		httpExec.SetStdout(out)
+		httpExec.SetStderr(&testWriter{})
+
+		err = httpExec.Run(context.Background())
+		assert.NoError(t, err)
+
+		var jsonResponse httpJSONResult
+		err = json.Unmarshal([]byte(out.String()), &jsonResponse)
+		assert.NoError(t, err)
+		assert.Equal(t, 200, jsonResponse.StatusCode)
 	})
 }
 
