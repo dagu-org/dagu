@@ -172,12 +172,12 @@ steps:
 		f.StartScheduler(40 * time.Second)
 		defer f.Stop()
 
-		require.Eventually(t, func() bool {
-			status := f.MustStatus(runID)
+		_, err := f.WaitForStatusMatch(runID, 25*time.Second, func(status *exec.DAGRunStatus) bool {
 			return status.Status == core.Succeeded &&
 				status.AttemptID != originalAttemptID &&
 				status.AutoRetryCount == 1
-		}, 25*time.Second, 250*time.Millisecond)
+		})
+		require.NoError(t, err)
 
 		f.WaitDrain(5 * time.Second)
 
@@ -219,12 +219,12 @@ steps:
 		f.StartScheduler(40 * time.Second)
 		defer f.Stop()
 
-		require.Eventually(t, func() bool {
-			status := f.MustStatus(runID)
+		_, err := f.WaitForStatusMatch(runID, 25*time.Second, func(status *exec.DAGRunStatus) bool {
 			return status.Status == core.Succeeded &&
 				status.AttemptID != originalAttemptID &&
 				status.AutoRetryCount == 1
-		}, 25*time.Second, 250*time.Millisecond)
+		})
+		require.NoError(t, err)
 
 		latest := f.MustStatus(runID)
 		assert.Equal(t, core.Succeeded, latest.Status)
@@ -274,12 +274,12 @@ steps:
 		f.StartScheduler(35 * time.Second)
 		defer f.Stop()
 
-		require.Eventually(t, func() bool {
-			status := f.MustStatus(runID)
+		_, err := f.WaitForStatusMatch(runID, 25*time.Second, func(status *exec.DAGRunStatus) bool {
 			return status.Status == core.Succeeded &&
 				status.AttemptID != originalAttemptID &&
 				status.AutoRetryCount == 1
-		}, 25*time.Second, 250*time.Millisecond)
+		})
+		require.NoError(t, err)
 
 		latest := f.MustStatus(runID)
 		assert.Equal(t, core.Succeeded, latest.Status)
